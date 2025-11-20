@@ -1,0 +1,36 @@
+module;
+
+#include <string_view>
+#include "RHI/RHI.Vulkan.hpp"
+
+export module Runtime.RHI.Context;
+
+import Core.Window; // We need this to know required extensions
+
+namespace Runtime::RHI {
+
+    export struct ContextConfig {
+        std::string_view AppName = "Intrinsic Engine";
+        bool EnableValidation = true;
+    };
+
+    export class VulkanContext {
+    public:
+        VulkanContext(const ContextConfig& config, Core::Windowing::Window& window);
+        ~VulkanContext();
+
+        // No copy
+        VulkanContext(const VulkanContext&) = delete;
+        VulkanContext& operator=(const VulkanContext&) = delete;
+
+        [[nodiscard]] VkInstance GetInstance() const { return m_Instance; }
+
+    private:
+        VkInstance m_Instance = VK_NULL_HANDLE;
+        VkDebugUtilsMessengerEXT m_DebugMessenger = VK_NULL_HANDLE;
+        
+        // Internal helpers
+        void CreateInstance(const ContextConfig& config);
+        void SetupDebugMessenger();
+    };
+}

@@ -1,0 +1,40 @@
+# Define the library
+set(target_name IntrinsicCore)
+add_library(${target_name})
+
+# Enable Module Scanning JUST for this target
+set_target_properties(${target_name} PROPERTIES CXX_SCAN_FOR_MODULES ON)
+
+# Apply Strict Flags ONLY to our code
+target_compile_options(${target_name} PRIVATE ${INTRINSIC_COMPILE_OPTIONS})
+
+# Setup Sources
+target_sources(${target_name}
+        PUBLIC
+        FILE_SET CXX_MODULES
+        FILES
+        Core.Memory.cppm
+        Core.Logging.cppm
+        Core.Tasks.cppm
+        Core.Window.cppm
+        PRIVATE
+        Core.Memory.cpp
+        Core.Tasks.cpp
+        Core.Window.cpp
+)
+
+# Link Dependencies
+target_link_libraries(${target_name}
+        PUBLIC
+        glm::glm
+        glfw
+        PRIVATE
+        Vulkan::Vulkan
+        # Telemetry libs will go here
+)
+
+# Compile Features
+target_compile_features(${target_name} PUBLIC cxx_std_23)
+
+# Note: Since we disabled exceptions globally, if any external lib needs them,
+# we might need to wrap includes, but GLM is fine.

@@ -1,0 +1,22 @@
+set(target_name IntrinsicTests)
+
+enable_testing()
+
+add_executable(${target_name}
+        Test_CoreMemory.cpp
+        Test_CoreTasks.cpp
+)
+
+#Apply Strict Flags ONLY to our tests
+target_compile_options(${target_name} PRIVATE ${INTRINSIC_COMPILE_OPTIONS})
+
+# Link against the Core Engine and GTest
+target_link_libraries(${target_name}
+        PRIVATE
+        IntrinsicCore
+        GTest::gtest_main
+)
+
+# Helper to run tests via CTest
+include(GoogleTest)
+gtest_discover_tests(${target_name})
