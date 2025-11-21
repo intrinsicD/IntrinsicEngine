@@ -22,6 +22,10 @@ target_sources(${target_name}
         RHI/RHI.Texture.cppm
         ECS/ECS.Components.cppm
         ECS/ECS.Scene.cppm
+        Graphics/Graphics.Material.cppm
+        Graphics/Graphics.Mesh.cppm
+        Graphics/Graphics.RenderSystem.cppm
+        Runtime.Engine.cppm
         PRIVATE
         RHI/RHI.Context.cpp
         RHI/RHI.Device.cpp
@@ -34,6 +38,10 @@ target_sources(${target_name}
         RHI/RHI.Descriptors.cpp
         RHI/RHI.Image.cpp
         RHI/RHI.Texture.cpp
+        Graphics/Graphics.Material.cpp
+        Graphics/Graphics.Mesh.cpp
+        Graphics/Graphics.RenderSystem.cpp
+        Runtime.Engine.cpp
 )
 
 target_include_directories(${target_name} PUBLIC .)

@@ -6,6 +6,8 @@ module;
 export module Runtime.ECS.Components;
 
 import Runtime.RHI.Buffer;
+import Runtime.Graphics.Mesh;
+import Runtime.Graphics.Material;
 
 export namespace Runtime::ECS
 {
@@ -29,14 +31,8 @@ export namespace Runtime::ECS
         }
     };
 
-    // Simple pointer to the mesh data (In reality, this would be a Resource Handle)
-    struct MeshComponent
-    {
-        // We store raw pointers just to link ECS to our RHI resources for this step
-        // In the future, use AssetID
-        // Note: We don't own these resources here!
-        class Runtime::RHI::VulkanBuffer* VertexBuffer;
-        class Runtime::RHI::VulkanBuffer* IndexBuffer;
-        uint32_t IndexCount;
+    struct MeshRendererComponent {
+        Graphics::Mesh* MeshRef;
+        Graphics::Material* MaterialRef;
     };
 }

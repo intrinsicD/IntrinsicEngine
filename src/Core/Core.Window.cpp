@@ -129,4 +129,10 @@ namespace Core::Windowing
         }
         return true;
     }
+
+    void Window::SetTitle(const std::string& title) const
+    {
+        glfwSetWindowTitle(static_cast<GLFWwindow*>(GetNativeHandle()), title.c_str());
+    }
+
 }

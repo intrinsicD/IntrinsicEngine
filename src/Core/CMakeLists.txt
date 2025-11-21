@@ -18,10 +18,12 @@ target_sources(${target_name}
         Core.Tasks.cppm
         Core.Window.cppm
         Core.Filesystem.cppm
+        Core.Input.cppm
         PRIVATE
         Core.Memory.cpp
         Core.Tasks.cpp
         Core.Window.cpp
+        Core.Input.cpp
 )
 
 # Link Dependencies

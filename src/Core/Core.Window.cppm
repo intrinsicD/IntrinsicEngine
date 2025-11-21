@@ -1,7 +1,6 @@
 module;
 #include <string>
 #include <functional>
-#include <utility>
 
 export module Core.Window;
 
@@ -54,6 +53,8 @@ namespace Core::Windowing
 
         // Set the function that the Window calls when something happens
         void SetEventCallback(const EventCallbackFn& callback) { m_Data.Callback = callback; }
+
+        void SetTitle(const std::string& title) const;
 
         // We use void* to avoid including vulkan.h in the module interface
         // instance is a VkInstance, allocator is VkAllocationCallbacks*
