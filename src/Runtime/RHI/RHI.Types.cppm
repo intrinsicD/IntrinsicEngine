@@ -10,6 +10,7 @@ export namespace Runtime::RHI {
     struct Vertex {
         glm::vec3 pos;
         glm::vec3 color;
+        glm::vec2 texCoord;
 
         static VkVertexInputBindingDescription GetBindingDescription() {
             VkVertexInputBindingDescription bindingDescription{};
@@ -20,27 +21,36 @@ export namespace Runtime::RHI {
         }
 
         static std::vector<VkVertexInputAttributeDescription> GetAttributeDescriptions() {
-            std::vector<VkVertexInputAttributeDescription> attributeDescriptions(2);
+            std::vector<VkVertexInputAttributeDescription> attributeDescriptions(3);
 
-            // Position: Location 0, Format vec2
+            // 0: Pos (vec3)
             attributeDescriptions[0].binding = 0;
             attributeDescriptions[0].location = 0;
-            attributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
+            attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
             attributeDescriptions[0].offset = offsetof(Vertex, pos);
 
-            // Color: Location 1, Format vec3
+            // 1: Color (vec3)
             attributeDescriptions[1].binding = 0;
             attributeDescriptions[1].location = 1;
             attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
             attributeDescriptions[1].offset = offsetof(Vertex, color);
 
+            // 2: TexCoord (vec2)
+            attributeDescriptions[2].binding = 0;
+            attributeDescriptions[2].location = 2;
+            attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
+            attributeDescriptions[2].offset = offsetof(Vertex, texCoord);
+
             return attributeDescriptions;
         }
     };
 
-    struct UniformBufferObject {
-        alignas(16) glm::mat4 model;
+    struct CameraBufferObject {
         alignas(16) glm::mat4 view;
         alignas(16) glm::mat4 proj;
+    };
+
+    struct MeshPushConstants {
+        glm::mat4 model;
     };
 }

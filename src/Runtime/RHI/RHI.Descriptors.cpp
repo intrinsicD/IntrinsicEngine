@@ -1,5 +1,6 @@
 module;
 #include "RHI/RHI.Vulkan.hpp"
+#include <vector>
 
 module Runtime.RHI.Descriptors;
 import Core.Logging;
@@ -9,17 +10,33 @@ namespace Runtime::RHI {
     // --- Descriptor Layout ---
     DescriptorLayout::DescriptorLayout(VulkanDevice& device) : m_Device(device) {
         // Define Binding 0: Vertex Shader Uniform Buffer
-        VkDescriptorSetLayoutBinding uboLayoutBinding{};
+        /*VkDescriptorSetLayoutBinding uboLayoutBinding{};
         uboLayoutBinding.binding = 0;
         uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         uboLayoutBinding.descriptorCount = 1;
         uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-        uboLayoutBinding.pImmutableSamplers = nullptr;
+        uboLayoutBinding.pImmutableSamplers = nullptr;*/
+
+
+        std::vector<VkDescriptorSetLayoutBinding> bindings(2);
+
+        // 0: UBO
+        bindings[0].binding = 0;
+        bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        bindings[0].descriptorCount = 1;
+        bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+        // 1: Texture Sampler
+        bindings[1].binding = 1;
+        bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        bindings[1].descriptorCount = 1;
+        bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        bindings[1].pImmutableSamplers = nullptr;
 
         VkDescriptorSetLayoutCreateInfo layoutInfo{};
         layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-        layoutInfo.bindingCount = 1;
-        layoutInfo.pBindings = &uboLayoutBinding;
+        layoutInfo.bindingCount = 2;
+        layoutInfo.pBindings = bindings.data();
 
         if (vkCreateDescriptorSetLayout(m_Device.GetLogicalDevice(), &layoutInfo, nullptr, &m_Layout) != VK_SUCCESS) {
             Core::Log::Error("Failed to create descriptor set layout!");
@@ -33,14 +50,16 @@ namespace Runtime::RHI {
     // --- Descriptor Pool ---
     DescriptorPool::DescriptorPool(VulkanDevice& device) : m_Device(device) {
         // We allocate enough space for a few frames.
-        VkDescriptorPoolSize poolSize{};
-        poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        poolSize.descriptorCount = 100; // Arbitrary size for sandbox
+        std::vector<VkDescriptorPoolSize> poolSizes(2);
+        poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        poolSizes[0].descriptorCount = 100;
+        poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        poolSizes[1].descriptorCount = 100;
 
         VkDescriptorPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-        poolInfo.poolSizeCount = 1;
-        poolInfo.pPoolSizes = &poolSize;
+        poolInfo.poolSizeCount = 2;
+        poolInfo.pPoolSizes = poolSizes.data();
         poolInfo.maxSets = 100; 
 
         if (vkCreateDescriptorPool(m_Device.GetLogicalDevice(), &poolInfo, nullptr, &m_Pool) != VK_SUCCESS) {

@@ -19,6 +19,9 @@ target_sources(${target_name}
         RHI/RHI.Pipeline.cppm
         RHI/RHI.Descriptors.cppm
         RHI/RHI.Image.cppm
+        RHI/RHI.Texture.cppm
+        ECS/ECS.Components.cppm
+        ECS/ECS.Scene.cppm
         PRIVATE
         RHI/RHI.Context.cpp
         RHI/RHI.Device.cpp
@@ -30,17 +33,22 @@ target_sources(${target_name}
         RHI/RHI.Vma.cpp
         RHI/RHI.Descriptors.cpp
         RHI/RHI.Image.cpp
+        RHI/RHI.Texture.cpp
 )
 
 target_include_directories(${target_name} PUBLIC .)
 
-target_include_directories(IntrinsicRuntime SYSTEM PUBLIC ${vma_SOURCE_DIR}/include)
+target_include_directories(${target_name} SYSTEM PUBLIC
+        ${vma_SOURCE_DIR}/include
+        ${stb_SOURCE_DIR}
+)
 
 target_link_libraries(${target_name}
         PUBLIC
         IntrinsicCore
         volk
         Vulkan::Vulkan
+        EnTT::EnTT
 )
 
 target_compile_features(${target_name} PUBLIC cxx_std_23)

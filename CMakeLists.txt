@@ -123,6 +123,20 @@ if(NOT vma_POPULATED)
     FetchContent_Populate(vma)
 endif()
 
+FetchContent_Declare(
+    stb
+    GIT_REPOSITORY https://github.com/nothings/stb.git
+    GIT_TAG master
+)
+FetchContent_MakeAvailable(stb)
+
+FetchContent_Declare(
+        entt
+        GIT_REPOSITORY https://github.com/skypjack/entt.git
+        GIT_TAG v3.13.0 # Use a stable tag
+)
+FetchContent_MakeAvailable(entt)
+
 # ------------------------------------------------------------------------------
 # Subdirectories
 # ------------------------------------------------------------------------------

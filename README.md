@@ -1,128 +1,109 @@
-Here is a comprehensive `README.md` tailored to your project's specific architecture and bleeding-edge toolchain.
-
-***
-
 # Intrinsic Engine
 
-**Intrinsic** is a Next-Gen Research & Rendering Engine built with Modern C++ (C++23) and Vulkan. It features a Data-Oriented architecture, a custom fiber-based task system, and a hybrid rendering graph.
+**Intrinsic** is a Next-Gen Research & Rendering Engine built with **Modern C++ (C++23 Modules)** and **Vulkan 1.3**. It features a Data-Oriented architecture, a custom fiber-based task system, and a hybrid rendering graph.
 
 ## 🏗 Architecture
 
 *   **Core:** Zero-overhead abstractions (C++20 Modules, Concepts).
-*   **Memory:** Linear Arena Allocators (No `malloc` in the hot path).
-*   **Tasks:** Fiber-based parallel job system.
-*   **RHI:** Vulkan 1.3 (via `volk` meta-loader) with dynamic binding.
+*   **Memory:** Linear Arena Allocators & VMA integration.
+*   **RHI:** Vulkan 1.3 Dynamic Rendering (via `volk` & `vk_mem_alloc`).
+*   **Pipeline:** Descriptor-based bindless-ready architecture.
 
-## 🚀 Prerequisites (Linux / Ubuntu)
+---
 
-This engine uses **C++23 Modules**, which requires a very recent compiler and build system.
+## 🐧 Ubuntu Setup Guide
 
-### 1. System Tools & Build System
-You need CMake 3.28+ and Ninja.
+This engine uses **Bleeding Edge** C++ features (Modules, `std::format`, `std::expected`). The default compilers in Ubuntu 22.04/24.04 are often too old.
+
+### 1. Install Prerequisites
+You need **CMake 3.28+**, **Ninja**, and the **Vulkan SDK**.
 
 ```bash
+# Basic Build Tools
 sudo apt update
 sudo apt install build-essential cmake ninja-build git
-```
 
-### 2. Compiler (Bleeding Edge)
-**Strict Requirement:** Clang 17+ or GCC 14+.
-*Recommended Environment:* Clang 20+ (nightly) or GCC 14.
-
-If using LLVM/Clang, you **must** install the matching `clang-tools` package to get `clang-scan-deps` (required for module scanning).
-
-```bash
-# Example for LLVM (Adjust version number as needed, e.g., -18, -19, -22)
-sudo apt install clang-18 clang-tools-18 libstdc++-12-dev
-```
-
-### 3. Vulkan SDK
-Required for the Render Hardware Interface.
-
-```bash
-# Install Vulkan loader, utils, and validation layers
+# Vulkan SDK & Drivers
 sudo apt install vulkan-tools libvulkan-dev vulkan-validationlayers-dev spirv-tools
+
+# Windowing Dependencies (GLFW)
+sudo apt install libwayland-dev libxkbcommon-dev xorg-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev
 ```
 
-### 4. Windowing Dependencies (GLFW)
-Although CMake fetches GLFW automatically, you need the system headers for it to compile on Linux.
+### 2. Install Bleeding Edge Compiler (LLVM/Clang)
+We require **Clang 18+** (tested on Clang 22). We also need the **GCC 14 Standard Library** because Clang uses the system's STL, and older versions lack `<format>`.
 
 ```bash
-# X11 and Wayland dependencies
-sudo apt install libwayland-dev libxkbcommon-dev xorg-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev
+# 1. Add LLVM repository (automated script)
+wget https://apt.llvm.org/llvm.sh
+chmod +x llvm.sh
+sudo ./llvm.sh 18  # Or 19/20/21/22 if available
+
+# 2. Add GCC Toolchain PPA (Required for C++23 STL headers like <format>)
+sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+sudo apt update
+sudo apt install libstdc++-14-dev
+
+# 3. Install Clang Tools (Critical for C++ Module Scanning)
+# Replace '18' with your installed version
+sudo apt install clang-tools-18
 ```
 
 ---
 
 ## 🛠 Building the Engine
 
-1.  **Clone the Repository:**
-    ```bash
-    git clone https://github.com/YourUsername/IntrinsicEngine.git
-    cd IntrinsicEngine
-    ```
+### 1. Clone
+```bash
+git clone https://github.com/YourUsername/IntrinsicEngine.git
+cd IntrinsicEngine
+```
 
-2.  **Configure (CMake):**
-    We strongly recommend using `Ninja` and explicit compilers if your system has multiple versions.
-
-    ```bash
-    # Create build directory
-    mkdir build && cd build
-
-    # Configure Debug build (Substitute clang++-22 with your version)
-    cmake -G "Ninja" \
-        -DCMAKE_BUILD_TYPE=Debug \
-        -DCMAKE_C_COMPILER=clang-22 \
-        -DCMAKE_CXX_COMPILER=clang++-22 \
-        ..
-    ```
-
-3.  **Build:**
-    ```bash
-    ninja
-    ```
-
-### Running the Sandbox
-The build output is located in `build/bin`.
+### 2. Configure
+We must explicitly tell CMake which compiler and **Dependency Scanner** to use.
 
 ```bash
-cd bin
-./Sandbox
+mkdir build && cd build
+
+# Replace 'clang++-18' and 'clang-scan-deps-18' with your specific version
+cmake -G "Ninja" \
+    -DCMAKE_BUILD_TYPE=Debug \
+    -DCMAKE_C_COMPILER=clang-18 \
+    -DCMAKE_CXX_COMPILER=clang++-18 \
+    -DCMAKE_CXX_COMPILER_CLANG_SCAN_DEPS=/usr/bin/clang-scan-deps-18 \
+    ..
+```
+
+*Note: If you are using CLion, go to **Settings -> Build, Execution, Deployment -> CMake** and add `-DCMAKE_CXX_COMPILER_CLANG_SCAN_DEPS=/usr/bin/clang-scan-deps-18` to the "CMake options" field.*
+
+### 3. Build & Run
+```bash
+ninja
+./bin/Sandbox
 ```
 
 ---
 
-## 🧩 Troubleshooting
+## 🧩 Common Issues
 
-### "Permission denied" / `clang-scan-deps` not found
-CMake needs to scan C++ modules to build the dependency graph. If it cannot find the scanner:
+### `fatal error: 'format' file not found`
+**Cause:** Your `libstdc++` is too old (GCC 11/12).
+**Fix:** Install `libstdc++-14-dev`.
 
-1.  Ensure `clang-tools-XX` is installed.
-2.  Check where the binary is: `ls /usr/bin/clang-scan-deps*`
-3.  Force CMake to use it:
-    ```bash
-    cmake -G "Ninja" -DCMAKE_CXX_COMPILER_CLANG_SCAN_DEPS=/usr/bin/clang-scan-deps-22 ..
-    ```
+### `/bin/sh: 1: : Permission denied`
+**Cause:** CMake cannot find `clang-scan-deps`.
+**Fix:** Ensure you installed `clang-tools-XX` and passed the `-DCMAKE_CXX_COMPILER_CLANG_SCAN_DEPS` flag pointing to it.
 
-### Vulkan Initialization Errors
-If the engine logs `[Vulkan Error]`, ensure you have a GPU driver that supports Vulkan 1.3.
-*   **NVIDIA:** `sudo apt install nvidia-driver-535` (or newer)
-*   **AMD/Intel:** `sudo apt install mesa-vulkan-drivers`
-
-### CLion Setup
-1.  **Toolchain:** Set "Generator" to **Ninja**.
-2.  **CMake Options:** Add `-DCMAKE_CXX_COMPILER_CLANG_SCAN_DEPS=/usr/bin/clang-scan-deps-XX` to the CMake options in Settings.
-3.  **Environment:** Ensure `CC` and `CXX` point to your modern compiler.
+### `Validation Error: Dynamic viewport/scissor...`
+**Cause:** The renderer failed to set dynamic state.
+**Fix:** Ensure `renderer.SetViewport()` is called every frame inside the render loop.
 
 ---
 
 ## 📦 Third-Party Libraries
-The engine automatically fetches and compiles these dependencies (no manual installation required):
+The engine automatically fetches and compiles these dependencies via CMake FetchContent:
 *   **GLFW:** Windowing & Input.
-*   **GLM:** Mathematics (SIMD optimized).
-*   **Volk:** Meta-loader for Vulkan.
-*   **GoogleTest:** Unit Testing framework.
-
-## Codex
-put into .bashrc or .zshrc for easy access:
-alias architect="codex run --model gpt-5.1-codex-max --auto-fix --verification-command 'ninja -C cmake-build-debug'"
+*   **GLM:** Mathematics.
+*   **Volk:** Vulkan Meta-Loader.
+*   **VulkanMemoryAllocator (VMA):** GPU Memory Management.
+*   **GoogleTest:** Unit Testing.

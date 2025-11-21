@@ -2,8 +2,9 @@ module;
 #include "RHI.Vulkan.hpp"
 
 module Runtime.RHI.Renderer;
-import Core.Logging;
 import Runtime.RHI.Image;
+import Runtime.RHI.CommandUtils;
+import Core.Logging;
 
 namespace Runtime::RHI
 {
@@ -51,70 +52,6 @@ namespace Runtime::RHI
         vkCreateSemaphore(m_Device.GetLogicalDevice(), &semaphoreInfo, nullptr, &m_RenderFinishedSemaphore);
         vkCreateFence(m_Device.GetLogicalDevice(), &fenceInfo, nullptr, &m_InFlightFence);
     }
-void SimpleRenderer::TransitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout) {
-        // 1. Declare and Initialize Barrier FIRST
-        VkImageMemoryBarrier2 barrier{};
-        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-        barrier.oldLayout = oldLayout;
-        barrier.newLayout = newLayout;
-        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barrier.image = image;
-
-        barrier.subresourceRange.baseMipLevel = 0;
-        barrier.subresourceRange.levelCount = 1;
-        barrier.subresourceRange.baseArrayLayer = 0;
-        barrier.subresourceRange.layerCount = 1;
-
-        // 2. Determine Aspect Mask and Destination Stages (Based on New Layout)
-        if (newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) {
-            barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-
-            barrier.dstStageMask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT;
-            barrier.dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-        }
-        else {
-            barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-
-            if (newLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL) {
-                barrier.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-                barrier.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
-            }
-            else if (newLayout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR) {
-                barrier.dstStageMask = VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT;
-                barrier.dstAccessMask = 0;
-            }
-            else {
-                barrier.dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-                barrier.dstAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_MEMORY_READ_BIT;
-            }
-        }
-
-        // 3. Determine Source Stages (Based on Old Layout)
-        if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED) {
-            barrier.srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
-            barrier.srcAccessMask = 0;
-        }
-        else if (oldLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL) {
-            barrier.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-            barrier.srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
-        }
-        else if (oldLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) {
-            barrier.srcStageMask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT;
-            barrier.srcAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-        }
-        else {
-            barrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-            barrier.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
-        }
-
-        VkDependencyInfo depInfo{};
-        depInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-        depInfo.imageMemoryBarrierCount = 1;
-        depInfo.pImageMemoryBarriers = &barrier;
-
-        vkCmdPipelineBarrier2(m_CommandBuffer, &depInfo);
-    }
 
     void SimpleRenderer::BeginFrame()
     {
@@ -154,12 +91,12 @@ void SimpleRenderer::TransitionImageLayout(VkImage image, VkImageLayout oldLayou
         VkImage currentImage = m_Swapchain.GetImages()[m_ImageIndex];
 
         // 4. Barrier: Undefined -> Color Attachment (Must happen BEFORE BeginRendering)
-        TransitionImageLayout(m_DepthImage->GetHandle(),
-                              VK_IMAGE_LAYOUT_UNDEFINED,
-                              VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
-        TransitionImageLayout(currentImage,
-                              VK_IMAGE_LAYOUT_UNDEFINED,
-                              VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+        CommandUtils::TransitionImageLayout(m_CommandBuffer, m_DepthImage->GetHandle(),
+                                            VK_IMAGE_LAYOUT_UNDEFINED,
+                                            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+        CommandUtils::TransitionImageLayout(m_CommandBuffer, currentImage,
+                                            VK_IMAGE_LAYOUT_UNDEFINED,
+                                            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
         // 5. Setup Rendering
         VkClearValue clearColor = {{{0.0f, 1.0f, 0.0f, 1.0f}}}; // Green
@@ -200,7 +137,8 @@ void SimpleRenderer::TransitionImageLayout(VkImage image, VkImageLayout oldLayou
 
         // 6. Barrier: Color Attachment -> Present Source
         VkImage currentImage = m_Swapchain.GetImages()[m_ImageIndex];
-        TransitionImageLayout(currentImage, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+        CommandUtils::TransitionImageLayout(m_CommandBuffer, currentImage, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                                            VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
         vkEndCommandBuffer(m_CommandBuffer);
 

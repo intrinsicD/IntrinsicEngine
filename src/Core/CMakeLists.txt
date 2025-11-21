@@ -17,6 +17,7 @@ target_sources(${target_name}
         Core.Logging.cppm
         Core.Tasks.cppm
         Core.Window.cppm
+        Core.Filesystem.cppm
         PRIVATE
         Core.Memory.cpp
         Core.Tasks.cpp
@@ -38,3 +39,9 @@ target_compile_features(${target_name} PUBLIC cxx_std_23)
 
 # Note: Since we disabled exceptions globally, if any external lib needs them,
 # we might need to wrap includes, but GLM is fine.
+
+target_compile_definitions(${target_name}
+        PUBLIC
+        # Pass the absolute path to the source root as a string macro
+        ENGINE_ROOT_DIR="${CMAKE_SOURCE_DIR}"
+)

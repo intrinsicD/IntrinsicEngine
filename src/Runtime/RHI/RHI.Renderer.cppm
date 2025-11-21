@@ -44,7 +44,6 @@ namespace Runtime::RHI
         bool m_IsFrameStarted = false;
 
         void InitSyncStructures();
-        void TransitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout);
         void CreateDepthBuffer();
     };
 }
