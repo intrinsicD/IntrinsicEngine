@@ -14,6 +14,7 @@ import Core.Input;
 import Runtime.Graphics.Mesh;
 import Runtime.Graphics.Material;
 import Runtime.Graphics.RenderSystem;
+import Runtime.Graphics.ModelLoader;
 import Runtime.ECS.Components;
 import Runtime.RHI.Types;
 
@@ -37,20 +38,27 @@ public:
     }
 
     // Store resources here so they stay alive
-    std::unique_ptr<Runtime::Graphics::Mesh> m_QuadMesh;
+    std::vector<std::unique_ptr<Runtime::Graphics::Mesh>> m_Meshes;
     std::unique_ptr<Runtime::Graphics::Material> m_Material;
 
     // Camera State
-    glm::vec3 m_CamPos = {0.0f, 0.0f, 5.0f};
+    glm::vec3 m_CamPos = {0.0f, 2.0f, 4.0f};
     float m_CamYaw = -90.0f;
-    float m_CamPitch = 0.0f;
+    float m_CamPitch = -20.0f;
 
     void OnStart() override
     {
         Log::Info("Sandbox Started!");
 
         // 1. Assets
-        m_QuadMesh = std::make_unique<Runtime::Graphics::Mesh>(GetDevice(), vertices, indices);
+        m_Meshes = Runtime::Graphics::ModelLoader::Load(GetDevice(), "assets/models/Duck.glb");
+        bool success = m_Meshes.size() > 0;
+
+        if (!success)
+        {
+            m_Meshes.emplace_back(std::make_unique<Runtime::Graphics::Mesh>(GetDevice(), vertices, indices));
+        }
+
         m_Material = std::make_unique<Runtime::Graphics::Material>(
             GetDevice(), GetDescriptorPool(), GetDescriptorLayout(), "assets/textures/Checkerboard.png"
         );
@@ -59,17 +67,31 @@ public:
         m_Material->WriteDescriptor(GetGlobalUBO()->GetHandle(), sizeof(Runtime::RHI::CameraBufferObject));
 
         // 2. Scene Setup
-        for (int i = 0; i < 10; i++)
+        if (success)
         {
-            for (int j = 0; j < 10; j++)
-            {
-                auto e = m_Scene.CreateEntity("Quad");
+            for (auto& mesh : m_Meshes) {
+                auto e = m_Scene.CreateEntity("ModelPart");
                 auto& t = m_Scene.GetRegistry().get<Runtime::ECS::TransformComponent>(e);
-                t.Position = glm::vec3(i * 1.5f - 7.5f, j * 1.5f - 7.5f, 0.0f);
+                t.Scale = glm::vec3(0.01f); // Adjust scale depending on model unit size
 
                 auto& mr = m_Scene.GetRegistry().emplace<Runtime::ECS::MeshRendererComponent>(e);
-                mr.MeshRef = m_QuadMesh.get();
+                mr.MeshRef = mesh.get();
                 mr.MaterialRef = m_Material.get();
+            }
+        }else
+        {
+            for (int i = 0; i < 10; i++)
+            {
+                for (int j = 0; j < 10; j++)
+                {
+                    auto e = m_Scene.CreateEntity("Quad");
+                    auto& t = m_Scene.GetRegistry().get<Runtime::ECS::TransformComponent>(e);
+                    t.Position = glm::vec3(i * 1.5f - 7.5f, j * 1.5f - 7.5f, 0.0f);
+
+                    auto& mr = m_Scene.GetRegistry().emplace<Runtime::ECS::MeshRendererComponent>(e);
+                    mr.MeshRef = m_Meshes[0].get();
+                    mr.MaterialRef = m_Material.get();
+                }
             }
         }
     }
@@ -113,7 +135,7 @@ public:
         camData.View = glm::lookAt(m_CamPos, m_CamPos + front, up);
         camData.Proj = glm::perspective(glm::radians(45.0f),
                                         GetSwapchain().GetExtent().width / (float)GetSwapchain().GetExtent().height,
-                                        0.1f, 100.0f);
+                                        0.1f, 1000.0f);
         camData.Proj[1][1] *= -1;
 
         // Draw

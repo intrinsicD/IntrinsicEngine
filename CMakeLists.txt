@@ -137,6 +137,22 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(entt)
 
+# --- JSON (Required for TinyGLTF) ---
+FetchContent_Declare(
+        json
+        GIT_REPOSITORY https://github.com/nlohmann/json.git
+        GIT_TAG v3.11.3
+)
+FetchContent_MakeAvailable(json)
+
+# --- TinyGLTF ---
+FetchContent_Declare(
+        tinygltf
+        GIT_REPOSITORY https://github.com/syoyo/tinygltf.git
+        GIT_TAG v2.9.0
+)
+FetchContent_MakeAvailable(tinygltf)
+
 # ------------------------------------------------------------------------------
 # Subdirectories
 # ------------------------------------------------------------------------------

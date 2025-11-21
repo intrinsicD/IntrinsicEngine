@@ -9,7 +9,7 @@ export namespace Runtime::RHI {
 
     struct Vertex {
         glm::vec3 pos;
-        glm::vec3 color;
+        glm::vec3 normal;
         glm::vec2 texCoord;
 
         static VkVertexInputBindingDescription GetBindingDescription() {
@@ -33,7 +33,7 @@ export namespace Runtime::RHI {
             attributeDescriptions[1].binding = 0;
             attributeDescriptions[1].location = 1;
             attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-            attributeDescriptions[1].offset = offsetof(Vertex, color);
+            attributeDescriptions[1].offset = offsetof(Vertex, normal);
 
             // 2: TexCoord (vec2)
             attributeDescriptions[2].binding = 0;

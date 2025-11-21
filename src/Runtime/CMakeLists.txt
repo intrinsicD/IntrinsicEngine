@@ -25,6 +25,7 @@ target_sources(${target_name}
         Graphics/Graphics.Material.cppm
         Graphics/Graphics.Mesh.cppm
         Graphics/Graphics.RenderSystem.cppm
+        Graphics/Graphics.ModelLoader.cppm
         Runtime.Engine.cppm
         PRIVATE
         RHI/RHI.Context.cpp
@@ -41,6 +42,8 @@ target_sources(${target_name}
         Graphics/Graphics.Material.cpp
         Graphics/Graphics.Mesh.cpp
         Graphics/Graphics.RenderSystem.cpp
+        Graphics/Graphics.ModelLoader.cpp
+        Graphics/Graphics.TinyGltf.cpp
         Runtime.Engine.cpp
 )
 
@@ -49,6 +52,7 @@ target_include_directories(${target_name} PUBLIC .)
 target_include_directories(${target_name} SYSTEM PUBLIC
         ${vma_SOURCE_DIR}/include
         ${stb_SOURCE_DIR}
+        ${tinygltf_SOURCE_DIR}
 )
 
 target_link_libraries(${target_name}
@@ -57,6 +61,7 @@ target_link_libraries(${target_name}
         volk
         Vulkan::Vulkan
         EnTT::EnTT
+        nlohmann_json::nlohmann_json
 )
 
 target_compile_features(${target_name} PUBLIC cxx_std_23)
