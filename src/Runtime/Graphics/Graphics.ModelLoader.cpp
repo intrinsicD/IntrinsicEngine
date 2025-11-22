@@ -5,6 +5,7 @@ module;
 #include <glm/gtc/type_ptr.hpp>
 #include <vector>
 #include <memory>
+#include <cstring>
 
 module Runtime.Graphics.ModelLoader;
 import Core.Logging;
@@ -50,6 +51,37 @@ namespace Runtime::Graphics
                 std::vector<RHI::Vertex> vertices;
                 std::vector<uint32_t> indices;
 
+                auto validateAccessor = [&](const tinygltf::Accessor& accessor, int expectedType, int expectedComponentType,
+                                            size_t expectedElementSize) -> bool
+                {
+                    if (accessor.type != expectedType || accessor.componentType != expectedComponentType)
+                    {
+                        Core::Log::Error("Unsupported accessor layout: type {} component {}", accessor.type,
+                                         accessor.componentType);
+                        return false;
+                    }
+
+                    const tinygltf::BufferView& bufferView = model.bufferViews[accessor.bufferView];
+                    const tinygltf::Buffer& buffer = model.buffers[bufferView.buffer];
+
+                    size_t stride = bufferView.byteStride == 0 ? expectedElementSize : bufferView.byteStride;
+                    if (stride != expectedElementSize)
+                    {
+                        Core::Log::Error("Unexpected stride {} for accessor; expected {}", stride, expectedElementSize);
+                        return false;
+                    }
+
+                    const size_t start = bufferView.byteOffset + accessor.byteOffset;
+                    const size_t end = start + stride * accessor.count;
+                    if (end > buffer.data.size())
+                    {
+                        Core::Log::Error("Accessor out of bounds (end {}, buffer size {})", end, buffer.data.size());
+                        return false;
+                    }
+
+                    return true;
+                };
+
                 // --- 1. Get Attributes (Pos, Normal, UV) ---
                 const float* positionBuffer = nullptr;
                 const float* normalsBuffer = nullptr;
@@ -60,10 +92,16 @@ namespace Runtime::Graphics
                 if (primitive.attributes.find("POSITION") != primitive.attributes.end())
                 {
                     const tinygltf::Accessor& accessor = model.accessors[primitive.attributes.at("POSITION")];
+                    if (!validateAccessor(accessor, TINYGLTF_TYPE_VEC3, TINYGLTF_COMPONENT_TYPE_FLOAT,
+                                          sizeof(float) * 3))
+                    {
+                        continue;
+                    }
+
                     const tinygltf::BufferView& bufferView = model.bufferViews[accessor.bufferView];
                     const tinygltf::Buffer& buffer = model.buffers[bufferView.buffer];
-                    positionBuffer = reinterpret_cast<const float*>(&buffer.data[bufferView.byteOffset + accessor.
-                        byteOffset]);
+                    positionBuffer = reinterpret_cast<const float*>(buffer.data.data() + bufferView.byteOffset + accessor.
+                        byteOffset);
                     vertexCount = accessor.count;
                 }
 
@@ -71,20 +109,32 @@ namespace Runtime::Graphics
                 if (primitive.attributes.find("NORMAL") != primitive.attributes.end())
                 {
                     const tinygltf::Accessor& accessor = model.accessors[primitive.attributes.at("NORMAL")];
+                    if (!validateAccessor(accessor, TINYGLTF_TYPE_VEC3, TINYGLTF_COMPONENT_TYPE_FLOAT,
+                                          sizeof(float) * 3))
+                    {
+                        continue;
+                    }
+
                     const tinygltf::BufferView& bufferView = model.bufferViews[accessor.bufferView];
                     const tinygltf::Buffer& buffer = model.buffers[bufferView.buffer];
-                    normalsBuffer = reinterpret_cast<const float*>(&buffer.data[bufferView.byteOffset + accessor.
-                        byteOffset]);
+                    normalsBuffer = reinterpret_cast<const float*>(buffer.data.data() + bufferView.byteOffset + accessor.
+                        byteOffset);
                 }
 
                 // TexCoords
                 if (primitive.attributes.find("TEXCOORD_0") != primitive.attributes.end())
                 {
                     const tinygltf::Accessor& accessor = model.accessors[primitive.attributes.at("TEXCOORD_0")];
+                    if (!validateAccessor(accessor, TINYGLTF_TYPE_VEC2, TINYGLTF_COMPONENT_TYPE_FLOAT,
+                                          sizeof(float) * 2))
+                    {
+                        continue;
+                    }
+
                     const tinygltf::BufferView& bufferView = model.bufferViews[accessor.bufferView];
                     const tinygltf::Buffer& buffer = model.buffers[bufferView.buffer];
-                    texCoordsBuffer = reinterpret_cast<const float*>(&buffer.data[bufferView.byteOffset + accessor.
-                        byteOffset]);
+                    texCoordsBuffer = reinterpret_cast<const float*>(buffer.data.data() + bufferView.byteOffset + accessor.
+                        byteOffset);
                 }
 
                 // Assemble Vertices
@@ -121,19 +171,53 @@ namespace Runtime::Graphics
                     const tinygltf::BufferView& bufferView = model.bufferViews[accessor.bufferView];
                     const tinygltf::Buffer& buffer = model.buffers[bufferView.buffer];
 
-                    const void* dataPtr = &buffer.data[bufferView.byteOffset + accessor.byteOffset];
+                    if (accessor.type != TINYGLTF_TYPE_SCALAR)
+                    {
+                        Core::Log::Error("Index accessor must be scalar type");
+                        continue;
+                    }
 
+                    size_t indexSize = 0;
                     if (accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT)
+                    {
+                        indexSize = sizeof(uint32_t);
+                    }
+                    else if (accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT)
+                    {
+                        indexSize = sizeof(uint16_t);
+                    }
+                    else if (accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE)
+                    {
+                        indexSize = sizeof(uint8_t);
+                    }
+                    else
+                    {
+                        Core::Log::Error("Unsupported index component type {}", accessor.componentType);
+                        continue;
+                    }
+
+                    size_t stride = bufferView.byteStride == 0 ? indexSize : bufferView.byteStride;
+                    const size_t start = bufferView.byteOffset + accessor.byteOffset;
+                    const size_t end = start + stride * accessor.count;
+                    if (stride != indexSize || end > buffer.data.size())
+                    {
+                        Core::Log::Error("Invalid index buffer stride {} or bounds (end {}, size {})", stride, end,
+                                         buffer.data.size());
+                        continue;
+                    }
+
+                    const void* dataPtr = buffer.data.data() + start;
+                    if (indexSize == sizeof(uint32_t))
                     {
                         const uint32_t* buf = static_cast<const uint32_t*>(dataPtr);
                         for (size_t i = 0; i < accessor.count; i++) indices.push_back(buf[i]);
                     }
-                    else if (accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT)
+                    else if (indexSize == sizeof(uint16_t))
                     {
                         const uint16_t* buf = static_cast<const uint16_t*>(dataPtr);
                         for (size_t i = 0; i < accessor.count; i++) indices.push_back(buf[i]);
                     }
-                    else if (accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE)
+                    else
                     {
                         const uint8_t* buf = static_cast<const uint8_t*>(dataPtr);
                         for (size_t i = 0; i < accessor.count; i++) indices.push_back(buf[i]);

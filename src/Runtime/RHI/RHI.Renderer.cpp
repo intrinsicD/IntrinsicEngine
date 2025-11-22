@@ -227,6 +227,13 @@ namespace Runtime::RHI
         vkCmdDraw(m_CommandBuffers[m_CurrentFrame], vertexCount, 1, 0, 0);
     }
 
+    void SimpleRenderer::OnResize()
+    {
+        vkDeviceWaitIdle(m_Device.GetLogicalDevice());
+        m_Swapchain.Recreate();
+        CreateDepthBuffer();
+    }
+
     void SimpleRenderer::CreateDepthBuffer()
     {
         if (m_DepthImage) delete m_DepthImage;

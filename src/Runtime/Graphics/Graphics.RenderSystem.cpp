@@ -32,19 +32,25 @@ namespace Runtime::Graphics
         // 2. Calculate aligned size for ONE frame
         size_t cameraDataSize = sizeof(RHI::CameraBufferObject);
         size_t alignedSize = PadUniformBufferSize(cameraDataSize, m_MinUboAlignment);
+        m_CameraStride = alignedSize;
 
         // Create the UBO once here
-        m_GlobalUBO = new RHI::VulkanBuffer(
+        m_GlobalUBO = std::make_unique<RHI::VulkanBuffer>(
             device,
             alignedSize * RHI::SimpleRenderer::MAX_FRAMES_IN_FLIGHT,
             VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
             VMA_MEMORY_USAGE_CPU_TO_GPU
         );
+
+        m_MappedCameraPtr = static_cast<char*>(m_GlobalUBO->Map());
     }
 
     RenderSystem::~RenderSystem()
     {
-        delete m_GlobalUBO;
+        if (m_GlobalUBO && m_MappedCameraPtr)
+        {
+            m_GlobalUBO->Unmap();
+        }
     }
 
     void RenderSystem::OnUpdate(ECS::Scene& scene, const CameraData& camera)
@@ -57,18 +63,14 @@ namespace Runtime::Graphics
             RHI::CameraBufferObject ubo{};
             ubo.view = camera.View;
             ubo.proj = camera.Proj;
-
-            size_t cameraDataSize = sizeof(RHI::CameraBufferObject);
-            size_t alignedSize = PadUniformBufferSize(cameraDataSize, m_MinUboAlignment);
+            const size_t cameraDataSize = sizeof(RHI::CameraBufferObject);
 
             // Offset based on CURRENT FRAME
             uint32_t frameIndex = m_Renderer.GetCurrentFrameIndex();
-            size_t offset = frameIndex * alignedSize;
+            size_t offset = frameIndex * m_CameraStride;
 
             // Write to specific offset
-            char* data = (char*)m_GlobalUBO->Map();
-            memcpy(data + offset, &ubo, cameraDataSize);
-            m_GlobalUBO->Unmap();
+            std::memcpy(m_MappedCameraPtr + offset, &ubo, cameraDataSize);
 
             m_Renderer.BindPipeline(m_Pipeline);
 

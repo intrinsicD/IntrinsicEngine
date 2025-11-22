@@ -28,6 +28,8 @@ namespace Runtime::RHI
         void Draw(uint32_t vertexCount);
         void SetViewport(uint32_t width, uint32_t height);
 
+        void OnResize();
+
         [[nodiscard]] bool IsFrameInProgress() const { return m_IsFrameStarted; }
         [[nodiscard]] VkCommandBuffer GetCommandBuffer() const { return m_CommandBuffers[m_CurrentFrame]; }
         [[nodiscard]] uint32_t GetCurrentFrameIndex() const { return m_CurrentFrame; }

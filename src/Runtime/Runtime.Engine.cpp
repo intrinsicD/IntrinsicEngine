@@ -26,6 +26,7 @@ namespace Runtime
         {
             if (e.Type == Core::Windowing::EventType::WindowClose) m_Running = false;
             if (e.Type == Core::Windowing::EventType::KeyPressed && e.KeyCode == 256) m_Running = false;
+            if (e.Type == Core::Windowing::EventType::WindowResize) m_FramebufferResized = true;
         });
 
         // 2. Vulkan Context & Surface
@@ -95,6 +96,12 @@ namespace Runtime
         {
             m_Window->OnUpdate();
 
+            if (m_FramebufferResized)
+            {
+                m_Renderer->OnResize();
+                m_FramebufferResized = false;
+            }
+
             auto currentTime = std::chrono::high_resolution_clock::now();
             float rawDt = std::chrono::duration<float>(currentTime - lastTime).count();
             lastTime = currentTime;
@@ -110,6 +117,8 @@ namespace Runtime
             if (dt > 0.1f) dt = 0.1f;
 
             OnUpdate(dt); // User Logic
+
+            OnRender();
 
             // Currently RenderSystem::OnUpdate handles the draw, so OnRender is optional hook
             // In future, OnRender might manipulate the RenderGraph
