@@ -5,21 +5,35 @@ module; // <--- Start Global Fragment
 #include <cstring>
 #include <new>
 #include <memory>
+#include <limits>
 #include <expected>
 
 module Core.Memory; // <--- Enter Module Purview
 
 namespace Core::Memory {
 
+    namespace
+    {
+        constexpr size_t AlignUp(size_t value, size_t alignment)
+        {
+            return (value + alignment - 1) & ~(alignment - 1);
+        }
+    }
+
     LinearArena::LinearArena(size_t sizeBytes)
-        : totalSize_(sizeBytes)
+        : totalSize_(AlignUp(sizeBytes, CACHE_LINE))
         , offset_(0)
     {
 #if defined(_MSC_VER)
-        start_ = static_cast<std::byte*>(_aligned_malloc(sizeBytes, CACHE_LINE));
+        start_ = static_cast<std::byte*>(_aligned_malloc(totalSize_, CACHE_LINE));
 #else
-        start_ = static_cast<std::byte*>(std::aligned_alloc(CACHE_LINE, sizeBytes));
+        start_ = static_cast<std::byte*>(std::aligned_alloc(CACHE_LINE, totalSize_));
 #endif
+
+        if (!start_)
+        {
+            totalSize_ = 0;
+        }
     }
 
     LinearArena::~LinearArena() {
@@ -33,15 +47,28 @@ namespace Core::Memory {
     }
 
     std::expected<void*, AllocatorError> LinearArena::Alloc(size_t size, size_t align) {
-        uintptr_t currentPtr = reinterpret_cast<uintptr_t>(start_ + offset_);
-        uintptr_t alignedPtr = (currentPtr + (align - 1)) & ~(align - 1);
-        size_t padding = alignedPtr - currentPtr;
-
-        if (offset_ + padding + size > totalSize_) {
+        if (!start_)
+        {
             return std::unexpected(AllocatorError::OutOfMemory);
         }
 
-        offset_ += padding;
+        const size_t safeAlign = align == 0 ? 1 : align;
+        uintptr_t currentPtr = reinterpret_cast<uintptr_t>(start_ + offset_);
+        uintptr_t alignedPtr = (currentPtr + (safeAlign - 1)) & ~(safeAlign - 1);
+        size_t padding = alignedPtr - currentPtr;
+
+        if (padding > (std::numeric_limits<size_t>::max() - offset_))
+        {
+            return std::unexpected(AllocatorError::OutOfMemory);
+        }
+
+        const size_t newOffset = offset_ + padding;
+        if (size > (std::numeric_limits<size_t>::max() - newOffset) || newOffset + size > totalSize_)
+        {
+            return std::unexpected(AllocatorError::OutOfMemory);
+        }
+
+        offset_ = newOffset;
         void* ptr = start_ + offset_;
         offset_ += size;
 

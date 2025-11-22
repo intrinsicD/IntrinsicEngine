@@ -1,5 +1,6 @@
 module;
 #include <glm/glm.hpp>
+#include <memory>
 
 export module Runtime.Graphics.RenderSystem;
 
@@ -29,7 +30,7 @@ export namespace Runtime::Graphics
 
         void OnUpdate(ECS::Scene& scene, const CameraData& camera);
 
-        [[nodiscard]] RHI::VulkanBuffer* GetGlobalUBO() const { return m_GlobalUBO; }
+        [[nodiscard]] RHI::VulkanBuffer* GetGlobalUBO() const { return m_GlobalUBO.get(); }
 
     private:
         size_t m_MinUboAlignment = 0;
@@ -40,6 +41,8 @@ export namespace Runtime::Graphics
         RHI::GraphicsPipeline& m_Pipeline;
 
         // The Global Camera UBO
-        RHI::VulkanBuffer* m_GlobalUBO;
+        std::unique_ptr<RHI::VulkanBuffer> m_GlobalUBO;
+        char* m_MappedCameraPtr = nullptr;
+        size_t m_CameraStride = 0;
     };
 }
