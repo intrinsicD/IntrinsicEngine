@@ -2,6 +2,7 @@ module;
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <string>
+#include <memory>
 
 export module Runtime.ECS.Components;
 
@@ -36,7 +37,7 @@ export namespace Runtime::ECS
     };
 
     struct MeshRendererComponent {
-        Graphics::Mesh* MeshRef;
-        Graphics::Material* MaterialRef;
+        std::shared_ptr<Graphics::Mesh> MeshRef;
+        std::shared_ptr<Graphics::Material> MaterialRef;
     };
 }

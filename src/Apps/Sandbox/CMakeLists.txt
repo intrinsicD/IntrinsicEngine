@@ -8,14 +8,15 @@ target_link_libraries(${target_name}
 )
 
 # Standard strict flags
-target_compile_options(${target_name} PRIVATE ${INTRINSIC_COMPILE_OPTIONS})
+target_compile_options(${target_name} PRIVATE ${INTRINSIC_COMPILE_FLAGS})
 target_compile_features(${target_name} PUBLIC cxx_std_23)
+target_link_options(${target_name} PRIVATE ${INTRINSIC_LINK_FLAGS})
 
 # --- SHADER COMPILATION LOGIC ---
 find_program(GLSL_COMPILER glslc)
-if(NOT GLSL_COMPILER)
+if (NOT GLSL_COMPILER)
     message(WARNING "glslc not found! Shaders will not compile.")
-else()
+else ()
     set(SHADER_SOURCE_DIR "${CMAKE_SOURCE_DIR}/assets/shaders")
     set(SHADER_BINARY_DIR "${CMAKE_BINARY_DIR}/bin/shaders")
 
@@ -27,7 +28,7 @@ else()
             triangle.frag
     )
 
-    foreach(SHADER ${SHADERS})
+    foreach (SHADER ${SHADERS})
         add_custom_command(
                 OUTPUT ${SHADER_BINARY_DIR}/${SHADER}.spv
                 COMMAND ${GLSL_COMPILER} ${SHADER_SOURCE_DIR}/${SHADER} -o ${SHADER_BINARY_DIR}/${SHADER}.spv
@@ -35,9 +36,9 @@ else()
                 COMMENT "Compiling ${SHADER}"
         )
         list(APPEND SPV_SHADERS ${SHADER_BINARY_DIR}/${SHADER}.spv)
-    endforeach()
+    endforeach ()
 
     # Ensure shaders are built before the app
     add_custom_target(Shaders ALL DEPENDS ${SPV_SHADERS})
     add_dependencies(Sandbox Shaders)
-endif()
+endif ()

@@ -65,6 +65,7 @@ export namespace Runtime
         std::unique_ptr<RHI::GraphicsPipeline> m_Pipeline;
 
         bool m_Running = true;
+        bool m_FramebufferResized = false;
 
         void InitVulkan();
         void InitPipeline();

@@ -20,13 +20,6 @@ else()
 endif()
 
 # ------------------------------------------------------------------------------
-# 1. NUCLEAR OPTION: Force Reset Compiler Flags
-# ------------------------------------------------------------------------------
-set(CMAKE_CXX_FLAGS "" CACHE STRING "" FORCE)
-set(CMAKE_CXX_FLAGS_DEBUG "-g -fsanitize=address,undefined -fno-omit-frame-pointer" CACHE STRING "" FORCE)
-set(CMAKE_CXX_FLAGS_RELEASE "-O3" CACHE STRING "" FORCE)
-
-# ------------------------------------------------------------------------------
 # Standard Settings
 # ------------------------------------------------------------------------------
 set(CMAKE_CXX_STANDARD 23)
@@ -41,12 +34,34 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 # ------------------------------------------------------------------------------
 # Our Strict Flags
 # ------------------------------------------------------------------------------
-set(INTRINSIC_COMPILE_OPTIONS
+set(INTRINSIC_BASE_FLAGS
         -Wall -Wextra -Wpedantic
         -Wno-unknown-pragmas
         -Werror=return-type
         -fno-exceptions
         -fno-rtti
+)
+
+set(INTRINSIC_DEBUG_FLAGS
+    $<$<CONFIG:Debug>:-fsanitize=address,undefined>
+    $<$<CONFIG:Debug>:-fno-omit-frame-pointer>
+)
+set(INTRINSIC_RELEASE_FLAGS
+        $<$<CONFIG:Release>:-O3>
+        $<$<CONFIG:RelWithDebInfo>:-O3>
+
+        # Optional: Optimize for the specific CPU you are compiling on (Faster, but not portable)
+        $<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>>:-march=native>
+)
+
+set(INTRINSIC_COMPILE_FLAGS
+        ${INTRINSIC_BASE_FLAGS}
+        ${INTRINSIC_DEBUG_FLAGS}
+        ${INTRINSIC_RELEASE_FLAGS}
+)
+set(INTRINSIC_LINK_FLAGS
+        ${INTRINSIC_DEBUG_FLAGS} # Sanitizers need to link too!
+        # Link-time optimization (LTO) could go here in the future
 )
 
 # ------------------------------------------------------------------------------

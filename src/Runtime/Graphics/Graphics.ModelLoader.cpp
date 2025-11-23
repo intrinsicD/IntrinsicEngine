@@ -13,7 +13,7 @@ import Runtime.RHI.Types;
 
 namespace Runtime::Graphics
 {
-    std::vector<std::unique_ptr<Mesh>> ModelLoader::Load(RHI::VulkanDevice& device,
+    std::vector<std::shared_ptr<Mesh>> ModelLoader::Load(RHI::VulkanDevice& device,
                                                          const std::string& filepath)
     {
         tinygltf::Model model;
@@ -36,7 +36,7 @@ namespace Runtime::Graphics
         if (!err.empty()) Core::Log::Error("GLTF Error: {}", err);
         if (!ret) return {};
 
-        std::vector<std::unique_ptr<Mesh>> resultMeshes;
+        std::vector<std::shared_ptr<Mesh>> resultMeshes;
 
         // Iterate over all meshes in the file
         for (const auto& gltfMesh : model.meshes)
@@ -141,7 +141,7 @@ namespace Runtime::Graphics
                 }
 
                 // Create Mesh
-                resultMeshes.push_back(std::make_unique<Mesh>(device, vertices, indices));
+                resultMeshes.push_back(std::make_shared<Mesh>(device, vertices, indices));
             }
         }
 

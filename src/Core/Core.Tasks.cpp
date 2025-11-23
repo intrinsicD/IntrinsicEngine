@@ -54,6 +54,7 @@ namespace Core::Tasks
     void Scheduler::Shutdown()
     {
         if (!s_Ctx) return;
+        WaitForAll();
 
         {
             std::lock_guard lock(s_Ctx->queueMutex);
@@ -73,6 +74,10 @@ namespace Core::Tasks
 
     void Scheduler::Dispatch(TaskFunction&& task)
     {
+        if (!s_Ctx) {
+            Log::Error("Scheduler::Dispatch called before Initialize");
+            return;
+        }
         {
             std::lock_guard lock(s_Ctx->queueMutex);
             s_Ctx->globalQueue.push_back(std::move(task));
@@ -83,6 +88,10 @@ namespace Core::Tasks
 
     void Scheduler::WaitForAll()
     {
+        if (!s_Ctx) {
+            Log::Error("Scheduler::WaitForAll called before Initialize");
+            return;
+        }
         std::unique_lock lock(s_Ctx->queueMutex);
         s_Ctx->waitCondition.wait(lock, []
         {

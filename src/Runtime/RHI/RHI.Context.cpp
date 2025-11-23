@@ -2,7 +2,7 @@ module;
 
 #include <GLFW/glfw3.h> // Only for glfwGetRequiredInstanceExtensions
 #include <vector>
-#include <iostream>
+#include <cstdlib>
 
 #include "RHI/RHI.Vulkan.hpp"
 
@@ -36,7 +36,7 @@ namespace Runtime::RHI {
         // 1. Initialize Volk (Load basic function pointers)
         if (volkInitialize() != VK_SUCCESS) {
             Core::Log::Error("Failed to initialize Volk! Is Vulkan installed?");
-            return;
+            std::exit(-1);
         }
 
         CreateInstance(config);
@@ -87,13 +87,16 @@ namespace Runtime::RHI {
         createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
         createInfo.ppEnabledExtensionNames = extensions.data();
 
+        //Must be outside the if block to extend lifetime
+        VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
+
         // --- Layers ---
         if (config.EnableValidation) {
             createInfo.enabledLayerCount = static_cast<uint32_t>(VALIDATION_LAYERS.size());
             createInfo.ppEnabledLayerNames = VALIDATION_LAYERS.data();
             
             // Setup debug info for the CreateInstance call itself
-            VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
+
             debugCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
             debugCreateInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
             debugCreateInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
@@ -108,6 +111,7 @@ namespace Runtime::RHI {
         VkResult result = vkCreateInstance(&createInfo, nullptr, &m_Instance);
         if (result != VK_SUCCESS) {
             Core::Log::Error("Failed to create Vulkan Instance! Error Code: {}", (int)result);
+            std::exit(-1);
         }
     }
 

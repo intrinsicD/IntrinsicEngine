@@ -29,7 +29,12 @@ namespace Runtime
         });
 
         // 2. Vulkan Context & Surface
-        RHI::ContextConfig rhiConfig{config.AppName, true};
+#ifdef NDEBUG
+        bool enableValidation = false;
+#else
+        bool enableValidation = true;
+#endif
+        RHI::ContextConfig rhiConfig{config.AppName, enableValidation};
         m_Context = std::make_unique<RHI::VulkanContext>(rhiConfig, *m_Window);
 
         if (!m_Window->CreateSurface(m_Context->GetInstance(), nullptr, &m_Surface))
@@ -53,6 +58,7 @@ namespace Runtime
         vkDeviceWaitIdle(m_Device->GetLogicalDevice());
 
         // Order matters!
+        m_Scene.GetRegistry().clear();
         m_RenderSystem.reset();
         m_Pipeline.reset();
         m_DescriptorPool.reset();
@@ -95,6 +101,11 @@ namespace Runtime
         {
             m_Window->OnUpdate();
 
+            if (m_FramebufferResized) {
+                m_Renderer->OnResize();
+                m_FramebufferResized = false;
+            }
+
             auto currentTime = std::chrono::high_resolution_clock::now();
             float rawDt = std::chrono::duration<float>(currentTime - lastTime).count();
             lastTime = currentTime;
@@ -113,6 +124,7 @@ namespace Runtime
 
             // Currently RenderSystem::OnUpdate handles the draw, so OnRender is optional hook
             // In future, OnRender might manipulate the RenderGraph
+            OnRender();
         }
 
         vkDeviceWaitIdle(m_Device->GetLogicalDevice());

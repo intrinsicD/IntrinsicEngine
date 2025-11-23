@@ -6,7 +6,9 @@ add_library(${target_name})
 set_target_properties(${target_name} PROPERTIES CXX_SCAN_FOR_MODULES ON)
 
 # Apply Strict Flags ONLY to our code
-target_compile_options(${target_name} PRIVATE ${INTRINSIC_COMPILE_OPTIONS})
+target_compile_options(${target_name} PRIVATE ${INTRINSIC_COMPILE_FLAGS})
+target_compile_features(${target_name} PUBLIC cxx_std_23)
+target_link_options(${target_name} PRIVATE ${INTRINSIC_LINK_FLAGS})
 
 # Setup Sources
 target_sources(${target_name}
@@ -35,9 +37,6 @@ target_link_libraries(${target_name}
         Vulkan::Vulkan
         # Telemetry libs will go here
 )
-
-# Compile Features
-target_compile_features(${target_name} PUBLIC cxx_std_23)
 
 # Note: Since we disabled exceptions globally, if any external lib needs them,
 # we might need to wrap includes, but GLM is fine.

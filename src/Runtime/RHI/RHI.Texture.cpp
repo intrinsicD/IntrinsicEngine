@@ -4,6 +4,7 @@ module;
 #include <RHI/RHI.Vulkan.hpp>
 #include <string>
 #include <cstring>
+#include <memory>
 
 module Runtime.RHI.Texture;
 import Runtime.RHI.Buffer;
@@ -100,7 +101,7 @@ namespace Runtime::RHI
     {
         // 1. Load Pixels from Disk
         int texWidth, texHeight, texChannels;
-        stbi_set_flip_vertically_on_load(true);
+        stbi_set_flip_vertically_on_load(false);
         // Vulkan UVs are usually flipped relative to OpenGL, but standard convention varies.
         stbi_uc* pixels = stbi_load(filepath.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
 
@@ -123,14 +124,14 @@ namespace Runtime::RHI
             VMA_MEMORY_USAGE_CPU_ONLY
         );
 
-        void* data = stagingBuffer.Map();
+        auto data = static_cast<std::byte*>(stagingBuffer.Map());
         std::memcpy(data, pixels, static_cast<size_t>(imageSize));
         stagingBuffer.Unmap();
 
         stbi_image_free(pixels);
 
         // 3. Create GPU Image
-        m_Image = new VulkanImage(
+        m_Image = std::make_unique<VulkanImage>(
             device,
             texWidth, texHeight,
             mipLevels,
@@ -182,7 +183,6 @@ namespace Runtime::RHI
     Texture::~Texture()
     {
         vkDestroySampler(m_Device.GetLogicalDevice(), m_Sampler, nullptr);
-        delete m_Image;
     }
 
     void Texture::CreateSampler()

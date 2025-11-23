@@ -112,7 +112,7 @@ namespace Runtime::RHI
                                             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
         // 5. Setup Rendering
-        VkClearValue clearColor = {{{0.0f, 1.0f, 0.0f, 1.0f}}}; // Green
+        VkClearValue clearColor = {{{0.1f, 0.3f, 0.6, 1.0f}}}; // Green
 
         VkRenderingAttachmentInfo colorAttachment{};
         colorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
@@ -220,6 +220,13 @@ namespace Runtime::RHI
 
         vkCmdSetViewport(m_CommandBuffers[m_CurrentFrame], 0, 1, &viewport);
         vkCmdSetScissor(m_CommandBuffers[m_CurrentFrame], 0, 1, &scissor);
+    }
+
+    void SimpleRenderer::OnResize()
+    {
+        vkDeviceWaitIdle(m_Device.GetLogicalDevice());
+        m_Swapchain.Recreate();
+        CreateDepthBuffer();
     }
 
     void SimpleRenderer::Draw(uint32_t vertexCount)

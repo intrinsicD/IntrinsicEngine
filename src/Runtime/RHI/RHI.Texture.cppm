@@ -1,6 +1,7 @@
 module;
 #include <RHI/RHI.Vulkan.hpp>
 #include <string>
+#include <memory>
 
 export module Runtime.RHI.Texture;
 
@@ -19,7 +20,7 @@ export namespace Runtime::RHI {
 
     private:
         VulkanDevice& m_Device;
-        VulkanImage* m_Image = nullptr;
+        std::unique_ptr<VulkanImage> m_Image;
         VkSampler m_Sampler = VK_NULL_HANDLE;
 
         void CreateSampler();

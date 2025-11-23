@@ -38,8 +38,8 @@ public:
     }
 
     // Store resources here so they stay alive
-    std::vector<std::unique_ptr<Runtime::Graphics::Mesh>> m_Meshes;
-    std::unique_ptr<Runtime::Graphics::Material> m_Material;
+    std::vector<std::shared_ptr<Runtime::Graphics::Mesh>> m_Meshes;
+    std::shared_ptr<Runtime::Graphics::Material> m_Material;
 
     // Camera State
     glm::vec3 m_CamPos = {0.0f, 2.0f, 4.0f};
@@ -52,15 +52,15 @@ public:
 
         // 1. Assets
         m_Meshes = Runtime::Graphics::ModelLoader::Load(GetDevice(), "assets/models/Duck.glb");
-        bool success = m_Meshes.size() > 0;
+        bool success = !m_Meshes.empty();
 
         if (!success)
         {
-            m_Meshes.emplace_back(std::make_unique<Runtime::Graphics::Mesh>(GetDevice(), vertices, indices));
+            m_Meshes.emplace_back(std::make_shared<Runtime::Graphics::Mesh>(GetDevice(), vertices, indices));
         }
 
-        m_Material = std::make_unique<Runtime::Graphics::Material>(
-            GetDevice(), GetDescriptorPool(), GetDescriptorLayout(), "assets/textures/Checkerboard.png"
+        m_Material = std::make_shared<Runtime::Graphics::Material>(
+            GetDevice(), GetDescriptorPool(), GetDescriptorLayout(), "assets/textures/DuckCM.png"
         );
 
         // Link Material to Global Camera UBO
@@ -75,8 +75,8 @@ public:
                 t.Scale = glm::vec3(0.01f); // Adjust scale depending on model unit size
 
                 auto& mr = m_Scene.GetRegistry().emplace<Runtime::ECS::MeshRendererComponent>(e);
-                mr.MeshRef = mesh.get();
-                mr.MaterialRef = m_Material.get();
+                mr.MeshRef = mesh;
+                mr.MaterialRef = m_Material;
             }
         }else
         {
@@ -89,8 +89,8 @@ public:
                     t.Position = glm::vec3(i * 1.5f - 7.5f, j * 1.5f - 7.5f, 0.0f);
 
                     auto& mr = m_Scene.GetRegistry().emplace<Runtime::ECS::MeshRendererComponent>(e);
-                    mr.MeshRef = m_Meshes[0].get();
-                    mr.MaterialRef = m_Material.get();
+                    mr.MeshRef = m_Meshes[0];
+                    mr.MaterialRef = m_Material;
                 }
             }
         }
