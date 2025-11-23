@@ -111,6 +111,13 @@ public:
             timer = 0.0f;
         }
 
+        // --- Rotate Entities ---
+        auto view = m_Scene.GetRegistry().view<Runtime::ECS::TransformComponent>();
+        for (auto [entity, transform] : view.each())
+        {
+            transform.Rotation.y += 45.0f * dt;
+        }
+
         // --- Free Fly Camera Control ---
         float speed = 5.0f * dt;
         if (Input::IsKeyPressed(Input::Key::LeftShift)) speed *= 2.0f;

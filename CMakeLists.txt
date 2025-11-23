@@ -9,14 +9,15 @@ project(IntrinsicEngine
 # ------------------------------------------------------------------------------
 # CRITICAL FIX: Manually point CMake to the dependency scanner
 # ------------------------------------------------------------------------------
-# Since you are using clang++-22, we explicitly look for clang-scan-deps-22
-find_program(CLANG_SCAN_DEPS_PATH NAMES clang-scan-deps-22 clang-scan-deps)
-
-if(CLANG_SCAN_DEPS_PATH)
-    message(STATUS "Found clang-scan-deps: ${CLANG_SCAN_DEPS_PATH}")
-    set(CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS "${CLANG_SCAN_DEPS_PATH}" CACHE FILEPATH "Force scanner" FORCE)
-else()
-    message(FATAL_ERROR "Could not find clang-scan-deps-22. Install clang-tools-22 or check your PATH.")
+# Check if the user/IDE provided a scanner, otherwise try to find one
+if(NOT CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS)
+    find_program(CLANG_SCAN_DEPS_PATH NAMES clang-scan-deps-18 clang-scan-deps-22 clang-scan-deps)
+    if(CLANG_SCAN_DEPS_PATH)
+        message(STATUS "Found clang-scan-deps: ${CLANG_SCAN_DEPS_PATH}")
+        set(CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS "${CLANG_SCAN_DEPS_PATH}" CACHE FILEPATH "Force scanner" FORCE)
+    else()
+        message(FATAL_ERROR "Could not find clang-scan-deps. Please install clang-tools-18+.")
+    endif()
 endif()
 
 # ------------------------------------------------------------------------------
