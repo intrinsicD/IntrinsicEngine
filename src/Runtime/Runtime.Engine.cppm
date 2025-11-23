@@ -69,5 +69,6 @@ export namespace Runtime
 
         void InitVulkan();
         void InitPipeline();
+        void LoadDroppedAsset(const std::string& path);
     };
 }

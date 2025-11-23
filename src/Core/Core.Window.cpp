@@ -96,6 +96,22 @@ namespace Core::Windowing
             e.KeyCode = key;
             if (data.Callback) data.Callback(e);
         });
+
+        glfwSetDropCallback(m_glfw, [](GLFWwindow* window, int count, const char** paths)
+        {
+            WindowData& data = *(WindowData*)glfwGetWindowUserPointer(window);
+
+            Event e;
+            e.Type = EventType::WindowDrop;
+
+            // Convert C-strings to std::vector<std::string>
+            for (int i = 0; i < count; i++)
+            {
+                e.Paths.emplace_back(paths[i]);
+            }
+
+            if (data.Callback) data.Callback(e);
+        });
     }
 
     void Window::Shutdown()
@@ -117,13 +133,15 @@ namespace Core::Windowing
         return glfwWindowShouldClose(m_glfw);
     }
 
-    bool Window::CreateSurface(void* instance, void* allocator, void* surfaceOut) {
+    bool Window::CreateSurface(void* instance, void* allocator, void* surfaceOut)
+    {
         VkInstance vkInst = static_cast<VkInstance>(instance);
         VkAllocationCallbacks* vkAlloc = static_cast<VkAllocationCallbacks*>(allocator);
         VkSurfaceKHR* vkSurf = static_cast<VkSurfaceKHR*>(surfaceOut);
         auto m_glfw = static_cast<GLFWwindow*>(m_Window);
         VkResult result = glfwCreateWindowSurface(vkInst, m_glfw, vkAlloc, vkSurf);
-        if (result != VK_SUCCESS) {
+        if (result != VK_SUCCESS)
+        {
             Log::Error("Failed to create Window Surface! Error: {}", (int)result);
             return false;
         }
@@ -134,5 +152,4 @@ namespace Core::Windowing
     {
         glfwSetWindowTitle(static_cast<GLFWwindow*>(GetNativeHandle()), title.c_str());
     }
-
 }

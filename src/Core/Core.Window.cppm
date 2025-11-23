@@ -18,6 +18,7 @@ namespace Core::Windowing
     {
         WindowClose,
         WindowResize,
+        WindowDrop,
         KeyPressed,
         KeyReleased
         // Mouse events to follow later
@@ -30,6 +31,8 @@ namespace Core::Windowing
         int KeyCode = 0;
         int Width = 0;
         int Height = 0;
+
+        std::vector<std::string> Paths; // For WindowDrop
     };
 
     using EventCallbackFn = std::function<void(const Event&)>;

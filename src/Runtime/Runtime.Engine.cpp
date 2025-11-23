@@ -1,8 +1,10 @@
 module;
 #include <chrono>
 #include <queue>
+#include <filesystem>
 #include <GLFW/glfw3.h>
 #include <RHI/RHI.Vulkan.hpp>
+#include <glm/glm.hpp>
 
 module Runtime.Engine;
 
@@ -10,6 +12,10 @@ import Core.Logging;
 import Core.Input;
 import Core.Window;
 import Runtime.RHI.Shader;
+import Runtime.Graphics.ModelLoader;
+import Runtime.Graphics.Material;
+import Runtime.ECS.Components;
+import Runtime.RHI.Types;
 
 namespace Runtime
 {
@@ -26,6 +32,14 @@ namespace Runtime
         {
             if (e.Type == Core::Windowing::EventType::WindowClose) m_Running = false;
             if (e.Type == Core::Windowing::EventType::KeyPressed && e.KeyCode == 256) m_Running = false;
+            if (e.Type == Core::Windowing::EventType::WindowResize) { m_FramebufferResized = true; }
+            if (e.Type == Core::Windowing::EventType::WindowDrop)
+            {
+                for (const auto& path : e.Paths)
+                {
+                    LoadDroppedAsset(path);
+                }
+            }
         });
 
         // 2. Vulkan Context & Surface
@@ -72,6 +86,76 @@ namespace Runtime
         m_Window.reset();
     }
 
+    void Engine::LoadDroppedAsset(const std::string& path)
+    {
+        std::filesystem::path fsPath(path);
+        std::string ext = fsPath.extension().string();
+
+        // Convert to lower case for comparison
+        for (auto& c : ext) c = tolower(c);
+
+        if (ext == ".gltf" || ext == ".glb")
+        {
+            Core::Log::Info("Drop Detected: Loading Model {}", path);
+
+            // TODO: Move this to Async Task Graph to prevent frame freeze
+            auto meshes = Graphics::ModelLoader::Load(GetDevice(), path);
+
+            if (meshes.empty())
+            {
+                Core::Log::Error("Failed to load model or model was empty.");
+                return;
+            }
+
+            // Create a default material (Pink debug to show if textures fail)
+            // In a real scenario, ModelLoader should return Materials too.
+            static auto defaultMat = std::make_shared<Graphics::Material>(
+                GetDevice(), GetDescriptorPool(), GetDescriptorLayout(), "assets/textures/DuckCM.png"
+            );
+            defaultMat->WriteDescriptor(GetGlobalUBO()->GetHandle(), sizeof(RHI::CameraBufferObject));
+
+            // Create Entity
+            auto entity = m_Scene.CreateEntity(fsPath.stem().string());
+
+            auto& t = m_Scene.GetRegistry().get<ECS::TransformComponent>(entity);
+            t.Scale = glm::vec3(1.0f);
+            t.Position = glm::vec3(0.0f, 0.0f, 0.0f); // Reset position
+
+            // If we loaded multiple meshes (submeshes), we might need multiple entities
+            // For simplicity here, we attach the first mesh to the entity.
+            // A better approach is to create children entities for each mesh.
+
+            for (size_t i = 0; i < meshes.size(); i++)
+            {
+                if (i == 0)
+                {
+                    auto& mr = m_Scene.GetRegistry().emplace<ECS::MeshRendererComponent>(entity);
+                    mr.MeshRef = meshes[i];
+                    mr.MaterialRef = defaultMat;
+                }
+                else
+                {
+                    // Create child entities for submeshes
+                    auto child = m_Scene.CreateEntity(fsPath.stem().string() + "_" + std::to_string(i));
+                    auto& ct = m_Scene.GetRegistry().get<ECS::TransformComponent>(child);
+                    // In a real loader, we would apply local transforms from GLTF nodes here
+
+                    auto& cmr = m_Scene.GetRegistry().emplace<ECS::MeshRendererComponent>(child);
+                    cmr.MeshRef = meshes[i];
+                    cmr.MaterialRef = defaultMat;
+                }
+            }
+
+            //TODO: using this i get Sandbox: /home/alex/Documents/IntrinsicEngine/external/cache/vma-src/include/vk_mem_alloc.h:11761: void VmaDeviceMemoryBlock::Destroy(VmaAllocator): Assertion `m_pMetadata->IsEmpty() && "Some allocations were not freed before destruction of this memory block!"' failed. when i close the window... Fix me!
+
+            Core::Log::Info("Model instantiated into Scene.");
+        }
+        else
+        {
+            Core::Log::Warn("Unsupported file extension dropped: {}", ext);
+        }
+    }
+
     void Engine::InitPipeline()
     {
         m_DescriptorLayout = std::make_unique<RHI::DescriptorLayout>(*m_Device);
@@ -101,7 +185,8 @@ namespace Runtime
         {
             m_Window->OnUpdate();
 
-            if (m_FramebufferResized) {
+            if (m_FramebufferResized)
+            {
                 m_Renderer->OnResize();
                 m_FramebufferResized = false;
             }
