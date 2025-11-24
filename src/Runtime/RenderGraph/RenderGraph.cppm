@@ -127,6 +127,9 @@ export namespace Runtime::Graph
             if (!allocResult)
             {
                 Core::Log::Error("RenderGraph: Frame Arena Out of Memory!");
+                Core::Log::Error("  Pass Name: {}", name);
+                Core::Log::Error("  Requested Size: {}", sizeof(Data));
+                Core::Log::Error("  Arena used: {} / {} bytes", m_Arena.GetUsed(), m_Arena.GetTotal());
                 std::exit(1);
             }
 
@@ -139,7 +142,6 @@ export namespace Runtime::Graph
             pass.Execute = [=](const RGRegistry& reg, VkCommandBuffer cmd)
             {
                 execute(*data, reg, cmd);
-                //delete data; // Cleanup
             };
         }
 
@@ -205,7 +207,7 @@ export namespace Runtime::Graph
         };
 
         RHI::VulkanDevice& m_Device;
-        Core::Memory::LinearArena & m_Arena;
+        Core::Memory::LinearArena& m_Arena;
 
         std::vector<RGPass> m_Passes;
         std::vector<ResourceNode> m_Resources;

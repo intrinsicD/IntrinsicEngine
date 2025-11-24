@@ -15,6 +15,13 @@ namespace Core::Memory
         : totalSize_((sizeBytes + CACHE_LINE - 1) & ~(CACHE_LINE - 1))
           , offset_(0)
     {
+
+        if (sizeBytes == 0)
+        {
+            start_ = nullptr;
+            totalSize_ = 0;
+            return;
+        }
 #if defined(_MSC_VER)
         start_ = static_cast<std::byte*>(_aligned_malloc(totalSize_, CACHE_LINE));
 #else
