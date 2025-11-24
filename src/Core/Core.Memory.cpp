@@ -2,6 +2,7 @@ module; // <--- Start Global Fragment
 
 // Standard headers must go HERE, before 'module Core.Memory'
 #include <cstdlib> // No semicolons!
+#include <cstdio>
 #include <cstring>
 #include <limits>
 #include <memory>
@@ -15,12 +16,31 @@ namespace Core::Memory
         : totalSize_((sizeBytes + CACHE_LINE - 1) & ~(CACHE_LINE - 1))
           , offset_(0)
     {
+        // Validate input size
+        if (sizeBytes == 0)
+        {
+            // Allow 0-size arena but don't allocate
+            start_ = nullptr;
+            totalSize_ = 0;
+            return;
+        }
+
 #if defined(_MSC_VER)
         start_ = static_cast<std::byte*>(_aligned_malloc(totalSize_, CACHE_LINE));
 #else
         // Now safe because totalSize_ is a multiple of CACHE_LINE
         start_ = static_cast<std::byte*>(std::aligned_alloc(CACHE_LINE, totalSize_));
 #endif
+
+        // CRITICAL: Check if allocation succeeded
+        if (!start_)
+        {
+            // Allocation failed - this is fatal, log and terminate
+            // Note: We can't throw exceptions in modules without proper exception handling setup
+            std::fprintf(stderr, "FATAL: LinearArena allocation failed for %zu bytes (aligned to %zu)\n",
+                        sizeBytes, totalSize_);
+            std::abort();
+        }
     }
 
     LinearArena::~LinearArena()

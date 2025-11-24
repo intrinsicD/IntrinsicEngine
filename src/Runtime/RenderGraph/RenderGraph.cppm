@@ -127,6 +127,9 @@ export namespace Runtime::Graph
             if (!allocResult)
             {
                 Core::Log::Error("RenderGraph: Frame Arena Out of Memory!");
+                Core::Log::Error("  Pass Name: {}", name);
+                Core::Log::Error("  Requested Size: {} bytes", sizeof(Data));
+                Core::Log::Error("  Arena Used: {} / {} bytes", m_Arena.GetUsed(), m_Arena.GetTotal());
                 std::exit(1);
             }
 
