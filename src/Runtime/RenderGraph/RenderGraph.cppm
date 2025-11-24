@@ -139,7 +139,8 @@ export namespace Runtime::Graph
             pass.Execute = [=](const RGRegistry& reg, VkCommandBuffer cmd)
             {
                 execute(*data, reg, cmd);
-                delete data; // Cleanup
+                // Note: 'data' is allocated from the frame arena and will be cleaned up
+                // when the arena is reset at the beginning of the next frame.
             };
         }
 
