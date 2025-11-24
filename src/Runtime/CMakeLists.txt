@@ -28,6 +28,7 @@ target_sources(${target_name}
         Graphics/Graphics.Mesh.cppm
         Graphics/Graphics.RenderSystem.cppm
         Graphics/Graphics.ModelLoader.cppm
+        RenderGraph/RenderGraph.cppm
         Runtime.Engine.cppm
         PRIVATE
         RHI/RHI.Context.cpp
@@ -46,6 +47,7 @@ target_sources(${target_name}
         Graphics/Graphics.RenderSystem.cpp
         Graphics/Graphics.ModelLoader.cpp
         Graphics/Graphics.TinyGltf.cpp
+        RenderGraph/RenderGraph.cpp
         Runtime.Engine.cpp
 )
 

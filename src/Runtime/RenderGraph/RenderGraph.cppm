@@ -27,8 +27,15 @@ export namespace Runtime::Graph
 
     enum class ResourceType { Texture, Buffer, Import };
 
+    struct RGAttachmentInfo {
+        VkAttachmentLoadOp LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        VkAttachmentStoreOp StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+        VkClearValue ClearValue = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
+    };
+
     struct RGTextureDesc {
-        uint32_t Width = 0, Height = 0;
+        uint32_t Width = 0;
+        uint32_t Height = 0;
         VkFormat Format = VK_FORMAT_UNDEFINED;
     };
 
@@ -47,6 +54,10 @@ export namespace Runtime::Graph
 
         // Declare intention to WRITE to a resource (RenderTarget / Storage)
         RGResourceHandle Write(RGResourceHandle resource);
+
+        // Rasterization specific writes
+        RGResourceHandle WriteColor(RGResourceHandle resource, RGAttachmentInfo info);
+        RGResourceHandle WriteDepth(RGResourceHandle resource, RGAttachmentInfo info);
 
         // Create a new transient texture managed by the graph
         RGResourceHandle CreateTexture(const std::string& name, const RGTextureDesc& desc);
@@ -85,7 +96,7 @@ export namespace Runtime::Graph
     // -------------------------------------------------------------------------
     class RenderGraph {
     public:
-        RenderGraph(RHI::VulkanDevice& device);
+        explicit RenderGraph(RHI::VulkanDevice& device);
         ~RenderGraph();
 
         // 1. Setup Phase: Add a pass to the frame
@@ -125,6 +136,15 @@ export namespace Runtime::Graph
             std::vector<ResourceID> Reads;
             std::vector<ResourceID> Writes;
             std::vector<ResourceID> Creates;
+            
+            // Rasterization Info
+            struct Attachment {
+                ResourceID ID;
+                RGAttachmentInfo Info;
+                bool IsDepth = false;
+            };
+            std::vector<Attachment> Attachments;
+
             RGExecuteFn Execute;
         };
 
@@ -151,6 +171,16 @@ export namespace Runtime::Graph
         std::vector<ResourceNode> m_Resources;
         std::vector<BarrierBatch> m_Barriers;
         RGRegistry m_Registry;
+        
+        // Ownership of transient resources
+        // Using void* to avoid including RHI.Image in header if not needed, or just forward declare.
+        // But since we import RHI.Image, we can use VulkanImage*.
+        // However, VulkanImage is not exported by RHI.Image?
+        // Checking imports... import Runtime.RHI.Image;
+        // It should be fine.
+        // Wait, I can't easily add a member that requires a type I might not have fully visible if it's a module.
+        // Let's just use a vector of void* and delete them in Reset/Destructor for now to be safe and quick.
+        std::vector<void*> m_TransientImages;
 
         RGPass& CreatePassInternal(const std::string& name);
         ResourceID CreateResourceInternal(const std::string& name, ResourceType type);

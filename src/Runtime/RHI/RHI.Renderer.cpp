@@ -12,7 +12,7 @@ namespace Runtime::RHI
         : m_Device(device), m_Swapchain(swapchain)
     {
         InitSyncStructures();
-        CreateDepthBuffer();
+        // Depth buffer is now managed by RenderGraph
 
         m_CommandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
 
@@ -34,7 +34,7 @@ namespace Runtime::RHI
         // Wait for GPU to finish before destroying sync objects
         vkDeviceWaitIdle(m_Device.GetLogicalDevice());
 
-        delete m_DepthImage;
+        // delete m_DepthImage;
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
         {
@@ -100,45 +100,9 @@ namespace Runtime::RHI
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         vkBeginCommandBuffer(cmd, &beginInfo);
 
-        // 3. Get the image we just acquired
-        VkImage currentImage = m_Swapchain.GetImages()[m_ImageIndex];
-
-        // 4. Barrier: Undefined -> Color Attachment (Must happen BEFORE BeginRendering)
-        CommandUtils::TransitionImageLayout(cmd, m_DepthImage->GetHandle(),
-                                            VK_IMAGE_LAYOUT_UNDEFINED,
-                                            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
-        CommandUtils::TransitionImageLayout(cmd, currentImage,
-                                            VK_IMAGE_LAYOUT_UNDEFINED,
-                                            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-
-        // 5. Setup Rendering
-        VkClearValue clearColor = {{{0.1f, 0.3f, 0.6, 1.0f}}}; // Green
-
-        VkRenderingAttachmentInfo colorAttachment{};
-        colorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-        colorAttachment.imageView = m_Swapchain.GetImageViews()[m_ImageIndex];
-        colorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-        colorAttachment.clearValue = clearColor;
-
-        VkRenderingAttachmentInfo depthAttachment{};
-        depthAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-        depthAttachment.imageView = m_DepthImage->GetView();
-        depthAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-        depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-        depthAttachment.clearValue.depthStencil = {1.0f, 0}; // Far plane is 1.0
-
-        VkRenderingInfo renderInfo{};
-        renderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
-        renderInfo.renderArea = {{0, 0}, m_Swapchain.GetExtent()};
-        renderInfo.layerCount = 1;
-        renderInfo.colorAttachmentCount = 1;
-        renderInfo.pColorAttachments = &colorAttachment;
-        renderInfo.pDepthAttachment = &depthAttachment;
-
-        vkCmdBeginRendering(cmd, &renderInfo);
+        // NOTE: We do NOT begin rendering here anymore. RenderGraph handles it.
+        // We also do NOT transition image layouts here. RenderGraph handles it.
+        
         m_IsFrameStarted = true;
     }
 
@@ -148,9 +112,14 @@ namespace Runtime::RHI
 
         VkCommandBuffer cmd = m_CommandBuffers[m_CurrentFrame];
 
-        vkCmdEndRendering(cmd);
-
-        // 6. Barrier: Color Attachment -> Present Source
+        // NOTE: We do NOT end rendering here anymore. RenderGraph handles it.
+        // NOTE: We do NOT transition to PRESENT_SRC here. RenderGraph handles it (via ImportTexture initial/final layout logic? 
+        // Wait, RenderGraph needs to know to transition it back to PresentSrc at the end.
+        // The current RenderGraph implementation doesn't have "FinalLayout" per resource.
+        // However, we can add a manual barrier here OR update RenderGraph to handle "Export".
+        // For now, let's add the transition back to PRESENT_SRC here manually to be safe, 
+        // assuming the RenderGraph left it in ColorAttachment or ReadOnly.
+        
         VkImage currentImage = m_Swapchain.GetImages()[m_ImageIndex];
         CommandUtils::TransitionImageLayout(cmd, currentImage, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                                             VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
@@ -192,7 +161,7 @@ namespace Runtime::RHI
         if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
         {
             m_Swapchain.Recreate();
-            CreateDepthBuffer();
+            // CreateDepthBuffer(); // No longer needed
         }
 
         m_IsFrameStarted = false;
@@ -226,7 +195,7 @@ namespace Runtime::RHI
     {
         vkDeviceWaitIdle(m_Device.GetLogicalDevice());
         m_Swapchain.Recreate();
-        CreateDepthBuffer();
+        // CreateDepthBuffer(); // No longer needed
     }
 
     void SimpleRenderer::Draw(uint32_t vertexCount)
@@ -234,20 +203,15 @@ namespace Runtime::RHI
         vkCmdDraw(m_CommandBuffers[m_CurrentFrame], vertexCount, 1, 0, 0);
     }
 
-    void SimpleRenderer::CreateDepthBuffer()
+    VkImage SimpleRenderer::GetSwapchainImage(uint32_t index) const
     {
-        if (m_DepthImage) delete m_DepthImage;
+        if (index >= m_Swapchain.GetImages().size()) return VK_NULL_HANDLE;
+        return m_Swapchain.GetImages()[index];
+    }
 
-        VkExtent2D extent = m_Swapchain.GetExtent();
-        VkFormat depthFormat = VulkanImage::FindDepthFormat(m_Device);
-
-        m_DepthImage = new VulkanImage(
-            m_Device,
-            extent.width, extent.height,
-            1,
-            depthFormat,
-            VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-            VK_IMAGE_ASPECT_DEPTH_BIT
-        );
+    VkImageView SimpleRenderer::GetSwapchainImageView(uint32_t index) const
+    {
+        if (index >= m_Swapchain.GetImageViews().size()) return VK_NULL_HANDLE;
+        return m_Swapchain.GetImageViews()[index];
     }
 }

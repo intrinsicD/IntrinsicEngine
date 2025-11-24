@@ -9,6 +9,7 @@ add_executable(${target_name}
 
 #Apply Strict Flags ONLY to our tests
 target_compile_options(${target_name} PRIVATE ${INTRINSIC_COMPILE_FLAGS})
+target_link_options(${target_name} PRIVATE ${INTRINSIC_LINK_FLAGS})
 
 # Link against the Core Engine and GTest
 target_link_libraries(${target_name}

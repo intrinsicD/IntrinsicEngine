@@ -9,6 +9,7 @@ import Runtime.RHI.Renderer;
 import Runtime.RHI.Pipeline;
 import Runtime.RHI.Buffer;
 import Runtime.ECS.Scene;
+import Runtime.RenderGraph;
 
 export namespace Runtime::Graphics
 {
@@ -41,5 +42,8 @@ export namespace Runtime::Graphics
 
         // The Global Camera UBO
         RHI::VulkanBuffer* m_GlobalUBO;
+        
+        // RenderGraph
+        Graph::RenderGraph m_RenderGraph;
     };
 }

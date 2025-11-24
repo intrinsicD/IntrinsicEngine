@@ -33,11 +33,17 @@ namespace Runtime::RHI
         [[nodiscard]] bool IsFrameInProgress() const { return m_IsFrameStarted; }
         [[nodiscard]] VkCommandBuffer GetCommandBuffer() const { return m_CommandBuffers[m_CurrentFrame]; }
         [[nodiscard]] uint32_t GetCurrentFrameIndex() const { return m_CurrentFrame; }
+        
+        // Expose Swapchain Image for RenderGraph Import
+        [[nodiscard]] VkImage GetSwapchainImage(uint32_t index) const;
+        [[nodiscard]] VkImageView GetSwapchainImageView(uint32_t index) const;
+        [[nodiscard]] uint32_t GetImageIndex() const { return m_ImageIndex; }
 
     private:
         VulkanDevice& m_Device;
         VulkanSwapchain& m_Swapchain;
-        VulkanImage* m_DepthImage = nullptr;
+        // Depth is now managed by RenderGraph
+        // VulkanImage* m_DepthImage = nullptr;
 
         // Arrays for Double Buffering
         std::vector<VkCommandBuffer> m_CommandBuffers;
@@ -50,6 +56,5 @@ namespace Runtime::RHI
         bool m_IsFrameStarted = false;
 
         void InitSyncStructures();
-        void CreateDepthBuffer();
     };
 }
