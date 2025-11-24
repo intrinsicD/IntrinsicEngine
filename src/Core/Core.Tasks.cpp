@@ -3,6 +3,7 @@ module;
 #include <thread>
 #include <queue>
 #include <mutex>
+#include <memory>
 #include <condition_variable>
 #include <atomic>
 #include <functional>
@@ -26,13 +27,13 @@ namespace Core::Tasks
         std::condition_variable waitCondition; // For WaitForAll
     };
 
-    static SchedulerContext* s_Ctx = nullptr;
+    static std::unique_ptr<SchedulerContext> s_Ctx = nullptr;
 
     void Scheduler::Initialize(unsigned threadCount)
     {
         if (s_Ctx) return; // Already initialized
 
-        s_Ctx = new SchedulerContext();
+        s_Ctx = std::make_unique<SchedulerContext>();
         s_Ctx->isRunning = true;
 
         // Auto-detect
@@ -67,8 +68,7 @@ namespace Core::Tasks
             if (t.joinable()) t.join();
         }
 
-        delete s_Ctx;
-        s_Ctx = nullptr;
+        s_Ctx.reset();
         Log::Info("Scheduler Shutdown.");
     }
 

@@ -11,6 +11,7 @@ module Runtime.Engine;
 import Core.Logging;
 import Core.Input;
 import Core.Window;
+import Core.Memory;
 import Runtime.RHI.Shader;
 import Runtime.Graphics.ModelLoader;
 import Runtime.Graphics.Material;
@@ -166,7 +167,7 @@ namespace Runtime
                                                              m_DescriptorLayout->GetHandle());
 
         m_RenderSystem = std::make_unique<Graphics::RenderSystem>(
-            *m_Device, *m_Swapchain, *m_Renderer, *m_Pipeline);
+            *m_Device, *m_Swapchain, *m_Renderer, *m_Pipeline, m_FrameArena);
     }
 
     void Engine::Run()
@@ -180,6 +181,8 @@ namespace Runtime
 
         while (m_Running && !m_Window->ShouldClose())
         {
+            m_FrameArena.Reset(); // Clear per-frame allocations
+
             m_Window->OnUpdate();
 
             if (m_FramebufferResized)

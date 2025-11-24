@@ -6,6 +6,8 @@ module;
 #include <algorithm>
 
 module Runtime.RenderGraph;
+
+import Core.Memory;
 import Core.Logging;
 
 namespace Runtime::Graph
@@ -74,7 +76,7 @@ namespace Runtime::Graph
         auto& node = m_Graph.m_Resources[id];
         node.PhysicalImage = image;
         node.PhysicalView = view;
-        node.InitialLayout = VK_IMAGE_LAYOUT_UNDEFINED; 
+        node.InitialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         node.CurrentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         node.Extent = extent;
         node.Format = format;
@@ -92,7 +94,8 @@ namespace Runtime::Graph
     }
 
     // --- RenderGraph ---
-    RenderGraph::RenderGraph(RHI::VulkanDevice& device) : m_Device(device)
+    RenderGraph::RenderGraph(RHI::VulkanDevice& device, Core::Memory::LinearArena& arena) : m_Device(device),
+        m_Arena(arena)
     {
     }
 
@@ -126,22 +129,26 @@ namespace Runtime::Graph
         m_Registry = RGRegistry();
 
         // Do NOT delete images. Just mark them free.
-        for (auto &item: m_ImagePool)
+        for (auto& item : m_ImagePool)
         {
             item.IsFree = true;
         }
     }
 
-    RHI::VulkanImage* RenderGraph::AllocateImage(uint32_t frameIndex, uint32_t width, uint32_t height, VkFormat format, VkImageUsageFlags usage, VkImageAspectFlags aspect) {
+    RHI::VulkanImage* RenderGraph::AllocateImage(uint32_t frameIndex, uint32_t width, uint32_t height, VkFormat format,
+                                                 VkImageUsageFlags usage, VkImageAspectFlags aspect)
+    {
         // Reuse logic: Look for a free image from the same frame index
-        for(auto& item : m_ImagePool) {
-            if (item.IsFree && item.LastFrameIndex == frameIndex) {
+        for (auto& item : m_ImagePool)
+        {
+            if (item.IsFree && item.LastFrameIndex == frameIndex)
+            {
                 // Check compatibility (Basic check)
                 if (item.Resource->GetFormat() == format &&
                     // Ideally check extent too, but VulkanImage doesn't store it publicly yet.
                     // Assuming graph topology is static for now.
-                    item.Resource->GetView() != VK_NULL_HANDLE) {
-
+                    item.Resource->GetView() != VK_NULL_HANDLE)
+                {
                     item.IsFree = false;
                     return item.Resource.get();
                 }
@@ -155,44 +162,57 @@ namespace Runtime::Graph
         return ptr;
     }
 
-    void RenderGraph::Compile(uint32_t frameIndex) {
+    void RenderGraph::Compile(uint32_t frameIndex)
+    {
         m_Barriers.resize(m_Passes.size());
 
         // 1. Resolve Transient Resources
-        for (size_t i = 0; i < m_Resources.size(); ++i) {
+        for (size_t i = 0; i < m_Resources.size(); ++i)
+        {
             auto& res = m_Resources[i];
-            if (res.Type == ResourceType::Texture && res.PhysicalImage == VK_NULL_HANDLE) {
+            if (res.Type == ResourceType::Texture && res.PhysicalImage == VK_NULL_HANDLE)
+            {
                 VkFormat fmt = res.Format;
                 VkImageUsageFlags usage = VK_IMAGE_USAGE_SAMPLED_BIT;
                 VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT;
 
-                if (res.Name.find("Depth") != std::string::npos) {
+                if (res.Name.find("Depth") != std::string::npos)
+                {
                     if (fmt == VK_FORMAT_UNDEFINED) fmt = RHI::VulkanImage::FindDepthFormat(m_Device);
                     usage |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
                     aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
-                } else {
+                }
+                else
+                {
                     usage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
                 }
 
-                RHI::VulkanImage* img = AllocateImage(frameIndex, res.Extent.width, res.Extent.height, fmt, usage, aspect);
+                RHI::VulkanImage* img = AllocateImage(frameIndex, res.Extent.width, res.Extent.height, fmt, usage,
+                                                      aspect);
                 res.PhysicalImage = img->GetHandle();
                 res.PhysicalView = img->GetView();
             }
-            if (res.PhysicalImage) {
+            if (res.PhysicalImage)
+            {
                 m_Registry.RegisterImage((ResourceID)i, res.PhysicalImage, res.PhysicalView);
             }
         }
 
         // 2. Barrier Calculation
-        for (size_t passIdx = 0; passIdx < m_Passes.size(); ++passIdx) {
+        for (size_t passIdx = 0; passIdx < m_Passes.size(); ++passIdx)
+        {
             const auto& pass = m_Passes[passIdx];
 
             // A. Attachments
-            for (const auto& att : pass.Attachments) {
+            for (const auto& att : pass.Attachments)
+            {
                 auto& res = m_Resources[att.ID];
-                VkImageLayout targetLayout = att.IsDepth ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                VkImageLayout targetLayout = att.IsDepth
+                                                 ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+                                                 : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-                if (res.CurrentLayout != targetLayout) {
+                if (res.CurrentLayout != targetLayout)
+                {
                     VkImageMemoryBarrier2 barrier{};
                     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
                     barrier.image = res.PhysicalImage;
@@ -201,21 +221,26 @@ namespace Runtime::Graph
 
                     // If the image was UNDEFINED (first use), we don't need to wait on anything
                     barrier.srcStageMask = (res.CurrentLayout == VK_IMAGE_LAYOUT_UNDEFINED)
-                        ? VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT
-                        : VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+                                               ? VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT
+                                               : VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
                     barrier.srcAccessMask = (res.CurrentLayout == VK_IMAGE_LAYOUT_UNDEFINED)
-                        ? 0
-                        : VK_ACCESS_2_MEMORY_WRITE_BIT;
+                                                ? 0
+                                                : VK_ACCESS_2_MEMORY_WRITE_BIT;
 
-                    if (att.IsDepth) {
-                        barrier.dstStageMask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
+                    if (att.IsDepth)
+                    {
+                        barrier.dstStageMask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT |
+                            VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
                         barrier.dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
                         barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
                         // FIX: If format has stencil, include it to be safe
-                        if (res.Format == VK_FORMAT_D32_SFLOAT_S8_UINT || res.Format == VK_FORMAT_D24_UNORM_S8_UINT) {
+                        if (res.Format == VK_FORMAT_D32_SFLOAT_S8_UINT || res.Format == VK_FORMAT_D24_UNORM_S8_UINT)
+                        {
                             barrier.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
                         }
-                    } else {
+                    }
+                    else
+                    {
                         barrier.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
                         barrier.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
                         barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -232,18 +257,20 @@ namespace Runtime::Graph
             }
 
             // B. Reads
-             for (ResourceID id : pass.Reads) {
+            for (ResourceID id : pass.Reads)
+            {
                 auto& res = m_Resources[id];
-                if (res.CurrentLayout != VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
-                     VkImageMemoryBarrier2 barrier{};
+                if (res.CurrentLayout != VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+                {
+                    VkImageMemoryBarrier2 barrier{};
                     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
                     barrier.image = res.PhysicalImage;
                     barrier.oldLayout = res.CurrentLayout;
                     barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
                     barrier.srcStageMask = (res.CurrentLayout == VK_IMAGE_LAYOUT_UNDEFINED)
-                        ? VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT
-                        : VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+                                               ? VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT
+                                               : VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
 
                     barrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
                     barrier.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
@@ -253,7 +280,7 @@ namespace Runtime::Graph
                     m_Barriers[passIdx].ImageBarriers.push_back(barrier);
                     res.CurrentLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
                 }
-             }
+            }
         }
     }
 
@@ -290,7 +317,9 @@ namespace Runtime::Graph
                     VkRenderingAttachmentInfo info{};
                     info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
                     info.imageView = res.PhysicalView;
-                    info.imageLayout = att.IsDepth ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                    info.imageLayout = att.IsDepth
+                                           ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+                                           : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
                     info.loadOp = att.Info.LoadOp;
                     info.storeOp = att.Info.StoreOp;
                     info.clearValue = att.Info.ClearValue;

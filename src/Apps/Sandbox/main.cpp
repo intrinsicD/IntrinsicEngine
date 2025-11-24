@@ -98,7 +98,6 @@ public:
 
     void OnUpdate(float dt) override
     {
-
         static float timer = 0.0f;
         static int frames = 0;
         timer += dt;
