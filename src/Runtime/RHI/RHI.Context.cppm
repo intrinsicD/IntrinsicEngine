@@ -16,7 +16,7 @@ namespace Runtime::RHI {
 
     export class VulkanContext {
     public:
-        VulkanContext(const ContextConfig& config, Core::Windowing::Window& window);
+        explicit VulkanContext(const ContextConfig& config);
         ~VulkanContext();
 
         // No copy

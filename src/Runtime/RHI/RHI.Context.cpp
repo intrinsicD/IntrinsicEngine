@@ -19,9 +19,9 @@ namespace Runtime::RHI {
     // Debug Callback Function (Standard Vulkan Boilerplate)
     static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
         VkDebugUtilsMessageSeverityFlagBitsEXT severity,
-        VkDebugUtilsMessageTypeFlagsEXT type,
+        [[maybe_unused]] VkDebugUtilsMessageTypeFlagsEXT type,
         const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
-        void* pUserData) 
+        [[maybe_unused]] void* pUserData)
     {
         // Filter out noisy verbose messages if needed
         if (severity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
@@ -32,7 +32,7 @@ namespace Runtime::RHI {
         return VK_FALSE;
     }
 
-    VulkanContext::VulkanContext(const ContextConfig& config, Core::Windowing::Window& window) {
+    VulkanContext::VulkanContext(const ContextConfig& config) {
         // 1. Initialize Volk (Load basic function pointers)
         if (volkInitialize() != VK_SUCCESS) {
             Core::Log::Error("Failed to initialize Volk! Is Vulkan installed?");

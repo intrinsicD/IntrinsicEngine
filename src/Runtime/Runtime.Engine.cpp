@@ -49,7 +49,7 @@ namespace Runtime
         bool enableValidation = true;
 #endif
         RHI::ContextConfig rhiConfig{config.AppName, enableValidation};
-        m_Context = std::make_unique<RHI::VulkanContext>(rhiConfig, *m_Window);
+        m_Context = std::make_unique<RHI::VulkanContext>(rhiConfig);
 
         if (!m_Window->CreateSurface(m_Context->GetInstance(), nullptr, &m_Surface))
         {
@@ -145,9 +145,6 @@ namespace Runtime
                     cmr.MaterialRef = defaultMat;
                 }
             }
-
-            //TODO: using this i get Sandbox: /home/alex/Documents/IntrinsicEngine/external/cache/vma-src/include/vk_mem_alloc.h:11761: void VmaDeviceMemoryBlock::Destroy(VmaAllocator): Assertion `m_pMetadata->IsEmpty() && "Some allocations were not freed before destruction of this memory block!"' failed. when i close the window... Fix me!
-
             Core::Log::Info("Model instantiated into Scene.");
         }
         else

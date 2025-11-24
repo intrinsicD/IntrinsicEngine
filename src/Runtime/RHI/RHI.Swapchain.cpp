@@ -163,11 +163,11 @@ namespace Runtime::RHI {
     }
 
     VkPresentModeKHR VulkanSwapchain::ChooseSwapPresentMode(const std::vector<VkPresentModeKHR>& presentModes) {
-        /*for (const auto& availablePresentMode : presentModes) {
+        for (const auto& availablePresentMode : presentModes) {
             if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
                 return availablePresentMode;
             }
-        }*/
+        }
         return VK_PRESENT_MODE_FIFO_KHR;
     }
 
