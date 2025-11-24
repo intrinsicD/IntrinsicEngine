@@ -1,5 +1,6 @@
 module;
 #include <functional>
+#include <memory>
 #include <string>
 #include <vector>
 #include <variant>
@@ -119,7 +120,7 @@ export namespace Runtime::Graph
         }
 
         // 2. Compile Phase: Calculate Barriers
-        void Compile();
+        void Compile(uint32_t frameIndex);
 
         // 3. Execute Phase: Record Commands
         void Execute(VkCommandBuffer cmd);
@@ -159,6 +160,7 @@ export namespace Runtime::Graph
             VkImage PhysicalImage = VK_NULL_HANDLE;
             VkImageView PhysicalView = VK_NULL_HANDLE;
             VkExtent2D Extent = {0,0};
+            VkFormat Format = VK_FORMAT_UNDEFINED;
         };
 
         // Barrier storage: Index = Pass Index
@@ -166,23 +168,23 @@ export namespace Runtime::Graph
             std::vector<VkImageMemoryBarrier2> ImageBarriers;
         };
 
+        struct PooledImage
+        {
+            std::unique_ptr<RHI::VulkanImage> Resource;
+            uint32_t LastFrameIndex;
+            bool IsFree;
+        };
+
         RHI::VulkanDevice& m_Device;
         std::vector<RGPass> m_Passes;
         std::vector<ResourceNode> m_Resources;
         std::vector<BarrierBatch> m_Barriers;
         RGRegistry m_Registry;
-        
-        // Ownership of transient resources
-        // Using void* to avoid including RHI.Image in header if not needed, or just forward declare.
-        // But since we import RHI.Image, we can use VulkanImage*.
-        // However, VulkanImage is not exported by RHI.Image?
-        // Checking imports... import Runtime.RHI.Image;
-        // It should be fine.
-        // Wait, I can't easily add a member that requires a type I might not have fully visible if it's a module.
-        // Let's just use a vector of void* and delete them in Reset/Destructor for now to be safe and quick.
-        std::vector<void*> m_TransientImages;
+
+        std::vector<PooledImage> m_ImagePool;
 
         RGPass& CreatePassInternal(const std::string& name);
         ResourceID CreateResourceInternal(const std::string& name, ResourceType type);
+        RHI::VulkanImage* AllocateImage(uint32_t frameIndex, uint32_t width, uint32_t height, VkFormat format, VkImageUsageFlags usage, VkImageAspectFlags aspect);
     };
 }

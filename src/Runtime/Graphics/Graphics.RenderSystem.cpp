@@ -55,9 +55,9 @@ namespace Runtime::Graphics
 
     void RenderSystem::OnUpdate(ECS::Scene& scene, const CameraData& camera)
     {
-        // 1. Begin Frame (Acquire Image, Wait Fences)
+        // 1. Begin Frame
         m_Renderer.BeginFrame();
-        
+
         if (m_Renderer.IsFrameInProgress())
         {
             // 2. Update Global UBO
@@ -67,12 +67,9 @@ namespace Runtime::Graphics
 
             size_t cameraDataSize = sizeof(RHI::CameraBufferObject);
             size_t alignedSize = PadUniformBufferSize(cameraDataSize, m_MinUboAlignment);
-
-            // Offset based on CURRENT FRAME
             uint32_t frameIndex = m_Renderer.GetCurrentFrameIndex();
             size_t offset = frameIndex * alignedSize;
 
-            // Write to specific offset
             char* data = (char*)m_GlobalUBO->Map();
             memcpy(data + offset, &ubo, cameraDataSize);
             m_GlobalUBO->Unmap();
@@ -86,84 +83,59 @@ namespace Runtime::Graphics
             m_RenderGraph.AddPass<ForwardPassData>("ForwardPass",
                 [&](ForwardPassData& data, Graph::RGBuilder& builder)
                 {
-                    // Import Swapchain Image
                     VkImage swapImage = m_Renderer.GetSwapchainImage(imageIndex);
                     VkImageView swapView = m_Renderer.GetSwapchainImageView(imageIndex);
-                    
+
+                    // Use explicit format from swapchain
                     auto importedColor = builder.ImportTexture("Backbuffer", swapImage, swapView, m_Swapchain.GetImageFormat(), extent);
-                    
-                    // Create Depth Image
+
                     Graph::RGTextureDesc depthDesc{};
                     depthDesc.Width = extent.width;
                     depthDesc.Height = extent.height;
-                    // Format is handled internally by RG for now (hack)
+                    // We don't set format here, RenderGraph will auto-detect
                     auto depth = builder.CreateTexture("DepthBuffer", depthDesc);
 
-                    // Setup Attachments
                     Graph::RGAttachmentInfo colorInfo{};
-                    colorInfo.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-                    colorInfo.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
                     colorInfo.ClearValue = {{{0.1f, 0.3f, 0.6f, 1.0f}}};
 
                     Graph::RGAttachmentInfo depthInfo{};
-                    depthInfo.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-                    depthInfo.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
                     depthInfo.ClearValue.depthStencil = {1.0f, 0};
 
                     data.Color = builder.WriteColor(importedColor, colorInfo);
                     data.Depth = builder.WriteDepth(depth, depthInfo);
                 },
-                [&, offset](const ForwardPassData& data, const Graph::RGRegistry& reg, VkCommandBuffer cmd)
+                [&, offset](const ForwardPassData&, const Graph::RGRegistry&, VkCommandBuffer cmd)
                 {
                     m_Renderer.BindPipeline(m_Pipeline);
                     m_Renderer.SetViewport(extent.width, extent.height);
 
-                    // In a real engine, we would sort entities by Material to minimize state changes.
-                    auto view = scene.GetRegistry().view<
-                        ECS::TransformComponent, ECS::MeshRendererComponent>();
-
+                    auto view = scene.GetRegistry().view<ECS::TransformComponent, ECS::MeshRendererComponent>();
                     for (auto [entity, transform, renderable] : view.each())
                     {
                         if (!renderable.MeshRef || !renderable.MaterialRef) continue;
 
                         VkDescriptorSet sets[] = {renderable.MaterialRef->GetDescriptorSet()};
                         uint32_t dynamicOffset = static_cast<uint32_t>(offset);
-                        vkCmdBindDescriptorSets(
-                            cmd,
-                            VK_PIPELINE_BIND_POINT_GRAPHICS,
-                            m_Pipeline.GetLayout(),
-                            0, 1, sets,
-                            1, &dynamicOffset
-                        );
+                        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_Pipeline.GetLayout(), 0, 1, sets, 1, &dynamicOffset);
 
-                        // Push Constants
                         RHI::MeshPushConstants push{};
                         push.model = transform.GetTransform();
+                        vkCmdPushConstants(cmd, m_Pipeline.GetLayout(), VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push), &push);
 
-                        vkCmdPushConstants(
-                            cmd,
-                            m_Pipeline.GetLayout(),
-                            VK_SHADER_STAGE_VERTEX_BIT,
-                            0, sizeof(push), &push
-                        );
-
-                        // Draw Mesh
                         VkBuffer vBuffers[] = {renderable.MeshRef->GetVertexBuffer()->GetHandle()};
                         VkDeviceSize offsets[] = {0};
                         vkCmdBindVertexBuffers(cmd, 0, 1, vBuffers, offsets);
-                        vkCmdBindIndexBuffer(cmd, renderable.MeshRef->GetIndexBuffer()->GetHandle(),
-                                             0, VK_INDEX_TYPE_UINT32);
-
+                        vkCmdBindIndexBuffer(cmd, renderable.MeshRef->GetIndexBuffer()->GetHandle(), 0, VK_INDEX_TYPE_UINT32);
                         vkCmdDrawIndexed(cmd, renderable.MeshRef->GetIndexCount(), 1, 0, 0, 0);
                     }
                 }
             );
 
-            // 4. Compile & Execute
-            m_RenderGraph.Compile();
+            // 4. Compile & Execute with Frame Index
+            m_RenderGraph.Compile(frameIndex);
             m_RenderGraph.Execute(m_Renderer.GetCommandBuffer());
 
-            // 5. End Frame (Submit, Present)
+            // 5. End Frame
             m_Renderer.EndFrame();
         }
     }

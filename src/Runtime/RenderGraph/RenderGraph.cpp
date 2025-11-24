@@ -2,6 +2,7 @@ module;
 #include <RHI/RHI.Vulkan.hpp>
 #include <string>
 #include <vector>
+#include <memory>
 #include <algorithm>
 
 module Runtime.RenderGraph;
@@ -62,10 +63,11 @@ namespace Runtime::Graph
         node.Extent = {desc.Width, desc.Height};
         node.InitialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         node.CurrentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        node.Format = desc.Format;
         return {id};
     }
 
-    RGResourceHandle RGBuilder::ImportTexture(const std::string& name, VkImage image, VkImageView view, VkFormat,
+    RGResourceHandle RGBuilder::ImportTexture(const std::string& name, VkImage image, VkImageView view, VkFormat format,
                                               VkExtent2D extent)
     {
         ResourceID id = m_Graph.CreateResourceInternal(name, ResourceType::Import);
@@ -75,7 +77,7 @@ namespace Runtime::Graph
         node.InitialLayout = VK_IMAGE_LAYOUT_UNDEFINED; 
         node.CurrentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         node.Extent = extent;
-
+        node.Format = format;
         m_Graph.m_Registry.RegisterImage(id, image, view);
         return {id};
     }
@@ -96,6 +98,9 @@ namespace Runtime::Graph
 
     RenderGraph::~RenderGraph()
     {
+        // Ensure GPU is done before we destroy pooled images
+        vkDeviceWaitIdle(m_Device.GetLogicalDevice());
+        m_ImagePool.clear();
     }
 
     RenderGraph::RGPass& RenderGraph::CreatePassInternal(const std::string& name)
@@ -118,105 +123,137 @@ namespace Runtime::Graph
         m_Passes.clear();
         m_Resources.clear();
         m_Barriers.clear();
-        
-        for (void* ptr : m_TransientImages)
+        m_Registry = RGRegistry();
+
+        // Do NOT delete images. Just mark them free.
+        for (auto &item: m_ImagePool)
         {
-            delete static_cast<RHI::VulkanImage*>(ptr);
+            item.IsFree = true;
         }
-        m_TransientImages.clear();
     }
 
-    void RenderGraph::Compile()
-    {
-        m_Barriers.resize(m_Passes.size());
+    RHI::VulkanImage* RenderGraph::AllocateImage(uint32_t frameIndex, uint32_t width, uint32_t height, VkFormat format, VkImageUsageFlags usage, VkImageAspectFlags aspect) {
+        // Reuse logic: Look for a free image from the same frame index
+        for(auto& item : m_ImagePool) {
+            if (item.IsFree && item.LastFrameIndex == frameIndex) {
+                // Check compatibility (Basic check)
+                if (item.Resource->GetFormat() == format &&
+                    // Ideally check extent too, but VulkanImage doesn't store it publicly yet.
+                    // Assuming graph topology is static for now.
+                    item.Resource->GetView() != VK_NULL_HANDLE) {
 
-        // 1. Allocate Transient Resources (Naive: Just create them if missing)
-        // In a real engine, we would use a frame allocator and alias memory.
-        for (size_t i = 0; i < m_Resources.size(); ++i)
-        {
-            auto& res = m_Resources[i];
-            if (res.Type == ResourceType::Texture && res.PhysicalImage == VK_NULL_HANDLE)
-            {
-                // We need format here. Since I missed adding it to ResourceNode, 
-                // I will assume a default format or rely on the fact that we might not be using CreateTexture yet for anything complex.
-                // Actually, for the Depth Buffer, we DO need to create it.
-                // Let's assume we only use CreateTexture for Depth for now and hardcode/find depth format.
-                // Or better, I should have added Format to ResourceNode. 
-                // I'll skip allocation logic here for a moment and assume the user (RenderSystem) imports everything or I'll fix it in next step.
-                // WAIT, the plan says "Implement CreateTexture".
-                // I'll assume for this specific task (Duck Rendering), we might just Import the Depth Buffer from Renderer if I didn't remove it yet?
-                // No, plan says "Remove CreateDepthBuffer" from Renderer.
-                // So I MUST allocate it here.
-                
-                // Hack: If name contains "Depth", use Depth Format.
-                if (res.Name.find("Depth") != std::string::npos)
-                {
-                     VkFormat depthFormat = RHI::VulkanImage::FindDepthFormat(m_Device);
-                     auto* img = new RHI::VulkanImage(m_Device, res.Extent.width, res.Extent.height, 1, depthFormat, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_ASPECT_DEPTH_BIT);
-                     res.PhysicalImage = img->GetHandle();
-                     res.PhysicalView = img->GetView();
-                     m_TransientImages.push_back(img);
+                    item.IsFree = false;
+                    return item.Resource.get();
                 }
             }
-            // Register whatever we have
-            if (res.PhysicalImage)
+        }
+
+        // Allocate new
+        auto img = std::make_unique<RHI::VulkanImage>(m_Device, width, height, 1, format, usage, aspect);
+        auto* ptr = img.get();
+        m_ImagePool.push_back({std::move(img), frameIndex, false});
+        return ptr;
+    }
+
+    void RenderGraph::Compile(uint32_t frameIndex) {
+        m_Barriers.resize(m_Passes.size());
+
+        // 1. Resolve Transient Resources
+        for (size_t i = 0; i < m_Resources.size(); ++i) {
+            auto& res = m_Resources[i];
+            if (res.Type == ResourceType::Texture && res.PhysicalImage == VK_NULL_HANDLE) {
+                VkFormat fmt = res.Format;
+                VkImageUsageFlags usage = VK_IMAGE_USAGE_SAMPLED_BIT;
+                VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+
+                if (res.Name.find("Depth") != std::string::npos) {
+                    if (fmt == VK_FORMAT_UNDEFINED) fmt = RHI::VulkanImage::FindDepthFormat(m_Device);
+                    usage |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+                    aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
+                } else {
+                    usage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+                }
+
+                RHI::VulkanImage* img = AllocateImage(frameIndex, res.Extent.width, res.Extent.height, fmt, usage, aspect);
+                res.PhysicalImage = img->GetHandle();
+                res.PhysicalView = img->GetView();
+            }
+            if (res.PhysicalImage) {
                 m_Registry.RegisterImage((ResourceID)i, res.PhysicalImage, res.PhysicalView);
+            }
         }
 
         // 2. Barrier Calculation
-        for (size_t passIdx = 0; passIdx < m_Passes.size(); ++passIdx)
-        {
+        for (size_t passIdx = 0; passIdx < m_Passes.size(); ++passIdx) {
             const auto& pass = m_Passes[passIdx];
 
-            // A. Handle Attachments (Color/Depth Writes)
-            for (const auto& att : pass.Attachments)
-            {
+            // A. Attachments
+            for (const auto& att : pass.Attachments) {
                 auto& res = m_Resources[att.ID];
                 VkImageLayout targetLayout = att.IsDepth ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-                
-                if (res.CurrentLayout != targetLayout)
-                {
+
+                if (res.CurrentLayout != targetLayout) {
                     VkImageMemoryBarrier2 barrier{};
                     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
                     barrier.image = res.PhysicalImage;
                     barrier.oldLayout = res.CurrentLayout;
                     barrier.newLayout = targetLayout;
-                    barrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-                    barrier.dstStageMask = att.IsDepth ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL : VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-                    barrier.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT; // Safe default
-                    barrier.dstAccessMask = att.IsDepth ? VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT : VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
-                    
-                    VkImageAspectFlags aspect = att.IsDepth ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
-                    barrier.subresourceRange = {aspect, 0, 1, 0, 1};
+
+                    // If the image was UNDEFINED (first use), we don't need to wait on anything
+                    barrier.srcStageMask = (res.CurrentLayout == VK_IMAGE_LAYOUT_UNDEFINED)
+                        ? VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT
+                        : VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+                    barrier.srcAccessMask = (res.CurrentLayout == VK_IMAGE_LAYOUT_UNDEFINED)
+                        ? 0
+                        : VK_ACCESS_2_MEMORY_WRITE_BIT;
+
+                    if (att.IsDepth) {
+                        barrier.dstStageMask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
+                        barrier.dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+                        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+                        // FIX: If format has stencil, include it to be safe
+                        if (res.Format == VK_FORMAT_D32_SFLOAT_S8_UINT || res.Format == VK_FORMAT_D24_UNORM_S8_UINT) {
+                            barrier.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+                        }
+                    } else {
+                        barrier.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+                        barrier.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+                        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                    }
+
+                    barrier.subresourceRange.baseMipLevel = 0;
+                    barrier.subresourceRange.levelCount = 1;
+                    barrier.subresourceRange.baseArrayLayer = 0;
+                    barrier.subresourceRange.layerCount = 1;
 
                     m_Barriers[passIdx].ImageBarriers.push_back(barrier);
                     res.CurrentLayout = targetLayout;
                 }
             }
 
-            // B. Handle Reads (Shader Read)
-            for (ResourceID id : pass.Reads)
-            {
+            // B. Reads
+             for (ResourceID id : pass.Reads) {
                 auto& res = m_Resources[id];
-                VkImageLayout targetLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-                if (res.CurrentLayout != targetLayout)
-                {
-                    VkImageMemoryBarrier2 barrier{};
+                if (res.CurrentLayout != VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+                     VkImageMemoryBarrier2 barrier{};
                     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
                     barrier.image = res.PhysicalImage;
                     barrier.oldLayout = res.CurrentLayout;
-                    barrier.newLayout = targetLayout;
-                    barrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+                    barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+                    barrier.srcStageMask = (res.CurrentLayout == VK_IMAGE_LAYOUT_UNDEFINED)
+                        ? VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT
+                        : VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+
                     barrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
                     barrier.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
                     barrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
-                    barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1}; // Assumption: Reads are color for now
+                    barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
 
                     m_Barriers[passIdx].ImageBarriers.push_back(barrier);
-                    res.CurrentLayout = targetLayout;
+                    res.CurrentLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
                 }
-            }
+             }
         }
     }
 
@@ -248,7 +285,7 @@ namespace Runtime::Graph
                 for (const auto& att : pass.Attachments)
                 {
                     auto& res = m_Resources[att.ID];
-                    renderArea = res.Extent; // Assume all attachments have same size
+                    renderArea = res.Extent;
 
                     VkRenderingAttachmentInfo info{};
                     info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
