@@ -5,12 +5,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - name: Install Clang 22
+    - name: Install Clang 18
       run: |
         sudo apt-get update
-        sudo apt-get install -y clang-22
+        sudo apt-get install -y clang-18
     - name: Configure CMake
-      run: cmake -B build -DCMAKE_C_COMPILER=clang-22 -DCMAKE_CXX_COMPILER=clang++-22
+      run: cmake -B build -DCMAKE_C_COMPILER=clang-18 -DCMAKE_CXX_COMPILER=clang++-18
     - name: Build
       run: cmake --build build
     - name: Run Tests

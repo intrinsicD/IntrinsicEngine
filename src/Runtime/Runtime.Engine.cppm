@@ -42,7 +42,7 @@ export namespace Runtime
     protected:
         // Protected access so Sandbox can manipulate Scene/Assets
         ECS::Scene m_Scene;
-        Core::Memory::LinearArena m_FrameArena{1024 * 1024}; // 1 MB per frame
+        Core::Memory::LinearArena m_FrameArena; // 1 MB per frame
         std::unique_ptr<Graphics::RenderSystem> m_RenderSystem;
         std::unique_ptr<RHI::VulkanDevice> m_Device;
 

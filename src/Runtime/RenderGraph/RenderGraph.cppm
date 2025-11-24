@@ -139,7 +139,7 @@ export namespace Runtime::Graph
             pass.Execute = [=](const RGRegistry& reg, VkCommandBuffer cmd)
             {
                 execute(*data, reg, cmd);
-                delete data; // Cleanup
+                //delete data; // Cleanup
             };
         }
 

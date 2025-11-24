@@ -20,7 +20,7 @@ import Runtime.RHI.Types;
 
 namespace Runtime
 {
-    Engine::Engine(const EngineConfig& config)
+    Engine::Engine(const EngineConfig& config) : m_FrameArena(1024 * 1024) // 1 MB per frame
     {
         Core::Log::Info("Initializing Engine...");
 

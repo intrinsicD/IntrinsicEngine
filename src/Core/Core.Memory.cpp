@@ -69,8 +69,11 @@ namespace Core::Memory
     void LinearArena::Reset()
     {
         offset_ = 0;
-#ifdef _DEBUG
-        std::memset(start_, 0xCC, totalSize_);
+#ifndef NDEBUG
+        // Only memset if start_ is valid!
+        if (start_) {
+            std::memset(start_, 0xCC, totalSize_);
+        }
 #endif
     }
 }
