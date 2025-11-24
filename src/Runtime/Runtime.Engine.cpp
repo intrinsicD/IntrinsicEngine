@@ -90,6 +90,14 @@ namespace Runtime
     void Engine::LoadDroppedAsset(const std::string& path)
     {
         std::filesystem::path fsPath(path);
+        std::filesystem::path canonical = std::filesystem::canonical(fsPath);
+        std::filesystem::path assetDir = std::filesystem::canonical("assets/");
+
+        if (!canonical.string().starts_with(assetDir.string()))
+        {
+            Core::Log::Error("Dropped file is outside of assets directory: {}", path);
+            return;
+        }
         std::string ext = fsPath.extension().string();
 
         // Convert to lower case for comparison

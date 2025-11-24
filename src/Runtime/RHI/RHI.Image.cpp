@@ -9,7 +9,7 @@ namespace Runtime::RHI
 {
     VulkanImage::VulkanImage(VulkanDevice& device, uint32_t width, uint32_t height, uint32_t mipLevels, VkFormat format,
                              VkImageUsageFlags usage, VkImageAspectFlags aspect)
-        : m_Device(device), m_Format(format), m_MipLevels(mipLevels)
+        : m_Device(device), m_Format(format), m_MipLevels(mipLevels), m_Width(width), m_Height(height)
     {
         // 1. Create Image
         VkImageCreateInfo imageInfo{};

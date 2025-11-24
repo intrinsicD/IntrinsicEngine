@@ -145,8 +145,8 @@ namespace Runtime::Graph
             {
                 // Check compatibility (Basic check)
                 if (item.Resource->GetFormat() == format &&
-                    // Ideally check extent too, but VulkanImage doesn't store it publicly yet.
-                    // Assuming graph topology is static for now.
+                    item.Resource->GetWidth() == width &&
+                    item.Resource->GetHeight() == height &&
                     item.Resource->GetView() != VK_NULL_HANDLE)
                 {
                     item.IsFree = false;

@@ -19,6 +19,9 @@ export namespace Runtime::RHI
         [[nodiscard]] VkFormat GetFormat() const { return m_Format; }
         [[nodiscard]] uint32_t GetMipLevels() const { return m_MipLevels; }
 
+        [[nodiscard]] uint32_t GetWidth() const{ return m_Width; }
+        [[nodiscard]] uint32_t GetHeight() const{ return m_Height; }
+
         // Helper to find a supported depth format
         static VkFormat FindDepthFormat(VulkanDevice& device);
 
@@ -29,5 +32,7 @@ export namespace Runtime::RHI
         VmaAllocation m_Allocation = VK_NULL_HANDLE;
         VkFormat m_Format;
         uint32_t m_MipLevels = 1;
+        uint32_t m_Width = 0;
+        uint32_t m_Height = 0;
     };
 }
