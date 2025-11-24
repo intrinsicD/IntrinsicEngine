@@ -123,7 +123,6 @@ namespace Runtime::Graphics
 
                                                        auto view = scene.GetRegistry().view<
                                                            ECS::TransformComponent, ECS::MeshRendererComponent>();
-                                                       Core::Log::Info("Entities to render: {}", view.size_hint());
                                                        for (auto [entity, transform, renderable] : view.each())
                                                        {
                                                            if (!renderable.MeshRef || !renderable.MaterialRef) continue;

@@ -121,6 +121,8 @@ export namespace Runtime::Graph
                      std::function<void(Data&, RGBuilder&)> setup,
                      std::function<void(const Data&, const RGRegistry&, VkCommandBuffer)> execute)
         {
+            static_assert(std::is_trivially_destructible_v<Data>,
+    "RenderGraph PassData must be trivially destructible (POD) because the LinearArena does not call destructors.");
             auto& pass = CreatePassInternal(name);
             // Allocate data on a linear arena (simulated here with heap for brevity)
             auto allocResult = m_Arena.New<Data>();

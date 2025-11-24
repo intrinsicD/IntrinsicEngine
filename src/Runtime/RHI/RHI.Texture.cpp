@@ -8,6 +8,7 @@ module;
 
 module Runtime.RHI.Texture;
 import Runtime.RHI.Buffer;
+import Runtime.RHI.Image;
 import Runtime.RHI.CommandUtils;
 import Core.Logging;
 
