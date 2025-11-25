@@ -169,6 +169,29 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(tinygltf)
 
+# --- ImGui (Docking Branch) ---
+FetchContent_Declare(
+        imgui
+        GIT_REPOSITORY https://github.com/ocornut/imgui.git
+        GIT_TAG docking
+)
+FetchContent_MakeAvailable(imgui)
+
+# Create a library for ImGui to make linking easier
+# We also include the backend sources for GLFW and Vulkan
+add_library(imgui_lib STATIC
+        ${imgui_SOURCE_DIR}/imgui.cpp
+        ${imgui_SOURCE_DIR}/imgui_demo.cpp
+        ${imgui_SOURCE_DIR}/imgui_draw.cpp
+        ${imgui_SOURCE_DIR}/imgui_tables.cpp
+        ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+        ${imgui_SOURCE_DIR}/backends/imgui_impl_glfw.cpp
+        ${imgui_SOURCE_DIR}/backends/imgui_impl_vulkan.cpp
+)
+target_include_directories(imgui_lib PUBLIC ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends)
+# Link GLFW and Vulkan to ImGui backend
+target_link_libraries(imgui_lib PUBLIC glfw Vulkan::Vulkan)
+
 # ------------------------------------------------------------------------------
 # Subdirectories
 # ------------------------------------------------------------------------------

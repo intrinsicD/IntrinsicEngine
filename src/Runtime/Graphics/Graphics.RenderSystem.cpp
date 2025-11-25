@@ -2,7 +2,8 @@ module;
 #include <cstring>
 #include <glm/glm.hpp>
 #include <entt/entt.hpp>
-#include <RHI/RHI.Vulkan.hpp>
+#include "RHI/RHI.Vulkan.hpp"
+#include <imgui.h>
 
 module Runtime.Graphics.RenderSystem;
 
@@ -12,6 +13,7 @@ import Core.Assets;
 import Runtime.RHI.Types;
 import Runtime.ECS.Components;
 import Runtime.Graphics.Camera;
+import Runtime.Interface.GUI;
 
 namespace Runtime::Graphics
 {
@@ -57,6 +59,11 @@ namespace Runtime::Graphics
         //keep for persistent camera data mapping = nullptr on destruction?
     }
 
+    struct ImGuiPassData
+    {
+        Graph::RGResourceHandle Backbuffer;
+    };
+
     struct ForwardPassData
     {
         Graph::RGResourceHandle Color;
@@ -65,6 +72,24 @@ namespace Runtime::Graphics
 
     void RenderSystem::OnUpdate(ECS::Scene& scene, const Camera& camera, Core::Assets::AssetManager& assetManager)
     {
+        Interface::GUI::BeginFrame();
+
+        {
+            ImGui::Begin("Renderer Stats");
+            ImGui::Text("Application Average: %.3f ms/frame (%.1f FPS)",
+                        1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+
+            static glm::vec3 sunDir = {1.0, 1.0, 1.0};
+            ImGui::DragFloat3("Sun Direction", &sunDir.x, 0.1f);
+
+            // Camera info
+            ImGui::Separator();
+            glm::vec3 camPos = camera.Position;
+            ImGui::Text("Camera Pos: %.2f, %.2f, %.2f", camPos.x, camPos.y, camPos.z);
+
+            ImGui::End();
+        }
+
         m_Renderer.BeginFrame();
 
         if (m_Renderer.IsFrameInProgress())
@@ -87,6 +112,8 @@ namespace Runtime::Graphics
             auto extent = m_Swapchain.GetExtent();
             uint32_t imageIndex = m_Renderer.GetImageIndex();
 
+            Graph::RGResourceHandle forwardOutput;
+
             m_RenderGraph.AddPass<ForwardPassData>("ForwardPass",
                                                    [&](ForwardPassData& data, Graph::RGBuilder& builder)
                                                    {
@@ -107,12 +134,16 @@ namespace Runtime::Graphics
 
                                                        Graph::RGAttachmentInfo colorInfo{};
                                                        colorInfo.ClearValue = {{{0.1f, 0.3f, 0.6f, 1.0f}}};
+                                                       colorInfo.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+                                                       colorInfo.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
 
                                                        Graph::RGAttachmentInfo depthInfo{};
                                                        depthInfo.ClearValue.depthStencil = {1.0f, 0};
 
                                                        data.Color = builder.WriteColor(importedColor, colorInfo);
                                                        data.Depth = builder.WriteDepth(depth, depthInfo);
+
+                                                       forwardOutput = data.Color;
                                                    },
                                                    [&, offset](const ForwardPassData&, const Graph::RGRegistry&,
                                                                VkCommandBuffer cmd)
@@ -157,6 +188,43 @@ namespace Runtime::Graphics
                                                                cmd, renderable.MeshRef->GetIndexCount(), 1, 0, 0, 0);
                                                        }
                                                    }
+            );
+
+            m_RenderGraph.AddPass<ImGuiPassData>("ImGuiPass",
+                                                 [&](ImGuiPassData& data, Graph::RGBuilder& builder)
+                                                 {
+                                                     // Re-import backbuffer? No, we need to handle dependency.
+                                                     // RGBuilder doesn't have a generic "GetResourceByName", so we rely on importing
+                                                     // or storing the handle in the class.
+                                                     // However, we can just re-import the swapchain logic since the RG resolves tracking.
+                                                     // But ideally, we chain the handle.
+
+                                                     // Hack for prototype: Re-import swapchain image.
+                                                     // In a real RG, ForwardPassData would return the handle, we pass it here.
+                                                     // Since we are inside OnUpdate, we can just grab the handle if we stored it outside,
+                                                     // but we didn't.
+                                                     // Let's just import "Backbuffer" again. The RenderGraph names resolve to IDs.
+                                                     // If RG implementation uses names for lookup, this works.
+                                                     // If not, we should store ForwardPassData outside.
+
+                                                     VkImage swapImage = m_Renderer.GetSwapchainImage(imageIndex);
+                                                     VkImageView swapView = m_Renderer.
+                                                         GetSwapchainImageView(imageIndex);
+
+                                                     // We need to Load (keep content) and Store (present)
+                                                     Graph::RGAttachmentInfo colorInfo{};
+                                                     colorInfo.LoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+                                                     colorInfo.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+
+                                                     auto backbuffer = builder.ImportTexture(
+                                                         "BackbufferUI", swapImage, swapView,
+                                                         m_Swapchain.GetImageFormat(), extent);
+                                                     data.Backbuffer = builder.WriteColor(backbuffer, colorInfo);
+                                                 },
+                                                 [](const ImGuiPassData&, const Graph::RGRegistry&, VkCommandBuffer cmd)
+                                                 {
+                                                     Interface::GUI::Render(cmd);
+                                                 }
             );
 
             m_RenderGraph.Compile(frameIndex);

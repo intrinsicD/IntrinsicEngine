@@ -21,6 +21,7 @@ import Runtime.Graphics.ModelLoader;
 import Runtime.Graphics.Material;
 import Runtime.ECS.Components;
 import Runtime.RHI.Types;
+import Runtime.Interface.GUI;
 
 namespace Runtime
 {
@@ -71,16 +72,26 @@ namespace Runtime
         m_Swapchain = std::make_unique<RHI::VulkanSwapchain>(*m_Device, *m_Window);
         m_Renderer = std::make_unique<RHI::SimpleRenderer>(*m_Device, *m_Swapchain);
 
+        Interface::GUI::Init(
+            *m_Window,
+            *m_Device,
+            *m_Swapchain,
+            m_Context->GetInstance(),
+            m_Device->GetGraphicsQueue()
+        );
+
         InitPipeline();
     }
 
     Engine::~Engine()
     {
-        if (m_Device) {
+        if (m_Device)
+        {
             vkDeviceWaitIdle(m_Device->GetLogicalDevice());
         }
 
         // Order matters!
+        Interface::GUI::Shutdown();
         Core::Tasks::Scheduler::Shutdown();
         m_Scene.GetRegistry().clear();
         m_AssetManager.Clear();
@@ -92,7 +103,8 @@ namespace Runtime
         m_Swapchain.reset();
         m_Device.reset();
 
-        if (m_Context) {
+        if (m_Context)
+        {
             vkDestroySurfaceKHR(m_Context->GetInstance(), m_Surface, nullptr);
         }
         m_Context.reset();
@@ -133,7 +145,8 @@ namespace Runtime
 
             // 1. Define Texture Loader
             // This lambda creates the actual RHI::Texture when the AssetTask runs.
-            auto textureLoader = [&](const std::string& path) {
+            auto textureLoader = [&](const std::string& path)
+            {
                 return std::make_shared<RHI::Texture>(GetDevice(), path);
             };
 

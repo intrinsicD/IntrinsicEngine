@@ -31,6 +31,7 @@ target_sources(${target_name}
         Graphics/Graphics.ModelLoader.cppm
         Graphics/Graphics.Camera.cppm
         RenderGraph/RenderGraph.cppm
+        Interface/Gui.cppm
         Runtime.Engine.cppm
         PRIVATE
         RHI/RHI.Context.cpp
@@ -50,6 +51,7 @@ target_sources(${target_name}
         Graphics/Graphics.ModelLoader.cpp
         Graphics/Graphics.TinyGltf.cpp
         RenderGraph/RenderGraph.cpp
+        Interface/Gui.cpp
         Runtime.Engine.cpp
 )
 
@@ -68,4 +70,5 @@ target_link_libraries(${target_name}
         Vulkan::Vulkan
         EnTT::EnTT
         nlohmann_json::nlohmann_json
+        imgui_lib
 )

@@ -34,6 +34,7 @@ target_link_libraries(${target_name}
         PUBLIC
         glm::glm
         glfw
+        imgui_lib
         PRIVATE
         Vulkan::Vulkan
         EnTT::EnTT

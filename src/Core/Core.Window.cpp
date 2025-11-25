@@ -1,8 +1,8 @@
 module;
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
-
 #include <iostream> // For panic logging if needed
+#include <imgui_impl_glfw.h>
 
 module Core.Window;
 import Core.Logging;
@@ -86,6 +86,9 @@ namespace Core::Windowing
         glfwSetKeyCallback(m_glfw, [](GLFWwindow* window, int key, [[maybe_unused]] int scancode, int action,
                                       [[maybe_unused]] int mods)
         {
+
+            ImGui_ImplGlfw_KeyCallback(window, key, scancode, action, mods);
+
             WindowData& data = *(WindowData*)glfwGetWindowUserPointer(window);
 
             Event e;
@@ -95,6 +98,27 @@ namespace Core::Windowing
 
             e.KeyCode = key;
             if (data.Callback) data.Callback(e);
+        });
+
+        glfwSetMouseButtonCallback(m_glfw, [](GLFWwindow* window, int button, int action, int mods)
+        {
+            ImGui_ImplGlfw_MouseButtonCallback(window, button, action, mods);
+            // TODO: Engine mouse events
+        });
+
+        glfwSetScrollCallback(m_glfw, [](GLFWwindow* window, double xoffset, double yoffset)
+        {
+            ImGui_ImplGlfw_ScrollCallback(window, xoffset, yoffset);
+        });
+
+        glfwSetCursorPosCallback(m_glfw, [](GLFWwindow* window, double xpos, double ypos)
+        {
+            ImGui_ImplGlfw_CursorPosCallback(window, xpos, ypos);
+        });
+
+        glfwSetCharCallback(m_glfw, [](GLFWwindow* window, unsigned int c)
+        {
+            ImGui_ImplGlfw_CharCallback(window, c);
         });
 
         glfwSetDropCallback(m_glfw, [](GLFWwindow* window, int count, const char** paths)
