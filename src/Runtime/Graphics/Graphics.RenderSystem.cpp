@@ -165,10 +165,13 @@ namespace Runtime::Graphics
                                                            VkDescriptorSet sets[] = {
                                                                renderable.MaterialRef->GetDescriptorSet()
                                                            };
-                                                           // CRITICAL FIX: Check for overflow before casting to uint32_t
-                                                           if (offset > static_cast<size_t>(std::numeric_limits<uint32_t>::max()))
+                                                           // Check for overflow before casting to uint32_t
+                                                           if (offset > static_cast<size_t>(std::numeric_limits<
+                                                               uint32_t>::max()))
                                                            {
-                                                               Core::Log::Error("UBO offset overflow! Offset {} exceeds uint32_t max", offset);
+                                                               Core::Log::Error(
+                                                                   "UBO offset overflow! Offset {} exceeds uint32_t max",
+                                                                   offset);
                                                                continue;
                                                            }
                                                            uint32_t dynamicOffset = static_cast<uint32_t>(offset);
@@ -223,7 +226,7 @@ namespace Runtime::Graphics
                                                      colorInfo.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
 
                                                      auto backbuffer = builder.ImportTexture(
-                                                         "BackbufferUI", swapImage, swapView,
+                                                         "Backbuffer", swapImage, swapView,
                                                          m_Swapchain.GetImageFormat(), extent);
                                                      data.Backbuffer = builder.WriteColor(backbuffer, colorInfo);
                                                  },

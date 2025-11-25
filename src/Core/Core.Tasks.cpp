@@ -79,7 +79,7 @@ namespace Core::Tasks
             return;
         }
 
-        // CRITICAL FIX: Increment counter BEFORE enqueuing to prevent race condition
+        // Increment counter BEFORE enqueuing to prevent race condition
         // where worker grabs and completes task before WaitForAll sees the increment
         s_Ctx->activeTaskCount++;
 

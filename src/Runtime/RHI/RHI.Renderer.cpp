@@ -19,7 +19,6 @@ namespace Runtime::RHI
         poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
         poolInfo.queueFamilyIndex = m_Device.GetQueueIndices().GraphicsFamily.value();
 
-        // CRITICAL FIX: Use VK_CHECK macro
         VK_CHECK(vkCreateCommandPool(m_Device.GetLogicalDevice(), &poolInfo, nullptr, &m_CommandPool));
 
         m_CommandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
@@ -30,7 +29,6 @@ namespace Runtime::RHI
         allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
         allocInfo.commandBufferCount = (uint32_t)m_CommandBuffers.size();
 
-        // CRITICAL FIX: Use VK_CHECK macro
         VK_CHECK(vkAllocateCommandBuffers(m_Device.GetLogicalDevice(), &allocInfo, m_CommandBuffers.data()));
     }
 
@@ -66,7 +64,6 @@ namespace Runtime::RHI
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
         {
-            // CRITICAL FIX: Use VK_CHECK macro for synchronization primitives
             VK_CHECK(vkCreateSemaphore(m_Device.GetLogicalDevice(), &semaphoreInfo, nullptr, &m_ImageAvailableSemaphores[i]));
             VK_CHECK(vkCreateSemaphore(m_Device.GetLogicalDevice(), &semaphoreInfo, nullptr, &m_RenderFinishedSemaphores[i]));
             VK_CHECK(vkCreateFence(m_Device.GetLogicalDevice(), &fenceInfo, nullptr, &m_InFlightFences[i]));

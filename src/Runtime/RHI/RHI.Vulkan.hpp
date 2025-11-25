@@ -8,12 +8,12 @@
 
 // 2. Include Vulkan Headers via Volk
 #include <volk.h>
+#include <iostream>
 
 // 3. Include VMA Declarations (Optional, but convenient if used everywhere)
 // We do NOT define VMA_IMPLEMENTATION here.
 #include <vk_mem_alloc.h>
 
-// 4. CRITICAL FIX: Vulkan Error Checking Macro
 // Wraps Vulkan calls and logs errors without exceptions
 #ifndef NDEBUG
     #define VK_CHECK(x)                                                              \

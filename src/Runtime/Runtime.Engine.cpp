@@ -2,7 +2,7 @@ module;
 #include <chrono>
 #include <queue>
 #include <filesystem>
-#include <system_error> // CRITICAL FIX: for std::error_code
+#include <system_error> // for std::error_code
 #include <algorithm> // for std::transform
 #include <cctype>    // for std::tolower
 #include <GLFW/glfw3.h>
@@ -26,7 +26,7 @@ import Runtime.Interface.GUI;
 
 namespace Runtime
 {
-    Engine::Engine(const EngineConfig& config) : m_FrameArena(config.FrameArenaSize) // CRITICAL FIX: Use configured size
+    Engine::Engine(const EngineConfig& config) : m_FrameArena(config.FrameArenaSize)
     {
         Core::Tasks::Scheduler::Initialize();
 
@@ -36,7 +36,6 @@ namespace Runtime
         Core::Windowing::WindowProps props{config.AppName, config.Width, config.Height};
         m_Window = std::make_unique<Core::Windowing::Window>(props);
 
-        // CRITICAL FIX: Check if window initialization succeeded
         if (!m_Window->IsValid())
         {
             Core::Log::Error("FATAL: Window initialization failed");
@@ -46,21 +45,31 @@ namespace Runtime
         Core::Input::Initialize(m_Window->GetNativeHandle());
         m_Window->SetEventCallback([this](const Core::Windowing::Event& e)
         {
-            if (e.Type == Core::Windowing::EventType::KeyPressed ||
-                e.Type == Core::Windowing::EventType::KeyReleased)
+            std::visit([this](auto&& event)
             {
-                if (Interface::GUI::WantCaptureKeyboard()) return; // STOP here
-            }
-            if (e.Type == Core::Windowing::EventType::WindowClose) m_Running = false;
-            if (e.Type == Core::Windowing::EventType::KeyPressed && e.KeyCode == 256) m_Running = false;
-            if (e.Type == Core::Windowing::EventType::WindowResize) { m_FramebufferResized = true; }
-            if (e.Type == Core::Windowing::EventType::WindowDrop)
-            {
-                for (const auto& path : e.Paths)
+                using T = std::decay_t<decltype(event)>;
+
+                if constexpr (std::is_same_v<T, Core::Windowing::WindowCloseEvent>)
                 {
-                    LoadDroppedAsset(path);
+                    m_Running = false;
                 }
-            }
+                else if constexpr (std::is_same_v<T, Core::Windowing::WindowResizeEvent>)
+                {
+                    m_FramebufferResized = true;
+                }
+                else if constexpr (std::is_same_v<T, Core::Windowing::KeyEvent>)
+                {
+                    if (Interface::GUI::WantCaptureKeyboard()) return;
+                    if (event.IsPressed && event.KeyCode == 256) m_Running = false;
+                }
+                else if constexpr (std::is_same_v<T, Core::Windowing::WindowDropEvent>)
+                {
+                    for (const auto& path : event.Paths)
+                    {
+                        LoadDroppedAsset(path);
+                    }
+                }
+            }, e);
         });
 
         // 2. Vulkan Context & Surface
@@ -126,7 +135,6 @@ namespace Runtime
 
     void Engine::LoadDroppedAsset(const std::string& path)
     {
-        // CRITICAL FIX: Use error_code to avoid exceptions (build has -fno-exceptions)
         std::error_code ec;
         std::filesystem::path fsPath(path);
 
@@ -151,7 +159,6 @@ namespace Runtime
             return;
         }
 
-        // CRITICAL FIX: Use lexically_relative for safer path containment check
         auto relativePath = canonical.lexically_relative(assetDir);
         if (relativePath.empty() || relativePath.native().starts_with(".."))
         {

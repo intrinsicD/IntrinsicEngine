@@ -1,43 +1,78 @@
 module;
 #include <string>
 #include <functional>
+#include <variant>
 
 export module Core.Window;
 
-namespace Core::Windowing
+export namespace Core::Windowing
 {
-    export struct WindowProps
+    struct WindowProps
     {
         std::string Title = "Intrinsic Engine";
         int Width = 1280;
         int Height = 720;
     };
 
-    // Simple Event Types for now
-    export enum class EventType
+    struct WindowCloseEvent
     {
-        WindowClose,
-        WindowResize,
-        WindowDrop,
-        KeyPressed,
-        KeyReleased
-        // Mouse events to follow later
     };
 
-    export struct Event
+    struct WindowResizeEvent
     {
-        EventType Type{};
-        // Minimal payload for now. In a real engine, this would be a variant or union.
-        int KeyCode = 0;
-        int Width = 0;
-        int Height = 0;
-
-        std::vector<std::string> Paths; // For WindowDrop
+        int Width;
+        int Height;
     };
+
+    struct KeyEvent
+    {
+        int KeyCode;
+        bool IsPressed; // true = pressed, false = released
+    };
+
+    struct MouseButtonEvent
+    {
+        int ButtonCode;
+        bool IsPressed; // true = pressed, false = released
+    };
+
+    struct ScrollEvent
+    {
+        double XOffset;
+        double YOffset;
+    };
+
+    struct CursorEvent
+    {
+        double XPos;
+        double YPos;
+    };
+
+    struct CharEvent
+    {
+        unsigned int Character;
+    };
+
+    struct WindowDropEvent
+    {
+        std::vector<std::string> Paths;
+    };
+
+    // Type-safe variant
+    using Event = std::variant<
+        WindowCloseEvent,
+        WindowResizeEvent,
+        KeyEvent,
+        MouseButtonEvent,
+        ScrollEvent,
+        CursorEvent,
+        CharEvent,
+        WindowDropEvent
+    >;
 
     using EventCallbackFn = std::function<void(const Event&)>;
 
-    export class Window
+    class Window
     {
     public:
         explicit Window(const WindowProps& props);
@@ -53,7 +88,7 @@ namespace Core::Windowing
         [[nodiscard]] void* GetNativeHandle() const { return m_Window; } // Returns GLFWwindow* void*
         [[nodiscard]] int GetWidth() const { return m_Data.Width; }
         [[nodiscard]] int GetHeight() const { return m_Data.Height; }
-        [[nodiscard]] bool IsValid() const { return m_IsValid; } // CRITICAL FIX: Check if window initialized successfully
+        [[nodiscard]] bool IsValid() const { return m_IsValid; }
 
         // Set the function that the Window calls when something happens
         void SetEventCallback(const EventCallbackFn& callback) { m_Data.Callback = callback; }
@@ -66,7 +101,7 @@ namespace Core::Windowing
 
     private:
         void* m_Window = nullptr;
-        bool m_IsValid = false; // CRITICAL FIX: Track initialization state
+        bool m_IsValid = false;
 
         struct WindowData
         {

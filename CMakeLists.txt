@@ -7,7 +7,7 @@ project(IntrinsicEngine
 )
 
 # ------------------------------------------------------------------------------
-# CRITICAL FIX: Manually point CMake to the dependency scanner
+# Manually point CMake to the dependency scanner
 # ------------------------------------------------------------------------------
 # Check if the user/IDE provided a scanner, otherwise try to find one
 if(NOT CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS)
@@ -43,7 +43,7 @@ set(INTRINSIC_BASE_FLAGS
         -fno-rtti
 )
 
-# CRITICAL FIX: Add sanitizers to RelWithDebInfo for better testing coverage
+# Add sanitizers to RelWithDebInfo for better testing coverage
 set(INTRINSIC_DEBUG_FLAGS
     $<$<CONFIG:Debug>:-fsanitize=address,undefined>
     $<$<CONFIG:Debug>:-fno-omit-frame-pointer>
@@ -123,7 +123,7 @@ set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(glfw)
 
 # --- Volk (Vulkan Meta Loader) ---
-# CRITICAL FIX: Pin to stable commit instead of master
+# Pin to stable commit instead of master
 FetchContent_Declare(
         volk
         GIT_REPOSITORY https://github.com/zeux/volk.git
@@ -143,7 +143,7 @@ if(NOT vma_POPULATED)
     FetchContent_Populate(vma)
 endif()
 
-# CRITICAL FIX: Pin STB to specific commit for reproducible builds
+# Pin STB to specific commit for reproducible builds
 FetchContent_Declare(
     stb
     GIT_REPOSITORY https://github.com/nothings/stb.git
@@ -175,11 +175,11 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(tinygltf)
 
 # --- ImGui (Docking Branch) ---
-# CRITICAL FIX: Pin to specific docking branch commit for stability
+# Pin to specific docking branch commit for stability
 FetchContent_Declare(
         imgui
         GIT_REPOSITORY https://github.com/ocornut/imgui.git
-        GIT_TAG v1.90.1-docking
+        GIT_TAG v1.92.5-docking
 )
 FetchContent_MakeAvailable(imgui)
 

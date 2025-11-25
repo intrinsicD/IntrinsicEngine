@@ -3,6 +3,8 @@ module;
 #include <memory>
 #include <string>
 #include <vector>
+#include <unordered_map>
+#include <utility>
 #include <RHI/RHI.Vulkan.hpp>
 
 export module Runtime.RenderGraph;
@@ -214,12 +216,14 @@ export namespace Runtime::Graph
         std::vector<RGPass> m_Passes;
         std::vector<ResourceNode> m_Resources;
         std::vector<BarrierBatch> m_Barriers;
-        RGRegistry m_Registry;
 
+        std::unordered_map<std::string, ResourceID> m_ResourceLookup;
+
+        RGRegistry m_Registry;
         std::vector<PooledImage> m_ImagePool;
 
         RGPass& CreatePassInternal(const std::string& name);
-        ResourceID CreateResourceInternal(const std::string& name, ResourceType type);
+        std::pair<ResourceID, bool> CreateResourceInternal(const std::string& name, ResourceType type);
         RHI::VulkanImage* AllocateImage(uint32_t frameIndex, uint32_t width, uint32_t height, VkFormat format,
                                         VkImageUsageFlags usage, VkImageAspectFlags aspect);
     };

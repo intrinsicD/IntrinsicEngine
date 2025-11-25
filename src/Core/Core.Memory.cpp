@@ -29,7 +29,6 @@ namespace Core::Memory
         start_ = static_cast<std::byte*>(std::aligned_alloc(CACHE_LINE, totalSize_));
 #endif
 
-        // CRITICAL FIX: Check if allocation failed
         if (!start_)
         {
             totalSize_ = 0;

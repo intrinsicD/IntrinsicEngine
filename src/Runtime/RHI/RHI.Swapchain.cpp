@@ -57,7 +57,6 @@ namespace Runtime::RHI {
         }
         m_ImageViews.clear();
 
-        // CRITICAL FIX: Clear images too, though they are owned by swapchain
         m_Images.clear();
 
         if (m_Swapchain != VK_NULL_HANDLE) {
