@@ -5,6 +5,7 @@ enable_testing()
 add_executable(${target_name}
         Test_CoreMemory.cpp
         Test_CoreTasks.cpp
+        Test_CoreAssets.cpp
 )
 
 #Apply Strict Flags ONLY to our tests
@@ -16,6 +17,7 @@ target_link_libraries(${target_name}
         PRIVATE
         IntrinsicCore
         GTest::gtest_main
+        EnTT::EnTT
 )
 
 # Helper to run tests via CTest

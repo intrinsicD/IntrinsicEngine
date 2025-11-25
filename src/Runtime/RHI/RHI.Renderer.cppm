@@ -42,8 +42,7 @@ namespace Runtime::RHI
     private:
         VulkanDevice& m_Device;
         VulkanSwapchain& m_Swapchain;
-        // Depth is now managed by RenderGraph
-        // VulkanImage* m_DepthImage = nullptr;
+        VkCommandPool m_CommandPool = VK_NULL_HANDLE;
 
         // Arrays for Double Buffering
         std::vector<VkCommandBuffer> m_CommandBuffers;

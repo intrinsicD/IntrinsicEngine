@@ -1,12 +1,16 @@
 module;
 #include <memory>
 #include <string>
+#include <vector>
 #include <RHI/RHI.Vulkan.hpp>
+
+#include "tiny_gltf.h"
 
 export module Runtime.Engine;
 
 import Core.Window;
 import Core.Memory;
+import Core.Assets;
 import Runtime.RHI.Context;
 import Runtime.RHI.Device;
 import Runtime.RHI.Swapchain;
@@ -15,6 +19,8 @@ import Runtime.RHI.Pipeline;
 import Runtime.RHI.Descriptors;
 import Runtime.RHI.Buffer;
 import Runtime.Graphics.RenderSystem;
+import Runtime.Graphics.Material;
+import Runtime.Graphics.Mesh;
 import Runtime.ECS.Scene;
 
 export namespace Runtime
@@ -42,6 +48,7 @@ export namespace Runtime
     protected:
         // Protected access so Sandbox can manipulate Scene/Assets
         ECS::Scene m_Scene;
+        Core::Assets::AssetManager m_AssetManager;
         Core::Memory::LinearArena m_FrameArena; // 1 MB per frame
         std::unique_ptr<Graphics::RenderSystem> m_RenderSystem;
         std::unique_ptr<RHI::VulkanDevice> m_Device;
@@ -66,10 +73,12 @@ export namespace Runtime
         std::unique_ptr<RHI::DescriptorPool> m_DescriptorPool;
         std::unique_ptr<RHI::GraphicsPipeline> m_Pipeline;
 
+        std::vector<std::shared_ptr<Graphics::Material>> m_LoadedMaterials;
+        std::vector<std::shared_ptr<Graphics::Mesh>> m_Meshes;
+
         bool m_Running = true;
         bool m_FramebufferResized = false;
 
-        void InitVulkan();
         void InitPipeline();
         void LoadDroppedAsset(const std::string& path);
     };

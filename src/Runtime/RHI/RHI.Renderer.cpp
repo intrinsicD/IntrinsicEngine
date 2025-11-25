@@ -1,5 +1,6 @@
 module;
 #include "RHI.Vulkan.hpp"
+#include <mutex>
 
 module Runtime.RHI.Renderer;
 import Runtime.RHI.Image;
@@ -12,13 +13,22 @@ namespace Runtime::RHI
         : m_Device(device), m_Swapchain(swapchain)
     {
         InitSyncStructures();
-        // Depth buffer is now managed by RenderGraph
+
+        VkCommandPoolCreateInfo poolInfo{};
+        poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+        poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+        poolInfo.queueFamilyIndex = m_Device.GetQueueIndices().GraphicsFamily.value();
+
+        if (vkCreateCommandPool(m_Device.GetLogicalDevice(), &poolInfo, nullptr, &m_CommandPool) != VK_SUCCESS)
+        {
+            Core::Log::Error("Failed to create Renderer command pool!");
+        }
 
         m_CommandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
 
         VkCommandBufferAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-        allocInfo.commandPool = m_Device.GetCommandPool();
+        allocInfo.commandPool = m_CommandPool;
         allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
         allocInfo.commandBufferCount = (uint32_t)m_CommandBuffers.size();
 
@@ -42,6 +52,8 @@ namespace Runtime::RHI
             vkDestroySemaphore(m_Device.GetLogicalDevice(), m_RenderFinishedSemaphores[i], nullptr);
             vkDestroyFence(m_Device.GetLogicalDevice(), m_InFlightFences[i], nullptr);
         }
+
+        vkDestroyCommandPool(m_Device.GetLogicalDevice(), m_CommandPool, nullptr);
     }
 
     void SimpleRenderer::InitSyncStructures()
@@ -85,13 +97,12 @@ namespace Runtime::RHI
             m_Swapchain.Recreate();
             return;
         }
-        else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
+        if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
         {
             Core::Log::Error("Failed to acquire swapchain image!");
             return;
         }
 
-        // Reset Fence (We are committing to drawing now)
         vkResetFences(m_Device.GetLogicalDevice(), 1, &m_InFlightFences[m_CurrentFrame]);
         VkCommandBuffer cmd = m_CommandBuffers[m_CurrentFrame];
         vkResetCommandBuffer(cmd, 0);
@@ -100,9 +111,6 @@ namespace Runtime::RHI
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         vkBeginCommandBuffer(cmd, &beginInfo);
 
-        // NOTE: We do NOT begin rendering here anymore. RenderGraph handles it.
-        // We also do NOT transition image layouts here. RenderGraph handles it.
-        
         m_IsFrameStarted = true;
     }
 
@@ -112,21 +120,12 @@ namespace Runtime::RHI
 
         VkCommandBuffer cmd = m_CommandBuffers[m_CurrentFrame];
 
-        // NOTE: We do NOT end rendering here anymore. RenderGraph handles it.
-        // NOTE: We do NOT transition to PRESENT_SRC here. RenderGraph handles it (via ImportTexture initial/final layout logic? 
-        // Wait, RenderGraph needs to know to transition it back to PresentSrc at the end.
-        // The current RenderGraph implementation doesn't have "FinalLayout" per resource.
-        // However, we can add a manual barrier here OR update RenderGraph to handle "Export".
-        // For now, let's add the transition back to PRESENT_SRC here manually to be safe, 
-        // assuming the RenderGraph left it in ColorAttachment or ReadOnly.
-        
         VkImage currentImage = m_Swapchain.GetImages()[m_ImageIndex];
         CommandUtils::TransitionImageLayout(cmd, currentImage, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                                             VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
         vkEndCommandBuffer(cmd);
 
-        // 7. Submit
         VkSubmitInfo submitInfo{};
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
@@ -143,7 +142,10 @@ namespace Runtime::RHI
         submitInfo.signalSemaphoreCount = 1;
         submitInfo.pSignalSemaphores = signalSemaphores;
 
-        vkQueueSubmit(m_Device.GetGraphicsQueue(), 1, &submitInfo, m_InFlightFences[m_CurrentFrame]);
+        {
+            std::lock_guard lock(m_Device.GetQueueMutex());
+            vkQueueSubmit(m_Device.GetGraphicsQueue(), 1, &submitInfo, m_InFlightFences[m_CurrentFrame]);
+        }
 
         // 8. Present
         VkPresentInfoKHR presentInfo{};
@@ -156,12 +158,18 @@ namespace Runtime::RHI
         presentInfo.pSwapchains = swapchains;
         presentInfo.pImageIndices = &m_ImageIndex;
 
-        VkResult result = vkQueuePresentKHR(m_Device.GetPresentQueue(), &presentInfo);
-
-        if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
+        // --- NEW: Lock Queue for Present ---
+        // (Technically PresentQueue might be different, but typically it's the same in this simple setup.
+        // Even if different, locking the Graphics queue mutex here is safe enough or we should have a PresentMutex)
         {
-            m_Swapchain.Recreate();
-            // CreateDepthBuffer(); // No longer needed
+            // For now, reuse the Queue mutex as most GPUs share the queue or driver serialization handles it.
+            // Ideally we check if queues are different, but simple lock is okay.
+            std::lock_guard lock(m_Device.GetQueueMutex());
+            VkResult result = vkQueuePresentKHR(m_Device.GetPresentQueue(), &presentInfo);
+
+            if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+                m_Swapchain.Recreate();
+            }
         }
 
         m_IsFrameStarted = false;

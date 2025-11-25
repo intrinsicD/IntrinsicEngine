@@ -1,6 +1,7 @@
 module;
 #include <vector>
 #include <optional>
+#include <mutex>
 #include "RHI/RHI.Vulkan.hpp"
 
 export module Runtime.RHI.Device;
@@ -50,6 +51,10 @@ namespace Runtime::RHI
         // Helper to query swapchain support (used later by Swapchain module)
         [[nodiscard]] SwapchainSupportDetails QuerySwapchainSupport() const;
 
+        [[nodiscard]] std::mutex& GetQueueMutex() { return m_QueueMutex; }
+
+        void RegisterThreadLocalPool(VkCommandPool pool);
+
     private:
         VkPhysicalDevice m_PhysicalDevice = VK_NULL_HANDLE;
         VkDevice m_Device = VK_NULL_HANDLE;
@@ -62,6 +67,10 @@ namespace Runtime::RHI
 
         VmaAllocator m_Allocator = VK_NULL_HANDLE;
         VkCommandPool m_CommandPool = VK_NULL_HANDLE;
+
+        mutable std::mutex m_QueueMutex;
+        std::mutex m_ThreadPoolsMutex;
+        std::vector<VkCommandPool> m_ThreadCommandPools;
 
         void PickPhysicalDevice(VkInstance instance);
         void CreateLogicalDevice(VulkanContext & context);

@@ -26,6 +26,7 @@ target_sources(${target_name}
         ECS/ECS.Scene.cppm
         Graphics/Graphics.Material.cppm
         Graphics/Graphics.Mesh.cppm
+        Graphics/Graphics.Model.cppm
         Graphics/Graphics.RenderSystem.cppm
         Graphics/Graphics.ModelLoader.cppm
         RenderGraph/RenderGraph.cppm

@@ -21,6 +21,7 @@ target_sources(${target_name}
         Core.Window.cppm
         Core.Filesystem.cppm
         Core.Input.cppm
+        Core.Assets.cppm
         PRIVATE
         Core.Memory.cpp
         Core.Tasks.cpp
@@ -35,6 +36,7 @@ target_link_libraries(${target_name}
         glfw
         PRIVATE
         Vulkan::Vulkan
+        EnTT::EnTT
         # Telemetry libs will go here
 )
 

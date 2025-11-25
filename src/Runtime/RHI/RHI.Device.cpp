@@ -1,6 +1,10 @@
 module;
 #include <cstdio>
 #include <cstdlib>
+#include <vector>
+#include <string>
+#include <set>
+#include <mutex>
 
 // --- 2. VMA Configuration ---
 #define VMA_STATIC_VULKAN_FUNCTIONS 0
@@ -14,38 +18,54 @@ module;
 
 #include "RHI.Vulkan.hpp"
 
-#include <vector>
-#include <string>
-#include <set>
 
 module Runtime.RHI.Device;
 import Core.Logging;
 
-namespace Runtime::RHI {
-
+namespace Runtime::RHI
+{
     const std::vector<const char*> DEVICE_EXTENSIONS = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME
     };
 
-    VulkanDevice::VulkanDevice(VulkanContext& context, VkSurfaceKHR surface) 
-        : m_Surface(surface) 
+    VulkanDevice::VulkanDevice(VulkanContext& context, VkSurfaceKHR surface)
+        : m_Surface(surface)
     {
         PickPhysicalDevice(context.GetInstance());
         CreateLogicalDevice(context);
         CreateCommandPool();
     }
 
-    VulkanDevice::~VulkanDevice() {
+    VulkanDevice::~VulkanDevice()
+    {
+        vkDeviceWaitIdle(m_Device);
+
+        {
+            std::lock_guard lock(m_ThreadPoolsMutex);
+            for (auto pool : m_ThreadCommandPools)
+            {
+                vkDestroyCommandPool(m_Device, pool, nullptr);
+            }
+            m_ThreadCommandPools.clear();
+        }
+
         vkDestroyCommandPool(m_Device, m_CommandPool, nullptr);
         vmaDestroyAllocator(m_Allocator);
         vkDestroyDevice(m_Device, nullptr);
     }
 
-    void VulkanDevice::PickPhysicalDevice(VkInstance instance) {
+    void VulkanDevice::RegisterThreadLocalPool(VkCommandPool pool) {
+        std::lock_guard lock(m_ThreadPoolsMutex);
+        m_ThreadCommandPools.push_back(pool);
+    }
+
+    void VulkanDevice::PickPhysicalDevice(VkInstance instance)
+    {
         uint32_t deviceCount = 0;
         vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
 
-        if (deviceCount == 0) {
+        if (deviceCount == 0)
+        {
             Core::Log::Error("Failed to find GPUs with Vulkan support!");
             return; // Panic
         }
@@ -53,25 +73,31 @@ namespace Runtime::RHI {
         std::vector<VkPhysicalDevice> devices(deviceCount);
         vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
 
-        // Naive selection: First one that works. 
+        // Naive selection: First one that works.
         // TODO: Score them (Discrete > Integrated)
-        for (const auto& device : devices) {
-            if (IsDeviceSuitable(device)) {
+        for (const auto& device : devices)
+        {
+            if (IsDeviceSuitable(device))
+            {
                 m_PhysicalDevice = device;
                 break;
             }
         }
 
-        if (m_PhysicalDevice == VK_NULL_HANDLE) {
+        if (m_PhysicalDevice == VK_NULL_HANDLE)
+        {
             Core::Log::Error("Failed to find a suitable GPU!");
-        } else {
+        }
+        else
+        {
             VkPhysicalDeviceProperties props;
             vkGetPhysicalDeviceProperties(m_PhysicalDevice, &props);
             Core::Log::Info("Selected GPU: {}", props.deviceName);
         }
     }
 
-    void VulkanDevice::CreateLogicalDevice(VulkanContext &context) {
+    void VulkanDevice::CreateLogicalDevice(VulkanContext& context)
+    {
         m_Indices = FindQueueFamilies(m_PhysicalDevice);
 
         std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
@@ -81,7 +107,8 @@ namespace Runtime::RHI {
         };
 
         float queuePriority = 1.0f;
-        for (uint32_t queueFamily : uniqueQueueFamilies) {
+        for (uint32_t queueFamily : uniqueQueueFamilies)
+        {
             VkDeviceQueueCreateInfo queueCreateInfo{};
             queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
             queueCreateInfo.queueFamilyIndex = queueFamily;
@@ -109,7 +136,7 @@ namespace Runtime::RHI {
         VkDeviceCreateInfo createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
         createInfo.pNext = &deviceFeatures2; // Chain modern features
-        
+
         createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
         createInfo.pQueueCreateInfos = queueCreateInfos.data();
 
@@ -117,9 +144,10 @@ namespace Runtime::RHI {
         createInfo.ppEnabledExtensionNames = DEVICE_EXTENSIONS.data();
 
         // Deprecated in newer Vulkan but good for compatibility
-        createInfo.enabledLayerCount = 0; 
+        createInfo.enabledLayerCount = 0;
 
-        if (vkCreateDevice(m_PhysicalDevice, &createInfo, nullptr, &m_Device) != VK_SUCCESS) {
+        if (vkCreateDevice(m_PhysicalDevice, &createInfo, nullptr, &m_Device) != VK_SUCCESS)
+        {
             Core::Log::Error("Failed to create logical device!");
         }
 
@@ -135,7 +163,8 @@ namespace Runtime::RHI {
         allocatorInfo.vulkanApiVersion = VK_API_VERSION_1_3;
         allocatorInfo.physicalDevice = m_PhysicalDevice;
         allocatorInfo.device = m_Device;
-        allocatorInfo.instance = context.GetInstance(); // You might need to pass Instance to CreateLogicalDevice or store it
+        allocatorInfo.instance = context.GetInstance();
+        // You might need to pass Instance to CreateLogicalDevice or store it
         allocatorInfo.pVulkanFunctions = &vulkanFunctions;
 
 
@@ -145,34 +174,38 @@ namespace Runtime::RHI {
         vkGetDeviceQueue(m_Device, m_Indices.PresentFamily.value(), 0, &m_PresentQueue);
     }
 
-    void VulkanDevice::CreateCommandPool() {
+    void VulkanDevice::CreateCommandPool()
+    {
         VkCommandPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
         poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
         poolInfo.queueFamilyIndex = m_Indices.GraphicsFamily.value();
 
-        if (vkCreateCommandPool(m_Device, &poolInfo, nullptr, &m_CommandPool) != VK_SUCCESS) {
+        if (vkCreateCommandPool(m_Device, &poolInfo, nullptr, &m_CommandPool) != VK_SUCCESS)
+        {
             Core::Log::Error("Failed to create command pool!");
         }
     }
 
-    bool VulkanDevice::IsDeviceSuitable(VkPhysicalDevice device) {
+    bool VulkanDevice::IsDeviceSuitable(VkPhysicalDevice device)
+    {
         QueueFamilyIndices indices = FindQueueFamilies(device);
         bool extensionsSupported = CheckDeviceExtensionSupport(device);
 
         bool swapChainAdequate = false;
-        if (extensionsSupported) {
-            // We technically need the surface to check format support, 
+        if (extensionsSupported)
+        {
+            // We technically need the surface to check format support,
             // so we call our helper locally
             // Note: In a pure implementation we might separate this, but this is fine for now.
             // We cast to invoke the helper below which queries m_Surface
             // But wait, 'QuerySwapchainSupport' uses m_PhysicalDevice which isn't set yet.
-            // We must implement a local version or refactor. 
+            // We must implement a local version or refactor.
             // For simplicity, let's check formats manually here:
-            
+
             uint32_t formatCount;
             vkGetPhysicalDeviceSurfaceFormatsKHR(device, m_Surface, &formatCount, nullptr);
-            
+
             uint32_t presentModeCount;
             vkGetPhysicalDeviceSurfacePresentModesKHR(device, m_Surface, &presentModeCount, nullptr);
 
@@ -182,7 +215,8 @@ namespace Runtime::RHI {
         return indices.IsComplete() && extensionsSupported && swapChainAdequate;
     }
 
-    bool VulkanDevice::CheckDeviceExtensionSupport(VkPhysicalDevice device) {
+    bool VulkanDevice::CheckDeviceExtensionSupport(VkPhysicalDevice device)
+    {
         uint32_t extensionCount;
         vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
 
@@ -191,14 +225,16 @@ namespace Runtime::RHI {
 
         std::set<std::string> requiredExtensions(DEVICE_EXTENSIONS.begin(), DEVICE_EXTENSIONS.end());
 
-        for (const auto& extension : availableExtensions) {
+        for (const auto& extension : availableExtensions)
+        {
             requiredExtensions.erase(extension.extensionName);
         }
 
         return requiredExtensions.empty();
     }
 
-    QueueFamilyIndices VulkanDevice::FindQueueFamilies(VkPhysicalDevice device) {
+    QueueFamilyIndices VulkanDevice::FindQueueFamilies(VkPhysicalDevice device)
+    {
         QueueFamilyIndices indices;
         uint32_t queueFamilyCount = 0;
         vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
@@ -207,14 +243,17 @@ namespace Runtime::RHI {
         vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
 
         int i = 0;
-        for (const auto& queueFamily : queueFamilies) {
-            if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+        for (const auto& queueFamily : queueFamilies)
+        {
+            if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)
+            {
                 indices.GraphicsFamily = i;
             }
 
             VkBool32 presentSupport = false;
             vkGetPhysicalDeviceSurfaceSupportKHR(device, i, m_Surface, &presentSupport);
-            if (presentSupport) {
+            if (presentSupport)
+            {
                 indices.PresentFamily = i;
             }
 
@@ -223,23 +262,27 @@ namespace Runtime::RHI {
         }
         return indices;
     }
-    
-    SwapchainSupportDetails VulkanDevice::QuerySwapchainSupport() const {
+
+    SwapchainSupportDetails VulkanDevice::QuerySwapchainSupport() const
+    {
         SwapchainSupportDetails details;
         vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_PhysicalDevice, m_Surface, &details.Capabilities);
 
         uint32_t formatCount;
         vkGetPhysicalDeviceSurfaceFormatsKHR(m_PhysicalDevice, m_Surface, &formatCount, nullptr);
-        if (formatCount != 0) {
+        if (formatCount != 0)
+        {
             details.Formats.resize(formatCount);
             vkGetPhysicalDeviceSurfaceFormatsKHR(m_PhysicalDevice, m_Surface, &formatCount, details.Formats.data());
         }
 
         uint32_t presentModeCount;
         vkGetPhysicalDeviceSurfacePresentModesKHR(m_PhysicalDevice, m_Surface, &presentModeCount, nullptr);
-        if (presentModeCount != 0) {
+        if (presentModeCount != 0)
+        {
             details.PresentModes.resize(presentModeCount);
-            vkGetPhysicalDeviceSurfacePresentModesKHR(m_PhysicalDevice, m_Surface, &presentModeCount, details.PresentModes.data());
+            vkGetPhysicalDeviceSurfacePresentModesKHR(m_PhysicalDevice, m_Surface, &presentModeCount,
+                                                      details.PresentModes.data());
         }
         return details;
     }

@@ -12,6 +12,7 @@ import Core.Logging;
 import Core.Input;
 import Core.Window;
 import Core.Memory;
+import Core.Tasks;
 import Runtime.RHI.Shader;
 import Runtime.Graphics.ModelLoader;
 import Runtime.Graphics.Material;
@@ -22,6 +23,8 @@ namespace Runtime
 {
     Engine::Engine(const EngineConfig& config) : m_FrameArena(1024 * 1024) // 1 MB per frame
     {
+        Core::Tasks::Scheduler::Initialize();
+
         Core::Log::Info("Initializing Engine...");
 
         // 1. Window
@@ -70,10 +73,14 @@ namespace Runtime
 
     Engine::~Engine()
     {
-        vkDeviceWaitIdle(m_Device->GetLogicalDevice());
+        if (m_Device) {
+            vkDeviceWaitIdle(m_Device->GetLogicalDevice());
+        }
 
         // Order matters!
+        Core::Tasks::Scheduler::Shutdown();
         m_Scene.GetRegistry().clear();
+        m_AssetManager.Clear();
         m_RenderSystem.reset();
         m_Pipeline.reset();
         m_DescriptorPool.reset();
@@ -82,7 +89,9 @@ namespace Runtime
         m_Swapchain.reset();
         m_Device.reset();
 
-        vkDestroySurfaceKHR(m_Context->GetInstance(), m_Surface, nullptr);
+        if (m_Context) {
+            vkDestroySurfaceKHR(m_Context->GetInstance(), m_Surface, nullptr);
+        }
         m_Context.reset();
         m_Window.reset();
     }
@@ -101,16 +110,17 @@ namespace Runtime
         std::string ext = fsPath.extension().string();
 
         // Convert to lower case for comparison
-        for (auto& c : ext) c = tolower(c);
+        std::transform(ext.begin(), ext.end(), ext.begin(),
+                       [](unsigned char c) { return std::tolower(c); });
 
         if (ext == ".gltf" || ext == ".glb")
         {
             Core::Log::Info("Drop Detected: Loading Model {}", path);
 
             // TODO: Move this to Async Task Graph to prevent frame freeze
-            auto meshes = Graphics::ModelLoader::Load(GetDevice(), path);
+            auto model = Graphics::ModelLoader::Load(GetDevice(), path);
 
-            if (meshes.empty())
+            if (model->Meshes.empty())
             {
                 Core::Log::Error("Failed to load model or model was empty.");
                 return;
@@ -123,6 +133,8 @@ namespace Runtime
             );
             defaultMat->WriteDescriptor(GetGlobalUBO()->GetHandle(), sizeof(RHI::CameraBufferObject));
 
+            m_LoadedMaterials.push_back(defaultMat);
+
             // Create Entity
             auto entity = m_Scene.CreateEntity(fsPath.stem().string());
 
@@ -134,12 +146,12 @@ namespace Runtime
             // For simplicity here, we attach the first mesh to the entity.
             // A better approach is to create children entities for each mesh.
 
-            for (size_t i = 0; i < meshes.size(); i++)
+            for (size_t i = 0; i < model->Size(); i++)
             {
                 if (i == 0)
                 {
                     auto& mr = m_Scene.GetRegistry().emplace<ECS::MeshRendererComponent>(entity);
-                    mr.MeshRef = meshes[i];
+                    mr.MeshRef = model->Meshes[i];
                     mr.MaterialRef = defaultMat;
                 }
                 else
@@ -150,7 +162,7 @@ namespace Runtime
                     // In a real loader, we would apply local transforms from GLTF nodes here
 
                     auto& cmr = m_Scene.GetRegistry().emplace<ECS::MeshRendererComponent>(child);
-                    cmr.MeshRef = meshes[i];
+                    cmr.MeshRef = model->Meshes[i];
                     cmr.MaterialRef = defaultMat;
                 }
             }
