@@ -165,6 +165,12 @@ namespace Runtime::Graphics
                                                            VkDescriptorSet sets[] = {
                                                                renderable.MaterialRef->GetDescriptorSet()
                                                            };
+                                                           // CRITICAL FIX: Check for overflow before casting to uint32_t
+                                                           if (offset > static_cast<size_t>(std::numeric_limits<uint32_t>::max()))
+                                                           {
+                                                               Core::Log::Error("UBO offset overflow! Offset {} exceeds uint32_t max", offset);
+                                                               continue;
+                                                           }
                                                            uint32_t dynamicOffset = static_cast<uint32_t>(offset);
                                                            vkCmdBindDescriptorSets(
                                                                cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,

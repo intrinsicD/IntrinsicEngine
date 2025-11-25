@@ -78,10 +78,14 @@ namespace Core::Tasks
             Log::Error("Scheduler::Dispatch called before Initialize");
             return;
         }
+
+        // CRITICAL FIX: Increment counter BEFORE enqueuing to prevent race condition
+        // where worker grabs and completes task before WaitForAll sees the increment
+        s_Ctx->activeTaskCount++;
+
         {
             std::lock_guard lock(s_Ctx->queueMutex);
             s_Ctx->globalQueue.push_back(std::move(task));
-            s_Ctx->activeTaskCount++;
         }
         s_Ctx->wakeCondition.notify_one();
     }

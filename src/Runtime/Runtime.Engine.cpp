@@ -2,6 +2,7 @@ module;
 #include <chrono>
 #include <queue>
 #include <filesystem>
+#include <system_error> // CRITICAL FIX: for std::error_code
 #include <algorithm> // for std::transform
 #include <cctype>    // for std::tolower
 #include <GLFW/glfw3.h>
@@ -25,7 +26,7 @@ import Runtime.Interface.GUI;
 
 namespace Runtime
 {
-    Engine::Engine(const EngineConfig& config) : m_FrameArena(1024 * 1024) // 1 MB per frame
+    Engine::Engine(const EngineConfig& config) : m_FrameArena(config.FrameArenaSize) // CRITICAL FIX: Use configured size
     {
         Core::Tasks::Scheduler::Initialize();
 
@@ -34,6 +35,13 @@ namespace Runtime
         // 1. Window
         Core::Windowing::WindowProps props{config.AppName, config.Width, config.Height};
         m_Window = std::make_unique<Core::Windowing::Window>(props);
+
+        // CRITICAL FIX: Check if window initialization succeeded
+        if (!m_Window->IsValid())
+        {
+            Core::Log::Error("FATAL: Window initialization failed");
+            std::exit(-1);
+        }
 
         Core::Input::Initialize(m_Window->GetNativeHandle());
         m_Window->SetEventCallback([this](const Core::Windowing::Event& e)
@@ -118,15 +126,39 @@ namespace Runtime
 
     void Engine::LoadDroppedAsset(const std::string& path)
     {
+        // CRITICAL FIX: Use error_code to avoid exceptions (build has -fno-exceptions)
+        std::error_code ec;
         std::filesystem::path fsPath(path);
-        std::filesystem::path canonical = std::filesystem::canonical(fsPath);
-        std::filesystem::path assetDir = std::filesystem::canonical("assets/");
 
-        if (!canonical.string().starts_with(assetDir.string()))
+        // Check if file exists before canonicalizing
+        if (!std::filesystem::exists(fsPath, ec) || ec)
+        {
+            Core::Log::Error("Dropped file does not exist: {}", path);
+            return;
+        }
+
+        std::filesystem::path canonical = std::filesystem::canonical(fsPath, ec);
+        if (ec)
+        {
+            Core::Log::Error("Failed to resolve canonical path for: {}", path);
+            return;
+        }
+
+        std::filesystem::path assetDir = std::filesystem::canonical("assets/", ec);
+        if (ec)
+        {
+            Core::Log::Error("Assets directory not found or inaccessible");
+            return;
+        }
+
+        // CRITICAL FIX: Use lexically_relative for safer path containment check
+        auto relativePath = canonical.lexically_relative(assetDir);
+        if (relativePath.empty() || relativePath.native().starts_with(".."))
         {
             Core::Log::Error("Dropped file is outside of assets directory: {}", path);
             return;
         }
+
         std::string ext = fsPath.extension().string();
 
         // Convert to lower case for comparison
