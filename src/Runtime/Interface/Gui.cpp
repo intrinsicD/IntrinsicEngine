@@ -10,9 +10,11 @@ module;
 #include <backends/imgui_impl_vulkan.h>
 #include <GLFW/glfw3.h> // Required for glfwGetInstanceProcAddress
 #include <vector>
+#include <filesystem>
 
 module Runtime.Interface.GUI;
 import Core.Logging;
+import Core.Filesystem;
 
 namespace Runtime::Interface::GUI
 {
@@ -30,26 +32,66 @@ namespace Runtime::Interface::GUI
         // 1. Setup Dear ImGui context
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
-        ImGuiIO& io = ImGui::GetIO(); (void)io;
+        ImGuiIO& io = ImGui::GetIO();
+        (void)io;
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
         io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
         ImGui::StyleColorsDark();
 
+        // --- HIGH DPI SCALING START ---
+
+        // 1. Detect Monitor Scale from GLFW
+        float x_scale = 1.0f, y_scale = 1.0f;
+        glfwGetWindowContentScale((GLFWwindow*)window.GetNativeHandle(), &x_scale, &y_scale);
+
+        // On some Linux configs (Wayland), GLFW might return 1.0 even on HiDPI.
+        // You can optionally override this if x_scale == 1.0f but you know it's wrong.
+        if (x_scale > 1.0f)
+        {
+            Core::Log::Info("High DPI Detected: Scale Factor {}", x_scale);
+
+            // 2. Scale UI Elements (Padding, Rounding, Spacing)
+            ImGui::GetStyle().ScaleAllSizes(x_scale);
+        }
+
+        // 3. Load Scaled Font
+        // IMPORTANT: Use a TTF file. The default bitmap font looks terrible when scaled.
+        float baseFontSize = 16.0f;
+        float scaledFontSize = baseFontSize * x_scale;
+
+        // Use your filesystem helper or a relative path
+        std::string fontPath = Core::Filesystem::GetAssetPath("assets/fonts/Roboto-Medium.ttf");
+
+        if (std::filesystem::exists(fontPath))
+        {
+            io.Fonts->AddFontFromFileTTF(fontPath.c_str(), scaledFontSize);
+            Core::Log::Info("Loaded custom font at size {}", scaledFontSize);
+        }
+        else
+        {
+            // Fallback: Scale the default ugly font (better than tiny text)
+            Core::Log::Warn("Custom font not found at '{}'. UI text may look blurry.", fontPath);
+            ImFontConfig fontConfig;
+            fontConfig.SizePixels = scaledFontSize;
+            io.Fonts->AddFontDefault(&fontConfig);
+        }
+        // --- HIGH DPI SCALING END ---
+
         // 2. Create Descriptor Pool
         VkDescriptorPoolSize pool_sizes[] =
         {
-            { VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
-            { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
-            { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000 },
-            { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000 },
-            { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000 },
-            { VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000 },
-            { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
-            { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 },
-            { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000 },
-            { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
-            { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000 }
+            {VK_DESCRIPTOR_TYPE_SAMPLER, 1000},
+            {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000},
+            {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000},
+            {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000},
+            {VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000},
+            {VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000},
+            {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000},
+            {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000},
+            {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000},
+            {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000},
+            {VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000}
         };
 
         VkDescriptorPoolCreateInfo pool_info = {};
@@ -94,7 +136,8 @@ namespace Runtime::Interface::GUI
 
         init_info.PipelineInfoMain.PipelineRenderingCreateInfo = pipeline_rendering_create_info;
 
-        ImGui_ImplVulkan_LoadFunctions(VK_API_VERSION_1_3, [](const char* function_name, void* vulkan_instance) {
+        ImGui_ImplVulkan_LoadFunctions(VK_API_VERSION_1_3, [](const char* function_name, void* vulkan_instance)
+        {
             return vkGetInstanceProcAddr(reinterpret_cast<VkInstance>(vulkan_instance), function_name);
         }, instance);
 
@@ -126,5 +169,15 @@ namespace Runtime::Interface::GUI
     {
         ImGui::Render();
         ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
+    }
+
+    bool WantCaptureMouse()
+    {
+        return ImGui::GetIO().WantCaptureMouse;
+    }
+
+    bool WantCaptureKeyboard()
+    {
+        return ImGui::GetIO().WantCaptureKeyboard;
     }
 }

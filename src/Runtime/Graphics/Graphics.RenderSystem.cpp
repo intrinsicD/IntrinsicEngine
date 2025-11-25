@@ -75,7 +75,7 @@ namespace Runtime::Graphics
         Interface::GUI::BeginFrame();
 
         {
-            ImGui::Begin("Renderer Stats");
+            ImGui::Begin("Renderer Stats", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
             ImGui::Text("Application Average: %.3f ms/frame (%.1f FPS)",
                         1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 

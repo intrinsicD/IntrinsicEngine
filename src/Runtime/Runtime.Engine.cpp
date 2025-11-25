@@ -38,6 +38,11 @@ namespace Runtime
         Core::Input::Initialize(m_Window->GetNativeHandle());
         m_Window->SetEventCallback([this](const Core::Windowing::Event& e)
         {
+            if (e.Type == Core::Windowing::EventType::KeyPressed ||
+                e.Type == Core::Windowing::EventType::KeyReleased)
+            {
+                if (Interface::GUI::WantCaptureKeyboard()) return; // STOP here
+            }
             if (e.Type == Core::Windowing::EventType::WindowClose) m_Running = false;
             if (e.Type == Core::Windowing::EventType::KeyPressed && e.KeyCode == 256) m_Running = false;
             if (e.Type == Core::Windowing::EventType::WindowResize) { m_FramebufferResized = true; }

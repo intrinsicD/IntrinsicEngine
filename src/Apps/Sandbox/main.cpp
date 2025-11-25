@@ -21,6 +21,7 @@ import Runtime.Graphics.Camera;
 import Runtime.ECS.Components;
 import Runtime.RHI.Types;
 import Runtime.RHI.Texture;
+import Runtime.Interface.GUI;
 
 using namespace Core;
 using namespace Runtime;
@@ -52,7 +53,8 @@ public:
         m_Camera.Position = {0.0f, 0.0f, 4.0f};
         m_CameraController = std::make_unique<Graphics::OrbitCameraController>();
 
-        auto textureLoader = [&](const std::string& path) {
+        auto textureLoader = [&](const std::string& path)
+        {
             // Note: RHI::Texture constructor does IO + GPU upload synchronously here
             // In a real engine, IO is separate from Upload.
             return std::make_shared<RHI::Texture>(GetDevice(), path);
@@ -80,9 +82,16 @@ public:
 
     void OnUpdate(float dt) override
     {
-        if (m_CameraController) m_CameraController->OnUpdate(m_Camera, dt);
+        bool mouseCaptured = Interface::GUI::WantCaptureMouse();
 
-        if (m_Window->GetWidth() != 0 && m_Window->GetHeight() != 0) {
+        if (m_CameraController)
+        {
+            m_CameraController->OnUpdate(m_Camera, dt, mouseCaptured);
+        }
+
+
+        if (m_Window->GetWidth() != 0 && m_Window->GetHeight() != 0)
+        {
             m_CameraController->OnResize(m_Camera, m_Window->GetWidth(), m_Window->GetHeight());
         }
 
@@ -132,7 +141,7 @@ public:
         }
 
         //if (Input::IsKeyPressed(Input::Key::Tab)) {
-            // Simple toggle logic (debounce omitted for brevity)
+        // Simple toggle logic (debounce omitted for brevity)
         //}
 
         // Draw

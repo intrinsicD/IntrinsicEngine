@@ -61,7 +61,7 @@ export namespace Runtime::Graphics
     {
     public:
         virtual ~CameraController() = default;
-        virtual void OnUpdate(Camera& camera, float dt) = 0;
+        virtual void OnUpdate(Camera& camera, float dt, bool disableInput = false) = 0;
 
         virtual void OnResize(Camera& camera, uint32_t width, uint32_t height)
         {
@@ -75,8 +75,10 @@ export namespace Runtime::Graphics
         float MoveSpeed = 5.0f;
         float MouseSensitivity = 0.1f;
 
-        void OnUpdate(Camera& camera, float dt) override
+        void OnUpdate(Camera& camera, float dt,  bool disableInput) override
         {
+            if (disableInput) return;
+
             using namespace Core::Input;
 
             // 1. Mouse Look
@@ -146,8 +148,11 @@ export namespace Runtime::Graphics
         // Used to track zoom distance, updated on first run or scroll
         float Distance = 5.0f;
 
-        void OnUpdate(Camera& camera, float dt) override
+        void OnUpdate(Camera& camera, float dt, bool disableInput) override
         {
+
+            if (disableInput) return;
+
             using namespace Core::Input;
 
             // Zoom logic (Simple W/S for distance for now, mouse scroll later)

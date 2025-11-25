@@ -23,4 +23,10 @@ export namespace Runtime::Interface::GUI
     // Records the ImGui draw commands into the provided command buffer.
     // Must be called inside a RenderPass (or BeginRendering).
     void Render(VkCommandBuffer cmd);
+
+    // Returns true if ImGui is using the mouse (hovering a window, dragging a slider)
+    [[nodiscard]] bool WantCaptureMouse();
+
+    // Returns true if ImGui is using the keyboard (typing in a text box)
+    [[nodiscard]] bool WantCaptureKeyboard();
 }
