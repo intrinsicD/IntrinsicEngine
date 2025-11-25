@@ -37,8 +37,6 @@ namespace Runtime::RHI
         // Wait for GPU to finish before destroying sync objects
         vkDeviceWaitIdle(m_Device.GetLogicalDevice());
 
-        // delete m_DepthImage;
-
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
         {
             vkDestroySemaphore(m_Device.GetLogicalDevice(), m_ImageAvailableSemaphores[i], nullptr);

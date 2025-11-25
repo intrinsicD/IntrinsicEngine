@@ -60,13 +60,44 @@ export namespace Core::Assets
     class AssetManager
     {
     public:
-        AssetManager() = default;
-        ~AssetManager() = default;
+        using AssetCallback = std::function<void(AssetHandle)>;
 
-        // 1. Synchronous/Async Loader
-        // Returns a handle immediately. The asset might not be ready yet.
+        AssetManager() = default;
+
+        // Call this once per frame on the Main Thread
+        void Update();
+
+        // 1. Load: Returns handle immediately. Starts async task.
         template <typename T, typename LoaderFunc>
-        AssetHandle Load(const std::string& path, LoaderFunc&& loader)
+        AssetHandle Load(const std::string& path, LoaderFunc&& loader);
+
+        // 2. Request Notify: Register a callback for when the asset is Ready.
+        // If already ready, callback fires immediately (synchronously).
+        void RequestNotify(AssetHandle handle, AssetCallback callback);
+
+        // 3. Get Resource
+        template <typename T>
+        std::shared_ptr<T> Get(AssetHandle handle);
+
+        LoadState GetState(AssetHandle handle);
+        void Clear();
+
+    private:
+        entt::registry m_Registry;
+        std::unordered_map<size_t, AssetHandle> m_Lookup;
+
+        // Callback System
+        std::unordered_map<AssetHandle, std::vector<AssetCallback>, AssetHandle::Hash> m_Listeners;
+        std::vector<AssetHandle> m_ReadyQueue; // Queue of assets loaded since last frame
+
+        std::shared_mutex m_Mutex;
+        std::mutex m_EventQueueMutex;
+
+        void EnqueueReadyEvent(AssetHandle handle);
+    };
+
+    template <typename T, typename LoaderFunc>
+        AssetHandle AssetManager::Load(const std::string& path, LoaderFunc&& loader)
         {
             std::unique_lock lock(m_Mutex);
 
@@ -89,11 +120,11 @@ export namespace Core::Assets
 
             // 3. Dispatch Async Task
             // We copy the loader and path into the lambda
-            Tasks::Scheduler::Dispatch([this, entity, path, loader = std::forward<LoaderFunc>(loader)]()
+            Tasks::Scheduler::Dispatch([this, handle, entity, path, loader = std::forward<LoaderFunc>(loader)]()
             {
                 // Execute user-provided loader (File IO / Parsing)
                 // This runs on a worker thread
-                std::shared_ptr<T> result = loader(path);
+                auto result = loader(path);
 
                 // Critical Section: Write back to registry
                 // Ideally, we might defer this to main thread to avoid locking registry,
@@ -107,6 +138,8 @@ export namespace Core::Assets
                             m_Registry.emplace<AssetPayload<T>>(entity, result);
                             m_Registry.get<AssetInfo>(entity).State = LoadState::Ready;
                             Log::Info("Asset Loaded: {}", path);
+
+                            EnqueueReadyEvent(handle);
                         }
                         else
                         {
@@ -123,7 +156,7 @@ export namespace Core::Assets
         // 2. Data Access
         // Returns nullptr if not ready or wrong type
         template <typename T>
-        std::shared_ptr<T> Get(AssetHandle handle)
+        std::shared_ptr<T> AssetManager::Get(AssetHandle handle)
         {
             std::shared_lock lock(m_Mutex);
             if (!m_Registry.valid(handle.ID)) return nullptr;
@@ -139,27 +172,4 @@ export namespace Core::Assets
             }
             return nullptr;
         }
-
-        // 3. Status Check
-        LoadState GetState(AssetHandle handle)
-        {
-            std::shared_lock lock(m_Mutex);
-            if (!m_Registry.valid(handle.ID)) return LoadState::Unloaded;
-            return m_Registry.get<AssetInfo>(handle.ID).State;
-        }
-
-        void Clear()
-        {
-            std::unique_lock lock(m_Mutex);
-            m_Registry.clear(); // Destroys all components -> release shared_ptrs -> free VMA memory
-            m_Lookup.clear();
-        }
-
-    private:
-        entt::registry m_Registry;
-        std::unordered_map<size_t, AssetHandle> m_Lookup;
-
-        // R/W Lock for thread safety
-        std::shared_mutex m_Mutex;
-    };
 }

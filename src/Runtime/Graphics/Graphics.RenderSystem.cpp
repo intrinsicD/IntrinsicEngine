@@ -157,11 +157,6 @@ namespace Runtime::Graphics
                                                        {
                                                            if (!renderable.MeshRef || !renderable.MaterialRef) continue;
 
-                                                           if (!renderable.MaterialRef->Prepare(assetManager))
-                                                           {
-                                                               // Material not loaded (texture missing). Skip draw or draw purple.
-                                                               continue;
-                                                           }
                                                            VkDescriptorSet sets[] = {
                                                                renderable.MaterialRef->GetDescriptorSet()
                                                            };

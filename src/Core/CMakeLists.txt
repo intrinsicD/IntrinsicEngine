@@ -27,6 +27,7 @@ target_sources(${target_name}
         Core.Tasks.cpp
         Core.Window.cpp
         Core.Input.cpp
+        Core.Assets.cpp
 )
 
 # Link Dependencies

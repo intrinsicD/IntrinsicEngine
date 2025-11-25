@@ -18,6 +18,7 @@ import Runtime.RHI.Renderer;
 import Runtime.RHI.Pipeline;
 import Runtime.RHI.Descriptors;
 import Runtime.RHI.Buffer;
+import Runtime.RHI.Texture;
 import Runtime.Graphics.RenderSystem;
 import Runtime.Graphics.Material;
 import Runtime.Graphics.Mesh;
@@ -53,6 +54,8 @@ export namespace Runtime
         Core::Memory::LinearArena m_FrameArena; // 1 MB per frame
         std::unique_ptr<Graphics::RenderSystem> m_RenderSystem;
         std::unique_ptr<RHI::VulkanDevice> m_Device;
+
+        std::shared_ptr<RHI::Texture> m_DefaultTexture;
 
         // Helper to access the camera buffer (Temporary until we have a Camera Component)
         [[nodiscard]] RHI::VulkanBuffer* GetGlobalUBO() const { return m_RenderSystem->GetGlobalUBO(); }

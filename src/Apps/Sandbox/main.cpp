@@ -37,6 +37,7 @@ public:
     // Resources
     Assets::AssetHandle m_DuckModel;
     Assets::AssetHandle m_DuckTexture;
+
     std::shared_ptr<Graphics::Material> m_DuckMaterial;
 
     // State to track if we have spawned the entity yet
@@ -61,19 +62,20 @@ public:
         };
         m_DuckTexture = m_AssetManager.Load<RHI::Texture>("assets/textures/DuckCM.png", textureLoader);
 
-        // 1. Define the Loader Lambda
         auto modelLoader = [&](const std::string& path)
         {
             return Graphics::ModelLoader::Load(GetDevice(), path);
         };
-
-        // 2. Start Async Load (Returns immediately)
-        // We use "assets/models/Duck.glb" assuming your folder structure
         m_DuckModel = m_AssetManager.Load<Graphics::Model>("assets/models/Duck.glb", modelLoader);
 
         // 3. Setup Material (Assuming texture loads synchronously or is handled)
         m_DuckMaterial = std::make_shared<Graphics::Material>(
-            GetDevice(), GetDescriptorPool(), GetDescriptorLayout(), m_DuckTexture
+            GetDevice(),
+            GetDescriptorPool(),
+            GetDescriptorLayout(),
+            m_DuckTexture,
+            m_DefaultTexture, // Inherited from Engine
+            m_AssetManager    // Inherited from Engine
         );
         m_DuckMaterial->WriteDescriptor(GetGlobalUBO()->GetHandle(), sizeof(RHI::CameraBufferObject));
 
@@ -82,6 +84,8 @@ public:
 
     void OnUpdate(float dt) override
     {
+        m_AssetManager.Update();
+
         bool mouseCaptured = Interface::GUI::WantCaptureMouse();
 
         if (m_CameraController)
@@ -95,22 +99,6 @@ public:
             m_CameraController->OnResize(m_Camera, m_Window->GetWidth(), m_Window->GetHeight());
         }
 
-        // --- FPS Counter ---
-        static float timer = 0.0f;
-        static int frames = 0;
-        timer += dt;
-        frames++;
-        if (timer >= 1.0f)
-        {
-            std::string title = "Intrinsic Engine | FPS: " + std::to_string(frames) + " | ms: " + std::to_string(
-                1000.0f / frames);
-            m_Window->SetTitle(title);
-            frames = 0;
-            timer = 0.0f;
-        }
-
-        // --- ASSET SYSTEM POLLING ---
-        // Check if the entity is not yet spawned, and if the asset is finally ready
         if (!m_IsEntitySpawned)
         {
             if (m_AssetManager.GetState(m_DuckModel) == Assets::LoadState::Ready)
@@ -139,10 +127,6 @@ public:
             ECS::TransformRotating rotator;
             rotator.OnUpdate(transform, dt);
         }
-
-        //if (Input::IsKeyPressed(Input::Key::Tab)) {
-        // Simple toggle logic (debounce omitted for brevity)
-        //}
 
         // Draw
         m_RenderSystem->OnUpdate(m_Scene, m_Camera, m_AssetManager);

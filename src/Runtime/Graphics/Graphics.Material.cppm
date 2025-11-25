@@ -19,23 +19,21 @@ export namespace Runtime::Graphics
         Material(RHI::VulkanDevice& device,
                  RHI::DescriptorPool& pool,
                  const RHI::DescriptorLayout& layout, // We share the layout
-                 Core::Assets::AssetHandle textureHandle);
-
-        bool Prepare(Core::Assets::AssetManager &assetManager);
+                 Core::Assets::AssetHandle textureHandle,
+                 std::shared_ptr<RHI::Texture> defaultTexture,
+                 Core::Assets::AssetManager& assetManager);
 
         // We need to update the UBO (Camera) descriptor
         void WriteDescriptor(VkBuffer cameraBuffer, VkDeviceSize range);
 
         [[nodiscard]] VkDescriptorSet GetDescriptorSet() const { return m_DescriptorSet; }
-        [[nodiscard]] Core::Assets::AssetHandle GetTextureHandle() const { return m_TextureHandle; }
 
     private:
         RHI::VulkanDevice& m_Device;
         VkDescriptorSet m_DescriptorSet = VK_NULL_HANDLE;
-        Core::Assets::AssetHandle m_TextureHandle;
+        std::shared_ptr<RHI::Texture> m_CurrentTexture;
 
-        bool m_IsDescriptorWritten = false;
-        VkBuffer m_PendingBuffer = VK_NULL_HANDLE;
-        VkDeviceSize m_PendingRange = 0;
+        // Internal helper to perform the Vulkan write
+        void UpdateImageWrite(const RHI::Texture& texture);
     };
 }

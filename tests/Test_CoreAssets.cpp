@@ -68,3 +68,41 @@ TEST(AssetSystem, Caching)
 
     Core::Tasks::Scheduler::Shutdown();
 }
+
+// Test_CoreAssets.cpp (Update)
+TEST(AssetSystem, EventCallbackOnMainThread)
+{
+    Core::Tasks::Scheduler::Initialize(2);
+    AssetManager manager;
+
+    bool callbackFired = false;
+    std::thread::id callbackThreadId;
+
+    // Loader runs on background thread
+    auto slowLoader = [](const std::string&) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        return std::make_shared<int>(42);
+    };
+
+    auto handle = manager.Load<int>("data", slowLoader);
+
+    // Register callback
+    manager.RequestNotify(handle, [&](AssetHandle) {
+        callbackFired = true;
+        callbackThreadId = std::this_thread::get_id();
+    });
+
+    // Wait for loader to finish background work
+    Core::Tasks::Scheduler::WaitForAll();
+
+    // At this point, asset is Ready in background, but callback hasn't fired yet
+    EXPECT_FALSE(callbackFired);
+
+    // Run Update on "Main Thread"
+    manager.Update();
+
+    EXPECT_TRUE(callbackFired);
+    EXPECT_EQ(callbackThreadId, std::this_thread::get_id()); // Must run on THIS thread
+
+    Core::Tasks::Scheduler::Shutdown();
+}

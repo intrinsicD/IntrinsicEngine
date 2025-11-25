@@ -78,8 +78,8 @@ namespace Runtime
 #else
         bool enableValidation = true;
 #endif
-        RHI::ContextConfig rhiConfig{config.AppName, enableValidation};
-        m_Context = std::make_unique<RHI::VulkanContext>(rhiConfig);
+        RHI::ContextConfig ctxConfig{config.AppName, enableValidation};
+        m_Context = std::make_unique<RHI::VulkanContext>(ctxConfig);
 
         if (!m_Window->CreateSurface(m_Context->GetInstance(), nullptr, &m_Surface))
         {
@@ -94,15 +94,12 @@ namespace Runtime
         m_Swapchain = std::make_unique<RHI::VulkanSwapchain>(*m_Device, *m_Window);
         m_Renderer = std::make_unique<RHI::SimpleRenderer>(*m_Device, *m_Swapchain);
 
-        Interface::GUI::Init(
-            *m_Window,
-            *m_Device,
-            *m_Swapchain,
-            m_Context->GetInstance(),
-            m_Device->GetGraphicsQueue()
-        );
+        Interface::GUI::Init(*m_Window, *m_Device, *m_Swapchain, m_Context->GetInstance(),
+                             m_Device->GetGraphicsQueue());
 
         InitPipeline();
+        std::vector<uint8_t> whitePixel = {255, 255, 255, 255};
+        m_DefaultTexture = std::make_shared<RHI::Texture>(*m_Device, whitePixel, 1, 1);
     }
 
     Engine::~Engine()
@@ -117,6 +114,8 @@ namespace Runtime
         Core::Tasks::Scheduler::Shutdown();
         m_Scene.GetRegistry().clear();
         m_AssetManager.Clear();
+        m_DefaultTexture.reset();
+
         m_RenderSystem.reset();
         m_Pipeline.reset();
         m_DescriptorPool.reset();
@@ -201,7 +200,12 @@ namespace Runtime
             // 3. Create the Default Material
             // We now pass the AssetHandle instead of a raw string path.
             auto defaultMat = std::make_shared<Graphics::Material>(
-                GetDevice(), GetDescriptorPool(), GetDescriptorLayout(), texHandle
+                GetDevice(),
+                GetDescriptorPool(),
+                GetDescriptorLayout(),
+                texHandle,
+                m_DefaultTexture, // <--- New Argument
+                m_AssetManager // <--- New Argument
             );
 
             // 4. Request Descriptor Write
@@ -269,43 +273,20 @@ namespace Runtime
 
     void Engine::Run()
     {
-        OnStart(); // User setup
-
+        OnStart();
         auto lastTime = std::chrono::high_resolution_clock::now();
-
-        std::deque<float> frameTimes;
-        const size_t FRAME_SAMPLES = 10;
 
         while (m_Running && !m_Window->ShouldClose())
         {
-            m_FrameArena.Reset(); // Clear per-frame allocations
-
+            m_FrameArena.Reset();
             m_Window->OnUpdate();
-
-            if (m_FramebufferResized)
-            {
-                m_Renderer->OnResize();
-                m_FramebufferResized = false;
-            }
+            if (m_FramebufferResized) { m_Renderer->OnResize(); m_FramebufferResized = false; }
 
             auto currentTime = std::chrono::high_resolution_clock::now();
-            float rawDt = std::chrono::duration<float>(currentTime - lastTime).count();
+            float dt = std::chrono::duration<float>(currentTime - lastTime).count();
             lastTime = currentTime;
 
-            frameTimes.push_back(rawDt);
-            if (frameTimes.size() > FRAME_SAMPLES) frameTimes.pop_front();
-
-            float dt = 0.0f;
-            for (float t : frameTimes) dt += t;
-            dt /= frameTimes.size();
-
-            // Cap dt to prevent spiral of death during lag spikes
-            if (dt > 0.1f) dt = 0.1f;
-
-            OnUpdate(dt); // User Logic
-
-            // Currently RenderSystem::OnUpdate handles the draw, so OnRender is optional hook
-            // In future, OnRender might manipulate the RenderGraph
+            OnUpdate(dt);
             OnRender();
         }
 
