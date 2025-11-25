@@ -94,12 +94,9 @@ namespace Runtime::Interface::GUI
 
         init_info.PipelineInfoMain.PipelineRenderingCreateInfo = pipeline_rendering_create_info;
 
-        // Loader Fix: Use GLFW's loader to bypass potential Volk/Static-Linking symbol conflicts
         ImGui_ImplVulkan_LoadFunctions(VK_API_VERSION_1_3, [](const char* function_name, void* vulkan_instance) {
-            if (!function_name) return (PFN_vkVoidFunction)nullptr;
-            VkInstance inst = reinterpret_cast<VkInstance>(vulkan_instance);
-            return glfwGetInstanceProcAddress(inst, function_name);
-        }, reinterpret_cast<void*>(instance));
+            return vkGetInstanceProcAddr(reinterpret_cast<VkInstance>(vulkan_instance), function_name);
+        }, instance);
 
         // Init
         ImGui_ImplVulkan_Init(&init_info);

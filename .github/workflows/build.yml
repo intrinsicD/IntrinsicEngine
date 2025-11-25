@@ -21,7 +21,7 @@ jobs:
           sudo apt-get install -y build-essential cmake ninja-build
           
           # 2. Install X11/Windowing Libs (Fixes the "Could NOT find X11" error)
-          sudo apt-get install -y libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev libxext-dev libxfixes-dev libwayland-dev libxkbcommon-dev
+          sudo apt-get install -y libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev libxext-dev libxfixes-dev libwayland-dev libxkbcommon-dev libgl1-mesa-dev
           
           # 3. Install Vulkan SDK (Required for linking)
           sudo apt-get install -y libvulkan-dev vulkan-tools spirv-tools
