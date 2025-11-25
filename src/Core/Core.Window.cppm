@@ -53,6 +53,7 @@ namespace Core::Windowing
         [[nodiscard]] void* GetNativeHandle() const { return m_Window; } // Returns GLFWwindow* void*
         [[nodiscard]] int GetWidth() const { return m_Data.Width; }
         [[nodiscard]] int GetHeight() const { return m_Data.Height; }
+        [[nodiscard]] bool IsValid() const { return m_IsValid; } // CRITICAL FIX: Check if window initialized successfully
 
         // Set the function that the Window calls when something happens
         void SetEventCallback(const EventCallbackFn& callback) { m_Data.Callback = callback; }
@@ -65,6 +66,7 @@ namespace Core::Windowing
 
     private:
         void* m_Window = nullptr;
+        bool m_IsValid = false; // CRITICAL FIX: Track initialization state
 
         struct WindowData
         {

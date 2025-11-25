@@ -19,10 +19,8 @@ namespace Runtime::RHI
         poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
         poolInfo.queueFamilyIndex = m_Device.GetQueueIndices().GraphicsFamily.value();
 
-        if (vkCreateCommandPool(m_Device.GetLogicalDevice(), &poolInfo, nullptr, &m_CommandPool) != VK_SUCCESS)
-        {
-            Core::Log::Error("Failed to create Renderer command pool!");
-        }
+        // CRITICAL FIX: Use VK_CHECK macro
+        VK_CHECK(vkCreateCommandPool(m_Device.GetLogicalDevice(), &poolInfo, nullptr, &m_CommandPool));
 
         m_CommandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
 
@@ -32,11 +30,8 @@ namespace Runtime::RHI
         allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
         allocInfo.commandBufferCount = (uint32_t)m_CommandBuffers.size();
 
-
-        if (vkAllocateCommandBuffers(m_Device.GetLogicalDevice(), &allocInfo, m_CommandBuffers.data()) != VK_SUCCESS)
-        {
-            Core::Log::Error("Failed to allocate command buffers!");
-        }
+        // CRITICAL FIX: Use VK_CHECK macro
+        VK_CHECK(vkAllocateCommandBuffers(m_Device.GetLogicalDevice(), &allocInfo, m_CommandBuffers.data()));
     }
 
     SimpleRenderer::~SimpleRenderer()
@@ -71,16 +66,17 @@ namespace Runtime::RHI
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
         {
-            vkCreateSemaphore(m_Device.GetLogicalDevice(), &semaphoreInfo, nullptr, &m_ImageAvailableSemaphores[i]);
-            vkCreateSemaphore(m_Device.GetLogicalDevice(), &semaphoreInfo, nullptr, &m_RenderFinishedSemaphores[i]);
-            vkCreateFence(m_Device.GetLogicalDevice(), &fenceInfo, nullptr, &m_InFlightFences[i]);
+            // CRITICAL FIX: Use VK_CHECK macro for synchronization primitives
+            VK_CHECK(vkCreateSemaphore(m_Device.GetLogicalDevice(), &semaphoreInfo, nullptr, &m_ImageAvailableSemaphores[i]));
+            VK_CHECK(vkCreateSemaphore(m_Device.GetLogicalDevice(), &semaphoreInfo, nullptr, &m_RenderFinishedSemaphores[i]));
+            VK_CHECK(vkCreateFence(m_Device.GetLogicalDevice(), &fenceInfo, nullptr, &m_InFlightFences[i]));
         }
     }
 
     void SimpleRenderer::BeginFrame()
     {
         // 1. Wait for fence (CPU wait)
-        vkWaitForFences(m_Device.GetLogicalDevice(), 1, &m_InFlightFences[m_CurrentFrame], VK_TRUE, UINT64_MAX);
+        VK_CHECK(vkWaitForFences(m_Device.GetLogicalDevice(), 1, &m_InFlightFences[m_CurrentFrame], VK_TRUE, UINT64_MAX));
 
         // 2. Acquire Image
         VkResult result = vkAcquireNextImageKHR(
@@ -103,13 +99,13 @@ namespace Runtime::RHI
             return;
         }
 
-        vkResetFences(m_Device.GetLogicalDevice(), 1, &m_InFlightFences[m_CurrentFrame]);
+        VK_CHECK(vkResetFences(m_Device.GetLogicalDevice(), 1, &m_InFlightFences[m_CurrentFrame]));
         VkCommandBuffer cmd = m_CommandBuffers[m_CurrentFrame];
-        vkResetCommandBuffer(cmd, 0);
+        VK_CHECK(vkResetCommandBuffer(cmd, 0));
 
         VkCommandBufferBeginInfo beginInfo{};
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-        vkBeginCommandBuffer(cmd, &beginInfo);
+        VK_CHECK(vkBeginCommandBuffer(cmd, &beginInfo));
 
         m_IsFrameStarted = true;
     }
@@ -124,7 +120,7 @@ namespace Runtime::RHI
         CommandUtils::TransitionImageLayout(cmd, currentImage, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                                             VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
-        vkEndCommandBuffer(cmd);
+        VK_CHECK(vkEndCommandBuffer(cmd));
 
         VkSubmitInfo submitInfo{};
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -144,7 +140,7 @@ namespace Runtime::RHI
 
         {
             std::lock_guard lock(m_Device.GetQueueMutex());
-            vkQueueSubmit(m_Device.GetGraphicsQueue(), 1, &submitInfo, m_InFlightFences[m_CurrentFrame]);
+            VK_CHECK(vkQueueSubmit(m_Device.GetGraphicsQueue(), 1, &submitInfo, m_InFlightFences[m_CurrentFrame]));
         }
 
         // 8. Present

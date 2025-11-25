@@ -30,6 +30,7 @@ export namespace Runtime
         std::string AppName = "Intrinsic App";
         int Width = 1600;
         int Height = 900;
+        size_t FrameArenaSize = 1024 * 1024; // CRITICAL FIX: Configurable frame arena (default: 1 MB)
     };
 
     class Engine

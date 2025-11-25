@@ -28,6 +28,15 @@ namespace Core::Memory
         // Now safe because totalSize_ is a multiple of CACHE_LINE
         start_ = static_cast<std::byte*>(std::aligned_alloc(CACHE_LINE, totalSize_));
 #endif
+
+        // CRITICAL FIX: Check if allocation failed
+        if (!start_)
+        {
+            totalSize_ = 0;
+            offset_ = 0;
+            // Note: Without exceptions, we can't fail in constructor.
+            // Caller must check via GetTotal() == 0 or first Alloc() will fail with OutOfMemory.
+        }
     }
 
     LinearArena::~LinearArena()

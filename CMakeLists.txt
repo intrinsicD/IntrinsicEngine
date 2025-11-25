@@ -43,9 +43,12 @@ set(INTRINSIC_BASE_FLAGS
         -fno-rtti
 )
 
+# CRITICAL FIX: Add sanitizers to RelWithDebInfo for better testing coverage
 set(INTRINSIC_DEBUG_FLAGS
     $<$<CONFIG:Debug>:-fsanitize=address,undefined>
     $<$<CONFIG:Debug>:-fno-omit-frame-pointer>
+    $<$<CONFIG:RelWithDebInfo>:-fsanitize=address,undefined>
+    $<$<CONFIG:RelWithDebInfo>:-fno-omit-frame-pointer>
 )
 set(INTRINSIC_RELEASE_FLAGS
         $<$<CONFIG:Release>:-O3>
@@ -120,10 +123,11 @@ set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(glfw)
 
 # --- Volk (Vulkan Meta Loader) ---
+# CRITICAL FIX: Pin to stable commit instead of master
 FetchContent_Declare(
         volk
         GIT_REPOSITORY https://github.com/zeux/volk.git
-        GIT_TAG master
+        GIT_TAG vulkan-sdk-1.3.268.0
 )
 FetchContent_MakeAvailable(volk)
 find_package(Vulkan REQUIRED)
@@ -139,10 +143,11 @@ if(NOT vma_POPULATED)
     FetchContent_Populate(vma)
 endif()
 
+# CRITICAL FIX: Pin STB to specific commit for reproducible builds
 FetchContent_Declare(
     stb
     GIT_REPOSITORY https://github.com/nothings/stb.git
-    GIT_TAG master
+    GIT_TAG 5736b15f7ea0ffb08dd38af21067c314d6a3aae9  # 2023-01-30
 )
 FetchContent_MakeAvailable(stb)
 
@@ -170,10 +175,11 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(tinygltf)
 
 # --- ImGui (Docking Branch) ---
+# CRITICAL FIX: Pin to specific docking branch commit for stability
 FetchContent_Declare(
         imgui
         GIT_REPOSITORY https://github.com/ocornut/imgui.git
-        GIT_TAG docking
+        GIT_TAG v1.90.1-docking
 )
 FetchContent_MakeAvailable(imgui)
 

@@ -31,6 +31,28 @@ export namespace Core::Memory
         { a.Reset() } -> std::same_as<void>;
     };
 
+    // -------------------------------------------------------------------------
+    // LinearArena - High-performance bump allocator for temporary allocations
+    // -------------------------------------------------------------------------
+    // CRITICAL DESIGN DECISION: This allocator does NOT call destructors!
+    //
+    // Rationale:
+    // - Zero-overhead abstraction for per-frame allocations
+    // - Destructors would require tracking all allocated objects (overhead)
+    // - Designed for POD types and types with trivial destructors only
+    //
+    // Usage Requirements:
+    // - ONLY allocate trivially destructible types (std::is_trivially_destructible_v)
+    // - DO NOT allocate types with non-trivial destructors (std::string, std::vector, etc.)
+    // - Use std::unique_ptr/std::shared_ptr from heap for complex types
+    // - RenderGraph enforces this with static_assert
+    //
+    // Performance Benefits:
+    // - O(1) allocation (just bump offset pointer)
+    // - O(1) reset (just set offset to 0)
+    // - Cache-friendly linear memory layout
+    // - No per-allocation bookkeeping
+    // -------------------------------------------------------------------------
     // EXPORT THE CLASS
     class LinearArena
     {

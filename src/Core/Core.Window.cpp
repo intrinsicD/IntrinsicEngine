@@ -40,7 +40,8 @@ namespace Core::Windowing
             if (!success)
             {
                 Log::Error("Could not initialize GLFW!");
-                return; // TODO: Handle fatal error better
+                m_IsValid = false; // CRITICAL FIX: Mark window as invalid
+                return;
             }
             glfwSetErrorCallback(GLFWErrorCallback);
             s_GLFWInitialized = true;
@@ -52,7 +53,17 @@ namespace Core::Windowing
 
         auto m_glfw = glfwCreateWindow(m_Data.Width, m_Data.Height, m_Data.Title.c_str(), nullptr, nullptr);
 
+        // CRITICAL FIX: Check if window creation failed
+        if (!m_glfw)
+        {
+            Log::Error("Failed to create GLFW window!");
+            m_IsValid = false;
+            return;
+        }
+
         m_Window = m_glfw;
+        m_IsValid = true; // CRITICAL FIX: Mark window as valid
+
         // Store a pointer to our data struct inside the GLFW window so callbacks can find it
         glfwSetWindowUserPointer(m_glfw, &m_Data);
 
@@ -140,19 +151,24 @@ namespace Core::Windowing
 
     void Window::Shutdown()
     {
-        auto m_glfw = static_cast<GLFWwindow*>(m_Window);
-        glfwDestroyWindow(m_glfw);
+        if (m_Window)
+        {
+            auto m_glfw = static_cast<GLFWwindow*>(m_Window);
+            glfwDestroyWindow(m_glfw);
+        }
         // Note: We generally don't terminate GLFW here in case we have multiple windows,
         // but for a game engine, usually closing the main window kills the app.
     }
 
     void Window::OnUpdate()
     {
+        if (!m_IsValid) return; // CRITICAL FIX: Don't poll events on invalid window
         glfwPollEvents();
     }
 
     bool Window::ShouldClose() const
     {
+        if (!m_IsValid) return true; // CRITICAL FIX: Invalid window should be considered closed
         auto m_glfw = static_cast<GLFWwindow*>(m_Window);
         return glfwWindowShouldClose(m_glfw);
     }
