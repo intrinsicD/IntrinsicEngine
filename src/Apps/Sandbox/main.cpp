@@ -49,8 +49,8 @@ public:
     {
         Log::Info("Sandbox Started!");
 
-        m_Camera.Position = {0.0f, 2.0f, 4.0f};
-        m_CameraController = std::make_unique<Graphics::FPSCameraController>();
+        m_Camera.Position = {0.0f, 0.0f, 4.0f};
+        m_CameraController = std::make_unique<Graphics::OrbitCameraController>();
 
         auto textureLoader = [&](const std::string& path) {
             // Note: RHI::Texture constructor does IO + GPU upload synchronously here

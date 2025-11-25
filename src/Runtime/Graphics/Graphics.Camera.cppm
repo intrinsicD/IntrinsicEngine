@@ -137,17 +137,24 @@ export namespace Runtime::Graphics
         bool m_FirstMouse = true;
     };
 
-    // Simple Orbit Camera for inspecting models
+    // Trackball / Free Orbit Camera
     class OrbitCameraController : public CameraController
     {
     public:
         glm::vec3 Target{0.0f};
-        float Radius = 5.0f;
         float Sensitivity = 0.2f;
+        // Used to track zoom distance, updated on first run or scroll
+        float Distance = 5.0f;
 
         void OnUpdate(Camera& camera, float dt) override
         {
             using namespace Core::Input;
+
+            // Zoom logic (Simple W/S for distance for now, mouse scroll later)
+            // Recalculate distance based on current position to stay in sync
+            glm::vec3 offset = camera.Position - Target;
+
+            // Handle Rotation
             if (IsMouseButtonPressed(0)) // Left Click
             {
                 double x = GetMouseX();
@@ -163,12 +170,29 @@ export namespace Runtime::Graphics
                 float xDelta = static_cast<float>(x - m_LastX) * Sensitivity;
                 float yDelta = static_cast<float>(y - m_LastY) * Sensitivity;
 
-                m_Theta -= xDelta; // Azimuth
-                m_Phi += yDelta; // Elevation
+                // --- Trackball Logic ---
+                // 1. Get Camera Basis Vectors
+                glm::vec3 camRight = camera.GetRight();
+                glm::vec3 camUp = camera.GetUp();
 
-                // Clamp Phi to avoid Gimbal lock (approx)
-                if (m_Phi > 89.0f) m_Phi = 89.0f;
-                if (m_Phi < -89.0f) m_Phi = -89.0f;
+                // 2. Create rotation quaternions
+                // Rotate around Camera Up for Yaw (Horizontal mouse movement)
+                // Rotate around Camera Right for Pitch (Vertical mouse movement)
+                // Note: Angles in radians.
+                glm::quat yawRot = glm::angleAxis(glm::radians(-xDelta), glm::vec3(0, 1, 0));
+                // World Up for stability, OR camUp for free-tumble
+                // For "continuous in any direction" like PMP, usually we rotate around Screen Axes (CamUp/CamRight).
+                // Let's use CamUp to allow tumbling over the pole cleanly.
+                yawRot = glm::angleAxis(glm::radians(-xDelta), camUp);
+
+                glm::quat pitchRot = glm::angleAxis(glm::radians(-yDelta), camRight);
+
+                // 3. Combine rotations (Pitch then Yaw is standard for trackball feel)
+                glm::quat rotation = yawRot * pitchRot;
+
+                // 4. Apply rotation to offset and orientation
+                offset = rotation * offset;
+                camera.Orientation = glm::normalize(rotation * camera.Orientation);
 
                 m_LastX = x;
                 m_LastY = y;
@@ -178,22 +202,14 @@ export namespace Runtime::Graphics
                 m_FirstMouse = true;
             }
 
-            // Convert Spherical to Cartesian
-            float radPhi = glm::radians(m_Phi);
-            float radTheta = glm::radians(m_Theta);
+            // Apply Zoom/Movement (Optional: Add wheel support here in future)
+            // Just ensure position is updated based on Target + Rotated Offset
+            camera.Position = Target + offset;
 
-            float x = Radius * cos(radPhi) * cos(radTheta);
-            float y = Radius * sin(radPhi);
-            float z = Radius * cos(radPhi) * sin(radTheta);
-
-            camera.Position = Target + glm::vec3(x, y, z);
-            camera.Orientation = glm::quatLookAt(glm::normalize(Target - camera.Position), glm::vec3(0, 1, 0));
             camera.UpdateMatrices();
         }
 
     private:
-        float m_Theta = 90.0f;
-        float m_Phi = 0.0f;
         double m_LastX = 0.0;
         double m_LastY = 0.0;
         bool m_FirstMouse = true;
