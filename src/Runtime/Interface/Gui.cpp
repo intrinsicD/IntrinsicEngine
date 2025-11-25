@@ -1,15 +1,14 @@
 module;
 
-// 1. Force ImGui to expose Dynamic Rendering fields even if system headers are old
+// 1. Force ImGui to expose Dynamic Rendering fields
 #define IMGUI_IMPL_VULKAN_HAS_DYNAMIC_RENDERING
 
-// 2. Ensure we use Volk's function pointers, not raw symbols
-#define IMGUI_IMPL_VULKAN_NO_PROTOTYPES
 #include "RHI/RHI.Vulkan.hpp"
 
 #include <imgui.h>
 #include <backends/imgui_impl_glfw.h>
 #include <backends/imgui_impl_vulkan.h>
+#include <GLFW/glfw3.h> // Required for glfwGetInstanceProcAddress
 #include <vector>
 
 module Runtime.Interface.GUI;
@@ -31,8 +30,7 @@ namespace Runtime::Interface::GUI
         // 1. Setup Dear ImGui context
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
-        ImGuiIO& io = ImGui::GetIO();
-        (void)io;
+        ImGuiIO& io = ImGui::GetIO(); (void)io;
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
         io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
@@ -41,17 +39,17 @@ namespace Runtime::Interface::GUI
         // 2. Create Descriptor Pool
         VkDescriptorPoolSize pool_sizes[] =
         {
-            {VK_DESCRIPTOR_TYPE_SAMPLER, 1000},
-            {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000},
-            {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000},
-            {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000},
-            {VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000},
-            {VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000},
-            {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000},
-            {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000},
-            {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000},
-            {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000},
-            {VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000}
+            { VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
+            { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
+            { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000 },
+            { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000 },
+            { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000 },
+            { VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000 },
+            { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
+            { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 },
+            { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000 },
+            { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
+            { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000 }
         };
 
         VkDescriptorPoolCreateInfo pool_info = {};
@@ -72,7 +70,7 @@ namespace Runtime::Interface::GUI
 
         // 4. Init Vulkan Backend
         ImGui_ImplVulkan_InitInfo init_info = {};
-        init_info.ApiVersion = VK_API_VERSION_1_3; // REQUIRED in v1.91+
+        init_info.ApiVersion = VK_API_VERSION_1_3;
         init_info.Instance = instance;
         init_info.PhysicalDevice = device.GetPhysicalDevice();
         init_info.Device = device.GetLogicalDevice();
@@ -82,36 +80,28 @@ namespace Runtime::Interface::GUI
         init_info.MinImageCount = 2;
         init_info.ImageCount = (uint32_t)swapchain.GetImages().size();
 
-        // --- API CHANGE FIX (v1.91+) ---
-        // MSAASamples moved to PipelineInfoMain
+        // API Fix for v1.91+
         init_info.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
 
         // Dynamic Rendering Setup
         init_info.UseDynamicRendering = true;
 
-        // We must construct VkPipelineRenderingCreateInfo manually and pass it via PipelineInfoMain
         VkFormat color_format = swapchain.GetImageFormat();
-
         VkPipelineRenderingCreateInfo pipeline_rendering_create_info = {};
         pipeline_rendering_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
         pipeline_rendering_create_info.colorAttachmentCount = 1;
         pipeline_rendering_create_info.pColorAttachmentFormats = &color_format;
-        // pipeline_rendering_create_info.depthAttachmentFormat = VK_FORMAT_UNDEFINED; // Set if you use depth in UI
 
         init_info.PipelineInfoMain.PipelineRenderingCreateInfo = pipeline_rendering_create_info;
 
-        ImGui_ImplVulkan_LoadFunctions(VK_API_VERSION_1_3, [](const char* function_name, void* vulkan_instance)
-        {
-            // Check if function_name is valid
+        // Loader Fix: Use GLFW's loader to bypass potential Volk/Static-Linking symbol conflicts
+        ImGui_ImplVulkan_LoadFunctions(VK_API_VERSION_1_3, [](const char* function_name, void* vulkan_instance) {
             if (!function_name) return (PFN_vkVoidFunction)nullptr;
-
-            // Convert void* back to VkInstance
             VkInstance inst = reinterpret_cast<VkInstance>(vulkan_instance);
-
-            return vkGetInstanceProcAddr(inst, function_name);
+            return glfwGetInstanceProcAddress(inst, function_name);
         }, reinterpret_cast<void*>(instance));
 
-        // Init (No RenderPass argument anymore)
+        // Init
         ImGui_ImplVulkan_Init(&init_info);
 
         Core::Log::Info("ImGui Initialized.");

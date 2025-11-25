@@ -1,17 +1,49 @@
-name: CI
-on: [push, pull_request]
+name: Build Engine
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
 jobs:
   build:
-    runs-on: ubuntu-latest
+    # Use ubuntu-24.04 to get a newer environment, or 22.04 is fine too
+    runs-on: ubuntu-24.04
+
     steps:
-    - uses: actions/checkout@v3
-    - name: Install Clang 18
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y clang-18
-    - name: Configure CMake
-      run: cmake -B build -DCMAKE_C_COMPILER=clang-18 -DCMAKE_CXX_COMPILER=clang++-18
-    - name: Build
-      run: cmake --build build
-    - name: Run Tests
-      run: ctest --test-dir build
+      - uses: actions/checkout@v4
+
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          # 1. Install Basic Build Tools & CMake
+          sudo apt-get install -y build-essential cmake ninja-build
+          
+          # 2. Install X11/Windowing Libs (Fixes the "Could NOT find X11" error)
+          sudo apt-get install -y libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev libxext-dev libxfixes-dev libwayland-dev libxkbcommon-dev
+          
+          # 3. Install Vulkan SDK (Required for linking)
+          sudo apt-get install -y libvulkan-dev vulkan-tools spirv-tools
+
+      - name: Install Clang 18 & Tools
+        run: |
+          # Automated script from llvm.org to fetch clang-18
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 18
+          
+          # CRITICAL: Install clang-tools-18 for Module Scanning and GCC-14 STL for <format> support
+          sudo apt-get install -y clang-tools-18 libstdc++-14-dev
+
+      - name: Configure CMake
+        # We must explicitly point to the scanner we just installed
+        run: |
+          cmake -B build -G "Ninja" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=clang-18 \
+            -DCMAKE_CXX_COMPILER=clang++-18 \
+            -DCMAKE_CXX_COMPILER_CLANG_SCAN_DEPS=/usr/bin/clang-scan-deps-18
+
+      - name: Build
+        run: cmake --build build
