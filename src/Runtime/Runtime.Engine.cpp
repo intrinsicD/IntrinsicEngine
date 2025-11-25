@@ -2,9 +2,11 @@ module;
 #include <chrono>
 #include <queue>
 #include <filesystem>
+#include <algorithm> // for std::transform
+#include <cctype>    // for std::tolower
 #include <GLFW/glfw3.h>
-#include <RHI/RHI.Vulkan.hpp>
 #include <glm/glm.hpp>
+#include "RHI/RHI.Vulkan.hpp"
 
 module Runtime.Engine;
 
@@ -14,6 +16,7 @@ import Core.Window;
 import Core.Memory;
 import Core.Tasks;
 import Runtime.RHI.Shader;
+import Runtime.RHI.Texture;
 import Runtime.Graphics.ModelLoader;
 import Runtime.Graphics.Material;
 import Runtime.ECS.Components;
@@ -126,14 +129,31 @@ namespace Runtime
                 return;
             }
 
-            // Create a default material (Pink debug to show if textures fail)
-            // In a real scenario, ModelLoader should return Materials too.
-            static auto defaultMat = std::make_shared<Graphics::Material>(
-                GetDevice(), GetDescriptorPool(), GetDescriptorLayout(), "assets/textures/DuckCM.png"
+            // --- MATERIAL & ASSET LOGIC START ---
+
+            // 1. Define Texture Loader
+            // This lambda creates the actual RHI::Texture when the AssetTask runs.
+            auto textureLoader = [&](const std::string& path) {
+                return std::make_shared<RHI::Texture>(GetDevice(), path);
+            };
+
+            // 2. Load the Fallback Texture (Parameterization.png)
+            // We use the AssetManager. If it's already loaded, we get the handle immediately.
+            auto texHandle = m_AssetManager.Load<RHI::Texture>("assets/textures/Parameterization.png", textureLoader);
+
+            // 3. Create the Default Material
+            // We now pass the AssetHandle instead of a raw string path.
+            auto defaultMat = std::make_shared<Graphics::Material>(
+                GetDevice(), GetDescriptorPool(), GetDescriptorLayout(), texHandle
             );
+
+            // 4. Request Descriptor Write
+            // The material will wait until texHandle is 'Ready' inside RenderSystem::OnUpdate
             defaultMat->WriteDescriptor(GetGlobalUBO()->GetHandle(), sizeof(RHI::CameraBufferObject));
 
             m_LoadedMaterials.push_back(defaultMat);
+
+            // --- MATERIAL & ASSET LOGIC END ---
 
             // Create Entity
             auto entity = m_Scene.CreateEntity(fsPath.stem().string());
@@ -158,7 +178,7 @@ namespace Runtime
                 {
                     // Create child entities for submeshes
                     auto child = m_Scene.CreateEntity(fsPath.stem().string() + "_" + std::to_string(i));
-                    auto& ct = m_Scene.GetRegistry().get<ECS::TransformComponent>(child);
+                    //auto& ct = m_Scene.GetRegistry().get<ECS::TransformComponent>(child);
                     // In a real loader, we would apply local transforms from GLTF nodes here
 
                     auto& cmr = m_Scene.GetRegistry().emplace<ECS::MeshRendererComponent>(child);

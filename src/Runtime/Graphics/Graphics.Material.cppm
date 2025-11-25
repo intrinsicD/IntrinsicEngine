@@ -9,6 +9,7 @@ import Runtime.RHI.Device;
 import Runtime.RHI.Texture;
 import Runtime.RHI.Pipeline;
 import Runtime.RHI.Descriptors;
+import Core.Assets;
 
 export namespace Runtime::Graphics
 {
@@ -18,17 +19,23 @@ export namespace Runtime::Graphics
         Material(RHI::VulkanDevice& device,
                  RHI::DescriptorPool& pool,
                  const RHI::DescriptorLayout& layout, // We share the layout
-                 const std::string& texturePath);
+                 Core::Assets::AssetHandle textureHandle);
+
+        bool Prepare(Core::Assets::AssetManager &assetManager);
 
         // We need to update the UBO (Camera) descriptor
         void WriteDescriptor(VkBuffer cameraBuffer, VkDeviceSize range);
 
         [[nodiscard]] VkDescriptorSet GetDescriptorSet() const { return m_DescriptorSet; }
-        [[nodiscard]] RHI::Texture* GetTexture() const { return m_Texture.get(); }
+        [[nodiscard]] Core::Assets::AssetHandle GetTextureHandle() const { return m_TextureHandle; }
 
     private:
-        std::unique_ptr<RHI::Texture> m_Texture;
-        VkDescriptorSet m_DescriptorSet = VK_NULL_HANDLE;
         RHI::VulkanDevice& m_Device;
+        VkDescriptorSet m_DescriptorSet = VK_NULL_HANDLE;
+        Core::Assets::AssetHandle m_TextureHandle;
+
+        bool m_IsDescriptorWritten = false;
+        VkBuffer m_PendingBuffer = VK_NULL_HANDLE;
+        VkDeviceSize m_PendingRange = 0;
     };
 }

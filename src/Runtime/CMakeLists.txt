@@ -29,6 +29,7 @@ target_sources(${target_name}
         Graphics/Graphics.Model.cppm
         Graphics/Graphics.RenderSystem.cppm
         Graphics/Graphics.ModelLoader.cppm
+        Graphics/Graphics.Camera.cppm
         RenderGraph/RenderGraph.cppm
         Runtime.Engine.cppm
         PRIVATE

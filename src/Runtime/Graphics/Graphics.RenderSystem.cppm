@@ -11,16 +11,12 @@ import Runtime.RHI.Pipeline;
 import Runtime.RHI.Buffer;
 import Runtime.ECS.Scene;
 import Runtime.RenderGraph;
+import Runtime.Graphics.Camera;
 import Core.Memory;
+import Core.Assets;
 
 export namespace Runtime::Graphics
 {
-    struct CameraData
-    {
-        glm::mat4 View;
-        glm::mat4 Proj;
-    };
-
     class RenderSystem
     {
     public:
@@ -31,7 +27,7 @@ export namespace Runtime::Graphics
                      Core::Memory::LinearArena &frameArena);
         ~RenderSystem();
 
-        void OnUpdate(ECS::Scene& scene, const CameraData& camera);
+        void OnUpdate(ECS::Scene& scene, const Camera& camera, Core::Assets::AssetManager& assetManager);
 
         [[nodiscard]] RHI::VulkanBuffer* GetGlobalUBO() const { return m_GlobalUBO.get(); }
 

@@ -8,8 +8,10 @@ module Runtime.Graphics.RenderSystem;
 
 import Core.Logging;
 import Core.Memory;
+import Core.Assets;
 import Runtime.RHI.Types;
 import Runtime.ECS.Components;
+import Runtime.Graphics.Camera;
 
 namespace Runtime::Graphics
 {
@@ -61,17 +63,15 @@ namespace Runtime::Graphics
         Graph::RGResourceHandle Depth;
     };
 
-    void RenderSystem::OnUpdate(ECS::Scene& scene, const CameraData& camera)
+    void RenderSystem::OnUpdate(ECS::Scene& scene, const Camera& camera, Core::Assets::AssetManager& assetManager)
     {
-        // 1. Begin Frame
         m_Renderer.BeginFrame();
 
         if (m_Renderer.IsFrameInProgress())
         {
-            // 2. Update Global UBO
             RHI::CameraBufferObject ubo{};
-            ubo.view = camera.View;
-            ubo.proj = camera.Proj;
+            ubo.view = camera.ViewMatrix;
+            ubo.proj = camera.ProjectionMatrix;
 
             size_t cameraDataSize = sizeof(RHI::CameraBufferObject);
             size_t alignedSize = PadUniformBufferSize(cameraDataSize, m_MinUboAlignment);
@@ -82,7 +82,6 @@ namespace Runtime::Graphics
             memcpy(data + offset, &ubo, cameraDataSize);
             m_GlobalUBO->Unmap();
 
-            // 3. Setup Render Graph
             m_RenderGraph.Reset();
 
             auto extent = m_Swapchain.GetExtent();
@@ -127,6 +126,11 @@ namespace Runtime::Graphics
                                                        {
                                                            if (!renderable.MeshRef || !renderable.MaterialRef) continue;
 
+                                                           if (!renderable.MaterialRef->Prepare(assetManager))
+                                                           {
+                                                               // Material not loaded (texture missing). Skip draw or draw purple.
+                                                               continue;
+                                                           }
                                                            VkDescriptorSet sets[] = {
                                                                renderable.MaterialRef->GetDescriptorSet()
                                                            };
@@ -155,11 +159,8 @@ namespace Runtime::Graphics
                                                    }
             );
 
-            // 4. Compile & Execute with Frame Index
             m_RenderGraph.Compile(frameIndex);
             m_RenderGraph.Execute(m_Renderer.GetCommandBuffer());
-
-            // 5. End Frame
             m_Renderer.EndFrame();
         }
     }

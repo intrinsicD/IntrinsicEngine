@@ -11,23 +11,39 @@ namespace Runtime::Graphics {
     Material::Material(RHI::VulkanDevice& device,
                        RHI::DescriptorPool& pool,
                        const RHI::DescriptorLayout& layout,
-                       const std::string& texturePath)
-        : m_Device(device)
+                       Core::Assets::AssetHandle textureHandle)
+        : m_Device(device), m_TextureHandle(textureHandle)
     {
-        // 1. Load Texture
-        std::string fullPath = Core::Filesystem::GetAssetPath(texturePath);
-        m_Texture = std::make_unique<RHI::Texture>(device, fullPath);
-
-        // 2. Allocate Set
         m_DescriptorSet = pool.Allocate(layout.GetHandle());
     }
 
     void Material::WriteDescriptor(VkBuffer cameraBuffer, VkDeviceSize range) {
+
+        m_PendingBuffer = cameraBuffer;
+        m_PendingRange = range;
+        m_IsDescriptorWritten = false; // Mark dirty
+    }
+
+    bool Material::Prepare(Core::Assets::AssetManager& assetManager)
+    {
+        // If already written, we are good.
+        if (m_IsDescriptorWritten) return true;
+
+        // Check dependencies
+        auto texture = assetManager.Get<RHI::Texture>(m_TextureHandle);
+        if (!texture) {
+            // Texture not ready yet.
+            // In a real engine, we would bind a "default white" texture here temporarily.
+            return false;
+        }
+
+        if (m_PendingBuffer == VK_NULL_HANDLE) return false;
+
         // 1. Camera UBO Write
         VkDescriptorBufferInfo bufferInfo{};
-        bufferInfo.buffer = cameraBuffer;
+        bufferInfo.buffer = m_PendingBuffer;
         bufferInfo.offset = 0;
-        bufferInfo.range = range;
+        bufferInfo.range = m_PendingRange;
 
         VkWriteDescriptorSet descriptorWriteUBO{};
         descriptorWriteUBO.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -37,11 +53,11 @@ namespace Runtime::Graphics {
         descriptorWriteUBO.descriptorCount = 1;
         descriptorWriteUBO.pBufferInfo = &bufferInfo;
 
-        // 2. Texture Write
+        // 2. Texture Write (Now using the asset!)
         VkDescriptorImageInfo imageInfo{};
         imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        imageInfo.imageView = m_Texture->GetView();
-        imageInfo.sampler = m_Texture->GetSampler();
+        imageInfo.imageView = texture->GetView();
+        imageInfo.sampler = texture->GetSampler();
 
         VkWriteDescriptorSet descriptorWriteImage{};
         descriptorWriteImage.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -52,6 +68,10 @@ namespace Runtime::Graphics {
         descriptorWriteImage.pImageInfo = &imageInfo;
 
         std::vector<VkWriteDescriptorSet> writes = {descriptorWriteUBO, descriptorWriteImage};
-        vkUpdateDescriptorSets(m_Device.GetLogicalDevice(), 2, writes.data(), 0, nullptr);
+        vkUpdateDescriptorSets(m_Device.GetLogicalDevice(), (uint32_t)writes.size(), writes.data(), 0, nullptr);
+
+        m_IsDescriptorWritten = true;
+        return true;
     }
+
 }

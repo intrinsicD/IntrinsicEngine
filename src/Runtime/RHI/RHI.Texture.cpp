@@ -11,6 +11,7 @@ import Runtime.RHI.Buffer;
 import Runtime.RHI.Image;
 import Runtime.RHI.CommandUtils;
 import Core.Logging;
+import Core.Filesystem;
 
 namespace Runtime::RHI
 {
@@ -100,11 +101,13 @@ namespace Runtime::RHI
     Texture::Texture(VulkanDevice& device, const std::string& filepath)
         : m_Device(device)
     {
+
+        std::string fullPath = Core::Filesystem::GetAssetPath(filepath);
         // 1. Load Pixels from Disk
         int texWidth, texHeight, texChannels;
         stbi_set_flip_vertically_on_load(false);
         // Vulkan UVs are usually flipped relative to OpenGL, but standard convention varies.
-        stbi_uc* pixels = stbi_load(filepath.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+        stbi_uc* pixels = stbi_load(fullPath.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
 
         if (!pixels)
         {

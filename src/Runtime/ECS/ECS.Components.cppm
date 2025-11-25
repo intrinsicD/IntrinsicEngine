@@ -27,16 +27,34 @@ export namespace Runtime::ECS
         {
             glm::mat4 mat = glm::translate(glm::mat4(1.0f), Position);
 
-            mat = glm::rotate(mat, glm::radians(Rotation.x), glm::vec3(1,0,0));
-            mat = glm::rotate(mat, glm::radians(Rotation.y), glm::vec3(0,1,0));
-            mat = glm::rotate(mat, glm::radians(Rotation.z), glm::vec3(0,0,1));
+            mat = glm::rotate(mat, glm::radians(Rotation.x), glm::vec3(1, 0, 0));
+            mat = glm::rotate(mat, glm::radians(Rotation.y), glm::vec3(0, 1, 0));
+            mat = glm::rotate(mat, glm::radians(Rotation.z), glm::vec3(0, 0, 1));
 
             mat = glm::scale(mat, Scale);
             return mat;
         }
     };
 
-    struct MeshRendererComponent {
+    class TransformController
+    {
+    public:
+        virtual ~TransformController() = default;
+        virtual void OnUpdate(TransformComponent& transform, float dt) = 0;
+    };
+
+    class TransformRotating : public TransformController
+    {
+    public:
+        float Speed = 45.0f;
+        void OnUpdate(TransformComponent& transform, float dt) override
+        {
+            transform.Rotation.y += Speed * dt;
+        }
+    };
+
+    struct MeshRendererComponent
+    {
         std::shared_ptr<Graphics::Mesh> MeshRef;
         std::shared_ptr<Graphics::Material> MaterialRef;
     };
