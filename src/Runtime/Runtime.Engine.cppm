@@ -47,7 +47,7 @@ export namespace Runtime
         virtual void OnUpdate(float deltaTime) = 0;
         virtual void OnRender() = 0; // Optional custom rendering hook
 
-    protected:
+    //protected:
         // Protected access so Sandbox can manipulate Scene/Assets
         ECS::Scene m_Scene;
         Core::Assets::AssetManager m_AssetManager;

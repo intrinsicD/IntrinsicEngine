@@ -4,6 +4,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <vector>
 #include <memory>
+#include <imgui.h>
 
 // Include Macros for Vulkan (VK_NO_PROTOTYPES)
 #include "tiny_gltf.h"
@@ -75,11 +76,40 @@ public:
             GetDescriptorLayout(),
             m_DuckTexture,
             m_DefaultTexture, // Inherited from Engine
-            m_AssetManager    // Inherited from Engine
+            m_AssetManager // Inherited from Engine
         );
         m_DuckMaterial->WriteDescriptor(GetGlobalUBO()->GetHandle(), sizeof(RHI::CameraBufferObject));
 
         Log::Info("Asset Load Requested. Waiting for background thread...");
+
+        Interface::GUI::RegisterPanel("Renderer Stats", [camera = &m_Camera]()
+        {
+            ImGui::Text("Application Average: %.3f ms/frame (%.1f FPS)",
+                        1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+
+            static glm::vec3 sunDir = {1.0, 1.0, 1.0};
+            ImGui::DragFloat3("Sun Direction", &sunDir.x, 0.1f);
+
+            // Camera info
+            ImGui::Separator();
+            glm::vec3 camPos = camera->Position;
+            ImGui::Text("Camera Pos: %.2f, %.2f, %.2f", camPos.x, camPos.y, camPos.z);
+        }, true, ImGuiWindowFlags_AlwaysAutoResize);
+
+        Interface::GUI::RegisterPanel("Inspector", [this]()
+        {
+            // Just the content!
+            if (ImGui::Button("Spawn Duck"))
+            {
+                /* ... */
+            }
+
+            auto view = m_Scene.GetRegistry().view<ECS::TagComponent>();
+            for (auto [entity, tag] : view.each())
+            {
+                ImGui::Text("Entity: %s", tag.Name.c_str());
+            }
+        });
     }
 
     void OnUpdate(float dt) override
@@ -92,7 +122,6 @@ public:
         {
             m_CameraController->OnUpdate(m_Camera, dt, mouseCaptured);
         }
-
 
         if (m_Window->GetWidth() != 0 && m_Window->GetHeight() != 0)
         {

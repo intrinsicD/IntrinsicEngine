@@ -1,4 +1,6 @@
 module;
+#include <functional>
+
 #include "RHI/RHI.Vulkan.hpp" // For VkCommandBuffer
 
 export module Runtime.Interface.GUI;
@@ -9,6 +11,9 @@ import Core.Window;
 
 export namespace Runtime::Interface::GUI
 {
+    using UIPanelCallback = std::function<void(void)>;
+    using UIMenuCallback = std::function<void(void)>;
+
     // Initializes ImGui, GLFW backend, and Vulkan backend (Dynamic Rendering)
     void Init(Core::Windowing::Window& window, 
               RHI::VulkanDevice& device, 
@@ -19,10 +24,18 @@ export namespace Runtime::Interface::GUI
     void Shutdown();
 
     void BeginFrame();
+
+    void DrawGUI();
     
     // Records the ImGui draw commands into the provided command buffer.
     // Must be called inside a RenderPass (or BeginRendering).
     void Render(VkCommandBuffer cmd);
+
+    void RegisterPanel(std::string name, UIPanelCallback callback, bool isClosable = true, int flags = 0);
+
+    void RemovePanel(const std::string& name);
+
+    void RegisterMainMenuBar(std::string name, UIMenuCallback callback);
 
     // Returns true if ImGui is using the mouse (hovering a window, dragging a slider)
     [[nodiscard]] bool WantCaptureMouse();

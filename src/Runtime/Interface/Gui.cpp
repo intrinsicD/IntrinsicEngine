@@ -18,6 +18,23 @@ import Core.Filesystem;
 
 namespace Runtime::Interface::GUI
 {
+    struct RegisteredPanel
+    {
+        std::string Name;
+        UIPanelCallback Callback;
+        bool IsClosable = true;
+        bool IsOpen = true; // Track state
+        int Flags = 0;
+    };
+
+    struct RegisteredMenu
+    {
+        std::string Name;
+        UIMenuCallback Callback;
+    };
+
+    static std::vector<RegisteredPanel> s_Panels;
+    static std::vector<RegisteredMenu> s_Menus;
     static VkDescriptorPool s_DescriptorPool = VK_NULL_HANDLE;
     static RHI::VulkanDevice* s_Device = nullptr;
 
@@ -165,10 +182,91 @@ namespace Runtime::Interface::GUI
         ImGui::NewFrame();
     }
 
+    void DrawGUI()
+    {
+        // 1. MAIN MENU BAR
+        if (ImGui::BeginMainMenuBar())
+        {
+            // A. Execute User Registered Menus (File, Edit, etc.)
+            for (const auto& menu : s_Menus)
+            {
+                if (menu.Callback) menu.Callback();
+            }
+
+            // B. Automatic "Panels" Menu (To re-open closed windows)
+            if (ImGui::BeginMenu("Panels"))
+            {
+                for (auto& panel : s_Panels)
+                {
+                    // Checkbox to toggle visibility
+                    if (ImGui::MenuItem(panel.Name.c_str(), nullptr, &panel.IsOpen))
+                    {
+                        // Logic handled by bool reference
+                    }
+                }
+                ImGui::EndMenu();
+            }
+
+            ImGui::EndMainMenuBar();
+        }
+
+        // 2. PANELS (WINDOWS)
+        for (auto it = s_Panels.begin(); it != s_Panels.end(); )
+        {
+            if (!it->IsOpen && it->IsClosable)
+            {
+                // If closed, we skip drawing, but we KEEP it in the vector
+                // so the "Panels" menu above can re-enable it.
+                ++it;
+                continue;
+            }
+
+            bool* pOpen = it->IsClosable ? &it->IsOpen : nullptr;
+
+            if (ImGui::Begin(it->Name.c_str(), pOpen, it->Flags))
+            {
+                if (it->Callback) it->Callback();
+            }
+            ImGui::End();
+
+            ++it;
+        }
+    }
+
     void Render(VkCommandBuffer cmd)
     {
         ImGui::Render();
         ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
+    }
+
+    void RegisterPanel(std::string name, UIPanelCallback callback, bool isClosable, int flags)
+    {
+        // Check if panel exists to update it (re-open it if it was closed)
+        for (auto& panel : s_Panels)
+        {
+            if (panel.Name == name)
+            {
+                panel.Callback = std::move(callback);
+                panel.IsClosable = isClosable;
+                panel.Flags = flags;
+                panel.IsOpen = true; // Re-open
+                return;
+            }
+        }
+
+        // Add new
+        s_Panels.push_back({std::move(name), std::move(callback), isClosable, true, flags});
+    }
+
+    void RemovePanel(const std::string& name)
+    {
+        std::erase_if(s_Panels, [&](const RegisteredPanel& p) { return p.Name == name; });
+    }
+
+    void RegisterMainMenuBar(std::string name, UIMenuCallback callback)
+    {
+        // Simple append - ImGui menus merge automatically if they have the same name (e.g. "File")
+        s_Menus.push_back({std::move(name), std::move(callback)});
     }
 
     bool WantCaptureMouse()

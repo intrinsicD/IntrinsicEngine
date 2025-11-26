@@ -74,21 +74,7 @@ namespace Runtime::Graphics
     {
         Interface::GUI::BeginFrame();
 
-        {
-            ImGui::Begin("Renderer Stats", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
-            ImGui::Text("Application Average: %.3f ms/frame (%.1f FPS)",
-                        1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-
-            static glm::vec3 sunDir = {1.0, 1.0, 1.0};
-            ImGui::DragFloat3("Sun Direction", &sunDir.x, 0.1f);
-
-            // Camera info
-            ImGui::Separator();
-            glm::vec3 camPos = camera.Position;
-            ImGui::Text("Camera Pos: %.2f, %.2f, %.2f", camPos.x, camPos.y, camPos.z);
-
-            ImGui::End();
-        }
+        Interface::GUI::DrawGUI();
 
         m_Renderer.BeginFrame();
 
@@ -111,8 +97,6 @@ namespace Runtime::Graphics
 
             auto extent = m_Swapchain.GetExtent();
             uint32_t imageIndex = m_Renderer.GetImageIndex();
-
-            Graph::RGResourceHandle forwardOutput;
 
             m_RenderGraph.AddPass<ForwardPassData>("ForwardPass",
                                                    [&](ForwardPassData& data, Graph::RGBuilder& builder)
@@ -142,8 +126,6 @@ namespace Runtime::Graphics
 
                                                        data.Color = builder.WriteColor(importedColor, colorInfo);
                                                        data.Depth = builder.WriteDepth(depth, depthInfo);
-
-                                                       forwardOutput = data.Color;
                                                    },
                                                    [&, offset](const ForwardPassData&, const Graph::RGRegistry&,
                                                                VkCommandBuffer cmd)
