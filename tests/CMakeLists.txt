@@ -6,6 +6,7 @@ add_executable(${target_name}
         Test_CoreMemory.cpp
         Test_CoreTasks.cpp
         Test_CoreAssets.cpp
+        Test_RuntimeGeometry.cpp
 )
 
 #Apply Strict Flags ONLY to our tests
@@ -16,6 +17,7 @@ target_link_options(${target_name} PRIVATE ${INTRINSIC_LINK_FLAGS})
 target_link_libraries(${target_name}
         PRIVATE
         IntrinsicCore
+        IntrinsicRuntime
         GTest::gtest_main
         EnTT::EnTT
 )

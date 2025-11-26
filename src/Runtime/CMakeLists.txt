@@ -32,6 +32,11 @@ target_sources(${target_name}
         Graphics/Graphics.Camera.cppm
         RenderGraph/RenderGraph.cppm
         Interface/Gui.cppm
+        Geometry/Geometry.ContactManifold.cppm
+        Geometry/Geometry.Containment.cppm
+        Geometry/Geometry.GJK.cppm
+        Geometry/Geometry.Overlap.cppm
+        Geometry/Geometry.Primitives.cppm
         Runtime.Engine.cppm
         PRIVATE
         RHI/RHI.Context.cpp
