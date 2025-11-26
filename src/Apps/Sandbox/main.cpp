@@ -129,7 +129,7 @@ public:
         }
 
         // Draw
-        m_RenderSystem->OnUpdate(m_Scene, m_Camera, m_AssetManager);
+        m_RenderSystem->OnUpdate(m_Scene, m_Camera);
     }
 
     void OnRender() override

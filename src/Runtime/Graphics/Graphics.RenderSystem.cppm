@@ -27,7 +27,7 @@ export namespace Runtime::Graphics
                      Core::Memory::LinearArena &frameArena);
         ~RenderSystem();
 
-        void OnUpdate(ECS::Scene& scene, const Camera& camera, Core::Assets::AssetManager& assetManager);
+        void OnUpdate(ECS::Scene& scene, const Camera& camera);
 
         [[nodiscard]] RHI::VulkanBuffer* GetGlobalUBO() const { return m_GlobalUBO.get(); }
 

@@ -70,7 +70,7 @@ namespace Runtime::Graphics
         Graph::RGResourceHandle Depth;
     };
 
-    void RenderSystem::OnUpdate(ECS::Scene& scene, const Camera& camera, Core::Assets::AssetManager& assetManager)
+    void RenderSystem::OnUpdate(ECS::Scene& scene, const Camera& camera)
     {
         Interface::GUI::BeginFrame();
 

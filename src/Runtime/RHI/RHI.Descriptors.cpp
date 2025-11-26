@@ -32,6 +32,7 @@ namespace Runtime::RHI {
 
         if (vkCreateDescriptorSetLayout(m_Device->GetLogicalDevice(), &layoutInfo, nullptr, &m_Layout) != VK_SUCCESS) {
             Core::Log::Error("Failed to create descriptor set layout!");
+            m_IsValid = false;
         }
     }
 
@@ -57,6 +58,7 @@ namespace Runtime::RHI {
 
         if (vkCreateDescriptorPool(m_Device->GetLogicalDevice(), &poolInfo, nullptr, &m_Pool) != VK_SUCCESS) {
             Core::Log::Error("Failed to create descriptor pool!");
+            m_IsValid = false;
         }
     }
 

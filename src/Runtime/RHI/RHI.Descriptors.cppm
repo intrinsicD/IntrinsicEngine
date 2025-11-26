@@ -15,9 +15,11 @@ export namespace Runtime::RHI
         ~DescriptorLayout();
 
         [[nodiscard]] VkDescriptorSetLayout GetHandle() const { return m_Layout; }
+        [[nodiscard]] bool IsValid() const { return m_IsValid; }
 
     private:
         std::shared_ptr<VulkanDevice> m_Device;
+        bool m_IsValid = true;
         VkDescriptorSetLayout m_Layout = VK_NULL_HANDLE;
     };
 
@@ -29,9 +31,11 @@ export namespace Runtime::RHI
 
         // Allocate a single set from the pool using the given layout
         [[nodiscard]] VkDescriptorSet Allocate(VkDescriptorSetLayout layout);
+        [[nodiscard]] bool IsValid() const { return m_IsValid; }
 
     private:
         std::shared_ptr<VulkanDevice> m_Device;
+        bool m_IsValid = true;
         VkDescriptorPool m_Pool = VK_NULL_HANDLE;
     };
 }
