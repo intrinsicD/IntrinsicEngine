@@ -5,6 +5,7 @@ module;
 #include <string>
 #include <cstring>
 #include <memory>
+#include <vector>
 
 module Runtime.RHI.Texture;
 import Runtime.RHI.Buffer;
@@ -98,7 +99,7 @@ namespace Runtime::RHI
                              1, &barrier);
     }
 
-    Texture::Texture(VulkanDevice& device, const std::string& filepath)
+    Texture::Texture(std::shared_ptr<VulkanDevice> device, const std::string& filepath)
         : m_Device(device)
     {
         int w, h, c;
@@ -116,7 +117,7 @@ namespace Runtime::RHI
         stbi_image_free(pixels);
     }
 
-    Texture::Texture(VulkanDevice& device, const std::vector<uint8_t>& data, uint32_t width,
+    Texture::Texture(std::shared_ptr<VulkanDevice> device, const std::vector<uint8_t>& data, uint32_t width,
                      uint32_t height) : m_Device(device)
     {
         if (data.size() != width * height * 4)
@@ -129,7 +130,7 @@ namespace Runtime::RHI
 
     Texture::~Texture()
     {
-        if (m_Sampler) vkDestroySampler(m_Device.GetLogicalDevice(), m_Sampler, nullptr);
+        if (m_Sampler) vkDestroySampler(m_Device->GetLogicalDevice(), m_Sampler, nullptr);
     }
 
     void Texture::CreateSampler()
@@ -145,7 +146,7 @@ namespace Runtime::RHI
         samplerInfo.anisotropyEnable = VK_TRUE;
 
         VkPhysicalDeviceProperties properties{};
-        vkGetPhysicalDeviceProperties(m_Device.GetPhysicalDevice(), &properties);
+        vkGetPhysicalDeviceProperties(m_Device->GetPhysicalDevice(), &properties);
         samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
 
         samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
@@ -156,7 +157,7 @@ namespace Runtime::RHI
         samplerInfo.minLod = 0.0f;
         samplerInfo.maxLod = static_cast<float>(m_Image->GetMipLevels());
 
-        if (vkCreateSampler(m_Device.GetLogicalDevice(), &samplerInfo, nullptr, &m_Sampler) != VK_SUCCESS)
+        if (vkCreateSampler(m_Device->GetLogicalDevice(), &samplerInfo, nullptr, &m_Sampler) != VK_SUCCESS)
         {
             Core::Log::Error("Failed to create texture sampler!");
         }
@@ -178,7 +179,7 @@ namespace Runtime::RHI
             VK_IMAGE_ASPECT_COLOR_BIT
         );
 
-        CommandUtils::ExecuteImmediate(m_Device, [&](VkCommandBuffer cmd)
+        CommandUtils::ExecuteImmediate(*m_Device, [&](VkCommandBuffer cmd)
         {
             // 1. Transition Undefined -> Transfer Dst
             VkImageMemoryBarrier barrier{};

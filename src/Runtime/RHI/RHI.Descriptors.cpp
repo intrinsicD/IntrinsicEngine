@@ -1,6 +1,7 @@
 module;
 #include "RHI/RHI.Vulkan.hpp"
 #include <vector>
+#include <memory>
 
 module Runtime.RHI.Descriptors;
 import Core.Logging;
@@ -8,7 +9,7 @@ import Core.Logging;
 namespace Runtime::RHI {
 
     // --- Descriptor Layout ---
-    DescriptorLayout::DescriptorLayout(VulkanDevice& device) : m_Device(device) {
+    DescriptorLayout::DescriptorLayout(std::shared_ptr<VulkanDevice> device) : m_Device(device) {
         std::vector<VkDescriptorSetLayoutBinding> bindings(2);
 
         // 0: UBO
@@ -29,17 +30,17 @@ namespace Runtime::RHI {
         layoutInfo.bindingCount = 2;
         layoutInfo.pBindings = bindings.data();
 
-        if (vkCreateDescriptorSetLayout(m_Device.GetLogicalDevice(), &layoutInfo, nullptr, &m_Layout) != VK_SUCCESS) {
+        if (vkCreateDescriptorSetLayout(m_Device->GetLogicalDevice(), &layoutInfo, nullptr, &m_Layout) != VK_SUCCESS) {
             Core::Log::Error("Failed to create descriptor set layout!");
         }
     }
 
     DescriptorLayout::~DescriptorLayout() {
-        vkDestroyDescriptorSetLayout(m_Device.GetLogicalDevice(), m_Layout, nullptr);
+        vkDestroyDescriptorSetLayout(m_Device->GetLogicalDevice(), m_Layout, nullptr);
     }
 
     // --- Descriptor Pool ---
-    DescriptorPool::DescriptorPool(VulkanDevice& device) : m_Device(device) {
+    DescriptorPool::DescriptorPool(std::shared_ptr<VulkanDevice> device) : m_Device(device) {
         // We allocate enough space for a few frames.
         std::vector<VkDescriptorPoolSize> poolSizes(2);
         poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
@@ -54,13 +55,13 @@ namespace Runtime::RHI {
         poolInfo.pPoolSizes = poolSizes.data();
         poolInfo.maxSets = 100; 
 
-        if (vkCreateDescriptorPool(m_Device.GetLogicalDevice(), &poolInfo, nullptr, &m_Pool) != VK_SUCCESS) {
+        if (vkCreateDescriptorPool(m_Device->GetLogicalDevice(), &poolInfo, nullptr, &m_Pool) != VK_SUCCESS) {
             Core::Log::Error("Failed to create descriptor pool!");
         }
     }
 
     DescriptorPool::~DescriptorPool() {
-        vkDestroyDescriptorPool(m_Device.GetLogicalDevice(), m_Pool, nullptr);
+        vkDestroyDescriptorPool(m_Device->GetLogicalDevice(), m_Pool, nullptr);
     }
 
     VkDescriptorSet DescriptorPool::Allocate(VkDescriptorSetLayout layout) {
@@ -71,7 +72,7 @@ namespace Runtime::RHI {
         allocInfo.pSetLayouts = &layout;
 
         VkDescriptorSet set;
-        if (vkAllocateDescriptorSets(m_Device.GetLogicalDevice(), &allocInfo, &set) != VK_SUCCESS) {
+        if (vkAllocateDescriptorSets(m_Device->GetLogicalDevice(), &allocInfo, &set) != VK_SUCCESS) {
             Core::Log::Error("Failed to allocate descriptor set!");
             return VK_NULL_HANDLE;
         }

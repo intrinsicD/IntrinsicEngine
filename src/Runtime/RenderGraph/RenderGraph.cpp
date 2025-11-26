@@ -111,14 +111,14 @@ namespace Runtime::Graph
     }
 
     // --- RenderGraph ---
-    RenderGraph::RenderGraph(RHI::VulkanDevice& device, Core::Memory::LinearArena& arena) : m_Device(device),
+    RenderGraph::RenderGraph(std::shared_ptr<RHI::VulkanDevice> device, Core::Memory::LinearArena& arena) : m_Device(device),
         m_Arena(arena)
     {
     }
 
     RenderGraph::~RenderGraph()
     {
-        vkDeviceWaitIdle(m_Device.GetLogicalDevice());
+        vkDeviceWaitIdle(m_Device->GetLogicalDevice());
         m_ImagePool.clear();
     }
 
@@ -203,7 +203,7 @@ namespace Runtime::Graph
 
                 if (res.Name.find("Depth") != std::string::npos)
                 {
-                    if (fmt == VK_FORMAT_UNDEFINED) fmt = RHI::VulkanImage::FindDepthFormat(m_Device);
+                    if (fmt == VK_FORMAT_UNDEFINED) fmt = RHI::VulkanImage::FindDepthFormat(*m_Device);
                     usage |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
                     aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
                 }

@@ -16,7 +16,7 @@ export namespace Runtime::Graphics
     class Material
     {
     public:
-        Material(RHI::VulkanDevice& device,
+        Material(std::shared_ptr<RHI::VulkanDevice> device,
                  RHI::DescriptorPool& pool,
                  const RHI::DescriptorLayout& layout, // We share the layout
                  Core::Assets::AssetHandle textureHandle,
@@ -29,7 +29,7 @@ export namespace Runtime::Graphics
         [[nodiscard]] VkDescriptorSet GetDescriptorSet() const { return m_DescriptorSet; }
 
     private:
-        RHI::VulkanDevice& m_Device;
+        std::shared_ptr<RHI::VulkanDevice> m_Device;
         VkDescriptorSet m_DescriptorSet = VK_NULL_HANDLE;
         std::shared_ptr<RHI::Texture> m_CurrentTexture;
 

@@ -1,19 +1,34 @@
 # Intrinsic Engine
 
-**Intrinsic** is a Next-Gen Research & Rendering Engine built with **Modern C++ (C++23 Modules)** and **Vulkan 1.3**. It features a Data-Oriented architecture, a custom fiber-based task system, and a hybrid rendering graph.
+**Intrinsic** is a Next-Gen Research & Rendering Engine built with **Modern C++ (C++23 Modules)** and **Vulkan 1.3**. It features a Data-Oriented architecture, a custom fiber-based task system, and a frame-graph based rendering pipeline.
 
-## 🏗 Architecture
+This project serves as a testbed for high-performance graphics concepts, utilizing **Clang 18+** to leverage the latest C++ standards including Modules (`.cppm`), Concepts, and `std::expected`.
 
-*   **Core:** Zero-overhead abstractions (C++20 Modules, Concepts).
-*   **Memory:** Linear Arena Allocators & VMA integration.
-*   **RHI:** Vulkan 1.3 Dynamic Rendering (via `volk` & `vk_mem_alloc`).
-*   **Pipeline:** Descriptor-based bindless-ready architecture.
+---
+
+## 🚀 Key Features
+
+### 🏗 Core Architecture
+*   **C++23 Modules**: Zero-overhead build times and strict interface boundaries using `.cppm` files.
+*   **No-Exception / No-RTTI**: Designed for maximum performance and stability (`-fno-exceptions`, `-fno-rtti`).
+*   **Task System**: Fiber-based, work-stealing scheduler (`Core.Tasks`) for high-throughput parallel processing.
+*   **Memory Management**: Custom `LinearArena` allocators for per-frame temporary allocations with O(1) reset cost.
+
+### 🎨 Rendering & Graphics
+*   **Vulkan 1.3 Native**: Utilizes Dynamic Rendering and Synchronization2 (no Render Passes or Framebuffers required).
+*   **Render Graph (Frame Graph)**: 
+    *   Automatic dependency tracking and barrier injection (Sync2).
+    *   Transient resource aliasing (reuses memory for resources that don't overlap in time).
+    *   Automatic layout transitions.
+*   **Async Asset System**: Multi-threaded loading (Textures/Models) with lock-free synchronization for main-thread callbacks.
+*   **glTF 2.0 Support**: Asynchronous loading of geometry and materials via TinyGLTF.
+*   **ECS**: Entity-Component-System architecture powered by **EnTT**.
 
 ---
 
 ## 🐧 Ubuntu Setup Guide
 
-This engine uses **Bleeding Edge** C++ features (Modules, `std::format`, `std::expected`). The default compilers in Ubuntu 22.04/24.04 are often too old.
+**Warning:** This engine uses bleeding-edge C++ features. Standard repository compilers (GCC 11/12 or Clang 14) **will not work**. You must use Clang 18+ and a standard library that supports C++23.
 
 ### 1. Install Prerequisites
 You need **CMake 3.28+**, **Ninja**, and the **Vulkan SDK**.
@@ -31,21 +46,20 @@ sudo apt install libwayland-dev libxkbcommon-dev xorg-dev libxrandr-dev libxiner
 ```
 
 ### 2. Install Bleeding Edge Compiler (LLVM/Clang)
-We require **Clang 18+** (tested on Clang 22). We also need the **GCC 14 Standard Library** because Clang uses the system's STL, and older versions lack `<format>`.
+We require **Clang 18+** for proper C++ Module scanning support.
 
 ```bash
 # 1. Add LLVM repository (automated script)
 wget https://apt.llvm.org/llvm.sh
 chmod +x llvm.sh
-sudo ./llvm.sh 18  # Or 19/20/21/22 if available
+sudo ./llvm.sh 18  # Or 19/20 if available
 
-# 2. Add GCC Toolchain PPA (Required for C++23 STL headers like <format>)
+# 2. Add GCC Toolchain PPA (Required for C++23 STL headers like <format> and <expected>)
 sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
 sudo apt update
 sudo apt install libstdc++-14-dev
 
-# 3. Install Clang Tools (Critical for C++ Module Scanning)
-# Replace '18' with your installed version
+# 3. Install Clang Tools (Critical for CMake Module Scanning)
 sudo apt install clang-tools-18
 ```
 
@@ -60,12 +74,12 @@ cd IntrinsicEngine
 ```
 
 ### 2. Configure
-We must explicitly tell CMake which compiler and **Dependency Scanner** to use.
+We must explicitly tell CMake to use Clang and point it to the specific **Dependency Scanner** (`clang-scan-deps`).
 
 ```bash
 mkdir build && cd build
 
-# Replace 'clang++-18' and 'clang-scan-deps-18' with your specific version
+# Replace 'clang++-18' and 'clang-scan-deps-18' with your specific installed version
 cmake -G "Ninja" \
     -DCMAKE_BUILD_TYPE=Debug \
     -DCMAKE_C_COMPILER=clang-18 \
@@ -73,8 +87,6 @@ cmake -G "Ninja" \
     -DCMAKE_CXX_COMPILER_CLANG_SCAN_DEPS=/usr/bin/clang-scan-deps-18 \
     ..
 ```
-
-*Note: If you are using CLion, go to **Settings -> Build, Execution, Deployment -> CMake** and add `-DCMAKE_CXX_COMPILER_CLANG_SCAN_DEPS=/usr/bin/clang-scan-deps-18` to the "CMake options" field.*
 
 ### 3. Build & Run
 ```bash
@@ -84,26 +96,54 @@ ninja
 
 ---
 
+## 🎮 Controls (Sandbox)
+
+The default **Sandbox** application loads a glTF model and sets up an orbit camera.
+
+*   **Left Click + Drag**: Rotate Camera (Orbit).
+*   **Drag & Drop**: Drop `.glb` or `.gltf` files onto the window to load them dynamically.
+*   **ImGui**: Use the overlay to adjust Sun Direction or view performance stats.
+
+---
+
+## 📂 Project Structure
+
+*   **`src/Core`**: Low-level systems.
+    *   `Core.Memory`: Linear Arena allocators.
+    *   `Core.Tasks`: Thread pool and scheduler.
+    *   `Core.Assets`: Async asset manager.
+*   **`src/Runtime`**: The Engine layer.
+    *   `Runtime.RHI`: Thin abstraction over Vulkan (Device, Swapchain, CommandBuffers).
+    *   `Runtime.RenderGraph`: High-level rendering orchestration (Passes, Resources, Barriers).
+    *   `Runtime.ECS`: Scene and Component management.
+*   **`src/Apps`**: Application entry points (Sandbox).
+*   **`assets/`**: Shaders (`.vert`, `.frag`), default textures, and models.
+
+---
+
 ## 🧩 Common Issues
 
 ### `fatal error: 'format' file not found`
-**Cause:** Your `libstdc++` is too old (GCC 11/12).
-**Fix:** Install `libstdc++-14-dev`.
+**Cause:** Your system's `libstdc++` is too old.
+**Fix:** Install `libstdc++-14-dev` via the ubuntu-toolchain-r PPA.
 
-### `/bin/sh: 1: : Permission denied`
-**Cause:** CMake cannot find `clang-scan-deps`.
-**Fix:** Ensure you installed `clang-tools-XX` and passed the `-DCMAKE_CXX_COMPILER_CLANG_SCAN_DEPS` flag pointing to it.
+### `CMake Error: Could not find clang-scan-deps`
+**Cause:** CMake needs the scanner to parse C++20 Modules.
+**Fix:** Ensure you installed `clang-tools-18` and passed `-DCMAKE_CXX_COMPILER_CLANG_SCAN_DEPS` during configuration.
 
 ### `Validation Error: Dynamic viewport/scissor...`
-**Cause:** The renderer failed to set dynamic state.
-**Fix:** Ensure `renderer.SetViewport()` is called every frame inside the render loop.
+**Cause:** Vulkan Dynamic State not set correctly.
+**Fix:** Ensure the renderer calls `SetViewport` and `SetScissor` within the recording command buffer loop.
 
 ---
 
 ## 📦 Third-Party Libraries
-The engine automatically fetches and compiles these dependencies via CMake FetchContent:
-*   **GLFW:** Windowing & Input.
-*   **GLM:** Mathematics.
-*   **Volk:** Vulkan Meta-Loader.
-*   **VulkanMemoryAllocator (VMA):** GPU Memory Management.
-*   **GoogleTest:** Unit Testing.
+Dependencies are automatically managed via CMake `FetchContent`:
+*   **GLFW**: Windowing.
+*   **Volk**: Vulkan Meta-Loader.
+*   **VMA**: Vulkan Memory Allocator.
+*   **GLM**: Math.
+*   **EnTT**: ECS.
+*   **TinyGLTF**: Model Loading.
+*   **ImGui**: UI (Docking Branch).
+*   **GoogleTest**: Testing Framework.

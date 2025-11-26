@@ -1,6 +1,7 @@
 module;
 
 #include <vector>
+#include <memory>
 
 #include "RHI/RHI.Vulkan.hpp"
 
@@ -18,7 +19,7 @@ namespace Runtime::RHI
     public:
         static constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 2;
 
-        SimpleRenderer(VulkanDevice& device, VulkanSwapchain& swapchain);
+        SimpleRenderer(std::shared_ptr<VulkanDevice> device, VulkanSwapchain& swapchain);
         ~SimpleRenderer();
 
         void BeginFrame();
@@ -40,7 +41,7 @@ namespace Runtime::RHI
         [[nodiscard]] uint32_t GetImageIndex() const { return m_ImageIndex; }
 
     private:
-        VulkanDevice& m_Device;
+        std::shared_ptr<VulkanDevice> m_Device;
         VulkanSwapchain& m_Swapchain;
         VkCommandPool m_CommandPool = VK_NULL_HANDLE;
 

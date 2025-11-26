@@ -114,7 +114,7 @@ export namespace Runtime::Graph
     class RenderGraph
     {
     public:
-        explicit RenderGraph(RHI::VulkanDevice& device, Core::Memory::LinearArena& arena);
+        explicit RenderGraph(std::shared_ptr<RHI::VulkanDevice> device, Core::Memory::LinearArena& arena);
         ~RenderGraph();
 
         // 1. Setup Phase: Add a pass to the frame
@@ -210,7 +210,7 @@ export namespace Runtime::Graph
             bool IsFree;
         };
 
-        RHI::VulkanDevice& m_Device;
+        std::shared_ptr<RHI::VulkanDevice> m_Device;
         Core::Memory::LinearArena& m_Arena;
 
         std::vector<RGPass> m_Passes;

@@ -67,7 +67,8 @@ namespace Runtime::RHI
         if (deviceCount == 0)
         {
             Core::Log::Error("Failed to find GPUs with Vulkan support!");
-            return; // Panic
+            m_IsValid = false;
+            return;
         }
 
         std::vector<VkPhysicalDevice> devices(deviceCount);
@@ -87,6 +88,7 @@ namespace Runtime::RHI
         if (m_PhysicalDevice == VK_NULL_HANDLE)
         {
             Core::Log::Error("Failed to find a suitable GPU!");
+            m_IsValid = false;
         }
         else
         {
@@ -149,6 +151,8 @@ namespace Runtime::RHI
         if (vkCreateDevice(m_PhysicalDevice, &createInfo, nullptr, &m_Device) != VK_SUCCESS)
         {
             Core::Log::Error("Failed to create logical device!");
+            m_IsValid = false;
+            return;
         }
 
         // LOAD DEVICE POINTERS (Important for Volk)
@@ -168,7 +172,12 @@ namespace Runtime::RHI
         allocatorInfo.pVulkanFunctions = &vulkanFunctions;
 
 
-        vmaCreateAllocator(&allocatorInfo, &m_Allocator);
+        if (vmaCreateAllocator(&allocatorInfo, &m_Allocator) != VK_SUCCESS)
+        {
+            Core::Log::Error("Failed to create VMA allocator!");
+            m_IsValid = false;
+            return;
+        }
 
         vkGetDeviceQueue(m_Device, m_Indices.GraphicsFamily.value(), 0, &m_GraphicsQueue);
         vkGetDeviceQueue(m_Device, m_Indices.PresentFamily.value(), 0, &m_PresentQueue);
@@ -184,6 +193,7 @@ namespace Runtime::RHI
         if (vkCreateCommandPool(m_Device, &poolInfo, nullptr, &m_CommandPool) != VK_SUCCESS)
         {
             Core::Log::Error("Failed to create command pool!");
+            m_IsValid = false;
         }
     }
 

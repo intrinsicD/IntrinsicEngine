@@ -9,7 +9,7 @@ import Core.Logging;
 
 namespace Runtime::Graphics {
 
-    Material::Material(RHI::VulkanDevice& device,
+    Material::Material(std::shared_ptr<RHI::VulkanDevice> device,
                        RHI::DescriptorPool& pool,
                        const RHI::DescriptorLayout& layout,
                        Core::Assets::AssetHandle targetTextureHandle,
@@ -27,10 +27,10 @@ namespace Runtime::Graphics {
         // 3. Async Upgrade: Register callback for the real texture
         // We capture 'this' safely. In a real engine, we'd use weak_from_this()
         // to ensure the material still exists, but here we assume lifetime is managed by scene.
-        assetManager.RequestNotify(targetTextureHandle, [this, &assetManager](Core::Assets::AssetHandle handle)
+        assetManager.RequestNotify(targetTextureHandle, [this, assetManager = &assetManager](Core::Assets::AssetHandle handle)
         {
             // This runs on the Main Thread via AssetManager::Update()
-            auto newTexture = assetManager.Get<RHI::Texture>(handle);
+            auto newTexture = assetManager->Get<RHI::Texture>(handle);
             if (newTexture)
             {
                 m_CurrentTexture = newTexture; // Keep reference alive
@@ -59,7 +59,7 @@ namespace Runtime::Graphics {
         // that is pending execution is technically a race condition.
         // For this research engine, we rely on the fact that this happens at the start of the frame
         // (AssetManager::Update) before the render pass records commands.
-        vkUpdateDescriptorSets(m_Device.GetLogicalDevice(), 1, &descriptorWrite, 0, nullptr);
+        vkUpdateDescriptorSets(m_Device->GetLogicalDevice(), 1, &descriptorWrite, 0, nullptr);
     }
 
 
@@ -78,6 +78,6 @@ namespace Runtime::Graphics {
         descriptorWrite.descriptorCount = 1;
         descriptorWrite.pBufferInfo = &bufferInfo;
 
-        vkUpdateDescriptorSets(m_Device.GetLogicalDevice(), 1, &descriptorWrite, 0, nullptr);
+        vkUpdateDescriptorSets(m_Device->GetLogicalDevice(), 1, &descriptorWrite, 0, nullptr);
     }
 }

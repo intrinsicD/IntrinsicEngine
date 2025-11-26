@@ -64,10 +64,10 @@ namespace Core::Memory
             return std::unexpected(AllocatorError::OutOfMemory);
         }
 
-        if (offset_ + padding + size > totalSize_)
+        /*if (offset_ + padding + size > totalSize_) //TOTO remove this reduntant test.
         {
             return std::unexpected(AllocatorError::OutOfMemory);
-        }
+        }*/
 
         const size_t newOffset = offset_ + padding;
         if (size > (std::numeric_limits<size_t>::max() - newOffset) || newOffset + size > totalSize_) {

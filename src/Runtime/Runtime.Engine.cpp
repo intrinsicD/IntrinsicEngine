@@ -91,15 +91,15 @@ namespace Runtime
         m_Device = std::make_unique<RHI::VulkanDevice>(*m_Context, m_Surface);
 
         // 4. Swapchain & Renderer
-        m_Swapchain = std::make_unique<RHI::VulkanSwapchain>(*m_Device, *m_Window);
-        m_Renderer = std::make_unique<RHI::SimpleRenderer>(*m_Device, *m_Swapchain);
+        m_Swapchain = std::make_unique<RHI::VulkanSwapchain>(m_Device, *m_Window);
+        m_Renderer = std::make_unique<RHI::SimpleRenderer>(m_Device, *m_Swapchain);
 
         Interface::GUI::Init(*m_Window, *m_Device, *m_Swapchain, m_Context->GetInstance(),
                              m_Device->GetGraphicsQueue());
 
         InitPipeline();
         std::vector<uint8_t> whitePixel = {255, 255, 255, 255};
-        m_DefaultTexture = std::make_shared<RHI::Texture>(*m_Device, whitePixel, 1, 1);
+        m_DefaultTexture = std::make_shared<RHI::Texture>(m_Device, whitePixel, 1, 1);
     }
 
     Engine::~Engine()
@@ -257,18 +257,18 @@ namespace Runtime
 
     void Engine::InitPipeline()
     {
-        m_DescriptorLayout = std::make_unique<RHI::DescriptorLayout>(*m_Device);
-        m_DescriptorPool = std::make_unique<RHI::DescriptorPool>(*m_Device);
+        m_DescriptorLayout = std::make_unique<RHI::DescriptorLayout>(m_Device);
+        m_DescriptorPool = std::make_unique<RHI::DescriptorPool>(m_Device);
 
-        RHI::ShaderModule vert(*m_Device, "shaders/triangle.vert.spv", RHI::ShaderStage::Vertex);
-        RHI::ShaderModule frag(*m_Device, "shaders/triangle.frag.spv", RHI::ShaderStage::Fragment);
+        RHI::ShaderModule vert(m_Device, "shaders/triangle.vert.spv", RHI::ShaderStage::Vertex);
+        RHI::ShaderModule frag(m_Device, "shaders/triangle.frag.spv", RHI::ShaderStage::Fragment);
 
         RHI::PipelineConfig config{&vert, &frag};
-        m_Pipeline = std::make_unique<RHI::GraphicsPipeline>(*m_Device, *m_Swapchain, config,
+        m_Pipeline = std::make_unique<RHI::GraphicsPipeline>(m_Device, *m_Swapchain, config,
                                                              m_DescriptorLayout->GetHandle());
 
         m_RenderSystem = std::make_unique<Graphics::RenderSystem>(
-            *m_Device, *m_Swapchain, *m_Renderer, *m_Pipeline, m_FrameArena);
+            m_Device, *m_Swapchain, *m_Renderer, *m_Pipeline, m_FrameArena);
     }
 
     void Engine::Run()

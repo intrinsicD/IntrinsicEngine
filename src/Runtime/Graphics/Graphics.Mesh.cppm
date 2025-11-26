@@ -14,7 +14,7 @@ export namespace Runtime::Graphics
     class Mesh
     {
     public:
-        Mesh(RHI::VulkanDevice& device, const std::vector<RHI::Vertex>& vertices, const std::vector<uint32_t>& indices);
+        Mesh(std::shared_ptr<RHI::VulkanDevice> device, const std::vector<RHI::Vertex>& vertices, const std::vector<uint32_t>& indices);
         ~Mesh() = default; // UniquePtr handles destruction
 
         [[nodiscard]] RHI::VulkanBuffer* GetVertexBuffer() const { return m_VertexBuffer.get(); }

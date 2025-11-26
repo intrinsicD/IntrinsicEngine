@@ -13,7 +13,7 @@ import Runtime.RHI.Types;
 
 namespace Runtime::Graphics
 {
-    std::shared_ptr<Model> ModelLoader::Load(RHI::VulkanDevice& device,
+    std::shared_ptr<Model> ModelLoader::Load(std::shared_ptr<RHI::VulkanDevice> device,
                                              const std::string& filepath)
     {
         tinygltf::Model model;

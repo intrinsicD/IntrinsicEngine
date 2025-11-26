@@ -47,6 +47,7 @@ namespace Runtime::RHI
         [[nodiscard]] VkSurfaceKHR GetSurface() const { return m_Surface; }
         [[nodiscard]] VkCommandPool GetCommandPool() const { return m_CommandPool; }
         [[nodiscard]] VmaAllocator GetAllocator() const { return m_Allocator; }
+        [[nodiscard]] bool IsValid() const { return m_IsValid; }
 
         // Helper to query swapchain support (used later by Swapchain module)
         [[nodiscard]] SwapchainSupportDetails QuerySwapchainSupport() const;
@@ -71,6 +72,8 @@ namespace Runtime::RHI
         mutable std::mutex m_QueueMutex;
         std::mutex m_ThreadPoolsMutex;
         std::vector<VkCommandPool> m_ThreadCommandPools;
+
+        bool m_IsValid = true;
 
         void PickPhysicalDevice(VkInstance instance);
         void CreateLogicalDevice(VulkanContext & context);

@@ -11,7 +11,7 @@ import Runtime.RHI.Buffer;
 
 namespace Runtime::Graphics
 {
-    Mesh::Mesh(RHI::VulkanDevice& device, const std::vector<RHI::Vertex>& vertices,
+    Mesh::Mesh(std::shared_ptr<RHI::VulkanDevice> device, const std::vector<RHI::Vertex>& vertices,
                const std::vector<uint32_t>& indices)
     {
         m_IndexCount = static_cast<uint32_t>(indices.size());
@@ -41,7 +41,7 @@ namespace Runtime::Graphics
         );
 
         // 3. Upload
-        RHI::CommandUtils::ExecuteImmediate(device, [&](VkCommandBuffer cmd)
+        RHI::CommandUtils::ExecuteImmediate(*device, [&](VkCommandBuffer cmd)
         {
             VkBufferCopy copyRegion{};
             copyRegion.size = vSize;

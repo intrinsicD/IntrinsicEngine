@@ -2,6 +2,7 @@ module;
 #include "RHI.Vulkan.hpp"
 #include <string>
 #include <vector>
+#include <memory>
 
 export module Runtime.RHI.Shader;
 
@@ -13,14 +14,14 @@ export namespace Runtime::RHI {
 
     class ShaderModule {
     public:
-        ShaderModule(VulkanDevice& device, const std::string& filepath, ShaderStage stage);
+        ShaderModule(std::shared_ptr<VulkanDevice> device, const std::string& filepath, ShaderStage stage);
         ~ShaderModule();
 
         [[nodiscard]] VkShaderModule GetHandle() const { return m_Module; }
         [[nodiscard]] VkPipelineShaderStageCreateInfo GetStageInfo() const;
 
     private:
-        VulkanDevice& m_Device;
+        std::shared_ptr<VulkanDevice> m_Device;
         VkShaderModule m_Module = VK_NULL_HANDLE;
         ShaderStage m_Stage;
 

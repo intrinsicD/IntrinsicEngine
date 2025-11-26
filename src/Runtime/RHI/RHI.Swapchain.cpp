@@ -3,13 +3,16 @@ module;
 #include <vector>
 #include <algorithm>
 #include <limits>
+#include <memory>
+
+#include "GLFW/glfw3.h"
 
 module Runtime.RHI.Swapchain;
 import Core.Logging;
 
 namespace Runtime::RHI {
 
-    VulkanSwapchain::VulkanSwapchain(VulkanDevice& device, Core::Windowing::Window& window)
+    VulkanSwapchain::VulkanSwapchain(std::shared_ptr<VulkanDevice> device, Core::Windowing::Window& window)
         : m_Device(device), m_Window(window)
     {
         CreateSwapchain();
@@ -24,16 +27,16 @@ namespace Runtime::RHI {
         int width = m_Window.GetWidth();
         int height = m_Window.GetHeight();
         while (width == 0 || height == 0) {
+            glfwWaitEvents();
             width = m_Window.GetWidth();
             height = m_Window.GetHeight();
-            m_Window.OnUpdate();
         }
 
-        vkDeviceWaitIdle(m_Device.GetLogicalDevice());
+        vkDeviceWaitIdle(m_Device->GetLogicalDevice());
 
         // 1. Cleanup OLD views, but KEEP the swapchain handle for a moment
         for (auto imageView : m_ImageViews) {
-            vkDestroyImageView(m_Device.GetLogicalDevice(), imageView, nullptr);
+            vkDestroyImageView(m_Device->GetLogicalDevice(), imageView, nullptr);
         }
         m_ImageViews.clear();
         // Do NOT destroy m_Swapchain yet. We pass it to the new one.
@@ -44,7 +47,7 @@ namespace Runtime::RHI {
 
         // 3. Destroy the OLD swapchain now that the new one is ready
         if (oldSwapchain != VK_NULL_HANDLE) {
-            vkDestroySwapchainKHR(m_Device.GetLogicalDevice(), oldSwapchain, nullptr);
+            vkDestroySwapchainKHR(m_Device->GetLogicalDevice(), oldSwapchain, nullptr);
         }
 
         // 4. Create Views for the new swapchain
@@ -53,20 +56,20 @@ namespace Runtime::RHI {
 
     void VulkanSwapchain::Cleanup() {
         for (auto imageView : m_ImageViews) {
-            vkDestroyImageView(m_Device.GetLogicalDevice(), imageView, nullptr);
+            vkDestroyImageView(m_Device->GetLogicalDevice(), imageView, nullptr);
         }
         m_ImageViews.clear();
 
         m_Images.clear();
 
         if (m_Swapchain != VK_NULL_HANDLE) {
-            vkDestroySwapchainKHR(m_Device.GetLogicalDevice(), m_Swapchain, nullptr);
+            vkDestroySwapchainKHR(m_Device->GetLogicalDevice(), m_Swapchain, nullptr);
             m_Swapchain = VK_NULL_HANDLE;
         }
     }
 
     void VulkanSwapchain::CreateSwapchain() {
-        auto support = m_Device.QuerySwapchainSupport();
+        auto support = m_Device->QuerySwapchainSupport();
 
         VkSurfaceFormatKHR surfaceFormat = ChooseSwapSurfaceFormat(support.Formats);
         VkPresentModeKHR presentMode = ChooseSwapPresentMode(support.PresentModes);
@@ -79,7 +82,7 @@ namespace Runtime::RHI {
 
         VkSwapchainCreateInfoKHR createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-        createInfo.surface = m_Device.GetSurface();
+        createInfo.surface = m_Device->GetSurface();
         createInfo.minImageCount = imageCount;
         createInfo.imageFormat = surfaceFormat.format;
         createInfo.imageColorSpace = surfaceFormat.colorSpace;
@@ -87,7 +90,7 @@ namespace Runtime::RHI {
         createInfo.imageArrayLayers = 1;
         createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
-        QueueFamilyIndices indices = m_Device.GetQueueIndices();
+        QueueFamilyIndices indices = m_Device->GetQueueIndices();
         uint32_t queueFamilyIndices[] = {indices.GraphicsFamily.value(), indices.PresentFamily.value()};
 
         if (indices.GraphicsFamily != indices.PresentFamily) {
@@ -108,15 +111,15 @@ namespace Runtime::RHI {
 
         // Use a temporary handle so we don't overwrite m_Swapchain if creation fails
         VkSwapchainKHR newSwapchain;
-        if (vkCreateSwapchainKHR(m_Device.GetLogicalDevice(), &createInfo, nullptr, &newSwapchain) != VK_SUCCESS) {
+        if (vkCreateSwapchainKHR(m_Device->GetLogicalDevice(), &createInfo, nullptr, &newSwapchain) != VK_SUCCESS) {
             Core::Log::Error("Failed to create swapchain!");
             return;
         }
         m_Swapchain = newSwapchain;
 
-        vkGetSwapchainImagesKHR(m_Device.GetLogicalDevice(), m_Swapchain, &imageCount, nullptr);
+        vkGetSwapchainImagesKHR(m_Device->GetLogicalDevice(), m_Swapchain, &imageCount, nullptr);
         m_Images.resize(imageCount);
-        vkGetSwapchainImagesKHR(m_Device.GetLogicalDevice(), m_Swapchain, &imageCount, m_Images.data());
+        vkGetSwapchainImagesKHR(m_Device->GetLogicalDevice(), m_Swapchain, &imageCount, m_Images.data());
 
         m_ImageFormat = surfaceFormat.format;
         m_Extent = extent;
@@ -145,7 +148,7 @@ namespace Runtime::RHI {
             createInfo.subresourceRange.baseArrayLayer = 0;
             createInfo.subresourceRange.layerCount = 1;
 
-            if (vkCreateImageView(m_Device.GetLogicalDevice(), &createInfo, nullptr, &m_ImageViews[i]) != VK_SUCCESS) {
+            if (vkCreateImageView(m_Device->GetLogicalDevice(), &createInfo, nullptr, &m_ImageViews[i]) != VK_SUCCESS) {
                 Core::Log::Error("Failed to create image views!");
             }
         }

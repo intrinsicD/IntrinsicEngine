@@ -1,6 +1,7 @@
 module;
 #include "RHI.Vulkan.hpp"
 #include <vector>
+#include <memory>
 
 module Runtime.RHI.Pipeline;
 import Runtime.RHI.Types;
@@ -9,7 +10,7 @@ import Core.Logging;
 
 namespace Runtime::RHI {
 
-    GraphicsPipeline::GraphicsPipeline(VulkanDevice& device, const VulkanSwapchain& swapchain, const PipelineConfig& config, VkDescriptorSetLayout descriptorLayout)
+    GraphicsPipeline::GraphicsPipeline(std::shared_ptr<VulkanDevice> device, const VulkanSwapchain& swapchain, const PipelineConfig& config, VkDescriptorSetLayout descriptorLayout)
         : m_Device(device)
     {
         CreateLayout(descriptorLayout);
@@ -17,8 +18,8 @@ namespace Runtime::RHI {
     }
 
     GraphicsPipeline::~GraphicsPipeline() {
-        vkDestroyPipeline(m_Device.GetLogicalDevice(), m_Pipeline, nullptr);
-        vkDestroyPipelineLayout(m_Device.GetLogicalDevice(), m_Layout, nullptr);
+        vkDestroyPipeline(m_Device->GetLogicalDevice(), m_Pipeline, nullptr);
+        vkDestroyPipelineLayout(m_Device->GetLogicalDevice(), m_Layout, nullptr);
     }
 
     void GraphicsPipeline::CreateLayout(VkDescriptorSetLayout descriptorLayout) {
@@ -35,7 +36,7 @@ namespace Runtime::RHI {
         pipelineLayoutInfo.pushConstantRangeCount = 1;
         pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
 
-        if (vkCreatePipelineLayout(m_Device.GetLogicalDevice(), &pipelineLayoutInfo, nullptr, &m_Layout) != VK_SUCCESS) {
+        if (vkCreatePipelineLayout(m_Device->GetLogicalDevice(), &pipelineLayoutInfo, nullptr, &m_Layout) != VK_SUCCESS) {
             Core::Log::Error("Failed to create pipeline layout!");
         }
     }
@@ -115,7 +116,7 @@ namespace Runtime::RHI {
         depthStencil.depthBoundsTestEnable = VK_FALSE;
         depthStencil.stencilTestEnable = VK_FALSE;
 
-        VkFormat depthFormat = VulkanImage::FindDepthFormat(m_Device);
+        VkFormat depthFormat = VulkanImage::FindDepthFormat(*m_Device);
 
         VkFormat colorFormat = swapchain.GetImageFormat();
         
@@ -143,7 +144,7 @@ namespace Runtime::RHI {
         pipelineInfo.renderPass = VK_NULL_HANDLE; // No RenderPass!
         pipelineInfo.subpass = 0;
 
-        if (vkCreateGraphicsPipelines(m_Device.GetLogicalDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_Pipeline) != VK_SUCCESS) {
+        if (vkCreateGraphicsPipelines(m_Device->GetLogicalDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_Pipeline) != VK_SUCCESS) {
             Core::Log::Error("Failed to create graphics pipeline!");
         }
     }

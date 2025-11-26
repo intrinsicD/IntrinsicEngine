@@ -1,13 +1,15 @@
 module;
 #include <vk_mem_alloc.h>
 #include <cstring> // memcpy
+#include <memory>
+
 
 module Runtime.RHI.Buffer;
 import Core.Logging;
 
 namespace Runtime::RHI {
 
-    VulkanBuffer::VulkanBuffer(VulkanDevice& device, size_t size, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage)
+    VulkanBuffer::VulkanBuffer(std::shared_ptr<VulkanDevice> device, size_t size, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage)
         : m_Device(device)
     {
         VkBufferCreateInfo bufferInfo{};
@@ -23,22 +25,22 @@ namespace Runtime::RHI {
             allocInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
         }
 
-        if (vmaCreateBuffer(device.GetAllocator(), &bufferInfo, &allocInfo, &m_Buffer, &m_Allocation, nullptr) != VK_SUCCESS) {
+        if (vmaCreateBuffer(device->GetAllocator(), &bufferInfo, &allocInfo, &m_Buffer, &m_Allocation, nullptr) != VK_SUCCESS) {
             Core::Log::Error("Failed to create buffer!");
         }
     }
 
     VulkanBuffer::~VulkanBuffer() {
-        vmaDestroyBuffer(m_Device.GetAllocator(), m_Buffer, m_Allocation);
+        vmaDestroyBuffer(m_Device->GetAllocator(), m_Buffer, m_Allocation);
     }
 
     void* VulkanBuffer::Map() {
         void* data;
-        vmaMapMemory(m_Device.GetAllocator(), m_Allocation, &data);
+        vmaMapMemory(m_Device->GetAllocator(), m_Allocation, &data);
         return data;
     }
 
     void VulkanBuffer::Unmap() {
-        vmaUnmapMemory(m_Device.GetAllocator(), m_Allocation);
+        vmaUnmapMemory(m_Device->GetAllocator(), m_Allocation);
     }
 }

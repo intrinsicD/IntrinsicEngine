@@ -1,6 +1,7 @@
 module;
 #include "RHI.Vulkan.hpp"
 #include <mutex>
+#include <memory>
 
 module Runtime.RHI.Renderer;
 import Runtime.RHI.Image;
@@ -9,7 +10,7 @@ import Core.Logging;
 
 namespace Runtime::RHI
 {
-    SimpleRenderer::SimpleRenderer(VulkanDevice& device, VulkanSwapchain& swapchain)
+    SimpleRenderer::SimpleRenderer(std::shared_ptr<VulkanDevice> device, VulkanSwapchain& swapchain)
         : m_Device(device), m_Swapchain(swapchain)
     {
         InitSyncStructures();
@@ -17,9 +18,9 @@ namespace Runtime::RHI
         VkCommandPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
         poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-        poolInfo.queueFamilyIndex = m_Device.GetQueueIndices().GraphicsFamily.value();
+        poolInfo.queueFamilyIndex = m_Device->GetQueueIndices().GraphicsFamily.value();
 
-        VK_CHECK(vkCreateCommandPool(m_Device.GetLogicalDevice(), &poolInfo, nullptr, &m_CommandPool));
+        VK_CHECK(vkCreateCommandPool(m_Device->GetLogicalDevice(), &poolInfo, nullptr, &m_CommandPool));
 
         m_CommandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
 
@@ -29,22 +30,22 @@ namespace Runtime::RHI
         allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
         allocInfo.commandBufferCount = (uint32_t)m_CommandBuffers.size();
 
-        VK_CHECK(vkAllocateCommandBuffers(m_Device.GetLogicalDevice(), &allocInfo, m_CommandBuffers.data()));
+        VK_CHECK(vkAllocateCommandBuffers(m_Device->GetLogicalDevice(), &allocInfo, m_CommandBuffers.data()));
     }
 
     SimpleRenderer::~SimpleRenderer()
     {
         // Wait for GPU to finish before destroying sync objects
-        vkDeviceWaitIdle(m_Device.GetLogicalDevice());
+        vkDeviceWaitIdle(m_Device->GetLogicalDevice());
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
         {
-            vkDestroySemaphore(m_Device.GetLogicalDevice(), m_ImageAvailableSemaphores[i], nullptr);
-            vkDestroySemaphore(m_Device.GetLogicalDevice(), m_RenderFinishedSemaphores[i], nullptr);
-            vkDestroyFence(m_Device.GetLogicalDevice(), m_InFlightFences[i], nullptr);
+            vkDestroySemaphore(m_Device->GetLogicalDevice(), m_ImageAvailableSemaphores[i], nullptr);
+            vkDestroySemaphore(m_Device->GetLogicalDevice(), m_RenderFinishedSemaphores[i], nullptr);
+            vkDestroyFence(m_Device->GetLogicalDevice(), m_InFlightFences[i], nullptr);
         }
 
-        vkDestroyCommandPool(m_Device.GetLogicalDevice(), m_CommandPool, nullptr);
+        vkDestroyCommandPool(m_Device->GetLogicalDevice(), m_CommandPool, nullptr);
     }
 
     void SimpleRenderer::InitSyncStructures()
@@ -62,20 +63,20 @@ namespace Runtime::RHI
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
         {
-            VK_CHECK(vkCreateSemaphore(m_Device.GetLogicalDevice(), &semaphoreInfo, nullptr, &m_ImageAvailableSemaphores[i]));
-            VK_CHECK(vkCreateSemaphore(m_Device.GetLogicalDevice(), &semaphoreInfo, nullptr, &m_RenderFinishedSemaphores[i]));
-            VK_CHECK(vkCreateFence(m_Device.GetLogicalDevice(), &fenceInfo, nullptr, &m_InFlightFences[i]));
+            VK_CHECK(vkCreateSemaphore(m_Device->GetLogicalDevice(), &semaphoreInfo, nullptr, &m_ImageAvailableSemaphores[i]));
+            VK_CHECK(vkCreateSemaphore(m_Device->GetLogicalDevice(), &semaphoreInfo, nullptr, &m_RenderFinishedSemaphores[i]));
+            VK_CHECK(vkCreateFence(m_Device->GetLogicalDevice(), &fenceInfo, nullptr, &m_InFlightFences[i]));
         }
     }
 
     void SimpleRenderer::BeginFrame()
     {
         // 1. Wait for fence (CPU wait)
-        VK_CHECK(vkWaitForFences(m_Device.GetLogicalDevice(), 1, &m_InFlightFences[m_CurrentFrame], VK_TRUE, UINT64_MAX));
+        VK_CHECK(vkWaitForFences(m_Device->GetLogicalDevice(), 1, &m_InFlightFences[m_CurrentFrame], VK_TRUE, UINT64_MAX));
 
         // 2. Acquire Image
         VkResult result = vkAcquireNextImageKHR(
-            m_Device.GetLogicalDevice(),
+            m_Device->GetLogicalDevice(),
             m_Swapchain.GetHandle(),
             UINT64_MAX,
             m_ImageAvailableSemaphores[m_CurrentFrame],
@@ -94,7 +95,7 @@ namespace Runtime::RHI
             return;
         }
 
-        VK_CHECK(vkResetFences(m_Device.GetLogicalDevice(), 1, &m_InFlightFences[m_CurrentFrame]));
+        VK_CHECK(vkResetFences(m_Device->GetLogicalDevice(), 1, &m_InFlightFences[m_CurrentFrame]));
         VkCommandBuffer cmd = m_CommandBuffers[m_CurrentFrame];
         VK_CHECK(vkResetCommandBuffer(cmd, 0));
 
@@ -134,8 +135,8 @@ namespace Runtime::RHI
         submitInfo.pSignalSemaphores = signalSemaphores;
 
         {
-            std::lock_guard lock(m_Device.GetQueueMutex());
-            VK_CHECK(vkQueueSubmit(m_Device.GetGraphicsQueue(), 1, &submitInfo, m_InFlightFences[m_CurrentFrame]));
+            std::lock_guard lock(m_Device->GetQueueMutex());
+            VK_CHECK(vkQueueSubmit(m_Device->GetGraphicsQueue(), 1, &submitInfo, m_InFlightFences[m_CurrentFrame]));
         }
 
         // 8. Present
@@ -155,8 +156,8 @@ namespace Runtime::RHI
         {
             // For now, reuse the Queue mutex as most GPUs share the queue or driver serialization handles it.
             // Ideally we check if queues are different, but simple lock is okay.
-            std::lock_guard lock(m_Device.GetQueueMutex());
-            VkResult result = vkQueuePresentKHR(m_Device.GetPresentQueue(), &presentInfo);
+            std::lock_guard lock(m_Device->GetQueueMutex());
+            VkResult result = vkQueuePresentKHR(m_Device->GetPresentQueue(), &presentInfo);
 
             if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
                 m_Swapchain.Recreate();
@@ -192,7 +193,7 @@ namespace Runtime::RHI
 
     void SimpleRenderer::OnResize()
     {
-        vkDeviceWaitIdle(m_Device.GetLogicalDevice());
+        vkDeviceWaitIdle(m_Device->GetLogicalDevice());
         m_Swapchain.Recreate();
         // CreateDepthBuffer(); // No longer needed
     }

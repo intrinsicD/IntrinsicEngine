@@ -26,7 +26,7 @@ namespace Runtime::Graphics
         return originalSize;
     }
 
-    RenderSystem::RenderSystem(RHI::VulkanDevice& device,
+    RenderSystem::RenderSystem(std::shared_ptr<RHI::VulkanDevice> device,
                                RHI::VulkanSwapchain& swapchain,
                                RHI::SimpleRenderer& renderer,
                                RHI::GraphicsPipeline& pipeline,
@@ -38,7 +38,7 @@ namespace Runtime::Graphics
           m_RenderGraph(device, frameArena)
     {
         VkPhysicalDeviceProperties props;
-        vkGetPhysicalDeviceProperties(device.GetPhysicalDevice(), &props);
+        vkGetPhysicalDeviceProperties(device->GetPhysicalDevice(), &props);
         m_MinUboAlignment = props.limits.minUniformBufferOffsetAlignment;
 
         // 2. Calculate aligned size for ONE frame

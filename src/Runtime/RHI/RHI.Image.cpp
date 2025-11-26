@@ -1,13 +1,14 @@
 module;
 #include "RHI.Vulkan.hpp"
 #include <vector>
+#include <memory>
 
 module Runtime.RHI.Image;
 import Core.Logging;
 
 namespace Runtime::RHI
 {
-    VulkanImage::VulkanImage(VulkanDevice& device, uint32_t width, uint32_t height, uint32_t mipLevels, VkFormat format,
+    VulkanImage::VulkanImage(std::shared_ptr<VulkanDevice> device, uint32_t width, uint32_t height, uint32_t mipLevels, VkFormat format,
                              VkImageUsageFlags usage, VkImageAspectFlags aspect)
         : m_Device(device), m_Format(format), m_MipLevels(mipLevels), m_Width(width), m_Height(height)
     {
@@ -31,10 +32,11 @@ namespace Runtime::RHI
         allocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
         allocInfo.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 
-        if (vmaCreateImage(device.GetAllocator(), &imageInfo, &allocInfo, &m_Image, &m_Allocation, nullptr) !=
+        if (vmaCreateImage(device->GetAllocator(), &imageInfo, &allocInfo, &m_Image, &m_Allocation, nullptr) !=
             VK_SUCCESS)
         {
             Core::Log::Error("Failed to create image!");
+            m_IsValid = false;
             return;
         }
 
@@ -50,16 +52,18 @@ namespace Runtime::RHI
         viewInfo.subresourceRange.baseArrayLayer = 0;
         viewInfo.subresourceRange.layerCount = 1;
 
-        if (vkCreateImageView(device.GetLogicalDevice(), &viewInfo, nullptr, &m_ImageView) != VK_SUCCESS)
+        if (vkCreateImageView(device->GetLogicalDevice(), &viewInfo, nullptr, &m_ImageView) != VK_SUCCESS)
         {
             Core::Log::Error("Failed to create image view!");
+            m_IsValid = false;
+            return;
         }
     }
 
     VulkanImage::~VulkanImage()
     {
-        vkDestroyImageView(m_Device.GetLogicalDevice(), m_ImageView, nullptr);
-        vmaDestroyImage(m_Device.GetAllocator(), m_Image, m_Allocation);
+        vkDestroyImageView(m_Device->GetLogicalDevice(), m_ImageView, nullptr);
+        vmaDestroyImage(m_Device->GetAllocator(), m_Image, m_Allocation);
     }
 
     VkFormat VulkanImage::FindDepthFormat(VulkanDevice& device)

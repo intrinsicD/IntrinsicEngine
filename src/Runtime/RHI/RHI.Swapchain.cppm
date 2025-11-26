@@ -2,6 +2,7 @@ module;
 
 #include <vector>
 #include <cstdint>
+#include <memory>
 
 #include "RHI/RHI.Vulkan.hpp"
 
@@ -15,7 +16,7 @@ namespace Runtime::RHI
     export class VulkanSwapchain
     {
     public:
-        VulkanSwapchain(VulkanDevice& device, Core::Windowing::Window& window);
+        VulkanSwapchain(std::shared_ptr<VulkanDevice> device, Core::Windowing::Window& window);
         ~VulkanSwapchain();
 
         void Recreate(); // Call this when window resizes
@@ -29,7 +30,7 @@ namespace Runtime::RHI
         [[nodiscard]] const std::vector<VkImage>& GetImages() const { return m_Images; }
 
     private:
-        VulkanDevice& m_Device;
+        std::shared_ptr<VulkanDevice> m_Device;
         Core::Windowing::Window& m_Window;
 
         VkSwapchainKHR m_Swapchain = VK_NULL_HANDLE;

@@ -1,5 +1,6 @@
 module;
 #include "RHI.Vulkan.hpp"
+#include <memory>
 
 export module Runtime.RHI.Pipeline;
 
@@ -16,14 +17,14 @@ export namespace Runtime::RHI {
 
     class GraphicsPipeline {
     public:
-        GraphicsPipeline(VulkanDevice& device, const VulkanSwapchain& swapchain, const PipelineConfig& config, VkDescriptorSetLayout descriptorSetLayout);
+        GraphicsPipeline(std::shared_ptr<VulkanDevice> device, const VulkanSwapchain& swapchain, const PipelineConfig& config, VkDescriptorSetLayout descriptorSetLayout);
         ~GraphicsPipeline();
 
         [[nodiscard]] VkPipeline GetHandle() const { return m_Pipeline; }
         [[nodiscard]] VkPipelineLayout GetLayout() const { return m_Layout; }
 
     private:
-        VulkanDevice& m_Device;
+        std::shared_ptr<VulkanDevice> m_Device;
         VkPipeline m_Pipeline = VK_NULL_HANDLE;
         VkPipelineLayout m_Layout = VK_NULL_HANDLE;
 

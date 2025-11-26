@@ -1,6 +1,5 @@
 module;
 #include <string>
-#include <vector>
 #include <memory>
 
 export module Runtime.Graphics.ModelLoader;
@@ -14,6 +13,6 @@ export namespace Runtime::Graphics {
     class ModelLoader {
     public:
         // Loads a GLTF file and returns a list of Meshes (Primitives)
-        static std::shared_ptr<Model> Load(RHI::VulkanDevice& device, const std::string& filepath);
+        static std::shared_ptr<Model> Load(std::shared_ptr<RHI::VulkanDevice> device, const std::string& filepath);
     };
 }

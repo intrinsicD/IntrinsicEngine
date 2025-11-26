@@ -78,25 +78,25 @@ namespace Core::Windowing
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
 
-        auto m_glfw = glfwCreateWindow(m_Data.Width, m_Data.Height, m_Data.Title.c_str(), nullptr, nullptr);
+        auto glfwWindow = glfwCreateWindow(m_Data.Width, m_Data.Height, m_Data.Title.c_str(), nullptr, nullptr);
 
-        if (!m_glfw)
+        if (!glfwWindow)
         {
             Log::Error("Failed to create GLFW window!");
             m_IsValid = false;
             return;
         }
 
-        m_Window = m_glfw;
+        m_Window = glfwWindow;
         m_IsValid = true;
 
         // Store a pointer to our data struct inside the GLFW window so callbacks can find it
-        glfwSetWindowUserPointer(m_glfw, &m_Data);
+        glfwSetWindowUserPointer(glfwWindow, &m_Data);
 
         // --- Setup Callbacks ---
 
         // 1. Resize
-        glfwSetFramebufferSizeCallback(m_glfw, [](GLFWwindow* window, int width, int height)
+        glfwSetFramebufferSizeCallback(glfwWindow, [](GLFWwindow* window, int width, int height)
         {
             WindowData& data = *(WindowData*)glfwGetWindowUserPointer(window);
             if (data.Callback)
@@ -106,7 +106,7 @@ namespace Core::Windowing
         });
 
         // 2. Close
-        glfwSetWindowCloseCallback(m_glfw, [](GLFWwindow* window)
+        glfwSetWindowCloseCallback(glfwWindow, [](GLFWwindow* window)
         {
             WindowData& data = *(WindowData*)glfwGetWindowUserPointer(window);
             if (data.Callback)
@@ -116,7 +116,7 @@ namespace Core::Windowing
         });
 
         // 3. Key
-        glfwSetKeyCallback(m_glfw, [](GLFWwindow* window, int key, [[maybe_unused]] int scancode, int action,
+        glfwSetKeyCallback(glfwWindow, [](GLFWwindow* window, int key, [[maybe_unused]] int scancode, int action,
                                       [[maybe_unused]] int mods)
         {
             ImGui_ImplGlfw_KeyCallback(window, key, scancode, action, mods);
@@ -131,7 +131,7 @@ namespace Core::Windowing
             }
         });
 
-        glfwSetMouseButtonCallback(m_glfw, [](GLFWwindow* window, int button, int action, int mods)
+        glfwSetMouseButtonCallback(glfwWindow, [](GLFWwindow* window, int button, int action, int mods)
         {
             ImGui_ImplGlfw_MouseButtonCallback(window, button, action, mods);
             WindowData& data = *(WindowData*)glfwGetWindowUserPointer(window);
@@ -145,7 +145,7 @@ namespace Core::Windowing
             }
         });
 
-        glfwSetScrollCallback(m_glfw, [](GLFWwindow* window, double xoffset, double yoffset)
+        glfwSetScrollCallback(glfwWindow, [](GLFWwindow* window, double xoffset, double yoffset)
         {
             ImGui_ImplGlfw_ScrollCallback(window, xoffset, yoffset);
             WindowData& data = *(WindowData*)glfwGetWindowUserPointer(window);
@@ -155,17 +155,17 @@ namespace Core::Windowing
             }
         });
 
-        glfwSetCursorPosCallback(m_glfw, [](GLFWwindow* window, double xpos, double ypos)
+        glfwSetCursorPosCallback(glfwWindow, [](GLFWwindow* window, double xpos, double ypos)
         {
             ImGui_ImplGlfw_CursorPosCallback(window, xpos, ypos);
             WindowData& data = *(WindowData*)glfwGetWindowUserPointer(window);
             if (data.Callback)
             {
-                data.Callback(ScrollEvent{xpos, ypos});
+                data.Callback(CursorEvent{xpos, ypos});
             }
         });
 
-        glfwSetCharCallback(m_glfw, [](GLFWwindow* window, unsigned int c)
+        glfwSetCharCallback(glfwWindow, [](GLFWwindow* window, unsigned int c)
         {
             ImGui_ImplGlfw_CharCallback(window, c);
             WindowData& data = *(WindowData*)glfwGetWindowUserPointer(window);
@@ -175,10 +175,9 @@ namespace Core::Windowing
             }
         });
 
-        glfwSetDropCallback(m_glfw, [](GLFWwindow* window, int count, const char** paths)
+        glfwSetDropCallback(glfwWindow, [](GLFWwindow* window, int count, const char** paths)
         {
             WindowData& data = *(WindowData*)glfwGetWindowUserPointer(window);
-
 
             WindowDropEvent event;
             // Convert C-strings to std::vector<std::string>
@@ -198,8 +197,8 @@ namespace Core::Windowing
     {
         if (m_Window)
         {
-            auto m_glfw = static_cast<GLFWwindow*>(m_Window);
-            glfwDestroyWindow(m_glfw);
+            auto glfwWindow = static_cast<GLFWwindow*>(m_Window);
+            glfwDestroyWindow(glfwWindow);
         }
         // Note: We generally don't terminate GLFW here in case we have multiple windows,
         // but for a game engine, usually closing the main window kills the app.
@@ -214,17 +213,17 @@ namespace Core::Windowing
     bool Window::ShouldClose() const
     {
         if (!m_IsValid) return true;
-        auto m_glfw = static_cast<GLFWwindow*>(m_Window);
-        return glfwWindowShouldClose(m_glfw);
+        auto glfwWindow = static_cast<GLFWwindow*>(m_Window);
+        return glfwWindowShouldClose(glfwWindow);
     }
 
     bool Window::CreateSurface(void* instance, void* allocator, void* surfaceOut)
     {
-        VkInstance vkInst = static_cast<VkInstance>(instance);
-        VkAllocationCallbacks* vkAlloc = static_cast<VkAllocationCallbacks*>(allocator);
-        VkSurfaceKHR* vkSurf = static_cast<VkSurfaceKHR*>(surfaceOut);
-        auto m_glfw = static_cast<GLFWwindow*>(m_Window);
-        VkResult result = glfwCreateWindowSurface(vkInst, m_glfw, vkAlloc, vkSurf);
+        auto vkInst = static_cast<VkInstance>(instance);
+        auto vkAlloc = static_cast<VkAllocationCallbacks*>(allocator);
+        auto vkSurf = static_cast<VkSurfaceKHR*>(surfaceOut);
+        auto glfwWindow = static_cast<GLFWwindow*>(m_Window);
+        VkResult result = glfwCreateWindowSurface(vkInst, glfwWindow, vkAlloc, vkSurf);
         if (result != VK_SUCCESS)
         {
             Log::Error("Failed to create Window Surface! Error: {}", (int)result);

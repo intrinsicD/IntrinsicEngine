@@ -1,5 +1,6 @@
 module;
 #include <vk_mem_alloc.h>
+#include <memory>
 
 export module Runtime.RHI.Buffer;
 
@@ -11,7 +12,7 @@ export namespace Runtime::RHI {
     public:
         // usage: VertexBuffer, IndexBuffer, TransferSrc, etc.
         // properties: DeviceLocal (GPU only) or HostVisible (CPU writable)
-        VulkanBuffer(VulkanDevice& device, size_t size, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
+        VulkanBuffer(std::shared_ptr<VulkanDevice> device, size_t size, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
         ~VulkanBuffer();
 
         [[nodiscard]] VkBuffer GetHandle() const { return m_Buffer; }
@@ -21,7 +22,7 @@ export namespace Runtime::RHI {
         void Unmap();
 
     private:
-        VulkanDevice& m_Device;
+        std::shared_ptr<VulkanDevice> m_Device;
         VkBuffer m_Buffer = VK_NULL_HANDLE;
         VmaAllocation m_Allocation = VK_NULL_HANDLE;
     };

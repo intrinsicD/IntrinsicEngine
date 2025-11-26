@@ -20,7 +20,7 @@ export namespace Runtime::Graphics
     class RenderSystem
     {
     public:
-        RenderSystem(RHI::VulkanDevice& device,
+        RenderSystem(std::shared_ptr<RHI::VulkanDevice> device,
                      RHI::VulkanSwapchain& swapchain,
                      RHI::SimpleRenderer& renderer,
                      RHI::GraphicsPipeline& pipelin,
@@ -34,7 +34,7 @@ export namespace Runtime::Graphics
     private:
         size_t m_MinUboAlignment = 0;
 
-        RHI::VulkanDevice& m_Device;
+        std::shared_ptr<RHI::VulkanDevice> m_Device;
         RHI::VulkanSwapchain& m_Swapchain;
         RHI::SimpleRenderer& m_Renderer;
         RHI::GraphicsPipeline& m_Pipeline;
