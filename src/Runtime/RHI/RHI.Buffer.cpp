@@ -22,11 +22,19 @@ namespace Runtime::RHI {
         allocInfo.usage = memoryUsage;
         // Use VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT for CPU->GPU mapping
         if (memoryUsage == VMA_MEMORY_USAGE_AUTO_PREFER_HOST || memoryUsage == VMA_MEMORY_USAGE_CPU_TO_GPU) {
-            allocInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+            allocInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
         }
 
-        if (vmaCreateBuffer(device->GetAllocator(), &bufferInfo, &allocInfo, &m_Buffer, &m_Allocation, nullptr) != VK_SUCCESS) {
+        VmaAllocationInfo resultInfo{};
+
+        if (vmaCreateBuffer(device->GetAllocator(), &bufferInfo, &allocInfo, &m_Buffer, &m_Allocation, &resultInfo) != VK_SUCCESS) {
             Core::Log::Error("Failed to create buffer!");
+            return;
+        }
+
+        if (resultInfo.pMappedData != nullptr) {
+            m_MappedData = resultInfo.pMappedData;
+            m_IsPersistent = true;
         }
     }
 
@@ -35,12 +43,20 @@ namespace Runtime::RHI {
     }
 
     void* VulkanBuffer::Map() {
-        void* data;
-        vmaMapMemory(m_Device->GetAllocator(), m_Allocation, &data);
-        return data;
+        if (m_MappedData) {
+            return m_MappedData;
+        }
+
+        vmaMapMemory(m_Device->GetAllocator(), m_Allocation, &m_MappedData);
+        return m_MappedData;
     }
 
     void VulkanBuffer::Unmap() {
-        vmaUnmapMemory(m_Device->GetAllocator(), m_Allocation);
+        if (m_IsPersistent) return;
+
+        if (m_MappedData) {
+            vmaUnmapMemory(m_Device->GetAllocator(), m_Allocation);
+            m_MappedData = nullptr;
+        }
     }
 }

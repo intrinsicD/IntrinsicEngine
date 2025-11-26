@@ -89,9 +89,8 @@ namespace Runtime::Graphics
             uint32_t frameIndex = m_Renderer.GetCurrentFrameIndex();
             size_t offset = frameIndex * alignedSize;
 
-            char* data = (char*)m_GlobalUBO->Map();
-            memcpy(data + offset, &ubo, cameraDataSize);
-            m_GlobalUBO->Unmap();
+            char* dataPtr = static_cast<char*>(m_GlobalUBO->Map());
+            memcpy(dataPtr + offset, &ubo, cameraDataSize);
 
             m_RenderGraph.Reset();
 

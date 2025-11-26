@@ -21,9 +21,15 @@ export namespace Runtime::RHI {
         void* Map();
         void Unmap();
 
+        [[nodiscard]] void* GetMappedData() const { return m_MappedData; }
+
     private:
         std::shared_ptr<VulkanDevice> m_Device;
         VkBuffer m_Buffer = VK_NULL_HANDLE;
         VmaAllocation m_Allocation = VK_NULL_HANDLE;
+
+        // The persistent pointer. nullptr if memory is GPU-only.
+        void* m_MappedData = nullptr;
+        bool m_IsPersistent = false;
     };
 }
