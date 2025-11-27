@@ -19,6 +19,136 @@ void ExpectVec3Eq(const glm::vec3& a, const glm::vec3& b, float epsilon = 0.001f
 }
 
 // =========================================================================
+// RAY CASTING TESTS
+// =========================================================================
+
+TEST(GeometryRayCast, RayVsSphere)
+{
+    Sphere s{{0, 0, 0}, 1.0f};
+    Ray r{{0, 0, 5}, {0, 0, -1}}; // Fired from +Z towards origin
+
+    auto hit = RayCast(r, s);
+    ASSERT_TRUE(hit.has_value());
+    EXPECT_NEAR(hit->Distance, 4.0f, 0.001f); // Should hit at z=1
+    ExpectVec3Eq(hit->Point, {0, 0, 1});
+    ExpectVec3Eq(hit->Normal, {0, 0, 1});
+}
+
+TEST(GeometryRayCast, RayVsSphere_Miss)
+{
+    Sphere s{{0, 0, 0}, 1.0f};
+    Ray r{{0, 2, 5}, {0, 0, -1}}; // Fired parallel, above sphere
+
+    auto hit = RayCast(r, s);
+    EXPECT_FALSE(hit.has_value());
+}
+
+TEST(GeometryRayCast, RayVsAABB)
+{
+    AABB box{{-1, -1, -1}, {1, 1, 1}};
+    Ray r{{-5, 0, 0}, {1, 0, 0}}; // From -X towards box
+
+    auto hit = RayCast(r, box);
+    ASSERT_TRUE(hit.has_value());
+    EXPECT_NEAR(hit->Distance, 4.0f, 0.001f); // Hits at x=-1
+    ExpectVec3Eq(hit->Point, {-1, 0, 0});
+    ExpectVec3Eq(hit->Normal, {-1, 0, 0});
+}
+
+TEST(GeometryRayCast, RayVsAABB_Inside)
+{
+    AABB box{{-1, -1, -1}, {1, 1, 1}};
+    Ray r{{0, 0, 0}, {1, 0, 0}}; // From Center
+
+    auto hit = RayCast(r, box);
+    ASSERT_TRUE(hit.has_value());
+    EXPECT_NEAR(hit->Distance, 1.0f, 0.001f); // Hits inside face at x=1
+    ExpectVec3Eq(hit->Point, {1, 0, 0});
+}
+
+// =========================================================================
+// OVERLAP TESTS (EXTENDED)
+// =========================================================================
+
+TEST(GeometryOverlap, OBB_Vs_OBB_SAT)
+{
+    OBB a, b;
+    a.Center = {0, 0, 0};
+    a.Extents = {1, 1, 1};
+    a.Rotation = glm::quat(1, 0, 0, 0); // Identity
+
+    b.Center = {1.5, 0, 0}; // Overlap: x range [0.5, 2.5] vs [-1, 1] -> Overlap 0.5
+    b.Extents = {1, 1, 1};
+    b.Rotation = glm::quat(1, 0, 0, 0);
+
+    EXPECT_TRUE(TestOverlap(a, b));
+
+    // Move b far away
+    b.Center = {3, 0, 0};
+    EXPECT_FALSE(TestOverlap(a, b));
+
+    // Rotate 45 degrees around Z
+    b.Center = {2, 0, 0}; // Edges touch if unrotated.
+    // 2.0 dist. extents 1+1 = 2.0. Touching.
+    // Rotate 45 deg: corner distance becomes sqrt(2) ~ 1.414
+    b.Rotation = glm::angleAxis(glm::radians(45.0f), glm::vec3(0, 0, 1));
+    // Gap increases or decreases depending on axis.
+    // With 45 deg, the corner points at A.
+    // Corner at 2.0 - 1.414 = 0.586. A extends to 1.0.
+    // Overlap should be TRUE.
+    EXPECT_TRUE(TestOverlap(a, b));
+}
+
+TEST(GeometryOverlap, Frustum_Vs_AABB)
+{
+    // 1. Create a valid Frustum from a ViewProjection Matrix
+    // Projection: 90 deg FOV, Aspect 1.0, Near 0.1, Far 100.0
+    glm::mat4 proj = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 100.0f);
+    // View: Camera at origin, looking down -Z
+    glm::mat4 view = glm::lookAt(glm::vec3(0,0,0), glm::vec3(0,0,-1), glm::vec3(0,1,0));
+
+    // Create frustum (populates both Corners and Planes)
+    auto f = Frustum::CreateFromMatrix(proj * view);
+
+    // 2. Test Overlap (Inside)
+    // Box is at Z = -5 (Directly in front)
+    AABB bHit{{-1, -1, -6}, {1, 1, -4}};
+    EXPECT_TRUE(TestOverlap(f, bHit));
+
+    // 3. Test No Overlap (Outside)
+    // Box is at Z = +5 (Behind camera) - Culled by Near Plane or Z-plane
+    AABB bMiss{{-1, -1, 4}, {1, 1, 6}};
+    EXPECT_FALSE(TestOverlap(f, bMiss));
+
+    // Box is far to the right
+    AABB bMissSide{{50, -1, -10}, {55, 1, -5}};
+    EXPECT_FALSE(TestOverlap(f, bMissSide));
+}
+
+TEST(GeometryPrimitives, Frustum_Construction_And_Overlap)
+{
+    // Create a Camera looking at -Z
+    glm::mat4 proj = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 100.0f);
+    glm::mat4 view = glm::lookAt(glm::vec3(0,0,0), glm::vec3(0,0,-1), glm::vec3(0,1,0));
+    // Correction for GLM to Vulkan clip space if necessary,
+    // but Geometry logic is usually consistent if conventions match.
+
+    auto frustum = Frustum::CreateFromMatrix(proj * view);
+
+    // 1. Test Object Visible (In front of camera)
+    AABB visibleBox{{-1, -1, -10}, {1, 1, -5}};
+    EXPECT_TRUE(TestOverlap(frustum, visibleBox));
+
+    // 2. Test Object Behind (Culled by Near Plane or geometric position)
+    AABB behindBox{{-1, -1, 5}, {1, 1, 10}};
+    EXPECT_FALSE(TestOverlap(frustum, behindBox));
+
+    // 3. Test Object To the Side (Culled by Left/Right)
+    AABB sideBox{{50, -1, -10}, {55, 1, -5}};
+    EXPECT_FALSE(TestOverlap(frustum, sideBox));
+}
+
+// =========================================================================
 // 1. PRIMITIVE SUPPORT TESTS (Crucial for GJK correctness)
 // =========================================================================
 

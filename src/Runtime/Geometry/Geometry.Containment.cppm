@@ -71,6 +71,31 @@ export namespace Runtime::Geometry
             return true;
         }
 
+        // Note: For Culling, we often want "Intersection" not strict "Containment".
+        // A Frustum contains an AABB if the AABB is FULLY inside.
+        // A Frustum "Sees" an AABB if they Overlap.
+        // We implement strict containment here.
+        bool Contains_Analytic(const Frustum& f, const AABB& box)
+        {
+            // For STRICT containment, ALL 8 corners of the AABB must be inside ALL 6 planes.
+            // Optimization: Test the point most likely to be OUTSIDE (Negative Vertex)
+
+            for (const auto& plane : f.Planes)
+            {
+                // Find the point most likely to be "outside" (behind) the plane
+                glm::vec3 negativeVertex = box.Max;
+                if (plane.Normal.x >= 0) negativeVertex.x = box.Min.x;
+                if (plane.Normal.y >= 0) negativeVertex.y = box.Min.y;
+                if (plane.Normal.z >= 0) negativeVertex.z = box.Min.z;
+
+                if (plane.GetSignedDistance(negativeVertex) < 0)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
         // --- Fallback ---
 
         template<typename Container, typename Object>

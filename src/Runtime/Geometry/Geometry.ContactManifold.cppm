@@ -21,6 +21,13 @@ export namespace Runtime::Geometry
         glm::vec3 ContactPointB;
     };
 
+    struct RayHit
+    {
+        float Distance;
+        glm::vec3 Point;
+        glm::vec3 Normal;
+    };
+
     namespace Internal
     {
         // --- Analytic Solvers ---
@@ -99,6 +106,60 @@ export namespace Runtime::Geometry
             return m;
         }
 
+        // --- Ray Cast Solvers ---
+
+        std::optional<RayHit> RayCast_Analytic(const Ray& r, const Sphere& s)
+        {
+            glm::vec3 m = r.Origin - s.Center;
+            float b = glm::dot(m, r.Direction);
+            float c = glm::dot(m, m) - s.Radius * s.Radius;
+
+            if (c > 0.0f && b > 0.0f) return std::nullopt;
+
+            float discr = b * b - c;
+            if (discr < 0.0f) return std::nullopt;
+
+            float t = -b - std::sqrt(discr);
+            if (t < 0.0f) t = 0.0f; // Inside sphere
+
+            RayHit hit;
+            hit.Distance = t;
+            hit.Point = r.Origin + r.Direction * t;
+            hit.Normal = glm::normalize(hit.Point - s.Center);
+            return hit;
+        }
+
+        std::optional<RayHit> RayCast_Analytic(const Ray& r, const AABB& box)
+        {
+            glm::vec3 invDir = 1.0f / r.Direction;
+            glm::vec3 t0s = (box.Min - r.Origin) * invDir;
+            glm::vec3 t1s = (box.Max - r.Origin) * invDir;
+
+            glm::vec3 tsmaller = glm::min(t0s, t1s);
+            glm::vec3 tbigger  = glm::max(t0s, t1s);
+
+            float tmin = glm::max(tsmaller.x, glm::max(tsmaller.y, tsmaller.z));
+            float tmax = glm::min(tbigger.x, glm::min(tbigger.y, tbigger.z));
+
+            if (tmax < tmin || tmax < 0.0f) return std::nullopt;
+
+            // Compute normal
+            RayHit hit;
+            hit.Distance = tmin > 0 ? tmin : tmax; // if tmin < 0, origin is inside
+            hit.Point = r.Origin + r.Direction * hit.Distance;
+
+            // Simple normal logic based on hit point proximity to faces
+            const float epsilon = 1e-4f;
+            if (std::abs(hit.Point.x - box.Min.x) < epsilon) hit.Normal = {-1, 0, 0};
+            else if (std::abs(hit.Point.x - box.Max.x) < epsilon) hit.Normal = {1, 0, 0};
+            else if (std::abs(hit.Point.y - box.Min.y) < epsilon) hit.Normal = {0, -1, 0};
+            else if (std::abs(hit.Point.y - box.Max.y) < epsilon) hit.Normal = {0, 1, 0};
+            else if (std::abs(hit.Point.z - box.Min.z) < epsilon) hit.Normal = {0, 0, -1};
+            else hit.Normal = {0, 0, 1};
+
+            return hit;
+        }
+
         // --- Fallback ---
 
         template<typename A, typename B>
@@ -142,6 +203,20 @@ export namespace Runtime::Geometry
         }
         else {
             return Internal::Contact_Fallback(a, b);
+        }
+    }
+
+    // --- RayCast Dispatcher ---
+    template<typename Shape>
+    [[nodiscard]] std::optional<RayHit> RayCast(const Ray& ray, const Shape& shape)
+    {
+        if constexpr (requires { Internal::RayCast_Analytic(ray, shape); }) {
+            return Internal::RayCast_Analytic(ray, shape);
+        }
+        else {
+            // Raycast fallback not typically done via GJK directly efficiently,
+            // but one could raymarch the SDF defined by GJK.
+            return std::nullopt;
         }
     }
 }
