@@ -40,6 +40,7 @@ target_sources(${target_name}
         Geometry/Geometry.Support.cppm
         Geometry/Geometry.SDF.cppm
         Geometry/Geometry.SDFContact.cppm
+        Geometry/Geometry.Properties.cppm
         Runtime.Engine.cppm
         PRIVATE
         RHI/RHI.Context.cpp

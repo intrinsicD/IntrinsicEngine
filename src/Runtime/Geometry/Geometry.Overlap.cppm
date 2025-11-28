@@ -17,20 +17,23 @@ export namespace Runtime::Geometry
         // --- Separating Axis Theorem (SAT) Helpers ---
 
         // Test a specific axis for separation. Returns true if separated.
-        bool SAT_TestAxis(const glm::vec3& axis, const std::span<const glm::vec3>& vertsA, const std::span<const glm::vec3>& vertsB)
+        bool SAT_TestAxis(const glm::vec3& axis, const std::span<const glm::vec3>& vertsA,
+                          const std::span<const glm::vec3>& vertsB)
         {
             float minA = std::numeric_limits<float>::max(), maxA = std::numeric_limits<float>::lowest();
             float minB = std::numeric_limits<float>::max(), maxB = std::numeric_limits<float>::lowest();
 
             // Project A
-            for (const auto& v : vertsA) {
+            for (const auto& v : vertsA)
+            {
                 float p = glm::dot(v, axis);
                 if (p < minA) minA = p;
                 if (p > maxA) maxA = p;
             }
 
             // Project B
-            for (const auto& v : vertsB) {
+            for (const auto& v : vertsB)
+            {
                 float p = glm::dot(v, axis);
                 if (p < minB) minB = p;
                 if (p > maxB) maxB = p;
@@ -43,45 +46,118 @@ export namespace Runtime::Geometry
         // --- OBB vs OBB (SAT) ---
         bool Overlap_Analytic(const OBB& a, const OBB& b)
         {
+            const float epsilon = 1e-6f;
+
             // 1. Compute rotation matrices
             glm::mat3 R_A = glm::toMat3(a.Rotation);
             glm::mat3 R_B = glm::toMat3(b.Rotation);
 
-            // 2. Compute translation vector
+            // 2. Compute translation vector in A's frame
             glm::vec3 t = b.Center - a.Center;
-            // Bring translation into A's coordinate frame
             t = glm::vec3(glm::dot(t, R_A[0]), glm::dot(t, R_A[1]), glm::dot(t, R_A[2]));
 
-            // 3. Compute common subexpressions. Add epsilon to fix parallel edge cases
-            glm::mat3 AbsR;
-            const float epsilon = 1e-6f;
+            // 3. Compute relative rotation matrix R (B in A's frame) and AbsR
+            // R[i][j] = dot(A_i, B_j)
+            glm::mat3 R, AbsR;
             for (int i = 0; i < 3; i++)
+            {
                 for (int j = 0; j < 3; j++)
-                    AbsR[i][j] = std::abs(glm::dot(R_A[i], R_B[j])) + epsilon;
+                {
+                    R[i][j] = glm::dot(R_A[i], R_B[j]);
+                    AbsR[i][j] = std::abs(R[i][j]) + epsilon;
+                }
+            }
 
             // 4. Test axes L = A0, A1, A2
-            for (int i = 0; i < 3; i++) {
+            for (int i = 0; i < 3; i++)
+            {
                 float ra = a.Extents[i];
                 float rb = b.Extents[0] * AbsR[i][0] + b.Extents[1] * AbsR[i][1] + b.Extents[2] * AbsR[i][2];
                 if (std::abs(t[i]) > ra + rb) return false;
             }
 
             // 5. Test axes L = B0, B1, B2
-            for (int i = 0; i < 3; i++) {
+            for (int i = 0; i < 3; i++)
+            {
                 float ra = a.Extents[0] * AbsR[0][i] + a.Extents[1] * AbsR[1][i] + a.Extents[2] * AbsR[2][i];
                 float rb = b.Extents[i];
-                if (std::abs(t[0] * R_A[0][i] + t[1] * R_A[1][i] + t[2] * R_A[2][i]) > ra + rb) return false;
+                float t_proj = t[0] * R[0][i] + t[1] * R[1][i] + t[2] * R[2][i];
+                if (std::abs(t_proj) > ra + rb) return false;
             }
 
             // 6. Test 9 Cross products (Edges)
-            // L = A0 x B0
-            if (std::abs(t[2] * R_A[1][0] - t[1] * R_A[2][0]) > a.Extents[1] * AbsR[2][0] + a.Extents[2] * AbsR[1][0] +
-                b.Extents[1] * AbsR[0][2] + b.Extents[2] * AbsR[0][1]) return false;
 
-            // ... (Other 8 cross product axes omitted for brevity in this snippet,
-            // but OBB-OBB complete usually requires all 15 axes)
+            // L = A0 x B0
+            if (std::abs(t[2] * R[1][0] - t[1] * R[2][0]) >
+                a.Extents[1] * AbsR[2][0] + a.Extents[2] * AbsR[1][0] +
+                b.Extents[1] * AbsR[0][2] + b.Extents[2] * AbsR[0][1])
+                return false;
+
+            // L = A0 x B1
+            if (std::abs(t[2] * R[1][1] - t[1] * R[2][1]) >
+                a.Extents[1] * AbsR[2][1] + a.Extents[2] * AbsR[1][1] +
+                b.Extents[0] * AbsR[0][2] + b.Extents[2] * AbsR[0][0])
+                return false;
+
+            // L = A0 x B2
+            if (std::abs(t[2] * R[1][2] - t[1] * R[2][2]) >
+                a.Extents[1] * AbsR[2][2] + a.Extents[2] * AbsR[1][2] +
+                b.Extents[0] * AbsR[0][1] + b.Extents[1] * AbsR[0][0])
+                return false;
+
+            // L = A1 x B0
+            if (std::abs(t[0] * R[2][0] - t[2] * R[0][0]) >
+                a.Extents[0] * AbsR[2][0] + a.Extents[2] * AbsR[0][0] +
+                b.Extents[1] * AbsR[1][2] + b.Extents[2] * AbsR[1][1])
+                return false;
+
+            // L = A1 x B1
+            if (std::abs(t[0] * R[2][1] - t[2] * R[0][1]) >
+                a.Extents[0] * AbsR[2][1] + a.Extents[2] * AbsR[0][1] +
+                b.Extents[0] * AbsR[1][2] + b.Extents[2] * AbsR[1][0])
+                return false;
+
+            // L = A1 x B2
+            if (std::abs(t[0] * R[2][2] - t[2] * R[0][2]) >
+                a.Extents[0] * AbsR[2][2] + a.Extents[2] * AbsR[0][2] +
+                b.Extents[0] * AbsR[1][1] + b.Extents[1] * AbsR[1][0])
+                return false;
+
+            // L = A2 x B0
+            if (std::abs(t[1] * R[0][0] - t[0] * R[1][0]) >
+                a.Extents[0] * AbsR[1][0] + a.Extents[1] * AbsR[0][0] +
+                b.Extents[1] * AbsR[2][2] + b.Extents[2] * AbsR[2][1])
+                return false;
+
+            // L = A2 x B1
+            if (std::abs(t[1] * R[0][1] - t[0] * R[1][1]) >
+                a.Extents[0] * AbsR[1][1] + a.Extents[1] * AbsR[0][1] +
+                b.Extents[0] * AbsR[2][2] + b.Extents[2] * AbsR[2][0])
+                return false;
+
+            // L = A2 x B2
+            if (std::abs(t[1] * R[0][2] - t[0] * R[1][2]) >
+                a.Extents[0] * AbsR[1][2] + a.Extents[1] * AbsR[0][2] +
+                b.Extents[0] * AbsR[2][1] + b.Extents[1] * AbsR[2][0])
+                return false;
 
             return true;
+        }
+
+        bool Overlap_Analytic(const OBB& a, const Sphere& b)
+        {
+            // 1. Transform World Sphere Center to OBB Local Space
+            // Conjugate of a quaternion represents the inverse rotation (if normalized)
+            glm::vec3 localSphereCenter = glm::conjugate(a.Rotation) * (b.Center - a.Center);
+
+            // 2. Find closest point on the OBB (which aligns to axes in local space)
+            // The OBB local extents define an AABB from -Extents to +Extents
+            glm::vec3 closestPoint = glm::clamp(localSphereCenter, -a.Extents, a.Extents);
+
+            // 3. Distance Check
+            // If distance between sphere center and closest point on box < radius, they intersect
+            float dist2 = glm::length2(localSphereCenter - closestPoint);
+            return dist2 <= (b.Radius * b.Radius);
         }
 
         // --- Frustum vs AABB ---
@@ -129,7 +205,7 @@ export namespace Runtime::Geometry
             glm::vec3 t1s = (b.Max - r.Origin) * invDir;
 
             glm::vec3 tsmaller = glm::min(t0s, t1s);
-            glm::vec3 tbigger  = glm::max(t0s, t1s);
+            glm::vec3 tbigger = glm::max(t0s, t1s);
 
             float tmin = glm::max(tsmaller.x, glm::max(tsmaller.y, tsmaller.z));
             float tmax = glm::min(tbigger.x, glm::min(tbigger.y, tbigger.z));
