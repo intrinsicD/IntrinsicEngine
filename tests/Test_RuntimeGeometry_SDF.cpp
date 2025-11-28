@@ -12,7 +12,7 @@ import Runtime.Geometry.SDF.General;
 using namespace Runtime::Geometry;
 
 // --- Helper for approximate vector equality ---
-void ExpectVec3Near(const glm::vec3& a, const glm::vec3& b, float tolerance = 0.01f)
+inline void ExpectVec3Near(const glm::vec3& a, const glm::vec3& b, float tolerance = 0.01f)
 {
     EXPECT_NEAR(a.x, b.x, tolerance) << "Expected " << glm::to_string(b) << ", got " << glm::to_string(a);
     EXPECT_NEAR(a.y, b.y, tolerance);
@@ -34,32 +34,7 @@ TEST(SDF_Solver, Sphere_Vs_Sphere)
 
     ASSERT_TRUE(result.has_value());
     EXPECT_NEAR(result->PenetrationDepth, 0.5f, 0.05f);
-    ExpectVec3Near(result->Normal, {1, 0, 0}); // Normal on B pointing away from A?
-    // Logic in solver: Normal = normalize(gradB - gradA).
-    // GradA at contact (0.75) is (1,0,0). GradB at contact is (-1,0,0).
-    // B - A = (-1) - (1) = (-2, 0, 0). Normalized: (-1, 0, 0).
-    // So Normal points A <- B.
-    // WAIT. Physics convention is usually A -> B.
-    // Let's verify the solver code: "separationAxis = gradB - gradA".
-    // If we want normal A->B, we should usually return separationAxis normalized.
-    // If GradA points OUT of A (towards B), and GradB points OUT of B (towards A).
-    // Then GradA ~ (1,0,0). GradB ~ (-1,0,0).
-    // Diff = -2.
-    // Let's check the test expectation vs code logic.
-    // If Result Normal is (-1, 0, 0), that points A <- B.
-
-    // Correction: In Contact_General_SDF I wrote: m.Normal = glm::normalize(separationAxis);
-    // This produces (-1, 0, 0).
-    // Standard expectation: Normal points FROM A TO B.
-    // So expectation should be {-1, 0, 0} based on code, OR we flip the code sign.
-    // Let's assume we want the standard A->B normal.
-    // gradA points A->B. gradB points B->A.
-    // We want A->B. So generally just 'gradA' is a decent approximation at the interface.
-    // Or (gradA - gradB) is (1) - (-1) = 2.
-    // In my code I did gradB - gradA. That gives -2.
-    // FIX: Let's accept {-1, 0, 0} as valid for now, or update code to `gradA - gradB`.
-
-    ExpectVec3Near(result->Normal, {-1, 0, 0});
+    ExpectVec3Near(result->Normal, {1, 0, 0});
 }
 
 TEST(SDF_Solver, OBB_Vs_Sphere_Deep)
@@ -81,15 +56,11 @@ TEST(SDF_Solver, OBB_Vs_Sphere_Deep)
     auto result = SDF::Contact_General_SDF(sdfBox, sdfSphere, guess);
 
     ASSERT_TRUE(result.has_value());
-    // Box corner is at distance ~1.41 from origin.
-    // Sphere is at 1.0, radius 0.5 => extends to 1.5.
-    // Overlap should be detected.
 
-    // Normal should point roughly along +X (rotated).
-    EXPECT_GT(result->Normal.x, 0.0f); // Actually depends on B-A or A-B convention.
-    // If B-A (Sphere - Box), normal points towards Box (negative X).
-    // If we kept code as `gradB - gradA`, and B is Sphere (outside normal +X), A is Box (outside normal +X).
-    // At intersection, gradients oppose.
+    // Normal A->B (Box -> Sphere).
+    // Box center (0,0,0). Sphere center (1,0,0).
+    // Normal should point roughly +X.
+    EXPECT_GT(result->Normal.x, 0.5f);
 }
 
 TEST(SDF_Solver, Capsule_Vs_Box)
@@ -129,4 +100,30 @@ TEST(SDF_Solver, No_Overlap)
 
     auto result = SDF::Contact_General_SDF(sdf1, sdf2, {1.5f, 0, 0});
     EXPECT_FALSE(result.has_value());
+}
+
+TEST(SDF_Solver, Sphere_Vs_Triangle)
+{
+    // Triangle on the floor
+    Triangle t{
+            {-2, 0, -2},
+            { 2, 0, -2},
+            { 0, 0,  2}
+    };
+
+    // Sphere falling onto it
+    Sphere s{{0, 0.5f, 0}, 1.0f};
+
+    auto sdfTri = SDF::CreateSDF(t);
+    auto sdfSphere = SDF::CreateSDF(s);
+
+    auto result = SDF::Contact_General_SDF(sdfTri, sdfSphere, {0, 0.2f, 0});
+
+    ASSERT_TRUE(result.has_value());
+    // Sphere Radius 1.0. Center Y=0.5. Floor Y=0.
+    // Penetration = 0.5.
+    EXPECT_NEAR(result->PenetrationDepth, 0.5f, 0.05f);
+    // Normal should be Up (0, 1, 0)
+    // Note: Sign depends on A-B vs B-A convention.
+    EXPECT_NEAR(std::abs(result->Normal.y), 1.0f, 0.05f);
 }

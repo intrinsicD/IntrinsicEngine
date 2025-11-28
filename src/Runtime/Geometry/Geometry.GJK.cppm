@@ -9,6 +9,7 @@ module;
 export module Runtime.Geometry.GJK;
 
 import Runtime.Geometry.Primitives; // Needs definitions of ContactManifold
+import Runtime.Geometry.Support; // Needs definitions of ContactManifold
 
 export namespace Runtime::Geometry::Internal
 {
@@ -19,10 +20,11 @@ export namespace Runtime::Geometry::Internal
         // We use function pointers or templates in a real generic system, 
         // but for this specific GJK implementation, we assume templates from the caller.
         // Helper to compute A - B support
-        template <typename A, typename B>
+        template <ConvexShape A, ConvexShape B>
         static glm::vec3 Support(const A& a, const B& b, const glm::vec3& dir)
         {
-            return a.Support(dir) - b.Support(-dir);
+            // NEW: Call the free functions via ADL
+            return Geometry::Support(a, dir) - Geometry::Support(b, -dir);
         }
     };
 

@@ -61,7 +61,7 @@ export namespace Runtime::Graphics
     {
     public:
         virtual ~CameraController() = default;
-        virtual void OnUpdate(Camera& camera, float dt, bool disableInput = false) = 0;
+        virtual void OnUpdate(Camera& camera, float dt, bool disableInput) = 0;
 
         virtual void OnResize(Camera& camera, uint32_t width, uint32_t height)
         {
@@ -181,14 +181,10 @@ export namespace Runtime::Graphics
                 glm::vec3 camUp = camera.GetUp();
 
                 // 2. Create rotation quaternions
-                // Rotate around Camera Up for Yaw (Horizontal mouse movement)
-                // Rotate around Camera Right for Pitch (Vertical mouse movement)
-                // Note: Angles in radians.
-                glm::quat yawRot = glm::angleAxis(glm::radians(-xDelta), glm::vec3(0, 1, 0));
                 // World Up for stability, OR camUp for free-tumble
                 // For "continuous in any direction" like PMP, usually we rotate around Screen Axes (CamUp/CamRight).
                 // Let's use CamUp to allow tumbling over the pole cleanly.
-                yawRot = glm::angleAxis(glm::radians(-xDelta), camUp);
+                glm::quat yawRot = glm::angleAxis(glm::radians(-xDelta), camUp);
 
                 glm::quat pitchRot = glm::angleAxis(glm::radians(-yDelta), camRight);
 

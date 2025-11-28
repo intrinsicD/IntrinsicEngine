@@ -8,6 +8,7 @@ add_executable(${target_name}
         Test_CoreAssets.cpp
         Test_RuntimeGeometry.cpp
         Test_RuntimeGeometry_SDF.cpp
+        Test_RuntimeGeometry_All.cpp
 )
 
 #Apply Strict Flags ONLY to our tests

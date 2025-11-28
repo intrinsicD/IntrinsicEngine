@@ -7,6 +7,7 @@ module;
 export module Runtime.Geometry.Overlap;
 
 import Runtime.Geometry.Primitives;
+import Runtime.Geometry.SDF;
 import Runtime.Geometry.GJK;
 
 export namespace Runtime::Geometry
@@ -97,7 +98,7 @@ export namespace Runtime::Geometry
                 if (plane.Normal.y >= 0) positiveVertex.y = box.Max.y;
                 if (plane.Normal.z >= 0) positiveVertex.z = box.Max.z;
 
-                if (plane.GetSignedDistance(positiveVertex) < 0)
+                if (SDF::Math::Sdf_Plane(positiveVertex, plane.Normal, plane.Distance) < 0)
                 {
                     // The "most inside" point is actually outside.
                     // Therefore the whole box is outside.
@@ -112,7 +113,7 @@ export namespace Runtime::Geometry
         {
             for (const auto& plane : f.Planes)
             {
-                if (plane.GetSignedDistance(s.Center) < -s.Radius)
+                if (SDF::Math::Sdf_Plane(s.Center, plane.Normal, plane.Distance) < -s.Radius)
                 {
                     return false;
                 }

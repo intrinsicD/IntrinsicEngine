@@ -9,12 +9,14 @@ module;
 export module Runtime.Geometry.Containment;
 
 import Runtime.Geometry.Primitives;
+import Runtime.Geometry.SDF;
 
 export namespace Runtime::Geometry
 {
     // Concept to check if an object exposes vertices for fallback checks
-    template<typename T>
-    concept HasVertices = requires(T t) {
+    template <typename T>
+    concept HasVertices = requires(T t)
+    {
         // Either std::vector or std::array of vec3
         { t.Vertices } -> std::convertible_to<std::span<const glm::vec3>>;
         // Or specific access logic... for simplicity let's assume direct iteration
@@ -32,16 +34,16 @@ export namespace Runtime::Geometry
 
         bool Contains_Analytic(const AABB& outer, const glm::vec3& p)
         {
-             return p.x >= outer.Min.x && p.x <= outer.Max.x &&
-                    p.y >= outer.Min.y && p.y <= outer.Max.y &&
-                    p.z >= outer.Min.z && p.z <= outer.Max.z;
+            return p.x >= outer.Min.x && p.x <= outer.Max.x &&
+                p.y >= outer.Min.y && p.y <= outer.Max.y &&
+                p.z >= outer.Min.z && p.z <= outer.Max.z;
         }
 
         bool Contains_Analytic(const AABB& outer, const AABB& inner)
         {
             return inner.Min.x >= outer.Min.x && inner.Max.x <= outer.Max.x &&
-                   inner.Min.y >= outer.Min.y && inner.Max.y <= outer.Max.y &&
-                   inner.Min.z >= outer.Min.z && inner.Max.z <= outer.Max.z;
+                inner.Min.y >= outer.Min.y && inner.Max.y <= outer.Max.y &&
+                inner.Min.z >= outer.Min.z && inner.Max.z <= outer.Max.z;
         }
 
         bool Contains_Analytic(const Sphere& outer, const AABB& inner)
@@ -49,7 +51,7 @@ export namespace Runtime::Geometry
             // All 8 corners of AABB must be inside Sphere
             // Optimization: Find the corner furthest from sphere center
             glm::vec3 furthest = inner.Max;
-            if (outer.Center.x > inner.Min.x + (inner.Max.x - inner.Min.x)*0.5f) furthest.x = inner.Min.x;
+            if (outer.Center.x > inner.Min.x + (inner.Max.x - inner.Min.x) * 0.5f) furthest.x = inner.Min.x;
             // ... (requires checking quadrant).
 
             // Simpler: Check all 8 corners
@@ -65,8 +67,9 @@ export namespace Runtime::Geometry
             };
 
             float r2 = outer.Radius * outer.Radius;
-            for(const auto& p : corners) {
-                if(glm::distance2(p, outer.Center) > r2) return false;
+            for (const auto& p : corners)
+            {
+                if (glm::distance2(p, outer.Center) > r2) return false;
             }
             return true;
         }
@@ -88,7 +91,7 @@ export namespace Runtime::Geometry
                 if (plane.Normal.y >= 0) negativeVertex.y = box.Min.y;
                 if (plane.Normal.z >= 0) negativeVertex.z = box.Min.z;
 
-                if (plane.GetSignedDistance(negativeVertex) < 0)
+                if (SDF::Math::Sdf_Plane(negativeVertex, plane.Normal, plane.Distance) < 0)
                 {
                     return false;
                 }
@@ -96,9 +99,19 @@ export namespace Runtime::Geometry
             return true;
         }
 
+        bool Contains_Analytic(const Frustum& f, const Sphere& s)
+        {
+            for (const auto& p : f.Planes)
+            {
+                // If the sphere touches or crosses the plane (dist > -r), it's not fully contained
+                if (SDF::Math::Sdf_Plane(s.Center, p.Normal, p.Distance) > -s.Radius) return false;
+            }
+            return true;
+        }
+
         // --- Fallback ---
 
-        template<typename Container, typename Object>
+        template <typename Container, typename Object>
         bool Contains_Fallback(const Container& c, const Object& o)
         {
             // Fallback strategy:
@@ -107,7 +120,8 @@ export namespace Runtime::Geometry
 
             if constexpr (requires { o.Vertices; })
             {
-                for(const auto& v : o.Vertices) {
+                for (const auto& v : o.Vertices)
+                {
                     if (!Contains_Analytic(c, v)) return false; // Requires Point check
                 }
                 return true;
@@ -118,12 +132,15 @@ export namespace Runtime::Geometry
         }
     }
 
-    template<typename Outer, typename Inner>
+    template <typename Outer, typename Inner>
     [[nodiscard]] bool Contains(const Outer& container, const Inner& object)
     {
-        if constexpr (requires { Internal::Contains_Analytic(container, object); }) {
+        if constexpr (requires { Internal::Contains_Analytic(container, object); })
+        {
             return Internal::Contains_Analytic(container, object);
-        } else {
+        }
+        else
+        {
             return Internal::Contains_Fallback(container, object);
         }
     }

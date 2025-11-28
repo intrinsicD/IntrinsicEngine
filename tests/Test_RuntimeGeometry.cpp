@@ -7,6 +7,7 @@ import Runtime.Geometry.Primitives;
 import Runtime.Geometry.Overlap;
 import Runtime.Geometry.Containment;
 import Runtime.Geometry.Contact;
+import Runtime.Geometry.Support;
 
 using namespace Runtime::Geometry;
 
@@ -72,14 +73,16 @@ TEST(GeometryRayCast, RayVsAABB_Inside)
 
 TEST(GeometryOverlap, OBB_Vs_OBB_SAT)
 {
-    OBB a, b;
-    a.Center = {0, 0, 0};
-    a.Extents = {1, 1, 1};
-    a.Rotation = glm::quat(1, 0, 0, 0); // Identity
-
-    b.Center = {1.5, 0, 0}; // Overlap: x range [0.5, 2.5] vs [-1, 1] -> Overlap 0.5
-    b.Extents = {1, 1, 1};
-    b.Rotation = glm::quat(1, 0, 0, 0);
+    OBB a{
+        .Center = {0, 0, 0},
+        .Extents = {1, 1, 1},
+        .Rotation = glm::quat(1, 0, 0, 0)
+    };
+    OBB b{
+        .Center = {1.5, 0, 0}, // Overlap: x range [0.5, 2.5] vs [-1, 1] -> Overlap 0.5
+        .Extents = {1, 1, 1},
+        .Rotation = glm::quat(1, 0, 0, 0)
+    };
 
     EXPECT_TRUE(TestOverlap(a, b));
 
@@ -157,24 +160,24 @@ TEST(GeometryPrimitives, AABB_Support)
     AABB box{{-1, -1, -1}, {1, 1, 1}};
 
     // Test Cardinals
-    ExpectVec3Eq(box.Support({1, 0, 0}), {1, -1, -1}); // Implementation specific: checks > 0
-    ExpectVec3Eq(box.Support({-1, 0, 0}), {-1, -1, -1});
-    ExpectVec3Eq(box.Support({0, 1, 0}), {-1, 1, -1});
+    ExpectVec3Eq(Support(box, {1, 0, 0}), {1, 1, 1}); // Implementation specific: checks > 0
+    ExpectVec3Eq(Support(box, {-1, 0, 0}), {-1, 1, 1});
+    ExpectVec3Eq(Support(box, {0, 1, 0}), {1, 1, 1});
 
     // Test Diagonal
-    ExpectVec3Eq(box.Support({1, 1, 1}), {1, 1, 1});
+    ExpectVec3Eq(Support(box, {1, 1, 1}), {1, 1, 1});
 }
 
 TEST(GeometryPrimitives, Sphere_Support)
 {
     Sphere s{{0, 0, 0}, 1.0f};
 
-    ExpectVec3Eq(s.Support({1, 0, 0}), {1, 0, 0});
-    ExpectVec3Eq(s.Support({0, 1, 0}), {0, 1, 0});
+    ExpectVec3Eq(Support(s, {1, 0, 0}), {1, 0, 0});
+    ExpectVec3Eq(Support(s, {0, 1, 0}), {0, 1, 0});
 
     // Normalized direction check
     glm::vec3 dir = glm::normalize(glm::vec3(1, 1, 0));
-    ExpectVec3Eq(s.Support({1, 1, 0}), dir);
+    ExpectVec3Eq(Support(s, {1, 1, 0}), dir);
 }
 
 TEST(GeometryPrimitives, Cylinder_Support)
@@ -182,15 +185,15 @@ TEST(GeometryPrimitives, Cylinder_Support)
     Cylinder cyl{{0, 0, 0}, {0, 2, 0}, 1.0f}; // Height 2 along Y, Radius 1
 
     // Support along Y axis (Cap)
-    ExpectVec3Eq(cyl.Support({0, 1, 0}), {0, 2, 0});
-    ExpectVec3Eq(cyl.Support({0, -1, 0}), {0, 0, 0});
+    ExpectVec3Eq(Support(cyl, {0, 1, 0}), {0, 2, 0});
+    ExpectVec3Eq(Support(cyl, {0, -1, 0}), {0, 0, 0});
 
     // Support perpendicular (Side)
-    ExpectVec3Eq(cyl.Support({1, 0, 0}), {1, 0, 0}); // Bottom circle edge
+    ExpectVec3Eq(Support(cyl, {1, 0, 0}), {1, 0, 0}); // Bottom circle edge
 
     // Support diagonal (Rim)
     glm::vec3 diag = glm::normalize(glm::vec3(1, 1, 0));
-    glm::vec3 result = cyl.Support(diag);
+    glm::vec3 result = Support(cyl, diag);
 
     // It should pick the top cap ({0,2,0}) pushed out by radius in X ({1,0,0})
     ExpectVec3Eq(result, {1, 2, 0});
@@ -248,10 +251,11 @@ TEST(GeometryOverlap, Fallback_GJK_AABBOBB)
     // AABB vs Oriented Box
     AABB aabb{{-1, -1, -1}, {1, 1, 1}};
 
-    OBB obb;
-    obb.Center = {2, 0, 0};
-    obb.Extents = {0.5f, 0.5f, 0.5f};
-    obb.Rotation = glm::quat(glm::vec3(0, 0, 0)); // Identity
+    OBB obb{
+        .Center = {2, 0, 0},
+        .Extents = {0.5f, 0.5f, 0.5f},
+        .Rotation = glm::quat(glm::vec3(0, 0, 0))
+    };
 
     // Touching exactly at x=1 (AABB Max) and x=1.5 (OBB Min). Gap 0.5. No overlap.
     EXPECT_FALSE(TestOverlap(aabb, obb));

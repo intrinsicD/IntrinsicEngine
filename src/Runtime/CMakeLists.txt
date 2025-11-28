@@ -37,6 +37,7 @@ target_sources(${target_name}
         Geometry/Geometry.GJK.cppm
         Geometry/Geometry.Overlap.cppm
         Geometry/Geometry.Primitives.cppm
+        Geometry/Geometry.Support.cppm
         Geometry/Geometry.SDF.cppm
         Geometry/Geometry.SDFContact.cppm
         Runtime.Engine.cppm
