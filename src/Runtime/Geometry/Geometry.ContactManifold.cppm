@@ -11,21 +11,41 @@ import Runtime.Geometry.GJK; // Should contain GJK_EPA logic in full version
 
 export namespace Runtime::Geometry
 {
-    // Define the Manifold structure again if not exported by Primitives
-    // (Ensure it's only defined once in your project structure, preferably in Primitives)
+    // =========================================================================
+    // CONTACT MANIFOLD NORMAL CONVENTION
+    // =========================================================================
+    //
+    // All contact normals follow the convention: Normal points from A to B
+    //
+    // To resolve collision:
+    //   - Move A in direction: -Normal * (PenetrationDepth * 0.5)
+    //   - Move B in direction: +Normal * (PenetrationDepth * 0.5)
+    //
+    // Contact points:
+    //   - ContactPointA: Point on surface of object A (in world space)
+    //   - ContactPointB: Point on surface of object B (in world space)
+    //
+    // Example:
+    //   ComputeContact(sphereA, sphereB) returns:
+    //     - Normal: unit vector from A.center to B.center
+    //     - PenetrationDepth: (A.radius + B.radius) - distance(A, B)
+    //     - ContactPointA: A.center + Normal * A.radius
+    //     - ContactPointB: B.center - Normal * B.radius
+    // =========================================================================
+
     struct ContactManifold
     {
-        glm::vec3 Normal;
-        float PenetrationDepth;
-        glm::vec3 ContactPointA;
-        glm::vec3 ContactPointB;
+        glm::vec3 Normal;           // Unit vector pointing from A to B
+        float PenetrationDepth;     // Positive value indicating overlap magnitude
+        glm::vec3 ContactPointA;    // Contact point on surface of object A
+        glm::vec3 ContactPointB;    // Contact point on surface of object B
     };
 
     struct RayHit
     {
-        float Distance;
-        glm::vec3 Point;
-        glm::vec3 Normal;
+        float Distance;             // Distance along ray to hit point (t parameter)
+        glm::vec3 Point;            // World-space hit point
+        glm::vec3 Normal;           // Surface normal at hit point (points outward from surface)
     };
 
     namespace Internal

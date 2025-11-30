@@ -74,8 +74,21 @@ export namespace Runtime::Geometry
         void Normalize()
         {
             const float len = glm::length(Normal);
+            if (len < 1e-6f)
+            {
+                // Degenerate plane: default to XY plane at origin
+                Normal = glm::vec3(0, 0, 1);
+                Distance = 0.0f;
+                return;
+            }
             Normal /= len;
             Distance /= len;
+        }
+
+        bool IsValid() const
+        {
+            float lenSq = glm::dot(Normal, Normal);
+            return lenSq > 1e-12f && !std::isnan(Distance) && !std::isinf(Distance);
         }
     };
 
