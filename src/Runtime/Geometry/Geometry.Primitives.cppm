@@ -74,6 +74,11 @@ export namespace Runtime::Geometry
         void Normalize()
         {
             const float len = glm::length(Normal);
+            if (len < 1e-6f) {
+                Normal = glm::vec3(0, 1, 0);
+                Distance = 0.0f;
+                return;
+            }
             Normal /= len;
             Distance /= len;
         }

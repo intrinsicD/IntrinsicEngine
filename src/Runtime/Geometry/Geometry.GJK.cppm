@@ -211,6 +211,7 @@ export namespace Runtime::Geometry::Internal
         // A production engine needs the full expansion loop here.
 
         // Return placeholder for logic: Normal * Depth
+        //TODO: Implement full EPA or document that users should rely on analytic solvers and SDF fallback
         return glm::vec3(0, 1, 0) * 0.0f;
     }
 }

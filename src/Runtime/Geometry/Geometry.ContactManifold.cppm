@@ -11,21 +11,41 @@ import Runtime.Geometry.GJK; // Should contain GJK_EPA logic in full version
 
 export namespace Runtime::Geometry
 {
-    // Define the Manifold structure again if not exported by Primitives
-    // (Ensure it's only defined once in your project structure, preferably in Primitives)
+    // =========================================================================
+    // CONTACT MANIFOLD NORMAL CONVENTION
+    // =========================================================================
+    //
+    // All contact normals follow the convention: Normal points from A to B
+    //
+    // To resolve collision:
+    //   - Move A in direction: -Normal * (PenetrationDepth * 0.5)
+    //   - Move B in direction: +Normal * (PenetrationDepth * 0.5)
+    //
+    // Contact points:
+    //   - ContactPointA: Point on surface of object A (in world space)
+    //   - ContactPointB: Point on surface of object B (in world space)
+    //
+    // Example:
+    //   ComputeContact(sphereA, sphereB) returns:
+    //     - Normal: unit vector from A.center to B.center
+    //     - PenetrationDepth: (A.radius + B.radius) - distance(A, B)
+    //     - ContactPointA: A.center + Normal * A.radius
+    //     - ContactPointB: B.center - Normal * B.radius
+    // =========================================================================
+
     struct ContactManifold
     {
-        glm::vec3 Normal;
-        float PenetrationDepth;
-        glm::vec3 ContactPointA;
-        glm::vec3 ContactPointB;
+        glm::vec3 Normal;           // Unit vector pointing from A to B
+        float PenetrationDepth;     // Positive value indicating overlap magnitude
+        glm::vec3 ContactPointA;    // Contact point on surface of object A
+        glm::vec3 ContactPointB;    // Contact point on surface of object B
     };
 
     struct RayHit
     {
-        float Distance;
-        glm::vec3 Point;
-        glm::vec3 Normal;
+        float Distance;             // Distance along ray to hit point (t parameter)
+        glm::vec3 Point;            // World-space hit point
+        glm::vec3 Normal;           // Surface normal at hit point (points outward from surface)
     };
 
     namespace Internal
@@ -43,10 +63,13 @@ export namespace Runtime::Geometry
             float dist = std::sqrt(dist2);
             ContactManifold m;
 
-            if (dist < 1e-6f) {
+            if (dist < 1e-6f)
+            {
                 m.Normal = glm::vec3(0, 1, 0);
                 m.PenetrationDepth = radSum;
-            } else {
+            }
+            else
+            {
                 m.Normal = diff / dist;
                 m.PenetrationDepth = radSum - dist;
             }
@@ -81,19 +104,29 @@ export namespace Runtime::Geometry
                 glm::vec3 overlap = halfExt - glm::abs(d);
 
                 // Find smallest overlap axis
-                if (overlap.x < overlap.y && overlap.x < overlap.z) {
+                if (overlap.x < overlap.y && overlap.x < overlap.z)
+                {
                     m.Normal = glm::vec3(d.x > 0 ? 1 : -1, 0, 0);
                     m.PenetrationDepth = overlap.x + s.Radius;
-                } else if (overlap.y < overlap.z) {
+                }
+                else if (overlap.y < overlap.z)
+                {
                     m.Normal = glm::vec3(0, d.y > 0 ? 1 : -1, 0);
                     m.PenetrationDepth = overlap.y + s.Radius;
-                } else {
+                }
+                else
+                {
                     m.Normal = glm::vec3(0, 0, d.z > 0 ? 1 : -1);
                     m.PenetrationDepth = overlap.z + s.Radius;
                 }
 
-                m.ContactPointB = s.Center - m.Normal * overlap[0]; // Approx
-                m.ContactPointA = s.Center; // Deep inside
+                float minOverlap = (overlap.x < overlap.y && overlap.x < overlap.z)
+                                       ? overlap.x
+                                       : (overlap.y < overlap.z)
+                                       ? overlap.y
+                                       : overlap.z;
+                m.ContactPointB = s.Center - m.Normal * minOverlap;
+                m.ContactPointA = s.Center - m.Normal * s.Radius;
             }
             else
             {
@@ -136,7 +169,7 @@ export namespace Runtime::Geometry
             glm::vec3 t1s = (box.Max - r.Origin) * invDir;
 
             glm::vec3 tsmaller = glm::min(t0s, t1s);
-            glm::vec3 tbigger  = glm::max(t0s, t1s);
+            glm::vec3 tbigger = glm::max(t0s, t1s);
 
             float tmin = glm::max(tsmaller.x, glm::max(tsmaller.y, tsmaller.z));
             float tmax = glm::min(tbigger.x, glm::min(tbigger.y, tbigger.z));
@@ -162,7 +195,7 @@ export namespace Runtime::Geometry
 
         // --- Fallback ---
 
-        template<typename A, typename B>
+        template <typename A, typename B>
         std::optional<ContactManifold> Contact_Fallback(const A& a, const B& b)
         {
             // In a real engine, this calls GJK to find collision,
@@ -176,7 +209,7 @@ export namespace Runtime::Geometry
                 // but doesn't resolve it correctly.
                 // TODO: Implement full EPA here.
                 ContactManifold m;
-                m.Normal = glm::vec3(0,1,0);
+                m.Normal = glm::vec3(0, 1, 0);
                 m.PenetrationDepth = 0.001f;
                 return m;
             }
@@ -187,33 +220,39 @@ export namespace Runtime::Geometry
     // =========================================================================
     // CONTACT DISPATCHER
     // =========================================================================
-    template<ConvexShape A, ConvexShape B>
+    template <ConvexShape A, ConvexShape B>
     [[nodiscard]] std::optional<ContactManifold> ComputeContact(const A& a, const B& b)
     {
-        if constexpr (requires { Internal::Contact_Analytic(a, b); }) {
+        if constexpr (requires { Internal::Contact_Analytic(a, b); })
+        {
             return Internal::Contact_Analytic(a, b);
         }
-        else if constexpr (requires { Internal::Contact_Analytic(b, a); }) {
+        else if constexpr (requires { Internal::Contact_Analytic(b, a); })
+        {
             auto result = Internal::Contact_Analytic(b, a);
-            if (result) {
+            if (result)
+            {
                 result->Normal = -result->Normal;
                 std::swap(result->ContactPointA, result->ContactPointB);
             }
             return result;
         }
-        else {
+        else
+        {
             return Internal::Contact_Fallback(a, b);
         }
     }
 
     // --- RayCast Dispatcher ---
-    template<typename Shape>
+    template <typename Shape>
     [[nodiscard]] std::optional<RayHit> RayCast(const Ray& ray, const Shape& shape)
     {
-        if constexpr (requires { Internal::RayCast_Analytic(ray, shape); }) {
+        if constexpr (requires { Internal::RayCast_Analytic(ray, shape); })
+        {
             return Internal::RayCast_Analytic(ray, shape);
         }
-        else {
+        else
+        {
             // Raycast fallback not typically done via GJK directly efficiently,
             // but one could raymarch the SDF defined by GJK.
             return std::nullopt;

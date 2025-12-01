@@ -29,7 +29,12 @@ export namespace Runtime::Geometry
         bool Contains_Analytic(const Sphere& outer, const Sphere& inner)
         {
             float dist = glm::distance(outer.Center, inner.Center);
-            return (dist + inner.Radius) <= outer.Radius;
+            if (inner.Radius == 0.0f)
+            {
+                // Point containment
+                return dist <= outer.Radius;
+            }
+            return (dist + inner.Radius) < outer.Radius;
         }
 
         bool Contains_Analytic(const AABB& outer, const glm::vec3& p)
@@ -104,7 +109,7 @@ export namespace Runtime::Geometry
             for (const auto& p : f.Planes)
             {
                 // If the sphere touches or crosses the plane (dist > -r), it's not fully contained
-                if (SDF::Math::Sdf_Plane(s.Center, p.Normal, p.Distance) > -s.Radius) return false;
+                if (SDF::Math::Sdf_Plane(s.Center, p.Normal, p.Distance) < s.Radius) return false;
             }
             return true;
         }

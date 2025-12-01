@@ -254,7 +254,14 @@ export namespace Runtime::Geometry
         {
             // 1. Find closest point on segment AB to sphere center
             glm::vec3 ab = c.PointB - c.PointA;
-            float t = glm::dot(s.Center - c.PointA, ab) / glm::length2(ab);
+            float abLen2 = glm::length2(ab);
+
+            // Degenerate capsule: treat as sphere
+            if (abLen2 < 1e-6f) {
+                return Overlap_Analytic(s, Sphere{c.PointA, c.Radius});
+            }
+
+            float t = glm::dot(s.Center - c.PointA, ab) / abLen2;
             t = glm::clamp(t, 0.0f, 1.0f);
             glm::vec3 closestOnSegment = c.PointA + t * ab;
 

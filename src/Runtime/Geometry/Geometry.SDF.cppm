@@ -67,22 +67,23 @@ export namespace Runtime::Geometry::SDF
         // Inigo Quilez's Exact Triangle SDF
         inline float Sdf_Triangle(const glm::vec3& p, const glm::vec3& a, const glm::vec3& b, const glm::vec3& c)
         {
-            glm::vec3 ba = b - a; glm::vec3 pa = p - a;
-            glm::vec3 cb = c - b; glm::vec3 pb = p - b;
-            glm::vec3 ac = a - c; glm::vec3 pc = p - c;
+            glm::vec3 ba = b - a;
+            glm::vec3 pa = p - a;
+            glm::vec3 cb = c - b;
+            glm::vec3 pb = p - b;
+            glm::vec3 ac = a - c;
+            glm::vec3 pc = p - c;
             glm::vec3 nor = glm::cross(ba, ac);
 
             return sqrt(
                 (glm::sign(glm::dot(glm::cross(ba, nor), pa)) +
-                 glm::sign(glm::dot(glm::cross(cb, nor), pb)) +
-                 glm::sign(glm::dot(glm::cross(ac, nor), pc)) < 2.0)
-                 ?
-                 glm::min(glm::min(
-                 Math_Dot2(ba * glm::clamp(glm::dot(ba, pa) / Math_Dot2(ba), 0.0f, 1.0f) - pa),
-                 Math_Dot2(cb * glm::clamp(glm::dot(cb, pb) / Math_Dot2(cb), 0.0f, 1.0f) - pb)),
-                 Math_Dot2(ac * glm::clamp(glm::dot(ac, pc) / Math_Dot2(ac), 0.0f, 1.0f) - pc))
-                 :
-                 glm::dot(nor, pa) * glm::dot(nor, pa) / Math_Dot2(nor));
+                    glm::sign(glm::dot(glm::cross(cb, nor), pb)) +
+                    glm::sign(glm::dot(glm::cross(ac, nor), pc)) < 2.0)
+                    ? glm::min(glm::min(
+                                   Math_Dot2(ba * glm::clamp(glm::dot(ba, pa) / Math_Dot2(ba), 0.0f, 1.0f) - pa),
+                                   Math_Dot2(cb * glm::clamp(glm::dot(cb, pb) / Math_Dot2(cb), 0.0f, 1.0f) - pb)),
+                               Math_Dot2(ac * glm::clamp(glm::dot(ac, pc) / Math_Dot2(ac), 0.0f, 1.0f) - pc))
+                    : glm::dot(nor, pa) * glm::dot(nor, pa) / Math_Dot2(nor));
         }
 
         inline float Sdf_Plane(const glm::vec3& p, const glm::vec3& n, float d)
@@ -188,6 +189,13 @@ export namespace Runtime::Geometry::SDF
 
         float operator()(const glm::vec3& p) const
         {
+            // Handle empty hull (degenerate case)
+            if (Planes.empty())
+            {
+                // Empty hull contains nothing - return large positive distance
+                return std::numeric_limits<float>::max();
+            }
+
             float maxDist = -std::numeric_limits<float>::infinity();
 
             for (const auto& plane : Planes)
@@ -293,7 +301,7 @@ export namespace Runtime::Geometry::SDF
 
     auto CreateSDF(const OBB& b)
     {
-        return ObbSDF{b}; // Simple copy
+        return ObbSDF{b, glm::conjugate(b.Rotation)}; // Simple copy
     }
 
     auto CreateSDF(const Capsule& c)
@@ -304,20 +312,51 @@ export namespace Runtime::Geometry::SDF
     auto CreateSDF(const Cylinder& c)
     {
         // --- Heavy Math happens ONCE here, not in the loop ---
-        float height = glm::length(c.PointB - c.PointA) * 0.5f;
-        glm::vec3 center = (c.PointA + c.PointB) * 0.5f;
-        glm::vec3 up = glm::vec3(0, 1, 0);
-        glm::vec3 axis = glm::normalize(c.PointB - c.PointA);
+        glm::vec3 axisVec = c.PointB - c.PointA;
+        float axisLen = glm::length(axisVec);
 
-        // Robust rotation calculation
-        glm::quat rot;
-        if (std::abs(glm::dot(up, axis)) > 0.999f)
+        // Handle degenerate cylinder (PointA == PointB)
+        if (axisLen < 1e-6f)
         {
-            rot = (axis.y > 0) ? glm::quat(1, 0, 0, 0) : glm::angleAxis(glm::pi<float>(), glm::vec3(1, 0, 0));
+            // Degenerate to sphere
+            return CylinderSDF{c.PointA, 0.0f, c.Radius, glm::quat(1, 0, 0, 0)};
+        }
+
+        float height = axisLen * 0.5f;
+        glm::vec3 center = (c.PointA + c.PointB) * 0.5f;
+        glm::vec3 axis = axisVec / axisLen; // Normalized axis
+
+        // Robust quaternion construction from orthonormal basis
+        // We want to rotate Y-axis to align with 'axis'
+        glm::vec3 up = glm::vec3(0, 1, 0);
+        glm::quat rot;
+
+        float d = glm::dot(up, axis);
+
+        // Check if vectors are parallel (aligned or opposite)
+        if (d > 0.9999f)
+        {
+            // Already aligned with Y-axis
+            rot = glm::quat(1, 0, 0, 0);
+        }
+        else if (d < -0.9999f)
+        {
+            // Opposite to Y-axis: rotate 180 degrees around X
+            rot = glm::angleAxis(glm::pi<float>(), glm::vec3(1, 0, 0));
         }
         else
         {
-            rot = glm::rotation(up, axis);
+            // General case: use half-angle formula for numerical stability
+            // This is more stable than glm::rotation() for small angles
+            glm::vec3 c = glm::cross(up, axis);
+            float s = glm::length(c);
+
+            // Quaternion from axis-angle using half-angle formula
+            // q.w = cos(theta/2) = sqrt((1 + cos(theta)) / 2)
+            // q.xyz = sin(theta/2) * normalized_axis = c / (2 * sqrt((1 + cos(theta)) / 2))
+            float qw = std::sqrt((1.0f + d) * 0.5f);
+            float qw2 = 2.0f * qw;
+            rot = glm::quat(qw, c.x / qw2, c.y / qw2, c.z / qw2);
         }
 
         return CylinderSDF{center, height, c.Radius, glm::conjugate(rot)};

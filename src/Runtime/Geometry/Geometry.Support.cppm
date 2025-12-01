@@ -11,8 +11,14 @@ export namespace Runtime::Geometry
 {
     namespace Internal
     {
-        inline glm::vec3 Normalize(const glm::vec3& v) { return glm::normalize(v); }
+        inline glm::vec3 Normalize(const glm::vec3& v)
+        {
+            float lenSq = glm::length2(v);
+            if (lenSq < 1e-12f) return {0, 1, 0}; // Fallback direction
+            return v * glm::inversesqrt(lenSq);
+        }
     }
+
     // -------------------------------------------------------------------------
     // Sphere
     // -------------------------------------------------------------------------
@@ -41,19 +47,18 @@ export namespace Runtime::Geometry
     // -------------------------------------------------------------------------
     glm::vec3 Support(const Capsule& shape, const glm::vec3& direction)
     {
-        auto dir = Internal::Normalize(direction);
         // 1. Find support on the inner segment (Line A-B)
-        float dotA = glm::dot(dir, shape.PointA);
-        float dotB = glm::dot(dir, shape.PointB);
+        float dotA = glm::dot(direction, shape.PointA);
+        float dotB = glm::dot(direction, shape.PointB);
         glm::vec3 segmentSupport = (dotA > dotB) ? shape.PointA : shape.PointB;
 
         // 2. Expand by radius in the dir of the search
         // We must normalize dir to add exactly 'Radius' distance.
         // Guard against zero vector to prevent NaN.
-        float lenSq = glm::length2(dir);
+        float lenSq = glm::length2(direction);
         if (lenSq < 1e-6f) return segmentSupport;
 
-        return segmentSupport + (dir * (shape.Radius * glm::inversesqrt(lenSq)));
+        return segmentSupport + (direction * (shape.Radius * glm::inversesqrt(lenSq)));
     }
 
     // -------------------------------------------------------------------------
