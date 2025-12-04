@@ -6,42 +6,50 @@ module;
 export module Runtime.RHI.Types;
 
 export namespace Runtime::RHI {
+    struct GeometryPipelineSpec {
+        static std::vector<VkVertexInputBindingDescription> GetBindings() {
+            std::vector<VkVertexInputBindingDescription> bindings(3);
 
-    struct Vertex {
-        glm::vec3 pos;
-        glm::vec3 normal;
-        glm::vec2 texCoord;
+            // Binding 0: Positions
+            bindings[0].binding = 0;
+            bindings[0].stride = sizeof(glm::vec3);
+            bindings[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
-        static VkVertexInputBindingDescription GetBindingDescription() {
-            VkVertexInputBindingDescription bindingDescription{};
-            bindingDescription.binding = 0;
-            bindingDescription.stride = sizeof(Vertex);
-            bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-            return bindingDescription;
+            // Binding 1: Normals
+            bindings[1].binding = 1;
+            bindings[1].stride = sizeof(glm::vec3);
+            bindings[1].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+            // Binding 2: Aux (Vec4)
+            bindings[2].binding = 2;
+            bindings[2].stride = sizeof(glm::vec4);
+            bindings[2].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+            return bindings;
         }
 
-        static std::vector<VkVertexInputAttributeDescription> GetAttributeDescriptions() {
-            std::vector<VkVertexInputAttributeDescription> attributeDescriptions(3);
+        static std::vector<VkVertexInputAttributeDescription> GetAttributes() {
+            std::vector<VkVertexInputAttributeDescription> attributes(3);
 
-            // 0: Pos (vec3)
-            attributeDescriptions[0].binding = 0;
-            attributeDescriptions[0].location = 0;
-            attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-            attributeDescriptions[0].offset = offsetof(Vertex, pos);
+            // Location 0: Position
+            attributes[0].binding = 0;
+            attributes[0].location = 0;
+            attributes[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+            attributes[0].offset = 0;
 
-            // 1: Color (vec3)
-            attributeDescriptions[1].binding = 0;
-            attributeDescriptions[1].location = 1;
-            attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-            attributeDescriptions[1].offset = offsetof(Vertex, normal);
+            // Location 1: Normal
+            attributes[1].binding = 1;
+            attributes[1].location = 1;
+            attributes[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+            attributes[1].offset = 0;
 
-            // 2: TexCoord (vec2)
-            attributeDescriptions[2].binding = 0;
-            attributeDescriptions[2].location = 2;
-            attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
-            attributeDescriptions[2].offset = offsetof(Vertex, texCoord);
+            // Location 2: Aux (UV + Extra)
+            attributes[2].binding = 2;
+            attributes[2].location = 2;
+            attributes[2].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+            attributes[2].offset = 0;
 
-            return attributeDescriptions;
+            return attributes;
         }
     };
 

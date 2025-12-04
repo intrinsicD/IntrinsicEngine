@@ -5,7 +5,6 @@ module;
 export module Runtime.Graphics.ModelLoader;
 
 import Runtime.Graphics.Model;
-import Runtime.Graphics.Mesh;
 import Runtime.RHI.Device;
 
 export namespace Runtime::Graphics {

@@ -21,7 +21,7 @@ import Runtime.RHI.Buffer;
 import Runtime.RHI.Texture;
 import Runtime.Graphics.RenderSystem;
 import Runtime.Graphics.Material;
-import Runtime.Graphics.Mesh;
+import Runtime.Graphics.Geometry;
 import Runtime.ECS.Scene;
 
 export namespace Runtime
@@ -78,7 +78,7 @@ export namespace Runtime
         std::unique_ptr<RHI::GraphicsPipeline> m_Pipeline;
 
         std::vector<std::shared_ptr<Graphics::Material>> m_LoadedMaterials;
-        std::vector<std::shared_ptr<Graphics::Mesh>> m_Meshes;
+        std::vector<std::shared_ptr<Graphics::GeometryGpuData>> m_LoadedGeometries;
 
         bool m_Running = true;
         bool m_FramebufferResized = false;

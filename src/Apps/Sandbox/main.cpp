@@ -14,6 +14,7 @@ import Runtime.Engine;
 import Core.Logging;
 import Core.Input;
 import Core.Assets;
+import Runtime.Graphics.Geometry;
 import Runtime.Graphics.Model;
 import Runtime.Graphics.Material;
 import Runtime.Graphics.RenderSystem;
@@ -140,7 +141,7 @@ public:
                     t.Scale = glm::vec3(0.01f);
 
                     auto& mr = m_Scene.GetRegistry().emplace<ECS::MeshRendererComponent>(e);
-                    mr.MeshRef = model->Meshes[0];
+                    mr.GeometryRef = model->Meshes[0];
                     mr.MaterialRef = m_DuckMaterial; // Assign material with handle
 
                     m_IsEntitySpawned = true;

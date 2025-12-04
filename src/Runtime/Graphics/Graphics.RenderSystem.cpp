@@ -136,7 +136,8 @@ namespace Runtime::Graphics
                                                            ECS::TransformComponent, ECS::MeshRendererComponent>();
                                                        for (auto [entity, transform, renderable] : view.each())
                                                        {
-                                                           if (!renderable.MeshRef || !renderable.MaterialRef) continue;
+                                                           if (!renderable.GeometryRef || !renderable.MaterialRef)
+                                                               continue;
 
                                                            VkDescriptorSet sets[] = {
                                                                renderable.MaterialRef->GetDescriptorSet()
@@ -161,16 +162,36 @@ namespace Runtime::Graphics
                                                                cmd, m_Pipeline.GetLayout(), VK_SHADER_STAGE_VERTEX_BIT,
                                                                0, sizeof(push), &push);
 
+
+                                                           auto* geo = renderable.GeometryRef.get();
+                                                           auto* vBuf = geo->GetVertexBuffer()->GetHandle();
+                                                           const auto& layout = geo->GetLayout();
+
                                                            VkBuffer vBuffers[] = {
-                                                               renderable.MeshRef->GetVertexBuffer()->GetHandle()
+                                                               vBuf, vBuf, vBuf
                                                            };
-                                                           VkDeviceSize offsets[] = {0};
-                                                           vkCmdBindVertexBuffers(cmd, 0, 1, vBuffers, offsets);
-                                                           vkCmdBindIndexBuffer(
-                                                               cmd, renderable.MeshRef->GetIndexBuffer()->GetHandle(),
-                                                               0, VK_INDEX_TYPE_UINT32);
-                                                           vkCmdDrawIndexed(
-                                                               cmd, renderable.MeshRef->GetIndexCount(), 1, 0, 0, 0);
+                                                           VkDeviceSize offsets[] = {
+                                                               layout.PositionsOffset,
+                                                               layout.NormalsOffset,
+                                                               layout.AuxOffset
+                                                           };
+                                                           vkCmdBindVertexBuffers(cmd, 0, 3, vBuffers, offsets);
+
+                                                           if (geo->GetIndexCount() > 0)
+                                                           {
+                                                               vkCmdBindIndexBuffer(
+                                                                   cmd, geo->GetIndexBuffer()->GetHandle(), 0,
+                                                                   VK_INDEX_TYPE_UINT32);
+                                                               vkCmdDrawIndexed(cmd, geo->GetIndexCount(), 1, 0, 0, 0);
+                                                           }
+                                                           else
+                                                           {
+                                                               // Point cloud support (non-indexed)
+                                                               // Assume vertex count is positions size / stride
+                                                               uint32_t vertCount = static_cast<uint32_t>(layout.
+                                                                   PositionsSize / sizeof(glm::vec3));
+                                                               vkCmdDraw(cmd, vertCount, 1, 0, 0);
+                                                           }
                                                        }
                                                    }
             );

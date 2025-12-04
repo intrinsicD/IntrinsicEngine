@@ -6,6 +6,7 @@ module;
 module Runtime.RHI.Pipeline;
 import Runtime.RHI.Types;
 import Runtime.RHI.Image;
+import Runtime.Graphics.Geometry;
 import Core.Logging;
 
 namespace Runtime::RHI {
@@ -49,13 +50,13 @@ namespace Runtime::RHI {
         };
 
         // 2. Vertex Input (Empty for now!)
-        auto bindingDescription = Vertex::GetBindingDescription();
-        auto attributeDescriptions = Vertex::GetAttributeDescriptions();
+        auto bindingDescriptions = GeometryPipelineSpec::GetBindings();
+        auto attributeDescriptions = GeometryPipelineSpec::GetAttributes();
 
         VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
         vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-        vertexInputInfo.vertexBindingDescriptionCount = 1;
-        vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
+        vertexInputInfo.vertexBindingDescriptionCount = static_cast<uint32_t>(bindingDescriptions.size());
+        vertexInputInfo.pVertexBindingDescriptions = bindingDescriptions.data();
         vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
         vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
 

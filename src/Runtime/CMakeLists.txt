@@ -25,8 +25,8 @@ target_sources(${target_name}
         ECS/ECS.Components.cppm
         ECS/ECS.Scene.cppm
         Graphics/Graphics.Material.cppm
-        Graphics/Graphics.Mesh.cppm
         Graphics/Graphics.Model.cppm
+        Graphics/Graphics.Geometry.cppm
         Graphics/Graphics.RenderSystem.cppm
         Graphics/Graphics.ModelLoader.cppm
         Graphics/Graphics.Camera.cppm
@@ -56,8 +56,8 @@ target_sources(${target_name}
         RHI/RHI.Image.cpp
         RHI/RHI.Texture.cpp
         Graphics/Graphics.Material.cpp
-        Graphics/Graphics.Mesh.cpp
         Graphics/Graphics.RenderSystem.cpp
+        Graphics/Graphics.Geometry.cpp
         Graphics/Graphics.ModelLoader.cpp
         Graphics/Graphics.TinyGltf.cpp
         RenderGraph/RenderGraph.cpp

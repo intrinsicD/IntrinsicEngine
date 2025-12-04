@@ -6,6 +6,7 @@ add_executable(${target_name}
         Test_CoreMemory.cpp
         Test_CoreTasks.cpp
         Test_CoreAssets.cpp
+        Test_GraphicsGeometry.cpp
         Test_RuntimeGeometry_Contact.cpp
         Test_RuntimeGeometry_Containment.cpp
         Test_RuntimeGeometry_Overlap.cpp

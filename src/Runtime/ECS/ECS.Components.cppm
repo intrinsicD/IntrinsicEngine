@@ -7,8 +7,8 @@ module;
 export module Runtime.ECS.Components;
 
 import Runtime.RHI.Buffer;
-import Runtime.Graphics.Mesh;
 import Runtime.Graphics.Material;
+import Runtime.Graphics.Geometry;
 
 export namespace Runtime::ECS
 {
@@ -53,9 +53,8 @@ export namespace Runtime::ECS
         }
     };
 
-    struct MeshRendererComponent
-    {
-        std::shared_ptr<Graphics::Mesh> MeshRef;
+    struct MeshRendererComponent {
+        std::shared_ptr<Graphics::GeometryGpuData> GeometryRef; // Renamed from MeshRef
         std::shared_ptr<Graphics::Material> MaterialRef;
     };
 }

@@ -10,6 +10,7 @@ module Runtime.Graphics.ModelLoader;
 import Core.Logging;
 import Core.Filesystem;
 import Runtime.RHI.Types;
+import Runtime.Graphics.Geometry;
 
 namespace Runtime::Graphics
 {
@@ -38,114 +39,82 @@ namespace Runtime::Graphics
 
         auto resultModel = std::make_shared<Model>();
 
-        // Iterate over all meshes in the file
         for (const auto& gltfMesh : model.meshes)
         {
-            // Iterate over primitives (sub-meshes)
             for (const auto& primitive : gltfMesh.primitives)
             {
-                // We only support triangles
-                if (primitive.mode != TINYGLTF_MODE_TRIANGLES) continue;
+                GeometryCpuData cpuData;
 
-                std::vector<RHI::Vertex> vertices;
-                std::vector<uint32_t> indices;
-
-                // --- 1. Get Attributes (Pos, Normal, UV) ---
+                // --- 1. Accessors ---
                 const float* positionBuffer = nullptr;
                 const float* normalsBuffer = nullptr;
                 const float* texCoordsBuffer = nullptr;
                 size_t vertexCount = 0;
 
-                // Positions
-                if (primitive.attributes.find("POSITION") != primitive.attributes.end())
+                // Helper to get buffer pointer
+                auto GetBuffer = [&](const char* attrName) -> const float* {
+                    if (primitive.attributes.find(attrName) == primitive.attributes.end()) return nullptr;
+                    const auto& accessor = model.accessors[primitive.attributes.at(attrName)];
+                    const auto& view = model.bufferViews[accessor.bufferView];
+                    vertexCount = accessor.count; // Assume synced counts
+                    return reinterpret_cast<const float*>(&model.buffers[view.buffer].data[view.byteOffset + accessor.byteOffset]);
+                };
+
+                positionBuffer = GetBuffer("POSITION");
+                normalsBuffer = GetBuffer("NORMAL");
+                texCoordsBuffer = GetBuffer("TEXCOORD_0");
+
+                if (!positionBuffer) continue;
+
+                // --- 2. Populate Vectors (SoA) ---
+                cpuData.Positions.resize(vertexCount);
+                cpuData.Normals.resize(vertexCount);
+                cpuData.Aux.resize(vertexCount);
+
+                // Bulk Copy if possible, or loop for safety/swizzling
+                for (size_t i = 0; i < vertexCount; i++)
                 {
-                    const tinygltf::Accessor& accessor = model.accessors[primitive.attributes.at("POSITION")];
-                    const tinygltf::BufferView& bufferView = model.bufferViews[accessor.bufferView];
-                    const tinygltf::Buffer& buffer = model.buffers[bufferView.buffer];
-                    positionBuffer = reinterpret_cast<const float*>(&buffer.data[bufferView.byteOffset + accessor.
-                        byteOffset]);
-                    vertexCount = accessor.count;
-                }
+                    // Positions
+                    cpuData.Positions[i] = glm::make_vec3(&positionBuffer[i * 3]);
 
-                // Normals
-                if (primitive.attributes.find("NORMAL") != primitive.attributes.end())
-                {
-                    const tinygltf::Accessor& accessor = model.accessors[primitive.attributes.at("NORMAL")];
-                    const tinygltf::BufferView& bufferView = model.bufferViews[accessor.bufferView];
-                    const tinygltf::Buffer& buffer = model.buffers[bufferView.buffer];
-                    normalsBuffer = reinterpret_cast<const float*>(&buffer.data[bufferView.byteOffset + accessor.
-                        byteOffset]);
-                }
+                    // Normals (Default up if missing)
+                    if (normalsBuffer) cpuData.Normals[i] = glm::make_vec3(&normalsBuffer[i * 3]);
+                    else cpuData.Normals[i] = glm::vec3(0, 1, 0);
 
-                // TexCoords
-                if (primitive.attributes.find("TEXCOORD_0") != primitive.attributes.end())
-                {
-                    const tinygltf::Accessor& accessor = model.accessors[primitive.attributes.at("TEXCOORD_0")];
-                    const tinygltf::BufferView& bufferView = model.bufferViews[accessor.bufferView];
-                    const tinygltf::Buffer& buffer = model.buffers[bufferView.buffer];
-                    texCoordsBuffer = reinterpret_cast<const float*>(&buffer.data[bufferView.byteOffset + accessor.
-                        byteOffset]);
-                }
-
-                // Assemble Vertices
-                for (size_t v = 0; v < vertexCount; v++)
-                {
-                    RHI::Vertex vertex{};
-
-                    if (positionBuffer)
-                    {
-                        vertex.pos = glm::make_vec3(&positionBuffer[v * 3]);
-                    }
-
-                    if (normalsBuffer)
-                    {
-                        vertex.normal = glm::make_vec3(&normalsBuffer[v * 3]);
-                    }
-                    else
-                    {
-                        vertex.normal = glm::vec3(0.0f, 1.0f, 0.0f); // Default up
-                    }
-
-                    if (texCoordsBuffer)
-                    {
-                        vertex.texCoord = glm::make_vec2(&texCoordsBuffer[v * 2]);
-                    }
-
-                    vertices.push_back(vertex);
-                }
-
-                // --- 2. Get Indices ---
-                if (primitive.indices >= 0)
-                {
-                    const tinygltf::Accessor& accessor = model.accessors[primitive.indices];
-                    const tinygltf::BufferView& bufferView = model.bufferViews[accessor.bufferView];
-                    const tinygltf::Buffer& buffer = model.buffers[bufferView.buffer];
-
-                    const void* dataPtr = &buffer.data[bufferView.byteOffset + accessor.byteOffset];
-
-                    if (accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT)
-                    {
-                        const uint32_t* buf = static_cast<const uint32_t*>(dataPtr);
-                        for (size_t i = 0; i < accessor.count; i++) indices.push_back(buf[i]);
-                    }
-                    else if (accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT)
-                    {
-                        const uint16_t* buf = static_cast<const uint16_t*>(dataPtr);
-                        for (size_t i = 0; i < accessor.count; i++) indices.push_back(buf[i]);
-                    }
-                    else if (accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE)
-                    {
-                        const uint8_t* buf = static_cast<const uint8_t*>(dataPtr);
-                        for (size_t i = 0; i < accessor.count; i++) indices.push_back(buf[i]);
+                    // Aux (UV in xy, zw unused for now)
+                    if (texCoordsBuffer) {
+                        glm::vec2 uv = glm::make_vec2(&texCoordsBuffer[i * 2]);
+                        cpuData.Aux[i] = glm::vec4(uv.x, uv.y, 0.0f, 0.0f);
+                    } else {
+                        cpuData.Aux[i] = glm::vec4(0.0f);
                     }
                 }
 
-                // Create Mesh
-                resultModel->Meshes.push_back(std::make_shared<Mesh>(device, vertices, indices));
+                // --- 3. Indices ---
+                if (primitive.indices >= 0) {
+                     const auto& accessor = model.accessors[primitive.indices];
+                     const auto& view = model.bufferViews[accessor.bufferView];
+                     const auto& buffer = model.buffers[view.buffer];
+                     const uint8_t* data = &buffer.data[view.byteOffset + accessor.byteOffset];
+
+                     if (accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT) {
+                         const uint32_t* buf = reinterpret_cast<const uint32_t*>(data);
+                         cpuData.Indices.assign(buf, buf + accessor.count);
+                     } else if (accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) {
+                         const uint16_t* buf = reinterpret_cast<const uint16_t*>(data);
+                         for(size_t i=0; i<accessor.count; ++i) cpuData.Indices.push_back(buf[i]);
+                     } else if (accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE) {
+                         const uint8_t* buf = reinterpret_cast<const uint8_t*>(data);
+                         for(size_t i=0; i<accessor.count; ++i) cpuData.Indices.push_back(buf[i]);
+                     }
+                }
+
+                // --- 4. Upload ---
+                // Model now needs to hold GeometryGpuData instead of Mesh
+                // We update the Model struct definition in step F.
+                resultModel->Meshes.push_back(std::make_shared<GeometryGpuData>(device, cpuData.ToUploadRequest()));
             }
         }
-
-        Core::Log::Info("Loaded GLTF: {} with {} meshes", filepath, resultModel->Size());
         return resultModel;
     }
 }

@@ -4,7 +4,7 @@ module;
 
 export module Runtime.Graphics.Model;
 
-import Runtime.Graphics.Mesh;
+import Runtime.Graphics.Geometry;
 import Runtime.Graphics.Material; // Optional, if we want to store materials here later
 
 export namespace Runtime::Graphics
@@ -12,7 +12,7 @@ export namespace Runtime::Graphics
     struct Model
     {
         // The individual parts of the model (primitives)
-        std::vector<std::shared_ptr<Mesh>> Meshes;
+        std::vector<std::shared_ptr<GeometryGpuData>> Meshes;
 
         // Helper to check if loaded
         [[nodiscard]] bool IsValid() const { return !Meshes.empty(); }

@@ -232,7 +232,7 @@ namespace Runtime
                 if (i == 0)
                 {
                     auto& mr = m_Scene.GetRegistry().emplace<ECS::MeshRendererComponent>(entity);
-                    mr.MeshRef = model->Meshes[i];
+                    mr.GeometryRef = model->Meshes[i];
                     mr.MaterialRef = defaultMat;
                 }
                 else
@@ -243,7 +243,7 @@ namespace Runtime
                     // In a real loader, we would apply local transforms from GLTF nodes here
 
                     auto& cmr = m_Scene.GetRegistry().emplace<ECS::MeshRendererComponent>(child);
-                    cmr.MeshRef = model->Meshes[i];
+                    cmr.GeometryRef = model->Meshes[i];
                     cmr.MaterialRef = defaultMat;
                 }
             }
