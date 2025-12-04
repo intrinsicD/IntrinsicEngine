@@ -53,9 +53,9 @@ export namespace Runtime
         Core::Assets::AssetManager m_AssetManager;
         Core::Memory::LinearArena m_FrameArena; // 1 MB per frame
         std::unique_ptr<Graphics::RenderSystem> m_RenderSystem;
-        std::shared_ptr<RHI::VulkanDevice> m_Device;
 
-        std::shared_ptr<RHI::Texture> m_DefaultTexture;
+
+
 
         // Helper to access the camera buffer (Temporary until we have a Camera Component)
         [[nodiscard]] RHI::VulkanBuffer* GetGlobalUBO() const { return m_RenderSystem->GetGlobalUBO(); }
@@ -69,6 +69,7 @@ export namespace Runtime
     protected:
         std::unique_ptr<Core::Windowing::Window> m_Window;
         std::unique_ptr<RHI::VulkanContext> m_Context;
+        std::shared_ptr<RHI::VulkanDevice> m_Device;
         VkSurfaceKHR m_Surface = VK_NULL_HANDLE;
 
         std::unique_ptr<RHI::VulkanSwapchain> m_Swapchain;
@@ -77,6 +78,7 @@ export namespace Runtime
         std::unique_ptr<RHI::DescriptorPool> m_DescriptorPool;
         std::unique_ptr<RHI::GraphicsPipeline> m_Pipeline;
 
+        std::shared_ptr<RHI::Texture> m_DefaultTexture;
         std::vector<std::shared_ptr<Graphics::Material>> m_LoadedMaterials;
         std::vector<std::shared_ptr<Graphics::GeometryGpuData>> m_LoadedGeometries;
 

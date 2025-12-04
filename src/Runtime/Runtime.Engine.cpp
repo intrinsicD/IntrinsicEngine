@@ -7,6 +7,7 @@ module;
 #include <cctype>    // for std::tolower
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
+#include <entt/fwd.hpp>
 #include "RHI/RHI.Vulkan.hpp"
 
 module Runtime.Engine;
@@ -112,9 +113,13 @@ namespace Runtime
         // Order matters!
         Interface::GUI::Shutdown();
         Core::Tasks::Scheduler::Shutdown();
+
         m_Scene.GetRegistry().clear();
         m_AssetManager.Clear();
         m_DefaultTexture.reset();
+
+        m_LoadedMaterials.clear();
+        m_LoadedGeometries.clear();
 
         m_RenderSystem.reset();
         m_Pipeline.reset();
@@ -154,15 +159,13 @@ namespace Runtime
         std::filesystem::path assetDir = std::filesystem::canonical("assets/", ec);
         if (ec)
         {
-            Core::Log::Error("Assets directory not found or inaccessible");
-            return;
+            Core::Log::Warn("Assets directory not found or inaccessible");
         }
 
         auto relativePath = canonical.lexically_relative(assetDir);
         if (relativePath.empty() || relativePath.native().starts_with(".."))
         {
-            Core::Log::Error("Dropped file is outside of assets directory: {}", path);
-            return;
+            Core::Log::Warn("Dropped file is outside of assets directory: {}", path);
         }
 
         std::string ext = fsPath.extension().string();
@@ -171,87 +174,72 @@ namespace Runtime
         std::transform(ext.begin(), ext.end(), ext.begin(),
                        [](unsigned char c) { return std::tolower(c); });
 
-        if (ext == ".gltf" || ext == ".glb")
-        {
-            Core::Log::Info("Drop Detected: Loading Model {}", path);
+        bool isModel = (ext == ".gltf" || ext == ".glb" ||
+            ext == ".obj" || ext == ".ply" ||
+            ext == ".xyz" || ext == ".pcd" ||
+            ext == ".tgf");
 
-            // TODO: Move this to Async Task Graph to prevent frame freeze
+        if (isModel)
+        {
+            Core::Log::Info("Loading Model: {}", path);
+
+            // TODO: Move to Async Task
             auto model = Graphics::ModelLoader::Load(GetDevice(), path);
 
-            if (model->Meshes.empty())
+            if (!model || !model->IsValid())
             {
-                Core::Log::Error("Failed to load model or model was empty.");
+                Core::Log::Error("Failed to load model: {}", path);
                 return;
             }
 
-            // --- MATERIAL & ASSET LOGIC START ---
+            // --- Setup Default Material ---
+            auto textureLoader = [&](const std::string& p) { return std::make_shared<RHI::Texture>(GetDevice(), p); };
+            auto texHandle = m_AssetManager.Load<RHI::Texture>("assets/textures/Parameterization.jpg", textureLoader);
 
-            // 1. Define Texture Loader
-            // This lambda creates the actual RHI::Texture when the AssetTask runs.
-            auto textureLoader = [&](const std::string& path)
-            {
-                return std::make_shared<RHI::Texture>(GetDevice(), path);
-            };
-
-            // 2. Load the Fallback Texture (Parameterization.png)
-            // We use the AssetManager. If it's already loaded, we get the handle immediately.
-            auto texHandle = m_AssetManager.Load<RHI::Texture>("assets/textures/Parameterization.png", textureLoader);
-
-            // 3. Create the Default Material
-            // We now pass the AssetHandle instead of a raw string path.
             auto defaultMat = std::make_shared<Graphics::Material>(
-                GetDevice(),
-                GetDescriptorPool(),
-                GetDescriptorLayout(),
-                texHandle,
-                m_DefaultTexture, // <--- New Argument
-                m_AssetManager // <--- New Argument
+                GetDevice(), GetDescriptorPool(), GetDescriptorLayout(),
+                texHandle, m_DefaultTexture, m_AssetManager
             );
-
-            // 4. Request Descriptor Write
-            // The material will wait until texHandle is 'Ready' inside RenderSystem::OnUpdate
             defaultMat->WriteDescriptor(GetGlobalUBO()->GetHandle(), sizeof(RHI::CameraBufferObject));
-
             m_LoadedMaterials.push_back(defaultMat);
 
-            // --- MATERIAL & ASSET LOGIC END ---
+            // --- Spawn Entity ---
+            std::string entityName = fsPath.stem().string();
 
-            // Create Entity
-            auto entity = m_Scene.CreateEntity(fsPath.stem().string());
+            // Create a Parent Entity if multiple meshes, or just one if single
+            entt::entity rootEntity = m_Scene.CreateEntity(entityName);
 
-            auto& t = m_Scene.GetRegistry().get<ECS::TransformComponent>(entity);
+            // Setup Transform for Root
+            auto& t = m_Scene.GetRegistry().get<ECS::TransformComponent>(rootEntity);
             t.Scale = glm::vec3(1.0f);
-            t.Position = glm::vec3(0.0f, 0.0f, 0.0f); // Reset position
 
-            // If we loaded multiple meshes (submeshes), we might need multiple entities
-            // For simplicity here, we attach the first mesh to the entity.
-            // A better approach is to create children entities for each mesh.
+            // If it's a point cloud, we might want to scale it differently or center it?
+            // For now, keep at origin.
 
             for (size_t i = 0; i < model->Size(); i++)
             {
-                if (i == 0)
-                {
-                    auto& mr = m_Scene.GetRegistry().emplace<ECS::MeshRendererComponent>(entity);
-                    mr.GeometryRef = model->Meshes[i];
-                    mr.MaterialRef = defaultMat;
-                }
-                else
-                {
-                    // Create child entities for submeshes
-                    auto child = m_Scene.CreateEntity(fsPath.stem().string() + "_" + std::to_string(i));
-                    //auto& ct = m_Scene.GetRegistry().get<ECS::TransformComponent>(child);
-                    // In a real loader, we would apply local transforms from GLTF nodes here
+                // Store in engine cache to keep alive (optional, shared_ptr handles this mostly via components)
+                m_LoadedGeometries.push_back(model->Meshes[i]);
 
-                    auto& cmr = m_Scene.GetRegistry().emplace<ECS::MeshRendererComponent>(child);
-                    cmr.GeometryRef = model->Meshes[i];
-                    cmr.MaterialRef = defaultMat;
+                entt::entity targetEntity = rootEntity;
+
+                // If multi-mesh, create children (simple hierarchy simulation)
+                if (model->Size() > 1)
+                {
+                    targetEntity = m_Scene.CreateEntity(entityName + "_" + std::to_string(i));
+                    // TODO: Parenting system
                 }
+
+                auto& mr = m_Scene.GetRegistry().emplace<ECS::MeshRendererComponent>(targetEntity);
+                mr.GeometryRef = model->Meshes[i]; // <--- USING NEW FIELD
+                mr.MaterialRef = defaultMat;
             }
-            Core::Log::Info("Model instantiated into Scene.");
+
+            Core::Log::Info("Successfully spawned: {}", entityName);
         }
         else
         {
-            Core::Log::Warn("Unsupported file extension dropped: {}", ext);
+            Core::Log::Warn("Unsupported file extension: {}", ext);
         }
     }
 
@@ -280,7 +268,11 @@ namespace Runtime
         {
             m_FrameArena.Reset();
             m_Window->OnUpdate();
-            if (m_FramebufferResized) { m_Renderer->OnResize(); m_FramebufferResized = false; }
+            if (m_FramebufferResized)
+            {
+                m_Renderer->OnResize();
+                m_FramebufferResized = false;
+            }
 
             auto currentTime = std::chrono::high_resolution_clock::now();
             float dt = std::chrono::duration<float>(currentTime - lastTime).count();

@@ -12,6 +12,7 @@ import Runtime.RHI.Buffer;
 import Runtime.ECS.Scene;
 import Runtime.RenderGraph;
 import Runtime.Graphics.Camera;
+import Runtime.Graphics.Geometry;
 import Core.Memory;
 import Core.Assets;
 

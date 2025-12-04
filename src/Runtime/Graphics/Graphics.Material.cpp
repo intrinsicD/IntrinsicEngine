@@ -42,6 +42,8 @@ namespace Runtime::Graphics {
 
     void Material::UpdateImageWrite(const RHI::Texture& texture)
     {
+        vkDeviceWaitIdle(m_Device->GetLogicalDevice());
+
         VkDescriptorImageInfo imageInfo{};
         imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         imageInfo.imageView = texture.GetView();

@@ -177,6 +177,20 @@ namespace Runtime::Graphics
                                                            };
                                                            vkCmdBindVertexBuffers(cmd, 0, 3, vBuffers, offsets);
 
+                                                           VkPrimitiveTopology vkTopo =
+                                                               VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+                                                           switch (geo->GetTopology())
+                                                           {
+                                                           case PrimitiveTopology::Lines: vkTopo =
+                                                                   VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
+                                                               break;
+                                                           case PrimitiveTopology::Points: vkTopo =
+                                                                   VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+                                                               break;
+                                                           default: break;
+                                                           }
+                                                           vkCmdSetPrimitiveTopology(cmd, vkTopo);
+
                                                            if (geo->GetIndexCount() > 0)
                                                            {
                                                                vkCmdBindIndexBuffer(

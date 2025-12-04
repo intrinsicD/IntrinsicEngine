@@ -123,11 +123,16 @@ namespace Runtime::RHI
         VkPhysicalDeviceFeatures deviceFeatures{};
         deviceFeatures.samplerAnisotropy = VK_TRUE; // Usually desired
 
+        VkPhysicalDeviceExtendedDynamicStateFeaturesEXT dynamicStateFeatures{};
+        dynamicStateFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT;
+        dynamicStateFeatures.extendedDynamicState = VK_TRUE;
+
         // Enable Dynamic Rendering (Vulkan 1.3 Core)
         VkPhysicalDeviceVulkan13Features features13{};
         features13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
         features13.dynamicRendering = VK_TRUE;
         features13.synchronization2 = VK_TRUE;
+        features13.pNext = &dynamicStateFeatures;
 
         VkPhysicalDeviceFeatures2 deviceFeatures2{};
         deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;

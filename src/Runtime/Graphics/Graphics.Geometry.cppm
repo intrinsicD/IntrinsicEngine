@@ -15,12 +15,20 @@ export namespace Runtime::Graphics
 {
     // --- Data Structures ---
 
+    enum class PrimitiveTopology
+    {
+        Triangles,
+        Lines,
+        Points
+    };
+
     struct GeometryUploadRequest
     {
         std::span<const glm::vec3> Positions;
         std::span<const glm::vec3> Normals;
         std::span<const glm::vec4> Aux; // UVs packed in xy, Color/Data in zw
         std::span<const uint32_t> Indices;
+        PrimitiveTopology Topology = PrimitiveTopology::Triangles;
     };
 
     struct GeometryCpuData
@@ -29,10 +37,11 @@ export namespace Runtime::Graphics
         std::vector<glm::vec3> Normals;
         std::vector<glm::vec4> Aux;
         std::vector<uint32_t> Indices;
+        PrimitiveTopology Topology = PrimitiveTopology::Triangles;
 
         [[nodiscard]] GeometryUploadRequest ToUploadRequest() const
         {
-            return {Positions, Normals, Aux, Indices};
+            return {Positions, Normals, Aux, Indices, Topology};
         }
     };
 
@@ -46,6 +55,7 @@ export namespace Runtime::Graphics
 
         VkDeviceSize AuxOffset = 0;
         VkDeviceSize AuxSize = 0;
+        PrimitiveTopology Topology = PrimitiveTopology::Triangles;
     };
 
     // --- The GPU Resource ---
@@ -60,7 +70,7 @@ export namespace Runtime::Graphics
         [[nodiscard]] RHI::VulkanBuffer* GetIndexBuffer() const { return m_IndexBuffer.get(); }
         [[nodiscard]] uint32_t GetIndexCount() const { return m_IndexCount; }
         [[nodiscard]] const GeometryBufferLayout& GetLayout() const { return m_Layout; }
-
+        [[nodiscard]] PrimitiveTopology GetTopology() const { return m_Layout.Topology; }
     private:
         std::unique_ptr<RHI::VulkanBuffer> m_VertexBuffer;
         std::unique_ptr<RHI::VulkanBuffer> m_IndexBuffer;
