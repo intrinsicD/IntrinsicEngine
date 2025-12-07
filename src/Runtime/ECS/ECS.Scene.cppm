@@ -23,6 +23,8 @@ export namespace Runtime::ECS
 
         entt::registry& GetRegistry() { return m_Registry; }
 
+        [[nodiscard]] size_t Size() const { return m_Registry.storage<entt::entity>()->size(); }
+
     private:
         entt::registry m_Registry;
     };

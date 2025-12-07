@@ -1,6 +1,6 @@
 module;
 #include <functional>
-
+#include <glm/glm.hpp>
 #include "RHI/RHI.Vulkan.hpp" // For VkCommandBuffer
 
 export module Runtime.Interface.GUI;
@@ -42,4 +42,6 @@ export namespace Runtime::Interface::GUI
 
     // Returns true if ImGui is using the keyboard (typing in a text box)
     [[nodiscard]] bool WantCaptureKeyboard();
+
+    bool DrawVec3Control(const std::string& label, glm::vec3& values, float resetValue = 0.0f, float columnWidth = 100.0f);
 }

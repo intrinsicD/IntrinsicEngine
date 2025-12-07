@@ -5,7 +5,9 @@ module;
 
 #include "RHI/RHI.Vulkan.hpp"
 
+#include <glm/glm.hpp>
 #include <imgui.h>
+#include <imgui_internal.h>
 #include <backends/imgui_impl_glfw.h>
 #include <backends/imgui_impl_vulkan.h>
 #include <GLFW/glfw3.h> // Required for glfwGetInstanceProcAddress
@@ -277,5 +279,52 @@ namespace Runtime::Interface::GUI
     bool WantCaptureKeyboard()
     {
         return ImGui::GetIO().WantCaptureKeyboard;
+    }
+
+    bool DrawVec3Control(const std::string& label, glm::vec3& values, float resetValue, float columnWidth)
+    {
+        bool changed = false;
+        ImGui::PushID(label.c_str());
+
+        // Simple columns layout
+        ImGui::Columns(2);
+        ImGui::SetColumnWidth(0, columnWidth);
+
+        ImGui::Text("%s", label.c_str());
+        ImGui::NextColumn();
+
+        // 3 floats
+        ImGui::PushMultiItemsWidths(3, ImGui::CalcItemWidth());
+
+        // X
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0.8f, 0.1f, 0.15f, 1.0f});
+        if (ImGui::Button("X")) { values.x = resetValue; changed = true; }
+        ImGui::PopStyleColor();
+        ImGui::SameLine();
+        if (ImGui::DragFloat("##X", &values.x, 0.1f, 0.0f, 0.0f, "%.2f")) changed = true;
+        ImGui::PopItemWidth();
+        ImGui::SameLine();
+
+        // Y
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0.2f, 0.7f, 0.2f, 1.0f});
+        if (ImGui::Button("Y")) { values.y = resetValue; changed = true; }
+        ImGui::PopStyleColor();
+        ImGui::SameLine();
+        if (ImGui::DragFloat("##Y", &values.y, 0.1f, 0.0f, 0.0f, "%.2f")) changed = true;
+        ImGui::PopItemWidth();
+        ImGui::SameLine();
+
+        // Z
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0.1f, 0.25f, 0.8f, 1.0f});
+        if (ImGui::Button("Z")) { values.z = resetValue; changed = true; }
+        ImGui::PopStyleColor();
+        ImGui::SameLine();
+        if (ImGui::DragFloat("##Z", &values.z, 0.1f, 0.0f, 0.0f, "%.2f")) changed = true;
+        ImGui::PopItemWidth();
+
+        ImGui::Columns(1);
+        ImGui::PopID();
+
+        return changed;
     }
 }
