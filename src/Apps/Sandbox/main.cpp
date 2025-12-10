@@ -38,8 +38,8 @@ public:
     }
 
     // Resources
-    Assets::AssetHandle m_DuckModel;
-    Assets::AssetHandle m_DuckTexture;
+    Assets::AssetHandle m_DuckModel{};
+    Assets::AssetHandle m_DuckTexture{};
 
     std::shared_ptr<Graphics::Material> m_DuckMaterial;
 
@@ -85,41 +85,13 @@ public:
 
         Log::Info("Asset Load Requested. Waiting for background thread...");
 
-        /*Interface::GUI::RegisterPanel("Renderer Stats", [camera = &m_Camera]()
-        {
-            ImGui::Text("Application Average: %.3f ms/frame (%.1f FPS)",
-                        1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-
-            static glm::vec3 sunDir = {1.0, 1.0, 1.0};
-            ImGui::DragFloat3("Sun Direction", &sunDir.x, 0.1f);
-
-            // Camera info
-            ImGui::Separator();
-            glm::vec3 camPos = camera->Position;
-            ImGui::Text("Camera Pos: %.2f, %.2f, %.2f", camPos.x, camPos.y, camPos.z);
-        }, true, ImGuiWindowFlags_AlwaysAutoResize);
-
-        Interface::GUI::RegisterPanel("Inspector", [this]()
-        {
-            // Just the content!
-            if (ImGui::Button("Spawn Duck"))
-            {
-                /* ... #1#
-            }
-
-            auto view = m_Scene.GetRegistry().view<ECS::TagComponent>();
-            for (auto [entity, tag] : view.each())
-            {
-                ImGui::Text("Entity: %s", tag.Name.c_str());
-            }
-        });*/
-
         Interface::GUI::RegisterPanel("Hierarchy", [this]() { DrawHierarchyPanel(); });
         Interface::GUI::RegisterPanel("Inspector", [this]() { DrawInspectorPanel(); });
-        Interface::GUI::RegisterPanel("Stats", [this]() {
-       ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
-       ImGui::Text("Entities: %d", (int)m_Scene.Size());
-  });
+        Interface::GUI::RegisterPanel("Stats", [this]()
+        {
+            ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
+            ImGui::Text("Entities: %d", (int)m_Scene.Size());
+        });
     }
 
     void OnUpdate(float dt) override
@@ -185,37 +157,45 @@ public:
         {
             // Try to get tag, default to "Entity"
             std::string name = "Entity";
-            if (m_Scene.GetRegistry().all_of<ECS::TagComponent>(entityID)) {
+            if (m_Scene.GetRegistry().all_of<ECS::TagComponent>(entityID))
+            {
                 name = m_Scene.GetRegistry().get<ECS::TagComponent>(entityID).Name;
             }
 
             // Selection flags
-            ImGuiTreeNodeFlags flags = ((m_SelectedEntity == entityID) ? ImGuiTreeNodeFlags_Selected : 0) | ImGuiTreeNodeFlags_OpenOnArrow;
+            ImGuiTreeNodeFlags flags = ((m_SelectedEntity == entityID) ? ImGuiTreeNodeFlags_Selected : 0) |
+                ImGuiTreeNodeFlags_OpenOnArrow;
             flags |= ImGuiTreeNodeFlags_SpanAvailWidth;
 
             bool opened = ImGui::TreeNodeEx((void*)(uint64_t)(uint32_t)entityID, flags, "%s", name.c_str());
 
-            if (ImGui::IsItemClicked()) {
+            if (ImGui::IsItemClicked())
+            {
                 m_SelectedEntity = entityID;
             }
 
-            if (opened) {
+            if (opened)
+            {
                 // If we had children, we'd loop here. For now, flat hierarchy.
                 ImGui::TreePop();
             }
         });
 
         // Deselect if clicking in empty space
-        if (ImGui::IsMouseDown(0) && ImGui::IsWindowHovered()) {
+        if (ImGui::IsMouseDown(0) && ImGui::IsWindowHovered())
+        {
             m_SelectedEntity = entt::null;
         }
 
         // Context Menu for creating new entities
-        if (ImGui::BeginPopupContextWindow(0, 1)) {
-            if (ImGui::MenuItem("Create Empty Entity")) {
+        if (ImGui::BeginPopupContextWindow(0, 1))
+        {
+            if (ImGui::MenuItem("Create Empty Entity"))
+            {
                 m_Scene.CreateEntity("Empty Entity");
             }
-            if (ImGui::MenuItem("Remove Entity")) {
+            if (ImGui::MenuItem("Remove Entity"))
+            {
                 m_Scene.GetRegistry().destroy(m_SelectedEntity);
                 m_SelectedEntity = entt::null;
             }
@@ -240,7 +220,8 @@ public:
                 char buffer[256];
                 memset(buffer, 0, sizeof(buffer));
                 strncpy(buffer, tag.Name.c_str(), sizeof(buffer) - 1);
-                if (ImGui::InputText("Name", buffer, sizeof(buffer))) {
+                if (ImGui::InputText("Name", buffer, sizeof(buffer)))
+                {
                     tag.Name = std::string(buffer);
                 }
             }
@@ -258,7 +239,8 @@ public:
 
                     // Convert to degrees for display
                     glm::vec3 rotationDegrees = transform.Rotation;
-                    if (Interface::GUI::DrawVec3Control("Rotation", rotationDegrees)) {
+                    if (Interface::GUI::DrawVec3Control("Rotation", rotationDegrees))
+                    {
                         transform.Rotation = rotationDegrees;
                     }
 
@@ -272,15 +254,20 @@ public:
                 if (ImGui::CollapsingHeader("Mesh Renderer", ImGuiTreeNodeFlags_DefaultOpen))
                 {
                     auto& mr = reg.get<ECS::MeshRendererComponent>(m_SelectedEntity);
-                    if (mr.GeometryRef) {
+                    if (mr.GeometryRef)
+                    {
                         ImGui::Text("Vertices: %u", mr.GeometryRef->GetLayout().PositionsSize / sizeof(glm::vec3));
                         ImGui::Text("Indices: %u", mr.GeometryRef->GetIndexCount());
 
                         std::string topoName = "Unknown";
-                        switch(mr.GeometryRef->GetTopology()) {
-                            case Graphics::PrimitiveTopology::Triangles: topoName = "Triangles"; break;
-                            case Graphics::PrimitiveTopology::Lines: topoName = "Lines"; break;
-                            case Graphics::PrimitiveTopology::Points: topoName = "Points"; break;
+                        switch (mr.GeometryRef->GetTopology())
+                        {
+                        case Graphics::PrimitiveTopology::Triangles: topoName = "Triangles";
+                            break;
+                        case Graphics::PrimitiveTopology::Lines: topoName = "Lines";
+                            break;
+                        case Graphics::PrimitiveTopology::Points: topoName = "Points";
+                            break;
                         }
                         ImGui::Text("Topology: %s", topoName.c_str());
                     }

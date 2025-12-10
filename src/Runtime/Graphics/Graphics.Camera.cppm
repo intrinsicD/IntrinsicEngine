@@ -28,18 +28,6 @@ export namespace Runtime::Graphics
         glm::mat4 ViewMatrix{1.0f};
         glm::mat4 ProjectionMatrix{1.0f};
 
-        void UpdateMatrices()
-        {
-            // View
-            glm::mat4 rotate = glm::toMat4(glm::conjugate(Orientation));
-            glm::mat4 translate = glm::translate(glm::mat4(1.0f), -Position);
-            ViewMatrix = rotate * translate;
-
-            // Projection (Vulkan: Y flipped, Depth 0..1)
-            ProjectionMatrix = glm::perspective(glm::radians(Fov), AspectRatio, Near, Far);
-            ProjectionMatrix[1][1] *= -1;
-        }
-
         [[nodiscard]] glm::vec3 GetForward() const
         {
             return glm::rotate(Orientation, glm::vec3(0.0f, 0.0f, -1.0f));
@@ -55,6 +43,18 @@ export namespace Runtime::Graphics
             return glm::rotate(Orientation, glm::vec3(0.0f, 1.0f, 0.0f));
         }
     };
+
+    void UpdateMatrices(Camera &camera)
+    {
+        // View
+        glm::mat4 rotate = glm::toMat4(glm::conjugate(camera.Orientation));
+        glm::mat4 translate = glm::translate(glm::mat4(1.0f), -camera.Position);
+        camera.ViewMatrix = rotate * translate;
+
+        // Projection (Vulkan: Y flipped, Depth 0..1)
+        camera.ProjectionMatrix = glm::perspective(glm::radians(camera.Fov), camera.AspectRatio, camera.Near, camera.Far);
+        camera.ProjectionMatrix[1][1] *= -1;
+    }
 
     // --- Controllers ---
 
@@ -129,7 +129,7 @@ export namespace Runtime::Graphics
             if (IsKeyPressed(Key::Space)) camera.Position += glm::vec3(0, 1, 0) * velocity;
 
             // 3. Update Matrices
-            camera.UpdateMatrices();
+            UpdateMatrices(camera);
         }
 
     private:
@@ -208,7 +208,7 @@ export namespace Runtime::Graphics
             // Just ensure position is updated based on Target + Rotated Offset
             camera.Position = Target + offset;
 
-            camera.UpdateMatrices();
+            UpdateMatrices(camera);
         }
 
     private:

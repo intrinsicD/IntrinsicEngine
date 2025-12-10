@@ -9,6 +9,8 @@ module;
 
 export module Runtime.Geometry.Primitives;
 
+export import Runtime.Geometry.AABB;
+
 export namespace Runtime::Geometry
 {
     template <typename T>
@@ -21,12 +23,6 @@ export namespace Runtime::Geometry
     {
         glm::vec3 Center;
         float Radius;
-    };
-
-    struct AABB
-    {
-        glm::vec3 Min;
-        glm::vec3 Max;
     };
 
     struct Capsule
