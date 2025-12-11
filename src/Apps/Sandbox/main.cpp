@@ -2,6 +2,7 @@
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
 #include <vector>
 #include <memory>
 #include <imgui.h>
@@ -48,15 +49,18 @@ public:
     entt::entity m_SelectedEntity = entt::null;
 
     // Camera State
-    Graphics::Camera m_Camera;
-    std::unique_ptr<Graphics::CameraController> m_CameraController;
+    entt::entity m_CameraEntity = entt::null;
+    Graphics::CameraComponent m_Camera;
 
     void OnStart() override
     {
         Log::Info("Sandbox Started!");
 
+        m_CameraEntity = m_Scene.CreateEntity("Main Camera");
+        m_Camera = m_Scene.GetRegistry().emplace<Graphics::CameraComponent>(m_CameraEntity);
+        m_Scene.GetRegistry().emplace<Graphics::OrbitControlComponent>(m_CameraEntity);
+
         m_Camera.Position = {0.0f, 0.0f, 4.0f};
-        m_CameraController = std::make_unique<Graphics::OrbitCameraController>();
 
         auto textureLoader = [&](const std::string& path)
         {
@@ -100,15 +104,37 @@ public:
 
         bool uiCapturesMouse = Interface::GUI::WantCaptureMouse();
         bool uiCapturesKeyboard = Interface::GUI::WantCaptureKeyboard();
+        bool inputCaptured = uiCapturesMouse || uiCapturesKeyboard;
 
-        if (m_CameraController)
+        float aspectRatio = (float)m_Window->GetWidth() / (float)m_Window->GetHeight();
+
+        Graphics::CameraComponent* cameraComponent = nullptr;
+        if (m_Scene.GetRegistry().valid(m_CameraEntity))
         {
-            m_CameraController->OnUpdate(m_Camera, dt, uiCapturesMouse);
+            // Check if it has Orbit controls
+            cameraComponent = m_Scene.GetRegistry().try_get<Graphics::CameraComponent>(m_CameraEntity);
+            if (auto* orbit = m_Scene.GetRegistry().try_get<Graphics::OrbitControlComponent>(m_CameraEntity))
+            {
+                Graphics::OnUpdate(*cameraComponent, *orbit, dt, inputCaptured);
+            }
+            // Check if it has Fly controls
+            else if (auto* fly = m_Scene.GetRegistry().try_get<Graphics::FlyControlComponent>(m_CameraEntity))
+            {
+                Graphics::OnUpdate(*cameraComponent, *fly, dt, inputCaptured);
+            }
+
+            if (m_Window->GetWidth() != 0 && m_Window->GetHeight() != 0)
+            {
+                Graphics::OnResize(*cameraComponent, m_Window->GetWidth(), m_Window->GetHeight());
+            }
         }
 
-        if (m_Window->GetWidth() != 0 && m_Window->GetHeight() != 0)
         {
-            m_CameraController->OnResize(m_Camera, m_Window->GetWidth(), m_Window->GetHeight());
+            auto view = m_Scene.GetRegistry().view<Graphics::CameraComponent>();
+            for (auto [entity, cam] : view.each())
+            {
+                Graphics::UpdateMatrices(cam, aspectRatio);
+            }
         }
 
         if (!m_IsEntitySpawned)
@@ -120,10 +146,11 @@ public:
                 {
                     auto e = m_Scene.CreateEntity("Duck");
                     m_SelectedEntity = e;
-                    auto& t = m_Scene.GetRegistry().get<ECS::TransformComponent>(e);
+                    auto& t = m_Scene.GetRegistry().get<ECS::Transform::Component>(e);
                     t.Scale = glm::vec3(0.01f);
+                    m_Scene.GetRegistry().emplace<ECS::Transform::Rotator>(e, ECS::Transform::Rotator::Y());
 
-                    auto& mr = m_Scene.GetRegistry().emplace<ECS::MeshRendererComponent>(e);
+                    auto& mr = m_Scene.GetRegistry().emplace<ECS::MeshRenderer::Component>(e);
                     mr.GeometryRef = model->Meshes[0];
                     mr.MaterialRef = m_DuckMaterial; // Assign material with handle
 
@@ -133,16 +160,20 @@ public:
             }
         }
 
-        // --- Rotate Entities ---
-        auto view = m_Scene.GetRegistry().view<ECS::TransformComponent>();
-        for (auto [entity, transform] : view.each())
         {
-            ECS::TransformRotating rotator;
-            rotator.OnUpdate(transform, dt);
+            // --- Rotate Entities ---
+            auto view = m_Scene.GetRegistry().view<ECS::Transform::Component, ECS::Transform::Rotator>();
+            for (auto [entity, transform, rotator] : view.each())
+            {
+                ECS::Transform::OnUpdate(transform, rotator,dt);
+            }
         }
 
         // Draw
-        m_RenderSystem->OnUpdate(m_Scene, m_Camera);
+        if (cameraComponent != nullptr)
+        {
+            m_RenderSystem->OnUpdate(m_Scene, *cameraComponent);
+        }
     }
 
     void OnRender() override
@@ -157,9 +188,9 @@ public:
         {
             // Try to get tag, default to "Entity"
             std::string name = "Entity";
-            if (m_Scene.GetRegistry().all_of<ECS::TagComponent>(entityID))
+            if (m_Scene.GetRegistry().all_of<ECS::Tag::Component>(entityID))
             {
-                name = m_Scene.GetRegistry().get<ECS::TagComponent>(entityID).Name;
+                name = m_Scene.GetRegistry().get<ECS::Tag::Component>(entityID).Name;
             }
 
             // Selection flags
@@ -214,9 +245,9 @@ public:
             auto& reg = m_Scene.GetRegistry();
 
             // 1. Tag Component
-            if (reg.all_of<ECS::TagComponent>(m_SelectedEntity))
+            if (reg.all_of<ECS::Tag::Component>(m_SelectedEntity))
             {
-                auto& tag = reg.get<ECS::TagComponent>(m_SelectedEntity);
+                auto& tag = reg.get<ECS::Tag::Component>(m_SelectedEntity);
                 char buffer[256];
                 memset(buffer, 0, sizeof(buffer));
                 strncpy(buffer, tag.Name.c_str(), sizeof(buffer) - 1);
@@ -229,19 +260,21 @@ public:
             ImGui::Separator();
 
             // 2. Transform Component
-            if (reg.all_of<ECS::TransformComponent>(m_SelectedEntity))
+            if (reg.all_of<ECS::Transform::Component>(m_SelectedEntity))
             {
                 if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen))
                 {
-                    auto& transform = reg.get<ECS::TransformComponent>(m_SelectedEntity);
+                    auto& transform = reg.get<ECS::Transform::Component>(m_SelectedEntity);
 
                     Interface::GUI::DrawVec3Control("Position", transform.Position);
 
                     // Convert to degrees for display
-                    glm::vec3 rotationDegrees = transform.Rotation;
+                    //quaternion to euler angles
+                    glm::vec3 rotationDegrees = glm::degrees(glm::eulerAngles(transform.Rotation));
                     if (Interface::GUI::DrawVec3Control("Rotation", rotationDegrees))
                     {
-                        transform.Rotation = rotationDegrees;
+                        //euler angles to quaternion
+                        transform.Rotation = glm::quat(glm::radians(rotationDegrees));
                     }
 
                     Interface::GUI::DrawVec3Control("Scale", transform.Scale, 1.0f);
@@ -249,11 +282,11 @@ public:
             }
 
             // 3. Mesh Info
-            if (reg.all_of<ECS::MeshRendererComponent>(m_SelectedEntity))
+            if (reg.all_of<ECS::MeshRenderer::Component>(m_SelectedEntity))
             {
                 if (ImGui::CollapsingHeader("Mesh Renderer", ImGuiTreeNodeFlags_DefaultOpen))
                 {
-                    auto& mr = reg.get<ECS::MeshRendererComponent>(m_SelectedEntity);
+                    auto& mr = reg.get<ECS::MeshRenderer::Component>(m_SelectedEntity);
                     if (mr.GeometryRef)
                     {
                         ImGui::Text("Vertices: %u", mr.GeometryRef->GetLayout().PositionsSize / sizeof(glm::vec3));

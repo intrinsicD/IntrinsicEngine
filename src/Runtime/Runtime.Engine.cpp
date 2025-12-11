@@ -210,7 +210,7 @@ namespace Runtime
             entt::entity rootEntity = m_Scene.CreateEntity(entityName);
 
             // Setup Transform for Root
-            auto& t = m_Scene.GetRegistry().get<ECS::TransformComponent>(rootEntity);
+            auto& t = m_Scene.GetRegistry().get<ECS::Transform::Component>(rootEntity);
             t.Scale = glm::vec3(0.01f);
 
             // If it's a point cloud, we might want to scale it differently or center it?
@@ -230,7 +230,7 @@ namespace Runtime
                     // TODO: Parenting system
                 }
 
-                auto& mr = m_Scene.GetRegistry().emplace<ECS::MeshRendererComponent>(targetEntity);
+                auto& mr = m_Scene.GetRegistry().emplace<ECS::MeshRenderer::Component>(targetEntity);
                 mr.GeometryRef = model->Meshes[i]; // <--- USING NEW FIELD
                 mr.MaterialRef = defaultMat;
             }

@@ -70,7 +70,7 @@ namespace Runtime::Graphics
         Graph::RGResourceHandle Depth;
     };
 
-    void RenderSystem::OnUpdate(ECS::Scene& scene, const Camera& camera)
+    void RenderSystem::OnUpdate(ECS::Scene& scene, const CameraComponent& camera)
     {
         Interface::GUI::BeginFrame();
 
@@ -133,7 +133,7 @@ namespace Runtime::Graphics
                                                        m_Renderer.SetViewport(extent.width, extent.height);
 
                                                        auto view = scene.GetRegistry().view<
-                                                           ECS::TransformComponent, ECS::MeshRendererComponent>();
+                                                           ECS::Transform::Component, ECS::MeshRenderer::Component>();
                                                        for (auto [entity, transform, renderable] : view.each())
                                                        {
                                                            if (!renderable.GeometryRef || !renderable.MaterialRef)

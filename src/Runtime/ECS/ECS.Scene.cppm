@@ -16,8 +16,8 @@ export namespace Runtime::ECS
         entt::entity CreateEntity(const std::string& name)
         {
             entt::entity e = m_Registry.create();
-            m_Registry.emplace<TagComponent>(e, name);
-            m_Registry.emplace<TransformComponent>(e);
+            m_Registry.emplace<Tag::Component>(e, name);
+            m_Registry.emplace<Transform::Component>(e);
             return e;
         }
 
