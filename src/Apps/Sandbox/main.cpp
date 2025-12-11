@@ -60,8 +60,6 @@ public:
         m_Camera = m_Scene.GetRegistry().emplace<Graphics::CameraComponent>(m_CameraEntity);
         m_Scene.GetRegistry().emplace<Graphics::OrbitControlComponent>(m_CameraEntity);
 
-        m_Camera.Position = {0.0f, 0.0f, 4.0f};
-
         auto textureLoader = [&](const std::string& path)
         {
             // Note: RHI::Texture constructor does IO + GPU upload synchronously here
