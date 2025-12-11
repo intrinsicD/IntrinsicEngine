@@ -39,7 +39,15 @@ namespace Runtime::RHI {
     }
 
     VulkanBuffer::~VulkanBuffer() {
-        vmaDestroyBuffer(m_Device->GetAllocator(), m_Buffer, m_Allocation);
+        if (m_Buffer) {
+            VkBuffer buffer = m_Buffer;
+            VmaAllocation allocation = m_Allocation;
+            VmaAllocator allocator = m_Device->GetAllocator();
+
+            m_Device->SafeDestroy([allocator, buffer, allocation]() {
+                vmaDestroyBuffer(allocator, buffer, allocation);
+            });
+        }
     }
 
     void* VulkanBuffer::Map() {

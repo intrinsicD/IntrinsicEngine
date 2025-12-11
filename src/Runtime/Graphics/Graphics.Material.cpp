@@ -24,18 +24,14 @@ namespace Runtime::Graphics {
         // This ensures the material is valid for rendering IMMEDIATELY.
         UpdateImageWrite(*m_CurrentTexture);
 
-        // 3. Async Upgrade: Register callback for the real texture
-        // We capture 'this' safely. In a real engine, we'd use weak_from_this()
-        // to ensure the material still exists, but here we assume lifetime is managed by scene.
-        assetManager.RequestNotify(targetTextureHandle, [this, assetManager = &assetManager](Core::Assets::AssetHandle handle)
+        assetManager.Listen(targetTextureHandle, [this, &assetManager](Core::Assets::AssetHandle handle)
         {
-            // This runs on the Main Thread via AssetManager::Update()
-            auto newTexture = assetManager->Get<RHI::Texture>(handle);
+            auto newTexture = assetManager.Get<RHI::Texture>(handle);
             if (newTexture)
             {
-                m_CurrentTexture = newTexture; // Keep reference alive
+                m_CurrentTexture = newTexture;
                 UpdateImageWrite(*newTexture);
-                Core::Log::Info("Material updated to high-res texture.");
+                // No log here to avoid spamming console on rapid edits
             }
         });
     }

@@ -2,6 +2,7 @@ module;
 #include <vector>
 #include <optional>
 #include <mutex>
+#include <functional>
 #include "RHI/RHI.Vulkan.hpp"
 
 export module Runtime.RHI.Device;
@@ -56,6 +57,9 @@ namespace Runtime::RHI
 
         void RegisterThreadLocalPool(VkCommandPool pool);
 
+        void FlushDeletionQueue(uint32_t frameIndex);
+        void SafeDestroy(std::function<void()>&& deleteFn);
+
     private:
         VkPhysicalDevice m_PhysicalDevice = VK_NULL_HANDLE;
         VkDevice m_Device = VK_NULL_HANDLE;
@@ -74,6 +78,12 @@ namespace Runtime::RHI
         std::vector<VkCommandPool> m_ThreadCommandPools;
 
         bool m_IsValid = true;
+
+        //TODO: dont set this separately from the Renderer. Do this on creation of the device
+        static constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 2; // Must match Renderer
+        std::vector<std::function<void()>> m_DeletionQueue[MAX_FRAMES_IN_FLIGHT];
+        uint32_t m_CurrentFrameIndex = 0;
+        std::mutex m_DeletionMutex;
 
         void PickPhysicalDevice(VkInstance instance);
         void CreateLogicalDevice(VulkanContext & context);

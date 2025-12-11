@@ -17,6 +17,7 @@ import Core.Input;
 import Core.Window;
 import Core.Memory;
 import Core.Tasks;
+import Core.Filesystem;
 import Runtime.RHI.Shader;
 import Runtime.RHI.Texture;
 import Runtime.Graphics.ModelLoader;
@@ -30,6 +31,7 @@ namespace Runtime
     Engine::Engine(const EngineConfig& config) : m_FrameArena(config.FrameArenaSize)
     {
         Core::Tasks::Scheduler::Initialize();
+        Core::Filesystem::FileWatcher::Initialize();
 
         Core::Log::Info("Initializing Engine...");
 
@@ -112,6 +114,7 @@ namespace Runtime
 
         // Order matters!
         Interface::GUI::Shutdown();
+        Core::Filesystem::FileWatcher::Shutdown();
         Core::Tasks::Scheduler::Shutdown();
 
         m_Scene.GetRegistry().clear();

@@ -130,7 +130,16 @@ namespace Runtime::RHI
 
     Texture::~Texture()
     {
-        if (m_Sampler) vkDestroySampler(m_Device->GetLogicalDevice(), m_Sampler, nullptr);
+        if (m_Sampler)
+        {
+            VkDevice logicalDevice = m_Device->GetLogicalDevice();
+            VkSampler sampler = m_Sampler;
+
+            m_Device->SafeDestroy([logicalDevice, sampler]()
+            {
+                vkDestroySampler(logicalDevice, sampler, nullptr);
+            });
+        }
     }
 
     void Texture::CreateSampler()

@@ -89,6 +89,7 @@ public:
 
         Interface::GUI::RegisterPanel("Hierarchy", [this]() { DrawHierarchyPanel(); });
         Interface::GUI::RegisterPanel("Inspector", [this]() { DrawInspectorPanel(); });
+        Interface::GUI::RegisterPanel("Assets", [this]() { m_AssetManager.AssetsUiPanel(); });
         Interface::GUI::RegisterPanel("Stats", [this]()
         {
             ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);

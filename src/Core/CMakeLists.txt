@@ -26,6 +26,7 @@ target_sources(${target_name}
         Core.Memory.cpp
         Core.Tasks.cpp
         Core.Window.cpp
+        Core.Filesystem.cpp
         Core.Input.cpp
         Core.Assets.cpp
 )

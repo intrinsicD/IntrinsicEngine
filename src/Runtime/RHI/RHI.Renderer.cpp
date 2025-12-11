@@ -74,6 +74,8 @@ namespace Runtime::RHI
         // 1. Wait for fence (CPU wait)
         VK_CHECK(vkWaitForFences(m_Device->GetLogicalDevice(), 1, &m_InFlightFences[m_CurrentFrame], VK_TRUE, UINT64_MAX));
 
+        m_Device->FlushDeletionQueue(m_CurrentFrame);
+
         // 2. Acquire Image
         VkResult result = vkAcquireNextImageKHR(
             m_Device->GetLogicalDevice(),

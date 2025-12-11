@@ -62,8 +62,27 @@ namespace Runtime::RHI
 
     VulkanImage::~VulkanImage()
     {
-        vkDestroyImageView(m_Device->GetLogicalDevice(), m_ImageView, nullptr);
-        vmaDestroyImage(m_Device->GetAllocator(), m_Image, m_Allocation);
+        VkDevice logicalDevice = m_Device->GetLogicalDevice();
+        VmaAllocator allocator = m_Device->GetAllocator();
+
+        if (m_ImageView)
+        {
+            VkImageView view = m_ImageView;
+            m_Device->SafeDestroy([logicalDevice, view]()
+            {
+                vkDestroyImageView(logicalDevice, view, nullptr);
+            });
+        }
+
+        if (m_Image)
+        {
+            VkImage image = m_Image;
+            VmaAllocation allocation = m_Allocation;
+            m_Device->SafeDestroy([allocator, image, allocation]()
+            {
+                vmaDestroyImage(allocator, image, allocation);
+            });
+        }
     }
 
     VkFormat VulkanImage::FindDepthFormat(VulkanDevice& device)

@@ -12,6 +12,7 @@ module;
 export module Core.Assets;
 
 import Core.Logging;
+import Core.Filesystem;
 import Core.Tasks; // Using your Async Task Graph
 
 export namespace Core::Assets
@@ -38,6 +39,7 @@ export namespace Core::Assets
     struct AssetInfo
     {
         std::string Name;
+        std::string Type;
         LoadState State = LoadState::Unloaded;
     };
 
@@ -53,6 +55,11 @@ export namespace Core::Assets
     struct AssetPayload
     {
         std::shared_ptr<T> Resource;
+    };
+
+    struct AssetReloader
+    {
+        std::function<void()> ReloadAction;
     };
 
     // --- Asset Manager ---
@@ -71,105 +78,138 @@ export namespace Core::Assets
         template <typename T, typename LoaderFunc>
         AssetHandle Load(const std::string& path, LoaderFunc&& loader);
 
-        // 2. Request Notify: Register a callback for when the asset is Ready.
+        // 2. Persistent Listener (Updates every reload)
+        void Listen(AssetHandle handle, AssetCallback callback);
+
+        // 3. Request Notify: Register a callback for when the asset is Ready.
         // If already ready, callback fires immediately (synchronously).
         void RequestNotify(AssetHandle handle, AssetCallback callback);
 
-        // 3. Get Resource
+        // 4. Get Resource
         template <typename T>
         std::shared_ptr<T> Get(AssetHandle handle);
-
         LoadState GetState(AssetHandle handle);
+
         void Clear();
+        void AssetsUiPanel();
 
     private:
         entt::registry m_Registry;
         std::unordered_map<size_t, AssetHandle> m_Lookup;
 
-        // Callback System
-        std::unordered_map<AssetHandle, std::vector<AssetCallback>, AssetHandle::Hash> m_Listeners;
-        std::vector<AssetHandle> m_ReadyQueue; // Queue of assets loaded since last frame
+        // Separate map for Persistent Listeners
+        std::unordered_map<AssetHandle, std::vector<AssetCallback>, AssetHandle::Hash> m_PersistentListeners;
+        // Map for One-Shot Listeners
+        std::unordered_map<AssetHandle, std::vector<AssetCallback>, AssetHandle::Hash> m_OneShotListeners;
 
+        std::vector<AssetHandle> m_ReadyQueue; // Queue of assets loaded since last frame
         std::shared_mutex m_Mutex;
         std::mutex m_EventQueueMutex;
 
         void EnqueueReadyEvent(AssetHandle handle);
+
+        // Internal reload helper
+        template <typename T, typename LoaderFunc>
+        void Reload(AssetHandle handle, LoaderFunc&& loader);
     };
 
     template <typename T, typename LoaderFunc>
-        AssetHandle AssetManager::Load(const std::string& path, LoaderFunc&& loader)
+    AssetHandle AssetManager::Load(const std::string& path, LoaderFunc&& loader)
+    {
+        std::unique_lock lock(m_Mutex);
+
+        size_t pathHash = std::hash<std::string>{}(path);
+        if (m_Lookup.contains(pathHash)) return m_Lookup[pathHash];
+
+        auto entity = m_Registry.create();
+        AssetHandle handle{entity};
+
+        m_Registry.emplace<AssetInfo>(entity, path, "Unknown", LoadState::Loading);
+        m_Registry.emplace<AssetSource>(entity, path);
+        m_Lookup[pathHash] = handle;
+
+        m_Registry.emplace<AssetReloader>(entity, [this, handle, loader]() mutable
+        {
+            this->Reload<T>(handle, loader);
+        });
+
+        // WATCHER REGISTRATION
+        // We capture 'loader' by value (copy) for the lambda.
+        // NOTE: 'loader' usually captures pointers/refs, ensure they are safe or copyable!
+        Filesystem::FileWatcher::Watch(path, [this, handle, loader](const std::string&)
+        {
+            this->Reload<T>(handle, loader);
+        });
+
+        // Trigger initial load via Reload logic to avoid duplication
+        lock.unlock(); // Reload locks internally
+        Reload<T>(handle, std::forward<LoaderFunc>(loader));
+
+        return handle;
+    }
+
+    template <typename T, typename LoaderFunc>
+    void AssetManager::Reload(AssetHandle handle, LoaderFunc&& loader)
+    {
+        // 1. Mark Loading (Thread Safe)
         {
             std::unique_lock lock(m_Mutex);
-
-            // 1. Check Cache
-            size_t pathHash = std::hash<std::string>{}(path);
-            if (m_Lookup.contains(pathHash))
+            if (m_Registry.valid(handle.ID))
             {
-                return m_Lookup[pathHash];
+                m_Registry.get<AssetInfo>(handle.ID).State = LoadState::Loading;
             }
-
-            // 2. Create Asset Entity
-            auto entity = m_Registry.create();
-            AssetHandle handle{entity};
-
-            m_Registry.emplace<AssetInfo>(entity, path, LoadState::Loading);
-            m_Registry.emplace<AssetSource>(entity, path);
-
-            // Register in lookup
-            m_Lookup[pathHash] = handle;
-
-            // 3. Dispatch Async Task
-            // We copy the loader and path into the lambda
-            Tasks::Scheduler::Dispatch([this, handle, entity, path, loader = std::forward<LoaderFunc>(loader)]()
-            {
-                // Execute user-provided loader (File IO / Parsing)
-                // This runs on a worker thread
-                auto result = loader(path);
-
-                // Critical Section: Write back to registry
-                // Ideally, we might defer this to main thread to avoid locking registry,
-                // but for now, we lock.
-                {
-                    std::unique_lock lock(m_Mutex);
-                    if (m_Registry.valid(entity))
-                    {
-                        if (result)
-                        {
-                            m_Registry.emplace<AssetPayload<T>>(entity, result);
-                            m_Registry.get<AssetInfo>(entity).State = LoadState::Ready;
-                            Log::Info("Asset Loaded: {}", path);
-
-                            EnqueueReadyEvent(handle);
-                        }
-                        else
-                        {
-                            m_Registry.get<AssetInfo>(entity).State = LoadState::Failed;
-                            Log::Error("Asset Failed: {}", path);
-                        }
-                    }
-                }
-            });
-
-            return handle;
         }
 
-        // 2. Data Access
-        // Returns nullptr if not ready or wrong type
-        template <typename T>
-        std::shared_ptr<T> AssetManager::Get(AssetHandle handle)
+        // 2. Get Path
+        std::string path;
         {
             std::shared_lock lock(m_Mutex);
-            if (!m_Registry.valid(handle.ID)) return nullptr;
-
-            // Check if loaded
-            const auto& info = m_Registry.get<AssetInfo>(handle.ID);
-            if (info.State != LoadState::Ready) return nullptr;
-
-            // Check if it has the specific payload
-            if (auto* payload = m_Registry.try_get<AssetPayload<T>>(handle.ID))
-            {
-                return payload->Resource;
-            }
-            return nullptr;
+            if (!m_Registry.valid(handle.ID)) return;
+            path = m_Registry.get<AssetSource>(handle.ID).FilePath.string();
         }
+
+        // 3. Async Task
+        Tasks::Scheduler::Dispatch([this, handle, path, loader]()
+        {
+            auto result = loader(path);
+
+            std::unique_lock lock(m_Mutex);
+            if (m_Registry.valid(handle.ID))
+            {
+                if (result)
+                {
+                    // Replace Payload
+                    m_Registry.emplace_or_replace<AssetPayload<T>>(handle.ID, result);
+                    m_Registry.get<AssetInfo>(handle.ID).State = LoadState::Ready;
+                    Log::Info("Asset Loaded/Reloaded: {}", path);
+                    EnqueueReadyEvent(handle);
+                }
+                else
+                {
+                    m_Registry.get<AssetInfo>(handle.ID).State = LoadState::Failed;
+                    Log::Error("Asset Load Failed: {}", path);
+                }
+            }
+        });
+    }
+
+    // 2. Data Access
+    // Returns nullptr if not ready or wrong type
+    template <typename T>
+    std::shared_ptr<T> AssetManager::Get(AssetHandle handle)
+    {
+        std::shared_lock lock(m_Mutex);
+        if (!m_Registry.valid(handle.ID)) return nullptr;
+
+        // Check if loaded
+        const auto& info = m_Registry.get<AssetInfo>(handle.ID);
+        if (info.State != LoadState::Ready) return nullptr;
+
+        // Check if it has the specific payload
+        if (auto* payload = m_Registry.try_get<AssetPayload<T>>(handle.ID))
+        {
+            return payload->Resource;
+        }
+        return nullptr;
+    }
 }

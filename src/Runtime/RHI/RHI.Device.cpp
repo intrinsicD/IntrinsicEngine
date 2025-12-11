@@ -5,6 +5,7 @@ module;
 #include <string>
 #include <set>
 #include <mutex>
+#include <functional>
 
 // --- 2. VMA Configuration ---
 #define VMA_STATIC_VULKAN_FUNCTIONS 0
@@ -38,8 +39,24 @@ namespace Runtime::RHI
 
     VulkanDevice::~VulkanDevice()
     {
-        vkDeviceWaitIdle(m_Device);
+        // 1. Wait for GPU to stop
+        if (m_Device) vkDeviceWaitIdle(m_Device);
 
+        // 2. Flush ALL Deletion Queues (Break the resource cycle)
+        // We iterate all frame buckets because we are shutting down.
+        {
+            std::lock_guard lock(m_DeletionMutex);
+            for (auto& queue : m_DeletionQueue)
+            {
+                for (auto& fn : queue)
+                {
+                    fn();
+                }
+                queue.clear();
+            }
+        }
+
+        // 3. Destroy Thread Pools
         {
             std::lock_guard lock(m_ThreadPoolsMutex);
             for (auto pool : m_ThreadCommandPools)
@@ -49,14 +66,43 @@ namespace Runtime::RHI
             m_ThreadCommandPools.clear();
         }
 
-        vkDestroyCommandPool(m_Device, m_CommandPool, nullptr);
-        vmaDestroyAllocator(m_Allocator);
-        vkDestroyDevice(m_Device, nullptr);
+        // 4. Destroy Main Resources
+        if (m_CommandPool) vkDestroyCommandPool(m_Device, m_CommandPool, nullptr);
+        if (m_Allocator) vmaDestroyAllocator(m_Allocator);
+
+        // 5. Destroy Device (Now safe because children are gone)
+        if (m_Device) vkDestroyDevice(m_Device, nullptr);
     }
 
-    void VulkanDevice::RegisterThreadLocalPool(VkCommandPool pool) {
+    void VulkanDevice::RegisterThreadLocalPool(VkCommandPool pool)
+    {
         std::lock_guard lock(m_ThreadPoolsMutex);
         m_ThreadCommandPools.push_back(pool);
+    }
+
+    void VulkanDevice::FlushDeletionQueue(uint32_t frameIndex)
+    {
+        // Update current frame index so SafeDestroy knows where to push
+        m_CurrentFrameIndex = frameIndex;
+
+        // Execute all deleters pending for THIS frame slot.
+        // Because we cycled back to this index and passed the Fence,
+        // the GPU is done with the resources that were used 'MAX_FRAMES' ago.
+        std::lock_guard lock(m_DeletionMutex);
+        auto& queue = m_DeletionQueue[frameIndex];
+        for (auto& fn : queue)
+        {
+            fn();
+        }
+        queue.clear();
+    }
+
+    void VulkanDevice::SafeDestroy(std::function<void()>&& deleteFn)
+    {
+        std::lock_guard lock(m_DeletionMutex);
+        // Push to the CURRENT frame bucket.
+        // It will be cleared when we hit this frame index again in the next cycle.
+        m_DeletionQueue[m_CurrentFrameIndex].push_back(std::move(deleteFn));
     }
 
     void VulkanDevice::PickPhysicalDevice(VkInstance instance)
