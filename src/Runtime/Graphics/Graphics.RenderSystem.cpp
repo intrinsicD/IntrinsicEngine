@@ -97,6 +97,8 @@ namespace Runtime::Graphics
             auto extent = m_Swapchain.GetExtent();
             uint32_t imageIndex = m_Renderer.GetImageIndex();
 
+            Graph::RGResourceHandle backbufferHandle{};
+
             m_RenderGraph.AddPass<ForwardPassData>("ForwardPass",
                                                    [&](ForwardPassData& data, Graph::RGBuilder& builder)
                                                    {
@@ -125,6 +127,7 @@ namespace Runtime::Graphics
 
                                                        data.Color = builder.WriteColor(importedColor, colorInfo);
                                                        data.Depth = builder.WriteDepth(depth, depthInfo);
+                                                       backbufferHandle = data.Color;
                                                    },
                                                    [&, offset](const ForwardPassData&, const Graph::RGRegistry&,
                                                                VkCommandBuffer cmd)
@@ -213,33 +216,11 @@ namespace Runtime::Graphics
             m_RenderGraph.AddPass<ImGuiPassData>("ImGuiPass",
                                                  [&](ImGuiPassData& data, Graph::RGBuilder& builder)
                                                  {
-                                                     // Re-import backbuffer? No, we need to handle dependency.
-                                                     // RGBuilder doesn't have a generic "GetResourceByName", so we rely on importing
-                                                     // or storing the handle in the class.
-                                                     // However, we can just re-import the swapchain logic since the RG resolves tracking.
-                                                     // But ideally, we chain the handle.
-
-                                                     // Hack for prototype: Re-import swapchain image.
-                                                     // In a real RG, ForwardPassData would return the handle, we pass it here.
-                                                     // Since we are inside OnUpdate, we can just grab the handle if we stored it outside,
-                                                     // but we didn't.
-                                                     // Let's just import "Backbuffer" again. The RenderGraph names resolve to IDs.
-                                                     // If RG implementation uses names for lookup, this works.
-                                                     // If not, we should store ForwardPassData outside.
-
-                                                     VkImage swapImage = m_Renderer.GetSwapchainImage(imageIndex);
-                                                     VkImageView swapView = m_Renderer.
-                                                         GetSwapchainImageView(imageIndex);
-
-                                                     // We need to Load (keep content) and Store (present)
                                                      Graph::RGAttachmentInfo colorInfo{};
                                                      colorInfo.LoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
                                                      colorInfo.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
 
-                                                     auto backbuffer = builder.ImportTexture(
-                                                         "Backbuffer", swapImage, swapView,
-                                                         m_Swapchain.GetImageFormat(), extent);
-                                                     data.Backbuffer = builder.WriteColor(backbuffer, colorInfo);
+                                                     data.Backbuffer = builder.WriteColor(backbufferHandle, colorInfo);
                                                  },
                                                  [](const ImGuiPassData&, const Graph::RGRegistry&, VkCommandBuffer cmd)
                                                  {

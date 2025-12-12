@@ -105,7 +105,11 @@ public:
         bool uiCapturesKeyboard = Interface::GUI::WantCaptureKeyboard();
         bool inputCaptured = uiCapturesMouse || uiCapturesKeyboard;
 
-        float aspectRatio = (float)m_Window->GetWidth() / (float)m_Window->GetHeight();
+        float aspectRatio = 1.0f;
+        if (m_Window->GetHeight() > 0)
+        {
+            aspectRatio = (float)m_Window->GetWidth() / (float)m_Window->GetHeight();
+        }
 
         Graphics::CameraComponent* cameraComponent = nullptr;
         if (m_Scene.GetRegistry().valid(m_CameraEntity))
@@ -226,8 +230,11 @@ public:
             }
             if (ImGui::MenuItem("Remove Entity"))
             {
-                m_Scene.GetRegistry().destroy(m_SelectedEntity);
-                m_SelectedEntity = entt::null;
+                if (m_SelectedEntity != entt::null && m_Scene.GetRegistry().valid(m_SelectedEntity))
+                {
+                    m_Scene.GetRegistry().destroy(m_SelectedEntity);
+                    m_SelectedEntity = entt::null;
+                }
             }
             ImGui::EndPopup();
         }
