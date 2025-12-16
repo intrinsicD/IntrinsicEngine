@@ -16,6 +16,7 @@ import Runtime.Engine;
 import Core.Logging;
 import Core.Input;
 import Core.Assets;
+import Core.Filesystem;
 import Runtime.Graphics.Geometry;
 import Runtime.Graphics.Model;
 import Runtime.Graphics.Material;
@@ -66,13 +67,14 @@ public:
             // In a real engine, IO is separate from Upload.
             return std::make_shared<RHI::Texture>(GetDevice(), path);
         };
-        m_DuckTexture = m_AssetManager.Load<RHI::Texture>("assets/textures/DuckCM.png", textureLoader);
+        auto rootPath = Filesystem::GetRoot();
+        m_DuckTexture = m_AssetManager.Load<RHI::Texture>(rootPath / "assets/textures/DuckCM.png", textureLoader);
 
         auto modelLoader = [&](const std::string& path)
         {
             return Graphics::ModelLoader::Load(GetDevice(), path);
         };
-        m_DuckModel = m_AssetManager.Load<Graphics::Model>("assets/models/Duck.glb", modelLoader);
+        m_DuckModel = m_AssetManager.Load<Graphics::Model>(rootPath / "assets/models/Duck.glb", modelLoader);
 
         // 3. Setup Material (Assuming texture loads synchronously or is handled)
         m_DuckMaterial = std::make_shared<Graphics::Material>(
