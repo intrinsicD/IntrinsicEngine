@@ -10,6 +10,8 @@ export module Runtime.Graphics.Geometry;
 
 import Runtime.RHI.Device;
 import Runtime.RHI.Buffer;
+import Runtime.Geometry.AABB;
+import Runtime.Geometry.Octree;
 
 export namespace Runtime::Graphics
 {
@@ -43,6 +45,16 @@ export namespace Runtime::Graphics
         {
             return {Positions, Normals, Aux, Indices, Topology};
         }
+    };
+
+    struct GeometryCollisionData
+    {
+        Geometry::AABB LocalAABB;
+        Geometry::Octree LocalOctree; // Static octree of mesh vertices
+
+        // Optional: Keep positions for precise ray intersection tests after Octree broadphase
+        std::vector<glm::vec3> Positions;
+        std::vector<uint32_t> Indices;
     };
 
     struct GeometryBufferLayout

@@ -349,7 +349,7 @@ export namespace Runtime::Geometry::SDF
             // General case: use half-angle formula for numerical stability
             // This is more stable than glm::rotation() for small angles
             glm::vec3 c = glm::cross(up, axis);
-            float s = glm::length(c);
+            float s = glm::length(c); //TODO: Why is this unused? can i remove it?
 
             // Quaternion from axis-angle using half-angle formula
             // q.w = cos(theta/2) = sqrt((1 + cos(theta)) / 2)

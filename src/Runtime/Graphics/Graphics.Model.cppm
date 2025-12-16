@@ -9,10 +9,18 @@ import Runtime.Graphics.Material; // Optional, if we want to store materials her
 
 export namespace Runtime::Graphics
 {
+
+    struct MeshSegment
+    {
+        std::shared_ptr<GeometryGpuData> GpuGeometry;
+        std::shared_ptr<GeometryCollisionData> CollisionGeometry;
+        std::string Name;
+    };
+
     struct Model
     {
         // The individual parts of the model (primitives)
-        std::vector<std::shared_ptr<GeometryGpuData>> Meshes;
+        std::vector<std::shared_ptr<MeshSegment>> Meshes;
 
         // Helper to check if loaded
         [[nodiscard]] bool IsValid() const { return !Meshes.empty(); }

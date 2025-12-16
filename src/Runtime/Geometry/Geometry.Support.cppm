@@ -9,6 +9,12 @@ import Runtime.Geometry.Primitives;
 
 export namespace Runtime::Geometry
 {
+    template <typename T>
+    concept ConvexShape = requires(const T& s, const glm::vec3& d)
+    {
+        { Support(s, d) } -> std::convertible_to<glm::vec3>;
+    };
+
     namespace Internal
     {
         inline glm::vec3 Normalize(const glm::vec3& v)

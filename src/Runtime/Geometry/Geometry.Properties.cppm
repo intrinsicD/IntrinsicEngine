@@ -145,7 +145,7 @@ export namespace Runtime::Geometry
         inline void Clear() { m_Storages.clear(); }
         inline void Reserve(std::size_t n) { m_Storages.reserve(n); }
         void Resize(std::size_t n) { m_Size = n; for (auto& storage : m_Storages) storage->Resize(n); }
-        void Shrink_to_fit() { for (auto& storage : m_Storages) storage->Shrink_to_fit(); }
+        void ShrinkToFit() { for (auto& storage : m_Storages) storage->Shrink_to_fit(); }
         void PushBack() { for (auto& storage : m_Storages) storage->PushBack(); }
         void Swap(std::size_t i0, std::size_t i1) { m_Storages[i0]->Swap(0, i1); }
 
@@ -451,24 +451,24 @@ export namespace Runtime::Geometry
         [[nodiscard]] bool IsValid() const noexcept { return static_cast<bool>(m_Buffer); }
         explicit operator bool() const noexcept { return static_cast<bool>(m_Buffer); }
 
-        [[nodiscard]] const std::string& Name() const { return m_Buffer.name(); }
+        [[nodiscard]] const std::string& Name() const { return m_Buffer.Name(); }
 
         [[nodiscard]] decltype(auto) operator[](std::size_t index) const { return m_Buffer[index]; }
         [[nodiscard]] decltype(auto) operator[](std::size_t index) { return m_Buffer[index]; }
 
-        [[nodiscard]] std::vector<T>& Vector() { return m_Buffer.vector(); }
-        [[nodiscard]] const std::vector<T>& Vector() const { return m_Buffer.vector(); }
+        [[nodiscard]] std::vector<T>& Vector() { return m_Buffer.Vector(); }
+        [[nodiscard]] const std::vector<T>& Vector() const { return m_Buffer.Vector(); }
 
-        [[nodiscard]] std::vector<T>& Array() { return m_Buffer.vector(); }
-        [[nodiscard]] const std::vector<T>& Array() const { return m_Buffer.vector(); }
+        [[nodiscard]] std::vector<T>& Array() { return m_Buffer.Vector(); }
+        [[nodiscard]] const std::vector<T>& Array() const { return m_Buffer.Vector(); }
 
-        [[nodiscard]] std::span<T> Span() { return m_Buffer.span(); }
-        [[nodiscard]] std::span<const T> Span() const { return m_Buffer.span(); }
+        [[nodiscard]] std::span<T> Span() { return m_Buffer.Span(); }
+        [[nodiscard]] std::span<const T> Span() const { return m_Buffer.Span(); }
 
         [[nodiscard]] PropertyBuffer<T>& Handle() noexcept { return m_Buffer; }
         [[nodiscard]] const PropertyBuffer<T>& Handle() const noexcept { return m_Buffer; }
 
-        void Reset() noexcept { m_Buffer.reset(); }
+        void Reset() noexcept { m_Buffer.Reset(); }
 
     private:
         PropertyBuffer<T> m_Buffer;
@@ -484,11 +484,11 @@ export namespace Runtime::Geometry
         {
         }
 
-        [[nodiscard]] decltype(auto) operator[](HandleT handle) { return Property<T>::operator[](handle.index()); }
+        [[nodiscard]] decltype(auto) operator[](HandleT handle) { return Property<T>::operator[](handle.Index); }
 
         [[nodiscard]] decltype(auto) operator[](HandleT handle) const
         {
-            return Property<T>::operator[](handle.index());
+            return Property<T>::operator[](handle.Index);
         }
     };
 
@@ -504,7 +504,7 @@ export namespace Runtime::Geometry
         inline void Resize(std::size_t n) { m_Registry.Resize(n); }
         inline void PushBack() { m_Registry.PushBack(); }
         inline void Swap(std::size_t i0, std::size_t i1) { m_Registry.Swap(i0, i1); }
-        inline void Shrink_to_fit() { m_Registry.Shrink_to_fit(); }
+        inline void Shrink_to_fit() { m_Registry.ShrinkToFit(); }
         [[nodiscard]] inline bool Empty() const { return m_Registry.Size() == 0; }
         [[nodiscard]] inline bool Exists(std::string_view name) const { return m_Registry.Contains(name); }
         [[nodiscard]] inline std::vector<std::string> Properties() const { return m_Registry.PropertyNames(); }

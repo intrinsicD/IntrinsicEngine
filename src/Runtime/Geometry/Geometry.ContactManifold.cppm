@@ -8,6 +8,7 @@ export module Runtime.Geometry.Contact;
 
 import Runtime.Geometry.Primitives;
 import Runtime.Geometry.GJK; // Should contain GJK_EPA logic in full version
+import Runtime.Geometry.Support;
 
 export namespace Runtime::Geometry
 {

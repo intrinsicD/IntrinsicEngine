@@ -10,15 +10,10 @@ module;
 export module Runtime.Geometry.Primitives;
 
 export import Runtime.Geometry.AABB;
+export import Runtime.Geometry.OBB;
 
 export namespace Runtime::Geometry
 {
-    template <typename T>
-    concept ConvexShape = requires(const T& s, const glm::vec3& d)
-    {
-        { Support(s, d) } -> std::convertible_to<glm::vec3>;
-    };
-
     struct Sphere
     {
         glm::vec3 Center;
@@ -29,13 +24,6 @@ export namespace Runtime::Geometry
     {
         glm::vec3 PointA, PointB;
         float Radius;
-    };
-
-    struct OBB
-    {
-        glm::vec3 Center;
-        glm::vec3 Extents; // Half-width, half-height, half-depth
-        glm::quat Rotation;
     };
 
     struct Cylinder

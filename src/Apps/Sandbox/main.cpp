@@ -156,7 +156,7 @@ public:
                     m_Scene.GetRegistry().emplace<ECS::Transform::Rotator>(e, ECS::Transform::Rotator::Y());
 
                     auto& mr = m_Scene.GetRegistry().emplace<ECS::MeshRenderer::Component>(e);
-                    mr.GeometryRef = model->Meshes[0];
+                    mr.GeometryRef = model->Meshes[0]->GpuGeometry;
                     mr.MaterialRef = m_DuckMaterial; // Assign material with handle
 
                     m_IsEntitySpawned = true;

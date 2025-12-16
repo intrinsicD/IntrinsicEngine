@@ -222,7 +222,7 @@ namespace Runtime
             for (size_t i = 0; i < model->Size(); i++)
             {
                 // Store in engine cache to keep alive (optional, shared_ptr handles this mostly via components)
-                m_LoadedGeometries.push_back(model->Meshes[i]);
+                m_LoadedGeometries.push_back(model->Meshes[i]->GpuGeometry);
 
                 entt::entity targetEntity = rootEntity;
 
@@ -234,7 +234,7 @@ namespace Runtime
                 }
 
                 auto& mr = m_Scene.GetRegistry().emplace<ECS::MeshRenderer::Component>(targetEntity);
-                mr.GeometryRef = model->Meshes[i]; // <--- USING NEW FIELD
+                mr.GeometryRef = model->Meshes[i]->GpuGeometry;
                 mr.MaterialRef = defaultMat;
             }
 

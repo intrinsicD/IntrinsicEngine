@@ -33,6 +33,7 @@ target_sources(${target_name}
         RenderGraph/RenderGraph.cppm
         Interface/Gui.cppm
         Geometry/Geometry.AABB.cppm
+        Geometry/Geometry.OBB.cppm
         Geometry/Geometry.ContactManifold.cppm
         Geometry/Geometry.Containment.cppm
         Geometry/Geometry.GJK.cppm
@@ -43,6 +44,9 @@ target_sources(${target_name}
         Geometry/Geometry.SDFContact.cppm
         Geometry/Geometry.Validation.cppm
         Geometry/Geometry.Properties.cppm
+        Geometry/Geometry.MeshUtils.cppm
+        Geometry/Geometry.Octree.cppm
+        Utils/Utils.BoundedHeap.cppm
         Runtime.Engine.cppm
         PRIVATE
         RHI/RHI.Context.cpp
@@ -61,6 +65,7 @@ target_sources(${target_name}
         Graphics/Graphics.Geometry.cpp
         Graphics/Graphics.ModelLoader.cpp
         Graphics/Graphics.TinyGltf.cpp
+        Geometry/Geometry.MeshUtils.cpp
         RenderGraph/RenderGraph.cpp
         Interface/Gui.cpp
         Runtime.Engine.cpp

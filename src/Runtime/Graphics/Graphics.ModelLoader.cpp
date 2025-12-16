@@ -8,39 +8,50 @@ module;
 #include <memory>
 #include <filesystem>
 #include <fstream>
+#include <span>
 
 module Runtime.Graphics.ModelLoader;
 import Core.Logging;
 import Core.Filesystem;
 import Runtime.RHI.Types;
 import Runtime.Graphics.Geometry;
+import Runtime.Geometry.MeshUtils;
+import Runtime.Geometry.Octree;
+import Runtime.Geometry.AABB;
 
 namespace Runtime::Graphics
 {
     // --- Helpers ---
 
-    struct VertexKey {
+    struct VertexKey
+    {
         int p = -1, n = -1, t = -1;
-        bool operator==(const VertexKey& other) const { return p==other.p && n==other.n && t==other.t; }
+        bool operator==(const VertexKey& other) const { return p == other.p && n == other.n && t == other.t; }
     };
-    struct VertexKeyHash {
-        size_t operator()(const VertexKey& k) const {
-             return std::hash<int>()(k.p) ^ (std::hash<int>()(k.n) << 1) ^ (std::hash<int>()(k.t) << 2);
+
+    struct VertexKeyHash
+    {
+        size_t operator()(const VertexKey& k) const
+        {
+            return std::hash<int>()(k.p) ^ (std::hash<int>()(k.n) << 1) ^ (std::hash<int>()(k.t) << 2);
         }
     };
 
     // Fast float parsing from string_view
-    static float ParseFloat(std::string_view sv) {
+    static float ParseFloat(std::string_view sv)
+    {
         float val = 0.0f;
         std::from_chars(sv.data(), sv.data() + sv.size(), val);
         return val;
     }
 
     // Split string by delimiter
-    static std::vector<std::string_view> Split(std::string_view str, char delimiter) {
+    static std::vector<std::string_view> Split(std::string_view str, const char delimiter)
+    {
         std::vector<std::string_view> result;
         size_t first = 0;
-        while (first < str.size()) {
+        while (first < str.size())
+        {
             const auto second = str.find(delimiter, first);
             if (first != second)
                 result.emplace_back(str.substr(first, second - first));
@@ -64,77 +75,116 @@ namespace Runtime::Graphics
 
         outData.Topology = PrimitiveTopology::Triangles; // Default
         std::string line;
+        bool hasNormals = false;
+        bool hasUVs = false;
 
-        while (std::getline(file, line)) {
+        while (std::getline(file, line))
+        {
             if (line.empty() || line[0] == '#') continue;
             std::stringstream ss(line);
             std::string type;
             ss >> type;
 
-            if (type == "v") {
-                glm::vec3 v; ss >> v.x >> v.y >> v.z;
+            if (type == "v")
+            {
+                glm::vec3 v;
+                ss >> v.x >> v.y >> v.z;
                 tempPos.push_back(v);
-            } else if (type == "vn") {
-                glm::vec3 vn; ss >> vn.x >> vn.y >> vn.z;
+            }
+            else if (type == "vn")
+            {
+                glm::vec3 vn;
+                ss >> vn.x >> vn.y >> vn.z;
                 tempNorm.push_back(vn);
-            } else if (type == "vt") {
-                glm::vec2 vt; ss >> vt.x >> vt.y;
+                hasNormals = true;
+            }
+            else if (type == "vt")
+            {
+                glm::vec2 vt;
+                ss >> vt.x >> vt.y;
                 tempUV.push_back(vt);
-            } else if (type == "f") {
+                hasUVs = true;
+            }
+            else if (type == "f")
+            {
                 std::string vertexStr;
                 std::vector<uint32_t> faceIndices;
 
-                while (ss >> vertexStr) {
+                while (ss >> vertexStr)
+                {
                     VertexKey key;
                     size_t s1 = vertexStr.find('/');
                     size_t s2 = vertexStr.find('/', s1 + 1);
 
                     // Pos index
-                    std::from_chars(vertexStr.data(), vertexStr.data() + (s1 == std::string::npos ? vertexStr.size() : s1), key.p);
+                    std::from_chars(vertexStr.data(),
+                                    vertexStr.data() + (s1 == std::string::npos ? vertexStr.size() : s1), key.p);
                     key.p--; // OBJ 1-based
 
-                    if (s1 != std::string::npos) {
+                    if (s1 != std::string::npos)
+                    {
                         // Tex Index
-                        if (s2 != std::string::npos && s2 - s1 > 1) {
-                             std::from_chars(vertexStr.data() + s1 + 1, vertexStr.data() + s2, key.t);
-                             key.t--;
+                        if (s2 != std::string::npos && s2 - s1 > 1)
+                        {
+                            std::from_chars(vertexStr.data() + s1 + 1, vertexStr.data() + s2, key.t);
+                            key.t--;
                         }
                         // Norm Index
-                        if (s2 != std::string::npos && s2 + 1 < vertexStr.size()) {
-                             std::from_chars(vertexStr.data() + s2 + 1, vertexStr.data() + vertexStr.size(), key.n);
-                             key.n--;
+                        if (s2 != std::string::npos && s2 + 1 < vertexStr.size())
+                        {
+                            std::from_chars(vertexStr.data() + s2 + 1, vertexStr.data() + vertexStr.size(), key.n);
+                            key.n--;
                         }
                     }
 
-                    if (uniqueVertices.find(key) == uniqueVertices.end()) {
-                        uint32_t idx = (uint32_t)outData.Positions.size();
+                    if (uniqueVertices.find(key) == uniqueVertices.end())
+                    {
+                        auto idx = static_cast<uint32_t>(outData.Positions.size());
                         uniqueVertices[key] = idx;
 
                         outData.Positions.push_back(tempPos[key.p]);
-                        outData.Normals.push_back((key.n >= 0 && key.n < tempNorm.size()) ? tempNorm[key.n] : glm::vec3(0,1,0));
-                        glm::vec2 uv = (key.t >= 0 && key.t < tempUV.size()) ? tempUV[key.t] : glm::vec2(0,0);
+                        outData.Normals.push_back((key.n >= 0 && key.n < tempNorm.size())
+                                                      ? tempNorm[key.n]
+                                                      : glm::vec3(0, 1, 0));
+                        glm::vec2 uv = (key.t >= 0 && key.t < tempUV.size()) ? tempUV[key.t] : glm::vec2(0, 0);
                         outData.Aux.emplace_back(uv.x, uv.y, 0, 0);
                     }
                     faceIndices.push_back(uniqueVertices[key]);
                 }
 
                 // Triangulate Fan
-                for (size_t i = 1; i < faceIndices.size() - 1; ++i) {
+                for (size_t i = 1; i < faceIndices.size() - 1; ++i)
+                {
                     outData.Indices.push_back(faceIndices[0]);
                     outData.Indices.push_back(faceIndices[i]);
-                    outData.Indices.push_back(faceIndices[i+1]);
+                    outData.Indices.push_back(faceIndices[i + 1]);
                 }
-            } else if (type == "l") {
+            }
+            else if (type == "l")
+            {
                 outData.Topology = PrimitiveTopology::Lines;
                 // Line parsing logic similar to faces but usually just 2 indices
                 // Simplified for brevity
             }
         }
+
+        if (hasNormals)
+        {
+            Geometry::MeshUtils::RecalculateNormals(outData);
+        }
+        if (!hasUVs)
+        {
+            Geometry::MeshUtils::GenerateUVs(outData);
+        }
         return true;
     }
 
     // PLY Property Mapping
-    struct PlyProp { std::string name; int offset; }; // simplified
+    struct PlyProp
+    {
+        std::string name;
+        int offset;
+    }; // simplified
 
     static bool LoadPLY(const std::string& path, GeometryCpuData& outData)
     {
@@ -150,26 +200,50 @@ namespace Runtime::Graphics
         int idxX = -1, idxY = -1, idxZ = -1;
         int idxNX = -1, idxNY = -1, idxNZ = -1;
         int idxR = -1, idxG = -1, idxB = -1;
+        int idxS = -1, idxT = -1;
 
         int propCounter = 0;
         bool headerEnded = false;
         bool inVertex = false;
 
         // 1. Header Parse
-        while (std::getline(file, line)) {
-            if (line == "end_header") { headerEnded = true; break; }
+        while (std::getline(file, line))
+        {
+            if (line == "end_header")
+            {
+                headerEnded = true;
+                break;
+            }
             std::stringstream ss(line);
-            std::string token; ss >> token;
+            std::string token;
+            ss >> token;
 
-            if (token == "format") {
-                std::string fmt; ss >> fmt;
+            if (token == "format")
+            {
+                std::string fmt;
+                ss >> fmt;
                 if (fmt == "binary_little_endian") binary = true;
-            } else if (token == "element") {
-                std::string type; ss >> type;
-                if (type == "vertex") { ss >> vertexCount; inVertex = true; propCounter = 0; }
-                else if (type == "face") { ss >> faceCount; inVertex = false; }
-            } else if (token == "property" && inVertex) {
-                std::string type, name; ss >> type >> name;
+            }
+            else if (token == "element")
+            {
+                std::string type;
+                ss >> type;
+                if (type == "vertex")
+                {
+                    ss >> vertexCount;
+                    inVertex = true;
+                    propCounter = 0;
+                }
+                else if (type == "face")
+                {
+                    ss >> faceCount;
+                    inVertex = false;
+                }
+            }
+            else if (token == "property" && inVertex)
+            {
+                std::string type, name;
+                ss >> type >> name;
                 if (name == "x") idxX = propCounter;
                 if (name == "y") idxY = propCounter;
                 if (name == "z") idxZ = propCounter;
@@ -186,11 +260,12 @@ namespace Runtime::Graphics
         if (!headerEnded) return false;
 
         outData.Positions.resize(vertexCount);
-        outData.Normals.resize(vertexCount, glm::vec3(0,1,0));
+        outData.Normals.resize(vertexCount, glm::vec3(0, 1, 0));
         outData.Aux.resize(vertexCount, glm::vec4(1)); // Default white color
 
         // 2. Body Parse
-        if (binary) {
+        if (binary)
+        {
             // Assume all properties are float (4 bytes) or uchar (1 byte) for colors.
             // This is a simplified binary loader. A full one requires tracking types per property.
             // For robustness, let's fallback to "Support ASCII PLY only" or implement full type tracking.
@@ -198,9 +273,12 @@ namespace Runtime::Graphics
             // ... (Binary implementation omitted for brevity, assuming ASCII for research/text files)
             Core::Log::Warn("Binary PLY not fully implemented in this sample. Use ASCII PLY.");
             return false;
-        } else {
+        }
+        else
+        {
             // ASCII
-            for (size_t i = 0; i < vertexCount; ++i) {
+            for (size_t i = 0; i < vertexCount; ++i)
+            {
                 std::getline(file, line);
                 std::vector<std::string_view> tokens = Split(line, ' ');
 
@@ -215,42 +293,64 @@ namespace Runtime::Graphics
                 if (idxNY >= 0) outData.Normals[i].y = ParseFloat(tokens[idxNY]);
                 if (idxNZ >= 0) outData.Normals[i].z = ParseFloat(tokens[idxNZ]);
 
-                if (idxR >= 0 && idxG >= 0 && idxB >= 0) {
-                     // PLY colors are usually 0-255 int or 0-1 float. Simple heuristic:
-                     float r = ParseFloat(tokens[idxR]);
-                     if (r > 1.0f) { // Assume 0-255
-                         outData.Aux[i] = glm::vec4(
-                             r / 255.0f,
-                             ParseFloat(tokens[idxG]) / 255.0f,
-                             ParseFloat(tokens[idxB]) / 255.0f,
-                             1.0f
-                         );
-                     } else {
-                         outData.Aux[i] = glm::vec4(r, ParseFloat(tokens[idxG]), ParseFloat(tokens[idxB]), 1.0f);
-                     }
+                if (idxR >= 0 && idxG >= 0 && idxB >= 0)
+                {
+                    // PLY colors are usually 0-255 int or 0-1 float. Simple heuristic:
+                    float r = ParseFloat(tokens[idxR]);
+                    if (r > 1.0f)
+                    {
+                        // Assume 0-255
+                        outData.Aux[i] = glm::vec4(
+                            r / 255.0f,
+                            ParseFloat(tokens[idxG]) / 255.0f,
+                            ParseFloat(tokens[idxB]) / 255.0f,
+                            1.0f
+                        );
+                    }
+                    else
+                    {
+                        outData.Aux[i] = glm::vec4(r, ParseFloat(tokens[idxG]), ParseFloat(tokens[idxB]), 1.0f);
+                    }
                 }
+                if (idxS >= 0) outData.Aux[i].x = ParseFloat(tokens[idxS]);
+                if (idxT >= 0) outData.Aux[i].y = ParseFloat(tokens[idxT]);
             }
 
             // Faces
-            if (faceCount > 0) {
+            if (faceCount > 0)
+            {
                 outData.Topology = PrimitiveTopology::Triangles;
-                for (size_t i = 0; i < faceCount; ++i) {
+                for (size_t i = 0; i < faceCount; ++i)
+                {
                     std::getline(file, line);
                     std::stringstream ss(line);
-                    int count; ss >> count;
+                    int count;
+                    ss >> count;
                     std::vector<uint32_t> faceIndices(count);
-                    for(int k=0; k<count; ++k) ss >> faceIndices[k];
+                    for (int k = 0; k < count; ++k) ss >> faceIndices[k];
 
                     // Triangulate
-                    for (size_t k = 1; k < faceIndices.size() - 1; ++k) {
+                    for (size_t k = 1; k < faceIndices.size() - 1; ++k)
+                    {
                         outData.Indices.push_back(faceIndices[0]);
                         outData.Indices.push_back(faceIndices[k]);
-                        outData.Indices.push_back(faceIndices[k+1]);
+                        outData.Indices.push_back(faceIndices[k + 1]);
                     }
                 }
-            } else {
+            }
+            else
+            {
                 outData.Topology = PrimitiveTopology::Points;
             }
+        }
+
+        if (idxNX == -1)
+        {
+            Geometry::MeshUtils::RecalculateNormals(outData);
+        }
+        if (idxS == -1 || idxT == -1)
+        {
+            Geometry::MeshUtils::GenerateUVs(outData);
         }
         return true;
     }
@@ -262,23 +362,29 @@ namespace Runtime::Graphics
 
         outData.Topology = PrimitiveTopology::Points;
         std::string line;
-        while(std::getline(file, line)) {
-            if(line.empty() || line[0] == '#') continue;
+        while (std::getline(file, line))
+        {
+            if (line.empty() || line[0] == '#') continue;
             std::stringstream ss(line);
             glm::vec3 p;
             ss >> p.x >> p.y >> p.z;
             outData.Positions.push_back(p);
-            outData.Normals.push_back({0,1,0});
+            outData.Normals.emplace_back(0, 1, 0);
 
             // Check for colors
-            if (!ss.eof()) {
-                float r,g,b;
+            if (!ss.eof())
+            {
+                float r, g, b;
                 ss >> r >> g >> b;
                 outData.Aux.emplace_back(r, g, b, 1.0f);
-            } else {
+            }
+            else
+            {
                 outData.Aux.emplace_back(1.0f);
             }
         }
+
+        Geometry::MeshUtils::GenerateUVs(outData);
         return true;
     }
 
@@ -296,13 +402,20 @@ namespace Runtime::Graphics
         bool parsingEdges = false;
         std::unordered_map<int, uint32_t> idMap;
 
-        while(std::getline(file, line)) {
-            if(line.empty()) continue;
-            if(line[0] == '#') { parsingEdges = true; continue; }
+        while (std::getline(file, line))
+        {
+            if (line.empty()) continue;
+            if (line[0] == '#')
+            {
+                parsingEdges = true;
+                continue;
+            }
 
             std::stringstream ss(line);
-            if (!parsingEdges) {
-                int id; ss >> id;
+            if (!parsingEdges)
+            {
+                int id;
+                ss >> id;
                 // TGF doesn't have coordinates usually, only topology.
                 // We'll assign random positions or require a sidecar file?
                 // For this research engine, let's assume valid lines contain ID X Y Z
@@ -310,14 +423,18 @@ namespace Runtime::Graphics
                 glm::vec3 p{0.0f};
                 if (!ss.eof()) ss >> p.x >> p.y >> p.z;
 
-                uint32_t idx = (uint32_t)outData.Positions.size();
+                auto idx = static_cast<uint32_t>(outData.Positions.size());
                 idMap[id] = idx;
                 outData.Positions.push_back(p);
-                outData.Normals.push_back({0,1,0});
+                outData.Normals.emplace_back(0, 1, 0);
                 outData.Aux.emplace_back(1);
-            } else {
-                int from, to; ss >> from >> to;
-                if (idMap.count(from) && idMap.count(to)) {
+            }
+            else
+            {
+                int from, to;
+                ss >> from >> to;
+                if (idMap.count(from) && idMap.count(to))
+                {
                     outData.Indices.push_back(idMap[from]);
                     outData.Indices.push_back(idMap[to]);
                 }
@@ -329,39 +446,47 @@ namespace Runtime::Graphics
     // --- GLTF Adapter ---
     static bool LoadGLTF(const std::string& fullPath, std::vector<GeometryCpuData>& outMeshes)
     {
-         tinygltf::Model model;
-         tinygltf::TinyGLTF loader;
-         std::string err, warn;
-         bool ret = fullPath.ends_with(".glb")
-             ? loader.LoadBinaryFromFile(&model, &err, &warn, fullPath)
-             : loader.LoadASCIIFromFile(&model, &err, &warn, fullPath);
+        tinygltf::Model model;
+        tinygltf::TinyGLTF loader;
+        std::string err, warn;
+        bool ret = fullPath.ends_with(".glb")
+                       ? loader.LoadBinaryFromFile(&model, &err, &warn, fullPath)
+                       : loader.LoadASCIIFromFile(&model, &err, &warn, fullPath);
 
-         if (!warn.empty()) Core::Log::Warn("GLTF: {}", warn);
-         if (!ret) return false;
+        if (!warn.empty()) Core::Log::Warn("GLTF: {}", warn);
+        if (!ret) return false;
 
-         for (const auto& gltfMesh : model.meshes) {
-            for (const auto& primitive : gltfMesh.primitives) {
-                 GeometryCpuData meshData;
+        for (const auto& gltfMesh : model.meshes)
+        {
+            for (const auto& primitive : gltfMesh.primitives)
+            {
+                GeometryCpuData meshData;
+                bool hasNormals = false;
 
-                 // 1. Topology Mapping
-                 switch(primitive.mode) {
-                     case TINYGLTF_MODE_POINTS: meshData.Topology = PrimitiveTopology::Points; break;
-                     case TINYGLTF_MODE_LINE:
-                     case TINYGLTF_MODE_LINE_LOOP:
-                     case TINYGLTF_MODE_LINE_STRIP: meshData.Topology = PrimitiveTopology::Lines; break;
-                     case TINYGLTF_MODE_TRIANGLES:
-                     case TINYGLTF_MODE_TRIANGLE_STRIP:
-                     case TINYGLTF_MODE_TRIANGLE_FAN: meshData.Topology = PrimitiveTopology::Triangles; break;
-                     default: continue; // Unsupported topology
-                 }
+                // 1. Topology Mapping
+                switch (primitive.mode)
+                {
+                case TINYGLTF_MODE_POINTS: meshData.Topology = PrimitiveTopology::Points;
+                    break;
+                case TINYGLTF_MODE_LINE:
+                case TINYGLTF_MODE_LINE_LOOP:
+                case TINYGLTF_MODE_LINE_STRIP: meshData.Topology = PrimitiveTopology::Lines;
+                    break;
+                case TINYGLTF_MODE_TRIANGLES:
+                case TINYGLTF_MODE_TRIANGLE_STRIP:
+                case TINYGLTF_MODE_TRIANGLE_FAN: meshData.Topology = PrimitiveTopology::Triangles;
+                    break;
+                default: continue; // Unsupported topology
+                }
 
-                 // 2. Accessors Setup
-                 const float* positionBuffer = nullptr;
-                 const float* normalsBuffer = nullptr;
-                 const float* texCoordsBuffer = nullptr;
-                 size_t vertexCount = 0;
+                // 2. Accessors Setup
+                const float* positionBuffer = nullptr;
+                const float* normalsBuffer = nullptr;
+                const float* texCoordsBuffer = nullptr;
+                size_t vertexCount = 0;
 
-                 auto GetBuffer = [&](const char* attrName) -> const float* {
+                auto GetBuffer = [&](const char* attrName) -> const float*
+                {
                     if (primitive.attributes.find(attrName) == primitive.attributes.end()) return nullptr;
                     const auto& accessor = model.accessors[primitive.attributes.at(attrName)];
                     const auto& view = model.bufferViews[accessor.bufferView];
@@ -386,43 +511,61 @@ namespace Runtime::Graphics
                 {
                     meshData.Positions[i] = glm::make_vec3(&positionBuffer[i * 3]);
 
-                    if (normalsBuffer) {
+                    if (normalsBuffer)
+                    {
                         meshData.Normals[i] = glm::make_vec3(&normalsBuffer[i * 3]);
-                    } else {
+                    }
+                    else
+                    {
                         meshData.Normals[i] = glm::vec3(0, 1, 0);
                     }
 
-                    if (texCoordsBuffer) {
+                    if (texCoordsBuffer)
+                    {
                         glm::vec2 uv = glm::make_vec2(&texCoordsBuffer[i * 2]);
                         meshData.Aux[i] = glm::vec4(uv.x, uv.y, 0.0f, 0.0f);
-                    } else {
+                    }
+                    else
+                    {
                         meshData.Aux[i] = glm::vec4(0.0f);
                     }
                 }
 
                 // 4. Indices
-                if (primitive.indices >= 0) {
-                     const auto& accessor = model.accessors[primitive.indices];
-                     const auto& view = model.bufferViews[accessor.bufferView];
-                     const auto& buffer = model.buffers[view.buffer];
-                     const uint8_t* data = &buffer.data[view.byteOffset + accessor.byteOffset];
+                if (primitive.indices >= 0)
+                {
+                    const auto& accessor = model.accessors[primitive.indices];
+                    const auto& view = model.bufferViews[accessor.bufferView];
+                    const auto& buffer = model.buffers[view.buffer];
+                    const uint8_t* data = &buffer.data[view.byteOffset + accessor.byteOffset];
 
-                     if (accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT) {
-                         const uint32_t* buf = reinterpret_cast<const uint32_t*>(data);
-                         meshData.Indices.assign(buf, buf + accessor.count);
-                     } else if (accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) {
-                         const uint16_t* buf = reinterpret_cast<const uint16_t*>(data);
-                         for(size_t i=0; i<accessor.count; ++i) meshData.Indices.push_back(buf[i]);
-                     } else if (accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE) {
-                         const uint8_t* buf = reinterpret_cast<const uint8_t*>(data);
-                         for(size_t i=0; i<accessor.count; ++i) meshData.Indices.push_back(buf[i]);
-                     }
+                    if (accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT)
+                    {
+                        const auto* buf = reinterpret_cast<const uint32_t*>(data);
+                        meshData.Indices.assign(buf, buf + accessor.count);
+                    }
+                    else if (accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT)
+                    {
+                        const auto* buf = reinterpret_cast<const uint16_t*>(data);
+                        for (size_t i = 0; i < accessor.count; ++i) meshData.Indices.push_back(buf[i]);
+                    }
+                    else if (accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE)
+                    {
+                        const auto* buf = reinterpret_cast<const uint8_t*>(data);
+                        for (size_t i = 0; i < accessor.count; ++i) meshData.Indices.push_back(buf[i]);
+                    }
                 }
+
+                if (!hasNormals)
+                {
+                    Geometry::MeshUtils::RecalculateNormals(meshData);
+                }
+                if (!texCoordsBuffer) Geometry::MeshUtils::GenerateUVs(meshData);
 
                 outMeshes.push_back(std::move(meshData));
             }
-         }
-         return true;
+        }
+        return true;
     }
 
     std::shared_ptr<Model> ModelLoader::Load(std::shared_ptr<RHI::VulkanDevice> device,
@@ -476,7 +619,70 @@ namespace Runtime::Graphics
         {
             for (const auto& meshData : cpuMeshes)
             {
-                model->Meshes.push_back(std::make_shared<GeometryGpuData>(device, meshData.ToUploadRequest()));
+                MeshSegment segment;
+                segment.Name = "Mesh_" + std::to_string(model->Meshes.size());
+
+                // 1. Compute Logic Data (COOKING)
+                segment.CollisionGeometry = std::make_shared<GeometryCollisionData>();
+
+                // A. Compute AABB
+                auto aabbs = Geometry::Convert(meshData.Positions);
+                segment.CollisionGeometry->LocalAABB = Geometry::Union(aabbs);
+
+                // B. Build Octree (Fit to Points)
+                // We construct a vector of small AABBs for the points or triangles to feed the Octree
+                // For a static mesh, building an Octree of Triangles is usually better than points.
+                std::vector<Geometry::AABB> primitiveBounds;
+
+                if (meshData.Indices.empty())
+                {
+                    // Non-indexed logic (every 3 vertices = 1 triangle)
+                    primitiveBounds.reserve(meshData.Positions.size() / 3);
+                    for (size_t i = 0; i < meshData.Positions.size(); i += 3)
+                    {
+                        auto aabb = Geometry::AABB{meshData.Positions[i], meshData.Positions[i]};
+                        aabb = Geometry::Union(aabb, meshData.Positions[i + 1]);
+                        aabb = Geometry::Union(aabb, meshData.Positions[i + 2]);
+                        primitiveBounds.push_back(aabb);
+                    }
+                }
+                else
+                {
+                    // Indexed logic
+                    primitiveBounds.reserve(meshData.Indices.size() / 3);
+                    for (size_t i = 0; i < meshData.Indices.size(); i += 3)
+                    {
+                        uint32_t i0 = meshData.Indices[i];
+                        uint32_t i1 = meshData.Indices[i + 1];
+                        uint32_t i2 = meshData.Indices[i + 2];
+                        auto aabb = Geometry::AABB{meshData.Positions[i0], meshData.Positions[i0]};
+                        aabb = Geometry::Union(aabb, meshData.Positions[i1]);
+                        aabb = Geometry::Union(aabb, meshData.Positions[i2]);
+                        primitiveBounds.push_back(aabb);
+                    }
+                }
+
+                segment.CollisionGeometry->LocalOctree.Build(primitiveBounds, Geometry::Octree::SplitPolicy{}, 16, 8);
+                Core::Log::Info("Octree built: {} nodes for {} primitives",
+                                segment.CollisionGeometry->LocalOctree.Nodes.Span().size(),
+                                primitiveBounds.size());
+                // Keep CPU positions for precise checks if needed (Trade-off: RAM usage)
+                segment.CollisionGeometry->Positions = std::move(meshData.Positions);
+                segment.CollisionGeometry->Indices = std::move(meshData.Indices);
+
+                // 2. Upload to GPU
+                // Note: We moved Positions out of meshData above, so we might need to copy
+                // or change order if we want to keep them.
+                // Better approach: Pass meshData to GpuData constructor *before* moving vectors.
+                GeometryUploadRequest uploadReq;
+                uploadReq.Positions = segment.CollisionGeometry->Positions;
+                uploadReq.Indices = segment.CollisionGeometry->Indices;
+                uploadReq.Normals = meshData.Normals; // These weren't moved
+                uploadReq.Aux = meshData.Aux; // These weren't moved
+
+                segment.GpuGeometry = std::make_shared<GeometryGpuData>(device, uploadReq);
+
+                model->Meshes.emplace_back(std::make_shared<MeshSegment>(segment));
             }
             Core::Log::Info("Loaded {} ({} submeshes)", filepath, model->Size());
         }

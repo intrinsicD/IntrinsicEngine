@@ -9,6 +9,7 @@ export module Runtime.Geometry.Overlap;
 import Runtime.Geometry.Primitives;
 import Runtime.Geometry.SDF;
 import Runtime.Geometry.GJK;
+import Runtime.Geometry.Support;
 
 export namespace Runtime::Geometry
 {
