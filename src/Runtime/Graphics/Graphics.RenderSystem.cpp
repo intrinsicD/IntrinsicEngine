@@ -1,6 +1,9 @@
 module;
 #include <cstring>
+#include <limits>
 #include <glm/glm.hpp>
+#include <unordered_map>
+#include <vector>
 #include <entt/entt.hpp>
 #include "RHI/RHI.Vulkan.hpp"
 #include <imgui.h>
@@ -70,6 +73,134 @@ namespace Runtime::Graphics
         Graph::RGResourceHandle Depth;
     };
 
+    struct DrawInstance
+    {
+        glm::mat4 Model;
+    };
+
+    struct DrawBatch
+    {
+        GeometryPtr Geometry;
+        MaterialPtr Material;
+        std::vector<DrawInstance> Instances;
+    };
+
+    struct DrawKey
+    {
+        GeometryPtr Geometry;
+        MaterialPtr Material;
+
+        bool operator==(const DrawKey&) const = default;
+    };
+
+    struct DrawKeyHash
+    {
+        size_t operator()(const DrawKey& key) const noexcept
+        {
+            size_t seed = reinterpret_cast<size_t>(key.Geometry.get());
+            seed ^= reinterpret_cast<size_t>(key.Material.get()) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+            return seed;
+        }
+    };
+
+    static void AppendInstancesFromScene(ECS::Scene& scene, std::vector<DrawBatch>& batches)
+    {
+        std::unordered_map<DrawKey, uint32_t, DrawKeyHash> batchLookup;
+
+        auto view = scene.GetRegistry().view<ECS::Transform::Component, ECS::MeshRenderer::Component>();
+        for (auto [entity, transform, renderable] : view.each())
+        {
+            if (!renderable.GeometryRef || !renderable.MaterialRef)
+                continue;
+
+            DrawKey key{renderable.GeometryRef, renderable.MaterialRef};
+            auto iter = batchLookup.find(key);
+            if (iter == batchLookup.end())
+            {
+                uint32_t index = static_cast<uint32_t>(batches.size());
+                batchLookup.emplace(key, index);
+
+                DrawBatch& batch = batches.emplace_back();
+                batch.Geometry = renderable.GeometryRef;
+                batch.Material = renderable.MaterialRef;
+                batch.Instances.push_back({transform.GetTransform()});
+            }
+            else
+            {
+                batches[iter->second].Instances.push_back({transform.GetTransform()});
+            }
+        }
+    }
+
+    static void SubmitBatches(const std::vector<DrawBatch>& batches,
+                              RHI::SimpleRenderer& renderer,
+                              RHI::GraphicsPipeline& pipeline,
+                              uint32_t dynamicOffset,
+                              VkCommandBuffer cmd)
+    {
+        renderer.BindPipeline(pipeline);
+
+        for (const DrawBatch& batch : batches)
+        {
+            if (!batch.Geometry || !batch.Material || batch.Instances.empty())
+                continue;
+
+            VkDescriptorSet sets[] = {
+                batch.Material->GetDescriptorSet()
+            };
+            vkCmdBindDescriptorSets(
+                cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                pipeline.GetLayout(), 0, 1, sets, 1, &dynamicOffset);
+
+            RHI::MeshPushConstants push{};
+
+            auto* geo = batch.Geometry.get();
+            auto* vBuf = geo->GetVertexBuffer()->GetHandle();
+            const auto& layout = geo->GetLayout();
+
+            VkBuffer vBuffers[] = {
+                vBuf, vBuf, vBuf
+            };
+            VkDeviceSize offsets[] = {
+                layout.PositionsOffset,
+                layout.NormalsOffset,
+                layout.AuxOffset
+            };
+            vkCmdBindVertexBuffers(cmd, 0, 3, vBuffers, offsets);
+
+            VkPrimitiveTopology vkTopo = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+            switch (geo->GetTopology())
+            {
+            case PrimitiveTopology::Lines: vkTopo = VK_PRIMITIVE_TOPOLOGY_LINE_LIST; break;
+            case PrimitiveTopology::Points: vkTopo = VK_PRIMITIVE_TOPOLOGY_POINT_LIST; break;
+            default: break;
+            }
+            vkCmdSetPrimitiveTopology(cmd, vkTopo);
+
+            if (geo->GetIndexCount() > 0)
+            {
+                vkCmdBindIndexBuffer(cmd, geo->GetIndexBuffer()->GetHandle(), 0, VK_INDEX_TYPE_UINT32);
+
+                for (const DrawInstance& instance : batch.Instances)
+                {
+                    push.model = instance.Model;
+                    vkCmdPushConstants(cmd, pipeline.GetLayout(), VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push), &push);
+                    vkCmdDrawIndexed(cmd, geo->GetIndexCount(), 1, 0, 0, 0);
+                }
+            }
+            else
+            {
+                uint32_t vertCount = static_cast<uint32_t>(layout.PositionsSize / sizeof(glm::vec3));
+                for (const DrawInstance& instance : batch.Instances)
+                {
+                    push.model = instance.Model;
+                    vkCmdPushConstants(cmd, pipeline.GetLayout(), VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(push), &push);
+                    vkCmdDraw(cmd, vertCount, 1, 0, 0);
+                }
+            }
+        }
+    }
+
     void RenderSystem::OnUpdate(ECS::Scene& scene, const CameraComponent& camera)
     {
         Interface::GUI::BeginFrame();
@@ -96,6 +227,9 @@ namespace Runtime::Graphics
 
             auto extent = m_Swapchain.GetExtent();
             uint32_t imageIndex = m_Renderer.GetImageIndex();
+
+            std::vector<DrawBatch> drawList;
+            AppendInstancesFromScene(scene, drawList);
 
             Graph::RGResourceHandle backbufferHandle{};
 
@@ -132,84 +266,18 @@ namespace Runtime::Graphics
                                                    [&, offset](const ForwardPassData&, const Graph::RGRegistry&,
                                                                VkCommandBuffer cmd)
                                                    {
-                                                       m_Renderer.BindPipeline(m_Pipeline);
                                                        m_Renderer.SetViewport(extent.width, extent.height);
 
-                                                       auto view = scene.GetRegistry().view<
-                                                           ECS::Transform::Component, ECS::MeshRenderer::Component>();
-                                                       for (auto [entity, transform, renderable] : view.each())
+                                                       if (offset > static_cast<size_t>(std::numeric_limits<uint32_t>::max()))
                                                        {
-                                                           if (!renderable.GeometryRef || !renderable.MaterialRef)
-                                                               continue;
-
-                                                           VkDescriptorSet sets[] = {
-                                                               renderable.MaterialRef->GetDescriptorSet()
-                                                           };
-                                                           // Check for overflow before casting to uint32_t
-                                                           if (offset > static_cast<size_t>(std::numeric_limits<
-                                                               uint32_t>::max()))
-                                                           {
-                                                               Core::Log::Error(
-                                                                   "UBO offset overflow! Offset {} exceeds uint32_t max",
-                                                                   offset);
-                                                               continue;
-                                                           }
-                                                           uint32_t dynamicOffset = static_cast<uint32_t>(offset);
-                                                           vkCmdBindDescriptorSets(
-                                                               cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                                               m_Pipeline.GetLayout(), 0, 1, sets, 1, &dynamicOffset);
-
-                                                           RHI::MeshPushConstants push{};
-                                                           push.model = transform.GetTransform();
-                                                           vkCmdPushConstants(
-                                                               cmd, m_Pipeline.GetLayout(), VK_SHADER_STAGE_VERTEX_BIT,
-                                                               0, sizeof(push), &push);
-
-
-                                                           auto* geo = renderable.GeometryRef.get();
-                                                           auto* vBuf = geo->GetVertexBuffer()->GetHandle();
-                                                           const auto& layout = geo->GetLayout();
-
-                                                           VkBuffer vBuffers[] = {
-                                                               vBuf, vBuf, vBuf
-                                                           };
-                                                           VkDeviceSize offsets[] = {
-                                                               layout.PositionsOffset,
-                                                               layout.NormalsOffset,
-                                                               layout.AuxOffset
-                                                           };
-                                                           vkCmdBindVertexBuffers(cmd, 0, 3, vBuffers, offsets);
-
-                                                           VkPrimitiveTopology vkTopo =
-                                                               VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-                                                           switch (geo->GetTopology())
-                                                           {
-                                                           case PrimitiveTopology::Lines: vkTopo =
-                                                                   VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
-                                                               break;
-                                                           case PrimitiveTopology::Points: vkTopo =
-                                                                   VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
-                                                               break;
-                                                           default: break;
-                                                           }
-                                                           vkCmdSetPrimitiveTopology(cmd, vkTopo);
-
-                                                           if (geo->GetIndexCount() > 0)
-                                                           {
-                                                               vkCmdBindIndexBuffer(
-                                                                   cmd, geo->GetIndexBuffer()->GetHandle(), 0,
-                                                                   VK_INDEX_TYPE_UINT32);
-                                                               vkCmdDrawIndexed(cmd, geo->GetIndexCount(), 1, 0, 0, 0);
-                                                           }
-                                                           else
-                                                           {
-                                                               // Point cloud support (non-indexed)
-                                                               // Assume vertex count is positions size / stride
-                                                               uint32_t vertCount = static_cast<uint32_t>(layout.
-                                                                   PositionsSize / sizeof(glm::vec3));
-                                                               vkCmdDraw(cmd, vertCount, 1, 0, 0);
-                                                           }
+                                                           Core::Log::Error(
+                                                               "UBO offset overflow! Offset {} exceeds uint32_t max",
+                                                               offset);
+                                                           return;
                                                        }
+
+                                                       SubmitBatches(drawList, m_Renderer, m_Pipeline,
+                                                                     static_cast<uint32_t>(offset), cmd);
                                                    }
             );
 

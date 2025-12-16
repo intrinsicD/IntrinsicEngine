@@ -186,59 +186,55 @@ namespace Runtime
         {
             Core::Log::Info("Loading Model: {}", path);
 
-            // TODO: Move to Async Task
-            auto model = Graphics::ModelLoader::Load(GetDevice(), path);
-
-            if (!model || !model->IsValid())
+            auto loader = [device = GetDevice()](const std::string& p)
             {
-                Core::Log::Error("Failed to load model: {}", path);
-                return;
-            }
+                return Graphics::ModelLoader::Load(device, p);
+            };
 
-            // --- Setup Default Material ---
-            auto textureLoader = [&](const std::string& p) { return std::make_shared<RHI::Texture>(GetDevice(), p); };
-            auto texHandle = m_AssetManager.Load<RHI::Texture>("assets/textures/Parameterization.jpg", textureLoader);
-
-            auto defaultMat = std::make_shared<Graphics::Material>(
-                GetDevice(), GetDescriptorPool(), GetDescriptorLayout(),
-                texHandle, m_DefaultTexture, m_AssetManager
-            );
-            defaultMat->WriteDescriptor(GetGlobalUBO()->GetHandle(), sizeof(RHI::CameraBufferObject));
-            m_LoadedMaterials.push_back(defaultMat);
-
-            // --- Spawn Entity ---
+            auto modelHandle = m_AssetManager.Load<Graphics::Model>(canonical.string(), loader);
             std::string entityName = fsPath.stem().string();
 
-            // Create a Parent Entity if multiple meshes, or just one if single
-            entt::entity rootEntity = m_Scene.CreateEntity(entityName);
-
-            // Setup Transform for Root
-            auto& t = m_Scene.GetRegistry().get<ECS::Transform::Component>(rootEntity);
-            t.Scale = glm::vec3(0.01f);
-
-            // If it's a point cloud, we might want to scale it differently or center it?
-            // For now, keep at origin.
-
-            for (size_t i = 0; i < model->Size(); i++)
+            m_AssetManager.RequestNotify(modelHandle, [this, entityName, canonicalPath = canonical.string()](Core::Assets::AssetHandle handle)
             {
-                // Store in engine cache to keep alive (optional, shared_ptr handles this mostly via components)
-                m_LoadedGeometries.push_back(model->Meshes[i]);
-
-                entt::entity targetEntity = rootEntity;
-
-                // If multi-mesh, create children (simple hierarchy simulation)
-                if (model->Size() > 1)
+                auto model = m_AssetManager.Get<Graphics::Model>(handle);
+                if (!model || !model->IsValid())
                 {
-                    targetEntity = m_Scene.CreateEntity(entityName + "_" + std::to_string(i));
-                    // TODO: Parenting system
+                    Core::Log::Error("Failed to load model: {}", canonicalPath);
+                    return;
                 }
 
-                auto& mr = m_Scene.GetRegistry().emplace<ECS::MeshRenderer::Component>(targetEntity);
-                mr.GeometryRef = model->Meshes[i]; // <--- USING NEW FIELD
-                mr.MaterialRef = defaultMat;
-            }
+                auto textureLoader = [device = GetDevice()](const std::string& p) { return std::make_shared<RHI::Texture>(device, p); };
+                auto texHandle = m_AssetManager.Load<RHI::Texture>("assets/textures/Parameterization.jpg", textureLoader);
 
-            Core::Log::Info("Successfully spawned: {}", entityName);
+                auto defaultMat = std::make_shared<Graphics::Material>(
+                    GetDevice(), GetDescriptorPool(), GetDescriptorLayout(),
+                    texHandle, m_DefaultTexture, m_AssetManager
+                );
+                defaultMat->WriteDescriptor(GetGlobalUBO()->GetHandle(), sizeof(RHI::CameraBufferObject));
+                m_LoadedMaterials.push_back(defaultMat);
+
+                entt::entity rootEntity = m_Scene.CreateEntity(entityName);
+
+                auto& t = m_Scene.GetRegistry().get<ECS::Transform::Component>(rootEntity);
+                t.Scale = glm::vec3(0.01f);
+
+                for (size_t i = 0; i < model->Size(); i++)
+                {
+                    m_LoadedGeometries.push_back(model->Meshes[i]);
+
+                    entt::entity targetEntity = rootEntity;
+                    if (model->Size() > 1)
+                    {
+                        targetEntity = m_Scene.CreateEntity(entityName + "_" + std::to_string(i));
+                    }
+
+                    auto& mr = m_Scene.GetRegistry().emplace<ECS::MeshRenderer::Component>(targetEntity);
+                    mr.GeometryRef = model->Meshes[i];
+                    mr.MaterialRef = defaultMat;
+                }
+
+                Core::Log::Info("Successfully spawned: {}", entityName);
+            });
         }
         else
         {
@@ -281,6 +277,7 @@ namespace Runtime
             float dt = std::chrono::duration<float>(currentTime - lastTime).count();
             lastTime = currentTime;
 
+            m_AssetManager.Update();
             OnUpdate(dt);
             OnRender();
         }

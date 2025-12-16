@@ -33,6 +33,9 @@ export namespace Runtime::Graphics
         [[nodiscard]] RHI::VulkanBuffer* GetGlobalUBO() const { return m_GlobalUBO.get(); }
 
     private:
+        using MaterialPtr = std::shared_ptr<Graphics::Material>;
+        using GeometryPtr = std::shared_ptr<Graphics::GeometryGpuData>;
+
         size_t m_MinUboAlignment = 0;
 
         std::shared_ptr<RHI::VulkanDevice> m_Device;

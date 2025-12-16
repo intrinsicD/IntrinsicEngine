@@ -46,6 +46,13 @@ export namespace Runtime::Graph
         VkFormat Format = VK_FORMAT_UNDEFINED;
     };
 
+    struct RGBufferDesc
+    {
+        size_t Size = 0;
+        VkBufferUsageFlags Usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+        VmaMemoryUsage Memory = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+    };
+
     // -------------------------------------------------------------------------
     // The Pass Builder (User Interface)
     // -------------------------------------------------------------------------
@@ -72,9 +79,16 @@ export namespace Runtime::Graph
         // Create a new transient texture managed by the graph
         RGResourceHandle CreateTexture(const std::string& name, const RGTextureDesc& desc);
 
+        // Create a transient buffer managed by the graph
+        RGResourceHandle CreateBuffer(const std::string& name, const RGBufferDesc& desc);
+
         // Import an existing Vulkan Image (e.g., Swapchain Backbuffer)
         RGResourceHandle ImportTexture(const std::string& name, VkImage image, VkImageView view, VkFormat format,
                                        VkExtent2D extent);
+
+        // Declare buffer usage for a pass
+        RGResourceHandle ReadBuffer(RGResourceHandle resource);
+        RGResourceHandle WriteBuffer(RGResourceHandle resource);
 
         [[nodiscard]] VkExtent2D GetTextureExtent(RGResourceHandle handle) const;
 
@@ -92,9 +106,11 @@ export namespace Runtime::Graph
         // Get the physical Vulkan bindable object
         [[nodiscard]] VkImage GetImage(RGResourceHandle handle) const;
         [[nodiscard]] VkImageView GetImageView(RGResourceHandle handle) const;
+        [[nodiscard]] VkBuffer GetBuffer(RGResourceHandle handle) const;
 
         // Internal use (populating the registry)
         void RegisterImage(ResourceID id, VkImage img, VkImageView view);
+        void RegisterBuffer(ResourceID id, VkBuffer buffer);
 
     private:
         struct PhysicalImage
@@ -103,7 +119,13 @@ export namespace Runtime::Graph
             VkImageView View;
         };
 
+        struct PhysicalBuffer
+        {
+            VkBuffer Buffer;
+        };
+
         std::vector<PhysicalImage> m_PhysicalImages;
+        std::vector<PhysicalBuffer> m_PhysicalBuffers;
     };
 
     using RGExecuteFn = std::function<void(const RGRegistry&, VkCommandBuffer)>;
@@ -189,18 +211,27 @@ export namespace Runtime::Graph
             // State tracking for barriers
             VkImageLayout CurrentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
             VkImageLayout InitialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            VkPipelineStageFlags2 CurrentStage = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
+            VkAccessFlags2 CurrentAccess = 0;
 
             // If imported
             VkImage PhysicalImage = VK_NULL_HANDLE;
             VkImageView PhysicalView = VK_NULL_HANDLE;
             VkExtent2D Extent = {0, 0};
             VkFormat Format = VK_FORMAT_UNDEFINED;
+
+            // Buffer info
+            VkBuffer PhysicalBuffer = VK_NULL_HANDLE;
+            size_t BufferSize = 0;
+            VkBufferUsageFlags BufferUsage = 0;
+            VmaMemoryUsage BufferMemory = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
         };
 
         // Barrier storage: Index = Pass Index
         struct BarrierBatch
         {
             std::vector<VkImageMemoryBarrier2> ImageBarriers;
+            std::vector<VkBufferMemoryBarrier2> BufferBarriers;
         };
 
         struct PooledImage
@@ -208,6 +239,16 @@ export namespace Runtime::Graph
             std::unique_ptr<RHI::VulkanImage> Resource;
             uint32_t LastFrameIndex;
             bool IsFree;
+        };
+
+        struct PooledBuffer
+        {
+            std::unique_ptr<RHI::VulkanBuffer> Resource;
+            uint32_t LastFrameIndex;
+            bool IsFree;
+            size_t Size;
+            VkBufferUsageFlags Usage;
+            VmaMemoryUsage Memory;
         };
 
         std::shared_ptr<RHI::VulkanDevice> m_Device;
@@ -221,10 +262,13 @@ export namespace Runtime::Graph
 
         RGRegistry m_Registry;
         std::vector<PooledImage> m_ImagePool;
+        std::vector<PooledBuffer> m_BufferPool;
 
         RGPass& CreatePassInternal(const std::string& name);
         std::pair<ResourceID, bool> CreateResourceInternal(const std::string& name, ResourceType type);
         RHI::VulkanImage* AllocateImage(uint32_t frameIndex, uint32_t width, uint32_t height, VkFormat format,
                                         VkImageUsageFlags usage, VkImageAspectFlags aspect);
+        RHI::VulkanBuffer* AllocateBuffer(uint32_t frameIndex, size_t size, VkBufferUsageFlags usage,
+                                          VmaMemoryUsage memoryUsage);
     };
 }
