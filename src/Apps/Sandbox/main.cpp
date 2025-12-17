@@ -147,17 +147,23 @@ public:
             if (m_AssetManager.GetState(m_DuckModel) == Assets::LoadState::Ready)
             {
                 auto model = m_AssetManager.Get<Graphics::Model>(m_DuckModel);
-                if (model && !model->Meshes.empty())
-                {
-                    auto e = m_Scene.CreateEntity("Duck");
-                    m_SelectedEntity = e;
-                    auto& t = m_Scene.GetRegistry().get<ECS::Transform::Component>(e);
-                    t.Scale = glm::vec3(0.01f);
-                    m_Scene.GetRegistry().emplace<ECS::Transform::Rotator>(e, ECS::Transform::Rotator::Y());
 
-                    auto& mr = m_Scene.GetRegistry().emplace<ECS::MeshRenderer::Component>(e);
-                    mr.GeometryRef = model->Meshes[0]->GpuGeometry;
-                    mr.MaterialRef = m_DuckMaterial; // Assign material with handle
+                for (const auto& meshSegment : model->Meshes)
+                {
+                    auto entity = m_Scene.CreateEntity(meshSegment->Name);
+
+                    m_SelectedEntity = entity;
+                    auto& t = m_Scene.GetRegistry().get<ECS::Transform::Component>(entity);
+                    t.Scale = glm::vec3(0.01f);
+                    m_Scene.GetRegistry().emplace<ECS::Transform::Rotator>(entity, ECS::Transform::Rotator::Y());
+
+                    auto& mr = m_Scene.GetRegistry().emplace<ECS::MeshRenderer::Component>(entity);
+                    mr.GeometryRef = meshSegment->GpuGeometry;
+                    mr.MaterialRef = m_DuckMaterial;
+
+                    auto& collider = m_Scene.GetRegistry().emplace<ECS::MeshCollider::Component>(entity);
+                    collider.CollisionRef = meshSegment->CollisionGeometry; // Shared Ptr
+                    collider.WorldOBB.Center = meshSegment->CollisionGeometry->LocalAABB.GetCenter();
 
                     m_IsEntitySpawned = true;
                     Log::Info("Duck Entity Spawned.");
@@ -171,6 +177,24 @@ public:
             for (auto [entity, transform, rotator] : view.each())
             {
                 ECS::Transform::OnUpdate(transform, rotator,dt);
+            }
+        }
+
+        {
+            auto view = m_Scene.GetRegistry().view<ECS::Transform::Component, ECS::MeshCollider::Component>();
+            for (auto [entity, transform, collider] : view.each())
+            {
+                // World center: transform the local center point
+                // Explicitly cast vec4 result to vec3
+                glm::vec3 localCenter = collider.CollisionRef->LocalAABB.GetCenter();
+                collider.WorldOBB.Center = glm::vec3(transform.GetTransform() * glm::vec4(localCenter, 1.0f));
+
+                // Extents: scale component-wise by absolute scale (handles negative/non-uniform scale)
+                glm::vec3 localExtents = collider.CollisionRef->LocalAABB.GetExtents();
+                collider.WorldOBB.Extents = localExtents * glm::abs(transform.Scale);
+
+                // Rotation: object rotation in world space.
+                collider.WorldOBB.Rotation = transform.Rotation;
             }
         }
 
@@ -203,7 +227,7 @@ public:
                 ImGuiTreeNodeFlags_OpenOnArrow;
             flags |= ImGuiTreeNodeFlags_SpanAvailWidth;
 
-            bool opened = ImGui::TreeNodeEx((void*)(uint64_t)(uint32_t)entityID, flags, "%s", name.c_str());
+            bool opened = ImGui::TreeNodeEx(reinterpret_cast<void*>(static_cast<entt::id_type>(entityID)), flags, "%s", name.c_str());
 
             if (ImGui::IsItemClicked())
             {

@@ -10,6 +10,7 @@ export module Runtime.ECS.Components;
 import Runtime.RHI.Buffer;
 import Runtime.Graphics.Material;
 import Runtime.Graphics.Geometry;
+import Runtime.Geometry.OBB;
 
 export namespace Runtime::ECS::Tag
 {
@@ -30,7 +31,7 @@ export namespace Runtime::ECS::Transform
         [[nodiscard]] glm::mat4 GetTransform() const
         {
             glm::mat4 mat = glm::translate(glm::mat4(1.0f), Position);
-            mat = glm::mat4_cast(Rotation) * mat;
+            mat = mat * glm::mat4_cast(Rotation); // Multiply on right to apply rotation after translation
             mat = glm::scale(mat, Scale);
             return mat;
         }
@@ -60,5 +61,14 @@ export namespace Runtime::ECS::MeshRenderer
     {
         std::shared_ptr<Graphics::GeometryGpuData> GeometryRef; // Renamed from MeshRef
         std::shared_ptr<Graphics::Material> MaterialRef;
+    };
+}
+
+export namespace Runtime::ECS::MeshCollider
+{
+    struct Component
+    {
+        std::shared_ptr<Graphics::GeometryCollisionData> CollisionRef;
+        Geometry::OBB WorldOBB;
     };
 }

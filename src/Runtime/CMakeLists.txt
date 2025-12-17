@@ -64,6 +64,7 @@ target_sources(${target_name}
         Graphics/Graphics.RenderSystem.cpp
         Graphics/Graphics.Geometry.cpp
         Graphics/Graphics.ModelLoader.cpp
+        Graphics/Graphics.Camera.cpp
         Graphics/Graphics.TinyGltf.cpp
         Geometry/Geometry.MeshUtils.cpp
         RenderGraph/RenderGraph.cpp
