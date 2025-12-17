@@ -98,7 +98,7 @@ namespace Core::Windowing
         // 1. Resize
         glfwSetFramebufferSizeCallback(glfwWindow, [](GLFWwindow* window, int width, int height)
         {
-            WindowData& data = *(WindowData*)glfwGetWindowUserPointer(window);
+            WindowData& data = *static_cast<WindowData*>(glfwGetWindowUserPointer(window));
             if (data.Callback)
             {
                 data.Callback(WindowResizeEvent{width, height});
@@ -108,7 +108,7 @@ namespace Core::Windowing
         // 2. Close
         glfwSetWindowCloseCallback(glfwWindow, [](GLFWwindow* window)
         {
-            WindowData& data = *(WindowData*)glfwGetWindowUserPointer(window);
+            WindowData& data = *static_cast<WindowData*>(glfwGetWindowUserPointer(window));
             if (data.Callback)
             {
                 data.Callback(WindowCloseEvent{});
@@ -120,7 +120,7 @@ namespace Core::Windowing
                                       [[maybe_unused]] int mods)
         {
             ImGui_ImplGlfw_KeyCallback(window, key, scancode, action, mods);
-            WindowData& data = *(WindowData*)glfwGetWindowUserPointer(window);
+            WindowData& data = *static_cast<WindowData*>(glfwGetWindowUserPointer(window));
 
             if (action == GLFW_PRESS || action == GLFW_RELEASE)
             {
@@ -134,7 +134,7 @@ namespace Core::Windowing
         glfwSetMouseButtonCallback(glfwWindow, [](GLFWwindow* window, int button, int action, int mods)
         {
             ImGui_ImplGlfw_MouseButtonCallback(window, button, action, mods);
-            WindowData& data = *(WindowData*)glfwGetWindowUserPointer(window);
+            WindowData& data = *static_cast<WindowData*>(glfwGetWindowUserPointer(window));
 
             if (action == GLFW_PRESS || action == GLFW_RELEASE)
             {
@@ -148,7 +148,7 @@ namespace Core::Windowing
         glfwSetScrollCallback(glfwWindow, [](GLFWwindow* window, double xoffset, double yoffset)
         {
             ImGui_ImplGlfw_ScrollCallback(window, xoffset, yoffset);
-            WindowData& data = *(WindowData*)glfwGetWindowUserPointer(window);
+            WindowData& data = *static_cast<WindowData*>(glfwGetWindowUserPointer(window));
             if (data.Callback)
             {
                 data.Callback(ScrollEvent{xoffset, yoffset});
@@ -158,7 +158,7 @@ namespace Core::Windowing
         glfwSetCursorPosCallback(glfwWindow, [](GLFWwindow* window, double xpos, double ypos)
         {
             ImGui_ImplGlfw_CursorPosCallback(window, xpos, ypos);
-            WindowData& data = *(WindowData*)glfwGetWindowUserPointer(window);
+            WindowData& data = *static_cast<WindowData*>(glfwGetWindowUserPointer(window));
             if (data.Callback)
             {
                 data.Callback(CursorEvent{xpos, ypos});
@@ -168,7 +168,7 @@ namespace Core::Windowing
         glfwSetCharCallback(glfwWindow, [](GLFWwindow* window, unsigned int c)
         {
             ImGui_ImplGlfw_CharCallback(window, c);
-            WindowData& data = *(WindowData*)glfwGetWindowUserPointer(window);
+            WindowData& data = *static_cast<WindowData*>(glfwGetWindowUserPointer(window));
             if (data.Callback)
             {
                 data.Callback(CharEvent{c});
@@ -177,7 +177,7 @@ namespace Core::Windowing
 
         glfwSetDropCallback(glfwWindow, [](GLFWwindow* window, int count, const char** paths)
         {
-            WindowData& data = *(WindowData*)glfwGetWindowUserPointer(window);
+            WindowData& data = *static_cast<WindowData*>(glfwGetWindowUserPointer(window));
 
             WindowDropEvent event;
             // Convert C-strings to std::vector<std::string>
@@ -208,6 +208,17 @@ namespace Core::Windowing
     {
         if (!m_IsValid) return;
         glfwPollEvents();
+        glfwGetWindowSize(static_cast<GLFWwindow*>(m_Window), &m_Data.Width, &m_Data.Height);
+    }
+
+    int Window::GetWidth() const
+    {
+        return m_Data.Width;
+    }
+
+    int Window::GetHeight() const
+    {
+        return m_Data.Height;
     }
 
     bool Window::ShouldClose() const

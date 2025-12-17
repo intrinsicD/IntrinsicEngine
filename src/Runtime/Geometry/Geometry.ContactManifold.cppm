@@ -1,7 +1,6 @@
 module;
 #include <glm/glm.hpp>
 #include <optional>
-#define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/norm.hpp>
 
 export module Runtime.Geometry.Contact;

@@ -2,6 +2,7 @@ module;
 #include <string>
 #include <functional>
 #include <variant>
+#include <vector>
 
 export module Core.Window;
 
@@ -86,8 +87,8 @@ export namespace Core::Windowing
 
         [[nodiscard]] bool ShouldClose() const;
         [[nodiscard]] void* GetNativeHandle() const { return m_Window; } // Returns GLFWwindow* void*
-        [[nodiscard]] int GetWidth() const { return m_Data.Width; }
-        [[nodiscard]] int GetHeight() const { return m_Data.Height; }
+        [[nodiscard]] int GetWidth() const;
+        [[nodiscard]] int GetHeight() const;
         [[nodiscard]] bool IsValid() const { return m_IsValid; }
 
         // Set the function that the Window calls when something happens

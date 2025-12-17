@@ -1,4 +1,5 @@
 module;
+
 #include <vector>
 #include <thread>
 #include <queue>
@@ -81,7 +82,7 @@ namespace Core::Tasks
 
         // Increment counter BEFORE enqueuing to prevent race condition
         // where worker grabs and completes task before WaitForAll sees the increment
-        s_Ctx->activeTaskCount++;
+        ++s_Ctx->activeTaskCount;
 
         {
             std::lock_guard lock(s_Ctx->queueMutex);
@@ -137,7 +138,7 @@ namespace Core::Tasks
             // Decrement counter and notify waiter
             {
                 std::lock_guard lock(s_Ctx->queueMutex);
-                s_Ctx->activeTaskCount--;
+                --s_Ctx->activeTaskCount;
                 if (s_Ctx->activeTaskCount == 0 && s_Ctx->globalQueue.empty())
                 {
                     s_Ctx->waitCondition.notify_all();

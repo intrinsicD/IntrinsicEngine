@@ -1,11 +1,6 @@
 module;
-#include <vector>
-#include <thread>
+
 #include <functional>
-#include <atomic>
-#include <deque>
-#include <mutex>
-#include <condition_variable>
 
 export module Core.Tasks;
 import Core.Logging;

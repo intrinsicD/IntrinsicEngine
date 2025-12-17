@@ -3,6 +3,9 @@ module;
 #include <string>
 #include <functional>
 #include <thread>
+#include <vector>
+#include <mutex>
+#include <atomic>
 
 export module Core.Filesystem;
 

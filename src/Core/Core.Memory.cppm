@@ -61,38 +61,10 @@ export namespace Core::Memory
         LinearArena& operator=(const LinearArena&) = delete;
 
         // Move Constructor
-        LinearArena(LinearArena&& other) noexcept
-            : start_(other.start_), totalSize_(other.totalSize_), offset_(other.offset_)
-        {
-            other.start_ = nullptr;
-            other.totalSize_ = 0;
-            other.offset_ = 0;
-        }
+        LinearArena(LinearArena&& other) noexcept;
 
         // Move Assignment
-        LinearArena& operator=(LinearArena&& other) noexcept {
-            if (this != &other) {
-                // Free our own memory first
-                if (start_) {
-#if defined(_MSC_VER)
-                    _aligned_free(start_);
-#else
-                    std::free(start_);
-#endif
-                }
-
-                // Steal resources
-                start_ = other.start_;
-                totalSize_ = other.totalSize_;
-                offset_ = other.offset_;
-
-                // Nullify source
-                other.start_ = nullptr;
-                other.totalSize_ = 0;
-                other.offset_ = 0;
-            }
-            return *this;
-        }
+        LinearArena& operator=(LinearArena&& other) noexcept;
 
         explicit LinearArena(size_t sizeBytes);
         ~LinearArena();
@@ -126,12 +98,12 @@ export namespace Core::Memory
         }
 
         void Reset();
-        [[nodiscard]] size_t GetUsed() const { return offset_; }
-        [[nodiscard]] size_t GetTotal() const { return totalSize_; }
+        [[nodiscard]] size_t GetUsed() const { return m_Offset; }
+        [[nodiscard]] size_t GetTotal() const { return m_TotalSize; }
 
     private:
-        std::byte* start_ = nullptr;
-        size_t totalSize_ = 0;
-        size_t offset_ = 0;
+        std::byte* m_Start = nullptr;
+        size_t m_TotalSize = 0;
+        size_t m_Offset = 0;
     };
 }

@@ -96,6 +96,7 @@ FetchContent_Declare(
         GIT_TAG 1.0.0
 )
 FetchContent_MakeAvailable(glm)
+target_compile_definitions(glm PUBLIC GLM_FORCE_RADIANS GLM_FORCE_DEPTH_ZERO_TO_ONE GLM_ENABLE_EXPERIMENTAL GLM_RIGHT_HANDED)
 
 if(TARGET glm)
     target_compile_options(glm PRIVATE -w)

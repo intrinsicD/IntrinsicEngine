@@ -143,10 +143,10 @@ namespace Runtime::Graphics
                         uniqueVertices[key] = idx;
 
                         outData.Positions.push_back(tempPos[key.p]);
-                        outData.Normals.push_back((key.n >= 0 && key.n < tempNorm.size())
+                        outData.Normals.push_back((key.n >= 0 && static_cast<size_t>(key.n) < tempNorm.size())
                                                       ? tempNorm[key.n]
                                                       : glm::vec3(0, 1, 0));
-                        glm::vec2 uv = (key.t >= 0 && key.t < tempUV.size()) ? tempUV[key.t] : glm::vec2(0, 0);
+                        glm::vec2 uv = (key.t >= 0 && static_cast<size_t>(key.t) < tempUV.size()) ? tempUV[key.t] : glm::vec2(0, 0);
                         outData.Aux.emplace_back(uv.x, uv.y, 0, 0);
                     }
                     faceIndices.push_back(uniqueVertices[key]);
@@ -168,7 +168,7 @@ namespace Runtime::Graphics
             }
         }
 
-        if (hasNormals)
+        if (!hasNormals)
         {
             Geometry::MeshUtils::RecalculateNormals(outData);
         }
@@ -514,6 +514,7 @@ namespace Runtime::Graphics
                     if (normalsBuffer)
                     {
                         meshData.Normals[i] = glm::make_vec3(&normalsBuffer[i * 3]);
+                        hasNormals = true;
                     }
                     else
                     {

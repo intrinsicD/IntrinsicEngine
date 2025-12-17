@@ -24,6 +24,7 @@ target_sources(${target_name}
         Core.Assets.cppm
         PRIVATE
         Core.Memory.cpp
+        Core.Logging.cpp
         Core.Tasks.cpp
         Core.Window.cpp
         Core.Filesystem.cpp

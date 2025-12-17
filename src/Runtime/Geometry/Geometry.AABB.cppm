@@ -1,10 +1,11 @@
 module;
 
 #include <glm/glm.hpp>
-#define GLM_ENABLE_EXPERIMENTAL
+
 #include <glm/gtx/component_wise.hpp>
 #include <span>
 #include <vector>
+#include <cfloat>
 
 export module Runtime.Geometry.AABB;
 

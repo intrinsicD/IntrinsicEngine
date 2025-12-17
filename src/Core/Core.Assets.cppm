@@ -22,7 +22,7 @@ export namespace Core::Assets
     {
         entt::entity ID = entt::null;
 
-        bool IsValid() const { return ID != entt::null; }
+        [[nodiscard]] bool IsValid() const { return ID != entt::null; }
         bool operator==(const AssetHandle& other) const { return ID == other.ID; }
 
         // Allow hashing for maps

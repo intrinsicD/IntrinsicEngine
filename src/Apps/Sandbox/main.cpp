@@ -1,5 +1,3 @@
-#define GLM_FORCE_RADIANS
-#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -7,9 +5,7 @@
 #include <memory>
 #include <imgui.h>
 #include <entt/entity/registry.hpp>
-
-// Include Macros for Vulkan (VK_NO_PROTOTYPES)
-#include "tiny_gltf.h"
+#include <tiny_gltf.h>
 #include "RHI/RHI.Vulkan.hpp"
 
 import Runtime.Engine;
@@ -321,7 +317,7 @@ public:
                     auto& mr = reg.get<ECS::MeshRenderer::Component>(m_SelectedEntity);
                     if (mr.GeometryRef)
                     {
-                        ImGui::Text("Vertices: %u", mr.GeometryRef->GetLayout().PositionsSize / sizeof(glm::vec3));
+                        ImGui::Text("Vertices: %lu", mr.GeometryRef->GetLayout().PositionsSize / sizeof(glm::vec3));
                         ImGui::Text("Indices: %u", mr.GeometryRef->GetIndexCount());
 
                         std::string topoName = "Unknown";

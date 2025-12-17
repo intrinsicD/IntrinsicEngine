@@ -24,10 +24,10 @@ namespace Runtime::RHI {
         [[maybe_unused]] void* pUserData)
     {
         // Filter out noisy verbose messages if needed
-        if (severity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
-            Core::Log::Warn("[Vulkan Validation]: {}", pCallbackData->pMessage);
-        } else if (severity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
+        if (severity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
             Core::Log::Error("[Vulkan Error]: {}", pCallbackData->pMessage);
+        } else if (severity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
+            Core::Log::Warn("[Vulkan Validation]: {}", pCallbackData->pMessage);
         }
         return VK_FALSE;
     }
