@@ -10,6 +10,7 @@ target_sources(${target_name}
         PUBLIC
         FILE_SET CXX_MODULES
         FILES
+        RHI/RHI.Bindless.cppm
         RHI/RHI.Context.cppm
         RHI/RHI.Device.cppm
         RHI/RHI.Swapchain.cppm
@@ -49,6 +50,7 @@ target_sources(${target_name}
         Utils/Utils.BoundedHeap.cppm
         Runtime.Engine.cppm
         PRIVATE
+        RHI/RHI.Bindless.cpp
         RHI/RHI.Context.cpp
         RHI/RHI.Device.cpp
         RHI/RHI.Swapchain.cpp

@@ -154,6 +154,7 @@ namespace Runtime::RHI
         }
 
         // --- Features ---
+
         VkPhysicalDeviceFeatures deviceFeatures{};
         deviceFeatures.samplerAnisotropy = VK_TRUE; // Usually desired
 
@@ -168,10 +169,19 @@ namespace Runtime::RHI
         features13.synchronization2 = VK_TRUE;
         features13.pNext = &dynamicStateFeatures;
 
+        VkPhysicalDeviceVulkan12Features features12{};
+        features12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+        features12.descriptorIndexing = VK_TRUE;
+        features12.runtimeDescriptorArray = VK_TRUE;
+        features12.descriptorBindingPartiallyBound = VK_TRUE; // Allow sparse array
+        features12.descriptorBindingVariableDescriptorCount = VK_TRUE;
+        features12.shaderSampledImageArrayNonUniformIndexing = VK_TRUE; // Essential for
+        features12.pNext = &features13;
+
         VkPhysicalDeviceFeatures2 deviceFeatures2{};
         deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
         deviceFeatures2.features = deviceFeatures;
-        deviceFeatures2.pNext = &features13;
+        deviceFeatures2.pNext = &features12;
 
         // --- Creation ---
         VkDeviceCreateInfo createInfo{};

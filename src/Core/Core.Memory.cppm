@@ -76,6 +76,9 @@ export namespace Core::Memory
         [[nodiscard]]
         std::expected<T*, AllocatorError> New(Args&&... args)
         {
+            static_assert(std::is_trivially_destructible_v<T>,
+                          "LinearArena cannot manage types with non-trivial destructors. Use a PoolAllocator or standard heap.")
+                ;
             auto mem = Alloc(sizeof(T), alignof(T));
             if (!mem) return std::unexpected(mem.error());
 

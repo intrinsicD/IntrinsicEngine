@@ -11,7 +11,7 @@ This project serves as a testbed for high-performance graphics concepts, utilizi
 ### 🏗 Core Architecture
 *   **C++23 Modules**: Zero-overhead build times and strict interface boundaries using `.cppm` files.
 *   **No-Exception / No-RTTI**: Designed for maximum performance and stability (`-fno-exceptions`, `-fno-rtti`).
-*   **Task System**: Fiber-based, work-stealing scheduler (`Core.Tasks`) for high-throughput parallel processing.
+*   **Task System**: ThreadPool. Goal: Fiber-based, work-stealing scheduler (`Core.Tasks`) for high-throughput parallel processing.
 *   **Memory Management**: Custom `LinearArena` allocators for per-frame temporary allocations with O(1) reset cost.
 
 ### 🎨 Rendering & Graphics

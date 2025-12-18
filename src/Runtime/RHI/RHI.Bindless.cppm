@@ -1,0 +1,47 @@
+module;
+#include "RHI.Vulkan.hpp"
+#include <vector>
+#include <queue>
+#include <memory>
+
+export module Runtime.RHI.Bindless;
+
+import Runtime.RHI.Device;
+import Runtime.RHI.Texture;
+import Core.Logging;
+
+export namespace Runtime::RHI {
+
+    // Hard limit for research engine (can be dynamic, but 1024 is plenty for now)
+    constexpr uint32_t MAX_BINDLESS_TEXTURES = 1024;
+
+    class BindlessDescriptorSystem {
+    public:
+        BindlessDescriptorSystem(std::shared_ptr<VulkanDevice> device);
+        ~BindlessDescriptorSystem();
+
+        // Returns the index in the global array
+        uint32_t RegisterTexture(const Texture& texture);
+        
+        // Return index to free pool
+        void UnregisterTexture(uint32_t index);
+
+        // Update an existing slot (e.g., when async load finishes)
+        void UpdateTexture(uint32_t index, const Texture& texture);
+
+        [[nodiscard]] VkDescriptorSet GetGlobalSet() const { return m_GlobalSet; }
+        [[nodiscard]] VkDescriptorSetLayout GetLayout() const { return m_Layout; }
+
+    private:
+        std::shared_ptr<VulkanDevice> m_Device;
+        VkDescriptorPool m_Pool = VK_NULL_HANDLE;
+        VkDescriptorSetLayout m_Layout = VK_NULL_HANDLE;
+        VkDescriptorSet m_GlobalSet = VK_NULL_HANDLE;
+
+        std::queue<uint32_t> m_FreeSlots;
+        uint32_t m_HighWaterMark = 0; // Current max index used
+
+        void CreateLayout();
+        void CreatePoolAndSet();
+    };
+}
