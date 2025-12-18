@@ -32,6 +32,27 @@ namespace Core::Tasks
 
     static std::unique_ptr<SchedulerContext> s_Ctx = nullptr;
 
+    static bool TryPopTask(TaskFunction& outTask)
+    {
+        std::lock_guard lock(s_Ctx->queueMutex);
+        if (s_Ctx->globalQueue.empty()) return false;
+
+        outTask = std::move(s_Ctx->globalQueue.front());
+        s_Ctx->globalQueue.pop_front();
+        --s_Ctx->queuedTaskCount;
+        return true;
+    }
+
+    static void CompleteTask()
+    {
+        std::lock_guard lock(s_Ctx->queueMutex);
+        --s_Ctx->activeTaskCount;
+        if (s_Ctx->activeTaskCount == 0 && s_Ctx->queuedTaskCount == 0)
+        {
+            s_Ctx->waitCondition.notify_all();
+        }
+    }
+
     void Scheduler::Initialize(unsigned threadCount)
     {
         if (s_Ctx) return; // Already initialized
@@ -92,6 +113,7 @@ namespace Core::Tasks
             s_Ctx->globalQueue.push_back(std::move(task));
         }
         s_Ctx->wakeCondition.notify_one();
+        s_Ctx->waitCondition.notify_all();
     }
 
     void Scheduler::WaitForAll()
@@ -100,12 +122,30 @@ namespace Core::Tasks
             Log::Error("Scheduler::WaitForAll called before Initialize");
             return;
         }
-        std::unique_lock waitLock(s_Ctx->waitMutex);
+        /*std::unique_lock waitLock(s_Ctx->waitMutex);
         s_Ctx->waitCondition.wait(waitLock, []
         {
             return s_Ctx->queuedTaskCount.load(std::memory_order_acquire) == 0
                 && s_Ctx->activeTaskCount.load(std::memory_order_acquire) == 0;
-        });
+        });*/
+        while (true)
+        {
+            TaskFunction task;
+            if (TryPopTask(task))
+            {
+                task();
+                CompleteTask();
+                continue;
+            }
+
+            std::unique_lock waitLock(s_Ctx->waitMutex);
+            if (s_Ctx->queuedTaskCount.load(std::memory_order_acquire) == 0
+                && s_Ctx->activeTaskCount.load(std::memory_order_acquire) == 0)
+            {
+                break;
+            }
+            s_Ctx->waitCondition.wait(waitLock);
+        }
     }
 
     void Scheduler::WorkerEntry(unsigned threadIndex)
@@ -117,6 +157,7 @@ namespace Core::Tasks
         {
             TaskFunction task;
 
+            if (!TryPopTask(task))
             {
                 std::unique_lock lock(s_Ctx->queueMutex);
 
@@ -141,14 +182,15 @@ namespace Core::Tasks
             task();
 
             // Decrement counter and notify waiter
-            {
+            /*{
                 std::lock_guard lock(s_Ctx->queueMutex);
                 --s_Ctx->activeTaskCount;
                 if (s_Ctx->activeTaskCount == 0 && s_Ctx->queuedTaskCount == 0)
                 {
                     s_Ctx->waitCondition.notify_all();
                 }
-            }
+            }*/
+            CompleteTask();
         }
     }
 }

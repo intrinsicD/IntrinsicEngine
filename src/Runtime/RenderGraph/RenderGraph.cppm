@@ -191,6 +191,8 @@ export namespace Runtime::Graph
             // State tracking for barriers
             VkImageLayout CurrentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
             VkImageLayout InitialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            VkPipelineStageFlags2 LastUsageStage = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
+            VkAccessFlags2 LastUsageAccess = 0;
 
             // If imported
             VkImage PhysicalImage = VK_NULL_HANDLE;

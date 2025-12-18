@@ -7,6 +7,8 @@ module; // <--- Start Global Fragment
 #include <memory>
 #include <expected>
 #include <algorithm>
+#include <cassert>
+#include <thread>
 
 module Core.Memory; // <--- Enter Module Purview
 
@@ -14,9 +16,8 @@ namespace Core::Memory
 {
     LinearArena::LinearArena(size_t sizeBytes)
         : m_TotalSize((sizeBytes + CACHE_LINE - 1) & ~(CACHE_LINE - 1))
-          , m_Offset(0)
+          , m_OwningThread(std::this_thread::get_id())
     {
-
         if (sizeBytes == 0)
         {
             m_Start = nullptr;
@@ -52,18 +53,25 @@ namespace Core::Memory
     }
 
     LinearArena::LinearArena(LinearArena&& other) noexcept
-           : m_Start(other.m_Start), m_TotalSize(other.m_TotalSize), m_Offset(other.m_Offset)
+        : m_Start(other.m_Start),
+          m_TotalSize(other.m_TotalSize),
+          m_Offset(other.m_Offset),
+          m_OwningThread(other.m_OwningThread)
     {
         other.m_Start = nullptr;
         other.m_TotalSize = 0;
         other.m_Offset = 0;
+        other.m_OwningThread = std::thread::id();
     }
 
     // Move Assignment
-    LinearArena& LinearArena::operator=(LinearArena&& other) noexcept {
-        if (this != &other) {
+    LinearArena& LinearArena::operator=(LinearArena&& other) noexcept
+    {
+        if (this != &other)
+        {
             // Free our own memory first
-            if (m_Start) {
+            if (m_Start)
+            {
 #if defined(_MSC_VER)
                 _aligned_free(m_Start);
 #else
@@ -75,17 +83,20 @@ namespace Core::Memory
             m_Start = other.m_Start;
             m_TotalSize = other.m_TotalSize;
             m_Offset = other.m_Offset;
+            m_OwningThread = other.m_OwningThread;
 
             // Nullify source
             other.m_Start = nullptr;
             other.m_TotalSize = 0;
             other.m_Offset = 0;
+            other.m_OwningThread = std::thread::id();
         }
         return *this;
     }
 
     std::expected<void*, AllocatorError> LinearArena::Alloc(size_t size, size_t align)
     {
+        assert(m_OwningThread == std::this_thread::get_id() && "LinearArena is not thread-safe; use a separate arena per thread.");
         if (!m_Start) return std::unexpected(AllocatorError::OutOfMemory);
         // Validate align is power of two
         if (align == 0) return std::unexpected(AllocatorError::InvalidAlignment);
@@ -99,7 +110,8 @@ namespace Core::Memory
         uintptr_t alignedPtr = (currentPtr + (safeAlign - 1)) & ~(safeAlign - 1);
         size_t padding = alignedPtr - currentPtr;
 
-        if (padding > (std::numeric_limits<size_t>::max() - m_Offset)) {
+        if (padding > (std::numeric_limits<size_t>::max() - m_Offset))
+        {
             return std::unexpected(AllocatorError::OutOfMemory);
         }
 
@@ -109,7 +121,8 @@ namespace Core::Memory
         }*/
 
         const size_t newOffset = m_Offset + padding;
-        if (size > (std::numeric_limits<size_t>::max() - newOffset) || newOffset + size > m_TotalSize) {
+        if (size > (std::numeric_limits<size_t>::max() - newOffset) || newOffset + size > m_TotalSize)
+        {
             return std::unexpected(AllocatorError::OutOfMemory);
         }
 
@@ -126,7 +139,8 @@ namespace Core::Memory
 #ifndef NDEBUG
         static constexpr size_t DEBUG_FILL_THRESHOLD_BYTES = 8 * 1024 * 1024; // 8 MB
         // Only memset if start_ is valid!
-        if (m_Start && m_TotalSize <= DEBUG_FILL_THRESHOLD_BYTES) {
+        if (m_Start && m_TotalSize <= DEBUG_FILL_THRESHOLD_BYTES)
+        {
             std::memset(m_Start, 0xCC, m_TotalSize);
         }
 #endif

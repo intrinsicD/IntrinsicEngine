@@ -137,10 +137,7 @@ namespace Runtime::RHI
         submitInfo.signalSemaphoreCount = 1;
         submitInfo.pSignalSemaphores = signalSemaphores;
 
-        {
-            std::lock_guard lock(m_Device->GetQueueMutex());
-            VK_CHECK(vkQueueSubmit(m_Device->GetGraphicsQueue(), 1, &submitInfo, m_InFlightFences[m_CurrentFrame]));
-        }
+        VK_CHECK(m_Device->SubmitToGraphicsQueue(submitInfo, m_InFlightFences[m_CurrentFrame]));
 
         // 8. Present
         VkPresentInfoKHR presentInfo{};
@@ -156,15 +153,10 @@ namespace Runtime::RHI
         // --- NEW: Lock Queue for Present ---
         // (Technically PresentQueue might be different, but typically it's the same in this simple setup.
         // Even if different, locking the Graphics queue mutex here is safe enough or we should have a PresentMutex)
-        {
-            // For now, reuse the Queue mutex as most GPUs share the queue or driver serialization handles it.
-            // Ideally we check if queues are different, but simple lock is okay.
-            std::lock_guard lock(m_Device->GetQueueMutex());
-            VkResult result = vkQueuePresentKHR(m_Device->GetPresentQueue(), &presentInfo);
+        VkResult result = m_Device->Present(presentInfo);
 
-            if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-                m_Swapchain.Recreate();
-            }
+        if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+            m_Swapchain.Recreate();
         }
 
         m_IsFrameStarted = false;

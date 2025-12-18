@@ -4,6 +4,7 @@ module;
 #include <set>
 #include <mutex>
 #include <functional>
+#include <string_view>
 
 #include "RHI.Vulkan.hpp"
 
@@ -60,6 +61,18 @@ namespace Runtime::RHI
 
         // 5. Destroy Device (Now safe because children are gone)
         if (m_Device) vkDestroyDevice(m_Device, nullptr);
+    }
+
+    VkResult VulkanDevice::SubmitToGraphicsQueue(const VkSubmitInfo& submitInfo, VkFence fence)
+    {
+        std::scoped_lock lock(m_QueueMutex);
+        return vkQueueSubmit(m_GraphicsQueue, 1, &submitInfo, fence);
+    }
+
+    VkResult VulkanDevice::Present(const VkPresentInfoKHR& presentInfo)
+    {
+        std::scoped_lock lock(m_QueueMutex);
+        return vkQueuePresentKHR(m_PresentQueue, &presentInfo);
     }
 
     void VulkanDevice::RegisterThreadLocalPool(VkCommandPool pool)
@@ -154,29 +167,66 @@ namespace Runtime::RHI
         }
 
         // --- Features ---
+        // Query supported features before enabling optional chains
+        VkPhysicalDeviceExtendedDynamicStateFeaturesEXT dynamicStateQuery{};
+        dynamicStateQuery.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT;
+
+        VkPhysicalDeviceVulkan13Features features13Query{};
+        features13Query.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
+        features13Query.pNext = &dynamicStateQuery;
+
+        VkPhysicalDeviceVulkan12Features features12Query{};
+        features12Query.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+        features12Query.pNext = &features13Query;
+
+        VkPhysicalDeviceFeatures2 availableFeatures{};
+        availableFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+        availableFeatures.pNext = &features12Query;
+        vkGetPhysicalDeviceFeatures2(m_PhysicalDevice, &availableFeatures);
+
+        auto warnIfDisabled = [](std::string_view name)
+        {
+            Core::Log::Warn("VulkanDevice: '{}' not supported on the selected GPU; feature disabled.", name);
+        };
 
         VkPhysicalDeviceFeatures deviceFeatures{};
-        deviceFeatures.samplerAnisotropy = VK_TRUE; // Usually desired
+        if (availableFeatures.features.samplerAnisotropy)
+        {
+            deviceFeatures.samplerAnisotropy = VK_TRUE; // Usually desired
+        }
+        else
+        {
+            warnIfDisabled("samplerAnisotropy");
+        }
 
         VkPhysicalDeviceExtendedDynamicStateFeaturesEXT dynamicStateFeatures{};
         dynamicStateFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT;
-        dynamicStateFeatures.extendedDynamicState = VK_TRUE;
+        dynamicStateFeatures.extendedDynamicState = dynamicStateQuery.extendedDynamicState;
+        if (!dynamicStateFeatures.extendedDynamicState) warnIfDisabled("extendedDynamicState");
 
         // Enable Dynamic Rendering (Vulkan 1.3 Core)
         VkPhysicalDeviceVulkan13Features features13{};
         features13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
-        features13.dynamicRendering = VK_TRUE;
-        features13.synchronization2 = VK_TRUE;
+        features13.dynamicRendering = features13Query.dynamicRendering;
+        features13.synchronization2 = features13Query.synchronization2;
         features13.pNext = &dynamicStateFeatures;
+        if (!features13.dynamicRendering) warnIfDisabled("dynamicRendering");
+        if (!features13.synchronization2) warnIfDisabled("synchronization2");
 
         VkPhysicalDeviceVulkan12Features features12{};
         features12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
-        features12.descriptorIndexing = VK_TRUE;
-        features12.runtimeDescriptorArray = VK_TRUE;
-        features12.descriptorBindingPartiallyBound = VK_TRUE; // Allow sparse array
-        features12.descriptorBindingVariableDescriptorCount = VK_TRUE;
-        features12.shaderSampledImageArrayNonUniformIndexing = VK_TRUE; // Essential for
+        features12.descriptorIndexing = features12Query.descriptorIndexing;
+        features12.runtimeDescriptorArray = features12Query.runtimeDescriptorArray;
+        features12.descriptorBindingPartiallyBound = features12Query.descriptorBindingPartiallyBound; // Allow sparse array
+        features12.descriptorBindingVariableDescriptorCount = features12Query.descriptorBindingVariableDescriptorCount;
+        features12.shaderSampledImageArrayNonUniformIndexing = features12Query.shaderSampledImageArrayNonUniformIndexing;
         features12.pNext = &features13;
+
+        if (!features12.descriptorIndexing) warnIfDisabled("descriptorIndexing");
+        if (!features12.runtimeDescriptorArray) warnIfDisabled("runtimeDescriptorArray");
+        if (!features12.descriptorBindingPartiallyBound) warnIfDisabled("descriptorBindingPartiallyBound");
+        if (!features12.descriptorBindingVariableDescriptorCount) warnIfDisabled("descriptorBindingVariableDescriptorCount");
+        if (!features12.shaderSampledImageArrayNonUniformIndexing) warnIfDisabled("shaderSampledImageArrayNonUniformIndexing");
 
         VkPhysicalDeviceFeatures2 deviceFeatures2{};
         deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;

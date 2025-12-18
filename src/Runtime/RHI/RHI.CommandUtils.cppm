@@ -1,6 +1,5 @@
 module;
 #include "RHI/RHI.Vulkan.hpp"
-#include <mutex>
 
 export module Runtime.RHI.CommandUtils;
 
@@ -86,11 +85,7 @@ export namespace Runtime::RHI::CommandUtils
         VkFence fence;
         vkCreateFence(device.GetLogicalDevice(), &fenceInfo, nullptr, &fence);
 
-        {
-            // We still need to lock the Queue, as it is shared across all threads
-            std::lock_guard<std::mutex> lock(device.GetQueueMutex());
-            vkQueueSubmit(device.GetGraphicsQueue(), 1, &submitInfo, fence);
-        }
+        VK_CHECK(device.SubmitToGraphicsQueue(submitInfo, fence));
 
         // 5. Wait & Cleanup
         vkWaitForFences(device.GetLogicalDevice(), 1, &fence, VK_TRUE, UINT64_MAX);

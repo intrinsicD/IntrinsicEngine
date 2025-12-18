@@ -285,6 +285,7 @@ namespace Runtime
             OnRender();
         }
 
+        Core::Tasks::Scheduler::WaitForAll();
         vkDeviceWaitIdle(m_Device->GetLogicalDevice());
     }
 }

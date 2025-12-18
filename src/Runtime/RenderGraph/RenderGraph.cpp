@@ -93,8 +93,8 @@ namespace Runtime::Graph
             node.Extent = extent;
             node.Format = format;
             node.Aspect = (format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT)
-                               ? (VkImageAspectFlags)(VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT)
-                               : VK_IMAGE_ASPECT_COLOR_BIT;
+                              ? (VkImageAspectFlags)(VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT)
+                              : VK_IMAGE_ASPECT_COLOR_BIT;
             m_Graph.m_Registry.RegisterImage(id, image, view);
         }
         else
@@ -116,7 +116,8 @@ namespace Runtime::Graph
     }
 
     // --- RenderGraph ---
-    RenderGraph::RenderGraph(std::shared_ptr<RHI::VulkanDevice> device, Core::Memory::LinearArena& arena) : m_Device(device),
+    RenderGraph::RenderGraph(std::shared_ptr<RHI::VulkanDevice> device, Core::Memory::LinearArena& arena) :
+        m_Device(device),
         m_Arena(arena)
     {
     }
@@ -196,6 +197,9 @@ namespace Runtime::Graph
     {
         m_Barriers.resize(m_Passes.size());
 
+        constexpr VkPipelineStageFlags2 kDefaultReadStage = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+        constexpr VkAccessFlags2 kDefaultReadAccess = VK_ACCESS_2_SHADER_READ_BIT;
+
         // 1. Resolve Transient Resources
         for (size_t i = 0; i < m_Resources.size(); ++i)
         {
@@ -247,12 +251,25 @@ namespace Runtime::Graph
                                                  ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
                                                  : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
+                const VkPipelineStageFlags2 writerStage = att.IsDepth
+                                                              ? (VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT |
+                                                                  VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT)
+                                                              : VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+
+                const VkAccessFlags2 writerAccess = att.IsDepth
+                                                        ? VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT
+                                                        : VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+
                 // OPTION B FIX: Check for WAW (Write-After-Write) hazards on same layout.
                 // If layout is identical, we still might need a barrier between passes.
                 // For simplicity in this step, we rely on state change.
                 // (A full barrier solver is out of scope, but the aliasing allows state to propagate).
 
-                if (res.CurrentLayout != targetLayout)
+                const bool needsBarrier = res.CurrentLayout != targetLayout
+                    || res.LastUsageStage != writerStage
+                    || res.LastUsageAccess != writerAccess;
+
+                if (needsBarrier)
                 {
                     VkImageMemoryBarrier2 barrier{};
                     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
@@ -262,27 +279,20 @@ namespace Runtime::Graph
 
                     barrier.srcStageMask = (res.CurrentLayout == VK_IMAGE_LAYOUT_UNDEFINED)
                                                ? VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT
-                                               : VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+                                               : res.LastUsageStage;
                     barrier.srcAccessMask = (res.CurrentLayout == VK_IMAGE_LAYOUT_UNDEFINED)
                                                 ? 0
-                                                : VK_ACCESS_2_MEMORY_WRITE_BIT;
+                                                : res.LastUsageAccess;
 
-                    if (att.IsDepth)
+                    barrier.dstStageMask = writerStage;
+                    barrier.dstAccessMask = writerAccess;
+                    barrier.subresourceRange.aspectMask = att.IsDepth
+                                                              ? VK_IMAGE_ASPECT_DEPTH_BIT
+                                                              : VK_IMAGE_ASPECT_COLOR_BIT;
+                    if (att.IsDepth && (res.Format == VK_FORMAT_D32_SFLOAT_S8_UINT || res.Format ==
+                        VK_FORMAT_D24_UNORM_S8_UINT))
                     {
-                        barrier.dstStageMask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT |
-                            VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
-                        barrier.dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-                        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-                        if (res.Format == VK_FORMAT_D32_SFLOAT_S8_UINT || res.Format == VK_FORMAT_D24_UNORM_S8_UINT)
-                        {
-                            barrier.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
-                        }
-                    }
-                    else
-                    {
-                        barrier.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-                        barrier.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
-                        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                        barrier.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
                     }
 
                     barrier.subresourceRange.baseMipLevel = 0;
@@ -292,6 +302,14 @@ namespace Runtime::Graph
 
                     m_Barriers[passIdx].ImageBarriers.push_back(barrier);
                     res.CurrentLayout = targetLayout;
+                    res.LastUsageStage = writerStage;
+                    res.LastUsageAccess = writerAccess;
+                }
+                else
+                {
+                    // Even when layouts match, keep stage/access up to date for future hazards.
+                    res.LastUsageStage = writerStage;
+                    res.LastUsageAccess = writerAccess;
                 }
             }
 
@@ -299,7 +317,14 @@ namespace Runtime::Graph
             for (ResourceID id : pass.Reads)
             {
                 auto& res = m_Resources[id];
-                if (res.CurrentLayout != VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+                const VkPipelineStageFlags2 readStage = kDefaultReadStage;
+                const VkAccessFlags2 readAccess = VK_ACCESS_2_SHADER_READ_BIT;
+
+                const bool needsBarrier = res.CurrentLayout != VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+                    || res.LastUsageStage != readStage
+                    || res.LastUsageAccess != readAccess;
+
+                if (needsBarrier)
                 {
                     VkImageMemoryBarrier2 barrier{};
                     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
@@ -309,15 +334,23 @@ namespace Runtime::Graph
 
                     barrier.srcStageMask = (res.CurrentLayout == VK_IMAGE_LAYOUT_UNDEFINED)
                                                ? VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT
-                                               : VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+                                               : res.LastUsageStage;
 
-                    barrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
-                    barrier.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
-                    barrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
+                    barrier.dstStageMask = readStage;
+                    barrier.srcAccessMask = res.LastUsageAccess;
+                    barrier.dstAccessMask = readAccess;
                     barrier.subresourceRange = {res.Aspect, 0, 1, 0, 1};
 
                     m_Barriers[passIdx].ImageBarriers.push_back(barrier);
                     res.CurrentLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                    res.CurrentLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                    res.LastUsageStage = readStage;
+                    res.LastUsageAccess = readAccess;
+                }
+                else
+                {
+                    res.LastUsageStage = readStage;
+                    res.LastUsageAccess = readAccess;
                 }
             }
         }

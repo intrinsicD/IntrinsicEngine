@@ -48,7 +48,7 @@ namespace Runtime::Graphics
         // Create the UBO once here
         m_GlobalUBO = std::make_unique<RHI::VulkanBuffer>(
             device,
-            alignedSize * RHI::SimpleRenderer::MAX_FRAMES_IN_FLIGHT,
+            alignedSize * renderer.GetFramesInFlight(),
             VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
             VMA_MEMORY_USAGE_CPU_TO_GPU
         );

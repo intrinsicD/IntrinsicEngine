@@ -45,6 +45,8 @@ namespace Runtime::RHI
         [[nodiscard]] VkQueue GetGraphicsQueue() const { return m_GraphicsQueue; }
         [[nodiscard]] VkQueue GetPresentQueue() const { return m_PresentQueue; }
         [[nodiscard]] QueueFamilyIndices GetQueueIndices() const { return m_Indices; }
+        [[nodiscard]] VkResult SubmitToGraphicsQueue(const VkSubmitInfo& submitInfo, VkFence fence);
+        [[nodiscard]] VkResult Present(const VkPresentInfoKHR& presentInfo);
         [[nodiscard]] VkSurfaceKHR GetSurface() const { return m_Surface; }
         [[nodiscard]] VkCommandPool GetCommandPool() const { return m_CommandPool; }
         [[nodiscard]] VmaAllocator GetAllocator() const { return m_Allocator; }
@@ -80,8 +82,7 @@ namespace Runtime::RHI
 
         bool m_IsValid = true;
 
-        //TODO: dont set this separately from the Renderer. Do this on creation of the device
-        static constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 2; // Must match Renderer
+        static constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 2;
         std::vector<std::function<void()>> m_DeletionQueue[MAX_FRAMES_IN_FLIGHT];
         uint32_t m_CurrentFrameIndex = 0;
         std::mutex m_DeletionMutex;

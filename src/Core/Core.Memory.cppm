@@ -6,6 +6,8 @@ module; // Global Fragment
 #include <expected>
 #include <span>
 #include <utility>
+#include <cassert>
+#include <thread>
 
 export module Core.Memory;
 
@@ -91,6 +93,8 @@ export namespace Core::Memory
         [[nodiscard]]
         std::expected<std::span<T>, AllocatorError> NewArray(size_t count)
         {
+            static_assert(std::is_trivially_destructible_v<T>,
+                     "LinearArena cannot manage arrays of non-trivially-destructible types.");
             auto mem = Alloc(sizeof(T) * count, alignof(T));
             if (!mem) return std::unexpected(mem.error());
 
@@ -108,5 +112,6 @@ export namespace Core::Memory
         std::byte* m_Start = nullptr;
         size_t m_TotalSize = 0;
         size_t m_Offset = 0;
+        std::thread::id m_OwningThread;
     };
 }
