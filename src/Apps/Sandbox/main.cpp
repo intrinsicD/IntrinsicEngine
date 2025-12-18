@@ -6,7 +6,6 @@
 #include <imgui.h>
 #include <entt/entity/registry.hpp>
 #include <tiny_gltf.h>
-#include "RHI/RHI.Vulkan.hpp"
 
 import Runtime.Engine;
 import Core.Logging;
@@ -63,14 +62,13 @@ public:
             // In a real engine, IO is separate from Upload.
             return std::make_shared<RHI::Texture>(GetDevice(), path);
         };
-        auto rootPath = Filesystem::GetRoot();
-        m_DuckTexture = m_AssetManager.Load<RHI::Texture>(rootPath / "assets/textures/DuckCM.png", textureLoader);
+        m_DuckTexture = m_AssetManager.Load<RHI::Texture>(Filesystem::GetAssetPath("textures/DuckCM.png"), textureLoader);
 
         auto modelLoader = [&](const std::string& path)
         {
             return Graphics::ModelLoader::Load(GetDevice(), path);
         };
-        m_DuckModel = m_AssetManager.Load<Graphics::Model>(rootPath / "assets/models/Duck.glb", modelLoader);
+        m_DuckModel = m_AssetManager.Load<Graphics::Model>(Filesystem::GetAssetPath("models/Duck.glb"), modelLoader);
 
         // 3. Setup Material (Assuming texture loads synchronously or is handled)
         m_DuckMaterial = std::make_shared<Graphics::Material>(
@@ -104,9 +102,9 @@ public:
         bool inputCaptured = uiCapturesMouse || uiCapturesKeyboard;
 
         float aspectRatio = 1.0f;
-        if (m_Window->GetHeight() > 0)
+        if (m_Window->GetWindowHeight() > 0)
         {
-            aspectRatio = (float)m_Window->GetWidth() / (float)m_Window->GetHeight();
+            aspectRatio = (float)m_Window->GetWindowWidth() / (float)m_Window->GetWindowHeight();
         }
 
         Graphics::CameraComponent* cameraComponent = nullptr;
@@ -124,9 +122,9 @@ public:
                 Graphics::OnUpdate(*cameraComponent, *fly, dt, inputCaptured);
             }
 
-            if (m_Window->GetWidth() != 0 && m_Window->GetHeight() != 0)
+            if (m_Window->GetWindowWidth() != 0 && m_Window->GetWindowHeight() != 0)
             {
-                Graphics::OnResize(*cameraComponent, m_Window->GetWidth(), m_Window->GetHeight());
+                Graphics::OnResize(*cameraComponent, m_Window->GetWindowWidth(), m_Window->GetWindowHeight());
             }
         }
 

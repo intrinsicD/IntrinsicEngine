@@ -68,6 +68,13 @@ set(INTRINSIC_LINK_FLAGS
         # Link-time optimization (LTO) could go here in the future
 )
 
+add_library(IntrinsicConfig INTERFACE)
+target_compile_definitions(IntrinsicConfig INTERFACE
+        GLM_FORCE_RADIANS
+        GLM_FORCE_DEPTH_ZERO_TO_ONE
+        GLM_RIGHT_HANDED
+)
+
 # ------------------------------------------------------------------------------
 # Dependencies
 # ------------------------------------------------------------------------------
@@ -96,7 +103,8 @@ FetchContent_Declare(
         GIT_TAG 1.0.0
 )
 FetchContent_MakeAvailable(glm)
-target_compile_definitions(glm PUBLIC GLM_FORCE_RADIANS GLM_FORCE_DEPTH_ZERO_TO_ONE GLM_ENABLE_EXPERIMENTAL GLM_RIGHT_HANDED)
+#target_link_libraries(glm PUBLIC GLM_FORCE_RADIANS GLM_FORCE_DEPTH_ZERO_TO_ONE GLM_ENABLE_EXPERIMENTAL GLM_RIGHT_HANDED)
+#target_link_libraries(glm PUBLIC IntrinsicConfig)
 
 if(TARGET glm)
     target_compile_options(glm PRIVATE -w)
@@ -138,11 +146,9 @@ FetchContent_Declare(
     GIT_REPOSITORY https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
     GIT_TAG v3.0.1
 )
-# Manually populate to avoid building their library target
-FetchContent_GetProperties(vma)
-if(NOT vma_POPULATED)
-    FetchContent_Populate(vma)
-endif()
+
+FetchContent_MakeAvailable(vma)
+
 
 # Pin STB to specific commit for reproducible builds
 FetchContent_Declare(
@@ -150,7 +156,11 @@ FetchContent_Declare(
     GIT_REPOSITORY https://github.com/nothings/stb.git
     GIT_TAG 5736b15f7ea0ffb08dd38af21067c314d6a3aae9  # 2023-01-30
 )
+
 FetchContent_MakeAvailable(stb)
+
+add_library(stb INTERFACE)
+target_include_directories(stb INTERFACE ${stb_SOURCE_DIR})
 
 FetchContent_Declare(
         entt
@@ -203,6 +213,6 @@ target_link_libraries(imgui_lib PUBLIC glfw volk)
 # Subdirectories
 # ------------------------------------------------------------------------------
 add_subdirectory(src/Core)
-add_subdirectory(tests)
-add_subdirectory(src/Apps/Sandbox)
 add_subdirectory(src/Runtime)
+add_subdirectory(src/Apps/Sandbox)
+add_subdirectory(tests)

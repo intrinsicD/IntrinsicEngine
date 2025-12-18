@@ -11,8 +11,8 @@ export namespace Core::Windowing
     struct WindowProps
     {
         std::string Title = "Intrinsic Engine";
-        int Width = 1280;
-        int Height = 720;
+        int WindowWidth = 1280;
+        int WindowHeight = 720;
     };
 
     struct WindowCloseEvent
@@ -87,8 +87,10 @@ export namespace Core::Windowing
 
         [[nodiscard]] bool ShouldClose() const;
         [[nodiscard]] void* GetNativeHandle() const { return m_Window; } // Returns GLFWwindow* void*
-        [[nodiscard]] int GetWidth() const;
-        [[nodiscard]] int GetHeight() const;
+        [[nodiscard]] int GetWindowWidth() const;
+        [[nodiscard]] int GetWindowHeight() const;
+        [[nodiscard]] int GetFramebufferWidth() const;
+        [[nodiscard]] int GetFramebufferHeight() const;
         [[nodiscard]] bool IsValid() const { return m_IsValid; }
 
         // Set the function that the Window calls when something happens
@@ -107,8 +109,10 @@ export namespace Core::Windowing
         struct WindowData
         {
             std::string Title;
-            int Width;
-            int Height;
+            int WindowWidth;
+            int WindowHeight;
+            int FramebufferWidth;
+            int FramebufferHeight;
             EventCallbackFn Callback;
         };
 

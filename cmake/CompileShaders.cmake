@@ -26,5 +26,5 @@ else ()
 
     # Ensure shaders are built before the app
     add_custom_target(Shaders ALL DEPENDS ${SPV_SHADERS})
-    add_dependencies(Sandbox Shaders)
+    add_dependencies(${target_name} Shaders)
 endif ()

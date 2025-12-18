@@ -34,7 +34,7 @@ export namespace Core::Filesystem {
     }
 
     std::string GetAssetPath(const std::string& relativePath) {
-        auto path = GetRoot() / relativePath;
+        auto path = GetRoot() / "assets" / relativePath;
         return path.string();
     }
 

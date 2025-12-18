@@ -3,6 +3,7 @@ module;
 #include <array>
 #include <span>
 #include <glm/glm.hpp>
+#define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/norm.hpp>
 
 export module Runtime.Geometry.Containment;

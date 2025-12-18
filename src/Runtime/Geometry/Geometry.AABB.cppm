@@ -1,7 +1,7 @@
 module;
 
 #include <glm/glm.hpp>
-
+#define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/component_wise.hpp>
 #include <span>
 #include <vector>
@@ -108,12 +108,13 @@ export namespace Runtime::Geometry
 
     double Distance(const AABB& a, const glm::vec3& p)
     {
+        // is negative inside the box so checks should check for distance <= 0 to be inside the box.
         return glm::length(glm::max(a.Min - p, p - a.Max));
     }
 
     double SquaredDistance(const AABB& a, const glm::vec3& p)
     {
-        glm::vec3 delta = glm::max(a.Min - p, p - a.Max);
+        glm::vec3 delta = glm::max(glm::max(a.Min - p, p - a.Max), glm::vec3(0.0f));
         return glm::dot(delta, delta);
     }
 }

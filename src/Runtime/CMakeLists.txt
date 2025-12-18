@@ -76,13 +76,13 @@ target_include_directories(${target_name} PUBLIC .)
 
 target_include_directories(${target_name} SYSTEM PUBLIC
         ${vma_SOURCE_DIR}/include
-        ${stb_SOURCE_DIR}
         ${tinygltf_SOURCE_DIR}
 )
 
 target_link_libraries(${target_name}
         PUBLIC
         IntrinsicCore
+        stb
         volk
         Vulkan::Vulkan
         EnTT::EnTT

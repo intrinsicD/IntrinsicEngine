@@ -17,7 +17,7 @@ export module Runtime.Geometry.Properties;
 
 export namespace Runtime::Geometry
 {
-    using PropertyId = std::size_t;
+    using PropertyId = size_t;
 
     class PropertyRegistry;
 
@@ -39,29 +39,22 @@ export namespace Runtime::Geometry
         class PropertyStorageBase
         {
         public:
-            explicit PropertyStorageBase(std::string name) : m_Name(std::move(name))
-            {
-            }
-
+            PropertyStorageBase() = default;
             virtual ~PropertyStorageBase() = default;
 
             PropertyStorageBase(const PropertyStorageBase&) = delete;
             PropertyStorageBase& operator=(const PropertyStorageBase&) = delete;
 
-            [[nodiscard]] const std::string& Name() const noexcept { return m_Name; }
-
             [[nodiscard]] virtual std::unique_ptr<PropertyStorageBase> Clone() const = 0;
 
-            virtual void Reserve(std::size_t n) = 0;
-            virtual void Resize(std::size_t n) = 0;
-            virtual void Shrink_to_fit() = 0;
+            [[nodiscard]] virtual std::string_view Name() const = 0;
+            virtual void Reserve(size_t n) = 0;
+            virtual void Resize(size_t n) = 0;
+            virtual void ShrinkToFit() = 0;
             virtual void PushBack() = 0;
-            virtual void Swap(std::size_t i0, std::size_t i1) = 0;
+            virtual void Swap(size_t i0, size_t i1) = 0;
 
             [[nodiscard]] virtual TypeID Type() const noexcept = 0;
-
-        protected:
-            std::string m_Name;
         };
 
         template <class T>
@@ -69,12 +62,12 @@ export namespace Runtime::Geometry
         {
         public:
             PropertyStorage(std::string name, T defaultValue)
-                : PropertyStorageBase(std::move(name)), m_Data(), m_Default(std::move(defaultValue))
+                : PropertyStorageBase(), m_Name(std::move(name)), m_Data(), m_Default(std::move(defaultValue))
             {
             }
 
             PropertyStorage(const PropertyStorage& other)
-                : PropertyStorageBase(other.Name()), m_Data(other.m_Data), m_Default(other.m_Default)
+                : PropertyStorageBase(), m_Name(other.m_Name), m_Data(other.m_Data), m_Default(other.m_Default)
             {
             }
 
@@ -94,12 +87,13 @@ export namespace Runtime::Geometry
                 return std::make_unique<PropertyStorage<T>>(*this);
             }
 
-            void Reserve(std::size_t n) override { m_Data.reserve(n); }
-            void Resize(std::size_t n) override { m_Data.resize(n, m_Default); }
-            void Shrink_to_fit() override { m_Data.shrink_to_fit(); }
+            [[nodiscard]] std::string_view Name() const override { return m_Name; }
+            void Reserve(size_t n) override { m_Data.reserve(n); }
+            void Resize(size_t n) override { m_Data.resize(n, m_Default); }
+            void ShrinkToFit() override { m_Data.shrink_to_fit(); }
             void PushBack() override { m_Data.push_back(m_Default); }
 
-            void Swap(std::size_t i0, std::size_t i1) override
+            void Swap(size_t i0, size_t i1) override
             {
                 using std::swap;
                 swap(m_Data[i0], m_Data[i1]);
@@ -115,6 +109,7 @@ export namespace Runtime::Geometry
             [[nodiscard]] const T& DefaultValue() const noexcept { return m_Default; }
 
         private:
+            std::string m_Name;
             std::vector<T> m_Data;
             T m_Default;
         };
@@ -137,17 +132,27 @@ export namespace Runtime::Geometry
         PropertyRegistry& operator=(const PropertyRegistry& other);
         PropertyRegistry& operator=(PropertyRegistry&&) noexcept = default;
 
-        [[nodiscard]] std::size_t Size() const noexcept { return m_Size; }
-        [[nodiscard]] std::size_t PropertyCount() const noexcept { return m_Storages.size(); }
+        [[nodiscard]] size_t Size() const noexcept { return m_Size; }
+        [[nodiscard]] size_t PropertyCount() const noexcept { return m_Storages.size(); }
 
         [[nodiscard]] std::vector<std::string> PropertyNames() const;
 
         inline void Clear() { m_Storages.clear(); }
-        inline void Reserve(std::size_t n) { m_Storages.reserve(n); }
-        void Resize(std::size_t n) { m_Size = n; for (auto& storage : m_Storages) storage->Resize(n); }
-        void ShrinkToFit() { for (auto& storage : m_Storages) storage->Shrink_to_fit(); }
+        inline void Reserve(size_t n) { m_Storages.reserve(n); }
+
+        void Resize(size_t n)
+        {
+            m_Size = n;
+            for (auto& storage : m_Storages) storage->Resize(n);
+        }
+
+        void ShrinkToFit() { for (auto& storage : m_Storages) storage->ShrinkToFit(); }
         void PushBack() { for (auto& storage : m_Storages) storage->PushBack(); }
-        void Swap(std::size_t i0, std::size_t i1) { m_Storages[i0]->Swap(0, i1); }
+
+        void Swap(size_t i0, size_t i1)
+        {
+            for (auto& storage : m_Storages) storage->Swap(i0, i1);
+        }
 
         [[nodiscard]] bool Contains(std::string_view name) const
         {
@@ -191,6 +196,7 @@ export namespace Runtime::Geometry
         {
             return m_Storages[id].get();
         }
+
         [[nodiscard]] const Internal::PropertyStorageBase* Storage(PropertyId id) const noexcept
         {
             return m_Storages[id].get();
@@ -203,7 +209,7 @@ export namespace Runtime::Geometry
         [[nodiscard]] const Internal::PropertyStorage<T>* Storage(PropertyId id) const noexcept;
 
         std::vector<std::unique_ptr<Internal::PropertyStorageBase>> m_Storages;
-        std::size_t m_Size{0};
+        size_t m_Size{0};
     };
 
     template <class T>
@@ -217,7 +223,7 @@ export namespace Runtime::Geometry
         [[nodiscard]] const std::string& Name() const noexcept
         {
             assert(m_Storage != nullptr);
-            return m_Storage->name();
+            return m_Storage->Name();
         }
 
         [[nodiscard]] explicit operator bool() const noexcept { return m_Storage != nullptr; }
@@ -228,7 +234,7 @@ export namespace Runtime::Geometry
             return m_Storage->Data();
         }
 
-        [[nodiscard]] decltype(auto) operator[](std::size_t index) const
+        [[nodiscard]] decltype(auto) operator[](size_t index) const
         {
             assert(m_Storage != nullptr);
             assert(index < m_Storage->Data().size());
@@ -292,7 +298,7 @@ export namespace Runtime::Geometry
             return m_Storage->Data();
         }
 
-        [[nodiscard]] decltype(auto) operator[](std::size_t index) const
+        [[nodiscard]] decltype(auto) operator[](size_t index) const
         {
             assert(m_Storage != nullptr);
             assert(index < m_Storage->Data().size());
@@ -453,8 +459,8 @@ export namespace Runtime::Geometry
 
         [[nodiscard]] const std::string& Name() const { return m_Buffer.Name(); }
 
-        [[nodiscard]] decltype(auto) operator[](std::size_t index) const { return m_Buffer[index]; }
-        [[nodiscard]] decltype(auto) operator[](std::size_t index) { return m_Buffer[index]; }
+        [[nodiscard]] decltype(auto) operator[](size_t index) const { return m_Buffer[index]; }
+        [[nodiscard]] decltype(auto) operator[](size_t index) { return m_Buffer[index]; }
 
         [[nodiscard]] std::vector<T>& Vector() { return m_Buffer.Vector(); }
         [[nodiscard]] const std::vector<T>& Vector() const { return m_Buffer.Vector(); }
@@ -497,13 +503,13 @@ export namespace Runtime::Geometry
     public:
         PropertySet() = default;
 
-        [[nodiscard]] std::size_t Size() const noexcept { return m_Registry.Size(); }
+        [[nodiscard]] size_t Size() const noexcept { return m_Registry.Size(); }
 
         inline void Clear() { m_Registry.Clear(); }
-        inline void Reserve(std::size_t n) { m_Registry.Reserve(n); }
-        inline void Resize(std::size_t n) { m_Registry.Resize(n); }
+        inline void Reserve(size_t n) { m_Registry.Reserve(n); }
+        inline void Resize(size_t n) { m_Registry.Resize(n); }
         inline void PushBack() { m_Registry.PushBack(); }
-        inline void Swap(std::size_t i0, std::size_t i1) { m_Registry.Swap(i0, i1); }
+        inline void Swap(size_t i0, size_t i1) { m_Registry.Swap(i0, i1); }
         inline void Shrink_to_fit() { m_Registry.ShrinkToFit(); }
         [[nodiscard]] inline bool Empty() const { return m_Registry.Size() == 0; }
         [[nodiscard]] inline bool Exists(std::string_view name) const { return m_Registry.Contains(name); }

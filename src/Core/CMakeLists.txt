@@ -35,6 +35,7 @@ target_sources(${target_name}
 # Link Dependencies
 target_link_libraries(${target_name}
         PUBLIC
+        IntrinsicConfig
         glm::glm
         glfw
         imgui_lib

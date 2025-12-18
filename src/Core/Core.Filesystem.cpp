@@ -39,7 +39,8 @@ namespace Core::Filesystem
 
         std::error_code ec;
         auto time = std::filesystem::last_write_time(path, ec);
-        if (ec) {
+        if (ec)
+        {
             Log::Warn("FileWatcher: Could not find file to watch '{}'", path);
             return;
         }
@@ -52,27 +53,40 @@ namespace Core::Filesystem
         while (s_Running)
         {
             std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            std::vector<Entry> change_entries;
 
-            std::lock_guard lock(s_Mutex);
-            for (auto& entry : s_Watches)
             {
-                std::error_code ec;
-                if (!std::filesystem::exists(entry.Path, ec)) continue;
-
-                auto currentTime = std::filesystem::last_write_time(entry.Path, ec);
-                if (ec) continue;
-
-                if (currentTime > entry.LastTime)
+                std::scoped_lock lock(s_Mutex);
+                for (auto& entry : s_Watches)
                 {
-                    entry.LastTime = currentTime;
+                    std::error_code ec;
+                    if (!std::filesystem::exists(entry.Path, ec)) continue;
 
-                    // Fixed: No try-catch block.
-                    // We assume the callback is safe.
-                    if (entry.Callback) {
-                        entry.Callback(entry.Path.string());
+                    auto currentTime = std::filesystem::last_write_time(entry.Path, ec);
+                    if (ec) continue;
+
+                    if (currentTime > entry.LastTime)
+                    {
+                        entry.LastTime = currentTime;
+
+                        // Fixed: No try-catch block.
+                        // We assume the callback is safe.
+                        if (entry.Callback)
+                        {
+                            change_entries.push_back(entry);
+                            //entry.Callback(entry.Path.string());
+                        }
+
+                        Log::Info("[HotReload] Detected change: {}", entry.Path.string());
                     }
-                    
-                    Log::Info("[HotReload] Detected change: {}", entry.Path.string());
+                }
+            }
+
+            for (auto& entry : change_entries)
+            {
+                if (entry.Callback)
+                {
+                    entry.Callback(entry.Path.string());
                 }
             }
         }

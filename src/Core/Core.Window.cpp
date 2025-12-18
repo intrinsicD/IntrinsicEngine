@@ -54,10 +54,10 @@ namespace Core::Windowing
     void Window::Init(const WindowProps& props)
     {
         m_Data.Title = props.Title;
-        m_Data.Width = props.Width;
-        m_Data.Height = props.Height;
+        m_Data.WindowWidth = props.WindowWidth;
+        m_Data.WindowHeight = props.WindowHeight;
 
-        Log::Info("Creating Window {0} ({1}x{2})", props.Title, props.Width, props.Height);
+        Log::Info("Creating Window {0} ({1}x{2})", props.Title, props.WindowWidth, props.WindowHeight);
 
         [[maybe_unused]] auto& lifetime = GLFWLifetime::Instance();
 
@@ -78,7 +78,8 @@ namespace Core::Windowing
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
 
-        auto glfwWindow = glfwCreateWindow(m_Data.Width, m_Data.Height, m_Data.Title.c_str(), nullptr, nullptr);
+        auto glfwWindow = glfwCreateWindow(m_Data.WindowWidth, m_Data.WindowHeight, m_Data.Title.c_str(), nullptr,
+                                           nullptr);
 
         if (!glfwWindow)
         {
@@ -117,7 +118,7 @@ namespace Core::Windowing
 
         // 3. Key
         glfwSetKeyCallback(glfwWindow, [](GLFWwindow* window, int key, [[maybe_unused]] int scancode, int action,
-                                      [[maybe_unused]] int mods)
+                                          [[maybe_unused]] int mods)
         {
             ImGui_ImplGlfw_KeyCallback(window, key, scancode, action, mods);
             WindowData& data = *static_cast<WindowData*>(glfwGetWindowUserPointer(window));
@@ -208,17 +209,28 @@ namespace Core::Windowing
     {
         if (!m_IsValid) return;
         glfwPollEvents();
-        glfwGetWindowSize(static_cast<GLFWwindow*>(m_Window), &m_Data.Width, &m_Data.Height);
+        glfwGetWindowSize(static_cast<GLFWwindow*>(m_Window), &m_Data.WindowWidth, &m_Data.WindowHeight);
+        glfwGetFramebufferSize(static_cast<GLFWwindow*>(m_Window), &m_Data.FramebufferWidth, &m_Data.FramebufferHeight);
     }
 
-    int Window::GetWidth() const
+    int Window::GetWindowWidth() const
     {
-        return m_Data.Width;
+        return m_Data.WindowWidth;
     }
 
-    int Window::GetHeight() const
+    int Window::GetWindowHeight() const
     {
-        return m_Data.Height;
+        return m_Data.WindowHeight;
+    }
+
+    int Window::GetFramebufferWidth() const
+    {
+        return m_Data.FramebufferWidth;
+    }
+
+    int Window::GetFramebufferHeight() const
+    {
+        return m_Data.FramebufferHeight;
     }
 
     bool Window::ShouldClose() const

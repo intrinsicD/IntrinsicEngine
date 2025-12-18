@@ -1,24 +1,16 @@
 module;
 #include <glm/glm.hpp>
+#define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/norm.hpp>
 #include <span>
 
 module Runtime.Geometry.MeshUtils;
-import Runtime.Graphics.Geometry;
 import Core.Logging;
 
 namespace Runtime::Geometry::MeshUtils
 {
-    void RecalculateNormals(Graphics::GeometryCpuData& mesh)
-    {
-        if (mesh.Topology != Graphics::PrimitiveTopology::Triangles) return;
-
-        CalculateNormals(mesh.Positions, mesh.Indices, mesh.Normals);
-        Core::Log::Info("Recalculated normals for vertices.");
-    }
-
     void CalculateNormals(std::span<const glm::vec3> positions, std::span<const uint32_t> indices,
-                   std::span<glm::vec3> normals)
+                          std::span<glm::vec3> normals)
     {
         // Reset normals to zero
         std::fill(normals.begin(), normals.end(), glm::vec3(0.0f));
@@ -67,17 +59,17 @@ namespace Runtime::Geometry::MeshUtils
         }
     }
 
-        // --- Helper: UV Generation ---
+    // --- Helper: UV Generation ---
     // Uses Planar Projection based on the largest dimensions of the mesh
-    void GenerateUVs(Graphics::GeometryCpuData& mesh)
+    int GenerateUVs(std::span<const glm::vec3> positions, std::span<glm::vec4> aux)
     {
-        if (mesh.Positions.empty()) return;
+        if (positions.empty()) return -1;
 
         // 1. Calculate AABB
         glm::vec3 minBounds(std::numeric_limits<float>::max());
         glm::vec3 maxBounds(std::numeric_limits<float>::lowest());
 
-        for (const auto& pos : mesh.Positions)
+        for (const auto& pos : positions)
         {
             minBounds = glm::min(minBounds, pos);
             maxBounds = glm::max(maxBounds, pos);
@@ -88,7 +80,7 @@ namespace Runtime::Geometry::MeshUtils
         // 2. Determine dominant plane (Find smallest axis to collapse)
         // 0=X, 1=Y, 2=Z
         int flatAxis = 0;
-        if (size.y < size.x && size.y < size.z) flatAxis = 1;      // Flatten Y -> XZ Plane
+        if (size.y < size.x && size.y < size.z) flatAxis = 1; // Flatten Y -> XZ Plane
         else if (size.z < size.x && size.z < size.y) flatAxis = 2; // Flatten Z -> XY Plane
         // else Flatten X -> YZ Plane
 
@@ -98,9 +90,9 @@ namespace Runtime::Geometry::MeshUtils
         if (size.z < 1e-6f) size.z = 1.0f;
 
         // 3. Generate UVs
-        for (size_t i = 0; i < mesh.Positions.size(); ++i)
+        for (size_t i = 0; i < positions.size(); ++i)
         {
-            const auto& pos = mesh.Positions[i];
+            const auto& pos = positions[i];
             glm::vec2 uv(0.0f);
 
             switch (flatAxis)
@@ -124,10 +116,10 @@ namespace Runtime::Geometry::MeshUtils
             uv.y = 1.0f - uv.y;
 
             // Store in Aux (xy = UV)
-            mesh.Aux[i].x = uv.x;
-            mesh.Aux[i].y = uv.y;
+            aux[i].x = uv.x;
+            aux[i].y = uv.y;
         }
 
-        Core::Log::Info("Generated Planar UVs for {} vertices (Axis: {})", mesh.Positions.size(), flatAxis);
+        return flatAxis;
     }
 }

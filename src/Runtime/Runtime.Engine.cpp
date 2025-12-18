@@ -91,7 +91,7 @@ namespace Runtime
         }
 
         // 3. Device
-        m_Device = std::make_unique<RHI::VulkanDevice>(*m_Context, m_Surface);
+        m_Device = std::make_shared<RHI::VulkanDevice>(*m_Context, m_Surface);
 
         // 4. Swapchain & Renderer
         m_Swapchain = std::make_unique<RHI::VulkanSwapchain>(m_Device, *m_Window);
@@ -197,7 +197,7 @@ namespace Runtime
 
             // --- Setup Default Material ---
             auto textureLoader = [&](const std::string& p) { return std::make_shared<RHI::Texture>(GetDevice(), p); };
-            auto texHandle = m_AssetManager.Load<RHI::Texture>("assets/textures/Parameterization.jpg", textureLoader);
+            auto texHandle = m_AssetManager.Load<RHI::Texture>(Core::Filesystem::GetAssetPath("textures/Parameterization.jpg") , textureLoader);
 
             auto defaultMat = std::make_shared<Graphics::Material>(
                 GetDevice(), GetDescriptorPool(), GetDescriptorLayout(),

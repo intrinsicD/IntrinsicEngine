@@ -1,5 +1,8 @@
 module;
+
 #include <entt/entt.hpp>
+#include <string>
+#include <cstddef>
 
 export module Runtime.ECS.Scene;
 

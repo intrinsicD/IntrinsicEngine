@@ -1,21 +1,9 @@
 module;
-#include <cstdio>
-#include <cstdlib>
 #include <vector>
 #include <string>
 #include <set>
 #include <mutex>
 #include <functional>
-
-// --- 2. VMA Configuration ---
-#define VMA_STATIC_VULKAN_FUNCTIONS 0
-#define VMA_DYNAMIC_VULKAN_FUNCTIONS 1
-#define VMA_USE_NULLABILITY_ANNOTATIONS 0
-
-#define VMA_SYSTEM_MALLOC(size) std::malloc(size)
-#define VMA_SYSTEM_FREE(ptr) std::free(ptr)
-#define VMA_SYSTEM_ALIGNED_MALLOC(size, align) std::aligned_alloc(align, size)
-#define VMA_SYSTEM_ALIGNED_FREE(ptr) std::free(ptr)
 
 #include "RHI.Vulkan.hpp"
 

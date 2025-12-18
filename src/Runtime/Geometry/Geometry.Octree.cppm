@@ -741,7 +741,7 @@ export namespace Runtime::Geometry
 
             for (auto it = std::next(begin); it != end; ++it)
             {
-                Union(tight, ElementAabbs[*it]);
+                tight = Union(tight, ElementAabbs[*it]);
             }
 
             if (eps > 0.0f)

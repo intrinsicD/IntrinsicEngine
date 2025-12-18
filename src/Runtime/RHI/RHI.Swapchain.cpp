@@ -24,12 +24,12 @@ namespace Runtime::RHI {
     }
 
     void VulkanSwapchain::Recreate() {
-        int width = m_Window.GetWidth();
-        int height = m_Window.GetHeight();
+        int width = m_Window.GetFramebufferWidth();
+        int height = m_Window.GetFramebufferHeight();
         while (width == 0 || height == 0) {
             glfwWaitEvents();
-            width = m_Window.GetWidth();
-            height = m_Window.GetHeight();
+            width = m_Window.GetFramebufferWidth();
+            height = m_Window.GetFramebufferHeight();
         }
 
         vkDeviceWaitIdle(m_Device->GetLogicalDevice());
@@ -177,8 +177,8 @@ namespace Runtime::RHI {
         if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
             return capabilities.currentExtent;
         } else {
-            int width = m_Window.GetWidth();
-            int height = m_Window.GetHeight();
+            int width = m_Window.GetFramebufferWidth();
+            int height = m_Window.GetFramebufferHeight();
             VkExtent2D actualExtent = { static_cast<uint32_t>(width), static_cast<uint32_t>(height) };
             actualExtent.width = std::clamp(actualExtent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
             actualExtent.height = std::clamp(actualExtent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);

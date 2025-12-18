@@ -1,5 +1,6 @@
 module;
 
+#define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/quaternion.hpp>
 
 module Runtime.Graphics.Camera;

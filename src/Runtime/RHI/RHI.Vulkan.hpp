@@ -12,6 +12,7 @@
 
 // 3. Include VMA Declarations (Optional, but convenient if used everywhere)
 // We do NOT define VMA_IMPLEMENTATION here.
+#include "RHI/RHI.VmaConfig.hpp"
 #include <vk_mem_alloc.h>
 
 // Wraps Vulkan calls and logs errors without exceptions

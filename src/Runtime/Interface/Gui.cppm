@@ -25,6 +25,8 @@ export namespace Runtime::Interface::GUI
 
     void BeginFrame();
 
+    void EndFrame();
+
     void DrawGUI();
     
     // Records the ImGui draw commands into the provided command buffer.

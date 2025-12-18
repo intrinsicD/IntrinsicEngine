@@ -61,6 +61,29 @@ namespace Runtime::Graphics
         return result;
     }
 
+    inline void RecalculateNormals(GeometryCpuData& mesh)
+    {
+        if (mesh.Topology != PrimitiveTopology::Triangles) return;
+
+        Geometry::MeshUtils::CalculateNormals(mesh.Positions, mesh.Indices, mesh.Normals);
+        Core::Log::Info("Recalculated normals for vertices.");
+    }
+
+
+    inline void GenerateUVs(GeometryCpuData& mesh)
+    {
+        auto flatAxis = Geometry::MeshUtils::GenerateUVs(mesh.Positions, mesh.Aux);
+
+        if (flatAxis == -1)
+        {
+            Core::Log::Warn("Failed to generate UVs: Mesh has no vertices.");
+        }
+        else
+        {
+            Core::Log::Info("Generated Planar UVs for {} vertices (Axis: {})", mesh.Positions.size(), flatAxis);
+        }
+    }
+
     // --- Format Parsers ---
 
     static bool LoadOBJ(const std::string& path, GeometryCpuData& outData)
@@ -170,11 +193,11 @@ namespace Runtime::Graphics
 
         if (!hasNormals)
         {
-            Geometry::MeshUtils::RecalculateNormals(outData);
+            RecalculateNormals(outData);
         }
         if (!hasUVs)
         {
-            Geometry::MeshUtils::GenerateUVs(outData);
+            GenerateUVs(outData);
         }
         return true;
     }
@@ -346,11 +369,11 @@ namespace Runtime::Graphics
 
         if (idxNX == -1)
         {
-            Geometry::MeshUtils::RecalculateNormals(outData);
+            RecalculateNormals(outData);
         }
         if (idxS == -1 || idxT == -1)
         {
-            Geometry::MeshUtils::GenerateUVs(outData);
+            GenerateUVs(outData);
         }
         return true;
     }
@@ -384,7 +407,7 @@ namespace Runtime::Graphics
             }
         }
 
-        Geometry::MeshUtils::GenerateUVs(outData);
+        GenerateUVs(outData);
         return true;
     }
 
@@ -514,7 +537,6 @@ namespace Runtime::Graphics
                     if (normalsBuffer)
                     {
                         meshData.Normals[i] = glm::make_vec3(&normalsBuffer[i * 3]);
-                        hasNormals = true;
                     }
                     else
                     {
@@ -557,11 +579,13 @@ namespace Runtime::Graphics
                     }
                 }
 
+                hasNormals = normalsBuffer != nullptr;
+
                 if (!hasNormals)
                 {
-                    Geometry::MeshUtils::RecalculateNormals(meshData);
+                    RecalculateNormals(meshData);
                 }
-                if (!texCoordsBuffer) Geometry::MeshUtils::GenerateUVs(meshData);
+                if (!texCoordsBuffer) GenerateUVs(meshData);
 
                 outMeshes.push_back(std::move(meshData));
             }
@@ -618,7 +642,7 @@ namespace Runtime::Graphics
 
         if (success && !cpuMeshes.empty())
         {
-            for (const auto& meshData : cpuMeshes)
+            for (auto& meshData : cpuMeshes)
             {
                 MeshSegment segment;
                 segment.Name = "Mesh_" + std::to_string(model->Meshes.size());

@@ -80,7 +80,7 @@ namespace Runtime::Interface::GUI
         float scaledFontSize = baseFontSize * x_scale;
 
         // Use your filesystem helper or a relative path
-        std::string fontPath = Core::Filesystem::GetAssetPath("assets/fonts/Roboto-Medium.ttf");
+        std::string fontPath = Core::Filesystem::GetAssetPath("fonts/Roboto-Medium.ttf");
 
         if (std::filesystem::exists(fontPath))
         {
@@ -182,6 +182,11 @@ namespace Runtime::Interface::GUI
         ImGui_ImplVulkan_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
+    }
+
+    void EndFrame()
+    {
+        ImGui::EndFrame();
     }
 
     void DrawGUI()

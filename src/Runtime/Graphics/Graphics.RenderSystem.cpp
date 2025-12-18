@@ -231,6 +231,9 @@ namespace Runtime::Graphics
             m_RenderGraph.Compile(frameIndex);
             m_RenderGraph.Execute(m_Renderer.GetCommandBuffer());
             m_Renderer.EndFrame();
+        }else
+        {
+            Interface::GUI::EndFrame();
         }
     }
 }

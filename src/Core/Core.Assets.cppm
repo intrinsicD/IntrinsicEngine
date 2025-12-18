@@ -78,6 +78,12 @@ export namespace Core::Assets
         template <typename T, typename LoaderFunc>
         AssetHandle Load(const std::string& path, LoaderFunc&& loader);
 
+        template <typename T, typename LoaderFunc>
+        AssetHandle Load(const std::filesystem::path& path, LoaderFunc&& loader)
+        {
+            return Load<T>(path.generic_string(), std::forward<LoaderFunc>(loader));
+        }
+
         // 2. Persistent Listener (Updates every reload)
         void Listen(AssetHandle handle, AssetCallback callback);
 
@@ -95,7 +101,7 @@ export namespace Core::Assets
 
     private:
         entt::registry m_Registry;
-        std::unordered_map<size_t, AssetHandle> m_Lookup;
+        std::unordered_map<std::string, AssetHandle> m_Lookup;
 
         // Separate map for Persistent Listeners
         std::unordered_map<AssetHandle, std::vector<AssetCallback>, AssetHandle::Hash> m_PersistentListeners;
@@ -118,15 +124,14 @@ export namespace Core::Assets
     {
         std::unique_lock lock(m_Mutex);
 
-        size_t pathHash = std::hash<std::string>{}(path);
-        if (m_Lookup.contains(pathHash)) return m_Lookup[pathHash];
+        if (m_Lookup.contains(path)) return m_Lookup[path];
 
         auto entity = m_Registry.create();
         AssetHandle handle{entity};
 
         m_Registry.emplace<AssetInfo>(entity, path, "Unknown", LoadState::Loading);
         m_Registry.emplace<AssetSource>(entity, path);
-        m_Lookup[pathHash] = handle;
+        m_Lookup[path] = handle;
 
         m_Registry.emplace<AssetReloader>(entity, [this, handle, loader]() mutable
         {

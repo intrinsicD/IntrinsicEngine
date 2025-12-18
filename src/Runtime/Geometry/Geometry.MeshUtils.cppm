@@ -4,13 +4,9 @@ module;
 
 export module Runtime.Geometry.MeshUtils;
 
-import Runtime.Graphics.Geometry;
-
 export namespace Runtime::Geometry::MeshUtils
 {
-    void RecalculateNormals(Graphics::GeometryCpuData& mesh);
-
-    void GenerateUVs(Graphics::GeometryCpuData& mesh);
+    int GenerateUVs(std::span<const glm::vec3> positions, std::span<glm::vec4> aux);
 
     void CalculateNormals(std::span<const glm::vec3> positions, std::span<const uint32_t> indices,
                           std::span<glm::vec3> normals);
