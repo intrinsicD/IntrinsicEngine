@@ -44,6 +44,8 @@ export namespace Runtime::Graph
         uint32_t Width = 0;
         uint32_t Height = 0;
         VkFormat Format = VK_FORMAT_UNDEFINED;
+        VkImageUsageFlags Usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+        VkImageAspectFlags Aspect = VK_IMAGE_ASPECT_COLOR_BIT;
     };
 
     // -------------------------------------------------------------------------
@@ -195,6 +197,8 @@ export namespace Runtime::Graph
             VkImageView PhysicalView = VK_NULL_HANDLE;
             VkExtent2D Extent = {0, 0};
             VkFormat Format = VK_FORMAT_UNDEFINED;
+            VkImageUsageFlags Usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+            VkImageAspectFlags Aspect = VK_IMAGE_ASPECT_COLOR_BIT;
         };
 
         // Barrier storage: Index = Pass Index

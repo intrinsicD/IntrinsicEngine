@@ -49,6 +49,7 @@ namespace Runtime::RHI
         [[nodiscard]] VkCommandPool GetCommandPool() const { return m_CommandPool; }
         [[nodiscard]] VmaAllocator GetAllocator() const { return m_Allocator; }
         [[nodiscard]] bool IsValid() const { return m_IsValid; }
+        [[nodiscard]] constexpr uint32_t GetFramesInFlight() const { return MAX_FRAMES_IN_FLIGHT; }
 
         // Helper to query swapchain support (used later by Swapchain module)
         [[nodiscard]] SwapchainSupportDetails QuerySwapchainSupport() const;

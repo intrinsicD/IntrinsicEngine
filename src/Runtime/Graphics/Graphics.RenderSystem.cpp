@@ -114,7 +114,10 @@ namespace Runtime::Graphics
                                                        Graph::RGTextureDesc depthDesc{};
                                                        depthDesc.Width = extent.width;
                                                        depthDesc.Height = extent.height;
-                                                       // We don't set format here, RenderGraph will auto-detect
+                                                       depthDesc.Format = VK_FORMAT_D32_SFLOAT;
+                                                       depthDesc.Usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT
+                                                           | VK_IMAGE_USAGE_SAMPLED_BIT;
+                                                       depthDesc.Aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
                                                        auto depth = builder.CreateTexture("DepthBuffer", depthDesc);
 
                                                        Graph::RGAttachmentInfo colorInfo{};

@@ -17,8 +17,6 @@ namespace Runtime::RHI
     export class SimpleRenderer
     {
     public:
-        static constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 2;
-
         SimpleRenderer(std::shared_ptr<VulkanDevice> device, VulkanSwapchain& swapchain);
         ~SimpleRenderer();
 
@@ -34,7 +32,8 @@ namespace Runtime::RHI
         [[nodiscard]] bool IsFrameInProgress() const { return m_IsFrameStarted; }
         [[nodiscard]] VkCommandBuffer GetCommandBuffer() const { return m_CommandBuffers[m_CurrentFrame]; }
         [[nodiscard]] uint32_t GetCurrentFrameIndex() const { return m_CurrentFrame; }
-        
+        [[nodiscard]] uint32_t GetFramesInFlight() const { return m_FramesInFlight; }
+
         // Expose Swapchain Image for RenderGraph Import
         [[nodiscard]] VkImage GetSwapchainImage(uint32_t index) const;
         [[nodiscard]] VkImageView GetSwapchainImageView(uint32_t index) const;
@@ -53,6 +52,7 @@ namespace Runtime::RHI
 
         uint32_t m_CurrentFrame = 0;
         uint32_t m_ImageIndex = 0;
+        uint32_t m_FramesInFlight = 0;
         bool m_IsFrameStarted = false;
 
         void InitSyncStructures();

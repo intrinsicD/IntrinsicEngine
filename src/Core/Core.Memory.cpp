@@ -1,11 +1,12 @@
 module; // <--- Start Global Fragment
 
-// Standard headers must go HERE, before 'module Core.Memory'
-#include <cstdlib> // No semicolons!
+#include <cstdlib>
 #include <cstring>
+#include <cstddef>
 #include <limits>
 #include <memory>
 #include <expected>
+#include <algorithm>
 
 module Core.Memory; // <--- Enter Module Purview
 
@@ -87,12 +88,13 @@ namespace Core::Memory
     {
         if (!m_Start) return std::unexpected(AllocatorError::OutOfMemory);
         // Validate align is power of two
+        if (align == 0) return std::unexpected(AllocatorError::InvalidAlignment);
         if ((align & (align - 1)) != 0) return std::unexpected(AllocatorError::InvalidAlignment);
         // Clamp align to at least alignof(std::max_align_t)
 
 
-        const size_t safeAlign = align == 0 ? 1 : align;
-
+        //const size_t safeAlign = align == 0 ? 1 : align;
+        const size_t safeAlign = std::max(align, alignof(std::max_align_t));
         auto currentPtr = reinterpret_cast<uintptr_t>(m_Start + m_Offset);
         uintptr_t alignedPtr = (currentPtr + (safeAlign - 1)) & ~(safeAlign - 1);
         size_t padding = alignedPtr - currentPtr;
@@ -122,8 +124,9 @@ namespace Core::Memory
     {
         m_Offset = 0;
 #ifndef NDEBUG
+        static constexpr size_t DEBUG_FILL_THRESHOLD_BYTES = 8 * 1024 * 1024; // 8 MB
         // Only memset if start_ is valid!
-        if (m_Start) {
+        if (m_Start && m_TotalSize <= DEBUG_FILL_THRESHOLD_BYTES) {
             std::memset(m_Start, 0xCC, m_TotalSize);
         }
 #endif

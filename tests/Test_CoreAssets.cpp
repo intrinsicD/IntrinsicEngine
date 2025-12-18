@@ -33,7 +33,7 @@ TEST(AssetSystem, AsyncLoading)
     };
 
     // 3. Request Load
-    AssetHandle handle = manager.Load<Texture>("assets/wood.png", textureLoader);
+    AssetHandle handle = manager.Load<Texture>("wood.png", textureLoader);
 
     // 4. Check Initial State
     EXPECT_TRUE(handle.IsValid());

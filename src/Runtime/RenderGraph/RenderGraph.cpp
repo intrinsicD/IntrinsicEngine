@@ -72,6 +72,8 @@ namespace Runtime::Graph
             node.InitialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
             node.CurrentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
             node.Format = desc.Format;
+            node.Usage = desc.Usage;
+            node.Aspect = desc.Aspect;
         }
         return {id};
     }
@@ -90,6 +92,9 @@ namespace Runtime::Graph
             node.CurrentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
             node.Extent = extent;
             node.Format = format;
+            node.Aspect = (format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT)
+                               ? (VkImageAspectFlags)(VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT)
+                               : VK_IMAGE_ASPECT_COLOR_BIT;
             m_Graph.m_Registry.RegisterImage(id, image, view);
         }
         else
@@ -198,18 +203,24 @@ namespace Runtime::Graph
             if (res.Type == ResourceType::Texture && res.PhysicalImage == VK_NULL_HANDLE)
             {
                 VkFormat fmt = res.Format;
-                VkImageUsageFlags usage = VK_IMAGE_USAGE_SAMPLED_BIT;
-                VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+                VkImageUsageFlags usage = res.Usage;
+                VkImageAspectFlags aspect = res.Aspect;
 
-                if (res.Name.find("Depth") != std::string::npos)
+                if ((usage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT) != 0)
                 {
                     if (fmt == VK_FORMAT_UNDEFINED) fmt = RHI::VulkanImage::FindDepthFormat(*m_Device);
-                    usage |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-                    aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
+                    if ((aspect & VK_IMAGE_ASPECT_DEPTH_BIT) == 0)
+                    {
+                        aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
+                    }
                 }
-                else
+                else if ((usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) == 0)
                 {
                     usage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+                }
+                if (fmt == VK_FORMAT_UNDEFINED)
+                {
+                    fmt = VK_FORMAT_R8G8B8A8_UNORM;
                 }
 
                 RHI::VulkanImage* img = AllocateImage(frameIndex, res.Extent.width, res.Extent.height, fmt, usage,
@@ -303,7 +314,7 @@ namespace Runtime::Graph
                     barrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
                     barrier.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
                     barrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
-                    barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+                    barrier.subresourceRange = {res.Aspect, 0, 1, 0, 1};
 
                     m_Barriers[passIdx].ImageBarriers.push_back(barrier);
                     res.CurrentLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;

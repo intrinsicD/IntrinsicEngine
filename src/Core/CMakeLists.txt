@@ -32,6 +32,9 @@ target_sources(${target_name}
         Core.Assets.cpp
 )
 
+set_target_properties(EnTT PROPERTIES INTERFACE_SYSTEM_INCLUDE_DIRECTORIES
+        $<TARGET_PROPERTY:EnTT,INTERFACE_INCLUDE_DIRECTORIES>) #Silences warnings about SYSTEM includes
+
 # Link Dependencies
 target_link_libraries(${target_name}
         PUBLIC

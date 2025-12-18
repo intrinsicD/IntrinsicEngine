@@ -13,6 +13,7 @@ namespace Runtime::RHI
     SimpleRenderer::SimpleRenderer(std::shared_ptr<VulkanDevice> device, VulkanSwapchain& swapchain)
         : m_Device(device), m_Swapchain(swapchain)
     {
+        m_FramesInFlight = m_Device->GetFramesInFlight();
         InitSyncStructures();
 
         VkCommandPoolCreateInfo poolInfo{};
@@ -22,7 +23,7 @@ namespace Runtime::RHI
 
         VK_CHECK(vkCreateCommandPool(m_Device->GetLogicalDevice(), &poolInfo, nullptr, &m_CommandPool));
 
-        m_CommandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+        m_CommandBuffers.resize(m_FramesInFlight);
 
         VkCommandBufferAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -38,7 +39,7 @@ namespace Runtime::RHI
         // Wait for GPU to finish before destroying sync objects
         vkDeviceWaitIdle(m_Device->GetLogicalDevice());
 
-        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+        for (size_t i = 0; i < m_FramesInFlight; i++)
         {
             vkDestroySemaphore(m_Device->GetLogicalDevice(), m_ImageAvailableSemaphores[i], nullptr);
             vkDestroySemaphore(m_Device->GetLogicalDevice(), m_RenderFinishedSemaphores[i], nullptr);
@@ -50,9 +51,9 @@ namespace Runtime::RHI
 
     void SimpleRenderer::InitSyncStructures()
     {
-        m_ImageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
-        m_RenderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
-        m_InFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
+        m_ImageAvailableSemaphores.resize(m_FramesInFlight);
+        m_RenderFinishedSemaphores.resize(m_FramesInFlight);
+        m_InFlightFences.resize(m_FramesInFlight);
 
         VkSemaphoreCreateInfo semaphoreInfo{};
         semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
@@ -61,7 +62,7 @@ namespace Runtime::RHI
         fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
         fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+        for (size_t i = 0; i < m_FramesInFlight; i++)
         {
             VK_CHECK(vkCreateSemaphore(m_Device->GetLogicalDevice(), &semaphoreInfo, nullptr, &m_ImageAvailableSemaphores[i]));
             VK_CHECK(vkCreateSemaphore(m_Device->GetLogicalDevice(), &semaphoreInfo, nullptr, &m_RenderFinishedSemaphores[i]));
@@ -167,7 +168,7 @@ namespace Runtime::RHI
         }
 
         m_IsFrameStarted = false;
-        m_CurrentFrame = (m_CurrentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+        m_CurrentFrame = (m_CurrentFrame + 1) % m_FramesInFlight;
     }
 
     void SimpleRenderer::BindPipeline(const GraphicsPipeline& pipeline)

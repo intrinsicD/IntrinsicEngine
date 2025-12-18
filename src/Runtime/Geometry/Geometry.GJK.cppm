@@ -40,6 +40,9 @@ export namespace Runtime::Geometry::Internal
 
     // --- GJK IMPLEMENTATION (Boolean Overlap) ---
 
+    constexpr float kEpsilon = 1e-6f;
+    constexpr int kMaxGjkIterations = 64;
+
     // Handles the logic of processing the simplex to see if it contains origin
     // Returns true if intersection found, updates direction for next search
     bool NextSimplex(Simplex& points, glm::vec3& direction)
@@ -56,6 +59,10 @@ export namespace Runtime::Geometry::Internal
                 if (glm::dot(ab, ao) > 0)
                 {
                     direction = glm::cross(glm::cross(ab, ao), ab);
+                    if (glm::length2(direction) < kEpsilon)
+                    {
+                        direction = ao; // Fallback to avoid zero direction on nearly collinear points
+                    }
                 }
                 else
                 {
@@ -73,6 +80,14 @@ export namespace Runtime::Geometry::Internal
                 glm::vec3 ac = c - a;
                 glm::vec3 ao = -a;
                 glm::vec3 abc = glm::cross(ab, ac);
+
+                if (glm::length2(abc) < kEpsilon)
+                {
+                    direction = ao;
+                    points.Size = 2;
+                    points[1] = c;
+                    return false;
+                }
 
                 if (glm::dot(glm::cross(abc, ac), ao) > 0)
                 {
@@ -168,6 +183,7 @@ export namespace Runtime::Geometry::Internal
         points.Push(support);
 
         glm::vec3 direction = -support;
+        int maxIterations = kMaxGjkIterations;
 
         while (true)
         {
@@ -178,6 +194,11 @@ export namespace Runtime::Geometry::Internal
             points.Push(support);
 
             if (NextSimplex(points, direction)) return true;
+
+            if (points.Size > 0 && --maxIterations == 0)
+            {
+                return false;
+            }
         }
     }
 

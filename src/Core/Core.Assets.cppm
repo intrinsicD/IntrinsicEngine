@@ -76,13 +76,7 @@ export namespace Core::Assets
 
         // 1. Load: Returns handle immediately. Starts async task.
         template <typename T, typename LoaderFunc>
-        AssetHandle Load(const std::string& path, LoaderFunc&& loader);
-
-        template <typename T, typename LoaderFunc>
-        AssetHandle Load(const std::filesystem::path& path, LoaderFunc&& loader)
-        {
-            return Load<T>(path.generic_string(), std::forward<LoaderFunc>(loader));
-        }
+        AssetHandle Load(const std::filesystem::path& path, LoaderFunc&& loader);
 
         // 2. Persistent Listener (Updates every reload)
         void Listen(AssetHandle handle, AssetCallback callback);
@@ -120,7 +114,7 @@ export namespace Core::Assets
     };
 
     template <typename T, typename LoaderFunc>
-    AssetHandle AssetManager::Load(const std::string& path, LoaderFunc&& loader)
+    AssetHandle AssetManager::Load(const std::filesystem::path& path, LoaderFunc&& loader)
     {
         std::unique_lock lock(m_Mutex);
 

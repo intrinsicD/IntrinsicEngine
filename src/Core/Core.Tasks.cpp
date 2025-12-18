@@ -25,7 +25,9 @@ namespace Core::Tasks
 
         std::atomic<bool> isRunning{false};
         std::atomic<int> activeTaskCount{0};
+        std::atomic<int> queuedTaskCount{0};
         std::condition_variable waitCondition; // For WaitForAll
+        std::mutex waitMutex;
     };
 
     static std::unique_ptr<SchedulerContext> s_Ctx = nullptr;
@@ -83,6 +85,7 @@ namespace Core::Tasks
         // Increment counter BEFORE enqueuing to prevent race condition
         // where worker grabs and completes task before WaitForAll sees the increment
         ++s_Ctx->activeTaskCount;
+        ++s_Ctx->queuedTaskCount;
 
         {
             std::lock_guard lock(s_Ctx->queueMutex);
@@ -97,10 +100,11 @@ namespace Core::Tasks
             Log::Error("Scheduler::WaitForAll called before Initialize");
             return;
         }
-        std::unique_lock lock(s_Ctx->queueMutex);
-        s_Ctx->waitCondition.wait(lock, []
+        std::unique_lock waitLock(s_Ctx->waitMutex);
+        s_Ctx->waitCondition.wait(waitLock, []
         {
-            return s_Ctx->globalQueue.empty() && s_Ctx->activeTaskCount == 0;
+            return s_Ctx->queuedTaskCount.load(std::memory_order_acquire) == 0
+                && s_Ctx->activeTaskCount.load(std::memory_order_acquire) == 0;
         });
     }
 
@@ -130,6 +134,7 @@ namespace Core::Tasks
                 // Grab task
                 task = std::move(s_Ctx->globalQueue.front());
                 s_Ctx->globalQueue.pop_front();
+                --s_Ctx->queuedTaskCount;
             }
 
             // Execute Task
@@ -139,7 +144,7 @@ namespace Core::Tasks
             {
                 std::lock_guard lock(s_Ctx->queueMutex);
                 --s_Ctx->activeTaskCount;
-                if (s_Ctx->activeTaskCount == 0 && s_Ctx->globalQueue.empty())
+                if (s_Ctx->activeTaskCount == 0 && s_Ctx->queuedTaskCount == 0)
                 {
                     s_Ctx->waitCondition.notify_all();
                 }
