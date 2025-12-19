@@ -18,6 +18,7 @@ import Core.Window;
 import Core.Memory;
 import Core.Tasks;
 import Core.Filesystem;
+import Core.Profiling;
 import Runtime.RHI.Shader;
 import Runtime.RHI.Texture;
 import Runtime.Graphics.ModelLoader;
@@ -277,6 +278,7 @@ namespace Runtime
 
     void Engine::Run()
     {
+        Core::Profiling::ScopedTimer timer("Engine::Run");
         OnStart();
         auto lastTime = std::chrono::high_resolution_clock::now();
 

@@ -98,37 +98,22 @@ namespace Core::Memory
     {
         assert(m_OwningThread == std::this_thread::get_id() && "LinearArena is not thread-safe; use a separate arena per thread.");
         if (!m_Start) return std::unexpected(AllocatorError::OutOfMemory);
-        // Validate align is power of two
-        if (align == 0) return std::unexpected(AllocatorError::InvalidAlignment);
-        if ((align & (align - 1)) != 0) return std::unexpected(AllocatorError::InvalidAlignment);
-        // Clamp align to at least alignof(std::max_align_t)
 
-
-        //const size_t safeAlign = align == 0 ? 1 : align;
+        // Always align the *current* offset, not just the pointer logic
+        // This ensures GetUsed() returns an aligned watermark for subsequent saves/restores
         const size_t safeAlign = std::max(align, alignof(std::max_align_t));
-        auto currentPtr = reinterpret_cast<uintptr_t>(m_Start + m_Offset);
-        uintptr_t alignedPtr = (currentPtr + (safeAlign - 1)) & ~(safeAlign - 1);
-        size_t padding = alignedPtr - currentPtr;
 
-        if (padding > (std::numeric_limits<size_t>::max() - m_Offset))
+        // Calculate aligned offset
+        const size_t alignedOffset = (m_Offset + (safeAlign - 1)) & ~(safeAlign - 1);
+
+        // Check overflow
+        if (alignedOffset + size > m_TotalSize)
         {
             return std::unexpected(AllocatorError::OutOfMemory);
         }
 
-        /*if (offset_ + padding + size > totalSize_) //TOTO remove this reduntant test.
-        {
-            return std::unexpected(AllocatorError::OutOfMemory);
-        }*/
-
-        const size_t newOffset = m_Offset + padding;
-        if (size > (std::numeric_limits<size_t>::max() - newOffset) || newOffset + size > m_TotalSize)
-        {
-            return std::unexpected(AllocatorError::OutOfMemory);
-        }
-
-        m_Offset = newOffset;
-        void* ptr = m_Start + m_Offset;
-        m_Offset += size;
+        void* ptr = m_Start + alignedOffset;
+        m_Offset = alignedOffset + size;
 
         return ptr;
     }

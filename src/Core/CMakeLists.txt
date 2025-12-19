@@ -22,6 +22,7 @@ target_sources(${target_name}
         Core.Filesystem.cppm
         Core.Input.cppm
         Core.Assets.cppm
+        Core.Profiling.cppm
         PRIVATE
         Core.Memory.cpp
         Core.Logging.cpp

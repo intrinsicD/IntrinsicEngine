@@ -159,7 +159,9 @@ export namespace Runtime::Geometry
             Nodes[root_idx].NumElements = num_elements;
             Nodes[root_idx].Aabb = Union(ElementAabbs);
 
-            SubdivideVolume(root_idx, 0);
+            std::vector<size_t> localScratch;
+            localScratch.reserve(m_ElementIndices.size());
+            SubdivideVolume(root_idx, 0, localScratch);
             return true;
         }
 
@@ -196,7 +198,8 @@ export namespace Runtime::Geometry
             // Use a small local stack to avoid heap allocation for the stack itself if possible,
             // though std::vector is fine given the depth is low (10).
             // Optimization: Use a fixed array stack since MaxDepth is known/limited.
-            std::array<size_t, 64> stack{}; // Depth 10 * 8 children < 64? No, but stack depth is roughly depth*7 in worst case?
+            std::array<size_t, 64> stack{};
+            // Depth 10 * 8 children < 64? No, but stack depth is roughly depth*7 in worst case?
             // Actually for DFS, stack size is proportional to Depth. 64 is plenty for depth 10.
             int stackTop = 0;
             stack[stackTop++] = 0; // Push Root (Index 0)
@@ -517,7 +520,7 @@ export namespace Runtime::Geometry
             return NodeHandle(node_idx);
         }
 
-        void SubdivideVolume(const NodeHandle node_idx, std::size_t depth)
+        void SubdivideVolume(const NodeHandle node_idx, std::size_t depth, std::vector<size_t>& scratch)
         {
             const Node& node = Nodes[node_idx]; // We'll be modifying the node
 
@@ -554,9 +557,9 @@ export namespace Runtime::Geometry
             }
 
             std::array<std::vector<size_t>, 8> child_elements;
-            m_ScratchIndices.clear();
-            m_ScratchIndices.reserve(node.NumElements);
-            auto& straddlers = m_ScratchIndices;
+            scratch.clear();
+            scratch.reserve(node.NumElements);
+            auto& straddlers = scratch;
 
             for (size_t i = 0; i < node.NumElements; ++i)
             {
@@ -677,7 +680,7 @@ export namespace Runtime::Geometry
                         child.Aabb = octant_aabbs[i];
                     }
 
-                    SubdivideVolume(child_node_handle, depth + 1);
+                    SubdivideVolume(child_node_handle, depth + 1, scratch);
                 }
             }
         }
@@ -769,6 +772,5 @@ export namespace Runtime::Geometry
         std::size_t m_MaxBvhDepth = 10;
         SplitPolicy m_SplitPolicy;
         std::vector<size_t> m_ElementIndices;
-        std::vector<size_t> m_ScratchIndices;
     };
 }

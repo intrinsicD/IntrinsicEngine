@@ -43,8 +43,8 @@ export namespace Runtime::Graphics
 
         std::shared_ptr<RHI::VulkanDevice> m_Device;
         RHI::VulkanSwapchain& m_Swapchain;
-        RHI::BindlessDescriptorSystem& m_BindlessSystem;
         RHI::SimpleRenderer& m_Renderer;
+        RHI::BindlessDescriptorSystem& m_BindlessSystem;
         RHI::GraphicsPipeline& m_Pipeline;
         VkDescriptorSet m_GlobalDescriptorSet = VK_NULL_HANDLE;
 
