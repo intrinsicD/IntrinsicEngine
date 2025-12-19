@@ -6,6 +6,8 @@ module;
 
 export module Core.Window;
 
+import Core.Input;
+
 export namespace Core::Windowing
 {
     struct WindowProps
@@ -92,6 +94,7 @@ export namespace Core::Windowing
         [[nodiscard]] int GetFramebufferWidth() const;
         [[nodiscard]] int GetFramebufferHeight() const;
         [[nodiscard]] bool IsValid() const { return m_IsValid; }
+        [[nodiscard]] const Input::Context &GetInput() const { return m_InputContext; }
 
         // Set the function that the Window calls when something happens
         void SetEventCallback(const EventCallbackFn& callback) { m_Data.Callback = callback; }
@@ -117,6 +120,7 @@ export namespace Core::Windowing
         };
 
         WindowData m_Data;
+        Input::Context m_InputContext;
 
         // Internal init helper
         void Init(const WindowProps& props);

@@ -45,7 +45,6 @@ namespace Runtime
             std::exit(-1);
         }
 
-        Core::Input::Initialize(m_Window->GetNativeHandle());
         m_Window->SetEventCallback([this](const Core::Windowing::Event& e)
         {
             std::visit([this](auto&& event)

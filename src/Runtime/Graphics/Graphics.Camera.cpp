@@ -25,27 +25,29 @@ namespace Runtime::Graphics
         if (height > 0) camera.AspectRatio = (float)width / (float)height;
     }
 
-    void OnUpdate(CameraComponent& camera, FlyControlComponent& flyControlComponent, float dt, bool disableInput)
+    void OnUpdate(CameraComponent& camera,
+        FlyControlComponent& flyControlComponent,
+        const Core::Input::Context &inputContext,
+        float dt, bool disableInput)
     {
         if (disableInput) return;
 
         using namespace Core::Input;
 
         // 1. Mouse Look
-        if (IsMouseButtonPressed(1)) // Right Click to look
+        if (inputContext.IsMouseButtonPressed(1)) // Right Click to look
         {
-            double x = GetMouseX();
-            double y = GetMouseY();
+            glm::vec2 pos = inputContext.GetMousePosition();
 
             if (flyControlComponent.FirstMouse)
             {
-                flyControlComponent.LastX = x;
-                flyControlComponent.LastY = y;
+                flyControlComponent.LastX = pos.x;
+                flyControlComponent.LastY = pos.y;
                 flyControlComponent.FirstMouse = false;
             }
 
-            float xOffset = static_cast<float>(x - flyControlComponent.LastX) * flyControlComponent.MouseSensitivity;
-            float yOffset = static_cast<float>(y - flyControlComponent.LastY) * flyControlComponent.MouseSensitivity;
+            float xOffset = static_cast<float>(pos.x - flyControlComponent.LastX) * flyControlComponent.MouseSensitivity;
+            float yOffset = static_cast<float>(pos.y - flyControlComponent.LastY) * flyControlComponent.MouseSensitivity;
 
             flyControlComponent.Yaw -= xOffset;
             flyControlComponent.Pitch -= yOffset;
@@ -54,8 +56,8 @@ namespace Runtime::Graphics
             if (flyControlComponent.Pitch > 89.0f) flyControlComponent.Pitch = 89.0f;
             if (flyControlComponent.Pitch < -89.0f) flyControlComponent.Pitch = -89.0f;
 
-            flyControlComponent.LastX = x;
-            flyControlComponent.LastY = y;
+            flyControlComponent.LastX = pos.x;
+            flyControlComponent.LastY = pos.y;
         }
         else
         {
@@ -69,18 +71,20 @@ namespace Runtime::Graphics
 
         // 2. Movement
         float velocity = flyControlComponent.MoveSpeed * dt;
-        if (IsKeyPressed(Key::LeftShift)) velocity *= 2.0f;
-
-        if (IsKeyPressed(Key::W)) camera.Position += camera.GetForward() * velocity;
-        if (IsKeyPressed(Key::S)) camera.Position -= camera.GetForward() * velocity;
-        if (IsKeyPressed(Key::D)) camera.Position += camera.GetRight() * velocity;
-        if (IsKeyPressed(Key::A)) camera.Position -= camera.GetRight() * velocity;
-        if (IsKeyPressed(Key::Space)) camera.Position += glm::vec3(0, 1, 0) * velocity;
+        if (inputContext.IsKeyPressed(Key::LeftShift)) velocity *= 2.0f;
+        if (inputContext.IsKeyPressed(Key::W)) camera.Position += camera.GetForward() * velocity;
+        if (inputContext.IsKeyPressed(Key::S)) camera.Position -= camera.GetForward() * velocity;
+        if (inputContext.IsKeyPressed(Key::D)) camera.Position += camera.GetRight() * velocity;
+        if (inputContext.IsKeyPressed(Key::A)) camera.Position -= camera.GetRight() * velocity;
+        if (inputContext.IsKeyPressed(Key::Space)) camera.Position += glm::vec3(0, 1, 0) * velocity;
     }
 
     // Trackball / Free Orbit Camera
 
-    void OnUpdate(CameraComponent& camera, OrbitControlComponent& orbitControlComponent, float, bool disableInput)
+    void OnUpdate(CameraComponent& camera,
+        OrbitControlComponent& orbitControlComponent,
+        const Core::Input::Context &inputContext,
+        float, bool disableInput)
     {
         if (disableInput) return;
 
@@ -91,20 +95,19 @@ namespace Runtime::Graphics
         glm::vec3 offset = camera.Position - orbitControlComponent.Target;
 
         // Handle Rotation
-        if (IsMouseButtonPressed(0)) // Left Click
+        if (inputContext.IsMouseButtonPressed(0)) // Left Click
         {
-            double x = GetMouseX();
-            double y = GetMouseY();
+            glm::vec2 pos = inputContext.GetMousePosition();
 
             if (orbitControlComponent.FirstMouse)
             {
-                orbitControlComponent.LastX = x;
-                orbitControlComponent.LastY = y;
+                orbitControlComponent.LastX = pos.x;
+                orbitControlComponent.LastY = pos.y;
                 orbitControlComponent.FirstMouse = false;
             }
 
-            float xDelta = static_cast<float>(x - orbitControlComponent.LastX) * orbitControlComponent.Sensitivity;
-            float yDelta = static_cast<float>(y - orbitControlComponent.LastY) * orbitControlComponent.Sensitivity;
+            float xDelta = static_cast<float>(pos.x - orbitControlComponent.LastX) * orbitControlComponent.Sensitivity;
+            float yDelta = static_cast<float>(pos.y - orbitControlComponent.LastY) * orbitControlComponent.Sensitivity;
 
             // --- Trackball Logic ---
             // 1. Get Camera Basis Vectors
@@ -126,8 +129,8 @@ namespace Runtime::Graphics
             offset = rotation * offset;
             camera.Orientation = glm::normalize(rotation * camera.Orientation);
 
-            orbitControlComponent.LastX = x;
-            orbitControlComponent.LastY = y;
+            orbitControlComponent.LastX = pos.x;
+            orbitControlComponent.LastY = pos.y;
         }
         else
         {

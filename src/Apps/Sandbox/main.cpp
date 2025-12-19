@@ -62,7 +62,8 @@ public:
             // In a real engine, IO is separate from Upload.
             return std::make_shared<RHI::Texture>(GetDevice(), path);
         };
-        m_DuckTexture = m_AssetManager.Load<RHI::Texture>(Filesystem::GetAssetPath("textures/DuckCM.png"), textureLoader);
+        m_DuckTexture = m_AssetManager.Load<RHI::Texture>(Filesystem::GetAssetPath("textures/DuckCM.png"),
+                                                          textureLoader);
 
         auto modelLoader = [&](const std::string& path)
         {
@@ -112,12 +113,12 @@ public:
             cameraComponent = m_Scene.GetRegistry().try_get<Graphics::CameraComponent>(m_CameraEntity);
             if (auto* orbit = m_Scene.GetRegistry().try_get<Graphics::OrbitControlComponent>(m_CameraEntity))
             {
-                Graphics::OnUpdate(*cameraComponent, *orbit, dt, inputCaptured);
+                Graphics::OnUpdate(*cameraComponent, *orbit, m_Window->GetInput(), dt, inputCaptured);
             }
             // Check if it has Fly controls
             else if (auto* fly = m_Scene.GetRegistry().try_get<Graphics::FlyControlComponent>(m_CameraEntity))
             {
-                Graphics::OnUpdate(*cameraComponent, *fly, dt, inputCaptured);
+                Graphics::OnUpdate(*cameraComponent, *fly, m_Window->GetInput(), dt, inputCaptured);
             }
 
             if (m_Window->GetWindowWidth() != 0 && m_Window->GetWindowHeight() != 0)
@@ -168,7 +169,7 @@ public:
             auto view = m_Scene.GetRegistry().view<ECS::Transform::Component, ECS::Transform::Rotator>();
             for (auto [entity, transform, rotator] : view.each())
             {
-                ECS::Transform::OnUpdate(transform, rotator,dt);
+                ECS::Transform::OnUpdate(transform, rotator, dt);
             }
         }
 
@@ -219,7 +220,8 @@ public:
                 ImGuiTreeNodeFlags_OpenOnArrow;
             flags |= ImGuiTreeNodeFlags_SpanAvailWidth;
 
-            bool opened = ImGui::TreeNodeEx(reinterpret_cast<void*>(static_cast<entt::id_type>(entityID)), flags, "%s", name.c_str());
+            bool opened = ImGui::TreeNodeEx(reinterpret_cast<void*>(static_cast<entt::id_type>(entityID)), flags, "%s",
+                                            name.c_str());
 
             if (ImGui::IsItemClicked())
             {

@@ -90,6 +90,7 @@ namespace Core::Windowing
 
         m_Window = glfwWindow;
         m_IsValid = true;
+        m_InputContext.Initialize(m_Window);
 
         // Store a pointer to our data struct inside the GLFW window so callbacks can find it
         glfwSetWindowUserPointer(glfwWindow, &m_Data);

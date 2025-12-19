@@ -187,59 +187,66 @@ export namespace Runtime::Geometry
                 return;
             }
 
+            const auto& nodeData = Nodes.Handle().Vector();
+            const Node* nodePtr = nodeData.data(); // Raw pointer for speed
+
             constexpr double eps = 0.0; // set to a small positive tolerance if you want numerical slack
             const auto query_volume = static_cast<double>(Volume(query_shape));
 
-            std::vector<NodeHandle> stack{NodeHandle{0}};
-            while (!stack.empty())
+            // Use a small local stack to avoid heap allocation for the stack itself if possible,
+            // though std::vector is fine given the depth is low (10).
+            // Optimization: Use a fixed array stack since MaxDepth is known/limited.
+            std::array<size_t, 64> stack{}; // Depth 10 * 8 children < 64? No, but stack depth is roughly depth*7 in worst case?
+            // Actually for DFS, stack size is proportional to Depth. 64 is plenty for depth 10.
+            int stackTop = 0;
+            stack[stackTop++] = 0; // Push Root (Index 0)
+
+            while (stackTop > 0)
             {
-                const NodeHandle node_idx = stack.back();
-                stack.pop_back();
-                const Node& node = Nodes[node_idx];
+                const size_t node_idx = stack[--stackTop];
+                const Node& node = nodePtr[node_idx];
 
                 if (!TestOverlap(node.Aabb, query_shape)) continue;
-
 
                 const double node_volume = node.Aabb.GetVolume();
                 const double strictly_larger = (query_volume > node_volume + eps);
 
                 if (strictly_larger && Contains(query_shape, node.Aabb))
                 {
-                    for (size_t i = 0; i < node.NumElements; ++i)
+                    // Optimization: Batch copy
+                    const size_t end = node.FirstElement + node.NumElements;
+                    for (size_t i = node.FirstElement; i < end; ++i)
                     {
-                        result.push_back(m_ElementIndices[node.FirstElement + i]);
+                        result.push_back(m_ElementIndices[i]);
                     }
                     continue;
                 }
 
-                if (node.IsLeaf)
+                // Process Elements (Leaf or Straddlers)
+                size_t elemEnd = node.FirstElement + (node.IsLeaf ? node.NumElements : node.NumStraddlers);
+                for (size_t i = node.FirstElement; i < elemEnd; ++i)
                 {
-                    for (size_t i = 0; i < node.NumElements; ++i)
+                    size_t ei = m_ElementIndices[i];
+                    if (TestOverlap(ElementAabbs[ei], query_shape))
                     {
-                        std::size_t ei = m_ElementIndices[node.FirstElement + i];
-                        if (TestOverlap(ElementAabbs[ei], query_shape))
-                        {
-                            result.push_back(ei);
-                        }
+                        result.push_back(ei);
                     }
                 }
-                else
+
+                if (!node.IsLeaf)
                 {
-                    for (size_t i = 0; i < node.NumStraddlers; ++i)
-                    {
-                        std::size_t ei = m_ElementIndices[node.FirstElement + i];
-                        if (TestOverlap(ElementAabbs[ei], query_shape))
-                        {
-                            result.push_back(ei);
-                        }
-                    }
                     for (const auto ci : node.Children)
                     {
-                        auto nhci = NodeHandle(ci);
-                        if (nhci.IsValid() &&
-                            TestOverlap(Nodes[nhci].Aabb, query_shape))
+                        // Check validity via index directly
+                        if (ci != kInvalidIndex)
                         {
-                            stack.push_back(nhci);
+                            // Optimization: Check Child AABB here before pushing to stack?
+                            // The original code pushed then checked.
+                            // Checking here saves a stack push/pop cycle.
+                            if (TestOverlap(nodePtr[ci].Aabb, query_shape))
+                            {
+                                stack[stackTop++] = ci;
+                            }
                         }
                     }
                 }

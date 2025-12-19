@@ -1,44 +1,35 @@
 module;
 #include <GLFW/glfw3.h>
+#include <glm/glm.hpp>
 
 module Core.Input;
 
 namespace Core::Input
 {
-    static GLFWwindow* s_Window = nullptr;
-
-    void Initialize(void* windowHandle)
+    void Context::Initialize(void* windowHandle)
     {
-        s_Window = static_cast<GLFWwindow*>(windowHandle);
+        m_WindowHandle = static_cast<GLFWwindow*>(windowHandle);
     }
 
-    bool IsKeyPressed(int keycode)
+    bool Context::IsKeyPressed(int keycode) const
     {
-        if (!s_Window) return false;
-        int state = glfwGetKey(s_Window, keycode);
+        if (!m_WindowHandle) return false;
+        int state = glfwGetKey((GLFWwindow*)m_WindowHandle, keycode);
         return state == GLFW_PRESS || state == GLFW_REPEAT;
     }
 
-    bool IsMouseButtonPressed(int button)
+    bool Context::IsMouseButtonPressed(int button) const
     {
-        if (!s_Window) return false;
-        int state = glfwGetMouseButton(s_Window, button);
+        if (!m_WindowHandle) return false;
+        int state = glfwGetMouseButton((GLFWwindow*)m_WindowHandle, button);
         return state == GLFW_PRESS;
     }
 
-    double GetMouseX()
+    glm::vec2 Context::GetMousePosition() const
     {
-        if (!s_Window) return 0.0;
+        if (!m_WindowHandle) return {0.0f, 0.0f};
         double x, y;
-        glfwGetCursorPos(s_Window, &x, &y);
-        return x;
-    }
-
-    double GetMouseY()
-    {
-        if (!s_Window) return 0.0;
-        double x, y;
-        glfwGetCursorPos(s_Window, &x, &y);
-        return y;
+        glfwGetCursorPos((GLFWwindow*)m_WindowHandle, &x, &y);
+        return {static_cast<float>(x), static_cast<float>(y)};
     }
 }

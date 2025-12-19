@@ -74,7 +74,13 @@ export namespace Runtime::Graphics
 
     void OnResize(CameraComponent& camera, uint32_t width, uint32_t height);
 
-    void OnUpdate(CameraComponent& camera, FlyControlComponent& flyControlComponent, float dt, bool disableInput);
+    void OnUpdate(CameraComponent& camera,
+        FlyControlComponent& flyControlComponent,
+        const Core::Input::Context &inputContext,
+        float dt, bool disableInput);
 
-    void OnUpdate(CameraComponent& camera, OrbitControlComponent& orbitControlComponent, float dt, bool disableInput);
+    void OnUpdate(CameraComponent& camera,
+        OrbitControlComponent& orbitControlComponent,
+        const Core::Input::Context &inputContext,
+        float dt, bool disableInput);
 }
