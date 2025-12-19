@@ -166,85 +166,61 @@ namespace Runtime::RHI
             queueCreateInfos.push_back(queueCreateInfo);
         }
 
-        // --- Features ---
-        // Query supported features before enabling optional chains
-        VkPhysicalDeviceExtendedDynamicStateFeaturesEXT dynamicStateQuery{};
-        dynamicStateQuery.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT;
+        // --- FEATURES CHAIN SETUP ---
+        // We use one set of structs for both Querying and Enabling.
+        // This ensures that if the driver says "TRUE", we ask for "TRUE".
 
-        VkPhysicalDeviceVulkan13Features features13Query{};
-        features13Query.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
-        features13Query.pNext = &dynamicStateQuery;
+        // 1. Dynamic State (Viewport, Scissor, Topology)
+        VkPhysicalDeviceExtendedDynamicStateFeaturesEXT dynamicState{};
+        dynamicState.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT;
 
-        VkPhysicalDeviceVulkan12Features features12Query{};
-        features12Query.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
-        features12Query.pNext = &features13Query;
-
-        VkPhysicalDeviceFeatures2 availableFeatures{};
-        availableFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-        availableFeatures.pNext = &features12Query;
-        vkGetPhysicalDeviceFeatures2(m_PhysicalDevice, &availableFeatures);
-
-        auto warnIfDisabled = [](std::string_view name)
-        {
-            Core::Log::Warn("VulkanDevice: '{}' not supported on the selected GPU; feature disabled.", name);
-        };
-
-        VkPhysicalDeviceFeatures deviceFeatures{};
-        if (availableFeatures.features.samplerAnisotropy)
-        {
-            deviceFeatures.samplerAnisotropy = VK_TRUE; // Usually desired
-        }
-        else
-        {
-            warnIfDisabled("samplerAnisotropy");
-        }
-
-        VkPhysicalDeviceExtendedDynamicStateFeaturesEXT dynamicStateFeatures{};
-        dynamicStateFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT;
-        dynamicStateFeatures.extendedDynamicState = dynamicStateQuery.extendedDynamicState;
-        if (!dynamicStateFeatures.extendedDynamicState) warnIfDisabled("extendedDynamicState");
-
-        // Enable Dynamic Rendering (Vulkan 1.3 Core)
+        // 2. Vulkan 1.3 (Dynamic Rendering, Sync2)
         VkPhysicalDeviceVulkan13Features features13{};
         features13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
-        features13.dynamicRendering = features13Query.dynamicRendering;
-        features13.synchronization2 = features13Query.synchronization2;
-        features13.pNext = &dynamicStateFeatures;
-        if (!features13.dynamicRendering) warnIfDisabled("dynamicRendering");
-        if (!features13.synchronization2) warnIfDisabled("synchronization2");
+        features13.pNext = &dynamicState;
 
+        // 3. Vulkan 1.2 (Bindless / Descriptor Indexing)
+        // Note: UpdateAfterBind is part of Vulkan 1.2 core, so it lives here.
         VkPhysicalDeviceVulkan12Features features12{};
         features12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
-        features12.descriptorIndexing = features12Query.descriptorIndexing;
-        features12.runtimeDescriptorArray = features12Query.runtimeDescriptorArray;
-        features12.descriptorBindingPartiallyBound = features12Query.descriptorBindingPartiallyBound; // Allow sparse array
-        features12.descriptorBindingVariableDescriptorCount = features12Query.descriptorBindingVariableDescriptorCount;
-        features12.shaderSampledImageArrayNonUniformIndexing = features12Query.shaderSampledImageArrayNonUniformIndexing;
         features12.pNext = &features13;
 
-        if (!features12.descriptorIndexing) warnIfDisabled("descriptorIndexing");
-        if (!features12.runtimeDescriptorArray) warnIfDisabled("runtimeDescriptorArray");
-        if (!features12.descriptorBindingPartiallyBound) warnIfDisabled("descriptorBindingPartiallyBound");
-        if (!features12.descriptorBindingVariableDescriptorCount) warnIfDisabled("descriptorBindingVariableDescriptorCount");
-        if (!features12.shaderSampledImageArrayNonUniformIndexing) warnIfDisabled("shaderSampledImageArrayNonUniformIndexing");
+        // 4. Features2 (Base features like Anisotropy)
+        VkPhysicalDeviceFeatures2 features2{};
+        features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+        features2.pNext = &features12;
 
-        VkPhysicalDeviceFeatures2 deviceFeatures2{};
-        deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-        deviceFeatures2.features = deviceFeatures;
-        deviceFeatures2.pNext = &features12;
+        // --- QUERY SUPPORT ---
+        // This fills the structs with what the GPU *actually* supports.
+        vkGetPhysicalDeviceFeatures2(m_PhysicalDevice, &features2);
 
-        // --- Creation ---
+        // --- VERIFY REQUIREMENTS ---
+        // If the GPU doesn't support something we need, we should error out or disable it.
+        // For this engine, we require these features:
+
+        if (!features13.dynamicRendering) Core::Log::Error("Vulkan 1.3 Dynamic Rendering not supported!");
+        if (!features13.synchronization2) Core::Log::Error("Vulkan 1.3 Sync2 not supported!");
+
+        // The Critical Fix for your Validation Error:
+        if (!features12.descriptorBindingSampledImageUpdateAfterBind)
+            Core::Log::Error("Bindless: UpdateAfterBind not supported!");
+        if (!features12.descriptorBindingPartiallyBound)
+            Core::Log::Error("Bindless: PartiallyBound not supported!");
+        if (!features12.runtimeDescriptorArray)
+            Core::Log::Error("Bindless: RuntimeArray not supported!");
+
+        // --- CREATE DEVICE ---
         VkDeviceCreateInfo createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-        createInfo.pNext = &deviceFeatures2; // Chain modern features
+
+        // Pass the whole chain (which now contains the TRUE values from the query)
+        createInfo.pNext = &features2;
 
         createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
         createInfo.pQueueCreateInfos = queueCreateInfos.data();
 
         createInfo.enabledExtensionCount = static_cast<uint32_t>(DEVICE_EXTENSIONS.size());
         createInfo.ppEnabledExtensionNames = DEVICE_EXTENSIONS.data();
-
-        // Deprecated in newer Vulkan but good for compatibility
         createInfo.enabledLayerCount = 0;
 
         if (vkCreateDevice(m_PhysicalDevice, &createInfo, nullptr, &m_Device) != VK_SUCCESS)
@@ -254,10 +230,9 @@ namespace Runtime::RHI
             return;
         }
 
-        // LOAD DEVICE POINTERS (Important for Volk)
         volkLoadDevice(m_Device);
 
-        // Initialize VMA
+        // ... (VMA Initialization remains the same) ...
         VmaVulkanFunctions vulkanFunctions = {};
         vulkanFunctions.vkGetInstanceProcAddr = vkGetInstanceProcAddr;
         vulkanFunctions.vkGetDeviceProcAddr = vkGetDeviceProcAddr;
@@ -267,9 +242,7 @@ namespace Runtime::RHI
         allocatorInfo.physicalDevice = m_PhysicalDevice;
         allocatorInfo.device = m_Device;
         allocatorInfo.instance = context.GetInstance();
-        // You might need to pass Instance to CreateLogicalDevice or store it
         allocatorInfo.pVulkanFunctions = &vulkanFunctions;
-
 
         if (vmaCreateAllocator(&allocatorInfo, &m_Allocator) != VK_SUCCESS)
         {

@@ -43,7 +43,7 @@ target_link_libraries(${target_name}
         glfw
         imgui_lib
         PRIVATE
-        Vulkan::Vulkan
+        volk::volk
         EnTT::EnTT
         # Telemetry libs will go here
 )

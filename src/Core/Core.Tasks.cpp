@@ -1,71 +1,45 @@
 module;
-
 #include <vector>
+#include <deque>
 #include <thread>
-#include <queue>
 #include <mutex>
-#include <memory>
 #include <condition_variable>
 #include <atomic>
-#include <functional>
+#include <memory>
 
 module Core.Tasks;
-import Core.Logging; // We use our new logger
+import Core.Logging;
 
 namespace Core::Tasks
 {
-    // Global Scheduler State
     struct SchedulerContext
     {
         std::vector<std::thread> workers;
-        std::deque<TaskFunction> globalQueue;
+        std::deque<LocalTask> globalQueue; // Now stores LocalTask (No std::function allocs)
 
         std::mutex queueMutex;
         std::condition_variable wakeCondition;
 
         std::atomic<bool> isRunning{false};
         std::atomic<int> activeTaskCount{0};
-        std::atomic<int> queuedTaskCount{0};
-        std::condition_variable waitCondition; // For WaitForAll
+        std::atomic<int> queuedTaskCount{0}; // Tracked separately to avoid queue locking for size
+
+        std::condition_variable waitCondition;
         std::mutex waitMutex;
     };
 
     static std::unique_ptr<SchedulerContext> s_Ctx = nullptr;
 
-    static bool TryPopTask(TaskFunction& outTask)
-    {
-        std::lock_guard lock(s_Ctx->queueMutex);
-        if (s_Ctx->globalQueue.empty()) return false;
-
-        outTask = std::move(s_Ctx->globalQueue.front());
-        s_Ctx->globalQueue.pop_front();
-        --s_Ctx->queuedTaskCount;
-        return true;
-    }
-
-    static void CompleteTask()
-    {
-        std::lock_guard lock(s_Ctx->queueMutex);
-        --s_Ctx->activeTaskCount;
-        if (s_Ctx->activeTaskCount == 0 && s_Ctx->queuedTaskCount == 0)
-        {
-            s_Ctx->waitCondition.notify_all();
-        }
-    }
-
     void Scheduler::Initialize(unsigned threadCount)
     {
-        if (s_Ctx) return; // Already initialized
-
+        if (s_Ctx) return;
         s_Ctx = std::make_unique<SchedulerContext>();
         s_Ctx->isRunning = true;
 
-        // Auto-detect
         if (threadCount == 0)
         {
             threadCount = std::thread::hardware_concurrency();
-            // Leave one core free for the OS if we have many
-            if (threadCount > 4) threadCount--;
+            if (threadCount > 2) threadCount--; // Leave core for OS/Main
         }
 
         Log::Info("Initializing Scheduler with {} worker threads.", threadCount);
@@ -79,8 +53,8 @@ namespace Core::Tasks
     void Scheduler::Shutdown()
     {
         if (!s_Ctx) return;
-        WaitForAll();
 
+        // Stop accepting work
         {
             std::lock_guard lock(s_Ctx->queueMutex);
             s_Ctx->isRunning = false;
@@ -91,77 +65,49 @@ namespace Core::Tasks
         {
             if (t.joinable()) t.join();
         }
-
         s_Ctx.reset();
-        Log::Info("Scheduler Shutdown.");
     }
 
-    void Scheduler::Dispatch(TaskFunction&& task)
+    void Scheduler::DispatchInternal(LocalTask&& task)
     {
-        if (!s_Ctx) {
-            Log::Error("Scheduler::Dispatch called before Initialize");
-            return;
-        }
+        if (!s_Ctx) return;
 
-        // Increment counter BEFORE enqueuing to prevent race condition
-        // where worker grabs and completes task before WaitForAll sees the increment
-        ++s_Ctx->activeTaskCount;
-        ++s_Ctx->queuedTaskCount;
+        // Optimization: Increment counters BEFORE lock
+        // This ensures WaitForAll doesn't accidentally exit if it sees 0 queued
+        // before the worker picks it up.
+        s_Ctx->activeTaskCount.fetch_add(1, std::memory_order_relaxed);
+        s_Ctx->queuedTaskCount.fetch_add(1, std::memory_order_release);
 
         {
             std::lock_guard lock(s_Ctx->queueMutex);
-            s_Ctx->globalQueue.push_back(std::move(task));
+            s_Ctx->globalQueue.emplace_back(std::move(task));
         }
         s_Ctx->wakeCondition.notify_one();
-        s_Ctx->waitCondition.notify_all();
     }
 
     void Scheduler::WaitForAll()
     {
-        if (!s_Ctx) {
-            Log::Error("Scheduler::WaitForAll called before Initialize");
-            return;
-        }
-        /*std::unique_lock waitLock(s_Ctx->waitMutex);
-        s_Ctx->waitCondition.wait(waitLock, []
-        {
-            return s_Ctx->queuedTaskCount.load(std::memory_order_acquire) == 0
-                && s_Ctx->activeTaskCount.load(std::memory_order_acquire) == 0;
-        });*/
-        while (true)
-        {
-            TaskFunction task;
-            if (TryPopTask(task))
-            {
-                task();
-                CompleteTask();
-                continue;
-            }
+        if (!s_Ctx) return;
 
-            std::unique_lock waitLock(s_Ctx->waitMutex);
-            if (s_Ctx->queuedTaskCount.load(std::memory_order_acquire) == 0
-                && s_Ctx->activeTaskCount.load(std::memory_order_acquire) == 0)
-            {
-                break;
-            }
-            s_Ctx->waitCondition.wait(waitLock);
-        }
+        // Help with work while waiting (Work Stealing placeholder)
+        // For now, simple wait
+        std::unique_lock lock(s_Ctx->waitMutex);
+        s_Ctx->waitCondition.wait(lock, []
+        {
+            return s_Ctx->activeTaskCount.load(std::memory_order_acquire) == 0;
+        });
     }
 
-    void Scheduler::WorkerEntry(unsigned threadIndex)
+    void Scheduler::WorkerEntry(unsigned)
     {
-        // Identify thread
-        // Log::Debug("Worker {} started.", threadIndex);
-
         while (true)
         {
-            TaskFunction task;
+            LocalTask task;
 
-            if (!TryPopTask(task))
+            // SCOPE 1: Acquire Task
             {
                 std::unique_lock lock(s_Ctx->queueMutex);
 
-                // Wait for work or shutdown
                 s_Ctx->wakeCondition.wait(lock, []
                 {
                     return !s_Ctx->globalQueue.empty() || !s_Ctx->isRunning;
@@ -169,28 +115,33 @@ namespace Core::Tasks
 
                 if (!s_Ctx->isRunning && s_Ctx->globalQueue.empty())
                 {
-                    return; // Exit loop
+                    return;
                 }
 
-                // Grab task
-                task = std::move(s_Ctx->globalQueue.front());
-                s_Ctx->globalQueue.pop_front();
-                --s_Ctx->queuedTaskCount;
+                if (!s_Ctx->globalQueue.empty())
+                {
+                    task = std::move(s_Ctx->globalQueue.front());
+                    s_Ctx->globalQueue.pop_front();
+                    s_Ctx->queuedTaskCount.fetch_sub(1, std::memory_order_relaxed);
+                }
             }
 
-            // Execute Task
-            task();
+            // SCOPE 2: Execute Task (Unlocked)
+            if (task.Valid())
+            {
+                task();
 
-            // Decrement counter and notify waiter
-            /*{
-                std::lock_guard lock(s_Ctx->queueMutex);
-                --s_Ctx->activeTaskCount;
-                if (s_Ctx->activeTaskCount == 0 && s_Ctx->queuedTaskCount == 0)
+                // Decrement active count
+                int remaining = s_Ctx->activeTaskCount.fetch_sub(1, std::memory_order_release) - 1;
+
+                // Signal Main Thread if all done
+                if (remaining == 0)
                 {
+                    // Optimization: Only lock/notify if we hit zero
+                    std::lock_guard waitLock(s_Ctx->waitMutex);
                     s_Ctx->waitCondition.notify_all();
                 }
-            }*/
-            CompleteTask();
+            }
         }
     }
 }

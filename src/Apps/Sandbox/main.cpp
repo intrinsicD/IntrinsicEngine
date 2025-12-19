@@ -73,13 +73,11 @@ public:
         // 3. Setup Material (Assuming texture loads synchronously or is handled)
         m_DuckMaterial = std::make_shared<Graphics::Material>(
             GetDevice(),
-            GetDescriptorPool(),
-            GetDescriptorLayout(),
+            *m_BindlessSystem,
             m_DuckTexture,
-            m_DefaultTexture, // Inherited from Engine
-            m_AssetManager // Inherited from Engine
+            m_DefaultTexture,
+            m_AssetManager
         );
-        m_DuckMaterial->WriteDescriptor(GetGlobalUBO()->GetHandle(), sizeof(RHI::CameraBufferObject));
 
         Log::Info("Asset Load Requested. Waiting for background thread...");
 

@@ -1,35 +1,136 @@
 module;
 
 #include <functional>
+#include <concepts>
+#include <type_traits>
+#include <utility>
+#include <memory>
+#include <new>
+#include <cassert>
 
 export module Core.Tasks;
 import Core.Logging;
 
-namespace Core::Tasks {
+namespace Core::Tasks
+{
+    // A fixed-size, non-allocating task wrapper.
+    // Fits exactly in one CPU cache line (64 bytes).
+    class LocalTask
+    {
+        static constexpr size_t STORAGE_SIZE = 120; // 64 - vptr/funcptr overhead
 
-    // A Task is just a unit of work. 
-    // For now, we use std::function. Later we can optimize to raw function pointers 
-    // to avoid heap allocation, or use our LinearArena.
-    using TaskFunction = std::function<void()>;
+        struct Concept
+        {
+            virtual ~Concept() = default;
+            virtual void Execute() = 0;
+            virtual void MoveTo(void* dest) = 0;
+        };
 
-    export class Scheduler {
+        template <typename T>
+        struct Model final : Concept
+        {
+            T payload;
+
+            explicit Model(T&& p) : payload(std::move(p))
+            {
+            }
+
+            void Execute() override { payload(); }
+
+            void MoveTo(void* dest) override
+            {
+                std::construct_at(static_cast<Model<T>*>(dest), std::move(payload));
+            }
+        };
+
+        alignas(8) std::byte m_Storage[STORAGE_SIZE];
+        Concept* m_VTable = nullptr; // Points to m_Storage (reinterpreted)
+
     public:
-        // Initialize with 'threadCount' workers (0 = Auto-detect hardware threads)
+        LocalTask() = default;
+
+        // Constructor for lambdas
+        template <typename F>
+            requires (!std::is_same_v<std::decay_t<F>, LocalTask>)
+        LocalTask(F&& f)
+        {
+            using Type = std::decay_t<F>;
+            static_assert(sizeof(Model<Type>) <= STORAGE_SIZE,
+                          "Task lambda capture is too big! Use pointers or simplify captures.");
+            static_assert(alignof(Model<Type>) <= alignof(std::max_align_t),
+                          "Task alignment requirement too strict.");
+
+            auto* ptr = reinterpret_cast<Model<Type>*>(m_Storage);
+            std::construct_at(ptr, std::forward<F>(f));
+            m_VTable = ptr;
+        }
+
+        ~LocalTask()
+        {
+            if (m_VTable) std::destroy_at(m_VTable);
+        }
+
+        // Move Constructor
+        LocalTask(LocalTask&& other) noexcept
+        {
+            if (other.m_VTable)
+            {
+                other.m_VTable->MoveTo(m_Storage);
+                m_VTable = reinterpret_cast<Concept*>(m_Storage);
+                std::destroy_at(other.m_VTable);
+                other.m_VTable = nullptr;
+            }
+        }
+
+        // Move Assignment
+        LocalTask& operator=(LocalTask&& other) noexcept
+        {
+            if (this != &other)
+            {
+                if (m_VTable) std::destroy_at(m_VTable);
+                m_VTable = nullptr;
+
+                if (other.m_VTable)
+                {
+                    other.m_VTable->MoveTo(m_Storage);
+                    m_VTable = reinterpret_cast<Concept*>(m_Storage);
+                    std::destroy_at(other.m_VTable);
+                    other.m_VTable = nullptr;
+                }
+            }
+            return *this;
+        }
+
+        // No copy
+        LocalTask(const LocalTask&) = delete;
+        LocalTask& operator=(const LocalTask&) = delete;
+
+        void operator()()
+        {
+            if (m_VTable) m_VTable->Execute();
+        }
+
+        [[nodiscard]] bool Valid() const { return m_VTable != nullptr; }
+    };
+
+    export class Scheduler
+    {
+    public:
         static void Initialize(unsigned threadCount = 0);
         static void Shutdown();
 
-        // Add a fire-and-forget task
-        static void Dispatch(TaskFunction&& task);
+        // Dispatch takes our new LocalTask
+        // We use a template to allow implicit conversion from lambdas at the call site
+        template <typename F>
+        static void Dispatch(F&& task)
+        {
+            DispatchInternal(LocalTask(std::forward<F>(task)));
+        }
 
-        // Wait until all tasks currently in the queue are finished
-        // (Simple fence mechanism for research purposes)
         static void WaitForAll();
 
     private:
+        static void DispatchInternal(LocalTask&& task);
         static void WorkerEntry(unsigned threadIndex);
-        
-        // We hide implementation details in the cpp mostly, 
-        // but for this module example, we keep state here.
-        // In a real engine, this would be PIMPL or a Singleton instance.
     };
 }

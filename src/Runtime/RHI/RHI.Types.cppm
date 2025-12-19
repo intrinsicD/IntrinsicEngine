@@ -60,5 +60,7 @@ export namespace Runtime::RHI {
 
     struct MeshPushConstants {
         glm::mat4 model;
+        uint32_t textureID;
+        uint32_t _pad[3];
     };
 }

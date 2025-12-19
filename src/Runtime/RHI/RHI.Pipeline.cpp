@@ -9,40 +9,47 @@ import Runtime.RHI.Image;
 import Runtime.Graphics.Geometry;
 import Core.Logging;
 
-namespace Runtime::RHI {
-
-    GraphicsPipeline::GraphicsPipeline(std::shared_ptr<VulkanDevice> device, const VulkanSwapchain& swapchain, const PipelineConfig& config, VkDescriptorSetLayout descriptorLayout)
+namespace Runtime::RHI
+{
+    GraphicsPipeline::GraphicsPipeline(std::shared_ptr<VulkanDevice> device,
+                                       const VulkanSwapchain& swapchain,
+                                       const PipelineConfig& config,
+                                       const std::vector<VkDescriptorSetLayout> &descriptorLayouts)
         : m_Device(device)
     {
-        CreateLayout(descriptorLayout);
+        CreateLayout(descriptorLayouts);
         CreatePipeline(swapchain, config);
     }
 
-    GraphicsPipeline::~GraphicsPipeline() {
+    GraphicsPipeline::~GraphicsPipeline()
+    {
         vkDestroyPipeline(m_Device->GetLogicalDevice(), m_Pipeline, nullptr);
         vkDestroyPipelineLayout(m_Device->GetLogicalDevice(), m_Layout, nullptr);
     }
 
-    void GraphicsPipeline::CreateLayout(VkDescriptorSetLayout descriptorLayout) {
+    void GraphicsPipeline::CreateLayout(const std::vector<VkDescriptorSetLayout> &descriptorLayouts)
+    {
         // Define Push Constant Range
         VkPushConstantRange pushConstantRange{};
-        pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+        pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
         pushConstantRange.offset = 0;
         pushConstantRange.size = sizeof(MeshPushConstants); // Must match struct size
 
         VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
         pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-        pipelineLayoutInfo.setLayoutCount = 1;
-        pipelineLayoutInfo.pSetLayouts = &descriptorLayout;
+        pipelineLayoutInfo.setLayoutCount = static_cast<uint32_t>(descriptorLayouts.size());
+        pipelineLayoutInfo.pSetLayouts = descriptorLayouts.data();
         pipelineLayoutInfo.pushConstantRangeCount = 1;
         pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
 
-        if (vkCreatePipelineLayout(m_Device->GetLogicalDevice(), &pipelineLayoutInfo, nullptr, &m_Layout) != VK_SUCCESS) {
+        if (vkCreatePipelineLayout(m_Device->GetLogicalDevice(), &pipelineLayoutInfo, nullptr, &m_Layout) != VK_SUCCESS)
+        {
             Core::Log::Error("Failed to create pipeline layout!");
         }
     }
 
-    void GraphicsPipeline::CreatePipeline(const VulkanSwapchain& swapchain, const PipelineConfig& config) {
+    void GraphicsPipeline::CreatePipeline(const VulkanSwapchain& swapchain, const PipelineConfig& config)
+    {
         // 1. Shaders
         VkPipelineShaderStageCreateInfo shaderStages[] = {
             config.VertexShader->GetStageInfo(),
@@ -90,7 +97,8 @@ namespace Runtime::RHI {
 
         // 7. Color Blending
         VkPipelineColorBlendAttachmentState colorBlendAttachment{};
-        colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+        colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+            VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
         colorBlendAttachment.blendEnable = VK_FALSE; // Simple opaque
 
         VkPipelineColorBlendStateCreateInfo colorBlending{};
@@ -121,7 +129,7 @@ namespace Runtime::RHI {
         VkFormat depthFormat = VulkanImage::FindDepthFormat(*m_Device);
 
         VkFormat colorFormat = swapchain.GetImageFormat();
-        
+
         VkPipelineRenderingCreateInfo renderingInfo{};
         renderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
         renderingInfo.colorAttachmentCount = 1;
@@ -146,7 +154,9 @@ namespace Runtime::RHI {
         pipelineInfo.renderPass = VK_NULL_HANDLE; // No RenderPass!
         pipelineInfo.subpass = 0;
 
-        if (vkCreateGraphicsPipelines(m_Device->GetLogicalDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_Pipeline) != VK_SUCCESS) {
+        if (vkCreateGraphicsPipelines(m_Device->GetLogicalDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr,
+                                      &m_Pipeline) != VK_SUCCESS)
+        {
             Core::Log::Error("Failed to create graphics pipeline!");
         }
     }

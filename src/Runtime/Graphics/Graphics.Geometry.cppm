@@ -76,6 +76,11 @@ export namespace Runtime::Graphics
     {
     public:
         GeometryGpuData(std::shared_ptr<RHI::VulkanDevice> device, const GeometryUploadRequest& data);
+        GeometryGpuData(std::shared_ptr<RHI::VulkanDevice> device,
+                   const GeometryUploadRequest& data,
+                   VkCommandBuffer cmd,
+                   RHI::VulkanBuffer& stagingBuffer,
+                   size_t stagingOffset);
         ~GeometryGpuData() = default;
 
         [[nodiscard]] RHI::VulkanBuffer* GetVertexBuffer() const { return m_VertexBuffer.get(); }

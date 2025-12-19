@@ -85,8 +85,7 @@ target_link_libraries(${target_name}
         PUBLIC
         IntrinsicCore
         stb
-        volk
-        Vulkan::Vulkan
+        volk::volk
         EnTT::EnTT
         nlohmann_json::nlohmann_json
         imgui_lib

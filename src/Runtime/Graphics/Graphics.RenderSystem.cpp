@@ -29,11 +29,15 @@ namespace Runtime::Graphics
     RenderSystem::RenderSystem(std::shared_ptr<RHI::VulkanDevice> device,
                                RHI::VulkanSwapchain& swapchain,
                                RHI::SimpleRenderer& renderer,
+                               RHI::BindlessDescriptorSystem& bindlessSystem,
+                               RHI::DescriptorPool& descriptorPool,
+                               RHI::DescriptorLayout& descriptorLayout,
                                RHI::GraphicsPipeline& pipeline,
                                Core::Memory::LinearArena& frameArena)
         : m_Device(device),
           m_Swapchain(swapchain),
           m_Renderer(renderer),
+          m_BindlessSystem(bindlessSystem),
           m_Pipeline(pipeline),
           m_RenderGraph(device, frameArena)
     {
@@ -52,6 +56,27 @@ namespace Runtime::Graphics
             VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
             VMA_MEMORY_USAGE_CPU_TO_GPU
         );
+
+        //In RenderSystem constructor, allocate a set from m_DescriptorPool using m_DescriptorLayout (passed in), pointing to m_GlobalUBO.
+        // 2. Allocate Descriptor Set (Set 0)
+        m_GlobalDescriptorSet = descriptorPool.Allocate(descriptorLayout.GetHandle());
+
+        // 3. Update Descriptor Set to point to UBO
+        VkDescriptorBufferInfo bufferInfo{};
+        bufferInfo.buffer = m_GlobalUBO->GetHandle();
+        bufferInfo.offset = 0; // We use dynamic offsets, so base offset is 0
+        bufferInfo.range = sizeof(RHI::CameraBufferObject); // Size of ONE view
+
+        VkWriteDescriptorSet descriptorWrite{};
+        descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrite.dstSet = m_GlobalDescriptorSet;
+        descriptorWrite.dstBinding = 0; // Binding 0 = Camera
+        descriptorWrite.dstArrayElement = 0;
+        descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+        descriptorWrite.descriptorCount = 1;
+        descriptorWrite.pBufferInfo = &bufferInfo;
+
+        vkUpdateDescriptorSets(m_Device->GetLogicalDevice(), 1, &descriptorWrite, 0, nullptr);
     }
 
     RenderSystem::~RenderSystem()
@@ -138,6 +163,24 @@ namespace Runtime::Graphics
                                                        m_Renderer.BindPipeline(m_Pipeline);
                                                        m_Renderer.SetViewport(extent.width, extent.height);
 
+
+                                                       // 1. Bind Set 0: Global Camera (Dynamic Offset)
+                                                       uint32_t dynamicOffset = static_cast<uint32_t>(offset);
+                                                       vkCmdBindDescriptorSets(
+                                                           cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                                           m_Pipeline.GetLayout(),
+                                                           0, 1, &m_GlobalDescriptorSet,
+                                                           1, &dynamicOffset
+                                                       );
+
+                                                       // 2. Bind Set 1: Bindless Textures (Static)
+                                                       VkDescriptorSet globalTextures = m_BindlessSystem.GetGlobalSet();
+                                                       vkCmdBindDescriptorSets(
+                                                           cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                                           m_Pipeline.GetLayout(),
+                                                           1, 1, &globalTextures,
+                                                           0, nullptr
+                                                       );
                                                        auto view = scene.GetRegistry().view<
                                                            ECS::Transform::Component, ECS::MeshRenderer::Component>();
                                                        for (auto [entity, transform, renderable] : view.each())
@@ -145,27 +188,15 @@ namespace Runtime::Graphics
                                                            if (!renderable.GeometryRef || !renderable.MaterialRef)
                                                                continue;
 
-                                                           VkDescriptorSet sets[] = {
-                                                               renderable.MaterialRef->GetDescriptorSet()
-                                                           };
-                                                           // Check for overflow before casting to uint32_t
-                                                           if (offset > static_cast<size_t>(std::numeric_limits<
-                                                               uint32_t>::max()))
-                                                           {
-                                                               Core::Log::Error(
-                                                                   "UBO offset overflow! Offset {} exceeds uint32_t max",
-                                                                   offset);
-                                                               continue;
-                                                           }
-                                                           uint32_t dynamicOffset = static_cast<uint32_t>(offset);
-                                                           vkCmdBindDescriptorSets(
-                                                               cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                                               m_Pipeline.GetLayout(), 0, 1, sets, 1, &dynamicOffset);
-
                                                            RHI::MeshPushConstants push{};
                                                            push.model = transform.GetTransform();
+                                                           push.textureID = renderable.MaterialRef->GetTextureIndex();
+                                                           // NEW
+
                                                            vkCmdPushConstants(
-                                                               cmd, m_Pipeline.GetLayout(), VK_SHADER_STAGE_VERTEX_BIT,
+                                                               cmd, m_Pipeline.GetLayout(),
+                                                               VK_SHADER_STAGE_VERTEX_BIT |
+                                                               VK_SHADER_STAGE_FRAGMENT_BIT,
                                                                0, sizeof(push), &push);
 
 
@@ -234,7 +265,8 @@ namespace Runtime::Graphics
             m_RenderGraph.Compile(frameIndex);
             m_RenderGraph.Execute(m_Renderer.GetCommandBuffer());
             m_Renderer.EndFrame();
-        }else
+        }
+        else
         {
             Interface::GUI::EndFrame();
         }

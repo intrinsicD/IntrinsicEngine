@@ -22,40 +22,18 @@ export namespace Runtime::RHI::CommandUtils
         return ctx;
     }
 
-    // Thread-Safe Immediate Execution using Thread-Local Pools
-    void ExecuteImmediate(VulkanDevice& device, auto&& function)
-    {
+    [[nodiscard]] VkCommandBuffer BeginSingleTimeCommands(VulkanDevice& device) {
         ThreadRenderContext& ctx = GetThreadContext();
-
-        // Check if the cached pool belongs to a dead device (e.g. Engine restart)
-        if (ctx.CommandPool != VK_NULL_HANDLE && ctx.Owner != &device) {
-            // We can't destroy the old pool because the old device is gone.
-            // Just leak the handle ID (it's invalid anyway) and reset.
-            ctx.CommandPool = VK_NULL_HANDLE;
-            ctx.Owner = nullptr;
-        }
-
-        // 1. Lazy Initialization of Thread-Local Pool
-        if (ctx.CommandPool == VK_NULL_HANDLE)
-        {
+        if (ctx.CommandPool == VK_NULL_HANDLE) {
             VkCommandPoolCreateInfo poolInfo{};
             poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-            // TRANSIENT: Hints that buffers are short-lived
             poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
             poolInfo.queueFamilyIndex = device.GetQueueIndices().GraphicsFamily.value();
-
-            if (vkCreateCommandPool(device.GetLogicalDevice(), &poolInfo, nullptr, &ctx.CommandPool) != VK_SUCCESS)
-            {
-                Core::Log::Error("Failed to create thread-local command pool!");
-                return;
-            }
-
-            // REGISTER WITH DEVICE for auto-cleanup
+            vkCreateCommandPool(device.GetLogicalDevice(), &poolInfo, nullptr, &ctx.CommandPool);
             ctx.Owner = &device;
             device.RegisterThreadLocalPool(ctx.CommandPool);
         }
 
-        // 2. Allocate Command Buffer (No lock needed: Pool is local to this thread)
         VkCommandBufferAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
         allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
@@ -65,33 +43,46 @@ export namespace Runtime::RHI::CommandUtils
         VkCommandBuffer commandBuffer;
         vkAllocateCommandBuffers(device.GetLogicalDevice(), &allocInfo, &commandBuffer);
 
-        // 3. Record
         VkCommandBufferBeginInfo beginInfo{};
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
         vkBeginCommandBuffer(commandBuffer, &beginInfo);
-        function(commandBuffer);
+        return commandBuffer;
+    }
+
+    void EndSingleTimeCommands(VulkanDevice& device, VkCommandBuffer commandBuffer) {
         vkEndCommandBuffer(commandBuffer);
 
-        // 4. Submit (QUEUE IS SHARED -> NEEDS LOCK)
         VkSubmitInfo submitInfo{};
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
         submitInfo.commandBufferCount = 1;
         submitInfo.pCommandBuffers = &commandBuffer;
 
+        // Create a temporary fence
         VkFenceCreateInfo fenceInfo{};
         fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
         VkFence fence;
         vkCreateFence(device.GetLogicalDevice(), &fenceInfo, nullptr, &fence);
 
+        // Submit
         VK_CHECK(device.SubmitToGraphicsQueue(submitInfo, fence));
 
-        // 5. Wait & Cleanup
+        // Wait (Blocking!) - We keep this for compatibility with old code,
+        // but new code should avoid calling this if possible.
         vkWaitForFences(device.GetLogicalDevice(), 1, &fence, VK_TRUE, UINT64_MAX);
         vkDestroyFence(device.GetLogicalDevice(), fence, nullptr);
 
+        ThreadRenderContext& ctx = GetThreadContext();
         vkFreeCommandBuffers(device.GetLogicalDevice(), ctx.CommandPool, 1, &commandBuffer);
+    }
+
+    // Thread-Safe Immediate Execution using Thread-Local Pools
+    void ExecuteImmediate(VulkanDevice& device, auto&& function)
+    {
+        VkCommandBuffer cmd = BeginSingleTimeCommands(device);
+        function(cmd);
+        EndSingleTimeCommands(device, cmd);
     }
 
     // Helper for barriers (unchanged logic)

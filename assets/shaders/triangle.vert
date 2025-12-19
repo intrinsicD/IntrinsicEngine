@@ -7,19 +7,19 @@ layout(location = 2) in vec2 inTexCoord;
 layout(location = 0) out vec3 fragNormal;
 layout(location = 1) out vec2 fragTexCoord;
 
-layout(binding = 0) uniform CameraBuffer {
+// Set 0, Binding 0 is Camera UBO
+layout(set = 0, binding = 0) uniform CameraBuffer {
     mat4 view;
     mat4 proj;
 } camera;
 
 layout(push_constant) uniform PushConsts {
     mat4 model;
+    uint textureID;
 } push;
 
 void main() {
     gl_Position = camera.proj * camera.view * push.model * vec4(inPosition, 1.0);
-
-    // Transform normal to world space (simplified, assumes uniform scale)
     fragNormal = mat3(push.model) * inNormal;
     fragTexCoord = inTexCoord;
 }

@@ -126,6 +126,7 @@ namespace Runtime
 
         m_RenderSystem.reset();
         m_Pipeline.reset();
+        m_BindlessSystem.reset();
         m_DescriptorPool.reset();
         m_DescriptorLayout.reset();
         m_Renderer.reset();
@@ -197,13 +198,13 @@ namespace Runtime
 
             // --- Setup Default Material ---
             auto textureLoader = [&](const std::string& p) { return std::make_shared<RHI::Texture>(GetDevice(), p); };
-            auto texHandle = m_AssetManager.Load<RHI::Texture>(Core::Filesystem::GetAssetPath("textures/Parameterization.jpg") , textureLoader);
+            auto texHandle = m_AssetManager.Load<RHI::Texture>(
+                Core::Filesystem::GetAssetPath("textures/Parameterization.jpg"), textureLoader);
 
             auto defaultMat = std::make_shared<Graphics::Material>(
-                GetDevice(), GetDescriptorPool(), GetDescriptorLayout(),
+                GetDevice(), *m_BindlessSystem, // Pass bindless system
                 texHandle, m_DefaultTexture, m_AssetManager
             );
-            defaultMat->WriteDescriptor(GetGlobalUBO()->GetHandle(), sizeof(RHI::CameraBufferObject));
             m_LoadedMaterials.push_back(defaultMat);
 
             // --- Spawn Entity ---
@@ -250,16 +251,29 @@ namespace Runtime
     {
         m_DescriptorLayout = std::make_unique<RHI::DescriptorLayout>(m_Device);
         m_DescriptorPool = std::make_unique<RHI::DescriptorPool>(m_Device);
+        m_BindlessSystem = std::make_unique<RHI::BindlessDescriptorSystem>(m_Device);
 
         RHI::ShaderModule vert(m_Device, "shaders/triangle.vert.spv", RHI::ShaderStage::Vertex);
         RHI::ShaderModule frag(m_Device, "shaders/triangle.frag.spv", RHI::ShaderStage::Fragment);
 
         RHI::PipelineConfig config{&vert, &frag};
-        m_Pipeline = std::make_unique<RHI::GraphicsPipeline>(m_Device, *m_Swapchain, config,
-                                                             m_DescriptorLayout->GetHandle());
+        std::vector<VkDescriptorSetLayout> layouts = {
+            m_DescriptorLayout->GetHandle(),
+            m_BindlessSystem->GetLayout()
+        };
+
+        m_Pipeline = std::make_unique<RHI::GraphicsPipeline>(m_Device, *m_Swapchain, config, layouts);
 
         m_RenderSystem = std::make_unique<Graphics::RenderSystem>(
-            m_Device, *m_Swapchain, *m_Renderer, *m_Pipeline, m_FrameArena);
+               m_Device,
+               *m_Swapchain,
+               *m_Renderer,
+               *m_BindlessSystem,    // <--- Passed
+               *m_DescriptorPool,    // <--- Passed
+               *m_DescriptorLayout,  // <--- Passed
+               *m_Pipeline,
+               m_FrameArena
+           );
     }
 
     void Engine::Run()

@@ -20,16 +20,9 @@ namespace Runtime::RHI {
     }
 
     void BindlessDescriptorSystem::CreateLayout() {
-        // Binding 0: Camera UBO (Dynamic)
-        VkDescriptorSetLayoutBinding uboBinding{};
-        uboBinding.binding = 0;
-        uboBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-        uboBinding.descriptorCount = 1;
-        uboBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-
-        // Binding 1: Bindless Texture Array
+        // Binding 0: Bindless Texture Array
         VkDescriptorSetLayoutBinding textureBinding{};
-        textureBinding.binding = 1;
+        textureBinding.binding = 0;
         textureBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         textureBinding.descriptorCount = MAX_BINDLESS_TEXTURES;
         textureBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
@@ -42,16 +35,13 @@ namespace Runtime::RHI {
 
         VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlags{};
         bindingFlags.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
-        std::array<VkDescriptorBindingFlags, 2> flagsArray = { 0, flags };
-        bindingFlags.bindingCount = 2;
-        bindingFlags.pBindingFlags = flagsArray.data();
-
-        std::array<VkDescriptorSetLayoutBinding, 2> bindings = { uboBinding, textureBinding };
+        bindingFlags.bindingCount = 1;
+        bindingFlags.pBindingFlags = &flags;
 
         VkDescriptorSetLayoutCreateInfo layoutInfo{};
         layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-        layoutInfo.bindingCount = (uint32_t)bindings.size();
-        layoutInfo.pBindings = bindings.data();
+        layoutInfo.bindingCount = 1;
+        layoutInfo.pBindings = &textureBinding;
         layoutInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
         layoutInfo.pNext = &bindingFlags;
 
@@ -59,17 +49,15 @@ namespace Runtime::RHI {
     }
 
     void BindlessDescriptorSystem::CreatePoolAndSet() {
-        std::array<VkDescriptorPoolSize, 2> poolSizes{};
-        poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-        poolSizes[0].descriptorCount = 1;
-        poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        poolSizes[1].descriptorCount = MAX_BINDLESS_TEXTURES;
+        VkDescriptorPoolSize poolSize;
+        poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        poolSize.descriptorCount = MAX_BINDLESS_TEXTURES;
 
         VkDescriptorPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
         poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT; // Critical
-        poolInfo.poolSizeCount = (uint32_t)poolSizes.size();
-        poolInfo.pPoolSizes = poolSizes.data();
+        poolInfo.poolSizeCount = 1;
+        poolInfo.pPoolSizes = &poolSize;
         poolInfo.maxSets = 1;
 
         VK_CHECK(vkCreateDescriptorPool(m_Device->GetLogicalDevice(), &poolInfo, nullptr, &m_Pool));
@@ -109,7 +97,7 @@ namespace Runtime::RHI {
         VkWriteDescriptorSet descriptorWrite{};
         descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         descriptorWrite.dstSet = m_GlobalSet;
-        descriptorWrite.dstBinding = 1;
+        descriptorWrite.dstBinding = 0;
         descriptorWrite.dstArrayElement = index; // The magic index
         descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         descriptorWrite.descriptorCount = 1;

@@ -11,6 +11,7 @@ export module Runtime.Engine;
 import Core.Window;
 import Core.Memory;
 import Core.Assets;
+import Runtime.RHI.Bindless;
 import Runtime.RHI.Context;
 import Runtime.RHI.Device;
 import Runtime.RHI.Swapchain;
@@ -54,9 +55,6 @@ export namespace Runtime
         Core::Memory::LinearArena m_FrameArena; // 1 MB per frame
         std::unique_ptr<Graphics::RenderSystem> m_RenderSystem;
 
-
-
-
         // Helper to access the camera buffer (Temporary until we have a Camera Component)
         [[nodiscard]] RHI::VulkanBuffer* GetGlobalUBO() const { return m_RenderSystem->GetGlobalUBO(); }
 
@@ -77,6 +75,7 @@ export namespace Runtime
         std::unique_ptr<RHI::DescriptorLayout> m_DescriptorLayout;
         std::unique_ptr<RHI::DescriptorPool> m_DescriptorPool;
         std::unique_ptr<RHI::GraphicsPipeline> m_Pipeline;
+        std::unique_ptr<RHI::BindlessDescriptorSystem> m_BindlessSystem;
 
         std::shared_ptr<RHI::Texture> m_DefaultTexture;
         std::vector<std::shared_ptr<Graphics::Material>> m_LoadedMaterials;

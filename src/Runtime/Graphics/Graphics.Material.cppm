@@ -1,14 +1,12 @@
 module;
 #include <volk.h>
 #include <memory>
-#include <string>
 
 export module Runtime.Graphics.Material;
 
 import Runtime.RHI.Device;
+import Runtime.RHI.Bindless; // New import
 import Runtime.RHI.Texture;
-import Runtime.RHI.Pipeline;
-import Runtime.RHI.Descriptors;
 import Core.Assets;
 
 export namespace Runtime::Graphics
@@ -17,23 +15,21 @@ export namespace Runtime::Graphics
     {
     public:
         Material(std::shared_ptr<RHI::VulkanDevice> device,
-                 RHI::DescriptorPool& pool,
-                 const RHI::DescriptorLayout& layout, // We share the layout
+                 RHI::BindlessDescriptorSystem& bindlessSystem, // Pass bindless system
                  Core::Assets::AssetHandle textureHandle,
                  std::shared_ptr<RHI::Texture> defaultTexture,
                  Core::Assets::AssetManager& assetManager);
 
-        // We need to update the UBO (Camera) descriptor
-        void WriteDescriptor(VkBuffer cameraBuffer, VkDeviceSize range);
+        ~Material();
 
-        [[nodiscard]] VkDescriptorSet GetDescriptorSet() const { return m_DescriptorSet; }
+        // Returns the index into the bindless array
+        [[nodiscard]] uint32_t GetTextureIndex() const { return m_TextureIndex; }
 
     private:
         std::shared_ptr<RHI::VulkanDevice> m_Device;
-        VkDescriptorSet m_DescriptorSet = VK_NULL_HANDLE;
-        std::shared_ptr<RHI::Texture> m_CurrentTexture;
+        RHI::BindlessDescriptorSystem& m_BindlessSystem;
 
-        // Internal helper to perform the Vulkan write
-        void UpdateImageWrite(const RHI::Texture& texture);
+        uint32_t m_TextureIndex = 0;
+        std::shared_ptr<RHI::Texture> m_CurrentTexture;
     };
 }
