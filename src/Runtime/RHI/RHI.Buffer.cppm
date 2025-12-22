@@ -1,4 +1,5 @@
 module;
+#include <cstring>
 #include <vk_mem_alloc.h>
 #include <memory>
 
@@ -22,6 +23,12 @@ export namespace Runtime::RHI {
         void Unmap();
 
         [[nodiscard]] void* GetMappedData() const { return m_MappedData; }
+
+        void Write(const void* data, size_t size, size_t offset = 0) {
+            void* ptr = Map();
+            std::memcpy(static_cast<uint8_t*>(ptr) + offset, data, size);
+            Unmap();
+        }
 
     private:
         std::shared_ptr<VulkanDevice> m_Device;

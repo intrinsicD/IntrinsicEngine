@@ -309,6 +309,12 @@ namespace Runtime
         RHI::ShaderModule frag(m_Device, "shaders/triangle.frag.spv", RHI::ShaderStage::Fragment);
 
         RHI::PipelineConfig config{&vert, &frag};
+        config.BindingDescriptions = RHI::GeometryPipelineSpec::GetBindings();
+        config.AttributeDescriptions = RHI::GeometryPipelineSpec::GetAttributes();
+        config.Topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+        config.DepthTest = true;
+        config.DepthWrite = true;
+
         std::vector<VkDescriptorSetLayout> layouts = {
             m_DescriptorLayout->GetHandle(),
             m_BindlessSystem->GetLayout()

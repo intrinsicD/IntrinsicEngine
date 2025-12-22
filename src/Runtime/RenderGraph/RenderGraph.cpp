@@ -163,9 +163,12 @@ namespace Runtime::Graph
         m_ResourceLookup.clear(); // Clear lookup table
         m_Registry = RGRegistry();
 
-        for (auto& [key, item] : m_ImagePool)
+        for (auto& [key, stack] : m_ImagePool)
         {
-            item.IsFree = true;
+            for (auto& item : stack.Images)
+            {
+                item.IsFree = true;
+            }
         }
     }
 
@@ -173,24 +176,28 @@ namespace Runtime::Graph
                                                  VkImageUsageFlags usage, VkImageAspectFlags aspect)
     {
         ImageCacheKey key{format, width, height, usage};
-        auto range = m_ImagePool.equal_range(key);
+        auto& stack = m_ImagePool[key];
 
-        for (auto it = range.first; it != range.second; ++it) {
-            // Check frame index to avoid reusing resource currently in flight
-            if (it->second.IsFree && it->second.LastFrameIndex != frameIndex) {
-                it->second.IsFree = false;
-                it->second.LastFrameIndex = frameIndex;
-                return it->second.Resource.get();
+        // Iterate backwards (hot cache likely at end)
+        for (int i = stack.Images.size() - 1; i >= 0; --i) {
+            auto& item = stack.Images[i];
+            // Check frame index to avoid reusing resource currently in flight (Double Buffering safety)
+            if (item.LastFrameIndex != frameIndex) { // Assuming frameIndex increments, strict inequality might be needed depending on wraparound
+                // logic: if (frameIndex - item.LastFrameIndex >= FramesInFlight)
+                // Simple logic for now: Just don't use *current* frame index from a previous pass in same frame?
+                // Actually, Frame Graph resets every frame. Images from 'LastFrameIndex < CurrentFrameIndex' are safe.
+                if (item.LastFrameIndex != frameIndex) { // Safe if < current
+                    item.LastFrameIndex = frameIndex;
+                    return item.Resource.get();
+                }
             }
         }
 
-        // Not found, create new (default to Exclusive sharing for graph resources usually)
+        // Not found, create new
         auto img = std::make_unique<RHI::VulkanImage>(m_Device, width, height, 1, format, usage, aspect);
         auto* ptr = img.get();
 
-        PooledImage newEntry{std::move(img), frameIndex, false};
-        m_ImagePool.emplace(key, std::move(newEntry));
-
+        stack.Images.push_back({std::move(img), frameIndex, false}); // IsFree flag effectively replaced by logic above
         return ptr;
     }
 

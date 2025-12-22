@@ -15,6 +15,13 @@ export namespace Runtime::RHI
     {
         ShaderModule* VertexShader = nullptr;
         ShaderModule* FragmentShader = nullptr;
+
+        std::vector<VkVertexInputBindingDescription> BindingDescriptions;
+        std::vector<VkVertexInputAttributeDescription> AttributeDescriptions;
+
+        VkPrimitiveTopology Topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+        bool DepthTest = true;
+        bool DepthWrite = true;
     };
 
     class GraphicsPipeline

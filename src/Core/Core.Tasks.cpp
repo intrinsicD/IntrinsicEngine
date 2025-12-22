@@ -89,13 +89,44 @@ namespace Core::Tasks
     {
         if (!s_Ctx) return;
 
-        // Help with work while waiting (Work Stealing placeholder)
-        // For now, simple wait
-        std::unique_lock lock(s_Ctx->waitMutex);
-        s_Ctx->waitCondition.wait(lock, []
+        //Help with work while waiting
+        while (s_Ctx->activeTaskCount.load(std::memory_order_acquire) > 0 ||
+            s_Ctx->queuedTaskCount.load(std::memory_order_acquire) > 0)
         {
-            return s_Ctx->activeTaskCount.load(std::memory_order_acquire) == 0;
-        });
+            LocalTask task;
+            bool foundWork = false;
+
+            // Try to steal work
+            {
+                std::unique_lock lock(s_Ctx->queueMutex);
+                if (!s_Ctx->globalQueue.empty())
+                {
+                    task = std::move(s_Ctx->globalQueue.front());
+                    s_Ctx->globalQueue.pop_front();
+                    s_Ctx->queuedTaskCount.fetch_sub(1, std::memory_order_relaxed);
+                    foundWork = true;
+                }
+            }
+
+            if (foundWork && task.Valid())
+            {
+                // We picked up a task, so we are effectively a worker now.
+                // activeTaskCount was already incremented by Dispatch.
+                task();
+                s_Ctx->activeTaskCount.fetch_sub(1, std::memory_order_release);
+            }
+            else
+            {
+                // No work left in queue, but active tasks exist on other threads.
+                // Now we yield/wait.
+                std::unique_lock lock(s_Ctx->waitMutex);
+                s_Ctx->waitCondition.wait(lock, []
+                {
+                    return s_Ctx->activeTaskCount.load(std::memory_order_acquire) == 0;
+                });
+                break; // Exit loop if condition met
+            }
+        }
     }
 
     void Scheduler::WorkerEntry(unsigned)

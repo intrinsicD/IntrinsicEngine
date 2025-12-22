@@ -234,6 +234,11 @@ export namespace Runtime::Graph
             }
         };
 
+        struct PooledImageStack {
+            std::vector<PooledImage> Images;
+        };
+
+
         std::shared_ptr<RHI::VulkanDevice> m_Device;
         Core::Memory::LinearArena& m_Arena;
 
@@ -244,7 +249,7 @@ export namespace Runtime::Graph
         std::unordered_map<std::string, ResourceID> m_ResourceLookup;
 
         RGRegistry m_Registry;
-        std::unordered_multimap<ImageCacheKey, PooledImage, ImageCacheKeyHash> m_ImagePool;
+        std::unordered_map<ImageCacheKey, PooledImageStack, ImageCacheKeyHash> m_ImagePool;
 
         RGPass& CreatePassInternal(const std::string& name);
         std::pair<ResourceID, bool> CreateResourceInternal(const std::string& name, ResourceType type);

@@ -57,8 +57,8 @@ namespace Runtime::RHI
         };
 
         // 2. Vertex Input (Empty for now!)
-        auto bindingDescriptions = GeometryPipelineSpec::GetBindings();
-        auto attributeDescriptions = GeometryPipelineSpec::GetAttributes();
+        const auto& bindingDescriptions = config.BindingDescriptions;
+        const auto& attributeDescriptions = config.AttributeDescriptions;
 
         VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
         vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -120,8 +120,8 @@ namespace Runtime::RHI
 
         VkPipelineDepthStencilStateCreateInfo depthStencil{};
         depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-        depthStencil.depthTestEnable = VK_TRUE;
-        depthStencil.depthWriteEnable = VK_TRUE;
+        depthStencil.depthTestEnable = config.DepthTest ? VK_TRUE : VK_FALSE;
+        depthStencil.depthWriteEnable = config.DepthWrite ? VK_TRUE : VK_FALSE;
         depthStencil.depthCompareOp = VK_COMPARE_OP_LESS; // Close things obscure far things
         depthStencil.depthBoundsTestEnable = VK_FALSE;
         depthStencil.stencilTestEnable = VK_FALSE;

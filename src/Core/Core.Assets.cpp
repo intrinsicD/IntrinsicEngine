@@ -29,7 +29,7 @@ namespace Core::Assets
 
         for (const auto& handle : events)
         {
-            // 1. Process One-Shot Listeners (Remove after run)
+            // 1. Process One-Shot Listeners
             std::vector<AssetCallback> runOneShots;
             {
                 std::unique_lock lock(m_Mutex);
@@ -40,17 +40,19 @@ namespace Core::Assets
                     m_OneShotListeners.erase(it);
                 }
             }
+            // Execute OUTSIDE lock
             for (const auto& cb : runOneShots) cb(handle);
 
-            // 2. Process Persistent Listeners (Keep after run)
+            // 2. Process Persistent Listeners
             std::vector<AssetCallback> runPersistent;
             {
-                std::shared_lock lock(m_Mutex);
+                std::shared_lock lock(m_Mutex); // Lock only to copy
                 if (m_PersistentListeners.contains(handle))
                 {
                     runPersistent = m_PersistentListeners.at(handle);
                 }
             }
+            // Execute OUTSIDE lock (Safe to call Load() recursively now)
             for (const auto& cb : runPersistent) cb(handle);
         }
     }
