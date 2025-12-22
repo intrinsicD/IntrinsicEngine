@@ -22,6 +22,7 @@ import Core.Profiling;
 import Runtime.RHI.Shader;
 import Runtime.RHI.Texture;
 import Runtime.Graphics.ModelLoader;
+import Runtime.Graphics.TextureLoader;
 import Runtime.Graphics.Material;
 import Runtime.ECS.Components;
 import Runtime.RHI.Types;
@@ -96,7 +97,7 @@ namespace Runtime
         // 4. Swapchain & Renderer
         m_Swapchain = std::make_unique<RHI::VulkanSwapchain>(m_Device, *m_Window);
         m_Renderer = std::make_unique<RHI::SimpleRenderer>(m_Device, *m_Swapchain);
-
+        m_TransferManager = std::make_unique<RHI::TransferManager>(m_Device);
         Interface::GUI::Init(*m_Window, *m_Device, *m_Swapchain, m_Context->GetInstance(),
                              m_Device->GetGraphicsQueue());
 
@@ -113,9 +114,10 @@ namespace Runtime
         }
 
         // Order matters!
-        Interface::GUI::Shutdown();
-        Core::Filesystem::FileWatcher::Shutdown();
         Core::Tasks::Scheduler::Shutdown();
+        Core::Filesystem::FileWatcher::Shutdown();
+
+        Interface::GUI::Shutdown();
 
         m_Scene.GetRegistry().clear();
         m_AssetManager.Clear();
@@ -131,6 +133,7 @@ namespace Runtime
         m_DescriptorLayout.reset();
         m_Renderer.reset();
         m_Swapchain.reset();
+        m_TransferManager.reset();
         m_Device.reset();
 
         if (m_Context)
@@ -197,7 +200,25 @@ namespace Runtime
             }
 
             // --- Setup Default Material ---
-            auto textureLoader = [&](const std::string& p) { return std::make_shared<RHI::Texture>(GetDevice(), p); };
+            auto textureLoader = [this](const std::string& pathStr, Core::Assets::AssetHandle handle)
+                -> std::shared_ptr<RHI::Texture>
+            {
+                std::filesystem::path path(pathStr);
+                auto result = Graphics::TextureLoader::LoadAsync(path, GetDevice(), *m_TransferManager);
+
+                if (result)
+                {
+                    // 1. Notify AssetManager: "Don't set Ready yet, I'm processing"
+                    m_AssetManager.MoveToProcessing(handle);
+
+                    // 2. Notify Engine: "Wake up AssetManager when this token is done"
+                    RegisterAssetLoad(handle, result->Token);
+
+                    return result->Resource;
+                }
+                return nullptr;
+            };
+
             auto texHandle = m_AssetManager.Load<RHI::Texture>(
                 Core::Filesystem::GetAssetPath("textures/Parameterization.jpg"), textureLoader);
 
@@ -247,6 +268,37 @@ namespace Runtime
         }
     }
 
+    void Engine::RegisterAssetLoad(Core::Assets::AssetHandle handle, RHI::TransferToken token)
+    {
+        std::lock_guard lock(m_LoadMutex);
+        m_PendingLoads.push_back({handle, token});
+    }
+
+    void Engine::ProcessUploads()
+    {
+        // 1. Cleanup Staging Memory
+        m_TransferManager->GarbageCollect();
+
+        // 2. Check for completions
+        std::lock_guard lock(m_LoadMutex);
+        if (m_PendingLoads.empty()) return;
+
+        // Use erase-remove idiom to process finished loads
+        auto it = std::remove_if(m_PendingLoads.begin(), m_PendingLoads.end(),
+                                 [&](const PendingLoad& load)
+                                 {
+                                     if (m_TransferManager->IsCompleted(load.Token))
+                                     {
+                                         // Signal Core that the "External Processing" is done
+                                         m_AssetManager.FinalizeLoad(load.Handle);
+                                         return true; // Remove from list
+                                     }
+                                     return false; // Keep waiting
+                                 });
+
+        m_PendingLoads.erase(it, m_PendingLoads.end());
+    }
+
     void Engine::InitPipeline()
     {
         m_DescriptorLayout = std::make_unique<RHI::DescriptorLayout>(m_Device);
@@ -265,15 +317,15 @@ namespace Runtime
         m_Pipeline = std::make_unique<RHI::GraphicsPipeline>(m_Device, *m_Swapchain, config, layouts);
 
         m_RenderSystem = std::make_unique<Graphics::RenderSystem>(
-               m_Device,
-               *m_Swapchain,
-               *m_Renderer,
-               *m_BindlessSystem,    // <--- Passed
-               *m_DescriptorPool,    // <--- Passed
-               *m_DescriptorLayout,  // <--- Passed
-               *m_Pipeline,
-               m_FrameArena
-           );
+            m_Device,
+            *m_Swapchain,
+            *m_Renderer,
+            *m_BindlessSystem, // <--- Passed
+            *m_DescriptorPool, // <--- Passed
+            *m_DescriptorLayout, // <--- Passed
+            *m_Pipeline,
+            m_FrameArena
+        );
     }
 
     void Engine::Run()
@@ -291,6 +343,9 @@ namespace Runtime
                 m_Renderer->OnResize();
                 m_FramebufferResized = false;
             }
+
+            ProcessUploads();
+            m_TransferManager->GarbageCollect();
 
             auto currentTime = std::chrono::high_resolution_clock::now();
             float dt = std::chrono::duration<float>(currentTime - lastTime).count();

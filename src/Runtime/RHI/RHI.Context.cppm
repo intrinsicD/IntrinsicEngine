@@ -12,6 +12,7 @@ namespace Runtime::RHI {
     export struct ContextConfig {
         std::string_view AppName = "Intrinsic Engine";
         bool EnableValidation = true;
+        bool Headless = false;
     };
 
     export class VulkanContext {

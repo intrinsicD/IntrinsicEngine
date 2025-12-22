@@ -20,6 +20,7 @@ import Runtime.RHI.Pipeline;
 import Runtime.RHI.Descriptors;
 import Runtime.RHI.Buffer;
 import Runtime.RHI.Texture;
+import Runtime.RHI.Transfer;
 import Runtime.Graphics.RenderSystem;
 import Runtime.Graphics.Material;
 import Runtime.Graphics.Geometry;
@@ -48,7 +49,7 @@ export namespace Runtime
         virtual void OnUpdate(float deltaTime) = 0;
         virtual void OnRender() = 0; // Optional custom rendering hook
 
-    //protected:
+        //protected:
         // Protected access so Sandbox can manipulate Scene/Assets
         ECS::Scene m_Scene;
         Core::Assets::AssetManager m_AssetManager;
@@ -63,6 +64,8 @@ export namespace Runtime
         [[nodiscard]] RHI::DescriptorPool& GetDescriptorPool() const { return *m_DescriptorPool; }
         [[nodiscard]] RHI::DescriptorLayout& GetDescriptorLayout() const { return *m_DescriptorLayout; }
         [[nodiscard]] RHI::VulkanSwapchain& GetSwapchain() const { return *m_Swapchain; }
+
+        void RegisterAssetLoad(Core::Assets::AssetHandle handle, RHI::TransferToken token);
 
     protected:
         std::unique_ptr<Core::Windowing::Window> m_Window;
@@ -80,11 +83,24 @@ export namespace Runtime
         std::shared_ptr<RHI::Texture> m_DefaultTexture;
         std::vector<std::shared_ptr<Graphics::Material>> m_LoadedMaterials;
         std::vector<std::shared_ptr<Graphics::GeometryGpuData>> m_LoadedGeometries;
+        std::unique_ptr<RHI::TransferManager> m_TransferManager;
+
+        // Internal tracking struct (POD)
+        struct PendingLoad
+        {
+            Core::Assets::AssetHandle Handle;
+            RHI::TransferToken Token;
+        };
+
+        // Protected by mutex because Loaders call RegisterAssetLoad from worker threads
+        std::mutex m_LoadMutex;
+        std::vector<PendingLoad> m_PendingLoads;
 
         bool m_Running = true;
         bool m_FramebufferResized = false;
 
         void InitPipeline();
         void LoadDroppedAsset(const std::string& path);
+        void ProcessUploads();
     };
 }

@@ -15,8 +15,10 @@ export namespace Runtime::RHI {
     public:
         Texture(std::shared_ptr<VulkanDevice> device, const std::string& filepath);
         Texture(std::shared_ptr<VulkanDevice> device, const std::vector<uint8_t>& data, uint32_t width, uint32_t height);
+        Texture(std::shared_ptr<VulkanDevice> device, uint32_t width, uint32_t height, VkFormat format);
         ~Texture();
 
+        [[nodiscard]] VkImage GetImage() const { return m_Image->GetHandle(); }
         [[nodiscard]] VkImageView GetView() const { return m_Image->GetView(); }
         [[nodiscard]] VkSampler GetSampler() const { return m_Sampler; }
 

@@ -2,6 +2,7 @@
 #include <vector>
 #include <cstdint>
 #include <span>
+#include <memory>
 
 import Core.Memory;
 
@@ -190,9 +191,11 @@ TEST(LinearArena, NoDestructorOnReset)
     LifecycleTracker::s_DestructorCount = 0;
 
     {
-        auto res = arena.New<LifecycleTracker>(10);
+        // Manually allocate to bypass static_assert in New<T>
+        auto res = arena.Alloc(sizeof(LifecycleTracker), alignof(LifecycleTracker));
         ASSERT_TRUE(res.has_value());
-    } // res goes out of scope, but it's just a pointer. No delete called.
+        std::construct_at(static_cast<LifecycleTracker*>(*res), 10);
+    }
 
     arena.Reset();
 

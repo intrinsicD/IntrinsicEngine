@@ -85,10 +85,17 @@ namespace Runtime::RHI
         createInfo.pApplicationInfo = &appInfo;
 
         // --- Extensions ---
-        uint32_t glfwExtensionCount = 0;
-        const char** glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+        std::vector<const char*> extensions;
 
-        std::vector<const char*> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
+        if (!config.Headless)
+        {
+            uint32_t glfwExtensionCount = 0;
+            const char** glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+            if (glfwExtensions)
+            {
+                extensions.insert(extensions.end(), glfwExtensions, glfwExtensions + glfwExtensionCount);
+            }
+        }
 
         if (config.EnableValidation)
         {

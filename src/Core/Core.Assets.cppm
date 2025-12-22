@@ -34,7 +34,14 @@ export namespace Core::Assets
 
     // --- Components ---
 
-    enum class LoadState { Unloaded, Loading, Ready, Failed };
+    enum class LoadState
+    {
+        Unloaded,
+        Loading,
+        Processing,
+        Ready,
+        Failed
+    };
 
     struct AssetInfo
     {
@@ -84,6 +91,10 @@ export namespace Core::Assets
         // 3. Request Notify: Register a callback for when the asset is Ready.
         // If already ready, callback fires immediately (synchronously).
         void RequestNotify(AssetHandle handle, AssetCallback callback);
+
+        void FinalizeLoad(AssetHandle handle);
+
+        void MoveToProcessing(AssetHandle handle);
 
         // 4. Get Resource
         template <typename T>
@@ -170,7 +181,7 @@ export namespace Core::Assets
         // 3. Async Task
         Tasks::Scheduler::Dispatch([this, handle, path, loader]()
         {
-            auto result = loader(path);
+            auto result = loader(path, handle);
 
             std::unique_lock lock(m_Mutex);
             if (m_Registry.valid(handle.ID))
@@ -179,9 +190,17 @@ export namespace Core::Assets
                 {
                     // Replace Payload
                     m_Registry.emplace_or_replace<AssetPayload<T>>(handle.ID, result);
-                    m_Registry.get<AssetInfo>(handle.ID).State = LoadState::Ready;
-                    Log::Info("Asset Loaded/Reloaded: {}", path);
-                    EnqueueReadyEvent(handle);
+                    auto& info = m_Registry.get<AssetInfo>(handle.ID);
+                    if (info.State != LoadState::Processing)
+                    {
+                        info.State = LoadState::Ready;
+                        EnqueueReadyEvent(handle);
+                        Log::Info("Asset Loaded: {}", path);
+                    }
+                    else
+                    {
+                        Log::Info("Asset Loaded (CPU) -> Waiting for Processing: {}", path);
+                    }
                 }
                 else
                 {

@@ -72,6 +72,25 @@ namespace Core::Assets
         m_OneShotListeners[handle].push_back(callback);
     }
 
+    void AssetManager::FinalizeLoad(AssetHandle handle) {
+        std::unique_lock lock(m_Mutex);
+        if (m_Registry.valid(handle.ID)) {
+            auto& info = m_Registry.get<AssetInfo>(handle.ID);
+            if (info.State == LoadState::Processing) {
+                info.State = LoadState::Ready;
+                EnqueueReadyEvent(handle);
+                Log::Debug("Asset finalization signaled for: {}", info.Name);
+            }
+        }
+    }
+
+    void AssetManager::MoveToProcessing(AssetHandle handle) {
+        std::unique_lock lock(m_Mutex);
+        if (m_Registry.valid(handle.ID)) {
+            m_Registry.get<AssetInfo>(handle.ID).State = LoadState::Processing;
+        }
+    }
+
     void AssetManager::Listen(AssetHandle handle, AssetCallback callback)
     {
         std::unique_lock lock(m_Mutex);

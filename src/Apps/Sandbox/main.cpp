@@ -3,6 +3,7 @@
 #include <glm/gtc/quaternion.hpp>
 #include <vector>
 #include <memory>
+#include <filesystem>
 #include <imgui.h>
 #include <entt/entity/registry.hpp>
 #include <tiny_gltf.h>
@@ -17,6 +18,7 @@ import Runtime.Graphics.Model;
 import Runtime.Graphics.Material;
 import Runtime.Graphics.RenderSystem;
 import Runtime.Graphics.ModelLoader;
+import Runtime.Graphics.TextureLoader;
 import Runtime.Graphics.Camera;
 import Runtime.ECS.Components;
 import Runtime.RHI.Types;
@@ -56,20 +58,39 @@ public:
         m_Camera = m_Scene.GetRegistry().emplace<Graphics::CameraComponent>(m_CameraEntity);
         m_Scene.GetRegistry().emplace<Graphics::OrbitControlComponent>(m_CameraEntity);
 
-        auto textureLoader = [&](const std::string& path)
+        auto textureLoader = [this](const std::filesystem::path& path, Core::Assets::AssetHandle handle)
+            -> std::shared_ptr<RHI::Texture>
         {
-            // Note: RHI::Texture constructor does IO + GPU upload synchronously here
-            // In a real engine, IO is separate from Upload.
-            return std::make_shared<RHI::Texture>(GetDevice(), path);
+            // Delegate complex logic to the subsystem
+            auto result = Graphics::TextureLoader::LoadAsync(path, GetDevice(), *m_TransferManager);
+
+            if (result)
+            {
+                // 1. Notify Engine to track the GPU work
+                RegisterAssetLoad(handle, result->Token);
+
+                // 2. Notify AssetManager to wait
+                m_AssetManager.MoveToProcessing(handle);
+
+                // 3. Return the resource (even though it's not ready yet, it's valid memory)
+                return result->Resource;
+            }
+
+            return nullptr; // Load failed
         };
         m_DuckTexture = m_AssetManager.Load<RHI::Texture>(Filesystem::GetAssetPath("textures/DuckCM.png"),
                                                           textureLoader);
 
-        auto modelLoader = [&](const std::string& path)
+        auto modelLoader = [&](const std::string& path, Assets::AssetHandle /*handle*/)
         {
+            // Handle is unused for models (cpu-only load or blocking load for now), so we ignore it
             return Graphics::ModelLoader::Load(GetDevice(), path);
         };
-        m_DuckModel = m_AssetManager.Load<Graphics::Model>(Filesystem::GetAssetPath("models/Duck.glb"), modelLoader);
+
+        m_DuckModel = m_AssetManager.Load<Graphics::Model>(
+            Filesystem::GetAssetPath("models/Duck.glb"),
+            modelLoader
+        );
 
         // 3. Setup Material (Assuming texture loads synchronously or is handled)
         m_DuckMaterial = std::make_shared<Graphics::Material>(

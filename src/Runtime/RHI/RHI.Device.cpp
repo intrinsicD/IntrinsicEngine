@@ -150,10 +150,11 @@ namespace Runtime::RHI
         m_Indices = FindQueueFamilies(m_PhysicalDevice);
 
         std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
-        std::set<uint32_t> uniqueQueueFamilies = {
-            m_Indices.GraphicsFamily.value(),
-            m_Indices.PresentFamily.value()
-        };
+        std::set<uint32_t> uniqueQueueFamilies;
+        if (m_Indices.GraphicsFamily.has_value())
+            uniqueQueueFamilies.insert(m_Indices.GraphicsFamily.value());
+        if (m_Indices.PresentFamily.has_value())
+            uniqueQueueFamilies.insert(m_Indices.PresentFamily.value());
 
         float queuePriority = 1.0f;
         for (uint32_t queueFamily : uniqueQueueFamilies)
@@ -219,8 +220,14 @@ namespace Runtime::RHI
         createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
         createInfo.pQueueCreateInfos = queueCreateInfos.data();
 
-        createInfo.enabledExtensionCount = static_cast<uint32_t>(DEVICE_EXTENSIONS.size());
-        createInfo.ppEnabledExtensionNames = DEVICE_EXTENSIONS.data();
+        std::vector<const char*> enabledExtensions = DEVICE_EXTENSIONS;
+        if (m_Surface == VK_NULL_HANDLE)
+        {
+            std::erase_if(enabledExtensions, [](const char* ext) { return std::string_view(ext) == VK_KHR_SWAPCHAIN_EXTENSION_NAME; });
+        }
+
+        createInfo.enabledExtensionCount = static_cast<uint32_t>(enabledExtensions.size());
+        createInfo.ppEnabledExtensionNames = enabledExtensions.data();
         createInfo.enabledLayerCount = 0;
 
         if (vkCreateDevice(m_PhysicalDevice, &createInfo, nullptr, &m_Device) != VK_SUCCESS)
@@ -252,7 +259,10 @@ namespace Runtime::RHI
         }
 
         vkGetDeviceQueue(m_Device, m_Indices.GraphicsFamily.value(), 0, &m_GraphicsQueue);
-        vkGetDeviceQueue(m_Device, m_Indices.PresentFamily.value(), 0, &m_PresentQueue);
+        if (m_Indices.PresentFamily.has_value())
+        {
+            vkGetDeviceQueue(m_Device, m_Indices.PresentFamily.value(), 0, &m_PresentQueue);
+        }
     }
 
     void VulkanDevice::CreateCommandPool()
@@ -277,24 +287,34 @@ namespace Runtime::RHI
         bool swapChainAdequate = false;
         if (extensionsSupported)
         {
-            // We technically need the surface to check format support,
-            // so we call our helper locally
-            // Note: In a pure implementation we might separate this, but this is fine for now.
-            // We cast to invoke the helper below which queries m_Surface
-            // But wait, 'QuerySwapchainSupport' uses m_PhysicalDevice which isn't set yet.
-            // We must implement a local version or refactor.
-            // For simplicity, let's check formats manually here:
+            if (m_Surface != VK_NULL_HANDLE)
+            {
+                // We technically need the surface to check format support,
+                // so we call our helper locally
+                // Note: In a pure implementation we might separate this, but this is fine for now.
+                // We cast to invoke the helper below which queries m_Surface
+                // But wait, 'QuerySwapchainSupport' uses m_PhysicalDevice which isn't set yet.
+                // We must implement a local version or refactor.
+                // For simplicity, let's check formats manually here:
 
-            uint32_t formatCount;
-            vkGetPhysicalDeviceSurfaceFormatsKHR(device, m_Surface, &formatCount, nullptr);
+                uint32_t formatCount;
+                vkGetPhysicalDeviceSurfaceFormatsKHR(device, m_Surface, &formatCount, nullptr);
 
-            uint32_t presentModeCount;
-            vkGetPhysicalDeviceSurfacePresentModesKHR(device, m_Surface, &presentModeCount, nullptr);
+                uint32_t presentModeCount;
+                vkGetPhysicalDeviceSurfacePresentModesKHR(device, m_Surface, &presentModeCount, nullptr);
 
-            swapChainAdequate = (formatCount != 0) && (presentModeCount != 0);
+                swapChainAdequate = (formatCount != 0) && (presentModeCount != 0);
+            }
+            else
+            {
+                swapChainAdequate = true;
+            }
         }
 
-        return indices.IsComplete() && extensionsSupported && swapChainAdequate;
+        bool indicesComplete = indices.GraphicsFamily.has_value() &&
+                               (m_Surface == VK_NULL_HANDLE || indices.PresentFamily.has_value());
+
+        return indicesComplete && extensionsSupported && swapChainAdequate;
     }
 
     bool VulkanDevice::CheckDeviceExtensionSupport(VkPhysicalDevice device)
@@ -306,6 +326,11 @@ namespace Runtime::RHI
         vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
 
         std::set<std::string> requiredExtensions(DEVICE_EXTENSIONS.begin(), DEVICE_EXTENSIONS.end());
+
+        if (m_Surface == VK_NULL_HANDLE)
+        {
+            requiredExtensions.erase(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+        }
 
         for (const auto& extension : availableExtensions)
         {
@@ -319,6 +344,7 @@ namespace Runtime::RHI
     {
         QueueFamilyIndices indices;
         uint32_t queueFamilyCount = 0;
+
         vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
 
         std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
@@ -332,14 +358,17 @@ namespace Runtime::RHI
                 indices.GraphicsFamily = i;
             }
 
-            VkBool32 presentSupport = false;
-            vkGetPhysicalDeviceSurfaceSupportKHR(device, i, m_Surface, &presentSupport);
-            if (presentSupport)
+            if (m_Surface != VK_NULL_HANDLE)
             {
-                indices.PresentFamily = i;
+                VkBool32 presentSupport = false;
+                vkGetPhysicalDeviceSurfaceSupportKHR(device, i, m_Surface, &presentSupport);
+                if (presentSupport)
+                {
+                    indices.PresentFamily = i;
+                }
             }
 
-            if (indices.IsComplete()) break;
+            if (indices.GraphicsFamily.has_value() && (m_Surface == VK_NULL_HANDLE || indices.PresentFamily.has_value())) break;
             i++;
         }
         return indices;

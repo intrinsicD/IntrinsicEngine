@@ -1,5 +1,4 @@
 module;
-#define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 #include <RHI/RHI.Vulkan.hpp>
 #include <string>
@@ -126,6 +125,22 @@ namespace Runtime::RHI
             return;
         }
         Upload(data.data(), width, height);
+    }
+
+    Texture::Texture(std::shared_ptr<VulkanDevice> device, uint32_t width, uint32_t height, VkFormat format)
+       : m_Device(device)
+    {
+        // 1. Create Image Object
+        // We need TRANSFER_DST to copy data into it later.
+        // We need SAMPLED to read it in the shader.
+        m_Image = std::make_unique<VulkanImage>(
+            device, width, height, 1, format,
+            VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+            VK_IMAGE_ASPECT_COLOR_BIT
+        );
+
+        // 2. Create Sampler immediately so the descriptor set can be bound
+        CreateSampler();
     }
 
     Texture::~Texture()

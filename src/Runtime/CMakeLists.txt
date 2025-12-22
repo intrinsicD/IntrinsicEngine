@@ -23,6 +23,7 @@ target_sources(${target_name}
         RHI/RHI.Descriptors.cppm
         RHI/RHI.Image.cppm
         RHI/RHI.Texture.cppm
+        RHI/RHI.Transfer.cppm
         ECS/ECS.Components.cppm
         ECS/ECS.Scene.cppm
         Graphics/Graphics.Material.cppm
@@ -30,6 +31,7 @@ target_sources(${target_name}
         Graphics/Graphics.Geometry.cppm
         Graphics/Graphics.RenderSystem.cppm
         Graphics/Graphics.ModelLoader.cppm
+        Graphics/Graphics.TextureLoader.cppm
         Graphics/Graphics.Camera.cppm
         RenderGraph/RenderGraph.cppm
         Interface/Gui.cppm
@@ -62,10 +64,12 @@ target_sources(${target_name}
         RHI/RHI.Descriptors.cpp
         RHI/RHI.Image.cpp
         RHI/RHI.Texture.cpp
+        RHI/RHI.Transfer.cpp
         Graphics/Graphics.Material.cpp
         Graphics/Graphics.RenderSystem.cpp
         Graphics/Graphics.Geometry.cpp
         Graphics/Graphics.ModelLoader.cpp
+        Graphics/Graphics.TextureLoader.cpp
         Graphics/Graphics.Camera.cpp
         Graphics/Graphics.TinyGltf.cpp
         Geometry/Geometry.MeshUtils.cpp

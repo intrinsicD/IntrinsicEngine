@@ -11,6 +11,7 @@ add_executable(${target_name}
         Test_RuntimeGeometry_Containment.cpp
         Test_RuntimeGeometry_Overlap.cpp
         Test_RuntimeGeometryProperties.cpp
+        Test_Transfer.cpp
 )
 
 #Apply Strict Flags ONLY to our tests

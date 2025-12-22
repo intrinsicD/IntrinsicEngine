@@ -25,7 +25,8 @@ TEST(AssetSystem, AsyncLoading)
     AssetManager manager;
 
     // 2. Define a Loader Function (Simulates slow IO)
-    auto textureLoader = [](const std::string& path) -> std::shared_ptr<Texture>
+    // FIX: Added AssetHandle argument to match new signature
+    auto textureLoader = [](const std::string& path, AssetHandle) -> std::shared_ptr<Texture>
     {
         std::this_thread::sleep_for(std::chrono::milliseconds(50)); // Fake IO work
         if (path == "fail.png") return nullptr;
@@ -57,7 +58,8 @@ TEST(AssetSystem, Caching)
     Core::Tasks::Scheduler::Initialize(1);
     AssetManager manager;
 
-    auto simpleLoader = [](const std::string&) { return std::make_shared<Mesh>(100); };
+    // FIX: Added AssetHandle argument
+    auto simpleLoader = [](const std::string&, AssetHandle) { return std::make_shared<Mesh>(100); };
 
     // Load same path twice
     AssetHandle h1 = manager.Load<Mesh>("mesh.obj", simpleLoader);
@@ -69,7 +71,6 @@ TEST(AssetSystem, Caching)
     Core::Tasks::Scheduler::Shutdown();
 }
 
-// Test_CoreAssets.cpp (Update)
 TEST(AssetSystem, EventCallbackOnMainThread)
 {
     Core::Tasks::Scheduler::Initialize(2);
@@ -79,7 +80,8 @@ TEST(AssetSystem, EventCallbackOnMainThread)
     std::thread::id callbackThreadId;
 
     // Loader runs on background thread
-    auto slowLoader = [](const std::string&) {
+    // FIX: Added AssetHandle argument
+    auto slowLoader = [](const std::string&, AssetHandle) {
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
         return std::make_shared<int>(42);
     };
@@ -103,6 +105,34 @@ TEST(AssetSystem, EventCallbackOnMainThread)
 
     EXPECT_TRUE(callbackFired);
     EXPECT_EQ(callbackThreadId, std::this_thread::get_id()); // Must run on THIS thread
+
+    Core::Tasks::Scheduler::Shutdown();
+}
+
+TEST(AssetSystem, ExternalFinalization) {
+    Core::Tasks::Scheduler::Initialize(1); // 1. Start Scheduler
+    AssetManager manager;
+
+    // Loader creates payload
+    auto handle = manager.Load<int>("test", [](const std::string&, AssetHandle){
+        return std::make_shared<int>(1);
+    });
+
+    // 2. Wait for background task to populate payload (State becomes Ready initially)
+    Core::Tasks::Scheduler::WaitForAll();
+
+    // 3. Simulate transition to "Processing" (e.g. waiting for GPU)
+    manager.MoveToProcessing(handle);
+    EXPECT_EQ(manager.GetState(handle), LoadState::Processing);
+
+    // 4. Verify Get returns null while processing (Access Control)
+    EXPECT_EQ(manager.Get<int>(handle), nullptr);
+
+    // 5. Finalize
+    manager.FinalizeLoad(handle);
+
+    EXPECT_EQ(manager.GetState(handle), LoadState::Ready);
+    EXPECT_NE(manager.Get<int>(handle), nullptr);
 
     Core::Tasks::Scheduler::Shutdown();
 }
