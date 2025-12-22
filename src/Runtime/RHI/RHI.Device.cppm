@@ -16,10 +16,11 @@ namespace Runtime::RHI
     {
         std::optional<uint32_t> GraphicsFamily;
         std::optional<uint32_t> PresentFamily;
+        std::optional<uint32_t> TransferFamily;
 
         bool IsComplete() const
         {
-            return GraphicsFamily.has_value() && PresentFamily.has_value();
+            return GraphicsFamily.has_value() && PresentFamily.has_value() && TransferFamily.has_value();
         }
     };
 
@@ -44,6 +45,7 @@ namespace Runtime::RHI
         [[nodiscard]] VkPhysicalDevice GetPhysicalDevice() const { return m_PhysicalDevice; }
         [[nodiscard]] VkQueue GetGraphicsQueue() const { return m_GraphicsQueue; }
         [[nodiscard]] VkQueue GetPresentQueue() const { return m_PresentQueue; }
+        [[nodiscard]] VkQueue GetTransferQueue() const { return m_TransferQueue; }
         [[nodiscard]] QueueFamilyIndices GetQueueIndices() const { return m_Indices; }
         [[nodiscard]] VkResult SubmitToGraphicsQueue(const VkSubmitInfo& submitInfo, VkFence fence);
         [[nodiscard]] VkResult Present(const VkPresentInfoKHR& presentInfo);
@@ -71,6 +73,7 @@ namespace Runtime::RHI
 
         VkQueue m_GraphicsQueue = VK_NULL_HANDLE;
         VkQueue m_PresentQueue = VK_NULL_HANDLE;
+        VkQueue m_TransferQueue = VK_NULL_HANDLE;
         QueueFamilyIndices m_Indices;
 
         VmaAllocator m_Allocator = VK_NULL_HANDLE;

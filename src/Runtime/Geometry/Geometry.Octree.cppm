@@ -557,6 +557,7 @@ export namespace Runtime::Geometry
             }
 
             std::array<std::vector<size_t>, 8> child_elements;
+            for(auto& vec : child_elements) vec.reserve(node.NumElements / 8);
             scratch.clear();
             scratch.reserve(node.NumElements);
             auto& straddlers = scratch;
