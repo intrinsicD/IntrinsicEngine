@@ -11,12 +11,29 @@ project(IntrinsicEngine
 # ------------------------------------------------------------------------------
 # Check if the user/IDE provided a scanner, otherwise try to find one
 if(NOT CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS)
-    find_program(CLANG_SCAN_DEPS_PATH NAMES clang-scan-deps-18 clang-scan-deps-22 clang-scan-deps)
+    # Search for versioned binaries first, then generic
+    find_program(CLANG_SCAN_DEPS_PATH
+            NAMES
+            clang-scan-deps-18
+            clang-scan-deps-19
+            clang-scan-deps
+            HINTS
+            $ENV{LLVM_DIR}/bin
+    )
+
     if(CLANG_SCAN_DEPS_PATH)
         message(STATUS "Found clang-scan-deps: ${CLANG_SCAN_DEPS_PATH}")
         set(CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS "${CLANG_SCAN_DEPS_PATH}" CACHE FILEPATH "Force scanner" FORCE)
     else()
-        message(FATAL_ERROR "Could not find clang-scan-deps. Please install clang-tools-18+.")
+        # Fallback: Check if the compiler itself can tell us
+        execute_process(COMMAND ${CMAKE_CXX_COMPILER} -print-prog-name=clang-scan-deps
+                OUTPUT_VARIABLE COMPILER_HINT_PATH
+                OUTPUT_STRIP_TRAILING_WHITESPACE)
+        if(EXISTS "${COMPILER_HINT_PATH}")
+            set(CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS "${COMPILER_HINT_PATH}" CACHE FILEPATH "Force scanner" FORCE)
+        else()
+            message(FATAL_ERROR "Could not find clang-scan-deps. Ensure Clang Tools 18+ are in your PATH.")
+        endif()
     endif()
 endif()
 

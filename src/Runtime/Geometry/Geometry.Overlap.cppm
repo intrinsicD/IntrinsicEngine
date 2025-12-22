@@ -164,21 +164,26 @@ export namespace Runtime::Geometry
         // --- Frustum vs AABB ---
         bool Overlap_Analytic(const Frustum& f, const AABB& box)
         {
-            // If the box is completely BEHIND any single plane, it is culled.
             for (const auto& plane : f.Planes)
             {
-                // Find the point on the AABB most likely to be "behind" the plane
-                // based on the normal direction.
-                // We want the point furthest in the direction of the normal.
-                glm::vec3 positiveVertex = box.Min;
-                if (plane.Normal.x >= 0) positiveVertex.x = box.Max.x;
-                if (plane.Normal.y >= 0) positiveVertex.y = box.Max.y;
-                if (plane.Normal.z >= 0) positiveVertex.z = box.Max.z;
+                // Test the vertex most likely to be BEHIND the plane (Negative Half-Space)
+                // If the "Negative Vertex" is still strictly positive (in front of plane),
+                // then the entire box is in the positive half-space (Inside).
+                // If the "Positive Vertex" is strictly negative (behind plane),
+                // then the entire box is Outside.
 
-                if (SDF::Math::Sdf_Plane(positiveVertex, plane.Normal, plane.Distance) < 0)
+                // Assuming Gribb-Hartmann: Normals point INWARD.
+                // Inside = Positive Distance.
+                // We want to check if the box is fully OUTSIDE (Negative Distance).
+
+                glm::vec3 maxPoint; // The point furthest in the normal direction
+                if (plane.Normal.x > 0) maxPoint.x = box.Max.x; else maxPoint.x = box.Min.x;
+                if (plane.Normal.y > 0) maxPoint.y = box.Max.y; else maxPoint.y = box.Min.y;
+                if (plane.Normal.z > 0) maxPoint.z = box.Max.z; else maxPoint.z = box.Min.z;
+
+                // If the point furthest IN is actually OUT (<0), the whole box is culled.
+                if (SDF::Math::Sdf_Plane(maxPoint, plane.Normal, plane.Distance) < 0.0f)
                 {
-                    // The "most inside" point is actually outside.
-                    // Therefore the whole box is outside.
                     return false;
                 }
             }

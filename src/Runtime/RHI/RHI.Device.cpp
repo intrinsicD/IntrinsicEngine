@@ -352,8 +352,29 @@ namespace Runtime::RHI
                 }
             }
 
-            if (indices.GraphicsFamily.has_value() && (m_Surface == VK_NULL_HANDLE || indices.PresentFamily.has_value())) break;
+            if ((queueFamily.queueFlags & VK_QUEUE_TRANSFER_BIT) &&
+                !(queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) &&
+                !(queueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT))
+            {
+                indices.TransferFamily = i;
+            }
             i++;
+
+        }
+        if (!indices.TransferFamily.has_value()) {
+            i = 0;
+            for (const auto& queueFamily : queueFamilies) {
+                if (queueFamily.queueFlags & VK_QUEUE_TRANSFER_BIT) {
+                    indices.TransferFamily = i;
+                    break;
+                }
+                i++;
+            }
+        }
+
+        // Final Fallback: Graphics queue implies Transfer support implicitly in Vulkan
+        if (!indices.TransferFamily.has_value() && indices.GraphicsFamily.has_value()) {
+            indices.TransferFamily = indices.GraphicsFamily;
         }
         return indices;
     }

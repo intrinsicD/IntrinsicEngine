@@ -167,9 +167,9 @@ export namespace Runtime::Graph
         struct RGPass
         {
             std::string Name;
-            std::vector<ResourceID> Reads;
-            std::vector<ResourceID> Writes;
-            std::vector<ResourceID> Creates;
+            std::vector<ResourceID> Reads{};
+            std::vector<ResourceID> Writes{};
+            std::vector<ResourceID> Creates{};
 
             // Rasterization Info
             struct Attachment
@@ -179,7 +179,7 @@ export namespace Runtime::Graph
                 bool IsDepth = false;
             };
 
-            std::vector<Attachment> Attachments;
+            std::vector<Attachment> Attachments{};
 
             RGExecuteFn Execute;
         };
@@ -216,6 +216,24 @@ export namespace Runtime::Graph
             bool IsFree;
         };
 
+        struct ImageCacheKey {
+            VkFormat Format;
+            uint32_t Width;
+            uint32_t Height;
+            VkImageUsageFlags Usage;
+            bool operator==(const ImageCacheKey&) const = default;
+        };
+
+        struct ImageCacheKeyHash {
+            std::size_t operator()(const ImageCacheKey& k) const {
+                // Simple hash combine
+                std::size_t h = std::hash<uint32_t>()(k.Width);
+                h ^= std::hash<uint32_t>()(k.Height) + 0x9e3779b9 + (h << 6) + (h >> 2);
+                h ^= std::hash<uint32_t>()((uint32_t)k.Format) + 0x9e3779b9 + (h << 6) + (h >> 2);
+                return h;
+            }
+        };
+
         std::shared_ptr<RHI::VulkanDevice> m_Device;
         Core::Memory::LinearArena& m_Arena;
 
@@ -226,7 +244,7 @@ export namespace Runtime::Graph
         std::unordered_map<std::string, ResourceID> m_ResourceLookup;
 
         RGRegistry m_Registry;
-        std::vector<PooledImage> m_ImagePool;
+        std::unordered_multimap<ImageCacheKey, PooledImage, ImageCacheKeyHash> m_ImagePool;
 
         RGPass& CreatePassInternal(const std::string& name);
         std::pair<ResourceID, bool> CreateResourceInternal(const std::string& name, ResourceType type);

@@ -163,7 +163,7 @@ namespace Runtime::Graph
         m_ResourceLookup.clear(); // Clear lookup table
         m_Registry = RGRegistry();
 
-        for (auto& item : m_ImagePool)
+        for (auto& [key, item] : m_ImagePool)
         {
             item.IsFree = true;
         }
@@ -172,24 +172,25 @@ namespace Runtime::Graph
     RHI::VulkanImage* RenderGraph::AllocateImage(uint32_t frameIndex, uint32_t width, uint32_t height, VkFormat format,
                                                  VkImageUsageFlags usage, VkImageAspectFlags aspect)
     {
-        for (auto& item : m_ImagePool)
-        {
-            if (item.IsFree && item.LastFrameIndex == frameIndex)
-            {
-                if (item.Resource->GetFormat() == format &&
-                    item.Resource->GetWidth() == width &&
-                    item.Resource->GetHeight() == height &&
-                    item.Resource->GetView() != VK_NULL_HANDLE)
-                {
-                    item.IsFree = false;
-                    return item.Resource.get();
-                }
+        ImageCacheKey key{format, width, height, usage};
+        auto range = m_ImagePool.equal_range(key);
+
+        for (auto it = range.first; it != range.second; ++it) {
+            // Check frame index to avoid reusing resource currently in flight
+            if (it->second.IsFree && it->second.LastFrameIndex != frameIndex) {
+                it->second.IsFree = false;
+                it->second.LastFrameIndex = frameIndex;
+                return it->second.Resource.get();
             }
         }
 
+        // Not found, create new (default to Exclusive sharing for graph resources usually)
         auto img = std::make_unique<RHI::VulkanImage>(m_Device, width, height, 1, format, usage, aspect);
         auto* ptr = img.get();
-        m_ImagePool.push_back({std::move(img), frameIndex, false});
+
+        PooledImage newEntry{std::move(img), frameIndex, false};
+        m_ImagePool.emplace(key, std::move(newEntry));
+
         return ptr;
     }
 
@@ -198,7 +199,6 @@ namespace Runtime::Graph
         m_Barriers.resize(m_Passes.size());
 
         constexpr VkPipelineStageFlags2 kDefaultReadStage = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
-        constexpr VkAccessFlags2 kDefaultReadAccess = VK_ACCESS_2_SHADER_READ_BIT;
 
         // 1. Resolve Transient Resources
         for (size_t i = 0; i < m_Resources.size(); ++i)

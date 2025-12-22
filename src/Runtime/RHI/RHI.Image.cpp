@@ -2,6 +2,7 @@ module;
 #include "RHI.Vulkan.hpp"
 #include <vector>
 #include <memory>
+#include <optional>
 
 module Runtime.RHI.Image;
 import Core.Logging;
@@ -9,7 +10,7 @@ import Core.Logging;
 namespace Runtime::RHI
 {
     VulkanImage::VulkanImage(std::shared_ptr<VulkanDevice> device, uint32_t width, uint32_t height, uint32_t mipLevels, VkFormat format,
-                             VkImageUsageFlags usage, VkImageAspectFlags aspect)
+                             VkImageUsageFlags usage, VkImageAspectFlags aspect, VkSharingMode sharingMode)
         : m_Device(device), m_Format(format), m_MipLevels(mipLevels), m_Width(width), m_Height(height)
     {
         // 1. Create Image
@@ -26,7 +27,22 @@ namespace Runtime::RHI
         imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         imageInfo.usage = usage;
         imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-        imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        imageInfo.sharingMode = sharingMode;
+
+        std::vector<uint32_t> queueIndices;
+        if (sharingMode == VK_SHARING_MODE_CONCURRENT) {
+            auto indices = m_Device->GetQueueIndices();
+            if (indices.GraphicsFamily.has_value())
+            {
+                queueIndices.push_back(indices.GraphicsFamily.value());
+            }
+            // Avoid duplicate if transfer == graphics
+            if (indices.TransferFamily.has_value() && indices.TransferFamily != indices.GraphicsFamily) {
+                queueIndices.push_back(indices.TransferFamily.value());
+            }
+            imageInfo.queueFamilyIndexCount = static_cast<uint32_t>(queueIndices.size());
+            imageInfo.pQueueFamilyIndices = queueIndices.data();
+        }
 
         VmaAllocationCreateInfo allocInfo{};
         allocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;

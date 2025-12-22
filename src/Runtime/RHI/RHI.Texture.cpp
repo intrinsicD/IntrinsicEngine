@@ -130,16 +130,23 @@ namespace Runtime::RHI
     Texture::Texture(std::shared_ptr<VulkanDevice> device, uint32_t width, uint32_t height, VkFormat format)
        : m_Device(device)
     {
-        // 1. Create Image Object
-        // We need TRANSFER_DST to copy data into it later.
-        // We need SAMPLED to read it in the shader.
+        auto indices = m_Device->GetQueueIndices();
+        bool distinctQueues = false;
+
+        // Defensive check to avoid bad_optional_access
+        if (indices.GraphicsFamily.has_value() && indices.TransferFamily.has_value()) {
+            distinctQueues = (indices.GraphicsFamily.value() != indices.TransferFamily.value());
+        }
+
+        VkSharingMode sharingMode = distinctQueues ? VK_SHARING_MODE_CONCURRENT : VK_SHARING_MODE_EXCLUSIVE;
+
         m_Image = std::make_unique<VulkanImage>(
             device, width, height, 1, format,
             VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-            VK_IMAGE_ASPECT_COLOR_BIT
+            VK_IMAGE_ASPECT_COLOR_BIT,
+            sharingMode
         );
 
-        // 2. Create Sampler immediately so the descriptor set can be bound
         CreateSampler();
     }
 
