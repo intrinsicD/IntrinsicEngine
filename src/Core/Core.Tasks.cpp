@@ -15,17 +15,16 @@ namespace Core::Tasks
     struct SchedulerContext
     {
         std::vector<std::thread> workers;
-        std::deque<LocalTask> globalQueue; // Now stores LocalTask (No std::function allocs)
+        std::deque<LocalTask> globalQueue;
 
         std::mutex queueMutex;
-        std::condition_variable wakeCondition;
+        std::condition_variable wakeCondition; // Used to wake up sleeping WORKERS
 
         std::atomic<bool> isRunning{false};
-        std::atomic<int> activeTaskCount{0};
-        std::atomic<int> queuedTaskCount{0}; // Tracked separately to avoid queue locking for size
 
-        std::condition_variable waitCondition;
-        std::mutex waitMutex;
+        // We use std::atomic::wait on activeTaskCount, so no separate CV/Mutex needed for waiting
+        std::atomic<int> activeTaskCount{0};
+        std::atomic<int> queuedTaskCount{0};
     };
 
     static std::unique_ptr<SchedulerContext> s_Ctx = nullptr;
@@ -72,9 +71,7 @@ namespace Core::Tasks
     {
         if (!s_Ctx) return;
 
-        // Optimization: Increment counters BEFORE lock
-        // This ensures WaitForAll doesn't accidentally exit if it sees 0 queued
-        // before the worker picks it up.
+        // Increment active count (Task is now tracked)
         s_Ctx->activeTaskCount.fetch_add(1, std::memory_order_relaxed);
         s_Ctx->queuedTaskCount.fetch_add(1, std::memory_order_release);
 
@@ -89,9 +86,8 @@ namespace Core::Tasks
     {
         if (!s_Ctx) return;
 
-        //Help with work while waiting
-        while (s_Ctx->activeTaskCount.load(std::memory_order_acquire) > 0 ||
-            s_Ctx->queuedTaskCount.load(std::memory_order_acquire) > 0)
+        // 1. Help with work while tasks are queued
+        while (s_Ctx->queuedTaskCount.load(std::memory_order_acquire) > 0)
         {
             LocalTask task;
             bool foundWork = false;
@@ -110,22 +106,33 @@ namespace Core::Tasks
 
             if (foundWork && task.Valid())
             {
-                // We picked up a task, so we are effectively a worker now.
-                // activeTaskCount was already incremented by Dispatch.
+                // Execute stolen task
                 task();
+
+                // Task done. Decrement active count and notify any other waiters.
                 s_Ctx->activeTaskCount.fetch_sub(1, std::memory_order_release);
+                s_Ctx->activeTaskCount.notify_all();
             }
             else
             {
-                // No work left in queue, but active tasks exist on other threads.
-                // Now we yield/wait.
-                std::unique_lock lock(s_Ctx->waitMutex);
-                s_Ctx->waitCondition.wait(lock, []
-                {
-                    return s_Ctx->activeTaskCount.load(std::memory_order_acquire) == 0;
-                });
-                break; // Exit loop if condition met
+                // Queue counter suggested work, but queue was empty (race condition).
+                // Yield briefly to let other threads progress.
+                std::this_thread::yield();
             }
+        }
+
+        // 2. Efficient Wait (C++20)
+        // Queue is empty, but workers might still be running tasks.
+        // Wait until activeTaskCount drops to 0.
+        int active = s_Ctx->activeTaskCount.load(std::memory_order_acquire);
+        while (active > 0)
+        {
+            // Atomically waits if value is still 'active'.
+            // This blocks at OS level (futex) preventing 100% CPU usage.
+            s_Ctx->activeTaskCount.wait(active);
+
+            // Reload value to check loop condition
+            active = s_Ctx->activeTaskCount.load(std::memory_order_acquire);
         }
     }
 
@@ -163,15 +170,10 @@ namespace Core::Tasks
                 task();
 
                 // Decrement active count
-                int remaining = s_Ctx->activeTaskCount.fetch_sub(1, std::memory_order_release) - 1;
+                s_Ctx->activeTaskCount.fetch_sub(1, std::memory_order_release);
 
-                // Signal Main Thread if all done
-                if (remaining == 0)
-                {
-                    // Optimization: Only lock/notify if we hit zero
-                    std::lock_guard waitLock(s_Ctx->waitMutex);
-                    s_Ctx->waitCondition.notify_all();
-                }
+                // Notify WaitForAll() that a task has finished
+                s_Ctx->activeTaskCount.notify_all();
             }
         }
     }
