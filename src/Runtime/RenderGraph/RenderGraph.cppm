@@ -27,7 +27,7 @@ export namespace Runtime::Graph
     struct RGResourceHandle
     {
         ResourceID ID = kInvalidResource;
-        bool IsValid() const { return ID != kInvalidResource; }
+        [[nodiscard]] bool IsValid() const { return ID != kInvalidResource; }
     };
 
     enum class ResourceType { Texture, Buffer, Import };
@@ -126,7 +126,8 @@ export namespace Runtime::Graph
                      std::function<void(const Data&, const RGRegistry&, VkCommandBuffer)> execute)
         {
             static_assert(std::is_trivially_destructible_v<Data>,
-    "RenderGraph PassData must be trivially destructible (POD) because the LinearArena does not call destructors.");
+                          "RenderGraph PassData must be trivially destructible (POD) because the LinearArena does not call destructors.")
+                ;
             auto& pass = CreatePassInternal(name);
             // Allocate data on a linear arena (simulated here with heap for brevity)
             auto allocResult = m_Arena.New<Data>();
@@ -181,7 +182,7 @@ export namespace Runtime::Graph
 
             std::vector<Attachment> Attachments{};
 
-            RGExecuteFn Execute;
+            RGExecuteFn Execute{};
         };
 
         struct ResourceNode
@@ -201,6 +202,9 @@ export namespace Runtime::Graph
             VkFormat Format = VK_FORMAT_UNDEFINED;
             VkImageUsageFlags Usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
             VkImageAspectFlags Aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+
+            uint32_t StartPass = ~0u;
+            uint32_t EndPass = 0;
         };
 
         // Barrier storage: Index = Pass Index
@@ -213,10 +217,12 @@ export namespace Runtime::Graph
         {
             std::unique_ptr<RHI::VulkanImage> Resource;
             uint32_t LastFrameIndex;
-            bool IsFree;
+
+            std::vector<std::pair<uint32_t, uint32_t>> ActiveIntervals{};
         };
 
-        struct ImageCacheKey {
+        struct ImageCacheKey
+        {
             VkFormat Format;
             uint32_t Width;
             uint32_t Height;
@@ -224,8 +230,10 @@ export namespace Runtime::Graph
             bool operator==(const ImageCacheKey&) const = default;
         };
 
-        struct ImageCacheKeyHash {
-            std::size_t operator()(const ImageCacheKey& k) const {
+        struct ImageCacheKeyHash
+        {
+            std::size_t operator()(const ImageCacheKey& k) const
+            {
                 // Simple hash combine
                 std::size_t h = std::hash<uint32_t>()(k.Width);
                 h ^= std::hash<uint32_t>()(k.Height) + 0x9e3779b9 + (h << 6) + (h >> 2);
@@ -234,10 +242,10 @@ export namespace Runtime::Graph
             }
         };
 
-        struct PooledImageStack {
+        struct PooledImageStack
+        {
             std::vector<PooledImage> Images;
         };
-
 
         std::shared_ptr<RHI::VulkanDevice> m_Device;
         Core::Memory::LinearArena& m_Arena;
@@ -253,7 +261,6 @@ export namespace Runtime::Graph
 
         RGPass& CreatePassInternal(const std::string& name);
         std::pair<ResourceID, bool> CreateResourceInternal(const std::string& name, ResourceType type);
-        RHI::VulkanImage* AllocateImage(uint32_t frameIndex, uint32_t width, uint32_t height, VkFormat format,
-                                        VkImageUsageFlags usage, VkImageAspectFlags aspect);
+        RHI::VulkanImage* ResolveImage(uint32_t frameIndex, const ResourceNode& node);
     };
 }

@@ -143,7 +143,7 @@ namespace Runtime::Graph
         }
 
         // 2. Create New
-        ResourceID id = (ResourceID)m_Resources.size();
+        auto id = static_cast<ResourceID>(m_Resources.size());
         ResourceNode node{};
         node.Name = name;
         node.Type = type;
@@ -162,42 +162,60 @@ namespace Runtime::Graph
         m_Barriers.clear();
         m_ResourceLookup.clear(); // Clear lookup table
         m_Registry = RGRegistry();
-
-        for (auto& [key, stack] : m_ImagePool)
-        {
-            for (auto& item : stack.Images)
-            {
-                item.IsFree = true;
-            }
-        }
     }
 
-    RHI::VulkanImage* RenderGraph::AllocateImage(uint32_t frameIndex, uint32_t width, uint32_t height, VkFormat format,
-                                                 VkImageUsageFlags usage, VkImageAspectFlags aspect)
+    RHI::VulkanImage* RenderGraph::ResolveImage(uint32_t frameIndex, const ResourceNode& node)
     {
-        ImageCacheKey key{format, width, height, usage};
+        ImageCacheKey key{node.Format, node.Extent.width, node.Extent.height, node.Usage};
         auto& stack = m_ImagePool[key];
 
-        // Iterate backwards (hot cache likely at end)
-        for (int i = stack.Images.size() - 1; i >= 0; --i) {
-            auto& item = stack.Images[i];
-            // Check frame index to avoid reusing resource currently in flight (Double Buffering safety)
-            if (item.LastFrameIndex != frameIndex) { // Assuming frameIndex increments, strict inequality might be needed depending on wraparound
-                // logic: if (frameIndex - item.LastFrameIndex >= FramesInFlight)
-                // Simple logic for now: Just don't use *current* frame index from a previous pass in same frame?
-                // Actually, Frame Graph resets every frame. Images from 'LastFrameIndex < CurrentFrameIndex' are safe.
-                if (item.LastFrameIndex != frameIndex) { // Safe if < current
-                    item.LastFrameIndex = frameIndex;
+        // 1. Look for a compatible image in the pool
+        for (auto& item : stack.Images)
+        {
+            // Case A: Image from previous frame (Double Buffering Logic)
+            // It is completely free to use. Reset intervals.
+            if (item.LastFrameIndex < frameIndex)
+            {
+                item.LastFrameIndex = frameIndex;
+                item.ActiveIntervals.clear();
+
+                item.ActiveIntervals.emplace_back(node.StartPass, node.EndPass);
+                return item.Resource.get();
+            }
+
+            // Case B: Image already used in THIS frame (Aliasing Logic)
+            // Check for lifetime overlap.
+            if (item.LastFrameIndex == frameIndex)
+            {
+                bool overlap = false;
+                for (const auto& interval : item.ActiveIntervals)
+                {
+                    // Intersection test: (StartA <= EndB) and (EndA >= StartB)
+                    if (node.StartPass <= interval.second && node.EndPass >= interval.first)
+                    {
+                        overlap = true;
+                        break;
+                    }
+                }
+
+                if (!overlap)
+                {
+                    // No overlap found! We can ALIAS this memory.
+                    // Add new interval to the list.
+                    item.ActiveIntervals.emplace_back(node.StartPass, node.EndPass);
                     return item.Resource.get();
                 }
             }
         }
 
-        // Not found, create new
-        auto img = std::make_unique<RHI::VulkanImage>(m_Device, width, height, 1, format, usage, aspect);
+        // 2. No suitable image found. Allocate new one.
+        auto img = std::make_unique<RHI::VulkanImage>(m_Device, node.Extent.width, node.Extent.height, 1, node.Format, node.Usage, node.Aspect);
         auto* ptr = img.get();
 
-        stack.Images.push_back({std::move(img), frameIndex, false}); // IsFree flag effectively replaced by logic above
+        PooledImage pooled{std::move(img), frameIndex};
+        pooled.ActiveIntervals.emplace_back(node.StartPass, node.EndPass);
+        stack.Images.push_back(std::move(pooled));
+
         return ptr;
     }
 
@@ -234,8 +252,7 @@ namespace Runtime::Graph
                     fmt = VK_FORMAT_R8G8B8A8_UNORM;
                 }
 
-                RHI::VulkanImage* img = AllocateImage(frameIndex, res.Extent.width, res.Extent.height, fmt, usage,
-                                                      aspect);
+                RHI::VulkanImage* img = ResolveImage(frameIndex, res);
                 res.PhysicalImage = img->GetHandle();
                 res.PhysicalView = img->GetView();
             }
