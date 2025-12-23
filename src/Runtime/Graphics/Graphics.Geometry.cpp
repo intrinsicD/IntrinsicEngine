@@ -175,12 +175,12 @@ namespace Runtime::Graphics
         }
     }
 
-    std::pair<std::shared_ptr<GeometryGpuData>, RHI::TransferToken>
+    std::pair<std::unique_ptr<GeometryGpuData>, RHI::TransferToken>
     GeometryGpuData::CreateAsync(std::shared_ptr<RHI::VulkanDevice> device,
                                  RHI::TransferManager& transferManager,
                                  const GeometryUploadRequest& data)
     {
-        auto result = std::make_shared<GeometryGpuData>();
+        auto result = std::make_unique<GeometryGpuData>();
         result->m_IndexCount = static_cast<uint32_t>(data.Indices.size());
         result->m_Layout.Topology = data.Topology;
 
@@ -249,6 +249,6 @@ namespace Runtime::Graphics
         // 3. Submit
         RHI::TransferToken token = transferManager.Submit(cmd, std::move(stagingBuffers));
 
-        return { result, token };
+        return { std::move(result), token };
     }
 }

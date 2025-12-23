@@ -89,7 +89,7 @@ export namespace Runtime::Graphics
                    size_t stagingOffset);
         ~GeometryGpuData() = default;
 
-        [[nodiscard]] static std::pair<std::shared_ptr<GeometryGpuData>, RHI::TransferToken>
+        [[nodiscard]] static std::pair<std::unique_ptr<GeometryGpuData>, RHI::TransferToken>
        CreateAsync(std::shared_ptr<RHI::VulkanDevice> device,
                    RHI::TransferManager& transferManager,
                    const GeometryUploadRequest& data);

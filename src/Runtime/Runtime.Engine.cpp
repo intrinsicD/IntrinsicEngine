@@ -124,7 +124,6 @@ namespace Runtime
         m_DefaultTexture.reset();
 
         m_LoadedMaterials.clear();
-        m_LoadedGeometries.clear();
 
         m_RenderSystem.reset();
         m_Pipeline.reset();
@@ -186,7 +185,7 @@ namespace Runtime
             ext == ".xyz" || ext == ".pcd" ||
             ext == ".tgf");
 
-if (isModel)
+        if (isModel)
         {
             Core::Log::Info("Scheduling Async Load: {}", path);
 
@@ -194,7 +193,7 @@ if (isModel)
             Core::Tasks::Scheduler::Dispatch([this, path]()
             {
                 // [Worker Thread] Heavy OBJ/GLTF Parsing
-                auto loadResult = Graphics::ModelLoader::LoadAsync(GetDevice(), *m_TransferManager, path);
+                auto loadResult = Graphics::ModelLoader::LoadAsync(GetDevice(), *m_TransferManager, m_GeometryStorage, path);
 
                 if (!loadResult)
                 {
@@ -219,7 +218,8 @@ if (isModel)
                     {
                         std::filesystem::path texPath(pathStr);
                         auto result = Graphics::TextureLoader::LoadAsync(texPath, GetDevice(), *m_TransferManager);
-                        if (result) {
+                        if (result)
+                        {
                             m_AssetManager.MoveToProcessing(handle);
                             RegisterAssetLoad(handle, result->Token);
                             return result->Resource;
@@ -247,24 +247,23 @@ if (isModel)
 
                     for (size_t i = 0; i < model->Size(); i++)
                     {
-                        // Cache Geometry
-                        m_LoadedGeometries.push_back(model->Meshes[i]->GpuGeometry);
-
                         entt::entity targetEntity = rootEntity;
-                        if (model->Size() > 1) {
+                        if (model->Size() > 1)
+                        {
                             targetEntity = m_Scene.CreateEntity(entityName + "_" + std::to_string(i));
                             // TODO: Add parent-child relationship component
                         }
 
                         auto& mr = m_Scene.GetRegistry().emplace<ECS::MeshRenderer::Component>(targetEntity);
-                        mr.GeometryRef = model->Meshes[i]->GpuGeometry;
+                        mr.Geometry = model->Meshes[i]->Handle;
                         mr.MaterialRef = defaultMat;
 
                         // Add Collider
-                        if (model->Meshes[i]->CollisionGeometry) {
-                             auto& col = m_Scene.GetRegistry().emplace<ECS::MeshCollider::Component>(targetEntity);
-                             col.CollisionRef = model->Meshes[i]->CollisionGeometry;
-                             col.WorldOBB.Center = col.CollisionRef->LocalAABB.GetCenter(); // Init center
+                        if (model->Meshes[i]->CollisionGeometry)
+                        {
+                            auto& col = m_Scene.GetRegistry().emplace<ECS::MeshCollider::Component>(targetEntity);
+                            col.CollisionRef = model->Meshes[i]->CollisionGeometry;
+                            col.WorldOBB.Center = col.CollisionRef->LocalAABB.GetCenter(); // Init center
                         }
                     }
                     Core::Log::Info("Successfully spawned: {}", entityName);
@@ -360,7 +359,8 @@ if (isModel)
             *m_DescriptorPool, // <--- Passed
             *m_DescriptorLayout, // <--- Passed
             *m_Pipeline,
-            m_FrameArena
+            m_FrameArena,
+            m_GeometryStorage
         );
     }
 

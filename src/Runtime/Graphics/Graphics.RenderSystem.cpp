@@ -250,8 +250,21 @@ namespace Runtime::Graphics
                                                                }
 
                                                                // Set Topology
-                                                               // (If topology varies per mesh, set it here. If mostly triangles, optimize)
-                                                               // vkCmdSetPrimitiveTopology(cmd, ...);
+                                                               VkPrimitiveTopology vkTopo =
+                                                                   VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+                                                               switch (currentGeo->GetTopology())
+                                                               {
+                                                               case PrimitiveTopology::Points: vkTopo =
+                                                                       VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+                                                                   break;
+                                                               case PrimitiveTopology::Lines: vkTopo =
+                                                                       VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
+                                                                   break;
+                                                               case PrimitiveTopology::Triangles:
+                                                               default: vkTopo = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+                                                                   break;
+                                                               }
+                                                               vkCmdSetPrimitiveTopology(cmd, vkTopo);
                                                            }
 
                                                            if (!currentGeo) continue;

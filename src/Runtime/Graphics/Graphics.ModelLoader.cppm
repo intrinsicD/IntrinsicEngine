@@ -6,6 +6,7 @@ module;
 export module Runtime.Graphics.ModelLoader;
 
 import Runtime.Graphics.Model;
+import Runtime.Graphics.Geometry;
 import Runtime.RHI.Device;
 import Runtime.RHI.Transfer;
 
@@ -24,6 +25,7 @@ export namespace Runtime::Graphics
         static std::optional<ModelLoadResult> LoadAsync(
             std::shared_ptr<RHI::VulkanDevice> device,
             RHI::TransferManager& transferManager,
+            GeometryStorage& geometryStorage,
             const std::string& filepath
         );
     };

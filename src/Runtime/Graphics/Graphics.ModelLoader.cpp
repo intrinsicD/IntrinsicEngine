@@ -598,13 +598,14 @@ namespace Runtime::Graphics
     std::optional<ModelLoadResult> ModelLoader::LoadAsync(
         std::shared_ptr<RHI::VulkanDevice> device,
         RHI::TransferManager& transferManager,
+        GeometryStorage& geometryStorage,
         const std::string& filepath)
     {
         std::string fullPath = Core::Filesystem::GetAssetPath(filepath);
         std::string ext = std::filesystem::path(fullPath).extension().string();
         for (auto& c : ext) c = tolower(c);
 
-        auto model = std::make_shared<Model>();
+        auto model = std::make_shared<Model>(geometryStorage);
         std::vector<GeometryCpuData> cpuMeshes;
         bool success = false;
 
@@ -668,9 +669,9 @@ namespace Runtime::Graphics
 
                 // --- KEY CHANGE IS HERE ---
                 auto [gpuData, token] = GeometryGpuData::CreateAsync(device, transferManager, uploadReq);
-                segment.GpuGeometry = gpuData;
                 latestToken = token; // Since tokens are monotonic, keeping the last one is enough
-                // --------------------------
+
+                segment.Handle = geometryStorage.Add(std::move(gpuData));
 
                 model->Meshes.emplace_back(std::make_shared<MeshSegment>(segment));
             }

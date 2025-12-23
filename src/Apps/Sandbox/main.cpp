@@ -84,7 +84,7 @@ public:
         auto modelLoader = [&](const std::string& path, Assets::AssetHandle handle)
             -> std::shared_ptr<Graphics::Model>
         {
-            auto result = Graphics::ModelLoader::LoadAsync(GetDevice(), *m_TransferManager, path);
+            auto result = Graphics::ModelLoader::LoadAsync(GetDevice(), *m_TransferManager, m_GeometryStorage, path);
 
             if (result)
             {
@@ -186,7 +186,7 @@ public:
                     m_Scene.GetRegistry().emplace<ECS::Transform::Rotator>(entity, ECS::Transform::Rotator::Y());
 
                     auto& mr = m_Scene.GetRegistry().emplace<ECS::MeshRenderer::Component>(entity);
-                    mr.GeometryRef = meshSegment->GpuGeometry;
+                    mr.Geometry = meshSegment->Handle;
                     mr.MaterialRef = m_DuckMaterial;
 
                     auto& collider = m_Scene.GetRegistry().emplace<ECS::MeshCollider::Component>(entity);
@@ -348,13 +348,20 @@ public:
                 if (ImGui::CollapsingHeader("Mesh Renderer", ImGuiTreeNodeFlags_DefaultOpen))
                 {
                     auto& mr = reg.get<ECS::MeshRenderer::Component>(m_SelectedEntity);
-                    if (mr.GeometryRef)
+                    Graphics::GeometryGpuData* geo = nullptr;
+                    if (mr.Geometry.IsValid())
                     {
-                        ImGui::Text("Vertices: %lu", mr.GeometryRef->GetLayout().PositionsSize / sizeof(glm::vec3));
-                        ImGui::Text("Indices: %u", mr.GeometryRef->GetIndexCount());
+                        geo = GetGeometryStorage().Get(mr.Geometry);
+                    }
+
+                    if (geo)
+                    {
+                        // Note: Using size_t casts to match printf format or ImGui expectations
+                        ImGui::Text("Vertices: %lu", geo->GetLayout().PositionsSize / sizeof(glm::vec3));
+                        ImGui::Text("Indices: %u", geo->GetIndexCount());
 
                         std::string topoName = "Unknown";
-                        switch (mr.GeometryRef->GetTopology())
+                        switch (geo->GetTopology())
                         {
                         case Graphics::PrimitiveTopology::Triangles: topoName = "Triangles";
                             break;
@@ -364,6 +371,10 @@ public:
                             break;
                         }
                         ImGui::Text("Topology: %s", topoName.c_str());
+                    }
+                    else
+                    {
+                        ImGui::TextColored({0.8f, 0.2f, 0.2f, 1.0f}, "Invalid Geometry Handle");
                     }
                 }
             }

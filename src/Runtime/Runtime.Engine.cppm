@@ -56,6 +56,7 @@ export namespace Runtime
         ECS::Scene m_Scene;
         Core::Assets::AssetManager m_AssetManager;
         Core::Memory::LinearArena m_FrameArena; // 1 MB per frame
+        Graphics::GeometryStorage m_GeometryStorage;
         std::unique_ptr<Graphics::RenderSystem> m_RenderSystem;
 
         // Helper to access the camera buffer (Temporary until we have a Camera Component)
@@ -66,6 +67,7 @@ export namespace Runtime
         [[nodiscard]] RHI::DescriptorPool& GetDescriptorPool() const { return *m_DescriptorPool; }
         [[nodiscard]] RHI::DescriptorLayout& GetDescriptorLayout() const { return *m_DescriptorLayout; }
         [[nodiscard]] RHI::VulkanSwapchain& GetSwapchain() const { return *m_Swapchain; }
+        [[nodiscard]] Graphics::GeometryStorage& GetGeometryStorage() { return m_GeometryStorage; }
 
         void RegisterAssetLoad(Core::Assets::AssetHandle handle, RHI::TransferToken token);
         void RunOnMainThread(std::function<void()> task);
@@ -84,7 +86,6 @@ export namespace Runtime
 
         std::shared_ptr<RHI::Texture> m_DefaultTexture;
         std::vector<std::shared_ptr<Graphics::Material>> m_LoadedMaterials;
-        std::vector<std::shared_ptr<Graphics::GeometryGpuData>> m_LoadedGeometries;
         std::unique_ptr<RHI::TransferManager> m_TransferManager;
 
         // Internal tracking struct (POD)
