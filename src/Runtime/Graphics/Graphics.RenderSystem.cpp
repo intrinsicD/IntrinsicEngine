@@ -1,5 +1,7 @@
 module;
 #include <cstring>
+#include <vector>
+#include <algorithm>
 #include <glm/glm.hpp>
 #include <entt/entt.hpp>
 #include "RHI/RHI.Vulkan.hpp"
@@ -33,13 +35,15 @@ namespace Runtime::Graphics
                                RHI::DescriptorPool& descriptorPool,
                                RHI::DescriptorLayout& descriptorLayout,
                                RHI::GraphicsPipeline& pipeline,
-                               Core::Memory::LinearArena& frameArena)
+                               Core::Memory::LinearArena& frameArena,
+                               GeometryStorage& geometryStorage)
         : m_Device(device),
           m_Swapchain(swapchain),
           m_Renderer(renderer),
           m_BindlessSystem(bindlessSystem),
           m_Pipeline(pipeline),
-          m_RenderGraph(device, frameArena)
+          m_RenderGraph(device, frameArena),
+          m_GeometryStorage(geometryStorage)
     {
         VkPhysicalDeviceProperties props;
         vkGetPhysicalDeviceProperties(device->GetPhysicalDevice(), &props);
@@ -93,6 +97,20 @@ namespace Runtime::Graphics
     {
         Graph::RGResourceHandle Color;
         Graph::RGResourceHandle Depth;
+    };
+
+    struct RenderPacket
+    {
+        GeometryHandle GeoHandle;
+        uint32_t TextureID;
+        glm::mat4 Transform;
+
+        // Comparison for sorting
+        bool operator<(const RenderPacket& other) const
+        {
+            if (GeoHandle != other.GeoHandle) return GeoHandle < other.GeoHandle;
+            return TextureID < other.TextureID;
+        }
     };
 
     void RenderSystem::OnUpdate(ECS::Scene& scene, const CameraComponent& camera)
@@ -163,7 +181,6 @@ namespace Runtime::Graphics
                                                        m_Renderer.BindPipeline(m_Pipeline);
                                                        m_Renderer.SetViewport(extent.width, extent.height);
 
-
                                                        // 1. Bind Set 0: Global Camera (Dynamic Offset)
                                                        uint32_t dynamicOffset = static_cast<uint32_t>(offset);
                                                        vkCmdBindDescriptorSets(
@@ -183,64 +200,83 @@ namespace Runtime::Graphics
                                                        );
                                                        auto view = scene.GetRegistry().view<
                                                            ECS::Transform::Component, ECS::MeshRenderer::Component>();
+                                                       std::vector<RenderPacket> packets;
+                                                       packets.reserve(view.size_hint());
                                                        for (auto [entity, transform, renderable] : view.each())
                                                        {
-                                                           if (!renderable.GeometryRef || !renderable.MaterialRef)
+                                                           if (!renderable.Geometry.IsValid() ||
+                                                               !renderable.MaterialRef)
                                                                continue;
+                                                           packets.push_back({
+                                                               renderable.Geometry,
+                                                               renderable.MaterialRef->GetTextureIndex(),
+                                                               transform.GetTransform()
+                                                           });
+                                                       }
 
-                                                           RHI::MeshPushConstants push{};
-                                                           push.model = transform.GetTransform();
-                                                           push.textureID = renderable.MaterialRef->GetTextureIndex();
-                                                           // NEW
+                                                       // 2. Sort to minimize state changes (Batching)
+                                                       std::sort(packets.begin(), packets.end());
 
-                                                           vkCmdPushConstants(
-                                                               cmd, m_Pipeline.GetLayout(),
-                                                               VK_SHADER_STAGE_VERTEX_BIT |
-                                                               VK_SHADER_STAGE_FRAGMENT_BIT,
-                                                               0, sizeof(push), &push);
+                                                       // 3. Draw Loop
+                                                       GeometryHandle currentGeoHandle = {};
+                                                       GeometryGpuData* currentGeo = nullptr;
 
-
-                                                           auto* geo = renderable.GeometryRef.get();
-                                                           auto* vBuf = geo->GetVertexBuffer()->GetHandle();
-                                                           const auto& layout = geo->GetLayout();
-
-                                                           VkBuffer vBuffers[] = {
-                                                               vBuf, vBuf, vBuf
-                                                           };
-                                                           VkDeviceSize offsets[] = {
-                                                               layout.PositionsOffset,
-                                                               layout.NormalsOffset,
-                                                               layout.AuxOffset
-                                                           };
-                                                           vkCmdBindVertexBuffers(cmd, 0, 3, vBuffers, offsets);
-
-                                                           VkPrimitiveTopology vkTopo =
-                                                               VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-                                                           switch (geo->GetTopology())
+                                                       for (const auto& packet : packets)
+                                                       {
+                                                           // Resolve Geometry only when it changes
+                                                           if (packet.GeoHandle != currentGeoHandle)
                                                            {
-                                                           case PrimitiveTopology::Lines: vkTopo =
-                                                                   VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
-                                                               break;
-                                                           case PrimitiveTopology::Points: vkTopo =
-                                                                   VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
-                                                               break;
-                                                           default: break;
+                                                               currentGeo = m_GeometryStorage.Get(packet.GeoHandle);
+                                                               currentGeoHandle = packet.GeoHandle;
+
+                                                               if (!currentGeo) continue; // Invalid handle?
+
+                                                               // Bind Vertex Buffers
+                                                               auto* vBuf = currentGeo->GetVertexBuffer()->GetHandle();
+                                                               const auto& layout = currentGeo->GetLayout();
+                                                               VkBuffer vBuffers[] = {vBuf, vBuf, vBuf};
+                                                               VkDeviceSize offsets[] = {
+                                                                   layout.PositionsOffset, layout.NormalsOffset,
+                                                                   layout.AuxOffset
+                                                               };
+                                                               vkCmdBindVertexBuffers(cmd, 0, 3, vBuffers, offsets);
+
+                                                               // Bind Index Buffer
+                                                               if (currentGeo->GetIndexCount() > 0)
+                                                               {
+                                                                   vkCmdBindIndexBuffer(
+                                                                       cmd, currentGeo->GetIndexBuffer()->GetHandle(),
+                                                                       0, VK_INDEX_TYPE_UINT32);
+                                                               }
+
+                                                               // Set Topology
+                                                               // (If topology varies per mesh, set it here. If mostly triangles, optimize)
+                                                               // vkCmdSetPrimitiveTopology(cmd, ...);
                                                            }
-                                                           vkCmdSetPrimitiveTopology(cmd, vkTopo);
 
-                                                           if (geo->GetIndexCount() > 0)
+                                                           if (!currentGeo) continue;
+
+                                                           // Push Constants (Per Object)
+                                                           RHI::MeshPushConstants push{};
+                                                           push.model = packet.Transform;
+                                                           push.textureID = packet.TextureID;
+
+                                                           vkCmdPushConstants(cmd, m_Pipeline.GetLayout(),
+                                                                              VK_SHADER_STAGE_VERTEX_BIT |
+                                                                              VK_SHADER_STAGE_FRAGMENT_BIT,
+                                                                              0, sizeof(push), &push);
+
+                                                           // Issue Draw
+                                                           if (currentGeo->GetIndexCount() > 0)
                                                            {
-                                                               vkCmdBindIndexBuffer(
-                                                                   cmd, geo->GetIndexBuffer()->GetHandle(), 0,
-                                                                   VK_INDEX_TYPE_UINT32);
-                                                               vkCmdDrawIndexed(cmd, geo->GetIndexCount(), 1, 0, 0, 0);
+                                                               vkCmdDrawIndexed(
+                                                                   cmd, currentGeo->GetIndexCount(), 1, 0, 0, 0);
                                                            }
                                                            else
                                                            {
-                                                               // Point cloud support (non-indexed)
-                                                               // Assume vertex count is positions size / stride
-                                                               uint32_t vertCount = static_cast<uint32_t>(layout.
-                                                                   PositionsSize / sizeof(glm::vec3));
+                                                               // Point Cloud
+                                                               uint32_t vertCount = static_cast<uint32_t>(currentGeo->
+                                                                   GetLayout().PositionsSize / sizeof(glm::vec3));
                                                                vkCmdDraw(cmd, vertCount, 1, 0, 0);
                                                            }
                                                        }
@@ -254,9 +290,11 @@ namespace Runtime::Graphics
                                                      colorInfo.LoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
                                                      colorInfo.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
 
-                                                     data.Backbuffer = builder.WriteColor(backbufferHandle, colorInfo);
+                                                     data.Backbuffer = builder.WriteColor(
+                                                         backbufferHandle, colorInfo);
                                                  },
-                                                 [](const ImGuiPassData&, const Graph::RGRegistry&, VkCommandBuffer cmd)
+                                                 [](const ImGuiPassData&, const Graph::RGRegistry&,
+                                                    VkCommandBuffer cmd)
                                                  {
                                                      Interface::GUI::Render(cmd);
                                                  }

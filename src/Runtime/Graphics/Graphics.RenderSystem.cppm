@@ -31,7 +31,8 @@ export namespace Runtime::Graphics
                      RHI::DescriptorPool& descriptorPool,
                      RHI::DescriptorLayout& descriptorLayout,
                      RHI::GraphicsPipeline& pipeline,
-                     Core::Memory::LinearArena& frameArena);
+                     Core::Memory::LinearArena& frameArena,
+                     GeometryStorage& geometryStorage);
         ~RenderSystem();
 
         void OnUpdate(ECS::Scene& scene, const CameraComponent& camera);
@@ -53,5 +54,6 @@ export namespace Runtime::Graphics
 
         // RenderGraph
         Graph::RenderGraph m_RenderGraph;
+        GeometryStorage& m_GeometryStorage;
     };
 }

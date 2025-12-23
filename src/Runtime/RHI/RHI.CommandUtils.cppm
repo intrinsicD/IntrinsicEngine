@@ -24,10 +24,20 @@ export namespace Runtime::RHI::CommandUtils
 
     [[nodiscard]] VkCommandBuffer BeginSingleTimeCommands(VulkanDevice& device) {
         ThreadRenderContext& ctx = GetThreadContext();
+
+        // Safety Check: Handle Engine Restart / Device Change
+        // If the device instance changed (e.g. Engine restart), the old pool handle
+        // in this thread_local storage is invalid (destroyed by the previous device).
+        if (ctx.Owner != &device) {
+            ctx.CommandPool = VK_NULL_HANDLE;
+            ctx.Owner = nullptr;
+        }
+
         if (ctx.CommandPool == VK_NULL_HANDLE) {
             VkCommandPoolCreateInfo poolInfo{};
             poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-            poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+
+            poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
             poolInfo.queueFamilyIndex = device.GetQueueIndices().GraphicsFamily.value();
             vkCreateCommandPool(device.GetLogicalDevice(), &poolInfo, nullptr, &ctx.CommandPool);
             ctx.Owner = &device;

@@ -60,7 +60,7 @@ export namespace Runtime::ECS::MeshRenderer
 {
     struct Component
     {
-        std::shared_ptr<Graphics::GeometryGpuData> GeometryRef; // Renamed from MeshRef
+        Graphics::GeometryHandle Geometry;
         std::shared_ptr<Graphics::Material> MaterialRef;
     };
 }

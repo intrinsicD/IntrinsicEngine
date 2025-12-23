@@ -4,6 +4,7 @@ module;
 #include <span>
 #include <memory>
 #include <utility>
+#include <queue>
 #include <glm/glm.hpp>
 #include <RHI/RHI.Vulkan.hpp>
 
@@ -104,5 +105,77 @@ export namespace Runtime::Graphics
 
         GeometryBufferLayout m_Layout{};
         uint32_t m_IndexCount = 0;
+    };
+
+    struct GeometryHandle
+    {
+        uint32_t Index = std::numeric_limits<uint32_t>::max();
+        uint32_t Generation = 0;
+
+        auto operator<=>(const GeometryHandle&) const = default;
+        [[nodiscard]] bool IsValid() const { return Index != std::numeric_limits<uint32_t>::max(); }
+    };
+
+    class GeometryStorage
+    {
+    public:
+        // Adds ownership of the GPU data to the system and returns a handle
+        GeometryHandle Add(std::unique_ptr<GeometryGpuData> data)
+        {
+            uint32_t index;
+            if (!m_FreeIndices.empty())
+            {
+                index = m_FreeIndices.front();
+                m_FreeIndices.pop_front();
+            }
+            else
+            {
+                index = static_cast<uint32_t>(m_Slots.size());
+                m_Slots.emplace_back();
+            }
+
+            Slot& slot = m_Slots[index];
+            slot.Data = std::move(data);
+            slot.Generation++; // Bump generation on allocation
+            slot.IsActive = true;
+
+            return {index, slot.Generation};
+        }
+
+        void Remove(GeometryHandle handle)
+        {
+            if (handle.Index >= m_Slots.size()) return;
+
+            Slot& slot = m_Slots[handle.Index];
+            if (slot.IsActive && slot.Generation == handle.Generation)
+            {
+                slot.Data.reset();
+                slot.IsActive = false;
+                m_FreeIndices.push_back(handle.Index);
+            }
+        }
+
+        [[nodiscard]] GeometryGpuData* Get(GeometryHandle handle)
+        {
+            if (handle.Index >= m_Slots.size()) return nullptr;
+
+            Slot& slot = m_Slots[handle.Index];
+            if (slot.IsActive && slot.Generation == handle.Generation)
+            {
+                return slot.Data.get();
+            }
+            return nullptr;
+        }
+
+    private:
+        struct Slot
+        {
+            std::unique_ptr<GeometryGpuData> Data;
+            uint32_t Generation = 0;
+            bool IsActive = false;
+        };
+
+        std::vector<Slot> m_Slots;
+        std::deque<uint32_t> m_FreeIndices;
     };
 }

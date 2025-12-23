@@ -9,6 +9,10 @@ module;
 #include <utility>
 #include <cstdint>
 #include <span>
+#include <cmath>
+#include <vector>
+#include <string>
+#include <iostream>
 #include <glm/glm.hpp>
 
 export module Runtime.Geometry.Octree;
@@ -42,19 +46,25 @@ export namespace Runtime::Geometry
     class Octree
     {
     public:
+        using NodeIndex = std::uint32_t;
+        using ElementIndex = std::uint32_t;
+        static constexpr NodeIndex kInvalidIndex = std::numeric_limits<NodeIndex>::max();
+
         struct Node
         {
             AABB Aabb;
-            std::size_t FirstElement = std::numeric_limits<size_t>::max();
-            std::size_t NumStraddlers = 0; // number of elements that straddle child node boundaries
-            std::size_t NumElements = 0;
+            std::array<NodeIndex, 8> Children{};
+
+            ElementIndex FirstElement = std::numeric_limits<ElementIndex>::max();
+            std::uint32_t NumElements = 0;
+            std::uint32_t NumStraddlers = 0; // number of elements that straddle child node boundaries
             // total number of elements in this node (including straddlers).Necessary for early out in queries
-            std::array<size_t, 8> Children{};
+
             bool IsLeaf = true;
 
             Node()
             {
-                Children.fill(NodeHandle().Index);
+                Children.fill(kInvalidIndex);
             }
 
             friend std::ostream& operator<<(std::ostream& stream, const Node&)
@@ -73,15 +83,16 @@ export namespace Runtime::Geometry
             float Epsilon = 0.0f; // optional padding when tightening
         };
 
+        std::vector<Node> m_Nodes;
         Nodes NodeProperties;
-        NodeProperty<Node> Nodes;
 
         std::span<const AABB> ElementAabbs;
 
         template <class T>
-        [[nodiscard]] NodeProperty<T> AddNodeProperty(const std::string& name, T default_value = T())
+        [[nodiscard]] NodeProperty<T> AddNodeProperty(const std::string& name, T defaultValue = T())
         {
-            return NodeProperty<T>(NodeProperties.Add<T>(name, default_value));
+            if (NodeProperties.Size() != m_Nodes.size()) NodeProperties.Resize(m_Nodes.size());
+            return NodeProperty<T>(NodeProperties.Add<T>(name, defaultValue));
         }
 
         template <class T>
@@ -91,9 +102,9 @@ export namespace Runtime::Geometry
         }
 
         template <class T>
-        [[nodiscard]] NodeProperty<T> GetOrAddNodeProperty(const std::string& name, T default_value = T())
+        [[nodiscard]] NodeProperty<T> GetOrAddNodeProperty(const std::string& name, T defaultValue = T())
         {
-            return NodeProperty<T>(NodeProperties.GetOrAdd<T>(name, default_value));
+            return NodeProperty<T>(NodeProperties.GetOrAdd<T>(name, defaultValue));
         }
 
         template <class T>
@@ -120,7 +131,7 @@ export namespace Runtime::Geometry
             return m_SplitPolicy;
         }
 
-        [[nodiscard]] const std::vector<size_t>& GetElementIndices() const noexcept
+        [[nodiscard]] const std::vector<ElementIndex>& GetElementIndices() const noexcept
         {
             return m_ElementIndices;
         }
@@ -139,66 +150,63 @@ export namespace Runtime::Geometry
             m_MaxElementsPerNode = maxPerNode;
             m_MaxBvhDepth = maxDepth;
 
+            m_Nodes.clear();
+            m_Nodes.reserve(aabbs.size() / 4);
             NodeProperties.Clear(); // Clear previous state
-            const std::size_t num_elements = ElementAabbs.size();
 
-            if (num_elements == 0)
-            {
-                m_ElementIndices.clear();
-                return false;
-            }
-
-            m_ElementIndices.resize(num_elements);
+            const std::size_t numElements = ElementAabbs.size();
+            m_ElementIndices.resize(numElements);
             std::iota(m_ElementIndices.begin(), m_ElementIndices.end(), 0);
 
-            Nodes = AddNodeProperty<Node>("n:nodes");
-
             // Create root node
-            const auto root_idx = CreateNode();
-            Nodes[root_idx].FirstElement = 0;
-            Nodes[root_idx].NumElements = num_elements;
-            Nodes[root_idx].Aabb = Union(ElementAabbs);
+            m_Nodes.emplace_back();
+            m_Nodes[0].FirstElement = 0;
+            m_Nodes[0].NumElements = static_cast<uint32_t>(numElements);
+            m_Nodes[0].Aabb = Union(ElementAabbs);
 
             std::vector<size_t> localScratch;
             localScratch.reserve(m_ElementIndices.size());
-            SubdivideVolume(root_idx, 0, localScratch);
+            SubdivideVolume(0, 0, localScratch);
+
+            NodeProperties.Resize(m_Nodes.size());
+
             return true;
         }
 
-        void QueryRay(const Ray& query_shape, std::vector<size_t>& result) const
+        void QueryRay(const Ray& queryShape, std::vector<size_t>& result) const
         {
-            Query<Ray>(query_shape, result);
+            Query<Ray>(queryShape, result);
         }
 
-        void QueryAABB(const AABB& query_shape, std::vector<size_t>& out) const
+        void QueryAABB(const AABB& queryShape, std::vector<size_t>& out) const
         {
-            Query<AABB>(query_shape, out);
+            Query<AABB>(queryShape, out);
         }
 
-        void QuerySphere(const Sphere& query_shape, std::vector<size_t>& out) const
+        void QuerySphere(const Sphere& queryShape, std::vector<size_t>& out) const
         {
-            Query<Sphere>(query_shape, out);
+            Query<Sphere>(queryShape, out);
         }
 
         template <VolumetricSpatialQueryShape Shape>
-        void Query(const Shape& query_shape, std::vector<size_t>& result) const
+        void Query(const Shape& queryShape, std::vector<size_t>& result) const
         {
             result.clear();
-            if (NodeProperties.Empty())
+            if (m_Nodes.empty())
             {
                 return;
             }
 
-            const auto& nodeData = Nodes.Handle().Vector();
+            const auto& nodeData = m_Nodes;
             const Node* nodePtr = nodeData.data(); // Raw pointer for speed
 
             constexpr double eps = 0.0; // set to a small positive tolerance if you want numerical slack
-            const auto query_volume = static_cast<double>(Volume(query_shape));
+            const auto queryVolume = static_cast<double>(Volume(queryShape));
 
             // Use a small local stack to avoid heap allocation for the stack itself if possible,
             // though std::vector is fine given the depth is low (10).
             // Optimization: Use a fixed array stack since MaxDepth is known/limited.
-            std::array<size_t, 64> stack{};
+            std::array<NodeIndex, 64> stack{};
             // Depth 10 * 8 children < 64? No, but stack depth is roughly depth*7 in worst case?
             // Actually for DFS, stack size is proportional to Depth. 64 is plenty for depth 10.
             int stackTop = 0;
@@ -206,15 +214,15 @@ export namespace Runtime::Geometry
 
             while (stackTop > 0)
             {
-                const size_t node_idx = stack[--stackTop];
-                const Node& node = nodePtr[node_idx];
+                const size_t nodeIdx = stack[--stackTop];
+                const Node& node = nodePtr[nodeIdx];
 
-                if (!TestOverlap(node.Aabb, query_shape)) continue;
+                if (!TestOverlap(node.Aabb, queryShape)) continue;
 
-                const double node_volume = node.Aabb.GetVolume();
-                const double strictly_larger = (query_volume > node_volume + eps);
+                const double nodeVolume = node.Aabb.GetVolume();
+                const double strictlyLarger = (queryVolume > nodeVolume + eps);
 
-                if (strictly_larger && Contains(query_shape, node.Aabb))
+                if (strictlyLarger && Contains(queryShape, node.Aabb))
                 {
                     // Optimization: Batch copy
                     const size_t end = node.FirstElement + node.NumElements;
@@ -230,7 +238,7 @@ export namespace Runtime::Geometry
                 for (size_t i = node.FirstElement; i < elemEnd; ++i)
                 {
                     size_t ei = m_ElementIndices[i];
-                    if (TestOverlap(ElementAabbs[ei], query_shape))
+                    if (TestOverlap(ElementAabbs[ei], queryShape))
                     {
                         result.push_back(ei);
                     }
@@ -238,17 +246,17 @@ export namespace Runtime::Geometry
 
                 if (!node.IsLeaf)
                 {
-                    for (const auto ci : node.Children)
+                    for (const auto childIndex : node.Children)
                     {
                         // Check validity via index directly
-                        if (ci != kInvalidIndex)
+                        if (childIndex != kInvalidIndex)
                         {
                             // Optimization: Check Child AABB here before pushing to stack?
                             // The original code pushed then checked.
                             // Checking here saves a stack push/pop cycle.
-                            if (TestOverlap(nodePtr[ci].Aabb, query_shape))
+                            if (TestOverlap(nodePtr[childIndex].Aabb, queryShape))
                             {
-                                stack[stackTop++] = ci;
+                                stack[stackTop++] = childIndex;
                             }
                         }
                     }
@@ -257,30 +265,32 @@ export namespace Runtime::Geometry
         }
 
         template <SpatialQueryShape Shape>
-        void Query(const Shape& query_shape, std::vector<size_t>& result) const
+        void Query(const Shape& queryShape, std::vector<size_t>& result) const
             requires (!VolumetricSpatialQueryShape<Shape>)
         {
             result.clear();
-            if (NodeProperties.Empty())
-            {
-                return;
-            }
+            if (m_Nodes.empty()) return;
 
-            std::vector<NodeHandle> stack{NodeHandle{0}};
-            while (!stack.empty())
-            {
-                const NodeHandle node_idx = stack.back();
-                stack.pop_back();
-                const Node& node = Nodes[node_idx];
+            const Node* nodePtr = m_Nodes.data();
 
-                if (!TestOverlap(node.Aabb, query_shape)) continue;
+            // OPTIMIZATION: Use std::array stack here too for performance consistency
+            std::array<NodeIndex, 64> stack{};
+            int stackTop = 0;
+            stack[stackTop++] = 0;
+
+            while (stackTop > 0)
+            {
+                const NodeIndex nodeIdx = stack[--stackTop];
+                const Node& node = nodePtr[nodeIdx];
+
+                if (!TestOverlap(node.Aabb, queryShape)) continue;
 
                 if (node.IsLeaf)
                 {
                     for (size_t i = 0; i < node.NumElements; ++i)
                     {
                         std::size_t ei = m_ElementIndices[node.FirstElement + i];
-                        if (TestOverlap(ElementAabbs[ei], query_shape))
+                        if (TestOverlap(ElementAabbs[ei], queryShape))
                         {
                             result.push_back(ei);
                         }
@@ -291,24 +301,23 @@ export namespace Runtime::Geometry
                     for (size_t i = 0; i < node.NumStraddlers; ++i)
                     {
                         std::size_t ei = m_ElementIndices[node.FirstElement + i];
-                        if (TestOverlap(ElementAabbs[ei], query_shape))
+                        if (TestOverlap(ElementAabbs[ei], queryShape))
                         {
                             result.push_back(ei);
                         }
                     }
-                    for (const auto ci : node.Children)
+                    for (const auto childIndex : node.Children)
                     {
-                        auto nhci = NodeHandle(ci);
-                        if (nhci.IsValid() && TestOverlap(Nodes[nhci].Aabb, query_shape))
+                        if (TestOverlap(m_Nodes[childIndex].Aabb, queryShape))
                         {
-                            stack.push_back(nhci);
+                            stack[stackTop++] = childIndex;
                         }
                     }
                 }
             }
         }
 
-        void QueryKnn(const glm::vec3& query_point, std::size_t k, std::vector<size_t>& results) const
+        void QueryKnn(const glm::vec3& queryPoint, std::size_t k, std::vector<size_t>& results) const
         {
             results.clear();
             if (NodeProperties.Empty() || k == 0)
@@ -319,46 +328,46 @@ export namespace Runtime::Geometry
             using QueueElement = std::pair<float, std::size_t>;
             Utils::BoundedHeap<QueueElement> heap(k);
 
-            using Trav = std::pair<float, NodeHandle>; // (node lower-bound d2, node index)
+            using Trav = std::pair<float, NodeIndex>; // (node lower-bound d2, node index)
             std::priority_queue<Trav, std::vector<Trav>, std::greater<>> pq;
 
-            constexpr NodeHandle root(0);
-            auto d2_node = [&](NodeHandle ni)
+            constexpr NodeIndex rootIndex(0);
+            auto d2Node = [&](NodeIndex nodeIndex)
             {
-                return static_cast<float>(SquaredDistance(Nodes[ni].Aabb, query_point));
+                return static_cast<float>(SquaredDistance(m_Nodes[nodeIndex].Aabb, queryPoint));
             };
-            auto d2_elem = [&](size_t ei)
+            auto d2Elem = [&](size_t ei)
             {
-                return static_cast<float>(SquaredDistance(ElementAabbs[ei], query_point));
+                return static_cast<float>(SquaredDistance(ElementAabbs[ei], queryPoint));
             };
 
-            pq.emplace(d2_node(root), root);
+            pq.emplace(d2Node(rootIndex), rootIndex);
             float tau = std::numeric_limits<float>::infinity();
-            auto update_tau = [&]()
+            auto UpdateTau = [&]()
             {
                 tau = (heap.Size() == k) ? heap.top().first : std::numeric_limits<float>::infinity();
             };
 
             while (!pq.empty())
             {
-                auto [nd2, ni] = pq.top();
+                auto [nd2, nodeIndex] = pq.top();
                 pq.pop();
 
                 // Global prune: the best remaining node is already worse than our kth best.
                 if (heap.Size() == k && nd2 > tau) break;
 
-                const Node& node = Nodes[ni];
+                const Node& node = m_Nodes[nodeIndex];
 
                 if (node.IsLeaf)
                 {
                     for (size_t i = 0; i < node.NumElements; ++i)
                     {
                         const std::size_t ei = m_ElementIndices[node.FirstElement + i];
-                        const QueueElement candidate{d2_elem(ei), ei};
+                        const QueueElement candidate{d2Elem(ei), ei};
                         if (heap.Size() < k || candidate < heap.top())
                         {
                             heap.Push(candidate);
-                            update_tau();
+                            UpdateTau();
                         }
                     }
                 }
@@ -368,20 +377,19 @@ export namespace Runtime::Geometry
                     for (size_t i = 0; i < node.NumStraddlers; ++i)
                     {
                         const std::size_t ei = m_ElementIndices[node.FirstElement + i];
-                        const QueueElement candidate{d2_elem(ei), ei};
+                        const QueueElement candidate{d2Elem(ei), ei};
                         if (heap.Size() < k || candidate < heap.top())
                         {
                             heap.Push(candidate);
-                            update_tau();
+                            UpdateTau();
                         }
                     }
                     // Push children best-first, pruned by current tau
-                    for (const auto ci : node.Children)
+                    for (const auto childIndex : node.Children)
                     {
-                        const auto nhci = NodeHandle(ci);
-                        if (!nhci.IsValid()) continue;
-                        const float cd2 = d2_node(nhci);
-                        if (cd2 <= tau) pq.emplace(cd2, ci);
+                        if (childIndex == kInvalidIndex) continue;
+                        const float cd2 = d2Node(childIndex);
+                        if (cd2 <= tau) pq.emplace(cd2, childIndex);
                     }
                 }
             }
@@ -394,7 +402,7 @@ export namespace Runtime::Geometry
             }
         }
 
-        void QueryNearest(const glm::vec3& query_point, std::size_t& result) const
+        void QueryNearest(const glm::vec3& queryPoint, std::size_t& result) const
         {
             result = std::numeric_limits<size_t>::max();
             if (NodeProperties.Empty())
@@ -402,28 +410,28 @@ export namespace Runtime::Geometry
                 return;
             }
 
-            double min_dist_sq = std::numeric_limits<double>::max();
+            double minDistSq = std::numeric_limits<double>::max();
 
-            using TraversalElement = std::pair<float, NodeHandle>;
+            using TraversalElement = std::pair<float, NodeIndex>;
             std::priority_queue<TraversalElement, std::vector<TraversalElement>, std::greater<>> pq;
 
-            constexpr auto root_idx = NodeHandle(0);
-            const double root_dist_sq = SquaredDistance(
-                Nodes[root_idx].Aabb, query_point);
-            pq.emplace(root_dist_sq, root_idx);
+            constexpr NodeIndex rootIndex = 0;
+            const double rootDistSq = SquaredDistance(
+                m_Nodes[rootIndex].Aabb, queryPoint);
+            pq.emplace(rootDistSq, rootIndex);
 
             while (!pq.empty())
             {
-                const float node_dist_sq = pq.top().first;
-                const NodeHandle node_idx = pq.top().second;
+                const float nodeDistSq = pq.top().first;
+                const NodeIndex nodeIdx = pq.top().second;
                 pq.pop();
 
-                if (node_dist_sq >= min_dist_sq)
+                if (nodeDistSq >= minDistSq)
                 {
                     break;
                 }
 
-                const Node& node = Nodes[node_idx];
+                const Node& node = m_Nodes[nodeIdx];
 
                 if (node.IsLeaf)
                 {
@@ -431,14 +439,14 @@ export namespace Runtime::Geometry
                     for (size_t i = 0; i < node.NumElements; ++i)
                     {
                         assert(node.FirstElement + i < m_ElementIndices.size());
-                        const std::size_t elem_idx = m_ElementIndices[node.FirstElement + i];
-                        assert(elem_idx < ElementAabbs.size());
-                        const double elem_dist_sq = SquaredDistance(ElementAabbs[elem_idx], query_point);
+                        const std::size_t elemIdx = m_ElementIndices[node.FirstElement + i];
+                        assert(elemIdx < ElementAabbs.size());
+                        const double elemDistSq = SquaredDistance(ElementAabbs[elemIdx], queryPoint);
 
-                        if (elem_dist_sq < min_dist_sq)
+                        if (elemDistSq < minDistSq)
                         {
-                            min_dist_sq = elem_dist_sq;
-                            result = elem_idx;
+                            minDistSq = elemDistSq;
+                            result = elemIdx;
                         }
                     }
                 }
@@ -447,26 +455,25 @@ export namespace Runtime::Geometry
                     for (size_t i = 0; i < node.NumStraddlers; ++i)
                     {
                         assert(node.FirstElement + i < m_ElementIndices.size());
-                        const std::size_t elem_idx = m_ElementIndices[node.FirstElement + i];
-                        assert(elem_idx < ElementAabbs.size());
-                        const double elem_dist_sq = SquaredDistance(ElementAabbs[elem_idx], query_point);
+                        const std::size_t elemIdx = m_ElementIndices[node.FirstElement + i];
+                        assert(elemIdx < ElementAabbs.size());
+                        const double elemDistSq = SquaredDistance(ElementAabbs[elemIdx], queryPoint);
 
-                        if (elem_dist_sq < min_dist_sq)
+                        if (elemDistSq < minDistSq)
                         {
-                            min_dist_sq = elem_dist_sq;
-                            result = elem_idx;
+                            minDistSq = elemDistSq;
+                            result = elemIdx;
                         }
                     }
                     // This is an internal node, so traverse to its children.
-                    for (const auto child_idx : node.Children)
+                    for (const auto childIndex : node.Children)
                     {
-                        const auto nhci = NodeHandle(child_idx);
-                        if (nhci.IsValid())
+                        if (childIndex != kInvalidIndex)
                         {
-                            const double child_dist_sq = SquaredDistance(Nodes[nhci].Aabb, query_point);
-                            if (child_dist_sq < min_dist_sq)
+                            const double childDistSq = SquaredDistance(m_Nodes[childIndex].Aabb, queryPoint);
+                            if (childDistSq < minDistSq)
                             {
-                                pq.emplace(child_dist_sq, child_idx);
+                                pq.emplace(childDistSq, childIndex);
                             }
                         }
                     }
@@ -477,13 +484,13 @@ export namespace Runtime::Geometry
         [[nodiscard]] bool ValidateStructure() const
         {
             if (NodeProperties.Empty()) return m_ElementIndices.empty();
-            return ValidateNode(NodeHandle{0});
+            return ValidateNode(0);
         }
 
     private:
-        [[nodiscard]] bool ValidateNode(NodeHandle node_idx) const
+        [[nodiscard]] bool ValidateNode(NodeIndex nodeIdx) const
         {
-            const Node& node = Nodes[node_idx];
+            const Node& node = m_Nodes[nodeIdx];
             if (node.FirstElement > m_ElementIndices.size()) return false;
             if (node.FirstElement + node.NumElements > m_ElementIndices.size()) return false;
 
@@ -493,113 +500,114 @@ export namespace Runtime::Geometry
             }
 
             std::size_t accumulated = node.FirstElement + node.NumStraddlers;
-            std::size_t child_total = 0;
-            for (const auto ci : node.Children)
+            std::size_t childTotal = 0;
+            for (const auto childIndex : node.Children)
             {
-                const auto nhci = NodeHandle(ci);
-                if (!nhci.IsValid()) continue;
+                if (childIndex == kInvalidIndex) continue;
 
-                const Node& child = Nodes[nhci];
+                const Node& child = m_Nodes[childIndex];
                 if (child.FirstElement != accumulated) return false;
                 if (child.NumElements == 0) return false;
                 if (child.FirstElement + child.NumElements > node.FirstElement + node.NumElements) return false;
-                if (!ValidateNode(nhci)) return false;
+                if (!ValidateNode(childIndex)) return false;
 
                 accumulated += child.NumElements;
-                child_total += child.NumElements;
+                childTotal += child.NumElements;
             }
 
             return accumulated == node.FirstElement + node.NumElements &&
-                child_total + node.NumStraddlers == node.NumElements;
+                childTotal + node.NumStraddlers == node.NumElements;
         }
 
-        NodeHandle CreateNode()
+        NodeIndex CreateNode()
         {
-            size_t node_idx = NodeProperties.Size();
-            NodeProperties.PushBack();
-            return NodeHandle(node_idx);
+            const auto idx = static_cast<NodeIndex>(m_Nodes.size());
+            m_Nodes.emplace_back();
+            return idx;
         }
 
-        void SubdivideVolume(const NodeHandle node_idx, std::size_t depth, std::vector<size_t>& scratch)
+        void SubdivideVolume(const NodeIndex nodeIdx, std::size_t depth, std::vector<size_t>& scratch)
         {
-            const Node& node = Nodes[node_idx]; // We'll be modifying the node
+            AABB nodeAabb = m_Nodes[nodeIdx].Aabb;
+            uint32_t firstElement = m_Nodes[nodeIdx].FirstElement;
+            uint32_t numElements = m_Nodes[nodeIdx].NumElements;
 
-            if (depth >= m_MaxBvhDepth || node.NumElements <= m_MaxElementsPerNode)
+            if (depth >= m_MaxBvhDepth || numElements <= m_MaxElementsPerNode)
             {
-                Nodes[node_idx].IsLeaf = true;
+                m_Nodes[nodeIdx].IsLeaf = true;
                 return;
             }
 
-            glm::vec3 sp = ChooseSplitPoint(node_idx);
+            glm::vec3 sp = ChooseSplitPoint(nodeIdx);
 
             //Jitter/tighten the split point when it hits data
             for (int ax = 0; ax < 3; ++ax)
             {
-                const float lo = node.Aabb.Min[ax], hi = node.Aabb.Max[ax];
+                const float lo = nodeAabb.Min[ax], hi = nodeAabb.Max[ax];
                 float& s = sp[ax];
                 if (s <= lo || s >= hi) s = 0.5f * (lo + hi);
                 if (s == lo) s = std::nextafter(s, hi);
                 else if (s == hi) s = std::nextafter(s, lo);
             }
 
-            std::array<AABB, 8> octant_aabbs;
+            std::array<AABB, 8> octantAabbs;
             for (int j = 0; j < 8; ++j)
             {
-                glm::vec3 child_min = {
-                    (j & 1) ? sp[0] : node.Aabb.Min[0], (j & 2) ? sp[1] : node.Aabb.Min[1],
-                    (j & 4) ? sp[2] : node.Aabb.Min[2]
+                glm::vec3 childMin = {
+                    (j & 1) ? sp[0] : nodeAabb.Min[0], (j & 2) ? sp[1] : nodeAabb.Min[1],
+                    (j & 4) ? sp[2] : nodeAabb.Min[2]
                 };
-                glm::vec3 child_max = {
-                    (j & 1) ? node.Aabb.Max[0] : sp[0], (j & 2) ? node.Aabb.Max[1] : sp[1],
-                    (j & 4) ? node.Aabb.Max[2] : sp[2]
+                glm::vec3 childMax = {
+                    (j & 1) ? nodeAabb.Max[0] : sp[0], (j & 2) ? nodeAabb.Max[1] : sp[1],
+                    (j & 4) ? nodeAabb.Max[2] : sp[2]
                 };
-                octant_aabbs[j] = {.Min = child_min, .Max = child_max};
+                octantAabbs[j] = {.Min = childMin, .Max = childMax};
             }
 
-            std::array<std::vector<size_t>, 8> child_elements;
-            for(auto& vec : child_elements) vec.reserve(node.NumElements / 8);
+            std::array<std::vector<size_t>, 8> childElements;
+            for (auto& vec : childElements) vec.reserve(numElements / 8);
             scratch.clear();
-            scratch.reserve(node.NumElements);
+            scratch.reserve(numElements);
             auto& straddlers = scratch;
 
-            for (size_t i = 0; i < node.NumElements; ++i)
+            for (size_t i = 0; i < numElements; ++i)
             {
-                std::size_t elem_idx = m_ElementIndices[node.FirstElement + i];
-                const auto& elem_aabb = ElementAabbs[elem_idx];
-                int found_child = -1;
+                std::size_t elemIdx = m_ElementIndices[firstElement + i];
+                const auto& elemAabb = ElementAabbs[elemIdx];
+                int foundChild = -1;
 
-                if (elem_aabb.Min == elem_aabb.Max)
+                if (elemAabb.Min == elemAabb.Max)
                 {
-                    const glm::vec3& p = elem_aabb.Min;
+                    const glm::vec3& p = elemAabb.Min;
                     // Element is a point. Directly assign it to one of the octants.
                     int code = 0;
                     code |= (p[0] >= sp[0]) ? 1 : 0;
                     code |= (p[1] >= sp[1]) ? 2 : 0;
                     code |= (p[2] >= sp[2]) ? 4 : 0;
-                    child_elements[code].push_back(elem_idx);
+                    childElements[code].push_back(elemIdx);
                 }
                 else
                 {
                     for (int j = 0; j < 8; ++j)
                     {
-                        if (Contains(octant_aabbs[j], elem_aabb))
+                        if (Contains(octantAabbs[j], elemAabb))
                         {
-                            if (found_child == -1)
+                            if (foundChild == -1)
                             {
-                                found_child = j;
+                                foundChild = j;
                             }
                             else
                             {
                                 // The element is contained in more than one child box, which shouldn't happen with this logic.
                                 // Treat as a straddler just in case of floating point issues.
-                                found_child = -1;
+                                foundChild = -1;
                                 break;
                             }
                         }
                     }
-                    if (found_child != -1)
+                    if (foundChild != -1)
                     {
-                        child_elements[found_child].push_back(elem_idx);
+                        childElements[foundChild].push_back(elemIdx);
                     }
                     else
                     {
@@ -607,16 +615,16 @@ export namespace Runtime::Geometry
                         // otherwise keep as straddler to preserve correctness.
                         if (m_SplitPolicy.TightChildren)
                         {
-                            const glm::vec3 c = elem_aabb.GetCenter();
+                            const glm::vec3 c = elemAabb.GetCenter();
                             int code = 0;
                             code |= (c[0] >= sp[0]) ? 1 : 0;
                             code |= (c[1] >= sp[1]) ? 2 : 0;
                             code |= (c[2] >= sp[2]) ? 4 : 0;
-                            child_elements[code].push_back(elem_idx);
+                            childElements[code].push_back(elemIdx);
                         }
                         else
                         {
-                            straddlers.push_back(elem_idx);
+                            straddlers.push_back(elemIdx);
                         }
                     }
                 }
@@ -624,74 +632,74 @@ export namespace Runtime::Geometry
 
             // If we couldn't push a significant number of elements down, it's better to stop and make this a leaf.
             // This prevents creating child nodes with very few elements.
-            if (straddlers.size() == node.NumElements)
+            if (straddlers.size() == numElements)
             {
-                Nodes[node_idx].IsLeaf = true;
+                m_Nodes[nodeIdx].IsLeaf = true;
                 return;
             }
 
             // This node is now an internal node. It stores nothing itself.
             // Re-arrange the element_indices array.
-            std::size_t current_pos = node.FirstElement;
+            std::size_t currentPos = firstElement;
             // First, place all the straddlers
             for (size_t idx : straddlers)
             {
-                m_ElementIndices[current_pos++] = idx;
+                m_ElementIndices[currentPos++] = idx;
             }
             // Then, place the elements for each child sequentially
-            std::array<size_t, 8> child_starts{};
+            std::array<size_t, 8> childStarts{};
             for (int i = 0; i < 8; ++i)
             {
-                child_starts[i] = current_pos;
-                for (size_t idx : child_elements[i])
+                childStarts[i] = currentPos;
+                for (size_t idx : childElements[i])
                 {
-                    m_ElementIndices[current_pos++] = idx;
+                    m_ElementIndices[currentPos++] = idx;
                 }
             }
 
             // --- This node is now officially an internal node ---
-            // Its 'first_element' points to the start of the straddlers
-            // Its 'num_straddlers' counts how many straddlers there are
-            // Its 'num_elements' counts all elements (straddlers + children)
+            // Its 'firstElement' points to the start of the straddlers
+            // Its 'numStraddlers' counts how many straddlers there are
+            // Its 'numElements' counts all elements (straddlers + children)
             // Its children[] point to the new child nodes (created below)
             // We need to keep the straddlers at the start of the range for correct querying,
             // But we also still need to keep track of the total number of elements for early out. This is important!
-            Nodes[node_idx].IsLeaf = false;
-            Nodes[node_idx].NumStraddlers = straddlers.size();
+            m_Nodes[nodeIdx].IsLeaf = false;
+            m_Nodes[nodeIdx].NumStraddlers = straddlers.size();
 
             // Create children and recurse
             for (int i = 0; i < 8; ++i)
             {
-                if (!child_elements[i].empty())
+                if (!childElements[i].empty())
                 {
-                    const auto child_node_handle = CreateNode();
-                    Nodes[node_idx].Children[i] = child_node_handle.Index;
+                    const auto childIndex = CreateNode();
+                    m_Nodes[nodeIdx].Children[i] = childIndex;
 
-                    Node& child = Nodes[child_node_handle];
-                    child.FirstElement = child_starts[i];
-                    child.NumElements = child_elements[i].size();
+                    Node& child = m_Nodes[childIndex];
+                    child.FirstElement = childStarts[i];
+                    child.NumElements = childElements[i].size();
 
                     if (m_SplitPolicy.TightChildren)
                     {
-                        child.Aabb = TightChildAabb(child_elements[i].begin(), child_elements[i].end(),
+                        child.Aabb = TightChildAabb(childElements[i].begin(), childElements[i].end(),
                                                     m_SplitPolicy.Epsilon);
                     }
                     else
                     {
-                        child.Aabb = octant_aabbs[i];
+                        child.Aabb = octantAabbs[i];
                     }
 
-                    SubdivideVolume(child_node_handle, depth + 1, scratch);
+                    SubdivideVolume(childIndex, depth + 1, scratch);
                 }
             }
         }
 
         [[nodiscard]] glm::vec3 ComputeMeanCenter(size_t first, std::size_t size,
-                                                  const glm::vec3& fallback_center) const
+                                                  const glm::vec3& fallbackCenter) const
         {
             if (size == 0)
             {
-                return fallback_center; // fallback; or pass node_idx and use aabbs[node_idx]
+                return fallbackCenter; // fallback; or pass nodeIdx and use aabbs[nodeIdx]
             }
             glm::vec3 acc(0.0f, 0.0f, 0.0f);
             for (size_t i = 0; i < size; ++i)
@@ -703,11 +711,11 @@ export namespace Runtime::Geometry
         }
 
         [[nodiscard]] glm::vec3 ComputeMedianCenter(size_t first, std::size_t size,
-                                                    const glm::vec3& fallback_center) const
+                                                    const glm::vec3& fallbackCenter) const
         {
             if (size == 0)
             {
-                return fallback_center; // fallback; or pass node_idx and use aabbs[node_idx]
+                return fallbackCenter; // fallback; or pass nodeIdx and use aabbs[nodeIdx]
             }
             std::vector<glm::vec3> centers;
             centers.reserve(size);
@@ -715,28 +723,28 @@ export namespace Runtime::Geometry
             {
                 centers.push_back(ElementAabbs[m_ElementIndices[first + i]].GetCenter());
             }
-            const auto median_idx = centers.size() / 2;
-            auto kth = [](std::vector<glm::vec3>& centers, std::size_t median_idx, int dim)
+            const auto medianIdx = centers.size() / 2;
+            auto kth = [](std::vector<glm::vec3>& centers, std::size_t medianIdx, int dim)
             {
-                std::ranges::nth_element(centers, centers.begin() + median_idx,
+                std::ranges::nth_element(centers, centers.begin() + medianIdx,
                                          [dim](const auto& a, const auto& b) { return a[dim] < b[dim]; });
-                return centers[median_idx][dim];
+                return centers[medianIdx][dim];
             };
-            return {kth(centers, median_idx, 0), kth(centers, median_idx, 1), kth(centers, median_idx, 2)};
+            return {kth(centers, medianIdx, 0), kth(centers, medianIdx, 1), kth(centers, medianIdx, 2)};
         }
 
-        [[nodiscard]] glm::vec3 ChooseSplitPoint(NodeHandle node_idx) const
+        [[nodiscard]] glm::vec3 ChooseSplitPoint(NodeIndex nodeIdx) const
         {
-            const auto& node = Nodes[node_idx];
-            const glm::vec3 fallback_center = Nodes[node_idx].Aabb.GetCenter();
+            const auto& node = m_Nodes[nodeIdx];
+            const glm::vec3 fallbackCenter = m_Nodes[nodeIdx].Aabb.GetCenter();
             switch (m_SplitPolicy.SplitPoint)
             {
             case SplitPoint::Mean: return ComputeMeanCenter(node.FirstElement, node.NumElements,
-                                                            fallback_center);
+                                                            fallbackCenter);
             case SplitPoint::Median: return ComputeMedianCenter(node.FirstElement, node.NumElements,
-                                                                fallback_center);
+                                                                fallbackCenter);
             case SplitPoint::Center:
-            default: return fallback_center;
+            default: return fallbackCenter;
             }
         }
 
@@ -772,6 +780,6 @@ export namespace Runtime::Geometry
         std::size_t m_MaxElementsPerNode = 32;
         std::size_t m_MaxBvhDepth = 10;
         SplitPolicy m_SplitPolicy;
-        std::vector<size_t> m_ElementIndices;
+        std::vector<ElementIndex> m_ElementIndices;
     };
 }
