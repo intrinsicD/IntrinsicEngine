@@ -1,12 +1,12 @@
 module;
 #include "RHI.Vulkan.hpp"
-#include <array>
 #include <memory>
+#include <algorithm>
 
 module Runtime.RHI.Bindless;
 
-namespace Runtime::RHI {
-
+namespace Runtime::RHI
+{
     BindlessDescriptorSystem::BindlessDescriptorSystem(std::shared_ptr<VulkanDevice> device)
         : m_Device(device)
     {
@@ -14,24 +14,41 @@ namespace Runtime::RHI {
         CreatePoolAndSet();
     }
 
-    BindlessDescriptorSystem::~BindlessDescriptorSystem() {
+    BindlessDescriptorSystem::~BindlessDescriptorSystem()
+    {
         vkDestroyDescriptorPool(m_Device->GetLogicalDevice(), m_Pool, nullptr);
         vkDestroyDescriptorSetLayout(m_Device->GetLogicalDevice(), m_Layout, nullptr);
     }
 
-    void BindlessDescriptorSystem::CreateLayout() {
+    void BindlessDescriptorSystem::CreateLayout()
+    {
+        VkPhysicalDeviceProperties2 props2{};
+        props2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+        VkPhysicalDeviceDescriptorIndexingProperties indexingProps{};
+        indexingProps.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_PROPERTIES;
+        props2.pNext = &indexingProps;
+        vkGetPhysicalDeviceProperties2(m_Device->GetPhysicalDevice(), &props2);
+
+        // Cap at 64k or hardware limit.
+        // 500k+ is common on desktop, but large descriptor pools allocate significant CPU memory.
+        // 65536 is a safe sweet spot for a "Next-Gen" research engine foundation.
+        m_MaxDescriptors = std::min(indexingProps.maxDescriptorSetUpdateAfterBindSampledImages, 65536u);
+
+        Core::Log::Info("Bindless System: Allocating {} slots (HW Limit: {}).",
+                        m_MaxDescriptors, indexingProps.maxDescriptorSetUpdateAfterBindSampledImages);
+
         // Binding 0: Bindless Texture Array
         VkDescriptorSetLayoutBinding textureBinding{};
         textureBinding.binding = 0;
         textureBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        textureBinding.descriptorCount = MAX_BINDLESS_TEXTURES;
+        textureBinding.descriptorCount = m_MaxDescriptors;
         textureBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
         // Allows array to be not fully filled
         // Allows shaders to index dynamically
         // Allows updating while bound (UPDATE_AFTER_BIND)
         // PARTIALLY_BOUND is critical!
-        VkDescriptorBindingFlags flags = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | 
-                                         VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT;
+        VkDescriptorBindingFlags flags = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT |
+            VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT;
 
         VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlags{};
         bindingFlags.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
@@ -48,10 +65,11 @@ namespace Runtime::RHI {
         VK_CHECK(vkCreateDescriptorSetLayout(m_Device->GetLogicalDevice(), &layoutInfo, nullptr, &m_Layout));
     }
 
-    void BindlessDescriptorSystem::CreatePoolAndSet() {
+    void BindlessDescriptorSystem::CreatePoolAndSet()
+    {
         VkDescriptorPoolSize poolSize;
         poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        poolSize.descriptorCount = MAX_BINDLESS_TEXTURES;
+        poolSize.descriptorCount = m_MaxDescriptors;
 
         VkDescriptorPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -71,15 +89,20 @@ namespace Runtime::RHI {
         VK_CHECK(vkAllocateDescriptorSets(m_Device->GetLogicalDevice(), &allocInfo, &m_GlobalSet));
     }
 
-    uint32_t BindlessDescriptorSystem::RegisterTexture(const Texture& texture) {
+    uint32_t BindlessDescriptorSystem::RegisterTexture(const Texture& texture)
+    {
         uint32_t index;
-        if (!m_FreeSlots.empty()) {
+        if (!m_FreeSlots.empty())
+        {
             index = m_FreeSlots.front();
             m_FreeSlots.pop();
-        } else {
-            if (m_HighWaterMark >= MAX_BINDLESS_TEXTURES) {
+        }
+        else
+        {
+            if (m_HighWaterMark >= m_MaxDescriptors)
+            {
                 Core::Log::Error("Bindless Texture Limit Reached!");
-                return 0; // Return dummy slot 0?
+                return 0; // Return dummy slot 0
             }
             index = m_HighWaterMark++;
         }
@@ -88,7 +111,8 @@ namespace Runtime::RHI {
         return index;
     }
 
-    void BindlessDescriptorSystem::UpdateTexture(uint32_t index, const Texture& texture) {
+    void BindlessDescriptorSystem::UpdateTexture(uint32_t index, const Texture& texture)
+    {
         VkDescriptorImageInfo imageInfo{};
         imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         imageInfo.imageView = texture.GetView();
@@ -106,7 +130,8 @@ namespace Runtime::RHI {
         vkUpdateDescriptorSets(m_Device->GetLogicalDevice(), 1, &descriptorWrite, 0, nullptr);
     }
 
-    void BindlessDescriptorSystem::UnregisterTexture(uint32_t index) {
+    void BindlessDescriptorSystem::UnregisterTexture(uint32_t index)
+    {
         m_FreeSlots.push(index);
         // Optional: Overwrite slot with a dummy/debug texture to prevent crashes if used after free
     }

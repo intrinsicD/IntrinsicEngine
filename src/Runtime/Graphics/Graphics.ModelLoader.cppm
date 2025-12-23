@@ -1,17 +1,30 @@
 module;
 #include <string>
 #include <memory>
+#include <optional>
 
 export module Runtime.Graphics.ModelLoader;
 
 import Runtime.Graphics.Model;
 import Runtime.RHI.Device;
+import Runtime.RHI.Transfer;
 
-export namespace Runtime::Graphics {
-    
-    class ModelLoader {
+export namespace Runtime::Graphics
+{
+    struct ModelLoadResult
+    {
+        std::shared_ptr<Model> ModelData;
+        RHI::TransferToken Token; // The fence/timeline value to wait for
+    };
+
+    class ModelLoader
+    {
     public:
-        // Loads a GLTF file and returns a list of Meshes (Primitives)
-        static std::shared_ptr<Model> Load(std::shared_ptr<RHI::VulkanDevice> device, const std::string& filepath);
+        [[nodiscard]]
+        static std::optional<ModelLoadResult> LoadAsync(
+            std::shared_ptr<RHI::VulkanDevice> device,
+            RHI::TransferManager& transferManager,
+            const std::string& filepath
+        );
     };
 }

@@ -81,10 +81,24 @@ public:
         m_DuckTexture = m_AssetManager.Load<RHI::Texture>(Filesystem::GetAssetPath("textures/DuckCM.png"),
                                                           textureLoader);
 
-        auto modelLoader = [&](const std::string& path, Assets::AssetHandle /*handle*/)
+        auto modelLoader = [&](const std::string& path, Assets::AssetHandle handle)
+            -> std::shared_ptr<Graphics::Model>
         {
-            // Handle is unused for models (cpu-only load or blocking load for now), so we ignore it
-            return Graphics::ModelLoader::Load(GetDevice(), path);
+            auto result = Graphics::ModelLoader::LoadAsync(GetDevice(), *m_TransferManager, path);
+
+            if (result)
+            {
+                // 1. Notify Engine to track the GPU work
+                RegisterAssetLoad(handle, result->Token);
+
+                // 2. Notify AssetManager to wait
+                m_AssetManager.MoveToProcessing(handle);
+
+                // 3. Return the model (valid CPU pointers, GPU buffers are allocated but content is uploading)
+                return result->ModelData;
+            }
+
+            return nullptr; // Failed
         };
 
         m_DuckModel = m_AssetManager.Load<Graphics::Model>(

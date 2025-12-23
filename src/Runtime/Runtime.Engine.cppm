@@ -2,6 +2,8 @@ module;
 #include <memory>
 #include <string>
 #include <vector>
+#include <functional>
+
 #include <RHI/RHI.Vulkan.hpp>
 
 #include "tiny_gltf.h"
@@ -66,7 +68,7 @@ export namespace Runtime
         [[nodiscard]] RHI::VulkanSwapchain& GetSwapchain() const { return *m_Swapchain; }
 
         void RegisterAssetLoad(Core::Assets::AssetHandle handle, RHI::TransferToken token);
-
+        void RunOnMainThread(std::function<void()> task);
     protected:
         std::unique_ptr<Core::Windowing::Window> m_Window;
         std::unique_ptr<RHI::VulkanContext> m_Context;
@@ -95,6 +97,10 @@ export namespace Runtime
         // Protected by mutex because Loaders call RegisterAssetLoad from worker threads
         std::mutex m_LoadMutex;
         std::vector<PendingLoad> m_PendingLoads;
+
+        std::mutex m_MainThreadQueueMutex;
+        std::vector<std::function<void()>> m_MainThreadQueue;
+        void ProcessMainThreadQueue();
 
         bool m_Running = true;
         bool m_FramebufferResized = false;

@@ -102,10 +102,15 @@ namespace Runtime::RHI {
 
         // 3. Submit to Queue (Thread Safe)
         {
-            std::lock_guard lock(m_Mutex);
+            // Lock the Device's queue mutex to prevent collision with the Renderer
+            // attempting to Present() or Submit() to the same physical queue.
+            std::scoped_lock deviceLock(m_Device->GetQueueMutex());
+
+            // We also keep our internal lock to protect m_InFlightBatches
+            std::lock_guard internalLock(m_Mutex);
+
             VK_CHECK(vkQueueSubmit(m_TransferQueue, 1, &submitInfo, VK_NULL_HANDLE));
 
-            // Store ownership of staging buffers so they stay alive
             m_InFlightBatches.push_back({ TransferToken{signalValue}, std::move(stagingBuffers) });
         }
 

@@ -8,12 +8,14 @@ module;
 #include <memory>
 #include <filesystem>
 #include <fstream>
+#include <optional>
 #include <span>
 
 module Runtime.Graphics.ModelLoader;
 import Core.Logging;
 import Core.Filesystem;
 import Runtime.RHI.Types;
+import Runtime.RHI.Transfer;
 import Runtime.Graphics.Geometry;
 import Runtime.Geometry.MeshUtils;
 import Runtime.Geometry.Octree;
@@ -593,90 +595,56 @@ namespace Runtime::Graphics
         return true;
     }
 
-    std::shared_ptr<Model> ModelLoader::Load(std::shared_ptr<RHI::VulkanDevice> device,
-                                             const std::string& filepath)
+    std::optional<ModelLoadResult> ModelLoader::LoadAsync(
+        std::shared_ptr<RHI::VulkanDevice> device,
+        RHI::TransferManager& transferManager,
+        const std::string& filepath)
     {
         std::string fullPath = Core::Filesystem::GetAssetPath(filepath);
         std::string ext = std::filesystem::path(fullPath).extension().string();
-        // ToLower
         for (auto& c : ext) c = tolower(c);
 
         auto model = std::make_shared<Model>();
         std::vector<GeometryCpuData> cpuMeshes;
         bool success = false;
 
-        if (ext == ".obj")
-        {
-            GeometryCpuData data;
-            success = LoadOBJ(fullPath, data);
-            if (success) cpuMeshes.push_back(std::move(data));
-        }
-        else if (ext == ".ply")
-        {
-            GeometryCpuData data;
-            success = LoadPLY(fullPath, data);
-            if (success) cpuMeshes.push_back(std::move(data));
-        }
-        else if (ext == ".xyz" || ext == ".pcd")
-        {
-            // Treating simple PCD like XYZ
-            GeometryCpuData data;
-            success = LoadXYZ(fullPath, data);
-            if (success) cpuMeshes.push_back(std::move(data));
-        }
-        else if (ext == ".tgf")
-        {
-            GeometryCpuData data;
-            success = LoadTGF(fullPath, data);
-            if (success) cpuMeshes.push_back(std::move(data));
-        }
-        else if (ext == ".gltf" || ext == ".glb")
-        {
-            success = LoadGLTF(fullPath, cpuMeshes);
-        }
-        else
-        {
+        // Reuse the existing parsers
+        if (ext == ".obj") { GeometryCpuData data; success = LoadOBJ(fullPath, data); if(success) cpuMeshes.push_back(std::move(data)); }
+        else if (ext == ".ply") { GeometryCpuData data; success = LoadPLY(fullPath, data); if(success) cpuMeshes.push_back(std::move(data)); }
+        else if (ext == ".xyz" || ext == ".pcd") { GeometryCpuData data; success = LoadXYZ(fullPath, data); if(success) cpuMeshes.push_back(std::move(data)); }
+        else if (ext == ".tgf") { GeometryCpuData data; success = LoadTGF(fullPath, data); if(success) cpuMeshes.push_back(std::move(data)); }
+        else if (ext == ".gltf" || ext == ".glb") { success = LoadGLTF(fullPath, cpuMeshes); }
+        else {
             Core::Log::Error("Unsupported format: {}", ext);
-            return model;
+            return std::nullopt;
         }
 
         if (success && !cpuMeshes.empty())
         {
+            RHI::TransferToken latestToken = {0};
+
             for (auto& meshData : cpuMeshes)
             {
                 MeshSegment segment;
                 segment.Name = "Mesh_" + std::to_string(model->Meshes.size());
 
-                // 1. Compute Logic Data (COOKING)
+                // 1. Physics / Collision Logic (CPU)
                 segment.CollisionGeometry = std::make_shared<GeometryCollisionData>();
-
-                // A. Compute AABB
                 auto aabbs = Geometry::Convert(meshData.Positions);
                 segment.CollisionGeometry->LocalAABB = Geometry::Union(aabbs);
 
-                // B. Build Octree (Fit to Points)
-                // We construct a vector of small AABBs for the points or triangles to feed the Octree
-                // For a static mesh, building an Octree of Triangles is usually better than points.
                 std::vector<Geometry::AABB> primitiveBounds;
-
-                if (meshData.Indices.empty())
-                {
-                    // Non-indexed logic (every 3 vertices = 1 triangle)
+                if (meshData.Indices.empty()) {
                     primitiveBounds.reserve(meshData.Positions.size() / 3);
-                    for (size_t i = 0; i < meshData.Positions.size(); i += 3)
-                    {
+                    for (size_t i = 0; i < meshData.Positions.size(); i += 3) {
                         auto aabb = Geometry::AABB{meshData.Positions[i], meshData.Positions[i]};
                         aabb = Geometry::Union(aabb, meshData.Positions[i + 1]);
                         aabb = Geometry::Union(aabb, meshData.Positions[i + 2]);
                         primitiveBounds.push_back(aabb);
                     }
-                }
-                else
-                {
-                    // Indexed logic
+                } else {
                     primitiveBounds.reserve(meshData.Indices.size() / 3);
-                    for (size_t i = 0; i < meshData.Indices.size(); i += 3)
-                    {
+                    for (size_t i = 0; i < meshData.Indices.size(); i += 3) {
                         uint32_t i0 = meshData.Indices[i];
                         uint32_t i1 = meshData.Indices[i + 1];
                         uint32_t i2 = meshData.Indices[i + 2];
@@ -686,36 +654,32 @@ namespace Runtime::Graphics
                         primitiveBounds.push_back(aabb);
                     }
                 }
-
                 segment.CollisionGeometry->LocalOctree.Build(primitiveBounds, Geometry::Octree::SplitPolicy{}, 16, 8);
-                Core::Log::Info("Octree built: {} nodes for {} primitives",
-                                segment.CollisionGeometry->LocalOctree.Nodes.Span().size(),
-                                primitiveBounds.size());
-                // Keep CPU positions for precise checks if needed (Trade-off: RAM usage)
                 segment.CollisionGeometry->Positions = std::move(meshData.Positions);
                 segment.CollisionGeometry->Indices = std::move(meshData.Indices);
 
-                // 2. Upload to GPU
-                // Note: We moved Positions out of meshData above, so we might need to copy
-                // or change order if we want to keep them.
-                // Better approach: Pass meshData to GpuData constructor *before* moving vectors.
+                // 2. Upload to GPU (Async)
                 GeometryUploadRequest uploadReq;
                 uploadReq.Positions = segment.CollisionGeometry->Positions;
                 uploadReq.Indices = segment.CollisionGeometry->Indices;
-                uploadReq.Normals = meshData.Normals; // These weren't moved
-                uploadReq.Aux = meshData.Aux; // These weren't moved
+                uploadReq.Normals = meshData.Normals;
+                uploadReq.Aux = meshData.Aux;
+                uploadReq.Topology = meshData.Topology;
 
-                segment.GpuGeometry = std::make_shared<GeometryGpuData>(device, uploadReq);
+                // --- KEY CHANGE IS HERE ---
+                auto [gpuData, token] = GeometryGpuData::CreateAsync(device, transferManager, uploadReq);
+                segment.GpuGeometry = gpuData;
+                latestToken = token; // Since tokens are monotonic, keeping the last one is enough
+                // --------------------------
 
                 model->Meshes.emplace_back(std::make_shared<MeshSegment>(segment));
             }
             Core::Log::Info("Loaded {} ({} submeshes)", filepath, model->Size());
-        }
-        else
-        {
-            Core::Log::Error("Failed to load geometry: {}", filepath);
+
+            return ModelLoadResult{ model, latestToken };
         }
 
-        return model;
+        Core::Log::Error("Failed to load geometry: {}", filepath);
+        return std::nullopt;
     }
 }

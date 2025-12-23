@@ -11,10 +11,6 @@ import Runtime.RHI.Texture;
 import Core.Logging;
 
 export namespace Runtime::RHI {
-
-    // Hard limit for research engine (can be dynamic, but 1024 is plenty for now)
-    constexpr uint32_t MAX_BINDLESS_TEXTURES = 1024;
-
     class BindlessDescriptorSystem {
     public:
         BindlessDescriptorSystem(std::shared_ptr<VulkanDevice> device);
@@ -40,6 +36,7 @@ export namespace Runtime::RHI {
 
         std::queue<uint32_t> m_FreeSlots;
         uint32_t m_HighWaterMark = 0; // Current max index used
+        uint32_t m_MaxDescriptors = 0;
 
         void CreateLayout();
         void CreatePoolAndSet();

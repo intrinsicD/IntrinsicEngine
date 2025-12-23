@@ -186,81 +186,90 @@ namespace Runtime
             ext == ".xyz" || ext == ".pcd" ||
             ext == ".tgf");
 
-        if (isModel)
+if (isModel)
         {
-            Core::Log::Info("Loading Model: {}", path);
+            Core::Log::Info("Scheduling Async Load: {}", path);
 
-            // TODO: Move to Async Task
-            auto model = Graphics::ModelLoader::Load(GetDevice(), path);
-
-            if (!model || !model->IsValid())
+            // 1. Offload heavy parsing to Worker Thread
+            Core::Tasks::Scheduler::Dispatch([this, path]()
             {
-                Core::Log::Error("Failed to load model: {}", path);
-                return;
-            }
+                // [Worker Thread] Heavy OBJ/GLTF Parsing
+                auto loadResult = Graphics::ModelLoader::LoadAsync(GetDevice(), *m_TransferManager, path);
 
-            // --- Setup Default Material ---
-            auto textureLoader = [this](const std::string& pathStr, Core::Assets::AssetHandle handle)
-                -> std::shared_ptr<RHI::Texture>
-            {
-                std::filesystem::path path(pathStr);
-                auto result = Graphics::TextureLoader::LoadAsync(path, GetDevice(), *m_TransferManager);
-
-                if (result)
+                if (!loadResult)
                 {
-                    // 1. Notify AssetManager: "Don't set Ready yet, I'm processing"
-                    m_AssetManager.MoveToProcessing(handle);
-
-                    // 2. Notify Engine: "Wake up AssetManager when this token is done"
-                    RegisterAssetLoad(handle, result->Token);
-
-                    return result->Resource;
-                }
-                return nullptr;
-            };
-
-            auto texHandle = m_AssetManager.Load<RHI::Texture>(
-                Core::Filesystem::GetAssetPath("textures/Parameterization.jpg"), textureLoader);
-
-            auto defaultMat = std::make_shared<Graphics::Material>(
-                GetDevice(), *m_BindlessSystem, // Pass bindless system
-                texHandle, m_DefaultTexture, m_AssetManager
-            );
-            m_LoadedMaterials.push_back(defaultMat);
-
-            // --- Spawn Entity ---
-            std::string entityName = fsPath.stem().string();
-
-            // Create a Parent Entity if multiple meshes, or just one if single
-            entt::entity rootEntity = m_Scene.CreateEntity(entityName);
-
-            // Setup Transform for Root
-            auto& t = m_Scene.GetRegistry().get<ECS::Transform::Component>(rootEntity);
-            t.Scale = glm::vec3(0.01f);
-
-            // If it's a point cloud, we might want to scale it differently or center it?
-            // For now, keep at origin.
-
-            for (size_t i = 0; i < model->Size(); i++)
-            {
-                // Store in engine cache to keep alive (optional, shared_ptr handles this mostly via components)
-                m_LoadedGeometries.push_back(model->Meshes[i]->GpuGeometry);
-
-                entt::entity targetEntity = rootEntity;
-
-                // If multi-mesh, create children (simple hierarchy simulation)
-                if (model->Size() > 1)
-                {
-                    targetEntity = m_Scene.CreateEntity(entityName + "_" + std::to_string(i));
-                    // TODO: Parenting system
+                    Core::Log::Error("Failed to load model: {}", path);
+                    return;
                 }
 
-                auto& mr = m_Scene.GetRegistry().emplace<ECS::MeshRenderer::Component>(targetEntity);
-                mr.GeometryRef = model->Meshes[i]->GpuGeometry;
-                mr.MaterialRef = defaultMat;
-            }
+                // 2. Register Token immediately (Thread-safe)
+                // This ensures the Engine knows GPU work is pending before we even try to spawn.
+                RegisterAssetLoad(Core::Assets::AssetHandle{}, loadResult->Token);
 
-            Core::Log::Info("Successfully spawned: {}", entityName);
+                // 3. Schedule Entity Spawning on Main Thread
+                // We CANNOT touch m_Scene, m_AssetManager, or m_LoadedMaterials here.
+                RunOnMainThread([this, model = loadResult->ModelData, path]()
+                {
+                    // [Main Thread] Safe to touch Scene/Assets
+
+                    // --- Setup Material (Requires AssetManager) ---
+                    // Define local loader lambda inside the main thread task
+                    auto textureLoader = [this](const std::string& pathStr, Core::Assets::AssetHandle handle)
+                        -> std::shared_ptr<RHI::Texture>
+                    {
+                        std::filesystem::path texPath(pathStr);
+                        auto result = Graphics::TextureLoader::LoadAsync(texPath, GetDevice(), *m_TransferManager);
+                        if (result) {
+                            m_AssetManager.MoveToProcessing(handle);
+                            RegisterAssetLoad(handle, result->Token);
+                            return result->Resource;
+                        }
+                        return nullptr;
+                    };
+
+                    // Load Default Texture
+                    auto texHandle = m_AssetManager.Load<RHI::Texture>(
+                        Core::Filesystem::GetAssetPath("textures/Parameterization.jpg"), textureLoader);
+
+                    auto defaultMat = std::make_shared<Graphics::Material>(
+                        GetDevice(), *m_BindlessSystem,
+                        texHandle, m_DefaultTexture, m_AssetManager
+                    );
+                    m_LoadedMaterials.push_back(defaultMat);
+
+                    // --- Spawn Entities ---
+                    std::filesystem::path fsPath(path);
+                    std::string entityName = fsPath.stem().string();
+                    entt::entity rootEntity = m_Scene.CreateEntity(entityName);
+
+                    auto& t = m_Scene.GetRegistry().get<ECS::Transform::Component>(rootEntity);
+                    t.Scale = glm::vec3(0.01f);
+
+                    for (size_t i = 0; i < model->Size(); i++)
+                    {
+                        // Cache Geometry
+                        m_LoadedGeometries.push_back(model->Meshes[i]->GpuGeometry);
+
+                        entt::entity targetEntity = rootEntity;
+                        if (model->Size() > 1) {
+                            targetEntity = m_Scene.CreateEntity(entityName + "_" + std::to_string(i));
+                            // TODO: Add parent-child relationship component
+                        }
+
+                        auto& mr = m_Scene.GetRegistry().emplace<ECS::MeshRenderer::Component>(targetEntity);
+                        mr.GeometryRef = model->Meshes[i]->GpuGeometry;
+                        mr.MaterialRef = defaultMat;
+
+                        // Add Collider
+                        if (model->Meshes[i]->CollisionGeometry) {
+                             auto& col = m_Scene.GetRegistry().emplace<ECS::MeshCollider::Component>(targetEntity);
+                             col.CollisionRef = model->Meshes[i]->CollisionGeometry;
+                             col.WorldOBB.Center = col.CollisionRef->LocalAABB.GetCenter(); // Init center
+                        }
+                    }
+                    Core::Log::Info("Successfully spawned: {}", entityName);
+                });
+            });
         }
         else
         {
@@ -297,6 +306,27 @@ namespace Runtime
                                  });
 
         m_PendingLoads.erase(it, m_PendingLoads.end());
+    }
+
+    void Engine::RunOnMainThread(std::function<void()> task)
+    {
+        std::lock_guard lock(m_MainThreadQueueMutex);
+        m_MainThreadQueue.emplace_back(std::move(task));
+    }
+
+    void Engine::ProcessMainThreadQueue()
+    {
+        std::vector<std::function<void()>> tasks;
+        {
+            std::lock_guard lock(m_MainThreadQueueMutex);
+            if (m_MainThreadQueue.empty()) return;
+            tasks.swap(m_MainThreadQueue);
+        }
+
+        for (const auto& task : tasks)
+        {
+            task();
+        }
     }
 
     void Engine::InitPipeline()
@@ -344,6 +374,8 @@ namespace Runtime
         {
             m_FrameArena.Reset();
             m_Window->OnUpdate();
+            ProcessMainThreadQueue();
+
             if (m_FramebufferResized)
             {
                 m_Renderer->OnResize();

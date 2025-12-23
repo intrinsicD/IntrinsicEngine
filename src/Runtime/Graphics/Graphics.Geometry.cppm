@@ -3,6 +3,7 @@ module;
 #include <vector>
 #include <span>
 #include <memory>
+#include <utility>
 #include <glm/glm.hpp>
 #include <RHI/RHI.Vulkan.hpp>
 
@@ -10,6 +11,7 @@ export module Runtime.Graphics.Geometry;
 
 import Runtime.RHI.Device;
 import Runtime.RHI.Buffer;
+import Runtime.RHI.Transfer;
 import Runtime.Geometry.AABB;
 import Runtime.Geometry.Octree;
 
@@ -75,13 +77,21 @@ export namespace Runtime::Graphics
     class GeometryGpuData
     {
     public:
+        GeometryGpuData() = default;
+        [[deprecated("Use CreateAsync to avoid stalling the Render Thread via ExecuteImmediate.")]]
         GeometryGpuData(std::shared_ptr<RHI::VulkanDevice> device, const GeometryUploadRequest& data);
+        [[deprecated("Use CreateAsync. This constructor does not manage index buffer staging memory correctly.")]]
         GeometryGpuData(std::shared_ptr<RHI::VulkanDevice> device,
                    const GeometryUploadRequest& data,
                    VkCommandBuffer cmd,
                    RHI::VulkanBuffer& stagingBuffer,
                    size_t stagingOffset);
         ~GeometryGpuData() = default;
+
+        [[nodiscard]] static std::pair<std::shared_ptr<GeometryGpuData>, RHI::TransferToken>
+       CreateAsync(std::shared_ptr<RHI::VulkanDevice> device,
+                   RHI::TransferManager& transferManager,
+                   const GeometryUploadRequest& data);
 
         [[nodiscard]] RHI::VulkanBuffer* GetVertexBuffer() const { return m_VertexBuffer.get(); }
         [[nodiscard]] RHI::VulkanBuffer* GetIndexBuffer() const { return m_IndexBuffer.get(); }
