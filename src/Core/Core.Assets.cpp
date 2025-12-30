@@ -8,7 +8,8 @@ module;
 #include <map>
 #include <entt/entity/registry.hpp>
 
-module Core.Assets;
+module Core:Assets.Impl;
+import :Assets;
 
 namespace Core::Assets
 {

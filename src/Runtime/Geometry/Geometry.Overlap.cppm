@@ -4,14 +4,14 @@ module;
 #include <glm/gtx/norm.hpp>
 #include <span>
 
-export module Runtime.Geometry.Overlap;
+export module Geometry:Overlap;
 
-import Runtime.Geometry.Primitives;
-import Runtime.Geometry.SDF;
-import Runtime.Geometry.GJK;
-import Runtime.Geometry.Support;
+import :Primitives;
+import :SDF;
+import :GJK;
+import :Support;
 
-export namespace Runtime::Geometry
+export namespace Geometry
 {
     namespace Internal
     {

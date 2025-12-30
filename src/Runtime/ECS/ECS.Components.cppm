@@ -6,14 +6,9 @@ module;
 #include <string>
 #include <memory>
 
-export module Runtime.ECS.Components;
+export module ECS:Components;
 
-import Runtime.RHI.Buffer;
-import Runtime.Graphics.Material;
-import Runtime.Graphics.Geometry;
-import Runtime.Geometry.OBB;
-
-export namespace Runtime::ECS::Tag
+export namespace ECS::Tag
 {
     struct Component
     {
@@ -21,7 +16,7 @@ export namespace Runtime::ECS::Tag
     };
 }
 
-export namespace Runtime::ECS::Transform
+export namespace ECS::Transform
 {
     struct Component
     {
@@ -56,20 +51,3 @@ export namespace Runtime::ECS::Transform
     }
 }
 
-export namespace Runtime::ECS::MeshRenderer
-{
-    struct Component
-    {
-        Graphics::GeometryHandle Geometry;
-        std::shared_ptr<Graphics::Material> MaterialRef;
-    };
-}
-
-export namespace Runtime::ECS::MeshCollider
-{
-    struct Component
-    {
-        std::shared_ptr<Graphics::GeometryCollisionData> CollisionRef;
-        Geometry::OBB WorldOBB;
-    };
-}

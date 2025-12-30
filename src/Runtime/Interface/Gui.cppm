@@ -1,15 +1,14 @@
 module;
 #include <functional>
 #include <glm/glm.hpp>
-#include "RHI/RHI.Vulkan.hpp" // For VkCommandBuffer
+#include "RHI.Vulkan.hpp" // For VkCommandBuffer
 
-export module Runtime.Interface.GUI;
+export module Interface:GUI;
 
-import Runtime.RHI.Device;
-import Runtime.RHI.Swapchain;
-import Core.Window;
+import RHI;
+import Core;
 
-export namespace Runtime::Interface::GUI
+export namespace Interface::GUI
 {
     using UIPanelCallback = std::function<void(void)>;
     using UIMenuCallback = std::function<void(void)>;

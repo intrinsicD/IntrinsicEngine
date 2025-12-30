@@ -1,11 +1,12 @@
 module;
-#include <RHI/RHI.Vulkan.hpp>
+#include "RHI.Vulkan.hpp"
 #include <memory>
 
-module Runtime.Graphics.Material;
-import Core.Logging;
+module Graphics:Material.Impl;
+import :Material;
+import Core;
 
-namespace Runtime::Graphics {
+namespace Graphics {
 
     Material::Material(std::shared_ptr<RHI::VulkanDevice> device,
                        RHI::BindlessDescriptorSystem& bindlessSystem,

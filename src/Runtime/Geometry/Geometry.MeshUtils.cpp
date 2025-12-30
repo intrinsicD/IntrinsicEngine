@@ -4,10 +4,11 @@ module;
 #include <glm/gtx/norm.hpp>
 #include <span>
 
-module Runtime.Geometry.MeshUtils;
-import Core.Logging;
+module Geometry:MeshUtils.Impl;
+import :MeshUtils;
+import Core;
 
-namespace Runtime::Geometry::MeshUtils
+namespace Geometry::MeshUtils
 {
     void CalculateNormals(std::span<const glm::vec3> positions, std::span<const uint32_t> indices,
                           std::span<glm::vec3> normals)

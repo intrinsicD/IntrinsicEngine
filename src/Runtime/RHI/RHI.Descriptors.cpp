@@ -1,12 +1,13 @@
 module;
-#include "RHI/RHI.Vulkan.hpp"
+#include "RHI.Vulkan.hpp"
 #include <vector>
 #include <memory>
 
-module Runtime.RHI.Descriptors;
-import Core.Logging;
+module RHI:Descriptors.Impl;
+import :Descriptors;
+import Core;
 
-namespace Runtime::RHI {
+namespace RHI {
 
     // --- Descriptor Layout ---
     DescriptorLayout::DescriptorLayout(std::shared_ptr<VulkanDevice> device) : m_Device(device) {

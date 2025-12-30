@@ -3,12 +3,13 @@ module;
 #include <mutex>
 #include <memory>
 
-module Runtime.RHI.Renderer;
-import Runtime.RHI.Image;
-import Runtime.RHI.CommandUtils;
-import Core.Logging;
+module RHI:Renderer.Impl;
+import :Renderer;
+import :Image;
+import :CommandUtils;
+import Core;
 
-namespace Runtime::RHI
+namespace RHI
 {
     SimpleRenderer::SimpleRenderer(std::shared_ptr<VulkanDevice> device, VulkanSwapchain& swapchain)
         : m_Device(device), m_Swapchain(swapchain)

@@ -3,13 +3,13 @@ module;
 #include <vector>
 #include <memory>
 
-module Runtime.RHI.Pipeline;
-import Runtime.RHI.Types;
-import Runtime.RHI.Image;
-import Runtime.Graphics.Geometry;
-import Core.Logging;
+module RHI:Pipeline.Impl;
+import :Pipeline;
+import :Types;
+import :Image;
+import Core;
 
-namespace Runtime::RHI
+namespace RHI
 {
     GraphicsPipeline::GraphicsPipeline(std::shared_ptr<VulkanDevice> device,
                                        const VulkanSwapchain& swapchain,

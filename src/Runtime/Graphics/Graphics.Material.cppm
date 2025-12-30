@@ -2,14 +2,12 @@ module;
 #include <volk.h>
 #include <memory>
 
-export module Runtime.Graphics.Material;
+export module Graphics:Material;
 
-import Runtime.RHI.Device;
-import Runtime.RHI.Bindless; // New import
-import Runtime.RHI.Texture;
-import Core.Assets;
+import RHI;
+import Core;
 
-export namespace Runtime::Graphics
+export namespace Graphics
 {
     class Material
     {

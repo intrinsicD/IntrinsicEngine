@@ -13,8 +13,11 @@ target_link_options(${target_name} PRIVATE ${INTRINSIC_LINK_FLAGS})
 # Setup Sources
 target_sources(${target_name}
         PUBLIC
-        FILE_SET CXX_MODULES
-        FILES
+        FILE_SET CXX_MODULES FILES
+        Utils/Utils.BoundedHeap.cppm
+        PUBLIC
+        FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
+        Core.cppm
         Core.Memory.cppm
         Core.Logging.cppm
         Core.Tasks.cppm
@@ -24,6 +27,7 @@ target_sources(${target_name}
         Core.Assets.cppm
         Core.Profiling.cppm
         PRIVATE
+        FILE_SET core_impl TYPE CXX_MODULES FILES
         Core.Memory.cpp
         Core.Logging.cpp
         Core.Tasks.cpp

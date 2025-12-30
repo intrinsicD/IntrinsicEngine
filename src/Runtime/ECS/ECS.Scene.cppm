@@ -4,11 +4,9 @@ module;
 #include <string>
 #include <cstddef>
 
-export module Runtime.ECS.Scene;
+export module ECS:Scene;
 
-import Runtime.ECS.Components;
-
-export namespace Runtime::ECS
+export namespace ECS
 {
     class Scene
     {
@@ -16,13 +14,7 @@ export namespace Runtime::ECS
         Scene() = default;
         ~Scene() = default;
 
-        entt::entity CreateEntity(const std::string& name)
-        {
-            entt::entity e = m_Registry.create();
-            m_Registry.emplace<Tag::Component>(e, name);
-            m_Registry.emplace<Transform::Component>(e);
-            return e;
-        }
+        entt::entity CreateEntity(const std::string& name);
 
         entt::registry& GetRegistry() { return m_Registry; }
 

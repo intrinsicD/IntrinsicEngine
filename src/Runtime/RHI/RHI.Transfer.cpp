@@ -4,12 +4,13 @@ module;
 #include <mutex>
 #include <atomic>
 #include <memory>
-#include "RHI/RHI.Vulkan.hpp"
+#include "RHI.Vulkan.hpp"
 
-module Runtime.RHI.Transfer;
-import Core.Logging;
+module RHI:Transfer.Impl;
+import :Transfer;
+import Core;
 
-namespace Runtime::RHI {
+namespace RHI {
 
     TransferManager::TransferManager(std::shared_ptr<VulkanDevice> device)
         : m_Device(device)

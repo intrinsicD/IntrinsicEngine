@@ -9,11 +9,11 @@ module;
 #include <unordered_map>
 #include <typeindex>
 
-export module Core.Assets;
+export module Core:Assets;
 
-import Core.Logging;
-import Core.Filesystem;
-import Core.Tasks; // Using your Async Task Graph
+import :Logging;
+import :Filesystem;
+import :Tasks; // Using your Async Task Graph
 
 export namespace Core::Assets
 {

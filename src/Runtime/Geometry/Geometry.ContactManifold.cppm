@@ -4,13 +4,13 @@ module;
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/norm.hpp>
 
-export module Runtime.Geometry.Contact;
+export module Geometry:Contact;
 
-import Runtime.Geometry.Primitives;
-import Runtime.Geometry.GJK; // Should contain GJK_EPA logic in full version
-import Runtime.Geometry.Support;
+import :Primitives;
+import :GJK; // Should contain GJK_EPA logic in full version
+import :Support;
 
-export namespace Runtime::Geometry
+export namespace Geometry
 {
     // =========================================================================
     // CONTACT MANIFOLD NORMAL CONVENTION

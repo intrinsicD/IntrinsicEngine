@@ -1,9 +1,9 @@
 #include <gtest/gtest.h>
 #include <glm/glm.hpp>
 
-import Runtime.Geometry.Properties;
+import Geometry;
 
-using namespace Runtime::Geometry;
+using namespace Geometry;
 
 TEST(GeometryProperties, NoRTTI_System)
 {

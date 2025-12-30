@@ -1,12 +1,12 @@
 module;
-#include <RHI/RHI.Vulkan.hpp>
+#include "RHI.Vulkan.hpp"
 #include <memory>
 
-export module Runtime.RHI.Descriptors;
+export module RHI:Descriptors;
 
-import Runtime.RHI.Device;
+import :Device;
 
-export namespace Runtime::RHI
+export namespace RHI
 {
     class DescriptorLayout
     {

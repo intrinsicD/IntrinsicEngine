@@ -3,7 +3,7 @@ module;
 #include <format>
 #include <string_view>
 
-export module Core.Logging;
+export module Core:Logging;
 
 namespace Core::Log {
     enum class Level {

@@ -7,9 +7,9 @@ module;
 #include <vector>
 #include <cfloat>
 
-export module Runtime.Geometry.AABB;
+export module Geometry:AABB;
 
-export namespace Runtime::Geometry
+export namespace Geometry
 {
     struct AABB
     {

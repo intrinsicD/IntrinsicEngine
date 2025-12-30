@@ -3,10 +3,11 @@ module;
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/quaternion.hpp>
 
-module Runtime.Graphics.Camera;
-import Core.Input;
+module Graphics:Camera.Impl;
+import :Camera;
+import Core;
 
-namespace Runtime::Graphics
+namespace Graphics
 {
     void UpdateMatrices(CameraComponent& camera, float aspectRatio)
     {

@@ -3,7 +3,7 @@ module;
 // 1. Force ImGui to expose Dynamic Rendering fields
 #define IMGUI_IMPL_VULKAN_HAS_DYNAMIC_RENDERING
 
-#include "RHI/RHI.Vulkan.hpp"
+#include "RHI.Vulkan.hpp"
 
 #include <glm/glm.hpp>
 #include <imgui.h>
@@ -14,11 +14,11 @@ module;
 #include <vector>
 #include <filesystem>
 
-module Runtime.Interface.GUI;
-import Core.Logging;
-import Core.Filesystem;
+module Interface:GUI.Impl;
+import :GUI;
+import Core;
 
-namespace Runtime::Interface::GUI
+namespace Interface::GUI
 {
     struct RegisteredPanel
     {

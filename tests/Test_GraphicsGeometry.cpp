@@ -3,13 +3,13 @@
 #include <glm/glm.hpp>
 #include <vector>
 
-import Runtime.Graphics.Geometry;
+import Graphics;
 // Mock Device would be needed for a full GPU test,
 // but here we verify logic correctness via unit tests on CpuData
 
 TEST(Geometry, CpuDataToRequest)
 {
-    using namespace Runtime::Graphics;
+    using namespace Graphics;
 
     GeometryCpuData cpu;
     cpu.Positions = {{0,0,0}, {1,1,1}};

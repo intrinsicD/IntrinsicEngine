@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 #include <atomic>
 import Core.Tasks;
-import Core.Logging;
+import Core;
 
 using namespace Core::Tasks;
 

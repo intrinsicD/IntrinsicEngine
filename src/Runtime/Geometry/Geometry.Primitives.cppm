@@ -7,12 +7,12 @@ module;
 #include <array>
 #include <vector>
 
-export module Runtime.Geometry.Primitives;
+export module Geometry:Primitives;
 
-export import Runtime.Geometry.AABB;
-export import Runtime.Geometry.OBB;
+export import :AABB;
+export import :OBB;
 
-export namespace Runtime::Geometry
+export namespace Geometry
 {
     struct Sphere
     {

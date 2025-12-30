@@ -4,29 +4,16 @@ module;
 #include <vector>
 #include <functional>
 
-#include <RHI/RHI.Vulkan.hpp>
+#include "RHI.Vulkan.hpp"
 
 #include "tiny_gltf.h"
 
 export module Runtime.Engine;
 
-import Core.Window;
-import Core.Memory;
-import Core.Assets;
-import Runtime.RHI.Bindless;
-import Runtime.RHI.Context;
-import Runtime.RHI.Device;
-import Runtime.RHI.Swapchain;
-import Runtime.RHI.Renderer;
-import Runtime.RHI.Pipeline;
-import Runtime.RHI.Descriptors;
-import Runtime.RHI.Buffer;
-import Runtime.RHI.Texture;
-import Runtime.RHI.Transfer;
-import Runtime.Graphics.RenderSystem;
-import Runtime.Graphics.Material;
-import Runtime.Graphics.Geometry;
-import Runtime.ECS.Scene;
+import Core;
+import RHI;
+import Graphics;
+import ECS;
 
 export namespace Runtime
 {

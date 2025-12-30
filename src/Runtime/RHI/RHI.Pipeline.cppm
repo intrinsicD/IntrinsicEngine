@@ -3,13 +3,13 @@ module;
 #include <memory>
 #include <vector>
 
-export module Runtime.RHI.Pipeline;
+export module RHI:Pipeline;
 
-import Runtime.RHI.Device;
-import Runtime.RHI.Shader;
-import Runtime.RHI.Swapchain; // Needed to know color formats
+import :Device;
+import :Shader;
+import :Swapchain; // Needed to know color formats
 
-export namespace Runtime::RHI
+export namespace RHI
 {
     struct PipelineConfig
     {

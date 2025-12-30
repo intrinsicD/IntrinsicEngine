@@ -11,17 +11,14 @@ module;
 #include <optional>
 #include <span>
 
-module Runtime.Graphics.ModelLoader;
-import Core.Logging;
-import Core.Filesystem;
-import Runtime.RHI.Types;
-import Runtime.RHI.Transfer;
-import Runtime.Graphics.Geometry;
-import Runtime.Geometry.MeshUtils;
-import Runtime.Geometry.Octree;
-import Runtime.Geometry.AABB;
+module Graphics:ModelLoader.Impl;
+import :ModelLoader;
+import Core;
+import RHI;
+import :Geometry;
+import Geometry;
 
-namespace Runtime::Graphics
+namespace Graphics
 {
     // --- Helpers ---
 

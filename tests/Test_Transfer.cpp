@@ -1,24 +1,21 @@
 #include <gtest/gtest.h>
 #include <memory>
 #include <vector>
-#include <RHI/RHI.Vulkan.hpp>
+#include "RHI.Vulkan.hpp"
 
-import Runtime.RHI.Context;
-import Runtime.RHI.Device;
-import Runtime.RHI.Buffer;
-import Runtime.RHI.Transfer;
-import Core.Logging;
+import RHI;
+import Core;
 
 class TransferTest : public ::testing::Test {
 protected:
     void SetUp() override {
         // Minimal Vulkan setup for testing
-        Runtime::RHI::ContextConfig config{
+        RHI::ContextConfig config{
             .AppName = "TransferTest",
             .EnableValidation = true,
             .Headless = true
         };
-        m_Context = std::make_unique<Runtime::RHI::VulkanContext>(config);
+        m_Context = std::make_unique<RHI::VulkanContext>(config);
 
         // Note: In a real test, you'd need a surface.
         // For headless RHI tests, we assume a mock or a dummy window.

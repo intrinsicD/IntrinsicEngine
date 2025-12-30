@@ -4,16 +4,17 @@ module;
 #include <queue>
 #include <memory>
 
-export module Runtime.RHI.Bindless;
+export module RHI:Bindless;
 
-import Runtime.RHI.Device;
-import Runtime.RHI.Texture;
-import Core.Logging;
+import :Device;
+import :Texture;
+import Core;
 
-export namespace Runtime::RHI {
+export namespace RHI {
     class BindlessDescriptorSystem {
     public:
-        BindlessDescriptorSystem(std::shared_ptr<VulkanDevice> device);
+        explicit BindlessDescriptorSystem(std::shared_ptr<VulkanDevice> device);
+
         ~BindlessDescriptorSystem();
 
         // Returns the index in the global array

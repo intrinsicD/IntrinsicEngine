@@ -6,10 +6,9 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/quaternion.hpp>
  
-import Runtime.Geometry.Primitives;
-import Runtime.Geometry.Containment;
+import Geometry;
  
-using namespace Runtime::Geometry;
+using namespace Geometry;
  
 // =========================================================================
 // TEST HELPERS

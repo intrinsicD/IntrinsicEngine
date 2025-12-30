@@ -3,9 +3,9 @@ module;
 #include <glm/glm.hpp>
 #include <vector>
 
-export module Runtime.RHI.Types;
+export module RHI:Types;
 
-export namespace Runtime::RHI {
+export namespace RHI {
     struct GeometryPipelineSpec {
         static std::vector<VkVertexInputBindingDescription> GetBindings() {
             std::vector<VkVertexInputBindingDescription> bindings(3);

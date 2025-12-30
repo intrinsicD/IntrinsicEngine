@@ -6,11 +6,11 @@ module;
 #include <limits>
 
 
-export module Runtime.Geometry.Validation;
+export module Geometry:Validation;
  
-import Runtime.Geometry.Primitives;
+import :Primitives;
  
-export namespace Runtime::Geometry::Validation
+export namespace Geometry::Validation
 {
     // =========================================================================
     // VALIDATION UTILITIES

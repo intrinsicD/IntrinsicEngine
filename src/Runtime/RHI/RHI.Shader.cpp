@@ -5,10 +5,11 @@ module;
 #include <filesystem>
 #include <memory>
 
-module Runtime.RHI.Shader;
-import Core.Logging;
+module RHI:Shader.Impl;
+import :Shader;
+import Core;
 
-namespace Runtime::RHI {
+namespace RHI {
 
     ShaderModule::ShaderModule(std::shared_ptr<VulkanDevice> device, const std::string& filepath, ShaderStage stage)
         : m_Device(device), m_Stage(stage)

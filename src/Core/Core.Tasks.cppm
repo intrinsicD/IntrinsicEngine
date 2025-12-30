@@ -1,15 +1,12 @@
 module;
 
 #include <functional>
-#include <concepts>
 #include <type_traits>
 #include <utility>
 #include <memory>
-#include <new>
-#include <cassert>
 
-export module Core.Tasks;
-import Core.Logging;
+export module Core:Tasks;
+import :Logging;
 
 namespace Core::Tasks
 {
@@ -65,50 +62,19 @@ namespace Core::Tasks
             m_VTable = ptr;
         }
 
-        ~LocalTask()
-        {
-            if (m_VTable) std::destroy_at(m_VTable);
-        }
+        ~LocalTask();
 
         // Move Constructor
-        LocalTask(LocalTask&& other) noexcept
-        {
-            if (other.m_VTable)
-            {
-                other.m_VTable->MoveTo(m_Storage);
-                m_VTable = reinterpret_cast<Concept*>(m_Storage);
-                std::destroy_at(other.m_VTable);
-                other.m_VTable = nullptr;
-            }
-        }
+        LocalTask(LocalTask&& other) noexcept;
 
         // Move Assignment
-        LocalTask& operator=(LocalTask&& other) noexcept
-        {
-            if (this != &other)
-            {
-                if (m_VTable) std::destroy_at(m_VTable);
-                m_VTable = nullptr;
-
-                if (other.m_VTable)
-                {
-                    other.m_VTable->MoveTo(m_Storage);
-                    m_VTable = reinterpret_cast<Concept*>(m_Storage);
-                    std::destroy_at(other.m_VTable);
-                    other.m_VTable = nullptr;
-                }
-            }
-            return *this;
-        }
+        LocalTask& operator=(LocalTask&& other) noexcept;
 
         // No copy
         LocalTask(const LocalTask&) = delete;
         LocalTask& operator=(const LocalTask&) = delete;
 
-        void operator()()
-        {
-            if (m_VTable) m_VTable->Execute();
-        }
+        void operator()();
 
         [[nodiscard]] bool Valid() const { return m_VTable != nullptr; }
     };

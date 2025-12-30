@@ -7,26 +7,16 @@ module;
 #include <cctype>    // for std::tolower
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
-#include <entt/fwd.hpp>
-#include "RHI/RHI.Vulkan.hpp"
+#include <entt/entity/registry.hpp>
+#include "RHI.Vulkan.hpp"
 
 module Runtime.Engine;
 
-import Core.Logging;
-import Core.Input;
-import Core.Window;
-import Core.Memory;
-import Core.Tasks;
-import Core.Filesystem;
-import Core.Profiling;
-import Runtime.RHI.Shader;
-import Runtime.RHI.Texture;
-import Runtime.Graphics.ModelLoader;
-import Runtime.Graphics.TextureLoader;
-import Runtime.Graphics.Material;
-import Runtime.ECS.Components;
-import Runtime.RHI.Types;
-import Runtime.Interface.GUI;
+import Core;
+import RHI;
+import Graphics;
+import ECS;
+import Interface;
 
 namespace Runtime
 {

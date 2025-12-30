@@ -6,11 +6,11 @@ module;
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/quaternion.hpp>
 
-export module Runtime.Graphics.Camera;
+export module Graphics:Camera;
 
-import Core.Input;
+import Core;
 
-export namespace Runtime::Graphics
+export namespace Graphics
 {
     // --- Pure Data Class ---
     struct CameraComponent

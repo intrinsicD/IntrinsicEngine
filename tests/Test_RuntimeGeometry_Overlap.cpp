@@ -5,13 +5,9 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/string_cast.hpp>
 
-import Runtime.Geometry.Primitives;
-import Runtime.Geometry.Support;
-import Runtime.Geometry.Contact;
-import Runtime.Geometry.SDF;
-import Runtime.Geometry.SDF.General;
+import Geometry;
 
-using namespace Runtime::Geometry;
+using namespace Geometry;
 
 // =========================================================================
 // TEST HELPERS

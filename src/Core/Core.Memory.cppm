@@ -1,15 +1,13 @@
 module; // Global Fragment
 #include <cstddef>
-#include <cstdint>
 #include <cstdlib>
 #include <concepts>
 #include <expected>
 #include <span>
 #include <utility>
-#include <cassert>
 #include <thread>
 
-export module Core.Memory;
+export module Core:Memory;
 
 export namespace Core::Memory
 {

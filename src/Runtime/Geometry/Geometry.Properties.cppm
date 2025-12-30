@@ -13,9 +13,9 @@ module;
 #include <vector>
 #include <limits>
 
-export module Runtime.Geometry.Properties;
+export module Geometry:Properties;
 
-export namespace Runtime::Geometry
+export namespace Geometry
 {
     using PropertyId = size_t;
 

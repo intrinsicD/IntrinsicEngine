@@ -3,14 +3,14 @@ module;
 #include <memory>
 #include <vector>
 #include <atomic>
-#include <RHI/RHI.Vulkan.hpp> // Implementation detail, kept in module fragment if possible, but needed for class members
+#include "RHI.Vulkan.hpp" // Implementation detail, kept in module fragment if possible, but needed for class members
 
-export module Runtime.RHI.Transfer;
+export module RHI:Transfer;
 
-import Runtime.RHI.Device;
-import Runtime.RHI.Buffer;
+import :Device;
+import :Buffer;
 
-export namespace Runtime::RHI {
+export namespace RHI {
 
     // 1. Pure C++ Token (No Vulkan Header required for users of this struct)
     struct TransferToken {

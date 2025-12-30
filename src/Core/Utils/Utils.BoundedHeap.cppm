@@ -4,9 +4,9 @@ module;
 #include <algorithm>
 #include <stdexcept>
 
-export module Runtime.Geometry.Utils.BoundedHeap;
+export module Utils.BoundedHeap;
 
-export namespace Runtime::Geometry::Utils
+export namespace Utils
 {
     // Keeps the k *smallest* T by operator<. top() = current worst (largest) in the heap.
     // Works great with T = std::pair<float,size_t> (lexicographic compare).

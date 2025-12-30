@@ -6,17 +6,14 @@ module;
 #include <utility>
 #include <queue>
 #include <glm/glm.hpp>
-#include <RHI/RHI.Vulkan.hpp>
+#include "RHI.Vulkan.hpp"
 
-export module Runtime.Graphics.Geometry;
+export module Graphics:Geometry;
 
-import Runtime.RHI.Device;
-import Runtime.RHI.Buffer;
-import Runtime.RHI.Transfer;
-import Runtime.Geometry.AABB;
-import Runtime.Geometry.Octree;
+import RHI;
+import Geometry;
 
-export namespace Runtime::Graphics
+export namespace Graphics
 {
     // --- Data Structures ---
 

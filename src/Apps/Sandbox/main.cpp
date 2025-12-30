@@ -9,21 +9,11 @@
 #include <tiny_gltf.h>
 
 import Runtime.Engine;
-import Core.Logging;
-import Core.Input;
-import Core.Assets;
-import Core.Filesystem;
-import Runtime.Graphics.Geometry;
-import Runtime.Graphics.Model;
-import Runtime.Graphics.Material;
-import Runtime.Graphics.RenderSystem;
-import Runtime.Graphics.ModelLoader;
-import Runtime.Graphics.TextureLoader;
-import Runtime.Graphics.Camera;
-import Runtime.ECS.Components;
-import Runtime.RHI.Types;
-import Runtime.RHI.Texture;
-import Runtime.Interface.GUI;
+import Core;
+import Graphics;
+import ECS;
+import RHI;
+import Interface;
 
 using namespace Core;
 using namespace Runtime;

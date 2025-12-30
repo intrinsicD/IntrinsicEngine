@@ -4,12 +4,9 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/string_cast.hpp>
 
-import Runtime.Geometry.Primitives;
-import Runtime.Geometry.Contact;
-import Runtime.Geometry.SDF;
-import Runtime.Geometry.SDF.General;
+import Geometry;
 
-using namespace Runtime::Geometry;
+using namespace Geometry;
 
 // --- Helper for approximate vector equality ---
 inline void ExpectVec3Near(const glm::vec3& a, const glm::vec3& b, float tolerance = 0.01f)

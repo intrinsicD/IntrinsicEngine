@@ -15,17 +15,17 @@ module;
 #include <iostream>
 #include <glm/glm.hpp>
 
-export module Runtime.Geometry.Octree;
+export module Geometry:Octree;
 
-import Runtime.Geometry.Utils.BoundedHeap;
-import Runtime.Geometry.Properties;
-import Runtime.Geometry.AABB;
-import Runtime.Geometry.Primitives;
-import Runtime.Geometry.Containment;
-import Runtime.Geometry.Overlap;
-import Runtime.Geometry.Support;
+import Utils.BoundedHeap;
+import :Properties;
+import :AABB;
+import :Primitives;
+import :Containment;
+import :Overlap;
+import :Support;
 
-export namespace Runtime::Geometry
+export namespace Geometry
 {
     template <typename Shape>
     concept SpatialQueryShape =

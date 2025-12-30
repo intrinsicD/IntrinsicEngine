@@ -4,14 +4,14 @@ module;
 #include <memory>
 #include <numeric>
 #include <vector>
-#include <RHI/RHI.Vulkan.hpp>
+#include "RHI.Vulkan.hpp"
 
-module Runtime.Graphics.Geometry;
-import Runtime.RHI.CommandUtils;
-import Runtime.RHI.Transfer;
-import Core.Logging;
+module Graphics:Geometry.Impl;
+import :Geometry;
+import RHI;
+import Core;
 
-namespace Runtime::Graphics
+namespace Graphics
 {
     // Helper to align offsets to 16 bytes for SIMD safety
     static VkDeviceSize AlignSize(VkDeviceSize size, VkDeviceSize alignment)

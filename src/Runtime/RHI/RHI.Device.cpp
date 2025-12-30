@@ -9,10 +9,11 @@ module;
 #include "RHI.Vulkan.hpp"
 
 
-module Runtime.RHI.Device;
-import Core.Logging;
+module RHI:Device.Impl;
+import :Device;
+import Core;
 
-namespace Runtime::RHI
+namespace RHI
 {
     const std::vector<const char*> DEVICE_EXTENSIONS = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME

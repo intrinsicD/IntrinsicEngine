@@ -1,19 +1,19 @@
 module;
 #include "stb_image.h"
-#include <RHI/RHI.Vulkan.hpp>
+#include "RHI.Vulkan.hpp"
 #include <string>
 #include <cstring>
 #include <memory>
 #include <vector>
 
-module Runtime.RHI.Texture;
-import Runtime.RHI.Buffer;
-import Runtime.RHI.Image;
-import Runtime.RHI.CommandUtils;
-import Core.Logging;
-import Core.Filesystem;
+module RHI:Texture.Impl;
+import :Texture;
+import :Buffer;
+import :Image;
+import :CommandUtils;
+import Core;
 
-namespace Runtime::RHI
+namespace RHI
 {
     // Helper to generate mips
     inline void GenerateMipmaps(VkCommandBuffer cmd, VkImage image, int32_t texWidth, int32_t texHeight,

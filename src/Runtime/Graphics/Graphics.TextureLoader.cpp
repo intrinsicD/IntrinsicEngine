@@ -4,16 +4,15 @@ module;
 #include <filesystem>
 #include <optional>
 #include <vector>
-#include <RHI/RHI.Vulkan.hpp>
+#include "RHI.Vulkan.hpp"
 
-module Runtime.Graphics.TextureLoader;
+module Graphics:TextureLoader.Impl;
+import :TextureLoader;
 
-import Core.Logging;
-import Core.Filesystem;
-import Runtime.RHI.Buffer;
-import Runtime.RHI.CommandUtils;
+import Core;
+import RHI;
 
-namespace Runtime::Graphics {
+namespace Graphics {
 
     std::optional<TextureLoadResult> TextureLoader::LoadAsync(
         const std::filesystem::path& filepath,

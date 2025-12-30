@@ -4,8 +4,9 @@ module;
 #include <iostream> // For panic logging if needed
 #include <imgui_impl_glfw.h>
 
-module Core.Window;
-import Core.Logging;
+module Core:Window.Impl;
+import :Logging;
+import :Window;
 
 namespace Core::Windowing
 {

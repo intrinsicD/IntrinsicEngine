@@ -4,20 +4,19 @@ module;
 #include <algorithm>
 #include <glm/glm.hpp>
 #include <entt/entt.hpp>
-#include "RHI/RHI.Vulkan.hpp"
+#include "RHI.Vulkan.hpp"
 #include <imgui.h>
 
-module Runtime.Graphics.RenderSystem;
+module Graphics:RenderSystem.Impl;
+import :RenderSystem;
+import :Camera;
+import :Components;
+import Core;
+import RHI;
+import ECS;
+import Interface;
 
-import Core.Logging;
-import Core.Memory;
-import Core.Assets;
-import Runtime.RHI.Types;
-import Runtime.ECS.Components;
-import Runtime.Graphics.Camera;
-import Runtime.Interface.GUI;
-
-namespace Runtime::Graphics
+namespace Graphics
 {
     inline size_t PadUniformBufferSize(size_t originalSize, size_t minAlignment)
     {
@@ -90,13 +89,13 @@ namespace Runtime::Graphics
 
     struct ImGuiPassData
     {
-        Graph::RGResourceHandle Backbuffer;
+        RGResourceHandle Backbuffer;
     };
 
     struct ForwardPassData
     {
-        Graph::RGResourceHandle Color;
-        Graph::RGResourceHandle Depth;
+        RGResourceHandle Color;
+        RGResourceHandle Depth;
     };
 
     struct RenderPacket
@@ -140,10 +139,10 @@ namespace Runtime::Graphics
             auto extent = m_Swapchain.GetExtent();
             uint32_t imageIndex = m_Renderer.GetImageIndex();
 
-            Graph::RGResourceHandle backbufferHandle{};
+            RGResourceHandle backbufferHandle{};
 
             m_RenderGraph.AddPass<ForwardPassData>("ForwardPass",
-                                                   [&](ForwardPassData& data, Graph::RGBuilder& builder)
+                                                   [&](ForwardPassData& data, RGBuilder& builder)
                                                    {
                                                        VkImage swapImage = m_Renderer.GetSwapchainImage(imageIndex);
                                                        VkImageView swapView = m_Renderer.GetSwapchainImageView(
@@ -154,7 +153,7 @@ namespace Runtime::Graphics
                                                            "Backbuffer", swapImage, swapView,
                                                            m_Swapchain.GetImageFormat(), extent);
 
-                                                       Graph::RGTextureDesc depthDesc{};
+                                                       RGTextureDesc depthDesc{};
                                                        depthDesc.Width = extent.width;
                                                        depthDesc.Height = extent.height;
                                                        depthDesc.Format = VK_FORMAT_D32_SFLOAT;
@@ -163,19 +162,19 @@ namespace Runtime::Graphics
                                                        depthDesc.Aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
                                                        auto depth = builder.CreateTexture("DepthBuffer", depthDesc);
 
-                                                       Graph::RGAttachmentInfo colorInfo{};
+                                                       RGAttachmentInfo colorInfo{};
                                                        colorInfo.ClearValue = {{{0.1f, 0.3f, 0.6f, 1.0f}}};
                                                        colorInfo.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
                                                        colorInfo.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
 
-                                                       Graph::RGAttachmentInfo depthInfo{};
+                                                       RGAttachmentInfo depthInfo{};
                                                        depthInfo.ClearValue.depthStencil = {1.0f, 0};
 
                                                        data.Color = builder.WriteColor(importedColor, colorInfo);
                                                        data.Depth = builder.WriteDepth(depth, depthInfo);
                                                        backbufferHandle = data.Color;
                                                    },
-                                                   [&, offset](const ForwardPassData&, const Graph::RGRegistry&,
+                                                   [&, offset](const ForwardPassData&, const RGRegistry&,
                                                                VkCommandBuffer cmd)
                                                    {
                                                        m_Renderer.BindPipeline(m_Pipeline);
@@ -297,16 +296,16 @@ namespace Runtime::Graphics
             );
 
             m_RenderGraph.AddPass<ImGuiPassData>("ImGuiPass",
-                                                 [&](ImGuiPassData& data, Graph::RGBuilder& builder)
+                                                 [&](ImGuiPassData& data, RGBuilder& builder)
                                                  {
-                                                     Graph::RGAttachmentInfo colorInfo{};
+                                                     RGAttachmentInfo colorInfo{};
                                                      colorInfo.LoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
                                                      colorInfo.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
 
                                                      data.Backbuffer = builder.WriteColor(
                                                          backbufferHandle, colorInfo);
                                                  },
-                                                 [](const ImGuiPassData&, const Graph::RGRegistry&,
+                                                 [](const ImGuiPassData&, const RGRegistry&,
                                                     VkCommandBuffer cmd)
                                                  {
                                                      Interface::GUI::Render(cmd);

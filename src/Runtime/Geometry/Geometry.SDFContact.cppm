@@ -4,11 +4,11 @@ module;
 #include <functional>
 #include <concepts>
 
-export module Runtime.Geometry.SDF.General;
+export module Geometry:SDFContact;
 
-import Runtime.Geometry.Contact;
+import :Contact;
 
-export namespace Runtime::Geometry::SDF
+export namespace Geometry::SDF
 {
     template <typename T>
     concept SDFFunc = requires(T f, glm::vec3 p)

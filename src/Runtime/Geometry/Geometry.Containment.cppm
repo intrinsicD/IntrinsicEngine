@@ -6,12 +6,12 @@ module;
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/norm.hpp>
 
-export module Runtime.Geometry.Containment;
+export module Geometry:Containment;
 
-import Runtime.Geometry.Primitives;
-import Runtime.Geometry.SDF;
+import :Primitives;
+import :SDF;
 
-export namespace Runtime::Geometry
+export namespace Geometry
 {
     // Concept to check if an object exposes vertices for fallback checks
     template <typename T>

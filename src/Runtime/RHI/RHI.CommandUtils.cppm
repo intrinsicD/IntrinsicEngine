@@ -1,12 +1,12 @@
 module;
-#include "RHI/RHI.Vulkan.hpp"
+#include "RHI.Vulkan.hpp"
 
-export module Runtime.RHI.CommandUtils;
+export module RHI:CommandUtils;
 
-import Runtime.RHI.Device;
-import Core.Logging;
+import :Device;
+import Core;
 
-export namespace Runtime::RHI::CommandUtils
+export namespace RHI::CommandUtils
 {
     // Internal: Holds the pool specific to the current thread
     struct ThreadRenderContext

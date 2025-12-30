@@ -2,11 +2,11 @@ module;
 #include "RHI.Vulkan.hpp"
 #include <memory>
 
-export module Runtime.RHI.Image;
+export module RHI:Image;
 
-import Runtime.RHI.Device;
+import :Device;
 
-export namespace Runtime::RHI
+export namespace RHI
 {
     class VulkanImage
     {

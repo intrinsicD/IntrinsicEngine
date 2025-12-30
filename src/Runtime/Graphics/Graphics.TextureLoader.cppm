@@ -3,13 +3,11 @@ module;
 #include <memory>
 #include <optional>
 
-export module Runtime.Graphics.TextureLoader;
+export module Graphics:TextureLoader;
 
-import Runtime.RHI.Device;
-import Runtime.RHI.Texture;
-import Runtime.RHI.Transfer;
+import RHI;
 
-export namespace Runtime::Graphics {
+export namespace Graphics {
 
     struct TextureLoadResult {
         std::shared_ptr<RHI::Texture> Resource;

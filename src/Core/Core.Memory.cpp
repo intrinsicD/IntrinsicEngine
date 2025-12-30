@@ -3,14 +3,14 @@ module; // <--- Start Global Fragment
 #include <cstdlib>
 #include <cstring>
 #include <cstddef>
-#include <limits>
 #include <memory>
 #include <expected>
 #include <algorithm>
 #include <cassert>
 #include <thread>
 
-module Core.Memory; // <--- Enter Module Purview
+module Core:Memory.Impl;
+import :Memory;
 
 namespace Core::Memory
 {

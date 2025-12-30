@@ -3,14 +3,13 @@ module;
 #include <memory>
 #include <optional>
 
-export module Runtime.Graphics.ModelLoader;
+export module Graphics:ModelLoader;
 
-import Runtime.Graphics.Model;
-import Runtime.Graphics.Geometry;
-import Runtime.RHI.Device;
-import Runtime.RHI.Transfer;
+import :Model;
+import :Geometry;
+import RHI;
 
-export namespace Runtime::Graphics
+export namespace Graphics
 {
     struct ModelLoadResult
     {

@@ -3,11 +3,11 @@ module;
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/norm.hpp>
 
-export module Runtime.Geometry.Support;
+export module Geometry:Support;
 
-import Runtime.Geometry.Primitives;
+import :Primitives;
 
-export namespace Runtime::Geometry
+export namespace Geometry
 {
     template <typename T>
     concept ConvexShape = requires(const T& s, const glm::vec3& d)

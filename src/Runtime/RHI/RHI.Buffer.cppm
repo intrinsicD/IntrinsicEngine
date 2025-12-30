@@ -3,12 +3,11 @@ module;
 #include <vk_mem_alloc.h>
 #include <memory>
 
-export module Runtime.RHI.Buffer;
+export module RHI:Buffer;
 
-import Runtime.RHI.Device;
+import :Device;
 
-export namespace Runtime::RHI {
-
+export namespace RHI {
     class VulkanBuffer {
     public:
         // usage: VertexBuffer, IndexBuffer, TransferSrc, etc.

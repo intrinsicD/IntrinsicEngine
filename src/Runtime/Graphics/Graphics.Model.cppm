@@ -3,12 +3,12 @@ module;
 #include <memory>
 #include <string>
 
-export module Runtime.Graphics.Model;
+export module Graphics:Model;
 
-import Runtime.Graphics.Geometry;
-import Runtime.Graphics.Material; // Optional, if we want to store materials here later
+import :Geometry;
+import :Material; // Optional, if we want to store materials here later
 
-export namespace Runtime::Graphics
+export namespace Graphics
 {
 
     struct MeshSegment

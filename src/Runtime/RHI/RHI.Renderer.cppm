@@ -3,16 +3,16 @@ module;
 #include <vector>
 #include <memory>
 
-#include "RHI/RHI.Vulkan.hpp"
+#include "RHI.Vulkan.hpp"
 
-export module Runtime.RHI.Renderer;
+export module RHI:Renderer;
 
-import Runtime.RHI.Device;
-import Runtime.RHI.Swapchain;
-import Runtime.RHI.Pipeline;
-import Runtime.RHI.Image;
+import :Device;
+import :Swapchain;
+import :Pipeline;
+import :Image;
 
-namespace Runtime::RHI
+namespace RHI
 {
     export class SimpleRenderer
     {

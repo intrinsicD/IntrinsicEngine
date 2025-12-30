@@ -4,14 +4,14 @@ module;
 #include <cstdint>
 #include <memory>
 
-#include "RHI/RHI.Vulkan.hpp"
+#include "RHI.Vulkan.hpp"
 
-export module Runtime.RHI.Swapchain;
+export module RHI:Swapchain;
 
-import Runtime.RHI.Device;
-import Core.Window; // For window dimensions
+import :Device;
+import Core; // For window dimensions
 
-namespace Runtime::RHI
+namespace RHI
 {
     export class VulkanSwapchain
     {

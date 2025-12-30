@@ -6,12 +6,12 @@ module;
 #include <array>
 #include <optional>
 
-export module Runtime.Geometry.GJK;
+export module Geometry:GJK;
 
-import Runtime.Geometry.Primitives; // Needs definitions of ContactManifold
-import Runtime.Geometry.Support; // Needs definitions of ContactManifold
+import :Primitives; // Needs definitions of ContactManifold
+import :Support; // Needs definitions of ContactManifold
 
-export namespace Runtime::Geometry::Internal
+export namespace Geometry::Internal
 {
     // --- GJK HELPER STRUCTS ---
 

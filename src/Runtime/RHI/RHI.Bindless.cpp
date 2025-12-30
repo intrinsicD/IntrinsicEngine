@@ -3,9 +3,10 @@ module;
 #include <memory>
 #include <algorithm>
 
-module Runtime.RHI.Bindless;
+module RHI:Bindless.Impl;
+import :Bindless;
 
-namespace Runtime::RHI
+namespace RHI
 {
     BindlessDescriptorSystem::BindlessDescriptorSystem(std::shared_ptr<VulkanDevice> device)
         : m_Device(device)

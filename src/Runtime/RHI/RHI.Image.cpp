@@ -4,10 +4,11 @@ module;
 #include <memory>
 #include <optional>
 
-module Runtime.RHI.Image;
-import Core.Logging;
+module RHI:Image.Impl;
+import :Image;
+import Core;
 
-namespace Runtime::RHI
+namespace RHI
 {
     VulkanImage::VulkanImage(std::shared_ptr<VulkanDevice> device, uint32_t width, uint32_t height, uint32_t mipLevels, VkFormat format,
                              VkImageUsageFlags usage, VkImageAspectFlags aspect, VkSharingMode sharingMode)

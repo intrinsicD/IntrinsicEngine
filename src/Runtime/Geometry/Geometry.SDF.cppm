@@ -6,11 +6,11 @@ module;
 #include <vector>
 #include <cmath>
 
-export module Runtime.Geometry.SDF;
+export module Geometry:SDF;
 
-import Runtime.Geometry.Primitives;
+import :Primitives;
 
-export namespace Runtime::Geometry::SDF
+export namespace Geometry::SDF
 {
     // --- 1. Raw Math Functions (Pure Math, No State) ---
 

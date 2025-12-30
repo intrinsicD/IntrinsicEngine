@@ -4,9 +4,9 @@ module;
 #include <variant>
 #include <vector>
 
-export module Core.Window;
+export module Core:Window;
 
-import Core.Input;
+import :Input;
 
 export namespace Core::Windowing
 {

@@ -1,25 +1,18 @@
 module;
 #include <glm/glm.hpp>
 #include <memory>
-#include "RHI/RHI.Vulkan.hpp"
+#include "RHI.Vulkan.hpp"
 
-export module Runtime.Graphics.RenderSystem;
+export module Graphics:RenderSystem;
 
-import Runtime.RHI.Bindless;
-import Runtime.RHI.Device;
-import Runtime.RHI.Swapchain;
-import Runtime.RHI.Renderer;
-import Runtime.RHI.Pipeline;
-import Runtime.RHI.Descriptors;
-import Runtime.RHI.Buffer;
-import Runtime.ECS.Scene;
-import Runtime.RenderGraph;
-import Runtime.Graphics.Camera;
-import Runtime.Graphics.Geometry;
-import Core.Memory;
-import Core.Assets;
+import RHI;
+import :Camera;
+import :Geometry;
+import :RenderGraph;
+import Core;
+import ECS;
 
-export namespace Runtime::Graphics
+export namespace Graphics
 {
     class RenderSystem
     {
@@ -53,7 +46,7 @@ export namespace Runtime::Graphics
         std::unique_ptr<RHI::VulkanBuffer> m_GlobalUBO;
 
         // RenderGraph
-        Graph::RenderGraph m_RenderGraph;
+        RenderGraph m_RenderGraph;
         GeometryStorage& m_GeometryStorage;
     };
 }

@@ -6,9 +6,9 @@ module;
 #include <span>
 #include <array>
 
-export module Runtime.Geometry.OBB;
+export module Geometry:OBB;
 
-export namespace Runtime::Geometry
+export namespace Geometry
 {
     struct OBB
     {

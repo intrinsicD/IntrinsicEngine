@@ -4,12 +4,13 @@ module;
 #include <vector>
 #include <cstdlib>
 
-#include "RHI/RHI.Vulkan.hpp"
+#include "RHI.Vulkan.hpp"
 
-module Runtime.RHI.Context;
-import Core.Logging;
+module RHI:Context.Impl;
+import :Context;
+import Core;
 
-namespace Runtime::RHI
+namespace RHI
 {
     // Validation Layer Name
     const std::vector<const char*> VALIDATION_LAYERS = {

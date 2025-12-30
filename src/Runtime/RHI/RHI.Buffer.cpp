@@ -3,11 +3,11 @@ module;
 #include <cstring> // memcpy
 #include <memory>
 
+module RHI:Buffer.Impl;
+import :Buffer;
+import Core;
 
-module Runtime.RHI.Buffer;
-import Core.Logging;
-
-namespace Runtime::RHI {
+namespace RHI {
 
     VulkanBuffer::VulkanBuffer(std::shared_ptr<VulkanDevice> device, size_t size, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage)
         : m_Device(device)

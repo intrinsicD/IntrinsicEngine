@@ -1,17 +1,16 @@
 module;
-#include <RHI/RHI.Vulkan.hpp>
+#include "RHI.Vulkan.hpp"
 #include <string>
 #include <vector>
 #include <memory>
 #include <algorithm>
 #include <unordered_map>
 
-module Runtime.RenderGraph;
+module Graphics:RenderGraph.Impl;
+import :RenderGraph;
+import Core;
 
-import Core.Memory;
-import Core.Logging;
-
-namespace Runtime::Graph
+namespace Graphics
 {
     // --- RGRegistry ---
     VkImage RGRegistry::GetImage(RGResourceHandle handle) const

@@ -5,18 +5,14 @@ module;
 #include <vector>
 #include <unordered_map>
 #include <utility>
-#include <RHI/RHI.Vulkan.hpp>
+#include "RHI.Vulkan.hpp"
 
-export module Runtime.RenderGraph;
+export module Graphics:RenderGraph;
 
-import Runtime.RHI.Device;
-import Runtime.RHI.Image;
-import Runtime.RHI.Buffer;
-import Runtime.RHI.CommandUtils;
-import Core.Memory;
-import Core.Logging;
+import RHI;
+import Core;
 
-export namespace Runtime::Graph
+export namespace Graphics
 {
     // -------------------------------------------------------------------------
     // Handles & Resources

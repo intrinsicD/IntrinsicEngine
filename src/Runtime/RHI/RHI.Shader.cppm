@@ -4,11 +4,11 @@ module;
 #include <vector>
 #include <memory>
 
-export module Runtime.RHI.Shader;
+export module RHI:Shader;
 
-import Runtime.RHI.Device;
+import :Device;
 
-export namespace Runtime::RHI {
+export namespace RHI {
     
     enum class ShaderStage { Vertex, Fragment, Compute };
 

@@ -2,9 +2,9 @@ module;
 #include <span>
 #include <glm/fwd.hpp>
 
-export module Runtime.Geometry.MeshUtils;
+export module Geometry:MeshUtils;
 
-export namespace Runtime::Geometry::MeshUtils
+export namespace Geometry::MeshUtils
 {
     int GenerateUVs(std::span<const glm::vec3> positions, std::span<glm::vec4> aux);
 

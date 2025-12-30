@@ -7,10 +7,11 @@ module;
 
 #include "GLFW/glfw3.h"
 
-module Runtime.RHI.Swapchain;
-import Core.Logging;
+module RHI:Swapchain.Impl;
+import :Swapchain;
+import Core;
 
-namespace Runtime::RHI {
+namespace RHI {
 
     VulkanSwapchain::VulkanSwapchain(std::shared_ptr<VulkanDevice> device, Core::Windowing::Window& window)
         : m_Device(device), m_Window(window)

@@ -3,14 +3,14 @@ module;
 #include <optional>
 #include <mutex>
 #include <functional>
-#include "RHI/RHI.Vulkan.hpp"
+#include "RHI.Vulkan.hpp"
 
-export module Runtime.RHI.Device;
+export module RHI:Device;
 
-import Runtime.RHI.Context;
-import Core.Logging;
+import :Context;
+import Core;
 
-namespace Runtime::RHI
+namespace RHI
 {
     export struct QueueFamilyIndices
     {

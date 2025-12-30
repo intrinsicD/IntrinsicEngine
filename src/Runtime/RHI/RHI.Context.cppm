@@ -1,13 +1,13 @@
 module;
 
 #include <string_view>
-#include "RHI/RHI.Vulkan.hpp"
+#include "RHI.Vulkan.hpp"
 
-export module Runtime.RHI.Context;
+export module RHI:Context;
 
-import Core.Window; // We need this to know required extensions
+import Core; // We need this to know required extensions
 
-namespace Runtime::RHI {
+namespace RHI {
 
     export struct ContextConfig {
         std::string_view AppName = "Intrinsic Engine";
