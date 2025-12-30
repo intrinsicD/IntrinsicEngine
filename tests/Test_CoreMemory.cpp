@@ -4,7 +4,7 @@
 #include <span>
 #include <memory>
 
-import Core.Memory;
+import Core;
 
 using namespace Core::Memory;
 

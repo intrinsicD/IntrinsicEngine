@@ -46,8 +46,8 @@ target_link_libraries(${target_name}
         IntrinsicConfig
         glm::glm
         glfw
-        imgui_lib
         PRIVATE
+        imgui_lib
         volk::volk
         EnTT::EnTT
         # Telemetry libs will go here

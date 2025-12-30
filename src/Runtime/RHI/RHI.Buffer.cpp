@@ -1,9 +1,10 @@
 module;
-#include <vk_mem_alloc.h>
 #include <cstring> // memcpy
 #include <memory>
+#include "RHI.Vulkan.hpp"
 
 module RHI:Buffer.Impl;
+
 import :Buffer;
 import Core;
 

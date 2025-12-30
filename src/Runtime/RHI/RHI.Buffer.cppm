@@ -1,7 +1,7 @@
 module;
 #include <cstring>
-#include <vk_mem_alloc.h>
 #include <memory>
+#include "RHI.Vulkan.hpp"
 
 export module RHI:Buffer;
 

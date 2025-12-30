@@ -20,17 +20,17 @@ protected:
         // Note: In a real test, you'd need a surface.
         // For headless RHI tests, we assume a mock or a dummy window.
         // Here we use the Device's ability to pick a GPU without a surface for pure transfer.
-        m_Device = std::make_shared<Runtime::RHI::VulkanDevice>(*m_Context, VK_NULL_HANDLE);
-        m_TransferMgr = std::make_unique<Runtime::RHI::TransferManager>(m_Device);
+        m_Device = std::make_shared<RHI::VulkanDevice>(*m_Context, VK_NULL_HANDLE);
+        m_TransferMgr = std::make_unique<RHI::TransferManager>(m_Device);
     }
 
-    std::unique_ptr<Runtime::RHI::VulkanContext> m_Context;
-    std::shared_ptr<Runtime::RHI::VulkanDevice> m_Device;
-    std::unique_ptr<Runtime::RHI::TransferManager> m_TransferMgr;
+    std::unique_ptr<RHI::VulkanContext> m_Context;
+    std::shared_ptr<RHI::VulkanDevice> m_Device;
+    std::unique_ptr<RHI::TransferManager> m_TransferMgr;
 };
 
 TEST_F(TransferTest, AsyncBufferUpload) {
-    using namespace Runtime::RHI;
+    using namespace RHI;
 
     const size_t bufferSize = 1024 * 1024; // 1MB
 

@@ -2,8 +2,7 @@
 #include <thread>
 #include <chrono>
 
-import Core.Assets;
-import Core.Tasks;
+import Core;
 
 using namespace Core::Assets;
 
