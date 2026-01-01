@@ -104,8 +104,6 @@ export namespace Graphics
         std::vector<PhysicalImage> m_PhysicalImages;
     };
 
-    using RGExecuteFn = std::function<void(const RGRegistry&, VkCommandBuffer)>;
-
     // -------------------------------------------------------------------------
     // The Render Graph
     // -------------------------------------------------------------------------
@@ -116,12 +114,10 @@ export namespace Graphics
         ~RenderGraph();
 
         // 1. Setup Phase: Add a pass to the frame
-        template <typename Data>
-        void AddPass(const std::string& name,
-                     std::function<void(Data&, RGBuilder&)> setup,
-                     std::function<void(const Data&, const RGRegistry&, VkCommandBuffer)> execute)
+        template <typename Data, typename SetupFn, typename ExecuteFn>
+             void AddPass(const std::string& name, SetupFn&& setup, ExecuteFn&& execute)
         {
-            static_assert(std::is_trivially_destructible_v<Data>,
+            /*static_assert(std::is_trivially_destructible_v<Data>,
                           "RenderGraph PassData must be trivially destructible (POD) because the LinearArena does not call destructors.")
                 ;
             auto& pass = CreatePassInternal(name);
@@ -145,7 +141,38 @@ export namespace Graphics
             pass.Execute = [=](const RGRegistry& reg, VkCommandBuffer cmd)
             {
                 execute(*data, reg, cmd);
+            };*/
+            // 1. Allocate Pass Data
+            auto dataResult = m_Arena.New<Data>();
+            Data* data = *dataResult;
+
+            auto& pass = CreatePassInternal(name);
+            RGBuilder builder(*this, (uint32_t)m_Passes.size() - 1);
+
+            // 2. Run Setup (Immediate)
+            setup(*data, builder);
+
+            // 3. Store Execution Lambda in Arena
+            // We wrapper the user's lambda in a struct we can placement-new into the arena
+            struct PassClosure {
+                ExecuteFn func;
+                Data* dataPtr;
             };
+
+            // Allocate closure in arena
+            // Note: ExecuteFn (lambda) must be Trivially Destructible or we leak resources inside the lambda
+            // (LinearArena limitation). Usually pass lambdas just capture pointers/PODs.
+            auto closureMem = m_Arena.New<PassClosure>(std::forward<ExecuteFn>(execute), data);
+
+            if (closureMem) {
+                PassClosure* closure = *closureMem;
+
+                // 4. Type Erase via stateless lambda
+                pass.Execute = [closure](const RGRegistry& reg, VkCommandBuffer cmd) {
+                    // Invoke the stored lambda
+                    (closure->func)(*(closure->dataPtr), reg, cmd);
+                };
+            }
         }
 
         // 2. Compile Phase: Calculate Barriers
@@ -161,6 +188,8 @@ export namespace Graphics
         friend class RGBuilder;
 
     private:
+        using RGExecuteFn = void(*)(void*, const RGRegistry&, VkCommandBuffer);
+
         struct RGPass
         {
             std::string Name;
@@ -178,7 +207,7 @@ export namespace Graphics
 
             std::vector<Attachment> Attachments{};
 
-            RGExecuteFn Execute{};
+            std::function<void(const RGRegistry&, VkCommandBuffer)> Execute;
         };
 
         struct ResourceNode
