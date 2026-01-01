@@ -10,8 +10,8 @@ import Core;
 
 export namespace Interface::GUI
 {
-    using UIPanelCallback = std::function<void(void)>;
-    using UIMenuCallback = std::function<void(void)>;
+    using UIPanelCallback = std::function<void()>;
+    using UIMenuCallback = std::function<void()>;
 
     // Initializes ImGui, GLFW backend, and Vulkan backend (Dynamic Rendering)
     void Init(Core::Windowing::Window& window, 

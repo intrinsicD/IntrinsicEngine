@@ -2,7 +2,6 @@ module;
 #include <vector>
 #include <cstddef>
 #include <algorithm>
-#include <stdexcept>
 
 export module Utils.BoundedHeap;
 

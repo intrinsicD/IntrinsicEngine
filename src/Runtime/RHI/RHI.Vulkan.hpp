@@ -20,13 +20,13 @@ import Core;
 
 // Wraps Vulkan calls and logs errors without exceptions
 #ifndef NDEBUG
-#define VK_CHECK(x)                                                              \
+#define VK_CHECK(x)                                                                  \
         do {                                                                         \
             VkResult result = x;                                                     \
             if (result != VK_SUCCESS) {                                              \
-                Core::Log::Error("Vulkan Error: {} failed with result {} at {}:{}", \
-                    #x, (int)result, __FILE__, __LINE__); \
-                std::abort(); \
+                Core::Log::Error("Vulkan Error: {} failed with result {} at {}:{}",  \
+                    #x, (int)result, __FILE__, __LINE__);                            \
+                std::abort();                                                        \
             }                                                                        \
         } while(0)
 #else

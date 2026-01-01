@@ -13,8 +13,7 @@ import :Logging;
 
 namespace Core::Tasks
 {
-
-    LocalTask:: ~LocalTask()
+    LocalTask::~LocalTask()
     {
         if (m_VTable) std::destroy_at(m_VTable);
     }

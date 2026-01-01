@@ -23,10 +23,8 @@ set_target_properties(${target_name} PROPERTIES CXX_SCAN_FOR_MODULES ON)
 target_link_libraries(${target_name}
         PRIVATE
         IntrinsicConfig
-        IntrinsicCore
         IntrinsicRuntime
         GTest::gtest_main
-        EnTT::EnTT
 )
 
 # Helper to run tests via CTest

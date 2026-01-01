@@ -28,7 +28,7 @@ export namespace Core::Assets
         // Allow hashing for maps
         struct Hash
         {
-            std::size_t operator()(const AssetHandle& h) const { return (size_t)h.ID; }
+            size_t operator()(const AssetHandle& h) const { return (size_t)h.ID; }
         };
     };
 
