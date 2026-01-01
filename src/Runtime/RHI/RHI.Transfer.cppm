@@ -41,9 +41,14 @@ export namespace RHI {
         void GarbageCollect();
 
     private:
+        struct ThreadTransferContext {
+            VkCommandPool Pool = VK_NULL_HANDLE;
+        };
+
+        ThreadTransferContext& GetThreadContext();
+
         std::shared_ptr<VulkanDevice> m_Device;
         VkQueue m_TransferQueue = VK_NULL_HANDLE;
-        VkCommandPool m_CommandPool = VK_NULL_HANDLE;
         VkSemaphore m_TimelineSemaphore = VK_NULL_HANDLE;
 
         // Atomic is strictly required as Loaders run on threads, but Engine checks on Main.

@@ -15,6 +15,15 @@ namespace Graphics {
                        Core::Assets::AssetManager& assetManager)
         : m_Device(device), m_BindlessSystem(bindlessSystem), m_CurrentTexture(defaultTexture)
     {
+        if (!m_CurrentTexture)
+        {
+            Core::Log::Error("Material initialized with null default texture!");
+        }
+        else if (m_CurrentTexture->GetView() == VK_NULL_HANDLE)
+        {
+            Core::Log::Error("Material initialized with default texture having NULL view!");
+        }
+
         // Register default texture immediately
         m_TextureIndex = m_BindlessSystem.RegisterTexture(*m_CurrentTexture);
 

@@ -1,6 +1,7 @@
 module;
 #include <chrono>
 #include <queue>
+#include <mutex>
 #include <filesystem>
 #include <system_error> // for std::error_code
 #include <algorithm> // for std::transform
@@ -322,7 +323,7 @@ namespace Runtime
     {
         m_DescriptorLayout = std::make_unique<RHI::DescriptorLayout>(m_Device);
         m_DescriptorPool = std::make_unique<RHI::DescriptorPool>(m_Device);
-        m_BindlessSystem = std::make_unique<RHI::BindlessDescriptorSystem>(m_Device);
+        m_BindlessSystem = std::make_shared<RHI::BindlessDescriptorSystem>(m_Device);
 
         RHI::ShaderModule vert(m_Device, "shaders/triangle.vert.spv", RHI::ShaderStage::Vertex);
         RHI::ShaderModule frag(m_Device, "shaders/triangle.frag.spv", RHI::ShaderStage::Fragment);

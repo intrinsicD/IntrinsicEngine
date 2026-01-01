@@ -44,6 +44,11 @@ public:
     {
         Log::Info("Sandbox Started!");
 
+        if (!m_TransferManager) {
+            Log::Error("FATAL: TransferManager is null in OnStart!");
+            std::exit(-1);
+        }
+
         m_CameraEntity = m_Scene.CreateEntity("Main Camera");
         m_Camera = m_Scene.GetRegistry().emplace<Graphics::CameraComponent>(m_CameraEntity);
         m_Scene.GetRegistry().emplace<Graphics::OrbitControlComponent>(m_CameraEntity);

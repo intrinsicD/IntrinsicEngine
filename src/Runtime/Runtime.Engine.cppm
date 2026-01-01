@@ -69,7 +69,7 @@ export namespace Runtime
         std::unique_ptr<RHI::DescriptorLayout> m_DescriptorLayout;
         std::unique_ptr<RHI::DescriptorPool> m_DescriptorPool;
         std::unique_ptr<RHI::GraphicsPipeline> m_Pipeline;
-        std::unique_ptr<RHI::BindlessDescriptorSystem> m_BindlessSystem;
+        std::shared_ptr<RHI::BindlessDescriptorSystem> m_BindlessSystem;
 
         std::shared_ptr<RHI::Texture> m_DefaultTexture;
         std::vector<std::shared_ptr<Graphics::Material>> m_LoadedMaterials;

@@ -2,6 +2,8 @@ module;
 #include "RHI.Vulkan.hpp"
 #include <memory>
 #include <algorithm>
+#include <mutex>
+#include <iostream>
 
 module RHI:Bindless.Impl;
 import :Bindless;
@@ -28,15 +30,29 @@ namespace RHI
         VkPhysicalDeviceDescriptorIndexingProperties indexingProps{};
         indexingProps.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_PROPERTIES;
         props2.pNext = &indexingProps;
+
+        if (vkGetPhysicalDeviceProperties2 == nullptr) {
+            Core::Log::Error("CRITICAL: vkGetPhysicalDeviceProperties2 is NULL. Vulkan 1.1+ not loaded correctly via Volk.");
+            std::abort();
+        }
+
         vkGetPhysicalDeviceProperties2(m_Device->GetPhysicalDevice(), &props2);
 
-        // Cap at 64k or hardware limit.
-        // 500k+ is common on desktop, but large descriptor pools allocate significant CPU memory.
-        // 65536 is a safe sweet spot for a "Next-Gen" research engine foundation.
-        m_MaxDescriptors = std::min(indexingProps.maxDescriptorSetUpdateAfterBindSampledImages, 65536u);
+        uint32_t hwLimit = indexingProps.maxDescriptorSetUpdateAfterBindSampledImages;
+
+        // FAILSAFE: If the query failed (hwLimit == 0), default to a safe value.
+        // This prevents vkCreateDescriptorPool from crashing on size 0.
+        if (hwLimit == 0) {
+            Core::Log::Warn("[Bindless] Hardware reported 0 descriptors. This usually indicates a driver issue or missing extension. Defaulting to 4096.");
+            hwLimit = 4096;
+        }
+
+        // Clamp to 64k or HW limit
+        m_MaxDescriptors = std::min(hwLimit, 65536u);
 
         Core::Log::Info("Bindless System: Allocating {} slots (HW Limit: {}).",
-                        m_MaxDescriptors, indexingProps.maxDescriptorSetUpdateAfterBindSampledImages);
+                        m_MaxDescriptors, hwLimit);
+        std::cout << std::flush;
 
         // Binding 0: Bindless Texture Array
         VkDescriptorSetLayoutBinding textureBinding{};
@@ -93,19 +109,22 @@ namespace RHI
     uint32_t BindlessDescriptorSystem::RegisterTexture(const Texture& texture)
     {
         uint32_t index;
-        if (!m_FreeSlots.empty())
         {
-            index = m_FreeSlots.front();
-            m_FreeSlots.pop();
-        }
-        else
-        {
-            if (m_HighWaterMark >= m_MaxDescriptors)
+            std::lock_guard lock(m_Mutex);
+            if (!m_FreeSlots.empty())
             {
-                Core::Log::Error("Bindless Texture Limit Reached!");
-                return 0; // Return dummy slot 0
+                index = m_FreeSlots.front();
+                m_FreeSlots.pop();
             }
-            index = m_HighWaterMark++;
+            else
+            {
+                if (m_HighWaterMark >= m_MaxDescriptors)
+                {
+                    Core::Log::Error("Bindless Texture Limit Reached!");
+                    return 0; // Return dummy slot 0
+                }
+                index = m_HighWaterMark++;
+            }
         }
 
         UpdateTexture(index, texture);
@@ -133,7 +152,13 @@ namespace RHI
 
     void BindlessDescriptorSystem::UnregisterTexture(uint32_t index)
     {
-        m_FreeSlots.push(index);
-        // Optional: Overwrite slot with a dummy/debug texture to prevent crashes if used after free
+        m_Device->SafeDestroy([weak = weak_from_this(), index]()
+        {
+            if (auto self = weak.lock())
+            {
+                std::lock_guard lock(self->m_Mutex);
+                self->m_FreeSlots.push(index);
+            }
+        });
     }
 }

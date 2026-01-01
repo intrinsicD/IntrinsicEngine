@@ -54,6 +54,7 @@ namespace RHI
         [[nodiscard]] VmaAllocator GetAllocator() const { return m_Allocator; }
         [[nodiscard]] bool IsValid() const { return m_IsValid; }
         [[nodiscard]] constexpr uint32_t GetFramesInFlight() const { return MAX_FRAMES_IN_FLIGHT; }
+        [[nodiscard]] constexpr uint32_t GetCurrentFrameIndex() const { return m_CurrentFrameIndex; }
 
         // Helper to query swapchain support (used later by Swapchain module)
         [[nodiscard]] SwapchainSupportDetails QuerySwapchainSupport() const;
