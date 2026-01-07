@@ -12,7 +12,7 @@ export namespace ECS::MeshRenderer
     struct Component
     {
         Graphics::GeometryHandle Geometry;
-        std::shared_ptr<Graphics::Material> MaterialRef;
+        Core::Assets::AssetHandle Material;
     };
 }
 

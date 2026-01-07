@@ -99,10 +99,15 @@ export namespace Core::Assets
         // 4. Get Resource
         template <typename T>
         std::shared_ptr<T> Get(AssetHandle handle);
+        template <typename T>
+        T* GetRaw(AssetHandle handle);
         LoadState GetState(AssetHandle handle);
 
         void Clear();
         void AssetsUiPanel();
+
+        template <typename T>
+        AssetHandle Create(const std::string& name, std::shared_ptr<T> resource);
 
     private:
         entt::registry m_Registry;
@@ -229,5 +234,39 @@ export namespace Core::Assets
             return payload->Resource;
         }
         return nullptr;
+    }
+
+    template <typename T>
+    T* AssetManager::GetRaw(AssetHandle handle)
+    {
+        // Use shared_lock for reader concurrency
+        std::shared_lock lock(m_Mutex);
+        if (!m_Registry.valid(handle.ID)) return nullptr;
+
+        const auto& info = m_Registry.get<AssetInfo>(handle.ID);
+        if (info.State != LoadState::Ready) return nullptr;
+
+        if (auto* payload = m_Registry.try_get<AssetPayload<T>>(handle.ID))
+        {
+            return payload->Resource.get();
+        }
+        return nullptr;
+    }
+
+    template <typename T>
+    AssetHandle AssetManager::Create(const std::string& name, std::shared_ptr<T> resource)
+    {
+        std::unique_lock lock(m_Mutex);
+
+        auto entity = m_Registry.create();
+        AssetHandle handle{entity};
+
+        m_Registry.emplace<AssetInfo>(entity, name, "Runtime", LoadState::Ready);
+        m_Registry.emplace<AssetPayload<T>>(entity, resource);
+
+        // Allow lookup by name
+        m_Lookup[name] = handle;
+
+        return handle;
     }
 }

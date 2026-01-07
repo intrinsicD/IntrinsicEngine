@@ -112,7 +112,7 @@ namespace Graphics
         }
     };
 
-    void RenderSystem::OnUpdate(ECS::Scene& scene, const CameraComponent& camera)
+    void RenderSystem::OnUpdate(ECS::Scene& scene, const CameraComponent& camera, Core::Assets::AssetManager &assetManager)
     {
         Interface::GUI::BeginFrame();
 
@@ -203,14 +203,19 @@ namespace Graphics
                                                        packets.reserve(view.size_hint());
                                                        for (auto [entity, transform, renderable] : view.each())
                                                        {
-                                                           if (!renderable.Geometry.IsValid() ||
-                                                               !renderable.MaterialRef)
+                                                           if (!renderable.Geometry.IsValid() || !renderable.Material.IsValid())
                                                                continue;
-                                                           packets.push_back({
-                                                               renderable.Geometry,
-                                                               renderable.MaterialRef->GetTextureIndex(),
-                                                               transform.GetTransform()
-                                                           });
+
+                                                           Material* mat = assetManager.GetRaw<Material>(renderable.Material);
+
+                                                           if (mat)
+                                                           {
+                                                               packets.push_back({
+                                                                   renderable.Geometry,
+                                                                   mat->GetTextureIndex(),
+                                                                   transform.GetTransform()
+                                                               });
+                                                           }
                                                        }
 
                                                        // 2. Sort to minimize state changes (Batching)

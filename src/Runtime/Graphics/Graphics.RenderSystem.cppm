@@ -28,7 +28,7 @@ export namespace Graphics
                      GeometryStorage& geometryStorage);
         ~RenderSystem();
 
-        void OnUpdate(ECS::Scene& scene, const CameraComponent& camera);
+        void OnUpdate(ECS::Scene& scene, const CameraComponent& camera, Core::Assets::AssetManager &assetManager);
 
         [[nodiscard]] RHI::VulkanBuffer* GetGlobalUBO() const { return m_GlobalUBO.get(); }
 

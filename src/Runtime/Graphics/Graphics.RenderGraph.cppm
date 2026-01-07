@@ -72,7 +72,7 @@ export namespace Graphics
 
         // Import an existing Vulkan Image (e.g., Swapchain Backbuffer)
         RGResourceHandle ImportTexture(const std::string& name, VkImage image, VkImageView view, VkFormat format,
-                                       VkExtent2D extent);
+                                       VkExtent2D extent, VkImageLayout currentLayout = VK_IMAGE_LAYOUT_UNDEFINED);
 
         [[nodiscard]] VkExtent2D GetTextureExtent(RGResourceHandle handle) const;
 

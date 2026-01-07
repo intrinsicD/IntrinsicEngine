@@ -228,6 +228,8 @@ namespace Runtime
                     );
                     m_LoadedMaterials.push_back(defaultMat);
 
+                    auto defaultMaterialHandle = m_AssetManager.Create("DefaultMaterial",defaultMat);
+
                     // --- Spawn Entities ---
                     std::filesystem::path fsPath(path);
                     std::string entityName = fsPath.stem().string();
@@ -247,7 +249,7 @@ namespace Runtime
 
                         auto& mr = m_Scene.GetRegistry().emplace<ECS::MeshRenderer::Component>(targetEntity);
                         mr.Geometry = model->Meshes[i]->Handle;
-                        mr.MaterialRef = defaultMat;
+                        mr.Material = defaultMaterialHandle;
 
                         // Add Collider
                         if (model->Meshes[i]->CollisionGeometry)

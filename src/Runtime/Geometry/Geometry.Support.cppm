@@ -189,13 +189,17 @@ export namespace Geometry
         float maxDot = -std::numeric_limits<float>::infinity();
         glm::vec3 bestPt(0.0f);
 
-        for (const auto& v : shape.Vertices)
+        // Pre-fetch data pointer to avoid iterator overhead in Debug builds
+        const glm::vec3* ptr = shape.Vertices.data();
+        const size_t count = shape.Vertices.size();
+
+        for (size_t i = 0; i < count; ++i)
         {
-            float dot = glm::dot(v, dir);
+            float dot = glm::dot(ptr[i], dir);
             if (dot > maxDot)
             {
                 maxDot = dot;
-                bestPt = v;
+                bestPt = ptr[i];
             }
         }
         return bestPt;

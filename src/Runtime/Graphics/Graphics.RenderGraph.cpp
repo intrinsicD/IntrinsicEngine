@@ -78,7 +78,7 @@ namespace Graphics
     }
 
     RGResourceHandle RGBuilder::ImportTexture(const std::string& name, VkImage image, VkImageView view, VkFormat format,
-                                              VkExtent2D extent)
+                                              VkExtent2D extent, VkImageLayout currentLayout)
     {
         auto [id, created] = m_Graph.CreateResourceInternal(name, ResourceType::Import);
 
@@ -87,8 +87,8 @@ namespace Graphics
             auto& node = m_Graph.m_Resources[id];
             node.PhysicalImage = image;
             node.PhysicalView = view;
-            node.InitialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-            node.CurrentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            node.InitialLayout = currentLayout;
+            node.CurrentLayout = currentLayout;
             node.Extent = extent;
             node.Format = format;
             node.Aspect = (format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT)

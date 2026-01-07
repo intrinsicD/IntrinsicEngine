@@ -30,7 +30,7 @@ public:
     Assets::AssetHandle m_DuckModel{};
     Assets::AssetHandle m_DuckTexture{};
 
-    std::shared_ptr<Graphics::Material> m_DuckMaterial;
+    Assets::AssetHandle m_DuckMaterialHandle;
 
     // State to track if we have spawned the entity yet
     bool m_IsEntitySpawned = false;
@@ -102,13 +102,16 @@ public:
         );
 
         // 3. Setup Material (Assuming texture loads synchronously or is handled)
-        m_DuckMaterial = std::make_shared<Graphics::Material>(
+        auto DuckMaterial = std::make_shared<Graphics::Material>(
             GetDevice(),
             *m_BindlessSystem,
             m_DuckTexture,
             m_DefaultTexture,
             m_AssetManager
         );
+
+        m_LoadedMaterials.push_back(DuckMaterial);
+        m_DuckMaterialHandle = m_AssetManager.Create("DuckMaterial", DuckMaterial);
 
         Log::Info("Asset Load Requested. Waiting for background thread...");
 
@@ -182,7 +185,7 @@ public:
 
                     auto& mr = m_Scene.GetRegistry().emplace<ECS::MeshRenderer::Component>(entity);
                     mr.Geometry = meshSegment->Handle;
-                    mr.MaterialRef = m_DuckMaterial;
+                    mr.Material = m_DuckMaterialHandle;
 
                     auto& collider = m_Scene.GetRegistry().emplace<ECS::MeshCollider::Component>(entity);
                     collider.CollisionRef = meshSegment->CollisionGeometry; // Shared Ptr
@@ -224,7 +227,7 @@ public:
         // Draw
         if (cameraComponent != nullptr)
         {
-            m_RenderSystem->OnUpdate(m_Scene, *cameraComponent);
+            m_RenderSystem->OnUpdate(m_Scene, *cameraComponent, m_AssetManager);
         }
     }
 

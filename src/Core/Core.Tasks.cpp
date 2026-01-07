@@ -58,13 +58,14 @@ namespace Core::Tasks
         std::deque<LocalTask> globalQueue;
 
         std::mutex queueMutex;
-        std::condition_variable wakeCondition; // Used to wake up sleeping WORKERS
+
+        std::atomic<uint32_t> workSignal{0};
 
         std::atomic<bool> isRunning{false};
 
-        // We use std::atomic::wait on activeTaskCount, so no separate CV/Mutex needed for waiting
-        std::atomic<int> activeTaskCount{0};
-        std::atomic<int> queuedTaskCount{0};
+        // Existing counters remain for logic
+        std::atomic<int> activeTaskCount{0}; // Tasks currently running on threads
+        std::atomic<int> queuedTaskCount{0}; // Tasks sitting in the deque
     };
 
     static std::unique_ptr<SchedulerContext> s_Ctx = nullptr;
@@ -93,12 +94,11 @@ namespace Core::Tasks
     {
         if (!s_Ctx) return;
 
-        // Stop accepting work
-        {
-            std::lock_guard lock(s_Ctx->queueMutex);
-            s_Ctx->isRunning = false;
-        }
-        s_Ctx->wakeCondition.notify_all();
+        s_Ctx->isRunning = false;
+
+        // Wake everyone up so they can exit
+        s_Ctx->workSignal.fetch_add(1, std::memory_order_release);
+        s_Ctx->workSignal.notify_all();
 
         for (auto& t : s_Ctx->workers)
         {
@@ -111,29 +111,35 @@ namespace Core::Tasks
     {
         if (!s_Ctx) return;
 
-        // Increment active count (Task is now tracked)
+        // 1. Update Counters
         s_Ctx->activeTaskCount.fetch_add(1, std::memory_order_relaxed);
         s_Ctx->queuedTaskCount.fetch_add(1, std::memory_order_release);
 
+        // 2. Push to Queue
         {
             std::lock_guard lock(s_Ctx->queueMutex);
             s_Ctx->globalQueue.emplace_back(std::move(task));
         }
-        s_Ctx->wakeCondition.notify_one();
+
+        // 3. Wake up ONE worker (Futex wake)
+        s_Ctx->workSignal.fetch_add(1, std::memory_order_release);
+        s_Ctx->workSignal.notify_one();
     }
 
     void Scheduler::WaitForAll()
     {
         if (!s_Ctx) return;
 
-        // 1. Help with work while tasks are queued
+        // 1. Work Stealing Loop
+        // While there are tasks in the queue, the main thread helps out.
         while (s_Ctx->queuedTaskCount.load(std::memory_order_acquire) > 0)
         {
             LocalTask task;
             bool foundWork = false;
 
-            // Try to steal work
             {
+                // Try locking with std::try_lock to avoid contention with workers?
+                // For simplicity, standard lock is fine here.
                 std::unique_lock lock(s_Ctx->queueMutex);
                 if (!s_Ctx->globalQueue.empty())
                 {
@@ -146,74 +152,67 @@ namespace Core::Tasks
 
             if (foundWork && task.Valid())
             {
-                // Execute stolen task
                 task();
-
-                // Task done. Decrement active count and notify any other waiters.
                 s_Ctx->activeTaskCount.fetch_sub(1, std::memory_order_release);
                 s_Ctx->activeTaskCount.notify_all();
             }
             else
             {
-                // Queue counter suggested work, but queue was empty (race condition).
-                // Yield briefly to let other threads progress.
                 std::this_thread::yield();
             }
         }
 
-        // 2. Efficient Wait (C++20)
-        // Queue is empty, but workers might still be running tasks.
-        // Wait until activeTaskCount drops to 0.
+        // 2. Wait for Active Tasks (C++20 Atomic Wait)
+        // Queue is empty, but threads might still be processing the last items.
         int active = s_Ctx->activeTaskCount.load(std::memory_order_acquire);
         while (active > 0)
         {
-            // Atomically waits if value is still 'active'.
-            // This blocks at OS level (futex) preventing 100% CPU usage.
             s_Ctx->activeTaskCount.wait(active);
-
-            // Reload value to check loop condition
             active = s_Ctx->activeTaskCount.load(std::memory_order_acquire);
         }
     }
 
     void Scheduler::WorkerEntry(unsigned)
     {
-        while (true)
+        // Capture current signal to know when it changes
+        uint32_t lastSignal = s_Ctx->workSignal.load(std::memory_order_acquire);
+
+        while (s_Ctx->isRunning)
         {
             LocalTask task;
+            bool foundWork = false;
 
-            // SCOPE 1: Acquire Task
+            // 1. Try Pop
             {
                 std::unique_lock lock(s_Ctx->queueMutex);
-
-                s_Ctx->wakeCondition.wait(lock, []
-                {
-                    return !s_Ctx->globalQueue.empty() || !s_Ctx->isRunning;
-                });
-
-                if (!s_Ctx->isRunning && s_Ctx->globalQueue.empty())
-                {
-                    return;
-                }
-
                 if (!s_Ctx->globalQueue.empty())
                 {
                     task = std::move(s_Ctx->globalQueue.front());
                     s_Ctx->globalQueue.pop_front();
                     s_Ctx->queuedTaskCount.fetch_sub(1, std::memory_order_relaxed);
+                    foundWork = true;
                 }
             }
 
-            // SCOPE 2: Execute Task (Unlocked)
-            if (task.Valid())
+            // 2. Execute or Sleep
+            if (foundWork && task.Valid())
             {
                 task();
 
-                // Decrement active count
+                // Task Complete
                 s_Ctx->activeTaskCount.fetch_sub(1, std::memory_order_release);
 
-                // Notify WaitForAll() that a task has finished
+                // Wake up the Main Thread if it is blocked in WaitForAll
                 s_Ctx->activeTaskCount.notify_all();
+            }
+            else
+            {
+                // No work found. Sleep efficiently using atomic wait.
+                // We wait until 'workSignal' is NOT EQUAL to 'lastSignal'.
+                s_Ctx->workSignal.wait(lastSignal);
+
+                // Refresh signal value for next loop
+                lastSignal = s_Ctx->workSignal.load(std::memory_order_acquire);
             }
         }
     }
