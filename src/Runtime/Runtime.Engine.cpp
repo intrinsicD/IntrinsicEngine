@@ -325,8 +325,11 @@ namespace Runtime
         m_DescriptorPool = std::make_unique<RHI::DescriptorPool>(m_Device);
         m_BindlessSystem = std::make_shared<RHI::BindlessDescriptorSystem>(m_Device);
 
-        RHI::ShaderModule vert(m_Device, "shaders/triangle.vert.spv", RHI::ShaderStage::Vertex);
-        RHI::ShaderModule frag(m_Device, "shaders/triangle.frag.spv", RHI::ShaderStage::Fragment);
+        // Resolve shader paths robustly. Depending on how the app is launched, the CWD may be
+        // the repo root, the build dir, or bin/. Prefer the common dev layout: <bin>/shaders/*.spv.
+
+        RHI::ShaderModule vert(m_Device, Core::Filesystem::GetShaderPath("shaders/triangle.vert.spv"), RHI::ShaderStage::Vertex);
+        RHI::ShaderModule frag(m_Device, Core::Filesystem::GetShaderPath("shaders/triangle.frag.spv"), RHI::ShaderStage::Fragment);
 
         RHI::PipelineConfig config{&vert, &frag};
         config.BindingDescriptions = RHI::GeometryPipelineSpec::GetBindings();

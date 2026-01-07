@@ -23,8 +23,15 @@ namespace RHI
 
     GraphicsPipeline::~GraphicsPipeline()
     {
-        vkDestroyPipeline(m_Device->GetLogicalDevice(), m_Pipeline, nullptr);
-        vkDestroyPipelineLayout(m_Device->GetLogicalDevice(), m_Layout, nullptr);
+        // These may remain VK_NULL_HANDLE if pipeline creation failed (e.g., missing shaders).
+        if(m_Pipeline != VK_NULL_HANDLE)
+        {
+            vkDestroyPipeline(m_Device->GetLogicalDevice(), m_Pipeline, nullptr);
+        }
+        if(m_Layout != VK_NULL_HANDLE)
+        {
+            vkDestroyPipelineLayout(m_Device->GetLogicalDevice(), m_Layout, nullptr);
+        }
     }
 
     void GraphicsPipeline::CreateLayout(const std::vector<VkDescriptorSetLayout> &descriptorLayouts)
@@ -51,10 +58,26 @@ namespace RHI
     void GraphicsPipeline::CreatePipeline(const VulkanSwapchain& swapchain, const PipelineConfig& config)
     {
         // 1. Shaders
+        if(!config.VertexShader || !config.FragmentShader)
+        {
+            Core::Log::Error("CreatePipeline: Missing vertex/fragment shader.");
+            m_Pipeline = VK_NULL_HANDLE;
+            return;
+        }
+
         VkPipelineShaderStageCreateInfo shaderStages[] = {
             config.VertexShader->GetStageInfo(),
             config.FragmentShader->GetStageInfo()
         };
+
+        // Guard against invalid module handles. The Vulkan validation layer will complain,
+        // and on some driver/layer combos this can crash during pipeline creation.
+        if(shaderStages[0].module == VK_NULL_HANDLE || shaderStages[1].module == VK_NULL_HANDLE)
+        {
+            Core::Log::Error("CreatePipeline: Shader module was VK_NULL_HANDLE (did shader SPIR-V fail to load?)");
+            m_Pipeline = VK_NULL_HANDLE;
+            return;
+        }
 
         // 2. Vertex Input (Empty for now!)
         const auto& bindingDescriptions = config.BindingDescriptions;
@@ -158,6 +181,7 @@ namespace RHI
                                       &m_Pipeline) != VK_SUCCESS)
         {
             Core::Log::Error("Failed to create graphics pipeline!");
+            m_Pipeline = VK_NULL_HANDLE;
         }
     }
 }

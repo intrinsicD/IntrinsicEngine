@@ -11,15 +11,17 @@ import Core;
 
 namespace Core::Filesystem
 {
-
-    std::filesystem::path GetRoot() {
+    std::filesystem::path GetRoot()
+    {
         // 1. Check if "assets" exists in current working directory (Production/Binary Release)
-        if (std::filesystem::exists("assets")) {
+        if (std::filesystem::exists("assets"))
+        {
             return std::filesystem::current_path();
         }
 
         // 2. Check if we are in "bin" and need to go up (Common dev scenario)
-        if (std::filesystem::exists("../assets")) {
+        if (std::filesystem::exists("../assets"))
+        {
             return std::filesystem::current_path().parent_path();
         }
 
@@ -32,9 +34,36 @@ namespace Core::Filesystem
 #endif
     }
 
-    std::string GetAssetPath(const std::string& relativePath) {
+    std::string GetAssetPath(const std::string& relativePath)
+    {
         auto path = GetRoot() / "assets" / relativePath;
         return path.string();
+    }
+
+    std::string GetShaderPath(const std::string& relativePath)
+    {
+        // try CWD/rel first
+        if (std::filesystem::exists(relativePath))
+        {
+            return relativePath;
+        }
+        // try CWD/bin/rel (when launched from build dir)
+        if (std::filesystem::exists(std::filesystem::path("bin") / relativePath))
+        {
+            return (std::filesystem::path("bin") / relativePath).string();
+        }
+        // try CWD/../bin/rel (when launched from repo root)
+        if (std::filesystem::exists(std::filesystem::path("..") / "bin" / relativePath))
+        {
+            return (std::filesystem::path("..") / "bin" / relativePath).string();
+        }
+        // last resort: try assets (if you ever copy SPV there)
+        auto asset = Core::Filesystem::GetAssetPath(relativePath);
+        if (std::filesystem::exists(asset))
+        {
+            return asset;
+        }
+        return relativePath; // let ShaderModule print a clear error
     }
 
     std::vector<FileWatcher::Entry> FileWatcher::s_Watches;

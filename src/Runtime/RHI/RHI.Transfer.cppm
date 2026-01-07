@@ -43,6 +43,7 @@ export namespace RHI {
     private:
         struct ThreadTransferContext {
             VkCommandPool Pool = VK_NULL_HANDLE;
+            void* Owner = nullptr;
         };
 
         ThreadTransferContext& GetThreadContext();

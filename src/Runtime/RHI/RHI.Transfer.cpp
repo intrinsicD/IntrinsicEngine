@@ -142,6 +142,13 @@ namespace RHI {
 
     TransferManager::ThreadTransferContext& TransferManager::GetThreadContext() {
         thread_local ThreadTransferContext ctx;
+
+        if (ctx.Owner != this)
+        {
+            ctx.Pool = VK_NULL_HANDLE;
+            ctx.Owner = this;
+        }
+
         if (ctx.Pool == VK_NULL_HANDLE) {
             VkCommandPoolCreateInfo poolInfo{ VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
             poolInfo.queueFamilyIndex = m_Device->GetQueueIndices().GraphicsFamily.value(); // Or TransferFamily

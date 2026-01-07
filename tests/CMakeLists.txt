@@ -29,4 +29,23 @@ target_link_libraries(${target_name}
 
 # Helper to run tests via CTest
 include(GoogleTest)
-gtest_discover_tests(${target_name})
+
+# Try to locate a symbolizer so sanitizer reports have function/file/line.
+find_program(INTRINSIC_LLVM_SYMBOLIZER
+        NAMES llvm-symbolizer llvm-symbolizer-18 llvm-symbolizer-19 llvm-symbolizer-20 llvm-symbolizer-21 llvm-symbolizer-22
+)
+
+set(_intrinsic_test_env
+        "LSAN_OPTIONS=suppressions=${CMAKE_SOURCE_DIR}/lsan.supp:fast_unwind_on_malloc=0"
+        "ASAN_OPTIONS=symbolize=1:detect_leaks=1:fast_unwind_on_malloc=0"
+)
+
+if(INTRINSIC_LLVM_SYMBOLIZER)
+    list(APPEND _intrinsic_test_env "ASAN_SYMBOLIZER_PATH=${INTRINSIC_LLVM_SYMBOLIZER}")
+endif()
+
+gtest_discover_tests(${target_name}
+    PROPERTIES
+    ENVIRONMENT "${_intrinsic_test_env}"
+    DISCOVERY_MODE PRE_TEST
+)

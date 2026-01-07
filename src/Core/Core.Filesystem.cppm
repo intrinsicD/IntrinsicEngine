@@ -17,6 +17,8 @@ export namespace Core::Filesystem
 
     std::string GetAssetPath(const std::string& relativePath);
 
+    std::string GetShaderPath(const std::string& relativePath);
+
     class FileWatcher
     {
     public:
