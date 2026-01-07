@@ -201,6 +201,11 @@ namespace Runtime
                 RunOnMainThread([this, model = loadResult->ModelData, path]()
                 {
                     // [Main Thread] Safe to touch Scene/Assets
+                    std::filesystem::path fsPath(path);
+                    std::string assetName = fsPath.filename().string();
+
+                    // This increments the ref-count of the shared_ptr, preventing ~Model() from running
+                    m_AssetManager.Create(assetName, model);
 
                     // --- Setup Material (Requires AssetManager) ---
                     // Define local loader lambda inside the main thread task
@@ -231,7 +236,6 @@ namespace Runtime
                     auto defaultMaterialHandle = m_AssetManager.Create("DefaultMaterial",defaultMat);
 
                     // --- Spawn Entities ---
-                    std::filesystem::path fsPath(path);
                     std::string entityName = fsPath.stem().string();
                     entt::entity rootEntity = m_Scene.CreateEntity(entityName);
 

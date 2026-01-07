@@ -3,6 +3,8 @@ module;
 #include <vector>
 #include <span>
 #include <memory>
+#include <mutex>
+#include <shared_mutex>
 #include <utility>
 #include <queue>
 #include <glm/glm.hpp>
@@ -119,6 +121,8 @@ export namespace Graphics
         // Adds ownership of the GPU data to the system and returns a handle
         GeometryHandle Add(std::unique_ptr<GeometryGpuData> data)
         {
+            std::unique_lock lock(m_Mutex);
+
             uint32_t index;
             if (!m_FreeIndices.empty())
             {
@@ -141,6 +145,8 @@ export namespace Graphics
 
         void Remove(GeometryHandle handle)
         {
+            std::unique_lock lock(m_Mutex);
+
             if (handle.Index >= m_Slots.size()) return;
 
             Slot& slot = m_Slots[handle.Index];
@@ -154,6 +160,8 @@ export namespace Graphics
 
         [[nodiscard]] GeometryGpuData* Get(GeometryHandle handle)
         {
+            std::unique_lock lock(m_Mutex);
+
             if (handle.Index >= m_Slots.size()) return nullptr;
 
             Slot& slot = m_Slots[handle.Index];
@@ -174,5 +182,6 @@ export namespace Graphics
 
         std::vector<Slot> m_Slots;
         std::deque<uint32_t> m_FreeIndices;
+        std::shared_mutex m_Mutex;
     };
 }
