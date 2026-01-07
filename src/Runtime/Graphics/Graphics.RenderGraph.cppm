@@ -115,33 +115,11 @@ export namespace Graphics
 
         // 1. Setup Phase: Add a pass to the frame
         template <typename Data, typename SetupFn, typename ExecuteFn>
-             void AddPass(const std::string& name, SetupFn&& setup, ExecuteFn&& execute)
+        void AddPass(const std::string& name, SetupFn&& setup, ExecuteFn&& execute)
         {
-            /*static_assert(std::is_trivially_destructible_v<Data>,
-                          "RenderGraph PassData must be trivially destructible (POD) because the LinearArena does not call destructors.")
-                ;
-            auto& pass = CreatePassInternal(name);
-            // Allocate data on a linear arena (simulated here with heap for brevity)
-            auto allocResult = m_Arena.New<Data>();
-            if (!allocResult)
-            {
-                Core::Log::Error("RenderGraph: Frame Arena Out of Memory!");
-                Core::Log::Error("  Pass Name: {}", name);
-                Core::Log::Error("  Requested Size: {}", sizeof(Data));
-                Core::Log::Error("  Arena used: {} / {} bytes", m_Arena.GetUsed(), m_Arena.GetTotal());
-                std::exit(1);
-            }
-
-            Data* data = *allocResult;
-
-            RGBuilder builder(*this, (uint32_t)m_Passes.size() - 1);
-
-            setup(*data, builder);
-
-            pass.Execute = [=](const RGRegistry& reg, VkCommandBuffer cmd)
-            {
-                execute(*data, reg, cmd);
-            };*/
+            static_assert(std::is_trivially_destructible_v<Data>,
+                          "RenderGraph PassData must be trivially destructible (POD). "
+                          "LinearArena does not call destructors! Do not use std::vector/std::string in PassData.");
             // 1. Allocate Pass Data
             auto dataResult = m_Arena.New<Data>();
             Data* data = *dataResult;
@@ -154,7 +132,8 @@ export namespace Graphics
 
             // 3. Store Execution Lambda in Arena
             // We wrapper the user's lambda in a struct we can placement-new into the arena
-            struct PassClosure {
+            struct PassClosure
+            {
                 ExecuteFn func;
                 Data* dataPtr;
             };
@@ -164,11 +143,13 @@ export namespace Graphics
             // (LinearArena limitation). Usually pass lambdas just capture pointers/PODs.
             auto closureMem = m_Arena.New<PassClosure>(std::forward<ExecuteFn>(execute), data);
 
-            if (closureMem) {
+            if (closureMem)
+            {
                 PassClosure* closure = *closureMem;
 
                 // 4. Type Erase via stateless lambda
-                pass.Execute = [closure](const RGRegistry& reg, VkCommandBuffer cmd) {
+                pass.Execute = [closure](const RGRegistry& reg, VkCommandBuffer cmd)
+                {
                     // Invoke the stored lambda
                     (closure->func)(*(closure->dataPtr), reg, cmd);
                 };

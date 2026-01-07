@@ -17,7 +17,7 @@ namespace Graphics {
     std::optional<TextureLoadResult> TextureLoader::LoadAsync(
         const std::filesystem::path& filepath,
         std::shared_ptr<RHI::VulkanDevice> device,
-        RHI::TransferManager& transferManager)
+        RHI::TransferManager& transferManager, bool isSRGB)
     {
         // 1. IO & Decode
         // (Note: In a full engine, we'd use Core::Filesystem to read into memory buffer first)
@@ -42,9 +42,11 @@ namespace Graphics {
         staging->Unmap();
         stbi_image_free(pixels);
 
+        VkFormat format = isSRGB ? VK_FORMAT_R8G8B8A8_SRGB : VK_FORMAT_R8G8B8A8_UNORM;
+
         // 3. Allocate GPU Resource
         auto texture = std::make_shared<RHI::Texture>(
-            device, static_cast<uint32_t>(w), static_cast<uint32_t>(h), VK_FORMAT_R8G8B8A8_SRGB
+            device, static_cast<uint32_t>(w), static_cast<uint32_t>(h), format
         );
 
         // 4. Record Transfer Commands

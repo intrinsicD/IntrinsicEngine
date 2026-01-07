@@ -22,7 +22,8 @@ export namespace Graphics {
         static std::optional<TextureLoadResult> LoadAsync(
             const std::filesystem::path& filepath,
             std::shared_ptr<RHI::VulkanDevice> device,
-            RHI::TransferManager& transferManager
+            RHI::TransferManager& transferManager,
+            bool isSRGB = true
         );
     };
 }
