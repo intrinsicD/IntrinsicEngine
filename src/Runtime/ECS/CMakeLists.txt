@@ -10,7 +10,11 @@ target_sources(${target_name}
         PUBLIC
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
         ECS.cppm
-        ECS.Components.cppm
+        Components/ECS.Components.cppm
+        Components/ECS.Components.AxisRotator.cppm
+        Components/ECS.Components.Hierarchy.cppm
+        Components/ECS.Components.NameTag.cppm
+        Components/ECS.Components.Transform.cppm
         ECS.Scene.cppm
         FILE_SET ecs_impl TYPE CXX_MODULES FILES
         ECS.Scene.cpp

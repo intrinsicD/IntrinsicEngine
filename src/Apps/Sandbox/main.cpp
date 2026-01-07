@@ -179,9 +179,9 @@ public:
                     auto entity = m_Scene.CreateEntity(meshSegment->Name);
 
                     m_SelectedEntity = entity;
-                    auto& t = m_Scene.GetRegistry().get<ECS::Transform::Component>(entity);
+                    auto& t = m_Scene.GetRegistry().get<ECS::Components::Transform::Component>(entity);
                     t.Scale = glm::vec3(0.01f);
-                    m_Scene.GetRegistry().emplace<ECS::Transform::Rotator>(entity, ECS::Transform::Rotator::Y());
+                    m_Scene.GetRegistry().emplace<ECS::Components::AxisRotator::Component>(entity, ECS::Components::AxisRotator::Component::Y());
 
                     auto& mr = m_Scene.GetRegistry().emplace<ECS::MeshRenderer::Component>(entity);
                     mr.Geometry = meshSegment->Handle;
@@ -199,21 +199,21 @@ public:
 
         {
             // --- Rotate Entities ---
-            auto view = m_Scene.GetRegistry().view<ECS::Transform::Component, ECS::Transform::Rotator>();
+            auto view = m_Scene.GetRegistry().view<ECS::Components::Transform::Component, ECS::Components::AxisRotator::Component>();
             for (auto [entity, transform, rotator] : view.each())
             {
-                ECS::Transform::OnUpdate(transform, rotator, dt);
+                ECS::Components::AxisRotator::OnUpdate(transform, rotator, dt);
             }
         }
 
         {
-            auto view = m_Scene.GetRegistry().view<ECS::Transform::Component, ECS::MeshCollider::Component>();
+            auto view = m_Scene.GetRegistry().view<ECS::Components::Transform::Component, ECS::MeshCollider::Component>();
             for (auto [entity, transform, collider] : view.each())
             {
                 // World center: transform the local center point
                 // Explicitly cast vec4 result to vec3
                 glm::vec3 localCenter = collider.CollisionRef->LocalAABB.GetCenter();
-                collider.WorldOBB.Center = glm::vec3(transform.GetTransform() * glm::vec4(localCenter, 1.0f));
+                collider.WorldOBB.Center = glm::vec3(GetMatrix(transform) * glm::vec4(localCenter, 1.0f));
 
                 // Extents: scale component-wise by absolute scale (handles negative/non-uniform scale)
                 glm::vec3 localExtents = collider.CollisionRef->LocalAABB.GetExtents();
@@ -243,9 +243,9 @@ public:
         {
             // Try to get tag, default to "Entity"
             std::string name = "Entity";
-            if (m_Scene.GetRegistry().all_of<ECS::Tag::Component>(entityID))
+            if (m_Scene.GetRegistry().all_of<ECS::Components::NameTag::Component>(entityID))
             {
-                name = m_Scene.GetRegistry().get<ECS::Tag::Component>(entityID).Name;
+                name = m_Scene.GetRegistry().get<ECS::Components::NameTag::Component>(entityID).Name;
             }
 
             // Selection flags
@@ -304,9 +304,9 @@ public:
             auto& reg = m_Scene.GetRegistry();
 
             // 1. Tag Component
-            if (reg.all_of<ECS::Tag::Component>(m_SelectedEntity))
+            if (reg.all_of<ECS::Components::NameTag::Component>(m_SelectedEntity))
             {
-                auto& tag = reg.get<ECS::Tag::Component>(m_SelectedEntity);
+                auto& tag = reg.get<ECS::Components::NameTag::Component>(m_SelectedEntity);
                 char buffer[256];
                 memset(buffer, 0, sizeof(buffer));
                 strncpy(buffer, tag.Name.c_str(), sizeof(buffer) - 1);
@@ -319,11 +319,11 @@ public:
             ImGui::Separator();
 
             // 2. Transform Component
-            if (reg.all_of<ECS::Transform::Component>(m_SelectedEntity))
+            if (reg.all_of<ECS::Components::Transform::Component>(m_SelectedEntity))
             {
                 if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen))
                 {
-                    auto& transform = reg.get<ECS::Transform::Component>(m_SelectedEntity);
+                    auto& transform = reg.get<ECS::Components::Transform::Component>(m_SelectedEntity);
 
                     Interface::GUI::DrawVec3Control("Position", transform.Position);
 

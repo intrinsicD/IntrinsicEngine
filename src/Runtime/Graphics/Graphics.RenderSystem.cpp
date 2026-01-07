@@ -198,7 +198,7 @@ namespace Graphics
                                                            0, nullptr
                                                        );
                                                        auto view = scene.GetRegistry().view<
-                                                           ECS::Transform::Component, ECS::MeshRenderer::Component>();
+                                                           ECS::Components::Transform::Component, ECS::MeshRenderer::Component>();
                                                        std::vector<RenderPacket> packets;
                                                        packets.reserve(view.size_hint());
                                                        for (auto [entity, transform, renderable] : view.each())
@@ -213,7 +213,7 @@ namespace Graphics
                                                                packets.push_back({
                                                                    renderable.Geometry,
                                                                    mat->GetTextureIndex(),
-                                                                   transform.GetTransform()
+                                                                   GetMatrix(transform)
                                                                });
                                                            }
                                                        }

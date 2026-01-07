@@ -12,8 +12,9 @@ namespace ECS
     entt::entity Scene::CreateEntity(const std::string& name)
     {
         entt::entity e = m_Registry.create();
-        m_Registry.emplace<Tag::Component>(e, name);
-        m_Registry.emplace<Transform::Component>(e);
+        m_Registry.emplace<Components::NameTag::Component>(e, name);
+        m_Registry.emplace<Components::Transform::Component>(e);
+        m_Registry.emplace<Components::Hierarchy::Component>(e);
         return e;
     }
 }

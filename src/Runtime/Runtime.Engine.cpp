@@ -239,7 +239,7 @@ namespace Runtime
                     std::string entityName = fsPath.stem().string();
                     entt::entity rootEntity = m_Scene.CreateEntity(entityName);
 
-                    auto& t = m_Scene.GetRegistry().get<ECS::Transform::Component>(rootEntity);
+                    auto& t = m_Scene.GetRegistry().get<ECS::Components::Transform::Component>(rootEntity);
                     t.Scale = glm::vec3(0.01f);
 
                     for (size_t i = 0; i < model->Size(); i++)
