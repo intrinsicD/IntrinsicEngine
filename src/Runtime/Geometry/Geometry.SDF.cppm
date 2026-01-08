@@ -4,6 +4,7 @@ module;
 #include <glm/gtx/quaternion.hpp>
 #include <algorithm>
 #include <vector>
+#include <span>
 #include <cmath>
 
 export module Geometry:SDF;
@@ -184,7 +185,7 @@ export namespace Geometry::SDF
 
     struct ConvexHullSDF
     {
-        std::vector<Plane> Planes;
+        std::span<const Plane> Planes;
 
         float operator()(const glm::vec3& p) const
         {
@@ -368,7 +369,7 @@ export namespace Geometry::SDF
 
     auto CreateSDF(const ConvexHull& hull)
     {
-        return ConvexHullSDF{hull.Planes};
+        return ConvexHullSDF{std::span{hull.Planes}};
     }
 
     auto CreateSDF(const Ellipsoid& e)

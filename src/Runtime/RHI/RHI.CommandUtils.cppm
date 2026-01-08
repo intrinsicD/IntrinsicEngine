@@ -88,6 +88,7 @@ export namespace RHI::CommandUtils
     }
 
     // Thread-Safe Immediate Execution using Thread-Local Pools
+    [[deprecated]]
     void ExecuteImmediate(VulkanDevice& device, auto&& function)
     {
         VkCommandBuffer cmd = BeginSingleTimeCommands(device);

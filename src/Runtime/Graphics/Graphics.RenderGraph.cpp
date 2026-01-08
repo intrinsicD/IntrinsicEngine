@@ -58,7 +58,7 @@ namespace Graphics
         return resource;
     }
 
-    RGResourceHandle RGBuilder::CreateTexture(const std::string& name, const RGTextureDesc& desc)
+    RGResourceHandle RGBuilder::CreateTexture(Core::Hash::StringID name, const RGTextureDesc& desc)
     {
         auto [id, created] = m_Graph.CreateResourceInternal(name, ResourceType::Texture);
 
@@ -77,7 +77,7 @@ namespace Graphics
         return {id};
     }
 
-    RGResourceHandle RGBuilder::ImportTexture(const std::string& name, VkImage image, VkImageView view, VkFormat format,
+    RGResourceHandle RGBuilder::ImportTexture(Core::Hash::StringID name, VkImage image, VkImageView view, VkFormat format,
                                               VkExtent2D extent, VkImageLayout currentLayout)
     {
         auto [id, created] = m_Graph.CreateResourceInternal(name, ResourceType::Import);
@@ -132,7 +132,7 @@ namespace Graphics
         return m_Passes.emplace_back(RGPass{name});
     }
 
-    std::pair<ResourceID, bool> RenderGraph::CreateResourceInternal(const std::string& name, ResourceType type)
+    std::pair<ResourceID, bool> RenderGraph::CreateResourceInternal(Core::Hash::StringID name, ResourceType type)
     {
         // 1. Check Aliasing
         if (auto it = m_ResourceLookup.find(name); it != m_ResourceLookup.end())

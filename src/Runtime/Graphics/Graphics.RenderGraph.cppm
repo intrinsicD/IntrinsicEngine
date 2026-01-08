@@ -68,10 +68,10 @@ export namespace Graphics
         RGResourceHandle WriteDepth(RGResourceHandle resource, RGAttachmentInfo info);
 
         // Create a new transient texture managed by the graph
-        RGResourceHandle CreateTexture(const std::string& name, const RGTextureDesc& desc);
+        RGResourceHandle CreateTexture(Core::Hash::StringID name, const RGTextureDesc& desc);
 
         // Import an existing Vulkan Image (e.g., Swapchain Backbuffer)
-        RGResourceHandle ImportTexture(const std::string& name, VkImage image, VkImageView view, VkFormat format,
+        RGResourceHandle ImportTexture(Core::Hash::StringID name, VkImage image, VkImageView view, VkFormat format,
                                        VkExtent2D extent, VkImageLayout currentLayout = VK_IMAGE_LAYOUT_UNDEFINED);
 
         [[nodiscard]] VkExtent2D GetTextureExtent(RGResourceHandle handle) const;
@@ -193,7 +193,7 @@ export namespace Graphics
 
         struct ResourceNode
         {
-            std::string Name;
+            Core::Hash::StringID Name;
             ResourceType Type;
             // State tracking for barriers
             VkImageLayout CurrentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -260,13 +260,13 @@ export namespace Graphics
         std::vector<ResourceNode> m_Resources;
         std::vector<BarrierBatch> m_Barriers;
 
-        std::unordered_map<std::string, ResourceID> m_ResourceLookup;
+        std::unordered_map<Core::Hash::StringID, ResourceID> m_ResourceLookup;
 
         RGRegistry m_Registry;
         std::unordered_map<ImageCacheKey, PooledImageStack, ImageCacheKeyHash> m_ImagePool;
 
         RGPass& CreatePassInternal(const std::string& name);
-        std::pair<ResourceID, bool> CreateResourceInternal(const std::string& name, ResourceType type);
+        std::pair<ResourceID, bool> CreateResourceInternal(Core::Hash::StringID name, ResourceType type);
         RHI::VulkanImage* ResolveImage(uint32_t frameIndex, const ResourceNode& node);
     };
 }

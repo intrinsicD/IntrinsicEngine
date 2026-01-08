@@ -210,6 +210,7 @@ namespace RHI
             VK_IMAGE_ASPECT_COLOR_BIT
         );
 
+        //TODO: use the Async TransferManager path...
         CommandUtils::ExecuteImmediate(*m_Device, [&](VkCommandBuffer cmd)
         {
             // 1. Transition Undefined -> Transfer Dst

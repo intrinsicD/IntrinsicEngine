@@ -13,6 +13,31 @@ import :Logging;
 
 namespace Core::Tasks
 {
+    struct SpinLock
+    {
+        std::atomic_flag flag = ATOMIC_FLAG_INIT;
+
+        void lock()
+        {
+            while (flag.test_and_set(std::memory_order_acquire))
+            {
+#if defined(__cpp_lib_atomic_wait)
+                flag.wait(true, std::memory_order_relaxed);
+#else
+                std::this_thread::yield();
+#endif
+            }
+        }
+
+        void unlock()
+        {
+            flag.clear(std::memory_order_release);
+#if defined(__cpp_lib_atomic_wait)
+            flag.notify_one();
+#endif
+        }
+    };
+
     LocalTask::~LocalTask()
     {
         if (m_VTable) std::destroy_at(m_VTable);
@@ -57,7 +82,7 @@ namespace Core::Tasks
         std::vector<std::thread> workers;
         std::deque<LocalTask> globalQueue;
 
-        std::mutex queueMutex;
+        SpinLock queueMutex;
 
         std::atomic<uint32_t> workSignal{0};
 

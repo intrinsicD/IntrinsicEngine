@@ -10,20 +10,20 @@ module RHI:Transfer.Impl;
 import :Transfer;
 import Core;
 
-namespace RHI {
-
+namespace RHI
+{
     TransferManager::TransferManager(std::shared_ptr<VulkanDevice> device)
         : m_Device(device)
     {
         uint32_t queueFamilyIndex = m_Device->GetQueueIndices().GraphicsFamily.value();
         vkGetDeviceQueue(m_Device->GetLogicalDevice(), queueFamilyIndex, 0, &m_TransferQueue);
 
-        VkSemaphoreTypeCreateInfo timelineInfo{  };
+        VkSemaphoreTypeCreateInfo timelineInfo{};
         timelineInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
         timelineInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
         timelineInfo.initialValue = 0;
 
-        VkSemaphoreCreateInfo semInfo{ };
+        VkSemaphoreCreateInfo semInfo{};
         semInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
         semInfo.pNext = &timelineInfo;
 
@@ -32,7 +32,8 @@ namespace RHI {
         Core::Log::Info("RHI Transfer System Initialized.");
     }
 
-    TransferManager::~TransferManager() {
+    TransferManager::~TransferManager()
+    {
         // Wait for all pending transfers before destroying the pool
         vkDeviceWaitIdle(m_Device->GetLogicalDevice());
 
@@ -42,10 +43,11 @@ namespace RHI {
         vkDestroySemaphore(m_Device->GetLogicalDevice(), m_TimelineSemaphore, nullptr);
     }
 
-    VkCommandBuffer TransferManager::Begin() {
+    VkCommandBuffer TransferManager::Begin()
+    {
         auto& ctx = GetThreadContext();
 
-        VkCommandBufferAllocateInfo allocInfo{ };
+        VkCommandBufferAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
         allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
         allocInfo.commandBufferCount = 1;
@@ -54,7 +56,7 @@ namespace RHI {
         VkCommandBuffer cmd;
         VK_CHECK(vkAllocateCommandBuffers(m_Device->GetLogicalDevice(), &allocInfo, &cmd));
 
-        VkCommandBufferBeginInfo beginInfo{ };
+        VkCommandBufferBeginInfo beginInfo{};
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
@@ -63,7 +65,9 @@ namespace RHI {
         return cmd;
     }
 
-    TransferToken TransferManager::Submit(VkCommandBuffer cmd, std::vector<std::unique_ptr<VulkanBuffer>>&& stagingBuffers) {
+    TransferToken TransferManager::Submit(VkCommandBuffer cmd,
+                                          std::vector<std::unique_ptr<VulkanBuffer>>&& stagingBuffers)
+    {
         // 1. End Recording
         VK_CHECK(vkEndCommandBuffer(cmd));
 
@@ -71,12 +75,12 @@ namespace RHI {
         // Increment the ticket. This value represents "This Batch Completed".
         uint64_t signalValue = m_NextTicket.fetch_add(1);
 
-        VkTimelineSemaphoreSubmitInfo timelineSubmit{ };
+        VkTimelineSemaphoreSubmitInfo timelineSubmit{};
         timelineSubmit.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
         timelineSubmit.signalSemaphoreValueCount = 1;
         timelineSubmit.pSignalSemaphoreValues = &signalValue;
 
-        VkSubmitInfo submitInfo{  };
+        VkSubmitInfo submitInfo{};
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
         submitInfo.pNext = &timelineSubmit;
         submitInfo.commandBufferCount = 1;
@@ -96,14 +100,15 @@ namespace RHI {
 
             VK_CHECK(vkQueueSubmit(m_TransferQueue, 1, &submitInfo, VK_NULL_HANDLE));
 
-            m_InFlightBatches.push_back({ TransferToken{signalValue}, std::move(stagingBuffers) });
+            m_InFlightBatches.push_back({TransferToken{signalValue}, std::move(stagingBuffers)});
         }
 
         // Return the token so the Engine knows what to wait for
-        return TransferToken{ signalValue };
+        return TransferToken{signalValue};
     }
 
-    bool TransferManager::IsCompleted(TransferToken token) const {
+    bool TransferManager::IsCompleted(TransferToken token) const
+    {
         if (!token.IsValid()) return true;
 
         uint64_t gpuValue = 0;
@@ -113,7 +118,8 @@ namespace RHI {
         return gpuValue >= token.Value;
     }
 
-    void TransferManager::GarbageCollect() {
+    void TransferManager::GarbageCollect()
+    {
         uint64_t gpuValue = 0;
         VK_CHECK(vkGetSemaphoreCounterValue(m_Device->GetLogicalDevice(), m_TimelineSemaphore, &gpuValue));
 
@@ -122,25 +128,28 @@ namespace RHI {
 
         // Remove batches that have been processed by the GPU
         auto it = std::remove_if(m_InFlightBatches.begin(), m_InFlightBatches.end(),
-            [gpuValue, this](const PendingBatch& batch) {
-                if (gpuValue >= batch.Token.Value) {
-                    // GPU is done.
-                    // Note: We also need to free the CommandBuffer!
-                    // In a simple pool, we can't free individual buffers easily if they are mixed,
-                    // but vkFreeCommandBuffers IS allowed.
-                    // However, for this implementation, we rely on vkResetCommandPool periodically
-                    // or just let the pool grow.
-                    // Perfectionist fix: Store cmd buffer in PendingBatch and free it here.
-                    return true;
-                }
-                return false;
-            });
+                                 [gpuValue, this](const PendingBatch& batch)
+                                 {
+                                     if (gpuValue >= batch.Token.Value)
+                                     {
+                                         // GPU is done.
+                                         // Note: We also need to free the CommandBuffer!
+                                         // In a simple pool, we can't free individual buffers easily if they are mixed,
+                                         // but vkFreeCommandBuffers IS allowed.
+                                         // However, for this implementation, we rely on vkResetCommandPool periodically
+                                         // or just let the pool grow.
+                                         // Perfectionist fix: Store cmd buffer in PendingBatch and free it here.
+                                         return true;
+                                     }
+                                     return false;
+                                 });
 
         // This actually calls the destructors of the unique_ptr<VulkanBuffer>, freeing CPU memory.
         m_InFlightBatches.erase(it, m_InFlightBatches.end());
     }
 
-    TransferManager::ThreadTransferContext& TransferManager::GetThreadContext() {
+    TransferManager::ThreadTransferContext& TransferManager::GetThreadContext()
+    {
         thread_local ThreadTransferContext ctx;
 
         if (ctx.Owner != this)
@@ -149,8 +158,10 @@ namespace RHI {
             ctx.Owner = this;
         }
 
-        if (ctx.Pool == VK_NULL_HANDLE) {
-            VkCommandPoolCreateInfo poolInfo{ VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
+        if (ctx.Pool == VK_NULL_HANDLE)
+        {
+            VkCommandPoolCreateInfo poolInfo{};
+            poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
             poolInfo.queueFamilyIndex = m_Device->GetQueueIndices().GraphicsFamily.value(); // Or TransferFamily
             poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT; // Buffers are short lived
             VK_CHECK(vkCreateCommandPool(m_Device->GetLogicalDevice(), &poolInfo, nullptr, &ctx.Pool));

@@ -9,3 +9,4 @@ export import :Filesystem;
 export import :Input;
 export import :Assets;
 export import :Profiling;
+export import :Hash;

@@ -16,6 +16,8 @@ import RHI;
 import ECS;
 import Interface;
 
+using namespace Core::Hash;
+
 namespace Graphics
 {
     inline size_t PadUniformBufferSize(size_t originalSize, size_t minAlignment)
@@ -160,7 +162,7 @@ namespace Graphics
                                                        depthDesc.Usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT
                                                            | VK_IMAGE_USAGE_SAMPLED_BIT;
                                                        depthDesc.Aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
-                                                       auto depth = builder.CreateTexture("DepthBuffer", depthDesc);
+                                                       auto depth = builder.CreateTexture("DepthBuffer"_id, depthDesc);
 
                                                        RGAttachmentInfo colorInfo{};
                                                        colorInfo.ClearValue = {{{0.1f, 0.3f, 0.6f, 1.0f}}};

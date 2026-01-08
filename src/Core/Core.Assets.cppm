@@ -14,6 +14,9 @@ export module Core:Assets;
 import :Logging;
 import :Filesystem;
 import :Tasks; // Using your Async Task Graph
+import :Hash;
+
+using namespace Core::Hash;
 
 export namespace Core::Assets
 {
@@ -111,7 +114,7 @@ export namespace Core::Assets
 
     private:
         entt::registry m_Registry;
-        std::unordered_map<std::string, AssetHandle> m_Lookup;
+        std::unordered_map<StringID, AssetHandle> m_Lookup;
 
         // Separate map for Persistent Listeners
         std::unordered_map<AssetHandle, std::vector<AssetCallback>, AssetHandle::Hash> m_PersistentListeners;
@@ -132,16 +135,19 @@ export namespace Core::Assets
     template <typename T, typename LoaderFunc>
     AssetHandle AssetManager::Load(const std::filesystem::path& path, LoaderFunc&& loader)
     {
+        std::string key = std::filesystem::absolute(path).string();
+
+        StringID id(key); // Hashes here
         std::unique_lock lock(m_Mutex);
 
-        if (m_Lookup.contains(path)) return m_Lookup[path];
+        if (m_Lookup.contains(id)) return m_Lookup[id];
 
         auto entity = m_Registry.create();
         AssetHandle handle{entity};
 
-        m_Registry.emplace<AssetInfo>(entity, path, "Unknown", LoadState::Loading);
-        m_Registry.emplace<AssetSource>(entity, path);
-        m_Lookup[path] = handle;
+        m_Registry.emplace<AssetInfo>(entity, key, "Unknown", LoadState::Loading);
+        m_Registry.emplace<AssetSource>(entity, key);
+        m_Lookup[id] = handle;
 
         m_Registry.emplace<AssetReloader>(entity, [this, handle, loader]() mutable
         {
@@ -151,7 +157,7 @@ export namespace Core::Assets
         // WATCHER REGISTRATION
         // We capture 'loader' by value (copy) for the lambda.
         // NOTE: 'loader' usually captures pointers/refs, ensure they are safe or copyable!
-        Filesystem::FileWatcher::Watch(path, [this, handle, loader](const std::string&)
+        Filesystem::FileWatcher::Watch(key, [this, handle, loader](const std::string&)
         {
             this->Reload<T>(handle, loader);
         });
@@ -265,7 +271,7 @@ export namespace Core::Assets
         m_Registry.emplace<AssetPayload<T>>(entity, resource);
 
         // Allow lookup by name
-        m_Lookup[name] = handle;
+        m_Lookup[StringID(name)] = handle;
 
         return handle;
     }

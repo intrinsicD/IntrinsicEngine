@@ -75,11 +75,14 @@ namespace Core::Assets
         m_OneShotListeners[handle].push_back(callback);
     }
 
-    void AssetManager::FinalizeLoad(AssetHandle handle) {
+    void AssetManager::FinalizeLoad(AssetHandle handle)
+    {
         std::unique_lock lock(m_Mutex);
-        if (m_Registry.valid(handle.ID)) {
+        if (m_Registry.valid(handle.ID))
+        {
             auto& info = m_Registry.get<AssetInfo>(handle.ID);
-            if (info.State == LoadState::Processing) {
+            if (info.State == LoadState::Processing)
+            {
                 info.State = LoadState::Ready;
                 EnqueueReadyEvent(handle);
                 Log::Debug("Asset finalization signaled for: {}", info.Name);
@@ -87,9 +90,11 @@ namespace Core::Assets
         }
     }
 
-    void AssetManager::MoveToProcessing(AssetHandle handle) {
+    void AssetManager::MoveToProcessing(AssetHandle handle)
+    {
         std::unique_lock lock(m_Mutex);
-        if (m_Registry.valid(handle.ID)) {
+        if (m_Registry.valid(handle.ID))
+        {
             m_Registry.get<AssetInfo>(handle.ID).State = LoadState::Processing;
         }
     }
@@ -137,6 +142,7 @@ namespace Core::Assets
         {
         case LoadState::Ready: return {0.2f, 0.8f, 0.2f, 1.0f}; // Green
         case LoadState::Loading: return {0.8f, 0.8f, 0.2f, 1.0f}; // Yellow
+        case LoadState::Processing: return {0.2f, 0.8f, 0.8f, 1.0f};
         case LoadState::Failed: return {0.8f, 0.2f, 0.2f, 1.0f}; // Red
         case LoadState::Unloaded: return {0.5f, 0.5f, 0.5f, 1.0f}; // Grey
         }
@@ -149,6 +155,7 @@ namespace Core::Assets
         {
         case LoadState::Ready: return "READY";
         case LoadState::Loading: return "LOADING";
+        case LoadState::Processing: return "PROCESSING";
         case LoadState::Failed: return "FAILED";
         case LoadState::Unloaded: return "UNLOADED";
         }

@@ -23,6 +23,7 @@ target_sources(${target_name}
         Core.Tasks.cppm
         Core.Window.cppm
         Core.Filesystem.cppm
+        Core.Hash.cppm
         Core.Input.cppm
         Core.Assets.cppm
         Core.Profiling.cppm
