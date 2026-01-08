@@ -390,6 +390,7 @@ namespace Runtime
             lastTime = currentTime;
 
             OnUpdate(dt);
+            ECS::Systems::Transform::OnUpdate(m_Scene.GetRegistry());
             OnRender();
         }
 

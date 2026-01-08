@@ -15,8 +15,11 @@ target_sources(${target_name}
         Components/ECS.Components.Hierarchy.cppm
         Components/ECS.Components.NameTag.cppm
         Components/ECS.Components.Transform.cppm
+        ECS.Systems.Transform.cppm
         ECS.Scene.cppm
         FILE_SET ecs_impl TYPE CXX_MODULES FILES
+        Components/ECS.Components.Hierarchy.cpp
+        ECS.Systems.Transform.cpp
         ECS.Scene.cpp
 )
 

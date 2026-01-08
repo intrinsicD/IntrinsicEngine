@@ -13,6 +13,17 @@ export namespace ECS::Components::Transform
         glm::vec3 Position{0.0f};
         glm::quat Rotation{1.0f, 0.0f, 0.0f, 0.0f}; // Quaternion for rotation
         glm::vec3 Scale{1.0f};
+        bool IsDirty = true;
+    };
+
+    struct IsDirtyTag
+    {
+
+    };
+
+    struct WorldMatrix
+    {
+        glm::mat4 Matrix{1.0f};
     };
 
     [[nodiscard]] glm::mat4 GetMatrix(const Component& transform)
