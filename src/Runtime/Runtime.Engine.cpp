@@ -184,7 +184,8 @@ namespace Runtime
             Core::Tasks::Scheduler::Dispatch([this, path]()
             {
                 // [Worker Thread] Heavy OBJ/GLTF Parsing
-                auto loadResult = Graphics::ModelLoader::LoadAsync(GetDevice(), *m_TransferManager, m_GeometryStorage, path);
+                auto loadResult = Graphics::ModelLoader::LoadAsync(GetDevice(), *m_TransferManager, m_GeometryStorage,
+                                                                   path);
 
                 if (!loadResult)
                 {
@@ -233,7 +234,7 @@ namespace Runtime
                     );
                     m_LoadedMaterials.push_back(defaultMat);
 
-                    auto defaultMaterialHandle = m_AssetManager.Create("DefaultMaterial",defaultMat);
+                    auto defaultMaterialHandle = m_AssetManager.Create("DefaultMaterial", defaultMat);
 
                     // --- Spawn Entities ---
                     std::string entityName = fsPath.stem().string();
@@ -334,34 +335,58 @@ namespace Runtime
         // Resolve shader paths robustly. Depending on how the app is launched, the CWD may be
         // the repo root, the build dir, or bin/. Prefer the common dev layout: <bin>/shaders/*.spv.
 
-        RHI::ShaderModule vert(m_Device, Core::Filesystem::GetShaderPath("shaders/triangle.vert.spv"), RHI::ShaderStage::Vertex);
-        RHI::ShaderModule frag(m_Device, Core::Filesystem::GetShaderPath("shaders/triangle.frag.spv"), RHI::ShaderStage::Fragment);
+        RHI::ShaderModule vert(m_Device, Core::Filesystem::GetShaderPath("shaders/triangle.vert.spv"),
+                               RHI::ShaderStage::Vertex);
+        RHI::ShaderModule frag(m_Device, Core::Filesystem::GetShaderPath("shaders/triangle.frag.spv"),
+                               RHI::ShaderStage::Fragment);
 
-        RHI::PipelineConfig config{&vert, &frag};
-        config.BindingDescriptions = RHI::GeometryPipelineSpec::GetBindings();
-        config.AttributeDescriptions = RHI::GeometryPipelineSpec::GetAttributes();
-        config.Topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-        config.DepthTest = true;
-        config.DepthWrite = true;
+        // --- NEW: Using Builder ---
+        RHI::PipelineBuilder builder(m_Device);
 
-        std::vector<VkDescriptorSetLayout> layouts = {
-            m_DescriptorLayout->GetHandle(),
-            m_BindlessSystem->GetLayout()
-        };
+        // 1. Shaders
+        builder.SetShaders(&vert, &frag);
 
-        m_Pipeline = std::make_unique<RHI::GraphicsPipeline>(m_Device, *m_Swapchain, config, layouts);
+        // 2. Vertex Layout (Previously hardcoded inside RHI::Types)
+        builder.SetInputLayout(RHI::StandardLayoutFactory::Get());
 
-        m_RenderSystem = std::make_unique<Graphics::RenderSystem>(
-            m_Device,
-            *m_Swapchain,
-            *m_Renderer,
-            *m_BindlessSystem, // <--- Passed
-            *m_DescriptorPool, // <--- Passed
-            *m_DescriptorLayout, // <--- Passed
-            *m_Pipeline,
-            m_FrameArena,
-            m_GeometryStorage
-        );
+        // 3. Render Targets (Dynamic Rendering)
+        builder.SetColorFormats({m_Swapchain->GetImageFormat()});
+        builder.SetDepthFormat(RHI::VulkanImage::FindDepthFormat(*m_Device));
+
+        // 4. Layouts
+        builder.AddDescriptorSetLayout(m_DescriptorLayout->GetHandle());
+        builder.AddDescriptorSetLayout(m_BindlessSystem->GetLayout());
+
+        // 5. Push Constants
+        VkPushConstantRange pushConstant{};
+        pushConstant.offset = 0;
+        pushConstant.size = sizeof(RHI::MeshPushConstants);
+        pushConstant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+        builder.AddPushConstantRange(pushConstant);
+
+        // Build
+        auto pipelineResult = builder.Build();
+        if (pipelineResult)
+        {
+            m_Pipeline = std::move(*pipelineResult);
+            Core::Log::Info("Pipeline built successfully using Builder.");
+
+            m_RenderSystem = std::make_unique<Graphics::RenderSystem>(
+                m_Device,
+                *m_Swapchain,
+                *m_Renderer,
+                *m_BindlessSystem, // <--- Passed
+                *m_DescriptorPool, // <--- Passed
+                *m_DescriptorLayout, // <--- Passed
+                *m_Pipeline,
+                m_FrameArena,
+                m_GeometryStorage
+            );
+        }
+        else
+        {
+            Core::Log::Error("Failed to build pipeline: {}", (int)pipelineResult.error());
+        }
     }
 
     void Engine::Run()

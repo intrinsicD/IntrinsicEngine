@@ -125,8 +125,8 @@ namespace Graphics
         if (m_Renderer.IsFrameInProgress())
         {
             RHI::CameraBufferObject ubo{};
-            ubo.view = camera.ViewMatrix;
-            ubo.proj = camera.ProjectionMatrix;
+            ubo.View = camera.ViewMatrix;
+            ubo.Proj = camera.ProjectionMatrix;
 
             size_t cameraDataSize = sizeof(RHI::CameraBufferObject);
             size_t alignedSize = PadUniformBufferSize(cameraDataSize, m_MinUboAlignment);
@@ -277,8 +277,8 @@ namespace Graphics
 
                                                            // Push Constants (Per Object)
                                                            RHI::MeshPushConstants push{};
-                                                           push.model = packet.Transform;
-                                                           push.textureID = packet.TextureID;
+                                                           push.Model = packet.Transform;
+                                                           push.TextureID = packet.TextureID;
 
                                                            vkCmdPushConstants(cmd, m_Pipeline.GetLayout(),
                                                                               VK_SHADER_STAGE_VERTEX_BIT |

@@ -78,26 +78,20 @@ export namespace Graphics
     {
     public:
         GeometryGpuData() = default;
-        [[deprecated("Use CreateAsync to avoid stalling the Render Thread via ExecuteImmediate.")]]
-        GeometryGpuData(std::shared_ptr<RHI::VulkanDevice> device, const GeometryUploadRequest& data);
-        [[deprecated("Use CreateAsync. This constructor does not manage index buffer staging memory correctly.")]]
-        GeometryGpuData(std::shared_ptr<RHI::VulkanDevice> device,
-                   const GeometryUploadRequest& data,
-                   VkCommandBuffer cmd,
-                   RHI::VulkanBuffer& stagingBuffer,
-                   size_t stagingOffset);
+
         ~GeometryGpuData() = default;
 
         [[nodiscard]] static std::pair<std::unique_ptr<GeometryGpuData>, RHI::TransferToken>
-       CreateAsync(std::shared_ptr<RHI::VulkanDevice> device,
-                   RHI::TransferManager& transferManager,
-                   const GeometryUploadRequest& data);
+        CreateAsync(std::shared_ptr<RHI::VulkanDevice> device,
+                    RHI::TransferManager& transferManager,
+                    const GeometryUploadRequest& data);
 
         [[nodiscard]] RHI::VulkanBuffer* GetVertexBuffer() const { return m_VertexBuffer.get(); }
         [[nodiscard]] RHI::VulkanBuffer* GetIndexBuffer() const { return m_IndexBuffer.get(); }
         [[nodiscard]] uint32_t GetIndexCount() const { return m_IndexCount; }
         [[nodiscard]] const GeometryBufferLayout& GetLayout() const { return m_Layout; }
         [[nodiscard]] PrimitiveTopology GetTopology() const { return m_Layout.Topology; }
+
     private:
         std::unique_ptr<RHI::VulkanBuffer> m_VertexBuffer;
         std::unique_ptr<RHI::VulkanBuffer> m_IndexBuffer;

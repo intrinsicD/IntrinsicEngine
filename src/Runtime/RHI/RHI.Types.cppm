@@ -5,9 +5,12 @@ module;
 
 export module RHI:Types;
 
-export namespace RHI {
-    struct GeometryPipelineSpec {
-        static std::vector<VkVertexInputBindingDescription> GetBindings() {
+export namespace RHI
+{
+    struct GeometryPipelineSpec
+    {
+        static std::vector<VkVertexInputBindingDescription> GetBindings()
+        {
             std::vector<VkVertexInputBindingDescription> bindings(3);
 
             // Binding 0: Positions
@@ -28,7 +31,8 @@ export namespace RHI {
             return bindings;
         }
 
-        static std::vector<VkVertexInputAttributeDescription> GetAttributes() {
+        static std::vector<VkVertexInputAttributeDescription> GetAttributes()
+        {
             std::vector<VkVertexInputAttributeDescription> attributes(3);
 
             // Location 0: Position
@@ -53,14 +57,46 @@ export namespace RHI {
         }
     };
 
-    struct CameraBufferObject {
-        alignas(16) glm::mat4 view;
-        alignas(16) glm::mat4 proj;
+    struct CameraBufferObject
+    {
+        alignas(16) glm::mat4 View;
+        alignas(16) glm::mat4 Proj;
     };
 
-    struct MeshPushConstants {
-        glm::mat4 model;
-        uint32_t textureID;
+    struct MeshPushConstants
+    {
+        glm::mat4 Model;
+        uint32_t TextureID;
         uint32_t _pad[3];
+    };
+
+    struct VertexInputDescription
+    {
+        std::vector<VkVertexInputBindingDescription> Bindings;
+        std::vector<VkVertexInputAttributeDescription> Attributes;
+        VkPipelineVertexInputStateCreateFlags Flags = 0;
+    };
+
+    struct StandardLayoutFactory
+    {
+        static VertexInputDescription Get()
+        {
+            VertexInputDescription desc;
+            // Binding 0: Positions
+            desc.Bindings.push_back({0, sizeof(glm::vec3), VK_VERTEX_INPUT_RATE_VERTEX});
+            // Binding 1: Normals
+            desc.Bindings.push_back({1, sizeof(glm::vec3), VK_VERTEX_INPUT_RATE_VERTEX});
+            // Binding 2: Aux (Vec4)
+            desc.Bindings.push_back({2, sizeof(glm::vec4), VK_VERTEX_INPUT_RATE_VERTEX});
+
+            //Attribute 0: Position
+            desc.Attributes.push_back({0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0});
+            //Attribute 1: Normal
+            desc.Attributes.push_back({1, 1, VK_FORMAT_R32G32B32_SFLOAT, 0});
+            //Attribute 2: Aux (UV + Extra)
+            desc.Attributes.push_back({2, 2, VK_FORMAT_R32G32B32A32_SFLOAT, 0});
+
+            return desc;
+        }
     };
 }

@@ -15,7 +15,7 @@ namespace RHI
     TransferManager::TransferManager(std::shared_ptr<VulkanDevice> device)
         : m_Device(device)
     {
-        uint32_t queueFamilyIndex = m_Device->GetQueueIndices().GraphicsFamily.value();
+        uint32_t queueFamilyIndex = m_Device->GetQueueIndices().TransferFamily.value();
         vkGetDeviceQueue(m_Device->GetLogicalDevice(), queueFamilyIndex, 0, &m_TransferQueue);
 
         VkSemaphoreTypeCreateInfo timelineInfo{};
@@ -162,7 +162,7 @@ namespace RHI
         {
             VkCommandPoolCreateInfo poolInfo{};
             poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-            poolInfo.queueFamilyIndex = m_Device->GetQueueIndices().GraphicsFamily.value(); // Or TransferFamily
+            poolInfo.queueFamilyIndex = m_Device->GetQueueIndices().TransferFamily.value();
             poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT; // Buffers are short lived
             VK_CHECK(vkCreateCommandPool(m_Device->GetLogicalDevice(), &poolInfo, nullptr, &ctx.Pool));
 

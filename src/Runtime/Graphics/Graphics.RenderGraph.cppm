@@ -125,7 +125,7 @@ export namespace Graphics
             Data* data = *dataResult;
 
             auto& pass = CreatePassInternal(name);
-            RGBuilder builder(*this, (uint32_t)m_Passes.size() - 1);
+            RGBuilder builder(*this, static_cast<uint32_t>(m_Passes.size()) - 1);
 
             // 2. Run Setup (Immediate)
             setup(*data, builder);
@@ -181,20 +181,20 @@ export namespace Graphics
             // Rasterization Info
             struct Attachment
             {
-                ResourceID ID;
-                RGAttachmentInfo Info;
+                ResourceID ID{};
+                RGAttachmentInfo Info{};
                 bool IsDepth = false;
             };
 
             std::vector<Attachment> Attachments{};
 
-            std::function<void(const RGRegistry&, VkCommandBuffer)> Execute;
+            std::function<void(const RGRegistry&, VkCommandBuffer)> Execute{};
         };
 
         struct ResourceNode
         {
             Core::Hash::StringID Name;
-            ResourceType Type;
+            ResourceType Type{};
             // State tracking for barriers
             VkImageLayout CurrentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
             VkImageLayout InitialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -243,7 +243,7 @@ export namespace Graphics
                 // Simple hash combine
                 std::size_t h = std::hash<uint32_t>()(k.Width);
                 h ^= std::hash<uint32_t>()(k.Height) + 0x9e3779b9 + (h << 6) + (h >> 2);
-                h ^= std::hash<uint32_t>()((uint32_t)k.Format) + 0x9e3779b9 + (h << 6) + (h >> 2);
+                h ^= std::hash<uint32_t>()(static_cast<uint32_t>(k.Format)) + 0x9e3779b9 + (h << 6) + (h >> 2);
                 return h;
             }
         };

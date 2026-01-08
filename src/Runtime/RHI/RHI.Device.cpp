@@ -148,7 +148,6 @@ namespace RHI
 
     void VulkanDevice::CreateLogicalDevice(VulkanContext& context)
     {
-        // ... (Keep existing implementation logic) ...
         m_Indices = FindQueueFamilies(m_PhysicalDevice);
 
         std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
@@ -157,6 +156,8 @@ namespace RHI
             uniqueQueueFamilies.insert(m_Indices.GraphicsFamily.value());
         if (m_Indices.PresentFamily.has_value())
             uniqueQueueFamilies.insert(m_Indices.PresentFamily.value());
+        if (m_Indices.TransferFamily.has_value())
+            uniqueQueueFamilies.insert(m_Indices.TransferFamily.value());
 
         float queuePriority = 1.0f;
         for (uint32_t queueFamily : uniqueQueueFamilies)
@@ -237,6 +238,10 @@ namespace RHI
         if (m_Indices.PresentFamily.has_value())
         {
             vkGetDeviceQueue(m_Device, m_Indices.PresentFamily.value(), 0, &m_PresentQueue);
+        }
+        if (m_Indices.TransferFamily.has_value())
+        {
+            vkGetDeviceQueue(m_Device, m_Indices.TransferFamily.value(), 0, &m_TransferQueue);
         }
     }
 
