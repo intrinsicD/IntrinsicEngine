@@ -1,6 +1,7 @@
 module;
 #include <glm/glm.hpp>
 #include <memory>
+#include <vector>
 #include "RHI.Vulkan.hpp"
 
 export module Graphics:RenderSystem;
@@ -48,5 +49,7 @@ export namespace Graphics
         // RenderGraph
         RenderGraph m_RenderGraph;
         GeometryStorage& m_GeometryStorage;
+
+        std::vector<std::unique_ptr<RHI::VulkanImage>> m_DepthImages;
     };
 }

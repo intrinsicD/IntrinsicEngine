@@ -93,8 +93,10 @@ namespace Runtime
                              m_Device->GetGraphicsQueue());
 
         InitPipeline();
+        Core::Log::Info("Engine: InitPipeline complete, creating default texture...");
         std::vector<uint8_t> whitePixel = {255, 255, 255, 255};
         m_DefaultTexture = std::make_shared<RHI::Texture>(m_Device, whitePixel, 1, 1);
+        Core::Log::Info("Engine: Constructor complete.");
     }
 
     Engine::~Engine()
@@ -371,6 +373,7 @@ namespace Runtime
             m_Pipeline = std::move(*pipelineResult);
             Core::Log::Info("Pipeline built successfully using Builder.");
 
+            Core::Log::Info("About to create RenderSystem...");
             m_RenderSystem = std::make_unique<Graphics::RenderSystem>(
                 m_Device,
                 *m_Swapchain,
@@ -382,15 +385,24 @@ namespace Runtime
                 m_FrameArena,
                 m_GeometryStorage
             );
+            Core::Log::Info("RenderSystem created successfully.");
         }
         else
         {
             Core::Log::Error("Failed to build pipeline: {}", (int)pipelineResult.error());
+            std::exit(1);
+        }
+
+        if (!m_RenderSystem)
+        {
+            Core::Log::Error("Failed to create RenderSystem!");
+            std::exit(1);
         }
     }
 
     void Engine::Run()
     {
+        Core::Log::Info("Engine::Run starting...");
         Core::Profiling::ScopedTimer timer("Engine::Run");
         OnStart();
         auto lastTime = std::chrono::high_resolution_clock::now();

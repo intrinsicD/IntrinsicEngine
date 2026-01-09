@@ -134,9 +134,9 @@ namespace RHI
     void BindlessDescriptorSystem::UpdateTexture(uint32_t index, const Texture& texture)
     {
         VkDescriptorImageInfo imageInfo{};
-        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        imageInfo.imageView = texture.GetView();
         imageInfo.sampler = texture.GetSampler();
+        imageInfo.imageView = texture.GetView();
+        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
         VkWriteDescriptorSet descriptorWrite{};
         descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;

@@ -225,7 +225,7 @@ public:
         }
 
         // Draw
-        if (cameraComponent != nullptr)
+        if (cameraComponent != nullptr && m_RenderSystem)
         {
             m_RenderSystem->OnUpdate(m_Scene, *cameraComponent, m_AssetManager);
         }

@@ -107,6 +107,15 @@ namespace RHI
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         VK_CHECK(vkBeginCommandBuffer(cmd, &beginInfo));
 
+        // Ensure the acquired swapchain image is in COLOR_ATTACHMENT_OPTIMAL before any rendering.
+        // We do this here so RenderGraph can treat the backbuffer as ready for use.
+        {
+            VkImage currentImage = m_Swapchain.GetImages()[m_ImageIndex];
+            CommandUtils::TransitionImageLayout(cmd, currentImage,
+                                                VK_IMAGE_LAYOUT_UNDEFINED,
+                                                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+        }
+
         m_IsFrameStarted = true;
     }
 

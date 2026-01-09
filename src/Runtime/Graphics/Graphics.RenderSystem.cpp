@@ -2,6 +2,8 @@ module;
 #include <cstring>
 #include <vector>
 #include <algorithm>
+#include <memory>
+#include <string>
 #include <glm/glm.hpp>
 #include <entt/entt.hpp>
 #include "RHI.Vulkan.hpp"
@@ -46,6 +48,10 @@ namespace Graphics
           m_RenderGraph(device, frameArena),
           m_GeometryStorage(geometryStorage)
     {
+        Core::Log::Info("RenderSystem: Starting constructor body...");
+        m_DepthImages.resize(renderer.GetFramesInFlight());
+        Core::Log::Info("RenderSystem: DepthImages resized.");
+
         VkPhysicalDeviceProperties props;
         vkGetPhysicalDeviceProperties(device->GetPhysicalDevice(), &props);
         m_MinUboAlignment = props.limits.minUniformBufferOffsetAlignment;
@@ -61,27 +67,37 @@ namespace Graphics
             VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
             VMA_MEMORY_USAGE_CPU_TO_GPU
         );
+        Core::Log::Info("RenderSystem: UBO created.");
 
-        //In RenderSystem constructor, allocate a set from m_DescriptorPool using m_DescriptorLayout (passed in), pointing to m_GlobalUBO.
         // 2. Allocate Descriptor Set (Set 0)
         m_GlobalDescriptorSet = descriptorPool.Allocate(descriptorLayout.GetHandle());
+        Core::Log::Info("RenderSystem: Descriptor set allocated.");
 
-        // 3. Update Descriptor Set to point to UBO
-        VkDescriptorBufferInfo bufferInfo{};
-        bufferInfo.buffer = m_GlobalUBO->GetHandle();
-        bufferInfo.offset = 0; // We use dynamic offsets, so base offset is 0
-        bufferInfo.range = sizeof(RHI::CameraBufferObject); // Size of ONE view
+        if (m_GlobalDescriptorSet != VK_NULL_HANDLE && m_GlobalUBO && m_GlobalUBO->GetHandle() != VK_NULL_HANDLE)
+        {
+            // 3. Update Descriptor Set to point to UBO
+            VkDescriptorBufferInfo bufferInfo{};
+            bufferInfo.buffer = m_GlobalUBO->GetHandle();
+            bufferInfo.offset = 0; // We use dynamic offsets, so base offset is 0
+            bufferInfo.range = sizeof(RHI::CameraBufferObject); // Size of ONE view
 
-        VkWriteDescriptorSet descriptorWrite{};
-        descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrite.dstSet = m_GlobalDescriptorSet;
-        descriptorWrite.dstBinding = 0; // Binding 0 = Camera
-        descriptorWrite.dstArrayElement = 0;
-        descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-        descriptorWrite.descriptorCount = 1;
-        descriptorWrite.pBufferInfo = &bufferInfo;
+            VkWriteDescriptorSet descriptorWrite{};
+            descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrite.dstSet = m_GlobalDescriptorSet;
+            descriptorWrite.dstBinding = 0; // Binding 0 = Camera
+            descriptorWrite.dstArrayElement = 0;
+            descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+            descriptorWrite.descriptorCount = 1;
+            descriptorWrite.pBufferInfo = &bufferInfo;
 
-        vkUpdateDescriptorSets(m_Device->GetLogicalDevice(), 1, &descriptorWrite, 0, nullptr);
+            vkUpdateDescriptorSets(m_Device->GetLogicalDevice(), 1, &descriptorWrite, 0, nullptr);
+            Core::Log::Info("RenderSystem: Descriptor set updated successfully.");
+        }
+        else
+        {
+            Core::Log::Error("RenderSystem: Failed to initialize Global UBO or Descriptor Set");
+        }
+        Core::Log::Info("RenderSystem: Constructor complete.");
     }
 
     RenderSystem::~RenderSystem()
@@ -114,7 +130,8 @@ namespace Graphics
         }
     };
 
-    void RenderSystem::OnUpdate(ECS::Scene& scene, const CameraComponent& camera, Core::Assets::AssetManager &assetManager)
+    void RenderSystem::OnUpdate(ECS::Scene& scene, const CameraComponent& camera,
+                                Core::Assets::AssetManager& assetManager)
     {
         Interface::GUI::BeginFrame();
 
@@ -153,16 +170,29 @@ namespace Graphics
                                                        // Use explicit format from swapchain
                                                        auto importedColor = builder.ImportTexture(
                                                            "Backbuffer", swapImage, swapView,
-                                                           m_Swapchain.GetImageFormat(), extent);
+                                                           m_Swapchain.GetImageFormat(), extent,
+                                                           VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
-                                                       RGTextureDesc depthDesc{};
-                                                       depthDesc.Width = extent.width;
-                                                       depthDesc.Height = extent.height;
-                                                       depthDesc.Format = VK_FORMAT_D32_SFLOAT;
-                                                       depthDesc.Usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT
-                                                           | VK_IMAGE_USAGE_SAMPLED_BIT;
-                                                       depthDesc.Aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
-                                                       auto depth = builder.CreateTexture("DepthBuffer"_id, depthDesc);
+                                                       // Check and create Depth Buffer if needed
+                                                       auto& depthImg = m_DepthImages[frameIndex];
+                                                       if (!depthImg || depthImg->GetWidth() != extent.width ||
+                                                           depthImg->GetHeight() != extent.height)
+                                                       {
+                                                           VkFormat depthFormat = RHI::VulkanImage::FindDepthFormat(
+                                                               *m_Device);
+                                                           depthImg = std::make_unique<RHI::VulkanImage>(
+                                                               m_Device, extent.width, extent.height, 1,
+                                                               depthFormat,
+                                                               VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT |
+                                                               VK_IMAGE_USAGE_SAMPLED_BIT,
+                                                               VK_IMAGE_ASPECT_DEPTH_BIT
+                                                           );
+                                                       }
+
+                                                       auto depth = builder.ImportTexture(
+                                                           "DepthBuffer", depthImg->GetHandle(), depthImg->GetView(),
+                                                           depthImg->GetFormat(), extent,
+                                                           VK_IMAGE_LAYOUT_UNDEFINED);
 
                                                        RGAttachmentInfo colorInfo{};
                                                        colorInfo.ClearValue = {{{0.1f, 0.3f, 0.6f, 1.0f}}};
@@ -176,39 +206,51 @@ namespace Graphics
                                                        data.Depth = builder.WriteDepth(depth, depthInfo);
                                                        backbufferHandle = data.Color;
                                                    },
-                                                   [&, offset](const ForwardPassData&, const RGRegistry&,
+                                                   [renderer = &m_Renderer,
+                                                       pipeline = &m_Pipeline,
+                                                       bindless = &m_BindlessSystem,
+                                                       globalSet0 = m_GlobalDescriptorSet,
+                                                       geoStorage = &m_GeometryStorage,
+                                                       scenePtr = &scene,
+                                                       assets = &assetManager,
+                                                       extent,
+                                                       offset](const ForwardPassData&, const RGRegistry&,
                                                                VkCommandBuffer cmd)
                                                    {
-                                                       m_Renderer.BindPipeline(m_Pipeline);
-                                                       m_Renderer.SetViewport(extent.width, extent.height);
+                                                       renderer->BindPipeline(*pipeline);
+                                                       renderer->SetViewport(extent.width, extent.height);
 
                                                        // 1. Bind Set 0: Global Camera (Dynamic Offset)
                                                        uint32_t dynamicOffset = static_cast<uint32_t>(offset);
                                                        vkCmdBindDescriptorSets(
                                                            cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                                           m_Pipeline.GetLayout(),
-                                                           0, 1, &m_GlobalDescriptorSet,
+                                                           pipeline->GetLayout(),
+                                                           0, 1, &globalSet0,
                                                            1, &dynamicOffset
                                                        );
 
                                                        // 2. Bind Set 1: Bindless Textures (Static)
-                                                       VkDescriptorSet globalTextures = m_BindlessSystem.GetGlobalSet();
+                                                       VkDescriptorSet globalTextures = bindless->GetGlobalSet();
                                                        vkCmdBindDescriptorSets(
                                                            cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                                           m_Pipeline.GetLayout(),
+                                                           pipeline->GetLayout(),
                                                            1, 1, &globalTextures,
                                                            0, nullptr
                                                        );
-                                                       auto view = scene.GetRegistry().view<
-                                                           ECS::Components::Transform::Component, ECS::MeshRenderer::Component>();
+
+                                                       auto view = scenePtr->GetRegistry().view<
+                                                           ECS::Components::Transform::Component,
+                                                           ECS::MeshRenderer::Component>();
                                                        std::vector<RenderPacket> packets;
                                                        packets.reserve(view.size_hint());
                                                        for (auto [entity, transform, renderable] : view.each())
                                                        {
-                                                           if (!renderable.Geometry.IsValid() || !renderable.Material.IsValid())
+                                                           if (!renderable.Geometry.IsValid() || !renderable.Material.
+                                                               IsValid())
                                                                continue;
 
-                                                           Material* mat = assetManager.GetRaw<Material>(renderable.Material);
+                                                           Material* mat = assets->GetRaw<
+                                                               Material>(renderable.Material);
 
                                                            if (mat)
                                                            {
@@ -232,7 +274,7 @@ namespace Graphics
                                                            // Resolve Geometry only when it changes
                                                            if (packet.GeoHandle != currentGeoHandle)
                                                            {
-                                                               currentGeo = m_GeometryStorage.Get(packet.GeoHandle);
+                                                               currentGeo = geoStorage->Get(packet.GeoHandle);
                                                                currentGeoHandle = packet.GeoHandle;
 
                                                                if (!currentGeo) continue; // Invalid handle?
@@ -280,7 +322,7 @@ namespace Graphics
                                                            push.Model = packet.Transform;
                                                            push.TextureID = packet.TextureID;
 
-                                                           vkCmdPushConstants(cmd, m_Pipeline.GetLayout(),
+                                                           vkCmdPushConstants(cmd, pipeline->GetLayout(),
                                                                               VK_SHADER_STAGE_VERTEX_BIT |
                                                                               VK_SHADER_STAGE_FRAGMENT_BIT,
                                                                               0, sizeof(push), &push);

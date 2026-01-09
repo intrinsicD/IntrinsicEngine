@@ -1,3 +1,4 @@
+// Graphics.RenderGraph.cpp
 module;
 #include "RHI.Vulkan.hpp"
 #include <string>
@@ -25,35 +26,56 @@ namespace Graphics
         return m_PhysicalImages[handle.ID].View;
     }
 
+    VkBuffer RGRegistry::GetBuffer(RGResourceHandle handle) const
+    {
+        if (handle.ID >= m_PhysicalBuffers.size()) return VK_NULL_HANDLE;
+        return m_PhysicalBuffers[handle.ID];
+    }
+
     void RGRegistry::RegisterImage(ResourceID id, VkImage img, VkImageView view)
     {
         if (m_PhysicalImages.size() <= id) m_PhysicalImages.resize(id + 1);
         m_PhysicalImages[id] = {img, view};
     }
 
-    // --- RGBuilder ---
-    RGResourceHandle RGBuilder::Read(RGResourceHandle resource)
+    void RGRegistry::RegisterBuffer(ResourceID id, VkBuffer buffer)
     {
-        m_Graph.m_Passes[m_PassIndex].Reads.push_back(resource.ID);
+        if (m_PhysicalBuffers.size() <= id) m_PhysicalBuffers.resize(id + 1);
+        m_PhysicalBuffers[id] = buffer;
+    }
+
+    // --- RGBuilder ---
+    
+    RGResourceHandle RGBuilder::Read(RGResourceHandle resource, VkPipelineStageFlags2 stage, VkAccessFlags2 access)
+    {
+        m_Graph.m_Passes[m_PassIndex].Accesses.push_back({resource.ID, stage, access});
+        // Extend lifetime
+        auto& node = m_Graph.m_Resources[resource.ID];
+        node.EndPass = std::max(node.EndPass, m_PassIndex);
         return resource;
     }
 
-    RGResourceHandle RGBuilder::Write(RGResourceHandle resource)
+    RGResourceHandle RGBuilder::Write(RGResourceHandle resource, VkPipelineStageFlags2 stage, VkAccessFlags2 access)
     {
-        m_Graph.m_Passes[m_PassIndex].Writes.push_back(resource.ID);
+        m_Graph.m_Passes[m_PassIndex].Accesses.push_back({resource.ID, stage, access});
+        auto& node = m_Graph.m_Resources[resource.ID];
+        if (node.StartPass == ~0u) node.StartPass = m_PassIndex; // First write defines start
+        node.EndPass = std::max(node.EndPass, m_PassIndex);
         return resource;
     }
 
     RGResourceHandle RGBuilder::WriteColor(RGResourceHandle resource, RGAttachmentInfo info)
     {
-        m_Graph.m_Passes[m_PassIndex].Writes.push_back(resource.ID);
+        // Raster write is implicitly Color Attachment Output
+        Write(resource, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT);
         m_Graph.m_Passes[m_PassIndex].Attachments.push_back({resource.ID, info, false});
         return resource;
     }
 
     RGResourceHandle RGBuilder::WriteDepth(RGResourceHandle resource, RGAttachmentInfo info)
     {
-        m_Graph.m_Passes[m_PassIndex].Writes.push_back(resource.ID);
+        Write(resource, VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
+              VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
         m_Graph.m_Passes[m_PassIndex].Attachments.push_back({resource.ID, info, true});
         return resource;
     }
@@ -61,9 +83,6 @@ namespace Graphics
     RGResourceHandle RGBuilder::CreateTexture(Core::Hash::StringID name, const RGTextureDesc& desc)
     {
         auto [id, created] = m_Graph.CreateResourceInternal(name, ResourceType::Texture);
-
-        // Only initialize properties if it's a new resource.
-        // If existing, we assume properties match or it's a usage declaration.
         if (created)
         {
             auto& node = m_Graph.m_Resources[id];
@@ -77,11 +96,22 @@ namespace Graphics
         return {id};
     }
 
+    RGResourceHandle RGBuilder::CreateBuffer(Core::Hash::StringID name, const RGBufferDesc& desc)
+    {
+        auto [id, created] = m_Graph.CreateResourceInternal(name, ResourceType::Buffer);
+        if (created)
+        {
+            auto& node = m_Graph.m_Resources[id];
+            node.BufferSize = desc.Size;
+            node.BufferUsage = desc.Usage;
+        }
+        return {id};
+    }
+
     RGResourceHandle RGBuilder::ImportTexture(Core::Hash::StringID name, VkImage image, VkImageView view, VkFormat format,
                                               VkExtent2D extent, VkImageLayout currentLayout)
     {
         auto [id, created] = m_Graph.CreateResourceInternal(name, ResourceType::Import);
-
         if (created)
         {
             auto& node = m_Graph.m_Resources[id];
@@ -91,16 +121,28 @@ namespace Graphics
             node.CurrentLayout = currentLayout;
             node.Extent = extent;
             node.Format = format;
-            node.Aspect = (format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT)
-                              ? (VkImageAspectFlags)(VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT)
+            node.Aspect = (format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT || format == VK_FORMAT_D32_SFLOAT)
+                              ? (VkImageAspectFlags)(VK_IMAGE_ASPECT_DEPTH_BIT) // Simplify logic for now
                               : VK_IMAGE_ASPECT_COLOR_BIT;
             m_Graph.m_Registry.RegisterImage(id, image, view);
+            
+            // Mark as active immediately for imports
+            node.StartPass = 0;
+            node.EndPass = 0;
         }
-        else
+        return {id};
+    }
+
+    RGResourceHandle RGBuilder::ImportBuffer(Core::Hash::StringID name, RHI::VulkanBuffer& buffer)
+    {
+        auto [id, created] = m_Graph.CreateResourceInternal(name, ResourceType::Import);
+        if (created)
         {
-            // Resource exists. In a robust system, check if image == node.PhysicalImage.
-            // We assume the user is sane and imports the same physical resource for the same name.
-            // Important: Do NOT reset CurrentLayout here, as that tracks the state from previous passes.
+            auto& node = m_Graph.m_Resources[id];
+            node.PhysicalBuffer = buffer.GetHandle();
+            m_Graph.m_Registry.RegisterBuffer(id, buffer.GetHandle());
+            node.StartPass = 0; 
+            node.EndPass = 0;
         }
         return {id};
     }
@@ -125,6 +167,7 @@ namespace Graphics
     {
         vkDeviceWaitIdle(m_Device->GetLogicalDevice());
         m_ImagePool.clear();
+        m_BufferPool.clear();
     }
 
     RenderGraph::RGPass& RenderGraph::CreatePassInternal(const std::string& name)
@@ -134,23 +177,16 @@ namespace Graphics
 
     std::pair<ResourceID, bool> RenderGraph::CreateResourceInternal(Core::Hash::StringID name, ResourceType type)
     {
-        // 1. Check Aliasing
         if (auto it = m_ResourceLookup.find(name); it != m_ResourceLookup.end())
         {
-            // Return existing ID and created=false
             return {it->second, false};
         }
-
-        // 2. Create New
         auto id = static_cast<ResourceID>(m_Resources.size());
         ResourceNode node{};
         node.Name = name;
         node.Type = type;
         m_Resources.push_back(node);
-
-        // Register name
         m_ResourceLookup[name] = id;
-
         return {id, true};
     }
 
@@ -159,7 +195,7 @@ namespace Graphics
         m_Passes.clear();
         m_Resources.clear();
         m_Barriers.clear();
-        m_ResourceLookup.clear(); // Clear lookup table
+        m_ResourceLookup.clear();
         m_Registry = RGRegistry();
     }
 
@@ -168,53 +204,80 @@ namespace Graphics
         ImageCacheKey key{node.Format, node.Extent.width, node.Extent.height, node.Usage};
         auto& stack = m_ImagePool[key];
 
-        // 1. Look for a compatible image in the pool
         for (auto& item : stack.Images)
         {
-            // Case A: Image from previous frame (Double Buffering Logic)
-            // It is completely free to use. Reset intervals.
             if (item.LastFrameIndex < frameIndex)
             {
                 item.LastFrameIndex = frameIndex;
                 item.ActiveIntervals.clear();
-
                 item.ActiveIntervals.emplace_back(node.StartPass, node.EndPass);
                 return item.Resource.get();
             }
-
-            // Case B: Image already used in THIS frame (Aliasing Logic)
-            // Check for lifetime overlap.
             if (item.LastFrameIndex == frameIndex)
             {
                 bool overlap = false;
                 for (const auto& interval : item.ActiveIntervals)
                 {
-                    // Intersection test: (StartA <= EndB) and (EndA >= StartB)
                     if (node.StartPass <= interval.second && node.EndPass >= interval.first)
                     {
                         overlap = true;
                         break;
                     }
                 }
-
                 if (!overlap)
                 {
-                    // No overlap found! We can ALIAS this memory.
-                    // Add new interval to the list.
                     item.ActiveIntervals.emplace_back(node.StartPass, node.EndPass);
                     return item.Resource.get();
                 }
             }
         }
 
-        // 2. No suitable image found. Allocate new one.
         auto img = std::make_unique<RHI::VulkanImage>(m_Device, node.Extent.width, node.Extent.height, 1, node.Format, node.Usage, node.Aspect);
         auto* ptr = img.get();
-
         PooledImage pooled{std::move(img), frameIndex};
         pooled.ActiveIntervals.emplace_back(node.StartPass, node.EndPass);
         stack.Images.push_back(std::move(pooled));
+        return ptr;
+    }
 
+    RHI::VulkanBuffer* RenderGraph::ResolveBuffer(uint32_t frameIndex, const ResourceNode& node)
+    {
+        BufferCacheKey key{node.BufferSize, node.BufferUsage};
+        auto& stack = m_BufferPool[key];
+
+        for (auto& item : stack.Buffers)
+        {
+            if (item.LastFrameIndex < frameIndex)
+            {
+                item.LastFrameIndex = frameIndex;
+                item.ActiveIntervals.clear();
+                item.ActiveIntervals.emplace_back(node.StartPass, node.EndPass);
+                return item.Resource.get();
+            }
+            if (item.LastFrameIndex == frameIndex)
+            {
+                bool overlap = false;
+                for (const auto& interval : item.ActiveIntervals)
+                {
+                    if (node.StartPass <= interval.second && node.EndPass >= interval.first)
+                    {
+                        overlap = true;
+                        break;
+                    }
+                }
+                if (!overlap)
+                {
+                    item.ActiveIntervals.emplace_back(node.StartPass, node.EndPass);
+                    return item.Resource.get();
+                }
+            }
+        }
+
+        auto buf = std::make_unique<RHI::VulkanBuffer>(m_Device, node.BufferSize, node.BufferUsage, VMA_MEMORY_USAGE_GPU_ONLY);
+        auto* ptr = buf.get();
+        PooledBuffer pooled{std::move(buf), frameIndex};
+        pooled.ActiveIntervals.emplace_back(node.StartPass, node.EndPass);
+        stack.Buffers.push_back(std::move(pooled));
         return ptr;
     }
 
@@ -222,42 +285,57 @@ namespace Graphics
     {
         m_Barriers.resize(m_Passes.size());
 
-        constexpr VkPipelineStageFlags2 kDefaultReadStage = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+        // Clear any previous barrier batches (Compile() can be called every frame)
+        for (auto& batch : m_Barriers)
+        {
+            batch.ImageBarriers.clear();
+            batch.BufferBarriers.clear();
+        }
 
         // 1. Resolve Transient Resources
         for (size_t i = 0; i < m_Resources.size(); ++i)
         {
             auto& res = m_Resources[i];
+
+            // Ensure imported resources start from their declared initial state each frame.
+            if (res.Type == ResourceType::Import)
+            {
+                res.CurrentLayout = res.InitialLayout;
+                res.LastUsageStage = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
+                res.LastUsageAccess = 0;
+            }
+
+            // Texture Handling
             if (res.Type == ResourceType::Texture && res.PhysicalImage == VK_NULL_HANDLE)
             {
-                VkFormat fmt = res.Format;
-                VkImageUsageFlags usage = res.Usage;
-                VkImageAspectFlags aspect = res.Aspect;
-
-                if ((usage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT) != 0)
-                {
-                    if (fmt == VK_FORMAT_UNDEFINED) fmt = RHI::VulkanImage::FindDepthFormat(*m_Device);
-                    if ((aspect & VK_IMAGE_ASPECT_DEPTH_BIT) == 0)
-                    {
-                        aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
-                    }
-                }
-                else if ((usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) == 0)
-                {
-                    usage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-                }
-                if (fmt == VK_FORMAT_UNDEFINED)
-                {
-                    fmt = VK_FORMAT_R8G8B8A8_UNORM;
-                }
-
                 RHI::VulkanImage* img = ResolveImage(frameIndex, res);
+                if (!img || !img->IsValid())
+                {
+                    Core::Log::Error("RenderGraph: failed to allocate transient image for resource {}", (uint32_t)i);
+                    res.PhysicalImage = VK_NULL_HANDLE;
+                    res.PhysicalView = VK_NULL_HANDLE;
+                    continue;
+                }
+
                 res.PhysicalImage = img->GetHandle();
                 res.PhysicalView = img->GetView();
-            }
-            if (res.PhysicalImage)
-            {
+                res.CurrentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+                res.InitialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
                 m_Registry.RegisterImage((ResourceID)i, res.PhysicalImage, res.PhysicalView);
+            }
+
+            // Buffer Handling
+            if (res.Type == ResourceType::Buffer && res.PhysicalBuffer == VK_NULL_HANDLE)
+            {
+                RHI::VulkanBuffer* buf = ResolveBuffer(frameIndex, res);
+                if (!buf || buf->GetHandle() == VK_NULL_HANDLE)
+                {
+                    Core::Log::Error("RenderGraph: failed to allocate transient buffer for resource {}", (uint32_t)i);
+                    res.PhysicalBuffer = VK_NULL_HANDLE;
+                    continue;
+                }
+                res.PhysicalBuffer = buf->GetHandle();
+                m_Registry.RegisterBuffer((ResourceID)i, res.PhysicalBuffer);
             }
         }
 
@@ -266,114 +344,112 @@ namespace Graphics
         {
             const auto& pass = m_Passes[passIdx];
 
-            // A. Attachments
-            for (const auto& att : pass.Attachments)
+            // Iterate ALL accesses in this pass
+            for (const auto& access : pass.Accesses)
             {
-                auto& res = m_Resources[att.ID];
-                VkImageLayout targetLayout = att.IsDepth
-                                                 ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
-                                                 : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-                const VkPipelineStageFlags2 writerStage = att.IsDepth
-                                                              ? (VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT |
-                                                                  VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT)
-                                                              : VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-
-                const VkAccessFlags2 writerAccess = att.IsDepth
-                                                        ? VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT
-                                                        : VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
-
-                // OPTION B FIX: Check for WAW (Write-After-Write) hazards on same layout.
-                // If layout is identical, we still might need a barrier between passes.
-                // For simplicity in this step, we rely on state change.
-                // (A full barrier solver is out of scope, but the aliasing allows state to propagate).
-
-                const bool needsBarrier = res.CurrentLayout != targetLayout
-                    || res.LastUsageStage != writerStage
-                    || res.LastUsageAccess != writerAccess;
-
-                if (needsBarrier)
+                auto& res = m_Resources[access.ID];
+                
+                bool needsBarrier = false;
+                
+                // --- IMAGE LOGIC ---
+                if (res.Type == ResourceType::Texture || (res.Type == ResourceType::Import && res.PhysicalImage))
                 {
-                    VkImageMemoryBarrier2 barrier{};
-                    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-                    barrier.image = res.PhysicalImage;
-                    barrier.oldLayout = res.CurrentLayout;
-                    barrier.newLayout = targetLayout;
+                    VkImageLayout targetLayout = res.CurrentLayout;
 
-                    barrier.srcStageMask = (res.CurrentLayout == VK_IMAGE_LAYOUT_UNDEFINED)
-                                               ? VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT
-                                               : res.LastUsageStage;
-                    barrier.srcAccessMask = (res.CurrentLayout == VK_IMAGE_LAYOUT_UNDEFINED)
-                                                ? 0
-                                                : res.LastUsageAccess;
+                    // Infer optimal layout if not explicit
+                    if (access.Access & VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT) targetLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                    else if (access.Access & VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT) targetLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+                    else if (access.Access & VK_ACCESS_2_SHADER_SAMPLED_READ_BIT) targetLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                    else if (access.Access & VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT) targetLayout = VK_IMAGE_LAYOUT_GENERAL;
+                    else if (access.Access & VK_ACCESS_2_SHADER_STORAGE_READ_BIT) targetLayout = VK_IMAGE_LAYOUT_GENERAL;
+                    else if (access.Access & VK_ACCESS_2_TRANSFER_WRITE_BIT) targetLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+                    else if (access.Access & VK_ACCESS_2_TRANSFER_READ_BIT) targetLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
 
-                    barrier.dstStageMask = writerStage;
-                    barrier.dstAccessMask = writerAccess;
-                    barrier.subresourceRange.aspectMask = att.IsDepth
-                                                              ? VK_IMAGE_ASPECT_DEPTH_BIT
-                                                              : VK_IMAGE_ASPECT_COLOR_BIT;
-                    if (att.IsDepth && (res.Format == VK_FORMAT_D32_SFLOAT_S8_UINT || res.Format ==
-                        VK_FORMAT_D24_UNORM_S8_UINT))
+                    needsBarrier = (res.CurrentLayout != targetLayout) ||
+                                   // If the previous usage produced a write, we must order it before any subsequent access.
+                                   (res.LastUsageAccess & (VK_ACCESS_2_MEMORY_WRITE_BIT |
+                                                         VK_ACCESS_2_SHADER_WRITE_BIT |
+                                                         VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT |
+                                                         VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
+                                                         VK_ACCESS_2_TRANSFER_WRITE_BIT |
+                                                         VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT)) ||
+                                   // If we're writing now, we must create an execution+memory dependency.
+                                   (access.Access & (VK_ACCESS_2_MEMORY_WRITE_BIT |
+                                                    VK_ACCESS_2_SHADER_WRITE_BIT |
+                                                    VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT |
+                                                    VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
+                                                    VK_ACCESS_2_TRANSFER_WRITE_BIT |
+                                                    VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT));
+
+                    // If this is the first usage, we still need a barrier if we are changing layout away from UNDEFINED.
+                    if (res.LastUsageStage == VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT && res.LastUsageAccess == 0)
                     {
-                        barrier.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+                        needsBarrier = (res.CurrentLayout != targetLayout);
                     }
 
-                    barrier.subresourceRange.baseMipLevel = 0;
-                    barrier.subresourceRange.levelCount = 1;
-                    barrier.subresourceRange.baseArrayLayer = 0;
-                    barrier.subresourceRange.layerCount = 1;
+                    if (needsBarrier)
+                    {
+                        VkImageMemoryBarrier2 barrier{};
+                        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+                        barrier.image = res.PhysicalImage;
+                        barrier.oldLayout = res.CurrentLayout;
+                        barrier.newLayout = targetLayout;
+                        barrier.srcStageMask = (res.CurrentLayout == VK_IMAGE_LAYOUT_UNDEFINED)
+                                                   ? VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT
+                                                   : res.LastUsageStage;
+                        barrier.srcAccessMask = (res.CurrentLayout == VK_IMAGE_LAYOUT_UNDEFINED) ? 0 : res.LastUsageAccess;
+                        barrier.dstStageMask = access.Stage;
+                        barrier.dstAccessMask = access.Access;
+                        barrier.subresourceRange.aspectMask = res.Aspect;
+                        barrier.subresourceRange.baseMipLevel = 0;
+                        barrier.subresourceRange.levelCount = 1;
+                        barrier.subresourceRange.baseArrayLayer = 0;
+                        barrier.subresourceRange.layerCount = 1;
 
-                    m_Barriers[passIdx].ImageBarriers.push_back(barrier);
-                    res.CurrentLayout = targetLayout;
-                    res.LastUsageStage = writerStage;
-                    res.LastUsageAccess = writerAccess;
+                        m_Barriers[passIdx].ImageBarriers.push_back(barrier);
+
+                        res.CurrentLayout = targetLayout;
+                        res.LastUsageStage = access.Stage;
+                        res.LastUsageAccess = access.Access;
+                    }
+                    else
+                    {
+                        res.LastUsageStage = access.Stage;
+                        res.LastUsageAccess = access.Access;
+                    }
                 }
-                else
+                // --- BUFFER LOGIC ---
+                else if (res.Type == ResourceType::Buffer || (res.Type == ResourceType::Import && res.PhysicalBuffer))
                 {
-                    // Even when layouts match, keep stage/access up to date for future hazards.
-                    res.LastUsageStage = writerStage;
-                    res.LastUsageAccess = writerAccess;
-                }
-            }
+                    // Buffer Barriers check for execution dependencies and memory visibility
+                    // If the previous usage was a WRITE, we ALWAYS need a barrier before READ or WRITE.
+                    // If previous was READ and now is WRITE, we need a barrier (WAR).
+                    // If previous was READ and now is READ, no barrier.
 
-            // B. Reads
-            for (ResourceID id : pass.Reads)
-            {
-                auto& res = m_Resources[id];
-                const VkPipelineStageFlags2 readStage = kDefaultReadStage;
-                const VkAccessFlags2 readAccess = VK_ACCESS_2_SHADER_READ_BIT;
+                    bool prevWrite = (res.LastUsageAccess & (VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_SHADER_WRITE_BIT | VK_ACCESS_2_TRANSFER_WRITE_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT));
+                    bool currWrite = (access.Access & (VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_SHADER_WRITE_BIT | VK_ACCESS_2_TRANSFER_WRITE_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT));
 
-                const bool needsBarrier = res.CurrentLayout != VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-                    || res.LastUsageStage != readStage
-                    || res.LastUsageAccess != readAccess;
+                    if (prevWrite || currWrite)
+                    {
+                        // Optimization: Skip if it's the first usage
+                        if (res.LastUsageStage != VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT)
+                        {
+                            VkBufferMemoryBarrier2 barrier{};
+                            barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
+                            barrier.buffer = res.PhysicalBuffer;
+                            barrier.offset = 0;
+                            barrier.size = VK_WHOLE_SIZE;
+                            barrier.srcStageMask = res.LastUsageStage;
+                            barrier.srcAccessMask = res.LastUsageAccess;
+                            barrier.dstStageMask = access.Stage;
+                            barrier.dstAccessMask = access.Access;
 
-                if (needsBarrier)
-                {
-                    VkImageMemoryBarrier2 barrier{};
-                    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-                    barrier.image = res.PhysicalImage;
-                    barrier.oldLayout = res.CurrentLayout;
-                    barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-                    barrier.srcStageMask = (res.CurrentLayout == VK_IMAGE_LAYOUT_UNDEFINED)
-                                               ? VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT
-                                               : res.LastUsageStage;
-
-                    barrier.dstStageMask = readStage;
-                    barrier.srcAccessMask = res.LastUsageAccess;
-                    barrier.dstAccessMask = readAccess;
-                    barrier.subresourceRange = {res.Aspect, 0, 1, 0, 1};
-
-                    m_Barriers[passIdx].ImageBarriers.push_back(barrier);
-                    res.CurrentLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-                    res.CurrentLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-                    res.LastUsageStage = readStage;
-                    res.LastUsageAccess = readAccess;
-                }
-                else
-                {
-                    res.LastUsageStage = readStage;
-                    res.LastUsageAccess = readAccess;
+                            m_Barriers[passIdx].BufferBarriers.push_back(barrier);
+                        }
+                    }
+                    
+                    res.LastUsageStage = access.Stage;
+                    res.LastUsageAccess = access.Access;
                 }
             }
         }
@@ -385,12 +461,15 @@ namespace Graphics
         {
             const auto& pass = m_Passes[i];
 
-            if (!m_Barriers[i].ImageBarriers.empty())
+            if (!m_Barriers[i].ImageBarriers.empty() || !m_Barriers[i].BufferBarriers.empty())
             {
                 VkDependencyInfo depInfo{};
                 depInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
                 depInfo.imageMemoryBarrierCount = (uint32_t)m_Barriers[i].ImageBarriers.size();
                 depInfo.pImageMemoryBarriers = m_Barriers[i].ImageBarriers.data();
+                depInfo.bufferMemoryBarrierCount = (uint32_t)m_Barriers[i].BufferBarriers.size();
+                depInfo.pBufferMemoryBarriers = m_Barriers[i].BufferBarriers.data();
+                
                 vkCmdPipelineBarrier2(cmd, &depInfo);
             }
 
@@ -439,7 +518,10 @@ namespace Graphics
                 vkCmdBeginRendering(cmd, &renderInfo);
             }
 
-            pass.Execute(m_Registry, cmd);
+            if (pass.ExecuteFn)
+            {
+                pass.ExecuteFn(pass.ExecuteUserData, m_Registry, cmd);
+            }
 
             if (isRaster)
             {
@@ -448,3 +530,5 @@ namespace Graphics
         }
     }
 }
+
+
