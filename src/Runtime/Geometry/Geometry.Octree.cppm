@@ -308,7 +308,7 @@ export namespace Geometry
                     }
                     for (const auto childIndex : node.Children)
                     {
-                        if (TestOverlap(m_Nodes[childIndex].Aabb, queryShape))
+                        if (childIndex != kInvalidIndex && TestOverlap(m_Nodes[childIndex].Aabb, queryShape))
                         {
                             stack[stackTop++] = childIndex;
                         }
