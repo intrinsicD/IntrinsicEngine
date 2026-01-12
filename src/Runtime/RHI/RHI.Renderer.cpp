@@ -109,11 +109,43 @@ namespace RHI
 
         // Ensure the acquired swapchain image is in COLOR_ATTACHMENT_OPTIMAL before any rendering.
         // We do this here so RenderGraph can treat the backbuffer as ready for use.
+        //
+        // IMPORTANT: The semaphore wait (m_ImageAvailableSemaphores) happens at vkQueueSubmit
+        // with waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT. This means the GPU
+        // will block at that stage until the image is acquired. Our barrier must synchronize
+        // with that stage to avoid WRITE_AFTER_READ hazards with the presentation engine.
         {
             VkImage currentImage = m_Swapchain.GetImages()[m_ImageIndex];
-            CommandUtils::TransitionImageLayout(cmd, currentImage,
-                                                VK_IMAGE_LAYOUT_UNDEFINED,
-                                                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+            VkImageMemoryBarrier2 barrier{};
+            barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+            barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            barrier.image = currentImage;
+            barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            barrier.subresourceRange.baseMipLevel = 0;
+            barrier.subresourceRange.levelCount = 1;
+            barrier.subresourceRange.baseArrayLayer = 0;
+            barrier.subresourceRange.layerCount = 1;
+
+            // Source: Wait for the semaphore's stage (COLOR_ATTACHMENT_OUTPUT is where we wait)
+            // This synchronizes with the presentation engine's read that completes when the
+            // acquire semaphore is signaled.
+            barrier.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+            barrier.srcAccessMask = 0; // No prior access from our side; presentation engine handled externally
+
+            // Destination: We want to write as a color attachment
+            barrier.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+            barrier.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+
+            VkDependencyInfo depInfo{};
+            depInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+            depInfo.imageMemoryBarrierCount = 1;
+            depInfo.pImageMemoryBarriers = &barrier;
+
+            vkCmdPipelineBarrier2(cmd, &depInfo);
         }
 
         m_IsFrameStarted = true;
@@ -125,9 +157,38 @@ namespace RHI
 
         VkCommandBuffer cmd = m_CommandBuffers[m_CurrentFrame];
 
+        // Transition swapchain image from COLOR_ATTACHMENT_OPTIMAL to PRESENT_SRC_KHR
+        // We need to ensure all color attachment writes complete before presenting.
         VkImage currentImage = m_Swapchain.GetImages()[m_ImageIndex];
-        CommandUtils::TransitionImageLayout(cmd, currentImage, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                                            VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+
+        VkImageMemoryBarrier2 barrier{};
+        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+        barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.image = currentImage;
+        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        barrier.subresourceRange.baseMipLevel = 0;
+        barrier.subresourceRange.levelCount = 1;
+        barrier.subresourceRange.baseArrayLayer = 0;
+        barrier.subresourceRange.layerCount = 1;
+
+        // Source: Wait for all color attachment writes to complete
+        barrier.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+        barrier.srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+
+        // Destination: Bottom of pipe / no specific access needed before present
+        // The render finished semaphore handles synchronization with present
+        barrier.dstStageMask = VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT;
+        barrier.dstAccessMask = 0;
+
+        VkDependencyInfo depInfo{};
+        depInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+        depInfo.imageMemoryBarrierCount = 1;
+        depInfo.pImageMemoryBarriers = &barrier;
+
+        vkCmdPipelineBarrier2(cmd, &depInfo);
 
         VK_CHECK(vkEndCommandBuffer(cmd));
 
