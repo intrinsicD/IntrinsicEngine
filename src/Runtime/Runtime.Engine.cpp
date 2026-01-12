@@ -405,13 +405,37 @@ namespace Runtime
         Core::Log::Info("Engine::Run starting...");
         Core::Profiling::ScopedTimer timer("Engine::Run");
         OnStart();
-        auto lastTime = std::chrono::high_resolution_clock::now();
+
+        using Clock = std::chrono::high_resolution_clock;
+        auto lastTime = Clock::now();
+        double accumulator = 0.0;
+        const double dt = 1.0 / 60.0; // Fixed 60hz physics
 
         while (m_Running && !m_Window->ShouldClose())
         {
+            auto currentTime = Clock::now();
+            double frameTime = std::chrono::duration<double>(currentTime - lastTime).count();
+            lastTime = currentTime;
+
+            // Prevent spiral of death
+            if (frameTime > 0.25) frameTime = 0.25;
+
+            accumulator += frameTime;
+
             m_FrameArena.Reset();
             m_Window->OnUpdate();
             ProcessMainThreadQueue();
+            ProcessUploads();
+
+            // Update with variable dt for responsive input/camera
+            OnUpdate(static_cast<float>(frameTime));
+
+            // Fixed timestep for physics simulation
+            while (accumulator >= dt)
+            {
+                ECS::Systems::Transform::OnUpdate(m_Scene.GetRegistry());
+                accumulator -= dt;
+            }
 
             if (m_FramebufferResized)
             {
@@ -419,15 +443,8 @@ namespace Runtime
                 m_FramebufferResized = false;
             }
 
-            ProcessUploads();
             m_TransferManager->GarbageCollect();
 
-            auto currentTime = std::chrono::high_resolution_clock::now();
-            float dt = std::chrono::duration<float>(currentTime - lastTime).count();
-            lastTime = currentTime;
-
-            OnUpdate(dt);
-            ECS::Systems::Transform::OnUpdate(m_Scene.GetRegistry());
             OnRender();
         }
 

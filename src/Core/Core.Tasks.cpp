@@ -15,26 +15,26 @@ namespace Core::Tasks
 {
     struct SpinLock
     {
-        std::atomic_flag flag = ATOMIC_FLAG_INIT;
+        std::atomic<bool> locked = false;
 
         void lock()
         {
-            while (flag.test_and_set(std::memory_order_acquire))
-            {
-#if defined(__cpp_lib_atomic_wait)
-                flag.wait(true, std::memory_order_relaxed);
-#else
-                std::this_thread::yield();
-#endif
+            while (true) {
+                // Optimistic check
+                if (!locked.exchange(true, std::memory_order_acquire)) {
+                    return;
+                }
+                // Wait until value changes (OS level wait)
+                while (locked.load(std::memory_order_relaxed)) {
+                    locked.wait(true, std::memory_order_relaxed);
+                }
             }
         }
 
         void unlock()
         {
-            flag.clear(std::memory_order_release);
-#if defined(__cpp_lib_atomic_wait)
-            flag.notify_one();
-#endif
+            locked.store(false, std::memory_order_release);
+            locked.notify_one();
         }
     };
 
