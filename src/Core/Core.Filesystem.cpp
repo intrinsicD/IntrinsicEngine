@@ -42,27 +42,48 @@ namespace Core::Filesystem
 
     std::string GetShaderPath(const std::string& relativePath)
     {
-        // try CWD/rel first
-        if (std::filesystem::exists(relativePath))
+        // Normalize input like "shaders/foo.spv".
+        const std::filesystem::path rel = relativePath;
+
+        // 1) Try as-given relative to CWD.
+        if (std::filesystem::exists(rel))
         {
-            return relativePath;
+            return rel.string();
         }
-        // try CWD/bin/rel (when launched from build dir)
-        if (std::filesystem::exists(std::filesystem::path("bin") / relativePath))
+
+        // 2) Common dev: launched from build dir (e.g. cmake-build-debug/)
+        //    shaders are copied to <build>/bin/shaders/*.
         {
-            return (std::filesystem::path("bin") / relativePath).string();
+            const auto p = std::filesystem::path("bin") / rel;
+            if (std::filesystem::exists(p)) return p.string();
         }
-        // try CWD/../bin/rel (when launched from repo root)
-        if (std::filesystem::exists(std::filesystem::path("..") / "bin" / relativePath))
+
+        // 3) Common dev: launched from repo root, shaders live in cmake-build-*/bin/shaders.
+        //    Search a couple of typical build folders.
         {
-            return (std::filesystem::path("..") / "bin" / relativePath).string();
+            static const std::vector<std::filesystem::path> buildDirs = {
+                "cmake-build-debug", "cmake-build-release", "build", "out/build"
+            };
+
+            for (const auto& buildDir : buildDirs)
+            {
+                const auto p = std::filesystem::path(buildDir) / "bin" / rel;
+                if (std::filesystem::exists(p)) return p.string();
+            }
         }
-        // last resort: try assets (if you ever copy SPV there)
-        auto asset = Core::Filesystem::GetAssetPath(relativePath);
-        if (std::filesystem::exists(asset))
+
+        // 4) When launched from bin/, go up.
         {
-            return asset;
+            const auto p = std::filesystem::path("..") / "bin" / rel;
+            if (std::filesystem::exists(p)) return p.string();
         }
+
+        // 5) Last resort: allow SPV to be placed in assets/ (not typical, but convenient).
+        {
+            auto asset = Core::Filesystem::GetAssetPath(relativePath);
+            if (std::filesystem::exists(asset)) return asset;
+        }
+
         return relativePath; // let ShaderModule print a clear error
     }
 

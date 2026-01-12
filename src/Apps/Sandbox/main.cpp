@@ -101,6 +101,7 @@ public:
             modelLoader
         );
 
+
         // 3. Setup Material (Assuming texture loads synchronously or is handled)
         auto DuckMaterial = std::make_shared<Graphics::Material>(
             GetDevice(),

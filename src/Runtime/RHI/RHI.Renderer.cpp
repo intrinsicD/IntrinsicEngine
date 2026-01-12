@@ -78,6 +78,10 @@ namespace RHI
 
         m_Device->FlushDeletionQueue(m_CurrentFrame);
 
+        // Increment global frame counter for deferred resource tracking
+        // This provides a monotonically increasing frame number for safe GPU resource deletion
+        m_Device->IncrementFrame();
+
         // 2. Acquire Image
         VkResult result = vkAcquireNextImageKHR(
             m_Device->GetLogicalDevice(),

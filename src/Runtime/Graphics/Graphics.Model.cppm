@@ -7,6 +7,7 @@ export module Graphics:Model;
 
 import :Geometry;
 import :Material; // Optional, if we want to store materials here later
+import RHI;
 
 export namespace Graphics
 {
@@ -20,13 +21,17 @@ export namespace Graphics
 
     struct Model
     {
-        Model(GeometryStorage& storage) : m_Storage(storage) {}
+        Model(GeometryStorage& storage, std::shared_ptr<RHI::VulkanDevice> device)
+            : m_Storage(storage), m_Device(std::move(device)) {}
 
-        // RAII: Release handles on destruction
+        // RAII: Release handles on destruction using deferred deletion
         ~Model() {
+            // Get the current global frame number for deferred deletion
+            uint64_t currentFrame = m_Device ? m_Device->GetGlobalFrameNumber() : 0;
+
             for(auto& mesh : Meshes) {
                 if(mesh->Handle.IsValid()) {
-                    m_Storage.Remove(mesh->Handle);
+                    m_Storage.Remove(mesh->Handle, currentFrame);
                 }
             }
         }
@@ -39,5 +44,6 @@ export namespace Graphics
 
     private:
         GeometryStorage& m_Storage;
+        std::shared_ptr<RHI::VulkanDevice> m_Device;
     };
 }

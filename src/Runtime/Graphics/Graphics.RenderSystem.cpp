@@ -133,6 +133,11 @@ namespace Graphics
     void RenderSystem::OnUpdate(ECS::Scene& scene, const CameraComponent& camera,
                                 Core::Assets::AssetManager& assetManager)
     {
+        // Process deferred geometry deletions at the start of the frame
+        // This ensures GPU resources are freed only after FramesInFlight have passed
+        uint64_t currentFrame = m_Device->GetGlobalFrameNumber();
+        m_GeometryStorage.ProcessDeletions(currentFrame);
+
         Interface::GUI::BeginFrame();
 
         Interface::GUI::DrawGUI();

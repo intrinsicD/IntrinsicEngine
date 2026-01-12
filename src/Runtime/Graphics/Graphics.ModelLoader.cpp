@@ -602,7 +602,7 @@ namespace Graphics
         std::string ext = std::filesystem::path(fullPath).extension().string();
         for (auto& c : ext) c = tolower(c);
 
-        auto model = std::make_shared<Model>(geometryStorage);
+        auto model = std::make_shared<Model>(geometryStorage, device);
         std::vector<GeometryCpuData> cpuMeshes;
         bool success = false;
 

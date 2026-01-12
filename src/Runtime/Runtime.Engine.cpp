@@ -85,6 +85,9 @@ namespace Runtime
         // 3. Device
         m_Device = std::make_shared<RHI::VulkanDevice>(*m_Context, m_Surface);
 
+        // Initialize GeometryStorage with frames-in-flight for safe deferred deletion
+        m_GeometryStorage.Initialize(m_Device->GetFramesInFlight());
+
         // 4. Swapchain & Renderer
         m_Swapchain = std::make_unique<RHI::VulkanSwapchain>(m_Device, *m_Window);
         m_Renderer = std::make_unique<RHI::SimpleRenderer>(m_Device, *m_Swapchain);

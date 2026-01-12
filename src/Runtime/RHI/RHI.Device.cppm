@@ -55,6 +55,10 @@ namespace RHI
         [[nodiscard]] bool IsValid() const { return m_IsValid; }
         [[nodiscard]] constexpr uint32_t GetFramesInFlight() const { return MAX_FRAMES_IN_FLIGHT; }
         [[nodiscard]] constexpr uint32_t GetCurrentFrameIndex() const { return m_CurrentFrameIndex; }
+        [[nodiscard]] uint64_t GetGlobalFrameNumber() const { return m_GlobalFrameNumber; }
+
+        // Call at the start of each frame (after waiting for in-flight fence)
+        void IncrementFrame() { ++m_GlobalFrameNumber; }
 
         // Helper to query swapchain support (used later by Swapchain module)
         [[nodiscard]] SwapchainSupportDetails QuerySwapchainSupport() const;
@@ -89,6 +93,7 @@ namespace RHI
         static constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 2;
         std::vector<std::function<void()>> m_DeletionQueue[MAX_FRAMES_IN_FLIGHT];
         uint32_t m_CurrentFrameIndex = 0;
+        uint64_t m_GlobalFrameNumber = 0; // Monotonically increasing frame counter
         std::mutex m_DeletionMutex;
 
         void PickPhysicalDevice(VkInstance instance);

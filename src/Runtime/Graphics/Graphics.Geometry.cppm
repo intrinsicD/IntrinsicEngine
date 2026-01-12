@@ -112,6 +112,12 @@ export namespace Graphics
     class GeometryStorage
     {
     public:
+        // Initialize with frames-in-flight count for safe deferred deletion
+        void Initialize(uint32_t framesInFlight)
+        {
+            m_FramesInFlight = framesInFlight;
+        }
+
         // Adds ownership of the GPU data to the system and returns a handle
         GeometryHandle Add(std::unique_ptr<GeometryGpuData> data)
         {
@@ -137,7 +143,9 @@ export namespace Graphics
             return {index, slot.Generation};
         }
 
-        void Remove(GeometryHandle handle)
+        // Deferred removal: Marks the handle for deletion but doesn't free immediately.
+        // The slot will be recycled after FramesInFlight frames have passed.
+        void Remove(GeometryHandle handle, uint64_t currentFrameNumber)
         {
             std::unique_lock lock(m_Mutex);
 
@@ -146,9 +154,44 @@ export namespace Graphics
             Slot& slot = m_Slots[handle.Index];
             if (slot.IsActive && slot.Generation == handle.Generation)
             {
-                slot.Data.reset();
+                // Mark as inactive immediately so Get() returns nullptr
                 slot.IsActive = false;
-                m_FreeIndices.push_back(handle.Index);
+
+                // Queue for deferred destruction
+                PendingKill pending;
+                pending.SlotIndex = handle.Index;
+                pending.Generation = handle.Generation;
+                pending.KillFrameNumber = currentFrameNumber;
+                m_PendingKillList.push_back(pending);
+            }
+        }
+
+        // Process the pending kill list. Call this once per frame from RenderSystem.
+        // Recycles slots only after enough frames have passed to ensure GPU is done.
+        void ProcessDeletions(uint64_t currentFrameNumber)
+        {
+            std::unique_lock lock(m_Mutex);
+
+            auto it = m_PendingKillList.begin();
+            while (it != m_PendingKillList.end())
+            {
+                // Safe to recycle when: CurrentFrame > KillFrame + FramesInFlight
+                if (currentFrameNumber > it->KillFrameNumber + m_FramesInFlight)
+                {
+                    // Verify the slot still matches (hasn't been reallocated somehow)
+                    Slot& slot = m_Slots[it->SlotIndex];
+                    if (!slot.IsActive && slot.Generation == it->Generation)
+                    {
+                        // Now safe to destroy the GPU data and recycle the index
+                        slot.Data.reset();
+                        m_FreeIndices.push_back(it->SlotIndex);
+                    }
+                    it = m_PendingKillList.erase(it);
+                }
+                else
+                {
+                    ++it;
+                }
             }
         }
 
@@ -166,6 +209,13 @@ export namespace Graphics
             return nullptr;
         }
 
+        // Returns count of pending deletions (for debugging/metrics)
+        [[nodiscard]] size_t GetPendingDeletionCount() const
+        {
+            std::shared_lock lock(m_Mutex);
+            return m_PendingKillList.size();
+        }
+
     private:
         struct Slot
         {
@@ -174,8 +224,17 @@ export namespace Graphics
             bool IsActive = false;
         };
 
+        struct PendingKill
+        {
+            uint32_t SlotIndex = 0;
+            uint32_t Generation = 0;
+            uint64_t KillFrameNumber = 0; // The frame when Remove() was called
+        };
+
         std::vector<Slot> m_Slots;
         std::deque<uint32_t> m_FreeIndices;
-        std::shared_mutex m_Mutex;
+        std::vector<PendingKill> m_PendingKillList;
+        mutable std::shared_mutex m_Mutex;
+        uint32_t m_FramesInFlight = 2; // Default, should be initialized properly
     };
 }
