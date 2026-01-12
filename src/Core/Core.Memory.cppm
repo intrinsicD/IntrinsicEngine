@@ -20,7 +20,8 @@ export namespace Core::Memory
     {
         OutOfMemory,
         InvalidAlignment,
-        Overflow
+        Overflow,
+        ThreadViolation  // Cross-thread access attempted on thread-local allocator
     };
 
     // EXPORT THIS CONCEPT

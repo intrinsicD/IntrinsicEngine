@@ -11,10 +11,11 @@ import :Logging;
 namespace Core::Tasks
 {
     // A fixed-size, non-allocating task wrapper.
-    // Fits exactly in one CPU cache line (64 bytes).
+    // Sized for two cache lines (128 bytes) to accommodate lambdas with moderate captures.
+    // Trade-off: Larger tasks reduce cache efficiency but allow more flexible captures.
     class LocalTask
     {
-        static constexpr size_t STORAGE_SIZE = 120; // 64 - vptr/funcptr overhead
+        static constexpr size_t STORAGE_SIZE = 120; // 128 - 8 (vtable ptr)
 
         struct Concept
         {

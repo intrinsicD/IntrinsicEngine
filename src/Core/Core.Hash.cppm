@@ -23,6 +23,9 @@ export namespace Core::Hash
     struct StringID
     {
         uint32_t Value;
+#ifndef NDEBUG
+        const char* DebugString = nullptr; // For debugging hash collisions
+#endif
 
         constexpr StringID() : Value(0)
         {
@@ -32,15 +35,25 @@ export namespace Core::Hash
         {
         }
 
+        // Note: DebugString points to the literal, safe only for string literals
         constexpr StringID(const char* str) : Value(HashString(str))
+#ifndef NDEBUG
+            , DebugString(str)
+#endif
         {
         }
 
         constexpr StringID(std::string_view str) : Value(HashString(str))
+#ifndef NDEBUG
+            , DebugString(str.data()) // Only valid if str outlives StringID
+#endif
         {
         }
 
         auto operator<=>(const StringID&) const = default;
+
+        // Equality only compares Value, not DebugString
+        bool operator==(const StringID& other) const { return Value == other.Value; }
     };
 
     // User-defined literal for convenient IDs, e.g. "Backbuffer"_id.

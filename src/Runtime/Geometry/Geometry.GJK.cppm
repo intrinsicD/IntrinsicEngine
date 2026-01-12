@@ -30,7 +30,7 @@ export namespace Geometry::Internal
 
     struct Simplex
     {
-        std::array<glm::vec3, 4> Points;
+        std::array<glm::vec3, 4> Points{}; // Value-initialize to zeros
         int Size = 0;
 
         void Push(glm::vec3 p) { Points[Size++] = p; }
@@ -38,10 +38,17 @@ export namespace Geometry::Internal
         const glm::vec3& operator[](int i) const { return Points[i]; }
     };
 
+    // --- GJK Configuration ---
+    // Centralized constants for tuning collision detection algorithms
+    namespace Config {
+        constexpr float GJK_EPSILON = 1e-6f;           // Numerical tolerance for GJK convergence
+        constexpr int GJK_MAX_ITERATIONS = 64;         // Maximum iterations before giving up
+        constexpr float EPA_EPSILON = 1e-4f;           // Tolerance for EPA penetration depth
+        constexpr int EPA_MAX_ITERATIONS = 32;         // Maximum EPA iterations
+    }
+
     // --- GJK IMPLEMENTATION (Boolean Overlap) ---
 
-    constexpr float kEpsilon = 1e-6f;
-    constexpr int kMaxGjkIterations = 64;
 
     // Handles the logic of processing the simplex to see if it contains origin
     // Returns true if intersection found, updates direction for next search
@@ -59,7 +66,7 @@ export namespace Geometry::Internal
                 if (glm::dot(ab, ao) > 0)
                 {
                     direction = glm::cross(glm::cross(ab, ao), ab);
-                    if (glm::length2(direction) < kEpsilon)
+                    if (glm::length2(direction) < Config::GJK_EPSILON)
                     {
                         direction = ao; // Fallback to avoid zero direction on nearly collinear points
                     }
@@ -81,7 +88,7 @@ export namespace Geometry::Internal
                 glm::vec3 ao = -a;
                 glm::vec3 abc = glm::cross(ab, ac);
 
-                if (glm::length2(abc) < kEpsilon)
+                if (glm::length2(abc) < Config::GJK_EPSILON)
                 {
                     direction = ao;
                     points.Size = 2;
@@ -183,7 +190,7 @@ export namespace Geometry::Internal
         points.Push(support);
 
         glm::vec3 direction = -support;
-        int maxIterations = kMaxGjkIterations;
+        int maxIterations = Config::GJK_MAX_ITERATIONS;
 
         while (true)
         {

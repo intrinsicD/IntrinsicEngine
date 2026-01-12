@@ -20,15 +20,17 @@ namespace ECS::Systems::Transform::Detail
         // If no transform, stop recursing this branch (or continue if just hierarchy exists)
         if (!local || !world) return;
 
-        // 2. Determine Dirty State
+        // 2. Determine Dirty State using tag component
         // If parent moved, WE effectively moved in world space, even if our local didn't change.
-        bool isDirty = local->IsDirty || parentDirty;
+        bool localDirty = reg.all_of<Components::Transform::IsDirtyTag>(entity);
+        bool isDirty = localDirty || parentDirty;
 
         // 3. Update Matrix if needed
         if (isDirty)
         {
             world->Matrix = parentMatrix * GetMatrix(*local);
-            local->IsDirty = false;
+            // Remove dirty tag after processing
+            reg.remove<Components::Transform::IsDirtyTag>(entity);
         }
 
         // 4. Recurse Children

@@ -6,8 +6,9 @@ module;
 #include <glm/gtx/matrix_decompose.hpp>
 
 module ECS:Components.Hierarchy.Impl;
+import :Components.Hierarchy;
+import :Components.Transform;
 import :Scene;
-import :Components;
 
 namespace ECS::Components::Hierarchy::Detail
 {
@@ -136,7 +137,8 @@ namespace ECS::Components::Hierarchy
             glm::vec4 perspective;
             glm::decompose(newLocalMat, childLocal.Scale, childLocal.Rotation, childLocal.Position, skew, perspective);
 
-            childLocal.IsDirty = true; // Mark for next frame update
+            // Mark for next frame update using tag component
+            registry.emplace_or_replace<Transform::IsDirtyTag>(child);
         }
 
         // 4. Perform Attach

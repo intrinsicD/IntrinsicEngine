@@ -96,7 +96,12 @@ namespace Core::Memory
 
     std::expected<void*, AllocatorError> LinearArena::Alloc(size_t size, size_t align)
     {
-        assert(m_OwningThread == std::this_thread::get_id() && "LinearArena is not thread-safe; use a separate arena per thread.");
+        // Thread safety check - always enforced, not just debug builds
+        // This prevents silent memory corruption from cross-thread access
+        if (m_OwningThread != std::this_thread::get_id()) {
+            assert(false && "LinearArena is not thread-safe; use a separate arena per thread.");
+            return std::unexpected(AllocatorError::ThreadViolation);
+        }
         if (!m_Start) return std::unexpected(AllocatorError::OutOfMemory);
 
         // Always align the *current* offset, not just the pointer logic

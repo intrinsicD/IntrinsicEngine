@@ -16,33 +16,33 @@ export namespace Geometry
         glm::vec3 Min = glm::vec3(FLT_MAX);
         glm::vec3 Max = glm::vec3(-FLT_MAX);
 
-        [[nodiscard]] bool IsValid() const
+        [[nodiscard]] constexpr bool IsValid() const
         {
             return (Min.x <= Max.x) && (Min.y <= Max.y) && (Min.z <= Max.z);
         }
 
-        [[nodiscard]] glm::vec3 GetCenter() const
+        [[nodiscard]] constexpr glm::vec3 GetCenter() const
         {
             return (Min + Max) * 0.5f;
         }
 
-        [[nodiscard]] glm::vec3 GetExtents() const
+        [[nodiscard]] constexpr glm::vec3 GetExtents() const
         {
             return (Max - Min) * 0.5f;
         }
 
-        [[nodiscard]] glm::vec3 GetSize() const
+        [[nodiscard]] constexpr glm::vec3 GetSize() const
         {
             return Max - Min;
         }
 
-        [[nodiscard]] float GetSurfaceArea() const
+        [[nodiscard]] constexpr float GetSurfaceArea() const
         {
             const glm::vec3 size = GetSize();
             return 2.0f * (size.x * size.y + size.y * size.z + size.z * size.x);
         }
 
-        [[nodiscard]] float GetVolume() const
+        [[nodiscard]] constexpr float GetVolume() const
         {
             const glm::vec3 size = GetSize();
             return size.x * size.y * size.z;
