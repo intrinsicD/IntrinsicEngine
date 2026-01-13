@@ -10,6 +10,7 @@ module;
 #include <glm/glm.hpp>
 #include <entt/entity/registry.hpp>
 #include "RHI.Vulkan.hpp"
+#include "Core.Profiling.Macros.hpp"
 
 module Runtime.Engine;
 
@@ -259,7 +260,7 @@ namespace Runtime
                         if (model->Size() > 1)
                         {
                             targetEntity = m_Scene.CreateEntity(entityName + "_" + std::to_string(i));
-                            // NOTE: Parent-child relationships could be added here via a Hierarchy component
+                             // NOTE: Parent-child relationships could be added here via a Hierarchy component
                             // when the ECS supports transform hierarchies (e.g., ECS::Hierarchy::Component).
                         }
 
@@ -412,7 +413,6 @@ namespace Runtime
     void Engine::Run()
     {
         Core::Log::Info("Engine::Run starting...");
-        Core::Profiling::ScopedTimer timer("Engine::Run");
         OnStart();
 
         using Clock = std::chrono::high_resolution_clock;
@@ -422,6 +422,9 @@ namespace Runtime
 
         while (m_Running && !m_Window->ShouldClose())
         {
+            // Begin frame telemetry
+            Core::Telemetry::TelemetrySystem::Get().BeginFrame();
+
             auto currentTime = Clock::now();
             double frameTime = std::chrono::duration<double>(currentTime - lastTime).count();
             lastTime = currentTime;
@@ -431,19 +434,37 @@ namespace Runtime
 
             accumulator += frameTime;
 
-            m_FrameArena.Reset();
-            m_Window->OnUpdate();
-            ProcessMainThreadQueue();
-            ProcessUploads();
+            {
+                PROFILE_SCOPE("FrameArena::Reset");
+                m_FrameArena.Reset();
+            }
 
-            // Update with variable dt for responsive input/camera
-            OnUpdate(static_cast<float>(frameTime));
+            {
+                PROFILE_SCOPE("Window::OnUpdate");
+                m_Window->OnUpdate();
+            }
+
+            ProcessMainThreadQueue();
+
+            {
+                PROFILE_SCOPE("ProcessUploads");
+                ProcessUploads();
+            }
+
+            {
+                PROFILE_SCOPE("OnUpdate");
+                // Update with variable dt for responsive input/camera
+                OnUpdate(static_cast<float>(frameTime));
+            }
 
             // Fixed timestep for physics simulation
-            while (accumulator >= dt)
             {
-                ECS::Systems::Transform::OnUpdate(m_Scene.GetRegistry());
-                accumulator -= dt;
+                PROFILE_SCOPE("PhysicsUpdate");
+                while (accumulator >= dt)
+                {
+                    ECS::Systems::Transform::OnUpdate(m_Scene.GetRegistry());
+                    accumulator -= dt;
+                }
             }
 
             if (m_FramebufferResized)
@@ -454,7 +475,13 @@ namespace Runtime
 
             m_TransferManager->GarbageCollect();
 
-            OnRender();
+            {
+                PROFILE_SCOPE("OnRender");
+                OnRender();
+            }
+
+            // End frame telemetry
+            Core::Telemetry::TelemetrySystem::Get().EndFrame();
         }
 
         Core::Tasks::Scheduler::WaitForAll();

@@ -41,6 +41,8 @@ target_sources(${target_name}
         Core.Assets.cpp
 )
 
+target_include_directories(${target_name} PUBLIC .)
+
 set_target_properties(EnTT PROPERTIES INTERFACE_SYSTEM_INCLUDE_DIRECTORIES
         $<TARGET_PROPERTY:EnTT,INTERFACE_INCLUDE_DIRECTORIES>) #Silences warnings about SYSTEM includes
 

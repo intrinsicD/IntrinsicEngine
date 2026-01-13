@@ -43,6 +43,88 @@ namespace Interface::GUI
     static std::vector<RegisteredMenu> s_Menus;
     static VkDescriptorPool s_DescriptorPool = VK_NULL_HANDLE;
     static RHI::VulkanDevice* s_Device = nullptr;
+    static bool s_ShowTelemetryPanel = false;
+
+    // Helper to draw performance/telemetry panel
+    static void DrawTelemetryPanel()
+    {
+        ImGui::SetNextWindowSize(ImVec2(400, 300), ImGuiCond_FirstUseEver);
+        if (ImGui::Begin("Performance", &s_ShowTelemetryPanel))
+        {
+            auto& telemetry = Core::Telemetry::TelemetrySystem::Get();
+            const auto& stats = telemetry.GetFrameStats(0);
+
+            // Frame timing
+            double avgMs = telemetry.GetAverageFrameTimeMs(60);
+            double avgFps = telemetry.GetAverageFPS(60);
+
+            ImGui::Text("FPS: %.1f (%.2f ms)", avgFps, avgMs);
+            ImGui::Text("Frame: %llu", stats.FrameNumber);
+            ImGui::Text("Draw Calls: %u", stats.DrawCalls);
+            ImGui::Text("Triangles: %u", stats.TriangleCount);
+
+            ImGui::Separator();
+
+            // Frame time graph
+            static float frameTimesMs[120] = {};
+            static int frameTimeIdx = 0;
+            frameTimesMs[frameTimeIdx] = static_cast<float>(stats.FrameTimeNs) / 1'000'000.0f;
+            frameTimeIdx = (frameTimeIdx + 1) % 120;
+
+            float maxFrameTime = 33.3f; // 30 FPS baseline
+            for (int i = 0; i < 120; ++i)
+            {
+                if (frameTimesMs[i] > maxFrameTime) maxFrameTime = frameTimesMs[i];
+            }
+
+            ImGui::PlotLines("Frame Time", frameTimesMs, 120, frameTimeIdx,
+                nullptr, 0.0f, maxFrameTime * 1.1f, ImVec2(0, 80));
+
+            ImGui::Separator();
+
+            // Timing categories (sorted by total time)
+            if (ImGui::TreeNode("Timing Breakdown"))
+            {
+                auto categories = telemetry.GetCategoriesSortedByTime();
+
+                if (ImGui::BeginTable("TimingTable", 4,
+                    ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
+                    ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollX |
+                    ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_NoHostExtendX))
+                {
+                    ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed, 150.0f);
+                    ImGui::TableSetupColumn("Total (ms)", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+                    ImGui::TableSetupColumn("Avg (ms)", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+                    ImGui::TableSetupColumn("Calls", ImGuiTableColumnFlags_WidthFixed, 60.0f);
+                    ImGui::TableHeadersRow();
+
+                    for (const auto* cat : categories)
+                    {
+                        ImGui::TableNextRow();
+                        ImGui::TableNextColumn();
+                        if (cat->Name)
+                        {
+                            ImGui::TextUnformatted(cat->Name);
+                        }
+                        else
+                        {
+                            ImGui::Text("0x%08X", cat->NameHash);
+                        }
+                        ImGui::TableNextColumn();
+                        ImGui::Text("%.3f", cat->TotalMs());
+                        ImGui::TableNextColumn();
+                        ImGui::Text("%.3f", cat->AverageMs());
+                        ImGui::TableNextColumn();
+                        ImGui::Text("%u", cat->CallCount);
+                    }
+
+                    ImGui::EndTable();
+                }
+                ImGui::TreePop();
+            }
+        }
+        ImGui::End();
+    }
 
     void Init(Core::Windowing::Window& window,
               RHI::VulkanDevice& device,
@@ -224,13 +306,21 @@ namespace Interface::GUI
                         // Logic handled by bool reference
                     }
                 }
+                ImGui::Separator();
+                ImGui::MenuItem("Performance", nullptr, &s_ShowTelemetryPanel);
                 ImGui::EndMenu();
             }
 
             ImGui::EndMainMenuBar();
         }
 
-        // 2. PANELS (WINDOWS)
+        // 2. BUILT-IN TELEMETRY PANEL
+        if (s_ShowTelemetryPanel)
+        {
+            DrawTelemetryPanel();
+        }
+
+        // 3. USER PANELS (WINDOWS)
         for (auto it = s_Panels.begin(); it != s_Panels.end(); )
         {
             if (!it->IsOpen && it->IsClosable)

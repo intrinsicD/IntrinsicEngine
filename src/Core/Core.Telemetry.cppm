@@ -1,4 +1,4 @@
-gmodule;
+module;
 
 #include <chrono>
 #include <cstdint>

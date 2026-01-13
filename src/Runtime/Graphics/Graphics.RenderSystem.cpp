@@ -338,6 +338,9 @@ namespace Graphics
                                                            {
                                                                vkCmdDrawIndexed(
                                                                    cmd, currentGeo->GetIndexCount(), 1, 0, 0, 0);
+                                                               // Record telemetry for draw call
+                                                               Core::Telemetry::TelemetrySystem::Get().RecordDrawCall(
+                                                                   currentGeo->GetIndexCount() / 3);
                                                            }
                                                            else
                                                            {
@@ -345,6 +348,7 @@ namespace Graphics
                                                                uint32_t vertCount = static_cast<uint32_t>(currentGeo->
                                                                    GetLayout().PositionsSize / sizeof(glm::vec3));
                                                                vkCmdDraw(cmd, vertCount, 1, 0, 0);
+                                                               Core::Telemetry::TelemetrySystem::Get().RecordDrawCall(0);
                                                            }
                                                        }
                                                    }
