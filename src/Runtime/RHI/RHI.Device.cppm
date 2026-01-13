@@ -18,7 +18,7 @@ namespace RHI
         std::optional<uint32_t> PresentFamily;
         std::optional<uint32_t> TransferFamily;
 
-        bool IsComplete() const
+        [[nodiscard]] bool IsComplete() const
         {
             return GraphicsFamily.has_value() && PresentFamily.has_value() && TransferFamily.has_value();
         }
@@ -53,12 +53,15 @@ namespace RHI
         [[nodiscard]] VkCommandPool GetCommandPool() const { return m_CommandPool; }
         [[nodiscard]] VmaAllocator GetAllocator() const { return m_Allocator; }
         [[nodiscard]] bool IsValid() const { return m_IsValid; }
-        [[nodiscard]] constexpr uint32_t GetFramesInFlight() const { return MAX_FRAMES_IN_FLIGHT; }
+        [[nodiscard]] static constexpr uint32_t GetFramesInFlight() { return MAX_FRAMES_IN_FLIGHT; }
         [[nodiscard]] constexpr uint32_t GetCurrentFrameIndex() const { return m_CurrentFrameIndex; }
         [[nodiscard]] uint64_t GetGlobalFrameNumber() const { return m_GlobalFrameNumber; }
 
         // Call at the start of each frame (after waiting for in-flight fence)
-        void IncrementFrame() { ++m_GlobalFrameNumber; }
+        void IncrementFrame() {
+            ++m_GlobalFrameNumber;
+            m_CurrentFrameIndex = (m_CurrentFrameIndex + 1) % MAX_FRAMES_IN_FLIGHT;
+        }
 
         // Helper to query swapchain support (used later by Swapchain module)
         [[nodiscard]] SwapchainSupportDetails QuerySwapchainSupport() const;

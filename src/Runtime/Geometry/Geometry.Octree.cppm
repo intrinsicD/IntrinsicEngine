@@ -12,7 +12,6 @@ module;
 #include <cmath>
 #include <vector>
 #include <string>
-#include <iostream>
 #include <glm/glm.hpp>
 
 export module Geometry:Octree;
@@ -65,12 +64,6 @@ export namespace Geometry
             Node()
             {
                 Children.fill(kInvalidIndex);
-            }
-
-            friend std::ostream& operator<<(std::ostream& stream, const Node&)
-            {
-                stream << "output for node not yet implemented";
-                return stream;
             }
         };
 
@@ -136,6 +129,8 @@ export namespace Geometry
             return m_ElementIndices;
         }
 
+        /// @brief Build the octree from a span of AABBs.
+        /// @return true if build succeeded, false if input was empty or invalid.
         [[nodiscard]] bool Build(std::span<const AABB> aabbs, const SplitPolicy& policy, const std::size_t maxPerNode,
                    const std::size_t maxDepth)
         {
@@ -320,7 +315,7 @@ export namespace Geometry
         void QueryKnn(const glm::vec3& queryPoint, std::size_t k, std::vector<size_t>& results) const
         {
             results.clear();
-            if (NodeProperties.Empty() || k == 0)
+            if (m_Nodes.empty() || k == 0)
             {
                 return;
             }
@@ -723,12 +718,12 @@ export namespace Geometry
             {
                 centers.push_back(ElementAabbs[m_ElementIndices[first + i]].GetCenter());
             }
-            const auto medianIdx = centers.size() / 2;
-            auto kth = [](std::vector<glm::vec3>& centers, std::size_t medianIdx, int dim)
+            const auto medianIdx = static_cast<std::ptrdiff_t>(centers.size() / 2);
+            auto kth = [](std::vector<glm::vec3>& centers, std::ptrdiff_t medianIdx, int dim)
             {
                 std::ranges::nth_element(centers, centers.begin() + medianIdx,
                                          [dim](const auto& a, const auto& b) { return a[dim] < b[dim]; });
-                return centers[medianIdx][dim];
+                return centers[static_cast<size_t>(medianIdx)][dim];
             };
             return {kth(centers, medianIdx, 0), kth(centers, medianIdx, 1), kth(centers, medianIdx, 2)};
         }

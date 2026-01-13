@@ -173,7 +173,14 @@ public:
         {
             if (m_AssetManager.GetState(m_DuckModel) == Assets::LoadState::Ready)
             {
-                auto model = m_AssetManager.Get<Graphics::Model>(m_DuckModel);
+                auto modelResult = m_AssetManager.Get<Graphics::Model>(m_DuckModel);
+                if (!modelResult)
+                {
+                    Log::Error("Failed to get model: {}", Core::ErrorCodeToString(modelResult.error()));
+                    m_IsEntitySpawned = true; // Don't retry
+                    return;
+                }
+                auto model = *modelResult;
 
                 for (const auto& meshSegment : model->Meshes)
                 {
@@ -350,7 +357,8 @@ public:
                     Graphics::GeometryGpuData* geo = nullptr;
                     if (mr.Geometry.IsValid())
                     {
-                        geo = GetGeometryStorage().Get(mr.Geometry);
+                        // Use GetUnchecked for simple UI display - we already checked IsValid
+                        geo = GetGeometryStorage().GetUnchecked(mr.Geometry);
                     }
 
                     if (geo)

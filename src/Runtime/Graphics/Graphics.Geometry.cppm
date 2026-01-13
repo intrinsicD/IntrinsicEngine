@@ -7,6 +7,7 @@ module;
 #include <shared_mutex>
 #include <utility>
 #include <queue>
+#include <expected>
 #include <glm/glm.hpp>
 #include "RHI.Vulkan.hpp"
 
@@ -14,6 +15,7 @@ export module Graphics:Geometry;
 
 import RHI;
 import Geometry;
+import Core;
 
 export namespace Graphics
 {
@@ -100,14 +102,11 @@ export namespace Graphics
         uint32_t m_IndexCount = 0;
     };
 
-    struct GeometryHandle
-    {
-        uint32_t Index = std::numeric_limits<uint32_t>::max();
-        uint32_t Generation = 0;
+    // Type tag for GeometryHandle - enables type-safe handle via Core::StrongHandle
+    struct GeometryTag {};
 
-        auto operator<=>(const GeometryHandle&) const = default;
-        [[nodiscard]] bool IsValid() const { return Index != std::numeric_limits<uint32_t>::max(); }
-    };
+    // Use the core StrongHandle template for type safety and consistency
+    using GeometryHandle = Core::StrongHandle<GeometryTag>;
 
     class GeometryStorage
     {
@@ -195,17 +194,34 @@ export namespace Graphics
             }
         }
 
-        [[nodiscard]] GeometryGpuData* Get(GeometryHandle handle)
+        /// @brief Get geometry data by handle
+        /// @return Expected with pointer to data, or error if handle is invalid/stale
+        [[nodiscard]] Core::Expected<GeometryGpuData*> Get(GeometryHandle handle)
         {
             std::shared_lock lock(m_Mutex);  // Use shared_lock for read-only access
 
-            if (handle.Index >= m_Slots.size()) return nullptr;
+            if (handle.Index >= m_Slots.size())
+                return std::unexpected(Core::ErrorCode::ResourceNotFound);
 
             const Slot& slot = m_Slots[handle.Index];
+            if (!slot.IsActive)
+                return std::unexpected(Core::ErrorCode::ResourceNotFound);
+
+            if (slot.Generation != handle.Generation)
+                return std::unexpected(Core::ErrorCode::ResourceNotFound); // Stale handle
+
+            return slot.Data.get();
+        }
+
+        /// @brief Get geometry data by handle (raw pointer version for hot paths)
+        /// @return Raw pointer to data, or nullptr if invalid. Use only when you've validated the handle.
+        [[nodiscard]] GeometryGpuData* GetUnchecked(GeometryHandle handle)
+        {
+            std::shared_lock lock(m_Mutex);
+            if (handle.Index >= m_Slots.size()) return nullptr;
+            const Slot& slot = m_Slots[handle.Index];
             if (slot.IsActive && slot.Generation == handle.Generation)
-            {
                 return slot.Data.get();
-            }
             return nullptr;
         }
 

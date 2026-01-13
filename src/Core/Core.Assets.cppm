@@ -8,9 +8,11 @@ module;
 #include <shared_mutex>
 #include <unordered_map>
 #include <typeindex>
+#include <expected>
 
 export module Core:Assets;
 
+import :Error;
 import :Logging;
 import :Filesystem;
 import :Tasks; // Using your Async Task Graph
@@ -99,12 +101,15 @@ export namespace Core::Assets
 
         void MoveToProcessing(AssetHandle handle);
 
-        // 4. Get Resource
+        // 4. Get Resource - Returns Expected with proper error codes
+        // Use Get() for shared ownership, GetRaw() for temporary access
         template <typename T>
-        std::shared_ptr<T> Get(AssetHandle handle);
+        [[nodiscard]] Expected<std::shared_ptr<T>> Get(AssetHandle handle);
+
         template <typename T>
-        T* GetRaw(AssetHandle handle);
-        LoadState GetState(AssetHandle handle);
+        [[nodiscard]] Expected<T*> GetRaw(AssetHandle handle);
+
+        [[nodiscard]] LoadState GetState(AssetHandle handle);
 
         void Clear();
         void AssetsUiPanel();
@@ -222,41 +227,52 @@ export namespace Core::Assets
         });
     }
 
-    // 2. Data Access
-    // Returns nullptr if not ready or wrong type
+    // 2. Data Access - Returns Expected with proper error information
     template <typename T>
-    std::shared_ptr<T> AssetManager::Get(AssetHandle handle)
+    Expected<std::shared_ptr<T>> AssetManager::Get(AssetHandle handle)
     {
         std::shared_lock lock(m_Mutex);
-        if (!m_Registry.valid(handle.ID)) return nullptr;
+        if (!m_Registry.valid(handle.ID))
+            return std::unexpected(ErrorCode::ResourceNotFound);
 
         // Check if loaded
         const auto& info = m_Registry.get<AssetInfo>(handle.ID);
-        if (info.State != LoadState::Ready) return nullptr;
+        if (info.State != LoadState::Ready)
+        {
+            if (info.State == LoadState::Failed)
+                return std::unexpected(ErrorCode::AssetLoadFailed);
+            return std::unexpected(ErrorCode::AssetNotLoaded);
+        }
 
         // Check if it has the specific payload
         if (auto* payload = m_Registry.try_get<AssetPayload<T>>(handle.ID))
         {
             return payload->Resource;
         }
-        return nullptr;
+        return std::unexpected(ErrorCode::AssetTypeMismatch);
     }
 
     template <typename T>
-    T* AssetManager::GetRaw(AssetHandle handle)
+    Expected<T*> AssetManager::GetRaw(AssetHandle handle)
     {
         // Use shared_lock for reader concurrency
         std::shared_lock lock(m_Mutex);
-        if (!m_Registry.valid(handle.ID)) return nullptr;
+        if (!m_Registry.valid(handle.ID))
+            return std::unexpected(ErrorCode::ResourceNotFound);
 
         const auto& info = m_Registry.get<AssetInfo>(handle.ID);
-        if (info.State != LoadState::Ready) return nullptr;
+        if (info.State != LoadState::Ready)
+        {
+            if (info.State == LoadState::Failed)
+                return std::unexpected(ErrorCode::AssetLoadFailed);
+            return std::unexpected(ErrorCode::AssetNotLoaded);
+        }
 
         if (auto* payload = m_Registry.try_get<AssetPayload<T>>(handle.ID))
         {
             return payload->Resource.get();
         }
-        return nullptr;
+        return std::unexpected(ErrorCode::AssetTypeMismatch);
     }
 
     template <typename T>

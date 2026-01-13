@@ -43,9 +43,12 @@ export namespace Core::Hash
         {
         }
 
+        // WARNING: DebugString stores str.data() which is only valid if str outlives this StringID.
+        // Prefer the const char* constructor with string literals for safety.
+        // This constructor is mainly for compile-time string_view literals.
         constexpr StringID(std::string_view str) : Value(HashString(str))
 #ifndef NDEBUG
-            , DebugString(str.data()) // Only valid if str outlives StringID
+            , DebugString(str.data()) // UNSAFE: Only valid if str outlives StringID!
 #endif
         {
         }

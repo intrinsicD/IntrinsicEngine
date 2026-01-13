@@ -18,6 +18,7 @@ target_sources(${target_name}
         PUBLIC
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
         Core.cppm
+        Core.Error.cppm
         Core.Memory.cppm
         Core.Logging.cppm
         Core.Tasks.cppm
@@ -28,6 +29,7 @@ target_sources(${target_name}
         Core.Input.cppm
         Core.Assets.cppm
         Core.Profiling.cppm
+        Core.Telemetry.cppm
         PRIVATE
         FILE_SET core_impl TYPE CXX_MODULES FILES
         Core.Memory.cpp

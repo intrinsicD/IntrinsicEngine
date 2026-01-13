@@ -4,6 +4,7 @@
 
 import Core;
 
+using namespace Core;
 using namespace Core::Assets;
 
 // Dummy Resource Types
@@ -38,16 +39,20 @@ TEST(AssetSystem, AsyncLoading)
     // 4. Check Initial State
     EXPECT_TRUE(handle.IsValid());
     EXPECT_EQ(manager.GetState(handle), LoadState::Loading);
-    EXPECT_EQ(manager.Get<Texture>(handle), nullptr); // Not ready yet
+
+    // Not ready yet - should return error
+    auto notReady = manager.Get<Texture>(handle);
+    EXPECT_FALSE(notReady.has_value());
+    EXPECT_EQ(notReady.error(), ErrorCode::AssetNotLoaded);
 
     // 5. Wait for Task
     Core::Tasks::Scheduler::WaitForAll();
 
     // 6. Check Final State
     EXPECT_EQ(manager.GetState(handle), LoadState::Ready);
-    auto tex = manager.Get<Texture>(handle);
-    ASSERT_NE(tex, nullptr);
-    EXPECT_EQ(tex->width, 1024);
+    auto texResult = manager.Get<Texture>(handle);
+    ASSERT_TRUE(texResult.has_value());
+    EXPECT_EQ((*texResult)->width, 1024);
 
     Core::Tasks::Scheduler::Shutdown();
 }
@@ -124,14 +129,17 @@ TEST(AssetSystem, ExternalFinalization) {
     manager.MoveToProcessing(handle);
     EXPECT_EQ(manager.GetState(handle), LoadState::Processing);
 
-    // 4. Verify Get returns null while processing (Access Control)
-    EXPECT_EQ(manager.Get<int>(handle), nullptr);
+    // 4. Verify Get returns error while processing (Access Control)
+    auto processingResult = manager.Get<int>(handle);
+    EXPECT_FALSE(processingResult.has_value());
+    EXPECT_EQ(processingResult.error(), ErrorCode::AssetNotLoaded);
 
     // 5. Finalize
     manager.FinalizeLoad(handle);
 
     EXPECT_EQ(manager.GetState(handle), LoadState::Ready);
-    EXPECT_NE(manager.Get<int>(handle), nullptr);
+    auto finalResult = manager.Get<int>(handle);
+    EXPECT_TRUE(finalResult.has_value());
 
     Core::Tasks::Scheduler::Shutdown();
 }

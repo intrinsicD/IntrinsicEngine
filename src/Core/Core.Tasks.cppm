@@ -11,11 +11,12 @@ import :Logging;
 namespace Core::Tasks
 {
     // A fixed-size, non-allocating task wrapper.
-    // Sized for two cache lines (128 bytes) to accommodate lambdas with moderate captures.
+    // Sized for two cache lines (128 bytes total) to accommodate lambdas with moderate captures.
+    // Layout: 120 bytes storage + 8 bytes vtable pointer = 128 bytes.
     // Trade-off: Larger tasks reduce cache efficiency but allow more flexible captures.
     class LocalTask
     {
-        static constexpr size_t STORAGE_SIZE = 120; // 128 - 8 (vtable ptr)
+        static constexpr size_t STORAGE_SIZE = 120; // 128 total - sizeof(Concept*)
 
         struct Concept
         {
@@ -41,7 +42,7 @@ namespace Core::Tasks
             }
         };
 
-        alignas(8) std::byte m_Storage[STORAGE_SIZE];
+        alignas(8) std::byte m_Storage[STORAGE_SIZE]{}; // Value-initialize to zero
         Concept* m_VTable = nullptr; // Points to m_Storage (reinterpreted)
 
     public:

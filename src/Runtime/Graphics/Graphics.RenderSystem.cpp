@@ -254,11 +254,11 @@ namespace Graphics
                                                                IsValid())
                                                                continue;
 
-                                                           Material* mat = assets->GetRaw<
-                                                               Material>(renderable.Material);
+                                                           auto matResult = assets->GetRaw<Material>(renderable.Material);
 
-                                                           if (mat)
+                                                           if (matResult.has_value())
                                                            {
+                                                               Material* mat = *matResult;
                                                                packets.push_back({
                                                                    renderable.Geometry,
                                                                    mat->GetTextureIndex(),
@@ -279,7 +279,8 @@ namespace Graphics
                                                            // Resolve Geometry only when it changes
                                                            if (packet.GeoHandle != currentGeoHandle)
                                                            {
-                                                               currentGeo = geoStorage->Get(packet.GeoHandle);
+                                                               // Hot path: use GetUnchecked for performance
+                                                               currentGeo = geoStorage->GetUnchecked(packet.GeoHandle);
                                                                currentGeoHandle = packet.GeoHandle;
 
                                                                if (!currentGeo) continue; // Invalid handle?

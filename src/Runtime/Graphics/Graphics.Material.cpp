@@ -29,10 +29,10 @@ namespace Graphics {
 
         assetManager.Listen(textureHandle, [this, &assetManager](Core::Assets::AssetHandle handle)
         {
-            auto newTexture = assetManager.Get<RHI::Texture>(handle);
-            if (newTexture)
+            auto textureResult = assetManager.Get<RHI::Texture>(handle);
+            if (textureResult.has_value())
             {
-                m_CurrentTexture = newTexture;
+                m_CurrentTexture = *textureResult;
                 // Update the existing slot! No new descriptor set needed.
                 m_BindlessSystem.UpdateTexture(m_TextureIndex, *m_CurrentTexture);
             }

@@ -154,16 +154,29 @@ TEST(BoundedHeap, Clear)
 // Threshold Tests
 // -----------------------------------------------------------------------------
 
-TEST(BoundedHeap, Threshold_NotFull)
+TEST(BoundedHeap, IsFull_NotFull)
 {
     BoundedHeap<int> heap(5);
 
     heap.Push(10);
     heap.Push(20);
 
-    // Not full, returns default T{}
-    auto threshold = heap.Threshold();
-    EXPECT_EQ(threshold, int{});  // 0 for int
+    // Not full yet
+    EXPECT_FALSE(heap.IsFull());
+    EXPECT_EQ(heap.Size(), 2u);
+}
+
+TEST(BoundedHeap, IsFull_Full)
+{
+    BoundedHeap<int> heap(3);
+
+    heap.Push(10);
+    heap.Push(30);
+    heap.Push(20);
+
+    // Now full
+    EXPECT_TRUE(heap.IsFull());
+    EXPECT_EQ(heap.Size(), 3u);
 }
 
 TEST(BoundedHeap, Threshold_Full)
@@ -175,6 +188,7 @@ TEST(BoundedHeap, Threshold_Full)
     heap.Push(20);
 
     // Full, returns current worst
+    EXPECT_TRUE(heap.IsFull());
     EXPECT_EQ(heap.Threshold(), 30);
 }
 

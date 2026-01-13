@@ -52,16 +52,15 @@ export namespace Utils
 
         void Clear() { m_Data.clear(); }
 
-        // Convenience: +inf if not full, otherwise the current worst (useful as pruning threshold).
-        T Threshold() const
+        // Convenience: Returns current worst (threshold for pruning).
+        // IMPORTANT: Only call when Size() == Capacity(), otherwise threshold is undefined.
+        // Caller should manage tau externally when heap is not yet full.
+        const T& Threshold() const
         {
-            if (m_Data.size() < m_MaxSize)
-            {
-                // Caller commonly uses T = pair<float,size_t>; you can specialize if you like.
-                return T{}; // Be careful: for distances you'd rather manage tau externally.
-            }
             return top();
         }
+
+        [[nodiscard]] bool IsFull() const { return m_Data.size() >= m_MaxSize; }
 
         // Returns items sorted ascending (best..worst) **without** destroying the heap.
         std::vector<T> GetSortedData() const
