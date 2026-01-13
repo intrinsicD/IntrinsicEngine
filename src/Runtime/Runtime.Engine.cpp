@@ -117,11 +117,15 @@ namespace Runtime
 
         m_Scene.GetRegistry().clear();
         m_AssetManager.Clear();
-        m_DefaultTexture.reset();
 
+        m_DefaultTexture.reset();
         m_LoadedMaterials.clear();
 
         m_RenderSystem.reset();
+
+        // Clear geometry storage before pipeline/device destruction
+        m_GeometryStorage.Clear();
+
         m_Pipeline.reset();
         m_BindlessSystem.reset();
         m_DescriptorPool.reset();
@@ -129,6 +133,7 @@ namespace Runtime
         m_Renderer.reset();
         m_Swapchain.reset();
         m_TransferManager.reset();
+
         m_Device.reset();
 
         if (m_Context)
@@ -254,7 +259,8 @@ namespace Runtime
                         if (model->Size() > 1)
                         {
                             targetEntity = m_Scene.CreateEntity(entityName + "_" + std::to_string(i));
-                            // TODO: Add parent-child relationship component
+                            // NOTE: Parent-child relationships could be added here via a Hierarchy component
+                            // when the ECS supports transform hierarchies (e.g., ECS::Hierarchy::Component).
                         }
 
                         auto& mr = m_Scene.GetRegistry().emplace<ECS::MeshRenderer::Component>(targetEntity);

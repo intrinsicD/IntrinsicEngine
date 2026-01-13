@@ -210,41 +210,42 @@ namespace RHI
             VK_IMAGE_ASPECT_COLOR_BIT
         );
 
-        //TODO: use the Async TransferManager path...
-        CommandUtils::ExecuteImmediate(*m_Device, [&](VkCommandBuffer cmd)
-        {
-            // 1. Transition Undefined -> Transfer Dst
-            VkImageMemoryBarrier barrier{};
-            barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-            barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-            barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-            barrier.srcAccessMask = 0;
-            barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-            barrier.image = m_Image->GetHandle();
-            barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, mipLevels, 0, 1};
+        // Use BeginSingleTimeCommands / EndSingleTimeCommands for explicit control
+        VkCommandBuffer cmd = CommandUtils::BeginSingleTimeCommands(*m_Device);
 
-            vkCmdPipelineBarrier(cmd,
-                                 VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                                 0, 0, nullptr, 0, nullptr, 1, &barrier);
+        // 1. Transition Undefined -> Transfer Dst
+        VkImageMemoryBarrier barrier{};
+        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        barrier.srcAccessMask = 0;
+        barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barrier.image = m_Image->GetHandle();
+        barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, mipLevels, 0, 1};
 
-            // 2. Copy Buffer to Image
-            VkBufferImageCopy region{};
-            region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-            region.imageExtent = {width, height, 1};
-            vkCmdCopyBufferToImage(cmd, stagingBuffer.GetHandle(), m_Image->GetHandle(),
-                                   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+        vkCmdPipelineBarrier(cmd,
+                             VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                             0, 0, nullptr, 0, nullptr, 1, &barrier);
 
-            // 3. Transition Transfer Dst -> Shader Read Only
-            VkImageMemoryBarrier readBarrier = barrier;
-            readBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-            readBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            readBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-            readBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        // 2. Copy Buffer to Image
+        VkBufferImageCopy region{};
+        region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+        region.imageExtent = {width, height, 1};
+        vkCmdCopyBufferToImage(cmd, stagingBuffer.GetHandle(), m_Image->GetHandle(),
+                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
-            vkCmdPipelineBarrier(cmd,
-                                 VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                                 0, 0, nullptr, 0, nullptr, 1, &readBarrier);
-        });
+        // 3. Transition Transfer Dst -> Shader Read Only
+        VkImageMemoryBarrier readBarrier = barrier;
+        readBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        readBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        readBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        readBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+        vkCmdPipelineBarrier(cmd,
+                             VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                             0, 0, nullptr, 0, nullptr, 1, &readBarrier);
+
+        CommandUtils::EndSingleTimeCommands(*m_Device, cmd);
 
         CreateSampler();
     }

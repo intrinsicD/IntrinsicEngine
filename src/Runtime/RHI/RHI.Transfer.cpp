@@ -128,7 +128,7 @@ namespace RHI
 
         // Remove batches that have been processed by the GPU
         auto it = std::remove_if(m_InFlightBatches.begin(), m_InFlightBatches.end(),
-                                 [gpuValue, this](const PendingBatch& batch)
+                                 [gpuValue](const PendingBatch& batch)
                                  {
                                      if (gpuValue >= batch.Token.Value)
                                      {

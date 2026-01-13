@@ -15,6 +15,14 @@ export namespace RHI {
         VulkanBuffer(std::shared_ptr<VulkanDevice> device, size_t size, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
         ~VulkanBuffer();
 
+        // Disable copy
+        VulkanBuffer(const VulkanBuffer&) = delete;
+        VulkanBuffer& operator=(const VulkanBuffer&) = delete;
+
+        // Enable move for efficient container storage
+        VulkanBuffer(VulkanBuffer&& other) noexcept;
+        VulkanBuffer& operator=(VulkanBuffer&& other) noexcept;
+
         [[nodiscard]] VkBuffer GetHandle() const { return m_Buffer; }
         
         // Map memory (only works for HostVisible)

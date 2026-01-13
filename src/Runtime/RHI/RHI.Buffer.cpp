@@ -1,6 +1,7 @@
 module;
 #include <cstring> // memcpy
 #include <memory>
+#include <utility> // std::exchange
 #include "RHI.Vulkan.hpp"
 
 module RHI:Buffer.Impl;
@@ -40,7 +41,7 @@ namespace RHI {
     }
 
     VulkanBuffer::~VulkanBuffer() {
-        if (m_Buffer) {
+        if (m_Buffer && m_Device) {
             VkBuffer buffer = m_Buffer;
             VmaAllocation allocation = m_Allocation;
             VmaAllocator allocator = m_Device->GetAllocator();
@@ -49,6 +50,37 @@ namespace RHI {
                 vmaDestroyBuffer(allocator, buffer, allocation);
             });
         }
+    }
+
+    VulkanBuffer::VulkanBuffer(VulkanBuffer&& other) noexcept
+        : m_Device(std::move(other.m_Device))
+        , m_Buffer(std::exchange(other.m_Buffer, VK_NULL_HANDLE))
+        , m_Allocation(std::exchange(other.m_Allocation, VK_NULL_HANDLE))
+        , m_MappedData(std::exchange(other.m_MappedData, nullptr))
+        , m_IsPersistent(other.m_IsPersistent)
+    {
+    }
+
+    VulkanBuffer& VulkanBuffer::operator=(VulkanBuffer&& other) noexcept {
+        if (this != &other) {
+            // Destroy current resources if any
+            if (m_Buffer && m_Device) {
+                VkBuffer buffer = m_Buffer;
+                VmaAllocation allocation = m_Allocation;
+                VmaAllocator allocator = m_Device->GetAllocator();
+                m_Device->SafeDestroy([allocator, buffer, allocation]() {
+                    vmaDestroyBuffer(allocator, buffer, allocation);
+                });
+            }
+
+            // Move from other
+            m_Device = std::move(other.m_Device);
+            m_Buffer = std::exchange(other.m_Buffer, VK_NULL_HANDLE);
+            m_Allocation = std::exchange(other.m_Allocation, VK_NULL_HANDLE);
+            m_MappedData = std::exchange(other.m_MappedData, nullptr);
+            m_IsPersistent = other.m_IsPersistent;
+        }
+        return *this;
     }
 
     void* VulkanBuffer::Map() {

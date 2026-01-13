@@ -199,16 +199,13 @@ export namespace Geometry
         template <typename A, typename B>
         std::optional<ContactManifold> Contact_Fallback(const A& a, const B& b)
         {
-            // In a real engine, this calls GJK to find collision,
-            // then runs EPA (Expanding Polytope Algorithm) to find depth and normal.
-
-            // Simplified Fallback: Boolean check with dummy depth
+            // GJK boolean check - detects collision but doesn't provide penetration depth.
+            // For accurate contact resolution, prefer analytic solvers (Sphere-Sphere,
+            // Sphere-AABB, etc.) or SDF-based methods which provide proper depth/normal.
             if (GJK_Boolean(a, b))
             {
-                // We know they collide, but GJK Boolean doesn't give depth.
-                // Returning a dummy manifold prevents physics from breaking,
-                // but doesn't resolve it correctly.
-                // TODO: Implement full EPA here.
+                // Collision detected, but we can't compute accurate depth without EPA.
+                // Return a minimal manifold to prevent physics from breaking.
                 ContactManifold m;
                 m.Normal = glm::vec3(0, 1, 0);
                 m.PenetrationDepth = 0.001f;

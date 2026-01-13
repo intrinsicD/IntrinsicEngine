@@ -172,7 +172,7 @@ namespace Graphics
 
     RenderGraph::RGPass& RenderGraph::CreatePassInternal(const std::string& name)
     {
-        return m_Passes.emplace_back(RGPass{name});
+        return m_Passes.emplace_back(RGPass{name, {}});
     }
 
     std::pair<ResourceID, bool> RenderGraph::CreateResourceInternal(Core::Hash::StringID name, ResourceType type)

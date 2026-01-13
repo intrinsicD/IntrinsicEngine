@@ -197,11 +197,11 @@ export namespace Graphics
 
         [[nodiscard]] GeometryGpuData* Get(GeometryHandle handle)
         {
-            std::unique_lock lock(m_Mutex);
+            std::shared_lock lock(m_Mutex);  // Use shared_lock for read-only access
 
             if (handle.Index >= m_Slots.size()) return nullptr;
 
-            Slot& slot = m_Slots[handle.Index];
+            const Slot& slot = m_Slots[handle.Index];
             if (slot.IsActive && slot.Generation == handle.Generation)
             {
                 return slot.Data.get();
@@ -214,6 +214,20 @@ export namespace Graphics
         {
             std::shared_lock lock(m_Mutex);
             return m_PendingKillList.size();
+        }
+
+        // Clear all geometry data immediately. Call before device destruction.
+        void Clear()
+        {
+            std::unique_lock lock(m_Mutex);
+            m_PendingKillList.clear();
+            for (auto& slot : m_Slots)
+            {
+                slot.Data.reset();
+                slot.IsActive = false;
+            }
+            m_Slots.clear();
+            m_FreeIndices.clear();
         }
 
     private:

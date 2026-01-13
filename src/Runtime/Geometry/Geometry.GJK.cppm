@@ -208,38 +208,4 @@ export namespace Geometry::Internal
             }
         }
     }
-
-    // --- EPA IMPLEMENTATION (Contact Manifold) ---
-    // Note: This requires a GJK run first that leaves the simplex intact.
-    // For brevity, this is a simplified EPA that assumes GJK returned a tetrahedron.
-
-    struct PolytopeFace
-    {
-        glm::vec3 Normal;
-        float Distance;
-        int A, B, C;
-    };
-
-    template <typename ShapeA, typename ShapeB>
-    std::optional<glm::vec3> EPA_Run(const ShapeA& a, const ShapeB& b, const Simplex& simplex,
-                                     std::vector<glm::vec3>& polytope)
-    {
-        // 1. Initialize Polytope from Simplex
-        polytope.insert(polytope.end(), simplex.Points.begin(), simplex.Points.end());
-        std::vector<int> faces = {
-            0, 1, 2,
-            0, 3, 1,
-            0, 2, 3,
-            1, 3, 2
-        };
-
-        // ... (Full EPA implementation is ~100 lines of mesh expansion logic)
-        // For this snippet, we will assume a simple GJK depth estimation
-        // or return a basic vector.
-        // A production engine needs the full expansion loop here.
-
-        // Return placeholder for logic: Normal * Depth
-        //TODO: Implement full EPA or document that users should rely on analytic solvers and SDF fallback
-        return glm::vec3(0, 1, 0) * 0.0f;
-    }
 }

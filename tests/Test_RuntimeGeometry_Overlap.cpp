@@ -248,8 +248,8 @@ TEST(GeometryContact, Contact_Fallback_BooleanCheck)
     auto result = ComputeContact(cap, s);
     ASSERT_TRUE(result.has_value());
 
-    // Based on the placeholder fallback implementation:
-    // Returns dummy values since EPA is not implemented
+    // Based on the GJK-only fallback (no EPA implementation):
+    // Returns dummy values for generic convex-convex contacts
     EXPECT_NEAR(result->PenetrationDepth, 0.001f, 0.0001f);
     ExpectVec3Near(result->Normal, {0, 1, 0});
 }

@@ -136,7 +136,7 @@ export namespace Geometry
             return m_ElementIndices;
         }
 
-        bool Build(std::span<const AABB> aabbs, const SplitPolicy& policy, const std::size_t maxPerNode,
+        [[nodiscard]] bool Build(std::span<const AABB> aabbs, const SplitPolicy& policy, const std::size_t maxPerNode,
                    const std::size_t maxDepth)
         {
             ElementAabbs = aabbs;

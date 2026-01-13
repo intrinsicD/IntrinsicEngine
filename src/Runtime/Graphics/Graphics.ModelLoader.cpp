@@ -652,7 +652,9 @@ namespace Graphics
                         primitiveBounds.push_back(aabb);
                     }
                 }
-                segment.CollisionGeometry->LocalOctree.Build(primitiveBounds, Geometry::Octree::SplitPolicy{}, 16, 8);
+                if (!segment.CollisionGeometry->LocalOctree.Build(primitiveBounds, Geometry::Octree::SplitPolicy{}, 16, 8)) {
+                    Core::Log::Warn("Failed to build collision octree for mesh segment");
+                }
                 segment.CollisionGeometry->Positions = std::move(meshData.Positions);
                 segment.CollisionGeometry->Indices = std::move(meshData.Indices);
 

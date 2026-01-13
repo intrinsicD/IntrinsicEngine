@@ -106,10 +106,20 @@ export namespace Geometry
         return aabb.GetVolume();
     }
 
+    // Returns unsigned distance from point to AABB surface.
+    // Returns 0 if point is inside or on the surface.
     double Distance(const AABB& a, const glm::vec3& p)
     {
-        // is negative inside the box so checks should check for distance <= 0 to be inside the box.
-        return glm::length(glm::max(a.Min - p, p - a.Max));
+        glm::vec3 delta = glm::max(glm::max(a.Min - p, p - a.Max), glm::vec3(0.0f));
+        return glm::length(delta);
+    }
+
+    // Returns signed distance: negative inside, positive outside.
+    double SignedDistance(const AABB& a, const glm::vec3& p)
+    {
+        glm::vec3 d = glm::abs(p - a.GetCenter()) - a.GetExtents();
+        return glm::length(glm::max(d, glm::vec3(0.0f))) +
+               glm::min(glm::max(d.x, glm::max(d.y, d.z)), 0.0f);
     }
 
     double SquaredDistance(const AABB& a, const glm::vec3& p)

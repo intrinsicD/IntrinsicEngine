@@ -104,6 +104,11 @@ namespace Core::Memory
         }
         if (!m_Start) return std::unexpected(AllocatorError::OutOfMemory);
 
+        // Early overflow check for obviously invalid inputs
+        if (size > m_TotalSize || align > m_TotalSize) {
+            return std::unexpected(AllocatorError::Overflow);
+        }
+
         // Always align the *current* offset, not just the pointer logic
         // This ensures GetUsed() returns an aligned watermark for subsequent saves/restores
         const size_t safeAlign = std::max(align, alignof(std::max_align_t));
@@ -111,8 +116,13 @@ namespace Core::Memory
         // Calculate aligned offset
         const size_t alignedOffset = (m_Offset + (safeAlign - 1)) & ~(safeAlign - 1);
 
-        // Check overflow
-        if (alignedOffset + size > m_TotalSize)
+        // Check for alignment calculation overflow (would wrap around on huge offsets)
+        if (alignedOffset < m_Offset) {
+            return std::unexpected(AllocatorError::Overflow);
+        }
+
+        // Check space availability
+        if (alignedOffset + size > m_TotalSize || alignedOffset + size < alignedOffset)
         {
             return std::unexpected(AllocatorError::OutOfMemory);
         }

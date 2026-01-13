@@ -150,7 +150,7 @@ TEST(Octree, QueryAABB_EmptyResult)
     auto aabbs = GenerateRandomAABBs(100, 50.0f, 2.0f);
 
     Octree::SplitPolicy policy;
-    octree.Build(aabbs, policy, 8, 10);
+    ASSERT_TRUE(octree.Build(aabbs, policy, 8, 10));
 
     // Query far outside the data
     AABB query{{1000, 1000, 1000}, {1001, 1001, 1001}};
@@ -166,7 +166,7 @@ TEST(Octree, QueryAABB_AllElements)
     auto aabbs = GenerateRandomAABBs(50, 10.0f, 1.0f);
 
     Octree::SplitPolicy policy;
-    octree.Build(aabbs, policy, 8, 10);
+    ASSERT_TRUE(octree.Build(aabbs, policy, 8, 10));
 
     // Query encompassing all elements
     AABB query{{-100, -100, -100}, {100, 100, 100}};
@@ -182,7 +182,7 @@ TEST(Octree, QueryAABB_PartialOverlap)
     auto aabbs = GenerateGridAABBs(5, 2.0f);  // 125 boxes in 5x5x5 grid
 
     Octree::SplitPolicy policy;
-    octree.Build(aabbs, policy, 8, 10);
+    ASSERT_TRUE(octree.Build(aabbs, policy, 8, 10));
 
     // Query should hit a subset
     AABB query{{0, 0, 0}, {4, 4, 4}};  // Should hit ~27 boxes (3x3x3 region)
@@ -205,7 +205,7 @@ TEST(Octree, QueryAABB_CorrectResults)
     auto aabbs = GenerateRandomAABBs(200, 50.0f, 2.0f, 123);
 
     Octree::SplitPolicy policy;
-    octree.Build(aabbs, policy, 8, 10);
+    ASSERT_TRUE(octree.Build(aabbs, policy, 8, 10));
 
     AABB query{{-10, -10, -10}, {10, 10, 10}};
     std::vector<size_t> octreeResults;
@@ -237,7 +237,7 @@ TEST(Octree, QuerySphere_Basic)
     auto aabbs = GenerateGridAABBs(5, 2.0f);
 
     Octree::SplitPolicy policy;
-    octree.Build(aabbs, policy, 8, 10);
+    ASSERT_TRUE(octree.Build(aabbs, policy, 8, 10));
 
     Sphere query{{4, 4, 4}, 3.0f};
     std::vector<size_t> results;
@@ -258,7 +258,7 @@ TEST(Octree, QuerySphere_CorrectResults)
     auto aabbs = GenerateRandomAABBs(150, 40.0f, 2.0f, 456);
 
     Octree::SplitPolicy policy;
-    octree.Build(aabbs, policy, 8, 10);
+    ASSERT_TRUE(octree.Build(aabbs, policy, 8, 10));
 
     Sphere query{{0, 0, 0}, 10.0f};
     std::vector<size_t> octreeResults;
@@ -290,7 +290,7 @@ TEST(Octree, QueryRay_Basic)
     auto aabbs = GenerateGridAABBs(5, 2.0f);
 
     Octree::SplitPolicy policy;
-    octree.Build(aabbs, policy, 8, 10);
+    ASSERT_TRUE(octree.Build(aabbs, policy, 8, 10));
 
     Ray query{{-10, 2, 2}, glm::normalize(glm::vec3(1, 0, 0))};
     std::vector<size_t> results;
@@ -306,7 +306,7 @@ TEST(Octree, QueryRay_Miss)
     std::vector<AABB> aabbs = {AABB{{0, 0, 0}, {1, 1, 1}}};
 
     Octree::SplitPolicy policy;
-    octree.Build(aabbs, policy, 8, 10);
+    ASSERT_TRUE(octree.Build(aabbs, policy, 8, 10));
 
     // Ray that misses the box
     Ray query{{10, 10, 10}, glm::normalize(glm::vec3(1, 0, 0))};
@@ -330,7 +330,7 @@ TEST(Octree, QueryNearest_Basic)
     };
 
     Octree::SplitPolicy policy;
-    octree.Build(aabbs, policy, 8, 10);
+    ASSERT_TRUE(octree.Build(aabbs, policy, 8, 10));
 
     glm::vec3 queryPoint{0.5f, 0.5f, 0.5f};
     size_t result;
@@ -345,7 +345,7 @@ TEST(Octree, QueryNearest_CorrectResult)
     auto aabbs = GenerateRandomAABBs(100, 50.0f, 2.0f, 789);
 
     Octree::SplitPolicy policy;
-    octree.Build(aabbs, policy, 8, 10);
+    ASSERT_TRUE(octree.Build(aabbs, policy, 8, 10));
 
     glm::vec3 queryPoint{5.0f, 5.0f, 5.0f};
     size_t octreeResult;
@@ -383,7 +383,7 @@ TEST(Octree, QueryKnn_Basic)
     };
 
     Octree::SplitPolicy policy;
-    octree.Build(aabbs, policy, 8, 10);
+    ASSERT_TRUE(octree.Build(aabbs, policy, 8, 10));
 
     glm::vec3 queryPoint{0.5f, 0.5f, 0.5f};
     std::vector<size_t> results;
@@ -405,7 +405,7 @@ TEST(Octree, QueryKnn_KGreaterThanElements)
     };
 
     Octree::SplitPolicy policy;
-    octree.Build(aabbs, policy, 8, 10);
+    ASSERT_TRUE(octree.Build(aabbs, policy, 8, 10));
 
     std::vector<size_t> results;
     octree.QueryKnn({0, 0, 0}, 10, results);  // Ask for 10, only 2 exist
@@ -419,7 +419,7 @@ TEST(Octree, QueryKnn_CorrectResults)
     auto aabbs = GenerateRandomAABBs(100, 50.0f, 2.0f, 321);
 
     Octree::SplitPolicy policy;
-    octree.Build(aabbs, policy, 8, 10);
+    ASSERT_TRUE(octree.Build(aabbs, policy, 8, 10));
 
     glm::vec3 queryPoint{0, 0, 0};
     const size_t k = 5;
@@ -454,7 +454,7 @@ TEST(Octree, AddNodeProperty)
     auto aabbs = GenerateRandomAABBs(50, 20.0f, 2.0f);
 
     Octree::SplitPolicy policy;
-    octree.Build(aabbs, policy, 8, 10);
+    ASSERT_TRUE(octree.Build(aabbs, policy, 8, 10));
 
     auto floatProp = octree.AddNodeProperty<float>("Density", 0.0f);
     EXPECT_TRUE(floatProp.IsValid());
@@ -471,7 +471,7 @@ TEST(Octree, GetNodeProperty)
     auto aabbs = GenerateRandomAABBs(20, 10.0f, 1.0f);
 
     Octree::SplitPolicy policy;
-    octree.Build(aabbs, policy, 8, 10);
+    ASSERT_TRUE(octree.Build(aabbs, policy, 8, 10));
 
     [[maybe_unused]] auto _ = octree.AddNodeProperty<int>("Count", 42);
 
@@ -488,7 +488,7 @@ TEST(Octree, HasNodeProperty)
     auto aabbs = GenerateRandomAABBs(10, 5.0f, 1.0f);
 
     Octree::SplitPolicy policy;
-    octree.Build(aabbs, policy, 8, 10);
+    ASSERT_TRUE(octree.Build(aabbs, policy, 8, 10));
 
     EXPECT_FALSE(octree.HasNodeProperty("Custom"));
 

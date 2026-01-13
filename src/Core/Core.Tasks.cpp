@@ -163,14 +163,14 @@ namespace Core::Tasks
             bool foundWork = false;
 
             {
-                // Try locking with std::try_lock to avoid contention with workers?
-                // For simplicity, standard lock is fine here.
-                std::unique_lock lock(s_Ctx->queueMutex);
+                // Use lock_guard for exception safety (though we don't throw)
+                std::lock_guard lock(s_Ctx->queueMutex);
                 if (!s_Ctx->globalQueue.empty())
                 {
+                    // Decrement BEFORE popping to prevent race with workers
+                    s_Ctx->queuedTaskCount.fetch_sub(1, std::memory_order_release);
                     task = std::move(s_Ctx->globalQueue.front());
                     s_Ctx->globalQueue.pop_front();
-                    s_Ctx->queuedTaskCount.fetch_sub(1, std::memory_order_relaxed);
                     foundWork = true;
                 }
             }
@@ -209,12 +209,13 @@ namespace Core::Tasks
 
             // 1. Try Pop
             {
-                std::unique_lock lock(s_Ctx->queueMutex);
+                std::lock_guard lock(s_Ctx->queueMutex);
                 if (!s_Ctx->globalQueue.empty())
                 {
+                    // Decrement BEFORE popping to maintain consistency with WaitForAll
+                    s_Ctx->queuedTaskCount.fetch_sub(1, std::memory_order_release);
                     task = std::move(s_Ctx->globalQueue.front());
                     s_Ctx->globalQueue.pop_front();
-                    s_Ctx->queuedTaskCount.fetch_sub(1, std::memory_order_relaxed);
                     foundWork = true;
                 }
             }

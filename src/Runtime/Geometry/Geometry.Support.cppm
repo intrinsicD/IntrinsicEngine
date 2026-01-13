@@ -28,7 +28,7 @@ export namespace Geometry
     // -------------------------------------------------------------------------
     // Sphere
     // -------------------------------------------------------------------------
-    glm::vec3 Support(const Sphere& shape, const glm::vec3& direction)
+    glm::vec3 Support(const Sphere& shape, const glm::vec3& direction) noexcept
     {
         auto dir = Internal::Normalize(direction);
         return shape.Center + dir * shape.Radius;
@@ -37,7 +37,7 @@ export namespace Geometry
     // -------------------------------------------------------------------------
     // AABB (Axis-Aligned Bounding Box)
     // -------------------------------------------------------------------------
-    glm::vec3 Support(const AABB& shape, const glm::vec3& direction)
+    glm::vec3 Support(const AABB& shape, const glm::vec3& direction) noexcept
     {
         // Simple sign check. No normalization necessary
         // If direction.x > 0, the furthest point is Max.x, else Min.x
@@ -51,7 +51,7 @@ export namespace Geometry
     // -------------------------------------------------------------------------
     // Capsule
     // -------------------------------------------------------------------------
-    glm::vec3 Support(const Capsule& shape, const glm::vec3& direction)
+    glm::vec3 Support(const Capsule& shape, const glm::vec3& direction) noexcept
     {
         // 1. Find support on the inner segment (Line A-B)
         float dotA = glm::dot(direction, shape.PointA);
@@ -70,7 +70,7 @@ export namespace Geometry
     // -------------------------------------------------------------------------
     // OBB (Oriented Bounding Box)
     // -------------------------------------------------------------------------
-    glm::vec3 Support(const OBB& shape, const glm::vec3& direction)
+    glm::vec3 Support(const OBB& shape, const glm::vec3& direction) noexcept
     {
         // 1. Transform direction into Box's Local Space
         // Conjugate of quaternion = Inverse rotation
@@ -92,7 +92,7 @@ export namespace Geometry
     // -------------------------------------------------------------------------
     // Cylinder
     // -------------------------------------------------------------------------
-    glm::vec3 Support(const Cylinder& shape, const glm::vec3& direction)
+    glm::vec3 Support(const Cylinder& shape, const glm::vec3& direction) noexcept
     {
         auto dir = Internal::Normalize(direction);
         glm::vec3 axis = shape.PointB - shape.PointA;
