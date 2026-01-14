@@ -4,12 +4,16 @@ module;
 #include <type_traits>
 #include <utility>
 #include <memory>
+#include <coroutine>
 
 export module Core:Tasks;
 import :Logging;
 
 namespace Core::Tasks
 {
+    // Forward declaration for Scheduler overload.
+    export class Job;
+
     // A fixed-size, non-allocating task wrapper.
     // Sized for two cache lines (128 bytes total) to accommodate lambdas with moderate captures.
     // Layout: 120 bytes storage + 8 bytes vtable pointer = 128 bytes.
@@ -87,13 +91,18 @@ namespace Core::Tasks
         static void Initialize(unsigned threadCount = 0);
         static void Shutdown();
 
-        // Dispatch takes our new LocalTask
-        // We use a template to allow implicit conversion from lambdas at the call site
         template <typename F>
         static void Dispatch(F&& task)
         {
             DispatchInternal(LocalTask(std::forward<F>(task)));
         }
+
+        // Coroutine job support (fire-and-forget).
+        // The coroutine is resumed on the scheduler until it reaches final suspend.
+        static void Dispatch(Job&& job);
+
+        // Used by coroutine awaiters to enqueue a continuation back onto the scheduler.
+        static void Reschedule(std::coroutine_handle<> h);
 
         static void WaitForAll();
 
@@ -101,4 +110,60 @@ namespace Core::Tasks
         static void DispatchInternal(LocalTask&& task);
         static void WorkerEntry(unsigned threadIndex);
     };
+
+    // ---------------------------------------------------------------------
+    // Coroutine Job (MVP)
+    // ---------------------------------------------------------------------
+
+    // Fire-and-forget coroutine driven by Scheduler.
+    // It is intentionally minimal: no return value, no exception propagation.
+    export class Job
+    {
+    public:
+        struct promise_type
+        {
+            Job get_return_object() noexcept;
+            std::suspend_always initial_suspend() noexcept { return {}; }
+            // Keep the frame alive so the scheduler can destroy it after observing done().
+            std::suspend_always final_suspend() noexcept { return {}; }
+            void return_void() noexcept {}
+            void unhandled_exception() noexcept;
+        };
+
+        Job() = default;
+        explicit Job(std::coroutine_handle<promise_type> h) noexcept : m_Handle(h) {}
+
+        Job(Job&& other) noexcept : m_Handle(other.m_Handle) { other.m_Handle = {}; }
+        Job& operator=(Job&& other) noexcept
+        {
+            if (this != &other)
+            {
+                // We intentionally don't destroy here; ownership is transferred.
+                m_Handle = other.m_Handle;
+                other.m_Handle = {};
+            }
+            return *this;
+        }
+
+        Job(const Job&) = delete;
+        Job& operator=(const Job&) = delete;
+
+        ~Job() = default; // Lifetime is owned by the scheduler once dispatched.
+
+        [[nodiscard]] bool Valid() const noexcept { return m_Handle != nullptr; }
+
+    private:
+        std::coroutine_handle<promise_type> m_Handle{};
+        friend class Scheduler;
+    };
+
+    struct YieldAwaiter
+    {
+        bool await_ready() const noexcept { return false; }
+        void await_suspend(std::coroutine_handle<>) const noexcept;
+        void await_resume() const noexcept {}
+    };
+
+    // Cooperative yield: reschedules the current coroutine back onto the Scheduler.
+    export [[nodiscard]] inline YieldAwaiter Yield() noexcept { return {}; }
 }

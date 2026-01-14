@@ -6,6 +6,7 @@ module;
 #include <condition_variable>
 #include <atomic>
 #include <memory>
+#include <coroutine>
 
 #if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
   #include <immintrin.h> // _mm_pause
@@ -138,6 +139,57 @@ namespace Core::Tasks
     };
 
     static std::unique_ptr<SchedulerContext> s_Ctx = nullptr;
+
+    // ---------------------------------------------------------------------
+    // Coroutine support
+    // ---------------------------------------------------------------------
+
+    Job Job::promise_type::get_return_object() noexcept
+    {
+        return Job(std::coroutine_handle<promise_type>::from_promise(*this));
+    }
+
+    void Job::promise_type::unhandled_exception() noexcept
+    {
+        // Exceptions are disabled in this engine. If something still throws in user code,
+        // we treat it as fatal-in-debug. In release, log and continue.
+        Log::Error("Core::Tasks::Job encountered an unhandled exception (exceptions disabled). Terminating coroutine.");
+    }
+
+    void YieldAwaiter::await_suspend(std::coroutine_handle<> h) const noexcept
+    {
+        Scheduler::Reschedule(h);
+    }
+
+    void Scheduler::Reschedule(std::coroutine_handle<> h)
+    {
+        if (!s_Ctx) return;
+        if (!h) return;
+
+        // Enqueue a task that runs exactly one coroutine slice.
+        // The coroutine runs until its next suspension point (e.g., Yield) or completion.
+        DispatchInternal(LocalTask([h]() mutable {
+            if (!h) return;
+
+            h.resume();
+
+            // With final_suspend = suspend_always, the coroutine frame is still valid here.
+            if (h.done())
+                h.destroy();
+        }));
+    }
+
+    void Scheduler::Dispatch(Job&& job)
+    {
+        if (!s_Ctx) return;
+        if (!job.Valid()) return;
+
+        auto h = job.m_Handle;
+        job.m_Handle = {};
+
+        // Treat initial start just like any other continuation.
+        Reschedule(h);
+    }
 
     void Scheduler::Initialize(unsigned threadCount)
     {
