@@ -11,6 +11,7 @@ add_executable(${target_name}
         Test_BoundedHeap.cpp
         Test_ECS.cpp
         Test_GraphicsGeometry.cpp
+        Test_GraphicsModelLoader_PLY.cpp
         Test_RuntimeGeometry_Contact.cpp
         Test_RuntimeGeometry_Containment.cpp
         Test_RuntimeGeometry_Overlap.cpp
