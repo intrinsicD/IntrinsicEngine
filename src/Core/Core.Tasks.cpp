@@ -7,26 +7,70 @@ module;
 #include <atomic>
 #include <memory>
 
+#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
+  #include <immintrin.h> // _mm_pause
+#endif
+
 module Core:Tasks.Impl;
 import :Tasks;
 import :Logging;
 
 namespace Core::Tasks
 {
+    namespace
+    {
+        [[nodiscard]] inline bool CpuRelaxOnce() noexcept
+        {
+#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
+            _mm_pause();
+            return true;
+#elif defined(__aarch64__) || defined(__arm__)
+            // Hint to the CPU that we're in a spin-wait loop.
+            asm volatile("yield" ::: "memory");
+            return true;
+#else
+            return false;
+#endif
+        }
+
+        inline void CpuRelaxOrYield() noexcept
+        {
+            if (!CpuRelaxOnce())
+                std::this_thread::yield();
+        }
+    }
+
     struct SpinLock
     {
         std::atomic<bool> locked = false;
 
         void lock()
         {
-            while (true) {
-                // Optimistic check
-                if (!locked.exchange(true, std::memory_order_acquire)) {
+            // Hybrid strategy:
+            // 1) Try to acquire.
+            // 2)) If contended, do a short polite spin with CPU relax.
+            // 3) If still contended, use atomic::wait (futex) to sleep.
+            while (true)
+            {
+                if (!locked.exchange(true, std::memory_order_acquire))
                     return;
-                }
-                // Wait until value changes (OS level wait)
-                while (locked.load(std::memory_order_relaxed)) {
+
+                // Bounded spin to reduce cache/memory-bus pressure under short contention.
+                // Keep the load relaxed: we only care about observing a transition to false.
+                constexpr int kSpinIters = 64;
+                int spins = 0;
+                while (locked.load(std::memory_order_relaxed))
+                {
+                    if (spins++ < kSpinIters)
+                    {
+                        CpuRelaxOrYield();
+                        continue;
+                    }
+
+                    // Sleep until 'locked' changes from true -> false.
+                    // Note: wait() may spuriously wake; we re-check in the outer loop.
                     locked.wait(true, std::memory_order_relaxed);
+                    spins = 0;
                 }
             }
         }
