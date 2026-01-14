@@ -26,6 +26,7 @@ export namespace Graphics
                      RHI::DescriptorLayout& descriptorLayout,
                      RHI::GraphicsPipeline& pipeline,
                      Core::Memory::LinearArena& frameArena,
+                     Core::Memory::ScopeStack& frameScope,
                      GeometryStorage& geometryStorage);
         ~RenderSystem();
 

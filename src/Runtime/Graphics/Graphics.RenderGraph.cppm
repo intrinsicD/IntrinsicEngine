@@ -123,7 +123,9 @@ export namespace Graphics
     class RenderGraph
     {
     public:
-        explicit RenderGraph(std::shared_ptr<RHI::VulkanDevice> device, Core::Memory::LinearArena& arena);
+        explicit RenderGraph(std::shared_ptr<RHI::VulkanDevice> device,
+                             Core::Memory::LinearArena& arena,
+                             Core::Memory::ScopeStack& scope);
         ~RenderGraph();
 
         // 1. Setup Phase: Add a pass to the frame
@@ -134,16 +136,12 @@ export namespace Graphics
                           "RenderGraph PassData must be trivially destructible (POD). "
                           "LinearArena does not call destructors! Do not use std::vector/std::string in PassData.");
 
-            // IMPORTANT: Pass closure also lives in LinearArena, so it must be trivially destructible too.
-            static_assert(std::is_trivially_destructible_v<ExecuteFn>,
-                          "RenderGraph ExecuteFn must be trivially destructible because it is stored in LinearArena. "
-                          "Avoid capturing std::string/std::vector/std::function/etc. Capture raw pointers/handles only.");
+            // NOTE: ExecuteFn is stored in ScopeStack, so it may capture non-trivial objects (std::string/shared_ptr/etc.).
 
-            // 1. Allocate Pass Data
+            // 1. Allocate Pass Data (POD-only)
             auto dataResult = m_Arena.New<Data>();
             if (!dataResult)
             {
-                // Arena OOM (or invalid). Fail fast in debug; in release we just skip adding the pass.
                 Core::Log::Error("RenderGraph::AddPass failed to allocate PassData from LinearArena");
                 return;
             }
@@ -155,30 +153,27 @@ export namespace Graphics
             // 2. Run Setup (Immediate)
             setup(*data, builder);
 
-            // 3. Store Execution Lambda in Arena
+            // 3. Store Execution Lambda in ScopeStack (destructor-safe)
             struct PassClosure
             {
-                ExecuteFn func;
-                Data* dataPtr;
+                ExecuteFn Func;
+                Data* DataPtr;
             };
 
-            static_assert(std::is_trivially_destructible_v<PassClosure>,
-                          "Internal error: PassClosure must be trivially destructible to live in LinearArena.");
-
-            auto closureMem = m_Arena.New<PassClosure>(std::forward<ExecuteFn>(execute), data);
+            auto closureMem = m_Scope.New<PassClosure>(std::forward<ExecuteFn>(execute), data);
             if (!closureMem)
             {
-                Core::Log::Error("RenderGraph::AddPass failed to allocate PassClosure from LinearArena");
+                Core::Log::Error("RenderGraph::AddPass failed to allocate PassClosure from ScopeStack");
                 return;
             }
 
             PassClosure* closure = *closureMem;
 
-            // 4. Type erase via function pointer thunk (no captures, arena-safe)
+            // 4. Type erase via function pointer thunk (no captures)
             pass.ExecuteFn = +[](void* userData, const RGRegistry& reg, VkCommandBuffer cmd)
             {
                 auto* c = static_cast<PassClosure*>(userData);
-                (c->func)(*(c->dataPtr), reg, cmd);
+                (c->Func)(*(c->DataPtr), reg, cmd);
             };
             pass.ExecuteUserData = closure;
         }
@@ -324,7 +319,8 @@ export namespace Graphics
         };
 
         std::shared_ptr<RHI::VulkanDevice> m_Device;
-        Core::Memory::LinearArena& m_Arena;
+        Core::Memory::LinearArena& m_Arena;      // POD pass data
+        Core::Memory::ScopeStack& m_Scope;       // destructor-safe pass closures
 
         std::vector<RGPass> m_Passes;
         std::vector<ResourceNode> m_Resources;

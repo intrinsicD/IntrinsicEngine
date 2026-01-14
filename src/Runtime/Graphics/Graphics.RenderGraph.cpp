@@ -157,9 +157,12 @@ namespace Graphics
     }
 
     // --- RenderGraph ---
-    RenderGraph::RenderGraph(std::shared_ptr<RHI::VulkanDevice> device, Core::Memory::LinearArena& arena) :
+    RenderGraph::RenderGraph(std::shared_ptr<RHI::VulkanDevice> device,
+                             Core::Memory::LinearArena& arena,
+                             Core::Memory::ScopeStack& scope) :
         m_Device(device),
-        m_Arena(arena)
+        m_Arena(arena),
+        m_Scope(scope)
     {
     }
 
@@ -192,6 +195,9 @@ namespace Graphics
 
     void RenderGraph::Reset()
     {
+        // Ensure pass closures (which may hold shared_ptr/string/etc.) are destroyed each frame.
+        m_Scope.Reset();
+
         m_Passes.clear();
         m_Resources.clear();
         m_Barriers.clear();

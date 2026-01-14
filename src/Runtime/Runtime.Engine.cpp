@@ -22,7 +22,9 @@ import Interface;
 
 namespace Runtime
 {
-    Engine::Engine(const EngineConfig& config) : m_FrameArena(config.FrameArenaSize)
+    Engine::Engine(const EngineConfig& config) :
+        m_FrameArena(config.FrameArenaSize),
+        m_FrameScope(config.FrameArenaSize)
     {
         Core::Tasks::Scheduler::Initialize();
         Core::Filesystem::FileWatcher::Initialize();
@@ -388,11 +390,12 @@ namespace Runtime
                 m_Device,
                 *m_Swapchain,
                 *m_Renderer,
-                *m_BindlessSystem, // <--- Passed
-                *m_DescriptorPool, // <--- Passed
-                *m_DescriptorLayout, // <--- Passed
+                *m_BindlessSystem,
+                *m_DescriptorPool,
+                *m_DescriptorLayout,
                 *m_Pipeline,
                 m_FrameArena,
+                m_FrameScope,
                 m_GeometryStorage
             );
             Core::Log::Info("RenderSystem created successfully.");
@@ -436,6 +439,7 @@ namespace Runtime
 
             {
                 PROFILE_SCOPE("FrameArena::Reset");
+                m_FrameScope.Reset();
                 m_FrameArena.Reset();
             }
 

@@ -59,6 +59,7 @@ export namespace Runtime
         ECS::Scene m_Scene;
         Core::Assets::AssetManager m_AssetManager;
         Core::Memory::LinearArena m_FrameArena; // 1 MB per frame
+        Core::Memory::ScopeStack m_FrameScope;  // per-frame scope allocator with destructors
         Graphics::GeometryStorage m_GeometryStorage;
         std::unique_ptr<Graphics::RenderSystem> m_RenderSystem;
 

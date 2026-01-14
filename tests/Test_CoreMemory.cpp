@@ -20,7 +20,8 @@ struct LifecycleTracker
     static int s_DestructorCount;
     int data = 0;
 
-    LifecycleTracker(int val) : data(val)
+    LifecycleTracker() = default;
+    explicit LifecycleTracker(int val) : data(val)
     {
     }
 
@@ -28,6 +29,278 @@ struct LifecycleTracker
 };
 
 int LifecycleTracker::s_DestructorCount = 0;
+
+// Helper to track destruction order (for ScopeStack LIFO verification)
+struct OrderTracker
+{
+    static std::vector<int> s_DestructionOrder;
+    int id = 0;
+
+    OrderTracker() = default;
+    explicit OrderTracker(int id) : id(id) {}
+    ~OrderTracker() { s_DestructionOrder.push_back(id); }
+};
+
+std::vector<int> OrderTracker::s_DestructionOrder;
+
+// -----------------------------------------------------------------------------
+// ScopeStack Tests
+// -----------------------------------------------------------------------------
+
+TEST(ScopeStack, BasicPODAllocation)
+{
+    ScopeStack stack(1024);
+
+    // Allocate POD types (should work like LinearArena)
+    auto intResult = stack.New<int>(42);
+    ASSERT_TRUE(intResult.has_value());
+    EXPECT_EQ(**intResult, 42);
+
+    auto floatResult = stack.New<float>(3.14f);
+    ASSERT_TRUE(floatResult.has_value());
+    EXPECT_FLOAT_EQ(**floatResult, 3.14f);
+
+    EXPECT_GT(stack.GetUsed(), 0u);
+    EXPECT_EQ(stack.GetDestructorCount(), 0u); // POD types don't track destructors
+}
+
+TEST(ScopeStack, NonTrivialDestructorCalled)
+{
+    LifecycleTracker::s_DestructorCount = 0;
+
+    {
+        ScopeStack stack(1024);
+
+        auto result = stack.New<LifecycleTracker>(100);
+        ASSERT_TRUE(result.has_value());
+        EXPECT_EQ((*result)->data, 100);
+        EXPECT_EQ(stack.GetDestructorCount(), 1u);
+
+        // Destructor not called yet
+        EXPECT_EQ(LifecycleTracker::s_DestructorCount, 0);
+    }
+    // Stack destructor calls Reset() which invokes destructors
+    EXPECT_EQ(LifecycleTracker::s_DestructorCount, 1);
+}
+
+TEST(ScopeStack, DestructionOrderLIFO)
+{
+    OrderTracker::s_DestructionOrder.clear();
+
+    {
+        ScopeStack stack(1024);
+
+        // Allocate objects in order: 1, 2, 3
+        auto r1 = stack.New<OrderTracker>(1);
+        auto r2 = stack.New<OrderTracker>(2);
+        auto r3 = stack.New<OrderTracker>(3);
+
+        ASSERT_TRUE(r1.has_value() && r2.has_value() && r3.has_value());
+    }
+
+    // Should be destroyed in LIFO order: 3, 2, 1
+    ASSERT_EQ(OrderTracker::s_DestructionOrder.size(), 3u);
+    EXPECT_EQ(OrderTracker::s_DestructionOrder[0], 3);
+    EXPECT_EQ(OrderTracker::s_DestructionOrder[1], 2);
+    EXPECT_EQ(OrderTracker::s_DestructionOrder[2], 1);
+}
+
+TEST(ScopeStack, ExplicitReset)
+{
+    OrderTracker::s_DestructionOrder.clear();
+
+    ScopeStack stack(1024);
+
+    auto r1 = stack.New<OrderTracker>(10);
+    auto r2 = stack.New<OrderTracker>(20);
+    ASSERT_TRUE(r1.has_value() && r2.has_value());
+
+    EXPECT_EQ(stack.GetDestructorCount(), 2u);
+    EXPECT_GT(stack.GetUsed(), 0u);
+
+    stack.Reset();
+
+    // After reset: destructors called, memory reused
+    EXPECT_EQ(stack.GetUsed(), 0u);
+    EXPECT_EQ(stack.GetDestructorCount(), 0u);
+
+    // LIFO order: 20, 10
+    ASSERT_EQ(OrderTracker::s_DestructionOrder.size(), 2u);
+    EXPECT_EQ(OrderTracker::s_DestructionOrder[0], 20);
+    EXPECT_EQ(OrderTracker::s_DestructionOrder[1], 10);
+}
+
+TEST(ScopeStack, NewArrayWithDestructors)
+{
+    LifecycleTracker::s_DestructorCount = 0;
+
+    {
+        ScopeStack stack(4096);
+
+        // Allocate array of non-trivially destructible objects
+        auto arrResult = stack.NewArray<LifecycleTracker>(5);
+        ASSERT_TRUE(arrResult.has_value());
+
+        auto arr = *arrResult;
+        EXPECT_EQ(arr.size(), 5u);
+
+        // Array counts as a single destructor entry
+        EXPECT_EQ(stack.GetDestructorCount(), 1u);
+        EXPECT_EQ(LifecycleTracker::s_DestructorCount, 0);
+    }
+
+    // All 5 elements should be destroyed
+    EXPECT_EQ(LifecycleTracker::s_DestructorCount, 5);
+}
+
+TEST(ScopeStack, NewArrayDestructionOrderReversed)
+{
+    OrderTracker::s_DestructionOrder.clear();
+
+    {
+        ScopeStack stack(4096);
+
+        // Allocate array of 4 elements
+        auto arrResult = stack.NewArray<OrderTracker>(4);
+        ASSERT_TRUE(arrResult.has_value());
+
+        auto arr = *arrResult;
+        // Manually set IDs after default construction
+        arr[0].id = 100;
+        arr[1].id = 101;
+        arr[2].id = 102;
+        arr[3].id = 103;
+    }
+
+    // Array elements should be destroyed in reverse order: 103, 102, 101, 100
+    ASSERT_EQ(OrderTracker::s_DestructionOrder.size(), 4u);
+    EXPECT_EQ(OrderTracker::s_DestructionOrder[0], 103);
+    EXPECT_EQ(OrderTracker::s_DestructionOrder[1], 102);
+    EXPECT_EQ(OrderTracker::s_DestructionOrder[2], 101);
+    EXPECT_EQ(OrderTracker::s_DestructionOrder[3], 100);
+}
+
+TEST(ScopeStack, MixedPODAndNonTrivial)
+{
+    OrderTracker::s_DestructionOrder.clear();
+
+    {
+        ScopeStack stack(2048);
+
+        // Mix POD and non-trivial allocations
+        auto pod1 = stack.New<int>(1);
+        auto tracked1 = stack.New<OrderTracker>(1);
+        auto pod2 = stack.New<double>(2.0);
+        auto tracked2 = stack.New<OrderTracker>(2);
+        auto pod3 = stack.New<AlignedStruct16>();
+        auto tracked3 = stack.New<OrderTracker>(3);
+
+        ASSERT_TRUE(pod1.has_value() && pod2.has_value() && pod3.has_value());
+        ASSERT_TRUE(tracked1.has_value() && tracked2.has_value() && tracked3.has_value());
+
+        // Only non-trivial types tracked
+        EXPECT_EQ(stack.GetDestructorCount(), 3u);
+    }
+
+    // Non-trivial destructors in LIFO order: 3, 2, 1
+    ASSERT_EQ(OrderTracker::s_DestructionOrder.size(), 3u);
+    EXPECT_EQ(OrderTracker::s_DestructionOrder[0], 3);
+    EXPECT_EQ(OrderTracker::s_DestructionOrder[1], 2);
+    EXPECT_EQ(OrderTracker::s_DestructionOrder[2], 1);
+}
+
+TEST(ScopeStack, SharedPtrSupport)
+{
+    // Use case: Capturing std::shared_ptr in render passes
+    static int s_SharedDestructed = 0;
+    s_SharedDestructed = 0;
+
+    // Use a custom deleter so we can observe *exactly* when the last shared_ptr releases ownership.
+    auto makeObserved = []()
+    {
+        return std::shared_ptr<int>(
+            new int(42),
+            [](int* p)
+            {
+                delete p;
+                s_SharedDestructed++;
+            });
+    };
+
+    auto external = makeObserved();
+
+    {
+        ScopeStack stack(1024);
+
+        auto sharedResult = stack.New<std::shared_ptr<int>>(external);
+        ASSERT_TRUE(sharedResult.has_value());
+        EXPECT_EQ(*(*sharedResult)->get(), 42);
+
+        // Destructor for shared_ptr is tracked.
+        EXPECT_EQ(stack.GetDestructorCount(), 1u);
+
+        // Still alive because 'external' holds a ref.
+        EXPECT_EQ(s_SharedDestructed, 0);
+
+        // Drop external ref; object must stay alive until stack destroys its entry.
+        external.reset();
+        EXPECT_EQ(s_SharedDestructed, 0);
+    }
+
+    // Stack destructor called Reset(), releasing the last ref.
+    EXPECT_EQ(s_SharedDestructed, 1);
+}
+
+TEST(ScopeStack, StringSupport)
+{
+    // Use case: Capturing std::string for debugging
+    {
+        ScopeStack stack(1024);
+
+        auto strResult = stack.New<std::string>("Debug Pass Name: ForwardLighting");
+        ASSERT_TRUE(strResult.has_value());
+        EXPECT_EQ(**strResult, "Debug Pass Name: ForwardLighting");
+
+        EXPECT_EQ(stack.GetDestructorCount(), 1u);
+    }
+    // No crash = destructor was properly called
+}
+
+TEST(ScopeStack, DirectArenaAccessForPOD)
+{
+    ScopeStack stack(1024);
+
+    // Use GetArena() for POD allocations to bypass destructor tracking overhead
+    auto& arena = stack.GetArena();
+    auto podResult = arena.New<int>(999);
+    ASSERT_TRUE(podResult.has_value());
+    EXPECT_EQ(**podResult, 999);
+
+    // No destructor tracked since we went directly to LinearArena
+    EXPECT_EQ(stack.GetDestructorCount(), 0u);
+}
+
+TEST(ScopeStack, MoveSemantics)
+{
+    OrderTracker::s_DestructionOrder.clear();
+
+    ScopeStack stack1(1024);
+    auto r1 = stack1.New<OrderTracker>(1);
+    ASSERT_TRUE(r1.has_value());
+
+    // Move construct
+    ScopeStack stack2(std::move(stack1));
+    EXPECT_EQ(stack2.GetDestructorCount(), 1u);
+
+    // Original should be empty
+    EXPECT_EQ(stack1.GetUsed(), 0u);
+    EXPECT_EQ(stack1.GetDestructorCount(), 0u);
+
+    // Destruction should only happen once
+    stack2.Reset();
+    ASSERT_EQ(OrderTracker::s_DestructionOrder.size(), 1u);
+    EXPECT_EQ(OrderTracker::s_DestructionOrder[0], 1);
+}
 
 // -----------------------------------------------------------------------------
 // Basic Functionality

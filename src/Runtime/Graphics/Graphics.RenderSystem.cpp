@@ -39,13 +39,14 @@ namespace Graphics
                                RHI::DescriptorLayout& descriptorLayout,
                                RHI::GraphicsPipeline& pipeline,
                                Core::Memory::LinearArena& frameArena,
+                               Core::Memory::ScopeStack& frameScope,
                                GeometryStorage& geometryStorage)
         : m_Device(device),
           m_Swapchain(swapchain),
           m_Renderer(renderer),
           m_BindlessSystem(bindlessSystem),
           m_Pipeline(pipeline),
-          m_RenderGraph(device, frameArena),
+          m_RenderGraph(device, frameArena, frameScope),
           m_GeometryStorage(geometryStorage)
     {
         Core::Log::Info("RenderSystem: Starting constructor body...");

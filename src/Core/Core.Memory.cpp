@@ -98,14 +98,16 @@ namespace Core::Memory
     {
         // Thread safety check - always enforced, not just debug builds
         // This prevents silent memory corruption from cross-thread access
-        if (m_OwningThread != std::this_thread::get_id()) {
+        if (m_OwningThread != std::this_thread::get_id())
+        {
             assert(false && "LinearArena is not thread-safe; use a separate arena per thread.");
             return std::unexpected(AllocatorError::ThreadViolation);
         }
         if (!m_Start) return std::unexpected(AllocatorError::OutOfMemory);
 
         // Early overflow check for obviously invalid inputs
-        if (size > m_TotalSize || align > m_TotalSize) {
+        if (size > m_TotalSize || align > m_TotalSize)
+        {
             return std::unexpected(AllocatorError::Overflow);
         }
 
@@ -117,7 +119,8 @@ namespace Core::Memory
         const size_t alignedOffset = (m_Offset + (safeAlign - 1)) & ~(safeAlign - 1);
 
         // Check for alignment calculation overflow (would wrap around on huge offsets)
-        if (alignedOffset < m_Offset) {
+        if (alignedOffset < m_Offset)
+        {
             return std::unexpected(AllocatorError::Overflow);
         }
 
@@ -144,5 +147,37 @@ namespace Core::Memory
             std::memset(m_Start, 0xCC, m_TotalSize);
         }
 #endif
+    }
+
+    // -------------------------------------------------------------------------
+    // ScopeStack Implementation
+    // -------------------------------------------------------------------------
+    ScopeStack::ScopeStack(ScopeStack&& other) noexcept
+        : m_Arena(std::move(other.m_Arena)),
+          m_Destructors(std::move(other.m_Destructors))
+    {
+    }
+
+    ScopeStack& ScopeStack::operator=(ScopeStack&& other) noexcept
+    {
+        if (this != &other)
+        {
+            // First, destroy our current objects (LIFO order)
+            Reset();
+            m_Arena = std::move(other.m_Arena);
+            m_Destructors = std::move(other.m_Destructors);
+        }
+        return *this;
+    }
+
+    void ScopeStack::Reset()
+    {
+        // Destroy in reverse order of allocation
+        for (auto it = m_Destructors.rbegin(); it != m_Destructors.rend(); ++it)
+        {
+            (*it)();
+        }
+        m_Destructors.clear();
+        m_Arena.Reset();
     }
 }
