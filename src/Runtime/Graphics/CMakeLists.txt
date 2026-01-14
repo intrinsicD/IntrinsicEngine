@@ -19,6 +19,7 @@ target_sources(${target_name}
         Graphics.Components.cppm
         Graphics.ModelLoader.cppm
         Graphics.TextureLoader.cppm
+        Graphics.AssetErrors.cppm
         PRIVATE
         Graphics.TinyGltf.cpp
         PRIVATE

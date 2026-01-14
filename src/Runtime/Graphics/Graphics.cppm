@@ -9,3 +9,4 @@ export import :RenderSystem;
 export import :TextureLoader;
 export import :RenderGraph;
 export import :Components;
+export import :AssetErrors;

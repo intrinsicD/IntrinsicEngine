@@ -202,7 +202,7 @@ namespace Runtime
 
                 if (!loadResult)
                 {
-                    Core::Log::Error("Failed to load model: {}", path);
+                    Core::Log::Error("Failed to load model: {} ({})", path, Graphics::AssetErrorToString(loadResult.error()));
                     return;
                 }
 
@@ -234,6 +234,8 @@ namespace Runtime
                             RegisterAssetLoad(handle, result->Token);
                             return result->Resource;
                         }
+
+                        Core::Log::Warn("Texture load failed: {} ({})", pathStr, Graphics::AssetErrorToString(result.error()));
                         return nullptr;
                     };
 

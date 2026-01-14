@@ -71,6 +71,7 @@ public:
                 return result->Resource;
             }
 
+            Log::Warn("Texture load failed: {} ({})", path.string(), Graphics::AssetErrorToString(result.error()));
             return nullptr; // Load failed
         };
         m_DuckTexture = m_AssetManager.Load<RHI::Texture>(Filesystem::GetAssetPath("textures/DuckCM.png"),
@@ -93,6 +94,7 @@ public:
                 return result->ModelData;
             }
 
+            Log::Warn("Model load failed: {} ({})", path, Graphics::AssetErrorToString(result.error()));
             return nullptr; // Failed
         };
 

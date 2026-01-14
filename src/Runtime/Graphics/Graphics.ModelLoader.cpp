@@ -8,8 +8,11 @@ module;
 #include <memory>
 #include <filesystem>
 #include <fstream>
-#include <optional>
 #include <span>
+#include <string_view>
+#include <algorithm>
+#include <expected>
+#include <cctype>
 
 module Graphics:ModelLoader.Impl;
 import :ModelLoader;
@@ -592,29 +595,55 @@ namespace Graphics
         return true;
     }
 
-    std::optional<ModelLoadResult> ModelLoader::LoadAsync(
+    std::expected<ModelLoadResult, AssetError> ModelLoader::LoadAsync(
         std::shared_ptr<RHI::VulkanDevice> device,
         RHI::TransferManager& transferManager,
         GeometryStorage& geometryStorage,
         const std::string& filepath)
     {
+        if (!device)
+            return std::unexpected(AssetError::InvalidData);
+
         std::string fullPath = Core::Filesystem::GetAssetPath(filepath);
         std::string ext = std::filesystem::path(fullPath).extension().string();
-        for (auto& c : ext) c = tolower(c);
+        for (auto& ch : ext) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
 
         auto model = std::make_shared<Model>(geometryStorage, device);
         std::vector<GeometryCpuData> cpuMeshes;
         bool success = false;
 
         // Reuse the existing parsers
-        if (ext == ".obj") { GeometryCpuData data; success = LoadOBJ(fullPath, data); if(success) cpuMeshes.push_back(std::move(data)); }
-        else if (ext == ".ply") { GeometryCpuData data; success = LoadPLY(fullPath, data); if(success) cpuMeshes.push_back(std::move(data)); }
-        else if (ext == ".xyz" || ext == ".pcd") { GeometryCpuData data; success = LoadXYZ(fullPath, data); if(success) cpuMeshes.push_back(std::move(data)); }
-        else if (ext == ".tgf") { GeometryCpuData data; success = LoadTGF(fullPath, data); if(success) cpuMeshes.push_back(std::move(data)); }
-        else if (ext == ".gltf" || ext == ".glb") { success = LoadGLTF(fullPath, cpuMeshes); }
-        else {
-            Core::Log::Error("Unsupported format: {}", ext);
-            return std::nullopt;
+        if (ext == ".obj")
+        {
+            GeometryCpuData data;
+            success = LoadOBJ(fullPath, data);
+            if (success) cpuMeshes.push_back(std::move(data));
+        }
+        else if (ext == ".ply")
+        {
+            GeometryCpuData data;
+            success = LoadPLY(fullPath, data);
+            if (success) cpuMeshes.push_back(std::move(data));
+        }
+        else if (ext == ".xyz" || ext == ".pcd")
+        {
+            GeometryCpuData data;
+            success = LoadXYZ(fullPath, data);
+            if (success) cpuMeshes.push_back(std::move(data));
+        }
+        else if (ext == ".tgf")
+        {
+            GeometryCpuData data;
+            success = LoadTGF(fullPath, data);
+            if (success) cpuMeshes.push_back(std::move(data));
+        }
+        else if (ext == ".gltf" || ext == ".glb")
+        {
+            success = LoadGLTF(fullPath, cpuMeshes);
+        }
+        else
+        {
+            return std::unexpected(AssetError::UnsupportedFormat);
         }
 
         if (success && !cpuMeshes.empty())
@@ -632,29 +661,37 @@ namespace Graphics
                 segment.CollisionGeometry->LocalAABB = Geometry::Union(aabbs);
 
                 std::vector<Geometry::AABB> primitiveBounds;
-                if (meshData.Indices.empty()) {
+                if (meshData.Indices.empty())
+                {
                     primitiveBounds.reserve(meshData.Positions.size() / 3);
-                    for (size_t i = 0; i < meshData.Positions.size(); i += 3) {
+                    for (size_t i = 0; i < meshData.Positions.size(); i += 3)
+                    {
                         auto aabb = Geometry::AABB{meshData.Positions[i], meshData.Positions[i]};
                         aabb = Geometry::Union(aabb, meshData.Positions[i + 1]);
                         aabb = Geometry::Union(aabb, meshData.Positions[i + 2]);
                         primitiveBounds.push_back(aabb);
                     }
-                } else {
+                }
+                else
+                {
                     primitiveBounds.reserve(meshData.Indices.size() / 3);
-                    for (size_t i = 0; i < meshData.Indices.size(); i += 3) {
-                        uint32_t i0 = meshData.Indices[i];
-                        uint32_t i1 = meshData.Indices[i + 1];
-                        uint32_t i2 = meshData.Indices[i + 2];
+                    for (size_t i = 0; i < meshData.Indices.size(); i += 3)
+                    {
+                        const uint32_t i0 = meshData.Indices[i];
+                        const uint32_t i1 = meshData.Indices[i + 1];
+                        const uint32_t i2 = meshData.Indices[i + 2];
                         auto aabb = Geometry::AABB{meshData.Positions[i0], meshData.Positions[i0]};
                         aabb = Geometry::Union(aabb, meshData.Positions[i1]);
                         aabb = Geometry::Union(aabb, meshData.Positions[i2]);
                         primitiveBounds.push_back(aabb);
                     }
                 }
-                if (!segment.CollisionGeometry->LocalOctree.Build(primitiveBounds, Geometry::Octree::SplitPolicy{}, 16, 8)) {
+
+                if (!segment.CollisionGeometry->LocalOctree.Build(primitiveBounds, Geometry::Octree::SplitPolicy{}, 16, 8))
+                {
                     Core::Log::Warn("Failed to build collision octree for mesh segment");
                 }
+
                 segment.CollisionGeometry->Positions = std::move(meshData.Positions);
                 segment.CollisionGeometry->Indices = std::move(meshData.Indices);
 
@@ -666,20 +703,17 @@ namespace Graphics
                 uploadReq.Aux = meshData.Aux;
                 uploadReq.Topology = meshData.Topology;
 
-                // --- KEY CHANGE IS HERE ---
                 auto [gpuData, token] = GeometryGpuData::CreateAsync(device, transferManager, uploadReq);
-                latestToken = token; // Since tokens are monotonic, keeping the last one is enough
+                latestToken = token; // Tokens are monotonic; keeping the last one is enough
 
                 segment.Handle = geometryStorage.Add(std::move(gpuData));
-
                 model->Meshes.emplace_back(std::make_shared<MeshSegment>(segment));
             }
-            Core::Log::Info("Loaded {} ({} submeshes)", filepath, model->Size());
 
+            Core::Log::Info("Loaded {} ({} submeshes)", filepath, model->Size());
             return ModelLoadResult{ model, latestToken };
         }
 
-        Core::Log::Error("Failed to load geometry: {}", filepath);
-        return std::nullopt;
+        return std::unexpected(AssetError::InvalidData);
     }
 }

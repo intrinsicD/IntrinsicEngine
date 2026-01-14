@@ -1,10 +1,11 @@
 module;
 #include <filesystem>
 #include <memory>
-#include <optional>
+#include <expected>
 
 export module Graphics:TextureLoader;
 
+import :AssetErrors;
 import RHI;
 
 export namespace Graphics {
@@ -16,14 +17,12 @@ export namespace Graphics {
 
     class TextureLoader {
     public:
-        // Returns nullopt if file not found or decode failed.
-        // Returns the Resource + The Token to wait on.
-        [[nodiscard]] 
-        static std::optional<TextureLoadResult> LoadAsync(
+        // Fallible operation (I/O + decode + GPU upload): return expected with a typed error.
+        [[nodiscard]]
+        static std::expected<TextureLoadResult, AssetError> LoadAsync(
             const std::filesystem::path& filepath,
             std::shared_ptr<RHI::VulkanDevice> device,
             RHI::TransferManager& transferManager,
-            bool isSRGB = true
-        );
+            bool isSRGB = true);
     };
 }
