@@ -474,6 +474,10 @@ namespace Runtime
             if (m_FramebufferResized)
             {
                 m_Renderer->OnResize();
+                if (m_RenderSystem)
+                {
+                    m_RenderSystem->OnResize();
+                }
                 m_FramebufferResized = false;
             }
 

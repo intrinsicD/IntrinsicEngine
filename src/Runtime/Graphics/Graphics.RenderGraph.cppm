@@ -187,6 +187,10 @@ export namespace Graphics
         // Reset for the next frame
         void Reset();
 
+        // Clear transient resource pools (images/buffers).
+        // Intended for swapchain resize or other events that invalidate most cached extents/sizes.
+        void Trim();
+
         // Internal methods for Builder
         friend class RGBuilder;
 

@@ -173,6 +173,15 @@ namespace Graphics
         m_BufferPool.clear();
     }
 
+    void RenderGraph::Trim()
+    {
+        // Caller is expected to have synchronized with the GPU (e.g., vkDeviceWaitIdle via renderer resize path).
+        // We keep Trim() itself lightweight and deterministic.
+        m_ImagePool.clear();
+        m_BufferPool.clear();
+        Core::Log::Info("RenderGraph: Pools trimmed.");
+    }
+
     RenderGraph::RGPass& RenderGraph::CreatePassInternal(const std::string& name)
     {
         return m_Passes.emplace_back(RGPass{name, {}});

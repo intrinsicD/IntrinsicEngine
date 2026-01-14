@@ -481,3 +481,24 @@ TEST(LinearArena, NoDestructorOnReset)
     // std::destroy_at(ptr);
     // but normally we only put PODs in here.
 }
+
+TEST(LinearArena, MoveRebindsThreadAffinity)
+{
+    // LinearArena is thread-affine (not thread-safe). It can be moved, but the moved-from
+    // arena should become inert and must not be used.
+
+    LinearArena arena(1024);
+    auto a0 = arena.New<int>(123);
+    ASSERT_TRUE(a0.has_value());
+    EXPECT_EQ(**a0, 123);
+
+    // Move construct on the same thread.
+    LinearArena moved(std::move(arena));
+    auto a1 = moved.New<int>(456);
+    ASSERT_TRUE(a1.has_value());
+    EXPECT_EQ(**a1, 456);
+
+    // Moved-from arena is expected to be empty/inert. Using it is a programming error in debug.
+    // We validate it doesn't report used bytes.
+    EXPECT_EQ(arena.GetUsed(), 0u);
+}

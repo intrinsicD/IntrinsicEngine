@@ -381,4 +381,17 @@ namespace Graphics
             Interface::GUI::EndFrame();
         }
     }
+
+    void RenderSystem::OnResize()
+    {
+        // Swapchain recreation already waited for idle in SimpleRenderer::OnResize().
+        // Trim transient caches so old-extent resources don't accumulate.
+        m_RenderGraph.Trim();
+
+        // Depth images are sized to the swapchain extent; force them to be recreated.
+        for (auto& img : m_DepthImages)
+        {
+            img.reset();
+        }
+    }
 }

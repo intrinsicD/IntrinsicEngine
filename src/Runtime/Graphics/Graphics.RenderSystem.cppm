@@ -32,6 +32,10 @@ export namespace Graphics
 
         void OnUpdate(ECS::Scene& scene, const CameraComponent& camera, Core::Assets::AssetManager &assetManager);
 
+        // Called after swapchain recreation.
+        // Clears transient caches and recreates per-frame resources as needed.
+        void OnResize();
+
         [[nodiscard]] RHI::VulkanBuffer* GetGlobalUBO() const { return m_GlobalUBO.get(); }
 
     private:

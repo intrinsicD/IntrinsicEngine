@@ -56,7 +56,8 @@ namespace Core::Memory
         : m_Start(other.m_Start),
           m_TotalSize(other.m_TotalSize),
           m_Offset(other.m_Offset),
-          m_OwningThread(other.m_OwningThread)
+          // The thread receiving the move is the new owner.
+          m_OwningThread(std::this_thread::get_id())
     {
         other.m_Start = nullptr;
         other.m_TotalSize = 0;
@@ -83,7 +84,8 @@ namespace Core::Memory
             m_Start = other.m_Start;
             m_TotalSize = other.m_TotalSize;
             m_Offset = other.m_Offset;
-            m_OwningThread = other.m_OwningThread;
+            // The thread receiving the move is the new owner.
+            m_OwningThread = std::this_thread::get_id();
 
             // Nullify source
             other.m_Start = nullptr;
