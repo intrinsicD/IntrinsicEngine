@@ -343,7 +343,7 @@ namespace Runtime
     void Engine::InitPipeline()
     {
         m_DescriptorLayout = std::make_unique<RHI::DescriptorLayout>(m_Device);
-        m_DescriptorPool = std::make_unique<RHI::DescriptorPool>(m_Device);
+        m_DescriptorPool = std::make_unique<RHI::DescriptorAllocator>(m_Device);
         m_BindlessSystem = std::make_shared<RHI::BindlessDescriptorSystem>(m_Device);
 
         // Resolve shader paths robustly. Depending on how the app is launched, the CWD may be

@@ -50,7 +50,7 @@ export namespace Runtime
         std::unique_ptr<RHI::TransferManager> m_TransferManager;
 
         std::unique_ptr<RHI::DescriptorLayout> m_DescriptorLayout;
-        std::unique_ptr<RHI::DescriptorPool> m_DescriptorPool;
+        std::unique_ptr<RHI::DescriptorAllocator> m_DescriptorPool;
         std::unique_ptr<RHI::GraphicsPipeline> m_Pipeline;
         std::shared_ptr<RHI::BindlessDescriptorSystem> m_BindlessSystem;
     public:
@@ -68,7 +68,7 @@ export namespace Runtime
 
         // Needed for resource creation
         [[nodiscard]] std::shared_ptr<RHI::VulkanDevice> GetDevice() const { return m_Device; }
-        [[nodiscard]] RHI::DescriptorPool& GetDescriptorPool() const { return *m_DescriptorPool; }
+        [[nodiscard]] RHI::DescriptorAllocator& GetDescriptorPool() const { return *m_DescriptorPool; }
         [[nodiscard]] RHI::DescriptorLayout& GetDescriptorLayout() const { return *m_DescriptorLayout; }
         [[nodiscard]] RHI::VulkanSwapchain& GetSwapchain() const { return *m_Swapchain; }
         [[nodiscard]] Graphics::GeometryStorage& GetGeometryStorage() { return m_GeometryStorage; }

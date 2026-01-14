@@ -24,8 +24,10 @@ target_sources(${target_name}
         RHI.Image.cppm
         RHI.Texture.cppm
         RHI.Transfer.cppm
+        RHI.StagingBelt.cppm
         PRIVATE
         RHI.Vma.cpp
+        RHI.Transfer.cpp
         PRIVATE
         FILE_SET rhi_impl TYPE CXX_MODULES FILES
         RHI.Bindless.cpp
@@ -40,6 +42,7 @@ target_sources(${target_name}
         RHI.Image.cpp
         RHI.Texture.cpp
         RHI.Transfer.cpp
+        RHI.StagingBelt.cpp
 )
 
 target_include_directories(${target_name} PUBLIC .)

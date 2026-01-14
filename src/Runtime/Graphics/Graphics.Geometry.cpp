@@ -47,15 +47,46 @@ namespace Graphics
         std::vector<std::unique_ptr<RHI::VulkanBuffer>> stagingBuffers;
         VkCommandBuffer cmd = transferManager.Begin();
 
+        // Vulkan requires srcOffset to be aligned.
+        VkPhysicalDeviceProperties props{};
+        vkGetPhysicalDeviceProperties(device->GetPhysicalDevice(), &props);
+        const size_t copyAlign = std::max<size_t>(16, static_cast<size_t>(props.limits.optimalBufferCopyOffsetAlignment));
+
         // Vertex Buffer Upload
         if (totalVertexSize > 0) {
-            auto staging = std::make_unique<RHI::VulkanBuffer>(device, totalVertexSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
-            uint8_t* ptr = static_cast<uint8_t*>(staging->Map());
+            // Try staging belt (fast path)
+            auto alloc = transferManager.AllocateStaging(static_cast<size_t>(totalVertexSize), copyAlign);
 
-            if (!data.Positions.empty()) memcpy(ptr + result->m_Layout.PositionsOffset, data.Positions.data(), posSize);
-            if (!data.Normals.empty()) memcpy(ptr + result->m_Layout.NormalsOffset, data.Normals.data(), normSize);
-            if (!data.Aux.empty()) memcpy(ptr + result->m_Layout.AuxOffset, data.Aux.data(), auxSize);
-            staging->Unmap();
+            VkBuffer stagingHandle = VK_NULL_HANDLE;
+            VkDeviceSize stagingOffset = 0;
+
+            if (alloc.Buffer != VK_NULL_HANDLE)
+            {
+                uint8_t* ptr = static_cast<uint8_t*>(alloc.MappedPtr);
+
+                if (!data.Positions.empty()) memcpy(ptr + result->m_Layout.PositionsOffset, data.Positions.data(), posSize);
+                if (!data.Normals.empty()) memcpy(ptr + result->m_Layout.NormalsOffset, data.Normals.data(), normSize);
+                if (!data.Aux.empty()) memcpy(ptr + result->m_Layout.AuxOffset, data.Aux.data(), auxSize);
+
+                stagingHandle = alloc.Buffer;
+                stagingOffset = static_cast<VkDeviceSize>(alloc.Offset);
+            }
+            else
+            {
+                // Slow path fallback: dedicated staging allocation
+                auto staging = std::make_unique<RHI::VulkanBuffer>(device, totalVertexSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
+                uint8_t* ptr = static_cast<uint8_t*>(staging->Map());
+
+                if (!data.Positions.empty()) memcpy(ptr + result->m_Layout.PositionsOffset, data.Positions.data(), posSize);
+                if (!data.Normals.empty()) memcpy(ptr + result->m_Layout.NormalsOffset, data.Normals.data(), normSize);
+                if (!data.Aux.empty()) memcpy(ptr + result->m_Layout.AuxOffset, data.Aux.data(), auxSize);
+                staging->Unmap();
+
+                stagingHandle = staging->GetHandle();
+                stagingOffset = 0;
+
+                stagingBuffers.push_back(std::move(staging));
+            }
 
             result->m_VertexBuffer = std::make_unique<RHI::VulkanBuffer>(
                 device, totalVertexSize,
@@ -64,18 +95,35 @@ namespace Graphics
             );
 
             VkBufferCopy copyRegion{};
+            copyRegion.srcOffset = stagingOffset;
+            copyRegion.dstOffset = 0;
             copyRegion.size = totalVertexSize;
-            vkCmdCopyBuffer(cmd, staging->GetHandle(), result->m_VertexBuffer->GetHandle(), 1, &copyRegion);
-
-            // Move ownership to staging list so it survives until GPU is done
-            stagingBuffers.push_back(std::move(staging));
+            vkCmdCopyBuffer(cmd, stagingHandle, result->m_VertexBuffer->GetHandle(), 1, &copyRegion);
         }
 
         // Index Buffer Upload
         if (result->m_IndexCount > 0) {
-            auto iStaging = std::make_unique<RHI::VulkanBuffer>(device, idxSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
-            memcpy(iStaging->Map(), data.Indices.data(), idxSize);
-            iStaging->Unmap();
+            auto alloc = transferManager.AllocateStaging(static_cast<size_t>(idxSize), copyAlign);
+
+            VkBuffer stagingHandle = VK_NULL_HANDLE;
+            VkDeviceSize stagingOffset = 0;
+
+            if (alloc.Buffer != VK_NULL_HANDLE)
+            {
+                memcpy(alloc.MappedPtr, data.Indices.data(), idxSize);
+                stagingHandle = alloc.Buffer;
+                stagingOffset = static_cast<VkDeviceSize>(alloc.Offset);
+            }
+            else
+            {
+                auto iStaging = std::make_unique<RHI::VulkanBuffer>(device, idxSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
+                memcpy(iStaging->Map(), data.Indices.data(), idxSize);
+                iStaging->Unmap();
+
+                stagingHandle = iStaging->GetHandle();
+                stagingOffset = 0;
+                stagingBuffers.push_back(std::move(iStaging));
+            }
 
             result->m_IndexBuffer = std::make_unique<RHI::VulkanBuffer>(
                 device, idxSize,
@@ -84,14 +132,16 @@ namespace Graphics
             );
 
             VkBufferCopy copyRegion{};
+            copyRegion.srcOffset = stagingOffset;
+            copyRegion.dstOffset = 0;
             copyRegion.size = idxSize;
-            vkCmdCopyBuffer(cmd, iStaging->GetHandle(), result->m_IndexBuffer->GetHandle(), 1, &copyRegion);
-
-            stagingBuffers.push_back(std::move(iStaging));
+            vkCmdCopyBuffer(cmd, stagingHandle, result->m_IndexBuffer->GetHandle(), 1, &copyRegion);
         }
 
         // 3. Submit
-        RHI::TransferToken token = transferManager.Submit(cmd, std::move(stagingBuffers));
+        RHI::TransferToken token = stagingBuffers.empty()
+            ? transferManager.Submit(cmd)
+            : transferManager.Submit(cmd, std::move(stagingBuffers));
 
         return { std::move(result), token };
     }

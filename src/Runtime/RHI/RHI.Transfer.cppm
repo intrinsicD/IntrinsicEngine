@@ -3,12 +3,14 @@ module;
 #include <memory>
 #include <vector>
 #include <atomic>
+#include <mutex>
 #include "RHI.Vulkan.hpp" // Implementation detail, kept in module fragment if possible, but needed for class members
 
 export module RHI:Transfer;
 
 import :Device;
 import :Buffer;
+import :StagingBelt;
 
 export namespace RHI {
 
@@ -29,10 +31,25 @@ export namespace RHI {
         // The caller (Loader) records copies into this.
         [[nodiscard]] VkCommandBuffer Begin();
 
+        // Persistent staging belt allocation for buffer uploads.
+        // Returns {buffer, offset, ptr} for caller to memcpy into.
+        [[nodiscard]] StagingBelt::Allocation AllocateStaging(size_t sizeBytes, size_t alignment);
+
+        // Persistent staging belt allocation for image uploads (vkCmdCopyBufferToImage).
+        // texelBlockSize should be bytes per texel/block for the source format (e.g. 4 for RGBA8).
+        [[nodiscard]] StagingBelt::Allocation AllocateStagingForImage(size_t sizeBytes,
+                                                                      size_t texelBlockSize,
+                                                                      size_t rowPitchBytes,
+                                                                      size_t optimalBufferCopyOffsetAlignment,
+                                                                      size_t optimalBufferCopyRowPitchAlignment);
+
         // Submits the work.
         // 'stagingBuffers' are kept alive internally until the GPU passes the timeline point.
         // Returns a generic token.
         [[nodiscard]] TransferToken Submit(VkCommandBuffer cmd, std::vector<std::unique_ptr<VulkanBuffer>>&& stagingBuffers);
+
+        // Variant that retires any staging-belt allocations made since the last submission.
+        [[nodiscard]] TransferToken Submit(VkCommandBuffer cmd);
 
         // Thread-safe check.
         [[nodiscard]] bool IsCompleted(TransferToken token) const;
@@ -55,11 +72,13 @@ export namespace RHI {
         // Atomic is strictly required as Loaders run on threads, but Engine checks on Main.
         std::atomic<uint64_t> m_NextTicket{1};
 
+        std::unique_ptr<StagingBelt> m_StagingBelt;
+
         struct PendingBatch {
             TransferToken Token;
             std::vector<std::unique_ptr<VulkanBuffer>> Resources;
         };
         std::vector<PendingBatch> m_InFlightBatches;
-        mutable std::mutex m_Mutex; // Protects m_InFlightBatches
+        mutable std::mutex m_Mutex; // Protects m_InFlightBatches and staging retire/GC
     };
 }

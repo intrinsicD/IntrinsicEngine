@@ -59,7 +59,7 @@ namespace Interface::GUI
             double avgFps = telemetry.GetAverageFPS(60);
 
             ImGui::Text("FPS: %.1f (%.2f ms)", avgFps, avgMs);
-            ImGui::Text("Frame: %llu", stats.FrameNumber);
+            ImGui::Text("Frame: %lu", stats.FrameNumber);
             ImGui::Text("Draw Calls: %u", stats.DrawCalls);
             ImGui::Text("Triangles: %u", stats.TriangleCount);
 

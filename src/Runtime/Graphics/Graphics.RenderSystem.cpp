@@ -35,7 +35,7 @@ namespace Graphics
                                RHI::VulkanSwapchain& swapchain,
                                RHI::SimpleRenderer& renderer,
                                RHI::BindlessDescriptorSystem& bindlessSystem,
-                               RHI::DescriptorPool& descriptorPool,
+                               RHI::DescriptorAllocator& descriptorPool,
                                RHI::DescriptorLayout& descriptorLayout,
                                RHI::GraphicsPipeline& pipeline,
                                Core::Memory::LinearArena& frameArena,

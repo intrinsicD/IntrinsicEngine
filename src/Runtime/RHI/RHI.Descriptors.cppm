@@ -1,6 +1,7 @@
 module;
 #include "RHI.Vulkan.hpp"
 #include <memory>
+#include <vector>
 
 export module RHI:Descriptors;
 
@@ -23,19 +24,31 @@ export namespace RHI
         VkDescriptorSetLayout m_Layout = VK_NULL_HANDLE;
     };
 
-    class DescriptorPool
+    // Replaces DescriptorPool: grows by chaining VkDescriptorPools.
+    // Intended usage: allocate many transient sets (materials, per-draw) and call Reset() at frame start.
+    class DescriptorAllocator
     {
     public:
-        DescriptorPool(std::shared_ptr<VulkanDevice> device);
-        ~DescriptorPool();
+        explicit DescriptorAllocator(std::shared_ptr<VulkanDevice> device);
+        ~DescriptorAllocator();
 
-        // Allocate a single set from the pool using the given layout
+        // Allocate a single set using the given layout.
+        // Returns VK_NULL_HANDLE on failure.
         [[nodiscard]] VkDescriptorSet Allocate(VkDescriptorSetLayout layout);
+
+        // Call at start of frame to reset all pools used since last Reset().
+        void Reset();
+
         [[nodiscard]] bool IsValid() const { return m_IsValid; }
 
     private:
+        [[nodiscard]] VkDescriptorPool GrabPool();
+
         std::shared_ptr<VulkanDevice> m_Device;
         bool m_IsValid = true;
-        VkDescriptorPool m_Pool = VK_NULL_HANDLE;
+
+        VkDescriptorPool m_CurrentPool = VK_NULL_HANDLE;
+        std::vector<VkDescriptorPool> m_UsedPools;
+        std::vector<VkDescriptorPool> m_FreePools;
     };
 }

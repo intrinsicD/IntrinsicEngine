@@ -8,6 +8,7 @@ module;
 
 module RHI:Transfer.Impl;
 import :Transfer;
+import :StagingBelt;
 import Core;
 
 namespace RHI
@@ -29,6 +30,11 @@ namespace RHI
 
         VK_CHECK(vkCreateSemaphore(m_Device->GetLogicalDevice(), &semInfo, nullptr, &m_TimelineSemaphore));
 
+        // Default staging belt size: large enough for typical level-load bursts.
+        // If this turns out too small, we can grow or add a slow-path.
+        constexpr size_t defaultBeltSize = 64ull * 1024ull * 1024ull; // 64 MiB
+        m_StagingBelt = std::make_unique<StagingBelt>(m_Device, defaultBeltSize);
+
         Core::Log::Info("RHI Transfer System Initialized.");
     }
 
@@ -39,6 +45,8 @@ namespace RHI
 
         // Clear batches (destroys staging buffers)
         m_InFlightBatches.clear();
+
+        m_StagingBelt.reset();
 
         vkDestroySemaphore(m_Device->GetLogicalDevice(), m_TimelineSemaphore, nullptr);
     }
@@ -65,6 +73,11 @@ namespace RHI
         return cmd;
     }
 
+    StagingBelt::Allocation TransferManager::AllocateStaging(size_t sizeBytes, size_t alignment)
+    {
+        return m_StagingBelt ? m_StagingBelt->Allocate(sizeBytes, alignment) : StagingBelt::Allocation{};
+    }
+
     TransferToken TransferManager::Submit(VkCommandBuffer cmd,
                                           std::vector<std::unique_ptr<VulkanBuffer>>&& stagingBuffers)
     {
@@ -72,7 +85,6 @@ namespace RHI
         VK_CHECK(vkEndCommandBuffer(cmd));
 
         // 2. Prepare Synchronization
-        // Increment the ticket. This value represents "This Batch Completed".
         uint64_t signalValue = m_NextTicket.fetch_add(1);
 
         VkTimelineSemaphoreSubmitInfo timelineSubmit{};
@@ -85,26 +97,27 @@ namespace RHI
         submitInfo.pNext = &timelineSubmit;
         submitInfo.commandBufferCount = 1;
         submitInfo.pCommandBuffers = &cmd;
-
         submitInfo.signalSemaphoreCount = 1;
         submitInfo.pSignalSemaphores = &m_TimelineSemaphore;
 
-        // 3. Submit to Queue (Thread Safe)
         {
-            // Lock the Device's queue mutex to prevent collision with the Renderer
-            // attempting to Present() or Submit() to the same physical queue.
             std::scoped_lock deviceLock(m_Device->GetQueueMutex());
-
-            // We also keep our internal lock to protect m_InFlightBatches
             std::lock_guard internalLock(m_Mutex);
 
             VK_CHECK(vkQueueSubmit(m_TransferQueue, 1, &submitInfo, VK_NULL_HANDLE));
-
             m_InFlightBatches.push_back({TransferToken{signalValue}, std::move(stagingBuffers)});
+
+            if (m_StagingBelt)
+                m_StagingBelt->Retire(signalValue);
         }
 
-        // Return the token so the Engine knows what to wait for
         return TransferToken{signalValue};
+    }
+
+    TransferToken TransferManager::Submit(VkCommandBuffer cmd)
+    {
+        std::vector<std::unique_ptr<VulkanBuffer>> none;
+        return Submit(cmd, std::move(none));
     }
 
     bool TransferManager::IsCompleted(TransferToken token) const
@@ -112,7 +125,6 @@ namespace RHI
         if (!token.IsValid()) return true;
 
         uint64_t gpuValue = 0;
-        // Non-blocking query of the semaphore value
         VK_CHECK(vkGetSemaphoreCounterValue(m_Device->GetLogicalDevice(), m_TimelineSemaphore, &gpuValue));
 
         return gpuValue >= token.Value;
@@ -124,27 +136,18 @@ namespace RHI
         VK_CHECK(vkGetSemaphoreCounterValue(m_Device->GetLogicalDevice(), m_TimelineSemaphore, &gpuValue));
 
         std::lock_guard lock(m_Mutex);
+
+        if (m_StagingBelt)
+            m_StagingBelt->GarbageCollect(gpuValue);
+
         if (m_InFlightBatches.empty()) return;
 
-        // Remove batches that have been processed by the GPU
         auto it = std::remove_if(m_InFlightBatches.begin(), m_InFlightBatches.end(),
                                  [gpuValue](const PendingBatch& batch)
                                  {
-                                     if (gpuValue >= batch.Token.Value)
-                                     {
-                                         // GPU is done.
-                                         // Note: We also need to free the CommandBuffer!
-                                         // In a simple pool, we can't free individual buffers easily if they are mixed,
-                                         // but vkFreeCommandBuffers IS allowed.
-                                         // However, for this implementation, we rely on vkResetCommandPool periodically
-                                         // or just let the pool grow.
-                                         // Perfectionist fix: Store cmd buffer in PendingBatch and free it here.
-                                         return true;
-                                     }
-                                     return false;
+                                     return gpuValue >= batch.Token.Value;
                                  });
 
-        // This actually calls the destructors of the unique_ptr<VulkanBuffer>, freeing CPU memory.
         m_InFlightBatches.erase(it, m_InFlightBatches.end());
     }
 
@@ -163,12 +166,24 @@ namespace RHI
             VkCommandPoolCreateInfo poolInfo{};
             poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
             poolInfo.queueFamilyIndex = m_Device->GetQueueIndices().TransferFamily.value();
-            poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT; // Buffers are short lived
+            poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
             VK_CHECK(vkCreateCommandPool(m_Device->GetLogicalDevice(), &poolInfo, nullptr, &ctx.Pool));
 
-            // Register with device for cleanup at shutdown
             m_Device->RegisterThreadLocalPool(ctx.Pool);
         }
         return ctx;
+    }
+
+    StagingBelt::Allocation TransferManager::AllocateStagingForImage(size_t sizeBytes,
+                                                                     size_t texelBlockSize,
+                                                                     size_t rowPitchBytes,
+                                                                     size_t optimalBufferCopyOffsetAlignment,
+                                                                     size_t optimalBufferCopyRowPitchAlignment)
+    {
+        return m_StagingBelt
+            ? m_StagingBelt->AllocateForImageUpload(sizeBytes, texelBlockSize, rowPitchBytes,
+                                                   optimalBufferCopyOffsetAlignment,
+                                                   optimalBufferCopyRowPitchAlignment)
+            : StagingBelt::Allocation{};
     }
 }
