@@ -180,6 +180,11 @@ namespace Core::Memory
             (*it)();
         }
         m_Destructors.clear();
+        // Heuristic: Reserve space for next frame based on previous usage or a fixed safe amount
+        if (m_Destructors.capacity() < 128)
+        {
+            m_Destructors.reserve(128);
+        }
         m_Arena.Reset();
     }
 }

@@ -51,8 +51,8 @@ target_link_libraries(${target_name}
         PUBLIC
         IntrinsicConfig
         glm::glm
-        glfw
         PRIVATE
+        glfw
         imgui_lib
         volk::volk
         EnTT::EnTT

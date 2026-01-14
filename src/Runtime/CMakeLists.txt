@@ -29,6 +29,8 @@ target_link_libraries(${target_name}
         IntrinsicInterface
         IntrinsicECS
         IntrinsicRHI
+        PRIVATE
+        glfw
 )
 
 add_subdirectory(ECS)

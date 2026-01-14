@@ -255,15 +255,27 @@ namespace Graphics
                                                                IsValid())
                                                                continue;
 
-                                                           auto matResult = assets->GetRaw<Material>(renderable.Material);
+                                                           auto matResult = assets->GetRaw<Material>(
+                                                               renderable.Material);
 
                                                            if (matResult.has_value())
                                                            {
                                                                Material* mat = *matResult;
+                                                               glm::mat4 worldMatrix;
+                                                               if (auto* world = scenePtr->GetRegistry().try_get<
+                                                                   ECS::Components::Transform::WorldMatrix>(entity))
+                                                               {
+                                                                   worldMatrix = world->Matrix;
+                                                               }
+                                                               else
+                                                               {
+                                                                   // Fallback for non-hierarchical entities
+                                                                   worldMatrix = GetMatrix(transform);
+                                                               }
                                                                packets.push_back({
                                                                    renderable.Geometry,
                                                                    mat->GetTextureIndex(),
-                                                                   GetMatrix(transform)
+                                                                   worldMatrix
                                                                });
                                                            }
                                                        }
@@ -349,7 +361,8 @@ namespace Graphics
                                                                uint32_t vertCount = static_cast<uint32_t>(currentGeo->
                                                                    GetLayout().PositionsSize / sizeof(glm::vec3));
                                                                vkCmdDraw(cmd, vertCount, 1, 0, 0);
-                                                               Core::Telemetry::TelemetrySystem::Get().RecordDrawCall(0);
+                                                               Core::Telemetry::TelemetrySystem::Get().
+                                                                   RecordDrawCall(0);
                                                            }
                                                        }
                                                    }

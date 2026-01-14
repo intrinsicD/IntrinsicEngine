@@ -52,4 +52,6 @@ target_link_libraries(${target_name}
         IntrinsicCore
         volk::volk
         stb
+        PRIVATE
+        glfw
 )
