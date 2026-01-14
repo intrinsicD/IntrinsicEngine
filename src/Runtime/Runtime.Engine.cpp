@@ -88,6 +88,15 @@ namespace Runtime
         // 3. Device
         m_Device = std::make_shared<RHI::VulkanDevice>(*m_Context, m_Surface);
 
+        // Create a default 1x1 texture early so user code (OnStart) and systems can safely reference it.
+        // OnStart() is called later from Engine::Run(), but apps often create Materials during OnStart.
+        // Those Materials register the default texture into the bindless system immediately, which
+        // requires a valid VkImageView.
+        {
+            std::vector<uint8_t> whitePixel = {255, 255, 255, 255};
+            m_DefaultTexture = std::make_shared<RHI::Texture>(m_Device, whitePixel, 1, 1);
+        }
+
         // Initialize GeometryStorage with frames-in-flight for safe deferred deletion
         m_GeometryStorage.Initialize(m_Device->GetFramesInFlight());
 
@@ -99,9 +108,7 @@ namespace Runtime
                              m_Device->GetGraphicsQueue());
 
         InitPipeline();
-        Core::Log::Info("Engine: InitPipeline complete, creating default texture...");
-        std::vector<uint8_t> whitePixel = {255, 255, 255, 255};
-        m_DefaultTexture = std::make_shared<RHI::Texture>(m_Device, whitePixel, 1, 1);
+        Core::Log::Info("Engine: InitPipeline complete.");
         Core::Log::Info("Engine: Constructor complete.");
     }
 

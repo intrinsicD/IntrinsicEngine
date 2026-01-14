@@ -356,12 +356,11 @@ public:
                 if (ImGui::CollapsingHeader("Mesh Renderer", ImGuiTreeNodeFlags_DefaultOpen))
                 {
                     auto& mr = reg.get<ECS::MeshRenderer::Component>(m_SelectedEntity);
-                    Graphics::GeometryGpuData* geo = nullptr;
-                    if (mr.Geometry.IsValid())
-                    {
-                        // Use GetUnchecked for simple UI display - we already checked IsValid
-                        geo = GetGeometryStorage().GetUnchecked(mr.Geometry);
-                    }
+
+                    // NOTE: StrongHandle::IsValid() typically only checks "non-null / non-default".
+                    // It does NOT guarantee the backing resource is still resident in the storage.
+                    // Always resolve the handle and null-check before dereferencing.
+                    Graphics::GeometryGpuData* geo = GetGeometryStorage().GetUnchecked(mr.Geometry);
 
                     if (geo)
                     {
@@ -383,7 +382,7 @@ public:
                     }
                     else
                     {
-                        ImGui::TextColored({0.8f, 0.2f, 0.2f, 1.0f}, "Invalid Geometry Handle");
+                        ImGui::TextColored({0.8f, 0.2f, 0.2f, 1.0f}, "Invalid or unloaded Geometry Handle");
                     }
                 }
             }

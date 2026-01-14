@@ -156,8 +156,11 @@ namespace Core::Memory
     // -------------------------------------------------------------------------
     ScopeStack::ScopeStack(ScopeStack&& other) noexcept
         : m_Arena(std::move(other.m_Arena)),
-          m_Destructors(std::move(other.m_Destructors))
+          m_Head(other.m_Head),
+          m_DestructorCount(other.m_DestructorCount)
     {
+        other.m_Head = nullptr;
+        other.m_DestructorCount = 0;
     }
 
     ScopeStack& ScopeStack::operator=(ScopeStack&& other) noexcept
@@ -167,24 +170,25 @@ namespace Core::Memory
             // First, destroy our current objects (LIFO order)
             Reset();
             m_Arena = std::move(other.m_Arena);
-            m_Destructors = std::move(other.m_Destructors);
+            m_Head = other.m_Head;
+            m_DestructorCount = other.m_DestructorCount;
+            other.m_Head = nullptr;
+            other.m_DestructorCount = 0;
         }
         return *this;
     }
 
     void ScopeStack::Reset()
     {
-        // Destroy in reverse order of allocation
-        for (auto it = m_Destructors.rbegin(); it != m_Destructors.rend(); ++it)
+        // Walk the intrusive linked list and call destructors (already LIFO order)
+        DestructorNode* current = m_Head;
+        while (current)
         {
-            (*it)();
+            current->DestroyFn(current->Ptr);
+            current = current->Next;
         }
-        m_Destructors.clear();
-        // Heuristic: Reserve space for next frame based on previous usage or a fixed safe amount
-        if (m_Destructors.capacity() < 128)
-        {
-            m_Destructors.reserve(128);
-        }
-        m_Arena.Reset();
+        m_Head = nullptr;
+        m_DestructorCount = 0;
+        m_Arena.Reset(); // Reclaim all memory (objects + headers)
     }
 }

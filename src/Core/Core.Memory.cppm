@@ -6,8 +6,7 @@ module; // Global Fragment
 #include <span>
 #include <utility>
 #include <thread>
-#include <vector>
-#include <functional>
+#include <type_traits>
 
 export module Core:Memory;
 
@@ -125,7 +124,8 @@ export namespace Core::Memory
     //
     // Design Tradeoffs:
     // - Uses LinearArena for O(1) bump allocation (fast path)
-    // - Tracks destructors in a separate vector (heap allocation overhead)
+    // - Tracks destructors via intrusive linked list stored IN the arena
+    // - Zero heap allocations - all metadata lives in the LinearArena
     // - Destroys objects in LIFO order on Reset() (stack semantics)
     //
     // Use Cases:
@@ -134,8 +134,9 @@ export namespace Core::Memory
     // - Callbacks/closures with complex captured state
     //
     // Performance Notes:
-    // - ~10-20 bytes overhead per non-trivial allocation (destructor storage)
-    // - Still O(1) allocation, O(n) reset where n = non-trivial allocations
+    // - ~24 bytes overhead per non-trivial allocation (DestructorNode in arena)
+    // - Strictly O(1) allocation with zero system heap allocations
+    // - O(n) reset where n = non-trivial allocations
     // - For POD-only hot paths, prefer LinearArena directly
     // -------------------------------------------------------------------------
     class ScopeStack
@@ -156,15 +157,30 @@ export namespace Core::Memory
         template <typename T, typename... Args>
         [[nodiscard]] std::expected<T*, AllocatorError> New(Args&&... args)
         {
+            // 1. Allocate the object
             auto result = m_Arena.Alloc(sizeof(T), alignof(T));
             if (!result) return std::unexpected(result.error());
 
             T* ptr = static_cast<T*>(*result);
             std::construct_at(ptr, std::forward<Args>(args)...);
 
+            // 2. If non-trivially destructible, allocate DestructorNode in arena and link
             if constexpr (!std::is_trivially_destructible_v<T>)
             {
-                m_Destructors.push_back([ptr]() { std::destroy_at(ptr); });
+                auto headRes = m_Arena.Alloc(sizeof(DestructorNode), alignof(DestructorNode));
+                if (!headRes)
+                {
+                    // Critical: allocated object but can't track destructor - must cleanup
+                    std::destroy_at(ptr);
+                    return std::unexpected(headRes.error());
+                }
+
+                auto* node = static_cast<DestructorNode*>(*headRes);
+                node->Ptr = ptr;
+                node->DestroyFn = [](void* p) { std::destroy_at(static_cast<T*>(p)); };
+                node->Next = m_Head;
+                m_Head = node;
+                ++m_DestructorCount;
             }
             return ptr;
         }
@@ -189,15 +205,54 @@ export namespace Core::Memory
 
             if constexpr (!std::is_trivially_destructible_v<T>)
             {
-                // Capture both pointer and count for array destruction
-                m_Destructors.push_back([ptr, count]()
+                // Allocate ArrayMetadata to store count alongside pointer
+                struct ArrayMetadata
                 {
-                    // Destroy in reverse order within the array
+                    T* Ptr;
+                    size_t Count;
+                };
+
+                auto metaRes = m_Arena.Alloc(sizeof(ArrayMetadata), alignof(ArrayMetadata));
+                if (!metaRes)
+                {
+                    // Cleanup: destroy constructed elements
                     for (size_t i = count; i > 0; --i)
                     {
                         std::destroy_at(ptr + i - 1);
                     }
-                });
+                    return std::unexpected(metaRes.error());
+                }
+
+                auto* meta = static_cast<ArrayMetadata*>(*metaRes);
+                meta->Ptr = ptr;
+                meta->Count = count;
+
+                // Allocate DestructorNode
+                auto headRes = m_Arena.Alloc(sizeof(DestructorNode), alignof(DestructorNode));
+                if (!headRes)
+                {
+                    // Cleanup: destroy constructed elements
+                    for (size_t i = count; i > 0; --i)
+                    {
+                        std::destroy_at(ptr + i - 1);
+                    }
+                    return std::unexpected(headRes.error());
+                }
+
+                auto* node = static_cast<DestructorNode*>(*headRes);
+                node->Ptr = meta;
+                node->DestroyFn = [](void* p)
+                {
+                    auto* m = static_cast<ArrayMetadata*>(p);
+                    // Destroy in reverse order within the array
+                    for (size_t i = m->Count; i > 0; --i)
+                    {
+                        std::destroy_at(m->Ptr + i - 1);
+                    }
+                };
+                node->Next = m_Head;
+                m_Head = node;
+                ++m_DestructorCount;
             }
             return std::span<T>(ptr, count);
         }
@@ -207,14 +262,23 @@ export namespace Core::Memory
         // Diagnostics
         [[nodiscard]] size_t GetUsed() const { return m_Arena.GetUsed(); }
         [[nodiscard]] size_t GetTotal() const { return m_Arena.GetTotal(); }
-        [[nodiscard]] size_t GetDestructorCount() const { return m_Destructors.size(); }
+        [[nodiscard]] size_t GetDestructorCount() const { return m_DestructorCount; }
 
         // Direct arena access for POD allocations (bypasses destructor tracking)
         LinearArena& GetArena() { return m_Arena; }
         [[nodiscard]] const LinearArena& GetArena() const { return m_Arena; }
 
     private:
+        // Intrusive linked list node stored in the arena itself
+        struct DestructorNode
+        {
+            void (*DestroyFn)(void*);  // Function pointer to type-erased destructor
+            void* Ptr;                  // Pointer to object (or ArrayMetadata for arrays)
+            DestructorNode* Next;       // Next node in LIFO chain
+        };
+
         LinearArena m_Arena;
-        std::vector<std::function<void()>> m_Destructors;
+        DestructorNode* m_Head = nullptr;  // Head of intrusive linked list
+        size_t m_DestructorCount = 0;      // Track count for diagnostics
     };
 }

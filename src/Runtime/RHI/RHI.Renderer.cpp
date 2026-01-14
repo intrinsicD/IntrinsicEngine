@@ -114,10 +114,11 @@ namespace RHI
         // Ensure the acquired swapchain image is in COLOR_ATTACHMENT_OPTIMAL before any rendering.
         // We do this here so RenderGraph can treat the backbuffer as ready for use.
         //
-        // IMPORTANT: The semaphore wait (m_ImageAvailableSemaphores) happens at vkQueueSubmit
-        // with waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT. This means the GPU
-        // will block at that stage until the image is acquired. Our barrier must synchronize
-        // with that stage to avoid WRITE_AFTER_READ hazards with the presentation engine.
+        // Synchronization note (important): ordering vs the presentation engine is established by the
+        // acquire semaphore waited on at queue submit. The wait stage mask MUST be at or before the
+        // first command that touches the swapchain image. Since this layout transition happens right
+        // at the start of the command buffer, we must not use a later wait stage like
+        // COLOR_ATTACHMENT_OUTPUT only.
         {
             VkImage currentImage = m_Swapchain.GetImages()[m_ImageIndex];
 
@@ -134,13 +135,12 @@ namespace RHI
             barrier.subresourceRange.baseArrayLayer = 0;
             barrier.subresourceRange.layerCount = 1;
 
-            // Source: Wait for the semaphore's stage (COLOR_ATTACHMENT_OUTPUT is where we wait)
-            // This synchronizes with the presentation engine's read that completes when the
-            // acquire semaphore is signaled.
-            barrier.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-            barrier.srcAccessMask = 0; // No prior access from our side; presentation engine handled externally
+            // No prior GPU work in this submission has accessed the image; the acquire semaphore wait
+            // (specified at submit) provides the external ordering with the presentation engine.
+            barrier.srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
+            barrier.srcAccessMask = 0;
 
-            // Destination: We want to write as a color attachment
+            // Destination: we will write it as a color attachment.
             barrier.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
             barrier.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
 
@@ -200,7 +200,11 @@ namespace RHI
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
         VkSemaphore waitSemaphores[] = {m_ImageAvailableSemaphores[m_CurrentFrame]};
-        VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+
+        // Must be <= earliest swapchain image use in the command buffer (the BeginFrame layout transition).
+        // Using TOP_OF_PIPE keeps vertex/compute overlap with presentation while still correctly gating the
+        // first access to the acquired image.
+        VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT};
         submitInfo.waitSemaphoreCount = 1;
         submitInfo.pWaitSemaphores = waitSemaphores;
         submitInfo.pWaitDstStageMask = waitStages;
