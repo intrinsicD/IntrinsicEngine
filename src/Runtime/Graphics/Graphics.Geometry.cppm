@@ -171,27 +171,24 @@ export namespace Graphics
         {
             std::unique_lock lock(m_Mutex);
 
-            auto it = m_PendingKillList.begin();
-            while (it != m_PendingKillList.end())
+            std::erase_if(m_PendingKillList, [&](const PendingKill& item)
             {
                 // Safe to recycle when: CurrentFrame > KillFrame + FramesInFlight
-                if (currentFrameNumber > it->KillFrameNumber + m_FramesInFlight)
+                if (currentFrameNumber <= item.KillFrameNumber + m_FramesInFlight)
+                    return false;
+
+                // Verify the slot still matches (hasn't been reallocated somehow)
+                Slot& slot = m_Slots[item.SlotIndex];
+                if (!slot.IsActive && slot.Generation == item.Generation)
                 {
-                    // Verify the slot still matches (hasn't been reallocated somehow)
-                    Slot& slot = m_Slots[it->SlotIndex];
-                    if (!slot.IsActive && slot.Generation == it->Generation)
-                    {
-                        // Now safe to destroy the GPU data and recycle the index
-                        slot.Data.reset();
-                        m_FreeIndices.push_back(it->SlotIndex);
-                    }
-                    it = m_PendingKillList.erase(it);
+                    // Now safe to destroy the GPU data and recycle the index
+                    slot.Data.reset();
+                    m_FreeIndices.push_back(item.SlotIndex);
                 }
-                else
-                {
-                    ++it;
-                }
-            }
+
+                // Either way, we can drop the pending entry after the fence.
+                return true;
+            });
         }
 
         /// @brief Get geometry data by handle
