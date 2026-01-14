@@ -48,17 +48,17 @@ namespace Graphics
     
     RGResourceHandle RGBuilder::Read(RGResourceHandle resource, VkPipelineStageFlags2 stage, VkAccessFlags2 access)
     {
-        m_Graph.m_Passes[m_PassIndex].Accesses.push_back({resource.ID, stage, access});
+        m_Graph.m_PassPool[m_PassIndex].Accesses.push_back({resource.ID, stage, access});
         // Extend lifetime
-        auto& node = m_Graph.m_Resources[resource.ID];
+        auto& node = m_Graph.m_ResourcePool[resource.ID];
         node.EndPass = std::max(node.EndPass, m_PassIndex);
         return resource;
     }
 
     RGResourceHandle RGBuilder::Write(RGResourceHandle resource, VkPipelineStageFlags2 stage, VkAccessFlags2 access)
     {
-        m_Graph.m_Passes[m_PassIndex].Accesses.push_back({resource.ID, stage, access});
-        auto& node = m_Graph.m_Resources[resource.ID];
+        m_Graph.m_PassPool[m_PassIndex].Accesses.push_back({resource.ID, stage, access});
+        auto& node = m_Graph.m_ResourcePool[resource.ID];
         if (node.StartPass == ~0u) node.StartPass = m_PassIndex; // First write defines start
         node.EndPass = std::max(node.EndPass, m_PassIndex);
         return resource;
@@ -68,7 +68,7 @@ namespace Graphics
     {
         // Raster write is implicitly Color Attachment Output
         Write(resource, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT);
-        m_Graph.m_Passes[m_PassIndex].Attachments.push_back({resource.ID, info, false});
+        m_Graph.m_PassPool[m_PassIndex].Attachments.push_back({resource.ID, info, false});
         return resource;
     }
 
@@ -76,7 +76,7 @@ namespace Graphics
     {
         Write(resource, VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
               VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
-        m_Graph.m_Passes[m_PassIndex].Attachments.push_back({resource.ID, info, true});
+        m_Graph.m_PassPool[m_PassIndex].Attachments.push_back({resource.ID, info, true});
         return resource;
     }
 
@@ -85,7 +85,7 @@ namespace Graphics
         auto [id, created] = m_Graph.CreateResourceInternal(name, ResourceType::Texture);
         if (created)
         {
-            auto& node = m_Graph.m_Resources[id];
+            auto& node = m_Graph.m_ResourcePool[id];
             node.Extent = {desc.Width, desc.Height};
             node.InitialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
             node.CurrentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -101,7 +101,7 @@ namespace Graphics
         auto [id, created] = m_Graph.CreateResourceInternal(name, ResourceType::Buffer);
         if (created)
         {
-            auto& node = m_Graph.m_Resources[id];
+            auto& node = m_Graph.m_ResourcePool[id];
             node.BufferSize = desc.Size;
             node.BufferUsage = desc.Usage;
         }
@@ -114,7 +114,7 @@ namespace Graphics
         auto [id, created] = m_Graph.CreateResourceInternal(name, ResourceType::Import);
         if (created)
         {
-            auto& node = m_Graph.m_Resources[id];
+            auto& node = m_Graph.m_ResourcePool[id];
             node.PhysicalImage = image;
             node.PhysicalView = view;
             node.InitialLayout = currentLayout;
@@ -122,10 +122,10 @@ namespace Graphics
             node.Extent = extent;
             node.Format = format;
             node.Aspect = (format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT || format == VK_FORMAT_D32_SFLOAT)
-                              ? (VkImageAspectFlags)(VK_IMAGE_ASPECT_DEPTH_BIT) // Simplify logic for now
+                              ? (VkImageAspectFlags)(VK_IMAGE_ASPECT_DEPTH_BIT)
                               : VK_IMAGE_ASPECT_COLOR_BIT;
             m_Graph.m_Registry.RegisterImage(id, image, view);
-            
+
             // Mark as active immediately for imports
             node.StartPass = 0;
             node.EndPass = 0;
@@ -138,10 +138,10 @@ namespace Graphics
         auto [id, created] = m_Graph.CreateResourceInternal(name, ResourceType::Import);
         if (created)
         {
-            auto& node = m_Graph.m_Resources[id];
+            auto& node = m_Graph.m_ResourcePool[id];
             node.PhysicalBuffer = buffer.GetHandle();
             m_Graph.m_Registry.RegisterBuffer(id, buffer.GetHandle());
-            node.StartPass = 0; 
+            node.StartPass = 0;
             node.EndPass = 0;
         }
         return {id};
@@ -149,9 +149,9 @@ namespace Graphics
 
     VkExtent2D RGBuilder::GetTextureExtent(RGResourceHandle handle) const
     {
-        if (handle.ID < m_Graph.m_Resources.size())
+        if (handle.ID < m_Graph.m_ActiveResourceCount)
         {
-            return m_Graph.m_Resources[handle.ID].Extent;
+            return m_Graph.m_ResourcePool[handle.ID].Extent;
         }
         return {0, 0};
     }
@@ -184,7 +184,18 @@ namespace Graphics
 
     RenderGraph::RGPass& RenderGraph::CreatePassInternal(const std::string& name)
     {
-        return m_Passes.emplace_back(RGPass{name, {}});
+        // Grow pool if needed
+        if (m_ActivePassCount >= m_PassPool.size())
+        {
+            m_PassPool.resize(m_ActivePassCount + 1);
+        }
+
+        auto& pass = m_PassPool[m_ActivePassCount++];
+        pass.Name = name;
+        pass.ExecuteFn = nullptr;
+        pass.ExecuteUserData = nullptr;
+        // Accesses/Attachments are cleared during Reset() (capacity preserved)
+        return pass;
     }
 
     std::pair<ResourceID, bool> RenderGraph::CreateResourceInternal(Core::Hash::StringID name, ResourceType type)
@@ -193,25 +204,55 @@ namespace Graphics
         {
             return {it->second, false};
         }
-        auto id = static_cast<ResourceID>(m_Resources.size());
-        ResourceNode node{};
+
+        // Grow pool if needed
+        if (m_ActiveResourceCount >= m_ResourcePool.size())
+        {
+            m_ResourcePool.resize(m_ActiveResourceCount + 1);
+        }
+
+        auto id = m_ActiveResourceCount++;
+        auto& node = m_ResourcePool[id];
+        node = ResourceNode{}; // reset all state
         node.Name = name;
         node.Type = type;
-        m_Resources.push_back(node);
+
         m_ResourceLookup[name] = id;
         return {id, true};
     }
 
     void RenderGraph::Reset()
     {
-        // Ensure pass closures (which may hold shared_ptr/string/etc.) are destroyed each frame.
+        // 1) Reset ScopeStack (Destructors for closures run here)
         m_Scope.Reset();
 
-        m_Passes.clear();
-        m_Resources.clear();
-        m_Barriers.clear();
+        // 2) Reset Allocators (Pointers go back to 0, memory is NOT freed)
+        m_Arena.Reset();
+
+        // 3) Soft-clear the pools (preserve capacity)
+        for (uint32_t i = 0; i < m_ActivePassCount; ++i)
+        {
+            m_PassPool[i].Accesses.clear();
+            m_PassPool[i].Attachments.clear();
+            m_PassPool[i].Name.clear();
+            m_PassPool[i].ExecuteFn = nullptr;
+            m_PassPool[i].ExecuteUserData = nullptr;
+        }
+        m_ActivePassCount = 0;
+
+        // Resources are POD-like; just reset count
+        m_ActiveResourceCount = 0;
         m_ResourceLookup.clear();
+
+        // Registry accumulates per-frame physical bindings
         m_Registry = RGRegistry();
+
+        // Barriers are per-pass; recycle per-batch vectors
+        for (auto& batch : m_Barriers)
+        {
+            batch.ImageBarriers.clear();
+            batch.BufferBarriers.clear();
+        }
     }
 
     RHI::VulkanImage* RenderGraph::ResolveImage(uint32_t frameIndex, const ResourceNode& node)
@@ -298,19 +339,23 @@ namespace Graphics
 
     void RenderGraph::Compile(uint32_t frameIndex)
     {
-        m_Barriers.resize(m_Passes.size());
-
-        // Clear any previous barrier batches (Compile() can be called every frame)
-        for (auto& batch : m_Barriers)
+        // Resize barrier batches to match pass count if needed (capacity preserved)
+        if (m_Barriers.size() < m_ActivePassCount)
         {
-            batch.ImageBarriers.clear();
-            batch.BufferBarriers.clear();
+            m_Barriers.resize(m_ActivePassCount);
+        }
+
+        // Clear any previous barrier batches
+        for (uint32_t i = 0; i < m_ActivePassCount; ++i)
+        {
+            m_Barriers[i].ImageBarriers.clear();
+            m_Barriers[i].BufferBarriers.clear();
         }
 
         // 1. Resolve Transient Resources
-        for (size_t i = 0; i < m_Resources.size(); ++i)
+        for (uint32_t i = 0; i < m_ActiveResourceCount; ++i)
         {
-            auto& res = m_Resources[i];
+            auto& res = m_ResourcePool[i];
 
             // Ensure imported resources start from their declared initial state each frame.
             if (res.Type == ResourceType::Import)
@@ -355,23 +400,21 @@ namespace Graphics
         }
 
         // 2. Barrier Calculation
-        for (size_t passIdx = 0; passIdx < m_Passes.size(); ++passIdx)
+        for (uint32_t passIdx = 0; passIdx < m_ActivePassCount; ++passIdx)
         {
-            const auto& pass = m_Passes[passIdx];
+            const auto& pass = m_PassPool[passIdx];
 
-            // Iterate ALL accesses in this pass
             for (const auto& access : pass.Accesses)
             {
-                auto& res = m_Resources[access.ID];
-                
+                auto& res = m_ResourcePool[access.ID];
+
                 bool needsBarrier = false;
-                
+
                 // --- IMAGE LOGIC ---
                 if (res.Type == ResourceType::Texture || (res.Type == ResourceType::Import && res.PhysicalImage))
                 {
                     VkImageLayout targetLayout = res.CurrentLayout;
 
-                    // Infer optimal layout if not explicit
                     if (access.Access & VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT) targetLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
                     else if (access.Access & VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT) targetLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
                     else if (access.Access & VK_ACCESS_2_SHADER_SAMPLED_READ_BIT) targetLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -381,14 +424,12 @@ namespace Graphics
                     else if (access.Access & VK_ACCESS_2_TRANSFER_READ_BIT) targetLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
 
                     needsBarrier = (res.CurrentLayout != targetLayout) ||
-                                   // If the previous usage produced a write, we must order it before any subsequent access.
                                    (res.LastUsageAccess & (VK_ACCESS_2_MEMORY_WRITE_BIT |
                                                          VK_ACCESS_2_SHADER_WRITE_BIT |
                                                          VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT |
                                                          VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
                                                          VK_ACCESS_2_TRANSFER_WRITE_BIT |
                                                          VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT)) ||
-                                   // If we're writing now, we must create an execution+memory dependency.
                                    (access.Access & (VK_ACCESS_2_MEMORY_WRITE_BIT |
                                                     VK_ACCESS_2_SHADER_WRITE_BIT |
                                                     VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT |
@@ -396,7 +437,6 @@ namespace Graphics
                                                     VK_ACCESS_2_TRANSFER_WRITE_BIT |
                                                     VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT));
 
-                    // If this is the first usage, we still need a barrier if we are changing layout away from UNDEFINED.
                     if (res.LastUsageStage == VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT && res.LastUsageAccess == 0)
                     {
                         needsBarrier = (res.CurrentLayout != targetLayout);
@@ -436,17 +476,11 @@ namespace Graphics
                 // --- BUFFER LOGIC ---
                 else if (res.Type == ResourceType::Buffer || (res.Type == ResourceType::Import && res.PhysicalBuffer))
                 {
-                    // Buffer Barriers check for execution dependencies and memory visibility
-                    // If the previous usage was a WRITE, we ALWAYS need a barrier before READ or WRITE.
-                    // If previous was READ and now is WRITE, we need a barrier (WAR).
-                    // If previous was READ and now is READ, no barrier.
-
                     bool prevWrite = (res.LastUsageAccess & (VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_SHADER_WRITE_BIT | VK_ACCESS_2_TRANSFER_WRITE_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT));
                     bool currWrite = (access.Access & (VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_SHADER_WRITE_BIT | VK_ACCESS_2_TRANSFER_WRITE_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT));
 
                     if (prevWrite || currWrite)
                     {
-                        // Optimization: Skip if it's the first usage
                         if (res.LastUsageStage != VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT)
                         {
                             VkBufferMemoryBarrier2 barrier{};
@@ -462,7 +496,7 @@ namespace Graphics
                             m_Barriers[passIdx].BufferBarriers.push_back(barrier);
                         }
                     }
-                    
+
                     res.LastUsageStage = access.Stage;
                     res.LastUsageAccess = access.Access;
                 }
@@ -472,9 +506,9 @@ namespace Graphics
 
     void RenderGraph::Execute(VkCommandBuffer cmd)
     {
-        for (size_t i = 0; i < m_Passes.size(); ++i)
+        for (uint32_t i = 0; i < m_ActivePassCount; ++i)
         {
-            const auto& pass = m_Passes[i];
+            const auto& pass = m_PassPool[i];
 
             if (!m_Barriers[i].ImageBarriers.empty() || !m_Barriers[i].BufferBarriers.empty())
             {
@@ -484,7 +518,7 @@ namespace Graphics
                 depInfo.pImageMemoryBarriers = m_Barriers[i].ImageBarriers.data();
                 depInfo.bufferMemoryBarrierCount = (uint32_t)m_Barriers[i].BufferBarriers.size();
                 depInfo.pBufferMemoryBarriers = m_Barriers[i].BufferBarriers.data();
-                
+
                 vkCmdPipelineBarrier2(cmd, &depInfo);
             }
 
@@ -498,7 +532,7 @@ namespace Graphics
 
                 for (const auto& att : pass.Attachments)
                 {
-                    auto& res = m_Resources[att.ID];
+                    auto& res = m_ResourcePool[att.ID];
                     renderArea = res.Extent;
 
                     VkRenderingAttachmentInfo info{};
@@ -545,5 +579,4 @@ namespace Graphics
         }
     }
 }
-
 

@@ -148,7 +148,7 @@ export namespace Graphics
             Data* data = *dataResult;
 
             auto& pass = CreatePassInternal(name);
-            RGBuilder builder(*this, static_cast<uint32_t>(m_Passes.size()) - 1);
+            RGBuilder builder(*this, static_cast<uint32_t>(m_ActivePassCount - 1));
 
             // 2. Run Setup (Immediate)
             setup(*data, builder);
@@ -326,9 +326,14 @@ export namespace Graphics
         Core::Memory::LinearArena& m_Arena;      // POD pass data
         Core::Memory::ScopeStack& m_Scope;       // destructor-safe pass closures
 
-        std::vector<RGPass> m_Passes;
-        std::vector<ResourceNode> m_Resources;
-        std::vector<BarrierBatch> m_Barriers;
+        // Change per-frame vectors to persistent pools we recycle each Reset()
+        std::vector<RGPass> m_PassPool;
+        uint32_t m_ActivePassCount = 0;
+
+        std::vector<ResourceNode> m_ResourcePool;
+        uint32_t m_ActiveResourceCount = 0;
+
+        std::vector<BarrierBatch> m_Barriers; // sized to active pass count (capacity preserved)
 
         std::unordered_map<Core::Hash::StringID, ResourceID> m_ResourceLookup;
 
