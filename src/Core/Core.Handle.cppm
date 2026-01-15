@@ -25,7 +25,7 @@ export namespace Core
     //   TextureHandle tex = textures.Add(...);
     //   // geo = tex; // Compile error - different types!
     // -------------------------------------------------------------------------
-    template<typename Tag>
+    template <typename Tag>
     struct StrongHandle
     {
         static constexpr uint32_t INVALID_INDEX = std::numeric_limits<uint32_t>::max();
@@ -34,7 +34,10 @@ export namespace Core
         uint32_t Generation = 0;
 
         constexpr StrongHandle() = default;
-        constexpr StrongHandle(uint32_t index, uint32_t gen) : Index(index), Generation(gen) {}
+
+        constexpr StrongHandle(uint32_t index, uint32_t gen) : Index(index), Generation(gen)
+        {
+        }
 
         [[nodiscard]] constexpr bool IsValid() const noexcept
         {
@@ -51,15 +54,17 @@ export namespace Core
 }
 
 // Allow StrongHandle to be used in unordered containers
-template<typename Tag>
-struct std::hash<Core::StrongHandle<Tag>>
+namespace std
 {
-    std::size_t operator()(const Core::StrongHandle<Tag>& h) const noexcept
+    template <typename Tag>
+    struct hash<Core::StrongHandle<Tag>>
     {
-        // Combine index and generation into single hash
-        std::size_t seed = std::hash<uint32_t>{}(h.Index);
-        seed ^= std::hash<uint32_t>{}(h.Generation) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-        return seed;
-    }
-};
-
+        std::size_t operator()(const Core::StrongHandle<Tag>& h) const noexcept
+        {
+            // Combine index and generation into single hash
+            std::size_t seed = std::hash<uint32_t>{}(h.Index);
+            seed ^= std::hash<uint32_t>{}(h.Generation) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+            return seed;
+        }
+    };
+}

@@ -109,6 +109,12 @@ export namespace Core::Assets
         template <typename T>
         [[nodiscard]] Expected<T*> GetRaw(AssetHandle handle);
 
+        // OPTIMIZATION: Lightweight accessor for hot loops.
+        // Returns nullptr if not loaded/ready, invalid handle, or wrong type.
+        // Intentionally does not return error codes to minimize overhead.
+        template <typename T>
+        [[nodiscard]] T* TryGet(AssetHandle handle);
+
         [[nodiscard]] LoadState GetState(AssetHandle handle);
 
         void Clear();
@@ -273,6 +279,22 @@ export namespace Core::Assets
             return payload->Resource.get();
         }
         return std::unexpected(ErrorCode::AssetTypeMismatch);
+    }
+
+    template <typename T>
+    T* AssetManager::TryGet(AssetHandle handle)
+    {
+        std::shared_lock lock(m_Mutex);
+        if (!m_Registry.valid(handle.ID)) return nullptr;
+
+        const auto& info = m_Registry.get<AssetInfo>(handle.ID);
+        if (info.State != LoadState::Ready) return nullptr;
+
+        if (auto* payload = m_Registry.try_get<AssetPayload<T>>(handle.ID))
+        {
+            return payload->Resource.get();
+        }
+        return nullptr;
     }
 
     template <typename T>

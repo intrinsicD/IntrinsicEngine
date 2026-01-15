@@ -3,6 +3,7 @@ module;
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/norm.hpp>
 #include <span>
+#include <limits>
 
 module Geometry:MeshUtils.Impl;
 import :MeshUtils;
@@ -65,7 +66,11 @@ namespace Geometry::MeshUtils
     int GenerateUVs(std::span<const glm::vec3> positions, std::span<glm::vec4> aux)
     {
         if (positions.empty()) return -1;
-
+        if (aux.size() < positions.size())
+        {
+            Core::Log::Error("GenerateUVs: aux span smaller than positions.");
+            return -1;
+        }
         // 1. Calculate AABB
         glm::vec3 minBounds(std::numeric_limits<float>::max());
         glm::vec3 maxBounds(std::numeric_limits<float>::lowest());
@@ -110,6 +115,7 @@ namespace Geometry::MeshUtils
                 uv.x = (pos.x - minBounds.x) / size.x;
                 uv.y = (pos.y - minBounds.y) / size.y; // Y is V (might need 1.0 - y for Vulkan)
                 break;
+            default: break;
             }
 
             // Note: Vulkan UVs top-left is 0,0. GLTF/OpenGL bottom-left is 0,0.

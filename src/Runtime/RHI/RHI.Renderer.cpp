@@ -7,6 +7,7 @@ module RHI:Renderer.Impl;
 import :Renderer;
 import :Image;
 import :CommandUtils;
+import :Profiler;
 import Core;
 
 namespace RHI
@@ -33,6 +34,13 @@ namespace RHI
         allocInfo.commandBufferCount = (uint32_t)m_CommandBuffers.size();
 
         VK_CHECK(vkAllocateCommandBuffers(m_Device->GetLogicalDevice(), &allocInfo, m_CommandBuffers.data()));
+
+        // Optional GPU timestamping; safe to keep null if unsupported.
+        m_GpuProfiler = std::make_unique<GpuProfiler>(m_Device);
+        if (m_GpuProfiler && !m_GpuProfiler->IsSupported())
+        {
+            m_GpuProfiler.reset();
+        }
     }
 
     SimpleRenderer::~SimpleRenderer()
@@ -110,6 +118,13 @@ namespace RHI
         VkCommandBufferBeginInfo beginInfo{};
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         VK_CHECK(vkBeginCommandBuffer(cmd, &beginInfo));
+
+        if (m_GpuProfiler)
+        {
+            // Reset query range and write a frame start timestamp.
+            m_GpuProfiler->BeginFrame(cmd, m_CurrentFrame, 256);
+            m_GpuProfiler->WriteFrameStart(cmd);
+        }
 
         // Ensure the acquired swapchain image is in COLOR_ATTACHMENT_OPTIMAL before any rendering.
         // We do this here so RenderGraph can treat the backbuffer as ready for use.
@@ -194,6 +209,12 @@ namespace RHI
 
         vkCmdPipelineBarrier2(cmd, &depInfo);
 
+        if (m_GpuProfiler)
+        {
+            // Frame end timestamp should be as late as possible in this command buffer.
+            m_GpuProfiler->WriteFrameEnd(cmd);
+        }
+
         VK_CHECK(vkEndCommandBuffer(cmd));
 
         VkSubmitInfo submitInfo{};
@@ -217,6 +238,18 @@ namespace RHI
         submitInfo.pSignalSemaphores = signalSemaphores;
 
         VK_CHECK(m_Device->SubmitToGraphicsQueue(submitInfo, m_InFlightFences[m_CurrentFrame]));
+
+        // --- Non-blocking resolve of an older frame (avoid stalls) ---
+        if (m_GpuProfiler)
+        {
+            const uint32_t framesInFlight = m_FramesInFlight;
+            const uint32_t resolveFrame = (m_CurrentFrame + 1u) % framesInFlight;
+
+            if (auto resolved = m_GpuProfiler->Resolve(resolveFrame); resolved.has_value())
+            {
+                Core::Telemetry::TelemetrySystem::Get().SetGpuFrameTimeNs(resolved->GpuFrameTimeNs);
+            }
+        }
 
         // 8. Present
         VkPresentInfoKHR presentInfo{};

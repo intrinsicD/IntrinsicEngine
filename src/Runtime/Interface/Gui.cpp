@@ -45,81 +45,207 @@ namespace Interface::GUI
     static RHI::VulkanDevice* s_Device = nullptr;
     static bool s_ShowTelemetryPanel = false;
 
+    static float ToMs(uint64_t ns) { return static_cast<float>(static_cast<double>(ns) / 1'000'000.0); }
+
+    // Simple horizontal bar for time in ms (clamped to a target window).
+    static void DrawTimeBar(const char* label, float ms, float targetMs)
+    {
+        const float clamped = std::min(ms, targetMs);
+        const float frac = (targetMs > 0.0f) ? (clamped / targetMs) : 0.0f;
+
+        ImGui::TextUnformatted(label);
+        ImGui::SameLine();
+
+        // Reserve a nice wide bar.
+        const float barWidth = std::max(160.0f, ImGui::GetContentRegionAvail().x - 80.0f);
+        const ImVec2 size(barWidth, 0.0f);
+
+        ImGui::PushStyleColor(ImGuiCol_PlotHistogram, ImGui::GetStyleColorVec4(ImGuiCol_PlotHistogram));
+        ImGui::ProgressBar(frac, size, nullptr);
+        ImGui::PopStyleColor();
+
+        ImGui::SameLine();
+        ImGui::Text("%.2f ms", ms);
+    }
+
     // Helper to draw performance/telemetry panel
     static void DrawTelemetryPanel()
     {
-        ImGui::SetNextWindowSize(ImVec2(400, 300), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowSize(ImVec2(520, 420), ImGuiCond_FirstUseEver);
         if (ImGui::Begin("Performance", &s_ShowTelemetryPanel))
         {
             auto& telemetry = Core::Telemetry::TelemetrySystem::Get();
             const auto& stats = telemetry.GetFrameStats(0);
 
-            // Frame timing
-            double avgMs = telemetry.GetAverageFrameTimeMs(60);
-            double avgFps = telemetry.GetAverageFPS(60);
+            const double avgMs = telemetry.GetAverageFrameTimeMs(60);
+            const double avgFps = telemetry.GetAverageFPS(60);
 
-            ImGui::Text("FPS: %.1f (%.2f ms)", avgFps, avgMs);
-            ImGui::Text("Frame: %lu", stats.FrameNumber);
-            ImGui::Text("Draw Calls: %u", stats.DrawCalls);
-            ImGui::Text("Triangles: %u", stats.TriangleCount);
+            const float cpuMs = ToMs(stats.CpuTimeNs);
+            const float gpuMs = ToMs(stats.GpuTimeNs);
+            const float frameMs = ToMs(stats.FrameTimeNs);
 
-            ImGui::Separator();
-
-            // Frame time graph
-            static float frameTimesMs[120] = {};
-            static int frameTimeIdx = 0;
-            frameTimesMs[frameTimeIdx] = static_cast<float>(stats.FrameTimeNs) / 1'000'000.0f;
-            frameTimeIdx = (frameTimeIdx + 1) % 120;
-
-            float maxFrameTime = 33.3f; // 30 FPS baseline
-            for (int i = 0; i < 120; ++i)
+            // -----------------------------------------------------------------
+            // Header (big FPS + key counters)
+            // -----------------------------------------------------------------
             {
-                if (frameTimesMs[i] > maxFrameTime) maxFrameTime = frameTimesMs[i];
+                ImGui::PushFont(ImGui::GetFont());
+                ImGui::Text("%.1f FPS", avgFps);
+                ImGui::PopFont();
+
+                ImGui::SameLine();
+                ImGui::TextDisabled("(avg %.2f ms)", avgMs);
+
+                ImGui::Separator();
+
+                ImGui::TextDisabled("Frame #");
+                ImGui::SameLine();
+                ImGui::Text("%lu", stats.FrameNumber);
+
+                ImGui::SameLine();
+                ImGui::TextDisabled("  Draw");
+                ImGui::SameLine();
+                ImGui::Text("%u", stats.DrawCalls);
+
+                ImGui::SameLine();
+                ImGui::TextDisabled("  Tris");
+                ImGui::SameLine();
+                ImGui::Text("%u", stats.TriangleCount);
             }
 
-            ImGui::PlotLines("Frame Time", frameTimesMs, 120, frameTimeIdx,
-                nullptr, 0.0f, maxFrameTime * 1.1f, ImVec2(0, 80));
+            ImGui::Spacing();
+
+            // -----------------------------------------------------------------
+            // Frame budget bars (CPU/GPU)
+            // -----------------------------------------------------------------
+            {
+                // Common budgets
+                constexpr float kBudget60 = 16.6667f;
+                constexpr float kBudget30 = 33.3333f;
+
+                ImGui::TextDisabled("Frame Budget");
+
+                // Use 16.6 ms as primary target, but clamp to 33ms for visibility.
+                const float targetMs = kBudget60;
+                const float clampMs = kBudget30;
+
+                DrawTimeBar("CPU", std::min(cpuMs, clampMs), targetMs);
+                DrawTimeBar("GPU", std::min(gpuMs, clampMs), targetMs);
+                DrawTimeBar("Total", std::min(frameMs, clampMs), targetMs);
+            }
 
             ImGui::Separator();
 
-            // Timing categories (sorted by total time)
-            if (ImGui::TreeNode("Timing Breakdown"))
+            // -----------------------------------------------------------------
+            // Graphs: CPU and GPU history
+            // -----------------------------------------------------------------
             {
+                static float cpuHistoryMs[120] = {};
+                static float gpuHistoryMs[120] = {};
+                static int historyIdx = 0;
+
+                cpuHistoryMs[historyIdx] = cpuMs;
+                gpuHistoryMs[historyIdx] = gpuMs;
+                historyIdx = (historyIdx + 1) % 120;
+
+                float maxMs = 33.3f;
+                for (int i = 0; i < 120; ++i)
+                {
+                    maxMs = std::max(maxMs, cpuHistoryMs[i]);
+                    maxMs = std::max(maxMs, gpuHistoryMs[i]);
+                }
+
+                ImGui::TextDisabled("CPU/GPU Frame Time (ms)");
+
+                ImGui::PushStyleColor(ImGuiCol_PlotLines, ImVec4(0.25f, 0.65f, 1.0f, 1.0f));
+                ImGui::PlotLines("CPU", cpuHistoryMs, 120, historyIdx, nullptr, 0.0f, maxMs * 1.1f, ImVec2(0, 70));
+                ImGui::PopStyleColor();
+
+                ImGui::PushStyleColor(ImGuiCol_PlotLines, ImVec4(0.90f, 0.55f, 0.15f, 1.0f));
+                ImGui::PlotLines("GPU", gpuHistoryMs, 120, historyIdx, nullptr, 0.0f, maxMs * 1.1f, ImVec2(0, 70));
+                ImGui::PopStyleColor();
+            }
+
+            ImGui::Separator();
+
+            // -----------------------------------------------------------------
+            // CPU timing categories
+            // -----------------------------------------------------------------
+            if (ImGui::TreeNodeEx("CPU Timing Breakdown", ImGuiTreeNodeFlags_DefaultOpen))
+            {
+                static char filterBuf[64] = {};
+                ImGui::TextDisabled("Filter");
+                ImGui::SameLine();
+                ImGui::SetNextItemWidth(220.0f);
+                ImGui::InputText("##TimingFilter", filterBuf, sizeof(filterBuf));
+
                 auto categories = telemetry.GetCategoriesSortedByTime();
 
-                if (ImGui::BeginTable("TimingTable", 4,
+                // Show only the top N by default (avoids overwhelming the panel).
+                static int topN = 20;
+                ImGui::SameLine();
+                ImGui::TextDisabled("Top");
+                ImGui::SameLine();
+                ImGui::SetNextItemWidth(70.0f);
+                ImGui::SliderInt("##TopN", &topN, 5, 50, "%d", ImGuiSliderFlags_AlwaysClamp);
+
+                const bool hasFilter = filterBuf[0] != '\0';
+
+                if (ImGui::BeginTable("TimingTable", 5,
                     ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
-                    ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollX |
-                    ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_NoHostExtendX))
+                    ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollY |
+                    ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_NoHostExtendX,
+                    ImVec2(0.0f, 160.0f)))
                 {
-                    ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed, 150.0f);
-                    ImGui::TableSetupColumn("Total (ms)", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+                    ImGui::TableSetupScrollFreeze(0, 1);
+                    ImGui::TableSetupColumn("Scope", ImGuiTableColumnFlags_WidthStretch);
+                    ImGui::TableSetupColumn("Total (ms)", ImGuiTableColumnFlags_WidthFixed, 90.0f);
                     ImGui::TableSetupColumn("Avg (ms)", ImGuiTableColumnFlags_WidthFixed, 80.0f);
                     ImGui::TableSetupColumn("Calls", ImGuiTableColumnFlags_WidthFixed, 60.0f);
+                    ImGui::TableSetupColumn("%Frame", ImGuiTableColumnFlags_WidthFixed, 70.0f);
                     ImGui::TableHeadersRow();
 
+                    int shown = 0;
                     for (const auto* cat : categories)
                     {
+                        if (!cat || cat->CallCount == 0) continue;
+
+                        const char* name = cat->Name ? cat->Name : "<unnamed>";
+                        if (hasFilter)
+                        {
+                            if (strstr(name, filterBuf) == nullptr)
+                                continue;
+                        }
+
+                        if (!hasFilter && shown >= topN)
+                            break;
+
+                        const float totalMs = static_cast<float>(cat->TotalMs());
+                        const float avgCatMs = static_cast<float>(cat->AverageMs());
+                        const float pctFrame = (cpuMs > 0.0f) ? (totalMs / cpuMs) * 100.0f : 0.0f;
+
                         ImGui::TableNextRow();
+
                         ImGui::TableNextColumn();
-                        if (cat->Name)
-                        {
-                            ImGui::TextUnformatted(cat->Name);
-                        }
-                        else
-                        {
-                            ImGui::Text("0x%08X", cat->NameHash);
-                        }
+                        ImGui::TextUnformatted(name);
+
                         ImGui::TableNextColumn();
-                        ImGui::Text("%.3f", cat->TotalMs());
+                        ImGui::Text("%.3f", totalMs);
+
                         ImGui::TableNextColumn();
-                        ImGui::Text("%.3f", cat->AverageMs());
+                        ImGui::Text("%.3f", avgCatMs);
+
                         ImGui::TableNextColumn();
                         ImGui::Text("%u", cat->CallCount);
+
+                        ImGui::TableNextColumn();
+                        ImGui::Text("%.1f", pctFrame);
+
+                        ++shown;
                     }
 
                     ImGui::EndTable();
                 }
+
                 ImGui::TreePop();
             }
         }

@@ -251,33 +251,47 @@ namespace Graphics
                                                        packets.reserve(view.size_hint());
                                                        for (auto [entity, transform, renderable] : view.each())
                                                        {
-                                                           if (!renderable.Geometry.IsValid() || !renderable.Material.
-                                                               IsValid())
+                                                           if (!renderable.Geometry.IsValid() || !renderable.Material.IsValid())
                                                                continue;
 
-                                                           auto matResult = assets->GetRaw<Material>(
-                                                               renderable.Material);
-
-                                                           if (matResult.has_value())
+                                                           // --- CACHE RESOLUTION START ---
+                                                           // Only query AssetManager if the material handle changed or cache is uninitialized.
+                                                           if (renderable.Material != renderable.CachedMaterialHandle ||
+                                                               renderable.TextureID_Cache == ~0u)
                                                            {
-                                                               Material* mat = *matResult;
-                                                               glm::mat4 worldMatrix;
-                                                               if (auto* world = scenePtr->GetRegistry().try_get<
-                                                                   ECS::Components::Transform::WorldMatrix>(entity))
+                                                               auto* mat = assets->TryGet<Material>(renderable.Material);
+                                                               if (mat)
                                                                {
-                                                                   worldMatrix = world->Matrix;
+                                                                   renderable.TextureID_Cache = mat->GetTextureIndex();
+                                                                   renderable.CachedMaterialHandle = renderable.Material;
                                                                }
                                                                else
                                                                {
-                                                                   // Fallback for non-hierarchical entities
-                                                                   worldMatrix = GetMatrix(transform);
+                                                                   // Material not ready yet (or wrong type). Skip for now.
+                                                                   continue;
                                                                }
-                                                               packets.push_back({
-                                                                   renderable.Geometry,
-                                                                   mat->GetTextureIndex(),
-                                                                   worldMatrix
-                                                               });
                                                            }
+                                                           // --- CACHE RESOLUTION END ---
+
+                                                           const uint32_t textureID = renderable.TextureID_Cache;
+
+                                                           glm::mat4 worldMatrix;
+                                                           if (auto* world = scenePtr->GetRegistry().try_get<
+                                                               ECS::Components::Transform::WorldMatrix>(entity))
+                                                           {
+                                                               worldMatrix = world->Matrix;
+                                                           }
+                                                           else
+                                                           {
+                                                               // Fallback for non-hierarchical entities
+                                                               worldMatrix = GetMatrix(transform);
+                                                           }
+
+                                                           packets.push_back({
+                                                               renderable.Geometry,
+                                                               textureID,
+                                                               worldMatrix
+                                                           });
                                                        }
 
                                                        // 2. Sort to minimize state changes (Batching)

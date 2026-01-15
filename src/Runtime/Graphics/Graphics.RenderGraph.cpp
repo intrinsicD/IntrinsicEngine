@@ -45,18 +45,29 @@ namespace Graphics
     }
 
     // --- RGBuilder ---
-    
+
     RGResourceHandle RGBuilder::Read(RGResourceHandle resource, VkPipelineStageFlags2 stage, VkAccessFlags2 access)
     {
+        if (!resource.IsValid() || resource.ID >= m_Graph.m_ActiveResourceCount)
+        {
+            Core::Log::Error("RenderGraph: invalid resource handle in pass {}", m_PassIndex);
+            return {kInvalidResource};
+        }
         m_Graph.m_PassPool[m_PassIndex].Accesses.push_back({resource.ID, stage, access});
         // Extend lifetime
         auto& node = m_Graph.m_ResourcePool[resource.ID];
+        if (node.StartPass == ~0u) node.StartPass = m_PassIndex;
         node.EndPass = std::max(node.EndPass, m_PassIndex);
         return resource;
     }
 
     RGResourceHandle RGBuilder::Write(RGResourceHandle resource, VkPipelineStageFlags2 stage, VkAccessFlags2 access)
     {
+        if (!resource.IsValid() || resource.ID >= m_Graph.m_ActiveResourceCount)
+        {
+            Core::Log::Error("RenderGraph: invalid resource handle in pass {}", m_PassIndex);
+            return {kInvalidResource};
+        }
         m_Graph.m_PassPool[m_PassIndex].Accesses.push_back({resource.ID, stage, access});
         auto& node = m_Graph.m_ResourcePool[resource.ID];
         if (node.StartPass == ~0u) node.StartPass = m_PassIndex; // First write defines start
@@ -108,7 +119,8 @@ namespace Graphics
         return {id};
     }
 
-    RGResourceHandle RGBuilder::ImportTexture(Core::Hash::StringID name, VkImage image, VkImageView view, VkFormat format,
+    RGResourceHandle RGBuilder::ImportTexture(Core::Hash::StringID name, VkImage image, VkImageView view,
+                                              VkFormat format,
                                               VkExtent2D extent, VkImageLayout currentLayout)
     {
         auto [id, created] = m_Graph.CreateResourceInternal(name, ResourceType::Import);
@@ -121,7 +133,8 @@ namespace Graphics
             node.CurrentLayout = currentLayout;
             node.Extent = extent;
             node.Format = format;
-            node.Aspect = (format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT || format == VK_FORMAT_D32_SFLOAT)
+            node.Aspect = (format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT || format ==
+                              VK_FORMAT_D32_SFLOAT)
                               ? (VkImageAspectFlags)(VK_IMAGE_ASPECT_DEPTH_BIT)
                               : VK_IMAGE_ASPECT_COLOR_BIT;
             m_Graph.m_Registry.RegisterImage(id, image, view);
@@ -288,7 +301,8 @@ namespace Graphics
             }
         }
 
-        auto img = std::make_unique<RHI::VulkanImage>(m_Device, node.Extent.width, node.Extent.height, 1, node.Format, node.Usage, node.Aspect);
+        auto img = std::make_unique<RHI::VulkanImage>(m_Device, node.Extent.width, node.Extent.height, 1, node.Format,
+                                                      node.Usage, node.Aspect);
         auto* ptr = img.get();
         PooledImage pooled{std::move(img), frameIndex};
         pooled.ActiveIntervals.emplace_back(node.StartPass, node.EndPass);
@@ -329,7 +343,8 @@ namespace Graphics
             }
         }
 
-        auto buf = std::make_unique<RHI::VulkanBuffer>(m_Device, node.BufferSize, node.BufferUsage, VMA_MEMORY_USAGE_GPU_ONLY);
+        auto buf = std::make_unique<RHI::VulkanBuffer>(m_Device, node.BufferSize, node.BufferUsage,
+                                                       VMA_MEMORY_USAGE_GPU_ONLY);
         auto* ptr = buf.get();
         PooledBuffer pooled{std::move(buf), frameIndex};
         pooled.ActiveIntervals.emplace_back(node.StartPass, node.EndPass);
@@ -415,27 +430,41 @@ namespace Graphics
                 {
                     VkImageLayout targetLayout = res.CurrentLayout;
 
-                    if (access.Access & VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT) targetLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-                    else if (access.Access & VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT) targetLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-                    else if (access.Access & VK_ACCESS_2_SHADER_SAMPLED_READ_BIT) targetLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-                    else if (access.Access & VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT) targetLayout = VK_IMAGE_LAYOUT_GENERAL;
-                    else if (access.Access & VK_ACCESS_2_SHADER_STORAGE_READ_BIT) targetLayout = VK_IMAGE_LAYOUT_GENERAL;
-                    else if (access.Access & VK_ACCESS_2_TRANSFER_WRITE_BIT) targetLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-                    else if (access.Access & VK_ACCESS_2_TRANSFER_READ_BIT) targetLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+                    if (access.Access & VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT)
+                        targetLayout =
+                            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                    else if (access.Access & VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT)
+                        targetLayout =
+                            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+                    else if (access.Access & VK_ACCESS_2_SHADER_SAMPLED_READ_BIT)
+                        targetLayout =
+                            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                    else if (access.Access & VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT)
+                        targetLayout =
+                            VK_IMAGE_LAYOUT_GENERAL;
+                    else if (access.Access & VK_ACCESS_2_SHADER_STORAGE_READ_BIT)
+                        targetLayout =
+                            VK_IMAGE_LAYOUT_GENERAL;
+                    else if (access.Access & VK_ACCESS_2_TRANSFER_WRITE_BIT)
+                        targetLayout =
+                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+                    else if (access.Access & VK_ACCESS_2_TRANSFER_READ_BIT)
+                        targetLayout =
+                            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
 
                     needsBarrier = (res.CurrentLayout != targetLayout) ||
-                                   (res.LastUsageAccess & (VK_ACCESS_2_MEMORY_WRITE_BIT |
-                                                         VK_ACCESS_2_SHADER_WRITE_BIT |
-                                                         VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT |
-                                                         VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
-                                                         VK_ACCESS_2_TRANSFER_WRITE_BIT |
-                                                         VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT)) ||
-                                   (access.Access & (VK_ACCESS_2_MEMORY_WRITE_BIT |
-                                                    VK_ACCESS_2_SHADER_WRITE_BIT |
-                                                    VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT |
-                                                    VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
-                                                    VK_ACCESS_2_TRANSFER_WRITE_BIT |
-                                                    VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT));
+                        (res.LastUsageAccess & (VK_ACCESS_2_MEMORY_WRITE_BIT |
+                            VK_ACCESS_2_SHADER_WRITE_BIT |
+                            VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT |
+                            VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
+                            VK_ACCESS_2_TRANSFER_WRITE_BIT |
+                            VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT)) ||
+                        (access.Access & (VK_ACCESS_2_MEMORY_WRITE_BIT |
+                            VK_ACCESS_2_SHADER_WRITE_BIT |
+                            VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT |
+                            VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
+                            VK_ACCESS_2_TRANSFER_WRITE_BIT |
+                            VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT));
 
                     if (res.LastUsageStage == VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT && res.LastUsageAccess == 0)
                     {
@@ -452,7 +481,9 @@ namespace Graphics
                         barrier.srcStageMask = (res.CurrentLayout == VK_IMAGE_LAYOUT_UNDEFINED)
                                                    ? VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT
                                                    : res.LastUsageStage;
-                        barrier.srcAccessMask = (res.CurrentLayout == VK_IMAGE_LAYOUT_UNDEFINED) ? 0 : res.LastUsageAccess;
+                        barrier.srcAccessMask = (res.CurrentLayout == VK_IMAGE_LAYOUT_UNDEFINED)
+                                                    ? 0
+                                                    : res.LastUsageAccess;
                         barrier.dstStageMask = access.Stage;
                         barrier.dstAccessMask = access.Access;
                         barrier.subresourceRange.aspectMask = res.Aspect;
@@ -476,8 +507,10 @@ namespace Graphics
                 // --- BUFFER LOGIC ---
                 else if (res.Type == ResourceType::Buffer || (res.Type == ResourceType::Import && res.PhysicalBuffer))
                 {
-                    bool prevWrite = (res.LastUsageAccess & (VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_SHADER_WRITE_BIT | VK_ACCESS_2_TRANSFER_WRITE_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT));
-                    bool currWrite = (access.Access & (VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_SHADER_WRITE_BIT | VK_ACCESS_2_TRANSFER_WRITE_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT));
+                    bool prevWrite = (res.LastUsageAccess & (VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_SHADER_WRITE_BIT
+                        | VK_ACCESS_2_TRANSFER_WRITE_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT));
+                    bool currWrite = (access.Access & (VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_SHADER_WRITE_BIT |
+                        VK_ACCESS_2_TRANSFER_WRITE_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT));
 
                     if (prevWrite || currWrite)
                     {
@@ -506,6 +539,8 @@ namespace Graphics
 
     void RenderGraph::Execute(VkCommandBuffer cmd)
     {
+        std::vector<VkRenderingAttachmentInfo> colorAtts;
+        colorAtts.reserve(m_PassPool[0].Attachments.size());
         for (uint32_t i = 0; i < m_ActivePassCount; ++i)
         {
             const auto& pass = m_PassPool[i];
@@ -525,7 +560,8 @@ namespace Graphics
             bool isRaster = !pass.Attachments.empty();
             if (isRaster)
             {
-                std::vector<VkRenderingAttachmentInfo> colorAtts;
+                colorAtts.reserve(pass.Attachments.size());
+                colorAtts.clear();
                 VkRenderingAttachmentInfo depthAtt{};
                 bool hasDepth = false;
                 VkExtent2D renderArea = {0, 0};
@@ -533,7 +569,10 @@ namespace Graphics
                 for (const auto& att : pass.Attachments)
                 {
                     auto& res = m_ResourcePool[att.ID];
-                    renderArea = res.Extent;
+                    if (renderArea.width == 0 && renderArea.height == 0)
+                        renderArea = res.Extent;
+                    else if (renderArea.width != res.Extent.width || renderArea.height != res.Extent.height)
+                        Core::Log::Error("RenderGraph: attachment extents mismatch in pass {}", pass.Name);
 
                     VkRenderingAttachmentInfo info{};
                     info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
@@ -579,4 +618,3 @@ namespace Graphics
         }
     }
 }
-

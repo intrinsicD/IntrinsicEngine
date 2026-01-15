@@ -15,6 +15,7 @@ target_sources(${target_name}
         RHI.Device.cppm
         RHI.Swapchain.cppm
         RHI.Renderer.cppm
+        RHI.Profiler.cppm
         RHI.Buffer.cppm
         RHI.CommandUtils.cppm
         RHI.Types.cppm
@@ -35,6 +36,7 @@ target_sources(${target_name}
         RHI.Device.cpp
         RHI.Swapchain.cpp
         RHI.Renderer.cpp
+        RHI.Profiler.cpp
         RHI.Buffer.cpp
         RHI.Shader.cpp
         RHI.Pipeline.cpp

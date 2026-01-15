@@ -46,7 +46,7 @@ namespace Core::Tasks
             }
         };
 
-        alignas(8) std::byte m_Storage[STORAGE_SIZE]{}; // Value-initialize to zero
+        alignas(std::max_align_t) std::byte m_Storage[STORAGE_SIZE]{}; // Value-initialize to zero
         Concept* m_VTable = nullptr; // Points to m_Storage (reinterpreted)
 
     public:

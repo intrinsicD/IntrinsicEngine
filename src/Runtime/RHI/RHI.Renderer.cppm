@@ -11,6 +11,7 @@ import :Device;
 import :Swapchain;
 import :Pipeline;
 import :Image;
+import :Profiler;
 
 namespace RHI
 {
@@ -39,6 +40,8 @@ namespace RHI
         [[nodiscard]] VkImageView GetSwapchainImageView(uint32_t index) const;
         [[nodiscard]] uint32_t GetImageIndex() const { return m_ImageIndex; }
 
+        [[nodiscard]] GpuProfiler* GetGpuProfiler() const { return m_GpuProfiler.get(); }
+
     private:
         std::shared_ptr<VulkanDevice> m_Device;
         VulkanSwapchain& m_Swapchain;
@@ -56,5 +59,6 @@ namespace RHI
         bool m_IsFrameStarted = false;
 
         void InitSyncStructures();
+        std::unique_ptr<GpuProfiler> m_GpuProfiler;
     };
 }

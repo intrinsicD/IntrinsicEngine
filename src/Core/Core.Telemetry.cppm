@@ -159,6 +159,14 @@ export namespace Core::Telemetry
             m_TriangleCount.fetch_add(triangles, std::memory_order_relaxed);
         }
 
+        // Publish GPU frame time (in nanoseconds) computed by the renderer/RHI.
+        // This is intentionally explicit to avoid stalling reads inside Telemetry.
+        void SetGpuFrameTimeNs(uint64_t gpuTimeNs)
+        {
+            size_t idx = (m_CurrentFrame - 1) % MAX_FRAME_HISTORY;
+            m_FrameHistory[idx].GpuTimeNs = gpuTimeNs;
+        }
+
         // Get frame statistics for UI display
         [[nodiscard]] const FrameStats& GetFrameStats(size_t framesAgo = 0) const
         {

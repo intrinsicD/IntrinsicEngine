@@ -143,3 +143,34 @@ TEST(AssetSystem, ExternalFinalization) {
 
     Core::Tasks::Scheduler::Shutdown();
 }
+
+TEST(AssetSystem, TryGet_HotPathOptimization)
+{
+    Core::Tasks::Scheduler::Initialize(1);
+    AssetManager manager;
+
+    auto handle = manager.Load<int>("number", [](const std::string&, AssetHandle)
+    {
+        return std::make_shared<int>(123);
+    });
+
+    Core::Tasks::Scheduler::WaitForAll();
+
+    // NOTE: unlike RequestNotify tests, this doesn't require manager.Update() because TryGet reads state directly.
+
+    // 1. Valid access
+    int* val = manager.TryGet<int>(handle);
+    ASSERT_NE(val, nullptr);
+    EXPECT_EQ(*val, 123);
+
+    // 2. Type mismatch (safe fail)
+    float* failType = manager.TryGet<float>(handle);
+    EXPECT_EQ(failType, nullptr);
+
+    // 3. Invalid handle (safe fail)
+    AssetHandle invalidHandle;
+    int* failHandle = manager.TryGet<int>(invalidHandle);
+    EXPECT_EQ(failHandle, nullptr);
+
+    Core::Tasks::Scheduler::Shutdown();
+}

@@ -113,6 +113,11 @@ namespace Core::Memory
             return std::unexpected(AllocatorError::Overflow);
         }
 
+        if (align == 0 || (align & (align - 1)) != 0)
+        {
+            return std::unexpected(AllocatorError::InvalidAlignment);
+        }
+
         // Always align the *current* offset, not just the pointer logic
         // This ensures GetUsed() returns an aligned watermark for subsequent saves/restores
         const size_t safeAlign = std::max(align, alignof(std::max_align_t));
