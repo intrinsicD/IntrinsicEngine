@@ -16,12 +16,11 @@ namespace Graphics
 {
     std::expected<TextureLoadResult, AssetError> TextureLoader::LoadAsync(
         const std::filesystem::path& filepath,
-        std::shared_ptr<RHI::VulkanDevice> device,
+        RHI::VulkanDevice& device,
         RHI::TransferManager& transferManager,
         bool isSRGB)
     {
-        if (!device)
-            return std::unexpected(AssetError::InvalidData);
+        // Device is a non-null reference by contract.
 
         // 1) IO & Decode
         int w = 0;
@@ -43,7 +42,7 @@ namespace Graphics
         const size_t imageSize = static_cast<size_t>(w) * static_cast<size_t>(h) * 4u;
 
         VkPhysicalDeviceProperties props{};
-        vkGetPhysicalDeviceProperties(device->GetPhysicalDevice(), &props);
+        vkGetPhysicalDeviceProperties(device.GetPhysicalDevice(), &props);
 
         constexpr size_t texelSize = 4; // RGBA8
         const size_t rowPitch = static_cast<size_t>(w) * texelSize;
@@ -87,7 +86,7 @@ namespace Graphics
         const VkFormat format = isSRGB ? VK_FORMAT_R8G8B8A8_SRGB : VK_FORMAT_R8G8B8A8_UNORM;
 
         // 3) Allocate GPU Resource
-        auto texture = std::make_shared<RHI::Texture>(
+        auto texture = std::make_unique<RHI::Texture>(
             device,
             static_cast<uint32_t>(w),
             static_cast<uint32_t>(h),
@@ -128,6 +127,6 @@ namespace Graphics
             ? transferManager.Submit(cmd)
             : transferManager.Submit(cmd, std::move(stagingBuffers));
 
-        return TextureLoadResult{ texture, token };
+        return TextureLoadResult{ std::move(texture), token };
     }
 }

@@ -2,7 +2,6 @@ module;
 #include <memory>
 #include <string>
 #include <vector>
-#include <functional>
 
 #include "RHI.Vulkan.hpp"
 
@@ -52,7 +51,7 @@ export namespace Runtime
         std::unique_ptr<RHI::DescriptorLayout> m_DescriptorLayout;
         std::unique_ptr<RHI::DescriptorAllocator> m_DescriptorPool;
         std::unique_ptr<RHI::GraphicsPipeline> m_Pipeline;
-        std::shared_ptr<RHI::BindlessDescriptorSystem> m_BindlessSystem;
+        std::unique_ptr<RHI::BindlessDescriptorSystem> m_BindlessSystem;
     public:
 
         // Protected access so Sandbox can manipulate Scene/Assets
@@ -74,11 +73,20 @@ export namespace Runtime
         [[nodiscard]] Graphics::GeometryStorage& GetGeometryStorage() { return m_GeometryStorage; }
 
         void RegisterAssetLoad(Core::Assets::AssetHandle handle, RHI::TransferToken token);
-        void RunOnMainThread(std::function<void()> task);
+        template <typename F>
+        void RunOnMainThread(F&& task)
+        {
+            std::lock_guard lock(m_MainThreadQueueMutex);
+            m_MainThreadQueue.emplace_back(Core::Tasks::LocalTask(std::forward<F>(task)));
+        }
 
     protected:
         std::shared_ptr<RHI::Texture> m_DefaultTexture;
-        std::vector<std::shared_ptr<Graphics::Material>> m_LoadedMaterials;
+        uint32_t m_DefaultTextureIndex = 0;
+
+        // Keep-alive list for runtime-created materials is handle-based to avoid shared_ptr overhead.
+        // The AssetManager owns the actual material payload.
+        std::vector<Core::Assets::AssetHandle> m_LoadedMaterials;
 
         // Internal tracking struct (POD)
         struct PendingLoad
@@ -92,7 +100,7 @@ export namespace Runtime
         std::vector<PendingLoad> m_PendingLoads;
 
         std::mutex m_MainThreadQueueMutex;
-        std::vector<std::function<void()>> m_MainThreadQueue;
+        std::vector<Core::Tasks::LocalTask> m_MainThreadQueue;
 
         bool m_Running = true;
         bool m_FramebufferResized = false;

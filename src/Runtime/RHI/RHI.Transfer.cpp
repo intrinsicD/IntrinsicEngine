@@ -13,11 +13,11 @@ import Core;
 
 namespace RHI
 {
-    TransferManager::TransferManager(std::shared_ptr<VulkanDevice> device)
+    TransferManager::TransferManager(VulkanDevice& device)
         : m_Device(device)
     {
-        uint32_t queueFamilyIndex = m_Device->GetQueueIndices().TransferFamily.value();
-        vkGetDeviceQueue(m_Device->GetLogicalDevice(), queueFamilyIndex, 0, &m_TransferQueue);
+        uint32_t queueFamilyIndex = m_Device.GetQueueIndices().TransferFamily.value();
+        vkGetDeviceQueue(m_Device.GetLogicalDevice(), queueFamilyIndex, 0, &m_TransferQueue);
 
         VkSemaphoreTypeCreateInfo timelineInfo{};
         timelineInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
@@ -28,7 +28,7 @@ namespace RHI
         semInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
         semInfo.pNext = &timelineInfo;
 
-        VK_CHECK(vkCreateSemaphore(m_Device->GetLogicalDevice(), &semInfo, nullptr, &m_TimelineSemaphore));
+        VK_CHECK(vkCreateSemaphore(m_Device.GetLogicalDevice(), &semInfo, nullptr, &m_TimelineSemaphore));
 
         // Default staging belt size: large enough for typical level-load bursts.
         // If this turns out too small, we can grow or add a slow-path.
@@ -41,14 +41,14 @@ namespace RHI
     TransferManager::~TransferManager()
     {
         // Wait for all pending transfers before destroying the pool
-        vkDeviceWaitIdle(m_Device->GetLogicalDevice());
+        vkDeviceWaitIdle(m_Device.GetLogicalDevice());
 
         // Clear batches (destroys staging buffers)
         m_InFlightBatches.clear();
 
         m_StagingBelt.reset();
 
-        vkDestroySemaphore(m_Device->GetLogicalDevice(), m_TimelineSemaphore, nullptr);
+        vkDestroySemaphore(m_Device.GetLogicalDevice(), m_TimelineSemaphore, nullptr);
     }
 
     VkCommandBuffer TransferManager::Begin()
@@ -62,7 +62,7 @@ namespace RHI
         allocInfo.commandPool = ctx.Pool;
 
         VkCommandBuffer cmd;
-        VK_CHECK(vkAllocateCommandBuffers(m_Device->GetLogicalDevice(), &allocInfo, &cmd));
+        VK_CHECK(vkAllocateCommandBuffers(m_Device.GetLogicalDevice(), &allocInfo, &cmd));
 
         VkCommandBufferBeginInfo beginInfo{};
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -101,7 +101,7 @@ namespace RHI
         submitInfo.pSignalSemaphores = &m_TimelineSemaphore;
 
         {
-            std::scoped_lock deviceLock(m_Device->GetQueueMutex());
+            std::scoped_lock deviceLock(m_Device.GetQueueMutex());
             std::lock_guard internalLock(m_Mutex);
 
             VK_CHECK(vkQueueSubmit(m_TransferQueue, 1, &submitInfo, VK_NULL_HANDLE));
@@ -125,7 +125,7 @@ namespace RHI
         if (!token.IsValid()) return true;
 
         uint64_t gpuValue = 0;
-        VK_CHECK(vkGetSemaphoreCounterValue(m_Device->GetLogicalDevice(), m_TimelineSemaphore, &gpuValue));
+        VK_CHECK(vkGetSemaphoreCounterValue(m_Device.GetLogicalDevice(), m_TimelineSemaphore, &gpuValue));
 
         return gpuValue >= token.Value;
     }
@@ -133,7 +133,7 @@ namespace RHI
     void TransferManager::GarbageCollect()
     {
         uint64_t gpuValue = 0;
-        VK_CHECK(vkGetSemaphoreCounterValue(m_Device->GetLogicalDevice(), m_TimelineSemaphore, &gpuValue));
+        VK_CHECK(vkGetSemaphoreCounterValue(m_Device.GetLogicalDevice(), m_TimelineSemaphore, &gpuValue));
 
         std::lock_guard lock(m_Mutex);
 
@@ -165,11 +165,11 @@ namespace RHI
         {
             VkCommandPoolCreateInfo poolInfo{};
             poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-            poolInfo.queueFamilyIndex = m_Device->GetQueueIndices().TransferFamily.value();
+            poolInfo.queueFamilyIndex = m_Device.GetQueueIndices().TransferFamily.value();
             poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-            VK_CHECK(vkCreateCommandPool(m_Device->GetLogicalDevice(), &poolInfo, nullptr, &ctx.Pool));
+            VK_CHECK(vkCreateCommandPool(m_Device.GetLogicalDevice(), &poolInfo, nullptr, &ctx.Pool));
 
-            m_Device->RegisterThreadLocalPool(ctx.Pool);
+            m_Device.RegisterThreadLocalPool(ctx.Pool);
         }
         return ctx;
     }

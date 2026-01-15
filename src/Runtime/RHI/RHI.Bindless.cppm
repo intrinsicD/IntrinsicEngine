@@ -2,7 +2,6 @@ module;
 #include "RHI.Vulkan.hpp"
 #include <vector>
 #include <queue>
-#include <memory>
 #include <mutex>
 
 export module RHI:Bindless;
@@ -13,10 +12,10 @@ import Core;
 
 export namespace RHI
 {
-    class BindlessDescriptorSystem : public std::enable_shared_from_this<BindlessDescriptorSystem>
+    class BindlessDescriptorSystem
     {
     public:
-        explicit BindlessDescriptorSystem(std::shared_ptr<VulkanDevice> device);
+        explicit BindlessDescriptorSystem(VulkanDevice& device);
 
         ~BindlessDescriptorSystem();
 
@@ -42,7 +41,7 @@ export namespace RHI
         std::vector<PendingDeletion> m_DeletionQueue;
         std::mutex m_DeletionMutex; // Need mutex as materials might die on any thread
 
-        std::shared_ptr<VulkanDevice> m_Device;
+        VulkanDevice& m_Device;
         VkDescriptorPool m_Pool = VK_NULL_HANDLE;
         VkDescriptorSetLayout m_Layout = VK_NULL_HANDLE;
         VkDescriptorSet m_GlobalSet = VK_NULL_HANDLE;

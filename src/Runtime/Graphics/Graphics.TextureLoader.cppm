@@ -11,7 +11,7 @@ import RHI;
 export namespace Graphics {
 
     struct TextureLoadResult {
-        std::shared_ptr<RHI::Texture> Resource;
+        std::unique_ptr<RHI::Texture> Resource;
         RHI::TransferToken Token;
     };
 
@@ -21,7 +21,7 @@ export namespace Graphics {
         [[nodiscard]]
         static std::expected<TextureLoadResult, AssetError> LoadAsync(
             const std::filesystem::path& filepath,
-            std::shared_ptr<RHI::VulkanDevice> device,
+            RHI::VulkanDevice& device,
             RHI::TransferManager& transferManager,
             bool isSRGB = true);
     };

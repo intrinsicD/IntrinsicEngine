@@ -98,7 +98,7 @@ namespace RHI
                              1, &barrier);
     }
 
-    Texture::Texture(std::shared_ptr<VulkanDevice> device, const std::string& filepath)
+    Texture::Texture(VulkanDevice& device, const std::string& filepath)
         : m_Device(device)
     {
         int w, h, c;
@@ -116,7 +116,7 @@ namespace RHI
         stbi_image_free(pixels);
     }
 
-    Texture::Texture(std::shared_ptr<VulkanDevice> device, const std::vector<uint8_t>& data, uint32_t width,
+    Texture::Texture(VulkanDevice& device, const std::vector<uint8_t>& data, uint32_t width,
                      uint32_t height) : m_Device(device)
     {
         if (data.size() != width * height * 4)
@@ -127,10 +127,10 @@ namespace RHI
         Upload(data.data(), width, height);
     }
 
-    Texture::Texture(std::shared_ptr<VulkanDevice> device, uint32_t width, uint32_t height, VkFormat format)
+    Texture::Texture(VulkanDevice& device, uint32_t width, uint32_t height, VkFormat format)
        : m_Device(device)
     {
-        auto indices = m_Device->GetQueueIndices();
+        auto indices = m_Device.GetQueueIndices();
         bool distinctQueues = false;
 
         // Defensive check to avoid bad_optional_access
@@ -141,7 +141,7 @@ namespace RHI
         VkSharingMode sharingMode = distinctQueues ? VK_SHARING_MODE_CONCURRENT : VK_SHARING_MODE_EXCLUSIVE;
 
         m_Image = std::make_unique<VulkanImage>(
-            device, width, height, 1, format,
+            m_Device, width, height, 1, format,
             VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
             VK_IMAGE_ASPECT_COLOR_BIT,
             sharingMode
@@ -154,10 +154,10 @@ namespace RHI
     {
         if (m_Sampler)
         {
-            VkDevice logicalDevice = m_Device->GetLogicalDevice();
+            VkDevice logicalDevice = m_Device.GetLogicalDevice();
             VkSampler sampler = m_Sampler;
 
-            m_Device->SafeDestroy([logicalDevice, sampler]()
+            m_Device.SafeDestroy([logicalDevice, sampler]()
             {
                 vkDestroySampler(logicalDevice, sampler, nullptr);
             });
@@ -177,7 +177,7 @@ namespace RHI
         samplerInfo.anisotropyEnable = VK_TRUE;
 
         VkPhysicalDeviceProperties properties{};
-        vkGetPhysicalDeviceProperties(m_Device->GetPhysicalDevice(), &properties);
+        vkGetPhysicalDeviceProperties(m_Device.GetPhysicalDevice(), &properties);
         samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
 
         samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
@@ -188,7 +188,7 @@ namespace RHI
         samplerInfo.minLod = 0.0f;
         samplerInfo.maxLod = static_cast<float>(m_Image->GetMipLevels());
 
-        if (vkCreateSampler(m_Device->GetLogicalDevice(), &samplerInfo, nullptr, &m_Sampler) != VK_SUCCESS)
+        if (vkCreateSampler(m_Device.GetLogicalDevice(), &samplerInfo, nullptr, &m_Sampler) != VK_SUCCESS)
         {
             Core::Log::Error("Failed to create texture sampler!");
         }
@@ -211,7 +211,7 @@ namespace RHI
         );
 
         // Use BeginSingleTimeCommands / EndSingleTimeCommands for explicit control
-        VkCommandBuffer cmd = CommandUtils::BeginSingleTimeCommands(*m_Device);
+        VkCommandBuffer cmd = CommandUtils::BeginSingleTimeCommands(m_Device);
 
         // 1. Transition Undefined -> Transfer Dst
         VkImageMemoryBarrier barrier{};
@@ -245,7 +245,7 @@ namespace RHI
                              VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
                              0, 0, nullptr, 0, nullptr, 1, &readBarrier);
 
-        CommandUtils::EndSingleTimeCommands(*m_Device, cmd);
+        CommandUtils::EndSingleTimeCommands(m_Device, cmd);
 
         CreateSampler();
     }

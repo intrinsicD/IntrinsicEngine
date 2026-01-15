@@ -8,39 +8,32 @@ import Core;
 
 namespace Graphics {
 
-    Material::Material(std::shared_ptr<RHI::VulkanDevice> device,
+    Material::Material(RHI::VulkanDevice& device,
                        RHI::BindlessDescriptorSystem& bindlessSystem,
                        Core::Assets::AssetHandle textureHandle,
-                       std::shared_ptr<RHI::Texture> defaultTexture,
+                       uint32_t defaultTextureIndex,
                        Core::Assets::AssetManager& assetManager)
-        : m_Device(device), m_BindlessSystem(bindlessSystem), m_CurrentTexture(defaultTexture)
+        : m_Device(device)
+        , m_BindlessSystem(bindlessSystem)
+        , m_TextureHandle(textureHandle)
+        , m_TextureIndex(defaultTextureIndex)
     {
-        if (!m_CurrentTexture)
-        {
-            Core::Log::Error("Material initialized with null default texture!");
-        }
-        else if (m_CurrentTexture->GetView() == VK_NULL_HANDLE)
-        {
-            Core::Log::Error("Material initialized with default texture having NULL view!");
-        }
-
-        // Register default texture immediately
-        m_TextureIndex = m_BindlessSystem.RegisterTexture(*m_CurrentTexture);
-
+        // Keep a stable bindless slot index for the lifetime of this material.
+        // We only update the slot contents when the texture asset becomes ready/reloads.
         assetManager.Listen(textureHandle, [this, &assetManager](Core::Assets::AssetHandle handle)
         {
-            auto textureResult = assetManager.Get<RHI::Texture>(handle);
-            if (textureResult.has_value())
+            // Hot-path safe: no shared_ptr copies; just a pointer lookup.
+            if (auto* tex = assetManager.TryGet<RHI::Texture>(handle))
             {
-                m_CurrentTexture = *textureResult;
-                // Update the existing slot! No new descriptor set needed.
-                m_BindlessSystem.UpdateTexture(m_TextureIndex, *m_CurrentTexture);
+                m_BindlessSystem.UpdateTexture(m_TextureIndex, *tex);
             }
         });
     }
 
-    Material::~Material() {
-        // Optional: Release slot if we want to recycle indices
+    Material::~Material()
+    {
+        // NOTE: this does not destroy the texture; it only releases the bindless slot.
+        // Slot recycling is deferred inside BindlessDescriptorSystem via SafeDestroy().
         m_BindlessSystem.UnregisterTexture(m_TextureIndex);
     }
 }

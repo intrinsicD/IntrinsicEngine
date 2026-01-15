@@ -10,7 +10,7 @@ import :Bindless;
 
 namespace RHI
 {
-    BindlessDescriptorSystem::BindlessDescriptorSystem(std::shared_ptr<VulkanDevice> device)
+    BindlessDescriptorSystem::BindlessDescriptorSystem(VulkanDevice& device)
         : m_Device(device)
     {
         CreateLayout();
@@ -19,8 +19,8 @@ namespace RHI
 
     BindlessDescriptorSystem::~BindlessDescriptorSystem()
     {
-        vkDestroyDescriptorPool(m_Device->GetLogicalDevice(), m_Pool, nullptr);
-        vkDestroyDescriptorSetLayout(m_Device->GetLogicalDevice(), m_Layout, nullptr);
+        vkDestroyDescriptorPool(m_Device.GetLogicalDevice(), m_Pool, nullptr);
+        vkDestroyDescriptorSetLayout(m_Device.GetLogicalDevice(), m_Layout, nullptr);
     }
 
     void BindlessDescriptorSystem::CreateLayout()
@@ -36,7 +36,7 @@ namespace RHI
             std::abort();
         }
 
-        vkGetPhysicalDeviceProperties2(m_Device->GetPhysicalDevice(), &props2);
+        vkGetPhysicalDeviceProperties2(m_Device.GetPhysicalDevice(), &props2);
 
         uint32_t hwLimit = indexingProps.maxDescriptorSetUpdateAfterBindSampledImages;
 
@@ -79,7 +79,7 @@ namespace RHI
         layoutInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
         layoutInfo.pNext = &bindingFlags;
 
-        VK_CHECK(vkCreateDescriptorSetLayout(m_Device->GetLogicalDevice(), &layoutInfo, nullptr, &m_Layout));
+        VK_CHECK(vkCreateDescriptorSetLayout(m_Device.GetLogicalDevice(), &layoutInfo, nullptr, &m_Layout));
     }
 
     void BindlessDescriptorSystem::CreatePoolAndSet()
@@ -95,7 +95,7 @@ namespace RHI
         poolInfo.pPoolSizes = &poolSize;
         poolInfo.maxSets = 1;
 
-        VK_CHECK(vkCreateDescriptorPool(m_Device->GetLogicalDevice(), &poolInfo, nullptr, &m_Pool));
+        VK_CHECK(vkCreateDescriptorPool(m_Device.GetLogicalDevice(), &poolInfo, nullptr, &m_Pool));
 
         VkDescriptorSetAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -103,7 +103,7 @@ namespace RHI
         allocInfo.descriptorSetCount = 1;
         allocInfo.pSetLayouts = &m_Layout;
 
-        VK_CHECK(vkAllocateDescriptorSets(m_Device->GetLogicalDevice(), &allocInfo, &m_GlobalSet));
+        VK_CHECK(vkAllocateDescriptorSets(m_Device.GetLogicalDevice(), &allocInfo, &m_GlobalSet));
     }
 
     uint32_t BindlessDescriptorSystem::RegisterTexture(const Texture& texture)
@@ -147,18 +147,17 @@ namespace RHI
         descriptorWrite.descriptorCount = 1;
         descriptorWrite.pImageInfo = &imageInfo;
 
-        vkUpdateDescriptorSets(m_Device->GetLogicalDevice(), 1, &descriptorWrite, 0, nullptr);
+        vkUpdateDescriptorSets(m_Device.GetLogicalDevice(), 1, &descriptorWrite, 0, nullptr);
     }
 
     void BindlessDescriptorSystem::UnregisterTexture(uint32_t index)
     {
-        m_Device->SafeDestroy([weak = weak_from_this(), index]()
+        // NOTE: SafeDestroy enqueues this functor to execute later on the device's deletion queue.
+        // This is safe because Engine destroys subsidiary systems (materials/bindless) before the device.
+        m_Device.SafeDestroy([this, index]()
         {
-            if (auto self = weak.lock())
-            {
-                std::lock_guard lock(self->m_Mutex);
-                self->m_FreeSlots.push(index);
-            }
+            std::lock_guard lock(m_Mutex);
+            m_FreeSlots.push(index);
         });
     }
 }

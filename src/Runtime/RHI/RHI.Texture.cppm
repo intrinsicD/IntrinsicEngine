@@ -1,8 +1,8 @@
 module;
 #include "RHI.Vulkan.hpp"
 #include <string>
-#include <memory>
 #include <vector>
+#include <memory>
 
 export module RHI:Texture;
 
@@ -14,10 +14,10 @@ export namespace RHI
     class Texture
     {
     public:
-        Texture(std::shared_ptr<VulkanDevice> device, const std::string& filepath);
-        Texture(std::shared_ptr<VulkanDevice> device, const std::vector<uint8_t>& data, uint32_t width,
+        Texture(VulkanDevice& device, const std::string& filepath);
+        Texture(VulkanDevice& device, const std::vector<uint8_t>& data, uint32_t width,
                 uint32_t height);
-        Texture(std::shared_ptr<VulkanDevice> device, uint32_t width, uint32_t height, VkFormat format);
+        Texture(VulkanDevice& device, uint32_t width, uint32_t height, VkFormat format);
         ~Texture();
 
         [[nodiscard]] VkImage GetImage() const { return m_Image->GetHandle(); }
@@ -25,7 +25,7 @@ export namespace RHI
         [[nodiscard]] VkSampler GetSampler() const { return m_Sampler; }
 
     private:
-        std::shared_ptr<VulkanDevice> m_Device;
+        VulkanDevice& m_Device;
         std::unique_ptr<VulkanImage> m_Image;
         VkSampler m_Sampler = VK_NULL_HANDLE;
 

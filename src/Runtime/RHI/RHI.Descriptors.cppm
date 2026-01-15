@@ -1,6 +1,5 @@
 module;
 #include "RHI.Vulkan.hpp"
-#include <memory>
 #include <vector>
 
 export module RHI:Descriptors;
@@ -12,14 +11,14 @@ export namespace RHI
     class DescriptorLayout
     {
     public:
-        DescriptorLayout(std::shared_ptr<VulkanDevice> device);
+        DescriptorLayout(VulkanDevice& device);
         ~DescriptorLayout();
 
         [[nodiscard]] VkDescriptorSetLayout GetHandle() const { return m_Layout; }
         [[nodiscard]] bool IsValid() const { return m_IsValid; }
 
     private:
-        std::shared_ptr<VulkanDevice> m_Device;
+        VulkanDevice& m_Device;
         bool m_IsValid = true;
         VkDescriptorSetLayout m_Layout = VK_NULL_HANDLE;
     };
@@ -29,7 +28,7 @@ export namespace RHI
     class DescriptorAllocator
     {
     public:
-        explicit DescriptorAllocator(std::shared_ptr<VulkanDevice> device);
+        explicit DescriptorAllocator(VulkanDevice& device);
         ~DescriptorAllocator();
 
         // Allocate a single set using the given layout.
@@ -44,7 +43,7 @@ export namespace RHI
     private:
         [[nodiscard]] VkDescriptorPool GrabPool();
 
-        std::shared_ptr<VulkanDevice> m_Device;
+        VulkanDevice& m_Device;
         bool m_IsValid = true;
 
         VkDescriptorPool m_CurrentPool = VK_NULL_HANDLE;

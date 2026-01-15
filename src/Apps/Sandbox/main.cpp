@@ -54,10 +54,10 @@ public:
         m_Scene.GetRegistry().emplace<Graphics::OrbitControlComponent>(m_CameraEntity);
 
         auto textureLoader = [this](const std::filesystem::path& path, Core::Assets::AssetHandle handle)
-            -> std::shared_ptr<RHI::Texture>
+            -> std::unique_ptr<RHI::Texture>
         {
             // Delegate complex logic to the subsystem
-            auto result = Graphics::TextureLoader::LoadAsync(path, GetDevice(), *m_TransferManager);
+            auto result = Graphics::TextureLoader::LoadAsync(path, *GetDevice(), *m_TransferManager);
 
             if (result)
             {
@@ -68,7 +68,7 @@ public:
                 m_AssetManager.MoveToProcessing(handle);
 
                 // 3. Return the resource (even though it's not ready yet, it's valid memory)
-                return result->Resource;
+                return std::move(result->Resource);
             }
 
             Log::Warn("Texture load failed: {} ({})", path.string(), Graphics::AssetErrorToString(result.error()));
@@ -78,25 +78,25 @@ public:
                                                           textureLoader);
 
         auto modelLoader = [&](const std::string& path, Assets::AssetHandle handle)
-            -> std::shared_ptr<Graphics::Model>
-        {
-            auto result = Graphics::ModelLoader::LoadAsync(GetDevice(), *m_TransferManager, m_GeometryStorage, path);
+            -> std::unique_ptr<Graphics::Model>
+         {
+             auto result = Graphics::ModelLoader::LoadAsync(GetDevice(), *m_TransferManager, m_GeometryStorage, path);
 
-            if (result)
-            {
-                // 1. Notify Engine to track the GPU work
-                RegisterAssetLoad(handle, result->Token);
+             if (result)
+             {
+                 // 1. Notify Engine to track the GPU work
+                 RegisterAssetLoad(handle, result->Token);
 
-                // 2. Notify AssetManager to wait
-                m_AssetManager.MoveToProcessing(handle);
+                 // 2. Notify AssetManager to wait
+                 m_AssetManager.MoveToProcessing(handle);
 
-                // 3. Return the model (valid CPU pointers, GPU buffers are allocated but content is uploading)
-                return result->ModelData;
-            }
+                 // 3. Return the model (valid CPU pointers, GPU buffers are allocated but content is uploading)
+                return std::move(result->ModelData);
+             }
 
-            Log::Warn("Model load failed: {} ({})", path, Graphics::AssetErrorToString(result.error()));
-            return nullptr; // Failed
-        };
+             Log::Warn("Model load failed: {} ({})", path, Graphics::AssetErrorToString(result.error()));
+             return nullptr; // Failed
+         };
 
         m_DuckModel = m_AssetManager.Load<Graphics::Model>(
             Filesystem::GetAssetPath("models/Duck.glb"),
@@ -105,16 +105,17 @@ public:
 
 
         // 3. Setup Material (Assuming texture loads synchronously or is handled)
-        auto DuckMaterial = std::make_shared<Graphics::Material>(
-            GetDevice(),
+        auto DuckMaterial = std::make_unique<Graphics::Material>(
+            *GetDevice(),
             *m_BindlessSystem,
             m_DuckTexture,
-            m_DefaultTexture,
+            m_DefaultTextureIndex,
             m_AssetManager
         );
 
-        m_LoadedMaterials.push_back(DuckMaterial);
-        m_DuckMaterialHandle = m_AssetManager.Create("DuckMaterial", DuckMaterial);
+         // Track handle only; AssetManager owns the actual Material object.
+         m_DuckMaterialHandle = m_AssetManager.Create("DuckMaterial", std::move(DuckMaterial));
+        m_LoadedMaterials.push_back(m_DuckMaterialHandle);
 
         Log::Info("Asset Load Requested. Waiting for background thread...");
 
@@ -182,7 +183,7 @@ public:
                     m_IsEntitySpawned = true; // Don't retry
                     return;
                 }
-                auto model = *modelResult;
+                const auto& model = *modelResult;
 
                 for (const auto& meshSegment : model->Meshes)
                 {
@@ -285,7 +286,7 @@ public:
         }
 
         // Context Menu for creating new entities
-        if (ImGui::BeginPopupContextWindow(0, 1))
+        if (ImGui::BeginPopupContextWindow(nullptr, 1))
         {
             if (ImGui::MenuItem("Create Empty Entity"))
             {

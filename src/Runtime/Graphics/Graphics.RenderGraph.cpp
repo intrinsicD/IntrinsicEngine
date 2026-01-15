@@ -301,7 +301,7 @@ namespace Graphics
             }
         }
 
-        auto img = std::make_unique<RHI::VulkanImage>(m_Device, node.Extent.width, node.Extent.height, 1, node.Format,
+        auto img = std::make_unique<RHI::VulkanImage>(*m_Device, node.Extent.width, node.Extent.height, 1, node.Format,
                                                       node.Usage, node.Aspect);
         auto* ptr = img.get();
         PooledImage pooled{std::move(img), frameIndex};
@@ -343,7 +343,7 @@ namespace Graphics
             }
         }
 
-        auto buf = std::make_unique<RHI::VulkanBuffer>(m_Device, node.BufferSize, node.BufferUsage,
+        auto buf = std::make_unique<RHI::VulkanBuffer>(*m_Device, node.BufferSize, node.BufferUsage,
                                                        VMA_MEMORY_USAGE_GPU_ONLY);
         auto* ptr = buf.get();
         PooledBuffer pooled{std::move(buf), frameIndex};

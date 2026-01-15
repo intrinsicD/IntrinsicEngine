@@ -6,11 +6,26 @@ add_executable(${target_name}
         Test_CoreMemory.cpp
         Test_CoreTasks.cpp
         Test_CoreAssets.cpp
+        Test_CoreAssets_Lease.cpp
+        Test_CoreAssets_ReloadLease.cpp
+        Test_CoreAssets_UniquePtrLoader.cpp
+        Test_CoreAssets_UniquePtrMaterial.cpp
+        Test_GraphicsModelLoader_UniquePtr.cpp
+        Test_GraphicsMaterial_DeviceRef.cpp
+        Test_RHIBindless_DeviceRef.cpp
+        Test_RHITexture_DeviceRef.cpp
+        Test_RHIBuffer_DeviceRef.cpp
+        Test_RHIImage_DeviceRef.cpp
+        Test_RHIShader_DeviceRef.cpp
+        Test_RHIDescriptors_DeviceRef.cpp
+        Test_RHITransfer_DeviceRef.cpp
+        Test_RHIStagingBelt_DeviceRef.cpp
         Test_CoreHandle.cpp
         Test_CoreHash.cpp
         Test_BoundedHeap.cpp
         Test_ECS.cpp
         Test_GraphicsGeometry.cpp
+        Test_GraphicsMaterial_BindlessIndex.cpp
         Test_GraphicsModelLoader_PLY.cpp
         Test_GraphicsModelLoader_PLY_TriStrips.cpp
         Test_GraphicsModelLoader_PLY_VCGLIB.cpp

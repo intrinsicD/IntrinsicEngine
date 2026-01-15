@@ -1,7 +1,6 @@
 module;
 #include "RHI.Vulkan.hpp"
 #include <vector>
-#include <memory>
 
 module RHI:Descriptors.Impl;
 import :Descriptors;
@@ -10,7 +9,7 @@ import Core;
 namespace RHI {
 
     // --- Descriptor Layout ---
-    DescriptorLayout::DescriptorLayout(std::shared_ptr<VulkanDevice> device) : m_Device(device) {
+    DescriptorLayout::DescriptorLayout(VulkanDevice& device) : m_Device(device) {
         VkDescriptorSetLayoutBinding uboBinding{};
         uboBinding.binding = 0;
         uboBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
@@ -22,35 +21,31 @@ namespace RHI {
         layoutInfo.bindingCount = 1;
         layoutInfo.pBindings = &uboBinding;
 
-        if (vkCreateDescriptorSetLayout(m_Device->GetLogicalDevice(), &layoutInfo, nullptr, &m_Layout) != VK_SUCCESS) {
+        if (vkCreateDescriptorSetLayout(m_Device.GetLogicalDevice(), &layoutInfo, nullptr, &m_Layout) != VK_SUCCESS) {
             Core::Log::Error("Failed to create descriptor set layout!");
             m_IsValid = false;
         }
     }
 
     DescriptorLayout::~DescriptorLayout() {
-        vkDestroyDescriptorSetLayout(m_Device->GetLogicalDevice(), m_Layout, nullptr);
+        if (m_Layout == VK_NULL_HANDLE) return;
+        VkDevice logicalDevice = m_Device.GetLogicalDevice();
+        VkDescriptorSetLayout layout = m_Layout;
+
+        m_Device.SafeDestroy([logicalDevice, layout]()
+        {
+            vkDestroyDescriptorSetLayout(logicalDevice, layout, nullptr);
+        });
     }
 
     // --- Descriptor Allocator (growing pools) ---
-    DescriptorAllocator::DescriptorAllocator(std::shared_ptr<VulkanDevice> device)
-        : m_Device(std::move(device))
-    {
-        if (!m_Device)
-        {
-            Core::Log::Error("DescriptorAllocator: device is null");
-            m_IsValid = false;
-        }
-    }
+    DescriptorAllocator::DescriptorAllocator(VulkanDevice& device)
+        : m_Device(device)
+    {}
 
     DescriptorAllocator::~DescriptorAllocator()
     {
-        if (!m_Device)
-        {
-            return;
-        }
-
-        const VkDevice logicalDevice = m_Device->GetLogicalDevice();
+        const VkDevice logicalDevice = m_Device.GetLogicalDevice();
 
         // NOTE: m_CurrentPool is also stored in m_UsedPools when active.
         // Destroy pools exactly once to avoid validation errors.
@@ -70,11 +65,6 @@ namespace RHI {
 
     VkDescriptorPool DescriptorAllocator::GrabPool()
     {
-        if (!m_Device)
-        {
-            return VK_NULL_HANDLE;
-        }
-
         if (!m_FreePools.empty())
         {
             VkDescriptorPool pool = m_FreePools.back();
@@ -104,7 +94,7 @@ namespace RHI {
         poolInfo.pPoolSizes = sizes;
 
         VkDescriptorPool pool = VK_NULL_HANDLE;
-        const VkResult res = vkCreateDescriptorPool(m_Device->GetLogicalDevice(), &poolInfo, nullptr, &pool);
+        const VkResult res = vkCreateDescriptorPool(m_Device.GetLogicalDevice(), &poolInfo, nullptr, &pool);
         if (res != VK_SUCCESS)
         {
             Core::Log::Error("DescriptorAllocator: vkCreateDescriptorPool failed ({})", static_cast<int>(res));
@@ -117,7 +107,7 @@ namespace RHI {
 
     VkDescriptorSet DescriptorAllocator::Allocate(VkDescriptorSetLayout layout)
     {
-        if (!m_Device || !m_IsValid)
+        if (!m_IsValid)
         {
             return VK_NULL_HANDLE;
         }
@@ -145,7 +135,7 @@ namespace RHI {
         allocInfo.pSetLayouts = &layout;
 
         VkDescriptorSet set = VK_NULL_HANDLE;
-        VkResult result = vkAllocateDescriptorSets(m_Device->GetLogicalDevice(), &allocInfo, &set);
+        VkResult result = vkAllocateDescriptorSets(m_Device.GetLogicalDevice(), &allocInfo, &set);
 
         // Pool exhausted/fragmented: rotate to a new pool and retry.
         if (result == VK_ERROR_OUT_OF_POOL_MEMORY || result == VK_ERROR_FRAGMENTED_POOL)
@@ -159,7 +149,7 @@ namespace RHI {
 
             allocInfo.descriptorPool = m_CurrentPool;
             set = VK_NULL_HANDLE;
-            result = vkAllocateDescriptorSets(m_Device->GetLogicalDevice(), &allocInfo, &set);
+            result = vkAllocateDescriptorSets(m_Device.GetLogicalDevice(), &allocInfo, &set);
         }
 
         if (result != VK_SUCCESS)
@@ -173,20 +163,16 @@ namespace RHI {
 
     void DescriptorAllocator::Reset()
     {
-        if (!m_Device)
-        {
-            return;
-        }
 
-        const VkDevice logicalDevice = m_Device->GetLogicalDevice();
+         const VkDevice logicalDevice = m_Device.GetLogicalDevice();
 
-        for (VkDescriptorPool p : m_UsedPools)
-        {
-            vkResetDescriptorPool(logicalDevice, p, 0);
-            m_FreePools.push_back(p);
-        }
+         for (VkDescriptorPool p : m_UsedPools)
+         {
+             vkResetDescriptorPool(logicalDevice, p, 0);
+             m_FreePools.push_back(p);
+         }
 
-        m_UsedPools.clear();
-        m_CurrentPool = VK_NULL_HANDLE;
-    }
+         m_UsedPools.clear();
+         m_CurrentPool = VK_NULL_HANDLE;
+     }
 }

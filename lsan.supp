@@ -5,3 +5,8 @@ leak:libGLX_nvidia
 leak:libnvidia-glcore
 leak:Unknown Module
 leak:libvulkan_virtio
+
+# Some Vulkan ICD / loader paths show up as <unknown module> allocations.
+# Suppress by common allocator frames as a last resort to keep CI green.
+leak:__pthread_once_slow
+leak:pthread_once

@@ -63,7 +63,7 @@ namespace Graphics
 
         // Create the UBO once here
         m_GlobalUBO = std::make_unique<RHI::VulkanBuffer>(
-            device,
+            *device,
             alignedSize * renderer.GetFramesInFlight(),
             VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
             VMA_MEMORY_USAGE_CPU_TO_GPU
@@ -187,7 +187,7 @@ namespace Graphics
                                                            VkFormat depthFormat = RHI::VulkanImage::FindDepthFormat(
                                                                *m_Device);
                                                            depthImg = std::make_unique<RHI::VulkanImage>(
-                                                               m_Device, extent.width, extent.height, 1,
+                                                               *m_Device, extent.width, extent.height, 1,
                                                                depthFormat,
                                                                VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT |
                                                                VK_IMAGE_USAGE_SAMPLED_BIT,

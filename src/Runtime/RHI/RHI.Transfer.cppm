@@ -1,9 +1,9 @@
 module;
-#include <cstdint>
-#include <memory>
+
 #include <vector>
 #include <atomic>
 #include <mutex>
+#include <memory>
 #include "RHI.Vulkan.hpp" // Implementation detail, kept in module fragment if possible, but needed for class members
 
 export module RHI:Transfer;
@@ -24,7 +24,7 @@ export namespace RHI {
     // 2. The Manager
     class TransferManager {
     public:
-        explicit TransferManager(std::shared_ptr<VulkanDevice> device);
+        explicit TransferManager(VulkanDevice& device);
         ~TransferManager();
 
         // Returns a command buffer in the "Recording" state.
@@ -65,7 +65,7 @@ export namespace RHI {
 
         ThreadTransferContext& GetThreadContext();
 
-        std::shared_ptr<VulkanDevice> m_Device;
+        VulkanDevice& m_Device;
         VkQueue m_TransferQueue = VK_NULL_HANDLE;
         VkSemaphore m_TimelineSemaphore = VK_NULL_HANDLE;
 

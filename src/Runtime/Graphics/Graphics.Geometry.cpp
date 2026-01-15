@@ -74,7 +74,7 @@ namespace Graphics
             else
             {
                 // Slow path fallback: dedicated staging allocation
-                auto staging = std::make_unique<RHI::VulkanBuffer>(device, totalVertexSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
+                auto staging = std::make_unique<RHI::VulkanBuffer>(*device, totalVertexSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
                 uint8_t* ptr = static_cast<uint8_t*>(staging->Map());
 
                 if (!data.Positions.empty()) memcpy(ptr + result->m_Layout.PositionsOffset, data.Positions.data(), posSize);
@@ -89,7 +89,7 @@ namespace Graphics
             }
 
             result->m_VertexBuffer = std::make_unique<RHI::VulkanBuffer>(
-                device, totalVertexSize,
+                *device, totalVertexSize,
                 VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
                 VMA_MEMORY_USAGE_GPU_ONLY
             );
@@ -116,7 +116,7 @@ namespace Graphics
             }
             else
             {
-                auto iStaging = std::make_unique<RHI::VulkanBuffer>(device, idxSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
+                auto iStaging = std::make_unique<RHI::VulkanBuffer>(*device, idxSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
                 memcpy(iStaging->Map(), data.Indices.data(), idxSize);
                 iStaging->Unmap();
 
@@ -126,7 +126,7 @@ namespace Graphics
             }
 
             result->m_IndexBuffer = std::make_unique<RHI::VulkanBuffer>(
-                device, idxSize,
+                *device, idxSize,
                 VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
                 VMA_MEMORY_USAGE_GPU_ONLY
             );

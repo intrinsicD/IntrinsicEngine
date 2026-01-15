@@ -1,6 +1,5 @@
 module;
 #include <cstring>
-#include <memory>
 #include "RHI.Vulkan.hpp"
 
 export module RHI:Buffer;
@@ -12,7 +11,7 @@ export namespace RHI {
     public:
         // usage: VertexBuffer, IndexBuffer, TransferSrc, etc.
         // properties: DeviceLocal (GPU only) or HostVisible (CPU writable)
-        VulkanBuffer(std::shared_ptr<VulkanDevice> device, size_t size, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
+        VulkanBuffer(VulkanDevice& device, size_t size, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
         ~VulkanBuffer();
 
         // Disable copy
@@ -38,7 +37,7 @@ export namespace RHI {
         }
 
     private:
-        std::shared_ptr<VulkanDevice> m_Device;
+        VulkanDevice& m_Device;
         VkBuffer m_Buffer = VK_NULL_HANDLE;
         VmaAllocation m_Allocation = VK_NULL_HANDLE;
 

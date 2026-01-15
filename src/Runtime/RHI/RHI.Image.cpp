@@ -1,7 +1,6 @@
 module;
 #include "RHI.Vulkan.hpp"
 #include <vector>
-#include <memory>
 #include <optional>
 
 module RHI:Image.Impl;
@@ -10,7 +9,7 @@ import Core;
 
 namespace RHI
 {
-    VulkanImage::VulkanImage(std::shared_ptr<VulkanDevice> device, uint32_t width, uint32_t height, uint32_t mipLevels, VkFormat format,
+    VulkanImage::VulkanImage(VulkanDevice& device, uint32_t width, uint32_t height, uint32_t mipLevels, VkFormat format,
                              VkImageUsageFlags usage, VkImageAspectFlags aspect, VkSharingMode sharingMode)
         : m_Device(device), m_Format(format), m_MipLevels(mipLevels), m_Width(width), m_Height(height)
     {
@@ -32,14 +31,20 @@ namespace RHI
 
         std::vector<uint32_t> queueIndices;
         if (sharingMode == VK_SHARING_MODE_CONCURRENT) {
-            auto indices = m_Device->GetQueueIndices();
+            auto indices = m_Device.GetQueueIndices();
             if (indices.GraphicsFamily.has_value())
             {
                 queueIndices.push_back(indices.GraphicsFamily.value());
             }
             // Avoid duplicate if transfer == graphics
-            if (indices.TransferFamily.has_value() && indices.TransferFamily != indices.GraphicsFamily) {
-                queueIndices.push_back(indices.TransferFamily.value());
+            if (indices.TransferFamily.has_value())
+            {
+                const bool isDistinct = !indices.GraphicsFamily.has_value() ||
+                    (indices.TransferFamily.value() != indices.GraphicsFamily.value());
+                if (isDistinct)
+                {
+                    queueIndices.push_back(indices.TransferFamily.value());
+                }
             }
             imageInfo.queueFamilyIndexCount = static_cast<uint32_t>(queueIndices.size());
             imageInfo.pQueueFamilyIndices = queueIndices.data();
@@ -49,7 +54,7 @@ namespace RHI
         allocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
         allocInfo.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 
-        if (vmaCreateImage(device->GetAllocator(), &imageInfo, &allocInfo, &m_Image, &m_Allocation, nullptr) !=
+        if (vmaCreateImage(device.GetAllocator(), &imageInfo, &allocInfo, &m_Image, &m_Allocation, nullptr) !=
             VK_SUCCESS)
         {
             Core::Log::Error("Failed to create image!");
@@ -69,7 +74,7 @@ namespace RHI
         viewInfo.subresourceRange.baseArrayLayer = 0;
         viewInfo.subresourceRange.layerCount = 1;
 
-        if (vkCreateImageView(device->GetLogicalDevice(), &viewInfo, nullptr, &m_ImageView) != VK_SUCCESS)
+        if (vkCreateImageView(device.GetLogicalDevice(), &viewInfo, nullptr, &m_ImageView) != VK_SUCCESS)
         {
             Core::Log::Error("Failed to create image view!");
             m_IsValid = false;
@@ -79,13 +84,13 @@ namespace RHI
 
     VulkanImage::~VulkanImage()
     {
-        VkDevice logicalDevice = m_Device->GetLogicalDevice();
-        VmaAllocator allocator = m_Device->GetAllocator();
+        VkDevice logicalDevice = m_Device.GetLogicalDevice();
+        VmaAllocator allocator = m_Device.GetAllocator();
 
         if (m_ImageView)
         {
             VkImageView view = m_ImageView;
-            m_Device->SafeDestroy([logicalDevice, view]()
+            m_Device.SafeDestroy([logicalDevice, view]()
             {
                 vkDestroyImageView(logicalDevice, view, nullptr);
             });
@@ -95,7 +100,7 @@ namespace RHI
         {
             VkImage image = m_Image;
             VmaAllocation allocation = m_Allocation;
-            m_Device->SafeDestroy([allocator, image, allocation]()
+            m_Device.SafeDestroy([allocator, image, allocation]()
             {
                 vmaDestroyImage(allocator, image, allocation);
             });

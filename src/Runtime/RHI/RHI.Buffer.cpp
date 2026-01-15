@@ -11,7 +11,7 @@ import Core;
 
 namespace RHI {
 
-    VulkanBuffer::VulkanBuffer(std::shared_ptr<VulkanDevice> device, size_t size, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage)
+    VulkanBuffer::VulkanBuffer(VulkanDevice& device, size_t size, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage)
         : m_Device(device)
     {
         VkBufferCreateInfo bufferInfo{};
@@ -29,7 +29,7 @@ namespace RHI {
 
         VmaAllocationInfo resultInfo{};
 
-        if (vmaCreateBuffer(device->GetAllocator(), &bufferInfo, &allocInfo, &m_Buffer, &m_Allocation, &resultInfo) != VK_SUCCESS) {
+        if (vmaCreateBuffer(device.GetAllocator(), &bufferInfo, &allocInfo, &m_Buffer, &m_Allocation, &resultInfo) != VK_SUCCESS) {
             Core::Log::Error("Failed to create buffer!");
             return;
         }
@@ -41,19 +41,19 @@ namespace RHI {
     }
 
     VulkanBuffer::~VulkanBuffer() {
-        if (m_Buffer && m_Device) {
-            VkBuffer buffer = m_Buffer;
-            VmaAllocation allocation = m_Allocation;
-            VmaAllocator allocator = m_Device->GetAllocator();
+        if (!m_Buffer) return;
 
-            m_Device->SafeDestroy([allocator, buffer, allocation]() {
-                vmaDestroyBuffer(allocator, buffer, allocation);
-            });
-        }
+        VkBuffer buffer = m_Buffer;
+        VmaAllocation allocation = m_Allocation;
+        VmaAllocator allocator = m_Device.GetAllocator();
+
+        m_Device.SafeDestroy([allocator, buffer, allocation]() {
+            vmaDestroyBuffer(allocator, buffer, allocation);
+        });
     }
 
     VulkanBuffer::VulkanBuffer(VulkanBuffer&& other) noexcept
-        : m_Device(std::move(other.m_Device))
+        : m_Device(other.m_Device)
         , m_Buffer(std::exchange(other.m_Buffer, VK_NULL_HANDLE))
         , m_Allocation(std::exchange(other.m_Allocation, VK_NULL_HANDLE))
         , m_MappedData(std::exchange(other.m_MappedData, nullptr))
@@ -64,17 +64,16 @@ namespace RHI {
     VulkanBuffer& VulkanBuffer::operator=(VulkanBuffer&& other) noexcept {
         if (this != &other) {
             // Destroy current resources if any
-            if (m_Buffer && m_Device) {
+            if (m_Buffer) {
                 VkBuffer buffer = m_Buffer;
                 VmaAllocation allocation = m_Allocation;
-                VmaAllocator allocator = m_Device->GetAllocator();
-                m_Device->SafeDestroy([allocator, buffer, allocation]() {
+                VmaAllocator allocator = m_Device.GetAllocator();
+                m_Device.SafeDestroy([allocator, buffer, allocation]() {
                     vmaDestroyBuffer(allocator, buffer, allocation);
                 });
             }
 
             // Move from other
-            m_Device = std::move(other.m_Device);
             m_Buffer = std::exchange(other.m_Buffer, VK_NULL_HANDLE);
             m_Allocation = std::exchange(other.m_Allocation, VK_NULL_HANDLE);
             m_MappedData = std::exchange(other.m_MappedData, nullptr);
@@ -88,7 +87,7 @@ namespace RHI {
             return m_MappedData;
         }
 
-        vmaMapMemory(m_Device->GetAllocator(), m_Allocation, &m_MappedData);
+        vmaMapMemory(m_Device.GetAllocator(), m_Allocation, &m_MappedData);
         return m_MappedData;
     }
 
@@ -96,7 +95,7 @@ namespace RHI {
         if (m_IsPersistent) return;
 
         if (m_MappedData) {
-            vmaUnmapMemory(m_Device->GetAllocator(), m_Allocation);
+            vmaUnmapMemory(m_Device.GetAllocator(), m_Allocation);
             m_MappedData = nullptr;
         }
     }

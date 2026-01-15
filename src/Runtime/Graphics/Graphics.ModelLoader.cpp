@@ -1602,7 +1602,7 @@ namespace Graphics
         std::string ext = std::filesystem::path(fullPath).extension().string();
         for (auto& ch : ext) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
 
-        auto model = std::make_shared<Model>(geometryStorage, device);
+        auto model = std::make_unique<Model>(geometryStorage, device);
         std::vector<GeometryCpuData> cpuMeshes;
         bool success = false;
 
@@ -1720,7 +1720,7 @@ namespace Graphics
             }
 
             Core::Log::Info("Loaded {} ({} submeshes)", filepath, model->Size());
-            return ModelLoadResult{ model, latestToken };
+            return ModelLoadResult{ std::move(model), latestToken };
         }
 
         return std::unexpected(AssetError::InvalidData);

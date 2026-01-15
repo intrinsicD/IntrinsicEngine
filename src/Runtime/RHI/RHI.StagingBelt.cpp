@@ -28,8 +28,8 @@ namespace RHI
         return rem == 0 ? value : (value + (alignment - rem));
     }
 
-    StagingBelt::StagingBelt(std::shared_ptr<VulkanDevice> device, size_t capacityBytes)
-        : m_Device(std::move(device))
+    StagingBelt::StagingBelt(VulkanDevice& device, size_t capacityBytes)
+        : m_Device(device)
         , m_Capacity(capacityBytes)
     {
         // We want persistent mapped, sequential write.

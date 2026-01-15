@@ -18,7 +18,7 @@ namespace Core::Tasks
     // Sized for two cache lines (128 bytes total) to accommodate lambdas with moderate captures.
     // Layout: 120 bytes storage + 8 bytes vtable pointer = 128 bytes.
     // Trade-off: Larger tasks reduce cache efficiency but allow more flexible captures.
-    class LocalTask
+    export class LocalTask
     {
         static constexpr size_t STORAGE_SIZE = 120; // 128 total - sizeof(Concept*)
 

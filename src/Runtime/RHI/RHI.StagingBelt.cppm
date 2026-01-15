@@ -1,10 +1,8 @@
 module;
-#include <cstddef>
-#include <cstdint>
-#include <memory>
+
 #include <deque>
 #include <mutex>
-#include <utility>
+#include <memory>
 #include "RHI.Vulkan.hpp"
 
 export module RHI:StagingBelt;
@@ -27,7 +25,7 @@ export namespace RHI
             size_t Size = 0;
         };
 
-        StagingBelt(std::shared_ptr<VulkanDevice> device, size_t capacityBytes);
+        StagingBelt(VulkanDevice& device, size_t capacityBytes);
         ~StagingBelt();
 
         StagingBelt(const StagingBelt&) = delete;
@@ -63,7 +61,7 @@ export namespace RHI
         [[nodiscard]] static size_t AlignUp(size_t value, size_t alignment);
         [[nodiscard]] bool HasSpaceContiguous(size_t alignedTail, size_t sizeBytes) const;
 
-        std::shared_ptr<VulkanDevice> m_Device;
+        VulkanDevice& m_Device;
         std::unique_ptr<VulkanBuffer> m_Buffer;
 
         void* m_MappedBase = nullptr;

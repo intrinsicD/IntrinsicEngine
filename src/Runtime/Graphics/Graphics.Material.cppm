@@ -1,6 +1,5 @@
 module;
 #include <volk.h>
-#include <memory>
 
 export module Graphics:Material;
 
@@ -12,10 +11,10 @@ export namespace Graphics
     class Material
     {
     public:
-        Material(std::shared_ptr<RHI::VulkanDevice> device,
-                 RHI::BindlessDescriptorSystem& bindlessSystem, // Pass bindless system
+        Material(RHI::VulkanDevice& device,
+                 RHI::BindlessDescriptorSystem& bindlessSystem,
                  Core::Assets::AssetHandle textureHandle,
-                 std::shared_ptr<RHI::Texture> defaultTexture,
+                 uint32_t defaultTextureIndex,
                  Core::Assets::AssetManager& assetManager);
 
         ~Material();
@@ -24,10 +23,12 @@ export namespace Graphics
         [[nodiscard]] uint32_t GetTextureIndex() const { return m_TextureIndex; }
 
     private:
-        std::shared_ptr<RHI::VulkanDevice> m_Device;
+        RHI::VulkanDevice& m_Device;
         RHI::BindlessDescriptorSystem& m_BindlessSystem;
 
+        Core::Assets::AssetHandle m_TextureHandle{};
+
+        // Hot-path binding data
         uint32_t m_TextureIndex = 0;
-        std::shared_ptr<RHI::Texture> m_CurrentTexture;
     };
 }

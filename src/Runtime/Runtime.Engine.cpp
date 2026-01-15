@@ -94,8 +94,13 @@ namespace Runtime
         // requires a valid VkImageView.
         {
             std::vector<uint8_t> whitePixel = {255, 255, 255, 255};
-            m_DefaultTexture = std::make_shared<RHI::Texture>(m_Device, whitePixel, 1, 1);
+            m_DefaultTexture = std::make_shared<RHI::Texture>(*m_Device, whitePixel, 1, 1);
         }
+
+        // Bindless: reserve a stable slot for the default texture.
+        // Materials can use this index immediately and later update their slot when an async texture finishes.
+        m_BindlessSystem = std::make_unique<RHI::BindlessDescriptorSystem>(*m_Device);
+        m_DefaultTextureIndex = m_BindlessSystem->RegisterTexture(*m_DefaultTexture);
 
         // Initialize GeometryStorage with frames-in-flight for safe deferred deletion
         m_GeometryStorage.Initialize(m_Device->GetFramesInFlight());
@@ -103,7 +108,7 @@ namespace Runtime
         // 4. Swapchain & Renderer
         m_Swapchain = std::make_unique<RHI::VulkanSwapchain>(m_Device, *m_Window);
         m_Renderer = std::make_unique<RHI::SimpleRenderer>(m_Device, *m_Swapchain);
-        m_TransferManager = std::make_unique<RHI::TransferManager>(m_Device);
+        m_TransferManager = std::make_unique<RHI::TransferManager>(*m_Device);
         Interface::GUI::Init(*m_Window, *m_Device, *m_Swapchain, m_Context->GetInstance(),
                              m_Device->GetGraphicsQueue());
 
@@ -219,76 +224,78 @@ namespace Runtime
 
                 // 3. Schedule Entity Spawning on Main Thread
                 // We CANNOT touch m_Scene, m_AssetManager, or m_LoadedMaterials here.
-                RunOnMainThread([this, model = loadResult->ModelData, path]()
-                {
-                    // [Main Thread] Safe to touch Scene/Assets
-                    std::filesystem::path fsPath(path);
-                    std::string assetName = fsPath.filename().string();
+                RunOnMainThread([this, model = std::move(loadResult->ModelData), path]() mutable
+                 {
+                      // [Main Thread] Safe to touch Scene/Assets
+                      std::filesystem::path fsPath(path);
+                      std::string assetName = fsPath.filename().string();
 
-                    // This increments the ref-count of the shared_ptr, preventing ~Model() from running
-                    m_AssetManager.Create(assetName, model);
+                      // Transfer ownership of the model into the AssetManager (zero-copy).
+                      // Keep a raw pointer for the rest of this scope (AssetManager now owns lifetime).
+                      auto* modelPtr = model.get();
+                      m_AssetManager.Create(assetName, std::move(model));
 
-                    // --- Setup Material (Requires AssetManager) ---
-                    // Define local loader lambda inside the main thread task
-                    auto textureLoader = [this](const std::string& pathStr, Core::Assets::AssetHandle handle)
-                        -> std::shared_ptr<RHI::Texture>
-                    {
-                        std::filesystem::path texPath(pathStr);
-                        auto result = Graphics::TextureLoader::LoadAsync(texPath, GetDevice(), *m_TransferManager);
-                        if (result)
-                        {
-                            m_AssetManager.MoveToProcessing(handle);
-                            RegisterAssetLoad(handle, result->Token);
-                            return result->Resource;
-                        }
+                     // --- Setup Material (Requires AssetManager) ---
+                     // Define local loader lambda inside the main thread task
+                     auto textureLoader = [this](const std::string& pathStr, Core::Assets::AssetHandle handle)
+                         -> std::unique_ptr<RHI::Texture>
+                      {
+                          std::filesystem::path texPath(pathStr);
+                          auto result = Graphics::TextureLoader::LoadAsync(texPath, *GetDevice(), *m_TransferManager);
+                          if (result)
+                          {
+                              m_AssetManager.MoveToProcessing(handle);
+                              RegisterAssetLoad(handle, result->Token);
+                              return std::move(result->Resource);
+                          }
 
-                        Core::Log::Warn("Texture load failed: {} ({})", pathStr, Graphics::AssetErrorToString(result.error()));
-                        return nullptr;
-                    };
+                          Core::Log::Warn("Texture load failed: {} ({})", pathStr, Graphics::AssetErrorToString(result.error()));
+                          return nullptr;
+                      };
 
-                    // Load Default Texture
-                    auto texHandle = m_AssetManager.Load<RHI::Texture>(
-                        Core::Filesystem::GetAssetPath("textures/Parameterization.jpg"), textureLoader);
+                     // Load Default Texture
+                     auto texHandle = m_AssetManager.Load<RHI::Texture>(
+                         Core::Filesystem::GetAssetPath("textures/Parameterization.jpg"), textureLoader);
 
-                    auto defaultMat = std::make_shared<Graphics::Material>(
-                        GetDevice(), *m_BindlessSystem,
-                        texHandle, m_DefaultTexture, m_AssetManager
-                    );
-                    m_LoadedMaterials.push_back(defaultMat);
+                     auto defaultMat = std::make_unique<Graphics::Material>(
+                         *GetDevice(), *m_BindlessSystem,
+                         texHandle, m_DefaultTextureIndex, m_AssetManager
+                     );
 
-                    auto defaultMaterialHandle = m_AssetManager.Create("DefaultMaterial", defaultMat);
+                     auto defaultMaterialHandle = m_AssetManager.Create("DefaultMaterial", std::move(defaultMat));
+                      m_LoadedMaterials.push_back(defaultMaterialHandle);
 
-                    // --- Spawn Entities ---
-                    std::string entityName = fsPath.stem().string();
-                    entt::entity rootEntity = m_Scene.CreateEntity(entityName);
+                     // --- Spawn Entities ---
+                     std::string entityName = fsPath.stem().string();
+                     entt::entity rootEntity = m_Scene.CreateEntity(entityName);
 
-                    auto& t = m_Scene.GetRegistry().get<ECS::Components::Transform::Component>(rootEntity);
-                    t.Scale = glm::vec3(0.01f);
+                     auto& t = m_Scene.GetRegistry().get<ECS::Components::Transform::Component>(rootEntity);
+                     t.Scale = glm::vec3(0.01f);
 
-                    for (size_t i = 0; i < model->Size(); i++)
-                    {
-                        entt::entity targetEntity = rootEntity;
-                        if (model->Size() > 1)
-                        {
-                            targetEntity = m_Scene.CreateEntity(entityName + "_" + std::to_string(i));
-                             // NOTE: Parent-child relationships could be added here via a Hierarchy component
-                            // when the ECS supports transform hierarchies (e.g., ECS::Hierarchy::Component).
-                        }
+                    for (size_t i = 0; i < modelPtr->Size(); i++)
+                     {
+                         entt::entity targetEntity = rootEntity;
+                         if (modelPtr->Size() > 1)
+                         {
+                             targetEntity = m_Scene.CreateEntity(entityName + "_" + std::to_string(i));
+                              // NOTE: Parent-child relationships could be added here via a Hierarchy component
+                             // when the ECS supports transform hierarchies (e.g., ECS::Hierarchy::Component).
+                         }
 
-                        auto& mr = m_Scene.GetRegistry().emplace<ECS::MeshRenderer::Component>(targetEntity);
-                        mr.Geometry = model->Meshes[i]->Handle;
-                        mr.Material = defaultMaterialHandle;
+                         auto& mr = m_Scene.GetRegistry().emplace<ECS::MeshRenderer::Component>(targetEntity);
+                         mr.Geometry = modelPtr->Meshes[i]->Handle;
+                         mr.Material = defaultMaterialHandle;
 
-                        // Add Collider
-                        if (model->Meshes[i]->CollisionGeometry)
-                        {
-                            auto& col = m_Scene.GetRegistry().emplace<ECS::MeshCollider::Component>(targetEntity);
-                            col.CollisionRef = model->Meshes[i]->CollisionGeometry;
-                            col.WorldOBB.Center = col.CollisionRef->LocalAABB.GetCenter(); // Init center
-                        }
-                    }
-                    Core::Log::Info("Successfully spawned: {}", entityName);
-                });
+                         // Add Collider
+                         if (modelPtr->Meshes[i]->CollisionGeometry)
+                         {
+                             auto& col = m_Scene.GetRegistry().emplace<ECS::MeshCollider::Component>(targetEntity);
+                             col.CollisionRef = modelPtr->Meshes[i]->CollisionGeometry;
+                             col.WorldOBB.Center = col.CollisionRef->LocalAABB.GetCenter(); // Init center
+                         }
+                     }
+                     Core::Log::Info("Successfully spawned: {}", entityName);
+                 });
             });
         }
         else
@@ -328,22 +335,16 @@ namespace Runtime
         m_PendingLoads.erase(it, m_PendingLoads.end());
     }
 
-    void Engine::RunOnMainThread(std::function<void()> task)
-    {
-        std::lock_guard lock(m_MainThreadQueueMutex);
-        m_MainThreadQueue.emplace_back(std::move(task));
-    }
-
     void Engine::ProcessMainThreadQueue()
     {
-        std::vector<std::function<void()>> tasks;
+        std::vector<Core::Tasks::LocalTask> tasks;
         {
             std::lock_guard lock(m_MainThreadQueueMutex);
             if (m_MainThreadQueue.empty()) return;
             tasks.swap(m_MainThreadQueue);
         }
 
-        for (const auto& task : tasks)
+        for (auto& task : tasks)
         {
             task();
         }
@@ -351,16 +352,15 @@ namespace Runtime
 
     void Engine::InitPipeline()
     {
-        m_DescriptorLayout = std::make_unique<RHI::DescriptorLayout>(m_Device);
-        m_DescriptorPool = std::make_unique<RHI::DescriptorAllocator>(m_Device);
-        m_BindlessSystem = std::make_shared<RHI::BindlessDescriptorSystem>(m_Device);
+        m_DescriptorLayout = std::make_unique<RHI::DescriptorLayout>(*m_Device);
+        m_DescriptorPool = std::make_unique<RHI::DescriptorAllocator>(*m_Device);
 
         // Resolve shader paths robustly. Depending on how the app is launched, the CWD may be
         // the repo root, the build dir, or bin/. Prefer the common dev layout: <bin>/shaders/*.spv.
 
-        RHI::ShaderModule vert(m_Device, Core::Filesystem::GetShaderPath("shaders/triangle.vert.spv"),
+        RHI::ShaderModule vert(*m_Device, Core::Filesystem::GetShaderPath("shaders/triangle.vert.spv"),
                                RHI::ShaderStage::Vertex);
-        RHI::ShaderModule frag(m_Device, Core::Filesystem::GetShaderPath("shaders/triangle.frag.spv"),
+        RHI::ShaderModule frag(*m_Device, Core::Filesystem::GetShaderPath("shaders/triangle.frag.spv"),
                                RHI::ShaderStage::Fragment);
 
         // --- NEW: Using Builder ---

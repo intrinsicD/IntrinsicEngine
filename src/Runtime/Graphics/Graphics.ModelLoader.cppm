@@ -14,7 +14,7 @@ export namespace Graphics
 {
     struct ModelLoadResult
     {
-        std::shared_ptr<Model> ModelData;
+        std::unique_ptr<Model> ModelData;
         RHI::TransferToken Token; // The fence/timeline value to wait for
     };
 

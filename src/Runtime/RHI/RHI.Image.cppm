@@ -1,6 +1,5 @@
 module;
 #include "RHI.Vulkan.hpp"
-#include <memory>
 
 export module RHI:Image;
 
@@ -11,7 +10,7 @@ export namespace RHI
     class VulkanImage
     {
     public:
-        VulkanImage(std::shared_ptr<VulkanDevice> device, uint32_t width, uint32_t height, uint32_t mipLevels,
+        VulkanImage(VulkanDevice& device, uint32_t width, uint32_t height, uint32_t mipLevels,
                     VkFormat format, VkImageUsageFlags usage,
                     VkImageAspectFlags aspect, VkSharingMode sharingMode = VK_SHARING_MODE_EXCLUSIVE);
         ~VulkanImage();
@@ -29,7 +28,7 @@ export namespace RHI
         static VkFormat FindDepthFormat(VulkanDevice& device);
 
     private:
-        std::shared_ptr<VulkanDevice> m_Device;
+        VulkanDevice& m_Device;
         VkImage m_Image = VK_NULL_HANDLE;
         VkImageView m_ImageView = VK_NULL_HANDLE;
         VmaAllocation m_Allocation = VK_NULL_HANDLE;
