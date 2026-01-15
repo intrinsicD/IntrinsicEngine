@@ -56,6 +56,11 @@ namespace RHI
         [[nodiscard]] static constexpr uint32_t GetFramesInFlight() { return MAX_FRAMES_IN_FLIGHT; }
         [[nodiscard]] constexpr uint32_t GetCurrentFrameIndex() const { return m_CurrentFrameIndex; }
         [[nodiscard]] uint64_t GetGlobalFrameNumber() const { return m_GlobalFrameNumber; }
+        VkPhysicalDeviceProperties GetPhysicalDeviceProperties() {
+            VkPhysicalDeviceProperties properties;
+            vkGetPhysicalDeviceProperties(m_PhysicalDevice, &properties);
+            return properties;
+        }
 
         // Call at the start of each frame (after waiting for in-flight fence)
         void IncrementFrame() {

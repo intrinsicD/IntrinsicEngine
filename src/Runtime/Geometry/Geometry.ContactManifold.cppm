@@ -9,6 +9,7 @@ export module Geometry:Contact;
 import :Primitives;
 import :GJK; // Should contain GJK_EPA logic in full version
 import :Support;
+import Core;
 
 export namespace Geometry
 {
@@ -199,15 +200,20 @@ export namespace Geometry
         template <typename A, typename B>
         std::optional<ContactManifold> Contact_Fallback(const A& a, const B& b)
         {
-            // GJK boolean check - detects collision but doesn't provide penetration depth.
-            // For accurate contact resolution, prefer analytic solvers (Sphere-Sphere,
-            // Sphere-AABB, etc.) or SDF-based methods which provide proper depth/normal.
             if (GJK_Boolean(a, b))
             {
-                // Collision detected, but we can't compute accurate depth without EPA.
-                // Return a minimal manifold to prevent physics from breaking.
+                // TODO: Implement EPA (Expanding Polytope Algorithm) here.
+                // Returning dummy data is physically unstable.
+                // For now, log a warning to identify which objects are using this path.
+                Core::Log::Warn("Physics: GJK collision detected without EPA solver. Contact resolution will be wrong.");
+
                 ContactManifold m;
-                m.Normal = glm::vec3(0, 1, 0);
+                // Best guess: direction from center to center (better than 0,1,0)
+                // Note: This is still mathematically wrong for non-spherical objects, but better than hardcoded Up.
+                glm::vec3 dir = b.Center - a.Center; // Requires A/B to have 'Center' or calculate geometric center
+                if (glm::length2(dir) < 1e-6f) m.Normal = glm::vec3(0, 1, 0);
+                else m.Normal = glm::normalize(dir);
+
                 m.PenetrationDepth = 0.001f;
                 return m;
             }

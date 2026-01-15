@@ -30,14 +30,14 @@ namespace RHI
 
     StagingBelt::StagingBelt(VulkanDevice& device, size_t capacityBytes)
         : m_Device(device)
-        , m_Capacity(capacityBytes)
+          , m_Capacity(capacityBytes)
     {
         // We want persistent mapped, sequential write.
         // This repo's VulkanBuffer sets VMA mapped flag for VMA_MEMORY_USAGE_CPU_TO_GPU or AUTO_PREFER_HOST.
         // CPU_ONLY does not request persistent mapping.
         m_Buffer = std::make_unique<VulkanBuffer>(m_Device, m_Capacity,
-            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-            VMA_MEMORY_USAGE_CPU_TO_GPU);
+                                                  VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                                                  VMA_MEMORY_USAGE_CPU_TO_GPU);
 
         m_MappedBase = m_Buffer->Map();
         m_PendingBegin = 0;
@@ -78,20 +78,25 @@ namespace RHI
         if (sizeBytes == 0)
             return {};
 
+
+        size_t MIN_VULKAN_ALIGN = m_Device.GetPhysicalDeviceProperties().limits.minMemoryMapAlignment;
+        size_t effectiveAlign = std::max(alignment, MIN_VULKAN_ALIGN); //TODO: Is this correct?
+
         // We can't safely reuse regions until GC processes.
         // If ring is full, we fail-fast; caller may fall back to dedicated staging.
-        size_t alignedTail = AlignUp(m_Tail, std::max<size_t>(alignment, 1));
+        size_t alignedTail = AlignUp(m_Tail, std::max<size_t>(effectiveAlign, 1));
 
         if (!HasSpaceContiguous(alignedTail, sizeBytes))
         {
             // Try wrapping to 0
             alignedTail = 0;
-            alignedTail = AlignUp(alignedTail, std::max<size_t>(alignment, 1));
+            alignedTail = AlignUp(alignedTail, std::max<size_t>(effectiveAlign, 1));
 
             if (!HasSpaceContiguous(alignedTail, sizeBytes))
             {
-                Core::Log::Warn("StagingBelt out of space (req {} bytes, align {}). Capacity={} Head={} Tail={} InFlight={}",
-                               sizeBytes, alignment, m_Capacity, m_Head, m_Tail, m_InFlight.size());
+                Core::Log::Warn(
+                    "StagingBelt out of space (req {} bytes, align {}). Capacity={} Head={} Tail={} InFlight={}",
+                    sizeBytes, effectiveAlign, m_Capacity, m_Head, m_Tail, m_InFlight.size());
                 return {};
             }
 
@@ -117,7 +122,8 @@ namespace RHI
             // For now, disallow wrap while pending.
             if (begin < m_PendingBegin)
             {
-                Core::Log::Warn("StagingBelt allocation wrapped during pending batch. Call Retire() before wrap-heavy allocations.");
+                Core::Log::Warn(
+                    "StagingBelt allocation wrapped during pending batch. Call Retire() before wrap-heavy allocations.");
                 // Treat as new pending chunk
                 m_PendingBegin = begin;
                 m_PendingEnd = end;

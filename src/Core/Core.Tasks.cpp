@@ -230,7 +230,7 @@ namespace Core::Tasks
 
     void Scheduler::DispatchInternal(LocalTask&& task)
     {
-        if (!s_Ctx) return;
+        if (!s_Ctx || !s_Ctx->isRunning) return; // Drop tasks if shutting down
 
         // 1. Update Counters
         s_Ctx->activeTaskCount.fetch_add(1, std::memory_order_relaxed);
