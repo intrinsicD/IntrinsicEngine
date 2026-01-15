@@ -195,6 +195,43 @@ export namespace Geometry
             return hit;
         }
 
+        // Small helper for fallback paths: best-effort world-space "center" estimation.
+        // This must be cheap and constexpr-friendly; it shouldn't allocate.
+        template <typename Shape>
+        [[nodiscard]] inline glm::vec3 CenterOf(const Shape& s)
+        {
+            if constexpr (requires { s.Center; })
+            {
+                return s.Center;
+            }
+            else if constexpr (std::same_as<Shape, Capsule>)
+            {
+                return (s.PointA + s.PointB) * 0.5f;
+            }
+            else if constexpr (std::same_as<Shape, AABB>)
+            {
+                return (s.Min + s.Max) * 0.5f;
+            }
+            else if constexpr (std::same_as<Shape, OBB>)
+            {
+                return s.Center;
+            }
+            else if constexpr (std::same_as<Shape, ConvexHull>)
+            {
+                // Robust even for empty hulls.
+                if (s.Vertices.empty()) return glm::vec3(0.0f);
+                glm::vec3 sum(0.0f);
+                for (const glm::vec3& v : s.Vertices) sum += v;
+                return sum / static_cast<float>(s.Vertices.size());
+            }
+            else
+            {
+                // Unknown shape type. Returning 0 keeps compilation working and preserves
+                // the "log warning + unstable manifold" behavior, but without hard errors.
+                return glm::vec3(0.0f);
+            }
+        }
+
         // --- Fallback ---
 
         template <typename A, typename B>
@@ -207,14 +244,29 @@ export namespace Geometry
                 // For now, log a warning to identify which objects are using this path.
                 Core::Log::Warn("Physics: GJK collision detected without EPA solver. Contact resolution will be wrong.");
 
-                ContactManifold m;
-                // Best guess: direction from center to center (better than 0,1,0)
-                // Note: This is still mathematically wrong for non-spherical objects, but better than hardcoded Up.
-                glm::vec3 dir = b.Center - a.Center; // Requires A/B to have 'Center' or calculate geometric center
-                if (glm::length2(dir) < 1e-6f) m.Normal = glm::vec3(0, 1, 0);
+                ContactManifold m{};
+
+                // Best guess normal: direction from an estimated center of A to B.
+                glm::vec3 dir = CenterOf(b) - CenterOf(a);
+                if (glm::length2(dir) < 1e-10f) m.Normal = glm::vec3(0, 1, 0);
                 else m.Normal = glm::normalize(dir);
 
+                // Tiny placeholder depth to keep solvers from exploding.
                 m.PenetrationDepth = 0.001f;
+
+                // Slightly better than leaving points uninitialized: use support mapping.
+                // Convention: normal points from A to B.
+                if constexpr (requires { Support(a, -m.Normal); Support(b, m.Normal); })
+                {
+                    m.ContactPointA = Support(a, -m.Normal);
+                    m.ContactPointB = Support(b, m.Normal);
+                }
+                else
+                {
+                    m.ContactPointA = CenterOf(a);
+                    m.ContactPointB = CenterOf(b);
+                }
+
                 return m;
             }
             return std::nullopt;

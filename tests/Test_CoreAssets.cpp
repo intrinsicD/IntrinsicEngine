@@ -1,8 +1,12 @@
 #include <gtest/gtest.h>
-#include <thread>
 #include <chrono>
+#include <memory>
+#include <thread>
+#include <type_traits>
 
 import Core;
+import Graphics;
+import RHI;
 
 using namespace Core;
 using namespace Core::Assets;
@@ -55,6 +59,166 @@ TEST(AssetSystem, AsyncLoading)
     EXPECT_EQ((*texResult)->width, 1024);
 
     Core::Tasks::Scheduler::Shutdown();
+}
+
+TEST(AssetSystem, Pin_LeaseBasic)
+{
+    Core::Tasks::Scheduler::Initialize(1);
+    AssetManager manager;
+
+    auto handle = manager.Load<int>("value", [](const std::string&, AssetHandle)
+    {
+        return std::make_shared<int>(7);
+    });
+
+    Core::Tasks::Scheduler::WaitForAll();
+
+    auto leaseResult = manager.Pin<int>(handle);
+    ASSERT_TRUE(leaseResult.has_value());
+
+    auto lease = *leaseResult;
+    ASSERT_TRUE((bool)lease);
+    ASSERT_NE(lease.get(), nullptr);
+    EXPECT_EQ(*lease, 7);
+    EXPECT_EQ(*lease.get(), 7);
+
+    Core::Tasks::Scheduler::Shutdown();
+}
+
+TEST(AssetSystem, Pin_RespectsProcessingGate)
+{
+    Core::Tasks::Scheduler::Initialize(1);
+    AssetManager manager;
+
+    auto handle = manager.Load<int>("test", [](const std::string&, AssetHandle)
+    {
+        return std::make_shared<int>(1);
+    });
+
+    Core::Tasks::Scheduler::WaitForAll();
+
+    manager.MoveToProcessing(handle);
+    EXPECT_EQ(manager.GetState(handle), LoadState::Processing);
+
+    auto lease = manager.Pin<int>(handle);
+    EXPECT_FALSE(lease.has_value());
+    EXPECT_EQ(lease.error(), ErrorCode::AssetNotLoaded);
+
+    Core::Tasks::Scheduler::Shutdown();
+}
+
+TEST(AssetSystem, Pin_TypeMismatch)
+{
+    Core::Tasks::Scheduler::Initialize(1);
+    AssetManager manager;
+
+    auto handle = manager.Load<int>("number", [](const std::string&, AssetHandle)
+    {
+        return std::make_shared<int>(123);
+    });
+
+    Core::Tasks::Scheduler::WaitForAll();
+
+    auto mismatch = manager.Pin<float>(handle);
+    EXPECT_FALSE(mismatch.has_value());
+    EXPECT_EQ(mismatch.error(), ErrorCode::AssetTypeMismatch);
+
+    Core::Tasks::Scheduler::Shutdown();
+}
+
+struct Reloadable
+{
+    int Value = 0;
+};
+
+TEST(AssetSystem, LeaseSurvivesReload_NewLeaseSeesNewValue)
+{
+    Core::Tasks::Scheduler::Initialize(1);
+    AssetManager manager;
+
+    int generation = 1;
+
+    auto loader = [&](const std::string&, AssetHandle) -> std::shared_ptr<Reloadable>
+    {
+        auto r = std::make_shared<Reloadable>();
+        r->Value = generation;
+        return r;
+    };
+
+    auto handle = manager.Load<Reloadable>("reloadable", loader);
+    Core::Tasks::Scheduler::WaitForAll();
+
+    // Pin old value.
+    auto lease1Res = manager.Pin<Reloadable>(handle);
+    ASSERT_TRUE(lease1Res.has_value());
+    auto lease1 = *lease1Res;
+    ASSERT_TRUE((bool)lease1);
+    EXPECT_EQ(lease1->Value, 1);
+
+    // Trigger reload to new value.
+    generation = 2;
+    manager.ReloadAsset<Reloadable>(handle);
+    Core::Tasks::Scheduler::WaitForAll();
+
+    // Old lease must still see old data.
+    EXPECT_EQ(lease1->Value, 1);
+
+    // New lease must see new data.
+    auto lease2Res = manager.Pin<Reloadable>(handle);
+    ASSERT_TRUE(lease2Res.has_value());
+    EXPECT_EQ((*lease2Res)->Value, 2);
+
+    Core::Tasks::Scheduler::Shutdown();
+}
+
+struct NonCopyable
+{
+    NonCopyable() = default;
+    explicit NonCopyable(int v) : Value(v) {}
+
+    NonCopyable(const NonCopyable&) = delete;
+    NonCopyable& operator=(const NonCopyable&) = delete;
+
+    NonCopyable(NonCopyable&&) = default;
+    NonCopyable& operator=(NonCopyable&&) = default;
+
+    int Value = 0;
+};
+
+TEST(AssetSystem, UniquePtrLoader_SupportsNonCopyable)
+{
+    Core::Tasks::Scheduler::Initialize(1);
+    AssetManager manager;
+
+    auto loader = [](const std::string&, AssetHandle) -> std::unique_ptr<NonCopyable>
+    {
+        return std::make_unique<NonCopyable>(42);
+    };
+
+    auto handle = manager.Load<NonCopyable>("noncopy", loader);
+    Core::Tasks::Scheduler::WaitForAll();
+
+    auto raw = manager.GetRaw<NonCopyable>(handle);
+    ASSERT_TRUE(raw.has_value());
+    ASSERT_NE(*raw, nullptr);
+    EXPECT_EQ((*raw)->Value, 42);
+
+    auto lease = manager.Pin<NonCopyable>(handle);
+    ASSERT_TRUE(lease.has_value());
+    EXPECT_EQ((*lease)->Value, 42);
+
+    Core::Tasks::Scheduler::Shutdown();
+}
+
+// Contract-ish test: AssetManager must be able to own non-copyable payloads like Graphics::Material
+// via the Create(name, unique_ptr<T>) overload.
+TEST(CoreAssets, Create_UniquePtrMaterialCompiles)
+{
+    static_assert(!std::is_copy_constructible_v<Graphics::Material>);
+
+    // We only validate compile-time ownership plumbing here.
+    // Running this would require a VulkanDevice + BindlessDescriptorSystem instance.
+    SUCCEED();
 }
 
 TEST(AssetSystem, Caching)

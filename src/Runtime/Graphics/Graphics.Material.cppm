@@ -19,6 +19,11 @@ export namespace Graphics
 
         ~Material();
 
+        Material(const Material&) = delete;
+        Material& operator=(const Material&) = delete;
+        Material(Material&&) = delete;
+        Material& operator=(Material&&) = delete;
+
         // Returns the index into the bindless array
         [[nodiscard]] uint32_t GetTextureIndex() const { return m_TextureIndex; }
 

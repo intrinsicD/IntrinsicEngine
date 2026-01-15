@@ -11,6 +11,7 @@ export import :Pipeline;
 export import :Renderer;
 export import :Shader;
 export import :Swapchain;
+export import :StagingBelt;
 export import :Texture;
 export import :Transfer;
 export import :Types;
