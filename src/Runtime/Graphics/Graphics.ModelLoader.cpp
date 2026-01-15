@@ -374,7 +374,236 @@ namespace Graphics
             return std::nullopt;
         }
 
-        [[nodiscard]] static bool IsColorByteBased(PlyScalarType t) { return t == PlyScalarType::UInt8 || t == PlyScalarType::Int8; }
+        [[nodiscard]] static std::optional<int64_t> ReadScalarAsI64(std::ifstream& file, PlyScalarType type, bool fileIsLittleEndian)
+        {
+            auto maybeSwap = [&](auto v)
+            {
+                using V = decltype(v);
+                if constexpr (sizeof(V) == 1) return v;
+                const bool needSwap = (HostIsLittleEndian() != fileIsLittleEndian);
+                return needSwap ? ByteSwap(v) : v;
+            };
+
+            switch (type)
+            {
+            case PlyScalarType::Int8:
+            {
+                int8_t v{};
+                if (!ReadRaw(file, v)) return std::nullopt;
+                return (int64_t)v;
+            }
+            case PlyScalarType::UInt8:
+            {
+                uint8_t v{};
+                if (!ReadRaw(file, v)) return std::nullopt;
+                return (int64_t)v;
+            }
+            case PlyScalarType::Int16:
+            {
+                int16_t v{};
+                if (!ReadRaw(file, v)) return std::nullopt;
+                v = maybeSwap(v);
+                return (int64_t)v;
+            }
+            case PlyScalarType::UInt16:
+            {
+                uint16_t v{};
+                if (!ReadRaw(file, v)) return std::nullopt;
+                v = maybeSwap(v);
+                return (int64_t)v;
+            }
+            case PlyScalarType::Int32:
+            {
+                int32_t v{};
+                if (!ReadRaw(file, v)) return std::nullopt;
+                v = maybeSwap(v);
+                return (int64_t)v;
+            }
+            case PlyScalarType::UInt32:
+            {
+                uint32_t v{};
+                if (!ReadRaw(file, v)) return std::nullopt;
+                v = maybeSwap(v);
+                return (int64_t)v;
+            }
+            case PlyScalarType::Float32:
+            case PlyScalarType::Float64:
+                return std::nullopt;
+            }
+            return std::nullopt;
+        }
+
+        [[nodiscard]] bool IsColorByteBased(PlyScalarType t) { return t == PlyScalarType::UInt8 || t == PlyScalarType::Int8; }
+
+        [[nodiscard]] std::string TrimRight(std::string s)
+        {
+            while (!s.empty() && (s.back() == '\r' || s.back() == '\n' || s.back() == ' ' || s.back() == '\t'))
+                s.pop_back();
+            return s;
+        }
+
+        [[nodiscard]] std::string ToLower(std::string s)
+        {
+            std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+            return s;
+        }
+
+        [[nodiscard]] bool PlyScalarIsIntegerLike(PlyScalarType t)
+        {
+            switch (t)
+            {
+            case PlyScalarType::Int8:
+            case PlyScalarType::UInt8:
+            case PlyScalarType::Int16:
+            case PlyScalarType::UInt16:
+            case PlyScalarType::Int32:
+            case PlyScalarType::UInt32: return true;
+            case PlyScalarType::Float32:
+            case PlyScalarType::Float64: return false;
+            }
+            return false;
+        }
+
+        [[nodiscard]] bool SkipBytes(std::ifstream& file, size_t bytes)
+        {
+            if (bytes == 0) return true;
+            file.seekg(static_cast<std::streamoff>(bytes), std::ios_base::cur);
+            return static_cast<bool>(file);
+        }
+
+        [[nodiscard]] bool SkipBinaryProperty(std::ifstream& file, const PlyProperty& prop, bool fileIsLittleEndian)
+        {
+            if (!prop.IsList)
+            {
+                return SkipBytes(file, PlyScalarSizeBytes(prop.ScalarType));
+            }
+
+            const auto maybeCount = ReadScalarAsU64(file, prop.ListCountType, fileIsLittleEndian);
+            if (!maybeCount) return false;
+            const size_t count = static_cast<size_t>(*maybeCount);
+            const size_t elemBytes = PlyScalarSizeBytes(prop.ListElementType);
+            return SkipBytes(file, count * elemBytes);
+        }
+
+        [[nodiscard]] bool ConsumeBinaryLineBreaksAfterHeader(std::ifstream& file)
+        {
+            for (;;)
+            {
+                const int c = file.peek();
+                if (c == '\r' || c == '\n')
+                {
+                    file.get();
+                    continue;
+                }
+                break;
+            }
+            return static_cast<bool>(file);
+        }
+
+        [[nodiscard]] const PlyProperty* ChooseFaceIndexListProperty(const PlyElement& faceElement)
+        {
+            const PlyProperty* best = nullptr;
+            int bestScore = -1;
+
+            for (const auto& p : faceElement.Properties)
+            {
+                if (!p.IsList) continue;
+
+                const std::string nameLower = ToLower(p.Name);
+                int score = 0;
+
+                if (nameLower == "vertex_indices" || nameLower == "vertex_index") score += 100;
+                if (nameLower.find("vertex") != std::string::npos) score += 20;
+                if (nameLower.find("index") != std::string::npos || nameLower.find("indices") != std::string::npos) score += 20;
+                if (nameLower == "indices") score += 10;
+
+                if (PlyScalarIsIntegerLike(p.ListElementType)) score += 10;
+                else score -= 50;
+
+                if (p.ListElementType == PlyScalarType::UInt32 || p.ListElementType == PlyScalarType::Int32) score += 2;
+
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    best = &p;
+                }
+            }
+
+            return best;
+        }
+
+        [[nodiscard]] bool IsConnectivityElementName(std::string_view nameLower)
+        {
+            return nameLower == "face" || nameLower == "tristrips";
+        }
+
+        [[nodiscard]] bool PlyElementHasListProperty(const PlyElement& elem)
+        {
+            for (const auto& p : elem.Properties)
+            {
+                if (p.IsList) return true;
+            }
+            return false;
+        }
+
+        struct TriStripState
+        {
+            std::array<int64_t, 2> Prev = { -1, -1 };
+            bool Parity = false;
+
+            void Reset() { Prev = { -1, -1 }; Parity = false; }
+        };
+
+        void AppendTriStripAsTriangles(const std::vector<int64_t>& strip, std::vector<uint32_t>& outIndices)
+        {
+            TriStripState state;
+
+            for (const int64_t idx : strip)
+            {
+                if (idx < 0)
+                {
+                    // Restart marker (-1)
+                    state.Reset();
+                    continue;
+                }
+
+                if (state.Prev[0] < 0)
+                {
+                    state.Prev[0] = idx;
+                    continue;
+                }
+                if (state.Prev[1] < 0)
+                {
+                    state.Prev[1] = idx;
+                    continue;
+                }
+
+                const int64_t a = state.Prev[0];
+                const int64_t b = state.Prev[1];
+                const int64_t c = idx;
+
+                // Skip degenerate triangles
+                if (a != b && b != c && a != c)
+                {
+                    if (!state.Parity)
+                    {
+                        outIndices.push_back(static_cast<uint32_t>(a));
+                        outIndices.push_back(static_cast<uint32_t>(b));
+                        outIndices.push_back(static_cast<uint32_t>(c));
+                    }
+                    else
+                    {
+                        outIndices.push_back(static_cast<uint32_t>(b));
+                        outIndices.push_back(static_cast<uint32_t>(a));
+                        outIndices.push_back(static_cast<uint32_t>(c));
+                    }
+                }
+
+                state.Prev[0] = state.Prev[1];
+                state.Prev[1] = idx;
+                state.Parity = !state.Parity;
+            }
+        }
     }
 
     static bool LoadPLY(const std::string& path, GeometryCpuData& outData)
@@ -387,12 +616,16 @@ namespace Graphics
 
         PlyElement vertexElement{};
         PlyElement faceElement{};
+
+        // Header order elements (for robust binary skipping)
+        std::vector<PlyElement> elementsInOrder;
         PlyElement* currentElement = nullptr;
 
         // Quick lookup of vertex property indices
         int idxX = -1, idxY = -1, idxZ = -1;
         int idxNX = -1, idxNY = -1, idxNZ = -1;
         int idxR = -1, idxG = -1, idxB = -1;
+        int idxA = -1;
         int idxS = -1, idxT = -1;
 
         bool headerEnded = false;
@@ -400,13 +633,14 @@ namespace Graphics
         // 1. Header Parse
         while (std::getline(file, line))
         {
+            line = TrimRight(line);
+
             if (line == "end_header")
             {
                 headerEnded = true;
                 break;
             }
 
-            // skip comments/empty
             if (line.empty()) continue;
 
             std::stringstream ss(line);
@@ -418,6 +652,7 @@ namespace Graphics
             {
                 std::string fmt;
                 ss >> fmt;
+                fmt = ToLower(fmt);
                 if (fmt == "ascii") format = PlyFormat::Ascii;
                 else if (fmt == "binary_little_endian") format = PlyFormat::BinaryLittleEndian;
                 else if (fmt == "binary_big_endian") format = PlyFormat::BinaryBigEndian;
@@ -432,18 +667,24 @@ namespace Graphics
                 std::string type;
                 size_t count = 0;
                 ss >> type >> count;
+                type = ToLower(type);
+
+                elementsInOrder.emplace_back();
+                elementsInOrder.back().Name = type;
+                elementsInOrder.back().Count = count;
+                currentElement = &elementsInOrder.back();
 
                 if (type == "vertex")
                 {
                     vertexElement = PlyElement{};
                     vertexElement.Name = "vertex";
                     vertexElement.Count = count;
-                    currentElement = &vertexElement;
 
                     // reset indices
                     idxX = idxY = idxZ = -1;
                     idxNX = idxNY = idxNZ = -1;
                     idxR = idxG = idxB = -1;
+                    idxA = -1;
                     idxS = idxT = -1;
                 }
                 else if (type == "face")
@@ -451,12 +692,6 @@ namespace Graphics
                     faceElement = PlyElement{};
                     faceElement.Name = "face";
                     faceElement.Count = count;
-                    currentElement = &faceElement;
-                }
-                else
-                {
-                    // Still parse properties to skip header correctly, but we ignore body for unknown elements.
-                    currentElement = nullptr;
                 }
             }
             else if (token == "property")
@@ -465,6 +700,7 @@ namespace Graphics
 
                 std::string typeOrList;
                 ss >> typeOrList;
+                typeOrList = ToLower(typeOrList);
 
                 PlyProperty prop{};
 
@@ -481,7 +717,7 @@ namespace Graphics
                         return false;
                     }
 
-                    prop.Name = name;
+                    prop.Name = ToLower(name);
                     prop.IsList = true;
                     prop.ListCountType = *countTy;
                     prop.ListElementType = *elemTy;
@@ -496,28 +732,36 @@ namespace Graphics
                         Core::Log::Error("PLY: Unsupported scalar type: {}", typeOrList);
                         return false;
                     }
-                    prop.Name = name;
+                    prop.Name = ToLower(name);
                     prop.IsList = false;
                     prop.ScalarType = *scalarTy;
                 }
 
-                const int propIndex = static_cast<int>(currentElement->Properties.size());
                 currentElement->Properties.push_back(prop);
 
-                if (currentElement == &vertexElement)
+                // Keep dedicated copies for vertex/face for compatibility with old code paths
+                if (currentElement->Name == "vertex")
                 {
-                    const std::string& n = currentElement->Properties.back().Name;
-                    if (n == "x") idxX = propIndex;
-                    else if (n == "y") idxY = propIndex;
-                    else if (n == "z") idxZ = propIndex;
-                    else if (n == "nx") idxNX = propIndex;
-                    else if (n == "ny") idxNY = propIndex;
-                    else if (n == "nz") idxNZ = propIndex;
-                    else if (n == "red" || n == "r") idxR = propIndex;
-                    else if (n == "green" || n == "g") idxG = propIndex;
-                    else if (n == "blue" || n == "b") idxB = propIndex;
-                    else if (n == "s" || n == "u" || n == "texture_u") idxS = propIndex;
-                    else if (n == "t" || n == "v" || n == "texture_v") idxT = propIndex;
+                    vertexElement.Properties.push_back(prop);
+                    const int vIndex = static_cast<int>(vertexElement.Properties.size()) - 1;
+
+                    const std::string& n = vertexElement.Properties.back().Name;
+                    if (n == "x") idxX = vIndex;
+                    else if (n == "y") idxY = vIndex;
+                    else if (n == "z") idxZ = vIndex;
+                    else if (n == "nx" || n == "normal_x" || n == "n_x") idxNX = vIndex;
+                    else if (n == "ny" || n == "normal_y" || n == "n_y") idxNY = vIndex;
+                    else if (n == "nz" || n == "normal_z" || n == "n_z") idxNZ = vIndex;
+                    else if (n == "red" || n == "r") idxR = vIndex;
+                    else if (n == "green" || n == "g") idxG = vIndex;
+                    else if (n == "blue" || n == "b") idxB = vIndex;
+                    else if (n == "alpha" || n == "a") idxA = vIndex;
+                    else if (n == "s" || n == "u" || n == "texture_u" || n == "texcoord_u" || n == "u0") idxS = vIndex;
+                    else if (n == "t" || n == "v" || n == "texture_v" || n == "texcoord_v" || n == "v0") idxT = vIndex;
+                }
+                else if (currentElement->Name == "face")
+                {
+                    faceElement.Properties.push_back(prop);
                 }
             }
         }
@@ -529,42 +773,85 @@ namespace Graphics
             return false;
         }
 
-        // Setup binary stride/offsets for vertex fixed-size properties.
-        if (format != PlyFormat::Ascii)
+        // Compute feature flags once, early. Used by both ASCII + binary decoding.
+        const bool hasNormals = (idxNX >= 0 && idxNY >= 0 && idxNZ >= 0);
+        const bool hasUVs = (idxS >= 0 && idxT >= 0);
+        const bool hasColors = (idxR >= 0 && idxG >= 0 && idxB >= 0);
+        const bool hasAlpha = (idxA >= 0);
+
+        // Allocate output buffers before decoding.
+        outData.Positions.resize(vertexElement.Count);
+        outData.Normals.resize(vertexElement.Count, glm::vec3(0, 1, 0));
+        outData.Aux.resize(vertexElement.Count, glm::vec4(1));
+
+        const bool isBinary = (format != PlyFormat::Ascii);
+        const bool fileIsLittle = (format == PlyFormat::BinaryLittleEndian);
+        if (isBinary)
+        {
+            if (!ConsumeBinaryLineBreaksAfterHeader(file))
+                return false;
+        }
+
+        // Setup binary stride/offsets for vertex fixed-size properties (fast path only if no list props).
+        bool vertexHasList = false;
+        if (isBinary)
         {
             size_t offset = 0;
             for (auto& p : vertexElement.Properties)
             {
                 if (p.IsList)
                 {
-                    Core::Log::Error("PLY: vertex element contains 'list' property '{}', unsupported in binary loader", p.Name);
-                    return false;
+                    vertexHasList = true;
+                    break;
                 }
                 p.ByteOffset = offset;
-                offset += PlyScalarSizeBytes(p.ScalarType);
+                const size_t sz = PlyScalarSizeBytes(p.ScalarType);
+                if (sz == 0)
+                {
+                    Core::Log::Error("PLY: Unsupported/invalid scalar size for vertex property '{}'", p.Name);
+                    return false;
+                }
+                offset += sz;
             }
-            vertexElement.BinaryStrideBytes = offset;
+            vertexElement.BinaryStrideBytes = vertexHasList ? 0 : offset;
 
-            // Face element: we only support a single list property (vertex_indices / vertex_index)
-            size_t listProps = 0;
-            for (const auto& p : faceElement.Properties)
+            if (!vertexHasList)
             {
-                if (p.IsList) listProps++;
+                if (vertexElement.BinaryStrideBytes == 0)
+                {
+                    Core::Log::Error("PLY: Invalid binary vertex stride (0)");
+                    return false;
+                }
+
+                // Quick sanity check: x/y/z must be within stride.
+                auto inStride = [&](int idx) -> bool
+                {
+                    if (idx < 0) return false;
+                    const auto& p = vertexElement.Properties[(size_t)idx];
+                    return (p.ByteOffset + PlyScalarSizeBytes(p.ScalarType)) <= vertexElement.BinaryStrideBytes;
+                };
+
+                if (!inStride(idxX) || !inStride(idxY) || !inStride(idxZ))
+                {
+                    Core::Log::Error("PLY: Invalid x/y/z offsets for binary vertex layout");
+                    return false;
+                }
             }
-            if (faceElement.Count > 0 && listProps == 0)
+
+            // Face: must have at least one list property to form indices
+            if (faceElement.Count > 0)
             {
-                Core::Log::Error("PLY: face element has no list property; cannot read indices");
-                return false;
+                const PlyProperty* idxProp = ChooseFaceIndexListProperty(faceElement);
+                if (!idxProp)
+                {
+                    Core::Log::Error("PLY: face element has no usable list property for indices");
+                    return false;
+                }
             }
         }
 
-        const bool hasNormals = (idxNX >= 0 && idxNY >= 0 && idxNZ >= 0);
-        const bool hasUVs = (idxS >= 0 && idxT >= 0);
-        const bool hasColors = (idxR >= 0 && idxG >= 0 && idxB >= 0);
-
-        outData.Positions.resize(vertexElement.Count);
-        outData.Normals.resize(vertexElement.Count, glm::vec3(0, 1, 0));
-        outData.Aux.resize(vertexElement.Count, glm::vec4(1));
+        // Track connectivity source if present (face or tristrips)
+        std::string connectivityElementName;
 
         // 2. Body Parse
         if (format == PlyFormat::Ascii)
@@ -592,13 +879,15 @@ namespace Graphics
                     float r = ParseFloat(tokens[(size_t)idxR]);
                     float g = ParseFloat(tokens[(size_t)idxG]);
                     float b = ParseFloat(tokens[(size_t)idxB]);
-                    if (r > 1.0f || g > 1.0f || b > 1.0f)
+                    float a = hasAlpha ? ParseFloat(tokens[(size_t)idxA]) : 255.0f;
+                    if (r > 1.0f || g > 1.0f || b > 1.0f || a > 1.0f)
                     {
                         r /= 255.0f;
                         g /= 255.0f;
                         b /= 255.0f;
+                        a /= 255.0f;
                     }
-                    outData.Aux[i] = glm::vec4(r, g, b, 1.0f);
+                    outData.Aux[i] = glm::vec4(r, g, b, a);
                 }
 
                 if (hasUVs)
@@ -636,228 +925,439 @@ namespace Graphics
         }
         else
         {
-            const bool fileIsLittle = (format == PlyFormat::BinaryLittleEndian);
+            // Robust binary element iteration (prevents desync when extra elements exist).
 
-            // Read all vertex bytes in one go (fast path).
+            auto readFromBlobAsDouble = [&](const std::byte* base, const PlyProperty& p) -> double
             {
-                const size_t totalBytes = vertexElement.Count * vertexElement.BinaryStrideBytes;
-                std::vector<std::byte> vertexBlob(totalBytes);
-                file.read(reinterpret_cast<char*>(vertexBlob.data()), static_cast<std::streamsize>(vertexBlob.size()));
-                if (!file)
+                const bool needSwap = (HostIsLittleEndian() != fileIsLittle);
+                const std::byte* ptr = base + p.ByteOffset;
+
+                switch (p.ScalarType)
                 {
-                    Core::Log::Error("PLY: Failed to read binary vertex blob ({} bytes)", totalBytes);
-                    return false;
+                case PlyScalarType::Int8:
+                {
+                    int8_t v;
+                    std::memcpy(&v, ptr, 1);
+                    return (double)v;
                 }
-
-                auto readFromBlobAsDouble = [&](const std::byte* base, const PlyProperty& p) -> double
+                case PlyScalarType::UInt8:
                 {
-                    const bool needSwap = (HostIsLittleEndian() != fileIsLittle);
-                    const std::byte* ptr = base + p.ByteOffset;
-
-                    switch (p.ScalarType)
-                    {
-                    case PlyScalarType::Int8:
-                    {
-                        int8_t v;
-                        std::memcpy(&v, ptr, 1);
-                        return (double)v;
-                    }
-                    case PlyScalarType::UInt8:
-                    {
-                        uint8_t v;
-                        std::memcpy(&v, ptr, 1);
-                        return (double)v;
-                    }
-                    case PlyScalarType::Int16:
-                    {
-                        int16_t v;
-                        std::memcpy(&v, ptr, 2);
-                        if (needSwap) v = ByteSwap(v);
-                        return (double)v;
-                    }
-                    case PlyScalarType::UInt16:
-                    {
-                        uint16_t v;
-                        std::memcpy(&v, ptr, 2);
-                        if (needSwap) v = ByteSwap(v);
-                        return (double)v;
-                    }
-                    case PlyScalarType::Int32:
-                    {
-                        int32_t v;
-                        std::memcpy(&v, ptr, 4);
-                        if (needSwap) v = ByteSwap(v);
-                        return (double)v;
-                    }
-                    case PlyScalarType::UInt32:
-                    {
-                        uint32_t v;
-                        std::memcpy(&v, ptr, 4);
-                        if (needSwap) v = ByteSwap(v);
-                        return (double)v;
-                    }
-                    case PlyScalarType::Float32:
-                    {
-                        float v;
-                        std::memcpy(&v, ptr, 4);
-                        if (needSwap) v = ByteSwap(v);
-                        return (double)v;
-                    }
-                    case PlyScalarType::Float64:
-                    {
-                        double v;
-                        std::memcpy(&v, ptr, 8);
-                        if (needSwap) v = ByteSwap(v);
-                        return v;
-                    }
-                    }
-                    return 0.0;
-                };
-
-                // Required: x/y/z
-                if (idxX < 0 || idxY < 0 || idxZ < 0)
-                {
-                    Core::Log::Error("PLY: Missing required x/y/z properties");
-                    return false;
+                    uint8_t v;
+                    std::memcpy(&v, ptr, 1);
+                    return (double)v;
                 }
-
-                const PlyProperty& px = vertexElement.Properties[(size_t)idxX];
-                const PlyProperty& py = vertexElement.Properties[(size_t)idxY];
-                const PlyProperty& pz = vertexElement.Properties[(size_t)idxZ];
-
-                const PlyProperty* pnx = (idxNX >= 0) ? &vertexElement.Properties[(size_t)idxNX] : nullptr;
-                const PlyProperty* pny = (idxNY >= 0) ? &vertexElement.Properties[(size_t)idxNY] : nullptr;
-                const PlyProperty* pnz = (idxNZ >= 0) ? &vertexElement.Properties[(size_t)idxNZ] : nullptr;
-
-                const PlyProperty* pr = (idxR >= 0) ? &vertexElement.Properties[(size_t)idxR] : nullptr;
-                const PlyProperty* pg = (idxG >= 0) ? &vertexElement.Properties[(size_t)idxG] : nullptr;
-                const PlyProperty* pb = (idxB >= 0) ? &vertexElement.Properties[(size_t)idxB] : nullptr;
-
-                const PlyProperty* ps = (idxS >= 0) ? &vertexElement.Properties[(size_t)idxS] : nullptr;
-                const PlyProperty* pt = (idxT >= 0) ? &vertexElement.Properties[(size_t)idxT] : nullptr;
-
-                const std::byte* base = vertexBlob.data();
-                for (size_t i = 0; i < vertexElement.Count; ++i)
+                case PlyScalarType::Int16:
                 {
-                    const std::byte* v = base + i * vertexElement.BinaryStrideBytes;
-
-                    outData.Positions[i] = glm::vec3(
-                        (float)readFromBlobAsDouble(v, px),
-                        (float)readFromBlobAsDouble(v, py),
-                        (float)readFromBlobAsDouble(v, pz));
-
-                    if (pnx && pny && pnz)
-                    {
-                        outData.Normals[i] = glm::vec3(
-                            (float)readFromBlobAsDouble(v, *pnx),
-                            (float)readFromBlobAsDouble(v, *pny),
-                            (float)readFromBlobAsDouble(v, *pnz));
-                    }
-
-                    if (pr && pg && pb)
-                    {
-                        const double rd = readFromBlobAsDouble(v, *pr);
-                        const double gd = readFromBlobAsDouble(v, *pg);
-                        const double bd = readFromBlobAsDouble(v, *pb);
-
-                        // Heuristic: if byte-based or values > 1, normalize.
-                        const bool byteBased = IsColorByteBased(pr->ScalarType) && IsColorByteBased(pg->ScalarType) && IsColorByteBased(pb->ScalarType);
-                        float rf = (float)rd;
-                        float gf = (float)gd;
-                        float bf = (float)bd;
-                        if (byteBased || rf > 1.0f || gf > 1.0f || bf > 1.0f)
-                        {
-                            rf /= 255.0f;
-                            gf /= 255.0f;
-                            bf /= 255.0f;
-                        }
-                        outData.Aux[i] = glm::vec4(rf, gf, bf, 1.0f);
-                    }
-
-                    if (ps && pt)
-                    {
-                        outData.Aux[i].x = (float)readFromBlobAsDouble(v, *ps);
-                        outData.Aux[i].y = (float)readFromBlobAsDouble(v, *pt);
-                    }
+                    int16_t v;
+                    std::memcpy(&v, ptr, 2);
+                    if (needSwap) v = ByteSwap(v);
+                    return (double)v;
                 }
-            }
+                case PlyScalarType::UInt16:
+                {
+                    uint16_t v;
+                    std::memcpy(&v, ptr, 2);
+                    if (needSwap) v = ByteSwap(v);
+                    return (double)v;
+                }
+                case PlyScalarType::Int32:
+                {
+                    int32_t v;
+                    std::memcpy(&v, ptr, 4);
+                    if (needSwap) v = ByteSwap(v);
+                    return (double)v;
+                }
+                case PlyScalarType::UInt32:
+                {
+                    uint32_t v;
+                    std::memcpy(&v, ptr, 4);
+                    if (needSwap) v = ByteSwap(v);
+                    return (double)v;
+                }
+                case PlyScalarType::Float32:
+                {
+                    float v;
+                    std::memcpy(&v, ptr, 4);
+                    if (needSwap) v = ByteSwap(v);
+                    return (double)v;
+                }
+                case PlyScalarType::Float64:
+                {
+                    double v;
+                    std::memcpy(&v, ptr, 8);
+                    if (needSwap) v = ByteSwap(v);
+                    return v;
+                }
+                }
+                return 0.0;
+            };
 
-            // Faces come after the vertex blob in the file.
-            if (faceElement.Count > 0)
+            const PlyProperty& px = vertexElement.Properties[(size_t)idxX];
+            const PlyProperty& py = vertexElement.Properties[(size_t)idxY];
+            const PlyProperty& pz = vertexElement.Properties[(size_t)idxZ];
+
+            const PlyProperty* pnx = (idxNX >= 0) ? &vertexElement.Properties[(size_t)idxNX] : nullptr;
+            const PlyProperty* pny = (idxNY >= 0) ? &vertexElement.Properties[(size_t)idxNY] : nullptr;
+            const PlyProperty* pnz = (idxNZ >= 0) ? &vertexElement.Properties[(size_t)idxNZ] : nullptr;
+
+            const PlyProperty* pr = (idxR >= 0) ? &vertexElement.Properties[(size_t)idxR] : nullptr;
+            const PlyProperty* pg = (idxG >= 0) ? &vertexElement.Properties[(size_t)idxG] : nullptr;
+            const PlyProperty* pb = (idxB >= 0) ? &vertexElement.Properties[(size_t)idxB] : nullptr;
+            const PlyProperty* pa = (idxA >= 0) ? &vertexElement.Properties[(size_t)idxA] : nullptr;
+
+            const PlyProperty* ps = (idxS >= 0) ? &vertexElement.Properties[(size_t)idxS] : nullptr;
+            const PlyProperty* pt = (idxT >= 0) ? &vertexElement.Properties[(size_t)idxT] : nullptr;
+
+            const PlyProperty* faceIndicesProp = ChooseFaceIndexListProperty(faceElement);
+
+            // Process elements in header order
+            for (const PlyElement& elem : elementsInOrder)
             {
-                outData.Topology = PrimitiveTopology::Triangles;
+                if (elem.Count == 0) continue;
 
-                // Find indices list property
-                const PlyProperty* indicesProp = nullptr;
-                for (const auto& p : faceElement.Properties)
+                if (elem.Name == "vertex")
                 {
-                    if (p.IsList && (p.Name == "vertex_indices" || p.Name == "vertex_index" || p.Name == "indices"))
+                    if (!vertexHasList)
                     {
-                        indicesProp = &p;
-                        break;
-                    }
-                }
-                if (!indicesProp)
-                {
-                    // accept first list property
-                    for (const auto& p : faceElement.Properties)
-                    {
-                        if (p.IsList)
+                        // Fast path: read blob then decode known offsets.
+                        const size_t totalBytes = vertexElement.Count * vertexElement.BinaryStrideBytes;
+                        std::vector<std::byte> vertexBlob(totalBytes);
+                        file.read(reinterpret_cast<char*>(vertexBlob.data()), static_cast<std::streamsize>(vertexBlob.size()));
+                        if (!file)
                         {
-                            indicesProp = &p;
-                            break;
+                            Core::Log::Error("PLY: Failed to read binary vertex blob ({} bytes)", totalBytes);
+                            return false;
+                        }
+
+                        const std::byte* base = vertexBlob.data();
+                        for (size_t i = 0; i < vertexElement.Count; ++i)
+                        {
+                            const std::byte* v = base + i * vertexElement.BinaryStrideBytes;
+
+                            outData.Positions[i] = glm::vec3(
+                                (float)readFromBlobAsDouble(v, px),
+                                (float)readFromBlobAsDouble(v, py),
+                                (float)readFromBlobAsDouble(v, pz));
+
+                            if (pnx && pny && pnz)
+                            {
+                                outData.Normals[i] = glm::vec3(
+                                    (float)readFromBlobAsDouble(v, *pnx),
+                                    (float)readFromBlobAsDouble(v, *pny),
+                                    (float)readFromBlobAsDouble(v, *pnz));
+                            }
+
+                            if (pr && pg && pb)
+                            {
+                                const double rd = readFromBlobAsDouble(v, *pr);
+                                const double gd = readFromBlobAsDouble(v, *pg);
+                                const double bd = readFromBlobAsDouble(v, *pb);
+                                const double ad = pa ? readFromBlobAsDouble(v, *pa) : 255.0;
+
+                                const bool byteBased = IsColorByteBased(pr->ScalarType) && IsColorByteBased(pg->ScalarType) && IsColorByteBased(pb->ScalarType)
+                                                       && (!pa || IsColorByteBased(pa->ScalarType));
+                                float rf = (float)rd;
+                                float gf = (float)gd;
+                                float bf = (float)bd;
+                                float af = (float)ad;
+                                if (byteBased || rf > 1.0f || gf > 1.0f || bf > 1.0f || af > 1.0f)
+                                {
+                                    rf /= 255.0f;
+                                    gf /= 255.0f;
+                                    bf /= 255.0f;
+                                    af /= 255.0f;
+                                }
+                                outData.Aux[i] = glm::vec4(rf, gf, bf, af);
+                            }
+
+                            if (ps && pt)
+                            {
+                                outData.Aux[i].x = (float)readFromBlobAsDouble(v, *ps);
+                                outData.Aux[i].y = (float)readFromBlobAsDouble(v, *pt);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // Slow but robust: per-vertex parse/skip property-by-property.
+                        // NOTE: list properties in vertex are skipped; we still decode x/y/z/etc scalars.
+                        for (size_t i = 0; i < vertexElement.Count; ++i)
+                        {
+                            // Temporary storage for scalar values we care about
+                            glm::vec3 pos{0};
+                            glm::vec3 nrm{0, 1, 0};
+                            glm::vec2 uv{0};
+                            glm::vec4 rgba{1, 1, 1, 1};
+                            bool gotColor = false;
+
+                            for (size_t pIndex = 0; pIndex < vertexElement.Properties.size(); ++pIndex)
+                            {
+                                const PlyProperty& p = vertexElement.Properties[pIndex];
+                                if (p.IsList)
+                                {
+                                    if (!SkipBinaryProperty(file, p, fileIsLittle)) return false;
+                                    continue;
+                                }
+
+                                // read scalar for selective properties
+                                auto readScalar = [&]() -> std::optional<double>
+                                {
+                                    // reuse ReadScalarAsU64 for ints, but use float/double read to keep precision
+                                    // We'll implement small reads inline here.
+                                    switch (p.ScalarType)
+                                    {
+                                    case PlyScalarType::Int8:
+                                    {
+                                        int8_t v{};
+                                        if (!ReadRaw(file, v)) return std::nullopt;
+                                        return (double)v;
+                                    }
+                                    case PlyScalarType::UInt8:
+                                    {
+                                        uint8_t v{};
+                                        if (!ReadRaw(file, v)) return std::nullopt;
+                                        return (double)v;
+                                    }
+                                    case PlyScalarType::Int16:
+                                    {
+                                        int16_t v{};
+                                        if (!ReadRaw(file, v)) return std::nullopt;
+                                        if (HostIsLittleEndian() != fileIsLittle) v = ByteSwap(v);
+                                        return (double)v;
+                                    }
+                                    case PlyScalarType::UInt16:
+                                    {
+                                        uint16_t v{};
+                                        if (!ReadRaw(file, v)) return std::nullopt;
+                                        if (HostIsLittleEndian() != fileIsLittle) v = ByteSwap(v);
+                                        return (double)v;
+                                    }
+                                    case PlyScalarType::Int32:
+                                    {
+                                        int32_t v{};
+                                        if (!ReadRaw(file, v)) return std::nullopt;
+                                        if (HostIsLittleEndian() != fileIsLittle) v = ByteSwap(v);
+                                        return (double)v;
+                                    }
+                                    case PlyScalarType::UInt32:
+                                    {
+                                        uint32_t v{};
+                                        if (!ReadRaw(file, v)) return std::nullopt;
+                                        if (HostIsLittleEndian() != fileIsLittle) v = ByteSwap(v);
+                                        return (double)v;
+                                    }
+                                    case PlyScalarType::Float32:
+                                    {
+                                        float v{};
+                                        if (!ReadRaw(file, v)) return std::nullopt;
+                                        if (HostIsLittleEndian() != fileIsLittle) v = ByteSwap(v);
+                                        return (double)v;
+                                    }
+                                    case PlyScalarType::Float64:
+                                    {
+                                        double v{};
+                                        if (!ReadRaw(file, v)) return std::nullopt;
+                                        if (HostIsLittleEndian() != fileIsLittle) v = ByteSwap(v);
+                                        return v;
+                                    }
+                                    }
+                                    return std::nullopt;
+                                };
+
+                                const auto maybeVal = readScalar();
+                                if (!maybeVal) return false;
+
+                                if ((int)pIndex == idxX) pos.x = (float)(*maybeVal);
+                                else if ((int)pIndex == idxY) pos.y = (float)(*maybeVal);
+                                else if ((int)pIndex == idxZ) pos.z = (float)(*maybeVal);
+                                else if ((int)pIndex == idxNX) nrm.x = (float)(*maybeVal);
+                                else if ((int)pIndex == idxNY) nrm.y = (float)(*maybeVal);
+                                else if ((int)pIndex == idxNZ) nrm.z = (float)(*maybeVal);
+                                else if ((int)pIndex == idxS) uv.x = (float)(*maybeVal);
+                                else if ((int)pIndex == idxT) uv.y = (float)(*maybeVal);
+                                else if ((int)pIndex == idxR) { rgba.r = (float)(*maybeVal); gotColor = true; }
+                                else if ((int)pIndex == idxG) rgba.g = (float)(*maybeVal);
+                                else if ((int)pIndex == idxB) rgba.b = (float)(*maybeVal);
+                                else if ((int)pIndex == idxA) rgba.a = (float)(*maybeVal);
+                            }
+
+                            outData.Positions[i] = pos;
+                            if (hasNormals) outData.Normals[i] = nrm;
+
+                            if (hasColors && gotColor)
+                            {
+                                float rf = rgba.r;
+                                float gf = rgba.g;
+                                float bf = rgba.b;
+                                float af = hasAlpha ? rgba.a : 255.0f;
+                                if (rf > 1.0f || gf > 1.0f || bf > 1.0f || af > 1.0f)
+                                {
+                                    rf /= 255.0f;
+                                    gf /= 255.0f;
+                                    bf /= 255.0f;
+                                    af /= 255.0f;
+                                }
+                                outData.Aux[i] = glm::vec4(rf, gf, bf, af);
+                            }
+
+                            if (hasUVs)
+                            {
+                                outData.Aux[i].x = uv.x;
+                                outData.Aux[i].y = uv.y;
+                            }
                         }
                     }
                 }
-
-                if (!indicesProp)
+                else if (elem.Name == "face")
                 {
-                    Core::Log::Error("PLY: face element has no list property for indices");
-                    return false;
-                }
-
-                for (size_t f = 0; f < faceElement.Count; ++f)
-                {
-                    const auto maybeCountU64 = ReadScalarAsU64(file, indicesProp->ListCountType, fileIsLittle);
-                    if (!maybeCountU64)
+                    if (faceElement.Count == 0)
                     {
-                        Core::Log::Error("PLY: Failed reading face list count");
-                        return false;
-                    }
-
-                    const size_t count = static_cast<size_t>(*maybeCountU64);
-                    if (count < 2)
-                    {
-                        // still need to skip any malformed data
-                        for (size_t k = 0; k < count; ++k)
-                        {
-                            (void)ReadScalarAsU64(file, indicesProp->ListElementType, fileIsLittle);
-                        }
+                        outData.Topology = PrimitiveTopology::Points;
                         continue;
                     }
 
-                    std::vector<uint32_t> faceIndices(count);
-                    for (size_t k = 0; k < count; ++k)
+                    outData.Topology = PrimitiveTopology::Triangles;
+
+                    if (!faceIndicesProp)
                     {
-                        const auto maybeIdx = ReadScalarAsU64(file, indicesProp->ListElementType, fileIsLittle);
-                        if (!maybeIdx)
-                        {
-                            Core::Log::Error("PLY: Failed reading face index {}", k);
-                            return false;
-                        }
-                        faceIndices[k] = static_cast<uint32_t>(*maybeIdx);
+                        Core::Log::Error("PLY: face element has no usable list property for indices");
+                        return false;
                     }
 
-                    // triangulate fan (works for triangles/quads/n-gons)
-                    for (size_t k = 1; k + 1 < faceIndices.size(); ++k)
+                    for (size_t f = 0; f < faceElement.Count; ++f)
                     {
-                        outData.Indices.push_back(faceIndices[0]);
-                        outData.Indices.push_back(faceIndices[k]);
-                        outData.Indices.push_back(faceIndices[k + 1]);
+                        std::vector<uint32_t> faceIndices;
+
+                        for (const auto& p : faceElement.Properties)
+                        {
+                            if (&p == faceIndicesProp)
+                            {
+                                const auto maybeCountU64 = ReadScalarAsU64(file, p.ListCountType, fileIsLittle);
+                                if (!maybeCountU64)
+                                {
+                                    Core::Log::Error("PLY: Failed reading face list count");
+                                    return false;
+                                }
+
+                                const size_t count = static_cast<size_t>(*maybeCountU64);
+                                faceIndices.resize(count);
+                                for (size_t k = 0; k < count; ++k)
+                                {
+                                    const auto maybeIdx = ReadScalarAsU64(file, p.ListElementType, fileIsLittle);
+                                    if (!maybeIdx)
+                                    {
+                                        Core::Log::Error("PLY: Failed reading face index {}", k);
+                                        return false;
+                                    }
+                                    faceIndices[k] = static_cast<uint32_t>(*maybeIdx);
+                                }
+                            }
+                            else
+                            {
+                                if (!SkipBinaryProperty(file, p, fileIsLittle))
+                                {
+                                    Core::Log::Error("PLY: Failed skipping face property '{}'", p.Name);
+                                    return false;
+                                }
+                            }
+                        }
+
+                        if (faceIndices.size() >= 3)
+                        {
+                            for (size_t k = 1; k + 1 < faceIndices.size(); ++k)
+                            {
+                                outData.Indices.push_back(faceIndices[0]);
+                                outData.Indices.push_back(faceIndices[k]);
+                                outData.Indices.push_back(faceIndices[k + 1]);
+                            }
+                        }
+                    }
+                }
+                else if (elem.Name == "tristrips")
+                {
+                    // Common in some scanners / VCGLIB / custom exporters.
+                    // Typical header:
+                    // element tristrips 1
+                    // property list int int vertex_indices
+
+                    const PlyProperty* stripProp = nullptr;
+                    for (const auto& p : elem.Properties)
+                    {
+                        if (p.IsList)
+                        {
+                            stripProp = &p;
+                            break;
+                        }
+                    }
+
+                    if (!stripProp)
+                    {
+                        Core::Log::Error("PLY: tristrips element has no list property");
+                        return false;
+                    }
+
+                    outData.Topology = PrimitiveTopology::Triangles;
+                    connectivityElementName = "tristrips";
+
+                    for (size_t s = 0; s < elem.Count; ++s)
+                    {
+                        std::vector<int64_t> strip;
+
+                        for (const auto& p : elem.Properties)
+                        {
+                            if (&p == stripProp)
+                            {
+                                const auto maybeCountU64 = ReadScalarAsU64(file, p.ListCountType, fileIsLittle);
+                                if (!maybeCountU64)
+                                {
+                                    Core::Log::Error("PLY: Failed reading tristrips list count");
+                                    return false;
+                                }
+
+                                const size_t count = static_cast<size_t>(*maybeCountU64);
+                                strip.resize(count);
+                                for (size_t k = 0; k < count; ++k)
+                                {
+                                    const auto maybeIdxI64 = ReadScalarAsI64(file, p.ListElementType, fileIsLittle);
+                                    if (!maybeIdxI64)
+                                    {
+                                        Core::Log::Error("PLY: Failed reading tristrips index {}", k);
+                                        return false;
+                                    }
+                                    strip[k] = *maybeIdxI64;
+                                }
+                            }
+                            else
+                            {
+                                if (!SkipBinaryProperty(file, p, fileIsLittle))
+                                {
+                                    Core::Log::Error("PLY: Failed skipping tristrips property '{}'", p.Name);
+                                    return false;
+                                }
+                            }
+                        }
+
+                        AppendTriStripAsTriangles(strip, outData.Indices);
+                    }
+                }
+                else
+                {
+                    // Unknown element: skip its payload safely.
+                    for (size_t i = 0; i < elem.Count; ++i)
+                    {
+                        for (const auto& p : elem.Properties)
+                        {
+                            if (!SkipBinaryProperty(file, p, fileIsLittle))
+                            {
+                                Core::Log::Error("PLY: Failed skipping element '{}' property '{}'", elem.Name, p.Name);
+                                return false;
+                            }
+                        }
                     }
                 }
             }
-            else
+
+            if (faceElement.Count == 0 && connectivityElementName.empty())
             {
                 outData.Topology = PrimitiveTopology::Points;
             }
@@ -1155,10 +1655,21 @@ namespace Graphics
                 segment.CollisionGeometry->LocalAABB = Geometry::Union(aabbs);
 
                 std::vector<Geometry::AABB> primitiveBounds;
-                if (meshData.Indices.empty())
+
+                // For point clouds, each point is its own primitive (no triangles).
+                if (meshData.Topology == PrimitiveTopology::Points)
                 {
+                    primitiveBounds.reserve(meshData.Positions.size());
+                    for (const auto& pos : meshData.Positions)
+                    {
+                        primitiveBounds.push_back(Geometry::AABB{pos, pos});
+                    }
+                }
+                else if (meshData.Indices.empty())
+                {
+                    // Non-indexed triangle mesh
                     primitiveBounds.reserve(meshData.Positions.size() / 3);
-                    for (size_t i = 0; i < meshData.Positions.size(); i += 3)
+                    for (size_t i = 0; i + 2 < meshData.Positions.size(); i += 3)
                     {
                         auto aabb = Geometry::AABB{meshData.Positions[i], meshData.Positions[i]};
                         aabb = Geometry::Union(aabb, meshData.Positions[i + 1]);
@@ -1168,16 +1679,20 @@ namespace Graphics
                 }
                 else
                 {
+                    // Indexed triangle mesh
                     primitiveBounds.reserve(meshData.Indices.size() / 3);
-                    for (size_t i = 0; i < meshData.Indices.size(); i += 3)
+                    for (size_t i = 0; i + 2 < meshData.Indices.size(); i += 3)
                     {
                         const uint32_t i0 = meshData.Indices[i];
                         const uint32_t i1 = meshData.Indices[i + 1];
                         const uint32_t i2 = meshData.Indices[i + 2];
-                        auto aabb = Geometry::AABB{meshData.Positions[i0], meshData.Positions[i0]};
-                        aabb = Geometry::Union(aabb, meshData.Positions[i1]);
-                        aabb = Geometry::Union(aabb, meshData.Positions[i2]);
-                        primitiveBounds.push_back(aabb);
+                        if (i0 < meshData.Positions.size() && i1 < meshData.Positions.size() && i2 < meshData.Positions.size())
+                        {
+                            auto aabb = Geometry::AABB{meshData.Positions[i0], meshData.Positions[i0]};
+                            aabb = Geometry::Union(aabb, meshData.Positions[i1]);
+                            aabb = Geometry::Union(aabb, meshData.Positions[i2]);
+                            primitiveBounds.push_back(aabb);
+                        }
                     }
                 }
 
