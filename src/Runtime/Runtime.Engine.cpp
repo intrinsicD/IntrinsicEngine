@@ -142,6 +142,7 @@ namespace Runtime
         m_GeometryStorage.Clear();
 
         m_Pipeline.reset();
+        m_PickPipeline.reset();
         m_BindlessSystem.reset();
         m_DescriptorPool.reset();
         m_DescriptorLayout.reset();
@@ -358,62 +359,92 @@ namespace Runtime
         // Resolve shader paths robustly. Depending on how the app is launched, the CWD may be
         // the repo root, the build dir, or bin/. Prefer the common dev layout: <bin>/shaders/*.spv.
 
+        // ---------------------------------------------------------------------
+        // Main forward pipeline (textured)
+        // ---------------------------------------------------------------------
         RHI::ShaderModule vert(*m_Device, Core::Filesystem::GetShaderPath("shaders/triangle.vert.spv"),
                                RHI::ShaderStage::Vertex);
         RHI::ShaderModule frag(*m_Device, Core::Filesystem::GetShaderPath("shaders/triangle.frag.spv"),
                                RHI::ShaderStage::Fragment);
 
-        // --- NEW: Using Builder ---
         RHI::PipelineBuilder builder(m_Device);
-
-        // 1. Shaders
         builder.SetShaders(&vert, &frag);
-
-        // 2. Vertex Layout (Previously hardcoded inside RHI::Types)
         builder.SetInputLayout(RHI::StandardLayoutFactory::Get());
-
-        // 3. Render Targets (Dynamic Rendering)
         builder.SetColorFormats({m_Swapchain->GetImageFormat()});
         builder.SetDepthFormat(RHI::VulkanImage::FindDepthFormat(*m_Device));
-
-        // 4. Layouts
         builder.AddDescriptorSetLayout(m_DescriptorLayout->GetHandle());
         builder.AddDescriptorSetLayout(m_BindlessSystem->GetLayout());
 
-        // 5. Push Constants
         VkPushConstantRange pushConstant{};
         pushConstant.offset = 0;
         pushConstant.size = sizeof(RHI::MeshPushConstants);
         pushConstant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
         builder.AddPushConstantRange(pushConstant);
 
-        // Build
         auto pipelineResult = builder.Build();
         if (pipelineResult)
         {
             m_Pipeline = std::move(*pipelineResult);
             Core::Log::Info("Pipeline built successfully using Builder.");
-
-            Core::Log::Info("About to create RenderSystem...");
-            m_RenderSystem = std::make_unique<Graphics::RenderSystem>(
-                m_Device,
-                *m_Swapchain,
-                *m_Renderer,
-                *m_BindlessSystem,
-                *m_DescriptorPool,
-                *m_DescriptorLayout,
-                *m_Pipeline,
-                m_FrameArena,
-                m_FrameScope,
-                m_GeometryStorage
-            );
-            Core::Log::Info("RenderSystem created successfully.");
         }
         else
         {
             Core::Log::Error("Failed to build pipeline: {}", (int)pipelineResult.error());
             std::exit(1);
         }
+
+        // ---------------------------------------------------------------------
+        // GPU picking pipeline (ID buffer)
+        // ---------------------------------------------------------------------
+        RHI::ShaderModule pickVert(*m_Device, Core::Filesystem::GetShaderPath("shaders/pick_id.vert.spv"),
+                                   RHI::ShaderStage::Vertex);
+        RHI::ShaderModule pickFrag(*m_Device, Core::Filesystem::GetShaderPath("shaders/pick_id.frag.spv"),
+                                   RHI::ShaderStage::Fragment);
+
+        RHI::PipelineBuilder pickBuilder(m_Device);
+        pickBuilder.SetShaders(&pickVert, &pickFrag);
+        pickBuilder.SetInputLayout(RHI::StandardLayoutFactory::Get());
+
+        // ID target is R32_UINT.
+        pickBuilder.SetColorFormats({VK_FORMAT_R32_UINT});
+        pickBuilder.SetDepthFormat(RHI::VulkanImage::FindDepthFormat(*m_Device));
+
+        // Only needs camera set 0 (no textures).
+        pickBuilder.AddDescriptorSetLayout(m_DescriptorLayout->GetHandle());
+
+        VkPushConstantRange pickPush{};
+        pickPush.offset = 0;
+        pickPush.size = sizeof(glm::mat4) + sizeof(uint32_t);
+        pickPush.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+        pickBuilder.AddPushConstantRange(pickPush);
+
+        auto pickPipelineResult = pickBuilder.Build();
+        if (pickPipelineResult)
+        {
+            m_PickPipeline = std::move(*pickPipelineResult);
+            Core::Log::Info("Pick pipeline built successfully.");
+        }
+        else
+        {
+            Core::Log::Error("Failed to build pick pipeline: {}", (int)pickPipelineResult.error());
+            std::exit(1);
+        }
+
+        Core::Log::Info("About to create RenderSystem...");
+        m_RenderSystem = std::make_unique<Graphics::RenderSystem>(
+            m_Device,
+            *m_Swapchain,
+            *m_Renderer,
+            *m_BindlessSystem,
+            *m_DescriptorPool,
+            *m_DescriptorLayout,
+            *m_Pipeline,
+            *m_PickPipeline,
+            m_FrameArena,
+            m_FrameScope,
+            m_GeometryStorage
+        );
+        Core::Log::Info("RenderSystem created successfully.");
 
         if (!m_RenderSystem)
         {

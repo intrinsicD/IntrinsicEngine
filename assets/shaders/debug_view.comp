@@ -1,0 +1,79 @@
+#version 450
+
+// Debug resolve: convert various source formats into RGBA8 for ImGui visualization.
+//
+// Supported today:
+//  - R32_UINT: entity id buffer, hashed into RGB
+//  - D32_SFLOAT / D24_UNORM_S8_UINT / D32_SFLOAT_S8_UINT: depth (uses .r, maps to grayscale)
+//  - Everything else: treat as normalized float4 and write to RGBA8
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform sampler2D uSrcFloat;              // for float/normalized color
+layout(set = 0, binding = 1) uniform usampler2D uSrcUint;              // for R32_UINT
+layout(set = 0, binding = 2) uniform sampler2D uSrcDepth;              // for depth (sampled)
+layout(set = 0, binding = 3, rgba8) writeonly uniform image2D uDst;     // RGBA8 output
+
+layout(push_constant) uniform Push
+{
+    ivec2 Extent;
+    int Mode; // 0=float, 1=uint, 2=depth
+    float DepthNear;
+    float DepthFar;
+} pc;
+
+// 32-bit integer hash -> RGB in [0,1]
+vec3 HashColor(uint v)
+{
+    // https://www.shadertoy.com/view/4djSRW-ish (simple integer hashing)
+    v ^= v >> 16;
+    v *= 0x7feb352du;
+    v ^= v >> 15;
+    v *= 0x846ca68bu;
+    v ^= v >> 16;
+
+    // Use three different mixes
+    uint r = v;
+    uint g = v * 1664525u + 1013904223u;
+    uint b = v * 22695477u + 1u;
+
+    return vec3(float(r & 255u), float(g & 255u), float(b & 255u)) / 255.0;
+}
+
+float LinearizeDepth(float z)
+{
+    // Assumes standard perspective depth in [0,1].
+    // If your projection differs, tweak this mapping.
+    float n = max(pc.DepthNear, 1e-6);
+    float f = max(pc.DepthFar, n + 1e-6);
+    return (2.0 * n) / (f + n - z * (f - n));
+}
+
+void main()
+{
+    ivec2 p = ivec2(gl_GlobalInvocationID.xy);
+    if (p.x >= pc.Extent.x || p.y >= pc.Extent.y) return;
+
+    vec4 outColor = vec4(0.0, 0.0, 0.0, 1.0);
+
+    if (pc.Mode == 1)
+    {
+        uint id = texelFetch(uSrcUint, p, 0).x;
+        outColor.rgb = (id == 0u) ? vec3(0.0) : HashColor(id);
+    }
+    else if (pc.Mode == 2)
+    {
+        float z = texelFetch(uSrcDepth, p, 0).r;
+        float lin = LinearizeDepth(z);
+        outColor.rgb = vec3(clamp(lin / pc.DepthFar, 0.0, 1.0));
+    }
+    else
+    {
+        vec4 c = texelFetch(uSrcFloat, p, 0);
+        // Basic clamp; no tonemapping.
+        outColor = vec4(clamp(c.rgb, 0.0, 1.0), 1.0);
+    }
+
+    imageStore(uDst, p, outColor);
+}
+

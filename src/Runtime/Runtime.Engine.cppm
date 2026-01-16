@@ -13,6 +13,7 @@ import Core;
 import RHI;
 import Graphics;
 import ECS;
+import Runtime.SelectionModule;
 
 export namespace Runtime
 {
@@ -51,6 +52,7 @@ export namespace Runtime
         std::unique_ptr<RHI::DescriptorLayout> m_DescriptorLayout;
         std::unique_ptr<RHI::DescriptorAllocator> m_DescriptorPool;
         std::unique_ptr<RHI::GraphicsPipeline> m_Pipeline;
+        std::unique_ptr<RHI::GraphicsPipeline> m_PickPipeline;
         std::unique_ptr<RHI::BindlessDescriptorSystem> m_BindlessSystem;
     public:
 
@@ -61,6 +63,12 @@ export namespace Runtime
         Core::Memory::ScopeStack m_FrameScope;  // per-frame scope allocator with destructors
         Graphics::GeometryStorage m_GeometryStorage;
         std::unique_ptr<Graphics::RenderSystem> m_RenderSystem;
+
+        // Engine-owned selection controller (Editor-like single selection).
+        SelectionModule m_Selection;
+
+        [[nodiscard]] SelectionModule& GetSelection() { return m_Selection; }
+        [[nodiscard]] const SelectionModule& GetSelection() const { return m_Selection; }
 
         // Helper to access the camera buffer (Temporary until we have a Camera Component)
         [[nodiscard]] RHI::VulkanBuffer* GetGlobalUBO() const { return m_RenderSystem->GetGlobalUBO(); }
@@ -79,6 +87,8 @@ export namespace Runtime
             std::lock_guard lock(m_MainThreadQueueMutex);
             m_MainThreadQueue.emplace_back(Core::Tasks::LocalTask(std::forward<F>(task)));
         }
+
+
 
     protected:
         std::shared_ptr<RHI::Texture> m_DefaultTexture;

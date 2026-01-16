@@ -14,6 +14,9 @@ else ()
             triangle.frag
             pick_id.vert
             pick_id.frag
+            debug_view.vert
+            debug_view.frag
+            debug_view.comp
     )
 
     foreach (SHADER ${SHADERS})

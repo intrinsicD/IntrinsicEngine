@@ -117,6 +117,39 @@ export namespace Graphics
         std::vector<VkBuffer> m_PhysicalBuffers;
     };
 
+    struct RenderGraphDebugImage
+    {
+        Core::Hash::StringID Name{};
+        ResourceID Resource{};
+
+        VkExtent2D Extent{0u, 0u};
+        VkFormat Format{VK_FORMAT_UNDEFINED};
+        VkImageUsageFlags Usage{0};
+        VkImageAspectFlags Aspect{0};
+        VkImageLayout CurrentLayout{VK_IMAGE_LAYOUT_UNDEFINED};
+
+        VkImage Image{VK_NULL_HANDLE};
+        VkImageView View{VK_NULL_HANDLE};
+
+        uint32_t StartPass{~0u};
+        uint32_t EndPass{0u};
+    };
+
+    struct RenderGraphDebugPass
+    {
+        const char* Name = "";
+        uint32_t PassIndex = 0;
+
+        struct Attachment
+        {
+            Core::Hash::StringID ResourceName{};
+            ResourceID Resource{};
+            bool IsDepth = false;
+        };
+
+        std::vector<Attachment> Attachments{};
+    };
+
     // -------------------------------------------------------------------------
     // The Render Graph
     // -------------------------------------------------------------------------
@@ -190,6 +223,10 @@ export namespace Graphics
         // Clear transient resource pools (images/buffers).
         // Intended for swapchain resize or other events that invalidate most cached extents/sizes.
         void Trim();
+
+        // Debug/introspection for UI: valid after Compile() until Reset().
+        [[nodiscard]] std::vector<RenderGraphDebugPass> BuildDebugPassList() const;
+        [[nodiscard]] std::vector<RenderGraphDebugImage> BuildDebugImageList() const;
 
         // Internal methods for Builder
         friend class RGBuilder;

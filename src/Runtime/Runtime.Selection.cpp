@@ -95,18 +95,11 @@ namespace Runtime::Selection
             if (positions.empty() || indices.size() < 3) continue;
 
             // Optional: broadphase using the mesh's local octree (vertex AABBs).
-            // Current collision data stores a vertex octree, not a triangle BVH; use it as a conservative filter.
-            std::vector<size_t> candidateVertices;
-            if (!collider.CollisionRef->LocalOctree.m_Nodes.empty())
-            {
-                collider.CollisionRef->LocalOctree.QueryRay(rayLocal, candidateVertices);
-                if (candidateVertices.empty())
-                {
-                    // Still could intersect a triangle that has no vertex AABB overlap due to slab test quirks,
-                    // but in practice this is a good conservative early-out.
-                    continue;
-                }
-            }
+            // NOTE: Disabled for robustness.
+            // The current collision data stores a vertex octree, which is not a triangle BVH.
+            // Additionally, Ray-vs-AABB slab tests can produce NaNs/inf for degenerate rays
+            // (e.g., zero components in direction) and trigger ASAN/UBSAN failures.
+            // We rely on the conservative world AABB broadphase + watertight triangle test.
 
             // Narrow phase.
             const float tMax = std::min(request.MaxDistance, best.T);

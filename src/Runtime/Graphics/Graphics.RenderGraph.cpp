@@ -617,4 +617,62 @@ namespace Graphics
             }
         }
     }
+
+    std::vector<RenderGraphDebugPass> RenderGraph::BuildDebugPassList() const
+    {
+        std::vector<RenderGraphDebugPass> out;
+        out.reserve(m_ActivePassCount);
+
+        for (uint32_t i = 0; i < m_ActivePassCount; ++i)
+        {
+            const auto& p = m_PassPool[i];
+            RenderGraphDebugPass dp{};
+            dp.Name = p.Name.c_str();
+            dp.PassIndex = i;
+            dp.Attachments.reserve(p.Attachments.size());
+
+            for (const auto& att : p.Attachments)
+            {
+                if (att.ID >= m_ResourcePool.size())
+                    continue;
+
+                const auto& res = m_ResourcePool[att.ID];
+                dp.Attachments.push_back({res.Name, att.ID, att.IsDepth});
+            }
+
+            out.push_back(std::move(dp));
+        }
+
+        return out;
+    }
+
+    std::vector<RenderGraphDebugImage> RenderGraph::BuildDebugImageList() const
+    {
+        std::vector<RenderGraphDebugImage> out;
+        out.reserve(m_ActiveResourceCount);
+
+        for (uint32_t i = 0; i < m_ActiveResourceCount; ++i)
+        {
+            const auto& res = m_ResourcePool[i];
+            if (res.Type != ResourceType::Texture && res.Type != ResourceType::Import)
+                continue;
+
+            RenderGraphDebugImage di{};
+            di.Name = res.Name;
+            di.Resource = i;
+            di.Extent = res.Extent;
+            di.Format = res.Format;
+            di.Usage = res.Usage;
+            di.Aspect = res.Aspect;
+            di.CurrentLayout = res.CurrentLayout;
+            di.Image = res.PhysicalImage;
+            di.View = res.PhysicalView;
+            di.StartPass = res.StartPass;
+            di.EndPass = res.EndPass;
+
+            out.push_back(di);
+        }
+
+        return out;
+    }
 }

@@ -561,4 +561,16 @@ namespace Interface::GUI
 
         return changed;
     }
+
+    void* AddTexture(VkSampler sampler, VkImageView imageView, VkImageLayout imageLayout)
+    {
+        // ImGui's Vulkan backend returns an opaque ImTextureID.
+        return ImGui_ImplVulkan_AddTexture(sampler, imageView, imageLayout);
+    }
+
+    void RemoveTexture(void* textureId)
+    {
+        if (!textureId) return;
+        ImGui_ImplVulkan_RemoveTexture(reinterpret_cast<VkDescriptorSet>(textureId));
+    }
 }

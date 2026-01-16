@@ -102,6 +102,39 @@ namespace RHI
         return *this;
     }
 
+    PipelineBuilder& PipelineBuilder::SetTopology(VkPrimitiveTopology topology)
+    {
+        m_InputAssembly.topology = topology;
+        return *this;
+    }
+
+    PipelineBuilder& PipelineBuilder::SetPolygonMode(VkPolygonMode mode)
+    {
+        m_Rasterizer.polygonMode = mode;
+        return *this;
+    }
+
+    PipelineBuilder& PipelineBuilder::SetCullMode(VkCullModeFlags cullMode, VkFrontFace frontFace)
+    {
+        m_Rasterizer.cullMode = cullMode;
+        m_Rasterizer.frontFace = frontFace;
+        return *this;
+    }
+
+    PipelineBuilder& PipelineBuilder::SetMultisampling(VkSampleCountFlagBits samples)
+    {
+        m_Multisampling.rasterizationSamples = samples;
+        return *this;
+    }
+
+    PipelineBuilder& PipelineBuilder::DisableDepthTest()
+    {
+        m_DepthStencil.depthTestEnable = VK_FALSE;
+        m_DepthStencil.depthWriteEnable = VK_FALSE;
+        m_DepthStencil.depthCompareOp = VK_COMPARE_OP_ALWAYS;
+        return *this;
+    }
+
     std::expected<std::unique_ptr<GraphicsPipeline>, VkResult> PipelineBuilder::Build()
     {
         // 1. Pipeline Layout

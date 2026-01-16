@@ -45,4 +45,13 @@ export namespace Interface::GUI
     [[nodiscard]] bool WantCaptureKeyboard();
 
     bool DrawVec3Control(const std::string& label, glm::vec3& values, float resetValue = 0.0f, float columnWidth = 100.0f);
+
+    // Registers a sampled image for use with ImGui::Image(). Returns an ImTextureID that remains valid
+    // until explicitly removed via RemoveTexture().
+    //
+    // Note: The image view must remain alive while the texture is registered.
+    [[nodiscard]] void* AddTexture(VkSampler sampler, VkImageView imageView, VkImageLayout imageLayout);
+
+    // Unregisters a previously added ImGui texture.
+    void RemoveTexture(void* textureId);
 }

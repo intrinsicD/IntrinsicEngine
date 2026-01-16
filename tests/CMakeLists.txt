@@ -13,6 +13,7 @@ add_executable(${target_name}
         Test_RuntimeRHI.cpp
         Test_RuntimeECS.cpp
         Test_RuntimeGeometry.cpp
+        Test_RuntimeSelection.cpp
 )
 
 #Apply Strict Flags ONLY to our tests

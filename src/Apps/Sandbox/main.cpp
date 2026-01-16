@@ -9,6 +9,7 @@
 #include <tiny_gltf.h>
 
 import Runtime.Engine;
+import Runtime.Selection;
 import Core;
 import Graphics;
 import ECS;
@@ -34,11 +35,13 @@ public:
 
     // State to track if we have spawned the entity yet
     bool m_IsEntitySpawned = false;
-    entt::entity m_SelectedEntity = entt::null;
 
     // Camera State
     entt::entity m_CameraEntity = entt::null;
     Graphics::CameraComponent m_Camera;
+
+    // Editor / Selection Settings
+    int m_SelectMouseButton = 1; // 0=LMB, 1=RMB, 2=MMB. Default: RMB to avoid conflict with LMB-drag orbit.
 
     void OnStart() override
     {
@@ -126,6 +129,29 @@ public:
         {
             ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
             ImGui::Text("Entities: %d", (int)m_Scene.Size());
+
+            // --- Selection Debug ---
+            ImGui::SeparatorText("Selection");
+            ImGui::Text("Select Mouse Button: %d", m_SelectMouseButton);
+
+            const entt::entity selected = GetSelection().GetSelectedEntity(m_Scene);
+            const bool selectedValid = (selected != entt::null) && m_Scene.GetRegistry().valid(selected);
+
+            ImGui::Text("Selected: %u (%s)",
+                        static_cast<uint32_t>(static_cast<entt::id_type>(selected)),
+                        selectedValid ? "valid" : "invalid");
+
+            if (selectedValid)
+            {
+                const auto& reg = m_Scene.GetRegistry();
+                const bool hasSelectedTag = reg.all_of<ECS::Components::Selection::SelectedTag>(selected);
+                const bool hasSelectableTag = reg.all_of<ECS::Components::Selection::SelectableTag>(selected);
+                const bool hasMeshRenderer = reg.all_of<ECS::MeshRenderer::Component>(selected);
+                const bool hasMeshCollider = reg.all_of<ECS::MeshCollider::Component>(selected);
+
+                ImGui::Text("Tags: Selectable=%d Selected=%d", (int)hasSelectableTag, (int)hasSelectedTag);
+                ImGui::Text("Components: MeshRenderer=%d MeshCollider=%d", (int)hasMeshRenderer, (int)hasMeshCollider);
+            }
         });
     }
 
@@ -189,7 +215,6 @@ public:
                 {
                     auto entity = m_Scene.CreateEntity(meshSegment->Name);
 
-                    m_SelectedEntity = entity;
                     auto& t = m_Scene.GetRegistry().get<ECS::Components::Transform::Component>(entity);
                     t.Scale = glm::vec3(0.01f);
                     m_Scene.GetRegistry().emplace<ECS::Components::AxisRotator::Component>(entity, ECS::Components::AxisRotator::Component::Y());
@@ -201,6 +226,13 @@ public:
                     auto& collider = m_Scene.GetRegistry().emplace<ECS::MeshCollider::Component>(entity);
                     collider.CollisionRef = meshSegment->CollisionGeometry; // Shared Ptr
                     collider.WorldOBB.Center = meshSegment->CollisionGeometry->LocalAABB.GetCenter();
+
+                    // Mark entity as selectable by the editor picking system.
+                    m_Scene.GetRegistry().emplace_or_replace<ECS::Components::Selection::SelectableTag>(entity);
+
+                    // Optional: auto-select first spawned entity for convenience.
+                    if (GetSelection().GetSelectedEntity(m_Scene) == entt::null)
+                        GetSelection().SetSelectedEntity(m_Scene, entity);
 
                     m_IsEntitySpawned = true;
                     Log::Info("Duck Entity Spawned.");
@@ -235,6 +267,22 @@ public:
             }
         }
 
+        // ---------------------------------------------------------------------
+        // Selection: delegate click-to-pick-to-registry-tags to the Engine module.
+        // ---------------------------------------------------------------------
+        if (cameraComponent != nullptr && m_RenderSystem)
+        {
+            // Keep module config in sync with the UI setting.
+            GetSelection().GetConfig().MouseButton = m_SelectMouseButton;
+
+            GetSelection().Update(
+                m_Scene,
+                *m_RenderSystem,
+                cameraComponent,
+                *m_Window,
+                uiCapturesMouse);
+        }
+
         // Draw
         if (cameraComponent != nullptr && m_RenderSystem)
         {
@@ -250,6 +298,20 @@ public:
     {
         ImGui::Begin("Scene Hierarchy");
 
+        // Editor settings
+        if (ImGui::CollapsingHeader("Selection", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            ImGui::TextUnformatted("Pick mouse button:");
+            ImGui::SameLine();
+            ImGui::RadioButton("LMB", &m_SelectMouseButton, 0);
+            ImGui::SameLine();
+            ImGui::RadioButton("RMB", &m_SelectMouseButton, 1);
+            ImGui::SameLine();
+            ImGui::RadioButton("MMB", &m_SelectMouseButton, 2);
+        }
+
+        const entt::entity selected = GetSelection().GetSelectedEntity(m_Scene);
+
         m_Scene.GetRegistry().view<entt::entity>().each([&](auto entityID)
         {
             // Try to get tag, default to "Entity"
@@ -260,7 +322,7 @@ public:
             }
 
             // Selection flags
-            ImGuiTreeNodeFlags flags = ((m_SelectedEntity == entityID) ? ImGuiTreeNodeFlags_Selected : 0) |
+            ImGuiTreeNodeFlags flags = ((selected == entityID) ? ImGuiTreeNodeFlags_Selected : 0) |
                 ImGuiTreeNodeFlags_OpenOnArrow;
             flags |= ImGuiTreeNodeFlags_SpanAvailWidth;
 
@@ -269,20 +331,19 @@ public:
 
             if (ImGui::IsItemClicked())
             {
-                m_SelectedEntity = entityID;
+                GetSelection().SetSelectedEntity(m_Scene, entityID);
             }
 
             if (opened)
             {
-                // If we had children, we'd loop here. For now, flat hierarchy.
                 ImGui::TreePop();
             }
         });
 
-        // Deselect if clicking in empty space
+        // Deselect if clicking in empty space (in the hierarchy panel)
         if (ImGui::IsMouseDown(0) && ImGui::IsWindowHovered())
         {
-            m_SelectedEntity = entt::null;
+            GetSelection().ClearSelection(m_Scene);
         }
 
         // Context Menu for creating new entities
@@ -294,10 +355,11 @@ public:
             }
             if (ImGui::MenuItem("Remove Entity"))
             {
-                if (m_SelectedEntity != entt::null && m_Scene.GetRegistry().valid(m_SelectedEntity))
+                const entt::entity cur = GetSelection().GetSelectedEntity(m_Scene);
+                if (cur != entt::null && m_Scene.GetRegistry().valid(cur))
                 {
-                    m_Scene.GetRegistry().destroy(m_SelectedEntity);
-                    m_SelectedEntity = entt::null;
+                    m_Scene.GetRegistry().destroy(cur);
+                    GetSelection().ClearSelection(m_Scene);
                 }
             }
             ImGui::EndPopup();
@@ -310,14 +372,16 @@ public:
     {
         ImGui::Begin("Inspector");
 
-        if (m_SelectedEntity != entt::null && m_Scene.GetRegistry().valid(m_SelectedEntity))
+        const entt::entity selected = GetSelection().GetSelectedEntity(m_Scene);
+
+        if (selected != entt::null && m_Scene.GetRegistry().valid(selected))
         {
             auto& reg = m_Scene.GetRegistry();
 
             // 1. Tag Component
-            if (reg.all_of<ECS::Components::NameTag::Component>(m_SelectedEntity))
+            if (reg.all_of<ECS::Components::NameTag::Component>(selected))
             {
-                auto& tag = reg.get<ECS::Components::NameTag::Component>(m_SelectedEntity);
+                auto& tag = reg.get<ECS::Components::NameTag::Component>(selected);
                 char buffer[256];
                 memset(buffer, 0, sizeof(buffer));
                 strncpy(buffer, tag.Name.c_str(), sizeof(buffer) - 1);
@@ -330,20 +394,17 @@ public:
             ImGui::Separator();
 
             // 2. Transform Component
-            if (reg.all_of<ECS::Components::Transform::Component>(m_SelectedEntity))
+            if (reg.all_of<ECS::Components::Transform::Component>(selected))
             {
                 if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen))
                 {
-                    auto& transform = reg.get<ECS::Components::Transform::Component>(m_SelectedEntity);
+                    auto& transform = reg.get<ECS::Components::Transform::Component>(selected);
 
                     Interface::GUI::DrawVec3Control("Position", transform.Position);
 
-                    // Convert to degrees for display
-                    //quaternion to euler angles
                     glm::vec3 rotationDegrees = glm::degrees(glm::eulerAngles(transform.Rotation));
                     if (Interface::GUI::DrawVec3Control("Rotation", rotationDegrees))
                     {
-                        //euler angles to quaternion
                         transform.Rotation = glm::quat(glm::radians(rotationDegrees));
                     }
 
@@ -352,20 +413,15 @@ public:
             }
 
             // 3. Mesh Info
-            if (reg.all_of<ECS::MeshRenderer::Component>(m_SelectedEntity))
+            if (reg.all_of<ECS::MeshRenderer::Component>(selected))
             {
                 if (ImGui::CollapsingHeader("Mesh Renderer", ImGuiTreeNodeFlags_DefaultOpen))
                 {
-                    auto& mr = reg.get<ECS::MeshRenderer::Component>(m_SelectedEntity);
-
-                    // NOTE: StrongHandle::IsValid() typically only checks "non-null / non-default".
-                    // It does NOT guarantee the backing resource is still resident in the storage.
-                    // Always resolve the handle and null-check before dereferencing.
+                    auto& mr = reg.get<ECS::MeshRenderer::Component>(selected);
                     Graphics::GeometryGpuData* geo = GetGeometryStorage().GetUnchecked(mr.Geometry);
 
                     if (geo)
                     {
-                        // Note: Using size_t casts to match printf format or ImGui expectations
                         ImGui::Text("Vertices: %lu", geo->GetLayout().PositionsSize / sizeof(glm::vec3));
                         ImGui::Text("Indices: %u", geo->GetIndexCount());
 

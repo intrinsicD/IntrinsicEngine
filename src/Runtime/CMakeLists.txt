@@ -11,9 +11,11 @@ target_sources(${target_name}
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
         Runtime.Engine.cppm
         Runtime.Selection.cppm
+        Runtime.SelectionModule.cppm
         PRIVATE
         Runtime.Engine.cpp
         Runtime.Selection.cpp
+        Runtime.SelectionModule.cpp
 )
 
 target_include_directories(${target_name} PUBLIC .)

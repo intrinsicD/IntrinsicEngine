@@ -26,10 +26,22 @@ void main() {
     float diff = max(dot(norm, lightDir), 0.0);
     vec3 diffuse = diff * lightColor;
 
+    const bool selected = (push.textureID & 0x80000000u) != 0u;
+    const uint texIndex = push.textureID & 0x7fffffffu;
+
     // BINDLESS SAMPLE
     // nonuniformEXT helps the driver handle divergent indexing within a warp/wavefront
-    vec4 textureColor = texture(globalTextures[nonuniformEXT(push.textureID)], fragTexCoord);
+    vec4 textureColor = texture(globalTextures[nonuniformEXT(texIndex)], fragTexCoord);
 
     vec3 result = (ambient + diffuse) * textureColor.rgb;
+
+    if (selected)
+    {
+        // A simple "editor highlight" tint toward orange.
+        // Keep shading but bias the albedo so the selection is obvious.
+        const vec3 highlight = vec3(1.0, 0.55, 0.0);
+        result = mix(result, highlight, 0.55);
+    }
+
     outColor = vec4(result, 1.0);
 }

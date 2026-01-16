@@ -211,6 +211,10 @@ namespace Core::Windowing
     {
         if (!m_IsValid) return;
         glfwPollEvents();
+
+        // Keep per-frame input transitions in sync with the polled event stream.
+        m_InputContext.Update();
+
         glfwGetWindowSize(static_cast<GLFWwindow*>(m_Window), &m_Data.WindowWidth, &m_Data.WindowHeight);
         glfwGetFramebufferSize(static_cast<GLFWwindow*>(m_Window), &m_Data.FramebufferWidth, &m_Data.FramebufferHeight);
     }
