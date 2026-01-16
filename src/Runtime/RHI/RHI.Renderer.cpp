@@ -1,7 +1,7 @@
 module;
 #include "RHI.Vulkan.hpp"
-#include <mutex>
 #include <memory>
+#include <algorithm>
 
 module RHI:Renderer.Impl;
 import :Renderer;
@@ -320,5 +320,39 @@ namespace RHI
     {
         if (index >= m_Swapchain.GetImageViews().size()) return VK_NULL_HANDLE;
         return m_Swapchain.GetImageViews()[index];
+    }
+
+    void SimpleRenderer::CopyPixel_R32_UINT_ToBuffer(VkImage srcImage,
+                                                    uint32_t srcWidth,
+                                                    uint32_t srcHeight,
+                                                    uint32_t x,
+                                                    uint32_t y,
+                                                    VkBuffer dstBuffer)
+    {
+        if (!m_IsFrameStarted) return;
+        if (srcImage == VK_NULL_HANDLE || dstBuffer == VK_NULL_HANDLE) return;
+        if (srcWidth == 0 || srcHeight == 0) return;
+
+        x = std::min(x, srcWidth - 1u);
+        y = std::min(y, srcHeight - 1u);
+
+        VkBufferImageCopy region{};
+        region.bufferOffset = 0;
+        region.bufferRowLength = 0;    // tightly packed
+        region.bufferImageHeight = 0;  // tightly packed
+        region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        region.imageSubresource.mipLevel = 0;
+        region.imageSubresource.baseArrayLayer = 0;
+        region.imageSubresource.layerCount = 1;
+        region.imageOffset = { static_cast<int32_t>(x), static_cast<int32_t>(y), 0 };
+        region.imageExtent = { 1, 1, 1 };
+
+        vkCmdCopyImageToBuffer(
+            m_CommandBuffers[m_CurrentFrame],
+            srcImage,
+            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            dstBuffer,
+            1,
+            &region);
     }
 }

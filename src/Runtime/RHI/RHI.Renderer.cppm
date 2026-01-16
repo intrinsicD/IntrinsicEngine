@@ -42,6 +42,15 @@ namespace RHI
 
         [[nodiscard]] GpuProfiler* GetGpuProfiler() const { return m_GpuProfiler.get(); }
 
+        // GPU picking helper: schedule a copy of a single pixel (x,y) from an R32_UINT image into a host-visible buffer.
+        // The caller must ensure the image is in VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL.
+        void CopyPixel_R32_UINT_ToBuffer(VkImage srcImage,
+                                        uint32_t srcWidth,
+                                        uint32_t srcHeight,
+                                        uint32_t x,
+                                        uint32_t y,
+                                        VkBuffer dstBuffer);
+
     private:
         std::shared_ptr<VulkanDevice> m_Device;
         VulkanSwapchain& m_Swapchain;

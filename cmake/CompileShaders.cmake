@@ -12,6 +12,8 @@ else ()
     set(SHADERS
             triangle.vert
             triangle.frag
+            pick_id.vert
+            pick_id.frag
     )
 
     foreach (SHADER ${SHADERS})

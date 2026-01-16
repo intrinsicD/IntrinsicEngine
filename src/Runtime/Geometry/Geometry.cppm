@@ -7,6 +7,7 @@ export import :GJK;
 export import :MeshUtils;
 export import :OBB;
 export import :Octree;
+export import :Raycast;
 export import :Overlap;
 export import :Primitives;
 export import :Properties;

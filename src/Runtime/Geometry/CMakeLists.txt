@@ -24,9 +24,11 @@ target_sources(${target_name}
         Geometry.Properties.cppm
         Geometry.MeshUtils.cppm
         Geometry.Octree.cppm
+        Geometry.Raycast.cppm
         PRIVATE
         FILE_SET geometry_impl TYPE CXX_MODULES FILES
         Geometry.MeshUtils.cpp
+        Geometry.Raycast.cpp
 )
 
 target_include_directories(${target_name} PUBLIC .)

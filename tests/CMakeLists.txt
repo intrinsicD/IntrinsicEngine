@@ -9,7 +9,6 @@ add_executable(${target_name}
         Test_CoreAssets.cpp
         Test_CoreHandle.cpp
         Test_CoreHash.cpp
-        Test_GraphicsModelLoader.cpp
         Test_RuntimeGraphics.cpp
         Test_RuntimeRHI.cpp
         Test_RuntimeECS.cpp

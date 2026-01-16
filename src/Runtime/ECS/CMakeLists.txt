@@ -15,6 +15,7 @@ target_sources(${target_name}
         Components/ECS.Components.Hierarchy.cppm
         Components/ECS.Components.NameTag.cppm
         Components/ECS.Components.Transform.cppm
+        Components/ECS.Components.Selection.cppm
         ECS.Systems.Transform.cppm
         ECS.Scene.cppm
         FILE_SET ecs_impl TYPE CXX_MODULES FILES
@@ -30,4 +31,3 @@ target_link_libraries(${target_name}
         IntrinsicCore
         EnTT::EnTT
 )
-

@@ -10,8 +10,10 @@ target_sources(${target_name}
         PUBLIC
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
         Runtime.Engine.cppm
+        Runtime.Selection.cppm
         PRIVATE
         Runtime.Engine.cpp
+        Runtime.Selection.cpp
 )
 
 target_include_directories(${target_name} PUBLIC .)

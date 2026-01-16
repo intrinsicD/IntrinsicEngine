@@ -17,6 +17,7 @@ export namespace ECS
         entt::entity CreateEntity(const std::string& name);
 
         entt::registry& GetRegistry() { return m_Registry; }
+        const entt::registry& GetRegistry() const { return m_Registry; }
 
         [[nodiscard]] size_t Size() const { return m_Registry.storage<entt::entity>()->size(); }
 
