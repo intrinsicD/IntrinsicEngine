@@ -902,7 +902,7 @@ namespace Graphics
                 m_RenderGraph.AddPass<DebugViewResolvePassData>("DebugViewResolve",
                     [&, this](DebugViewResolvePassData& data, RGBuilder& builder)
                     {
-                        if (!m_DebugView.Enabled)
+                        if (!m_DebugView.Enabled && !m_DebugView.ShowInViewport)
                             return;
 
                         // On the first frame m_LastDebugImages is empty; skip resolve entirely.

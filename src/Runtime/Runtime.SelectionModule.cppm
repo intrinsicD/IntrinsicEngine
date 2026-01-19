@@ -35,10 +35,10 @@ export namespace Runtime
 
             // If true, we do GPU ID-buffer picking.
             // If false, we'll fall back to CPU raycast picking.
-            Runtime::Selection::PickBackend Backend = Runtime::Selection::PickBackend::GPU;
+            Selection::PickBackend Backend = Selection::PickBackend::GPU;
 
             // Selection mode on click.
-            Runtime::Selection::PickMode Mode = Runtime::Selection::PickMode::Replace;
+            Selection::PickMode Mode = Selection::PickMode::Replace;
 
             Activation Active = Activation::Enabled;
         };
