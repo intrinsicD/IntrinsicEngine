@@ -78,11 +78,13 @@ export namespace Core::Assets
 
         explicit AssetSlot(std::unique_ptr<T> resource)
             : Unique(std::move(resource))
-        {}
+        {
+        }
 
         explicit AssetSlot(std::shared_ptr<T> resource)
             : Shared(std::move(resource))
-        {}
+        {
+        }
 
         [[nodiscard]] T* Get() const noexcept
         {
@@ -103,6 +105,7 @@ export namespace Core::Assets
         T* Ptr = nullptr;
 
         AssetPayload() = default;
+
         explicit AssetPayload(std::shared_ptr<AssetSlot<T>> slot)
             : Slot(std::move(slot))
         {
@@ -120,11 +123,15 @@ export namespace Core::Assets
 
         explicit AssetLease(std::shared_ptr<AssetSlot<T>> slot)
             : m_Slot(std::move(slot))
-        { PinIfValid(); }
+        {
+            PinIfValid();
+        }
 
         AssetLease(const AssetLease& other)
             : m_Slot(other.m_Slot)
-        { PinIfValid(); }
+        {
+            PinIfValid();
+        }
 
         AssetLease(AssetLease&& other) noexcept
             : m_Slot(std::move(other.m_Slot))
@@ -174,7 +181,7 @@ export namespace Core::Assets
             }
         }
 
-         std::shared_ptr<AssetSlot<T>> m_Slot{};
+        std::shared_ptr<AssetSlot<T>> m_Slot{};
     };
 
     // --- Asset Manager ---
@@ -210,7 +217,13 @@ export namespace Core::Assets
         [[nodiscard]] Expected<std::shared_ptr<T>> Get(AssetHandle handle);
 
         template <typename T>
+        [[nodiscard]] Expected<std::shared_ptr<T>> Get(AssetHandle handle) const;
+
+        template <typename T>
         [[nodiscard]] Expected<T*> GetRaw(AssetHandle handle);
+
+        template <typename T>
+        [[nodiscard]] Expected<const T*> GetRaw(AssetHandle handle) const;
 
         // OPTIMIZATION: Lightweight accessor for hot loops.
         // Returns nullptr if not loaded/ready, invalid handle, or wrong type.
@@ -251,7 +264,7 @@ export namespace Core::Assets
         std::unordered_map<AssetHandle, std::vector<AssetCallback>, AssetHandle::Hash> m_OneShotListeners;
 
         std::vector<AssetHandle> m_ReadyQueue; // Queue of assets loaded since last frame
-        std::shared_mutex m_Mutex;
+        mutable std::shared_mutex m_Mutex;
         std::mutex m_EventQueueMutex;
 
         void EnqueueReadyEvent(AssetHandle handle);
@@ -419,6 +432,31 @@ export namespace Core::Assets
     }
 
     template <typename T>
+    Expected<std::shared_ptr<T>> AssetManager::Get(AssetHandle handle) const
+    {
+        // Stage 3B: keep API for compatibility, but create a shared_ptr aliasing the slot.
+        // Prefer Pin() or GetRaw()/TryGet() to avoid shared_ptr churn.
+        std::shared_lock lock(m_Mutex);
+        if (!m_Registry.valid(handle.ID))
+            return std::unexpected(ErrorCode::ResourceNotFound);
+
+        const auto& info = m_Registry.get<AssetInfo>(handle.ID);
+        if (info.State != LoadState::Ready)
+        {
+            if (info.State == LoadState::Failed)
+                return std::unexpected(ErrorCode::AssetLoadFailed);
+            return std::unexpected(ErrorCode::AssetNotLoaded);
+        }
+
+        if (auto* payload = m_Registry.try_get<AssetPayload<T>>(handle.ID))
+        {
+            // aliasing ctor: control block is Slot, pointee is payload->Ptr
+            return std::shared_ptr<T>(std::static_pointer_cast<AssetSlot<T>>(payload->Slot), payload->Ptr);
+        }
+        return std::unexpected(ErrorCode::AssetTypeMismatch);
+    }
+
+    template <typename T>
     Expected<T*> AssetManager::GetRaw(AssetHandle handle)
     {
         std::shared_lock lock(m_Mutex);
@@ -437,6 +475,28 @@ export namespace Core::Assets
         {
             return payload->Ptr;
         }
+        return std::unexpected(ErrorCode::AssetTypeMismatch);
+    }
+
+
+    template <typename T>
+    Expected<const T*> AssetManager::GetRaw(AssetHandle handle) const
+    {
+        std::shared_lock lock(m_Mutex);
+        if (!m_Registry.valid(handle.ID))
+            return std::unexpected(ErrorCode::ResourceNotFound);
+
+        const auto& info = m_Registry.get<AssetInfo>(handle.ID);
+        if (info.State != LoadState::Ready)
+        {
+            if (info.State == LoadState::Failed)
+                return std::unexpected(ErrorCode::AssetLoadFailed);
+            return std::unexpected(ErrorCode::AssetNotLoaded);
+        }
+
+        if (auto* payload = m_Registry.try_get<AssetPayload<T>>(handle.ID))
+            return payload->Ptr;
+
         return std::unexpected(ErrorCode::AssetTypeMismatch);
     }
 

@@ -1,0 +1,117 @@
+module;
+
+#include <unordered_map>
+#include <memory>
+#include <span>
+
+#include "RHI.Vulkan.hpp"
+
+export module Graphics:RenderPipeline;
+
+import :RenderGraph;
+import Core;
+import ECS;
+import RHI;
+
+export namespace Graphics
+{
+    // ---------------------------------------------------------------------
+    // RenderBlackboard
+    // ---------------------------------------------------------------------
+    // A tiny, low-ceremony frame-local dictionary for sharing RenderGraph
+    // resource handles between features.
+    //
+    // NOTE: We keep it StringID-keyed (not std::string) to avoid allocations
+    // and because the engine already uses hashed IDs heavily.
+    struct RenderBlackboard
+    {
+        std::unordered_map<Core::Hash::StringID, RGResourceHandle> Resources;
+
+        void Add(Core::Hash::StringID name, RGResourceHandle handle)
+        {
+            Resources[name] = handle;
+        }
+
+        [[nodiscard]] RGResourceHandle Get(Core::Hash::StringID name) const
+        {
+            if (auto it = Resources.find(name); it != Resources.end())
+                return it->second;
+            return {};
+        }
+    };
+
+    // ---------------------------------------------------------------------
+    // Frame Context
+    // ---------------------------------------------------------------------
+    struct RenderPassContext
+    {
+        RenderGraph& Graph;
+        RenderBlackboard& Blackboard;
+
+        // Scene
+        ECS::Scene& Scene;
+        const Core::Assets::AssetManager& AssetManager;
+        class GeometryStorage& GeometryStorage;
+
+        // Frame
+        uint32_t FrameIndex = 0;
+        VkExtent2D Resolution{};
+
+        // Swapchain/backbuffer import context
+        uint32_t SwapchainImageIndex = 0;
+        VkFormat SwapchainFormat = VK_FORMAT_UNDEFINED;
+
+        // Command submission helpers
+        RHI::SimpleRenderer& Renderer;
+
+        // Global GPU state
+        RHI::VulkanBuffer* GlobalCameraUBO = nullptr;
+        VkDescriptorSet GlobalDescriptorSet = VK_NULL_HANDLE;
+        size_t GlobalCameraDynamicOffset = 0; // byte offset (dynamic UBO)
+
+        RHI::BindlessDescriptorSystem& Bindless;
+
+        // Interaction state
+        struct PickRequestState
+        {
+            bool Pending = false;
+            uint32_t X = 0;
+            uint32_t Y = 0;
+        } PickRequest;
+
+        // Debug state
+        struct DebugState
+        {
+            bool Enabled = false;
+            bool ShowInViewport = false;
+            Core::Hash::StringID SelectedResource = Core::Hash::StringID{"PickID"};
+            float DepthNear = 0.1f;
+            float DepthFar = 1000.0f;
+        } Debug;
+
+        // Previous frame compiled debug lists (used because features run before compile).
+        std::span<const RenderGraphDebugImage> PrevFrameDebugImages{};
+        std::span<const RenderGraphDebugPass> PrevFrameDebugPasses{};
+    };
+
+    // ---------------------------------------------------------------------
+    // Feature interface
+    // ---------------------------------------------------------------------
+    class IRenderFeature
+    {
+    public:
+        virtual ~IRenderFeature() = default;
+
+        // Called once at startup (create pipelines, persistent GPU resources).
+        virtual void Initialize(RHI::VulkanDevice& device,
+                                RHI::DescriptorAllocator& descriptorPool,
+                                RHI::DescriptorLayout& globalLayout) = 0;
+
+        // Called every frame to inject passes into the graph.
+        virtual void AddPasses(RenderPassContext& ctx) = 0;
+
+        // Optional lifecycle.
+        virtual void Shutdown() {}
+        virtual void OnResize(uint32_t width, uint32_t height) { (void)width; (void)height; }
+    };
+}

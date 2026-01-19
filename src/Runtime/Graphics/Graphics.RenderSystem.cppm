@@ -11,6 +11,11 @@ import RHI;
 import :Camera;
 import :Geometry;
 import :RenderGraph;
+import :RenderPipeline;
+import :Passes.Picking;
+import :Passes.Forward;
+import :Passes.DebugView;
+import :Passes.ImGui;
 import Core;
 import ECS;
 
@@ -32,17 +37,10 @@ export namespace Graphics
                      GeometryStorage& geometryStorage);
         ~RenderSystem();
 
-        void OnUpdate(ECS::Scene& scene, const CameraComponent& camera, Core::Assets::AssetManager &assetManager);
+        void OnUpdate(ECS::Scene& scene, const CameraComponent& camera, Core::Assets::AssetManager& assetManager);
 
-        // Called after swapchain recreation.
-        // Clears transient caches and recreates per-frame resources as needed.
         void OnResize();
 
-        // -----------------------------------------------------------------
-        // GPU picking (pixel-perfect ID buffer)
-        // -----------------------------------------------------------------
-        // Schedule a pick readback for the given framebuffer pixel.
-        // Result becomes available a few frames later (FramesInFlight).
         void RequestPick(uint32_t x, uint32_t y);
 
         struct PickResultGpu
@@ -51,25 +49,17 @@ export namespace Graphics
             uint32_t EntityID = 0;
         };
 
-        // Non-blocking: returns the most recent resolved pick result.
         [[nodiscard]] PickResultGpu GetLastPickResult() const;
-
-        // Pop the next completed pick result (one-shot). Returns std::nullopt if not ready yet.
         [[nodiscard]] std::optional<PickResultGpu> TryConsumePickResult();
 
         [[nodiscard]] RHI::VulkanBuffer* GetGlobalUBO() const { return m_GlobalUBO.get(); }
 
-        // -----------------------------------------------------------------
-        // Render-target viewer (debug)
-        // -----------------------------------------------------------------
         struct DebugViewState
         {
-            bool Enabled = false; // Disabled by default; enable via UI
+            bool Enabled = false;
             Core::Hash::StringID SelectedResource = Core::Hash::StringID("PickID");
-            ResourceID SelectedResourceId = kInvalidResource;        // resolved from per-pass attachment selection
-            bool ShowInViewport = false; // if true, replace the main view with the debug view
-
-            // Camera params for depth visualization (heuristic defaults)
+            ResourceID SelectedResourceId = kInvalidResource;
+            bool ShowInViewport = false;
             float DepthNear = 0.1f;
             float DepthFar = 1000.0f;
         };
@@ -81,7 +71,10 @@ export namespace Graphics
     private:
         size_t m_MinUboAlignment = 0;
 
-        std::shared_ptr<RHI::VulkanDevice> m_Device;
+        // Ownership stays with the caller, but we avoid ref-count ops in hot code.
+        std::shared_ptr<RHI::VulkanDevice> m_DeviceOwner;
+        RHI::VulkanDevice* m_Device = nullptr;
+
         RHI::VulkanSwapchain& m_Swapchain;
         RHI::SimpleRenderer& m_Renderer;
         RHI::BindlessDescriptorSystem& m_BindlessSystem;
@@ -89,59 +82,41 @@ export namespace Graphics
         RHI::GraphicsPipeline& m_PickPipeline;
         VkDescriptorSet m_GlobalDescriptorSet = VK_NULL_HANDLE;
 
-        // The Global Camera UBO
         std::unique_ptr<RHI::VulkanBuffer> m_GlobalUBO;
 
-        // RenderGraph
         RenderGraph m_RenderGraph;
         GeometryStorage& m_GeometryStorage;
 
         std::vector<std::unique_ptr<RHI::VulkanImage>> m_DepthImages;
 
-        // --- GPU picking state ---
         struct PendingPick
         {
             bool Pending = false;
             uint32_t X = 0;
             uint32_t Y = 0;
-            uint32_t RequestFrame = 0; // Frame index when pick was requested
+            uint32_t RequestFrame = 0;
         };
 
         PendingPick m_PendingPick;
-
-        // One readback buffer per frame-in-flight.
         std::vector<std::unique_ptr<RHI::VulkanBuffer>> m_PickReadbackBuffers;
-
-        // Track which frame's pick result is ready to be consumed.
-        // -1 means no pending result.
         int32_t m_PickResultReadyFrame = -1;
-
-        // Last resolved result (from an older frame, no GPU stall).
         PickResultGpu m_LastPickResult{};
-
-        // Next result to be consumed by the app.
         bool m_HasPendingConsumedResult = false;
         PickResultGpu m_PendingConsumedResult{};
 
         DebugViewState m_DebugView{};
 
-        // Debug-view resources (per-frame)
-        std::vector<std::unique_ptr<RHI::VulkanImage>> m_DebugViewImages;
-        VkSampler m_DebugViewSampler = VK_NULL_HANDLE;
-        void* m_DebugViewImGuiTexId = nullptr; // ImGui texture for current debug view image
-
-        // Debug-view pipeline resources
-        VkDescriptorSetLayout m_DebugViewSetLayout = VK_NULL_HANDLE;
-        std::vector<VkDescriptorSet> m_DebugViewSets; // One per frame-in-flight
-        std::unique_ptr<RHI::GraphicsPipeline> m_DebugViewPipeline;
-
-        // Dummy 1x1 textures to initialize all descriptor bindings (avoid validation errors)
-        std::unique_ptr<RHI::VulkanImage> m_DebugViewDummyFloat;  // R8G8B8A8_UNORM
-        std::unique_ptr<RHI::VulkanImage> m_DebugViewDummyUint;   // R32_UINT
-        std::unique_ptr<RHI::VulkanImage> m_DebugViewDummyDepth;  // D32_SFLOAT
-
-        // Cached frame lists for UI
+        // Cached frame lists for UI and debug resolve selection.
         std::vector<RenderGraphDebugPass> m_LastDebugPasses;
         std::vector<RenderGraphDebugImage> m_LastDebugImages;
+
+        // Features (owned)
+        std::unique_ptr<Passes::PickingPass> m_PickingPass;
+        std::unique_ptr<Passes::ForwardPass> m_ForwardPass;
+        std::unique_ptr<Passes::DebugViewPass> m_DebugViewPass;
+        std::unique_ptr<Passes::ImGuiPass> m_ImGuiPass;
+
+        // NOTE: Descriptor allocator reference is needed for DebugView per-frame sets
+        RHI::DescriptorAllocator& m_DescriptorPool;
     };
 }
