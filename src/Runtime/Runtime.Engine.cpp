@@ -128,6 +128,8 @@ namespace Runtime
         Core::Tasks::Scheduler::Shutdown();
         Core::Filesystem::FileWatcher::Shutdown();
 
+        m_RenderSystem.reset();
+
         Interface::GUI::Shutdown();
 
         m_Scene.GetRegistry().clear();
@@ -135,8 +137,6 @@ namespace Runtime
 
         m_DefaultTexture.reset();
         m_LoadedMaterials.clear();
-
-        m_RenderSystem.reset();
 
         // Clear geometry storage before pipeline/device destruction
         m_GeometryStorage.Clear();

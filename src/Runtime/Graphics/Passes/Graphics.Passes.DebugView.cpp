@@ -224,6 +224,31 @@ namespace Graphics::Passes
         if (!srcInfo)
             return;
 
+        // 1. Prepare Intermediate Image (Always needed for UI, and now source for Viewport)
+        if (ctx.FrameIndex >= m_PreviewImages.size())
+            m_PreviewImages.resize(ctx.FrameIndex + 1);
+
+        auto& dbgImg = m_PreviewImages[ctx.FrameIndex];
+        // Recreate if resolution changed
+        if (!dbgImg || dbgImg->GetWidth() != ctx.Resolution.width || dbgImg->GetHeight() != ctx.Resolution.height)
+        {
+            dbgImg = std::make_unique<RHI::VulkanImage>(
+                *m_Device,
+                ctx.Resolution.width,
+                ctx.Resolution.height,
+                1,
+                ctx.SwapchainFormat,
+                // ADDED: TRANSFER_SRC_BIT so we can blit FROM this to the backbuffer
+                VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+                VK_IMAGE_ASPECT_COLOR_BIT);
+
+            if (ctx.FrameIndex < m_ImGuiTextureIds.size() && m_ImGuiTextureIds[ctx.FrameIndex])
+            {
+                Interface::GUI::RemoveTexture(m_ImGuiTextureIds[ctx.FrameIndex]);
+                m_ImGuiTextureIds[ctx.FrameIndex] = nullptr;
+            }
+        }
+
         // Only transient resources are supported by the current resolve strategy.
         RGTextureDesc srcDesc{};
         srcDesc.Width = srcInfo->Extent.width;
@@ -235,70 +260,39 @@ namespace Graphics::Passes
         ctx.Graph.AddPass<ResolveData>("DebugViewResolve",
                                        [&](ResolveData& data, RGBuilder& builder)
                                        {
-                                           auto srcHandle = builder.CreateTexture(srcInfo->Name, srcDesc);
+                                           // Blackboard lookup patch logic goes here
+                                           RGResourceHandle srcHandle = ctx.Blackboard.Get(srcInfo->Name);
                                            if (!srcHandle.IsValid())
-                                               return;
+                                               srcHandle = builder.CreateTexture(
+                                                   srcInfo->Name, srcDesc);
+                                           if (!srcHandle.IsValid()) return;
 
-                                           // Destination: either backbuffer or per-frame preview image.
-                                           if (ctx.Debug.ShowInViewport)
-                                           {
-                                               RGAttachmentInfo colorInfo{};
-                                               colorInfo.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-                                               colorInfo.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
-                                               const auto bb = ctx.Blackboard.Get("Backbuffer"_id);
-                                               data.Dst = builder.WriteColor(bb, colorInfo);
-                                           }
-                                           else
-                                           {
-                                               // Ensure per-frame preview exists
-                                               if (ctx.FrameIndex >= m_PreviewImages.size())
-                                                   m_PreviewImages.resize(ctx.FrameIndex + 1);
+                                           // Import intermediate
+                                           auto dst = builder.ImportTexture(
+                                               "DebugViewRGBA"_id,
+                                               dbgImg->GetHandle(),
+                                               dbgImg->GetView(),
+                                               dbgImg->GetFormat(),
+                                               ctx.Resolution,
+                                               VK_IMAGE_LAYOUT_UNDEFINED);
 
-                                               auto& dbgImg = m_PreviewImages[ctx.FrameIndex];
-                                               if (!dbgImg || dbgImg->GetWidth() != ctx.Resolution.width || dbgImg->
-                                                   GetHeight() != ctx.Resolution.height)
-                                               {
-                                                   dbgImg = std::make_unique<RHI::VulkanImage>(
-                                                       *m_Device,
-                                                       ctx.Resolution.width,
-                                                       ctx.Resolution.height,
-                                                       1,
-                                                       ctx.SwapchainFormat,
-                                                       VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                                                       VK_IMAGE_ASPECT_COLOR_BIT);
+                                           // Write to Intermediate
+                                           RGAttachmentInfo info{};
+                                           info.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+                                           info.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+                                           data.Dst = builder.WriteColor(dst, info);
 
-                                                   if (ctx.FrameIndex < m_ImGuiTextureIds.size() && m_ImGuiTextureIds[
-                                                       ctx.FrameIndex])
-                                                   {
-                                                       // Safe to remove here because this happens inside OnResize usually, or before binding
-                                                       Interface::GUI::RemoveTexture(m_ImGuiTextureIds[ctx.FrameIndex]);
-                                                       m_ImGuiTextureIds[ctx.FrameIndex] = nullptr;
-                                                   }
-                                               }
-
-                                               auto dst = builder.ImportTexture(
-                                                   "DebugViewRGBA"_id,
-                                                   dbgImg->GetHandle(),
-                                                   dbgImg->GetView(),
-                                                   dbgImg->GetFormat(),
-                                                   ctx.Resolution,
-                                                   VK_IMAGE_LAYOUT_UNDEFINED);
-
-                                               RGAttachmentInfo info{};
-                                               info.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-                                               info.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
-                                               data.Dst = builder.WriteColor(dst, info);
-                                               ctx.Blackboard.Add("DebugViewRGBA"_id, data.Dst);
-                                           }
-
-                                           data.Src = builder.Read(srcHandle,
-                                                                   VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                                           // Read Source
+                                           data.Src = builder.Read(srcHandle, VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
                                                                    VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
 
+                                           // Metadata
                                            data.SrcFormat = srcInfo->Format;
                                            data.IsDepth = (srcInfo->Aspect & VK_IMAGE_ASPECT_DEPTH_BIT) != 0;
-
                                            m_LastSrcHandle = data.Src;
+
+                                           // Expose to Blackboard
+                                           ctx.Blackboard.Add("DebugViewRGBA"_id, data.Dst);
                                        },
                                        [&, this](const ResolveData& data, const RGRegistry&, VkCommandBuffer cmd)
                                        {
@@ -353,31 +347,79 @@ namespace Graphics::Passes
                                            vkCmdDraw(cmd, 3, 1, 0, 0);
                                        });
 
-        if (!ctx.Debug.ShowInViewport)
+        if (ctx.Debug.ShowInViewport)
         {
-            struct TransitionData
+            struct BlitData
             {
-                RGResourceHandle Img;
+                RGResourceHandle Src;
+                RGResourceHandle Dst;
             };
-            ctx.Graph.AddPass<TransitionData>("DebugViewBarrier",
-                                              [&](TransitionData& data, RGBuilder& builder)
-                                              {
-                                                  // Find the texture we just wrote to
-                                                  auto handle = ctx.Blackboard.Get("DebugViewRGBA"_id);
-                                                  if (handle.IsValid())
-                                                  {
-                                                      // Declare a read access. This forces a transition from COLOR_ATTACHMENT_OPTIMAL.
-                                                      data.Img = builder.Read(
-                                                          handle, VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-                                                          VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
-                                                  }
-                                              },
-                                              [](const TransitionData&, const RGRegistry&, VkCommandBuffer)
-                                              {
-                                                  /* No-op, just for barrier generation */
-                                              }
+
+            ctx.Graph.AddPass<BlitData>("DebugViewBlit",
+                                        [&](BlitData& data, RGBuilder& builder)
+                                        {
+                                            const RGResourceHandle intermediate = ctx.Blackboard.
+                                                Get("DebugViewRGBA"_id);
+                                            const RGResourceHandle backbuffer = ctx.Blackboard.Get("Backbuffer"_id);
+
+                                            if (intermediate.IsValid() && backbuffer.IsValid())
+                                            {
+                                                // Blit requires TRANSFER_READ on source and TRANSFER_WRITE on dest
+                                                data.Src = builder.Read(intermediate, VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+                                                                        VK_ACCESS_2_TRANSFER_READ_BIT);
+                                                data.Dst = builder.Write(
+                                                    backbuffer, VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+                                                    VK_ACCESS_2_TRANSFER_WRITE_BIT);
+                                            }
+                                        },
+                                        [&](const BlitData& data, const RGRegistry& reg, VkCommandBuffer cmd)
+                                        {
+                                            if (!data.Src.IsValid() || !data.Dst.IsValid()) return;
+
+                                            VkImageBlit blit{};
+                                            blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                                            blit.srcSubresource.layerCount = 1;
+                                            blit.srcOffsets[1] = {
+                                                (int32_t)ctx.Resolution.width, (int32_t)ctx.Resolution.height, 1
+                                            };
+
+                                            blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                                            blit.dstSubresource.layerCount = 1;
+                                            blit.dstOffsets[1] = {
+                                                (int32_t)ctx.Resolution.width, (int32_t)ctx.Resolution.height, 1
+                                            };
+
+                                            vkCmdBlitImage(cmd,
+                                                           reg.GetImage(data.Src), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                                                           reg.GetImage(data.Dst), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                                                           1, &blit, VK_FILTER_NEAREST);
+                                        }
             );
         }
+
+        // --- PASS 3: TRANSITION FOR UI (Mandatory) ---
+        // Ensure "DebugViewRGBA" ends up in SHADER_READ_ONLY_OPTIMAL for ImGui
+        struct TransitionData
+        {
+            RGResourceHandle Img;
+        };
+        ctx.Graph.AddPass<TransitionData>("DebugViewBarrier",
+                                          [&](TransitionData& data, RGBuilder& builder)
+                                          {
+                                              auto handle = ctx.Blackboard.Get("DebugViewRGBA"_id);
+                                              if (handle.IsValid())
+                                              {
+                                                  // This read ensures RenderGraph generates a barrier from whatever state it was left in
+                                                  // (COLOR_ATTACHMENT if no blit, or TRANSFER_SRC if blitted) -> SHADER_READ_ONLY.
+                                                  data.Img = builder.Read(
+                                                      handle, VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                                                      VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
+                                              }
+                                          },
+                                          [](const TransitionData&, const RGRegistry&, VkCommandBuffer)
+                                          {
+                                          }
+        );
     }
 
     void DebugViewPass::PostCompile(uint32_t frameIndex, std::span<const RenderGraphDebugImage> debugImages)
