@@ -51,7 +51,7 @@ namespace Graphics
     {
         // Allocate node in the frame arena (Zero overhead)
         auto nodeMem = arena.New<NodeT>(std::move(value));
-        if (!nodeMem) return ; // OOM check
+        if (!nodeMem) return; // OOM check
 
         NodeT* node = *nodeMem;
         node->Next = nullptr;
@@ -69,7 +69,8 @@ namespace Graphics
 
     RGResourceHandle RGBuilder::Read(RGResourceHandle resource, VkPipelineStageFlags2 stage, VkAccessFlags2 access)
     {
-        if (!resource.IsValid() || resource.ID >= m_Graph.m_ActiveResourceCount) {
+        if (!resource.IsValid() || resource.ID >= m_Graph.m_ActiveResourceCount)
+        {
             Core::Log::Error("RG: Invalid resource handle");
             return {kInvalidResource};
         }
@@ -88,7 +89,8 @@ namespace Graphics
 
     RGResourceHandle RGBuilder::Write(RGResourceHandle resource, VkPipelineStageFlags2 stage, VkAccessFlags2 access)
     {
-        if (!resource.IsValid() || resource.ID >= m_Graph.m_ActiveResourceCount) {
+        if (!resource.IsValid() || resource.ID >= m_Graph.m_ActiveResourceCount)
+        {
             Core::Log::Error("RG: Invalid resource handle");
             return {kInvalidResource};
         }
@@ -120,7 +122,7 @@ namespace Graphics
     RGResourceHandle RGBuilder::WriteDepth(RGResourceHandle resource, RGAttachmentInfo info)
     {
         Write(resource, VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
-                    VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
+              VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
 
         AttachmentNode node{resource.ID, info, true, nullptr};
         AppendToList(m_Graph.m_Arena,
@@ -302,56 +304,33 @@ namespace Graphics
 
     RHI::VulkanImage* RenderGraph::ResolveImage(uint32_t frameIndex, const ResourceNode& node)
     {
-        ImageCacheKey key{node.Format, node.Extent.width, node.Extent.height, node.Usage};
-        auto& stack = m_ImagePool[key];
+        // 1. Create the Handle (Cheap, no memory yet)
+        // Note: Ensure RHI::VulkanImage has a move constructor!
+        auto unboundImg = RHI::VulkanImage::CreateUnbound(*m_Device, node.Extent.width, node.Extent.height, node.Format, node.Usage);
 
-        // Get monotonic frame counter from device to detect staleness
-        uint64_t globalFrame = m_Device->GetGlobalFrameNumber();
+        // 2. Query Requirements
+        VkMemoryRequirements reqs = unboundImg.GetMemoryRequirements();
 
-        for (auto& item : stack.Images)
+        // 3. Find Memory (The "Refinement")
+        // This returns a raw VkDeviceMemory handle from your pool
+        VkDeviceMemory memory = AllocateOrReuseMemory(reqs, node.StartPass, node.EndPass, frameIndex);
+
+        // 4. Bind
+        unboundImg.BindMemory(memory, 0);
+
+        // 5. Move to Frame Scope
+        // We move the 'unboundImg' object (which is now fully bound) into the arena.
+        // The ScopeStack will call the destructor of this object at the end of the frame.
+        auto allocation = m_Scope.New<RHI::VulkanImage>(std::move(unboundImg));
+
+        if (!allocation)
         {
-            // 1. Strict Frame-In-Flight Separation
-            if (item.LastFrameIndex != frameIndex) continue;
-
-            // 2. Staleness Check
-            // If the resource hasn't been touched in *this specific* global frame yet,
-            // it means it's from a previous cycle (e.g. 2 frames ago). Reset it.
-            if (item.LastUsedGlobalFrame != globalFrame)
-            {
-                item.LastUsedGlobalFrame = globalFrame;
-                item.ActiveIntervals.clear();
-                item.ActiveIntervals.emplace_back(node.StartPass, node.EndPass);
-                return item.Resource.get();
-            }
-
-            // 3. Aliasing Check (Resource already used this frame, check for lifetime overlap)
-            bool overlap = false;
-            for (const auto& interval : item.ActiveIntervals)
-            {
-                if (node.StartPass <= interval.second && node.EndPass >= interval.first)
-                {
-                    overlap = true;
-                    break;
-                }
-            }
-
-            if (!overlap)
-            {
-                item.ActiveIntervals.emplace_back(node.StartPass, node.EndPass);
-                return item.Resource.get();
-            }
+            Core::Log::Error("RenderGraph: Failed to allocate image wrapper in ScopeStack (OOM)");
+            return nullptr;
         }
 
-        // 4. Allocate New
-        auto img = std::make_unique<RHI::VulkanImage>(*m_Device, node.Extent.width, node.Extent.height, 1, node.Format,
-                                                      node.Usage, node.Aspect);
-        auto* ptr = img.get();
-
-        // Initialize with current global frame
-        PooledImage pooled{std::move(img), frameIndex, globalFrame};
-        pooled.ActiveIntervals.emplace_back(node.StartPass, node.EndPass);
-        stack.Images.push_back(std::move(pooled));
-        return ptr;
+        // Dereference std::expected to get the raw pointer
+        return *allocation;
     }
 
     RHI::VulkanBuffer* RenderGraph::ResolveBuffer(uint32_t frameIndex, const ResourceNode& node)
@@ -398,20 +377,104 @@ namespace Graphics
         return ptr;
     }
 
+    VkDeviceMemory RenderGraph::AllocateOrReuseMemory(const VkMemoryRequirements& reqs, uint32_t startPass,
+                                                      uint32_t endPass, uint32_t frameIndex)
+    {
+        // 1. Look for a compatible bucket (Memory Type Bits)
+        auto& bucket = m_MemoryPool[reqs.memoryTypeBits];
+
+        uint64_t globalFrame = m_Device->GetGlobalFrameNumber();
+
+        for (auto& chunk : bucket)
+        {
+            // Must match frame index (frames in flight isolation)
+            if (chunk->LastFrameIndex != frameIndex) continue;
+
+            // Reset if stale (used in previous frames)
+            if (chunk->LastUsedGlobalFrame != globalFrame)
+            {
+                chunk->LastUsedGlobalFrame = globalFrame;
+                chunk->AllocatedIntervals.clear();
+            }
+
+            // Strict Size & Alignment Check
+            // Note: We currently support 1 image per chunk for simplicity (Heap Allocator).
+            // A full implementation would use a 'LinearAllocator' logic here to put multiple images in one chunk.
+            if (chunk->Size < reqs.size) continue;
+
+            // Lifetime Overlap Check
+            bool overlaps = false;
+            for (const auto& interval : chunk->AllocatedIntervals)
+            {
+                // Simple 1D interval intersection: (StartA <= EndB) and (EndA >= StartB)
+                if (startPass <= interval.second && endPass >= interval.first)
+                {
+                    overlaps = true;
+                    break;
+                }
+            }
+
+            if (!overlaps)
+            {
+                // Found a free spot! "Alias" this memory.
+                chunk->AllocatedIntervals.emplace_back(startPass, endPass);
+                return chunk->Memory;
+            }
+        }
+
+        // 2. No suitable chunk found, allocate new one via VMA (or raw Vulkan)
+        // Here we use a raw allocation for simplicity of the example, but in production use VMA.
+        VkMemoryAllocateInfo allocInfo{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
+        allocInfo.allocationSize = reqs.size;
+
+        // Find memory type index
+        VkPhysicalDeviceMemoryProperties memProps;
+        vkGetPhysicalDeviceMemoryProperties(m_Device->GetPhysicalDevice(), &memProps);
+
+        for (uint32_t i = 0; i < memProps.memoryTypeCount; i++)
+        {
+            if ((reqs.memoryTypeBits & (1 << i)) &&
+                (memProps.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
+            {
+                allocInfo.memoryTypeIndex = i;
+                break;
+            }
+        }
+
+        VkDeviceMemory newMemory;
+        vkAllocateMemory(m_Device->GetLogicalDevice(), &allocInfo, nullptr, &newMemory);
+
+        auto newChunk = std::make_unique<MemoryChunk>();
+        newChunk->Memory = newMemory;
+        newChunk->Size = reqs.size;
+        newChunk->MemoryTypeBits = reqs.memoryTypeBits;
+        newChunk->LastFrameIndex = frameIndex;
+        newChunk->LastUsedGlobalFrame = globalFrame;
+        newChunk->AllocatedIntervals.emplace_back(startPass, endPass);
+
+        VkDeviceMemory result = newMemory;
+        bucket.push_back(std::move(newChunk));
+
+        return result;
+    }
+
     void RenderGraph::Compile(uint32_t frameIndex)
     {
         // 1. Resolve Transient Resources (Unchanged)
         for (uint32_t i = 0; i < m_ActiveResourceCount; ++i)
         {
             auto& res = m_ResourcePool[i];
-            if (res.Type == ResourceType::Import) {
+            if (res.Type == ResourceType::Import)
+            {
                 res.CurrentLayout = res.InitialLayout;
                 res.LastUsageStage = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
                 res.LastUsageAccess = 0;
             }
-            if (res.Type == ResourceType::Texture && res.PhysicalImage == VK_NULL_HANDLE) {
+            if (res.Type == ResourceType::Texture && res.PhysicalImage == VK_NULL_HANDLE)
+            {
                 RHI::VulkanImage* img = ResolveImage(frameIndex, res);
-                if (img && img->IsValid()) {
+                if (img && img->IsValid())
+                {
                     res.PhysicalImage = img->GetHandle();
                     res.PhysicalView = img->GetView();
                     res.CurrentLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -419,9 +482,11 @@ namespace Graphics
                     m_Registry.RegisterImage((ResourceID)i, res.PhysicalImage, res.PhysicalView);
                 }
             }
-            if (res.Type == ResourceType::Buffer && res.PhysicalBuffer == VK_NULL_HANDLE) {
+            if (res.Type == ResourceType::Buffer && res.PhysicalBuffer == VK_NULL_HANDLE)
+            {
                 RHI::VulkanBuffer* buf = ResolveBuffer(frameIndex, res);
-                if (buf && buf->GetHandle() != VK_NULL_HANDLE) {
+                if (buf && buf->GetHandle() != VK_NULL_HANDLE)
+                {
                     res.PhysicalBuffer = buf->GetHandle();
                     m_Registry.RegisterBuffer((ResourceID)i, res.PhysicalBuffer);
                 }
@@ -446,16 +511,26 @@ namespace Graphics
 
                 // --- Image Barrier Logic ---
                 VkImageLayout targetLayout = res.CurrentLayout;
-                if (node->Access & VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT) targetLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-                else if (node->Access & VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT) targetLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-                else if (node->Access & VK_ACCESS_2_SHADER_SAMPLED_READ_BIT) targetLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-                else if (node->Access & (VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT | VK_ACCESS_2_SHADER_STORAGE_READ_BIT)) targetLayout = VK_IMAGE_LAYOUT_GENERAL;
-                else if (node->Access & VK_ACCESS_2_TRANSFER_WRITE_BIT) targetLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-                else if (node->Access & VK_ACCESS_2_TRANSFER_READ_BIT) targetLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+                if (node->Access & VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT) targetLayout =
+                    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                else if (node->Access & VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT) targetLayout =
+                    VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+                else if (node->Access & VK_ACCESS_2_SHADER_SAMPLED_READ_BIT) targetLayout =
+                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                else if (node->Access & (VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT | VK_ACCESS_2_SHADER_STORAGE_READ_BIT))
+                    targetLayout = VK_IMAGE_LAYOUT_GENERAL;
+                else if (node->Access & VK_ACCESS_2_TRANSFER_WRITE_BIT) targetLayout =
+                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+                else if (node->Access & VK_ACCESS_2_TRANSFER_READ_BIT) targetLayout =
+                    VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
 
                 bool needsBarrier = (res.CurrentLayout != targetLayout) ||
-                    (res.LastUsageAccess & (VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_SHADER_WRITE_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_2_TRANSFER_WRITE_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT)) ||
-                    (node->Access & (VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_SHADER_WRITE_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_2_TRANSFER_WRITE_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT));
+                    (res.LastUsageAccess & (VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_SHADER_WRITE_BIT |
+                        VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
+                        VK_ACCESS_2_TRANSFER_WRITE_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT)) ||
+                    (node->Access & (VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_SHADER_WRITE_BIT |
+                        VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
+                        VK_ACCESS_2_TRANSFER_WRITE_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT));
 
                 if (res.LastUsageStage == VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT && res.LastUsageAccess == 0)
                     needsBarrier = (res.CurrentLayout != targetLayout);
@@ -467,7 +542,9 @@ namespace Graphics
                     barrier.image = res.PhysicalImage;
                     barrier.oldLayout = res.CurrentLayout;
                     barrier.newLayout = targetLayout;
-                    barrier.srcStageMask = (res.CurrentLayout == VK_IMAGE_LAYOUT_UNDEFINED) ? VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT : res.LastUsageStage;
+                    barrier.srcStageMask = (res.CurrentLayout == VK_IMAGE_LAYOUT_UNDEFINED)
+                                               ? VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT
+                                               : res.LastUsageStage;
                     barrier.srcAccessMask = (res.CurrentLayout == VK_IMAGE_LAYOUT_UNDEFINED) ? 0 : res.LastUsageAccess;
                     barrier.dstStageMask = node->Stage;
                     barrier.dstAccessMask = node->Access;
@@ -479,7 +556,8 @@ namespace Graphics
 
                     // Allocate in Arena
                     auto alloc = m_Arena.New<VkImageMemoryBarrier2>(barrier);
-                    if (alloc) {
+                    if (alloc)
+                    {
                         if (imgCount == 0) imgStart = *alloc;
                         imgCount++;
                     }
@@ -503,11 +581,14 @@ namespace Graphics
             for (AccessNode* node = pass.AccessHead; node != nullptr; node = node->Next)
             {
                 auto& res = m_ResourcePool[node->ID];
-                bool isBuffer = (res.Type == ResourceType::Buffer) || (res.Type == ResourceType::Import && res.PhysicalBuffer);
+                bool isBuffer = (res.Type == ResourceType::Buffer) || (res.Type == ResourceType::Import && res.
+                    PhysicalBuffer);
                 if (!isBuffer) continue;
 
-                bool prevWrite = (res.LastUsageAccess & (VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_SHADER_WRITE_BIT | VK_ACCESS_2_TRANSFER_WRITE_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT));
-                bool currWrite = (node->Access & (VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_SHADER_WRITE_BIT | VK_ACCESS_2_TRANSFER_WRITE_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT));
+                bool prevWrite = (res.LastUsageAccess & (VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_SHADER_WRITE_BIT |
+                    VK_ACCESS_2_TRANSFER_WRITE_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT));
+                bool currWrite = (node->Access & (VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_SHADER_WRITE_BIT |
+                    VK_ACCESS_2_TRANSFER_WRITE_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT));
 
                 if ((prevWrite || currWrite) && res.LastUsageStage != VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT)
                 {
@@ -522,7 +603,8 @@ namespace Graphics
                     barrier.dstAccessMask = node->Access;
 
                     auto alloc = m_Arena.New<VkBufferMemoryBarrier2>(barrier);
-                    if (alloc) {
+                    if (alloc)
+                    {
                         if (bufCount == 0) bufStart = *alloc;
                         bufCount++;
                     }
@@ -571,12 +653,18 @@ namespace Graphics
                     VkRenderingAttachmentInfo info{};
                     info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
                     info.imageView = res.PhysicalView;
-                    info.imageLayout = att->IsDepth ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                    info.imageLayout = att->IsDepth
+                                           ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+                                           : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
                     info.loadOp = att->Info.LoadOp;
                     info.storeOp = att->Info.StoreOp;
                     info.clearValue = att->Info.ClearValue;
 
-                    if (att->IsDepth) { depthAtt = info; hasDepth = true; }
+                    if (att->IsDepth)
+                    {
+                        depthAtt = info;
+                        hasDepth = true;
+                    }
                     else { colorAtts.push_back(info); }
                 }
 
@@ -616,7 +704,7 @@ namespace Graphics
             dp.Name = p.Name.c_str();
             dp.PassIndex = i;
 
-            for(AttachmentNode* att = p.AttachmentHead; att != nullptr; att = att->Next)
+            for (AttachmentNode* att = p.AttachmentHead; att != nullptr; att = att->Next)
             {
                 if (att->ID >= m_ResourcePool.size()) continue;
                 const auto& res = m_ResourcePool[att->ID];

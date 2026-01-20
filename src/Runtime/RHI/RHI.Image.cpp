@@ -2,6 +2,7 @@ module;
 #include "RHI.Vulkan.hpp"
 #include <vector>
 #include <optional>
+#include <utility>
 
 module RHI:Image.Impl;
 import :Image;
@@ -30,7 +31,8 @@ namespace RHI
         imageInfo.sharingMode = sharingMode;
 
         std::vector<uint32_t> queueIndices;
-        if (sharingMode == VK_SHARING_MODE_CONCURRENT) {
+        if (sharingMode == VK_SHARING_MODE_CONCURRENT)
+        {
             auto indices = m_Device.GetQueueIndices();
             if (indices.GraphicsFamily.has_value())
             {
@@ -82,11 +84,56 @@ namespace RHI
         }
     }
 
+    VulkanImage::VulkanImage(VulkanDevice& device, uint32_t width, uint32_t height, VkFormat format)
+        : m_Device(device), m_Format(format), m_Width(width), m_Height(height), m_IsValid(true), m_OwnsMemory(false)
+    {
+    }
+
+    // 4. Move Constructor (CRITICAL FIX)
+    VulkanImage::VulkanImage(VulkanImage&& other) noexcept
+        : m_Device(other.m_Device)
+          , m_Image(std::exchange(other.m_Image, VK_NULL_HANDLE))
+          , m_ImageView(std::exchange(other.m_ImageView, VK_NULL_HANDLE))
+          , m_Allocation(std::exchange(other.m_Allocation, VK_NULL_HANDLE))
+          , m_Format(other.m_Format)
+          , m_MipLevels(other.m_MipLevels)
+          , m_Width(other.m_Width)
+          , m_Height(other.m_Height)
+          , m_IsValid(other.m_IsValid)
+          , m_OwnsMemory(other.m_OwnsMemory)
+    {
+    }
+
+    VulkanImage& VulkanImage::operator=(VulkanImage&& other) noexcept
+    {
+        if (this != &other)
+        {
+            // Destroy current resources (if any)
+            this->~VulkanImage();
+
+            // Move data
+            // Note: m_Device is a reference, cannot be reassigned easily if different,
+            // but in this engine m_Device is a singleton/shared_ptr usually.
+            // We assume moving between images of same device context.
+            m_Image = std::exchange(other.m_Image, VK_NULL_HANDLE);
+            m_ImageView = std::exchange(other.m_ImageView, VK_NULL_HANDLE);
+            m_Allocation = std::exchange(other.m_Allocation, VK_NULL_HANDLE);
+            m_Format = other.m_Format;
+            m_MipLevels = other.m_MipLevels;
+            m_Width = other.m_Width;
+            m_Height = other.m_Height;
+            m_IsValid = other.m_IsValid;
+            m_OwnsMemory = other.m_OwnsMemory;
+        }
+        return *this;
+    }
+
     VulkanImage::~VulkanImage()
     {
         VkDevice logicalDevice = m_Device.GetLogicalDevice();
         VmaAllocator allocator = m_Device.GetAllocator();
 
+        // 1. Always destroy the Image View
         if (m_ImageView)
         {
             VkImageView view = m_ImageView;
@@ -96,14 +143,36 @@ namespace RHI
             });
         }
 
+        // 2. Destroy the Image Handle (and Memory if owned)
         if (m_Image)
         {
             VkImage image = m_Image;
-            VmaAllocation allocation = m_Allocation;
-            m_Device.SafeDestroy([allocator, image, allocation]()
+
+            if (m_OwnsMemory)
             {
-                vmaDestroyImage(allocator, image, allocation);
-            });
+                // CASE A: Standard VMA Allocation
+                // We own the memory. vmaDestroyImage frees both the VkImage and the allocation.
+                VmaAllocation allocation = m_Allocation;
+
+                // Defensive check, though allocation should be valid if m_OwnsMemory is true
+                if (allocation)
+                {
+                    m_Device.SafeDestroy([allocator, image, allocation]()
+                    {
+                        vmaDestroyImage(allocator, image, allocation);
+                    });
+                }
+            }
+            else
+            {
+                // CASE B: Aliased / Unbound (RenderGraph)
+                // We do NOT own the memory (it belongs to the RenderGraph pool).
+                // We MUST destroy the VkImage handle, but MUST NOT touch the memory.
+                m_Device.SafeDestroy([logicalDevice, image]()
+                {
+                    vkDestroyImage(logicalDevice, image, nullptr);
+                });
+            }
         }
     }
 
@@ -124,5 +193,67 @@ namespace RHI
         }
         Core::Log::Error("Failed to find supported depth format!");
         return VK_FORMAT_UNDEFINED;
+    }
+
+    VulkanImage VulkanImage::CreateUnbound(VulkanDevice& device, uint32_t width, uint32_t height,
+                                           VkFormat format, VkImageUsageFlags usage)
+    {
+        // Use private constructor to initialize clean state
+        VulkanImage img(device, width, height, format);
+
+        VkImageCreateInfo imageInfo{};
+        imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+        imageInfo.imageType = VK_IMAGE_TYPE_2D;
+        imageInfo.extent = {width, height, 1};
+        imageInfo.mipLevels = 1;
+        imageInfo.arrayLayers = 1;
+        imageInfo.format = format;
+        imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+        imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        imageInfo.usage = usage;
+        imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+
+        // ALIAS_BIT is required for memory aliasing
+        imageInfo.flags = VK_IMAGE_CREATE_ALIAS_BIT;
+
+        if (vkCreateImage(device.GetLogicalDevice(), &imageInfo, nullptr, &img.m_Image) != VK_SUCCESS)
+        {
+            Core::Log::Error("Failed to create unbound vkImage");
+            img.m_IsValid = false;
+        }
+
+        return img; // RVO or Move
+    }
+
+    VkMemoryRequirements VulkanImage::GetMemoryRequirements() const
+    {
+        VkMemoryRequirements memReqs;
+        vkGetImageMemoryRequirements(m_Device.GetLogicalDevice(), m_Image, &memReqs);
+        return memReqs;
+    }
+
+    void VulkanImage::BindMemory(VkDeviceMemory memory, VkDeviceSize offset)
+    {
+        vkBindImageMemory(m_Device.GetLogicalDevice(), m_Image, memory, offset);
+
+        // Create view AFTER memory is bound
+        VkImageViewCreateInfo viewInfo{};
+        viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        viewInfo.image = m_Image;
+        viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        viewInfo.format = m_Format;
+        viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT; // Simplified
+        if (m_Format == VK_FORMAT_D32_SFLOAT || m_Format == VK_FORMAT_D24_UNORM_S8_UINT)
+            viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+
+        viewInfo.subresourceRange.baseMipLevel = 0;
+        viewInfo.subresourceRange.levelCount = 1;
+        viewInfo.subresourceRange.baseArrayLayer = 0;
+        viewInfo.subresourceRange.layerCount = 1;
+
+        if (vkCreateImageView(m_Device.GetLogicalDevice(), &viewInfo, nullptr, &m_ImageView) != VK_SUCCESS)
+        {
+            Core::Log::Error("Failed to create bound image view");
+        }
     }
 }

@@ -96,7 +96,6 @@ namespace RHI
 
     void VulkanDevice::FlushDeletionQueue(uint32_t frameIndex)
     {
-        m_CurrentFrameIndex = frameIndex;
         std::lock_guard lock(m_DeletionMutex);
         auto& queue = m_DeletionQueue[frameIndex];
         for (auto& fn : queue) fn();
@@ -106,7 +105,9 @@ namespace RHI
     void VulkanDevice::SafeDestroy(std::function<void()>&& deleteFn)
     {
         std::lock_guard lock(m_DeletionMutex);
-        m_DeletionQueue[m_CurrentFrameIndex].push_back(std::move(deleteFn));
+
+        uint32_t safeFrameIndex = (m_CurrentFrameIndex + 1) % MAX_FRAMES_IN_FLIGHT;
+        m_DeletionQueue[safeFrameIndex].push_back(std::move(deleteFn));
     }
 
     void VulkanDevice::PickPhysicalDevice(VkInstance instance)

@@ -370,6 +370,20 @@ export namespace Graphics
             std::vector<PooledBuffer> Buffers;
         };
 
+        struct MemoryChunk
+        {
+            VkDeviceMemory Memory = VK_NULL_HANDLE;
+            VkDeviceSize Size = 0;
+            uint32_t MemoryTypeBits = 0;
+
+            // Track the lifetime of this chunk (Frame index)
+            uint32_t LastFrameIndex = 0;
+            uint64_t LastUsedGlobalFrame = 0;
+
+            // List of time intervals this memory is occupied in the current frame
+            std::vector<std::pair<uint32_t, uint32_t>> AllocatedIntervals;
+        };
+
         std::shared_ptr<RHI::VulkanDevice> m_Device;
         Core::Memory::LinearArena& m_Arena;      // POD pass data
         Core::Memory::ScopeStack& m_Scope;       // destructor-safe pass closures
@@ -387,11 +401,14 @@ export namespace Graphics
 
         std::unordered_map<ImageCacheKey, PooledImageStack, ImageCacheKeyHash> m_ImagePool;
         std::unordered_map<BufferCacheKey, PooledBufferStack, BufferCacheKeyHash> m_BufferPool;
+        std::unordered_map<uint32_t, std::vector<std::unique_ptr<MemoryChunk>>> m_MemoryPool;
+
 
         RGPass& CreatePassInternal(const std::string& name);
         std::pair<ResourceID, bool> CreateResourceInternal(Core::Hash::StringID name, ResourceType type);
 
         RHI::VulkanImage* ResolveImage(uint32_t frameIndex, const ResourceNode& node);
         RHI::VulkanBuffer* ResolveBuffer(uint32_t frameIndex, const ResourceNode& node);
+        VkDeviceMemory AllocateOrReuseMemory(const VkMemoryRequirements& reqs, uint32_t startPass, uint32_t endPass, uint32_t frameIndex);
     };
 }
