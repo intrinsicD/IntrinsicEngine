@@ -202,41 +202,15 @@ public:
         {
             if (m_AssetManager.GetState(m_DuckModel) == Assets::LoadState::Ready)
             {
-                auto modelResult = m_AssetManager.Get<Graphics::Model>(m_DuckModel);
-                if (!modelResult)
-                {
-                    Log::Error("Failed to get model: {}", Core::ErrorCodeToString(modelResult.error()));
-                    m_IsEntitySpawned = true; // Don't retry
-                    return;
-                }
-                const auto& model = *modelResult;
+                // One line to rule them all
+                SpawnModel(m_DuckModel, m_DuckMaterialHandle, glm::vec3(0.0f), glm::vec3(0.01f));
 
-                for (const auto& meshSegment : model->Meshes)
-                {
-                    auto entity = m_Scene.CreateEntity(meshSegment->Name);
+                // (Optional) If you need to add specific behaviors like rotation:
+                // entt::entity duck = SpawnModel(...);
+                // m_Scene.GetRegistry().emplace<ECS::Components::AxisRotator::Component>(duck, ...);
 
-                    auto& t = m_Scene.GetRegistry().get<ECS::Components::Transform::Component>(entity);
-                    t.Scale = glm::vec3(0.01f);
-                    m_Scene.GetRegistry().emplace<ECS::Components::AxisRotator::Component>(entity, ECS::Components::AxisRotator::Component::Y());
-
-                    auto& mr = m_Scene.GetRegistry().emplace<ECS::MeshRenderer::Component>(entity);
-                    mr.Geometry = meshSegment->Handle;
-                    mr.Material = m_DuckMaterialHandle;
-
-                    auto& collider = m_Scene.GetRegistry().emplace<ECS::MeshCollider::Component>(entity);
-                    collider.CollisionRef = meshSegment->CollisionGeometry; // Shared Ptr
-                    collider.WorldOBB.Center = meshSegment->CollisionGeometry->LocalAABB.GetCenter();
-
-                    // Mark entity as selectable by the editor picking system.
-                    m_Scene.GetRegistry().emplace_or_replace<ECS::Components::Selection::SelectableTag>(entity);
-
-                    // Optional: auto-select first spawned entity for convenience.
-                    if (GetSelection().GetSelectedEntity(m_Scene) == entt::null)
-                        GetSelection().SetSelectedEntity(m_Scene, entity);
-
-                    m_IsEntitySpawned = true;
-                    Log::Info("Duck Entity Spawned.");
-                }
+                m_IsEntitySpawned = true;
+                Log::Info("Duck Entity Spawned.");
             }
         }
 

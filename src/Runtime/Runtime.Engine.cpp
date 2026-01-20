@@ -22,6 +22,62 @@ import Interface;
 
 namespace Runtime
 {
+    entt::entity Engine::SpawnModel(Core::Assets::AssetHandle modelHandle,
+                                    Core::Assets::AssetHandle materialHandle,
+                                    glm::vec3 position,
+                                    glm::vec3 scale)
+    {
+        // 1. Resolve Model
+        auto modelResult = m_AssetManager.Get<Graphics::Model>(modelHandle);
+        if (!modelResult)
+        {
+            Core::Log::Error("Cannot spawn model: Asset not ready or invalid.");
+            return entt::null;
+        }
+        const auto& model = *modelResult;
+
+        // 2. Create Root
+        // We use the Asset Name as the entity name base
+        std::string name = "Model";
+        // (Optional: fetch name from AssetManager metadata if available)
+
+        entt::entity root = m_Scene.CreateEntity(name);
+        auto& t = m_Scene.GetRegistry().get<ECS::Components::Transform::Component>(root);
+        t.Position = position;
+        t.Scale = scale;
+
+        // 3. Create Submeshes
+        for (size_t i = 0; i < model->Meshes.size(); i++)
+        {
+            entt::entity targetEntity = root;
+
+            // If complex model, create children. If single mesh, put it on root.
+            if (model->Meshes.size() > 1)
+            {
+                targetEntity = m_Scene.CreateEntity(model->Meshes[i]->Name);
+                ECS::Components::Hierarchy::Attach(m_Scene.GetRegistry(), targetEntity, root);
+            }
+
+            // Add Renderer
+            auto& mr = m_Scene.GetRegistry().emplace<ECS::MeshRenderer::Component>(targetEntity);
+            mr.Geometry = model->Meshes[i]->Handle;
+            mr.Material = materialHandle;
+
+            // Add Collider
+            if (model->Meshes[i]->CollisionGeometry)
+            {
+                auto& col = m_Scene.GetRegistry().emplace<ECS::MeshCollider::Component>(targetEntity);
+                col.CollisionRef = model->Meshes[i]->CollisionGeometry;
+                col.WorldOBB.Center = col.CollisionRef->LocalAABB.GetCenter();
+            }
+
+            // Add Selectable Tag (THE CRITICAL FIX)
+            m_Scene.GetRegistry().emplace<ECS::Components::Selection::SelectableTag>(targetEntity);
+        }
+
+        return root;
+    }
+
     Engine::Engine(const EngineConfig& config) :
         m_FrameArena(config.FrameArenaSize),
         m_FrameScope(config.FrameArenaSize)
@@ -215,7 +271,8 @@ namespace Runtime
 
                 if (!loadResult)
                 {
-                    Core::Log::Error("Failed to load model: {} ({})", path, Graphics::AssetErrorToString(loadResult.error()));
+                    Core::Log::Error("Failed to load model: {} ({})", path,
+                                     Graphics::AssetErrorToString(loadResult.error()));
                     return;
                 }
 
@@ -226,77 +283,51 @@ namespace Runtime
                 // 3. Schedule Entity Spawning on Main Thread
                 // We CANNOT touch m_Scene, m_AssetManager, or m_LoadedMaterials here.
                 RunOnMainThread([this, model = std::move(loadResult->ModelData), path]() mutable
-                 {
-                      // [Main Thread] Safe to touch Scene/Assets
-                      std::filesystem::path fsPath(path);
-                      std::string assetName = fsPath.filename().string();
+                {
+                    // [Main Thread] Safe to touch Scene/Assets
+                    std::filesystem::path fsPath(path);
+                    std::string assetName = fsPath.filename().string();
 
-                      // Transfer ownership of the model into the AssetManager (zero-copy).
-                      // Keep a raw pointer for the rest of this scope (AssetManager now owns lifetime).
-                      auto* modelPtr = model.get();
-                      m_AssetManager.Create(assetName, std::move(model));
+                    // Transfer ownership of the model into the AssetManager (zero-copy).
+                    // Keep a raw pointer for the rest of this scope (AssetManager now owns lifetime).
+                    auto modelHandle = m_AssetManager.Create(assetName, std::move(model));
 
-                     // --- Setup Material (Requires AssetManager) ---
-                     // Define local loader lambda inside the main thread task
-                     auto textureLoader = [this](const std::string& pathStr, Core::Assets::AssetHandle handle)
-                         -> std::unique_ptr<RHI::Texture>
-                      {
-                          std::filesystem::path texPath(pathStr);
-                          auto result = Graphics::TextureLoader::LoadAsync(texPath, *GetDevice(), *m_TransferManager);
-                          if (result)
-                          {
-                              m_AssetManager.MoveToProcessing(handle);
-                              RegisterAssetLoad(handle, result->Token);
-                              return std::move(result->Resource);
-                          }
+                    // --- Setup Material (Requires AssetManager) ---
+                    // Define local loader lambda inside the main thread task
+                    auto textureLoader = [this](const std::string& pathStr, Core::Assets::AssetHandle handle)
+                        -> std::unique_ptr<RHI::Texture>
+                    {
+                        std::filesystem::path texPath(pathStr);
+                        auto result = Graphics::TextureLoader::LoadAsync(texPath, *GetDevice(), *m_TransferManager);
+                        if (result)
+                        {
+                            m_AssetManager.MoveToProcessing(handle);
+                            RegisterAssetLoad(handle, result->Token);
+                            return std::move(result->Resource);
+                        }
 
-                          Core::Log::Warn("Texture load failed: {} ({})", pathStr, Graphics::AssetErrorToString(result.error()));
-                          return nullptr;
-                      };
+                        Core::Log::Warn("Texture load failed: {} ({})", pathStr,
+                                        Graphics::AssetErrorToString(result.error()));
+                        return nullptr;
+                    };
 
-                     // Load Default Texture
-                     auto texHandle = m_AssetManager.Load<RHI::Texture>(
-                         Core::Filesystem::GetAssetPath("textures/Parameterization.jpg"), textureLoader);
+                    // Load Default Texture
+                    auto texHandle = m_AssetManager.Load<RHI::Texture>(
+                        Core::Filesystem::GetAssetPath("textures/Parameterization.jpg"), textureLoader);
 
-                     auto defaultMat = std::make_unique<Graphics::Material>(
-                         *GetDevice(), *m_BindlessSystem,
-                         texHandle, m_DefaultTextureIndex, m_AssetManager
-                     );
+                    auto defaultMat = std::make_unique<Graphics::Material>(
+                        *GetDevice(), *m_BindlessSystem,
+                        texHandle, m_DefaultTextureIndex, m_AssetManager
+                    );
 
-                     auto defaultMaterialHandle = m_AssetManager.Create("DefaultMaterial", std::move(defaultMat));
-                      m_LoadedMaterials.push_back(defaultMaterialHandle);
+                    auto defaultMaterialHandle = m_AssetManager.Create("DefaultMaterial", std::move(defaultMat));
+                    m_LoadedMaterials.push_back(defaultMaterialHandle);
 
-                     // --- Spawn Entities ---
-                     std::string entityName = fsPath.stem().string();
-                     entt::entity rootEntity = m_Scene.CreateEntity(entityName);
+                    // --- Spawn Entities ---
+                    SpawnModel(modelHandle, defaultMaterialHandle, glm::vec3(0.0f), glm::vec3(0.01f));
 
-                     auto& t = m_Scene.GetRegistry().get<ECS::Components::Transform::Component>(rootEntity);
-                     t.Scale = glm::vec3(0.01f);
-
-                    for (size_t i = 0; i < modelPtr->Size(); i++)
-                     {
-                         entt::entity targetEntity = rootEntity;
-                         if (modelPtr->Size() > 1)
-                         {
-                             targetEntity = m_Scene.CreateEntity(entityName + "_" + std::to_string(i));
-                              // NOTE: Parent-child relationships could be added here via a Hierarchy component
-                             // when the ECS supports transform hierarchies (e.g., ECS::Hierarchy::Component).
-                         }
-
-                         auto& mr = m_Scene.GetRegistry().emplace<ECS::MeshRenderer::Component>(targetEntity);
-                         mr.Geometry = modelPtr->Meshes[i]->Handle;
-                         mr.Material = defaultMaterialHandle;
-
-                         // Add Collider
-                         if (modelPtr->Meshes[i]->CollisionGeometry)
-                         {
-                             auto& col = m_Scene.GetRegistry().emplace<ECS::MeshCollider::Component>(targetEntity);
-                             col.CollisionRef = modelPtr->Meshes[i]->CollisionGeometry;
-                             col.WorldOBB.Center = col.CollisionRef->LocalAABB.GetCenter(); // Init center
-                         }
-                     }
-                     Core::Log::Info("Successfully spawned: {}", entityName);
-                 });
+                    Core::Log::Info("Successfully spawned: {}", assetName);
+                });
             });
         }
         else

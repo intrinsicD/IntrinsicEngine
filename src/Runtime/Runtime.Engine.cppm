@@ -2,6 +2,8 @@ module;
 #include <memory>
 #include <string>
 #include <vector>
+#include <entt/entity/entity.hpp>
+#include <glm/glm.hpp>
 
 #include "RHI.Vulkan.hpp"
 
@@ -37,6 +39,10 @@ export namespace Runtime
         virtual void OnStart() = 0;
         virtual void OnUpdate(float deltaTime) = 0;
         virtual void OnRender() = 0; // Optional custom rendering hook
+        entt::entity SpawnModel(Core::Assets::AssetHandle modelHandle,
+                                Core::Assets::AssetHandle materialHandle,
+                                glm::vec3 position,
+                                glm::vec3 scale = glm::vec3(1.0f));
 
     protected:
         std::unique_ptr<Core::Windowing::Window> m_Window;
@@ -54,13 +60,13 @@ export namespace Runtime
         std::unique_ptr<RHI::GraphicsPipeline> m_Pipeline;
         std::unique_ptr<RHI::GraphicsPipeline> m_PickPipeline;
         std::unique_ptr<RHI::BindlessDescriptorSystem> m_BindlessSystem;
-    public:
 
+    public:
         // Protected access so Sandbox can manipulate Scene/Assets
         ECS::Scene m_Scene;
         Core::Assets::AssetManager m_AssetManager;
         Core::Memory::LinearArena m_FrameArena; // 1 MB per frame
-        Core::Memory::ScopeStack m_FrameScope;  // per-frame scope allocator with destructors
+        Core::Memory::ScopeStack m_FrameScope; // per-frame scope allocator with destructors
         Graphics::GeometryStorage m_GeometryStorage;
         std::unique_ptr<Graphics::RenderSystem> m_RenderSystem;
 
@@ -81,14 +87,13 @@ export namespace Runtime
         [[nodiscard]] Graphics::GeometryStorage& GetGeometryStorage() { return m_GeometryStorage; }
 
         void RegisterAssetLoad(Core::Assets::AssetHandle handle, RHI::TransferToken token);
+
         template <typename F>
         void RunOnMainThread(F&& task)
         {
             std::lock_guard lock(m_MainThreadQueueMutex);
             m_MainThreadQueue.emplace_back(Core::Tasks::LocalTask(std::forward<F>(task)));
         }
-
-
 
     protected:
         std::shared_ptr<RHI::Texture> m_DefaultTexture;
