@@ -50,19 +50,14 @@ namespace Core::Assets
                 std::shared_lock lock(m_Mutex);
 
                 // Check if any listeners exist for this asset
-                auto it = m_PersistentListeners.find(handle);
-                if (it != m_PersistentListeners.end())
+                if (m_PersistentListeners.contains(handle))
                 {
-                    // it->second is now std::unordered_map<uint32_t, AssetCallback>
-                    const auto& innerMap = it->second;
+                    const auto& listeners = m_PersistentListeners.at(handle);
+                    runPersistent.reserve(listeners.size());
 
-                    // Pre-allocate to avoid reallocations during extraction
-                    runPersistent.reserve(innerMap.size());
-
-                    // Extract just the callbacks (values) from the ID map
-                    for (const auto& [listenerID, callback] : innerMap)
-                    {
-                        runPersistent.push_back(callback);
+                    // Copy valid callbacks only
+                    for(const auto& [id, cb] : listeners) {
+                        if(cb) runPersistent.push_back(cb);
                     }
                 }
             }
