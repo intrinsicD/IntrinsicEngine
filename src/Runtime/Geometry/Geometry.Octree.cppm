@@ -12,6 +12,7 @@ module;
 #include <cmath>
 #include <vector>
 #include <string>
+#include <bit>
 #include <glm/glm.hpp>
 
 export module Geometry:Octree;
@@ -52,18 +53,21 @@ export namespace Geometry
         struct Node
         {
             AABB Aabb;
-            std::array<NodeIndex, 8> Children{};
+            NodeIndex BaseChildIndex = kInvalidIndex;
 
             ElementIndex FirstElement = std::numeric_limits<ElementIndex>::max();
             std::uint32_t NumElements = 0;
             std::uint32_t NumStraddlers = 0; // number of elements that straddle child node boundaries
             // total number of elements in this node (including straddlers).Necessary for early out in queries
 
+            uint8_t ChildMask = 0;
             bool IsLeaf = true;
 
-            Node()
+            Node() = default;
+
+            [[nodiscard]] bool ChildExists(std::size_t childIdx) const
             {
-                Children.fill(kInvalidIndex);
+                return (ChildMask & (1 << childIdx)) != 0;
             }
         };
 
@@ -132,7 +136,7 @@ export namespace Geometry
         /// @brief Build the octree from a span of AABBs.
         /// @return true if build succeeded, false if input was empty or invalid.
         [[nodiscard]] bool Build(std::span<const AABB> aabbs, const SplitPolicy& policy, const std::size_t maxPerNode,
-                   const std::size_t maxDepth)
+                                 const std::size_t maxDepth)
         {
             ElementAabbs = aabbs;
 
@@ -239,20 +243,25 @@ export namespace Geometry
                     }
                 }
 
-                if (!node.IsLeaf)
+                if (!node.IsLeaf && node.BaseChildIndex != kInvalidIndex)
                 {
-                    for (const auto childIndex : node.Children)
+                    uint32_t childOffset = 0;
+                    for (int i = 0; i < 8; ++i)
                     {
-                        // Check validity via index directly
-                        if (childIndex != kInvalidIndex)
+                        // Check if the i-th octant exists
+                        if (node.ChildExists(i))
                         {
-                            // Optimization: Check Child AABB here before pushing to stack?
-                            // The original code pushed then checked.
-                            // Checking here saves a stack push/pop cycle.
+                            // Calculate absolute index in m_Nodes
+                            const NodeIndex childIndex = node.BaseChildIndex + childOffset;
+
+                            // Optimization: Check child AABB before pushing to stack
                             if (TestOverlap(nodePtr[childIndex].Aabb, queryShape))
                             {
                                 stack[stackTop++] = childIndex;
                             }
+
+                            // Move to the next existing child in the contiguous block
+                            childOffset++;
                         }
                     }
                 }
@@ -301,11 +310,27 @@ export namespace Geometry
                             result.push_back(ei);
                         }
                     }
-                    for (const auto childIndex : node.Children)
+
+                    if (node.BaseChildIndex != kInvalidIndex)
                     {
-                        if (childIndex != kInvalidIndex && TestOverlap(m_Nodes[childIndex].Aabb, queryShape))
+                        uint32_t childOffset = 0;
+                        for (int i = 0; i < 8; ++i)
                         {
-                            stack[stackTop++] = childIndex;
+                            // Check if the i-th octant exists
+                            if (node.ChildExists(i))
+                            {
+                                // Calculate absolute index in m_Nodes
+                                const NodeIndex childIndex = node.BaseChildIndex + childOffset;
+
+                                // Optimization: Check child AABB before pushing to stack
+                                if (childIndex != kInvalidIndex && TestOverlap(nodePtr[childIndex].Aabb, queryShape))
+                                {
+                                    stack[stackTop++] = childIndex;
+                                }
+
+                                // Move to the next existing child in the contiguous block
+                                childOffset++;
+                            }
                         }
                     }
                 }
@@ -380,11 +405,26 @@ export namespace Geometry
                         }
                     }
                     // Push children best-first, pruned by current tau
-                    for (const auto childIndex : node.Children)
+
+                    if (node.BaseChildIndex != kInvalidIndex)
                     {
-                        if (childIndex == kInvalidIndex) continue;
-                        const float cd2 = d2Node(childIndex);
-                        if (cd2 <= tau) pq.emplace(cd2, childIndex);
+                        uint32_t childOffset = 0;
+                        for (int i = 0; i < 8; ++i)
+                        {
+                            // Check if the i-th octant exists
+                            if (node.ChildExists(i))
+                            {
+                                // Calculate absolute index in m_Nodes
+                                const NodeIndex childIndex = node.BaseChildIndex + childOffset;
+
+                                if (childIndex == kInvalidIndex) continue;
+                                const float cd2 = d2Node(childIndex);
+                                if (cd2 <= tau) pq.emplace(cd2, childIndex);
+
+                                // Move to the next existing child in the contiguous block
+                                childOffset++;
+                            }
+                        }
                     }
                 }
             }
@@ -461,14 +501,25 @@ export namespace Geometry
                         }
                     }
                     // This is an internal node, so traverse to its children.
-                    for (const auto childIndex : node.Children)
+                    if (node.BaseChildIndex != kInvalidIndex)
                     {
-                        if (childIndex != kInvalidIndex)
+                        uint32_t childOffset = 0;
+                        for (int i = 0; i < 8; ++i)
                         {
-                            const double childDistSq = SquaredDistance(m_Nodes[childIndex].Aabb, queryPoint);
-                            if (childDistSq < minDistSq)
+                            // Check if the i-th octant exists
+                            if (node.ChildExists(i))
                             {
-                                pq.emplace(childDistSq, childIndex);
+                                // Calculate absolute index in m_Nodes
+                                const NodeIndex childIndex = node.BaseChildIndex + childOffset;
+
+                                const double childDistSq = SquaredDistance(m_Nodes[childIndex].Aabb, queryPoint);
+                                if (childDistSq < minDistSq)
+                                {
+                                    pq.emplace(childDistSq, childIndex);
+                                }
+
+                                // Move to the next existing child in the contiguous block
+                                childOffset++;
                             }
                         }
                     }
@@ -496,18 +547,33 @@ export namespace Geometry
 
             std::size_t accumulated = node.FirstElement + node.NumStraddlers;
             std::size_t childTotal = 0;
-            for (const auto childIndex : node.Children)
+
+            if (node.BaseChildIndex != kInvalidIndex)
             {
-                if (childIndex == kInvalidIndex) continue;
+                uint32_t childOffset = 0;
+                for (int i = 0; i < 8; ++i)
+                {
+                    // Check if the i-th octant exists
+                    if (node.ChildExists(i))
+                    {
+                        // Calculate absolute index in m_Nodes
+                        const NodeIndex childIndex = node.BaseChildIndex + childOffset;
 
-                const Node& child = m_Nodes[childIndex];
-                if (child.FirstElement != accumulated) return false;
-                if (child.NumElements == 0) return false;
-                if (child.FirstElement + child.NumElements > node.FirstElement + node.NumElements) return false;
-                if (!ValidateNode(childIndex)) return false;
+                        if (childIndex == kInvalidIndex) continue;
 
-                accumulated += child.NumElements;
-                childTotal += child.NumElements;
+                        const Node& child = m_Nodes[childIndex];
+                        if (child.FirstElement != accumulated) return false;
+                        if (child.NumElements == 0) return false;
+                        if (child.FirstElement + child.NumElements > node.FirstElement + node.NumElements) return false;
+                        if (!ValidateNode(childIndex)) return false;
+
+                        accumulated += child.NumElements;
+                        childTotal += child.NumElements;
+
+                        // Move to the next existing child in the contiguous block
+                        childOffset++;
+                    }
+                }
             }
 
             return accumulated == node.FirstElement + node.NumElements &&
@@ -523,19 +589,23 @@ export namespace Geometry
 
         void SubdivideVolume(const NodeIndex nodeIdx, std::size_t depth, std::vector<size_t>& scratch)
         {
+            // 1. Capture Parent Data
+            // We copy values because m_Nodes.resize() later might invalidate references.
             AABB nodeAabb = m_Nodes[nodeIdx].Aabb;
             uint32_t firstElement = m_Nodes[nodeIdx].FirstElement;
             uint32_t numElements = m_Nodes[nodeIdx].NumElements;
 
+            // 2. Recursion Termination Check
             if (depth >= m_MaxBvhDepth || numElements <= m_MaxElementsPerNode)
             {
                 m_Nodes[nodeIdx].IsLeaf = true;
                 return;
             }
 
+            // 3. Calculate Split Point
             glm::vec3 sp = ChooseSplitPoint(nodeIdx);
 
-            //Jitter/tighten the split point when it hits data
+            // Jitter/tighten the split point to avoid slicing empty space or coincident geometry
             for (int ax = 0; ax < 3; ++ax)
             {
                 const float lo = nodeAabb.Min[ax], hi = nodeAabb.Max[ax];
@@ -545,22 +615,27 @@ export namespace Geometry
                 else if (s == hi) s = std::nextafter(s, lo);
             }
 
+            // 4. Define Octant Bounds
             std::array<AABB, 8> octantAabbs;
             for (int j = 0; j < 8; ++j)
             {
                 glm::vec3 childMin = {
-                    (j & 1) ? sp[0] : nodeAabb.Min[0], (j & 2) ? sp[1] : nodeAabb.Min[1],
+                    (j & 1) ? sp[0] : nodeAabb.Min[0],
+                    (j & 2) ? sp[1] : nodeAabb.Min[1],
                     (j & 4) ? sp[2] : nodeAabb.Min[2]
                 };
                 glm::vec3 childMax = {
-                    (j & 1) ? nodeAabb.Max[0] : sp[0], (j & 2) ? nodeAabb.Max[1] : sp[1],
+                    (j & 1) ? nodeAabb.Max[0] : sp[0],
+                    (j & 2) ? nodeAabb.Max[1] : sp[1],
                     (j & 4) ? nodeAabb.Max[2] : sp[2]
                 };
                 octantAabbs[j] = {.Min = childMin, .Max = childMax};
             }
 
+            // 5. Bucket Elements
             std::array<std::vector<size_t>, 8> childElements;
             for (auto& vec : childElements) vec.reserve(numElements / 8);
+
             scratch.clear();
             scratch.reserve(numElements);
             auto& straddlers = scratch;
@@ -573,8 +648,8 @@ export namespace Geometry
 
                 if (elemAabb.Min == elemAabb.Max)
                 {
+                    // Point optimization
                     const glm::vec3& p = elemAabb.Min;
-                    // Element is a point. Directly assign it to one of the octants.
                     int code = 0;
                     code |= (p[0] >= sp[0]) ? 1 : 0;
                     code |= (p[1] >= sp[1]) ? 2 : 0;
@@ -593,8 +668,7 @@ export namespace Geometry
                             }
                             else
                             {
-                                // The element is contained in more than one child box, which shouldn't happen with this logic.
-                                // Treat as a straddler just in case of floating point issues.
+                                // Overlaps multiple octants -> Straddler
                                 foundChild = -1;
                                 break;
                             }
@@ -606,8 +680,7 @@ export namespace Geometry
                     }
                     else
                     {
-                        // Fallback: assign by center if we will tighten children;
-                        // otherwise keep as straddler to preserve correctness.
+                        // Fallback strategy: loose fit or straddler
                         if (m_SplitPolicy.TightChildren)
                         {
                             const glm::vec3 c = elemAabb.GetCenter();
@@ -625,55 +698,79 @@ export namespace Geometry
                 }
             }
 
-            // If we couldn't push a significant number of elements down, it's better to stop and make this a leaf.
-            // This prevents creating child nodes with very few elements.
+            // 6. Check Efficiency
+            // If everything straddles, we can't subdivide further. Make leaf.
             if (straddlers.size() == numElements)
             {
                 m_Nodes[nodeIdx].IsLeaf = true;
                 return;
             }
 
-            // This node is now an internal node. It stores nothing itself.
-            // Re-arrange the element_indices array.
-            std::size_t currentPos = firstElement;
-            // First, place all the straddlers
-            for (size_t idx : straddlers)
-            {
-                m_ElementIndices[currentPos++] = idx;
-            }
-            // Then, place the elements for each child sequentially
-            std::array<size_t, 8> childStarts{};
-            for (int i = 0; i < 8; ++i)
-            {
-                childStarts[i] = currentPos;
-                for (size_t idx : childElements[i])
-                {
-                    m_ElementIndices[currentPos++] = idx;
-                }
-            }
-
-            // --- This node is now officially an internal node ---
-            // Its 'firstElement' points to the start of the straddlers
-            // Its 'numStraddlers' counts how many straddlers there are
-            // Its 'numElements' counts all elements (straddlers + children)
-            // Its children[] point to the new child nodes (created below)
-            // We need to keep the straddlers at the start of the range for correct querying,
-            // But we also still need to keep track of the total number of elements for early out. This is important!
-            m_Nodes[nodeIdx].IsLeaf = false;
-            m_Nodes[nodeIdx].NumStraddlers = straddlers.size();
-
-            // Create children and recurse
+            // 7. Calculate Sparse Mask & Allocation Requirements
+            uint8_t mask = 0;
+            uint32_t childrenNeeded = 0;
             for (int i = 0; i < 8; ++i)
             {
                 if (!childElements[i].empty())
                 {
-                    const auto childIndex = CreateNode();
-                    m_Nodes[nodeIdx].Children[i] = childIndex;
+                    mask |= (1 << i);
+                    childrenNeeded++;
+                }
+            }
 
-                    Node& child = m_Nodes[childIndex];
-                    child.FirstElement = childStarts[i];
-                    child.NumElements = childElements[i].size();
+            if (childrenNeeded == 0)
+            {
+                m_Nodes[nodeIdx].IsLeaf = true;
+                return;
+            }
 
+            // 8. Allocate Contiguous Children
+            const NodeIndex baseChildIdx = static_cast<NodeIndex>(m_Nodes.size());
+            // Resize vector. WARNING: This invalidates pointers/references to existing nodes!
+            // We must use indices to access nodes from here on.
+            m_Nodes.resize(m_Nodes.size() + childrenNeeded);
+
+            // 9. Update Parent Node
+            {
+                Node& node = m_Nodes[nodeIdx]; // Re-fetch reference after resize
+                node.IsLeaf = false;
+                node.NumStraddlers = static_cast<uint32_t>(straddlers.size());
+                node.ChildMask = mask;
+                node.BaseChildIndex = baseChildIdx;
+                // node.NumElements includes straddlers + children elements (recursive total).
+                // We leave it as total count for early culling optimization.
+            }
+
+            // 10. Reorder Index Buffer (Straddlers -> Child 0 -> Child 1 ...)
+            // We repack the elements in-place within the global m_ElementIndices vector.
+            std::size_t currentPos = firstElement;
+
+            // A. Place Straddlers first
+            for (size_t idx : straddlers)
+            {
+                m_ElementIndices[currentPos++] = idx;
+            }
+
+            // B. Initialize Children and Recurse
+            uint32_t childOffset = 0;
+            for (int i = 0; i < 8; ++i)
+            {
+                if (mask & (1 << i))
+                {
+                    const NodeIndex currentChildIdx = baseChildIdx + childOffset;
+                    Node& child = m_Nodes[currentChildIdx];
+
+                    // Assign Range
+                    child.FirstElement = static_cast<uint32_t>(currentPos);
+                    child.NumElements = static_cast<uint32_t>(childElements[i].size());
+
+                    // Fill Buffer
+                    for (size_t idx : childElements[i])
+                    {
+                        m_ElementIndices[currentPos++] = idx;
+                    }
+
+                    // Compute Bounds
                     if (m_SplitPolicy.TightChildren)
                     {
                         child.Aabb = TightChildAabb(childElements[i].begin(), childElements[i].end(),
@@ -684,7 +781,10 @@ export namespace Geometry
                         child.Aabb = octantAabbs[i];
                     }
 
-                    SubdivideVolume(childIndex, depth + 1, scratch);
+                    // Recurse (Depth First)
+                    SubdivideVolume(currentChildIdx, depth + 1, scratch);
+
+                    childOffset++;
                 }
             }
         }

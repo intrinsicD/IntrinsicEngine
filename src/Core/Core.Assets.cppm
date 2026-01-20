@@ -184,8 +184,13 @@ export namespace Core::Assets
         std::shared_ptr<AssetSlot<T>> m_Slot{};
     };
 
-    // --- Asset Manager ---
+    struct ListenerHandle
+    {
+        uint32_t ID = 0;
+        bool Valid() const { return ID != 0; }
+    };
 
+    // --- Asset Manager ---
     class AssetManager
     {
     public:
@@ -201,7 +206,8 @@ export namespace Core::Assets
         AssetHandle Load(const std::filesystem::path& path, LoaderFunc&& loader);
 
         // 2. Persistent Listener (Updates every reload)
-        void Listen(AssetHandle handle, AssetCallback callback);
+        ListenerHandle Listen(AssetHandle handle, AssetCallback callback);
+        void Unlisten(AssetHandle handle, ListenerHandle listenerId);
 
         // 3. Request Notify: Register a callback for when the asset is Ready.
         // If already ready, callback fires immediately (synchronously).
@@ -259,7 +265,8 @@ export namespace Core::Assets
         std::unordered_map<StringID, AssetHandle> m_Lookup;
 
         // Separate map for Persistent Listeners
-        std::unordered_map<AssetHandle, std::vector<AssetCallback>, AssetHandle::Hash> m_PersistentListeners;
+        // deprecated: std::unordered_map<AssetHandle, std::vector<AssetCallback>, AssetHandle::Hash> m_PersistentListeners;
+        std::unordered_map<AssetHandle, std::unordered_map<uint32_t, AssetCallback>, AssetHandle::Hash> m_PersistentListeners;
         // Map for One-Shot Listeners
         std::unordered_map<AssetHandle, std::vector<AssetCallback>, AssetHandle::Hash> m_OneShotListeners;
 

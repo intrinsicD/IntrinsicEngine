@@ -122,20 +122,16 @@ namespace Core::Tasks
         if (m_VTable) m_VTable->Execute();
     }
 
-    struct SchedulerContext
+    struct alignas(64) SchedulerContext
     {
         std::vector<std::thread> workers;
         std::deque<LocalTask> globalQueue;
-
         SpinLock queueMutex;
 
-        std::atomic<uint32_t> workSignal{0};
-
-        std::atomic<bool> isRunning{false};
-
-        // Existing counters remain for logic
-        std::atomic<int> activeTaskCount{0}; // Tasks currently running on threads
-        std::atomic<int> queuedTaskCount{0}; // Tasks sitting in the deque
+        alignas(64) std::atomic<uint32_t> workSignal{0};
+        alignas(64) std::atomic<bool> isRunning{false};
+        alignas(64) std::atomic<int> activeTaskCount{0}; // Tasks currently running on threads
+        alignas(64) std::atomic<int> queuedTaskCount{0}; // Tasks sitting in the deque
     };
 
     static std::unique_ptr<SchedulerContext> s_Ctx = nullptr;

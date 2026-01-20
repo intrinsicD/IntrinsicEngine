@@ -47,10 +47,23 @@ namespace Core::Assets
             // 2. Process Persistent Listeners
             std::vector<AssetCallback> runPersistent;
             {
-                std::shared_lock lock(m_Mutex); // Lock only to copy
-                if (m_PersistentListeners.contains(handle))
+                std::shared_lock lock(m_Mutex);
+
+                // Check if any listeners exist for this asset
+                auto it = m_PersistentListeners.find(handle);
+                if (it != m_PersistentListeners.end())
                 {
-                    runPersistent = m_PersistentListeners.at(handle);
+                    // it->second is now std::unordered_map<uint32_t, AssetCallback>
+                    const auto& innerMap = it->second;
+
+                    // Pre-allocate to avoid reallocations during extraction
+                    runPersistent.reserve(innerMap.size());
+
+                    // Extract just the callbacks (values) from the ID map
+                    for (const auto& [listenerID, callback] : innerMap)
+                    {
+                        runPersistent.push_back(callback);
+                    }
                 }
             }
             // Execute OUTSIDE lock (Safe to call Load() recursively now)
@@ -99,12 +112,16 @@ namespace Core::Assets
         }
     }
 
-    void AssetManager::Listen(AssetHandle handle, AssetCallback callback)
+    static std::atomic<uint32_t> s_ListenerIdCounter{1};
+
+    ListenerHandle AssetManager::Listen(AssetHandle handle, AssetCallback callback)
     {
         std::unique_lock lock(m_Mutex);
-        if (!m_Registry.valid(handle.ID)) return;
+        if (!m_Registry.valid(handle.ID)) return {0};
 
-        m_PersistentListeners[handle].push_back(callback);
+        uint32_t id = s_ListenerIdCounter++;
+
+        m_PersistentListeners[handle][id] = std::move(callback);
 
         // Optional: Fire immediately if valid?
         // For hot reloading textures, we usually want to know if it's already there to set it up initially.
@@ -112,6 +129,16 @@ namespace Core::Assets
         {
             lock.unlock();
             callback(handle);
+        }
+        return {id};
+    }
+
+    void AssetManager::Unlisten(AssetHandle handle, ListenerHandle listener)
+    {
+        std::unique_lock lock(m_Mutex);
+        if (m_PersistentListeners.contains(handle))
+        {
+            m_PersistentListeners[handle].erase(listener.ID);
         }
     }
 

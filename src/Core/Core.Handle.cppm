@@ -61,10 +61,17 @@ namespace std
     {
         std::size_t operator()(const Core::StrongHandle<Tag>& h) const noexcept
         {
-            // Combine index and generation into single hash
-            std::size_t seed = std::hash<uint32_t>{}(h.Index);
-            seed ^= std::hash<uint32_t>{}(h.Generation) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-            return seed;
+            // Pack into 64-bit integer (assuming 32-bit index/gen)
+            uint64_t val = (static_cast<uint64_t>(h.Generation) << 32) | h.Index;
+
+            // MurmurHash3 Mix / WyHash Mix (Very fast, high avalanche)
+            val ^= val >> 33;
+            val *= 0xff51afd7ed558ccd;
+            val ^= val >> 33;
+            val *= 0xc4ceb9fe1a85ec53;
+            val ^= val >> 33;
+
+            return static_cast<std::size_t>(val);
         }
     };
 }
