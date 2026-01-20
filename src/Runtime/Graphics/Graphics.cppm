@@ -10,6 +10,7 @@ export import :TextureLoader;
 export import :RenderGraph;
 export import :Components;
 export import :AssetErrors;
+export import :ShaderLibrary;
 
 // New modular render pipeline
 export import :RenderPipeline;

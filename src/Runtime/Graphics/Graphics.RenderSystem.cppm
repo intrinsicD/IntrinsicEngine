@@ -16,6 +16,7 @@ import :Passes.Picking;
 import :Passes.Forward;
 import :Passes.DebugView;
 import :Passes.ImGui;
+import :ShaderLibrary;
 import Core;
 import ECS;
 
@@ -68,6 +69,7 @@ export namespace Graphics
         void SetDebugViewSelectedResource(Core::Hash::StringID name) { m_DebugView.SelectedResource = name; }
         void SetDebugViewShowInViewport(bool show) { m_DebugView.ShowInViewport = show; }
 
+        //TODO: finish implementing the ShaderLibrary hot reload
     private:
         size_t m_MinUboAlignment = 0;
 
@@ -83,6 +85,7 @@ export namespace Graphics
         VkDescriptorSet m_GlobalDescriptorSet = VK_NULL_HANDLE;
 
         std::unique_ptr<RHI::VulkanBuffer> m_GlobalUBO;
+        std::unique_ptr<ShaderLibrary> m_ShaderLibrary;
 
         RenderGraph m_RenderGraph;
         GeometryStorage& m_GeometryStorage;

@@ -61,7 +61,8 @@ namespace Graphics
           m_PickPipeline(pickPipeline),
           m_RenderGraph(m_DeviceOwner, frameArena, frameScope),
           m_GeometryStorage(geometryStorage),
-          m_DescriptorPool(descriptorPool)
+          m_DescriptorPool(descriptorPool),
+          m_ShaderLibrary(std::make_unique<Graphics::ShaderLibrary>(*m_Device))
     {
         m_DepthImages.resize(renderer.GetFramesInFlight());
 
@@ -412,4 +413,6 @@ namespace Graphics
         if (m_PickingPass) m_PickingPass->OnResize(extent.width, extent.height);
         if (m_DebugViewPass) m_DebugViewPass->OnResize(extent.width, extent.height);
     }
+
+
 }
