@@ -302,6 +302,7 @@ export namespace Graphics
         {
             std::unique_ptr<RHI::VulkanImage> Resource;
             uint32_t LastFrameIndex;
+            uint64_t LastUsedGlobalFrame = 0;
             std::vector<std::pair<uint32_t, uint32_t>> ActiveIntervals{};
         };
 
@@ -331,6 +332,7 @@ export namespace Graphics
         {
             std::unique_ptr<RHI::VulkanBuffer> Resource;
             uint32_t LastFrameIndex;
+            uint64_t LastUsedGlobalFrame = 0;
             std::vector<std::pair<uint32_t, uint32_t>> ActiveIntervals{};
         };
 

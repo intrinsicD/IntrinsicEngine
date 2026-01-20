@@ -132,58 +132,71 @@ namespace Graphics
 
         // Register UI panel (reuses cached lists maintained in RenderSystem)
         Interface::GUI::RegisterPanel("Render Target Viewer",
-            [this]()
-            {
-                ImGui::Checkbox("Enable Debug View", &m_DebugView.Enabled);
+                                      [this]()
+                                      {
+                                          ImGui::Checkbox("Enable Debug View", &m_DebugView.Enabled);
 
-                if (!m_DebugView.Enabled)
-                {
-                    ImGui::TextDisabled("Debug view disabled. Enable to visualize render targets.");
-                    return;
-                }
+                                          if (!m_DebugView.Enabled)
+                                          {
+                                              ImGui::TextDisabled(
+                                                  "Debug view disabled. Enable to visualize render targets.");
+                                              return;
+                                          }
 
-                ImGui::Checkbox("Show debug view in viewport", &m_DebugView.ShowInViewport);
-                ImGui::Separator();
+                                          ImGui::Checkbox("Show debug view in viewport", &m_DebugView.ShowInViewport);
+                                          ImGui::Separator();
 
-                for (const auto& pass : m_LastDebugPasses)
-                {
-                    if (!ImGui::TreeNode(pass.Name))
-                        continue;
+                                          for (const auto& pass : m_LastDebugPasses)
+                                          {
+                                              if (!ImGui::TreeNode(pass.Name))
+                                                  continue;
 
-                    for (const auto& att : pass.Attachments)
-                    {
-                        const bool isSelected = (att.ResourceName == m_DebugView.SelectedResource);
-                        char label[128];
-                        snprintf(label, sizeof(label), "0x%08X%s", att.ResourceName.Value, att.IsDepth ? " (Depth)" : "");
+                                              for (const auto& att : pass.Attachments)
+                                              {
+                                                  const bool isSelected = (att.ResourceName == m_DebugView.
+                                                      SelectedResource);
+                                                  char label[128];
+                                                  snprintf(label, sizeof(label), "0x%08X%s", att.ResourceName.Value,
+                                                           att.IsDepth ? " (Depth)" : "");
 
-                        if (ImGui::Selectable(label, isSelected))
-                        {
-                            m_DebugView.SelectedResource = att.ResourceName;
-                            m_DebugView.SelectedResourceId = att.Resource;
-                        }
-                    }
+                                                  if (ImGui::Selectable(label, isSelected))
+                                                  {
+                                                      m_DebugView.SelectedResource = att.ResourceName;
+                                                      m_DebugView.SelectedResourceId = att.Resource;
+                                                  }
+                                              }
 
-                    ImGui::TreePop();
-                }
+                                              ImGui::TreePop();
+                                          }
 
-                ImGui::Separator();
-                ImGui::DragFloat("Depth Near", &m_DebugView.DepthNear, 0.01f, 1e-4f, 10.0f, "%.4f", ImGuiSliderFlags_AlwaysClamp);
-                ImGui::DragFloat("Depth Far", &m_DebugView.DepthFar, 1.0f, 1.0f, 100000.0f, "%.1f", ImGuiSliderFlags_AlwaysClamp);
+                                          ImGui::Separator();
+                                          ImGui::DragFloat("Depth Near", &m_DebugView.DepthNear, 0.01f, 1e-4f, 10.0f,
+                                                           "%.4f", ImGuiSliderFlags_AlwaysClamp);
+                                          ImGui::DragFloat("Depth Far", &m_DebugView.DepthFar, 1.0f, 1.0f, 100000.0f,
+                                                           "%.1f", ImGuiSliderFlags_AlwaysClamp);
 
-                if (m_DebugViewPass && m_DebugViewPass->GetImGuiTextureId())
-                {
-                    ImGui::TextUnformatted("Preview (resolved RGBA8)");
-                    ImVec2 avail = ImGui::GetContentRegionAvail();
-                    float w = avail.x;
-                    float h = (w > 0.0f) ? w * 9.0f / 16.0f : 0.0f;
-                    ImGui::Image(m_DebugViewPass->GetImGuiTextureId(), ImVec2(w, h));
-                }
-                else
-                {
-                    ImGui::TextUnformatted("No debug image yet.");
-                }
-            },
-            true);
+                                          if (m_DebugViewPass)
+                                          {
+                                              // RenderSystem tracks current frame index via m_Renderer.
+                                              // We need the texture ID specific to the current frame to avoid race conditions.
+                                              uint32_t currentFrame = m_Renderer.GetCurrentFrameIndex();
+                                              void* texId = m_DebugViewPass->GetImGuiTextureId(currentFrame);
+
+                                              if (texId)
+                                              {
+                                                  ImGui::TextUnformatted("Preview (resolved RGBA8)");
+                                                  ImVec2 avail = ImGui::GetContentRegionAvail();
+                                                  float w = avail.x;
+                                                  float h = (w > 0.0f) ? w * 9.0f / 16.0f : 0.0f;
+                                                  ImGui::Image(texId, ImVec2(w, h));
+                                              }
+                                              else
+                                              {
+                                                  ImGui::TextUnformatted("No debug image yet.");
+                                              }
+                                          }
+                                      },
+                                      true);
     }
 
     RenderSystem::~RenderSystem()
@@ -258,43 +271,48 @@ namespace Graphics
         };
 
         m_RenderGraph.AddPass<FrameSetupData>("FrameSetup",
-            [&](FrameSetupData& data, RGBuilder& builder)
-            {
-                VkImage swapImage = m_Renderer.GetSwapchainImage(imageIndex);
-                VkImageView swapView = m_Renderer.GetSwapchainImageView(imageIndex);
+                                              [&](FrameSetupData& data, RGBuilder& builder)
+                                              {
+                                                  VkImage swapImage = m_Renderer.GetSwapchainImage(imageIndex);
+                                                  VkImageView swapView = m_Renderer.GetSwapchainImageView(imageIndex);
 
-                data.Backbuffer = builder.ImportTexture(
-                    "Backbuffer"_id,
-                    swapImage,
-                    swapView,
-                    m_Swapchain.GetImageFormat(),
-                    extent,
-                    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+                                                  data.Backbuffer = builder.ImportTexture(
+                                                      "Backbuffer"_id,
+                                                      swapImage,
+                                                      swapView,
+                                                      m_Swapchain.GetImageFormat(),
+                                                      extent,
+                                                      VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
-                // Ensure depth image exists and import
-                auto& depthImg = m_DepthImages[frameIndex];
-                if (!depthImg || depthImg->GetWidth() != extent.width || depthImg->GetHeight() != extent.height)
-                {
-                    VkFormat depthFormat = RHI::VulkanImage::FindDepthFormat(*m_Device);
-                    depthImg = std::make_unique<RHI::VulkanImage>(
-                        *m_Device, extent.width, extent.height, 1,
-                        depthFormat,
-                        VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                        VK_IMAGE_ASPECT_DEPTH_BIT);
-                }
+                                                  // Ensure depth image exists and import
+                                                  auto& depthImg = m_DepthImages[frameIndex];
+                                                  if (!depthImg || depthImg->GetWidth() != extent.width || depthImg->
+                                                      GetHeight() != extent.height)
+                                                  {
+                                                      VkFormat depthFormat = RHI::VulkanImage::FindDepthFormat(
+                                                          *m_Device);
+                                                      depthImg = std::make_unique<RHI::VulkanImage>(
+                                                          *m_Device, extent.width, extent.height, 1,
+                                                          depthFormat,
+                                                          VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT |
+                                                          VK_IMAGE_USAGE_SAMPLED_BIT,
+                                                          VK_IMAGE_ASPECT_DEPTH_BIT);
+                                                  }
 
-                data.Depth = builder.ImportTexture(
-                    "SceneDepth"_id,
-                    depthImg->GetHandle(),
-                    depthImg->GetView(),
-                    depthImg->GetFormat(),
-                    extent,
-                    VK_IMAGE_LAYOUT_UNDEFINED);
+                                                  data.Depth = builder.ImportTexture(
+                                                      "SceneDepth"_id,
+                                                      depthImg->GetHandle(),
+                                                      depthImg->GetView(),
+                                                      depthImg->GetFormat(),
+                                                      extent,
+                                                      VK_IMAGE_LAYOUT_UNDEFINED);
 
-                blackboard.Add("Backbuffer"_id, data.Backbuffer);
-                blackboard.Add("SceneDepth"_id, data.Depth);
-            },
-            [](const FrameSetupData&, const RGRegistry&, VkCommandBuffer){});
+                                                  blackboard.Add("Backbuffer"_id, data.Backbuffer);
+                                                  blackboard.Add("SceneDepth"_id, data.Depth);
+                                              },
+                                              [](const FrameSetupData&, const RGRegistry&, VkCommandBuffer)
+                                              {
+                                              });
 
         RenderPassContext ctx{
             m_RenderGraph,
@@ -312,9 +330,13 @@ namespace Graphics
             dynamicOffset,
             m_BindlessSystem,
             {m_PendingPick.Pending, m_PendingPick.X, m_PendingPick.Y},
-            {m_DebugView.Enabled, m_DebugView.ShowInViewport, m_DebugView.SelectedResource, m_DebugView.DepthNear, m_DebugView.DepthFar},
+            {
+                m_DebugView.Enabled, m_DebugView.ShowInViewport, m_DebugView.SelectedResource, m_DebugView.DepthNear,
+                m_DebugView.DepthFar
+            },
             m_LastDebugImages,
-            m_LastDebugPasses};
+            m_LastDebugPasses
+        };
 
         if (m_PickingPass) m_PickingPass->AddPasses(ctx);
         if (m_ForwardPass) m_ForwardPass->AddPasses(ctx);
@@ -346,6 +368,12 @@ namespace Graphics
         m_RenderGraph.Trim();
 
         for (auto& img : m_DepthImages)
+        {
             img.reset();
+        }
+
+        auto extent = m_Swapchain.GetExtent();
+        if (m_PickingPass) m_PickingPass->OnResize(extent.width, extent.height);
+        if (m_DebugViewPass) m_DebugViewPass->OnResize(extent.width, extent.height);
     }
 }

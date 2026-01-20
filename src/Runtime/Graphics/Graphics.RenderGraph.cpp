@@ -273,38 +273,50 @@ namespace Graphics
         ImageCacheKey key{node.Format, node.Extent.width, node.Extent.height, node.Usage};
         auto& stack = m_ImagePool[key];
 
+        // Get monotonic frame counter from device to detect staleness
+        uint64_t globalFrame = m_Device->GetGlobalFrameNumber();
+
         for (auto& item : stack.Images)
         {
-            if (item.LastFrameIndex < frameIndex)
+            // 1. Strict Frame-In-Flight Separation
+            if (item.LastFrameIndex != frameIndex) continue;
+
+            // 2. Staleness Check
+            // If the resource hasn't been touched in *this specific* global frame yet,
+            // it means it's from a previous cycle (e.g. 2 frames ago). Reset it.
+            if (item.LastUsedGlobalFrame != globalFrame)
             {
-                item.LastFrameIndex = frameIndex;
+                item.LastUsedGlobalFrame = globalFrame;
                 item.ActiveIntervals.clear();
                 item.ActiveIntervals.emplace_back(node.StartPass, node.EndPass);
                 return item.Resource.get();
             }
-            if (item.LastFrameIndex == frameIndex)
+
+            // 3. Aliasing Check (Resource already used this frame, check for lifetime overlap)
+            bool overlap = false;
+            for (const auto& interval : item.ActiveIntervals)
             {
-                bool overlap = false;
-                for (const auto& interval : item.ActiveIntervals)
+                if (node.StartPass <= interval.second && node.EndPass >= interval.first)
                 {
-                    if (node.StartPass <= interval.second && node.EndPass >= interval.first)
-                    {
-                        overlap = true;
-                        break;
-                    }
+                    overlap = true;
+                    break;
                 }
-                if (!overlap)
-                {
-                    item.ActiveIntervals.emplace_back(node.StartPass, node.EndPass);
-                    return item.Resource.get();
-                }
+            }
+
+            if (!overlap)
+            {
+                item.ActiveIntervals.emplace_back(node.StartPass, node.EndPass);
+                return item.Resource.get();
             }
         }
 
+        // 4. Allocate New
         auto img = std::make_unique<RHI::VulkanImage>(*m_Device, node.Extent.width, node.Extent.height, 1, node.Format,
                                                       node.Usage, node.Aspect);
         auto* ptr = img.get();
-        PooledImage pooled{std::move(img), frameIndex};
+
+        // Initialize with current global frame
+        PooledImage pooled{std::move(img), frameIndex, globalFrame};
         pooled.ActiveIntervals.emplace_back(node.StartPass, node.EndPass);
         stack.Images.push_back(std::move(pooled));
         return ptr;
@@ -315,38 +327,40 @@ namespace Graphics
         BufferCacheKey key{node.BufferSize, node.BufferUsage};
         auto& stack = m_BufferPool[key];
 
+        uint64_t globalFrame = m_Device->GetGlobalFrameNumber();
+
         for (auto& item : stack.Buffers)
         {
-            if (item.LastFrameIndex < frameIndex)
+            if (item.LastFrameIndex != frameIndex) continue;
+
+            if (item.LastUsedGlobalFrame != globalFrame)
             {
-                item.LastFrameIndex = frameIndex;
+                item.LastUsedGlobalFrame = globalFrame;
                 item.ActiveIntervals.clear();
                 item.ActiveIntervals.emplace_back(node.StartPass, node.EndPass);
                 return item.Resource.get();
             }
-            if (item.LastFrameIndex == frameIndex)
+
+            bool overlap = false;
+            for (const auto& interval : item.ActiveIntervals)
             {
-                bool overlap = false;
-                for (const auto& interval : item.ActiveIntervals)
+                if (node.StartPass <= interval.second && node.EndPass >= interval.first)
                 {
-                    if (node.StartPass <= interval.second && node.EndPass >= interval.first)
-                    {
-                        overlap = true;
-                        break;
-                    }
+                    overlap = true;
+                    break;
                 }
-                if (!overlap)
-                {
-                    item.ActiveIntervals.emplace_back(node.StartPass, node.EndPass);
-                    return item.Resource.get();
-                }
+            }
+            if (!overlap)
+            {
+                item.ActiveIntervals.emplace_back(node.StartPass, node.EndPass);
+                return item.Resource.get();
             }
         }
 
         auto buf = std::make_unique<RHI::VulkanBuffer>(*m_Device, node.BufferSize, node.BufferUsage,
                                                        VMA_MEMORY_USAGE_GPU_ONLY);
         auto* ptr = buf.get();
-        PooledBuffer pooled{std::move(buf), frameIndex};
+        PooledBuffer pooled{std::move(buf), frameIndex, globalFrame};
         pooled.ActiveIntervals.emplace_back(node.StartPass, node.EndPass);
         stack.Buffers.push_back(std::move(pooled));
         return ptr;

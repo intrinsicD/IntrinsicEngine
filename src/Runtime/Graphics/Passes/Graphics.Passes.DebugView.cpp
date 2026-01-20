@@ -22,8 +22,8 @@ namespace Graphics::Passes
     }
 
     void DebugViewPass::Initialize(RHI::VulkanDevice& device,
-                                  RHI::DescriptorAllocator& descriptorPool,
-                                  RHI::DescriptorLayout&)
+                                   RHI::DescriptorAllocator& descriptorPool,
+                                   RHI::DescriptorLayout&)
     {
         m_Device = &device;
 
@@ -40,29 +40,22 @@ namespace Graphics::Passes
         samp.maxAnisotropy = 1.0f;
         CheckVk(vkCreateSampler(m_Device->GetLogicalDevice(), &samp, nullptr, &m_Sampler), "vkCreateSampler");
 
-        VkDescriptorSetLayoutBinding b0{};
-        b0.binding = 0;
-        b0.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        b0.descriptorCount = 1;
-        b0.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        VkDescriptorSetLayoutBinding bindings[] = {
+            {0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
+            {1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
+            {2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}
+        };
 
-        VkDescriptorSetLayoutBinding b1 = b0;
-        b1.binding = 1;
-
-        VkDescriptorSetLayoutBinding b2 = b0;
-        b2.binding = 2;
-
-        VkDescriptorSetLayoutBinding bindings[] = {b0, b1, b2};
         VkDescriptorSetLayoutCreateInfo layoutInfo{};
         layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
         layoutInfo.bindingCount = 3;
         layoutInfo.pBindings = bindings;
         CheckVk(vkCreateDescriptorSetLayout(m_Device->GetLogicalDevice(), &layoutInfo, nullptr, &m_DescriptorSetLayout),
-            "vkCreateDescriptorSetLayout");
+                "vkCreateDescriptorSetLayout");
 
-        // Allocate one descriptor set for frame 0 initially; RenderSystem will resize if needed.
-        m_DescriptorSets.resize(1);
-        m_DescriptorSets[0] = descriptorPool.Allocate(m_DescriptorSetLayout);
+        m_DescriptorSets.resize(RHI::VulkanDevice::GetFramesInFlight());
+        for (auto& set : m_DescriptorSets) set = descriptorPool.Allocate(m_DescriptorSetLayout);
+        m_ImGuiTextureIds.resize(RHI::VulkanDevice::GetFramesInFlight(), nullptr);
 
         // Dummy textures
         m_DummyFloat = std::make_unique<RHI::VulkanImage>(
@@ -125,9 +118,15 @@ namespace Graphics::Passes
         // Init descriptor bindings with dummy textures
         for (auto& set : m_DescriptorSets)
         {
-            VkDescriptorImageInfo dummyFloatInfo{m_Sampler, m_DummyFloat->GetView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
-            VkDescriptorImageInfo dummyUintInfo{m_Sampler, m_DummyUint->GetView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
-            VkDescriptorImageInfo dummyDepthInfo{m_Sampler, m_DummyDepth->GetView(), VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL};
+            VkDescriptorImageInfo dummyFloatInfo{
+                m_Sampler, m_DummyFloat->GetView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            };
+            VkDescriptorImageInfo dummyUintInfo{
+                m_Sampler, m_DummyUint->GetView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            };
+            VkDescriptorImageInfo dummyDepthInfo{
+                m_Sampler, m_DummyDepth->GetView(), VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
+            };
 
             VkWriteDescriptorSet writes[3] = {};
 
@@ -164,12 +163,16 @@ namespace Graphics::Passes
         // Lazy pipeline build once we know swapchain format.
         if (!m_Pipeline)
         {
-            RHI::ShaderModule vert(*m_Device, Core::Filesystem::GetShaderPath("shaders/debug_view.vert.spv"), RHI::ShaderStage::Vertex);
-            RHI::ShaderModule frag(*m_Device, Core::Filesystem::GetShaderPath("shaders/debug_view.frag.spv"), RHI::ShaderStage::Fragment);
+            RHI::ShaderModule vert(*m_Device, Core::Filesystem::GetShaderPath("shaders/debug_view.vert.spv"),
+                                   RHI::ShaderStage::Vertex);
+            RHI::ShaderModule frag(*m_Device, Core::Filesystem::GetShaderPath("shaders/debug_view.frag.spv"),
+                                   RHI::ShaderStage::Fragment);
 
             // PipelineBuilder API takes std::shared_ptr<VulkanDevice>. We don't own the device here.
             // Use an aliasing shared_ptr with a no-op deleter to satisfy the API without changing ownership.
-            std::shared_ptr<RHI::VulkanDevice> deviceAlias(m_Device, [](RHI::VulkanDevice*) {});
+            std::shared_ptr<RHI::VulkanDevice> deviceAlias(m_Device, [](RHI::VulkanDevice*)
+            {
+            });
             RHI::PipelineBuilder pb(deviceAlias);
             pb.SetShaders(&vert, &frag);
             pb.SetTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
@@ -230,113 +233,151 @@ namespace Graphics::Passes
         srcDesc.Aspect = srcInfo->Aspect;
 
         ctx.Graph.AddPass<ResolveData>("DebugViewResolve",
-            [&](ResolveData& data, RGBuilder& builder)
+                                       [&](ResolveData& data, RGBuilder& builder)
+                                       {
+                                           auto srcHandle = builder.CreateTexture(srcInfo->Name, srcDesc);
+                                           if (!srcHandle.IsValid())
+                                               return;
+
+                                           // Destination: either backbuffer or per-frame preview image.
+                                           if (ctx.Debug.ShowInViewport)
+                                           {
+                                               RGAttachmentInfo colorInfo{};
+                                               colorInfo.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+                                               colorInfo.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+                                               const auto bb = ctx.Blackboard.Get("Backbuffer"_id);
+                                               data.Dst = builder.WriteColor(bb, colorInfo);
+                                           }
+                                           else
+                                           {
+                                               // Ensure per-frame preview exists
+                                               if (ctx.FrameIndex >= m_PreviewImages.size())
+                                                   m_PreviewImages.resize(ctx.FrameIndex + 1);
+
+                                               auto& dbgImg = m_PreviewImages[ctx.FrameIndex];
+                                               if (!dbgImg || dbgImg->GetWidth() != ctx.Resolution.width || dbgImg->
+                                                   GetHeight() != ctx.Resolution.height)
+                                               {
+                                                   dbgImg = std::make_unique<RHI::VulkanImage>(
+                                                       *m_Device,
+                                                       ctx.Resolution.width,
+                                                       ctx.Resolution.height,
+                                                       1,
+                                                       ctx.SwapchainFormat,
+                                                       VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                                                       VK_IMAGE_ASPECT_COLOR_BIT);
+
+                                                   if (ctx.FrameIndex < m_ImGuiTextureIds.size() && m_ImGuiTextureIds[
+                                                       ctx.FrameIndex])
+                                                   {
+                                                       // Safe to remove here because this happens inside OnResize usually, or before binding
+                                                       Interface::GUI::RemoveTexture(m_ImGuiTextureIds[ctx.FrameIndex]);
+                                                       m_ImGuiTextureIds[ctx.FrameIndex] = nullptr;
+                                                   }
+                                               }
+
+                                               auto dst = builder.ImportTexture(
+                                                   "DebugViewRGBA"_id,
+                                                   dbgImg->GetHandle(),
+                                                   dbgImg->GetView(),
+                                                   dbgImg->GetFormat(),
+                                                   ctx.Resolution,
+                                                   VK_IMAGE_LAYOUT_UNDEFINED);
+
+                                               RGAttachmentInfo info{};
+                                               info.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+                                               info.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+                                               data.Dst = builder.WriteColor(dst, info);
+                                               ctx.Blackboard.Add("DebugViewRGBA"_id, data.Dst);
+                                           }
+
+                                           data.Src = builder.Read(srcHandle,
+                                                                   VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                                                                   VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
+
+                                           data.SrcFormat = srcInfo->Format;
+                                           data.IsDepth = (srcInfo->Aspect & VK_IMAGE_ASPECT_DEPTH_BIT) != 0;
+
+                                           m_LastSrcHandle = data.Src;
+                                       },
+                                       [&, this](const ResolveData& data, const RGRegistry&, VkCommandBuffer cmd)
+                                       {
+                                           if (!m_Pipeline) return;
+                                           if (!data.Dst.IsValid()) return;
+                                           if (!data.Src.IsValid()) return;
+
+                                           vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                                             m_Pipeline->GetHandle());
+
+                                           VkViewport vp{};
+                                           vp.x = 0.0f;
+                                           vp.y = 0.0f;
+                                           vp.width = (float)ctx.Resolution.width;
+                                           vp.height = (float)ctx.Resolution.height;
+                                           vp.minDepth = 0.0f;
+                                           vp.maxDepth = 1.0f;
+                                           VkRect2D sc{{0, 0}, ctx.Resolution};
+                                           vkCmdSetViewport(cmd, 0, 1, &vp);
+                                           vkCmdSetScissor(cmd, 0, 1, &sc);
+
+                                           vkCmdSetPrimitiveTopology(cmd, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+
+                                           VkDescriptorSet currentSet = GetDescriptorSet(ctx.FrameIndex);
+                                           if (currentSet == VK_NULL_HANDLE)
+                                               return;
+
+                                           vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                                                   m_Pipeline->GetLayout(),
+                                                                   0, 1, &currentSet,
+                                                                   0, nullptr);
+
+                                           struct Push
+                                           {
+                                               int Mode;
+                                               float DepthNear;
+                                               float DepthFar;
+                                           } push{};
+
+                                           push.DepthNear = ctx.Debug.DepthNear;
+                                           push.DepthFar = ctx.Debug.DepthFar;
+
+                                           if (data.IsDepth)
+                                               push.Mode = 2;
+                                           else if (data.SrcFormat == VK_FORMAT_R32_UINT)
+                                               push.Mode = 1;
+                                           else
+                                               push.Mode = 0;
+
+                                           vkCmdPushConstants(cmd, m_Pipeline->GetLayout(),
+                                                              VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(Push), &push);
+                                           vkCmdDraw(cmd, 3, 1, 0, 0);
+                                       });
+
+        if (!ctx.Debug.ShowInViewport)
+        {
+            struct TransitionData
             {
-                auto srcHandle = builder.CreateTexture(srcInfo->Name, srcDesc);
-                if (!srcHandle.IsValid())
-                    return;
-
-                // Destination: either backbuffer or per-frame preview image.
-                if (ctx.Debug.ShowInViewport)
-                {
-                    RGAttachmentInfo colorInfo{};
-                    colorInfo.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-                    colorInfo.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
-                    const auto bb = ctx.Blackboard.Get("Backbuffer"_id);
-                    data.Dst = builder.WriteColor(bb, colorInfo);
-                }
-                else
-                {
-                    // Ensure per-frame preview exists
-                    if (ctx.FrameIndex >= m_PreviewImages.size())
-                        m_PreviewImages.resize(ctx.FrameIndex + 1);
-
-                    auto& dbgImg = m_PreviewImages[ctx.FrameIndex];
-                    if (!dbgImg || dbgImg->GetWidth() != ctx.Resolution.width || dbgImg->GetHeight() != ctx.Resolution.height)
-                    {
-                        dbgImg = std::make_unique<RHI::VulkanImage>(
-                            *m_Device,
-                            ctx.Resolution.width,
-                            ctx.Resolution.height,
-                            1,
-                            ctx.SwapchainFormat,
-                            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                            VK_IMAGE_ASPECT_COLOR_BIT);
-                    }
-
-                    auto dst = builder.ImportTexture(
-                        "DebugViewRGBA"_id,
-                        dbgImg->GetHandle(),
-                        dbgImg->GetView(),
-                        dbgImg->GetFormat(),
-                        ctx.Resolution,
-                        VK_IMAGE_LAYOUT_UNDEFINED);
-
-                    RGAttachmentInfo info{};
-                    info.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-                    info.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
-                    data.Dst = builder.WriteColor(dst, info);
-                }
-
-                data.Src = builder.Read(srcHandle,
-                    VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-                    VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
-
-                data.SrcFormat = srcInfo->Format;
-                data.IsDepth = (srcInfo->Aspect & VK_IMAGE_ASPECT_DEPTH_BIT) != 0;
-
-                m_LastSrcHandle = data.Src;
-            },
-            [&, this](const ResolveData& data, const RGRegistry&, VkCommandBuffer cmd)
-            {
-                if (!m_Pipeline) return;
-                if (!data.Dst.IsValid()) return;
-                if (!data.Src.IsValid()) return;
-
-                vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_Pipeline->GetHandle());
-
-                VkViewport vp{};
-                vp.x = 0.0f;
-                vp.y = 0.0f;
-                vp.width = (float)ctx.Resolution.width;
-                vp.height = (float)ctx.Resolution.height;
-                vp.minDepth = 0.0f;
-                vp.maxDepth = 1.0f;
-                VkRect2D sc{{0, 0}, ctx.Resolution};
-                vkCmdSetViewport(cmd, 0, 1, &vp);
-                vkCmdSetScissor(cmd, 0, 1, &sc);
-
-                vkCmdSetPrimitiveTopology(cmd, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-
-                VkDescriptorSet currentSet = GetDescriptorSet(ctx.FrameIndex);
-                if (currentSet == VK_NULL_HANDLE)
-                    return;
-
-                vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                    m_Pipeline->GetLayout(),
-                    0, 1, &currentSet,
-                    0, nullptr);
-
-                struct Push
-                {
-                    int Mode;
-                    float DepthNear;
-                    float DepthFar;
-                } push{};
-
-                push.DepthNear = ctx.Debug.DepthNear;
-                push.DepthFar = ctx.Debug.DepthFar;
-
-                if (data.IsDepth)
-                    push.Mode = 2;
-                else if (data.SrcFormat == VK_FORMAT_R32_UINT)
-                    push.Mode = 1;
-                else
-                    push.Mode = 0;
-
-                vkCmdPushConstants(cmd, m_Pipeline->GetLayout(), VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(Push), &push);
-                vkCmdDraw(cmd, 3, 1, 0, 0);
-            });
+                RGResourceHandle Img;
+            };
+            ctx.Graph.AddPass<TransitionData>("DebugViewBarrier",
+                                              [&](TransitionData& data, RGBuilder& builder)
+                                              {
+                                                  // Find the texture we just wrote to
+                                                  auto handle = ctx.Blackboard.Get("DebugViewRGBA"_id);
+                                                  if (handle.IsValid())
+                                                  {
+                                                      // Declare a read access. This forces a transition from COLOR_ATTACHMENT_OPTIMAL.
+                                                      data.Img = builder.Read(
+                                                          handle, VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                                                          VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
+                                                  }
+                                              },
+                                              [](const TransitionData&, const RGRegistry&, VkCommandBuffer)
+                                              {
+                                                  /* No-op, just for barrier generation */
+                                              }
+            );
+        }
     }
 
     void DebugViewPass::PostCompile(uint32_t frameIndex, std::span<const RenderGraphDebugImage> debugImages)
@@ -353,73 +394,80 @@ namespace Graphics::Passes
         }
 
         VkDescriptorSet currentSet = m_DescriptorSets[frameIndex];
-        if (currentSet == VK_NULL_HANDLE)
-            return;
-
-        if (!m_LastSrcHandle.IsValid())
-            return;
-
-        for (const auto& img : debugImages)
+        if (currentSet && m_LastSrcHandle.IsValid())
         {
-            if (img.Resource == m_LastSrcHandle.ID && img.View != VK_NULL_HANDLE)
+            for (const auto& img : debugImages)
             {
-                VkDescriptorImageInfo imageInfo{m_Sampler, img.View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
+                if (img.Resource == m_LastSrcHandle.ID && img.View != VK_NULL_HANDLE)
+                {
+                    VkDescriptorImageInfo imageInfo{m_Sampler, img.View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
 
-                uint32_t targetBinding = 0;
-                if (img.Format == VK_FORMAT_R32_UINT)
-                    targetBinding = 1;
-                else if ((img.Aspect & VK_IMAGE_ASPECT_DEPTH_BIT) != 0)
-                    targetBinding = 2;
+                    uint32_t targetBinding = 0;
+                    if (img.Format == VK_FORMAT_R32_UINT)
+                        targetBinding = 1;
+                    else if ((img.Aspect & VK_IMAGE_ASPECT_DEPTH_BIT) != 0)
+                        targetBinding = 2;
 
-                VkWriteDescriptorSet write{};
-                write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                write.dstSet = currentSet;
-                write.dstBinding = targetBinding;
-                write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-                write.descriptorCount = 1;
-                write.pImageInfo = &imageInfo;
+                    VkWriteDescriptorSet write{};
+                    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                    write.dstSet = currentSet;
+                    write.dstBinding = targetBinding;
+                    write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+                    write.descriptorCount = 1;
+                    write.pImageInfo = &imageInfo;
 
-                vkUpdateDescriptorSets(m_Device->GetLogicalDevice(), 1, &write, 0, nullptr);
-                break;
+                    vkUpdateDescriptorSets(m_Device->GetLogicalDevice(), 1, &write, 0, nullptr);
+                    break;
+                }
             }
         }
 
-        // Update ImGui preview binding.
-        if (m_ImGuiTexId)
-        {
-            Interface::GUI::RemoveTexture(m_ImGuiTexId);
-            m_ImGuiTexId = nullptr;
-        }
+        if (frameIndex >= m_ImGuiTextureIds.size()) m_ImGuiTextureIds.resize(frameIndex + 1, nullptr);
 
         if (frameIndex < m_PreviewImages.size() && m_PreviewImages[frameIndex])
         {
-            m_ImGuiTexId = Interface::GUI::AddTexture(m_Sampler,
-                m_PreviewImages[frameIndex]->GetView(),
-                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            // Only create if not already cached.
+            // This prevents destroying/recreating the descriptor set every frame (Flickering Fix).
+            if (m_ImGuiTextureIds[frameIndex] == nullptr)
+            {
+                m_ImGuiTextureIds[frameIndex] = Interface::GUI::AddTexture(
+                    m_Sampler,
+                    m_PreviewImages[frameIndex]->GetView(),
+                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            }
         }
+    }
+
+    void DebugViewPass::OnResize(uint32_t width, uint32_t height)
+    {
+        (void)width;
+        (void)height;
+        // Device is idle when this is called from RenderSystem::OnResize
+
+        // 1. Clear ImGui Descriptors
+        for (void* texId : m_ImGuiTextureIds)
+        {
+            if (texId) Interface::GUI::RemoveTexture(texId);
+        }
+        std::fill(m_ImGuiTextureIds.begin(), m_ImGuiTextureIds.end(), nullptr);
+
+        // 2. Clear Images
+        m_PreviewImages.clear();
     }
 
     void DebugViewPass::Shutdown()
     {
-        if (m_ImGuiTexId)
+        for (void* texId : m_ImGuiTextureIds)
         {
-            Interface::GUI::RemoveTexture(m_ImGuiTexId);
-            m_ImGuiTexId = nullptr;
+            if (texId) Interface::GUI::RemoveTexture(texId);
         }
+        m_ImGuiTextureIds.clear();
 
-        if (!m_Device)
-            return;
-
+        if (!m_Device) return;
         if (m_DescriptorSetLayout)
-        {
-            vkDestroyDescriptorSetLayout(m_Device->GetLogicalDevice(), m_DescriptorSetLayout, nullptr);
-            m_DescriptorSetLayout = VK_NULL_HANDLE;
-        }
-        if (m_Sampler)
-        {
-            vkDestroySampler(m_Device->GetLogicalDevice(), m_Sampler, nullptr);
-            m_Sampler = VK_NULL_HANDLE;
-        }
+            vkDestroyDescriptorSetLayout(m_Device->GetLogicalDevice(), m_DescriptorSetLayout,
+                                         nullptr);
+        if (m_Sampler) vkDestroySampler(m_Device->GetLogicalDevice(), m_Sampler, nullptr);
     }
 
     VkDescriptorSet DebugViewPass::GetDescriptorSet(uint32_t frameIndex) const
@@ -427,5 +475,11 @@ namespace Graphics::Passes
         if (frameIndex >= m_DescriptorSets.size())
             return VK_NULL_HANDLE;
         return m_DescriptorSets[frameIndex];
+    }
+
+    void* DebugViewPass::GetImGuiTextureId(uint32_t frameIndex) const
+    {
+        if (frameIndex >= m_ImGuiTextureIds.size()) return nullptr;
+        return m_ImGuiTextureIds[frameIndex];
     }
 }
