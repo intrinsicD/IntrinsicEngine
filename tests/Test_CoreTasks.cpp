@@ -160,3 +160,27 @@ TEST(CoreTasks, CoroutinesActuallyYield)
 
     Scheduler::Shutdown();
 }
+
+TEST(CoreTasks, OverflowHandling)
+{
+    // Initialize with 1 thread to force accumulation
+    Scheduler::Initialize(1);
+
+    std::atomic<int> counter = 0;
+    // Dispatch MORE than RingBuffer capacity (65536)
+    const int taskCount = 70000;
+
+    for(int i = 0; i < taskCount; ++i) {
+        Scheduler::Dispatch([&counter]() {
+            counter.fetch_add(1, std::memory_order_relaxed);
+        });
+    }
+
+    Scheduler::WaitForAll();
+
+    // Without the fix, this would equal 65536 and log errors.
+    // With the fix, this equals 70000.
+    EXPECT_EQ(counter.load(), taskCount);
+
+    Scheduler::Shutdown();
+}

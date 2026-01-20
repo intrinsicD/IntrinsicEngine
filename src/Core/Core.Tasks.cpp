@@ -154,9 +154,14 @@ namespace Core::Tasks
     {
         std::vector<std::thread> workers;
 
-        // REPLACED: std::deque with RingBuffer (64k tasks = ~8MB of fixed memory)
+        // 1. FAST PATH: Fixed-size Lock-Free Ring
         RingBuffer<LocalTask, 65536> globalQueue;
-        SpinLock queueMutex;
+        SpinLock queueMutex; // Kept for the RingBuffer's internal head/tail sync if needed, or remove if RingBuffer is truly lock-free
+
+        // 2. SLOW PATH: Unbounded Overflow Queue
+        std::mutex overflowMutex;
+        std::deque<LocalTask> overflowQueue;
+        std::atomic<bool> hasOverflow{false}; // Optimization: Atomic flag to avoid locking mutex on read
 
         alignas(64) std::atomic<uint32_t> workSignal{0};
         alignas(64) std::atomic<bool> isRunning{false};
@@ -258,67 +263,100 @@ namespace Core::Tasks
     {
         if (!s_Ctx || !s_Ctx->isRunning) return;
 
+        // Increment active counters immediately
         s_Ctx->activeTaskCount.fetch_add(1, std::memory_order_relaxed);
-
-        // We increment queued count tentatively
         s_Ctx->queuedTaskCount.fetch_add(1, std::memory_order_release);
 
+        // 1. Try Fast Path (Ring Buffer)
         bool pushed = false;
         {
+            // Note: If your RingBuffer implementation inside Core.Tasks.cpp uses the SpinLock,
+            // keep this lock. If it's purely atomic, remove the lock.
+            // Assuming your current RingBuffer uses the SpinLock 'queueMutex' based on previous file:
             std::lock_guard lock(s_Ctx->queueMutex);
             pushed = s_Ctx->globalQueue.Push(std::move(task));
         }
 
+        // 2. Fallback to Slow Path (Overflow)
         if (!pushed)
         {
-            // Critical failure: Queue full.
-            // In a production engine, we might spin-wait here or fallback to a secondary overflow list.
-            // For now, reverse the counters and log (task is dropped).
-            s_Ctx->queuedTaskCount.fetch_sub(1, std::memory_order_relaxed);
-            s_Ctx->activeTaskCount.fetch_sub(1, std::memory_order_relaxed);
-            Log::Error("Scheduler RingBuffer Full! Task dropped.");
-            return;
+            // Performance Warning: This should ideally not happen every frame.
+            // Consider logging strictly once per second if this path is hit to alert developers.
+            {
+                std::lock_guard lock(s_Ctx->overflowMutex);
+                s_Ctx->overflowQueue.push_back(std::move(task));
+            }
+            s_Ctx->hasOverflow.store(true, std::memory_order_release);
         }
 
+        // 3. Wake up workers
         s_Ctx->workSignal.fetch_add(1, std::memory_order_release);
         s_Ctx->workSignal.notify_one();
+    }
+
+    static bool TryPopTask(LocalTask& outTask)
+    {
+        // 1. Try Fast Path (Ring Buffer)
+        {
+            std::lock_guard lock(s_Ctx->queueMutex);
+            if (s_Ctx->globalQueue.Pop(outTask)) return true;
+        }
+
+        // 2. Try Slow Path (Overflow)
+        // Optimization: Check atomic flag before acquiring mutex
+        if (s_Ctx->hasOverflow.load(std::memory_order_acquire))
+        {
+            std::lock_guard lock(s_Ctx->overflowMutex);
+            if (!s_Ctx->overflowQueue.empty())
+            {
+                outTask = std::move(s_Ctx->overflowQueue.front());
+                s_Ctx->overflowQueue.pop_front();
+
+                // Update flag if empty
+                if (s_Ctx->overflowQueue.empty())
+                    s_Ctx->hasOverflow.store(false, std::memory_order_release);
+
+                return true;
+            }
+            else
+            {
+                // Race condition handle: flag was true, but queue is empty now
+                s_Ctx->hasOverflow.store(false, std::memory_order_release);
+            }
+        }
+
+        return false;
     }
 
     void Scheduler::WaitForAll()
     {
         if (!s_Ctx) return;
 
-        // 1. Work Stealing Loop
+        // Work Stealing Loop
         while (s_Ctx->queuedTaskCount.load(std::memory_order_acquire) > 0)
         {
             LocalTask task;
-            bool foundWork = false;
-
+            if (TryPopTask(task))
             {
-                std::lock_guard lock(s_Ctx->queueMutex);
-                // CHANGE: Use RingBuffer Pop
-                if (s_Ctx->globalQueue.Pop(task))
+                // Decrement queued count (item removed from storage)
+                s_Ctx->queuedTaskCount.fetch_sub(1, std::memory_order_release);
+
+                if (task.Valid())
                 {
-                    // Decrement BEFORE execution
-                    s_Ctx->queuedTaskCount.fetch_sub(1, std::memory_order_release);
-                    foundWork = true;
+                    task();
+                    // Decrement active count (execution finished)
+                    s_Ctx->activeTaskCount.fetch_sub(1, std::memory_order_release);
+                    s_Ctx->activeTaskCount.notify_all();
                 }
-            }
-
-            if (foundWork && task.Valid())
-            {
-                task();
-                s_Ctx->activeTaskCount.fetch_sub(1, std::memory_order_release);
-                s_Ctx->activeTaskCount.notify_all();
             }
             else
             {
-                // If queue count > 0 but Pop failed (contention), yield.
+                // Yield if we see count > 0 but failed to pop (contention)
                 std::this_thread::yield();
             }
         }
 
-        // 2. Wait for Active Tasks (unchanged)
+        // Wait for Active Tasks (other threads executing)
         int active = s_Ctx->activeTaskCount.load(std::memory_order_acquire);
         while (active > 0)
         {
@@ -334,28 +372,21 @@ namespace Core::Tasks
         while (s_Ctx->isRunning)
         {
             LocalTask task;
-            bool foundWork = false;
 
-            // 1. Try Pop
+            if (TryPopTask(task))
             {
-                std::lock_guard lock(s_Ctx->queueMutex);
-                // CHANGE: Use RingBuffer Pop
-                if (s_Ctx->globalQueue.Pop(task))
+                s_Ctx->queuedTaskCount.fetch_sub(1, std::memory_order_release);
+
+                if (task.Valid())
                 {
-                    s_Ctx->queuedTaskCount.fetch_sub(1, std::memory_order_release);
-                    foundWork = true;
+                    task();
+                    s_Ctx->activeTaskCount.fetch_sub(1, std::memory_order_release);
+                    s_Ctx->activeTaskCount.notify_all();
                 }
-            }
-
-            // 2. Execute or Sleep
-            if (foundWork && task.Valid())
-            {
-                task();
-                s_Ctx->activeTaskCount.fetch_sub(1, std::memory_order_release);
-                s_Ctx->activeTaskCount.notify_all();
             }
             else
             {
+                // Sleep until signaled
                 s_Ctx->workSignal.wait(lastSignal);
                 lastSignal = s_Ctx->workSignal.load(std::memory_order_acquire);
             }

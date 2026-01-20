@@ -205,7 +205,7 @@ export namespace Geometry
             // Use a small local stack to avoid heap allocation for the stack itself if possible,
             // though std::vector is fine given the depth is low (10).
             // Optimization: Use a fixed array stack since MaxDepth is known/limited.
-            std::array<NodeIndex, 64> stack{};
+            alignas(64) std::array<NodeIndex, 128> stack{};
             // Depth 10 * 8 children < 64? No, but stack depth is roughly depth*7 in worst case?
             // Actually for DFS, stack size is proportional to Depth. 64 is plenty for depth 10.
             int stackTop = 0;
@@ -278,7 +278,7 @@ export namespace Geometry
             const Node* nodePtr = m_Nodes.data();
 
             // OPTIMIZATION: Use std::array stack here too for performance consistency
-            std::array<NodeIndex, 64> stack{};
+            alignas(64) std::array<NodeIndex, 128> stack{};
             int stackTop = 0;
             stack[stackTop++] = 0;
 
