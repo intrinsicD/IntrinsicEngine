@@ -114,6 +114,12 @@ namespace Graphics
                 sizeof(uint32_t),
                 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                 static_cast<VmaMemoryUsage>(VMA_MEMORY_USAGE_GPU_TO_CPU));
+
+            if (void* ptr = buf->Map())
+            {
+                std::memset(ptr, 0, sizeof(uint32_t));
+                buf->Unmap();
+            }
         }
 
         // Create features
