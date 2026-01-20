@@ -81,12 +81,8 @@ namespace Graphics::Passes
 
                     if (renderable.Material != renderable.CachedMaterialHandle || renderable.TextureID_Cache == ~0u)
                     {
-                        // Hot-path: const raw access (no shared_ptr churn).
-                        auto matResult = ctx.AssetManager.GetRaw<Material>(renderable.Material);
-                        if (!matResult)
-                            continue;
-
-                        const Material* mat = *matResult;
+                        const Material* mat = ctx.AssetManager.TryGetFast<Material>(renderable.Material);
+                        if (!mat) continue;
                         renderable.TextureID_Cache = mat->GetTextureIndex();
                         renderable.CachedMaterialHandle = renderable.Material;
                     }

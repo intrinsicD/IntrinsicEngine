@@ -23,7 +23,7 @@ namespace Graphics {
         assetManager.Listen(textureHandle, [this, &assetManager](Core::Assets::AssetHandle handle)
         {
             // Hot-path safe: no shared_ptr copies; just a pointer lookup.
-            if (auto* tex = assetManager.TryGet<RHI::Texture>(handle))
+            if (auto* tex = assetManager.TryGetFast<RHI::Texture>(handle))
             {
                 m_BindlessSystem.UpdateTexture(m_TextureIndex, *tex);
             }

@@ -5,6 +5,7 @@ module;
 #include <vector>
 #include <unordered_map>
 #include <utility>
+#include <span>
 #include "RHI.Vulkan.hpp"
 
 export module Graphics:RenderGraph;
@@ -150,6 +151,22 @@ export namespace Graphics
         std::vector<Attachment> Attachments{};
     };
 
+    struct AccessNode
+    {
+        ResourceID ID;
+        VkPipelineStageFlags2 Stage;
+        VkAccessFlags2 Access;
+        AccessNode* Next = nullptr;
+    };
+
+    struct AttachmentNode
+    {
+        ResourceID ID;
+        RGAttachmentInfo Info;
+        bool IsDepth = false;
+        AttachmentNode* Next = nullptr;
+    };
+
     // -------------------------------------------------------------------------
     // The Render Graph
     // -------------------------------------------------------------------------
@@ -243,22 +260,21 @@ export namespace Graphics
 
         struct RGPass
         {
-            std::string Name;
+            std::string Name; // std::string is the only non-POD part remaining (acceptable for debug names)
 
-            // Replaced generic Reads/Writes with structured access info
-            std::vector<ResourceAccess> Accesses;
+            // Inputs (Linked Lists in Arena)
+            AccessNode* AccessHead = nullptr;
+            AccessNode* AccessTail = nullptr; // Track tail for O(1) append
 
-            // Still track specific Raster attachments for BeginRendering
-            struct Attachment
-            {
-                ResourceID ID{};
-                RGAttachmentInfo Info{};
-                bool IsDepth = false;
-            };
+            AttachmentNode* AttachmentHead = nullptr;
+            AttachmentNode* AttachmentTail = nullptr;
 
-            std::vector<Attachment> Attachments{};
+            // Outputs (Spans in Arena, populated during Compile)
+            std::span<VkImageMemoryBarrier2> ImageBarriers;
+            std::span<VkBufferMemoryBarrier2> BufferBarriers;
 
-            // Arena-safe execution (no std::function heap allocations)
+            // Execution
+            using RGExecuteFn = void(*)(void*, const RGRegistry&, VkCommandBuffer);
             RGExecuteFn ExecuteFn = nullptr;
             void* ExecuteUserData = nullptr;
         };
@@ -289,13 +305,6 @@ export namespace Graphics
 
             uint32_t StartPass = ~0u;
             uint32_t EndPass = 0;
-        };
-
-        // Barrier storage: Index = Pass Index
-        struct BarrierBatch
-        {
-            std::vector<VkImageMemoryBarrier2> ImageBarriers;
-            std::vector<VkBufferMemoryBarrier2> BufferBarriers;
         };
 
         struct PooledImage
@@ -371,8 +380,6 @@ export namespace Graphics
 
         std::vector<ResourceNode> m_ResourcePool;
         uint32_t m_ActiveResourceCount = 0;
-
-        std::vector<BarrierBatch> m_Barriers; // sized to active pass count (capacity preserved)
 
         std::unordered_map<Core::Hash::StringID, ResourceID> m_ResourceLookup;
 

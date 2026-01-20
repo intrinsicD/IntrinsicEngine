@@ -122,16 +122,46 @@ namespace Core::Tasks
         if (m_VTable) m_VTable->Execute();
     }
 
+    template <typename T, size_t Capacity>
+    struct RingBuffer {
+        std::array<T, Capacity> Buffer;
+        std::atomic<size_t> Head{0};
+        std::atomic<size_t> Tail{0};
+
+        bool Push(T&& item) {
+            size_t tail = Tail.load(std::memory_order_relaxed);
+            size_t head = Head.load(std::memory_order_acquire);
+            if (tail - head >= Capacity) return false; // Full
+
+            Buffer[tail % Capacity] = std::move(item);
+            Tail.store(tail + 1, std::memory_order_release);
+            return true;
+        }
+
+        bool Pop(T& outItem) {
+            size_t head = Head.load(std::memory_order_relaxed);
+            size_t tail = Tail.load(std::memory_order_acquire);
+            if (head >= tail) return false; // Empty
+
+            outItem = std::move(Buffer[head % Capacity]);
+            Head.store(head + 1, std::memory_order_release);
+            return true;
+        }
+    };
+
+
     struct alignas(64) SchedulerContext
     {
         std::vector<std::thread> workers;
-        std::deque<LocalTask> globalQueue;
+
+        // REPLACED: std::deque with RingBuffer (64k tasks = ~8MB of fixed memory)
+        RingBuffer<LocalTask, 65536> globalQueue;
         SpinLock queueMutex;
 
         alignas(64) std::atomic<uint32_t> workSignal{0};
         alignas(64) std::atomic<bool> isRunning{false};
-        alignas(64) std::atomic<int> activeTaskCount{0}; // Tasks currently running on threads
-        alignas(64) std::atomic<int> queuedTaskCount{0}; // Tasks sitting in the deque
+        alignas(64) std::atomic<int> activeTaskCount{0};
+        alignas(64) std::atomic<int> queuedTaskCount{0};
     };
 
     static std::unique_ptr<SchedulerContext> s_Ctx = nullptr;
@@ -226,19 +256,30 @@ namespace Core::Tasks
 
     void Scheduler::DispatchInternal(LocalTask&& task)
     {
-        if (!s_Ctx || !s_Ctx->isRunning) return; // Drop tasks if shutting down
+        if (!s_Ctx || !s_Ctx->isRunning) return;
 
-        // 1. Update Counters
         s_Ctx->activeTaskCount.fetch_add(1, std::memory_order_relaxed);
+
+        // We increment queued count tentatively
         s_Ctx->queuedTaskCount.fetch_add(1, std::memory_order_release);
 
-        // 2. Push to Queue
+        bool pushed = false;
         {
             std::lock_guard lock(s_Ctx->queueMutex);
-            s_Ctx->globalQueue.emplace_back(std::move(task));
+            pushed = s_Ctx->globalQueue.Push(std::move(task));
         }
 
-        // 3. Wake up ONE worker (Futex wake)
+        if (!pushed)
+        {
+            // Critical failure: Queue full.
+            // In a production engine, we might spin-wait here or fallback to a secondary overflow list.
+            // For now, reverse the counters and log (task is dropped).
+            s_Ctx->queuedTaskCount.fetch_sub(1, std::memory_order_relaxed);
+            s_Ctx->activeTaskCount.fetch_sub(1, std::memory_order_relaxed);
+            Log::Error("Scheduler RingBuffer Full! Task dropped.");
+            return;
+        }
+
         s_Ctx->workSignal.fetch_add(1, std::memory_order_release);
         s_Ctx->workSignal.notify_one();
     }
@@ -248,21 +289,18 @@ namespace Core::Tasks
         if (!s_Ctx) return;
 
         // 1. Work Stealing Loop
-        // While there are tasks in the queue, the main thread helps out.
         while (s_Ctx->queuedTaskCount.load(std::memory_order_acquire) > 0)
         {
             LocalTask task;
             bool foundWork = false;
 
             {
-                // Use lock_guard for exception safety (though we don't throw)
                 std::lock_guard lock(s_Ctx->queueMutex);
-                if (!s_Ctx->globalQueue.empty())
+                // CHANGE: Use RingBuffer Pop
+                if (s_Ctx->globalQueue.Pop(task))
                 {
-                    // Decrement BEFORE popping to prevent race with workers
+                    // Decrement BEFORE execution
                     s_Ctx->queuedTaskCount.fetch_sub(1, std::memory_order_release);
-                    task = std::move(s_Ctx->globalQueue.front());
-                    s_Ctx->globalQueue.pop_front();
                     foundWork = true;
                 }
             }
@@ -275,12 +313,12 @@ namespace Core::Tasks
             }
             else
             {
+                // If queue count > 0 but Pop failed (contention), yield.
                 std::this_thread::yield();
             }
         }
 
-        // 2. Wait for Active Tasks (C++20 Atomic Wait)
-        // Queue is empty, but threads might still be processing the last items.
+        // 2. Wait for Active Tasks (unchanged)
         int active = s_Ctx->activeTaskCount.load(std::memory_order_acquire);
         while (active > 0)
         {
@@ -291,7 +329,6 @@ namespace Core::Tasks
 
     void Scheduler::WorkerEntry(unsigned)
     {
-        // Capture current signal to know when it changes
         uint32_t lastSignal = s_Ctx->workSignal.load(std::memory_order_acquire);
 
         while (s_Ctx->isRunning)
@@ -302,12 +339,10 @@ namespace Core::Tasks
             // 1. Try Pop
             {
                 std::lock_guard lock(s_Ctx->queueMutex);
-                if (!s_Ctx->globalQueue.empty())
+                // CHANGE: Use RingBuffer Pop
+                if (s_Ctx->globalQueue.Pop(task))
                 {
-                    // Decrement BEFORE popping to maintain consistency with WaitForAll
                     s_Ctx->queuedTaskCount.fetch_sub(1, std::memory_order_release);
-                    task = std::move(s_Ctx->globalQueue.front());
-                    s_Ctx->globalQueue.pop_front();
                     foundWork = true;
                 }
             }
@@ -316,20 +351,12 @@ namespace Core::Tasks
             if (foundWork && task.Valid())
             {
                 task();
-
-                // Task Complete
                 s_Ctx->activeTaskCount.fetch_sub(1, std::memory_order_release);
-
-                // Wake up the Main Thread if it is blocked in WaitForAll
                 s_Ctx->activeTaskCount.notify_all();
             }
             else
             {
-                // No work found. Sleep efficiently using atomic wait.
-                // We wait until 'workSignal' is NOT EQUAL to 'lastSignal'.
                 s_Ctx->workSignal.wait(lastSignal);
-
-                // Refresh signal value for next loop
                 lastSignal = s_Ctx->workSignal.load(std::memory_order_acquire);
             }
         }

@@ -237,6 +237,25 @@ export namespace Core::Assets
         template <typename T>
         [[nodiscard]] T* TryGet(AssetHandle handle);
 
+        template <typename T>
+       [[nodiscard]] T* TryGetFast(AssetHandle handle) const
+        {
+            // Direct registry access is generally not thread-safe if modifications happen concurrently.
+            // However, assuming assets are only Loaded/Unloaded at specific sync points or via
+            // the main thread while the render thread reads:
+            if (!m_Registry.valid(handle.ID)) return nullptr;
+
+            // We skip the lock. The user guarantees no assets are Unloaded during the RenderPass.
+            const auto* info = m_Registry.try_get<AssetInfo>(handle.ID);
+            if (!info || info->State != LoadState::Ready) return nullptr;
+
+            if (const auto* payload = m_Registry.try_get<AssetPayload<T>>(handle.ID))
+            {
+                return payload->Ptr;
+            }
+            return nullptr;
+        }
+
         [[nodiscard]] LoadState GetState(AssetHandle handle);
 
         void Clear();
