@@ -85,7 +85,6 @@ export namespace Graphics
         VkDescriptorSet m_GlobalDescriptorSet = VK_NULL_HANDLE;
 
         std::unique_ptr<RHI::VulkanBuffer> m_GlobalUBO;
-        std::unique_ptr<ShaderLibrary> m_ShaderLibrary;
 
         RenderGraph m_RenderGraph;
         GeometryStorage& m_GeometryStorage;
@@ -122,5 +121,6 @@ export namespace Graphics
 
         // NOTE: Descriptor allocator reference is needed for DebugView per-frame sets
         RHI::DescriptorAllocator& m_DescriptorPool;
+        std::unique_ptr<ShaderLibrary> m_ShaderLibrary;
     };
 }

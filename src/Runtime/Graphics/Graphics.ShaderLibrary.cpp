@@ -2,6 +2,9 @@ module;
 #include <filesystem>
 #include <vector>
 #include <format>
+#include <mutex>
+#include <algorithm>
+#include "RHI.Vulkan.hpp"
 
 module Graphics:ShaderLibrary.Impl;
 import :ShaderLibrary;
