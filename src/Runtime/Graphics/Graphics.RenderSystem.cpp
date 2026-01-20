@@ -104,14 +104,16 @@ namespace Graphics
         }
 
         // Picking: one 4-byte host-visible readback buffer per frame-in-flight.
-        m_PickReadbackBuffers.resize(renderer.GetFramesInFlight());
+        auto NumFramesInFlight = renderer.GetFramesInFlight();
+        m_PickReadbackBuffers.resize(NumFramesInFlight);
+        m_FrameHasPendingReadback.resize(NumFramesInFlight, false);
         for (auto& buf : m_PickReadbackBuffers)
         {
             buf = std::make_unique<RHI::VulkanBuffer>(
                 *m_Device,
                 sizeof(uint32_t),
                 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-                static_cast<VmaMemoryUsage>(VMA_MEMORY_USAGE_CPU_TO_GPU));
+                static_cast<VmaMemoryUsage>(VMA_MEMORY_USAGE_GPU_TO_CPU));
         }
 
         // Create features
@@ -244,13 +246,41 @@ namespace Graphics
             return;
         }
 
+        const uint32_t frameIndex = m_Renderer.GetCurrentFrameIndex();
+
+        if (m_FrameHasPendingReadback[frameIndex])
+        {
+            // Map and read
+            void* mapped = m_PickReadbackBuffers[frameIndex]->Map();
+            if (mapped)
+            {
+                uint32_t entityID = *static_cast<uint32_t*>(mapped);
+                m_PickReadbackBuffers[frameIndex]->Unmap();
+
+                // Publish result
+                m_PendingConsumedResult = {entityID != 0, entityID};
+                m_HasPendingConsumedResult = true;
+                m_LastPickResult = m_PendingConsumedResult;
+
+                // Log for debug
+                if (entityID != 0)
+                    Core::Log::Info("GPU Pick Hit: Entity ID {}", entityID);
+            }
+            m_FrameHasPendingReadback[frameIndex] = false;
+        }
+
+        // If we are about to record a pick command this frame, mark it for readback next time
+        if (m_PendingPick.Pending)
+        {
+            m_FrameHasPendingReadback[frameIndex] = true;
+        }
+
         RHI::CameraBufferObject ubo{};
         ubo.View = camera.ViewMatrix;
         ubo.Proj = camera.ProjectionMatrix;
 
         const size_t cameraDataSize = sizeof(RHI::CameraBufferObject);
         const size_t alignedSize = PadUniformBufferSize(cameraDataSize, m_MinUboAlignment);
-        const uint32_t frameIndex = m_Renderer.GetCurrentFrameIndex();
         const size_t dynamicOffset = frameIndex * alignedSize;
 
         char* dataPtr = static_cast<char*>(m_GlobalUBO->Map());

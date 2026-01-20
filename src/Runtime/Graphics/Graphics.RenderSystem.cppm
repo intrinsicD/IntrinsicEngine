@@ -99,6 +99,7 @@ export namespace Graphics
 
         PendingPick m_PendingPick;
         std::vector<std::unique_ptr<RHI::VulkanBuffer>> m_PickReadbackBuffers;
+        std::vector<bool> m_FrameHasPendingReadback;
         int32_t m_PickResultReadyFrame = -1;
         PickResultGpu m_LastPickResult{};
         bool m_HasPendingConsumedResult = false;
