@@ -168,6 +168,7 @@ namespace Runtime
         Interface::GUI::Init(*m_Window, *m_Device, *m_Swapchain, m_Context->GetInstance(),
                              m_Device->GetGraphicsQueue());
 
+
         InitPipeline();
         Core::Log::Info("Engine: InitPipeline complete.");
         Core::Log::Info("Engine: Constructor complete.");

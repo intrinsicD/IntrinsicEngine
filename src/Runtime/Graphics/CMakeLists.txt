@@ -21,7 +21,6 @@ target_sources(${target_name}
         Graphics.TextureLoader.cppm
         Graphics.AssetErrors.cppm
         Graphics.RenderPipeline.cppm
-        Graphics.ShaderLibrary.cppm
         Passes/Graphics.Passes.Picking.cppm
         Passes/Graphics.Passes.Forward.cppm
         Passes/Graphics.Passes.DebugView.cppm
@@ -38,7 +37,6 @@ target_sources(${target_name}
         Graphics.RenderGraph.cpp
         Graphics.ModelLoader.cpp
         Graphics.TextureLoader.cpp
-        Graphics.ShaderLibrary.cpp
         Passes/Graphics.Passes.Picking.cpp
         Passes/Graphics.Passes.Forward.cpp
         Passes/Graphics.Passes.DebugView.cpp

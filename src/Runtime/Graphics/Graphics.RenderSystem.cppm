@@ -16,7 +16,6 @@ import :Passes.Picking;
 import :Passes.Forward;
 import :Passes.DebugView;
 import :Passes.ImGui;
-import :ShaderLibrary;
 import Core;
 import ECS;
 
@@ -68,8 +67,6 @@ export namespace Graphics
         [[nodiscard]] const DebugViewState& GetDebugViewState() const { return m_DebugView; }
         void SetDebugViewSelectedResource(Core::Hash::StringID name) { m_DebugView.SelectedResource = name; }
         void SetDebugViewShowInViewport(bool show) { m_DebugView.ShowInViewport = show; }
-
-        //TODO: finish implementing the ShaderLibrary hot reload
     private:
         size_t m_MinUboAlignment = 0;
 
@@ -121,6 +118,5 @@ export namespace Graphics
 
         // NOTE: Descriptor allocator reference is needed for DebugView per-frame sets
         RHI::DescriptorAllocator& m_DescriptorPool;
-        std::unique_ptr<ShaderLibrary> m_ShaderLibrary;
     };
 }
