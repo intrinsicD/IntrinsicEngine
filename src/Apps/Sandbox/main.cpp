@@ -47,7 +47,8 @@ public:
     {
         Log::Info("Sandbox Started!");
 
-        if (!m_TransferManager) {
+        if (!m_TransferManager)
+        {
             Log::Error("FATAL: TransferManager is null in OnStart!");
             std::exit(-1);
         }
@@ -82,24 +83,24 @@ public:
 
         auto modelLoader = [&](const std::string& path, Assets::AssetHandle handle)
             -> std::unique_ptr<Graphics::Model>
-         {
-             auto result = Graphics::ModelLoader::LoadAsync(GetDevice(), *m_TransferManager, m_GeometryStorage, path);
+        {
+            auto result = Graphics::ModelLoader::LoadAsync(GetDevice(), *m_TransferManager, m_GeometryStorage, path);
 
-             if (result)
-             {
-                 // 1. Notify Engine to track the GPU work
-                 RegisterAssetLoad(handle, result->Token);
+            if (result)
+            {
+                // 1. Notify Engine to track the GPU work
+                RegisterAssetLoad(handle, result->Token);
 
-                 // 2. Notify AssetManager to wait
-                 m_AssetManager.MoveToProcessing(handle);
+                // 2. Notify AssetManager to wait
+                m_AssetManager.MoveToProcessing(handle);
 
-                 // 3. Return the model (valid CPU pointers, GPU buffers are allocated but content is uploading)
+                // 3. Return the model (valid CPU pointers, GPU buffers are allocated but content is uploading)
                 return std::move(result->ModelData);
-             }
+            }
 
-             Log::Warn("Model load failed: {} ({})", path, Graphics::AssetErrorToString(result.error()));
-             return nullptr; // Failed
-         };
+            Log::Warn("Model load failed: {} ({})", path, Graphics::AssetErrorToString(result.error()));
+            return nullptr; // Failed
+        };
 
         m_DuckModel = m_AssetManager.Load<Graphics::Model>(
             Filesystem::GetAssetPath("models/Duck.glb"),
@@ -116,8 +117,8 @@ public:
             m_AssetManager
         );
 
-         // Track handle only; AssetManager owns the actual Material object.
-         m_DuckMaterialHandle = m_AssetManager.Create("DuckMaterial", std::move(DuckMaterial));
+        // Track handle only; AssetManager owns the actual Material object.
+        m_DuckMaterialHandle = m_AssetManager.Create("DuckMaterial", std::move(DuckMaterial));
         m_LoadedMaterials.push_back(m_DuckMaterialHandle);
 
         Log::Info("Asset Load Requested. Waiting for background thread...");
@@ -215,16 +216,12 @@ public:
         }
 
         {
-            // --- Rotate Entities ---
-            auto view = m_Scene.GetRegistry().view<ECS::Components::Transform::Component, ECS::Components::AxisRotator::Component>();
-            for (auto [entity, transform, rotator] : view.each())
-            {
-                ECS::Components::AxisRotator::OnUpdate(transform, rotator, dt);
-            }
+            ECS::Systems::AxisRotator::OnUpdate(m_Scene.GetRegistry(), dt);
         }
 
         {
-            auto view = m_Scene.GetRegistry().view<ECS::Components::Transform::Component, ECS::MeshCollider::Component>();
+            auto view = m_Scene.GetRegistry().view<
+                ECS::Components::Transform::Component, ECS::MeshCollider::Component>();
             for (auto [entity, transform, collider] : view.each())
             {
                 // World center: transform the local center point
