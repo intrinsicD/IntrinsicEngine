@@ -15,6 +15,8 @@ target_sources(${target_name}
         PUBLIC
         FILE_SET CXX_MODULES FILES
         Utils/Utils.BoundedHeap.cppm
+        Utils/Utils.LockFreeQueue.cppm
+        Utils/Utils.RingBuffer.cppm
         PUBLIC
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
         Core.cppm

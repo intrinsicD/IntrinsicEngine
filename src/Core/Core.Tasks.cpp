@@ -15,6 +15,7 @@ module;
 module Core:Tasks.Impl;
 import :Tasks;
 import :Logging;
+import Utils.LockFreeQueue;
 
 namespace Core::Tasks
 {
@@ -122,42 +123,13 @@ namespace Core::Tasks
         if (m_VTable) m_VTable->Execute();
     }
 
-    template <typename T, size_t Capacity>
-    struct RingBuffer {
-        std::array<T, Capacity> Buffer;
-        std::atomic<size_t> Head{0};
-        std::atomic<size_t> Tail{0};
-
-        bool Push(T&& item) {
-            size_t tail = Tail.load(std::memory_order_relaxed);
-            size_t head = Head.load(std::memory_order_acquire);
-            if (tail - head >= Capacity) return false; // Full
-
-            Buffer[tail % Capacity] = std::move(item);
-            Tail.store(tail + 1, std::memory_order_release);
-            return true;
-        }
-
-        bool Pop(T& outItem) {
-            size_t head = Head.load(std::memory_order_relaxed);
-            size_t tail = Tail.load(std::memory_order_acquire);
-            if (head >= tail) return false; // Empty
-
-            outItem = std::move(Buffer[head % Capacity]);
-            Head.store(head + 1, std::memory_order_release);
-            return true;
-        }
-    };
-
-
     struct alignas(64) SchedulerContext
     {
         std::vector<std::thread> workers;
 
-        // 1. FAST PATH: Fixed-size Lock-Free Ring
-        RingBuffer<LocalTask, 65536> globalQueue;
-        SpinLock queueMutex; // Kept for the RingBuffer's internal head/tail sync if needed, or remove if RingBuffer is truly lock-free
-
+        // 1. FAST PATH: MPMC Lock-Free Queue
+        // 65536 slots = power of 2, sufficient for high throughput
+        Utils::LockFreeQueue<LocalTask> globalQueue{65536};
         // 2. SLOW PATH: Unbounded Overflow Queue
         std::mutex overflowMutex;
         std::deque<LocalTask> overflowQueue;
@@ -267,15 +239,9 @@ namespace Core::Tasks
         s_Ctx->activeTaskCount.fetch_add(1, std::memory_order_relaxed);
         s_Ctx->queuedTaskCount.fetch_add(1, std::memory_order_release);
 
-        // 1. Try Fast Path (Ring Buffer)
-        bool pushed = false;
-        {
-            // Note: If your RingBuffer implementation inside Core.Tasks.cpp uses the SpinLock,
-            // keep this lock. If it's purely atomic, remove the lock.
-            // Assuming your current RingBuffer uses the SpinLock 'queueMutex' based on previous file:
-            std::lock_guard lock(s_Ctx->queueMutex);
-            pushed = s_Ctx->globalQueue.Push(std::move(task));
-        }
+        // 1. Try Fast Path (Lock-Free)
+        // No lock_guard here anymore!
+        bool pushed = s_Ctx->globalQueue.Push(std::move(task));
 
         // 2. Fallback to Slow Path (Overflow)
         if (!pushed)
@@ -296,11 +262,9 @@ namespace Core::Tasks
 
     static bool TryPopTask(LocalTask& outTask)
     {
-        // 1. Try Fast Path (Ring Buffer)
-        {
-            std::lock_guard lock(s_Ctx->queueMutex);
-            if (s_Ctx->globalQueue.Pop(outTask)) return true;
-        }
+        // 1. Try Fast Path (Lock-Free)
+        // No lock_guard here anymore!
+        if (s_Ctx->globalQueue.Pop(outTask)) return true;
 
         // 2. Try Slow Path (Overflow)
         // Optimization: Check atomic flag before acquiring mutex
