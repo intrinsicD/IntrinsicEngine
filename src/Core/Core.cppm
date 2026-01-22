@@ -11,5 +11,6 @@ export import :Input;
 export import :Assets;
 export import :Profiling;
 export import :Telemetry;
+export import :ResourcePool;
 export import :Hash;
 export import :Handle;

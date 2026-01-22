@@ -13,7 +13,7 @@ export namespace ECS::MeshRenderer
 {
     struct Component
     {
-        Graphics::GeometryHandle Geometry;
+        Geometry::GeometryHandle Geometry;
         Core::Assets::AssetHandle Material;
 
         // --- Render Cache ---

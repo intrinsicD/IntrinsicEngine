@@ -25,7 +25,7 @@ export namespace Graphics
         static std::expected<ModelLoadResult, AssetError> LoadAsync(
             std::shared_ptr<RHI::VulkanDevice> device,
             RHI::TransferManager& transferManager,
-            GeometryStorage& geometryStorage,
+            GeometryPool& geometryStorage,
             const std::string& filepath);
     };
 }

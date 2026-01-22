@@ -1592,7 +1592,7 @@ namespace Graphics
     std::expected<ModelLoadResult, AssetError> ModelLoader::LoadAsync(
         std::shared_ptr<RHI::VulkanDevice> device,
         RHI::TransferManager& transferManager,
-        GeometryStorage& geometryStorage,
+        GeometryPool& geometryStorage,
         const std::string& filepath)
     {
         if (!device)

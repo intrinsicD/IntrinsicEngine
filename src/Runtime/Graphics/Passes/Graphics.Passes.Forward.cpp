@@ -108,7 +108,7 @@ namespace Graphics::Passes
 
                                         std::sort(packets.begin(), packets.end());
 
-                                        GeometryHandle currentGeoHandle{};
+                                        Geometry::GeometryHandle currentGeoHandle{};
                                         GeometryGpuData* currentGeo = nullptr;
 
                                         for (const auto& packet : packets)

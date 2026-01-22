@@ -41,7 +41,7 @@ export namespace Graphics::Passes
 
         struct RenderPacket
         {
-            GeometryHandle GeoHandle;
+            Geometry::GeometryHandle GeoHandle;
             uint32_t TextureID = 0;
             glm::mat4 Transform{1.0f};
             bool IsSelected = false;

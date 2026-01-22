@@ -5,6 +5,7 @@ export import :Contact;
 export import :Containment;
 export import :GJK;
 export import :EPA;
+export import :Handle;
 export import :MeshUtils;
 export import :OBB;
 export import :Octree;

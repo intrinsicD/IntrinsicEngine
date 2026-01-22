@@ -30,6 +30,7 @@ target_sources(${target_name}
         Core.Handle.cppm
         Core.Input.cppm
         Core.Assets.cppm
+        Core.ResourcePool.cppm
         Core.Profiling.cppm
         Core.Telemetry.cppm
         PRIVATE

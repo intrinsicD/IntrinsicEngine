@@ -16,6 +16,7 @@ target_sources(${target_name}
         Geometry.Containment.cppm
         Geometry.GJK.cppm
         Geometry.EPA.cppm
+        Geometry.Handle.cppm
         Geometry.Overlap.cppm
         Geometry.Primitives.cppm
         Geometry.Support.cppm

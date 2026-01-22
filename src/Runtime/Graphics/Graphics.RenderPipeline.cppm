@@ -10,6 +10,7 @@ export module Graphics:RenderPipeline;
 
 import :RenderGraph;
 import Core;
+import :Geometry;
 import ECS;
 import RHI;
 
@@ -51,7 +52,7 @@ export namespace Graphics
         // Scene
         ECS::Scene& Scene;
         const Core::Assets::AssetManager& AssetManager;
-        class GeometryStorage& GeometryStorage;
+        GeometryPool& GeometryStorage;
 
         // Frame
         uint32_t FrameIndex = 0;

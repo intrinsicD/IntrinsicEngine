@@ -34,7 +34,7 @@ export namespace Graphics
                      RHI::GraphicsPipeline& pickPipeline,
                      Core::Memory::LinearArena& frameArena,
                      Core::Memory::ScopeStack& frameScope,
-                     GeometryStorage& geometryStorage);
+                     GeometryPool& geometryStorage);
         ~RenderSystem();
 
         void OnUpdate(ECS::Scene& scene, const CameraComponent& camera, Core::Assets::AssetManager& assetManager);
@@ -84,7 +84,7 @@ export namespace Graphics
         std::unique_ptr<RHI::VulkanBuffer> m_GlobalUBO;
 
         RenderGraph m_RenderGraph;
-        GeometryStorage& m_GeometryStorage;
+        GeometryPool& m_GeometryStorage;
 
         std::vector<std::unique_ptr<RHI::VulkanImage>> m_DepthImages;
 

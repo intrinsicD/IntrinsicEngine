@@ -67,7 +67,7 @@ export namespace Runtime
         Core::Assets::AssetManager m_AssetManager;
         Core::Memory::LinearArena m_FrameArena; // 1 MB per frame
         Core::Memory::ScopeStack m_FrameScope; // per-frame scope allocator with destructors
-        Graphics::GeometryStorage m_GeometryStorage;
+        Graphics::GeometryPool m_GeometryStorage;
         std::unique_ptr<Graphics::RenderSystem> m_RenderSystem;
 
         // Engine-owned selection controller (Editor-like single selection).
@@ -84,7 +84,7 @@ export namespace Runtime
         [[nodiscard]] RHI::DescriptorAllocator& GetDescriptorPool() const { return *m_DescriptorPool; }
         [[nodiscard]] RHI::DescriptorLayout& GetDescriptorLayout() const { return *m_DescriptorLayout; }
         [[nodiscard]] RHI::VulkanSwapchain& GetSwapchain() const { return *m_Swapchain; }
-        [[nodiscard]] Graphics::GeometryStorage& GetGeometryStorage() { return m_GeometryStorage; }
+        [[nodiscard]] Graphics::GeometryPool& GetGeometryStorage() { return m_GeometryStorage; }
 
         void RegisterAssetLoad(Core::Assets::AssetHandle handle, RHI::TransferToken token);
 

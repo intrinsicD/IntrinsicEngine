@@ -102,13 +102,11 @@ export namespace Graphics
         uint32_t m_IndexCount = 0;
     };
 
-    // Type tag for GeometryHandle - enables type-safe handle via Core::StrongHandle
-    struct GeometryTag {};
-
     // Use the core StrongHandle template for type safety and consistency
-    using GeometryHandle = Core::StrongHandle<GeometryTag>;
 
-    class GeometryStorage
+    using GeometryPool = Core::ResourcePool<GeometryGpuData, Geometry::GeometryHandle>;
+
+    /*class GeometryStorage
     {
     public:
         // Initialize with frames-in-flight count for safe deferred deletion
@@ -263,5 +261,5 @@ export namespace Graphics
         std::vector<PendingKill> m_PendingKillList;
         mutable std::shared_mutex m_Mutex;
         uint32_t m_FramesInFlight = 2; // Default, should be initialized properly
-    };
+    };*/
 }

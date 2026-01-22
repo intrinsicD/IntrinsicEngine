@@ -51,7 +51,7 @@ namespace Graphics
                                RHI::GraphicsPipeline& pickPipeline,
                                Core::Memory::LinearArena& frameArena,
                                Core::Memory::ScopeStack& frameScope,
-                               GeometryStorage& geometryStorage)
+                               GeometryPool& geometryStorage)
         : m_DeviceOwner(std::move(device)),
           m_Device(m_DeviceOwner.get()),
           m_Swapchain(swapchain),

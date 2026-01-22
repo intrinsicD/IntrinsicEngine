@@ -14,14 +14,14 @@ export namespace Graphics
 
     struct MeshSegment
     {
-        GeometryHandle Handle;
+        Geometry::GeometryHandle Handle;
         std::shared_ptr<GeometryCollisionData> CollisionGeometry;
         std::string Name;
     };
 
     struct Model
     {
-        Model(GeometryStorage& storage, std::shared_ptr<RHI::VulkanDevice> device)
+        Model(GeometryPool& storage, std::shared_ptr<RHI::VulkanDevice> device)
             : m_Storage(storage), m_Device(std::move(device)) {}
 
         // RAII: Release handles on destruction using deferred deletion
@@ -43,7 +43,7 @@ export namespace Graphics
         [[nodiscard]] size_t Size() const { return Meshes.size(); }
 
     private:
-        GeometryStorage& m_Storage;
+        GeometryPool& m_Storage;
         std::shared_ptr<RHI::VulkanDevice> m_Device;
     };
 }
