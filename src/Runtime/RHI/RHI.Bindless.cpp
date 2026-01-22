@@ -143,6 +143,7 @@ namespace RHI
         descriptorWrite.descriptorCount = 1;
         descriptorWrite.pImageInfo = &imageInfo;
 
+        std::lock_guard lock(m_UpdateMutex);
         vkUpdateDescriptorSets(m_Device.GetLogicalDevice(), 1, &descriptorWrite, 0, nullptr);
     }
 

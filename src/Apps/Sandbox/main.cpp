@@ -105,8 +105,6 @@ public:
         // 3. Setup Material (Assuming texture loads synchronously or is handled)
         auto DuckMaterial = std::make_unique<Graphics::Material>(
             *GetDevice(),
-            *m_BindlessSystem,
-            *m_TextureSystem,
             m_DuckTexture,
             m_DefaultTextureIndex,
             m_AssetManager

@@ -339,7 +339,7 @@ namespace Runtime
                         Core::Filesystem::GetAssetPath("textures/Parameterization.jpg"), textureLoader);
 
                     auto defaultMat = std::make_unique<Graphics::Material>(
-                        *GetDevice(), *m_BindlessSystem, *m_TextureSystem,
+                        *GetDevice(),
                         texHandle, m_DefaultTextureIndex, m_AssetManager
                     );
 

@@ -39,6 +39,7 @@ export namespace RHI
         VkDescriptorSetLayout m_Layout = VK_NULL_HANDLE;
         VkDescriptorSet m_GlobalSet = VK_NULL_HANDLE;
         uint32_t m_MaxDescriptors = 0;
+        std::mutex m_UpdateMutex;
 
         void CreateLayout();
         void CreatePoolAndSet();

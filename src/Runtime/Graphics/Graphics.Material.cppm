@@ -12,8 +12,6 @@ export namespace Graphics
     {
     public:
         Material(RHI::VulkanDevice& device,
-                 RHI::BindlessDescriptorSystem& bindlessSystem,
-                 RHI::TextureSystem& textureSystem,
                  Core::Assets::AssetHandle textureHandle,
                  uint32_t defaultTextureIndex,
                  Core::Assets::AssetManager& assetManager);
@@ -30,9 +28,6 @@ export namespace Graphics
 
     private:
         RHI::VulkanDevice& m_Device;
-        RHI::BindlessDescriptorSystem& m_BindlessSystem;
-        RHI::TextureSystem& m_TextureSystem;
-
         Core::Assets::AssetHandle m_TextureHandle{};
 
         // Hot-path binding data
