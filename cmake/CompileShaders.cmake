@@ -22,7 +22,7 @@ else ()
     foreach (SHADER ${SHADERS})
         add_custom_command(
                 OUTPUT ${SHADER_BINARY_DIR}/${SHADER}.spv
-                COMMAND ${GLSL_COMPILER} ${SHADER_SOURCE_DIR}/${SHADER} -o ${SHADER_BINARY_DIR}/${SHADER}.spv
+                COMMAND ${GLSL_COMPILER} ${SHADER_SOURCE_DIR}/${SHADER} -o ${SHADER_BINARY_DIR}/${SHADER}.spv --target-env=vulkan1.3
                 DEPENDS ${SHADER_SOURCE_DIR}/${SHADER}
                 COMMENT "Compiling ${SHADER}"
         )

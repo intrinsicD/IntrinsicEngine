@@ -100,7 +100,7 @@ if (INTRINSIC_ENABLE_NATIVE_ARCH)
     )
 endif()
 
-include(Dependencies.cmake)
+include(cmake/Dependencies.cmake)
 
 # ------------------------------------------------------------------------------
 # Subdirectories

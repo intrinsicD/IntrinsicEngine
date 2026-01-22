@@ -16,8 +16,6 @@
 #include "RHI.VmaConfig.hpp"
 #include <vk_mem_alloc.h>
 
-import Core;
-
 // Wraps Vulkan calls and logs errors without exceptions
 #ifndef NDEBUG
 #define VK_CHECK(x)                                                                  \

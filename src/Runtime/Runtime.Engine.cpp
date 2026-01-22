@@ -388,20 +388,19 @@ namespace Runtime
         m_DescriptorLayout = std::make_unique<RHI::DescriptorLayout>(*m_Device);
         m_DescriptorPool = std::make_unique<RHI::DescriptorAllocator>(*m_Device);
 
-        // Resolve shader paths robustly. Depending on how the app is launched, the CWD may be
-        // the repo root, the build dir, or bin/. Prefer the common dev layout: <bin>/shaders/*.spv.
-
         // ---------------------------------------------------------------------
-        // Main forward pipeline (textured)
+        // Main forward pipeline (Textured + BDA)
         // ---------------------------------------------------------------------
         RHI::ShaderModule vert(*m_Device, Core::Filesystem::GetShaderPath("shaders/triangle.vert.spv"),
                                RHI::ShaderStage::Vertex);
         RHI::ShaderModule frag(*m_Device, Core::Filesystem::GetShaderPath("shaders/triangle.frag.spv"),
                                RHI::ShaderStage::Fragment);
 
+        RHI::VertexInputDescription inputLayout = {}; //Use Empty Input Layout now because of BDA
+        // RHI::VertexInputDescription inputLayout = RHI::StandardLayoutFactory::Get(); // Removed because were using BDA now
         RHI::PipelineBuilder builder(m_Device);
         builder.SetShaders(&vert, &frag);
-        builder.SetInputLayout(RHI::StandardLayoutFactory::Get());
+        builder.SetInputLayout(inputLayout);
         builder.SetColorFormats({m_Swapchain->GetImageFormat()});
         builder.SetDepthFormat(RHI::VulkanImage::FindDepthFormat(*m_Device));
         builder.AddDescriptorSetLayout(m_DescriptorLayout->GetHandle());
@@ -426,7 +425,7 @@ namespace Runtime
         }
 
         // ---------------------------------------------------------------------
-        // GPU picking pipeline (ID buffer)
+        // GPU picking pipeline (ID buffer + BDA)
         // ---------------------------------------------------------------------
         RHI::ShaderModule pickVert(*m_Device, Core::Filesystem::GetShaderPath("shaders/pick_id.vert.spv"),
                                    RHI::ShaderStage::Vertex);
@@ -435,7 +434,7 @@ namespace Runtime
 
         RHI::PipelineBuilder pickBuilder(m_Device);
         pickBuilder.SetShaders(&pickVert, &pickFrag);
-        pickBuilder.SetInputLayout(RHI::StandardLayoutFactory::Get());
+        pickBuilder.SetInputLayout(inputLayout); //Same here for BDA
 
         // ID target is R32_UINT.
         pickBuilder.SetColorFormats({VK_FORMAT_R32_UINT});
@@ -446,7 +445,7 @@ namespace Runtime
 
         VkPushConstantRange pickPush{};
         pickPush.offset = 0;
-        pickPush.size = sizeof(glm::mat4) + sizeof(uint32_t);
+        pickPush.size = sizeof(RHI::MeshPushConstants);
         pickPush.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
         pickBuilder.AddPushConstantRange(pickPush);
 

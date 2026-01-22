@@ -424,7 +424,8 @@ namespace Graphics
 
         // 2. No suitable chunk found, allocate new one via VMA (or raw Vulkan)
         // Here we use a raw allocation for simplicity of the example, but in production use VMA.
-        VkMemoryAllocateInfo allocInfo{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
+        VkMemoryAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
         allocInfo.allocationSize = reqs.size;
 
         // Find memory type index

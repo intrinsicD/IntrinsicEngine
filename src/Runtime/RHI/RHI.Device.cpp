@@ -181,6 +181,7 @@ namespace RHI
         VkPhysicalDeviceVulkan12Features features12{};
         features12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
         features12.pNext = &features13;
+        features12.bufferDeviceAddress = VK_TRUE;
 
         VkPhysicalDeviceFeatures2 features2{};
         features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
@@ -227,6 +228,7 @@ namespace RHI
         allocatorInfo.device = m_Device;
         allocatorInfo.instance = context.GetInstance();
         allocatorInfo.pVulkanFunctions = &vulkanFunctions;
+        allocatorInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
 
         if (vmaCreateAllocator(&allocatorInfo, &m_Allocator) != VK_SUCCESS)
         {

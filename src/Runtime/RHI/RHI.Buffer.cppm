@@ -30,6 +30,8 @@ export namespace RHI {
 
         [[nodiscard]] void* GetMappedData() const { return m_MappedData; }
 
+        [[nodiscard]] uint64_t GetDeviceAddress() const;
+
         void Write(const void* data, size_t size, size_t offset = 0) {
             void* ptr = Map();
             std::memcpy(static_cast<uint8_t*>(ptr) + offset, data, size);
