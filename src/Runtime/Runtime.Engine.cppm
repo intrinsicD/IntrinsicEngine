@@ -60,6 +60,7 @@ export namespace Runtime
         std::unique_ptr<RHI::GraphicsPipeline> m_Pipeline;
         std::unique_ptr<RHI::GraphicsPipeline> m_PickPipeline;
         std::unique_ptr<RHI::BindlessDescriptorSystem> m_BindlessSystem;
+        std::unique_ptr<RHI::TextureSystem> m_TextureSystem;
 
     public:
         // Protected access so Sandbox can manipulate Scene/Assets

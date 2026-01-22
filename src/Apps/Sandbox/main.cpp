@@ -58,25 +58,19 @@ public:
         m_Scene.GetRegistry().emplace<Graphics::OrbitControlComponent>(m_CameraEntity);
 
         auto textureLoader = [this](const std::filesystem::path& path, Core::Assets::AssetHandle handle)
-            -> std::unique_ptr<RHI::Texture>
+            -> std::shared_ptr<RHI::Texture>
         {
-            // Delegate complex logic to the subsystem
-            auto result = Graphics::TextureLoader::LoadAsync(path, *GetDevice(), *m_TransferManager);
+            auto result = Graphics::TextureLoader::LoadAsync(path, *GetDevice(), *m_TransferManager, *m_TextureSystem);
 
             if (result)
             {
-                // 1. Notify Engine to track the GPU work
                 RegisterAssetLoad(handle, result->Token);
-
-                // 2. Notify AssetManager to wait
                 m_AssetManager.MoveToProcessing(handle);
-
-                // 3. Return the resource (even though it's not ready yet, it's valid memory)
-                return std::move(result->Resource);
+                return std::move(result->Texture);
             }
 
             Log::Warn("Texture load failed: {} ({})", path.string(), Graphics::AssetErrorToString(result.error()));
-            return nullptr; // Load failed
+            return {};
         };
         m_DuckTexture = m_AssetManager.Load<RHI::Texture>(Filesystem::GetAssetPath("textures/DuckCM.png"),
                                                           textureLoader);
@@ -112,6 +106,7 @@ public:
         auto DuckMaterial = std::make_unique<Graphics::Material>(
             *GetDevice(),
             *m_BindlessSystem,
+            *m_TextureSystem,
             m_DuckTexture,
             m_DefaultTextureIndex,
             m_AssetManager

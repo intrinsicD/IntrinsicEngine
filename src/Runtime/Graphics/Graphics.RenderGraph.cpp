@@ -223,6 +223,22 @@ namespace Graphics
     RenderGraph::~RenderGraph()
     {
         vkDeviceWaitIdle(m_Device->GetLogicalDevice());
+
+        // Release any raw VkDeviceMemory allocations made by AllocateOrReuseMemory().
+        // (These are NOT VMA allocations, so we must free them explicitly.)
+        for (auto& [typeBits, chunks] : m_MemoryPool)
+        {
+            for (auto& chunk : chunks)
+            {
+                if (chunk && chunk->Memory)
+                {
+                    vkFreeMemory(m_Device->GetLogicalDevice(), chunk->Memory, nullptr);
+                    chunk->Memory = VK_NULL_HANDLE;
+                }
+            }
+        }
+        m_MemoryPool.clear();
+
         m_ImagePool.clear();
         m_BufferPool.clear();
     }
@@ -231,6 +247,21 @@ namespace Graphics
     {
         // Caller is expected to have synchronized with the GPU (e.g., vkDeviceWaitIdle via renderer resize path).
         // We keep Trim() itself lightweight and deterministic.
+
+        // Free raw device memory pool as well, since it is sized/typed to previous usages.
+        for (auto& [typeBits, chunks] : m_MemoryPool)
+        {
+            for (auto& chunk : chunks)
+            {
+                if (chunk && chunk->Memory)
+                {
+                    vkFreeMemory(m_Device->GetLogicalDevice(), chunk->Memory, nullptr);
+                    chunk->Memory = VK_NULL_HANDLE;
+                }
+            }
+        }
+        m_MemoryPool.clear();
+
         m_ImagePool.clear();
         m_BufferPool.clear();
         Core::Log::Info("RenderGraph: Pools trimmed.");

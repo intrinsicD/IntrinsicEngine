@@ -13,5 +13,6 @@ export import :Shader;
 export import :Swapchain;
 export import :StagingBelt;
 export import :Texture;
+export import :TextureSystem;
 export import :Transfer;
 export import :Types;

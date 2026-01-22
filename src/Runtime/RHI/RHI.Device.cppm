@@ -78,6 +78,10 @@ namespace RHI
         void FlushDeletionQueue(uint32_t frameIndex);
         void SafeDestroy(std::function<void()>&& deleteFn);
 
+        // New: execute and clear *all* deferred deletions immediately.
+        // Safe to call only when the GPU is idle.
+        void FlushAllDeletionQueues();
+
     private:
         VkPhysicalDevice m_PhysicalDevice = VK_NULL_HANDLE;
         VkDevice m_Device = VK_NULL_HANDLE;

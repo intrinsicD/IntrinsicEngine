@@ -41,21 +41,23 @@ namespace RHI
         CreateCommandPool();
     }
 
+    void VulkanDevice::FlushAllDeletionQueues()
+    {
+        std::lock_guard lock(m_DeletionMutex);
+        for (auto& queue : m_DeletionQueue)
+        {
+            for (auto& fn : queue) fn();
+            queue.clear();
+        }
+    }
+
     VulkanDevice::~VulkanDevice()
     {
-        // ... (Destructor remains the same) ...
         // 1. Wait for GPU to stop
         if (m_Device) vkDeviceWaitIdle(m_Device);
 
-        // 2. Flush ALL Deletion Queues
-        {
-            std::lock_guard lock(m_DeletionMutex);
-            for (auto& queue : m_DeletionQueue)
-            {
-                for (auto& fn : queue) fn();
-                queue.clear();
-            }
-        }
+        // 2. Execute all deferred deletions while the device + allocator are still valid
+        FlushAllDeletionQueues();
 
         // 3. Destroy Thread Pools
         {

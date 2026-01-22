@@ -1,4 +1,3 @@
-
 # ------------------------------------------------------------------------------
 # Dependencies
 # ------------------------------------------------------------------------------
@@ -64,6 +63,11 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(volk)
 find_package(Vulkan REQUIRED)
+
+# VulkanMemoryAllocator is header-only for engine usage.
+# Disable its sample targets to avoid toolchain-specific libc header issues.
+set(VMA_BUILD_SAMPLES OFF CACHE BOOL "" FORCE)
+set(VMA_STATIC_VULKAN_FUNCTIONS ON CACHE BOOL "" FORCE)
 
 FetchContent_Declare(
         vma

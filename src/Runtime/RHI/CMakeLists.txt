@@ -24,6 +24,7 @@ target_sources(${target_name}
         RHI.Descriptors.cppm
         RHI.Image.cppm
         RHI.Texture.cppm
+        RHI.TextureSystem.cppm
         RHI.Transfer.cppm
         RHI.StagingBelt.cppm
         PRIVATE
@@ -43,6 +44,7 @@ target_sources(${target_name}
         RHI.Descriptors.cpp
         RHI.Image.cpp
         RHI.Texture.cpp
+        RHI.TextureSystem.cpp
         RHI.Transfer.cpp
         RHI.StagingBelt.cpp
 )

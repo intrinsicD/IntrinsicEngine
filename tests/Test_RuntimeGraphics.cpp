@@ -381,6 +381,7 @@ TEST(GraphicsMaterial, ConstructorSignature_NoSharedPtrTexture)
     static_assert(std::is_constructible_v<Graphics::Material,
                                          RHI::VulkanDevice&,
                                          RHI::BindlessDescriptorSystem&,
+                                         RHI::TextureSystem&,
                                          Core::Assets::AssetHandle,
                                          uint32_t,
                                          Core::Assets::AssetManager&>);
@@ -390,6 +391,7 @@ TEST(GraphicsMaterial, ConstructorSignature_NoSharedPtrTexture)
     static_assert(!std::is_constructible_v<Graphics::Material,
                                           RHI::VulkanDevice&,
                                           RHI::BindlessDescriptorSystem&,
+                                          RHI::TextureSystem&,
                                           Core::Assets::AssetHandle,
                                           std::shared_ptr<RHI::Texture>,
                                           Core::Assets::AssetManager&>);
@@ -399,10 +401,10 @@ TEST(GraphicsMaterial, ConstructorTakesDeviceByRef)
 {
     using namespace Graphics;
 
-    // Compile-time API contract: Materials must not require shared_ptr<VulkanDevice>.
     static_assert(std::is_constructible_v<Material,
         RHI::VulkanDevice&,
         RHI::BindlessDescriptorSystem&,
+        RHI::TextureSystem&,
         Core::Assets::AssetHandle,
         uint32_t,
         Core::Assets::AssetManager&>);
@@ -410,6 +412,7 @@ TEST(GraphicsMaterial, ConstructorTakesDeviceByRef)
     static_assert(!std::is_constructible_v<Material,
         std::shared_ptr<RHI::VulkanDevice>,
         RHI::BindlessDescriptorSystem&,
+        RHI::TextureSystem&,
         Core::Assets::AssetHandle,
         uint32_t,
         Core::Assets::AssetManager&>);

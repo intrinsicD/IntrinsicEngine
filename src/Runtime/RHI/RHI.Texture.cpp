@@ -8,6 +8,7 @@ module;
 
 module RHI:Texture.Impl;
 import :Texture;
+import :TextureSystem;
 import :Buffer;
 import :Image;
 import :CommandUtils;
@@ -15,156 +16,7 @@ import Core;
 
 namespace RHI
 {
-    // Helper to generate mips
-    inline void GenerateMipmaps(VkCommandBuffer cmd, VkImage image, int32_t texWidth, int32_t texHeight,
-                                uint32_t mipLevels)
-    {
-        VkImageMemoryBarrier barrier{};
-        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        barrier.image = image;
-        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        barrier.subresourceRange.baseArrayLayer = 0;
-        barrier.subresourceRange.layerCount = 1;
-        barrier.subresourceRange.levelCount = 1;
-
-        int32_t mipWidth = texWidth;
-        int32_t mipHeight = texHeight;
-
-        for (uint32_t i = 1; i < mipLevels; i++)
-        {
-            // Transition level i-1 to TRANSFER_SRC_OPTIMAL
-            barrier.subresourceRange.baseMipLevel = i - 1;
-            barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-            barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-            barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-            barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-
-            vkCmdPipelineBarrier(cmd,
-                                 VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
-                                 0, nullptr,
-                                 0, nullptr,
-                                 1, &barrier);
-
-            // Blit i-1 to i
-            VkImageBlit blit{};
-            blit.srcOffsets[0] = {0, 0, 0};
-            blit.srcOffsets[1] = {mipWidth, mipHeight, 1};
-            blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-            blit.srcSubresource.mipLevel = i - 1;
-            blit.srcSubresource.baseArrayLayer = 0;
-            blit.srcSubresource.layerCount = 1;
-            blit.dstOffsets[0] = {0, 0, 0};
-            blit.dstOffsets[1] = {mipWidth > 1 ? mipWidth / 2 : 1, mipHeight > 1 ? mipHeight / 2 : 1, 1};
-            blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-            blit.dstSubresource.mipLevel = i;
-            blit.dstSubresource.baseArrayLayer = 0;
-            blit.dstSubresource.layerCount = 1;
-
-            vkCmdBlitImage(cmd,
-                           image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                           image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                           1, &blit,
-                           VK_FILTER_LINEAR);
-
-            // Transition level i-1 to SHADER_READ_ONLY_OPTIMAL (We are done with it)
-            barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-            barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-
-            vkCmdPipelineBarrier(cmd,
-                                 VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0,
-                                 0, nullptr,
-                                 0, nullptr,
-                                 1, &barrier);
-
-            if (mipWidth > 1) mipWidth /= 2;
-            if (mipHeight > 1) mipHeight /= 2;
-        }
-
-        // Transition the LAST level to SHADER_READ_ONLY_OPTIMAL
-        barrier.subresourceRange.baseMipLevel = mipLevels - 1;
-        barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-        barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-
-        vkCmdPipelineBarrier(cmd,
-                             VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0,
-                             0, nullptr,
-                             0, nullptr,
-                             1, &barrier);
-    }
-
-    Texture::Texture(VulkanDevice& device, const std::string& filepath)
-        : m_Device(device)
-    {
-        int w, h, c;
-        std::string fullPath = Core::Filesystem::GetAssetPath(filepath);
-        stbi_uc* pixels = stbi_load(fullPath.c_str(), &w, &h, &c, STBI_rgb_alpha);
-        if (!pixels)
-        {
-            Core::Log::Error("Failed to load texture: {}", filepath);
-            // Create a pink fallback 1x1
-            uint32_t pink = 0xFF00FFFF;
-            Upload(&pink, 1, 1);
-            return;
-        }
-        Upload(pixels, w, h);
-        stbi_image_free(pixels);
-    }
-
-    Texture::Texture(VulkanDevice& device, const std::vector<uint8_t>& data, uint32_t width,
-                     uint32_t height) : m_Device(device)
-    {
-        if (data.size() != width * height * 4)
-        {
-            Core::Log::Error("Texture data size mismatch!");
-            return;
-        }
-        Upload(data.data(), width, height);
-    }
-
-    Texture::Texture(VulkanDevice& device, uint32_t width, uint32_t height, VkFormat format)
-       : m_Device(device)
-    {
-        auto indices = m_Device.GetQueueIndices();
-        bool distinctQueues = false;
-
-        // Defensive check to avoid bad_optional_access
-        if (indices.GraphicsFamily.has_value() && indices.TransferFamily.has_value()) {
-            distinctQueues = (indices.GraphicsFamily.value() != indices.TransferFamily.value());
-        }
-
-        VkSharingMode sharingMode = distinctQueues ? VK_SHARING_MODE_CONCURRENT : VK_SHARING_MODE_EXCLUSIVE;
-
-        m_Image = std::make_unique<VulkanImage>(
-            m_Device, width, height, 1, format,
-            VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-            VK_IMAGE_ASPECT_COLOR_BIT,
-            sharingMode
-        );
-
-        CreateSampler();
-    }
-
-    Texture::~Texture()
-    {
-        if (m_Sampler)
-        {
-            VkDevice logicalDevice = m_Device.GetLogicalDevice();
-            VkSampler sampler = m_Sampler;
-
-            m_Device.SafeDestroy([logicalDevice, sampler]()
-            {
-                vkDestroySampler(logicalDevice, sampler, nullptr);
-            });
-        }
-    }
-
-    void Texture::CreateSampler()
+    static void CreateSampler(VulkanDevice& device, uint32_t mipLevels, VkSampler& outSampler)
     {
         VkSamplerCreateInfo samplerInfo{};
         samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -177,64 +29,69 @@ namespace RHI
         samplerInfo.anisotropyEnable = VK_TRUE;
 
         VkPhysicalDeviceProperties properties{};
-        vkGetPhysicalDeviceProperties(m_Device.GetPhysicalDevice(), &properties);
+        vkGetPhysicalDeviceProperties(device.GetPhysicalDevice(), &properties);
         samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
 
         samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
         samplerInfo.unnormalizedCoordinates = VK_FALSE;
         samplerInfo.compareEnable = VK_FALSE;
         samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-
         samplerInfo.minLod = 0.0f;
-        samplerInfo.maxLod = static_cast<float>(m_Image->GetMipLevels());
+        samplerInfo.maxLod = static_cast<float>(mipLevels);
 
-        if (vkCreateSampler(m_Device.GetLogicalDevice(), &samplerInfo, nullptr, &m_Sampler) != VK_SUCCESS)
+        if (vkCreateSampler(device.GetLogicalDevice(), &samplerInfo, nullptr, &outSampler) != VK_SUCCESS)
         {
             Core::Log::Error("Failed to create texture sampler!");
+            outSampler = VK_NULL_HANDLE;
         }
     }
 
-    void Texture::Upload(const void* data, uint32_t width, uint32_t height)
+    static std::unique_ptr<TextureGpuData> UploadTextureData(
+        VulkanDevice& device,
+        const void* pixels,
+        uint32_t width,
+        uint32_t height,
+        VkFormat format)
     {
-        uint32_t mipLevels = 1;
+        auto gpu = std::make_unique<TextureGpuData>();
 
-        VkDeviceSize imageSize = width * height * 4;
-
-        VulkanBuffer stagingBuffer(m_Device, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
-        std::memcpy(stagingBuffer.Map(), data, static_cast<size_t>(imageSize));
+        const VkDeviceSize imageSize = static_cast<VkDeviceSize>(width) * static_cast<VkDeviceSize>(height) * 4u;
+        VulkanBuffer stagingBuffer(device, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
+        std::memcpy(stagingBuffer.Map(), pixels, static_cast<size_t>(imageSize));
         stagingBuffer.Unmap();
 
-        m_Image = std::make_unique<VulkanImage>(
-            m_Device, width, height, mipLevels, VK_FORMAT_R8G8B8A8_SRGB,
-            VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, // Removed SRC_BIT as we aren't blitting
-            VK_IMAGE_ASPECT_COLOR_BIT
-        );
+        const uint32_t mipLevels = 1;
 
-        // Use BeginSingleTimeCommands / EndSingleTimeCommands for explicit control
-        VkCommandBuffer cmd = CommandUtils::BeginSingleTimeCommands(m_Device);
+        gpu->Image = std::make_unique<VulkanImage>(
+            device,
+            width,
+            height,
+            mipLevels,
+            format,
+            VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+            VK_IMAGE_ASPECT_COLOR_BIT);
 
-        // 1. Transition Undefined -> Transfer Dst
+        VkCommandBuffer cmd = CommandUtils::BeginSingleTimeCommands(device);
+
         VkImageMemoryBarrier barrier{};
         barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
         barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
         barrier.srcAccessMask = 0;
         barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        barrier.image = m_Image->GetHandle();
+        barrier.image = gpu->Image->GetHandle();
         barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, mipLevels, 0, 1};
 
         vkCmdPipelineBarrier(cmd,
                              VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
                              0, 0, nullptr, 0, nullptr, 1, &barrier);
 
-        // 2. Copy Buffer to Image
         VkBufferImageCopy region{};
         region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
         region.imageExtent = {width, height, 1};
-        vkCmdCopyBufferToImage(cmd, stagingBuffer.GetHandle(), m_Image->GetHandle(),
+        vkCmdCopyBufferToImage(cmd, stagingBuffer.GetHandle(), gpu->Image->GetHandle(),
                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
-        // 3. Transition Transfer Dst -> Shader Read Only
         VkImageMemoryBarrier readBarrier = barrier;
         readBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
         readBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -245,8 +102,148 @@ namespace RHI
                              VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
                              0, 0, nullptr, 0, nullptr, 1, &readBarrier);
 
-        CommandUtils::EndSingleTimeCommands(m_Device, cmd);
+        CommandUtils::EndSingleTimeCommands(device, cmd);
 
-        CreateSampler();
+        CreateSampler(device, mipLevels, gpu->Sampler);
+
+        return gpu;
+    }
+
+    Texture::Texture(TextureSystem& system, VulkanDevice& device, const std::string& filepath)
+        : m_System(&system), m_Device(&device)
+    {
+        int w = 0, h = 0, c = 0;
+        std::string fullPath = Core::Filesystem::GetAssetPath(filepath);
+        stbi_uc* pixels = stbi_load(fullPath.c_str(), &w, &h, &c, STBI_rgb_alpha);
+
+        if (!pixels || w <= 0 || h <= 0)
+        {
+            Core::Log::Error("Failed to load texture: {}", filepath);
+            uint32_t pink = 0xFF00FFFF;
+            auto gpu = UploadTextureData(device, &pink, 1, 1, VK_FORMAT_R8G8B8A8_SRGB);
+            if (pixels) stbi_image_free(pixels);
+            m_Handle = m_System->CreateFromData(std::move(gpu));
+            return;
+        }
+
+        auto gpu = UploadTextureData(device, pixels, static_cast<uint32_t>(w), static_cast<uint32_t>(h), VK_FORMAT_R8G8B8A8_SRGB);
+        stbi_image_free(pixels);
+
+        m_Handle = m_System->CreateFromData(std::move(gpu));
+    }
+
+    Texture::Texture(TextureSystem& system, VulkanDevice& device, const std::vector<uint8_t>& data,
+                     uint32_t width, uint32_t height, VkFormat format)
+        : m_System(&system), m_Device(&device)
+    {
+        if (data.size() != static_cast<size_t>(width) * static_cast<size_t>(height) * 4u)
+        {
+            Core::Log::Error("Texture data size mismatch!");
+            return;
+        }
+
+        auto gpu = UploadTextureData(device, data.data(), width, height, format);
+        m_Handle = m_System->CreateFromData(std::move(gpu));
+    }
+
+    Texture::Texture(TextureSystem& system, VulkanDevice& device, uint32_t width, uint32_t height, VkFormat format)
+        : m_System(&system), m_Device(&device)
+    {
+        auto gpu = std::make_unique<TextureGpuData>();
+
+        auto indices = device.GetQueueIndices();
+        bool distinctQueues = false;
+        if (indices.GraphicsFamily.has_value() && indices.TransferFamily.has_value())
+        {
+            distinctQueues = (indices.GraphicsFamily.value() != indices.TransferFamily.value());
+        }
+
+        VkSharingMode sharingMode = distinctQueues ? VK_SHARING_MODE_CONCURRENT : VK_SHARING_MODE_EXCLUSIVE;
+
+        gpu->Image = std::make_unique<VulkanImage>(
+            device, width, height, 1, format,
+            VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+            VK_IMAGE_ASPECT_COLOR_BIT,
+            sharingMode);
+
+        CreateSampler(device, gpu->Image->GetMipLevels(), gpu->Sampler);
+
+        m_Handle = m_System->CreateFromData(std::move(gpu));
+    }
+
+    Texture::~Texture()
+    {
+        if (!m_System || !m_Device || !m_Handle.IsValid())
+            return;
+
+        // Defer sampler destruction in the same way old Texture did.
+        // The pool stores TextureGpuData; we need to ensure VkSampler is destroyed safely.
+        // We do that by scheduling sampler destruction now and then removing the pool entry.
+        if (const TextureGpuData* data = m_System->Get(m_Handle))
+        {
+            if (data->Sampler)
+            {
+                VkDevice logicalDevice = m_Device->GetLogicalDevice();
+                VkSampler sampler = data->Sampler;
+                m_Device->SafeDestroy([logicalDevice, sampler]()
+                {
+                    vkDestroySampler(logicalDevice, sampler, nullptr);
+                });
+            }
+        }
+
+        m_System->Destroy(m_Handle);
+        m_Handle = {};
+        m_System = nullptr;
+        m_Device = nullptr;
+    }
+
+    Texture::Texture(Texture&& other) noexcept
+        : m_System(other.m_System)
+        , m_Device(other.m_Device)
+        , m_Handle(other.m_Handle)
+    {
+        other.m_System = nullptr;
+        other.m_Device = nullptr;
+        other.m_Handle = {};
+    }
+
+    Texture& Texture::operator=(Texture&& other) noexcept
+    {
+        if (this == &other) return *this;
+
+        // Release current
+        this->~Texture();
+
+        m_System = other.m_System;
+        m_Device = other.m_Device;
+        m_Handle = other.m_Handle;
+
+        other.m_System = nullptr;
+        other.m_Device = nullptr;
+        other.m_Handle = {};
+
+        return *this;
+    }
+
+    VkImage Texture::GetImage() const
+    {
+        if (!m_System || !m_Handle.IsValid()) return VK_NULL_HANDLE;
+        if (const auto* data = m_System->Get(m_Handle)) return data->Image->GetHandle();
+        return VK_NULL_HANDLE;
+    }
+
+    VkImageView Texture::GetView() const
+    {
+        if (!m_System || !m_Handle.IsValid()) return VK_NULL_HANDLE;
+        if (const auto* data = m_System->Get(m_Handle)) return data->Image->GetView();
+        return VK_NULL_HANDLE;
+    }
+
+    VkSampler Texture::GetSampler() const
+    {
+        if (!m_System || !m_Handle.IsValid()) return VK_NULL_HANDLE;
+        if (const auto* data = m_System->Get(m_Handle)) return data->Sampler;
+        return VK_NULL_HANDLE;
     }
 }

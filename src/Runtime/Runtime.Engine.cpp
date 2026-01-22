@@ -144,19 +144,17 @@ namespace Runtime
         // 3. Device
         m_Device = std::make_shared<RHI::VulkanDevice>(*m_Context, m_Surface);
 
-        // Create a default 1x1 texture early so user code (OnStart) and systems can safely reference it.
-        // OnStart() is called later from Engine::Run(), but apps often create Materials during OnStart.
-        // Those Materials register the default texture into the bindless system immediately, which
-        // requires a valid VkImageView.
+        // Bindless + TextureSystem
+        m_BindlessSystem = std::make_unique<RHI::BindlessDescriptorSystem>(*m_Device);
+        m_TextureSystem = std::make_unique<RHI::TextureSystem>(*m_Device, *m_BindlessSystem);
+
+        // Create and register an engine-owned default 1x1 white texture.
+        // Keep it alive for the lifetime of the engine so slots never go stale.
         {
             std::vector<uint8_t> whitePixel = {255, 255, 255, 255};
-            m_DefaultTexture = std::make_shared<RHI::Texture>(*m_Device, whitePixel, 1, 1);
+            m_DefaultTexture = std::make_shared<RHI::Texture>(*m_TextureSystem, *m_Device, whitePixel, 1, 1);
+            m_DefaultTextureIndex = m_DefaultTexture->GetBindlessIndex();
         }
-
-        // Bindless: reserve a stable slot for the default texture.
-        // Materials can use this index immediately and later update their slot when an async texture finishes.
-        m_BindlessSystem = std::make_unique<RHI::BindlessDescriptorSystem>(*m_Device);
-        m_DefaultTextureIndex = m_BindlessSystem->RegisterTexture(*m_DefaultTexture);
 
         // Initialize GeometryStorage with frames-in-flight for safe deferred deletion
         m_GeometryStorage.Initialize(m_Device->GetFramesInFlight());
@@ -185,6 +183,7 @@ namespace Runtime
         Core::Tasks::Scheduler::Shutdown();
         Core::Filesystem::FileWatcher::Shutdown();
 
+        // Destroy GPU systems first while device is still alive.
         m_RenderSystem.reset();
 
         Interface::GUI::Shutdown();
@@ -198,6 +197,18 @@ namespace Runtime
         // Clear geometry storage before pipeline/device destruction
         m_GeometryStorage.Clear();
 
+        // Critical: destroy any per-frame transient RHI objects (RenderGraph images, pass closures, etc.)
+        // while the VulkanDevice is still alive.
+        m_FrameScope.Reset();
+
+        // Ensure any deferred texture pool deletions are processed and the pool is cleared
+        // while the device is still valid and idle.
+        if (m_TextureSystem)
+        {
+            m_TextureSystem->ProcessDeletions();
+            m_TextureSystem->Clear();
+        }
+
         m_Pipeline.reset();
         m_PickPipeline.reset();
         m_BindlessSystem.reset();
@@ -206,6 +217,15 @@ namespace Runtime
         m_Renderer.reset();
         m_Swapchain.reset();
         m_TransferManager.reset();
+
+        // Destroy the texture system before the device.
+        m_TextureSystem.reset();
+
+        // Flush any remaining deferred SafeDestroy work now (must be done before VulkanDevice teardown).
+        if (m_Device)
+        {
+            m_Device->FlushAllDeletionQueues();
+        }
 
         m_Device.reset();
 
@@ -296,20 +316,22 @@ namespace Runtime
                     // --- Setup Material (Requires AssetManager) ---
                     // Define local loader lambda inside the main thread task
                     auto textureLoader = [this](const std::string& pathStr, Core::Assets::AssetHandle handle)
-                        -> std::unique_ptr<RHI::Texture>
+                        -> std::shared_ptr<RHI::Texture>
                     {
                         std::filesystem::path texPath(pathStr);
-                        auto result = Graphics::TextureLoader::LoadAsync(texPath, *GetDevice(), *m_TransferManager);
+                        auto result = Graphics::TextureLoader::LoadAsync(texPath, *GetDevice(), *m_TransferManager, *m_TextureSystem);
                         if (result)
                         {
+                            // This path currently creates a fully uploaded texture synchronously.
+                            // Keep the AssetManager state machine consistent.
                             m_AssetManager.MoveToProcessing(handle);
                             RegisterAssetLoad(handle, result->Token);
-                            return std::move(result->Resource);
+                            return std::move(result->Texture);
                         }
 
                         Core::Log::Warn("Texture load failed: {} ({})", pathStr,
                                         Graphics::AssetErrorToString(result.error()));
-                        return nullptr;
+                        return {};
                     };
 
                     // Load Default Texture
@@ -317,7 +339,7 @@ namespace Runtime
                         Core::Filesystem::GetAssetPath("textures/Parameterization.jpg"), textureLoader);
 
                     auto defaultMat = std::make_unique<Graphics::Material>(
-                        *GetDevice(), *m_BindlessSystem,
+                        *GetDevice(), *m_BindlessSystem, *m_TextureSystem,
                         texHandle, m_DefaultTextureIndex, m_AssetManager
                     );
 
@@ -525,6 +547,12 @@ namespace Runtime
                 ProcessUploads();
             }
 
+            // Reclaim pool slots for textures that became unreachable this frame.
+            if (m_TextureSystem)
+            {
+                m_TextureSystem->ProcessDeletions();
+            }
+
             {
                 PROFILE_SCOPE("OnUpdate");
                 // Update with variable dt for responsive input/camera
@@ -564,5 +592,9 @@ namespace Runtime
 
         Core::Tasks::Scheduler::WaitForAll();
         vkDeviceWaitIdle(m_Device->GetLogicalDevice());
+
+        // Final flush: destroy any RHI resources that were deferred via VulkanDevice::SafeDestroy().
+        // This is required because SafeDestroy is keyed off frame indices; at shutdown we want deterministic teardown.
+        m_Device->FlushAllDeletionQueues();
     }
 }

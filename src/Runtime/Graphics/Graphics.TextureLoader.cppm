@@ -8,14 +8,16 @@ export module Graphics:TextureLoader;
 import :AssetErrors;
 import RHI;
 
-export namespace Graphics {
-
-    struct TextureLoadResult {
-        std::unique_ptr<RHI::Texture> Resource;
+export namespace Graphics
+{
+    struct TextureLoadResult
+    {
+        std::shared_ptr<RHI::Texture> Texture;
         RHI::TransferToken Token;
     };
 
-    class TextureLoader {
+    class TextureLoader
+    {
     public:
         // Fallible operation (I/O + decode + GPU upload): return expected with a typed error.
         [[nodiscard]]
@@ -23,6 +25,7 @@ export namespace Graphics {
             const std::filesystem::path& filepath,
             RHI::VulkanDevice& device,
             RHI::TransferManager& transferManager,
+            RHI::TextureSystem& textureSystem,
             bool isSRGB = true);
     };
 }

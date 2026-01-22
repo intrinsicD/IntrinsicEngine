@@ -106,43 +106,39 @@ namespace RHI
         VK_CHECK(vkAllocateDescriptorSets(m_Device.GetLogicalDevice(), &allocInfo, &m_GlobalSet));
     }
 
-    uint32_t BindlessDescriptorSystem::RegisterTexture(const Texture& texture)
+    void BindlessDescriptorSystem::SetTexture(uint32_t index, const Texture& texture)
     {
-        uint32_t index;
-        {
-            std::lock_guard lock(m_Mutex);
-            if (!m_FreeSlots.empty())
-            {
-                index = m_FreeSlots.front();
-                m_FreeSlots.pop();
-            }
-            else
-            {
-                if (m_HighWaterMark >= m_MaxDescriptors)
-                {
-                    Core::Log::Error("Bindless Texture Limit Reached!");
-                    return 0; // Return dummy slot 0
-                }
-                index = m_HighWaterMark++;
-            }
-        }
-
-        UpdateTexture(index, texture);
-        return index;
+        UpdateTexture(index, texture.GetView(), texture.GetSampler(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     }
 
-    void BindlessDescriptorSystem::UpdateTexture(uint32_t index, const Texture& texture)
+    void BindlessDescriptorSystem::UpdateTexture(uint32_t index, VkImageView view, VkSampler sampler, VkImageLayout layout)
     {
+        if (index >= m_MaxDescriptors)
+        {
+            Core::Log::Error("Bindless update out of bounds: {} >= {}", index, m_MaxDescriptors);
+            return;
+        }
+
+        // Vulkan validation: writing VK_NULL_HANDLE into COMBINED_IMAGE_SAMPLER is illegal unless nullDescriptor is enabled.
+        // Our layout uses PARTIALLY_BOUND so *unused* descriptors can remain uninitialized, but we must avoid explicitly
+        // writing null handles.
+        if (view == VK_NULL_HANDLE || sampler == VK_NULL_HANDLE)
+        {
+            Core::Log::Warn("[Bindless] Ignoring UpdateTexture({}, view={}, sampler={}) - null handles are not writable without nullDescriptor.",
+                           index, static_cast<void*>(view), static_cast<void*>(sampler));
+            return;
+        }
+
         VkDescriptorImageInfo imageInfo{};
-        imageInfo.sampler = texture.GetSampler();
-        imageInfo.imageView = texture.GetView();
-        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        imageInfo.sampler = sampler;
+        imageInfo.imageView = view;
+        imageInfo.imageLayout = layout;
 
         VkWriteDescriptorSet descriptorWrite{};
         descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         descriptorWrite.dstSet = m_GlobalSet;
         descriptorWrite.dstBinding = 0;
-        descriptorWrite.dstArrayElement = index; // The magic index
+        descriptorWrite.dstArrayElement = index;
         descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         descriptorWrite.descriptorCount = 1;
         descriptorWrite.pImageInfo = &imageInfo;
@@ -152,12 +148,8 @@ namespace RHI
 
     void BindlessDescriptorSystem::UnregisterTexture(uint32_t index)
     {
-        // NOTE: SafeDestroy enqueues this functor to execute later on the device's deletion queue.
-        // This is safe because Engine destroys subsidiary systems (materials/bindless) before the device.
-        m_Device.SafeDestroy([this, index]()
-        {
-            std::lock_guard lock(m_Mutex);
-            m_FreeSlots.push(index);
-        });
+        // Do NOT write VK_NULL_HANDLE unless VK_EXT_robustness2/nullDescriptor is enabled.
+        // Higher-level code should keep a valid default bound for any potentially-sampled index.
+        if (index >= m_MaxDescriptors) return;
     }
 }
