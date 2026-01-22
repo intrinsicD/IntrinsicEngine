@@ -10,35 +10,35 @@ Built strictly on **C++23 Modules**, it features a **Vulkan 1.3** bindless rende
 
 ### 1. 🏗 Core Systems & Concurrency
 *   **C++23 Modular Design**: Strict interface boundaries using `.cppm` partitions and `std::expected` for monadic error handling.
-*   **Zero-Overhead Memory**: 
+*   **Zero-Overhead Memory**:
     *   `LinearArena`: O(1) monotonic frame allocators.
     *   `ScopeStack`: LIFO allocator with destructor support for complex per-frame objects.
-*   **Coroutine Task Scheduler**: 
+*   **Coroutine Task Scheduler**:
     *   Replaces traditional fibers with **C++20 `std::coroutine`**.
     *   Wait-free work-stealing queues.
     *   `Job` and `Yield()` support for cooperative multitasking.
-*   **Telemetry & Profiling**: 
+*   **Telemetry & Profiling**:
     *   Lock-free ring-buffered telemetry system.
     *   Real-time tracking of CPU frame times, draw calls, and triangle counts.
 
 ### 2. 📐 Geometry & Spatial Processing
 A "Distinguished Scientist" grade geometry kernel located in `Runtime.Geometry`:
 *   **Primitives**: Comprehensive support for Spheres, AABBs, OBBs, Capsules, Cylinders (with pre-computed basis), and Convex Hulls.
-*   **Intersection Solvers**: 
+*   **Intersection Solvers**:
     *   **Analytic**: Optimized SAT (Separating Axis Theorem) and algebraic solvers for primitive pairs.
     *   **GJK (Gilbert-Johnson-Keerthi)**: Generic convex collision detection fallback.
     *   **SDF (Signed Distance Fields)**: Contact manifold generation using gradient descent on SDFs.
-*   **Spatial Acceleration**: 
+*   **Spatial Acceleration**:
     *   **Linear Octree**: Cache-friendly spatial partitioning with configurable split strategies (Mean/Median/Center) and tight bounds.
     *   **Bounded Heaps**: For fast K-Nearest Neighbor (KNN) queries.
 
 ### 3. 🎨 Rendering (Vulkan 1.3)
 *   **Bindless Architecture**: Full `descriptor_indexing` support for bindless textures.
-*   **Frame Graph (Render Graph)**: 
+*   **Frame Graph (Render Graph)**:
     *   Automatic dependency tracking and barrier injection (Sync2).
     *   Transient resource aliasing (memory reuse).
     *   Lambda-based pass declaration (`AddPass<Data>(setup, execute)`).
-*   **Async Transfer System**: 
+*   **Async Transfer System**:
     *   **Staging Belt**: Persistent ring-buffer allocator for high-throughput CPU-to-GPU streaming (`RHI.StagingBelt`).
     *   Timeline Semaphore synchronization for async asset uploads.
 *   **Dynamic Rendering**: No `VkRenderPass` or `VkFramebuffer` objects; fully dynamic attachment binding.

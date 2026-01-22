@@ -397,7 +397,6 @@ namespace Runtime
                                RHI::ShaderStage::Fragment);
 
         RHI::VertexInputDescription inputLayout = {}; //Use Empty Input Layout now because of BDA
-        // RHI::VertexInputDescription inputLayout = RHI::StandardLayoutFactory::Get(); // Removed because were using BDA now
         RHI::PipelineBuilder builder(m_Device);
         builder.SetShaders(&vert, &frag);
         builder.SetInputLayout(inputLayout);
