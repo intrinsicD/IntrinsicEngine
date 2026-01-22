@@ -40,11 +40,12 @@ export namespace Geometry::Internal
 
     // --- GJK Configuration ---
     // Centralized constants for tuning collision detection algorithms
-    namespace Config {
-        constexpr float GJK_EPSILON = 1e-6f;           // Numerical tolerance for GJK convergence
-        constexpr int GJK_MAX_ITERATIONS = 64;         // Maximum iterations before giving up
-        constexpr float EPA_EPSILON = 1e-4f;           // Tolerance for EPA penetration depth
-        constexpr int EPA_MAX_ITERATIONS = 32;         // Maximum EPA iterations
+    namespace Config
+    {
+        constexpr float GJK_EPSILON = 1e-6f; // Numerical tolerance for GJK convergence
+        constexpr int GJK_MAX_ITERATIONS = 64; // Maximum iterations before giving up
+        constexpr float EPA_EPSILON = 1e-4f; // Tolerance for EPA penetration depth
+        constexpr int EPA_MAX_ITERATIONS = 32; // Maximum EPA iterations
     }
 
     // --- GJK IMPLEMENTATION (Boolean Overlap) ---
@@ -207,5 +208,24 @@ export namespace Geometry::Internal
                 return false;
             }
         }
+    }
+
+    template <typename A, typename B>
+    std::optional<Simplex> GJK_Intersection(const A& a, const B& b)
+    {
+        glm::vec3 support = MinkowskiDifference::Support(a, b, {1, 0, 0});
+        Simplex points;
+        points.Push(support);
+        glm::vec3 direction = -support;
+        int maxIterations = Config::GJK_MAX_ITERATIONS;
+
+        while (maxIterations-- > 0)
+        {
+            support = MinkowskiDifference::Support(a, b, direction);
+            if (glm::dot(support, direction) < 0) return std::nullopt;
+            points.Push(support);
+            if (NextSimplex(points, direction)) return points; // Return the simplex containing origin
+        }
+        return std::nullopt;
     }
 }

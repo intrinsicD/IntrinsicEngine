@@ -15,6 +15,7 @@ target_sources(${target_name}
         Geometry.ContactManifold.cppm
         Geometry.Containment.cppm
         Geometry.GJK.cppm
+        Geometry.EPA.cppm
         Geometry.Overlap.cppm
         Geometry.Primitives.cppm
         Geometry.Support.cppm
@@ -29,6 +30,7 @@ target_sources(${target_name}
         FILE_SET geometry_impl TYPE CXX_MODULES FILES
         Geometry.MeshUtils.cpp
         Geometry.Raycast.cpp
+        Geometry.EPA.cpp
 )
 
 target_include_directories(${target_name} PUBLIC .)

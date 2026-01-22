@@ -8,6 +8,7 @@ export module Geometry:Contact;
 
 import :Primitives;
 import :GJK; // Should contain GJK_EPA logic in full version
+import :EPA;
 import :Support;
 import Core;
 
@@ -198,7 +199,7 @@ export namespace Geometry
         // Small helper for fallback paths: best-effort world-space "center" estimation.
         // This must be cheap and constexpr-friendly; it shouldn't allocate.
         template <typename Shape>
-        [[nodiscard]] inline glm::vec3 CenterOf(const Shape& s)
+        [[nodiscard]]  glm::vec3 CenterOf(const Shape& s)
         {
             if constexpr (requires { s.Center; })
             {
@@ -237,36 +238,39 @@ export namespace Geometry
         template <typename A, typename B>
         std::optional<ContactManifold> Contact_Fallback(const A& a, const B& b)
         {
-            if (GJK_Boolean(a, b))
+            // Use GJK_Intersection to get the simplex
+            auto simplexOpt = Internal::GJK_Intersection(a, b);
+
+            if (simplexOpt)
             {
-                // TODO: Implement EPA (Expanding Polytope Algorithm) here.
-                // Returning dummy data is physically unstable.
-                // For now, log a warning to identify which objects are using this path.
-                Core::Log::Warn("Physics: GJK collision detected without EPA solver. Contact resolution will be wrong.");
+                // Collision Detected! Use EPA to resolve depth/normal.
+                auto epa = Internal::EPA_Solver(a, b, *simplexOpt);
+
+                if (epa)
+                {
+                    ContactManifold m;
+                    m.Normal = epa->Normal;
+                    m.PenetrationDepth = epa->Depth;
+
+                    // EPA gives us ContactPoint on A (roughly).
+                    // B = A + Normal * Depth
+                    m.ContactPointA = epa->ContactPoint;
+                    m.ContactPointB = m.ContactPointA + (m.Normal * m.PenetrationDepth);
+
+                    return m;
+                }
+
+                // Fallback if EPA fails (e.g. numerical instability or degenerate simplex)
+                // Use heuristic center-diff
+                Core::Log::Warn("Physics: GJK hit but EPA failed. Using heuristic fallback.");
 
                 ContactManifold m{};
-
-                // Best guess normal: direction from an estimated center of A to B.
                 glm::vec3 dir = CenterOf(b) - CenterOf(a);
                 if (glm::length2(dir) < 1e-10f) m.Normal = glm::vec3(0, 1, 0);
                 else m.Normal = glm::normalize(dir);
-
-                // Tiny placeholder depth to keep solvers from exploding.
                 m.PenetrationDepth = 0.001f;
-
-                // Slightly better than leaving points uninitialized: use support mapping.
-                // Convention: normal points from A to B.
-                if constexpr (requires { Support(a, -m.Normal); Support(b, m.Normal); })
-                {
-                    m.ContactPointA = Support(a, -m.Normal);
-                    m.ContactPointB = Support(b, m.Normal);
-                }
-                else
-                {
-                    m.ContactPointA = CenterOf(a);
-                    m.ContactPointB = CenterOf(b);
-                }
-
+                m.ContactPointA = Geometry::Support(a, m.Normal);
+                m.ContactPointB = Geometry::Support(b, -m.Normal);
                 return m;
             }
             return std::nullopt;
