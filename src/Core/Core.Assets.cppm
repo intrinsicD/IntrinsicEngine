@@ -3,6 +3,7 @@ module;
 #include <string>
 #include <filesystem>
 #include <memory>
+#include <span>
 #include <functional>
 #include <mutex>
 #include <shared_mutex>
@@ -275,6 +276,13 @@ export namespace Core::Assets
         // No-op if the asset doesn't have a reloader (e.g., runtime-created via Create).
         template <typename T>
         void ReloadAsset(AssetHandle handle);
+
+        // OPTIMIZATION: Batch Resolve
+        // Acquires the read lock ONCE, then resolves all handles.
+        // Result vector will correspond 1:1 to the input handles.
+        // Returns nullptr for any handle that is invalid, not loaded, or wrong type.
+        template <typename T>
+        void BatchResolve(std::span<const AssetHandle> handles, std::vector<T*>& outResults) const;
 
     private:
         entt::registry m_Registry;
@@ -627,5 +635,41 @@ export namespace Core::Assets
         }
 
         return std::unexpected(ErrorCode::AssetTypeMismatch);
+    }
+
+    template <typename T>
+    void AssetManager::BatchResolve(std::span<const AssetHandle> handles, std::vector<T*>& outResults) const
+    {
+        // 1. Acquire Shared Lock (Read-Only)
+        // This prevents the background thread from modifying the registry (e.g. finishing a load)
+        // while we are reading, ensuring iterator stability and data consistency.
+        std::shared_lock lock(m_Mutex);
+
+        // 2. Prepare Output
+        // We clear to ensure the indices match the input span exactly [0] -> [0]
+        outResults.clear();
+        outResults.reserve(handles.size());
+
+        // 3. Hot Loop
+        for (const auto& handle : handles)
+        {
+            T* result = nullptr;
+
+            // Logic mirrors TryGetFast, but we already hold the lock.
+            // 1. Validate Entity
+            if (handle.IsValid() && m_Registry.valid(handle.ID))
+            {
+                // 2. Check Payload
+                // Note: In our architecture, AssetPayload<T> is ONLY attached
+                // when the asset transitions to LoadState::Ready.
+                // Therefore, checking for component existence is sufficient validation.
+                if (auto* payload = m_Registry.try_get<AssetPayload<T>>(handle.ID))
+                {
+                    result = payload->Ptr;
+                }
+            }
+
+            outResults.push_back(result);
+        }
     }
 }

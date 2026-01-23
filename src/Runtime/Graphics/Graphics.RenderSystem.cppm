@@ -16,26 +16,34 @@ import :Passes.Picking;
 import :Passes.Forward;
 import :Passes.DebugView;
 import :Passes.ImGui;
+import :ShaderRegistry;
+import :PipelineLibrary;
 import Core;
 import ECS;
 
 export namespace Graphics
 {
+    struct RenderSystemConfig
+    {
+        // Future: MSAA settings, Shadow resolution, etc.
+    };
+
     class RenderSystem
     {
     public:
-        RenderSystem(std::shared_ptr<RHI::VulkanDevice> device,
+        RenderSystem(const RenderSystemConfig& config,
+                     std::shared_ptr<RHI::VulkanDevice> device,
                      RHI::VulkanSwapchain& swapchain,
                      RHI::SimpleRenderer& renderer,
                      RHI::BindlessDescriptorSystem& bindlessSystem,
                      RHI::DescriptorAllocator& descriptorPool,
                      RHI::DescriptorLayout& descriptorLayout,
-                     RHI::GraphicsPipeline& pipeline,
-                     RHI::GraphicsPipeline& pickPipeline,
+                     PipelineLibrary& pipelineLibrary,
+                     const ShaderRegistry& shaderRegistry,
                      Core::Memory::LinearArena& frameArena,
                      Core::Memory::ScopeStack& frameScope,
                      GeometryPool& geometryStorage,
-                     MaterialSystem &materialSystem);
+                     MaterialSystem& materialSystem);
         ~RenderSystem();
 
         void OnUpdate(ECS::Scene& scene, const CameraComponent& camera, Core::Assets::AssetManager& assetManager);
@@ -68,8 +76,13 @@ export namespace Graphics
         [[nodiscard]] const DebugViewState& GetDebugViewState() const { return m_DebugView; }
         void SetDebugViewSelectedResource(Core::Hash::StringID name) { m_DebugView.SelectedResource = name; }
         void SetDebugViewShowInViewport(bool show) { m_DebugView.ShowInViewport = show; }
+
     private:
+        RenderSystemConfig m_Config;
         size_t m_MinUboAlignment = 0;
+
+        const ShaderRegistry* m_ShaderRegistry = nullptr; // non-owning
+        PipelineLibrary* m_PipelineLibrary = nullptr; // non-owning
 
         // Ownership stays with the caller, but we avoid ref-count ops in hot code.
         std::shared_ptr<RHI::VulkanDevice> m_DeviceOwner;
@@ -78,8 +91,6 @@ export namespace Graphics
         RHI::VulkanSwapchain& m_Swapchain;
         RHI::SimpleRenderer& m_Renderer;
         RHI::BindlessDescriptorSystem& m_BindlessSystem;
-        RHI::GraphicsPipeline& m_Pipeline;
-        RHI::GraphicsPipeline& m_PickPipeline;
         VkDescriptorSet m_GlobalDescriptorSet = VK_NULL_HANDLE;
 
         std::unique_ptr<RHI::VulkanBuffer> m_GlobalUBO;

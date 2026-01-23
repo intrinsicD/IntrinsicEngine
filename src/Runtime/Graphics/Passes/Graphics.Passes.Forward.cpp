@@ -2,6 +2,7 @@ module;
 
 #include <algorithm>
 #include <vector>
+#include <unordered_map>
 #include <glm/glm.hpp>
 
 #include "RHI.Vulkan.hpp"
@@ -72,40 +73,73 @@ namespace Graphics::Passes
                                             ECS::Components::Transform::Component,
                                             ECS::MeshRenderer::Component>();
 
+                                        std::vector<Core::Assets::AssetHandle> batchHandles;
+                                        std::vector<Graphics::Material*> batchResults;
+                                        std::vector<size_t> entityToBatchIndex;
+                                        // Map entity iteration index to batch index
+
+                                        // We need a temporary structure to map back to the renderable component
+                                        struct ResolutionRequest
+                                        {
+                                            ECS::MeshRenderer::Component* Renderable;
+                                        };
+                                        std::vector<ResolutionRequest> requests;
+
+                                        // Pre-pass: Identify what needs resolving
+                                        for (auto [entity, transform, renderable] : view.each())
+                                        {
+                                            if (renderable.Geometry.IsValid() &&
+                                                !renderable.CachedMaterialHandle.IsValid() &&
+                                                renderable.Material.IsValid())
+                                            {
+                                                batchHandles.push_back(renderable.Material);
+                                                requests.push_back({&renderable});
+                                            }
+                                        }
+
+                                        // 2. Single Lock Batch Resolve
+                                        if (!batchHandles.empty())
+                                        {
+                                            // O(1) Lock Acquisition
+                                            ctx.AssetManager.BatchResolve<Graphics::Material>(
+                                                batchHandles, batchResults);
+
+                                            // 3. Update Components
+                                            for (size_t i = 0; i < requests.size(); ++i)
+                                            {
+                                                Graphics::Material* mat = batchResults[i];
+                                                if (mat)
+                                                {
+                                                    requests[i].Renderable->CachedMaterialHandle = mat->GetHandle();
+                                                }
+                                            }
+                                        }
+
                                         std::vector<RenderPacket> packets;
                                         packets.reserve(view.size_hint());
 
                                         for (auto [entity, transform, renderable] : view.each())
                                         {
+                                            // 1. Basic Geometry Validation
                                             if (!renderable.Geometry.IsValid()) continue;
 
-                                            // 1. Resolve Cache
-                                            if (!renderable.CachedMaterialHandle.IsValid())
-                                            {
-                                                if (renderable.Material.IsValid())
-                                                {
-                                                    // Slow path: Get wrapper -> Get Handle
-                                                    if (auto* mat = ctx.AssetManager.TryGet<Material>(
-                                                        renderable.Material))
-                                                    {
-                                                        renderable.CachedMaterialHandle = mat->GetHandle();
-                                                    }
-                                                }
-                                            }
-
+                                            // 2. Material Validation
+                                            // We rely entirely on the cached handle being updated in Phase 2.
                                             if (!renderable.CachedMaterialHandle.IsValid()) continue;
 
-                                            // 2. Fetch Data (O(1) Pool Lookup)
+                                            // 3. Fetch Material Data (O(1) Pool Lookup via StrongHandle)
                                             const auto* matData = ctx.MaterialSystem.GetData(
                                                 renderable.CachedMaterialHandle);
+
                                             if (!matData)
                                             {
-                                                // Handle stale cache (Asset reloaded/destroyed?)
+                                                // Handle stale cache: If MaterialSystem destroyed the material (e.g. unload),
+                                                // invalidate our cache so Phase 1 picks it up again next frame.
                                                 renderable.CachedMaterialHandle = {};
                                                 continue;
                                             }
 
-                                            // 3. Use Data
+                                            // 4. Build Packet
                                             uint32_t textureID = matData->AlbedoID;
                                             const bool isSelected = ctx.Scene.GetRegistry().all_of<
                                                 ECS::Components::Selection::SelectedTag>(entity);

@@ -22,6 +22,8 @@ import :Passes.Picking;
 import :Passes.Forward;
 import :Passes.DebugView;
 import :Passes.ImGui;
+import :ShaderRegistry;
+import :PipelineLibrary;
 
 import Core;
 import RHI;
@@ -41,25 +43,27 @@ namespace Graphics
         return originalSize;
     }
 
-    RenderSystem::RenderSystem(std::shared_ptr<RHI::VulkanDevice> device,
+    RenderSystem::RenderSystem(const RenderSystemConfig& config,
+                               std::shared_ptr<RHI::VulkanDevice> device,
                                RHI::VulkanSwapchain& swapchain,
                                RHI::SimpleRenderer& renderer,
                                RHI::BindlessDescriptorSystem& bindlessSystem,
                                RHI::DescriptorAllocator& descriptorPool,
                                RHI::DescriptorLayout& descriptorLayout,
-                               RHI::GraphicsPipeline& pipeline,
-                               RHI::GraphicsPipeline& pickPipeline,
+                               PipelineLibrary& pipelineLibrary,
+                               const ShaderRegistry& shaderRegistry,
                                Core::Memory::LinearArena& frameArena,
                                Core::Memory::ScopeStack& frameScope,
                                GeometryPool& geometryStorage,
                                MaterialSystem& materialSystem)
-        : m_DeviceOwner(std::move(device)),
+        : m_Config(config),
+          m_ShaderRegistry(&shaderRegistry),
+          m_PipelineLibrary(&pipelineLibrary),
+          m_DeviceOwner(std::move(device)),
           m_Device(m_DeviceOwner.get()),
           m_Swapchain(swapchain),
           m_Renderer(renderer),
           m_BindlessSystem(bindlessSystem),
-          m_Pipeline(pipeline),
-          m_PickPipeline(pickPipeline),
           m_RenderGraph(m_DeviceOwner, frameArena, frameScope),
           m_GeometryStorage(geometryStorage),
           m_MaterialSystem(materialSystem),
@@ -127,15 +131,16 @@ namespace Graphics
         // Create features
         m_PickingPass = std::make_unique<Passes::PickingPass>();
         m_PickingPass->Initialize(*m_Device, descriptorPool, descriptorLayout);
-        m_PickingPass->SetPipeline(&m_PickPipeline);
+        m_PickingPass->SetPipeline(&m_PipelineLibrary->GetOrDie(kPipeline_Picking));
         m_PickingPass->SetReadbackBuffers(m_PickReadbackBuffers);
 
         m_ForwardPass = std::make_unique<Passes::ForwardPass>();
         m_ForwardPass->Initialize(*m_Device, descriptorPool, descriptorLayout);
-        m_ForwardPass->SetPipeline(&m_Pipeline);
+        m_ForwardPass->SetPipeline(&m_PipelineLibrary->GetOrDie(kPipeline_Forward));
 
         m_DebugViewPass = std::make_unique<Passes::DebugViewPass>();
         m_DebugViewPass->Initialize(*m_Device, descriptorPool, descriptorLayout);
+        m_DebugViewPass->SetShaderRegistry(shaderRegistry);
 
         m_ImGuiPass = std::make_unique<Passes::ImGuiPass>();
         m_ImGuiPass->Initialize(*m_Device, descriptorPool, descriptorLayout);

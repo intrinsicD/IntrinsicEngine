@@ -12,7 +12,7 @@ export namespace RHI::CommandUtils
     struct ThreadRenderContext
     {
         VkCommandPool CommandPool = VK_NULL_HANDLE;
-        VulkanDevice* Owner = nullptr;
+        VulkanDevice* OwnerDevicePtr = nullptr;
     };
 
     // Returns a reference to the thread-local context
@@ -28,9 +28,9 @@ export namespace RHI::CommandUtils
         // Safety Check: Handle Engine Restart / Device Change
         // If the device instance changed (e.g. Engine restart), the old pool handle
         // in this thread_local storage is invalid (destroyed by the previous device).
-        if (ctx.Owner != &device) {
+        if (ctx.OwnerDevicePtr != &device) {
             ctx.CommandPool = VK_NULL_HANDLE;
-            ctx.Owner = nullptr;
+            ctx.OwnerDevicePtr = &device;
         }
 
         if (ctx.CommandPool == VK_NULL_HANDLE) {
@@ -39,8 +39,10 @@ export namespace RHI::CommandUtils
 
             poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
             poolInfo.queueFamilyIndex = device.GetQueueIndices().GraphicsFamily.value();
-            vkCreateCommandPool(device.GetLogicalDevice(), &poolInfo, nullptr, &ctx.CommandPool);
-            ctx.Owner = &device;
+
+            VK_CHECK(vkCreateCommandPool(device.GetLogicalDevice(), &poolInfo, nullptr, &ctx.CommandPool));
+
+            ctx.OwnerDevicePtr = &device;
             device.RegisterThreadLocalPool(ctx.CommandPool);
         }
 
@@ -51,18 +53,18 @@ export namespace RHI::CommandUtils
         allocInfo.commandBufferCount = 1;
 
         VkCommandBuffer commandBuffer;
-        vkAllocateCommandBuffers(device.GetLogicalDevice(), &allocInfo, &commandBuffer);
+        VK_CHECK(vkAllocateCommandBuffers(device.GetLogicalDevice(), &allocInfo, &commandBuffer));
 
         VkCommandBufferBeginInfo beginInfo{};
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
-        vkBeginCommandBuffer(commandBuffer, &beginInfo);
+        VK_CHECK(vkBeginCommandBuffer(commandBuffer, &beginInfo));
         return commandBuffer;
     }
 
     void EndSingleTimeCommands(VulkanDevice& device, VkCommandBuffer commandBuffer) {
-        vkEndCommandBuffer(commandBuffer);
+        VK_CHECK(vkEndCommandBuffer(commandBuffer));
 
         VkSubmitInfo submitInfo{};
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -73,14 +75,14 @@ export namespace RHI::CommandUtils
         VkFenceCreateInfo fenceInfo{};
         fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
         VkFence fence;
-        vkCreateFence(device.GetLogicalDevice(), &fenceInfo, nullptr, &fence);
+        VK_CHECK(vkCreateFence(device.GetLogicalDevice(), &fenceInfo, nullptr, &fence));
 
         // Submit
         VK_CHECK(device.SubmitToGraphicsQueue(submitInfo, fence));
 
         // Wait (Blocking!) - We keep this for compatibility with old code,
         // but new code should avoid calling this if possible.
-        vkWaitForFences(device.GetLogicalDevice(), 1, &fence, VK_TRUE, UINT64_MAX);
+        VK_CHECK(vkWaitForFences(device.GetLogicalDevice(), 1, &fence, VK_TRUE, UINT64_MAX));
         vkDestroyFence(device.GetLogicalDevice(), fence, nullptr);
 
         ThreadRenderContext& ctx = GetThreadContext();

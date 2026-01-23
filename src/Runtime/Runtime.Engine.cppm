@@ -57,10 +57,11 @@ export namespace Runtime
 
         std::unique_ptr<RHI::DescriptorLayout> m_DescriptorLayout;
         std::unique_ptr<RHI::DescriptorAllocator> m_DescriptorPool;
-        std::unique_ptr<RHI::GraphicsPipeline> m_Pipeline;
-        std::unique_ptr<RHI::GraphicsPipeline> m_PickPipeline;
         std::unique_ptr<RHI::BindlessDescriptorSystem> m_BindlessSystem;
         std::unique_ptr<RHI::TextureSystem> m_TextureSystem;
+
+        Graphics::ShaderRegistry m_ShaderRegistry;
+        std::unique_ptr<Graphics::PipelineLibrary> m_PipelineLibrary;
 
     public:
         // Protected access so Sandbox can manipulate Scene/Assets

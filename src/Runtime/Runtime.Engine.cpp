@@ -20,6 +20,8 @@ import Graphics;
 import ECS;
 import Interface;
 
+using namespace Core::Hash;
+
 namespace Runtime
 {
     entt::entity Engine::SpawnModel(Core::Assets::AssetHandle modelHandle,
@@ -185,6 +187,7 @@ namespace Runtime
 
         // Destroy GPU systems first while device is still alive.
         m_RenderSystem.reset();
+        m_PipelineLibrary.reset();
 
         Interface::GUI::Shutdown();
 
@@ -216,8 +219,6 @@ namespace Runtime
             m_TextureSystem->Clear();
         }
 
-        m_Pipeline.reset();
-        m_PickPipeline.reset();
         m_BindlessSystem.reset();
         m_DescriptorPool.reset();
         m_DescriptorLayout.reset();
@@ -424,87 +425,39 @@ namespace Runtime
         m_DescriptorPool = std::make_unique<RHI::DescriptorAllocator>(*m_Device);
 
         // ---------------------------------------------------------------------
-        // Main forward pipeline (Textured + BDA)
+        // Shader policy (data-driven)
         // ---------------------------------------------------------------------
-        RHI::ShaderModule vert(*m_Device, Core::Filesystem::GetShaderPath("shaders/triangle.vert.spv"),
-                               RHI::ShaderStage::Vertex);
-        RHI::ShaderModule frag(*m_Device, Core::Filesystem::GetShaderPath("shaders/triangle.frag.spv"),
-                               RHI::ShaderStage::Fragment);
-
-        RHI::VertexInputDescription inputLayout = {}; //Use Empty Input Layout now because of BDA
-        RHI::PipelineBuilder builder(m_Device);
-        builder.SetShaders(&vert, &frag);
-        builder.SetInputLayout(inputLayout);
-        builder.SetColorFormats({m_Swapchain->GetImageFormat()});
-        builder.SetDepthFormat(RHI::VulkanImage::FindDepthFormat(*m_Device));
-        builder.AddDescriptorSetLayout(m_DescriptorLayout->GetHandle());
-        builder.AddDescriptorSetLayout(m_BindlessSystem->GetLayout());
-
-        VkPushConstantRange pushConstant{};
-        pushConstant.offset = 0;
-        pushConstant.size = sizeof(RHI::MeshPushConstants);
-        pushConstant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-        builder.AddPushConstantRange(pushConstant);
-
-        auto pipelineResult = builder.Build();
-        if (pipelineResult)
-        {
-            m_Pipeline = std::move(*pipelineResult);
-            Core::Log::Info("Pipeline built successfully using Builder.");
-        }
-        else
-        {
-            Core::Log::Error("Failed to build pipeline: {}", (int)pipelineResult.error());
-            std::exit(1);
-        }
+        m_ShaderRegistry.Register("Forward.Vert"_id, "shaders/triangle.vert.spv");
+        m_ShaderRegistry.Register("Forward.Frag"_id, "shaders/triangle.frag.spv");
+        m_ShaderRegistry.Register("Picking.Vert"_id, "shaders/pick_id.vert.spv");
+        m_ShaderRegistry.Register("Picking.Frag"_id, "shaders/pick_id.frag.spv");
+        m_ShaderRegistry.Register("Debug.Vert"_id, "shaders/debug_view.vert.spv");
+        m_ShaderRegistry.Register("Debug.Frag"_id, "shaders/debug_view.frag.spv");
+        m_ShaderRegistry.Register("Debug.Comp"_id, "shaders/debug_view.comp.spv");
 
         // ---------------------------------------------------------------------
-        // GPU picking pipeline (ID buffer + BDA)
+        // Pipeline library (owns PSOs)
         // ---------------------------------------------------------------------
-        RHI::ShaderModule pickVert(*m_Device, Core::Filesystem::GetShaderPath("shaders/pick_id.vert.spv"),
-                                   RHI::ShaderStage::Vertex);
-        RHI::ShaderModule pickFrag(*m_Device, Core::Filesystem::GetShaderPath("shaders/pick_id.frag.spv"),
-                                   RHI::ShaderStage::Fragment);
+        m_PipelineLibrary = std::make_unique<Graphics::PipelineLibrary>(m_Device, *m_BindlessSystem, *m_DescriptorLayout);
+        m_PipelineLibrary->BuildDefaults(m_ShaderRegistry,
+                                         m_Swapchain->GetImageFormat(),
+                                         RHI::VulkanImage::FindDepthFormat(*m_Device));
 
-        RHI::PipelineBuilder pickBuilder(m_Device);
-        pickBuilder.SetShaders(&pickVert, &pickFrag);
-        pickBuilder.SetInputLayout(inputLayout); //Same here for BDA
-
-        // ID target is R32_UINT.
-        pickBuilder.SetColorFormats({VK_FORMAT_R32_UINT});
-        pickBuilder.SetDepthFormat(RHI::VulkanImage::FindDepthFormat(*m_Device));
-
-        // Only needs camera set 0 (no textures).
-        pickBuilder.AddDescriptorSetLayout(m_DescriptorLayout->GetHandle());
-
-        VkPushConstantRange pickPush{};
-        pickPush.offset = 0;
-        pickPush.size = sizeof(RHI::MeshPushConstants);
-        pickPush.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-        pickBuilder.AddPushConstantRange(pickPush);
-
-        auto pickPipelineResult = pickBuilder.Build();
-        if (pickPipelineResult)
-        {
-            m_PickPipeline = std::move(*pickPipelineResult);
-            Core::Log::Info("Pick pipeline built successfully.");
-        }
-        else
-        {
-            Core::Log::Error("Failed to build pick pipeline: {}", (int)pickPipelineResult.error());
-            std::exit(1);
-        }
-
+        // ---------------------------------------------------------------------
+        // RenderSystem (borrows PSOs via PipelineLibrary)
+        // ---------------------------------------------------------------------
         Core::Log::Info("About to create RenderSystem...");
+        Graphics::RenderSystemConfig rsConfig{};
         m_RenderSystem = std::make_unique<Graphics::RenderSystem>(
+            rsConfig,
             m_Device,
             *m_Swapchain,
             *m_Renderer,
             *m_BindlessSystem,
             *m_DescriptorPool,
             *m_DescriptorLayout,
-            *m_Pipeline,
-            *m_PickPipeline,
+            *m_PipelineLibrary,
+            m_ShaderRegistry,
             m_FrameArena,
             m_FrameScope,
             m_GeometryStorage,

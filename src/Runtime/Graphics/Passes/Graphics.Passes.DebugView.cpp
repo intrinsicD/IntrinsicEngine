@@ -8,6 +8,7 @@ module;
 module Graphics:Passes.DebugView.Impl;
 
 import :Passes.DebugView;
+import :ShaderRegistry;
 import Core;
 import RHI;
 
@@ -19,6 +20,17 @@ namespace Graphics::Passes
     {
         if (r != VK_SUCCESS)
             Core::Log::Error("DebugView: {} failed (VkResult={})", what, (int)r);
+    }
+
+    static std::string ResolveShaderPathOrExit(const ShaderRegistry& registry, Core::Hash::StringID name)
+    {
+        auto path = registry.Get(name);
+        if (!path)
+        {
+            Core::Log::Error("CRITICAL: Missing shader configuration for ID: 0x{:08X}", name.Value);
+            std::exit(-1);
+        }
+        return Core::Filesystem::GetShaderPath(*path);
     }
 
     void DebugViewPass::Initialize(RHI::VulkanDevice& device,
@@ -163,10 +175,17 @@ namespace Graphics::Passes
         // Lazy pipeline build once we know swapchain format.
         if (!m_Pipeline)
         {
-            RHI::ShaderModule vert(*m_Device, Core::Filesystem::GetShaderPath("shaders/debug_view.vert.spv"),
-                                   RHI::ShaderStage::Vertex);
-            RHI::ShaderModule frag(*m_Device, Core::Filesystem::GetShaderPath("shaders/debug_view.frag.spv"),
-                                   RHI::ShaderStage::Fragment);
+            if (!m_ShaderRegistry)
+            {
+                Core::Log::Error("DebugView: ShaderRegistry not configured.");
+                std::exit(-1);
+            }
+
+            const std::string vertPath = ResolveShaderPathOrExit(*m_ShaderRegistry, "Debug.Vert"_id);
+            const std::string fragPath = ResolveShaderPathOrExit(*m_ShaderRegistry, "Debug.Frag"_id);
+
+            RHI::ShaderModule vert(*m_Device, vertPath, RHI::ShaderStage::Vertex);
+            RHI::ShaderModule frag(*m_Device, fragPath, RHI::ShaderStage::Fragment);
 
             // PipelineBuilder API takes std::shared_ptr<VulkanDevice>. We don't own the device here.
             // Use an aliasing shared_ptr with a no-op deleter to satisfy the API without changing ownership.
