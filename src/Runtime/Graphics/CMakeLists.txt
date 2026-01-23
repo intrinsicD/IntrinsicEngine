@@ -13,6 +13,7 @@ target_sources(${target_name}
         Graphics.Camera.cppm
         Graphics.Geometry.cppm
         Graphics.Material.cppm
+        Graphics.MaterialSystem.cppm
         Graphics.Model.cppm
         Graphics.RenderSystem.cppm
         Graphics.RenderGraph.cppm
@@ -33,6 +34,7 @@ target_sources(${target_name}
         Graphics.Camera.cpp
         Graphics.Geometry.cpp
         Graphics.Material.cpp
+        Graphics.MaterialSystem.cpp
         Graphics.RenderSystem.cpp
         Graphics.RenderGraph.cpp
         Graphics.ModelLoader.cpp

@@ -18,9 +18,9 @@ TEST(Geometry, CpuDataToRequest)
     using namespace Graphics;
 
     GeometryCpuData cpu;
-    cpu.Positions = {{0,0,0}, {1,1,1}};
-    cpu.Normals = {{0,1,0}, {0,1,0}};
-    cpu.Aux = {{0,0,0,0}, {1,1,0,0}};
+    cpu.Positions = {{0, 0, 0}, {1, 1, 1}};
+    cpu.Normals = {{0, 1, 0}, {0, 1, 0}};
+    cpu.Aux = {{0, 0, 0, 0}, {1, 1, 0, 0}};
     cpu.Indices = {0, 1};
 
     auto req = cpu.ToUploadRequest();
@@ -83,40 +83,57 @@ namespace
             {0.0f, 1.0f, 0.0f},
         };
 
-        for (int i = 0; i < 3; ++i)
+        for (auto i : v)
         {
-            WriteScalar(f, v[i][0], littleEndian);
-            WriteScalar(f, v[i][1], littleEndian);
-            WriteScalar(f, v[i][2], littleEndian);
+            WriteScalar(f, i[0], littleEndian);
+            WriteScalar(f, i[1], littleEndian);
+            WriteScalar(f, i[2], littleEndian);
         }
 
         // face: list count + indices
-        const uint8_t count = 3;
+        constexpr uint8_t count = 3;
         WriteScalar(f, count, littleEndian);
-        const int32_t idx[3] = {0, 1, 2};
+        constexpr int32_t idx[3] = {0, 1, 2};
         WriteScalar(f, idx[0], littleEndian);
         WriteScalar(f, idx[1], littleEndian);
         WriteScalar(f, idx[2], littleEndian);
     }
 
-    static void WriteI32LE(std::ofstream& f, int32_t v) { f.write(reinterpret_cast<const char*>(&v), sizeof(v)); }
-    static void WriteF32LE(std::ofstream& f, float v) { f.write(reinterpret_cast<const char*>(&v), sizeof(v)); }
+    void WriteI32LE(std::ofstream& f, int32_t v) { f.write(reinterpret_cast<const char*>(&v), sizeof(v)); }
+    void WriteF32LE(std::ofstream& f, float v) { f.write(reinterpret_cast<const char*>(&v), sizeof(v)); }
 
     // Minimal tristrips triangulation: matches engine logic (alternating winding, -1 restarts).
-    static std::vector<uint32_t> TriangulateTriStrip(const std::vector<int32_t>& idx)
+    std::vector<uint32_t> TriangulateTriStrip(const std::vector<int32_t>& idx)
     {
         std::vector<uint32_t> out;
         int32_t a = -1, b = -1;
         bool parity = false;
 
-        auto reset = [&]() { a = -1; b = -1; parity = false; };
+        auto reset = [&]()
+        {
+            a = -1;
+            b = -1;
+            parity = false;
+        };
         reset();
 
         for (int32_t v : idx)
         {
-            if (v < 0) { reset(); continue; }
-            if (a < 0) { a = v; continue; }
-            if (b < 0) { b = v; continue; }
+            if (v < 0)
+            {
+                reset();
+                continue;
+            }
+            if (a < 0)
+            {
+                a = v;
+                continue;
+            }
+            if (b < 0)
+            {
+                b = v;
+                continue;
+            }
 
             const int32_t c = v;
             if (a != b && b != c && a != c)
@@ -147,7 +164,7 @@ namespace
     // - vertex element: float x y z
     // - tristrips element: list int int vertex_indices
     // It returns the triangulated index buffer.
-    static std::vector<uint32_t> LoadTestTristripsPLY(const std::string& path)
+    std::vector<uint32_t> LoadTestTristripsPLY(const std::string& path)
     {
         std::ifstream f(path, std::ios::binary);
         EXPECT_TRUE(f.is_open());
@@ -163,16 +180,16 @@ namespace
 
             if (line.rfind("element vertex ", 0) == 0)
             {
-                vcount = (size_t)std::stoul(line.substr(std::string("element vertex ").size()));
+                vcount = std::stoul(line.substr(std::string("element vertex ").size()));
             }
             else if (line.rfind("element tristrips ", 0) == 0)
             {
-                tscount = (size_t)std::stoul(line.substr(std::string("element tristrips ").size()));
+                tscount = std::stoul(line.substr(std::string("element tristrips ").size()));
             }
         }
 
         // skip vertices (x y z floats)
-        f.seekg((std::streamoff)(vcount * 12), std::ios_base::cur);
+        f.seekg(static_cast<std::streamoff>(vcount * 12), std::ios_base::cur);
 
         std::vector<uint32_t> out;
         for (size_t s = 0; s < tscount; ++s)
@@ -181,8 +198,8 @@ namespace
             f.read(reinterpret_cast<char*>(&count), sizeof(count));
             EXPECT_GT(count, 0);
 
-            std::vector<int32_t> idx((size_t)count);
-            f.read(reinterpret_cast<char*>(idx.data()), (std::streamsize)(idx.size() * sizeof(int32_t)));
+            std::vector<int32_t> idx(static_cast<size_t>(count));
+            f.read(reinterpret_cast<char*>(idx.data()), static_cast<std::streamsize>(idx.size() * sizeof(int32_t)));
 
             auto tri = TriangulateTriStrip(idx);
             out.insert(out.end(), tri.begin(), tri.end());
@@ -199,9 +216,11 @@ namespace
         std::memcpy(bytes.data(), &v, sizeof(T));
         if constexpr (sizeof(T) > 1)
         {
-            const bool hostLittle = (std::endian::native == std::endian::little);
+            constexpr bool hostLittle = (std::endian::native == std::endian::little);
             if (!hostLittle)
+            {
                 std::reverse(bytes.begin(), bytes.end());
+            }
         }
         f.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
     }
@@ -282,10 +301,18 @@ TEST(ModelLoaderPLY, TriStripsRestartAndWinding)
     f << "end_header\n";
 
     // 4 vertices
-    WriteF32LE(f, 0.0f); WriteF32LE(f, 0.0f); WriteF32LE(f, 0.0f);
-    WriteF32LE(f, 1.0f); WriteF32LE(f, 0.0f); WriteF32LE(f, 0.0f);
-    WriteF32LE(f, 0.0f); WriteF32LE(f, 1.0f); WriteF32LE(f, 0.0f);
-    WriteF32LE(f, 1.0f); WriteF32LE(f, 1.0f); WriteF32LE(f, 0.0f);
+    WriteF32LE(f, 0.0f);
+    WriteF32LE(f, 0.0f);
+    WriteF32LE(f, 0.0f);
+    WriteF32LE(f, 1.0f);
+    WriteF32LE(f, 0.0f);
+    WriteF32LE(f, 0.0f);
+    WriteF32LE(f, 0.0f);
+    WriteF32LE(f, 1.0f);
+    WriteF32LE(f, 0.0f);
+    WriteF32LE(f, 1.0f);
+    WriteF32LE(f, 1.0f);
+    WriteF32LE(f, 0.0f);
 
     // One strip list with a restart: [0 1 2 3 -1 0 2 3]
     // First segment (0,1,2,3) => tris: (0,1,2) and (2,1,3)
@@ -379,22 +406,20 @@ TEST(ModelLoaderPLY, VCGLIB_RGBA_Radius_Face0_DoesNotCrash)
 TEST(GraphicsMaterial, ConstructorSignature_NoSharedPtrTexture)
 {
     static_assert(std::is_constructible_v<Graphics::Material,
-                                         RHI::VulkanDevice&,
-                                         RHI::BindlessDescriptorSystem&,
-                                         RHI::TextureSystem&,
-                                         Core::Assets::AssetHandle,
-                                         uint32_t,
-                                         Core::Assets::AssetManager&>);
+                                          RHI::VulkanDevice&,
+                                          Core::Assets::AssetHandle,
+                                          uint32_t,
+                                          Core::Assets::AssetManager&>);
 
     static_assert(std::is_destructible_v<Graphics::Material>);
 
     static_assert(!std::is_constructible_v<Graphics::Material,
-                                          RHI::VulkanDevice&,
-                                          RHI::BindlessDescriptorSystem&,
-                                          RHI::TextureSystem&,
-                                          Core::Assets::AssetHandle,
-                                          std::shared_ptr<RHI::Texture>,
-                                          Core::Assets::AssetManager&>);
+                                           RHI::VulkanDevice&,
+                                           RHI::BindlessDescriptorSystem&,
+                                           RHI::TextureSystem&,
+                                           Core::Assets::AssetHandle,
+                                           std::shared_ptr<RHI::Texture>,
+                                           Core::Assets::AssetManager&>);
 }
 
 TEST(GraphicsMaterial, ConstructorTakesDeviceByRef)
@@ -402,20 +427,18 @@ TEST(GraphicsMaterial, ConstructorTakesDeviceByRef)
     using namespace Graphics;
 
     static_assert(std::is_constructible_v<Material,
-        RHI::VulkanDevice&,
-        RHI::BindlessDescriptorSystem&,
-        RHI::TextureSystem&,
-        Core::Assets::AssetHandle,
-        uint32_t,
-        Core::Assets::AssetManager&>);
+                                          RHI::VulkanDevice&,
+                                          Core::Assets::AssetHandle,
+                                          uint32_t,
+                                          Core::Assets::AssetManager&>);
 
     static_assert(!std::is_constructible_v<Material,
-        std::shared_ptr<RHI::VulkanDevice>,
-        RHI::BindlessDescriptorSystem&,
-        RHI::TextureSystem&,
-        Core::Assets::AssetHandle,
-        uint32_t,
-        Core::Assets::AssetManager&>);
+                                           std::shared_ptr<RHI::VulkanDevice>,
+                                           RHI::BindlessDescriptorSystem&,
+                                           RHI::TextureSystem&,
+                                           Core::Assets::AssetHandle,
+                                           uint32_t,
+                                           Core::Assets::AssetManager&>);
 
     SUCCEED();
 }

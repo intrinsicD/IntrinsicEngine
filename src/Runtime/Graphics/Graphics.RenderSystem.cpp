@@ -51,7 +51,8 @@ namespace Graphics
                                RHI::GraphicsPipeline& pickPipeline,
                                Core::Memory::LinearArena& frameArena,
                                Core::Memory::ScopeStack& frameScope,
-                               GeometryPool& geometryStorage)
+                               GeometryPool& geometryStorage,
+                               MaterialSystem& materialSystem)
         : m_DeviceOwner(std::move(device)),
           m_Device(m_DeviceOwner.get()),
           m_Swapchain(swapchain),
@@ -61,6 +62,7 @@ namespace Graphics
           m_PickPipeline(pickPipeline),
           m_RenderGraph(m_DeviceOwner, frameArena, frameScope),
           m_GeometryStorage(geometryStorage),
+          m_MaterialSystem(materialSystem),
           m_DescriptorPool(descriptorPool)
     {
         m_DepthImages.resize(renderer.GetFramesInFlight());
@@ -356,6 +358,7 @@ namespace Graphics
             scene,
             assetManager,
             m_GeometryStorage,
+            m_MaterialSystem,
             frameIndex,
             extent,
             imageIndex,

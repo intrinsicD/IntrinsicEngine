@@ -77,20 +77,36 @@ namespace Graphics::Passes
 
                                         for (auto [entity, transform, renderable] : view.each())
                                         {
-                                            if (!renderable.Geometry.IsValid() || !renderable.Material.IsValid())
-                                                continue;
+                                            if (!renderable.Geometry.IsValid()) continue;
 
-                                            if (renderable.Material != renderable.CachedMaterialHandle || renderable.
-                                                TextureID_Cache == ~0u)
+                                            // 1. Resolve Cache
+                                            if (!renderable.CachedMaterialHandle.IsValid())
                                             {
-                                                const Material* mat = ctx.AssetManager.TryGetFast<Material>(
-                                                    renderable.Material);
-                                                if (!mat) continue;
-                                                renderable.TextureID_Cache = mat->GetTextureIndex();
-                                                renderable.CachedMaterialHandle = renderable.Material;
+                                                if (renderable.Material.IsValid())
+                                                {
+                                                    // Slow path: Get wrapper -> Get Handle
+                                                    if (auto* mat = ctx.AssetManager.TryGet<Material>(
+                                                        renderable.Material))
+                                                    {
+                                                        renderable.CachedMaterialHandle = mat->GetHandle();
+                                                    }
+                                                }
                                             }
 
-                                            const uint32_t textureID = renderable.TextureID_Cache;
+                                            if (!renderable.CachedMaterialHandle.IsValid()) continue;
+
+                                            // 2. Fetch Data (O(1) Pool Lookup)
+                                            const auto* matData = ctx.MaterialSystem.GetData(
+                                                renderable.CachedMaterialHandle);
+                                            if (!matData)
+                                            {
+                                                // Handle stale cache (Asset reloaded/destroyed?)
+                                                renderable.CachedMaterialHandle = {};
+                                                continue;
+                                            }
+
+                                            // 3. Use Data
+                                            uint32_t textureID = matData->AlbedoID;
                                             const bool isSelected = ctx.Scene.GetRegistry().all_of<
                                                 ECS::Components::Selection::SelectedTag>(entity);
 

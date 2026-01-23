@@ -1,40 +1,52 @@
+// src/Runtime/Graphics/Graphics.Material.cpp
 module;
-#include "RHI.Vulkan.hpp"
-#include <memory>
+#include <utility>
 
 module Graphics:Material.Impl;
 import :Material;
-import Core;
+import :MaterialSystem;
 
-namespace Graphics {
-
-    Material::Material(RHI::VulkanDevice& device,
-                       Core::Assets::AssetHandle textureHandle,
-                       uint32_t defaultTextureIndex,
-                       Core::Assets::AssetManager& assetManager)
-        : m_Device(device)
-        , m_TextureHandle(textureHandle)
-        , m_TextureIndex(defaultTextureIndex)
+namespace Graphics
+{
+    Material::Material(MaterialSystem& system, const MaterialData& initialData)
+        : m_System(&system)
     {
-        // 1. Initial Setup: If texture is already loaded, grab its index immediately
-        if (auto* tex = assetManager.TryGetFast<RHI::Texture>(textureHandle)) {
-            m_TextureIndex = tex->GetBindlessIndex();
-        }
-
-        // 2. Listener: Update index when asset loads/reloads
-        assetManager.Listen(textureHandle, [this, &assetManager](Core::Assets::AssetHandle handle)
-        {
-            if (auto* tex = assetManager.TryGetFast<RHI::Texture>(handle))
-            {
-                // ATOMIC UPDATE: Just swap the integer index.
-                // The TextureSystem already ensured the descriptor at this index is valid.
-                m_TextureIndex = tex->GetBindlessIndex();
-            }
-        });
+        m_Handle = m_System->Create(initialData);
     }
 
     Material::~Material()
     {
+        if (m_System && m_Handle.IsValid())
+        {
+            m_System->Destroy(m_Handle);
+        }
+    }
 
+    Material::Material(Material&& other) noexcept
+        : m_System(other.m_System), m_Handle(other.m_Handle)
+    {
+        other.m_System = nullptr;
+        other.m_Handle = {};
+    }
+
+    Material& Material::operator=(Material&& other) noexcept
+    {
+        if (this != &other)
+        {
+            if (m_System && m_Handle.IsValid()) m_System->Destroy(m_Handle);
+            m_System = other.m_System;
+            m_Handle = other.m_Handle;
+            other.m_System = nullptr;
+            other.m_Handle = {};
+        }
+        return *this;
+    }
+
+    void Material::SetAlbedoTexture(Core::Assets::AssetHandle textureAsset)
+    {
+        if (m_System && m_Handle.IsValid())
+        {
+            m_System->SetAlbedoAsset(m_Handle, textureAsset);
+        }
     }
 }

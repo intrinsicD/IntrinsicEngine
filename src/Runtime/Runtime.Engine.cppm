@@ -70,7 +70,7 @@ export namespace Runtime
         Core::Memory::ScopeStack m_FrameScope; // per-frame scope allocator with destructors
         Graphics::GeometryPool m_GeometryStorage;
         std::unique_ptr<Graphics::RenderSystem> m_RenderSystem;
-
+        std::unique_ptr<Graphics::MaterialSystem> m_MaterialSystem;
         // Engine-owned selection controller (Editor-like single selection).
         SelectionModule m_Selection;
 

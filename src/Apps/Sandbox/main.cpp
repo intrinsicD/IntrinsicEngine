@@ -60,7 +60,7 @@ public:
         auto textureLoader = [this](const std::filesystem::path& path, Core::Assets::AssetHandle handle)
             -> std::shared_ptr<RHI::Texture>
         {
-            auto result = Graphics::TextureLoader::LoadAsync(path, *GetDevice(), *m_TransferManager, *m_TextureSystem);
+            auto result = Graphics::TextureLoader::LoadAsync(path, *GetDevice(), *m_TextureSystem);
 
             if (result)
             {
@@ -103,12 +103,18 @@ public:
 
 
         // 3. Setup Material (Assuming texture loads synchronously or is handled)
+        Graphics::MaterialData matData;
+        matData.AlbedoID = m_DefaultTextureIndex; // Fallback until loaded
+        matData.RoughnessFactor = 1.0f;
+        matData.MetallicFactor = 0.0f;
+
         auto DuckMaterial = std::make_unique<Graphics::Material>(
-            *GetDevice(),
-            m_DuckTexture,
-            m_DefaultTextureIndex,
-            m_AssetManager
+            *m_MaterialSystem,
+            matData
         );
+
+        // Link the texture asset to the material (this registers the listener)
+        DuckMaterial->SetAlbedoTexture(m_DuckTexture);
 
         // Track handle only; AssetManager owns the actual Material object.
         m_DuckMaterialHandle = m_AssetManager.Create("DuckMaterial", std::move(DuckMaterial));

@@ -18,8 +18,7 @@ export namespace ECS::MeshRenderer
 
         // --- Render Cache ---
         // Allows RenderSystem to avoid AssetManager lookups once resolved.
-        Core::Assets::AssetHandle CachedMaterialHandle = {};
-        uint32_t TextureID_Cache = ~0u; // ~0u indicates invalid/uninitialized
+        Graphics::MaterialHandle CachedMaterialHandle = {};
     };
 }
 

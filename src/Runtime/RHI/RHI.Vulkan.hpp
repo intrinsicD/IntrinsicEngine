@@ -22,7 +22,7 @@
         do {                                                                         \
             VkResult result = x;                                                     \
             if (result != VK_SUCCESS) {                                              \
-                Core::Log::Error("Vulkan Error: {} failed with result {} at {}:{}",  \
+                Core::Log::Error("(Check) Vulkan Error: {} failed with result {} at {}:{}",  \
                     #x, (int)result, __FILE__, __LINE__);                            \
                 std::abort();                                                        \
             }                                                                        \

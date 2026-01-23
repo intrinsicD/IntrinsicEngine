@@ -34,7 +34,8 @@ export namespace Graphics
                      RHI::GraphicsPipeline& pickPipeline,
                      Core::Memory::LinearArena& frameArena,
                      Core::Memory::ScopeStack& frameScope,
-                     GeometryPool& geometryStorage);
+                     GeometryPool& geometryStorage,
+                     MaterialSystem &materialSystem);
         ~RenderSystem();
 
         void OnUpdate(ECS::Scene& scene, const CameraComponent& camera, Core::Assets::AssetManager& assetManager);
@@ -57,7 +58,7 @@ export namespace Graphics
         struct DebugViewState
         {
             bool Enabled = false;
-            Core::Hash::StringID SelectedResource = Core::Hash::StringID("PickID");
+            StringID SelectedResource = StringID("PickID");
             ResourceID SelectedResourceId = kInvalidResource;
             bool ShowInViewport = false;
             float DepthNear = 0.1f;
@@ -85,6 +86,7 @@ export namespace Graphics
 
         RenderGraph m_RenderGraph;
         GeometryPool& m_GeometryStorage;
+        MaterialSystem& m_MaterialSystem;
 
         std::vector<std::unique_ptr<RHI::VulkanImage>> m_DepthImages;
 

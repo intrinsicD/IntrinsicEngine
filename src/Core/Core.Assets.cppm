@@ -235,7 +235,7 @@ export namespace Core::Assets
         // Returns nullptr if not loaded/ready, invalid handle, or wrong type.
         // Intentionally does not return error codes to minimize overhead.
         template <typename T>
-        [[nodiscard]] T* TryGet(AssetHandle handle);
+        [[nodiscard]] T* TryGet(AssetHandle handle) const;
 
         template <typename T>
        [[nodiscard]] T* TryGetFast(AssetHandle handle) const
@@ -524,7 +524,7 @@ export namespace Core::Assets
     }
 
     template <typename T>
-    T* AssetManager::TryGet(AssetHandle handle)
+    T* AssetManager::TryGet(AssetHandle handle) const
     {
         std::shared_lock lock(m_Mutex);
         if (!m_Registry.valid(handle.ID)) return nullptr;

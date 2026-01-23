@@ -24,7 +24,6 @@ export namespace Graphics
         static std::expected<TextureLoadResult, AssetError> LoadAsync(
             const std::filesystem::path& filepath,
             RHI::VulkanDevice& device,
-            RHI::TransferManager& transferManager,
             RHI::TextureSystem& textureSystem,
             bool isSRGB = true);
     };

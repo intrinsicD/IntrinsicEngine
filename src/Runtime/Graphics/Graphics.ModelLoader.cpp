@@ -532,20 +532,6 @@ namespace Graphics
             return best;
         }
 
-        [[nodiscard]] bool IsConnectivityElementName(std::string_view nameLower)
-        {
-            return nameLower == "face" || nameLower == "tristrips";
-        }
-
-        [[nodiscard]] bool PlyElementHasListProperty(const PlyElement& elem)
-        {
-            for (const auto& p : elem.Properties)
-            {
-                if (p.IsList) return true;
-            }
-            return false;
-        }
-
         struct TriStripState
         {
             std::array<int64_t, 2> Prev = { -1, -1 };

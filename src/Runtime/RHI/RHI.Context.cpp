@@ -27,15 +27,15 @@ namespace RHI
         // Filter out noisy verbose messages if needed
         if (severity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
         {
-            Core::Log::Error("[Vulkan Error]: {}", pCallbackData->pMessage);
+            Core::Log::Error("[(Context) Vulkan Error]: {}", pCallbackData->pMessage);
         }
         else if (severity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
         {
-            Core::Log::Warn("[Vulkan Validation]: {}", pCallbackData->pMessage);
+            Core::Log::Warn("[(Context) Vulkan Validation]: {}", pCallbackData->pMessage);
         }
         /*else
         {
-            Core::Log::Info("[Vulkan Info]: {}", pCallbackData->pMessage);
+            Core::Log::Info("[(Context) Vulkan Info]: {}", pCallbackData->pMessage);
         }*/
         return VK_FALSE;
     }

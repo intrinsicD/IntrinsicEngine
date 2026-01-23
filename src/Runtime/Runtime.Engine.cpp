@@ -147,7 +147,7 @@ namespace Runtime
         // Bindless + TextureSystem
         m_BindlessSystem = std::make_unique<RHI::BindlessDescriptorSystem>(*m_Device);
         m_TextureSystem = std::make_unique<RHI::TextureSystem>(*m_Device, *m_BindlessSystem);
-
+        m_MaterialSystem = std::make_unique<Graphics::MaterialSystem>(*m_TextureSystem, m_AssetManager);
         // Create and register an engine-owned default 1x1 white texture.
         // Keep it alive for the lifetime of the engine so slots never go stale.
         {
@@ -193,6 +193,13 @@ namespace Runtime
 
         m_DefaultTexture.reset();
         m_LoadedMaterials.clear();
+
+        if (m_MaterialSystem)
+        {
+            // Process any final deletions from the clear above
+            m_MaterialSystem->ProcessDeletions(m_Device->GetGlobalFrameNumber());
+            m_MaterialSystem.reset();
+        }
 
         // Clear geometry storage before pipeline/device destruction
         m_GeometryStorage.Clear();
@@ -319,7 +326,8 @@ namespace Runtime
                         -> std::shared_ptr<RHI::Texture>
                     {
                         std::filesystem::path texPath(pathStr);
-                        auto result = Graphics::TextureLoader::LoadAsync(texPath, *GetDevice(), *m_TransferManager, *m_TextureSystem);
+                        auto result = Graphics::TextureLoader::LoadAsync(
+                            texPath, *GetDevice(), *m_TextureSystem);
                         if (result)
                         {
                             // This path currently creates a fully uploaded texture synchronously.
@@ -338,10 +346,15 @@ namespace Runtime
                     auto texHandle = m_AssetManager.Load<RHI::Texture>(
                         Core::Filesystem::GetAssetPath("textures/Parameterization.jpg"), textureLoader);
 
-                    auto defaultMat = std::make_unique<Graphics::Material>(
-                        *GetDevice(),
-                        texHandle, m_DefaultTextureIndex, m_AssetManager
-                    );
+                    Graphics::MaterialData matData;
+                    matData.AlbedoID = m_DefaultTextureIndex;
+                    matData.RoughnessFactor = 0.5f;
+
+                    // Create RAII Wrapper (Allocates in Pool)
+                    auto defaultMat = std::make_unique<Graphics::Material>(*m_MaterialSystem, matData);
+
+                    // Link Texture Asset (Setup Listener)
+                    defaultMat->SetAlbedoTexture(texHandle);
 
                     auto defaultMaterialHandle = m_AssetManager.Create("DefaultMaterial", std::move(defaultMat));
                     m_LoadedMaterials.push_back(defaultMaterialHandle);
@@ -494,7 +507,8 @@ namespace Runtime
             *m_PickPipeline,
             m_FrameArena,
             m_FrameScope,
-            m_GeometryStorage
+            m_GeometryStorage,
+            *m_MaterialSystem
         );
         Core::Log::Info("RenderSystem created successfully.");
 
@@ -551,6 +565,11 @@ namespace Runtime
             if (m_TextureSystem)
             {
                 m_TextureSystem->ProcessDeletions();
+            }
+
+            if (m_MaterialSystem)
+            {
+                m_MaterialSystem->ProcessDeletions(m_Device->GetGlobalFrameNumber());
             }
 
             {

@@ -3,6 +3,7 @@ export module Graphics;
 export import :Camera;
 export import :Geometry;
 export import :Material;
+export import :MaterialSystem;
 export import :Model;
 export import :ModelLoader;
 export import :RenderSystem;

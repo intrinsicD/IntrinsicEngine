@@ -146,11 +146,21 @@ namespace Core::Assets
 
     void AssetManager::Clear()
     {
-        std::unique_lock lock(m_Mutex);
+        // 1. Clear auxiliary maps under lock
+        {
+            std::unique_lock lock(m_Mutex);
+            m_Lookup.clear();
+            m_OneShotListeners.clear();
+            m_PersistentListeners.clear();
+        }
+
+        // 2. Clear registry WITHOUT holding the main mutex.
+        // This triggers destructors (e.g. ~Material -> MaterialSystem::Destroy -> AssetManager::Unlisten).
+        // Since we released the lock above, Unlisten() can safely re-acquire it.
+        // This avoids the recursive lock crash/deadlock.
         m_Registry.clear();
-        m_Lookup.clear();
-        m_OneShotListeners.clear();
-        m_PersistentListeners.clear();
+
+        // 3. Clear event queue
         {
             std::lock_guard qLock(m_EventQueueMutex);
             m_ReadyQueue.clear();
