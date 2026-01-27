@@ -212,10 +212,19 @@ namespace Graphics
                                           }
                                       },
                                       true);
+
+        // RenderGraph transient GPU memory allocator (pages persist, bump resets each frame).
+        m_TransientAllocator = std::make_unique<RHI::TransientAllocator>(*m_Device);
+        m_RenderGraph.SetTransientAllocator(*m_TransientAllocator);
     }
 
     RenderSystem::~RenderSystem()
     {
+        // Ensure allocator is destroyed before VulkanDevice and after GPU idle.
+        // Engine already waits idle before tearing down RenderSystem, but this is a cheap safety net.
+        if (m_Device) vkDeviceWaitIdle(m_Device->GetLogicalDevice());
+        m_TransientAllocator.reset();
+
         if (m_DebugViewPass)
         {
             m_DebugViewPass->Shutdown();

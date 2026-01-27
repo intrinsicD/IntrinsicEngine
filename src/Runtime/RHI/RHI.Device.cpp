@@ -5,12 +5,14 @@ module;
 #include <mutex>
 #include <functional>
 #include <string_view>
+#include <memory>
 
 #include "RHI.Vulkan.hpp"
 
 
 module RHI:Device.Impl;
 import :Device;
+import :TransientAllocator;
 import Core;
 
 namespace RHI
@@ -38,6 +40,9 @@ namespace RHI
             return;
         }
 
+        // Create transient allocator AFTER device creation (it owns VkDeviceMemory pages).
+        m_TransientAllocator = new TransientAllocator(*this);
+
         CreateCommandPool();
     }
 
@@ -53,13 +58,21 @@ namespace RHI
 
     VulkanDevice::~VulkanDevice()
     {
-        // 1. Wait for GPU to stop
+        // 1) Stop the GPU first.
         if (m_Device) vkDeviceWaitIdle(m_Device);
 
-        // 2. Execute all deferred deletions while the device + allocator are still valid
+        // 2) Execute all deferred deletions while the device + VMA allocator are still valid.
+        //    (Many resources enqueue vmaDestroyBuffer/Image via SafeDestroy.)
         FlushAllDeletionQueues();
 
-        // 3. Destroy Thread Pools
+        // 3) Destroy transient allocator pages (raw VkDeviceMemory pages).
+        delete static_cast<TransientAllocator*>(m_TransientAllocator);
+        m_TransientAllocator = nullptr;
+
+        // 4) One more flush in case any destructors enqueued work during step (3).
+        FlushAllDeletionQueues();
+
+        // 5) Destroy Thread Pools
         {
             std::lock_guard lock(m_ThreadPoolsMutex);
             for (auto pool : m_ThreadCommandPools)
@@ -69,11 +82,11 @@ namespace RHI
             m_ThreadCommandPools.clear();
         }
 
-        // 4. Destroy Main Resources
+        // 6) Destroy Main Resources
         if (m_CommandPool) vkDestroyCommandPool(m_Device, m_CommandPool, nullptr);
         if (m_Allocator) vmaDestroyAllocator(m_Allocator);
 
-        // 5. Destroy Device
+        // 7) Destroy Device
         if (m_Device) vkDestroyDevice(m_Device, nullptr);
     }
 
@@ -414,3 +427,4 @@ namespace RHI
         return details;
     }
 }
+

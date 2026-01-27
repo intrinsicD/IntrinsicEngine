@@ -15,4 +15,5 @@ export import :StagingBelt;
 export import :Texture;
 export import :TextureSystem;
 export import :Transfer;
+export import :TransientAllocator;
 export import :Types;

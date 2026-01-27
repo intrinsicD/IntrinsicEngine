@@ -245,6 +245,10 @@ export namespace Graphics
         [[nodiscard]] std::vector<RenderGraphDebugPass> BuildDebugPassList() const;
         [[nodiscard]] std::vector<RenderGraphDebugImage> BuildDebugImageList() const;
 
+        // Inject externally-owned transient allocator (must outlive RenderGraph).
+        // This avoids file-static allocators that can outlive VkDevice at shutdown.
+        void SetTransientAllocator(RHI::TransientAllocator& allocator) { m_TransientAllocator = &allocator; }
+
         // Internal methods for Builder
         friend class RGBuilder;
 
@@ -374,6 +378,7 @@ export namespace Graphics
         {
             VkDeviceMemory Memory = VK_NULL_HANDLE;
             VkDeviceSize Size = 0;
+            VkDeviceSize BaseOffset = 0; // Sub-allocation offset within Memory
             uint32_t MemoryTypeBits = 0;
 
             // Track the lifetime of this chunk (Frame index)
@@ -387,6 +392,8 @@ export namespace Graphics
         std::shared_ptr<RHI::VulkanDevice> m_Device;
         Core::Memory::LinearArena& m_Arena;      // POD pass data
         Core::Memory::ScopeStack& m_Scope;       // destructor-safe pass closures
+
+        RHI::TransientAllocator* m_TransientAllocator = nullptr; // non-owning
 
         // Change per-frame vectors to persistent pools we recycle each Reset()
         std::vector<RGPass> m_PassPool;

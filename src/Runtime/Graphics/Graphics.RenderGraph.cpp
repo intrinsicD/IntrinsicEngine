@@ -7,13 +7,17 @@ module;
 #include <span>
 #include <algorithm>
 #include <unordered_map>
+#include <utility>
 
 module Graphics:RenderGraph.Impl;
 import :RenderGraph;
 import Core;
+import RHI;
 
 namespace Graphics
 {
+    // Remove file-local transient allocator state; lifetime is managed by RenderSystem.
+
     // --- RGRegistry ---
     VkImage RGRegistry::GetImage(RGResourceHandle handle) const
     {
@@ -224,19 +228,10 @@ namespace Graphics
     {
         vkDeviceWaitIdle(m_Device->GetLogicalDevice());
 
-        // Release any raw VkDeviceMemory allocations made by AllocateOrReuseMemory().
-        // (These are NOT VMA allocations, so we must free them explicitly.)
-        for (auto& [typeBits, chunks] : m_MemoryPool)
-        {
-            for (auto& chunk : chunks)
-            {
-                if (chunk && chunk->Memory)
-                {
-                    vkFreeMemory(m_Device->GetLogicalDevice(), chunk->Memory, nullptr);
-                    chunk->Memory = VK_NULL_HANDLE;
-                }
-            }
-        }
+        // NOTE:
+        // RenderGraph no longer owns VkDeviceMemory when backed by the RHI::TransientAllocator.
+        // Multiple logical MemoryChunks may point into the same VkDeviceMemory page, so freeing
+        // per-chunk would double-free and trigger validation errors.
         m_MemoryPool.clear();
 
         m_ImagePool.clear();
@@ -248,18 +243,9 @@ namespace Graphics
         // Caller is expected to have synchronized with the GPU (e.g., vkDeviceWaitIdle via renderer resize path).
         // We keep Trim() itself lightweight and deterministic.
 
-        // Free raw device memory pool as well, since it is sized/typed to previous usages.
-        for (auto& [typeBits, chunks] : m_MemoryPool)
-        {
-            for (auto& chunk : chunks)
-            {
-                if (chunk && chunk->Memory)
-                {
-                    vkFreeMemory(m_Device->GetLogicalDevice(), chunk->Memory, nullptr);
-                    chunk->Memory = VK_NULL_HANDLE;
-                }
-            }
-        }
+        // NOTE:
+        // With TransientAllocator backing, RenderGraph's memory pool is just lifetime metadata.
+        // Physical memory is owned by RHI::TransientAllocator.
         m_MemoryPool.clear();
 
         m_ImagePool.clear();
@@ -312,6 +298,12 @@ namespace Graphics
         m_Scope.Reset();
         m_Arena.Reset();
 
+        // Reset transient GPU pages too (bump pointers only; no frees)
+        if (m_TransientAllocator)
+        {
+            m_TransientAllocator->Reset();
+        }
+
         // 2. Soft-reset passes
         for (uint32_t i = 0; i < m_ActivePassCount; ++i)
         {
@@ -336,31 +328,50 @@ namespace Graphics
     RHI::VulkanImage* RenderGraph::ResolveImage(uint32_t frameIndex, const ResourceNode& node)
     {
         // 1. Create the Handle (Cheap, no memory yet)
-        // Note: Ensure RHI::VulkanImage has a move constructor!
         auto unboundImg = RHI::VulkanImage::CreateUnbound(*m_Device, node.Extent.width, node.Extent.height, node.Format, node.Usage);
 
         // 2. Query Requirements
         VkMemoryRequirements reqs = unboundImg.GetMemoryRequirements();
 
-        // 3. Find Memory (The "Refinement")
-        // This returns a raw VkDeviceMemory handle from your pool
-        VkDeviceMemory memory = AllocateOrReuseMemory(reqs, node.StartPass, node.EndPass, frameIndex);
+        // 3. Find Memory
+        VkDeviceMemory memory = VK_NULL_HANDLE;
+        VkDeviceSize offset = 0;
 
-        // 4. Bind
-        unboundImg.BindMemory(memory, 0);
+        // AllocateOrReuseMemory now returns the memory handle but also stores the sub-offset in the chunk.
+        // For now we bind at offset 0 unless we find a chunk with non-zero BaseOffset.
+        VkDeviceMemory memHandle = AllocateOrReuseMemory(reqs, node.StartPass, node.EndPass, frameIndex);
+        memory = memHandle;
+
+        // NOTE: our current API returns only VkDeviceMemory; ResolveImage binds offset=0.
+        // We upgrade by looking up the last chunk we just allocated in the pool.
+        // This is safe because AllocateOrReuseMemory always pushes the new chunk at the end.
+        if (memory != VK_NULL_HANDLE)
+        {
+            auto& bucket = m_MemoryPool[reqs.memoryTypeBits];
+            if (!bucket.empty())
+            {
+                // Find the chunk matching this memory for current frame.
+                for (auto it = bucket.rbegin(); it != bucket.rend(); ++it)
+                {
+                    if ((*it)->Memory == memory && (*it)->LastFrameIndex == frameIndex)
+                    {
+                        offset = (*it)->BaseOffset;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // 4. Bind with offset
+        unboundImg.BindMemory(memory, offset);
 
         // 5. Move to Frame Scope
-        // We move the 'unboundImg' object (which is now fully bound) into the arena.
-        // The ScopeStack will call the destructor of this object at the end of the frame.
         auto allocation = m_Scope.New<RHI::VulkanImage>(std::move(unboundImg));
-
         if (!allocation)
         {
             Core::Log::Error("RenderGraph: Failed to allocate image wrapper in ScopeStack (OOM)");
             return nullptr;
         }
-
-        // Dereference std::expected to get the raw pointer
         return *allocation;
     }
 
@@ -418,26 +429,19 @@ namespace Graphics
 
         for (auto& chunk : bucket)
         {
-            // Must match frame index (frames in flight isolation)
             if (chunk->LastFrameIndex != frameIndex) continue;
 
-            // Reset if stale (used in previous frames)
             if (chunk->LastUsedGlobalFrame != globalFrame)
             {
                 chunk->LastUsedGlobalFrame = globalFrame;
                 chunk->AllocatedIntervals.clear();
             }
 
-            // Strict Size & Alignment Check
-            // Note: We currently support 1 image per chunk for simplicity (Heap Allocator).
-            // A full implementation would use a 'LinearAllocator' logic here to put multiple images in one chunk.
             if (chunk->Size < reqs.size) continue;
 
-            // Lifetime Overlap Check
             bool overlaps = false;
             for (const auto& interval : chunk->AllocatedIntervals)
             {
-                // Simple 1D interval intersection: (StartA <= EndB) and (EndA >= StartB)
                 if (startPass <= interval.second && endPass >= interval.first)
                 {
                     overlaps = true;
@@ -447,44 +451,35 @@ namespace Graphics
 
             if (!overlaps)
             {
-                // Found a free spot! "Alias" this memory.
                 chunk->AllocatedIntervals.emplace_back(startPass, endPass);
                 return chunk->Memory;
             }
         }
 
-        // 2. No suitable chunk found, allocate new one via VMA (or raw Vulkan)
-        // Here we use a raw allocation for simplicity of the example, but in production use VMA.
-        VkMemoryAllocateInfo allocInfo{};
-        allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-        allocInfo.allocationSize = reqs.size;
-
-        // Find memory type index
-        VkPhysicalDeviceMemoryProperties memProps;
-        vkGetPhysicalDeviceMemoryProperties(m_Device->GetPhysicalDevice(), &memProps);
-
-        for (uint32_t i = 0; i < memProps.memoryTypeCount; i++)
+        // 2. No suitable chunk found -> allocate via transient page allocator.
+        if (!m_TransientAllocator)
         {
-            if ((reqs.memoryTypeBits & (1 << i)) &&
-                (memProps.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
-            {
-                allocInfo.memoryTypeIndex = i;
-                break;
-            }
+            Core::Log::Error("RenderGraph: TransientAllocator not set. Call RenderGraph::SetTransientAllocator().");
+            return VK_NULL_HANDLE;
         }
 
-        VkDeviceMemory newMemory;
-        vkAllocateMemory(m_Device->GetLogicalDevice(), &allocInfo, nullptr, &newMemory);
+        auto allocation = m_TransientAllocator->Allocate(reqs, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+        if (!allocation.IsValid())
+        {
+            Core::Log::Error("RenderGraph: Failed to allocate transient memory.");
+            return VK_NULL_HANDLE;
+        }
 
         auto newChunk = std::make_unique<MemoryChunk>();
-        newChunk->Memory = newMemory;
-        newChunk->Size = reqs.size;
+        newChunk->Memory = allocation.Memory;
+        newChunk->Size = allocation.Size;
+        newChunk->BaseOffset = allocation.Offset;
         newChunk->MemoryTypeBits = reqs.memoryTypeBits;
         newChunk->LastFrameIndex = frameIndex;
         newChunk->LastUsedGlobalFrame = globalFrame;
         newChunk->AllocatedIntervals.emplace_back(startPass, endPass);
 
-        VkDeviceMemory result = newMemory;
+        VkDeviceMemory result = newChunk->Memory;
         bucket.push_back(std::move(newChunk));
 
         return result;

@@ -27,6 +27,7 @@ target_sources(${target_name}
         RHI.TextureSystem.cppm
         RHI.Transfer.cppm
         RHI.StagingBelt.cppm
+        RHI.TransientAllocator.cppm
         PRIVATE
         RHI.Vma.cpp
         RHI.Transfer.cpp
@@ -47,6 +48,7 @@ target_sources(${target_name}
         RHI.TextureSystem.cpp
         RHI.Transfer.cpp
         RHI.StagingBelt.cpp
+        RHI.TransientAllocator.cpp
 )
 
 target_include_directories(${target_name} PUBLIC .)

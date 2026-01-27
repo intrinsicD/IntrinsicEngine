@@ -3,6 +3,7 @@ module;
 #include <optional>
 #include <mutex>
 #include <functional>
+#include <memory>
 #include "RHI.Vulkan.hpp"
 
 export module RHI:Device;
@@ -115,5 +116,8 @@ namespace RHI
         bool IsDeviceSuitable(VkPhysicalDevice device);
         QueueFamilyIndices FindQueueFamilies(VkPhysicalDevice device);
         bool CheckDeviceExtensionSupport(VkPhysicalDevice device);
+
+        // Opaque pointer to device-owned transient allocator (defined + managed in RHI.Device.cpp).
+        void* m_TransientAllocator = nullptr;
     };
 }

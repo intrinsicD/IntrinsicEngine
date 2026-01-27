@@ -95,6 +95,10 @@ export namespace Graphics
 
         std::unique_ptr<RHI::VulkanBuffer> m_GlobalUBO;
 
+        // Transient GPU memory for RenderGraph (page allocator). Owned here so it is destroyed
+        // before VulkanDevice teardown (Engine destroys RenderSystem first).
+        std::unique_ptr<RHI::TransientAllocator> m_TransientAllocator;
+
         RenderGraph m_RenderGraph;
         GeometryPool& m_GeometryStorage;
         MaterialSystem& m_MaterialSystem;
