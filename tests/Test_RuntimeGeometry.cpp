@@ -386,7 +386,7 @@ TEST(GeometryValidation, Ray_Invalid_ZeroDirection)
     EXPECT_FALSE(IsValid(r));
 }
 
-TEST(GeometryValidation, Ray_Invalid_NaNOrigin)
+TEST(GeometryValidation, Ray_Invalid_NaDOrigin)
 {
     Ray r{{std::numeric_limits<float>::quiet_NaN(), 0, 0}, {1, 0, 0}};
     EXPECT_FALSE(IsValid(r));
@@ -408,7 +408,7 @@ TEST(GeometryValidation, Plane_Invalid_ZeroNormal)
     EXPECT_FALSE(IsValid(p));
 }
 
-TEST(GeometryValidation, Plane_Invalid_NaNDistance)
+TEST(GeometryValidation, Plane_Invalid_NaDDistance)
 {
     Plane p{glm::vec3(0, 1, 0), std::numeric_limits<float>::quiet_NaN()};
     EXPECT_FALSE(IsValid(p));
@@ -1004,3 +1004,109 @@ TEST(Octree, LargeExtentDifferences)
     octree.QueryAABB(AABB{{-2000, -2000, -2000}, {2000, 2000, 2000}}, results);
     EXPECT_EQ(results.size(), 2u);
 }
+
+// -----------------------------------------------------------------------------
+// Halfedge Mesh Tests
+// -----------------------------------------------------------------------------
+
+TEST(HalfedgeMesh, SingleTriangle_Connectivity)
+{
+    using Geometry::Halfedge::Mesh;
+
+    Mesh m;
+    auto v0 = m.AddVertex();
+    auto v1 = m.AddVertex();
+    auto v2 = m.AddVertex();
+
+    auto f = m.AddTriangle(v0, v1, v2);
+    ASSERT_TRUE(f.has_value());
+
+    EXPECT_EQ(m.VerticesSize(), 3u);
+    EXPECT_EQ(m.FacesSize(), 1u);
+    EXPECT_EQ(m.EdgesSize(), 3u);
+    EXPECT_EQ(m.HalfedgesSize(), 6u);
+
+    const HalfedgeHandle h0 = m.Halfedge(*f);
+    ASSERT_TRUE(h0.IsValid());
+    const HalfedgeHandle h1 = m.NextHalfedge(h0);
+    const HalfedgeHandle h2 = m.NextHalfedge(h1);
+
+    EXPECT_EQ(m.NextHalfedge(h2), h0);
+    EXPECT_EQ(m.PrevHalfedge(h0), h2);
+
+    // Face halfedges are interior.
+    EXPECT_FALSE(m.IsBoundary(h0));
+    EXPECT_FALSE(m.IsBoundary(h1));
+    EXPECT_FALSE(m.IsBoundary(h2));
+
+    // Their opposites are boundary.
+    EXPECT_TRUE(m.IsBoundary(m.OppositeHalfedge(h0)));
+    EXPECT_TRUE(m.IsBoundary(m.OppositeHalfedge(h1)));
+    EXPECT_TRUE(m.IsBoundary(m.OppositeHalfedge(h2)));
+}
+
+TEST(HalfedgeMesh, TwoTriangles_SharedEdge)
+{
+    using Geometry::Halfedge::Mesh;
+
+    Mesh m;
+    for (int i = 0; i < 4; ++i) (void)m.AddVertex();
+
+    ASSERT_TRUE(m.AddTriangle(VertexHandle{0}, VertexHandle{1}, VertexHandle{2}).has_value());
+    ASSERT_TRUE(m.AddTriangle(VertexHandle{0}, VertexHandle{2}, VertexHandle{3}).has_value());
+
+    EXPECT_EQ(m.VerticesSize(), 4u);
+    EXPECT_EQ(m.FacesSize(), 2u);
+    EXPECT_EQ(m.EdgesSize(), 5u);
+    EXPECT_EQ(m.HalfedgesSize(), 10u);
+
+    // Find halfedge 0->2 and check it is not boundary and opposite is also not boundary.
+    auto h02 = m.FindHalfedge(VertexHandle{0}, VertexHandle{2});
+    ASSERT_TRUE(h02.has_value());
+    EXPECT_FALSE(m.IsBoundary(*h02));
+    EXPECT_FALSE(m.IsBoundary(m.OppositeHalfedge(*h02)));
+}
+
+TEST(HalfedgeMesh, AddFace_RejectsNonBoundaryInsertion)
+{
+    using Geometry::Halfedge::Mesh;
+
+    // Build a closed triangle, then attempt to add another face reusing a directed halfedge that already has a face.
+    Mesh m;
+    auto v0 = m.AddVertex();
+    auto v1 = m.AddVertex();
+    auto v2 = m.AddVertex();
+    auto v3 = m.AddVertex();
+
+    ASSERT_TRUE(m.AddTriangle(v0, v1, v2).has_value());
+
+    // This tries to use the existing halfedge v0->v1 as part of a new face; should fail.
+    const std::array<VertexHandle, 3> verts = {v0, v1, v3};
+    auto f = m.AddFace(verts);
+    EXPECT_FALSE(f.has_value());
+}
+
+TEST(HalfedgeMesh, DeleteFace_ThenGarbageCollect)
+{
+    using Geometry::Halfedge::Mesh;
+
+    Mesh m;
+    for (int i = 0; i < 4; ++i) (void)m.AddVertex();
+
+    auto f0 = m.AddTriangle(VertexHandle{0}, VertexHandle{1}, VertexHandle{2});
+    auto f1 = m.AddTriangle(VertexHandle{0}, VertexHandle{2}, VertexHandle{3});
+    ASSERT_TRUE(f0.has_value());
+    ASSERT_TRUE(f1.has_value());
+
+    EXPECT_FALSE(m.HasGarbage());
+
+    m.DeleteFace(*f0);
+    EXPECT_TRUE(m.HasGarbage());
+
+    m.GarbageCollection();
+    EXPECT_FALSE(m.HasGarbage());
+
+    // We should now have exactly one face left.
+    EXPECT_EQ(m.FaceCount(), 1u);
+}
+

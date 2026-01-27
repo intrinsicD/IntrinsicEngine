@@ -17,4 +17,6 @@ namespace ECS
         m_Registry.emplace<Components::Hierarchy::Component>(e);
         return e;
     }
+
+    [[nodiscard]] size_t Scene::Size() const { return m_Registry.storage<entt::entity>()->size(); }
 }

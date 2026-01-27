@@ -405,40 +405,32 @@ TEST(ModelLoaderPLY, VCGLIB_RGBA_Radius_Face0_DoesNotCrash)
 
 TEST(GraphicsMaterial, ConstructorSignature_NoSharedPtrTexture)
 {
-    static_assert(std::is_constructible_v<Graphics::Material,
+    using namespace Graphics;
+
+    // Current engine contract: Material is an RAII wrapper over a MaterialSystem pool slot.
+    static_assert(std::is_constructible_v<Material, MaterialSystem&, const MaterialData&>);
+    static_assert(std::is_destructible_v<Material>);
+
+    // Still enforce: no legacy constructor taking std::shared_ptr<Texture>.
+    static_assert(!std::is_constructible_v<Material,
                                           RHI::VulkanDevice&,
+                                          RHI::BindlessDescriptorSystem&,
+                                          RHI::TextureSystem&,
                                           Core::Assets::AssetHandle,
-                                          uint32_t,
+                                          std::shared_ptr<RHI::Texture>,
                                           Core::Assets::AssetManager&>);
-
-    static_assert(std::is_destructible_v<Graphics::Material>);
-
-    static_assert(!std::is_constructible_v<Graphics::Material,
-                                           RHI::VulkanDevice&,
-                                           RHI::BindlessDescriptorSystem&,
-                                           RHI::TextureSystem&,
-                                           Core::Assets::AssetHandle,
-                                           std::shared_ptr<RHI::Texture>,
-                                           Core::Assets::AssetManager&>);
 }
 
 TEST(GraphicsMaterial, ConstructorTakesDeviceByRef)
 {
     using namespace Graphics;
 
-    static_assert(std::is_constructible_v<Material,
+    // The Material wrapper no longer takes a VulkanDevice directly; it takes a MaterialSystem.
+    static_assert(!std::is_constructible_v<Material,
                                           RHI::VulkanDevice&,
                                           Core::Assets::AssetHandle,
                                           uint32_t,
                                           Core::Assets::AssetManager&>);
-
-    static_assert(!std::is_constructible_v<Material,
-                                           std::shared_ptr<RHI::VulkanDevice>,
-                                           RHI::BindlessDescriptorSystem&,
-                                           RHI::TextureSystem&,
-                                           Core::Assets::AssetHandle,
-                                           uint32_t,
-                                           Core::Assets::AssetManager&>);
 
     SUCCEED();
 }

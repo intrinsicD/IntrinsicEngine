@@ -8,8 +8,9 @@ module;
 
 export module Geometry:GJK;
 
-import :Primitives; // Needs definitions of ContactManifold
-import :Support; // Needs definitions of ContactManifold
+import :Primitives;
+import :Support;
+import Core;
 
 export namespace Geometry::Internal
 {
@@ -183,8 +184,9 @@ export namespace Geometry::Internal
     }
 
     template <typename A, typename B>
-    bool GJK_Boolean(const A& a, const B& b)
+    bool GJK_Boolean(const A& a, const B& b, Core::Memory::LinearArena& /*scratch*/)
     {
+        // Currently allocation-free; scratch is plumbed for consistency with EPA.
         glm::vec3 support = MinkowskiDifference::Support(a, b, {1, 0, 0});
 
         Simplex points;
@@ -211,7 +213,7 @@ export namespace Geometry::Internal
     }
 
     template <typename A, typename B>
-    std::optional<Simplex> GJK_Intersection(const A& a, const B& b)
+    std::optional<Simplex> GJK_Intersection(const A& a, const B& b, Core::Memory::LinearArena& /*scratch*/)
     {
         glm::vec3 support = MinkowskiDifference::Support(a, b, {1, 0, 0});
         Simplex points;
@@ -227,5 +229,20 @@ export namespace Geometry::Internal
             if (NextSimplex(points, direction)) return points; // Return the simplex containing origin
         }
         return std::nullopt;
+    }
+
+    // Back-compat overloads (existing call sites): route through the scratch-taking versions.
+    template <typename A, typename B>
+    bool GJK_Boolean(const A& a, const B& b)
+    {
+        Core::Memory::LinearArena scratch(8 * 1024);
+        return GJK_Boolean(a, b, scratch);
+    }
+
+    template <typename A, typename B>
+    std::optional<Simplex> GJK_Intersection(const A& a, const B& b)
+    {
+        Core::Memory::LinearArena scratch(8 * 1024);
+        return GJK_Intersection(a, b, scratch);
     }
 }

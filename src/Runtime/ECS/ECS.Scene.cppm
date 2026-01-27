@@ -19,7 +19,7 @@ export namespace ECS
         entt::registry& GetRegistry() { return m_Registry; }
         const entt::registry& GetRegistry() const { return m_Registry; }
 
-        [[nodiscard]] size_t Size() const { return m_Registry.storage<entt::entity>()->size(); }
+        [[nodiscard]] size_t Size() const;
 
     private:
         entt::registry m_Registry;

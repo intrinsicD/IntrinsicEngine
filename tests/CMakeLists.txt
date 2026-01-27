@@ -13,6 +13,8 @@ add_executable(${target_name}
         Test_RuntimeRHI.cpp
         Test_RuntimeECS.cpp
         Test_RuntimeGeometry.cpp
+        Test_RuntimeGeometry_NoHeapEPA.cpp
+        Test_RuntimeGraph.cpp
         Test_RuntimeSelection.cpp
 )
 
@@ -27,6 +29,7 @@ target_link_libraries(${target_name}
         IntrinsicConfig
         IntrinsicRuntime
         GTest::gtest_main
+        dl
 )
 
 # Helper to run tests via CTest

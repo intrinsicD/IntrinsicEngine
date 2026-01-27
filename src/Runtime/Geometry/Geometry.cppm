@@ -13,6 +13,8 @@ export import :Raycast;
 export import :Overlap;
 export import :Primitives;
 export import :Properties;
+export import :HalfedgeMesh;
+export import :Graph;
 export import :SDF;
 export import :SDFContact;
 export import :Support;

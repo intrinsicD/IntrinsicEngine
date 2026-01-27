@@ -64,7 +64,7 @@ export namespace Geometry
             if (dist2 > radSum * radSum) return std::nullopt;
 
             float dist = std::sqrt(dist2);
-            ContactManifold m;
+            ContactManifold m{};
 
             if (dist < 1e-6f)
             {
@@ -94,7 +94,7 @@ export namespace Geometry
             if (dist2 > s.Radius * s.Radius) return std::nullopt;
 
             float dist = std::sqrt(dist2);
-            ContactManifold m;
+            ContactManifold m{};
 
             // Handle center inside box
             if (dist < 1e-6f)
@@ -158,7 +158,7 @@ export namespace Geometry
             float t = -b - std::sqrt(discr);
             if (t < 0.0f) t = 0.0f; // Inside sphere
 
-            RayHit hit;
+            RayHit hit{};
             hit.Distance = t;
             hit.Point = r.Origin + r.Direction * t;
             hit.Normal = glm::normalize(hit.Point - s.Center);
@@ -180,7 +180,7 @@ export namespace Geometry
             if (tmax < tmin || tmax < 0.0f) return std::nullopt;
 
             // Compute normal
-            RayHit hit;
+            RayHit hit{};
             hit.Distance = tmin > 0 ? tmin : tmax; // if tmin < 0, origin is inside
             hit.Point = r.Origin + r.Direction * hit.Distance;
 
@@ -236,19 +236,19 @@ export namespace Geometry
         // --- Fallback ---
 
         template <typename A, typename B>
-        std::optional<ContactManifold> Contact_Fallback(const A& a, const B& b)
+        std::optional<ContactManifold> Contact_Fallback(const A& a, const B& b, Core::Memory::LinearArena& scratch)
         {
             // Use GJK_Intersection to get the simplex
-            auto simplexOpt = Internal::GJK_Intersection(a, b);
+            auto simplexOpt = Internal::GJK_Intersection(a, b, scratch);
 
             if (simplexOpt)
             {
                 // Collision Detected! Use EPA to resolve depth/normal.
-                auto epa = Internal::EPA_Solver(a, b, *simplexOpt);
+                auto epa = Internal::EPA_Solver(a, b, *simplexOpt, scratch);
 
                 if (epa)
                 {
-                    ContactManifold m;
+                    ContactManifold m{};
                     m.Normal = epa->Normal;
                     m.PenetrationDepth = epa->Depth;
 
@@ -275,6 +275,14 @@ export namespace Geometry
             }
             return std::nullopt;
         }
+
+        // Back-compat overload (existing call sites): uses a small local scratch.
+        template <typename A, typename B>
+        std::optional<ContactManifold> Contact_Fallback(const A& a, const B& b)
+        {
+            Core::Memory::LinearArena scratch(64 * 1024);
+            return Contact_Fallback(a, b, scratch);
+        }
     }
 
     // =========================================================================
@@ -300,6 +308,30 @@ export namespace Geometry
         else
         {
             return Internal::Contact_Fallback(a, b);
+        }
+    }
+
+    // Scratch-aware dispatcher overload (preferred for hot paths)
+    template <ConvexShape A, ConvexShape B>
+    [[nodiscard]] std::optional<ContactManifold> ComputeContact(const A& a, const B& b, Core::Memory::LinearArena& scratch)
+    {
+        if constexpr (requires { Internal::Contact_Analytic(a, b); })
+        {
+            return Internal::Contact_Analytic(a, b);
+        }
+        else if constexpr (requires { Internal::Contact_Analytic(b, a); })
+        {
+            auto result = Internal::Contact_Analytic(b, a);
+            if (result)
+            {
+                result->Normal = -result->Normal;
+                std::swap(result->ContactPointA, result->ContactPointB);
+            }
+            return result;
+        }
+        else
+        {
+            return Internal::Contact_Fallback(a, b, scratch);
         }
     }
 

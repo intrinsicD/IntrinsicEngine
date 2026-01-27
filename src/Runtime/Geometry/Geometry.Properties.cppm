@@ -287,7 +287,7 @@ export namespace Geometry
         [[nodiscard]] const std::string& Name() const noexcept
         {
             assert(m_Storage != nullptr);
-            return m_Storage->name();
+            return m_Storage->Name();
         }
 
         [[nodiscard]] explicit operator bool() const noexcept { return m_Storage != nullptr; }
@@ -409,12 +409,12 @@ export namespace Geometry
     template <class T>
     PropertyBuffer<T> PropertyRegistry::GetOrAdd(std::string name, T m_Defaultvalue)
     {
-        if (auto existing = get<T>(name))
+        if (auto existing = Get<T>(name))
         {
             return *existing;
         }
 
-        auto created = add<T>(std::move(name), std::move(m_Defaultvalue));
+        auto created = Add<T>(std::move(name), std::move(m_Defaultvalue));
         if (created)
         {
             return std::move(*created);
@@ -425,23 +425,20 @@ export namespace Geometry
     template <class T>
     bool PropertyRegistry::Remove(PropertyBuffer<T>& handle)
     {
-        if (!handle)
-        {
-            return false;
-        }
+        const auto id = handle.Id();
+        handle.Reset();
+        return Remove(id);
+    }
 
-        auto* typed = storage<T>(handle.id_);
-        if (typed != handle.storage_)
-        {
-            return false;
-        }
+    inline bool PropertyRegistry::Remove(PropertyId id)
+    {
+        if (id >= m_Storages.size()) return false;
+        if (!m_Storages[id]) return false;
 
-        const bool removed = remove(handle.id_);
-        if (removed)
-        {
-            handle.reset();
-        }
-        return removed;
+        // Keep IDs dense: other code enumerates storages by index (Find, Resize, Swap, etc.).
+        // Leaving holes (nullptr) would crash later when iterating.
+        m_Storages.erase(m_Storages.begin() + static_cast<std::ptrdiff_t>(id));
+        return true;
     }
 
     template <class T>
@@ -573,8 +570,8 @@ export namespace Geometry
     template <class T>
     void PropertySet::Remove(Property<T>& property)
     {
-        m_Registry.Remove(property.handle());
-        property.reset();
+        m_Registry.Remove(property.Handle());
+        property.Reset();
     }
 
     using PropertyIndex = std::uint32_t;
@@ -620,14 +617,11 @@ export namespace Geometry
 
     using NodeHandle = Handle<NodeTag>;
 
+    // Stream operators are defined in Geometry.Properties.cpp (implementation unit)
     std::ostream& operator<<(std::ostream& os, VertexHandle v);
-
     std::ostream& operator<<(std::ostream& os, HalfedgeHandle h);
-
     std::ostream& operator<<(std::ostream& os, EdgeHandle e);
-
     std::ostream& operator<<(std::ostream& os, FaceHandle f);
-
     std::ostream& operator<<(std::ostream& os, NodeHandle n);
 
     template <class T>

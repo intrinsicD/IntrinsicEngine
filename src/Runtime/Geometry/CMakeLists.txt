@@ -27,11 +27,16 @@ target_sources(${target_name}
         Geometry.MeshUtils.cppm
         Geometry.Octree.cppm
         Geometry.Raycast.cppm
+        Geometry.HalfedgeMesh.cppm
+        Geometry.Graph.cppm
         PRIVATE
         FILE_SET geometry_impl TYPE CXX_MODULES FILES
         Geometry.MeshUtils.cpp
         Geometry.Raycast.cpp
         Geometry.EPA.cpp
+        Geometry.HalfedgeMesh.cpp
+        Geometry.Properties.cpp
+        Geometry.Graph.cpp
 )
 
 target_include_directories(${target_name} PUBLIC .)

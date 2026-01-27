@@ -7,6 +7,8 @@ module; // Global Fragment
 #include <utility>
 #include <thread>
 #include <type_traits>
+#include <new>
+#include <limits>
 
 export module Core:Memory;
 
@@ -280,5 +282,62 @@ export namespace Core::Memory
         LinearArena m_Arena;
         DestructorNode* m_Head = nullptr;  // Head of intrusive linked list
         size_t m_DestructorCount = 0;      // Track count for diagnostics
+    };
+
+    // -------------------------------------------------------------------------
+    // ArenaAllocator - STL-compatible adapter for LinearArena (monotonic)
+    // -------------------------------------------------------------------------
+    // Notes:
+    // - allocate() bumps the LinearArena; deallocate() is a no-op.
+    // - Containers using this allocator must not outlive the arena they reference.
+    // - OOM is treated as fatal for the container contract: we throw std::bad_alloc.
+    template <typename T>
+    class ArenaAllocator
+    {
+    public:
+        using value_type = T;
+
+        LinearArena* m_Arena = nullptr;
+
+        explicit ArenaAllocator(LinearArena& arena) noexcept : m_Arena(&arena) {}
+
+        template <typename U>
+        ArenaAllocator(const ArenaAllocator<U>& other) noexcept : m_Arena(other.m_Arena) {}
+
+        [[nodiscard]] T* allocate(std::size_t n)
+        {
+            if (n == 0) return nullptr;
+            if (n > std::numeric_limits<std::size_t>::max() / sizeof(T))
+            {
+                std::terminate();
+            }
+
+            auto res = m_Arena->Alloc(n * sizeof(T), alignof(T));
+            if (!res)
+            {
+                // Exceptions are disabled in this codebase; monotonic scratch OOM is fatal.
+                std::terminate();
+            }
+            return static_cast<T*>(*res);
+        }
+
+        void deallocate(T*, std::size_t) noexcept
+        {
+            // No-op: LinearArena is monotonic and resets en-masse.
+        }
+
+        template <typename U>
+        struct rebind
+        {
+            using other = ArenaAllocator<U>;
+        };
+
+        template <typename U>
+        friend class ArenaAllocator;
+
+        friend bool operator==(const ArenaAllocator& a, const ArenaAllocator& b) noexcept
+        {
+            return a.m_Arena == b.m_Arena;
+        }
     };
 }
