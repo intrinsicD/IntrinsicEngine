@@ -178,6 +178,17 @@ namespace Core::Filesystem
         return relativePath; // let ShaderModule print a clear error
     }
 
+    std::string ResolveShaderPathOrExit(ShaderPathLookup lookup, Core::Hash::StringID name)
+    {
+        auto path = lookup(name);
+        if (!path)
+        {
+            Core::Log::Error("CRITICAL: Missing shader configuration for ID: 0x{:08X}", name.Value);
+            std::exit(-1);
+        }
+        return Core::Filesystem::GetShaderPath(*path);
+    }
+
     std::vector<FileWatcher::Entry> FileWatcher::s_Watches;
     std::mutex FileWatcher::s_Mutex;
     std::atomic<bool> FileWatcher::s_Running = false;

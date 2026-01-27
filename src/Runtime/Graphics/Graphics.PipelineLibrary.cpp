@@ -4,6 +4,7 @@ module;
 #include <string>
 #include <optional>
 #include <memory>
+#include <glm/glm.hpp>
 #include "RHI.Vulkan.hpp"
 
 module Graphics:PipelineLibrary.Impl;
@@ -17,17 +18,6 @@ using namespace Core::Hash;
 
 namespace Graphics
 {
-    static std::string ResolveShaderPathOrExit(const ShaderRegistry& registry, StringID key)
-    {
-        auto rel = registry.Get(key);
-        if (!rel)
-        {
-            Core::Log::Error("CRITICAL: Missing shader configuration for ID: 0x{:08X}", key.Value);
-            std::exit(-1);
-        }
-        return Core::Filesystem::GetShaderPath(*rel);
-    }
-
     PipelineLibrary::PipelineLibrary(std::shared_ptr<RHI::VulkanDevice> device,
                                      RHI::BindlessDescriptorSystem& bindless,
                                      RHI::DescriptorLayout& globalSetLayout)
@@ -46,8 +36,12 @@ namespace Graphics
         // Forward pipeline (Textured + BDA)
         // ---------------------------------------------------------------------
         {
-            const std::string vertPath = ResolveShaderPathOrExit(shaderRegistry, "Forward.Vert"_id);
-            const std::string fragPath = ResolveShaderPathOrExit(shaderRegistry, "Forward.Frag"_id);
+            const std::string vertPath = Core::Filesystem::ResolveShaderPathOrExit(
+                [&](Core::Hash::StringID id) { return shaderRegistry.Get(id); },
+                "Forward.Vert"_id);
+            const std::string fragPath = Core::Filesystem::ResolveShaderPathOrExit(
+                [&](Core::Hash::StringID id) { return shaderRegistry.Get(id); },
+                "Forward.Frag"_id);
 
             RHI::ShaderModule vert(*m_Device, vertPath, RHI::ShaderStage::Vertex);
             RHI::ShaderModule frag(*m_Device, fragPath, RHI::ShaderStage::Fragment);
@@ -60,6 +54,35 @@ namespace Graphics
             builder.SetDepthFormat(depthFormat);
             builder.AddDescriptorSetLayout(m_GlobalSetLayout.GetHandle());
             builder.AddDescriptorSetLayout(m_Bindless.GetLayout());
+
+            // Stage 1: per-frame instance/visibility SSBOs (set = 2).
+            // Create this layout once and reuse it (must match the pipeline layout exactly).
+            if (m_Stage1InstanceSetLayout == VK_NULL_HANDLE)
+            {
+                VkDescriptorSetLayoutBinding bindings[2]{};
+                bindings[0].binding = 0;
+                bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                bindings[0].descriptorCount = 1;
+                bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+
+                bindings[1].binding = 1;
+                bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                bindings[1].descriptorCount = 1;
+                bindings[1].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+                VkDescriptorSetLayoutCreateInfo layoutInfo{};
+                layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+                layoutInfo.bindingCount = 2;
+                layoutInfo.pBindings = bindings;
+
+                VK_CHECK(vkCreateDescriptorSetLayout(m_Device->GetLogicalDevice(), &layoutInfo, nullptr,
+                                                    &m_Stage1InstanceSetLayout));
+
+                // NOTE: Do NOT SafeDestroy() this layout. SafeDestroy schedules deletion a frame later,
+                // which will invalidate descriptor allocations while the pipeline (and ForwardPass) are still live.
+            }
+
+            builder.AddDescriptorSetLayout(m_Stage1InstanceSetLayout);
 
             VkPushConstantRange pushConstant{};
             pushConstant.offset = 0;
@@ -81,8 +104,12 @@ namespace Graphics
         // Picking pipeline (ID buffer + BDA)
         // ---------------------------------------------------------------------
         {
-            const std::string vertPath = ResolveShaderPathOrExit(shaderRegistry, "Picking.Vert"_id);
-            const std::string fragPath = ResolveShaderPathOrExit(shaderRegistry, "Picking.Frag"_id);
+            const std::string vertPath = Core::Filesystem::ResolveShaderPathOrExit(
+                [&](Core::Hash::StringID id) { return shaderRegistry.Get(id); },
+                "Picking.Vert"_id);
+            const std::string fragPath = Core::Filesystem::ResolveShaderPathOrExit(
+                [&](Core::Hash::StringID id) { return shaderRegistry.Get(id); },
+                "Picking.Frag"_id);
 
             RHI::ShaderModule vert(*m_Device, vertPath, RHI::ShaderStage::Vertex);
             RHI::ShaderModule frag(*m_Device, fragPath, RHI::ShaderStage::Fragment);
@@ -109,6 +136,79 @@ namespace Graphics
             }
 
             m_Pipelines[kPipeline_Picking] = std::move(*pipelineResult);
+        }
+
+        // ---------------------------------------------------------------------
+        // Stage 3: Compute culling pipeline
+        // ---------------------------------------------------------------------
+        {
+            if (m_CullSetLayout == VK_NULL_HANDLE)
+            {
+                VkDescriptorSetLayoutBinding bindings[5]{};
+                // binding 1: Instances
+                bindings[0].binding = 1;
+                bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                bindings[0].descriptorCount = 1;
+                bindings[0].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+                // binding 2: Bounds
+                bindings[1].binding = 2;
+                bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                bindings[1].descriptorCount = 1;
+                bindings[1].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+                // binding 3: IndirectOut
+                bindings[2].binding = 3;
+                bindings[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                bindings[2].descriptorCount = 1;
+                bindings[2].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+                // binding 4: VisibilityOut
+                bindings[3].binding = 4;
+                bindings[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                bindings[3].descriptorCount = 1;
+                bindings[3].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+                // binding 5: Counter
+                bindings[4].binding = 5;
+                bindings[4].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                bindings[4].descriptorCount = 1;
+                bindings[4].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+                VkDescriptorSetLayoutCreateInfo layoutInfo{};
+                layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+                layoutInfo.bindingCount = 5;
+                layoutInfo.pBindings = bindings;
+
+                VK_CHECK(vkCreateDescriptorSetLayout(m_Device->GetLogicalDevice(), &layoutInfo, nullptr, &m_CullSetLayout));
+            }
+
+            if (!m_CullPipeline)
+            {
+                const std::string compPath = Core::Filesystem::ResolveShaderPathOrExit(
+                    [&](Core::Hash::StringID id) { return shaderRegistry.Get(id); },
+                    "Cull.Comp"_id);
+
+                RHI::ShaderModule comp(*m_Device, compPath, RHI::ShaderStage::Compute);
+
+                RHI::ComputePipelineBuilder cb(m_DeviceOwner);
+                cb.SetShader(&comp);
+                cb.AddDescriptorSetLayout(m_CullSetLayout);
+
+                VkPushConstantRange pcr{};
+                pcr.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+                pcr.offset = 0;
+                pcr.size = sizeof(glm::vec4) * 6 + sizeof(uint32_t) * 4;
+                cb.AddPushConstantRange(pcr);
+
+                auto built = cb.Build();
+                if (!built)
+                {
+                    Core::Log::Error("Failed to build Cull compute pipeline: {}", (int)built.error());
+                    std::exit(1);
+                }
+                m_CullPipeline = std::move(*built);
+            }
         }
     }
 

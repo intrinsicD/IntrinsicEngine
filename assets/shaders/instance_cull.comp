@@ -1,0 +1,97 @@
+#version 460
+#extension GL_EXT_scalar_block_layout : require
+
+layout(local_size_x = 64) in;
+
+struct InstanceData {
+    mat4 Model;
+    uint TextureID;
+    uint EntityID;
+    uint Pad0;
+    uint Pad1;
+};
+
+struct DrawIndexedIndirect {
+    uint indexCount;
+    uint instanceCount;
+    uint firstIndex;
+    int  vertexOffset;
+    uint firstInstance;
+};
+
+struct Sphere {
+    vec4 CenterRadius;
+};
+
+layout(push_constant, scalar) uniform CullPC {
+    vec4 Planes[6];
+    uint TotalInstanceCount;
+    uint IndexCount;
+    uint _pad0;
+    uint _pad1;
+} pc;
+
+layout(std430, set = 0, binding = 1) readonly buffer Instances {
+    InstanceData Data[];
+} instances;
+
+layout(std430, set = 0, binding = 2) readonly buffer Bounds {
+    Sphere Spheres[];
+} bounds;
+
+layout(std430, set = 0, binding = 3) writeonly buffer IndirectOut {
+    DrawIndexedIndirect Cmds[];
+} indirectOut;
+
+layout(std430, set = 0, binding = 4) writeonly buffer VisibilityOut {
+    uint VisibleRemap[];
+} visibilityOut;
+
+layout(std430, set = 0, binding = 5) buffer Counter {
+    uint DrawCount;
+} counter;
+
+bool SphereVisible(vec3 worldCenter, float worldRadius)
+{
+    for (int i = 0; i < 6; ++i)
+    {
+        vec4 p = pc.Planes[i];
+        float d = dot(p.xyz, worldCenter) + p.w;
+        if (d < -worldRadius)
+            return false;
+    }
+    return true;
+}
+
+void main()
+{
+    uint id = gl_GlobalInvocationID.x;
+    if (id >= pc.TotalInstanceCount) return;
+
+    Sphere s = bounds.Spheres[id];
+    vec3 localC = s.CenterRadius.xyz;
+    float localR = s.CenterRadius.w;
+
+    vec3 worldC = (instances.Data[id].Model * vec4(localC, 1.0)).xyz;
+
+    mat3 m = mat3(instances.Data[id].Model);
+    float sx = length(m[0]);
+    float sy = length(m[1]);
+    float sz = length(m[2]);
+    float worldR = localR * max(sx, max(sy, sz));
+
+    if (!SphereVisible(worldC, worldR))
+        return;
+
+    uint drawIndex = atomicAdd(counter.DrawCount, 1);
+
+    DrawIndexedIndirect cmd;
+    cmd.indexCount = pc.IndexCount;
+    cmd.instanceCount = 1;
+    cmd.firstIndex = 0;
+    cmd.vertexOffset = 0;
+    cmd.firstInstance = drawIndex;
+    indirectOut.Cmds[drawIndex] = cmd;
+
+    visibilityOut.VisibleRemap[drawIndex] = id;
+}

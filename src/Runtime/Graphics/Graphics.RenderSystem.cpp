@@ -137,6 +137,9 @@ namespace Graphics
         m_ForwardPass = std::make_unique<Passes::ForwardPass>();
         m_ForwardPass->Initialize(*m_Device, descriptorPool, descriptorLayout);
         m_ForwardPass->SetPipeline(&m_PipelineLibrary->GetOrDie(kPipeline_Forward));
+        m_ForwardPass->SetInstanceSetLayout(m_PipelineLibrary->GetStage1InstanceSetLayout());
+        m_ForwardPass->SetCullPipeline(m_PipelineLibrary->GetCullPipeline());
+        m_ForwardPass->SetCullSetLayout(m_PipelineLibrary->GetCullSetLayout());
 
         m_DebugViewPass = std::make_unique<Passes::DebugViewPass>();
         m_DebugViewPass->Initialize(*m_Device, descriptorPool, descriptorLayout);

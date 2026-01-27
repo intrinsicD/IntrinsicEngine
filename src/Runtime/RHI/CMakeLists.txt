@@ -28,6 +28,9 @@ target_sources(${target_name}
         RHI.Transfer.cppm
         RHI.StagingBelt.cppm
         RHI.TransientAllocator.cppm
+        RHI.SceneInstances.cppm
+        RHI.PersistentDescriptors.cppm
+        RHI.ComputePipeline.cppm
         PRIVATE
         RHI.Vma.cpp
         RHI.Transfer.cpp
@@ -49,6 +52,8 @@ target_sources(${target_name}
         RHI.Transfer.cpp
         RHI.StagingBelt.cpp
         RHI.TransientAllocator.cpp
+        RHI.PersistentDescriptors.cpp
+        RHI.ComputePipeline.cpp
 )
 
 target_include_directories(${target_name} PUBLIC .)

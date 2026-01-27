@@ -5,11 +5,13 @@ module;
 #include <thread>
 #include <vector>
 #include <mutex>
+#include <optional>
 #include <atomic>
 
 export module Core:Filesystem;
 
 import :Logging;
+import :Hash;
 
 export namespace Core::Filesystem
 {
@@ -18,6 +20,12 @@ export namespace Core::Filesystem
     std::string GetAssetPath(const std::string& relativePath);
 
     std::string GetShaderPath(const std::string& relativePath);
+
+    // Resolve a shader path using a caller-provided lookup.
+    // lookup(name) -> optional relative path (e.g. "shaders/foo.spv").
+    // Exits the process if the lookup fails.
+    using ShaderPathLookup = std::function<std::optional<std::string>(Core::Hash::StringID)>;
+    [[nodiscard]] std::string ResolveShaderPathOrExit(ShaderPathLookup lookup, Core::Hash::StringID name);
 
     class FileWatcher
     {

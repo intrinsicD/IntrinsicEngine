@@ -3,6 +3,7 @@ module;
 #include <unordered_map>
 #include <memory>
 #include <span>
+#include <glm/glm.hpp>
 
 #include "RHI.Vulkan.hpp"
 
@@ -95,6 +96,11 @@ export namespace Graphics
         // Previous frame compiled debug lists (used because features run before compile).
         std::span<const RenderGraphDebugImage> PrevFrameDebugImages{};
         std::span<const RenderGraphDebugPass> PrevFrameDebugPasses{};
+
+        // CPU camera matrices for passes that need analytic camera data (e.g., frustum culling).
+        // These mirror what is uploaded to RHI::CameraBufferObject each frame.
+        glm::mat4 CameraView{1.0f};
+        glm::mat4 CameraProj{1.0f};
     };
 
     // ---------------------------------------------------------------------

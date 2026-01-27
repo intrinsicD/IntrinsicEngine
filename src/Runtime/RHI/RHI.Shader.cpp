@@ -39,7 +39,12 @@ namespace RHI {
     VkPipelineShaderStageCreateInfo ShaderModule::GetStageInfo() const {
         VkPipelineShaderStageCreateInfo info{};
         info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        info.stage = (m_Stage == ShaderStage::Vertex) ? VK_SHADER_STAGE_VERTEX_BIT : VK_SHADER_STAGE_FRAGMENT_BIT;
+        switch (m_Stage)
+        {
+        case ShaderStage::Vertex:   info.stage = VK_SHADER_STAGE_VERTEX_BIT; break;
+        case ShaderStage::Fragment: info.stage = VK_SHADER_STAGE_FRAGMENT_BIT; break;
+        case ShaderStage::Compute:  info.stage = VK_SHADER_STAGE_COMPUTE_BIT; break;
+        }
         info.module = m_Module;
         info.pName = "main";
         return info;

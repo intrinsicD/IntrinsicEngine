@@ -434,6 +434,7 @@ namespace Runtime
         m_ShaderRegistry.Register("Debug.Vert"_id, "shaders/debug_view.vert.spv");
         m_ShaderRegistry.Register("Debug.Frag"_id, "shaders/debug_view.frag.spv");
         m_ShaderRegistry.Register("Debug.Comp"_id, "shaders/debug_view.comp.spv");
+        m_ShaderRegistry.Register("Cull.Comp"_id, "shaders/instance_cull.comp.spv");
 
         // ---------------------------------------------------------------------
         // Pipeline library (owns PSOs)

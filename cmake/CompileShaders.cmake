@@ -17,6 +17,7 @@ else ()
             debug_view.vert
             debug_view.frag
             debug_view.comp
+            instance_cull.comp
     )
 
     foreach (SHADER ${SHADERS})

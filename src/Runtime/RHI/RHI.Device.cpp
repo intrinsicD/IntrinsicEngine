@@ -18,7 +18,8 @@ import Core;
 namespace RHI
 {
     const std::vector<const char*> DEVICE_EXTENSIONS = {
-        VK_KHR_SWAPCHAIN_EXTENSION_NAME
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+        VK_KHR_DRAW_INDIRECT_COUNT_EXTENSION_NAME
     };
 
     VulkanDevice::VulkanDevice(VulkanContext& context, VkSurfaceKHR surface)
@@ -189,24 +190,39 @@ namespace RHI
         VkPhysicalDeviceExtendedDynamicStateFeaturesEXT dynamicState{};
         dynamicState.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT;
 
-        VkPhysicalDeviceVulkan13Features features13{};
-        features13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
-        features13.pNext = &dynamicState;
+        // Vulkan 1.1 Features (This is where shaderDrawParameters lives)
+        VkPhysicalDeviceVulkan11Features features11{};
+        features11.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES;
+        features11.shaderDrawParameters = VK_TRUE;
+        features11.pNext = &dynamicState;
 
+        // Vulkan 1.2 Features (BDA lives here)
         VkPhysicalDeviceVulkan12Features features12{};
         features12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
-        features12.pNext = &features13;
         features12.bufferDeviceAddress = VK_TRUE;
+        features12.descriptorIndexing = VK_TRUE;
+        features12.runtimeDescriptorArray = VK_TRUE;
+        features12.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
+        features12.pNext = &features11; // Chain 12 -> 11
+
+        // Vulkan 1.3 Features (Dynamic Rendering/Sync2 live here)
+        VkPhysicalDeviceVulkan13Features features13{};
+        features13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
+        features13.synchronization2 = VK_TRUE;
+        features13.dynamicRendering = VK_TRUE;
+        features13.pNext = &features12; // Chain 13 -> 12
+
 
         VkPhysicalDeviceFeatures2 features2{};
         features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-        features2.pNext = &features12;
+        features2.pNext = &features13;
 
         vkGetPhysicalDeviceFeatures2(m_PhysicalDevice, &features2);
 
-        // Optional: Warn if features are missing (keep existing warnings)
+        // Verify required features (Panic if missing)
         if (!features13.dynamicRendering) Core::Log::Error("Vulkan 1.3 Dynamic Rendering not supported!");
         if (!features13.synchronization2) Core::Log::Error("Vulkan 1.3 Sync2 not supported!");
+        if (!features12.bufferDeviceAddress) Core::Log::Error("Vulkan 1.2 Buffer Device Address not supported!");
 
         VkDeviceCreateInfo createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;

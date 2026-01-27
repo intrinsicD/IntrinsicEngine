@@ -22,17 +22,6 @@ namespace Graphics::Passes
             Core::Log::Error("DebugView: {} failed (VkResult={})", what, (int)r);
     }
 
-    static std::string ResolveShaderPathOrExit(const ShaderRegistry& registry, Core::Hash::StringID name)
-    {
-        auto path = registry.Get(name);
-        if (!path)
-        {
-            Core::Log::Error("CRITICAL: Missing shader configuration for ID: 0x{:08X}", name.Value);
-            std::exit(-1);
-        }
-        return Core::Filesystem::GetShaderPath(*path);
-    }
-
     void DebugViewPass::Initialize(RHI::VulkanDevice& device,
                                    RHI::DescriptorAllocator& descriptorPool,
                                    RHI::DescriptorLayout&)
@@ -181,8 +170,12 @@ namespace Graphics::Passes
                 std::exit(-1);
             }
 
-            const std::string vertPath = ResolveShaderPathOrExit(*m_ShaderRegistry, "Debug.Vert"_id);
-            const std::string fragPath = ResolveShaderPathOrExit(*m_ShaderRegistry, "Debug.Frag"_id);
+            const std::string vertPath = Core::Filesystem::ResolveShaderPathOrExit(
+                [&](Core::Hash::StringID id) { return m_ShaderRegistry->Get(id); },
+                "Debug.Vert"_id);
+            const std::string fragPath = Core::Filesystem::ResolveShaderPathOrExit(
+                [&](Core::Hash::StringID id) { return m_ShaderRegistry->Get(id); },
+                "Debug.Frag"_id);
 
             RHI::ShaderModule vert(*m_Device, vertPath, RHI::ShaderStage::Vertex);
             RHI::ShaderModule frag(*m_Device, fragPath, RHI::ShaderStage::Fragment);

@@ -24,6 +24,8 @@ export namespace Graphics
                         RHI::BindlessDescriptorSystem& bindless,
                         RHI::DescriptorLayout& globalSetLayout);
 
+        ~PipelineLibrary() = default;
+
         // Build the engine's baseline pipelines (Forward + Picking), keyed by stable IDs.
         // This is intended to be called from the composition root.
         void BuildDefaults(const ShaderRegistry& shaderRegistry,
@@ -42,6 +44,13 @@ export namespace Graphics
 
         [[nodiscard]] bool Contains(Core::Hash::StringID name) const { return m_Pipelines.contains(name); }
 
+        // Stage 1: set=2 layout for instance + visibility SSBOs used by Forward shaders.
+        [[nodiscard]] VkDescriptorSetLayout GetStage1InstanceSetLayout() const { return m_Stage1InstanceSetLayout; }
+
+        // Stage 3: compute culling pipeline + set layout (set = 0 in compute pipeline).
+        [[nodiscard]] VkDescriptorSetLayout GetCullSetLayout() const { return m_CullSetLayout; }
+        [[nodiscard]] RHI::ComputePipeline* GetCullPipeline() const { return m_CullPipeline.get(); }
+
     private:
         std::shared_ptr<RHI::VulkanDevice> m_DeviceOwner;
         RHI::VulkanDevice* m_Device = nullptr;
@@ -50,6 +59,11 @@ export namespace Graphics
         RHI::DescriptorLayout& m_GlobalSetLayout;
 
         std::unordered_map<Core::Hash::StringID, std::unique_ptr<RHI::GraphicsPipeline>> m_Pipelines;
+
+        VkDescriptorSetLayout m_Stage1InstanceSetLayout = VK_NULL_HANDLE;
+
+        VkDescriptorSetLayout m_CullSetLayout = VK_NULL_HANDLE;
+        std::unique_ptr<RHI::ComputePipeline> m_CullPipeline;
     };
     using namespace Core::Hash;
     // Canonical pipeline IDs used across the engine.
