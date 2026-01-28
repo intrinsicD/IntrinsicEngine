@@ -208,19 +208,24 @@ namespace Graphics::Passes
                                         if (!cpuVisibility.empty())
                                             m_VisibilityBuffer[frame]->Write(cpuVisibility.data(), visibilityBytes);
 
-                                        // Allocate a fresh instance descriptor set for this frame.
+                                        // Allocate (once) + update the per-frame instance descriptor set.
                                         if (!m_InstanceSetPool)
                                         {
                                             Core::Log::Error("ForwardPass: Persistent descriptor pool not initialized for Stage 1 instance set.");
                                             return;
                                         }
 
-                                        VkDescriptorSet instanceSet = m_InstanceSetPool->Allocate(m_InstanceSetLayout);
-                                        if (instanceSet == VK_NULL_HANDLE)
+                                        if (m_InstanceSet[frame] == VK_NULL_HANDLE)
                                         {
-                                            Core::Log::Error("ForwardPass: Failed to allocate Stage 1 instance descriptor set.");
-                                            return;
+                                            m_InstanceSet[frame] = m_InstanceSetPool->Allocate(m_InstanceSetLayout);
+                                            if (m_InstanceSet[frame] == VK_NULL_HANDLE)
+                                            {
+                                                Core::Log::Error("ForwardPass: Failed to allocate Stage 1 instance descriptor set.");
+                                                return;
+                                            }
                                         }
+
+                                        VkDescriptorSet instanceSet = m_InstanceSet[frame];
 
                                         VkDescriptorBufferInfo instInfo{};
                                         instInfo.buffer = m_InstanceBuffer[frame]->GetHandle();
@@ -814,12 +819,23 @@ namespace Graphics::Passes
                                         if (enableStage3 && s_Stage3[fi].InstanceCount > 0 && s_Stage3[fi].GeoHandle.IsValid())
                                         {
                                             // Bind set=2 instance+remap (visibility is GPU-written in Stage 3).
-                                            VkDescriptorSet instanceSet = m_InstanceSetPool->Allocate(m_InstanceSetLayout);
-                                            if (instanceSet == VK_NULL_HANDLE)
+                                            if (!m_InstanceSetPool)
                                             {
-                                                Core::Log::Error("ForwardDraw: Failed to allocate instance set.");
+                                                Core::Log::Error("ForwardDraw: Stage 1 instance pool not initialized.");
                                                 return;
                                             }
+
+                                            if (m_InstanceSet[fi] == VK_NULL_HANDLE)
+                                            {
+                                                m_InstanceSet[fi] = m_InstanceSetPool->Allocate(m_InstanceSetLayout);
+                                                if (m_InstanceSet[fi] == VK_NULL_HANDLE)
+                                                {
+                                                    Core::Log::Error("ForwardDraw: Failed to allocate instance set.");
+                                                    return;
+                                                }
+                                            }
+
+                                            VkDescriptorSet instanceSet = m_InstanceSet[fi];
 
                                             VkDescriptorBufferInfo instInfo{};
                                             instInfo.buffer = m_InstanceBuffer[fi]->GetHandle();

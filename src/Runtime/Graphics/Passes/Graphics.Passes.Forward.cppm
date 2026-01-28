@@ -72,6 +72,9 @@ export namespace Graphics::Passes
         std::unique_ptr<RHI::VulkanBuffer> m_InstanceBuffer[FRAMES];
         std::unique_ptr<RHI::VulkanBuffer> m_VisibilityBuffer[FRAMES];
 
+        // Cache the instance descriptor set per frame (updated each frame).
+        VkDescriptorSet m_InstanceSet[FRAMES] = {VK_NULL_HANDLE, VK_NULL_HANDLE};
+
         // Stage 3: compute culling.
         VkDescriptorSetLayout m_CullSetLayout = VK_NULL_HANDLE;
         std::unique_ptr<RHI::PersistentDescriptorPool> m_CullSetPool;
