@@ -28,6 +28,31 @@ namespace Graphics
     {
     }
 
+    PipelineLibrary::~PipelineLibrary()
+    {
+        if (!m_Device) return;
+
+        VkDevice logicalDevice = m_Device->GetLogicalDevice();
+        if (logicalDevice == VK_NULL_HANDLE) return;
+
+        // Clear pipelines first (they reference the layouts).
+        m_Pipelines.clear();
+        m_CullPipeline.reset();
+
+        // Destroy descriptor set layouts created in BuildDefaults().
+        if (m_Stage1InstanceSetLayout != VK_NULL_HANDLE)
+        {
+            vkDestroyDescriptorSetLayout(logicalDevice, m_Stage1InstanceSetLayout, nullptr);
+            m_Stage1InstanceSetLayout = VK_NULL_HANDLE;
+        }
+
+        if (m_CullSetLayout != VK_NULL_HANDLE)
+        {
+            vkDestroyDescriptorSetLayout(logicalDevice, m_CullSetLayout, nullptr);
+            m_CullSetLayout = VK_NULL_HANDLE;
+        }
+    }
+
     void PipelineLibrary::BuildDefaults(const ShaderRegistry& shaderRegistry,
                                        VkFormat swapchainFormat,
                                        VkFormat depthFormat)

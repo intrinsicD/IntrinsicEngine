@@ -18,6 +18,7 @@ target_sources(${target_name}
         RHI.Profiler.cppm
         RHI.Buffer.cppm
         RHI.CommandUtils.cppm
+        RHI.CommandContext.cppm
         RHI.Types.cppm
         RHI.Shader.cppm
         RHI.Pipeline.cppm
@@ -54,6 +55,7 @@ target_sources(${target_name}
         RHI.TransientAllocator.cpp
         RHI.PersistentDescriptors.cpp
         RHI.ComputePipeline.cpp
+        RHI.CommandContext.cpp
 )
 
 target_include_directories(${target_name} PUBLIC .)

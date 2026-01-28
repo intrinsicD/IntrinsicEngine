@@ -156,39 +156,61 @@ namespace Graphics::Passes
                                         });
 
         ctx.Graph.AddPass<PickCopyPassData>("PickCopy",
-                                            [&](PickCopyPassData& data, RGBuilder& builder)
-                                            {
-                                                if (!ctx.PickRequest.Pending)
-                                                    return;
+                                             [&](PickCopyPassData& data, RGBuilder& builder)
+                                             {
+                                                 if (!ctx.PickRequest.Pending)
+                                                     return;
 
-                                                data.IdBuffer = builder.Read(pickIdHandle,
-                                                                             VK_PIPELINE_STAGE_2_TRANSFER_BIT,
-                                                                             VK_ACCESS_2_TRANSFER_READ_BIT);
-                                            },
-                                            [&](const PickCopyPassData& data, const RGRegistry& reg,
-                                                VkCommandBuffer cmd)
-                                            {
-                                                (void)cmd;
+                                                 // Force a proper layout transition out of COLOR_ATTACHMENT_OPTIMAL.
+                                                 // The graph currently considers barriers mandatory when either previous or current access writes.
+                                                 // A pure-read access can get optimized away if the graph thinks it is read-after-read.
+                                                 // For copy, we conservatively mark the usage as memory write as well, to enforce the barrier.
+                                                 data.IdBuffer = builder.Read(pickIdHandle,
+                                                                              VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+                                                                              VK_ACCESS_2_TRANSFER_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT);
+                                             },
+                                             [&](const PickCopyPassData& data, const RGRegistry& reg,
+                                                 VkCommandBuffer cmd)
+                                             {
+                                                 if (!ctx.PickRequest.Pending)
+                                                     return;
+                                                 if (!data.IdBuffer.IsValid())
+                                                     return;
 
-                                                if (!ctx.PickRequest.Pending)
-                                                    return;
-                                                if (!data.IdBuffer.IsValid())
-                                                    return;
+                                                 if (ctx.FrameIndex >= m_ReadbackBuffers.size() || !m_ReadbackBuffers[ctx.FrameIndex])
+                                                     return;
 
-                                                if (ctx.FrameIndex >= m_ReadbackBuffers.size() || !m_ReadbackBuffers[ctx
-                                                    .FrameIndex])
-                                                    return;
+                                                 const VkBuffer dst = m_ReadbackBuffers[ctx.FrameIndex]->GetHandle();
+                                                 const VkImage img = reg.GetImage(data.IdBuffer);
+                                                 if (img == VK_NULL_HANDLE || dst == VK_NULL_HANDLE)
+                                                     return;
 
-                                                const VkBuffer dst = m_ReadbackBuffers[ctx.FrameIndex]->GetHandle();
-                                                const VkImage img = reg.GetImage(data.IdBuffer);
+                                                 const uint32_t srcW = ctx.Resolution.width;
+                                                 const uint32_t srcH = ctx.Resolution.height;
+                                                 if (srcW == 0 || srcH == 0)
+                                                     return;
 
-                                                ctx.Renderer.CopyPixel_R32_UINT_ToBuffer(
-                                                    img,
-                                                    ctx.Resolution.width,
-                                                    ctx.Resolution.height,
-                                                    ctx.PickRequest.X,
-                                                    ctx.PickRequest.Y,
-                                                    dst);
-                                            });
+                                                 const uint32_t x = std::min(ctx.PickRequest.X, srcW - 1u);
+                                                 const uint32_t y = std::min(ctx.PickRequest.Y, srcH - 1u);
+
+                                                 VkBufferImageCopy region{};
+                                                 region.bufferOffset = 0;
+                                                 region.bufferRowLength = 0;
+                                                 region.bufferImageHeight = 0;
+                                                 region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                                                 region.imageSubresource.mipLevel = 0;
+                                                 region.imageSubresource.baseArrayLayer = 0;
+                                                 region.imageSubresource.layerCount = 1;
+                                                 region.imageOffset = {static_cast<int32_t>(x), static_cast<int32_t>(y), 0};
+                                                 region.imageExtent = {1, 1, 1};
+
+                                                 // The graph must have transitioned this image to TRANSFER_SRC_OPTIMAL for correctness.
+                                                 vkCmdCopyImageToBuffer(cmd,
+                                                                       img,
+                                                                       VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                                                                       dst,
+                                                                       1,
+                                                                       &region);
+                                             });
     }
 }

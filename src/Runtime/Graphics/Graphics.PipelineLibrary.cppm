@@ -24,7 +24,7 @@ export namespace Graphics
                         RHI::BindlessDescriptorSystem& bindless,
                         RHI::DescriptorLayout& globalSetLayout);
 
-        ~PipelineLibrary() = default;
+        ~PipelineLibrary();
 
         // Build the engine's baseline pipelines (Forward + Picking), keyed by stable IDs.
         // This is intended to be called from the composition root.

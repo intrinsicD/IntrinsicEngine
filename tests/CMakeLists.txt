@@ -15,6 +15,7 @@ add_executable(${target_name}
         Test_RuntimeGeometry.cpp
         Test_RuntimeGeometry_NoHeapEPA.cpp
         Test_RuntimeGraph.cpp
+        Test_RuntimeGraph_ParallelLayers.cpp
         Test_RuntimeSelection.cpp
 )
 

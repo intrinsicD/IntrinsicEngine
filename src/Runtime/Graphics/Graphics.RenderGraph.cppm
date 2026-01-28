@@ -249,6 +249,9 @@ export namespace Graphics
         // This avoids file-static allocators that can outlive VkDevice at shutdown.
         void SetTransientAllocator(RHI::TransientAllocator& allocator) { m_TransientAllocator = &allocator; }
 
+        // Debug/introspection for tests/tools: valid after Compile() until Reset().
+        [[nodiscard]] const std::vector<std::vector<uint32_t>>& GetExecutionLayers() const { return m_ExecutionLayers; }
+
         // Internal methods for Builder
         friend class RGBuilder;
 
@@ -417,5 +420,18 @@ export namespace Graphics
         RHI::VulkanImage* ResolveImage(uint32_t frameIndex, const ResourceNode& node);
         RHI::VulkanBuffer* ResolveBuffer(uint32_t frameIndex, const ResourceNode& node);
         VkDeviceMemory AllocateOrReuseMemory(const VkMemoryRequirements& reqs, uint32_t startPass, uint32_t endPass, uint32_t frameIndex);
+
+        struct DependencyInfo
+        {
+            std::vector<uint32_t> DependsOn{};
+            std::vector<uint32_t> Dependents{};
+            uint32_t Indegree = 0;
+        };
+
+        std::vector<DependencyInfo> m_AdjacencyList{};
+        std::vector<std::vector<uint32_t>> m_ExecutionLayers{};
+
+        void BuildAdjacencyList();
+        void TopologicalSortIntoLayers();
     };
 }

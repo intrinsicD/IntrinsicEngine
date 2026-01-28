@@ -54,7 +54,7 @@ namespace Graphics
     void AppendToList(Core::Memory::LinearArena& arena, NodeT*& head, NodeT*& tail, NodeT&& value)
     {
         // Allocate node in the frame arena (Zero overhead)
-        auto nodeMem = arena.New<NodeT>(std::move(value));
+        auto nodeMem = arena.New<NodeT>(std::forward<NodeT>(value));
         if (!nodeMem) return; // OOM check
 
         NodeT* node = *nodeMem;
@@ -412,11 +412,11 @@ namespace Graphics
 
         auto buf = std::make_unique<RHI::VulkanBuffer>(*m_Device, node.BufferSize, node.BufferUsage,
                                                        VMA_MEMORY_USAGE_GPU_ONLY);
-        auto* ptr = buf.get();
+
         PooledBuffer pooled{std::move(buf), frameIndex, globalFrame};
         pooled.ActiveIntervals.emplace_back(node.StartPass, node.EndPass);
         stack.Buffers.push_back(std::move(pooled));
-        return ptr;
+        return stack.Buffers.back().Resource.get();
     }
 
     VkDeviceMemory RenderGraph::AllocateOrReuseMemory(const VkMemoryRequirements& reqs, uint32_t startPass,
@@ -641,82 +641,322 @@ namespace Graphics
             }
             if (bufCount > 0) pass.BufferBarriers = std::span<VkBufferMemoryBarrier2>(bufStart, bufCount);
         }
+
+        // 3. Dependency analysis (DAG build + layering for parallel recording)
+        BuildAdjacencyList();
+        TopologicalSortIntoLayers();
+    }
+
+    namespace
+    {
+        [[nodiscard]] inline bool IsWriteAccess(VkAccessFlags2 a) noexcept
+        {
+            // Conservative: any write bit means write.
+            return (a & (VK_ACCESS_2_MEMORY_WRITE_BIT |
+                         VK_ACCESS_2_SHADER_WRITE_BIT |
+                         VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT |
+                         VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
+                         VK_ACCESS_2_TRANSFER_WRITE_BIT |
+                         VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT | // already implies shader write but keep explicit
+                         VK_ACCESS_2_ACCELERATION_STRUCTURE_WRITE_BIT_KHR)) != 0;
+        }
+    }
+
+    void RenderGraph::BuildAdjacencyList()
+    {
+        m_AdjacencyList.clear();
+        m_AdjacencyList.resize(m_ActivePassCount);
+
+        for (auto& d : m_AdjacencyList)
+        {
+            d.DependsOn.clear();
+            d.Dependents.clear();
+            d.Indegree = 0;
+        }
+
+        // Track last writer and last readers per resource. This is enough to model RAW/WAR/WAW.
+        const uint32_t passInvalid = ~0u;
+        std::vector<uint32_t> lastWriter(m_ActiveResourceCount, passInvalid);
+        std::vector<std::vector<uint32_t>> lastReaders(m_ActiveResourceCount);
+
+        auto addEdge = [&](uint32_t from, uint32_t to)
+        {
+            if (from == passInvalid || to == passInvalid || from == to) return;
+            m_AdjacencyList[from].Dependents.push_back(to);
+            m_AdjacencyList[to].DependsOn.push_back(from);
+            m_AdjacencyList[to].Indegree++;
+        };
+
+        for (uint32_t passIdx = 0; passIdx < m_ActivePassCount; ++passIdx)
+        {
+            const auto& pass = m_PassPool[passIdx];
+
+            // Access hazards.
+            for (AccessNode* node = pass.AccessHead; node != nullptr; node = node->Next)
+            {
+                if (node->ID >= m_ActiveResourceCount) continue;
+
+                const bool isWrite = IsWriteAccess(node->Access);
+                const bool isRead = !isWrite; // treat all non-write accesses as read
+
+                if (isRead)
+                {
+                    // RAW: depend on last writer.
+                    addEdge(lastWriter[node->ID], passIdx);
+                    lastReaders[node->ID].push_back(passIdx);
+                }
+                else
+                {
+                    // WAW: depend on last writer.
+                    addEdge(lastWriter[node->ID], passIdx);
+
+                    // WAR: depend on all outstanding readers since last write.
+                    for (uint32_t r : lastReaders[node->ID])
+                        addEdge(r, passIdx);
+                    lastReaders[node->ID].clear();
+
+                    lastWriter[node->ID] = passIdx;
+                }
+            }
+
+            // Attachment hazards: treat as writes (raster). This ensures a pass that renders to an image
+            // correctly serializes with later reads/writes even if user forgot to declare explicit Access.
+            for (AttachmentNode* att = pass.AttachmentHead; att != nullptr; att = att->Next)
+            {
+                if (att->ID >= m_ActiveResourceCount) continue;
+
+                // WAW + WAR with prior users.
+                addEdge(lastWriter[att->ID], passIdx);
+                for (uint32_t r : lastReaders[att->ID])
+                    addEdge(r, passIdx);
+                lastReaders[att->ID].clear();
+                lastWriter[att->ID] = passIdx;
+            }
+        }
+    }
+
+    void RenderGraph::TopologicalSortIntoLayers()
+    {
+        m_ExecutionLayers.clear();
+        if (m_ActivePassCount == 0) return;
+
+        std::vector<uint32_t> indeg(m_ActivePassCount);
+        for (uint32_t i = 0; i < m_ActivePassCount; ++i)
+            indeg[i] = m_AdjacencyList[i].Indegree;
+
+        std::vector<uint32_t> layer;
+        layer.reserve(m_ActivePassCount);
+
+        for (uint32_t i = 0; i < m_ActivePassCount; ++i)
+            if (indeg[i] == 0) layer.push_back(i);
+
+        uint32_t processed = 0;
+        while (!layer.empty())
+        {
+            m_ExecutionLayers.push_back(layer);
+            processed += static_cast<uint32_t>(layer.size());
+
+            std::vector<uint32_t> next;
+            next.reserve(m_ActivePassCount);
+
+            for (uint32_t p : layer)
+            {
+                for (uint32_t dep : m_AdjacencyList[p].Dependents)
+                {
+                    if (dep >= m_ActivePassCount) continue;
+                    if (indeg[dep] == 0) continue; // already scheduled
+                    indeg[dep]--;
+                    if (indeg[dep] == 0) next.push_back(dep);
+                }
+            }
+
+            layer = std::move(next);
+        }
+
+        if (processed != m_ActivePassCount)
+        {
+            // Cycle: should not happen. Fall back to sequential order for safety.
+            Core::Log::Error("RenderGraph: dependency cycle detected (processed {} / {}). Falling back to sequential execution order.",
+                             processed, m_ActivePassCount);
+            m_ExecutionLayers.clear();
+            m_ExecutionLayers.emplace_back();
+            m_ExecutionLayers.back().reserve(m_ActivePassCount);
+            for (uint32_t i = 0; i < m_ActivePassCount; ++i) m_ExecutionLayers.back().push_back(i);
+        }
     }
 
     void RenderGraph::Execute(VkCommandBuffer cmd)
     {
-        for (uint32_t i = 0; i < m_ActivePassCount; ++i)
+        // If Compile() wasn't called (or for safety), build layers lazily.
+        if (m_ExecutionLayers.empty() && m_ActivePassCount > 0)
         {
-            const auto& pass = m_PassPool[i];
+            BuildAdjacencyList();
+            TopologicalSortIntoLayers();
+        }
 
-            // 1. Pipeline Barriers (from Spans)
-            if (!pass.ImageBarriers.empty() || !pass.BufferBarriers.empty())
+        // Record each layer in parallel into secondary command buffers.
+        // GPU execution order remains: layers in order; passes within a layer in vector order.
+        for (const auto& layer : m_ExecutionLayers)
+        {
+            if (layer.empty()) continue;
+
+            // Precompute inheritance info per pass (stable pointers for the worker tasks).
+            struct RasterInfo
             {
-                VkDependencyInfo depInfo{};
-                depInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-                depInfo.imageMemoryBarrierCount = (uint32_t)pass.ImageBarriers.size();
-                depInfo.pImageMemoryBarriers = pass.ImageBarriers.data();
-                depInfo.bufferMemoryBarrierCount = (uint32_t)pass.BufferBarriers.size();
-                depInfo.pBufferMemoryBarriers = pass.BufferBarriers.data();
-                vkCmdPipelineBarrier2(cmd, &depInfo);
+                bool IsRaster = false;
+                std::vector<VkFormat> ColorFormats;
+                VkFormat Depth = VK_FORMAT_UNDEFINED;
+                VkFormat Stencil = VK_FORMAT_UNDEFINED;
+            };
+
+            std::vector<RasterInfo> rasterInfos;
+            rasterInfos.resize(layer.size());
+
+            for (size_t i = 0; i < layer.size(); ++i)
+            {
+                const auto& pass = m_PassPool[layer[i]];
+                RasterInfo ri{};
+                ri.IsRaster = (pass.AttachmentHead != nullptr);
+                if (ri.IsRaster)
+                {
+                    for (AttachmentNode* att = pass.AttachmentHead; att != nullptr; att = att->Next)
+                    {
+                        const auto& res = m_ResourcePool[att->ID];
+                        if (att->IsDepth)
+                        {
+                            ri.Depth = res.Format;
+                        }
+                        else
+                        {
+                            ri.ColorFormats.push_back(res.Format);
+                        }
+                    }
+                }
+                rasterInfos[i] = std::move(ri);
             }
 
-            // 2. Rendering (Attachments)
-            bool isRaster = (pass.AttachmentHead != nullptr);
-            if (isRaster)
+            std::vector<VkCommandBuffer> secondaryCmds(layer.size(), VK_NULL_HANDLE);
+
+            // Dispatch one task per pass. This is fine for now; we can chunk later.
+            for (size_t i = 0; i < layer.size(); ++i)
             {
-                // Local vector for attachments (max 8 usually, so low allocation overhead or use scratch arena)
-                std::vector<VkRenderingAttachmentInfo> colorAtts;
-                colorAtts.reserve(8);
-                VkRenderingAttachmentInfo depthAtt{};
-                bool hasDepth = false;
-                VkExtent2D renderArea = {0, 0};
+                const uint32_t passIdx = layer[i];
 
-                for (AttachmentNode* att = pass.AttachmentHead; att != nullptr; att = att->Next)
+                Core::Tasks::Scheduler::Dispatch([this, passIdx, &secondaryCmds, i, &rasterInfos]
                 {
-                    auto& res = m_ResourcePool[att->ID];
-                    if (renderArea.width == 0 && renderArea.height == 0) renderArea = res.Extent;
+                    auto& pass = m_PassPool[passIdx];
 
-                    VkRenderingAttachmentInfo info{};
-                    info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-                    info.imageView = res.PhysicalView;
-                    info.imageLayout = att->IsDepth
-                                           ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
-                                           : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-                    info.loadOp = att->Info.LoadOp;
-                    info.storeOp = att->Info.StoreOp;
-                    info.clearValue = att->Info.ClearValue;
+                    // IMPORTANT:
+                    // Whether a secondary needs dynamic-rendering inheritance is strictly determined by
+                    // whether it will be executed inside a vkCmdBeginRendering/vkCmdEndRendering scope.
+                    // Our primary command buffer does that iff the pass has attachments.
+                    const bool isRaster = (pass.AttachmentHead != nullptr);
 
-                    if (att->IsDepth)
+                    RHI::SecondaryInheritanceInfo inherit{};
+                    if (isRaster)
                     {
-                        depthAtt = info;
-                        hasDepth = true;
+                        inherit.ColorAttachmentFormats = std::span<const VkFormat>(rasterInfos[i].ColorFormats.data(),
+                                                                                   rasterInfos[i].ColorFormats.size());
+                        inherit.DepthAttachmentFormat = rasterInfos[i].Depth;
+                        inherit.StencilAttachmentFormat = rasterInfos[i].Stencil;
+                        inherit.RasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+                        inherit.ViewMask = 0;
                     }
-                    else { colorAtts.push_back(info); }
+
+                    VkCommandBuffer sec = RHI::CommandContext::BeginSecondary(*m_Device, inherit);
+
+                    if (pass.ExecuteFn)
+                        pass.ExecuteFn(pass.ExecuteUserData, m_Registry, sec);
+
+                    RHI::CommandContext::End(sec);
+                    secondaryCmds[i] = sec;
+                });
+            }
+
+            Core::Tasks::Scheduler::WaitForAll();
+
+            // Execute passes in a deterministic order on the primary command buffer.
+            for (size_t i = 0; i < layer.size(); ++i)
+            {
+                const uint32_t passIdx = layer[i];
+                const auto& pass = m_PassPool[passIdx];
+
+                // 1) Barriers for this pass (computed in Compile, and now hoisted to primary).
+                if (!pass.ImageBarriers.empty() || !pass.BufferBarriers.empty())
+                {
+                    VkDependencyInfo depInfo{};
+                    depInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+                    depInfo.imageMemoryBarrierCount = (uint32_t)pass.ImageBarriers.size();
+                    depInfo.pImageMemoryBarriers = pass.ImageBarriers.data();
+                    depInfo.bufferMemoryBarrierCount = (uint32_t)pass.BufferBarriers.size();
+                    depInfo.pBufferMemoryBarriers = pass.BufferBarriers.data();
+                    vkCmdPipelineBarrier2(cmd, &depInfo);
                 }
 
+                const bool isRaster = (pass.AttachmentHead != nullptr);
                 VkRenderingInfo renderInfo{};
-                renderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
-                renderInfo.renderArea = {{0, 0}, renderArea};
-                renderInfo.layerCount = 1;
-                renderInfo.colorAttachmentCount = (uint32_t)colorAtts.size();
-                renderInfo.pColorAttachments = colorAtts.data();
-                renderInfo.pDepthAttachment = hasDepth ? &depthAtt : nullptr;
+                std::vector<VkRenderingAttachmentInfo> colorAtts;
+                VkRenderingAttachmentInfo depthAtt{};
+                bool hasDepth = false;
 
-                vkCmdBeginRendering(cmd, &renderInfo);
-            }
+                if (isRaster)
+                {
+                    colorAtts.reserve(8);
+                    VkExtent2D renderArea{0, 0};
 
-            // 3. User Callback
-            if (pass.ExecuteFn)
-            {
-                pass.ExecuteFn(pass.ExecuteUserData, m_Registry, cmd);
-            }
+                    for (AttachmentNode* att = pass.AttachmentHead; att != nullptr; att = att->Next)
+                    {
+                        auto& res = m_ResourcePool[att->ID];
+                        if (renderArea.width == 0 && renderArea.height == 0) renderArea = res.Extent;
 
-            if (isRaster)
-            {
-                vkCmdEndRendering(cmd);
+                        VkRenderingAttachmentInfo info{};
+                        info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+                        info.imageView = res.PhysicalView;
+
+                        // Dynamic rendering requires attachment-optimal (or GENERAL) layouts for imageLayout.
+                        // We always render attachments in attachment-optimal layouts; the graph will insert explicit
+                        // barriers between passes to transition to other layouts (e.g., TRANSFER_SRC for readback).
+                        info.imageLayout = att->IsDepth
+                                               ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+                                               : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+                        info.loadOp = att->Info.LoadOp;
+                        info.storeOp = att->Info.StoreOp;
+                        info.clearValue = att->Info.ClearValue;
+
+                        if (att->IsDepth)
+                        {
+                            depthAtt = info;
+                            hasDepth = true;
+                        }
+                        else
+                        {
+                            colorAtts.push_back(info);
+                        }
+                    }
+
+                    renderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+                    renderInfo.flags = VK_RENDERING_CONTENTS_SECONDARY_COMMAND_BUFFERS_BIT;
+                    renderInfo.renderArea = {{0, 0}, renderArea};
+                    renderInfo.layerCount = 1;
+                    renderInfo.colorAttachmentCount = (uint32_t)colorAtts.size();
+                    renderInfo.pColorAttachments = colorAtts.data();
+                    renderInfo.pDepthAttachment = hasDepth ? &depthAtt : nullptr;
+
+                    vkCmdBeginRendering(cmd, &renderInfo);
+                }
+
+                VkCommandBuffer sec = secondaryCmds[i];
+                if (sec != VK_NULL_HANDLE)
+                    vkCmdExecuteCommands(cmd, 1, &sec);
+
+                if (isRaster)
+                    vkCmdEndRendering(cmd);
             }
         }
+
+        // Note: CommandContext::Reset() is intentionally not called by RenderGraph.
+        // The engine should reset thread-local pools at a known safe point (end-of-frame) once.
     }
 
     std::vector<RenderGraphDebugPass> RenderGraph::BuildDebugPassList() const

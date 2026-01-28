@@ -3,6 +3,7 @@ export module RHI;
 export import :Bindless;
 export import :Buffer;
 export import :CommandUtils;
+export import :CommandContext;
 export import :ComputePipeline;
 export import :Context;
 export import :Descriptors;

@@ -80,8 +80,24 @@ namespace Graphics::Passes
                                     // IMPORTANT: stored by RenderGraph, so do not capture stack locals by reference.
                                     [this, &ctx, pipeline = m_Pipeline](const PassData&, const RGRegistry&, VkCommandBuffer cmd)
                                     {
-                                        ctx.Renderer.BindPipeline(*pipeline);
-                                        ctx.Renderer.SetViewport(ctx.Resolution.width, ctx.Resolution.height);
+                                        // IMPORTANT: this is recorded into a *secondary* command buffer now.
+                                        // Do not call ctx.Renderer helpers here (they record on the primary CB).
+                                        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->GetHandle());
+
+                                        VkViewport viewport{};
+                                        viewport.x = 0.0f;
+                                        viewport.y = 0.0f;
+                                        viewport.width = (float)ctx.Resolution.width;
+                                        viewport.height = (float)ctx.Resolution.height;
+                                        viewport.minDepth = 0.0f;
+                                        viewport.maxDepth = 1.0f;
+
+                                        VkRect2D scissor{};
+                                        scissor.offset = {0, 0};
+                                        scissor.extent = {ctx.Resolution.width, ctx.Resolution.height};
+
+                                        vkCmdSetViewport(cmd, 0, 1, &viewport);
+                                        vkCmdSetScissor(cmd, 0, 1, &scissor);
 
                                         const uint32_t dynamicOffset = static_cast<uint32_t>(ctx.GlobalCameraDynamicOffset);
                                         vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -798,8 +814,24 @@ namespace Graphics::Passes
                                     },
                                     [this, &ctx, pipeline = m_Pipeline, enableStage3/*, frame*/](const PassData&, const RGRegistry&, VkCommandBuffer cmd)
                                     {
-                                        ctx.Renderer.BindPipeline(*pipeline);
-                                        ctx.Renderer.SetViewport(ctx.Resolution.width, ctx.Resolution.height);
+                                        // IMPORTANT: This callback is recorded into a *secondary* command buffer now.
+                                        // Do not use ctx.Renderer helpers (they record to the primary CB).
+                                        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->GetHandle());
+
+                                        VkViewport viewport{};
+                                        viewport.x = 0.0f;
+                                        viewport.y = 0.0f;
+                                        viewport.width = (float)ctx.Resolution.width;
+                                        viewport.height = (float)ctx.Resolution.height;
+                                        viewport.minDepth = 0.0f;
+                                        viewport.maxDepth = 1.0f;
+
+                                        VkRect2D scissor{};
+                                        scissor.offset = {0, 0};
+                                        scissor.extent = {ctx.Resolution.width, ctx.Resolution.height};
+
+                                        vkCmdSetViewport(cmd, 0, 1, &viewport);
+                                        vkCmdSetScissor(cmd, 0, 1, &scissor);
 
                                         const uint32_t dynamicOffset = static_cast<uint32_t>(ctx.GlobalCameraDynamicOffset);
                                         vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
