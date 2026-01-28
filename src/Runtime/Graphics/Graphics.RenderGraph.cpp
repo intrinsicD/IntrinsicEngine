@@ -913,12 +913,14 @@ namespace Graphics
                         info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
                         info.imageView = res.PhysicalView;
 
-                        // Dynamic rendering requires attachment-optimal (or GENERAL) layouts for imageLayout.
-                        // We always render attachments in attachment-optimal layouts; the graph will insert explicit
-                        // barriers between passes to transition to other layouts (e.g., TRANSFER_SRC for readback).
-                        info.imageLayout = att->IsDepth
-                                               ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
-                                               : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                        // IMPORTANT:
+                        // RenderGraph barriers compute and update ResourceNode::CurrentLayout.
+                        // When executing secondary command buffers with dynamic rendering, the attachment imageLayout
+                        // passed here must match the actual current layout, otherwise validation complains.
+                        //
+                        // We therefore use the tracked layout (which should already be transitioned to attachment-optimal
+                        // for this pass), instead of hardcoding COLOR_ATTACHMENT_OPTIMAL / DEPTH_STENCIL_ATTACHMENT_OPTIMAL.
+                        info.imageLayout = res.CurrentLayout;
 
                         info.loadOp = att->Info.LoadOp;
                         info.storeOp = att->Info.StoreOp;

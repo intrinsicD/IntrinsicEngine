@@ -110,13 +110,14 @@ export namespace Graphics
             bool Pending = false;
             uint32_t X = 0;
             uint32_t Y = 0;
-            uint32_t RequestFrame = 0;
+            uint32_t RequestFrameIndex = 0;    // which slot (0..N-1) the request was recorded into
+            uint64_t RequestGlobalFrame = 0;   // global frame number when request was made
         };
 
         PendingPick m_PendingPick;
         std::vector<std::unique_ptr<RHI::VulkanBuffer>> m_PickReadbackBuffers;
-        std::vector<bool> m_FrameHasPendingReadback;
-        int32_t m_PickResultReadyFrame = -1;
+        // For each frame slot: the global frame number when a pick was recorded, or 0 if none pending.
+        std::vector<uint64_t> m_PickReadbackRequestFrame;
         PickResultGpu m_LastPickResult{};
         bool m_HasPendingConsumedResult = false;
         PickResultGpu m_PendingConsumedResult{};

@@ -17,6 +17,7 @@ add_executable(${target_name}
         Test_RuntimeGraph.cpp
         Test_RuntimeGraph_ParallelLayers.cpp
         Test_RuntimeSelection.cpp
+        Test_RuntimeSelection_Multi.cpp
 )
 
 #Apply Strict Flags ONLY to our tests

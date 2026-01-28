@@ -1,5 +1,6 @@
 module;
 #include <cstring>
+#include <limits>
 #include "RHI.Vulkan.hpp"
 
 export module RHI:Buffer;
@@ -37,6 +38,11 @@ export namespace RHI {
             std::memcpy(static_cast<uint8_t*>(ptr) + offset, data, size);
             Unmap();
         }
+
+        // Explicit cache management for host-visible memory.
+        // Needed for GPU->CPU readbacks when memory is not HOST_COHERENT.
+        void Invalidate(size_t offset = 0, size_t size = std::numeric_limits<size_t>::max());
+        void Flush(size_t offset = 0, size_t size = std::numeric_limits<size_t>::max());
 
     private:
         VulkanDevice& m_Device;

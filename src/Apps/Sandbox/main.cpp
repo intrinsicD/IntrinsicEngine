@@ -310,8 +310,9 @@ public:
             }
         });
 
-        // Deselect if clicking in empty space (in the hierarchy panel)
-        if (ImGui::IsMouseDown(0) && ImGui::IsWindowHovered())
+        // Deselect only when clicking empty space in the hierarchy window.
+        // (The previous IsMouseDown(...) version cleared selection even when clicking an item.)
+        if (ImGui::IsWindowHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ImGui::IsAnyItemHovered())
         {
             GetSelection().ClearSelection(m_Scene);
         }

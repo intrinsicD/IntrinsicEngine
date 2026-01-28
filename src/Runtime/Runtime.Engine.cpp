@@ -48,6 +48,14 @@ namespace Runtime
         t.Position = position;
         t.Scale = scale;
 
+        // Assign stable pick IDs (monotonic, never reused during runtime).
+        // This decouples GPU picking from entt::entity recycling.
+        static uint32_t s_NextPickId = 1u;
+        if (!m_Scene.GetRegistry().all_of<ECS::Components::Selection::PickID>(root))
+        {
+            m_Scene.GetRegistry().emplace<ECS::Components::Selection::PickID>(root, s_NextPickId++);
+        }
+
         // 3. Create Submeshes
         for (size_t i = 0; i < model->Meshes.size(); i++)
         {
@@ -59,6 +67,7 @@ namespace Runtime
                 targetEntity = m_Scene.CreateEntity(model->Meshes[i]->Name);
                 ECS::Components::Hierarchy::Attach(m_Scene.GetRegistry(), targetEntity, root);
             }
+
 
             // Add Renderer
             auto& mr = m_Scene.GetRegistry().emplace<ECS::MeshRenderer::Component>(targetEntity);
@@ -75,6 +84,12 @@ namespace Runtime
 
             // Add Selectable Tag (THE CRITICAL FIX)
             m_Scene.GetRegistry().emplace<ECS::Components::Selection::SelectableTag>(targetEntity);
+
+            // Stable pick ID for each selectable entity.
+            if (!m_Scene.GetRegistry().all_of<ECS::Components::Selection::PickID>(targetEntity))
+            {
+                m_Scene.GetRegistry().emplace<ECS::Components::Selection::PickID>(targetEntity, s_NextPickId++);
+            }
         }
 
         return root;

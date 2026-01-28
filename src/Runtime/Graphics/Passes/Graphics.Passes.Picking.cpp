@@ -126,23 +126,39 @@ namespace Graphics::Passes
                                                 }
                                                 vkCmdSetPrimitiveTopology(cmd, vkTopo);
 
-                                                const uint32_t id = static_cast<uint32_t>(static_cast<entt::id_type>(
-                                                    entity));
+                                                // Use a stable, explicit GPU pick ID.
+                                                // entt::entity values can be recycled and are not safe as persistent pick identifiers.
+                                                uint32_t pickId = 0u;
+                                                if (auto* pid = ctx.Scene.GetRegistry().try_get<ECS::Components::Selection::PickID>(entity))
+                                                    pickId = pid->Value;
+
                                                 uint64_t baseAddr = geo->GetVertexBuffer()->GetDeviceAddress();
                                                 const auto& layout = geo->GetLayout();
-                                                RHI::MeshPushConstants push{
+
+                                                // Match the push constant layout expected by pick_id.vert/frag (PickPushConsts).
+                                                struct PickPushConsts
+                                                {
+                                                    glm::mat4 Model;
+                                                    uint64_t PtrPositions;
+                                                    uint64_t PtrNormals;
+                                                    uint64_t PtrAux;
+                                                    uint32_t EntityID;
+                                                    uint32_t _pad[3];
+                                                };
+
+                                                PickPushConsts push{
                                                     .Model = worldMatrix,
                                                     .PtrPositions = baseAddr + layout.PositionsOffset,
                                                     .PtrNormals = 0,
                                                     .PtrAux = 0,
-                                                    .TextureID = id,
+                                                    .EntityID = pickId,
                                                     ._pad = {}
                                                 };
 
                                                 vkCmdPushConstants(cmd, pipeline->GetLayout(),
                                                                    VK_SHADER_STAGE_VERTEX_BIT |
                                                                    VK_SHADER_STAGE_FRAGMENT_BIT,
-                                                                   0, sizeof(RHI::MeshPushConstants), &push);
+                                                                   0, sizeof(PickPushConsts), &push);
 
                                                 if (geo->GetIndexCount() > 0)
                                                     vkCmdDrawIndexed(cmd, geo->GetIndexCount(), 1, 0, 0, 0);

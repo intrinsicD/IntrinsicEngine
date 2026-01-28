@@ -129,15 +129,21 @@ namespace Graphics::Passes
                                         };
                                         std::vector<ResolutionRequest> requests;
 
+                                        // Resolve material assets for all renderables (cheap batched lookup, single shared_lock).
+                                        // This avoids stale CachedMaterialHandle when the underlying asset changes or pool slots are reused.
                                         for (auto [entity, transform, renderable] : view.each())
                                         {
-                                            if (renderable.Geometry.IsValid() &&
-                                                !renderable.CachedMaterialHandle.IsValid() &&
-                                                renderable.Material.IsValid())
+                                            if (!renderable.Geometry.IsValid())
+                                                continue;
+
+                                            if (!renderable.Material.IsValid())
                                             {
-                                                batchHandles.push_back(renderable.Material);
-                                                requests.push_back({&renderable});
+                                                renderable.CachedMaterialHandle = {};
+                                                continue;
                                             }
+
+                                            batchHandles.push_back(renderable.Material);
+                                            requests.push_back({&renderable});
                                         }
 
                                         if (!batchHandles.empty())
@@ -145,8 +151,8 @@ namespace Graphics::Passes
                                             ctx.AssetManager.BatchResolve<Graphics::Material>(batchHandles, batchResults);
                                             for (size_t i = 0; i < requests.size(); ++i)
                                             {
-                                                Graphics::Material* mat = batchResults[i];
-                                                if (mat) requests[i].Renderable->CachedMaterialHandle = mat->GetHandle();
+                                                Graphics::Material* mat = (i < batchResults.size()) ? batchResults[i] : nullptr;
+                                                requests[i].Renderable->CachedMaterialHandle = mat ? mat->GetHandle() : Graphics::MaterialHandle{};
                                             }
                                         }
 

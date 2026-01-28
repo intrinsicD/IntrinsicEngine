@@ -53,17 +53,28 @@ namespace Runtime
                                           const Graphics::RenderSystem::PickResultGpu& pick,
                                           Runtime::Selection::PickMode mode)
     {
-        if (pick.HasHit)
+        auto& reg = scene.GetRegistry();
+
+        if (pick.HasHit && pick.EntityID != 0u)
         {
-            const auto e = static_cast<entt::entity>(static_cast<entt::id_type>(pick.EntityID));
-            if (scene.GetRegistry().valid(e))
+            // Resolve pick ID -> entity via component lookup.
+            // Keep this restricted to selectable entities to avoid picking internal/non-editor entities.
+            auto view = reg.view<ECS::Components::Selection::PickID, ECS::Components::Selection::SelectableTag>();
+            for (auto e : view)
             {
-                Runtime::Selection::ApplySelection(scene, e, mode);
-                return;
+                const auto& pid = view.get<ECS::Components::Selection::PickID>(e);
+                if (pid.Value == pick.EntityID)
+                {
+                    if (reg.valid(e))
+                    {
+                        Runtime::Selection::ApplySelection(scene, e, mode);
+                        return;
+                    }
+                }
             }
         }
 
-        // No hit or invalid -> clear selection (depending on mode Replace semantics).
+        // No hit or invalid -> treat as background.
         Runtime::Selection::ApplySelection(scene, entt::null, mode);
     }
 
@@ -95,6 +106,14 @@ namespace Runtime
         if (m_Config.Active != Activation::Enabled)
             return;
 
+        // Shift modifies selection semantics:
+        //  - no shift: add the clicked entity (no deselection)
+        //  - shift: toggle clicked entity; background clears only if shift is NOT held
+        const bool shiftDown = window.GetInput().IsKeyPressed(340) || window.GetInput().IsKeyPressed(344); // GLFW_KEY_LEFT_SHIFT / RIGHT_SHIFT
+        const Runtime::Selection::PickMode clickMode = shiftDown
+            ? Runtime::Selection::PickMode::Toggle
+            : Runtime::Selection::PickMode::Add;
+
         // 1) On click: schedule GPU pick or do CPU pick immediately.
         if (camera != nullptr && !uiCapturesMouse)
         {
@@ -121,7 +140,7 @@ namespace Runtime
                         Runtime::Selection::PickRequest req{};
                         req.WorldRay = Runtime::Selection::RayFromNDC(*camera, {nx, ny});
                         req.Backend = Runtime::Selection::PickBackend::CPU;
-                        req.Mode = m_Config.Mode;
+                        req.Mode = clickMode;
 
                         const auto hit = Runtime::Selection::PickCPU(scene, req);
                         Runtime::Selection::ApplySelection(scene, hit.Entity, req.Mode);
@@ -135,7 +154,18 @@ namespace Runtime
         {
             if (auto pickOpt = renderSystem.TryConsumePickResult(); pickOpt.has_value())
             {
-                ApplyFromGpuPick(scene, *pickOpt, m_Config.Mode);
+                // Background behavior requested:
+                //  - shift held: background does NOT deselect (skip deselection)
+                //  - no shift: background deselects all
+                if (!pickOpt->HasHit || pickOpt->EntityID == 0u)
+                {
+                    if (!shiftDown)
+                        Runtime::Selection::ApplySelection(scene, entt::null, Runtime::Selection::PickMode::Replace);
+                }
+                else
+                {
+                    ApplyFromGpuPick(scene, *pickOpt, clickMode);
+                }
             }
         }
     }

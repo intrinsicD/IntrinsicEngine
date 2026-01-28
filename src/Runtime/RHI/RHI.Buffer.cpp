@@ -121,4 +121,18 @@ namespace RHI
         info.buffer = m_Buffer;
         return vkGetBufferDeviceAddress(m_Device.GetLogicalDevice(), &info);
     }
+
+    void VulkanBuffer::Invalidate(size_t offset, size_t size)
+    {
+        if (!m_Allocation) return;
+        vmaInvalidateAllocation(m_Device.GetAllocator(), m_Allocation, static_cast<VkDeviceSize>(offset),
+                                static_cast<VkDeviceSize>(size));
+    }
+
+    void VulkanBuffer::Flush(size_t offset, size_t size)
+    {
+        if (!m_Allocation) return;
+        vmaFlushAllocation(m_Device.GetAllocator(), m_Allocation, static_cast<VkDeviceSize>(offset),
+                           static_cast<VkDeviceSize>(size));
+    }
 }

@@ -112,7 +112,7 @@ namespace Graphics
         // Picking: one 4-byte host-visible readback buffer per frame-in-flight.
         auto NumFramesInFlight = renderer.GetFramesInFlight();
         m_PickReadbackBuffers.resize(NumFramesInFlight);
-        m_FrameHasPendingReadback.resize(NumFramesInFlight, false);
+        m_PickReadbackRequestFrame.resize(NumFramesInFlight, 0);
         for (auto& buf : m_PickReadbackBuffers)
         {
             buf = std::make_unique<RHI::VulkanBuffer>(
@@ -251,7 +251,11 @@ namespace Graphics
 
     void RenderSystem::RequestPick(uint32_t x, uint32_t y)
     {
-        m_PendingPick = {true, x, y, m_Renderer.GetCurrentFrameIndex()};
+        m_PendingPick = {
+            true, x, y,
+            m_Renderer.GetCurrentFrameIndex(),
+            m_Device->GetGlobalFrameNumber()
+        };
     }
 
     void RenderSystem::OnUpdate(ECS::Scene& scene, const CameraComponent& camera,
@@ -272,32 +276,44 @@ namespace Graphics
         }
 
         const uint32_t frameIndex = m_Renderer.GetCurrentFrameIndex();
+        const uint64_t currentGlobalFrame = m_Device->GetGlobalFrameNumber();
+        const uint32_t framesInFlight = m_Renderer.GetFramesInFlight();
 
-        if (m_FrameHasPendingReadback[frameIndex])
+        // Check if a prior pick recorded into this slot is now safe to read.
+        // Safe = at least FramesInFlight global frames have passed since the request,
+        // guaranteeing the GPU has completed that command buffer.
+        if (m_PickReadbackRequestFrame[frameIndex] != 0)
         {
-            // Map and read
-            void* mapped = m_PickReadbackBuffers[frameIndex]->Map();
-            if (mapped)
+            const uint64_t requestFrame = m_PickReadbackRequestFrame[frameIndex];
+            if (currentGlobalFrame >= requestFrame + framesInFlight)
             {
-                uint32_t entityID = *static_cast<uint32_t*>(mapped);
-                m_PickReadbackBuffers[frameIndex]->Unmap();
+                // GPU has completed; safe to read.
+                // IMPORTANT: on non-coherent host-visible memory we must invalidate before reading.
+                m_PickReadbackBuffers[frameIndex]->Invalidate(0, sizeof(uint32_t));
 
-                // Publish result
-                m_PendingConsumedResult = {entityID != 0, entityID};
-                m_HasPendingConsumedResult = true;
-                m_LastPickResult = m_PendingConsumedResult;
+                void* mapped = m_PickReadbackBuffers[frameIndex]->Map();
+                if (mapped)
+                {
+                    uint32_t entityID = *static_cast<uint32_t*>(mapped);
+                    m_PickReadbackBuffers[frameIndex]->Unmap();
 
-                // Log for debug
-                if (entityID != 0)
-                    Core::Log::Info("GPU Pick Hit: Entity ID {}", entityID);
+                    // Publish result
+                    m_PendingConsumedResult = {entityID != 0, entityID};
+                    m_HasPendingConsumedResult = true;
+                    m_LastPickResult = m_PendingConsumedResult;
+
+                    // Log for debug
+                    if (entityID != 0)
+                        Core::Log::Info("GPU Pick Hit: Entity ID {}", entityID);
+                }
+                m_PickReadbackRequestFrame[frameIndex] = 0;
             }
-            m_FrameHasPendingReadback[frameIndex] = false;
         }
 
-        // If we are about to record a pick command this frame, mark it for readback next time
+        // If we are about to record a pick command this frame, mark this slot with the current global frame.
         if (m_PendingPick.Pending)
         {
-            m_FrameHasPendingReadback[frameIndex] = true;
+            m_PickReadbackRequestFrame[frameIndex] = currentGlobalFrame;
         }
 
         RHI::CameraBufferObject ubo{};

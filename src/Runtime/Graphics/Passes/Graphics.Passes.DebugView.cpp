@@ -295,8 +295,12 @@ namespace Graphics::Passes
                                            data.Dst = builder.WriteColor(dst, info);
 
                                            // Read Source
-                                           data.Src = builder.Read(srcHandle, VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-                                                                   VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
+                                           // NOTE: We OR-in MEMORY_WRITE to force a barrier if the previous pass ended in a writable layout
+                                           // (e.g., COLOR_ATTACHMENT_OPTIMAL for PickID). The RenderGraph currently allows read-after-read
+                                           // accesses to skip barriers, which can leave the image in the wrong layout for sampling.
+                                           data.Src = builder.Read(srcHandle,
+                                                                   VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                                                                   VK_ACCESS_2_SHADER_SAMPLED_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT);
 
                                            // Metadata
                                            data.SrcFormat = srcInfo->Format;
