@@ -487,6 +487,8 @@ namespace Graphics
 
     void RenderGraph::Compile(uint32_t frameIndex)
     {
+        m_CompiledFrameIndex = frameIndex;
+
         // 1. Resolve Transient Resources (Unchanged)
         for (uint32_t i = 0; i < m_ActiveResourceCount; ++i)
         {
@@ -845,11 +847,6 @@ namespace Graphics
                 Core::Tasks::Scheduler::Dispatch([this, passIdx, &secondaryCmds, i, &rasterInfos]
                 {
                     auto& pass = m_PassPool[passIdx];
-
-                    // IMPORTANT:
-                    // Whether a secondary needs dynamic-rendering inheritance is strictly determined by
-                    // whether it will be executed inside a vkCmdBeginRendering/vkCmdEndRendering scope.
-                    // Our primary command buffer does that iff the pass has attachments.
                     const bool isRaster = (pass.AttachmentHead != nullptr);
 
                     RHI::SecondaryInheritanceInfo inherit{};
@@ -863,7 +860,10 @@ namespace Graphics
                         inherit.ViewMask = 0;
                     }
 
-                    VkCommandBuffer sec = RHI::CommandContext::BeginSecondary(*m_Device, inherit);
+                    // `m_CompiledFrameIndex` is a monotonically increasing frame counter.
+                    // Secondary command buffer reuse is keyed on a monotonic CPU frame epoch.
+                    const uint64_t frameEpoch = m_Device ? m_Device->GetGlobalFrameNumber() : 0ull;
+                    VkCommandBuffer sec = RHI::CommandContext::BeginSecondary(*m_Device, frameEpoch, inherit);
 
                     if (pass.ExecuteFn)
                         pass.ExecuteFn(pass.ExecuteUserData, m_Registry, sec);

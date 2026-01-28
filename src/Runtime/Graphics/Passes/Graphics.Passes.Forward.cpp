@@ -62,7 +62,7 @@ namespace Graphics::Passes
             return;
 
         ctx.Graph.AddPass<PassData>("ForwardPass",
-                                    [this, &ctx, backbuffer, depth](PassData& data, RGBuilder& builder)
+                                    [&ctx, backbuffer, depth](PassData& data, RGBuilder& builder)
                                     {
                                         RGAttachmentInfo colorInfo{};
                                         colorInfo.ClearValue = {{{0.1f, 0.3f, 0.6f, 1.0f}}};
@@ -224,24 +224,27 @@ namespace Graphics::Passes
                                         if (!cpuVisibility.empty())
                                             m_VisibilityBuffer[frame]->Write(cpuVisibility.data(), visibilityBytes);
 
-                                        // Allocate (once) + update the per-frame instance descriptor set.
+                                        // Allocate + update the per-frame instance descriptor set.
+                                        // IMPORTANT (Validation): we must not vkUpdateDescriptorSets() on a set that may still be
+                                        // in use by an in-flight command buffer unless the binding uses UPDATE_AFTER_BIND/UNUSED_WHILE_PENDING.
+                                        // Our stage1 bindings are plain storage buffers, so we use the safe pattern: allocate
+                                        // a fresh set per frame-slot.
                                         if (!m_InstanceSetPool)
                                         {
                                             Core::Log::Error("ForwardPass: Persistent descriptor pool not initialized for Stage 1 instance set.");
                                             return;
                                         }
 
-                                        if (m_InstanceSet[frame] == VK_NULL_HANDLE)
+                                        // Always allocate a new set each frame slot to avoid updating an in-flight set.
+                                        VkDescriptorSet instanceSet = m_InstanceSetPool->Allocate(m_InstanceSetLayout);
+                                        if (instanceSet == VK_NULL_HANDLE)
                                         {
-                                            m_InstanceSet[frame] = m_InstanceSetPool->Allocate(m_InstanceSetLayout);
-                                            if (m_InstanceSet[frame] == VK_NULL_HANDLE)
-                                            {
-                                                Core::Log::Error("ForwardPass: Failed to allocate Stage 1 instance descriptor set.");
-                                                return;
-                                            }
+                                            Core::Log::Error("ForwardPass: Failed to allocate Stage 1 instance descriptor set.");
+                                            return;
                                         }
 
-                                        VkDescriptorSet instanceSet = m_InstanceSet[frame];
+                                        // Keep a handle for debugging / optional reuse policies.
+                                        m_InstanceSet[frame] = instanceSet;
 
                                         VkDescriptorBufferInfo instInfo{};
                                         instInfo.buffer = m_InstanceBuffer[frame]->GetHandle();

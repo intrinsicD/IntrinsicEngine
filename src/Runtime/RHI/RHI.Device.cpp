@@ -6,6 +6,7 @@ module;
 #include <functional>
 #include <string_view>
 #include <memory>
+#include <algorithm>
 
 #include "RHI.Vulkan.hpp"
 
@@ -41,6 +42,25 @@ namespace RHI
             return;
         }
 
+        // Create graphics timeline semaphore for accurate deferred destruction.
+        {
+            VkSemaphoreTypeCreateInfo timelineInfo{};
+            timelineInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
+            timelineInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
+            timelineInfo.initialValue = 0;
+
+            VkSemaphoreCreateInfo semInfo{};
+            semInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+            semInfo.pNext = &timelineInfo;
+
+            if (vkCreateSemaphore(m_Device, &semInfo, nullptr, &m_GraphicsTimelineSemaphore) != VK_SUCCESS)
+            {
+                Core::Log::Error("Failed to create graphics timeline semaphore");
+                m_IsValid = false;
+                return;
+            }
+        }
+
         // Create transient allocator AFTER device creation (it owns VkDeviceMemory pages).
         m_TransientAllocator = new TransientAllocator(*this);
 
@@ -63,8 +83,24 @@ namespace RHI
         if (m_Device) vkDeviceWaitIdle(m_Device);
 
         // 2) Execute all deferred deletions while the device + VMA allocator are still valid.
-        //    (Many resources enqueue vmaDestroyBuffer/Image via SafeDestroy.)
         FlushAllDeletionQueues();
+
+        // Also flush timeline-based deletions.
+        {
+            std::lock_guard lock(m_DeletionMutex);
+            for (auto& item : m_TimelineDeletionQueue)
+            {
+                if (item.Fn) item.Fn();
+            }
+            m_TimelineDeletionQueue.clear();
+        }
+
+        // Destroy timeline semaphore while device is still alive.
+        if (m_GraphicsTimelineSemaphore)
+        {
+            vkDestroySemaphore(m_Device, m_GraphicsTimelineSemaphore, nullptr);
+            m_GraphicsTimelineSemaphore = VK_NULL_HANDLE;
+        }
 
         // 3) Destroy transient allocator pages (raw VkDeviceMemory pages).
         delete static_cast<TransientAllocator*>(m_TransientAllocator);
@@ -91,39 +127,65 @@ namespace RHI
         if (m_Device) vkDestroyDevice(m_Device, nullptr);
     }
 
-    // ... (SubmitToGraphicsQueue, Present, RegisterThreadLocalPool, FlushDeletionQueue, SafeDestroy remain the same) ...
-    VkResult VulkanDevice::SubmitToGraphicsQueue(const VkSubmitInfo& submitInfo, VkFence fence)
+    uint64_t VulkanDevice::SignalGraphicsTimeline()
     {
-        std::scoped_lock lock(m_QueueMutex);
-        return vkQueueSubmit(m_GraphicsQueue, 1, &submitInfo, fence);
+        const uint64_t value = m_GraphicsTimelineNextValue.fetch_add(1, std::memory_order_relaxed);
+        m_GraphicsTimelineValue = value;
+        return value;
     }
 
-    VkResult VulkanDevice::Present(const VkPresentInfoKHR& presentInfo)
+    uint64_t VulkanDevice::GetGraphicsTimelineCompletedValue() const
     {
-        std::scoped_lock lock(m_QueueMutex);
-        return vkQueuePresentKHR(m_PresentQueue, &presentInfo);
+        if (!m_GraphicsTimelineSemaphore) return 0;
+        uint64_t completed = 0;
+        VK_CHECK(vkGetSemaphoreCounterValue(m_Device, m_GraphicsTimelineSemaphore, &completed));
+        return completed;
     }
 
-    void VulkanDevice::RegisterThreadLocalPool(VkCommandPool pool)
+    void VulkanDevice::CollectGarbage()
     {
-        std::lock_guard lock(m_ThreadPoolsMutex);
-        m_ThreadCommandPools.push_back(pool);
+        const uint64_t completed = GetGraphicsTimelineCompletedValue();
+
+        std::lock_guard lock(m_DeletionMutex);
+
+        if (m_TimelineDeletionQueue.empty())
+            return;
+
+        // Keep order; destroys are typically small, so a single pass erase is fine.
+        std::erase_if(m_TimelineDeletionQueue, [&](DeferredDelete& item)
+        {
+            if (item.Value <= completed)
+            {
+                if (item.Fn) item.Fn();
+                return true;
+            }
+            return false;
+        });
+    }
+
+    void VulkanDevice::SafeDestroyAfter(uint64_t value, std::function<void()>&& deleteFn)
+    {
+        std::lock_guard lock(m_DeletionMutex);
+        m_TimelineDeletionQueue.push_back(DeferredDelete{.Value = value, .Fn = std::move(deleteFn)});
+    }
+
+    void VulkanDevice::SafeDestroy(std::function<void()>&& deleteFn)
+    {
+        // Defer until the *next* graphics submit completes.
+        // If no submit has happened yet, fall back to value 1 (first submit).
+        const uint64_t target = (m_GraphicsTimelineValue > 0) ? (m_GraphicsTimelineValue + 1) : 1;
+        SafeDestroyAfter(target, std::move(deleteFn));
     }
 
     void VulkanDevice::FlushDeletionQueue(uint32_t frameIndex)
     {
         std::lock_guard lock(m_DeletionMutex);
+
+        m_CurrentSafeDestroyFrame = frameIndex;
+
         auto& queue = m_DeletionQueue[frameIndex];
         for (auto& fn : queue) fn();
         queue.clear();
-    }
-
-    void VulkanDevice::SafeDestroy(std::function<void()>&& deleteFn)
-    {
-        std::lock_guard lock(m_DeletionMutex);
-
-        uint32_t safeFrameIndex = (m_CurrentFrameIndex + 1) % MAX_FRAMES_IN_FLIGHT;
-        m_DeletionQueue[safeFrameIndex].push_back(std::move(deleteFn));
     }
 
     void VulkanDevice::PickPhysicalDevice(VkInstance instance)
@@ -442,5 +504,35 @@ namespace RHI
         }
         return details;
     }
-}
 
+    VkResult VulkanDevice::SubmitToGraphicsQueue(const VkSubmitInfo& submitInfo, VkFence fence)
+    {
+        if (!m_Device || !m_GraphicsQueue)
+            return VK_ERROR_DEVICE_LOST;
+
+        std::scoped_lock lock(m_QueueMutex);
+        return vkQueueSubmit(m_GraphicsQueue, 1, &submitInfo, fence);
+    }
+
+    VkResult VulkanDevice::Present(const VkPresentInfoKHR& presentInfo)
+    {
+        // Headless / offscreen mode: no surface == no present.
+        if (m_Surface == VK_NULL_HANDLE)
+            return VK_SUCCESS;
+
+        if (!m_Device || !m_PresentQueue)
+            return VK_ERROR_DEVICE_LOST;
+
+        std::scoped_lock lock(m_QueueMutex);
+        return vkQueuePresentKHR(m_PresentQueue, &presentInfo);
+    }
+
+    void VulkanDevice::RegisterThreadLocalPool(VkCommandPool pool)
+    {
+        if (pool == VK_NULL_HANDLE || !m_Device)
+            return;
+
+        std::lock_guard lock(m_ThreadPoolsMutex);
+        m_ThreadCommandPools.push_back(pool);
+    }
+}

@@ -31,7 +31,11 @@ export namespace RHI
     public:
         // Returns a Secondary command buffer ready for recording.
         // Uses a thread-local VkCommandPool internally.
+        //
+        // frameEpoch must be a *monotonic* frame counter (e.g. VulkanDevice::GetGlobalFrameNumber()).
+        // This is required to make per-thread secondary buffer reuse robust across frames-in-flight.
         [[nodiscard]] static VkCommandBuffer BeginSecondary(VulkanDevice& device,
+                                                           uint64_t frameEpoch,
                                                            const SecondaryInheritanceInfo& inherit = {});
 
         // Finalize the secondary buffer.

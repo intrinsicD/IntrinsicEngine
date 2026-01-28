@@ -16,11 +16,19 @@ namespace RHI
             VkCommandPool Pool = VK_NULL_HANDLE;
             VulkanDevice* OwnerDevicePtr = nullptr;
 
-            std::vector<VkCommandBuffer> Buffers;
-            uint32_t UsedCount = 0;
+            // One secondary buffer ring per in-flight frame.
+            // Engine default is 3 frames; keep a small fixed upper bound to avoid allocations in hot paths.
+            static constexpr uint32_t kMaxFramesInFlight = 3;
+            std::vector<VkCommandBuffer> BuffersPerFrame[kMaxFramesInFlight];
+            uint32_t UsedCountPerFrame[kMaxFramesInFlight] = {0u, 0u, 0u};
+
+            uint32_t FramesInFlight = kMaxFramesInFlight;
+
+            // Tracks the last *epoch* (monotonic frame counter) observed for each slot.
+            uint64_t LastEpochPerFrame[kMaxFramesInFlight] = {~0ull, ~0ull, ~0ull};
         };
 
-        static thread_local ThreadData s_Thread;
+        thread_local ThreadData s_Thread;
 
         [[nodiscard]] VkCommandPool GetOrCreatePool(VulkanDevice& device)
         {
@@ -29,8 +37,18 @@ namespace RHI
             {
                 s_Thread.Pool = VK_NULL_HANDLE;
                 s_Thread.OwnerDevicePtr = &device;
-                s_Thread.Buffers.clear();
-                s_Thread.UsedCount = 0;
+
+                for (auto& v : s_Thread.BuffersPerFrame) v.clear();
+                s_Thread.UsedCountPerFrame[0] = 0;
+                s_Thread.UsedCountPerFrame[1] = 0;
+                s_Thread.UsedCountPerFrame[2] = 0;
+                s_Thread.LastEpochPerFrame[0] = ~0ull;
+                s_Thread.LastEpochPerFrame[1] = ~0ull;
+                s_Thread.LastEpochPerFrame[2] = ~0ull;
+
+                s_Thread.FramesInFlight = device.GetFramesInFlight();
+                if (s_Thread.FramesInFlight == 0 || s_Thread.FramesInFlight > ThreadData::kMaxFramesInFlight)
+                    s_Thread.FramesInFlight = ThreadData::kMaxFramesInFlight;
             }
 
             if (s_Thread.Pool == VK_NULL_HANDLE)
@@ -42,6 +60,9 @@ namespace RHI
 
                 VK_CHECK(vkCreateCommandPool(device.GetLogicalDevice(), &poolInfo, nullptr, &s_Thread.Pool));
                 s_Thread.OwnerDevicePtr = &device;
+                s_Thread.FramesInFlight = device.GetFramesInFlight();
+                if (s_Thread.FramesInFlight == 0 || s_Thread.FramesInFlight > ThreadData::kMaxFramesInFlight)
+                    s_Thread.FramesInFlight = ThreadData::kMaxFramesInFlight;
                 device.RegisterThreadLocalPool(s_Thread.Pool);
             }
 
@@ -62,22 +83,36 @@ namespace RHI
         }
     }
 
-    VkCommandBuffer CommandContext::BeginSecondary(VulkanDevice& device, const SecondaryInheritanceInfo& inherit)
+    VkCommandBuffer CommandContext::BeginSecondary(VulkanDevice& device,
+                                                  uint64_t frameEpoch,
+                                                  const SecondaryInheritanceInfo& inherit)
     {
         VkCommandPool pool = GetOrCreatePool(device);
 
-        if (s_Thread.UsedCount >= s_Thread.Buffers.size())
+        const uint32_t frames = (s_Thread.FramesInFlight > 0) ? s_Thread.FramesInFlight : 1u;
+        const uint32_t slot = static_cast<uint32_t>(frameEpoch % static_cast<uint64_t>(frames));
+
+        // Reset per-slot cursor once per new epoch.
+        if (s_Thread.LastEpochPerFrame[slot] != frameEpoch)
         {
-            s_Thread.Buffers.push_back(AllocateSecondary(device, pool));
+            s_Thread.LastEpochPerFrame[slot] = frameEpoch;
+            s_Thread.UsedCountPerFrame[slot] = 0;
         }
 
-        VkCommandBuffer cmd = s_Thread.Buffers[s_Thread.UsedCount++];
+        auto& buffers = s_Thread.BuffersPerFrame[slot];
+        uint32_t& used = s_Thread.UsedCountPerFrame[slot];
+
+        if (used >= buffers.size())
+        {
+            buffers.push_back(AllocateSecondary(device, pool));
+        }
+
+        VkCommandBuffer cmd = buffers[used++];
 
         // Reset is allowed because pool has RESET_COMMAND_BUFFER_BIT.
+        // Safety relies on the renderer waiting on the in-flight fence for this slot.
         VK_CHECK(vkResetCommandBuffer(cmd, 0));
 
-        // If this secondary is executed inside vkCmdBeginRendering, Vulkan requires dynamic rendering
-        // inheritance info AND the RENDER_PASS_CONTINUE flag.
         const bool isRasterSecondary = inherit.IsRaster();
 
         VkCommandBufferInheritanceInfo inheritInfo{};
@@ -102,8 +137,6 @@ namespace RHI
 
         VkCommandBufferBeginInfo beginInfo{};
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-
-        // For SECONDARY command buffers, pInheritanceInfo must always be valid.
         beginInfo.pInheritanceInfo = &inheritInfo;
 
         beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
@@ -127,7 +160,12 @@ namespace RHI
         if (s_Thread.OwnerDevicePtr != &device) return;
         if (s_Thread.Pool == VK_NULL_HANDLE) return;
 
-        s_Thread.UsedCount = 0;
+        s_Thread.UsedCountPerFrame[0] = 0;
+        s_Thread.UsedCountPerFrame[1] = 0;
+        s_Thread.UsedCountPerFrame[2] = 0;
+        s_Thread.LastEpochPerFrame[0] = ~0ull;
+        s_Thread.LastEpochPerFrame[1] = ~0ull;
+        s_Thread.LastEpochPerFrame[2] = ~0ull;
         VK_CHECK(vkResetCommandPool(device.GetLogicalDevice(), s_Thread.Pool, 0));
     }
 }

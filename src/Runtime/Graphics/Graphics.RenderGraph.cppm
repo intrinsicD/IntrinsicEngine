@@ -433,5 +433,9 @@ export namespace Graphics
 
         void BuildAdjacencyList();
         void TopologicalSortIntoLayers();
+
+        // Frame index associated with the most recent Compile().
+        // Used for per-thread secondary command buffer reuse.
+        uint32_t m_CompiledFrameIndex = ~0u;
     };
 }

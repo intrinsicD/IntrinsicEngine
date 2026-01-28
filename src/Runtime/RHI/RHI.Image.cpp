@@ -108,13 +108,50 @@ namespace RHI
     {
         if (this != &other)
         {
-            // Destroy current resources (if any)
-            this->~VulkanImage();
+            // Release current resources (if any) WITHOUT destroying the object (calling the destructor
+            // directly is UB unless followed by placement-new).
+            VkDevice logicalDevice = m_Device.GetLogicalDevice();
+            VmaAllocator allocator = m_Device.GetAllocator();
+
+            if (m_ImageView)
+            {
+                VkImageView view = m_ImageView;
+                m_Device.SafeDestroy([logicalDevice, view]()
+                {
+                    vkDestroyImageView(logicalDevice, view, nullptr);
+                });
+                m_ImageView = VK_NULL_HANDLE;
+            }
+
+            if (m_Image)
+            {
+                VkImage image = m_Image;
+                if (m_OwnsMemory)
+                {
+                    VmaAllocation allocation = m_Allocation;
+                    if (allocation)
+                    {
+                        m_Device.SafeDestroy([allocator, image, allocation]()
+                        {
+                            vmaDestroyImage(allocator, image, allocation);
+                        });
+                    }
+                }
+                else
+                {
+                    m_Device.SafeDestroy([logicalDevice, image]()
+                    {
+                        vkDestroyImage(logicalDevice, image, nullptr);
+                    });
+                }
+
+                m_Image = VK_NULL_HANDLE;
+                m_Allocation = VK_NULL_HANDLE;
+                m_OwnsMemory = false;
+            }
 
             // Move data
-            // Note: m_Device is a reference, cannot be reassigned easily if different,
-            // but in this engine m_Device is a singleton/shared_ptr usually.
-            // We assume moving between images of same device context.
+            // Note: m_Device is a reference, cannot be reassigned.
             m_Image = std::exchange(other.m_Image, VK_NULL_HANDLE);
             m_ImageView = std::exchange(other.m_ImageView, VK_NULL_HANDLE);
             m_Allocation = std::exchange(other.m_Allocation, VK_NULL_HANDLE);
@@ -124,6 +161,10 @@ namespace RHI
             m_Height = other.m_Height;
             m_IsValid = other.m_IsValid;
             m_OwnsMemory = other.m_OwnsMemory;
+
+            // Leave the moved-from object in a consistent inert state.
+            other.m_OwnsMemory = false;
+            other.m_IsValid = false;
         }
         return *this;
     }
@@ -154,7 +195,6 @@ namespace RHI
                 // We own the memory. vmaDestroyImage frees both the VkImage and the allocation.
                 VmaAllocation allocation = m_Allocation;
 
-                // Defensive check, though allocation should be valid if m_OwnsMemory is true
                 if (allocation)
                 {
                     m_Device.SafeDestroy([allocator, image, allocation]()
@@ -168,6 +208,8 @@ namespace RHI
                 // CASE B: Aliased / Unbound (RenderGraph)
                 // We do NOT own the memory (it belongs to the RenderGraph pool).
                 // We MUST destroy the VkImage handle, but MUST NOT touch the memory.
+                // IMPORTANT: still defer the destruction until the GPU is done with any command buffers
+                // that reference this VkImage.
                 m_Device.SafeDestroy([logicalDevice, image]()
                 {
                     vkDestroyImage(logicalDevice, image, nullptr);

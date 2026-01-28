@@ -84,11 +84,15 @@ namespace RHI
         // 1. Wait for fence (CPU wait)
         VK_CHECK(vkWaitForFences(m_Device->GetLogicalDevice(), 1, &m_InFlightFences[m_CurrentFrame], VK_TRUE, UINT64_MAX));
 
+        // Reclaim timeline-based deferred deletions whose submissions have completed.
+        m_Device->CollectGarbage();
+
+        // 2. Reclaim resources that were scheduled on this frame-slot.
+        // IMPORTANT: this must happen before advancing the global frame epoch used by SafeDestroy().
         m_Device->FlushDeletionQueue(m_CurrentFrame);
 
-        // Increment global frame counter for deferred resource tracking
-        // This provides a monotonically increasing frame number for safe GPU resource deletion
-        m_Device->IncrementFrame();
+        // 3. Advance global frame epoch for newly scheduled deferred deletions.
+        m_Device->IncrementGlobalFrame();
 
         // 2. Acquire Image
         VkResult result = vkAcquireNextImageKHR(
@@ -217,14 +221,26 @@ namespace RHI
 
         VK_CHECK(vkEndCommandBuffer(cmd));
 
+        // Attach a timeline signal to this submit.
+        const uint64_t signalValue = m_Device->SignalGraphicsTimeline();
+
+        VkTimelineSemaphoreSubmitInfo timelineSubmit{};
+        timelineSubmit.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
+
+        // We signal 2 semaphores (binary + timeline). The timeline submit info must provide a value
+        // for *each* signaled semaphore. Values for binary semaphores are ignored by Vulkan.
+        const uint64_t signalValues[] = { 0ull, signalValue };
+        timelineSubmit.signalSemaphoreValueCount = 2;
+        timelineSubmit.pSignalSemaphoreValues = signalValues;
+
+        VkSemaphore timelineSem = m_Device->GetGraphicsTimelineSemaphore();
+        VkSemaphore submitSignalSemaphores[] = { m_RenderFinishedSemaphores[m_CurrentFrame], timelineSem };
+
         VkSubmitInfo submitInfo{};
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        submitInfo.pNext = &timelineSubmit;
 
         VkSemaphore waitSemaphores[] = {m_ImageAvailableSemaphores[m_CurrentFrame]};
-
-        // Must be <= earliest swapchain image use in the command buffer (the BeginFrame layout transition).
-        // Using TOP_OF_PIPE keeps vertex/compute overlap with presentation while still correctly gating the
-        // first access to the acquired image.
         VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT};
         submitInfo.waitSemaphoreCount = 1;
         submitInfo.pWaitSemaphores = waitSemaphores;
@@ -233,9 +249,9 @@ namespace RHI
         submitInfo.commandBufferCount = 1;
         submitInfo.pCommandBuffers = &cmd;
 
-        VkSemaphore signalSemaphores[] = {m_RenderFinishedSemaphores[m_CurrentFrame]};
-        submitInfo.signalSemaphoreCount = 1;
-        submitInfo.pSignalSemaphores = signalSemaphores;
+        // Signal render-finished + timeline.
+        submitInfo.signalSemaphoreCount = 2;
+        submitInfo.pSignalSemaphores = submitSignalSemaphores;
 
         VK_CHECK(m_Device->SubmitToGraphicsQueue(submitInfo, m_InFlightFences[m_CurrentFrame]));
 
@@ -254,8 +270,11 @@ namespace RHI
         // 8. Present
         VkPresentInfoKHR presentInfo{};
         presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+
+        // Present can only wait on *binary* semaphores.
+        VkSemaphore presentWaitSemaphores[] = { m_RenderFinishedSemaphores[m_CurrentFrame] };
         presentInfo.waitSemaphoreCount = 1;
-        presentInfo.pWaitSemaphores = signalSemaphores;
+        presentInfo.pWaitSemaphores = presentWaitSemaphores;
 
         VkSwapchainKHR swapchains[] = {m_Swapchain.GetHandle()};
         presentInfo.swapchainCount = 1;

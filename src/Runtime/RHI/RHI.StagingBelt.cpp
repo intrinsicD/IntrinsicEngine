@@ -78,9 +78,10 @@ namespace RHI
         if (sizeBytes == 0)
             return {};
 
-
-        size_t MIN_VULKAN_ALIGN = m_Device.GetPhysicalDeviceProperties().limits.minMemoryMapAlignment;
-        size_t effectiveAlign = std::max(alignment, MIN_VULKAN_ALIGN); //TODO: Is this correct?
+        VkPhysicalDeviceProperties props{};
+        vkGetPhysicalDeviceProperties(m_Device.GetPhysicalDevice(), &props);
+        const size_t minVulkanAlign = static_cast<size_t>(props.limits.minMemoryMapAlignment);
+        const size_t effectiveAlign = std::max(alignment, minVulkanAlign);
 
         // We can't safely reuse regions until GC processes.
         // If ring is full, we fail-fast; caller may fall back to dedicated staging.
