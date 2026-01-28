@@ -44,7 +44,8 @@ namespace Graphics::Passes
 
             m_InstanceSetPool = std::make_unique<RHI::PersistentDescriptorPool>(*m_Device,
                                                                                 /*maxSets*/ 256,
-                                                                                /*storageBufferCount*/ 512);
+                                                                                /*storageBufferCount*/ 512,
+                                                                                /*debugName*/ "ForwardPass.Stage1.Instance");
         }
 
         // Ensure cull descriptor pool exists.
@@ -53,7 +54,8 @@ namespace Graphics::Passes
             // 1 set per frame is enough for now.
             m_CullSetPool = std::make_unique<RHI::PersistentDescriptorPool>(*m_Device,
                                                                             /*maxSets*/ 16,
-                                                                            /*storageBufferCount*/ 16 * 5);
+                                                                            /*storageBufferCount*/ 16 * 5,
+                                                                            /*debugName*/ "ForwardPass.Cull");
         }
 
         const RGResourceHandle backbuffer = ctx.Blackboard.Get("Backbuffer"_id);
