@@ -12,6 +12,8 @@ export module Graphics:RenderPipeline;
 import :RenderGraph;
 import :MaterialSystem;
 import :Geometry;
+import :ShaderRegistry;
+import :PipelineLibrary;
 import Core;
 import ECS;
 import RHI;
@@ -101,6 +103,10 @@ export namespace Graphics
         // These mirror what is uploaded to RHI::CameraBufferObject each frame.
         glm::mat4 CameraView{1.0f};
         glm::mat4 CameraProj{1.0f};
+
+        // Picking readback destination for *this frame slot* (owned by RenderSystem).
+        // The PickingPass uses this for vkCmdCopyImageToBuffer.
+        RHI::VulkanBuffer* PickReadbackBuffer = nullptr;
     };
 
     // ---------------------------------------------------------------------
@@ -122,5 +128,38 @@ export namespace Graphics
         // Optional lifecycle.
         virtual void Shutdown() {}
         virtual void OnResize(uint32_t width, uint32_t height) { (void)width; (void)height; }
+    };
+
+    // ---------------------------------------------------------------------
+    // RenderPipeline interface (owns features, hot-swappable)
+    // ---------------------------------------------------------------------
+    class RenderPipeline
+    {
+    public:
+        virtual ~RenderPipeline() = default;
+
+        // Called when this pipeline becomes active.
+        virtual void Initialize(RHI::VulkanDevice& device,
+                                RHI::DescriptorAllocator& descriptorPool,
+                                RHI::DescriptorLayout& globalLayout,
+                                const ShaderRegistry& shaderRegistry,
+                                PipelineLibrary& pipelineLibrary) = 0;
+
+        virtual void Shutdown() {}
+
+        // Declare passes for this frame.
+        virtual void SetupFrame(RenderPassContext& ctx) = 0;
+
+        virtual void OnResize(uint32_t width, uint32_t height) { (void)width; (void)height; }
+
+        // Called after RenderGraph::Compile() but before Execute().
+        virtual void PostCompile(uint32_t frameIndex,
+                                 std::span<const RenderGraphDebugImage> debugImages,
+                                 std::span<const RenderGraphDebugPass> debugPasses)
+        {
+            (void)frameIndex;
+            (void)debugImages;
+            (void)debugPasses;
+        }
     };
 }

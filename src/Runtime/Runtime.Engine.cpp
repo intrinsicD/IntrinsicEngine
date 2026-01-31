@@ -486,6 +486,12 @@ namespace Runtime
             Core::Log::Error("Failed to create RenderSystem!");
             std::exit(1);
         }
+
+        // ---------------------------------------------------------------------
+        // Default Render Pipeline (hot-swappable)
+        // ---------------------------------------------------------------------
+        // Engine owns lifetime (RenderSystem owns pipeline); applications can request swaps at runtime.
+        m_RenderSystem->RequestPipelineSwap(std::make_unique<Graphics::DefaultPipeline>());
     }
 
     void Engine::Run()

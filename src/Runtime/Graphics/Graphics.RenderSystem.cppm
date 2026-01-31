@@ -12,10 +12,6 @@ import :Camera;
 import :Geometry;
 import :RenderGraph;
 import :RenderPipeline;
-import :Passes.Picking;
-import :Passes.Forward;
-import :Passes.DebugView;
-import :Passes.ImGui;
 import :ShaderRegistry;
 import :PipelineLibrary;
 import Core;
@@ -45,6 +41,9 @@ export namespace Graphics
                      GeometryPool& geometryStorage,
                      MaterialSystem& materialSystem);
         ~RenderSystem();
+
+        // Hot-swap: schedules activation at the start of the next successfully-begun frame.
+        void RequestPipelineSwap(std::unique_ptr<RenderPipeline> pipeline);
 
         void OnUpdate(ECS::Scene& scene, const CameraComponent& camera, Core::Assets::AssetManager& assetManager);
 
@@ -93,6 +92,9 @@ export namespace Graphics
         RHI::BindlessDescriptorSystem& m_BindlessSystem;
         VkDescriptorSet m_GlobalDescriptorSet = VK_NULL_HANDLE;
 
+        RHI::DescriptorAllocator& m_DescriptorPool;
+        RHI::DescriptorLayout& m_DescriptorLayout;
+
         std::unique_ptr<RHI::VulkanBuffer> m_GlobalUBO;
 
         // Transient GPU memory for RenderGraph (page allocator). Owned here so it is destroyed
@@ -128,13 +130,18 @@ export namespace Graphics
         std::vector<RenderGraphDebugPass> m_LastDebugPasses;
         std::vector<RenderGraphDebugImage> m_LastDebugImages;
 
-        // Features (owned)
-        std::unique_ptr<Passes::PickingPass> m_PickingPass;
-        std::unique_ptr<Passes::ForwardPass> m_ForwardPass;
-        std::unique_ptr<Passes::DebugViewPass> m_DebugViewPass;
-        std::unique_ptr<Passes::ImGuiPass> m_ImGuiPass;
+        // Pipeline (hot-swappable)
+        std::unique_ptr<RenderPipeline> m_ActivePipeline;
+        std::unique_ptr<RenderPipeline> m_PendingPipeline;
 
-        // NOTE: Descriptor allocator reference is needed for DebugView per-frame sets
-        RHI::DescriptorAllocator& m_DescriptorPool;
+        struct RetiredPipeline
+        {
+            std::unique_ptr<RenderPipeline> Pipeline;
+            uint64_t RetireFrame = 0;
+        };
+        std::vector<RetiredPipeline> m_RetiredPipelines;
+
+        void ApplyPendingPipelineSwap(uint32_t width, uint32_t height);
+        void GarbageCollectRetiredPipelines();
     };
 }

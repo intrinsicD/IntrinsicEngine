@@ -18,10 +18,6 @@ import :Camera;
 import :Components;
 
 import :RenderPipeline;
-import :Passes.Picking;
-import :Passes.Forward;
-import :Passes.DebugView;
-import :Passes.ImGui;
 import :ShaderRegistry;
 import :PipelineLibrary;
 
@@ -64,10 +60,11 @@ namespace Graphics
           m_Swapchain(swapchain),
           m_Renderer(renderer),
           m_BindlessSystem(bindlessSystem),
+          m_DescriptorPool(descriptorPool),
+          m_DescriptorLayout(descriptorLayout),
           m_RenderGraph(m_DeviceOwner, frameArena, frameScope),
           m_GeometryStorage(geometryStorage),
-          m_MaterialSystem(materialSystem),
-          m_DescriptorPool(descriptorPool)
+          m_MaterialSystem(materialSystem)
     {
         m_DepthImages.resize(renderer.GetFramesInFlight());
 
@@ -128,26 +125,6 @@ namespace Graphics
             }
         }
 
-        // Create features
-        m_PickingPass = std::make_unique<Passes::PickingPass>();
-        m_PickingPass->Initialize(*m_Device, descriptorPool, descriptorLayout);
-        m_PickingPass->SetPipeline(&m_PipelineLibrary->GetOrDie(kPipeline_Picking));
-        m_PickingPass->SetReadbackBuffers(m_PickReadbackBuffers);
-
-        m_ForwardPass = std::make_unique<Passes::ForwardPass>();
-        m_ForwardPass->Initialize(*m_Device, descriptorPool, descriptorLayout);
-        m_ForwardPass->SetPipeline(&m_PipelineLibrary->GetOrDie(kPipeline_Forward));
-        m_ForwardPass->SetInstanceSetLayout(m_PipelineLibrary->GetStage1InstanceSetLayout());
-        m_ForwardPass->SetCullPipeline(m_PipelineLibrary->GetCullPipeline());
-        m_ForwardPass->SetCullSetLayout(m_PipelineLibrary->GetCullSetLayout());
-
-        m_DebugViewPass = std::make_unique<Passes::DebugViewPass>();
-        m_DebugViewPass->Initialize(*m_Device, descriptorPool, descriptorLayout);
-        m_DebugViewPass->SetShaderRegistry(shaderRegistry);
-
-        m_ImGuiPass = std::make_unique<Passes::ImGuiPass>();
-        m_ImGuiPass->Initialize(*m_Device, descriptorPool, descriptorLayout);
-
         // Register UI panel (reuses cached lists maintained in RenderSystem)
         Interface::GUI::RegisterPanel("Render Target Viewer",
                                       [this]()
@@ -193,26 +170,8 @@ namespace Graphics
                                           ImGui::DragFloat("Depth Far", &m_DebugView.DepthFar, 1.0f, 1.0f, 100000.0f,
                                                            "%.1f", ImGuiSliderFlags_AlwaysClamp);
 
-                                          if (m_DebugViewPass)
-                                          {
-                                              // RenderSystem tracks current frame index via m_Renderer.
-                                              // We need the texture ID specific to the current frame to avoid race conditions.
-                                              uint32_t currentFrame = m_Renderer.GetCurrentFrameIndex();
-                                              void* texId = m_DebugViewPass->GetImGuiTextureId(currentFrame);
-
-                                              if (texId)
-                                              {
-                                                  ImGui::TextUnformatted("Preview (resolved RGBA8)");
-                                                  ImVec2 avail = ImGui::GetContentRegionAvail();
-                                                  float w = avail.x;
-                                                  float h = (w > 0.0f) ? w * 9.0f / 16.0f : 0.0f;
-                                                  ImGui::Image(texId, ImVec2(w, h));
-                                              }
-                                              else
-                                              {
-                                                  ImGui::TextUnformatted("No debug image yet.");
-                                              }
-                                          }
+                                          // Pipeline-owned features may provide their own ImGui preview;
+                                          // RenderSystem now only shows whatever was registered via Interface::GUI.
                                       },
                                       true);
 
@@ -224,15 +183,76 @@ namespace Graphics
     RenderSystem::~RenderSystem()
     {
         // Ensure allocator is destroyed before VulkanDevice and after GPU idle.
-        // Engine already waits idle before tearing down RenderSystem, but this is a cheap safety net.
         if (m_Device) vkDeviceWaitIdle(m_Device->GetLogicalDevice());
-        m_TransientAllocator.reset();
 
-        if (m_DebugViewPass)
+        if (m_ActivePipeline) m_ActivePipeline->Shutdown();
+        if (m_PendingPipeline) m_PendingPipeline->Shutdown();
+        for (auto& p : m_RetiredPipelines)
         {
-            m_DebugViewPass->Shutdown();
-            m_DebugViewPass.reset();
+            if (p.Pipeline) p.Pipeline->Shutdown();
         }
+
+        m_RetiredPipelines.clear();
+        m_ActivePipeline.reset();
+        m_PendingPipeline.reset();
+
+        m_TransientAllocator.reset();
+    }
+
+    void RenderSystem::RequestPipelineSwap(std::unique_ptr<RenderPipeline> pipeline)
+    {
+        // Overwrite any previously requested swap.
+        if (m_PendingPipeline)
+            m_PendingPipeline->Shutdown();
+
+        m_PendingPipeline = std::move(pipeline);
+    }
+
+    void RenderSystem::ApplyPendingPipelineSwap(uint32_t width, uint32_t height)
+    {
+        if (!m_PendingPipeline)
+            return;
+
+        const uint64_t retireFrame = m_Device ? m_Device->GetGlobalFrameNumber() : 0;
+
+        if (m_ActivePipeline)
+        {
+            m_RetiredPipelines.push_back({std::move(m_ActivePipeline), retireFrame});
+        }
+
+        m_ActivePipeline = std::move(m_PendingPipeline);
+
+        if (m_ActivePipeline)
+        {
+            m_ActivePipeline->Initialize(*m_Device, m_DescriptorPool, m_DescriptorLayout,
+                                         *m_ShaderRegistry, *m_PipelineLibrary);
+            m_ActivePipeline->OnResize(width, height);
+        }
+    }
+
+    void RenderSystem::GarbageCollectRetiredPipelines()
+    {
+        if (!m_Device)
+            return;
+
+        const uint64_t currentGlobalFrame = m_Device->GetGlobalFrameNumber();
+        const uint32_t framesInFlight = m_Renderer.GetFramesInFlight();
+
+        if (m_RetiredPipelines.empty())
+            return;
+
+        auto it = std::remove_if(m_RetiredPipelines.begin(), m_RetiredPipelines.end(),
+                                 [&](RetiredPipeline& p)
+                                 {
+                                     if (!p.Pipeline)
+                                         return true;
+                                     if (currentGlobalFrame < p.RetireFrame + framesInFlight)
+                                         return false;
+                                     p.Pipeline->Shutdown();
+                                     return true;
+                                 });
+
+        m_RetiredPipelines.erase(it, m_RetiredPipelines.end());
     }
 
     RenderSystem::PickResultGpu RenderSystem::GetLastPickResult() const
@@ -264,6 +284,9 @@ namespace Graphics
         const uint64_t currentFrame = m_Device->GetGlobalFrameNumber();
         m_GeometryStorage.ProcessDeletions(currentFrame);
 
+        // Safe-point GC for swapped-out pipelines.
+        GarbageCollectRetiredPipelines();
+
         Interface::GUI::BeginFrame();
         Interface::GUI::DrawGUI();
 
@@ -279,16 +302,17 @@ namespace Graphics
         const uint64_t currentGlobalFrame = m_Device->GetGlobalFrameNumber();
         const uint32_t framesInFlight = m_Renderer.GetFramesInFlight();
 
+        const auto extent = m_Swapchain.GetExtent();
+
+        // Apply swap only once we know a frame is actually in-progress.
+        ApplyPendingPipelineSwap(extent.width, extent.height);
+
         // Check if a prior pick recorded into this slot is now safe to read.
-        // Safe = at least FramesInFlight global frames have passed since the request,
-        // guaranteeing the GPU has completed that command buffer.
         if (m_PickReadbackRequestFrame[frameIndex] != 0)
         {
             const uint64_t requestFrame = m_PickReadbackRequestFrame[frameIndex];
             if (currentGlobalFrame >= requestFrame + framesInFlight)
             {
-                // GPU has completed; safe to read.
-                // IMPORTANT: on non-coherent host-visible memory we must invalidate before reading.
                 m_PickReadbackBuffers[frameIndex]->Invalidate(0, sizeof(uint32_t));
 
                 void* mapped = m_PickReadbackBuffers[frameIndex]->Map();
@@ -297,12 +321,10 @@ namespace Graphics
                     uint32_t entityID = *static_cast<uint32_t*>(mapped);
                     m_PickReadbackBuffers[frameIndex]->Unmap();
 
-                    // Publish result
                     m_PendingConsumedResult = {entityID != 0, entityID};
                     m_HasPendingConsumedResult = true;
                     m_LastPickResult = m_PendingConsumedResult;
 
-                    // Log for debug
                     if (entityID != 0)
                         Core::Log::Info("GPU Pick Hit: Entity ID {}", entityID);
                 }
@@ -310,7 +332,6 @@ namespace Graphics
             }
         }
 
-        // If we are about to record a pick command this frame, mark this slot with the current global frame.
         if (m_PendingPick.Pending)
         {
             m_PickReadbackRequestFrame[frameIndex] = currentGlobalFrame;
@@ -329,7 +350,6 @@ namespace Graphics
 
         m_RenderGraph.Reset();
 
-        const auto extent = m_Swapchain.GetExtent();
         const uint32_t imageIndex = m_Renderer.GetImageIndex();
 
         RenderBlackboard blackboard;
@@ -407,27 +427,22 @@ namespace Graphics
                 m_DebugView.DepthFar
             },
             m_LastDebugImages,
-            m_LastDebugPasses
+            m_LastDebugPasses,
+            camera.ViewMatrix,
+            camera.ProjectionMatrix,
+            (frameIndex < m_PickReadbackBuffers.size()) ? m_PickReadbackBuffers[frameIndex].get() : nullptr
         };
 
-        if (m_PickingPass) m_PickingPass->AddPasses(ctx);
-        if (m_ForwardPass) m_ForwardPass->AddPasses(ctx);
-
-        if (m_DebugViewPass && m_DebugView.Enabled && m_DebugView.ShowInViewport)
-            m_DebugViewPass->AddPasses(ctx);
-
-        if (m_ImGuiPass) m_ImGuiPass->AddPasses(ctx);
-
-        if (m_DebugViewPass && m_DebugView.Enabled && !m_DebugView.ShowInViewport)
-            m_DebugViewPass->AddPasses(ctx);
+        if (m_ActivePipeline)
+            m_ActivePipeline->SetupFrame(ctx);
 
         m_RenderGraph.Compile(frameIndex);
 
         m_LastDebugPasses = m_RenderGraph.BuildDebugPassList();
         m_LastDebugImages = m_RenderGraph.BuildDebugImageList();
 
-        if (m_DebugViewPass)
-            m_DebugViewPass->PostCompile(frameIndex, m_LastDebugImages);
+        if (m_ActivePipeline)
+            m_ActivePipeline->PostCompile(frameIndex, m_LastDebugImages, m_LastDebugPasses);
 
         m_RenderGraph.Execute(m_Renderer.GetCommandBuffer());
         m_Renderer.EndFrame();
@@ -445,7 +460,7 @@ namespace Graphics
         }
 
         auto extent = m_Swapchain.GetExtent();
-        if (m_PickingPass) m_PickingPass->OnResize(extent.width, extent.height);
-        if (m_DebugViewPass) m_DebugViewPass->OnResize(extent.width, extent.height);
+        if (m_ActivePipeline)
+            m_ActivePipeline->OnResize(extent.width, extent.height);
     }
 }

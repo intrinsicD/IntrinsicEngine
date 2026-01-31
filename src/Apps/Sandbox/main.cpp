@@ -130,8 +130,23 @@ public:
             ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
             ImGui::Text("Entities: %d", (int)m_Scene.Size());
 
+            // --- Render Pipeline ---
+            ImGui::SeparatorText("Render Pipeline");
+            if (m_RenderSystem)
+            {
+                if (ImGui::Button("Hot-swap: DefaultPipeline"))
+                {
+                    // Request swap; RenderSystem owns lifetime and applies at the start of the next frame.
+                    m_RenderSystem->RequestPipelineSwap(std::make_unique<Graphics::DefaultPipeline>());
+                }
+            }
+            else
+            {
+                ImGui::TextDisabled("RenderSystem not initialized.");
+            }
+
             // --- Selection Debug ---
-            ImGui::SeparatorText("Selection");
+            ImGui::Separator();
             ImGui::Text("Select Mouse Button: %d", m_SelectMouseButton);
 
             const entt::entity selected = GetSelection().GetSelectedEntity(m_Scene);

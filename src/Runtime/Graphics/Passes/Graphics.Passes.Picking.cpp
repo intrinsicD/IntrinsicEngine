@@ -101,12 +101,6 @@ namespace Graphics::Passes
                                                 else
                                                     worldMatrix = GetMatrix(transform);
 
-                                                /*auto* vBuf = geo->GetVertexBuffer()->GetHandle();
-                                                const auto& layout = geo->GetLayout();
-                                                VkBuffer vBuffers[] = {vBuf, vBuf, vBuf};
-                                                VkDeviceSize offsets[] = {layout.PositionsOffset, layout.NormalsOffset, layout.AuxOffset};
-                                                vkCmdBindVertexBuffers(cmd, 0, 3, vBuffers, offsets);*/
-
                                                 if (geo->GetIndexCount() > 0)
                                                     vkCmdBindIndexBuffer(
                                                         cmd, geo->GetIndexBuffer()->GetHandle(), 0,
@@ -193,10 +187,10 @@ namespace Graphics::Passes
                                                  if (!data.IdBuffer.IsValid())
                                                      return;
 
-                                                 if (ctx.FrameIndex >= m_ReadbackBuffers.size() || !m_ReadbackBuffers[ctx.FrameIndex])
+                                                 if (!ctx.PickReadbackBuffer)
                                                      return;
 
-                                                 const VkBuffer dst = m_ReadbackBuffers[ctx.FrameIndex]->GetHandle();
+                                                 const VkBuffer dst = ctx.PickReadbackBuffer->GetHandle();
                                                  const VkImage img = reg.GetImage(data.IdBuffer);
                                                  if (img == VK_NULL_HANDLE || dst == VK_NULL_HANDLE)
                                                      return;

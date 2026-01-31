@@ -28,7 +28,6 @@ export namespace Graphics::Passes
         }
 
         void SetPipeline(RHI::GraphicsPipeline* p) { m_Pipeline = p; }
-        void SetReadbackBuffers(std::span<std::unique_ptr<RHI::VulkanBuffer>> buffers) { m_ReadbackBuffers = buffers; }
 
         void AddPasses(RenderPassContext& ctx) override;
 
@@ -45,7 +44,6 @@ export namespace Graphics::Passes
         };
 
         RHI::VulkanDevice* m_Device = nullptr; // non-owning
-        RHI::GraphicsPipeline* m_Pipeline = nullptr; // owned by RenderSystem for now
-        std::span<std::unique_ptr<RHI::VulkanBuffer>> m_ReadbackBuffers{}; // one per frame-in-flight
+        RHI::GraphicsPipeline* m_Pipeline = nullptr; // owned by pipeline library / engine
     };
 }
