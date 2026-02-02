@@ -141,6 +141,8 @@ namespace Graphics::Passes
                                                 continue;
                                             }
 
+                                            // Force-resolve every frame. The extra BatchResolve is cheap and avoids subtle aliasing
+                                            // when assets/materials are created dynamically (e.g. drag-drop spawning).
                                             batchHandles.push_back(renderable.Material);
                                             requests.push_back({&renderable});
                                         }
@@ -177,6 +179,14 @@ namespace Graphics::Passes
                                             }
 
                                             uint32_t textureID = matData->AlbedoID;
+
+                                            // DEBUG: trace the actual texture ID used for this entity.
+                                            Core::Log::Info("[ForwardPass] Entity={} mat(index={}, gen={}) AlbedoID={}",
+                                                           static_cast<uint32_t>(static_cast<entt::id_type>(entity)),
+                                                           renderable.CachedMaterialHandle.Index,
+                                                           renderable.CachedMaterialHandle.Generation,
+                                                           textureID);
+
                                             const bool isSelected = ctx.Scene.GetRegistry().all_of<
                                                 ECS::Components::Selection::SelectedTag>(entity);
 

@@ -23,6 +23,10 @@ export namespace RHI
     {
         std::unique_ptr<VulkanImage> Image;
         VkSampler Sampler = VK_NULL_HANDLE;
+
+        // Shader-visible stable index into the global bindless texture array.
+        // NOTE: This is intentionally NOT TextureHandle::Index because pool indices can be reused.
+        uint32_t BindlessSlot = 0;
     };
 
     // Public RAII handle held by AssetManager (via shared_ptr<T> slot).
@@ -43,7 +47,9 @@ export namespace RHI
         Texture& operator=(Texture&&) noexcept;
 
         [[nodiscard]] TextureHandle GetHandle() const { return m_Handle; }
-        [[nodiscard]] uint32_t GetBindlessIndex() const { return m_Handle.Index; }
+
+        // Stable shader-visible index.
+        [[nodiscard]] uint32_t GetBindlessIndex() const;
 
         // Convenience accessors for tools/UI code paths.
         [[nodiscard]] VkImage GetImage() const;

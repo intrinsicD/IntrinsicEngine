@@ -226,6 +226,13 @@ namespace RHI
         return *this;
     }
 
+    uint32_t Texture::GetBindlessIndex() const
+    {
+        if (!m_System || !m_Handle.IsValid()) return 0u;
+        if (const auto* data = m_System->Get(m_Handle)) return data->BindlessSlot;
+        return 0u;
+    }
+
     VkImage Texture::GetImage() const
     {
         if (!m_System || !m_Handle.IsValid()) return VK_NULL_HANDLE;

@@ -129,6 +129,13 @@ namespace RHI
             return;
         }
 
+        // DEBUG: trace descriptor writes (helps catch accidental overwrites of slot 0 or other active slots).
+        Core::Log::Info("[Bindless] UpdateTexture: slot={} view={} sampler={} layout={} ",
+                        index,
+                        reinterpret_cast<void*>(view),
+                        reinterpret_cast<void*>(sampler),
+                        static_cast<uint32_t>(layout));
+
         VkDescriptorImageInfo imageInfo{};
         imageInfo.sampler = sampler;
         imageInfo.imageView = view;

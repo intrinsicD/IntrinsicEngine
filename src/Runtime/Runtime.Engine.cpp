@@ -170,7 +170,11 @@ namespace Runtime
         {
             std::vector<uint8_t> whitePixel = {255, 255, 255, 255};
             m_DefaultTexture = std::make_shared<RHI::Texture>(*m_TextureSystem, *m_Device, whitePixel, 1, 1);
-            m_DefaultTextureIndex = m_DefaultTexture->GetBindlessIndex();
+
+            // Contract: bindless slot 0 is reserved for the default/error texture.
+            // This must be stable across the entire runtime.
+            m_DefaultTextureIndex = 0;
+            m_BindlessSystem->SetTexture(m_DefaultTextureIndex, *m_DefaultTexture);
         }
 
         // Initialize GeometryStorage with frames-in-flight for safe deferred deletion
@@ -359,8 +363,10 @@ namespace Runtime
                     };
 
                     // Load Default Texture
-                    auto texHandle = m_AssetManager.Load<RHI::Texture>(
-                        Core::Filesystem::GetAssetPath("textures/Parameterization.jpg"), textureLoader);
+                    // NOTE: For now, newly dropped models should NOT auto-bind any image texture.
+                    // They should render with the engine default texture (bindless slot 0) until a real material/texture is assigned.
+                    // auto texHandle = m_AssetManager.Load<RHI::Texture>(
+                    //     Core::Filesystem::GetAssetPath("textures/Parameterization.jpg"), textureLoader);
 
                     Graphics::MaterialData matData;
                     matData.AlbedoID = m_DefaultTextureIndex;
@@ -370,9 +376,13 @@ namespace Runtime
                     auto defaultMat = std::make_unique<Graphics::Material>(*m_MaterialSystem, matData);
 
                     // Link Texture Asset (Setup Listener)
-                    defaultMat->SetAlbedoTexture(texHandle);
+                    // defaultMat->SetAlbedoTexture(texHandle);
 
-                    auto defaultMaterialHandle = m_AssetManager.Create("DefaultMaterial", std::move(defaultMat));
+                    // NOTE: AssetManager::Create() inserts into a name->handle lookup.
+                    // If we reuse the same name ("DefaultMaterial") for multiple drops,
+                    // later creates overwrite the lookup and can cause stale/incorrect material resolution.
+                    const std::string materialName = assetName + "::DefaultMaterial";
+                    auto defaultMaterialHandle = m_AssetManager.Create(materialName, std::move(defaultMat));
                     m_LoadedMaterials.push_back(defaultMaterialHandle);
 
                     // --- Spawn Entities ---

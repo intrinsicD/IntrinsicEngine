@@ -94,10 +94,13 @@ namespace Graphics
         // 2. Get the Bindless Index
         uint32_t bindlessID = tex->GetBindlessIndex();
 
+        // DEBUG: trace material->texture binding updates.
+        Core::Log::Info("[MaterialSystem] OnTextureLoad: mat(index={}, gen={}) texAsset(id={}) -> bindlessSlot={} slotType={} ",
+                        matHandle.Index, matHandle.Generation,
+                        static_cast<uint32_t>(texHandle.ID),
+                        bindlessID, slotType);
+
         // 3. Update Material Data in Pool
-        // We use GetUnchecked here because we are inside a callback potentially off-frame,
-        // but we want to ensure the slot is still valid (Get checks generation).
-        // const_cast is necessary because listeners update data.
         if (auto* data = const_cast<MaterialData*>(GetData(matHandle)))
         {
             if (slotType == 0) data->AlbedoID = bindlessID;
