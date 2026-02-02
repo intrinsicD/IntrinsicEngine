@@ -1,6 +1,7 @@
 module;
 
 #include <memory>
+#include <span>
 
 export module Graphics:Pipelines;
 

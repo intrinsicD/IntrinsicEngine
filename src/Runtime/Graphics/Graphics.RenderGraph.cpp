@@ -531,33 +531,20 @@ namespace Graphics
             VkImageMemoryBarrier2* imgStart = nullptr;
             size_t imgCount = 0;
 
-            for (AccessNode* node = pass.AccessHead; node != nullptr; node = node->Next)
+            auto pushImageBarrier = [&](ResourceNode& res,
+                                        VkPipelineStageFlags2 dstStage,
+                                        VkAccessFlags2 dstAccess,
+                                        VkImageLayout targetLayout)
             {
-                auto& res = m_ResourcePool[node->ID];
-                if (res.Type == ResourceType::Buffer) continue;
-                // Treat imported buffers as buffers, imported images as images
-                if (res.Type == ResourceType::Import && res.PhysicalBuffer) continue;
-
-                // --- Image Barrier Logic ---
-                VkImageLayout targetLayout = res.CurrentLayout;
-                if (node->Access & VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT) targetLayout =
-                    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-                else if (node->Access & VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT) targetLayout =
-                    VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-                else if (node->Access & VK_ACCESS_2_SHADER_SAMPLED_READ_BIT) targetLayout =
-                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-                else if (node->Access & (VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT | VK_ACCESS_2_SHADER_STORAGE_READ_BIT))
-                    targetLayout = VK_IMAGE_LAYOUT_GENERAL;
-                else if (node->Access & VK_ACCESS_2_TRANSFER_WRITE_BIT) targetLayout =
-                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-                else if (node->Access & VK_ACCESS_2_TRANSFER_READ_BIT) targetLayout =
-                    VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+                // Imported buffers are handled in buffer barrier pass, not here.
+                if (res.Type == ResourceType::Buffer) return;
+                if (res.Type == ResourceType::Import && res.PhysicalBuffer) return;
 
                 bool needsBarrier = (res.CurrentLayout != targetLayout) ||
                     (res.LastUsageAccess & (VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_SHADER_WRITE_BIT |
                         VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
                         VK_ACCESS_2_TRANSFER_WRITE_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT)) ||
-                    (node->Access & (VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_SHADER_WRITE_BIT |
+                    (dstAccess & (VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_SHADER_WRITE_BIT |
                         VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
                         VK_ACCESS_2_TRANSFER_WRITE_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT));
 
@@ -575,8 +562,8 @@ namespace Graphics
                                                ? VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT
                                                : res.LastUsageStage;
                     barrier.srcAccessMask = (res.CurrentLayout == VK_IMAGE_LAYOUT_UNDEFINED) ? 0 : res.LastUsageAccess;
-                    barrier.dstStageMask = node->Stage;
-                    barrier.dstAccessMask = node->Access;
+                    barrier.dstStageMask = dstStage;
+                    barrier.dstAccessMask = dstAccess;
                     barrier.subresourceRange.aspectMask = res.Aspect;
                     barrier.subresourceRange.baseMipLevel = 0;
                     barrier.subresourceRange.levelCount = 1;
@@ -592,15 +579,88 @@ namespace Graphics
                     }
 
                     res.CurrentLayout = targetLayout;
-                    res.LastUsageStage = node->Stage;
-                    res.LastUsageAccess = node->Access;
+                    res.LastUsageStage = dstStage;
+                    res.LastUsageAccess = dstAccess;
                 }
                 else
                 {
-                    res.LastUsageStage = node->Stage;
-                    res.LastUsageAccess = node->Access;
+                    res.LastUsageStage = dstStage;
+                    res.LastUsageAccess = dstAccess;
+                }
+            };
+
+            // 1a) Attachment usages are implicit accesses; they MUST participate in layout tracking.
+            // IMPORTANT: Do this BEFORE iterating AccessHead. Otherwise, a pass that both renders to an image
+            // and later copies/samples it (common for debug/picking) can end up with its *final* tracked layout
+            // being TRANSFER_* which is invalid for vkCmdBeginRendering.
+            for (AttachmentNode* att = pass.AttachmentHead; att != nullptr; att = att->Next)
+            {
+                if (att->ID >= m_ActiveResourceCount) continue;
+
+                auto& res = m_ResourcePool[att->ID];
+
+                if (att->IsDepth)
+                {
+                    pushImageBarrier(res,
+                                     VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
+                                     VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+                                     VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+                }
+                else
+                {
+                    pushImageBarrier(res,
+                                     VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                                     VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                                     VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
                 }
             }
+
+            // 1b) Explicit resource accesses.
+            for (AccessNode* node = pass.AccessHead; node != nullptr; node = node->Next)
+            {
+                auto& res = m_ResourcePool[node->ID];
+
+                // --- Image Barrier Logic ---
+                // IMPORTANT: choose layout by looking for *specific* access intents.
+                // Also: a node can contain multiple bits (e.g. TRANSFER_READ | MEMORY_WRITE to force hazard tracking).
+                // In that case we still want the layout implied by the real operation (TRANSFER_READ/WRITE, ATTACHMENT, etc.).
+                VkImageLayout targetLayout = res.CurrentLayout;
+
+                if ((node->Access & (VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT)) != 0)
+                {
+                    targetLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                }
+                else if ((node->Access & (VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT)) != 0)
+                {
+                    targetLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+                }
+                else if ((node->Access & VK_ACCESS_2_TRANSFER_WRITE_BIT) != 0)
+                {
+                    targetLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+                }
+                else if ((node->Access & VK_ACCESS_2_TRANSFER_READ_BIT) != 0)
+                {
+                    targetLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+                }
+                else if ((node->Access & VK_ACCESS_2_SHADER_SAMPLED_READ_BIT) != 0)
+                {
+                    // NOTE: This is a non-core extension-ish convenience bit in some codebases.
+                    // If it doesn't exist on this SDK, sampling should come through SHADER_READ or UNIFORM_READ.
+                    targetLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                }
+                else if ((node->Access & (VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_UNIFORM_READ_BIT | VK_ACCESS_2_INPUT_ATTACHMENT_READ_BIT)) != 0)
+                {
+                    targetLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                }
+                else if ((node->Access & (VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT | VK_ACCESS_2_SHADER_STORAGE_READ_BIT)) != 0)
+                {
+                    targetLayout = VK_IMAGE_LAYOUT_GENERAL;
+                }
+
+                pushImageBarrier(res, node->Stage, node->Access, targetLayout);
+            }
+
+
             if (imgCount > 0) pass.ImageBarriers = std::span<VkImageMemoryBarrier2>(imgStart, imgCount);
 
             // --- Pass 2: Buffer Barriers ---
@@ -913,14 +973,13 @@ namespace Graphics
                         info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
                         info.imageView = res.PhysicalView;
 
-                        // IMPORTANT:
-                        // RenderGraph barriers compute and update ResourceNode::CurrentLayout.
-                        // When executing secondary command buffers with dynamic rendering, the attachment imageLayout
-                        // passed here must match the actual current layout, otherwise validation complains.
-                        //
-                        // We therefore use the tracked layout (which should already be transitioned to attachment-optimal
-                        // for this pass), instead of hardcoding COLOR_ATTACHMENT_OPTIMAL / DEPTH_STENCIL_ATTACHMENT_OPTIMAL.
-                        info.imageLayout = res.CurrentLayout;
+                        // Dynamic rendering requires an attachment-capable layout.
+                        // IMPORTANT: Don't use ResourceNode::CurrentLayout here.
+                        // A pass can legally transition the same image to TRANSFER_SRC_OPTIMAL later (e.g. picking copy pass)
+                        // which would make CurrentLayout reflect the *final* layout, not the layout at begin rendering.
+                        info.imageLayout = att->IsDepth
+                                               ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+                                               : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
                         info.loadOp = att->Info.LoadOp;
                         info.storeOp = att->Info.StoreOp;

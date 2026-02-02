@@ -1,7 +1,7 @@
 module;
 
 #include <memory>
-#include "RHI.Vulkan.hpp"
+#include <span>
 
 // This is a standard implementation unit for the named module `Graphics.Pipelines`.
 module Graphics:Pipelines.Impl;
