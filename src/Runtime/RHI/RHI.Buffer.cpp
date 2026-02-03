@@ -19,7 +19,10 @@ namespace RHI
         VkBufferCreateInfo bufferInfo{};
         bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
         bufferInfo.size = size;
-        bufferInfo.usage = usage | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+        // IMPORTANT: Do not implicitly add SHADER_DEVICE_ADDRESS.
+        // Some buffers (e.g. indirect count buffers) must be created with specific usage bits;
+        // adding unrelated bits can trigger validation requirements or feature dependencies.
+        bufferInfo.usage = usage;
         bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
         VmaAllocationCreateInfo allocInfo{};

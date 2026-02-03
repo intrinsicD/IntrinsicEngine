@@ -140,7 +140,7 @@ namespace Graphics::Passes
             m_Stage3DrawCountsPacked[frame] = std::make_unique<RHI::VulkanBuffer>(
                 *m_Device,
                 drawCountsBytes,
-                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                 VMA_MEMORY_USAGE_GPU_ONLY);
         }
 

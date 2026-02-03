@@ -95,6 +95,17 @@ export namespace Runtime
         void RegisterAssetLoad(Core::Assets::AssetHandle handle, RHI::TransferToken token);
 
         template <typename F>
+        void RegisterAssetLoad(Core::Assets::AssetHandle handle, RHI::TransferToken token, F&& onComplete)
+        {
+            std::lock_guard lock(m_LoadMutex);
+            PendingLoad l{};
+            l.Handle = handle;
+            l.Token = token;
+            l.OnComplete = Core::Tasks::LocalTask(std::forward<F>(onComplete));
+            m_PendingLoads.push_back(std::move(l));
+        }
+
+        template <typename F>
         void RunOnMainThread(F&& task)
         {
             std::lock_guard lock(m_MainThreadQueueMutex);
@@ -114,6 +125,7 @@ export namespace Runtime
         {
             Core::Assets::AssetHandle Handle;
             RHI::TransferToken Token;
+            Core::Tasks::LocalTask OnComplete{}; // optional main-thread completion work
         };
 
         // Protected by mutex because Loaders call RegisterAssetLoad from worker threads

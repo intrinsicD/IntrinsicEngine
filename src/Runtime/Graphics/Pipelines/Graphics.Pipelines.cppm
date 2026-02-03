@@ -6,6 +6,7 @@ module;
 export module Graphics:Pipelines;
 
 import :RenderPipeline;
+import :RenderPath;
 import :Passes.DebugView;
 import :Passes.Forward;
 import :Passes.ImGui;
@@ -39,5 +40,11 @@ export namespace Graphics
         std::unique_ptr<Passes::ForwardPass> m_ForwardPass;
         std::unique_ptr<Passes::DebugViewPass> m_DebugViewPass;
         std::unique_ptr<Passes::ImGuiPass> m_ImGuiPass;
+
+        // Modern Data-Driven Render Path
+        RenderPath m_Path;
+        bool m_PathDirty = true;
+
+        void RebuildPath();
     };
 }

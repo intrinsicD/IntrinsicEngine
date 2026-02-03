@@ -34,9 +34,17 @@ export namespace RHI
     class Texture
     {
     public:
-        Texture(TextureSystem& system, VulkanDevice& device, const std::string& filepath);
-        Texture(TextureSystem& system, VulkanDevice& device, const std::vector<uint8_t>& data,
-                uint32_t width, uint32_t height, VkFormat format = VK_FORMAT_R8G8B8A8_SRGB);
+        // New: lightweight wrapper around an already-allocated texture handle.
+        // Contract: handle must come from TextureSystem.
+        Texture(TextureSystem& system, VulkanDevice& device, TextureHandle handle);
+
+        // Removed: synchronous I/O + blocking upload constructors.
+        // Streaming must go through TransferManager + TextureSystem.
+        // Texture(TextureSystem& system, VulkanDevice& device, const std::string& filepath);
+        // Texture(TextureSystem& system, VulkanDevice& device, const std::vector<uint8_t>& data,
+        //         uint32_t width, uint32_t height, VkFormat format = VK_FORMAT_R8G8B8A8_SRGB);
+
+        // Kept: Create an empty GPU texture (used for default/error or render targets).
         Texture(TextureSystem& system, VulkanDevice& device, uint32_t width, uint32_t height, VkFormat format);
 
         ~Texture();

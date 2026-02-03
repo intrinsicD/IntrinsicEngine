@@ -11,6 +11,7 @@ module;
 #include <entt/entity/registry.hpp>
 #include "RHI.Vulkan.hpp"
 #include "Core.Profiling.Macros.hpp"
+#include <cstring>
 
 module Runtime.Engine;
 
@@ -94,14 +95,94 @@ namespace Runtime
         m_BindlessSystem = std::make_unique<RHI::BindlessDescriptorSystem>(*m_Device);
         m_TextureSystem = std::make_unique<RHI::TextureSystem>(*m_Device, *m_BindlessSystem);
         m_MaterialSystem = std::make_unique<Graphics::MaterialSystem>(*m_TextureSystem, m_AssetManager);
+
+        // Initialize GeometryStorage with frames-in-flight for safe deferred deletion
+        m_GeometryStorage.Initialize(m_Device->GetFramesInFlight());
+
+        // Swapchain & Renderer (TransferManager is needed for default texture upload)
+        m_Swapchain = std::make_unique<RHI::VulkanSwapchain>(m_Device, *m_Window);
+        m_Renderer = std::make_unique<RHI::SimpleRenderer>(m_Device, *m_Swapchain);
+        m_TransferManager = std::make_unique<RHI::TransferManager>(*m_Device);
+
         // Create and register an engine-owned default 1x1 white texture.
         // Keep it alive for the lifetime of the engine so slots never go stale.
         {
-            std::vector<uint8_t> whitePixel = {255, 255, 255, 255};
-            m_DefaultTexture = std::make_shared<RHI::Texture>(*m_TextureSystem, *m_Device, whitePixel, 1, 1);
+            const RHI::TextureHandle handle = m_TextureSystem->CreatePending(1, 1, VK_FORMAT_R8G8B8A8_SRGB);
+            m_DefaultTexture = std::make_shared<RHI::Texture>(*m_TextureSystem, *m_Device, handle);
+
+            // Upload a single white pixel (RGBA8) via the transfer queue.
+            const uint32_t white = 0xFFFFFFFFu;
+
+            VkPhysicalDeviceProperties props{};
+            vkGetPhysicalDeviceProperties(m_Device->GetPhysicalDevice(), &props);
+
+            auto alloc = m_TransferManager->AllocateStagingForImage(
+                sizeof(white),
+                /*texelBlockSize*/ 4,
+                /*rowPitchBytes*/ 4,
+                static_cast<size_t>(props.limits.optimalBufferCopyOffsetAlignment),
+                static_cast<size_t>(props.limits.optimalBufferCopyRowPitchAlignment));
+
+            if (alloc.Buffer != VK_NULL_HANDLE && alloc.MappedPtr != nullptr)
+            {
+                std::memcpy(alloc.MappedPtr, &white, sizeof(white));
+
+                VkCommandBuffer cmd = m_TransferManager->Begin();
+                VkImage dstImage = m_DefaultTexture->GetImage();
+
+                if (dstImage != VK_NULL_HANDLE)
+                {
+                    VkImageMemoryBarrier2 barrier{};
+                    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+                    barrier.srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
+                    barrier.srcAccessMask = 0;
+                    barrier.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+                    barrier.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+                    barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+                    barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+                    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+                    barrier.image = dstImage;
+                    barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+                    VkDependencyInfo dep{};
+                    dep.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+                    dep.imageMemoryBarrierCount = 1;
+                    dep.pImageMemoryBarriers = &barrier;
+                    vkCmdPipelineBarrier2(cmd, &dep);
+
+                    VkBufferImageCopy region{};
+                    region.bufferOffset = static_cast<VkDeviceSize>(alloc.Offset);
+                    region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+                    region.imageExtent = {1, 1, 1};
+                    vkCmdCopyBufferToImage(cmd, alloc.Buffer, dstImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+
+                    VkImageMemoryBarrier2 readBarrier = barrier;
+                    readBarrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+                    readBarrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+                    // Fix: On a dedicated Transfer Queue, we cannot wait for FRAGMENT_SHADER stage.
+                    // We transition to SHADER_READ_ONLY layout here, but the execution dependency
+                    // must be purely TRANSFER-local. Actual visibility to Graphics Queue is handled by semaphores.
+                    readBarrier.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT; 
+                    readBarrier.dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT; // Dummy access
+                    readBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+                    readBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+                    VkDependencyInfo dep2{};
+                    dep2.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+                    dep2.imageMemoryBarrierCount = 1;
+                    dep2.pImageMemoryBarriers = &readBarrier;
+                    vkCmdPipelineBarrier2(cmd, &dep2);
+                }
+
+                (void)m_TransferManager->Submit(cmd);
+            }
+            else
+            {
+                Core::Log::Warn("Default texture staging allocation failed; default texture may appear black.");
+            }
 
             // Contract: bindless slot 0 is reserved for the default/error texture.
-            // This must be stable across the entire runtime.
             m_DefaultTextureIndex = 0;
             m_BindlessSystem->SetTexture(m_DefaultTextureIndex, *m_DefaultTexture);
 
@@ -109,13 +190,6 @@ namespace Runtime
             m_TextureSystem->SetDefaultDescriptor(m_DefaultTexture->GetView(), m_DefaultTexture->GetSampler());
         }
 
-        // Initialize GeometryStorage with frames-in-flight for safe deferred deletion
-        m_GeometryStorage.Initialize(m_Device->GetFramesInFlight());
-
-        // 4. Swapchain & Renderer
-        m_Swapchain = std::make_unique<RHI::VulkanSwapchain>(m_Device, *m_Window);
-        m_Renderer = std::make_unique<RHI::SimpleRenderer>(m_Device, *m_Swapchain);
-        m_TransferManager = std::make_unique<RHI::TransferManager>(*m_Device);
         Interface::GUI::Init(*m_Window, *m_Device, *m_Swapchain, m_Context->GetInstance(),
                              m_Device->GetGraphicsQueue());
 
@@ -153,6 +227,7 @@ namespace Runtime
         Core::Filesystem::FileWatcher::Shutdown();
 
         // Destroy GPU systems first while device is still alive.
+        m_GpuScene.reset(); // Destroy GPUScene (and its buffers) BEFORE device
         m_RenderSystem.reset();
         m_PipelineLibrary.reset();
 
@@ -334,7 +409,7 @@ namespace Runtime
     void Engine::RegisterAssetLoad(Core::Assets::AssetHandle handle, RHI::TransferToken token)
     {
         std::lock_guard lock(m_LoadMutex);
-        m_PendingLoads.push_back({handle, token});
+        m_PendingLoads.push_back({handle, token, {}});
     }
 
     void Engine::ProcessUploads()
@@ -348,10 +423,12 @@ namespace Runtime
 
         // Use erase-remove idiom to process finished loads
         auto it = std::remove_if(m_PendingLoads.begin(), m_PendingLoads.end(),
-                                 [&](const PendingLoad& load)
+                                 [&](PendingLoad& load)
                                  {
                                      if (m_TransferManager->IsCompleted(load.Token))
                                      {
+                                         if (load.OnComplete.Valid()) load.OnComplete();
+
                                          // Signal Core that the "External Processing" is done
                                          m_AssetManager.FinalizeLoad(load.Handle);
                                          return true; // Remove from list

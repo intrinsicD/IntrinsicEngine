@@ -15,6 +15,8 @@ import :RenderPipeline;
 import :ShaderRegistry;
 import :PipelineLibrary;
 import :GPUScene;
+import :Interaction; // New: Interaction Logic
+import :Presentation; // New: Presentation Logic
 import Core;
 import ECS;
 
@@ -50,35 +52,20 @@ export namespace Graphics
 
         void OnResize();
 
-        void RequestPick(uint32_t x, uint32_t y);
-
-        struct PickResultGpu
-        {
-            bool HasHit = false;
-            uint32_t EntityID = 0;
-        };
-
-        [[nodiscard]] PickResultGpu GetLastPickResult() const;
-        [[nodiscard]] std::optional<PickResultGpu> TryConsumePickResult();
-
         [[nodiscard]] RHI::VulkanBuffer* GetGlobalUBO() const { return m_GlobalUBO.get(); }
-
-        struct DebugViewState
-        {
-            bool Enabled = false;
-            StringID SelectedResource = StringID("PickID");
-            ResourceID SelectedResourceId = kInvalidResource;
-            bool ShowInViewport = false;
-            float DepthNear = 0.1f;
-            float DepthFar = 1000.0f;
-        };
-
-        [[nodiscard]] const DebugViewState& GetDebugViewState() const { return m_DebugView; }
-        void SetDebugViewSelectedResource(Core::Hash::StringID name) { m_DebugView.SelectedResource = name; }
-        void SetDebugViewShowInViewport(bool show) { m_DebugView.ShowInViewport = show; }
 
         // Retained-mode scene is owned by Runtime::Engine. RenderSystem consumes it during rendering.
         void SetGpuScene(GPUScene* scene) { m_GpuScene = scene; }
+
+        // Interaction System Access
+        [[nodiscard]] InteractionSystem& GetInteraction() { return m_Interaction; }
+        [[nodiscard]] const InteractionSystem& GetInteraction() const { return m_Interaction; }
+
+        // Picking API Facade (Delegates to InteractionSystem)
+        using PickResultGpu = InteractionSystem::PickResultGpu;
+        void RequestPick(uint32_t x, uint32_t y);
+        [[nodiscard]] PickResultGpu GetLastPickResult() const;
+        [[nodiscard]] std::optional<PickResultGpu> TryConsumePickResult();
 
     private:
         RenderSystemConfig m_Config;
@@ -112,26 +99,9 @@ export namespace Graphics
         // Retained-mode GPU scene (persistent SSBOs + sparse updates). Non-owning.
         GPUScene* m_GpuScene = nullptr;
 
-        std::vector<std::unique_ptr<RHI::VulkanImage>> m_DepthImages;
-
-        struct PendingPick
-        {
-            bool Pending = false;
-            uint32_t X = 0;
-            uint32_t Y = 0;
-            uint32_t RequestFrameIndex = 0;    // which slot (0..N-1) the request was recorded into
-            uint64_t RequestGlobalFrame = 0;   // global frame number when request was made
-        };
-
-        PendingPick m_PendingPick;
-        std::vector<std::unique_ptr<RHI::VulkanBuffer>> m_PickReadbackBuffers;
-        // For each frame slot: the global frame number when a pick was recorded, or 0 if none pending.
-        std::vector<uint64_t> m_PickReadbackRequestFrame;
-        PickResultGpu m_LastPickResult{};
-        bool m_HasPendingConsumedResult = false;
-        PickResultGpu m_PendingConsumedResult{};
-
-        DebugViewState m_DebugView{};
+        // Functional Sub-Systems
+        PresentationSystem m_Presentation; // New
+        InteractionSystem m_Interaction;   // New
 
         // Cached frame lists for UI and debug resolve selection.
         std::vector<RenderGraphDebugPass> m_LastDebugPasses;

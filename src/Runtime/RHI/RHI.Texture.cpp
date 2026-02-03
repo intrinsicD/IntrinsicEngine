@@ -1,18 +1,12 @@
 module;
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
+
 #include "RHI.Vulkan.hpp"
-#include <string>
-#include <cstring>
 #include <memory>
-#include <vector>
 
 module RHI:Texture.Impl;
 import :Texture;
 import :TextureSystem;
-import :Buffer;
 import :Image;
-import :CommandUtils;
 import Core;
 
 namespace RHI
@@ -47,104 +41,9 @@ namespace RHI
         }
     }
 
-    static std::unique_ptr<TextureGpuData> UploadTextureData(
-        VulkanDevice& device,
-        const void* pixels,
-        uint32_t width,
-        uint32_t height,
-        VkFormat format)
+    Texture::Texture(TextureSystem& system, VulkanDevice& device, TextureHandle handle)
+        : m_System(&system), m_Device(&device), m_Handle(handle)
     {
-        auto gpu = std::make_unique<TextureGpuData>();
-
-        const VkDeviceSize imageSize = static_cast<VkDeviceSize>(width) * static_cast<VkDeviceSize>(height) * 4u;
-        VulkanBuffer stagingBuffer(device, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
-        std::memcpy(stagingBuffer.Map(), pixels, static_cast<size_t>(imageSize));
-        stagingBuffer.Unmap();
-
-        const uint32_t mipLevels = 1;
-
-        gpu->Image = std::make_unique<VulkanImage>(
-            device,
-            width,
-            height,
-            mipLevels,
-            format,
-            VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-            VK_IMAGE_ASPECT_COLOR_BIT);
-
-        VkCommandBuffer cmd = CommandUtils::BeginSingleTimeCommands(device);
-
-        VkImageMemoryBarrier barrier{};
-        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-        barrier.srcAccessMask = 0;
-        barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        barrier.image = gpu->Image->GetHandle();
-        barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, mipLevels, 0, 1};
-
-        vkCmdPipelineBarrier(cmd,
-                             VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                             0, 0, nullptr, 0, nullptr, 1, &barrier);
-
-        VkBufferImageCopy region{};
-        region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-        region.imageExtent = {width, height, 1};
-        vkCmdCopyBufferToImage(cmd, stagingBuffer.GetHandle(), gpu->Image->GetHandle(),
-                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
-
-        VkImageMemoryBarrier readBarrier = barrier;
-        readBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-        readBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        readBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        readBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-
-        vkCmdPipelineBarrier(cmd,
-                             VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                             0, 0, nullptr, 0, nullptr, 1, &readBarrier);
-
-        CommandUtils::EndSingleTimeCommands(device, cmd);
-
-        CreateSampler(device, mipLevels, gpu->Sampler);
-
-        return gpu;
-    }
-
-    Texture::Texture(TextureSystem& system, VulkanDevice& device, const std::string& filepath)
-        : m_System(&system), m_Device(&device)
-    {
-        int w = 0, h = 0, c = 0;
-        std::string fullPath = Core::Filesystem::GetAssetPath(filepath);
-        stbi_uc* pixels = stbi_load(fullPath.c_str(), &w, &h, &c, STBI_rgb_alpha);
-
-        if (!pixels || w <= 0 || h <= 0)
-        {
-            Core::Log::Error("Failed to load texture: {}", filepath);
-            uint32_t pink = 0xFF00FFFF;
-            auto gpu = UploadTextureData(device, &pink, 1, 1, VK_FORMAT_R8G8B8A8_SRGB);
-            if (pixels) stbi_image_free(pixels);
-            m_Handle = m_System->CreateFromData(std::move(gpu));
-            return;
-        }
-
-        auto gpu = UploadTextureData(device, pixels, static_cast<uint32_t>(w), static_cast<uint32_t>(h), VK_FORMAT_R8G8B8A8_SRGB);
-        stbi_image_free(pixels);
-
-        m_Handle = m_System->CreateFromData(std::move(gpu));
-    }
-
-    Texture::Texture(TextureSystem& system, VulkanDevice& device, const std::vector<uint8_t>& data,
-                     uint32_t width, uint32_t height, VkFormat format)
-        : m_System(&system), m_Device(&device)
-    {
-        if (data.size() != static_cast<size_t>(width) * static_cast<size_t>(height) * 4u)
-        {
-            Core::Log::Error("Texture data size mismatch!");
-            return;
-        }
-
-        auto gpu = UploadTextureData(device, data.data(), width, height, format);
-        m_Handle = m_System->CreateFromData(std::move(gpu));
     }
 
     Texture::Texture(TextureSystem& system, VulkanDevice& device, uint32_t width, uint32_t height, VkFormat format)
@@ -155,9 +54,7 @@ namespace RHI
         auto indices = device.GetQueueIndices();
         bool distinctQueues = false;
         if (indices.GraphicsFamily.has_value() && indices.TransferFamily.has_value())
-        {
             distinctQueues = (indices.GraphicsFamily.value() != indices.TransferFamily.value());
-        }
 
         VkSharingMode sharingMode = distinctQueues ? VK_SHARING_MODE_CONCURRENT : VK_SHARING_MODE_EXCLUSIVE;
 

@@ -16,11 +16,12 @@ module Graphics:RenderSystem.Impl;
 import :RenderSystem;
 import :Camera;
 import :Components;
-
 import :RenderPipeline;
 import :ShaderRegistry;
 import :PipelineLibrary;
 import :GPUScene;
+import :Interaction;
+import :Presentation; // New
 
 import Core;
 import RHI;
@@ -65,10 +66,11 @@ namespace Graphics
           m_DescriptorLayout(descriptorLayout),
           m_RenderGraph(m_DeviceOwner, frameArena, frameScope),
           m_GeometryStorage(geometryStorage),
-          m_MaterialSystem(materialSystem)
+          m_MaterialSystem(materialSystem),
+          // Sub-systems
+          m_Presentation(m_DeviceOwner, swapchain, renderer),
+          m_Interaction({.MaxFramesInFlight = renderer.GetFramesInFlight()}, m_DeviceOwner)
     {
-        m_DepthImages.resize(renderer.GetFramesInFlight());
-
         VkPhysicalDeviceProperties props;
         vkGetPhysicalDeviceProperties(m_Device->GetPhysicalDevice(), &props);
         m_MinUboAlignment = props.limits.minUniformBufferOffsetAlignment;
@@ -107,39 +109,20 @@ namespace Graphics
             Core::Log::Error("RenderSystem: Failed to initialize Global UBO or Descriptor Set");
         }
 
-        // Picking: one 4-byte host-visible readback buffer per frame-in-flight.
-        auto NumFramesInFlight = renderer.GetFramesInFlight();
-        m_PickReadbackBuffers.resize(NumFramesInFlight);
-        m_PickReadbackRequestFrame.resize(NumFramesInFlight, 0);
-        for (auto& buf : m_PickReadbackBuffers)
-        {
-            buf = std::make_unique<RHI::VulkanBuffer>(
-                *m_Device,
-                sizeof(uint32_t),
-                VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-                static_cast<VmaMemoryUsage>(VMA_MEMORY_USAGE_GPU_TO_CPU));
-
-            if (void* ptr = buf->Map())
-            {
-                std::memset(ptr, 0, sizeof(uint32_t));
-                buf->Unmap();
-            }
-        }
-
-        // Register UI panel (reuses cached lists maintained in RenderSystem)
+        // Register UI panel
         Interface::GUI::RegisterPanel("Render Target Viewer",
                                       [this]()
                                       {
-                                          ImGui::Checkbox("Enable Debug View", &m_DebugView.Enabled);
+                                          auto& debugView = m_Interaction.GetDebugViewStateMut();
+                                          ImGui::Checkbox("Enable Debug View", &debugView.Enabled);
 
-                                          if (!m_DebugView.Enabled)
+                                          if (!debugView.Enabled)
                                           {
-                                              ImGui::TextDisabled(
-                                                  "Debug view disabled. Enable to visualize render targets.");
+                                              ImGui::TextDisabled("Debug view disabled. Enable to visualize render targets.");
                                               return;
                                           }
 
-                                          ImGui::Checkbox("Show debug view in viewport", &m_DebugView.ShowInViewport);
+                                          ImGui::Checkbox("Show debug view in viewport", &debugView.ShowInViewport);
                                           ImGui::Separator();
 
                                           for (const auto& pass : m_LastDebugPasses)
@@ -149,16 +132,14 @@ namespace Graphics
 
                                               for (const auto& att : pass.Attachments)
                                               {
-                                                  const bool isSelected = (att.ResourceName == m_DebugView.
-                                                      SelectedResource);
+                                                  const bool isSelected = (att.ResourceName == debugView.SelectedResource);
                                                   char label[128];
                                                   snprintf(label, sizeof(label), "0x%08X%s", att.ResourceName.Value,
                                                            att.IsDepth ? " (Depth)" : "");
 
                                                   if (ImGui::Selectable(label, isSelected))
                                                   {
-                                                      m_DebugView.SelectedResource = att.ResourceName;
-                                                      m_DebugView.SelectedResourceId = att.Resource;
+                                                      debugView.SelectedResource = att.ResourceName;
                                                   }
                                               }
 
@@ -166,28 +147,20 @@ namespace Graphics
                                           }
 
                                           ImGui::Separator();
-                                          ImGui::DragFloat("Depth Near", &m_DebugView.DepthNear, 0.01f, 1e-4f, 10.0f,
-                                                           "%.4f", ImGuiSliderFlags_AlwaysClamp);
-                                          ImGui::DragFloat("Depth Far", &m_DebugView.DepthFar, 1.0f, 1.0f, 100000.0f,
-                                                           "%.1f", ImGuiSliderFlags_AlwaysClamp);
-
-                                          // Pipeline-owned features may provide their own ImGui preview;
-                                          // RenderSystem now only shows whatever was registered via Interface::GUI.
+                                          ImGui::DragFloat("Depth Near", &debugView.DepthNear, 0.01f, 1e-4f, 10.0f, "%.4f", ImGuiSliderFlags_AlwaysClamp);
+                                          ImGui::DragFloat("Depth Far", &debugView.DepthFar, 1.0f, 1.0f, 100000.0f, "%.1f", ImGuiSliderFlags_AlwaysClamp);
                                       },
                                       true);
 
-        // RenderGraph transient GPU memory allocator (pages persist, bump resets each frame).
+        // RenderGraph transient GPU memory allocator
         m_TransientAllocator = std::make_unique<RHI::TransientAllocator>(*m_Device);
         m_RenderGraph.SetTransientAllocator(*m_TransientAllocator);
 
-        // Retained-mode GPUScene (persistent instance + bounds SSBOs).
-        // Ownership lives above RenderSystem (Runtime/Engine): game/systems queue updates, RenderSystem only consumes.
         m_GpuScene = nullptr;
     }
 
     RenderSystem::~RenderSystem()
     {
-        // Ensure allocator is destroyed before VulkanDevice and after GPU idle.
         if (m_Device) vkDeviceWaitIdle(m_Device->GetLogicalDevice());
 
         if (m_ActivePipeline) m_ActivePipeline->Shutdown();
@@ -206,10 +179,8 @@ namespace Graphics
 
     void RenderSystem::RequestPipelineSwap(std::unique_ptr<RenderPipeline> pipeline)
     {
-        // Overwrite any previously requested swap.
         if (m_PendingPipeline)
             m_PendingPipeline->Shutdown();
-
         m_PendingPipeline = std::move(pipeline);
     }
 
@@ -260,27 +231,19 @@ namespace Graphics
         m_RetiredPipelines.erase(it, m_RetiredPipelines.end());
     }
 
+    void RenderSystem::RequestPick(uint32_t x, uint32_t y)
+    {
+        m_Interaction.RequestPick(x, y, m_Presentation.GetFrameIndex(), m_Device->GetGlobalFrameNumber());
+    }
+
     RenderSystem::PickResultGpu RenderSystem::GetLastPickResult() const
     {
-        return m_LastPickResult;
+        return m_Interaction.GetLastPickResult();
     }
 
     std::optional<RenderSystem::PickResultGpu> RenderSystem::TryConsumePickResult()
     {
-        if (!m_HasPendingConsumedResult)
-            return std::nullopt;
-
-        m_HasPendingConsumedResult = false;
-        return m_PendingConsumedResult;
-    }
-
-    void RenderSystem::RequestPick(uint32_t x, uint32_t y)
-    {
-        m_PendingPick = {
-            true, x, y,
-            m_Renderer.GetCurrentFrameIndex(),
-            m_Device->GetGlobalFrameNumber()
-        };
+        return m_Interaction.TryConsumePickResult();
     }
 
     void RenderSystem::OnUpdate(ECS::Scene& scene, const CameraComponent& camera,
@@ -288,60 +251,31 @@ namespace Graphics
     {
         const uint64_t currentFrame = m_Device->GetGlobalFrameNumber();
         m_GeometryStorage.ProcessDeletions(currentFrame);
-
-        // Safe-point GC for swapped-out pipelines.
         GarbageCollectRetiredPipelines();
+        
+        // ---------------------------------------------------------
+        // 1. Check for Completed GPU Readbacks (Picking)
+        // ---------------------------------------------------------
+        m_Interaction.ProcessReadbacks(currentFrame);
 
         Interface::GUI::BeginFrame();
         Interface::GUI::DrawGUI();
 
-        m_Renderer.BeginFrame();
-
-        if (!m_Renderer.IsFrameInProgress())
+        // ---------------------------------------------------------
+        // 2. Begin Frame (Presentation)
+        // ---------------------------------------------------------
+        if (!m_Presentation.BeginFrame())
         {
             Interface::GUI::EndFrame();
             return;
         }
 
-        const uint32_t frameIndex = m_Renderer.GetCurrentFrameIndex();
-        const uint64_t currentGlobalFrame = m_Device->GetGlobalFrameNumber();
-        const uint32_t framesInFlight = m_Renderer.GetFramesInFlight();
+        const uint32_t frameIndex = m_Presentation.GetFrameIndex();
+        const auto extent = m_Presentation.GetResolution();
 
-        const auto extent = m_Swapchain.GetExtent();
-
-        // Apply swap only once we know a frame is actually in-progress.
         ApplyPendingPipelineSwap(extent.width, extent.height);
 
-        // Check if a prior pick recorded into this slot is now safe to read.
-        if (m_PickReadbackRequestFrame[frameIndex] != 0)
-        {
-            const uint64_t requestFrame = m_PickReadbackRequestFrame[frameIndex];
-            if (currentGlobalFrame >= requestFrame + framesInFlight)
-            {
-                m_PickReadbackBuffers[frameIndex]->Invalidate(0, sizeof(uint32_t));
-
-                void* mapped = m_PickReadbackBuffers[frameIndex]->Map();
-                if (mapped)
-                {
-                    uint32_t entityID = *static_cast<uint32_t*>(mapped);
-                    m_PickReadbackBuffers[frameIndex]->Unmap();
-
-                    m_PendingConsumedResult = {entityID != 0, entityID};
-                    m_HasPendingConsumedResult = true;
-                    m_LastPickResult = m_PendingConsumedResult;
-
-                    if (entityID != 0)
-                        Core::Log::Info("GPU Pick Hit: Entity ID {}", entityID);
-                }
-                m_PickReadbackRequestFrame[frameIndex] = 0;
-            }
-        }
-
-        if (m_PendingPick.Pending)
-        {
-            m_PickReadbackRequestFrame[frameIndex] = currentGlobalFrame;
-        }
-
+        // Update Camera UBO
         RHI::CameraBufferObject ubo{};
         ubo.View = camera.ViewMatrix;
         ubo.Proj = camera.ProjectionMatrix;
@@ -353,83 +287,60 @@ namespace Graphics
         char* dataPtr = static_cast<char*>(m_GlobalUBO->Map());
         memcpy(dataPtr + dynamicOffset, &ubo, cameraDataSize);
 
+        // ---------------------------------------------------------
+        // 3. Prepare Render Graph Context
+        // ---------------------------------------------------------
         m_RenderGraph.Reset();
-
-        const uint32_t imageIndex = m_Renderer.GetImageIndex();
-
+        const uint32_t imageIndex = m_Presentation.GetImageIndex();
         RenderBlackboard blackboard;
+        
+        const auto& pendingPick = m_Interaction.GetPendingPick();
+        const auto& debugView = m_Interaction.GetDebugViewState();
 
-        // Frame setup pass: import swapchain & depth and seed blackboard.
-        struct FrameSetupData
-        {
-            RGResourceHandle Backbuffer;
-            RGResourceHandle Depth;
-        };
-
+        // Frame setup pass: import swapchain & depth
+        struct FrameSetupData { RGResourceHandle Backbuffer; RGResourceHandle Depth; };
         m_RenderGraph.AddPass<FrameSetupData>("FrameSetup",
                                               [&](FrameSetupData& data, RGBuilder& builder)
                                               {
-                                                  VkImage swapImage = m_Renderer.GetSwapchainImage(imageIndex);
-                                                  VkImageView swapView = m_Renderer.GetSwapchainImageView(imageIndex);
-
                                                   data.Backbuffer = builder.ImportTexture(
                                                       "Backbuffer"_id,
-                                                      swapImage,
-                                                      swapView,
-                                                      m_Swapchain.GetImageFormat(),
+                                                      m_Presentation.GetBackbuffer(),
+                                                      m_Presentation.GetBackbufferView(),
+                                                      m_Presentation.GetBackbufferFormat(),
                                                       extent,
                                                       VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
-                                                  // Ensure depth image exists and import
-                                                  auto& depthImg = m_DepthImages[frameIndex];
-                                                  if (!depthImg || depthImg->GetWidth() != extent.width || depthImg->
-                                                      GetHeight() != extent.height)
-                                                  {
-                                                      VkFormat depthFormat = RHI::VulkanImage::FindDepthFormat(
-                                                          *m_Device);
-                                                      depthImg = std::make_unique<RHI::VulkanImage>(
-                                                          *m_Device, extent.width, extent.height, 1,
-                                                          depthFormat,
-                                                          VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT |
-                                                          VK_IMAGE_USAGE_SAMPLED_BIT,
-                                                          VK_IMAGE_ASPECT_DEPTH_BIT);
-                                                  }
-
+                                                  auto& depthImg = m_Presentation.GetDepthBuffer();
                                                   data.Depth = builder.ImportTexture(
                                                       "SceneDepth"_id,
-                                                      depthImg->GetHandle(),
-                                                      depthImg->GetView(),
-                                                      depthImg->GetFormat(),
+                                                      depthImg.GetHandle(),
+                                                      depthImg.GetView(),
+                                                      depthImg.GetFormat(),
                                                       extent,
                                                       VK_IMAGE_LAYOUT_UNDEFINED);
 
                                                   blackboard.Add("Backbuffer"_id, data.Backbuffer);
                                                   blackboard.Add("SceneDepth"_id, data.Depth);
                                               },
-                                              [](const FrameSetupData&, const RGRegistry&, VkCommandBuffer)
-                                              {
-                                              });
+                                              [](const FrameSetupData&, const RGRegistry&, VkCommandBuffer){});
 
-        // GPUScene update pass: scatter queued deltas into persistent SSBOs.
+        // GPUScene update pass
         struct SceneUpdateData { int _dummy = 0; };
         m_RenderGraph.AddPass<SceneUpdateData>("SceneUpdate",
                                               [&](SceneUpdateData&, RGBuilder& builder)
                                               {
-                                                  if (!m_GpuScene)
-                                                      return;
-
-                                                  auto sceneBuf = builder.ImportBuffer("GPUScene.Scene"_id, m_GpuScene->GetSceneBuffer());
-                                                  auto boundsBuf = builder.ImportBuffer("GPUScene.Bounds"_id, m_GpuScene->GetBoundsBuffer());
-
-                                                  builder.Write(sceneBuf, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT);
-                                                  builder.Write(boundsBuf, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT);
+                                                  if (!m_GpuScene) return;
+                                                  builder.Write(builder.ImportBuffer("GPUScene.Scene"_id, m_GpuScene->GetSceneBuffer()), VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT);
+                                                  builder.Write(builder.ImportBuffer("GPUScene.Bounds"_id, m_GpuScene->GetBoundsBuffer()), VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT);
                                               },
                                               [this](const SceneUpdateData&, const RGRegistry&, VkCommandBuffer cmd)
                                               {
-                                                  if (m_GpuScene)
-                                                      m_GpuScene->Sync(cmd);
+                                                  if (m_GpuScene) m_GpuScene->Sync(cmd);
                                               });
 
+        // ---------------------------------------------------------
+        // 4. Execute Pipeline
+        // ---------------------------------------------------------
         RenderPassContext ctx{
             m_RenderGraph,
             blackboard,
@@ -447,16 +358,14 @@ namespace Graphics
             m_GlobalDescriptorSet,
             dynamicOffset,
             m_BindlessSystem,
-            {m_PendingPick.Pending, m_PendingPick.X, m_PendingPick.Y},
-            {
-                m_DebugView.Enabled, m_DebugView.ShowInViewport, m_DebugView.SelectedResource, m_DebugView.DepthNear,
-                m_DebugView.DepthFar
-            },
+            // Pass interaction state
+            {pendingPick.Pending, pendingPick.X, pendingPick.Y},
+            {debugView.Enabled, debugView.ShowInViewport, debugView.SelectedResource, debugView.DepthNear, debugView.DepthFar},
             m_LastDebugImages,
             m_LastDebugPasses,
             camera.ViewMatrix,
             camera.ProjectionMatrix,
-            (frameIndex < m_PickReadbackBuffers.size()) ? m_PickReadbackBuffers[frameIndex].get() : nullptr
+            m_Interaction.GetReadbackBuffer(frameIndex)
         };
 
         if (m_ActivePipeline)
@@ -470,23 +379,19 @@ namespace Graphics
         if (m_ActivePipeline)
             m_ActivePipeline->PostCompile(frameIndex, m_LastDebugImages, m_LastDebugPasses);
 
-        m_RenderGraph.Execute(m_Renderer.GetCommandBuffer());
-        m_Renderer.EndFrame();
-
-        m_PendingPick.Pending = false;
+        m_RenderGraph.Execute(m_Presentation.GetCommandBuffer());
+        
+        // ---------------------------------------------------------
+        // 5. Submit & Present
+        // ---------------------------------------------------------
+        m_Presentation.EndFrame();
     }
 
     void RenderSystem::OnResize()
     {
         m_RenderGraph.Trim();
-
-        for (auto& img : m_DepthImages)
-        {
-            img.reset();
-        }
-
-        auto extent = m_Swapchain.GetExtent();
-        if (m_ActivePipeline)
-            m_ActivePipeline->OnResize(extent.width, extent.height);
+        m_Presentation.OnResize();
+        auto extent = m_Presentation.GetResolution();
+        if (m_ActivePipeline) m_ActivePipeline->OnResize(extent.width, extent.height);
     }
 }

@@ -180,3 +180,22 @@ Your `libstdc++` is too old. Ensure you installed `libstdc++-14-dev`.
 
 **Asset Loading Fails**
 Check the logs (`[ERR]`). Ensure the `assets/` folder is adjacent to the binary or in the project root. The engine attempts to resolve paths relative to the executable.
+
+---
+
+## Async Texture Uploads (Phase 1)
+
+Texture streaming must not block worker threads on GPU work.
+
+**Old (removed):** creating `RHI::Texture` from CPU pixel data implicitly recorded commands and waited on a fence (`vkWaitForFences`) via `RHI::CommandUtils::EndSingleTimeCommands`.
+
+**New (current):** `Graphics::TextureLoader::LoadAsync(...)` decodes on CPU, allocates staging via `RHI::TransferManager` (timeline semaphore), records `vkCmdCopyBufferToImage` on the transfer queue, and returns a `RHI::TransferToken`.
+
+While the upload is in flight, the texture’s bindless slot is bound to the engine default texture (bindless slot 0). When the token completes, the `AssetManager` transitions the asset to `Ready`.
+
+**Key APIs:**
+- `Graphics::TextureLoader::LoadAsync(path, device, transferManager, textureSystem, isSRGB)`
+- `RHI::TextureSystem::CreatePending(width, height, format)`
+- `Runtime::Engine::ProcessUploads()` polls `TransferManager::IsCompleted(token)`
+
+**Guarantee:** no loader thread calls `vkWaitForFences` for texture uploads.

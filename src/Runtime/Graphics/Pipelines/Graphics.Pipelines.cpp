@@ -45,6 +45,8 @@ namespace Graphics
         m_ForwardPass->SetCullSetLayout(pipelineLibrary.GetCullSetLayout());
 
         m_DebugViewPass->SetShaderRegistry(shaderRegistry);
+        
+        m_PathDirty = true;
     }
 
     void DefaultPipeline::Shutdown()
@@ -60,18 +62,38 @@ namespace Graphics
         m_ImGuiPass.reset();
     }
 
+    void DefaultPipeline::RebuildPath()
+    {
+        m_Path.Clear();
+
+        // 1. Picking (Readback)
+        m_Path.AddFeature("Picking", m_PickingPass.get());
+
+        // 2. Forward (Main Scene)
+        m_Path.AddFeature("Forward", m_ForwardPass.get());
+
+        // 3. Debug View (Conditional)
+        m_Path.AddStage("DebugView", [this](RenderPassContext& ctx)
+        {
+            if (m_DebugViewPass && ctx.Debug.Enabled)
+            {
+                m_DebugViewPass->AddPasses(ctx);
+            }
+        });
+
+        // 4. ImGui (Overlay)
+        m_Path.AddFeature("ImGui", m_ImGuiPass.get());
+    }
+
     void DefaultPipeline::SetupFrame(RenderPassContext& ctx)
     {
-        if (m_PickingPass) m_PickingPass->AddPasses(ctx);
-        if (m_ForwardPass) m_ForwardPass->AddPasses(ctx);
+        if (m_PathDirty)
+        {
+            RebuildPath();
+            m_PathDirty = false;
+        }
 
-        if (m_DebugViewPass && ctx.Debug.Enabled && ctx.Debug.ShowInViewport)
-            m_DebugViewPass->AddPasses(ctx);
-
-        if (m_ImGuiPass) m_ImGuiPass->AddPasses(ctx);
-
-        if (m_DebugViewPass && ctx.Debug.Enabled && !ctx.Debug.ShowInViewport)
-            m_DebugViewPass->AddPasses(ctx);
+        m_Path.Execute(ctx);
     }
 
     void DefaultPipeline::OnResize(uint32_t width, uint32_t height)

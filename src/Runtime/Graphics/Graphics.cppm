@@ -17,7 +17,9 @@ export import :Pipelines;
 export import :GPUScene;
 export import :Systems.GPUSceneSync;
 
-// New modular render pipeline (interface only)
+export import :Interaction;
+export import :Presentation;
+export import :RenderPath;
 export import :RenderPipeline;
 
 // NOTE: We intentionally do NOT re-export pipeline implementations here.

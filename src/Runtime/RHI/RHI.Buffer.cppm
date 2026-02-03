@@ -65,6 +65,31 @@ export namespace RHI {
         [[nodiscard]] bool IsHostVisible() const { return m_IsHostVisible; }
         [[nodiscard]] size_t GetSizeBytes() const { return m_SizeBytes; }
 
+        // Helper to read data from a mapped buffer (GPU->CPU).
+        // Safely handles invalidation, mapping, copying, and unmapping.
+        template<typename T>
+        void Read(T* outData, size_t count = 1, size_t byteOffset = 0)
+        {
+            if (!outData || count == 0) return;
+            const size_t byteSize = count * sizeof(T);
+            
+            if (byteOffset + byteSize > m_SizeBytes)
+            {
+                Core::Log::Error("VulkanBuffer::Read(): Out of bounds. size={} offset={} cap={}", byteSize, byteOffset, m_SizeBytes);
+                return;
+            }
+
+            // Invalidate CPU cache to see GPU writes (if non-coherent).
+            Invalidate(byteOffset, byteSize);
+
+            void* ptr = Map();
+            if (ptr)
+            {
+                std::memcpy(outData, static_cast<uint8_t*>(ptr) + byteOffset, byteSize);
+                Unmap();
+            }
+        }
+
     private:
         VulkanDevice& m_Device;
         VkBuffer m_Buffer = VK_NULL_HANDLE;

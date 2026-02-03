@@ -40,13 +40,6 @@ namespace Geometry
         {
             return i == 0 ? v.x : (i == 1 ? v.y : v.z);
         }
-
-        inline void SetByIndex(glm::vec3& v, int i, float value)
-        {
-            if (i == 0) v.x = value;
-            else if (i == 1) v.y = value;
-            else v.z = value;
-        }
     }
 
     std::optional<RayTriangleHit>

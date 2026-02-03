@@ -60,11 +60,25 @@ public:
         auto textureLoader = [this](const std::filesystem::path& path, Core::Assets::AssetHandle handle)
             -> std::shared_ptr<RHI::Texture>
         {
-            auto result = Graphics::TextureLoader::LoadAsync(path, *GetDevice(), *m_TextureSystem);
+            auto result = Graphics::TextureLoader::LoadAsync(path, *GetDevice(), *m_TransferManager, *m_TextureSystem);
 
             if (result)
             {
-                RegisterAssetLoad(handle, result->Token);
+                // When the transfer finishes, publish the real descriptor for this texture's bindless slot.
+                RegisterAssetLoad(handle, result->Token, [this, texHandle = result->TextureHandle]()
+                {
+                    if (m_TextureSystem)
+                    {
+                        if (const auto* data = m_TextureSystem->Get(texHandle))
+                        {
+                            // Flip bindless slot from default -> real view/sampler.
+                            // This is the critical publish step in Phase 1.
+                            // (No GPU waits; safe because token completion implies transfer queue copy is done.)
+                            m_BindlessSystem->UpdateTexture(data->BindlessSlot, data->Image->GetView(), data->Sampler);
+                        }
+                    }
+                });
+
                 m_AssetManager.MoveToProcessing(handle);
                 return std::move(result->Texture);
             }

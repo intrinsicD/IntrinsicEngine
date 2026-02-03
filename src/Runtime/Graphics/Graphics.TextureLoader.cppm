@@ -13,6 +13,7 @@ export namespace Graphics
     struct TextureLoadResult
     {
         std::shared_ptr<RHI::Texture> Texture;
+        RHI::TextureHandle TextureHandle; // Needed for completion publish
         RHI::TransferToken Token;
     };
 
@@ -24,6 +25,7 @@ export namespace Graphics
         static std::expected<TextureLoadResult, AssetError> LoadAsync(
             const std::filesystem::path& filepath,
             RHI::VulkanDevice& device,
+            RHI::TransferManager& transferManager,
             RHI::TextureSystem& textureSystem,
             bool isSRGB = true);
     };

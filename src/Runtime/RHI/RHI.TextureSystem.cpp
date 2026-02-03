@@ -88,6 +88,119 @@ namespace RHI
         return handle;
     }
 
+    TextureHandle TextureSystem::CreatePending(uint32_t width, uint32_t height, VkFormat format)
+    {
+        // Allocate a pool entry with a bindless slot, but keep it bound to default.
+        auto gpu = std::make_unique<TextureGpuData>();
+
+        auto indices = m_Device.GetQueueIndices();
+        bool distinctQueues = false;
+        if (indices.GraphicsFamily.has_value() && indices.TransferFamily.has_value())
+            distinctQueues = (indices.GraphicsFamily.value() != indices.TransferFamily.value());
+
+        VkSharingMode sharingMode = distinctQueues ? VK_SHARING_MODE_CONCURRENT : VK_SHARING_MODE_EXCLUSIVE;
+
+        gpu->Image = std::make_unique<VulkanImage>(
+            m_Device,
+            width,
+            height,
+            /*mips*/ 1,
+            format,
+            VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+            VK_IMAGE_ASPECT_COLOR_BIT,
+            sharingMode);
+
+        // Sampler will be created later when real data is published; but we can create one now for consistency.
+        // Use a default sampler so tools can sample this immediately.
+        {
+            VkSamplerCreateInfo samplerInfo{};
+            samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+            samplerInfo.magFilter = VK_FILTER_LINEAR;
+            samplerInfo.minFilter = VK_FILTER_LINEAR;
+            samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+            samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+            samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+            samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+            samplerInfo.anisotropyEnable = VK_TRUE;
+
+            VkPhysicalDeviceProperties properties{};
+            vkGetPhysicalDeviceProperties(m_Device.GetPhysicalDevice(), &properties);
+            samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
+            samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+            samplerInfo.unnormalizedCoordinates = VK_FALSE;
+            samplerInfo.minLod = 0.0f;
+            samplerInfo.maxLod = 1.0f;
+
+            VK_CHECK(vkCreateSampler(m_Device.GetLogicalDevice(), &samplerInfo, nullptr, &gpu->Sampler));
+        }
+
+        // Allocate stable slot.
+        gpu->BindlessSlot = AllocateBindlessSlot();
+
+        if (gpu->BindlessSlot >= m_Bindless.GetCapacity())
+        {
+            Core::Log::Error("Bindless texture capacity exceeded (slot {} >= {}). Texture will not be visible.",
+                             gpu->BindlessSlot, m_Bindless.GetCapacity());
+        }
+
+        // Insert into pool.
+        TextureHandle handle = m_Pool.Add(std::move(gpu));
+
+        // Immediately bind to default so sampling is safe until publish.
+        if (handle.IsValid())
+        {
+            const TextureGpuData* data = m_Pool.GetUnchecked(handle);
+            if (m_DefaultView != VK_NULL_HANDLE && m_DefaultSampler != VK_NULL_HANDLE)
+            {
+                m_Bindless.UpdateTexture(data->BindlessSlot, m_DefaultView, m_DefaultSampler);
+            }
+            else
+            {
+                // Engine init order: CreatePending may be called before SetDefaultDescriptor().
+                // In that case, bind the real view/sampler now so this texture isn't permanently stuck sampling an uninitialized/default slot.
+                m_Bindless.UpdateTexture(data->BindlessSlot, data->Image->GetView(), data->Sampler);
+            }
+        }
+
+        return handle;
+    }
+
+    void TextureSystem::Publish(TextureHandle handle, std::unique_ptr<TextureGpuData> gpuData)
+    {
+        if (!handle.IsValid() || !gpuData || !gpuData->Image)
+            return;
+
+        auto slot = m_Pool.Get(handle);
+        if (!slot)
+            return;
+
+        TextureGpuData* dst = *slot;
+        if (!dst)
+            return;
+
+        // Preserve stable bindless slot assigned at creation.
+        const uint32_t bindlessSlot = dst->BindlessSlot;
+        gpuData->BindlessSlot = bindlessSlot;
+
+        // Schedule destruction of any old sampler on this slot.
+        if (dst->Sampler)
+        {
+            VkDevice logicalDevice = m_Device.GetLogicalDevice();
+            VkSampler oldSampler = dst->Sampler;
+            m_Device.SafeDestroy([logicalDevice, oldSampler]()
+            {
+                vkDestroySampler(logicalDevice, oldSampler, nullptr);
+            });
+        }
+
+        // Overwrite contents in-place; pool owns the allocation.
+        *dst = std::move(*gpuData);
+        dst->BindlessSlot = bindlessSlot;
+
+        // Update bindless descriptor to point to the real image/sampler.
+        m_Bindless.UpdateTexture(dst->BindlessSlot, dst->Image->GetView(), dst->Sampler);
+    }
+
     void TextureSystem::Destroy(TextureHandle handle)
     {
         if (!handle.IsValid())
