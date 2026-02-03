@@ -18,7 +18,7 @@ struct InstanceData {
     mat4 Model;
     uint TextureID;
     uint EntityID;
-    uint Pad0;
+    uint GeometryID;
     uint Pad1;
 };
 

@@ -282,7 +282,12 @@ namespace Runtime
                 {
                     // [Main Thread] Safe to touch Scene/Assets
                     std::filesystem::path fsPath(path);
-                    std::string assetName = fsPath.filename().string();
+                    std::string baseName = fsPath.filename().string();
+
+                    // Generate unique asset name to avoid overwriting existing assets with same filename.
+                    // AssetManager::Create() destroys any existing asset with a matching name.
+                    static uint64_t s_AssetLoadCounter = 0;
+                    std::string assetName = baseName + "::" + std::to_string(++s_AssetLoadCounter);
 
                     // Transfer ownership of the model into the AssetManager (zero-copy).
                     // Keep a raw pointer for the rest of this scope (AssetManager now owns lifetime).
@@ -389,7 +394,7 @@ namespace Runtime
         m_ShaderRegistry.Register("Debug.Comp"_id, "shaders/debug_view.comp.spv");
 
         // Stage 3 compute
-        m_ShaderRegistry.Register("Cull.Comp"_id, "shaders/instance_cull.comp.spv");
+        m_ShaderRegistry.Register("Cull.Comp"_id, "shaders/instance_cull_multigeo.comp.spv");
 
         // GPUScene scatter update
         m_ShaderRegistry.Register("SceneUpdate.Comp"_id, "shaders/scene_update.comp.spv");
@@ -494,6 +499,7 @@ namespace Runtime
                 // Initial packet
                 Graphics::GpuInstanceData inst{};
                 inst.Model = ECS::Components::Transform::GetMatrix(t);
+                inst.GeometryID = mr.Geometry.Index;
 
                 if (auto* pick = m_Scene.GetRegistry().try_get<ECS::Components::Selection::PickID>(targetEntity))
                     inst.EntityID = pick->Value;

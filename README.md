@@ -134,6 +134,42 @@ ninja
 
 ---
 
+## Forward Rendering (Stages 1/2/3)
+
+The forward renderer has three conceptual stages:
+
+- **Stage 1 (Instance Resolve):** Collects renderables and resolves materials/texture IDs.
+- **Stage 2 (CPU Indirect Build):** Builds batched per-geometry `VkDrawIndexedIndirectCommand` streams on the CPU.
+- **Stage 3 (GPU Culling / Indirect Build):** Uses the persistent `GPUScene` SSBOs, frustum-culls on the GPU, and produces a compacted indirect stream.
+
+### Important contract
+
+All instance data shared between CPU and GPU uses a std430-compatible layout and includes:
+
+- `Model` matrix
+- `TextureID`
+- `EntityID`
+- `GeometryID` (**new**): a stable per-geometry identifier used for GPU-driven batching/culling
+
+Shaders updated to match this contract:
+
+- `assets/shaders/triangle.vert`
+- `assets/shaders/scene_update.comp`
+- `assets/shaders/instance_cull.comp`
+
+### Why this matters
+
+Loading multiple models should never cause previously loaded models to vanish. A previous bug came from mixing Stage 1/2 drawing with Stage 3 drawing (and clearing) in the same frame.
+
+The forward pass is now structured so that only one path renders per frame:
+
+- If GPU-driven culling is active and supported, Stage 3 is used.
+- Otherwise the CPU-driven Stage 2 path renders.
+
+This makes it difficult to accidentally double-draw or clear the backbuffer twice.
+
+---
+
 ## 🧩 Troubleshooting
 
 **`CMake Error: Could not find clang-scan-deps`**

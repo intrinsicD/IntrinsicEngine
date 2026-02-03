@@ -59,6 +59,9 @@ namespace Graphics::Systems::GPUSceneSync
             GpuInstanceData inst{};
             inst.Model = world.Matrix;
 
+            // GeometryID: used by GPU-driven culling/draw batching (Stage 3+).
+            inst.GeometryID = mr.Geometry.Index;
+
             // TextureID: bindless index from material; 0 is default/error.
             inst.TextureID = (matData) ? matData->AlbedoID : 0u;
 

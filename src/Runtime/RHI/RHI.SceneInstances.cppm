@@ -9,10 +9,10 @@ export namespace RHI
     // std430-friendly. Mat4 is 16-byte aligned with glm defaults in this project.
     struct GpuInstanceData
     {
-        glm::mat4 Model;
-        uint32_t TextureID;
-        uint32_t EntityID;
-        uint32_t Padding0 = 0;
+        glm::mat4 Model{1.0f};
+        uint32_t TextureID = 0;
+        uint32_t EntityID = 0;
+        uint32_t GeometryID = 0;
         uint32_t Padding1 = 0;
     };
 

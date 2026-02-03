@@ -22,6 +22,8 @@ export namespace Graphics::Passes
     class ForwardPass final : public IRenderFeature
     {
     public:
+        ForwardPass() = default;
+
         void Initialize(RHI::VulkanDevice& device,
                         RHI::DescriptorAllocator& descriptorPool, RHI::DescriptorLayout&) override
         {
@@ -43,13 +45,13 @@ export namespace Graphics::Passes
     private:
         struct PassData
         {
-            RGResourceHandle Color;
-            RGResourceHandle Depth;
+            RGResourceHandle Color{};
+            RGResourceHandle Depth{};
         };
 
         struct RenderPacket
         {
-            Geometry::GeometryHandle GeoHandle;
+            Geometry::GeometryHandle GeoHandle{};
             uint32_t TextureID = 0;
             glm::mat4 Transform{1.0f};
             bool IsSelected = false;
@@ -92,10 +94,71 @@ export namespace Graphics::Passes
         std::unique_ptr<RHI::VulkanBuffer> m_Stage2IndirectIndexedBuffer[FRAMES];
         std::unique_ptr<RHI::VulkanBuffer> m_Stage3IndirectIndexedBuffer[FRAMES];
 
+        // Option A (multi-geometry Stage 3): per-frame geometry table (dense) and packed output streams.
+        std::unique_ptr<RHI::VulkanBuffer> m_Stage3GeometryIndexCount[FRAMES];
+
+        // Packed outputs (device-local): [GeometryCount * MaxDrawsPerGeometry]
+        std::unique_ptr<RHI::VulkanBuffer> m_Stage3VisibilityPacked[FRAMES];
+        std::unique_ptr<RHI::VulkanBuffer> m_Stage3IndirectPacked[FRAMES];
+        std::unique_ptr<RHI::VulkanBuffer> m_Stage3DrawCountsPacked[FRAMES];
+
+        uint32_t m_Stage3LastGeometryCount = 0;
+        uint32_t m_Stage3LastMaxDrawsPerGeometry = 0;
+
         // Stage 1: allocate per-frame descriptor sets freshly (do not cache across frames).
         VkDescriptorSetLayout m_InstanceSetLayout = VK_NULL_HANDLE;
         std::unique_ptr<RHI::PersistentDescriptorPool> m_InstanceSetPool;
 
         bool m_EnableGpuCulling = true;
+
+        // ---------------------------------------------------------------------
+        // Unified draw-stream contract (long-term error-resistant design)
+        // ---------------------------------------------------------------------
+        struct DrawBatch
+        {
+            Geometry::GeometryHandle GeoHandle{};
+            VkPrimitiveTopology Topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+
+            VkBuffer IndexBuffer = VK_NULL_HANDLE;
+            uint32_t IndexCount = 0;
+
+            // Vertex buffer device addresses (SoA).
+            uint64_t PtrPositions = 0;
+            uint64_t PtrNormals = 0;
+            uint64_t PtrAux = 0;
+
+            // Packed-slice offsets (bytes) into Indirect/Visibility buffers.
+            VkDeviceSize IndirectOffsetBytes = 0;
+            VkDeviceSize VisibilityOffsetBytes = 0;
+            VkDeviceSize CountOffsetBytes = 0;
+
+            // Per-batch indirect buffers. If CountBuffer is VK_NULL_HANDLE, fall back to fixed drawCount.
+            RHI::VulkanBuffer* IndirectBuffer = nullptr; // non-owning
+            RHI::VulkanBuffer* CountBuffer = nullptr;    // optional (non-owning)
+            uint32_t MaxDraws = 0;
+
+            // Visibility/remap buffer: maps gl_InstanceIndex -> instance slot.
+            RHI::VulkanBuffer* VisibilityBuffer = nullptr; // non-owning
+
+            // Instance buffer for the vertex shader (set=2,binding=0).
+            RHI::VulkanBuffer* InstanceBuffer = nullptr; // non-owning
+        };
+
+        struct DrawStream
+        {
+            // Invariant: if Batches is empty, raster pass is skipped.
+            std::vector<DrawBatch> Batches{};
+        };
+
+        // Build either a CPU (Stage1/2) or GPU-driven (Stage3) draw stream.
+        [[nodiscard]] DrawStream BuildDrawStream(RenderPassContext& ctx);
+
+        // Record a single raster pass that consumes the draw stream exactly once.
+        void AddRasterPass(RenderPassContext& ctx, RGResourceHandle backbuffer, RGResourceHandle depth, DrawStream&& stream);
+
+        // Legacy helpers (will be folded into BuildDrawStream/AddRasterPass).
+        void AddStage1And2Passes(RenderPassContext& ctx, RGResourceHandle backbuffer, RGResourceHandle depth);
+        void AddStage3Passes(RenderPassContext& ctx, RGResourceHandle backbuffer, RGResourceHandle depth,
+                             Geometry::GeometryHandle singleGeometry);
     };
 }

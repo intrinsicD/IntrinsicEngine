@@ -1,0 +1,128 @@
+#version 460
+#extension GL_EXT_scalar_block_layout : require
+
+// Option A: GPU-driven multi-geometry culling + compaction.
+//
+// This pass processes *all* GPUScene instances. For each instance, it:
+//  1) discards inactive slots (radius <= 0)
+//  2) frustum-tests the instance bounding sphere
+//  3) routes survivors into a per-geometry compacted draw stream:
+//     - visibilityRemap[geom][drawIndex] = instanceSlot
+//     - indirectCmds[geom][drawIndex] = DrawIndexedIndirect(indexCount = geomIndexCount[geom], firstInstance = drawIndex)
+//     - drawCount[geom] = number of survivors
+//
+// Geometry binding is driven by GeometryID stored in InstanceData.
+
+layout(local_size_x = 64) in;
+
+struct InstanceData {
+    mat4 Model;
+    uint TextureID;
+    uint EntityID;
+    uint GeometryID;
+    uint Pad1;
+};
+
+struct DrawIndexedIndirect {
+    uint indexCount;
+    uint instanceCount;
+    uint firstIndex;
+    int  vertexOffset;
+    uint firstInstance;
+};
+
+struct Sphere {
+    vec4 CenterRadius;
+};
+
+layout(push_constant, scalar) uniform CullPC {
+    vec4 Planes[6];
+    uint TotalInstanceCount;      // GPUScene active span
+    uint GeometryCount;           // number of geometry batches
+    uint MaxDrawsPerGeometry;     // capacity per-geometry for indirect/remap
+    uint _pad0;
+} pc;
+
+// GPUScene
+layout(std430, set = 0, binding = 1) readonly buffer Instances {
+    InstanceData Data[];
+} instances;
+
+layout(std430, set = 0, binding = 2) readonly buffer Bounds {
+    Sphere Spheres[];
+} bounds;
+
+// Geometry table
+layout(std430, set = 0, binding = 3) readonly buffer GeometryIndexCount {
+    uint IndexCount[]; // [GeometryCount]
+} geoIndexCount;
+
+// Outputs
+layout(std430, set = 0, binding = 4) writeonly buffer IndirectOut {
+    DrawIndexedIndirect Cmds[];   // [GeometryCount * MaxDrawsPerGeometry]
+} indirectOut;
+
+layout(std430, set = 0, binding = 5) writeonly buffer VisibilityOut {
+    uint VisibleRemap[];          // [GeometryCount * MaxDrawsPerGeometry]
+} visibilityOut;
+
+layout(std430, set = 0, binding = 6) buffer DrawCounts {
+    uint Count[]; // [GeometryCount]
+} drawCounts;
+
+bool SphereVisible(vec3 worldCenter, float worldRadius)
+{
+    for (int i = 0; i < 6; ++i)
+    {
+        vec4 p = pc.Planes[i];
+        float d = dot(p.xyz, worldCenter) + p.w;
+        if (d < -worldRadius)
+            return false;
+    }
+    return true;
+}
+
+void main()
+{
+    uint id = gl_GlobalInvocationID.x;
+    if (id >= pc.TotalInstanceCount) return;
+
+    Sphere s = bounds.Spheres[id];
+    vec3 localC = s.CenterRadius.xyz;
+    float localR = s.CenterRadius.w;
+
+    // Inactive-slot contract: radius <= 0 => slot not live.
+    if (localR <= 0.0)
+        return;
+
+    uint geom = instances.Data[id].GeometryID;
+    if (geom >= pc.GeometryCount)
+        return;
+
+    vec3 worldC = (instances.Data[id].Model * vec4(localC, 1.0)).xyz;
+
+    mat3 m = mat3(instances.Data[id].Model);
+    float sx = length(m[0]);
+    float sy = length(m[1]);
+    float sz = length(m[2]);
+    float worldR = localR * max(sx, max(sy, sz));
+
+    if (!SphereVisible(worldC, worldR))
+        return;
+
+    uint drawIndex = atomicAdd(drawCounts.Count[geom], 1);
+    if (drawIndex >= pc.MaxDrawsPerGeometry)
+        return;
+
+    uint base = geom * pc.MaxDrawsPerGeometry;
+
+    DrawIndexedIndirect cmd;
+    cmd.indexCount = geoIndexCount.IndexCount[geom];
+    cmd.instanceCount = 1;
+    cmd.firstIndex = 0;
+    cmd.vertexOffset = 0;
+    cmd.firstInstance = drawIndex; // gl_InstanceIndex => drawIndex
+    indirectOut.Cmds[base + drawIndex] = cmd;
+
+    visibilityOut.VisibleRemap[base + drawIndex] = id;
+}

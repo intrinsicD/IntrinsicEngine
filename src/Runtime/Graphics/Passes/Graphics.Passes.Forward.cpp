@@ -32,10 +32,12 @@ namespace Graphics::Passes
         if (!m_Pipeline)
             return;
 
-        const bool enableStage3 = (m_EnableGpuCulling && m_CullPipeline && (m_CullSetLayout != VK_NULL_HANDLE));
+        const RGResourceHandle backbuffer = ctx.Blackboard.Get("Backbuffer"_id);
+        const RGResourceHandle depth = ctx.Blackboard.Get("SceneDepth"_id);
+        if (!backbuffer.IsValid() || !depth.IsValid())
+            return;
 
-        // Stage 1: use the canonical set=2 layout provided by PipelineLibrary.
-        // ForwardPass must NOT create/destroy its own layout; it must match the pipeline layout exactly.
+        // Lazily init descriptor pools.
         if (m_InstanceSetPool == nullptr)
         {
             if (m_InstanceSetLayout == VK_NULL_HANDLE)
@@ -50,22 +52,299 @@ namespace Graphics::Passes
                                                                                 /*debugName*/ "ForwardPass.Stage1.Instance");
         }
 
-        // Ensure cull descriptor pool exists.
         if (m_CullSetPool == nullptr)
         {
-            // 1 set per frame is enough for now.
             m_CullSetPool = std::make_unique<RHI::PersistentDescriptorPool>(*m_Device,
-                                                                            /*maxSets*/ 16,
-                                                                            /*storageBufferCount*/ 16 * 5,
+                                                                            /*maxSets*/ 64,
+                                                                            /*storageBufferCount*/ 64 * 5,
                                                                             /*debugName*/ "ForwardPass.Cull");
         }
 
-        const RGResourceHandle backbuffer = ctx.Blackboard.Get("Backbuffer"_id);
-        const RGResourceHandle depth = ctx.Blackboard.Get("SceneDepth"_id);
-        if (!backbuffer.IsValid() || !depth.IsValid())
+        DrawStream stream = BuildDrawStream(ctx);
+        AddRasterPass(ctx, backbuffer, depth, std::move(stream));
+    }
+
+    ForwardPass::DrawStream ForwardPass::BuildDrawStream(RenderPassContext& ctx)
+    {
+        DrawStream out{};
+
+        const bool canGpu = m_EnableGpuCulling && (ctx.GpuScene != nullptr) && (m_CullPipeline != nullptr) && (m_CullSetLayout != VK_NULL_HANDLE);
+        if (!canGpu)
+            return out; // CPU path not yet ported into draw-stream.
+
+        // -----------------------------------------------------------------
+        // Dense geometry batching (per-frame)
+        // -----------------------------------------------------------------
+        struct DenseGeo
+        {
+            Geometry::GeometryHandle Handle{};
+            GeometryGpuData* Geo = nullptr;
+        };
+
+        std::vector<DenseGeo> dense;
+        dense.reserve(256);
+
+        // Build unique geometry list from ECS.
+        {
+            auto view = ctx.Scene.GetRegistry().view<ECS::MeshRenderer::Component>();
+            for (auto entity : view)
+            {
+                const auto& mr = view.get<ECS::MeshRenderer::Component>(entity);
+                if (!mr.Geometry.IsValid())
+                    continue;
+
+                bool seen = false;
+                for (const DenseGeo& g : dense)
+                {
+                    if (g.Handle == mr.Geometry) { seen = true; break; }
+                }
+                if (seen)
+                    continue;
+
+                GeometryGpuData* geo = ctx.GeometryStorage.GetUnchecked(mr.Geometry);
+                if (!geo || geo->GetIndexCount() == 0 || !geo->GetIndexBuffer() || !geo->GetVertexBuffer())
+                    continue;
+
+                dense.push_back({.Handle = mr.Geometry, .Geo = geo});
+            }
+        }
+
+        const uint32_t geometryCount = static_cast<uint32_t>(dense.size());
+        if (geometryCount == 0)
+            return out;
+
+        const uint32_t frame = (ctx.FrameIndex % FRAMES);
+
+        // Conservative capacity: allow up to the active GPUScene span per geometry.
+        // This avoids overflow for now; we can tighten later by tracking per-geometry instance counts.
+        const uint32_t maxDrawsPerGeometry = std::max<uint32_t>(ctx.GpuScene->GetActiveCountApprox(), 1u);
+
+        const size_t geoIndexCountBytes = std::max<size_t>(geometryCount * sizeof(uint32_t), 4);
+        const size_t drawCountsBytes = std::max<size_t>(geometryCount * sizeof(uint32_t), 4);
+        const size_t packedCapacity = static_cast<size_t>(geometryCount) * static_cast<size_t>(maxDrawsPerGeometry);
+        const size_t packedIndirectBytes = std::max<size_t>(packedCapacity * sizeof(VkDrawIndexedIndirectCommand), 4);
+        const size_t packedVisibilityBytes = std::max<size_t>(packedCapacity * sizeof(uint32_t), 4);
+
+        // Allocate / resize per-frame buffers.
+        if (!m_Stage3GeometryIndexCount[frame] || m_Stage3LastGeometryCount < geometryCount)
+        {
+            m_Stage3GeometryIndexCount[frame] = std::make_unique<RHI::VulkanBuffer>(
+                *m_Device,
+                geoIndexCountBytes,
+                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                VMA_MEMORY_USAGE_CPU_TO_GPU);
+        }
+
+        if (!m_Stage3DrawCountsPacked[frame] || m_Stage3LastGeometryCount < geometryCount)
+        {
+            m_Stage3DrawCountsPacked[frame] = std::make_unique<RHI::VulkanBuffer>(
+                *m_Device,
+                drawCountsBytes,
+                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                VMA_MEMORY_USAGE_GPU_ONLY);
+        }
+
+        const bool needPackedResize = (!m_Stage3IndirectPacked[frame] || !m_Stage3VisibilityPacked[frame] ||
+                                      m_Stage3LastGeometryCount < geometryCount ||
+                                      m_Stage3LastMaxDrawsPerGeometry < maxDrawsPerGeometry);
+
+        if (needPackedResize)
+        {
+            m_Stage3IndirectPacked[frame] = std::make_unique<RHI::VulkanBuffer>(
+                *m_Device,
+                packedIndirectBytes,
+                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                VMA_MEMORY_USAGE_GPU_ONLY);
+
+            m_Stage3VisibilityPacked[frame] = std::make_unique<RHI::VulkanBuffer>(
+                *m_Device,
+                packedVisibilityBytes,
+                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                VMA_MEMORY_USAGE_GPU_ONLY);
+        }
+
+        m_Stage3LastGeometryCount = std::max(m_Stage3LastGeometryCount, geometryCount);
+        m_Stage3LastMaxDrawsPerGeometry = std::max(m_Stage3LastMaxDrawsPerGeometry, maxDrawsPerGeometry);
+
+        // Upload geometry index counts table.
+        std::vector<uint32_t> cpuIndexCounts;
+        cpuIndexCounts.reserve(geometryCount);
+        for (const DenseGeo& g : dense)
+            cpuIndexCounts.push_back(g.Geo->GetIndexCount());
+        m_Stage3GeometryIndexCount[frame]->Write(cpuIndexCounts.data(), geometryCount * sizeof(uint32_t));
+
+        // Enqueue multi-geometry compute culling.
+        {
+            const VkBuffer gpuSceneBufferHandle = ctx.GpuScene->GetSceneBuffer().GetHandle();
+            const VkBuffer gpuBoundsBufferHandle = ctx.GpuScene->GetBoundsBuffer().GetHandle();
+
+            struct CullPassData
+            {
+                RGResourceHandle Instances;
+                RGResourceHandle Bounds;
+                RGResourceHandle GeoIndexCount;
+                RGResourceHandle Indirect;
+                RGResourceHandle Visibility;
+                RGResourceHandle DrawCounts;
+            };
+
+            // Snapshot frustum.
+            std::array<glm::vec4, 6> planes{};
+            {
+                const glm::mat4 viewProj = ctx.CameraProj * ctx.CameraView;
+                const Geometry::Frustum fr = Geometry::Frustum::CreateFromMatrix(viewProj);
+                for (int i = 0; i < 6; ++i)
+                {
+                    const auto& p = fr.Planes[i];
+                    planes[i] = glm::vec4(p.Normal, p.Distance);
+                }
+            }
+
+            const uint32_t totalInstanceCount = ctx.GpuScene->GetActiveCountApprox();
+
+            ctx.Graph.AddPass<CullPassData>("ForwardCull.MultiGeo",
+                                            [this, &ctx, frame](CullPassData& data, RGBuilder& builder) mutable
+                                            {
+                                                const uint32_t fi = frame;
+                                                data.Instances = builder.ImportBuffer("GPUScene.Scene"_id, ctx.GpuScene->GetSceneBuffer());
+                                                data.Bounds = builder.ImportBuffer("GPUScene.Bounds"_id, ctx.GpuScene->GetBoundsBuffer());
+                                                data.GeoIndexCount = builder.ImportBuffer("Stage3.GeoIndexCount"_id, *m_Stage3GeometryIndexCount[fi]);
+                                                data.Indirect = builder.ImportBuffer("Stage3.IndirectPacked"_id, *m_Stage3IndirectPacked[fi]);
+                                                data.Visibility = builder.ImportBuffer("Stage3.VisibilityPacked"_id, *m_Stage3VisibilityPacked[fi]);
+                                                data.DrawCounts = builder.ImportBuffer("Stage3.DrawCounts"_id, *m_Stage3DrawCountsPacked[fi]);
+
+                                                builder.Read(data.Instances, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_STORAGE_READ_BIT);
+                                                builder.Read(data.Bounds, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_STORAGE_READ_BIT);
+                                                builder.Read(data.GeoIndexCount, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_STORAGE_READ_BIT);
+
+                                                builder.Write(data.Indirect, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT);
+                                                builder.Write(data.Visibility, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT);
+                                                builder.Write(data.DrawCounts, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT);
+                                            },
+                                            [this,
+                                             fi = frame,
+                                             planes,
+                                             totalInstanceCount,
+                                             geometryCount,
+                                             maxDrawsPerGeometry,
+                                             gpuSceneBufferHandle,
+                                             gpuBoundsBufferHandle](const CullPassData&, const RGRegistry&, VkCommandBuffer cmd) mutable
+                                            {
+                                                if (!m_Stage3GeometryIndexCount[fi] || !m_Stage3IndirectPacked[fi] || !m_Stage3VisibilityPacked[fi] || !m_Stage3DrawCountsPacked[fi])
+                                                    return;
+
+                                                // Reset drawCounts to 0 for [0..geometryCount).
+                                                vkCmdFillBuffer(cmd, m_Stage3DrawCountsPacked[fi]->GetHandle(), 0, geometryCount * sizeof(uint32_t), 0);
+
+                                                VkDescriptorSet cullSet = m_CullSetPool->Allocate(m_CullSetLayout);
+                                                if (cullSet == VK_NULL_HANDLE)
+                                                    return;
+
+                                                VkDescriptorBufferInfo inst{.buffer = gpuSceneBufferHandle, .offset = 0, .range = VK_WHOLE_SIZE};
+                                                VkDescriptorBufferInfo bounds{.buffer = gpuBoundsBufferHandle, .offset = 0, .range = VK_WHOLE_SIZE};
+                                                VkDescriptorBufferInfo geoIdx{.buffer = m_Stage3GeometryIndexCount[fi]->GetHandle(), .offset = 0, .range = VK_WHOLE_SIZE};
+                                                VkDescriptorBufferInfo indirect{.buffer = m_Stage3IndirectPacked[fi]->GetHandle(), .offset = 0, .range = VK_WHOLE_SIZE};
+                                                VkDescriptorBufferInfo vis{.buffer = m_Stage3VisibilityPacked[fi]->GetHandle(), .offset = 0, .range = VK_WHOLE_SIZE};
+                                                VkDescriptorBufferInfo counts{.buffer = m_Stage3DrawCountsPacked[fi]->GetHandle(), .offset = 0, .range = VK_WHOLE_SIZE};
+
+                                                VkWriteDescriptorSet w[6]{};
+                                                auto setBuf = [&](uint32_t i, uint32_t binding, const VkDescriptorBufferInfo* info)
+                                                {
+                                                    w[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                                                    w[i].dstSet = cullSet;
+                                                    w[i].dstBinding = binding;
+                                                    w[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                                                    w[i].descriptorCount = 1;
+                                                    w[i].pBufferInfo = info;
+                                                };
+
+                                                setBuf(0, 1, &inst);
+                                                setBuf(1, 2, &bounds);
+                                                setBuf(2, 3, &geoIdx);
+                                                setBuf(3, 4, &indirect);
+                                                setBuf(4, 5, &vis);
+                                                setBuf(5, 6, &counts);
+
+                                                vkUpdateDescriptorSets(m_Device->GetLogicalDevice(), 6, w, 0, nullptr);
+
+                                                vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_CullPipeline->GetHandle());
+                                                vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_CullPipeline->GetLayout(), 0, 1, &cullSet, 0, nullptr);
+
+                                                struct CullPC
+                                                {
+                                                    glm::vec4 Planes[6];
+                                                    uint32_t TotalInstanceCount;
+                                                    uint32_t GeometryCount;
+                                                    uint32_t MaxDrawsPerGeometry;
+                                                    uint32_t _pad0;
+                                                } pc{};
+
+                                                for (int i = 0; i < 6; ++i)
+                                                    pc.Planes[i] = planes[i];
+                                                pc.TotalInstanceCount = totalInstanceCount;
+                                                pc.GeometryCount = geometryCount;
+                                                pc.MaxDrawsPerGeometry = maxDrawsPerGeometry;
+
+                                                vkCmdPushConstants(cmd, m_CullPipeline->GetLayout(), VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(CullPC), &pc);
+
+                                                const uint32_t wg = 64;
+                                                const uint32_t groups = (totalInstanceCount + wg - 1) / wg;
+                                                vkCmdDispatch(cmd, groups, 1, 1);
+                                            });
+        }
+
+        // Build draw batches: one per geometry, slicing packed buffers.
+        // We reuse the same packed buffers as non-owning pointers; the per-geometry offset is applied via indirect buffer offset.
+        for (uint32_t gi = 0; gi < geometryCount; ++gi)
+        {
+            const DenseGeo& g = dense[gi];
+
+            DrawBatch b{};
+            b.GeoHandle = g.Handle;
+
+            b.IndexBuffer = g.Geo->GetIndexBuffer()->GetHandle();
+            b.IndexCount = g.Geo->GetIndexCount();
+
+            const uint64_t vbda = g.Geo->GetVertexBuffer()->GetDeviceAddress();
+            const auto& layout = g.Geo->GetLayout();
+            b.PtrPositions = vbda + layout.PositionsOffset;
+            b.PtrNormals = vbda + layout.NormalsOffset;
+            b.PtrAux = vbda + layout.AuxOffset;
+
+            switch (g.Geo->GetTopology())
+            {
+            case PrimitiveTopology::Points: b.Topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST; break;
+            case PrimitiveTopology::Lines: b.Topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST; break;
+            case PrimitiveTopology::Triangles:
+            default: b.Topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST; break;
+            }
+
+            // Packed buffers.
+            b.InstanceBuffer = &ctx.GpuScene->GetSceneBuffer();
+            b.VisibilityBuffer = m_Stage3VisibilityPacked[frame].get();
+            b.IndirectBuffer = m_Stage3IndirectPacked[frame].get();
+            b.CountBuffer = m_Stage3DrawCountsPacked[frame].get();
+            b.MaxDraws = maxDrawsPerGeometry;
+
+            // Slice offsets.
+            b.IndirectOffsetBytes = static_cast<VkDeviceSize>(gi) * static_cast<VkDeviceSize>(maxDrawsPerGeometry) * sizeof(VkDrawIndexedIndirectCommand);
+            b.VisibilityOffsetBytes = static_cast<VkDeviceSize>(gi) * static_cast<VkDeviceSize>(maxDrawsPerGeometry) * sizeof(uint32_t);
+            b.CountOffsetBytes = static_cast<VkDeviceSize>(gi) * sizeof(uint32_t);
+
+            out.Batches.push_back(b);
+        }
+
+        return out;
+    }
+
+    void ForwardPass::AddRasterPass(RenderPassContext& ctx, RGResourceHandle backbuffer, RGResourceHandle depth, DrawStream&& stream)
+    {
+        // If CPU path injected its own raster pass, do nothing.
+        if (stream.Batches.empty())
             return;
 
-        ctx.Graph.AddPass<PassData>("ForwardPass",
+        // Single raster pass consuming the draw stream.
+        ctx.Graph.AddPass<PassData>("ForwardRaster",
                                     [&ctx, backbuffer, depth](PassData& data, RGBuilder& builder)
                                     {
                                         RGAttachmentInfo colorInfo{};
@@ -78,14 +357,10 @@ namespace Graphics::Passes
 
                                         data.Color = builder.WriteColor(backbuffer, colorInfo);
                                         data.Depth = builder.WriteDepth(depth, depthInfo);
-
                                         ctx.Blackboard.Add("SceneColor"_id, data.Color);
                                     },
-                                    // IMPORTANT: stored by RenderGraph, so do not capture stack locals by reference.
-                                    [this, &ctx, pipeline = m_Pipeline](const PassData&, const RGRegistry&, VkCommandBuffer cmd)
+                                    [this, &ctx, pipeline = m_Pipeline, stream = std::move(stream)](const PassData&, const RGRegistry&, VkCommandBuffer cmd) mutable
                                     {
-                                        // IMPORTANT: this is recorded into a *secondary* command buffer now.
-                                        // Do not call ctx.Renderer helpers here (they record on the primary CB).
                                         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->GetHandle());
 
                                         VkViewport viewport{};
@@ -109,354 +384,92 @@ namespace Graphics::Passes
                                                                 0, 1, &ctx.GlobalDescriptorSet,
                                                                 1, &dynamicOffset);
 
-                                        // Bind bindless (set=1)
                                         VkDescriptorSet globalTextures = ctx.Bindless.GetGlobalSet();
                                         vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                                                 pipeline->GetLayout(),
                                                                 1, 1, &globalTextures,
                                                                 0, nullptr);
 
-                                        // -----------------------------------------------------------------
-                                        // Collect visible instances (Stage 1: no culling, identity visibility)
-                                        // -----------------------------------------------------------------
-                                        auto view = ctx.Scene.GetRegistry().view<
-                                            ECS::Components::Transform::Component,
-                                            ECS::MeshRenderer::Component>();
-
-                                        std::vector<Core::Assets::AssetHandle> batchHandles;
-                                        std::vector<Graphics::Material*> batchResults;
-
-                                        struct ResolutionRequest
+                                        for (const DrawBatch& b : stream.Batches)
                                         {
-                                            ECS::MeshRenderer::Component* Renderable;
-                                        };
-                                        std::vector<ResolutionRequest> requests;
-
-                                        // Resolve material assets for all renderables (cheap batched lookup, single shared_lock).
-                                        // This avoids stale CachedMaterialHandle when the underlying asset changes or pool slots are reused.
-                                        for (auto [entity, transform, renderable] : view.each())
-                                        {
-                                            if (!renderable.Geometry.IsValid())
+                                            if (!b.InstanceBuffer || !b.VisibilityBuffer || !b.IndirectBuffer)
                                                 continue;
 
-                                            if (!renderable.Material.IsValid())
-                                            {
-                                                renderable.CachedMaterialHandle = {};
-                                                continue;
-                                            }
-
-                                            // Force-resolve every frame. The extra BatchResolve is cheap and avoids subtle aliasing
-                                            // when assets/materials are created dynamically (e.g. drag-drop spawning).
-                                            batchHandles.push_back(renderable.Material);
-                                            requests.push_back({&renderable});
-                                        }
-
-                                        if (!batchHandles.empty())
-                                        {
-                                            ctx.AssetManager.BatchResolve<Graphics::Material>(batchHandles, batchResults);
-                                            for (size_t i = 0; i < requests.size(); ++i)
-                                            {
-                                                Graphics::Material* mat = (i < batchResults.size()) ? batchResults[i] : nullptr;
-                                                requests[i].Renderable->CachedMaterialHandle = mat ? mat->GetHandle() : Graphics::MaterialHandle{};
-                                            }
-                                        }
-
-                                        std::vector<RenderPacket> packets;
-                                        packets.reserve(view.size_hint());
-
-                                        // Stage 1 buffers are indexed by "Submit order" in packets.
-                                        std::vector<RHI::GpuInstanceData> cpuInstances;
-                                        cpuInstances.reserve(view.size_hint());
-                                        std::vector<uint32_t> cpuVisibility;
-                                        cpuVisibility.reserve(view.size_hint());
-
-                                        for (auto [entity, transform, renderable] : view.each())
-                                        {
-                                            if (!renderable.Geometry.IsValid()) continue;
-                                            if (!renderable.CachedMaterialHandle.IsValid()) continue;
-
-                                            const auto* matData = ctx.MaterialSystem.GetData(renderable.CachedMaterialHandle);
-                                            if (!matData)
-                                            {
-                                                renderable.CachedMaterialHandle = {};
-                                                continue;
-                                            }
-
-                                            uint32_t textureID = matData->AlbedoID;
-
-#if defined(INTRINSIC_FORWARDPASS_TRACE_TEXTURES)
-                                            Core::Log::Info("[ForwardPass] Entity={} mat(index={}, gen={}) AlbedoID={}",
-                                                           static_cast<uint32_t>(static_cast<entt::id_type>(entity)),
-                                                           renderable.CachedMaterialHandle.Index,
-                                                           renderable.CachedMaterialHandle.Generation,
-                                                           textureID);
-#endif
-
-                                            const bool isSelected = ctx.Scene.GetRegistry().all_of<
-                                                ECS::Components::Selection::SelectedTag>(entity);
-
-                                            glm::mat4 worldMatrix;
-                                            if (auto* world = ctx.Scene.GetRegistry().try_get<
-                                                ECS::Components::Transform::WorldMatrix>(entity))
-                                                worldMatrix = world->Matrix;
-                                            else
-                                                worldMatrix = ECS::Components::Transform::GetMatrix(transform);
-
-                                            packets.push_back({renderable.Geometry, textureID, worldMatrix, isSelected});
-
-                                            const uint32_t entityID = static_cast<uint32_t>(static_cast<entt::id_type>(entity));
-                                            RHI::GpuInstanceData inst{};
-                                            inst.Model = worldMatrix;
-                                            inst.TextureID = textureID | (isSelected ? 0x80000000u : 0u);
-                                            inst.EntityID = entityID;
-                                            cpuInstances.push_back(inst);
-                                            cpuVisibility.push_back(static_cast<uint32_t>(cpuInstances.size() - 1));
-                                        }
-
-                                        // Upload SSBOs for this frame.
-                                        // Use the engine-provided frame index so we line up with frames-in-flight.
-                                        const uint32_t frame = (ctx.FrameIndex % FRAMES);
-
-                                        const size_t instancesBytes = cpuInstances.size() * sizeof(RHI::GpuInstanceData);
-                                        const size_t visibilityBytes = cpuVisibility.size() * sizeof(uint32_t);
-
-                                        // Track current capacity via static shadow arrays.
-                                        static size_t s_InstanceCap[FRAMES] = {0, 0};
-                                        static size_t s_VisibilityCap[FRAMES] = {0, 0};
-
-                                        if (instancesBytes > s_InstanceCap[frame] || !m_InstanceBuffer[frame])
-                                        {
-                                            s_InstanceCap[frame] = std::max(instancesBytes, size_t(4));
-                                            m_InstanceBuffer[frame] = std::make_unique<RHI::VulkanBuffer>(
-                                                *m_Device, s_InstanceCap[frame],
-                                                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                                                VMA_MEMORY_USAGE_CPU_TO_GPU);
-                                        }
-
-                                        // NOTE: Stage 1 visibility is CPU-generated (identity mapping) and must be host-visible.
-                                        // Stage 3 uses a different GPU-only visibility/remap buffer. Do not share.
-                                        if (visibilityBytes > s_VisibilityCap[frame] || !m_Stage1VisibilityBuffer[frame])
-                                        {
-                                            s_VisibilityCap[frame] = std::max(visibilityBytes, size_t(4));
-                                            m_Stage1VisibilityBuffer[frame] = std::make_unique<RHI::VulkanBuffer>(
-                                                *m_Device, s_VisibilityCap[frame],
-                                                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                                                VMA_MEMORY_USAGE_CPU_TO_GPU);
-                                        }
-
-                                        if (!cpuInstances.empty())
-                                            m_InstanceBuffer[frame]->Write(cpuInstances.data(), instancesBytes);
-                                        if (!cpuVisibility.empty())
-                                            m_Stage1VisibilityBuffer[frame]->Write(cpuVisibility.data(), visibilityBytes);
-
-                                        // Allocate + update the per-frame instance descriptor set.
-                                        // IMPORTANT (Validation): we must not vkUpdateDescriptorSets() on a set that may still be
-                                        // in use by an in-flight command buffer unless the binding uses UPDATE_AFTER_BIND/UNUSED_WHILE_PENDING.
-                                        // Our stage1 bindings are plain storage buffers, so we use the safe pattern: allocate
-                                        // a fresh set per frame-slot.
-                                        if (!m_InstanceSetPool)
-                                        {
-                                            Core::Log::Error("ForwardPass: Persistent descriptor pool not initialized for Stage 1 instance set.");
-                                            return;
-                                        }
-
-                                        // Always allocate a new set each frame slot to avoid updating an in-flight set.
-                                        VkDescriptorSet instanceSet = m_InstanceSetPool->Allocate(m_InstanceSetLayout);
-                                        if (instanceSet == VK_NULL_HANDLE)
-                                        {
-                                            Core::Log::Error("ForwardPass: Failed to allocate Stage 1 instance descriptor set.");
-                                            return;
-                                        }
-
-                                        // Keep a handle for debugging / optional reuse policies.
-                                        m_InstanceSet[frame] = instanceSet;
-
-                                        VkDescriptorBufferInfo instInfo{};
-                                        instInfo.buffer = m_InstanceBuffer[frame]->GetHandle();
-                                        instInfo.offset = 0;
-                                        instInfo.range = instancesBytes == 0 ? 4 : instancesBytes;
-
-                                        VkDescriptorBufferInfo visInfo{};
-                                        visInfo.buffer = m_Stage1VisibilityBuffer[frame]->GetHandle();
-                                        visInfo.offset = 0;
-                                        visInfo.range = visibilityBytes == 0 ? 4 : visibilityBytes;
-
-                                        VkWriteDescriptorSet writes[2]{};
-                                        writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                                        writes[0].dstSet = instanceSet;
-                                        writes[0].dstBinding = 0;
-                                        writes[0].descriptorCount = 1;
-                                        writes[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-                                        writes[0].pBufferInfo = &instInfo;
-
-                                        writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                                        writes[1].dstSet = instanceSet;
-                                        writes[1].dstBinding = 1;
-                                        writes[1].descriptorCount = 1;
-                                        writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-                                        writes[1].pBufferInfo = &visInfo;
-
-                                        vkUpdateDescriptorSets(m_Device->GetLogicalDevice(), 2, writes, 0, nullptr);
-
-                                        // Bind Stage 1 instance buffers at set=2.
-                                        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                                                pipeline->GetLayout(),
-                                                                2, 1, &instanceSet,
-                                                                0, nullptr);
-
-                                        // Sort for state changes only (geo/material). Instance index is stable within packets.
-                                        std::sort(packets.begin(), packets.end());
-
-                                        // -----------------------------------------------------------------
-                                        // Stage 2: build indirect stream (one command per instance)
-                                        // -----------------------------------------------------------------
-                                        std::vector<VkDrawIndexedIndirectCommand> cpuIndirect;
-                                        cpuIndirect.reserve(packets.size());
-
-                                        // We will also record draw-call ranges per geometry run.
-                                        struct Run
-                                        {
-                                            GeometryGpuData* Geo = nullptr;
-                                            uint32_t FirstCmd = 0;
-                                            uint32_t CmdCount = 0;
-                                            VkPrimitiveTopology Topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-                                        };
-                                        std::vector<Run> runs;
-                                        runs.reserve(256);
-
-                                        Geometry::GeometryHandle currentGeoHandle{};
-                                        GeometryGpuData* currentGeo = nullptr;
-                                        Run* currentRun = nullptr;
-
-                                        uint32_t instanceIndex = 0;
-                                        for (const auto& packet : packets)
-                                        {
-                                            if (packet.GeoHandle != currentGeoHandle)
-                                            {
-                                                currentGeo = ctx.GeometryStorage.GetUnchecked(packet.GeoHandle);
-                                                currentGeoHandle = packet.GeoHandle;
-                                                currentRun = nullptr;
-
-                                                if (!currentGeo)
-                                                {
-                                                    ++instanceIndex;
-                                                    continue;
-                                                }
-
-                                                VkPrimitiveTopology vkTopo = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-                                                switch (currentGeo->GetTopology())
-                                                {
-                                                case PrimitiveTopology::Points: vkTopo = VK_PRIMITIVE_TOPOLOGY_POINT_LIST; break;
-                                                case PrimitiveTopology::Lines: vkTopo = VK_PRIMITIVE_TOPOLOGY_LINE_LIST; break;
-                                                case PrimitiveTopology::Triangles:
-                                                default: vkTopo = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST; break;
-                                                }
-
-                                                runs.push_back({.Geo = currentGeo, .FirstCmd = (uint32_t)cpuIndirect.size(), .CmdCount = 0u, .Topology = vkTopo});
-                                                currentRun = &runs.back();
-                                            }
-
-                                            if (!currentGeo || currentGeo->GetIndexCount() == 0)
-                                            {
-                                                // Stage 2: only indexed path for now; non-indexed meshes keep the old path later.
-                                                ++instanceIndex;
-                                                continue;
-                                            }
-
-                                            VkDrawIndexedIndirectCommand cmdi{};
-                                            cmdi.indexCount = currentGeo->GetIndexCount();
-                                            cmdi.instanceCount = 1;
-                                            cmdi.firstIndex = 0;
-                                            cmdi.vertexOffset = 0;
-                                            cmdi.firstInstance = instanceIndex; // drives gl_InstanceIndex
-                                            cpuIndirect.push_back(cmdi);
-                                            if (currentRun) currentRun->CmdCount++;
-
-                                            ++instanceIndex;
-                                        }
-
-                                        // Upload indirect buffer.
-                                        const size_t indirectBytes = cpuIndirect.size() * sizeof(VkDrawIndexedIndirectCommand);
-                                        static size_t s_IndirectCap[FRAMES] = {0, 0};
-                                        if (indirectBytes > s_IndirectCap[frame] || !m_Stage2IndirectIndexedBuffer[frame])
-                                        {
-                                            s_IndirectCap[frame] = std::max(indirectBytes, size_t(4));
-                                            m_Stage2IndirectIndexedBuffer[frame] = std::make_unique<RHI::VulkanBuffer>(
-                                                *m_Device, s_IndirectCap[frame],
-                                                VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-                                                VMA_MEMORY_USAGE_CPU_TO_GPU);
-                                        }
-                                        if (!cpuIndirect.empty())
-                                            m_Stage2IndirectIndexedBuffer[frame]->Write(cpuIndirect.data(), indirectBytes);
-
-                                        // Optional: register buffer in rendergraph for debugging/resource list.
-                                        (void)ctx.Graph;
-
-                                        // Barrier: make host writes visible to indirect + vertex stages.
-                                        // NOTE: vkCmdPipelineBarrier2 with buffer barriers is NOT allowed inside dynamic rendering.
-                                        // Stage 2 uses CPU_TO_GPU buffers, which are host-coherent in our allocator; the extra barrier
-                                        // is redundant for correctness here and will be reintroduced in a pre-render pass if needed.
-                                        // (See VUID-vkCmdPipelineBarrier2-None-09553/09554.)
-
-                                        // -----------------------------------------------------------------
-                                        // Draw phase (Stage 2): indirect per geometry run
-                                        // -----------------------------------------------------------------
-                                        uint32_t drawCallTelemetryCount = 0;
-                                        for (const auto& run : runs)
-                                        {
-                                            if (!run.Geo || run.CmdCount == 0)
+                                            // Bind instances + visibility at set=2.
+                                            VkDescriptorSet instanceSet = m_InstanceSetPool->Allocate(m_InstanceSetLayout);
+                                            if (instanceSet == VK_NULL_HANDLE)
                                                 continue;
 
-                                            vkCmdBindIndexBuffer(cmd, run.Geo->GetIndexBuffer()->GetHandle(), 0, VK_INDEX_TYPE_UINT32);
-                                            vkCmdSetPrimitiveTopology(cmd, run.Topology);
+                                            VkDescriptorBufferInfo instInfo{.buffer = b.InstanceBuffer->GetHandle(), .offset = 0, .range = VK_WHOLE_SIZE};
+                                            VkDescriptorBufferInfo visInfo{.buffer = b.VisibilityBuffer->GetHandle(), .offset = b.VisibilityOffsetBytes, .range = VK_WHOLE_SIZE};
 
-                                            // Push only per-geometry BDA pointers; instance selection happens via gl_InstanceIndex.
-                                            const uint64_t baseAddr = run.Geo->GetVertexBuffer()->GetDeviceAddress();
-                                            const auto& layout = run.Geo->GetLayout();
-                                            RHI::MeshPushConstants push{
-                                                .Model = glm::mat4(1.0f),
-                                                .PtrPositions = baseAddr + layout.PositionsOffset,
-                                                .PtrNormals = baseAddr + layout.NormalsOffset,
-                                                .PtrAux = baseAddr + layout.AuxOffset,
-                                                .TextureID = 0,
-                                                ._pad = {}
-                                            };
+                                            VkWriteDescriptorSet writes[2]{};
+                                            writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                                            writes[0].dstSet = instanceSet;
+                                            writes[0].dstBinding = 0;
+                                            writes[0].descriptorCount = 1;
+                                            writes[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                                            writes[0].pBufferInfo = &instInfo;
 
+                                            writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                                            writes[1].dstSet = instanceSet;
+                                            writes[1].dstBinding = 1;
+                                            writes[1].descriptorCount = 1;
+                                            writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                                            writes[1].pBufferInfo = &visInfo;
+
+                                            vkUpdateDescriptorSets(m_Device->GetLogicalDevice(), 2, writes, 0, nullptr);
+
+                                            vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                                                    pipeline->GetLayout(),
+                                                                    2, 1, &instanceSet,
+                                                                    0, nullptr);
+
+                                            vkCmdBindIndexBuffer(cmd, b.IndexBuffer, 0, VK_INDEX_TYPE_UINT32);
+                                            vkCmdSetPrimitiveTopology(cmd, b.Topology);
+
+                                            RHI::MeshPushConstants push{.Model = glm::mat4(1.0f), .PtrPositions = b.PtrPositions, .PtrNormals = b.PtrNormals, .PtrAux = b.PtrAux, .TextureID = 0, ._pad = {}};
                                             vkCmdPushConstants(cmd, pipeline->GetLayout(),
                                                                VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
                                                                0, sizeof(RHI::MeshPushConstants), &push);
 
-                                            vkCmdDrawIndexedIndirect(cmd,
-                                                                     m_Stage2IndirectIndexedBuffer[frame]->GetHandle(),
-                                                                     run.FirstCmd * sizeof(VkDrawIndexedIndirectCommand),
-                                                                     run.CmdCount,
-                                                                     sizeof(VkDrawIndexedIndirectCommand));
-                                            drawCallTelemetryCount += run.CmdCount;
+                                            const uint32_t maxDraws = b.MaxDraws;
+                                            if (maxDraws == 0)
+                                                continue;
+
+                                            if (b.CountBuffer && vkCmdDrawIndexedIndirectCountKHR)
+                                            {
+                                                vkCmdDrawIndexedIndirectCountKHR(cmd,
+                                                                                 b.IndirectBuffer->GetHandle(),
+                                                                                 b.IndirectOffsetBytes,
+                                                                                 b.CountBuffer->GetHandle(),
+                                                                                 b.CountOffsetBytes,
+                                                                                 maxDraws,
+                                                                                 sizeof(VkDrawIndexedIndirectCommand));
+                                            }
+                                            else
+                                            {
+                                                vkCmdDrawIndexedIndirect(cmd,
+                                                                         b.IndirectBuffer->GetHandle(),
+                                                                         b.IndirectOffsetBytes,
+                                                                         maxDraws,
+                                                                         sizeof(VkDrawIndexedIndirectCommand));
+                                            }
                                         }
-
-                                        // Approximate telemetry (one command == one instance draw)
-                                        if (drawCallTelemetryCount > 0)
-                                            Core::Telemetry::TelemetrySystem::Get().RecordDrawCall(drawCallTelemetryCount);
-
-                                        // NOTE: Non-indexed geometry still uses the Stage 1 direct draw path; we can add a second
-                                        // indirect stream later if needed.
                                     });
+    }
 
-        // ---------------------------------------------------------------------
-        // Stage 3 NOTE
-        // ---------------------------------------------------------------------
-        // Stage 3 is the GPU-driven validation path: cull + draw from persistent GPUScene SSBOs.
-        // TODO(stage3): generalize batching to per-geometry draws and remove the single-geometry shortcut.
-
-        // Only run Stage 3 if explicitly enabled and a GPUScene is bound.
-        if (!enableStage3 || ctx.GpuScene == nullptr)
-            return;
-
+    // =========================================================================
+    // Stage 3: GPU-driven culling with single shared geometry
+    // =========================================================================
+    void ForwardPass::AddStage3Passes(RenderPassContext& ctx,
+                                      RGResourceHandle /*backbuffer*/,
+                                      RGResourceHandle /*depth*/,
+                                      Geometry::GeometryHandle singleGeometry)
+    {
         const VkBuffer gpuSceneBufferHandle = ctx.GpuScene->GetSceneBuffer().GetHandle();
         const VkBuffer gpuBoundsBufferHandle = ctx.GpuScene->GetBoundsBuffer().GetHandle();
 
-        // When Stage 3 is active, we intentionally stop after Stage 1 setup (material resolve and stability checks)
-        // and do not execute Stage 2 (CPU-built indirect). This prevents double-drawing.
 
         // Per-frame persistent state for the Stage 3 validation path.
         // NOTE: RenderGraph executes passes on worker threads; keep data trivially-copyable and avoid heap allocations.
@@ -487,17 +500,8 @@ namespace Graphics::Passes
                 stage3.Planes[i] = glm::vec4(p.Normal, p.Distance);
             }
 
-            // Temporary batching: pick the first valid geometry as the global mesh.
-            const auto viewEnt = ctx.Scene.GetRegistry().view<ECS::MeshRenderer::Component>();
-            for (auto entity : viewEnt)
-            {
-                const auto& renderable = viewEnt.get<ECS::MeshRenderer::Component>(entity);
-                if (renderable.Geometry.IsValid())
-                {
-                    stage3.GeoHandle = renderable.Geometry;
-                    break;
-                }
-            }
+            // Use the pre-validated single geometry passed from AddPasses()
+            stage3.GeoHandle = singleGeometry;
 
             if (stage3.GeoHandle.IsValid())
             {
@@ -661,180 +665,17 @@ namespace Graphics::Passes
                                             vkCmdDispatch(cmd, groups, 1, 1);
                                         });
 
-        // ---------------------------
-        // Pass C: Draw (raster)
-        // ---------------------------
-        ctx.Graph.AddPass<PassData>("ForwardDraw",
-                                    [this, &ctx, enableStage3, frame, backbuffer, depth](PassData& data, RGBuilder& builder)
-                                    {
-                                        RGAttachmentInfo colorInfo{};
-                                        colorInfo.ClearValue = {{{0.1f, 0.3f, 0.6f, 1.0f}}};
-                                        colorInfo.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-                                        colorInfo.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+        // NOTE: No raster pass here.
+        // The unified forward path records exactly ONE raster pass (ForwardRaster) that consumes
+        // the produced indirect/count/visibility buffers.
+    }
 
-                                        RGAttachmentInfo depthInfo{};
-                                        depthInfo.ClearValue.depthStencil = {1.0f, 0};
-
-                                        data.Color = builder.WriteColor(backbuffer, colorInfo);
-                                        data.Depth = builder.WriteDepth(depth, depthInfo);
-
-                                        if (enableStage3)
-                                        {
-                                            const uint32_t fi = frame;
-                                            if (m_Stage3IndirectIndexedBuffer[fi])
-                                            {
-                                                auto indirect = builder.ImportBuffer("Stage3.Indirect"_id, *m_Stage3IndirectIndexedBuffer[fi]);
-                                                builder.Read(indirect, VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT, VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT);
-                                            }
-                                            if (m_DrawCountBuffer[fi])
-                                            {
-                                                auto count = builder.ImportBuffer("Stage3.Count"_id, *m_DrawCountBuffer[fi]);
-                                                builder.Read(count, VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT, VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT);
-                                            }
-                                            if (m_VisibilityBuffer[fi])
-                                            {
-                                                auto remap = builder.ImportBuffer("Stage3.Visibility"_id, *m_VisibilityBuffer[fi]);
-                                                builder.Read(remap, VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT, VK_ACCESS_2_SHADER_STORAGE_READ_BIT);
-                                            }
-
-                                            // Persistent scene buffer read by vertex shader.
-                                            auto scene = builder.ImportBuffer("GPUScene.Scene"_id, ctx.GpuScene->GetSceneBuffer());
-                                            builder.Read(scene, VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT, VK_ACCESS_2_SHADER_STORAGE_READ_BIT);
-                                        }
-
-                                        ctx.Blackboard.Add("SceneColor"_id, data.Color);
-                                    },
-                                    [this, &ctx, pipeline = m_Pipeline, enableStage3, stage3](const PassData&, const RGRegistry&, VkCommandBuffer cmd) mutable
-                                    {
-                                        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->GetHandle());
-
-                                        VkViewport viewport{};
-                                        viewport.x = 0.0f;
-                                        viewport.y = 0.0f;
-                                        viewport.width = (float)ctx.Resolution.width;
-                                        viewport.height = (float)ctx.Resolution.height;
-                                        viewport.minDepth = 0.0f;
-                                        viewport.maxDepth = 1.0f;
-
-                                        VkRect2D scissor{};
-                                        scissor.offset = {0, 0};
-                                        scissor.extent = {ctx.Resolution.width, ctx.Resolution.height};
-
-                                        vkCmdSetViewport(cmd, 0, 1, &viewport);
-                                        vkCmdSetScissor(cmd, 0, 1, &scissor);
-
-                                        const uint32_t dynamicOffset = static_cast<uint32_t>(ctx.GlobalCameraDynamicOffset);
-                                        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                                                pipeline->GetLayout(),
-                                                                0, 1, &ctx.GlobalDescriptorSet,
-                                                                1, &dynamicOffset);
-
-                                        // Bind bindless (set=1)
-                                        VkDescriptorSet globalTextures = ctx.Bindless.GetGlobalSet();
-                                        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                                                pipeline->GetLayout(),
-                                                                1, 1, &globalTextures,
-                                                                0, nullptr);
-
-                                        const uint32_t fi = (ctx.FrameIndex % FRAMES);
-
-                                        if (!enableStage3)
-                                            return;
-                                        if (stage3.InstanceCount == 0 || stage3.IndexBuffer == VK_NULL_HANDLE)
-                                            return;
-                                        if (!m_DrawCountBuffer[fi] || !m_Stage3IndirectIndexedBuffer[fi] || !m_VisibilityBuffer[fi])
-                                            return;
-                                        if (m_InstanceSetLayout == VK_NULL_HANDLE || !m_InstanceSetPool)
-                                            return;
-
-                                        // Bind Stage3 instance/visibility (set=2) expected by the forward pipeline.
-                                        // Binding 0: instances buffer (GPUScene.Scene)
-                                        // Binding 1: visibility/remap buffer (Stage3.Visibility)
-                                        VkDescriptorSet instanceSet = m_InstanceSetPool->Allocate(m_InstanceSetLayout);
-                                        if (instanceSet == VK_NULL_HANDLE)
-                                            return;
-
-                                        VkDescriptorBufferInfo instInfo{};
-                                        instInfo.buffer = ctx.GpuScene->GetSceneBuffer().GetHandle();
-                                        instInfo.offset = 0;
-                                        instInfo.range = VK_WHOLE_SIZE;
-
-                                        VkDescriptorBufferInfo visInfo{};
-                                        visInfo.buffer = m_VisibilityBuffer[fi]->GetHandle();
-                                        visInfo.offset = 0;
-                                        visInfo.range = VK_WHOLE_SIZE;
-
-                                        VkWriteDescriptorSet writes[2]{};
-                                        writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                                        writes[0].dstSet = instanceSet;
-                                        writes[0].dstBinding = 0;
-                                        writes[0].descriptorCount = 1;
-                                        writes[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-                                        writes[0].pBufferInfo = &instInfo;
-
-                                        writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                                        writes[1].dstSet = instanceSet;
-                                        writes[1].dstBinding = 1;
-                                        writes[1].descriptorCount = 1;
-                                        writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-                                        writes[1].pBufferInfo = &visInfo;
-
-                                        vkUpdateDescriptorSets(m_Device->GetLogicalDevice(), 2, writes, 0, nullptr);
-
-                                        vkCmdBindDescriptorSets(cmd,
-                                                                VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                                                pipeline->GetLayout(),
-                                                                2,
-                                                                1,
-                                                                &instanceSet,
-                                                                0,
-                                                                nullptr);
-
-                                        vkCmdBindIndexBuffer(cmd, stage3.IndexBuffer, 0, VK_INDEX_TYPE_UINT32);
-                                        vkCmdSetPrimitiveTopology(cmd, stage3.Topology);
-
-                                        {
-                                            RHI::MeshPushConstants push{
-                                                .Model = glm::mat4(1.0f),
-                                                .PtrPositions = stage3.PtrPositions,
-                                                .PtrNormals = stage3.PtrNormals,
-                                                .PtrAux = stage3.PtrAux,
-                                                .TextureID = 0,
-                                                ._pad = {}
-                                            };
-
-                                            vkCmdPushConstants(cmd,
-                                                               pipeline->GetLayout(),
-                                                               VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-                                                               0,
-                                                               sizeof(RHI::MeshPushConstants),
-                                                               &push);
-                                        }
-
-                                        const uint32_t maxDraws = stage3.InstanceCount;
-                                        if (maxDraws == 0)
-                                            return;
-
-                                        if (vkCmdDrawIndexedIndirectCountKHR)
-                                        {
-                                            vkCmdDrawIndexedIndirectCountKHR(cmd,
-                                                                             m_Stage3IndirectIndexedBuffer[fi]->GetHandle(),
-                                                                             0,
-                                                                             m_DrawCountBuffer[fi]->GetHandle(),
-                                                                             0,
-                                                                             maxDraws,
-                                                                             sizeof(VkDrawIndexedIndirectCommand));
-                                        }
-                                        else
-                                        {
-                                            vkCmdDrawIndexedIndirect(cmd,
-                                                                     m_Stage3IndirectIndexedBuffer[fi]->GetHandle(),
-                                                                     0,
-                                                                     maxDraws,
-                                                                     sizeof(VkDrawIndexedIndirectCommand));
-                                        }
-                                    });
-
-        return;
+    void ForwardPass::AddStage1And2Passes(RenderPassContext& ctx,
+                                          RGResourceHandle /*backbuffer*/,
+                                          RGResourceHandle /*depth*/)
+    {
+        // CPU producer is implemented directly in BuildDrawStream().
+        // This function is kept only as an ABI-stable stub while we transition away from the old design.
+        // Intentionally empty.
     }
 }
