@@ -26,14 +26,16 @@ export namespace Graphics
     // ---------------------------------------------------------------------
     // RenderBlackboard
     // ---------------------------------------------------------------------
-    // A tiny, low-ceremony frame-local dictionary for sharing RenderGraph
-    // resource handles between features.
+    // A tiny, frame-local dictionary for sharing RenderGraph resource handles between features.
     //
-    // NOTE: We keep it StringID-keyed (not std::string) to avoid allocations
-    // and because the engine already uses hashed IDs heavily.
+    // Contract:
+    // - Keys are stable hashed IDs (StringID) to avoid per-frame allocations.
+    // - Values are lightweight RenderGraph handles (no ownership).
+    // - Blackboard is reset/overwritten by the active pipeline each frame.
     struct RenderBlackboard
     {
         std::unordered_map<Core::Hash::StringID, RGResourceHandle> Resources;
+
 
         void Add(Core::Hash::StringID name, RGResourceHandle handle)
         {

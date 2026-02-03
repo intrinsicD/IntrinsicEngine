@@ -2,7 +2,7 @@
 
 **Intrinsic** is a state-of-the-art Research & Rendering Engine designed for **High-Performance Geometry Processing** and **Real-Time Rendering**. It bridges the gap between rigorous mathematical formalism and "close-to-the-metal" engine architecture.
 
-Built strictly on **C++23 Modules**, it features a **Vulkan 1.3** bindless rendering pipeline, a coroutine-based job system, and a custom mathematical kernel for collision and spatial queries.
+Built primarily on **C++23 Modules**, it features a **Vulkan 1.3** bindless rendering pipeline, a coroutine-based job system, and a custom mathematical kernel for collision and spatial queries.
 
 ---
 
@@ -15,7 +15,7 @@ Built strictly on **C++23 Modules**, it features a **Vulkan 1.3** bindless rende
     *   `ScopeStack`: LIFO allocator with destructor support for complex per-frame objects.
 *   **Coroutine Task Scheduler**:
     *   Replaces traditional fibers with **C++20 `std::coroutine`**.
-    *   Wait-free work-stealing queues.
+    *   Work-stealing queues.
     *   `Job` and `Yield()` support for cooperative multitasking.
 *   **Telemetry & Profiling**:
     *   Lock-free ring-buffered telemetry system.

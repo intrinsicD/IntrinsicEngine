@@ -2,12 +2,14 @@ module;
 
 #include <algorithm>
 #include <vector>
-#include <unordered_map>
 #include <array>
 #include <entt/entity/registry.hpp>
 #include <glm/glm.hpp>
 
 #include "RHI.Vulkan.hpp"
+
+// Optional: enable extremely verbose per-entity material/texture tracing.
+// #define INTRINSIC_FORWARDPASS_TRACE_TEXTURES
 
 module Graphics:Passes.Forward.Impl;
 
@@ -182,12 +184,13 @@ namespace Graphics::Passes
 
                                             uint32_t textureID = matData->AlbedoID;
 
-                                            // DEBUG: trace the actual texture ID used for this entity.
+#if defined(INTRINSIC_FORWARDPASS_TRACE_TEXTURES)
                                             Core::Log::Info("[ForwardPass] Entity={} mat(index={}, gen={}) AlbedoID={}",
                                                            static_cast<uint32_t>(static_cast<entt::id_type>(entity)),
                                                            renderable.CachedMaterialHandle.Index,
                                                            renderable.CachedMaterialHandle.Generation,
                                                            textureID);
+#endif
 
                                             const bool isSelected = ctx.Scene.GetRegistry().all_of<
                                                 ECS::Components::Selection::SelectedTag>(entity);
@@ -442,8 +445,8 @@ namespace Graphics::Passes
         // ---------------------------------------------------------------------
         // Stage 3 NOTE
         // ---------------------------------------------------------------------
-        // Stage 3 is currently under active development (batching + per-geometry draws).
-        // v1: enable Stage 3 when GPUScene is available so we can cull + draw from persistent SSBOs.
+        // Stage 3 is the GPU-driven validation path: cull + draw from persistent GPUScene SSBOs.
+        // TODO(stage3): generalize batching to per-geometry draws and remove the single-geometry shortcut.
 
         // Only run Stage 3 if explicitly enabled and a GPUScene is bound.
         if (!enableStage3 || ctx.GpuScene == nullptr)
@@ -452,10 +455,10 @@ namespace Graphics::Passes
         const VkBuffer gpuSceneBufferHandle = ctx.GpuScene->GetSceneBuffer().GetHandle();
         const VkBuffer gpuBoundsBufferHandle = ctx.GpuScene->GetBoundsBuffer().GetHandle();
 
-        // v1: when Stage 3 is active, we intentionally stop after Stage 1 setup (material resolve and stability checks)
+        // When Stage 3 is active, we intentionally stop after Stage 1 setup (material resolve and stability checks)
         // and do not execute Stage 2 (CPU-built indirect). This prevents double-drawing.
 
-        // v1: per-frame persistent state for the Stage 3 validation path.
+        // Per-frame persistent state for the Stage 3 validation path.
         // NOTE: RenderGraph executes passes on worker threads; keep data trivially-copyable and avoid heap allocations.
         struct Stage3FrameState
         {
@@ -484,7 +487,7 @@ namespace Graphics::Passes
                 stage3.Planes[i] = glm::vec4(p.Normal, p.Distance);
             }
 
-            // v1 batching: pick the first valid geometry as the global mesh.
+            // Temporary batching: pick the first valid geometry as the global mesh.
             const auto viewEnt = ctx.Scene.GetRegistry().view<ECS::MeshRenderer::Component>();
             for (auto entity : viewEnt)
             {

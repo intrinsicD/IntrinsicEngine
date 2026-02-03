@@ -75,6 +75,23 @@ namespace RHI
             for (auto& fn : queue) fn();
             queue.clear();
         }
+
+        // Drain timeline-based queue too (caller must ensure GPU idle).
+        for (auto& item : m_TimelineDeletionQueue)
+        {
+            if (item.Fn) item.Fn();
+        }
+        m_TimelineDeletionQueue.clear();
+    }
+
+    void VulkanDevice::FlushTimelineDeletionQueueNow()
+    {
+        std::lock_guard lock(m_DeletionMutex);
+        for (auto& item : m_TimelineDeletionQueue)
+        {
+            if (item.Fn) item.Fn();
+        }
+        m_TimelineDeletionQueue.clear();
     }
 
     VulkanDevice::~VulkanDevice()

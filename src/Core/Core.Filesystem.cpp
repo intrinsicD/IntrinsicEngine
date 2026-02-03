@@ -219,7 +219,7 @@ namespace Core::Filesystem
         auto time = std::filesystem::last_write_time(path, ec);
         if (ec)
         {
-            Log::Warn("FileWatcher: Could not find file to watch '{}'", path);
+            Log::Debug("FileWatcher: Could not find file to watch '{}'", path);
             return;
         }
 

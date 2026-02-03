@@ -4,17 +4,27 @@ module;
 #include <tiny_gltf.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
-#include <vector>
-#include <memory>
+
+#include <algorithm>
+#include <array>
+#include <bit>
+#include <cctype>
+#include <cstddef>
+#include <cstdint>
+#include <expected>
 #include <filesystem>
 #include <fstream>
+#include <memory>
 #include <span>
+#include <sstream>
+#include <string>
 #include <string_view>
-#include <algorithm>
-#include <expected>
-#include <cctype>
 #include <unordered_map>
 #include <variant>
+#include <vector>
+
+// Optional: enable verbose import-time logging.
+// #define INTRINSIC_MODELLOADER_VERBOSE 1
 
 module Graphics:ModelLoader.Impl;
 import :ModelLoader;
@@ -70,7 +80,9 @@ namespace Graphics
         if (mesh.Topology != PrimitiveTopology::Triangles) return;
 
         Geometry::MeshUtils::CalculateNormals(mesh.Positions, mesh.Indices, mesh.Normals);
+#if defined(INTRINSIC_MODELLOADER_VERBOSE)
         Core::Log::Info("Recalculated normals for vertices.");
+#endif
     }
 
 
@@ -84,7 +96,9 @@ namespace Graphics
         }
         else
         {
+#if defined(INTRINSIC_MODELLOADER_VERBOSE)
             Core::Log::Info("Generated Planar UVs for {} vertices (Axis: {})", mesh.Positions.size(), flatAxis);
+#endif
         }
     }
 
@@ -1705,7 +1719,9 @@ namespace Graphics
                 model->Meshes.emplace_back(std::make_shared<MeshSegment>(segment));
             }
 
+#if defined(INTRINSIC_MODELLOADER_VERBOSE)
             Core::Log::Info("Loaded {} ({} submeshes)", filepath, model->Size());
+#endif
             return ModelLoadResult{ std::move(model), latestToken };
         }
 

@@ -54,5 +54,5 @@ endif()
 gtest_discover_tests(${target_name}
     PROPERTIES
     ENVIRONMENT "${_intrinsic_test_env}"
-    DISCOVERY_MODE PRE_TEST
+    DISCOVERY_MODE POST_BUILD
 )

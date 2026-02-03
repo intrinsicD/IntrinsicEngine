@@ -181,8 +181,7 @@ namespace Graphics
         m_RenderGraph.SetTransientAllocator(*m_TransientAllocator);
 
         // Retained-mode GPUScene (persistent instance + bounds SSBOs).
-        // NOTE: Ownership lives in Runtime::Engine for v1 so spawning/systems can queue updates.
-        // RenderSystem consumes it indirectly via RenderPassContext.
+        // Ownership lives above RenderSystem (Runtime/Engine): game/systems queue updates, RenderSystem only consumes.
         m_GpuScene = nullptr;
     }
 

@@ -91,6 +91,10 @@ namespace RHI
         // Safe to call only when the GPU is idle.
         void FlushAllDeletionQueues();
 
+        // Drain *timeline-based* deferred deletions immediately.
+        // Contract: only call when the GPU is idle (e.g., after vkDeviceWaitIdle).
+        void FlushTimelineDeletionQueueNow();
+
         // ---------------------------------------------------------------------
         // GPU-completion based deferred destruction (timeline).
         // ---------------------------------------------------------------------

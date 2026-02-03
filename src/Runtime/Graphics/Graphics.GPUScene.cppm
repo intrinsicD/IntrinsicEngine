@@ -61,7 +61,7 @@ export namespace Graphics
         [[nodiscard]] RHI::VulkanBuffer& GetSceneBuffer() const { return *m_SceneBuffer; }
         [[nodiscard]] RHI::VulkanBuffer& GetBoundsBuffer() const { return *m_BoundsBuffer; }
 
-        // Current live slot count estimate (maxAllocatedIndex+1). v1 uses this for culling count.
+        // Current live slot count estimate (maxAllocatedIndex+1). Used as the instance count for culling/dispatch.
         [[nodiscard]] uint32_t GetActiveCountApprox() const { return m_ActiveCountApprox; }
 
     private:
@@ -76,7 +76,7 @@ export namespace Graphics
         std::unique_ptr<RHI::VulkanBuffer> m_SceneBuffer;
         std::unique_ptr<RHI::VulkanBuffer> m_BoundsBuffer;
 
-        // Slot allocator (simple free list). v1 uses dense allocation and an approximate active count.
+        // Slot allocator (simple free list). Dense allocation + an approximate active count.
         std::vector<uint32_t> m_FreeSlots;
         uint32_t m_NextSlot = 0;
         uint32_t m_ActiveCountApprox = 0;

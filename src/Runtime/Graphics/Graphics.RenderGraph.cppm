@@ -4,7 +4,6 @@ module;
 #include <string>
 #include <vector>
 #include <unordered_map>
-#include <utility>
 #include <span>
 #include "RHI.Vulkan.hpp"
 

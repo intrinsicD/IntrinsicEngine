@@ -50,9 +50,13 @@ namespace RHI
         m_InFlightBatches.clear();
 
         // IMPORTANT:
-        // VulkanBuffer destruction is deferred via VulkanDevice::SafeDestroy(), which enqueues vmaDestroyBuffer.
-        // If we don't flush here, the VMA allocator may be destroyed later with live allocations,
-        // triggering: "Some allocations were not freed before destruction".
+        // VulkanBuffer destruction is deferred via VulkanDevice::SafeDestroy()/SafeDestroyAfter(), which enqueues
+        // vmaDestroyBuffer/vmaDestroyImage on a timeline-based deletion queue.
+        // If we don't flush *both* the frame-slot queue and the timeline queue here, the VMA allocator may be
+        // destroyed later with live allocations, triggering:
+        //   "Some allocations were not freed before destruction of this memory block!"
+        m_Device.FlushAllDeletionQueues();
+        m_Device.FlushTimelineDeletionQueueNow();
         m_Device.FlushAllDeletionQueues();
 
         m_StagingBelt.reset();

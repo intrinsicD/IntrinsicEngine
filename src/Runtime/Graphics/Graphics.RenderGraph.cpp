@@ -6,7 +6,6 @@ module;
 #include <memory>
 #include <span>
 #include <algorithm>
-#include <unordered_map>
 #include <utility>
 
 module Graphics:RenderGraph.Impl;

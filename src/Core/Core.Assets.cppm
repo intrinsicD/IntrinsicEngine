@@ -289,7 +289,6 @@ export namespace Core::Assets
         std::unordered_map<StringID, AssetHandle> m_Lookup;
 
         // Separate map for Persistent Listeners
-        // deprecated: std::unordered_map<AssetHandle, std::vector<AssetCallback>, AssetHandle::Hash> m_PersistentListeners;
         std::unordered_map<AssetHandle, std::unordered_map<uint32_t, AssetCallback>, AssetHandle::Hash> m_PersistentListeners;
         // Map for One-Shot Listeners
         std::unordered_map<AssetHandle, std::vector<AssetCallback>, AssetHandle::Hash> m_OneShotListeners;

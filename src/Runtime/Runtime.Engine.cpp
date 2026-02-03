@@ -516,7 +516,7 @@ namespace Runtime
                 if (auto* pick = m_Scene.GetRegistry().try_get<ECS::Components::Selection::PickID>(targetEntity))
                     inst.EntityID = pick->Value;
 
-                // v1: use default texture slot; material system will update later.
+                // Initialize with the default texture slot; material/asset systems may patch TextureID later.
                 inst.TextureID = m_DefaultTextureIndex;
 
                 glm::vec4 sphere{0.0f};

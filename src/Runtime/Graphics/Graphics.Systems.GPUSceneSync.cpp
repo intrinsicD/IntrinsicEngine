@@ -1,7 +1,6 @@
 module;
 
 #include <entt/entity/registry.hpp>
-#include <glm/glm.hpp>
 
 module Graphics:Systems.GPUSceneSync.Impl;
 
@@ -14,8 +13,12 @@ namespace Graphics::Systems::GPUSceneSync
 {
     void OnUpdate(entt::registry& registry, GPUScene& gpuScene)
     {
-        // Stream only entities whose WorldMatrix changed this tick.
-        // NOTE: For v1 we don't recompute bounds here; sphere bounds remain the initial local bounds.
+        // Contract:
+        // - Streams only entities whose WorldMatrix changed this tick.
+        // - Keeps picking ID stable if the Selection::PickID component exists.
+        // - Bounds updates are currently disabled: the GPU keeps the originally uploaded local sphere.
+        //   TODO(bounds): store per-entity local sphere (and track local-bounds dirty), then update a conservative
+        //   world-space sphere here (handle non-uniform scale by expanding radius with max scale).
         auto view = registry.view<
             ECS::Components::Transform::WorldMatrix,
             ECS::Components::Transform::WorldUpdatedTag,
@@ -34,9 +37,7 @@ namespace Graphics::Systems::GPUSceneSync
             if (auto* pick = registry.try_get<ECS::Components::Selection::PickID>(entt::entity(entity)))
                 inst.EntityID = pick->Value;
 
-            // Bounds remain the original local sphere (stored in GPUScene bounds buffer).
-            // If you want correct scaled bounds, we should store local sphere per entity and update here.
-            gpuScene.QueueUpdate(mr.GpuSlot, inst, /*sphereBounds*/ glm::vec4(0.0f));
+            gpuScene.QueueUpdate(mr.GpuSlot, inst, /*sphereBounds*/ {0.0f, 0.0f, 0.0f, 0.0f});
 
             // Clear tag so we don't resend next tick.
             registry.remove<ECS::Components::Transform::WorldUpdatedTag>(entt::entity(entity));

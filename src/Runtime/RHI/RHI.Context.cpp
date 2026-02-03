@@ -3,6 +3,7 @@ module;
 #include <GLFW/glfw3.h> // Only for glfwGetRequiredInstanceExtensions
 #include <vector>
 #include <cstdlib>
+#include <string_view>
 
 #include "RHI.Vulkan.hpp"
 
@@ -24,14 +25,25 @@ namespace RHI
         const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
         [[maybe_unused]] void* pUserData)
     {
-        // Filter out noisy verbose messages if needed
+        const std::string_view msg = pCallbackData && pCallbackData->pMessage ? std::string_view{pCallbackData->pMessage} : std::string_view{};
+
+        // Filter out known-noisy loader/ICD enumeration messages that are not actionable.
+        // Example:
+        //   terminator_CreateInstance: Received return code -3 from call to vkCreateInstance in ICD ...libvulkan_virtio.so. Skipping this driver.
+        const bool isNoisyLoaderMessage =
+            (msg.find("terminator_CreateInstance") != std::string_view::npos) ||
+            (msg.find("Skipping this driver") != std::string_view::npos);
+
         if (severity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
         {
             Core::Log::Error("[(Context) Vulkan Error]: {}", pCallbackData->pMessage);
         }
         else if (severity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
         {
-            Core::Log::Warn("[(Context) Vulkan Validation]: {}", pCallbackData->pMessage);
+            if (isNoisyLoaderMessage)
+                Core::Log::Debug("[(Context) Vulkan Validation]: {}", pCallbackData->pMessage);
+            else
+                Core::Log::Warn("[(Context) Vulkan Validation]: {}", pCallbackData->pMessage);
         }
         /*else
         {
