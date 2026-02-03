@@ -29,6 +29,10 @@ namespace ECS::Systems::Transform::Detail
         if (isDirty)
         {
             world->Matrix = parentMatrix * GetMatrix(*local);
+
+            // Emit "world updated" marker for downstream systems (GPUScene sync, physics broadphase, etc.)
+            reg.emplace_or_replace<Components::Transform::WorldUpdatedTag>(entity);
+
             // Remove dirty tag after processing
             reg.remove<Components::Transform::IsDirtyTag>(entity);
         }

@@ -618,6 +618,14 @@ namespace Runtime
                 while (accumulator >= dt)
                 {
                     ECS::Systems::Transform::OnUpdate(m_Scene.GetRegistry());
+
+                    // Stream updated transforms into GPUScene (sparse retained-mode updates).
+                    if (m_GpuScene)
+                    {
+                        PROFILE_SCOPE("GPUSceneSync");
+                        Graphics::Systems::GPUSceneSync::OnUpdate(m_Scene.GetRegistry(), *m_GpuScene);
+                    }
+
                     accumulator -= dt;
                 }
             }

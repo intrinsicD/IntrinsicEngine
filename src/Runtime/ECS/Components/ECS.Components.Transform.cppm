@@ -24,7 +24,15 @@ export namespace ECS::Components::Transform
     //        registry.view<Component, IsDirtyTag>() to iterate dirty transforms
     struct IsDirtyTag
     {
+    };
 
+    // Tag component for downstream systems that need to know which entities had their
+    // WorldMatrix recomputed this tick.
+    // Contract:
+    //  - Added by TransformSystem when it writes WorldMatrix.
+    //  - Cleared by the consumer system once processed (e.g., GPU scene sync).
+    struct WorldUpdatedTag
+    {
     };
 
     struct WorldMatrix

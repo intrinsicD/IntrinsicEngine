@@ -15,6 +15,7 @@ export import :ShaderRegistry;
 export import :PipelineLibrary;
 export import :Pipelines;
 export import :GPUScene;
+export import :Systems.GPUSceneSync;
 
 // New modular render pipeline (interface only)
 export import :RenderPipeline;

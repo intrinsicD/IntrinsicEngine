@@ -18,6 +18,9 @@ namespace ECS::Systems::AxisRotator
         {
             glm::quat deltaRotation = glm::angleAxis(glm::radians(rotator.Speed * dt), rotator.axis);
             transform.Rotation = glm::normalize(deltaRotation * transform.Rotation);
+
+            // Ensure the transform system recomputes WorldMatrix this tick.
+            registry.emplace_or_replace<Components::Transform::IsDirtyTag>(entity);
         }
     }
 }

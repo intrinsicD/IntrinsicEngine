@@ -6,7 +6,14 @@ module;
 // This is a standard implementation unit for the named module `Graphics.Pipelines`.
 module Graphics:Pipelines.Impl;
 
-import Graphics;
+import :RenderPipeline;
+import :Passes.Picking;
+import :Passes.Forward;
+import :Passes.DebugView;
+import :Passes.ImGui;
+import :PipelineLibrary;
+import :ShaderRegistry;
+import :Pipelines;
 import RHI;
 import Core;
 

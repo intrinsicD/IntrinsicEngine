@@ -386,15 +386,21 @@ public:
                 {
                     auto& transform = reg.get<ECS::Components::Transform::Component>(selected);
 
-                    Interface::GUI::DrawVec3Control("Position", transform.Position);
+                    const bool posChanged = Interface::GUI::DrawVec3Control("Position", transform.Position);
 
                     glm::vec3 rotationDegrees = glm::degrees(glm::eulerAngles(transform.Rotation));
-                    if (Interface::GUI::DrawVec3Control("Rotation", rotationDegrees))
+                    const bool rotChanged = Interface::GUI::DrawVec3Control("Rotation", rotationDegrees);
+                    if (rotChanged)
                     {
                         transform.Rotation = glm::quat(glm::radians(rotationDegrees));
                     }
 
-                    Interface::GUI::DrawVec3Control("Scale", transform.Scale, 1.0f);
+                    const bool scaleChanged = Interface::GUI::DrawVec3Control("Scale", transform.Scale, 1.0f);
+
+                    if (posChanged || rotChanged || scaleChanged)
+                    {
+                        reg.emplace_or_replace<ECS::Components::Transform::IsDirtyTag>(selected);
+                    }
                 }
             }
 
