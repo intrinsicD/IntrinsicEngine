@@ -8,20 +8,20 @@ import :Systems.GPUSceneSync;
 
 import ECS;
 import :Components;
+import Core;
+import :MaterialSystem;
+import :Material;
 
 namespace Graphics::Systems::GPUSceneSync
 {
-    void OnUpdate(entt::registry& registry, GPUScene& gpuScene)
+    void OnUpdate(entt::registry& registry,
+                  GPUScene& gpuScene,
+                  const Core::Assets::AssetManager& assetManager,
+                  const MaterialSystem& materialSystem)
     {
-        // Contract:
-        // - Streams only entities whose WorldMatrix changed this tick.
-        // - Keeps picking ID stable if the Selection::PickID component exists.
-        // - Bounds updates are currently disabled: the GPU keeps the originally uploaded local sphere.
-        //   TODO(bounds): store per-entity local sphere (and track local-bounds dirty), then update a conservative
-        //   world-space sphere here (handle non-uniform scale by expanding radius with max scale).
+        // Fast path: only entities that either changed transform OR need material refresh.
         auto view = registry.view<
             ECS::Components::Transform::WorldMatrix,
-            ECS::Components::Transform::WorldUpdatedTag,
             ECS::MeshRenderer::Component>();
 
         for (auto [entity, world, mr] : view.each())
@@ -29,18 +29,53 @@ namespace Graphics::Systems::GPUSceneSync
             if (mr.GpuSlot == ECS::MeshRenderer::Component::kInvalidSlot)
                 continue;
 
+            const bool transformDirty = registry.all_of<ECS::Components::Transform::WorldUpdatedTag>(entity);
+
+            // Resolve material handle once and cache it inside the MeshRenderer component as intended.
+            if (!mr.CachedMaterialHandle.IsValid())
+            {
+                auto matRes = assetManager.Get<Graphics::Material>(mr.Material);
+                if (matRes)
+                {
+                    const auto& mat = *matRes;
+                    mr.CachedMaterialHandle = mat->GetHandle();
+                }
+            }
+
+            uint32_t matRev = 0u;
+            const MaterialData* matData = nullptr;
+            if (mr.CachedMaterialHandle.IsValid())
+            {
+                matRev = materialSystem.GetRevision(mr.CachedMaterialHandle);
+                matData = materialSystem.GetData(mr.CachedMaterialHandle);
+            }
+
+            const bool materialDirty = (mr.CachedMaterialHandle != mr.CachedMaterialHandleForInstance) ||
+                                       (matRev != mr.CachedMaterialRevisionForInstance);
+
+            if (!transformDirty && !materialDirty)
+                continue;
+
             GpuInstanceData inst{};
             inst.Model = world.Matrix;
+
+            // TextureID: bindless index from material; 0 is default/error.
+            inst.TextureID = (matData) ? matData->AlbedoID : 0u;
 
             // Keep the picking ID stable.
             // If selection/picking is missing, EntityID stays 0.
             if (auto* pick = registry.try_get<ECS::Components::Selection::PickID>(entt::entity(entity)))
                 inst.EntityID = pick->Value;
 
-            gpuScene.QueueUpdate(mr.GpuSlot, inst, /*sphereBounds*/ {0.0f, 0.0f, 0.0f, 0.0f});
+            // IMPORTANT(bounds): don't clobber spawn-time local bounds.
+            // Sentinel contract: radius < 0 => keep existing bounds.
+            gpuScene.QueueUpdate(mr.GpuSlot, inst, /*sphereBounds*/ {0.0f, 0.0f, 0.0f, -1.0f});
 
-            // Clear tag so we don't resend next tick.
-            registry.remove<ECS::Components::Transform::WorldUpdatedTag>(entt::entity(entity));
+            mr.CachedMaterialHandleForInstance = mr.CachedMaterialHandle;
+            mr.CachedMaterialRevisionForInstance = matRev;
+
+            if (transformDirty)
+                registry.remove<ECS::Components::Transform::WorldUpdatedTag>(entt::entity(entity));
         }
     }
 }

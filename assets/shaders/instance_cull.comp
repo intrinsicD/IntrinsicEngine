@@ -72,6 +72,12 @@ void main()
     vec3 localC = s.CenterRadius.xyz;
     float localR = s.CenterRadius.w;
 
+    // Inactive-slot contract:
+    // - localR <= 0 means this slot is not a live render instance.
+    //   (Either it's never been initialized yet, or it was freed.)
+    if (localR <= 0.0)
+        return;
+
     vec3 worldC = (instances.Data[id].Model * vec4(localC, 1.0)).xyz;
 
     mat3 m = mat3(instances.Data[id].Model);

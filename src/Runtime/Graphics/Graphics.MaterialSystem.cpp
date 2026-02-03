@@ -13,6 +13,7 @@ namespace Graphics
         : m_TextureSystem(textureSystem), m_AssetManager(assetManager)
     {
         m_Pool.Initialize(2); // 2 Frames in flight
+        m_Revisions.resize(1024u, 1u);
     }
 
     MaterialSystem::~MaterialSystem()
@@ -26,14 +27,34 @@ namespace Graphics
         m_Pool.Clear();
     }
 
+    uint32_t MaterialSystem::GetRevision(MaterialHandle handle) const
+    {
+        if (!handle.IsValid())
+            return 0u;
+        if (handle.Index >= m_Revisions.size())
+            return 0u;
+        return m_Revisions[handle.Index];
+    }
+
     MaterialHandle MaterialSystem::Create(const MaterialData& data)
     {
-        return m_Pool.Create(data);
+        MaterialHandle h = m_Pool.Create(data);
+        if (h.IsValid())
+        {
+            if (h.Index >= m_Revisions.size())
+                m_Revisions.resize(static_cast<size_t>(h.Index) + 1u, 1u);
+            ++m_Revisions[h.Index];
+        }
+        return h;
     }
 
     void MaterialSystem::Destroy(MaterialHandle handle)
     {
         if(!handle.IsValid()) return;
+
+        // Bump revision so any cached per-entity state will refresh if the handle is (incorrectly) reused.
+        if (handle.Index < m_Revisions.size())
+            ++m_Revisions[handle.Index];
 
         {
             std::lock_guard lock(m_ListenerMutex);
@@ -105,6 +126,10 @@ namespace Graphics
         {
             if (slotType == 0) data->AlbedoID = bindlessID;
             // if (slotType == 1) data->NormalID = bindlessID;
+
+            if (matHandle.Index >= m_Revisions.size())
+                m_Revisions.resize(static_cast<size_t>(matHandle.Index) + 1u, 1u);
+            ++m_Revisions[matHandle.Index];
         }
     }
 }

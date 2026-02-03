@@ -552,6 +552,19 @@ export namespace Core::Assets
         // Compatibility: allow shared_ptr resources without copying.
         std::unique_lock lock(m_Mutex);
 
+        const StringID key(name);
+
+        // Same overwrite semantics as unique_ptr Create().
+        if (auto it = m_Lookup.find(key); it != m_Lookup.end())
+        {
+            const AssetHandle old = it->second;
+            if (old.IsValid() && m_Registry.valid(old.ID))
+            {
+                m_Registry.destroy(old.ID);
+            }
+            m_Lookup.erase(it);
+        }
+
         auto entity = m_Registry.create();
         AssetHandle handle{entity};
 
@@ -568,33 +581,29 @@ export namespace Core::Assets
         auto slot = std::make_shared<AssetSlot<T>>(std::move(resource));
         m_Registry.emplace<AssetPayload<T>>(entity, slot);
 
-        m_Lookup[StringID(name)] = handle;
+        m_Lookup[key] = handle;
         return handle;
-    }
-
-    template <typename T>
-    void AssetManager::ReloadAsset(AssetHandle handle)
-    {
-        std::function<void()> action;
-        {
-            std::shared_lock lock(m_Mutex);
-            if (!m_Registry.valid(handle.ID)) return;
-            if (auto* reloader = m_Registry.try_get<AssetReloader>(handle.ID))
-            {
-                action = reloader->ReloadAction;
-            }
-        }
-
-        if (action)
-        {
-            action();
-        }
     }
 
     template <typename T>
     AssetHandle AssetManager::Create(const std::string& name, std::unique_ptr<T> resource)
     {
         std::unique_lock lock(m_Mutex);
+
+        const StringID key(name);
+
+        // If an asset with this name already exists, destroy it first.
+        // This keeps name->handle lookup coherent and avoids having live entities reference an asset
+        // whose payload was effectively replaced out from under them.
+        if (auto it = m_Lookup.find(key); it != m_Lookup.end())
+        {
+            const AssetHandle old = it->second;
+            if (old.IsValid() && m_Registry.valid(old.ID))
+            {
+                m_Registry.destroy(old.ID);
+            }
+            m_Lookup.erase(it);
+        }
 
         auto entity = m_Registry.create();
         AssetHandle handle{entity};
@@ -609,7 +618,7 @@ export namespace Core::Assets
 
         auto slot = std::make_shared<AssetSlot<T>>(std::move(resource));
         m_Registry.emplace<AssetPayload<T>>(entity, slot);
-        m_Lookup[StringID(name)] = handle;
+        m_Lookup[key] = handle;
         return handle;
     }
 

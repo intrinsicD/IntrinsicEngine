@@ -5,6 +5,7 @@ module;
 export module Graphics:Systems.GPUSceneSync;
 
 import :GPUScene;
+import :MaterialSystem;
 
 export namespace Graphics::Systems::GPUSceneSync
 {
@@ -13,5 +14,11 @@ export namespace Graphics::Systems::GPUSceneSync
     //  - Consumes ECS::Components::Transform::WorldUpdatedTag emitted by TransformSystem.
     //  - Clears WorldUpdatedTag after processing.
     //  - Updates only entities that have an allocated MeshRenderer::GpuSlot.
-    void OnUpdate(entt::registry& registry, GPUScene& gpuScene);
+    //
+    // Extended contract:
+    //  - Also refreshes instance TextureID when the referenced material changes (MaterialSystem revision bump).
+    void OnUpdate(entt::registry& registry,
+                  GPUScene& gpuScene,
+                  const Core::Assets::AssetManager& assetManager,
+                  const MaterialSystem& materialSystem);
 }

@@ -18,6 +18,7 @@ add_executable(${target_name}
         Test_RuntimeGraph_ParallelLayers.cpp
         Test_RuntimeSelection.cpp
         Test_RuntimeSelection_Multi.cpp
+        Test_TextureMaterialHotReload.cpp
 )
 
 #Apply Strict Flags ONLY to our tests

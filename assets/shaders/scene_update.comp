@@ -41,5 +41,11 @@ void main()
     InstanceUpdate u = updates.Deltas[gid];
 
     scene.Instances[u.SlotIndex] = u.Data;
-    bounds.Spheres[u.SlotIndex] = u.SphereBounds;
+
+    // Sentinel contract: if radius < 0, keep the existing sphere bounds.
+    // This lets CPU-side systems update transforms/materials without recomputing local bounds.
+    if (u.SphereBounds.w >= 0.0)
+    {
+        bounds.Spheres[u.SlotIndex] = u.SphereBounds;
+    }
 }

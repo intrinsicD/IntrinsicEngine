@@ -26,16 +26,40 @@ namespace RHI
 
     uint32_t TextureSystem::AllocateBindlessSlot()
     {
-        // Always allocate monotonically to guarantee global uniqueness for the lifetime of the process.
-        // With a bindless capacity in the thousands (or more), this avoids all slot-reuse aliasing bugs
-        // during typical editor/sandbox sessions.
+        // Prefer reuse to avoid exhausting the global bindless capacity.
+        if (!m_FreeBindlessSlots.empty())
+        {
+            const uint32_t slot = m_FreeBindlessSlots.back();
+            m_FreeBindlessSlots.pop_back();
+            return slot;
+        }
+
         return m_NextBindlessSlot++;
     }
 
-    void TextureSystem::FreeBindlessSlot(uint32_t /*slot*/)
+    void TextureSystem::SetDefaultDescriptor(VkImageView view, VkSampler sampler)
     {
-        // Intentionally no-op: we never reuse slots during a run.
-        // Slot 0 remains reserved for the engine default texture.
+        m_DefaultView = view;
+        m_DefaultSampler = sampler;
+    }
+
+    void TextureSystem::FreeBindlessSlot(uint32_t slot)
+    {
+        // Slot 0 is reserved for the engine default/error texture.
+        if (slot == 0)
+            return;
+
+        // Make stale indices safe-by-construction: immediately rebind this slot to the default descriptor.
+        if (m_DefaultView != VK_NULL_HANDLE && m_DefaultSampler != VK_NULL_HANDLE)
+        {
+            m_Bindless.UpdateTexture(slot, m_DefaultView, m_DefaultSampler);
+        }
+        else
+        {
+            Core::Log::Warn("TextureSystem::FreeBindlessSlot({}) called before default descriptor was set. Slot will be recycled with stale descriptor content.", slot);
+        }
+
+        m_FreeBindlessSlots.push_back(slot);
     }
 
     TextureHandle TextureSystem::CreateFromData(std::unique_ptr<TextureGpuData> gpuData)

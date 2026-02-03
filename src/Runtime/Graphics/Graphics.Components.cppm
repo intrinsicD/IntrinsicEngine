@@ -23,6 +23,10 @@ export namespace ECS::MeshRenderer
         // --- Render Cache ---
         // Allows RenderSystem to avoid AssetManager lookups once resolved.
         Graphics::MaterialHandle CachedMaterialHandle = {};
+
+        // Cached snapshot used by GPUSceneSync to detect when instance TextureID must be refreshed.
+        Graphics::MaterialHandle CachedMaterialHandleForInstance = {};
+        uint32_t CachedMaterialRevisionForInstance = 0u;
     };
 }
 

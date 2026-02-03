@@ -34,6 +34,9 @@ export namespace Graphics
         // Binding Logic
         void SetAlbedoAsset(MaterialHandle material, Core::Assets::AssetHandle textureAsset);
 
+        // Signal that a material's GPU-facing data changed (e.g. bindless texture index) and instances should refresh.
+        [[nodiscard]] uint32_t GetRevision(MaterialHandle handle) const;
+
     private:
         RHI::TextureSystem& m_TextureSystem;
         Core::Assets::AssetManager& m_AssetManager;
@@ -48,6 +51,10 @@ export namespace Graphics
 
         std::mutex m_ListenerMutex;
         std::unordered_map<MaterialHandle, std::vector<ListenerEntry>> m_Listeners;
+
+        // Monotonic per-material revision used for fast dirty checks.
+        // Index is MaterialHandle::Index.
+        std::vector<uint32_t> m_Revisions;
 
         void OnTextureLoad(MaterialHandle matHandle, Core::Assets::AssetHandle texHandle, int slotType);
     };

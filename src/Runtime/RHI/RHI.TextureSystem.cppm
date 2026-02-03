@@ -28,6 +28,10 @@ export namespace RHI
         [[nodiscard]] const TextureGpuData* Get(TextureHandle handle) const;
         [[nodiscard]] const TextureGpuData* GetUnchecked(TextureHandle handle) const;
 
+        // Default/fallback texture descriptor (bindless slot 0 contract).
+        // Must be called once during engine init after bindless is created.
+        void SetDefaultDescriptor(VkImageView view, VkSampler sampler);
+
     private:
         [[nodiscard]] uint32_t AllocateBindlessSlot();
         void FreeBindlessSlot(uint32_t slot);
@@ -41,5 +45,8 @@ export namespace RHI
         // NOTE: We currently allocate monotonically and do not reuse slots during a run.
         std::vector<uint32_t> m_FreeBindlessSlots;
         uint32_t m_NextBindlessSlot = 1;
+
+        VkImageView m_DefaultView = VK_NULL_HANDLE;
+        VkSampler m_DefaultSampler = VK_NULL_HANDLE;
     };
 }
