@@ -21,7 +21,8 @@ import :ShaderRegistry;
 import :PipelineLibrary;
 import :GPUScene;
 import :Interaction;
-import :Presentation; // New
+import :Presentation;
+import :GlobalResources;
 
 import Core;
 import RHI;
@@ -32,15 +33,6 @@ using namespace Core::Hash;
 
 namespace Graphics
 {
-    inline size_t PadUniformBufferSize(size_t originalSize, size_t minAlignment)
-    {
-        if (minAlignment > 0)
-        {
-            return (originalSize + minAlignment - 1) & ~(minAlignment - 1);
-        }
-        return originalSize;
-    }
-
     RenderSystem::RenderSystem(const RenderSystemConfig& config,
                                std::shared_ptr<RHI::VulkanDevice> device,
                                RHI::VulkanSwapchain& swapchain,
@@ -55,60 +47,18 @@ namespace Graphics
                                GeometryPool& geometryStorage,
                                MaterialSystem& materialSystem)
         : m_Config(config),
-          m_ShaderRegistry(&shaderRegistry),
-          m_PipelineLibrary(&pipelineLibrary),
           m_DeviceOwner(std::move(device)),
           m_Device(m_DeviceOwner.get()),
           m_Swapchain(swapchain),
           m_Renderer(renderer),
-          m_BindlessSystem(bindlessSystem),
-          m_DescriptorPool(descriptorPool),
-          m_DescriptorLayout(descriptorLayout),
           m_RenderGraph(m_DeviceOwner, frameArena, frameScope),
           m_GeometryStorage(geometryStorage),
           m_MaterialSystem(materialSystem),
           // Sub-systems
+          m_GlobalResources(m_DeviceOwner, descriptorPool, descriptorLayout, bindlessSystem, shaderRegistry, pipelineLibrary, renderer.GetFramesInFlight()),
           m_Presentation(m_DeviceOwner, swapchain, renderer),
           m_Interaction({.MaxFramesInFlight = renderer.GetFramesInFlight()}, m_DeviceOwner)
     {
-        VkPhysicalDeviceProperties props;
-        vkGetPhysicalDeviceProperties(m_Device->GetPhysicalDevice(), &props);
-        m_MinUboAlignment = props.limits.minUniformBufferOffsetAlignment;
-
-        const size_t cameraDataSize = sizeof(RHI::CameraBufferObject);
-        const size_t alignedSize = PadUniformBufferSize(cameraDataSize, m_MinUboAlignment);
-
-        m_GlobalUBO = std::make_unique<RHI::VulkanBuffer>(
-            *m_Device,
-            alignedSize * renderer.GetFramesInFlight(),
-            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-            static_cast<VmaMemoryUsage>(VMA_MEMORY_USAGE_CPU_TO_GPU));
-
-        m_GlobalDescriptorSet = descriptorPool.Allocate(descriptorLayout.GetHandle());
-
-        if (m_GlobalDescriptorSet != VK_NULL_HANDLE && m_GlobalUBO && m_GlobalUBO->GetHandle() != VK_NULL_HANDLE)
-        {
-            VkDescriptorBufferInfo bufferInfo{};
-            bufferInfo.buffer = m_GlobalUBO->GetHandle();
-            bufferInfo.offset = 0;
-            bufferInfo.range = sizeof(RHI::CameraBufferObject);
-
-            VkWriteDescriptorSet descriptorWrite{};
-            descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            descriptorWrite.dstSet = m_GlobalDescriptorSet;
-            descriptorWrite.dstBinding = 0;
-            descriptorWrite.dstArrayElement = 0;
-            descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-            descriptorWrite.descriptorCount = 1;
-            descriptorWrite.pBufferInfo = &bufferInfo;
-
-            vkUpdateDescriptorSets(m_Device->GetLogicalDevice(), 1, &descriptorWrite, 0, nullptr);
-        }
-        else
-        {
-            Core::Log::Error("RenderSystem: Failed to initialize Global UBO or Descriptor Set");
-        }
-
         // Register UI panel
         Interface::GUI::RegisterPanel("Render Target Viewer",
                                       [this]()
@@ -152,10 +102,7 @@ namespace Graphics
                                       },
                                       true);
 
-        // RenderGraph transient GPU memory allocator
-        m_TransientAllocator = std::make_unique<RHI::TransientAllocator>(*m_Device);
-        m_RenderGraph.SetTransientAllocator(*m_TransientAllocator);
-
+        m_RenderGraph.SetTransientAllocator(m_GlobalResources.GetTransientAllocator());
         m_GpuScene = nullptr;
     }
 
@@ -173,8 +120,6 @@ namespace Graphics
         m_RetiredPipelines.clear();
         m_ActivePipeline.reset();
         m_PendingPipeline.reset();
-
-        m_TransientAllocator.reset();
     }
 
     void RenderSystem::RequestPipelineSwap(std::unique_ptr<RenderPipeline> pipeline)
@@ -200,8 +145,11 @@ namespace Graphics
 
         if (m_ActivePipeline)
         {
-            m_ActivePipeline->Initialize(*m_Device, m_DescriptorPool, m_DescriptorLayout,
-                                         *m_ShaderRegistry, *m_PipelineLibrary);
+            m_ActivePipeline->Initialize(*m_Device,
+                                         m_GlobalResources.GetDescriptorPool(),
+                                         m_GlobalResources.GetDescriptorLayout(),
+                                         m_GlobalResources.GetShaderRegistry(),
+                                         m_GlobalResources.GetPipelineLibrary());
             m_ActivePipeline->OnResize(width, height);
         }
     }
@@ -238,12 +186,17 @@ namespace Graphics
 
     RenderSystem::PickResultGpu RenderSystem::GetLastPickResult() const
     {
-        return m_Interaction.GetLastPickResult();
+        auto res = m_Interaction.GetLastPickResult();
+        return {res.HasHit, res.EntityID};
     }
 
     std::optional<RenderSystem::PickResultGpu> RenderSystem::TryConsumePickResult()
     {
-        return m_Interaction.TryConsumePickResult();
+        if (auto res = m_Interaction.TryConsumePickResult())
+        {
+            return RenderSystem::PickResultGpu{res->HasHit, res->EntityID};
+        }
+        return std::nullopt;
     }
 
     void RenderSystem::OnUpdate(ECS::Scene& scene, const CameraComponent& camera,
@@ -254,16 +207,13 @@ namespace Graphics
         GarbageCollectRetiredPipelines();
         
         // ---------------------------------------------------------
-        // 1. Check for Completed GPU Readbacks (Picking)
+        // 1. Interaction & WSI
         // ---------------------------------------------------------
         m_Interaction.ProcessReadbacks(currentFrame);
 
         Interface::GUI::BeginFrame();
         Interface::GUI::DrawGUI();
 
-        // ---------------------------------------------------------
-        // 2. Begin Frame (Presentation)
-        // ---------------------------------------------------------
         if (!m_Presentation.BeginFrame())
         {
             Interface::GUI::EndFrame();
@@ -273,22 +223,16 @@ namespace Graphics
         const uint32_t frameIndex = m_Presentation.GetFrameIndex();
         const auto extent = m_Presentation.GetResolution();
 
+        // ---------------------------------------------------------
+        // 2. Global Resources (Camera, Allocators)
+        // ---------------------------------------------------------
+        m_GlobalResources.BeginFrame(frameIndex);
+        m_GlobalResources.Update(camera, frameIndex);
+
         ApplyPendingPipelineSwap(extent.width, extent.height);
 
-        // Update Camera UBO
-        RHI::CameraBufferObject ubo{};
-        ubo.View = camera.ViewMatrix;
-        ubo.Proj = camera.ProjectionMatrix;
-
-        const size_t cameraDataSize = sizeof(RHI::CameraBufferObject);
-        const size_t alignedSize = PadUniformBufferSize(cameraDataSize, m_MinUboAlignment);
-        const size_t dynamicOffset = frameIndex * alignedSize;
-
-        char* dataPtr = static_cast<char*>(m_GlobalUBO->Map());
-        memcpy(dataPtr + dynamicOffset, &ubo, cameraDataSize);
-
         // ---------------------------------------------------------
-        // 3. Prepare Render Graph Context
+        // 3. Prepare Render Graph
         // ---------------------------------------------------------
         m_RenderGraph.Reset();
         const uint32_t imageIndex = m_Presentation.GetImageIndex();
@@ -297,7 +241,7 @@ namespace Graphics
         const auto& pendingPick = m_Interaction.GetPendingPick();
         const auto& debugView = m_Interaction.GetDebugViewState();
 
-        // Frame setup pass: import swapchain & depth
+        // Frame setup pass
         struct FrameSetupData { RGResourceHandle Backbuffer; RGResourceHandle Depth; };
         m_RenderGraph.AddPass<FrameSetupData>("FrameSetup",
                                               [&](FrameSetupData& data, RGBuilder& builder)
@@ -354,10 +298,10 @@ namespace Graphics
             imageIndex,
             m_Swapchain.GetImageFormat(),
             m_Renderer,
-            m_GlobalUBO.get(),
-            m_GlobalDescriptorSet,
-            dynamicOffset,
-            m_BindlessSystem,
+            m_GlobalResources.GetCameraUBO(),
+            m_GlobalResources.GetGlobalDescriptorSet(),
+            m_GlobalResources.GetDynamicUBOOffset(frameIndex),
+            m_GlobalResources.GetBindlessSystem(),
             // Pass interaction state
             {pendingPick.Pending, pendingPick.X, pendingPick.Y},
             {debugView.Enabled, debugView.ShowInViewport, debugView.SelectedResource, debugView.DepthNear, debugView.DepthFar},

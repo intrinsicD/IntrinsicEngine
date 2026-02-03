@@ -17,6 +17,7 @@ import :PipelineLibrary;
 import :GPUScene;
 import :Interaction; // New: Interaction Logic
 import :Presentation; // New: Presentation Logic
+import :GlobalResources; // New: Global State
 import Core;
 import ECS;
 
@@ -52,14 +53,15 @@ export namespace Graphics
 
         void OnResize();
 
-        [[nodiscard]] RHI::VulkanBuffer* GetGlobalUBO() const { return m_GlobalUBO.get(); }
+        [[nodiscard]] RHI::VulkanBuffer* GetGlobalUBO() const { return m_GlobalResources.GetCameraUBO(); }
 
         // Retained-mode scene is owned by Runtime::Engine. RenderSystem consumes it during rendering.
         void SetGpuScene(GPUScene* scene) { m_GpuScene = scene; }
 
-        // Interaction System Access
+        // Accessors
         [[nodiscard]] InteractionSystem& GetInteraction() { return m_Interaction; }
         [[nodiscard]] const InteractionSystem& GetInteraction() const { return m_Interaction; }
+        [[nodiscard]] GlobalResources& GetGlobalResources() { return m_GlobalResources; }
 
         // Picking API Facade (Delegates to InteractionSystem)
         using PickResultGpu = InteractionSystem::PickResultGpu;
@@ -69,10 +71,6 @@ export namespace Graphics
 
     private:
         RenderSystemConfig m_Config;
-        size_t m_MinUboAlignment = 0;
-
-        const ShaderRegistry* m_ShaderRegistry = nullptr; // non-owning
-        PipelineLibrary* m_PipelineLibrary = nullptr; // non-owning
 
         // Ownership stays with the caller, but we avoid ref-count ops in hot code.
         std::shared_ptr<RHI::VulkanDevice> m_DeviceOwner;
@@ -80,17 +78,11 @@ export namespace Graphics
 
         RHI::VulkanSwapchain& m_Swapchain;
         RHI::SimpleRenderer& m_Renderer;
-        RHI::BindlessDescriptorSystem& m_BindlessSystem;
-        VkDescriptorSet m_GlobalDescriptorSet = VK_NULL_HANDLE;
 
-        RHI::DescriptorAllocator& m_DescriptorPool;
-        RHI::DescriptorLayout& m_DescriptorLayout;
-
-        std::unique_ptr<RHI::VulkanBuffer> m_GlobalUBO;
-
-        // Transient GPU memory for RenderGraph (page allocator). Owned here so it is destroyed
-        // before VulkanDevice teardown (Engine destroys RenderSystem first).
-        std::unique_ptr<RHI::TransientAllocator> m_TransientAllocator;
+        // Sub-Systems
+        GlobalResources m_GlobalResources; // Holds UBOs, Descriptors, Allocators
+        PresentationSystem m_Presentation;
+        InteractionSystem m_Interaction;
 
         RenderGraph m_RenderGraph;
         GeometryPool& m_GeometryStorage;
@@ -98,10 +90,6 @@ export namespace Graphics
 
         // Retained-mode GPU scene (persistent SSBOs + sparse updates). Non-owning.
         GPUScene* m_GpuScene = nullptr;
-
-        // Functional Sub-Systems
-        PresentationSystem m_Presentation; // New
-        InteractionSystem m_Interaction;   // New
 
         // Cached frame lists for UI and debug resolve selection.
         std::vector<RenderGraphDebugPass> m_LastDebugPasses;
