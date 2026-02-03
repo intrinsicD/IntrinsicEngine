@@ -4,6 +4,9 @@ module;
 #include <mutex>
 #include <atomic>
 #include <memory>
+#include <cstring>
+#include <span>
+#include <cstddef>
 #include "RHI.Vulkan.hpp"
 
 module RHI:Transfer.Impl;
@@ -45,6 +48,12 @@ namespace RHI
 
         // Clear batches (destroys staging buffers)
         m_InFlightBatches.clear();
+
+        // IMPORTANT:
+        // VulkanBuffer destruction is deferred via VulkanDevice::SafeDestroy(), which enqueues vmaDestroyBuffer.
+        // If we don't flush here, the VMA allocator may be destroyed later with live allocations,
+        // triggering: "Some allocations were not freed before destruction".
+        m_Device.FlushAllDeletionQueues();
 
         m_StagingBelt.reset();
 
@@ -185,5 +194,85 @@ namespace RHI
                                                    optimalBufferCopyOffsetAlignment,
                                                    optimalBufferCopyRowPitchAlignment)
             : StagingBelt::Allocation{};
+    }
+
+    TransferToken TransferManager::UploadBuffer(VkBuffer dst, std::span<const std::byte> src, VkDeviceSize dstOffset)
+    {
+        if (dst == VK_NULL_HANDLE) return {};
+        if (src.empty()) return {};
+
+        VkPhysicalDeviceProperties props{};
+        vkGetPhysicalDeviceProperties(m_Device.GetPhysicalDevice(), &props);
+
+        // Vulkan requires srcOffset and dstOffset to be multiples of optimalBufferCopyOffsetAlignment for vkCmdCopyBuffer.
+        const size_t copyAlign = std::max<size_t>(16, static_cast<size_t>(props.limits.optimalBufferCopyOffsetAlignment));
+
+        VkCommandBuffer cmd = Begin();
+
+        auto alloc = AllocateStaging(src.size_bytes(), copyAlign);
+        if (alloc.Buffer == VK_NULL_HANDLE || alloc.MappedPtr == nullptr)
+        {
+            Core::Log::Error("TransferManager::UploadBuffer(): staging allocation failed (size={}, align={}).", src.size_bytes(), copyAlign);
+            return {};
+        }
+
+        std::memcpy(alloc.MappedPtr, src.data(), src.size_bytes());
+
+        VkBufferCopy region{};
+        region.srcOffset = static_cast<VkDeviceSize>(alloc.Offset);
+        region.dstOffset = dstOffset;
+        region.size = static_cast<VkDeviceSize>(src.size_bytes());
+
+        vkCmdCopyBuffer(cmd, alloc.Buffer, dst, 1, &region);
+
+        return Submit(cmd);
+    }
+
+    VkCommandBuffer TransferManager::BeginUploadBatch()
+    {
+        return Begin();
+    }
+
+    VkCommandBuffer TransferManager::BeginUploadBatch(const UploadBatchConfig&)
+    {
+        // For now this is identical to Begin(); config is used by EnqueueUploadBuffer.
+        return Begin();
+    }
+
+    bool TransferManager::EnqueueUploadBuffer(VkCommandBuffer cmd,
+                                             VkBuffer dst,
+                                             std::span<const std::byte> src,
+                                             VkDeviceSize dstOffset,
+                                             size_t copyAlignment)
+    {
+        if (cmd == VK_NULL_HANDLE) return false;
+        if (dst == VK_NULL_HANDLE) return false;
+        if (src.empty()) return true; // no-op success
+
+        if (copyAlignment == 0)
+        {
+            VkPhysicalDeviceProperties props{};
+            vkGetPhysicalDeviceProperties(m_Device.GetPhysicalDevice(), &props);
+            copyAlignment = std::max<size_t>(16, static_cast<size_t>(props.limits.optimalBufferCopyOffsetAlignment));
+        }
+
+        auto alloc = AllocateStaging(src.size_bytes(), copyAlignment);
+        if (alloc.Buffer == VK_NULL_HANDLE || alloc.MappedPtr == nullptr)
+            return false;
+
+        std::memcpy(alloc.MappedPtr, src.data(), src.size_bytes());
+
+        VkBufferCopy region{};
+        region.srcOffset = static_cast<VkDeviceSize>(alloc.Offset);
+        region.dstOffset = dstOffset;
+        region.size = static_cast<VkDeviceSize>(src.size_bytes());
+
+        vkCmdCopyBuffer(cmd, alloc.Buffer, dst, 1, &region);
+        return true;
+    }
+
+    TransferToken TransferManager::EndUploadBatch(VkCommandBuffer cmd)
+    {
+        return Submit(cmd);
     }
 }

@@ -24,77 +24,6 @@ using namespace Core::Hash;
 
 namespace Runtime
 {
-    entt::entity Engine::SpawnModel(Core::Assets::AssetHandle modelHandle,
-                                    Core::Assets::AssetHandle materialHandle,
-                                    glm::vec3 position,
-                                    glm::vec3 scale)
-    {
-        // 1. Resolve Model
-        auto modelResult = m_AssetManager.Get<Graphics::Model>(modelHandle);
-        if (!modelResult)
-        {
-            Core::Log::Error("Cannot spawn model: Asset not ready or invalid.");
-            return entt::null;
-        }
-        const auto& model = *modelResult;
-
-        // 2. Create Root
-        // We use the Asset Name as the entity name base
-        std::string name = "Model";
-        // (Optional: fetch name from AssetManager metadata if available)
-
-        entt::entity root = m_Scene.CreateEntity(name);
-        auto& t = m_Scene.GetRegistry().get<ECS::Components::Transform::Component>(root);
-        t.Position = position;
-        t.Scale = scale;
-
-        // Assign stable pick IDs (monotonic, never reused during runtime).
-        // This decouples GPU picking from entt::entity recycling.
-        static uint32_t s_NextPickId = 1u;
-        if (!m_Scene.GetRegistry().all_of<ECS::Components::Selection::PickID>(root))
-        {
-            m_Scene.GetRegistry().emplace<ECS::Components::Selection::PickID>(root, s_NextPickId++);
-        }
-
-        // 3. Create Submeshes
-        for (size_t i = 0; i < model->Meshes.size(); i++)
-        {
-            entt::entity targetEntity = root;
-
-            // If complex model, create children. If single mesh, put it on root.
-            if (model->Meshes.size() > 1)
-            {
-                targetEntity = m_Scene.CreateEntity(model->Meshes[i]->Name);
-                ECS::Components::Hierarchy::Attach(m_Scene.GetRegistry(), targetEntity, root);
-            }
-
-
-            // Add Renderer
-            auto& mr = m_Scene.GetRegistry().emplace<ECS::MeshRenderer::Component>(targetEntity);
-            mr.Geometry = model->Meshes[i]->Handle;
-            mr.Material = materialHandle;
-
-            // Add Collider
-            if (model->Meshes[i]->CollisionGeometry)
-            {
-                auto& col = m_Scene.GetRegistry().emplace<ECS::MeshCollider::Component>(targetEntity);
-                col.CollisionRef = model->Meshes[i]->CollisionGeometry;
-                col.WorldOBB.Center = col.CollisionRef->LocalAABB.GetCenter();
-            }
-
-            // Add Selectable Tag (THE CRITICAL FIX)
-            m_Scene.GetRegistry().emplace<ECS::Components::Selection::SelectableTag>(targetEntity);
-
-            // Stable pick ID for each selectable entity.
-            if (!m_Scene.GetRegistry().all_of<ECS::Components::Selection::PickID>(targetEntity))
-            {
-                m_Scene.GetRegistry().emplace<ECS::Components::Selection::PickID>(targetEntity, s_NextPickId++);
-            }
-        }
-
-        return root;
-    }
-
     Engine::Engine(const EngineConfig& config) :
         m_FrameArena(config.FrameArenaSize),
         m_FrameScope(config.FrameArenaSize)
@@ -189,6 +118,22 @@ namespace Runtime
 
 
         InitPipeline();
+
+        // Retained-mode GPUScene: Engine owns it so SpawnModel/ECS can queue updates.
+        if (m_PipelineLibrary && m_Device)
+        {
+            if (auto* p = m_PipelineLibrary->GetSceneUpdatePipeline(); p && m_PipelineLibrary->GetSceneUpdateSetLayout() != VK_NULL_HANDLE)
+            {
+                m_GpuScene = std::make_unique<Graphics::GPUScene>(*m_Device,
+                                                                 *p,
+                                                                 m_PipelineLibrary->GetSceneUpdateSetLayout(),
+                                                                 /*maxInstances*/ 100'000);
+
+                if (m_RenderSystem)
+                    m_RenderSystem->SetGpuScene(m_GpuScene.get());
+            }
+        }
+
         Core::Log::Info("Engine: InitPipeline complete.");
         Core::Log::Info("Engine: Constructor complete.");
     }
@@ -342,6 +287,7 @@ namespace Runtime
 
                     // --- Setup Material (Requires AssetManager) ---
                     // Define local loader lambda inside the main thread task
+                    // TODO: is textureLoader deprecated? remove?
                     auto textureLoader = [this](const std::string& pathStr, Core::Assets::AssetHandle handle)
                         -> std::shared_ptr<RHI::Texture>
                     {
@@ -459,7 +405,12 @@ namespace Runtime
         m_ShaderRegistry.Register("Debug.Vert"_id, "shaders/debug_view.vert.spv");
         m_ShaderRegistry.Register("Debug.Frag"_id, "shaders/debug_view.frag.spv");
         m_ShaderRegistry.Register("Debug.Comp"_id, "shaders/debug_view.comp.spv");
+
+        // Stage 3 compute
         m_ShaderRegistry.Register("Cull.Comp"_id, "shaders/instance_cull.comp.spv");
+
+        // GPUScene scatter update
+        m_ShaderRegistry.Register("SceneUpdate.Comp"_id, "shaders/scene_update.comp.spv");
 
         // ---------------------------------------------------------------------
         // Pipeline library (owns PSOs)
@@ -502,6 +453,104 @@ namespace Runtime
         // ---------------------------------------------------------------------
         // Engine owns lifetime (RenderSystem owns pipeline); applications can request swaps at runtime.
         m_RenderSystem->RequestPipelineSwap(std::make_unique<Graphics::DefaultPipeline>());
+    }
+
+    entt::entity Engine::SpawnModel(Core::Assets::AssetHandle modelHandle,
+                                    Core::Assets::AssetHandle materialHandle,
+                                    glm::vec3 position,
+                                    glm::vec3 scale)
+    {
+        // 1. Resolve Model
+        auto modelResult = m_AssetManager.Get<Graphics::Model>(modelHandle);
+        if (!modelResult)
+        {
+            Core::Log::Error("Cannot spawn model: Asset not ready or invalid.");
+            return entt::null;
+        }
+        const auto& model = *modelResult;
+
+        // 2. Create Root
+        // We use the Asset Name as the entity name base
+        std::string name = "Model";
+        // (Optional: fetch name from AssetManager metadata if available)
+
+        entt::entity root = m_Scene.CreateEntity(name);
+        auto& t = m_Scene.GetRegistry().get<ECS::Components::Transform::Component>(root);
+        t.Position = position;
+        t.Scale = scale;
+
+        // Assign stable pick IDs (monotonic, never reused during runtime).
+        // This decouples GPU picking from entt::entity recycling.
+        static uint32_t s_NextPickId = 1u;
+        if (!m_Scene.GetRegistry().all_of<ECS::Components::Selection::PickID>(root))
+        {
+            m_Scene.GetRegistry().emplace<ECS::Components::Selection::PickID>(root, s_NextPickId++);
+        }
+
+        // 3. Create Submeshes
+        for (size_t i = 0; i < model->Meshes.size(); i++)
+        {
+            entt::entity targetEntity = root;
+
+            // If complex model, create children. If single mesh, put it on root.
+            if (model->Meshes.size() > 1)
+            {
+                targetEntity = m_Scene.CreateEntity(model->Meshes[i]->Name);
+                ECS::Components::Hierarchy::Attach(m_Scene.GetRegistry(), targetEntity, root);
+            }
+
+
+            // Add Renderer
+            auto& mr = m_Scene.GetRegistry().emplace<ECS::MeshRenderer::Component>(targetEntity);
+            mr.Geometry = model->Meshes[i]->Handle;
+            mr.Material = materialHandle;
+
+            if (m_GpuScene)
+            {
+                mr.GpuSlot = m_GpuScene->AllocateSlot();
+
+                // Initial packet
+                Graphics::GpuInstanceData inst{};
+                inst.Model = ECS::Components::Transform::GetMatrix(t);
+
+                if (auto* pick = m_Scene.GetRegistry().try_get<ECS::Components::Selection::PickID>(targetEntity))
+                    inst.EntityID = pick->Value;
+
+                // v1: use default texture slot; material system will update later.
+                inst.TextureID = m_DefaultTextureIndex;
+
+                glm::vec4 sphere{0.0f};
+                if (model->Meshes[i]->CollisionGeometry)
+                {
+                    const auto& aabb = model->Meshes[i]->CollisionGeometry->LocalAABB;
+                    const glm::vec3 c = aabb.GetCenter();
+                    const glm::vec3 e = aabb.GetExtents();
+                    const float r = glm::length(e);
+                    sphere = glm::vec4(c, r);
+                }
+
+                m_GpuScene->QueueUpdate(mr.GpuSlot, inst, sphere);
+            }
+
+            // Add Collider
+            if (model->Meshes[i]->CollisionGeometry)
+            {
+                auto& col = m_Scene.GetRegistry().emplace<ECS::MeshCollider::Component>(targetEntity);
+                col.CollisionRef = model->Meshes[i]->CollisionGeometry;
+                col.WorldOBB.Center = col.CollisionRef->LocalAABB.GetCenter();
+            }
+
+            // Add Selectable Tag (THE CRITICAL FIX)
+            m_Scene.GetRegistry().emplace<ECS::Components::Selection::SelectableTag>(targetEntity);
+
+            // Stable pick ID for each selectable entity.
+            if (!m_Scene.GetRegistry().all_of<ECS::Components::Selection::PickID>(targetEntity))
+            {
+                m_Scene.GetRegistry().emplace<ECS::Components::Selection::PickID>(targetEntity, s_NextPickId++);
+            }
+        }
+
+        return root;
     }
 
     void Engine::Run()

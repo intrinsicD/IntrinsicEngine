@@ -70,6 +70,9 @@ export namespace Graphics::Passes
         // Stage 1: SSBO pull-model.
         static constexpr uint32_t FRAMES = 2;
         std::unique_ptr<RHI::VulkanBuffer> m_InstanceBuffer[FRAMES];
+        std::unique_ptr<RHI::VulkanBuffer> m_Stage1VisibilityBuffer[FRAMES];
+
+        // Stage 3: visibility/remap (GPU-written) lives in m_VisibilityBuffer[].
         std::unique_ptr<RHI::VulkanBuffer> m_VisibilityBuffer[FRAMES];
 
         // Cache the instance descriptor set per frame (updated each frame).
@@ -84,7 +87,10 @@ export namespace Graphics::Passes
         std::unique_ptr<RHI::VulkanBuffer> m_DrawCountBuffer[FRAMES];
 
         // Indirect buffer becomes GPU-written (compute) and consumed by draw indirect.
-        std::unique_ptr<RHI::VulkanBuffer> m_IndirectIndexedBuffer[FRAMES];
+        // NOTE: Stage 2 builds indirect on the CPU (host-visible), Stage 3 builds indirect on the GPU (device-local).
+        // Keep them split to avoid aliasing a CPU Write() into GPU-only memory.
+        std::unique_ptr<RHI::VulkanBuffer> m_Stage2IndirectIndexedBuffer[FRAMES];
+        std::unique_ptr<RHI::VulkanBuffer> m_Stage3IndirectIndexedBuffer[FRAMES];
 
         // Stage 1: allocate per-frame descriptor sets freshly (do not cache across frames).
         VkDescriptorSetLayout m_InstanceSetLayout = VK_NULL_HANDLE;

@@ -14,6 +14,8 @@ namespace RHI
     VulkanBuffer::VulkanBuffer(VulkanDevice& device, size_t size, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage)
         : m_Device(device)
     {
+        m_SizeBytes = size;
+
         VkBufferCreateInfo bufferInfo{};
         bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
         bufferInfo.size = size;
@@ -37,10 +39,20 @@ namespace RHI
             return;
         }
 
+        // Cache memory properties so Map() can be a fast, safe check.
+        VkMemoryPropertyFlags memFlags = 0;
+        vmaGetAllocationMemoryProperties(device.GetAllocator(), m_Allocation, &memFlags);
+        m_IsHostVisible = (memFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0;
+
         if (resultInfo.pMappedData != nullptr)
         {
             m_MappedData = resultInfo.pMappedData;
             m_IsPersistent = true;
+        }
+        else
+        {
+            // If VMA didn't persistently map, ensure we don't accidentally think it's mappable.
+            m_MappedData = nullptr;
         }
     }
 
@@ -94,12 +106,28 @@ namespace RHI
 
     void* VulkanBuffer::Map()
     {
+        if (!m_Allocation)
+            return nullptr;
+
+        if (!m_IsHostVisible)
+        {
+            Core::Log::Error("VulkanBuffer::Map(): Attempted to map non-host-visible memory (device-local). "
+                            "Use a staging upload path or create the buffer with CPU_TO_GPU/AUTO_PREFER_HOST.");
+            return nullptr;
+        }
+
         if (m_MappedData)
         {
             return m_MappedData;
         }
 
-        vmaMapMemory(m_Device.GetAllocator(), m_Allocation, &m_MappedData);
+        VkResult res = vmaMapMemory(m_Device.GetAllocator(), m_Allocation, &m_MappedData);
+        if (res != VK_SUCCESS)
+        {
+            Core::Log::Error("VulkanBuffer::Map(): vmaMapMemory failed (VkResult={}).", static_cast<int>(res));
+            m_MappedData = nullptr;
+        }
+
         return m_MappedData;
     }
 

@@ -109,6 +109,16 @@ namespace RHI
         // 4) One more flush in case any destructors enqueued work during step (3).
         FlushAllDeletionQueues();
 
+        // ALSO: if any destructor enqueued SafeDestroy() (timeline-based) during step (3), flush it too.
+        {
+            std::lock_guard lock(m_DeletionMutex);
+            for (auto& item : m_TimelineDeletionQueue)
+            {
+                if (item.Fn) item.Fn();
+            }
+            m_TimelineDeletionQueue.clear();
+        }
+
         // 5) Destroy Thread Pools
         {
             std::lock_guard lock(m_ThreadPoolsMutex);

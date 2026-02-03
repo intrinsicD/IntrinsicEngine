@@ -1,0 +1,45 @@
+#version 460
+#extension GL_EXT_scalar_block_layout : require
+
+layout(local_size_x = 64) in;
+
+struct InstanceData {
+    mat4 Model;
+    uint TextureID;
+    uint EntityID;
+    uint Pad0;
+    uint Pad1;
+};
+
+struct InstanceUpdate {
+    uint SlotIndex;
+    InstanceData Data;
+    vec4 SphereBounds; // xyz = center, w = radius
+};
+
+layout(std430, set = 0, binding = 0) readonly buffer Updates {
+    InstanceUpdate Deltas[];
+} updates;
+
+layout(std430, set = 0, binding = 1) buffer Scene {
+    InstanceData Instances[];
+} scene;
+
+layout(std430, set = 0, binding = 2) buffer Bounds {
+    vec4 Spheres[];
+} bounds;
+
+layout(push_constant, scalar) uniform Push {
+    uint UpdateCount;
+} pc;
+
+void main()
+{
+    uint gid = gl_GlobalInvocationID.x;
+    if (gid >= pc.UpdateCount) return;
+
+    InstanceUpdate u = updates.Deltas[gid];
+
+    scene.Instances[u.SlotIndex] = u.Data;
+    bounds.Spheres[u.SlotIndex] = u.SphereBounds;
+}

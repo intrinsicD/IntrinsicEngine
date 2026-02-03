@@ -20,6 +20,9 @@ import RHI;
 
 export namespace Graphics
 {
+    // Forward declaration (keeps include graph minimal).
+    class GPUScene;
+
     // ---------------------------------------------------------------------
     // RenderBlackboard
     // ---------------------------------------------------------------------
@@ -58,6 +61,9 @@ export namespace Graphics
         const Core::Assets::AssetManager& AssetManager;
         GeometryPool& GeometryStorage;
         MaterialSystem& MaterialSystem;
+
+        // Retained-mode GPU scene (owned by RenderSystem).
+        GPUScene* GpuScene = nullptr;
 
         // Frame
         uint32_t FrameIndex = 0;

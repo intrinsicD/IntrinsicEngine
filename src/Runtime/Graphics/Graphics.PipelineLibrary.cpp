@@ -38,6 +38,7 @@ namespace Graphics
         // Clear pipelines first (they reference the layouts).
         m_Pipelines.clear();
         m_CullPipeline.reset();
+        m_SceneUpdatePipeline.reset();
 
         // Destroy descriptor set layouts created in BuildDefaults().
         if (m_Stage1InstanceSetLayout != VK_NULL_HANDLE)
@@ -50,6 +51,12 @@ namespace Graphics
         {
             vkDestroyDescriptorSetLayout(logicalDevice, m_CullSetLayout, nullptr);
             m_CullSetLayout = VK_NULL_HANDLE;
+        }
+
+        if (m_SceneUpdateSetLayout != VK_NULL_HANDLE)
+        {
+            vkDestroyDescriptorSetLayout(logicalDevice, m_SceneUpdateSetLayout, nullptr);
+            m_SceneUpdateSetLayout = VK_NULL_HANDLE;
         }
     }
 
@@ -161,6 +168,68 @@ namespace Graphics
             }
 
             m_Pipelines[kPipeline_Picking] = std::move(*pipelineResult);
+        }
+
+        // ---------------------------------------------------------------------
+        // GPUScene: Scatter update pipeline
+        // ---------------------------------------------------------------------
+        {
+            if (m_SceneUpdateSetLayout == VK_NULL_HANDLE)
+            {
+                VkDescriptorSetLayoutBinding bindings[3]{};
+
+                // binding 0: Updates
+                bindings[0].binding = 0;
+                bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                bindings[0].descriptorCount = 1;
+                bindings[0].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+                // binding 1: Scene instances (SSBO)
+                bindings[1].binding = 1;
+                bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                bindings[1].descriptorCount = 1;
+                bindings[1].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+                // binding 2: Bounds (SSBO)
+                bindings[2].binding = 2;
+                bindings[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                bindings[2].descriptorCount = 1;
+                bindings[2].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+                VkDescriptorSetLayoutCreateInfo layoutInfo{};
+                layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+                layoutInfo.bindingCount = 3;
+                layoutInfo.pBindings = bindings;
+
+                VK_CHECK(vkCreateDescriptorSetLayout(m_Device->GetLogicalDevice(), &layoutInfo, nullptr, &m_SceneUpdateSetLayout));
+            }
+
+            if (!m_SceneUpdatePipeline)
+            {
+                const std::string compPath = Core::Filesystem::ResolveShaderPathOrExit(
+                    [&](Core::Hash::StringID id) { return shaderRegistry.Get(id); },
+                    "SceneUpdate.Comp"_id);
+
+                RHI::ShaderModule comp(*m_Device, compPath, RHI::ShaderStage::Compute);
+
+                RHI::ComputePipelineBuilder cb(m_DeviceOwner);
+                cb.SetShader(&comp);
+                cb.AddDescriptorSetLayout(m_SceneUpdateSetLayout);
+
+                VkPushConstantRange pcr{};
+                pcr.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+                pcr.offset = 0;
+                pcr.size = sizeof(uint32_t) * 4; // UpdateCount + padding
+                cb.AddPushConstantRange(pcr);
+
+                auto built = cb.Build();
+                if (!built)
+                {
+                    Core::Log::Error("Failed to build SceneUpdate compute pipeline: {}", (int)built.error());
+                    std::exit(1);
+                }
+                m_SceneUpdatePipeline = std::move(*built);
+            }
         }
 
         // ---------------------------------------------------------------------

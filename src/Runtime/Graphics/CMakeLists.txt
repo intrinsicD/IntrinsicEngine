@@ -24,6 +24,7 @@ target_sources(${target_name}
         Graphics.ShaderRegistry.cppm
         Graphics.PipelineLibrary.cppm
         Graphics.RenderPipeline.cppm
+        Graphics.GPUScene.cppm
         Pipelines/Graphics.Pipelines.cppm
         Passes/Graphics.Passes.Picking.cppm
         Passes/Graphics.Passes.Forward.cppm
@@ -43,6 +44,7 @@ target_sources(${target_name}
         Graphics.ModelLoader.cpp
         Graphics.TextureLoader.cpp
         Graphics.PipelineLibrary.cpp
+        Graphics.GPUScene.cpp
         Pipelines/Graphics.Pipelines.cpp
         Passes/Graphics.Passes.Picking.cpp
         Passes/Graphics.Passes.Forward.cpp

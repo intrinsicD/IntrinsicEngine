@@ -60,6 +60,10 @@ export namespace Runtime
         std::unique_ptr<RHI::BindlessDescriptorSystem> m_BindlessSystem;
         std::unique_ptr<RHI::TextureSystem> m_TextureSystem;
 
+        // Retained-mode GPU scene (persistent SSBOs managed by Graphics::RenderSystem).
+        // Owned by Engine to allow SpawnModel/ECS to allocate slots and queue updates.
+        std::unique_ptr<Graphics::GPUScene> m_GpuScene;
+
         Graphics::ShaderRegistry m_ShaderRegistry;
         std::unique_ptr<Graphics::PipelineLibrary> m_PipelineLibrary;
 

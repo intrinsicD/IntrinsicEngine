@@ -14,6 +14,7 @@ import :RenderGraph;
 import :RenderPipeline;
 import :ShaderRegistry;
 import :PipelineLibrary;
+import :GPUScene;
 import Core;
 import ECS;
 
@@ -76,6 +77,9 @@ export namespace Graphics
         void SetDebugViewSelectedResource(Core::Hash::StringID name) { m_DebugView.SelectedResource = name; }
         void SetDebugViewShowInViewport(bool show) { m_DebugView.ShowInViewport = show; }
 
+        // Retained-mode scene is owned by Runtime::Engine. RenderSystem consumes it during rendering.
+        void SetGpuScene(GPUScene* scene) { m_GpuScene = scene; }
+
     private:
         RenderSystemConfig m_Config;
         size_t m_MinUboAlignment = 0;
@@ -104,6 +108,9 @@ export namespace Graphics
         RenderGraph m_RenderGraph;
         GeometryPool& m_GeometryStorage;
         MaterialSystem& m_MaterialSystem;
+
+        // Retained-mode GPU scene (persistent SSBOs + sparse updates). Non-owning.
+        GPUScene* m_GpuScene = nullptr;
 
         std::vector<std::unique_ptr<RHI::VulkanImage>> m_DepthImages;
 

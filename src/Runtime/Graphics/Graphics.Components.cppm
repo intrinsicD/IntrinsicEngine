@@ -16,6 +16,10 @@ export namespace ECS::MeshRenderer
         Geometry::GeometryHandle Geometry;
         Core::Assets::AssetHandle Material;
 
+        // --- Retained Mode Slot ---
+        static constexpr uint32_t kInvalidSlot = ~0u;
+        uint32_t GpuSlot = kInvalidSlot;
+
         // --- Render Cache ---
         // Allows RenderSystem to avoid AssetManager lookups once resolved.
         Graphics::MaterialHandle CachedMaterialHandle = {};

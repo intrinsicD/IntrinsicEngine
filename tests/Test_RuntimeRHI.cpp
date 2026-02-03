@@ -1,7 +1,11 @@
 #include <gtest/gtest.h>
 #include <memory>
+#include <type_traits>
 
 #include "RHI.Vulkan.hpp"
+
+// Ensure VMA memory usage enums are visible to this TU.
+#include <vk_mem_alloc.h>
 
 import RHI;
 import Core;
@@ -272,4 +276,67 @@ TEST_F(TransferTest, StagingBeltManySmallUploads)
         std::this_thread::yield();
 
     m_TransferMgr->GarbageCollect();
+}
+
+TEST_F(TransferTest, UploadBufferHelper)
+{
+    using namespace RHI;
+
+    constexpr size_t bufferSize = 64 * 1024;
+
+    auto dst = std::make_unique<VulkanBuffer>(
+        *m_Device, bufferSize,
+        VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        VMA_MEMORY_USAGE_GPU_ONLY);
+
+    std::vector<std::byte> payload(bufferSize);
+    for (size_t i = 0; i < payload.size(); ++i)
+        payload[i] = static_cast<std::byte>(static_cast<uint8_t>(i));
+
+    TransferToken token = m_TransferMgr->UploadBuffer(dst->GetHandle(), payload);
+    ASSERT_TRUE(token.IsValid());
+
+    while (!m_TransferMgr->IsCompleted(token))
+        m_TransferMgr->GarbageCollect();
+
+    // Basic sanity: token completed without device loss. Readback correctness is covered by other tests.
+    SUCCEED();
+}
+
+TEST_F(TransferTest, UploadBufferBatchHelper)
+{
+    using namespace RHI;
+
+    constexpr size_t uploadSize = 4096;
+    constexpr int uploadCount = 256;
+
+    std::vector<std::unique_ptr<VulkanBuffer>> dst;
+    dst.reserve(uploadCount);
+
+    TransferManager::UploadBatchConfig cfg{};
+    VkCommandBuffer cmd = m_TransferMgr->BeginUploadBatch(cfg);
+
+    std::vector<std::byte> payload(uploadSize);
+    for (size_t i = 0; i < payload.size(); ++i)
+        payload[i] = static_cast<std::byte>(0x5A);
+
+    for (int i = 0; i < uploadCount; ++i)
+    {
+        dst.push_back(std::make_unique<VulkanBuffer>(
+            *m_Device, uploadSize,
+            VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+            VMA_MEMORY_USAGE_GPU_ONLY));
+
+        const bool ok = m_TransferMgr->EnqueueUploadBuffer(cmd, dst.back()->GetHandle(), payload);
+        ASSERT_TRUE(ok) << "Failed at i=" << i;
+    }
+
+    TransferToken token = m_TransferMgr->EndUploadBatch(cmd);
+    ASSERT_TRUE(token.IsValid());
+
+    while (!m_TransferMgr->IsCompleted(token))
+        std::this_thread::yield();
+
+    m_TransferMgr->GarbageCollect();
+    SUCCEED();
 }

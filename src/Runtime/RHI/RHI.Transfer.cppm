@@ -4,6 +4,8 @@ module;
 #include <atomic>
 #include <mutex>
 #include <memory>
+#include <span>
+#include <cstddef>
 #include "RHI.Vulkan.hpp" // Implementation detail, kept in module fragment if possible, but needed for class members
 
 export module RHI:Transfer;
@@ -56,6 +58,34 @@ export namespace RHI {
 
         // Cleanup resources for completed tokens.
         void GarbageCollect();
+
+        // Convenience helper: upload a CPU memory block into a destination buffer via staging belt.
+        // - dst must be created with VK_BUFFER_USAGE_TRANSFER_DST_BIT.
+        // - This is safe for GPU_ONLY buffers.
+        [[nodiscard]] TransferToken UploadBuffer(VkBuffer dst,
+                                                std::span<const std::byte> src,
+                                                VkDeviceSize dstOffset = 0);
+
+        // --- Batched uploads -------------------------------------------------
+        // Use this when you have many small uploads and want a single Begin/Submit.
+        struct UploadBatchConfig
+        {
+            size_t CopyAlignment = 0; // 0 => use device optimalBufferCopyOffsetAlignment (clamped to >= 16)
+        };
+
+        [[nodiscard]] VkCommandBuffer BeginUploadBatch();
+        [[nodiscard]] VkCommandBuffer BeginUploadBatch(const UploadBatchConfig& cfg);
+
+        // Enqueue a buffer upload into an already-recording transfer command buffer.
+        // Returns false if staging allocation failed.
+        [[nodiscard]] bool EnqueueUploadBuffer(VkCommandBuffer cmd,
+                                               VkBuffer dst,
+                                               std::span<const std::byte> src,
+                                               VkDeviceSize dstOffset = 0,
+                                               size_t copyAlignment = 0);
+
+        // Ends+submits the batch. Equivalent to Submit(cmd).
+        [[nodiscard]] TransferToken EndUploadBatch(VkCommandBuffer cmd);
 
     private:
         struct ThreadTransferContext {

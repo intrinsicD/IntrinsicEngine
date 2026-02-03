@@ -20,6 +20,7 @@ import :Components;
 import :RenderPipeline;
 import :ShaderRegistry;
 import :PipelineLibrary;
+import :GPUScene;
 
 import Core;
 import RHI;
@@ -178,6 +179,11 @@ namespace Graphics
         // RenderGraph transient GPU memory allocator (pages persist, bump resets each frame).
         m_TransientAllocator = std::make_unique<RHI::TransientAllocator>(*m_Device);
         m_RenderGraph.SetTransientAllocator(*m_TransientAllocator);
+
+        // Retained-mode GPUScene (persistent instance + bounds SSBOs).
+        // NOTE: Ownership lives in Runtime::Engine for v1 so spawning/systems can queue updates.
+        // RenderSystem consumes it indirectly via RenderPassContext.
+        m_GpuScene = nullptr;
     }
 
     RenderSystem::~RenderSystem()
@@ -405,6 +411,26 @@ namespace Graphics
                                               {
                                               });
 
+        // GPUScene update pass: scatter queued deltas into persistent SSBOs.
+        struct SceneUpdateData { int _dummy = 0; };
+        m_RenderGraph.AddPass<SceneUpdateData>("SceneUpdate",
+                                              [&](SceneUpdateData&, RGBuilder& builder)
+                                              {
+                                                  if (!m_GpuScene)
+                                                      return;
+
+                                                  auto sceneBuf = builder.ImportBuffer("GPUScene.Scene"_id, m_GpuScene->GetSceneBuffer());
+                                                  auto boundsBuf = builder.ImportBuffer("GPUScene.Bounds"_id, m_GpuScene->GetBoundsBuffer());
+
+                                                  builder.Write(sceneBuf, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT);
+                                                  builder.Write(boundsBuf, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT);
+                                              },
+                                              [this](const SceneUpdateData&, const RGRegistry&, VkCommandBuffer cmd)
+                                              {
+                                                  if (m_GpuScene)
+                                                      m_GpuScene->Sync(cmd);
+                                              });
+
         RenderPassContext ctx{
             m_RenderGraph,
             blackboard,
@@ -412,6 +438,7 @@ namespace Graphics
             assetManager,
             m_GeometryStorage,
             m_MaterialSystem,
+            m_GpuScene,
             frameIndex,
             extent,
             imageIndex,

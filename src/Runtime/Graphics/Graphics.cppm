@@ -14,6 +14,7 @@ export import :AssetErrors;
 export import :ShaderRegistry;
 export import :PipelineLibrary;
 export import :Pipelines;
+export import :GPUScene;
 
 // New modular render pipeline (interface only)
 export import :RenderPipeline;

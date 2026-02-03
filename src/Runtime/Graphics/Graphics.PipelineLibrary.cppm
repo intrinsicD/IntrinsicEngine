@@ -51,6 +51,10 @@ export namespace Graphics
         [[nodiscard]] VkDescriptorSetLayout GetCullSetLayout() const { return m_CullSetLayout; }
         [[nodiscard]] RHI::ComputePipeline* GetCullPipeline() const { return m_CullPipeline.get(); }
 
+        // GPUScene: scatter updates pipeline + set layout (set = 0).
+        [[nodiscard]] VkDescriptorSetLayout GetSceneUpdateSetLayout() const { return m_SceneUpdateSetLayout; }
+        [[nodiscard]] RHI::ComputePipeline* GetSceneUpdatePipeline() const { return m_SceneUpdatePipeline.get(); }
+
     private:
         std::shared_ptr<RHI::VulkanDevice> m_DeviceOwner;
         RHI::VulkanDevice* m_Device = nullptr;
@@ -64,6 +68,9 @@ export namespace Graphics
 
         VkDescriptorSetLayout m_CullSetLayout = VK_NULL_HANDLE;
         std::unique_ptr<RHI::ComputePipeline> m_CullPipeline;
+
+        VkDescriptorSetLayout m_SceneUpdateSetLayout = VK_NULL_HANDLE;
+        std::unique_ptr<RHI::ComputePipeline> m_SceneUpdatePipeline;
     };
     using namespace Core::Hash;
     // Canonical pipeline IDs used across the engine.
