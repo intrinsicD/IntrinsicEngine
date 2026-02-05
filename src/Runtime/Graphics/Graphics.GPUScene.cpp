@@ -17,6 +17,33 @@ import RHI;
 
 namespace Graphics
 {
+    namespace
+    {
+        constexpr uint32_t kPreserveGeometryId = 0xFFFFFFFFu;
+
+        void MergeUpdate(GpuUpdatePacket& dst, const GpuUpdatePacket& src)
+        {
+            const bool dstDeactivate = (dst.SphereBounds.w == 0.0f);
+            const bool srcDeactivate = (src.SphereBounds.w == 0.0f);
+            const bool srcPreserve = (src.SphereBounds.w < 0.0f);
+
+            if (srcDeactivate && dst.SphereBounds.w > 0.0f)
+                return;
+            if (dstDeactivate && srcPreserve)
+                return;
+
+            dst.Data.Model = src.Data.Model;
+            dst.Data.TextureID = src.Data.TextureID;
+            dst.Data.EntityID = src.Data.EntityID;
+
+            if (src.Data.GeometryID != kPreserveGeometryId)
+                dst.Data.GeometryID = src.Data.GeometryID;
+
+            if (src.SphereBounds.w >= 0.0f)
+                dst.SphereBounds = src.SphereBounds;
+        }
+    }
+
     GPUScene::GPUScene(RHI::VulkanDevice& device,
                        RHI::ComputePipeline& updatePipeline,
                        VkDescriptorSetLayout updateSetLayout,
@@ -27,6 +54,8 @@ namespace Graphics
         , m_MaxInstances(maxInstances)
     {
         EnsurePersistentBuffers();
+        m_PendingUpdateIndexBySlot.assign(m_MaxInstances, -1);
+        m_GeometryIdShadow.assign(m_MaxInstances, kPreserveGeometryId);
 
         // Enough sets for a few frames; update sets are allocated per Sync() call.
         m_UpdateSetPool = std::make_unique<RHI::PersistentDescriptorPool>(m_Device,
@@ -88,6 +117,8 @@ namespace Graphics
         if (slot == ~0u || slot >= m_MaxInstances)
             return;
         m_FreeSlots.push_back(slot);
+        if (slot < m_GeometryIdShadow.size())
+            m_GeometryIdShadow[slot] = kPreserveGeometryId;
     }
 
     void GPUScene::QueueUpdate(uint32_t slot, const GpuInstanceData& data, const glm::vec4& sphereBounds)
@@ -96,10 +127,36 @@ namespace Graphics
             return;
 
         std::lock_guard lock(m_UpdateMutex);
+
+        if (m_PendingUpdateIndexBySlot.empty())
+            m_PendingUpdateIndexBySlot.assign(m_MaxInstances, -1);
+        if (m_GeometryIdShadow.empty())
+            m_GeometryIdShadow.assign(m_MaxInstances, kPreserveGeometryId);
+
         GpuUpdatePacket p{};
         p.SlotIndex = slot;
         p.Data = data;
         p.SphereBounds = sphereBounds;
+
+        if (p.Data.GeometryID == kPreserveGeometryId)
+        {
+            const uint32_t shadowId = m_GeometryIdShadow[slot];
+            if (shadowId != kPreserveGeometryId)
+                p.Data.GeometryID = shadowId;
+        }
+        else
+        {
+            m_GeometryIdShadow[slot] = p.Data.GeometryID;
+        }
+
+        const int32_t existingIndex = m_PendingUpdateIndexBySlot[slot];
+        if (existingIndex >= 0)
+        {
+            MergeUpdate(m_PendingUpdates[static_cast<size_t>(existingIndex)], p);
+            return;
+        }
+
+        m_PendingUpdateIndexBySlot[slot] = static_cast<int32_t>(m_PendingUpdates.size());
         m_PendingUpdates.push_back(p);
     }
 
@@ -112,6 +169,7 @@ namespace Graphics
             if (m_PendingUpdates.empty())
                 return;
             updates.swap(m_PendingUpdates);
+            std::fill(m_PendingUpdateIndexBySlot.begin(), m_PendingUpdateIndexBySlot.end(), -1);
         }
 
         const size_t bytes = updates.size() * sizeof(GpuUpdatePacket);

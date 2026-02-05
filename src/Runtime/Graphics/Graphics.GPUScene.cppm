@@ -83,6 +83,8 @@ export namespace Graphics
         std::mutex m_AllocMutex;
 
         std::vector<GpuUpdatePacket> m_PendingUpdates;
+        std::vector<int32_t> m_PendingUpdateIndexBySlot;
+        std::vector<uint32_t> m_GeometryIdShadow;
         std::mutex m_UpdateMutex;
 
         // Per-sync transient resources.

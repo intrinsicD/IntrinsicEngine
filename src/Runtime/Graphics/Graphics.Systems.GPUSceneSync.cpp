@@ -17,7 +17,8 @@ namespace Graphics::Systems::GPUSceneSync
     void OnUpdate(entt::registry& registry,
                   GPUScene& gpuScene,
                   const Core::Assets::AssetManager& assetManager,
-                  const MaterialSystem& materialSystem)
+                  const MaterialSystem& materialSystem,
+                  uint32_t defaultTextureId)
     {
         // Fast path: only entities that either changed transform OR need material refresh.
         auto view = registry.view<
@@ -63,7 +64,7 @@ namespace Graphics::Systems::GPUSceneSync
             inst.GeometryID = 0xFFFFFFFFu;
 
             // TextureID: bindless index from material; 0 is default/error.
-            inst.TextureID = (matData) ? matData->AlbedoID : 0u;
+            inst.TextureID = (matData) ? matData->AlbedoID : defaultTextureId;
 
             // Keep the picking ID stable.
             // If selection/picking is missing, EntityID stays 0.

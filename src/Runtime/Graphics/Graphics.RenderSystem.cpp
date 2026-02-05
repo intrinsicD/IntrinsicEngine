@@ -76,6 +76,7 @@ namespace Graphics
                                           }
 
                                           ImGui::Checkbox("Show debug view in viewport", &debugView.ShowInViewport);
+                                          ImGui::Checkbox("Disable GPU culling", &debugView.DisableCulling);
                                           ImGui::Separator();
 
                                           for (const auto& pass : m_LastDebugPasses)
@@ -331,8 +332,8 @@ namespace Graphics
             // Pass interaction state
             {pendingPick.Pending, pendingPick.X, pendingPick.Y},
             {
-                debugView.Enabled, debugView.ShowInViewport, debugView.SelectedResource, debugView.DepthNear,
-                debugView.DepthFar
+                debugView.Enabled, debugView.ShowInViewport, debugView.DisableCulling, debugView.SelectedResource,
+                debugView.DepthNear, debugView.DepthFar
             },
             m_LastDebugImages,
             m_LastDebugPasses,

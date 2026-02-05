@@ -670,7 +670,11 @@ namespace Runtime
                                                                            m_GeometryStorage,
                                                                            m_DefaultTextureIndex);
 
-                        Graphics::Systems::GPUSceneSync::OnUpdate(m_Scene.GetRegistry(), *m_GpuScene, m_AssetManager, *m_MaterialSystem);
+                        Graphics::Systems::GPUSceneSync::OnUpdate(m_Scene.GetRegistry(),
+                                                                  *m_GpuScene,
+                                                                  m_AssetManager,
+                                                                  *m_MaterialSystem,
+                                                                  m_DefaultTextureIndex);
                     }
 
                     accumulator -= dt;

@@ -20,5 +20,6 @@ export namespace Graphics::Systems::GPUSceneSync
     void OnUpdate(entt::registry& registry,
                   GPUScene& gpuScene,
                   const Core::Assets::AssetManager& assetManager,
-                  const MaterialSystem& materialSystem);
+                  const MaterialSystem& materialSystem,
+                  uint32_t defaultTextureId);
 }

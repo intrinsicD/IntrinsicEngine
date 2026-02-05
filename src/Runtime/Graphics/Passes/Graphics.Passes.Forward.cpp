@@ -124,6 +124,37 @@ namespace Graphics::Passes
         for (uint32_t denseId = 0; denseId < geometryCount; ++denseId)
             handleToDense[dense[denseId].Handle.Index] = denseId;
 
+        {
+            uint32_t invalidGeometryHandle = 0;
+            uint32_t invalidGeometryMapping = 0;
+
+            auto view = ctx.Scene.GetRegistry().view<ECS::MeshRenderer::Component>();
+            for (auto entity : view)
+            {
+                const auto& mr = view.get<ECS::MeshRenderer::Component>(entity);
+                if (!mr.Geometry.IsValid())
+                {
+                    ++invalidGeometryHandle;
+                    continue;
+                }
+
+                if (mr.Geometry.Index >= handleToDense.size())
+                {
+                    ++invalidGeometryMapping;
+                    continue;
+                }
+
+                if (handleToDense[mr.Geometry.Index] == 0xFFFFFFFFu)
+                    ++invalidGeometryMapping;
+            }
+
+            if ((invalidGeometryHandle + invalidGeometryMapping) > 0)
+            {
+                Core::Log::Warn("ForwardCull: invalid geometry handles={}, unmapped geometry IDs={} (frame={})",
+                               invalidGeometryHandle, invalidGeometryMapping, ctx.FrameIndex);
+            }
+        }
+
         const uint32_t frame = (ctx.FrameIndex % FRAMES);
 
         const uint32_t requiredMapCount = static_cast<uint32_t>(handleToDense.size());
@@ -153,7 +184,12 @@ namespace Graphics::Passes
         const size_t packedVisibilityBytes = std::max<size_t>(packedCapacity * sizeof(uint32_t), 4);
 
         // Allocate / resize per-frame buffers.
-        if (!m_Stage3GeometryIndexCount[frame] || m_Stage3LastGeometryCount < geometryCount)
+        const auto needsResize = [](const std::unique_ptr<RHI::VulkanBuffer>& buf, size_t requiredBytes) -> bool
+        {
+            return !buf || buf->GetSizeBytes() < requiredBytes;
+        };
+
+        if (needsResize(m_Stage3GeometryIndexCount[frame], geoIndexCountBytes))
         {
             m_Stage3GeometryIndexCount[frame] = std::make_unique<RHI::VulkanBuffer>(
                 *m_Device,
@@ -162,7 +198,7 @@ namespace Graphics::Passes
                 VMA_MEMORY_USAGE_CPU_TO_GPU);
         }
 
-        if (!m_Stage3DrawCountsPacked[frame] || m_Stage3LastGeometryCount < geometryCount)
+        if (needsResize(m_Stage3DrawCountsPacked[frame], drawCountsBytes))
         {
             m_Stage3DrawCountsPacked[frame] = std::make_unique<RHI::VulkanBuffer>(
                 *m_Device,
@@ -171,9 +207,10 @@ namespace Graphics::Passes
                 VMA_MEMORY_USAGE_GPU_ONLY);
         }
 
-        const bool needPackedResize = (!m_Stage3IndirectPacked[frame] || !m_Stage3VisibilityPacked[frame] ||
+        const bool needPackedResize = needsResize(m_Stage3IndirectPacked[frame], packedIndirectBytes) ||
+                                      needsResize(m_Stage3VisibilityPacked[frame], packedVisibilityBytes) ||
                                       m_Stage3LastGeometryCount < geometryCount ||
-                                      m_Stage3LastMaxDrawsPerGeometry < maxDrawsPerGeometry);
+                                      m_Stage3LastMaxDrawsPerGeometry < maxDrawsPerGeometry;
 
         if (needPackedResize)
         {
@@ -308,7 +345,7 @@ namespace Graphics::Passes
                                                     uint32_t TotalInstanceCount;
                                                     uint32_t GeometryCount;
                                                     uint32_t MaxDrawsPerGeometry;
-                                                    uint32_t _pad0;
+                                                    uint32_t DebugFlags;
                                                 } pc{};
 
                                                 for (int i = 0; i < 6; ++i)
@@ -423,35 +460,50 @@ namespace Graphics::Passes
                                                                 1, 1, &globalTextures,
                                                                 0, nullptr);
 
+                                        VkDescriptorSet instanceSet = VK_NULL_HANDLE;
+                                        VkBuffer currentInstBuffer = VK_NULL_HANDLE;
+                                        VkBuffer currentVisBuffer = VK_NULL_HANDLE;
+
                                         for (const DrawBatch& b : stream.Batches)
                                         {
                                             if (!b.InstanceBuffer || !b.VisibilityBuffer || !b.IndirectBuffer)
                                                 continue;
 
-                                            // Bind instances + visibility at set=2.
-                                            VkDescriptorSet instanceSet = m_InstanceSetPool->Allocate(m_InstanceSetLayout);
+                                            const VkBuffer instHandle = b.InstanceBuffer->GetHandle();
+                                            const VkBuffer visHandle = b.VisibilityBuffer->GetHandle();
+
+                                            // Allocate once per pass; update if buffers differ.
                                             if (instanceSet == VK_NULL_HANDLE)
-                                                continue;
+                                            {
+                                                instanceSet = m_InstanceSetPool->Allocate(m_InstanceSetLayout);
+                                                if (instanceSet == VK_NULL_HANDLE)
+                                                    continue;
+                                            }
 
-                                            VkDescriptorBufferInfo instInfo{.buffer = b.InstanceBuffer->GetHandle(), .offset = 0, .range = VK_WHOLE_SIZE};
-                                            VkDescriptorBufferInfo visInfo{.buffer = b.VisibilityBuffer->GetHandle(), .offset = 0, .range = VK_WHOLE_SIZE};
+                                            if (instHandle != currentInstBuffer || visHandle != currentVisBuffer)
+                                            {
+                                                VkDescriptorBufferInfo instInfo{.buffer = instHandle, .offset = 0, .range = VK_WHOLE_SIZE};
+                                                VkDescriptorBufferInfo visInfo{.buffer = visHandle, .offset = 0, .range = VK_WHOLE_SIZE};
 
-                                            VkWriteDescriptorSet writes[2]{};
-                                            writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                                            writes[0].dstSet = instanceSet;
-                                            writes[0].dstBinding = 0;
-                                            writes[0].descriptorCount = 1;
-                                            writes[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-                                            writes[0].pBufferInfo = &instInfo;
+                                                VkWriteDescriptorSet writes[2]{};
+                                                writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                                                writes[0].dstSet = instanceSet;
+                                                writes[0].dstBinding = 0;
+                                                writes[0].descriptorCount = 1;
+                                                writes[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                                                writes[0].pBufferInfo = &instInfo;
 
-                                            writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                                            writes[1].dstSet = instanceSet;
-                                            writes[1].dstBinding = 1;
-                                            writes[1].descriptorCount = 1;
-                                            writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-                                            writes[1].pBufferInfo = &visInfo;
+                                                writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                                                writes[1].dstSet = instanceSet;
+                                                writes[1].dstBinding = 1;
+                                                writes[1].descriptorCount = 1;
+                                                writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                                                writes[1].pBufferInfo = &visInfo;
 
-                                            vkUpdateDescriptorSets(m_Device->GetLogicalDevice(), 2, writes, 0, nullptr);
+                                                vkUpdateDescriptorSets(m_Device->GetLogicalDevice(), 2, writes, 0, nullptr);
+                                                currentInstBuffer = instHandle;
+                                                currentVisBuffer = visHandle;
+                                            }
 
                                             vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                                                     pipeline->GetLayout(),
@@ -470,14 +522,28 @@ namespace Graphics::Passes
                                             if (maxDraws == 0)
                                                 continue;
 
+                                            const VkDeviceSize indirectSize = b.IndirectBuffer->GetSizeBytes();
+                                            if (indirectSize <= b.IndirectOffsetBytes)
+                                                continue;
+
+                                            const VkDeviceSize availableBytes = indirectSize - b.IndirectOffsetBytes;
+                                            const uint32_t maxDrawsInSlice = static_cast<uint32_t>(availableBytes / sizeof(VkDrawIndexedIndirectCommand));
+                                            const uint32_t safeMaxDraws = std::min(maxDraws, maxDrawsInSlice);
+                                            if (safeMaxDraws == 0)
+                                                continue;
+
                                             if (b.CountBuffer && vkCmdDrawIndexedIndirectCountKHR)
                                             {
+                                                const VkDeviceSize countSize = b.CountBuffer->GetSizeBytes();
+                                                if (countSize <= b.CountOffsetBytes)
+                                                    continue;
+
                                                 vkCmdDrawIndexedIndirectCountKHR(cmd,
                                                                                  b.IndirectBuffer->GetHandle(),
                                                                                  b.IndirectOffsetBytes,
                                                                                  b.CountBuffer->GetHandle(),
                                                                                  b.CountOffsetBytes,
-                                                                                 maxDraws,
+                                                                                 safeMaxDraws,
                                                                                  sizeof(VkDrawIndexedIndirectCommand));
                                             }
                                             else
@@ -485,7 +551,7 @@ namespace Graphics::Passes
                                                 vkCmdDrawIndexedIndirect(cmd,
                                                                          b.IndirectBuffer->GetHandle(),
                                                                          b.IndirectOffsetBytes,
-                                                                         maxDraws,
+                                                                         safeMaxDraws,
                                                                          sizeof(VkDrawIndexedIndirectCommand));
                                             }
                                         }
@@ -707,6 +773,7 @@ namespace Graphics::Passes
                                           RGResourceHandle /*backbuffer*/,
                                           RGResourceHandle /*depth*/)
     {
+        (void)ctx;
         // CPU producer is implemented directly in BuildDrawStream().
         // This function is kept only as an ABI-stable stub while we transition away from the old design.
         // Intentionally empty.

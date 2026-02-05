@@ -98,6 +98,7 @@ export namespace Graphics
         {
             bool Enabled = false;
             bool ShowInViewport = false;
+            bool DisableCulling = false;
             Core::Hash::StringID SelectedResource = Core::Hash::StringID{"PickID"};
             float DepthNear = 0.1f;
             float DepthFar = 1000.0f;

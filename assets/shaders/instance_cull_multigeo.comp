@@ -40,7 +40,7 @@ layout(push_constant, scalar) uniform CullPC {
     uint TotalInstanceCount;      // GPUScene active span
     uint GeometryCount;           // number of geometry batches
     uint MaxDrawsPerGeometry;     // capacity per-geometry for indirect/remap
-    uint _pad0;
+    uint DebugFlags;
 } pc;
 
 // GPUScene
@@ -97,7 +97,7 @@ void main()
     float localR = s.CenterRadius.w;
 
     // Inactive-slot contract: radius <= 0 => slot not live.
-    if (localR <= 0.0)
+    if ((pc.DebugFlags & 1u) == 0u && localR <= 0.0)
         return;
 
     // Instances store a sparse GeometryHandle.Index; map it to a dense per-frame geometry id.
@@ -117,8 +117,11 @@ void main()
     float sz = length(m[2]);
     float worldR = localR * max(sx, max(sy, sz));
 
-    if (!SphereVisible(worldC, worldR))
-        return;
+    if ((pc.DebugFlags & 1u) == 0u)
+    {
+        if (!SphereVisible(worldC, worldR))
+            return;
+    }
 
     uint drawIndex = atomicAdd(drawCounts.Count[geom], 1);
     if (drawIndex >= pc.MaxDrawsPerGeometry)
