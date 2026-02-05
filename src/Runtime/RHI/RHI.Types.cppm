@@ -69,7 +69,7 @@ export namespace RHI
         uint64_t PtrPositions; // Pointer to start of Positions block
         uint64_t PtrNormals; // Pointer to start of Normals block
         uint64_t PtrAux; // Pointer to start of Aux block
-        uint32_t TextureID;
+        uint32_t VisibilityBase; // Base offset into VisibleRemap[] for multi-geometry batching
         uint32_t _pad[3];
     };
 

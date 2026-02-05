@@ -36,7 +36,7 @@ layout(push_constant) uniform PushConsts {
     uint64_t ptrPos;
     uint64_t ptrNorm;
     uint64_t ptrAux;
-    uint _unusedInstanceID; // Stage 2: unused; use gl_InstanceIndex instead
+    uint VisibilityBase; // Base offset into VisibleRemap[] for this geometry batch
 } push;
 
 layout(location = 0) out vec3 fragNormal;
@@ -55,7 +55,8 @@ void main() {
 
     // Stage 2: firstInstance is written by the CPU into VkDrawIndexedIndirectCommand.
     // Vulkan defines gl_InstanceIndex = firstInstance + localInstance.
-    uint globalInstanceID = visibility.VisibleRemap[gl_InstanceIndex];
+    // For multi-geometry batching, we add VisibilityBase to index the correct slice.
+    uint globalInstanceID = visibility.VisibleRemap[push.VisibilityBase + gl_InstanceIndex];
     InstanceData inst = instances.Data[globalInstanceID];
 
     gl_Position = camera.proj * camera.view * inst.Model * vec4(inPos, 1.0);

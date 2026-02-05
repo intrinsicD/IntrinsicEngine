@@ -59,8 +59,10 @@ namespace Graphics::Systems::GPUSceneSync
             GpuInstanceData inst{};
             inst.Model = world.Matrix;
 
-            // GeometryID: used by GPU-driven culling/draw batching (Stage 3+).
-            inst.GeometryID = mr.Geometry.Index;
+            // IMPORTANT(GeometryID): do NOT overwrite GeometryID here.
+            // In the multi-geometry Stage 3 path, GeometryID is a per-frame dense geometry index.
+            // Overwriting it with mr.Geometry.Index (handle index) causes compute culling to drop the instance.
+            inst.GeometryID = 0xFFFFFFFFu;
 
             // TextureID: bindless index from material; 0 is default/error.
             inst.TextureID = (matData) ? matData->AlbedoID : 0u;
@@ -71,7 +73,9 @@ namespace Graphics::Systems::GPUSceneSync
                 inst.EntityID = pick->Value;
 
             // IMPORTANT(bounds): don't clobber spawn-time local bounds.
-            // Sentinel contract: radius < 0 => keep existing bounds.
+            // Sentinel contract:
+            //  - radius < 0 => keep existing bounds
+            //  - w/x/y/z = NaN ignored (implementation-defined), so keep it simple
             gpuScene.QueueUpdate(mr.GpuSlot, inst, /*sphereBounds*/ {0.0f, 0.0f, 0.0f, -1.0f});
 
             mr.CachedMaterialHandleForInstance = mr.CachedMaterialHandle;

@@ -97,6 +97,10 @@ export namespace Graphics::Passes
         // Option A (multi-geometry Stage 3): per-frame geometry table (dense) and packed output streams.
         std::unique_ptr<RHI::VulkanBuffer> m_Stage3GeometryIndexCount[FRAMES];
 
+        // Geometry routing table: maps GeometryHandle.Index -> dense geometry id for this frame.
+        std::unique_ptr<RHI::VulkanBuffer> m_Stage3HandleToDense[FRAMES];
+        uint32_t m_Stage3HandleToDenseCapacity = 0;
+
         // Packed outputs (device-local): [GeometryCount * MaxDrawsPerGeometry]
         std::unique_ptr<RHI::VulkanBuffer> m_Stage3VisibilityPacked[FRAMES];
         std::unique_ptr<RHI::VulkanBuffer> m_Stage3IndirectPacked[FRAMES];
@@ -127,10 +131,12 @@ export namespace Graphics::Passes
             uint64_t PtrNormals = 0;
             uint64_t PtrAux = 0;
 
-            // Packed-slice offsets (bytes) into Indirect/Visibility buffers.
+            // Packed-slice offsets (bytes) into Indirect buffers.
             VkDeviceSize IndirectOffsetBytes = 0;
-            VkDeviceSize VisibilityOffsetBytes = 0;
             VkDeviceSize CountOffsetBytes = 0;
+
+            // Base index into VisibleRemap[] for this geometry batch (passed via push constants).
+            uint32_t VisibilityBase = 0;
 
             // Per-batch indirect buffers. If CountBuffer is VK_NULL_HANDLE, fall back to fixed drawCount.
             RHI::VulkanBuffer* IndirectBuffer = nullptr; // non-owning

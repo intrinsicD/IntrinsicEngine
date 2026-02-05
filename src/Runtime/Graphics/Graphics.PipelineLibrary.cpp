@@ -238,7 +238,7 @@ namespace Graphics
         {
             if (m_CullSetLayout == VK_NULL_HANDLE)
             {
-                VkDescriptorSetLayoutBinding bindings[6]{};
+                VkDescriptorSetLayoutBinding bindings[7]{};
                 // binding 1: Instances
                 bindings[0].binding = 1;
                 bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
@@ -257,27 +257,33 @@ namespace Graphics
                 bindings[2].descriptorCount = 1;
                 bindings[2].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
-                // binding 4: IndirectOut
+                // binding 4: HandleToDense routing table
                 bindings[3].binding = 4;
                 bindings[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
                 bindings[3].descriptorCount = 1;
                 bindings[3].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
-                // binding 5: VisibilityOut
+                // binding 5: IndirectOut
                 bindings[4].binding = 5;
                 bindings[4].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
                 bindings[4].descriptorCount = 1;
                 bindings[4].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
-                // binding 6: DrawCounts
+                // binding 6: VisibilityOut
                 bindings[5].binding = 6;
                 bindings[5].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
                 bindings[5].descriptorCount = 1;
                 bindings[5].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
+                // binding 7: DrawCounts
+                bindings[6].binding = 7;
+                bindings[6].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                bindings[6].descriptorCount = 1;
+                bindings[6].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
                 VkDescriptorSetLayoutCreateInfo layoutInfo{};
                 layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-                layoutInfo.bindingCount = 6;
+                layoutInfo.bindingCount = 7;
                 layoutInfo.pBindings = bindings;
 
                 VK_CHECK(vkCreateDescriptorSetLayout(m_Device->GetLogicalDevice(), &layoutInfo, nullptr, &m_CullSetLayout));

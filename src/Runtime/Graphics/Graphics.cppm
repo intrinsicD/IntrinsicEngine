@@ -16,11 +16,7 @@ export import :PipelineLibrary;
 export import :Pipelines;
 export import :GPUScene;
 export import :Systems.GPUSceneSync;
-
-export import :Interaction;
-export import :Presentation;
-export import :RenderPath;
-export import :RenderPipeline;
+export import :Systems.MeshRendererLifecycle;
 
 // NOTE: We intentionally do NOT re-export pipeline implementations here.
 // Import `Graphics.Pipelines` explicitly in apps/tools when you need DefaultPipeline/etc.

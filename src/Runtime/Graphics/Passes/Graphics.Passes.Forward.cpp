@@ -84,6 +84,8 @@ namespace Graphics::Passes
         std::vector<DenseGeo> dense;
         dense.reserve(256);
 
+        uint32_t maxHandleIndex = 0;
+
         // Build unique geometry list from ECS.
         {
             auto view = ctx.Scene.GetRegistry().view<ECS::MeshRenderer::Component>();
@@ -92,6 +94,8 @@ namespace Graphics::Passes
                 const auto& mr = view.get<ECS::MeshRenderer::Component>(entity);
                 if (!mr.Geometry.IsValid())
                     continue;
+
+                maxHandleIndex = std::max(maxHandleIndex, mr.Geometry.Index);
 
                 bool seen = false;
                 for (const DenseGeo& g : dense)
@@ -113,14 +117,37 @@ namespace Graphics::Passes
         if (geometryCount == 0)
             return out;
 
+        // Build a dense routing table: GeometryHandle.Index -> DenseGeoId.
+        // This allows GPUScene instances to store the stable handle index (sparse), while the culler produces packed per-geometry streams.
+        std::vector<uint32_t> handleToDense;
+        handleToDense.assign(static_cast<size_t>(maxHandleIndex) + 1u, 0xFFFFFFFFu);
+        for (uint32_t denseId = 0; denseId < geometryCount; ++denseId)
+            handleToDense[dense[denseId].Handle.Index] = denseId;
+
         const uint32_t frame = (ctx.FrameIndex % FRAMES);
+
+        const uint32_t requiredMapCount = static_cast<uint32_t>(handleToDense.size());
+        const size_t requiredMapBytes = std::max<size_t>(size_t(requiredMapCount) * sizeof(uint32_t), 4);
+
+        // Upload mapping buffer (CPU->GPU)
+        if (!m_Stage3HandleToDense[frame] || m_Stage3HandleToDenseCapacity < requiredMapCount)
+        {
+            m_Stage3HandleToDenseCapacity = std::max(m_Stage3HandleToDenseCapacity, requiredMapCount);
+            const size_t bytes = std::max<size_t>(size_t(m_Stage3HandleToDenseCapacity) * sizeof(uint32_t), 4);
+            m_Stage3HandleToDense[frame] = std::make_unique<RHI::VulkanBuffer>(
+                *m_Device,
+                bytes,
+                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                VMA_MEMORY_USAGE_CPU_TO_GPU);
+        }
+        m_Stage3HandleToDense[frame]->Write(handleToDense.data(), requiredMapBytes);
 
         // Conservative capacity: allow up to the active GPUScene span per geometry.
         // This avoids overflow for now; we can tighten later by tracking per-geometry instance counts.
         const uint32_t maxDrawsPerGeometry = std::max<uint32_t>(ctx.GpuScene->GetActiveCountApprox(), 1u);
 
-        const size_t geoIndexCountBytes = std::max<size_t>(geometryCount * sizeof(uint32_t), 4);
-        const size_t drawCountsBytes = std::max<size_t>(geometryCount * sizeof(uint32_t), 4);
+        const size_t geoIndexCountBytes = std::max<size_t>(geometryCount * sizeof(uint32_t), 16);
+        const size_t drawCountsBytes = std::max<size_t>(geometryCount * sizeof(uint32_t), 16);
         const size_t packedCapacity = static_cast<size_t>(geometryCount) * static_cast<size_t>(maxDrawsPerGeometry);
         const size_t packedIndirectBytes = std::max<size_t>(packedCapacity * sizeof(VkDrawIndexedIndirectCommand), 4);
         const size_t packedVisibilityBytes = std::max<size_t>(packedCapacity * sizeof(uint32_t), 4);
@@ -183,6 +210,7 @@ namespace Graphics::Passes
                 RGResourceHandle Instances;
                 RGResourceHandle Bounds;
                 RGResourceHandle GeoIndexCount;
+                RGResourceHandle HandleToDense;
                 RGResourceHandle Indirect;
                 RGResourceHandle Visibility;
                 RGResourceHandle DrawCounts;
@@ -209,6 +237,7 @@ namespace Graphics::Passes
                                                 data.Instances = builder.ImportBuffer("GPUScene.Scene"_id, ctx.GpuScene->GetSceneBuffer());
                                                 data.Bounds = builder.ImportBuffer("GPUScene.Bounds"_id, ctx.GpuScene->GetBoundsBuffer());
                                                 data.GeoIndexCount = builder.ImportBuffer("Stage3.GeoIndexCount"_id, *m_Stage3GeometryIndexCount[fi]);
+                                                data.HandleToDense = builder.ImportBuffer("Stage3.HandleToDense"_id, *m_Stage3HandleToDense[fi]);
                                                 data.Indirect = builder.ImportBuffer("Stage3.IndirectPacked"_id, *m_Stage3IndirectPacked[fi]);
                                                 data.Visibility = builder.ImportBuffer("Stage3.VisibilityPacked"_id, *m_Stage3VisibilityPacked[fi]);
                                                 data.DrawCounts = builder.ImportBuffer("Stage3.DrawCounts"_id, *m_Stage3DrawCountsPacked[fi]);
@@ -216,6 +245,7 @@ namespace Graphics::Passes
                                                 builder.Read(data.Instances, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_STORAGE_READ_BIT);
                                                 builder.Read(data.Bounds, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_STORAGE_READ_BIT);
                                                 builder.Read(data.GeoIndexCount, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_STORAGE_READ_BIT);
+                                                builder.Read(data.HandleToDense, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_STORAGE_READ_BIT);
 
                                                 builder.Write(data.Indirect, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT);
                                                 builder.Write(data.Visibility, VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT, VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT);
@@ -233,8 +263,8 @@ namespace Graphics::Passes
                                                 if (!m_Stage3GeometryIndexCount[fi] || !m_Stage3IndirectPacked[fi] || !m_Stage3VisibilityPacked[fi] || !m_Stage3DrawCountsPacked[fi])
                                                     return;
 
-                                                // Reset drawCounts to 0 for [0..geometryCount).
-                                                vkCmdFillBuffer(cmd, m_Stage3DrawCountsPacked[fi]->GetHandle(), 0, geometryCount * sizeof(uint32_t), 0);
+                                                // Reset drawCounts to 0 for the entire buffer.
+                                                vkCmdFillBuffer(cmd, m_Stage3DrawCountsPacked[fi]->GetHandle(), 0, VK_WHOLE_SIZE, 0);
 
                                                 VkDescriptorSet cullSet = m_CullSetPool->Allocate(m_CullSetLayout);
                                                 if (cullSet == VK_NULL_HANDLE)
@@ -243,11 +273,12 @@ namespace Graphics::Passes
                                                 VkDescriptorBufferInfo inst{.buffer = gpuSceneBufferHandle, .offset = 0, .range = VK_WHOLE_SIZE};
                                                 VkDescriptorBufferInfo bounds{.buffer = gpuBoundsBufferHandle, .offset = 0, .range = VK_WHOLE_SIZE};
                                                 VkDescriptorBufferInfo geoIdx{.buffer = m_Stage3GeometryIndexCount[fi]->GetHandle(), .offset = 0, .range = VK_WHOLE_SIZE};
+                                                VkDescriptorBufferInfo map{.buffer = m_Stage3HandleToDense[fi]->GetHandle(), .offset = 0, .range = VK_WHOLE_SIZE};
                                                 VkDescriptorBufferInfo indirect{.buffer = m_Stage3IndirectPacked[fi]->GetHandle(), .offset = 0, .range = VK_WHOLE_SIZE};
                                                 VkDescriptorBufferInfo vis{.buffer = m_Stage3VisibilityPacked[fi]->GetHandle(), .offset = 0, .range = VK_WHOLE_SIZE};
                                                 VkDescriptorBufferInfo counts{.buffer = m_Stage3DrawCountsPacked[fi]->GetHandle(), .offset = 0, .range = VK_WHOLE_SIZE};
 
-                                                VkWriteDescriptorSet w[6]{};
+                                                VkWriteDescriptorSet w[7]{};
                                                 auto setBuf = [&](uint32_t i, uint32_t binding, const VkDescriptorBufferInfo* info)
                                                 {
                                                     w[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -261,11 +292,12 @@ namespace Graphics::Passes
                                                 setBuf(0, 1, &inst);
                                                 setBuf(1, 2, &bounds);
                                                 setBuf(2, 3, &geoIdx);
-                                                setBuf(3, 4, &indirect);
-                                                setBuf(4, 5, &vis);
-                                                setBuf(5, 6, &counts);
+                                                setBuf(3, 4, &map);
+                                                setBuf(4, 5, &indirect);
+                                                setBuf(5, 6, &vis);
+                                                setBuf(6, 7, &counts);
 
-                                                vkUpdateDescriptorSets(m_Device->GetLogicalDevice(), 6, w, 0, nullptr);
+                                                vkUpdateDescriptorSets(m_Device->GetLogicalDevice(), 7, w, 0, nullptr);
 
                                                 vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_CullPipeline->GetHandle());
                                                 vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_CullPipeline->GetLayout(), 0, 1, &cullSet, 0, nullptr);
@@ -294,7 +326,8 @@ namespace Graphics::Passes
         }
 
         // Build draw batches: one per geometry, slicing packed buffers.
-        // We reuse the same packed buffers as non-owning pointers; the per-geometry offset is applied via indirect buffer offset.
+        // NOTE: VisibilityBuffer is bound at offset 0 (alignment), and we pass VisibilityBase (element index)
+        // via push constants so the vertex shader indexes the packed table correctly.
         for (uint32_t gi = 0; gi < geometryCount; ++gi)
         {
             const DenseGeo& g = dense[gi];
@@ -328,7 +361,7 @@ namespace Graphics::Passes
 
             // Slice offsets.
             b.IndirectOffsetBytes = static_cast<VkDeviceSize>(gi) * static_cast<VkDeviceSize>(maxDrawsPerGeometry) * sizeof(VkDrawIndexedIndirectCommand);
-            b.VisibilityOffsetBytes = static_cast<VkDeviceSize>(gi) * static_cast<VkDeviceSize>(maxDrawsPerGeometry) * sizeof(uint32_t);
+            b.VisibilityBase = gi * maxDrawsPerGeometry; // Element index, not byte offset
             b.CountOffsetBytes = static_cast<VkDeviceSize>(gi) * sizeof(uint32_t);
 
             out.Batches.push_back(b);
@@ -401,7 +434,7 @@ namespace Graphics::Passes
                                                 continue;
 
                                             VkDescriptorBufferInfo instInfo{.buffer = b.InstanceBuffer->GetHandle(), .offset = 0, .range = VK_WHOLE_SIZE};
-                                            VkDescriptorBufferInfo visInfo{.buffer = b.VisibilityBuffer->GetHandle(), .offset = b.VisibilityOffsetBytes, .range = VK_WHOLE_SIZE};
+                                            VkDescriptorBufferInfo visInfo{.buffer = b.VisibilityBuffer->GetHandle(), .offset = 0, .range = VK_WHOLE_SIZE};
 
                                             VkWriteDescriptorSet writes[2]{};
                                             writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -428,7 +461,7 @@ namespace Graphics::Passes
                                             vkCmdBindIndexBuffer(cmd, b.IndexBuffer, 0, VK_INDEX_TYPE_UINT32);
                                             vkCmdSetPrimitiveTopology(cmd, b.Topology);
 
-                                            RHI::MeshPushConstants push{.Model = glm::mat4(1.0f), .PtrPositions = b.PtrPositions, .PtrNormals = b.PtrNormals, .PtrAux = b.PtrAux, .TextureID = 0, ._pad = {}};
+                                            RHI::MeshPushConstants push{.Model = glm::mat4(1.0f), .PtrPositions = b.PtrPositions, .PtrNormals = b.PtrNormals, .PtrAux = b.PtrAux, .VisibilityBase = b.VisibilityBase, ._pad = {}};
                                             vkCmdPushConstants(cmd, pipeline->GetLayout(),
                                                                VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
                                                                0, sizeof(RHI::MeshPushConstants), &push);

@@ -151,11 +151,20 @@ All instance data shared between CPU and GPU uses a std430-compatible layout and
 - `EntityID`
 - `GeometryID` (**new**): a stable per-geometry identifier used for GPU-driven batching/culling
 
-Shaders updated to match this contract:
+**Stage 3 indirection (critical):** GPU culling writes a *packed visibility remap* per geometry.
 
-- `assets/shaders/triangle.vert`
-- `assets/shaders/scene_update.comp`
-- `assets/shaders/instance_cull.comp`
+- Culling output: `VisibleRemap[geomBase + drawIndex] = instanceSlot`
+- Indirect output: `firstInstance = drawIndex`
+- Vertex shader: `slot = VisibleRemap[geomBase + gl_InstanceIndex]`
+
+This ensures `gl_InstanceIndex` is never treated as a global instance slot (it’s draw-local).
+
+### GPUScene lifecycle
+
+`GPUScene` is a retained-mode instance table. Slots are allocated/freed independently of ECS iteration order.
+
+- **Allocation & spawn packet:** `Graphics::Systems::MeshRendererLifecycle::OnUpdate(...)` allocates `MeshRenderer::GpuSlot` and queues the initial instance+bounds packet.
+- **Incremental updates:** `Graphics::Systems::GPUSceneSync::OnUpdate(...)` refreshes transforms and material TextureID when material revisions change.
 
 ### Why this matters
 

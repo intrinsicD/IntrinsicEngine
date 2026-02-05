@@ -2,6 +2,8 @@
 
 #include <entt/entity/registry.hpp>
 
+#include <glm/glm.hpp> // glm::mat4, glm::vec4
+
 import Core;
 import Graphics;
 import ECS;

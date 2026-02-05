@@ -57,16 +57,21 @@ layout(std430, set = 0, binding = 3) readonly buffer GeometryIndexCount {
     uint IndexCount[]; // [GeometryCount]
 } geoIndexCount;
 
+// Geometry routing table: GeometryHandle.Index -> dense geometry id for this frame.
+layout(std430, set = 0, binding = 4) readonly buffer HandleToDense {
+    uint DenseID[];
+} handleToDense;
+
 // Outputs
-layout(std430, set = 0, binding = 4) writeonly buffer IndirectOut {
+layout(std430, set = 0, binding = 5) writeonly buffer IndirectOut {
     DrawIndexedIndirect Cmds[];   // [GeometryCount * MaxDrawsPerGeometry]
 } indirectOut;
 
-layout(std430, set = 0, binding = 5) writeonly buffer VisibilityOut {
+layout(std430, set = 0, binding = 6) writeonly buffer VisibilityOut {
     uint VisibleRemap[];          // [GeometryCount * MaxDrawsPerGeometry]
 } visibilityOut;
 
-layout(std430, set = 0, binding = 6) buffer DrawCounts {
+layout(std430, set = 0, binding = 7) buffer DrawCounts {
     uint Count[]; // [GeometryCount]
 } drawCounts;
 
@@ -95,8 +100,13 @@ void main()
     if (localR <= 0.0)
         return;
 
-    uint geom = instances.Data[id].GeometryID;
-    if (geom >= pc.GeometryCount)
+    // Instances store a sparse GeometryHandle.Index; map it to a dense per-frame geometry id.
+    uint geomHandleIndex = instances.Data[id].GeometryID;
+    if (geomHandleIndex >= handleToDense.DenseID.length())
+        return;
+
+    uint geom = handleToDense.DenseID[geomHandleIndex];
+    if (geom == 0xFFFFFFFFu || geom >= pc.GeometryCount)
         return;
 
     vec3 worldC = (instances.Data[id].Model * vec4(localC, 1.0)).xyz;

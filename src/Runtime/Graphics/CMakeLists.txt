@@ -26,6 +26,7 @@ target_sources(${target_name}
         Graphics.RenderPipeline.cppm
         Graphics.GPUScene.cppm
         Graphics.Systems.GPUSceneSync.cppm
+        Graphics.Systems.MeshRendererLifecycle.cppm
         # New Modules
         Graphics.RenderPath.cppm
         Graphics.Interaction.cppm
@@ -53,6 +54,7 @@ target_sources(${target_name}
         Graphics.PipelineLibrary.cpp
         Graphics.GPUScene.cpp
         Graphics.Systems.GPUSceneSync.cpp
+        Graphics.Systems.MeshRendererLifecycle.cpp
         # New Implementations
         Graphics.Interaction.cpp
         Graphics.Presentation.cpp
