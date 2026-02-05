@@ -83,7 +83,7 @@ export namespace Geometry
         std::vector<Node> m_Nodes;
         Nodes NodeProperties;
 
-        std::span<const AABB> ElementAabbs;
+        std::vector<AABB> ElementAabbs;
 
         template <class T>
         [[nodiscard]] NodeProperty<T> AddNodeProperty(const std::string& name, T defaultValue = T())
@@ -138,38 +138,17 @@ export namespace Geometry
         [[nodiscard]] bool Build(std::span<const AABB> aabbs, const SplitPolicy& policy, const std::size_t maxPerNode,
                                  const std::size_t maxDepth)
         {
-            ElementAabbs = aabbs;
+            ElementAabbs.assign(aabbs.begin(), aabbs.end());
+            return BuildFromOwned(policy, maxPerNode, maxDepth);
+        }
 
-            if (ElementAabbs.empty())
-            {
-                return false;
-            }
-
-            m_SplitPolicy = policy;
-            m_MaxElementsPerNode = maxPerNode;
-            m_MaxBvhDepth = maxDepth;
-
-            m_Nodes.clear();
-            m_Nodes.reserve(aabbs.size() / 4);
-            NodeProperties.Clear(); // Clear previous state
-
-            const std::size_t numElements = ElementAabbs.size();
-            m_ElementIndices.resize(numElements);
-            std::iota(m_ElementIndices.begin(), m_ElementIndices.end(), 0);
-
-            // Create root node
-            m_Nodes.emplace_back();
-            m_Nodes[0].FirstElement = 0;
-            m_Nodes[0].NumElements = static_cast<uint32_t>(numElements);
-            m_Nodes[0].Aabb = Union(ElementAabbs);
-
-            std::vector<size_t> localScratch;
-            localScratch.reserve(m_ElementIndices.size());
-            SubdivideVolume(0, 0, localScratch);
-
-            NodeProperties.Resize(m_Nodes.size());
-
-            return true;
+        /// @brief Build the octree by taking ownership of the AABB storage.
+        /// @return true if build succeeded, false if input was empty or invalid.
+        [[nodiscard]] bool Build(std::vector<AABB>&& aabbs, const SplitPolicy& policy, const std::size_t maxPerNode,
+                                 const std::size_t maxDepth)
+        {
+            ElementAabbs = std::move(aabbs);
+            return BuildFromOwned(policy, maxPerNode, maxDepth);
         }
 
         void QueryRay(const Ray& queryShape, std::vector<size_t>& result) const
@@ -534,6 +513,41 @@ export namespace Geometry
         }
 
     private:
+        [[nodiscard]] bool BuildFromOwned(const SplitPolicy& policy, const std::size_t maxPerNode,
+                                          const std::size_t maxDepth)
+        {
+            if (ElementAabbs.empty())
+            {
+                return false;
+            }
+
+            m_SplitPolicy = policy;
+            m_MaxElementsPerNode = maxPerNode;
+            m_MaxBvhDepth = maxDepth;
+
+            m_Nodes.clear();
+            m_Nodes.reserve(ElementAabbs.size() / 4);
+            NodeProperties.Clear(); // Clear previous state
+
+            const std::size_t numElements = ElementAabbs.size();
+            m_ElementIndices.resize(numElements);
+            std::iota(m_ElementIndices.begin(), m_ElementIndices.end(), 0);
+
+            // Create root node
+            m_Nodes.emplace_back();
+            m_Nodes[0].FirstElement = 0;
+            m_Nodes[0].NumElements = static_cast<uint32_t>(numElements);
+            m_Nodes[0].Aabb = Union(std::span<const AABB>(ElementAabbs));
+
+            std::vector<size_t> localScratch;
+            localScratch.reserve(m_ElementIndices.size());
+            SubdivideVolume(0, 0, localScratch);
+
+            NodeProperties.Resize(m_Nodes.size());
+
+            return true;
+        }
+
         [[nodiscard]] bool ValidateNode(NodeIndex nodeIdx) const
         {
             const Node& node = m_Nodes[nodeIdx];
