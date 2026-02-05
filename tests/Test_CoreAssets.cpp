@@ -320,6 +320,8 @@ TEST(AssetSystem, TryGetFast_HotPathOptimization)
 
     Core::Tasks::Scheduler::WaitForAll();
 
+    manager.BeginReadPhase();
+
     // NOTE: unlike RequestNotify tests, this doesn't require manager.Update() because TryGet reads state directly.
 
     // 1. Valid access
@@ -335,6 +337,8 @@ TEST(AssetSystem, TryGetFast_HotPathOptimization)
     AssetHandle invalidHandle;
     int* failHandle = manager.TryGetFast<int>(invalidHandle);
     EXPECT_EQ(failHandle, nullptr);
+
+    manager.EndReadPhase();
 
     Core::Tasks::Scheduler::Shutdown();
 }

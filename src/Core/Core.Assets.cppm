@@ -10,6 +10,7 @@ module;
 #include <unordered_map>
 #include <expected>
 #include <atomic>
+#include <cassert>
 
 export module Core:Assets;
 
@@ -199,6 +200,23 @@ export namespace Core::Assets
 
         AssetManager() = default;
 
+        // Debug-verified phase ordering for TryGetFast.
+        // BeginReadPhase/EndReadPhase must bracket any parallel read usage.
+        void BeginReadPhase() const
+        {
+#ifndef NDEBUG
+            m_DebugReadPhase.fetch_add(1, std::memory_order_relaxed);
+#endif
+        }
+
+        void EndReadPhase() const
+        {
+#ifndef NDEBUG
+            const int prev = m_DebugReadPhase.fetch_sub(1, std::memory_order_relaxed);
+            assert(prev > 0 && "AssetManager::EndReadPhase without matching BeginReadPhase.");
+#endif
+        }
+
         // Call this once per frame on the Main Thread
         void Update();
 
@@ -234,9 +252,17 @@ export namespace Core::Assets
         template <typename T>
         [[nodiscard]] T* TryGet(AssetHandle handle) const;
 
+        // OPTIMIZATION: Lightweight accessor for hot loops.
+        // Returns nullptr if not loaded/ready, invalid handle, or wrong type.
+        // Intentionally does not return error codes to minimize overhead.
+        // SAFETY: must be called inside a declared AssetManager read phase.
         template <typename T>
        [[nodiscard]] T* TryGetFast(AssetHandle handle) const
         {
+#ifndef NDEBUG
+            assert(m_DebugReadPhase.load(std::memory_order_relaxed) > 0 &&
+                   "AssetManager::TryGetFast called outside read phase. Use BeginReadPhase/EndReadPhase or TryGet/AcquireLease.");
+#endif
             // 1. Validation check (fast bitmask)
             if (!handle.IsValid() || !m_Registry.valid(handle.ID))
                 return nullptr;
@@ -292,6 +318,9 @@ export namespace Core::Assets
         std::vector<AssetHandle> m_ReadyQueue; // Queue of assets loaded since last frame
         mutable std::shared_mutex m_Mutex;
         std::mutex m_EventQueueMutex;
+#ifndef NDEBUG
+        mutable std::atomic<int> m_DebugReadPhase{0};
+#endif
 
         void EnqueueReadyEvent(AssetHandle handle);
 

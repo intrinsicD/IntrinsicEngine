@@ -13,6 +13,7 @@ export namespace RHI {
     public:
         // usage: VertexBuffer, IndexBuffer, TransferSrc, etc.
         // properties: DeviceLocal (GPU only) or HostVisible (CPU writable)
+        // Note: HostVisible buffers are persistently mapped at creation.
         VulkanBuffer(VulkanDevice& device, size_t size, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
         ~VulkanBuffer();
 
@@ -26,9 +27,11 @@ export namespace RHI {
 
         [[nodiscard]] VkBuffer GetHandle() const { return m_Buffer; }
 
-        // Map memory (only works for HostVisible)
-        // Returns nullptr if the allocation is not HOST_VISIBLE.
+        // Returns the persistent pointer for host-visible buffers.
+        // Thread-safe: can be called concurrently. Pointer is valid until destruction.
+        // Returns nullptr if memory is DeviceLocal.
         void* Map();
+        // No-op for persistent buffers. Kept for compatibility.
         void Unmap();
 
         [[nodiscard]] void* GetMappedData() const { return m_MappedData; }
@@ -47,14 +50,11 @@ export namespace RHI {
                 return;
             }
 
-            void* ptr = Map();
-            if (!ptr) return;
-
-            std::memcpy(static_cast<uint8_t*>(ptr) + offset, data, size);
+            if (!m_MappedData) return;
+            std::memcpy(static_cast<uint8_t*>(m_MappedData) + offset, data, size);
 
             // Flush host writes. Safe for coherent memory too (no-op in driver/VMA).
             Flush(offset, size);
-            Unmap();
         }
 
         // Explicit cache management for host-visible memory.
@@ -66,7 +66,7 @@ export namespace RHI {
         [[nodiscard]] size_t GetSizeBytes() const { return m_SizeBytes; }
 
         // Helper to read data from a mapped buffer (GPU->CPU).
-        // Safely handles invalidation, mapping, copying, and unmapping.
+        // Safely handles invalidation and copying.
         template<typename T>
         void Read(T* outData, size_t count = 1, size_t byteOffset = 0)
         {
@@ -82,12 +82,8 @@ export namespace RHI {
             // Invalidate CPU cache to see GPU writes (if non-coherent).
             Invalidate(byteOffset, byteSize);
 
-            void* ptr = Map();
-            if (ptr)
-            {
-                std::memcpy(outData, static_cast<uint8_t*>(ptr) + byteOffset, byteSize);
-                Unmap();
-            }
+            if (!m_MappedData) return;
+            std::memcpy(outData, static_cast<uint8_t*>(m_MappedData) + byteOffset, byteSize);
         }
 
     private:
@@ -97,7 +93,6 @@ export namespace RHI {
 
         // The persistent pointer. nullptr if memory is GPU-only.
         void* m_MappedData = nullptr;
-        bool m_IsPersistent = false;
 
         size_t m_SizeBytes = 0;
         bool m_IsHostVisible = false;

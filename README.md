@@ -20,6 +20,10 @@ Built primarily on **C++23 Modules**, it features a **Vulkan 1.3** bindless rend
 *   **Telemetry & Profiling**:
     *   Lock-free ring-buffered telemetry system.
     *   Real-time tracking of CPU frame times, draw calls, and triangle counts.
+*   **AssetManager Read Phases**:
+    *   `AssetManager::Update()` is the single-writer phase on the main thread.
+    *   Parallel systems that use `AssetManager::TryGetFast()` must be bracketed by `BeginReadPhase()` / `EndReadPhase()`.
+    *   For long-lived access across reloads, use `AssetManager::AcquireLease()`.
 
 ### 2. 📐 Geometry & Spatial Processing
 A "Distinguished Scientist" grade geometry kernel located in `Runtime.Geometry`:

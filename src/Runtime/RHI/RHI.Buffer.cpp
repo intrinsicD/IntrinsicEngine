@@ -11,6 +11,14 @@ import Core;
 
 namespace RHI
 {
+    static bool IsHostVisibleUsage(VmaMemoryUsage usage)
+    {
+        return usage == VMA_MEMORY_USAGE_CPU_TO_GPU ||
+               usage == VMA_MEMORY_USAGE_GPU_TO_CPU ||
+               usage == VMA_MEMORY_USAGE_CPU_ONLY ||
+               usage == VMA_MEMORY_USAGE_AUTO_PREFER_HOST;
+    }
+
     VulkanBuffer::VulkanBuffer(VulkanDevice& device, size_t size, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage)
         : m_Device(device)
     {
@@ -27,10 +35,17 @@ namespace RHI
 
         VmaAllocationCreateInfo allocInfo{};
         allocInfo.usage = memoryUsage;
-        // Use VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT for CPU->GPU mapping
-        if (memoryUsage == VMA_MEMORY_USAGE_AUTO_PREFER_HOST || memoryUsage == VMA_MEMORY_USAGE_CPU_TO_GPU)
+        if (IsHostVisibleUsage(memoryUsage))
         {
-            allocInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
+            allocInfo.flags |= VMA_ALLOCATION_CREATE_MAPPED_BIT;
+            if (memoryUsage == VMA_MEMORY_USAGE_CPU_TO_GPU || memoryUsage == VMA_MEMORY_USAGE_AUTO_PREFER_HOST)
+            {
+                allocInfo.flags |= VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+            }
+            else if (memoryUsage == VMA_MEMORY_USAGE_GPU_TO_CPU)
+            {
+                allocInfo.flags |= VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT;
+            }
         }
 
         VmaAllocationInfo resultInfo{};
@@ -38,7 +53,7 @@ namespace RHI
         if (vmaCreateBuffer(device.GetAllocator(), &bufferInfo, &allocInfo, &m_Buffer, &m_Allocation, &resultInfo) !=
             VK_SUCCESS)
         {
-            Core::Log::Error("Failed to create buffer!");
+            Core::Log::Error("Failed to create buffer (size={})", size);
             return;
         }
 
@@ -47,14 +62,25 @@ namespace RHI
         vmaGetAllocationMemoryProperties(device.GetAllocator(), m_Allocation, &memFlags);
         m_IsHostVisible = (memFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0;
 
-        if (resultInfo.pMappedData != nullptr)
+        if (m_IsHostVisible)
         {
-            m_MappedData = resultInfo.pMappedData;
-            m_IsPersistent = true;
+            if (resultInfo.pMappedData != nullptr)
+            {
+                m_MappedData = resultInfo.pMappedData;
+            }
+            else
+            {
+                VkResult mapRes = vmaMapMemory(device.GetAllocator(), m_Allocation, &m_MappedData);
+                if (mapRes != VK_SUCCESS)
+                {
+                    Core::Log::Error("Failed to persistently map host-visible buffer (VkResult={}).",
+                                    static_cast<int>(mapRes));
+                    m_MappedData = nullptr;
+                }
+            }
         }
         else
         {
-            // If VMA didn't persistently map, ensure we don't accidentally think it's mappable.
             m_MappedData = nullptr;
         }
     }
@@ -78,7 +104,8 @@ namespace RHI
           , m_Buffer(std::exchange(other.m_Buffer, VK_NULL_HANDLE))
           , m_Allocation(std::exchange(other.m_Allocation, VK_NULL_HANDLE))
           , m_MappedData(std::exchange(other.m_MappedData, nullptr))
-          , m_IsPersistent(other.m_IsPersistent)
+          , m_SizeBytes(other.m_SizeBytes)
+          , m_IsHostVisible(other.m_IsHostVisible)
     {
     }
 
@@ -102,15 +129,15 @@ namespace RHI
             m_Buffer = std::exchange(other.m_Buffer, VK_NULL_HANDLE);
             m_Allocation = std::exchange(other.m_Allocation, VK_NULL_HANDLE);
             m_MappedData = std::exchange(other.m_MappedData, nullptr);
-            m_IsPersistent = other.m_IsPersistent;
+            m_SizeBytes = other.m_SizeBytes;
+            m_IsHostVisible = other.m_IsHostVisible;
         }
         return *this;
     }
 
     void* VulkanBuffer::Map()
     {
-        if (!m_Allocation)
-            return nullptr;
+        if (!m_Allocation) return nullptr;
 
         if (!m_IsHostVisible)
         {
@@ -119,30 +146,12 @@ namespace RHI
             return nullptr;
         }
 
-        if (m_MappedData)
-        {
-            return m_MappedData;
-        }
-
-        VkResult res = vmaMapMemory(m_Device.GetAllocator(), m_Allocation, &m_MappedData);
-        if (res != VK_SUCCESS)
-        {
-            Core::Log::Error("VulkanBuffer::Map(): vmaMapMemory failed (VkResult={}).", static_cast<int>(res));
-            m_MappedData = nullptr;
-        }
-
         return m_MappedData;
     }
 
     void VulkanBuffer::Unmap()
     {
-        if (m_IsPersistent) return;
-
-        if (m_MappedData)
-        {
-            vmaUnmapMemory(m_Device.GetAllocator(), m_Allocation);
-            m_MappedData = nullptr;
-        }
+        // No-op for persistent mapping. Kept for API compatibility.
     }
 
     uint64_t VulkanBuffer::GetDeviceAddress() const
@@ -155,14 +164,14 @@ namespace RHI
 
     void VulkanBuffer::Invalidate(size_t offset, size_t size)
     {
-        if (!m_Allocation) return;
+        if (!m_Allocation || !m_IsHostVisible) return;
         vmaInvalidateAllocation(m_Device.GetAllocator(), m_Allocation, static_cast<VkDeviceSize>(offset),
                                 static_cast<VkDeviceSize>(size));
     }
 
     void VulkanBuffer::Flush(size_t offset, size_t size)
     {
-        if (!m_Allocation) return;
+        if (!m_Allocation || !m_IsHostVisible) return;
         vmaFlushAllocation(m_Device.GetAllocator(), m_Allocation, static_cast<VkDeviceSize>(offset),
                            static_cast<VkDeviceSize>(size));
     }

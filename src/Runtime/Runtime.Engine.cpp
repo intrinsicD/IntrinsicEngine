@@ -525,7 +525,7 @@ namespace Runtime
                                     glm::vec3 scale)
     {
         // 1. Resolve Model
-        if (auto* model = m_AssetManager.TryGetFast<Graphics::Model>(modelHandle))
+        if (auto* model = m_AssetManager.TryGet<Graphics::Model>(modelHandle))
         {
             // 2. Create Root
             // We use the Asset Name as the entity name base
@@ -653,6 +653,7 @@ namespace Runtime
             // Fixed timestep for physics simulation
             {
                 PROFILE_SCOPE("PhysicsUpdate");
+                m_AssetManager.BeginReadPhase();
                 while (accumulator >= dt)
                 {
                     ECS::Systems::Transform::OnUpdate(m_Scene.GetRegistry());
@@ -674,6 +675,7 @@ namespace Runtime
 
                     accumulator -= dt;
                 }
+                m_AssetManager.EndReadPhase();
             }
 
             if (m_FramebufferResized)
