@@ -11,6 +11,7 @@ module;
 #include <cctype>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <expected>
 #include <filesystem>
 #include <fstream>
@@ -99,6 +100,52 @@ namespace Graphics
 #if defined(INTRINSIC_MODELLOADER_VERBOSE)
             Core::Log::Info("Generated Planar UVs for {} vertices (Axis: {})", mesh.Positions.size(), flatAxis);
 #endif
+        }
+    }
+
+    // --- Bulk Data Loading Helper ---
+    // Reads from a generic GLTF accessor into a destination vector.
+    // Optimizes for memcpy when types match and stride is packed.
+    template <typename DstT, typename SrcT>
+    void LoadBuffer(std::vector<DstT>& outBuffer,
+                    const tinygltf::Model& model,
+                    const tinygltf::Accessor& accessor,
+                    size_t count)
+    {
+        const auto& view = model.bufferViews[accessor.bufferView];
+        const auto& buffer = model.buffers[view.buffer];
+
+        const uint8_t* srcData = &buffer.data[view.byteOffset + accessor.byteOffset];
+
+        // GLTF spec: byteStride of 0 implies tightly packed.
+        // If > 0, it is the byte distance between start of attributes.
+        const size_t srcStride = view.byteStride == 0 ? sizeof(SrcT) : view.byteStride;
+
+        outBuffer.resize(count);
+
+        // Optimization: Bulk copy if types match and data is tightly packed.
+        if constexpr (std::is_same_v<DstT, SrcT>)
+        {
+            if (srcStride == sizeof(DstT))
+            {
+                std::memcpy(outBuffer.data(), srcData, count * sizeof(DstT));
+                return;
+            }
+        }
+
+        // Fallback: Stride-aware loop / type conversion.
+        DstT* dstPtr = outBuffer.data();
+        for (size_t i = 0; i < count; ++i)
+        {
+            const SrcT* elem = reinterpret_cast<const SrcT*>(srcData + i * srcStride);
+            if constexpr (std::is_same_v<DstT, SrcT>)
+            {
+                dstPtr[i] = *elem;
+            }
+            else
+            {
+                dstPtr[i] = static_cast<DstT>(*elem);
+            }
         }
     }
 
@@ -1498,90 +1545,75 @@ namespace Graphics
                 default: continue; // Unsupported topology
                 }
 
-                // 2. Accessors Setup
-                const float* positionBuffer = nullptr;
-                const float* normalsBuffer = nullptr;
-                const float* texCoordsBuffer = nullptr;
-                size_t vertexCount = 0;
+                // 2. Attributes
+                auto posIt = primitive.attributes.find("POSITION");
+                if (posIt == primitive.attributes.end()) continue;
 
-                auto GetBuffer = [&](const char* attrName) -> const float*
+                const auto& posAccessor = model.accessors[posIt->second];
+                const size_t vertexCount = posAccessor.count;
+
+                // --- FAST PATH: Positions ---
+                LoadBuffer<glm::vec3, glm::vec3>(meshData.Positions, model, posAccessor, vertexCount);
+
+                // --- FAST PATH: Normals ---
+                auto normIt = primitive.attributes.find("NORMAL");
+                if (normIt != primitive.attributes.end())
                 {
-                    if (primitive.attributes.find(attrName) == primitive.attributes.end()) return nullptr;
-                    const auto& accessor = model.accessors[primitive.attributes.at(attrName)];
-                    const auto& view = model.bufferViews[accessor.bufferView];
-                    const auto& buffer = model.buffers[view.buffer];
-
-                    vertexCount = accessor.count; // Set count based on Position (primary attribute)
-                    return reinterpret_cast<const float*>(&buffer.data[view.byteOffset + accessor.byteOffset]);
-                };
-
-                positionBuffer = GetBuffer("POSITION");
-                normalsBuffer = GetBuffer("NORMAL");
-                texCoordsBuffer = GetBuffer("TEXCOORD_0");
-
-                if (!positionBuffer || vertexCount == 0) continue;
-
-                // 3. Populate Vectors (SoA)
-                meshData.Positions.resize(vertexCount);
-                meshData.Normals.resize(vertexCount);
-                meshData.Aux.resize(vertexCount);
-
-                for (size_t i = 0; i < vertexCount; i++)
+                    LoadBuffer<glm::vec3, glm::vec3>(meshData.Normals, model, model.accessors[normIt->second], vertexCount);
+                    hasNormals = true;
+                }
+                else
                 {
-                    meshData.Positions[i] = glm::make_vec3(&positionBuffer[i * 3]);
+                    meshData.Normals.resize(vertexCount, glm::vec3(0, 1, 0));
+                }
 
-                    if (normalsBuffer)
-                    {
-                        meshData.Normals[i] = glm::make_vec3(&normalsBuffer[i * 3]);
-                    }
-                    else
-                    {
-                        meshData.Normals[i] = glm::vec3(0, 1, 0);
-                    }
+                // --- UVs (Aux) ---
+                // Requires packing vec2 -> vec4, so we cannot bulk copy.
+                meshData.Aux.resize(vertexCount, glm::vec4(0.0f));
+                auto uvIt = primitive.attributes.find("TEXCOORD_0");
+                if (uvIt != primitive.attributes.end())
+                {
+                    const auto& uvAccessor = model.accessors[uvIt->second];
+                    const auto& uvView = model.bufferViews[uvAccessor.bufferView];
+                    const auto& uvBuffer = model.buffers[uvView.buffer];
+                    const uint8_t* uvData = &uvBuffer.data[uvView.byteOffset + uvAccessor.byteOffset];
+                    const size_t uvStride = uvView.byteStride == 0 ? sizeof(glm::vec2) : uvView.byteStride;
 
-                    if (texCoordsBuffer)
+                    for (size_t i = 0; i < vertexCount; ++i)
                     {
-                        glm::vec2 uv = glm::make_vec2(&texCoordsBuffer[i * 2]);
-                        meshData.Aux[i] = glm::vec4(uv.x, uv.y, 0.0f, 0.0f);
-                    }
-                    else
-                    {
-                        meshData.Aux[i] = glm::vec4(0.0f);
+                        const glm::vec2* uv = reinterpret_cast<const glm::vec2*>(uvData + i * uvStride);
+                        meshData.Aux[i] = glm::vec4(uv->x, uv->y, 0.0f, 0.0f);
                     }
                 }
 
-                // 4. Indices
+                // 3. Indices
                 if (primitive.indices >= 0)
                 {
                     const auto& accessor = model.accessors[primitive.indices];
-                    const auto& view = model.bufferViews[accessor.bufferView];
-                    const auto& buffer = model.buffers[view.buffer];
-                    const uint8_t* data = &buffer.data[view.byteOffset + accessor.byteOffset];
+                    const size_t indexCount = accessor.count;
 
-                    if (accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT)
+                    switch (accessor.componentType)
                     {
-                        const auto* buf = reinterpret_cast<const uint32_t*>(data);
-                        meshData.Indices.assign(buf, buf + accessor.count);
-                    }
-                    else if (accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT)
-                    {
-                        const auto* buf = reinterpret_cast<const uint16_t*>(data);
-                        for (size_t i = 0; i < accessor.count; ++i) meshData.Indices.push_back(buf[i]);
-                    }
-                    else if (accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE)
-                    {
-                        const auto* buf = reinterpret_cast<const uint8_t*>(data);
-                        for (size_t i = 0; i < accessor.count; ++i) meshData.Indices.push_back(buf[i]);
+                    case TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT:
+                        LoadBuffer<uint32_t, uint32_t>(meshData.Indices, model, accessor, indexCount);
+                        break;
+                    case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT:
+                        LoadBuffer<uint32_t, uint16_t>(meshData.Indices, model, accessor, indexCount);
+                        break;
+                    case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE:
+                        LoadBuffer<uint32_t, uint8_t>(meshData.Indices, model, accessor, indexCount);
+                        break;
+                    default:
+                        Core::Log::Error("GLTF: Unsupported index component type: {}", accessor.componentType);
+                        break;
                     }
                 }
-
-                hasNormals = normalsBuffer != nullptr;
 
                 if (!hasNormals)
                 {
                     RecalculateNormals(meshData);
                 }
-                if (!texCoordsBuffer) GenerateUVs(meshData);
+                if (uvIt == primitive.attributes.end()) GenerateUVs(meshData);
 
                 outMeshes.push_back(std::move(meshData));
             }
