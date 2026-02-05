@@ -386,9 +386,6 @@ TEST(ECS_TransformSystem, UpdatesWorldMatrix)
 
     entt::entity e = scene.CreateEntity("Entity");
 
-    // Add WorldMatrix component
-    reg.emplace<Transform::WorldMatrix>(e);
-
     // Modify transform
     auto& t = reg.get<Transform::Component>(e);
     t.Position = {10.0f, 0.0f, 0.0f};
@@ -412,9 +409,6 @@ TEST(ECS_TransformSystem, HierarchicalPropagation)
 
     entt::entity parent = scene.CreateEntity("Parent");
     entt::entity child = scene.CreateEntity("Child");
-
-    reg.emplace<Transform::WorldMatrix>(parent);
-    reg.emplace<Transform::WorldMatrix>(child);
 
     Hierarchy::Attach(reg, child, parent);
 
@@ -442,9 +436,6 @@ TEST(ECS_TransformSystem, ParentDirty_PropagatesToChildren)
 
     entt::entity parent = scene.CreateEntity("Parent");
     entt::entity child = scene.CreateEntity("Child");
-
-    reg.emplace<Transform::WorldMatrix>(parent);
-    reg.emplace<Transform::WorldMatrix>(child);
 
     Hierarchy::Attach(reg, child, parent);
 
@@ -476,7 +467,6 @@ TEST(ECS_TransformSystem, RemovesDirtyTagAfterUpdate)
     auto& reg = scene.GetRegistry();
 
     entt::entity e = scene.CreateEntity("Entity");
-    reg.emplace<Transform::WorldMatrix>(e);
 
     reg.emplace_or_replace<Transform::IsDirtyTag>(e);
     EXPECT_TRUE(reg.all_of<Transform::IsDirtyTag>(e));

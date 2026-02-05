@@ -212,6 +212,9 @@ namespace Graphics
         m_GeometryStorage.ProcessDeletions(currentFrame);
         GarbageCollectRetiredPipelines();
 
+        // Apply deferred bindless updates before any render graph recording.
+        m_GlobalResources.GetBindlessSystem().FlushPending();
+
         // ---------------------------------------------------------
         // 1. Interaction & WSI
         // ---------------------------------------------------------

@@ -52,7 +52,7 @@ namespace RHI
         // Make stale indices safe-by-construction: immediately rebind this slot to the default descriptor.
         if (m_DefaultView != VK_NULL_HANDLE && m_DefaultSampler != VK_NULL_HANDLE)
         {
-            m_Bindless.UpdateTexture(slot, m_DefaultView, m_DefaultSampler);
+            m_Bindless.EnqueueUpdate(slot, m_DefaultView, m_DefaultSampler);
         }
         else
         {
@@ -81,8 +81,8 @@ namespace RHI
         if (handle.IsValid())
         {
             const TextureGpuData* data = m_Pool.GetUnchecked(handle);
-            // Write descriptor at the stable slot.
-            m_Bindless.UpdateTexture(data->BindlessSlot, data->Image->GetView(), data->Sampler);
+            // Queue descriptor update at the stable slot.
+            m_Bindless.EnqueueUpdate(data->BindlessSlot, data->Image->GetView(), data->Sampler);
         }
 
         return handle;
@@ -152,13 +152,13 @@ namespace RHI
             const TextureGpuData* data = m_Pool.GetUnchecked(handle);
             if (m_DefaultView != VK_NULL_HANDLE && m_DefaultSampler != VK_NULL_HANDLE)
             {
-                m_Bindless.UpdateTexture(data->BindlessSlot, m_DefaultView, m_DefaultSampler);
+                m_Bindless.EnqueueUpdate(data->BindlessSlot, m_DefaultView, m_DefaultSampler);
             }
             else
             {
                 // Engine init order: CreatePending may be called before SetDefaultDescriptor().
                 // In that case, bind the real view/sampler now so this texture isn't permanently stuck sampling an uninitialized/default slot.
-                m_Bindless.UpdateTexture(data->BindlessSlot, data->Image->GetView(), data->Sampler);
+                m_Bindless.EnqueueUpdate(data->BindlessSlot, data->Image->GetView(), data->Sampler);
             }
         }
 
@@ -198,7 +198,7 @@ namespace RHI
         dst->BindlessSlot = bindlessSlot;
 
         // Update bindless descriptor to point to the real image/sampler.
-        m_Bindless.UpdateTexture(dst->BindlessSlot, dst->Image->GetView(), dst->Sampler);
+        m_Bindless.EnqueueUpdate(dst->BindlessSlot, dst->Image->GetView(), dst->Sampler);
     }
 
     void TextureSystem::Destroy(TextureHandle handle)

@@ -539,16 +539,18 @@ namespace Graphics
                 if (res.Type == ResourceType::Buffer) return;
                 if (res.Type == ResourceType::Import && res.PhysicalBuffer) return;
 
-                bool needsBarrier = (res.CurrentLayout != targetLayout) ||
-                    (res.LastUsageAccess & (VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_SHADER_WRITE_BIT |
-                        VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
-                        VK_ACCESS_2_TRANSFER_WRITE_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT)) ||
-                    (dstAccess & (VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_SHADER_WRITE_BIT |
-                        VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
-                        VK_ACCESS_2_TRANSFER_WRITE_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT));
+                const bool prevWrite = (res.LastUsageAccess & (VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_SHADER_WRITE_BIT |
+                    VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
+                    VK_ACCESS_2_TRANSFER_WRITE_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT));
+                const bool currWrite = (dstAccess & (VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_SHADER_WRITE_BIT |
+                    VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
+                    VK_ACCESS_2_TRANSFER_WRITE_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT));
+                const bool layoutMismatch = (res.CurrentLayout != targetLayout);
+                const bool isInitial = (res.LastUsageStage == VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT && res.LastUsageAccess == 0);
 
-                if (res.LastUsageStage == VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT && res.LastUsageAccess == 0)
-                    needsBarrier = (res.CurrentLayout != targetLayout);
+                bool needsBarrier = layoutMismatch || prevWrite || currWrite;
+                if (isInitial)
+                    needsBarrier = layoutMismatch;
 
                 if (needsBarrier)
                 {
@@ -583,8 +585,8 @@ namespace Graphics
                 }
                 else
                 {
-                    res.LastUsageStage = dstStage;
-                    res.LastUsageAccess = dstAccess;
+                    res.LastUsageStage |= dstStage;
+                    res.LastUsageAccess |= dstAccess;
                 }
             };
 

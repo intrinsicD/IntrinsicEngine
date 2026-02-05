@@ -28,6 +28,12 @@ export namespace Graphics
         Points
     };
 
+    enum class GeometryUploadMode
+    {
+        Staged,
+        Direct
+    };
+
     struct GeometryUploadRequest
     {
         std::span<const glm::vec3> Positions;
@@ -35,6 +41,7 @@ export namespace Graphics
         std::span<const glm::vec4> Aux; // UVs packed in xy, Color/Data in zw
         std::span<const uint32_t> Indices;
         PrimitiveTopology Topology = PrimitiveTopology::Triangles;
+        GeometryUploadMode UploadMode = GeometryUploadMode::Staged;
     };
 
     struct GeometryCpuData
@@ -45,9 +52,9 @@ export namespace Graphics
         std::vector<uint32_t> Indices;
         PrimitiveTopology Topology = PrimitiveTopology::Triangles;
 
-        [[nodiscard]] GeometryUploadRequest ToUploadRequest() const
+        [[nodiscard]] GeometryUploadRequest ToUploadRequest(GeometryUploadMode mode = GeometryUploadMode::Staged) const
         {
-            return {Positions, Normals, Aux, Indices, Topology};
+            return {Positions, Normals, Aux, Indices, Topology, mode};
         }
     };
 

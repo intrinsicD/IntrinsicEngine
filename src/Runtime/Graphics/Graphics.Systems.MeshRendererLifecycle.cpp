@@ -38,17 +38,15 @@ namespace Graphics::Systems::MeshRendererLifecycle
                                             Core::Assets::AssetHandle materialAsset,
                                             uint32_t defaultTextureId) -> uint32_t
         {
-            auto matRes = assetManager.Get<Graphics::Material>(materialAsset);
-            if (!matRes)
-                return defaultTextureId;
+            if (auto* mat = assetManager.TryGetFast<Graphics::Material>(materialAsset))
+            {
+                const auto handle = mat->GetHandle();
+                if (!handle.IsValid())
+                    return defaultTextureId;
 
-            const auto& mat = *matRes;
-            const auto handle = mat->GetHandle();
-            if (!handle.IsValid())
-                return defaultTextureId;
-
-            if (const MaterialData* data = materialSystem.GetData(handle))
-                return data->AlbedoID;
+                if (const MaterialData* data = materialSystem.GetData(handle))
+                    return data->AlbedoID;
+            }
 
             return defaultTextureId;
         }

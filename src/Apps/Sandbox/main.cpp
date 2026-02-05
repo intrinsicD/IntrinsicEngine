@@ -74,7 +74,7 @@ public:
                             // Flip bindless slot from default -> real view/sampler.
                             // This is the critical publish step in Phase 1.
                             // (No GPU waits; safe because token completion implies transfer queue copy is done.)
-                            m_BindlessSystem->UpdateTexture(data->BindlessSlot, data->Image->GetView(), data->Sampler);
+                            m_BindlessSystem->EnqueueUpdate(data->BindlessSlot, data->Image->GetView(), data->Sampler);
                         }
                     }
                 });

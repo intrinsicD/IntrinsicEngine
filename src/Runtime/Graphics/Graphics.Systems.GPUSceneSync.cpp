@@ -34,10 +34,8 @@ namespace Graphics::Systems::GPUSceneSync
             // Resolve material handle once and cache it inside the MeshRenderer component as intended.
             if (!mr.CachedMaterialHandle.IsValid())
             {
-                auto matRes = assetManager.Get<Graphics::Material>(mr.Material);
-                if (matRes)
+                if (auto* mat = assetManager.TryGetFast<Graphics::Material>(mr.Material))
                 {
-                    const auto& mat = *matRes;
                     mr.CachedMaterialHandle = mat->GetHandle();
                 }
             }

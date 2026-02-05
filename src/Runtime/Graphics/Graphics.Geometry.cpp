@@ -43,6 +43,35 @@ namespace Graphics
         VkDeviceSize totalVertexSize = result->m_Layout.AuxOffset + result->m_Layout.AuxSize;
         VkDeviceSize idxSize = data.Indices.size_bytes();
 
+        if (data.UploadMode == GeometryUploadMode::Direct)
+        {
+            if (totalVertexSize > 0)
+            {
+                result->m_VertexBuffer = std::make_unique<RHI::VulkanBuffer>(
+                    *device, totalVertexSize,
+                    VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+                    VMA_MEMORY_USAGE_CPU_TO_GPU
+                );
+
+                if (!data.Positions.empty()) result->m_VertexBuffer->Write(data.Positions.data(), posSize, result->m_Layout.PositionsOffset);
+                if (!data.Normals.empty()) result->m_VertexBuffer->Write(data.Normals.data(), normSize, result->m_Layout.NormalsOffset);
+                if (!data.Aux.empty()) result->m_VertexBuffer->Write(data.Aux.data(), auxSize, result->m_Layout.AuxOffset);
+            }
+
+            if (result->m_IndexCount > 0)
+            {
+                result->m_IndexBuffer = std::make_unique<RHI::VulkanBuffer>(
+                    *device, idxSize,
+                    VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+                    VMA_MEMORY_USAGE_CPU_TO_GPU
+                );
+
+                result->m_IndexBuffer->Write(data.Indices.data(), idxSize, 0);
+            }
+
+            return { std::move(result), RHI::TransferToken{} };
+        }
+
         // 2. Prepare Transfer
         std::vector<std::unique_ptr<RHI::VulkanBuffer>> stagingBuffers;
         VkCommandBuffer cmd = transferManager.Begin();

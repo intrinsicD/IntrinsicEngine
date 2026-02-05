@@ -97,7 +97,7 @@ export namespace Core::Assets
     // Type-erased payload.
     // Stage 3B: we store a slot pointer (type-erased) + raw pointer for hot access.
     // - Slot lifetime is managed by shared ownership (slot is NOT a shared_ptr<T> control block).
-    // - Pin() increments PinCount and holds the slot.
+    // - AcquireLease() increments PinCount and holds the slot.
     // - Reload swaps the slot; old slot lives until last pin is released.
     template <typename T>
     struct AssetPayload
@@ -218,13 +218,9 @@ export namespace Core::Assets
 
         void MoveToProcessing(AssetHandle handle);
 
-        // 4. Get Resource - Returns Expected with proper error codes
-        // Use Get() for shared ownership, GetRaw() for temporary access
-        template <typename T>
-        [[nodiscard]] Expected<std::shared_ptr<T>> Get(AssetHandle handle);
-
-        template <typename T>
-        [[nodiscard]] Expected<std::shared_ptr<T>> Get(AssetHandle handle) const;
+        // 4. Asset Access
+        // Use GetRaw() for error-coded access, TryGetFast() for hot loops,
+        // AcquireLease() when you need lifetime stability across reloads.
 
         template <typename T>
         [[nodiscard]] Expected<T*> GetRaw(AssetHandle handle);
@@ -266,10 +262,10 @@ export namespace Core::Assets
         template <typename T>
         AssetHandle Create(const std::string& name, std::unique_ptr<T> resource);
 
-        // Pin (lease) the asset to ensure lifetime across reloads.
-        // Prefer this over Get() when you want to avoid shared_ptr churn at call sites.
+        // Acquire a lease to ensure lifetime across reloads.
+        // Prefer this in long-lived access paths that must survive reloads.
         template <typename T>
-        [[nodiscard]] Expected<AssetLease<T>> Pin(AssetHandle handle);
+        [[nodiscard]] Expected<AssetLease<T>> AcquireLease(AssetHandle handle);
 
         // Manually trigger a reload for an asset that was created via Load().
         // Returns ResourceNotFound if the handle is invalid.
@@ -438,56 +434,6 @@ export namespace Core::Assets
 
     // 2. Data Access - Returns Expected with proper error information
     template <typename T>
-    Expected<std::shared_ptr<T>> AssetManager::Get(AssetHandle handle)
-    {
-        // Stage 3B: keep API for compatibility, but create a shared_ptr aliasing the slot.
-        // Prefer Pin() or GetRaw()/TryGet() to avoid shared_ptr churn.
-        std::shared_lock lock(m_Mutex);
-        if (!m_Registry.valid(handle.ID))
-            return std::unexpected(ErrorCode::ResourceNotFound);
-
-        const auto& info = m_Registry.get<AssetInfo>(handle.ID);
-        if (info.State != LoadState::Ready)
-        {
-            if (info.State == LoadState::Failed)
-                return std::unexpected(ErrorCode::AssetLoadFailed);
-            return std::unexpected(ErrorCode::AssetNotLoaded);
-        }
-
-        if (auto* payload = m_Registry.try_get<AssetPayload<T>>(handle.ID))
-        {
-            // aliasing ctor: control block is Slot, pointee is payload->Ptr
-            return std::shared_ptr<T>(std::static_pointer_cast<AssetSlot<T>>(payload->Slot), payload->Ptr);
-        }
-        return std::unexpected(ErrorCode::AssetTypeMismatch);
-    }
-
-    template <typename T>
-    Expected<std::shared_ptr<T>> AssetManager::Get(AssetHandle handle) const
-    {
-        // Stage 3B: keep API for compatibility, but create a shared_ptr aliasing the slot.
-        // Prefer Pin() or GetRaw()/TryGet() to avoid shared_ptr churn.
-        std::shared_lock lock(m_Mutex);
-        if (!m_Registry.valid(handle.ID))
-            return std::unexpected(ErrorCode::ResourceNotFound);
-
-        const auto& info = m_Registry.get<AssetInfo>(handle.ID);
-        if (info.State != LoadState::Ready)
-        {
-            if (info.State == LoadState::Failed)
-                return std::unexpected(ErrorCode::AssetLoadFailed);
-            return std::unexpected(ErrorCode::AssetNotLoaded);
-        }
-
-        if (auto* payload = m_Registry.try_get<AssetPayload<T>>(handle.ID))
-        {
-            // aliasing ctor: control block is Slot, pointee is payload->Ptr
-            return std::shared_ptr<T>(std::static_pointer_cast<AssetSlot<T>>(payload->Slot), payload->Ptr);
-        }
-        return std::unexpected(ErrorCode::AssetTypeMismatch);
-    }
-
-    template <typename T>
     Expected<T*> AssetManager::GetRaw(AssetHandle handle)
     {
         std::shared_lock lock(m_Mutex);
@@ -624,7 +570,7 @@ export namespace Core::Assets
     }
 
     template <typename T>
-    Expected<AssetLease<T>> AssetManager::Pin(AssetHandle handle)
+    Expected<AssetLease<T>> AssetManager::AcquireLease(AssetHandle handle)
     {
         std::shared_lock lock(m_Mutex);
         if (!m_Registry.valid(handle.ID))

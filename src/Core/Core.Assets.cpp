@@ -68,19 +68,26 @@ namespace Core::Assets
 
     void AssetManager::RequestNotify(AssetHandle handle, AssetCallback callback)
     {
-        std::unique_lock lock(m_Mutex);
-        if (!m_Registry.valid(handle.ID)) return;
-
-        // If already ready, fire immediately
-        if (m_Registry.get<AssetInfo>(handle.ID).State == LoadState::Ready)
+        AssetCallback fireCallback{};
         {
-            lock.unlock(); // Unlock before callback to prevent deadlocks
-            callback(handle);
-            return;
+            std::unique_lock lock(m_Mutex);
+            if (!m_Registry.valid(handle.ID))
+                return;
+
+            // If already ready, fire immediately outside the lock.
+            if (m_Registry.get<AssetInfo>(handle.ID).State == LoadState::Ready)
+            {
+                fireCallback = std::move(callback);
+            }
+            else
+            {
+                // Register for future
+                m_OneShotListeners[handle].push_back(std::move(callback));
+            }
         }
 
-        // Register for future
-        m_OneShotListeners[handle].push_back(callback);
+        if (fireCallback)
+            fireCallback(handle);
     }
 
     void AssetManager::FinalizeLoad(AssetHandle handle)
@@ -111,21 +118,27 @@ namespace Core::Assets
 
     ListenerHandle AssetManager::Listen(AssetHandle handle, AssetCallback callback)
     {
-        std::unique_lock lock(m_Mutex);
-        if (!m_Registry.valid(handle.ID)) return {0};
-
-        uint32_t id = s_ListenerIdCounter++;
-
-        m_PersistentListeners[handle][id] = std::move(callback);
-
-        // Optional: Fire immediately if valid?
-        // For hot reloading textures, we usually want to know if it's already there to set it up initially.
-        if (m_Registry.get<AssetInfo>(handle.ID).State == LoadState::Ready)
+        AssetCallback fireCallback{};
+        ListenerHandle out{0};
         {
-            lock.unlock();
-            callback(handle);
+            std::unique_lock lock(m_Mutex);
+            if (!m_Registry.valid(handle.ID))
+                return {0};
+
+            const uint32_t id = s_ListenerIdCounter++;
+            out = {id};
+
+            // Keep the persistent listener registered, then snapshot for immediate fire if ready.
+            m_PersistentListeners[handle][id] = callback;
+
+            if (m_Registry.get<AssetInfo>(handle.ID).State == LoadState::Ready)
+                fireCallback = std::move(callback);
         }
-        return {id};
+
+        if (fireCallback)
+            fireCallback(handle);
+
+        return out;
     }
 
     void AssetManager::Unlisten(AssetHandle handle, ListenerHandle listener)

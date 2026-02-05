@@ -38,6 +38,7 @@ A "Distinguished Scientist" grade geometry kernel located in `Runtime.Geometry`:
     *   Automatic dependency tracking and barrier injection (Sync2).
     *   Transient resource aliasing (memory reuse).
     *   Lambda-based pass declaration (`AddPass<Data>(setup, execute)`).
+    *   Read-after-read layout transitions are enforced when layouts differ; reader stages/access are accumulated for later writer sync.
 *   **Async Transfer System**:
     *   **Staging Belt**: Persistent ring-buffer allocator for high-throughput CPU-to-GPU streaming (`RHI.StagingBelt`).
     *   Timeline Semaphore synchronization for async asset uploads.
@@ -199,6 +200,8 @@ Texture streaming must not block worker threads on GPU work.
 **Old (removed):** creating `RHI::Texture` from CPU pixel data implicitly recorded commands and waited on a fence (`vkWaitForFences`) via `RHI::CommandUtils::EndSingleTimeCommands`.
 
 **New (current):** `Graphics::TextureLoader::LoadAsync(...)` decodes on CPU, allocates staging via `RHI::TransferManager` (timeline semaphore), records `vkCmdCopyBufferToImage` on the transfer queue, and returns a `RHI::TransferToken`.
+
+**Bindless update policy:** descriptor writes are deferred via `RHI::BindlessDescriptorSystem::EnqueueUpdate(...)` and flushed once per frame at the start of `Graphics::RenderSystem::OnUpdate`.
 
 While the upload is in flight, the texture’s bindless slot is bound to the engine default texture (bindless slot 0). When the token completes, the `AssetManager` transitions the asset to `Ready`.
 

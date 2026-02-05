@@ -3,10 +3,12 @@ module;
 #include <memory>
 #include <algorithm>
 #include <mutex>
+#include <vector>
 #include <iostream>
 
 module RHI:Bindless.Impl;
 import :Bindless;
+import Core;
 
 namespace RHI
 {
@@ -15,6 +17,7 @@ namespace RHI
     {
         CreateLayout();
         CreatePoolAndSet();
+        m_PendingUpdates.reserve(1024);
     }
 
     BindlessDescriptorSystem::~BindlessDescriptorSystem()
@@ -108,10 +111,10 @@ namespace RHI
 
     void BindlessDescriptorSystem::SetTexture(uint32_t index, const Texture& texture)
     {
-        UpdateTexture(index, texture.GetView(), texture.GetSampler(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        EnqueueUpdate(index, texture.GetView(), texture.GetSampler(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     }
 
-    void BindlessDescriptorSystem::UpdateTexture(uint32_t index, VkImageView view, VkSampler sampler, VkImageLayout layout)
+    void BindlessDescriptorSystem::EnqueueUpdate(uint32_t index, VkImageView view, VkSampler sampler, VkImageLayout layout)
     {
         if (index >= m_MaxDescriptors)
         {
@@ -120,38 +123,50 @@ namespace RHI
         }
 
         // Vulkan validation: writing VK_NULL_HANDLE into COMBINED_IMAGE_SAMPLER is illegal unless nullDescriptor is enabled.
-        // Our layout uses PARTIALLY_BOUND so *unused* descriptors can remain uninitialized, but we must avoid explicitly
-        // writing null handles.
         if (view == VK_NULL_HANDLE || sampler == VK_NULL_HANDLE)
         {
-            Core::Log::Warn("[Bindless] Ignoring UpdateTexture({}, view={}, sampler={}) - null handles are not writable without nullDescriptor.",
+            Core::Log::Warn("[Bindless] Ignoring EnqueueUpdate({}, view={}, sampler={}) - null handles are not writable without nullDescriptor.",
                            index, static_cast<void*>(view), static_cast<void*>(sampler));
             return;
         }
 
-        // DEBUG: trace descriptor writes (helps catch accidental overwrites of slot 0 or other active slots).
-        Core::Log::Info("[Bindless] UpdateTexture: slot={} view={} sampler={} layout={} ",
-                        index,
-                        reinterpret_cast<void*>(view),
-                        reinterpret_cast<void*>(sampler),
-                        static_cast<uint32_t>(layout));
-
-        VkDescriptorImageInfo imageInfo{};
-        imageInfo.sampler = sampler;
-        imageInfo.imageView = view;
-        imageInfo.imageLayout = layout;
-
-        VkWriteDescriptorSet descriptorWrite{};
-        descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrite.dstSet = m_GlobalSet;
-        descriptorWrite.dstBinding = 0;
-        descriptorWrite.dstArrayElement = index;
-        descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        descriptorWrite.descriptorCount = 1;
-        descriptorWrite.pImageInfo = &imageInfo;
-
         std::lock_guard lock(m_UpdateMutex);
-        vkUpdateDescriptorSets(m_Device.GetLogicalDevice(), 1, &descriptorWrite, 0, nullptr);
+        m_PendingUpdates.push_back({index, view, sampler, layout});
+    }
+
+    void BindlessDescriptorSystem::FlushPending()
+    {
+        std::vector<PendingUpdate> updatesToApply;
+        {
+            std::lock_guard lock(m_UpdateMutex);
+            if (m_PendingUpdates.empty())
+                return;
+            updatesToApply.swap(m_PendingUpdates);
+        }
+
+        std::vector<VkDescriptorImageInfo> imageInfos;
+        imageInfos.reserve(updatesToApply.size());
+
+        std::vector<VkWriteDescriptorSet> writes;
+        writes.reserve(updatesToApply.size());
+
+        for (const auto& update : updatesToApply)
+        {
+            imageInfos.push_back({update.Sampler, update.View, update.Layout});
+
+            VkWriteDescriptorSet descriptorWrite{};
+            descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrite.dstSet = m_GlobalSet;
+            descriptorWrite.dstBinding = 0;
+            descriptorWrite.dstArrayElement = update.Index;
+            descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            descriptorWrite.descriptorCount = 1;
+            descriptorWrite.pImageInfo = &imageInfos.back();
+
+            writes.push_back(descriptorWrite);
+        }
+
+        vkUpdateDescriptorSets(m_Device.GetLogicalDevice(), static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
     }
 
     void BindlessDescriptorSystem::UnregisterTexture(uint32_t index)

@@ -45,7 +45,7 @@ TEST(AssetSystem, AsyncLoading)
     EXPECT_EQ(manager.GetState(handle), LoadState::Loading);
 
     // Not ready yet - should return error
-    auto notReady = manager.Get<Texture>(handle);
+    auto notReady = manager.GetRaw<Texture>(handle);
     EXPECT_FALSE(notReady.has_value());
     EXPECT_EQ(notReady.error(), ErrorCode::AssetNotLoaded);
 
@@ -54,7 +54,7 @@ TEST(AssetSystem, AsyncLoading)
 
     // 6. Check Final State
     EXPECT_EQ(manager.GetState(handle), LoadState::Ready);
-    auto texResult = manager.Get<Texture>(handle);
+    auto texResult = manager.GetRaw<Texture>(handle);
     ASSERT_TRUE(texResult.has_value());
     EXPECT_EQ((*texResult)->width, 1024);
 
@@ -73,7 +73,7 @@ TEST(AssetSystem, Pin_LeaseBasic)
 
     Core::Tasks::Scheduler::WaitForAll();
 
-    auto leaseResult = manager.Pin<int>(handle);
+    auto leaseResult = manager.AcquireLease<int>(handle);
     ASSERT_TRUE(leaseResult.has_value());
 
     auto lease = *leaseResult;
@@ -100,7 +100,7 @@ TEST(AssetSystem, Pin_RespectsProcessingGate)
     manager.MoveToProcessing(handle);
     EXPECT_EQ(manager.GetState(handle), LoadState::Processing);
 
-    auto lease = manager.Pin<int>(handle);
+    auto lease = manager.AcquireLease<int>(handle);
     EXPECT_FALSE(lease.has_value());
     EXPECT_EQ(lease.error(), ErrorCode::AssetNotLoaded);
 
@@ -119,7 +119,7 @@ TEST(AssetSystem, Pin_TypeMismatch)
 
     Core::Tasks::Scheduler::WaitForAll();
 
-    auto mismatch = manager.Pin<float>(handle);
+    auto mismatch = manager.AcquireLease<float>(handle);
     EXPECT_FALSE(mismatch.has_value());
     EXPECT_EQ(mismatch.error(), ErrorCode::AssetTypeMismatch);
 
@@ -149,7 +149,7 @@ TEST(AssetSystem, LeaseSurvivesReload_NewLeaseSeesNewValue)
     Core::Tasks::Scheduler::WaitForAll();
 
     // Pin old value.
-    auto lease1Res = manager.Pin<Reloadable>(handle);
+    auto lease1Res = manager.AcquireLease<Reloadable>(handle);
     ASSERT_TRUE(lease1Res.has_value());
     auto lease1 = *lease1Res;
     ASSERT_TRUE((bool)lease1);
@@ -164,7 +164,7 @@ TEST(AssetSystem, LeaseSurvivesReload_NewLeaseSeesNewValue)
     EXPECT_EQ(lease1->Value, 1);
 
     // New lease must see new data.
-    auto lease2Res = manager.Pin<Reloadable>(handle);
+    auto lease2Res = manager.AcquireLease<Reloadable>(handle);
     ASSERT_TRUE(lease2Res.has_value());
     EXPECT_EQ((*lease2Res)->Value, 2);
 
@@ -203,7 +203,7 @@ TEST(AssetSystem, UniquePtrLoader_SupportsNonCopyable)
     ASSERT_NE(*raw, nullptr);
     EXPECT_EQ((*raw)->Value, 42);
 
-    auto lease = manager.Pin<NonCopyable>(handle);
+    auto lease = manager.AcquireLease<NonCopyable>(handle);
     ASSERT_TRUE(lease.has_value());
     EXPECT_EQ((*lease)->Value, 42);
 
@@ -294,7 +294,7 @@ TEST(AssetSystem, ExternalFinalization) {
     EXPECT_EQ(manager.GetState(handle), LoadState::Processing);
 
     // 4. Verify Get returns error while processing (Access Control)
-    auto processingResult = manager.Get<int>(handle);
+    auto processingResult = manager.GetRaw<int>(handle);
     EXPECT_FALSE(processingResult.has_value());
     EXPECT_EQ(processingResult.error(), ErrorCode::AssetNotLoaded);
 
@@ -302,13 +302,13 @@ TEST(AssetSystem, ExternalFinalization) {
     manager.FinalizeLoad(handle);
 
     EXPECT_EQ(manager.GetState(handle), LoadState::Ready);
-    auto finalResult = manager.Get<int>(handle);
+    auto finalResult = manager.GetRaw<int>(handle);
     EXPECT_TRUE(finalResult.has_value());
 
     Core::Tasks::Scheduler::Shutdown();
 }
 
-TEST(AssetSystem, TryGet_HotPathOptimization)
+TEST(AssetSystem, TryGetFast_HotPathOptimization)
 {
     Core::Tasks::Scheduler::Initialize(1);
     AssetManager manager;
@@ -323,17 +323,17 @@ TEST(AssetSystem, TryGet_HotPathOptimization)
     // NOTE: unlike RequestNotify tests, this doesn't require manager.Update() because TryGet reads state directly.
 
     // 1. Valid access
-    int* val = manager.TryGet<int>(handle);
+    int* val = manager.TryGetFast<int>(handle);
     ASSERT_NE(val, nullptr);
     EXPECT_EQ(*val, 123);
 
     // 2. Type mismatch (safe fail)
-    float* failType = manager.TryGet<float>(handle);
+    float* failType = manager.TryGetFast<float>(handle);
     EXPECT_EQ(failType, nullptr);
 
     // 3. Invalid handle (safe fail)
     AssetHandle invalidHandle;
-    int* failHandle = manager.TryGet<int>(invalidHandle);
+    int* failHandle = manager.TryGetFast<int>(invalidHandle);
     EXPECT_EQ(failHandle, nullptr);
 
     Core::Tasks::Scheduler::Shutdown();

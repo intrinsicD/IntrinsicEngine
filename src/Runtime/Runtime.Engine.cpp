@@ -525,72 +525,70 @@ namespace Runtime
                                     glm::vec3 scale)
     {
         // 1. Resolve Model
-        auto modelResult = m_AssetManager.Get<Graphics::Model>(modelHandle);
-        if (!modelResult)
+        if (auto* model = m_AssetManager.TryGetFast<Graphics::Model>(modelHandle))
         {
-            Core::Log::Error("Cannot spawn model: Asset not ready or invalid.");
-            return entt::null;
-        }
-        const auto& model = *modelResult;
+            // 2. Create Root
+            // We use the Asset Name as the entity name base
+            std::string name = "Model";
+            // (Optional: fetch name from AssetManager metadata if available)
 
-        // 2. Create Root
-        // We use the Asset Name as the entity name base
-        std::string name = "Model";
-        // (Optional: fetch name from AssetManager metadata if available)
+            entt::entity root = m_Scene.CreateEntity(name);
+            auto& t = m_Scene.GetRegistry().get<ECS::Components::Transform::Component>(root);
+            t.Position = position;
+            t.Scale = scale;
 
-        entt::entity root = m_Scene.CreateEntity(name);
-        auto& t = m_Scene.GetRegistry().get<ECS::Components::Transform::Component>(root);
-        t.Position = position;
-        t.Scale = scale;
-
-        // Assign stable pick IDs (monotonic, never reused during runtime).
-        // This decouples GPU picking from entt::entity recycling.
-        static uint32_t s_NextPickId = 1u;
-        if (!m_Scene.GetRegistry().all_of<ECS::Components::Selection::PickID>(root))
-        {
-            m_Scene.GetRegistry().emplace<ECS::Components::Selection::PickID>(root, s_NextPickId++);
-        }
-
-        // 3. Create Submeshes
-        for (size_t i = 0; i < model->Meshes.size(); i++)
-        {
-            entt::entity targetEntity = root;
-
-            // If complex model, create children. If single mesh, put it on root.
-            if (model->Meshes.size() > 1)
+            // Assign stable pick IDs (monotonic, never reused during runtime).
+            // This decouples GPU picking from entt::entity recycling.
+            static uint32_t s_NextPickId = 1u;
+            if (!m_Scene.GetRegistry().all_of<ECS::Components::Selection::PickID>(root))
             {
-                targetEntity = m_Scene.CreateEntity(model->Meshes[i]->Name);
-                ECS::Components::Hierarchy::Attach(m_Scene.GetRegistry(), targetEntity, root);
+                m_Scene.GetRegistry().emplace<ECS::Components::Selection::PickID>(root, s_NextPickId++);
             }
 
-
-            // Add Renderer
-            auto& mr = m_Scene.GetRegistry().emplace<ECS::MeshRenderer::Component>(targetEntity);
-            mr.Geometry = model->Meshes[i]->Handle;
-            mr.Material = materialHandle;
-
-            // GPUScene slots + initial packets are handled by Graphics::Systems::MeshRendererLifecycle.
-            // This keeps the retained-mode contract centralized and prevents double-allocation.
-
-            // Add Collider
-            if (model->Meshes[i]->CollisionGeometry)
+            // 3. Create Submeshes
+            for (size_t i = 0; i < model->Meshes.size(); i++)
             {
-                auto& col = m_Scene.GetRegistry().emplace<ECS::MeshCollider::Component>(targetEntity);
-                col.CollisionRef = model->Meshes[i]->CollisionGeometry;
-                col.WorldOBB.Center = col.CollisionRef->LocalAABB.GetCenter();
+                entt::entity targetEntity = root;
+
+                // If complex model, create children. If single mesh, put it on root.
+                if (model->Meshes.size() > 1)
+                {
+                    targetEntity = m_Scene.CreateEntity(model->Meshes[i]->Name);
+                    ECS::Components::Hierarchy::Attach(m_Scene.GetRegistry(), targetEntity, root);
+                }
+
+
+                // Add Renderer
+                auto& mr = m_Scene.GetRegistry().emplace<ECS::MeshRenderer::Component>(targetEntity);
+                mr.Geometry = model->Meshes[i]->Handle;
+                mr.Material = materialHandle;
+
+                // GPUScene slots + initial packets are handled by Graphics::Systems::MeshRendererLifecycle.
+                // This keeps the retained-mode contract centralized and prevents double-allocation.
+
+                // Add Collider
+                if (model->Meshes[i]->CollisionGeometry)
+                {
+                    auto& col = m_Scene.GetRegistry().emplace<ECS::MeshCollider::Component>(targetEntity);
+                    col.CollisionRef = model->Meshes[i]->CollisionGeometry;
+                    col.WorldOBB.Center = col.CollisionRef->LocalAABB.GetCenter();
+                }
+
+                // Add Selectable Tag (THE CRITICAL FIX)
+                m_Scene.GetRegistry().emplace<ECS::Components::Selection::SelectableTag>(targetEntity);
+
+                // Stable pick ID for each selectable entity.
+                if (!m_Scene.GetRegistry().all_of<ECS::Components::Selection::PickID>(targetEntity))
+                {
+                    m_Scene.GetRegistry().emplace<ECS::Components::Selection::PickID>(targetEntity, s_NextPickId++);
+                }
             }
 
-            // Add Selectable Tag (THE CRITICAL FIX)
-            m_Scene.GetRegistry().emplace<ECS::Components::Selection::SelectableTag>(targetEntity);
-
-            // Stable pick ID for each selectable entity.
-            if (!m_Scene.GetRegistry().all_of<ECS::Components::Selection::PickID>(targetEntity))
-            {
-                m_Scene.GetRegistry().emplace<ECS::Components::Selection::PickID>(targetEntity, s_NextPickId++);
-            }
+            return root;
         }
 
-        return root;
+        Core::Log::Error("Cannot spawn model: Asset not ready or invalid.");
+        return entt::null;
     }
 
     void Engine::Run()
