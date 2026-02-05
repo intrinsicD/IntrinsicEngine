@@ -20,15 +20,17 @@ namespace Graphics::Systems::MeshRendererLifecycle
     {
         [[nodiscard]] auto ComputeLocalBoundingSphere(const GeometryGpuData& geo) -> glm::vec4
         {
-            // Robust fallback: if we can't infer bounds, return an "inactive" sphere.
-            // (caller will override to a tiny sphere to keep the slot alive if desired)
+            // Robust fallback:
+            //  - The culler treats radius <= 0 as "inactive" and will skip the instance entirely.
+            //  - GeometryGpuData currently doesn't ship precomputed bounds.
+            //
+            // Until ModelLoader plumbs local AABB/sphere into GeometryGpuData, we use a conservative
+            // "safety sphere" to effectively disable culling for typical assets (fixes Invisible Duck).
             if (geo.GetIndexCount() == 0)
                 return {0.0f, 0.0f, 0.0f, 0.0f};
 
-            // GeometryGpuData currently doesn’t expose a precomputed sphere, so we conservatively
-            // keep the previous Engine spawn strategy: tiny fixed radius around origin.
-            // TODO(next): plumb in per-geometry local AABB/sphere from ModelLoader/CollisionGeometry.
-            return {0.0f, 0.0f, 0.0f, 1e-3f};
+            // Massive radius = always visible under any sane camera frustum.
+            return {0.0f, 0.0f, 0.0f, 10'000.0f};
         }
 
         [[nodiscard]] auto ResolveTextureId(const Core::Assets::AssetManager& assetManager,

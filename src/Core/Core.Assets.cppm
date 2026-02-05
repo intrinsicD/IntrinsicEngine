@@ -188,7 +188,7 @@ export namespace Core::Assets
     struct ListenerHandle
     {
         uint32_t ID = 0;
-        bool Valid() const { return ID != 0; }
+        [[nodiscard]] bool Valid() const { return ID != 0; }
     };
 
     // --- Asset Manager ---
@@ -324,6 +324,7 @@ export namespace Core::Assets
         else
         {
             static_assert(sizeof(T) == 0, "Loader must return std::unique_ptr<T> or std::shared_ptr<T>.");
+            __builtin_unreachable();
         }
     }
 
@@ -679,5 +680,34 @@ export namespace Core::Assets
 
             outResults.push_back(result);
         }
+    }
+
+    template <typename T>
+    void AssetManager::ReloadAsset(AssetHandle handle)
+    {
+        // Contract:
+        // - If handle is invalid => no-op.
+        // - If no reloader is registered (runtime-created asset) => no-op.
+        // - Otherwise invoke the stored reloader (which schedules the async reload).
+        if (!handle.IsValid())
+            return;
+
+        std::function<void()> fn;
+        {
+            std::shared_lock lock(m_Mutex);
+            if (!m_Registry.valid(handle.ID))
+                return;
+
+            // Type check: only allow reload if the payload component exists *or* a reloader exists.
+            // (If it exists but wrong T, we still treat as no-op to keep -fno-exceptions behavior safe.)
+            if (!m_Registry.any_of<AssetReloader>(handle.ID))
+                return;
+
+            const auto& r = m_Registry.get<AssetReloader>(handle.ID);
+            fn = r.ReloadAction;
+        }
+
+        if (fn)
+            fn();
     }
 }

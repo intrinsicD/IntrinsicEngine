@@ -19,6 +19,7 @@ add_executable(${target_name}
         Test_RuntimeSelection.cpp
         Test_RuntimeSelection_Multi.cpp
         Test_TextureMaterialHotReload.cpp
+        Test_RuntimeCulling.cpp
 )
 
 #Apply Strict Flags ONLY to our tests

@@ -84,6 +84,11 @@ namespace Graphics
             builder.SetInputLayout(inputLayout);
             builder.SetColorFormats({swapchainFormat});
             builder.SetDepthFormat(depthFormat);
+
+            // Current asset winding is CCW in clip space; use CCW front-face.
+            // If this ever flips again, revisit the projection Y-flip convention.
+            builder.SetCullMode(VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE);
+
             builder.AddDescriptorSetLayout(m_GlobalSetLayout.GetHandle());
             builder.AddDescriptorSetLayout(m_Bindless.GetLayout());
 
@@ -152,6 +157,10 @@ namespace Graphics
             builder.SetInputLayout(inputLayout);
             builder.SetColorFormats({VK_FORMAT_R32_UINT});
             builder.SetDepthFormat(depthFormat);
+
+            // Keep winding convention consistent with the main Forward pass.
+            builder.SetCullMode(VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE);
+
             builder.AddDescriptorSetLayout(m_GlobalSetLayout.GetHandle());
 
             VkPushConstantRange pushConstant{};
