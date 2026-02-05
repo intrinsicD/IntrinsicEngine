@@ -12,8 +12,28 @@ namespace RHI
 {
     GraphicsPipeline::~GraphicsPipeline()
     {
-        if (m_Pipeline) vkDestroyPipeline(m_Device->GetLogicalDevice(), m_Pipeline, nullptr);
-        if (m_Layout) vkDestroyPipelineLayout(m_Device->GetLogicalDevice(), m_Layout, nullptr);
+        if (!m_Device) return;
+
+        VkDevice logicalDevice = m_Device->GetLogicalDevice();
+        if (m_Pipeline)
+        {
+            VkPipeline pipeline = m_Pipeline;
+            m_Device->SafeDestroy([logicalDevice, pipeline]()
+            {
+                vkDestroyPipeline(logicalDevice, pipeline, nullptr);
+            });
+            m_Pipeline = VK_NULL_HANDLE;
+        }
+
+        if (m_Layout)
+        {
+            VkPipelineLayout layout = m_Layout;
+            m_Device->SafeDestroy([logicalDevice, layout]()
+            {
+                vkDestroyPipelineLayout(logicalDevice, layout, nullptr);
+            });
+            m_Layout = VK_NULL_HANDLE;
+        }
     }
 
     PipelineBuilder::PipelineBuilder(std::shared_ptr<VulkanDevice> device) : m_Device(device)
