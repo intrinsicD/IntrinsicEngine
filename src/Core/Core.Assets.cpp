@@ -10,6 +10,7 @@ module;
 
 module Core:Assets.Impl;
 import :Assets;
+import :Logging;
 
 namespace Core::Assets
 {
@@ -168,7 +169,7 @@ namespace Core::Assets
             m_PersistentListeners.clear();
 
             auto view = m_Registry.view<AssetInfo>();
-            toDestroy.reserve(view.size_hint());
+            toDestroy.reserve(view.storage()->size());
             for (auto entity : view)
                 toDestroy.push_back(entity);
         }
@@ -237,7 +238,7 @@ namespace Core::Assets
         {
             std::shared_lock lock(m_Mutex);
             auto view = m_Registry.view<AssetInfo>();
-            snapshot.reserve(view.size_hint());
+            snapshot.reserve(view.storage()->size());
             for (auto [entity, info] : view.each())
             {
                 AssetSnapshot entry{entity, info, {}, false};
