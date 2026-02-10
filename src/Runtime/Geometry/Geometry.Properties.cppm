@@ -430,17 +430,6 @@ export namespace Geometry
         return Remove(id);
     }
 
-    inline bool PropertyRegistry::Remove(PropertyId id)
-    {
-        if (id >= m_Storages.size()) return false;
-        if (!m_Storages[id]) return false;
-
-        // Keep IDs dense: other code enumerates storages by index (Find, Resize, Swap, etc.).
-        // Leaving holes (nullptr) would crash later when iterating.
-        m_Storages.erase(m_Storages.begin() + static_cast<std::ptrdiff_t>(id));
-        return true;
-    }
-
     template <class T>
     class Property
     {
