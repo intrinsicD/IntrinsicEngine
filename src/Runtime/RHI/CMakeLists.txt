@@ -59,6 +59,9 @@ target_sources(${target_name}
 )
 
 target_include_directories(${target_name} PUBLIC .)
+target_include_directories(${target_name} SYSTEM PUBLIC
+        ${vma_SOURCE_DIR}/include
+)
 
 target_link_libraries(${target_name}
         PUBLIC

@@ -20,6 +20,7 @@ add_executable(${target_name}
         Test_RuntimeSelection_Multi.cpp
         Test_TextureMaterialHotReload.cpp
         Test_RuntimeCulling.cpp
+        Test_CoreFrameGraph.cpp
 )
 
 #Apply Strict Flags ONLY to our tests
@@ -54,6 +55,35 @@ if(INTRINSIC_LLVM_SYMBOLIZER)
 endif()
 
 gtest_discover_tests(${target_name}
+    PROPERTIES
+    ENVIRONMENT "${_intrinsic_test_env}"
+    DISCOVERY_MODE POST_BUILD
+)
+
+# --- Standalone Core-only tests (no Runtime dependency) ---
+set(core_test_target IntrinsicCoreTests)
+add_executable(${core_test_target}
+        Test_BoundedHeap.cpp
+        Test_CoreMemory.cpp
+        Test_CoreTasks.cpp
+        Test_CoreHandle.cpp
+        Test_CoreHash.cpp
+        Test_CoreFrameGraph.cpp
+)
+
+target_compile_options(${core_test_target} PRIVATE ${INTRINSIC_COMPILE_FLAGS})
+target_link_options(${core_test_target} PRIVATE ${INTRINSIC_LINK_FLAGS})
+set_target_properties(${core_test_target} PROPERTIES CXX_SCAN_FOR_MODULES ON)
+
+target_link_libraries(${core_test_target}
+        PRIVATE
+        IntrinsicConfig
+        IntrinsicCore
+        GTest::gtest_main
+        dl
+)
+
+gtest_discover_tests(${core_test_target}
     PROPERTIES
     ENVIRONMENT "${_intrinsic_test_env}"
     DISCOVERY_MODE POST_BUILD

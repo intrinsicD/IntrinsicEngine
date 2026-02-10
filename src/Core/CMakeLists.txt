@@ -33,6 +33,7 @@ target_sources(${target_name}
         Core.ResourcePool.cppm
         Core.Profiling.cppm
         Core.Telemetry.cppm
+        Core.FrameGraph.cppm
         PRIVATE
         FILE_SET core_impl TYPE CXX_MODULES FILES
         Core.Memory.cpp
@@ -42,6 +43,7 @@ target_sources(${target_name}
         Core.Filesystem.cpp
         Core.Input.cpp
         Core.Assets.cpp
+        Core.FrameGraph.cpp
 )
 
 target_include_directories(${target_name} PUBLIC .)
