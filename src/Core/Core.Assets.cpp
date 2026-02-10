@@ -168,7 +168,7 @@ namespace Core::Assets
             m_PersistentListeners.clear();
 
             auto view = m_Registry.view<AssetInfo>();
-            toDestroy.reserve(view.size_hint());
+            toDestroy.reserve(view.size());
             for (auto entity : view)
                 toDestroy.push_back(entity);
         }
@@ -237,7 +237,7 @@ namespace Core::Assets
         {
             std::shared_lock lock(m_Mutex);
             auto view = m_Registry.view<AssetInfo>();
-            snapshot.reserve(view.size_hint());
+            snapshot.reserve(view.size());
             for (auto [entity, info] : view.each())
             {
                 AssetSnapshot entry{entity, info, {}, false};
