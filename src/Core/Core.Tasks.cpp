@@ -161,18 +161,23 @@ namespace Core::Tasks
 
     void YieldAwaiter::await_suspend(std::coroutine_handle<> h) const noexcept
     {
+        // YieldAwaiter does not carry an alive token; the coroutine is guaranteed
+        // alive at the point of co_await since it's executing inside the frame.
         Scheduler::Reschedule(h);
     }
 
-    void Scheduler::Reschedule(std::coroutine_handle<> h)
+    void Scheduler::Reschedule(std::coroutine_handle<> h, std::shared_ptr<std::atomic<bool>> alive)
     {
         if (!s_Ctx) return;
         if (!h) return;
 
         // Enqueue a task that runs exactly one coroutine slice.
-        // The coroutine runs until its next suspension point (e.g., Yield) or completion.
-        DispatchInternal(LocalTask([h]() mutable {
-            if (!h) return;
+        // The alive token (if present) allows detecting if the owning Job was
+        // destroyed before this task executes, preventing use-after-free.
+        DispatchInternal(LocalTask([h, alive = std::move(alive)]() mutable {
+            // If the owning Job was destroyed, the coroutine frame is gone.
+            if (alive && !alive->load(std::memory_order_acquire))
+                return;
 
             h.resume();
 
@@ -188,10 +193,12 @@ namespace Core::Tasks
         if (!job.Valid()) return;
 
         auto h = job.m_Handle;
+        auto alive = job.m_Alive; // Share the lifetime token with the scheduler
         job.m_Handle = {};
+        job.m_Alive = nullptr; // Transfer ownership to scheduler
 
         // Treat initial start just like any other continuation.
-        Reschedule(h);
+        Reschedule(h, std::move(alive));
     }
 
     void Scheduler::Initialize(unsigned threadCount)

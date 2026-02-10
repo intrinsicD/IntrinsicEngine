@@ -9,6 +9,7 @@ module ECS:Components.Hierarchy.Impl;
 import :Components.Hierarchy;
 import :Components.Transform;
 import :Scene;
+import Core;
 
 namespace ECS::Components::Hierarchy::Detail
 {
@@ -109,7 +110,8 @@ namespace ECS::Components::Hierarchy
         // If we try to parent A to B, but B is a child of A, we create an infinite loop.
         if (Detail::IsDescendant(registry, child, newParent))
         {
-            // Log Error: "Cannot attach entity to its own descendant"
+            Core::Log::Warn("Hierarchy::Attach -- cycle detected: cannot attach entity {} to its own descendant {}",
+                            static_cast<uint32_t>(child), static_cast<uint32_t>(newParent));
             return;
         }
 
@@ -132,10 +134,24 @@ namespace ECS::Components::Hierarchy
             glm::mat4 newLocalMat = invParent * childWorld.Matrix;
 
             // Decompose newLocalMat back into Position/Rotation/Scale
-            // (GLM provides helper for this, or you can implement it)
             glm::vec3 skew;
             glm::vec4 perspective;
             glm::decompose(newLocalMat, childLocal.Scale, childLocal.Rotation, childLocal.Position, skew, perspective);
+
+            // Validate decomposition result: singular parent matrices (scale=0) produce NaN.
+            if (glm::any(glm::isnan(childLocal.Position)) ||
+                glm::any(glm::isnan(childLocal.Scale)) ||
+                glm::any(glm::isnan(glm::vec4(childLocal.Rotation.x, childLocal.Rotation.y,
+                                               childLocal.Rotation.z, childLocal.Rotation.w))))
+            {
+                Core::Log::Warn("Hierarchy::Attach -- matrix decomposition produced NaN "
+                                "(singular parent matrix?), keeping original local transform for entity {}",
+                                static_cast<uint32_t>(child));
+                // Restore identity-ish local transform rather than propagating NaN.
+                childLocal.Position = glm::vec3(0.0f);
+                childLocal.Rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+                childLocal.Scale = glm::vec3(1.0f);
+            }
 
             // Mark for next frame update using tag component
             registry.emplace_or_replace<Transform::IsDirtyTag>(child);
