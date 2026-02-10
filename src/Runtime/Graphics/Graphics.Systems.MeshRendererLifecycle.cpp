@@ -123,4 +123,25 @@ namespace Graphics::Systems::MeshRendererLifecycle
             mr.GpuSlot = ECS::MeshRenderer::Component::kInvalidSlot;
         }
     }
+
+    void RegisterSystem(Core::FrameGraph& graph,
+                        entt::registry& registry,
+                        GPUScene& gpuScene,
+                        const Core::Assets::AssetManager& assetManager,
+                        const MaterialSystem& materialSystem,
+                        const GeometryPool& geometryStorage,
+                        uint32_t defaultTextureId)
+    {
+        graph.AddPass("MeshRendererLifecycle",
+            [](Core::FrameGraphBuilder& builder)
+            {
+                builder.Read<ECS::Components::Transform::WorldMatrix>();
+                builder.Write<ECS::MeshRenderer::Component>();
+                builder.WaitFor("TransformUpdate"_id);
+            },
+            [&registry, &gpuScene, &assetManager, &materialSystem, &geometryStorage, defaultTextureId]()
+            {
+                OnUpdate(registry, gpuScene, assetManager, materialSystem, geometryStorage, defaultTextureId);
+            });
+    }
 }

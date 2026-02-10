@@ -39,6 +39,11 @@ export namespace Runtime
         virtual void OnStart() = 0;
         virtual void OnUpdate(float deltaTime) = 0;
         virtual void OnRender() = 0; // Optional custom rendering hook
+
+        // Override to register additional systems into the FrameGraph each frame.
+        // Called after the engine's core systems are registered but before Compile/Execute.
+        // Client systems (e.g. AxisRotator, gameplay logic) should be registered here.
+        virtual void OnRegisterSystems(Core::FrameGraph& graph, float deltaTime) {}
         entt::entity SpawnModel(Core::Assets::AssetHandle modelHandle,
                                 Core::Assets::AssetHandle materialHandle,
                                 glm::vec3 position,
@@ -73,6 +78,7 @@ export namespace Runtime
         Core::Assets::AssetManager m_AssetManager;
         Core::Memory::LinearArena m_FrameArena; // 1 MB per frame
         Core::Memory::ScopeStack m_FrameScope; // per-frame scope allocator with destructors
+        Core::FrameGraph m_FrameGraph;         // CPU-side system scheduling DAG (uses m_FrameScope)
         Graphics::GeometryPool m_GeometryStorage;
         std::unique_ptr<Graphics::RenderSystem> m_RenderSystem;
         std::unique_ptr<Graphics::MaterialSystem> m_MaterialSystem;

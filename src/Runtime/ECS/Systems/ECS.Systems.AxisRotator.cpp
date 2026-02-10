@@ -23,4 +23,19 @@ namespace ECS::Systems::AxisRotator
             registry.emplace_or_replace<Components::Transform::IsDirtyTag>(entity);
         }
     }
+
+    void RegisterSystem(Core::FrameGraph& graph, entt::registry& registry, float dt)
+    {
+        graph.AddPass("AxisRotator",
+            [](Core::FrameGraphBuilder& builder)
+            {
+                builder.Read<Components::AxisRotator::Component>();
+                builder.Write<Components::Transform::Component>();
+                builder.Write<Components::Transform::IsDirtyTag>();
+            },
+            [&registry, dt]()
+            {
+                OnUpdate(registry, dt);
+            });
+    }
 }

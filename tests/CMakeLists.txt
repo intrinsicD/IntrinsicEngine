@@ -21,6 +21,7 @@ add_executable(${target_name}
         Test_TextureMaterialHotReload.cpp
         Test_RuntimeCulling.cpp
         Test_CoreFrameGraph.cpp
+        Test_FrameGraphSystems.cpp
 )
 
 #Apply Strict Flags ONLY to our tests
@@ -84,6 +85,32 @@ target_link_libraries(${core_test_target}
 )
 
 gtest_discover_tests(${core_test_target}
+    PROPERTIES
+    ENVIRONMENT "${_intrinsic_test_env}"
+    DISCOVERY_MODE POST_BUILD
+)
+
+# --- Core + ECS tests (FrameGraph system integration) ---
+set(ecs_test_target IntrinsicECSTests)
+add_executable(${ecs_test_target}
+        Test_RuntimeECS.cpp
+        Test_FrameGraphSystems.cpp
+)
+
+target_compile_options(${ecs_test_target} PRIVATE ${INTRINSIC_COMPILE_FLAGS})
+target_link_options(${ecs_test_target} PRIVATE ${INTRINSIC_LINK_FLAGS})
+set_target_properties(${ecs_test_target} PROPERTIES CXX_SCAN_FOR_MODULES ON)
+
+target_link_libraries(${ecs_test_target}
+        PRIVATE
+        IntrinsicConfig
+        IntrinsicCore
+        IntrinsicECS
+        GTest::gtest_main
+        dl
+)
+
+gtest_discover_tests(${ecs_test_target}
     PROPERTIES
     ENVIRONMENT "${_intrinsic_test_env}"
     DISCOVERY_MODE POST_BUILD

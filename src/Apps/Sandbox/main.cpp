@@ -244,10 +244,6 @@ public:
         }
 
         {
-            ECS::Systems::AxisRotator::OnUpdate(m_Scene.GetRegistry(), dt);
-        }
-
-        {
             auto view = m_Scene.GetRegistry().view<
                 ECS::Components::Transform::Component, ECS::MeshCollider::Component>();
             for (auto [entity, transform, collider] : view.each())
@@ -291,6 +287,11 @@ public:
 
     void OnRender() override
     {
+    }
+
+    void OnRegisterSystems(Core::FrameGraph& graph, float deltaTime) override
+    {
+        ECS::Systems::AxisRotator::RegisterSystem(graph, m_Scene.GetRegistry(), deltaTime);
     }
 
     void DrawHierarchyPanel()

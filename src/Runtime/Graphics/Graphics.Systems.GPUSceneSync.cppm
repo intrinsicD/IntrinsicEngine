@@ -4,6 +4,7 @@ module;
 
 export module Graphics:Systems.GPUSceneSync;
 
+import Core;
 import :GPUScene;
 import :MaterialSystem;
 
@@ -22,4 +23,14 @@ export namespace Graphics::Systems::GPUSceneSync
                   const Core::Assets::AssetManager& assetManager,
                   const MaterialSystem& materialSystem,
                   uint32_t defaultTextureId);
+
+    // Register this system into a FrameGraph with its dependency declarations.
+    // Declares: Read<Transform::WorldMatrix>, Read<MeshRenderer::Component>,
+    //           Write<Transform::WorldUpdatedTag>, WaitFor("TransformUpdate"), Signal("GPUSceneReady").
+    void RegisterSystem(Core::FrameGraph& graph,
+                        entt::registry& registry,
+                        GPUScene& gpuScene,
+                        const Core::Assets::AssetManager& assetManager,
+                        const MaterialSystem& materialSystem,
+                        uint32_t defaultTextureId);
 }

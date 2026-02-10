@@ -7,6 +7,8 @@ import :Systems.Transform;
 import :Components.Transform;
 import :Components.Hierarchy;
 
+using Core::Hash::operator""_id;
+
 namespace ECS::Systems::Transform::Detail
 {
     void UpdateHierarchy(entt::registry& reg, entt::entity entity,
@@ -70,5 +72,23 @@ namespace ECS::Systems::Transform
                 Detail::UpdateHierarchy(registry, entity, glm::mat4(1.0f), false);
             }
         }
+    }
+
+    void RegisterSystem(Core::FrameGraph& graph, entt::registry& registry)
+    {
+        graph.AddPass("TransformUpdate",
+            [](Core::FrameGraphBuilder& builder)
+            {
+                builder.Read<Components::Transform::Component>();
+                builder.Read<Components::Hierarchy::Component>();
+                builder.Write<Components::Transform::WorldMatrix>();
+                builder.Write<Components::Transform::IsDirtyTag>();
+                builder.Write<Components::Transform::WorldUpdatedTag>();
+                builder.Signal("TransformUpdate"_id);
+            },
+            [&registry]()
+            {
+                OnUpdate(registry);
+            });
     }
 }

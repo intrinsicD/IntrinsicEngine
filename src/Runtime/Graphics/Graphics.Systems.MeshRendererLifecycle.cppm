@@ -4,6 +4,7 @@ module;
 
 export module Graphics:Systems.MeshRendererLifecycle;
 
+import Core;
 import :Geometry;
 import :GPUScene;
 import :MaterialSystem;
@@ -23,4 +24,14 @@ export namespace Graphics::Systems::MeshRendererLifecycle
                   const MaterialSystem& materialSystem,
                   const GeometryPool& geometryStorage,
                   uint32_t defaultTextureId);
+
+    // Register this system into a FrameGraph with its dependency declarations.
+    // Declares: Read<Transform::WorldMatrix>, Write<MeshRenderer::Component>, WaitFor("TransformUpdate").
+    void RegisterSystem(Core::FrameGraph& graph,
+                        entt::registry& registry,
+                        GPUScene& gpuScene,
+                        const Core::Assets::AssetManager& assetManager,
+                        const MaterialSystem& materialSystem,
+                        const GeometryPool& geometryStorage,
+                        uint32_t defaultTextureId);
 }
