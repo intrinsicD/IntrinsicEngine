@@ -3,6 +3,8 @@
 #include <memory>
 #include <thread>
 #include <type_traits>
+#include <atomic>
+#include <vector>
 
 import Core;
 import Graphics;
@@ -339,6 +341,127 @@ TEST(AssetSystem, TryGetFast_HotPathOptimization)
     EXPECT_EQ(failHandle, nullptr);
 
     manager.EndReadPhase();
+
+    Core::Tasks::Scheduler::Shutdown();
+}
+
+// ---------------------------------------------------------------------------
+// Tests for quick-win fixes
+// ---------------------------------------------------------------------------
+
+// Phase 6: Verify AssetLease PinCount is correct under concurrent copy/destroy.
+TEST(AssetSystem, Lease_ConcurrentPinUnpin)
+{
+    Core::Tasks::Scheduler::Initialize(4);
+    AssetManager manager;
+
+    auto handle = manager.Load<int>("shared_val", [](const std::string&, AssetHandle)
+    {
+        return std::make_shared<int>(999);
+    });
+
+    Core::Tasks::Scheduler::WaitForAll();
+
+    // Acquire a base lease
+    auto baseResult = manager.AcquireLease<int>(handle);
+    ASSERT_TRUE(baseResult.has_value());
+    auto baseLease = *baseResult;
+
+    // Spawn many threads that copy and destroy leases concurrently
+    constexpr int kThreads = 8;
+    constexpr int kIterations = 1000;
+    std::atomic<int> successCount{0};
+    std::vector<std::thread> threads;
+
+    for (int t = 0; t < kThreads; ++t)
+    {
+        threads.emplace_back([&baseLease, &successCount]()
+        {
+            for (int i = 0; i < kIterations; ++i)
+            {
+                // Copy (pins)
+                AssetLease<int> copy = baseLease;
+                if (copy.get() && *copy == 999)
+                    successCount.fetch_add(1, std::memory_order_relaxed);
+                // Destructor (unpins)
+            }
+        });
+    }
+
+    for (auto& th : threads)
+        th.join();
+
+    // All iterations should have seen the value (no torn reads)
+    EXPECT_EQ(successCount.load(), kThreads * kIterations);
+
+    // Base lease should still be valid
+    ASSERT_NE(baseLease.get(), nullptr);
+    EXPECT_EQ(*baseLease, 999);
+
+    Core::Tasks::Scheduler::Shutdown();
+}
+
+// Phase 7: Verify AssetManager::Clear() doesn't crash and properly resets state.
+TEST(AssetSystem, Clear_SafeWithMultipleAssets)
+{
+    Core::Tasks::Scheduler::Initialize(2);
+    AssetManager manager;
+
+    // Load several assets
+    auto loader = [](const std::string& path, AssetHandle) -> std::shared_ptr<int>
+    {
+        return std::make_shared<int>(42);
+    };
+
+    auto h1 = manager.Load<int>("asset_a", loader);
+    auto h2 = manager.Load<int>("asset_b", loader);
+    auto h3 = manager.Load<int>("asset_c", loader);
+
+    Core::Tasks::Scheduler::WaitForAll();
+
+    EXPECT_EQ(manager.GetState(h1), LoadState::Ready);
+    EXPECT_EQ(manager.GetState(h2), LoadState::Ready);
+    EXPECT_EQ(manager.GetState(h3), LoadState::Ready);
+
+    // Clear should not crash even with multiple loaded assets
+    manager.Clear();
+
+    // All handles should now be invalid/unloaded
+    EXPECT_EQ(manager.GetState(h1), LoadState::Unloaded);
+    EXPECT_EQ(manager.GetState(h2), LoadState::Unloaded);
+    EXPECT_EQ(manager.GetState(h3), LoadState::Unloaded);
+
+    Core::Tasks::Scheduler::Shutdown();
+}
+
+// Phase 7: Verify Clear() is safe when leases are still held.
+TEST(AssetSystem, Clear_WhileLeaseHeld)
+{
+    Core::Tasks::Scheduler::Initialize(1);
+    AssetManager manager;
+
+    auto handle = manager.Load<int>("leased", [](const std::string&, AssetHandle)
+    {
+        return std::make_shared<int>(77);
+    });
+
+    Core::Tasks::Scheduler::WaitForAll();
+
+    // Acquire lease before clearing
+    auto leaseResult = manager.AcquireLease<int>(handle);
+    ASSERT_TRUE(leaseResult.has_value());
+    auto lease = *leaseResult;
+    EXPECT_EQ(*lease, 77);
+
+    // Clear the manager — should not crash even though lease is held
+    manager.Clear();
+
+    // Lease should still hold the old value (backed by shared_ptr to slot)
+    ASSERT_NE(lease.get(), nullptr);
+    EXPECT_EQ(*lease, 77);
+
+    // Handle is now invalid
+    EXPECT_EQ(manager.GetState(handle), LoadState::Unloaded);
 
     Core::Tasks::Scheduler::Shutdown();
 }

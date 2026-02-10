@@ -163,7 +163,9 @@ export namespace Core::Assets
         {
             if (m_Slot)
             {
-                m_Slot->PinCount.fetch_sub(1, std::memory_order_relaxed);
+                // release ensures all accesses through this lease are visible to the
+                // thread that performs the reload (which observes PinCount == 0).
+                m_Slot->PinCount.fetch_sub(1, std::memory_order_release);
                 m_Slot.reset();
             }
         }
@@ -179,7 +181,9 @@ export namespace Core::Assets
         {
             if (m_Slot)
             {
-                m_Slot->PinCount.fetch_add(1, std::memory_order_relaxed);
+                // acquire ensures subsequent reads through this lease see writes made
+                // by the thread that published (or reloaded) the resource.
+                m_Slot->PinCount.fetch_add(1, std::memory_order_acquire);
             }
         }
 
