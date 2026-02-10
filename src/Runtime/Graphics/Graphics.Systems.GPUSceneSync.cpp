@@ -12,6 +12,8 @@ import Core;
 import :MaterialSystem;
 import :Material;
 
+using namespace Core::Hash;
+
 namespace Graphics::Systems::GPUSceneSync
 {
     void OnUpdate(entt::registry& registry,

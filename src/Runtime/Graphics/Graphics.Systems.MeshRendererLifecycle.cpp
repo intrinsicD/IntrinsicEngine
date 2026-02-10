@@ -14,6 +14,8 @@ import :Geometry;
 import Core;
 import ECS;
 
+using namespace Core::Hash;
+
 namespace Graphics::Systems::MeshRendererLifecycle
 {
     namespace
