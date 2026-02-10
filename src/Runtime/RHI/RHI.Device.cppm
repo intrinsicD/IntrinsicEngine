@@ -99,7 +99,11 @@ namespace RHI
         // GPU-completion based deferred destruction (timeline).
         // ---------------------------------------------------------------------
         // Returns the last value signaled on the graphics timeline.
-        [[nodiscard]] uint64_t GetGraphicsTimelineValue() const { return m_GraphicsTimelineValue; }
+        // Thread-safe: may be called from any thread (e.g. asset loaders calling SafeDestroy).
+        [[nodiscard]] uint64_t GetGraphicsTimelineValue() const
+        {
+            return m_GraphicsTimelineValue.load(std::memory_order_acquire);
+        }
 
         // Signal the graphics timeline and return the signaled value.
         // Call from the renderer exactly once per graphics-queue submit.
@@ -166,7 +170,7 @@ namespace RHI
         // Timeline semaphore to track completion on the graphics queue.
         VkSemaphore m_GraphicsTimelineSemaphore = VK_NULL_HANDLE;
         std::atomic<uint64_t> m_GraphicsTimelineNextValue{1};
-        uint64_t m_GraphicsTimelineValue = 0;
+        std::atomic<uint64_t> m_GraphicsTimelineValue{0};
 
         struct DeferredDelete
         {

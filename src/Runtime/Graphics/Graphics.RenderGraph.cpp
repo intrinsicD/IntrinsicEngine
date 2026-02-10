@@ -484,6 +484,25 @@ namespace Graphics
         return result;
     }
 
+    namespace
+    {
+        // Single source of truth for write-access detection across all barrier paths.
+        // Used by image barriers, buffer barriers, and the adjacency-list builder.
+        constexpr VkAccessFlags2 kWriteAccessMask =
+            VK_ACCESS_2_MEMORY_WRITE_BIT |
+            VK_ACCESS_2_SHADER_WRITE_BIT |
+            VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT |
+            VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
+            VK_ACCESS_2_TRANSFER_WRITE_BIT |
+            VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT |
+            VK_ACCESS_2_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
+
+        [[nodiscard]] constexpr bool IsWriteAccessCheck(VkAccessFlags2 a) noexcept
+        {
+            return (a & kWriteAccessMask) != 0;
+        }
+    }
+
     void RenderGraph::Compile(uint32_t frameIndex)
     {
         m_CompiledFrameIndex = frameIndex;
@@ -539,12 +558,8 @@ namespace Graphics
                 if (res.Type == ResourceType::Buffer) return;
                 if (res.Type == ResourceType::Import && res.PhysicalBuffer) return;
 
-                const bool prevWrite = (res.LastUsageAccess & (VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_SHADER_WRITE_BIT |
-                    VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
-                    VK_ACCESS_2_TRANSFER_WRITE_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT));
-                const bool currWrite = (dstAccess & (VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_SHADER_WRITE_BIT |
-                    VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
-                    VK_ACCESS_2_TRANSFER_WRITE_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT));
+                const bool prevWrite = IsWriteAccessCheck(res.LastUsageAccess);
+                const bool currWrite = IsWriteAccessCheck(dstAccess);
                 const bool layoutMismatch = (res.CurrentLayout != targetLayout);
                 const bool isInitial = (res.LastUsageStage == VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT && res.LastUsageAccess == 0);
 
@@ -675,10 +690,8 @@ namespace Graphics
                     PhysicalBuffer);
                 if (!isBuffer) continue;
 
-                bool prevWrite = (res.LastUsageAccess & (VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_SHADER_WRITE_BIT |
-                    VK_ACCESS_2_TRANSFER_WRITE_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT));
-                bool currWrite = (node->Access & (VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_SHADER_WRITE_BIT |
-                    VK_ACCESS_2_TRANSFER_WRITE_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT));
+                bool prevWrite = IsWriteAccessCheck(res.LastUsageAccess);
+                bool currWrite = IsWriteAccessCheck(node->Access);
 
                 if ((prevWrite || currWrite) && res.LastUsageStage != VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT)
                 {
@@ -708,21 +721,6 @@ namespace Graphics
         // 3. Dependency analysis (DAG build + layering for parallel recording)
         BuildAdjacencyList();
         TopologicalSortIntoLayers();
-    }
-
-    namespace
-    {
-        [[nodiscard]] inline bool IsWriteAccess(VkAccessFlags2 a) noexcept
-        {
-            // Conservative: any write bit means write.
-            return (a & (VK_ACCESS_2_MEMORY_WRITE_BIT |
-                         VK_ACCESS_2_SHADER_WRITE_BIT |
-                         VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT |
-                         VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
-                         VK_ACCESS_2_TRANSFER_WRITE_BIT |
-                         VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT | // already implies shader write but keep explicit
-                         VK_ACCESS_2_ACCELERATION_STRUCTURE_WRITE_BIT_KHR)) != 0;
-        }
     }
 
     void RenderGraph::BuildAdjacencyList()
@@ -759,7 +757,7 @@ namespace Graphics
             {
                 if (node->ID >= m_ActiveResourceCount) continue;
 
-                const bool isWrite = IsWriteAccess(node->Access);
+                const bool isWrite = IsWriteAccessCheck(node->Access);
                 const bool isRead = !isWrite; // treat all non-write accesses as read
 
                 if (isRead)

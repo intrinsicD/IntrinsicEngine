@@ -157,7 +157,7 @@ namespace RHI
     uint64_t VulkanDevice::SignalGraphicsTimeline()
     {
         const uint64_t value = m_GraphicsTimelineNextValue.fetch_add(1, std::memory_order_relaxed);
-        m_GraphicsTimelineValue = value;
+        m_GraphicsTimelineValue.store(value, std::memory_order_release);
         return value;
     }
 
@@ -200,7 +200,10 @@ namespace RHI
     {
         // Defer until the *next* graphics submit completes.
         // If no submit has happened yet, fall back to value 1 (first submit).
-        const uint64_t target = (m_GraphicsTimelineValue > 0) ? (m_GraphicsTimelineValue + 1) : 1;
+        // acquire pairs with the release in SignalGraphicsTimeline() to ensure
+        // we see the latest signaled value from any thread.
+        const uint64_t current = m_GraphicsTimelineValue.load(std::memory_order_acquire);
+        const uint64_t target = (current > 0) ? (current + 1) : 1;
         SafeDestroyAfter(target, std::move(deleteFn));
     }
 

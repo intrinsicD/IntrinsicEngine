@@ -159,21 +159,33 @@ namespace Core::Assets
 
     void AssetManager::Clear()
     {
-        // 1. Clear auxiliary maps under lock
+        // 1. Snapshot entities to destroy and clear auxiliary maps under lock.
+        std::vector<entt::entity> toDestroy;
         {
             std::unique_lock lock(m_Mutex);
             m_Lookup.clear();
             m_OneShotListeners.clear();
             m_PersistentListeners.clear();
+
+            auto view = m_Registry.view<AssetInfo>();
+            toDestroy.reserve(view.size_hint());
+            for (auto entity : view)
+                toDestroy.push_back(entity);
         }
 
-        // 2. Clear registry WITHOUT holding the main mutex.
-        // This triggers destructors (e.g. ~Material -> MaterialSystem::Destroy -> AssetManager::Unlisten).
-        // Since we released the lock above, Unlisten() can safely re-acquire it.
-        // This avoids the recursive lock crash/deadlock.
+        // 2. Destroy entities one-by-one WITHOUT holding the main mutex.
+        // Destructors (e.g. ~Material -> MaterialSystem::Destroy -> AssetManager::Unlisten)
+        // can safely re-acquire m_Mutex because we released it above.
+        for (auto entity : toDestroy)
+        {
+            if (m_Registry.valid(entity))
+                m_Registry.destroy(entity);
+        }
+
+        // 3. Final registry cleanup (should be empty; ensures no orphaned entities remain).
         m_Registry.clear();
 
-        // 3. Clear event queue
+        // 4. Drain event queue
         {
             std::lock_guard qLock(m_EventQueueMutex);
             m_ReadyQueue.clear();
@@ -209,24 +221,47 @@ namespace Core::Assets
 
     void AssetManager::AssetsUiPanel()
     {
-        // 1. HEADER & STATISTICS
+        // 1. SNAPSHOT UNDER LOCK
         // ---------------------------------------------------------------------
-        // Quick glance counters
+        // Snapshot asset state to avoid racing with background loader threads that
+        // modify m_Registry under lock in FinalizeLoad() / Reload().
+        struct AssetSnapshot
+        {
+            entt::entity Entity;
+            AssetInfo Info;
+            std::string SourcePath;
+            bool HasReloader = false;
+        };
+
+        std::vector<AssetSnapshot> snapshot;
+        {
+            std::shared_lock lock(m_Mutex);
+            auto view = m_Registry.view<AssetInfo>();
+            snapshot.reserve(view.size_hint());
+            for (auto [entity, info] : view.each())
+            {
+                AssetSnapshot entry{entity, info, {}, false};
+                if (auto* src = m_Registry.try_get<AssetSource>(entity))
+                    entry.SourcePath = src->FilePath.string();
+                entry.HasReloader = m_Registry.any_of<AssetReloader>(entity);
+                snapshot.push_back(std::move(entry));
+            }
+        }
+
+        // 2. HEADER & STATISTICS (from snapshot, no lock needed)
+        // ---------------------------------------------------------------------
         int countReady = 0;
         int countLoading = 0;
         int countFailed = 0;
 
-        // We do a quick pass or maintain these counters atomically in the manager
-        // For UI purposes, iterating the view is fast enough for <10k entities
-        auto view = m_Registry.view<AssetInfo>();
-        for (auto [entity, info] : view.each())
+        for (const auto& entry : snapshot)
         {
-            if (info.State == LoadState::Ready) countReady++;
-            else if (info.State == LoadState::Loading) countLoading++;
-            else if (info.State == LoadState::Failed) countFailed++;
+            if (entry.Info.State == LoadState::Ready) countReady++;
+            else if (entry.Info.State == LoadState::Loading) countLoading++;
+            else if (entry.Info.State == LoadState::Failed) countFailed++;
         }
 
-        ImGui::Text("Total: %d", (int)view.size());
+        ImGui::Text("Total: %d", (int)snapshot.size());
         ImGui::SameLine();
         ImGui::TextColored({0.2f, 0.8f, 0.2f, 1.0f}, "Ready: %d", countReady);
         ImGui::SameLine();
@@ -236,7 +271,7 @@ namespace Core::Assets
 
         ImGui::Separator();
 
-        // 2. SEARCH & FILTER
+        // 3. SEARCH & FILTER
         // ---------------------------------------------------------------------
         static char searchBuffer[128] = "";
         ImGui::InputTextWithHint("##SearchAssets", "Search by Name or Path...", searchBuffer, sizeof(searchBuffer));
@@ -252,13 +287,12 @@ namespace Core::Assets
         ImGui::SameLine();
         ImGui::Checkbox("Failed", &showFailed);
 
-        // 3. ASSET TABLE
+        // 4. ASSET TABLE (from snapshot)
         // ---------------------------------------------------------------------
         ImGuiTableFlags flags = ImGuiTableFlags_ScrollY | ImGuiTableFlags_RowBg |
             ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV |
             ImGuiTableFlags_Resizable | ImGuiTableFlags_Sortable;
 
-        // Determine height (leave space for bottom status bar if needed)
         if (ImGui::BeginTable("AssetTable", 5, flags))
         {
             ImGui::TableSetupColumn("ID", ImGuiTableColumnFlags_WidthFixed, 50.0f);
@@ -269,100 +303,99 @@ namespace Core::Assets
             ImGui::TableHeadersRow();
 
             // Gather filtered list for the Clipper
-            std::vector<entt::entity> filteredEntities;
-            filteredEntities.reserve(view.size());
+            std::vector<size_t> filteredIndices;
+            filteredIndices.reserve(snapshot.size());
 
-            for (auto [entity, info] : view.each())
+            for (size_t idx = 0; idx < snapshot.size(); ++idx)
             {
+                const auto& entry = snapshot[idx];
+
                 // State Filter
-                if (info.State == LoadState::Ready && !showReady) continue;
-                if (info.State == LoadState::Loading && !showLoading) continue;
-                if (info.State == LoadState::Failed && !showFailed) continue;
+                if (entry.Info.State == LoadState::Ready && !showReady) continue;
+                if (entry.Info.State == LoadState::Loading && !showLoading) continue;
+                if (entry.Info.State == LoadState::Failed && !showFailed) continue;
 
                 // Search String Filter
                 if (searchBuffer[0] != '\0')
                 {
-                    // Case-insensitive check (simplified)
                     std::string searchStr = searchBuffer;
-                    std::string nameStr = info.Name;
-                    // Note: In production, use a faster, case-insensitive substring search
-                    if (nameStr.find(searchStr) == std::string::npos) continue;
+                    if (entry.Info.Name.find(searchStr) == std::string::npos) continue;
                 }
 
-                filteredEntities.push_back(entity);
+                filteredIndices.push_back(idx);
             }
 
-            // 4. LIST CLIPPER (Performance for large lists)
+            // 5. LIST CLIPPER (Performance for large lists)
             // -----------------------------------------------------------------
             ImGuiListClipper clipper;
-            clipper.Begin((int)filteredEntities.size());
+            clipper.Begin((int)filteredIndices.size());
 
             while (clipper.Step())
             {
                 for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; i++)
                 {
-                    entt::entity entity = filteredEntities[i];
-                    auto& info = m_Registry.get<AssetInfo>(entity);
-                    auto* reloader = m_Registry.try_get<AssetReloader>(entity);
+                    const auto& entry = snapshot[filteredIndices[i]];
 
-                    ImGui::PushID((int)entity);
+                    ImGui::PushID((int)entry.Entity);
                     ImGui::TableNextRow();
 
                     // --- Col 0: ID ---
                     ImGui::TableSetColumnIndex(0);
-                    ImGui::Text("%d", (uint32_t)entity);
+                    ImGui::Text("%d", (uint32_t)entry.Entity);
 
                     // --- Col 1: State ---
                     ImGui::TableSetColumnIndex(1);
-                    ImGui::TextColored(GetStateColor(info.State), "%s", GetStateString(info.State));
-                    if (ImGui::IsItemHovered() && info.State == LoadState::Failed)
+                    ImGui::TextColored(GetStateColor(entry.Info.State), "%s", GetStateString(entry.Info.State));
+                    if (ImGui::IsItemHovered() && entry.Info.State == LoadState::Failed)
                     {
                         ImGui::SetTooltip("Asset failed to load. Check logs.");
                     }
 
                     // --- Col 2: Type ---
                     ImGui::TableSetColumnIndex(2);
-                    ImGui::TextUnformatted(info.Type.c_str());
+                    ImGui::TextUnformatted(entry.Info.Type.c_str());
 
                     // --- Col 3: Name / Path ---
                     ImGui::TableSetColumnIndex(3);
 
                     // Drag Source Logic: Drag asset from UI into Scene!
-                    ImGui::Selectable(info.Name.c_str(), false, ImGuiSelectableFlags_SpanAllColumns);
+                    ImGui::Selectable(entry.Info.Name.c_str(), false, ImGuiSelectableFlags_SpanAllColumns);
                     if (ImGui::BeginDragDropSource())
                     {
-                        // Pass the AssetHandle (which wraps the entity)
-                        AssetHandle handle{entity};
-                        // We pass the handle ID.
-                        // The receiver (Inspector) must know this is an "ASSET_HANDLE" payload.
+                        AssetHandle handle{entry.Entity};
                         ImGui::SetDragDropPayload("ASSET_HANDLE", &handle, sizeof(AssetHandle));
-
-                        // Preview
-                        ImGui::Text("Assign %s", info.Name.c_str());
+                        ImGui::Text("Assign %s", entry.Info.Name.c_str());
                         ImGui::EndDragDropSource();
                     }
 
-                    if (ImGui::IsItemHovered())
+                    if (ImGui::IsItemHovered() && !entry.SourcePath.empty())
                     {
-                        // If we have source path, show it in tooltip
-                        if (auto* src = m_Registry.try_get<AssetSource>(entity))
-                        {
-                            ImGui::SetTooltip("%s", src->FilePath.string().c_str());
-                        }
+                        ImGui::SetTooltip("%s", entry.SourcePath.c_str());
                     }
 
                     // --- Col 4: Actions ---
                     ImGui::TableSetColumnIndex(4);
 
-                    bool canReload = (reloader != nullptr) && (info.State != LoadState::Loading);
+                    bool canReload = entry.HasReloader && (entry.Info.State != LoadState::Loading);
 
                     if (!canReload) ImGui::BeginDisabled();
                     if (ImGui::Button("Reload"))
                     {
-                        if (reloader)
+                        // Re-acquire lock to safely fetch the reloader action.
+                        // This is safe: we only lock briefly for the single entity.
+                        std::function<void()> reloadAction;
                         {
-                            Log::Info("Manual Reload requested for: {}", info.Name);
-                            reloader->ReloadAction(); // <--- MAGIC HAPPENS HERE
+                            std::shared_lock lock(m_Mutex);
+                            if (m_Registry.valid(entry.Entity))
+                            {
+                                if (auto* reloader = m_Registry.try_get<AssetReloader>(entry.Entity))
+                                    reloadAction = reloader->ReloadAction;
+                            }
+                        }
+                        if (reloadAction)
+                        {
+                            Log::Info("Manual Reload requested for: {}", entry.Info.Name);
+                            reloadAction();
                         }
                     }
                     if (!canReload) ImGui::EndDisabled();
