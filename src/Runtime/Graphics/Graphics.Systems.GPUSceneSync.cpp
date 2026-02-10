@@ -84,4 +84,26 @@ namespace Graphics::Systems::GPUSceneSync
                 registry.remove<ECS::Components::Transform::WorldUpdatedTag>(entt::entity(entity));
         }
     }
+
+    void RegisterSystem(Core::FrameGraph& graph,
+                        entt::registry& registry,
+                        GPUScene& gpuScene,
+                        const Core::Assets::AssetManager& assetManager,
+                        const MaterialSystem& materialSystem,
+                        uint32_t defaultTextureId)
+    {
+        graph.AddPass("GPUSceneSync",
+            [](Core::FrameGraphBuilder& builder)
+            {
+                builder.Read<ECS::Components::Transform::WorldMatrix>();
+                builder.Read<ECS::MeshRenderer::Component>();
+                builder.Write<ECS::Components::Transform::WorldUpdatedTag>();
+                builder.WaitFor("TransformUpdate"_id);
+                builder.Signal("GPUSceneReady"_id);
+            },
+            [&registry, &gpuScene, &assetManager, &materialSystem, defaultTextureId]()
+            {
+                OnUpdate(registry, gpuScene, assetManager, materialSystem, defaultTextureId);
+            });
+    }
 }

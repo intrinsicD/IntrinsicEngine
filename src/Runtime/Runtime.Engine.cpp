@@ -27,7 +27,8 @@ namespace Runtime
 {
     Engine::Engine(const EngineConfig& config) :
         m_FrameArena(config.FrameArenaSize),
-        m_FrameScope(config.FrameArenaSize)
+        m_FrameScope(config.FrameArenaSize),
+        m_FrameGraph(m_FrameScope)
     {
         Core::Tasks::Scheduler::Initialize();
         Core::Filesystem::FileWatcher::Initialize();
@@ -650,36 +651,39 @@ namespace Runtime
                 OnUpdate(static_cast<float>(frameTime));
             }
 
-            // Fixed timestep for physics simulation
+            // --- FrameGraph: register, compile, and execute all systems ---
             {
-                PROFILE_SCOPE("PhysicsUpdate");
-                m_AssetManager.BeginReadPhase();
-                while (accumulator >= dt)
+                PROFILE_SCOPE("FrameGraph");
+                m_FrameGraph.Reset();
+
+                auto& registry = m_Scene.GetRegistry();
+                const float frameDt = static_cast<float>(frameTime);
+
+                // Client/gameplay systems first: they produce dirty state
+                // (e.g. AxisRotator writes Transform::Component + IsDirtyTag).
+                OnRegisterSystems(m_FrameGraph, frameDt);
+
+                // Core engine systems consume dirty state in pipeline order.
+                ECS::Systems::Transform::RegisterSystem(m_FrameGraph, registry);
+
+                if (m_GpuScene && m_MaterialSystem)
                 {
-                    ECS::Systems::Transform::OnUpdate(m_Scene.GetRegistry());
+                    Graphics::Systems::MeshRendererLifecycle::RegisterSystem(
+                        m_FrameGraph, registry, *m_GpuScene, m_AssetManager,
+                        *m_MaterialSystem, m_GeometryStorage, m_DefaultTextureIndex);
 
-                    // Stream updated transforms into GPUScene (sparse retained-mode updates).
-                    if (m_GpuScene)
-                    {
-                        PROFILE_SCOPE("GPUScene.Streaming");
-
-                        Graphics::Systems::MeshRendererLifecycle::OnUpdate(m_Scene.GetRegistry(),
-                                                                           *m_GpuScene,
-                                                                           m_AssetManager,
-                                                                           *m_MaterialSystem,
-                                                                           m_GeometryStorage,
-                                                                           m_DefaultTextureIndex);
-
-                        Graphics::Systems::GPUSceneSync::OnUpdate(m_Scene.GetRegistry(),
-                                                                  *m_GpuScene,
-                                                                  m_AssetManager,
-                                                                  *m_MaterialSystem,
-                                                                  m_DefaultTextureIndex);
-                    }
-
-                    accumulator -= dt;
+                    Graphics::Systems::GPUSceneSync::RegisterSystem(
+                        m_FrameGraph, registry, *m_GpuScene, m_AssetManager,
+                        *m_MaterialSystem, m_DefaultTextureIndex);
                 }
-                m_AssetManager.EndReadPhase();
+
+                auto compileResult = m_FrameGraph.Compile();
+                if (compileResult)
+                {
+                    m_AssetManager.BeginReadPhase();
+                    m_FrameGraph.Execute();
+                    m_AssetManager.EndReadPhase();
+                }
             }
 
             if (m_FramebufferResized)
