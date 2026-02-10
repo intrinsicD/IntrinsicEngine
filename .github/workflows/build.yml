@@ -26,24 +26,27 @@ jobs:
           # 3. Install Vulkan SDK (Required for linking)
           sudo apt-get install -y libvulkan-dev vulkan-tools spirv-tools
 
-      - name: Install Clang 18 & Tools
+      - name: Install Clang 20 & Tools
         run: |
-          # Automated script from llvm.org to fetch clang-18
+          # Automated script from llvm.org to fetch clang-20
+          # Clang 18 has known C++ modules bugs (broken name lookup in default
+          # arguments, std::unexpected not visible from global module fragment).
+          # Clang 20 resolves these.
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
-          sudo ./llvm.sh 18
-          
-          # CRITICAL: Install clang-tools-18 for Module Scanning and GCC-14 STL for <format> support
-          sudo apt-get install -y clang-tools-18 libstdc++-14-dev
+          sudo ./llvm.sh 20
+
+          # CRITICAL: Install clang-tools-20 for Module Scanning and GCC-14 STL for <format> support
+          sudo apt-get install -y clang-tools-20 libstdc++-14-dev
 
       - name: Configure CMake
         # We must explicitly point to the scanner we just installed
         run: |
           cmake -B build -G "Ninja" \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_C_COMPILER=clang-18 \
-            -DCMAKE_CXX_COMPILER=clang++-18 \
-            -DCMAKE_CXX_COMPILER_CLANG_SCAN_DEPS=/usr/bin/clang-scan-deps-18
+            -DCMAKE_C_COMPILER=clang-20 \
+            -DCMAKE_CXX_COMPILER=clang++-20 \
+            -DCMAKE_CXX_COMPILER_CLANG_SCAN_DEPS=/usr/bin/clang-scan-deps-20
 
       - name: Build
         run: cmake --build build
