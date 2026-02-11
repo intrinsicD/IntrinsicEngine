@@ -1,0 +1,19 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": "bash .claude/setup.sh",
+        "timeout": 600
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(cmake *)",
+      "Bash(ninja *)",
+      "Bash(ctest *)",
+      "Bash(cmake --build *)"
+    ]
+  }
+}
