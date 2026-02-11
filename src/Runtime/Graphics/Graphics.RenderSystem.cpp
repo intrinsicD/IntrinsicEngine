@@ -206,52 +206,59 @@ namespace Graphics
         return std::nullopt;
     }
 
-    void RenderSystem::OnUpdate(ECS::Scene& scene, const CameraComponent& camera,
-                                Core::Assets::AssetManager& assetManager)
+    // -------------------------------------------------------------------------
+    // OnUpdate sub-steps
+    // -------------------------------------------------------------------------
+
+    void RenderSystem::BeginFrame(uint64_t currentFrame)
     {
-        const uint64_t currentFrame = m_Device->GetGlobalFrameNumber();
         m_GeometryStorage.ProcessDeletions(currentFrame);
         GarbageCollectRetiredPipelines();
 
         // Apply deferred bindless updates before any render graph recording.
         m_GlobalResources.GetBindlessSystem().FlushPending();
 
-        // ---------------------------------------------------------
-        // 1. Interaction & WSI
-        // ---------------------------------------------------------
         m_Interaction.ProcessReadbacks(currentFrame);
 
         Interface::GUI::BeginFrame();
         Interface::GUI::DrawGUI();
+    }
 
+    bool RenderSystem::AcquireFrame()
+    {
         if (!m_Presentation.BeginFrame())
         {
             Interface::GUI::EndFrame();
-            return;
+            return false;
         }
+        return true;
+    }
 
+    void RenderSystem::UpdateGlobals(const CameraComponent& camera)
+    {
         const uint32_t frameIndex = m_Presentation.GetFrameIndex();
         const auto extent = m_Presentation.GetResolution();
 
-        // ---------------------------------------------------------
-        // 2. Global Resources (Camera, Allocators)
-        // ---------------------------------------------------------
         m_GlobalResources.BeginFrame(frameIndex);
         m_GlobalResources.Update(camera, frameIndex);
 
         ApplyPendingPipelineSwap(extent.width, extent.height);
+    }
 
-        // ---------------------------------------------------------
-        // 3. Prepare Render Graph
-        // ---------------------------------------------------------
+    void RenderSystem::BuildGraph(ECS::Scene& scene, Core::Assets::AssetManager& assetManager,
+                                  const CameraComponent& camera)
+    {
         m_RenderGraph.Reset();
+
+        const uint32_t frameIndex = m_Presentation.GetFrameIndex();
         const uint32_t imageIndex = m_Presentation.GetImageIndex();
+        const auto extent = m_Presentation.GetResolution();
         RenderBlackboard blackboard;
 
         const auto& pendingPick = m_Interaction.GetPendingPick();
         const auto& debugView = m_Interaction.GetDebugViewState();
 
-        // Frame setup pass
+        // Frame setup pass — imports backbuffer and depth into the render graph.
         struct FrameSetupData
         {
             RGResourceHandle Backbuffer;
@@ -284,7 +291,7 @@ namespace Graphics
                                               {
                                               });
 
-        // GPUScene update pass
+        // GPUScene update pass — syncs CPU-side scene data to GPU SSBOs.
         struct SceneUpdateData
         {
             int _dummy = 0;
@@ -309,9 +316,7 @@ namespace Graphics
                                                    if (m_GpuScene) m_GpuScene->Sync(cmd);
                                                });
 
-        // ---------------------------------------------------------
-        // 4. Execute Pipeline
-        // ---------------------------------------------------------
+        // Let the active pipeline register its passes.
         RenderPassContext ctx{
             m_RenderGraph,
             blackboard,
@@ -329,7 +334,6 @@ namespace Graphics
             m_GlobalResources.GetGlobalDescriptorSet(),
             m_GlobalResources.GetDynamicUBOOffset(frameIndex),
             m_GlobalResources.GetBindlessSystem(),
-            // Pass interaction state
             {pendingPick.Pending, pendingPick.X, pendingPick.Y},
             {
                 debugView.Enabled, debugView.ShowInViewport, debugView.DisableCulling, debugView.SelectedResource,
@@ -344,6 +348,11 @@ namespace Graphics
 
         if (m_ActivePipeline)
             m_ActivePipeline->SetupFrame(ctx);
+    }
+
+    void RenderSystem::ExecuteGraph()
+    {
+        const uint32_t frameIndex = m_Presentation.GetFrameIndex();
 
         m_RenderGraph.Compile(frameIndex);
 
@@ -354,11 +363,31 @@ namespace Graphics
             m_ActivePipeline->PostCompile(frameIndex, m_LastDebugImages, m_LastDebugPasses);
 
         m_RenderGraph.Execute(m_Presentation.GetCommandBuffer());
+    }
 
-        // ---------------------------------------------------------
-        // 5. Submit & Present
-        // ---------------------------------------------------------
+    void RenderSystem::EndFrame()
+    {
         m_Presentation.EndFrame();
+    }
+
+    // -------------------------------------------------------------------------
+    // OnUpdate — thin coordinator that calls sub-steps in order
+    // -------------------------------------------------------------------------
+
+    void RenderSystem::OnUpdate(ECS::Scene& scene, const CameraComponent& camera,
+                                Core::Assets::AssetManager& assetManager)
+    {
+        const uint64_t currentFrame = m_Device->GetGlobalFrameNumber();
+
+        BeginFrame(currentFrame);
+
+        if (!AcquireFrame())
+            return;
+
+        UpdateGlobals(camera);
+        BuildGraph(scene, assetManager, camera);
+        ExecuteGraph();
+        EndFrame();
     }
 
     void RenderSystem::OnResize()

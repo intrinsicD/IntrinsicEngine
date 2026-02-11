@@ -17,6 +17,7 @@ namespace Core::Memory
     LinearArena::LinearArena(size_t sizeBytes)
         : m_TotalSize((sizeBytes + CACHE_LINE - 1) & ~(CACHE_LINE - 1))
           , m_OwningThread(std::this_thread::get_id())
+          , m_Generation(Detail::g_NextArenaGeneration.fetch_add(1, std::memory_order_relaxed))
     {
         if (sizeBytes == 0)
         {
@@ -42,6 +43,10 @@ namespace Core::Memory
 
     LinearArena::~LinearArena()
     {
+        // Invalidate generation so any ArenaAllocator still holding a pointer
+        // to this arena will detect the lifetime violation on next allocate().
+        m_Generation = 0;
+
         if (m_Start)
         {
 #if defined(_MSC_VER)
@@ -57,8 +62,12 @@ namespace Core::Memory
           m_TotalSize(other.m_TotalSize),
           m_Offset(other.m_Offset),
           // The thread receiving the move is the new owner.
-          m_OwningThread(std::this_thread::get_id())
+          m_OwningThread(std::this_thread::get_id()),
+          // New generation — any ArenaAllocator holding the old generation will detect the move.
+          m_Generation(Detail::g_NextArenaGeneration.fetch_add(1, std::memory_order_relaxed))
     {
+        // Invalidate the moved-from arena's generation.
+        other.m_Generation = 0;
         other.m_Start = nullptr;
         other.m_TotalSize = 0;
         other.m_Offset = 0;
@@ -70,6 +79,9 @@ namespace Core::Memory
     {
         if (this != &other)
         {
+            // Invalidate our own generation first (any allocators pointing at us are now stale).
+            m_Generation = 0;
+
             // Free our own memory first
             if (m_Start)
             {
@@ -86,8 +98,11 @@ namespace Core::Memory
             m_Offset = other.m_Offset;
             // The thread receiving the move is the new owner.
             m_OwningThread = std::this_thread::get_id();
+            // New generation for the new identity.
+            m_Generation = Detail::g_NextArenaGeneration.fetch_add(1, std::memory_order_relaxed);
 
             // Nullify source
+            other.m_Generation = 0;
             other.m_Start = nullptr;
             other.m_TotalSize = 0;
             other.m_Offset = 0;

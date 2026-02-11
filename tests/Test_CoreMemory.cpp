@@ -542,3 +542,126 @@ TEST(LinearArena, MoveAllowsAllocationOnNewThread)
 
     EXPECT_TRUE(success);
 }
+
+TEST(LinearArena, GenerationAssignedOnConstruction)
+{
+    LinearArena a(1024);
+    LinearArena b(1024);
+
+    // Each arena must get a unique, non-zero generation.
+    EXPECT_NE(a.GetGeneration(), 0u);
+    EXPECT_NE(b.GetGeneration(), 0u);
+    EXPECT_NE(a.GetGeneration(), b.GetGeneration());
+}
+
+TEST(LinearArena, GenerationInvalidatedOnMove)
+{
+    LinearArena a(1024);
+    auto genA = a.GetGeneration();
+    EXPECT_NE(genA, 0u);
+
+    // Move-construct: source generation should become 0, destination gets a new generation.
+    LinearArena b(std::move(a));
+    EXPECT_EQ(a.GetGeneration(), 0u);
+    EXPECT_NE(b.GetGeneration(), 0u);
+    EXPECT_NE(b.GetGeneration(), genA); // New identity after move.
+}
+
+TEST(LinearArena, GenerationInvalidatedOnMoveAssign)
+{
+    LinearArena a(512);
+    LinearArena b(512);
+    auto genA = a.GetGeneration();
+    auto genB = b.GetGeneration();
+
+    // Move-assign a into b: b's old generation is gone, b gets a new one, a becomes 0.
+    b = std::move(a);
+    EXPECT_EQ(a.GetGeneration(), 0u);
+    EXPECT_NE(b.GetGeneration(), 0u);
+    EXPECT_NE(b.GetGeneration(), genA);
+    EXPECT_NE(b.GetGeneration(), genB);
+}
+
+// -----------------------------------------------------------------------------
+// ArenaAllocator Tests
+// -----------------------------------------------------------------------------
+
+TEST(ArenaAllocator, BasicAllocationWorks)
+{
+    LinearArena arena(4096);
+    ArenaAllocator<int> alloc(arena);
+
+    // Allocate a single int — should succeed.
+    int* p = alloc.allocate(1);
+    ASSERT_NE(p, nullptr);
+    *p = 42;
+    EXPECT_EQ(*p, 42);
+
+    // Deallocate is a no-op; should not crash.
+    alloc.deallocate(p, 1);
+}
+
+TEST(ArenaAllocator, WorksWithStdVector)
+{
+    LinearArena arena(4096);
+    ArenaAllocator<int> alloc(arena);
+
+    std::vector<int, ArenaAllocator<int>> vec(alloc);
+    for (int i = 0; i < 100; ++i)
+        vec.push_back(i);
+
+    EXPECT_EQ(vec.size(), 100u);
+    for (int i = 0; i < 100; ++i)
+        EXPECT_EQ(vec[i], i);
+}
+
+TEST(ArenaAllocator, RebindWorks)
+{
+    LinearArena arena(4096);
+    ArenaAllocator<int> intAlloc(arena);
+
+    // Rebind to double.
+    ArenaAllocator<double> doubleAlloc(intAlloc);
+    double* p = doubleAlloc.allocate(1);
+    ASSERT_NE(p, nullptr);
+    *p = 3.14;
+    EXPECT_DOUBLE_EQ(*p, 3.14);
+}
+
+TEST(ArenaAllocator, EqualityComparison)
+{
+    LinearArena a(1024);
+    LinearArena b(1024);
+    ArenaAllocator<int> allocA(a);
+    ArenaAllocator<int> allocA2(a);
+    ArenaAllocator<int> allocB(b);
+
+    EXPECT_EQ(allocA, allocA2); // Same arena.
+    EXPECT_NE(allocA, allocB);  // Different arenas.
+}
+
+#ifndef NDEBUG
+TEST(ArenaAllocatorDeathTest, DetectsUseAfterArenaDestroyed)
+{
+    ArenaAllocator<int>* leaked = nullptr;
+    {
+        LinearArena arena(1024);
+        leaked = new ArenaAllocator<int>(arena);
+        // Arena is destroyed here.
+    }
+    // Allocating from a dead arena's allocator should fire the assert.
+    EXPECT_DEATH(leaked->allocate(1), "arena lifetime violation");
+    delete leaked;
+}
+
+TEST(ArenaAllocatorDeathTest, DetectsUseAfterArenaMovedFrom)
+{
+    LinearArena arena(1024);
+    ArenaAllocator<int> alloc(arena);
+
+    // Move the arena away — the allocator's generation is now stale.
+    LinearArena moved(std::move(arena));
+
+    EXPECT_DEATH(alloc.allocate(1), "arena lifetime violation");
+}
+#endif // NDEBUG
