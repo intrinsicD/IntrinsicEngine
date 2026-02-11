@@ -55,7 +55,7 @@ public:
         m_Camera = m_Scene.GetRegistry().emplace<Graphics::CameraComponent>(m_CameraEntity);
         m_Scene.GetRegistry().emplace<Graphics::OrbitControlComponent>(m_CameraEntity);
 
-        auto textureLoader = [this](const std::filesystem::path& path, Core::Assets::AssetHandle handle)
+        auto textureLoader = [this, &gfx](const std::filesystem::path& path, Core::Assets::AssetHandle handle)
             -> std::shared_ptr<RHI::Texture>
         {
             auto result = Graphics::TextureLoader::LoadAsync(path, *GetDevice(),

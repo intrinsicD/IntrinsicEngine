@@ -1,5 +1,6 @@
 module;
 #include <cstring>
+#include <memory>
 #include "RHI.Vulkan.hpp"
 
 module Runtime.GraphicsBackend;
