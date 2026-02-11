@@ -23,6 +23,29 @@ import Interface;
 
 using namespace Core::Hash;
 
+namespace
+{
+    // File-static pointer for the EnTT on_destroy hook.
+    // Safe because there is exactly one Engine instance per process.
+    Graphics::GPUScene* g_GpuSceneForDestroyHook = nullptr;
+
+    void OnMeshRendererDestroyed(entt::registry& registry, entt::entity entity)
+    {
+        if (!g_GpuSceneForDestroyHook)
+            return;
+
+        auto& mr = registry.get<ECS::MeshRenderer::Component>(entity);
+        if (mr.GpuSlot == ECS::MeshRenderer::Component::kInvalidSlot)
+            return;
+
+        // Deactivate slot (radius = 0 => culler skips it) and free.
+        Graphics::GpuInstanceData inst{};
+        g_GpuSceneForDestroyHook->QueueUpdate(mr.GpuSlot, inst, /*sphere*/ {0.0f, 0.0f, 0.0f, 0.0f});
+        g_GpuSceneForDestroyHook->FreeSlot(mr.GpuSlot);
+        mr.GpuSlot = ECS::MeshRenderer::Component::kInvalidSlot;
+    }
+}
+
 namespace Runtime
 {
     Engine::Engine(const EngineConfig& config) :
@@ -204,8 +227,13 @@ namespace Runtime
             {
                 m_GpuScene = std::make_unique<Graphics::GPUScene>(*m_Device,
                                                                  *p,
-                                                                 m_PipelineLibrary->GetSceneUpdateSetLayout(),
-                                                                 /*maxInstances*/ 100'000);
+                                                                 m_PipelineLibrary->GetSceneUpdateSetLayout());
+
+                // Register EnTT on_destroy hook for immediate GPU slot reclaim.
+                // This provides O(1) cleanup instead of the one-frame-late orphan sweep.
+                g_GpuSceneForDestroyHook = m_GpuScene.get();
+                m_Scene.GetRegistry().on_destroy<ECS::MeshRenderer::Component>()
+                    .connect<&OnMeshRendererDestroyed>();
 
                 if (m_RenderSystem)
                     m_RenderSystem->SetGpuScene(m_GpuScene.get());
@@ -222,6 +250,13 @@ namespace Runtime
         {
             vkDeviceWaitIdle(m_Device->GetLogicalDevice());
         }
+
+        // Disconnect entity destruction hooks before tearing down GPU systems.
+        // This prevents the hook from firing on entities destroyed during shutdown
+        // after GPUScene has been destroyed.
+        m_Scene.GetRegistry().on_destroy<ECS::MeshRenderer::Component>()
+            .disconnect<&OnMeshRendererDestroyed>();
+        g_GpuSceneForDestroyHook = nullptr;
 
         // Order matters!
         Core::Tasks::Scheduler::Shutdown();

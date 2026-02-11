@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <span>
 #include <memory>
+#include <thread>
 
 import Core;
 
@@ -501,4 +502,43 @@ TEST(LinearArena, MoveRebindsThreadAffinity)
     // Moved-from arena is expected to be empty/inert. Using it is a programming error in debug.
     // We validate it doesn't report used bytes.
     EXPECT_EQ(arena.GetUsed(), 0u);
+}
+
+TEST(LinearArena, CrossThreadAllocationReturnsError)
+{
+    // LinearArena thread safety check is ALWAYS active (not just debug builds).
+    // Allocating from a different thread must return ThreadViolation.
+    LinearArena arena(1024);
+
+    // Verify allocation works on the owning thread.
+    auto okResult = arena.New<int>(42);
+    ASSERT_TRUE(okResult.has_value());
+
+    // Attempt allocation from a different thread.
+    AllocatorError crossThreadError = AllocatorError::OutOfMemory; // sentinel
+    std::thread worker([&arena, &crossThreadError]()
+    {
+        auto result = arena.Alloc(16);
+        if (!result.has_value())
+            crossThreadError = result.error();
+    });
+    worker.join();
+
+    EXPECT_EQ(crossThreadError, AllocatorError::ThreadViolation);
+}
+
+TEST(LinearArena, MoveAllowsAllocationOnNewThread)
+{
+    // Moving an arena to a new thread should rebind ownership and allow allocation.
+    LinearArena arena(1024);
+
+    bool success = false;
+    std::thread worker([a = std::move(arena), &success]() mutable
+    {
+        auto result = a.New<int>(99);
+        success = result.has_value();
+    });
+    worker.join();
+
+    EXPECT_TRUE(success);
 }

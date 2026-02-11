@@ -1,12 +1,12 @@
 module; // <--- Start Global Fragment
 
 #include <cstdlib>
+#include <cstdio>
 #include <cstring>
 #include <cstddef>
 #include <memory>
 #include <expected>
 #include <algorithm>
-#include <cassert>
 #include <thread>
 
 module Core:Memory.Impl;
@@ -98,11 +98,13 @@ namespace Core::Memory
 
     std::expected<void*, AllocatorError> LinearArena::Alloc(size_t size, size_t align)
     {
-        // Thread safety check - always enforced, not just debug builds
-        // This prevents silent memory corruption from cross-thread access
+        // Thread safety check - always enforced in ALL builds (not just debug).
+        // This prevents silent memory corruption from cross-thread access.
+        // We use fprintf instead of Core::Log to avoid circular module dependencies.
         if (m_OwningThread != std::this_thread::get_id())
         {
-            assert(false && "LinearArena is not thread-safe; use a separate arena per thread.");
+            std::fprintf(stderr, "[INTRINSIC] LinearArena thread violation: arena owned by different thread. "
+                                 "Use a separate arena per thread.\n");
             return std::unexpected(AllocatorError::ThreadViolation);
         }
         if (!m_Start) return std::unexpected(AllocatorError::OutOfMemory);

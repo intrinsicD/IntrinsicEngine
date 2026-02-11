@@ -332,13 +332,16 @@ export namespace Graphics
 
         struct ImageCacheKeyHash
         {
+            // Knuth's multiplicative hash constant (golden ratio * 2^32).
+            // Used in boost-style hash_combine for mixing independent hash values.
+            static constexpr std::size_t kGoldenRatio = 0x9e3779b9u;
+
             std::size_t operator()(const ImageCacheKey& k) const
             {
-                // Simple hash combine
                 std::size_t h = std::hash<uint32_t>()(k.Width);
-                h ^= std::hash<uint32_t>()(k.Height) + 0x9e3779b9 + (h << 6) + (h >> 2);
-                h ^= std::hash<uint32_t>()(static_cast<uint32_t>(k.Format)) + 0x9e3779b9 + (h << 6) + (h >> 2);
-                h ^= std::hash<uint32_t>()(k.Usage) + 0x9e3779b9 + (h << 6) + (h >> 2);
+                h ^= std::hash<uint32_t>()(k.Height) + kGoldenRatio + (h << 6) + (h >> 2);
+                h ^= std::hash<uint32_t>()(static_cast<uint32_t>(k.Format)) + kGoldenRatio + (h << 6) + (h >> 2);
+                h ^= std::hash<uint32_t>()(k.Usage) + kGoldenRatio + (h << 6) + (h >> 2);
                 return h;
             }
         };
@@ -432,6 +435,13 @@ export namespace Graphics
 
         void BuildAdjacencyList();
         void TopologicalSortIntoLayers();
+
+        // Compile() sub-functions — extracted for readability.
+        void ResolveTransientResources(uint32_t frameIndex);
+        void CalculateBarriers();
+
+        // Execute() sub-function — processes one execution layer.
+        void ExecuteLayer(VkCommandBuffer cmd, const std::vector<uint32_t>& layer);
 
         // Frame index associated with the most recent Compile().
         // Used for per-thread secondary command buffer reuse.

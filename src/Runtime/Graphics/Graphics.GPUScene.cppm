@@ -16,6 +16,38 @@ import RHI;
 
 export namespace Graphics
 {
+    // -----------------------------------------------------------------
+    // GPU Scene Constants
+    // -----------------------------------------------------------------
+    namespace GPUSceneConstants
+    {
+        // Maximum descriptor sets for the scene-update descriptor pool.
+        // Enough for a few frames of Sync() calls (each Sync allocates one set).
+        constexpr uint32_t kUpdatePoolMaxSets = 64;
+
+        // Storage buffer bindings per set: updates, scene, bounds (3 per set).
+        constexpr uint32_t kUpdatePoolStorageBuffers = kUpdatePoolMaxSets * 3;
+
+        // Compute shader workgroup size — must match scene_update.comp local_size_x.
+        constexpr uint32_t kSceneUpdateWorkgroupSize = 64;
+
+        // Minimum SSBO size in bytes. Vulkan requires buffer bindings to be non-zero.
+        constexpr VkDeviceSize kMinSSBOSize = 4;
+
+        // Sentinel value meaning "preserve existing GeometryID; don't overwrite".
+        constexpr uint32_t kPreserveGeometryId = 0xFFFFFFFFu;
+
+        // Default maximum GPU scene instances (can be overridden at construction).
+        constexpr uint32_t kDefaultMaxInstances = 100'000;
+
+        // Conservative bounding sphere radius for geometry without precomputed bounds.
+        // Large enough to be "always visible" under any sane camera frustum.
+        constexpr float kDefaultBoundingSphereRadius = 10'000.0f;
+
+        // Epsilon bounding sphere radius for degenerate geometry.
+        constexpr float kMinBoundingSphereRadius = 1e-3f;
+    }
+
     // Matches assets/shaders/instance_cull.comp (InstanceData) exactly.
     struct GpuInstanceData
     {
@@ -43,7 +75,7 @@ export namespace Graphics
         GPUScene(RHI::VulkanDevice& device,
                  RHI::ComputePipeline& updatePipeline,
                  VkDescriptorSetLayout updateSetLayout,
-                 uint32_t maxInstances = 100'000);
+                 uint32_t maxInstances = GPUSceneConstants::kDefaultMaxInstances);
         ~GPUScene();
 
         [[nodiscard]] uint32_t AllocateSlot();

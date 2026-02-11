@@ -19,7 +19,7 @@ namespace Graphics
 {
     namespace
     {
-        constexpr uint32_t kPreserveGeometryId = 0xFFFFFFFFu;
+        constexpr uint32_t kPreserveGeometryId = GPUSceneConstants::kPreserveGeometryId;
 
         void MergeUpdate(GpuUpdatePacket& dst, const GpuUpdatePacket& src)
         {
@@ -57,10 +57,9 @@ namespace Graphics
         m_PendingUpdateIndexBySlot.assign(m_MaxInstances, -1);
         m_GeometryIdShadow.assign(m_MaxInstances, kPreserveGeometryId);
 
-        // Enough sets for a few frames; update sets are allocated per Sync() call.
         m_UpdateSetPool = std::make_unique<RHI::PersistentDescriptorPool>(m_Device,
-                                                                          /*maxSets*/ 64,
-                                                                          /*storageBufferCount*/ 64 * 3,
+                                                                          GPUSceneConstants::kUpdatePoolMaxSets,
+                                                                          GPUSceneConstants::kUpdatePoolStorageBuffers,
                                                                           /*debugName*/ "GPUScene.SceneUpdate");
     }
 
@@ -76,13 +75,13 @@ namespace Graphics
 
         m_SceneBuffer = std::make_unique<RHI::VulkanBuffer>(
             m_Device,
-            std::max<VkDeviceSize>(sceneBytes, 4),
+            std::max<VkDeviceSize>(sceneBytes, GPUSceneConstants::kMinSSBOSize),
             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
             VMA_MEMORY_USAGE_GPU_ONLY);
 
         m_BoundsBuffer = std::make_unique<RHI::VulkanBuffer>(
             m_Device,
-            std::max<VkDeviceSize>(boundsBytes, 4),
+            std::max<VkDeviceSize>(boundsBytes, GPUSceneConstants::kMinSSBOSize),
             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
             VMA_MEMORY_USAGE_GPU_ONLY);
     }
@@ -179,7 +178,7 @@ namespace Graphics
         // Ensure transient buffer exists and is big enough.
         if (!m_UpdatesStaging || bytes > m_UpdatesStagingCapacity)
         {
-            m_UpdatesStagingCapacity = std::max(bytes, size_t(4));
+            m_UpdatesStagingCapacity = std::max(bytes, static_cast<size_t>(GPUSceneConstants::kMinSSBOSize));
             m_UpdatesStaging = std::make_unique<RHI::VulkanBuffer>(
                 m_Device,
                 m_UpdatesStagingCapacity,
@@ -246,8 +245,7 @@ namespace Graphics
         vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_UpdatePipeline.GetLayout(), 0, 1, &set, 0, nullptr);
         vkCmdPushConstants(cmd, m_UpdatePipeline.GetLayout(), VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(Push), &pc);
 
-        const uint32_t wg = 64;
-        const uint32_t groups = (pc.UpdateCount + wg - 1) / wg;
+        const uint32_t groups = (pc.UpdateCount + GPUSceneConstants::kSceneUpdateWorkgroupSize - 1) / GPUSceneConstants::kSceneUpdateWorkgroupSize;
         vkCmdDispatch(cmd, groups, 1, 1);
     }
 }
