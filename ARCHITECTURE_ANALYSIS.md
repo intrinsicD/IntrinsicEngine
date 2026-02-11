@@ -4,7 +4,53 @@
 
 IntrinsicEngine is a C++23 modules-first Vulkan game engine with a modern, data-oriented design. It demonstrates strong technical ambition: GPU-driven rendering, bindless textures, coroutine-based job scheduling, a render graph with automatic barrier generation, and custom zero-overhead allocators. The codebase is well-structured at the module level, with clear namespace conventions and a layered dependency graph.
 
-However, the analysis reveals several architectural concerns — most critically around the `Engine` class acting as a God Object, thread-safety gaps in core systems, inconsistent error handling, and a few potential data races in the Vulkan synchronization layer. Below is a detailed breakdown organized by severity.
+This document tracks architectural risks **and** verifies when they’ve been addressed. Several previously “critical” issues have been fixed in recent PRs (see **Recent Changes** below), notably around coroutine lifetime safety, hierarchy robustness, RHI deferred deletion backpressure, and multiple thread-safety hazards.
+
+---
+
+## Recent Changes (Last PRs)
+
+The following items were fixed/refactored in the most recent merged PRs and are now considered **resolved** (or significantly mitigated):
+
+### PR #11 — Fix critical architecture issues (coroutine lifetime, hierarchy cycle detection, deletion queue)
+
+* **Core.Tasks**: coroutine lifetime safety
+  * `Job` now carries a shared “alive token” so that undispatched coroutine frames / pending reschedule tasks can’t resume a dangling handle.
+  * `~Job()` properly destroys undispatched coroutine frames and signals pending reschedule tasks.
+
+* **ECS Hierarchy**: robustness improvements
+  * Cycle detection now **logs a warning** instead of silently returning.
+  * After reparenting, matrix decomposition validates for NaNs (often caused by singular parent matrices) and falls back to identity.
+
+* **RHI deletion queue**: bounded memory growth
+  * `SafeDestroyAfter()` now applies **backpressure** when the timeline deletion queue exceeds a threshold (8192): it forces a GPU sync + garbage collection to prevent unbounded growth.
+
+* **Tests added** for the above (scheduler/job lifetime, hierarchy cycle detection & singular-matrix handling, reparenting correctness).
+
+### PR #9 — Integrate FrameGraph into system scheduling with per-system `RegisterSystem()`
+
+* Engine scheduling now follows a **FrameGraph-like** model per frame:
+  * `FrameGraph::Reset()` → systems register dependencies → `Compile()` (topological sort) → `Execute()`
+* Systems export `RegisterSystem()` to declare dependencies and provide execution callbacks.
+* Integration tests validate ordering and dependency correctness across multiple systems.
+
+### PR #8 — Add `Core::FrameGraph` system execution task graph
+
+* Introduced `Core:FrameGraph` as a **CPU system scheduler** analogous to the GPU RenderGraph:
+  * Dependency types: Read/Write hazards (RAW/WAR/WAW) and label ordering (`Signal`/`WaitFor`).
+  * Compilation uses Kahn topological sort + “layer” grouping for parallel execution.
+  * Type IDs are RTTI-free; callbacks are stored with zero per-frame heap allocation.
+
+* Fixed a couple build issues (assets logging import, EnTT API mismatch, VMA include wiring).
+* Added a comprehensive test suite covering dependency correctness, cycle detection, and multi-frame reset.
+
+### Commit 44f150f — Thread-safety and barrier consistency
+
+* **RHI timeline value**: data race fixed via `std::atomic<uint64_t>` + proper acquire/release semantics.
+* **Assets UI**: race fixed by snapshotting under lock.
+* **RenderGraph barriers**: unified and corrected write-access mask.
+* **AssetLease**: corrected pin/unpin memory ordering (acquire/release).
+* **AssetManager::Clear()**: improved by snapshotting entities under lock and destroying them one-by-one without holding the mutex.
 
 ---
 
@@ -83,64 +129,36 @@ Apps/Sandbox  (depends on Runtime)
 
 ## 2. Critical Issues
 
-### 2.1 Data Race in `VulkanDevice::SignalGraphicsTimeline()`
+### 2.1 Data Race in `VulkanDevice::SignalGraphicsTimeline()` — **RESOLVED**
 
-**Location:** `src/Runtime/RHI/RHI.Device.cpp`
+**Status:** Fixed (commit `44f150f`)
 
-```cpp
-uint64_t VulkanDevice::SignalGraphicsTimeline()
-{
-    const uint64_t value = m_GraphicsTimelineNextValue.fetch_add(1, std::memory_order_relaxed);
-    m_GraphicsTimelineValue = value;  // NON-ATOMIC WRITE
-    return value;
-}
+`m_GraphicsTimelineValue` is now atomic with correct acquire/release semantics, eliminating a cross-thread race between timeline signaling and background-thread `SafeDestroy()` enqueues.
 
-void VulkanDevice::SafeDestroy(std::function<void()>&& deleteFn)
-{
-    const uint64_t target = (m_GraphicsTimelineValue > 0)  // UNSYNCHRONIZED READ
-        ? (m_GraphicsTimelineValue + 1) : 1;
-    SafeDestroyAfter(target, std::move(deleteFn));
-}
-```
+**Residual risk / follow-up:**
+* Keep timeline-value publication rules documented (which thread signals, which threads enqueue deletes).
+* Prefer small, deterministic deletion-queue draining at known points (frame boundaries) in addition to the backpressure threshold.
 
-`m_GraphicsTimelineValue` is written from the render thread in `SignalGraphicsTimeline()` and read from any thread (including asset loader threads) in `SafeDestroy()`. This is a data race that could cause deferred deletions to execute too early (use-after-free on GPU) or too late (memory leak).
+### 2.2 Data Race in `AssetManager::AssetsUiPanel()` — **RESOLVED**
 
-**Fix:** Make `m_GraphicsTimelineValue` an `std::atomic<uint64_t>`, or protect both read and write paths with `m_DeletionMutex`.
+**Status:** Fixed (commit `44f150f`)
 
-### 2.2 Data Race in `AssetManager::AssetsUiPanel()`
+The UI now snapshots asset state under a lock (shared lock) before iterating for ImGui, preventing iterator invalidation and torn reads while background loader threads mutate the registry.
 
-**Location:** `src/Core/Core.Assets.cpp`
+### 2.3 Coroutine Handle Lifetime Unsafety — **RESOLVED**
 
-The `AssetsUiPanel()` method iterates the EnTT registry (`m_Registry.view<AssetInfo>()`) without acquiring `m_Mutex`. Meanwhile, background loading threads modify the registry under lock via `Reload()` and `FinalizeLoad()`. This can cause iterator invalidation, use-after-free, or torn reads of `AssetInfo` state.
+**Status:** Fixed (PR #11, commit `43a06b5`)
 
-**Fix:** Acquire `std::shared_lock(m_Mutex)` for the entire UI panel iteration, or snapshot the data under lock and iterate the snapshot.
+The scheduler/job model now ensures a coroutine frame can’t be resumed after the owning `Job` is destroyed. This addresses the fundamental lifetime hazard in reschedule tasks.
 
-### 2.3 Coroutine Handle Lifetime Unsafety
+**Follow-up worth considering:**
+* Add a hard debug-assert if a reschedule sees an already-destroyed alive token (helps catch logic errors early).
 
-**Location:** `src/Core/Core.Tasks.cpp`, `Reschedule()`
+### 2.4 Write-Access Mask Inconsistency in RenderGraph Barriers — **RESOLVED**
 
-```cpp
-void Scheduler::Reschedule(std::coroutine_handle<> h)
-{
-    DispatchInternal(LocalTask([h]() mutable {
-        if (!h) return;   // std::coroutine_handle cannot be null; check is no-op
-        h.resume();
-        if (h.done()) h.destroy();
-    }));
-}
-```
+**Status:** Fixed (commit `44f150f`)
 
-The null check on `std::coroutine_handle<>` is always false — it's not a nullable type. More critically, if the `Job` owning the coroutine frame is destroyed before this task executes, the handle becomes a dangling pointer and `h.resume()` is undefined behavior.
-
-**Fix:** Use `std::shared_ptr` to share coroutine frame ownership between the `Job` object and any pending reschedule tasks, or enforce single-ownership with clear documentation that `Job` must outlive all pending reschedules.
-
-### 2.4 Write-Access Mask Inconsistency in RenderGraph Barriers
-
-**Location:** `src/Runtime/Graphics/Graphics.RenderGraph.cpp`
-
-The inline write-access detection in the barrier generation lambda omits `VK_ACCESS_2_ACCELERATION_STRUCTURE_WRITE_BIT_KHR`, while the standalone `IsWriteAccess()` function includes it. If ray-tracing or acceleration structures are ever used, image barriers would miss write-after-write hazards, causing GPU corruption.
-
-**Fix:** Extract write-access detection into a single shared function and use it consistently in all barrier paths.
+Write-access detection is unified so barrier generation is consistent across buffer/image paths and includes previously missed write bits (including acceleration-structure writes).
 
 ---
 
@@ -167,67 +185,35 @@ The constructor alone is ~220 lines and performs 11 distinct initialization phas
 
 **Proposed refactoring:** See §6.1.
 
-### 3.2 No System Execution Order Enforcement
+### 3.2 No System Execution Order Enforcement — **RESOLVED (via Core::FrameGraph)**
 
-**Location:** ECS systems in `src/Runtime/ECS/Systems/` and `src/Runtime/Graphics/Systems/`
+**Status:** Fixed (PR #8 + PR #9)
 
-The engine requires a specific execution order:
+System execution order is now compiled from declared dependencies in `Core::FrameGraph`. Each system registers itself via a `RegisterSystem()` function, declaring Read/Write/Signal/WaitFor dependencies.
 
-```
-MeshRendererLifecycle → Transform::OnUpdate → GPUSceneSync → RenderGraph
-```
+**Next step:**
+* Add a small “system registry” convenience layer so introducing a new component/system is a one-liner (e.g., auto-registration via module-level function table) while keeping the explicit dependency declarations.
 
-This ordering is enforced only by convention (comments in source). Nothing prevents a user from calling systems in the wrong order, which would cause silent data corruption (e.g., stale `WorldUpdatedTag` consumed before transforms are updated).
+### 3.3 `AssetManager::Clear()` Anti-Pattern — **RESOLVED**
 
-**Fix:** Introduce an explicit `SystemScheduler` that declares system dependencies and topologically sorts execution, or at minimum add runtime assertions that validate execution order.
+**Status:** Fixed (commit `44f150f`)
 
-### 3.3 `AssetManager::Clear()` Anti-Pattern
+The implementation now snapshots entities under lock and destroys them without holding `m_Mutex`, preventing deadlocks/corruption when destructors re-enter the asset manager.
 
-**Location:** `src/Core/Core.Assets.cpp`
+### 3.4 `AssetLease` PinCount Uses Relaxed Memory Ordering — **RESOLVED**
 
-```cpp
-void AssetManager::Clear()
-{
-    {
-        std::unique_lock lock(m_Mutex);
-        m_Lookup.clear();
-    }  // RELEASES LOCK
-    m_Registry.clear();  // Triggers destructors WITHOUT holding m_Mutex
-    // Comment: "Unlisten() can safely re-acquire it"
-}
-```
+**Status:** Fixed (commit `44f150f`)
 
-This relies on the assumption that destructors triggered by `m_Registry.clear()` will only call `Unlisten()`. If a destructor performs other operations that depend on `m_Mutex` state, deadlock or data corruption can occur. The pattern is fragile.
+Pin/unpin operations now use acquire/release ordering to establish a happens-before relation between resource publication and lease access.
 
-**Fix:** Use a deferred deletion queue. Collect entities to delete under lock, release lock, then destroy.
+### 3.5 Silent Hierarchy Cycle Detection Failure — **RESOLVED / MITIGATED**
 
-### 3.4 `AssetLease` PinCount Uses Relaxed Memory Ordering
+**Status:** Addressed (PR #11, commit `43a06b5`)
 
-**Location:** `src/Core/Core.Assets.cppm`
+Cycle detection no longer fails silently (now logs a warning). Reparenting now validates matrix decomposition results and guards against NaNs by falling back to identity.
 
-```cpp
-m_Slot->PinCount.fetch_sub(1, std::memory_order_relaxed);  // In Reset()
-m_Slot->PinCount.fetch_add(1, std::memory_order_relaxed);  // In PinIfValid()
-```
-
-Relaxed ordering provides no ordering guarantees relative to the actual resource pointer access. During concurrent reload, one thread could observe the pin count as non-zero while reading a stale (or partially-replaced) resource pointer.
-
-**Fix:** Use `std::memory_order_acquire` on the add (pin) and `std::memory_order_release` on the sub (unpin) to establish happens-before relationship with the resource replacement.
-
-### 3.5 Silent Hierarchy Cycle Detection Failure
-
-**Location:** `src/Runtime/ECS/Components/ECS.Components.Hierarchy.cppm`
-
-```cpp
-if (Detail::IsDescendant(registry, child, newParent))
-{
-    return;  // Silent failure — no error logged, no error returned
-}
-```
-
-When `Attach()` detects a cycle, it silently returns without notifying the caller. Client code cannot know the operation failed. Additionally, `glm::inverse()` is called during reparenting without checking for singular matrices (scale=0), which could produce NaN values.
-
-**Fix:** Return `std::expected<void, ErrorCode>` from `Attach()`. Validate matrix before decomposition.
+**Proposed next step (optional):**
+* Consider returning `std::expected<void, ErrorCode>` from hierarchy mutation APIs to make failure explicit and testable at call sites.
 
 ---
 
@@ -308,11 +294,13 @@ If a container using `ArenaAllocator` outlives the backing `LinearArena`, any su
 
 ### 4.7 Timeline Deletion Queue Unbounded Growth
 
-**Location:** `src/Runtime/RHI/RHI.Device.cpp`
+**Status:** **RESOLVED** (PR #11)
 
-`m_TimelineDeletionQueue` is an unbounded vector. If `CollectGarbage()` is not called regularly (e.g., in headless mode or during stalls), the queue grows indefinitely.
+`SafeDestroyAfter()` now applies backpressure when the timeline deletion queue exceeds a threshold (currently 8192), forcing a GPU sync + garbage collection to prevent unbounded growth.
 
-**Fix:** Add a maximum size with an assertion or backpressure mechanism that forces a flush when the queue exceeds a threshold.
+**Follow-up:**
+* Expose the threshold as a dev-only setting.
+* Add telemetry counters (max depth, forced-sync count) so regressions show up quickly.
 
 ### 4.8 Loader Capture Footgun in AssetManager
 
@@ -1664,38 +1652,3 @@ namespace Graphics::Constants
 }
 ```
 
----
-
-## Summary: Effort Estimates by Phase
-
-| Phase | Description | Effort | Risk | Dependencies |
-|-------|-------------|--------|------|--------------|
-| **1** | Critical data-race fixes | 1–2 days | Low | None |
-| **2** | Engine decomposition | 1–2 weeks | Medium | Phase 1 |
-| **3** | System scheduler | 3–5 days | Low | Phase 2 (step 1 only) |
-| **4** | RenderGraph decomposition | 2–3 days | Low | Phase 1.4 |
-| **5** | Error handling unification | 1 week (ongoing) | Low | None |
-| **6** | AssetLease memory ordering | < 1 day | Low | None |
-| **7** | AssetManager::Clear() fix | < 1 day | Low | None |
-| **8** | Entity destruction hooks | < 1 day | Low | Phase 2 (step 2) |
-| **9** | Deletion queue bounds | < 1 day | Low | Phase 1.1 |
-| **10** | Magic number extraction | 1–2 days | None | None |
-
-**Total estimated effort: ~4–5 weeks** (phases can overlap significantly).
-
-**Recommended execution order:** Phases 1, 6, 7 first (all < 1 day, no dependencies). Then Phase 4 and 5 in parallel. Then Phase 2 incrementally. Phases 3, 8, 9, 10 can slot in opportunistically.
-
----
-
-## Methodology
-
-This analysis was performed by reading every module interface (`.cppm`) and implementation (`.cpp`) file across Core, RHI, Graphics, ECS, Geometry, Interface, and Runtime modules. Specific attention was paid to:
-
-- Thread-safety and synchronization correctness
-- Vulkan resource lifecycle and barrier management
-- Memory management and allocation patterns
-- Module coupling and dependency direction
-- Error handling consistency
-- Code complexity and function length
-
-Total files analyzed: 91 module files + implementations + tests + build system.
