@@ -12,6 +12,13 @@ This document tracks architectural risks **and** verifies when they’ve been ad
 
 The following items were fixed/refactored in the most recent merged PRs and are now considered **resolved** (or significantly mitigated):
 
+### Current PR — Fix moderate architecture issues (magic numbers, thread safety, destruction hooks, RenderGraph decomposition)
+
+* **Magic Numbers:** All GPU code magic numbers extracted into named constants in `GPUSceneConstants` and `ForwardPassConstants` namespaces.
+* **LinearArena Thread Safety:** Always-on `fprintf(stderr, ...)` replaces debug-only `assert` for cross-thread violation. New tests added.
+* **Entity Destruction Hooks:** EnTT `on_destroy<MeshRenderer::Component>` signal registered for O(1) immediate GPU slot reclaim. Orphan sweep removed.
+* **RenderGraph Decomposition:** `Compile()` split into `ResolveTransientResources()` + `CalculateBarriers()`. `Execute()` delegates to `ExecuteLayer()`.
+
 ### PR #11 — Fix critical architecture issues (coroutine lifetime, hierarchy cycle detection, deletion queue)
 
 * **Core.Tasks**: coroutine lifetime safety
@@ -219,21 +226,19 @@ Cycle detection no longer fails silently (now logs a warning). Reparenting now v
 
 ## 4. Moderate Issues
 
-### 4.1 RenderGraph Functions Are Too Long
+### 4.1 RenderGraph Functions Are Too Long — **RESOLVED**
 
-`Compile()` (~225 lines) handles resource resolution, barrier calculation, and dependency analysis in a single function. `Execute()` (~170 lines) mixes raster info precomputation, secondary buffer recording, and primary buffer recording. `RenderSystem::OnUpdate()` (~155 lines) combines interaction processing, global resource updates, render graph setup, pipeline execution, and presentation.
+**Status:** Fixed (current PR)
 
-**Fix:** Extract into focused sub-functions: `ResolveResources()`, `CalculateBarriers()`, `BuildDependencyGraph()` for Compile; `PrepareRasterInfo()`, `RecordSecondaryBuffers()`, `RecordPrimaryBuffer()` for Execute.
+`Compile()` has been decomposed into `ResolveTransientResources()` and `CalculateBarriers()`, with `BuildAdjacencyList()` and `TopologicalSortIntoLayers()` already extracted previously. `Execute()` now delegates per-layer work to `ExecuteLayer()`. `Compile()` is now a clear 5-line orchestrator.
 
-### 4.2 Magic Numbers Throughout GPU Code
+**Remaining:** `RenderSystem::OnUpdate()` (~155 lines) is still a single function. Consider extracting `BeginFrame()`, `UpdateGlobalResources()`, `BuildRenderGraph()`, `EndFrame()` in a future pass.
 
-Examples:
-- `GPUScene` constructor: `maxSets=64, storageBufferCount=64*3` — undocumented
-- `GPUScene::EnsurePersistentBuffers`: `std::max<VkDeviceSize>(sceneBytes, 4)` — why 4?
-- Forward pass compute: `const uint32_t wg = 64` — workgroup size not configurable
-- `ImageCacheKeyHash`: `0x9e3779b9` used without naming
+### 4.2 Magic Numbers Throughout GPU Code — **RESOLVED**
 
-**Fix:** Extract all magic numbers into named constants with comments explaining the rationale.
+**Status:** Fixed (current PR)
+
+Named constants extracted into `Graphics::GPUSceneConstants` namespace (in `Graphics.GPUScene.cppm`) and `Graphics::Passes::ForwardPassConstants` (in `Graphics.Passes.Forward.cppm`). Constants include: `kUpdatePoolMaxSets`, `kUpdatePoolStorageBuffers`, `kSceneUpdateWorkgroupSize`, `kMinSSBOSize`, `kPreserveGeometryId`, `kDefaultMaxInstances`, `kDefaultBoundingSphereRadius`, `kMinBoundingSphereRadius`, `kCullWorkgroupSize`, `kInstancePoolMaxSets`, `kInstancePoolStorageBuffers`, `kCullPoolMaxSets`, `kCullPoolStorageBuffers`. The `0x9e3779b9` hash constant is now named `kGoldenRatio` in `ImageCacheKeyHash`.
 
 ### 4.3 Inconsistent Error Handling Strategy
 
@@ -249,34 +254,17 @@ The codebase mixes several error patterns:
 - Log warnings for recoverable skip-and-continue cases
 - Reserve `VK_CHECK` / abort only for truly unrecoverable GPU state corruption
 
-### 4.4 `LinearArena` Thread Safety Check Disabled in Release
+### 4.4 `LinearArena` Thread Safety Check Disabled in Release — **RESOLVED**
 
-**Location:** `src/Core/Core.Memory.cpp`
+**Status:** Fixed (current PR)
 
-```cpp
-if (m_OwningThread != std::this_thread::get_id())
-{
-    assert(false && "LinearArena is not thread-safe...");  // gone in release
-    return std::unexpected(AllocatorError::ThreadViolation);
-}
-```
+The debug-only `assert` has been replaced with an always-on `fprintf(stderr, ...)` diagnostic that fires in ALL builds (including release). The `return std::unexpected(AllocatorError::ThreadViolation)` error path was already always-active; now it's also accompanied by a visible diagnostic even if the caller ignores the return value. Uses `fprintf` instead of `Core::Log` to avoid circular module dependencies within Core. New tests (`CrossThreadAllocationReturnsError`, `MoveAllowsAllocationOnNewThread`) validate the behavior.
 
-The `assert` is stripped in release builds, and if the caller ignores the `Expected` error, silent memory corruption follows.
+### 4.5 No Entity Destruction Hooks — **RESOLVED**
 
-**Fix:** Always perform the thread check. Consider a compile-time flag for eliding the check in shipping builds rather than relying on `NDEBUG`.
+**Status:** Fixed (current PR)
 
-### 4.5 No Entity Destruction Hooks
-
-**Location:** `src/Runtime/Graphics/Systems/`
-
-A comment in the code acknowledges:
-```
-// TODO(next): register on_destroy hooks in Engine/Scene setup for O(1) reclaim.
-```
-
-Currently, GPU slot cleanup for destroyed entities happens one frame late via a `view<MeshRenderer>(exclude<WorldMatrix>)` pattern. This means the GPU scene contains stale data for one frame and relies on radius=0 culling.
-
-**Fix:** Register EnTT `on_destroy<MeshRenderer>` signal to immediately free GPU slots.
+An `on_destroy<ECS::MeshRenderer::Component>` signal is now registered in `Engine::Engine()` after GPUScene creation. The callback immediately deactivates the GPU slot (radius=0) and frees it, providing O(1) cleanup instead of the one-frame-late orphan sweep. The signal is properly disconnected in `Engine::~Engine()` before GPUScene is destroyed. The orphan-view sweep in `MeshRendererLifecycle::OnUpdate()` has been removed.
 
 ### 4.6 `ArenaAllocator` Lifetime Escape
 
@@ -457,18 +445,18 @@ class AssetManager { ... };
 | 6 | Add SystemScheduler with dependency declarations | New module | Medium |
 | 7 | Fix `AssetLease` PinCount memory ordering | Core.Assets.cppm | Small |
 | 8 | Fix `AssetManager::Clear()` lock pattern | Core.Assets.cpp | Small |
-| 9 | Register EnTT `on_destroy` hooks for GPU slots | Graphics.Systems | Small |
+| 9 | ~~Register EnTT `on_destroy` hooks for GPU slots~~ | ~~Graphics.Systems~~ | ~~Small~~ **DONE** |
 
 ### Tier 3 — Code Quality (Ongoing)
 
 | # | Issue | Location | Effort |
 |---|-------|----------|--------|
-| 10 | Extract RenderGraph sub-functions | Graphics.RenderGraph.cpp | Medium |
-| 11 | Replace magic numbers with named constants | GPUScene, Forward pass, etc. | Small |
+| 10 | ~~Extract RenderGraph sub-functions~~ | ~~Graphics.RenderGraph.cpp~~ | ~~Medium~~ **DONE** |
+| 11 | ~~Replace magic numbers with named constants~~ | ~~GPUScene, Forward pass, etc.~~ | ~~Small~~ **DONE** |
 | 12 | Unify error handling patterns | All modules | Medium |
 | 13 | Add thread-safety documentation | All public classes | Small |
-| 14 | Bound timeline deletion queue growth | RHI.Device.cpp | Small |
-| 15 | Always-on LinearArena thread check | Core.Memory.cpp | Small |
+| 14 | ~~Bound timeline deletion queue growth~~ | ~~RHI.Device.cpp~~ | ~~Small~~ **DONE** |
+| 15 | ~~Always-on LinearArena thread check~~ | ~~Core.Memory.cpp~~ | ~~Small~~ **DONE** |
 
 ### Tier 4 — Feature Gaps (Future)
 
@@ -1205,137 +1193,13 @@ This preserves the existing free-function implementations (no rewrite needed) wh
 
 ---
 
-### Phase 4: RenderGraph Function Decomposition (2–3 days)
+### Phase 4: RenderGraph Function Decomposition — **RESOLVED**
 
-#### 4.1 Break Down `Compile()` (225 lines → 4 functions)
+**Status:** Implemented (current PR).
 
-**Current structure of `Compile()` (line 487–711):**
-```
-Lines 491–522:  Resource resolution (pool allocation, transient binding)
-Lines 525–665:  Image barrier calculation
-Lines 667–705:  Buffer barrier calculation
-Lines 708–710:  Adjacency list construction
-```
+`Compile()` was decomposed into `ResolveTransientResources()`, `CalculateBarriers()`, `BuildAdjacencyList()`, and `TopologicalSortIntoLayers()`. `Execute()` delegates per-layer work to `ExecuteLayer()`.
 
-**Proposed extraction:**
-
-```cpp
-void RenderGraph::Compile(/* params */)
-{
-    ResolveResources(frameIndex, transientPool);
-    CalculateImageBarriers();
-    CalculateBufferBarriers();
-    BuildAdjacencyList();
-}
-```
-
-Each function operates on `m_Passes` and `m_ResourceNodes` (already member state), so no parameter explosion occurs.
-
-**`ResolveResources()` (lines 491–522):**
-```cpp
-void RenderGraph::ResolveResources(uint32_t frameIndex,
-                                   RHI::TransientAttachmentPool* transientPool)
-{
-    for (auto& [id, res] : m_ResourceNodes)
-    {
-        // Existing pool allocation logic (lines 491-522)
-        // ...
-    }
-}
-```
-
-**`CalculateImageBarriers()` — the largest block (lines 525–665):**
-
-This block contains a 59-line lambda `pushImageBarrier`. Extract it as a private method:
-
-```cpp
-// Private method replacing the lambda
-void RenderGraph::EmitImageBarrier(ResourceNode& res,
-                                   VkPipelineStageFlags2 dstStage,
-                                   VkAccessFlags2 dstAccess,
-                                   VkImageLayout targetLayout,
-                                   PassNode& pass,
-                                   VkImageMemoryBarrier2*& imgStart,
-                                   uint32_t& imgCount)
-{
-    // Existing lambda body (lines 533-591)
-    // Replace all captured references with parameters
-}
-```
-
-Then `CalculateImageBarriers()` becomes a straightforward loop:
-```cpp
-void RenderGraph::CalculateImageBarriers()
-{
-    for (auto& pass : m_Passes)
-    {
-        VkImageMemoryBarrier2* imgStart = nullptr;
-        uint32_t imgCount = 0;
-
-        // Process attachments first (existing lines 600-640)
-        for (auto& att : pass.Attachments)
-            EmitImageBarrier(/* ... */);
-
-        // Then explicit accesses (existing lines 645-660)
-        for (auto& acc : pass.Accesses)
-            if (acc.Type == ResourceType::Image)
-                EmitImageBarrier(/* ... */);
-
-        pass.ImageBarriers = imgStart;
-        pass.ImageBarrierCount = imgCount;
-    }
-}
-```
-
-**Risk:** Low. These are pure structural extractions with no behavioral change.
-
----
-
-#### 4.2 Break Down `Execute()` (172 lines → 3 functions)
-
-**Proposed:**
-```cpp
-void RenderGraph::Execute(VkCommandBuffer cmd, /* params */)
-{
-    if (!m_Compiled) Compile(/* ... */);
-
-    PrepareRasterInfo();
-    DispatchSecondaryRecording();
-    RecordPrimaryCommandBuffer(cmd);
-}
-```
-
-**`PrepareRasterInfo()` (lines 867–899):**
-Pre-computes `VkRenderingInfo` for each pass that uses dynamic rendering. Currently done inline in the execution loop.
-
-**`DispatchSecondaryRecording()` (lines 901–937):**
-Dispatches tasks to the scheduler for parallel secondary command buffer recording.
-
-**`RecordPrimaryCommandBuffer()` (lines 939–1017):**
-Records barriers and executes secondary buffers into the primary buffer.
-
----
-
-#### 4.3 Break Down `RenderSystem::OnUpdate()` (155 lines → 5 functions)
-
-**Proposed:**
-```cpp
-void RenderSystem::OnUpdate(ECS::Scene& scene, const CameraComponent& camera,
-                            Core::Assets::AssetManager& assetManager)
-{
-    BeginFrame();                           // GC, bindless flush, readbacks
-    if (!m_Presentation.BeginFrame())       // WSI acquire
-    {
-        Interface::GUI::EndFrame();
-        return;
-    }
-    UpdateGlobalResources(camera);          // UBO, view/proj matrices
-    BuildRenderGraph(scene, assetManager);  // Add passes, compile, execute
-    EndFrame();                             // Present
-}
-```
-
-Each sub-function maps directly to existing contiguous blocks in the current implementation.
+**Remaining:** `RenderSystem::OnUpdate()` (~155 lines) is still a monolith. Consider decomposing into `BeginFrame()`, `UpdateGlobalResources()`, `BuildRenderGraph()`, `EndFrame()` in a future pass.
 
 ---
 
@@ -1369,22 +1233,9 @@ Replace the pattern of `assert()` + `return error` with a single macro that is a
     } while (0)
 ```
 
-#### 5.2 Apply to `LinearArena` Thread Check
+#### 5.2 Apply to `LinearArena` Thread Check — **RESOLVED**
 
-**Before (`Core.Memory.cpp`):**
-```cpp
-if (m_OwningThread != std::this_thread::get_id())
-{
-    assert(false && "LinearArena is not thread-safe...");
-    return std::unexpected(AllocatorError::ThreadViolation);
-}
-```
-
-**After:**
-```cpp
-INTRINSIC_VERIFY(m_OwningThread == std::this_thread::get_id(),
-                 AllocatorError::ThreadViolation);
-```
+**Status:** Fixed (current PR). Replaced `assert` with always-on `fprintf(stderr, ...)` diagnostic. The `INTRINSIC_VERIFY` macro is deferred — `fprintf` is used instead to avoid circular module dependencies within Core.
 
 #### 5.3 Apply to `Hierarchy::Attach()`
 
@@ -1561,40 +1412,9 @@ void AssetManager::Clear()
 
 ---
 
-### Phase 8: Entity Destruction Hooks (< 1 day)
+### Phase 8: Entity Destruction Hooks — **RESOLVED**
 
-**File:** `src/Runtime/Runtime.Engine.cpp` (constructor or `InitPipeline()`)
-
-**Add EnTT signal registration:**
-```cpp
-void Engine::InitPipeline()
-{
-    // ... existing pipeline setup ...
-
-    // Register destruction hooks for immediate GPU slot cleanup
-    m_Scene.GetRegistry().on_destroy<ECS::MeshRenderer::Component>()
-        .connect<&OnMeshRendererDestroyed>(*m_GpuScene);
-}
-```
-
-**New free function:**
-```cpp
-void OnMeshRendererDestroyed(entt::registry& registry, entt::entity entity)
-{
-    auto& mr = registry.get<ECS::MeshRenderer::Component>(entity);
-    if (mr.GpuSlot != ECS::MeshRenderer::Component::kInvalidSlot)
-    {
-        // Mark as inactive + free in GPUScene
-        // The slot will be recycled after the current frame-in-flight completes
-        // (GPUScene's internal deferred deletion handles this)
-        m_GpuScene.DeactivateSlot(mr.GpuSlot);
-        m_GpuScene.FreeSlot(mr.GpuSlot);
-        mr.GpuSlot = ECS::MeshRenderer::Component::kInvalidSlot;
-    }
-}
-```
-
-**Remove the orphan-view sweep** from `MeshRendererLifecycle::OnUpdate()` (lines 106–124), as it's no longer needed.
+**Status:** Implemented (current PR). An `on_destroy<MeshRenderer::Component>` signal registered in `Engine::Engine()` via a file-static free function `OnMeshRendererDestroyed()`. Signal is properly disconnected in `~Engine()` before GPUScene teardown. The orphan-view sweep was removed from `MeshRendererLifecycle::OnUpdate()`.
 
 ---
 
@@ -1625,30 +1445,7 @@ void VulkanDevice::SafeDestroyAfter(uint64_t value, std::function<void()>&& dele
 
 ---
 
-### Phase 10: Magic Number Extraction (1–2 days, ongoing)
+### Phase 10: Magic Number Extraction — **RESOLVED**
 
-**File:** `src/Runtime/Graphics/Graphics.GPUScene.cppm` or a new constants file
-
-```cpp
-namespace Graphics::Constants
-{
-    // GPU Scene
-    constexpr uint32_t kMaxGPUSceneInstances    = 100'000;
-    constexpr uint32_t kGPUSceneMaxDescSets     = 64;
-    constexpr uint32_t kGPUSceneStorageBindings  = kGPUSceneMaxDescSets * 3; // instance + bounds + indirect
-
-    // Minimum SSBO size (Vulkan requires at least 4 bytes for buffer bindings)
-    constexpr VkDeviceSize kMinSSBOSize = 4;
-
-    // Compute dispatch
-    constexpr uint32_t kCullWorkgroupSize = 64;
-
-    // Hash constants
-    constexpr uint32_t kGoldenRatio32 = 0x9e3779b9u;  // Knuth's multiplicative hash constant
-
-    // Bounding sphere defaults
-    constexpr float kDefaultBoundingSphereRadius = 10'000.0f;  // Conservative "always visible" fallback
-    constexpr float kMinBoundingSphereRadius     = 1e-3f;      // Epsilon for degenerate geometry
-}
-```
+**Status:** Implemented (current PR). Constants are organized into `Graphics::GPUSceneConstants` (in `Graphics.GPUScene.cppm`) and `Graphics::Passes::ForwardPassConstants` (in `Graphics.Passes.Forward.cppm`). All magic numbers in GPUScene.cpp, Forward.cpp, and RenderGraph.cppm now reference named constants.
 

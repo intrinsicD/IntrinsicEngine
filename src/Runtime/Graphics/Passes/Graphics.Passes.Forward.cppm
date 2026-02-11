@@ -19,6 +19,23 @@ import RHI;
 
 export namespace Graphics::Passes
 {
+    // -----------------------------------------------------------------
+    // Forward Pass Constants
+    // -----------------------------------------------------------------
+    namespace ForwardPassConstants
+    {
+        // Compute shader workgroup size — must match instance_cull*.comp local_size_x.
+        constexpr uint32_t kCullWorkgroupSize = 64;
+
+        // Descriptor pool sizes for per-frame instance descriptor sets.
+        constexpr uint32_t kInstancePoolMaxSets = 256;
+        constexpr uint32_t kInstancePoolStorageBuffers = 512;
+
+        // Descriptor pool sizes for compute culling descriptor sets.
+        constexpr uint32_t kCullPoolMaxSets = 64;
+        constexpr uint32_t kCullPoolStorageBuffers = kCullPoolMaxSets * 5;
+    }
+
     class ForwardPass final : public IRenderFeature
     {
     public:

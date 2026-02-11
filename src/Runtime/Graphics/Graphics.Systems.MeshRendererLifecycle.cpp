@@ -32,7 +32,7 @@ namespace Graphics::Systems::MeshRendererLifecycle
                 return {0.0f, 0.0f, 0.0f, 0.0f};
 
             // Massive radius = always visible under any sane camera frustum.
-            return {0.0f, 0.0f, 0.0f, 10'000.0f};
+            return {0.0f, 0.0f, 0.0f, GPUSceneConstants::kDefaultBoundingSphereRadius};
         }
     }
 
@@ -96,7 +96,7 @@ namespace Graphics::Systems::MeshRendererLifecycle
 
                 sphere = ComputeLocalBoundingSphere(*geo);
                 if (sphere.w <= 0.0f)
-                    sphere.w = 1e-3f;
+                    sphere.w = GPUSceneConstants::kMinBoundingSphereRadius;
 
 
                 gpuScene.QueueUpdate(mr.GpuSlot, inst, sphere);
@@ -105,25 +105,9 @@ namespace Graphics::Systems::MeshRendererLifecycle
             }
         }
 
-        // Reclaim slots for entities destroyed since last frame.
-        // We can’t hook EnTT signals globally without a stable system init point, so we do a cheap sweep
-        // over MeshRenderer components and deactivate slots that no longer have required components.
-        //
-        // NOTE: This doesn’t catch immediate destruction mid-frame, but it guarantees correctness.
-        // TODO(next): register on_destroy hooks in Engine/Scene setup for O(1) reclaim.
-        auto orphanView = registry.view<ECS::MeshRenderer::Component>(entt::exclude<ECS::Components::Transform::WorldMatrix>);
-        for (auto entity : orphanView)
-        {
-            auto& mr = orphanView.get<ECS::MeshRenderer::Component>(entity);
-            if (mr.GpuSlot == ECS::MeshRenderer::Component::kInvalidSlot)
-                continue;
-
-            // Deactivate slot: radius <= 0 => cull skips it.
-            GpuInstanceData inst{};
-            gpuScene.QueueUpdate(mr.GpuSlot, inst, /*sphere*/ {0.0f, 0.0f, 0.0f, 0.0f});
-            gpuScene.FreeSlot(mr.GpuSlot);
-            mr.GpuSlot = ECS::MeshRenderer::Component::kInvalidSlot;
-        }
+        // NOTE: Slot reclamation for destroyed entities is now handled by an EnTT on_destroy
+        // signal registered in Engine. This provides O(1) immediate cleanup instead of the
+        // one-frame-late orphan sweep that was previously here.
     }
 
     void RegisterSystem(Core::FrameGraph& graph,

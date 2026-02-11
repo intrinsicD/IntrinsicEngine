@@ -506,8 +506,14 @@ namespace Graphics
     void RenderGraph::Compile(uint32_t frameIndex)
     {
         m_CompiledFrameIndex = frameIndex;
+        ResolveTransientResources(frameIndex);
+        CalculateBarriers();
+        BuildAdjacencyList();
+        TopologicalSortIntoLayers();
+    }
 
-        // 1. Resolve Transient Resources (Unchanged)
+    void RenderGraph::ResolveTransientResources(uint32_t frameIndex)
+    {
         for (uint32_t i = 0; i < m_ActiveResourceCount; ++i)
         {
             auto& res = m_ResourcePool[i];
@@ -539,13 +545,15 @@ namespace Graphics
                 }
             }
         }
+    }
 
-        // 2. Barrier Calculation (Refactored for Arena Spans)
+    void RenderGraph::CalculateBarriers()
+    {
         for (uint32_t passIdx = 0; passIdx < m_ActivePassCount; ++passIdx)
         {
             auto& pass = m_PassPool[passIdx];
 
-            // --- Pass 1: Image Barriers ---
+            // --- Image Barriers ---
             VkImageMemoryBarrier2* imgStart = nullptr;
             size_t imgCount = 0;
 
@@ -554,7 +562,6 @@ namespace Graphics
                                         VkAccessFlags2 dstAccess,
                                         VkImageLayout targetLayout)
             {
-                // Imported buffers are handled in buffer barrier pass, not here.
                 if (res.Type == ResourceType::Buffer) return;
                 if (res.Type == ResourceType::Import && res.PhysicalBuffer) return;
 
@@ -586,7 +593,6 @@ namespace Graphics
                     barrier.subresourceRange.baseArrayLayer = 0;
                     barrier.subresourceRange.layerCount = 1;
 
-                    // Allocate in Arena
                     auto alloc = m_Arena.New<VkImageMemoryBarrier2>(barrier);
                     if (alloc)
                     {
@@ -605,14 +611,13 @@ namespace Graphics
                 }
             };
 
-            // 1a) Attachment usages are implicit accesses; they MUST participate in layout tracking.
-            // IMPORTANT: Do this BEFORE iterating AccessHead. Otherwise, a pass that both renders to an image
-            // and later copies/samples it (common for debug/picking) can end up with its *final* tracked layout
-            // being TRANSFER_* which is invalid for vkCmdBeginRendering.
+            // Attachment usages are implicit accesses; they MUST participate in layout tracking.
+            // IMPORTANT: Process BEFORE explicit AccessHead. Otherwise, a pass that both renders to an image
+            // and later copies/samples it can end up with TRANSFER_* as its final tracked layout,
+            // which is invalid for vkCmdBeginRendering.
             for (AttachmentNode* att = pass.AttachmentHead; att != nullptr; att = att->Next)
             {
                 if (att->ID >= m_ActiveResourceCount) continue;
-
                 auto& res = m_ResourcePool[att->ID];
 
                 if (att->IsDepth)
@@ -631,63 +636,40 @@ namespace Graphics
                 }
             }
 
-            // 1b) Explicit resource accesses.
+            // Explicit resource accesses — determine target layout from access flags.
             for (AccessNode* node = pass.AccessHead; node != nullptr; node = node->Next)
             {
                 auto& res = m_ResourcePool[node->ID];
-
-                // --- Image Barrier Logic ---
-                // IMPORTANT: choose layout by looking for *specific* access intents.
-                // Also: a node can contain multiple bits (e.g. TRANSFER_READ | MEMORY_WRITE to force hazard tracking).
-                // In that case we still want the layout implied by the real operation (TRANSFER_READ/WRITE, ATTACHMENT, etc.).
                 VkImageLayout targetLayout = res.CurrentLayout;
 
                 if ((node->Access & (VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT)) != 0)
-                {
                     targetLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-                }
                 else if ((node->Access & (VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT)) != 0)
-                {
                     targetLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-                }
                 else if ((node->Access & VK_ACCESS_2_TRANSFER_WRITE_BIT) != 0)
-                {
                     targetLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-                }
                 else if ((node->Access & VK_ACCESS_2_TRANSFER_READ_BIT) != 0)
-                {
                     targetLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-                }
                 else if ((node->Access & VK_ACCESS_2_SHADER_SAMPLED_READ_BIT) != 0)
-                {
-                    // NOTE: This is a non-core extension-ish convenience bit in some codebases.
-                    // If it doesn't exist on this SDK, sampling should come through SHADER_READ or UNIFORM_READ.
                     targetLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-                }
                 else if ((node->Access & (VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_UNIFORM_READ_BIT | VK_ACCESS_2_INPUT_ATTACHMENT_READ_BIT)) != 0)
-                {
                     targetLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-                }
                 else if ((node->Access & (VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT | VK_ACCESS_2_SHADER_STORAGE_READ_BIT)) != 0)
-                {
                     targetLayout = VK_IMAGE_LAYOUT_GENERAL;
-                }
 
                 pushImageBarrier(res, node->Stage, node->Access, targetLayout);
             }
 
-
             if (imgCount > 0) pass.ImageBarriers = std::span<VkImageMemoryBarrier2>(imgStart, imgCount);
 
-            // --- Pass 2: Buffer Barriers ---
+            // --- Buffer Barriers ---
             VkBufferMemoryBarrier2* bufStart = nullptr;
             size_t bufCount = 0;
 
             for (AccessNode* node = pass.AccessHead; node != nullptr; node = node->Next)
             {
                 auto& res = m_ResourcePool[node->ID];
-                bool isBuffer = (res.Type == ResourceType::Buffer) || (res.Type == ResourceType::Import && res.
-                    PhysicalBuffer);
+                bool isBuffer = (res.Type == ResourceType::Buffer) || (res.Type == ResourceType::Import && res.PhysicalBuffer);
                 if (!isBuffer) continue;
 
                 bool prevWrite = IsWriteAccessCheck(res.LastUsageAccess);
@@ -717,10 +699,6 @@ namespace Graphics
             }
             if (bufCount > 0) pass.BufferBarriers = std::span<VkBufferMemoryBarrier2>(bufStart, bufCount);
         }
-
-        // 3. Dependency analysis (DAG build + layering for parallel recording)
-        BuildAdjacencyList();
-        TopologicalSortIntoLayers();
     }
 
     void RenderGraph::BuildAdjacencyList()
@@ -855,168 +833,159 @@ namespace Graphics
             TopologicalSortIntoLayers();
         }
 
-        // Record each layer in parallel into secondary command buffers.
-        // GPU execution order remains: layers in order; passes within a layer in vector order.
         for (const auto& layer : m_ExecutionLayers)
         {
-            if (layer.empty()) continue;
-
-            // Precompute inheritance info per pass (stable pointers for the worker tasks).
-            struct RasterInfo
-            {
-                bool IsRaster = false;
-                std::vector<VkFormat> ColorFormats;
-                VkFormat Depth = VK_FORMAT_UNDEFINED;
-                VkFormat Stencil = VK_FORMAT_UNDEFINED;
-            };
-
-            std::vector<RasterInfo> rasterInfos;
-            rasterInfos.resize(layer.size());
-
-            for (size_t i = 0; i < layer.size(); ++i)
-            {
-                const auto& pass = m_PassPool[layer[i]];
-                RasterInfo ri{};
-                ri.IsRaster = (pass.AttachmentHead != nullptr);
-                if (ri.IsRaster)
-                {
-                    for (AttachmentNode* att = pass.AttachmentHead; att != nullptr; att = att->Next)
-                    {
-                        const auto& res = m_ResourcePool[att->ID];
-                        if (att->IsDepth)
-                        {
-                            ri.Depth = res.Format;
-                        }
-                        else
-                        {
-                            ri.ColorFormats.push_back(res.Format);
-                        }
-                    }
-                }
-                rasterInfos[i] = std::move(ri);
-            }
-
-            std::vector<VkCommandBuffer> secondaryCmds(layer.size(), VK_NULL_HANDLE);
-
-            // Dispatch one task per pass. This is fine for now; we can chunk later.
-            for (size_t i = 0; i < layer.size(); ++i)
-            {
-                const uint32_t passIdx = layer[i];
-
-                Core::Tasks::Scheduler::Dispatch([this, passIdx, &secondaryCmds, i, &rasterInfos]
-                {
-                    auto& pass = m_PassPool[passIdx];
-                    const bool isRaster = (pass.AttachmentHead != nullptr);
-
-                    RHI::SecondaryInheritanceInfo inherit{};
-                    if (isRaster)
-                    {
-                        inherit.ColorAttachmentFormats = std::span<const VkFormat>(rasterInfos[i].ColorFormats.data(),
-                                                                                   rasterInfos[i].ColorFormats.size());
-                        inherit.DepthAttachmentFormat = rasterInfos[i].Depth;
-                        inherit.StencilAttachmentFormat = rasterInfos[i].Stencil;
-                        inherit.RasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-                        inherit.ViewMask = 0;
-                    }
-
-                    // `m_CompiledFrameIndex` is a monotonically increasing frame counter.
-                    // Secondary command buffer reuse is keyed on a monotonic CPU frame epoch.
-                    const uint64_t frameEpoch = m_Device ? m_Device->GetGlobalFrameNumber() : 0ull;
-                    VkCommandBuffer sec = RHI::CommandContext::BeginSecondary(*m_Device, frameEpoch, inherit);
-
-                    if (pass.ExecuteFn)
-                        pass.ExecuteFn(pass.ExecuteUserData, m_Registry, sec);
-
-                    RHI::CommandContext::End(sec);
-                    secondaryCmds[i] = sec;
-                });
-            }
-
-            Core::Tasks::Scheduler::WaitForAll();
-
-            // Execute passes in a deterministic order on the primary command buffer.
-            for (size_t i = 0; i < layer.size(); ++i)
-            {
-                const uint32_t passIdx = layer[i];
-                const auto& pass = m_PassPool[passIdx];
-
-                // 1) Barriers for this pass (computed in Compile, and now hoisted to primary).
-                if (!pass.ImageBarriers.empty() || !pass.BufferBarriers.empty())
-                {
-                    VkDependencyInfo depInfo{};
-                    depInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-                    depInfo.imageMemoryBarrierCount = (uint32_t)pass.ImageBarriers.size();
-                    depInfo.pImageMemoryBarriers = pass.ImageBarriers.data();
-                    depInfo.bufferMemoryBarrierCount = (uint32_t)pass.BufferBarriers.size();
-                    depInfo.pBufferMemoryBarriers = pass.BufferBarriers.data();
-                    vkCmdPipelineBarrier2(cmd, &depInfo);
-                }
-
-                const bool isRaster = (pass.AttachmentHead != nullptr);
-                VkRenderingInfo renderInfo{};
-                std::vector<VkRenderingAttachmentInfo> colorAtts;
-                VkRenderingAttachmentInfo depthAtt{};
-                bool hasDepth = false;
-
-                if (isRaster)
-                {
-                    colorAtts.reserve(8);
-                    VkExtent2D renderArea{0, 0};
-
-                    for (AttachmentNode* att = pass.AttachmentHead; att != nullptr; att = att->Next)
-                    {
-                        auto& res = m_ResourcePool[att->ID];
-                        if (renderArea.width == 0 && renderArea.height == 0) renderArea = res.Extent;
-
-                        VkRenderingAttachmentInfo info{};
-                        info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-                        info.imageView = res.PhysicalView;
-
-                        // Dynamic rendering requires an attachment-capable layout.
-                        // IMPORTANT: Don't use ResourceNode::CurrentLayout here.
-                        // A pass can legally transition the same image to TRANSFER_SRC_OPTIMAL later (e.g. picking copy pass)
-                        // which would make CurrentLayout reflect the *final* layout, not the layout at begin rendering.
-                        info.imageLayout = att->IsDepth
-                                               ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
-                                               : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-                        info.loadOp = att->Info.LoadOp;
-                        info.storeOp = att->Info.StoreOp;
-                        info.clearValue = att->Info.ClearValue;
-
-                        if (att->IsDepth)
-                        {
-                            depthAtt = info;
-                            hasDepth = true;
-                        }
-                        else
-                        {
-                            colorAtts.push_back(info);
-                        }
-                    }
-
-                    renderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
-                    renderInfo.flags = VK_RENDERING_CONTENTS_SECONDARY_COMMAND_BUFFERS_BIT;
-                    renderInfo.renderArea = {{0, 0}, renderArea};
-                    renderInfo.layerCount = 1;
-                    renderInfo.colorAttachmentCount = (uint32_t)colorAtts.size();
-                    renderInfo.pColorAttachments = colorAtts.data();
-                    renderInfo.pDepthAttachment = hasDepth ? &depthAtt : nullptr;
-
-                    vkCmdBeginRendering(cmd, &renderInfo);
-                }
-
-                VkCommandBuffer sec = secondaryCmds[i];
-                if (sec != VK_NULL_HANDLE)
-                    vkCmdExecuteCommands(cmd, 1, &sec);
-
-                if (isRaster)
-                    vkCmdEndRendering(cmd);
-            }
+            if (!layer.empty())
+                ExecuteLayer(cmd, layer);
         }
 
         // Note: CommandContext::Reset() is intentionally not called by RenderGraph.
         // The engine should reset thread-local pools at a known safe point (end-of-frame) once.
+    }
+
+    void RenderGraph::ExecuteLayer(VkCommandBuffer cmd, const std::vector<uint32_t>& layer)
+    {
+        // 1. Precompute inheritance info per pass (stable pointers for the worker tasks).
+        struct RasterInfo
+        {
+            bool IsRaster = false;
+            std::vector<VkFormat> ColorFormats;
+            VkFormat Depth = VK_FORMAT_UNDEFINED;
+            VkFormat Stencil = VK_FORMAT_UNDEFINED;
+        };
+
+        std::vector<RasterInfo> rasterInfos(layer.size());
+
+        for (size_t i = 0; i < layer.size(); ++i)
+        {
+            const auto& pass = m_PassPool[layer[i]];
+            RasterInfo ri{};
+            ri.IsRaster = (pass.AttachmentHead != nullptr);
+            if (ri.IsRaster)
+            {
+                for (AttachmentNode* att = pass.AttachmentHead; att != nullptr; att = att->Next)
+                {
+                    const auto& res = m_ResourcePool[att->ID];
+                    if (att->IsDepth)
+                        ri.Depth = res.Format;
+                    else
+                        ri.ColorFormats.push_back(res.Format);
+                }
+            }
+            rasterInfos[i] = std::move(ri);
+        }
+
+        // 2. Record secondary command buffers in parallel.
+        std::vector<VkCommandBuffer> secondaryCmds(layer.size(), VK_NULL_HANDLE);
+
+        for (size_t i = 0; i < layer.size(); ++i)
+        {
+            const uint32_t passIdx = layer[i];
+
+            Core::Tasks::Scheduler::Dispatch([this, passIdx, &secondaryCmds, i, &rasterInfos]
+            {
+                auto& pass = m_PassPool[passIdx];
+                const bool isRaster = (pass.AttachmentHead != nullptr);
+
+                RHI::SecondaryInheritanceInfo inherit{};
+                if (isRaster)
+                {
+                    inherit.ColorAttachmentFormats = std::span<const VkFormat>(rasterInfos[i].ColorFormats.data(),
+                                                                               rasterInfos[i].ColorFormats.size());
+                    inherit.DepthAttachmentFormat = rasterInfos[i].Depth;
+                    inherit.StencilAttachmentFormat = rasterInfos[i].Stencil;
+                    inherit.RasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+                    inherit.ViewMask = 0;
+                }
+
+                const uint64_t frameEpoch = m_Device ? m_Device->GetGlobalFrameNumber() : 0ull;
+                VkCommandBuffer sec = RHI::CommandContext::BeginSecondary(*m_Device, frameEpoch, inherit);
+
+                if (pass.ExecuteFn)
+                    pass.ExecuteFn(pass.ExecuteUserData, m_Registry, sec);
+
+                RHI::CommandContext::End(sec);
+                secondaryCmds[i] = sec;
+            });
+        }
+
+        Core::Tasks::Scheduler::WaitForAll();
+
+        // 3. Record barriers, begin rendering, and execute secondaries on the primary buffer.
+        for (size_t i = 0; i < layer.size(); ++i)
+        {
+            const uint32_t passIdx = layer[i];
+            const auto& pass = m_PassPool[passIdx];
+
+            // Barriers (computed in Compile, hoisted to primary).
+            if (!pass.ImageBarriers.empty() || !pass.BufferBarriers.empty())
+            {
+                VkDependencyInfo depInfo{};
+                depInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+                depInfo.imageMemoryBarrierCount = (uint32_t)pass.ImageBarriers.size();
+                depInfo.pImageMemoryBarriers = pass.ImageBarriers.data();
+                depInfo.bufferMemoryBarrierCount = (uint32_t)pass.BufferBarriers.size();
+                depInfo.pBufferMemoryBarriers = pass.BufferBarriers.data();
+                vkCmdPipelineBarrier2(cmd, &depInfo);
+            }
+
+            const bool isRaster = (pass.AttachmentHead != nullptr);
+            VkRenderingInfo renderInfo{};
+            std::vector<VkRenderingAttachmentInfo> colorAtts;
+            VkRenderingAttachmentInfo depthAtt{};
+            bool hasDepth = false;
+
+            if (isRaster)
+            {
+                colorAtts.reserve(8);
+                VkExtent2D renderArea{0, 0};
+
+                for (AttachmentNode* att = pass.AttachmentHead; att != nullptr; att = att->Next)
+                {
+                    auto& res = m_ResourcePool[att->ID];
+                    if (renderArea.width == 0 && renderArea.height == 0) renderArea = res.Extent;
+
+                    VkRenderingAttachmentInfo info{};
+                    info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+                    info.imageView = res.PhysicalView;
+                    // IMPORTANT: Use the attachment-capable layout, not CurrentLayout
+                    // (which may reflect a later transition).
+                    info.imageLayout = att->IsDepth
+                                           ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+                                           : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                    info.loadOp = att->Info.LoadOp;
+                    info.storeOp = att->Info.StoreOp;
+                    info.clearValue = att->Info.ClearValue;
+
+                    if (att->IsDepth)
+                    {
+                        depthAtt = info;
+                        hasDepth = true;
+                    }
+                    else
+                    {
+                        colorAtts.push_back(info);
+                    }
+                }
+
+                renderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+                renderInfo.flags = VK_RENDERING_CONTENTS_SECONDARY_COMMAND_BUFFERS_BIT;
+                renderInfo.renderArea = {{0, 0}, renderArea};
+                renderInfo.layerCount = 1;
+                renderInfo.colorAttachmentCount = (uint32_t)colorAtts.size();
+                renderInfo.pColorAttachments = colorAtts.data();
+                renderInfo.pDepthAttachment = hasDepth ? &depthAtt : nullptr;
+
+                vkCmdBeginRendering(cmd, &renderInfo);
+            }
+
+            VkCommandBuffer sec = secondaryCmds[i];
+            if (sec != VK_NULL_HANDLE)
+                vkCmdExecuteCommands(cmd, 1, &sec);
+
+            if (isRaster)
+                vkCmdEndRendering(cmd);
+        }
     }
 
     std::vector<RenderGraphDebugPass> RenderGraph::BuildDebugPassList() const

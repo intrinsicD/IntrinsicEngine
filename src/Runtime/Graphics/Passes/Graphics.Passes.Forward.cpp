@@ -47,16 +47,16 @@ namespace Graphics::Passes
             }
 
             m_InstanceSetPool = std::make_unique<RHI::PersistentDescriptorPool>(*m_Device,
-                                                                                /*maxSets*/ 256,
-                                                                                /*storageBufferCount*/ 512,
+                                                                                ForwardPassConstants::kInstancePoolMaxSets,
+                                                                                ForwardPassConstants::kInstancePoolStorageBuffers,
                                                                                 /*debugName*/ "ForwardPass.Stage1.Instance");
         }
 
         if (m_CullSetPool == nullptr)
         {
             m_CullSetPool = std::make_unique<RHI::PersistentDescriptorPool>(*m_Device,
-                                                                            /*maxSets*/ 64,
-                                                                            /*storageBufferCount*/ 64 * 5,
+                                                                            ForwardPassConstants::kCullPoolMaxSets,
+                                                                            ForwardPassConstants::kCullPoolStorageBuffers,
                                                                             /*debugName*/ "ForwardPass.Cull");
         }
 
@@ -120,7 +120,7 @@ namespace Graphics::Passes
         // Build a dense routing table: GeometryHandle.Index -> DenseGeoId.
         // This allows GPUScene instances to store the stable handle index (sparse), while the culler produces packed per-geometry streams.
         std::vector<uint32_t> handleToDense;
-        handleToDense.assign(static_cast<size_t>(maxHandleIndex) + 1u, 0xFFFFFFFFu);
+        handleToDense.assign(static_cast<size_t>(maxHandleIndex) + 1u, GPUSceneConstants::kPreserveGeometryId);
         for (uint32_t denseId = 0; denseId < geometryCount; ++denseId)
             handleToDense[dense[denseId].Handle.Index] = denseId;
 
@@ -144,7 +144,7 @@ namespace Graphics::Passes
                     continue;
                 }
 
-                if (handleToDense[mr.Geometry.Index] == 0xFFFFFFFFu)
+                if (handleToDense[mr.Geometry.Index] == GPUSceneConstants::kPreserveGeometryId)
                     ++invalidGeometryMapping;
             }
 
@@ -158,13 +158,13 @@ namespace Graphics::Passes
         const uint32_t frame = (ctx.FrameIndex % FRAMES);
 
         const uint32_t requiredMapCount = static_cast<uint32_t>(handleToDense.size());
-        const size_t requiredMapBytes = std::max<size_t>(size_t(requiredMapCount) * sizeof(uint32_t), 4);
+        const size_t requiredMapBytes = std::max<size_t>(size_t(requiredMapCount) * sizeof(uint32_t), GPUSceneConstants::kMinSSBOSize);
 
         // Upload mapping buffer (CPU->GPU)
         if (!m_Stage3HandleToDense[frame] || m_Stage3HandleToDenseCapacity < requiredMapCount)
         {
             m_Stage3HandleToDenseCapacity = std::max(m_Stage3HandleToDenseCapacity, requiredMapCount);
-            const size_t bytes = std::max<size_t>(size_t(m_Stage3HandleToDenseCapacity) * sizeof(uint32_t), 4);
+            const size_t bytes = std::max<size_t>(size_t(m_Stage3HandleToDenseCapacity) * sizeof(uint32_t), GPUSceneConstants::kMinSSBOSize);
             m_Stage3HandleToDense[frame] = std::make_unique<RHI::VulkanBuffer>(
                 *m_Device,
                 bytes,
@@ -180,8 +180,8 @@ namespace Graphics::Passes
         const size_t geoIndexCountBytes = std::max<size_t>(geometryCount * sizeof(uint32_t), 16);
         const size_t drawCountsBytes = std::max<size_t>(geometryCount * sizeof(uint32_t), 16);
         const size_t packedCapacity = static_cast<size_t>(geometryCount) * static_cast<size_t>(maxDrawsPerGeometry);
-        const size_t packedIndirectBytes = std::max<size_t>(packedCapacity * sizeof(VkDrawIndexedIndirectCommand), 4);
-        const size_t packedVisibilityBytes = std::max<size_t>(packedCapacity * sizeof(uint32_t), 4);
+        const size_t packedIndirectBytes = std::max<size_t>(packedCapacity * sizeof(VkDrawIndexedIndirectCommand), GPUSceneConstants::kMinSSBOSize);
+        const size_t packedVisibilityBytes = std::max<size_t>(packedCapacity * sizeof(uint32_t), GPUSceneConstants::kMinSSBOSize);
 
         // Allocate / resize per-frame buffers.
         const auto needsResize = [](const std::unique_ptr<RHI::VulkanBuffer>& buf, size_t requiredBytes) -> bool
@@ -356,8 +356,7 @@ namespace Graphics::Passes
 
                                                 vkCmdPushConstants(cmd, m_CullPipeline->GetLayout(), VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(CullPC), &pc);
 
-                                                const uint32_t wg = 64;
-                                                const uint32_t groups = (totalInstanceCount + wg - 1) / wg;
+                                                const uint32_t groups = (totalInstanceCount + ForwardPassConstants::kCullWorkgroupSize - 1) / ForwardPassConstants::kCullWorkgroupSize;
                                                 vkCmdDispatch(cmd, groups, 1, 1);
                                             });
         }
@@ -660,8 +659,8 @@ namespace Graphics::Passes
                                                 return;
 
                                             const uint32_t maxDraws = stage3.InstanceCount;
-                                            const size_t indirectBytes = std::max<size_t>(maxDraws * sizeof(VkDrawIndexedIndirectCommand), 4);
-                                            const size_t remapBytes = std::max<size_t>(maxDraws * sizeof(uint32_t), 4);
+                                            const size_t indirectBytes = std::max<size_t>(maxDraws * sizeof(VkDrawIndexedIndirectCommand), GPUSceneConstants::kMinSSBOSize);
+                                            const size_t remapBytes = std::max<size_t>(maxDraws * sizeof(uint32_t), GPUSceneConstants::kMinSSBOSize);
 
                                             static size_t s_IndirectCap[FRAMES] = {0, 0};
                                             static size_t s_RemapCap[FRAMES] = {0, 0};
@@ -759,8 +758,7 @@ namespace Graphics::Passes
 
                                             vkCmdPushConstants(cmd, m_CullPipeline->GetLayout(), VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(CullPC), &pc);
 
-                                            const uint32_t wg = 64;
-                                            const uint32_t groups = (stage3.InstanceCount + wg - 1) / wg;
+                                            const uint32_t groups = (stage3.InstanceCount + ForwardPassConstants::kCullWorkgroupSize - 1) / ForwardPassConstants::kCullWorkgroupSize;
                                             vkCmdDispatch(cmd, groups, 1, 1);
                                         });
 
