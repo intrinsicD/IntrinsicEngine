@@ -9,6 +9,7 @@
 #include <tiny_gltf.h>
 
 import Runtime.Engine;
+import Runtime.GraphicsBackend;
 import Runtime.Selection;
 import Core;
 import Graphics;
@@ -47,11 +48,8 @@ public:
     {
         Log::Info("Sandbox Started!");
 
-        if (!m_TransferManager)
-        {
-            Log::Error("FATAL: TransferManager is null in OnStart!");
-            std::exit(-1);
-        }
+        auto& gfx = GetGraphicsBackend();
+
 
         m_CameraEntity = m_Scene.CreateEntity("Main Camera");
         m_Camera = m_Scene.GetRegistry().emplace<Graphics::CameraComponent>(m_CameraEntity);
@@ -60,22 +58,21 @@ public:
         auto textureLoader = [this](const std::filesystem::path& path, Core::Assets::AssetHandle handle)
             -> std::shared_ptr<RHI::Texture>
         {
-            auto result = Graphics::TextureLoader::LoadAsync(path, *GetDevice(), *m_TransferManager, *m_TextureSystem);
+            auto result = Graphics::TextureLoader::LoadAsync(path, *GetDevice(),
+                gfx.GetTransferManager(), gfx.GetTextureSystem());
 
             if (result)
             {
                 // When the transfer finishes, publish the real descriptor for this texture's bindless slot.
                 RegisterAssetLoad(handle, result->Token, [this, texHandle = result->TextureHandle]()
                 {
-                    if (m_TextureSystem)
+                    auto& g = GetGraphicsBackend();
+                    if (const auto* data = g.GetTextureSystem().Get(texHandle))
                     {
-                        if (const auto* data = m_TextureSystem->Get(texHandle))
-                        {
-                            // Flip bindless slot from default -> real view/sampler.
-                            // This is the critical publish step in Phase 1.
-                            // (No GPU waits; safe because token completion implies transfer queue copy is done.)
-                            m_BindlessSystem->EnqueueUpdate(data->BindlessSlot, data->Image->GetView(), data->Sampler);
-                        }
+                        // Flip bindless slot from default -> real view/sampler.
+                        // This is the critical publish step in Phase 1.
+                        // (No GPU waits; safe because token completion implies transfer queue copy is done.)
+                        g.GetBindlessSystem().EnqueueUpdate(data->BindlessSlot, data->Image->GetView(), data->Sampler);
                     }
                 });
 
@@ -92,7 +89,7 @@ public:
         auto modelLoader = [&](const std::string& path, Assets::AssetHandle handle)
             -> std::unique_ptr<Graphics::Model>
         {
-            auto result = Graphics::ModelLoader::LoadAsync(GetDevice(), *m_TransferManager, m_GeometryStorage, path);
+            auto result = Graphics::ModelLoader::LoadAsync(GetDevice(), gfx.GetTransferManager(), m_GeometryStorage, path);
 
             if (result)
             {
@@ -118,7 +115,7 @@ public:
 
         // 3. Setup Material (Assuming texture loads synchronously or is handled)
         Graphics::MaterialData matData;
-        matData.AlbedoID = m_DefaultTextureIndex; // Fallback until loaded
+        matData.AlbedoID = gfx.GetDefaultTextureIndex(); // Fallback until loaded
         matData.RoughnessFactor = 1.0f;
         matData.MetallicFactor = 0.0f;
 

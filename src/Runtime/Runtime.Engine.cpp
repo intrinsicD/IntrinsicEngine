@@ -20,6 +20,7 @@ import RHI;
 import Graphics;
 import ECS;
 import Interface;
+import Runtime.GraphicsBackend;
 
 using namespace Core::Hash;
 
@@ -97,140 +98,42 @@ namespace Runtime
             }, e);
         });
 
-        // 2. Vulkan Context & Surface
+        // 2. GraphicsBackend (Vulkan context, device, swapchain, descriptors, transfer, textures)
 #ifdef NDEBUG
         bool enableValidation = false;
 #else
         bool enableValidation = true;
 #endif
-        RHI::ContextConfig ctxConfig{config.AppName, enableValidation};
-        m_Context = std::make_unique<RHI::VulkanContext>(ctxConfig);
+        GraphicsBackendConfig gfxConfig{config.AppName, enableValidation};
+        m_GraphicsBackend = std::make_unique<GraphicsBackend>(*m_Window, gfxConfig);
 
-        if (!m_Window->CreateSurface(m_Context->GetInstance(), nullptr, &m_Surface))
-        {
-            Core::Log::Error("FATAL: Failed to create Vulkan Surface");
-            std::exit(-1); // Hard fail without exceptions
-        }
+        // 3. MaterialSystem (depends on TextureSystem from GraphicsBackend + AssetManager)
+        m_MaterialSystem = std::make_unique<Graphics::MaterialSystem>(
+            m_GraphicsBackend->GetTextureSystem(), m_AssetManager);
 
-        // 3. Device
-        m_Device = std::make_shared<RHI::VulkanDevice>(*m_Context, m_Surface);
+        // 4. Initialize GeometryStorage with frames-in-flight for safe deferred deletion
+        m_GeometryStorage.Initialize(m_GraphicsBackend->GetDevice()->GetFramesInFlight());
 
-        // Bindless + TextureSystem
-        m_BindlessSystem = std::make_unique<RHI::BindlessDescriptorSystem>(*m_Device);
-        m_TextureSystem = std::make_unique<RHI::TextureSystem>(*m_Device, *m_BindlessSystem);
-        m_MaterialSystem = std::make_unique<Graphics::MaterialSystem>(*m_TextureSystem, m_AssetManager);
+        // 5. ImGui
+        Interface::GUI::Init(*m_Window,
+                             *m_GraphicsBackend->GetDevice(),
+                             m_GraphicsBackend->GetSwapchain(),
+                             m_GraphicsBackend->GetContext().GetInstance(),
+                             m_GraphicsBackend->GetDevice()->GetGraphicsQueue());
 
-        // Initialize GeometryStorage with frames-in-flight for safe deferred deletion
-        m_GeometryStorage.Initialize(m_Device->GetFramesInFlight());
-
-        // Swapchain & Renderer (TransferManager is needed for default texture upload)
-        m_Swapchain = std::make_unique<RHI::VulkanSwapchain>(m_Device, *m_Window);
-        m_Renderer = std::make_unique<RHI::SimpleRenderer>(m_Device, *m_Swapchain);
-        m_TransferManager = std::make_unique<RHI::TransferManager>(*m_Device);
-
-        // Create and register an engine-owned default 1x1 white texture.
-        // Keep it alive for the lifetime of the engine so slots never go stale.
-        {
-            const RHI::TextureHandle handle = m_TextureSystem->CreatePending(1, 1, VK_FORMAT_R8G8B8A8_SRGB);
-            m_DefaultTexture = std::make_shared<RHI::Texture>(*m_TextureSystem, *m_Device, handle);
-
-            // Upload a single white pixel (RGBA8) via the transfer queue.
-            const uint32_t white = 0xFFFFFFFFu;
-
-            VkPhysicalDeviceProperties props{};
-            vkGetPhysicalDeviceProperties(m_Device->GetPhysicalDevice(), &props);
-
-            auto alloc = m_TransferManager->AllocateStagingForImage(
-                sizeof(white),
-                /*texelBlockSize*/ 4,
-                /*rowPitchBytes*/ 4,
-                static_cast<size_t>(props.limits.optimalBufferCopyOffsetAlignment),
-                static_cast<size_t>(props.limits.optimalBufferCopyRowPitchAlignment));
-
-            if (alloc.Buffer != VK_NULL_HANDLE && alloc.MappedPtr != nullptr)
-            {
-                std::memcpy(alloc.MappedPtr, &white, sizeof(white));
-
-                VkCommandBuffer cmd = m_TransferManager->Begin();
-                VkImage dstImage = m_DefaultTexture->GetImage();
-
-                if (dstImage != VK_NULL_HANDLE)
-                {
-                    VkImageMemoryBarrier2 barrier{};
-                    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-                    barrier.srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
-                    barrier.srcAccessMask = 0;
-                    barrier.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
-                    barrier.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
-                    barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-                    barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-                    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-                    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-                    barrier.image = dstImage;
-                    barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-
-                    VkDependencyInfo dep{};
-                    dep.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-                    dep.imageMemoryBarrierCount = 1;
-                    dep.pImageMemoryBarriers = &barrier;
-                    vkCmdPipelineBarrier2(cmd, &dep);
-
-                    VkBufferImageCopy region{};
-                    region.bufferOffset = static_cast<VkDeviceSize>(alloc.Offset);
-                    region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-                    region.imageExtent = {1, 1, 1};
-                    vkCmdCopyBufferToImage(cmd, alloc.Buffer, dstImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
-
-                    VkImageMemoryBarrier2 readBarrier = barrier;
-                    readBarrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
-                    readBarrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
-                    // Fix: On a dedicated Transfer Queue, we cannot wait for FRAGMENT_SHADER stage.
-                    // We transition to SHADER_READ_ONLY layout here, but the execution dependency
-                    // must be purely TRANSFER-local. Actual visibility to Graphics Queue is handled by semaphores.
-                    readBarrier.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT; 
-                    readBarrier.dstAccessMask = VK_ACCESS_2_TRANSFER_READ_BIT; // Dummy access
-                    readBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-                    readBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-                    VkDependencyInfo dep2{};
-                    dep2.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-                    dep2.imageMemoryBarrierCount = 1;
-                    dep2.pImageMemoryBarriers = &readBarrier;
-                    vkCmdPipelineBarrier2(cmd, &dep2);
-                }
-
-                (void)m_TransferManager->Submit(cmd);
-            }
-            else
-            {
-                Core::Log::Warn("Default texture staging allocation failed; default texture may appear black.");
-            }
-
-            // Contract: bindless slot 0 is reserved for the default/error texture.
-            m_DefaultTextureIndex = 0;
-            m_BindlessSystem->SetTexture(m_DefaultTextureIndex, *m_DefaultTexture);
-
-            // Plumb default descriptor into the TextureSystem so freed slots become safe to sample.
-            m_TextureSystem->SetDefaultDescriptor(m_DefaultTexture->GetView(), m_DefaultTexture->GetSampler());
-        }
-
-        Interface::GUI::Init(*m_Window, *m_Device, *m_Swapchain, m_Context->GetInstance(),
-                             m_Device->GetGraphicsQueue());
-
-
+        // 6. Pipelines & RenderSystem
         InitPipeline();
 
-        // Retained-mode GPUScene: Engine owns it so SpawnModel/ECS can queue updates.
-        if (m_PipelineLibrary && m_Device)
+        // 7. Retained-mode GPUScene: Engine owns it so SpawnModel/ECS can queue updates.
+        if (m_PipelineLibrary && m_GraphicsBackend->GetDevice())
         {
             if (auto* p = m_PipelineLibrary->GetSceneUpdatePipeline(); p && m_PipelineLibrary->GetSceneUpdateSetLayout() != VK_NULL_HANDLE)
             {
-                m_GpuScene = std::make_unique<Graphics::GPUScene>(*m_Device,
+                m_GpuScene = std::make_unique<Graphics::GPUScene>(*m_GraphicsBackend->GetDevice(),
                                                                  *p,
                                                                  m_PipelineLibrary->GetSceneUpdateSetLayout());
 
                 // Register EnTT on_destroy hook for immediate GPU slot reclaim.
-                // This provides O(1) cleanup instead of the one-frame-late orphan sweep.
                 g_GpuSceneForDestroyHook = m_GpuScene.get();
                 m_Scene.GetRegistry().on_destroy<ECS::MeshRenderer::Component>()
                     .connect<&OnMeshRendererDestroyed>();
@@ -246,14 +149,9 @@ namespace Runtime
 
     Engine::~Engine()
     {
-        if (m_Device)
-        {
-            vkDeviceWaitIdle(m_Device->GetLogicalDevice());
-        }
+        m_GraphicsBackend->WaitIdle();
 
         // Disconnect entity destruction hooks before tearing down GPU systems.
-        // This prevents the hook from firing on entities destroyed during shutdown
-        // after GPUScene has been destroyed.
         m_Scene.GetRegistry().on_destroy<ECS::MeshRenderer::Component>()
             .disconnect<&OnMeshRendererDestroyed>();
         g_GpuSceneForDestroyHook = nullptr;
@@ -263,7 +161,7 @@ namespace Runtime
         Core::Filesystem::FileWatcher::Shutdown();
 
         // Destroy GPU systems first while device is still alive.
-        m_GpuScene.reset(); // Destroy GPUScene (and its buffers) BEFORE device
+        m_GpuScene.reset();
         m_RenderSystem.reset();
         m_PipelineLibrary.reset();
 
@@ -272,54 +170,24 @@ namespace Runtime
         m_Scene.GetRegistry().clear();
         m_AssetManager.Clear();
 
-        m_DefaultTexture.reset();
         m_LoadedMaterials.clear();
 
         if (m_MaterialSystem)
         {
-            // Process any final deletions from the clear above
-            m_MaterialSystem->ProcessDeletions(m_Device->GetGlobalFrameNumber());
+            m_MaterialSystem->ProcessDeletions(m_GraphicsBackend->GetDevice()->GetGlobalFrameNumber());
             m_MaterialSystem.reset();
         }
 
-        // Clear geometry storage before pipeline/device destruction
+        // Clear geometry storage before device destruction
         m_GeometryStorage.Clear();
 
-        // Critical: destroy any per-frame transient RHI objects (RenderGraph images, pass closures, etc.)
-        // while the VulkanDevice is still alive.
+        // Destroy per-frame transient RHI objects while VulkanDevice is still alive.
         m_FrameScope.Reset();
 
-        // Ensure any deferred texture pool deletions are processed and the pool is cleared
-        // while the device is still valid and idle.
-        if (m_TextureSystem)
-        {
-            m_TextureSystem->ProcessDeletions();
-            m_TextureSystem->Clear();
-        }
+        // GraphicsBackend destructor handles: texture system clear, descriptors,
+        // renderer, swapchain, transfer, device, surface, context.
+        m_GraphicsBackend.reset();
 
-        m_BindlessSystem.reset();
-        m_DescriptorPool.reset();
-        m_DescriptorLayout.reset();
-        m_Renderer.reset();
-        m_Swapchain.reset();
-        m_TransferManager.reset();
-
-        // Destroy the texture system before the device.
-        m_TextureSystem.reset();
-
-        // Flush any remaining deferred SafeDestroy work now (must be done before VulkanDevice teardown).
-        if (m_Device)
-        {
-            m_Device->FlushAllDeletionQueues();
-        }
-
-        m_Device.reset();
-
-        if (m_Context)
-        {
-            vkDestroySurfaceKHR(m_Context->GetInstance(), m_Surface, nullptr);
-        }
-        m_Context.reset();
         m_Window.reset();
     }
 
@@ -373,8 +241,9 @@ namespace Runtime
             Core::Tasks::Scheduler::Dispatch([this, path]()
             {
                 // [Worker Thread] Heavy OBJ/GLTF Parsing
-                auto loadResult = Graphics::ModelLoader::LoadAsync(GetDevice(), *m_TransferManager, m_GeometryStorage,
-                                                                   path);
+                auto loadResult = Graphics::ModelLoader::LoadAsync(
+                    GetDevice(), m_GraphicsBackend->GetTransferManager(),
+                    m_GeometryStorage, path);
 
                 if (!loadResult)
                 {
@@ -384,52 +253,30 @@ namespace Runtime
                 }
 
                 // 2. Register Token immediately (Thread-safe)
-                // This ensures the Engine knows GPU work is pending before we even try to spawn.
                 RegisterAssetLoad(Core::Assets::AssetHandle{}, loadResult->Token);
 
                 // 3. Schedule Entity Spawning on Main Thread
-                // We CANNOT touch m_Scene, m_AssetManager, or m_LoadedMaterials here.
                 RunOnMainThread([this, model = std::move(loadResult->ModelData), path]() mutable
                 {
                     // [Main Thread] Safe to touch Scene/Assets
                     std::filesystem::path fsPath(path);
                     std::string baseName = fsPath.filename().string();
 
-                    // Generate unique asset name to avoid overwriting existing assets with same filename.
-                    // AssetManager::Create() destroys any existing asset with a matching name.
                     static uint64_t s_AssetLoadCounter = 0;
                     std::string assetName = baseName + "::" + std::to_string(++s_AssetLoadCounter);
 
-                    // Transfer ownership of the model into the AssetManager (zero-copy).
-                    // Keep a raw pointer for the rest of this scope (AssetManager now owns lifetime).
                     auto modelHandle = m_AssetManager.Create(assetName, std::move(model));
 
-                    // --- Setup Material (Requires AssetManager) ---
-                    // NOTE: For now, newly dropped models should NOT auto-bind any image texture.
-                    // They should render with the engine default texture (bindless slot 0) until a real material/texture is assigned.
-
-                    // Load Default Texture
-                    // auto texHandle = m_AssetManager.Load<RHI::Texture>(
-                    //     Core::Filesystem::GetAssetPath("textures/Parameterization.jpg"), textureLoader);
-
                     Graphics::MaterialData matData;
-                    matData.AlbedoID = m_DefaultTextureIndex;
+                    matData.AlbedoID = m_GraphicsBackend->GetDefaultTextureIndex();
                     matData.RoughnessFactor = 0.5f;
 
-                    // Create RAII Wrapper (Allocates in Pool)
                     auto defaultMat = std::make_unique<Graphics::Material>(*m_MaterialSystem, matData);
 
-                    // Link Texture Asset (Setup Listener)
-                    // defaultMat->SetAlbedoTexture(texHandle);
-
-                    // NOTE: AssetManager::Create() inserts into a name->handle lookup.
-                    // If we reuse the same name ("DefaultMaterial") for multiple drops,
-                    // later creates overwrite the lookup and can cause stale/incorrect material resolution.
                     const std::string materialName = assetName + "::DefaultMaterial";
                     auto defaultMaterialHandle = m_AssetManager.Create(materialName, std::move(defaultMat));
                     m_LoadedMaterials.push_back(defaultMaterialHandle);
 
-                    // --- Spawn Entities ---
                     SpawnModel(modelHandle, defaultMaterialHandle, glm::vec3(0.0f), glm::vec3(0.01f));
 
                     Core::Log::Info("Successfully spawned: {}", assetName);
@@ -451,17 +298,19 @@ namespace Runtime
     void Engine::ProcessUploads()
     {
         // 1. Cleanup Staging Memory
-        m_TransferManager->GarbageCollect();
+        m_GraphicsBackend->GarbageCollectTransfers();
 
         // 2. Check for completions
         std::lock_guard lock(m_LoadMutex);
         if (m_PendingLoads.empty()) return;
 
+        auto& transferMgr = m_GraphicsBackend->GetTransferManager();
+
         // Use erase-remove idiom to process finished loads
         auto it = std::remove_if(m_PendingLoads.begin(), m_PendingLoads.end(),
                                  [&](PendingLoad& load)
                                  {
-                                     if (m_TransferManager->IsCompleted(load.Token))
+                                     if (transferMgr.IsCompleted(load.Token))
                                      {
                                          if (load.OnComplete.Valid()) load.OnComplete();
 
@@ -492,12 +341,7 @@ namespace Runtime
 
     void Engine::InitPipeline()
     {
-        m_DescriptorLayout = std::make_unique<RHI::DescriptorLayout>(*m_Device);
-        m_DescriptorPool = std::make_unique<RHI::DescriptorAllocator>(*m_Device);
-
-        // ---------------------------------------------------------------------
         // Shader policy (data-driven)
-        // ---------------------------------------------------------------------
         m_ShaderRegistry.Register("Forward.Vert"_id, "shaders/triangle.vert.spv");
         m_ShaderRegistry.Register("Forward.Frag"_id, "shaders/triangle.frag.spv");
         m_ShaderRegistry.Register("Picking.Vert"_id, "shaders/pick_id.vert.spv");
@@ -512,27 +356,26 @@ namespace Runtime
         // GPUScene scatter update
         m_ShaderRegistry.Register("SceneUpdate.Comp"_id, "shaders/scene_update.comp.spv");
 
-        // ---------------------------------------------------------------------
         // Pipeline library (owns PSOs)
-        // ---------------------------------------------------------------------
-        m_PipelineLibrary = std::make_unique<Graphics::PipelineLibrary>(m_Device, *m_BindlessSystem, *m_DescriptorLayout);
+        m_PipelineLibrary = std::make_unique<Graphics::PipelineLibrary>(
+            m_GraphicsBackend->GetDevice(),
+            m_GraphicsBackend->GetBindlessSystem(),
+            m_GraphicsBackend->GetDescriptorLayout());
         m_PipelineLibrary->BuildDefaults(m_ShaderRegistry,
-                                         m_Swapchain->GetImageFormat(),
-                                         RHI::VulkanImage::FindDepthFormat(*m_Device));
+                                         m_GraphicsBackend->GetSwapchain().GetImageFormat(),
+                                         RHI::VulkanImage::FindDepthFormat(*m_GraphicsBackend->GetDevice()));
 
-        // ---------------------------------------------------------------------
         // RenderSystem (borrows PSOs via PipelineLibrary)
-        // ---------------------------------------------------------------------
         Core::Log::Info("About to create RenderSystem...");
         Graphics::RenderSystemConfig rsConfig{};
         m_RenderSystem = std::make_unique<Graphics::RenderSystem>(
             rsConfig,
-            m_Device,
-            *m_Swapchain,
-            *m_Renderer,
-            *m_BindlessSystem,
-            *m_DescriptorPool,
-            *m_DescriptorLayout,
+            m_GraphicsBackend->GetDevice(),
+            m_GraphicsBackend->GetSwapchain(),
+            m_GraphicsBackend->GetRenderer(),
+            m_GraphicsBackend->GetBindlessSystem(),
+            m_GraphicsBackend->GetDescriptorPool(),
+            m_GraphicsBackend->GetDescriptorLayout(),
             *m_PipelineLibrary,
             m_ShaderRegistry,
             m_FrameArena,
@@ -548,10 +391,7 @@ namespace Runtime
             std::exit(1);
         }
 
-        // ---------------------------------------------------------------------
         // Default Render Pipeline (hot-swappable)
-        // ---------------------------------------------------------------------
-        // Engine owns lifetime (RenderSystem owns pipeline); applications can request swaps at runtime.
         m_RenderSystem->RequestPipelineSwap(std::make_unique<Graphics::DefaultPipeline>());
     }
 
@@ -564,9 +404,7 @@ namespace Runtime
         if (auto* model = m_AssetManager.TryGet<Graphics::Model>(modelHandle))
         {
             // 2. Create Root
-            // We use the Asset Name as the entity name base
             std::string name = "Model";
-            // (Optional: fetch name from AssetManager metadata if available)
 
             entt::entity root = m_Scene.CreateEntity(name);
             auto& t = m_Scene.GetRegistry().get<ECS::Components::Transform::Component>(root);
@@ -574,7 +412,6 @@ namespace Runtime
             t.Scale = scale;
 
             // Assign stable pick IDs (monotonic, never reused during runtime).
-            // This decouples GPU picking from entt::entity recycling.
             static uint32_t s_NextPickId = 1u;
             if (!m_Scene.GetRegistry().all_of<ECS::Components::Selection::PickID>(root))
             {
@@ -599,9 +436,6 @@ namespace Runtime
                 mr.Geometry = model->Meshes[i]->Handle;
                 mr.Material = materialHandle;
 
-                // GPUScene slots + initial packets are handled by Graphics::Systems::MeshRendererLifecycle.
-                // This keeps the retained-mode contract centralized and prevents double-allocation.
-
                 // Add Collider
                 if (model->Meshes[i]->CollisionGeometry)
                 {
@@ -610,7 +444,7 @@ namespace Runtime
                     col.WorldOBB.Center = col.CollisionRef->LocalAABB.GetCenter();
                 }
 
-                // Add Selectable Tag (THE CRITICAL FIX)
+                // Add Selectable Tag
                 m_Scene.GetRegistry().emplace<ECS::Components::Selection::SelectableTag>(targetEntity);
 
                 // Stable pick ID for each selectable entity.
@@ -670,14 +504,11 @@ namespace Runtime
             }
 
             // Reclaim pool slots for textures that became unreachable this frame.
-            if (m_TextureSystem)
-            {
-                m_TextureSystem->ProcessDeletions();
-            }
+            m_GraphicsBackend->ProcessTextureDeletions();
 
             if (m_MaterialSystem)
             {
-                m_MaterialSystem->ProcessDeletions(m_Device->GetGlobalFrameNumber());
+                m_MaterialSystem->ProcessDeletions(m_GraphicsBackend->GetDevice()->GetGlobalFrameNumber());
             }
 
             {
@@ -695,7 +526,6 @@ namespace Runtime
                 const float frameDt = static_cast<float>(frameTime);
 
                 // Client/gameplay systems first: they produce dirty state
-                // (e.g. AxisRotator writes Transform::Component + IsDirtyTag).
                 OnRegisterSystems(m_FrameGraph, frameDt);
 
                 // Core engine systems consume dirty state in pipeline order.
@@ -705,11 +535,12 @@ namespace Runtime
                 {
                     Graphics::Systems::MeshRendererLifecycle::RegisterSystem(
                         m_FrameGraph, registry, *m_GpuScene, m_AssetManager,
-                        *m_MaterialSystem, m_GeometryStorage, m_DefaultTextureIndex);
+                        *m_MaterialSystem, m_GeometryStorage,
+                        m_GraphicsBackend->GetDefaultTextureIndex());
 
                     Graphics::Systems::GPUSceneSync::RegisterSystem(
                         m_FrameGraph, registry, *m_GpuScene, m_AssetManager,
-                        *m_MaterialSystem, m_DefaultTextureIndex);
+                        *m_MaterialSystem, m_GraphicsBackend->GetDefaultTextureIndex());
                 }
 
                 auto compileResult = m_FrameGraph.Compile();
@@ -723,7 +554,7 @@ namespace Runtime
 
             if (m_FramebufferResized)
             {
-                m_Renderer->OnResize();
+                m_GraphicsBackend->OnResize();
                 if (m_RenderSystem)
                 {
                     m_RenderSystem->OnResize();
@@ -731,7 +562,7 @@ namespace Runtime
                 m_FramebufferResized = false;
             }
 
-            m_TransferManager->GarbageCollect();
+            m_GraphicsBackend->GarbageCollectTransfers();
 
             {
                 PROFILE_SCOPE("OnRender");
@@ -743,10 +574,9 @@ namespace Runtime
         }
 
         Core::Tasks::Scheduler::WaitForAll();
-        vkDeviceWaitIdle(m_Device->GetLogicalDevice());
+        m_GraphicsBackend->WaitIdle();
 
         // Final flush: destroy any RHI resources that were deferred via VulkanDevice::SafeDestroy().
-        // This is required because SafeDestroy is keyed off frame indices; at shutdown we want deterministic teardown.
-        m_Device->FlushAllDeletionQueues();
+        m_GraphicsBackend->FlushDeletionQueues();
     }
 }

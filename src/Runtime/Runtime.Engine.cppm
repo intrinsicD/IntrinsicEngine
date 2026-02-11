@@ -16,6 +16,7 @@ import RHI;
 import Graphics;
 import ECS;
 import Runtime.SelectionModule;
+import Runtime.GraphicsBackend;
 
 export namespace Runtime
 {
@@ -51,19 +52,9 @@ export namespace Runtime
 
     protected:
         std::unique_ptr<Core::Windowing::Window> m_Window;
-        std::unique_ptr<RHI::VulkanContext> m_Context;
-        std::shared_ptr<RHI::VulkanDevice> m_Device;
-        VkSurfaceKHR m_Surface = VK_NULL_HANDLE;
 
-        // Managers that depend on Device
-        std::unique_ptr<RHI::VulkanSwapchain> m_Swapchain;
-        std::unique_ptr<RHI::SimpleRenderer> m_Renderer;
-        std::unique_ptr<RHI::TransferManager> m_TransferManager;
-
-        std::unique_ptr<RHI::DescriptorLayout> m_DescriptorLayout;
-        std::unique_ptr<RHI::DescriptorAllocator> m_DescriptorPool;
-        std::unique_ptr<RHI::BindlessDescriptorSystem> m_BindlessSystem;
-        std::unique_ptr<RHI::TextureSystem> m_TextureSystem;
+        // All Vulkan/GPU infrastructure: context, device, swapchain, descriptors, etc.
+        std::unique_ptr<GraphicsBackend> m_GraphicsBackend;
 
         // Retained-mode GPU scene (persistent SSBOs managed by Graphics::RenderSystem).
         // Owned by Engine to allow SpawnModel/ECS to allocate slots and queue updates.
@@ -73,7 +64,7 @@ export namespace Runtime
         std::unique_ptr<Graphics::PipelineLibrary> m_PipelineLibrary;
 
     public:
-        // Protected access so Sandbox can manipulate Scene/Assets
+        // Public access so Sandbox can manipulate Scene/Assets
         ECS::Scene m_Scene;
         Core::Assets::AssetManager m_AssetManager;
         Core::Memory::LinearArena m_FrameArena; // 1 MB per frame
@@ -88,14 +79,17 @@ export namespace Runtime
         [[nodiscard]] SelectionModule& GetSelection() { return m_Selection; }
         [[nodiscard]] const SelectionModule& GetSelection() const { return m_Selection; }
 
+        // Access to the GraphicsBackend subsystem.
+        [[nodiscard]] GraphicsBackend& GetGraphicsBackend() const { return *m_GraphicsBackend; }
+
         // Helper to access the camera buffer (Temporary until we have a Camera Component)
         [[nodiscard]] RHI::VulkanBuffer* GetGlobalUBO() const { return m_RenderSystem->GetGlobalUBO(); }
 
-        // Needed for resource creation
-        [[nodiscard]] std::shared_ptr<RHI::VulkanDevice> GetDevice() const { return m_Device; }
-        [[nodiscard]] RHI::DescriptorAllocator& GetDescriptorPool() const { return *m_DescriptorPool; }
-        [[nodiscard]] RHI::DescriptorLayout& GetDescriptorLayout() const { return *m_DescriptorLayout; }
-        [[nodiscard]] RHI::VulkanSwapchain& GetSwapchain() const { return *m_Swapchain; }
+        // Convenience accessors that delegate to GraphicsBackend.
+        [[nodiscard]] std::shared_ptr<RHI::VulkanDevice> GetDevice() const { return m_GraphicsBackend->GetDevice(); }
+        [[nodiscard]] RHI::DescriptorAllocator& GetDescriptorPool() const { return m_GraphicsBackend->GetDescriptorPool(); }
+        [[nodiscard]] RHI::DescriptorLayout& GetDescriptorLayout() const { return m_GraphicsBackend->GetDescriptorLayout(); }
+        [[nodiscard]] RHI::VulkanSwapchain& GetSwapchain() const { return m_GraphicsBackend->GetSwapchain(); }
         [[nodiscard]] Graphics::GeometryPool& GetGeometryStorage() { return m_GeometryStorage; }
 
         void RegisterAssetLoad(Core::Assets::AssetHandle handle, RHI::TransferToken token);
@@ -119,9 +113,6 @@ export namespace Runtime
         }
 
     protected:
-        std::shared_ptr<RHI::Texture> m_DefaultTexture;
-        uint32_t m_DefaultTextureIndex = 0;
-
         // Keep-alive list for runtime-created materials is handle-based to avoid shared_ptr overhead.
         // The AssetManager owns the actual material payload.
         std::vector<Core::Assets::AssetHandle> m_LoadedMaterials;
