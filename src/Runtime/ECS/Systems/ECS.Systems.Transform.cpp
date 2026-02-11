@@ -6,6 +6,7 @@ module ECS:Systems.Transform.Impl;
 import :Systems.Transform;
 import :Components.Transform;
 import :Components.Hierarchy;
+import Core;
 
 using Core::Hash::operator""_id;
 

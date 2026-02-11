@@ -386,7 +386,7 @@ namespace Core::Assets
                     {
                         // Re-acquire lock to safely fetch the reloader action.
                         // This is safe: we only lock briefly for the single entity.
-                        std::function<void()> reloadAction;
+                        std::shared_ptr<std::function<void()>> reloadAction;
                         {
                             std::shared_lock lock(m_Mutex);
                             if (m_Registry.valid(entry.Entity))
@@ -395,10 +395,10 @@ namespace Core::Assets
                                     reloadAction = reloader->ReloadAction;
                             }
                         }
-                        if (reloadAction)
+                        if (reloadAction && *reloadAction)
                         {
                             Log::Info("Manual Reload requested for: {}", entry.Info.Name);
-                            reloadAction();
+                            (*reloadAction)();
                         }
                     }
                     if (!canReload) ImGui::EndDisabled();

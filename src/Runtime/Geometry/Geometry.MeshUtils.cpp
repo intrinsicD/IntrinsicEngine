@@ -4,6 +4,7 @@ module;
 #include <glm/gtx/norm.hpp>
 #include <span>
 #include <limits>
+#include <algorithm>
 
 module Geometry:MeshUtils.Impl;
 import :MeshUtils;

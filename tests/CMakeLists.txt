@@ -70,6 +70,7 @@ add_executable(${core_test_target}
         Test_CoreHandle.cpp
         Test_CoreHash.cpp
         Test_CoreFrameGraph.cpp
+        Test_CoreAssetSafety.cpp
 )
 
 target_compile_options(${core_test_target} PRIVATE ${INTRINSIC_COMPILE_FLAGS})

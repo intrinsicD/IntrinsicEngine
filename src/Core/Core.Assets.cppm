@@ -24,6 +24,24 @@ using namespace Core::Hash;
 
 export namespace Core::Assets
 {
+    // --- Asset Loader Concept ---
+    // Loaders passed to AssetManager::Load() MUST be:
+    //   1. Move-constructible (stored in shared ownership internally)
+    //   2. Copy-constructible (captured in long-lived callbacks)
+    //   3. Invocable with (const std::string& path, AssetHandle handle)
+    //   4. Return std::unique_ptr<T> or std::shared_ptr<T>
+    //
+    // IMPORTANT CAPTURE RULES:
+    //   - Loaders are stored persistently for hot-reload. They outlive the
+    //     calling scope of Load().
+    //   - NEVER capture stack references or raw pointers to local variables.
+    //   - Safe captures: values, shared_ptr, global/static refs, `this` (if
+    //     the object outlives the AssetManager).
+    template <typename F, typename T>
+    concept AssetLoaderFunc = std::is_move_constructible_v<std::decay_t<F>>
+        && std::is_copy_constructible_v<std::decay_t<F>>
+        && std::invocable<std::decay_t<F>, const std::string&, struct AssetHandle>;
+
     // --- Strong Handle Wrapper ---
     struct AssetHandle
     {
@@ -63,9 +81,13 @@ export namespace Core::Assets
     };
 
     // Stores the per-asset reload action (used by file watching and manual reloads).
+    // The ReloadAction is stored in a shared_ptr so the same underlying loader
+    // is shared between the AssetReloader and FileWatcher callback, preventing
+    // redundant copies of loader captures (and reducing the chance of accidentally
+    // copying dangling references multiple times).
     struct AssetReloader
     {
-        std::function<void()> ReloadAction;
+        std::shared_ptr<std::function<void()>> ReloadAction;
     };
 
     // Manager-owned storage slot for a given asset payload.
@@ -225,7 +247,10 @@ export namespace Core::Assets
         void Update();
 
         // 1. Load: Returns handle immediately. Starts async task.
+        //    The loader is stored persistently for hot-reload. See AssetLoaderFunc
+        //    concept documentation for capture rules.
         template <typename T, typename LoaderFunc>
+            requires AssetLoaderFunc<LoaderFunc, T>
         AssetHandle Load(const std::filesystem::path& path, LoaderFunc&& loader);
 
         // 2. Persistent Listener (Updates every reload)
@@ -358,6 +383,7 @@ export namespace Core::Assets
     }
 
     template <typename T, typename LoaderFunc>
+        requires AssetLoaderFunc<LoaderFunc, T>
     AssetHandle AssetManager::Load(const std::filesystem::path& path, LoaderFunc&& loader)
     {
         std::string key = std::filesystem::absolute(path).string();
@@ -374,22 +400,30 @@ export namespace Core::Assets
         m_Registry.emplace<AssetSource>(entity, key);
         m_Lookup[id] = handle;
 
-        m_Registry.emplace<AssetReloader>(entity, [this, handle, loader]() mutable
-        {
-            this->Reload<T>(handle, loader);
-        });
+        // Store loader in shared ownership. Both the AssetReloader and the
+        // FileWatcher callback share the same underlying loader, preventing
+        // redundant copies and reducing capture-related lifetime bugs.
+        auto sharedLoader = std::make_shared<std::decay_t<LoaderFunc>>(std::forward<LoaderFunc>(loader));
+
+        auto reloadAction = std::make_shared<std::function<void()>>(
+            [this, handle, sharedLoader]() mutable
+            {
+                this->Reload<T>(handle, *sharedLoader);
+            });
+
+        m_Registry.emplace<AssetReloader>(entity, AssetReloader{reloadAction});
 
         // WATCHER REGISTRATION
-        // We capture 'loader' by value (copy) for the lambda.
-        // NOTE: 'loader' usually captures pointers/refs, ensure they are safe or copyable!
-        Filesystem::FileWatcher::Watch(key, [this, handle, loader](const std::string&)
+        // Both the watcher and the reloader share the same sharedLoader.
+        // No extra copies of the user's loader captures are made.
+        Filesystem::FileWatcher::Watch(key, [reloadAction](const std::string&)
         {
-            this->Reload<T>(handle, loader);
+            if (reloadAction) (*reloadAction)();
         });
 
         // Trigger initial load via Reload logic to avoid duplication
         lock.unlock(); // Reload locks internally
-        Reload<T>(handle, std::forward<LoaderFunc>(loader));
+        Reload<T>(handle, *sharedLoader);
 
         return handle;
     }
@@ -671,7 +705,7 @@ export namespace Core::Assets
         if (!handle.IsValid())
             return;
 
-        std::function<void()> fn;
+        std::shared_ptr<std::function<void()>> fn;
         {
             std::shared_lock lock(m_Mutex);
             if (!m_Registry.valid(handle.ID))
@@ -686,7 +720,7 @@ export namespace Core::Assets
             fn = r.ReloadAction;
         }
 
-        if (fn)
-            fn();
+        if (fn && *fn)
+            (*fn)();
     }
 }

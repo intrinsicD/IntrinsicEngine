@@ -8,6 +8,7 @@ module ECS:Systems.AxisRotator.Impl;
 import :Systems.AxisRotator;
 import :Components.Transform;
 import :Components.AxisRotator;
+import Core;
 
 namespace ECS::Systems::AxisRotator
 {
