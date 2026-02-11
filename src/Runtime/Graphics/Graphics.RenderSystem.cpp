@@ -51,6 +51,7 @@ namespace Graphics
           , m_Device(m_DeviceOwner.get())
           , m_Swapchain(swapchain)
           , m_Renderer(renderer)
+          , m_FrameScope(frameScope)
           // Sub-Systems (must match declaration order)
           , m_GlobalResources(m_DeviceOwner, descriptorPool, descriptorLayout, bindlessSystem, shaderRegistry,
                               pipelineLibrary, renderer.GetFramesInFlight())
@@ -346,8 +347,23 @@ namespace Graphics
             m_Interaction.GetReadbackBuffer(frameIndex)
         };
 
-        if (m_ActivePipeline)
-            m_ActivePipeline->SetupFrame(ctx);
+        // IMPORTANT: RenderGraph executes passes on worker threads *after* BuildGraph() returns.
+        // Any execute lambda that captures RenderPassContext by reference will dangle.
+        // We copy the context into RenderGraph's per-frame ScopeStack so captures can safely
+        // take a pointer/reference to a stable object for the lifetime of this graph.
+        auto stable = m_FrameScope.New<RenderPassContext>(ctx);
+        if (stable)
+        {
+            RenderPassContext* stableCtx = *stable;
+            if (m_ActivePipeline)
+                m_ActivePipeline->SetupFrame(*stableCtx);
+        }
+        else
+        {
+            Core::Log::Error("RenderSystem::BuildGraph failed to allocate stable RenderPassContext from frame scope");
+            if (m_ActivePipeline)
+                m_ActivePipeline->SetupFrame(ctx);
+        }
     }
 
     void RenderSystem::ExecuteGraph()

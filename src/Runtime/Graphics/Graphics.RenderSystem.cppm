@@ -79,6 +79,11 @@ export namespace Graphics
         RHI::VulkanSwapchain& m_Swapchain;
         RHI::SimpleRenderer& m_Renderer;
 
+        // Per-frame scratch allocators provided by Runtime::Engine.
+        // - LinearArena: POD pass data
+        // - ScopeStack : destructor-safe closures + frame-stable context snapshots
+        Core::Memory::ScopeStack& m_FrameScope;
+
         // Sub-Systems
         GlobalResources m_GlobalResources; // Holds UBOs, Descriptors, Allocators
         PresentationSystem m_Presentation;

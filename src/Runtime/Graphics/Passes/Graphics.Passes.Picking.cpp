@@ -22,6 +22,21 @@ namespace Graphics::Passes
         if (!m_Pipeline)
             return;
 
+        // Hard preconditions: if the swapchain is minimized / invalid, or globals aren't ready,
+        // skip emitting picking passes for this frame.
+        // This prevents vkCmdSetViewport/vkCmdSetScissor from being fed bogus extents and avoids
+        // binding an invalid descriptor set.
+        if (ctx.Resolution.width == 0 || ctx.Resolution.height == 0)
+            return;
+
+        // Vulkan's "undefined extent" sentinel can leak through during WSI transitions.
+        // Treat it as invalid and skip. (UINT32_MAX is allowed as the sentinel in VkSurfaceCapabilitiesKHR.)
+        if (ctx.Resolution.width == ~0u || ctx.Resolution.height == ~0u)
+            return;
+
+        if (ctx.GlobalDescriptorSet == VK_NULL_HANDLE)
+            return;
+
         const RGResourceHandle depth = ctx.Blackboard.Get("SceneDepth"_id);
         if (!depth.IsValid())
             return;
@@ -56,9 +71,16 @@ namespace Graphics::Passes
                                             pickIdHandle = data.IdBuffer;
                                             ctx.Blackboard.Add("PickID"_id, data.IdBuffer);
                                         },
-                                        [&, pipeline = m_Pipeline](const PickPassData&, const RGRegistry&,
-                                                                   VkCommandBuffer cmd)
+                                        [&, pipeline = m_Pipeline](const PickPassData&, const RGRegistry&, VkCommandBuffer cmd)
                                         {
+                                            // Re-check: the execute lambda can run later; keep it safe.
+                                            if (ctx.Resolution.width == 0 || ctx.Resolution.height == 0)
+                                                return;
+                                            if (ctx.Resolution.width == ~0u || ctx.Resolution.height == ~0u)
+                                                return;
+                                            if (ctx.GlobalDescriptorSet == VK_NULL_HANDLE)
+                                                return;
+
                                             vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                                               pipeline->GetHandle());
 
@@ -73,8 +95,7 @@ namespace Graphics::Passes
                                             vkCmdSetViewport(cmd, 0, 1, &viewport);
                                             vkCmdSetScissor(cmd, 0, 1, &scissor);
 
-                                            const uint32_t dynamicOffset = static_cast<uint32_t>(ctx.
-                                                GlobalCameraDynamicOffset);
+                                            const uint32_t dynamicOffset = static_cast<uint32_t>(ctx.GlobalCameraDynamicOffset);
                                             vkCmdBindDescriptorSets(
                                                 cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                                 pipeline->GetLayout(),
