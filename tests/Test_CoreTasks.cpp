@@ -184,3 +184,90 @@ TEST(CoreTasks, OverflowHandling)
 
     Scheduler::Shutdown();
 }
+
+// --- Coroutine lifetime safety tests (Issue 2.3) ---
+
+TEST(CoreTasks, UndispatchedJobDestruction_NoLeak)
+{
+    // Creating a Job but never dispatching it should cleanly destroy the
+    // coroutine frame via ~Job(), not leak it.
+    Scheduler::Initialize(2);
+
+    std::atomic<bool> started = false;
+
+    {
+        auto job = [&started]() -> Job {
+            started.store(true, std::memory_order_relaxed);
+            co_return;
+        }();
+
+        // job goes out of scope without being dispatched.
+        // ~Job() should destroy the coroutine frame.
+    }
+
+    // The coroutine should never have started executing.
+    EXPECT_FALSE(started.load(std::memory_order_relaxed));
+
+    Scheduler::Shutdown();
+}
+
+TEST(CoreTasks, JobMoveDoesNotDoubleFree)
+{
+    // Moving a Job should transfer ownership; the source should not
+    // destroy the coroutine frame.
+    Scheduler::Initialize(2);
+
+    std::atomic<int> counter = 0;
+
+    auto makeJob = [&counter]() -> Job {
+        counter.fetch_add(1, std::memory_order_relaxed);
+        co_return;
+    };
+
+    {
+        Job j1 = makeJob();
+        Job j2 = std::move(j1);
+
+        // j1 should now be empty.
+        EXPECT_FALSE(j1.Valid());
+        EXPECT_TRUE(j2.Valid());
+
+        // Dispatch the moved-to job.
+        Scheduler::Dispatch(std::move(j2));
+    }
+
+    Scheduler::WaitForAll();
+    EXPECT_EQ(counter.load(std::memory_order_relaxed), 1);
+
+    Scheduler::Shutdown();
+}
+
+TEST(CoreTasks, JobMoveAssignment_CleansUpPrevious)
+{
+    // Move-assigning over an existing Job should destroy the old coroutine frame.
+    Scheduler::Initialize(2);
+
+    std::atomic<int> counter = 0;
+
+    auto makeJob = [&counter]() -> Job {
+        counter.fetch_add(1, std::memory_order_relaxed);
+        co_return;
+    };
+
+    {
+        Job j1 = makeJob(); // Will be overwritten
+        Job j2 = makeJob(); // Will be dispatched
+
+        // Move-assign j2 over j1. j1's old coroutine should be destroyed.
+        j1 = std::move(j2);
+
+        Scheduler::Dispatch(std::move(j1));
+    }
+
+    Scheduler::WaitForAll();
+
+    // Only one job should have executed (the one that was dispatched).
+    EXPECT_EQ(counter.load(std::memory_order_relaxed), 1);
+
+    Scheduler::Shutdown();
+}

@@ -192,8 +192,22 @@ namespace RHI
 
     void VulkanDevice::SafeDestroyAfter(uint64_t value, std::function<void()>&& deleteFn)
     {
-        std::lock_guard lock(m_DeletionMutex);
-        m_TimelineDeletionQueue.push_back(DeferredDelete{.Value = value, .Fn = std::move(deleteFn)});
+        bool needsFlush = false;
+        {
+            std::lock_guard lock(m_DeletionMutex);
+            m_TimelineDeletionQueue.push_back(DeferredDelete{.Value = value, .Fn = std::move(deleteFn)});
+
+            // Backpressure: if the queue grows excessively, force a GPU sync and flush.
+            static constexpr size_t kMaxDeferredDeletions = 8192;
+            needsFlush = (m_TimelineDeletionQueue.size() > kMaxDeferredDeletions);
+        }
+
+        if (needsFlush)
+        {
+            Core::Log::Warn("VulkanDevice: Timeline deletion queue exceeded high-water mark, forcing GPU sync");
+            vkDeviceWaitIdle(m_Device);
+            CollectGarbage();
+        }
     }
 
     void VulkanDevice::SafeDestroy(std::function<void()>&& deleteFn)

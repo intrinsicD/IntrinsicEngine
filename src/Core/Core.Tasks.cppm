@@ -5,6 +5,7 @@ module;
 #include <utility>
 #include <memory>
 #include <coroutine>
+#include <atomic>
 
 export module Core:Tasks;
 import :Logging;
@@ -102,7 +103,9 @@ namespace Core::Tasks
         static void Dispatch(Job&& job);
 
         // Used by coroutine awaiters to enqueue a continuation back onto the scheduler.
-        static void Reschedule(std::coroutine_handle<> h);
+        // The alive token allows detecting if the owning Job was destroyed before execution.
+        static void Reschedule(std::coroutine_handle<> h,
+                               std::shared_ptr<std::atomic<bool>> alive = nullptr);
 
         static void WaitForAll();
 
@@ -131,15 +134,25 @@ namespace Core::Tasks
         };
 
         Job() = default;
-        explicit Job(std::coroutine_handle<promise_type> h) noexcept : m_Handle(h) {}
+        explicit Job(std::coroutine_handle<promise_type> h) noexcept
+            : m_Handle(h)
+            , m_Alive(std::make_shared<std::atomic<bool>>(true))
+        {}
 
-        Job(Job&& other) noexcept : m_Handle(other.m_Handle) { other.m_Handle = {}; }
+        Job(Job&& other) noexcept
+            : m_Handle(other.m_Handle)
+            , m_Alive(std::move(other.m_Alive))
+        {
+            other.m_Handle = {};
+        }
+
         Job& operator=(Job&& other) noexcept
         {
             if (this != &other)
             {
-                // We intentionally don't destroy here; ownership is transferred.
+                DestroyIfOwned();
                 m_Handle = other.m_Handle;
+                m_Alive = std::move(other.m_Alive);
                 other.m_Handle = {};
             }
             return *this;
@@ -148,12 +161,33 @@ namespace Core::Tasks
         Job(const Job&) = delete;
         Job& operator=(const Job&) = delete;
 
-        ~Job() = default; // Lifetime is owned by the scheduler once dispatched.
+        ~Job()
+        {
+            // If the Job still owns the coroutine handle (was never dispatched),
+            // destroy the frame and signal any pending reschedule tasks.
+            DestroyIfOwned();
+        }
 
         [[nodiscard]] bool Valid() const noexcept { return m_Handle != nullptr; }
 
     private:
+        void DestroyIfOwned()
+        {
+            if (m_Handle)
+            {
+                // Signal pending reschedule tasks that the coroutine frame is gone.
+                if (m_Alive)
+                    m_Alive->store(false, std::memory_order_release);
+                if (!m_Handle.done())
+                    m_Handle.destroy();
+                m_Handle = {};
+            }
+        }
+
         std::coroutine_handle<promise_type> m_Handle{};
+        // Shared cancellation token: allows pending reschedule tasks to detect
+        // that the owning Job was destroyed and the coroutine frame is gone.
+        std::shared_ptr<std::atomic<bool>> m_Alive{};
         friend class Scheduler;
     };
 

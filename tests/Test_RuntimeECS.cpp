@@ -475,3 +475,117 @@ TEST(ECS_TransformSystem, RemovesDirtyTagAfterUpdate)
 
     EXPECT_FALSE(reg.all_of<Transform::IsDirtyTag>(e));
 }
+
+// -----------------------------------------------------------------------------
+// Hierarchy Cycle Detection Logging (Issue 3.5)
+// -----------------------------------------------------------------------------
+
+TEST(ECS_Hierarchy, CycleDetection_DoesNotCorruptHierarchy)
+{
+    // Verify that cycle detection prevents corruption of the hierarchy
+    // when attempting to create a cycle in a deep chain.
+    Scene scene;
+    auto& reg = scene.GetRegistry();
+
+    entt::entity a = scene.CreateEntity("A");
+    entt::entity b = scene.CreateEntity("B");
+    entt::entity c = scene.CreateEntity("C");
+    entt::entity d = scene.CreateEntity("D");
+
+    // Build chain: A -> B -> C -> D
+    Hierarchy::Attach(reg, b, a);
+    Hierarchy::Attach(reg, c, b);
+    Hierarchy::Attach(reg, d, c);
+
+    // Try to create cycle: A -> D (would create A -> B -> C -> D -> A)
+    Hierarchy::Attach(reg, a, d);
+
+    // A should remain a root (no parent).
+    auto& aHier = reg.get<Hierarchy::Component>(a);
+    EXPECT_TRUE(IsNull(aHier.Parent));
+
+    // The original chain should be intact.
+    auto& bHier = reg.get<Hierarchy::Component>(b);
+    auto& cHier = reg.get<Hierarchy::Component>(c);
+    auto& dHier = reg.get<Hierarchy::Component>(d);
+
+    EXPECT_TRUE(bHier.Parent == a);
+    EXPECT_TRUE(cHier.Parent == b);
+    EXPECT_TRUE(dHier.Parent == c);
+}
+
+TEST(ECS_Hierarchy, Attach_SingularParentMatrix_NoNaN)
+{
+    // Issue 3.5: When reparenting, if the parent has a singular matrix (scale=0),
+    // glm::decompose produces NaN. The fix should detect this and fall back to
+    // a safe default transform instead of propagating NaN.
+    Scene scene;
+    auto& reg = scene.GetRegistry();
+
+    entt::entity parent = scene.CreateEntity("Parent");
+    entt::entity child = scene.CreateEntity("Child");
+
+    // Set up initial transforms and run the transform system so WorldMatrix exists.
+    auto& parentT = reg.get<Transform::Component>(parent);
+    parentT.Position = {5.0f, 0.0f, 0.0f};
+    parentT.Scale = {0.0f, 0.0f, 0.0f}; // Singular matrix!
+
+    auto& childT = reg.get<Transform::Component>(child);
+    childT.Position = {10.0f, 0.0f, 0.0f};
+
+    reg.emplace_or_replace<Transform::IsDirtyTag>(parent);
+    reg.emplace_or_replace<Transform::IsDirtyTag>(child);
+    Systems::Transform::OnUpdate(reg);
+
+    // Now attach child to parent with singular world matrix.
+    Hierarchy::Attach(reg, child, parent);
+
+    // The child's local transform should NOT contain NaN.
+    auto& childLocal = reg.get<Transform::Component>(child);
+    EXPECT_FALSE(std::isnan(childLocal.Position.x));
+    EXPECT_FALSE(std::isnan(childLocal.Position.y));
+    EXPECT_FALSE(std::isnan(childLocal.Position.z));
+    EXPECT_FALSE(std::isnan(childLocal.Scale.x));
+    EXPECT_FALSE(std::isnan(childLocal.Scale.y));
+    EXPECT_FALSE(std::isnan(childLocal.Scale.z));
+    EXPECT_FALSE(std::isnan(childLocal.Rotation.x));
+    EXPECT_FALSE(std::isnan(childLocal.Rotation.y));
+    EXPECT_FALSE(std::isnan(childLocal.Rotation.z));
+    EXPECT_FALSE(std::isnan(childLocal.Rotation.w));
+
+    // Hierarchy should still be correctly formed.
+    auto& childHier = reg.get<Hierarchy::Component>(child);
+    EXPECT_TRUE(childHier.Parent == parent);
+}
+
+TEST(ECS_Hierarchy, Attach_NormalReparenting_PreservesWorldPosition)
+{
+    // Verify that reparenting with valid matrices correctly decomposes the
+    // new local transform to preserve the child's world position.
+    Scene scene;
+    auto& reg = scene.GetRegistry();
+
+    entt::entity parent = scene.CreateEntity("Parent");
+    entt::entity child = scene.CreateEntity("Child");
+
+    // Parent at (10, 0, 0)
+    auto& parentT = reg.get<Transform::Component>(parent);
+    parentT.Position = {10.0f, 0.0f, 0.0f};
+
+    // Child at (20, 0, 0) in world space
+    auto& childT = reg.get<Transform::Component>(child);
+    childT.Position = {20.0f, 0.0f, 0.0f};
+
+    reg.emplace_or_replace<Transform::IsDirtyTag>(parent);
+    reg.emplace_or_replace<Transform::IsDirtyTag>(child);
+    Systems::Transform::OnUpdate(reg);
+
+    // Attach child to parent. The child's local position should become (10, 0, 0)
+    // to maintain its world position of (20, 0, 0).
+    Hierarchy::Attach(reg, child, parent);
+
+    auto& childLocal = reg.get<Transform::Component>(child);
+    EXPECT_NEAR(childLocal.Position.x, 10.0f, 0.01f);
+    EXPECT_NEAR(childLocal.Position.y, 0.0f, 0.01f);
+    EXPECT_NEAR(childLocal.Position.z, 0.0f, 0.01f);
+}
