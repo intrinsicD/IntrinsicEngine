@@ -1,6 +1,7 @@
 module; // Global Fragment
 #include <cstddef>
 #include <cstdlib>
+#include <cassert>
 #include <concepts>
 #include <expected>
 #include <span>
@@ -9,6 +10,7 @@ module; // Global Fragment
 #include <type_traits>
 #include <new>
 #include <limits>
+#include <atomic>
 
 export module Core:Memory;
 
@@ -58,6 +60,21 @@ export namespace Core::Memory
     // - No per-allocation bookkeeping
     // -------------------------------------------------------------------------
     // EXPORT THE CLASS
+    // -------------------------------------------------------------------------
+    // GenerationToken — lightweight alive-check for arena lifetime validation
+    // -------------------------------------------------------------------------
+    // A monotonically-increasing global counter. Each LinearArena gets a unique
+    // generation on construction; ArenaAllocator snapshots it. In debug builds,
+    // every allocate() call asserts that the stored generation still matches
+    // the arena's current generation, catching use-after-free / use-after-move.
+    // -------------------------------------------------------------------------
+    using ArenaGeneration = uint64_t;
+
+    namespace Detail
+    {
+        inline std::atomic<ArenaGeneration> g_NextArenaGeneration{1};
+    }
+
     class LinearArena
     {
     public:
@@ -110,11 +127,15 @@ export namespace Core::Memory
         [[nodiscard]] size_t GetUsed() const { return m_Offset; }
         [[nodiscard]] size_t GetTotal() const { return m_TotalSize; }
 
+        // Lifetime token — used by ArenaAllocator to detect use-after-free/move.
+        [[nodiscard]] ArenaGeneration GetGeneration() const { return m_Generation; }
+
     private:
         std::byte* m_Start = nullptr;
         size_t m_TotalSize = 0;
         size_t m_Offset = 0;
         std::thread::id m_OwningThread;
+        ArenaGeneration m_Generation = 0; // 0 = dead/moved-from
     };
 
     // -------------------------------------------------------------------------
@@ -290,7 +311,12 @@ export namespace Core::Memory
     // Notes:
     // - allocate() bumps the LinearArena; deallocate() is a no-op.
     // - Containers using this allocator must not outlive the arena they reference.
-    // - OOM is treated as fatal for the container contract: we throw std::bad_alloc.
+    // - OOM is treated as fatal for the container contract: we call std::terminate().
+    //
+    // Lifetime safety (debug builds):
+    // - On construction, snapshots the arena's generation token.
+    // - On every allocate(), asserts the arena's generation still matches.
+    // - If the arena was destroyed or moved, the generation will differ → assert fires.
     template <typename T>
     class ArenaAllocator
     {
@@ -298,11 +324,24 @@ export namespace Core::Memory
         using value_type = T;
 
         LinearArena* m_Arena = nullptr;
+#ifndef NDEBUG
+        ArenaGeneration m_Generation = 0;
+#endif
 
-        explicit ArenaAllocator(LinearArena& arena) noexcept : m_Arena(&arena) {}
+        explicit ArenaAllocator(LinearArena& arena) noexcept
+            : m_Arena(&arena)
+#ifndef NDEBUG
+              , m_Generation(arena.GetGeneration())
+#endif
+        {}
 
         template <typename U>
-        ArenaAllocator(const ArenaAllocator<U>& other) noexcept : m_Arena(other.m_Arena) {}
+        ArenaAllocator(const ArenaAllocator<U>& other) noexcept
+            : m_Arena(other.m_Arena)
+#ifndef NDEBUG
+              , m_Generation(other.m_Generation)
+#endif
+        {}
 
         [[nodiscard]] T* allocate(std::size_t n)
         {
@@ -311,6 +350,13 @@ export namespace Core::Memory
             {
                 std::terminate();
             }
+
+#ifndef NDEBUG
+            // Lifetime check: detect use-after-free or use-after-move of the arena.
+            assert(m_Arena != nullptr && "ArenaAllocator: arena pointer is null");
+            assert(m_Arena->GetGeneration() == m_Generation &&
+                   "ArenaAllocator: arena lifetime violation — arena was destroyed or moved since this allocator was created");
+#endif
 
             auto res = m_Arena->Alloc(n * sizeof(T), alignof(T));
             if (!res)

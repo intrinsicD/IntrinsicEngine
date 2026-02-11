@@ -58,21 +58,7 @@ This document tracks **what’s left to do** in IntrinsicEngine’s architecture
 
 ---
 
-### 1.3 Fix `ArenaAllocator` Lifetime Escape
-
-**Problem:** `ArenaAllocator` stores `LinearArena*` with no lifetime guarantee. Containers can outlive the arena → use-after-free.
-
-**Options (pick one):**
-1. **Alive token**: allocator stores `{LinearArena*, GenerationToken}` (debug) and validates liveness.
-2. **Borrowed handle type**: `ArenaRef` with explicit lifetime semantics; allocator constructed only from `ArenaRef`.
-3. **Hard docs + debug assert**: minimal change, but relies on discipline.
-
-**Tests to add:**
-- Debug-only death/diagnostic test when allocating from an allocator whose arena is destroyed
-
----
-
-### 1.4 Asset Loader Hot-Reload Capture Footgun
+### 1.3 Asset Loader Hot-Reload Capture Footgun
 
 **Problem:** loaders captured into file-watcher callbacks can accidentally keep dangling references if the user lambda captures stack references.
 
@@ -87,22 +73,7 @@ This document tracks **what’s left to do** in IntrinsicEngine’s architecture
 
 ---
 
-### 1.5 RenderSystem `OnUpdate()` Still Monolithic
-
-Even after RenderGraph improvements, `RenderSystem::OnUpdate()` remains large and mixes:
-- frame begin/acquire
-- global resource updates
-- render graph setup
-- submit/present
-
-**Fix:** split into 3–5 coherent functions (`BeginFrame`, `UpdateGlobals`, `BuildGraph`, `ExecuteGraph`, `EndFrame`).
-
-**Tests:**
-- Minimal “render loop” integration test that exercises the new call sequence
-
----
-
-### 1.6 FrameGraph UX: Make System Addition One-Liner
+### 1.4 FrameGraph UX: Make System Addition One-Liner
 
 **Problem:** dependency correctness is good, but system discovery/registration may still be manual/boilerplate-heavy.
 
@@ -120,15 +91,13 @@ Even after RenderGraph improvements, `RenderSystem::OnUpdate()` remains large an
 
 ### Tier A (Next)
 1. **Engine decomposition** (start with `GraphicsBackend` or `AssetPipeline` extraction)
-2. **ArenaAllocator lifetime hardening** (debug enforcement + tests)
 
 ### Tier B
-3. **Error handling contract** (doc + enforce in hotspots + tests)
-4. **RenderSystem::OnUpdate function split**
+2. **Error handling contract** (doc + enforce in hotspots + tests)
 
 ### Tier C
-5. **Asset loader capture safety**
-6. **FrameGraph auto-registration / registry UX improvements**
+3. **Asset loader capture safety**
+4. **FrameGraph auto-registration / registry UX improvements**
 
 ---
 

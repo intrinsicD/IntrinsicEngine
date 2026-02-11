@@ -108,5 +108,13 @@ export namespace Graphics
 
         void ApplyPendingPipelineSwap(uint32_t width, uint32_t height);
         void GarbageCollectRetiredPipelines();
+
+        // OnUpdate sub-steps (called in order by OnUpdate)
+        void BeginFrame(uint64_t currentFrame);
+        bool AcquireFrame();  // returns false if frame could not be acquired (swapchain out-of-date)
+        void UpdateGlobals(const CameraComponent& camera);
+        void BuildGraph(ECS::Scene& scene, Core::Assets::AssetManager& assetManager, const CameraComponent& camera);
+        void ExecuteGraph();
+        void EndFrame();
     };
 }
