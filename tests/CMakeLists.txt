@@ -22,6 +22,7 @@ add_executable(${target_name}
         Test_RuntimeCulling.cpp
         Test_CoreFrameGraph.cpp
         Test_FrameGraphSystems.cpp
+        Test_GraphicsBackend.cpp
 )
 
 #Apply Strict Flags ONLY to our tests

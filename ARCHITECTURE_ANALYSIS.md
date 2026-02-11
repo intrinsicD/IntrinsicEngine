@@ -18,32 +18,29 @@ This document tracks **what's left to do** in IntrinsicEngine's architecture.
 
 ## 1. Open TODOs (What's left)
 
-### 1.1 Decompose the `Engine` God Object (Highest priority)
+### 1.1 Continue `Engine` Decomposition
 
-**Problem:** `Runtime::Engine` still aggregates too many responsibilities and exposes too much internal state, causing tight coupling (especially for Apps/Sandbox) and making isolated testing hard.
+**Context:** `GraphicsBackend` has been extracted (see Git history). The remaining subsystems still live inline in `Engine`.
 
-**Desired end-state:** `Engine` becomes a thin coordinator that owns a small number of subsystem objects with narrow interfaces.
+**Remaining extractions (one PR per subsystem):**
 
-**Proposed decomposition (incremental, one PR per subsystem):**
-
-- `WindowSystem` (window creation, input, resize events)
-- `GraphicsBackend` (Vulkan context/device/swapchain/descriptor plumbing)
-- `AssetPipeline` (AssetManager + transfer + texture/material upload orchestration)
-- `SceneManager` (ECS scene composition + lifetime)
-- `RenderOrchestrator` (RenderSystem + RenderGraph integration)
+- `AssetPipeline` (AssetManager + transfer polling + texture/material upload orchestration + `PendingLoad` tracking + `RunOnMainThread` queue)
+- `SceneManager` (ECS scene composition + lifetime + EnTT hooks)
+- `RenderOrchestrator` (RenderSystem + RenderGraph + GPUScene + PipelineLibrary integration)
 
 **Tests to add/extend:**
-- Construction/destruction order tests (especially GPU resource teardown vs. callbacks)
 - "Headless Engine" smoke test that runs one frame with minimal subsystems
 
-**Complexity:** Large (but can be made safe via mechanical, incremental extractions).
+**Complexity:** Medium per subsystem (mechanical extractions following the `GraphicsBackend` pattern).
 
 ---
 
 ## 2. Prioritized Roadmap
 
 ### Tier A (Next)
-1. **Engine decomposition** (start with `GraphicsBackend` or `AssetPipeline` extraction)
+1. **`AssetPipeline` extraction** — bundles `m_AssetManager`, `m_PendingLoads`, `m_LoadMutex`, `m_MainThreadQueue`, `m_MainThreadQueueMutex`, `m_LoadedMaterials`, `ProcessUploads()`, `ProcessMainThreadQueue()`, `RegisterAssetLoad()`, `RunOnMainThread()`, `LoadDroppedAsset()` into a coherent subsystem.
+2. **`SceneManager` extraction** — bundles `m_Scene`, ECS hooks, entity lifetime into a subsystem.
+3. **`RenderOrchestrator` extraction** — bundles `m_RenderSystem`, `m_GpuScene`, `m_PipelineLibrary`, `m_ShaderRegistry`, `m_FrameGraph`, `InitPipeline()` into a subsystem.
 
 ---
 
