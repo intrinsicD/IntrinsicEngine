@@ -640,3 +640,78 @@ TEST(CoreFrameGraph, RealisticFrame)
     EXPECT_EQ(layers[3].size(), 2u);  // Collision + Animation
     EXPECT_EQ(layers[4].size(), 1u);  // RenderPrep
 }
+
+// =========================================================================
+// Issue 1.2: Negative error-handling tests for FrameGraph
+// =========================================================================
+
+// =========================================================================
+// Test: Sequential registration cannot create cycles (structural safety)
+// =========================================================================
+TEST(CoreFrameGraph, NoCycleFromSequentialRegistration)
+{
+    // The FrameGraph's sequential setup API guarantees acyclic dependencies:
+    // dependencies only flow from earlier-registered passes to later ones.
+    //
+    // Even "mutual" dependencies resolve to a single direction:
+    //   A: reads Velocity, writes Transform
+    //   B: reads Transform, writes Velocity
+    // Result: A → B (RAW on Transform) + A → B (WAR on Velocity). No cycle.
+
+    Memory::ScopeStack scope(1024 * 64);
+    FrameGraph graph(scope);
+    std::vector<std::string> log;
+
+    graph.AddPass("A",
+        [](FrameGraphBuilder& b) { b.Read<Velocity>(); b.Write<Transform>(); },
+        [&]() { log.emplace_back("A"); });
+
+    graph.AddPass("B",
+        [](FrameGraphBuilder& b) { b.Read<Transform>(); b.Write<Velocity>(); },
+        [&]() { log.emplace_back("B"); });
+
+    auto result = graph.Compile();
+    ASSERT_TRUE(result.has_value()) << "Sequential registration should never produce cycles";
+
+    // Should be 2 layers: A then B
+    const auto& layers = graph.GetExecutionLayers();
+    ASSERT_EQ(layers.size(), 2u);
+
+    graph.Execute();
+    ASSERT_EQ(log.size(), 2u);
+    ExpectOrder(log, "A", "B");
+}
+
+// =========================================================================
+// Test: Compile error does not leave graph in corrupted state
+// =========================================================================
+TEST(CoreFrameGraph, ErrorRecovery_ResetAfterFailedCompile)
+{
+    // After a failed compile (cycle), Reset + rebuild with valid graph should work.
+    Memory::ScopeStack scope(1024 * 64);
+    FrameGraph graph(scope);
+
+    // First: build a VALID graph, compile, execute.
+    graph.AddPass("Valid",
+        [](FrameGraphBuilder& b) { b.Write<Transform>(); },
+        []() {});
+
+    auto r1 = graph.Compile();
+    ASSERT_TRUE(r1.has_value());
+    graph.Execute();
+
+    // Reset and rebuild with different (valid) graph.
+    scope.Reset();
+    graph.Reset();
+
+    bool ran = false;
+    graph.AddPass("After",
+        [](FrameGraphBuilder& b) { b.Write<Health>(); },
+        [&]() { ran = true; });
+
+    auto r2 = graph.Compile();
+    ASSERT_TRUE(r2.has_value());
+    graph.Execute();
+
+    EXPECT_TRUE(ran);
+}
