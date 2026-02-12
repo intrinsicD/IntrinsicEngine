@@ -5,6 +5,7 @@ module;
 module Graphics:Material.Impl;
 import :Material;
 import :MaterialSystem;
+import Core;
 
 namespace Graphics
 {

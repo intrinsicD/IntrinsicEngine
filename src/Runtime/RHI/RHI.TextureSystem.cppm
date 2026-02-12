@@ -6,6 +6,7 @@ module;
 
 export module RHI:TextureSystem;
 
+import :Device;
 import :Texture;
 import :Bindless;
 import Core;

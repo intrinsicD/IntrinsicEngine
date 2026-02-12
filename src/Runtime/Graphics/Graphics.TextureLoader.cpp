@@ -8,6 +8,7 @@ module;
 
 module Graphics:TextureLoader.Impl;
 import :TextureLoader;
+import :AssetErrors;
 
 import RHI;
 import Core;

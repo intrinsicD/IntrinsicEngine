@@ -8,6 +8,8 @@ module;
 module RHI:PersistentDescriptors.Impl;
 
 import :PersistentDescriptors;
+import :Device;
+import Core;
 
 namespace RHI
 {

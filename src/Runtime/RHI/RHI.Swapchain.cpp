@@ -9,6 +9,7 @@ module;
 
 module RHI:Swapchain.Impl;
 import :Swapchain;
+import :Device;
 import Core;
 
 namespace RHI {

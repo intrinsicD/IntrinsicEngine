@@ -6,6 +6,9 @@ module;
 
 module RHI:Pipeline.Impl;
 import :Pipeline;
+import :Device;
+import :Shader;
+import :Types;
 import Core;
 
 namespace RHI

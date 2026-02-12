@@ -13,6 +13,7 @@ module;
 
 module RHI:Device.Impl;
 import :Device;
+import :Context;
 import :TransientAllocator;
 import Core;
 

@@ -7,6 +7,9 @@ export module Graphics:Pipelines;
 
 import :RenderPipeline;
 import :RenderPath;
+import :RenderGraph;
+import :ShaderRegistry;
+import :PipelineLibrary;
 import :Passes.DebugView;
 import :Passes.Forward;
 import :Passes.ImGui;

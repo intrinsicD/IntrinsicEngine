@@ -15,10 +15,13 @@ module Graphics:Passes.Forward.Impl;
 
 import :Passes.Forward;
 
+import :RenderPipeline;
+import :RenderGraph;
 import :Geometry;
 import :Material;
 import :Components;
 import :GPUScene;
+import Geometry;
 import Core;
 import ECS;
 import RHI;

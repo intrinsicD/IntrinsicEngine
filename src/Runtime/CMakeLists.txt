@@ -13,6 +13,7 @@ target_sources(${target_name}
         Runtime.GraphicsBackend.cppm
         Runtime.AssetPipeline.cppm
         Runtime.SceneManager.cppm
+        Runtime.RenderOrchestrator.cppm
         Runtime.Selection.cppm
         Runtime.SelectionModule.cppm
         PRIVATE
@@ -20,6 +21,7 @@ target_sources(${target_name}
         Runtime.GraphicsBackend.cpp
         Runtime.AssetPipeline.cpp
         Runtime.SceneManager.cpp
+        Runtime.RenderOrchestrator.cpp
         Runtime.Selection.cpp
         Runtime.SelectionModule.cpp
 )

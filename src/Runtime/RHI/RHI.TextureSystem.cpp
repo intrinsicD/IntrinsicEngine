@@ -5,6 +5,10 @@ module;
 module RHI:TextureSystem.Impl;
 
 import :TextureSystem;
+import :Device;
+import :Texture;
+import :Bindless;
+import :Image;
 import Core;
 
 namespace RHI

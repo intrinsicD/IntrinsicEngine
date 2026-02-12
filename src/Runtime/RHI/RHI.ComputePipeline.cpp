@@ -6,6 +6,8 @@ module;
 module RHI:ComputePipeline.Impl;
 
 import :ComputePipeline;
+import :Device;
+import :Shader;
 
 namespace RHI
 {

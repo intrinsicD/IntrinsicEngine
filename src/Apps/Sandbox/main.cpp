@@ -11,6 +11,7 @@
 import Runtime.Engine;
 import Runtime.GraphicsBackend;
 import Runtime.AssetPipeline;
+import Runtime.RenderOrchestrator;
 import Runtime.Selection;
 import Core;
 import Graphics;
@@ -90,7 +91,7 @@ public:
         auto modelLoader = [&](const std::string& path, Assets::AssetHandle handle)
             -> std::unique_ptr<Graphics::Model>
         {
-            auto result = Graphics::ModelLoader::LoadAsync(GetDevice(), gfx.GetTransferManager(), m_GeometryStorage, path);
+            auto result = Graphics::ModelLoader::LoadAsync(GetDevice(), gfx.GetTransferManager(), GetGeometryStorage(), path);
 
             if (result)
             {
@@ -121,7 +122,7 @@ public:
         matData.MetallicFactor = 0.0f;
 
         auto DuckMaterial = std::make_unique<Graphics::Material>(
-            *m_MaterialSystem,
+            GetRenderOrchestrator().GetMaterialSystem(),
             matData
         );
 
@@ -144,17 +145,12 @@ public:
 
             // --- Render Pipeline ---
             ImGui::SeparatorText("Render Pipeline");
-            if (m_RenderSystem)
             {
                 if (ImGui::Button("Hot-swap: DefaultPipeline"))
                 {
                     // Request swap; RenderSystem owns lifetime and applies at the start of the next frame.
-                    m_RenderSystem->RequestPipelineSwap(std::make_unique<Graphics::DefaultPipeline>());
+                    GetRenderOrchestrator().GetRenderSystem().RequestPipelineSwap(std::make_unique<Graphics::DefaultPipeline>());
                 }
-            }
-            else
-            {
-                ImGui::TextDisabled("RenderSystem not initialized.");
             }
 
             // --- Selection Debug ---
@@ -263,23 +259,22 @@ public:
         // ---------------------------------------------------------------------
         // Selection: delegate click-to-pick-to-registry-tags to the Engine module.
         // ---------------------------------------------------------------------
-        if (cameraComponent != nullptr && m_RenderSystem)
+        if (cameraComponent != nullptr)
         {
+            auto& renderSys = GetRenderOrchestrator().GetRenderSystem();
+
             // Keep module config in sync with the UI setting.
             GetSelection().GetConfig().MouseButton = m_SelectMouseButton;
 
             GetSelection().Update(
                 GetScene(),
-                *m_RenderSystem,
+                renderSys,
                 cameraComponent,
                 *m_Window,
                 uiCapturesMouse);
-        }
 
-        // Draw
-        if (cameraComponent != nullptr && m_RenderSystem)
-        {
-            m_RenderSystem->OnUpdate(GetScene(), *cameraComponent, GetAssetManager());
+            // Draw
+            renderSys.OnUpdate(GetScene(), *cameraComponent, GetAssetManager());
         }
     }
 

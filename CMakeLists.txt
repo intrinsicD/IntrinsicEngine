@@ -60,6 +60,12 @@ set(INTRINSIC_BASE_FLAGS
         -fno-rtti
 )
 
+# Clang 18 reports __cpp_concepts as 201907L but GCC 14's <expected> header
+# guards on >= 202002L.  Override so libstdc++-14 C++23 features are available.
+if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS "19")
+    list(APPEND INTRINSIC_BASE_FLAGS -Wno-builtin-macro-redefined -D__cpp_concepts=202002L)
+endif()
+
 # Add sanitizers to RelWithDebInfo for better testing coverage
 set(INTRINSIC_DEBUG_FLAGS
     $<$<CONFIG:Debug>:-fsanitize=address,undefined>

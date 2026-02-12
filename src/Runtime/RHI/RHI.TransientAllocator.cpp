@@ -7,6 +7,7 @@ module;
 module RHI:TransientAllocator.Impl;
 
 import :TransientAllocator;
+import :Device;
 import Core;
 
 namespace RHI

@@ -5,6 +5,9 @@ module;
 
 module RHI:Renderer.Impl;
 import :Renderer;
+import :Device;
+import :Swapchain;
+import :Pipeline;
 import :Image;
 import :CommandUtils;
 import :Profiler;

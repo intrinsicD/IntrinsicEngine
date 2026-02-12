@@ -19,6 +19,7 @@ import Runtime.SelectionModule;
 import Runtime.GraphicsBackend;
 import Runtime.AssetPipeline;
 import Runtime.SceneManager;
+import Runtime.RenderOrchestrator;
 
 export namespace Runtime
 {
@@ -64,20 +65,11 @@ export namespace Runtime
         // ECS scene, entity lifecycle, and EnTT GPU-reclaim hooks.
         std::unique_ptr<SceneManager> m_SceneManager;
 
-        // Retained-mode GPU scene (persistent SSBOs managed by Graphics::RenderSystem).
-        // Owned by Engine to allow SpawnModel/ECS to allocate slots and queue updates.
-        std::unique_ptr<Graphics::GPUScene> m_GpuScene;
-
-        Graphics::ShaderRegistry m_ShaderRegistry;
-        std::unique_ptr<Graphics::PipelineLibrary> m_PipelineLibrary;
+        // Render subsystem: ShaderRegistry, PipelineLibrary, GPUScene, RenderSystem,
+        // MaterialSystem, per-frame arena/scope/FrameGraph, GeometryPool.
+        std::unique_ptr<RenderOrchestrator> m_RenderOrchestrator;
 
     public:
-        Core::Memory::LinearArena m_FrameArena; // 1 MB per frame
-        Core::Memory::ScopeStack m_FrameScope; // per-frame scope allocator with destructors
-        Core::FrameGraph m_FrameGraph;         // CPU-side system scheduling DAG (uses m_FrameScope)
-        Graphics::GeometryPool m_GeometryStorage;
-        std::unique_ptr<Graphics::RenderSystem> m_RenderSystem;
-        std::unique_ptr<Graphics::MaterialSystem> m_MaterialSystem;
         // Engine-owned selection controller (Editor-like single selection).
         SelectionModule m_Selection;
 
@@ -95,6 +87,10 @@ export namespace Runtime
         [[nodiscard]] SceneManager& GetSceneManager() { return *m_SceneManager; }
         [[nodiscard]] const SceneManager& GetSceneManager() const { return *m_SceneManager; }
 
+        // Access to the RenderOrchestrator subsystem.
+        [[nodiscard]] RenderOrchestrator& GetRenderOrchestrator() { return *m_RenderOrchestrator; }
+        [[nodiscard]] const RenderOrchestrator& GetRenderOrchestrator() const { return *m_RenderOrchestrator; }
+
         // Convenience: direct access to the ECS scene (delegates to SceneManager).
         [[nodiscard]] ECS::Scene& GetScene() { return m_SceneManager->GetScene(); }
         [[nodiscard]] const ECS::Scene& GetScene() const { return m_SceneManager->GetScene(); }
@@ -104,14 +100,14 @@ export namespace Runtime
         [[nodiscard]] const Core::Assets::AssetManager& GetAssetManager() const { return m_AssetPipeline->GetAssetManager(); }
 
         // Helper to access the camera buffer (Temporary until we have a Camera Component)
-        [[nodiscard]] RHI::VulkanBuffer* GetGlobalUBO() const { return m_RenderSystem->GetGlobalUBO(); }
+        [[nodiscard]] RHI::VulkanBuffer* GetGlobalUBO() const { return m_RenderOrchestrator->GetRenderSystem().GetGlobalUBO(); }
 
         // Convenience accessors that delegate to GraphicsBackend.
         [[nodiscard]] std::shared_ptr<RHI::VulkanDevice> GetDevice() const { return m_GraphicsBackend->GetDevice(); }
         [[nodiscard]] RHI::DescriptorAllocator& GetDescriptorPool() const { return m_GraphicsBackend->GetDescriptorPool(); }
         [[nodiscard]] RHI::DescriptorLayout& GetDescriptorLayout() const { return m_GraphicsBackend->GetDescriptorLayout(); }
         [[nodiscard]] RHI::VulkanSwapchain& GetSwapchain() const { return m_GraphicsBackend->GetSwapchain(); }
-        [[nodiscard]] Graphics::GeometryPool& GetGeometryStorage() { return m_GeometryStorage; }
+        [[nodiscard]] Graphics::GeometryPool& GetGeometryStorage() { return m_RenderOrchestrator->GetGeometryStorage(); }
 
         // Convenience methods that delegate to AssetPipeline.
         void RegisterAssetLoad(Core::Assets::AssetHandle handle, RHI::TransferToken token)
@@ -135,7 +131,6 @@ export namespace Runtime
         bool m_Running = true;
         bool m_FramebufferResized = false;
 
-        void InitPipeline();
         void LoadDroppedAsset(const std::string& path);
     };
 }

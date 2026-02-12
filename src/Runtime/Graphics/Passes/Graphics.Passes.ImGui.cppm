@@ -7,6 +7,7 @@ export module Graphics:Passes.ImGui;
 import :RenderPipeline;
 import :RenderGraph;
 import Core;
+import RHI;
 import Interface;
 
 using namespace Core::Hash;

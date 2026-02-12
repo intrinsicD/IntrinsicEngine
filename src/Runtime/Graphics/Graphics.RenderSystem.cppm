@@ -15,6 +15,7 @@ import :RenderPipeline;
 import :ShaderRegistry;
 import :PipelineLibrary;
 import :GPUScene;
+import :MaterialSystem;
 import :Interaction; // New: Interaction Logic
 import :Presentation; // New: Presentation Logic
 import :GlobalResources; // New: Global State

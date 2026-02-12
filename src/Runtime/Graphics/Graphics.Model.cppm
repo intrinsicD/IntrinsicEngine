@@ -7,6 +7,7 @@ export module Graphics:Model;
 
 import :Geometry;
 import :Material; // Optional, if we want to store materials here later
+import Geometry;
 import RHI;
 
 export namespace Graphics

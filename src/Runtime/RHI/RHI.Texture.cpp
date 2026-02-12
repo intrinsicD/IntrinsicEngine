@@ -5,6 +5,7 @@ module;
 
 module RHI:Texture.Impl;
 import :Texture;
+import :Device;
 import :TextureSystem;
 import :Image;
 import Core;

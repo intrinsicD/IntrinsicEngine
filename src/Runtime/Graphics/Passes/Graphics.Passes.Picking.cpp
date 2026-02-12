@@ -8,6 +8,9 @@ module Graphics:Passes.Picking.Impl;
 
 import :Passes.Picking;
 
+import :RenderPipeline;
+import :RenderGraph;
+import :Components;
 import :Geometry;
 import Core;
 import ECS;

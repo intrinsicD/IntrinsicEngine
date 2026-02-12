@@ -3,10 +3,10 @@ module;
 #include <memory>
 #include <span>
 
-// This is a standard implementation unit for the named module `Graphics.Pipelines`.
 module Graphics:Pipelines.Impl;
 
 import :RenderPipeline;
+import :RenderGraph;
 import :Passes.Picking;
 import :Passes.Forward;
 import :Passes.DebugView;

@@ -69,7 +69,7 @@ TEST_F(SceneManagerTest, RegistryAccessible)
 TEST_F(SceneManagerTest, CreateEntityViaScene)
 {
     entt::entity e = m_Mgr->GetScene().CreateEntity("TestEntity");
-    EXPECT_NE(e, entt::null);
+    EXPECT_TRUE(e != entt::null);
     EXPECT_EQ(m_Mgr->GetScene().Size(), 1u);
 
     // Verify default components were added by Scene::CreateEntity.
@@ -93,21 +93,22 @@ TEST_F(SceneManagerTest, MultipleCreateAndDestroy)
 {
     // Create, destroy, recreate — no crashes, counters correct.
     entt::entity e1 = m_Mgr->GetScene().CreateEntity("E1");
-    entt::entity e2 = m_Mgr->GetScene().CreateEntity("E2");
+    [[maybe_unused]] entt::entity e2 = m_Mgr->GetScene().CreateEntity("E2");
     EXPECT_EQ(m_Mgr->GetScene().Size(), 2u);
 
     m_Mgr->GetRegistry().destroy(e1);
     EXPECT_EQ(m_Mgr->GetScene().Size(), 1u);
 
     entt::entity e3 = m_Mgr->GetScene().CreateEntity("E3");
-    EXPECT_NE(e3, entt::null);
+    EXPECT_TRUE(e3 != entt::null);
     EXPECT_EQ(m_Mgr->GetScene().Size(), 2u);
 }
 
 TEST_F(SceneManagerTest, DisconnectGpuHooksNoOpWithoutConnect)
 {
     // Calling DisconnectGpuHooks without ConnectGpuHooks should be safe.
-    EXPECT_NO_THROW(m_Mgr->DisconnectGpuHooks());
+    m_Mgr->DisconnectGpuHooks();
+    SUCCEED();
 }
 
 TEST_F(SceneManagerTest, DestructorDisconnectsHooks)

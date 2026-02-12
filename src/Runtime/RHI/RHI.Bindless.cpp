@@ -8,6 +8,8 @@ module;
 
 module RHI:Bindless.Impl;
 import :Bindless;
+import :Device;
+import :Texture;
 import Core;
 
 namespace RHI

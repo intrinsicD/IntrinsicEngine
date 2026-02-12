@@ -6,6 +6,7 @@ module;
 module Graphics:Systems.MeshRendererLifecycle.Impl;
 
 import :Systems.MeshRendererLifecycle;
+import :GPUScene;
 
 import :Components;
 import :Material;

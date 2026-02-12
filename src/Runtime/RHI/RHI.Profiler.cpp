@@ -10,6 +10,8 @@ module;
 
 module RHI:Profiler.Impl;
 import :Profiler;
+import :Device;
+import Core;
 
 namespace RHI
 {

@@ -21,6 +21,7 @@ module;
 module Interface:GUI.Impl;
 import :GUI;
 import Core;
+import RHI;
 
 namespace Interface::GUI
 {

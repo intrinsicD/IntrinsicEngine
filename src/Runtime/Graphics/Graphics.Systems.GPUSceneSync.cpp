@@ -5,6 +5,7 @@ module;
 module Graphics:Systems.GPUSceneSync.Impl;
 
 import :Systems.GPUSceneSync;
+import :GPUScene;
 
 import ECS;
 import :Components;
