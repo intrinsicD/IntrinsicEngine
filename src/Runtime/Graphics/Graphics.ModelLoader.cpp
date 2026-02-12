@@ -29,6 +29,8 @@ module;
 
 module Graphics:ModelLoader.Impl;
 import :ModelLoader;
+import :AssetErrors;
+import :Model;
 import Core;
 import RHI;
 import :Geometry;

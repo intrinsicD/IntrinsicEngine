@@ -7,6 +7,7 @@ module;
 module RHI:Buffer.Impl;
 
 import :Buffer;
+import :Device;
 import Core;
 
 namespace RHI

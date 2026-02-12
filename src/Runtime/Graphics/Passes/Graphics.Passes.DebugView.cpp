@@ -8,9 +8,12 @@ module;
 module Graphics:Passes.DebugView.Impl;
 
 import :Passes.DebugView;
+import :RenderPipeline;
+import :RenderGraph;
 import :ShaderRegistry;
 import Core;
 import RHI;
+import Interface;
 
 using namespace Core::Hash;
 

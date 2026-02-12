@@ -9,6 +9,8 @@ module;
 module RHI:StagingBelt.Impl;
 
 import :StagingBelt;
+import :Device;
+import :Buffer;
 import Core;
 
 namespace

@@ -4,6 +4,7 @@ module;
 
 module RHI:Descriptors.Impl;
 import :Descriptors;
+import :Device;
 import Core;
 
 namespace RHI {

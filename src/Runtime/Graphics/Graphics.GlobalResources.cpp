@@ -7,6 +7,9 @@ module;
 module Graphics:GlobalResources.Impl;
 
 import :GlobalResources;
+import :ShaderRegistry;
+import :PipelineLibrary;
+import :Camera;
 import Core;
 import RHI;
 

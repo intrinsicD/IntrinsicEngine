@@ -4,6 +4,7 @@
 #include <atomic>
 #include <thread>
 
+#include <entt/entity/fwd.hpp>
 #include "RHI.Vulkan.hpp"
 
 import Runtime.AssetPipeline;

@@ -5,6 +5,7 @@ module;
 module RHI:CommandContext.Impl;
 
 import :CommandContext;
+import :Device;
 import Core;
 
 namespace RHI

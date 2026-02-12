@@ -23,15 +23,13 @@ import Interface;
 import Runtime.GraphicsBackend;
 import Runtime.AssetPipeline;
 import Runtime.SceneManager;
+import Runtime.RenderOrchestrator;
 
 using namespace Core::Hash;
 
 namespace Runtime
 {
-    Engine::Engine(const EngineConfig& config) :
-        m_FrameArena(config.FrameArenaSize),
-        m_FrameScope(config.FrameArenaSize),
-        m_FrameGraph(m_FrameScope)
+    Engine::Engine(const EngineConfig& config)
     {
         Core::Tasks::Scheduler::Initialize();
         Core::Filesystem::FileWatcher::Initialize();
@@ -92,41 +90,32 @@ namespace Runtime
         // 4. AssetPipeline (AssetManager, pending transfers, main-thread queue)
         m_AssetPipeline = std::make_unique<AssetPipeline>(m_GraphicsBackend->GetTransferManager());
 
-        // 5. MaterialSystem (depends on TextureSystem from GraphicsBackend + AssetManager)
-        m_MaterialSystem = std::make_unique<Graphics::MaterialSystem>(
-            m_GraphicsBackend->GetTextureSystem(), GetAssetManager());
-
-        // 6. Initialize GeometryStorage with frames-in-flight for safe deferred deletion
-        m_GeometryStorage.Initialize(m_GraphicsBackend->GetDevice()->GetFramesInFlight());
-
-        // 7. ImGui
+        // 5. ImGui
         Interface::GUI::Init(*m_Window,
                              *m_GraphicsBackend->GetDevice(),
                              m_GraphicsBackend->GetSwapchain(),
                              m_GraphicsBackend->GetContext().GetInstance(),
                              m_GraphicsBackend->GetDevice()->GetGraphicsQueue());
 
-        // 8. Pipelines & RenderSystem
-        InitPipeline();
+        // 6. RenderOrchestrator (MaterialSystem, GeometryStorage, Pipelines, RenderSystem, GPUScene, FrameGraph)
+        m_RenderOrchestrator = std::make_unique<RenderOrchestrator>(
+            m_GraphicsBackend->GetDevice(),
+            m_GraphicsBackend->GetSwapchain(),
+            m_GraphicsBackend->GetRenderer(),
+            m_GraphicsBackend->GetBindlessSystem(),
+            m_GraphicsBackend->GetDescriptorPool(),
+            m_GraphicsBackend->GetDescriptorLayout(),
+            m_GraphicsBackend->GetTextureSystem(),
+            GetAssetManager(),
+            m_GraphicsBackend->GetDefaultTextureIndex(),
+            config.FrameArenaSize);
 
-        // 9. Retained-mode GPUScene: Engine owns it so SpawnModel/ECS can queue updates.
-        if (m_PipelineLibrary && m_GraphicsBackend->GetDevice())
+        // 7. Connect EnTT on_destroy hook for immediate GPU slot reclaim (via SceneManager).
+        if (m_RenderOrchestrator->GetGPUScenePtr())
         {
-            if (auto* p = m_PipelineLibrary->GetSceneUpdatePipeline(); p && m_PipelineLibrary->GetSceneUpdateSetLayout() != VK_NULL_HANDLE)
-            {
-                m_GpuScene = std::make_unique<Graphics::GPUScene>(*m_GraphicsBackend->GetDevice(),
-                                                                 *p,
-                                                                 m_PipelineLibrary->GetSceneUpdateSetLayout());
-
-                // Connect EnTT on_destroy hook for immediate GPU slot reclaim (via SceneManager).
-                m_SceneManager->ConnectGpuHooks(*m_GpuScene);
-
-                if (m_RenderSystem)
-                    m_RenderSystem->SetGpuScene(m_GpuScene.get());
-            }
+            m_SceneManager->ConnectGpuHooks(m_RenderOrchestrator->GetGPUScene());
         }
 
-        Core::Log::Info("Engine: InitPipeline complete.");
         Core::Log::Info("Engine: Constructor complete.");
     }
 
@@ -141,10 +130,9 @@ namespace Runtime
         Core::Tasks::Scheduler::Shutdown();
         Core::Filesystem::FileWatcher::Shutdown();
 
-        // Destroy GPU systems first while device is still alive.
-        m_GpuScene.reset();
-        m_RenderSystem.reset();
-        m_PipelineLibrary.reset();
+        // Process material deletions before RenderOrchestrator destroys MaterialSystem.
+        auto& matSys = m_RenderOrchestrator->GetMaterialSystem();
+        matSys.ProcessDeletions(m_GraphicsBackend->GetDevice()->GetGlobalFrameNumber());
 
         Interface::GUI::Shutdown();
 
@@ -153,17 +141,9 @@ namespace Runtime
 
         m_AssetPipeline->ClearLoadedMaterials();
 
-        if (m_MaterialSystem)
-        {
-            m_MaterialSystem->ProcessDeletions(m_GraphicsBackend->GetDevice()->GetGlobalFrameNumber());
-            m_MaterialSystem.reset();
-        }
-
-        // Clear geometry storage before device destruction
-        m_GeometryStorage.Clear();
-
-        // Destroy per-frame transient RHI objects while VulkanDevice is still alive.
-        m_FrameScope.Reset();
+        // RenderOrchestrator destructor handles: GPUScene, RenderSystem, PipelineLibrary,
+        // MaterialSystem, GeometryStorage, frame state.
+        m_RenderOrchestrator.reset();
 
         // AssetPipeline destructor handles cleanup of asset state.
         m_AssetPipeline.reset();
@@ -230,7 +210,7 @@ namespace Runtime
                 // [Worker Thread] Heavy OBJ/GLTF Parsing
                 auto loadResult = Graphics::ModelLoader::LoadAsync(
                     GetDevice(), m_GraphicsBackend->GetTransferManager(),
-                    m_GeometryStorage, path);
+                    m_RenderOrchestrator->GetGeometryStorage(), path);
 
                 if (!loadResult)
                 {
@@ -258,7 +238,8 @@ namespace Runtime
                     matData.AlbedoID = m_GraphicsBackend->GetDefaultTextureIndex();
                     matData.RoughnessFactor = 0.5f;
 
-                    auto defaultMat = std::make_unique<Graphics::Material>(*m_MaterialSystem, matData);
+                    auto defaultMat = std::make_unique<Graphics::Material>(
+                        m_RenderOrchestrator->GetMaterialSystem(), matData);
 
                     const std::string materialName = assetName + "::DefaultMaterial";
                     auto defaultMaterialHandle = GetAssetManager().Create(materialName, std::move(defaultMat));
@@ -274,62 +255,6 @@ namespace Runtime
         {
             Core::Log::Warn("Unsupported file extension: {}", ext);
         }
-    }
-
-    void Engine::InitPipeline()
-    {
-        // Shader policy (data-driven)
-        m_ShaderRegistry.Register("Forward.Vert"_id, "shaders/triangle.vert.spv");
-        m_ShaderRegistry.Register("Forward.Frag"_id, "shaders/triangle.frag.spv");
-        m_ShaderRegistry.Register("Picking.Vert"_id, "shaders/pick_id.vert.spv");
-        m_ShaderRegistry.Register("Picking.Frag"_id, "shaders/pick_id.frag.spv");
-        m_ShaderRegistry.Register("Debug.Vert"_id, "shaders/debug_view.vert.spv");
-        m_ShaderRegistry.Register("Debug.Frag"_id, "shaders/debug_view.frag.spv");
-        m_ShaderRegistry.Register("Debug.Comp"_id, "shaders/debug_view.comp.spv");
-
-        // Stage 3 compute
-        m_ShaderRegistry.Register("Cull.Comp"_id, "shaders/instance_cull_multigeo.comp.spv");
-
-        // GPUScene scatter update
-        m_ShaderRegistry.Register("SceneUpdate.Comp"_id, "shaders/scene_update.comp.spv");
-
-        // Pipeline library (owns PSOs)
-        m_PipelineLibrary = std::make_unique<Graphics::PipelineLibrary>(
-            m_GraphicsBackend->GetDevice(),
-            m_GraphicsBackend->GetBindlessSystem(),
-            m_GraphicsBackend->GetDescriptorLayout());
-        m_PipelineLibrary->BuildDefaults(m_ShaderRegistry,
-                                         m_GraphicsBackend->GetSwapchain().GetImageFormat(),
-                                         RHI::VulkanImage::FindDepthFormat(*m_GraphicsBackend->GetDevice()));
-
-        // RenderSystem (borrows PSOs via PipelineLibrary)
-        Core::Log::Info("About to create RenderSystem...");
-        Graphics::RenderSystemConfig rsConfig{};
-        m_RenderSystem = std::make_unique<Graphics::RenderSystem>(
-            rsConfig,
-            m_GraphicsBackend->GetDevice(),
-            m_GraphicsBackend->GetSwapchain(),
-            m_GraphicsBackend->GetRenderer(),
-            m_GraphicsBackend->GetBindlessSystem(),
-            m_GraphicsBackend->GetDescriptorPool(),
-            m_GraphicsBackend->GetDescriptorLayout(),
-            *m_PipelineLibrary,
-            m_ShaderRegistry,
-            m_FrameArena,
-            m_FrameScope,
-            m_GeometryStorage,
-            *m_MaterialSystem
-        );
-        Core::Log::Info("RenderSystem created successfully.");
-
-        if (!m_RenderSystem)
-        {
-            Core::Log::Error("Failed to create RenderSystem!");
-            std::exit(1);
-        }
-
-        // Default Render Pipeline (hot-swappable)
-        m_RenderSystem->RequestPipelineSwap(std::make_unique<Graphics::DefaultPipeline>());
     }
 
     entt::entity Engine::SpawnModel(Core::Assets::AssetHandle modelHandle,
@@ -366,8 +291,7 @@ namespace Runtime
 
             {
                 PROFILE_SCOPE("FrameArena::Reset");
-                m_FrameScope.Reset();
-                m_FrameArena.Reset();
+                m_RenderOrchestrator->ResetFrameState();
             }
 
             {
@@ -385,9 +309,9 @@ namespace Runtime
             // Reclaim pool slots for textures that became unreachable this frame.
             m_GraphicsBackend->ProcessTextureDeletions();
 
-            if (m_MaterialSystem)
             {
-                m_MaterialSystem->ProcessDeletions(m_GraphicsBackend->GetDevice()->GetGlobalFrameNumber());
+                auto& matSys = m_RenderOrchestrator->GetMaterialSystem();
+                matSys.ProcessDeletions(m_GraphicsBackend->GetDevice()->GetGlobalFrameNumber());
             }
 
             {
@@ -399,34 +323,37 @@ namespace Runtime
             // --- FrameGraph: register, compile, and execute all systems ---
             {
                 PROFILE_SCOPE("FrameGraph");
-                m_FrameGraph.Reset();
+                auto& frameGraph = m_RenderOrchestrator->GetFrameGraph();
+                frameGraph.Reset();
 
                 auto& registry = m_SceneManager->GetRegistry();
                 const float frameDt = static_cast<float>(frameTime);
 
                 // Client/gameplay systems first: they produce dirty state
-                OnRegisterSystems(m_FrameGraph, frameDt);
+                OnRegisterSystems(frameGraph, frameDt);
 
                 // Core engine systems consume dirty state in pipeline order.
-                ECS::Systems::Transform::RegisterSystem(m_FrameGraph, registry);
+                ECS::Systems::Transform::RegisterSystem(frameGraph, registry);
 
-                if (m_GpuScene && m_MaterialSystem)
+                auto* gpuScene = m_RenderOrchestrator->GetGPUScenePtr();
+                if (gpuScene)
                 {
+                    auto& matSys = m_RenderOrchestrator->GetMaterialSystem();
                     Graphics::Systems::MeshRendererLifecycle::RegisterSystem(
-                        m_FrameGraph, registry, *m_GpuScene, GetAssetManager(),
-                        *m_MaterialSystem, m_GeometryStorage,
+                        frameGraph, registry, *gpuScene, GetAssetManager(),
+                        matSys, m_RenderOrchestrator->GetGeometryStorage(),
                         m_GraphicsBackend->GetDefaultTextureIndex());
 
                     Graphics::Systems::GPUSceneSync::RegisterSystem(
-                        m_FrameGraph, registry, *m_GpuScene, GetAssetManager(),
-                        *m_MaterialSystem, m_GraphicsBackend->GetDefaultTextureIndex());
+                        frameGraph, registry, *gpuScene, GetAssetManager(),
+                        matSys, m_GraphicsBackend->GetDefaultTextureIndex());
                 }
 
-                auto compileResult = m_FrameGraph.Compile();
+                auto compileResult = frameGraph.Compile();
                 if (compileResult)
                 {
                     GetAssetManager().BeginReadPhase();
-                    m_FrameGraph.Execute();
+                    frameGraph.Execute();
                     GetAssetManager().EndReadPhase();
                 }
             }
@@ -434,10 +361,7 @@ namespace Runtime
             if (m_FramebufferResized)
             {
                 m_GraphicsBackend->OnResize();
-                if (m_RenderSystem)
-                {
-                    m_RenderSystem->OnResize();
-                }
+                m_RenderOrchestrator->OnResize();
                 m_FramebufferResized = false;
             }
 

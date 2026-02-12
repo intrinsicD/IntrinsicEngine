@@ -11,6 +11,8 @@ module;
 
 module RHI:Transfer.Impl;
 import :Transfer;
+import :Device;
+import :Buffer;
 import :StagingBelt;
 import Core;
 

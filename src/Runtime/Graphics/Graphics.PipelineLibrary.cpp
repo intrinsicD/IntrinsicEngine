@@ -10,6 +10,7 @@ module;
 module Graphics:PipelineLibrary.Impl;
 
 import :PipelineLibrary;
+import :ShaderRegistry;
 
 import Core;
 import RHI;

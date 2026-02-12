@@ -20,26 +20,29 @@ This document tracks **what's left to do** in IntrinsicEngine's architecture.
 
 ### 1.1 Continue `Engine` Decomposition
 
-**Context:** `GraphicsBackend`, `AssetPipeline`, and `SceneManager` have been extracted (see Git history). The remaining render subsystem still lives inline in `Engine`.
+**Context:** `GraphicsBackend`, `AssetPipeline`, `SceneManager`, and `RenderOrchestrator` have been extracted (see Git history). The `Engine` class is now a thin shell that owns the four subsystems, a window, and a selection module.
 
-**Remaining extractions (one PR per subsystem):**
-
-- `RenderOrchestrator` (RenderSystem + RenderGraph + GPUScene + PipelineLibrary integration)
-
-**Tests to add/extend:**
+**Remaining work:**
 - "Headless Engine" smoke test that runs one frame with minimal subsystems
 
-**Complexity:** Medium (mechanical extraction following the `GraphicsBackend` / `AssetPipeline` / `SceneManager` pattern).
+**Complexity:** Low.
+
+---
+
+### 1.2 Pre-existing Build Environment Issues
+
+The following issues exist in this CI/development environment and should be tracked:
+
+- **Clang 18 `__cpp_concepts` mismatch:** Clang 18 reports `__cpp_concepts` as `201907L` but GCC 14's `<expected>` header guards on `>= 202002L`. Workaround applied in `CMakeLists.txt` (`-D__cpp_concepts=202002L`). Will be unnecessary with Clang 19+.
+- **C++20 module partition visibility:** Many `.cpp` module implementation partition units were missing explicit `import` statements for types used from sibling partitions. Clang 18 enforces strict module visibility. All known cases fixed; new ones may surface.
+- **`DefaultPipeline` vtable linkage:** The `Graphics::DefaultPipeline` class (defined in `:Pipelines` partition, implemented in `:Pipelines.Impl`) has a linker vtable error. Root cause is likely clang-18's handling of vtables across module partition implementation units.
 
 ---
 
 ## 2. Prioritized Roadmap
 
 ### Tier A (Next)
-1. **`RenderOrchestrator` extraction** — bundles `m_RenderSystem`, `m_GpuScene`, `m_PipelineLibrary`, `m_ShaderRegistry`, `m_FrameGraph`, `InitPipeline()` into a subsystem.
-
-### Tier B (After A)
-2. **`Core::DAGScheduler` extraction** — factor the shared DAG scheduling algorithm (adjacency building from R/W hazards, Kahn's topological sort, parallel-layer execution) into a reusable `Core::DAGScheduler<NodeT, ResourceIdT>` template. FrameGraph and RenderGraph both instantiate it with their own node/resource types, eliminating duplicated graph logic while keeping execution semantics domain-specific. (See §4.3.)
+1. **`Core::DAGScheduler` extraction** — factor the shared DAG scheduling algorithm (adjacency building from R/W hazards, Kahn's topological sort, parallel-layer execution) into a reusable `Core::DAGScheduler<NodeT, ResourceIdT>` template. FrameGraph and RenderGraph both instantiate it with their own node/resource types, eliminating duplicated graph logic while keeping execution semantics domain-specific. (See §4.3.)
 
 ---
 
