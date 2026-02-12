@@ -16,3 +16,4 @@ export import :Hash;
 export import :Handle;
 export import :FrameGraph;
 export import :DAGScheduler;
+export import :FeatureRegistry;

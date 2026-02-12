@@ -28,6 +28,7 @@ add_executable(${target_name}
         Test_RenderOrchestrator.cpp
         Test_DAGScheduler.cpp
         Test_HeadlessEngine.cpp
+        Test_FeatureRegistry.cpp
 )
 
 #Apply Strict Flags ONLY to our tests
@@ -78,6 +79,7 @@ add_executable(${core_test_target}
         Test_CoreFrameGraph.cpp
         Test_DAGScheduler.cpp
         Test_CoreAssetSafety.cpp
+        Test_FeatureRegistry.cpp
 )
 
 target_compile_options(${core_test_target} PRIVATE ${INTRINSIC_COMPILE_FLAGS})

@@ -35,6 +35,7 @@ target_sources(${target_name}
         Core.Telemetry.cppm
         Core.FrameGraph.cppm
         Core.DAGScheduler.cppm
+        Core.FeatureRegistry.cppm
         PRIVATE
         FILE_SET core_impl TYPE CXX_MODULES FILES
         Core.Memory.cpp
@@ -46,6 +47,7 @@ target_sources(${target_name}
         Core.Assets.cpp
         Core.FrameGraph.cpp
         Core.DAGScheduler.cpp
+        Core.FeatureRegistry.cpp
 )
 
 target_include_directories(${target_name} PUBLIC .)
