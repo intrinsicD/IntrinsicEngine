@@ -15,3 +15,4 @@ export import :ResourcePool;
 export import :Hash;
 export import :Handle;
 export import :FrameGraph;
+export import :DAGScheduler;

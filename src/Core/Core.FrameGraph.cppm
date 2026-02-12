@@ -14,25 +14,26 @@ import :Memory;
 import :Logging;
 import :Hash;
 import :Tasks;
+import :DAGScheduler;
 
 // -------------------------------------------------------------------------
 // Core::FrameGraph - System Execution Task Graph
 // -------------------------------------------------------------------------
 // PURPOSE: Orchestrates per-frame system execution order based on declared
 // data dependencies (Read/Write on component types). Mirrors the three-phase
-// design of Graphics::RenderGraph (Setup → Compile → Execute) but manages
+// design of Graphics::RenderGraph (Setup -> Compile -> Execute) but manages
 // System scheduling rather than GPU barriers.
 //
 // Dependency Model:
 // Given systems S = {S_1, ..., S_n}, each reading R_i and writing W_i:
-//   RAW (Read-after-Write):  S_a writes C, S_b reads C  → S_a before S_b
-//   WAW (Write-after-Write): S_a writes C, S_b writes C → S_a before S_b
-//   WAR (Write-after-Read):  S_a reads C,  S_b writes C → S_a before S_b
-//   RAR (Read-after-Read):   Both read C → may execute in parallel
+//   RAW (Read-after-Write):  S_a writes C, S_b reads C  -> S_a before S_b
+//   WAW (Write-after-Write): S_a writes C, S_b writes C -> S_a before S_b
+//   WAR (Write-after-Read):  S_a reads C,  S_b writes C -> S_a before S_b
+//   RAR (Read-after-Read):   Both read C -> may execute in parallel
 //
-// Compile() builds the DAG via Kahn's algorithm into parallel execution
-// layers. Execute() dispatches each layer to the Core::Tasks::Scheduler
-// and waits for each layer to complete before starting the next.
+// Implementation: Delegates DAG scheduling (hazard tracking, Kahn's
+// topological sort) to Core::DAGScheduler. FrameGraph owns pass data
+// (names, closures) and handles execution dispatch to the task scheduler.
 //
 // CPU vs GPU:
 // The FrameGraph schedules the CPU-side work. For GPU systems (e.g., GPU
@@ -104,7 +105,7 @@ export namespace Core
         template <typename SetupFn, typename ExecuteFn>
         void AddPass(std::string_view name, SetupFn&& setup, ExecuteFn&& execute)
         {
-            uint32_t index = m_ActivePassCount;
+            uint32_t index = m_Scheduler.AddNode();
 
             // Grow pass pool if needed
             if (index >= m_PassPool.size())
@@ -114,8 +115,6 @@ export namespace Core
 
             auto& pass = m_PassPool[index];
             pass.Name = name;
-            pass.Dependents.clear();
-            pass.Indegree = 0;
 
             // Allocate the closure in the ScopeStack (destructor-safe, no heap alloc).
             struct Closure
@@ -140,8 +139,6 @@ export namespace Core
             };
             pass.ExecuteUserData = closure;
 
-            ++m_ActivePassCount;
-
             // Run the user's setup to declare dependencies.
             FrameGraphBuilder builder(*this, index);
             setup(builder);
@@ -160,13 +157,13 @@ export namespace Core
         void Reset();
 
         // ----- Introspection -----
-        [[nodiscard]] uint32_t GetPassCount() const { return m_ActivePassCount; }
-        [[nodiscard]] const std::vector<std::vector<uint32_t>>& GetExecutionLayers() const { return m_ExecutionLayers; }
+        [[nodiscard]] uint32_t GetPassCount() const { return m_Scheduler.GetNodeCount(); }
+        [[nodiscard]] const std::vector<std::vector<uint32_t>>& GetExecutionLayers() const { return m_Scheduler.GetExecutionLayers(); }
 
         // Get the name of a pass by index (for debugging/telemetry).
         [[nodiscard]] std::string_view GetPassName(uint32_t index) const
         {
-            assert(index < m_ActivePassCount);
+            assert(index < m_Scheduler.GetNodeCount());
             return m_PassPool[index].Name;
         }
 
@@ -181,39 +178,19 @@ export namespace Core
             std::string_view Name;
             ExecuteThunk ExecuteFn = nullptr;
             void* ExecuteUserData = nullptr;
-
-            // DAG edges (outgoing) and indegree
-            std::vector<uint32_t> Dependents;
-            uint32_t Indegree = 0;
         };
 
-        struct ResourceState
-        {
-            static constexpr uint32_t kInvalid = ~0u;
-            uint32_t LastWriterIndex = kInvalid;
-            std::vector<uint32_t> CurrentReaders;
-        };
+        // Tag bit to distinguish label resource keys from TypeToken resource keys.
+        // TypeTokens are pointer addresses (never have MSB set in user space).
+        // Labels use MSB | label.Value to avoid collisions.
+        static constexpr size_t kLabelTag = size_t(1) << (sizeof(size_t) * 8 - 1);
 
         // ----- Data -----
         Memory::ScopeStack& m_Scope;
+        DAGScheduler m_Scheduler;
 
         // Pass pool (recycled across frames, grows to high-water mark)
         std::vector<PassNode> m_PassPool;
-        uint32_t m_ActivePassCount = 0;
-
-        // Compiled execution layers
-        std::vector<std::vector<uint32_t>> m_ExecutionLayers;
-
-        // Dependency tracking (cleared each Compile)
-        // Key: TypeToken<T> hash for component types
-        std::vector<std::pair<size_t, ResourceState>> m_ResourceStates;
-        // Key: StringID value for named labels
-        std::vector<std::pair<uint32_t, ResourceState>> m_LabelStates;
-
-        // ----- Helpers -----
-        void AddDependency(uint32_t producer, uint32_t consumer);
-        ResourceState& GetResourceState(size_t typeToken);
-        ResourceState& GetLabelState(Hash::StringID label);
     };
 
     // =========================================================================
@@ -224,40 +201,13 @@ export namespace Core
     void FrameGraphBuilder::Read()
     {
         size_t token = TypeToken<T>();
-        auto& state = m_Graph.GetResourceState(token);
-
-        // RAW: If someone wrote this resource, depend on the last writer.
-        if (state.LastWriterIndex != FrameGraph::ResourceState::kInvalid)
-        {
-            m_Graph.AddDependency(state.LastWriterIndex, m_PassIndex);
-        }
-
-        state.CurrentReaders.push_back(m_PassIndex);
+        m_Graph.m_Scheduler.DeclareRead(m_PassIndex, token);
     }
 
     template <typename T>
     void FrameGraphBuilder::Write()
     {
         size_t token = TypeToken<T>();
-        auto& state = m_Graph.GetResourceState(token);
-
-        // WAW: Depend on last writer.
-        if (state.LastWriterIndex != FrameGraph::ResourceState::kInvalid)
-        {
-            m_Graph.AddDependency(state.LastWriterIndex, m_PassIndex);
-        }
-
-        // WAR: Depend on all current readers (they must finish before we overwrite).
-        for (uint32_t readerIdx : state.CurrentReaders)
-        {
-            if (readerIdx != m_PassIndex)
-            {
-                m_Graph.AddDependency(readerIdx, m_PassIndex);
-            }
-        }
-
-        // We become the exclusive owner.
-        state.CurrentReaders.clear();
-        state.LastWriterIndex = m_PassIndex;
+        m_Graph.m_Scheduler.DeclareWrite(m_PassIndex, token);
     }
 }
