@@ -26,6 +26,7 @@ add_executable(${target_name}
         Test_AssetPipeline.cpp
         Test_SceneManager.cpp
         Test_RenderOrchestrator.cpp
+        Test_DAGScheduler.cpp
 )
 
 #Apply Strict Flags ONLY to our tests
@@ -74,6 +75,7 @@ add_executable(${core_test_target}
         Test_CoreHandle.cpp
         Test_CoreHash.cpp
         Test_CoreFrameGraph.cpp
+        Test_DAGScheduler.cpp
         Test_CoreAssetSafety.cpp
 )
 

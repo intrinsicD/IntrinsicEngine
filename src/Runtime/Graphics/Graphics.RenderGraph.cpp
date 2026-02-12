@@ -293,6 +293,9 @@ namespace Graphics
 
     void RenderGraph::Reset()
     {
+        // 0. Reset DAG scheduler state
+        m_Scheduler.Reset();
+
         // 1. Reset Allocators (Reclaim memory)
         m_Scope.Reset();
         m_Arena.Reset();
@@ -508,8 +511,7 @@ namespace Graphics
         m_CompiledFrameIndex = frameIndex;
         ResolveTransientResources(frameIndex);
         CalculateBarriers();
-        BuildAdjacencyList();
-        TopologicalSortIntoLayers();
+        BuildSchedulerGraph();
     }
 
     void RenderGraph::ResolveTransientResources(uint32_t frameIndex)
@@ -701,31 +703,18 @@ namespace Graphics
         }
     }
 
-    void RenderGraph::BuildAdjacencyList()
+    void RenderGraph::BuildSchedulerGraph()
     {
-        m_AdjacencyList.clear();
-        m_AdjacencyList.resize(m_ActivePassCount);
+        // Reset and populate the DAGScheduler with this frame's passes and dependencies.
+        m_Scheduler.Reset();
 
-        for (auto& d : m_AdjacencyList)
+        // Add a node per pass.
+        for (uint32_t i = 0; i < m_ActivePassCount; ++i)
         {
-            d.DependsOn.clear();
-            d.Dependents.clear();
-            d.Indegree = 0;
+            m_Scheduler.AddNode();
         }
 
-        // Track last writer and last readers per resource. This is enough to model RAW/WAR/WAW.
-        const uint32_t passInvalid = ~0u;
-        std::vector<uint32_t> lastWriter(m_ActiveResourceCount, passInvalid);
-        std::vector<std::vector<uint32_t>> lastReaders(m_ActiveResourceCount);
-
-        auto addEdge = [&](uint32_t from, uint32_t to)
-        {
-            if (from == passInvalid || to == passInvalid || from == to) return;
-            m_AdjacencyList[from].Dependents.push_back(to);
-            m_AdjacencyList[to].DependsOn.push_back(from);
-            m_AdjacencyList[to].Indegree++;
-        };
-
+        // Walk access/attachment lists and declare read/write hazards.
         for (uint32_t passIdx = 0; passIdx < m_ActivePassCount; ++passIdx)
         {
             const auto& pass = m_PassPool[passIdx];
@@ -736,26 +725,11 @@ namespace Graphics
                 if (node->ID >= m_ActiveResourceCount) continue;
 
                 const bool isWrite = IsWriteAccessCheck(node->Access);
-                const bool isRead = !isWrite; // treat all non-write accesses as read
 
-                if (isRead)
-                {
-                    // RAW: depend on last writer.
-                    addEdge(lastWriter[node->ID], passIdx);
-                    lastReaders[node->ID].push_back(passIdx);
-                }
+                if (isWrite)
+                    m_Scheduler.DeclareWrite(passIdx, static_cast<size_t>(node->ID));
                 else
-                {
-                    // WAW: depend on last writer.
-                    addEdge(lastWriter[node->ID], passIdx);
-
-                    // WAR: depend on all outstanding readers since last write.
-                    for (uint32_t r : lastReaders[node->ID])
-                        addEdge(r, passIdx);
-                    lastReaders[node->ID].clear();
-
-                    lastWriter[node->ID] = passIdx;
-                }
+                    m_Scheduler.DeclareRead(passIdx, static_cast<size_t>(node->ID));
             }
 
             // Attachment hazards: treat as writes (raster). This ensures a pass that renders to an image
@@ -763,77 +737,29 @@ namespace Graphics
             for (AttachmentNode* att = pass.AttachmentHead; att != nullptr; att = att->Next)
             {
                 if (att->ID >= m_ActiveResourceCount) continue;
-
-                // WAW + WAR with prior users.
-                addEdge(lastWriter[att->ID], passIdx);
-                for (uint32_t r : lastReaders[att->ID])
-                    addEdge(r, passIdx);
-                lastReaders[att->ID].clear();
-                lastWriter[att->ID] = passIdx;
+                m_Scheduler.DeclareWrite(passIdx, static_cast<size_t>(att->ID));
             }
         }
-    }
 
-    void RenderGraph::TopologicalSortIntoLayers()
-    {
-        m_ExecutionLayers.clear();
-        if (m_ActivePassCount == 0) return;
-
-        std::vector<uint32_t> indeg(m_ActivePassCount);
-        for (uint32_t i = 0; i < m_ActivePassCount; ++i)
-            indeg[i] = m_AdjacencyList[i].Indegree;
-
-        std::vector<uint32_t> layer;
-        layer.reserve(m_ActivePassCount);
-
-        for (uint32_t i = 0; i < m_ActivePassCount; ++i)
-            if (indeg[i] == 0) layer.push_back(i);
-
-        uint32_t processed = 0;
-        while (!layer.empty())
+        // Topological sort into execution layers.
+        auto result = m_Scheduler.Compile();
+        if (!result)
         {
-            m_ExecutionLayers.push_back(layer);
-            processed += static_cast<uint32_t>(layer.size());
-
-            std::vector<uint32_t> next;
-            next.reserve(m_ActivePassCount);
-
-            for (uint32_t p : layer)
-            {
-                for (uint32_t dep : m_AdjacencyList[p].Dependents)
-                {
-                    if (dep >= m_ActivePassCount) continue;
-                    if (indeg[dep] == 0) continue; // already scheduled
-                    indeg[dep]--;
-                    if (indeg[dep] == 0) next.push_back(dep);
-                }
-            }
-
-            layer = std::move(next);
-        }
-
-        if (processed != m_ActivePassCount)
-        {
-            // Cycle: should not happen. Fall back to sequential order for safety.
-            Core::Log::Error("RenderGraph: dependency cycle detected (processed {} / {}). Falling back to sequential execution order.",
-                             processed, m_ActivePassCount);
-            m_ExecutionLayers.clear();
-            m_ExecutionLayers.emplace_back();
-            m_ExecutionLayers.back().reserve(m_ActivePassCount);
-            for (uint32_t i = 0; i < m_ActivePassCount; ++i) m_ExecutionLayers.back().push_back(i);
+            // Cycle detected — fall back to sequential order for safety.
+            // DAGScheduler logs the error. We need to provide a valid execution order.
+            Core::Log::Error("RenderGraph: Falling back to sequential execution order.");
         }
     }
 
     void RenderGraph::Execute(VkCommandBuffer cmd)
     {
         // If Compile() wasn't called (or for safety), build layers lazily.
-        if (m_ExecutionLayers.empty() && m_ActivePassCount > 0)
+        if (m_Scheduler.GetExecutionLayers().empty() && m_ActivePassCount > 0)
         {
-            BuildAdjacencyList();
-            TopologicalSortIntoLayers();
+            BuildSchedulerGraph();
         }
 
-        for (const auto& layer : m_ExecutionLayers)
+        for (const auto& layer : m_Scheduler.GetExecutionLayers())
         {
             if (!layer.empty())
                 ExecuteLayer(cmd, layer);

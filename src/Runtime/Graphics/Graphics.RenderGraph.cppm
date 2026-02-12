@@ -249,7 +249,7 @@ export namespace Graphics
         void SetTransientAllocator(RHI::TransientAllocator& allocator) { m_TransientAllocator = &allocator; }
 
         // Debug/introspection for tests/tools: valid after Compile() until Reset().
-        [[nodiscard]] const std::vector<std::vector<uint32_t>>& GetExecutionLayers() const { return m_ExecutionLayers; }
+        [[nodiscard]] const std::vector<std::vector<uint32_t>>& GetExecutionLayers() const { return m_Scheduler.GetExecutionLayers(); }
 
         // Internal methods for Builder
         friend class RGBuilder;
@@ -423,18 +423,10 @@ export namespace Graphics
         RHI::VulkanBuffer* ResolveBuffer(uint32_t frameIndex, const ResourceNode& node);
         VkDeviceMemory AllocateOrReuseMemory(const VkMemoryRequirements& reqs, uint32_t startPass, uint32_t endPass, uint32_t frameIndex);
 
-        struct DependencyInfo
-        {
-            std::vector<uint32_t> DependsOn{};
-            std::vector<uint32_t> Dependents{};
-            uint32_t Indegree = 0;
-        };
+        // DAG scheduling: hazard tracking + topological sort (shared with FrameGraph).
+        Core::DAGScheduler m_Scheduler;
 
-        std::vector<DependencyInfo> m_AdjacencyList{};
-        std::vector<std::vector<uint32_t>> m_ExecutionLayers{};
-
-        void BuildAdjacencyList();
-        void TopologicalSortIntoLayers();
+        void BuildSchedulerGraph();
 
         // Compile() sub-functions — extracted for readability.
         void ResolveTransientResources(uint32_t frameIndex);

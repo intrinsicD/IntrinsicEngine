@@ -42,7 +42,11 @@ The following issues exist in this CI/development environment and should be trac
 ## 2. Prioritized Roadmap
 
 ### Tier A (Next)
-1. **`Core::DAGScheduler` extraction** — factor the shared DAG scheduling algorithm (adjacency building from R/W hazards, Kahn's topological sort, parallel-layer execution) into a reusable `Core::DAGScheduler<NodeT, ResourceIdT>` template. FrameGraph and RenderGraph both instantiate it with their own node/resource types, eliminating duplicated graph logic while keeping execution semantics domain-specific. (See §4.3.)
+_(No items — `Core::DAGScheduler` extraction is complete. See Git history.)_
+
+### Tier B (Future)
+1. **Port-based testing boundaries** — introduce type-erased "port" interfaces for filesystem, windowing, and time so that subsystems can be tested with fakes without Vulkan. (See §4.1.)
+2. **`Core::InplaceFunction`** — small-buffer owning callable to replace remaining `std::function` in hot paths. (See §4.2.)
 
 ---
 
@@ -82,7 +86,7 @@ The following issues exist in this CI/development environment and should be trac
 
 ---
 
-### 4.3 FrameGraph vs RenderGraph: keep separate, share the algorithm
+### 4.3 FrameGraph vs RenderGraph: shared algorithm extracted
 
 **Decision: Keep them separate.** They share the same 3-phase design (Setup → Compile → Execute) and Kahn's-algorithm topological sort, but operate on fundamentally different domains:
 
@@ -95,18 +99,17 @@ The following issues exist in this CI/development environment and should be trac
 | **Lives in** | `Core/` (no GPU deps) | `Runtime/Graphics/` (Vulkan-specific) |
 | **Testable without Vulkan** | Yes | No |
 
-**Rationale:**
+**Status: DONE.** The shared scheduling algorithm has been extracted into `Core::DAGScheduler`. Both FrameGraph and RenderGraph now delegate to it internally:
 
-1. **Execution domains are genuinely different.** CPU work is "run this lambda on a thread pool." GPU work is "record into a secondary command buffer, compute Vulkan barriers, manage image layouts." Unifying means every node carries the union of both concerns.
-2. **Dependency models differ.** FrameGraph tracks `Read<Transform>` / `Write<WorldMatrix>` via compile-time type identity. RenderGraph tracks `Read(depthBuffer, FRAGMENT_SHADER, SAMPLED_READ)` with Vulkan stage/access flags. A unified graph would need a polymorphic resource concept that doesn't simplify anything.
-3. **Layering stays clean.** `Core::FrameGraph` has zero GPU dependencies, keeping `IntrinsicCoreTests` and `IntrinsicECSTests` Vulkan-free.
-4. **Producer-consumer relationship is already simple.** Per frame: `FrameGraph.Execute()` → CPU state ready → `RenderGraph.Execute()` → GPU work submitted. One graph doesn't need to see the other's internal passes.
-
-**TODO: Extract shared scheduling algorithm** into a reusable `Core::DAGScheduler<NodeT, ResourceIdT>` template:
-- DAG adjacency building from Read/Write hazards (RAW, WAW, WAR)
-- Kahn's algorithm topological sort into parallel layers
-- Layer-wise execution with a barrier between layers
-
-FrameGraph instantiates with type tokens; RenderGraph with GPU resource IDs. Scheduling is shared, execution and barrier semantics stay domain-specific.
+- **`Core::DAGScheduler`** (`Core.DAGScheduler.cppm/.cpp`) encapsulates:
+  - Resource state tracking (last writer, current readers per resource key)
+  - Automatic edge insertion from R/W hazards (RAW, WAW, WAR)
+  - `DeclareWeakRead` for ordering-only dependencies (label `WaitFor` semantics)
+  - Kahn's algorithm topological sort into parallel execution layers
+  - Direct edge insertion and deduplication
+- **FrameGraph** maps TypeTokens and labels (via MSB-tagged keys) to DAGScheduler resource keys.
+- **RenderGraph** maps Vulkan resource IDs and access flags to DAGScheduler `DeclareRead/DeclareWrite` calls.
+- Scheduling is shared; execution and barrier semantics remain domain-specific.
+- 18 dedicated `DAGScheduler` tests cover all hazard types, edge cases, and multi-frame reuse.
 
 **When to revisit:** If cross-domain dependencies arise (e.g., GPU compute pass must finish before a CPU system reads back results). That would typically be handled with fences/timeline semaphores at the boundary rather than merging graphs.
