@@ -3,7 +3,7 @@ module;
 
 export module ECS:Systems.AxisRotator;
 
-import Core;
+import Core.FrameGraph;
 
 export namespace ECS::Systems::AxisRotator
 {

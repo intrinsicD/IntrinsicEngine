@@ -11,7 +11,6 @@ module;
 
 export module Graphics:GPUScene;
 
-import Core;
 import RHI;
 
 export namespace Graphics

@@ -12,7 +12,7 @@ module Graphics:GPUScene.Impl;
 
 import :GPUScene;
 
-import Core;
+import Core.Logging;
 import RHI;
 
 namespace Graphics

@@ -8,7 +8,7 @@ module;
 export module Graphics:Interaction;
 
 import RHI;
-import Core;
+import Core.Hash;
 
 export namespace Graphics
 {

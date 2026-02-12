@@ -11,7 +11,8 @@ module;
 module RHI:Profiler.Impl;
 import :Profiler;
 import :Device;
-import Core;
+import Core.Logging;
+import Core.Telemetry;
 
 namespace RHI
 {

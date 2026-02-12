@@ -8,8 +8,8 @@ module;
 #include <memory>
 #include <concepts>
 
-export module Core:ResourcePool;
-import :Error; // For ErrorCode, etc.
+export module Core.ResourcePool;
+import Core.Error; // For ErrorCode, etc.
 
 export namespace Core
 {

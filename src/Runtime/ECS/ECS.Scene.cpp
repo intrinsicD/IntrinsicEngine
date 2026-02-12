@@ -1,6 +1,4 @@
 module;
-#include <filesystem>
-#include <chrono>
 #include <entt/entity/registry.hpp>
 
 module ECS:Scene.Impl;

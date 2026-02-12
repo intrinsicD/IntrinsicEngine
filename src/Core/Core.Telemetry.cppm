@@ -5,19 +5,14 @@ module;
 #include <string_view>
 #include <array>
 #include <atomic>
-#include <mutex>
 #include <vector>
-#include <algorithm>
 
-export module Core:Telemetry;
+export module Core.Telemetry;
 
 export namespace Core::Telemetry
 {
     // -------------------------------------------------------------------------
     // Lock-Free Ring Buffer for Frame Timing Data
-    // -------------------------------------------------------------------------
-    // Design: Each frame pushes timing samples into a ring buffer.
-    // UI/Debug tools can read the last N frames without blocking the main thread.
     // -------------------------------------------------------------------------
 
     struct TimingSample
@@ -29,19 +24,17 @@ export namespace Core::Telemetry
         uint16_t Depth = 0;          // Nesting depth for hierarchical display
     };
 
-    // Per-frame statistics
     struct FrameStats
     {
         uint64_t FrameNumber = 0;
         uint64_t FrameTimeNs = 0;
         uint64_t CpuTimeNs = 0;
-        uint64_t GpuTimeNs = 0;      // Placeholder for GPU timing
+        uint64_t GpuTimeNs = 0;
         uint32_t DrawCalls = 0;
         uint32_t TriangleCount = 0;
-        uint32_t SampleCount = 0;    // Number of timing samples this frame
+        uint32_t SampleCount = 0;
     };
 
-    // Named timing category for aggregation
     struct TimingCategory
     {
         uint32_t NameHash = 0;
@@ -51,32 +44,10 @@ export namespace Core::Telemetry
         uint64_t MinTimeNs = UINT64_MAX;
         uint64_t MaxTimeNs = 0;
 
-        void AddSample(uint64_t durationNs)
-        {
-            TotalTimeNs += durationNs;
-            CallCount++;
-            MinTimeNs = std::min(MinTimeNs, durationNs);
-            MaxTimeNs = std::max(MaxTimeNs, durationNs);
-        }
-
-        [[nodiscard]] double AverageMs() const
-        {
-            if (CallCount == 0) return 0.0;
-            return static_cast<double>(TotalTimeNs) / static_cast<double>(CallCount) / 1'000'000.0;
-        }
-
-        [[nodiscard]] double TotalMs() const
-        {
-            return static_cast<double>(TotalTimeNs) / 1'000'000.0;
-        }
-
-        void Reset()
-        {
-            TotalTimeNs = 0;
-            CallCount = 0;
-            MinTimeNs = UINT64_MAX;
-            MaxTimeNs = 0;
-        }
+        void AddSample(uint64_t durationNs);
+        [[nodiscard]] double AverageMs() const;
+        [[nodiscard]] double TotalMs() const;
+        void Reset();
     };
 
     // -------------------------------------------------------------------------
@@ -86,7 +57,7 @@ export namespace Core::Telemetry
     {
     public:
         static constexpr size_t MAX_SAMPLES_PER_FRAME = 4096;
-        static constexpr size_t MAX_FRAME_HISTORY = 120;  // ~2 seconds at 60fps
+        static constexpr size_t MAX_FRAME_HISTORY = 120;
         static constexpr size_t MAX_CATEGORIES = 256;
 
         static TelemetrySystem& Get()
@@ -95,157 +66,30 @@ export namespace Core::Telemetry
             return instance;
         }
 
-        // Called at start of frame
-        void BeginFrame()
-        {
-            m_FrameStartTime = std::chrono::high_resolution_clock::now();
-            m_CurrentFrameSampleCount.store(0, std::memory_order_relaxed);
+        void BeginFrame();
+        void EndFrame();
+        void RecordSample(uint32_t nameHash, const char* name, uint64_t durationNs, uint16_t depth = 0);
+        void RecordDrawCall(uint32_t triangles = 0);
+        void SetGpuFrameTimeNs(uint64_t gpuTimeNs);
 
-            // Reset per-frame category stats
-            for (auto& cat : m_Categories)
-            {
-                cat.Reset();
-            }
-        }
-
-        // Called at end of frame
-        void EndFrame()
-        {
-            auto endTime = std::chrono::high_resolution_clock::now();
-            auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                endTime - m_FrameStartTime).count();
-
-            // Store frame stats
-            size_t idx = m_CurrentFrame % MAX_FRAME_HISTORY;
-            m_FrameHistory[idx].FrameNumber = m_CurrentFrame;
-            m_FrameHistory[idx].FrameTimeNs = duration;
-            m_FrameHistory[idx].CpuTimeNs = duration; // TODO: Separate CPU/GPU
-            m_FrameHistory[idx].SampleCount = m_CurrentFrameSampleCount.load(std::memory_order_relaxed);
-            m_FrameHistory[idx].DrawCalls = m_DrawCallCount.load(std::memory_order_relaxed);
-            m_FrameHistory[idx].TriangleCount = m_TriangleCount.load(std::memory_order_relaxed);
-
-            m_CurrentFrame++;
-            m_DrawCallCount.store(0, std::memory_order_relaxed);
-            m_TriangleCount.store(0, std::memory_order_relaxed);
-        }
-
-        // Record a timing sample (called from ScopedTimer destructor)
-        void RecordSample(uint32_t nameHash, const char* name, uint64_t durationNs, uint16_t depth = 0)
-        {
-            // Find or create category
-            size_t catIdx = FindOrCreateCategory(nameHash, name);
-            if (catIdx < MAX_CATEGORIES)
-            {
-                m_Categories[catIdx].AddSample(durationNs);
-            }
-
-            // Store in ring buffer for detailed analysis
-            uint32_t sampleIdx = m_CurrentFrameSampleCount.fetch_add(1, std::memory_order_relaxed);
-            if (sampleIdx < MAX_SAMPLES_PER_FRAME)
-            {
-                size_t frameIdx = m_CurrentFrame % MAX_FRAME_HISTORY;
-                auto& sample = m_SampleBuffer[frameIdx * MAX_SAMPLES_PER_FRAME + sampleIdx];
-                sample.NameHash = nameHash;
-                sample.DurationNs = durationNs;
-                sample.Depth = depth;
-                // ThreadId could be set here if needed
-            }
-        }
-
-        // Increment draw call counter (called from render system)
-        void RecordDrawCall(uint32_t triangles = 0)
-        {
-            m_DrawCallCount.fetch_add(1, std::memory_order_relaxed);
-            m_TriangleCount.fetch_add(triangles, std::memory_order_relaxed);
-        }
-
-        // Publish GPU frame time (in nanoseconds) computed by the renderer/RHI.
-        // This is intentionally explicit to avoid stalling reads inside Telemetry.
-        void SetGpuFrameTimeNs(uint64_t gpuTimeNs)
-        {
-            size_t idx = (m_CurrentFrame - 1) % MAX_FRAME_HISTORY;
-            m_FrameHistory[idx].GpuTimeNs = gpuTimeNs;
-        }
-
-        // Get frame statistics for UI display
         [[nodiscard]] const FrameStats& GetFrameStats(size_t framesAgo = 0) const
         {
             size_t idx = (m_CurrentFrame - 1 - framesAgo) % MAX_FRAME_HISTORY;
             return m_FrameHistory[idx];
         }
 
-        [[nodiscard]] double GetAverageFrameTimeMs(size_t frameCount = 60) const
-        {
-            uint64_t total = 0;
-            size_t count = std::min(frameCount, static_cast<size_t>(m_CurrentFrame));
-            for (size_t i = 0; i < count; ++i)
-            {
-                total += GetFrameStats(i).FrameTimeNs;
-            }
-            return count > 0 ? static_cast<double>(total) / static_cast<double>(count) / 1'000'000.0 : 0.0;
-        }
+        [[nodiscard]] double GetAverageFrameTimeMs(size_t frameCount = 60) const;
+        [[nodiscard]] double GetAverageFPS(size_t frameCount = 60) const;
 
-        [[nodiscard]] double GetAverageFPS(size_t frameCount = 60) const
-        {
-            double avgMs = GetAverageFrameTimeMs(frameCount);
-            return avgMs > 0.0 ? 1000.0 / avgMs : 0.0;
-        }
-
-        // Get category data for profiling UI
         [[nodiscard]] const TimingCategory* GetCategories() const { return m_Categories.data(); }
         [[nodiscard]] size_t GetCategoryCount() const { return m_CategoryCount.load(std::memory_order_relaxed); }
 
-        // Get sorted categories by total time (for UI)
-        std::vector<const TimingCategory*> GetCategoriesSortedByTime() const
-        {
-            std::vector<const TimingCategory*> result;
-            size_t count = m_CategoryCount.load(std::memory_order_relaxed);
-            result.reserve(count);
-
-            for (size_t i = 0; i < count; ++i)
-            {
-                if (m_Categories[i].CallCount > 0)
-                {
-                    result.push_back(&m_Categories[i]);
-                }
-            }
-
-            std::sort(result.begin(), result.end(),
-                [](const TimingCategory* a, const TimingCategory* b) {
-                    return a->TotalTimeNs > b->TotalTimeNs;
-                });
-
-            return result;
-        }
+        [[nodiscard]] std::vector<const TimingCategory*> GetCategoriesSortedByTime() const;
 
     private:
         TelemetrySystem() = default;
 
-        size_t FindOrCreateCategory(uint32_t nameHash, const char* name)
-        {
-            // Linear search for existing (fast for small N)
-            size_t count = m_CategoryCount.load(std::memory_order_relaxed);
-            for (size_t i = 0; i < count; ++i)
-            {
-                if (m_Categories[i].NameHash == nameHash)
-                {
-                    return i;
-                }
-            }
-
-            // Create new category
-            if (count < MAX_CATEGORIES)
-            {
-                size_t newIdx = m_CategoryCount.fetch_add(1, std::memory_order_relaxed);
-                if (newIdx < MAX_CATEGORIES)
-                {
-                    m_Categories[newIdx].NameHash = nameHash;
-                    m_Categories[newIdx].Name = name;
-                    return newIdx;
-                }
-            }
-            return MAX_CATEGORIES; // Failed
-        }
+        size_t FindOrCreateCategory(uint32_t nameHash, const char* name);
 
         std::chrono::high_resolution_clock::time_point m_FrameStartTime;
         uint64_t m_CurrentFrame = 0;
@@ -280,7 +124,6 @@ export namespace Core::Telemetry
             TelemetrySystem::Get().RecordSample(m_NameHash, m_Name, durationNs);
         }
 
-        // Non-copyable
         ScopedTimer(const ScopedTimer&) = delete;
         ScopedTimer& operator=(const ScopedTimer&) = delete;
 
@@ -308,17 +151,11 @@ export namespace Core::Telemetry
 // -------------------------------------------------------------------------
 // Macros for easy instrumentation
 // -------------------------------------------------------------------------
-// PROFILE_SCOPE("MyFunction") - Named scope
-// PROFILE_FUNCTION() - Uses __func__ automatically
-// -------------------------------------------------------------------------
-
 #define INTRINSIC_PROFILE_SCOPE(name) \
     static constexpr uint32_t _profileHash##__LINE__ = Core::Telemetry::HashString(name); \
     Core::Telemetry::ScopedTimer _profileTimer##__LINE__(name, _profileHash##__LINE__)
 
 #define INTRINSIC_PROFILE_FUNCTION() INTRINSIC_PROFILE_SCOPE(__func__)
 
-// Legacy compatibility
 #define PROFILE_SCOPE(name) INTRINSIC_PROFILE_SCOPE(name)
 #define PROFILE_FUNCTION() INTRINSIC_PROFILE_FUNCTION()
-

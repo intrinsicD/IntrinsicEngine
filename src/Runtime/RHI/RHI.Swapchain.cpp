@@ -10,7 +10,8 @@ module;
 module RHI:Swapchain.Impl;
 import :Swapchain;
 import :Device;
-import Core;
+import Core.Logging;
+import Core.Window;
 
 namespace RHI {
 

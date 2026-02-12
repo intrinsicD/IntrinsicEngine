@@ -12,7 +12,7 @@ export module Geometry:EPA;
 import :GJK;
 import :Support;
 import :Primitives;
-import Core;
+import Core.Memory;
 
 export namespace Geometry::Internal
 {

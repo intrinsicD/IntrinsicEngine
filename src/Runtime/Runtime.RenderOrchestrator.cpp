@@ -4,7 +4,11 @@ module;
 
 module Runtime.RenderOrchestrator;
 
-import Core;
+import Core.Logging;
+import Core.Hash;
+import Core.Memory;
+import Core.FrameGraph;
+import Core.Assets;
 import RHI;
 import Graphics;
 

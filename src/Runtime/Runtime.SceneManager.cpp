@@ -6,7 +6,8 @@ module;
 
 module Runtime.SceneManager;
 
-import Core;
+import Core.Logging;
+import Core.Assets;
 import Graphics;
 import ECS;
 

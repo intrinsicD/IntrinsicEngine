@@ -37,7 +37,6 @@ target_sources(${target_name}
         Core.DAGScheduler.cppm
         Core.FeatureRegistry.cppm
         PRIVATE
-        FILE_SET core_impl TYPE CXX_MODULES FILES
         Core.Memory.cpp
         Core.Logging.cpp
         Core.Tasks.cpp
@@ -45,6 +44,7 @@ target_sources(${target_name}
         Core.Filesystem.cpp
         Core.Input.cpp
         Core.Assets.cpp
+        Core.Telemetry.cpp
         Core.FrameGraph.cpp
         Core.DAGScheduler.cpp
         Core.FeatureRegistry.cpp

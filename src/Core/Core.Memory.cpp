@@ -9,8 +9,7 @@ module; // <--- Start Global Fragment
 #include <algorithm>
 #include <thread>
 
-module Core:Memory.Impl;
-import :Memory;
+module Core.Memory;
 
 namespace Core::Memory
 {

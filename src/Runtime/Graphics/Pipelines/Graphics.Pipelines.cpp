@@ -15,7 +15,7 @@ import :PipelineLibrary;
 import :ShaderRegistry;
 import :Pipelines;
 import RHI;
-import Core;
+import Core.Hash;
 
 using namespace Core::Hash;
 

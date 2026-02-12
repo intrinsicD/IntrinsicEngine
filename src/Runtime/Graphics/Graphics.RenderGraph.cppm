@@ -10,7 +10,10 @@ module;
 export module Graphics:RenderGraph;
 
 import RHI;
-import Core;
+import Core.Hash;
+import Core.Memory;
+import Core.Logging;
+import Core.DAGScheduler;
 
 export namespace Graphics
 {

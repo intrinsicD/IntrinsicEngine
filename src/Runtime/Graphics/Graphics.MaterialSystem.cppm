@@ -8,7 +8,8 @@ module;
 export module Graphics:MaterialSystem;
 
 import :Material;
-import Core;
+import Core.Assets;
+import Core.ResourcePool;
 import RHI;
 
 export namespace Graphics

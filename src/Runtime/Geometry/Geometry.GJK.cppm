@@ -10,7 +10,7 @@ export module Geometry:GJK;
 
 import :Primitives;
 import :Support;
-import Core;
+import Core.Memory;
 
 export namespace Geometry::Internal
 {

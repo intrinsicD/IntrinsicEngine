@@ -5,7 +5,6 @@ module;
 
 export module RHI:Context;
 
-import Core; // We need this to know required extensions
 
 namespace RHI {
 

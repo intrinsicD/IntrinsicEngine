@@ -11,7 +11,10 @@ module;
 
 export module Runtime.Engine;
 
-import Core;
+import Core.Window;
+import Core.FrameGraph;
+import Core.Assets;
+import Core.Memory;
 import RHI;
 import Graphics;
 import ECS;

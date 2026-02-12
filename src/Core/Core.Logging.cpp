@@ -4,8 +4,7 @@ module;
 #include <mutex>
 #include <string_view>
 
-module Core:Logging.Impl;
-import :Logging;
+module Core.Logging;
 
 namespace Core::Log
 {

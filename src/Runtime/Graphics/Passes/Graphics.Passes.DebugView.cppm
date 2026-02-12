@@ -11,7 +11,7 @@ export module Graphics:Passes.DebugView;
 import :RenderPipeline;
 import :RenderGraph;
 import :ShaderRegistry;
-import Core;
+import Core.Hash;
 import Interface;
 import RHI;
 

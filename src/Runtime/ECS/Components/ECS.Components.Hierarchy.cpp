@@ -9,7 +9,7 @@ module ECS:Components.Hierarchy.Impl;
 import :Components.Hierarchy;
 import :Components.Transform;
 import :Scene;
-import Core;
+import Core.Logging;
 
 namespace ECS::Components::Hierarchy::Detail
 {

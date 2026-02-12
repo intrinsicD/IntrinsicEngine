@@ -7,7 +7,7 @@ module;
 module RHI:Shader.Impl;
 import :Shader;
 import :Device;
-import Core;
+import Core.Logging;
 
 namespace RHI {
 

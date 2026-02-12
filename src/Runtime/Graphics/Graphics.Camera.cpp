@@ -5,7 +5,7 @@ module;
 
 module Graphics:Camera.Impl;
 import :Camera;
-import Core;
+import Core.Input;
 
 namespace Graphics
 {

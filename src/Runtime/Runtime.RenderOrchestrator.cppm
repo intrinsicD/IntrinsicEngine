@@ -6,7 +6,10 @@ module;
 
 export module Runtime.RenderOrchestrator;
 
-import Core;
+import Core.FrameGraph;
+import Core.Memory;
+import Core.Assets;
+import Core.Hash;
 import RHI;
 import Graphics;
 import ECS;

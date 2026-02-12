@@ -12,7 +12,9 @@ import :Components;
 import :Material;
 import :Geometry;
 
-import Core;
+import Core.Hash;
+import Core.Assets;
+import Core.FrameGraph;
 import ECS;
 
 using namespace Core::Hash;

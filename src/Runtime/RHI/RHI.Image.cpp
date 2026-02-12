@@ -7,7 +7,7 @@ module;
 module RHI:Image.Impl;
 import :Image;
 import :Device;
-import Core;
+import Core.Logging;
 
 namespace RHI
 {

@@ -12,7 +12,7 @@ module; // Global Fragment
 #include <limits>
 #include <atomic>
 
-export module Core:Memory;
+export module Core.Memory;
 
 export namespace Core::Memory
 {

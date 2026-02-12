@@ -8,7 +8,7 @@ module;
 
 export module Graphics:PipelineLibrary;
 
-import Core;
+import Core.Hash;
 import RHI;
 import :ShaderRegistry;
 

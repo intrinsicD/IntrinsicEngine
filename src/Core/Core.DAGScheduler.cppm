@@ -6,10 +6,10 @@ module;
 #include <expected>
 #include <vector>
 
-export module Core:DAGScheduler;
+export module Core.DAGScheduler;
 
-import :Error;
-import :Logging;
+import Core.Error;
+import Core.Logging;
 
 // -------------------------------------------------------------------------
 // Core::DAGScheduler - Reusable DAG Scheduling Algorithm

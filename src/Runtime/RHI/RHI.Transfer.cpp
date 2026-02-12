@@ -14,7 +14,7 @@ import :Transfer;
 import :Device;
 import :Buffer;
 import :StagingBelt;
-import Core;
+import Core.Logging;
 
 namespace RHI
 {

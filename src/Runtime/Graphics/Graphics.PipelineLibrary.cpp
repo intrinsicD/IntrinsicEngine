@@ -12,7 +12,9 @@ module Graphics:PipelineLibrary.Impl;
 import :PipelineLibrary;
 import :ShaderRegistry;
 
-import Core;
+import Core.Hash;
+import Core.Filesystem;
+import Core.Logging;
 import RHI;
 
 using namespace Core::Hash;

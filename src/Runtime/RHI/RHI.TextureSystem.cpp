@@ -9,7 +9,7 @@ import :Device;
 import :Texture;
 import :Bindless;
 import :Image;
-import Core;
+import Core.Logging;
 
 namespace RHI
 {

@@ -8,7 +8,8 @@ module;
 
 module Geometry:EPA.Impl;
 import :EPA;
-import Core;
+import Core.Memory;
+import Core.Logging;
 
 // NOTE: EPA is implemented as an exported inline template in `Geometry.EPA.cppm`.
 // This implementation partition is intentionally empty.

@@ -27,7 +27,10 @@ import :Interaction;
 import :Presentation;
 import :GlobalResources;
 
-import Core;
+import Core.Hash;
+import Core.Memory;
+import Core.Assets;
+import Core.Logging;
 import RHI;
 import ECS;
 import Interface;
