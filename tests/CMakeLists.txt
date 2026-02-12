@@ -24,6 +24,7 @@ add_executable(${target_name}
         Test_FrameGraphSystems.cpp
         Test_GraphicsBackend.cpp
         Test_AssetPipeline.cpp
+        Test_SceneManager.cpp
 )
 
 #Apply Strict Flags ONLY to our tests

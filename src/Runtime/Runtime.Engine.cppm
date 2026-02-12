@@ -18,6 +18,7 @@ import ECS;
 import Runtime.SelectionModule;
 import Runtime.GraphicsBackend;
 import Runtime.AssetPipeline;
+import Runtime.SceneManager;
 
 export namespace Runtime
 {
@@ -60,6 +61,9 @@ export namespace Runtime
         // Asset management: AssetManager, pending transfers, main-thread queue, material tracking.
         std::unique_ptr<AssetPipeline> m_AssetPipeline;
 
+        // ECS scene, entity lifecycle, and EnTT GPU-reclaim hooks.
+        std::unique_ptr<SceneManager> m_SceneManager;
+
         // Retained-mode GPU scene (persistent SSBOs managed by Graphics::RenderSystem).
         // Owned by Engine to allow SpawnModel/ECS to allocate slots and queue updates.
         std::unique_ptr<Graphics::GPUScene> m_GpuScene;
@@ -68,8 +72,6 @@ export namespace Runtime
         std::unique_ptr<Graphics::PipelineLibrary> m_PipelineLibrary;
 
     public:
-        // Public access so Sandbox can manipulate Scene
-        ECS::Scene m_Scene;
         Core::Memory::LinearArena m_FrameArena; // 1 MB per frame
         Core::Memory::ScopeStack m_FrameScope; // per-frame scope allocator with destructors
         Core::FrameGraph m_FrameGraph;         // CPU-side system scheduling DAG (uses m_FrameScope)
@@ -88,6 +90,14 @@ export namespace Runtime
         // Access to the AssetPipeline subsystem.
         [[nodiscard]] AssetPipeline& GetAssetPipeline() { return *m_AssetPipeline; }
         [[nodiscard]] const AssetPipeline& GetAssetPipeline() const { return *m_AssetPipeline; }
+
+        // Access to the SceneManager subsystem.
+        [[nodiscard]] SceneManager& GetSceneManager() { return *m_SceneManager; }
+        [[nodiscard]] const SceneManager& GetSceneManager() const { return *m_SceneManager; }
+
+        // Convenience: direct access to the ECS scene (delegates to SceneManager).
+        [[nodiscard]] ECS::Scene& GetScene() { return m_SceneManager->GetScene(); }
+        [[nodiscard]] const ECS::Scene& GetScene() const { return m_SceneManager->GetScene(); }
 
         // Convenience accessor: delegates to AssetPipeline.
         [[nodiscard]] Core::Assets::AssetManager& GetAssetManager() { return m_AssetPipeline->GetAssetManager(); }

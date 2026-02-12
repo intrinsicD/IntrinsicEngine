@@ -52,9 +52,9 @@ public:
         auto& gfx = GetGraphicsBackend();
 
 
-        m_CameraEntity = m_Scene.CreateEntity("Main Camera");
-        m_Camera = m_Scene.GetRegistry().emplace<Graphics::CameraComponent>(m_CameraEntity);
-        m_Scene.GetRegistry().emplace<Graphics::OrbitControlComponent>(m_CameraEntity);
+        m_CameraEntity = GetScene().CreateEntity("Main Camera");
+        m_Camera = GetScene().GetRegistry().emplace<Graphics::CameraComponent>(m_CameraEntity);
+        GetScene().GetRegistry().emplace<Graphics::OrbitControlComponent>(m_CameraEntity);
 
         auto textureLoader = [this, &gfx](const std::filesystem::path& path, Core::Assets::AssetHandle handle)
             -> std::shared_ptr<RHI::Texture>
@@ -140,7 +140,7 @@ public:
         Interface::GUI::RegisterPanel("Stats", [this]()
         {
             ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
-            ImGui::Text("Entities: %d", (int)m_Scene.Size());
+            ImGui::Text("Entities: %d", (int)GetScene().Size());
 
             // --- Render Pipeline ---
             ImGui::SeparatorText("Render Pipeline");
@@ -161,8 +161,8 @@ public:
             ImGui::Separator();
             ImGui::Text("Select Mouse Button: %d", m_SelectMouseButton);
 
-            const entt::entity selected = GetSelection().GetSelectedEntity(m_Scene);
-            const bool selectedValid = (selected != entt::null) && m_Scene.GetRegistry().valid(selected);
+            const entt::entity selected = GetSelection().GetSelectedEntity(GetScene());
+            const bool selectedValid = (selected != entt::null) && GetScene().GetRegistry().valid(selected);
 
             ImGui::Text("Selected: %u (%s)",
                         static_cast<uint32_t>(static_cast<entt::id_type>(selected)),
@@ -170,7 +170,7 @@ public:
 
             if (selectedValid)
             {
-                const auto& reg = m_Scene.GetRegistry();
+                const auto& reg = GetScene().GetRegistry();
                 const bool hasSelectedTag = reg.all_of<ECS::Components::Selection::SelectedTag>(selected);
                 const bool hasSelectableTag = reg.all_of<ECS::Components::Selection::SelectableTag>(selected);
                 const bool hasMeshRenderer = reg.all_of<ECS::MeshRenderer::Component>(selected);
@@ -197,16 +197,16 @@ public:
         }
 
         Graphics::CameraComponent* cameraComponent = nullptr;
-        if (m_Scene.GetRegistry().valid(m_CameraEntity))
+        if (GetScene().GetRegistry().valid(m_CameraEntity))
         {
             // Check if it has Orbit controls
-            cameraComponent = m_Scene.GetRegistry().try_get<Graphics::CameraComponent>(m_CameraEntity);
-            if (auto* orbit = m_Scene.GetRegistry().try_get<Graphics::OrbitControlComponent>(m_CameraEntity))
+            cameraComponent = GetScene().GetRegistry().try_get<Graphics::CameraComponent>(m_CameraEntity);
+            if (auto* orbit = GetScene().GetRegistry().try_get<Graphics::OrbitControlComponent>(m_CameraEntity))
             {
                 Graphics::OnUpdate(*cameraComponent, *orbit, m_Window->GetInput(), dt, inputCaptured);
             }
             // Check if it has Fly controls
-            else if (auto* fly = m_Scene.GetRegistry().try_get<Graphics::FlyControlComponent>(m_CameraEntity))
+            else if (auto* fly = GetScene().GetRegistry().try_get<Graphics::FlyControlComponent>(m_CameraEntity))
             {
                 Graphics::OnUpdate(*cameraComponent, *fly, m_Window->GetInput(), dt, inputCaptured);
             }
@@ -218,7 +218,7 @@ public:
         }
 
         {
-            auto view = m_Scene.GetRegistry().view<Graphics::CameraComponent>();
+            auto view = GetScene().GetRegistry().view<Graphics::CameraComponent>();
             for (auto [entity, cam] : view.each())
             {
                 Graphics::UpdateMatrices(cam, aspectRatio);
@@ -234,7 +234,7 @@ public:
 
                 // (Optional) If you need to add specific behaviors like rotation:
                 // entt::entity duck = SpawnModel(...);
-                // m_Scene.GetRegistry().emplace<ECS::Components::AxisRotator::Component>(duck, ...);
+                // GetScene().GetRegistry().emplace<ECS::Components::AxisRotator::Component>(duck, ...);
 
                 m_IsEntitySpawned = true;
                 Log::Info("Duck Entity Spawned.");
@@ -242,7 +242,7 @@ public:
         }
 
         {
-            auto view = m_Scene.GetRegistry().view<
+            auto view = GetScene().GetRegistry().view<
                 ECS::Components::Transform::Component, ECS::MeshCollider::Component>();
             for (auto [entity, transform, collider] : view.each())
             {
@@ -269,7 +269,7 @@ public:
             GetSelection().GetConfig().MouseButton = m_SelectMouseButton;
 
             GetSelection().Update(
-                m_Scene,
+                GetScene(),
                 *m_RenderSystem,
                 cameraComponent,
                 *m_Window,
@@ -279,7 +279,7 @@ public:
         // Draw
         if (cameraComponent != nullptr && m_RenderSystem)
         {
-            m_RenderSystem->OnUpdate(m_Scene, *cameraComponent, GetAssetManager());
+            m_RenderSystem->OnUpdate(GetScene(), *cameraComponent, GetAssetManager());
         }
     }
 
@@ -289,7 +289,7 @@ public:
 
     void OnRegisterSystems(Core::FrameGraph& graph, float deltaTime) override
     {
-        ECS::Systems::AxisRotator::RegisterSystem(graph, m_Scene.GetRegistry(), deltaTime);
+        ECS::Systems::AxisRotator::RegisterSystem(graph, GetScene().GetRegistry(), deltaTime);
     }
 
     void DrawHierarchyPanel()
@@ -308,15 +308,15 @@ public:
             ImGui::RadioButton("MMB", &m_SelectMouseButton, 2);
         }
 
-        const entt::entity selected = GetSelection().GetSelectedEntity(m_Scene);
+        const entt::entity selected = GetSelection().GetSelectedEntity(GetScene());
 
-        m_Scene.GetRegistry().view<entt::entity>().each([&](auto entityID)
+        GetScene().GetRegistry().view<entt::entity>().each([&](auto entityID)
         {
             // Try to get tag, default to "Entity"
             std::string name = "Entity";
-            if (m_Scene.GetRegistry().all_of<ECS::Components::NameTag::Component>(entityID))
+            if (GetScene().GetRegistry().all_of<ECS::Components::NameTag::Component>(entityID))
             {
-                name = m_Scene.GetRegistry().get<ECS::Components::NameTag::Component>(entityID).Name;
+                name = GetScene().GetRegistry().get<ECS::Components::NameTag::Component>(entityID).Name;
             }
 
             // Selection flags
@@ -329,7 +329,7 @@ public:
 
             if (ImGui::IsItemClicked())
             {
-                GetSelection().SetSelectedEntity(m_Scene, entityID);
+                GetSelection().SetSelectedEntity(GetScene(), entityID);
             }
 
             if (opened)
@@ -342,7 +342,7 @@ public:
         // (The previous IsMouseDown(...) version cleared selection even when clicking an item.)
         if (ImGui::IsWindowHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ImGui::IsAnyItemHovered())
         {
-            GetSelection().ClearSelection(m_Scene);
+            GetSelection().ClearSelection(GetScene());
         }
 
         // Context Menu for creating new entities
@@ -350,15 +350,15 @@ public:
         {
             if (ImGui::MenuItem("Create Empty Entity"))
             {
-                m_Scene.CreateEntity("Empty Entity");
+                GetScene().CreateEntity("Empty Entity");
             }
             if (ImGui::MenuItem("Remove Entity"))
             {
-                const entt::entity cur = GetSelection().GetSelectedEntity(m_Scene);
-                if (cur != entt::null && m_Scene.GetRegistry().valid(cur))
+                const entt::entity cur = GetSelection().GetSelectedEntity(GetScene());
+                if (cur != entt::null && GetScene().GetRegistry().valid(cur))
                 {
-                    m_Scene.GetRegistry().destroy(cur);
-                    GetSelection().ClearSelection(m_Scene);
+                    GetScene().GetRegistry().destroy(cur);
+                    GetSelection().ClearSelection(GetScene());
                 }
             }
             ImGui::EndPopup();
@@ -371,11 +371,11 @@ public:
     {
         ImGui::Begin("Inspector");
 
-        const entt::entity selected = GetSelection().GetSelectedEntity(m_Scene);
+        const entt::entity selected = GetSelection().GetSelectedEntity(GetScene());
 
-        if (selected != entt::null && m_Scene.GetRegistry().valid(selected))
+        if (selected != entt::null && GetScene().GetRegistry().valid(selected))
         {
-            auto& reg = m_Scene.GetRegistry();
+            auto& reg = GetScene().GetRegistry();
 
             // 1. Tag Component
             if (reg.all_of<ECS::Components::NameTag::Component>(selected))
