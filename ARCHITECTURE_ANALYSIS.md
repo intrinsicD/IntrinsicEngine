@@ -18,23 +18,12 @@ This document tracks **what's left to do** in IntrinsicEngine's architecture.
 
 ## 1. Open TODOs (What's left)
 
-### 1.1 Continue `Engine` Decomposition
-
-**Context:** `GraphicsBackend`, `AssetPipeline`, `SceneManager`, and `RenderOrchestrator` have been extracted (see Git history). The `Engine` class is now a thin shell that owns the four subsystems, a window, and a selection module.
-
-**Remaining work:**
-- "Headless Engine" smoke test that runs one frame with minimal subsystems
-
-**Complexity:** Low.
-
----
-
-### 1.2 Pre-existing Build Environment Issues
+### 1.1 Pre-existing Build Environment Issues
 
 The following issues exist in this CI/development environment and should be tracked:
 
 - **Clang 18 `__cpp_concepts` mismatch:** Clang 18 reports `__cpp_concepts` as `201907L` but GCC 14's `<expected>` header guards on `>= 202002L`. Workaround applied in `CMakeLists.txt` (`-D__cpp_concepts=202002L`). Will be unnecessary with Clang 19+.
-- **C++20 module partition visibility:** Many `.cpp` module implementation partition units were missing explicit `import` statements for types used from sibling partitions. Clang 18 enforces strict module visibility. All known cases fixed; new ones may surface.
+- **C++20 module partition visibility:** Most known cases fixed (latest: `Runtime.AssetPipeline.cpp` missing `#include <vector>`). New ones may surface as Clang 18 enforces strict module visibility.
 - **`DefaultPipeline` vtable linkage:** The `Graphics::DefaultPipeline` class (defined in `:Pipelines` partition, implemented in `:Pipelines.Impl`) has a linker vtable error. Root cause is likely clang-18's handling of vtables across module partition implementation units.
 
 ---
