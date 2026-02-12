@@ -20,5 +20,5 @@ namespace ECS
         return e;
     }
 
-    [[nodiscard]] size_t Scene::Size() const { return m_Registry.storage<entt::entity>()->size(); }
+    [[nodiscard]] size_t Scene::Size() const { return m_Registry.storage<entt::entity>()->free_list(); }
 }
