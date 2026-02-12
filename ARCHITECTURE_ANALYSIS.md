@@ -24,7 +24,6 @@ The following issues exist in this CI/development environment and should be trac
 
 - **Clang 18 `__cpp_concepts` mismatch:** Clang 18 reports `__cpp_concepts` as `201907L` but GCC 14's `<expected>` header guards on `>= 202002L`. Workaround applied in `CMakeLists.txt` (`-D__cpp_concepts=202002L`). Will be unnecessary with Clang 19+.
 - **C++20 module partition visibility:** Most known cases fixed (latest: `Runtime.AssetPipeline.cpp` missing `#include <vector>`). New ones may surface as Clang 18 enforces strict module visibility.
-- **`DefaultPipeline` vtable linkage:** The `Graphics::DefaultPipeline` class (defined in `:Pipelines` partition, implemented in `:Pipelines.Impl`) has a linker vtable error. Root cause is likely clang-18's handling of vtables across module partition implementation units.
 
 ---
 
@@ -497,7 +496,7 @@ Sub-entity select → Geometry processing (interactive operator input)
 
 #### Ongoing (Carried forward from existing roadmap)
 - **Port-based testing boundaries** — type-erased "port" interfaces for filesystem, windowing, and time so subsystems can be tested without Vulkan. (See §4.1.) Implement opportunistically as new subsystems are added.
-- **`Core::InplaceFunction`** — small-buffer owning callable to replace `std::function` in hot paths. (See §4.2.) Implement when profiling identifies `std::function` as a bottleneck.
+- **Migrate `std::function` hot paths to `Core::InplaceFunction`** — `Core::InplaceFunction` is now implemented (`Core.InplaceFunction.cppm`, 46 tests). Remaining work: replace `std::function` usage in `Graphics::RenderStage` (`Graphics.RenderPath.cppm`) and any other per-frame callables with `InplaceFunction`. Do this when profiling identifies `std::function` as a bottleneck.
 - **Shader hot-reload (§2.4 Tier 2)** — file-watcher integration for automatic recompilation on save. Implement alongside mesh rendering modes (Phase 2) for fast shader iteration.
 
 ---
@@ -522,17 +521,13 @@ Sub-entity select → Geometry processing (interactive operator input)
 
 ---
 
-### 4.2 `std::function` in hot loops
+### ~~4.2 `std::function` in hot loops~~ — RESOLVED
 
-**Long-term answer:** **Yes — ban `std::function` in hot loops.**
+**Answer:** **Ban `std::function` in hot loops.** Three alternatives are standardized:
 
-**Blessed alternatives (pick a small set and standardize):**
-1. **Thunk + context pointer**: `{ void(*Fn)(void*), void* Ctx }` (or `const void*` as appropriate)
-   - Zero allocations, fully predictable, ideal for FrameGraph nodes / scheduled tasks.
-2. **Small-buffer owning callable** for non-trivial capture ownership without heap:
-   - e.g. `Core::InplaceFunction<R(Args...), N>` where `N` is chosen by profiling (64B is a common starting point).
-3. **Arena-backed closures** for per-frame graphs:
-   - allocate capture payload out of `ScopeStack` / per-frame arena and store only thunk+ctx.
+1. **Thunk + context pointer**: `{ void(*Fn)(void*), void* Ctx }` — already used in FrameGraph.
+2. ~~**`Core::InplaceFunction`**~~ — **DONE.** `Core.InplaceFunction.cppm` provides a move-only, zero-heap, small-buffer owning callable (`InplaceFunction<R(Args...), BufferSize>`). Default 64-byte buffer. 46 dedicated tests in `IntrinsicCoreTests`. Ready to replace `std::function` in `Graphics::RenderStage` and other hot paths.
+3. **Arena-backed closures** — allocate capture payload out of `ScopeStack` / per-frame arena and store only thunk+ctx.
 
 **Policy:** `std::function` is acceptable in cold paths (editor UI, startup config, tooling) but not in per-frame/per-entity loops.
 
