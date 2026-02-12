@@ -8,7 +8,7 @@ module RHI:TransientAllocator.Impl;
 
 import :TransientAllocator;
 import :Device;
-import Core;
+import Core.Logging;
 
 namespace RHI
 {

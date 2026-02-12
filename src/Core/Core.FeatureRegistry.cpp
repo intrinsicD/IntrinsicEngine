@@ -6,11 +6,9 @@ module;
 #include <string>
 #include <vector>
 
-module Core:FeatureRegistry.Impl;
-
-import :FeatureRegistry;
-import :Hash;
-import :Logging;
+module Core.FeatureRegistry;
+import Core.Hash;
+import Core.Logging;
 
 namespace Core
 {

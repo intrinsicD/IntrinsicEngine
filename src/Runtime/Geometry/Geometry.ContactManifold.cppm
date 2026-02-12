@@ -10,7 +10,8 @@ import :Primitives;
 import :GJK; // Should contain GJK_EPA logic in full version
 import :EPA;
 import :Support;
-import Core;
+import Core.Memory;
+import Core.Logging;
 
 export namespace Geometry
 {

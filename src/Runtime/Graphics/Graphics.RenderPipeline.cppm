@@ -14,7 +14,8 @@ import :MaterialSystem;
 import :Geometry;
 import :ShaderRegistry;
 import :PipelineLibrary;
-import Core;
+import Core.Hash;
+import Core.Assets;
 import ECS;
 import RHI;
 

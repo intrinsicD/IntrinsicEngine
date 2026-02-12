@@ -8,9 +8,8 @@ module;
 #include <map>
 #include <entt/entity/registry.hpp>
 
-module Core:Assets.Impl;
-import :Assets;
-import :Logging;
+module Core.Assets;
+import Core.Logging;
 
 namespace Core::Assets
 {

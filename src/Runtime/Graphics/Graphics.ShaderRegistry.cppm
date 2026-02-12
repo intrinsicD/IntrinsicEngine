@@ -6,7 +6,7 @@ module;
 
 export module Graphics:ShaderRegistry;
 
-import Core;
+import Core.Hash;
 
 export namespace Graphics
 {

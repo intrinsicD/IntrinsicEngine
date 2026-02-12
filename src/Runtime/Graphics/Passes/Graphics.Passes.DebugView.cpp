@@ -11,7 +11,9 @@ import :Passes.DebugView;
 import :RenderPipeline;
 import :RenderGraph;
 import :ShaderRegistry;
-import Core;
+import Core.Hash;
+import Core.Logging;
+import Core.Filesystem;
 import RHI;
 import Interface;
 

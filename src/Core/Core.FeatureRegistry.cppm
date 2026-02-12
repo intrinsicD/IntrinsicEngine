@@ -6,10 +6,10 @@ module;
 #include <string>
 #include <vector>
 
-export module Core:FeatureRegistry;
+export module Core.FeatureRegistry;
 
-import :Hash;
-import :Logging;
+import Core.Hash;
+import Core.Logging;
 
 // -------------------------------------------------------------------------
 // Core::FeatureRegistry — Central Feature Registration

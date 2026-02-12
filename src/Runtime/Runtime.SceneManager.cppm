@@ -4,7 +4,7 @@ module;
 
 export module Runtime.SceneManager;
 
-import Core;
+import Core.Assets;
 import Graphics;
 import ECS;
 

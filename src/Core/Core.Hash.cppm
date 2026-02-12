@@ -4,7 +4,7 @@ module;
 #include <functional>
 #include  <string_view>
 
-export module Core:Hash;
+export module Core.Hash;
 
 export namespace Core::Hash
 {

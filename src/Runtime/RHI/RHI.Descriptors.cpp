@@ -5,7 +5,7 @@ module;
 module RHI:Descriptors.Impl;
 import :Descriptors;
 import :Device;
-import Core;
+import Core.Logging;
 
 namespace RHI {
 

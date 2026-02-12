@@ -8,7 +8,8 @@ module;
 
 export module Runtime.AssetPipeline;
 
-import Core;
+import Core.Assets;
+import Core.Tasks;
 import RHI;
 
 export namespace Runtime

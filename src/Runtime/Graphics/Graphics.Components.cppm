@@ -7,7 +7,7 @@ export module Graphics:Components;
 import :Geometry;
 import :Material;
 import Geometry;
-import Core;
+import Core.Assets;
 
 export namespace ECS::MeshRenderer
 {

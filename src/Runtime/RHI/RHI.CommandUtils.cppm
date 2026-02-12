@@ -4,7 +4,7 @@ module;
 export module RHI:CommandUtils;
 
 import :Device;
-import Core;
+import Core.Logging; // For VK_CHECK macro (uses Core::Log::Error)
 
 export namespace RHI::CommandUtils
 {

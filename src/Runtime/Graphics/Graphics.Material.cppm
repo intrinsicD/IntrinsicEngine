@@ -4,7 +4,8 @@ module;
 
 export module Graphics:Material;
 
-import Core;
+import Core.Handle;
+import Core.Assets;
 
 export namespace Graphics
 {

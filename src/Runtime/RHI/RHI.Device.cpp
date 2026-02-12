@@ -15,7 +15,7 @@ module RHI:Device.Impl;
 import :Device;
 import :Context;
 import :TransientAllocator;
-import Core;
+import Core.Logging;
 
 namespace RHI
 {

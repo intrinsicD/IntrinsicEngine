@@ -9,7 +9,6 @@ module;
 module Graphics:Geometry.Impl;
 import :Geometry;
 import RHI;
-import Core;
 
 namespace Graphics
 {

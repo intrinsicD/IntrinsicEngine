@@ -15,10 +15,9 @@ module;
     #include <mach-o/dyld.h>
 #endif
 
-module Core:Filesystem.Impl;
-import :Filesystem;
-import :Logging;
-import :Hash;
+module Core.Filesystem;
+import Core.Logging;
+import Core.Hash;
 
 namespace Core::Filesystem
 {

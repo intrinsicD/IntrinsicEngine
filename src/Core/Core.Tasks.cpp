@@ -12,9 +12,8 @@ module;
   #include <immintrin.h> // _mm_pause
 #endif
 
-module Core:Tasks.Impl;
-import :Tasks;
-import :Logging;
+module Core.Tasks;
+import Core.Logging;
 import Utils.LockFreeQueue;
 
 namespace Core::Tasks

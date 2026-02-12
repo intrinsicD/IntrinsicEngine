@@ -6,8 +6,7 @@ module;
 #include <atomic>
 #include <vector>
 
-module Core:Telemetry.Impl;
-import :Telemetry;
+module Core.Telemetry;
 
 namespace Core::Telemetry
 {

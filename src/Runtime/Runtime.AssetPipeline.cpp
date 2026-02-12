@@ -6,7 +6,9 @@ module;
 
 module Runtime.AssetPipeline;
 
-import Core;
+import Core.Logging;
+import Core.Tasks;
+import Core.Assets;
 import RHI;
 
 namespace Runtime

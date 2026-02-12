@@ -9,7 +9,7 @@ module Graphics:Interaction.Impl;
 
 import :Interaction;
 import RHI;
-import Core;
+import Core.Hash;
 
 using namespace Core::Hash;
 

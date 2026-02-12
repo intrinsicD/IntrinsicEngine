@@ -9,7 +9,9 @@ import :GPUScene;
 
 import ECS;
 import :Components;
-import Core;
+import Core.Hash;
+import Core.Assets;
+import Core.FrameGraph;
 import :MaterialSystem;
 import :Material;
 

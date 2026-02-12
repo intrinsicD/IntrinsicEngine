@@ -12,7 +12,7 @@ import :RenderPipeline;
 import :RenderGraph;
 import :Components;
 import :Geometry;
-import Core;
+import Core.Hash;
 import ECS;
 import RHI;
 

@@ -15,7 +15,15 @@ module;
 
 module Runtime.Engine;
 
-import Core;
+import Core.Logging;
+import Core.Tasks;
+import Core.Window;
+import Core.Filesystem;
+import Core.Assets;
+import Core.Telemetry;
+import Core.FrameGraph;
+import Core.Hash;
+import Core.Profiling;
 import RHI;
 import Graphics;
 import ECS;

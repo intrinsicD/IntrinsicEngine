@@ -6,7 +6,8 @@ module;
 
 export module Runtime.SelectionModule;
 
-import Core;
+import Core.Window;
+import Core.Input;
 import ECS;
 import Graphics;
 import Runtime.Selection;

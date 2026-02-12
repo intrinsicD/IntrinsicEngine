@@ -8,7 +8,7 @@ module;
 
 export module Graphics:Camera;
 
-import Core;
+import Core.Input;
 
 export namespace Graphics
 {

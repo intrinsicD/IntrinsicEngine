@@ -7,8 +7,8 @@ module;
 #include <coroutine>
 #include <atomic>
 
-export module Core:Tasks;
-import :Logging;
+export module Core.Tasks;
+import Core.Logging;
 
 namespace Core::Tasks
 {

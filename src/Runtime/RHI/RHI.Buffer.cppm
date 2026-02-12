@@ -6,7 +6,7 @@ module;
 export module RHI:Buffer;
 
 import :Device;
-import Core;
+import Core.Logging; // For Core::Log::Error in inline Write/Read methods
 
 export namespace RHI {
     class VulkanBuffer {

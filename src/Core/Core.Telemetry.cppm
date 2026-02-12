@@ -7,7 +7,7 @@ module;
 #include <atomic>
 #include <vector>
 
-export module Core:Telemetry;
+export module Core.Telemetry;
 
 export namespace Core::Telemetry
 {

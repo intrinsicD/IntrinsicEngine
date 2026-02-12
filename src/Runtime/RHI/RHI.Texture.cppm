@@ -8,7 +8,7 @@ export module RHI:Texture;
 
 import :Device;
 import :Image;
-import Core;
+import Core.Handle; // For Core::StrongHandle
 
 export namespace RHI
 {

@@ -1,6 +1,7 @@
 module;
 
 #include <algorithm>
+#include <memory>
 #include <vector>
 
 #include <glm/glm.hpp>

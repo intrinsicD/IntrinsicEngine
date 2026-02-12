@@ -10,7 +10,7 @@ import :GlobalResources;
 import :ShaderRegistry;
 import :PipelineLibrary;
 import :Camera;
-import Core;
+import Core.Logging;
 import RHI;
 
 namespace Graphics

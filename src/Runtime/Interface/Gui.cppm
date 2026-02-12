@@ -6,7 +6,8 @@ module;
 export module Interface:GUI;
 
 import RHI;
-import Core;
+import Core.Window;
+import Core.Telemetry;
 
 export namespace Interface::GUI
 {

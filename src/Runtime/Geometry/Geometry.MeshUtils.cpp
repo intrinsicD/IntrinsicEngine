@@ -8,7 +8,7 @@ module;
 
 module Geometry:MeshUtils.Impl;
 import :MeshUtils;
-import Core;
+import Core.Logging;
 
 namespace Geometry::MeshUtils
 {
