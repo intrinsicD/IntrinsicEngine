@@ -20,25 +20,23 @@ This document tracks **what's left to do** in IntrinsicEngine's architecture.
 
 ### 1.1 Continue `Engine` Decomposition
 
-**Context:** `GraphicsBackend` and `AssetPipeline` have been extracted (see Git history). The remaining subsystems still live inline in `Engine`.
+**Context:** `GraphicsBackend`, `AssetPipeline`, and `SceneManager` have been extracted (see Git history). The remaining render subsystem still lives inline in `Engine`.
 
 **Remaining extractions (one PR per subsystem):**
 
-- `SceneManager` (ECS scene composition + lifetime + EnTT hooks)
 - `RenderOrchestrator` (RenderSystem + RenderGraph + GPUScene + PipelineLibrary integration)
 
 **Tests to add/extend:**
 - "Headless Engine" smoke test that runs one frame with minimal subsystems
 
-**Complexity:** Medium per subsystem (mechanical extractions following the `GraphicsBackend` / `AssetPipeline` pattern).
+**Complexity:** Medium (mechanical extraction following the `GraphicsBackend` / `AssetPipeline` / `SceneManager` pattern).
 
 ---
 
 ## 2. Prioritized Roadmap
 
 ### Tier A (Next)
-1. **`SceneManager` extraction** — bundles `m_Scene`, ECS hooks, entity lifetime into a subsystem.
-2. **`RenderOrchestrator` extraction** — bundles `m_RenderSystem`, `m_GpuScene`, `m_PipelineLibrary`, `m_ShaderRegistry`, `m_FrameGraph`, `InitPipeline()` into a subsystem.
+1. **`RenderOrchestrator` extraction** — bundles `m_RenderSystem`, `m_GpuScene`, `m_PipelineLibrary`, `m_ShaderRegistry`, `m_FrameGraph`, `InitPipeline()` into a subsystem.
 
 ---
 

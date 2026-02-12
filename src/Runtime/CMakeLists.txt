@@ -12,12 +12,14 @@ target_sources(${target_name}
         Runtime.Engine.cppm
         Runtime.GraphicsBackend.cppm
         Runtime.AssetPipeline.cppm
+        Runtime.SceneManager.cppm
         Runtime.Selection.cppm
         Runtime.SelectionModule.cppm
         PRIVATE
         Runtime.Engine.cpp
         Runtime.GraphicsBackend.cpp
         Runtime.AssetPipeline.cpp
+        Runtime.SceneManager.cpp
         Runtime.Selection.cpp
         Runtime.SelectionModule.cpp
 )

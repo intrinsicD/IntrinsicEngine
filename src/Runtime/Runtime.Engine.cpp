@@ -22,31 +22,9 @@ import ECS;
 import Interface;
 import Runtime.GraphicsBackend;
 import Runtime.AssetPipeline;
+import Runtime.SceneManager;
 
 using namespace Core::Hash;
-
-namespace
-{
-    // File-static pointer for the EnTT on_destroy hook.
-    // Safe because there is exactly one Engine instance per process.
-    Graphics::GPUScene* g_GpuSceneForDestroyHook = nullptr;
-
-    void OnMeshRendererDestroyed(entt::registry& registry, entt::entity entity)
-    {
-        if (!g_GpuSceneForDestroyHook)
-            return;
-
-        auto& mr = registry.get<ECS::MeshRenderer::Component>(entity);
-        if (mr.GpuSlot == ECS::MeshRenderer::Component::kInvalidSlot)
-            return;
-
-        // Deactivate slot (radius = 0 => culler skips it) and free.
-        Graphics::GpuInstanceData inst{};
-        g_GpuSceneForDestroyHook->QueueUpdate(mr.GpuSlot, inst, /*sphere*/ {0.0f, 0.0f, 0.0f, 0.0f});
-        g_GpuSceneForDestroyHook->FreeSlot(mr.GpuSlot);
-        mr.GpuSlot = ECS::MeshRenderer::Component::kInvalidSlot;
-    }
-}
 
 namespace Runtime
 {
@@ -60,7 +38,10 @@ namespace Runtime
 
         Core::Log::Info("Initializing Engine...");
 
-        // 1. Window
+        // 1. SceneManager (ECS scene, entity lifecycle, GPU-reclaim hooks)
+        m_SceneManager = std::make_unique<SceneManager>();
+
+        // 2. Window
         Core::Windowing::WindowProps props{config.AppName, config.Width, config.Height};
         m_Window = std::make_unique<Core::Windowing::Window>(props);
 
@@ -99,7 +80,7 @@ namespace Runtime
             }, e);
         });
 
-        // 2. GraphicsBackend (Vulkan context, device, swapchain, descriptors, transfer, textures)
+        // 3. GraphicsBackend (Vulkan context, device, swapchain, descriptors, transfer, textures)
 #ifdef NDEBUG
         bool enableValidation = false;
 #else
@@ -108,27 +89,27 @@ namespace Runtime
         GraphicsBackendConfig gfxConfig{config.AppName, enableValidation};
         m_GraphicsBackend = std::make_unique<GraphicsBackend>(*m_Window, gfxConfig);
 
-        // 3. AssetPipeline (AssetManager, pending transfers, main-thread queue)
+        // 4. AssetPipeline (AssetManager, pending transfers, main-thread queue)
         m_AssetPipeline = std::make_unique<AssetPipeline>(m_GraphicsBackend->GetTransferManager());
 
-        // 4. MaterialSystem (depends on TextureSystem from GraphicsBackend + AssetManager)
+        // 5. MaterialSystem (depends on TextureSystem from GraphicsBackend + AssetManager)
         m_MaterialSystem = std::make_unique<Graphics::MaterialSystem>(
             m_GraphicsBackend->GetTextureSystem(), GetAssetManager());
 
-        // 5. Initialize GeometryStorage with frames-in-flight for safe deferred deletion
+        // 6. Initialize GeometryStorage with frames-in-flight for safe deferred deletion
         m_GeometryStorage.Initialize(m_GraphicsBackend->GetDevice()->GetFramesInFlight());
 
-        // 6. ImGui
+        // 7. ImGui
         Interface::GUI::Init(*m_Window,
                              *m_GraphicsBackend->GetDevice(),
                              m_GraphicsBackend->GetSwapchain(),
                              m_GraphicsBackend->GetContext().GetInstance(),
                              m_GraphicsBackend->GetDevice()->GetGraphicsQueue());
 
-        // 7. Pipelines & RenderSystem
+        // 8. Pipelines & RenderSystem
         InitPipeline();
 
-        // 8. Retained-mode GPUScene: Engine owns it so SpawnModel/ECS can queue updates.
+        // 9. Retained-mode GPUScene: Engine owns it so SpawnModel/ECS can queue updates.
         if (m_PipelineLibrary && m_GraphicsBackend->GetDevice())
         {
             if (auto* p = m_PipelineLibrary->GetSceneUpdatePipeline(); p && m_PipelineLibrary->GetSceneUpdateSetLayout() != VK_NULL_HANDLE)
@@ -137,10 +118,8 @@ namespace Runtime
                                                                  *p,
                                                                  m_PipelineLibrary->GetSceneUpdateSetLayout());
 
-                // Register EnTT on_destroy hook for immediate GPU slot reclaim.
-                g_GpuSceneForDestroyHook = m_GpuScene.get();
-                m_Scene.GetRegistry().on_destroy<ECS::MeshRenderer::Component>()
-                    .connect<&OnMeshRendererDestroyed>();
+                // Connect EnTT on_destroy hook for immediate GPU slot reclaim (via SceneManager).
+                m_SceneManager->ConnectGpuHooks(*m_GpuScene);
 
                 if (m_RenderSystem)
                     m_RenderSystem->SetGpuScene(m_GpuScene.get());
@@ -156,9 +135,7 @@ namespace Runtime
         m_GraphicsBackend->WaitIdle();
 
         // Disconnect entity destruction hooks before tearing down GPU systems.
-        m_Scene.GetRegistry().on_destroy<ECS::MeshRenderer::Component>()
-            .disconnect<&OnMeshRendererDestroyed>();
-        g_GpuSceneForDestroyHook = nullptr;
+        m_SceneManager->DisconnectGpuHooks();
 
         // Order matters!
         Core::Tasks::Scheduler::Shutdown();
@@ -171,7 +148,7 @@ namespace Runtime
 
         Interface::GUI::Shutdown();
 
-        m_Scene.GetRegistry().clear();
+        m_SceneManager->Clear();
         GetAssetManager().Clear();
 
         m_AssetPipeline->ClearLoadedMaterials();
@@ -190,6 +167,9 @@ namespace Runtime
 
         // AssetPipeline destructor handles cleanup of asset state.
         m_AssetPipeline.reset();
+
+        // SceneManager destructor handles: hook disconnect (no-op if already done), registry.
+        m_SceneManager.reset();
 
         // GraphicsBackend destructor handles: texture system clear, descriptors,
         // renderer, swapchain, transfer, device, surface, context.
@@ -357,65 +337,7 @@ namespace Runtime
                                     glm::vec3 position,
                                     glm::vec3 scale)
     {
-        // 1. Resolve Model
-        if (auto* model = GetAssetManager().TryGet<Graphics::Model>(modelHandle))
-        {
-            // 2. Create Root
-            std::string name = "Model";
-
-            entt::entity root = m_Scene.CreateEntity(name);
-            auto& t = m_Scene.GetRegistry().get<ECS::Components::Transform::Component>(root);
-            t.Position = position;
-            t.Scale = scale;
-
-            // Assign stable pick IDs (monotonic, never reused during runtime).
-            static uint32_t s_NextPickId = 1u;
-            if (!m_Scene.GetRegistry().all_of<ECS::Components::Selection::PickID>(root))
-            {
-                m_Scene.GetRegistry().emplace<ECS::Components::Selection::PickID>(root, s_NextPickId++);
-            }
-
-            // 3. Create Submeshes
-            for (size_t i = 0; i < model->Meshes.size(); i++)
-            {
-                entt::entity targetEntity = root;
-
-                // If complex model, create children. If single mesh, put it on root.
-                if (model->Meshes.size() > 1)
-                {
-                    targetEntity = m_Scene.CreateEntity(model->Meshes[i]->Name);
-                    ECS::Components::Hierarchy::Attach(m_Scene.GetRegistry(), targetEntity, root);
-                }
-
-
-                // Add Renderer
-                auto& mr = m_Scene.GetRegistry().emplace<ECS::MeshRenderer::Component>(targetEntity);
-                mr.Geometry = model->Meshes[i]->Handle;
-                mr.Material = materialHandle;
-
-                // Add Collider
-                if (model->Meshes[i]->CollisionGeometry)
-                {
-                    auto& col = m_Scene.GetRegistry().emplace<ECS::MeshCollider::Component>(targetEntity);
-                    col.CollisionRef = model->Meshes[i]->CollisionGeometry;
-                    col.WorldOBB.Center = col.CollisionRef->LocalAABB.GetCenter();
-                }
-
-                // Add Selectable Tag
-                m_Scene.GetRegistry().emplace<ECS::Components::Selection::SelectableTag>(targetEntity);
-
-                // Stable pick ID for each selectable entity.
-                if (!m_Scene.GetRegistry().all_of<ECS::Components::Selection::PickID>(targetEntity))
-                {
-                    m_Scene.GetRegistry().emplace<ECS::Components::Selection::PickID>(targetEntity, s_NextPickId++);
-                }
-            }
-
-            return root;
-        }
-
-        Core::Log::Error("Cannot spawn model: Asset not ready or invalid.");
-        return entt::null;
+        return m_SceneManager->SpawnModel(GetAssetManager(), modelHandle, materialHandle, position, scale);
     }
 
     void Engine::Run()
@@ -479,7 +401,7 @@ namespace Runtime
                 PROFILE_SCOPE("FrameGraph");
                 m_FrameGraph.Reset();
 
-                auto& registry = m_Scene.GetRegistry();
+                auto& registry = m_SceneManager->GetRegistry();
                 const float frameDt = static_cast<float>(frameTime);
 
                 // Client/gameplay systems first: they produce dirty state
