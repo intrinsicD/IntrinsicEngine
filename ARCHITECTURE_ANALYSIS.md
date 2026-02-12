@@ -385,34 +385,151 @@ The following issues exist in this CI/development environment and should be trac
 
 ---
 
-### Prioritization (Tiers)
+### Prioritization (Dependency-Ordered)
 
-#### Tier A — Foundational (build these first, many other features depend on them)
-1. Data I/O (§2.7) — without import/export, nothing else is usable
-2. Selection visual feedback / contour highlight (§2.2.1) — minimal effort, high UX impact
-3. Transform gizmos (§2.2.3) — basic interactive workflow
-4. Post-processing pipeline (§2.1.4) — HDR target needed before adding more render features
-5. Extension architecture / FeatureRegistry (§2.4 Tier 1) — needed before adding many render/geometry features
+The ordering below follows the dependency graph: each phase builds on what the previous phase established. Items within a phase are ordered by impact.
 
-#### Tier B — Core Rendering & Interaction
-6. Mesh rendering modes (§2.1.3) — shading variety
-7. Line rendering + debug visualization (§2.1.2 + §2.3) — essential for development and research
-8. Shadow mapping (§2.1.5) — spatial understanding
-9. Sub-entity selection (§2.2.2) — geometry processing workflows
-10. UI improvements (§2.5) — docking, toolbar, undo/redo
+```
+Dependency graph (→ means "is required by"):
 
-#### Tier C — Advanced Features
-11. Point cloud rendering (§2.1.1) — full variant support
-12. Geometry processing operators (§2.6) — research workflows
-13. Transparency / OIT (§2.1.6)
-14. Benchmarking & profiling (§2.8)
-15. Clipping planes (§2.9) + measurement tools (§2.10)
-16. Scene serialization + undo/redo (§2.11)
-17. Scripting layer (§2.4 Tier 3)
+FeatureRegistry ──→ Data I/O (IORegistry pattern)
+                ──→ Mesh rendering modes (register as features)
+                ──→ Point cloud rendering (register as feature)
+                ──→ Geometry operators (register as operators)
+                ──→ Scripting layer (exposes registry)
 
-### Tier D (Existing — carried forward)
-1. **Port-based testing boundaries** — introduce type-erased "port" interfaces for filesystem, windowing, and time so that subsystems can be tested with fakes without Vulkan. (See §4.1.)
-2. **`Core::InplaceFunction`** — small-buffer owning callable to replace remaining `std::function` in hot paths. (See §4.2.)
+Data I/O ─────────→ everything (can't render what you can't load)
+
+Post-processing ──→ Shadow mapping (composites into HDR buffer)
+                ──→ Transparency / OIT (needs HDR blend target)
+                ──→ Mesh rendering modes (HDR output assumed)
+                ──→ Point cloud rendering (blending, tone mapping)
+
+Line rendering ───→ Transform gizmos (axis arrows, rings, handles)
+               ───→ Debug visualization (wireframe boxes, lines, arrows)
+               ───→ Graph / wireframe rendering (edges, layout)
+               ───→ Measurement tools (leader lines, angle arcs)
+               ───→ Clipping plane visualization (plane outlines)
+               ───→ Normal / tangent visualization (hedgehog lines)
+
+Sub-entity select → Geometry processing (interactive operator input)
+                  → Measurement tools (click-to-pick points)
+```
+
+#### Phase 0 — Architecture & Plumbing
+*Everything else plugs into these. Build them first and every subsequent feature snaps in cleanly.*
+
+1. **Extension architecture / FeatureRegistry (§2.4 Tier 1)**
+   *Depends on: nothing. Depended on by: nearly everything.*
+   The registration pattern for render features, geometry operators, I/O format handlers, and UI panels. Without this, every feature is ad-hoc wiring into Engine/RenderSystem, and adding the registry later means retrofitting all existing features. Build it first, even if the initial set of registrants is small.
+
+2. **Data I/O (§2.7)**
+   *Depends on: FeatureRegistry (IORegistry uses registration pattern). Depended on by: everything (can't test rendering without loadable data).*
+   Format importers/exporters register via FeatureRegistry by file extension. Start with PLY + glTF (covers meshes, point clouds, scenes with materials). Remaining formats are incremental.
+
+3. **Post-processing pipeline (§2.1.4)**
+   *Depends on: nothing (rendering infrastructure). Depended on by: shadow mapping, transparency, mesh rendering modes, point cloud blending.*
+   The HDR intermediate render target and the post-pass chain (tone mapping at minimum). Currently the forward pass writes directly to the swapchain — every rendering feature added later assumes an HDR intermediate exists. Establish the plumbing now; individual effects (SSAO, bloom) can be added incrementally.
+
+4. **Line rendering + DebugDraw API (§2.1.2 infrastructure + §2.3 API)**
+   *Depends on: nothing. Depended on by: gizmos, debug visualization, wireframe, graph rendering, measurement tools, normal visualization, clipping plane visualization.*
+   The `LineRenderFeature` (GPU-side SSBO of line segments with screen-space expansion) and the immediate-mode `DebugDraw` API. This is a rendering primitive — at least 6 later features depend on it.
+
+---
+
+#### Phase 1 — Core UX
+*Make the engine usable for interactive work. Without these, it's a viewer, not a tool.*
+
+5. **Selection visual feedback / contour highlight (§2.2.1)**
+   *Depends on: RenderGraph (exists). Depended on by: nothing (leaf node, but highest UX impact per line of code).*
+   Stencil-based outline for selected entities, hover highlight. ~50 lines of shader + one extra draw call. The `SelectedTag`/`HoveredTag` exist but are visually invisible — fixing this immediately makes the engine feel interactive.
+
+6. **Transform gizmos (§2.2.3)**
+   *Depends on: line rendering (Phase 0). Depended on by: nothing directly, but every editing workflow uses them.*
+   Translate/rotate/scale handles. Without these, the only way to move objects is typing numbers into the Inspector panel. The line rendering infrastructure from Phase 0 provides the axis arrows and rings.
+
+7. **UI improvements (§2.5)**
+   *Depends on: nothing (ImGui exists). Depended on by: all interactive workflows (usability multiplier).*
+   Dockable panels (ImGui docking branch), viewport toolbar for render mode switching, keyboard shortcuts, console/log panel, context menus. Each improvement is independent — can be done incrementally alongside other work.
+
+8. **Scene serialization + undo/redo (§2.11)**
+   *Depends on: Data I/O (Phase 0, for asset references). Depended on by: any practical editing workflow.*
+   Save/load scenes + command-pattern undo stack. Without this, all interactive editing is lost on exit. Becomes critical once gizmos and property editing exist.
+
+---
+
+#### Phase 2 — Rendering Variety
+*Expand what the engine can show. Each item is a render feature registered via FeatureRegistry.*
+
+9. **Mesh rendering modes (§2.1.3)**
+   *Depends on: FeatureRegistry (Phase 0), post-processing / HDR target (Phase 0). Depended on by: nothing (leaf features).*
+   PBR extensions, flat, Gouraud/Phong, matcap, NPR (toon, Gooch, hatching), curvature/scalar field visualization, normal visualization, UV checker. Each shading mode is a variant PSO registered as a render feature. Share vertex pipeline, swap fragment shaders.
+
+10. **Shadow mapping (§2.1.5)**
+    *Depends on: post-processing pipeline (Phase 0). Depended on by: nothing directly.*
+    Cascaded shadow maps for directional lights. Critical for depth/spatial perception — without shadows, 3D scenes look flat. Shadow pass reuses existing geometry pipeline, writes depth only.
+
+11. **Debug visualization of spatial structures (§2.3.1)**
+    *Depends on: line rendering + DebugDraw API (Phase 0). Depended on by: nothing (development tool).*
+    Octree, BVH, bounding volumes, contact manifolds, normals/tangent frames, convex hulls — all rendered via DebugDraw. Toggled per-category in the UI. Essential for debugging every algorithm you build afterward.
+
+12. **Benchmarking & profiling (§2.8)**
+    *Depends on: nothing (Vulkan timestamp queries, `Core::Telemetry` exists). Depended on by: nothing directly, but establishes baselines before Phase 3+ adds heavy features.*
+    GPU per-pass timing, CPU per-system timing, reproducible benchmark scenes, automated runner, regression detection. Best to establish baselines now so you can measure the cost of every feature added in later phases.
+
+---
+
+#### Phase 3 — Advanced Rendering
+*New geometry types and rendering techniques. Each is a substantial feature building on Phase 0–2 infrastructure.*
+
+13. **Point cloud rendering (§2.1.1)**
+    *Depends on: FeatureRegistry, Data I/O (PLY/PCD/LAS loaders), post-processing (blending, tone mapping). Depended on by: graph rendering (kNN-graph), transparency (splat blending).*
+    3DGS, Potree-style LOD, flat splatting, EWA splatting, surfels. Point clouds as a first-class `GeometryType` with dedicated GPU buffer layout. The largest single feature — start with flat splatting, iterate toward 3DGS.
+
+14. **Graph / wireframe rendering — full (§2.1.2 advanced)**
+    *Depends on: line rendering (Phase 0), point cloud rendering (for kNN-graph on point clouds). Depended on by: nothing.*
+    Layout algorithms (force-directed, spectral, hierarchical) for abstract graphs, kNN-graph visualization, halfedge debug view. The line rendering infrastructure from Phase 0 handles the GPU side; this phase adds the algorithms.
+
+15. **Transparency / OIT (§2.1.6)**
+    *Depends on: post-processing pipeline (Phase 0, HDR blend target). Depended on by: nothing directly, but improves point cloud and translucent surface rendering.*
+    Weighted blended OIT as the default (simple, fast). Exact methods (linked lists, depth peeling) as alternatives.
+
+---
+
+#### Phase 4 — Advanced Interaction & Geometry Processing
+*Sub-mesh selection and geometry operators for research workflows.*
+
+16. **Sub-entity selection — vertex, edge, face, region (§2.2.2)**
+    *Depends on: line rendering (Phase 0, for highlighting edges/vertices), HalfedgeMesh (exists). Depended on by: geometry processing operators, measurement tools.*
+    Dedicated GPU picking pass writing `(EntityID, PrimitiveID, BarycentricCoords)`. Lasso/box/paint-brush/flood-fill/region-growing selection modes. Per-entity bitsets for selected sub-elements. This is the gateway to interactive geometry processing.
+
+17. **Geometry processing operators (§2.6)**
+    *Depends on: FeatureRegistry (Phase 0), sub-entity selection (Phase 4, for interactive input). Depended on by: nothing (leaf features).*
+    Simplification (QEM), remeshing, smoothing (Laplacian/Taubin), subdivision, normal estimation, surface reconstruction, mesh repair, booleans, UV parameterization, geodesic distance, curvature computation. Each operator follows the pattern: input → params → output + diagnostics. Registered via FeatureRegistry, invokable from UI and (later) scripting.
+
+18. **Clipping planes & cross-sections (§2.9)**
+    *Depends on: line rendering (Phase 0, for plane visualization). Depended on by: nothing.*
+    User-defined clip planes with gizmo positioning, cross-section fill, clip volumes.
+
+19. **Measurement & annotation tools (§2.10)**
+    *Depends on: sub-entity selection (Phase 4, for click-to-pick), line rendering (Phase 0, for leader lines). Depended on by: nothing.*
+    Point-to-point distance, angle, area, volume measurement. Persistent 3D annotations as ECS components.
+
+---
+
+#### Phase 5 — Long-term
+*High-effort features that unlock new usage patterns.*
+
+20. **Scripting layer (§2.4 Tier 3)**
+    *Depends on: FeatureRegistry (Phase 0, stable API to bind). Depended on by: nothing.*
+    Python (pybind11) or Lua (sol2) bindings for ECS manipulation, geometry operators, UI panels, and custom per-frame logic. Highest effort, but unlocks rapid prototyping of novel rendering and geometry methods without recompiling C++. Python especially valuable for ML/scientific workflow integration.
+
+---
+
+#### Ongoing (Carried forward from existing roadmap)
+- **Port-based testing boundaries** — type-erased "port" interfaces for filesystem, windowing, and time so subsystems can be tested without Vulkan. (See §4.1.) Implement opportunistically as new subsystems are added.
+- **`Core::InplaceFunction`** — small-buffer owning callable to replace `std::function` in hot paths. (See §4.2.) Implement when profiling identifies `std::function` as a bottleneck.
+- **Shader hot-reload (§2.4 Tier 2)** — file-watcher integration for automatic recompilation on save. Implement alongside mesh rendering modes (Phase 2) for fast shader iteration.
 
 ---
 
