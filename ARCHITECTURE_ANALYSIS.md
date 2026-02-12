@@ -38,6 +38,9 @@ This document tracks **what's left to do** in IntrinsicEngine's architecture.
 ### Tier A (Next)
 1. **`RenderOrchestrator` extraction** — bundles `m_RenderSystem`, `m_GpuScene`, `m_PipelineLibrary`, `m_ShaderRegistry`, `m_FrameGraph`, `InitPipeline()` into a subsystem.
 
+### Tier B (After A)
+2. **`Core::DAGScheduler` extraction** — factor the shared DAG scheduling algorithm (adjacency building from R/W hazards, Kahn's topological sort, parallel-layer execution) into a reusable `Core::DAGScheduler<NodeT, ResourceIdT>` template. FrameGraph and RenderGraph both instantiate it with their own node/resource types, eliminating duplicated graph logic while keeping execution semantics domain-specific. (See §4.3.)
+
 ---
 
 ## 3. Non-goals (For this doc)
@@ -73,3 +76,34 @@ This document tracks **what's left to do** in IntrinsicEngine's architecture.
    - allocate capture payload out of `ScopeStack` / per-frame arena and store only thunk+ctx.
 
 **Policy:** `std::function` is acceptable in cold paths (editor UI, startup config, tooling) but not in per-frame/per-entity loops.
+
+---
+
+### 4.3 FrameGraph vs RenderGraph: keep separate, share the algorithm
+
+**Decision: Keep them separate.** They share the same 3-phase design (Setup → Compile → Execute) and Kahn's-algorithm topological sort, but operate on fundamentally different domains:
+
+| | **FrameGraph** (Core) | **RenderGraph** (Graphics) |
+|---|---|---|
+| **Domain** | CPU-side ECS system scheduling | GPU-side render pass orchestration |
+| **Dependencies on** | Component type tokens (compile-time) | Named GPU resources (images, buffers) |
+| **Execution** | `Tasks::Scheduler` thread pool | Secondary command buffers + Vulkan barriers |
+| **Barrier model** | Just ordering (layer waits) | `VkImageMemoryBarrier2` / `VkBufferMemoryBarrier2` + layout transitions |
+| **Lives in** | `Core/` (no GPU deps) | `Runtime/Graphics/` (Vulkan-specific) |
+| **Testable without Vulkan** | Yes | No |
+
+**Rationale:**
+
+1. **Execution domains are genuinely different.** CPU work is "run this lambda on a thread pool." GPU work is "record into a secondary command buffer, compute Vulkan barriers, manage image layouts." Unifying means every node carries the union of both concerns.
+2. **Dependency models differ.** FrameGraph tracks `Read<Transform>` / `Write<WorldMatrix>` via compile-time type identity. RenderGraph tracks `Read(depthBuffer, FRAGMENT_SHADER, SAMPLED_READ)` with Vulkan stage/access flags. A unified graph would need a polymorphic resource concept that doesn't simplify anything.
+3. **Layering stays clean.** `Core::FrameGraph` has zero GPU dependencies, keeping `IntrinsicCoreTests` and `IntrinsicECSTests` Vulkan-free.
+4. **Producer-consumer relationship is already simple.** Per frame: `FrameGraph.Execute()` → CPU state ready → `RenderGraph.Execute()` → GPU work submitted. One graph doesn't need to see the other's internal passes.
+
+**TODO: Extract shared scheduling algorithm** into a reusable `Core::DAGScheduler<NodeT, ResourceIdT>` template:
+- DAG adjacency building from Read/Write hazards (RAW, WAW, WAR)
+- Kahn's algorithm topological sort into parallel layers
+- Layer-wise execution with a barrier between layers
+
+FrameGraph instantiates with type tokens; RenderGraph with GPU resource IDs. Scheduling is shared, execution and barrier semantics stay domain-specific.
+
+**When to revisit:** If cross-domain dependencies arise (e.g., GPU compute pass must finish before a CPU system reads back results). That would typically be handled with fences/timeline semaphores at the boundary rather than merging graphs.
