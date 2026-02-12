@@ -20,27 +20,25 @@ This document tracks **what's left to do** in IntrinsicEngine's architecture.
 
 ### 1.1 Continue `Engine` Decomposition
 
-**Context:** `GraphicsBackend` has been extracted (see Git history). The remaining subsystems still live inline in `Engine`.
+**Context:** `GraphicsBackend` and `AssetPipeline` have been extracted (see Git history). The remaining subsystems still live inline in `Engine`.
 
 **Remaining extractions (one PR per subsystem):**
 
-- `AssetPipeline` (AssetManager + transfer polling + texture/material upload orchestration + `PendingLoad` tracking + `RunOnMainThread` queue)
 - `SceneManager` (ECS scene composition + lifetime + EnTT hooks)
 - `RenderOrchestrator` (RenderSystem + RenderGraph + GPUScene + PipelineLibrary integration)
 
 **Tests to add/extend:**
 - "Headless Engine" smoke test that runs one frame with minimal subsystems
 
-**Complexity:** Medium per subsystem (mechanical extractions following the `GraphicsBackend` pattern).
+**Complexity:** Medium per subsystem (mechanical extractions following the `GraphicsBackend` / `AssetPipeline` pattern).
 
 ---
 
 ## 2. Prioritized Roadmap
 
 ### Tier A (Next)
-1. **`AssetPipeline` extraction** — bundles `m_AssetManager`, `m_PendingLoads`, `m_LoadMutex`, `m_MainThreadQueue`, `m_MainThreadQueueMutex`, `m_LoadedMaterials`, `ProcessUploads()`, `ProcessMainThreadQueue()`, `RegisterAssetLoad()`, `RunOnMainThread()`, `LoadDroppedAsset()` into a coherent subsystem.
-2. **`SceneManager` extraction** — bundles `m_Scene`, ECS hooks, entity lifetime into a subsystem.
-3. **`RenderOrchestrator` extraction** — bundles `m_RenderSystem`, `m_GpuScene`, `m_PipelineLibrary`, `m_ShaderRegistry`, `m_FrameGraph`, `InitPipeline()` into a subsystem.
+1. **`SceneManager` extraction** — bundles `m_Scene`, ECS hooks, entity lifetime into a subsystem.
+2. **`RenderOrchestrator` extraction** — bundles `m_RenderSystem`, `m_GpuScene`, `m_PipelineLibrary`, `m_ShaderRegistry`, `m_FrameGraph`, `InitPipeline()` into a subsystem.
 
 ---
 

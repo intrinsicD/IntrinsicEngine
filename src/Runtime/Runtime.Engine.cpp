@@ -21,6 +21,7 @@ import Graphics;
 import ECS;
 import Interface;
 import Runtime.GraphicsBackend;
+import Runtime.AssetPipeline;
 
 using namespace Core::Hash;
 
@@ -107,24 +108,27 @@ namespace Runtime
         GraphicsBackendConfig gfxConfig{config.AppName, enableValidation};
         m_GraphicsBackend = std::make_unique<GraphicsBackend>(*m_Window, gfxConfig);
 
-        // 3. MaterialSystem (depends on TextureSystem from GraphicsBackend + AssetManager)
-        m_MaterialSystem = std::make_unique<Graphics::MaterialSystem>(
-            m_GraphicsBackend->GetTextureSystem(), m_AssetManager);
+        // 3. AssetPipeline (AssetManager, pending transfers, main-thread queue)
+        m_AssetPipeline = std::make_unique<AssetPipeline>(m_GraphicsBackend->GetTransferManager());
 
-        // 4. Initialize GeometryStorage with frames-in-flight for safe deferred deletion
+        // 4. MaterialSystem (depends on TextureSystem from GraphicsBackend + AssetManager)
+        m_MaterialSystem = std::make_unique<Graphics::MaterialSystem>(
+            m_GraphicsBackend->GetTextureSystem(), GetAssetManager());
+
+        // 5. Initialize GeometryStorage with frames-in-flight for safe deferred deletion
         m_GeometryStorage.Initialize(m_GraphicsBackend->GetDevice()->GetFramesInFlight());
 
-        // 5. ImGui
+        // 6. ImGui
         Interface::GUI::Init(*m_Window,
                              *m_GraphicsBackend->GetDevice(),
                              m_GraphicsBackend->GetSwapchain(),
                              m_GraphicsBackend->GetContext().GetInstance(),
                              m_GraphicsBackend->GetDevice()->GetGraphicsQueue());
 
-        // 6. Pipelines & RenderSystem
+        // 7. Pipelines & RenderSystem
         InitPipeline();
 
-        // 7. Retained-mode GPUScene: Engine owns it so SpawnModel/ECS can queue updates.
+        // 8. Retained-mode GPUScene: Engine owns it so SpawnModel/ECS can queue updates.
         if (m_PipelineLibrary && m_GraphicsBackend->GetDevice())
         {
             if (auto* p = m_PipelineLibrary->GetSceneUpdatePipeline(); p && m_PipelineLibrary->GetSceneUpdateSetLayout() != VK_NULL_HANDLE)
@@ -168,9 +172,9 @@ namespace Runtime
         Interface::GUI::Shutdown();
 
         m_Scene.GetRegistry().clear();
-        m_AssetManager.Clear();
+        GetAssetManager().Clear();
 
-        m_LoadedMaterials.clear();
+        m_AssetPipeline->ClearLoadedMaterials();
 
         if (m_MaterialSystem)
         {
@@ -183,6 +187,9 @@ namespace Runtime
 
         // Destroy per-frame transient RHI objects while VulkanDevice is still alive.
         m_FrameScope.Reset();
+
+        // AssetPipeline destructor handles cleanup of asset state.
+        m_AssetPipeline.reset();
 
         // GraphicsBackend destructor handles: texture system clear, descriptors,
         // renderer, swapchain, transfer, device, surface, context.
@@ -253,10 +260,10 @@ namespace Runtime
                 }
 
                 // 2. Register Token immediately (Thread-safe)
-                RegisterAssetLoad(Core::Assets::AssetHandle{}, loadResult->Token);
+                m_AssetPipeline->RegisterAssetLoad(Core::Assets::AssetHandle{}, loadResult->Token);
 
                 // 3. Schedule Entity Spawning on Main Thread
-                RunOnMainThread([this, model = std::move(loadResult->ModelData), path]() mutable
+                m_AssetPipeline->RunOnMainThread([this, model = std::move(loadResult->ModelData), path]() mutable
                 {
                     // [Main Thread] Safe to touch Scene/Assets
                     std::filesystem::path fsPath(path);
@@ -265,7 +272,7 @@ namespace Runtime
                     static uint64_t s_AssetLoadCounter = 0;
                     std::string assetName = baseName + "::" + std::to_string(++s_AssetLoadCounter);
 
-                    auto modelHandle = m_AssetManager.Create(assetName, std::move(model));
+                    auto modelHandle = GetAssetManager().Create(assetName, std::move(model));
 
                     Graphics::MaterialData matData;
                     matData.AlbedoID = m_GraphicsBackend->GetDefaultTextureIndex();
@@ -274,8 +281,8 @@ namespace Runtime
                     auto defaultMat = std::make_unique<Graphics::Material>(*m_MaterialSystem, matData);
 
                     const std::string materialName = assetName + "::DefaultMaterial";
-                    auto defaultMaterialHandle = m_AssetManager.Create(materialName, std::move(defaultMat));
-                    m_LoadedMaterials.push_back(defaultMaterialHandle);
+                    auto defaultMaterialHandle = GetAssetManager().Create(materialName, std::move(defaultMat));
+                    m_AssetPipeline->TrackMaterial(defaultMaterialHandle);
 
                     SpawnModel(modelHandle, defaultMaterialHandle, glm::vec3(0.0f), glm::vec3(0.01f));
 
@@ -286,56 +293,6 @@ namespace Runtime
         else
         {
             Core::Log::Warn("Unsupported file extension: {}", ext);
-        }
-    }
-
-    void Engine::RegisterAssetLoad(Core::Assets::AssetHandle handle, RHI::TransferToken token)
-    {
-        std::lock_guard lock(m_LoadMutex);
-        m_PendingLoads.push_back({handle, token, {}});
-    }
-
-    void Engine::ProcessUploads()
-    {
-        // 1. Cleanup Staging Memory
-        m_GraphicsBackend->GarbageCollectTransfers();
-
-        // 2. Check for completions
-        std::lock_guard lock(m_LoadMutex);
-        if (m_PendingLoads.empty()) return;
-
-        auto& transferMgr = m_GraphicsBackend->GetTransferManager();
-
-        // Use erase-remove idiom to process finished loads
-        auto it = std::remove_if(m_PendingLoads.begin(), m_PendingLoads.end(),
-                                 [&](PendingLoad& load)
-                                 {
-                                     if (transferMgr.IsCompleted(load.Token))
-                                     {
-                                         if (load.OnComplete.Valid()) load.OnComplete();
-
-                                         // Signal Core that the "External Processing" is done
-                                         m_AssetManager.FinalizeLoad(load.Handle);
-                                         return true; // Remove from list
-                                     }
-                                     return false; // Keep waiting
-                                 });
-
-        m_PendingLoads.erase(it, m_PendingLoads.end());
-    }
-
-    void Engine::ProcessMainThreadQueue()
-    {
-        std::vector<Core::Tasks::LocalTask> tasks;
-        {
-            std::lock_guard lock(m_MainThreadQueueMutex);
-            if (m_MainThreadQueue.empty()) return;
-            tasks.swap(m_MainThreadQueue);
-        }
-
-        for (auto& task : tasks)
-        {
-            task();
         }
     }
 
@@ -401,7 +358,7 @@ namespace Runtime
                                     glm::vec3 scale)
     {
         // 1. Resolve Model
-        if (auto* model = m_AssetManager.TryGet<Graphics::Model>(modelHandle))
+        if (auto* model = GetAssetManager().TryGet<Graphics::Model>(modelHandle))
         {
             // 2. Create Root
             std::string name = "Model";
@@ -496,11 +453,11 @@ namespace Runtime
                 m_Window->OnUpdate();
             }
 
-            ProcessMainThreadQueue();
+            m_AssetPipeline->ProcessMainThreadQueue();
 
             {
                 PROFILE_SCOPE("ProcessUploads");
-                ProcessUploads();
+                m_AssetPipeline->ProcessUploads();
             }
 
             // Reclaim pool slots for textures that became unreachable this frame.
@@ -534,21 +491,21 @@ namespace Runtime
                 if (m_GpuScene && m_MaterialSystem)
                 {
                     Graphics::Systems::MeshRendererLifecycle::RegisterSystem(
-                        m_FrameGraph, registry, *m_GpuScene, m_AssetManager,
+                        m_FrameGraph, registry, *m_GpuScene, GetAssetManager(),
                         *m_MaterialSystem, m_GeometryStorage,
                         m_GraphicsBackend->GetDefaultTextureIndex());
 
                     Graphics::Systems::GPUSceneSync::RegisterSystem(
-                        m_FrameGraph, registry, *m_GpuScene, m_AssetManager,
+                        m_FrameGraph, registry, *m_GpuScene, GetAssetManager(),
                         *m_MaterialSystem, m_GraphicsBackend->GetDefaultTextureIndex());
                 }
 
                 auto compileResult = m_FrameGraph.Compile();
                 if (compileResult)
                 {
-                    m_AssetManager.BeginReadPhase();
+                    GetAssetManager().BeginReadPhase();
                     m_FrameGraph.Execute();
-                    m_AssetManager.EndReadPhase();
+                    GetAssetManager().EndReadPhase();
                 }
             }
 

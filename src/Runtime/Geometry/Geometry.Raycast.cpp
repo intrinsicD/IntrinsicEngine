@@ -7,6 +7,8 @@ module;
 module Geometry:Raycast.Impl;
 
 import :Raycast;
+import :Primitives;
+import :Validation;
 
 namespace Geometry
 {
