@@ -9,6 +9,7 @@ import Core.Hash;
 import Core.Memory;
 import Core.FrameGraph;
 import Core.Assets;
+import Core.FeatureRegistry;
 import RHI;
 import Graphics;
 
@@ -26,6 +27,7 @@ namespace Runtime
         RHI::TextureSystem& textureSystem,
         Core::Assets::AssetManager& assetManager,
         uint32_t defaultTextureIndex,
+        Core::FeatureRegistry* featureRegistry,
         size_t frameArenaSize)
         : m_FrameArena(frameArenaSize)
         , m_FrameScope(frameArenaSize)
@@ -34,6 +36,7 @@ namespace Runtime
         , m_Swapchain(swapchain)
         , m_Bindless(bindless)
         , m_DescriptorLayout(descriptorLayout)
+        , m_FeatureRegistry(featureRegistry)
     {
         Core::Log::Info("RenderOrchestrator: Initializing...");
 
@@ -136,7 +139,9 @@ namespace Runtime
         }
 
         // Default Render Pipeline (hot-swappable)
-        m_RenderSystem->RequestPipelineSwap(std::make_unique<Graphics::DefaultPipeline>());
+        auto defaultPipeline = std::make_unique<Graphics::DefaultPipeline>();
+        defaultPipeline->SetFeatureRegistry(m_FeatureRegistry);
+        m_RenderSystem->RequestPipelineSwap(std::move(defaultPipeline));
     }
 
     void RenderOrchestrator::OnResize()

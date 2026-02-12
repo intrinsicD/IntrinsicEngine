@@ -10,6 +10,7 @@ import Core.FrameGraph;
 import Core.Memory;
 import Core.Assets;
 import Core.Hash;
+import Core.FeatureRegistry;
 import RHI;
 import Graphics;
 import ECS;
@@ -34,6 +35,7 @@ export namespace Runtime
                            RHI::TextureSystem& textureSystem,
                            Core::Assets::AssetManager& assetManager,
                            uint32_t defaultTextureIndex,
+                           Core::FeatureRegistry* featureRegistry = nullptr,
                            size_t frameArenaSize = 1024 * 1024);
         ~RenderOrchestrator();
 
@@ -104,6 +106,9 @@ export namespace Runtime
         RHI::VulkanSwapchain& m_Swapchain;
         RHI::BindlessDescriptorSystem& m_Bindless;
         RHI::DescriptorLayout& m_DescriptorLayout;
+
+        // Borrowed reference to the engine-wide feature registry (nullable).
+        Core::FeatureRegistry* m_FeatureRegistry = nullptr;
 
         void InitPipeline(RHI::VulkanSwapchain& swapchain,
                           RHI::SimpleRenderer& renderer,

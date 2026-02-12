@@ -15,6 +15,7 @@ import Core.Window;
 import Core.FrameGraph;
 import Core.Assets;
 import Core.Memory;
+import Core.FeatureRegistry;
 import RHI;
 import Graphics;
 import ECS;
@@ -57,6 +58,9 @@ export namespace Runtime
                                 glm::vec3 scale = glm::vec3(1.0f));
 
     protected:
+        // Central feature catalog: render features, systems, panels, geometry operators.
+        Core::FeatureRegistry m_FeatureRegistry;
+
         std::unique_ptr<Core::Windowing::Window> m_Window;
 
         // All Vulkan/GPU infrastructure: context, device, swapchain, descriptors, etc.
@@ -78,6 +82,10 @@ export namespace Runtime
 
         [[nodiscard]] SelectionModule& GetSelection() { return m_Selection; }
         [[nodiscard]] const SelectionModule& GetSelection() const { return m_Selection; }
+
+        // Access to the central feature registry.
+        [[nodiscard]] Core::FeatureRegistry& GetFeatureRegistry() { return m_FeatureRegistry; }
+        [[nodiscard]] const Core::FeatureRegistry& GetFeatureRegistry() const { return m_FeatureRegistry; }
 
         // Access to the GraphicsBackend subsystem.
         [[nodiscard]] GraphicsBackend& GetGraphicsBackend() const { return *m_GraphicsBackend; }
@@ -135,5 +143,10 @@ export namespace Runtime
         bool m_FramebufferResized = false;
 
         void LoadDroppedAsset(const std::string& path);
+
+    private:
+        // Populate the FeatureRegistry with all core engine features
+        // (render passes, ECS systems). Called once at the end of the constructor.
+        void RegisterCoreFeatures();
     };
 }
