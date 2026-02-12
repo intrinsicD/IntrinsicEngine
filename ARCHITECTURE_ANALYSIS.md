@@ -39,12 +39,378 @@ The following issues exist in this CI/development environment and should be trac
 
 ---
 
-## 2. Prioritized Roadmap
+## 2. Feature Roadmap
 
-### Tier A (Next)
-_(No items — `Core::DAGScheduler` extraction is complete. See Git history.)_
+### 2.1 Rendering Modes
 
-### Tier B (Future)
+#### 2.1.1 Point Cloud Rendering
+
+**Context:** No point cloud rendering support exists. The engine needs configurable point cloud visualization for 3D vision and scanning workflows.
+
+**Required variants:**
+- **Gaussian Splatting (3DGS):** Render 3D Gaussians as oriented, anisotropic splats. This is the dominant representation in neural radiance field / 3D reconstruction research. Requires a dedicated compute-based rasterizer or a tile-based sort+blend pipeline (not standard triangle rasterization).
+- **Potree-style octree LOD:** Hierarchical out-of-core streaming for massive point clouds (billions of points). Octree nodes loaded on demand based on camera distance and screen-space error budget. The existing `Geometry.Octree` can serve as a starting point for the spatial index.
+- **Flat / fixed-size splatting:** Simple screen-space or world-space constant-size point sprites. Fast baseline for small-to-medium clouds.
+- **EWA (Elliptical Weighted Average) splatting:** Perspective-correct elliptical splats that avoid holes and aliasing at grazing angles. Classic Zwicker et al. approach.
+- **Surfel rendering:** Oriented discs derived from local surface normals + estimated radius. Good intermediate between points and meshes.
+
+**Architecture notes:**
+- Point clouds should be a first-class `GeometryType` alongside triangle meshes, with their own GPU buffer layout (position + optional normal, color, scalar attributes).
+- A `PointCloudRenderFeature` registered via the render pipeline system, with a config struct selecting the variant and parameters (splat size, LOD budget, etc.).
+- Large point clouds need streaming — integrate with `TransferManager` for async chunk uploads.
+
+---
+
+#### 2.1.2 Graph / Wireframe Rendering
+
+**Context:** The engine has `Geometry.Graph.cppm` and `Geometry.HalfedgeMesh.cppm` but no visualization for graph structures.
+
+**Required variants:**
+- **Mesh wireframe overlay:** Render triangle edges as lines over shaded geometry. Configurable color, thickness, and depth bias. Can be done via barycentric-coordinate fragment shader (no geometry shader needed) or a dedicated line-drawing pass.
+- **Graph structure visualization:** Render abstract node-edge graphs (e.g., scene hierarchy, dependency graphs, connectivity graphs). Needs graph layout algorithms:
+  - Force-directed (Fruchterman-Reingold)
+  - Spectral layout (Laplacian eigenvectors)
+  - Hierarchical / tree layout
+- **kNN-graph of point clouds:** Compute k-nearest-neighbor graph from point cloud spatial queries and render as line segments. Useful for debugging spatial algorithms. The existing `Geometry.Octree` can accelerate neighbor queries.
+- **Halfedge visualization:** Debug view of the halfedge data structure — vertices as points, edges as directed arrows, face normals.
+
+**Architecture notes:**
+- Line rendering needs a dedicated `LineRenderFeature` with GPU-side line storage (SSBO of segments).
+- Thick lines via screen-space expansion in vertex shader (Vulkan has no guaranteed wide-line support).
+- Node rendering can reuse point splatting infrastructure.
+
+---
+
+#### 2.1.3 Mesh Rendering Modes
+
+**Context:** Currently only a single forward PBR pass (metallic-roughness) exists via `ForwardPass`. Need configurable shading for research and artistic workflows.
+
+**Required shading models:**
+- **Physically-based (PBR):** Already implemented (metallic-roughness). Extend with clearcoat, sheen, transmission for glTF PBR extensions.
+- **Flat shading:** Per-face constant color (no interpolation). Useful for low-poly and CAD visualization.
+- **Gouraud / Phong:** Classic per-vertex and per-fragment Blinn-Phong. Useful for comparison and lightweight rendering.
+- **Matcap (Material Capture):** View-space normal → texture lookup. Fast artistic shading with no lights needed.
+- **Non-photorealistic rendering (NPR):**
+  - Toon / cel shading (discrete light bands + ink outlines)
+  - Gooch shading (warm-to-cool tone mapping based on surface orientation)
+  - Hatching / cross-hatching (texture-based stroke patterns modulated by light)
+  - Pencil / sketch style (edge detection + noise-based strokes)
+- **Curvature visualization:** Per-vertex mean/Gaussian curvature mapped to a diverging colormap. Requires differential geometry operators on the mesh.
+- **Scalar field visualization:** Map arbitrary per-vertex scalar data (e.g., geodesic distance, quality metric, segmentation label) to configurable colormaps (viridis, jet, coolwarm, etc.).
+- **Normal visualization:** Display surface normals as color (world-space or view-space RGB mapping) or as hedgehog lines.
+- **UV checker / texture-coordinate visualization:** Checkerboard pattern mapped via UVs to inspect parameterization quality.
+
+**Architecture notes:**
+- Implement as swappable `ShadingMode` enum on the material or render feature level, not as separate render passes.
+- Share the same vertex pipeline; only fragment shaders differ.
+- `PipelineLibrary` needs to support variant PSOs keyed by `(ShadingMode, VertexFormat)`.
+- The `RenderSystem::RequestPipelineSwap()` mechanism can be extended to switch shading modes globally or per-material.
+
+---
+
+#### 2.1.4 Post-Processing Pipeline
+
+**Context:** No post-processing exists. The forward pass writes directly to the swapchain.
+
+**Required effects:**
+- **Tone mapping:** HDR → LDR conversion (ACES, Reinhard, filmic, AgX). Prerequisite for HDR rendering.
+- **SSAO (Screen-Space Ambient Occlusion):** Depth-based ambient occlusion for contact shadows. HBAO+ or GTAO for quality.
+- **Bloom:** Bright-pass threshold + Gaussian blur cascade + additive blend.
+- **FXAA / TAA:** Anti-aliasing. FXAA for simplicity, TAA for temporal stability (important for thin geometry like wireframes and point clouds).
+- **Depth of field:** Optional — useful for presentation renders.
+- **Color grading:** LUT-based or parametric (exposure, contrast, saturation, white balance).
+
+**Architecture notes:**
+- Post-processing should be a chain of `RenderGraph` passes operating on the HDR color buffer.
+- Each effect is an independent pass that can be toggled at runtime.
+- Requires a dedicated HDR render target (R16G16B16A16_SFLOAT) separate from the swapchain.
+
+---
+
+#### 2.1.5 Shadow Mapping
+
+**Context:** No shadow support exists. Shadows are critical for spatial understanding in 3D scenes.
+
+**Required:**
+- **Cascaded shadow maps (CSM)** for directional lights.
+- **Point light shadow maps** (cubemap or dual-paraboloid) if point lights are added.
+- **Percentage-closer filtering (PCF)** or **variance shadow maps (VSM)** for soft edges.
+
+**Architecture notes:**
+- Shadow pass reuses the existing geometry pipeline but writes only depth.
+- Shadow atlas or array texture managed by `RenderSystem`.
+- Integrate as a `RenderGraph` pass that runs before the main forward pass.
+
+---
+
+#### 2.1.6 Transparency & Order-Independent Transparency
+
+**Context:** No transparency support. Required for translucent surfaces, point cloud blending, and X-ray visualization modes.
+
+**Options (pick one or provide configurable):**
+- **Weighted blended OIT** (McGuire & Bavoil): Simple, fast, approximate. Good default.
+- **Per-pixel linked lists:** Exact but memory-hungry and variable performance.
+- **Depth peeling:** Exact, predictable memory, but multi-pass.
+
+---
+
+### 2.2 Selection & Interaction
+
+#### 2.2.1 Selection Visual Feedback (Contour Highlight)
+
+**Context:** `SelectionModule` and `SelectedTag`/`HoveredTag` exist in ECS but have zero visual feedback. Selected objects look identical to unselected ones.
+
+**Required:**
+- **Outline / contour rendering** for selected entities. Standard approaches:
+  - **Stencil-based outline:** Render selected objects to stencil, then expand and draw outline where stencil differs. Simple, sharp outlines.
+  - **Jump Flood Algorithm (JFA):** Compute distance field from selected object silhouette in a few fullscreen passes. Supports variable-width, glowing, animated outlines.
+- **Hover highlight:** Subtle tint or fresnel rim effect for the entity under `HoveredTag`.
+- **Configurable appearance:** Outline color, width, opacity, animation (pulsing).
+
+**Architecture notes:**
+- Add as a `RenderGraph` post-pass after the main forward pass.
+- The `PickingPass` already writes EntityID to a buffer — this can seed the JFA or stencil.
+- Minimal: stencil-based outline is ~50 lines of shader code plus one extra draw call for selected objects.
+
+---
+
+#### 2.2.2 Sub-Entity Selection (Vertex, Edge, Face, Region)
+
+**Context:** Current selection is entity-level only. `HalfedgeMesh` exists in `Geometry/` providing the topological foundation for sub-mesh queries.
+
+**Required selection modes:**
+- **Vertex selection:** Click to select individual vertices. Render selected vertices as highlighted points.
+- **Edge selection:** Click to select edges (halfedge pairs). Render selected edges as highlighted line segments.
+- **Face selection:** Click to select triangles/polygons. Render selected faces with a distinct color overlay.
+- **Region / area selection:**
+  - Lasso selection (freeform screen-space polygon)
+  - Box / rectangle selection
+  - Paint-brush selection (drag to grow selection)
+  - Connected-component flood fill (select all connected faces matching a criterion)
+  - Angle-based region growing (select faces within normal-angle threshold of seed face)
+
+**Architecture notes:**
+- Sub-entity picking requires a dedicated GPU pass that writes `(EntityID, PrimitiveID, BarycentricCoords)` — the existing `PickingPass` only writes `EntityID`.
+- CPU-side: Use `HalfedgeMesh` for adjacency traversal (flood fill, region growing, connected components).
+- Selection state: Per-entity bitsets or index sets for selected vertices/edges/faces, stored as an ECS component.
+- Visualization: Overlay pass that reads the selection bitset and highlights geometry.
+
+---
+
+#### 2.2.3 Transform Gizmos
+
+**Context:** No visual manipulation gizmos exist despite the engine having a full transform system (`Transform::Component`). Currently transforms can only be edited via the ImGui Inspector panel.
+
+**Required:**
+- **Translate gizmo:** Three axis arrows + three plane handles + center sphere.
+- **Rotate gizmo:** Three axis rings (trackball).
+- **Scale gizmo:** Three axis handles with cube endpoints.
+- **Snap modes:** Grid snap (configurable step), angle snap for rotation.
+- **Space modes:** World-space vs. local-space orientation.
+- **Multi-object pivot:** Transform multiple selected entities around a shared pivot (centroid, first-selected, or custom).
+
+---
+
+### 2.3 Debug Visualization
+
+#### 2.3.1 Spatial Data Structure Visualization
+
+**Context:** `DebugViewPass` exists but is minimal (depth/picking debug only). The engine has `Geometry.Octree`, `Geometry.AABB`, `Geometry.OBB`, and other spatial structures but no way to visualize them.
+
+**Required debug overlays:**
+- **Octree:** Wireframe boxes at each occupied node, color-coded by depth level.
+- **KD-tree:** Wireframe splitting planes + leaf bounding boxes (KD-tree needs to be implemented first — see §2.6).
+- **BVH (Bounding Volume Hierarchy):** Wireframe AABBs/OBBs at each BVH node level, with configurable max display depth.
+- **Uniform grid:** Wireframe cells with occupancy coloring.
+- **Bounding volumes:** Overlay AABB, OBB, bounding sphere per entity. Toggle per-type.
+- **Contact manifolds:** Render contact points and normals from `Geometry.ContactManifold`.
+- **Normals / tangent frames:** Per-vertex or per-face normal/tangent/bitangent as colored line segments.
+- **Convex hulls:** Wireframe overlay of computed convex hulls from `Geometry.Primitives`.
+
+**Architecture notes:**
+- Use the `LineRenderFeature` (from §2.1.2) as the backend for all debug drawing.
+- Debug draw calls should go through an immediate-mode API: `DebugDraw::Line(a, b, color)`, `DebugDraw::Box(aabb, color)`, `DebugDraw::Sphere(center, radius, color)`, etc.
+- All debug geometry is transient — rebuilt each frame from `LinearArena`.
+- Toggled per-category via the UI (§2.5).
+
+---
+
+### 2.4 Extension / Plugin Architecture
+
+**Context:** No extension mechanism exists. The architecture uses concrete types with dependency injection — no abstract base classes. C++20 modules make dynamic (shared library) plugins impractical due to ABI instability.
+
+**Recommended approach: Static Registration + Scripting Layer**
+
+**Tier 1 — Static `FeatureRegistry` (C++ side):**
+- A central `FeatureRegistry` where render features, geometry operators, UI panels, and ECS systems register at static-init or engine-init time.
+- Registration API:
+  ```
+  FeatureRegistry::RegisterRenderFeature<MyFeature>("my_feature");
+  FeatureRegistry::RegisterGeometryOperator<MyOp>("my_op");
+  FeatureRegistry::RegisterPanel("my_panel", drawCallback);
+  ```
+- Engine discovers and instantiates registered features at startup.
+- Adding a new feature = add a `.cppm` module + one registration call. No modifications to `Engine` or `RenderSystem`.
+- Configuration via a declarative manifest (TOML/JSON) that selects which features are active.
+
+**Tier 2 — Shader hot-reload (already partially exists):**
+- `ShaderRegistry` provides the path lookup. Extend with file-watcher integration for automatic recompilation on save.
+- Materials reference shaders by name — hot-reload propagates automatically.
+
+**Tier 3 — Scripting layer (optional, for rapid prototyping):**
+- **Lua** (via sol2) or **Python** (via pybind11) bindings for:
+  - ECS entity manipulation (create, destroy, set/get components)
+  - Geometry operator invocation (simplify, smooth, remesh)
+  - UI panel scripting (ImGui bindings)
+  - Custom per-frame logic (registered as FrameGraph systems)
+- This is the practical path for "novel rendering approaches and geometry processing methods" without recompiling C++.
+- Python bindings are particularly valuable for integration with scientific/ML workflows (NumPy, PyTorch, Open3D interop).
+
+**What NOT to do:**
+- Don't attempt `.so`/`.dll` dynamic plugins with C++20 modules — the ABI is not stable across compilers or even compiler versions.
+- Don't introduce abstract base classes everywhere "just in case" — it contradicts the engine's concrete-type architecture and hurts performance.
+
+---
+
+### 2.5 UI Improvements
+
+**Context:** Current UI is basic ImGui panels (Hierarchy, Inspector, Assets, Performance). Functional but not user-friendly.
+
+**Required improvements:**
+- **Dockable panel layout:** ImGui docking branch (already available via imgui) — allow users to arrange panels freely, save/restore layouts.
+- **Viewport controls:** Toolbar for render mode switching (shading mode, wireframe overlay, debug views) directly in the 3D viewport, not buried in menus.
+- **Property editor improvements:**
+  - Undo/redo stack for all property changes.
+  - Multi-object editing (edit shared properties across all selected entities).
+  - Drag-and-drop for asset assignment (drag a material onto a mesh).
+- **Asset browser:** Thumbnail previews, drag-and-drop import, directory navigation. Replace the current flat list.
+- **Console / log panel:** Scrollable, filterable log output in the UI (currently logs go to stdout only).
+- **Status bar:** Frame time, entity count, GPU memory, active render mode at a glance.
+- **Keyboard shortcuts:** Configurable hotkeys for common operations (select mode, transform mode, render mode toggle).
+- **Dark/light theme:** Configurable ImGui theme with presets.
+- **Context menus:** Right-click menus on entities (delete, duplicate, rename, focus camera).
+
+---
+
+### 2.6 Geometry Processing Operators
+
+**Context:** The engine has collision and spatial query primitives (`GJK`, `EPA`, `Octree`, `HalfedgeMesh`, `Raycast`, etc.) but no higher-level geometry processing operators.
+
+**Required operators:**
+- **Mesh simplification / decimation:** Quadric error metric (QEM) edge collapse. Essential for LOD generation and working with scanned meshes.
+- **Remeshing:** Isotropic remeshing (uniform triangle quality) and adaptive remeshing (curvature-aware sizing). Built on `HalfedgeMesh` edge splits/collapses/flips.
+- **Mesh smoothing:** Laplacian smoothing, Taubin smoothing (shrinkage-free), bilateral mesh denoising.
+- **Subdivision surfaces:** Loop (triangles), Catmull-Clark (quads). For design workflows.
+- **Normal estimation:** For point clouds — PCA-based local plane fitting + consistent orientation (minimum spanning tree propagation).
+- **Surface reconstruction:** Point cloud → mesh. Poisson reconstruction, ball-pivoting algorithm, or marching cubes on an implicit field.
+- **Mesh repair:** Hole filling, non-manifold edge resolution, degenerate triangle removal, consistent face orientation. Use `Geometry.Validation` as a starting point.
+- **Boolean operations:** CSG union/intersection/difference. Built on `HalfedgeMesh` + exact/robust predicates.
+- **Parameterization (UV mapping):** LSCM, ABF++, or Boundary First Flattening for UV unwrapping.
+- **Geodesic distance:** Heat method or fast marching on triangle meshes. Useful for segmentation and analysis.
+- **Curvature computation:** Discrete differential geometry operators (mean curvature, Gaussian curvature, principal curvatures + directions) on triangle meshes.
+
+**Architecture notes:**
+- Each operator should follow a consistent pattern: input mesh/point cloud → parameters struct → output mesh/point cloud + diagnostics.
+- Operators register via `FeatureRegistry` (§2.4) so they appear in the UI automatically.
+- Long-running operators should execute on the task scheduler (`Core::Tasks`) with progress reporting.
+
+---
+
+### 2.7 Data I/O
+
+**Context:** No standardized file import/export layer exists. Asset loading is currently format-specific and hard-wired.
+
+**Required format support:**
+- **Mesh formats:** OBJ, PLY (ASCII + binary), glTF 2.0 / GLB, STL, OFF.
+- **Point cloud formats:** PLY, PCD (Point Cloud Library format), LAS/LAZ (LiDAR), XYZ/XYZRGB.
+- **Scene formats:** glTF 2.0 (with materials, hierarchy, cameras, lights), FBX (via Assimp or ufbx).
+- **Image formats:** PNG, JPEG, HDR/EXR (for environment maps and HDR textures).
+- **Gaussian splat formats:** `.ply` (3DGS standard), `.splat` (compressed variants).
+
+**Architecture notes:**
+- Unified `IORegistry` with `ImporterBase` / `ExporterBase` — format handlers register by file extension.
+- All importers return a common intermediate representation (mesh → `GeometryCpuData`, point cloud → new `PointCloudData`, scene → entity hierarchy).
+- Async import via `AssetPipeline` + `TransferManager` for GPU upload.
+- Export runs on worker thread with progress callback.
+
+---
+
+### 2.8 Benchmarking & Profiling
+
+**Context:** `Core::Telemetry` provides basic lock-free ring-buffered metrics. No GPU profiling, no reproducible benchmark infrastructure.
+
+**Required:**
+- **GPU timing:** Vulkan timestamp queries per render pass. Display per-pass timings in the Performance panel.
+- **Pipeline statistics:** Vulkan pipeline statistics queries (vertex invocations, fragment invocations, clipping primitives) for performance analysis.
+- **CPU frame profiling:** Per-system timing in the FrameGraph. Expose via telemetry.
+- **Reproducible benchmark scenes:** Predefined scenes with known entity counts, geometry complexity, and camera paths for consistent measurement.
+- **Benchmark runner:** Automated mode that runs N frames of a benchmark scene, collects min/avg/max/p99 frame times, GPU pass times, and memory usage, then outputs a report (JSON or CSV).
+- **Regression detection:** Compare benchmark results across commits/branches. Flag regressions above a configurable threshold.
+- **Memory profiling:** Track GPU memory allocation (via VMA statistics) and CPU allocator usage (LinearArena high watermarks, ScopeStack peak).
+
+---
+
+### 2.9 Clipping Planes & Cross-Sections
+
+**Context:** No clipping support. Essential for inspecting interiors of scanned objects, point clouds, and volumetric data.
+
+**Required:**
+- **User-defined clip planes:** Up to N (e.g., 6) arbitrary clip planes, toggled and positioned via gizmos.
+- **Cross-section rendering:** Fill the clipped surface with a solid color or hatch pattern to show the interior.
+- **Clip volume:** Combine planes into a convex clip volume (box, frustum) for region-of-interest isolation.
+
+---
+
+### 2.10 Measurement & Annotation Tools
+
+**Context:** No measurement tools exist. Common requirement for inspection and analysis workflows.
+
+**Required:**
+- **Point-to-point distance:** Click two points, display distance with a leader line.
+- **Angle measurement:** Click three points, display the angle.
+- **Area measurement:** Select a face region, compute and display total surface area.
+- **Volume measurement:** Compute volume of a closed mesh (via divergence theorem — `Geometry.Properties` already has this).
+- **Annotations:** Place text labels at 3D positions, persistently stored as ECS components.
+
+---
+
+### 2.11 Scene Serialization
+
+**Context:** No save/load mechanism for scenes. Required for any practical workflow.
+
+**Required:**
+- **Scene save/load:** Serialize entity hierarchy, component data, asset references to a file format (JSON, binary, or glTF extension).
+- **Undo/redo:** Command-pattern undo stack for all scene modifications (entity creation/deletion, component edits, selection changes).
+- **Project files:** Store scene + asset references + editor layout as a project.
+
+---
+
+### Prioritization (Tiers)
+
+#### Tier A — Foundational (build these first, many other features depend on them)
+1. Data I/O (§2.7) — without import/export, nothing else is usable
+2. Selection visual feedback / contour highlight (§2.2.1) — minimal effort, high UX impact
+3. Transform gizmos (§2.2.3) — basic interactive workflow
+4. Post-processing pipeline (§2.1.4) — HDR target needed before adding more render features
+5. Extension architecture / FeatureRegistry (§2.4 Tier 1) — needed before adding many render/geometry features
+
+#### Tier B — Core Rendering & Interaction
+6. Mesh rendering modes (§2.1.3) — shading variety
+7. Line rendering + debug visualization (§2.1.2 + §2.3) — essential for development and research
+8. Shadow mapping (§2.1.5) — spatial understanding
+9. Sub-entity selection (§2.2.2) — geometry processing workflows
+10. UI improvements (§2.5) — docking, toolbar, undo/redo
+
+#### Tier C — Advanced Features
+11. Point cloud rendering (§2.1.1) — full variant support
+12. Geometry processing operators (§2.6) — research workflows
+13. Transparency / OIT (§2.1.6)
+14. Benchmarking & profiling (§2.8)
+15. Clipping planes (§2.9) + measurement tools (§2.10)
+16. Scene serialization + undo/redo (§2.11)
+17. Scripting layer (§2.4 Tier 3)
+
+### Tier D (Existing — carried forward)
 1. **Port-based testing boundaries** — introduce type-erased "port" interfaces for filesystem, windowing, and time so that subsystems can be tested with fakes without Vulkan. (See §4.1.)
 2. **`Core::InplaceFunction`** — small-buffer owning callable to replace remaining `std::function` in hot paths. (See §4.2.)
 
