@@ -1,6 +1,7 @@
 module;
 #include <mutex>
 #include <algorithm>
+#include <vector>
 #include "RHI.Vulkan.hpp"
 
 module Runtime.AssetPipeline;
