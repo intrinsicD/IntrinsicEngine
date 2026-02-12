@@ -1,7 +1,7 @@
 module;
 
 #include <glm/glm.hpp>
-#include <entt/entt.hpp>
+#include <entt/entity/registry.hpp>
 #include "RHI.Vulkan.hpp"
 
 module Graphics:Passes.Picking.Impl;

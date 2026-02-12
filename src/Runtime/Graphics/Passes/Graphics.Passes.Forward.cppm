@@ -4,8 +4,6 @@ module;
 #include <vector>
 
 #include <glm/glm.hpp>
-#include <entt/entt.hpp>
-
 #include "RHI.Vulkan.hpp"
 
 export module Graphics:Passes.Forward;
@@ -14,7 +12,6 @@ import :RenderPipeline;
 import :RenderGraph;
 import :Components;
 import Geometry;
-import Core;
 import ECS;
 import RHI;
 

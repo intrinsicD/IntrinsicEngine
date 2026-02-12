@@ -16,7 +16,9 @@ module;
 #endif
 
 module Core:Filesystem.Impl;
-import Core;
+import :Filesystem;
+import :Logging;
+import :Hash;
 
 namespace Core::Filesystem
 {

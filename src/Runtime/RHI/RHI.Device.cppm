@@ -10,7 +10,6 @@ module;
 export module RHI:Device;
 
 import :Context;
-import Core;
 
 namespace RHI
 {

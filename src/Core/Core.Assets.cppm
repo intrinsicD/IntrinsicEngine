@@ -1,5 +1,5 @@
 module;
-#include <entt/entt.hpp>
+#include <entt/entity/registry.hpp>
 #include <string>
 #include <filesystem>
 #include <memory>

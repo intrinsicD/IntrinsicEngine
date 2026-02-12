@@ -6,7 +6,6 @@ module;
 export module Graphics:Presentation;
 
 import RHI;
-import Core;
 
 export namespace Graphics
 {

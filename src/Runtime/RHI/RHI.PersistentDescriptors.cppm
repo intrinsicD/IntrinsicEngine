@@ -6,7 +6,6 @@ module;
 export module RHI:PersistentDescriptors;
 
 import :Device;
-import Core;
 
 export namespace RHI
 {

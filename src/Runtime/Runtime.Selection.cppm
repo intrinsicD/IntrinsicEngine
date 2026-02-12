@@ -4,11 +4,10 @@ module;
 #include <optional>
 #include <vector>
 #include <glm/glm.hpp>
-#include <entt/entity/registry.hpp>
+#include <entt/entity/entity.hpp>
 
 export module Runtime.Selection;
 
-import Core;
 import ECS;
 import Geometry;
 import Graphics;

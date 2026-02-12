@@ -1,6 +1,5 @@
 module;
-#include <entt/entity/entity.hpp>
-#include <entt/entity/registry.hpp>
+#include <entt/fwd.hpp>
 #include <glm/glm.hpp>
 
 export module Runtime.SceneManager;

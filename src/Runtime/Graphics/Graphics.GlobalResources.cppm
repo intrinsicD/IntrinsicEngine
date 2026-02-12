@@ -10,7 +10,6 @@ import RHI;
 import :Camera;
 import :ShaderRegistry;
 import :PipelineLibrary;
-import Core;
 
 export namespace Graphics
 {

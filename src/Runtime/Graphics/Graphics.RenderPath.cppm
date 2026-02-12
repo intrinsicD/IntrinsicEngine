@@ -9,7 +9,6 @@ module;
 export module Graphics:RenderPath;
 
 import :RenderPipeline;
-import Core;
 
 export namespace Graphics
 {

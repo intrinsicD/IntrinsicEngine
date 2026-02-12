@@ -45,6 +45,7 @@ target_sources(${target_name}
         Core.Filesystem.cpp
         Core.Input.cpp
         Core.Assets.cpp
+        Core.Telemetry.cpp
         Core.FrameGraph.cpp
         Core.DAGScheduler.cpp
         Core.FeatureRegistry.cpp
