@@ -36,6 +36,7 @@ target_sources(${target_name}
         Core.FrameGraph.cppm
         Core.DAGScheduler.cppm
         Core.FeatureRegistry.cppm
+        Core.InplaceFunction.cppm
         PRIVATE
         Core.Memory.cpp
         Core.Logging.cpp

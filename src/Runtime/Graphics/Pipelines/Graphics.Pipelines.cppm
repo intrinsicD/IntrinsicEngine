@@ -62,4 +62,23 @@ export namespace Graphics
 
         void RebuildPath();
     };
+
+    // -------------------------------------------------------------------------
+    // Vtable anchor: Shutdown() is defined in this TU (the :Pipelines partition)
+    // so the vtable for DefaultPipeline is emitted here — same TU as the class.
+    // This works around Clang 18's failure to link vtables across module
+    // partition boundaries (see ARCHITECTURE_ANALYSIS.md §1.1).
+    // -------------------------------------------------------------------------
+    void DefaultPipeline::Shutdown()
+    {
+        if (m_PickingPass) m_PickingPass->Shutdown();
+        if (m_ForwardPass) m_ForwardPass->Shutdown();
+        if (m_DebugViewPass) m_DebugViewPass->Shutdown();
+        if (m_ImGuiPass) m_ImGuiPass->Shutdown();
+
+        m_PickingPass.reset();
+        m_ForwardPass.reset();
+        m_DebugViewPass.reset();
+        m_ImGuiPass.reset();
+    }
 }

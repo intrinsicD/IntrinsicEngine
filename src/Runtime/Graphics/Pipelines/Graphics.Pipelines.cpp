@@ -50,19 +50,6 @@ namespace Graphics
         m_PathDirty = true;
     }
 
-    void DefaultPipeline::Shutdown()
-    {
-        if (m_PickingPass) m_PickingPass->Shutdown();
-        if (m_ForwardPass) m_ForwardPass->Shutdown();
-        if (m_DebugViewPass) m_DebugViewPass->Shutdown();
-        if (m_ImGuiPass) m_ImGuiPass->Shutdown();
-
-        m_PickingPass.reset();
-        m_ForwardPass.reset();
-        m_DebugViewPass.reset();
-        m_ImGuiPass.reset();
-    }
-
     bool DefaultPipeline::IsFeatureEnabled(Core::Hash::StringID id) const
     {
         if (!m_Registry) return true; // No registry → all features enabled
