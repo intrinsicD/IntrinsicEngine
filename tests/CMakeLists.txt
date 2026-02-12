@@ -27,6 +27,7 @@ add_executable(${target_name}
         Test_SceneManager.cpp
         Test_RenderOrchestrator.cpp
         Test_DAGScheduler.cpp
+        Test_HeadlessEngine.cpp
 )
 
 #Apply Strict Flags ONLY to our tests
