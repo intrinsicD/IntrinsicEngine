@@ -2,6 +2,7 @@
 
 ## Build System
 
+- **Dependency Setup:** `.claude/setup.sh` (runs automatically on session start)'
 - **Generator:** Ninja (required for C++20 modules — never use Unix Makefiles)
 - **Compiler:** Clang 18+ with `clang-scan-deps-18` for module dependency scanning
 - **Standard:** C++23 (`std::expected`, `std::format`, modules)
