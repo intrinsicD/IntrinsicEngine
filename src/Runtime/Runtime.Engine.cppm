@@ -17,6 +17,7 @@ import Graphics;
 import ECS;
 import Runtime.SelectionModule;
 import Runtime.GraphicsBackend;
+import Runtime.AssetPipeline;
 
 export namespace Runtime
 {
@@ -56,6 +57,9 @@ export namespace Runtime
         // All Vulkan/GPU infrastructure: context, device, swapchain, descriptors, etc.
         std::unique_ptr<GraphicsBackend> m_GraphicsBackend;
 
+        // Asset management: AssetManager, pending transfers, main-thread queue, material tracking.
+        std::unique_ptr<AssetPipeline> m_AssetPipeline;
+
         // Retained-mode GPU scene (persistent SSBOs managed by Graphics::RenderSystem).
         // Owned by Engine to allow SpawnModel/ECS to allocate slots and queue updates.
         std::unique_ptr<Graphics::GPUScene> m_GpuScene;
@@ -64,9 +68,8 @@ export namespace Runtime
         std::unique_ptr<Graphics::PipelineLibrary> m_PipelineLibrary;
 
     public:
-        // Public access so Sandbox can manipulate Scene/Assets
+        // Public access so Sandbox can manipulate Scene
         ECS::Scene m_Scene;
-        Core::Assets::AssetManager m_AssetManager;
         Core::Memory::LinearArena m_FrameArena; // 1 MB per frame
         Core::Memory::ScopeStack m_FrameScope; // per-frame scope allocator with destructors
         Core::FrameGraph m_FrameGraph;         // CPU-side system scheduling DAG (uses m_FrameScope)
@@ -82,6 +85,14 @@ export namespace Runtime
         // Access to the GraphicsBackend subsystem.
         [[nodiscard]] GraphicsBackend& GetGraphicsBackend() const { return *m_GraphicsBackend; }
 
+        // Access to the AssetPipeline subsystem.
+        [[nodiscard]] AssetPipeline& GetAssetPipeline() { return *m_AssetPipeline; }
+        [[nodiscard]] const AssetPipeline& GetAssetPipeline() const { return *m_AssetPipeline; }
+
+        // Convenience accessor: delegates to AssetPipeline.
+        [[nodiscard]] Core::Assets::AssetManager& GetAssetManager() { return m_AssetPipeline->GetAssetManager(); }
+        [[nodiscard]] const Core::Assets::AssetManager& GetAssetManager() const { return m_AssetPipeline->GetAssetManager(); }
+
         // Helper to access the camera buffer (Temporary until we have a Camera Component)
         [[nodiscard]] RHI::VulkanBuffer* GetGlobalUBO() const { return m_RenderSystem->GetGlobalUBO(); }
 
@@ -92,52 +103,29 @@ export namespace Runtime
         [[nodiscard]] RHI::VulkanSwapchain& GetSwapchain() const { return m_GraphicsBackend->GetSwapchain(); }
         [[nodiscard]] Graphics::GeometryPool& GetGeometryStorage() { return m_GeometryStorage; }
 
-        void RegisterAssetLoad(Core::Assets::AssetHandle handle, RHI::TransferToken token);
+        // Convenience methods that delegate to AssetPipeline.
+        void RegisterAssetLoad(Core::Assets::AssetHandle handle, RHI::TransferToken token)
+        {
+            m_AssetPipeline->RegisterAssetLoad(handle, token);
+        }
 
         template <typename F>
         void RegisterAssetLoad(Core::Assets::AssetHandle handle, RHI::TransferToken token, F&& onComplete)
         {
-            std::lock_guard lock(m_LoadMutex);
-            PendingLoad l{};
-            l.Handle = handle;
-            l.Token = token;
-            l.OnComplete = Core::Tasks::LocalTask(std::forward<F>(onComplete));
-            m_PendingLoads.push_back(std::move(l));
+            m_AssetPipeline->RegisterAssetLoad(handle, token, std::forward<F>(onComplete));
         }
 
         template <typename F>
         void RunOnMainThread(F&& task)
         {
-            std::lock_guard lock(m_MainThreadQueueMutex);
-            m_MainThreadQueue.emplace_back(Core::Tasks::LocalTask(std::forward<F>(task)));
+            m_AssetPipeline->RunOnMainThread(std::forward<F>(task));
         }
 
     protected:
-        // Keep-alive list for runtime-created materials is handle-based to avoid shared_ptr overhead.
-        // The AssetManager owns the actual material payload.
-        std::vector<Core::Assets::AssetHandle> m_LoadedMaterials;
-
-        // Internal tracking struct (POD)
-        struct PendingLoad
-        {
-            Core::Assets::AssetHandle Handle;
-            RHI::TransferToken Token;
-            Core::Tasks::LocalTask OnComplete{}; // optional main-thread completion work
-        };
-
-        // Protected by mutex because Loaders call RegisterAssetLoad from worker threads
-        std::mutex m_LoadMutex;
-        std::vector<PendingLoad> m_PendingLoads;
-
-        std::mutex m_MainThreadQueueMutex;
-        std::vector<Core::Tasks::LocalTask> m_MainThreadQueue;
-
         bool m_Running = true;
         bool m_FramebufferResized = false;
 
         void InitPipeline();
         void LoadDroppedAsset(const std::string& path);
-        void ProcessUploads();
-        void ProcessMainThreadQueue();
     };
 }

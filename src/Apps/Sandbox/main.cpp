@@ -10,6 +10,7 @@
 
 import Runtime.Engine;
 import Runtime.GraphicsBackend;
+import Runtime.AssetPipeline;
 import Runtime.Selection;
 import Core;
 import Graphics;
@@ -76,15 +77,15 @@ public:
                     }
                 });
 
-                m_AssetManager.MoveToProcessing(handle);
+                GetAssetManager().MoveToProcessing(handle);
                 return std::move(result->Texture);
             }
 
             Log::Warn("Texture load failed: {} ({})", path.string(), Graphics::AssetErrorToString(result.error()));
             return {};
         };
-        m_DuckTexture = m_AssetManager.Load<RHI::Texture>(Filesystem::GetAssetPath("textures/DuckCM.png"),
-                                                          textureLoader);
+        m_DuckTexture = GetAssetManager().Load<RHI::Texture>(Filesystem::GetAssetPath("textures/DuckCM.png"),
+                                                              textureLoader);
 
         auto modelLoader = [&](const std::string& path, Assets::AssetHandle handle)
             -> std::unique_ptr<Graphics::Model>
@@ -97,7 +98,7 @@ public:
                 RegisterAssetLoad(handle, result->Token);
 
                 // 2. Notify AssetManager to wait
-                m_AssetManager.MoveToProcessing(handle);
+                GetAssetManager().MoveToProcessing(handle);
 
                 // 3. Return the model (valid CPU pointers, GPU buffers are allocated but content is uploading)
                 return std::move(result->ModelData);
@@ -107,7 +108,7 @@ public:
             return nullptr; // Failed
         };
 
-        m_DuckModel = m_AssetManager.Load<Graphics::Model>(
+        m_DuckModel = GetAssetManager().Load<Graphics::Model>(
             Filesystem::GetAssetPath("models/Duck.glb"),
             modelLoader
         );
@@ -128,14 +129,14 @@ public:
         DuckMaterial->SetAlbedoTexture(m_DuckTexture);
 
         // Track handle only; AssetManager owns the actual Material object.
-        m_DuckMaterialHandle = m_AssetManager.Create("DuckMaterial", std::move(DuckMaterial));
-        m_LoadedMaterials.push_back(m_DuckMaterialHandle);
+        m_DuckMaterialHandle = GetAssetManager().Create("DuckMaterial", std::move(DuckMaterial));
+        GetAssetPipeline().TrackMaterial(m_DuckMaterialHandle);
 
         Log::Info("Asset Load Requested. Waiting for background thread...");
 
         Interface::GUI::RegisterPanel("Hierarchy", [this]() { DrawHierarchyPanel(); });
         Interface::GUI::RegisterPanel("Inspector", [this]() { DrawInspectorPanel(); });
-        Interface::GUI::RegisterPanel("Assets", [this]() { m_AssetManager.AssetsUiPanel(); });
+        Interface::GUI::RegisterPanel("Assets", [this]() { GetAssetManager().AssetsUiPanel(); });
         Interface::GUI::RegisterPanel("Stats", [this]()
         {
             ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
@@ -183,7 +184,7 @@ public:
 
     void OnUpdate(float dt) override
     {
-        m_AssetManager.Update();
+        GetAssetManager().Update();
 
         bool uiCapturesMouse = Interface::GUI::WantCaptureMouse();
         bool uiCapturesKeyboard = Interface::GUI::WantCaptureKeyboard();
@@ -226,7 +227,7 @@ public:
 
         if (!m_IsEntitySpawned)
         {
-            if (m_AssetManager.GetState(m_DuckModel) == Assets::LoadState::Ready)
+            if (GetAssetManager().GetState(m_DuckModel) == Assets::LoadState::Ready)
             {
                 // One line to rule them all
                 SpawnModel(m_DuckModel, m_DuckMaterialHandle, glm::vec3(0.0f), glm::vec3(0.01f));
@@ -278,7 +279,7 @@ public:
         // Draw
         if (cameraComponent != nullptr && m_RenderSystem)
         {
-            m_RenderSystem->OnUpdate(m_Scene, *cameraComponent, m_AssetManager);
+            m_RenderSystem->OnUpdate(m_Scene, *cameraComponent, GetAssetManager());
         }
     }
 

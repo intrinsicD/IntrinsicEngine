@@ -11,11 +11,13 @@ target_sources(${target_name}
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
         Runtime.Engine.cppm
         Runtime.GraphicsBackend.cppm
+        Runtime.AssetPipeline.cppm
         Runtime.Selection.cppm
         Runtime.SelectionModule.cppm
         PRIVATE
         Runtime.Engine.cpp
         Runtime.GraphicsBackend.cpp
+        Runtime.AssetPipeline.cpp
         Runtime.Selection.cpp
         Runtime.SelectionModule.cpp
 )
