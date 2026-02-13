@@ -169,6 +169,7 @@ public:
         registerPanelFeature("Inspector", "Component property editor");
         registerPanelFeature("Assets", "Asset manager browser");
         registerPanelFeature("Stats", "Performance statistics and debug controls");
+        registerPanelFeature("View Settings", "Selection outline and viewport display settings");
         registerPanelFeature("Render Target Viewer", "Render target debug visualization");
 
         Log::Info("FeatureRegistry: {} total features after client registration", features.Count());
@@ -214,6 +215,54 @@ public:
 
                 ImGui::Text("Tags: Selectable=%d Selected=%d", (int)hasSelectableTag, (int)hasSelectedTag);
                 ImGui::Text("Components: MeshRenderer=%d MeshCollider=%d", (int)hasMeshRenderer, (int)hasMeshCollider);
+            }
+        });
+
+        // View Settings panel for configuring selection outline, etc.
+        Interface::GUI::RegisterPanel("View Settings", [this]()
+        {
+            auto* outlineSettings = GetRenderOrchestrator().GetRenderSystem().GetSelectionOutlineSettings();
+            if (!outlineSettings)
+            {
+                ImGui::TextDisabled("Selection outline settings not available.");
+                return;
+            }
+
+            ImGui::SeparatorText("Selection Outline");
+
+            // Selection color
+            float selColor[4] = {
+                outlineSettings->SelectionColor.r,
+                outlineSettings->SelectionColor.g,
+                outlineSettings->SelectionColor.b,
+                outlineSettings->SelectionColor.a
+            };
+            if (ImGui::ColorEdit4("Selection Color", selColor))
+            {
+                outlineSettings->SelectionColor = glm::vec4(selColor[0], selColor[1], selColor[2], selColor[3]);
+            }
+
+            // Hover color
+            float hoverColor[4] = {
+                outlineSettings->HoverColor.r,
+                outlineSettings->HoverColor.g,
+                outlineSettings->HoverColor.b,
+                outlineSettings->HoverColor.a
+            };
+            if (ImGui::ColorEdit4("Hover Color", hoverColor))
+            {
+                outlineSettings->HoverColor = glm::vec4(hoverColor[0], hoverColor[1], hoverColor[2], hoverColor[3]);
+            }
+
+            // Outline width
+            ImGui::SliderFloat("Outline Width", &outlineSettings->OutlineWidth, 1.0f, 10.0f, "%.1f px");
+
+            // Reset button
+            if (ImGui::Button("Reset to Defaults"))
+            {
+                outlineSettings->SelectionColor = glm::vec4(1.0f, 0.6f, 0.0f, 1.0f);
+                outlineSettings->HoverColor = glm::vec4(0.3f, 0.7f, 1.0f, 0.8f);
+                outlineSettings->OutlineWidth = 2.0f;
             }
         });
     }

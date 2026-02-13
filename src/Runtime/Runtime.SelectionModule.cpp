@@ -52,7 +52,7 @@ namespace Runtime
 
     void SelectionModule::ApplyFromGpuPick(ECS::Scene& scene,
                                           const Graphics::RenderSystem::PickResultGpu& pick,
-                                          Runtime::Selection::PickMode mode)
+                                          Selection::PickMode mode)
     {
         auto& reg = scene.GetRegistry();
 
@@ -68,7 +68,7 @@ namespace Runtime
                 {
                     if (reg.valid(e))
                     {
-                        Runtime::Selection::ApplySelection(scene, e, mode);
+                        Selection::ApplySelection(scene, e, mode);
                         return;
                     }
                 }
@@ -76,7 +76,7 @@ namespace Runtime
         }
 
         // No hit or invalid -> treat as background.
-        Runtime::Selection::ApplySelection(scene, entt::null, mode);
+        Selection::ApplySelection(scene, entt::null, mode);
     }
 
     entt::entity SelectionModule::GetSelectedEntity(const ECS::Scene& scene) const
@@ -90,12 +90,12 @@ namespace Runtime
 
     void SelectionModule::SetSelectedEntity(ECS::Scene& scene, entt::entity e)
     {
-        Runtime::Selection::ApplySelection(scene, e, Runtime::Selection::PickMode::Replace);
+        Selection::ApplySelection(scene, e, Selection::PickMode::Replace);
     }
 
     void SelectionModule::ClearSelection(ECS::Scene& scene)
     {
-        Runtime::Selection::ApplySelection(scene, entt::null, Runtime::Selection::PickMode::Replace);
+        Selection::ApplySelection(scene, entt::null, Selection::PickMode::Replace);
     }
 
     void SelectionModule::Update(ECS::Scene& scene,
@@ -111,16 +111,44 @@ namespace Runtime
         //  - no shift: replace selection with the clicked entity (standard click-to-select)
         //  - shift: toggle clicked entity; background clears only if shift is NOT held
         const bool shiftDown = window.GetInput().IsKeyPressed(340) || window.GetInput().IsKeyPressed(344); // GLFW_KEY_LEFT_SHIFT / RIGHT_SHIFT
-        const Runtime::Selection::PickMode clickMode = shiftDown
-            ? Runtime::Selection::PickMode::Toggle
-            : Runtime::Selection::PickMode::Replace;
+        const Selection::PickMode clickMode = shiftDown
+            ? Selection::PickMode::Toggle
+            : Selection::PickMode::Replace;
+
+        // 0) Hover highlight: update every frame via CPU raycast.
+        //    We always use CPU for hover since it's latency-insensitive visual feedback.
+        if (camera != nullptr && !uiCapturesMouse)
+        {
+            const uint32_t winW = static_cast<uint32_t>(window.GetWindowWidth());
+            const uint32_t winH = static_cast<uint32_t>(window.GetWindowHeight());
+            if (winW > 0 && winH > 0)
+            {
+                const glm::vec2 m = window.GetInput().GetMousePosition();
+
+                // NDC: x in [-1,1], y in [-1,1] with +y down (Vulkan).
+                const float nx = (2.0f * (m.x / static_cast<float>(winW))) - 1.0f;
+                const float ny = (2.0f * (m.y / static_cast<float>(winH))) - 1.0f;
+
+                Selection::PickRequest req{};
+                req.WorldRay = Selection::RayFromNDC(*camera, {nx, ny});
+                req.Backend = Selection::PickBackend::CPU;
+
+                const auto hit = Selection::PickCPU(scene, req);
+                Selection::ApplyHover(scene, hit.Entity);
+            }
+        }
+        else
+        {
+            // UI captures mouse or no camera: clear hover.
+            Selection::ApplyHover(scene, entt::null);
+        }
 
         // 1) On click: schedule GPU pick or do CPU pick immediately.
         if (camera != nullptr && !uiCapturesMouse)
         {
             if (window.GetInput().IsMouseButtonJustPressed(m_Config.MouseButton))
             {
-                if (m_Config.Backend == Runtime::Selection::PickBackend::GPU)
+                if (m_Config.Backend == Selection::PickBackend::GPU)
                 {
                     const glm::uvec2 px = WindowToFramebufferPixel(window, window.GetInput().GetMousePosition());
                     renderSystem.RequestPick(px.x, px.y);
@@ -138,20 +166,20 @@ namespace Runtime
                         const float nx = (2.0f * (m.x / static_cast<float>(winW))) - 1.0f;
                         const float ny = (2.0f * (m.y / static_cast<float>(winH))) - 1.0f;
 
-                        Runtime::Selection::PickRequest req{};
-                        req.WorldRay = Runtime::Selection::RayFromNDC(*camera, {nx, ny});
-                        req.Backend = Runtime::Selection::PickBackend::CPU;
+                        Selection::PickRequest req{};
+                        req.WorldRay = Selection::RayFromNDC(*camera, {nx, ny});
+                        req.Backend = Selection::PickBackend::CPU;
                         req.Mode = clickMode;
 
-                        const auto hit = Runtime::Selection::PickCPU(scene, req);
-                        Runtime::Selection::ApplySelection(scene, hit.Entity, req.Mode);
+                        const auto hit = Selection::PickCPU(scene, req);
+                        Selection::ApplySelection(scene, hit.Entity, req.Mode);
                     }
                 }
             }
         }
 
         // 2) For GPU: consume resolved results whenever they become ready.
-        if (m_Config.Backend == Runtime::Selection::PickBackend::GPU)
+        if (m_Config.Backend == Selection::PickBackend::GPU)
         {
             if (auto pickOpt = renderSystem.TryConsumePickResult(); pickOpt.has_value())
             {
@@ -161,7 +189,7 @@ namespace Runtime
                 if (!pickOpt->HasHit || pickOpt->EntityID == 0u)
                 {
                     if (!shiftDown)
-                        Runtime::Selection::ApplySelection(scene, entt::null, Runtime::Selection::PickMode::Replace);
+                        Selection::ApplySelection(scene, entt::null, Selection::PickMode::Replace);
                 }
                 else
                 {

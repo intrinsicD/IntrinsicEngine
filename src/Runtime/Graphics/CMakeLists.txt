@@ -36,6 +36,7 @@ target_sources(${target_name}
         Pipelines/Graphics.Pipelines.cppm
         Passes/Graphics.Passes.Picking.cppm
         Passes/Graphics.Passes.Forward.cppm
+        Passes/Graphics.Passes.SelectionOutlineSettings.cppm
         Passes/Graphics.Passes.SelectionOutline.cppm
         Passes/Graphics.Passes.DebugView.cppm
         Passes/Graphics.Passes.ImGui.cppm

@@ -4,10 +4,12 @@ module;
 #include <span>
 #include <vector>
 
+#include <glm/glm.hpp>
 #include "RHI.Vulkan.hpp"
 
 export module Graphics:Passes.SelectionOutline;
 
+import :Passes.SelectionOutlineSettings;
 import :RenderPipeline;
 import :RenderGraph;
 import :ShaderRegistry;
@@ -17,6 +19,7 @@ import RHI;
 
 export namespace Graphics::Passes
 {
+
     class SelectionOutlinePass final : public IRenderFeature
     {
     public:
@@ -35,6 +38,10 @@ export namespace Graphics::Passes
         // bindings to point at the actual PickID image view for this frame.
         void PostCompile(uint32_t frameIndex, std::span<const RenderGraphDebugImage> debugImages);
 
+        // Configuration accessors
+        SelectionOutlineSettings& GetSettings() { return m_Settings; }
+        [[nodiscard]] const SelectionOutlineSettings& GetSettings() const { return m_Settings; }
+
     private:
         struct OutlinePassData
         {
@@ -52,5 +59,8 @@ export namespace Graphics::Passes
 
         // Cached handle from AddPasses for PostCompile descriptor update.
         RGResourceHandle m_LastPickIdHandle{};
+
+        // User-configurable settings
+        SelectionOutlineSettings m_Settings;
     };
 }

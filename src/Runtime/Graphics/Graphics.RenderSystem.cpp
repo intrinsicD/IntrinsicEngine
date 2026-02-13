@@ -213,6 +213,11 @@ namespace Graphics
         return std::nullopt;
     }
 
+    Passes::SelectionOutlineSettings* RenderSystem::GetSelectionOutlineSettings()
+    {
+        return m_ActivePipeline ? m_ActivePipeline->GetSelectionOutlineSettings() : nullptr;
+    }
+
     // -------------------------------------------------------------------------
     // OnUpdate sub-steps
     // -------------------------------------------------------------------------

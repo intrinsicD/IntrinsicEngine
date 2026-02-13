@@ -48,6 +48,12 @@ export namespace Graphics
                          std::span<const RenderGraphDebugImage> debugImages,
                          std::span<const RenderGraphDebugPass> debugPasses) override;
 
+        // Access selection outline settings for UI configuration
+        Passes::SelectionOutlineSettings* GetSelectionOutlineSettings() override
+        {
+            return m_SelectionOutlinePass ? &m_SelectionOutlinePass->GetSettings() : nullptr;
+        }
+
     private:
         const Core::FeatureRegistry* m_Registry = nullptr;
 

@@ -14,6 +14,7 @@ import :MaterialSystem;
 import :Geometry;
 import :ShaderRegistry;
 import :PipelineLibrary;
+import :Passes.SelectionOutlineSettings;
 import Core.Hash;
 import Core.Assets;
 import ECS;
@@ -171,5 +172,8 @@ export namespace Graphics
             (void)debugImages;
             (void)debugPasses;
         }
+
+        // Access selection outline settings (returns nullptr if not supported by this pipeline)
+        virtual Passes::SelectionOutlineSettings* GetSelectionOutlineSettings() { return nullptr; }
     };
 }

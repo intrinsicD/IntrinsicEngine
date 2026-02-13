@@ -71,6 +71,9 @@ export namespace Graphics
         [[nodiscard]] PickResultGpu GetLastPickResult() const;
         [[nodiscard]] std::optional<PickResultGpu> TryConsumePickResult();
 
+        // Access selection outline settings (returns nullptr if not available)
+        [[nodiscard]] Passes::SelectionOutlineSettings* GetSelectionOutlineSettings();
+
     private:
         RenderSystemConfig m_Config;
 
