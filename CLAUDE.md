@@ -44,7 +44,7 @@ cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug \
 ### Important: Do
 
 - Before implementing a new feature, scan for existing functionality in the codebase
-- Refactor existing code only if necessary (e.g. to improve performance, reduce code duplication, a new feature requires it, or to extract a subsystem into its own module)
+- Refactor existing code only if necessary (e.g. to improve performance, reduce code duplication, create a good abstraction, a new feature requires it, or to extract a subsystem into its own module)
 - Make sure the code is tested well
 - Care about code quality, performance and maintainability of the codebase
 - Care about state of the art methods are used (e.g. for rendering, data structures, algorithms, etc.)
