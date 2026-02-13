@@ -23,6 +23,21 @@ using namespace Core::Hash;
 
 namespace Graphics
 {
+    void DefaultPipeline::Shutdown()
+    {
+        if (m_PickingPass) m_PickingPass->Shutdown();
+        if (m_ForwardPass) m_ForwardPass->Shutdown();
+        if (m_SelectionOutlinePass) m_SelectionOutlinePass->Shutdown();
+        if (m_DebugViewPass) m_DebugViewPass->Shutdown();
+        if (m_ImGuiPass) m_ImGuiPass->Shutdown();
+
+        m_PickingPass.reset();
+        m_ForwardPass.reset();
+        m_SelectionOutlinePass.reset();
+        m_DebugViewPass.reset();
+        m_ImGuiPass.reset();
+    }
+
     void DefaultPipeline::Initialize(RHI::VulkanDevice& device,
                                     RHI::DescriptorAllocator& descriptorPool,
                                     RHI::DescriptorLayout& globalLayout,

@@ -225,7 +225,8 @@ namespace Graphics
         // Apply deferred bindless updates before any render graph recording.
         m_GlobalResources.GetBindlessSystem().FlushPending();
 
-        m_Interaction.ProcessReadbacks(currentFrame);
+        // NOTE: ProcessReadbacks was moved to after AcquireFrame (fence wait) to ensure
+        // the GPU has actually completed writing to the readback buffer before we read it.
 
         Interface::GUI::BeginFrame();
         Interface::GUI::DrawGUI();
@@ -405,6 +406,18 @@ namespace Graphics
 
         if (!AcquireFrame())
             return;
+
+        // Process GPU pick readbacks AFTER the fence wait in AcquireFrame.
+        // The fence guarantees that the GPU has completed writing to the readback buffer
+        // for the previous use of this frame index. Using (currentFrame - framesInFlight)
+        // as the completed frame ensures we only consume results that are definitely done.
+        {
+            const uint32_t framesInFlight = m_Renderer.GetFramesInFlight();
+            const uint64_t safeCompleted = (currentFrame > framesInFlight)
+                ? (currentFrame - framesInFlight)
+                : 0;
+            m_Interaction.ProcessReadbacks(safeCompleted);
+        }
 
         UpdateGlobals(camera);
         BuildGraph(scene, assetManager, camera);

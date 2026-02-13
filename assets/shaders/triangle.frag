@@ -26,18 +26,9 @@ void main() {
     float diff = max(dot(norm, lightDir), 0.0);
     vec3 diffuse = diff * lightColor;
 
-    const bool selected = (fragTexID & 0x80000000u) != 0u;
-    const uint texIndex = fragTexID & 0x7fffffffu;
-
-    vec4 textureColor = texture(globalTextures[nonuniformEXT(texIndex)], fragTexCoord);
+    vec4 textureColor = texture(globalTextures[nonuniformEXT(fragTexID)], fragTexCoord);
 
     vec3 result = (ambient + diffuse) * textureColor.rgb;
-
-    if (selected)
-    {
-        const vec3 highlight = vec3(1.0, 0.55, 0.0);
-        result = mix(result, highlight, 0.55);
-    }
 
     outColor = vec4(result, 1.0);
 }
