@@ -20,26 +20,35 @@ namespace Graphics
     namespace
     {
         constexpr uint32_t kPreserveGeometryId = GPUSceneConstants::kPreserveGeometryId;
+        constexpr uint32_t kPreserveTextureId = 0xFFFFFFFFu;
 
         void MergeUpdate(GpuUpdatePacket& dst, const GpuUpdatePacket& src)
         {
             const bool dstDeactivate = (dst.SphereBounds.w == 0.0f);
             const bool srcDeactivate = (src.SphereBounds.w == 0.0f);
-            const bool srcPreserve = (src.SphereBounds.w < 0.0f);
+            const bool srcPreserveBounds = (src.SphereBounds.w < 0.0f);
 
+            // NOTE: Deactivation wins over later updates in the same batch.
             if (srcDeactivate && dst.SphereBounds.w > 0.0f)
                 return;
-            if (dstDeactivate && srcPreserve)
+            if (dstDeactivate && srcPreserveBounds)
                 return;
 
             dst.Data.Model = src.Data.Model;
-            dst.Data.TextureID = src.Data.TextureID;
-            dst.Data.EntityID = src.Data.EntityID;
 
+            // Sentinel contract(TextureID): 0xFFFFFFFF means "preserve existing".
+            if (src.Data.TextureID != kPreserveTextureId)
+                dst.Data.TextureID = src.Data.TextureID;
+
+            // Sentinel contract(EntityID): 0 means "preserve existing".
+            if (src.Data.EntityID != 0u)
+                dst.Data.EntityID = src.Data.EntityID;
+
+            // Sentinel contract(GeometryID): 0xFFFFFFFF means "preserve existing".
             if (src.Data.GeometryID != kPreserveGeometryId)
                 dst.Data.GeometryID = src.Data.GeometryID;
 
-            if (src.SphereBounds.w >= 0.0f)
+            if (!srcPreserveBounds)
                 dst.SphereBounds = src.SphereBounds;
         }
     }
@@ -159,8 +168,11 @@ namespace Graphics
         m_PendingUpdates.push_back(p);
     }
 
-    void GPUScene::Sync(VkCommandBuffer cmd)
+    void GPUScene::Sync(VkCommandBuffer cmd, uint32_t frameIndex)
     {
+        // Clamp frame index to valid range.
+        const uint32_t fi = frameIndex % kMaxFramesInFlight;
+
         // Move updates out under lock so we minimize contention.
         std::vector<GpuUpdatePacket> updates;
         {
@@ -175,18 +187,18 @@ namespace Graphics
         if (bytes == 0)
             return;
 
-        // Ensure transient buffer exists and is big enough.
-        if (!m_UpdatesStaging || bytes > m_UpdatesStagingCapacity)
+        // Ensure per-frame transient buffer exists and is big enough.
+        if (!m_UpdatesStaging[fi] || bytes > m_UpdatesStagingCapacity[fi])
         {
-            m_UpdatesStagingCapacity = std::max(bytes, static_cast<size_t>(GPUSceneConstants::kMinSSBOSize));
-            m_UpdatesStaging = std::make_unique<RHI::VulkanBuffer>(
+            m_UpdatesStagingCapacity[fi] = std::max(bytes, static_cast<size_t>(GPUSceneConstants::kMinSSBOSize));
+            m_UpdatesStaging[fi] = std::make_unique<RHI::VulkanBuffer>(
                 m_Device,
-                m_UpdatesStagingCapacity,
+                m_UpdatesStagingCapacity[fi],
                 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                 VMA_MEMORY_USAGE_CPU_TO_GPU);
         }
 
-        m_UpdatesStaging->Write(updates.data(), bytes);
+        m_UpdatesStaging[fi]->Write(updates.data(), bytes);
 
         if (!m_UpdateSetPool)
         {
@@ -202,7 +214,7 @@ namespace Graphics
         }
 
         VkDescriptorBufferInfo updatesInfo{};
-        updatesInfo.buffer = m_UpdatesStaging->GetHandle();
+        updatesInfo.buffer = m_UpdatesStaging[fi]->GetHandle();
         updatesInfo.offset = 0;
         updatesInfo.range = VK_WHOLE_SIZE;
 

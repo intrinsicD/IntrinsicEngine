@@ -85,7 +85,8 @@ export namespace Graphics
 
         // Record scatter compute into cmd. Caller is responsible for providing a valid command buffer.
         // This uploads pending updates to a transient SSBO and dispatches scene_update.comp.
-        void Sync(VkCommandBuffer cmd);
+        // frameIndex: the current frame-in-flight index (0..FramesInFlight-1) for per-frame staging buffer selection.
+        void Sync(VkCommandBuffer cmd, uint32_t frameIndex);
 
         [[nodiscard]] uint32_t GetMaxInstances() const { return m_MaxInstances; }
 
@@ -118,9 +119,10 @@ export namespace Graphics
         std::vector<uint32_t> m_GeometryIdShadow;
         std::mutex m_UpdateMutex;
 
-        // Per-sync transient resources.
-        std::unique_ptr<RHI::VulkanBuffer> m_UpdatesStaging;
-        size_t m_UpdatesStagingCapacity = 0;
+        // Per-sync transient resources (per-frame to avoid race conditions with frames in flight).
+        static constexpr uint32_t kMaxFramesInFlight = 3;
+        std::unique_ptr<RHI::VulkanBuffer> m_UpdatesStaging[kMaxFramesInFlight];
+        size_t m_UpdatesStagingCapacity[kMaxFramesInFlight] = {0, 0, 0};
 
         std::unique_ptr<RHI::PersistentDescriptorPool> m_UpdateSetPool;
     };

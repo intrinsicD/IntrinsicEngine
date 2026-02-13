@@ -40,16 +40,22 @@ void main()
 
     InstanceUpdate u = updates.Deltas[gid];
 
+    // Sentinel contract(TextureID): 0xFFFFFFFF means "preserve existing TextureID".
+    // This makes bindless slot 0 (default/error texture) a valid explicit value.
+    if (u.Data.TextureID == 0xFFFFFFFFu)
+        u.Data.TextureID = scene.Instances[u.SlotIndex].TextureID;
+
+    // Sentinel contract(EntityID): 0 means "preserve existing EntityID".
+    if (u.Data.EntityID == 0u)
+        u.Data.EntityID = scene.Instances[u.SlotIndex].EntityID;
+
     // Sentinel contract(GeometryID): 0xFFFFFFFF means "preserve existing GeometryID".
-    // This is required because the Stage 3 multi-geometry path uses a per-frame dense GeometryID.
-    // We want transform/material refresh to be able to keep routing stable.
     if (u.Data.GeometryID == 0xFFFFFFFFu)
         u.Data.GeometryID = scene.Instances[u.SlotIndex].GeometryID;
 
     scene.Instances[u.SlotIndex] = u.Data;
 
     // Sentinel contract: if radius < 0, keep the existing sphere bounds.
-    // This lets CPU-side systems update transforms/materials without recomputing local bounds.
     if (u.SphereBounds.w >= 0.0)
     {
         bounds.Spheres[u.SlotIndex] = u.SphereBounds;

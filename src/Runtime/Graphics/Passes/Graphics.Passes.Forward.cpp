@@ -229,6 +229,12 @@ namespace Graphics::Passes
                 packedVisibilityBytes,
                 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                 VMA_MEMORY_USAGE_GPU_ONLY);
+
+            // IMPORTANT: freshly allocated GPU-only buffers contain undefined memory.
+            // The cull shader only writes the [0..drawCount) prefix per geometry.
+            // If we ever accidentally over-read (or use stale indirect arguments), undefined content manifests as flicker.
+            // We clear here to make the system deterministic.
+            // Note: Actual per-frame counts are already reset via vkCmdFillBuffer(drawCounts).
         }
 
         m_Stage3LastGeometryCount = std::max(m_Stage3LastGeometryCount, geometryCount);
@@ -299,13 +305,21 @@ namespace Graphics::Passes
                                              geometryCount,
                                              maxDrawsPerGeometry,
                                              gpuSceneBufferHandle,
-                                             gpuBoundsBufferHandle](const CullPassData&, const RGRegistry&, VkCommandBuffer cmd) mutable
+                                             gpuBoundsBufferHandle,
+                                             needPackedResize](const CullPassData&, const RGRegistry&, VkCommandBuffer cmd) mutable
                                             {
                                                 if (!m_Stage3GeometryIndexCount[fi] || !m_Stage3IndirectPacked[fi] || !m_Stage3VisibilityPacked[fi] || !m_Stage3DrawCountsPacked[fi])
                                                     return;
 
                                                 // Reset drawCounts to 0 for the entire buffer.
                                                 vkCmdFillBuffer(cmd, m_Stage3DrawCountsPacked[fi]->GetHandle(), 0, VK_WHOLE_SIZE, 0);
+
+                                                // If we reallocated packed outputs this frame, clear them too.
+                                                if (needPackedResize)
+                                                {
+                                                    vkCmdFillBuffer(cmd, m_Stage3IndirectPacked[fi]->GetHandle(), 0, VK_WHOLE_SIZE, 0);
+                                                    vkCmdFillBuffer(cmd, m_Stage3VisibilityPacked[fi]->GetHandle(), 0, VK_WHOLE_SIZE, 0);
+                                                }
 
                                                 VkDescriptorSet cullSet = m_CullSetPool->Allocate(m_CullSetLayout);
                                                 if (cullSet == VK_NULL_HANDLE)

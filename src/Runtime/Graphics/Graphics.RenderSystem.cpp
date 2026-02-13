@@ -324,9 +324,9 @@ namespace Graphics
                                                        VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
                                                        VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT);
                                                },
-                                               [this](const SceneUpdateData&, const RGRegistry&, VkCommandBuffer cmd)
+                                               [this, frameIndex](const SceneUpdateData&, const RGRegistry&, VkCommandBuffer cmd)
                                                {
-                                                   if (m_GpuScene) m_GpuScene->Sync(cmd);
+                                                   if (m_GpuScene) m_GpuScene->Sync(cmd, frameIndex);
                                                });
 
         // Let the active pipeline register its passes.

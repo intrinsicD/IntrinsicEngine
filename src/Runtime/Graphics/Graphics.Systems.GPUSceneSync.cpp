@@ -60,22 +60,30 @@ namespace Graphics::Systems::GPUSceneSync
             if (!transformDirty && !materialDirty)
                 continue;
 
+            // If only the transform changed, don't touch TextureID/EntityID/GeometryID.
+            // If material changed, refresh TextureID.
+            const bool wantsMaterialRefresh = materialDirty;
+
             GpuInstanceData inst{};
             inst.Model = world.Matrix;
 
-            // IMPORTANT(GeometryID): do NOT overwrite GeometryID here.
-            // In the multi-geometry Stage 3 path, GeometryID is a per-frame dense geometry index.
-            // Overwriting it with mr.Geometry.Index (handle index) causes compute culling to drop the instance.
-            inst.GeometryID = 0xFFFFFFFFu;
+            inst.GeometryID = GPUSceneConstants::kPreserveGeometryId;
 
-            // TextureID: bindless index from material; 0 is default/error.
-            // Selection highlighting is handled by the SelectionOutlinePass (post-process).
-            inst.TextureID = (matData) ? matData->AlbedoID : defaultTextureId;
+            if (wantsMaterialRefresh)
+            {
+                inst.TextureID = (matData) ? matData->AlbedoID : defaultTextureId;
+            }
+            else
+            {
+                // Preserve existing TextureID.
+                inst.TextureID = 0xFFFFFFFFu;
+            }
 
             // Keep the picking ID stable.
             // If selection/picking is missing, EntityID stays 0.
             if (auto* pick = registry.try_get<ECS::Components::Selection::PickID>(entt::entity(entity)))
                 inst.EntityID = pick->Value;
+            // else preserve existing
 
             // IMPORTANT(bounds): don't clobber spawn-time local bounds.
             // Sentinel contract:
