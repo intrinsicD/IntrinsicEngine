@@ -292,7 +292,7 @@ namespace Graphics::Passes
                     uint32_t SelectedIds[kMaxSelectedIds];
                 } push{};
 
-                push.OutlineColor = glm::vec4(1.0f, 0.6f, 0.0f, 1.0f); // Orange
+                push.OutlineColor = glm::vec4(0.8f, 0.45f, 0.0f, 1.0f); // Orange
                 push.HoverColor = glm::vec4(0.3f, 0.7f, 1.0f, 0.8f);   // Light blue, slightly transparent
                 push.OutlineWidth = 2.0f;
                 push.SelectedCount = selState.SelectedCount;

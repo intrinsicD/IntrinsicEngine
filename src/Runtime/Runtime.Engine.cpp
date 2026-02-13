@@ -300,10 +300,11 @@ namespace Runtime
         };
 
         // --- Render Features ---
-        reg("ForwardPass",   Cat::RenderFeature, "Main forward PBR rendering pass");
-        reg("PickingPass",   Cat::RenderFeature, "Entity ID picking for mouse selection");
-        reg("DebugViewPass", Cat::RenderFeature, "Render target debug visualization");
-        reg("ImGuiPass",     Cat::RenderFeature, "ImGui UI overlay");
+        reg("ForwardPass",           Cat::RenderFeature, "Main forward PBR rendering pass");
+        reg("PickingPass",           Cat::RenderFeature, "Entity ID picking for mouse selection");
+        reg("SelectionOutlinePass",  Cat::RenderFeature, "Selection outline overlay for selected/hovered entities");
+        reg("DebugViewPass",         Cat::RenderFeature, "Render target debug visualization");
+        reg("ImGuiPass",             Cat::RenderFeature, "ImGui UI overlay");
 
         // --- ECS Systems ---
         reg("TransformUpdate",        Cat::System, "Propagates local transforms to world matrices");
