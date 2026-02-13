@@ -2,6 +2,7 @@
 
 ## Build System
 
+- **Dependencies Setup**: SessionStart hook in `.claude/setup.sh`
 - **Generator:** Ninja (required for C++20 modules — never use Unix Makefiles)
 - **Compiler:** Clang 18+ with `clang-scan-deps-18` for module dependency scanning
 - **Standard:** C++23 (`std::expected`, `std::format`, modules)
@@ -39,6 +40,14 @@ cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug \
 - Use `Unix Makefiles` generator — modules require Ninja
 - Delete directories under `external/cache/` — CMake FetchContent state lives there
 - Run `rm -rf build` unless you intend a full reconfigure (takes ~3 minutes)
+
+### Important: Do
+
+- Before implementing a new feature, scan for existing functionality in the codebase
+- Refactor existing code only if necessary (e.g. to improve performance, reduce code duplication, a new feature requires it, or to extract a subsystem into its own module)
+- Make sure the code is tested well
+- Care about code quality, performance and maintainability of the codebase
+- Care about state of the art methods are used (e.g. for rendering, data structures, algorithms, etc.)
 
 ## Project Structure
 
