@@ -386,8 +386,13 @@ namespace Graphics::Passes
                                             if (intermediate.IsValid() && backbuffer.IsValid())
                                             {
                                                 // Blit requires TRANSFER_READ on source and TRANSFER_WRITE on dest
+                                                // IMPORTANT: OR-in MEMORY_WRITE so the DAG scheduler treats this
+                                                // as a write on DebugViewRGBA. Without it, DebugViewBarrier (which
+                                                // also reads DebugViewRGBA) has no ordering constraint with this
+                                                // pass, and the scheduler can reorder them. CalculateBarriers
+                                                // assumes creation order, so reordering causes oldLayout mismatches.
                                                 data.Src = builder.Read(intermediate, VK_PIPELINE_STAGE_2_TRANSFER_BIT,
-                                                                        VK_ACCESS_2_TRANSFER_READ_BIT);
+                                                                        VK_ACCESS_2_TRANSFER_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT);
                                                 data.Dst = builder.Write(
                                                     backbuffer, VK_PIPELINE_STAGE_2_TRANSFER_BIT,
                                                     VK_ACCESS_2_TRANSFER_WRITE_BIT);
