@@ -108,12 +108,12 @@ namespace Runtime
             return;
 
         // Shift modifies selection semantics:
-        //  - no shift: add the clicked entity (no deselection)
+        //  - no shift: replace selection with the clicked entity (standard click-to-select)
         //  - shift: toggle clicked entity; background clears only if shift is NOT held
         const bool shiftDown = window.GetInput().IsKeyPressed(340) || window.GetInput().IsKeyPressed(344); // GLFW_KEY_LEFT_SHIFT / RIGHT_SHIFT
         const Runtime::Selection::PickMode clickMode = shiftDown
             ? Runtime::Selection::PickMode::Toggle
-            : Runtime::Selection::PickMode::Add;
+            : Runtime::Selection::PickMode::Replace;
 
         // 1) On click: schedule GPU pick or do CPU pick immediately.
         if (camera != nullptr && !uiCapturesMouse)

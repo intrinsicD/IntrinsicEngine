@@ -418,7 +418,7 @@ namespace Graphics::Passes
 
         // Single raster pass consuming the draw stream.
         ctx.Graph.AddPass<PassData>("ForwardRaster",
-                                    [&ctx, backbuffer, depth](PassData& data, RGBuilder& builder)
+                                    [this, &ctx, backbuffer, depth, fi = ctx.FrameIndex % FRAMES](PassData& data, RGBuilder& builder)
                                     {
                                         RGAttachmentInfo colorInfo{};
                                         colorInfo.ClearValue = {{{0.1f, 0.3f, 0.6f, 1.0f}}};
@@ -431,6 +431,29 @@ namespace Graphics::Passes
                                         data.Color = builder.WriteColor(backbuffer, colorInfo);
                                         data.Depth = builder.WriteDepth(depth, depthInfo);
                                         ctx.Blackboard.Add("SceneColor"_id, data.Color);
+
+                                        // Declare dependencies on the GPU-culled buffers to enforce
+                                        // compute→graphics barriers between ForwardCull and ForwardRaster.
+                                        if (m_Stage3IndirectPacked[fi])
+                                        {
+                                            auto indirect = builder.ImportBuffer("Stage3.IndirectPacked"_id, *m_Stage3IndirectPacked[fi]);
+                                            builder.Read(indirect, VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT, VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT);
+                                        }
+                                        if (m_Stage3VisibilityPacked[fi])
+                                        {
+                                            auto visibility = builder.ImportBuffer("Stage3.VisibilityPacked"_id, *m_Stage3VisibilityPacked[fi]);
+                                            builder.Read(visibility, VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT, VK_ACCESS_2_SHADER_STORAGE_READ_BIT);
+                                        }
+                                        if (m_Stage3DrawCountsPacked[fi])
+                                        {
+                                            auto counts = builder.ImportBuffer("Stage3.DrawCounts"_id, *m_Stage3DrawCountsPacked[fi]);
+                                            builder.Read(counts, VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT, VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT);
+                                        }
+                                        if (ctx.GpuScene)
+                                        {
+                                            auto instances = builder.ImportBuffer("GPUScene.Scene"_id, ctx.GpuScene->GetSceneBuffer());
+                                            builder.Read(instances, VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT, VK_ACCESS_2_SHADER_STORAGE_READ_BIT);
+                                        }
                                     },
                                     [this, &ctx, pipeline = m_Pipeline, stream = std::move(stream)](const PassData&, const RGRegistry&, VkCommandBuffer cmd) mutable
                                     {
