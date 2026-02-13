@@ -3,7 +3,6 @@ module;
 #include <string>
 #include <set>
 #include <mutex>
-#include <functional>
 #include <string_view>
 #include <memory>
 #include <algorithm>
@@ -16,6 +15,7 @@ import :Device;
 import :Context;
 import :TransientAllocator;
 import Core.Logging;
+import Core.InplaceFunction;
 
 namespace RHI
 {
@@ -191,7 +191,7 @@ namespace RHI
         });
     }
 
-    void VulkanDevice::SafeDestroyAfter(uint64_t value, std::function<void()>&& deleteFn)
+    void VulkanDevice::SafeDestroyAfter(uint64_t value, Core::InplaceFunction<void()>&& deleteFn)
     {
         bool needsFlush = false;
         {
@@ -211,7 +211,7 @@ namespace RHI
         }
     }
 
-    void VulkanDevice::SafeDestroy(std::function<void()>&& deleteFn)
+    void VulkanDevice::SafeDestroy(Core::InplaceFunction<void()>&& deleteFn)
     {
         // Defer until the *next* graphics submit completes.
         // If no submit has happened yet, fall back to value 1 (first submit).
