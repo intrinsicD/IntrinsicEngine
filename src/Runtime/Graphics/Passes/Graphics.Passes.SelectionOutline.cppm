@@ -48,6 +48,7 @@ export namespace Graphics::Passes
         VkSampler m_Sampler = VK_NULL_HANDLE;
         std::vector<VkDescriptorSet> m_DescriptorSets;
         std::unique_ptr<RHI::GraphicsPipeline> m_Pipeline;
+        std::unique_ptr<RHI::VulkanImage> m_DummyPickId;
 
         // Cached handle from AddPasses for PostCompile descriptor update.
         RGResourceHandle m_LastPickIdHandle{};

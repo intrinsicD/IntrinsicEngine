@@ -70,7 +70,7 @@ namespace Graphics::Passes
             set = descriptorPool.Allocate(m_DescriptorSetLayout);
 
         // Create a dummy 1x1 R32_UINT image for initial descriptor binding
-        auto dummyImage = std::make_unique<RHI::VulkanImage>(
+        m_DummyPickId = std::make_unique<RHI::VulkanImage>(
             *m_Device, 1, 1, 1,
             VK_FORMAT_R32_UINT,
             VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
@@ -85,7 +85,7 @@ namespace Graphics::Passes
             barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
             barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
             barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-            barrier.image = dummyImage->GetHandle();
+            barrier.image = m_DummyPickId->GetHandle();
             barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
             barrier.subresourceRange.baseMipLevel = 0;
             barrier.subresourceRange.levelCount = 1;
@@ -108,7 +108,7 @@ namespace Graphics::Passes
         for (auto& set : m_DescriptorSets)
         {
             VkDescriptorImageInfo imageInfo{
-                m_Sampler, dummyImage->GetView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+                m_Sampler, m_DummyPickId->GetView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
             };
 
             VkWriteDescriptorSet write{};
@@ -122,13 +122,7 @@ namespace Graphics::Passes
             vkUpdateDescriptorSets(m_Device->GetLogicalDevice(), 1, &write, 0, nullptr);
         }
 
-        // Dummy image can be destroyed after descriptor init (Vulkan keeps references)
-        // Actually, we must keep it alive. Store it as member? No — the transient PickID image from
-        // the render graph will replace this binding each frame via PostCompile.
-        // We still need the dummy alive for the first frame before PostCompile runs.
-        // For simplicity, let the dummyImage go out of scope — the device will defer-destroy it
-        // after frames-in-flight, by which time PostCompile will have updated the binding.
-        // This is safe because Vulkan descriptor updates are deferred to the next use.
+        // Keep the dummy alive until replaced in PostCompile.
     }
 
     void SelectionOutlinePass::AddPasses(RenderPassContext& ctx)
@@ -140,12 +134,13 @@ namespace Graphics::Passes
         uint32_t selectedCount = 0;
         uint32_t selectedIds[kMaxSelectedIds] = {};
         uint32_t hoveredId = 0;
+        bool hasHovered = false;
 
         auto selectedView = registry.view<
             ECS::Components::Selection::SelectedTag,
             ECS::Components::Selection::PickID>();
 
-        for (auto [entity, tag, pid] : selectedView.each())
+        for (auto [entity, pid] : selectedView.each())
         {
             if (selectedCount < kMaxSelectedIds)
                 selectedIds[selectedCount++] = pid.Value;
@@ -155,14 +150,18 @@ namespace Graphics::Passes
             ECS::Components::Selection::HoveredTag,
             ECS::Components::Selection::PickID>();
 
-        for (auto [entity, tag, pid] : hoveredView.each())
+        for (auto [entity, pid] : hoveredView.each())
         {
             hoveredId = pid.Value;
+            hasHovered = true;
             break; // Only one hovered entity at a time
         }
 
+        // Clear the cached handle unless we add the pass.
+        m_LastPickIdHandle = {};
+
         // Early out: nothing to outline
-        if (selectedCount == 0 && hoveredId == 0)
+        if (selectedCount == 0 && !hasHovered)
             return;
 
         if (ctx.Resolution.width == 0 || ctx.Resolution.height == 0)
@@ -240,7 +239,7 @@ namespace Graphics::Passes
                 // Read the PickID buffer as a sampled texture
                 data.PickID = builder.Read(pickId,
                     VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-                    VK_ACCESS_2_SHADER_SAMPLED_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT);
+                    VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
 
                 // Write (alpha-blend) onto the backbuffer, preserving existing content
                 RGAttachmentInfo info{};
@@ -344,6 +343,7 @@ namespace Graphics::Passes
     void SelectionOutlinePass::Shutdown()
     {
         if (!m_Device) return;
+        m_DummyPickId.reset();
         if (m_DescriptorSetLayout)
             vkDestroyDescriptorSetLayout(m_Device->GetLogicalDevice(), m_DescriptorSetLayout, nullptr);
         if (m_Sampler)
