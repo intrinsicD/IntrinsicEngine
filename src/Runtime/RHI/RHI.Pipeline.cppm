@@ -47,6 +47,7 @@ export namespace RHI
         PipelineBuilder& SetMultisampling(VkSampleCountFlagBits samples);
         PipelineBuilder& EnableDepthTest(bool depthWrite, VkCompareOp op = VK_COMPARE_OP_LESS);
         PipelineBuilder& DisableDepthTest();
+        PipelineBuilder& EnableAlphaBlending();
 
         // Critical: Dynamic Rendering Formats
         PipelineBuilder& SetColorFormats(const std::vector<VkFormat>& formats);

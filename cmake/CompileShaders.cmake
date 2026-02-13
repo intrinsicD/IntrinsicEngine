@@ -17,6 +17,7 @@ else ()
             debug_view.vert
             debug_view.frag
             debug_view.comp
+            selection_outline.frag
             instance_cull.comp
             instance_cull_multigeo.comp
             scene_update.comp

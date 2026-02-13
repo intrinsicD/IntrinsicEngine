@@ -158,6 +158,18 @@ namespace RHI
         return *this;
     }
 
+    PipelineBuilder& PipelineBuilder::EnableAlphaBlending()
+    {
+        m_ColorBlendAttachment.blendEnable = VK_TRUE;
+        m_ColorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+        m_ColorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+        m_ColorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
+        m_ColorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+        m_ColorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+        m_ColorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
+        return *this;
+    }
+
     std::expected<std::unique_ptr<GraphicsPipeline>, VkResult> PipelineBuilder::Build()
     {
         // 1. Pipeline Layout
