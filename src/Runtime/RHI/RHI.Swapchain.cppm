@@ -9,7 +9,7 @@ module;
 export module RHI:Swapchain;
 
 import :Device;
-import Core; // For window dimensions
+import Core.Window; // For Core::Windowing::Window
 
 namespace RHI
 {

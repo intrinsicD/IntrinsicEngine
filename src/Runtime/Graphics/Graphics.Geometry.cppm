@@ -15,7 +15,7 @@ export module Graphics:Geometry;
 
 import RHI;
 import Geometry;
-import Core;
+import Core.ResourcePool;
 
 export namespace Graphics
 {

@@ -10,7 +10,7 @@ module RHI:Bindless.Impl;
 import :Bindless;
 import :Device;
 import :Texture;
-import Core;
+import Core.Logging;
 
 namespace RHI
 {

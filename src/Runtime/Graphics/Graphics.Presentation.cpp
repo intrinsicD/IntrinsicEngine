@@ -7,7 +7,6 @@ module Graphics:Presentation.Impl;
 
 import :Presentation;
 import RHI;
-import Core;
 
 namespace Graphics
 {

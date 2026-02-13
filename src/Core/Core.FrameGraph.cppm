@@ -7,14 +7,14 @@ module;
 #include <string_view>
 #include <vector>
 
-export module Core:FrameGraph;
+export module Core.FrameGraph;
 
-import :Error;
-import :Memory;
-import :Logging;
-import :Hash;
-import :Tasks;
-import :DAGScheduler;
+import Core.Error;
+import Core.Memory;
+import Core.Logging;
+import Core.Hash;
+import Core.Tasks;
+import Core.DAGScheduler;
 
 // -------------------------------------------------------------------------
 // Core::FrameGraph - System Execution Task Graph

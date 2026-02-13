@@ -8,7 +8,7 @@ import :Texture;
 import :Device;
 import :TextureSystem;
 import :Image;
-import Core;
+import Core.Logging;
 
 namespace RHI
 {

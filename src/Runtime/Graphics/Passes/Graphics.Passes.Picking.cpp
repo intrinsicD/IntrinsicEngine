@@ -1,7 +1,7 @@
 module;
 
 #include <glm/glm.hpp>
-#include <entt/entt.hpp>
+#include <entt/entity/registry.hpp>
 #include "RHI.Vulkan.hpp"
 
 module Graphics:Passes.Picking.Impl;
@@ -12,7 +12,7 @@ import :RenderPipeline;
 import :RenderGraph;
 import :Components;
 import :Geometry;
-import Core;
+import Core.Hash;
 import ECS;
 import RHI;
 

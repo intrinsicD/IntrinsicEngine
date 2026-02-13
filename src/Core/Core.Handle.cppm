@@ -3,7 +3,7 @@ module;
 #include <limits>
 #include <functional>
 
-export module Core:Handle;
+export module Core.Handle;
 
 export namespace Core
 {

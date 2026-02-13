@@ -9,7 +9,8 @@ export module RHI:TextureSystem;
 import :Device;
 import :Texture;
 import :Bindless;
-import Core;
+import Core.Handle;       // For Core::StrongHandle (via TextureHandle)
+import Core.ResourcePool; // For Core::ResourcePool
 
 export namespace RHI
 {

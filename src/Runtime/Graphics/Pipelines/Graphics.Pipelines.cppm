@@ -15,13 +15,20 @@ import :Passes.Forward;
 import :Passes.ImGui;
 import :Passes.Picking;
 import RHI;
+import Core.Hash;
+import Core.FeatureRegistry;
 
 export namespace Graphics
 {
     // Default pipeline that replicates current hard-coded RenderSystem feature order.
+    // When a FeatureRegistry is provided, RebuildPath() checks IsEnabled() for each
+    // feature, allowing runtime toggling without pipeline recreation.
     class DefaultPipeline final : public RenderPipeline
     {
     public:
+        // Provide an optional FeatureRegistry for runtime enable/disable of features.
+        void SetFeatureRegistry(const Core::FeatureRegistry* registry) { m_Registry = registry; }
+
         void Initialize(RHI::VulkanDevice& device,
                         RHI::DescriptorAllocator& descriptorPool,
                         RHI::DescriptorLayout& globalLayout,
@@ -39,6 +46,8 @@ export namespace Graphics
                          std::span<const RenderGraphDebugPass> debugPasses) override;
 
     private:
+        const Core::FeatureRegistry* m_Registry = nullptr;
+
         std::unique_ptr<Passes::PickingPass> m_PickingPass;
         std::unique_ptr<Passes::ForwardPass> m_ForwardPass;
         std::unique_ptr<Passes::DebugViewPass> m_DebugViewPass;
@@ -48,6 +57,28 @@ export namespace Graphics
         RenderPath m_Path;
         bool m_PathDirty = true;
 
+        // Check if a feature is enabled via the registry (defaults to true if no registry).
+        bool IsFeatureEnabled(Core::Hash::StringID id) const;
+
         void RebuildPath();
     };
+
+    // -------------------------------------------------------------------------
+    // Vtable anchor: Shutdown() is defined in this TU (the :Pipelines partition)
+    // so the vtable for DefaultPipeline is emitted here — same TU as the class.
+    // This works around Clang 18's failure to link vtables across module
+    // partition boundaries (see ARCHITECTURE_ANALYSIS.md §1.1).
+    // -------------------------------------------------------------------------
+    void DefaultPipeline::Shutdown()
+    {
+        if (m_PickingPass) m_PickingPass->Shutdown();
+        if (m_ForwardPass) m_ForwardPass->Shutdown();
+        if (m_DebugViewPass) m_DebugViewPass->Shutdown();
+        if (m_ImGuiPass) m_ImGuiPass->Shutdown();
+
+        m_PickingPass.reset();
+        m_ForwardPass.reset();
+        m_DebugViewPass.reset();
+        m_ImGuiPass.reset();
+    }
 }

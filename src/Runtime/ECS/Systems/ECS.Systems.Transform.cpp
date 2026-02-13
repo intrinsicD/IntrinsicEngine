@@ -6,7 +6,8 @@ module ECS:Systems.Transform.Impl;
 import :Systems.Transform;
 import :Components.Transform;
 import :Components.Hierarchy;
-import Core;
+import Core.Hash;
+import Core.FrameGraph;
 
 using Core::Hash::operator""_id;
 

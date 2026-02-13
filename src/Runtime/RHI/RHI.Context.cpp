@@ -9,7 +9,7 @@ module;
 
 module RHI:Context.Impl;
 import :Context;
-import Core;
+import Core.Logging;
 
 namespace RHI
 {

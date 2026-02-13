@@ -15,7 +15,8 @@ import :PipelineLibrary;
 import :ShaderRegistry;
 import :Pipelines;
 import RHI;
-import Core;
+import Core.Hash;
+import Core.FeatureRegistry;
 
 using namespace Core::Hash;
 
@@ -49,45 +50,46 @@ namespace Graphics
         m_PathDirty = true;
     }
 
-    void DefaultPipeline::Shutdown()
+    bool DefaultPipeline::IsFeatureEnabled(Core::Hash::StringID id) const
     {
-        if (m_PickingPass) m_PickingPass->Shutdown();
-        if (m_ForwardPass) m_ForwardPass->Shutdown();
-        if (m_DebugViewPass) m_DebugViewPass->Shutdown();
-        if (m_ImGuiPass) m_ImGuiPass->Shutdown();
-
-        m_PickingPass.reset();
-        m_ForwardPass.reset();
-        m_DebugViewPass.reset();
-        m_ImGuiPass.reset();
+        if (!m_Registry) return true; // No registry → all features enabled
+        return m_Registry->IsEnabled(id);
     }
 
     void DefaultPipeline::RebuildPath()
     {
         m_Path.Clear();
 
-        // 1. Picking (Readback)
-        m_Path.AddFeature("Picking", m_PickingPass.get());
+        // 1. Picking (Readback) — gated by FeatureRegistry
+        if (m_PickingPass && IsFeatureEnabled("PickingPass"_id))
+            m_Path.AddFeature("Picking", m_PickingPass.get());
 
-        // 2. Forward (Main Scene)
-        m_Path.AddFeature("Forward", m_ForwardPass.get());
+        // 2. Forward (Main Scene) — gated by FeatureRegistry
+        if (m_ForwardPass && IsFeatureEnabled("ForwardPass"_id))
+            m_Path.AddFeature("Forward", m_ForwardPass.get());
 
-        // 3. Debug View (Conditional)
-        m_Path.AddStage("DebugView", [this](RenderPassContext& ctx)
+        // 3. Debug View (Conditional on both registry and per-frame debug state)
+        if (m_DebugViewPass && IsFeatureEnabled("DebugViewPass"_id))
         {
-            if (m_DebugViewPass && ctx.Debug.Enabled)
+            m_Path.AddStage("DebugView", [this](RenderPassContext& ctx)
             {
-                m_DebugViewPass->AddPasses(ctx);
-            }
-        });
+                if (ctx.Debug.Enabled)
+                {
+                    m_DebugViewPass->AddPasses(ctx);
+                }
+            });
+        }
 
-        // 4. ImGui (Overlay)
-        m_Path.AddFeature("ImGui", m_ImGuiPass.get());
+        // 4. ImGui (Overlay) — gated by FeatureRegistry
+        if (m_ImGuiPass && IsFeatureEnabled("ImGuiPass"_id))
+            m_Path.AddFeature("ImGui", m_ImGuiPass.get());
     }
 
     void DefaultPipeline::SetupFrame(RenderPassContext& ctx)
     {
-        if (m_PathDirty)
+        // When a FeatureRegistry is connected, rebuild every frame so that
+        // runtime enable/disable changes take effect immediately.
+        if (m_PathDirty || m_Registry)
         {
             RebuildPath();
             m_PathDirty = false;

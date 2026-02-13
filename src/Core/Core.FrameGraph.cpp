@@ -4,14 +4,13 @@ module;
 #include <cstdint>
 #include <vector>
 
-module Core:FrameGraph.Impl;
-import :FrameGraph;
-import :Error;
-import :Memory;
-import :Logging;
-import :Hash;
-import :Tasks;
-import :DAGScheduler;
+module Core.FrameGraph;
+import Core.Error;
+import Core.Memory;
+import Core.Logging;
+import Core.Hash;
+import Core.Tasks;
+import Core.DAGScheduler;
 
 namespace Core
 {

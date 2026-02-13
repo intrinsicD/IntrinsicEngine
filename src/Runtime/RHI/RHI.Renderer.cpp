@@ -11,7 +11,8 @@ import :Pipeline;
 import :Image;
 import :CommandUtils;
 import :Profiler;
-import Core;
+import Core.Logging;
+import Core.Telemetry;
 
 namespace RHI
 {

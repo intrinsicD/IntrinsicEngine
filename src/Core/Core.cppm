@@ -1,18 +1,20 @@
 export module Core;
 
 // Re-export all sub-systems so the user only needs 'import Core;'
-export import :Error;
-export import :Memory;
-export import :Logging;
-export import :Tasks;
-export import :Window;
-export import :Filesystem;
-export import :Input;
-export import :Assets;
-export import :Profiling;
-export import :Telemetry;
-export import :ResourcePool;
-export import :Hash;
-export import :Handle;
-export import :FrameGraph;
-export import :DAGScheduler;
+export import Core.Error;
+export import Core.Memory;
+export import Core.Logging;
+export import Core.Tasks;
+export import Core.Window;
+export import Core.Filesystem;
+export import Core.Input;
+export import Core.Assets;
+export import Core.Profiling;
+export import Core.Telemetry;
+export import Core.ResourcePool;
+export import Core.Hash;
+export import Core.Handle;
+export import Core.FrameGraph;
+export import Core.DAGScheduler;
+export import Core.FeatureRegistry;
+export import Core.InplaceFunction;

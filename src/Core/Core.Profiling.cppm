@@ -2,9 +2,9 @@ module;
 #include <source_location>
 #include <chrono>
 
-export module Core:Profiling;
+export module Core.Profiling;
 
-import :Telemetry;
+import Core.Telemetry;
 
 export namespace Core::Profiling
 {

@@ -1,5 +1,5 @@
 module;
-#include <entt/entity/registry.hpp>
+#include <entt/entity/entity.hpp>
 #include <cassert>
 
 export module ECS:Components.Hierarchy;

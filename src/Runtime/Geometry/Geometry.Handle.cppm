@@ -1,7 +1,9 @@
 module;
 
 export module Geometry:Handle;
-import Core;
+import Core.Handle;
+import Core.ResourcePool;
+import Core.Error;
 
 export namespace Geometry
 {

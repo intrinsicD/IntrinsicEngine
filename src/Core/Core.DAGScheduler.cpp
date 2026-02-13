@@ -4,10 +4,9 @@ module;
 #include <cstdint>
 #include <vector>
 
-module Core:DAGScheduler.Impl;
-import :DAGScheduler;
-import :Error;
-import :Logging;
+module Core.DAGScheduler;
+import Core.Error;
+import Core.Logging;
 
 namespace Core
 {

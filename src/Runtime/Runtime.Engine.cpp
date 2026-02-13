@@ -15,7 +15,16 @@ module;
 
 module Runtime.Engine;
 
-import Core;
+import Core.Logging;
+import Core.Tasks;
+import Core.Window;
+import Core.Filesystem;
+import Core.Assets;
+import Core.Telemetry;
+import Core.FrameGraph;
+import Core.Hash;
+import Core.Profiling;
+import Core.FeatureRegistry;
 import RHI;
 import Graphics;
 import ECS;
@@ -108,6 +117,7 @@ namespace Runtime
             m_GraphicsBackend->GetTextureSystem(),
             GetAssetManager(),
             m_GraphicsBackend->GetDefaultTextureIndex(),
+            &m_FeatureRegistry,
             config.FrameArenaSize);
 
         // 7. Connect EnTT on_destroy hook for immediate GPU slot reclaim (via SceneManager).
@@ -115,6 +125,9 @@ namespace Runtime
         {
             m_SceneManager->ConnectGpuHooks(m_RenderOrchestrator->GetGPUScene());
         }
+
+        // 8. Register core features in the central FeatureRegistry.
+        RegisterCoreFeatures();
 
         Core::Log::Info("Engine: Constructor complete.");
     }
@@ -265,6 +278,41 @@ namespace Runtime
         return m_SceneManager->SpawnModel(GetAssetManager(), modelHandle, materialHandle, position, scale);
     }
 
+    void Engine::RegisterCoreFeatures()
+    {
+        using Cat = Core::FeatureCategory;
+
+        // All features are registered as catalog entries for discovery and
+        // runtime enable/disable.  Factories are no-ops: render passes are
+        // owned by DefaultPipeline, and ECS systems are stateless free
+        // functions — neither needs FeatureRegistry to create instances.
+        auto noopFactory = []() -> void* { return nullptr; };
+        auto noopDestroy = [](void*) {};
+
+        auto reg = [&](const char* name, Cat cat, const char* desc) {
+            Core::FeatureInfo info{};
+            info.Name = name;
+            info.Id = Core::Hash::StringID(Core::Hash::HashString(info.Name));
+            info.Category = cat;
+            info.Description = desc;
+            info.Enabled = true;
+            m_FeatureRegistry.Register(std::move(info), noopFactory, noopDestroy);
+        };
+
+        // --- Render Features ---
+        reg("ForwardPass",   Cat::RenderFeature, "Main forward PBR rendering pass");
+        reg("PickingPass",   Cat::RenderFeature, "Entity ID picking for mouse selection");
+        reg("DebugViewPass", Cat::RenderFeature, "Render target debug visualization");
+        reg("ImGuiPass",     Cat::RenderFeature, "ImGui UI overlay");
+
+        // --- ECS Systems ---
+        reg("TransformUpdate",        Cat::System, "Propagates local transforms to world matrices");
+        reg("MeshRendererLifecycle",   Cat::System, "Allocates/deallocates GPU slots for mesh renderers");
+        reg("GPUSceneSync",           Cat::System, "Synchronizes CPU entity data to GPU scene buffers");
+
+        Core::Log::Info("FeatureRegistry: Registered {} core features", m_FeatureRegistry.Count());
+    }
+
     void Engine::Run()
     {
         Core::Log::Info("Engine::Run starting...");
@@ -333,20 +381,30 @@ namespace Runtime
                 OnRegisterSystems(frameGraph, frameDt);
 
                 // Core engine systems consume dirty state in pipeline order.
-                ECS::Systems::Transform::RegisterSystem(frameGraph, registry);
+                // Each system is gated by the FeatureRegistry so it can be
+                // toggled at runtime (e.g. for debugging or profiling).
+                if (m_FeatureRegistry.IsEnabled("TransformUpdate"_id))
+                    ECS::Systems::Transform::RegisterSystem(frameGraph, registry);
 
                 auto* gpuScene = m_RenderOrchestrator->GetGPUScenePtr();
                 if (gpuScene)
                 {
                     auto& matSys = m_RenderOrchestrator->GetMaterialSystem();
-                    Graphics::Systems::MeshRendererLifecycle::RegisterSystem(
-                        frameGraph, registry, *gpuScene, GetAssetManager(),
-                        matSys, m_RenderOrchestrator->GetGeometryStorage(),
-                        m_GraphicsBackend->GetDefaultTextureIndex());
 
-                    Graphics::Systems::GPUSceneSync::RegisterSystem(
-                        frameGraph, registry, *gpuScene, GetAssetManager(),
-                        matSys, m_GraphicsBackend->GetDefaultTextureIndex());
+                    if (m_FeatureRegistry.IsEnabled("MeshRendererLifecycle"_id))
+                    {
+                        Graphics::Systems::MeshRendererLifecycle::RegisterSystem(
+                            frameGraph, registry, *gpuScene, GetAssetManager(),
+                            matSys, m_RenderOrchestrator->GetGeometryStorage(),
+                            m_GraphicsBackend->GetDefaultTextureIndex());
+                    }
+
+                    if (m_FeatureRegistry.IsEnabled("GPUSceneSync"_id))
+                    {
+                        Graphics::Systems::GPUSceneSync::RegisterSystem(
+                            frameGraph, registry, *gpuScene, GetAssetManager(),
+                            matSys, m_GraphicsBackend->GetDefaultTextureIndex());
+                    }
                 }
 
                 auto compileResult = frameGraph.Compile();

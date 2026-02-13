@@ -2,8 +2,7 @@ module;
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 
-module Core:Input.Impl;
-import :Input;
+module Core.Input;
 
 namespace Core::Input
 {

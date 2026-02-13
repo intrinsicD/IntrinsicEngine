@@ -10,7 +10,10 @@ module;
 
 module Graphics:RenderGraph.Impl;
 import :RenderGraph;
-import Core;
+import Core.Hash;
+import Core.Memory;
+import Core.Logging;
+import Core.Tasks;
 import RHI;
 
 namespace Graphics

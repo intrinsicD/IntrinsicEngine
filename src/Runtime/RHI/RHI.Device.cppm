@@ -2,7 +2,6 @@ module;
 #include <vector>
 #include <optional>
 #include <mutex>
-#include <functional>
 #include <memory>
 #include <atomic>
 #include "RHI.Vulkan.hpp"
@@ -10,7 +9,7 @@ module;
 export module RHI:Device;
 
 import :Context;
-import Core;
+import Core.InplaceFunction;
 
 namespace RHI
 {
@@ -116,10 +115,10 @@ namespace RHI
         void CollectGarbage();
 
         // Like SafeDestroy(), but deferred until the graphics timeline reaches 'value'.
-        void SafeDestroyAfter(uint64_t value, std::function<void()>&& deleteFn);
+        void SafeDestroyAfter(uint64_t value, Core::InplaceFunction<void()>&& deleteFn);
 
         // Existing API: keep name, but implement in terms of timeline.
-        void SafeDestroy(std::function<void()>&& deleteFn);
+        void SafeDestroy(Core::InplaceFunction<void()>&& deleteFn);
 
         // Graphics timeline semaphore handle used for vkQueueSubmit signaling.
         [[nodiscard]] VkSemaphore GetGraphicsTimelineSemaphore() const { return m_GraphicsTimelineSemaphore; }
@@ -147,7 +146,7 @@ namespace RHI
         // NOTE: 3 frames-in-flight gives the deferred deletion queues enough slack for transient
         // RenderGraph resources that are recreated every frame.
         static constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 3;
-        std::vector<std::function<void()>> m_DeletionQueue[MAX_FRAMES_IN_FLIGHT];
+        std::vector<Core::InplaceFunction<void()>> m_DeletionQueue[MAX_FRAMES_IN_FLIGHT];
         uint32_t m_CurrentFrameIndex = 0;
         uint64_t m_GlobalFrameNumber = 0; // Monotonically increasing frame counter
         std::mutex m_DeletionMutex;
@@ -175,7 +174,7 @@ namespace RHI
         struct DeferredDelete
         {
             uint64_t Value = 0;
-            std::function<void()> Fn;
+            Core::InplaceFunction<void()> Fn;
         };
 
         std::vector<DeferredDelete> m_TimelineDeletionQueue;

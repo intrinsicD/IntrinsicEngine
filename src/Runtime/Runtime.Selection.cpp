@@ -11,7 +11,7 @@ module Runtime.Selection;
 
 import ECS;
 import Geometry;
-import Core;
+import Core.Logging;
 import Graphics;
 
 namespace Runtime::Selection

@@ -3,8 +3,6 @@ module;
 #include <memory>
 #include <span>
 
-#include <entt/entt.hpp>
-
 #include "RHI.Vulkan.hpp"
 
 export module Graphics:Passes.Picking;
@@ -12,7 +10,6 @@ export module Graphics:Passes.Picking;
 import :RenderPipeline;
 import :RenderGraph;
 import :Components;
-import Core;
 import ECS;
 import RHI;
 

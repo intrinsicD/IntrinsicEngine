@@ -7,7 +7,8 @@ module;
 
 export module Runtime.GraphicsBackend;
 
-import Core;
+import Core.Window;
+import Core.Logging;
 import RHI;
 
 export namespace Runtime

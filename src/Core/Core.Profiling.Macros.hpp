@@ -1,6 +1,6 @@
 #pragma once
 
-import Core;
+import Core.Profiling;
 
 // Macro for easy usage
 #define PROFILE_SCOPE(name) Core::Profiling::ScopedTimer timer##__LINE__(name)

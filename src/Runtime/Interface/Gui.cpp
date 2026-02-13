@@ -20,7 +20,10 @@ module;
 
 module Interface:GUI.Impl;
 import :GUI;
-import Core;
+import Core.Logging;
+import Core.Filesystem;
+import Core.Telemetry;
+import Core.Window;
 import RHI;
 
 namespace Interface::GUI

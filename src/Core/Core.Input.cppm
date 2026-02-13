@@ -3,7 +3,7 @@ module;
 #include <glm/glm.hpp>
 #include <array>
 
-export module Core:Input;
+export module Core.Input;
 
 export namespace Core::Input {
     // Common Key Codes (Subset)

@@ -6,7 +6,7 @@ export module Graphics:Passes.ImGui;
 
 import :RenderPipeline;
 import :RenderGraph;
-import Core;
+import Core.Hash;
 import RHI;
 import Interface;
 

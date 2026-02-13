@@ -5,7 +5,8 @@ module;
 module Graphics:MaterialSystem.Impl;
 import :MaterialSystem;
 import :Material;
-import Core;
+import Core.Assets;
+import Core.Logging;
 import RHI;
 
 namespace Graphics

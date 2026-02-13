@@ -9,7 +9,7 @@ import :Pipeline;
 import :Device;
 import :Shader;
 import :Types;
-import Core;
+// No Core imports needed - this file uses no Core types
 
 namespace RHI
 {

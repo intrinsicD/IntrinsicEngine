@@ -9,7 +9,7 @@ module RHI:PersistentDescriptors.Impl;
 
 import :PersistentDescriptors;
 import :Device;
-import Core;
+import Core.Logging;
 
 namespace RHI
 {

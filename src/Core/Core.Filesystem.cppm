@@ -8,10 +8,10 @@ module;
 #include <optional>
 #include <atomic>
 
-export module Core:Filesystem;
+export module Core.Filesystem;
 
-import :Logging;
-import :Hash;
+import Core.Logging;
+import Core.Hash;
 
 export namespace Core::Filesystem
 {

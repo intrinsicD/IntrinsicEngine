@@ -11,7 +11,6 @@ module;
 export module RHI:Profiler;
 
 import :Device;
-import Core;
 
 export namespace RHI
 {

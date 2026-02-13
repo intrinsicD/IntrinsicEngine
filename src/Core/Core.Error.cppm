@@ -5,7 +5,7 @@ module;
 #include <expected>
 #include <utility>
 
-export module Core:Error;
+export module Core.Error;
 
 export namespace Core
 {

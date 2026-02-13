@@ -23,8 +23,8 @@ This document tracks **what's left to do** in IntrinsicEngine's architecture.
 The following issues exist in this CI/development environment and should be tracked:
 
 - **Clang 18 `__cpp_concepts` mismatch:** Clang 18 reports `__cpp_concepts` as `201907L` but GCC 14's `<expected>` header guards on `>= 202002L`. Workaround applied in `CMakeLists.txt` (`-D__cpp_concepts=202002L`). Will be unnecessary with Clang 19+.
-- **C++20 module partition visibility:** Most known cases fixed (latest: `Runtime.AssetPipeline.cpp` missing `#include <vector>`). New ones may surface as Clang 18 enforces strict module visibility.
-- **`DefaultPipeline` vtable linkage:** The `Graphics::DefaultPipeline` class (defined in `:Pipelines` partition, implemented in `:Pipelines.Impl`) has a linker vtable error. Root cause is likely clang-18's handling of vtables across module partition implementation units.
+- **C++20 module partition visibility:** Most known cases fixed (latest: `RHI.Device.cpp` needed explicit `import Core.InplaceFunction` despite the partition interface importing it). New ones may surface as Clang 18 enforces strict module visibility.
+- **Clang 18 lambda noexcept deduction:** Clang 18 erroneously considers some lambda move constructors as potentially throwing even when all captures are nothrow-movable. `Core::InplaceFunction` static_assert relaxed from `is_nothrow_move_constructible` to `is_move_constructible`. Restore the stricter check when Clang 19+ is minimum.
 
 ---
 
@@ -226,21 +226,7 @@ The following issues exist in this CI/development environment and should be trac
 
 ### 2.4 Extension / Plugin Architecture
 
-**Context:** No extension mechanism exists. The architecture uses concrete types with dependency injection — no abstract base classes. C++20 modules make dynamic (shared library) plugins impractical due to ABI instability.
-
-**Recommended approach: Static Registration + Scripting Layer**
-
-**Tier 1 — Static `FeatureRegistry` (C++ side):**
-- A central `FeatureRegistry` where render features, geometry operators, UI panels, and ECS systems register at static-init or engine-init time.
-- Registration API:
-  ```
-  FeatureRegistry::RegisterRenderFeature<MyFeature>("my_feature");
-  FeatureRegistry::RegisterGeometryOperator<MyOp>("my_op");
-  FeatureRegistry::RegisterPanel("my_panel", drawCallback);
-  ```
-- Engine discovers and instantiates registered features at startup.
-- Adding a new feature = add a `.cppm` module + one registration call. No modifications to `Engine` or `RenderSystem`.
-- Configuration via a declarative manifest (TOML/JSON) that selects which features are active.
+**Context:** `Core::FeatureRegistry` provides the central registration pattern (Tier 1 — DONE). Remaining work is shader hot-reload and an optional scripting layer.
 
 **Tier 2 — Shader hot-reload (already partially exists):**
 - `ShaderRegistry` provides the path lookup. Extend with file-watcher integration for automatic recompilation on save.
@@ -381,11 +367,7 @@ The ordering below follows the dependency graph: each phase builds on what the p
 ```
 Dependency graph (→ means "is required by"):
 
-FeatureRegistry ──→ Data I/O (IORegistry pattern)
-                ──→ Mesh rendering modes (register as features)
-                ──→ Point cloud rendering (register as feature)
-                ──→ Geometry operators (register as operators)
-                ──→ Scripting layer (exposes registry)
+FeatureRegistry ──→ [DONE] All dependents can now use Core::FeatureRegistry
 
 Data I/O ─────────→ everything (can't render what you can't load)
 
@@ -408,19 +390,17 @@ Sub-entity select → Geometry processing (interactive operator input)
 #### Phase 0 — Architecture & Plumbing
 *Everything else plugs into these. Build them first and every subsequent feature snaps in cleanly.*
 
-1. **Extension architecture / FeatureRegistry (§2.4 Tier 1)**
-   *Depends on: nothing. Depended on by: nearly everything.*
-   The registration pattern for render features, geometry operators, I/O format handlers, and UI panels. Without this, every feature is ad-hoc wiring into Engine/RenderSystem, and adding the registry later means retrofitting all existing features. Build it first, even if the initial set of registrants is small.
+~~1. **Extension architecture / FeatureRegistry (§2.4 Tier 1)** — DONE.~~ `Core::FeatureRegistry` (`Core.FeatureRegistry.cppm/.cpp`) provides type-erased registration by category (RenderFeature, GeometryOperator, Panel, System) with factory-based instance creation, enable/disable, and query APIs. 27 dedicated tests in `IntrinsicCoreTests`.
 
-2. **Data I/O (§2.7)**
-   *Depends on: FeatureRegistry (IORegistry uses registration pattern). Depended on by: everything (can't test rendering without loadable data).*
+1. **Data I/O (§2.7)**
+   *Depends on: FeatureRegistry (DONE). Depended on by: everything (can't test rendering without loadable data).*
    Format importers/exporters register via FeatureRegistry by file extension. Start with PLY + glTF (covers meshes, point clouds, scenes with materials). Remaining formats are incremental.
 
-3. **Post-processing pipeline (§2.1.4)**
+2. **Post-processing pipeline (§2.1.4)**
    *Depends on: nothing (rendering infrastructure). Depended on by: shadow mapping, transparency, mesh rendering modes, point cloud blending.*
    The HDR intermediate render target and the post-pass chain (tone mapping at minimum). Currently the forward pass writes directly to the swapchain — every rendering feature added later assumes an HDR intermediate exists. Establish the plumbing now; individual effects (SSAO, bloom) can be added incrementally.
 
-4. **Line rendering + DebugDraw API (§2.1.2 infrastructure + §2.3 API)**
+3. **Line rendering + DebugDraw API (§2.1.2 infrastructure + §2.3 API)**
    *Depends on: nothing. Depended on by: gizmos, debug visualization, wireframe, graph rendering, measurement tools, normal visualization, clipping plane visualization.*
    The `LineRenderFeature` (GPU-side SSBO of line segments with screen-space expansion) and the immediate-mode `DebugDraw` API. This is a rendering primitive — at least 6 later features depend on it.
 
@@ -451,7 +431,7 @@ Sub-entity select → Geometry processing (interactive operator input)
 *Expand what the engine can show. Each item is a render feature registered via FeatureRegistry.*
 
 9. **Mesh rendering modes (§2.1.3)**
-   *Depends on: FeatureRegistry (Phase 0), post-processing / HDR target (Phase 0). Depended on by: nothing (leaf features).*
+   *Depends on: FeatureRegistry (DONE), post-processing / HDR target (Phase 0). Depended on by: nothing (leaf features).*
    PBR extensions, flat, Gouraud/Phong, matcap, NPR (toon, Gooch, hatching), curvature/scalar field visualization, normal visualization, UV checker. Each shading mode is a variant PSO registered as a render feature. Share vertex pipeline, swap fragment shaders.
 
 10. **Shadow mapping (§2.1.5)**
@@ -493,7 +473,7 @@ Sub-entity select → Geometry processing (interactive operator input)
     Dedicated GPU picking pass writing `(EntityID, PrimitiveID, BarycentricCoords)`. Lasso/box/paint-brush/flood-fill/region-growing selection modes. Per-entity bitsets for selected sub-elements. This is the gateway to interactive geometry processing.
 
 17. **Geometry processing operators (§2.6)**
-    *Depends on: FeatureRegistry (Phase 0), sub-entity selection (Phase 4, for interactive input). Depended on by: nothing (leaf features).*
+    *Depends on: FeatureRegistry (DONE), sub-entity selection (Phase 4, for interactive input). Depended on by: nothing (leaf features).*
     Simplification (QEM), remeshing, smoothing (Laplacian/Taubin), subdivision, normal estimation, surface reconstruction, mesh repair, booleans, UV parameterization, geodesic distance, curvature computation. Each operator follows the pattern: input → params → output + diagnostics. Registered via FeatureRegistry, invokable from UI and (later) scripting.
 
 18. **Clipping planes & cross-sections (§2.9)**
@@ -510,14 +490,14 @@ Sub-entity select → Geometry processing (interactive operator input)
 *High-effort features that unlock new usage patterns.*
 
 20. **Scripting layer (§2.4 Tier 3)**
-    *Depends on: FeatureRegistry (Phase 0, stable API to bind). Depended on by: nothing.*
+    *Depends on: FeatureRegistry (DONE, stable API to bind). Depended on by: nothing.*
     Python (pybind11) or Lua (sol2) bindings for ECS manipulation, geometry operators, UI panels, and custom per-frame logic. Highest effort, but unlocks rapid prototyping of novel rendering and geometry methods without recompiling C++. Python especially valuable for ML/scientific workflow integration.
 
 ---
 
 #### Ongoing (Carried forward from existing roadmap)
 - **Port-based testing boundaries** — type-erased "port" interfaces for filesystem, windowing, and time so subsystems can be tested without Vulkan. (See §4.1.) Implement opportunistically as new subsystems are added.
-- **`Core::InplaceFunction`** — small-buffer owning callable to replace `std::function` in hot paths. (See §4.2.) Implement when profiling identifies `std::function` as a bottleneck.
+- ~~**Migrate `std::function` hot paths to `Core::InplaceFunction`**~~ — **DONE.** `Graphics::RenderStage::ExecuteFn` (`Graphics.RenderPath.cppm`) and `RHI::VulkanDevice` deferred deletion queues (`RHI.Device.cppm`) now use `Core::InplaceFunction`. `std::function` remains only in cold paths (UI callbacks, asset loading, startup config) per policy. The `InplaceFunction` nothrow-move static_assert was relaxed to work around a Clang 18 lambda limitation (restore when Clang 19+ is minimum).
 - **Shader hot-reload (§2.4 Tier 2)** — file-watcher integration for automatic recompilation on save. Implement alongside mesh rendering modes (Phase 2) for fast shader iteration.
 
 ---
@@ -542,46 +522,18 @@ Sub-entity select → Geometry processing (interactive operator input)
 
 ---
 
-### 4.2 `std::function` in hot loops
+### ~~4.2 `std::function` in hot loops~~ — RESOLVED
 
-**Long-term answer:** **Yes — ban `std::function` in hot loops.**
+**Answer:** **Ban `std::function` in hot loops.** Three alternatives are standardized:
 
-**Blessed alternatives (pick a small set and standardize):**
-1. **Thunk + context pointer**: `{ void(*Fn)(void*), void* Ctx }` (or `const void*` as appropriate)
-   - Zero allocations, fully predictable, ideal for FrameGraph nodes / scheduled tasks.
-2. **Small-buffer owning callable** for non-trivial capture ownership without heap:
-   - e.g. `Core::InplaceFunction<R(Args...), N>` where `N` is chosen by profiling (64B is a common starting point).
-3. **Arena-backed closures** for per-frame graphs:
-   - allocate capture payload out of `ScopeStack` / per-frame arena and store only thunk+ctx.
+1. **Thunk + context pointer**: `{ void(*Fn)(void*), void* Ctx }` — already used in FrameGraph.
+2. ~~**`Core::InplaceFunction`**~~ — **DONE.** `Core.InplaceFunction.cppm` provides a move-only, zero-heap, small-buffer owning callable (`InplaceFunction<R(Args...), BufferSize>`). Default 64-byte buffer. 46 dedicated tests in `IntrinsicCoreTests`. **Migration complete:** `Graphics::RenderStage::ExecuteFn` and `RHI::VulkanDevice` deferred deletion queues now use `InplaceFunction`.
+3. **Arena-backed closures** — allocate capture payload out of `ScopeStack` / per-frame arena and store only thunk+ctx.
 
 **Policy:** `std::function` is acceptable in cold paths (editor UI, startup config, tooling) but not in per-frame/per-entity loops.
 
 ---
 
-### 4.3 FrameGraph vs RenderGraph: shared algorithm extracted
+### ~~4.3 FrameGraph vs RenderGraph: shared algorithm extracted~~ — DONE
 
-**Decision: Keep them separate.** They share the same 3-phase design (Setup → Compile → Execute) and Kahn's-algorithm topological sort, but operate on fundamentally different domains:
-
-| | **FrameGraph** (Core) | **RenderGraph** (Graphics) |
-|---|---|---|
-| **Domain** | CPU-side ECS system scheduling | GPU-side render pass orchestration |
-| **Dependencies on** | Component type tokens (compile-time) | Named GPU resources (images, buffers) |
-| **Execution** | `Tasks::Scheduler` thread pool | Secondary command buffers + Vulkan barriers |
-| **Barrier model** | Just ordering (layer waits) | `VkImageMemoryBarrier2` / `VkBufferMemoryBarrier2` + layout transitions |
-| **Lives in** | `Core/` (no GPU deps) | `Runtime/Graphics/` (Vulkan-specific) |
-| **Testable without Vulkan** | Yes | No |
-
-**Status: DONE.** The shared scheduling algorithm has been extracted into `Core::DAGScheduler`. Both FrameGraph and RenderGraph now delegate to it internally:
-
-- **`Core::DAGScheduler`** (`Core.DAGScheduler.cppm/.cpp`) encapsulates:
-  - Resource state tracking (last writer, current readers per resource key)
-  - Automatic edge insertion from R/W hazards (RAW, WAW, WAR)
-  - `DeclareWeakRead` for ordering-only dependencies (label `WaitFor` semantics)
-  - Kahn's algorithm topological sort into parallel execution layers
-  - Direct edge insertion and deduplication
-- **FrameGraph** maps TypeTokens and labels (via MSB-tagged keys) to DAGScheduler resource keys.
-- **RenderGraph** maps Vulkan resource IDs and access flags to DAGScheduler `DeclareRead/DeclareWrite` calls.
-- Scheduling is shared; execution and barrier semantics remain domain-specific.
-- 18 dedicated `DAGScheduler` tests cover all hazard types, edge cases, and multi-frame reuse.
-
-**When to revisit:** If cross-domain dependencies arise (e.g., GPU compute pass must finish before a CPU system reads back results). That would typically be handled with fences/timeline semaphores at the boundary rather than merging graphs.
+Removed (see Git history). `Core::DAGScheduler` extracts the shared scheduling algorithm; both FrameGraph and RenderGraph delegate to it. 18 dedicated tests.

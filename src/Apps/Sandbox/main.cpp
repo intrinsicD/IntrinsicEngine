@@ -13,7 +13,12 @@ import Runtime.GraphicsBackend;
 import Runtime.AssetPipeline;
 import Runtime.RenderOrchestrator;
 import Runtime.Selection;
-import Core;
+import Core.Logging;
+import Core.Filesystem;
+import Core.Assets;
+import Core.FrameGraph;
+import Core.FeatureRegistry;
+import Core.Hash;
 import Graphics;
 import ECS;
 import RHI;
@@ -135,6 +140,39 @@ public:
 
         Log::Info("Asset Load Requested. Waiting for background thread...");
 
+        // --- Register client features in the central FeatureRegistry ---
+        auto& features = GetFeatureRegistry();
+        using Cat = Core::FeatureCategory;
+
+        // Client ECS system
+        {
+            Core::FeatureInfo info{};
+            info.Name = "AxisRotator";
+            info.Id = Core::Hash::StringID(Core::Hash::HashString(info.Name));
+            info.Category = Cat::System;
+            info.Description = "Continuous rotation animation for tagged entities";
+            info.Enabled = true;
+            features.Register(std::move(info), []() -> void* { return nullptr; }, [](void*) {});
+        }
+
+        // UI panels
+        auto registerPanelFeature = [&features](const std::string& name, const std::string& desc) {
+            Core::FeatureInfo info{};
+            info.Name = name;
+            info.Id = Core::Hash::StringID(Core::Hash::HashString(info.Name));
+            info.Category = Cat::Panel;
+            info.Description = desc;
+            info.Enabled = true;
+            features.Register(std::move(info), []() -> void* { return nullptr; }, [](void*) {});
+        };
+        registerPanelFeature("Hierarchy", "Scene entity hierarchy browser");
+        registerPanelFeature("Inspector", "Component property editor");
+        registerPanelFeature("Assets", "Asset manager browser");
+        registerPanelFeature("Stats", "Performance statistics and debug controls");
+        registerPanelFeature("Render Target Viewer", "Render target debug visualization");
+
+        Log::Info("FeatureRegistry: {} total features after client registration", features.Count());
+
         Interface::GUI::RegisterPanel("Hierarchy", [this]() { DrawHierarchyPanel(); });
         Interface::GUI::RegisterPanel("Inspector", [this]() { DrawInspectorPanel(); });
         Interface::GUI::RegisterPanel("Assets", [this]() { GetAssetManager().AssetsUiPanel(); });
@@ -149,7 +187,9 @@ public:
                 if (ImGui::Button("Hot-swap: DefaultPipeline"))
                 {
                     // Request swap; RenderSystem owns lifetime and applies at the start of the next frame.
-                    GetRenderOrchestrator().GetRenderSystem().RequestPipelineSwap(std::make_unique<Graphics::DefaultPipeline>());
+                    auto pipeline = std::make_unique<Graphics::DefaultPipeline>();
+                    pipeline->SetFeatureRegistry(&GetFeatureRegistry());
+                    GetRenderOrchestrator().GetRenderSystem().RequestPipelineSwap(std::move(pipeline));
                 }
             }
 
@@ -284,7 +324,9 @@ public:
 
     void OnRegisterSystems(Core::FrameGraph& graph, float deltaTime) override
     {
-        ECS::Systems::AxisRotator::RegisterSystem(graph, GetScene().GetRegistry(), deltaTime);
+        using namespace Core::Hash;
+        if (GetFeatureRegistry().IsEnabled("AxisRotator"_id))
+            ECS::Systems::AxisRotator::RegisterSystem(graph, GetScene().GetRegistry(), deltaTime);
     }
 
     void DrawHierarchyPanel()

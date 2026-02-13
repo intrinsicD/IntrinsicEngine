@@ -1,5 +1,5 @@
 module;
-#include <entt/entt.hpp>
+#include <entt/entity/registry.hpp>
 #include <string>
 #include <filesystem>
 #include <memory>
@@ -12,13 +12,13 @@ module;
 #include <atomic>
 #include <cassert>
 
-export module Core:Assets;
+export module Core.Assets;
 
-import :Error;
-import :Logging;
-import :Filesystem;
-import :Tasks; // Using your Async Task Graph
-import :Hash;
+import Core.Error;
+import Core.Logging;
+import Core.Filesystem;
+import Core.Tasks; // Using your Async Task Graph
+import Core.Hash;
 
 using namespace Core::Hash;
 

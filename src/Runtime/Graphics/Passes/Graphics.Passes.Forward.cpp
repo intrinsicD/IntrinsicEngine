@@ -22,7 +22,8 @@ import :Material;
 import :Components;
 import :GPUScene;
 import Geometry;
-import Core;
+import Core.Hash;
+import Core.Logging;
 import ECS;
 import RHI;
 
