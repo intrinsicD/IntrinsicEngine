@@ -9,6 +9,7 @@ import :RenderPipeline;
 import :RenderGraph;
 import :Passes.Picking;
 import :Passes.Forward;
+import :Passes.SelectionOutline;
 import :Passes.DebugView;
 import :Passes.ImGui;
 import :PipelineLibrary;
@@ -30,11 +31,13 @@ namespace Graphics
     {
         m_PickingPass = std::make_unique<Passes::PickingPass>();
         m_ForwardPass = std::make_unique<Passes::ForwardPass>();
+        m_SelectionOutlinePass = std::make_unique<Passes::SelectionOutlinePass>();
         m_DebugViewPass = std::make_unique<Passes::DebugViewPass>();
         m_ImGuiPass = std::make_unique<Passes::ImGuiPass>();
 
         m_PickingPass->Initialize(device, descriptorPool, globalLayout);
         m_ForwardPass->Initialize(device, descriptorPool, globalLayout);
+        m_SelectionOutlinePass->Initialize(device, descriptorPool, globalLayout);
         m_DebugViewPass->Initialize(device, descriptorPool, globalLayout);
         m_ImGuiPass->Initialize(device, descriptorPool, globalLayout);
 
@@ -45,6 +48,7 @@ namespace Graphics
         m_ForwardPass->SetCullPipeline(pipelineLibrary.GetCullPipeline());
         m_ForwardPass->SetCullSetLayout(pipelineLibrary.GetCullSetLayout());
 
+        m_SelectionOutlinePass->SetShaderRegistry(shaderRegistry);
         m_DebugViewPass->SetShaderRegistry(shaderRegistry);
         
         m_PathDirty = true;
@@ -68,7 +72,11 @@ namespace Graphics
         if (m_ForwardPass && IsFeatureEnabled("ForwardPass"_id))
             m_Path.AddFeature("Forward", m_ForwardPass.get());
 
-        // 3. Debug View (Conditional on both registry and per-frame debug state)
+        // 3. Selection Outline (post-process overlay on selected/hovered entities)
+        if (m_SelectionOutlinePass && IsFeatureEnabled("SelectionOutlinePass"_id))
+            m_Path.AddFeature("SelectionOutline", m_SelectionOutlinePass.get());
+
+        // 4. Debug View (Conditional on both registry and per-frame debug state)
         if (m_DebugViewPass && IsFeatureEnabled("DebugViewPass"_id))
         {
             m_Path.AddStage("DebugView", [this](RenderPassContext& ctx)
@@ -80,7 +88,7 @@ namespace Graphics
             });
         }
 
-        // 4. ImGui (Overlay) — gated by FeatureRegistry
+        // 5. ImGui (Overlay) — gated by FeatureRegistry
         if (m_ImGuiPass && IsFeatureEnabled("ImGuiPass"_id))
             m_Path.AddFeature("ImGui", m_ImGuiPass.get());
     }
@@ -102,6 +110,7 @@ namespace Graphics
     {
         if (m_PickingPass) m_PickingPass->OnResize(width, height);
         if (m_ForwardPass) m_ForwardPass->OnResize(width, height);
+        if (m_SelectionOutlinePass) m_SelectionOutlinePass->OnResize(width, height);
         if (m_DebugViewPass) m_DebugViewPass->OnResize(width, height);
         if (m_ImGuiPass) m_ImGuiPass->OnResize(width, height);
     }
@@ -110,6 +119,8 @@ namespace Graphics
                                      std::span<const RenderGraphDebugImage> debugImages,
                                      std::span<const RenderGraphDebugPass>)
     {
+        if (m_SelectionOutlinePass)
+            m_SelectionOutlinePass->PostCompile(frameIndex, debugImages);
         if (m_DebugViewPass)
             m_DebugViewPass->PostCompile(frameIndex, debugImages);
     }

@@ -36,6 +36,7 @@ target_sources(${target_name}
         Pipelines/Graphics.Pipelines.cppm
         Passes/Graphics.Passes.Picking.cppm
         Passes/Graphics.Passes.Forward.cppm
+        Passes/Graphics.Passes.SelectionOutline.cppm
         Passes/Graphics.Passes.DebugView.cppm
         Passes/Graphics.Passes.ImGui.cppm
         PRIVATE
@@ -63,6 +64,7 @@ target_sources(${target_name}
         Pipelines/Graphics.Pipelines.cpp
         Passes/Graphics.Passes.Picking.cpp
         Passes/Graphics.Passes.Forward.cpp
+        Passes/Graphics.Passes.SelectionOutline.cpp
         Passes/Graphics.Passes.DebugView.cpp
 )
 

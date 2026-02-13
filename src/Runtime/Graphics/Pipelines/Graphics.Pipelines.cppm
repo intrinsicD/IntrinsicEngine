@@ -14,6 +14,7 @@ import :Passes.DebugView;
 import :Passes.Forward;
 import :Passes.ImGui;
 import :Passes.Picking;
+import :Passes.SelectionOutline;
 import RHI;
 import Core.Hash;
 import Core.FeatureRegistry;
@@ -50,6 +51,7 @@ export namespace Graphics
 
         std::unique_ptr<Passes::PickingPass> m_PickingPass;
         std::unique_ptr<Passes::ForwardPass> m_ForwardPass;
+        std::unique_ptr<Passes::SelectionOutlinePass> m_SelectionOutlinePass;
         std::unique_ptr<Passes::DebugViewPass> m_DebugViewPass;
         std::unique_ptr<Passes::ImGuiPass> m_ImGuiPass;
 
@@ -73,11 +75,13 @@ export namespace Graphics
     {
         if (m_PickingPass) m_PickingPass->Shutdown();
         if (m_ForwardPass) m_ForwardPass->Shutdown();
+        if (m_SelectionOutlinePass) m_SelectionOutlinePass->Shutdown();
         if (m_DebugViewPass) m_DebugViewPass->Shutdown();
         if (m_ImGuiPass) m_ImGuiPass->Shutdown();
 
         m_PickingPass.reset();
         m_ForwardPass.reset();
+        m_SelectionOutlinePass.reset();
         m_DebugViewPass.reset();
         m_ImGuiPass.reset();
     }

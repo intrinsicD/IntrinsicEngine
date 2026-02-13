@@ -145,21 +145,22 @@ The following issues exist in this CI/development environment and should be trac
 
 ### 2.2 Selection & Interaction
 
-#### 2.2.1 Selection Visual Feedback (Contour Highlight)
+#### ~~2.2.1 Selection Visual Feedback (Contour Highlight)~~ — DONE
 
-**Context:** `SelectionModule` and `SelectedTag`/`HoveredTag` exist in ECS but have zero visual feedback. Selected objects look identical to unselected ones.
+**Implementation:** Post-process outline rendering via `SelectionOutlinePass` (`Graphics.Passes.SelectionOutline.cppm/.cpp`).
 
-**Required:**
-- **Outline / contour rendering** for selected entities. Standard approaches:
-  - **Stencil-based outline:** Render selected objects to stencil, then expand and draw outline where stencil differs. Simple, sharp outlines.
-  - **Jump Flood Algorithm (JFA):** Compute distance field from selected object silhouette in a few fullscreen passes. Supports variable-width, glowing, animated outlines.
-- **Hover highlight:** Subtle tint or fresnel rim effect for the entity under `HoveredTag`.
-- **Configurable appearance:** Outline color, width, opacity, animation (pulsing).
+- **Approach:** Fullscreen fragment shader reads the PickID buffer (R32_UINT, written by `PickingPass`), samples 8 neighbors at configurable radius, edge-detects selection/hover boundaries, and alpha-blends outlines onto the backbuffer.
+- **Selection outline:** Orange (1.0, 0.6, 0.0) solid outline for entities with `SelectedTag`.
+- **Hover highlight:** Light blue (0.3, 0.7, 1.0) semi-transparent outline for entity with `HoveredTag`.
+- **Configurable:** Outline color, hover color, and width passed via push constants. Supports up to 16 simultaneously selected entities.
+- **Pipeline integration:** Runs as step 3 in `DefaultPipeline::RebuildPath()` (after Forward, before DebugView/ImGui). Gated by `FeatureRegistry` (`"SelectionOutlinePass"_id`). Descriptor set updated via `PostCompile()` after `RenderGraph::Compile()`.
+- **New files:** `selection_outline.frag` shader, `Graphics.Passes.SelectionOutline.cppm/.cpp`.
+- **RHI addition:** `PipelineBuilder::EnableAlphaBlending()` for standard src-alpha/one-minus-src-alpha blending.
 
-**Architecture notes:**
-- Add as a `RenderGraph` post-pass after the main forward pass.
-- The `PickingPass` already writes EntityID to a buffer — this can seed the JFA or stencil.
-- Minimal: stencil-based outline is ~50 lines of shader code plus one extra draw call for selected objects.
+**Remaining enhancements (future work):**
+- **Animation:** Pulsing outline via time-based alpha modulation.
+- **JFA-based distance field:** For smoother, glow-style outlines at arbitrary widths (current approach uses discrete neighbor sampling).
+- **Per-entity outline color:** Via per-entity SSBO instead of push constants (for more than 16 selections or custom colors).
 
 ---
 
@@ -409,9 +410,7 @@ Sub-entity select → Geometry processing (interactive operator input)
 #### Phase 1 — Core UX
 *Make the engine usable for interactive work. Without these, it's a viewer, not a tool.*
 
-5. **Selection visual feedback / contour highlight (§2.2.1)**
-   *Depends on: RenderGraph (exists). Depended on by: nothing (leaf node, but highest UX impact per line of code).*
-   Stencil-based outline for selected entities, hover highlight. ~50 lines of shader + one extra draw call. The `SelectedTag`/`HoveredTag` exist but are visually invisible — fixing this immediately makes the engine feel interactive.
+~~5. **Selection visual feedback / contour highlight (§2.2.1)** — DONE.~~ `SelectionOutlinePass` (`Graphics.Passes.SelectionOutline.cppm/.cpp`) provides post-process outline rendering for selected and hovered entities. Reads PickID buffer, edge-detects boundaries, alpha-blends configurable outlines onto backbuffer. Supports up to 16 simultaneous selections. `PipelineBuilder::EnableAlphaBlending()` added to RHI.
 
 6. **Transform gizmos (§2.2.3)**
    *Depends on: line rendering (Phase 0). Depended on by: nothing directly, but every editing workflow uses them.*
