@@ -1,7 +1,6 @@
 module;
 #include <string>
 #include <vector>
-#include <functional>
 #include <concepts>
 #include <string_view>
 #include <memory>
@@ -9,6 +8,7 @@ module;
 export module Graphics:RenderPath;
 
 import :RenderPipeline;
+import Core.InplaceFunction;
 
 export namespace Graphics
 {
@@ -20,7 +20,7 @@ export namespace Graphics
     class RenderStage
     {
     public:
-        using ExecuteFn = std::function<void(RenderPassContext&)>;
+        using ExecuteFn = Core::InplaceFunction<void(RenderPassContext&)>;
 
         RenderStage(std::string name, ExecuteFn fn)
             : m_Name(std::move(name)), m_Execute(std::move(fn)) {}

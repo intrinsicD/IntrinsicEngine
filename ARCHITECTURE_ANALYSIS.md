@@ -23,7 +23,8 @@ This document tracks **what's left to do** in IntrinsicEngine's architecture.
 The following issues exist in this CI/development environment and should be tracked:
 
 - **Clang 18 `__cpp_concepts` mismatch:** Clang 18 reports `__cpp_concepts` as `201907L` but GCC 14's `<expected>` header guards on `>= 202002L`. Workaround applied in `CMakeLists.txt` (`-D__cpp_concepts=202002L`). Will be unnecessary with Clang 19+.
-- **C++20 module partition visibility:** Most known cases fixed (latest: `Runtime.AssetPipeline.cpp` missing `#include <vector>`). New ones may surface as Clang 18 enforces strict module visibility.
+- **C++20 module partition visibility:** Most known cases fixed (latest: `RHI.Device.cpp` needed explicit `import Core.InplaceFunction` despite the partition interface importing it). New ones may surface as Clang 18 enforces strict module visibility.
+- **Clang 18 lambda noexcept deduction:** Clang 18 erroneously considers some lambda move constructors as potentially throwing even when all captures are nothrow-movable. `Core::InplaceFunction` static_assert relaxed from `is_nothrow_move_constructible` to `is_move_constructible`. Restore the stricter check when Clang 19+ is minimum.
 
 ---
 
@@ -496,7 +497,7 @@ Sub-entity select → Geometry processing (interactive operator input)
 
 #### Ongoing (Carried forward from existing roadmap)
 - **Port-based testing boundaries** — type-erased "port" interfaces for filesystem, windowing, and time so subsystems can be tested without Vulkan. (See §4.1.) Implement opportunistically as new subsystems are added.
-- **Migrate `std::function` hot paths to `Core::InplaceFunction`** — `Core::InplaceFunction` is now implemented (`Core.InplaceFunction.cppm`, 46 tests). Remaining work: replace `std::function` usage in `Graphics::RenderStage` (`Graphics.RenderPath.cppm`) and any other per-frame callables with `InplaceFunction`. Do this when profiling identifies `std::function` as a bottleneck.
+- ~~**Migrate `std::function` hot paths to `Core::InplaceFunction`**~~ — **DONE.** `Graphics::RenderStage::ExecuteFn` (`Graphics.RenderPath.cppm`) and `RHI::VulkanDevice` deferred deletion queues (`RHI.Device.cppm`) now use `Core::InplaceFunction`. `std::function` remains only in cold paths (UI callbacks, asset loading, startup config) per policy. The `InplaceFunction` nothrow-move static_assert was relaxed to work around a Clang 18 lambda limitation (restore when Clang 19+ is minimum).
 - **Shader hot-reload (§2.4 Tier 2)** — file-watcher integration for automatic recompilation on save. Implement alongside mesh rendering modes (Phase 2) for fast shader iteration.
 
 ---
@@ -526,7 +527,7 @@ Sub-entity select → Geometry processing (interactive operator input)
 **Answer:** **Ban `std::function` in hot loops.** Three alternatives are standardized:
 
 1. **Thunk + context pointer**: `{ void(*Fn)(void*), void* Ctx }` — already used in FrameGraph.
-2. ~~**`Core::InplaceFunction`**~~ — **DONE.** `Core.InplaceFunction.cppm` provides a move-only, zero-heap, small-buffer owning callable (`InplaceFunction<R(Args...), BufferSize>`). Default 64-byte buffer. 46 dedicated tests in `IntrinsicCoreTests`. Ready to replace `std::function` in `Graphics::RenderStage` and other hot paths.
+2. ~~**`Core::InplaceFunction`**~~ — **DONE.** `Core.InplaceFunction.cppm` provides a move-only, zero-heap, small-buffer owning callable (`InplaceFunction<R(Args...), BufferSize>`). Default 64-byte buffer. 46 dedicated tests in `IntrinsicCoreTests`. **Migration complete:** `Graphics::RenderStage::ExecuteFn` and `RHI::VulkanDevice` deferred deletion queues now use `InplaceFunction`.
 3. **Arena-backed closures** — allocate capture payload out of `ScopeStack` / per-frame arena and store only thunk+ctx.
 
 **Policy:** `std::function` is acceptable in cold paths (editor UI, startup config, tooling) but not in per-frame/per-entity loops.
