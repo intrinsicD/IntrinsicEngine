@@ -57,7 +57,10 @@ namespace Graphics::Systems::GPUSceneSync
             const bool materialDirty = (mr.CachedMaterialHandle != mr.CachedMaterialHandleForInstance) ||
                                        (matRev != mr.CachedMaterialRevisionForInstance);
 
-            if (!transformDirty && !materialDirty)
+            const bool isSelected = registry.all_of<ECS::Components::Selection::SelectedTag>(entity);
+            const bool selectionDirty = (isSelected != mr.CachedIsSelectedForInstance);
+
+            if (!transformDirty && !materialDirty && !selectionDirty)
                 continue;
 
             GpuInstanceData inst{};
@@ -69,7 +72,11 @@ namespace Graphics::Systems::GPUSceneSync
             inst.GeometryID = 0xFFFFFFFFu;
 
             // TextureID: bindless index from material; 0 is default/error.
-            inst.TextureID = (matData) ? matData->AlbedoID : defaultTextureId;
+            // Bit 31 (0x80000000) signals "selected" to the fragment shader for in-viewport highlight.
+            uint32_t texId = (matData) ? matData->AlbedoID : defaultTextureId;
+            if (isSelected)
+                texId |= 0x80000000u;
+            inst.TextureID = texId;
 
             // Keep the picking ID stable.
             // If selection/picking is missing, EntityID stays 0.
@@ -84,6 +91,7 @@ namespace Graphics::Systems::GPUSceneSync
 
             mr.CachedMaterialHandleForInstance = mr.CachedMaterialHandle;
             mr.CachedMaterialRevisionForInstance = matRev;
+            mr.CachedIsSelectedForInstance = isSelected;
 
             if (transformDirty)
                 registry.remove<ECS::Components::Transform::WorldUpdatedTag>(entt::entity(entity));

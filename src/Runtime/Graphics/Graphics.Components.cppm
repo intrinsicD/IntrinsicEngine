@@ -27,6 +27,7 @@ export namespace ECS::MeshRenderer
         // Cached snapshot used by GPUSceneSync to detect when instance TextureID must be refreshed.
         Graphics::MaterialHandle CachedMaterialHandleForInstance = {};
         uint32_t CachedMaterialRevisionForInstance = 0u;
+        bool CachedIsSelectedForInstance = false;
     };
 }
 
