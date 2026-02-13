@@ -1,3 +1,4 @@
+
 cmake_minimum_required(VERSION 3.28)
 
 # Project Definition
@@ -80,6 +81,19 @@ set(INTRINSIC_RELEASE_FLAGS
         # Optional: Optimize for the specific CPU you are compiling on (Faster, but not portable)
         $<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>>:-march=native>
 )
+option(INTRINSIC_ENABLE_NATIVE_ARCH "Enable -march=native for local profiling builds" OFF)
+
+set(INTRINSIC_RELEASE_FLAGS
+        $<$<CONFIG:Release>:-O3>
+        $<$<CONFIG:RelWithDebInfo>:-O3>
+)
+
+if(INTRINSIC_ENABLE_NATIVE_ARCH)
+    # Optional: Optimize for the specific CPU you are compiling on (Faster, but not portable)
+    list(APPEND INTRINSIC_RELEASE_FLAGS
+            $<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>>:-march=native>
+    )
+endif()
 
 set(INTRINSIC_COMPILE_FLAGS
         ${INTRINSIC_BASE_FLAGS}
@@ -97,14 +111,6 @@ target_compile_definitions(IntrinsicConfig INTERFACE
         GLM_FORCE_DEPTH_ZERO_TO_ONE
         GLM_RIGHT_HANDED
 )
-
-option(INTRINSIC_ENABLE_NATIVE_ARCH "Enable -march=native for local profiling builds" OFF)
-
-if (INTRINSIC_ENABLE_NATIVE_ARCH)
-    list(APPEND INTRINSIC_RELEASE_FLAGS
-            $<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>>:-march=native>
-    )
-endif()
 
 include(cmake/Dependencies.cmake)
 
