@@ -30,6 +30,7 @@ add_executable(${target_name}
         Test_HeadlessEngine.cpp
         Test_FeatureRegistry.cpp
         Test_InplaceFunction.cpp
+        Test_IORegistry.cpp
 )
 
 #Apply Strict Flags ONLY to our tests

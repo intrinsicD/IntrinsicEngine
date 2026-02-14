@@ -31,6 +31,8 @@ module Graphics:ModelLoader.Impl;
 import :ModelLoader;
 import :AssetErrors;
 import :Model;
+import :IORegistry;
+import Core.IOBackend;
 import Core.Filesystem;
 import Core.Logging;
 import RHI;
@@ -1761,5 +1763,105 @@ namespace Graphics
         }
 
         return std::unexpected(AssetError::InvalidData);
+    }
+
+    // --- New IORegistry-based LoadAsync ---
+    std::expected<ModelLoadResult, AssetError> ModelLoader::LoadAsync(
+        std::shared_ptr<RHI::VulkanDevice> device,
+        RHI::TransferManager& transferManager,
+        GeometryPool& geometryStorage,
+        const std::string& filepath,
+        const IORegistry& registry,
+        Core::IO::IIOBackend& backend)
+    {
+        if (!device)
+            return std::unexpected(AssetError::InvalidData);
+
+        std::string fullPath = Core::Filesystem::GetAssetPath(filepath);
+
+        // Use IORegistry to read bytes and decode
+        auto importResult = registry.Import(fullPath, backend);
+        if (!importResult)
+            return std::unexpected(importResult.error());
+
+        // Extract meshes from the import result
+        auto* meshImport = std::get_if<MeshImportData>(&*importResult);
+        if (!meshImport || meshImport->Meshes.empty())
+            return std::unexpected(AssetError::InvalidData);
+
+        auto model = std::make_unique<Model>(geometryStorage, device);
+        RHI::TransferToken latestToken = {0};
+
+        for (auto& meshData : meshImport->Meshes)
+        {
+            MeshSegment segment;
+            segment.Name = "Mesh_" + std::to_string(model->Meshes.size());
+
+            // 1. Physics / Collision Logic (CPU)
+            segment.CollisionGeometry = std::make_shared<GeometryCollisionData>();
+            auto aabbs = Geometry::Convert(meshData.Positions);
+            segment.CollisionGeometry->LocalAABB = Geometry::Union(aabbs);
+
+            std::vector<Geometry::AABB> primitiveBounds;
+
+            if (meshData.Topology == PrimitiveTopology::Points)
+            {
+                primitiveBounds.reserve(meshData.Positions.size());
+                for (const auto& pos : meshData.Positions)
+                    primitiveBounds.push_back(Geometry::AABB{pos, pos});
+            }
+            else if (meshData.Indices.empty())
+            {
+                primitiveBounds.reserve(meshData.Positions.size() / 3);
+                for (size_t i = 0; i + 2 < meshData.Positions.size(); i += 3)
+                {
+                    auto aabb = Geometry::AABB{meshData.Positions[i], meshData.Positions[i]};
+                    aabb = Geometry::Union(aabb, meshData.Positions[i + 1]);
+                    aabb = Geometry::Union(aabb, meshData.Positions[i + 2]);
+                    primitiveBounds.push_back(aabb);
+                }
+            }
+            else
+            {
+                primitiveBounds.reserve(meshData.Indices.size() / 3);
+                for (size_t i = 0; i + 2 < meshData.Indices.size(); i += 3)
+                {
+                    const uint32_t i0 = meshData.Indices[i];
+                    const uint32_t i1 = meshData.Indices[i + 1];
+                    const uint32_t i2 = meshData.Indices[i + 2];
+                    if (i0 < meshData.Positions.size() && i1 < meshData.Positions.size() && i2 < meshData.Positions.size())
+                    {
+                        auto aabb = Geometry::AABB{meshData.Positions[i0], meshData.Positions[i0]};
+                        aabb = Geometry::Union(aabb, meshData.Positions[i1]);
+                        aabb = Geometry::Union(aabb, meshData.Positions[i2]);
+                        primitiveBounds.push_back(aabb);
+                    }
+                }
+            }
+
+            if (!segment.CollisionGeometry->LocalOctree.Build(primitiveBounds, Geometry::Octree::SplitPolicy{}, 16, 8))
+            {
+                Core::Log::Warn("Failed to build collision octree for mesh segment");
+            }
+
+            segment.CollisionGeometry->Positions = std::move(meshData.Positions);
+            segment.CollisionGeometry->Indices = std::move(meshData.Indices);
+
+            // 2. Upload to GPU (Async)
+            GeometryUploadRequest uploadReq;
+            uploadReq.Positions = segment.CollisionGeometry->Positions;
+            uploadReq.Indices = segment.CollisionGeometry->Indices;
+            uploadReq.Normals = meshData.Normals;
+            uploadReq.Aux = meshData.Aux;
+            uploadReq.Topology = meshData.Topology;
+
+            auto [gpuData, token] = GeometryGpuData::CreateAsync(device, transferManager, uploadReq);
+            latestToken = token;
+
+            segment.Handle = geometryStorage.Add(std::move(gpuData));
+            model->Meshes.emplace_back(std::make_shared<MeshSegment>(segment));
+        }
+
+        return ModelLoadResult{ std::move(model), latestToken };
     }
 }

@@ -294,20 +294,27 @@ The following issues exist in this CI/development environment and should be trac
 
 ### 2.7 Data I/O
 
-**Context:** No standardized file import/export layer exists. Asset loading is currently format-specific and hard-wired.
+**Status: Phase 0 DONE.** Two-layer architecture implemented — I/O backend (how bytes are read) is separated from format loaders (how bytes become CPU objects). Loaders receive `std::span<const std::byte>` and never open files, enabling future migration to archive containers, `io_uring`, or DirectStorage without touching parser code.
 
-**Required format support:**
-- **Mesh formats:** OBJ, PLY (ASCII + binary), glTF 2.0 / GLB, STL, OFF.
-- **Point cloud formats:** PLY, PCD (Point Cloud Library format), LAS/LAZ (LiDAR), XYZ/XYZRGB.
-- **Scene formats:** glTF 2.0 (with materials, hierarchy, cameras, lights), FBX (via Assimp or ufbx).
+**What exists:**
+- `Core.IOBackend` — `IIOBackend` interface + `FileIOBackend` (Phase 0: `std::ifstream`).
+- `Graphics:IORegistry` — `IORegistry`, `IAssetLoader` / `IAssetExporter` interfaces, `ImportResult` variant (`MeshImportData`, `PointCloudImportData`, `GraphImportData`), `LoadContext`, `RegisterBuiltinLoaders()`.
+- **5 I/O-agnostic importer partitions:** OBJ, PLY (ASCII + binary), XYZ, TGF, glTF 2.0 / GLB.
+- `ModelLoader` new overload accepting `IORegistry` + `IIOBackend`; `Engine` owns both, populates at startup.
+- `Engine::LoadDroppedAsset` uses `IORegistry::CanImport()` instead of hardcoded extension list.
+- 21 tests covering `FileIOBackend`, `AssetId`, `IORegistry` mechanics, and in-memory byte parsing for all 5 formats.
+
+**Remaining format support (incremental):**
+- **Mesh formats:** STL, OFF.
+- **Point cloud formats:** PCD (Point Cloud Library format), LAS/LAZ (LiDAR).
+- **Scene formats:** FBX (via Assimp or ufbx), glTF materials/hierarchy/cameras/lights extraction.
 - **Image formats:** PNG, JPEG, HDR/EXR (for environment maps and HDR textures).
 - **Gaussian splat formats:** `.ply` (3DGS standard), `.splat` (compressed variants).
 
-**Architecture notes:**
-- Unified `IORegistry` with `ImporterBase` / `ExporterBase` — format handlers register by file extension.
-- All importers return a common intermediate representation (mesh → `GeometryCpuData`, point cloud → new `PointCloudData`, scene → entity hierarchy).
-- Async import via `AssetPipeline` + `TransferManager` for GPU upload.
-- Export runs on worker thread with progress callback.
+**Remaining architecture work:**
+- Export pipeline (`IAssetExporter` interface exists but no concrete exporters yet).
+- Export on worker thread with progress callback.
+- I/O backend Phase 1: archive/pack-file backend, async I/O.
 
 ---
 
@@ -393,9 +400,8 @@ Sub-entity select → Geometry processing (interactive operator input)
 
 ~~1. **Extension architecture / FeatureRegistry (§2.4 Tier 1)** — DONE.~~ `Core::FeatureRegistry` (`Core.FeatureRegistry.cppm/.cpp`) provides type-erased registration by category (RenderFeature, GeometryOperator, Panel, System) with factory-based instance creation, enable/disable, and query APIs. 27 dedicated tests in `IntrinsicCoreTests`.
 
-1. **Data I/O (§2.7)**
-   *Depends on: FeatureRegistry (DONE). Depended on by: everything (can't test rendering without loadable data).*
-   Format importers/exporters register via FeatureRegistry by file extension. Start with PLY + glTF (covers meshes, point clouds, scenes with materials). Remaining formats are incremental.
+~~1. **Data I/O (§2.7)**~~ — DONE (Phase 0).
+   `Core.IOBackend` (`Core.IOBackend.cppm/.cpp`) provides `IIOBackend` interface with `FileIOBackend`. `Graphics:IORegistry` (`Graphics.IORegistry.cppm/.cpp`) provides `IORegistry` with `IAssetLoader`/`IAssetExporter` and `RegisterBuiltinLoaders()`. Five I/O-agnostic importer partitions (OBJ, PLY, XYZ, TGF, GLTF) under `Importers/`. `ModelLoader` new overload routes through the registry. `Engine` owns and wires the subsystem. 21 tests in `IntrinsicTests`. Remaining formats (STL, OFF, PCD, LAS/LAZ, FBX, image, splat) and export pipeline are incremental.
 
 2. **Post-processing pipeline (§2.1.4)**
    *Depends on: nothing (rendering infrastructure). Depended on by: shadow mapping, transparency, mesh rendering modes, point cloud blending.*
@@ -536,3 +542,27 @@ Sub-entity select → Geometry processing (interactive operator input)
 ### ~~4.3 FrameGraph vs RenderGraph: shared algorithm extracted~~ — DONE
 
 Removed (see Git history). `Core::DAGScheduler` extracts the shared scheduling algorithm; both FrameGraph and RenderGraph delegate to it. 18 dedicated tests.
+
+---
+
+### 4.4 Clang 18 vtable emission failure with module partitions
+
+**Status:** Open. Blocks the `Sandbox` link target.
+
+**Problem:** Clang 18 does not reliably emit vtables when a polymorphic class is declared in a module partition interface (`.cppm`) and its virtual methods are defined in a separate partition implementation (`.cpp`). The vtable ends up in neither object file, causing `undefined reference to 'vtable for ...'` at link time.
+
+**Affected classes (Sandbox link failures):**
+- `DefaultPipeline` (base: `RenderPipeline`)
+- `ForwardPass`, `PickingPass`, `SelectionOutlinePass`, `DebugViewPass` (base: `RenderPass`)
+
+**Root cause:** `RenderPipeline` and `RenderPass` provide inline non-pure virtual functions (e.g. `Shutdown() {}`, `OnResize() {}`, `PostCompile() {...}`, `GetSelectionOutlineSettings() { return nullptr; }`). Under the Itanium C++ ABI, the compiler selects the first non-inline non-pure virtual function as the "key function" whose TU emits the vtable. When all non-pure virtuals are inline, there is no key function, and Clang 18's module implementation fails to emit the vtable anywhere.
+
+**Why the Data I/O loaders are not affected:** `IAssetLoader` has only pure virtual functions, so defining the destructor in a single TU (`Graphics.IORegistry.cpp`) reliably anchors the vtable there.
+
+**Possible fixes (not yet implemented):**
+1. **Make base-class default methods pure virtual + provide definitions.** E.g. `virtual void Shutdown() = 0;` in the interface, `void RenderPipeline::Shutdown() {}` in a `.cpp`. This gives the ABI a key function.
+2. **Move all Pass/Pipeline declarations and definitions into the same TU** (loses the partition separation benefit).
+3. **Factory functions** that force constructor instantiation in a known TU — works but cascades (each class with the same issue needs one).
+4. **Upgrade to Clang 19+** if the bug is fixed upstream (not yet verified).
+
+**Note:** `IntrinsicTests` is not affected — it does not instantiate `DefaultPipeline` or the Pass classes.

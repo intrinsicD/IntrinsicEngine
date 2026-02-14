@@ -37,6 +37,7 @@ target_sources(${target_name}
         Core.DAGScheduler.cppm
         Core.FeatureRegistry.cppm
         Core.InplaceFunction.cppm
+        Core.IOBackend.cppm
         PRIVATE
         Core.Memory.cpp
         Core.Logging.cpp
@@ -49,6 +50,7 @@ target_sources(${target_name}
         Core.FrameGraph.cpp
         Core.DAGScheduler.cpp
         Core.FeatureRegistry.cpp
+        Core.IOBackend.cpp
 )
 
 target_include_directories(${target_name} PUBLIC .)

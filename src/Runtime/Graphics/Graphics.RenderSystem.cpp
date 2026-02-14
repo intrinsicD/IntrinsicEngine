@@ -26,6 +26,7 @@ import :GPUScene;
 import :Interaction;
 import :Presentation;
 import :GlobalResources;
+import :Passes.SelectionOutlineSettings;
 
 import Core.Hash;
 import Core.Memory;

@@ -16,6 +16,7 @@ import Core.FrameGraph;
 import Core.Assets;
 import Core.Memory;
 import Core.FeatureRegistry;
+import Core.IOBackend;
 import RHI;
 import Graphics;
 import ECS;
@@ -76,6 +77,12 @@ export namespace Runtime
         // MaterialSystem, per-frame arena/scope/FrameGraph, GeometryPool.
         std::unique_ptr<RenderOrchestrator> m_RenderOrchestrator;
 
+        // I/O backend (Phase 0: loose files via std::ifstream)
+        std::unique_ptr<Core::IO::IIOBackend> m_IOBackend;
+
+        // Format loader/exporter registry (populated at startup with built-in loaders)
+        Graphics::IORegistry m_IORegistry;
+
     public:
         // Engine-owned selection controller (Editor-like single selection).
         SelectionModule m_Selection;
@@ -119,6 +126,11 @@ export namespace Runtime
         [[nodiscard]] RHI::DescriptorLayout& GetDescriptorLayout() const { return m_GraphicsBackend->GetDescriptorLayout(); }
         [[nodiscard]] RHI::VulkanSwapchain& GetSwapchain() const { return m_GraphicsBackend->GetSwapchain(); }
         [[nodiscard]] Graphics::GeometryPool& GetGeometryStorage() { return m_RenderOrchestrator->GetGeometryStorage(); }
+
+        // Access to the I/O subsystem.
+        [[nodiscard]] Core::IO::IIOBackend& GetIOBackend() { return *m_IOBackend; }
+        [[nodiscard]] const Graphics::IORegistry& GetIORegistry() const { return m_IORegistry; }
+        [[nodiscard]] Graphics::IORegistry& GetIORegistry() { return m_IORegistry; }
 
         // Convenience methods that delegate to AssetPipeline.
         void RegisterAssetLoad(Core::Assets::AssetHandle handle, RHI::TransferToken token)

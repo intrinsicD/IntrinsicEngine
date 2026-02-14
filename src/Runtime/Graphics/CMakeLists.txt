@@ -40,6 +40,12 @@ target_sources(${target_name}
         Passes/Graphics.Passes.SelectionOutline.cppm
         Passes/Graphics.Passes.DebugView.cppm
         Passes/Graphics.Passes.ImGui.cppm
+        Graphics.IORegistry.cppm
+        Importers/Graphics.Importers.OBJ.cppm
+        Importers/Graphics.Importers.PLY.cppm
+        Importers/Graphics.Importers.XYZ.cppm
+        Importers/Graphics.Importers.TGF.cppm
+        Importers/Graphics.Importers.GLTF.cppm
         PRIVATE
         Graphics.TinyGltf.cpp
         Graphics.ShaderCompiler.cpp
@@ -67,6 +73,12 @@ target_sources(${target_name}
         Passes/Graphics.Passes.Forward.cpp
         Passes/Graphics.Passes.SelectionOutline.cpp
         Passes/Graphics.Passes.DebugView.cpp
+        Graphics.IORegistry.cpp
+        Importers/Graphics.Importers.OBJ.cpp
+        Importers/Graphics.Importers.PLY.cpp
+        Importers/Graphics.Importers.XYZ.cpp
+        Importers/Graphics.Importers.TGF.cpp
+        Importers/Graphics.Importers.GLTF.cpp
 )
 
 target_include_directories(${target_name} PUBLIC .)

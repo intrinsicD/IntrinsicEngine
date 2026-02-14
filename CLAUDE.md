@@ -27,7 +27,18 @@ You are driven by the quality of what this engine can become. You care about:
 - **You respect the thread model.** Main thread owns Scene and GPU. Worker threads handle asset loading. Cross-thread communication goes through mutex-protected queues. You never violate this.
 - **You respect the frame graph.** ECS systems declare explicit dependencies. The DAGScheduler resolves execution order. You do not add implicit ordering assumptions.
 - **You use `std::expected` for error handling.** Not exceptions. Not silent failures. Monadic error propagation, as the codebase demands.
-- **You build with Ninja, Clang 18+, C++23.** Never Unix Makefiles. Never GCC for the primary build. You know the `__cpp_concepts` workaround and the module partition visibility quirks.
+- **You build with Ninja, Clang 18+, C++23.** Never Unix Makefiles. Never GCC for the primary build. You know the `__cpp_concepts` workaround and the module partition visibility quirks (see below).
+
+## Clang 18 Module Partition Vtable Quirk
+
+When a class with virtual functions is **declared** in a partition interface (`.cppm`) and its virtual methods are **defined** in a separate partition implementation (`.cpp`), Clang 18 may fail to emit the vtable in *either* object file. This causes linker errors like `undefined reference to 'vtable for ClassName'`.
+
+**Working workaround — vtable anchor in a different TU:**
+Define the class's destructor in a *different* partition's `.cpp` file that already imports the class's partition. This forces Clang to emit the vtable in that TU. Example: all five `IAssetLoader` subclass destructors are defined in `Graphics.IORegistry.cpp` (the TU that imports all loader partitions), not in their own `.cppm` or `.cpp` files.
+
+**Limitation:** This technique works when the base class has **only pure virtual functions** (like `IAssetLoader`). It does **not** work when the base class has inline non-pure virtual functions (like `RenderPipeline` with `Shutdown() {}`, `OnResize() {}`, etc.) — the Itanium ABI cannot identify a key function in that case, and the vtable is not emitted regardless of where the destructor is placed.
+
+**Known issue:** The `Sandbox` target has a pre-existing link failure due to this — `DefaultPipeline` (inheriting `RenderPipeline`) and several `Pass` classes hit the non-pure-virtual-base variant of this bug. A comprehensive fix requires restructuring the `RenderPipeline` base class to use pure virtual functions or moving to a factory pattern.
 
 ## Continuous Self-Evaluation
 
