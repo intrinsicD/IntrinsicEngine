@@ -542,3 +542,27 @@ Sub-entity select → Geometry processing (interactive operator input)
 ### ~~4.3 FrameGraph vs RenderGraph: shared algorithm extracted~~ — DONE
 
 Removed (see Git history). `Core::DAGScheduler` extracts the shared scheduling algorithm; both FrameGraph and RenderGraph delegate to it. 18 dedicated tests.
+
+---
+
+### 4.4 Clang 18 vtable emission failure with module partitions
+
+**Status:** Open. Blocks the `Sandbox` link target.
+
+**Problem:** Clang 18 does not reliably emit vtables when a polymorphic class is declared in a module partition interface (`.cppm`) and its virtual methods are defined in a separate partition implementation (`.cpp`). The vtable ends up in neither object file, causing `undefined reference to 'vtable for ...'` at link time.
+
+**Affected classes (Sandbox link failures):**
+- `DefaultPipeline` (base: `RenderPipeline`)
+- `ForwardPass`, `PickingPass`, `SelectionOutlinePass`, `DebugViewPass` (base: `RenderPass`)
+
+**Root cause:** `RenderPipeline` and `RenderPass` provide inline non-pure virtual functions (e.g. `Shutdown() {}`, `OnResize() {}`, `PostCompile() {...}`, `GetSelectionOutlineSettings() { return nullptr; }`). Under the Itanium C++ ABI, the compiler selects the first non-inline non-pure virtual function as the "key function" whose TU emits the vtable. When all non-pure virtuals are inline, there is no key function, and Clang 18's module implementation fails to emit the vtable anywhere.
+
+**Why the Data I/O loaders are not affected:** `IAssetLoader` has only pure virtual functions, so defining the destructor in a single TU (`Graphics.IORegistry.cpp`) reliably anchors the vtable there.
+
+**Possible fixes (not yet implemented):**
+1. **Make base-class default methods pure virtual + provide definitions.** E.g. `virtual void Shutdown() = 0;` in the interface, `void RenderPipeline::Shutdown() {}` in a `.cpp`. This gives the ABI a key function.
+2. **Move all Pass/Pipeline declarations and definitions into the same TU** (loses the partition separation benefit).
+3. **Factory functions** that force constructor instantiation in a known TU — works but cascades (each class with the same issue needs one).
+4. **Upgrade to Clang 19+** if the bug is fixed upstream (not yet verified).
+
+**Note:** `IntrinsicTests` is not affected — it does not instantiate `DefaultPipeline` or the Pass classes.
