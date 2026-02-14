@@ -25,6 +25,7 @@ import Core.FrameGraph;
 import Core.Hash;
 import Core.Profiling;
 import Core.FeatureRegistry;
+import Core.IOBackend;
 import RHI;
 import Graphics;
 import ECS;
@@ -129,6 +130,10 @@ namespace Runtime
         // 8. Register core features in the central FeatureRegistry.
         RegisterCoreFeatures();
 
+        // 9. I/O subsystem: backend + format registry.
+        m_IOBackend = std::make_unique<Core::IO::FileIOBackend>();
+        Graphics::RegisterBuiltinLoaders(m_IORegistry);
+
         Core::Log::Info("Engine: Constructor complete.");
     }
 
@@ -208,10 +213,7 @@ namespace Runtime
         std::transform(ext.begin(), ext.end(), ext.begin(),
                        [](unsigned char c) { return std::tolower(c); });
 
-        bool isModel = (ext == ".gltf" || ext == ".glb" ||
-            ext == ".obj" || ext == ".ply" ||
-            ext == ".xyz" || ext == ".pcd" ||
-            ext == ".tgf");
+        bool isModel = m_IORegistry.CanImport(ext);
 
         if (isModel)
         {
@@ -220,10 +222,11 @@ namespace Runtime
             // 1. Offload heavy parsing to Worker Thread
             Core::Tasks::Scheduler::Dispatch([this, path]()
             {
-                // [Worker Thread] Heavy OBJ/GLTF Parsing
+                // [Worker Thread] I/O-agnostic parsing via IORegistry
                 auto loadResult = Graphics::ModelLoader::LoadAsync(
                     GetDevice(), m_GraphicsBackend->GetTransferManager(),
-                    m_RenderOrchestrator->GetGeometryStorage(), path);
+                    m_RenderOrchestrator->GetGeometryStorage(), path,
+                    m_IORegistry, *m_IOBackend);
 
                 if (!loadResult)
                 {

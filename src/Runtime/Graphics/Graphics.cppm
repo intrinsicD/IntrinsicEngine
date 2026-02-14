@@ -11,6 +11,7 @@ export import :TextureLoader;
 export import :RenderGraph;
 export import :Components;
 export import :AssetErrors;
+export import :IORegistry;
 export import :ShaderRegistry;
 export import :PipelineLibrary;
 export import :Pipelines;

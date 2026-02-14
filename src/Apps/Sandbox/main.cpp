@@ -96,7 +96,9 @@ public:
         auto modelLoader = [&](const std::string& path, Assets::AssetHandle handle)
             -> std::unique_ptr<Graphics::Model>
         {
-            auto result = Graphics::ModelLoader::LoadAsync(GetDevice(), gfx.GetTransferManager(), GetGeometryStorage(), path);
+            auto result = Graphics::ModelLoader::LoadAsync(
+                GetDevice(), gfx.GetTransferManager(), GetGeometryStorage(), path,
+                GetIORegistry(), GetIOBackend());
 
             if (result)
             {

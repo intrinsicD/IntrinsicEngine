@@ -15,6 +15,7 @@ import :Passes.Forward;
 import :Passes.ImGui;
 import :Passes.Picking;
 import :Passes.SelectionOutline;
+import :Passes.SelectionOutlineSettings;
 import RHI;
 import Core.Hash;
 import Core.FeatureRegistry;
