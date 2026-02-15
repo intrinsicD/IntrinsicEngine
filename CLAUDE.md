@@ -27,22 +27,20 @@ You are driven by the quality of what this engine can become. You care about:
 - **You respect the thread model.** Main thread owns Scene and GPU. Worker threads handle asset loading. Cross-thread communication goes through mutex-protected queues. You never violate this.
 - **You respect the frame graph.** ECS systems declare explicit dependencies. The DAGScheduler resolves execution order. You do not add implicit ordering assumptions.
 - **You use `std::expected` for error handling.** Not exceptions. Not silent failures. Monadic error propagation, as the codebase demands.
-- **You build with Ninja, Clang 18+, C++23.** Never Unix Makefiles. Never GCC for the primary build. You know the `__cpp_concepts` workaround and the module partition visibility quirks (see below).
+- **You build with Ninja, Clang 20+, C++23.** Never Unix Makefiles. Never GCC for the primary build.
 
-## Clang 18 Module Partition Vtable Quirk
+## Module Partition Vtable Anchors
 
-When a class with virtual functions is **declared** in a partition interface (`.cppm`) and its virtual methods are **defined** in a separate partition implementation (`.cpp`), Clang 18 may fail to emit the vtable in *either* object file. This causes linker errors like `undefined reference to 'vtable for ClassName'`.
+When a class with virtual functions is declared in a module partition interface (`.cppm`) and its methods are defined elsewhere, vtable emission can be fragile across compilers. As defensive practice, this codebase anchors vtables explicitly:
 
-**Working workaround — vtable anchor in a different TU:**
-Define the class's destructor in a *different* partition's `.cpp` file that already imports the class's partition. This forces Clang to emit the vtable in that TU. Example: all five `IAssetLoader` subclass destructors are defined in `Graphics.IORegistry.cpp` (the TU that imports all loader partitions), not in their own `.cppm` or `.cpp` files.
+- **Pure-virtual base classes** (e.g., `IAssetLoader`): Define the destructor in a single known TU (e.g., `Graphics.IORegistry.cpp` defines all five loader destructors).
+- **Non-pure-virtual base classes** (e.g., `RenderPipeline`, `IRenderFeature`): The `DefaultPipeline` destructor is defined out-of-line in `Graphics.Pipelines.cppm` as a vtable anchor.
 
-**Limitation:** This technique works when the base class has **only pure virtual functions** (like `IAssetLoader`). It does **not** work when the base class has inline non-pure virtual functions (like `RenderPipeline` with `Shutdown() {}`, `OnResize() {}`, etc.) — the Itanium ABI cannot identify a key function in that case, and the vtable is not emitted regardless of where the destructor is placed.
-
-**Known issue:** The `Sandbox` target has a pre-existing link failure due to this — `DefaultPipeline` (inheriting `RenderPipeline`) and several `Pass` classes hit the non-pure-virtual-base variant of this bug. A comprehensive fix requires restructuring the `RenderPipeline` base class to use pure virtual functions or moving to a factory pattern.
+This pattern is retained for robustness even though Clang 20 has resolved the vtable emission bugs that affected Clang 18.
 
 ## Build & Test Workflow
 
-The setup script (`.claude/setup.sh`) installs dependencies, configures CMake (Debug, Ninja, Clang 18+), and builds the **library targets only** — not test executables. This keeps session setup fast.
+The setup script (`.claude/setup.sh`) installs dependencies, configures CMake (Debug, Ninja, Clang 20+), and builds the **library targets only** — not test executables. This keeps session setup fast.
 
 **Sanitizers:** ASan + UBSan are auto-detected at configure time. If `libclang_rt.asan` is not installed (common in containers), sanitizers are automatically disabled. No link failures. Override with `-DINTRINSIC_ENABLE_SANITIZERS=ON/OFF`.
 
@@ -53,7 +51,7 @@ Always build only the targets you need. Never run a bare `ninja` or `cmake --bui
 ```bash
 # Reconfigure (only needed after CMakeLists.txt changes):
 cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug \
-      -DCMAKE_C_COMPILER=clang-18 -DCMAKE_CXX_COMPILER=clang++-18
+      -DCMAKE_C_COMPILER=clang-20 -DCMAKE_CXX_COMPILER=clang++-20
 
 # Build a specific library you touched:
 ninja -C build IntrinsicGeometry
@@ -81,7 +79,7 @@ ninja -C build IntrinsicTests
 
 - **Build incrementally.** Ninja tracks file dependencies — after editing one `.cppm`/`.cpp`, only the affected targets recompile.
 - **Filter tests.** Use `--gtest_filter=` to run only the tests relevant to your change. Don't run the full suite on every iteration.
-- **Don't stop on pre-existing failures.** The `Sandbox` target has a known vtable link failure (§4.4 in ARCHITECTURE_ANALYSIS.md). This does not affect library or test builds.
+- **Build the Sandbox target.** The `Sandbox` vtable link failure from Clang 18 (§4.4 in ARCHITECTURE_ANALYSIS.md) is resolved with Clang 20.
 - **Keep building through the session.** Long compile times are expected for C++23 modules on first build (~2-5 min). Incremental rebuilds after editing a single file are fast (~5-15s). Do not abandon a session because a build takes time — use `--parallel $(nproc)` and wait.
 
 ---

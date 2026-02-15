@@ -174,12 +174,10 @@ namespace Graphics
     }
 
     // -------------------------------------------------------------------------
-    // Vtable anchors: Clang 18 cannot reliably emit vtables when a class is
-    // declared in one module partition interface and its virtual functions are
-    // defined in a different partition implementation TU.  Defining the
-    // destructor (the Itanium ABI key function) HERE — in the same TU that
-    // imports ALL loader partitions — forces Clang to emit each vtable in
-    // this object file where the linker can find it.
+    // Vtable anchors: defining the destructor (the Itanium ABI key function)
+    // HERE — in the TU that imports ALL loader partitions — ensures each
+    // vtable is emitted in this object file. Retained as defensive practice
+    // for robust vtable emission across module partition boundaries.
     // -------------------------------------------------------------------------
     OBJLoader::~OBJLoader() = default;
     PLYLoader::~PLYLoader() = default;

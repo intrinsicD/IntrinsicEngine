@@ -18,13 +18,13 @@ This document tracks **what's left to do** in IntrinsicEngine's architecture.
 
 ## 1. Open TODOs (What's left)
 
-### 1.1 Pre-existing Build Environment Issues
+### ~~1.1 Pre-existing Build Environment Issues~~ — RESOLVED (Clang 20)
 
-The following issues exist in this CI/development environment and should be tracked:
+The following Clang 18 issues are resolved by the upgrade to Clang 20 as the minimum compiler:
 
-- **Clang 18 `__cpp_concepts` mismatch:** Clang 18 reports `__cpp_concepts` as `201907L` but GCC 14's `<expected>` header guards on `>= 202002L`. Workaround applied in `CMakeLists.txt` (`-D__cpp_concepts=202002L`). Will be unnecessary with Clang 19+.
-- **C++20 module partition visibility:** Most known cases fixed (latest: `RHI.Device.cpp` needed explicit `import Core.InplaceFunction` despite the partition interface importing it). New ones may surface as Clang 18 enforces strict module visibility.
-- **Clang 18 lambda noexcept deduction:** Clang 18 erroneously considers some lambda move constructors as potentially throwing even when all captures are nothrow-movable. `Core::InplaceFunction` static_assert relaxed from `is_nothrow_move_constructible` to `is_move_constructible`. Restore the stricter check when Clang 19+ is minimum.
+- ~~**Clang 18 `__cpp_concepts` mismatch:**~~ Clang 20 reports the correct value. `CMakeLists.txt` workaround removed.
+- ~~**C++20 module partition visibility:**~~ Clang 20 handles transitive imports correctly. Redundant `import` statements in partition implementations (e.g., `RHI.Device.cpp`) remain as defensive practice but are no longer required.
+- ~~**Clang 18 lambda noexcept deduction:**~~ Clang 20 correctly deduces nothrow-movability. `Core::InplaceFunction` strict `is_nothrow_move_constructible` static_assert restored.
 
 ---
 
@@ -502,7 +502,7 @@ Sub-entity select → Geometry processing (interactive operator input)
 
 #### Ongoing (Carried forward from existing roadmap)
 - **Port-based testing boundaries** — type-erased "port" interfaces for filesystem, windowing, and time so subsystems can be tested without Vulkan. (See §4.1.) Implement opportunistically as new subsystems are added.
-- ~~**Migrate `std::function` hot paths to `Core::InplaceFunction`**~~ — **DONE.** `Graphics::RenderStage::ExecuteFn` (`Graphics.RenderPath.cppm`) and `RHI::VulkanDevice` deferred deletion queues (`RHI.Device.cppm`) now use `Core::InplaceFunction`. `std::function` remains only in cold paths (UI callbacks, asset loading, startup config) per policy. The `InplaceFunction` nothrow-move static_assert was relaxed to work around a Clang 18 lambda limitation (restore when Clang 19+ is minimum).
+- ~~**Migrate `std::function` hot paths to `Core::InplaceFunction`**~~ — **DONE.** `Graphics::RenderStage::ExecuteFn` (`Graphics.RenderPath.cppm`) and `RHI::VulkanDevice` deferred deletion queues (`RHI.Device.cppm`) now use `Core::InplaceFunction`. `std::function` remains only in cold paths (UI callbacks, asset loading, startup config) per policy. The strict `is_nothrow_move_constructible` static_assert is restored now that Clang 20 is the minimum compiler.
 - **Shader hot-reload (§2.4 Tier 2)** — file-watcher integration for automatic recompilation on save. Implement alongside mesh rendering modes (Phase 2) for fast shader iteration.
 
 ---
@@ -545,24 +545,10 @@ Removed (see Git history). `Core::DAGScheduler` extracts the shared scheduling a
 
 ---
 
-### 4.4 Clang 18 vtable emission failure with module partitions
+### ~~4.4 Clang 18 vtable emission failure with module partitions~~ — RESOLVED (Clang 20)
 
-**Status:** Open. Blocks the `Sandbox` link target.
+**Status:** Resolved. The `Sandbox` target links successfully with Clang 20.
 
-**Problem:** Clang 18 does not reliably emit vtables when a polymorphic class is declared in a module partition interface (`.cppm`) and its virtual methods are defined in a separate partition implementation (`.cpp`). The vtable ends up in neither object file, causing `undefined reference to 'vtable for ...'` at link time.
+**What was the problem:** Clang 18 did not reliably emit vtables when a polymorphic class was declared in a module partition interface (`.cppm`) and its virtual methods were defined in a separate partition implementation (`.cpp`). This caused `undefined reference to 'vtable for ...'` linker errors for `DefaultPipeline`, `ForwardPass`, `PickingPass`, `SelectionOutlinePass`, and `DebugViewPass`.
 
-**Affected classes (Sandbox link failures):**
-- `DefaultPipeline` (base: `RenderPipeline`)
-- `ForwardPass`, `PickingPass`, `SelectionOutlinePass`, `DebugViewPass` (base: `RenderPass`)
-
-**Root cause:** `RenderPipeline` and `RenderPass` provide inline non-pure virtual functions (e.g. `Shutdown() {}`, `OnResize() {}`, `PostCompile() {...}`, `GetSelectionOutlineSettings() { return nullptr; }`). Under the Itanium C++ ABI, the compiler selects the first non-inline non-pure virtual function as the "key function" whose TU emits the vtable. When all non-pure virtuals are inline, there is no key function, and Clang 18's module implementation fails to emit the vtable anywhere.
-
-**Why the Data I/O loaders are not affected:** `IAssetLoader` has only pure virtual functions, so defining the destructor in a single TU (`Graphics.IORegistry.cpp`) reliably anchors the vtable there.
-
-**Possible fixes (not yet implemented):**
-1. **Make base-class default methods pure virtual + provide definitions.** E.g. `virtual void Shutdown() = 0;` in the interface, `void RenderPipeline::Shutdown() {}` in a `.cpp`. This gives the ABI a key function.
-2. **Move all Pass/Pipeline declarations and definitions into the same TU** (loses the partition separation benefit).
-3. **Factory functions** that force constructor instantiation in a known TU — works but cascades (each class with the same issue needs one).
-4. **Upgrade to Clang 19+** if the bug is fixed upstream (not yet verified).
-
-**Note:** `IntrinsicTests` is not affected — it does not instantiate `DefaultPipeline` or the Pass classes.
+**Resolution:** Upgraded minimum compiler to Clang 20, which correctly handles vtable emission across module partition boundaries. Existing vtable anchor patterns (out-of-line destructors in `Graphics.Pipelines.cppm` and `Graphics.IORegistry.cpp`) are retained as defensive practice.
