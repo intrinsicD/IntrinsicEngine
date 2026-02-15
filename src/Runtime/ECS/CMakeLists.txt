@@ -16,6 +16,7 @@ target_sources(${target_name}
         Components/ECS.Components.NameTag.cppm
         Components/ECS.Components.Transform.cppm
         Components/ECS.Components.Selection.cppm
+        Components/ECS.Components.DEC.cppm
         Systems/ECS.Systems.AxisRotator.cppm
         Systems/ECS.Systems.Transform.cppm
         ECS.Scene.cppm
@@ -31,5 +32,6 @@ target_include_directories(${target_name} PUBLIC .)
 target_link_libraries(${target_name}
         PUBLIC
         IntrinsicCore
+        IntrinsicGeometry
         EnTT::EnTT
 )

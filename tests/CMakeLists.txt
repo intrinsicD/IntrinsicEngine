@@ -128,3 +128,32 @@ gtest_discover_tests(${ecs_test_target}
     ENVIRONMENT "${_intrinsic_test_env}"
     DISCOVERY_MODE POST_BUILD
 )
+
+# --- Core + Geometry tests (DEC, mesh algorithms — no GPU, no ECS) ---
+set(geometry_test_target IntrinsicGeometryTests)
+add_executable(${geometry_test_target}
+        Test_RuntimeGeometry.cpp
+        Test_RuntimeGeometry_NoHeapEPA.cpp
+        Test_RuntimeGraph.cpp
+        Test_RuntimeGraph_ParallelLayers.cpp
+        Test_DEC.cpp
+)
+
+target_compile_options(${geometry_test_target} PRIVATE ${INTRINSIC_COMPILE_FLAGS})
+target_link_options(${geometry_test_target} PRIVATE ${INTRINSIC_LINK_FLAGS})
+set_target_properties(${geometry_test_target} PROPERTIES CXX_SCAN_FOR_MODULES ON)
+
+target_link_libraries(${geometry_test_target}
+        PRIVATE
+        IntrinsicConfig
+        IntrinsicCore
+        IntrinsicGeometry
+        GTest::gtest_main
+        dl
+)
+
+gtest_discover_tests(${geometry_test_target}
+    PROPERTIES
+    ENVIRONMENT "${_intrinsic_test_env}"
+    DISCOVERY_MODE POST_BUILD
+)

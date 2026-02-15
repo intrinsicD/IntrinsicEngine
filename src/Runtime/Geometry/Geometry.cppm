@@ -19,3 +19,4 @@ export import :SDF;
 export import :SDFContact;
 export import :Support;
 export import :Validation;
+export import :DEC;

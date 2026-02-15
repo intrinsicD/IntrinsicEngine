@@ -67,13 +67,32 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND CMAKE_CXX_COMPILER_VERSION VERSION
     list(APPEND INTRINSIC_BASE_FLAGS -Wno-builtin-macro-redefined -D__cpp_concepts=202002L)
 endif()
 
-# Add sanitizers to RelWithDebInfo for better testing coverage
-set(INTRINSIC_DEBUG_FLAGS
-    $<$<CONFIG:Debug>:-fsanitize=address,undefined>
-    $<$<CONFIG:Debug>:-fno-omit-frame-pointer>
-    $<$<CONFIG:RelWithDebInfo>:-fsanitize=address,undefined>
-    $<$<CONFIG:RelWithDebInfo>:-fno-omit-frame-pointer>
+# Sanitizer support — gated behind INTRINSIC_ENABLE_SANITIZERS.
+# Auto-detects whether the Clang ASan runtime is available; disables gracefully
+# in container / CI environments that ship Clang but not compiler-rt.
+include(CheckCXXSourceCompiles)
+set(_SAVED_CMAKE_REQUIRED_FLAGS "${CMAKE_REQUIRED_FLAGS}")
+set(CMAKE_REQUIRED_FLAGS "-fsanitize=address")
+check_cxx_source_compiles("int main(){return 0;}" INTRINSIC_ASAN_AVAILABLE)
+set(CMAKE_REQUIRED_FLAGS "${_SAVED_CMAKE_REQUIRED_FLAGS}")
+
+option(INTRINSIC_ENABLE_SANITIZERS
+    "Enable AddressSanitizer + UBSan in Debug/RelWithDebInfo builds"
+    ${INTRINSIC_ASAN_AVAILABLE}
 )
+
+set(INTRINSIC_DEBUG_FLAGS "")
+if(INTRINSIC_ENABLE_SANITIZERS)
+    set(INTRINSIC_DEBUG_FLAGS
+        $<$<CONFIG:Debug>:-fsanitize=address,undefined>
+        $<$<CONFIG:Debug>:-fno-omit-frame-pointer>
+        $<$<CONFIG:RelWithDebInfo>:-fsanitize=address,undefined>
+        $<$<CONFIG:RelWithDebInfo>:-fno-omit-frame-pointer>
+    )
+    message(STATUS "Sanitizers ENABLED (ASan + UBSan) for Debug/RelWithDebInfo builds")
+else()
+    message(STATUS "Sanitizers DISABLED (libclang_rt.asan not found or manually turned off)")
+endif()
 set(INTRINSIC_RELEASE_FLAGS
         $<$<CONFIG:Release>:-O3>
         $<$<CONFIG:RelWithDebInfo>:-O3>

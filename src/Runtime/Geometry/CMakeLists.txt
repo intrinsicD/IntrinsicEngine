@@ -29,6 +29,7 @@ target_sources(${target_name}
         Geometry.Raycast.cppm
         Geometry.HalfedgeMesh.cppm
         Geometry.Graph.cppm
+        Geometry.DEC.cppm
         PRIVATE
         FILE_SET geometry_impl TYPE CXX_MODULES FILES
         Geometry.MeshUtils.cpp
@@ -37,6 +38,7 @@ target_sources(${target_name}
         Geometry.HalfedgeMesh.cpp
         Geometry.Properties.cpp
         Geometry.Graph.cpp
+        Geometry.DEC.cpp
 )
 
 target_include_directories(${target_name} PUBLIC .)
