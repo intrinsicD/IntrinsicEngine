@@ -107,14 +107,18 @@ configure_build() {
 }
 
 # --------------------------------------------------------------------------
-# 4. Build the project
+# 4. Build the project (targeted — only libraries, not test executables)
 # --------------------------------------------------------------------------
 build_project() {
-    echo "==> Building project …"
-    if cmake --build "$BUILD_DIR" --parallel "$(nproc)"; then
-        echo "==> Build succeeded."
+    echo "==> Building core libraries …"
+    # Build only the library targets.  Test executables are built on-demand
+    # during development (e.g. `ninja IntrinsicTests`) to keep setup fast.
+    if cmake --build "$BUILD_DIR" --parallel "$(nproc)" --target \
+        IntrinsicCore IntrinsicGeometry IntrinsicECS IntrinsicRHI \
+        IntrinsicGraphics IntrinsicInterface IntrinsicRuntime; then
+        echo "==> Library build succeeded."
     else
-        echo "==> Build failed (exit $?). You may need to fix build errors manually."
+        echo "==> Library build failed (exit $?). You may need to fix build errors manually."
         return 1
     fi
 }

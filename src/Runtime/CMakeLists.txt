@@ -45,8 +45,8 @@ target_link_libraries(${target_name}
         glfw
 )
 
-add_subdirectory(ECS)
 add_subdirectory(Geometry)
+add_subdirectory(ECS)
 add_subdirectory(Graphics)
 add_subdirectory(Interface)
 add_subdirectory(RHI)

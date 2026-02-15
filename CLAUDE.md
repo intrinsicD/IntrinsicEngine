@@ -40,6 +40,52 @@ Define the class's destructor in a *different* partition's `.cpp` file that alre
 
 **Known issue:** The `Sandbox` target has a pre-existing link failure due to this — `DefaultPipeline` (inheriting `RenderPipeline`) and several `Pass` classes hit the non-pure-virtual-base variant of this bug. A comprehensive fix requires restructuring the `RenderPipeline` base class to use pure virtual functions or moving to a factory pattern.
 
+## Build & Test Workflow
+
+The setup script (`.claude/setup.sh`) installs dependencies, configures CMake (Debug, Ninja, Clang 18+), and builds the **library targets only** — not test executables. This keeps session setup fast.
+
+**Sanitizers:** ASan + UBSan are auto-detected at configure time. If `libclang_rt.asan` is not installed (common in containers), sanitizers are automatically disabled. No link failures. Override with `-DINTRINSIC_ENABLE_SANITIZERS=ON/OFF`.
+
+### Targeted builds during development
+
+Always build only the targets you need. Never run a bare `ninja` or `cmake --build .` which rebuilds everything:
+
+```bash
+# Reconfigure (only needed after CMakeLists.txt changes):
+cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug \
+      -DCMAKE_C_COMPILER=clang-18 -DCMAKE_CXX_COMPILER=clang++-18
+
+# Build a specific library you touched:
+ninja -C build IntrinsicGeometry
+
+# Build and link the test executable:
+ninja -C build IntrinsicTests
+
+# Run only the tests matching your work (fast — skips unrelated tests):
+./build/bin/IntrinsicTests --gtest_filter="DEC_*"
+
+# Run the full test suite when ready:
+./build/bin/IntrinsicTests
+```
+
+### Test targets
+
+| Target | Links against | Use for |
+|---|---|---|
+| `IntrinsicCoreTests` | Core only | Pure algorithmic tests (no GPU, no ECS) |
+| `IntrinsicGeometryTests` | Core + Geometry | DEC, mesh algorithms, graphs (no GPU, no ECS) |
+| `IntrinsicECSTests` | Core + ECS | FrameGraph system integration |
+| `IntrinsicTests` | Full Runtime | Graphics, I/O, integration |
+
+### Key principles
+
+- **Build incrementally.** Ninja tracks file dependencies — after editing one `.cppm`/`.cpp`, only the affected targets recompile.
+- **Filter tests.** Use `--gtest_filter=` to run only the tests relevant to your change. Don't run the full suite on every iteration.
+- **Don't stop on pre-existing failures.** The `Sandbox` target has a known vtable link failure (§4.4 in ARCHITECTURE_ANALYSIS.md). This does not affect library or test builds.
+- **Keep building through the session.** Long compile times are expected for C++23 modules on first build (~2-5 min). Incremental rebuilds after editing a single file are fast (~5-15s). Do not abandon a session because a build takes time — use `--parallel $(nproc)` and wait.
+
+---
+
 ## Continuous Self-Evaluation
 
 After every change you make, you ask yourself:
