@@ -14,6 +14,7 @@ import :MaterialSystem;
 import :Geometry;
 import :ShaderRegistry;
 import :PipelineLibrary;
+import :DebugDraw;
 import :Passes.SelectionOutlineSettings;
 import Core.Hash;
 import Core.Assets;
@@ -118,6 +119,11 @@ export namespace Graphics
         // Picking readback destination for *this frame slot* (owned by RenderSystem).
         // The PickingPass uses this for vkCmdCopyImageToBuffer.
         RHI::VulkanBuffer* PickReadbackBuffer = nullptr;
+
+        // Immediate-mode debug drawing accumulator.
+        // Populated by ECS systems and other subsystems before rendering.
+        // Consumed by LineRenderPass during graph setup.
+        DebugDraw* DebugDrawPtr = nullptr;
     };
 
     // ---------------------------------------------------------------------

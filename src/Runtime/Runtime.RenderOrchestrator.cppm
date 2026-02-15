@@ -71,6 +71,9 @@ export namespace Runtime
         [[nodiscard]] Core::Memory::LinearArena& GetFrameArena() { return m_FrameArena; }
         [[nodiscard]] Core::Memory::ScopeStack& GetFrameScope() { return m_FrameScope; }
 
+        [[nodiscard]] Graphics::DebugDraw& GetDebugDraw() { return m_DebugDraw; }
+        [[nodiscard]] const Graphics::DebugDraw& GetDebugDraw() const { return m_DebugDraw; }
+
         // --- Per-frame maintenance ---
         void OnResize();
 
@@ -88,6 +91,9 @@ export namespace Runtime
 
         // Shader path registry (populated during init, read-only afterwards).
         Graphics::ShaderRegistry m_ShaderRegistry;
+
+        // Immediate-mode debug drawing accumulator (reset each frame).
+        Graphics::DebugDraw m_DebugDraw;
 
         // Pipeline state objects.
         std::unique_ptr<Graphics::PipelineLibrary> m_PipelineLibrary;

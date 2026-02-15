@@ -68,6 +68,8 @@ The following Clang 18 issues are resolved by the upgrade to Clang 20 as the min
 - Thick lines via screen-space expansion in vertex shader (Vulkan has no guaranteed wide-line support).
 - Node rendering can reuse point splatting infrastructure.
 
+**Status:** Core line rendering infrastructure is DONE — see Phase 0 item 3. `LineRenderPass` provides the SSBO-based thick-line backend. Remaining work: mesh wireframe overlay (barycentric), graph layout algorithms, kNN visualization, halfedge debug view. All build on the existing `DebugDraw` + `LineRenderPass` primitives.
+
 ---
 
 #### 2.1.3 Mesh Rendering Modes
@@ -222,6 +224,8 @@ The following Clang 18 issues are resolved by the upgrade to Clang 20 as the min
 - Debug draw calls should go through an immediate-mode API: `DebugDraw::Line(a, b, color)`, `DebugDraw::Box(aabb, color)`, `DebugDraw::Sphere(center, radius, color)`, etc.
 - All debug geometry is transient — rebuilt each frame from `LinearArena`.
 - Toggled per-category via the UI (§2.5).
+
+**Status:** Core API and rendering backend are DONE — see Phase 0 item 3. `DebugDraw` provides the immediate-mode accumulator with `Line`, `Box`, `WireBox`, `Sphere`, `Circle`, `Arrow`, `Axes`, `Frustum`, `Grid`, `Cross` plus overlay variants. Remaining work: per-category UI toggles (§2.5), contact manifold rendering, convex hull overlay. These are incremental additions to the existing `DebugDraw` API.
 
 ---
 
@@ -407,9 +411,7 @@ Sub-entity select → Geometry processing (interactive operator input)
    *Depends on: nothing (rendering infrastructure). Depended on by: shadow mapping, transparency, mesh rendering modes, point cloud blending.*
    The HDR intermediate render target and the post-pass chain (tone mapping at minimum). Currently the forward pass writes directly to the swapchain — every rendering feature added later assumes an HDR intermediate exists. Establish the plumbing now; individual effects (SSAO, bloom) can be added incrementally.
 
-3. **Line rendering + DebugDraw API (§2.1.2 infrastructure + §2.3 API)**
-   *Depends on: nothing. Depended on by: gizmos, debug visualization, wireframe, graph rendering, measurement tools, normal visualization, clipping plane visualization.*
-   The `LineRenderFeature` (GPU-side SSBO of line segments with screen-space expansion) and the immediate-mode `DebugDraw` API. This is a rendering primitive — at least 6 later features depend on it.
+~~3. **Line rendering + DebugDraw API (§2.1.2 infrastructure + §2.3 API)** — DONE.~~ `DebugDraw` (`Graphics.DebugDraw.cppm/.cpp`) provides an immediate-mode CPU-side accumulator with depth-tested and overlay line lists. API: `Line()`, `Box()`, `WireBox()`, `Sphere()`, `Circle()`, `Arrow()`, `Axes()`, `Frustum()`, `Grid()`, `Cross()` plus overlay variants. `LineRenderPass` (`Graphics.Passes.Line.cppm/.cpp`) implements `IRenderFeature` with screen-space thick-line expansion in the vertex shader (no geometry shader) — each segment becomes a 6-vertex quad via SSBO. Two pipeline variants: depth-tested (`VK_COMPARE_OP_LESS_OR_EQUAL`, no depth write) and overlay (depth test disabled). Per-frame SSBOs with power-of-2 growth. Anti-aliased edges via smoothstep in fragment shader. Integrated into `DefaultPipeline` (step 4, after SelectionOutline, before DebugView). `RenderOrchestrator` owns `DebugDraw` lifetime, threaded via `RenderSystem` → `RenderPassContext` → `LineRenderPass`. 32 tests in `IntrinsicTests`.
 
 ---
 

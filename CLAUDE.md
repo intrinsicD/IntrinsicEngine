@@ -38,6 +38,20 @@ When a class with virtual functions is declared in a module partition interface 
 
 This pattern is retained for robustness even though Clang 20 has resolved the vtable emission bugs that affected Clang 18.
 
+## Lambda Captures and InplaceFunction
+
+`RHI::VulkanDevice::SafeDestroy()` accepts an `InplaceFunction` (small-buffer-optimized callable) that requires `is_nothrow_move_constructible`. When writing deferred-destruction lambdas:
+
+- **Never capture a `const` container by value.** A `const std::vector<T>` member in a lambda prevents move construction — the compiler falls back to copy, which is not `noexcept`, failing the static assert.
+- **Pattern:** Move the container into a local variable first, then move-capture it:
+  ```cpp
+  std::vector<VkDescriptorPool> pools = std::move(m_AllPools);
+  m_Device.SafeDestroy([dev, pools = std::move(pools)]() {
+      for (auto pool : pools) vkDestroyDescriptorPool(dev, pool, nullptr);
+  });
+  ```
+- The non-const move capture ensures the lambda itself is nothrow-move-constructible.
+
 ## Build & Test Workflow
 
 The setup script (`.claude/setup.sh`) installs dependencies, configures CMake (Debug, Ninja, Clang 20+), and builds the **library targets only** — not test executables. This keeps session setup fast.

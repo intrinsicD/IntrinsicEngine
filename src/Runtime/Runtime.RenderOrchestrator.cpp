@@ -101,6 +101,10 @@ namespace Runtime
         m_ShaderRegistry.Register("Outline.Vert"_id, "shaders/debug_view.vert.spv"); // Reuse fullscreen triangle
         m_ShaderRegistry.Register("Outline.Frag"_id, "shaders/selection_outline.frag.spv");
 
+        // Line rendering (debug draw)
+        m_ShaderRegistry.Register("Line.Vert"_id, "shaders/line.vert.spv");
+        m_ShaderRegistry.Register("Line.Frag"_id, "shaders/line.frag.spv");
+
         // Stage 3 compute
         m_ShaderRegistry.Register("Cull.Comp"_id, "shaders/instance_cull_multigeo.comp.spv");
 
@@ -140,6 +144,9 @@ namespace Runtime
             std::exit(1);
         }
 
+        // Wire DebugDraw accumulator to RenderSystem (consumed by LineRenderPass).
+        m_RenderSystem->SetDebugDraw(&m_DebugDraw);
+
         // Default Render Pipeline (hot-swappable)
         auto defaultPipeline = std::make_unique<Graphics::DefaultPipeline>();
         defaultPipeline->SetFeatureRegistry(m_FeatureRegistry);
@@ -156,5 +163,6 @@ namespace Runtime
     {
         m_FrameScope.Reset();
         m_FrameArena.Reset();
+        m_DebugDraw.Reset();
     }
 }

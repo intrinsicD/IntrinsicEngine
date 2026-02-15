@@ -10,6 +10,7 @@ import :RenderGraph;
 import :Passes.Picking;
 import :Passes.Forward;
 import :Passes.SelectionOutline;
+import :Passes.Line;
 import :Passes.DebugView;
 import :Passes.ImGui;
 import :PipelineLibrary;
@@ -28,12 +29,14 @@ namespace Graphics
         if (m_PickingPass) m_PickingPass->Shutdown();
         if (m_ForwardPass) m_ForwardPass->Shutdown();
         if (m_SelectionOutlinePass) m_SelectionOutlinePass->Shutdown();
+        if (m_LineRenderPass) m_LineRenderPass->Shutdown();
         if (m_DebugViewPass) m_DebugViewPass->Shutdown();
         if (m_ImGuiPass) m_ImGuiPass->Shutdown();
 
         m_PickingPass.reset();
         m_ForwardPass.reset();
         m_SelectionOutlinePass.reset();
+        m_LineRenderPass.reset();
         m_DebugViewPass.reset();
         m_ImGuiPass.reset();
     }
@@ -47,12 +50,14 @@ namespace Graphics
         m_PickingPass = std::make_unique<Passes::PickingPass>();
         m_ForwardPass = std::make_unique<Passes::ForwardPass>();
         m_SelectionOutlinePass = std::make_unique<Passes::SelectionOutlinePass>();
+        m_LineRenderPass = std::make_unique<Passes::LineRenderPass>();
         m_DebugViewPass = std::make_unique<Passes::DebugViewPass>();
         m_ImGuiPass = std::make_unique<Passes::ImGuiPass>();
 
         m_PickingPass->Initialize(device, descriptorPool, globalLayout);
         m_ForwardPass->Initialize(device, descriptorPool, globalLayout);
         m_SelectionOutlinePass->Initialize(device, descriptorPool, globalLayout);
+        m_LineRenderPass->Initialize(device, descriptorPool, globalLayout);
         m_DebugViewPass->Initialize(device, descriptorPool, globalLayout);
         m_ImGuiPass->Initialize(device, descriptorPool, globalLayout);
 
@@ -64,6 +69,7 @@ namespace Graphics
         m_ForwardPass->SetCullSetLayout(pipelineLibrary.GetCullSetLayout());
 
         m_SelectionOutlinePass->SetShaderRegistry(shaderRegistry);
+        m_LineRenderPass->SetShaderRegistry(shaderRegistry);
         m_DebugViewPass->SetShaderRegistry(shaderRegistry);
         
         m_PathDirty = true;
@@ -91,7 +97,20 @@ namespace Graphics
         if (m_SelectionOutlinePass && IsFeatureEnabled("SelectionOutlinePass"_id))
             m_Path.AddFeature("SelectionOutline", m_SelectionOutlinePass.get());
 
-        // 4. Debug View (Conditional on both registry and per-frame debug state)
+        // 4. Debug Lines (depth-tested + overlay, consumes DebugDraw accumulator)
+        if (m_LineRenderPass && IsFeatureEnabled("LineRenderPass"_id))
+        {
+            m_Path.AddStage("DebugLines", [this](RenderPassContext& ctx)
+            {
+                if (ctx.DebugDrawPtr)
+                {
+                    m_LineRenderPass->SetDebugDraw(ctx.DebugDrawPtr);
+                    m_LineRenderPass->AddPasses(ctx);
+                }
+            });
+        }
+
+        // 5. Debug View (Conditional on both registry and per-frame debug state)
         if (m_DebugViewPass && IsFeatureEnabled("DebugViewPass"_id))
         {
             m_Path.AddStage("DebugView", [this](RenderPassContext& ctx)
@@ -103,7 +122,7 @@ namespace Graphics
             });
         }
 
-        // 5. ImGui (Overlay) — gated by FeatureRegistry
+        // 6. ImGui (Overlay) — gated by FeatureRegistry
         if (m_ImGuiPass && IsFeatureEnabled("ImGuiPass"_id))
             m_Path.AddFeature("ImGui", m_ImGuiPass.get());
     }
@@ -126,6 +145,7 @@ namespace Graphics
         if (m_PickingPass) m_PickingPass->OnResize(width, height);
         if (m_ForwardPass) m_ForwardPass->OnResize(width, height);
         if (m_SelectionOutlinePass) m_SelectionOutlinePass->OnResize(width, height);
+        if (m_LineRenderPass) m_LineRenderPass->OnResize(width, height);
         if (m_DebugViewPass) m_DebugViewPass->OnResize(width, height);
         if (m_ImGuiPass) m_ImGuiPass->OnResize(width, height);
     }

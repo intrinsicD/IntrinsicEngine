@@ -13,6 +13,7 @@ import :PipelineLibrary;
 import :Passes.DebugView;
 import :Passes.Forward;
 import :Passes.ImGui;
+import :Passes.Line;
 import :Passes.Picking;
 import :Passes.SelectionOutline;
 import :Passes.SelectionOutlineSettings;
@@ -61,6 +62,7 @@ export namespace Graphics
         std::unique_ptr<Passes::PickingPass> m_PickingPass;
         std::unique_ptr<Passes::ForwardPass> m_ForwardPass;
         std::unique_ptr<Passes::SelectionOutlinePass> m_SelectionOutlinePass;
+        std::unique_ptr<Passes::LineRenderPass> m_LineRenderPass;
         std::unique_ptr<Passes::DebugViewPass> m_DebugViewPass;
         std::unique_ptr<Passes::ImGuiPass> m_ImGuiPass;
 
