@@ -15,7 +15,7 @@ if(NOT CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS)
     # Search for versioned binaries first, then generic
     find_program(CLANG_SCAN_DEPS_PATH
             NAMES
-            clang-scan-deps-18
+            clang-scan-deps-20
             clang-scan-deps-19
             clang-scan-deps
             HINTS
@@ -33,7 +33,7 @@ if(NOT CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS)
         if(EXISTS "${COMPILER_HINT_PATH}")
             set(CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS "${COMPILER_HINT_PATH}" CACHE FILEPATH "Force scanner" FORCE)
         else()
-            message(FATAL_ERROR "Could not find clang-scan-deps. Ensure Clang Tools 18+ are in your PATH.")
+            message(FATAL_ERROR "Could not find clang-scan-deps. Ensure Clang Tools 20+ are in your PATH.")
         endif()
     endif()
 endif()
@@ -60,12 +60,6 @@ set(INTRINSIC_BASE_FLAGS
         -fno-exceptions
         -fno-rtti
 )
-
-# Clang 18 reports __cpp_concepts as 201907L but GCC 14's <expected> header
-# guards on >= 202002L.  Override so libstdc++-14 C++23 features are available.
-if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS "19")
-    list(APPEND INTRINSIC_BASE_FLAGS -Wno-builtin-macro-redefined -D__cpp_concepts=202002L)
-endif()
 
 # Sanitizer support — gated behind INTRINSIC_ENABLE_SANITIZERS.
 # Auto-detects whether the Clang ASan runtime is available; disables gracefully

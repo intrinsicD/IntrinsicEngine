@@ -29,9 +29,8 @@ jobs:
       - name: Install Clang 20 & Tools
         run: |
           # Automated script from llvm.org to fetch clang-20
-          # Clang 18 has known C++ modules bugs (broken name lookup in default
-          # arguments, std::unexpected not visible from global module fragment).
-          # Clang 20 resolves these.
+          # Clang 20 is the minimum supported compiler for IntrinsicEngine.
+          # It resolves C++ modules bugs present in earlier Clang versions.
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
           sudo ./llvm.sh 20

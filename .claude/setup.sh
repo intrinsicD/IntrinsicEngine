@@ -44,7 +44,7 @@ install_system_deps() {
     dpkg -s libstdc++-14-dev &>/dev/null || missing+=(libstdc++-14-dev)
 
     # Clang tools for C++23 module dependency scanning
-    dpkg -s clang-tools-18  &>/dev/null || missing+=(clang-tools-18)
+    dpkg -s clang-tools-20  &>/dev/null || missing+=(clang-tools-20)
 
     if [ ${#missing[@]} -gt 0 ]; then
         echo "==> Installing missing packages: ${missing[*]}"
@@ -56,10 +56,10 @@ install_system_deps() {
 }
 
 # --------------------------------------------------------------------------
-# 2. Detect the best available Clang version (prefer 20, fall back to 18)
+# 2. Detect the best available Clang version (require 20+)
 # --------------------------------------------------------------------------
 detect_clang() {
-    for ver in 20 18; do
+    for ver in 20; do
         if command -v "clang++-${ver}" &>/dev/null; then
             CLANG_VER="$ver"
             CC="clang-${ver}"
@@ -68,7 +68,7 @@ detect_clang() {
             return 0
         fi
     done
-    echo "ERROR: No supported Clang (18+) found. Install clang-18 or clang-20." >&2
+    echo "ERROR: Clang 20+ required. Install clang-20: sudo apt install clang-20 clang-tools-20" >&2
     return 1
 }
 

@@ -52,7 +52,7 @@ A "Distinguished Scientist" grade geometry kernel located in `Runtime.Geometry`:
 
 ## 🐧 Ubuntu Setup Guide
 
-**Requirement**: This engine uses bleeding-edge C++23 features. You must use **Clang 18+** and **CMake 3.28+**.
+**Requirement**: This engine uses bleeding-edge C++23 features. You must use **Clang 20+** and **CMake 3.28+**.
 
 ### 1. Install Dependencies
 ```bash
@@ -67,14 +67,14 @@ sudo apt install vulkan-tools libvulkan-dev vulkan-validationlayers-dev spirv-to
 sudo apt install libwayland-dev libxkbcommon-dev xorg-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev
 ```
 
-### 2. Install Clang 18+ & Tools
+### 2. Install Clang 20+ & Tools
 C++ Modules support requires specific Clang tools for dependency scanning.
 
 ```bash
-# 1. Install LLVM/Clang 18
+# 1. Install LLVM/Clang 20
 wget https://apt.llvm.org/llvm.sh
 chmod +x llvm.sh
-sudo ./llvm.sh 18
+sudo ./llvm.sh 20
 
 # 2. Install GCC Toolchain (for C++23 stdlib headers like <expected> and <format>)
 sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
@@ -82,7 +82,7 @@ sudo apt update
 sudo apt install libstdc++-14-dev
 
 # 3. Install Clang Tools (Crucial for CMake module scanning)
-sudo apt install clang-tools-18
+sudo apt install clang-tools-20
 ```
 
 ---
@@ -97,9 +97,9 @@ mkdir build && cd build
 
 cmake -G "Ninja" \
     -DCMAKE_BUILD_TYPE=Debug \
-    -DCMAKE_C_COMPILER=clang-18 \
-    -DCMAKE_CXX_COMPILER=clang++-18 \
-    -DCMAKE_CXX_COMPILER_CLANG_SCAN_DEPS=/usr/bin/clang-scan-deps-18 \
+    -DCMAKE_C_COMPILER=clang-20 \
+    -DCMAKE_CXX_COMPILER=clang++-20 \
+    -DCMAKE_CXX_COMPILER_CLANG_SCAN_DEPS=/usr/bin/clang-scan-deps-20 \
     ..
 ```
 
@@ -187,7 +187,7 @@ This makes it difficult to accidentally double-draw or clear the backbuffer twic
 ## 🧩 Troubleshooting
 
 **`CMake Error: Could not find clang-scan-deps`**
-Ensure you installed `clang-tools-18` and passed `-DCMAKE_CXX_COMPILER_CLANG_SCAN_DEPS` correctly.
+Ensure you installed `clang-tools-20` and passed `-DCMAKE_CXX_COMPILER_CLANG_SCAN_DEPS` correctly.
 
 **`fatal error: 'format' file not found`**
 Your `libstdc++` is too old. Ensure you installed `libstdc++-14-dev`.

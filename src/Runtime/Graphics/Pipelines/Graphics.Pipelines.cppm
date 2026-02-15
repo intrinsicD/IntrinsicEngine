@@ -75,10 +75,9 @@ export namespace Graphics
     };
 
     // -------------------------------------------------------------------------
-    // Vtable anchor: destructor is defined out-of-line in this TU (the :Pipelines
-    // partition) so the vtable for DefaultPipeline is emitted here — same TU as the
-    // class. This works around Clang 18's failure to link vtables across module
-    // partition boundaries (see ARCHITECTURE_ANALYSIS.md §1.1).
+    // Vtable anchor: destructor defined out-of-line so the vtable for
+    // DefaultPipeline is emitted in this TU. Retained as defensive practice
+    // for robust vtable emission across module partition boundaries.
     // -------------------------------------------------------------------------
     DefaultPipeline::~DefaultPipeline() {}
 }
