@@ -34,6 +34,7 @@ add_executable(${target_name}
         Test_DebugDraw.cpp
         Test_GeometryProcessing.cpp
         Test_GeometryProcessing2.cpp
+        Test_SurfaceReconstruction.cpp
 )
 
 #Apply Strict Flags ONLY to our tests
@@ -143,6 +144,7 @@ add_executable(${geometry_test_target}
         Test_MeshOperations.cpp
         Test_GeometryProcessing.cpp
         Test_GeometryProcessing2.cpp
+        Test_SurfaceReconstruction.cpp
 )
 
 target_compile_options(${geometry_test_target} PRIVATE ${INTRINSIC_COMPILE_FLAGS})

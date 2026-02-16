@@ -29,3 +29,5 @@ export import :Geodesic;
 export import :CatmullClark;
 export import :NormalEstimation;
 export import :MeshRepair;
+export import :MarchingCubes;
+export import :SurfaceReconstruction;

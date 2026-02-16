@@ -39,6 +39,8 @@ target_sources(${target_name}
         Geometry.CatmullClark.cppm
         Geometry.NormalEstimation.cppm
         Geometry.MeshRepair.cppm
+        Geometry.MarchingCubes.cppm
+        Geometry.SurfaceReconstruction.cppm
         PRIVATE
         FILE_SET geometry_impl TYPE CXX_MODULES FILES
         Geometry.MeshUtils.cpp
@@ -57,6 +59,8 @@ target_sources(${target_name}
         Geometry.CatmullClark.cpp
         Geometry.NormalEstimation.cpp
         Geometry.MeshRepair.cpp
+        Geometry.MarchingCubes.cpp
+        Geometry.SurfaceReconstruction.cpp
 )
 
 target_include_directories(${target_name} PUBLIC .)
