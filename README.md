@@ -52,6 +52,8 @@ A **"Distinguished Scientist" grade** geometry kernel in `src/Runtime/Geometry/`
 | **Geodesic Distance** | Heat method (diffusion + Poisson solve) | Crane et al. 2013 |
 | **Normal Estimation** | PCA local plane fitting + MST orientation | Hoppe et al. 1992 |
 | **Mesh Repair** | Hole filling (ear-clipping), degenerate removal, orientation | — |
+| **Marching Cubes** | Isosurface extraction from scalar fields with vertex welding | Lorensen & Cline 1987 |
+| **Surface Reconstruction** | Point cloud → mesh via signed distance field + Marching Cubes | Hoppe et al. 1992 |
 
 **Discrete Exterior Calculus (DEC):**
 - Exterior derivatives d0, d1 in CSR sparse matrix format.
@@ -160,6 +162,8 @@ Four test targets with clear GPU/no-GPU boundaries:
 ./build/bin/IntrinsicGeometryTests --gtest_filter="CatmullClark*"
 ./build/bin/IntrinsicGeometryTests --gtest_filter="NormalEstimation*"
 ./build/bin/IntrinsicGeometryTests --gtest_filter="MeshRepair*"
+./build/bin/IntrinsicGeometryTests --gtest_filter="MarchingCubes*"
+./build/bin/IntrinsicGeometryTests --gtest_filter="SurfaceReconstruction*"
 ./build/bin/IntrinsicGeometryTests --gtest_filter="DEC_*"
 ```
 
