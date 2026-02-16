@@ -2,7 +2,10 @@ module;
 
 #include <algorithm>
 #include <cassert>
+#include <cmath>
+#include <cstdint>
 #include <limits>
+#include <span>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -14,6 +17,15 @@ import :Properties;
 
 namespace Geometry::Graph
 {
+    namespace
+    {
+        struct Neighbor
+        {
+            std::uint32_t Index{0};
+            float Distance2{0.0F};
+        };
+    }
+
     Graph::Graph()
     {
         EnsureProperties();
@@ -251,6 +263,163 @@ namespace Geometry::Graph
         splice_into_vertex(v1, h1);
 
         return Edge(h0);
+    }
+
+
+    std::optional<KNNBuildResult> BuildKNNGraphFromIndices(Graph& graph, std::span<const glm::vec3> points,
+        std::span<const std::vector<std::uint32_t>> knnIndices, const KNNFromIndicesParams& params)
+    {
+        if (points.empty() || knnIndices.empty() || points.size() != knnIndices.size()) return std::nullopt;
+
+        graph.Clear();
+
+        std::size_t reservedEdges = 0;
+        for (const auto& neighbors : knnIndices) reservedEdges += neighbors.size();
+
+        graph.Reserve(points.size(), reservedEdges);
+        for (const glm::vec3& point : points)
+        {
+            graph.AddVertex(point);
+        }
+
+        const std::size_t n = points.size();
+        const float minDistance2 = std::max(0.0F, params.MinDistanceEpsilon * params.MinDistanceEpsilon);
+
+        KNNBuildResult result{};
+        result.VertexCount = n;
+
+        auto has_reverse_edge = [&](std::uint32_t i, std::uint32_t j)
+        {
+            const auto& reverse = knnIndices[static_cast<std::size_t>(j)];
+            return std::find(reverse.begin(), reverse.end(), i) != reverse.end();
+        };
+
+        for (std::uint32_t i = 0; i < static_cast<std::uint32_t>(n); ++i)
+        {
+            const auto& neighbors = knnIndices[static_cast<std::size_t>(i)];
+            for (const std::uint32_t j : neighbors)
+            {
+                if (j >= n || i == j)
+                {
+                    ++result.DegeneratePairCount;
+                    continue;
+                }
+
+                const glm::vec3 d = points[static_cast<std::size_t>(j)] - points[static_cast<std::size_t>(i)];
+                const float distance2 = glm::dot(d, d);
+                if (!std::isfinite(distance2) || distance2 <= minDistance2)
+                {
+                    ++result.DegeneratePairCount;
+                    continue;
+                }
+
+                ++result.CandidateEdgeCount;
+
+                if (params.Connectivity == KNNConnectivity::Mutual && !has_reverse_edge(i, j)) continue;
+
+                const auto edge = graph.AddEdge(VertexHandle{i}, VertexHandle{j});
+                if (edge.has_value()) ++result.InsertedEdgeCount;
+            }
+        }
+
+        return result;
+    }
+
+    std::optional<KNNBuildResult> BuildKNNGraph(Graph& graph, std::span<const glm::vec3> points,
+        const KNNBuildParams& params)
+    {
+        if (points.empty() || params.K == 0U) return std::nullopt;
+
+        graph.Clear();
+        graph.Reserve(points.size(), points.size() * static_cast<std::size_t>(params.K));
+
+        for (const glm::vec3& point : points)
+        {
+            graph.AddVertex(point);
+        }
+
+        const std::size_t n = points.size();
+        const std::size_t effectiveK = std::min<std::size_t>(params.K, n - 1U);
+
+        KNNBuildResult result{};
+        result.VertexCount = n;
+        result.RequestedK = params.K;
+        result.EffectiveK = effectiveK;
+
+        if (effectiveK == 0U) return result;
+
+        std::vector<std::vector<std::uint32_t>> neighborhoods(n);
+        std::vector<Neighbor> candidates;
+        candidates.reserve(n > 0 ? n - 1U : 0U);
+
+        const float minDistance2 = std::max(0.0F, params.MinDistanceEpsilon * params.MinDistanceEpsilon);
+
+        for (std::uint32_t i = 0; i < static_cast<std::uint32_t>(n); ++i)
+        {
+            candidates.clear();
+            candidates.reserve(n - 1U);
+
+            for (std::uint32_t j = 0; j < static_cast<std::uint32_t>(n); ++j)
+            {
+                if (i == j) continue;
+
+                const glm::vec3 d = points[static_cast<std::size_t>(j)] - points[static_cast<std::size_t>(i)];
+                const float distance2 = glm::dot(d, d);
+                if (!std::isfinite(distance2)) continue;
+                if (distance2 <= minDistance2)
+                {
+                    ++result.DegeneratePairCount;
+                    continue;
+                }
+
+                candidates.push_back(Neighbor{j, distance2});
+            }
+
+            if (candidates.empty()) continue;
+
+            const std::size_t selected = std::min(effectiveK, candidates.size());
+            if (selected < candidates.size())
+            {
+                std::nth_element(candidates.begin(), candidates.begin() + static_cast<std::ptrdiff_t>(selected),
+                    candidates.end(), [](const Neighbor& a, const Neighbor& b)
+                    {
+                        return a.Distance2 < b.Distance2;
+                    });
+            }
+            std::sort(candidates.begin(), candidates.begin() + static_cast<std::ptrdiff_t>(selected),
+                [](const Neighbor& a, const Neighbor& b)
+                {
+                    if (a.Distance2 != b.Distance2) return a.Distance2 < b.Distance2;
+                    return a.Index < b.Index;
+                });
+
+            auto& output = neighborhoods[static_cast<std::size_t>(i)];
+            output.reserve(selected);
+            for (std::size_t idx = 0; idx < selected; ++idx)
+            {
+                output.push_back(candidates[idx].Index);
+            }
+        }
+
+        auto has_reverse_edge = [&](std::uint32_t i, std::uint32_t j)
+        {
+            const auto& reverseNeighborhood = neighborhoods[static_cast<std::size_t>(j)];
+            return std::find(reverseNeighborhood.begin(), reverseNeighborhood.end(), i) != reverseNeighborhood.end();
+        };
+
+        for (std::uint32_t i = 0; i < static_cast<std::uint32_t>(n); ++i)
+        {
+            for (const std::uint32_t j : neighborhoods[static_cast<std::size_t>(i)])
+            {
+                ++result.CandidateEdgeCount;
+                if (params.Connectivity == KNNConnectivity::Mutual && !has_reverse_edge(i, j)) continue;
+
+                const auto edge = graph.AddEdge(VertexHandle{i}, VertexHandle{j});
+                if (edge.has_value()) ++result.InsertedEdgeCount;
+            }
+        }
+
+        return result;
     }
 
     void Graph::DeleteEdge(EdgeHandle e)

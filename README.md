@@ -40,6 +40,9 @@ A **"Distinguished Scientist" grade** geometry kernel in `src/Runtime/Geometry/`
 - Arbitrary polygon support: `AddTriangle`, `AddQuad`, `AddFace(span<VertexHandle>)`.
 - Property system with typed per-element storage and garbage collection.
 
+**Graph Processing Operators:**
+- **kNN Graph Builders:** `Geometry::Graph::BuildKNNGraph()` (brute-force CPU neighbor discovery) and `Geometry::Graph::BuildKNNGraphFromIndices()` (manual graph assembly from precomputed kNN index lists) both support Union/Mutual connectivity and epsilon-based coincident-point rejection for degenerate robustness.
+
 **Mesh Processing Operators:**
 | Operator | Algorithm | Reference |
 |---|---|---|
