@@ -214,7 +214,7 @@ The following Clang 18 issues are resolved by the upgrade to Clang 20 as the min
 - **KD-tree:** Wireframe splitting planes + leaf bounding boxes (KD-tree needs to be implemented first — see §2.6).
 - **BVH (Bounding Volume Hierarchy):** Wireframe AABBs/OBBs at each BVH node level, with configurable max display depth.
 - **Uniform grid:** Wireframe cells with occupancy coloring.
-- **Bounding volumes:** Overlay AABB, OBB, bounding sphere per entity. Toggle per-type.
+- ~~**Bounding volumes:**~~ — **DONE.** Sandbox can render selected `MeshCollider` bounds as world AABB, world OBB, and conservative bounding sphere overlays. Per-type toggles, independent colors, alpha, and overlay/depth-tested routing are exposed in `View Settings → Spatial Debug`.
 - **Contact manifolds:** Render contact points and normals from `Geometry.ContactManifold`.
 
 **Architecture notes:**

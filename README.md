@@ -186,13 +186,17 @@ Four test targets with clear GPU/no-GPU boundaries:
 
 Intrinsic includes an immediate-mode debug visualization layer (`Graphics::DebugDraw`) rendered by `LineRenderPass`.
 
-### Octree Visualization (Spatial Debug)
+### Spatial Debug Overlays
 
-The Sandbox app can visualize `Geometry::Octree` node bounds as wire boxes (useful for debugging broadphase acceleration structures and spatial queries).
+The Sandbox app can visualize selected `MeshCollider` acceleration/bounds data using `Graphics::DebugDraw` + `LineRenderPass`.
 
-- **UI:** `View Settings` → `Spatial Debug` → `Draw Selected MeshCollider Octree`
-- **Data source:** the selected entity’s `ECS::MeshCollider::Component::CollisionRef->LocalOctree`
-- **Knobs:** max depth, leaf-only, occupied-only, overlay vs depth-tested, depth-based color ramp, alpha
+- **Octree overlay UI:** `View Settings` → `Spatial Debug` → `Draw Selected MeshCollider Octree`
+- **Octree source:** selected entity’s `ECS::MeshCollider::Component::CollisionRef->LocalOctree`
+- **Octree knobs:** max depth, leaf-only, occupied-only, overlay vs depth-tested, depth-based color ramp, alpha
+
+- **Bounds overlay UI:** `View Settings` → `Spatial Debug` → `Draw Selected MeshCollider Bounds`
+- **Bounds variants:** world AABB, world OBB, conservative bounding sphere (independent toggles)
+- **Bounds knobs:** overlay vs depth-tested, alpha, per-primitive colors
 
 **Performance note:** drawing deep octrees can generate thousands of line segments. Use `Max Depth` and `Leaf Only` to cap cost.
 
