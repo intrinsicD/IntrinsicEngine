@@ -52,6 +52,16 @@ This pattern is retained for robustness even though Clang 20 has resolved the vt
   ```
 - The non-const move capture ensures the lambda itself is nothrow-move-constructible.
 
+## Geometry Processing Operator Pattern
+
+New geometry operators follow a consistent interface contract (see `Geometry::Simplification::Simplify()` as the canonical example):
+
+- **Params struct** with sensible defaults, **Result struct** with diagnostics (iterations performed, element counts, convergence status).
+- Return `std::optional<Result>` — `std::nullopt` for degenerate input (empty mesh, zero iterations, etc.).
+- Operations that modify topology (remeshing, simplification) work in-place. Operations that produce a new mesh (subdivision) take `const Mesh& input, Mesh& output`.
+- All `CWRotatedHalfedge` loops must have safety iteration limits (`if (++safety > N) break;`) to prevent infinite loops on corrupted topology during repeated mesh modifications.
+- The DEC module provides `SolveCG` and `SolveCGShifted` for SPD linear systems. The cotan Laplacian from `BuildOperators` is positive semidefinite (positive diagonal, negative off-diagonal). The system `(M + t·L)` is SPD for any `t > 0` — this is the foundation for the heat method and future implicit smoothing.
+
 ## Build & Test Workflow
 
 The setup script (`.claude/setup.sh`) installs dependencies, configures CMake (Debug, Ninja, Clang 20+), and builds the **library targets only** — not test executables. This keeps session setup fast.

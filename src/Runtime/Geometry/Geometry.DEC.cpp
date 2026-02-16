@@ -601,4 +601,249 @@ namespace Geometry::DEC
         return ops;
     }
 
+    // -------------------------------------------------------------------------
+    // Conjugate Gradient Solver — Jacobi-preconditioned
+    // -------------------------------------------------------------------------
+    //
+    // Standard preconditioned CG (Hestenes-Stiefel, 1952) with diagonal
+    // (Jacobi) preconditioning. Convergence for well-conditioned SPD systems
+    // from DEC operators (Laplacian, shifted heat operator) is typically
+    // achieved in O(√κ) iterations where κ is the condition number.
+
+    CGResult SolveCG(
+        const SparseMatrix& A,
+        std::span<const double> b,
+        std::span<double> x,
+        const CGParams& params)
+    {
+        assert(A.Rows == A.Cols);
+        assert(b.size() >= A.Rows);
+        assert(x.size() >= A.Rows);
+
+        const std::size_t n = A.Rows;
+        CGResult result;
+
+        // Extract diagonal for Jacobi preconditioner
+        std::vector<double> diagInv(n, 1.0);
+        for (std::size_t i = 0; i < n; ++i)
+        {
+            for (std::size_t k = A.RowOffsets[i]; k < A.RowOffsets[i + 1]; ++k)
+            {
+                if (A.ColIndices[k] == i)
+                {
+                    double d = A.Values[k];
+                    diagInv[i] = (std::abs(d) > 1e-15) ? (1.0 / d) : 1.0;
+                    break;
+                }
+            }
+        }
+
+        // r = b - A*x
+        std::vector<double> r(n);
+        std::vector<double> Ax(n);
+        A.Multiply(x, Ax);
+        for (std::size_t i = 0; i < n; ++i)
+            r[i] = b[i] - Ax[i];
+
+        // z = M^{-1} * r  (Jacobi preconditioner)
+        std::vector<double> z(n);
+        for (std::size_t i = 0; i < n; ++i)
+            z[i] = diagInv[i] * r[i];
+
+        // p = z
+        std::vector<double> p(z);
+
+        // rz = r^T * z
+        double rz = 0.0;
+        for (std::size_t i = 0; i < n; ++i)
+            rz += r[i] * z[i];
+
+        std::vector<double> Ap(n);
+        const double b_norm = [&]() {
+            double s = 0.0;
+            for (std::size_t i = 0; i < n; ++i)
+                s += b[i] * b[i];
+            return std::sqrt(s);
+        }();
+        const double tol = params.Tolerance * std::max(b_norm, 1.0);
+
+        for (std::size_t iter = 0; iter < params.MaxIterations; ++iter)
+        {
+            // Check convergence
+            double rNorm = 0.0;
+            for (std::size_t i = 0; i < n; ++i)
+                rNorm += r[i] * r[i];
+            rNorm = std::sqrt(rNorm);
+
+            result.Iterations = iter + 1;
+            result.ResidualNorm = rNorm;
+
+            if (rNorm < tol)
+            {
+                result.Converged = true;
+                return result;
+            }
+
+            // Ap = A * p
+            A.Multiply(p, Ap);
+
+            // alpha = rz / (p^T * Ap)
+            double pAp = 0.0;
+            for (std::size_t i = 0; i < n; ++i)
+                pAp += p[i] * Ap[i];
+
+            if (std::abs(pAp) < 1e-30)
+                break;
+
+            double alpha = rz / pAp;
+
+            // x = x + alpha * p
+            // r = r - alpha * Ap
+            for (std::size_t i = 0; i < n; ++i)
+            {
+                x[i] += alpha * p[i];
+                r[i] -= alpha * Ap[i];
+            }
+
+            // z = M^{-1} * r
+            for (std::size_t i = 0; i < n; ++i)
+                z[i] = diagInv[i] * r[i];
+
+            // rz_new = r^T * z
+            double rz_new = 0.0;
+            for (std::size_t i = 0; i < n; ++i)
+                rz_new += r[i] * z[i];
+
+            double beta = rz_new / rz;
+            rz = rz_new;
+
+            // p = z + beta * p
+            for (std::size_t i = 0; i < n; ++i)
+                p[i] = z[i] + beta * p[i];
+        }
+
+        return result;
+    }
+
+    CGResult SolveCGShifted(
+        const DiagonalMatrix& M, double alpha,
+        const SparseMatrix& A, double beta,
+        std::span<const double> b,
+        std::span<double> x,
+        const CGParams& params)
+    {
+        assert(A.Rows == A.Cols);
+        assert(M.Size == A.Rows);
+        assert(b.size() >= A.Rows);
+        assert(x.size() >= A.Rows);
+
+        const std::size_t n = A.Rows;
+        CGResult result;
+
+        // Combined matrix-vector product: y = (alpha*M + beta*A) * v
+        auto combinedMV = [&](std::span<const double> v, std::span<double> y)
+        {
+            // y = beta * A * v
+            A.Multiply(v, y);
+            for (std::size_t i = 0; i < n; ++i)
+                y[i] *= beta;
+            // y += alpha * M * v
+            for (std::size_t i = 0; i < n; ++i)
+                y[i] += alpha * M.Diagonal[i] * v[i];
+        };
+
+        // Jacobi preconditioner: inverse of diagonal of (alpha*M + beta*A)
+        std::vector<double> diagInv(n, 1.0);
+        for (std::size_t i = 0; i < n; ++i)
+        {
+            double d = alpha * M.Diagonal[i];
+            // Add A's diagonal contribution
+            for (std::size_t k = A.RowOffsets[i]; k < A.RowOffsets[i + 1]; ++k)
+            {
+                if (A.ColIndices[k] == i)
+                {
+                    d += beta * A.Values[k];
+                    break;
+                }
+            }
+            diagInv[i] = (std::abs(d) > 1e-15) ? (1.0 / d) : 1.0;
+        }
+
+        // r = b - (alpha*M + beta*A)*x
+        std::vector<double> r(n);
+        std::vector<double> Cx(n);
+        combinedMV(x, Cx);
+        for (std::size_t i = 0; i < n; ++i)
+            r[i] = b[i] - Cx[i];
+
+        // z = M^{-1} * r
+        std::vector<double> z(n);
+        for (std::size_t i = 0; i < n; ++i)
+            z[i] = diagInv[i] * r[i];
+
+        std::vector<double> p(z);
+
+        double rz = 0.0;
+        for (std::size_t i = 0; i < n; ++i)
+            rz += r[i] * z[i];
+
+        std::vector<double> Cp(n);
+        const double b_norm = [&]() {
+            double s = 0.0;
+            for (std::size_t i = 0; i < n; ++i)
+                s += b[i] * b[i];
+            return std::sqrt(s);
+        }();
+        const double tol = params.Tolerance * std::max(b_norm, 1.0);
+
+        for (std::size_t iter = 0; iter < params.MaxIterations; ++iter)
+        {
+            double rNorm = 0.0;
+            for (std::size_t i = 0; i < n; ++i)
+                rNorm += r[i] * r[i];
+            rNorm = std::sqrt(rNorm);
+
+            result.Iterations = iter + 1;
+            result.ResidualNorm = rNorm;
+
+            if (rNorm < tol)
+            {
+                result.Converged = true;
+                return result;
+            }
+
+            combinedMV(p, Cp);
+
+            double pCp = 0.0;
+            for (std::size_t i = 0; i < n; ++i)
+                pCp += p[i] * Cp[i];
+
+            if (std::abs(pCp) < 1e-30)
+                break;
+
+            double a = rz / pCp;
+
+            for (std::size_t i = 0; i < n; ++i)
+            {
+                x[i] += a * p[i];
+                r[i] -= a * Cp[i];
+            }
+
+            for (std::size_t i = 0; i < n; ++i)
+                z[i] = diagInv[i] * r[i];
+
+            double rz_new = 0.0;
+            for (std::size_t i = 0; i < n; ++i)
+                rz_new += r[i] * z[i];
+
+            double bt = rz_new / rz;
+            rz = rz_new;
+
+            for (std::size_t i = 0; i < n; ++i)
+                p[i] = z[i] + bt * p[i];
+        }
+
+        return result;
+    }
+
 } // namespace Geometry::DEC
