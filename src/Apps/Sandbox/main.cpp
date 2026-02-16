@@ -51,6 +51,10 @@ public:
     // Editor / Selection Settings
     int m_SelectMouseButton = 1; // 0=LMB, 1=RMB, 2=MMB. Default: RMB to avoid conflict with LMB-drag orbit.
 
+    // Octree Debug Visualization Settings (shared between UI and OnUpdate)
+    Graphics::OctreeDebugDrawSettings m_OctreeDebugSettings{};
+    bool m_DrawSelectedColliderOctree = false;
+
     void OnStart() override
     {
         Log::Info("Sandbox Started!");
@@ -266,6 +270,49 @@ public:
                 outlineSettings->HoverColor = glm::vec4(0.3f, 0.7f, 1.0f, 0.8f);
                 outlineSettings->OutlineWidth = 2.0f;
             }
+
+            // ---------------------------------------------------------------------
+            // Octree Visualization (MeshCollider local octree)
+            // ---------------------------------------------------------------------
+            ImGui::Spacing();
+            ImGui::SeparatorText("Spatial Debug");
+
+            ImGui::Checkbox("Draw Selected MeshCollider Octree", &m_DrawSelectedColliderOctree);
+            ImGui::Checkbox("Overlay (no depth test)", &m_OctreeDebugSettings.Overlay);
+            ImGui::Checkbox("Leaf Only", &m_OctreeDebugSettings.LeafOnly);
+            ImGui::Checkbox("Occupied Only", &m_OctreeDebugSettings.OccupiedOnly);
+            ImGui::Checkbox("Color By Depth", &m_OctreeDebugSettings.ColorByDepth);
+            ImGui::SliderInt("Max Depth", reinterpret_cast<int*>(&m_OctreeDebugSettings.MaxDepth), 0, 16);
+            ImGui::SliderFloat("Alpha", &m_OctreeDebugSettings.Alpha, 0.05f, 1.0f, "%.2f");
+
+            if (!m_OctreeDebugSettings.ColorByDepth)
+            {
+                float base[3] = {m_OctreeDebugSettings.BaseColor.r, m_OctreeDebugSettings.BaseColor.g, m_OctreeDebugSettings.BaseColor.b};
+                if (ImGui::ColorEdit3("Base Color", base))
+                    m_OctreeDebugSettings.BaseColor = glm::vec3(base[0], base[1], base[2]);
+            }
+
+            // NOTE: Actual DrawOctree() emission happens in OnUpdate() BEFORE renderSys.OnUpdate(),
+            // because ImGui panels run AFTER the render graph has already executed.
+            // The settings above will take effect on the next frame.
+
+            // Show status feedback
+            if (m_DrawSelectedColliderOctree)
+            {
+                const entt::entity selected = GetSelection().GetSelectedEntity(GetScene());
+                if (selected == entt::null || !GetScene().GetRegistry().valid(selected))
+                {
+                    ImGui::TextDisabled("No valid selected entity.");
+                }
+                else
+                {
+                    auto* collider = GetScene().GetRegistry().try_get<ECS::MeshCollider::Component>(selected);
+                    if (!collider || !collider->CollisionRef)
+                    {
+                        ImGui::TextDisabled("Selected entity has no MeshCollider.");
+                    }
+                }
+            }
         });
     }
 
@@ -344,6 +391,31 @@ public:
 
                 // Rotation: object rotation in world space.
                 collider.WorldOBB.Rotation = transform.Rotation;
+            }
+        }
+
+        // ---------------------------------------------------------------------
+        // Debug Visualization: emit DebugDraw geometry BEFORE render system runs.
+        // ImGui panels run AFTER render, so we emit here using settings from last frame.
+        // ---------------------------------------------------------------------
+        if (m_DrawSelectedColliderOctree)
+        {
+            const entt::entity selected = GetSelection().GetSelectedEntity(GetScene());
+            if (selected != entt::null && GetScene().GetRegistry().valid(selected))
+            {
+                auto& reg = GetScene().GetRegistry();
+                auto* collider = reg.try_get<ECS::MeshCollider::Component>(selected);
+                auto* xf = reg.try_get<ECS::Components::Transform::Component>(selected);
+
+                if (collider && collider->CollisionRef && xf)
+                {
+                    m_OctreeDebugSettings.Enabled = true;
+
+                    // Compute world transform matrix from transform component
+                    const glm::mat4 worldMatrix = GetMatrix(*xf);
+                    DrawOctree(GetRenderOrchestrator().GetDebugDraw(), collider->CollisionRef->LocalOctree,
+                               m_OctreeDebugSettings, worldMatrix);
+                }
             }
         }
 

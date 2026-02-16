@@ -306,6 +306,7 @@ namespace Runtime
         reg("ForwardPass",           Cat::RenderFeature, "Main forward PBR rendering pass");
         reg("PickingPass",           Cat::RenderFeature, "Entity ID picking for mouse selection");
         reg("SelectionOutlinePass",  Cat::RenderFeature, "Selection outline overlay for selected/hovered entities");
+        reg("LineRenderPass",        Cat::RenderFeature, "Immediate-mode debug line rendering (DebugDraw → LineRenderPass)");
         reg("DebugViewPass",         Cat::RenderFeature, "Render target debug visualization");
         reg("ImGuiPass",             Cat::RenderFeature, "ImGui UI overlay");
 

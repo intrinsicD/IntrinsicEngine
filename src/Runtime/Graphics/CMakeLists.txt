@@ -30,6 +30,7 @@ target_sources(${target_name}
         # New Modules
         Graphics.RenderPath.cppm
         Graphics.DebugDraw.cppm
+        Graphics.OctreeDebugDraw.cppm
         Graphics.Interaction.cppm
         Graphics.Presentation.cppm
         Graphics.GlobalResources.cppm
@@ -67,6 +68,7 @@ target_sources(${target_name}
         Graphics.Systems.MeshRendererLifecycle.cpp
         # New Implementations
         Graphics.DebugDraw.cpp
+        Graphics.OctreeDebugDraw.cpp
         Graphics.Interaction.cpp
         Graphics.Presentation.cpp
         Graphics.GlobalResources.cpp

@@ -32,6 +32,7 @@ add_executable(${target_name}
         Test_InplaceFunction.cpp
         Test_IORegistry.cpp
         Test_DebugDraw.cpp
+        Test_OctreeDebugDraw.cpp
         Test_GeometryProcessing.cpp
         Test_GeometryProcessing2.cpp
         Test_SurfaceReconstruction.cpp

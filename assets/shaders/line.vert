@@ -29,7 +29,7 @@ struct LineSegment {
     uint ColorEnd;
 };
 
-layout(std430, set = 2, binding = 0) readonly buffer LineBuffer {
+layout(std430, set = 1, binding = 0) readonly buffer LineBuffer {
     LineSegment segments[];
 } lines;
 

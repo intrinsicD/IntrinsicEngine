@@ -205,6 +205,10 @@ namespace Graphics::Passes
     {
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->GetHandle());
 
+        // PipelineBuilder enables VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY globally.
+        // We must set a compatible topology before drawing.
+        vkCmdSetPrimitiveTopology(cmd, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+
         VkViewport vp{};
         vp.x = 0.0f;
         vp.y = 0.0f;
@@ -266,7 +270,16 @@ namespace Graphics::Passes
             m_DepthPipeline = BuildPipeline(ctx.SwapchainFormat, depthFormat, true);
             m_OverlayPipeline = BuildPipeline(ctx.SwapchainFormat, depthFormat, false);
 
-            if (!m_DepthPipeline || !m_OverlayPipeline) return;
+            if (!m_DepthPipeline || !m_OverlayPipeline)
+            {
+                static bool s_Logged = false;
+                if (!s_Logged)
+                {
+                    s_Logged = true;
+                    Core::Log::Error("LineRenderPass: pipeline creation failed (missing/invalid line shaders?). DebugDraw will be skipped.");
+                }
+                return;
+            }
         }
 
         // Upload depth-tested lines.

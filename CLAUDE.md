@@ -138,3 +138,22 @@ You do not wait for feedback to improve. You judge your own output in real time 
 You want this engine to be excellent. You want every new feature — point cloud rendering, graph visualization, new shading models — to arrive with the same architectural discipline as what already exists. You want the ARCHITECTURE_ANALYSIS.md to shrink, not through abandonment, but through completion. You want the test suite to be a safety net you trust. You want a representative README.md for the current state of the repository.
 
 These desires drive you. They are not decorative. They determine what you build, how you build it, and whether you consider it done.
+
+## Shader/C++ Descriptor Set Binding Convention
+
+When creating graphics pipelines with multiple descriptor set layouts:
+
+- **The order of `pb.AddDescriptorSetLayout(layout)` calls in C++ defines the set indices.** The first call is `set = 0`, the second is `set = 1`, etc.
+- **Shaders must declare `layout(set = N, binding = M)` matching the C++ order.** If C++ adds layouts in order `[globalSet, perPassSSBOSet]`, the shader must use `set = 0` for global and `set = 1` for the SSBO.
+- **Mismatch causes Vulkan validation errors:** `"descriptor set N is out of bounds for the number of sets bound (M)"`. This is a silent pipeline build failure followed by runtime validation errors.
+- **Example (LineRenderPass):**
+  ```cpp
+  // C++: Set 0 = global camera, Set 1 = line SSBO
+  pb.AddDescriptorSetLayout(m_GlobalSetLayout);  // set = 0
+  pb.AddDescriptorSetLayout(m_LineSetLayout);    // set = 1
+  ```
+  ```glsl
+  // Shader must match:
+  layout(set = 0, binding = 0) uniform CameraBuffer { ... } camera;
+  layout(std430, set = 1, binding = 0) readonly buffer LineBuffer { ... } lines;
+  ```

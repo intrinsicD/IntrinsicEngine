@@ -69,7 +69,7 @@ export namespace Graphics::Passes
         VkDescriptorSetLayout m_GlobalSetLayout = VK_NULL_HANDLE;
 
         // Per-frame descriptor sets (persistent, updated each frame).
-        static constexpr uint32_t FRAMES = 2;
+        static constexpr uint32_t FRAMES = RHI::VulkanDevice::GetFramesInFlight();
         VkDescriptorSet m_DepthLineSet[FRAMES] = {};
         VkDescriptorSet m_OverlayLineSet[FRAMES] = {};
 
