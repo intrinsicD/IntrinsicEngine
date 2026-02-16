@@ -1,8 +1,11 @@
 module;
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <optional>
+#include <span>
+#include <vector>
 #include <glm/glm.hpp>
 
 export module Geometry:Graph;
@@ -11,6 +14,35 @@ import :Properties;
 
 export namespace Geometry::Graph
 {
+    enum class KNNConnectivity : std::uint8_t
+    {
+        Union,
+        Mutual
+    };
+
+    struct KNNBuildParams
+    {
+        std::uint32_t K{8};
+        float MinDistanceEpsilon{1.0e-12f};
+        KNNConnectivity Connectivity{KNNConnectivity::Union};
+    };
+
+    struct KNNBuildResult
+    {
+        std::size_t VertexCount{0};
+        std::size_t RequestedK{0};
+        std::size_t EffectiveK{0};
+        std::size_t CandidateEdgeCount{0};
+        std::size_t InsertedEdgeCount{0};
+        std::size_t DegeneratePairCount{0};
+    };
+
+    struct KNNFromIndicesParams
+    {
+        float MinDistanceEpsilon{1.0e-12f};
+        KNNConnectivity Connectivity{KNNConnectivity::Union};
+    };
+
     // A lightweight halfedge-based graph (no faces), designed for DOD-friendly algorithms.
     // Storage is via PropertySets, so user-defined properties are supported on vertices/halfedges/edges.
     class Graph
@@ -130,4 +162,15 @@ export namespace Geometry::Graph
         std::size_t m_DeletedEdges{0};
         bool m_HasGarbage{false};
     };
+
+    // Rebuilds `graph` from a point set using an undirected k-nearest-neighbor construction.
+    // Returns std::nullopt for degenerate input (empty points or k == 0).
+    [[nodiscard]] std::optional<KNNBuildResult> BuildKNNGraph(Graph& graph, std::span<const glm::vec3> points,
+        const KNNBuildParams& params = {});
+
+    // Builds an undirected graph directly from precomputed per-vertex kNN index lists.
+    // The implementation validates indices and rejects degenerate pairs using epsilon.
+    [[nodiscard]] std::optional<KNNBuildResult> BuildKNNGraphFromIndices(Graph& graph,
+        std::span<const glm::vec3> points, std::span<const std::vector<std::uint32_t>> knnIndices,
+        const KNNFromIndicesParams& params = {});
 }

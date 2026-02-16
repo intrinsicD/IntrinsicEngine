@@ -68,7 +68,7 @@ The following Clang 18 issues are resolved by the upgrade to Clang 20 as the min
 - Thick lines via screen-space expansion in vertex shader (Vulkan has no guaranteed wide-line support).
 - Node rendering can reuse point splatting infrastructure.
 
-**Status:** Core line rendering infrastructure is DONE — see Phase 0 item 3. `LineRenderPass` provides the SSBO-based thick-line backend. Remaining work: mesh wireframe overlay (barycentric), graph layout algorithms, kNN visualization, halfedge debug view. All build on the existing `DebugDraw` + `LineRenderPass` primitives.
+**Status:** Core line rendering infrastructure is DONE — see Phase 0 item 3. `LineRenderPass` provides the SSBO-based thick-line backend. **kNN graph construction is now available both as brute-force point-based build (`Geometry::Graph::BuildKNNGraph()`) and manual build from precomputed neighbor index lists (`Geometry::Graph::BuildKNNGraphFromIndices()`) with Union/Mutual connectivity and degenerate-pair filtering.** This path currently does **not** require Octree queries. Remaining work: mesh wireframe overlay (barycentric), graph layout algorithms, render-feature/UI integration for kNN visualization, halfedge debug view. All build on the existing `DebugDraw` + `LineRenderPass` primitives.
 
 ---
 
