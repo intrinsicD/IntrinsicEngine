@@ -1,217 +1,226 @@
 # Intrinsic Engine
 
-**Intrinsic** is a state-of-the-art Research & Rendering Engine designed for **High-Performance Geometry Processing** and **Real-Time Rendering**. It bridges the gap between rigorous mathematical formalism and "close-to-the-metal" engine architecture.
+**Intrinsic** is a state-of-the-art research and rendering engine designed for high-performance geometry processing and real-time rendering. It bridges rigorous mathematical formalism with close-to-the-metal engine architecture.
 
-Built primarily on **C++23 Modules**, it features a **Vulkan 1.3** bindless rendering pipeline, a coroutine-based job system, and a custom mathematical kernel for collision and spatial queries.
-
----
-
-## 🚀 Architectural Pillars
-
-### 1. 🏗 Core Systems & Concurrency
-*   **C++23 Modular Design**: Strict interface boundaries using `.cppm` partitions and `std::expected` for monadic error handling.
-*   **Zero-Overhead Memory**:
-    *   `LinearArena`: O(1) monotonic frame allocators.
-    *   `ScopeStack`: LIFO allocator with destructor support for complex per-frame objects.
-*   **Coroutine Task Scheduler**:
-    *   Replaces traditional fibers with **C++20 `std::coroutine`**.
-    *   Work-stealing queues.
-    *   `Job` and `Yield()` support for cooperative multitasking.
-*   **Telemetry & Profiling**:
-    *   Lock-free ring-buffered telemetry system.
-    *   Real-time tracking of CPU frame times, draw calls, and triangle counts.
-*   **AssetManager Read Phases**:
-    *   `AssetManager::Update()` is the single-writer phase on the main thread.
-    *   Parallel systems that use `AssetManager::TryGetFast()` must be bracketed by `BeginReadPhase()` / `EndReadPhase()`.
-    *   For long-lived access across reloads, use `AssetManager::AcquireLease()`.
-
-### 2. 📐 Geometry & Spatial Processing
-A "Distinguished Scientist" grade geometry kernel located in `Runtime.Geometry`:
-*   **Primitives**: Comprehensive support for Spheres, AABBs, OBBs, Capsules, Cylinders (with pre-computed basis), and Convex Hulls.
-*   **Intersection Solvers**:
-    *   **Analytic**: Optimized SAT (Separating Axis Theorem) and algebraic solvers for primitive pairs.
-    *   **GJK (Gilbert-Johnson-Keerthi)**: Generic convex collision detection fallback.
-    *   **SDF (Signed Distance Fields)**: Contact manifold generation using gradient descent on SDFs.
-*   **Spatial Acceleration**:
-    *   **Linear Octree**: Cache-friendly spatial partitioning with configurable split strategies (Mean/Median/Center) and tight bounds.
-    *   **Bounded Heaps**: For fast K-Nearest Neighbor (KNN) queries.
-
-### 3. 🎨 Rendering (Vulkan 1.3)
-*   **Bindless Architecture**: Full `descriptor_indexing` support for bindless textures.
-*   **Frame Graph (Render Graph)**:
-    *   Automatic dependency tracking and barrier injection (Sync2).
-    *   Transient resource aliasing (memory reuse).
-    *   Lambda-based pass declaration (`AddPass<Data>(setup, execute)`).
-    *   Read-after-read layout transitions are enforced when layouts differ; reader stages/access are accumulated for later writer sync.
-*   **Async Transfer System**:
-    *   **Staging Belt**: Persistent ring-buffer allocator for high-throughput CPU-to-GPU streaming (`RHI.StagingBelt`).
-    *   Timeline Semaphore synchronization for async asset uploads.
-*   **Dynamic Rendering**: No `VkRenderPass` or `VkFramebuffer` objects; fully dynamic attachment binding.
+Built on **C++23 Modules**, **Vulkan 1.3** bindless rendering, coroutine-based task scheduling, and a mathematically rigorous geometry kernel.
 
 ---
 
-## 🐧 Ubuntu Setup Guide
+## Architectural Pillars
 
-**Requirement**: This engine uses bleeding-edge C++23 features. You must use **Clang 20+** and **CMake 3.28+**.
+### 1. Core Systems & Concurrency
 
-### 1. Install Dependencies
+- **C++23 Modular Design:** Strict interface boundaries using `.cppm` partitions. `std::expected` for monadic error handling. No exceptions (`-fno-exceptions`).
+- **Zero-Overhead Memory:**
+  - `LinearArena` — O(1) monotonic frame allocator with O(1) bulk deallocation.
+  - `ScopeStack` — LIFO allocator with destructor support for complex per-frame objects.
+  - `InplaceFunction` — Small-buffer-optimized callable (64B SBO, move-only, zero-heap).
+- **Coroutine Task Scheduler:** C++20 `std::coroutine` with work-stealing queues. `Job` and `Yield()` for cooperative multitasking.
+- **Lock-Free Telemetry:** Ring-buffered telemetry system for real-time CPU frame times, draw calls, and triangle counts.
+- **FrameGraph + DAG Scheduler:** ECS systems declare explicit data dependencies; `DAGScheduler` resolves topological execution order. Shared scheduling algorithm between FrameGraph and RenderGraph.
+- **AssetManager Read Phases:**
+  - `AssetManager::Update()` is the single-writer phase on the main thread.
+  - Parallel systems use `BeginReadPhase()` / `EndReadPhase()` brackets.
+  - `AcquireLease()` for long-lived access across hot-reloads.
+
+### 2. Geometry Processing Kernel
+
+A **"Distinguished Scientist" grade** geometry kernel in `src/Runtime/Geometry/` (~11,000 lines):
+
+**Collision & Spatial Queries:**
+- **Primitives:** Spheres, AABBs, OBBs, Capsules, Cylinders, Convex Hulls.
+- **GJK/EPA:** Gilbert-Johnson-Keerthi collision detection with Expanding Polytope Algorithm for contact points.
+- **SDF:** Signed distance field evaluation with gradient-based contact manifold generation.
+- **SAT:** Separating Axis Theorem for analytic primitive pair tests.
+- **Linear Octree:** Cache-friendly spatial partitioning with Mean/Median/Center split strategies, tight bounds, and KNN queries.
+
+**Halfedge Mesh (PMP-style):**
+- Full halfedge data structure with `VertexHandle`, `EdgeHandle`, `FaceHandle`, `HalfedgeHandle`.
+- Euler operations: `EdgeCollapse` (Dey-Edelsbrunner link condition), `EdgeFlip`, `EdgeSplit`.
+- Arbitrary polygon support: `AddTriangle`, `AddQuad`, `AddFace(span<VertexHandle>)`.
+- Property system with typed per-element storage and garbage collection.
+
+**Mesh Processing Operators:**
+| Operator | Algorithm | Reference |
+|---|---|---|
+| **Simplification** | Garland-Heckbert QEM edge collapse | Garland & Heckbert 1997 |
+| **Smoothing** | Uniform / Cotangent / Taubin Laplacian | Botsch et al. 2010 |
+| **Curvature** | Mean, Gaussian, Principal (angle defect + mixed Voronoi) | Meyer et al. 2003 |
+| **Loop Subdivision** | Warren's simplified weights, boundary rules | Loop 1987, Warren 1995 |
+| **Catmull-Clark Subdivision** | Arbitrary polygon mesh, all-quad output | Catmull & Clark 1978 |
+| **Isotropic Remeshing** | Split/collapse/flip/smooth with target edge length | Botsch & Kobbelt 2004 |
+| **Geodesic Distance** | Heat method (diffusion + Poisson solve) | Crane et al. 2013 |
+| **Normal Estimation** | PCA local plane fitting + MST orientation | Hoppe et al. 1992 |
+| **Mesh Repair** | Hole filling (ear-clipping), degenerate removal, orientation | — |
+
+**Discrete Exterior Calculus (DEC):**
+- Exterior derivatives d0, d1 in CSR sparse matrix format.
+- Hodge star operators: diagonal mass matrices for 0-forms, 1-forms, 2-forms.
+- Cotan Laplacian: L = d0^T * star1 * d0 (positive semidefinite).
+- Jacobi-preconditioned Conjugate Gradient solver (`SolveCG`, `SolveCGShifted`).
+
+All operators follow a consistent contract: `Params` struct with defaults, `Result` struct with diagnostics, `std::optional<Result>` return for degenerate input.
+
+### 3. Rendering (Vulkan 1.3)
+
+- **Bindless Architecture:** Full `VK_EXT_descriptor_indexing` for bindless textures.
+- **Render Graph:**
+  - Automatic dependency tracking and barrier injection (VK_KHR_synchronization2).
+  - Transient resource aliasing (memory reuse).
+  - Lambda-based pass declaration: `AddPass<Data>(setup, execute)`.
+- **Async Transfer System:**
+  - Staging Belt: Persistent ring-buffer allocator for CPU-to-GPU streaming.
+  - Timeline Semaphore synchronization for async asset uploads.
+  - No loader thread ever calls `vkWaitForFences` for texture uploads.
+- **GPUScene:** Retained-mode instance table with independent slot allocation/deallocation.
+- **Dynamic Rendering:** No `VkRenderPass` or `VkFramebuffer`; fully dynamic attachment binding.
+- **DebugDraw:** Immediate-mode line/shape rendering with screen-space thick-line expansion (SSBO-based, no geometry shader). Depth-tested and overlay variants.
+- **Selection Outlines:** Post-process contour highlight for selected/hovered entities.
+
+### 4. Data I/O
+
+Two-layer architecture: I/O backend (byte transport) separated from format loaders (parsing).
+
+**Supported formats:**
+| Category | Formats |
+|---|---|
+| **Mesh** | glTF 2.0 / GLB, OBJ, PLY (ASCII + binary) |
+| **Point Cloud** | XYZ, PLY |
+| **Graph** | TGF |
+| **Texture** | PNG, JPG, KTX (via stb/KTX loaders) |
+
+Drag-and-drop file loading with automatic format detection via `IORegistry`.
+
+---
+
+## Build Requirements
+
+- **Compiler:** Clang 20+ (C++23 modules)
+- **Build system:** CMake 3.28+ with Ninja
+- **GPU:** Vulkan 1.3 compatible driver
+- **OS:** Linux (Ubuntu 22.04+)
+
+### Quick Setup
+
 ```bash
-# Build Tools & CMake
-sudo apt update
-sudo apt install build-essential cmake ninja-build git
+# Clone and set up (installs dependencies, configures, builds libraries)
+git clone <repo-url> && cd IntrinsicEngine
+bash .claude/setup.sh
 
-# Vulkan SDK & Drivers
-sudo apt install vulkan-tools libvulkan-dev vulkan-validationlayers-dev spirv-tools glslc
+# Or manual:
+sudo apt install build-essential cmake ninja-build git \
+    vulkan-tools libvulkan-dev vulkan-validationlayers-dev spirv-tools glslc \
+    libwayland-dev libxkbcommon-dev xorg-dev libxrandr-dev libxinerama-dev \
+    libxcursor-dev libxi-dev
 
-# Windowing (GLFW) & System
-sudo apt install libwayland-dev libxkbcommon-dev xorg-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev
+# Install Clang 20
+wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && sudo ./llvm.sh 20
+sudo apt install clang-tools-20 libstdc++-14-dev
 ```
 
-### 2. Install Clang 20+ & Tools
-C++ Modules support requires specific Clang tools for dependency scanning.
+### Build
 
 ```bash
-# 1. Install LLVM/Clang 20
-wget https://apt.llvm.org/llvm.sh
-chmod +x llvm.sh
-sudo ./llvm.sh 20
+# Configure
+cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug \
+    -DCMAKE_C_COMPILER=clang-20 -DCMAKE_CXX_COMPILER=clang++-20
 
-# 2. Install GCC Toolchain (for C++23 stdlib headers like <expected> and <format>)
-sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
-sudo apt update
-sudo apt install libstdc++-14-dev
+# Build everything
+ninja -C build
 
-# 3. Install Clang Tools (Crucial for CMake module scanning)
-sudo apt install clang-tools-20
+# Build specific targets (faster incremental rebuilds)
+ninja -C build IntrinsicGeometry      # geometry library only
+ninja -C build IntrinsicGeometryTests # geometry tests
+ninja -C build Sandbox                # application
+
+# Run
+./build/bin/Sandbox
+```
+
+**Sanitizers:** ASan + UBSan are auto-detected in Debug builds. If `libclang_rt.asan` is not installed, sanitizers are automatically disabled.
+
+---
+
+## Test Suite
+
+Four test targets with clear GPU/no-GPU boundaries:
+
+| Target | Dependencies | Scope | Tests |
+|---|---|---|---|
+| `IntrinsicCoreTests` | Core only | Memory, tasks, handles, frame graph, DAG scheduler | ~80 |
+| `IntrinsicGeometryTests` | Core + Geometry | DEC, mesh operations, collision, graphs, all geometry operators | ~200 |
+| `IntrinsicECSTests` | Core + ECS | FrameGraph system integration | ~15 |
+| `IntrinsicTests` | Full Runtime | Graphics, I/O, rendering, integration | ~230 |
+
+```bash
+# Run all geometry tests
+./build/bin/IntrinsicGeometryTests
+
+# Run specific test groups
+./build/bin/IntrinsicGeometryTests --gtest_filter="CatmullClark*"
+./build/bin/IntrinsicGeometryTests --gtest_filter="NormalEstimation*"
+./build/bin/IntrinsicGeometryTests --gtest_filter="MeshRepair*"
+./build/bin/IntrinsicGeometryTests --gtest_filter="DEC_*"
 ```
 
 ---
 
-## 🛠 Building & Running
+## Controls
 
-### 1. Configure
-We must explicitly point CMake to the `clang-scan-deps` utility matching our compiler version.
+- **Left Click + Drag:** Orbit camera.
+- **Right Click + WASD:** Fly camera mode.
+- **Drag & Drop:** Drop `.glb`, `.gltf`, `.ply`, `.obj`, `.xyz`, or `.tgf` files to load asynchronously.
+- **ImGui Panels:**
+  - **Hierarchy:** View and select entities.
+  - **Inspector:** Modify transforms, view mesh stats.
+  - **Assets:** Monitor async loading queues and asset states.
+  - **Performance:** Real-time telemetry graphs.
 
-```bash
-mkdir build && cd build
+---
 
-cmake -G "Ninja" \
-    -DCMAKE_BUILD_TYPE=Debug \
-    -DCMAKE_C_COMPILER=clang-20 \
-    -DCMAKE_CXX_COMPILER=clang++-20 \
-    -DCMAKE_CXX_COMPILER_CLANG_SCAN_DEPS=/usr/bin/clang-scan-deps-20 \
-    ..
+## Module Structure
+
+```
+src/
+  Core/           Foundation: memory, tasks, assets, telemetry, frame graph, I/O
+  Runtime/
+    Geometry/     Math kernel: collision, halfedge mesh, DEC, all operators
+    RHI/          Vulkan 1.3 abstraction: device, swapchain, pipeline, transfer
+    Graphics/     Engine layer: render graph, model loading, render system, debug draw
+    ECS/          Entity-component system: scene, components, systems (EnTT-based)
+  Apps/
+    Sandbox/      Application: engine configuration and main loop
+tests/            GTest suite: 33 test files across 4 targets
+assets/           Sample geometry and texture files
 ```
 
-### 2. Build
-```bash
-ninja
-```
+---
 
-### 3. Run
-```bash
-./bin/Sandbox
-```
+## Forward Rendering Pipeline
+
+Three conceptual stages:
+
+1. **Stage 1 (Instance Resolve):** Collects renderables, resolves materials/texture IDs.
+2. **Stage 2 (CPU Indirect Build):** Builds batched `VkDrawIndexedIndirectCommand` streams on the CPU.
+3. **Stage 3 (GPU Culling / Indirect Build):** Uses persistent `GPUScene` SSBOs, frustum-culls on the GPU, produces compacted indirect stream.
+
+Only one path renders per frame (Stage 2 CPU-driven OR Stage 3 GPU-driven). No double-draw, no double-clear.
+
+**GPUScene lifecycle:** Retained-mode instance table. Slots allocated/freed independently of ECS iteration order. Loading new models never causes previously loaded ones to vanish.
 
 ---
 
-## 🎮 Controls
+## Troubleshooting
 
-*   **Left Click + Drag**: Orbit Camera.
-*   **Right Click + WASD**: Fly Camera Mode.
-*   **Drag & Drop**: Drop `.glb`, `.gltf`, `.ply`, or `.obj` files into the window to load them asynchronously.
-*   **ImGui**:
-    *   **Hierarchy**: View and select entities.
-    *   **Inspector**: Modify Transforms (Position/Rotation/Scale) and view Mesh stats.
-    *   **Assets**: Monitor async loading queues and asset states.
-    *   **Performance**: Real-time telemetry graphs.
+**`CMake Error: Could not find clang-scan-deps`** — Install `clang-tools-20` and pass `-DCMAKE_CXX_COMPILER_CLANG_SCAN_DEPS=/usr/bin/clang-scan-deps-20`.
+
+**`fatal error: 'format' file not found`** — Install `libstdc++-14-dev`.
+
+**Asset Loading Fails** — Check logs (`[ERR]`). Ensure `assets/` is adjacent to the binary or in the project root.
 
 ---
 
-## 📂 Module Structure
+## Architecture Documentation
 
-*   **`Core`**: Foundation. `LinearArena`, `Scheduler` (Coroutines), `Telemetry`, `Filesystem`.
-*   **`Geometry`**: The Math Kernel. `SDF`, `GJK`, `Octree`, `AABB`, `Contact`.
-*   **`RHI`**: Vulkan Abstraction. `Device`, `Swapchain`, `Pipeline`, `TransferManager`.
-*   **`Graphics`**: Engine Layer. `RenderGraph`, `ModelLoader`, `RenderSystem`, `Camera`.
-*   **`ECS`**: Entity Component System. `Scene`, `Components`.
-*   **`Interface`**: UI. `GUI` (ImGui backend).
-
----
-
-## Forward Rendering (Stages 1/2/3)
-
-The forward renderer has three conceptual stages:
-
-- **Stage 1 (Instance Resolve):** Collects renderables and resolves materials/texture IDs.
-- **Stage 2 (CPU Indirect Build):** Builds batched per-geometry `VkDrawIndexedIndirectCommand` streams on the CPU.
-- **Stage 3 (GPU Culling / Indirect Build):** Uses the persistent `GPUScene` SSBOs, frustum-culls on the GPU, and produces a compacted indirect stream.
-
-### Important contract
-
-All instance data shared between CPU and GPU uses a std430-compatible layout and includes:
-
-- `Model` matrix
-- `TextureID`
-- `EntityID`
-- `GeometryID` (**new**): a stable per-geometry identifier used for GPU-driven batching/culling
-
-**Stage 3 indirection (critical):** GPU culling writes a *packed visibility remap* per geometry.
-
-- Culling output: `VisibleRemap[geomBase + drawIndex] = instanceSlot`
-- Indirect output: `firstInstance = drawIndex`
-- Vertex shader: `slot = VisibleRemap[geomBase + gl_InstanceIndex]`
-
-This ensures `gl_InstanceIndex` is never treated as a global instance slot (it’s draw-local).
-
-### GPUScene lifecycle
-
-`GPUScene` is a retained-mode instance table. Slots are allocated/freed independently of ECS iteration order.
-
-- **Allocation & spawn packet:** `Graphics::Systems::MeshRendererLifecycle::OnUpdate(...)` allocates `MeshRenderer::GpuSlot` and queues the initial instance+bounds packet.
-- **Incremental updates:** `Graphics::Systems::GPUSceneSync::OnUpdate(...)` refreshes transforms and material TextureID when material revisions change.
-
-### Why this matters
-
-Loading multiple models should never cause previously loaded models to vanish. A previous bug came from mixing Stage 1/2 drawing with Stage 3 drawing (and clearing) in the same frame.
-
-The forward pass is now structured so that only one path renders per frame:
-
-- If GPU-driven culling is active and supported, Stage 3 is used.
-- Otherwise the CPU-driven Stage 2 path renders.
-
-This makes it difficult to accidentally double-draw or clear the backbuffer twice.
-
----
-
-## 🧩 Troubleshooting
-
-**`CMake Error: Could not find clang-scan-deps`**
-Ensure you installed `clang-tools-20` and passed `-DCMAKE_CXX_COMPILER_CLANG_SCAN_DEPS` correctly.
-
-**`fatal error: 'format' file not found`**
-Your `libstdc++` is too old. Ensure you installed `libstdc++-14-dev`.
-
-**Asset Loading Fails**
-Check the logs (`[ERR]`). Ensure the `assets/` folder is adjacent to the binary or in the project root. The engine attempts to resolve paths relative to the executable.
-
----
-
-## Async Texture Uploads (Phase 1)
-
-Texture streaming must not block worker threads on GPU work.
-
-**Old (removed):** creating `RHI::Texture` from CPU pixel data implicitly recorded commands and waited on a fence (`vkWaitForFences`) via `RHI::CommandUtils::EndSingleTimeCommands`.
-
-**New (current):** `Graphics::TextureLoader::LoadAsync(...)` decodes on CPU, allocates staging via `RHI::TransferManager` (timeline semaphore), records `vkCmdCopyBufferToImage` on the transfer queue, and returns a `RHI::TransferToken`.
-
-**Bindless update policy:** descriptor writes are deferred via `RHI::BindlessDescriptorSystem::EnqueueUpdate(...)` and flushed once per frame at the start of `Graphics::RenderSystem::OnUpdate`.
-
-While the upload is in flight, the texture’s bindless slot is bound to the engine default texture (bindless slot 0). When the token completes, the `AssetManager` transitions the asset to `Ready`.
-
-**Key APIs:**
-- `Graphics::TextureLoader::LoadAsync(path, device, transferManager, textureSystem, isSRGB)`
-- `RHI::TextureSystem::CreatePending(width, height, format)`
-- `Runtime::Engine::ProcessUploads()` polls `TransferManager::IsCompleted(token)`
-
-**Guarantee:** no loader thread calls `vkWaitForFences` for texture uploads.
+- **`ARCHITECTURE_ANALYSIS.md`** — Living roadmap: completed features, open TODOs, dependency graph, prioritized phases.
+- **`CLAUDE.md`** — Development conventions, build workflows, architectural invariants.
