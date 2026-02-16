@@ -26,3 +26,6 @@ export import :Simplification;
 export import :Subdivision;
 export import :Remeshing;
 export import :Geodesic;
+export import :CatmullClark;
+export import :NormalEstimation;
+export import :MeshRepair;
