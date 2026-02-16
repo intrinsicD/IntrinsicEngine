@@ -482,7 +482,6 @@ namespace Geometry::DEC
     SparseMatrix BuildLaplacian(const Halfedge::Mesh& mesh)
     {
         const std::size_t nV = mesh.VerticesSize();
-        const std::size_t nE = mesh.EdgesSize();
 
         // Phase 1: Build the Hodge star 1 weights
         DiagonalMatrix hodge1 = BuildHodgeStar1(mesh);

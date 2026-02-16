@@ -47,12 +47,22 @@ export namespace Runtime
         // To be implemented by the Client (Sandbox)
         virtual void OnStart() = 0;
         virtual void OnUpdate(float deltaTime) = 0;
+
+        // Optional fixed-step hook (default no-op). Called 0..N times per render frame.
+        // Intended for deterministic simulation / physics.
+        virtual void OnFixedUpdate([[maybe_unused]] float fixedDeltaTime) {}
+
         virtual void OnRender() = 0; // Optional custom rendering hook
 
         // Override to register additional systems into the FrameGraph each frame.
         // Called after the engine's core systems are registered but before Compile/Execute.
         // Client systems (e.g. AxisRotator, gameplay logic) should be registered here.
-        virtual void OnRegisterSystems(Core::FrameGraph& graph, float deltaTime) {}
+        virtual void OnRegisterSystems([[maybe_unused]] Core::FrameGraph& graph, [[maybe_unused]] float deltaTime) {}
+
+        // Override to register fixed-step systems (e.g. physics) into the FrameGraph.
+        // Called 0..N times per render frame, once per fixed tick.
+        virtual void OnRegisterFixedSystems([[maybe_unused]] Core::FrameGraph& graph, [[maybe_unused]] float fixedDeltaTime) {}
+
         entt::entity SpawnModel(Core::Assets::AssetHandle modelHandle,
                                 Core::Assets::AssetHandle materialHandle,
                                 glm::vec3 position,

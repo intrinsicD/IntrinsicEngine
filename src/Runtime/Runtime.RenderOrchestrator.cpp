@@ -26,7 +26,7 @@ namespace Runtime
         RHI::DescriptorLayout& descriptorLayout,
         RHI::TextureSystem& textureSystem,
         Core::Assets::AssetManager& assetManager,
-        uint32_t defaultTextureIndex,
+        uint32_t defaultTextureIndex, //TODO: Why is this not used? can we remove it or was this an error to not use it?
         Core::FeatureRegistry* featureRegistry,
         size_t frameArenaSize)
         : m_FrameArena(frameArenaSize)

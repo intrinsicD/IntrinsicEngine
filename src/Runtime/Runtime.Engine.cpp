@@ -324,8 +324,12 @@ namespace Runtime
 
         using Clock = std::chrono::high_resolution_clock;
         auto lastTime = Clock::now();
+
+        // Fixed-step simulation (physics) accumulator.
+        // We keep render/input updates variable-dt for responsiveness.
         double accumulator = 0.0;
-        const double dt = 1.0 / 60.0; // Fixed 60hz physics
+        constexpr double fixedDt = 1.0 / 60.0; // 60 Hz fixed simulation
+        constexpr int maxSubstepsPerFrame = 8; // clamp to avoid spiral-of-death
 
         while (m_Running && !m_Window->ShouldClose())
         {
@@ -336,7 +340,7 @@ namespace Runtime
             double frameTime = std::chrono::duration<double>(currentTime - lastTime).count();
             lastTime = currentTime;
 
-            // Prevent spiral of death
+            // Prevent spiral of death from huge pauses/breakpoints
             if (frameTime > 0.25) frameTime = 0.25;
 
             accumulator += frameTime;
@@ -366,13 +370,59 @@ namespace Runtime
                 matSys.ProcessDeletions(m_GraphicsBackend->GetDevice()->GetGlobalFrameNumber());
             }
 
+            // -----------------------------------------------------------------
+            // Fixed-step lane (0..N substeps) for deterministic simulation
+            // -----------------------------------------------------------------
+            {
+                PROFILE_SCOPE("FixedStep");
+
+                int substeps = 0;
+                while (accumulator >= fixedDt && substeps < maxSubstepsPerFrame)
+                {
+                    {
+                        PROFILE_SCOPE("OnFixedUpdate");
+                        OnFixedUpdate(static_cast<float>(fixedDt));
+                    }
+
+                    // Allow client/engine simulation systems to run at fixed dt.
+                    // NOTE: This currently reuses the same FrameGraph instance.
+                    // If you register passes here, ensure pass names are unique per tick.
+                    {
+                        PROFILE_SCOPE("FixedStepFrameGraph");
+                        auto& fixedGraph = m_RenderOrchestrator->GetFrameGraph();
+                        fixedGraph.Reset();
+
+                        const float dtF = static_cast<float>(fixedDt);
+                        OnRegisterFixedSystems(fixedGraph, dtF);
+
+                        auto compileResult = fixedGraph.Compile();
+                        if (compileResult)
+                        {
+                            GetAssetManager().BeginReadPhase();
+                            fixedGraph.Execute();
+                            GetAssetManager().EndReadPhase();
+                        }
+                    }
+
+                    accumulator -= fixedDt;
+                    ++substeps;
+                }
+
+                // If we hit the clamp, drop remaining accumulated time.
+                // This keeps the engine responsive under extreme stalls.
+                if (substeps == maxSubstepsPerFrame)
+                {
+                    accumulator = 0.0;
+                }
+            }
+
             {
                 PROFILE_SCOPE("OnUpdate");
-                // Update with variable dt for responsive input/camera
+                // Variable-dt update for responsive input/camera
                 OnUpdate(static_cast<float>(frameTime));
             }
 
-            // --- FrameGraph: register, compile, and execute all systems ---
+            // --- FrameGraph: register, compile, and execute all variable-dt systems ---
             {
                 PROFILE_SCOPE("FrameGraph");
                 auto& frameGraph = m_RenderOrchestrator->GetFrameGraph();
