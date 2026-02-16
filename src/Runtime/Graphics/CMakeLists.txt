@@ -29,15 +29,17 @@ target_sources(${target_name}
         Graphics.Systems.MeshRendererLifecycle.cppm
         # New Modules
         Graphics.RenderPath.cppm
+        Graphics.DebugDraw.cppm
         Graphics.Interaction.cppm
         Graphics.Presentation.cppm
         Graphics.GlobalResources.cppm
-        
+
         Pipelines/Graphics.Pipelines.cppm
         Passes/Graphics.Passes.Picking.cppm
         Passes/Graphics.Passes.Forward.cppm
         Passes/Graphics.Passes.SelectionOutlineSettings.cppm
         Passes/Graphics.Passes.SelectionOutline.cppm
+        Passes/Graphics.Passes.Line.cppm
         Passes/Graphics.Passes.DebugView.cppm
         Passes/Graphics.Passes.ImGui.cppm
         Graphics.IORegistry.cppm
@@ -64,14 +66,16 @@ target_sources(${target_name}
         Graphics.Systems.GPUSceneSync.cpp
         Graphics.Systems.MeshRendererLifecycle.cpp
         # New Implementations
+        Graphics.DebugDraw.cpp
         Graphics.Interaction.cpp
         Graphics.Presentation.cpp
         Graphics.GlobalResources.cpp
-        
+
         Pipelines/Graphics.Pipelines.cpp
         Passes/Graphics.Passes.Picking.cpp
         Passes/Graphics.Passes.Forward.cpp
         Passes/Graphics.Passes.SelectionOutline.cpp
+        Passes/Graphics.Passes.Line.cpp
         Passes/Graphics.Passes.DebugView.cpp
         Graphics.IORegistry.cpp
         Importers/Graphics.Importers.OBJ.cpp

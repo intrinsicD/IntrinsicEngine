@@ -119,8 +119,10 @@ namespace RHI
             return;
 
         const VkDevice dev = m_Device.GetLogicalDevice();
-        const std::vector<VkDescriptorPool> pools = m_AllPools;
-        m_Device.SafeDestroy([dev, pools]()
+        // Move pools out so the lambda captures only the moved vector.
+        // std::vector is nothrow-move-constructible, satisfying InplaceFunction's requirement.
+        std::vector<VkDescriptorPool> pools = std::move(m_AllPools);
+        m_Device.SafeDestroy([dev, pools = std::move(pools)]()
         {
             for (VkDescriptorPool pool : pools)
             {
@@ -128,8 +130,6 @@ namespace RHI
                     vkDestroyDescriptorPool(dev, pool, nullptr);
             }
         });
-
-        m_AllPools.clear();
         m_CurrentPool = VK_NULL_HANDLE;
     }
 

@@ -31,6 +31,7 @@ add_executable(${target_name}
         Test_FeatureRegistry.cpp
         Test_InplaceFunction.cpp
         Test_IORegistry.cpp
+        Test_DebugDraw.cpp
 )
 
 #Apply Strict Flags ONLY to our tests

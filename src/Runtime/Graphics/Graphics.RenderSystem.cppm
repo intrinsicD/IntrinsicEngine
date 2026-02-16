@@ -16,6 +16,7 @@ import :ShaderRegistry;
 import :PipelineLibrary;
 import :GPUScene;
 import :MaterialSystem;
+import :DebugDraw;
 import :Interaction; // New: Interaction Logic
 import :Presentation; // New: Presentation Logic
 import :GlobalResources; // New: Global State
@@ -61,6 +62,9 @@ export namespace Graphics
         // Retained-mode scene is owned by Runtime::Engine. RenderSystem consumes it during rendering.
         void SetGpuScene(GPUScene* scene) { m_GpuScene = scene; }
 
+        // Debug drawing accumulator (owned by RenderOrchestrator, set during init).
+        void SetDebugDraw(DebugDraw* dd) { m_DebugDraw = dd; }
+
         // Accessors
         [[nodiscard]] InteractionSystem& GetInteraction() { return m_Interaction; }
         [[nodiscard]] const InteractionSystem& GetInteraction() const { return m_Interaction; }
@@ -101,6 +105,9 @@ export namespace Graphics
 
         // Retained-mode GPU scene (persistent SSBOs + sparse updates). Non-owning.
         GPUScene* m_GpuScene = nullptr;
+
+        // Debug drawing accumulator (non-owning, owned by RenderOrchestrator).
+        DebugDraw* m_DebugDraw = nullptr;
 
         // Cached frame lists for UI and debug resolve selection.
         std::vector<RenderGraphDebugPass> m_LastDebugPasses;
