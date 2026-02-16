@@ -173,4 +173,42 @@ export namespace Geometry::DEC
     // Build all DEC operators at once.
     [[nodiscard]] DECOperators BuildOperators(const Halfedge::Mesh& mesh);
 
+    // -------------------------------------------------------------------------
+    // Conjugate Gradient Solver (Jacobi-preconditioned)
+    // -------------------------------------------------------------------------
+    // Solves symmetric positive-definite linear systems arising from DEC
+    // operators (e.g., Poisson equations, heat diffusion).
+
+    struct CGParams
+    {
+        std::size_t MaxIterations{1000};
+        double Tolerance{1e-8};
+    };
+
+    struct CGResult
+    {
+        std::size_t Iterations{0};
+        double ResidualNorm{0.0};
+        bool Converged{false};
+    };
+
+    // Solve A*x = b where A is a symmetric positive-definite SparseMatrix.
+    // Uses Jacobi (diagonal) preconditioning.
+    // x is used as the initial guess and overwritten with the solution.
+    [[nodiscard]] CGResult SolveCG(
+        const SparseMatrix& A,
+        std::span<const double> b,
+        std::span<double> x,
+        const CGParams& params = {});
+
+    // Solve (alpha*M + beta*A)*x = b where M is diagonal, A is sparse.
+    // The combined system must be symmetric positive-definite.
+    // x is used as the initial guess and overwritten with the solution.
+    [[nodiscard]] CGResult SolveCGShifted(
+        const DiagonalMatrix& M, double alpha,
+        const SparseMatrix& A, double beta,
+        std::span<const double> b,
+        std::span<double> x,
+        const CGParams& params = {});
+
 } // namespace Geometry::DEC

@@ -33,6 +33,9 @@ target_sources(${target_name}
         Geometry.Curvature.cppm
         Geometry.Smoothing.cppm
         Geometry.Simplification.cppm
+        Geometry.Subdivision.cppm
+        Geometry.Remeshing.cppm
+        Geometry.Geodesic.cppm
         PRIVATE
         FILE_SET geometry_impl TYPE CXX_MODULES FILES
         Geometry.MeshUtils.cpp
@@ -45,6 +48,9 @@ target_sources(${target_name}
         Geometry.Curvature.cpp
         Geometry.Smoothing.cpp
         Geometry.Simplification.cpp
+        Geometry.Subdivision.cpp
+        Geometry.Remeshing.cpp
+        Geometry.Geodesic.cpp
 )
 
 target_include_directories(${target_name} PUBLIC .)

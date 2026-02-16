@@ -23,3 +23,6 @@ export import :DEC;
 export import :Curvature;
 export import :Smoothing;
 export import :Simplification;
+export import :Subdivision;
+export import :Remeshing;
+export import :Geodesic;
