@@ -55,6 +55,9 @@ public:
     Graphics::OctreeDebugDrawSettings m_OctreeDebugSettings{};
     bool m_DrawSelectedColliderOctree = false;
 
+    Graphics::BoundingDebugDrawSettings m_BoundsDebugSettings{};
+    bool m_DrawSelectedColliderBounds = false;
+
     void OnStart() override
     {
         Log::Info("Sandbox Started!");
@@ -278,6 +281,25 @@ public:
             ImGui::SeparatorText("Spatial Debug");
 
             ImGui::Checkbox("Draw Selected MeshCollider Octree", &m_DrawSelectedColliderOctree);
+            ImGui::Checkbox("Draw Selected MeshCollider Bounds", &m_DrawSelectedColliderBounds);
+            ImGui::Checkbox("Bounds Overlay (no depth test)", &m_BoundsDebugSettings.Overlay);
+            ImGui::Checkbox("Draw World AABB", &m_BoundsDebugSettings.DrawAABB);
+            ImGui::Checkbox("Draw World OBB", &m_BoundsDebugSettings.DrawOBB);
+            ImGui::Checkbox("Draw Bounding Sphere", &m_BoundsDebugSettings.DrawBoundingSphere);
+            ImGui::SliderFloat("Bounds Alpha", &m_BoundsDebugSettings.Alpha, 0.05f, 1.0f, "%.2f");
+
+            float aabbColor[3] = {m_BoundsDebugSettings.AABBColor.r, m_BoundsDebugSettings.AABBColor.g, m_BoundsDebugSettings.AABBColor.b};
+            if (ImGui::ColorEdit3("AABB Color", aabbColor))
+                m_BoundsDebugSettings.AABBColor = glm::vec3(aabbColor[0], aabbColor[1], aabbColor[2]);
+
+            float obbColor[3] = {m_BoundsDebugSettings.OBBColor.r, m_BoundsDebugSettings.OBBColor.g, m_BoundsDebugSettings.OBBColor.b};
+            if (ImGui::ColorEdit3("OBB Color", obbColor))
+                m_BoundsDebugSettings.OBBColor = glm::vec3(obbColor[0], obbColor[1], obbColor[2]);
+
+            float sphereColor[3] = {m_BoundsDebugSettings.SphereColor.r, m_BoundsDebugSettings.SphereColor.g, m_BoundsDebugSettings.SphereColor.b};
+            if (ImGui::ColorEdit3("Sphere Color", sphereColor))
+                m_BoundsDebugSettings.SphereColor = glm::vec3(sphereColor[0], sphereColor[1], sphereColor[2]);
+
             ImGui::Checkbox("Overlay (no depth test)", &m_OctreeDebugSettings.Overlay);
             ImGui::Checkbox("Leaf Only", &m_OctreeDebugSettings.LeafOnly);
             ImGui::Checkbox("Occupied Only", &m_OctreeDebugSettings.OccupiedOnly);
@@ -297,7 +319,7 @@ public:
             // The settings above will take effect on the next frame.
 
             // Show status feedback
-            if (m_DrawSelectedColliderOctree)
+            if (m_DrawSelectedColliderOctree || m_DrawSelectedColliderBounds)
             {
                 const entt::entity selected = GetSelection().GetSelectedEntity(GetScene());
                 if (selected == entt::null || !GetScene().GetRegistry().valid(selected))
@@ -398,7 +420,7 @@ public:
         // Debug Visualization: emit DebugDraw geometry BEFORE render system runs.
         // ImGui panels run AFTER render, so we emit here using settings from last frame.
         // ---------------------------------------------------------------------
-        if (m_DrawSelectedColliderOctree)
+        if (m_DrawSelectedColliderOctree || m_DrawSelectedColliderBounds)
         {
             const entt::entity selected = GetSelection().GetSelectedEntity(GetScene());
             if (selected != entt::null && GetScene().GetRegistry().valid(selected))
@@ -409,12 +431,24 @@ public:
 
                 if (collider && collider->CollisionRef && xf)
                 {
-                    m_OctreeDebugSettings.Enabled = true;
+                    if (m_DrawSelectedColliderOctree)
+                    {
+                        m_OctreeDebugSettings.Enabled = true;
 
-                    // Compute world transform matrix from transform component
-                    const glm::mat4 worldMatrix = GetMatrix(*xf);
-                    DrawOctree(GetRenderOrchestrator().GetDebugDraw(), collider->CollisionRef->LocalOctree,
-                               m_OctreeDebugSettings, worldMatrix);
+                        // Compute world transform matrix from transform component
+                        const glm::mat4 worldMatrix = GetMatrix(*xf);
+                        DrawOctree(GetRenderOrchestrator().GetDebugDraw(), collider->CollisionRef->LocalOctree,
+                                   m_OctreeDebugSettings, worldMatrix);
+                    }
+
+                    if (m_DrawSelectedColliderBounds)
+                    {
+                        m_BoundsDebugSettings.Enabled = true;
+                        DrawBoundingVolumes(GetRenderOrchestrator().GetDebugDraw(),
+                                            collider->CollisionRef->LocalAABB,
+                                            collider->WorldOBB,
+                                            m_BoundsDebugSettings);
+                    }
                 }
             }
         }

@@ -20,6 +20,7 @@ export import :Systems.GPUSceneSync;
 export import :Systems.MeshRendererLifecycle;
 export import :DebugDraw;
 export import :OctreeDebugDraw;
+export import :BoundingDebugDraw;
 
 // NOTE: We intentionally do NOT re-export pipeline implementations here.
 // Import `Graphics.Pipelines` explicitly in apps/tools when you need DefaultPipeline/etc.
