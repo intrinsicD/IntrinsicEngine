@@ -20,3 +20,6 @@ export import :SDFContact;
 export import :Support;
 export import :Validation;
 export import :DEC;
+export import :Curvature;
+export import :Smoothing;
+export import :Simplification;

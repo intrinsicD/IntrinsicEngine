@@ -141,6 +141,46 @@ export namespace Geometry::Halfedge
         void DeleteEdge(EdgeHandle e);
         void DeleteFace(FaceHandle f);
 
+        // -----------------------------------------------------------------
+        // Topological editing operations (Euler operations)
+        // -----------------------------------------------------------------
+
+        // Edge collapse: contract edge e, merging its two endpoint vertices
+        // into one. The surviving vertex is placed at the given position.
+        // Returns the surviving vertex handle, or nullopt if the collapse
+        // would create a non-manifold configuration.
+        //
+        // Preconditions checked:
+        //   - Link condition: |link(v0) ∩ link(v1)| == 2 for interior edges,
+        //     == 1 for boundary edges. Violation means the collapse would
+        //     produce a non-manifold mesh.
+        //   - Neither endpoint is isolated or deleted.
+        [[nodiscard]] std::optional<VertexHandle> Collapse(EdgeHandle e, glm::vec3 newPosition);
+
+        // Edge flip: rotate the edge shared by two adjacent triangles.
+        // Given edge (a,b) with adjacent faces (a,b,c) and (b,a,d),
+        // the flip produces edge (c,d) with faces (c,d,a) and (d,c,b).
+        // Returns true on success.
+        //
+        // Preconditions checked:
+        //   - Edge is interior (not boundary).
+        //   - Both adjacent faces are triangles.
+        //   - The flip would not create a duplicate edge.
+        //   - Neither opposite vertex has valence <= 2 after flip.
+        [[nodiscard]] bool Flip(EdgeHandle e);
+
+        // Edge split: insert a new vertex at the given position on edge e,
+        // splitting it and its adjacent triangles. For an interior edge with
+        // two adjacent triangles, this produces 4 triangles and 1 new vertex.
+        // Returns the new vertex handle.
+        [[nodiscard]] VertexHandle Split(EdgeHandle e, glm::vec3 position);
+
+        // Check whether collapsing edge e would violate the link condition.
+        [[nodiscard]] bool IsCollapseOk(EdgeHandle e) const;
+
+        // Check whether flipping edge e is topologically valid.
+        [[nodiscard]] bool IsFlipOk(EdgeHandle e) const;
+
         [[nodiscard]] bool HasGarbage() const noexcept { return m_HasGarbage; }
 
     private:
