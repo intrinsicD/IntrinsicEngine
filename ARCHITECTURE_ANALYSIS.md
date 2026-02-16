@@ -274,12 +274,16 @@ The following Clang 18 issues are resolved by the upgrade to Clang 20 as the min
 
 ### 2.6 Geometry Processing Operators
 
-**Context:** The engine has collision and spatial query primitives (`GJK`, `EPA`, `Octree`, `HalfedgeMesh`, `Raycast`, etc.) but no higher-level geometry processing operators.
+**Context:** The engine has collision and spatial query primitives (`GJK`, `EPA`, `Octree`, `HalfedgeMesh`, `Raycast`, etc.) and now a growing set of higher-level geometry processing operators.
 
-**Required operators:**
-- **Mesh simplification / decimation:** Quadric error metric (QEM) edge collapse. Essential for LOD generation and working with scanned meshes.
+**Implemented operators:**
+- ~~**Topological mesh editing:**~~ — **DONE.** `Geometry.HalfedgeMesh` now supports `EdgeCollapse` (with Dey-Edelsbrunner link condition), `EdgeFlip` (with valence/duplicate-edge guards), and `EdgeSplit`. These Euler operations are the building blocks for remeshing, simplification, and adaptive refinement.
+- ~~**Mesh simplification / decimation:**~~ — **DONE.** `Geometry.Simplification` implements Garland-Heckbert QEM edge collapse with per-vertex quadric error accumulation, optimal vertex placement via 3×3 Cramer solve (with midpoint/endpoint fallback), version-based lazy-deletion min-heap, and optional boundary constraint planes. Params: target face count, max error threshold, boundary preservation.
+- ~~**Mesh smoothing:**~~ — **DONE.** `Geometry.Smoothing` implements explicit uniform Laplacian smoothing, cotangent-weighted Laplacian smoothing (unnormalized cotan weights, clamped non-negative for stability on obtuse triangles), and Taubin shrinkage-free smoothing (λ/μ alternating passes with passband frequency control). All methods support boundary preservation.
+- ~~**Curvature computation:**~~ — **DONE.** `Geometry.Curvature` computes mean curvature (Laplace-Beltrami of position with cotan weights), Gaussian curvature (angle defect with mixed Voronoi areas, per Meyer et al. 2003), principal curvatures (H ± √(H²−K)), and mean curvature normal vectors. Verified against Gauss-Bonnet theorem (Σ K_i·A_i = 2πχ).
+
+**Remaining operators:**
 - **Remeshing:** Isotropic remeshing (uniform triangle quality) and adaptive remeshing (curvature-aware sizing). Built on `HalfedgeMesh` edge splits/collapses/flips.
-- **Mesh smoothing:** Laplacian smoothing, Taubin smoothing (shrinkage-free), bilateral mesh denoising.
 - **Subdivision surfaces:** Loop (triangles), Catmull-Clark (quads). For design workflows.
 - **Normal estimation:** For point clouds — PCA-based local plane fitting + consistent orientation (minimum spanning tree propagation).
 - **Surface reconstruction:** Point cloud → mesh. Poisson reconstruction, ball-pivoting algorithm, or marching cubes on an implicit field.
@@ -287,12 +291,16 @@ The following Clang 18 issues are resolved by the upgrade to Clang 20 as the min
 - **Boolean operations:** CSG union/intersection/difference. Built on `HalfedgeMesh` + exact/robust predicates.
 - **Parameterization (UV mapping):** LSCM, ABF++, or Boundary First Flattening for UV unwrapping.
 - **Geodesic distance:** Heat method or fast marching on triangle meshes. Useful for segmentation and analysis.
-- **Curvature computation:** Discrete differential geometry operators (mean curvature, Gaussian curvature, principal curvatures + directions) on triangle meshes.
 
 **Architecture notes:**
-- Each operator should follow a consistent pattern: input mesh/point cloud → parameters struct → output mesh/point cloud + diagnostics.
+- Each operator follows a consistent pattern: input mesh → parameters struct → output/modified mesh + diagnostics. See `Geometry::Simplification::Simplify()` for the canonical example.
 - Operators register via `FeatureRegistry` (§2.4) so they appear in the UI automatically.
 - Long-running operators should execute on the task scheduler (`Core::Tasks`) with progress reporting.
+
+**Lessons learned during implementation:**
+- **PropertyRegistry null-slot safety:** `PropertyRegistry::Remove()` leaves null slots in the storage vector. All iteration methods (`Resize`, `ShrinkToFit`, `PushBack`, `Swap`) must guard against null entries. This was a latent bug exposed by `GarbageCollection` creating and removing temporary map properties.
+- **Explicit cotan Laplacian stability:** The area-normalized cotan Laplacian (dividing by mixed Voronoi area) is correct for curvature computation but causes severe instability in explicit smoothing when vertex areas are small. The unnormalized form (omitting 1/A_i) is standard practice for explicit mesh smoothing (Botsch et al., *Polygon Mesh Processing*, §4.2). Cotan weights should be clamped to non-negative to handle obtuse triangles.
+- **Halfedge collapse connectivity:** Edge collapse requires careful splice operations to merge duplicate edges created by vertex redirect. The PMP-style approach works: (1) redirect all v1 references to v0, (2) splice degenerate face halfedges into adjacent face chains, (3) delete redundant edges/faces/vertex. Safety iteration limits on all `CWRotatedHalfedge` loops are essential for robustness during repeated collapses.
 
 ---
 
@@ -479,9 +487,9 @@ Sub-entity select → Geometry processing (interactive operator input)
     *Depends on: line rendering (Phase 0, for highlighting edges/vertices), HalfedgeMesh (exists). Depended on by: geometry processing operators, measurement tools.*
     Dedicated GPU picking pass writing `(EntityID, PrimitiveID, BarycentricCoords)`. Lasso/box/paint-brush/flood-fill/region-growing selection modes. Per-entity bitsets for selected sub-elements. This is the gateway to interactive geometry processing.
 
-17. **Geometry processing operators (§2.6)**
+17. **Geometry processing operators (§2.6)** — **PARTIALLY DONE**
     *Depends on: FeatureRegistry (DONE), sub-entity selection (Phase 4, for interactive input). Depended on by: nothing (leaf features).*
-    Simplification (QEM), remeshing, smoothing (Laplacian/Taubin), subdivision, normal estimation, surface reconstruction, mesh repair, booleans, UV parameterization, geodesic distance, curvature computation. Each operator follows the pattern: input → params → output + diagnostics. Registered via FeatureRegistry, invokable from UI and (later) scripting.
+    **Done:** Topological editing (collapse/flip/split), simplification (QEM), smoothing (Laplacian/cotan/Taubin), curvature computation (mean/Gaussian/principal). **Remaining:** Remeshing, subdivision, normal estimation, surface reconstruction, mesh repair, booleans, UV parameterization, geodesic distance. Each operator follows the pattern: input → params → output + diagnostics. Registered via FeatureRegistry, invokable from UI and (later) scripting.
 
 18. **Clipping planes & cross-sections (§2.9)**
     *Depends on: line rendering (Phase 0, for plane visualization). Depended on by: nothing.*

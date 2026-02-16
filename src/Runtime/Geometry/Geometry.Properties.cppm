@@ -143,15 +143,17 @@ export namespace Geometry
         void Resize(size_t n)
         {
             m_Size = n;
-            for (auto& storage : m_Storages) storage->Resize(n);
+            for (auto& storage : m_Storages)
+                if (storage) storage->Resize(n);
         }
 
-        void ShrinkToFit() { for (auto& storage : m_Storages) storage->ShrinkToFit(); }
-        void PushBack() { for (auto& storage : m_Storages) storage->PushBack(); }
+        void ShrinkToFit() { for (auto& storage : m_Storages) if (storage) storage->ShrinkToFit(); }
+        void PushBack() { for (auto& storage : m_Storages) if (storage) storage->PushBack(); }
 
         void Swap(size_t i0, size_t i1)
         {
-            for (auto& storage : m_Storages) storage->Swap(i0, i1);
+            for (auto& storage : m_Storages)
+                if (storage) storage->Swap(i0, i1);
         }
 
         [[nodiscard]] bool Contains(std::string_view name) const

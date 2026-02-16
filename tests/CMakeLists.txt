@@ -138,6 +138,7 @@ add_executable(${geometry_test_target}
         Test_RuntimeGraph.cpp
         Test_RuntimeGraph_ParallelLayers.cpp
         Test_DEC.cpp
+        Test_MeshOperations.cpp
 )
 
 target_compile_options(${geometry_test_target} PRIVATE ${INTRINSIC_COMPILE_FLAGS})

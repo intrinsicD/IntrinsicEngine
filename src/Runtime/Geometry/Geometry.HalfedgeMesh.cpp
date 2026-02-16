@@ -191,6 +191,8 @@ namespace Geometry::Halfedge
         const HalfedgeHandle start = h;
         if (h.IsValid())
         {
+            const std::size_t maxIter = HalfedgesSize();
+            std::size_t iter = 0;
             do
             {
                 if (IsBoundary(h))
@@ -199,6 +201,7 @@ namespace Geometry::Halfedge
                     return;
                 }
                 h = CWRotatedHalfedge(h);
+                if (++iter > maxIter) return; // safety: broken connectivity
             } while (h != start);
         }
     }
@@ -409,10 +412,12 @@ namespace Geometry::Halfedge
         const HalfedgeHandle start = h;
         if (h.IsValid())
         {
+            const std::size_t maxIter = HalfedgesSize();
             do
             {
                 ++count;
                 h = CWRotatedHalfedge(h);
+                if (count > maxIter) return count; // safety: broken connectivity
             } while (h != start);
         }
         return count;
@@ -705,5 +710,680 @@ namespace Geometry::Halfedge
 
         m_DeletedVertices = m_DeletedEdges = m_DeletedFaces = 0;
         m_HasGarbage = false;
+    }
+
+    // =========================================================================
+    // IsCollapseOk — Link condition check
+    // =========================================================================
+    //
+    // The link condition (Dey & Edelsbrunner) ensures that edge collapse
+    // preserves the topological type of the mesh. For interior edge (v0, v1):
+    //   |link(v0) ∩ link(v1)| must equal exactly 2 (the two opposite vertices).
+    // For boundary edge: intersection must equal 1.
+
+    bool Mesh::IsCollapseOk(EdgeHandle e) const
+    {
+        if (IsDeleted(e)) return false;
+
+        HalfedgeHandle h0 = Halfedge(e, 0);
+        HalfedgeHandle h1 = Halfedge(e, 1);
+
+        VertexHandle v0 = ToVertex(h1); // FromVertex of h0
+        VertexHandle v1 = ToVertex(h0);
+
+        if (IsDeleted(v0) || IsDeleted(v1)) return false;
+        if (IsIsolated(v0) || IsIsolated(v1)) return false;
+
+        // Collect 1-ring neighbors of v0 (with safety limit)
+        const std::size_t maxIter = HalfedgesSize();
+        std::vector<VertexHandle> link0;
+        link0.reserve(8);
+        {
+            HalfedgeHandle h = Halfedge(v0);
+            HalfedgeHandle start = h;
+            std::size_t iter = 0;
+            do
+            {
+                VertexHandle vn = ToVertex(h);
+                if (vn != v1) link0.push_back(vn);
+                h = CWRotatedHalfedge(h);
+                if (++iter > maxIter) return false;  // broken connectivity
+            } while (h != start);
+        }
+
+        // Collect 1-ring neighbors of v1 (with safety limit)
+        std::vector<VertexHandle> link1;
+        link1.reserve(8);
+        {
+            HalfedgeHandle h = Halfedge(v1);
+            HalfedgeHandle start = h;
+            std::size_t iter = 0;
+            do
+            {
+                VertexHandle vn = ToVertex(h);
+                if (vn != v0) link1.push_back(vn);
+                h = CWRotatedHalfedge(h);
+                if (++iter > maxIter) return false;  // broken connectivity
+            } while (h != start);
+        }
+
+        // Sort for intersection
+        std::sort(link0.begin(), link0.end(), [](VertexHandle a, VertexHandle b) { return a.Index < b.Index; });
+        std::sort(link1.begin(), link1.end(), [](VertexHandle a, VertexHandle b) { return a.Index < b.Index; });
+
+        // Count intersection
+        std::size_t commonCount = 0;
+        auto it0 = link0.begin();
+        auto it1 = link1.begin();
+        while (it0 != link0.end() && it1 != link1.end())
+        {
+            if (it0->Index < it1->Index) ++it0;
+            else if (it0->Index > it1->Index) ++it1;
+            else { ++commonCount; ++it0; ++it1; }
+        }
+
+        // For interior edge: exactly 2 common neighbors (the two opposite vertices)
+        // For boundary edge: exactly 1
+        bool isBoundaryEdge = IsBoundary(e);
+        std::size_t expected = isBoundaryEdge ? 1u : 2u;
+
+        if (commonCount != expected) return false;
+
+        // Additional check: don't collapse if it would make the mesh degenerate
+        // (e.g., both endpoints are boundary but the edge is interior)
+        if (IsBoundary(v0) && IsBoundary(v1) && !isBoundaryEdge)
+            return false;
+
+        return true;
+    }
+
+    // =========================================================================
+    // IsFlipOk — Edge flip validity check
+    // =========================================================================
+
+    bool Mesh::IsFlipOk(EdgeHandle e) const
+    {
+        if (IsDeleted(e)) return false;
+
+        HalfedgeHandle h0 = Halfedge(e, 0);
+        HalfedgeHandle h1 = Halfedge(e, 1);
+
+        // Must be interior edge
+        if (IsBoundary(h0) || IsBoundary(h1)) return false;
+
+        // Both faces must be triangles
+        FaceHandle f0 = Face(h0);
+        FaceHandle f1 = Face(h1);
+        if (Valence(f0) != 3 || Valence(f1) != 3) return false;
+
+        // The two opposite vertices
+        VertexHandle vc = ToVertex(NextHalfedge(h0));
+        VertexHandle vd = ToVertex(NextHalfedge(h1));
+
+        // Check that the new edge doesn't already exist
+        if (FindEdge(vc, vd).has_value()) return false;
+
+        // Don't flip if it would create a valence-2 vertex
+        VertexHandle va = ToVertex(h1); // FromVertex(h0)
+        VertexHandle vb = ToVertex(h0);
+        if (Valence(va) <= 3 || Valence(vb) <= 3) return false;
+
+        return true;
+    }
+
+    // =========================================================================
+    // Collapse — Edge collapse
+    // =========================================================================
+    //
+    // Collapses edge e by merging v1 into v0. v0 survives at newPosition.
+    // All halfedges pointing to v1 are redirected to v0. The edge and its
+    // adjacent faces are deleted. v1 is marked deleted.
+
+    std::optional<VertexHandle> Mesh::Collapse(EdgeHandle e, glm::vec3 newPosition)
+    {
+        if (!IsCollapseOk(e)) return std::nullopt;
+
+        HalfedgeHandle h0 = Halfedge(e, 0);
+        HalfedgeHandle h1 = Halfedge(e, 1);
+
+        VertexHandle v0 = FromVertex(h0);  // surviving vertex
+        VertexHandle v1 = ToVertex(h0);    // removed vertex
+
+        bool hasF0 = !IsBoundary(h0);
+        bool hasF1 = !IsBoundary(h1);
+
+        // Collect topology BEFORE modification
+        HalfedgeHandle h0n, h0p, h0n_opp, h0p_opp;
+        VertexHandle vc;
+        FaceHandle f0;
+        if (hasF0)
+        {
+            h0n = NextHalfedge(h0);
+            h0p = PrevHalfedge(h0);
+            h0n_opp = OppositeHalfedge(h0n);
+            h0p_opp = OppositeHalfedge(h0p);
+            vc = ToVertex(h0n);
+            f0 = Face(h0);
+        }
+
+        HalfedgeHandle h1n, h1p, h1n_opp, h1p_opp;
+        VertexHandle vd;
+        FaceHandle f1;
+        if (hasF1)
+        {
+            h1n = NextHalfedge(h1);
+            h1p = PrevHalfedge(h1);
+            h1n_opp = OppositeHalfedge(h1n);
+            h1p_opp = OppositeHalfedge(h1p);
+            vd = ToVertex(h1n);
+            f1 = Face(h1);
+        }
+
+        // Collect v1's outgoing halfedges before redirect
+        std::vector<HalfedgeHandle> v1out;
+        v1out.reserve(8);
+        {
+            HalfedgeHandle h = Halfedge(v1);
+            HalfedgeHandle start = h;
+            const std::size_t maxIter = HalfedgesSize();
+            std::size_t iter = 0;
+            do
+            {
+                v1out.push_back(h);
+                h = CWRotatedHalfedge(h);
+                if (++iter > maxIter) break; // safety: broken connectivity
+            } while (h != start);
+        }
+
+        // Phase 1: Redirect all v1 references to v0
+        for (auto h : v1out)
+        {
+            SetVertex(OppositeHalfedge(h), v0);
+        }
+
+        // Phase 2: Handle degenerate face on h0 side
+        if (hasF0)
+        {
+            // After redirect, h0n now goes v0→vc (was v1→vc).
+            // h0p_opp also goes v0→vc. These are duplicate edges.
+            // We keep edge(h0p) and delete edge(h0n).
+            // h0n_opp (vc→v0) must be spliced into h0p's chain.
+
+            // Splice h0p into the chain where h0n_opp was
+            SetNextHalfedge(PrevHalfedge(h0n_opp), h0p);
+            SetNextHalfedge(h0p, NextHalfedge(h0n_opp));
+            SetFace(h0p, Face(h0n_opp));
+
+            // Splice h0p_opp into the chain where h0n was
+            // (h0n was inside the deleted face, so h0p_opp takes its role
+            // in external faces — but actually h0p_opp is already in its own chain)
+            // No: h0n is being deleted along with its face.
+            // h0p_opp is in the chain of whatever face was using it.
+            // We just need to make sure face references are updated.
+
+            if (Face(h0n_opp).IsValid())
+                SetHalfedge(Face(h0n_opp), h0p);
+            if (Halfedge(vc) == h0n_opp)
+                SetHalfedge(vc, h0p);
+
+            m_FDeleted[f0] = true;
+            ++m_DeletedFaces;
+
+            EdgeHandle eDup = Edge(h0n);
+            if (!m_EDeleted[eDup])
+            {
+                m_EDeleted[eDup] = true;
+                ++m_DeletedEdges;
+            }
+        }
+
+        // Phase 3: Handle degenerate face on h1 side
+        if (hasF1)
+        {
+            // After redirect, h1p now goes vd→v0 (was vd→v1).
+            // h1n_opp also goes vd→v0. Duplicate edges.
+            // We keep edge(h1n) and delete edge(h1p).
+            // h1p_opp (v0→vd) must be spliced into h1n's chain.
+
+            SetNextHalfedge(PrevHalfedge(h1p_opp), h1n);
+            SetNextHalfedge(h1n, NextHalfedge(h1p_opp));
+            SetFace(h1n, Face(h1p_opp));
+
+            if (Face(h1p_opp).IsValid())
+                SetHalfedge(Face(h1p_opp), h1n);
+            if (Halfedge(vd) == h1p_opp)
+                SetHalfedge(vd, h1n);
+
+            m_FDeleted[f1] = true;
+            ++m_DeletedFaces;
+
+            EdgeHandle eDup = Edge(h1p);
+            if (!m_EDeleted[eDup])
+            {
+                m_EDeleted[eDup] = true;
+                ++m_DeletedEdges;
+            }
+        }
+
+        // Phase 4: Delete collapsed edge and vertex v1
+        m_EDeleted[e] = true;
+        ++m_DeletedEdges;
+        m_VDeleted[v1] = true;
+        ++m_DeletedVertices;
+
+        // Phase 5: Set v0's position and fix outgoing halfedge
+        Position(v0) = newPosition;
+
+        // Find a valid outgoing halfedge for v0
+        HalfedgeHandle validOut;
+        for (auto h : v1out)
+        {
+            EdgeHandle eH = Edge(h);
+            if (!m_EDeleted[eH])
+            {
+                validOut = h;
+                break;
+            }
+        }
+        if (validOut.IsValid())
+            SetHalfedge(v0, validOut);
+
+        AdjustOutgoingHalfedge(v0);
+        if (vc.IsValid() && !m_VDeleted[vc]) AdjustOutgoingHalfedge(vc);
+        if (vd.IsValid() && !m_VDeleted[vd]) AdjustOutgoingHalfedge(vd);
+
+        m_HasGarbage = true;
+        return v0;
+    }
+
+    // =========================================================================
+    // Flip — Edge flip
+    // =========================================================================
+    //
+    //  Before:           After:
+    //     c                 c
+    //    / \              / | \
+    //   / f0\            /  |  \
+    //  a-----b          a  f0'  b
+    //   \ f1/            \  |  /
+    //    \ /              \ | /
+    //     d                 d
+    //
+    //  Edge (a,b) becomes edge (c,d).
+
+    bool Mesh::Flip(EdgeHandle e)
+    {
+        if (!IsFlipOk(e)) return false;
+
+        HalfedgeHandle h0 = Halfedge(e, 0);  // a → b
+        HalfedgeHandle h1 = Halfedge(e, 1);  // b → a
+
+        // Halfedges in face f0 (a → b → c → a)
+        HalfedgeHandle h0n = NextHalfedge(h0);  // b → c
+        HalfedgeHandle h0p = PrevHalfedge(h0);  // c → a
+
+        // Halfedges in face f1 (b → a → d → b)
+        HalfedgeHandle h1n = NextHalfedge(h1);  // a → d
+        HalfedgeHandle h1p = PrevHalfedge(h1);  // d → b
+
+        FaceHandle f0 = Face(h0);
+        FaceHandle f1 = Face(h1);
+
+        VertexHandle va = FromVertex(h0);      // = ToVertex(h1)
+        VertexHandle vb = ToVertex(h0);
+        VertexHandle vc = ToVertex(h0n);       // opposite vertex in f0
+        VertexHandle vd = ToVertex(h1n);       // opposite vertex in f1
+
+        // Update the flipped edge endpoints: h0 becomes c → d, h1 becomes d → c
+        SetVertex(h0, vd);   // h0 now points to d
+        SetVertex(h1, vc);   // h1 now points to c
+
+        // Rewire face f0: c → d → a → c  (h0, h1n, h0p)
+        SetNextHalfedge(h0, h1n);   // c→d is followed by a→(old d→b becomes)... wait
+        // Let me be more precise:
+        // After flip: h0 = c → d,  we want f0 = (c,d,a)
+        //   h0 (c→d), then h1n (was a→d, but we need d→a... no)
+        //
+        // Actually let me reconsider the rewiring carefully.
+        // h0 goes from c to d (was a to b)
+        // h1 goes from d to c (was b to a)
+        //
+        // Face f0 should be (c, d, a): h0 (c→d), then h1p (d→b → but b is wrong...)
+        //
+        // Let me think again. After the flip:
+        // h0: c → d (face f0)
+        // h1: d → c (face f1)
+        //
+        // Face f0 = triangle (c, d, a):
+        //   h0 (c → d) → h1n (a → d? no...)
+        //
+        // I need to be more careful. Let me re-derive.
+        //
+        // Before flip:
+        //   f0: h0 (a→b), h0n (b→c), h0p (c→a)
+        //   f1: h1 (b→a), h1n (a→d), h1p (d→b)
+        //
+        // After flip, edge becomes (c,d):
+        //   h0: c → d
+        //   h1: d → c
+        //
+        //   f0 should be triangle (c, d, a):
+        //     h0 (c→d) → h1n (d... wait, h1n was a→d, not d→something)
+        //
+        // Hmm. Let me use the standard PMP flip algorithm.
+        // The key insight: we reuse the existing 6 halfedges.
+        // h0 and h1 get new endpoints. The other 4 halfedges get reassigned to faces.
+
+        // Standard approach: h0 becomes c→d, h1 becomes d→c
+        // Face f0: h0p (previously c→a, still c→a... no, h0 now starts from c)
+        //
+        // Let me follow the standard halfedge flip from PMP:
+
+        // Face f0: (c, d, a) = h1 won't work...
+        //
+        // OK let me use the well-known recipe:
+        // After flip, f0 = {h0, h1p, h0p} and f1 = {h1, h0n, h1n}...
+        // Wait, that's the Botsch et al. recipe? Let me just use the known-correct version.
+
+        // The standard halfedge flip from "Polygon Mesh Processing" (Botsch et al.):
+        // f0 gets: h0 → h1p → h0p  (c→d, d→b... no that's wrong for triangle (c,d,a))
+        //
+        // Actually the standard recipe is:
+        //   f0: h1p, h0, h0n... no.
+        //
+        // Let me just go step by step.
+        // We have 6 halfedges: h0, h0n, h0p, h1, h1n, h1p
+        // Before:
+        //   f0: h0→h0n→h0p→h0
+        //   f1: h1→h1n→h1p→h1
+        // After flip: h0 = c→d, h1 = d→c
+        //   f0 = (a, c, d): h0p(c→a)→h1n(a→d)→h0(... wait, h0 is c→d not d→c)
+        //   No. f0 = (c, d, a): h0(c→d)→?(d→a)→h0p(... h0p was c→a, but we need a→c)
+        //
+        // I think the cleaner approach is:
+        //   f0 = {h0, h1p, h0p} with next chain: h0→h1p→h0p→h0
+        //   f1 = {h1, h0n, h1n} with next chain: h1→h0n→h1n→h1
+        //   This gives:
+        //     f0: c→d (h0), d→(h1p.to)=b → wrong, we want d→a
+        //
+        // I'm overcomplicating this. Let me just use the well-known recipe from
+        // Surface_mesh/PMP library:
+
+        // After flip:
+        //   f0: h0 → h0n → h1n → h0     (Wait, that's 3 edges for a triangle)
+        //   f1: h1 → h1n → h0n → h1     (No...)
+        //
+        // Actually the correct recipe from PMP (Botsch et al.) is:
+        //   New face f0 = (h1p, h0, h0n) — wait, let me just look at the topology.
+        //
+        // h0 is now c → d
+        // h0n was b → c and remains b → c (not changed)
+        // h0p was c → a and remains c → a
+        // h1 is now d → c
+        // h1n was a → d and remains a → d
+        // h1p was d → b and remains d → b
+        //
+        // Triangle 1: (a, c, d) using halfedges: h0p (c→a... that's backwards)
+        //   Actually h0p goes from c to a. So reading endpoints:
+        //   h0p: c→a, h1n: a→d, h0: c→d (but h0 goes c→d, not d→c)
+        //   For triangle (a, c, d), we need: a→c, c→d, d→a
+        //   a→c = opposite of h0p... no, that's wrong.
+        //
+        // OK I think the confusion is because h0 and h1 have swapped *which vertex they point to*
+        // but the halfedge *pair* still represents the same edge slot. h0 is the even halfedge
+        // and h1 is the odd. After SetVertex, h0 now points TO vd and h1 points TO vc.
+        // But FromVertex(h0) = ToVertex(h1) = vc. FromVertex(h1) = ToVertex(h0) = vd.
+        //
+        // So: h0 goes from vc to vd, h1 goes from vd to vc. Good.
+        //
+        // Now I need two triangles:
+        //   Triangle A = (vc, vd, va):
+        //     vc→vd (h0), vd→va (???), va→vc (???)
+        //     h1n goes a→d, we need d→a. That's opposite(h1n).
+        //     Hmm, but we can't use opposite(h1n) because that's in a different edge pair.
+        //
+        // Wait. We don't change the other 4 halfedges' TO vertices. We only change next/prev
+        // pointers and face assignments. Let me reconsider.
+        //
+        // The 6 halfedges in play are h0, h0n, h0p, h1, h1n, h1p.
+        // We set h0.to = vd, h1.to = vc. Everything else stays.
+        // h0n.to = vc (still), h0p.to = va (still)
+        // h1n.to = vd (still), h1p.to = vb (still)
+        //
+        // h0: vc → vd
+        // h0n: vb → vc
+        // h0p: vc → va  (wait, h0p.to = va, h0p.from = ToVertex(opposite(h0p))
+        //   Actually: from = FromVertex(h0p) = ToVertex(OppositeHalfedge(h0p))
+        //   Before the flip, h0p was c→a, so FromVertex = c, ToVertex = a.
+        //   We haven't changed h0p's ToVertex, so h0p is still "?→a".
+        //   h0p.from was vc originally. We haven't changed that. So h0p: vc→va.
+        // h1: vd → vc
+        // h1n: va → vd
+        // h1p: vd → vb  (h1p.to = vb, h1p.from = vd? Let's verify:
+        //   h1p was d→b before. h1p.to = vb. h1p.from = ToVertex(opposite(h1p)).
+        //   We haven't changed that, so h1p: vd→vb.
+        //
+        // Good. Now I want:
+        //   Face 0: triangle (vc, vd, va) using h0(vc→vd), h1n(va→vd... NO: h1n: va→vd)
+        //     Hmm, h1n goes va→vd, but I need vd→va.
+        //
+        // Actually wait. For triangle (vc, vd, va):
+        //   Edge vc→vd: h0
+        //   Edge vd→va: I need a halfedge from vd to va. That's not any of my 6.
+        //   Edge va→vc: I need a halfedge from va to vc. h0n goes vb→vc, not va→vc.
+        //
+        // This means I need to reassign h1p and h0p:
+        //   Face 0 = (vc, vd, va): h0 (vc→vd), then I reuse h1p but change its TO?
+        //   No, that would change the edge endpoint.
+        //
+        // I think the standard flip recipe reassigns the next/prev pointers of the
+        // 6 halfedges among the 2 faces differently:
+        //
+        //   New Face 0: h0, h1p, h0n   (Wait, is this right?)
+        //     h0: vc→vd, h1p: vd→vb, h0n: vb→vc → Triangle (vc, vd, vb)
+        //   New Face 1: h1, h0p, h1n
+        //     h1: vd→vc, h0p: vc→va, h1n: va→vd → Triangle (vd, vc, va)
+        //
+        //   This gives triangles (vc, vd, vb) and (vd, vc, va) = (va, vd, vc).
+        //   The edge is (vc, vd) = (c, d). One triangle has vertices {a, c, d},
+        //   the other has {b, c, d}. That's correct!
+        //
+        //   Face 0: h0→h1p→h0n→h0  → (vc→vd→vb→vc)
+        //   Face 1: h1→h0p→h1n→h1  → (vd→vc→va→vd)
+
+        // Set next pointers for face f0: h0 → h1p → h0n → h0
+        SetNextHalfedge(h0, h1p);
+        SetNextHalfedge(h1p, h0n);
+        SetNextHalfedge(h0n, h0);
+
+        // Set next pointers for face f1: h1 → h0p → h1n → h1
+        SetNextHalfedge(h1, h0p);
+        SetNextHalfedge(h0p, h1n);
+        SetNextHalfedge(h1n, h1);
+
+        // Set face pointers
+        SetFace(h0, f0);
+        SetFace(h1p, f0);
+        SetFace(h0n, f0);
+
+        SetFace(h1, f1);
+        SetFace(h0p, f1);
+        SetFace(h1n, f1);
+
+        // Update face halfedge references
+        SetHalfedge(f0, h0);
+        SetHalfedge(f1, h1);
+
+        // Update vertex outgoing halfedges (va and vb lost an adjacent face each)
+        if (Halfedge(va) == h0) SetHalfedge(va, h1n);
+        if (Halfedge(vb) == h1) SetHalfedge(vb, h0n);
+
+        AdjustOutgoingHalfedge(va);
+        AdjustOutgoingHalfedge(vb);
+        AdjustOutgoingHalfedge(vc);
+        AdjustOutgoingHalfedge(vd);
+
+        return true;
+    }
+
+    // =========================================================================
+    // Split — Edge split
+    // =========================================================================
+    //
+    // Splits edge e = (va, vb) by inserting a new vertex vm at `position`.
+    //
+    //  Before (interior):       After:
+    //       c                      c
+    //      / \                   / | \
+    //     / f0\                /  f0 f2
+    //    a-----b              a---vm---b
+    //     \ f1/                \  f1 f3
+    //      \ /                   \ | /
+    //       d                      d
+    //
+    // Creates 1 vertex, 3 edges, 2 faces (interior) or 1 face (boundary).
+
+    VertexHandle Mesh::Split(EdgeHandle e, glm::vec3 position)
+    {
+        if (IsDeleted(e)) return {};
+
+        HalfedgeHandle h0 = Halfedge(e, 0);  // va → vb
+        HalfedgeHandle h1 = Halfedge(e, 1);  // vb → va
+
+        VertexHandle va = FromVertex(h0);
+        VertexHandle vb = ToVertex(h0);
+
+        bool hasFace0 = !IsBoundary(h0);
+        bool hasFace1 = !IsBoundary(h1);
+
+        // Gather adjacent topology before modification
+        HalfedgeHandle h0n{}, h0p{}, h1n{}, h1p{};
+        VertexHandle vc{}, vd{};
+        FaceHandle f0{}, f1{};
+
+        if (hasFace0)
+        {
+            h0n = NextHalfedge(h0);
+            h0p = PrevHalfedge(h0);
+            vc = ToVertex(h0n);
+            f0 = Face(h0);
+        }
+
+        if (hasFace1)
+        {
+            h1n = NextHalfedge(h1);
+            h1p = PrevHalfedge(h1);
+            vd = ToVertex(h1n);
+            f1 = Face(h1);
+        }
+
+        // Create new vertex
+        VertexHandle vm = AddVertex(position);
+
+        // Modify existing edge e: now goes va → vm (reuse h0/h1)
+        SetVertex(h0, vm);  // h0 now: va → vm
+        // h1 already: vb → va, but we need vm → va.
+        // Actually we need: e = (va, vm) with h0: va→vm, h1: vm→va
+        // But h1.to was va, and h1.from was vb. We need h1.from = vm.
+        // h1.from = ToVertex(OppositeHalfedge(h1)) = ToVertex(h0) = vm. Good!
+        // Wait, we just set h0.to = vm, so h1.from = vm. Correct.
+
+        // Create edge (vm, vb)
+        HalfedgeHandle hNewEdge = NewEdge(vm, vb);
+        HalfedgeHandle hNewEdgeOpp = OppositeHalfedge(hNewEdge);
+        // hNewEdge: vm → vb
+        // hNewEdgeOpp: vb → vm
+
+        // Update vb's outgoing halfedge if needed
+        if (Halfedge(vb) == h1)
+            SetHalfedge(vb, hNewEdgeOpp);
+
+        // Set vm's outgoing halfedge
+        SetHalfedge(vm, h0);
+
+        if (hasFace0)
+        {
+            // Create edge (vm, vc)
+            HalfedgeHandle hSplit0 = NewEdge(vm, vc);
+            HalfedgeHandle hSplit0Opp = OppositeHalfedge(hSplit0);
+            // hSplit0: vm → vc
+            // hSplit0Opp: vc → vm
+
+            // Create new face f2 = (vm, vb, vc)
+            FaceHandle f2 = NewFace();
+
+            // Existing face f0 becomes: (va, vm, vc)
+            //   h0 (va→vm), hSplit0 (vm→vc), h0p (vc→va)
+            SetNextHalfedge(h0, hSplit0);
+            SetNextHalfedge(hSplit0, h0p);
+            SetNextHalfedge(h0p, h0);
+            SetFace(h0, f0);
+            SetFace(hSplit0, f0);
+            SetFace(h0p, f0);
+            SetHalfedge(f0, h0);
+
+            // New face f2: (vm, vb, vc)
+            //   hNewEdge (vm→vb), h0n (vb→vc), hSplit0Opp (vc→vm)
+            SetNextHalfedge(hNewEdge, h0n);
+            SetNextHalfedge(h0n, hSplit0Opp);
+            SetNextHalfedge(hSplit0Opp, hNewEdge);
+            SetFace(hNewEdge, f2);
+            SetFace(h0n, f2);
+            SetFace(hSplit0Opp, f2);
+            SetHalfedge(f2, hNewEdge);
+        }
+        else
+        {
+            // Boundary on h0 side: just link h0 → hNewEdge in the boundary
+            HalfedgeHandle hBoundaryNext = NextHalfedge(h0);
+            SetNextHalfedge(h0, hNewEdge);
+            SetNextHalfedge(hNewEdge, hBoundaryNext);
+        }
+
+        if (hasFace1)
+        {
+            // Create edge (vm, vd)
+            HalfedgeHandle hSplit1 = NewEdge(vm, vd);
+            HalfedgeHandle hSplit1Opp = OppositeHalfedge(hSplit1);
+            // hSplit1: vm → vd
+            // hSplit1Opp: vd → vm
+
+            // Create new face f3 = (vm, va, vd) — wait, careful with winding
+            FaceHandle f3 = NewFace();
+
+            // Existing face f1 becomes: (vb, vm, vd)
+            //   hNewEdgeOpp (vb→vm), hSplit1 (vm→vd), h1p (vd→vb)
+            SetNextHalfedge(hNewEdgeOpp, hSplit1);
+            SetNextHalfedge(hSplit1, h1p);
+            SetNextHalfedge(h1p, hNewEdgeOpp);
+            SetFace(hNewEdgeOpp, f1);
+            SetFace(hSplit1, f1);
+            SetFace(h1p, f1);
+            SetHalfedge(f1, hNewEdgeOpp);
+
+            // New face f3: (vm, va, vd) → (h1 (vm→va), h1n (va→vd), hSplit1Opp (vd→vm))
+            SetNextHalfedge(h1, h1n);
+            SetNextHalfedge(h1n, hSplit1Opp);
+            SetNextHalfedge(hSplit1Opp, h1);
+            SetFace(h1, f3);
+            SetFace(h1n, f3);
+            SetFace(hSplit1Opp, f3);
+            SetHalfedge(f3, h1);
+        }
+        else
+        {
+            // Boundary on h1 side: link hNewEdgeOpp → h1 in the boundary
+            HalfedgeHandle hBoundaryPrev = PrevHalfedge(h1);
+            SetNextHalfedge(hBoundaryPrev, hNewEdgeOpp);
+            SetNextHalfedge(hNewEdgeOpp, h1);
+        }
+
+        AdjustOutgoingHalfedge(va);
+        AdjustOutgoingHalfedge(vb);
+        AdjustOutgoingHalfedge(vm);
+        if (vc.IsValid()) AdjustOutgoingHalfedge(vc);
+        if (vd.IsValid()) AdjustOutgoingHalfedge(vd);
+
+        return vm;
     }
 }
