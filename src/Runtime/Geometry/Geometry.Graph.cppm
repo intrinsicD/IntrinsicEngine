@@ -65,6 +65,24 @@ export namespace Geometry::Graph
         bool Converged{false};
     };
 
+    struct SpectralLayoutParams
+    {
+        std::uint32_t MaxIterations{96};
+        float StepScale{0.85F};
+        float ConvergenceTolerance{1.0e-5F};
+        float MinNormEpsilon{1.0e-8F};
+        float AreaExtent{2.0F};
+    };
+
+    struct SpectralLayoutResult
+    {
+        std::size_t ActiveVertexCount{0};
+        std::size_t ActiveEdgeCount{0};
+        std::uint32_t IterationsPerformed{0};
+        float SubspaceDelta{0.0F};
+        bool Converged{false};
+    };
+
     // A lightweight halfedge-based graph (no faces), designed for DOD-friendly algorithms.
     // Storage is via PropertySets, so user-defined properties are supported on vertices/halfedges/edges.
     class Graph
@@ -204,4 +222,9 @@ export namespace Geometry::Graph
     // `ioPositions` is updated in-place and must have at least graph.VerticesSize() entries.
     [[nodiscard]] std::optional<ForceDirectedLayoutResult> ComputeForceDirectedLayout(
         const Graph& graph, std::span<glm::vec2> ioPositions, const ForceDirectedLayoutParams& params = {});
+
+    // Computes a 2D spectral embedding using the first two non-constant eigenmodes
+    // of the graph Laplacian via projected orthogonal iteration.
+    [[nodiscard]] std::optional<SpectralLayoutResult> ComputeSpectralLayout(
+        const Graph& graph, std::span<glm::vec2> ioPositions, const SpectralLayoutParams& params = {});
 }

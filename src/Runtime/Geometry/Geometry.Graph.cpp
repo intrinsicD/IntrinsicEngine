@@ -1,6 +1,7 @@
 module;
 
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <cmath>
 #include <cstdint>
@@ -36,6 +37,52 @@ namespace Geometry::Graph
             const float phase = static_cast<float>((((i + 1U) * 1664525U) ^ ((j + 1U) * 1013904223U)) & 0xFFFFU);
             const float angle = phase * 0.0000958738F;
             return glm::vec2(std::cos(angle), std::sin(angle));
+        }
+
+        void RemoveMean(std::vector<float>& values)
+        {
+            if (values.empty()) return;
+
+            float mean = 0.0F;
+            for (const float value : values) mean += value;
+            mean /= static_cast<float>(values.size());
+            for (float& value : values) value -= mean;
+        }
+
+        [[nodiscard]] float Dot(const std::vector<float>& a, const std::vector<float>& b)
+        {
+            assert(a.size() == b.size());
+            float sum = 0.0F;
+            for (std::size_t i = 0; i < a.size(); ++i) sum += a[i] * b[i];
+            return sum;
+        }
+
+        [[nodiscard]] float Normalize(std::vector<float>& values, float minNorm)
+        {
+            const float norm2 = Dot(values, values);
+            if (!std::isfinite(norm2) || norm2 <= minNorm * minNorm) return 0.0F;
+            const float invNorm = 1.0F / std::sqrt(norm2);
+            for (float& value : values) value *= invNorm;
+            return std::sqrt(norm2);
+        }
+
+        [[nodiscard]] float OrthogonalizeAgainst(std::vector<float>& values, const std::vector<float>& basis)
+        {
+            const float proj = Dot(values, basis);
+            for (std::size_t i = 0; i < values.size(); ++i) values[i] -= proj * basis[i];
+            return proj;
+        }
+
+        void MultiplyCombinatorialLaplacian(std::span<const std::pair<std::uint32_t, std::uint32_t>> edges,
+            std::span<const float> x, std::span<float> y)
+        {
+            std::fill(y.begin(), y.end(), 0.0F);
+            for (const auto& [i, j] : edges)
+            {
+                const float d = x[static_cast<std::size_t>(i)] - x[static_cast<std::size_t>(j)];
+                y[static_cast<std::size_t>(i)] += d;
+                y[static_cast<std::size_t>(j)] -= d;
+            }
         }
     }
 
@@ -568,6 +615,133 @@ namespace Geometry::Graph
             {
                 result.Converged = true;
                 break;
+            }
+        }
+
+        return result;
+    }
+
+    std::optional<SpectralLayoutResult> ComputeSpectralLayout(
+        const Graph& graph, std::span<glm::vec2> ioPositions, const SpectralLayoutParams& params)
+    {
+        if (params.MaxIterations == 0U || ioPositions.size() < graph.VerticesSize()) return std::nullopt;
+
+        std::vector<std::uint32_t> activeVertices;
+        activeVertices.reserve(graph.VerticesSize());
+        std::vector<std::uint32_t> globalToLocal(graph.VerticesSize(), std::numeric_limits<std::uint32_t>::max());
+        for (std::uint32_t idx = 0; idx < static_cast<std::uint32_t>(graph.VerticesSize()); ++idx)
+        {
+            const VertexHandle v{idx};
+            if (graph.IsDeleted(v)) continue;
+            globalToLocal[idx] = static_cast<std::uint32_t>(activeVertices.size());
+            activeVertices.push_back(idx);
+        }
+        if (activeVertices.size() < 2U) return std::nullopt;
+
+        std::vector<std::pair<std::uint32_t, std::uint32_t>> localEdges;
+        localEdges.reserve(graph.EdgesSize());
+        std::vector<std::uint32_t> degree(activeVertices.size(), 0U);
+        for (std::uint32_t idx = 0; idx < static_cast<std::uint32_t>(graph.EdgesSize()); ++idx)
+        {
+            const EdgeHandle e{idx};
+            if (graph.IsDeleted(e)) continue;
+
+            const auto [start, end] = graph.EdgeVertices(e);
+            if (!start.IsValid() || !end.IsValid() || graph.IsDeleted(start) || graph.IsDeleted(end)) continue;
+            const std::uint32_t ls = globalToLocal[start.Index];
+            const std::uint32_t le = globalToLocal[end.Index];
+            if (ls == std::numeric_limits<std::uint32_t>::max() || le == std::numeric_limits<std::uint32_t>::max() || ls == le) continue;
+            localEdges.emplace_back(ls, le);
+            ++degree[ls];
+            ++degree[le];
+        }
+
+        const std::size_t n = activeVertices.size();
+        const auto maxDegreeIt = std::max_element(degree.begin(), degree.end());
+        const float maxDegree = maxDegreeIt != degree.end() ? static_cast<float>(*maxDegreeIt) : 0.0F;
+        const float alpha = params.StepScale / std::max(1.0F, maxDegree);
+        const float minNorm = std::max(params.MinNormEpsilon, 1.0e-12F);
+
+        std::array<std::vector<float>, 2> q{
+            std::vector<float>(n, 0.0F),
+            std::vector<float>(n, 0.0F)
+        };
+        for (std::size_t i = 0; i < n; ++i)
+        {
+            const float t = static_cast<float>(i + 1U);
+            q[0][i] = std::sin(0.73F * t) + 0.17F * std::cos(1.11F * t);
+            q[1][i] = std::cos(0.61F * t) - 0.21F * std::sin(1.37F * t);
+        }
+
+        RemoveMean(q[0]);
+        if (Normalize(q[0], minNorm) == 0.0F) return std::nullopt;
+        RemoveMean(q[1]);
+        OrthogonalizeAgainst(q[1], q[0]);
+        if (Normalize(q[1], minNorm) == 0.0F)
+        {
+            for (std::size_t i = 0; i < n; ++i) q[1][i] = static_cast<float>((i & 1U) ? 1.0F : -1.0F);
+            RemoveMean(q[1]);
+            OrthogonalizeAgainst(q[1], q[0]);
+            if (Normalize(q[1], minNorm) == 0.0F) return std::nullopt;
+        }
+
+        std::array<std::vector<float>, 2> y{
+            std::vector<float>(n, 0.0F),
+            std::vector<float>(n, 0.0F)
+        };
+        std::vector<float> laplace(n, 0.0F);
+
+        SpectralLayoutResult result{};
+        result.ActiveVertexCount = n;
+        result.ActiveEdgeCount = localEdges.size();
+
+        for (std::uint32_t iteration = 0; iteration < params.MaxIterations; ++iteration)
+        {
+            float subspaceDelta = 0.0F;
+            for (std::size_t col = 0; col < 2; ++col)
+            {
+                MultiplyCombinatorialLaplacian(localEdges, q[col], laplace);
+                for (std::size_t i = 0; i < n; ++i) y[col][i] = q[col][i] - alpha * laplace[i];
+                RemoveMean(y[col]);
+            }
+
+            Normalize(y[0], minNorm);
+            OrthogonalizeAgainst(y[1], y[0]);
+            if (Normalize(y[1], minNorm) == 0.0F) return std::nullopt;
+
+            for (std::size_t col = 0; col < 2; ++col)
+            {
+                for (std::size_t i = 0; i < n; ++i)
+                {
+                    subspaceDelta = std::max(subspaceDelta, std::abs(y[col][i] - q[col][i]));
+                    q[col][i] = y[col][i];
+                }
+            }
+
+            result.IterationsPerformed = iteration + 1U;
+            result.SubspaceDelta = subspaceDelta;
+            if (subspaceDelta <= params.ConvergenceTolerance)
+            {
+                result.Converged = true;
+                break;
+            }
+        }
+
+        float maxAbsCoord = 0.0F;
+        for (std::size_t i = 0; i < n; ++i)
+        {
+            const std::uint32_t global = activeVertices[i];
+            ioPositions[global] = glm::vec2(q[0][i], q[1][i]);
+            maxAbsCoord = std::max(maxAbsCoord, std::abs(q[0][i]));
+            maxAbsCoord = std::max(maxAbsCoord, std::abs(q[1][i]));
+        }
+
+        if (maxAbsCoord > minNorm)
+        {
+            const float scale = std::max(params.AreaExtent, 1.0e-3F) / maxAbsCoord;
+            for (const std::uint32_t global : activeVertices)
+            {
+                ioPositions[global] *= scale;
             }
         }
 

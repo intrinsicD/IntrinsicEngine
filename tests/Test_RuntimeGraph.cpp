@@ -110,3 +110,62 @@ TEST(RuntimeGraph, ForceDirectedLayoutProducesFiniteSeparatedEmbedding)
     EXPECT_GT(d01, 1.0e-3f);
     EXPECT_GT(d12, 1.0e-3f);
 }
+
+
+TEST(RuntimeGraph, SpectralLayoutRejectsDegenerateInputs)
+{
+    Geometry::Graph::Graph g;
+    auto v0 = g.AddVertex({0.0f, 0.0f, 0.0f});
+    auto v1 = g.AddVertex({1.0f, 0.0f, 0.0f});
+    ASSERT_TRUE(g.AddEdge(v0, v1).has_value());
+
+    std::vector<glm::vec2> positions(1, glm::vec2(0.0f));
+    EXPECT_FALSE(Geometry::Graph::ComputeSpectralLayout(g, positions).has_value());
+
+    Geometry::Graph::SpectralLayoutParams params{};
+    params.MaxIterations = 0;
+    positions.resize(g.VerticesSize(), glm::vec2(0.0f));
+    EXPECT_FALSE(Geometry::Graph::ComputeSpectralLayout(g, positions, params).has_value());
+}
+
+TEST(RuntimeGraph, SpectralLayoutProducesFiniteCenteredEmbedding)
+{
+    Geometry::Graph::Graph g;
+    auto v0 = g.AddVertex({0.0f, 0.0f, 0.0f});
+    auto v1 = g.AddVertex({1.0f, 0.0f, 0.0f});
+    auto v2 = g.AddVertex({2.0f, 0.0f, 0.0f});
+    auto v3 = g.AddVertex({3.0f, 0.0f, 0.0f});
+
+    ASSERT_TRUE(g.AddEdge(v0, v1).has_value());
+    ASSERT_TRUE(g.AddEdge(v1, v2).has_value());
+    ASSERT_TRUE(g.AddEdge(v2, v3).has_value());
+
+    std::vector<glm::vec2> positions(g.VerticesSize(), glm::vec2(0.0f));
+
+    Geometry::Graph::SpectralLayoutParams params{};
+    params.MaxIterations = 120;
+    params.ConvergenceTolerance = 1.0e-6f;
+
+    const auto result = Geometry::Graph::ComputeSpectralLayout(g, positions, params);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->ActiveVertexCount, 4u);
+    EXPECT_EQ(result->ActiveEdgeCount, 3u);
+    EXPECT_GT(result->IterationsPerformed, 0u);
+
+    glm::vec2 centroid(0.0f);
+    for (const glm::vec2& p : positions)
+    {
+        EXPECT_TRUE(std::isfinite(p.x));
+        EXPECT_TRUE(std::isfinite(p.y));
+        centroid += p;
+    }
+    centroid /= static_cast<float>(positions.size());
+
+    EXPECT_NEAR(centroid.x, 0.0f, 1.0e-3f);
+    EXPECT_NEAR(centroid.y, 0.0f, 1.0e-3f);
+
+    const float d01 = glm::length(positions[v0.Index] - positions[v1.Index]);
+    const float d12 = glm::length(positions[v1.Index] - positions[v2.Index]);
+    const float d23 = glm::length(positions[v2.Index] - positions[v3.Index]);
+    EXPECT_GT(d01 + d12 + d23, 1.0e-2f);
+}
