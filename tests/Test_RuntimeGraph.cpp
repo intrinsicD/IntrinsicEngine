@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <array>
 #include <cmath>
 #include <vector>
 
@@ -263,4 +264,34 @@ TEST(RuntimeGraph, HierarchicalLayoutProducesLayeredEmbedding)
     EXPECT_NEAR(positions[v3.Index].y, -4.0f, 1.0e-4f);
 
     EXPECT_GT(std::abs(positions[v1.Index].x - positions[v2.Index].x), 1.0e-4f);
+}
+
+TEST(RuntimeGraph, HierarchicalLayoutAutoRootCentersLongPath)
+{
+    Geometry::Graph::Graph g;
+    std::array<Geometry::VertexHandle, 7> vertices{};
+    for (std::size_t i = 0; i < vertices.size(); ++i)
+    {
+        vertices[i] = g.AddVertex({static_cast<float>(i), 0.0f, 0.0f});
+    }
+
+    for (std::size_t i = 0; i + 1 < vertices.size(); ++i)
+    {
+        ASSERT_TRUE(g.AddEdge(vertices[i], vertices[i + 1]).has_value());
+    }
+
+    std::vector<glm::vec2> positions(g.VerticesSize(), glm::vec2(0.0f));
+    Geometry::Graph::HierarchicalLayoutParams params{};
+    params.RootVertexIndex = Geometry::kInvalidIndex;
+    params.LayerSpacing = 1.0f;
+    params.NodeSpacing = 1.0f;
+
+    const auto result = Geometry::Graph::ComputeHierarchicalLayout(g, positions, params);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->LayerCount, 4u);
+
+    const std::uint32_t centerIndex = vertices[vertices.size() / 2].Index;
+    EXPECT_NEAR(positions[centerIndex].y, 0.0f, 1.0e-4f);
+    EXPECT_NEAR(positions[vertices.front().Index].y, -3.0f, 1.0e-4f);
+    EXPECT_NEAR(positions[vertices.back().Index].y, -3.0f, 1.0e-4f);
 }
