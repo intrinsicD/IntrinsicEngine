@@ -5,7 +5,9 @@ module;
 #include <cassert>
 #include <cmath>
 #include <cstdint>
+#include <functional>
 #include <limits>
+#include <numeric>
 #include <utility>
 #include <span>
 #include <vector>
@@ -745,6 +747,212 @@ namespace Geometry::Graph
             }
         }
 
+        return result;
+    }
+
+    std::optional<HierarchicalLayoutResult> ComputeHierarchicalLayout(
+        const Graph& graph, std::span<glm::vec2> ioPositions, const HierarchicalLayoutParams& params)
+    {
+        if (ioPositions.size() < graph.VerticesSize()) return std::nullopt;
+        if (params.LayerSpacing <= 0.0F || params.NodeSpacing <= 0.0F || params.ComponentSpacing < 0.0F)
+        {
+            return std::nullopt;
+        }
+
+        std::vector<std::uint32_t> activeVertices;
+        activeVertices.reserve(graph.VerticesSize());
+        std::vector<std::uint32_t> globalToLocal(graph.VerticesSize(), std::numeric_limits<std::uint32_t>::max());
+        for (std::uint32_t idx = 0; idx < static_cast<std::uint32_t>(graph.VerticesSize()); ++idx)
+        {
+            const VertexHandle v{idx};
+            if (graph.IsDeleted(v)) continue;
+            globalToLocal[idx] = static_cast<std::uint32_t>(activeVertices.size());
+            activeVertices.push_back(idx);
+        }
+        if (activeVertices.empty()) return std::nullopt;
+
+        std::vector<std::vector<std::uint32_t>> adjacency(activeVertices.size());
+        std::size_t activeEdgeCount = 0;
+        for (std::uint32_t idx = 0; idx < static_cast<std::uint32_t>(graph.EdgesSize()); ++idx)
+        {
+            const EdgeHandle e{idx};
+            if (graph.IsDeleted(e)) continue;
+
+            const auto [start, end] = graph.EdgeVertices(e);
+            if (!start.IsValid() || !end.IsValid() || graph.IsDeleted(start) || graph.IsDeleted(end)) continue;
+
+            const std::uint32_t ls = globalToLocal[start.Index];
+            const std::uint32_t le = globalToLocal[end.Index];
+            if (ls == std::numeric_limits<std::uint32_t>::max() || le == std::numeric_limits<std::uint32_t>::max() || ls == le)
+            {
+                continue;
+            }
+
+            adjacency[ls].push_back(le);
+            adjacency[le].push_back(ls);
+            ++activeEdgeCount;
+        }
+
+        for (auto& neighbors : adjacency)
+        {
+            std::sort(neighbors.begin(), neighbors.end());
+            neighbors.erase(std::unique(neighbors.begin(), neighbors.end()), neighbors.end());
+        }
+
+        std::vector<bool> visited(activeVertices.size(), false);
+        std::vector<std::int32_t> localLayer(activeVertices.size(), -1);
+        std::vector<float> localX(activeVertices.size(), 0.0F);
+        std::vector<float> previousOrder(activeVertices.size(), 0.0F);
+        std::vector<float> nextOrder(activeVertices.size(), 0.0F);
+
+        const auto first_unvisited_local = [&]() -> std::uint32_t
+        {
+            for (std::uint32_t i = 0; i < visited.size(); ++i)
+            {
+                if (!visited[i]) return i;
+            }
+            return std::numeric_limits<std::uint32_t>::max();
+        };
+
+        const auto resolve_root = [&]() -> std::uint32_t
+        {
+            if (params.RootVertexIndex != kInvalidIndex && params.RootVertexIndex < graph.VerticesSize())
+            {
+                const std::uint32_t local = globalToLocal[params.RootVertexIndex];
+                if (local != std::numeric_limits<std::uint32_t>::max()) return local;
+            }
+            return first_unvisited_local();
+        };
+
+        float componentXOffset = 0.0F;
+        std::size_t maxLayerWidth = 0;
+        std::size_t globalLayerCount = 0;
+        std::size_t componentCount = 0;
+
+        for (std::uint32_t seed = resolve_root(); seed != std::numeric_limits<std::uint32_t>::max(); seed = first_unvisited_local())
+        {
+            ++componentCount;
+
+            std::vector<std::uint32_t> frontier{seed};
+            std::vector<std::vector<std::uint32_t>> layers;
+            layers.reserve(8);
+            visited[seed] = true;
+            localLayer[seed] = 0;
+
+            while (!frontier.empty())
+            {
+                layers.push_back(frontier);
+                std::vector<std::uint32_t> next;
+                for (const std::uint32_t u : frontier)
+                {
+                    for (const std::uint32_t v : adjacency[u])
+                    {
+                        if (visited[v]) continue;
+                        visited[v] = true;
+                        localLayer[v] = static_cast<std::int32_t>(layers.size());
+                        next.push_back(v);
+                    }
+                }
+
+                std::sort(next.begin(), next.end());
+                next.erase(std::unique(next.begin(), next.end()), next.end());
+                frontier = std::move(next);
+            }
+
+            globalLayerCount = std::max(globalLayerCount, layers.size());
+            for (const auto& layer : layers) maxLayerWidth = std::max(maxLayerWidth, layer.size());
+
+            for (std::size_t li = 0; li < layers.size(); ++li)
+            {
+                auto& layer = layers[li];
+                std::sort(layer.begin(), layer.end());
+                for (std::size_t i = 0; i < layer.size(); ++i)
+                {
+                    previousOrder[layer[i]] = static_cast<float>(i);
+                }
+            }
+
+            const auto layer_sweep = [&](std::size_t li, bool forward)
+            {
+                if (layers[li].size() <= 1U) return;
+
+                auto barycenter = [&](std::uint32_t vertex)
+                {
+                    float sum = 0.0F;
+                    std::uint32_t count = 0;
+                    const std::int32_t targetLayer = static_cast<std::int32_t>(li) + (forward ? -1 : 1);
+                    for (const std::uint32_t n : adjacency[vertex])
+                    {
+                        if (localLayer[n] != targetLayer) continue;
+                        sum += previousOrder[n];
+                        ++count;
+                    }
+                    if (count == 0U) return previousOrder[vertex];
+                    return sum / static_cast<float>(count);
+                };
+
+                auto& layer = layers[li];
+                std::stable_sort(layer.begin(), layer.end(), [&](std::uint32_t a, std::uint32_t b)
+                {
+                    const float ba = barycenter(a);
+                    const float bb = barycenter(b);
+                    if (std::abs(ba - bb) > 1.0e-6F) return ba < bb;
+                    return a < b;
+                });
+
+                for (std::size_t i = 0; i < layer.size(); ++i)
+                {
+                    nextOrder[layer[i]] = static_cast<float>(i);
+                }
+            };
+
+            for (std::uint32_t sweep = 0; sweep < params.CrossingMinimizationSweeps; ++sweep)
+            {
+                for (std::size_t li = 1; li < layers.size(); ++li) layer_sweep(li, true);
+                std::swap(previousOrder, nextOrder);
+
+                if (layers.size() > 1U)
+                {
+                    for (std::size_t li = layers.size() - 1; li-- > 0;) layer_sweep(li, false);
+                    std::swap(previousOrder, nextOrder);
+                }
+            }
+
+            float componentWidth = 0.0F;
+            for (std::size_t li = 0; li < layers.size(); ++li)
+            {
+                auto& layer = layers[li];
+                const float layerCenter = static_cast<float>(layer.size() - 1U) * 0.5F;
+
+                for (std::size_t i = 0; i < layer.size(); ++i)
+                {
+                    const float x = (static_cast<float>(i) - layerCenter) * params.NodeSpacing;
+                    localX[layer[i]] = x;
+                    componentWidth = std::max(componentWidth, std::abs(x));
+                }
+            }
+
+            for (std::size_t li = 0; li < layers.size(); ++li)
+            {
+                for (const std::uint32_t localVertex : layers[li])
+                {
+                    const std::uint32_t globalVertex = activeVertices[localVertex];
+                    ioPositions[globalVertex] = glm::vec2(
+                        componentXOffset + localX[localVertex],
+                        -static_cast<float>(li) * params.LayerSpacing);
+                    if (!IsFiniteVec2(ioPositions[globalVertex])) return std::nullopt;
+                }
+            }
+
+            componentXOffset += 2.0F * componentWidth + params.ComponentSpacing + params.NodeSpacing;
+        }
+
+        HierarchicalLayoutResult result{};
+        result.ActiveVertexCount = activeVertices.size();
+        result.ActiveEdgeCount = activeEdgeCount;
+        result.ComponentCount = componentCount;
+        result.LayerCount = globalLayerCount;
+        result.MaxLayerWidth = maxLayerWidth;
         return result;
     }
 

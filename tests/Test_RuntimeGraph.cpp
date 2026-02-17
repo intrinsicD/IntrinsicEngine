@@ -169,3 +169,59 @@ TEST(RuntimeGraph, SpectralLayoutProducesFiniteCenteredEmbedding)
     const float d23 = glm::length(positions[v2.Index] - positions[v3.Index]);
     EXPECT_GT(d01 + d12 + d23, 1.0e-2f);
 }
+
+TEST(RuntimeGraph, HierarchicalLayoutRejectsDegenerateInputs)
+{
+    Geometry::Graph::Graph g;
+    auto v0 = g.AddVertex({0.0f, 0.0f, 0.0f});
+    auto v1 = g.AddVertex({1.0f, 0.0f, 0.0f});
+    ASSERT_TRUE(g.AddEdge(v0, v1).has_value());
+
+    std::vector<glm::vec2> positions(1, glm::vec2(0.0f));
+    EXPECT_FALSE(Geometry::Graph::ComputeHierarchicalLayout(g, positions).has_value());
+
+    positions.resize(g.VerticesSize(), glm::vec2(0.0f));
+    Geometry::Graph::HierarchicalLayoutParams params{};
+    params.LayerSpacing = 0.0f;
+    EXPECT_FALSE(Geometry::Graph::ComputeHierarchicalLayout(g, positions, params).has_value());
+}
+
+TEST(RuntimeGraph, HierarchicalLayoutProducesLayeredEmbedding)
+{
+    Geometry::Graph::Graph g;
+    auto v0 = g.AddVertex({0.0f, 0.0f, 0.0f});
+    auto v1 = g.AddVertex({1.0f, 0.0f, 0.0f});
+    auto v2 = g.AddVertex({2.0f, 0.0f, 0.0f});
+    auto v3 = g.AddVertex({3.0f, 0.0f, 0.0f});
+
+    ASSERT_TRUE(g.AddEdge(v0, v1).has_value());
+    ASSERT_TRUE(g.AddEdge(v0, v2).has_value());
+    ASSERT_TRUE(g.AddEdge(v1, v3).has_value());
+
+    std::vector<glm::vec2> positions(g.VerticesSize(), glm::vec2(0.0f));
+    Geometry::Graph::HierarchicalLayoutParams params{};
+    params.RootVertexIndex = v0.Index;
+    params.LayerSpacing = 2.0f;
+    params.NodeSpacing = 1.5f;
+
+    const auto result = Geometry::Graph::ComputeHierarchicalLayout(g, positions, params);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->ActiveVertexCount, 4u);
+    EXPECT_EQ(result->ActiveEdgeCount, 3u);
+    EXPECT_EQ(result->ComponentCount, 1u);
+    EXPECT_EQ(result->LayerCount, 3u);
+    EXPECT_EQ(result->MaxLayerWidth, 2u);
+
+    for (const auto& p : positions)
+    {
+        EXPECT_TRUE(std::isfinite(p.x));
+        EXPECT_TRUE(std::isfinite(p.y));
+    }
+
+    EXPECT_NEAR(positions[v0.Index].y, 0.0f, 1.0e-4f);
+    EXPECT_NEAR(positions[v1.Index].y, -2.0f, 1.0e-4f);
+    EXPECT_NEAR(positions[v2.Index].y, -2.0f, 1.0e-4f);
+    EXPECT_NEAR(positions[v3.Index].y, -4.0f, 1.0e-4f);
+
+    EXPECT_GT(std::abs(positions[v1.Index].x - positions[v2.Index].x), 1.0e-4f);
+}
