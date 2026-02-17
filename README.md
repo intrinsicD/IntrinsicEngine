@@ -205,14 +205,18 @@ The Sandbox app can visualize selected `MeshCollider` acceleration/bounds data u
 - **Bounds variants:** world AABB, world OBB, conservative bounding sphere (independent toggles)
 - **Bounds knobs:** overlay vs depth-tested, alpha, per-primitive colors
 
-**Performance note:** drawing deep octrees can generate thousands of line segments. Use `Max Depth` and `Leaf Only` to cap cost.
+**KD-tree overlay UI:** `View Settings` → `Spatial Debug` → `Draw Selected MeshCollider KD-Tree`
+- **KD-tree source:** built lazily from selected entity's `ECS::MeshCollider::Component::CollisionRef->Positions`, then cached per selected collider
+- **KD-tree knobs:** leaf/internal visibility, split-plane overlay, max depth, overlay vs depth-tested, alpha, per-category colors
+
+**Performance note:** drawing deep octrees/KD-trees can generate thousands of line segments. Use `Max Depth` and `Leaf Only` to cap cost.
 
 ---
 
 
 ### KD-Tree Spatial Queries
 
-`Geometry::KDTree` provides an Octree-inspired, axis-aligned BVH-style accelerator over element AABBs for analysis operators and future debug overlays.
+`Geometry::KDTree` provides an Octree-inspired, axis-aligned BVH-style accelerator over element AABBs for analysis operators and debug overlays (via `Graphics::DrawKDTree`).
 
 - **Build:** median split on max-extent axis, leaf-size and max-depth bounded, with `MinSplitExtent` guarding degenerate splits.
 - **Input modes:**

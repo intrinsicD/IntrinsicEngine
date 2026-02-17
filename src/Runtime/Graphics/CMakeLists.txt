@@ -32,6 +32,7 @@ target_sources(${target_name}
         Graphics.DebugDraw.cppm
         Graphics.OctreeDebugDraw.cppm
         Graphics.BoundingDebugDraw.cppm
+        Graphics.KDTreeDebugDraw.cppm
         Graphics.Interaction.cppm
         Graphics.Presentation.cppm
         Graphics.GlobalResources.cppm
@@ -71,6 +72,7 @@ target_sources(${target_name}
         Graphics.DebugDraw.cpp
         Graphics.OctreeDebugDraw.cpp
         Graphics.BoundingDebugDraw.cpp
+        Graphics.KDTreeDebugDraw.cpp
         Graphics.Interaction.cpp
         Graphics.Presentation.cpp
         Graphics.GlobalResources.cpp

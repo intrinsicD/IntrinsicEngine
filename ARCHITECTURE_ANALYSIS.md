@@ -211,7 +211,7 @@ The following Clang 18 issues are resolved by the upgrade to Clang 20 as the min
 
 **Required debug overlays:**
 - ~~**Octree:**~~ — **DONE.** Sandbox can render the selected entity’s `MeshCollider` `Geometry::Octree` as color-by-depth wire boxes via `Graphics::DebugDraw` + `LineRenderPass`. Controls live in `View Settings → Spatial Debug` (max depth, leaf-only, occupied-only, overlay/depth-tested).
-- **KD-tree:** Core geometry accelerator is **DONE** (`Geometry::KDTree`) with an Octree-inspired AABB-element build (`Build(span<const AABB>)` + `BuildFromPoints`) and exact AABB-distance kNN/radius queries. Remaining work: debug visualization overlays (splitting planes + leaves) through `DebugDraw` + `LineRenderPass`.
+- ~~**KD-tree:**~~ — **DONE.** Core geometry accelerator (`Geometry::KDTree`) now includes Sandbox debug overlays through `Graphics::DrawKDTree()` (leaf/internal AABB wires + split-plane rectangles), routed through `DebugDraw` + `LineRenderPass` with UI knobs for max depth, overlay/depth-tested mode, and per-category colors.
 - **BVH (Bounding Volume Hierarchy):** Wireframe AABBs/OBBs at each BVH node level, with configurable max display depth.
 - **Uniform grid:** Wireframe cells with occupancy coloring.
 - ~~**Bounding volumes:**~~ — **DONE.** Sandbox can render selected `MeshCollider` bounds as world AABB, world OBB, and conservative bounding sphere overlays. Per-type toggles, independent colors, alpha, and overlay/depth-tested routing are exposed in `View Settings → Spatial Debug`.
