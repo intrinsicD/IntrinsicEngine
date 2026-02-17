@@ -227,7 +227,7 @@ namespace Graphics::Passes
             m_Stage3VisibilityPacked[frame] = std::make_unique<RHI::VulkanBuffer>(
                 *m_Device,
                 packedVisibilityBytes,
-                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                 VMA_MEMORY_USAGE_GPU_ONLY);
 
             // IMPORTANT: freshly allocated GPU-only buffers contain undefined memory.

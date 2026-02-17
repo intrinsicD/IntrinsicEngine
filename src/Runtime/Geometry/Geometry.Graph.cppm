@@ -123,7 +123,7 @@ export namespace Geometry::Graph
         Graph& operator=(Graph&&) noexcept = default;
 
         [[nodiscard]] VertexHandle AddVertex();
-        [[nodiscard]] VertexHandle AddVertex(glm::vec3 position);
+         VertexHandle AddVertex(glm::vec3 position);
 
         void Clear();
         void FreeMemory();

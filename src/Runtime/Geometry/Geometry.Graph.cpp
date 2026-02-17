@@ -56,7 +56,7 @@ namespace Geometry::Graph
             return sum;
         }
 
-        [[nodiscard]] float Normalize(std::vector<float>& values, float minNorm)
+        float Normalize(std::vector<float>& values, float minNorm)
         {
             const float norm2 = Dot(values, values);
             if (!std::isfinite(norm2) || norm2 <= minNorm * minNorm) return 0.0F;
@@ -65,7 +65,7 @@ namespace Geometry::Graph
             return std::sqrt(norm2);
         }
 
-        [[nodiscard]] float OrthogonalizeAgainst(std::vector<float>& values, const std::vector<float>& basis)
+        float OrthogonalizeAgainst(std::vector<float>& values, const std::vector<float>& basis)
         {
             const float proj = Dot(values, basis);
             for (std::size_t i = 0; i < values.size(); ++i) values[i] -= proj * basis[i];
