@@ -20,6 +20,7 @@ import Core.FrameGraph;
 import Core.FeatureRegistry;
 import Core.Hash;
 import Graphics;
+import Geometry;
 import ECS;
 import RHI;
 import Interface;
@@ -57,6 +58,45 @@ public:
 
     Graphics::BoundingDebugDrawSettings m_BoundsDebugSettings{};
     bool m_DrawSelectedColliderBounds = false;
+
+    Graphics::KDTreeDebugDrawSettings m_KDTreeDebugSettings{};
+    bool m_DrawSelectedColliderKDTree = false;
+
+    Geometry::KDTree m_SelectedColliderKDTree{};
+    entt::entity m_SelectedKDTreeEntity = entt::null;
+    const Graphics::GeometryCollisionData* m_SelectedKDTreeSource = nullptr;
+
+
+    bool EnsureSelectedColliderKDTree(entt::entity selected,
+                                     const Graphics::GeometryCollisionData& collision)
+    {
+        const bool cacheValid =
+            (m_SelectedKDTreeEntity == selected) &&
+            (m_SelectedKDTreeSource == &collision) &&
+            !m_SelectedColliderKDTree.Nodes().empty();
+
+        if (cacheValid)
+            return true;
+
+        m_SelectedColliderKDTree = Geometry::KDTree{};
+        m_SelectedKDTreeEntity = entt::null;
+        m_SelectedKDTreeSource = nullptr;
+
+        if (collision.Positions.empty())
+            return false;
+
+        Geometry::KDTreeBuildParams params{};
+        params.LeafSize = 24;
+        params.MaxDepth = 24;
+
+        auto build = m_SelectedColliderKDTree.BuildFromPoints(collision.Positions, params);
+        if (!build)
+            return false;
+
+        m_SelectedKDTreeEntity = selected;
+        m_SelectedKDTreeSource = &collision;
+        return true;
+    }
 
     void OnStart() override
     {
@@ -282,6 +322,7 @@ public:
 
             ImGui::Checkbox("Draw Selected MeshCollider Octree", &m_DrawSelectedColliderOctree);
             ImGui::Checkbox("Draw Selected MeshCollider Bounds", &m_DrawSelectedColliderBounds);
+            ImGui::Checkbox("Draw Selected MeshCollider KD-Tree", &m_DrawSelectedColliderKDTree);
             ImGui::Checkbox("Bounds Overlay (no depth test)", &m_BoundsDebugSettings.Overlay);
             ImGui::Checkbox("Draw World AABB", &m_BoundsDebugSettings.DrawAABB);
             ImGui::Checkbox("Draw World OBB", &m_BoundsDebugSettings.DrawOBB);
@@ -300,6 +341,28 @@ public:
             if (ImGui::ColorEdit3("Sphere Color", sphereColor))
                 m_BoundsDebugSettings.SphereColor = glm::vec3(sphereColor[0], sphereColor[1], sphereColor[2]);
 
+            ImGui::SeparatorText("KD-Tree");
+            ImGui::Checkbox("KD Overlay (no depth test)", &m_KDTreeDebugSettings.Overlay);
+            ImGui::Checkbox("KD Leaf Only", &m_KDTreeDebugSettings.LeafOnly);
+            ImGui::Checkbox("KD Draw Internal", &m_KDTreeDebugSettings.DrawInternal);
+            ImGui::Checkbox("KD Occupied Only", &m_KDTreeDebugSettings.OccupiedOnly);
+            ImGui::Checkbox("KD Draw Split Planes", &m_KDTreeDebugSettings.DrawSplitPlanes);
+            ImGui::SliderInt("KD Max Depth", reinterpret_cast<int*>(&m_KDTreeDebugSettings.MaxDepth), 0, 32);
+            ImGui::SliderFloat("KD Alpha", &m_KDTreeDebugSettings.Alpha, 0.05f, 1.0f, "%.2f");
+
+            float kdLeafColor[3] = {m_KDTreeDebugSettings.LeafColor.r, m_KDTreeDebugSettings.LeafColor.g, m_KDTreeDebugSettings.LeafColor.b};
+            if (ImGui::ColorEdit3("KD Leaf Color", kdLeafColor))
+                m_KDTreeDebugSettings.LeafColor = glm::vec3(kdLeafColor[0], kdLeafColor[1], kdLeafColor[2]);
+
+            float kdInternalColor[3] = {m_KDTreeDebugSettings.InternalColor.r, m_KDTreeDebugSettings.InternalColor.g, m_KDTreeDebugSettings.InternalColor.b};
+            if (ImGui::ColorEdit3("KD Internal Color", kdInternalColor))
+                m_KDTreeDebugSettings.InternalColor = glm::vec3(kdInternalColor[0], kdInternalColor[1], kdInternalColor[2]);
+
+            float kdSplitColor[3] = {m_KDTreeDebugSettings.SplitPlaneColor.r, m_KDTreeDebugSettings.SplitPlaneColor.g, m_KDTreeDebugSettings.SplitPlaneColor.b};
+            if (ImGui::ColorEdit3("KD Split Color", kdSplitColor))
+                m_KDTreeDebugSettings.SplitPlaneColor = glm::vec3(kdSplitColor[0], kdSplitColor[1], kdSplitColor[2]);
+
+            ImGui::SeparatorText("Octree");
             ImGui::Checkbox("Overlay (no depth test)", &m_OctreeDebugSettings.Overlay);
             ImGui::Checkbox("Leaf Only", &m_OctreeDebugSettings.LeafOnly);
             ImGui::Checkbox("Occupied Only", &m_OctreeDebugSettings.OccupiedOnly);
@@ -319,7 +382,7 @@ public:
             // The settings above will take effect on the next frame.
 
             // Show status feedback
-            if (m_DrawSelectedColliderOctree || m_DrawSelectedColliderBounds)
+            if (m_DrawSelectedColliderOctree || m_DrawSelectedColliderBounds || m_DrawSelectedColliderKDTree)
             {
                 const entt::entity selected = GetSelection().GetSelectedEntity(GetScene());
                 if (selected == entt::null || !GetScene().GetRegistry().valid(selected))
@@ -420,7 +483,7 @@ public:
         // Debug Visualization: emit DebugDraw geometry BEFORE render system runs.
         // ImGui panels run AFTER render, so we emit here using settings from last frame.
         // ---------------------------------------------------------------------
-        if (m_DrawSelectedColliderOctree || m_DrawSelectedColliderBounds)
+        if (m_DrawSelectedColliderOctree || m_DrawSelectedColliderBounds || m_DrawSelectedColliderKDTree)
         {
             const entt::entity selected = GetSelection().GetSelectedEntity(GetScene());
             if (selected != entt::null && GetScene().GetRegistry().valid(selected))
@@ -448,6 +511,20 @@ public:
                                             collider->CollisionRef->LocalAABB,
                                             collider->WorldOBB,
                                             m_BoundsDebugSettings);
+                    }
+
+
+                    if (m_DrawSelectedColliderKDTree)
+                    {
+                        m_KDTreeDebugSettings.Enabled = true;
+                        if (EnsureSelectedColliderKDTree(selected, *collider->CollisionRef))
+                        {
+                            const glm::mat4 worldMatrix = GetMatrix(*xf);
+                            DrawKDTree(GetRenderOrchestrator().GetDebugDraw(),
+                                       m_SelectedColliderKDTree,
+                                       m_KDTreeDebugSettings,
+                                       worldMatrix);
+                        }
                     }
                 }
             }

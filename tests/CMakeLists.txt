@@ -36,6 +36,7 @@ add_executable(${target_name}
         Test_DebugDraw.cpp
         Test_OctreeDebugDraw.cpp
         Test_BoundingDebugDraw.cpp
+        Test_KDTreeDebugDraw.cpp
         Test_GeometryProcessing.cpp
         Test_GeometryProcessing2.cpp
         Test_SurfaceReconstruction.cpp
