@@ -67,11 +67,18 @@ export namespace Geometry::Graph
 
     struct SpectralLayoutParams
     {
+        enum class LaplacianVariant : std::uint8_t
+        {
+            Combinatorial,
+            NormalizedSymmetric
+        };
+
         std::uint32_t MaxIterations{96};
         float StepScale{0.85F};
         float ConvergenceTolerance{1.0e-5F};
         float MinNormEpsilon{1.0e-8F};
         float AreaExtent{2.0F};
+        LaplacianVariant Variant{LaplacianVariant::Combinatorial};
     };
 
     struct SpectralLayoutResult

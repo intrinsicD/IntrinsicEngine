@@ -170,6 +170,45 @@ TEST(RuntimeGraph, SpectralLayoutProducesFiniteCenteredEmbedding)
     EXPECT_GT(d01 + d12 + d23, 1.0e-2f);
 }
 
+
+TEST(RuntimeGraph, SpectralLayoutNormalizedVariantProducesFiniteEmbedding)
+{
+    Geometry::Graph::Graph g;
+    auto v0 = g.AddVertex({0.0f, 0.0f, 0.0f});
+    auto v1 = g.AddVertex({1.0f, 0.0f, 0.0f});
+    auto v2 = g.AddVertex({2.0f, 0.0f, 0.0f});
+    auto v3 = g.AddVertex({3.0f, 0.0f, 0.0f});
+    auto v4 = g.AddVertex({4.0f, 0.0f, 0.0f});
+
+    ASSERT_TRUE(g.AddEdge(v0, v1).has_value());
+    ASSERT_TRUE(g.AddEdge(v0, v2).has_value());
+    ASSERT_TRUE(g.AddEdge(v0, v3).has_value());
+    ASSERT_TRUE(g.AddEdge(v0, v4).has_value());
+
+    std::vector<glm::vec2> positions(g.VerticesSize(), glm::vec2(0.0f));
+
+    Geometry::Graph::SpectralLayoutParams params{};
+    params.MaxIterations = 140;
+    params.StepScale = 0.7f;
+    params.ConvergenceTolerance = 1.0e-6f;
+    params.Variant = Geometry::Graph::SpectralLayoutParams::LaplacianVariant::NormalizedSymmetric;
+
+    const auto result = Geometry::Graph::ComputeSpectralLayout(g, positions, params);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->ActiveVertexCount, 5u);
+    EXPECT_EQ(result->ActiveEdgeCount, 4u);
+
+    for (const glm::vec2& p : positions)
+    {
+        EXPECT_TRUE(std::isfinite(p.x));
+        EXPECT_TRUE(std::isfinite(p.y));
+    }
+
+    const float centerToLeaf0 = glm::length(positions[v0.Index] - positions[v1.Index]);
+    const float centerToLeaf1 = glm::length(positions[v0.Index] - positions[v2.Index]);
+    EXPECT_GT(centerToLeaf0 + centerToLeaf1, 1.0e-2f);
+}
+
 TEST(RuntimeGraph, HierarchicalLayoutRejectsDegenerateInputs)
 {
     Geometry::Graph::Graph g;
