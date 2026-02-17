@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
+#include <utility>
 #include <vector>
 
 import Geometry;
@@ -142,4 +144,60 @@ TEST(RuntimeGraphKNN, BuildFromIndicesRejectsInvalidAndCoincidentPairs)
     EXPECT_EQ(result->InsertedEdgeCount, 1u);
     EXPECT_GE(result->DegeneratePairCount, 3u);
     EXPECT_EQ(graph.EdgeCount(), 1u);
+}
+
+
+TEST(RuntimeGraphKNN, OctreeBuilderMatchesBruteForceNeighborSets)
+{
+    std::vector<glm::vec3> points{
+        {-2.0F, 0.0F, 1.0F},
+        {-1.0F, 1.0F, 0.0F},
+        {0.0F, 0.0F, 0.0F},
+        {1.0F, 1.0F, 0.0F},
+        {2.0F, 0.0F, 1.0F},
+        {0.0F, 2.0F, 2.0F},
+    };
+
+    Geometry::Graph::KNNBuildParams params{};
+    params.K = 3;
+    params.Connectivity = Geometry::Graph::KNNConnectivity::Mutual;
+
+    std::vector<std::vector<std::uint32_t>> bruteForce(points.size());
+    for (std::uint32_t i = 0; i < static_cast<std::uint32_t>(points.size()); ++i)
+    {
+        std::vector<std::pair<float, std::uint32_t>> distances;
+        for (std::uint32_t j = 0; j < static_cast<std::uint32_t>(points.size()); ++j)
+        {
+            if (i == j) continue;
+            const glm::vec3 d = points[j] - points[i];
+            distances.emplace_back(glm::dot(d, d), j);
+        }
+
+        std::sort(distances.begin(), distances.end(), [](const auto& a, const auto& b)
+        {
+            if (a.first != b.first) return a.first < b.first;
+            return a.second < b.second;
+        });
+
+        bruteForce[i].reserve(params.K);
+        for (std::size_t k = 0; k < static_cast<std::size_t>(params.K) && k < distances.size(); ++k)
+        {
+            bruteForce[i].push_back(distances[k].second);
+        }
+    }
+
+    Geometry::Graph::Graph octreeGraph;
+    const auto octreeResult = Geometry::Graph::BuildKNNGraph(octreeGraph, points, params);
+    ASSERT_TRUE(octreeResult.has_value());
+
+    Geometry::Graph::Graph referenceGraph;
+    Geometry::Graph::KNNFromIndicesParams fromIndicesParams{};
+    fromIndicesParams.Connectivity = params.Connectivity;
+    const auto referenceResult = Geometry::Graph::BuildKNNGraphFromIndices(referenceGraph, points, bruteForce,
+        fromIndicesParams);
+    ASSERT_TRUE(referenceResult.has_value());
+
+    EXPECT_EQ(octreeResult->CandidateEdgeCount, referenceResult->CandidateEdgeCount);
+    EXPECT_EQ(octreeResult->InsertedEdgeCount, referenceResult->InsertedEdgeCount);
+    EXPECT_EQ(octreeGraph.EdgeCount(), referenceGraph.EdgeCount());
 }

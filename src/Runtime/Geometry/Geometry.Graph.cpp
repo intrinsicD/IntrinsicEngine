@@ -17,18 +17,14 @@ module;
 module Geometry:Graph.Impl;
 
 import :Graph;
+import :AABB;
+import :Octree;
 import :Properties;
 
 namespace Geometry::Graph
 {
     namespace
     {
-        struct Neighbor
-        {
-            std::uint32_t Index{0};
-            float Distance2{0.0F};
-        };
-
         [[nodiscard]] bool IsFiniteVec2(const glm::vec2& value)
         {
             return std::isfinite(value.x) && std::isfinite(value.y);
@@ -430,56 +426,64 @@ namespace Geometry::Graph
 
         if (effectiveK == 0U) return result;
 
+        std::vector<AABB> pointAabbs(n);
+        for (std::size_t i = 0; i < n; ++i)
+        {
+            pointAabbs[i] = {.Min = points[i], .Max = points[i]};
+        }
+
+        Octree octree;
+        Octree::SplitPolicy splitPolicy{};
+        splitPolicy.SplitPoint = Octree::SplitPoint::Mean;
+        splitPolicy.TightChildren = true;
+
+        constexpr std::size_t kOctreeMaxPerNode = 32U;
+        constexpr std::size_t kOctreeMaxDepth = 16U;
+        if (!octree.Build(std::move(pointAabbs), splitPolicy, kOctreeMaxPerNode, kOctreeMaxDepth))
+        {
+            return std::nullopt;
+        }
+
         std::vector<std::vector<std::uint32_t>> neighborhoods(n);
-        std::vector<Neighbor> candidates;
-        candidates.reserve(n > 0 ? n - 1U : 0U);
+        std::vector<std::size_t> queryNeighbors;
+        queryNeighbors.reserve(std::min(n, effectiveK + 1U));
 
         const float minDistance2 = std::max(0.0F, params.MinDistanceEpsilon * params.MinDistanceEpsilon);
 
         for (std::uint32_t i = 0; i < static_cast<std::uint32_t>(n); ++i)
         {
-            candidates.clear();
-            candidates.reserve(n - 1U);
+            queryNeighbors.clear();
+            octree.QueryKnn(points[static_cast<std::size_t>(i)], effectiveK + 1U, queryNeighbors);
 
-            for (std::uint32_t j = 0; j < static_cast<std::uint32_t>(n); ++j)
+            auto& output = neighborhoods[static_cast<std::size_t>(i)];
+            output.reserve(effectiveK);
+
+            for (const std::size_t neighborIndex : queryNeighbors)
             {
+                if (neighborIndex >= n)
+                {
+                    ++result.DegeneratePairCount;
+                    continue;
+                }
+
+                const auto j = static_cast<std::uint32_t>(neighborIndex);
                 if (i == j) continue;
 
                 const glm::vec3 d = points[static_cast<std::size_t>(j)] - points[static_cast<std::size_t>(i)];
                 const float distance2 = glm::dot(d, d);
-                if (!std::isfinite(distance2)) continue;
+                if (!std::isfinite(distance2))
+                {
+                    ++result.DegeneratePairCount;
+                    continue;
+                }
                 if (distance2 <= minDistance2)
                 {
                     ++result.DegeneratePairCount;
                     continue;
                 }
 
-                candidates.push_back(Neighbor{j, distance2});
-            }
-
-            if (candidates.empty()) continue;
-
-            const std::size_t selected = std::min(effectiveK, candidates.size());
-            if (selected < candidates.size())
-            {
-                std::nth_element(candidates.begin(), candidates.begin() + static_cast<std::ptrdiff_t>(selected),
-                    candidates.end(), [](const Neighbor& a, const Neighbor& b)
-                    {
-                        return a.Distance2 < b.Distance2;
-                    });
-            }
-            std::sort(candidates.begin(), candidates.begin() + static_cast<std::ptrdiff_t>(selected),
-                [](const Neighbor& a, const Neighbor& b)
-                {
-                    if (a.Distance2 != b.Distance2) return a.Distance2 < b.Distance2;
-                    return a.Index < b.Index;
-                });
-
-            auto& output = neighborhoods[static_cast<std::size_t>(i)];
-            output.reserve(selected);
-            for (std::size_t idx = 0; idx < selected; ++idx)
-            {
-                output.push_back(candidates[idx].Index);
+                output.push_back(j);
+                if (output.size() == effectiveK) break;
             }
         }
 
