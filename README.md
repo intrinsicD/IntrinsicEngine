@@ -42,7 +42,7 @@ A **"Distinguished Scientist" grade** geometry kernel in `src/Runtime/Geometry/`
 
 **Graph Processing Operators:**
 - **kNN Graph Builders:** `Geometry::Graph::BuildKNNGraph()` (brute-force CPU neighbor discovery) and `Geometry::Graph::BuildKNNGraphFromIndices()` (manual graph assembly from precomputed kNN index lists) both support Union/Mutual connectivity and epsilon-based coincident-point rejection for degenerate robustness.
-- **Graph Layouts:** Fruchterman-Reingold force-directed embedding (`ComputeForceDirectedLayout`) and combinatorial-Laplacian spectral embedding (`ComputeSpectralLayout`) for stable low-frequency 2D graph visualization.
+- **Graph Layouts:** Fruchterman-Reingold force-directed embedding (`ComputeForceDirectedLayout`), combinatorial-Laplacian spectral embedding (`ComputeSpectralLayout`), and deterministic hierarchical layering (`ComputeHierarchicalLayout`) for stable DAG/tree-style 2D graph visualization.
 
 **Mesh Processing Operators:**
 | Operator | Algorithm | Reference |
@@ -81,7 +81,7 @@ All operators follow a consistent contract: `Params` struct with defaults, `Resu
 - **GPUScene:** Retained-mode instance table with independent slot allocation/deallocation.
 - **Dynamic Rendering:** No `VkRenderPass` or `VkFramebuffer`; fully dynamic attachment binding.
 - **DebugDraw:** Immediate-mode line/shape rendering with screen-space thick-line expansion (SSBO-based, no geometry shader). Depth-tested and overlay variants.
-- **Graph Processing:** Halfedge-based graph topology with robust kNN construction, force-directed 2D layout (`ComputeForceDirectedLayout`), and Laplacian spectral embedding (`ComputeSpectralLayout`) for connectivity visualization workflows.
+- **Graph Processing:** Halfedge-based graph topology with robust kNN construction, force-directed 2D layout (`ComputeForceDirectedLayout`), Laplacian spectral embedding (`ComputeSpectralLayout`), and hierarchical layered layout (`ComputeHierarchicalLayout`) for connectivity visualization workflows.
 - **Selection Outlines:** Post-process contour highlight for selected/hovered entities.
 
 ### 4. Data I/O

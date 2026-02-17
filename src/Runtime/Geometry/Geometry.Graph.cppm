@@ -83,6 +83,24 @@ export namespace Geometry::Graph
         bool Converged{false};
     };
 
+    struct HierarchicalLayoutParams
+    {
+        std::uint32_t RootVertexIndex{kInvalidIndex};
+        std::uint32_t CrossingMinimizationSweeps{4};
+        float LayerSpacing{1.0F};
+        float NodeSpacing{1.0F};
+        float ComponentSpacing{2.0F};
+    };
+
+    struct HierarchicalLayoutResult
+    {
+        std::size_t ActiveVertexCount{0};
+        std::size_t ActiveEdgeCount{0};
+        std::size_t ComponentCount{0};
+        std::size_t LayerCount{0};
+        std::size_t MaxLayerWidth{0};
+    };
+
     // A lightweight halfedge-based graph (no faces), designed for DOD-friendly algorithms.
     // Storage is via PropertySets, so user-defined properties are supported on vertices/halfedges/edges.
     class Graph
@@ -227,4 +245,9 @@ export namespace Geometry::Graph
     // of the graph Laplacian via projected orthogonal iteration.
     [[nodiscard]] std::optional<SpectralLayoutResult> ComputeSpectralLayout(
         const Graph& graph, std::span<glm::vec2> ioPositions, const SpectralLayoutParams& params = {});
+
+    // Computes a deterministic hierarchical (layered) embedding using BFS layers
+    // and barycentric crossing-minimization sweeps within each layer.
+    [[nodiscard]] std::optional<HierarchicalLayoutResult> ComputeHierarchicalLayout(
+        const Graph& graph, std::span<glm::vec2> ioPositions, const HierarchicalLayoutParams& params = {});
 }
