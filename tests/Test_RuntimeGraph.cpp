@@ -266,6 +266,42 @@ TEST(RuntimeGraph, HierarchicalLayoutProducesLayeredEmbedding)
     EXPECT_GT(std::abs(positions[v1.Index].x - positions[v2.Index].x), 1.0e-4f);
 }
 
+
+TEST(RuntimeGraph, HierarchicalLayoutCrossingMinimizationReducesCrossings)
+{
+    Geometry::Graph::Graph g;
+    auto r = g.AddVertex({0.0f, 0.0f, 0.0f});
+    auto a = g.AddVertex({1.0f, 0.0f, 0.0f});
+    auto b = g.AddVertex({2.0f, 0.0f, 0.0f});
+    auto c = g.AddVertex({3.0f, 0.0f, 0.0f});
+    auto d = g.AddVertex({4.0f, 0.0f, 0.0f});
+
+    ASSERT_TRUE(g.AddEdge(r, a).has_value());
+    ASSERT_TRUE(g.AddEdge(r, b).has_value());
+    ASSERT_TRUE(g.AddEdge(a, d).has_value());
+    ASSERT_TRUE(g.AddEdge(b, c).has_value());
+
+    std::vector<glm::vec2> baseline(g.VerticesSize(), glm::vec2(0.0f));
+    std::vector<glm::vec2> improved(g.VerticesSize(), glm::vec2(0.0f));
+
+    Geometry::Graph::HierarchicalLayoutParams noSweep{};
+    noSweep.RootVertexIndex = r.Index;
+    noSweep.CrossingMinimizationSweeps = 0;
+
+    Geometry::Graph::HierarchicalLayoutParams sweep = noSweep;
+    sweep.CrossingMinimizationSweeps = 8;
+
+    const auto noSweepResult = Geometry::Graph::ComputeHierarchicalLayout(g, baseline, noSweep);
+    const auto sweepResult = Geometry::Graph::ComputeHierarchicalLayout(g, improved, sweep);
+
+    ASSERT_TRUE(noSweepResult.has_value());
+    ASSERT_TRUE(sweepResult.has_value());
+
+    EXPECT_GE(noSweepResult->CrossingCount, 1u);
+    EXPECT_LE(sweepResult->CrossingCount, noSweepResult->CrossingCount);
+    EXPECT_EQ(sweepResult->CrossingCount, 0u);
+}
+
 TEST(RuntimeGraph, HierarchicalLayoutAutoRootCentersLongPath)
 {
     Geometry::Graph::Graph g;

@@ -1083,12 +1083,95 @@ namespace Geometry::Graph
             componentXOffset += 2.0F * componentWidth + params.ComponentSpacing + params.NodeSpacing;
         }
 
+        std::size_t crossingCount = 0;
+        {
+            std::vector<std::vector<std::uint32_t>> layerVertices(globalLayerCount);
+            for (std::uint32_t local = 0; local < static_cast<std::uint32_t>(activeVertices.size()); ++local)
+            {
+                const std::int32_t layer = localLayer[local];
+                if (layer < 0 || layer >= static_cast<std::int32_t>(globalLayerCount)) continue;
+                layerVertices[static_cast<std::size_t>(layer)].push_back(local);
+            }
+
+            for (auto& vertices : layerVertices)
+            {
+                std::stable_sort(vertices.begin(), vertices.end(), [&](const std::uint32_t a, const std::uint32_t b)
+                {
+                    const glm::vec2 pa = ioPositions[activeVertices[a]];
+                    const glm::vec2 pb = ioPositions[activeVertices[b]];
+                    if (std::abs(pa.x - pb.x) > 1.0e-6F) return pa.x < pb.x;
+                    return a < b;
+                });
+            }
+
+            std::vector<std::uint32_t> localOrder(activeVertices.size(), std::numeric_limits<std::uint32_t>::max());
+            std::vector<std::uint32_t> upperEdgeOrder;
+            std::vector<std::uint32_t> lowerEdgeOrder;
+            std::vector<std::uint32_t> bit;
+
+            for (std::size_t li = 0; li + 1 < globalLayerCount; ++li)
+            {
+                const auto& upper = layerVertices[li];
+                const auto& lower = layerVertices[li + 1U];
+                if (upper.empty() || lower.empty()) continue;
+
+                for (std::size_t i = 0; i < upper.size(); ++i) localOrder[upper[i]] = static_cast<std::uint32_t>(i);
+                for (std::size_t i = 0; i < lower.size(); ++i) localOrder[lower[i]] = static_cast<std::uint32_t>(i);
+
+                upperEdgeOrder.clear();
+                lowerEdgeOrder.clear();
+
+                for (const std::uint32_t u : upper)
+                {
+                    for (const std::uint32_t v : adjacency[u])
+                    {
+                        if (localLayer[v] != static_cast<std::int32_t>(li + 1U)) continue;
+                        upperEdgeOrder.push_back(localOrder[u]);
+                        lowerEdgeOrder.push_back(localOrder[v]);
+                    }
+                }
+
+                if (upperEdgeOrder.size() < 2U) continue;
+
+                std::vector<std::size_t> permutation(upperEdgeOrder.size());
+                std::iota(permutation.begin(), permutation.end(), 0U);
+                std::stable_sort(permutation.begin(), permutation.end(), [&](const std::size_t a, const std::size_t b)
+                {
+                    if (upperEdgeOrder[a] != upperEdgeOrder[b]) return upperEdgeOrder[a] < upperEdgeOrder[b];
+                    return lowerEdgeOrder[a] < lowerEdgeOrder[b];
+                });
+
+                bit.assign(lower.size() + 1U, 0U);
+                const auto bit_add = [&](std::size_t idx)
+                {
+                    for (++idx; idx < bit.size(); idx += idx & (~idx + 1U)) ++bit[idx];
+                };
+                const auto bit_sum = [&](std::size_t idx)
+                {
+                    std::uint32_t sum = 0;
+                    for (++idx; idx > 0; idx &= idx - 1U) sum += bit[idx];
+                    return sum;
+                };
+
+                std::size_t inserted = 0;
+                for (const std::size_t edgeIdx : permutation)
+                {
+                    const std::size_t vOrder = lowerEdgeOrder[edgeIdx];
+                    const std::size_t nonCrossing = bit_sum(vOrder);
+                    crossingCount += inserted - nonCrossing;
+                    bit_add(vOrder);
+                    ++inserted;
+                }
+            }
+        }
+
         HierarchicalLayoutResult result{};
         result.ActiveVertexCount = activeVertices.size();
         result.ActiveEdgeCount = activeEdgeCount;
         result.ComponentCount = componentCount;
         result.LayerCount = globalLayerCount;
         result.MaxLayerWidth = maxLayerWidth;
+        result.CrossingCount = crossingCount;
         return result;
     }
 

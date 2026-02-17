@@ -106,6 +106,7 @@ export namespace Geometry::Graph
         std::size_t ComponentCount{0};
         std::size_t LayerCount{0};
         std::size_t MaxLayerWidth{0};
+        std::size_t CrossingCount{0};
     };
 
     // A lightweight halfedge-based graph (no faces), designed for DOD-friendly algorithms.
