@@ -7,10 +7,14 @@ module;
 #include <limits>
 #include <optional>
 #include <queue>
+#include <span>
 #include <utility>
 #include <vector>
 
-module Geometry:KDTree;
+#include <glm/glm.hpp>
+
+module Geometry:KDTree.Impl;
+import :KDTree;
 
 namespace Geometry
 {

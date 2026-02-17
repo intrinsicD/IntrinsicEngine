@@ -21,6 +21,8 @@ import :Importers.PLY;
 import :Importers.XYZ;
 import :Importers.TGF;
 import :Importers.GLTF;
+import :Importers.STL;
+import :Importers.OFF;
 import Core.IOBackend;
 import Core.Error;
 import Core.Logging;
@@ -184,6 +186,8 @@ namespace Graphics
     XYZLoader::~XYZLoader() = default;
     TGFLoader::~TGFLoader() = default;
     GLTFLoader::~GLTFLoader() = default;
+    STLLoader::~STLLoader() = default;
+    OFFLoader::~OFFLoader() = default;
 
     void RegisterBuiltinLoaders(IORegistry& registry)
     {
@@ -192,6 +196,8 @@ namespace Graphics
         registry.RegisterLoader(std::make_unique<XYZLoader>());
         registry.RegisterLoader(std::make_unique<TGFLoader>());
         registry.RegisterLoader(std::make_unique<GLTFLoader>());
+        registry.RegisterLoader(std::make_unique<STLLoader>());
+        registry.RegisterLoader(std::make_unique<OFFLoader>());
 
         Core::Log::Info("IORegistry: Registered {} built-in loaders",
                         registry.GetSupportedImportExtensions().size());

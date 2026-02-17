@@ -42,6 +42,8 @@ target_sources(${target_name}
         Geometry.MeshRepair.cppm
         Geometry.MarchingCubes.cppm
         Geometry.SurfaceReconstruction.cppm
+        Geometry.Parameterization.cppm
+        Geometry.MeshQuality.cppm
         PRIVATE
         FILE_SET geometry_impl TYPE CXX_MODULES FILES
         Geometry.MeshUtils.cpp
@@ -63,6 +65,8 @@ target_sources(${target_name}
         Geometry.MeshRepair.cpp
         Geometry.MarchingCubes.cpp
         Geometry.SurfaceReconstruction.cpp
+        Geometry.Parameterization.cpp
+        Geometry.MeshQuality.cpp
 )
 
 target_include_directories(${target_name} PUBLIC .)

@@ -1,8 +1,11 @@
 module;
 
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <cstddef>
+#include <optional>
+#include <span>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -13,6 +16,7 @@ module Geometry:Smoothing.Impl;
 import :Smoothing;
 import :Properties;
 import :HalfedgeMesh;
+import :DEC;
 
 namespace Geometry::Smoothing
 {
@@ -266,6 +270,139 @@ namespace Geometry::Smoothing
             // Pass 2: Un-shrinking with μ
             UniformLaplacianPass(mesh, mu, params.PreserveBoundary);
         }
+    }
+
+    // =========================================================================
+    // Implicit Laplacian smoothing (backward Euler)
+    // =========================================================================
+    //
+    // Solves (M + λ·dt·L) x_new = M · x_old per coordinate axis.
+    // Same SolveCGShifted pattern as Geodesic::ComputeDistance().
+
+    static double MeanEdgeLength(const Halfedge::Mesh& mesh)
+    {
+        double sum = 0.0;
+        std::size_t count = 0;
+        for (std::size_t ei = 0; ei < mesh.EdgesSize(); ++ei)
+        {
+            EdgeHandle eh{static_cast<PropertyIndex>(ei)};
+            if (mesh.IsDeleted(eh)) continue;
+
+            HalfedgeHandle h{static_cast<PropertyIndex>(2u * ei)};
+            glm::vec3 a = mesh.Position(mesh.FromVertex(h));
+            glm::vec3 b = mesh.Position(mesh.ToVertex(h));
+            sum += static_cast<double>(glm::distance(a, b));
+            ++count;
+        }
+        return (count > 0) ? (sum / static_cast<double>(count)) : 0.0;
+    }
+
+    std::optional<ImplicitSmoothingResult> ImplicitLaplacian(
+        Halfedge::Mesh& mesh,
+        const ImplicitSmoothingParams& params)
+    {
+        if (mesh.IsEmpty() || mesh.FaceCount() == 0 || params.Iterations == 0)
+            return std::nullopt;
+
+        const std::size_t nV = mesh.VerticesSize();
+        ImplicitSmoothingResult result;
+        result.VertexCount = mesh.VertexCount();
+
+        for (std::size_t iter = 0; iter < params.Iterations; ++iter)
+        {
+            // Build DEC operators (rebuilt each iteration to track evolving geometry)
+            DEC::DECOperators ops = DEC::BuildOperators(mesh);
+            if (!ops.IsValid())
+                return std::nullopt;
+
+            // Compute timestep
+            double h = MeanEdgeLength(mesh);
+            double dt = (params.TimeStep > 0.0) ? params.TimeStep : h * h;
+            double beta = params.Lambda * dt;
+
+            // CG parameters
+            DEC::CGParams cgParams;
+            cgParams.MaxIterations = params.MaxSolverIterations;
+            cgParams.Tolerance = params.SolverTolerance;
+
+            // Extract current positions per axis
+            std::vector<double> xOld(nV, 0.0), yOld(nV, 0.0), zOld(nV, 0.0);
+            for (std::size_t i = 0; i < nV; ++i)
+            {
+                VertexHandle vh{static_cast<PropertyIndex>(i)};
+                if (mesh.IsDeleted(vh) || mesh.IsIsolated(vh)) continue;
+                glm::vec3 pos = mesh.Position(vh);
+                xOld[i] = static_cast<double>(pos.x);
+                yOld[i] = static_cast<double>(pos.y);
+                zOld[i] = static_cast<double>(pos.z);
+            }
+
+            // For each axis, solve (M + beta*L) x_new = M * x_old
+            std::vector<double> rhs(nV, 0.0);
+            std::vector<double> xNew(nV, 0.0);
+            std::size_t maxCGIter = 0;
+            bool allConverged = true;
+
+            auto solveAxis = [&](const std::vector<double>& oldCoord) {
+                // RHS = M * x_old
+                for (std::size_t i = 0; i < nV; ++i)
+                    rhs[i] = ops.Hodge0.Diagonal[i] * oldCoord[i];
+
+                // Initial guess = old position
+                for (std::size_t i = 0; i < nV; ++i)
+                    xNew[i] = oldCoord[i];
+
+                auto cgResult = DEC::SolveCGShifted(
+                    ops.Hodge0, 1.0,
+                    ops.Laplacian, beta,
+                    rhs, xNew, cgParams);
+
+                if (cgResult.Iterations > maxCGIter)
+                    maxCGIter = cgResult.Iterations;
+                if (!cgResult.Converged)
+                    allConverged = false;
+
+                // Pin boundary vertices
+                if (params.PreserveBoundary)
+                {
+                    for (std::size_t i = 0; i < nV; ++i)
+                    {
+                        VertexHandle vh{static_cast<PropertyIndex>(i)};
+                        if (mesh.IsDeleted(vh) || mesh.IsIsolated(vh)) continue;
+                        if (mesh.IsBoundary(vh))
+                            xNew[i] = oldCoord[i];
+                    }
+                }
+
+                return xNew;
+            };
+
+            auto xResult = solveAxis(xOld);
+            std::vector<double> xSolved = xResult;
+
+            auto yResult = solveAxis(yOld);
+            std::vector<double> ySolved = yResult;
+
+            auto zResult = solveAxis(zOld);
+            std::vector<double> zSolved = zResult;
+
+            // Write back positions
+            for (std::size_t i = 0; i < nV; ++i)
+            {
+                VertexHandle vh{static_cast<PropertyIndex>(i)};
+                if (mesh.IsDeleted(vh) || mesh.IsIsolated(vh)) continue;
+                mesh.Position(vh) = glm::vec3(
+                    static_cast<float>(xSolved[i]),
+                    static_cast<float>(ySolved[i]),
+                    static_cast<float>(zSolved[i]));
+            }
+
+            result.IterationsPerformed = iter + 1;
+            result.LastCGIterations = maxCGIter;
+            result.Converged = allConverged;
+        }
+
+        return result;
     }
 
 } // namespace Geometry::Smoothing

@@ -231,7 +231,8 @@ TEST(IORegistry, RegisterBuiltinLoadersPopulatesAll)
     EXPECT_TRUE(registry.CanImport(".tgf"));
     EXPECT_TRUE(registry.CanImport(".gltf"));
     EXPECT_TRUE(registry.CanImport(".glb"));
-    EXPECT_FALSE(registry.CanImport(".stl")); // Not yet implemented
+    EXPECT_TRUE(registry.CanImport(".stl"));
+    EXPECT_TRUE(registry.CanImport(".off"));
 }
 
 // =============================================================================
@@ -442,6 +443,328 @@ TEST(GLTFLoader, ParseGLBFromFile)
 // =============================================================================
 // IORegistry::Import integration test (full pipeline: backend + registry)
 // =============================================================================
+
+// =============================================================================
+// STL Loader Tests
+// =============================================================================
+
+TEST(STLLoader, ParseBinaryFromBytes)
+{
+    // Construct a minimal binary STL in memory: 1 triangle
+    // Binary format: 80-byte header + 4-byte triangle count + 50 bytes per triangle
+    std::vector<std::byte> data(80 + 4 + 50, std::byte{0});
+
+    // Triangle count = 1
+    uint32_t triCount = 1;
+    std::memcpy(data.data() + 80, &triCount, 4);
+
+    // Normal (0,0,1)
+    float normal[3] = {0.0f, 0.0f, 1.0f};
+    std::memcpy(data.data() + 84, normal, 12);
+
+    // Vertex 0: (0,0,0)
+    float v0[3] = {0.0f, 0.0f, 0.0f};
+    std::memcpy(data.data() + 96, v0, 12);
+
+    // Vertex 1: (1,0,0)
+    float v1[3] = {1.0f, 0.0f, 0.0f};
+    std::memcpy(data.data() + 108, v1, 12);
+
+    // Vertex 2: (0,1,0)
+    float v2[3] = {0.0f, 1.0f, 0.0f};
+    std::memcpy(data.data() + 120, v2, 12);
+
+    // Attribute byte count = 0
+    uint16_t attr = 0;
+    std::memcpy(data.data() + 132, &attr, 2);
+
+    IORegistry registry;
+    RegisterBuiltinLoaders(registry);
+
+    auto* loader = registry.FindLoader(".stl");
+    ASSERT_NE(loader, nullptr);
+
+    LoadContext ctx{};
+    auto result = loader->Load(data, ctx);
+    ASSERT_TRUE(result.has_value()) << "Binary STL parse failed";
+
+    auto* meshImport = std::get_if<MeshImportData>(&*result);
+    ASSERT_NE(meshImport, nullptr);
+    ASSERT_EQ(meshImport->Meshes.size(), 1u);
+    EXPECT_EQ(meshImport->Meshes[0].Positions.size(), 3u);
+    EXPECT_EQ(meshImport->Meshes[0].Indices.size(), 3u);
+    EXPECT_EQ(meshImport->Meshes[0].Topology, PrimitiveTopology::Triangles);
+}
+
+TEST(STLLoader, ParseAsciiFromBytes)
+{
+    const char* stlText =
+        "solid test\n"
+        "  facet normal 0 0 1\n"
+        "    outer loop\n"
+        "      vertex 0 0 0\n"
+        "      vertex 1 0 0\n"
+        "      vertex 0 1 0\n"
+        "    endloop\n"
+        "  endfacet\n"
+        "endsolid test\n";
+
+    std::span<const std::byte> bytes(reinterpret_cast<const std::byte*>(stlText), std::strlen(stlText));
+
+    IORegistry registry;
+    RegisterBuiltinLoaders(registry);
+
+    auto* loader = registry.FindLoader(".stl");
+    ASSERT_NE(loader, nullptr);
+
+    LoadContext ctx{};
+    auto result = loader->Load(bytes, ctx);
+    ASSERT_TRUE(result.has_value()) << "ASCII STL parse failed";
+
+    auto* meshImport = std::get_if<MeshImportData>(&*result);
+    ASSERT_NE(meshImport, nullptr);
+    ASSERT_EQ(meshImport->Meshes.size(), 1u);
+    EXPECT_EQ(meshImport->Meshes[0].Positions.size(), 3u);
+    EXPECT_EQ(meshImport->Meshes[0].Indices.size(), 3u);
+}
+
+TEST(STLLoader, VertexDeduplication)
+{
+    // Two triangles sharing an edge: (0,0,0)-(1,0,0) is shared
+    // Without dedup: 6 vertices. With dedup: 4 unique vertices.
+    std::vector<std::byte> data(80 + 4 + 100, std::byte{0});
+
+    uint32_t triCount = 2;
+    std::memcpy(data.data() + 80, &triCount, 4);
+
+    // Triangle 1: (0,0,0), (1,0,0), (0,1,0)
+    float n1[3] = {0.0f, 0.0f, 1.0f};
+    float t1v0[3] = {0.0f, 0.0f, 0.0f};
+    float t1v1[3] = {1.0f, 0.0f, 0.0f};
+    float t1v2[3] = {0.0f, 1.0f, 0.0f};
+    uint16_t attr = 0;
+    std::size_t off = 84;
+    std::memcpy(data.data() + off, n1, 12); off += 12;
+    std::memcpy(data.data() + off, t1v0, 12); off += 12;
+    std::memcpy(data.data() + off, t1v1, 12); off += 12;
+    std::memcpy(data.data() + off, t1v2, 12); off += 12;
+    std::memcpy(data.data() + off, &attr, 2); off += 2;
+
+    // Triangle 2: (0,0,0), (1,0,0), (0.5,0,-1)
+    float n2[3] = {0.0f, 0.0f, -1.0f};
+    float t2v0[3] = {0.0f, 0.0f, 0.0f};
+    float t2v1[3] = {1.0f, 0.0f, 0.0f};
+    float t2v2[3] = {0.5f, 0.0f, -1.0f};
+    std::memcpy(data.data() + off, n2, 12); off += 12;
+    std::memcpy(data.data() + off, t2v0, 12); off += 12;
+    std::memcpy(data.data() + off, t2v1, 12); off += 12;
+    std::memcpy(data.data() + off, t2v2, 12); off += 12;
+    std::memcpy(data.data() + off, &attr, 2);
+
+    IORegistry registry;
+    RegisterBuiltinLoaders(registry);
+
+    auto* loader = registry.FindLoader(".stl");
+    ASSERT_NE(loader, nullptr);
+
+    LoadContext ctx{};
+    auto result = loader->Load(data, ctx);
+    ASSERT_TRUE(result.has_value());
+
+    auto* meshImport = std::get_if<MeshImportData>(&*result);
+    ASSERT_NE(meshImport, nullptr);
+    EXPECT_EQ(meshImport->Meshes[0].Positions.size(), 4u); // 4 unique, not 6
+    EXPECT_EQ(meshImport->Meshes[0].Indices.size(), 6u);   // 2 triangles * 3
+}
+
+TEST(STLLoader, EmptyReturnsInvalidData)
+{
+    IORegistry registry;
+    RegisterBuiltinLoaders(registry);
+
+    auto* loader = registry.FindLoader(".stl");
+    ASSERT_NE(loader, nullptr);
+
+    LoadContext ctx{};
+    std::span<const std::byte> empty;
+    auto result = loader->Load(empty, ctx);
+    EXPECT_FALSE(result.has_value());
+}
+
+TEST(STLLoader, AutoDetectsBinaryWithSolidHeader)
+{
+    // Binary STL that happens to start with "solid" in the header
+    std::vector<std::byte> data(80 + 4 + 50, std::byte{0});
+
+    // Write "solid" into the header
+    const char* solidStr = "solid fake";
+    std::memcpy(data.data(), solidStr, std::strlen(solidStr));
+
+    // Set triangle count = 1 (binary size match: 80 + 4 + 1*50 = 134)
+    uint32_t triCount = 1;
+    std::memcpy(data.data() + 80, &triCount, 4);
+
+    // Fill in a valid triangle
+    float normal[3] = {0.0f, 0.0f, 1.0f};
+    float v0[3] = {0.0f, 0.0f, 0.0f};
+    float v1[3] = {1.0f, 0.0f, 0.0f};
+    float v2[3] = {0.0f, 1.0f, 0.0f};
+    uint16_t attr = 0;
+    std::memcpy(data.data() + 84, normal, 12);
+    std::memcpy(data.data() + 96, v0, 12);
+    std::memcpy(data.data() + 108, v1, 12);
+    std::memcpy(data.data() + 120, v2, 12);
+    std::memcpy(data.data() + 132, &attr, 2);
+
+    IORegistry registry;
+    RegisterBuiltinLoaders(registry);
+
+    auto* loader = registry.FindLoader(".stl");
+    ASSERT_NE(loader, nullptr);
+
+    LoadContext ctx{};
+    auto result = loader->Load(data, ctx);
+    ASSERT_TRUE(result.has_value()) << "Binary STL with 'solid' header should parse correctly";
+
+    auto* meshImport = std::get_if<MeshImportData>(&*result);
+    ASSERT_NE(meshImport, nullptr);
+    EXPECT_EQ(meshImport->Meshes[0].Positions.size(), 3u);
+}
+
+// =============================================================================
+// OFF Loader Tests
+// =============================================================================
+
+TEST(OFFLoader, ParseBasicTriangle)
+{
+    const char* offText =
+        "OFF\n"
+        "3 1 0\n"
+        "0.0 0.0 0.0\n"
+        "1.0 0.0 0.0\n"
+        "0.0 1.0 0.0\n"
+        "3 0 1 2\n";
+
+    std::span<const std::byte> bytes(reinterpret_cast<const std::byte*>(offText), std::strlen(offText));
+
+    IORegistry registry;
+    RegisterBuiltinLoaders(registry);
+
+    auto* loader = registry.FindLoader(".off");
+    ASSERT_NE(loader, nullptr);
+
+    LoadContext ctx{};
+    auto result = loader->Load(bytes, ctx);
+    ASSERT_TRUE(result.has_value()) << "OFF parse failed";
+
+    auto* meshImport = std::get_if<MeshImportData>(&*result);
+    ASSERT_NE(meshImport, nullptr);
+    ASSERT_EQ(meshImport->Meshes.size(), 1u);
+    EXPECT_EQ(meshImport->Meshes[0].Positions.size(), 3u);
+    EXPECT_EQ(meshImport->Meshes[0].Indices.size(), 3u);
+    EXPECT_EQ(meshImport->Meshes[0].Topology, PrimitiveTopology::Triangles);
+}
+
+TEST(OFFLoader, ParseQuadFaces)
+{
+    const char* offText =
+        "OFF\n"
+        "4 1 0\n"
+        "0.0 0.0 0.0\n"
+        "1.0 0.0 0.0\n"
+        "1.0 1.0 0.0\n"
+        "0.0 1.0 0.0\n"
+        "4 0 1 2 3\n";
+
+    std::span<const std::byte> bytes(reinterpret_cast<const std::byte*>(offText), std::strlen(offText));
+
+    IORegistry registry;
+    RegisterBuiltinLoaders(registry);
+
+    auto* loader = registry.FindLoader(".off");
+    ASSERT_NE(loader, nullptr);
+
+    LoadContext ctx{};
+    auto result = loader->Load(bytes, ctx);
+    ASSERT_TRUE(result.has_value());
+
+    auto* meshImport = std::get_if<MeshImportData>(&*result);
+    ASSERT_NE(meshImport, nullptr);
+    // A quad is fan-triangulated into 2 triangles = 6 indices
+    EXPECT_EQ(meshImport->Meshes[0].Indices.size(), 6u);
+}
+
+TEST(OFFLoader, ParseCOFF)
+{
+    const char* offText =
+        "COFF\n"
+        "3 1 0\n"
+        "0.0 0.0 0.0 255 0 0 255\n"
+        "1.0 0.0 0.0 0 255 0 255\n"
+        "0.0 1.0 0.0 0 0 255 255\n"
+        "3 0 1 2\n";
+
+    std::span<const std::byte> bytes(reinterpret_cast<const std::byte*>(offText), std::strlen(offText));
+
+    IORegistry registry;
+    RegisterBuiltinLoaders(registry);
+
+    auto* loader = registry.FindLoader(".off");
+    ASSERT_NE(loader, nullptr);
+
+    LoadContext ctx{};
+    auto result = loader->Load(bytes, ctx);
+    ASSERT_TRUE(result.has_value()) << "COFF parse failed";
+
+    auto* meshImport = std::get_if<MeshImportData>(&*result);
+    ASSERT_NE(meshImport, nullptr);
+    EXPECT_EQ(meshImport->Meshes[0].Positions.size(), 3u);
+}
+
+TEST(OFFLoader, EmptyReturnsInvalidData)
+{
+    IORegistry registry;
+    RegisterBuiltinLoaders(registry);
+
+    auto* loader = registry.FindLoader(".off");
+    ASSERT_NE(loader, nullptr);
+
+    LoadContext ctx{};
+    std::span<const std::byte> empty;
+    auto result = loader->Load(empty, ctx);
+    EXPECT_FALSE(result.has_value());
+}
+
+TEST(OFFLoader, PolygonFaces)
+{
+    // Pentagon (5 vertices, 1 face) should be triangulated into 3 triangles
+    const char* offText =
+        "OFF\n"
+        "5 1 0\n"
+        "1.0 0.0 0.0\n"
+        "0.309 0.951 0.0\n"
+        "-0.809 0.588 0.0\n"
+        "-0.809 -0.588 0.0\n"
+        "0.309 -0.951 0.0\n"
+        "5 0 1 2 3 4\n";
+
+    std::span<const std::byte> bytes(reinterpret_cast<const std::byte*>(offText), std::strlen(offText));
+
+    IORegistry registry;
+    RegisterBuiltinLoaders(registry);
+
+    auto* loader = registry.FindLoader(".off");
+    ASSERT_NE(loader, nullptr);
+
+    LoadContext ctx{};
+    auto result = loader->Load(bytes, ctx);
+    ASSERT_TRUE(result.has_value());
+
+    auto* meshImport = std::get_if<MeshImportData>(&*result);
+    ASSERT_NE(meshImport, nullptr);
+    // Pentagon → 3 triangles → 9 indices
+    EXPECT_EQ(meshImport->Meshes[0].Indices.size(), 9u);
+}
 
 TEST(IORegistryImport, FullPipelineWithGLB)
 {
