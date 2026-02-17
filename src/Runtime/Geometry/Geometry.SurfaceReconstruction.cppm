@@ -54,6 +54,17 @@ export namespace Geometry::SurfaceReconstruction
         // k>1 uses weighted averaging over neighbors (smoother).
         std::size_t KNeighbors{1};
 
+        // Weight exponent for normal-consistency term when KNeighbors > 1.
+        // Higher values suppress contributions from neighbors whose normals
+        // disagree with the nearest-neighbor normal direction.
+        float NormalAgreementPower{2.0f};
+
+        // Gaussian kernel bandwidth scale for weighted signed distance when
+        // KNeighbors > 1. For each query point, the bandwidth is estimated as
+        // h = KernelSigmaScale * max_i ||g - p_i|| over the k-neighborhood.
+        // Larger values smooth more aggressively.
+        float KernelSigmaScale{2.0f};
+
         // Bounding box padding: fraction of the bounding box diagonal added
         // on each side. Ensures the isosurface doesn't clip at the grid boundary.
         float BoundingBoxPadding{0.1f};

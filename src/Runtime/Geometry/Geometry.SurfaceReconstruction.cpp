@@ -23,6 +23,23 @@ import :Primitives;
 
 namespace Geometry::SurfaceReconstruction
 {
+    static constexpr float kDistanceEpsilon = 1e-8f;
+    static constexpr float kNormalLengthEpsilon = 1e-8f;
+
+    [[nodiscard]] static bool IsFiniteVec3(const glm::vec3& v)
+    {
+        return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z);
+    }
+
+    [[nodiscard]] static bool NormalizeSafe(glm::vec3& n)
+    {
+        const float len2 = glm::dot(n, n);
+        if (!std::isfinite(len2) || len2 <= (kNormalLengthEpsilon * kNormalLengthEpsilon))
+            return false;
+        n *= 1.0f / std::sqrt(len2);
+        return true;
+    }
+
     // =========================================================================
     // Signed distance computation
     // =========================================================================
@@ -48,13 +65,14 @@ namespace Geometry::SurfaceReconstruction
     // Compute signed distance at a query point using weighted average over
     // k nearest neighbors.
     // d(g) = sum(w_i * dot(g - p_i, n_i)) / sum(w_i)
-    // where w_i = 1 / (||g - p_i||^2 + epsilon)
+    // where w_i = exp(-||g - p_i||^2 / (2 h^2)) * max(0, dot(n_i, n_ref))^p
     static float SignedDistanceWeighted(
         const glm::vec3& queryPoint,
         const Octree& octree,
         const std::vector<glm::vec3>& points,
         const std::vector<glm::vec3>& normals,
         std::size_t k,
+        const ReconstructionParams& params,
         std::vector<std::size_t>& neighborBuffer)
     {
         octree.QueryKnn(queryPoint, k + 1, neighborBuffer);
@@ -62,7 +80,27 @@ namespace Geometry::SurfaceReconstruction
         if (neighborBuffer.empty())
             return std::numeric_limits<float>::max();
 
-        constexpr float eps = 1e-8f;
+        std::size_t nearestIdx = 0;
+        octree.QueryNearest(queryPoint, nearestIdx);
+        if (nearestIdx >= points.size())
+            return std::numeric_limits<float>::max();
+
+        const glm::vec3 refNormal = normals[nearestIdx];
+
+        float maxDist2 = 0.0f;
+        for (std::size_t idx : neighborBuffer)
+        {
+            if (idx >= points.size()) continue;
+            const glm::vec3 diff = queryPoint - points[idx];
+            const float dist2 = glm::dot(diff, diff);
+            maxDist2 = std::max(maxDist2, dist2);
+        }
+
+        const float sigmaScale = std::max(1e-3f, params.KernelSigmaScale);
+        const float sigma2 = std::max(kDistanceEpsilon, maxDist2 * sigmaScale * sigmaScale);
+        const float inv2Sigma2 = 0.5f / sigma2;
+        const float normalPower = std::max(0.0f, params.NormalAgreementPower);
+
         float sumWD = 0.0f;
         float sumW = 0.0f;
 
@@ -70,11 +108,15 @@ namespace Geometry::SurfaceReconstruction
         {
             if (idx >= points.size()) continue;
 
-            glm::vec3 diff = queryPoint - points[idx];
-            float dist2 = glm::dot(diff, diff);
-            float w = 1.0f / (dist2 + eps);
+            const glm::vec3 diff = queryPoint - points[idx];
+            const float dist2 = glm::dot(diff, diff);
+            const float spatialW = std::exp(-dist2 * inv2Sigma2);
 
-            float d = glm::dot(diff, normals[idx]);
+            const float alignRaw = std::max(0.0f, glm::dot(normals[idx], refNormal));
+            const float normalW = (normalPower > 0.0f) ? std::pow(alignRaw, normalPower) : 1.0f;
+            const float w = std::max(kDistanceEpsilon, spatialW * normalW);
+
+            const float d = glm::dot(diff, normals[idx]);
             sumWD += w * d;
             sumW += w;
         }
@@ -109,11 +151,28 @@ namespace Geometry::SurfaceReconstruction
         // -----------------------------------------------------------------
         // Step 1: Obtain normals
         // -----------------------------------------------------------------
+        std::vector<glm::vec3> usedPoints;
         std::vector<glm::vec3> usedNormals;
+        usedPoints.reserve(n);
+        usedNormals.reserve(n);
 
         if (!normals.empty())
         {
-            usedNormals = normals;
+            for (std::size_t i = 0; i < n; ++i)
+            {
+                if (!IsFiniteVec3(points[i]))
+                    continue;
+
+                glm::vec3 nrm = normals[i];
+                if (!NormalizeSafe(nrm))
+                    continue;
+
+                usedPoints.push_back(points[i]);
+                usedNormals.push_back(nrm);
+            }
+
+            if (usedPoints.size() < 3)
+                return std::nullopt;
         }
         else
         {
@@ -127,7 +186,21 @@ namespace Geometry::SurfaceReconstruction
             if (!neResult.has_value())
                 return std::nullopt;
 
-            usedNormals = std::move(neResult->Normals);
+            for (std::size_t i = 0; i < n; ++i)
+            {
+                if (!IsFiniteVec3(points[i]))
+                    continue;
+
+                glm::vec3 nrm = neResult->Normals[i];
+                if (!NormalizeSafe(nrm))
+                    continue;
+
+                usedPoints.push_back(points[i]);
+                usedNormals.push_back(nrm);
+            }
+
+            if (usedPoints.size() < 3)
+                return std::nullopt;
         }
 
         // -----------------------------------------------------------------
@@ -136,7 +209,7 @@ namespace Geometry::SurfaceReconstruction
         glm::vec3 bbMin(std::numeric_limits<float>::max());
         glm::vec3 bbMax(-std::numeric_limits<float>::max());
 
-        for (const auto& p : points)
+        for (const auto& p : usedPoints)
         {
             bbMin = glm::min(bbMin, p);
             bbMax = glm::max(bbMax, p);
@@ -158,6 +231,9 @@ namespace Geometry::SurfaceReconstruction
         // Step 3: Determine grid dimensions
         // -----------------------------------------------------------------
         float maxExtent = std::max({bbSize.x, bbSize.y, bbSize.z});
+        if (params.Resolution == 0)
+            return std::nullopt;
+
         float cellSize = maxExtent / static_cast<float>(params.Resolution);
 
         // Avoid degenerate cell size
@@ -176,10 +252,11 @@ namespace Geometry::SurfaceReconstruction
         // -----------------------------------------------------------------
         // Step 4: Build octree for spatial queries
         // -----------------------------------------------------------------
-        std::vector<AABB> pointAABBs(n);
-        for (std::size_t i = 0; i < n; ++i)
+        const std::size_t filteredCount = usedPoints.size();
+        std::vector<AABB> pointAABBs(filteredCount);
+        for (std::size_t i = 0; i < filteredCount; ++i)
         {
-            pointAABBs[i] = {.Min = points[i], .Max = points[i]};
+            pointAABBs[i] = {.Min = usedPoints[i], .Max = usedPoints[i]};
         }
 
         Octree octree;
@@ -203,6 +280,7 @@ namespace Geometry::SurfaceReconstruction
         grid.Values.resize((gridNX + 1) * (gridNY + 1) * (gridNZ + 1));
 
         const bool useWeighted = (params.KNeighbors > 1);
+        const std::size_t effectiveK = std::min(params.KNeighbors, filteredCount);
         std::vector<std::size_t> neighborBuffer;
 
         for (std::size_t z = 0; z <= gridNZ; ++z)
@@ -217,13 +295,13 @@ namespace Geometry::SurfaceReconstruction
                     if (useWeighted)
                     {
                         sd = SignedDistanceWeighted(
-                            gp, octree, points, usedNormals,
-                            params.KNeighbors, neighborBuffer);
+                            gp, octree, usedPoints, usedNormals,
+                            effectiveK, params, neighborBuffer);
                     }
                     else
                     {
                         sd = SignedDistanceNearest(
-                            gp, octree, points, usedNormals);
+                            gp, octree, usedPoints, usedNormals);
                     }
 
                     grid.Set(x, y, z, sd);
