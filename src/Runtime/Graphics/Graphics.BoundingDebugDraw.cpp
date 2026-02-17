@@ -1,6 +1,8 @@
 module;
 
 #include <algorithm>
+#include <cstdint>
+#include <glm/glm.hpp>
 
 module Graphics:BoundingDebugDraw.Impl;
 
