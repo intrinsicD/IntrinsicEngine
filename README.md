@@ -82,7 +82,7 @@ All operators follow a consistent contract: `Params` struct with defaults, `Resu
 - **GPUScene:** Retained-mode instance table with independent slot allocation/deallocation.
 - **Dynamic Rendering:** No `VkRenderPass` or `VkFramebuffer`; fully dynamic attachment binding.
 - **DebugDraw:** Immediate-mode line/shape rendering with screen-space thick-line expansion (SSBO-based, no geometry shader). Depth-tested and overlay variants.
-- **Graph Processing:** Halfedge-based graph topology with robust Octree-accelerated kNN construction, force-directed 2D layout (`ComputeForceDirectedLayout`), spectral embedding (`ComputeSpectralLayout`) with combinatorial or symmetric-normalized Laplacian iteration, and hierarchical layered layout (`ComputeHierarchicalLayout`) for connectivity visualization workflows, including diameter-aware auto-rooting for better-balanced disconnected component embeddings and inversion-based edge-crossing diagnostics (`HierarchicalLayoutResult::CrossingCount`).
+- **Graph Processing:** Halfedge-based graph topology with robust Octree-accelerated kNN construction, force-directed 2D layout (`ComputeForceDirectedLayout`), spectral embedding (`ComputeSpectralLayout`) with combinatorial or symmetric-normalized Laplacian iteration, and hierarchical layered layout (`ComputeHierarchicalLayout`) for connectivity visualization workflows, including diameter-aware auto-rooting for better-balanced disconnected component embeddings and inversion-based edge-crossing diagnostics (`HierarchicalLayoutResult::CrossingCount`) computed from final per-layer x-ordering.
 - **Selection Outlines:** Post-process contour highlight for selected/hovered entities.
 
 ### 4. Data I/O

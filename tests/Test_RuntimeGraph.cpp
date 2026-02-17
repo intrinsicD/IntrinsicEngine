@@ -299,6 +299,7 @@ TEST(RuntimeGraph, HierarchicalLayoutCrossingMinimizationReducesCrossings)
 
     EXPECT_GE(noSweepResult->CrossingCount, 1u);
     EXPECT_LE(sweepResult->CrossingCount, noSweepResult->CrossingCount);
+    EXPECT_EQ(sweepResult->CrossingCount, 0u);
 }
 
 TEST(RuntimeGraph, HierarchicalLayoutAutoRootCentersLongPath)

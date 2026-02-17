@@ -1085,25 +1085,34 @@ namespace Geometry::Graph
 
         std::size_t crossingCount = 0;
         {
+            std::vector<std::vector<std::uint32_t>> layerVertices(globalLayerCount);
+            for (std::uint32_t local = 0; local < static_cast<std::uint32_t>(activeVertices.size()); ++local)
+            {
+                const std::int32_t layer = localLayer[local];
+                if (layer < 0 || layer >= static_cast<std::int32_t>(globalLayerCount)) continue;
+                layerVertices[static_cast<std::size_t>(layer)].push_back(local);
+            }
+
+            for (auto& vertices : layerVertices)
+            {
+                std::stable_sort(vertices.begin(), vertices.end(), [&](const std::uint32_t a, const std::uint32_t b)
+                {
+                    const glm::vec2 pa = ioPositions[activeVertices[a]];
+                    const glm::vec2 pb = ioPositions[activeVertices[b]];
+                    if (std::abs(pa.x - pb.x) > 1.0e-6F) return pa.x < pb.x;
+                    return a < b;
+                });
+            }
+
             std::vector<std::uint32_t> localOrder(activeVertices.size(), std::numeric_limits<std::uint32_t>::max());
             std::vector<std::uint32_t> upperEdgeOrder;
             std::vector<std::uint32_t> lowerEdgeOrder;
             std::vector<std::uint32_t> bit;
 
-            const std::int32_t maxLayerIndex = static_cast<std::int32_t>(globalLayerCount);
-            for (std::int32_t li = 0; li + 1 < maxLayerIndex; ++li)
+            for (std::size_t li = 0; li + 1 < globalLayerCount; ++li)
             {
-                std::vector<std::uint32_t> upper;
-                std::vector<std::uint32_t> lower;
-                upper.reserve(activeVertices.size());
-                lower.reserve(activeVertices.size());
-
-                for (std::uint32_t local = 0; local < static_cast<std::uint32_t>(activeVertices.size()); ++local)
-                {
-                    if (localLayer[local] == li) upper.push_back(local);
-                    if (localLayer[local] == li + 1) lower.push_back(local);
-                }
-
+                const auto& upper = layerVertices[li];
+                const auto& lower = layerVertices[li + 1U];
                 if (upper.empty() || lower.empty()) continue;
 
                 for (std::size_t i = 0; i < upper.size(); ++i) localOrder[upper[i]] = static_cast<std::uint32_t>(i);
@@ -1116,7 +1125,7 @@ namespace Geometry::Graph
                 {
                     for (const std::uint32_t v : adjacency[u])
                     {
-                        if (localLayer[v] != li + 1) continue;
+                        if (localLayer[v] != static_cast<std::int32_t>(li + 1U)) continue;
                         upperEdgeOrder.push_back(localOrder[u]);
                         lowerEdgeOrder.push_back(localOrder[v]);
                     }
