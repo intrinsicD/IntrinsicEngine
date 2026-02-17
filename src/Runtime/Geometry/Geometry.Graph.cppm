@@ -109,6 +109,13 @@ export namespace Geometry::Graph
         std::size_t CrossingCount{0};
     };
 
+    struct EdgeCrossingParams
+    {
+        float IntersectionEpsilon{1.0e-6F};
+        bool IgnoreIncidentEdges{true};
+        bool CountCollinearOverlap{false};
+    };
+
     // A lightweight halfedge-based graph (no faces), designed for DOD-friendly algorithms.
     // Storage is via PropertySets, so user-defined properties are supported on vertices/halfedges/edges.
     class Graph
@@ -258,4 +265,9 @@ export namespace Geometry::Graph
     // and barycentric crossing-minimization sweeps within each layer.
     [[nodiscard]] std::optional<HierarchicalLayoutResult> ComputeHierarchicalLayout(
         const Graph& graph, std::span<glm::vec2> ioPositions, const HierarchicalLayoutParams& params = {});
+
+    // Counts geometric edge crossings for a 2D embedding of the graph.
+    // Returns std::nullopt for degenerate input (insufficient positions or non-finite coordinates).
+    [[nodiscard]] std::optional<std::size_t> CountEdgeCrossings(
+        const Graph& graph, std::span<const glm::vec2> positions, const EdgeCrossingParams& params = {});
 }

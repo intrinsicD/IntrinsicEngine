@@ -106,6 +106,74 @@ namespace Geometry::Graph
                 y[js] -= weight * x[is];
             }
         }
+
+        [[nodiscard]] float Orientation2D(const glm::vec2& a, const glm::vec2& b, const glm::vec2& c)
+        {
+            const glm::vec2 ab = b - a;
+            const glm::vec2 ac = c - a;
+            return ab.x * ac.y - ab.y * ac.x;
+        }
+
+        [[nodiscard]] bool RangesOverlap(float a0, float a1, float b0, float b1, float epsilon)
+        {
+            if (a0 > a1) std::swap(a0, a1);
+            if (b0 > b1) std::swap(b0, b1);
+            return (a0 <= b1 + epsilon) && (b0 <= a1 + epsilon);
+        }
+
+        [[nodiscard]] bool OnSegment(const glm::vec2& a, const glm::vec2& b, const glm::vec2& p, float epsilon)
+        {
+            return RangesOverlap(a.x, b.x, p.x, p.x, epsilon)
+                && RangesOverlap(a.y, b.y, p.y, p.y, epsilon);
+        }
+
+        [[nodiscard]] bool SegmentsIntersect(
+            const glm::vec2& a0,
+            const glm::vec2& a1,
+            const glm::vec2& b0,
+            const glm::vec2& b1,
+            const EdgeCrossingParams& params)
+        {
+            const float epsilon = std::max(params.IntersectionEpsilon, 0.0F);
+
+            if (!RangesOverlap(a0.x, a1.x, b0.x, b1.x, epsilon)
+                || !RangesOverlap(a0.y, a1.y, b0.y, b1.y, epsilon))
+            {
+                return false;
+            }
+
+            const float o0 = Orientation2D(a0, a1, b0);
+            const float o1 = Orientation2D(a0, a1, b1);
+            const float o2 = Orientation2D(b0, b1, a0);
+            const float o3 = Orientation2D(b0, b1, a1);
+
+            const auto sign = [epsilon](float value)
+            {
+                if (value > epsilon) return 1;
+                if (value < -epsilon) return -1;
+                return 0;
+            };
+
+            const int s0 = sign(o0);
+            const int s1 = sign(o1);
+            const int s2 = sign(o2);
+            const int s3 = sign(o3);
+
+            if (s0 == 0 && OnSegment(a0, a1, b0, epsilon)) return true;
+            if (s1 == 0 && OnSegment(a0, a1, b1, epsilon)) return true;
+            if (s2 == 0 && OnSegment(b0, b1, a0, epsilon)) return true;
+            if (s3 == 0 && OnSegment(b0, b1, a1, epsilon)) return true;
+
+            if ((s0 * s1 < 0) && (s2 * s3 < 0)) return true;
+
+            if (!params.CountCollinearOverlap) return false;
+
+            const bool collinear = s0 == 0 && s1 == 0 && s2 == 0 && s3 == 0;
+            if (!collinear) return false;
+
+            return RangesOverlap(a0.x, a1.x, b0.x, b1.x, epsilon)
+                && RangesOverlap(a0.y, a1.y, b0.y, b1.y, epsilon);
+        }
     }
 
     Graph::Graph()
@@ -1173,6 +1241,60 @@ namespace Geometry::Graph
         result.MaxLayerWidth = maxLayerWidth;
         result.CrossingCount = crossingCount;
         return result;
+    }
+
+    std::optional<std::size_t> CountEdgeCrossings(
+        const Graph& graph, std::span<const glm::vec2> positions, const EdgeCrossingParams& params)
+    {
+        if (graph.VertexCount() == 0 || graph.EdgeCount() == 0) return std::nullopt;
+        if (positions.size() < graph.VerticesSize()) return std::nullopt;
+        if (params.IntersectionEpsilon < 0.0F) return std::nullopt;
+
+        std::vector<std::pair<std::uint32_t, std::uint32_t>> edges;
+        edges.reserve(graph.EdgeCount());
+
+        for (std::uint32_t edgeIdx = 0; edgeIdx < static_cast<std::uint32_t>(graph.EdgesSize()); ++edgeIdx)
+        {
+            const EdgeHandle edge{edgeIdx};
+            if (!graph.IsValid(edge) || graph.IsDeleted(edge)) continue;
+
+            const auto [v0h, v1h] = graph.EdgeVertices(edge);
+            if (!v0h.IsValid() || !v1h.IsValid() || graph.IsDeleted(v0h) || graph.IsDeleted(v1h)) continue;
+
+            const std::uint32_t v0 = v0h.Index;
+            const std::uint32_t v1 = v1h.Index;
+            if (v0 == v1) continue;
+
+            const glm::vec2 p0 = positions[v0];
+            const glm::vec2 p1 = positions[v1];
+            if (!IsFiniteVec2(p0) || !IsFiniteVec2(p1)) return std::nullopt;
+            edges.emplace_back(v0, v1);
+        }
+
+        if (edges.size() < 2U) return std::size_t{0};
+
+        std::size_t crossings = 0;
+        for (std::size_t i = 0; i + 1 < edges.size(); ++i)
+        {
+            const auto [a0, a1] = edges[i];
+            const glm::vec2 p0 = positions[a0];
+            const glm::vec2 p1 = positions[a1];
+            for (std::size_t j = i + 1; j < edges.size(); ++j)
+            {
+                const auto [b0, b1] = edges[j];
+
+                if (params.IgnoreIncidentEdges)
+                {
+                    if (a0 == b0 || a0 == b1 || a1 == b0 || a1 == b1) continue;
+                }
+
+                const glm::vec2 q0 = positions[b0];
+                const glm::vec2 q1 = positions[b1];
+                if (SegmentsIntersect(p0, p1, q0, q1, params)) ++crossings;
+            }
+        }
+
+        return crossings;
     }
 
     void Graph::DeleteEdge(EdgeHandle e)
