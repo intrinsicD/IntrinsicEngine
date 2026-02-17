@@ -42,7 +42,7 @@ A **"Distinguished Scientist" grade** geometry kernel in `src/Runtime/Geometry/`
 
 **Graph Processing Operators:**
 - **kNN Graph Builders:** `Geometry::Graph::BuildKNNGraph()` (Octree-accelerated neighbor discovery, exact kNN) and `Geometry::Graph::BuildKNNGraphFromIndices()` (manual graph assembly from precomputed kNN index lists) both support Union/Mutual connectivity and epsilon-based coincident-point rejection for degenerate robustness.
-- **Graph Layouts:** Fruchterman-Reingold force-directed embedding (`ComputeForceDirectedLayout`), spectral embedding (`ComputeSpectralLayout`) with both combinatorial and symmetric-normalized Laplacian variants, and deterministic hierarchical layering (`ComputeHierarchicalLayout`) for stable DAG/tree-style 2D graph visualization.
+- **Graph Layouts:** Fruchterman-Reingold force-directed embedding (`ComputeForceDirectedLayout`), spectral embedding (`ComputeSpectralLayout`) with both combinatorial and symmetric-normalized Laplacian variants, and deterministic hierarchical layering (`ComputeHierarchicalLayout`) for stable DAG/tree-style 2D graph visualization. The hierarchical solver now performs a diameter-aware auto-root selection (two-sweep BFS, root at path midpoint) for components when no explicit root is provided, reducing depth skew on long chains.
 - **Surface Reconstruction Robustness:** Weighted signed distance uses an adaptive Gaussian kernel with normal-consistency weighting and automatic invalid-normal filtering before Marching Cubes extraction.
 
 **Mesh Processing Operators:**
@@ -82,7 +82,7 @@ All operators follow a consistent contract: `Params` struct with defaults, `Resu
 - **GPUScene:** Retained-mode instance table with independent slot allocation/deallocation.
 - **Dynamic Rendering:** No `VkRenderPass` or `VkFramebuffer`; fully dynamic attachment binding.
 - **DebugDraw:** Immediate-mode line/shape rendering with screen-space thick-line expansion (SSBO-based, no geometry shader). Depth-tested and overlay variants.
-- **Graph Processing:** Halfedge-based graph topology with robust Octree-accelerated kNN construction, force-directed 2D layout (`ComputeForceDirectedLayout`), spectral embedding (`ComputeSpectralLayout`) with combinatorial or symmetric-normalized Laplacian iteration, and hierarchical layered layout (`ComputeHierarchicalLayout`) for connectivity visualization workflows.
+- **Graph Processing:** Halfedge-based graph topology with robust Octree-accelerated kNN construction, force-directed 2D layout (`ComputeForceDirectedLayout`), spectral embedding (`ComputeSpectralLayout`) with combinatorial or symmetric-normalized Laplacian iteration, and hierarchical layered layout (`ComputeHierarchicalLayout`) for connectivity visualization workflows, including diameter-aware auto-rooting for better-balanced disconnected component embeddings.
 - **Selection Outlines:** Post-process contour highlight for selected/hovered entities.
 
 ### 4. Data I/O

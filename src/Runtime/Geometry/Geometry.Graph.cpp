@@ -8,6 +8,7 @@ module;
 #include <functional>
 #include <limits>
 #include <numeric>
+#include <queue>
 #include <utility>
 #include <span>
 #include <vector>
@@ -874,11 +875,106 @@ namespace Geometry::Graph
         {
             ++componentCount;
 
-            std::vector<std::uint32_t> frontier{seed};
+            std::vector<std::uint32_t> componentVertices;
+            componentVertices.reserve(16);
+            {
+                std::queue<std::uint32_t> queue;
+                queue.push(seed);
+                visited[seed] = true;
+
+                while (!queue.empty())
+                {
+                    const std::uint32_t u = queue.front();
+                    queue.pop();
+                    componentVertices.push_back(u);
+
+                    for (const std::uint32_t v : adjacency[u])
+                    {
+                        if (visited[v]) continue;
+                        visited[v] = true;
+                        queue.push(v);
+                    }
+                }
+            }
+
+            std::sort(componentVertices.begin(), componentVertices.end());
+
+            std::vector<bool> inComponent(activeVertices.size(), false);
+            for (const std::uint32_t u : componentVertices) inComponent[u] = true;
+
+            auto bfs_farthest = [&](std::uint32_t start,
+                                    std::vector<std::int32_t>& outDistance,
+                                    std::vector<std::uint32_t>* outParent) -> std::uint32_t
+            {
+                outDistance.assign(activeVertices.size(), -1);
+                if (outParent != nullptr)
+                {
+                    outParent->assign(activeVertices.size(), std::numeric_limits<std::uint32_t>::max());
+                }
+
+                std::queue<std::uint32_t> queue;
+                queue.push(start);
+                outDistance[start] = 0;
+                std::uint32_t farthest = start;
+
+                while (!queue.empty())
+                {
+                    const std::uint32_t u = queue.front();
+                    queue.pop();
+                    const std::int32_t du = outDistance[u];
+
+                    if (du > outDistance[farthest] || (du == outDistance[farthest] && u < farthest)) farthest = u;
+
+                    for (const std::uint32_t v : adjacency[u])
+                    {
+                        if (!inComponent[v] || outDistance[v] >= 0) continue;
+                        outDistance[v] = du + 1;
+                        if (outParent != nullptr) (*outParent)[v] = u;
+                        queue.push(v);
+                    }
+                }
+
+                return farthest;
+            };
+
+            std::uint32_t componentRoot = seed;
+            const bool userRootInComponent =
+                params.RootVertexIndex != kInvalidIndex &&
+                params.RootVertexIndex < graph.VerticesSize() &&
+                globalToLocal[params.RootVertexIndex] != std::numeric_limits<std::uint32_t>::max() &&
+                inComponent[globalToLocal[params.RootVertexIndex]];
+
+            if (userRootInComponent)
+            {
+                componentRoot = globalToLocal[params.RootVertexIndex];
+            }
+            else if (componentVertices.size() > 1U)
+            {
+                std::vector<std::int32_t> distances;
+                std::vector<std::uint32_t> parent;
+                const std::uint32_t start = componentVertices.front();
+                const std::uint32_t endpointA = bfs_farthest(start, distances, nullptr);
+                const std::uint32_t endpointB = bfs_farthest(endpointA, distances, &parent);
+
+                std::vector<std::uint32_t> diameterPath;
+                for (std::uint32_t current = endpointB; current != std::numeric_limits<std::uint32_t>::max();)
+                {
+                    diameterPath.push_back(current);
+                    if (current == endpointA) break;
+                    current = parent[current];
+                }
+
+                if (!diameterPath.empty())
+                {
+                    componentRoot = diameterPath[diameterPath.size() / 2U];
+                }
+            }
+
+            std::vector<std::uint32_t> frontier{componentRoot};
             std::vector<std::vector<std::uint32_t>> layers;
             layers.reserve(8);
-            visited[seed] = true;
-            localLayer[seed] = 0;
+            for (const std::uint32_t localVertex : componentVertices) localLayer[localVertex] = -1;
+            localLayer[componentRoot] = 0;
 
             while (!frontier.empty())
             {
@@ -888,8 +984,7 @@ namespace Geometry::Graph
                 {
                     for (const std::uint32_t v : adjacency[u])
                     {
-                        if (visited[v]) continue;
-                        visited[v] = true;
+                        if (!inComponent[v] || localLayer[v] >= 0) continue;
                         localLayer[v] = static_cast<std::int32_t>(layers.size());
                         next.push_back(v);
                     }
