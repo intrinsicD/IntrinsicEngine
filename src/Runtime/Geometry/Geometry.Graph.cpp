@@ -82,6 +82,29 @@ namespace Geometry::Graph
                 y[static_cast<std::size_t>(j)] -= d;
             }
         }
+
+        void MultiplyNormalizedSymmetricLaplacian(std::span<const std::pair<std::uint32_t, std::uint32_t>> edges,
+            std::span<const float> invSqrtDegree,
+            std::span<const float> x,
+            std::span<float> y)
+        {
+            std::fill(y.begin(), y.end(), 0.0F);
+            for (std::size_t i = 0; i < x.size(); ++i)
+            {
+                const float degreeTerm = invSqrtDegree[i] > 0.0F ? (x[i] / invSqrtDegree[i]) : x[i];
+                y[i] += degreeTerm;
+            }
+
+            for (const auto& [i, j] : edges)
+            {
+                const std::size_t is = static_cast<std::size_t>(i);
+                const std::size_t js = static_cast<std::size_t>(j);
+                const float weight = invSqrtDegree[is] * invSqrtDegree[js];
+                if (weight <= 0.0F) continue;
+                y[is] -= weight * x[js];
+                y[js] -= weight * x[is];
+            }
+        }
     }
 
     Graph::Graph()
@@ -668,6 +691,13 @@ namespace Geometry::Graph
         const float alpha = params.StepScale / std::max(1.0F, maxDegree);
         const float minNorm = std::max(params.MinNormEpsilon, 1.0e-12F);
 
+        std::vector<float> invSqrtDegree(n, 0.0F);
+        for (std::size_t i = 0; i < n; ++i)
+        {
+            const float d = static_cast<float>(degree[i]);
+            invSqrtDegree[i] = d > 0.0F ? 1.0F / std::sqrt(d) : 1.0F;
+        }
+
         std::array<std::vector<float>, 2> q{
             std::vector<float>(n, 0.0F),
             std::vector<float>(n, 0.0F)
@@ -706,7 +736,14 @@ namespace Geometry::Graph
             float subspaceDelta = 0.0F;
             for (std::size_t col = 0; col < 2; ++col)
             {
-                MultiplyCombinatorialLaplacian(localEdges, q[col], laplace);
+                if (params.Variant == SpectralLayoutParams::LaplacianVariant::NormalizedSymmetric)
+                {
+                    MultiplyNormalizedSymmetricLaplacian(localEdges, invSqrtDegree, q[col], laplace);
+                }
+                else
+                {
+                    MultiplyCombinatorialLaplacian(localEdges, q[col], laplace);
+                }
                 for (std::size_t i = 0; i < n; ++i) y[col][i] = q[col][i] - alpha * laplace[i];
                 RemoveMean(y[col]);
             }
