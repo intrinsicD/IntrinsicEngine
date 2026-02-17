@@ -43,6 +43,7 @@ A **"Distinguished Scientist" grade** geometry kernel in `src/Runtime/Geometry/`
 **Graph Processing Operators:**
 - **kNN Graph Builders:** `Geometry::Graph::BuildKNNGraph()` (Octree-accelerated neighbor discovery, exact kNN) and `Geometry::Graph::BuildKNNGraphFromIndices()` (manual graph assembly from precomputed kNN index lists) both support Union/Mutual connectivity and epsilon-based coincident-point rejection for degenerate robustness.
 - **Graph Layouts:** Fruchterman-Reingold force-directed embedding (`ComputeForceDirectedLayout`), spectral embedding (`ComputeSpectralLayout`) with both combinatorial and symmetric-normalized Laplacian variants, and deterministic hierarchical layering (`ComputeHierarchicalLayout`) for stable DAG/tree-style 2D graph visualization.
+- **Surface Reconstruction Robustness:** Weighted signed distance uses an adaptive Gaussian kernel with normal-consistency weighting and automatic invalid-normal filtering before Marching Cubes extraction.
 
 **Mesh Processing Operators:**
 | Operator | Algorithm | Reference |
@@ -57,7 +58,7 @@ A **"Distinguished Scientist" grade** geometry kernel in `src/Runtime/Geometry/`
 | **Normal Estimation** | PCA local plane fitting + MST orientation | Hoppe et al. 1992 |
 | **Mesh Repair** | Hole filling (ear-clipping), degenerate removal, orientation | — |
 | **Marching Cubes** | Isosurface extraction from scalar fields with vertex welding | Lorensen & Cline 1987 |
-| **Surface Reconstruction** | Point cloud → mesh via signed distance field + Marching Cubes | Hoppe et al. 1992 |
+| **Surface Reconstruction** | Point cloud → mesh via robust oriented SDF (Gaussian + normal-consistency weighting) + Marching Cubes | Hoppe et al. 1992 |
 
 **Discrete Exterior Calculus (DEC):**
 - Exterior derivatives d0, d1 in CSR sparse matrix format.

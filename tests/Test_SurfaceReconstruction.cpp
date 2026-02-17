@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include <cmath>
 #include <cstddef>
+#include <limits>
 #include <numbers>
 #include <numeric>
 #include <vector>
@@ -449,6 +450,50 @@ TEST(SurfaceReconstruction, NoNormalsAndNoEstimationReturnsNullopt)
     params.EstimateNormals = false;
 
     auto result = Geometry::SurfaceReconstruction::Reconstruct(points, emptyNormals, params);
+    EXPECT_FALSE(result.has_value());
+}
+
+
+TEST(SurfaceReconstruction, ZeroResolutionReturnsNullopt)
+{
+    auto points = MakeSpherePoints(100);
+    auto normals = MakeSphereNormals(points);
+
+    Geometry::SurfaceReconstruction::ReconstructionParams params;
+    params.Resolution = 0;
+    params.EstimateNormals = false;
+
+    auto result = Geometry::SurfaceReconstruction::Reconstruct(points, normals, params);
+    EXPECT_FALSE(result.has_value());
+}
+
+TEST(SurfaceReconstruction, InvalidNormalsAreRejected)
+{
+    auto points = MakeSpherePoints(64);
+    auto normals = MakeSphereNormals(points);
+
+    normals[0] = {0.0f, 0.0f, 0.0f};
+    normals[1] = {std::numeric_limits<float>::infinity(), 0.0f, 0.0f};
+
+    Geometry::SurfaceReconstruction::ReconstructionParams params;
+    params.Resolution = 18;
+    params.EstimateNormals = false;
+
+    auto result = Geometry::SurfaceReconstruction::Reconstruct(points, normals, params);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_GT(result->OutputVertexCount, 0u);
+}
+
+TEST(SurfaceReconstruction, AllInvalidNormalsReturnNullopt)
+{
+    auto points = MakeSpherePoints(32);
+    std::vector<glm::vec3> normals(points.size(), glm::vec3(0.0f));
+
+    Geometry::SurfaceReconstruction::ReconstructionParams params;
+    params.Resolution = 16;
+    params.EstimateNormals = false;
+
+    auto result = Geometry::SurfaceReconstruction::Reconstruct(points, normals, params);
     EXPECT_FALSE(result.has_value());
 }
 
