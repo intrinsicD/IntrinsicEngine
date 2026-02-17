@@ -26,6 +26,7 @@ target_sources(${target_name}
         Geometry.Properties.cppm
         Geometry.MeshUtils.cppm
         Geometry.Octree.cppm
+        Geometry.KDTree.cppm
         Geometry.Raycast.cppm
         Geometry.HalfedgeMesh.cppm
         Geometry.Graph.cppm
@@ -49,6 +50,7 @@ target_sources(${target_name}
         Geometry.HalfedgeMesh.cpp
         Geometry.Properties.cpp
         Geometry.Graph.cpp
+        Geometry.KDTree.cpp
         Geometry.DEC.cpp
         Geometry.Curvature.cpp
         Geometry.Smoothing.cpp

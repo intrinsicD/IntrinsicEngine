@@ -33,6 +33,7 @@ A **"Distinguished Scientist" grade** geometry kernel in `src/Runtime/Geometry/`
 - **SDF:** Signed distance field evaluation with gradient-based contact manifold generation.
 - **SAT:** Separating Axis Theorem for analytic primitive pair tests.
 - **Linear Octree:** Cache-friendly spatial partitioning with Mean/Median/Center split strategies, tight bounds, and KNN queries.
+- **KD-tree (new):** Octree-inspired spatial accelerator built over element AABBs (points, triangles, or other volumetric primitives), with overlap queries plus exact AABB-distance kNN/radius queries.
 
 **Halfedge Mesh (PMP-style):**
 - Full halfedge data structure with `VertexHandle`, `EdgeHandle`, `FaceHandle`, `HalfedgeHandle`.
@@ -207,6 +208,26 @@ The Sandbox app can visualize selected `MeshCollider` acceleration/bounds data u
 **Performance note:** drawing deep octrees can generate thousands of line segments. Use `Max Depth` and `Leaf Only` to cap cost.
 
 ---
+
+
+### KD-Tree Spatial Queries
+
+`Geometry::KDTree` provides an Octree-inspired, axis-aligned BVH-style accelerator over element AABBs for analysis operators and future debug overlays.
+
+- **Build:** median split on max-extent axis, leaf-size and max-depth bounded, with `MinSplitExtent` guarding degenerate splits.
+- **Input modes:**
+  - `Build(span<const AABB>)` / `Build(vector<AABB>&&)` for general volumetric elements (e.g., triangles via their bounds).
+  - `BuildFromPoints(span<const glm::vec3>)` convenience path for point clouds.
+- **Queries:**
+  - `Query(shape, out)` (`AABB`, `Sphere`, `Ray`, or any `SpatialQueryShape`) for overlap filtering.
+  - `QueryKnn(p, k, outIndices)` — exact top-`k` nearest elements under AABB distance using branch-and-bound.
+  - `QueryRadius(p, r, outIndices)` — exact elements with AABB distance within radius `r`.
+- **Robustness:** build/query reject degenerate parameters (`LeafSize == 0`, `k == 0`, negative/NaN radius) and remain stable for coincident elements.
+
+Complexity (typical, well-distributed points):
+- Build: $O(n \log n)$ time, $O(n)$ extra index storage.
+- kNN query: $O(\log n + k)$ expected, $O(n)$ worst-case.
+- Radius query: $O(\log n + m)$ expected where $m$ is returned neighbors, $O(n)$ worst-case.
 
 ## Module Structure
 
