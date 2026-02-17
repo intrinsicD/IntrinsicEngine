@@ -105,6 +105,7 @@ namespace Geometry
             const BuildFrame frame = stack.back();
             stack.pop_back();
 
+            // NOTE: m_Nodes can grow below. Do not keep references across push_back() calls.
             Node& node = m_Nodes[frame.NodeIndex];
             node.FirstElement = frame.Start;
             node.NumElements = frame.Count;
@@ -165,8 +166,9 @@ namespace Geometry
             const NodeIndex rightIndex = static_cast<NodeIndex>(m_Nodes.size());
             m_Nodes.push_back(Node{});
 
-            node.Left = leftIndex;
-            node.Right = rightIndex;
+            // Re-acquire node reference after possible vector reallocation.
+            m_Nodes[frame.NodeIndex].Left = leftIndex;
+            m_Nodes[frame.NodeIndex].Right = rightIndex;
 
             stack.push_back(BuildFrame{rightIndex, mid, rightCount, frame.Depth + 1});
             stack.push_back(BuildFrame{leftIndex, frame.Start, leftCount, frame.Depth + 1});

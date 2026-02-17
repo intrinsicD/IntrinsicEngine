@@ -52,6 +52,7 @@ target_sources(${target_name}
         Geometry.HalfedgeMesh.cpp
         Geometry.Properties.cpp
         Geometry.Graph.cpp
+        Geometry.Octree.cpp
         Geometry.KDTree.cpp
         Geometry.DEC.cpp
         Geometry.Curvature.cpp
