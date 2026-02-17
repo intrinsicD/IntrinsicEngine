@@ -8,9 +8,12 @@ module;
 #include <optional>
 #include <queue>
 #include <utility>
+#include <span>
 #include <vector>
+#include <glm/glm.hpp>
 
-module Geometry:KDTree;
+module Geometry:KDTree.Impl;
+import :KDTree;
 
 namespace Geometry
 {
