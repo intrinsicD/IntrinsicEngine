@@ -80,6 +80,7 @@ All operators follow a consistent contract: `Params` struct with defaults, `Resu
 - **GPUScene:** Retained-mode instance table with independent slot allocation/deallocation.
 - **Dynamic Rendering:** No `VkRenderPass` or `VkFramebuffer`; fully dynamic attachment binding.
 - **DebugDraw:** Immediate-mode line/shape rendering with screen-space thick-line expansion (SSBO-based, no geometry shader). Depth-tested and overlay variants.
+- **Graph Processing:** Halfedge-based graph topology with robust kNN construction and force-directed 2D layout (`ComputeForceDirectedLayout`) for connectivity visualization workflows.
 - **Selection Outlines:** Post-process contour highlight for selected/hovered entities.
 
 ### 4. Data I/O

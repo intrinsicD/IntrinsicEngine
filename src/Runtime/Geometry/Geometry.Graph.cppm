@@ -2,6 +2,7 @@ module;
 
 #include <cstddef>
 #include <cstdint>
+#include <utility>
 #include <string>
 #include <optional>
 #include <span>
@@ -41,6 +42,27 @@ export namespace Geometry::Graph
     {
         float MinDistanceEpsilon{1.0e-12f};
         KNNConnectivity Connectivity{KNNConnectivity::Union};
+    };
+
+    struct ForceDirectedLayoutParams
+    {
+        std::uint32_t MaxIterations{128};
+        float AreaExtent{2.0F};
+        float InitialTemperatureFactor{0.25F};
+        float CoolingFactor{0.95F};
+        float MinDistanceEpsilon{1.0e-6F};
+        float ConvergenceTolerance{1.0e-4F};
+        float Gravity{0.05F};
+    };
+
+    struct ForceDirectedLayoutResult
+    {
+        std::size_t ActiveVertexCount{0};
+        std::size_t ActiveEdgeCount{0};
+        std::uint32_t IterationsPerformed{0};
+        float FinalTemperature{0.0F};
+        float MaxDisplacement{0.0F};
+        bool Converged{false};
     };
 
     // A lightweight halfedge-based graph (no faces), designed for DOD-friendly algorithms.
@@ -109,6 +131,10 @@ export namespace Geometry::Graph
         [[nodiscard]] std::optional<HalfedgeHandle> FindHalfedge(VertexHandle start, VertexHandle end) const;
         [[nodiscard]] std::optional<EdgeHandle> FindEdge(VertexHandle a, VertexHandle b) const;
 
+        [[nodiscard]] glm::vec3 VertexPosition(VertexHandle v) const;
+        void SetVertexPosition(VertexHandle v, glm::vec3 position);
+        [[nodiscard]] std::pair<VertexHandle, VertexHandle> EdgeVertices(EdgeHandle e) const;
+
         // Properties
         template <class T>
         [[nodiscard]] VertexProperty<T> GetOrAddVertexProperty(std::string name, T defaultValue = T())
@@ -173,4 +199,9 @@ export namespace Geometry::Graph
     [[nodiscard]] std::optional<KNNBuildResult> BuildKNNGraphFromIndices(Graph& graph,
         std::span<const glm::vec3> points, std::span<const std::vector<std::uint32_t>> knnIndices,
         const KNNFromIndicesParams& params = {});
+
+    // Computes a Fruchterman-Reingold style 2D embedding for the current graph topology.
+    // `ioPositions` is updated in-place and must have at least graph.VerticesSize() entries.
+    [[nodiscard]] std::optional<ForceDirectedLayoutResult> ComputeForceDirectedLayout(
+        const Graph& graph, std::span<glm::vec2> ioPositions, const ForceDirectedLayoutParams& params = {});
 }

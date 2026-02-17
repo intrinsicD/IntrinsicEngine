@@ -5,6 +5,7 @@ module;
 #include <cmath>
 #include <cstdint>
 #include <limits>
+#include <utility>
 #include <span>
 #include <vector>
 
@@ -24,6 +25,18 @@ namespace Geometry::Graph
             std::uint32_t Index{0};
             float Distance2{0.0F};
         };
+
+        [[nodiscard]] bool IsFiniteVec2(const glm::vec2& value)
+        {
+            return std::isfinite(value.x) && std::isfinite(value.y);
+        }
+
+        [[nodiscard]] glm::vec2 UnitDirectionFromPair(std::uint32_t i, std::uint32_t j)
+        {
+            const float phase = static_cast<float>((((i + 1U) * 1664525U) ^ ((j + 1U) * 1013904223U)) & 0xFFFFU);
+            const float angle = phase * 0.0000958738F;
+            return glm::vec2(std::cos(angle), std::sin(angle));
+        }
     }
 
     Graph::Graph()
@@ -223,6 +236,26 @@ namespace Geometry::Graph
         return std::nullopt;
     }
 
+    glm::vec3 Graph::VertexPosition(VertexHandle v) const
+    {
+        assert(IsValid(v));
+        return m_VPoint[v];
+    }
+
+    void Graph::SetVertexPosition(VertexHandle v, glm::vec3 position)
+    {
+        assert(IsValid(v));
+        m_VPoint[v] = position;
+    }
+
+    std::pair<VertexHandle, VertexHandle> Graph::EdgeVertices(EdgeHandle e) const
+    {
+        assert(IsValid(e));
+        const HalfedgeHandle h0 = Halfedge(e, 0);
+        const HalfedgeHandle h1 = OppositeHalfedge(h0);
+        return {ToVertex(h1), ToVertex(h0)};
+    }
+
     std::optional<EdgeHandle> Graph::AddEdge(VertexHandle v0, VertexHandle v1)
     {
         if (!IsValid(v0) || !IsValid(v1) || v0 == v1) return std::nullopt;
@@ -416,6 +449,125 @@ namespace Geometry::Graph
 
                 const auto edge = graph.AddEdge(VertexHandle{i}, VertexHandle{j});
                 if (edge.has_value()) ++result.InsertedEdgeCount;
+            }
+        }
+
+        return result;
+    }
+
+    std::optional<ForceDirectedLayoutResult> ComputeForceDirectedLayout(
+        const Graph& graph, std::span<glm::vec2> ioPositions, const ForceDirectedLayoutParams& params)
+    {
+        if (params.MaxIterations == 0U || ioPositions.size() < graph.VerticesSize()) return std::nullopt;
+
+        std::vector<std::uint32_t> activeVertices;
+        activeVertices.reserve(graph.VerticesSize());
+        for (std::uint32_t idx = 0; idx < static_cast<std::uint32_t>(graph.VerticesSize()); ++idx)
+        {
+            const VertexHandle v{idx};
+            if (!graph.IsDeleted(v)) activeVertices.push_back(idx);
+        }
+        if (activeVertices.size() < 2U) return std::nullopt;
+
+        std::vector<std::pair<std::uint32_t, std::uint32_t>> activeEdges;
+        activeEdges.reserve(graph.EdgesSize());
+        for (std::uint32_t idx = 0; idx < static_cast<std::uint32_t>(graph.EdgesSize()); ++idx)
+        {
+            const EdgeHandle e{idx};
+            if (graph.IsDeleted(e)) continue;
+
+            const auto [start, end] = graph.EdgeVertices(e);
+            if (!start.IsValid() || !end.IsValid()) continue;
+            if (graph.IsDeleted(start) || graph.IsDeleted(end)) continue;
+            activeEdges.emplace_back(start.Index, end.Index);
+        }
+
+        const float areaExtent = std::max(params.AreaExtent, 1.0e-3F);
+        const float area = areaExtent * areaExtent;
+        const float minDistance = std::max(params.MinDistanceEpsilon, 1.0e-7F);
+        const float k = std::sqrt(area / static_cast<float>(activeVertices.size()));
+        float temperature = std::max(minDistance, areaExtent * params.InitialTemperatureFactor);
+        const float cooling = std::clamp(params.CoolingFactor, 0.5F, 0.9999F);
+
+        std::vector<glm::vec2> displacement(ioPositions.size(), glm::vec2(0.0F));
+
+        ForceDirectedLayoutResult result{};
+        result.ActiveVertexCount = activeVertices.size();
+        result.ActiveEdgeCount = activeEdges.size();
+
+        for (std::uint32_t iteration = 0; iteration < params.MaxIterations; ++iteration)
+        {
+            std::fill(displacement.begin(), displacement.end(), glm::vec2(0.0F));
+
+            for (std::size_t localI = 0; localI < activeVertices.size(); ++localI)
+            {
+                const std::uint32_t vi = activeVertices[localI];
+                for (std::size_t localJ = localI + 1U; localJ < activeVertices.size(); ++localJ)
+                {
+                    const std::uint32_t vj = activeVertices[localJ];
+                    glm::vec2 delta = ioPositions[vi] - ioPositions[vj];
+                    float distance = glm::length(delta);
+                    if (!std::isfinite(distance) || distance < minDistance)
+                    {
+                        delta = UnitDirectionFromPair(vi, vj) * minDistance;
+                        distance = minDistance;
+                    }
+
+                    const glm::vec2 dir = delta / distance;
+                    const float force = (k * k) / distance;
+                    const glm::vec2 forceVector = dir * force;
+                    displacement[vi] += forceVector;
+                    displacement[vj] -= forceVector;
+                }
+            }
+
+            for (const auto& [vi, vj] : activeEdges)
+            {
+                glm::vec2 delta = ioPositions[vi] - ioPositions[vj];
+                float distance = glm::length(delta);
+                if (!std::isfinite(distance) || distance < minDistance)
+                {
+                    delta = UnitDirectionFromPair(vi, vj) * minDistance;
+                    distance = minDistance;
+                }
+
+                const glm::vec2 dir = delta / distance;
+                const float force = (distance * distance) / std::max(k, minDistance);
+                const glm::vec2 forceVector = dir * force;
+                displacement[vi] -= forceVector;
+                displacement[vj] += forceVector;
+            }
+
+            float maxDisplacement = 0.0F;
+            for (const std::uint32_t vi : activeVertices)
+            {
+                displacement[vi] -= ioPositions[vi] * params.Gravity;
+
+                glm::vec2 move = displacement[vi];
+                float moveLength = glm::length(move);
+                if (!std::isfinite(moveLength) || moveLength <= 0.0F) continue;
+
+                if (moveLength > temperature)
+                {
+                    move *= (temperature / moveLength);
+                    moveLength = temperature;
+                }
+
+                ioPositions[vi] += move;
+                if (!IsFiniteVec2(ioPositions[vi])) return std::nullopt;
+                maxDisplacement = std::max(maxDisplacement, moveLength);
+            }
+
+            result.IterationsPerformed = iteration + 1U;
+            result.MaxDisplacement = maxDisplacement;
+
+            temperature *= cooling;
+            result.FinalTemperature = temperature;
+
+            if (maxDisplacement <= params.ConvergenceTolerance)
+            {
+                result.Converged = true;
+                break;
             }
         }
 
