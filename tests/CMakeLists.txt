@@ -1,60 +1,4 @@
-set(target_name IntrinsicTests)
-
 enable_testing()
-
-add_executable(${target_name}
-        Test_BoundedHeap.cpp
-        Test_CoreMemory.cpp
-        Test_CoreTasks.cpp
-        Test_CoreAssets.cpp
-        Test_CoreHandle.cpp
-        Test_CoreHash.cpp
-        Test_RuntimeGraphics.cpp
-        Test_RuntimeRHI.cpp
-        Test_RuntimeECS.cpp
-        Test_RuntimeGeometry.cpp
-        Test_RuntimeGeometry_NoHeapEPA.cpp
-        Test_RuntimeGraph.cpp
-        Test_RuntimeGraph_ParallelLayers.cpp
-        Test_RuntimeGraphKNN.cpp
-        Test_KDTree.cpp
-        Test_RuntimeSelection.cpp
-        Test_RuntimeSelection_Multi.cpp
-        Test_TextureMaterialHotReload.cpp
-        Test_RuntimeCulling.cpp
-        Test_CoreFrameGraph.cpp
-        Test_FrameGraphSystems.cpp
-        Test_GraphicsBackend.cpp
-        Test_AssetPipeline.cpp
-        Test_SceneManager.cpp
-        Test_RenderOrchestrator.cpp
-        Test_DAGScheduler.cpp
-        Test_HeadlessEngine.cpp
-        Test_FeatureRegistry.cpp
-        Test_InplaceFunction.cpp
-        Test_IORegistry.cpp
-        Test_DebugDraw.cpp
-        Test_OctreeDebugDraw.cpp
-        Test_BoundingDebugDraw.cpp
-        Test_KDTreeDebugDraw.cpp
-        Test_GeometryProcessing.cpp
-        Test_GeometryProcessing2.cpp
-        Test_SurfaceReconstruction.cpp
-)
-
-#Apply Strict Flags ONLY to our tests
-target_compile_options(${target_name} PRIVATE ${INTRINSIC_COMPILE_FLAGS})
-target_link_options(${target_name} PRIVATE ${INTRINSIC_LINK_FLAGS})
-set_target_properties(${target_name} PROPERTIES CXX_SCAN_FOR_MODULES ON)
-
-# Link against the Core Engine and GTest
-target_link_libraries(${target_name}
-        PRIVATE
-        IntrinsicConfig
-        IntrinsicRuntime
-        GTest::gtest_main
-        dl
-)
 
 # Helper to run tests via CTest
 include(GoogleTest)
@@ -73,15 +17,49 @@ if(INTRINSIC_LLVM_SYMBOLIZER)
     list(APPEND _intrinsic_test_env "ASAN_SYMBOLIZER_PATH=${INTRINSIC_LLVM_SYMBOLIZER}")
 endif()
 
-gtest_discover_tests(${target_name}
-    PROPERTIES
-    ENVIRONMENT "${_intrinsic_test_env}"
-    DISCOVERY_MODE POST_BUILD
-)
+# =============================================================================
+# Helper: create an OBJECT library for a group of test sources.
+# Each .cpp is compiled exactly once; the objects are then linked into
+# one or more executable targets.
+# =============================================================================
+function(intrinsic_test_object_lib name)
+    cmake_parse_arguments(ARG "" "" "SOURCES;DEPS" ${ARGN})
+    add_library(${name} OBJECT ${ARG_SOURCES})
+    target_compile_options(${name} PRIVATE ${INTRINSIC_COMPILE_FLAGS})
+    target_link_options(${name} PRIVATE ${INTRINSIC_LINK_FLAGS})
+    set_target_properties(${name} PROPERTIES CXX_SCAN_FOR_MODULES ON)
+    target_link_libraries(${name} PRIVATE IntrinsicConfig ${ARG_DEPS} GTest::gtest_main)
+endfunction()
 
-# --- Standalone Core-only tests (no Runtime dependency) ---
-set(core_test_target IntrinsicCoreTests)
-add_executable(${core_test_target}
+# =============================================================================
+# Helper: create a test executable from one or more OBJECT libraries.
+# =============================================================================
+function(intrinsic_test_executable name)
+    cmake_parse_arguments(ARG "" "" "OBJECTS;LINK_LIBS" ${ARGN})
+    add_executable(${name})
+    set_target_properties(${name} PROPERTIES CXX_SCAN_FOR_MODULES ON)
+    target_compile_options(${name} PRIVATE ${INTRINSIC_COMPILE_FLAGS})
+    target_link_options(${name} PRIVATE ${INTRINSIC_LINK_FLAGS})
+    # Pull in pre-compiled object files from each OBJECT library
+    foreach(obj ${ARG_OBJECTS})
+        target_link_libraries(${name} PRIVATE ${obj})
+    endforeach()
+    # Link against the actual libraries for symbol resolution
+    target_link_libraries(${name} PRIVATE IntrinsicConfig ${ARG_LINK_LIBS} GTest::gtest_main dl)
+    gtest_discover_tests(${name}
+        PROPERTIES
+        ENVIRONMENT "${_intrinsic_test_env}"
+        DISCOVERY_MODE POST_BUILD
+    )
+endfunction()
+
+# =============================================================================
+# OBJECT libraries — each test .cpp is compiled exactly once
+# =============================================================================
+
+# --- Core tests (pure algorithmic, no GPU, no ECS) ---
+intrinsic_test_object_lib(CoreTestObjs
+    SOURCES
         Test_BoundedHeap.cpp
         Test_CoreMemory.cpp
         Test_CoreTasks.cpp
@@ -92,55 +70,20 @@ add_executable(${core_test_target}
         Test_CoreAssetSafety.cpp
         Test_FeatureRegistry.cpp
         Test_InplaceFunction.cpp
+    DEPS IntrinsicCore
 )
 
-target_compile_options(${core_test_target} PRIVATE ${INTRINSIC_COMPILE_FLAGS})
-target_link_options(${core_test_target} PRIVATE ${INTRINSIC_LINK_FLAGS})
-set_target_properties(${core_test_target} PROPERTIES CXX_SCAN_FOR_MODULES ON)
-
-target_link_libraries(${core_test_target}
-        PRIVATE
-        IntrinsicConfig
-        IntrinsicCore
-        GTest::gtest_main
-        dl
-)
-
-gtest_discover_tests(${core_test_target}
-    PROPERTIES
-    ENVIRONMENT "${_intrinsic_test_env}"
-    DISCOVERY_MODE POST_BUILD
-)
-
-# --- Core + ECS tests (FrameGraph system integration) ---
-set(ecs_test_target IntrinsicECSTests)
-add_executable(${ecs_test_target}
+# --- ECS tests (FrameGraph system integration) ---
+intrinsic_test_object_lib(ECSTestObjs
+    SOURCES
         Test_RuntimeECS.cpp
         Test_FrameGraphSystems.cpp
+    DEPS IntrinsicCore IntrinsicECS
 )
 
-target_compile_options(${ecs_test_target} PRIVATE ${INTRINSIC_COMPILE_FLAGS})
-target_link_options(${ecs_test_target} PRIVATE ${INTRINSIC_LINK_FLAGS})
-set_target_properties(${ecs_test_target} PROPERTIES CXX_SCAN_FOR_MODULES ON)
-
-target_link_libraries(${ecs_test_target}
-        PRIVATE
-        IntrinsicConfig
-        IntrinsicCore
-        IntrinsicECS
-        GTest::gtest_main
-        dl
-)
-
-gtest_discover_tests(${ecs_test_target}
-    PROPERTIES
-    ENVIRONMENT "${_intrinsic_test_env}"
-    DISCOVERY_MODE POST_BUILD
-)
-
-# --- Core + Geometry tests (DEC, mesh algorithms — no GPU, no ECS) ---
-set(geometry_test_target IntrinsicGeometryTests)
-add_executable(${geometry_test_target}
+# --- Geometry tests (DEC, mesh algorithms, graphs — no GPU, no ECS) ---
+intrinsic_test_object_lib(GeometryTestObjs
+    SOURCES
         Test_RuntimeGeometry.cpp
         Test_RuntimeGeometry_NoHeapEPA.cpp
         Test_RuntimeGraph.cpp
@@ -152,23 +95,58 @@ add_executable(${geometry_test_target}
         Test_GeometryProcessing.cpp
         Test_GeometryProcessing2.cpp
         Test_SurfaceReconstruction.cpp
+        Test_MeshQuality.cpp
+        Test_Parameterization.cpp
+    DEPS IntrinsicCore IntrinsicGeometry
 )
 
-target_compile_options(${geometry_test_target} PRIVATE ${INTRINSIC_COMPILE_FLAGS})
-target_link_options(${geometry_test_target} PRIVATE ${INTRINSIC_LINK_FLAGS})
-set_target_properties(${geometry_test_target} PROPERTIES CXX_SCAN_FOR_MODULES ON)
-
-target_link_libraries(${geometry_test_target}
-        PRIVATE
-        IntrinsicConfig
-        IntrinsicCore
-        IntrinsicGeometry
-        GTest::gtest_main
-        dl
+# --- Runtime tests (Graphics, I/O, RHI — need full Runtime) ---
+intrinsic_test_object_lib(RuntimeTestObjs
+    SOURCES
+        Test_CoreAssets.cpp
+        Test_RuntimeGraphics.cpp
+        Test_RuntimeRHI.cpp
+        Test_RuntimeSelection.cpp
+        Test_RuntimeSelection_Multi.cpp
+        Test_TextureMaterialHotReload.cpp
+        Test_RuntimeCulling.cpp
+        Test_GraphicsBackend.cpp
+        Test_AssetPipeline.cpp
+        Test_SceneManager.cpp
+        Test_RenderOrchestrator.cpp
+        Test_HeadlessEngine.cpp
+        Test_IORegistry.cpp
+        Test_DebugDraw.cpp
+        Test_OctreeDebugDraw.cpp
+        Test_BoundingDebugDraw.cpp
+        Test_KDTreeDebugDraw.cpp
+    DEPS IntrinsicRuntime
 )
 
-gtest_discover_tests(${geometry_test_target}
-    PROPERTIES
-    ENVIRONMENT "${_intrinsic_test_env}"
-    DISCOVERY_MODE POST_BUILD
+# =============================================================================
+# Executable targets — link pre-compiled objects, no recompilation
+# =============================================================================
+
+# --- Full suite (all tests) ---
+intrinsic_test_executable(IntrinsicTests
+    OBJECTS  CoreTestObjs ECSTestObjs GeometryTestObjs RuntimeTestObjs
+    LINK_LIBS IntrinsicRuntime
+)
+
+# --- Core-only (no Runtime, no ECS, no GPU) ---
+intrinsic_test_executable(IntrinsicCoreTests
+    OBJECTS  CoreTestObjs
+    LINK_LIBS IntrinsicCore
+)
+
+# --- Core + ECS (FrameGraph system integration) ---
+intrinsic_test_executable(IntrinsicECSTests
+    OBJECTS  ECSTestObjs
+    LINK_LIBS IntrinsicCore IntrinsicECS
+)
+
+# --- Core + Geometry (DEC, mesh algorithms — no GPU, no ECS) ---
+intrinsic_test_executable(IntrinsicGeometryTests
+    OBJECTS  GeometryTestObjs
+    LINK_LIBS IntrinsicCore IntrinsicGeometry
 )

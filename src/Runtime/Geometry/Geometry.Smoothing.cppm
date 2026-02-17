@@ -1,11 +1,13 @@
 module;
 
 #include <cstddef>
+#include <optional>
 
 export module Geometry:Smoothing;
 
 import :Properties;
 import :HalfedgeMesh;
+import :DEC;
 
 export namespace Geometry::Smoothing
 {
@@ -96,5 +98,70 @@ export namespace Geometry::Smoothing
     };
 
     void Taubin(Halfedge::Mesh& mesh, const TaubinParams& params);
+
+    // -------------------------------------------------------------------------
+    // Implicit (backward Euler) Laplacian smoothing
+    // -------------------------------------------------------------------------
+    //
+    // Solves the heat equation implicitly:
+    //   (M + λ·dt·L) x_new = M · x_old
+    //
+    // where M = Hodge star 0 (vertex mass matrix), L = cotan Laplacian
+    // (positive semidefinite), λ is the diffusion coefficient, and dt is
+    // the timestep.
+    //
+    // Unlike explicit smoothing (forward Euler), the implicit scheme is
+    // unconditionally stable — arbitrarily large timesteps produce smooth
+    // results without oscillation or divergence. A single iteration with
+    // a large dt can achieve the same effect as many explicit iterations.
+    //
+    // The system (M + λ·dt·L) is SPD for λ·dt > 0, solved via the
+    // DEC module's SolveCGShifted (Jacobi-preconditioned CG).
+    //
+    // Reference: Desbrun et al., "Implicit Fairing of Irregular Meshes
+    // Using Diffusion and Curvature Flow" (1999).
+
+    struct ImplicitSmoothingParams
+    {
+        // Number of smoothing iterations. Each iteration rebuilds DEC
+        // operators so that cotan weights track the evolving geometry.
+        std::size_t Iterations{1};
+
+        // Diffusion coefficient. Controls smoothing strength.
+        double Lambda{1.0};
+
+        // Timestep. Larger values produce stronger smoothing per iteration.
+        // With implicit integration, stability is guaranteed for any dt > 0.
+        // If 0, auto-selects dt = h² where h is the mean edge length.
+        double TimeStep{0.0};
+
+        // If true, boundary vertices are pinned to their original positions.
+        bool PreserveBoundary{true};
+
+        // CG solver tolerance
+        double SolverTolerance{1e-8};
+
+        // CG solver maximum iterations
+        std::size_t MaxSolverIterations{2000};
+    };
+
+    struct ImplicitSmoothingResult
+    {
+        // Number of smoothing iterations performed
+        std::size_t IterationsPerformed{0};
+
+        // CG iterations used in the last solve (per-axis maximum)
+        std::size_t LastCGIterations{0};
+
+        // Whether the last CG solve converged
+        bool Converged{false};
+
+        // Final vertex count (unchanged — topology is preserved)
+        std::size_t VertexCount{0};
+    };
+
+    [[nodiscard]] std::optional<ImplicitSmoothingResult> ImplicitLaplacian(
+        Halfedge::Mesh& mesh,
+        const ImplicitSmoothingParams& params = {});
 
 } // namespace Geometry::Smoothing

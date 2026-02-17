@@ -741,6 +741,216 @@ TEST(Smoothing_Taubin, FlatMeshStaysFlat)
 }
 
 // =============================================================================
+// Implicit Laplacian Smoothing tests
+// =============================================================================
+
+TEST(Smoothing_Implicit, EmptyMeshReturnsNullopt)
+{
+    Geometry::Halfedge::Mesh mesh;
+    auto result = Geometry::Smoothing::ImplicitLaplacian(mesh);
+    EXPECT_FALSE(result.has_value());
+}
+
+TEST(Smoothing_Implicit, FlatMeshStaysFlat)
+{
+    auto mesh = MakeSubdividedTriangle();
+
+    Geometry::Smoothing::ImplicitSmoothingParams params;
+    params.Iterations = 3;
+    params.Lambda = 1.0;
+    params.PreserveBoundary = true;
+
+    auto result = Geometry::Smoothing::ImplicitLaplacian(mesh, params);
+    ASSERT_TRUE(result.has_value());
+
+    // All vertices should remain on z=0 plane
+    for (std::size_t i = 0; i < mesh.VerticesSize(); ++i)
+    {
+        Geometry::VertexHandle vh{static_cast<Geometry::PropertyIndex>(i)};
+        if (mesh.IsDeleted(vh) || mesh.IsIsolated(vh)) continue;
+
+        EXPECT_NEAR(mesh.Position(vh).z, 0.0f, 1e-4f)
+            << "Vertex " << i << " should remain on z=0 plane";
+    }
+}
+
+TEST(Smoothing_Implicit, ReducesNoise)
+{
+    auto mesh = MakeIcosahedron();
+
+    // Add noise
+    for (std::size_t i = 0; i < mesh.VerticesSize(); ++i)
+    {
+        Geometry::VertexHandle vh{static_cast<Geometry::PropertyIndex>(i)};
+        if (mesh.IsDeleted(vh)) continue;
+
+        float noise = 0.05f * (static_cast<float>(i % 5) - 2.0f);
+        glm::vec3 p = mesh.Position(vh);
+        mesh.Position(vh) = p + glm::normalize(p) * noise;
+    }
+
+    auto edgeLengthVariance = [](const Geometry::Halfedge::Mesh& m) -> double
+    {
+        double sum = 0.0, sumSq = 0.0;
+        std::size_t count = 0;
+        for (std::size_t i = 0; i < m.EdgesSize(); ++i)
+        {
+            Geometry::EdgeHandle e{static_cast<Geometry::PropertyIndex>(i)};
+            if (m.IsDeleted(e)) continue;
+            auto h = m.Halfedge(e, 0);
+            double len = static_cast<double>(glm::distance(
+                m.Position(m.FromVertex(h)), m.Position(m.ToVertex(h))));
+            sum += len;
+            sumSq += len * len;
+            ++count;
+        }
+        double mean = sum / static_cast<double>(count);
+        return sumSq / static_cast<double>(count) - mean * mean;
+    };
+
+    double varBefore = edgeLengthVariance(mesh);
+
+    Geometry::Smoothing::ImplicitSmoothingParams params;
+    params.Iterations = 1;
+    params.Lambda = 1.0;
+    params.PreserveBoundary = false;
+
+    auto result = Geometry::Smoothing::ImplicitLaplacian(mesh, params);
+    ASSERT_TRUE(result.has_value());
+
+    double varAfter = edgeLengthVariance(mesh);
+    EXPECT_LT(varAfter, varBefore);
+}
+
+TEST(Smoothing_Implicit, PreservesBoundary)
+{
+    auto mesh = MakeSubdividedTriangle();
+
+    // Record boundary positions
+    std::vector<std::pair<Geometry::VertexHandle, glm::vec3>> boundaryPositions;
+    for (std::size_t i = 0; i < mesh.VerticesSize(); ++i)
+    {
+        Geometry::VertexHandle vh{static_cast<Geometry::PropertyIndex>(i)};
+        if (mesh.IsBoundary(vh))
+            boundaryPositions.push_back({vh, mesh.Position(vh)});
+    }
+
+    Geometry::Smoothing::ImplicitSmoothingParams params;
+    params.Iterations = 3;
+    params.Lambda = 1.0;
+    params.PreserveBoundary = true;
+
+    auto result = Geometry::Smoothing::ImplicitLaplacian(mesh, params);
+    ASSERT_TRUE(result.has_value());
+
+    for (const auto& [vh, pos] : boundaryPositions)
+    {
+        glm::vec3 after = mesh.Position(vh);
+        EXPECT_NEAR(after.x, pos.x, 1e-5f);
+        EXPECT_NEAR(after.y, pos.y, 1e-5f);
+        EXPECT_NEAR(after.z, pos.z, 1e-5f);
+    }
+}
+
+TEST(Smoothing_Implicit, UnconditionallyStable)
+{
+    // Implicit smoothing should be stable even with very large timesteps
+    auto mesh = MakeIcosahedron();
+
+    Geometry::Smoothing::ImplicitSmoothingParams params;
+    params.Iterations = 1;
+    params.Lambda = 1.0;
+    params.TimeStep = 1000.0; // Enormous timestep
+    params.PreserveBoundary = false;
+
+    auto result = Geometry::Smoothing::ImplicitLaplacian(mesh, params);
+    ASSERT_TRUE(result.has_value());
+
+    // Check no NaN or Inf
+    for (std::size_t i = 0; i < mesh.VerticesSize(); ++i)
+    {
+        Geometry::VertexHandle vh{static_cast<Geometry::PropertyIndex>(i)};
+        if (mesh.IsDeleted(vh) || mesh.IsIsolated(vh)) continue;
+
+        glm::vec3 p = mesh.Position(vh);
+        EXPECT_FALSE(std::isnan(p.x) || std::isnan(p.y) || std::isnan(p.z))
+            << "Vertex " << i << " has NaN after large timestep";
+        EXPECT_FALSE(std::isinf(p.x) || std::isinf(p.y) || std::isinf(p.z))
+            << "Vertex " << i << " has Inf after large timestep";
+    }
+}
+
+TEST(Smoothing_Implicit, ConvergesForClosedMesh)
+{
+    auto mesh = MakeIcosahedron();
+
+    Geometry::Smoothing::ImplicitSmoothingParams params;
+    params.Iterations = 1;
+    params.Lambda = 1.0;
+    params.PreserveBoundary = false;
+
+    auto result = Geometry::Smoothing::ImplicitLaplacian(mesh, params);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_TRUE(result->Converged);
+    EXPECT_EQ(result->IterationsPerformed, 1u);
+}
+
+TEST(Smoothing_Implicit, MultipleIterations)
+{
+    auto mesh1 = MakeIcosahedron();
+    auto mesh2 = MakeIcosahedron();
+
+    // Add same noise to both
+    for (std::size_t i = 0; i < mesh1.VerticesSize(); ++i)
+    {
+        Geometry::VertexHandle vh{static_cast<Geometry::PropertyIndex>(i)};
+        if (mesh1.IsDeleted(vh)) continue;
+        float noise = 0.05f * (static_cast<float>(i % 5) - 2.0f);
+        glm::vec3 p = mesh1.Position(vh);
+        mesh1.Position(vh) = p + glm::normalize(p) * noise;
+        mesh2.Position(vh) = p + glm::normalize(p) * noise;
+    }
+
+    // 1 iteration on mesh1
+    Geometry::Smoothing::ImplicitSmoothingParams params1;
+    params1.Iterations = 1;
+    params1.Lambda = 1.0;
+    params1.PreserveBoundary = false;
+    (void)Geometry::Smoothing::ImplicitLaplacian(mesh1, params1);
+
+    // 3 iterations on mesh2
+    Geometry::Smoothing::ImplicitSmoothingParams params3;
+    params3.Iterations = 3;
+    params3.Lambda = 1.0;
+    params3.PreserveBoundary = false;
+    auto result = Geometry::Smoothing::ImplicitLaplacian(mesh2, params3);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->IterationsPerformed, 3u);
+
+    // mesh2 (3 iterations) should be smoother than mesh1 (1 iteration)
+    auto edgeLengthVariance = [](const Geometry::Halfedge::Mesh& m) -> double
+    {
+        double sum = 0.0, sumSq = 0.0;
+        std::size_t count = 0;
+        for (std::size_t i = 0; i < m.EdgesSize(); ++i)
+        {
+            Geometry::EdgeHandle e{static_cast<Geometry::PropertyIndex>(i)};
+            if (m.IsDeleted(e)) continue;
+            auto h = m.Halfedge(e, 0);
+            double len = static_cast<double>(glm::distance(
+                m.Position(m.FromVertex(h)), m.Position(m.ToVertex(h))));
+            sum += len;
+            sumSq += len * len;
+            ++count;
+        }
+        double mean = sum / static_cast<double>(count);
+        return sumSq / static_cast<double>(count) - mean * mean;
+    };
+
+    EXPECT_LE(edgeLengthVariance(mesh2), edgeLengthVariance(mesh1));
+}
+
+// =============================================================================
 // Simplification tests
 // =============================================================================
 

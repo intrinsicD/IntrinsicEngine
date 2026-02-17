@@ -7,6 +7,7 @@ module;
 #include <limits>
 #include <optional>
 #include <queue>
+#include <span>
 #include <utility>
 #include <span>
 #include <vector>

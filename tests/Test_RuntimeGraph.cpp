@@ -5,6 +5,8 @@
 #include <limits>
 #include <vector>
 
+#include <glm/glm.hpp>
+
 import Geometry;
 
 TEST(RuntimeGraph, AddEdge_FindEdge)

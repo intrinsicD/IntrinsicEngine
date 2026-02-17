@@ -6,6 +6,8 @@
 #include <utility>
 #include <vector>
 
+#include <glm/glm.hpp>
+
 import Geometry;
 
 TEST(RuntimeGraphKNN, ReturnsNulloptForDegenerateInputs)
