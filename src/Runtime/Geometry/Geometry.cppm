@@ -9,6 +9,7 @@ export import :Handle;
 export import :MeshUtils;
 export import :OBB;
 export import :Octree;
+export import :KDTree;
 export import :Raycast;
 export import :Overlap;
 export import :Primitives;

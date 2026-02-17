@@ -17,6 +17,7 @@ add_executable(${target_name}
         Test_RuntimeGraph.cpp
         Test_RuntimeGraph_ParallelLayers.cpp
         Test_RuntimeGraphKNN.cpp
+        Test_KDTree.cpp
         Test_RuntimeSelection.cpp
         Test_RuntimeSelection_Multi.cpp
         Test_TextureMaterialHotReload.cpp
@@ -144,6 +145,7 @@ add_executable(${geometry_test_target}
         Test_RuntimeGraph.cpp
         Test_RuntimeGraph_ParallelLayers.cpp
         Test_RuntimeGraphKNN.cpp
+        Test_KDTree.cpp
         Test_DEC.cpp
         Test_MeshOperations.cpp
         Test_GeometryProcessing.cpp

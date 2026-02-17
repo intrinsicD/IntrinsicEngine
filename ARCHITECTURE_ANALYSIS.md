@@ -211,7 +211,7 @@ The following Clang 18 issues are resolved by the upgrade to Clang 20 as the min
 
 **Required debug overlays:**
 - ~~**Octree:**~~ — **DONE.** Sandbox can render the selected entity’s `MeshCollider` `Geometry::Octree` as color-by-depth wire boxes via `Graphics::DebugDraw` + `LineRenderPass`. Controls live in `View Settings → Spatial Debug` (max depth, leaf-only, occupied-only, overlay/depth-tested).
-- **KD-tree:** Wireframe splitting planes + leaf bounding boxes (KD-tree needs to be implemented first — see §2.6).
+- **KD-tree:** Core geometry accelerator is **DONE** (`Geometry::KDTree`) with an Octree-inspired AABB-element build (`Build(span<const AABB>)` + `BuildFromPoints`) and exact AABB-distance kNN/radius queries. Remaining work: debug visualization overlays (splitting planes + leaves) through `DebugDraw` + `LineRenderPass`.
 - **BVH (Bounding Volume Hierarchy):** Wireframe AABBs/OBBs at each BVH node level, with configurable max display depth.
 - **Uniform grid:** Wireframe cells with occupancy coloring.
 - ~~**Bounding volumes:**~~ — **DONE.** Sandbox can render selected `MeshCollider` bounds as world AABB, world OBB, and conservative bounding sphere overlays. Per-type toggles, independent colors, alpha, and overlay/depth-tested routing are exposed in `View Settings → Spatial Debug`.
@@ -271,6 +271,8 @@ The following Clang 18 issues are resolved by the upgrade to Clang 20 as the min
 ---
 
 ### 2.6 Geometry Processing Operators
+
+The geometry module now includes `Geometry::KDTree`, an Octree-inspired accelerator over element AABBs (`Build(span<const AABB>)`, `BuildFromPoints`) for exact nearest-neighbor and radius queries under AABB distance, plus generic overlap filtering for `AABB`/`Sphere`/`Ray` query shapes. The builder uses median splits on the largest-extent axis with bounded leaf size/depth and branch-and-bound AABB pruning during query traversal. This provides a deterministic CPU fallback/complement to Octree queries for operators that benefit from axis-aligned binary partitioning and non-point primitives.
 
 **Context:** The engine has collision and spatial query primitives (`GJK`, `EPA`, `Octree`, `HalfedgeMesh`, `Raycast`, etc.) and now a growing set of higher-level geometry processing operators.
 
