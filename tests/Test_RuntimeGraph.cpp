@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cmath>
+#include <limits>
 #include <vector>
 
 import Geometry;
@@ -330,4 +331,82 @@ TEST(RuntimeGraph, HierarchicalLayoutAutoRootCentersLongPath)
     EXPECT_NEAR(positions[centerIndex].y, 0.0f, 1.0e-4f);
     EXPECT_NEAR(positions[vertices.front().Index].y, -3.0f, 1.0e-4f);
     EXPECT_NEAR(positions[vertices.back().Index].y, -3.0f, 1.0e-4f);
+}
+
+TEST(RuntimeGraph, CountEdgeCrossingsRejectsDegenerateInput)
+{
+    Geometry::Graph::Graph g;
+    auto v0 = g.AddVertex({0.0f, 0.0f, 0.0f});
+    auto v1 = g.AddVertex({1.0f, 0.0f, 0.0f});
+    ASSERT_TRUE(g.AddEdge(v0, v1).has_value());
+
+    std::vector<glm::vec2> smallPositions(1, glm::vec2(0.0f));
+    EXPECT_FALSE(Geometry::Graph::CountEdgeCrossings(g, smallPositions).has_value());
+
+    std::vector<glm::vec2> positions(g.VerticesSize(), glm::vec2(0.0f));
+    positions[v0.Index] = {0.0f, 0.0f};
+    positions[v1.Index] = {std::numeric_limits<float>::infinity(), 0.0f};
+    EXPECT_FALSE(Geometry::Graph::CountEdgeCrossings(g, positions).has_value());
+
+    Geometry::Graph::EdgeCrossingParams invalidParams{};
+    invalidParams.IntersectionEpsilon = -1.0e-3f;
+    positions[v1.Index] = {1.0f, 0.0f};
+    EXPECT_FALSE(Geometry::Graph::CountEdgeCrossings(g, positions, invalidParams).has_value());
+}
+
+TEST(RuntimeGraph, CountEdgeCrossingsCountsOnlyNonIncidentByDefault)
+{
+    Geometry::Graph::Graph g;
+    auto v0 = g.AddVertex({0.0f, 0.0f, 0.0f});
+    auto v1 = g.AddVertex({1.0f, 0.0f, 0.0f});
+    auto v2 = g.AddVertex({0.0f, 1.0f, 0.0f});
+    auto v3 = g.AddVertex({1.0f, 1.0f, 0.0f});
+
+    ASSERT_TRUE(g.AddEdge(v0, v3).has_value());
+    ASSERT_TRUE(g.AddEdge(v1, v2).has_value());
+    ASSERT_TRUE(g.AddEdge(v0, v1).has_value());
+
+    std::vector<glm::vec2> positions(g.VerticesSize(), glm::vec2(0.0f));
+    positions[v0.Index] = {-1.0f, -1.0f};
+    positions[v1.Index] = {1.0f, -1.0f};
+    positions[v2.Index] = {-1.0f, 1.0f};
+    positions[v3.Index] = {1.0f, 1.0f};
+
+    const auto crossings = Geometry::Graph::CountEdgeCrossings(g, positions);
+    ASSERT_TRUE(crossings.has_value());
+    EXPECT_EQ(*crossings, 1u);
+}
+
+TEST(RuntimeGraph, CountEdgeCrossingsCanIncludeIncidentAndCollinearOverlaps)
+{
+    Geometry::Graph::Graph g;
+    auto v0 = g.AddVertex({0.0f, 0.0f, 0.0f});
+    auto v1 = g.AddVertex({1.0f, 0.0f, 0.0f});
+    auto v2 = g.AddVertex({2.0f, 0.0f, 0.0f});
+    auto v3 = g.AddVertex({3.0f, 0.0f, 0.0f});
+
+    ASSERT_TRUE(g.AddEdge(v0, v2).has_value());
+    ASSERT_TRUE(g.AddEdge(v1, v3).has_value());
+
+    std::vector<glm::vec2> positions(g.VerticesSize(), glm::vec2(0.0f));
+    positions[v0.Index] = {0.0f, 0.0f};
+    positions[v1.Index] = {1.0f, 0.0f};
+    positions[v2.Index] = {2.0f, 0.0f};
+    positions[v3.Index] = {3.0f, 0.0f};
+
+    auto defaultCrossings = Geometry::Graph::CountEdgeCrossings(g, positions);
+    ASSERT_TRUE(defaultCrossings.has_value());
+    EXPECT_EQ(*defaultCrossings, 0u);
+
+    Geometry::Graph::EdgeCrossingParams overlapParams{};
+    overlapParams.CountCollinearOverlap = true;
+    auto overlapCrossings = Geometry::Graph::CountEdgeCrossings(g, positions, overlapParams);
+    ASSERT_TRUE(overlapCrossings.has_value());
+    EXPECT_EQ(*overlapCrossings, 1u);
+
+    Geometry::Graph::EdgeCrossingParams includeIncident{};
+    includeIncident.IgnoreIncidentEdges = false;
+    auto includeIncidentCrossings = Geometry::Graph::CountEdgeCrossings(g, positions, includeIncident);
+    ASSERT_TRUE(includeIncidentCrossings.has_value());
+    EXPECT_EQ(*includeIncidentCrossings, 1u);
 }
