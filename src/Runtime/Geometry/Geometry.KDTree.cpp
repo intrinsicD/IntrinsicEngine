@@ -9,8 +9,8 @@ module;
 #include <queue>
 #include <span>
 #include <utility>
+#include <span>
 #include <vector>
-
 #include <glm/glm.hpp>
 
 module Geometry:KDTree.Impl;
