@@ -2,6 +2,7 @@ module;
 #include <memory>
 #include <cstdint>
 #include <vector>
+#include <utility>
 
 #include <glm/glm.hpp>
 
@@ -81,5 +82,52 @@ export namespace ECS::PointCloudRenderer
         [[nodiscard]] bool HasNormals() const noexcept { return Normals.size() == Positions.size(); }
         [[nodiscard]] bool HasColors() const noexcept { return Colors.size() == Positions.size(); }
         [[nodiscard]] bool HasRadii() const noexcept { return Radii.size() == Positions.size(); }
+    };
+}
+
+// -------------------------------------------------------------------------
+// RenderVisualization — Per-entity rendering mode control.
+// -------------------------------------------------------------------------
+//
+// Decouples the visual representation from the CPU data type.  Any entity
+// with spatial data (mesh, graph, point cloud) can independently toggle:
+//   - Surface rendering  (filled faces — ForwardPass)
+//   - Wireframe rendering (edges — LineRenderPass via DebugDraw)
+//   - Vertex rendering   (points — PointCloudRenderPass)
+//
+// The component is attached lazily when the user first toggles a mode in
+// the Inspector.  Entities without this component use defaults:
+// surface=on, wireframe=off, vertices=off.
+
+export namespace ECS::RenderVisualization
+{
+    struct Component
+    {
+        // ---- Mode Toggles ----
+        bool ShowSurface   = true;   // ForwardPass mesh/line rendering.
+        bool ShowWireframe = false;  // Edge overlay via DebugDraw → LineRenderPass.
+        bool ShowVertices  = false;  // Vertex points via PointCloudRenderPass.
+
+        // ---- Wireframe Settings ----
+        glm::vec4 WireframeColor = {0.85f, 0.85f, 0.85f, 1.0f};
+        float     WireframeWidth = 1.5f;
+        bool      WireframeOverlay = false;  // true = no depth test (always visible).
+
+        // ---- Vertex Settings ----
+        glm::vec4 VertexColor      = {1.0f, 0.6f, 0.0f, 1.0f};
+        float     VertexSize       = 0.008f;  // World-space radius.
+        uint32_t  VertexRenderMode = 0;       // 0 = flat disc, 1 = surfel.
+
+        // ---- Edge Cache (internal, rebuilt lazily) ----
+        // Populated from MeshCollider collision data when wireframe is first
+        // enabled.  Stores unique edge pairs as index offsets into the
+        // collision position array.
+        std::vector<std::pair<uint32_t, uint32_t>> CachedEdges;
+        bool EdgeCacheDirty = true;
+
+        // ---- Sync State (internal) ----
+        // Tracks the last ShowSurface value written to GPUScene so that
+        // GPUSceneSync can detect transitions.
+        bool CachedShowSurface = true;
     };
 }
