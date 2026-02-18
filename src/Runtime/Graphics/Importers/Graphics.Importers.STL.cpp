@@ -12,6 +12,10 @@ module;
 #include <unordered_map>
 #include <vector>
 #include <glm/glm.hpp>
+#include <glm/gtc/epsilon.hpp>
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/norm.hpp>
+#include <glm/gtx/compatibility.hpp>
 
 module Graphics:Importers.STL.Impl;
 import :Importers.STL;
@@ -24,7 +28,7 @@ namespace Graphics
 {
     namespace
     {
-        static constexpr std::string_view s_Extensions[] = { ".stl" };
+        constexpr std::string_view s_Extensions[] = { ".stl" };
 
         // Spatial hash for vertex deduplication
         struct VertexKey
@@ -107,8 +111,6 @@ namespace Graphics
             uniqueVerts.reserve(triCount * 2);
 
             bool allNormalsZero = true;
-            std::vector<glm::vec3> faceNormals;
-            faceNormals.reserve(triCount);
 
             const std::byte* ptr = data.data() + 84;
 
@@ -120,7 +122,6 @@ namespace Graphics
                 std::memcpy(&ny, ptr + 4, 4);
                 std::memcpy(&nz, ptr + 8, 4);
                 glm::vec3 faceNormal(nx, ny, nz);
-                faceNormals.push_back(faceNormal);
                 if (glm::length(faceNormal) > 1e-6f) allNormalsZero = false;
 
                 // Read 3 vertices (each 3 floats)
@@ -150,9 +151,59 @@ namespace Graphics
                 ptr += 50; // 12 (normal) + 36 (3 vertices) + 2 (attribute byte count)
             }
 
-            // Normals: recompute from geometry if all-zero
+            // Normals: if the file provided meaningful face normals, keep them by accumulating
+            // them onto the deduplicated vertices. Otherwise recompute from geometry.
             outData.Normals.resize(outData.Positions.size(), glm::vec3(0, 0, 0));
-            Geometry::MeshUtils::CalculateNormals(outData.Positions, outData.Indices, outData.Normals);
+
+            if (!allNormalsZero)
+            {
+                const std::byte* nPtr = data.data() + 84;
+                for (uint32_t t = 0; t < triCount; ++t)
+                {
+                    float nx, ny, nz;
+                    std::memcpy(&nx, nPtr + 0, 4);
+                    std::memcpy(&ny, nPtr + 4, 4);
+                    std::memcpy(&nz, nPtr + 8, 4);
+
+                    glm::vec3 n(nx, ny, nz);
+                    if (!glm::all(glm::isfinite(n)) || glm::length2(n) < 1e-12f)
+                    {
+                        nPtr += 50;
+                        continue;
+                    }
+
+                    // Add to the three indices corresponding to this triangle.
+                    const std::size_t base = static_cast<std::size_t>(t) * 3;
+                    outData.Normals[outData.Indices[base + 0]] += n;
+                    outData.Normals[outData.Indices[base + 1]] += n;
+                    outData.Normals[outData.Indices[base + 2]] += n;
+
+                    nPtr += 50;
+                }
+
+                // Normalize; if everything collapsed to zero (degenerate mesh), fall back.
+                bool anyNonZero = false;
+                for (auto& n : outData.Normals)
+                {
+                    const float len2 = glm::length2(n);
+                    if (len2 > 1e-12f)
+                    {
+                        n *= glm::inversesqrt(len2);
+                        anyNonZero = true;
+                    }
+                    else
+                    {
+                        n = glm::vec3(0.0f);
+                    }
+                }
+
+                if (!anyNonZero)
+                    Geometry::MeshUtils::CalculateNormals(outData.Positions, outData.Indices, outData.Normals);
+            }
+            else
+            {
+                Geometry::MeshUtils::CalculateNormals(outData.Positions, outData.Indices, outData.Normals);
+            }
 
             // Generate UVs
             Geometry::MeshUtils::GenerateUVs(outData.Positions, outData.Aux);

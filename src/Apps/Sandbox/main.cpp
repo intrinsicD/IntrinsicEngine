@@ -12,7 +12,10 @@ import Runtime.Engine;
 import Runtime.GraphicsBackend;
 import Runtime.AssetPipeline;
 import Runtime.RenderOrchestrator;
+import Runtime.SelectionModule;
 import Runtime.Selection;
+import Runtime.EditorUI;
+
 import Core.Logging;
 import Core.Filesystem;
 import Core.Assets;
@@ -226,6 +229,10 @@ public:
         Interface::GUI::RegisterPanel("Hierarchy", [this]() { DrawHierarchyPanel(); });
         Interface::GUI::RegisterPanel("Inspector", [this]() { DrawInspectorPanel(); });
         Interface::GUI::RegisterPanel("Assets", [this]() { GetAssetManager().AssetsUiPanel(); });
+
+        // Register shared editor-facing panels (Feature browser, FrameGraph inspector, Selection config).
+        Runtime::EditorUI::RegisterDefaultPanels(*this);
+
         Interface::GUI::RegisterPanel("Stats", [this]()
         {
             ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);

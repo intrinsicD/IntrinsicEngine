@@ -285,3 +285,24 @@ Only one path renders per frame (Stage 2 CPU-driven OR Stage 3 GPU-driven). No d
 
 - **`ARCHITECTURE_ANALYSIS.md`** — Living roadmap: completed features, open TODOs, dependency graph, prioritized phases.
 - **`CLAUDE.md`** — Development conventions, build workflows, architectural invariants.
+
+---
+
+## Editor UI (ImGui)
+
+The sandbox app ships with a lightweight editor UI built on Dear ImGui.
+Panels are registered via `Interface::GUI::RegisterPanel()`.
+
+### New panels
+
+- `Features` — browse and toggle `Core::FeatureRegistry` categories (RenderFeatures, Systems, Panels, GeometryOperators).
+- `Frame Graph` — inspect the current `Core::FrameGraph` execution layers (pass names grouped by parallel layer).
+- `Selection` — configure selection backend (CPU/GPU), mouse button, and clear selection.
+
+### Extending
+
+Common editor panels live in `src/Runtime/EditorUI/` and are registered from the app via:
+
+- `Runtime::EditorUI::RegisterDefaultPanels(engine)`
+
+Add a new panel by calling `Interface::GUI::RegisterPanel("My Panel", []{ ... });` from `Runtime.EditorUI`.

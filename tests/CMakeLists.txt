@@ -120,10 +120,13 @@ intrinsic_test_object_lib(RuntimeTestObjs
         Test_IORegistry.cpp
         Test_Exporters.cpp
         Test_DebugDraw.cpp
-        Test_OctreeDebugDraw.cpp
         Test_BoundingDebugDraw.cpp
         Test_KDTreeDebugDraw.cpp
-    DEPS IntrinsicRuntime
+        Test_OctreeDebugDraw.cpp
+        Test_DAGScheduler.cpp
+        Test_EditorUI.cpp
+
+    DEPS IntrinsicCore IntrinsicRuntime
 )
 
 # =============================================================================

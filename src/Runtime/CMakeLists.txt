@@ -16,6 +16,7 @@ target_sources(${target_name}
         Runtime.RenderOrchestrator.cppm
         Runtime.Selection.cppm
         Runtime.SelectionModule.cppm
+        EditorUI/Runtime.EditorUI.cppm
         PRIVATE
         Runtime.Engine.cpp
         Runtime.GraphicsBackend.cpp
@@ -24,6 +25,7 @@ target_sources(${target_name}
         Runtime.RenderOrchestrator.cpp
         Runtime.Selection.cpp
         Runtime.SelectionModule.cpp
+        EditorUI/Runtime.EditorUI.cpp
 )
 
 target_include_directories(${target_name} PUBLIC .)

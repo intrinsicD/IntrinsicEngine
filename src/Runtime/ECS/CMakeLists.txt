@@ -10,13 +10,13 @@ target_sources(${target_name}
         PUBLIC
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
         ECS.cppm
-        Components/ECS.Components.cppm
         Components/ECS.Components.AxisRotator.cppm
         Components/ECS.Components.Hierarchy.cppm
         Components/ECS.Components.NameTag.cppm
         Components/ECS.Components.Transform.cppm
         Components/ECS.Components.Selection.cppm
         Components/ECS.Components.DEC.cppm
+        Components/ECS.Components.cppm
         Systems/ECS.Systems.AxisRotator.cppm
         Systems/ECS.Systems.Transform.cppm
         ECS.Scene.cppm
