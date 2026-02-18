@@ -3,6 +3,8 @@ module;
 #include <cstddef>
 #include <memory>
 #include <span>
+#include <algorithm>
+#include <unordered_set>
 #include <glm/glm.hpp>
 #include <entt/entt.hpp>
 
@@ -11,6 +13,8 @@ module Graphics:Pipelines.Impl;
 import :RenderPipeline;
 import :RenderGraph;
 import :Components;
+import :Geometry;
+import :DebugDraw;
 import :Passes.Picking;
 import :Passes.Forward;
 import :Passes.SelectionOutline;
@@ -104,54 +108,194 @@ namespace Graphics
         if (m_ForwardPass && IsFeatureEnabled("ForwardPass"_id))
             m_Path.AddFeature("Forward", m_ForwardPass.get());
 
-        // 2b. Point Cloud Rendering — gated by FeatureRegistry.
-        // Collects point cloud data from ECS PointCloudRenderer components,
-        // uploads to SSBO, and renders billboard/surfel/EWA splats.
-        if (m_PointCloudPass && IsFeatureEnabled("PointCloudRenderPass"_id))
+        // 2b. Visualization Collection — unified stage for point clouds,
+        // wireframe overlays, and vertex rendering from any entity type.
+        //
+        // Collects data from three sources:
+        //  (a) PointCloudRenderer entities — standard point cloud rendering.
+        //  (b) MeshRenderer entities with RenderVisualization::ShowVertices — mesh
+        //      vertices rendered as points via PointCloudRenderPass.
+        //  (c) MeshRenderer entities with RenderVisualization::ShowWireframe — mesh
+        //      edges rendered as lines via DebugDraw → LineRenderPass.
+        //
+        // This decouples the visual representation from the CPU data type:
+        // a mesh can show its surface, wireframe, and vertices independently.
         {
-            m_Path.AddStage("PointCloud", [this](RenderPassContext& ctx)
+            const bool pointCloudEnabled = m_PointCloudPass && IsFeatureEnabled("PointCloudRenderPass"_id);
+            const bool lineEnabled = m_LineRenderPass && IsFeatureEnabled("LineRenderPass"_id);
+
+            if (pointCloudEnabled || lineEnabled)
             {
-                // Reset and collect point data from all PointCloudRenderer entities.
-                m_PointCloudPass->ResetPoints();
-
-                auto& registry = ctx.Scene.GetRegistry();
-                auto view = registry.view<ECS::PointCloudRenderer::Component>();
-                for (auto [entity, pc] : view.each())
+                m_Path.AddStage("VisualizationCollect", [this, pointCloudEnabled, lineEnabled](RenderPassContext& ctx)
                 {
-                    if (!pc.Visible || pc.Positions.empty()) continue;
+                    if (pointCloudEnabled)
+                        m_PointCloudPass->ResetPoints();
 
-                    const uint32_t defaultColor = Passes::PointCloudRenderPass::PackColorF(
-                        pc.DefaultColor.r, pc.DefaultColor.g, pc.DefaultColor.b, pc.DefaultColor.a);
+                    auto& registry = ctx.Scene.GetRegistry();
 
-                    // Get world transform if available.
-                    glm::mat4 worldMatrix(1.0f);
-                    if (auto* wm = registry.try_get<ECS::Components::Transform::WorldMatrix>(entity))
-                        worldMatrix = wm->Matrix;
-
-                    for (std::size_t i = 0; i < pc.Positions.size(); ++i)
+                    // --- (a) PointCloudRenderer entities ---
+                    if (pointCloudEnabled)
                     {
-                        glm::vec3 worldPos = glm::vec3(worldMatrix * glm::vec4(pc.Positions[i], 1.0f));
-                        glm::vec3 normal = pc.HasNormals()
-                            ? glm::normalize(glm::mat3(worldMatrix) * pc.Normals[i])
-                            : glm::vec3(0.0f, 1.0f, 0.0f);
-                        float radius = pc.HasRadii() ? pc.Radii[i] : pc.DefaultRadius;
-                        uint32_t color = pc.HasColors()
-                            ? Passes::PointCloudRenderPass::PackColorF(
-                                pc.Colors[i].r, pc.Colors[i].g, pc.Colors[i].b, pc.Colors[i].a)
-                            : defaultColor;
+                        auto pcView = registry.view<ECS::PointCloudRenderer::Component>();
+                        for (auto [entity, pc] : pcView.each())
+                        {
+                            // RenderVisualization overrides Visible when present.
+                            bool visible = pc.Visible;
+                            if (auto* vis = registry.try_get<ECS::RenderVisualization::Component>(entity))
+                                visible = vis->ShowVertices;
 
-                        auto pt = Passes::PointCloudRenderPass::PackPoint(
-                            worldPos.x, worldPos.y, worldPos.z,
-                            normal.x, normal.y, normal.z,
-                            radius * pc.SizeMultiplier,
-                            color);
-                        m_PointCloudPass->SubmitPoints(&pt, 1);
+                            if (!visible || pc.Positions.empty()) continue;
+
+                            const uint32_t defaultColor = Passes::PointCloudRenderPass::PackColorF(
+                                pc.DefaultColor.r, pc.DefaultColor.g, pc.DefaultColor.b, pc.DefaultColor.a);
+
+                            glm::mat4 worldMatrix(1.0f);
+                            if (auto* wm = registry.try_get<ECS::Components::Transform::WorldMatrix>(entity))
+                                worldMatrix = wm->Matrix;
+
+                            for (std::size_t i = 0; i < pc.Positions.size(); ++i)
+                            {
+                                glm::vec3 worldPos = glm::vec3(worldMatrix * glm::vec4(pc.Positions[i], 1.0f));
+                                glm::vec3 normal = pc.HasNormals()
+                                    ? glm::normalize(glm::mat3(worldMatrix) * pc.Normals[i])
+                                    : glm::vec3(0.0f, 1.0f, 0.0f);
+                                float radius = pc.HasRadii() ? pc.Radii[i] : pc.DefaultRadius;
+                                uint32_t color = pc.HasColors()
+                                    ? Passes::PointCloudRenderPass::PackColorF(
+                                        pc.Colors[i].r, pc.Colors[i].g, pc.Colors[i].b, pc.Colors[i].a)
+                                    : defaultColor;
+
+                                auto pt = Passes::PointCloudRenderPass::PackPoint(
+                                    worldPos.x, worldPos.y, worldPos.z,
+                                    normal.x, normal.y, normal.z,
+                                    radius * pc.SizeMultiplier,
+                                    color);
+                                m_PointCloudPass->SubmitPoints(&pt, 1);
+                            }
+                        }
                     }
-                }
 
-                if (m_PointCloudPass->HasContent())
-                    m_PointCloudPass->AddPasses(ctx);
-            });
+                    // --- (b) & (c) MeshRenderer entities with visualization overlays ---
+                    {
+                        auto meshView = registry.view<ECS::MeshRenderer::Component,
+                                                      ECS::RenderVisualization::Component>();
+                        for (auto [entity, mr, vis] : meshView.each())
+                        {
+                            if (!vis.ShowWireframe && !vis.ShowVertices)
+                                continue;
+
+                            // Need CPU mesh data from collision geometry.
+                            auto* collider = registry.try_get<ECS::MeshCollider::Component>(entity);
+                            if (!collider || !collider->CollisionRef)
+                                continue;
+
+                            const auto& positions = collider->CollisionRef->Positions;
+                            const auto& indices = collider->CollisionRef->Indices;
+                            if (positions.empty())
+                                continue;
+
+                            glm::mat4 worldMatrix(1.0f);
+                            if (auto* wm = registry.try_get<ECS::Components::Transform::WorldMatrix>(entity))
+                                worldMatrix = wm->Matrix;
+
+                            // Determine topology from GPU geometry data.
+                            Graphics::PrimitiveTopology topology = Graphics::PrimitiveTopology::Triangles;
+                            GeometryGpuData* geo = ctx.GeometryStorage.GetUnchecked(mr.Geometry);
+                            if (geo)
+                                topology = geo->GetTopology();
+
+                            // --- Wireframe: extract edges and submit to DebugDraw ---
+                            if (vis.ShowWireframe && ctx.DebugDrawPtr && lineEnabled)
+                            {
+                                // Build edge cache lazily.
+                                if (vis.EdgeCacheDirty && !indices.empty())
+                                {
+                                    vis.CachedEdges.clear();
+
+                                    if (topology == Graphics::PrimitiveTopology::Triangles)
+                                    {
+                                        // Triangle mesh: extract unique edges from index triplets.
+                                        // Use a set keyed by (min, max) to deduplicate.
+                                        struct PairHash {
+                                            std::size_t operator()(std::pair<uint32_t, uint32_t> p) const noexcept {
+                                                return std::hash<uint64_t>{}(
+                                                    (uint64_t(p.first) << 32) | uint64_t(p.second));
+                                            }
+                                        };
+                                        std::unordered_set<std::pair<uint32_t, uint32_t>, PairHash> edgeSet;
+                                        edgeSet.reserve(indices.size()); // Upper bound
+
+                                        for (std::size_t t = 0; t + 2 < indices.size(); t += 3)
+                                        {
+                                            uint32_t i0 = indices[t], i1 = indices[t+1], i2 = indices[t+2];
+                                            auto addEdge = [&](uint32_t a, uint32_t b) {
+                                                auto key = (a < b) ? std::pair{a, b} : std::pair{b, a};
+                                                edgeSet.insert(key);
+                                            };
+                                            addEdge(i0, i1);
+                                            addEdge(i1, i2);
+                                            addEdge(i2, i0);
+                                        }
+
+                                        vis.CachedEdges.assign(edgeSet.begin(), edgeSet.end());
+                                    }
+                                    else if (topology == Graphics::PrimitiveTopology::Lines)
+                                    {
+                                        // Line topology: index pairs are already edges.
+                                        vis.CachedEdges.reserve(indices.size() / 2);
+                                        for (std::size_t e = 0; e + 1 < indices.size(); e += 2)
+                                            vis.CachedEdges.emplace_back(indices[e], indices[e+1]);
+                                    }
+
+                                    vis.EdgeCacheDirty = false;
+                                }
+
+                                // Submit cached edges as DebugDraw lines.
+                                const uint32_t wireColor = DebugDraw::PackColorF(
+                                    vis.WireframeColor.r, vis.WireframeColor.g,
+                                    vis.WireframeColor.b, vis.WireframeColor.a);
+
+                                for (const auto& [i0, i1] : vis.CachedEdges)
+                                {
+                                    if (i0 >= positions.size() || i1 >= positions.size())
+                                        continue;
+
+                                    glm::vec3 a = glm::vec3(worldMatrix * glm::vec4(positions[i0], 1.0f));
+                                    glm::vec3 b = glm::vec3(worldMatrix * glm::vec4(positions[i1], 1.0f));
+
+                                    if (vis.WireframeOverlay)
+                                        ctx.DebugDrawPtr->OverlayLine(a, b, wireColor);
+                                    else
+                                        ctx.DebugDrawPtr->Line(a, b, wireColor);
+                                }
+                            }
+
+                            // --- Vertices: submit positions to PointCloudRenderPass ---
+                            if (vis.ShowVertices && pointCloudEnabled)
+                            {
+                                const uint32_t vtxColor = Passes::PointCloudRenderPass::PackColorF(
+                                    vis.VertexColor.r, vis.VertexColor.g,
+                                    vis.VertexColor.b, vis.VertexColor.a);
+
+                                for (std::size_t i = 0; i < positions.size(); ++i)
+                                {
+                                    glm::vec3 worldPos = glm::vec3(worldMatrix * glm::vec4(positions[i], 1.0f));
+
+                                    auto pt = Passes::PointCloudRenderPass::PackPoint(
+                                        worldPos.x, worldPos.y, worldPos.z,
+                                        0.0f, 1.0f, 0.0f,    // Default up normal for flat disc.
+                                        vis.VertexSize,
+                                        vtxColor);
+                                    m_PointCloudPass->SubmitPoints(&pt, 1);
+                                }
+                            }
+                        }
+                    }
+
+                    if (pointCloudEnabled && m_PointCloudPass->HasContent())
+                        m_PointCloudPass->AddPasses(ctx);
+                });
+            }
         }
 
         // 3. Selection Outline (post-process overlay on selected/hovered entities)

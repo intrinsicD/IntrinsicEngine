@@ -726,6 +726,142 @@ public:
                     }
                 }
             }
+
+            // 4. Visualization — per-entity rendering mode toggles.
+            // Shown for any entity with renderable data (mesh, point cloud, graph).
+            {
+                const bool hasMesh = reg.all_of<ECS::MeshRenderer::Component>(selected);
+                const bool hasPointCloud = reg.all_of<ECS::PointCloudRenderer::Component>(selected);
+
+                if (hasMesh || hasPointCloud)
+                {
+                    // Determine topology for context-appropriate labels.
+                    Graphics::PrimitiveTopology topology = Graphics::PrimitiveTopology::Triangles;
+                    if (hasMesh)
+                    {
+                        auto& mr = reg.get<ECS::MeshRenderer::Component>(selected);
+                        if (auto* geo = GetGeometryStorage().GetUnchecked(mr.Geometry))
+                            topology = geo->GetTopology();
+                    }
+
+                    const bool isTriangleMesh = hasMesh && (topology == Graphics::PrimitiveTopology::Triangles);
+                    const bool isLineMesh = hasMesh && (topology == Graphics::PrimitiveTopology::Lines);
+
+                    if (ImGui::CollapsingHeader("Visualization", ImGuiTreeNodeFlags_DefaultOpen))
+                    {
+                        // Lazily attach RenderVisualization component on first interaction.
+                        auto* vis = reg.try_get<ECS::RenderVisualization::Component>(selected);
+                        bool justCreated = false;
+                        if (!vis)
+                        {
+                            // Show defaults until user interacts.
+                            // Create with appropriate defaults for the entity type.
+                            bool defaultShowSurface = hasMesh;
+                            bool defaultShowVertices = hasPointCloud && !hasMesh;
+
+                            // For lazy display without creating component yet, use temp values.
+                            bool showSurface = defaultShowSurface;
+                            bool showWireframe = false;
+                            bool showVertices = defaultShowVertices;
+
+                            bool changed = false;
+
+                            if (hasMesh)
+                            {
+                                if (isTriangleMesh)
+                                {
+                                    changed |= ImGui::Checkbox("Show Surface", &showSurface);
+                                    changed |= ImGui::Checkbox("Show Wireframe", &showWireframe);
+                                }
+                                else if (isLineMesh)
+                                {
+                                    changed |= ImGui::Checkbox("Show Edges", &showSurface);
+                                }
+                            }
+
+                            changed |= ImGui::Checkbox("Show Vertices", &showVertices);
+
+                            if (changed)
+                            {
+                                auto& newVis = reg.emplace<ECS::RenderVisualization::Component>(selected);
+                                newVis.ShowSurface = showSurface;
+                                newVis.ShowWireframe = showWireframe;
+                                newVis.ShowVertices = showVertices;
+                                // For point cloud entities, default ShowSurface is irrelevant.
+                                if (hasPointCloud && !hasMesh)
+                                    newVis.ShowSurface = true;
+                                vis = &newVis;
+                                justCreated = true;
+                            }
+                        }
+
+                        if (vis && !justCreated)
+                        {
+                            // --- Mode Toggles ---
+                            if (hasMesh)
+                            {
+                                if (isTriangleMesh)
+                                {
+                                    ImGui::Checkbox("Show Surface", &vis->ShowSurface);
+                                    ImGui::Checkbox("Show Wireframe", &vis->ShowWireframe);
+                                }
+                                else if (isLineMesh)
+                                {
+                                    ImGui::Checkbox("Show Edges", &vis->ShowSurface);
+                                }
+                            }
+
+                            ImGui::Checkbox("Show Vertices", &vis->ShowVertices);
+
+                            // --- Wireframe Settings ---
+                            if (vis->ShowWireframe && isTriangleMesh)
+                            {
+                                ImGui::Indent();
+                                float wc[4] = {vis->WireframeColor.r, vis->WireframeColor.g,
+                                               vis->WireframeColor.b, vis->WireframeColor.a};
+                                if (ImGui::ColorEdit4("Wire Color", wc))
+                                    vis->WireframeColor = glm::vec4(wc[0], wc[1], wc[2], wc[3]);
+
+                                ImGui::SliderFloat("Wire Width", &vis->WireframeWidth, 0.5f, 8.0f, "%.1f px");
+                                ImGui::Checkbox("Wireframe Overlay", &vis->WireframeOverlay);
+                                ImGui::Unindent();
+                            }
+
+                            // --- Vertex Settings ---
+                            if (vis->ShowVertices)
+                            {
+                                ImGui::Indent();
+                                float vc[4] = {vis->VertexColor.r, vis->VertexColor.g,
+                                               vis->VertexColor.b, vis->VertexColor.a};
+                                if (ImGui::ColorEdit4("Vertex Color", vc))
+                                    vis->VertexColor = glm::vec4(vc[0], vc[1], vc[2], vc[3]);
+
+                                ImGui::SliderFloat("Vertex Size", &vis->VertexSize, 0.001f, 0.1f, "%.4f");
+
+                                const char* modes[] = {"Flat Disc", "Surfel"};
+                                int mode = static_cast<int>(vis->VertexRenderMode);
+                                if (ImGui::Combo("Vertex Mode", &mode, modes, 2))
+                                    vis->VertexRenderMode = static_cast<uint32_t>(mode);
+
+                                ImGui::Unindent();
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 5. Point Cloud Info
+            if (reg.all_of<ECS::PointCloudRenderer::Component>(selected))
+            {
+                if (ImGui::CollapsingHeader("Point Cloud", ImGuiTreeNodeFlags_DefaultOpen))
+                {
+                    auto& pc = reg.get<ECS::PointCloudRenderer::Component>(selected);
+                    ImGui::Text("Points: %zu", pc.PointCount());
+                    ImGui::Text("Has Normals: %s", pc.HasNormals() ? "Yes" : "No");
+                    ImGui::Text("Has Colors: %s", pc.HasColors() ? "Yes" : "No");
+                    ImGui::Text("Has Radii: %s", pc.HasRadii() ? "Yes" : "No");
+                }
+            }
         }
         else
         {

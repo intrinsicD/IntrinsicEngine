@@ -1,6 +1,7 @@
 module;
 
 #include <entt/entity/registry.hpp>
+#include <glm/glm.hpp>
 
 module Graphics:Systems.GPUSceneSync.Impl;
 
@@ -37,6 +38,19 @@ namespace Graphics::Systems::GPUSceneSync
 
             const bool transformDirty = registry.all_of<ECS::Components::Transform::WorldUpdatedTag>(entity);
 
+            // --- Surface visibility via RenderVisualization ---
+            // When ShowSurface transitions, we deactivate (radius=0) or reactivate
+            // the GPU scene slot so the culling shader skips/includes the instance.
+            bool visibilityDirty = false;
+            if (auto* vis = registry.try_get<ECS::RenderVisualization::Component>(entt::entity(entity)))
+            {
+                if (vis->ShowSurface != vis->CachedShowSurface)
+                {
+                    visibilityDirty = true;
+                    vis->CachedShowSurface = vis->ShowSurface;
+                }
+            }
+
             // Resolve material handle once and cache it inside the MeshRenderer component as intended.
             if (!mr.CachedMaterialHandle.IsValid())
             {
@@ -57,7 +71,7 @@ namespace Graphics::Systems::GPUSceneSync
             const bool materialDirty = (mr.CachedMaterialHandle != mr.CachedMaterialHandleForInstance) ||
                                        (matRev != mr.CachedMaterialRevisionForInstance);
 
-            if (!transformDirty && !materialDirty)
+            if (!transformDirty && !materialDirty && !visibilityDirty)
                 continue;
 
             // If only the transform changed, don't touch TextureID/EntityID/GeometryID.
@@ -88,8 +102,28 @@ namespace Graphics::Systems::GPUSceneSync
             // IMPORTANT(bounds): don't clobber spawn-time local bounds.
             // Sentinel contract:
             //  - radius < 0 => keep existing bounds
-            //  - w/x/y/z = NaN ignored (implementation-defined), so keep it simple
-            gpuScene.QueueUpdate(mr.GpuSlot, inst, /*sphereBounds*/ {0.0f, 0.0f, 0.0f, -1.0f});
+            //  - radius == 0 => slot inactive (culler skips)
+            //
+            // When ShowSurface is toggled off, we deactivate by sending radius=0.
+            // When toggled back on, we restore the conservative default radius.
+            glm::vec4 sphereBounds{0.0f, 0.0f, 0.0f, -1.0f}; // Default: preserve existing bounds.
+
+            if (visibilityDirty)
+            {
+                auto* vis = registry.try_get<ECS::RenderVisualization::Component>(entt::entity(entity));
+                if (vis && !vis->ShowSurface)
+                {
+                    // Deactivate: radius = 0 makes the culler skip this instance.
+                    sphereBounds = {0.0f, 0.0f, 0.0f, 0.0f};
+                }
+                else
+                {
+                    // Reactivate: restore conservative bounding sphere.
+                    sphereBounds = {0.0f, 0.0f, 0.0f, GPUSceneConstants::kDefaultBoundingSphereRadius};
+                }
+            }
+
+            gpuScene.QueueUpdate(mr.GpuSlot, inst, sphereBounds);
 
             mr.CachedMaterialHandleForInstance = mr.CachedMaterialHandle;
             mr.CachedMaterialRevisionForInstance = matRev;
