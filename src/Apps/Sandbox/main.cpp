@@ -838,10 +838,10 @@ public:
 
                                 ImGui::SliderFloat("Vertex Size", &vis->VertexSize, 0.001f, 0.1f, "%.4f");
 
-                                const char* modes[] = {"Flat Disc", "Surfel"};
+                                const char* modes[] = {"Flat Disc", "Surfel", "EWA (Elliptical)"};
                                 int mode = static_cast<int>(vis->VertexRenderMode);
-                                if (ImGui::Combo("Vertex Mode", &mode, modes, 2))
-                                    vis->VertexRenderMode = static_cast<uint32_t>(mode);
+                                if (ImGui::Combo("Vertex Mode", &mode, modes, 3))
+                                    vis->VertexRenderMode = static_cast<Geometry::PointCloud::RenderMode>(mode);
 
                                 ImGui::Unindent();
                             }
@@ -860,6 +860,23 @@ public:
                     ImGui::Text("Has Normals: %s", pc.HasNormals() ? "Yes" : "No");
                     ImGui::Text("Has Colors: %s", pc.HasColors() ? "Yes" : "No");
                     ImGui::Text("Has Radii: %s", pc.HasRadii() ? "Yes" : "No");
+
+                    ImGui::SeparatorText("Rendering");
+                    ImGui::Checkbox("Visible", &pc.Visible);
+
+                    {
+                        const char* modes[] = {"Flat Disc", "Surfel", "EWA (Elliptical)"};
+                        int mode = static_cast<int>(pc.RenderMode);
+                        if (ImGui::Combo("Render Mode", &mode, modes, 3))
+                            pc.RenderMode = static_cast<Geometry::PointCloud::RenderMode>(mode);
+                    }
+
+                    ImGui::SliderFloat("Default Radius", &pc.DefaultRadius, 0.0005f, 0.1f, "%.5f", ImGuiSliderFlags_Logarithmic);
+                    ImGui::SliderFloat("Size Multiplier", &pc.SizeMultiplier, 0.1f, 10.0f, "%.2f", ImGuiSliderFlags_Logarithmic);
+
+                    float dc[4] = {pc.DefaultColor.r, pc.DefaultColor.g, pc.DefaultColor.b, pc.DefaultColor.a};
+                    if (ImGui::ColorEdit4("Default Color", dc))
+                        pc.DefaultColor = glm::vec4(dc[0], dc[1], dc[2], dc[3]);
                 }
             }
         }

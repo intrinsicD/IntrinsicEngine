@@ -13,6 +13,7 @@ import :RenderGraph;
 import :ShaderRegistry;
 import Core.Hash;
 import RHI;
+import Geometry;
 
 export namespace Graphics::Passes
 {
@@ -60,7 +61,7 @@ export namespace Graphics::Passes
 
         // Configuration
         float SizeMultiplier = 1.0f;   // Global point size multiplier.
-        uint32_t RenderMode = 0;       // 0 = flat, 1 = surfel, 2 = EWA.
+        Geometry::PointCloud::RenderMode RenderMode = Geometry::PointCloud::RenderMode::FlatDisc;
 
         void Initialize(RHI::VulkanDevice& device,
                         RHI::DescriptorAllocator& descriptorPool,

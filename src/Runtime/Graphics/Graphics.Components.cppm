@@ -71,7 +71,7 @@ export namespace ECS::PointCloudRenderer
         std::vector<float>     Radii;               // Optional (empty = use DefaultRadius).
 
         // ---- Rendering Parameters ----
-        uint32_t RenderMode       = 0;              // 0 = flat, 1 = surfel, 2 = EWA.
+        Geometry::PointCloud::RenderMode RenderMode = Geometry::PointCloud::RenderMode::FlatDisc;
         float    DefaultRadius    = 0.005f;         // World-space radius when Radii is empty.
         float    SizeMultiplier   = 1.0f;           // Per-entity size multiplier.
         glm::vec4 DefaultColor    = {1.f, 1.f, 1.f, 1.f}; // RGBA when Colors is empty.
@@ -116,7 +116,7 @@ export namespace ECS::RenderVisualization
         // ---- Vertex Settings ----
         glm::vec4 VertexColor      = {1.0f, 0.6f, 0.0f, 1.0f};
         float     VertexSize       = 0.008f;  // World-space radius.
-        uint32_t  VertexRenderMode = 0;       // 0 = flat disc, 1 = surfel.
+        Geometry::PointCloud::RenderMode VertexRenderMode = Geometry::PointCloud::RenderMode::FlatDisc;
 
         // ---- Edge Cache (internal, rebuilt lazily) ----
         // Populated from MeshCollider collision data when wireframe is first

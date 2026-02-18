@@ -307,3 +307,20 @@ Common editor panels live in `src/Runtime/EditorUI/` and are registered from the
 - `Runtime::EditorUI::RegisterDefaultPanels(engine)`
 
 Add a new panel by calling `Interface::GUI::RegisterPanel("My Panel", []{ ... });` from `Runtime.EditorUI`.
+
+## Point Rendering Modes (PointCloudRenderPass)
+
+The engine currently supports GPU point rendering via `Graphics::Passes::PointCloudRenderPass` with three shader-driven modes:
+
+* **Flat Disc** (`RenderMode = 0`) - Screen-aligned circular splats.
+* **Surfel** (`RenderMode = 1`) - Oriented discs using the per-point normal.
+* **EWA (Elliptical)** (`RenderMode = 2`) - Elliptical Weighted Average splatting (surface splatting style).
+
+### UI
+
+In the Sandbox app (`src/Apps/Sandbox/main.cpp`):
+
+* **Inspector > Visualization > Vertex Settings > Vertex Mode** - controls how *mesh vertices* are drawn when `Show Vertices` is enabled.
+* **Inspector > Point Cloud > Rendering > Render Mode** - controls how *point cloud entities* are drawn.
+
+Note: `PointCloudRenderPass` currently exposes a single `RenderMode` for the whole pass. If multiple point sources with different modes are visible in the same frame, the last submitted source wins. (Next step: batch submissions by mode, or add a per-point mode field.)

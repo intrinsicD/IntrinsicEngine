@@ -30,7 +30,7 @@ namespace Graphics::Passes
             Core::Log::Error("PointCloudRenderPass: {} failed (VkResult={})", what, (int)r);
     }
 
-    // Push constants layout (must match pointcloud.vert/pointcloud.frag).
+    // Push constants layout (must match point.vert/point.frag).
     struct PointCloudPushConstants
     {
         float SizeMultiplier;
@@ -244,7 +244,7 @@ namespace Graphics::Passes
         push.SizeMultiplier = SizeMultiplier;
         push.ViewportWidth = static_cast<float>(extent.width);
         push.ViewportHeight = static_cast<float>(extent.height);
-        push.RenderMode = RenderMode;
+        push.RenderMode = static_cast<uint32_t>(RenderMode);
 
         vkCmdPushConstants(cmd, m_Pipeline->GetLayout(),
                            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,

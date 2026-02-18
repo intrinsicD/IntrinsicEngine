@@ -106,8 +106,8 @@ namespace Runtime
         m_ShaderRegistry.Register("Line.Frag"_id, "shaders/line.frag.spv");
 
         // Point cloud rendering (billboard/surfel/EWA splatting)
-        m_ShaderRegistry.Register("PointCloud.Vert"_id, "shaders/pointcloud.vert.spv");
-        m_ShaderRegistry.Register("PointCloud.Frag"_id, "shaders/pointcloud.frag.spv");
+        m_ShaderRegistry.Register("PointCloud.Vert"_id, "shaders/point.vert.spv");
+        m_ShaderRegistry.Register("PointCloud.Frag"_id, "shaders/point.frag.spv");
 
         // Stage 3 compute
         m_ShaderRegistry.Register("Cull.Comp"_id, "shaders/instance_cull_multigeo.comp.spv");

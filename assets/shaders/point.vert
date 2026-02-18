@@ -1,4 +1,4 @@
-// pointcloud.vert — Point cloud billboard/surfel rendering via vertex-shader expansion.
+// point.vert — Point cloud billboard/surfel rendering via vertex-shader expansion.
 //
 // Technique: Each point is expanded into a screen-space quad (2 triangles,
 // 6 vertices) in the vertex shader. Three rendering modes are supported:
@@ -75,6 +75,7 @@ layout(location = 1) out vec2  fragUV;           // [-1,+1] within quad
 layout(location = 2) flat out uint fragMode;     // rendering mode for fragment shader
 layout(location = 3) out vec3  fragNormalWorld;  // world-space normal (for surfel lighting)
 layout(location = 4) out vec3  fragPosWorld;     // world-space position
+layout(location = 5) out vec4  fragConic;        // (Qxx, Qxy, Qyx, Qyy) for EWA ellipse
 
 void main()
 {
@@ -89,6 +90,7 @@ void main()
     fragMode = push.RenderMode;
     fragNormalWorld = pt.Normal;
     fragPosWorld = pt.Position;
+    fragConic = vec4(1.0, 0.0, 0.0, 1.0);
 
     // World-space radius with global multiplier.
     float radius = pt.Size * push.SizeMultiplier;
@@ -152,6 +154,11 @@ void main()
         return;
     }
 
+    // Common: view direction in world space.
+    // Note: camera.view is a rigid transform; inverse(view) has rotation R^T and translation.
+    vec3 camPosWorld = -transpose(mat3(camera.view)) * camera.view[3].xyz;
+    vec3 viewDirWorld = normalize(camPosWorld - pt.Position);
+
     // ------------------------------------------------------------------
     // Mode 1: Surfel — oriented disc in world space
     // ------------------------------------------------------------------
@@ -159,19 +166,24 @@ void main()
     {
         vec3 normal = normalize(pt.Normal);
 
-        // Construct tangent frame from normal.
-        vec3 tangent;
-        if (abs(normal.y) < 0.99)
-            tangent = normalize(cross(normal, vec3(0.0, 1.0, 0.0)));
+        // Build an in-plane orthonormal basis (u,v) that is view-aware so the disc "rotates" stably.
+        // We project the view direction into the surfel plane; this becomes the major axis.
+        vec3 u = viewDirWorld - normal * dot(viewDirWorld, normal);
+        float u2 = dot(u, u);
+        if (u2 < 1e-8)
+        {
+            // Degenerate when looking straight down the normal; fall back to any stable axis.
+            u = (abs(normal.y) < 0.99)
+                ? normalize(cross(normal, vec3(0.0, 1.0, 0.0)))
+                : normalize(cross(normal, vec3(1.0, 0.0, 0.0)));
+        }
         else
-            tangent = normalize(cross(normal, vec3(1.0, 0.0, 0.0)));
-        vec3 bitangent = cross(normal, tangent);
+        {
+            u *= inversesqrt(u2);
+        }
+        vec3 v = normalize(cross(normal, u));
 
-        // World-space disc corner.
-        vec3 worldPos = pt.Position
-                      + tangent * localOffset.x * radius
-                      + bitangent * localOffset.y * radius;
-
+        vec3 worldPos = pt.Position + (u * localOffset.x + v * localOffset.y) * radius;
         gl_Position = camera.proj * camera.view * vec4(worldPos, 1.0);
         return;
     }
@@ -179,52 +191,83 @@ void main()
     // ------------------------------------------------------------------
     // Mode 2: EWA Splatting — perspective-correct elliptical splats
     // ------------------------------------------------------------------
-    // (Zwicker et al. 2001)
-    //
-    // The screen-space footprint of a world-space disc is an ellipse
-    // determined by the Jacobian of the perspective projection applied
-    // to the surfel tangent frame. We compute the ellipse axes and use
-    // them to orient and scale the billboard quad.
+    // We compute a 2x2 conic Q such that the ellipse is:
+    //   d^T Q d <= 1,  where d is the pixel offset from the splat center.
+    // Q is the inverse covariance of the projected surfel kernel.
     {
         vec3 normal = normalize(pt.Normal);
 
-        // Tangent frame.
-        vec3 tangent;
-        if (abs(normal.y) < 0.99)
-            tangent = normalize(cross(normal, vec3(0.0, 1.0, 0.0)));
+        // Same in-plane basis as surfel mode.
+        vec3 u = viewDirWorld - normal * dot(viewDirWorld, normal);
+        float u2 = dot(u, u);
+        if (u2 < 1e-8)
+        {
+            u = (abs(normal.y) < 0.99)
+                ? normalize(cross(normal, vec3(0.0, 1.0, 0.0)))
+                : normalize(cross(normal, vec3(1.0, 0.0, 0.0)));
+        }
         else
-            tangent = normalize(cross(normal, vec3(1.0, 0.0, 0.0)));
-        vec3 bitangent = cross(normal, tangent);
-
-        // View-space tangent frame vectors (direction only, length = radius).
-        vec3 viewT = mat3(camera.view) * (tangent * radius);
-        vec3 viewB = mat3(camera.view) * (bitangent * radius);
-
-        // Approximate screen-space Jacobian: project tangent/bitangent
-        // endpoints to get screen-space ellipse axes.
-        float projScale = camera.proj[0][0]; // Assumes symmetric projection
-        float invZ = -1.0 / viewPos.z;       // Perspective divide factor
+        {
+            u *= inversesqrt(u2);
+        }
+        vec3 v = normalize(cross(normal, u));
 
         vec2 viewport = vec2(push.ViewportWidth, push.ViewportHeight);
 
-        // Screen-space axis vectors (in pixels).
-        vec2 axisU = vec2(viewT.x * invZ, viewT.y * invZ) * projScale * viewport * 0.5;
-        vec2 axisV = vec2(viewB.x * invZ, viewB.y * invZ) * projScale * viewport * 0.5;
+        vec2 ndcCenter = clipPos.xy / clipPos.w;
+        vec2 screenCenter = (ndcCenter * 0.5 + 0.5) * viewport;
 
-        // To avoid degenerate splats at grazing angles, clamp minimum size.
-        float axisULen = length(axisU);
-        float axisVLen = length(axisV);
-        float minPixels = 1.0;
-        if (axisULen < minPixels) axisU = vec2(minPixels, 0.0);
-        if (axisVLen < minPixels) axisV = vec2(0.0, minPixels);
+        vec4 clipU = camera.proj * camera.view * vec4(pt.Position + u * radius, 1.0);
+        vec4 clipV = camera.proj * camera.view * vec4(pt.Position + v * radius, 1.0);
 
-        // Expand quad using ellipse axes with AA margin.
-        vec2 ndc = clipPos.xy / clipPos.w;
-        vec2 screenCenter = (ndc * 0.5 + 0.5) * viewport;
-        vec2 screenPos = screenCenter + axisU * localOffset.x + axisV * localOffset.y;
+        if (clipU.w <= 0.0 || clipV.w <= 0.0)
+        {
+            vec3 worldPos = pt.Position + (u * localOffset.x + v * localOffset.y) * radius;
+            gl_Position = camera.proj * camera.view * vec4(worldPos, 1.0);
+            return;
+        }
 
-        // Small expansion for anti-aliasing.
-        vec2 expandDir = normalize(screenPos - screenCenter + vec2(0.001));
+        vec2 ndcU = clipU.xy / clipU.w;
+        vec2 ndcV = clipV.xy / clipV.w;
+        vec2 screenU = (ndcU * 0.5 + 0.5) * viewport;
+        vec2 screenV = (ndcV * 0.5 + 0.5) * viewport;
+
+        // Ellipse principal axes in screen pixels.
+        vec2 axisU = screenU - screenCenter;
+        vec2 axisV = screenV - screenCenter;
+
+        // Clamp to avoid singular matrices.
+        float lenU = length(axisU);
+        float lenV = length(axisV);
+        if (lenU < 1.0) axisU = vec2(1.0, 0.0);
+        if (lenV < 1.0) axisV = vec2(0.0, 1.0);
+
+        // Build covariance S = A A^T, where A = [axisU axisV].
+        // Then conic Q = inverse(S).
+        // S = [ uu  uv ; uv  vv ]
+        float uu = dot(axisU, axisU);
+        float vv = dot(axisV, axisV);
+        float uv = dot(axisU, axisV);
+
+        float det = uu * vv - uv * uv;
+        if (det < 1e-6) det = 1e-6;
+        float invDet = 1.0 / det;
+
+        // Q = (1/det) * [ vv  -uv ; -uv  uu ]
+        fragConic = vec4(vv * invDet, -uv * invDet,
+                         -uv * invDet, uu * invDet);
+
+        // For rasterization, we still need a conservative quad. Use a bounding box in pixel space.
+        // Compute half-extents from the ellipse axes lengths.
+        float ex = abs(axisU.x) + abs(axisV.x);
+        float ey = abs(axisU.y) + abs(axisV.y);
+        ex = max(ex, 1.0);
+        ey = max(ey, 1.0);
+
+        vec2 screenPos = screenCenter + vec2(localOffset.x * ex, localOffset.y * ey);
+
+        // AA margin.
+        vec2 expandDir = normalize(screenPos - screenCenter + vec2(1e-3));
         screenPos += expandDir * 1.0;
 
         vec2 finalNDC = (screenPos / viewport) * 2.0 - 1.0;

@@ -1,4 +1,4 @@
-// pointcloud.frag — Point cloud fragment shader with multi-mode rendering.
+// point.frag — Point cloud fragment shader with multi-mode rendering.
 //
 // Supports three rendering modes controlled by push constant:
 //
@@ -28,6 +28,7 @@ layout(location = 1) in vec2  fragUV;           // [-1,+1] within quad
 layout(location = 2) flat in uint fragMode;
 layout(location = 3) in vec3  fragNormalWorld;
 layout(location = 4) in vec3  fragPosWorld;
+layout(location = 5) in vec4  fragConic;        // (Qxx, Qxy, Qyx, Qyy)
 
 // ---- Push Constants ----
 layout(push_constant) uniform PushConsts {
@@ -48,7 +49,7 @@ layout(location = 0) out vec4 outColor;
 
 void main()
 {
-    float r2 = dot(fragUV, fragUV); // squared distance from center
+    float r2 = dot(fragUV, fragUV); // squared distance from center (modes 0/1)
 
     // ------------------------------------------------------------------
     // Mode 0: Flat Disc
@@ -116,14 +117,26 @@ void main()
     // Mode 2: EWA Splatting (Gaussian Kernel)
     // ------------------------------------------------------------------
     {
+        // Evaluate rotated ellipse using pixel-space conic.
+        // d = pixel offset from center. We approximate d from fragUV by treating it as the
+        // conservative bounding-quad parameterization, then remap to pixel offsets via
+        // the same conic (scale-invariant under linear changes of basis).
+        // Practically: use d = fragUV in the quadratic form defined by Q.
+        mat2 Q = mat2(fragConic.x, fragConic.y,
+                      fragConic.z, fragConic.w);
+        float e2 = dot(fragUV, Q * fragUV);
+
         // Gaussian reconstruction kernel: exp(-r^2 / (2 * sigma^2))
         // With sigma chosen so the kernel has negligible weight at r=1.
         // sigma^2 = 1/3 gives ~95% energy within the unit disc.
         float sigma2 = 1.0 / 3.0;
-        float weight = exp(-r2 / (2.0 * sigma2));
+        float weight = exp(-e2 / (2.0 * sigma2));
 
         // Discard negligible contributions.
         if (weight < 0.01) discard;
+
+        // Hard clip outside ellipse for stability (prevents wide Gaussian tails from the conservative quad).
+        if (e2 > 4.0) discard;
 
         // Simple directional lighting (same as surfel mode).
         vec3 normal = normalize(fragNormalWorld);

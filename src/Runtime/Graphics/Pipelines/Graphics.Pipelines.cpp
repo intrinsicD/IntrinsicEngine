@@ -139,6 +139,9 @@ namespace Graphics
                         auto pcView = registry.view<ECS::PointCloudRenderer::Component>();
                         for (auto [entity, pc] : pcView.each())
                         {
+                            // NOTE: The current PointCloudRenderPass has a single RenderMode for the whole pass.
+                            // For now, pick the mode of the last-submitted visible cloud. If we want mixed modes
+                            // in a single frame, we should batch by mode (or add mode to GpuPointData).                            m_PointCloudPass->RenderMode = pc.RenderMode;
                             // RenderVisualization overrides Visible when present.
                             bool visible = pc.Visible;
                             if (auto* vis = registry.try_get<ECS::RenderVisualization::Component>(entity))
@@ -273,6 +276,8 @@ namespace Graphics
                             // --- Vertices: submit positions to PointCloudRenderPass ---
                             if (vis.ShowVertices && pointCloudEnabled)
                             {
+                                m_PointCloudPass->RenderMode = vis.VertexRenderMode;
+
                                 const uint32_t vtxColor = Passes::PointCloudRenderPass::PackColorF(
                                     vis.VertexColor.r, vis.VertexColor.g,
                                     vis.VertexColor.b, vis.VertexColor.a);
