@@ -45,6 +45,7 @@ target_sources(${target_name}
         Geometry.Parameterization.cppm
         Geometry.MeshQuality.cppm
         Geometry.AdaptiveRemeshing.cppm
+        Geometry.ConvexHullBuilder.cppm
         PRIVATE
         FILE_SET geometry_impl TYPE CXX_MODULES FILES
         Geometry.MeshUtils.cpp
@@ -70,6 +71,7 @@ target_sources(${target_name}
         Geometry.Parameterization.cpp
         Geometry.MeshQuality.cpp
         Geometry.AdaptiveRemeshing.cpp
+        Geometry.ConvexHullBuilder.cpp
 )
 
 target_include_directories(${target_name} PUBLIC .)

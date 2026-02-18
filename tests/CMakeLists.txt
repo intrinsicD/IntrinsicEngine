@@ -98,6 +98,7 @@ intrinsic_test_object_lib(GeometryTestObjs
         Test_MeshQuality.cpp
         Test_Parameterization.cpp
         Test_AdaptiveRemeshing.cpp
+        Test_ConvexHull.cpp
     DEPS IntrinsicCore IntrinsicGeometry
 )
 

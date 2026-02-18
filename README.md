@@ -63,6 +63,7 @@ A **"Distinguished Scientist" grade** geometry kernel in `src/Runtime/Geometry/`
 | **Adaptive Remeshing** | Curvature-driven split/collapse/flip/smooth with per-vertex sizing field | Botsch & Kobbelt 2004 |
 | **Parameterization** | LSCM (Least Squares Conformal Maps) with auto boundary pinning | Lévy et al. 2002 |
 | **Mesh Quality** | Angle, aspect ratio, edge length, valence, area, volume diagnostics | — |
+| **Convex Hull** | Quickhull 3D (V-Rep + H-Rep + optional Halfedge::Mesh output) | Barber et al. 1996 |
 
 **Discrete Exterior Calculus (DEC):**
 - Exterior derivatives d0, d1 in CSR sparse matrix format.
@@ -161,9 +162,9 @@ Four test targets with clear GPU/no-GPU boundaries:
 | Target | Dependencies | Scope | Tests |
 |---|---|---|---|
 | `IntrinsicCoreTests` | Core only | Memory, tasks, handles, frame graph, DAG scheduler | ~80 |
-| `IntrinsicGeometryTests` | Core + Geometry | DEC, mesh operations, collision, graphs, all geometry operators | ~210 |
+| `IntrinsicGeometryTests` | Core + Geometry | DEC, mesh operations, collision, graphs, all geometry operators | ~240 |
 | `IntrinsicECSTests` | Core + ECS | FrameGraph system integration | ~15 |
-| `IntrinsicTests` | Full Runtime | Graphics, I/O, rendering, integration | ~240 |
+| `IntrinsicTests` | Full Runtime | Graphics, I/O, rendering, integration | ~270 |
 
 ```bash
 # Run all geometry tests
@@ -176,6 +177,7 @@ Four test targets with clear GPU/no-GPU boundaries:
 ./build/bin/IntrinsicGeometryTests --gtest_filter="MarchingCubes*"
 ./build/bin/IntrinsicGeometryTests --gtest_filter="SurfaceReconstruction*"
 ./build/bin/IntrinsicGeometryTests --gtest_filter="DEC_*"
+./build/bin/IntrinsicGeometryTests --gtest_filter="ConvexHull*"
 ```
 
 ---
@@ -249,7 +251,7 @@ src/
     ECS/          Entity-component system: scene, components, systems (EnTT-based)
   Apps/
     Sandbox/      Application: engine configuration and main loop
-tests/            GTest suite: 33 test files across 4 targets
+tests/            GTest suite: 34 test files across 4 targets
 assets/           Sample geometry and texture files
 ```
 
