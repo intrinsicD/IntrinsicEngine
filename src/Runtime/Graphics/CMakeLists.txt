@@ -53,6 +53,9 @@ target_sources(${target_name}
         Importers/Graphics.Importers.GLTF.cppm
         Importers/Graphics.Importers.STL.cppm
         Importers/Graphics.Importers.OFF.cppm
+        Exporters/Graphics.Exporters.OBJ.cppm
+        Exporters/Graphics.Exporters.PLY.cppm
+        Exporters/Graphics.Exporters.STL.cppm
         PRIVATE
         Graphics.TinyGltf.cpp
         Graphics.ShaderCompiler.cpp
@@ -93,6 +96,9 @@ target_sources(${target_name}
         Importers/Graphics.Importers.GLTF.cpp
         Importers/Graphics.Importers.STL.cpp
         Importers/Graphics.Importers.OFF.cpp
+        Exporters/Graphics.Exporters.OBJ.cpp
+        Exporters/Graphics.Exporters.PLY.cpp
+        Exporters/Graphics.Exporters.STL.cpp
 )
 
 target_include_directories(${target_name} PUBLIC .)
