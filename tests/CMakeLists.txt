@@ -99,6 +99,7 @@ intrinsic_test_object_lib(GeometryTestObjs
         Test_Parameterization.cpp
         Test_AdaptiveRemeshing.cpp
         Test_ConvexHull.cpp
+        Test_PointCloud.cpp
     DEPS IntrinsicCore IntrinsicGeometry
 )
 
@@ -125,6 +126,7 @@ intrinsic_test_object_lib(RuntimeTestObjs
         Test_OctreeDebugDraw.cpp
         Test_DAGScheduler.cpp
         Test_EditorUI.cpp
+        Test_PointCloudRenderPass.cpp
 
     DEPS IntrinsicCore IntrinsicRuntime
 )

@@ -1,22 +1,28 @@
 module;
 
+#include <cstddef>
 #include <memory>
 #include <span>
+#include <glm/glm.hpp>
+#include <entt/entt.hpp>
 
 module Graphics:Pipelines.Impl;
 
 import :RenderPipeline;
 import :RenderGraph;
+import :Components;
 import :Passes.Picking;
 import :Passes.Forward;
 import :Passes.SelectionOutline;
 import :Passes.Line;
+import :Passes.PointCloud;
 import :Passes.DebugView;
 import :Passes.ImGui;
 import :PipelineLibrary;
 import :ShaderRegistry;
 import :Pipelines;
 import RHI;
+import ECS;
 import Core.Hash;
 import Core.FeatureRegistry;
 
@@ -30,6 +36,7 @@ namespace Graphics
         if (m_ForwardPass) m_ForwardPass->Shutdown();
         if (m_SelectionOutlinePass) m_SelectionOutlinePass->Shutdown();
         if (m_LineRenderPass) m_LineRenderPass->Shutdown();
+        if (m_PointCloudPass) m_PointCloudPass->Shutdown();
         if (m_DebugViewPass) m_DebugViewPass->Shutdown();
         if (m_ImGuiPass) m_ImGuiPass->Shutdown();
 
@@ -37,6 +44,7 @@ namespace Graphics
         m_ForwardPass.reset();
         m_SelectionOutlinePass.reset();
         m_LineRenderPass.reset();
+        m_PointCloudPass.reset();
         m_DebugViewPass.reset();
         m_ImGuiPass.reset();
     }
@@ -51,6 +59,7 @@ namespace Graphics
         m_ForwardPass = std::make_unique<Passes::ForwardPass>();
         m_SelectionOutlinePass = std::make_unique<Passes::SelectionOutlinePass>();
         m_LineRenderPass = std::make_unique<Passes::LineRenderPass>();
+        m_PointCloudPass = std::make_unique<Passes::PointCloudRenderPass>();
         m_DebugViewPass = std::make_unique<Passes::DebugViewPass>();
         m_ImGuiPass = std::make_unique<Passes::ImGuiPass>();
 
@@ -58,6 +67,7 @@ namespace Graphics
         m_ForwardPass->Initialize(device, descriptorPool, globalLayout);
         m_SelectionOutlinePass->Initialize(device, descriptorPool, globalLayout);
         m_LineRenderPass->Initialize(device, descriptorPool, globalLayout);
+        m_PointCloudPass->Initialize(device, descriptorPool, globalLayout);
         m_DebugViewPass->Initialize(device, descriptorPool, globalLayout);
         m_ImGuiPass->Initialize(device, descriptorPool, globalLayout);
 
@@ -70,6 +80,7 @@ namespace Graphics
 
         m_SelectionOutlinePass->SetShaderRegistry(shaderRegistry);
         m_LineRenderPass->SetShaderRegistry(shaderRegistry);
+        m_PointCloudPass->SetShaderRegistry(shaderRegistry);
         m_DebugViewPass->SetShaderRegistry(shaderRegistry);
         
         m_PathDirty = true;
@@ -92,6 +103,56 @@ namespace Graphics
         // 2. Forward (Main Scene) — gated by FeatureRegistry
         if (m_ForwardPass && IsFeatureEnabled("ForwardPass"_id))
             m_Path.AddFeature("Forward", m_ForwardPass.get());
+
+        // 2b. Point Cloud Rendering — gated by FeatureRegistry.
+        // Collects point cloud data from ECS PointCloudRenderer components,
+        // uploads to SSBO, and renders billboard/surfel/EWA splats.
+        if (m_PointCloudPass && IsFeatureEnabled("PointCloudRenderPass"_id))
+        {
+            m_Path.AddStage("PointCloud", [this](RenderPassContext& ctx)
+            {
+                // Reset and collect point data from all PointCloudRenderer entities.
+                m_PointCloudPass->ResetPoints();
+
+                auto& registry = ctx.Scene.GetRegistry();
+                auto view = registry.view<ECS::PointCloudRenderer::Component>();
+                for (auto [entity, pc] : view.each())
+                {
+                    if (!pc.Visible || pc.Positions.empty()) continue;
+
+                    const uint32_t defaultColor = Passes::PointCloudRenderPass::PackColorF(
+                        pc.DefaultColor.r, pc.DefaultColor.g, pc.DefaultColor.b, pc.DefaultColor.a);
+
+                    // Get world transform if available.
+                    glm::mat4 worldMatrix(1.0f);
+                    if (auto* wm = registry.try_get<ECS::Components::Transform::WorldMatrix>(entity))
+                        worldMatrix = wm->Matrix;
+
+                    for (std::size_t i = 0; i < pc.Positions.size(); ++i)
+                    {
+                        glm::vec3 worldPos = glm::vec3(worldMatrix * glm::vec4(pc.Positions[i], 1.0f));
+                        glm::vec3 normal = pc.HasNormals()
+                            ? glm::normalize(glm::mat3(worldMatrix) * pc.Normals[i])
+                            : glm::vec3(0.0f, 1.0f, 0.0f);
+                        float radius = pc.HasRadii() ? pc.Radii[i] : pc.DefaultRadius;
+                        uint32_t color = pc.HasColors()
+                            ? Passes::PointCloudRenderPass::PackColorF(
+                                pc.Colors[i].r, pc.Colors[i].g, pc.Colors[i].b, pc.Colors[i].a)
+                            : defaultColor;
+
+                        auto pt = Passes::PointCloudRenderPass::PackPoint(
+                            worldPos.x, worldPos.y, worldPos.z,
+                            normal.x, normal.y, normal.z,
+                            radius * pc.SizeMultiplier,
+                            color);
+                        m_PointCloudPass->SubmitPoints(&pt, 1);
+                    }
+                }
+
+                if (m_PointCloudPass->HasContent())
+                    m_PointCloudPass->AddPasses(ctx);
+            });
+        }
 
         // 3. Selection Outline (post-process overlay on selected/hovered entities)
         if (m_SelectionOutlinePass && IsFeatureEnabled("SelectionOutlinePass"_id))
@@ -146,6 +207,7 @@ namespace Graphics
         if (m_ForwardPass) m_ForwardPass->OnResize(width, height);
         if (m_SelectionOutlinePass) m_SelectionOutlinePass->OnResize(width, height);
         if (m_LineRenderPass) m_LineRenderPass->OnResize(width, height);
+        if (m_PointCloudPass) m_PointCloudPass->OnResize(width, height);
         if (m_DebugViewPass) m_DebugViewPass->OnResize(width, height);
         if (m_ImGuiPass) m_ImGuiPass->OnResize(width, height);
     }
