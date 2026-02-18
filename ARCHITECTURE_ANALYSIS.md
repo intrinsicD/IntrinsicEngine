@@ -48,6 +48,17 @@ The following Clang 18 issues are resolved by the upgrade to Clang 20 as the min
 - A `PointCloudRenderFeature` registered via the render pipeline system, with a config struct selecting the variant and parameters (splat size, LOD budget, etc.).
 - Large point clouds need streaming — integrate with `TransferManager` for async chunk uploads.
 
+**Status:** Core point cloud rendering infrastructure is DONE:
+- **`Geometry.PointCloud` module** (`Geometry.PointCloud.cppm/.cpp`): First-class `Cloud` data structure with positions, normals, colors, radii. Operations: `ComputeBoundingBox`, `ComputeStatistics` (with KNN-based spacing), `VoxelDownsample` (O(n) hash-based), `EstimateRadii` (Octree-accelerated kNN density estimation), `RandomSubsample` (deterministic Fisher-Yates).
+- **`PointCloudRenderPass`** (`Graphics.Passes.PointCloud.cppm/.cpp`): `IRenderFeature` implementation following the `LineRenderPass` SSBO pattern. Three rendering modes selectable via push constant:
+  - Mode 0: **Flat Disc** — screen-aligned billboard with perspective-correct pixel radius, smooth AA edges.
+  - Mode 1: **Surfel** — world-space oriented disc from surface normal, Lambertian + hemisphere ambient + rim lighting.
+  - Mode 2: **EWA Splatting** (Zwicker et al. 2001) — perspective-correct Gaussian elliptical splats via view-space Jacobian of the surfel tangent frame, with degenerate-angle clamping.
+- **`PointCloudRenderer::Component`** (ECS): Per-entity point cloud data (positions, normals, colors, radii) with rendering parameters (mode, default radius, size multiplier, visibility toggle).
+- **Shaders** (`pointcloud.vert`, `pointcloud.frag`): Vertex-shader billboard expansion (6 verts/point, no geometry shader), 32-byte GPU point layout (2 x vec4), multi-mode fragment shading.
+- **Pipeline integration:** Registered in `DefaultPipeline` after Forward pass, gated by `FeatureRegistry` ("PointCloudRenderPass"). Shader paths registered in `RenderOrchestrator`. ECS component collection + world transform application in `RebuildPath()`.
+- Remaining work: Gaussian Splatting (3DGS) compute rasterizer, Potree-style octree LOD streaming, depth peeling for order-independent transparency, persistent device-local SSBO for large static clouds.
+
 ---
 
 #### 2.1.2 Graph / Wireframe Rendering

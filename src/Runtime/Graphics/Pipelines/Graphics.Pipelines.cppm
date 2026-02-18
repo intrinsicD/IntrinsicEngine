@@ -14,6 +14,7 @@ import :Passes.DebugView;
 import :Passes.Forward;
 import :Passes.ImGui;
 import :Passes.Line;
+import :Passes.PointCloud;
 import :Passes.Picking;
 import :Passes.SelectionOutline;
 import :Passes.SelectionOutlineSettings;
@@ -63,6 +64,7 @@ export namespace Graphics
         std::unique_ptr<Passes::ForwardPass> m_ForwardPass;
         std::unique_ptr<Passes::SelectionOutlinePass> m_SelectionOutlinePass;
         std::unique_ptr<Passes::LineRenderPass> m_LineRenderPass;
+        std::unique_ptr<Passes::PointCloudRenderPass> m_PointCloudPass;
         std::unique_ptr<Passes::DebugViewPass> m_DebugViewPass;
         std::unique_ptr<Passes::ImGuiPass> m_ImGuiPass;
 

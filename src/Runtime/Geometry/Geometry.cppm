@@ -36,3 +36,4 @@ export import :Parameterization;
 export import :MeshQuality;
 export import :AdaptiveRemeshing;
 export import :ConvexHullBuilder;
+export import :PointCloud;

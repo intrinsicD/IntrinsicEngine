@@ -20,6 +20,8 @@ else ()
             selection_outline.frag
             line.vert
             line.frag
+            pointcloud.vert
+            pointcloud.frag
             instance_cull.comp
             instance_cull_multigeo.comp
             scene_update.comp
