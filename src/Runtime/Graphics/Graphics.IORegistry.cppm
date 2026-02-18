@@ -61,7 +61,15 @@ export namespace Graphics
             const LoadContext& ctx) = 0;
     };
 
-    // --- Exporter Base Class (stub for Phase 0) ---
+    // --- Export Options ---
+    struct ExportOptions
+    {
+        bool Binary{true};  // false = ASCII (where format supports it)
+    };
+
+    // --- Exporter Base Class ---
+    // Exporters are pure transforms: CPU object -> bytes.
+    // They NEVER write files. The caller handles byte transport via the I/O backend.
     class IAssetExporter
     {
     public:
@@ -69,6 +77,11 @@ export namespace Graphics
 
         [[nodiscard]] virtual std::string_view FormatName() const = 0;
         [[nodiscard]] virtual std::span<const std::string_view> Extensions() const = 0;
+
+        // Serialize geometry data to a byte buffer in the target format.
+        [[nodiscard]] virtual std::expected<std::vector<std::byte>, AssetError> Export(
+            const GeometryCpuData& data,
+            const ExportOptions& options = {}) = 0;
     };
 
     // --- Registry ---
@@ -98,6 +111,16 @@ export namespace Graphics
             Core::IO::IIOBackend& backend,
             const ImportOptions& options = {}) const;
 
+        // Convenience: find exporter by extension, serialize, write bytes via backend.
+        [[nodiscard]] std::expected<void, AssetError> Export(
+            const std::string& filepath,
+            Core::IO::IIOBackend& backend,
+            const GeometryCpuData& data,
+            const ExportOptions& options = {}) const;
+
+        [[nodiscard]] bool CanExport(std::string_view extension) const;
+        [[nodiscard]] std::vector<std::string_view> GetSupportedExportExtensions() const;
+
     private:
         std::unordered_map<std::string, IAssetLoader*> m_LoadersByExt;
         std::vector<std::unique_ptr<IAssetLoader>> m_Loaders;
@@ -105,6 +128,9 @@ export namespace Graphics
         std::vector<std::unique_ptr<IAssetExporter>> m_Exporters;
     };
 
-    // Registers all built-in format loaders (OBJ, PLY, XYZ, TGF, GLTF).
+    // Registers all built-in format loaders (OBJ, PLY, XYZ, TGF, GLTF, STL, OFF).
     void RegisterBuiltinLoaders(IORegistry& registry);
+
+    // Registers all built-in format exporters (OBJ, PLY, STL).
+    void RegisterBuiltinExporters(IORegistry& registry);
 }

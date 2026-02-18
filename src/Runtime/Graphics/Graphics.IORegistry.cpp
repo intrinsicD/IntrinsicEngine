@@ -23,6 +23,9 @@ import :Importers.TGF;
 import :Importers.GLTF;
 import :Importers.STL;
 import :Importers.OFF;
+import :Exporters.OBJ;
+import :Exporters.PLY;
+import :Exporters.STL;
 import Core.IOBackend;
 import Core.Error;
 import Core.Logging;
@@ -175,10 +178,54 @@ namespace Graphics
         return loader->Load(readResult->Data, ctx);
     }
 
+    std::expected<void, AssetError> IORegistry::Export(
+        const std::string& filepath,
+        Core::IO::IIOBackend& backend,
+        const GeometryCpuData& data,
+        const ExportOptions& options) const
+    {
+        namespace fs = std::filesystem;
+
+        fs::path fsPath(filepath);
+        std::string ext = fsPath.extension().string();
+        std::transform(ext.begin(), ext.end(), ext.begin(),
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+
+        auto* exporter = FindExporter(ext);
+        if (!exporter)
+            return std::unexpected(AssetError::UnsupportedFormat);
+
+        auto bytes = exporter->Export(data, options);
+        if (!bytes)
+            return std::unexpected(bytes.error());
+
+        Core::IO::IORequest req;
+        req.Path = filepath;
+        auto writeResult = backend.Write(req, *bytes);
+        if (!writeResult)
+            return std::unexpected(MapCoreError(writeResult.error()));
+
+        return {};
+    }
+
+    bool IORegistry::CanExport(std::string_view extension) const
+    {
+        return FindExporter(extension) != nullptr;
+    }
+
+    std::vector<std::string_view> IORegistry::GetSupportedExportExtensions() const
+    {
+        std::vector<std::string_view> result;
+        result.reserve(m_ExportersByExt.size());
+        for (const auto& [ext, _] : m_ExportersByExt)
+            result.emplace_back(ext);
+        return result;
+    }
+
     // -------------------------------------------------------------------------
     // Vtable anchors: defining the destructor (the Itanium ABI key function)
-    // HERE — in the TU that imports ALL loader partitions — ensures each
-    // vtable is emitted in this object file. Retained as defensive practice
+    // HERE — in the TU that imports ALL loader/exporter partitions — ensures
+    // each vtable is emitted in this object file. Retained as defensive practice
     // for robust vtable emission across module partition boundaries.
     // -------------------------------------------------------------------------
     OBJLoader::~OBJLoader() = default;
@@ -188,6 +235,9 @@ namespace Graphics
     GLTFLoader::~GLTFLoader() = default;
     STLLoader::~STLLoader() = default;
     OFFLoader::~OFFLoader() = default;
+    OBJExporter::~OBJExporter() = default;
+    PLYExporter::~PLYExporter() = default;
+    STLExporter::~STLExporter() = default;
 
     void RegisterBuiltinLoaders(IORegistry& registry)
     {
@@ -201,5 +251,15 @@ namespace Graphics
 
         Core::Log::Info("IORegistry: Registered {} built-in loaders",
                         registry.GetSupportedImportExtensions().size());
+    }
+
+    void RegisterBuiltinExporters(IORegistry& registry)
+    {
+        registry.RegisterExporter(std::make_unique<OBJExporter>());
+        registry.RegisterExporter(std::make_unique<PLYExporter>());
+        registry.RegisterExporter(std::make_unique<STLExporter>());
+
+        Core::Log::Info("IORegistry: Registered {} built-in exporters",
+                        registry.GetSupportedExportExtensions().size());
     }
 }

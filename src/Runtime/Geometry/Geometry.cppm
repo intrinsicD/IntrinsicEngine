@@ -34,3 +34,4 @@ export import :MarchingCubes;
 export import :SurfaceReconstruction;
 export import :Parameterization;
 export import :MeshQuality;
+export import :AdaptiveRemeshing;

@@ -291,10 +291,11 @@ The geometry module now includes `Geometry::KDTree`, an Octree-inspired accelera
 - ~~**Mesh repair:**~~ — **DONE.** `Geometry.MeshRepair` provides: (1) **Boundary loop detection** — traces all boundary halfedge cycles to identify holes. (2) **Hole filling** — advancing-front ear-clipping triangulation that iteratively fills the minimum-angle ear, with winding auto-correction. (3) **Degenerate triangle removal** — detects and removes faces below an area threshold, followed by garbage collection. (4) **Consistent face orientation** — BFS-based orientation propagation through connected components (in valid halfedge meshes, orientation is structurally consistent by construction). (5) **Combined repair pipeline** — runs all steps in sequence. 15 tests.
 
 **Remaining operators:**
-- **Adaptive remeshing:** Curvature-aware sizing field for non-uniform remeshing. The isotropic infrastructure (split/collapse/flip/smooth) is in place — extend with per-vertex target lengths driven by curvature estimates.
+- ~~**Adaptive remeshing:**~~ — **DONE.** `Geometry.AdaptiveRemeshing` implements the Botsch & Kobbelt adaptive remeshing variant with a curvature-driven per-vertex sizing field: `L(v) = L_base / (1 + α·|H(v)|)` where H(v) is mean curvature and α is the configurable adaptation strength. Uses `Geometry.Curvature::ComputeCurvature()` for per-iteration curvature recomputation. Per-edge thresholds are the average of endpoint targets. Split/collapse/flip/smooth with local thresholds, boundary preservation, configurable min/max edge length bounds. 10 tests.
 - ~~**Surface reconstruction:**~~ — **DONE.** Two modules: `Geometry.MarchingCubes` implements Lorensen & Cline 1987 isosurface extraction with full 256-entry lookup tables and grid-edge-indexed vertex welding (no hash maps). `Geometry.SurfaceReconstruction` implements Hoppe et al. 1992 signed distance approach: (1) compute or estimate normals, (2) build bounding box with padding, (3) construct scalar grid, (4) build octree for KNN queries, (5) evaluate signed distance field (single-nearest or inverse-distance-weighted average), (6) extract isosurface via Marching Cubes, (7) convert to HalfedgeMesh via `ToMesh()` (skips non-manifold triangles). ScalarGrid provides O(1) vertex lookup and world-space coordinate mapping. 25 tests (18 MC + 7 SR).
+- ~~**Parameterization (UV mapping):**~~ — **DONE.** `Geometry.Parameterization` implements Least Squares Conformal Maps (LSCM) with automatic boundary pin selection via most-distant-pair arc-length heuristic. Assembles the conformal energy as a rectangular sparse system, forms normal equations A^T·A, solves via CG. Returns per-vertex UV coordinates with quality diagnostics: mean/max conformal distortion (singular value ratio), flipped triangle count, CG convergence status. 8 tests.
+- ~~**Mesh quality metrics:**~~ — **DONE.** `Geometry.MeshQuality` computes comprehensive per-element and aggregate quality diagnostics: angle distribution (min/max/mean), aspect ratios (normalized equilateral = 1.0), edge lengths (min/max/mean/stddev), valence statistics, face areas, volume (divergence theorem), degenerate element counts, Euler characteristic, and boundary loop counts. Single-pass computation with configurable thresholds.
 - **Boolean operations:** CSG union/intersection/difference. Built on `HalfedgeMesh` + exact/robust predicates.
-- **Parameterization (UV mapping):** LSCM, ABF++, or Boundary First Flattening for UV unwrapping.
 
 **Architecture notes:**
 - Each operator follows a consistent pattern: input mesh → parameters struct → output/modified mesh + diagnostics. See `Geometry::Simplification::Simplify()` for the canonical example.
@@ -313,22 +314,21 @@ The geometry module now includes `Geometry::KDTree`, an Octree-inspired accelera
 **Status: Phase 0 DONE.** Two-layer architecture implemented — I/O backend (how bytes are read) is separated from format loaders (how bytes become CPU objects). Loaders receive `std::span<const std::byte>` and never open files, enabling future migration to archive containers, `io_uring`, or DirectStorage without touching parser code.
 
 **What exists:**
-- `Core.IOBackend` — `IIOBackend` interface + `FileIOBackend` (Phase 0: `std::ifstream`).
-- `Graphics:IORegistry` — `IORegistry`, `IAssetLoader` / `IAssetExporter` interfaces, `ImportResult` variant (`MeshImportData`, `PointCloudImportData`, `GraphImportData`), `LoadContext`, `RegisterBuiltinLoaders()`.
-- **5 I/O-agnostic importer partitions:** OBJ, PLY (ASCII + binary), XYZ, TGF, glTF 2.0 / GLB.
+- `Core.IOBackend` — `IIOBackend` interface + `FileIOBackend` (Phase 0: `std::ifstream` read, `std::ofstream` write).
+- `Graphics:IORegistry` — `IORegistry`, `IAssetLoader` / `IAssetExporter` interfaces, `ImportResult` variant (`MeshImportData`, `PointCloudImportData`, `GraphImportData`), `LoadContext`, `RegisterBuiltinLoaders()`, `RegisterBuiltinExporters()`.
+- **7 I/O-agnostic importer partitions:** OBJ, PLY (ASCII + binary), XYZ, TGF, glTF 2.0 / GLB, STL (ASCII + binary), OFF.
+- **3 exporter partitions:** OBJ (ASCII), PLY (binary + ASCII), STL (binary + ASCII). `IAssetExporter::Export()` returns `std::expected<std::vector<std::byte>, AssetError>`. `IORegistry::Export()` convenience method finds exporter by extension, serializes, writes via `IIOBackend::Write()`.
 - `ModelLoader` new overload accepting `IORegistry` + `IIOBackend`; `Engine` owns both, populates at startup.
 - `Engine::LoadDroppedAsset` uses `IORegistry::CanImport()` instead of hardcoded extension list.
-- 21 tests covering `FileIOBackend`, `AssetId`, `IORegistry` mechanics, and in-memory byte parsing for all 5 formats.
+- 31 tests covering `FileIOBackend`, `AssetId`, `IORegistry` mechanics, in-memory byte parsing for all 7 import formats, and round-trip export/re-import for OBJ, PLY, STL.
 
 **Remaining format support (incremental):**
-- **Mesh formats:** STL, OFF.
 - **Point cloud formats:** PCD (Point Cloud Library format), LAS/LAZ (LiDAR).
 - **Scene formats:** FBX (via Assimp or ufbx), glTF materials/hierarchy/cameras/lights extraction.
 - **Image formats:** PNG, JPEG, HDR/EXR (for environment maps and HDR textures).
 - **Gaussian splat formats:** `.ply` (3DGS standard), `.splat` (compressed variants).
 
 **Remaining architecture work:**
-- Export pipeline (`IAssetExporter` interface exists but no concrete exporters yet).
 - Export on worker thread with progress callback.
 - I/O backend Phase 1: archive/pack-file backend, async I/O.
 
@@ -493,7 +493,7 @@ Sub-entity select → Geometry processing (interactive operator input)
 
 17. **Geometry processing operators (§2.6)** — **PARTIALLY DONE**
     *Depends on: FeatureRegistry (DONE), sub-entity selection (Phase 4, for interactive input). Depended on by: nothing (leaf features).*
-    **Done:** Topological editing (collapse/flip/split), simplification (QEM), smoothing (Laplacian/cotan/Taubin), curvature computation (mean/Gaussian/principal), CG solver, Loop subdivision, isotropic remeshing, geodesic distance, Catmull-Clark subdivision, normal estimation (PCA + MST orientation), mesh repair (hole filling, degenerate removal, consistent orientation). Surface reconstruction robustness was improved with adaptive Gaussian + normal-consistency weighted signed-distance sampling and invalid-normal filtering before Marching Cubes. **Remaining:** Adaptive remeshing, boolean operations, UV parameterization. Each operator follows the pattern: input → params → output + diagnostics. Registered via FeatureRegistry, invokable from UI and (later) scripting.
+    **Done:** Topological editing (collapse/flip/split), simplification (QEM), smoothing (Laplacian/cotan/Taubin), curvature computation (mean/Gaussian/principal), CG solver, Loop subdivision, isotropic remeshing, adaptive remeshing (curvature-driven sizing), geodesic distance, Catmull-Clark subdivision, normal estimation (PCA + MST orientation), mesh repair (hole filling, degenerate removal, consistent orientation), surface reconstruction (Marching Cubes + Hoppe SDF), parameterization (LSCM), mesh quality metrics. **Remaining:** Boolean operations. Each operator follows the pattern: input → params → output + diagnostics. Registered via FeatureRegistry, invokable from UI and (later) scripting.
 
 18. **Clipping planes & cross-sections (§2.9)**
     *Depends on: line rendering (Phase 0, for plane visualization). Depended on by: nothing.*

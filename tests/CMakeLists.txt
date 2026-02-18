@@ -97,6 +97,7 @@ intrinsic_test_object_lib(GeometryTestObjs
         Test_SurfaceReconstruction.cpp
         Test_MeshQuality.cpp
         Test_Parameterization.cpp
+        Test_AdaptiveRemeshing.cpp
     DEPS IntrinsicCore IntrinsicGeometry
 )
 
@@ -116,6 +117,7 @@ intrinsic_test_object_lib(RuntimeTestObjs
         Test_RenderOrchestrator.cpp
         Test_HeadlessEngine.cpp
         Test_IORegistry.cpp
+        Test_Exporters.cpp
         Test_DebugDraw.cpp
         Test_OctreeDebugDraw.cpp
         Test_BoundingDebugDraw.cpp

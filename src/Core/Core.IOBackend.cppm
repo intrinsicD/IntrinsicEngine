@@ -2,6 +2,7 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <expected>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -54,16 +55,25 @@ export namespace Core::IO
         [[nodiscard]] virtual std::expected<IOReadResult, ErrorCode> Read(
             const IORequest& request) = 0;
 
+        // Synchronous write. Safe to call from any thread.
+        // IORequest::Path specifies the destination. Offset/Size are ignored (full replacement).
+        [[nodiscard]] virtual std::expected<void, ErrorCode> Write(
+            const IORequest& request,
+            std::span<const std::byte> data) = 0;
+
     protected:
         IIOBackend() = default;
     };
 
-    // Phase 0 implementation: reads loose files via std::ifstream.
+    // Phase 0 implementation: reads/writes loose files via std::ifstream/std::ofstream.
     class FileIOBackend final : public IIOBackend
     {
     public:
         FileIOBackend() = default;
         [[nodiscard]] std::expected<IOReadResult, ErrorCode> Read(
             const IORequest& request) override;
+        [[nodiscard]] std::expected<void, ErrorCode> Write(
+            const IORequest& request,
+            std::span<const std::byte> data) override;
     };
 }

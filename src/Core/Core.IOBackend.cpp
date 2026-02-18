@@ -5,6 +5,7 @@ module;
 #include <filesystem>
 #include <fstream>
 #include <functional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -62,5 +63,34 @@ namespace Core::IO
             return std::unexpected(ErrorCode::FileReadError);
 
         return result;
+    }
+
+    std::expected<void, ErrorCode> FileIOBackend::Write(
+        const IORequest& request,
+        std::span<const std::byte> data)
+    {
+        if (request.Path.empty())
+            return std::unexpected(ErrorCode::InvalidPath);
+
+        // Create parent directories if they don't exist
+        namespace fs = std::filesystem;
+        std::error_code ec;
+        auto parent = fs::path(request.Path).parent_path();
+        if (!parent.empty())
+            fs::create_directories(parent, ec);
+
+        std::ofstream file(request.Path, std::ios::binary | std::ios::trunc);
+        if (!file.is_open())
+            return std::unexpected(ErrorCode::FileWriteError);
+
+        if (!data.empty())
+        {
+            file.write(reinterpret_cast<const char*>(data.data()),
+                       static_cast<std::streamsize>(data.size()));
+            if (!file)
+                return std::unexpected(ErrorCode::FileWriteError);
+        }
+
+        return {};
     }
 }

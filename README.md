@@ -60,6 +60,9 @@ A **"Distinguished Scientist" grade** geometry kernel in `src/Runtime/Geometry/`
 | **Mesh Repair** | Hole filling (ear-clipping), degenerate removal, orientation | — |
 | **Marching Cubes** | Isosurface extraction from scalar fields with vertex welding | Lorensen & Cline 1987 |
 | **Surface Reconstruction** | Point cloud → mesh via robust oriented SDF (Gaussian + normal-consistency weighting) + Marching Cubes | Hoppe et al. 1992 |
+| **Adaptive Remeshing** | Curvature-driven split/collapse/flip/smooth with per-vertex sizing field | Botsch & Kobbelt 2004 |
+| **Parameterization** | LSCM (Least Squares Conformal Maps) with auto boundary pinning | Lévy et al. 2002 |
+| **Mesh Quality** | Angle, aspect ratio, edge length, valence, area, volume diagnostics | — |
 
 **Discrete Exterior Calculus (DEC):**
 - Exterior derivatives d0, d1 in CSR sparse matrix format.
@@ -93,12 +96,13 @@ Two-layer architecture: I/O backend (byte transport) separated from format loade
 **Supported formats:**
 | Category | Formats |
 |---|---|
-| **Mesh** | glTF 2.0 / GLB, OBJ, PLY (ASCII + binary) |
+| **Mesh (Import)** | glTF 2.0 / GLB, OBJ, PLY (ASCII + binary), STL (ASCII + binary), OFF |
+| **Mesh (Export)** | OBJ, PLY (binary + ASCII), STL (binary + ASCII) |
 | **Point Cloud** | XYZ, PLY |
 | **Graph** | TGF |
 | **Texture** | PNG, JPG, KTX (via stb/KTX loaders) |
 
-Drag-and-drop file loading with automatic format detection via `IORegistry`.
+Drag-and-drop file loading with automatic format detection via `IORegistry`. Export pipeline with symmetric `IORegistry::Export()` API.
 
 ---
 
@@ -157,9 +161,9 @@ Four test targets with clear GPU/no-GPU boundaries:
 | Target | Dependencies | Scope | Tests |
 |---|---|---|---|
 | `IntrinsicCoreTests` | Core only | Memory, tasks, handles, frame graph, DAG scheduler | ~80 |
-| `IntrinsicGeometryTests` | Core + Geometry | DEC, mesh operations, collision, graphs, all geometry operators | ~200 |
+| `IntrinsicGeometryTests` | Core + Geometry | DEC, mesh operations, collision, graphs, all geometry operators | ~210 |
 | `IntrinsicECSTests` | Core + ECS | FrameGraph system integration | ~15 |
-| `IntrinsicTests` | Full Runtime | Graphics, I/O, rendering, integration | ~230 |
+| `IntrinsicTests` | Full Runtime | Graphics, I/O, rendering, integration | ~240 |
 
 ```bash
 # Run all geometry tests
