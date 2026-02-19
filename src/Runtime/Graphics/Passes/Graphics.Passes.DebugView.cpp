@@ -19,32 +19,17 @@ import Interface;
 
 using namespace Core::Hash;
 
+#include "Graphics.PassUtils.hpp"
+
 namespace Graphics::Passes
 {
-    static void CheckVk(VkResult r, const char* what)
-    {
-        if (r != VK_SUCCESS)
-            Core::Log::Error("DebugView: {} failed (VkResult={})", what, (int)r);
-    }
-
     void DebugViewPass::Initialize(RHI::VulkanDevice& device,
                                    RHI::DescriptorAllocator& descriptorPool,
                                    RHI::DescriptorLayout&)
     {
         m_Device = &device;
 
-        VkSamplerCreateInfo samp{};
-        samp.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-        samp.magFilter = VK_FILTER_NEAREST;
-        samp.minFilter = VK_FILTER_NEAREST;
-        samp.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
-        samp.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-        samp.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-        samp.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-        samp.minLod = 0.0f;
-        samp.maxLod = 0.0f;
-        samp.maxAnisotropy = 1.0f;
-        CheckVk(vkCreateSampler(m_Device->GetLogicalDevice(), &samp, nullptr, &m_Sampler), "vkCreateSampler");
+        m_Sampler = CreateNearestSampler(m_Device->GetLogicalDevice(), "DebugView");
 
         VkDescriptorSetLayoutBinding bindings[] = {
             {0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
@@ -56,8 +41,8 @@ namespace Graphics::Passes
         layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
         layoutInfo.bindingCount = 3;
         layoutInfo.pBindings = bindings;
-        CheckVk(vkCreateDescriptorSetLayout(m_Device->GetLogicalDevice(), &layoutInfo, nullptr, &m_DescriptorSetLayout),
-                "vkCreateDescriptorSetLayout");
+        CheckVkResult(vkCreateDescriptorSetLayout(m_Device->GetLogicalDevice(), &layoutInfo, nullptr, &m_DescriptorSetLayout),
+                      "DebugView", "vkCreateDescriptorSetLayout");
 
         m_DescriptorSets.resize(RHI::VulkanDevice::GetFramesInFlight());
         for (auto& set : m_DescriptorSets) set = descriptorPool.Allocate(m_DescriptorSetLayout);
@@ -83,81 +68,23 @@ namespace Graphics::Passes
             VK_IMAGE_ASPECT_DEPTH_BIT);
 
         // Transition dummy images for sampling.
-        {
-            VkCommandBuffer cmd = RHI::CommandUtils::BeginSingleTimeCommands(*m_Device);
-
-            VkImageMemoryBarrier2 floatBarrier{};
-            floatBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-            floatBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-            floatBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            floatBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-            floatBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-            floatBarrier.image = m_DummyFloat->GetHandle();
-            floatBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-            floatBarrier.subresourceRange.baseMipLevel = 0;
-            floatBarrier.subresourceRange.levelCount = 1;
-            floatBarrier.subresourceRange.baseArrayLayer = 0;
-            floatBarrier.subresourceRange.layerCount = 1;
-            floatBarrier.srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
-            floatBarrier.srcAccessMask = 0;
-            floatBarrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
-            floatBarrier.dstAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
-
-            VkImageMemoryBarrier2 uintBarrier = floatBarrier;
-            uintBarrier.image = m_DummyUint->GetHandle();
-
-            VkImageMemoryBarrier2 depthBarrier = floatBarrier;
-            depthBarrier.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
-            depthBarrier.image = m_DummyDepth->GetHandle();
-            depthBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-
-            VkImageMemoryBarrier2 barriers[] = {floatBarrier, uintBarrier, depthBarrier};
-            VkDependencyInfo depInfo{};
-            depInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-            depInfo.imageMemoryBarrierCount = 3;
-            depInfo.pImageMemoryBarriers = barriers;
-            vkCmdPipelineBarrier2(cmd, &depInfo);
-
-            RHI::CommandUtils::EndSingleTimeCommands(*m_Device, cmd);
-        }
+        TransitionImageToShaderRead(*m_Device, m_DummyFloat->GetHandle(), VK_IMAGE_ASPECT_COLOR_BIT);
+        TransitionImageToShaderRead(*m_Device, m_DummyUint->GetHandle(), VK_IMAGE_ASPECT_COLOR_BIT);
+        TransitionImageToShaderRead(*m_Device, m_DummyDepth->GetHandle(), VK_IMAGE_ASPECT_DEPTH_BIT,
+                                    VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL);
 
         // Init descriptor bindings with dummy textures
         for (auto& set : m_DescriptorSets)
         {
-            VkDescriptorImageInfo dummyFloatInfo{
-                m_Sampler, m_DummyFloat->GetView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-            };
-            VkDescriptorImageInfo dummyUintInfo{
-                m_Sampler, m_DummyUint->GetView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-            };
-            VkDescriptorImageInfo dummyDepthInfo{
-                m_Sampler, m_DummyDepth->GetView(), VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
-            };
-
-            VkWriteDescriptorSet writes[3] = {};
-
-            writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            writes[0].dstSet = set;
-            writes[0].dstBinding = 0;
-            writes[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            writes[0].descriptorCount = 1;
-            writes[0].pImageInfo = &dummyFloatInfo;
-
-            writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            writes[1].dstSet = set;
-            writes[1].dstBinding = 1;
-            writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            writes[1].descriptorCount = 1;
-            writes[1].pImageInfo = &dummyUintInfo;
-
-            writes[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            writes[2].dstSet = set;
-            writes[2].dstBinding = 2;
-            writes[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            writes[2].descriptorCount = 1;
-            writes[2].pImageInfo = &dummyDepthInfo;
-
-            vkUpdateDescriptorSets(m_Device->GetLogicalDevice(), 3, writes, 0, nullptr);
+            UpdateImageDescriptor(m_Device->GetLogicalDevice(), set, 0,
+                                  m_Sampler, m_DummyFloat->GetView(),
+                                  VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            UpdateImageDescriptor(m_Device->GetLogicalDevice(), set, 1,
+                                  m_Sampler, m_DummyUint->GetView(),
+                                  VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            UpdateImageDescriptor(m_Device->GetLogicalDevice(), set, 2,
+                                  m_Sampler, m_DummyDepth->GetView(),
+                                  VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL);
         }
     }
 
@@ -323,18 +250,7 @@ namespace Graphics::Passes
 
                                            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                                              m_Pipeline->GetHandle());
-
-                                           VkViewport vp{};
-                                           vp.x = 0.0f;
-                                           vp.y = 0.0f;
-                                           vp.width = (float)ctx.Resolution.width;
-                                           vp.height = (float)ctx.Resolution.height;
-                                           vp.minDepth = 0.0f;
-                                           vp.maxDepth = 1.0f;
-                                           VkRect2D sc{{0, 0}, ctx.Resolution};
-                                           vkCmdSetViewport(cmd, 0, 1, &vp);
-                                           vkCmdSetScissor(cmd, 0, 1, &sc);
-
+                                           SetViewportScissor(cmd, ctx.Resolution);
                                            vkCmdSetPrimitiveTopology(cmd, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 
                                            VkDescriptorSet currentSet = GetDescriptorSet(ctx.FrameIndex);
@@ -468,23 +384,15 @@ namespace Graphics::Passes
             {
                 if (img.Resource == m_LastSrcHandle.ID && img.View != VK_NULL_HANDLE)
                 {
-                    VkDescriptorImageInfo imageInfo{m_Sampler, img.View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
-
                     uint32_t targetBinding = 0;
                     if (img.Format == VK_FORMAT_R32_UINT)
                         targetBinding = 1;
                     else if ((img.Aspect & VK_IMAGE_ASPECT_DEPTH_BIT) != 0)
                         targetBinding = 2;
 
-                    VkWriteDescriptorSet write{};
-                    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                    write.dstSet = currentSet;
-                    write.dstBinding = targetBinding;
-                    write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-                    write.descriptorCount = 1;
-                    write.pImageInfo = &imageInfo;
-
-                    vkUpdateDescriptorSets(m_Device->GetLogicalDevice(), 1, &write, 0, nullptr);
+                    UpdateImageDescriptor(m_Device->GetLogicalDevice(), currentSet, targetBinding,
+                                          m_Sampler, img.View,
+                                          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
                     break;
                 }
             }

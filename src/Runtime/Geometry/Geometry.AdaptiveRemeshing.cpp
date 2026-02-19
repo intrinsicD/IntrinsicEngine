@@ -16,75 +16,15 @@ import :AdaptiveRemeshing;
 import :Properties;
 import :HalfedgeMesh;
 import :Curvature;
+import :MeshUtils;
 
 namespace Geometry::AdaptiveRemeshing
 {
-    // =========================================================================
-    // Internal helpers (independent copies — isotropic remeshing helpers are
-    // static/unexported and need per-vertex local thresholds here)
-    // =========================================================================
-
-    static double EdgeLengthSq(const Halfedge::Mesh& mesh, EdgeHandle e)
-    {
-        HalfedgeHandle h{static_cast<PropertyIndex>(2u * e.Index)};
-        glm::vec3 a = mesh.Position(mesh.FromVertex(h));
-        glm::vec3 b = mesh.Position(mesh.ToVertex(h));
-        glm::vec3 d = b - a;
-        return static_cast<double>(glm::dot(d, d));
-    }
-
-    static double MeanEdgeLength(const Halfedge::Mesh& mesh)
-    {
-        double sum = 0.0;
-        std::size_t count = 0;
-        for (std::size_t ei = 0; ei < mesh.EdgesSize(); ++ei)
-        {
-            EdgeHandle e{static_cast<PropertyIndex>(ei)};
-            if (mesh.IsDeleted(e)) continue;
-            sum += std::sqrt(EdgeLengthSq(mesh, e));
-            ++count;
-        }
-        return (count > 0) ? (sum / static_cast<double>(count)) : 0.0;
-    }
-
-    static int TargetValence(const Halfedge::Mesh& mesh, VertexHandle v)
-    {
-        return mesh.IsBoundary(v) ? 4 : 6;
-    }
-
-    static glm::vec3 FaceNormal(const Halfedge::Mesh& mesh, FaceHandle f)
-    {
-        HalfedgeHandle h0 = mesh.Halfedge(f);
-        HalfedgeHandle h1 = mesh.NextHalfedge(h0);
-        HalfedgeHandle h2 = mesh.NextHalfedge(h1);
-
-        glm::vec3 a = mesh.Position(mesh.ToVertex(h0));
-        glm::vec3 b = mesh.Position(mesh.ToVertex(h1));
-        glm::vec3 c = mesh.Position(mesh.ToVertex(h2));
-
-        return glm::cross(b - a, c - a);
-    }
-
-    static glm::vec3 VertexNormal(const Halfedge::Mesh& mesh, VertexHandle v)
-    {
-        glm::vec3 n(0.0f);
-        HalfedgeHandle hStart = mesh.Halfedge(v);
-        HalfedgeHandle h = hStart;
-        std::size_t safety = 0;
-        do
-        {
-            FaceHandle f = mesh.Face(h);
-            if (f.IsValid() && !mesh.IsDeleted(f))
-            {
-                n += FaceNormal(mesh, f);
-            }
-            h = mesh.CWRotatedHalfedge(h);
-            if (++safety > 100) break;
-        } while (h != hStart);
-
-        float len = glm::length(n);
-        return (len > 1e-8f) ? (n / len) : glm::vec3(0.0f, 1.0f, 0.0f);
-    }
+    using MeshUtils::EdgeLengthSq;
+    using MeshUtils::MeanEdgeLength;
+    using MeshUtils::FaceNormal;
+    using MeshUtils::VertexNormal;
+    using MeshUtils::TargetValence;
 
     // Per-edge local target = average of endpoint sizing fields
     static double LocalTarget(

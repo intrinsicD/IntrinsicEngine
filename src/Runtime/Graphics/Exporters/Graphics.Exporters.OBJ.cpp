@@ -14,17 +14,15 @@ import :IORegistry;
 import :Geometry;
 import :AssetErrors;
 
+#include "Graphics.ExportUtils.hpp"
+
 namespace Graphics
 {
+    using ExportUtils::AppendString;
+
     namespace
     {
         static constexpr std::string_view s_Extensions[] = { ".obj" };
-
-        void AppendString(std::vector<std::byte>& out, const std::string& s)
-        {
-            const auto* ptr = reinterpret_cast<const std::byte*>(s.data());
-            out.insert(out.end(), ptr, ptr + s.size());
-        }
     }
 
     std::span<const std::string_view> OBJExporter::Extensions() const

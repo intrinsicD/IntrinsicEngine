@@ -15,49 +15,13 @@ module Geometry:Curvature.Impl;
 import :Curvature;
 import :Properties;
 import :HalfedgeMesh;
+import :MeshUtils;
 
 namespace Geometry::Curvature
 {
-    // -------------------------------------------------------------------------
-    // Helper: cotangent of angle between two vectors
-    // -------------------------------------------------------------------------
-    static double Cotan(glm::vec3 u, glm::vec3 v)
-    {
-        auto crossVec = glm::cross(u, v);
-        double sinVal = static_cast<double>(glm::length(crossVec));
-        double cosVal = static_cast<double>(glm::dot(u, v));
-
-        if (sinVal < 1e-10)
-            return 0.0;
-
-        return cosVal / sinVal;
-    }
-
-    // -------------------------------------------------------------------------
-    // Helper: triangle area
-    // -------------------------------------------------------------------------
-    static double TriangleArea(glm::vec3 a, glm::vec3 b, glm::vec3 c)
-    {
-        return 0.5 * static_cast<double>(glm::length(glm::cross(b - a, c - a)));
-    }
-
-    // -------------------------------------------------------------------------
-    // Helper: angle at vertex a in triangle (a, b, c)
-    // -------------------------------------------------------------------------
-    static double AngleAtVertex(glm::vec3 a, glm::vec3 b, glm::vec3 c)
-    {
-        glm::vec3 ab = b - a;
-        glm::vec3 ac = c - a;
-        float lenAB = glm::length(ab);
-        float lenAC = glm::length(ac);
-
-        if (lenAB < 1e-10f || lenAC < 1e-10f)
-            return 0.0;
-
-        float cosAngle = glm::dot(ab, ac) / (lenAB * lenAC);
-        cosAngle = std::clamp(cosAngle, -1.0f, 1.0f);
-        return static_cast<double>(std::acos(cosAngle));
-    }
+    using MeshUtils::Cotan;
+    using MeshUtils::TriangleArea;
+    using MeshUtils::AngleAtVertex;
 
     // =========================================================================
     // Mixed Voronoi area per vertex (Meyer et al., 2003)

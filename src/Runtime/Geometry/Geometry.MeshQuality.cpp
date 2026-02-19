@@ -15,16 +15,21 @@ module Geometry:MeshQuality.Impl;
 import :MeshQuality;
 import :Properties;
 import :HalfedgeMesh;
+import :MeshUtils;
 
 namespace Geometry::MeshQuality
 {
+    using MeshUtils::TriangleArea;
+
     namespace
     {
         constexpr double kPi = 3.14159265358979323846;
         constexpr double kRadToDeg = 180.0 / kPi;
         constexpr double kSqrt3 = 1.7320508075688772;
 
-        // Compute angle at vertex B in triangle ABC using atan2 for robustness
+        // Compute angle at vertex B in triangle ABC using atan2 for robustness.
+        // Note: This uses atan2 for robustness, unlike MeshUtils::AngleAtVertex
+        // which uses acos. Both are valid; this one avoids acos domain issues.
         double TriangleAngleAt(glm::vec3 a, glm::vec3 b, glm::vec3 c)
         {
             glm::vec3 ba = a - b;
@@ -32,11 +37,6 @@ namespace Geometry::MeshQuality
             double crossLen = static_cast<double>(glm::length(glm::cross(ba, bc)));
             double dotVal = static_cast<double>(glm::dot(ba, bc));
             return std::atan2(crossLen, dotVal);
-        }
-
-        double TriangleArea(glm::vec3 a, glm::vec3 b, glm::vec3 c)
-        {
-            return 0.5 * static_cast<double>(glm::length(glm::cross(b - a, c - a)));
         }
     }
 
