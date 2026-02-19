@@ -127,6 +127,7 @@ intrinsic_test_object_lib(RuntimeTestObjs
         Test_DAGScheduler.cpp
         Test_EditorUI.cpp
         Test_PointCloudRenderPass.cpp
+        Test_RuntimeGeometry_Reuse.cpp
 
     DEPS IntrinsicCore IntrinsicRuntime
 )

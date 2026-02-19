@@ -40,8 +40,13 @@ export namespace Graphics
         std::span<const glm::vec3> Normals;
         std::span<const glm::vec4> Aux; // UVs packed in xy, Color/Data in zw
         std::span<const uint32_t> Indices;
+
         PrimitiveTopology Topology = PrimitiveTopology::Triangles;
         GeometryUploadMode UploadMode = GeometryUploadMode::Staged;
+
+        // If valid, reuse the vertex buffer (and its layout) from an existing geometry.
+        // When set, Positions/Normals/Aux are ignored. Indices are still uploaded for this view.
+        Geometry::GeometryHandle ReuseVertexBuffersFrom{};
     };
 
     struct GeometryCpuData
@@ -54,7 +59,7 @@ export namespace Graphics
 
         [[nodiscard]] GeometryUploadRequest ToUploadRequest(GeometryUploadMode mode = GeometryUploadMode::Staged) const
         {
-            return {Positions, Normals, Aux, Indices, Topology, mode};
+            return {Positions, Normals, Aux, Indices, Topology, mode, {}};
         }
     };
 
@@ -81,6 +86,9 @@ export namespace Graphics
         PrimitiveTopology Topology = PrimitiveTopology::Triangles;
     };
 
+    // Use the core StrongHandle template for type safety and consistency.
+    using GeometryPool = Core::ResourcePool<class GeometryGpuData, Geometry::GeometryHandle>;
+
     // --- The GPU Resource ---
 
     class GeometryGpuData
@@ -93,7 +101,8 @@ export namespace Graphics
         [[nodiscard]] static std::pair<std::unique_ptr<GeometryGpuData>, RHI::TransferToken>
         CreateAsync(std::shared_ptr<RHI::VulkanDevice> device,
                     RHI::TransferManager& transferManager,
-                    const GeometryUploadRequest& data);
+                    const GeometryUploadRequest& data,
+                    const GeometryPool* existingPool = nullptr);
 
         [[nodiscard]] RHI::VulkanBuffer* GetVertexBuffer() const { return m_VertexBuffer.get(); }
         [[nodiscard]] RHI::VulkanBuffer* GetIndexBuffer() const { return m_IndexBuffer.get(); }
@@ -102,16 +111,13 @@ export namespace Graphics
         [[nodiscard]] PrimitiveTopology GetTopology() const { return m_Layout.Topology; }
 
     private:
-        std::unique_ptr<RHI::VulkanBuffer> m_VertexBuffer;
-        std::unique_ptr<RHI::VulkanBuffer> m_IndexBuffer;
+        // Shared ownership enables multiple GeometryGpuData instances (views) to reference the same heavy buffers.
+        std::shared_ptr<RHI::VulkanBuffer> m_VertexBuffer;
+        std::shared_ptr<RHI::VulkanBuffer> m_IndexBuffer;
 
         GeometryBufferLayout m_Layout{};
         uint32_t m_IndexCount = 0;
     };
-
-    // Use the core StrongHandle template for type safety and consistency
-
-    using GeometryPool = Core::ResourcePool<GeometryGpuData, Geometry::GeometryHandle>;
 
     /*class GeometryStorage
     {

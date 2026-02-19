@@ -76,5 +76,7 @@ export namespace Graphics
     // Canonical pipeline IDs used across the engine.
     // (You can move these into a dedicated IDs module later.)
     inline constexpr StringID kPipeline_Forward = "Pipeline.Forward"_id;
+    inline constexpr StringID kPipeline_ForwardLines = "Pipeline.ForwardLines"_id;
+    inline constexpr StringID kPipeline_ForwardPoints = "Pipeline.ForwardPoints"_id;
     inline constexpr StringID kPipeline_Picking = "Pipeline.Picking"_id;
 }

@@ -78,6 +78,8 @@ namespace Graphics
         m_PickingPass->SetPipeline(&pipelineLibrary.GetOrDie(kPipeline_Picking));
 
         m_ForwardPass->SetPipeline(&pipelineLibrary.GetOrDie(kPipeline_Forward));
+        m_ForwardPass->SetLinePipeline(&pipelineLibrary.GetOrDie(kPipeline_ForwardLines));
+        m_ForwardPass->SetPointPipeline(&pipelineLibrary.GetOrDie(kPipeline_ForwardPoints));
         m_ForwardPass->SetInstanceSetLayout(pipelineLibrary.GetStage1InstanceSetLayout());
         m_ForwardPass->SetCullPipeline(pipelineLibrary.GetCullPipeline());
         m_ForwardPass->SetCullSetLayout(pipelineLibrary.GetCullSetLayout());
@@ -139,12 +141,10 @@ namespace Graphics
                         auto pcView = registry.view<ECS::PointCloudRenderer::Component>();
                         for (auto [entity, pc] : pcView.each())
                         {
-                            // NOTE: The current PointCloudRenderPass has a single RenderMode for the whole pass.
-                            // For now, pick the mode of the last-submitted visible cloud. If we want mixed modes
-                            // in a single frame, we should batch by mode (or add mode to GpuPointData).                            m_PointCloudPass->RenderMode = pc.RenderMode;
-                            // RenderVisualization overrides Visible when present.
-                            bool visible = pc.Visible;
-                            if (auto* vis = registry.try_get<ECS::RenderVisualization::Component>(entity))
+                            // Submit points into a mode-batched stream so multiple render modes can coexist.
+                             // RenderVisualization overrides Visible when present.
+                             bool visible = pc.Visible;
+                             if (auto* vis = registry.try_get<ECS::RenderVisualization::Component>(entity))
                                 visible = vis->ShowVertices;
 
                             if (!visible || pc.Positions.empty()) continue;
@@ -173,7 +173,7 @@ namespace Graphics
                                     normal.x, normal.y, normal.z,
                                     radius * pc.SizeMultiplier,
                                     color);
-                                m_PointCloudPass->SubmitPoints(&pt, 1);
+                                m_PointCloudPass->SubmitPoints(pc.RenderMode, &pt, 1);
                             }
                         }
                     }
@@ -187,7 +187,20 @@ namespace Graphics
                             if (!vis.ShowWireframe && !vis.ShowVertices)
                                 continue;
 
-                            // Need CPU mesh data from collision geometry.
+                            const bool hasGpuWire = vis.WireframeView.IsValid();
+                            const bool hasGpuVerts = vis.VertexView.IsValid();
+
+                            // If GPU views exist, skip CPU overlay generation entirely.
+                            // Rendering is handled by ForwardPass via GPUScene instances (GeometryViewRenderer).
+                            if ((vis.ShowWireframe && hasGpuWire) || (vis.ShowVertices && hasGpuVerts))
+                            {
+                                const bool needsCpuWire = vis.ShowWireframe && !hasGpuWire;
+                                const bool needsCpuVerts = vis.ShowVertices && !hasGpuVerts;
+                                if (!needsCpuWire && !needsCpuVerts)
+                                    continue;
+                            }
+
+                            // Need CPU mesh data from collision geometry for the CPU overlay implementation.
                             auto* collider = registry.try_get<ECS::MeshCollider::Component>(entity);
                             if (!collider || !collider->CollisionRef)
                                 continue;
@@ -208,7 +221,8 @@ namespace Graphics
                                 topology = geo->GetTopology();
 
                             // --- Wireframe: extract edges and submit to DebugDraw ---
-                            if (vis.ShowWireframe && ctx.DebugDrawPtr && lineEnabled)
+                            const bool doCpuWireframe = vis.ShowWireframe && !hasGpuWire;
+                            if (doCpuWireframe && ctx.DebugDrawPtr && lineEnabled)
                             {
                                 // Build edge cache lazily.
                                 if (vis.EdgeCacheDirty && !indices.empty())
@@ -274,58 +288,70 @@ namespace Graphics
                             }
 
                             // --- Vertices: submit positions to PointCloudRenderPass ---
-                            if (vis.ShowVertices && pointCloudEnabled)
+                            const bool doCpuVertices = vis.ShowVertices && !hasGpuVerts;
+                            if (doCpuVertices && pointCloudEnabled)
                             {
-                                m_PointCloudPass->RenderMode = vis.VertexRenderMode;
+                                const bool wantsAligned = (vis.VertexRenderMode == Geometry::PointCloud::RenderMode::Surfel) ||
+                                                          (vis.VertexRenderMode == Geometry::PointCloud::RenderMode::EWA);
 
-                                // Compute area-weighted vertex normals from mesh triangles (cached).
-                                if (vis.VertexNormalsDirty
-                                    && topology == Graphics::PrimitiveTopology::Triangles
-                                    && !indices.empty())
-                                {
-                                    vis.CachedVertexNormals.assign(positions.size(), glm::vec3(0.0f));
-                                    for (std::size_t t = 0; t + 2 < indices.size(); t += 3)
-                                    {
-                                        uint32_t i0 = indices[t], i1 = indices[t+1], i2 = indices[t+2];
-                                        if (i0 >= positions.size() || i1 >= positions.size() || i2 >= positions.size())
-                                            continue;
-                                        glm::vec3 e1 = positions[i1] - positions[i0];
-                                        glm::vec3 e2 = positions[i2] - positions[i0];
-                                        glm::vec3 fn = glm::cross(e1, e2); // magnitude = 2*triangle area
-                                        vis.CachedVertexNormals[i0] += fn;
-                                        vis.CachedVertexNormals[i1] += fn;
-                                        vis.CachedVertexNormals[i2] += fn;
-                                    }
-                                    for (auto& vn : vis.CachedVertexNormals)
-                                    {
-                                        float len = glm::length(vn);
-                                        vn = (len > 1e-12f) ? (vn / len) : glm::vec3(0.0f, 1.0f, 0.0f);
-                                    }
-                                    vis.VertexNormalsDirty = false;
-                                }
+                                 // Compute area-weighted vertex normals from mesh triangles (cached).
+                                 if (vis.VertexNormalsDirty
+                                    && wantsAligned
+                                     && topology == Graphics::PrimitiveTopology::Triangles
+                                     && !indices.empty())
+                                 {
+                                     vis.CachedVertexNormals.assign(positions.size(), glm::vec3(0.0f));
+                                     for (std::size_t t = 0; t + 2 < indices.size(); t += 3)
+                                     {
+                                         uint32_t i0 = indices[t], i1 = indices[t+1], i2 = indices[t+2];
+                                         if (i0 >= positions.size() || i1 >= positions.size() || i2 >= positions.size())
+                                             continue;
+                                         glm::vec3 e1 = positions[i1] - positions[i0];
+                                         glm::vec3 e2 = positions[i2] - positions[i0];
+                                         glm::vec3 fn = glm::cross(e1, e2); // magnitude = 2*triangle area
+                                         vis.CachedVertexNormals[i0] += fn;
+                                         vis.CachedVertexNormals[i1] += fn;
+                                         vis.CachedVertexNormals[i2] += fn;
+                                     }
+                                     for (auto& vn : vis.CachedVertexNormals)
+                                     {
+                                         float len = glm::length(vn);
+                                         vn = (len > 1e-12f) ? (vn / len) : glm::vec3(0.0f, 1.0f, 0.0f);
+                                     }
+                                     vis.VertexNormalsDirty = false;
+                                 }
 
                                 const uint32_t vtxColor = Passes::PointCloudRenderPass::PackColorF(
                                     vis.VertexColor.r, vis.VertexColor.g,
                                     vis.VertexColor.b, vis.VertexColor.a);
 
-                                const glm::mat3 normalMatrix = glm::mat3(worldMatrix);
+                                // Correct normal transform: inverse-transpose of the linear part.
+                                // This is required for non-uniform scale; otherwise surfels/EWA won't align to the surface.
+                                const glm::mat3 normalMatrix = glm::transpose(glm::inverse(glm::mat3(worldMatrix)));
 
                                 for (std::size_t i = 0; i < positions.size(); ++i)
                                 {
                                     glm::vec3 worldPos = glm::vec3(worldMatrix * glm::vec4(positions[i], 1.0f));
 
                                     glm::vec3 normal(0.0f, 1.0f, 0.0f);
-                                    if (i < vis.CachedVertexNormals.size())
-                                        normal = glm::normalize(normalMatrix * vis.CachedVertexNormals[i]);
+                                    if (wantsAligned && i < vis.CachedVertexNormals.size())
+                                    {
+                                        const glm::vec3 n = normalMatrix * vis.CachedVertexNormals[i];
+                                        const float n2 = glm::dot(n, n);
+                                        normal = (n2 > 1e-12f) ? (n * (1.0f / glm::sqrt(n2))) : glm::vec3(0.0f, 1.0f, 0.0f);
+                                    }
 
                                     auto pt = Passes::PointCloudRenderPass::PackPoint(
                                         worldPos.x, worldPos.y, worldPos.z,
                                         normal.x, normal.y, normal.z,
                                         vis.VertexSize,
                                         vtxColor);
-                                    m_PointCloudPass->SubmitPoints(&pt, 1);
+                                    m_PointCloudPass->SubmitPoints(vis.VertexRenderMode, &pt, 1);
                                 }
                             }
+
+                            // --- Vertices: submit points via PointCloudRenderPass when no GPU view exists ---
+                            // (CPU vertex overlay handled above.)
                         }
                     }
 

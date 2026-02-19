@@ -70,7 +70,8 @@ export namespace RHI
         uint64_t PtrNormals; // Pointer to start of Normals block
         uint64_t PtrAux; // Pointer to start of Aux block
         uint32_t VisibilityBase; // Base offset into VisibleRemap[] for multi-geometry batching
-        uint32_t _pad[3];
+        float    PointSizePx = 1.0f; // Used by Forward pass when drawing point-list topology.
+        uint32_t _pad[2];
     };
 
     struct VertexInputDescription

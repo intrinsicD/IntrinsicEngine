@@ -1749,7 +1749,7 @@ namespace Graphics
                 uploadReq.Aux = meshData.Aux;
                 uploadReq.Topology = meshData.Topology;
 
-                auto [gpuData, token] = GeometryGpuData::CreateAsync(device, transferManager, uploadReq);
+                auto [gpuData, token] = GeometryGpuData::CreateAsync(device, transferManager, uploadReq, &geometryStorage);
                 latestToken = token; // Tokens are monotonic; keeping the last one is enough
 
                 segment.Handle = geometryStorage.Add(std::move(gpuData));
@@ -1855,7 +1855,7 @@ namespace Graphics
             uploadReq.Aux = meshData.Aux;
             uploadReq.Topology = meshData.Topology;
 
-            auto [gpuData, token] = GeometryGpuData::CreateAsync(device, transferManager, uploadReq);
+            auto [gpuData, token] = GeometryGpuData::CreateAsync(device, transferManager, uploadReq, &geometryStorage);
             latestToken = token;
 
             segment.Handle = geometryStorage.Add(std::move(gpuData));

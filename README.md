@@ -324,3 +324,40 @@ In the Sandbox app (`src/Apps/Sandbox/main.cpp`):
 * **Inspector > Point Cloud > Rendering > Render Mode** - controls how *point cloud entities* are drawn.
 
 Note: `PointCloudRenderPass` currently exposes a single `RenderMode` for the whole pass. If multiple point sources with different modes are visible in the same frame, the last submitted source wins. (Next step: batch submissions by mode, or add a per-point mode field.)
+
+## Graphics Geometry: Shared GPU Ownership (Views)
+
+`Graphics::GeometryGpuData` now supports a **shared ownership** model for heavy GPU buffers. This enables the **“view” pattern**: multiple geometries (mesh / graph / point cloud) can reference the *same* vertex memory while owning their own index buffers.
+
+### Key API
+
+- `Graphics::GeometryUploadRequest`:
+  - `Geometry::GeometryHandle ReuseVertexBuffersFrom` (optional)
+    - If valid, the upload request **reuses the vertex buffer + layout** from the referenced geometry.
+    - When set, `Positions/Normals/Aux` spans are ignored.
+    - `Indices` are **always uploaded** and remain unique per view.
+
+- `Graphics::GeometryGpuData::CreateAsync(...)`:
+  - Adds an optional `const Graphics::GeometryPool* existingPool` argument.
+  - When `ReuseVertexBuffersFrom` is valid, `existingPool` must be provided so the source geometry can be looked up.
+
+### Example: Create a line-graph view from an existing mesh
+
+```cpp
+Graphics::GeometryUploadRequest req;
+req.ReuseVertexBuffersFrom = sourceMeshHandle;
+req.Indices = lineIndexPairs;
+req.Topology = Graphics::PrimitiveTopology::Lines;
+
+auto [gpuData, token] = Graphics::GeometryGpuData::CreateAsync(
+    device,
+    transferManager,
+    req,
+    &geometryPool);
+
+auto graphHandle = geometryPool.Add(std::move(gpuData));
+```
+
+### Lifetime semantics
+
+Because the vertex/index buffers are stored as `std::shared_ptr<RHI::VulkanBuffer>` inside `GeometryGpuData`, GPU memory remains alive until **all** views using that buffer are destroyed.

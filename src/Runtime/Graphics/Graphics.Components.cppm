@@ -118,6 +118,16 @@ export namespace ECS::RenderVisualization
         float     VertexSize       = 0.008f;  // World-space radius.
         Geometry::PointCloud::RenderMode VertexRenderMode = Geometry::PointCloud::RenderMode::FlatDisc;
 
+        // ---- Derived Geometry Views (GPU, shared-vertex) ----
+        // Lazily populated when the user toggles visualization modes.
+        // These are optional GPU-side "views" that reuse vertex buffers from
+        // the entity’s base geometry but provide alternative topology/indices.
+        Geometry::GeometryHandle WireframeView{}; // Lines
+        Geometry::GeometryHandle VertexView{};    // Points
+
+        bool WireframeViewDirty = true;
+        bool VertexViewDirty = true;
+
         // ---- Edge Cache (internal, rebuilt lazily) ----
         // Populated from MeshCollider collision data when wireframe is first
         // enabled.  Stores unique edge pairs as index offsets into the
@@ -135,5 +145,27 @@ export namespace ECS::RenderVisualization
         // Tracks the last ShowSurface value written to GPUScene so that
         // GPUSceneSync can detect transitions.
         bool CachedShowSurface = true;
+    };
+}
+
+export namespace ECS::GeometryViewRenderer
+{
+    struct Component
+    {
+        // Base (surface / primary) geometry.
+        Geometry::GeometryHandle Surface{};
+        uint32_t SurfaceGpuSlot = MeshRenderer::Component::kInvalidSlot;
+
+        // Optional view geometries.
+        Geometry::GeometryHandle Wireframe{}; // Lines
+        uint32_t WireframeGpuSlot = MeshRenderer::Component::kInvalidSlot;
+
+        Geometry::GeometryHandle Vertices{}; // Points
+        uint32_t VerticesGpuSlot = MeshRenderer::Component::kInvalidSlot;
+
+        // Visibility toggles mirrored from RenderVisualization.
+        bool ShowSurface = true;
+        bool ShowWireframe = false;
+        bool ShowVertices = false;
     };
 }

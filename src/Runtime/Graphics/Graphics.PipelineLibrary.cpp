@@ -141,6 +141,103 @@ namespace Graphics
         }
 
         // ---------------------------------------------------------------------
+        // Forward pipeline variants for Lines and Points.
+        //
+        // Rationale: VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY is enabled globally in PipelineBuilder,
+        // but most drivers run with dynamicPrimitiveTopologyUnrestricted = VK_FALSE.
+        // That means vkCmdSetPrimitiveTopology() must stay within the same topology class as
+        // the pipeline’s VkPipelineInputAssemblyStateCreateInfo::topology.
+        //
+        // Our base forward pipeline is created with TRIANGLE_LIST, so using it to draw LINE_LIST
+        // or POINT_LIST triggers validation errors and undefined behavior (flicker).
+        //
+        // Solution: create dedicated forward pipelines with matching base topology.
+        // ---------------------------------------------------------------------
+        {
+            // Lines
+            {
+                const std::string vertPath = Core::Filesystem::ResolveShaderPathOrExit(
+                    [&](Core::Hash::StringID id) { return shaderRegistry.Get(id); },
+                    "Forward.Vert"_id);
+                const std::string fragPath = Core::Filesystem::ResolveShaderPathOrExit(
+                    [&](Core::Hash::StringID id) { return shaderRegistry.Get(id); },
+                    "Forward.Frag"_id);
+
+                RHI::ShaderModule vert(*m_Device, vertPath, RHI::ShaderStage::Vertex);
+                RHI::ShaderModule frag(*m_Device, fragPath, RHI::ShaderStage::Fragment);
+
+                RHI::VertexInputDescription inputLayout = {};
+                RHI::PipelineBuilder builder(m_DeviceOwner);
+                builder.SetShaders(&vert, &frag);
+                builder.SetInputLayout(inputLayout);
+                builder.SetColorFormats({swapchainFormat});
+                builder.SetDepthFormat(depthFormat);
+                builder.SetTopology(VK_PRIMITIVE_TOPOLOGY_LINE_LIST);
+
+                builder.SetCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE);
+                builder.AddDescriptorSetLayout(m_GlobalSetLayout.GetHandle());
+                builder.AddDescriptorSetLayout(m_Bindless.GetLayout());
+                builder.AddDescriptorSetLayout(m_Stage1InstanceSetLayout);
+
+                VkPushConstantRange pushConstant{};
+                pushConstant.offset = 0;
+                pushConstant.size = sizeof(RHI::MeshPushConstants);
+                pushConstant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+                builder.AddPushConstantRange(pushConstant);
+
+                auto pipelineResult = builder.Build();
+                if (!pipelineResult)
+                {
+                    Core::Log::Error("Failed to build ForwardLines pipeline: {}", (int)pipelineResult.error());
+                    std::exit(1);
+                }
+
+                m_Pipelines[kPipeline_ForwardLines] = std::move(*pipelineResult);
+            }
+
+            // Points
+            {
+                const std::string vertPath = Core::Filesystem::ResolveShaderPathOrExit(
+                    [&](Core::Hash::StringID id) { return shaderRegistry.Get(id); },
+                    "Forward.Vert"_id);
+                const std::string fragPath = Core::Filesystem::ResolveShaderPathOrExit(
+                    [&](Core::Hash::StringID id) { return shaderRegistry.Get(id); },
+                    "Forward.Frag"_id);
+
+                RHI::ShaderModule vert(*m_Device, vertPath, RHI::ShaderStage::Vertex);
+                RHI::ShaderModule frag(*m_Device, fragPath, RHI::ShaderStage::Fragment);
+
+                RHI::VertexInputDescription inputLayout = {};
+                RHI::PipelineBuilder builder(m_DeviceOwner);
+                builder.SetShaders(&vert, &frag);
+                builder.SetInputLayout(inputLayout);
+                builder.SetColorFormats({swapchainFormat});
+                builder.SetDepthFormat(depthFormat);
+                builder.SetTopology(VK_PRIMITIVE_TOPOLOGY_POINT_LIST);
+
+                builder.SetCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE);
+                builder.AddDescriptorSetLayout(m_GlobalSetLayout.GetHandle());
+                builder.AddDescriptorSetLayout(m_Bindless.GetLayout());
+                builder.AddDescriptorSetLayout(m_Stage1InstanceSetLayout);
+
+                VkPushConstantRange pushConstant{};
+                pushConstant.offset = 0;
+                pushConstant.size = sizeof(RHI::MeshPushConstants);
+                pushConstant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+                builder.AddPushConstantRange(pushConstant);
+
+                auto pipelineResult = builder.Build();
+                if (!pipelineResult)
+                {
+                    Core::Log::Error("Failed to build ForwardPoints pipeline: {}", (int)pipelineResult.error());
+                    std::exit(1);
+                }
+
+                m_Pipelines[Graphics::kPipeline_ForwardPoints] = std::move(*pipelineResult);
+            }
+        }
+
+        // ---------------------------------------------------------------------
         // Picking pipeline (ID buffer + BDA)
         // ---------------------------------------------------------------------
         {

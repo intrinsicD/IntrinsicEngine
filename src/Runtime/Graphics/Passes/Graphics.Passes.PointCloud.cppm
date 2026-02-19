@@ -75,15 +75,39 @@ export namespace Graphics::Passes
         // ---- Point Cloud Data Submission ----
         // Call before AddPasses() each frame.
 
-        // Reset the per-frame point accumulator.
-        void ResetPoints() { m_StagingPoints.clear(); }
-
         // Append points to the frame buffer. Caller transforms to world space.
+        // Uses the pass-global RenderMode.
         void SubmitPoints(const GpuPointData* data, uint32_t count);
 
-        // Query accumulated point count.
-        [[nodiscard]] uint32_t GetPointCount() const { return static_cast<uint32_t>(m_StagingPoints.size()); }
-        [[nodiscard]] bool HasContent() const { return !m_StagingPoints.empty(); }
+        // Append points with an explicit render mode (allows batching by mode).
+        void SubmitPoints(Geometry::PointCloud::RenderMode mode, const GpuPointData* data, uint32_t count);
+
+        // Reset all per-frame point accumulators.
+        void ResetPoints()
+        {
+            m_StagingPoints.clear();
+            m_StagingPointsByMode[0].clear();
+            m_StagingPointsByMode[1].clear();
+            m_StagingPointsByMode[2].clear();
+        }
+
+        // True if any mode has content.
+        [[nodiscard]] bool HasContent() const
+        {
+            return !m_StagingPoints.empty() ||
+                   !m_StagingPointsByMode[0].empty() ||
+                   !m_StagingPointsByMode[1].empty() ||
+                   !m_StagingPointsByMode[2].empty();
+        }
+
+        // Total number of accumulated points across all modes.
+        [[nodiscard]] uint32_t GetPointCount() const
+        {
+            return static_cast<uint32_t>(m_StagingPoints.size() +
+                                         m_StagingPointsByMode[0].size() +
+                                         m_StagingPointsByMode[1].size() +
+                                         m_StagingPointsByMode[2].size());
+        }
 
         // Convenience: pack a single point from components.
         static GpuPointData PackPoint(float x, float y, float z,
@@ -139,6 +163,9 @@ export namespace Graphics::Passes
 
         // CPU-side staging buffer — accumulated per frame.
         std::vector<GpuPointData> m_StagingPoints;
+
+        // New: per-mode staging (0..2). Used when callers want different modes in the same frame.
+        std::vector<GpuPointData> m_StagingPointsByMode[3];
 
         // Ensure SSBO has capacity for the given point count.
         bool EnsureBuffer(uint32_t requiredPoints);

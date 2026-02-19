@@ -19,6 +19,10 @@ namespace
 
     void OnMeshRendererDestroyed(entt::registry& registry, entt::entity entity)
     {
+        // NOTE: This hook is invoked for every MeshRenderer component destroyed.
+        // With Geometry views (wireframe/vertex) we may attach additional MeshRenderer
+        // components to the same entity (or helper entities). Each one owns its own
+        // GPUScene slot and must be freed here.
         if (!g_GpuSceneForDestroyHook)
             return;
 
@@ -31,6 +35,29 @@ namespace
         g_GpuSceneForDestroyHook->QueueUpdate(mr.GpuSlot, inst, /*sphere*/ {0.0f, 0.0f, 0.0f, 0.0f});
         g_GpuSceneForDestroyHook->FreeSlot(mr.GpuSlot);
         mr.GpuSlot = ECS::MeshRenderer::Component::kInvalidSlot;
+    }
+
+    void OnGeometryViewRendererDestroyed(entt::registry& registry, entt::entity entity)
+    {
+        if (!g_GpuSceneForDestroyHook)
+            return;
+
+        auto& vr = registry.get<ECS::GeometryViewRenderer::Component>(entity);
+
+        auto freeSlot = [&](uint32_t& slot)
+        {
+            if (slot == ECS::MeshRenderer::Component::kInvalidSlot)
+                return;
+
+            Graphics::GpuInstanceData inst{};
+            g_GpuSceneForDestroyHook->QueueUpdate(slot, inst, /*sphere*/ {0.0f, 0.0f, 0.0f, 0.0f});
+            g_GpuSceneForDestroyHook->FreeSlot(slot);
+            slot = ECS::MeshRenderer::Component::kInvalidSlot;
+        };
+
+        freeSlot(vr.SurfaceGpuSlot);
+        freeSlot(vr.WireframeGpuSlot);
+        freeSlot(vr.VerticesGpuSlot);
     }
 }
 
@@ -52,12 +79,18 @@ namespace Runtime
         g_GpuSceneForDestroyHook = &gpuScene;
         m_Scene.GetRegistry().on_destroy<ECS::MeshRenderer::Component>()
             .connect<&OnMeshRendererDestroyed>();
+
+        m_Scene.GetRegistry().on_destroy<ECS::GeometryViewRenderer::Component>()
+            .connect<&OnGeometryViewRendererDestroyed>();
     }
 
     void SceneManager::DisconnectGpuHooks()
     {
         m_Scene.GetRegistry().on_destroy<ECS::MeshRenderer::Component>()
             .disconnect<&OnMeshRendererDestroyed>();
+
+        m_Scene.GetRegistry().on_destroy<ECS::GeometryViewRenderer::Component>()
+            .disconnect<&OnGeometryViewRendererDestroyed>();
         g_GpuSceneForDestroyHook = nullptr;
     }
 

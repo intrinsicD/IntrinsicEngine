@@ -1,5 +1,6 @@
 module;
 #include <memory>
+#include <span>
 #include "RHI.Vulkan.hpp"
 
 module Runtime.RenderOrchestrator;
@@ -168,5 +169,35 @@ namespace Runtime
         m_FrameScope.Reset();
         m_FrameArena.Reset();
         m_DebugDraw.Reset();
+    }
+
+    std::pair<Geometry::GeometryHandle, RHI::TransferToken>
+    RenderOrchestrator::CreateGeometryView(RHI::TransferManager& transferManager,
+                                           Geometry::GeometryHandle reuseVertexBuffersFrom,
+                                           std::span<const uint32_t> indices,
+                                           Graphics::PrimitiveTopology topology,
+                                           Graphics::GeometryUploadMode uploadMode)
+    {
+        if (!reuseVertexBuffersFrom.IsValid())
+        {
+            Core::Log::Error("RenderOrchestrator::CreateGeometryView: invalid reuse handle.");
+            return { {}, {} };
+        }
+
+        Graphics::GeometryUploadRequest req{};
+        req.ReuseVertexBuffersFrom = reuseVertexBuffersFrom;
+        req.Indices = indices;
+        req.Topology = topology;
+        req.UploadMode = uploadMode;
+
+        auto [gpuData, token] = Graphics::GeometryGpuData::CreateAsync(m_Device, transferManager, req, &m_GeometryStorage);
+        if (!gpuData)
+        {
+            Core::Log::Error("RenderOrchestrator::CreateGeometryView: GPU data creation failed.");
+            return { {}, {} };
+        }
+
+        const auto h = m_GeometryStorage.Add(std::move(gpuData));
+        return { h, token };
     }
 }

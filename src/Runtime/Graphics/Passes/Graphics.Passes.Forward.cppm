@@ -48,6 +48,8 @@ export namespace Graphics::Passes
         }
 
         void SetPipeline(RHI::GraphicsPipeline* p) { m_Pipeline = p; }
+        void SetLinePipeline(RHI::GraphicsPipeline* p) { m_LinePipeline = p; }
+        void SetPointPipeline(RHI::GraphicsPipeline* p) { m_PointPipeline = p; }
         void SetCullPipeline(RHI::ComputePipeline* p) { m_CullPipeline = p; }
 
         void AddPasses(RenderPassContext& ctx) override;
@@ -83,6 +85,8 @@ export namespace Graphics::Passes
         RHI::VulkanDevice* m_Device = nullptr; // non-owning
         RHI::DescriptorAllocator* m_DescriptorPool = nullptr; // non-owning
         RHI::GraphicsPipeline* m_Pipeline = nullptr; // owned by RenderSystem for now
+        RHI::GraphicsPipeline* m_LinePipeline = nullptr; // owned by PipelineLibrary
+        RHI::GraphicsPipeline* m_PointPipeline = nullptr; // owned by PipelineLibrary
         RHI::ComputePipeline* m_CullPipeline = nullptr; // owned by PipelineLibrary
 
         // Stage 1: SSBO pull-model.
@@ -138,6 +142,10 @@ export namespace Graphics::Passes
         {
             Geometry::GeometryHandle GeoHandle{};
             VkPrimitiveTopology Topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+
+            // For VK_PRIMITIVE_TOPOLOGY_POINT_LIST batches: pixel-sized points.
+            // Ignored for triangles/lines.
+            float PointSizePx = 1.0f;
 
             VkBuffer IndexBuffer = VK_NULL_HANDLE;
             uint32_t IndexCount = 0;

@@ -37,6 +37,9 @@ layout(push_constant) uniform PushConsts {
     uint64_t ptrNorm;
     uint64_t ptrAux;
     uint VisibilityBase; // Base offset into VisibleRemap[] for this geometry batch
+    float PointSizePx;  // Used when drawing VK_PRIMITIVE_TOPOLOGY_POINT_LIST via the Forward pass.
+    uint _pad0;
+    uint _pad1;
 } push;
 
 layout(location = 0) out vec3 fragNormal;
@@ -60,6 +63,12 @@ void main() {
     InstanceData inst = instances.Data[globalInstanceID];
 
     gl_Position = camera.proj * camera.view * inst.Model * vec4(inPos, 1.0);
+
+    // Forward pass point rendering: fixed pixel-size points.
+    // The pipeline variant is created with POINT_LIST topology.
+    // Note: This is independent of PointCloudRenderPass splat modes.
+    gl_PointSize = max(push.PointSizePx, 1.0);
+
     fragNormal = mat3(inst.Model) * inNorm;
     fragTexCoord = inUV;
     fragTexID = inst.TextureID;

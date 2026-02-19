@@ -1,6 +1,7 @@
 module;
 #include <memory>
 #include <cstddef>
+#include <span>
 
 #include "RHI.Vulkan.hpp"
 
@@ -13,6 +14,7 @@ import Core.Hash;
 import Core.FeatureRegistry;
 import RHI;
 import Graphics;
+import Geometry;
 import ECS;
 
 export namespace Runtime
@@ -79,6 +81,20 @@ export namespace Runtime
 
         // Reset per-frame allocators (call at the start of each frame).
         void ResetFrameState();
+
+        // -----------------------------------------------------------------
+        // Geometry Views (shared-vertex GPU data)
+        // -----------------------------------------------------------------
+        // Create a new GeometryGpuData instance that reuses the vertex buffer
+        // from an existing geometry handle, but uploads a new index buffer and
+        // sets a new topology (Lines/Points/etc).
+        // Returns {newHandle, transferToken}.
+        [[nodiscard]] std::pair<Geometry::GeometryHandle, RHI::TransferToken>
+        CreateGeometryView(RHI::TransferManager& transferManager,
+                           Geometry::GeometryHandle reuseVertexBuffersFrom,
+                           std::span<const uint32_t> indices,
+                           Graphics::PrimitiveTopology topology,
+                           Graphics::GeometryUploadMode uploadMode = Graphics::GeometryUploadMode::Staged);
 
     private:
         // Per-frame scratch memory.

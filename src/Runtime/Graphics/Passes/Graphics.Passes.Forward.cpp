@@ -70,7 +70,7 @@ namespace Graphics::Passes
 
     ForwardPass::DrawStream ForwardPass::BuildDrawStream(RenderPassContext& ctx)
     {
-        DrawStream out{};
+         DrawStream out{};
 
         const bool canGpu = m_EnableGpuCulling && (ctx.GpuScene != nullptr) && (m_CullPipeline != nullptr) && (m_CullSetLayout != VK_NULL_HANDLE);
         if (!canGpu)
@@ -116,6 +116,71 @@ namespace Graphics::Passes
                 dense.push_back({.Handle = mr.Geometry, .Geo = geo});
             }
         }
+
+        // Also include view geometries (wireframe/vertices) so their GeometryID values are mapped.
+         {
+             auto view = ctx.Scene.GetRegistry().view<ECS::GeometryViewRenderer::Component>();
+             for (auto entity : view)
+             {
+                 const auto& vr = view.get<ECS::GeometryViewRenderer::Component>(entity);
+
+                auto tryAdd = [&](Geometry::GeometryHandle h)
+                {
+                    if (!h.IsValid())
+                        return;
+
+                    maxHandleIndex = std::max(maxHandleIndex, h.Index);
+
+                    for (const DenseGeo& g : dense)
+                    {
+                        if (g.Handle == h)
+                            return;
+                    }
+
+                    GeometryGpuData* geo = ctx.GeometryStorage.GetUnchecked(h);
+                    if (!geo || geo->GetIndexCount() == 0 || !geo->GetIndexBuffer() || !geo->GetVertexBuffer())
+                        return;
+
+                    dense.push_back({.Handle = h, .Geo = geo});
+                };
+
+                tryAdd(vr.Surface);
+                tryAdd(vr.Wireframe);
+                tryAdd(vr.Vertices);
+             }
+         }
+
+        // Point size routing (by GeometryHandle.Index) for point-view geometries.
+        // We interpret RenderVisualization::VertexSize (a world-ish radius in the UI) as an artist-friendly scalar
+        // and map it into a pixel radius here.
+        std::vector<float> pointSizePxByHandleIndex;
+        pointSizePxByHandleIndex.assign(static_cast<size_t>(maxHandleIndex) + 1u, 4.0f);
+        {
+            auto view = ctx.Scene.GetRegistry().view<ECS::GeometryViewRenderer::Component, ECS::RenderVisualization::Component>();
+            for (auto entity : view)
+            {
+                const auto& vr = view.get<ECS::GeometryViewRenderer::Component>(entity);
+                const auto& vis = view.get<ECS::RenderVisualization::Component>(entity);
+
+                if (!vr.Vertices.IsValid())
+                    continue;
+
+                if (vr.Vertices.Index < pointSizePxByHandleIndex.size())
+                {
+                    // Slider is in world units for CPU splats; for forward points we want stable pixels.
+                    // This mapping is intentionally simple and clamped.
+                    pointSizePxByHandleIndex[vr.Vertices.Index] = std::clamp(vis.VertexSize * 1000.0f, 1.0f, 64.0f);
+                }
+            }
+        }
+
+         // IMPORTANT: ensure deterministic ordering.
+        // Dense IDs are used to slice packed indirect/visibility buffers.
+        // If dense order changes frame-to-frame, geometry will read the wrong slice → flicker.
+        std::sort(dense.begin(), dense.end(), [](const DenseGeo& a, const DenseGeo& b)
+        {
+            return a.Handle.Index < b.Handle.Index;
+        });
 
         const uint32_t geometryCount = static_cast<uint32_t>(dense.size());
         if (geometryCount == 0)
@@ -406,6 +471,15 @@ namespace Graphics::Passes
             default: b.Topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST; break;
             }
 
+            b.PointSizePx = 1.0f;
+            if (b.Topology == VK_PRIMITIVE_TOPOLOGY_POINT_LIST)
+            {
+                if (b.GeoHandle.IsValid() && b.GeoHandle.Index < pointSizePxByHandleIndex.size())
+                    b.PointSizePx = pointSizePxByHandleIndex[b.GeoHandle.Index];
+                else
+                    b.PointSizePx = 4.0f;
+            }
+
             // Packed buffers.
             b.InstanceBuffer = &ctx.GpuScene->GetSceneBuffer();
             b.VisibilityBuffer = m_Stage3VisibilityPacked[frame].get();
@@ -471,7 +545,8 @@ namespace Graphics::Passes
                                     },
                                     [this, &ctx, pipeline = m_Pipeline, stream = std::move(stream)](const PassData&, const RGRegistry&, VkCommandBuffer cmd) mutable
                                     {
-                                        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->GetHandle());
+                                        // NOTE: We bind pipelines per-batch based on topology.
+                                        // Vulkan restricts dynamic topology switches unless dynamicPrimitiveTopologyUnrestricted is enabled.
 
                                         VkViewport viewport{};
                                         viewport.x = 0.0f;
@@ -488,6 +563,8 @@ namespace Graphics::Passes
                                         vkCmdSetViewport(cmd, 0, 1, &viewport);
                                         vkCmdSetScissor(cmd, 0, 1, &scissor);
 
+                                        // Bind global sets using the base forward pipeline layout.
+                                        // (All forward variants share the same descriptor set layouts + push constant range.)
                                         const uint32_t dynamicOffset = static_cast<uint32_t>(ctx.GlobalCameraDynamicOffset);
                                         vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                                                 pipeline->GetLayout(),
@@ -500,25 +577,47 @@ namespace Graphics::Passes
                                                                 1, 1, &globalTextures,
                                                                 0, nullptr);
 
+                                        // Allocate once per pass.
                                         VkDescriptorSet instanceSet = VK_NULL_HANDLE;
                                         VkBuffer currentInstBuffer = VK_NULL_HANDLE;
                                         VkBuffer currentVisBuffer = VK_NULL_HANDLE;
+
+                                        const RHI::GraphicsPipeline* currentPipeline = nullptr;
 
                                         for (const DrawBatch& b : stream.Batches)
                                         {
                                             if (!b.InstanceBuffer || !b.VisibilityBuffer || !b.IndirectBuffer)
                                                 continue;
 
-                                            const VkBuffer instHandle = b.InstanceBuffer->GetHandle();
-                                            const VkBuffer visHandle = b.VisibilityBuffer->GetHandle();
+                                            const RHI::GraphicsPipeline* desired = [&]() -> const RHI::GraphicsPipeline*
+                                            {
+                                                switch (b.Topology)
+                                                {
+                                                case VK_PRIMITIVE_TOPOLOGY_LINE_LIST: return m_LinePipeline ? m_LinePipeline : m_Pipeline;
+                                                case VK_PRIMITIVE_TOPOLOGY_POINT_LIST: return m_PointPipeline ? m_PointPipeline : m_Pipeline;
+                                                case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST:
+                                                default: return m_Pipeline;
+                                                }
+                                            }();
 
-                                            // Allocate once per pass; update if buffers differ.
+                                            if (!desired)
+                                                continue;
+
+                                            if (desired != currentPipeline)
+                                            {
+                                                vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, desired->GetHandle());
+                                                currentPipeline = desired;
+                                            }
+
                                             if (instanceSet == VK_NULL_HANDLE)
                                             {
                                                 instanceSet = m_InstanceSetPool->Allocate(m_InstanceSetLayout);
                                                 if (instanceSet == VK_NULL_HANDLE)
                                                     continue;
                                             }
+
+                                            const VkBuffer instHandle = b.InstanceBuffer->GetHandle();
+                                            const VkBuffer visHandle = b.VisibilityBuffer->GetHandle();
 
                                             if (instHandle != currentInstBuffer || visHandle != currentVisBuffer)
                                             {
@@ -546,15 +645,25 @@ namespace Graphics::Passes
                                             }
 
                                             vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                                                    pipeline->GetLayout(),
+                                                                    desired->GetLayout(),
                                                                     2, 1, &instanceSet,
                                                                     0, nullptr);
 
                                             vkCmdBindIndexBuffer(cmd, b.IndexBuffer, 0, VK_INDEX_TYPE_UINT32);
                                             vkCmdSetPrimitiveTopology(cmd, b.Topology);
 
-                                            RHI::MeshPushConstants push{.Model = glm::mat4(1.0f), .PtrPositions = b.PtrPositions, .PtrNormals = b.PtrNormals, .PtrAux = b.PtrAux, .VisibilityBase = b.VisibilityBase, ._pad = {}};
-                                            vkCmdPushConstants(cmd, pipeline->GetLayout(),
+                                            // NOTE: Forward point rendering uses fixed pixel-size points via gl_PointSize.
+                                            // We default to 4px for visibility; later we can plumb per-entity UI values.
+                                            RHI::MeshPushConstants push{
+                                                .Model = glm::mat4(1.0f),
+                                                .PtrPositions = b.PtrPositions,
+                                                .PtrNormals = b.PtrNormals,
+                                                .PtrAux = b.PtrAux,
+                                                .VisibilityBase = b.VisibilityBase,
+                                                .PointSizePx = (b.Topology == VK_PRIMITIVE_TOPOLOGY_POINT_LIST) ? b.PointSizePx : 1.0f,
+                                                ._pad = {}
+                                            };
+                                            vkCmdPushConstants(cmd, desired->GetLayout(),
                                                                VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
                                                                0, sizeof(RHI::MeshPushConstants), &push);
 

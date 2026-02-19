@@ -7,6 +7,7 @@
 #include <imgui.h>
 #include <entt/entity/registry.hpp>
 #include <tiny_gltf.h>
+#include <unordered_set>
 
 import Runtime.Engine;
 import Runtime.GraphicsBackend;
@@ -797,6 +798,29 @@ public:
 
                         if (vis && !justCreated)
                         {
+                            // Ensure the entity has a GeometryViewRenderer when it has a MeshRenderer.
+                            ECS::GeometryViewRenderer::Component* viewR = nullptr;
+                            ECS::MeshRenderer::Component* mrPtr = nullptr;
+                            Graphics::GeometryGpuData* srcGeo = nullptr;
+
+                            if (hasMesh)
+                            {
+                                mrPtr = &reg.get<ECS::MeshRenderer::Component>(selected);
+                                srcGeo = GetGeometryStorage().GetUnchecked(mrPtr->Geometry);
+
+                                viewR = reg.try_get<ECS::GeometryViewRenderer::Component>(selected);
+                                if (!viewR)
+                                {
+                                    auto& vr = reg.emplace<ECS::GeometryViewRenderer::Component>(selected);
+                                    vr.Surface = mrPtr->Geometry;
+                                    viewR = &vr;
+                                }
+                                else
+                                {
+                                    viewR->Surface = mrPtr->Geometry;
+                                }
+                            }
+
                             // --- Mode Toggles ---
                             if (hasMesh)
                             {
@@ -813,37 +837,139 @@ public:
 
                             ImGui::Checkbox("Show Vertices", &vis->ShowVertices);
 
-                            // --- Wireframe Settings ---
-                            if (vis->ShowWireframe && isTriangleMesh)
-                            {
-                                ImGui::Indent();
-                                float wc[4] = {vis->WireframeColor.r, vis->WireframeColor.g,
-                                               vis->WireframeColor.b, vis->WireframeColor.a};
-                                if (ImGui::ColorEdit4("Wire Color", wc))
-                                    vis->WireframeColor = glm::vec4(wc[0], wc[1], wc[2], wc[3]);
-
-                                ImGui::SliderFloat("Wire Width", &vis->WireframeWidth, 0.5f, 8.0f, "%.1f px");
-                                ImGui::Checkbox("Wireframe Overlay", &vis->WireframeOverlay);
-                                ImGui::Unindent();
-                            }
-
-                            // --- Vertex Settings ---
                             if (vis->ShowVertices)
                             {
-                                ImGui::Indent();
-                                float vc[4] = {vis->VertexColor.r, vis->VertexColor.g,
-                                               vis->VertexColor.b, vis->VertexColor.a};
+                                ImGui::SeparatorText("Vertex Settings");
+                                {
+                                    const char* modes[] = {"Flat Disc", "Surfel", "EWA (Elliptical)"};
+                                    int mode = static_cast<int>(vis->VertexRenderMode);
+                                    if (ImGui::Combo("Vertex Mode", &mode, modes, 3))
+                                        vis->VertexRenderMode = static_cast<Geometry::PointCloud::RenderMode>(mode);
+                                }
+
+                                ImGui::SliderFloat("Vertex Size", &vis->VertexSize, 0.0005f, 0.05f, "%.5f", ImGuiSliderFlags_Logarithmic);
+                                float vc[4] = {vis->VertexColor.r, vis->VertexColor.g, vis->VertexColor.b, vis->VertexColor.a};
                                 if (ImGui::ColorEdit4("Vertex Color", vc))
                                     vis->VertexColor = glm::vec4(vc[0], vc[1], vc[2], vc[3]);
+                            }
 
-                                ImGui::SliderFloat("Vertex Size", &vis->VertexSize, 0.001f, 0.1f, "%.4f");
+                            // Mirror visibility into the GPU view renderer (if present).
+                            if (viewR)
+                            {
+                                viewR->ShowSurface = vis->ShowSurface;
+                                viewR->ShowWireframe = vis->ShowWireframe;
+                                viewR->ShowVertices = vis->ShowVertices;
+                            }
 
-                                const char* modes[] = {"Flat Disc", "Surfel", "EWA (Elliptical)"};
-                                int mode = static_cast<int>(vis->VertexRenderMode);
-                                if (ImGui::Combo("Vertex Mode", &mode, modes, 3))
-                                    vis->VertexRenderMode = static_cast<Geometry::PointCloud::RenderMode>(mode);
+                            // -----------------------------------------------------------------
+                            // Lazily create GPU views (one-time allocations/uploads)
+                            // -----------------------------------------------------------------
 
-                                ImGui::Unindent();
+                            // (1) Wireframe view (Lines) for triangle meshes: build edges from collision indices once.
+                            if (vis->ShowWireframe
+                                && isTriangleMesh
+                                && (vis->WireframeViewDirty || !vis->WireframeView.IsValid()))
+                            {
+                                if (mrPtr && srcGeo && mrPtr->Geometry.IsValid()
+                                    && reg.all_of<ECS::MeshCollider::Component>(selected))
+                                {
+                                    const auto& col = reg.get<ECS::MeshCollider::Component>(selected);
+                                    if (col.CollisionRef)
+                                    {
+                                        const auto& idx = col.CollisionRef->Indices;
+                                        if (!idx.empty())
+                                        {
+                                            struct PairHash
+                                            {
+                                                size_t operator()(const std::pair<uint32_t, uint32_t>& p) const
+                                                {
+                                                    return (static_cast<size_t>(p.first) << 32) ^ static_cast<size_t>(p.second);
+                                                }
+                                            };
+
+                                            std::unordered_set<std::pair<uint32_t, uint32_t>, PairHash> edgeSet;
+                                            edgeSet.reserve(idx.size());
+
+                                            for (size_t t = 0; t + 2 < idx.size(); t += 3)
+                                            {
+                                                const uint32_t i0 = idx[t], i1 = idx[t + 1], i2 = idx[t + 2];
+                                                auto add = [&](uint32_t a, uint32_t b)
+                                                {
+                                                    auto key = (a < b) ? std::pair{a, b} : std::pair{b, a};
+                                                    edgeSet.insert(key);
+                                                };
+                                                add(i0, i1);
+                                                add(i1, i2);
+                                                add(i2, i0);
+                                            }
+
+                                            std::vector<uint32_t> lineIndices;
+                                            lineIndices.reserve(edgeSet.size() * 2);
+                                            for (const auto& e : edgeSet)
+                                            {
+                                                lineIndices.push_back(e.first);
+                                                lineIndices.push_back(e.second);
+                                            }
+
+                                            auto [h, token] = GetRenderOrchestrator().CreateGeometryView(
+                                                GetGraphicsBackend().GetTransferManager(),
+                                                mrPtr->Geometry,
+                                                lineIndices,
+                                                Graphics::PrimitiveTopology::Lines,
+                                                Graphics::GeometryUploadMode::Staged);
+
+                                            if (h.IsValid())
+                                            {
+                                                vis->WireframeView = h;
+                                                vis->WireframeViewDirty = false;
+                                                if (viewR) viewR->Wireframe = h;
+
+                                                // Force a GPUScene refresh for this entity so the new view becomes visible immediately.
+                                                reg.emplace_or_replace<ECS::Components::Transform::WorldUpdatedTag>(selected);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // (2) Vertex view (Points): generate [0..N-1] once.
+                            if (vis->ShowVertices
+                                && (vis->VertexViewDirty || !vis->VertexView.IsValid()))
+                            {
+                                if (mrPtr && srcGeo && mrPtr->Geometry.IsValid())
+                                {
+                                    const uint32_t vertexCount = static_cast<uint32_t>(srcGeo->GetLayout().PositionsSize / sizeof(glm::vec3));
+                                    if (vertexCount > 0)
+                                    {
+                                        std::vector<uint32_t> pointIndices(vertexCount);
+                                        for (uint32_t i = 0; i < vertexCount; ++i)
+                                            pointIndices[i] = i;
+
+                                        auto [h, token] = GetRenderOrchestrator().CreateGeometryView(
+                                            GetGraphicsBackend().GetTransferManager(),
+                                            mrPtr->Geometry,
+                                            pointIndices,
+                                            Graphics::PrimitiveTopology::Points,
+                                            Graphics::GeometryUploadMode::Staged);
+
+                                        if (h.IsValid())
+                                        {
+                                            vis->VertexView = h;
+                                            vis->VertexViewDirty = false;
+                                            if (viewR) viewR->Vertices = h;
+
+                                            // Force a GPUScene refresh for this entity so the new view becomes visible immediately.
+                                            reg.emplace_or_replace<ECS::Components::Transform::WorldUpdatedTag>(selected);
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Publish handles (keep in sync even if created elsewhere).
+                            if (viewR)
+                            {
+                                viewR->Wireframe = vis->WireframeView;
+                                viewR->Vertices = vis->VertexView;
                             }
                         }
                     }

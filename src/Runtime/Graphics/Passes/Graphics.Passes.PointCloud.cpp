@@ -58,7 +58,25 @@ namespace Graphics::Passes
 
     void PointCloudRenderPass::SubmitPoints(const GpuPointData* data, uint32_t count)
     {
-        m_StagingPoints.insert(m_StagingPoints.end(), data, data + count);
+        SubmitPoints(RenderMode, data, count);
+    }
+
+    void PointCloudRenderPass::SubmitPoints(Geometry::PointCloud::RenderMode mode, const GpuPointData* data, uint32_t count)
+    {
+        if (!data || count == 0)
+            return;
+
+        const uint32_t m = static_cast<uint32_t>(mode);
+        if (m < 3)
+        {
+            auto& dst = m_StagingPointsByMode[m];
+            dst.insert(dst.end(), data, data + count);
+        }
+        else
+        {
+            // Fallback: preserve old behavior for unexpected values.
+            m_StagingPoints.insert(m_StagingPoints.end(), data, data + count);
+        }
     }
 
     // =========================================================================
@@ -260,10 +278,10 @@ namespace Graphics::Passes
 
     void PointCloudRenderPass::AddPasses(RenderPassContext& ctx)
     {
-        if (m_StagingPoints.empty()) return;
-        if (ctx.Resolution.width == 0 || ctx.Resolution.height == 0) return;
+        if (!HasContent()) return;
+         if (ctx.Resolution.width == 0 || ctx.Resolution.height == 0) return;
 
-        const uint32_t pointCount = static_cast<uint32_t>(m_StagingPoints.size());
+        const uint32_t pointCount = GetPointCount();
         const uint32_t frameIndex = ctx.FrameIndex;
 
         // Lazy pipeline creation (need swapchain format and depth format).
@@ -284,58 +302,84 @@ namespace Graphics::Passes
             }
         }
 
-        // Ensure SSBO capacity.
-        if (!EnsureBuffer(pointCount))
-            return;
+        // Helper: record one point draw batch for the given span and mode.
+        auto recordBatch = [&](std::span<const GpuPointData> pts, Geometry::PointCloud::RenderMode mode)
+        {
+            if (pts.empty())
+                return;
 
-        // Upload point data to SSBO.
-        m_PointBuffers[frameIndex]->Write(m_StagingPoints.data(),
-                                           m_StagingPoints.size() * sizeof(GpuPointData));
+            // Ensure SSBO capacity.
+            const uint32_t batchCount = static_cast<uint32_t>(pts.size());
+            if (!EnsureBuffer(batchCount))
+                return;
 
-        // Update descriptor set.
-        VkDescriptorBufferInfo bufInfo{};
-        bufInfo.buffer = m_PointBuffers[frameIndex]->GetHandle();
-        bufInfo.offset = 0;
-        bufInfo.range = m_StagingPoints.size() * sizeof(GpuPointData);
+            // Upload batch points.
+            m_PointBuffers[frameIndex]->Write(pts.data(), pts.size_bytes());
 
-        VkWriteDescriptorSet write{};
-        write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        write.dstSet = m_PointDescSets[frameIndex];
-        write.dstBinding = 0;
-        write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        write.descriptorCount = 1;
-        write.pBufferInfo = &bufInfo;
-        vkUpdateDescriptorSets(m_Device->GetLogicalDevice(), 1, &write, 0, nullptr);
+            // Update descriptor set.
+            VkDescriptorBufferInfo bufInfo{};
+            bufInfo.buffer = m_PointBuffers[frameIndex]->GetHandle();
+            bufInfo.offset = 0;
+            bufInfo.range = pts.size_bytes();
 
-        // Fetch resource handles from blackboard.
-        const RGResourceHandle backbuffer = ctx.Blackboard.Get("Backbuffer"_id);
-        const RGResourceHandle depth = ctx.Blackboard.Get("SceneDepth"_id);
-        if (!backbuffer.IsValid() || !depth.IsValid()) return;
+            VkWriteDescriptorSet write{};
+            write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            write.dstSet = m_PointDescSets[frameIndex];
+            write.dstBinding = 0;
+            write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+            write.descriptorCount = 1;
+            write.pBufferInfo = &bufInfo;
+            vkUpdateDescriptorSets(m_Device->GetLogicalDevice(), 1, &write, 0, nullptr);
 
-        // Add render graph pass.
-        ctx.Graph.AddPass<PointCloudPassData>("PointCloud",
-            [&](PointCloudPassData& data, RGBuilder& builder)
+            // Set pass-global mode for RecordDraw (it reads RenderMode member).
+            const auto oldMode = RenderMode;
+            RenderMode = mode;
+
+            // Fetch resource handles.
+            const RGResourceHandle backbuffer = ctx.Blackboard.Get("Backbuffer"_id);
+            const RGResourceHandle depth = ctx.Blackboard.Get("SceneDepth"_id);
+            if (!backbuffer.IsValid() || !depth.IsValid())
             {
-                RGAttachmentInfo colorInfo{};
-                colorInfo.LoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
-                colorInfo.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
-                data.Color = builder.WriteColor(backbuffer, colorInfo);
+                RenderMode = oldMode;
+                return;
+            }
 
-                RGAttachmentInfo depthInfo{};
-                depthInfo.LoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
-                depthInfo.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
-                data.Depth = builder.WriteDepth(depth, depthInfo);
-            },
-            [this, pointCount, frameIndex,
-             globalSet = ctx.GlobalDescriptorSet,
-             dynamicOffset = static_cast<uint32_t>(ctx.GlobalCameraDynamicOffset),
-             extent = ctx.Resolution]
-            (const PointCloudPassData&, const RGRegistry&, VkCommandBuffer cmd)
-            {
-                if (!m_Pipeline) return;
+            // Add render graph pass.
+            const uint32_t localCount = batchCount;
+            ctx.Graph.AddPass<PointCloudPassData>("PointCloud",
+                [&](PointCloudPassData& data, RGBuilder& builder)
+                {
+                    RGAttachmentInfo colorInfo{};
+                    colorInfo.LoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+                    colorInfo.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+                    data.Color = builder.WriteColor(backbuffer, colorInfo);
 
-                RecordDraw(cmd, m_PointDescSets[frameIndex], globalSet,
-                           dynamicOffset, extent, pointCount);
-            });
+                    RGAttachmentInfo depthInfo{};
+                    depthInfo.LoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+                    depthInfo.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+                    data.Depth = builder.WriteDepth(depth, depthInfo);
+                },
+                [this, &ctx, frameIndex, localCount](const PointCloudPassData&, const RGRegistry&, VkCommandBuffer cmd)
+                {
+                    const uint32_t dynamicOffset = static_cast<uint32_t>(ctx.GlobalCameraDynamicOffset);
+                    RecordDraw(cmd,
+                               m_PointDescSets[frameIndex],
+                               ctx.GlobalDescriptorSet,
+                               dynamicOffset,
+                               ctx.Resolution,
+                               localCount);
+                });
+
+            RenderMode = oldMode;
+        };
+
+        // Mode-batched draws.
+        recordBatch(std::span<const GpuPointData>(m_StagingPointsByMode[0].data(), m_StagingPointsByMode[0].size()), Geometry::PointCloud::RenderMode::FlatDisc);
+        recordBatch(std::span<const GpuPointData>(m_StagingPointsByMode[1].data(), m_StagingPointsByMode[1].size()), Geometry::PointCloud::RenderMode::Surfel);
+        recordBatch(std::span<const GpuPointData>(m_StagingPointsByMode[2].data(), m_StagingPointsByMode[2].size()), Geometry::PointCloud::RenderMode::EWA);
+
+        // Back-compat staging bucket (uses current RenderMode).
+        if (!m_StagingPoints.empty())
+            recordBatch(std::span<const GpuPointData>(m_StagingPoints.data(), m_StagingPoints.size()), RenderMode);
     }
 }

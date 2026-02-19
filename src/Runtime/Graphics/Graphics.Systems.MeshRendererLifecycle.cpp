@@ -108,6 +108,55 @@ namespace Graphics::Systems::MeshRendererLifecycle
             }
         }
 
+        // -----------------------------------------------------------------
+        // GeometryViewRenderer: additional GPU instances for wireframe/vertices
+        // -----------------------------------------------------------------
+        auto viewViews = registry.view<ECS::GeometryViewRenderer::Component, ECS::Components::Transform::WorldMatrix>();
+        for (auto [entity, vr, world] : viewViews.each())
+        {
+            auto enqueueInstance = [&](Geometry::GeometryHandle handle,
+                                       uint32_t& slot,
+                                       const bool visible)
+            {
+                if (!handle.IsValid())
+                    return;
+
+                GeometryGpuData* geo = geometryStorage.GetUnchecked(handle);
+                if (!geo || geo->GetIndexCount() == 0 || !geo->GetIndexBuffer() || !geo->GetVertexBuffer())
+                    return;
+
+                if (slot == ECS::MeshRenderer::Component::kInvalidSlot)
+                {
+                    slot = gpuScene.AllocateSlot();
+                    if (slot == ECS::MeshRenderer::Component::kInvalidSlot)
+                        return;
+                }
+
+                GpuInstanceData inst{};
+                inst.Model = world.Matrix;
+                inst.GeometryID = handle.Index;
+                inst.TextureID = defaultTextureId;
+
+                if (auto* pick = registry.try_get<ECS::Components::Selection::PickID>(entt::entity(entity)))
+                    inst.EntityID = pick->Value;
+
+                glm::vec4 sphere = ComputeLocalBoundingSphere(*geo);
+                if (sphere.w <= 0.0f)
+                    sphere.w = GPUSceneConstants::kMinBoundingSphereRadius;
+
+                if (!visible)
+                    sphere = {0.0f, 0.0f, 0.0f, 0.0f};
+
+                gpuScene.QueueUpdate(slot, inst, sphere);
+            };
+
+            enqueueInstance(vr.Surface, vr.SurfaceGpuSlot, vr.ShowSurface);
+            enqueueInstance(vr.Wireframe, vr.WireframeGpuSlot, vr.ShowWireframe);
+            enqueueInstance(vr.Vertices, vr.VerticesGpuSlot, vr.ShowVertices);
+
+            registry.remove<ECS::Components::Transform::WorldUpdatedTag>(entt::entity(entity));
+        }
+
         // NOTE: Slot reclamation for destroyed entities is now handled by an EnTT on_destroy
         // signal registered in Engine. This provides O(1) immediate cleanup instead of the
         // one-frame-late orphan sweep that was previously here.
