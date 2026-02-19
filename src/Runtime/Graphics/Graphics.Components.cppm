@@ -125,6 +125,12 @@ export namespace ECS::RenderVisualization
         std::vector<std::pair<uint32_t, uint32_t>> CachedEdges;
         bool EdgeCacheDirty = true;
 
+        // ---- Vertex Normal Cache (internal, rebuilt lazily) ----
+        // Area-weighted vertex normals computed from collision mesh triangles.
+        // Used by PointCloudRenderPass for surfel/EWA orientation.
+        std::vector<glm::vec3> CachedVertexNormals;
+        bool VertexNormalsDirty = true;
+
         // ---- Sync State (internal) ----
         // Tracks the last ShowSurface value written to GPUScene so that
         // GPUSceneSync can detect transitions.
