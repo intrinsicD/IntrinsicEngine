@@ -28,11 +28,6 @@ using namespace Core::Hash;
 
 namespace Graphics::Passes
 {
-    static void CheckVk(VkResult r, const char* what)
-    {
-        if (r != VK_SUCCESS)
-            Core::Log::Error("LineRenderPass: {} failed (VkResult={})", what, (int)r);
-    }
 
     // Push constants layout (must match line.vert/line.frag).
     struct LinePushConstants
@@ -57,18 +52,8 @@ namespace Graphics::Passes
         m_GlobalSetLayout = globalLayout.GetHandle();
 
         // Create descriptor set layout for the line SSBO (1 binding: SSBO at binding 0).
-        VkDescriptorSetLayoutBinding binding{};
-        binding.binding = 0;
-        binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        binding.descriptorCount = 1;
-        binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-
-        VkDescriptorSetLayoutCreateInfo layoutInfo{};
-        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-        layoutInfo.bindingCount = 1;
-        layoutInfo.pBindings = &binding;
-        CheckVk(vkCreateDescriptorSetLayout(m_Device->GetLogicalDevice(), &layoutInfo, nullptr, &m_LineSetLayout),
-                "vkCreateDescriptorSetLayout (line SSBO)");
+        m_LineSetLayout = CreateSSBODescriptorSetLayout(
+            m_Device->GetLogicalDevice(), VK_SHADER_STAGE_VERTEX_BIT, "LineRenderPass");
 
         // Allocate per-frame descriptor sets for depth-tested and overlay passes.
         for (uint32_t i = 0; i < FRAMES; ++i)
@@ -182,21 +167,8 @@ namespace Graphics::Passes
                                    uint32_t lineCount)
     {
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->GetHandle());
-
-        // PipelineBuilder enables VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY globally.
-        // We must set a compatible topology before drawing.
         vkCmdSetPrimitiveTopology(cmd, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-
-        VkViewport vp{};
-        vp.x = 0.0f;
-        vp.y = 0.0f;
-        vp.width = static_cast<float>(extent.width);
-        vp.height = static_cast<float>(extent.height);
-        vp.minDepth = 0.0f;
-        vp.maxDepth = 1.0f;
-        VkRect2D sc{{0, 0}, extent};
-        vkCmdSetViewport(cmd, 0, 1, &vp);
-        vkCmdSetScissor(cmd, 0, 1, &sc);
+        SetViewportScissor(cmd, extent);
 
         // Bind set 0: global camera (with dynamic offset).
         vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -267,23 +239,9 @@ namespace Graphics::Passes
                 return;
 
             auto lines = m_DebugDraw->GetLines();
-            m_DepthLineBuffer[frameIndex]->Write(lines.data(),
-                                                  lines.size_bytes());
-
-            // Update descriptor set.
-            VkDescriptorBufferInfo bufInfo{};
-            bufInfo.buffer = m_DepthLineBuffer[frameIndex]->GetHandle();
-            bufInfo.offset = 0;
-            bufInfo.range = lines.size_bytes();
-
-            VkWriteDescriptorSet write{};
-            write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            write.dstSet = m_DepthLineSet[frameIndex];
-            write.dstBinding = 0;
-            write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-            write.descriptorCount = 1;
-            write.pBufferInfo = &bufInfo;
-            vkUpdateDescriptorSets(m_Device->GetLogicalDevice(), 1, &write, 0, nullptr);
+            m_DepthLineBuffer[frameIndex]->Write(lines.data(), lines.size_bytes());
+            UpdateSSBODescriptor(m_Device->GetLogicalDevice(), m_DepthLineSet[frameIndex],
+                                 0, m_DepthLineBuffer[frameIndex]->GetHandle(), lines.size_bytes());
         }
 
         // Upload overlay lines.
@@ -293,22 +251,9 @@ namespace Graphics::Passes
                 return;
 
             auto lines = m_DebugDraw->GetOverlayLines();
-            m_OverlayLineBuffer[frameIndex]->Write(lines.data(),
-                                                     lines.size_bytes());
-
-            VkDescriptorBufferInfo bufInfo{};
-            bufInfo.buffer = m_OverlayLineBuffer[frameIndex]->GetHandle();
-            bufInfo.offset = 0;
-            bufInfo.range = lines.size_bytes();
-
-            VkWriteDescriptorSet write{};
-            write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            write.dstSet = m_OverlayLineSet[frameIndex];
-            write.dstBinding = 0;
-            write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-            write.descriptorCount = 1;
-            write.pBufferInfo = &bufInfo;
-            vkUpdateDescriptorSets(m_Device->GetLogicalDevice(), 1, &write, 0, nullptr);
+            m_OverlayLineBuffer[frameIndex]->Write(lines.data(), lines.size_bytes());
+            UpdateSSBODescriptor(m_Device->GetLogicalDevice(), m_OverlayLineSet[frameIndex],
+                                 0, m_OverlayLineBuffer[frameIndex]->GetHandle(), lines.size_bytes());
         }
 
         // Fetch resource handles from blackboard.

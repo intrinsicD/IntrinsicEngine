@@ -1,13 +1,19 @@
 module;
+#include <algorithm>
+#include <cmath>
+#include <cstddef>
+#include <limits>
+#include <span>
+
 #include <glm/glm.hpp>
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/norm.hpp>
-#include <span>
-#include <limits>
-#include <algorithm>
+#include <glm/geometric.hpp>
 
 module Geometry:MeshUtils.Impl;
 import :MeshUtils;
+import :Properties;
+import :HalfedgeMesh;
 import Core.Logging;
 
 namespace Geometry::MeshUtils
@@ -129,5 +135,103 @@ namespace Geometry::MeshUtils
         }
 
         return flatAxis;
+    }
+
+    // =========================================================================
+    // Halfedge mesh math utilities
+    // =========================================================================
+
+    double Cotan(glm::vec3 u, glm::vec3 v)
+    {
+        auto crossVec = glm::cross(u, v);
+        double sinVal = static_cast<double>(glm::length(crossVec));
+        double cosVal = static_cast<double>(glm::dot(u, v));
+
+        if (sinVal < 1e-10)
+            return 0.0;
+
+        return cosVal / sinVal;
+    }
+
+    double TriangleArea(glm::vec3 a, glm::vec3 b, glm::vec3 c)
+    {
+        return 0.5 * static_cast<double>(glm::length(glm::cross(b - a, c - a)));
+    }
+
+    double AngleAtVertex(glm::vec3 a, glm::vec3 b, glm::vec3 c)
+    {
+        glm::vec3 ab = b - a;
+        glm::vec3 ac = c - a;
+        float lenAB = glm::length(ab);
+        float lenAC = glm::length(ac);
+
+        if (lenAB < 1e-10f || lenAC < 1e-10f)
+            return 0.0;
+
+        float cosAngle = glm::dot(ab, ac) / (lenAB * lenAC);
+        cosAngle = std::clamp(cosAngle, -1.0f, 1.0f);
+        return static_cast<double>(std::acos(cosAngle));
+    }
+
+    double EdgeLengthSq(const Halfedge::Mesh& mesh, EdgeHandle e)
+    {
+        HalfedgeHandle h{static_cast<PropertyIndex>(2u * e.Index)};
+        glm::vec3 a = mesh.Position(mesh.FromVertex(h));
+        glm::vec3 b = mesh.Position(mesh.ToVertex(h));
+        glm::vec3 d = b - a;
+        return static_cast<double>(glm::dot(d, d));
+    }
+
+    double MeanEdgeLength(const Halfedge::Mesh& mesh)
+    {
+        double sum = 0.0;
+        std::size_t count = 0;
+        for (std::size_t ei = 0; ei < mesh.EdgesSize(); ++ei)
+        {
+            EdgeHandle e{static_cast<PropertyIndex>(ei)};
+            if (mesh.IsDeleted(e)) continue;
+            sum += std::sqrt(EdgeLengthSq(mesh, e));
+            ++count;
+        }
+        return (count > 0) ? (sum / static_cast<double>(count)) : 0.0;
+    }
+
+    glm::vec3 FaceNormal(const Halfedge::Mesh& mesh, FaceHandle f)
+    {
+        HalfedgeHandle h0 = mesh.Halfedge(f);
+        HalfedgeHandle h1 = mesh.NextHalfedge(h0);
+        HalfedgeHandle h2 = mesh.NextHalfedge(h1);
+
+        glm::vec3 a = mesh.Position(mesh.ToVertex(h0));
+        glm::vec3 b = mesh.Position(mesh.ToVertex(h1));
+        glm::vec3 c = mesh.Position(mesh.ToVertex(h2));
+
+        return glm::cross(b - a, c - a);
+    }
+
+    glm::vec3 VertexNormal(const Halfedge::Mesh& mesh, VertexHandle v)
+    {
+        glm::vec3 n(0.0f);
+        HalfedgeHandle hStart = mesh.Halfedge(v);
+        HalfedgeHandle h = hStart;
+        std::size_t safety = 0;
+        do
+        {
+            FaceHandle f = mesh.Face(h);
+            if (f.IsValid() && !mesh.IsDeleted(f))
+            {
+                n += FaceNormal(mesh, f);
+            }
+            h = mesh.CWRotatedHalfedge(h);
+            if (++safety > 100) break;
+        } while (h != hStart);
+
+        float len = glm::length(n);
+        return (len > 1e-8f) ? (n / len) : glm::vec3(0.0f, 1.0f, 0.0f);
+    }
+
+    int TargetValence(const Halfedge::Mesh& mesh, VertexHandle v)
+    {
+        return mesh.IsBoundary(v) ? 4 : 6;
     }
 }

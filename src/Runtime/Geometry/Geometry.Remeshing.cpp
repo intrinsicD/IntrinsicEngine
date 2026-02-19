@@ -15,39 +15,15 @@ module Geometry:Remeshing.Impl;
 import :Remeshing;
 import :Properties;
 import :HalfedgeMesh;
+import :MeshUtils;
 
 namespace Geometry::Remeshing
 {
-    // Compute squared edge length
-    static double EdgeLengthSq(const Halfedge::Mesh& mesh, EdgeHandle e)
-    {
-        HalfedgeHandle h{static_cast<PropertyIndex>(2u * e.Index)};
-        glm::vec3 a = mesh.Position(mesh.FromVertex(h));
-        glm::vec3 b = mesh.Position(mesh.ToVertex(h));
-        glm::vec3 d = b - a;
-        return static_cast<double>(glm::dot(d, d));
-    }
-
-    // Compute mean edge length
-    static double MeanEdgeLength(const Halfedge::Mesh& mesh)
-    {
-        double sum = 0.0;
-        std::size_t count = 0;
-        for (std::size_t ei = 0; ei < mesh.EdgesSize(); ++ei)
-        {
-            EdgeHandle e{static_cast<PropertyIndex>(ei)};
-            if (mesh.IsDeleted(e)) continue;
-            sum += std::sqrt(EdgeLengthSq(mesh, e));
-            ++count;
-        }
-        return (count > 0) ? (sum / static_cast<double>(count)) : 0.0;
-    }
-
-    // Target valence: 6 for interior, 4 for boundary
-    static int TargetValence(const Halfedge::Mesh& mesh, VertexHandle v)
-    {
-        return mesh.IsBoundary(v) ? 4 : 6;
-    }
+    using MeshUtils::EdgeLengthSq;
+    using MeshUtils::MeanEdgeLength;
+    using MeshUtils::FaceNormal;
+    using MeshUtils::VertexNormal;
+    using MeshUtils::TargetValence;
 
     // Compute valence deviation from target for four vertices affected by a flip
     static int ValenceDeviation(const Halfedge::Mesh& mesh,
@@ -60,42 +36,6 @@ namespace Geometry::Remeshing
             return std::abs(val - target);
         };
         return dev(a) + dev(b) + dev(c) + dev(d);
-    }
-
-    // Compute face normal
-    static glm::vec3 FaceNormal(const Halfedge::Mesh& mesh, FaceHandle f)
-    {
-        HalfedgeHandle h0 = mesh.Halfedge(f);
-        HalfedgeHandle h1 = mesh.NextHalfedge(h0);
-        HalfedgeHandle h2 = mesh.NextHalfedge(h1);
-
-        glm::vec3 a = mesh.Position(mesh.ToVertex(h0));
-        glm::vec3 b = mesh.Position(mesh.ToVertex(h1));
-        glm::vec3 c = mesh.Position(mesh.ToVertex(h2));
-
-        return glm::cross(b - a, c - a);
-    }
-
-    // Compute approximate vertex normal (area-weighted face normals)
-    static glm::vec3 VertexNormal(const Halfedge::Mesh& mesh, VertexHandle v)
-    {
-        glm::vec3 n(0.0f);
-        HalfedgeHandle hStart = mesh.Halfedge(v);
-        HalfedgeHandle h = hStart;
-        std::size_t safety = 0;
-        do
-        {
-            FaceHandle f = mesh.Face(h);
-            if (f.IsValid() && !mesh.IsDeleted(f))
-            {
-                n += FaceNormal(mesh, f); // Already area-weighted (cross product)
-            }
-            h = mesh.CWRotatedHalfedge(h);
-            if (++safety > 100) break;
-        } while (h != hStart);
-
-        float len = glm::length(n);
-        return (len > 1e-8f) ? (n / len) : glm::vec3(0.0f, 1.0f, 0.0f);
     }
 
     // =========================================================================

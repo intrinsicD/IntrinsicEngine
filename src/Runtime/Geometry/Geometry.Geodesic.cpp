@@ -17,38 +17,12 @@ import :Geodesic;
 import :Properties;
 import :HalfedgeMesh;
 import :DEC;
+import :MeshUtils;
 
 namespace Geometry::Geodesic
 {
-    // Compute mean edge length
-    static double MeanEdgeLength(const Halfedge::Mesh& mesh)
-    {
-        double sum = 0.0;
-        std::size_t count = 0;
-        for (std::size_t ei = 0; ei < mesh.EdgesSize(); ++ei)
-        {
-            EdgeHandle eh{static_cast<PropertyIndex>(ei)};
-            if (mesh.IsDeleted(eh)) continue;
-
-            HalfedgeHandle h{static_cast<PropertyIndex>(2u * ei)};
-            glm::vec3 a = mesh.Position(mesh.FromVertex(h));
-            glm::vec3 b = mesh.Position(mesh.ToVertex(h));
-            sum += static_cast<double>(glm::distance(a, b));
-            ++count;
-        }
-        return (count > 0) ? (sum / static_cast<double>(count)) : 0.0;
-    }
-
-    // Cotangent of angle between vectors u and v
-    static double Cotan(glm::vec3 u, glm::vec3 v)
-    {
-        auto crossVec = glm::cross(u, v);
-        double sinVal = static_cast<double>(glm::length(crossVec));
-        double cosVal = static_cast<double>(glm::dot(u, v));
-        if (sinVal < 1e-10)
-            return 0.0;
-        return cosVal / sinVal;
-    }
+    using MeshUtils::Cotan;
+    using MeshUtils::MeanEdgeLength;
 
     // =========================================================================
     // Step 2: Compute normalized negative gradient per face

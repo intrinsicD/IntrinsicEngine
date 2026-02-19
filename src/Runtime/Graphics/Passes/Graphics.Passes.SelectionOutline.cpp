@@ -22,47 +22,19 @@ import ECS;
 
 using namespace Core::Hash;
 
+#include "Graphics.PassUtils.hpp"
+
 namespace Graphics::Passes
 {
-    static void CheckVk(VkResult r, const char* what)
-    {
-        if (r != VK_SUCCESS)
-            Core::Log::Error("SelectionOutline: {} failed (VkResult={})", what, (int)r);
-    }
-
     void SelectionOutlinePass::Initialize(RHI::VulkanDevice& device,
                                           RHI::DescriptorAllocator& descriptorPool,
                                           RHI::DescriptorLayout&)
     {
         m_Device = &device;
 
-        // Nearest-neighbor sampler for integer PickID texture
-        VkSamplerCreateInfo samp{};
-        samp.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-        samp.magFilter = VK_FILTER_NEAREST;
-        samp.minFilter = VK_FILTER_NEAREST;
-        samp.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
-        samp.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-        samp.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-        samp.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-        samp.minLod = 0.0f;
-        samp.maxLod = 0.0f;
-        samp.maxAnisotropy = 1.0f;
-        CheckVk(vkCreateSampler(m_Device->GetLogicalDevice(), &samp, nullptr, &m_Sampler), "vkCreateSampler");
-
-        // Descriptor set layout: binding 0 = PickID usampler2D
-        VkDescriptorSetLayoutBinding binding{};
-        binding.binding = 0;
-        binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        binding.descriptorCount = 1;
-        binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-        VkDescriptorSetLayoutCreateInfo layoutInfo{};
-        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-        layoutInfo.bindingCount = 1;
-        layoutInfo.pBindings = &binding;
-        CheckVk(vkCreateDescriptorSetLayout(m_Device->GetLogicalDevice(), &layoutInfo, nullptr, &m_DescriptorSetLayout),
-                "vkCreateDescriptorSetLayout");
+        m_Sampler = CreateNearestSampler(m_Device->GetLogicalDevice(), "SelectionOutline");
+        m_DescriptorSetLayout = CreateSamplerDescriptorSetLayout(
+            m_Device->GetLogicalDevice(), VK_SHADER_STAGE_FRAGMENT_BIT, "SelectionOutline");
 
         // Allocate per-frame descriptor sets
         m_DescriptorSets.resize(RHI::VulkanDevice::GetFramesInFlight());
@@ -77,49 +49,14 @@ namespace Graphics::Passes
             VK_IMAGE_ASPECT_COLOR_BIT);
 
         // Transition dummy to SHADER_READ_ONLY_OPTIMAL
-        {
-            VkCommandBuffer cmd = RHI::CommandUtils::BeginSingleTimeCommands(*m_Device);
-            VkImageMemoryBarrier2 barrier{};
-            barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-            barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-            barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-            barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-            barrier.image = m_DummyPickId->GetHandle();
-            barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-            barrier.subresourceRange.baseMipLevel = 0;
-            barrier.subresourceRange.levelCount = 1;
-            barrier.subresourceRange.baseArrayLayer = 0;
-            barrier.subresourceRange.layerCount = 1;
-            barrier.srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
-            barrier.srcAccessMask = 0;
-            barrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
-            barrier.dstAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
-
-            VkDependencyInfo depInfo{};
-            depInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-            depInfo.imageMemoryBarrierCount = 1;
-            depInfo.pImageMemoryBarriers = &barrier;
-            vkCmdPipelineBarrier2(cmd, &depInfo);
-            RHI::CommandUtils::EndSingleTimeCommands(*m_Device, cmd);
-        }
+        TransitionImageToShaderRead(*m_Device, m_DummyPickId->GetHandle(), VK_IMAGE_ASPECT_COLOR_BIT);
 
         // Initialize descriptor bindings with the dummy image
         for (auto& set : m_DescriptorSets)
         {
-            VkDescriptorImageInfo imageInfo{
-                m_Sampler, m_DummyPickId->GetView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-            };
-
-            VkWriteDescriptorSet write{};
-            write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            write.dstSet = set;
-            write.dstBinding = 0;
-            write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            write.descriptorCount = 1;
-            write.pImageInfo = &imageInfo;
-
-            vkUpdateDescriptorSets(m_Device->GetLogicalDevice(), 1, &write, 0, nullptr);
+            UpdateImageDescriptor(m_Device->GetLogicalDevice(), set, 0,
+                                  m_Sampler, m_DummyPickId->GetView(),
+                                  VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         }
 
         // Keep the dummy alive until replaced in PostCompile.
@@ -257,17 +194,7 @@ namespace Graphics::Passes
                 if (ctx.Resolution.width == 0 || ctx.Resolution.height == 0) return;
 
                 vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->GetHandle());
-
-                VkViewport vp{};
-                vp.x = 0.0f;
-                vp.y = 0.0f;
-                vp.width = (float)ctx.Resolution.width;
-                vp.height = (float)ctx.Resolution.height;
-                vp.minDepth = 0.0f;
-                vp.maxDepth = 1.0f;
-                VkRect2D sc{{0, 0}, ctx.Resolution};
-                vkCmdSetViewport(cmd, 0, 1, &vp);
-                vkCmdSetScissor(cmd, 0, 1, &sc);
+                SetViewportScissor(cmd, ctx.Resolution);
                 vkCmdSetPrimitiveTopology(cmd, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 
                 VkDescriptorSet currentSet = VK_NULL_HANDLE;
@@ -322,19 +249,9 @@ namespace Graphics::Passes
         {
             if (img.Resource == m_LastPickIdHandle.ID && img.View != VK_NULL_HANDLE)
             {
-                VkDescriptorImageInfo imageInfo{
-                    m_Sampler, img.View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-                };
-
-                VkWriteDescriptorSet write{};
-                write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                write.dstSet = currentSet;
-                write.dstBinding = 0;
-                write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-                write.descriptorCount = 1;
-                write.pImageInfo = &imageInfo;
-
-                vkUpdateDescriptorSets(m_Device->GetLogicalDevice(), 1, &write, 0, nullptr);
+                UpdateImageDescriptor(m_Device->GetLogicalDevice(), currentSet, 0,
+                                      m_Sampler, img.View,
+                                      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
                 break;
             }
         }

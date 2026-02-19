@@ -16,9 +16,13 @@ module Geometry:DEC.Impl;
 import :DEC;
 import :Properties;
 import :HalfedgeMesh;
+import :MeshUtils;
 
 namespace Geometry::DEC
 {
+    using MeshUtils::Cotan;
+    using MeshUtils::TriangleArea;
+
     // -------------------------------------------------------------------------
     // SparseMatrix operations
     // -------------------------------------------------------------------------
@@ -91,35 +95,6 @@ namespace Geometry::DEC
                 y[i] = x[i] / Diagonal[i];
             }
         }
-    }
-
-    // -------------------------------------------------------------------------
-    // Helper: cotangent of angle between two vectors
-    // -------------------------------------------------------------------------
-    // cot(θ) = cos(θ) / sin(θ) = (u · v) / |u × v|
-
-    static double Cotan(glm::vec3 u, glm::vec3 v)
-    {
-        auto crossVec = glm::cross(u, v);
-        double sinVal = static_cast<double>(glm::length(crossVec));
-        double cosVal = static_cast<double>(glm::dot(u, v));
-
-        // Degenerate case: zero-area triangle contribution
-        if (sinVal < 1e-10)
-        {
-            return 0.0;
-        }
-
-        return cosVal / sinVal;
-    }
-
-    // -------------------------------------------------------------------------
-    // Helper: triangle area from three positions
-    // -------------------------------------------------------------------------
-
-    static double TriangleArea(glm::vec3 a, glm::vec3 b, glm::vec3 c)
-    {
-        return 0.5 * static_cast<double>(glm::length(glm::cross(b - a, c - a)));
     }
 
     // -------------------------------------------------------------------------

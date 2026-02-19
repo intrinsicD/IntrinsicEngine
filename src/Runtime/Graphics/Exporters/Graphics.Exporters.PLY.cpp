@@ -15,29 +15,17 @@ import :IORegistry;
 import :Geometry;
 import :AssetErrors;
 
+#include "Graphics.ExportUtils.hpp"
+
 namespace Graphics
 {
+    using ExportUtils::AppendString;
+    using ExportUtils::AppendBytes;
+    using ExportUtils::AppendValue;
+
     namespace
     {
         static constexpr std::string_view s_Extensions[] = { ".ply" };
-
-        void AppendString(std::vector<std::byte>& out, const std::string& s)
-        {
-            const auto* ptr = reinterpret_cast<const std::byte*>(s.data());
-            out.insert(out.end(), ptr, ptr + s.size());
-        }
-
-        void AppendBytes(std::vector<std::byte>& out, const void* data, std::size_t size)
-        {
-            const auto* ptr = reinterpret_cast<const std::byte*>(data);
-            out.insert(out.end(), ptr, ptr + size);
-        }
-
-        template <typename T>
-        void AppendValue(std::vector<std::byte>& out, T value)
-        {
-            AppendBytes(out, &value, sizeof(T));
-        }
     }
 
     std::span<const std::string_view> PLYExporter::Extensions() const

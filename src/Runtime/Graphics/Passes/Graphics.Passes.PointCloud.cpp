@@ -27,11 +27,6 @@ using namespace Core::Hash;
 
 namespace Graphics::Passes
 {
-    static void CheckVk(VkResult r, const char* what)
-    {
-        if (r != VK_SUCCESS)
-            Core::Log::Error("PointCloudRenderPass: {} failed (VkResult={})", what, (int)r);
-    }
 
     // Push constants layout (must match point.vert/point.frag).
     struct PointCloudPushConstants
@@ -95,18 +90,8 @@ namespace Graphics::Passes
         m_GlobalSetLayout = globalLayout.GetHandle();
 
         // Create descriptor set layout for point cloud SSBO (1 binding: SSBO at binding 0).
-        VkDescriptorSetLayoutBinding binding{};
-        binding.binding = 0;
-        binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        binding.descriptorCount = 1;
-        binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-
-        VkDescriptorSetLayoutCreateInfo layoutInfo{};
-        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-        layoutInfo.bindingCount = 1;
-        layoutInfo.pBindings = &binding;
-        CheckVk(vkCreateDescriptorSetLayout(m_Device->GetLogicalDevice(), &layoutInfo, nullptr, &m_PointSetLayout),
-                "vkCreateDescriptorSetLayout (point cloud SSBO)");
+        m_PointSetLayout = CreateSSBODescriptorSetLayout(
+            m_Device->GetLogicalDevice(), VK_SHADER_STAGE_VERTEX_BIT, "PointCloudRenderPass");
 
         // Allocate per-frame descriptor sets.
         for (uint32_t i = 0; i < FRAMES; ++i)
@@ -209,19 +194,8 @@ namespace Graphics::Passes
                                           uint32_t pointCount)
     {
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_Pipeline->GetHandle());
-
         vkCmdSetPrimitiveTopology(cmd, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-
-        VkViewport vp{};
-        vp.x = 0.0f;
-        vp.y = 0.0f;
-        vp.width = static_cast<float>(extent.width);
-        vp.height = static_cast<float>(extent.height);
-        vp.minDepth = 0.0f;
-        vp.maxDepth = 1.0f;
-        VkRect2D sc{{0, 0}, extent};
-        vkCmdSetViewport(cmd, 0, 1, &vp);
-        vkCmdSetScissor(cmd, 0, 1, &sc);
+        SetViewportScissor(cmd, extent);
 
         // Bind set 0: global camera (with dynamic offset).
         vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -293,21 +267,8 @@ namespace Graphics::Passes
 
             // Upload batch points.
             m_PointBuffers[frameIndex]->Write(pts.data(), pts.size_bytes());
-
-            // Update descriptor set.
-            VkDescriptorBufferInfo bufInfo{};
-            bufInfo.buffer = m_PointBuffers[frameIndex]->GetHandle();
-            bufInfo.offset = 0;
-            bufInfo.range = pts.size_bytes();
-
-            VkWriteDescriptorSet write{};
-            write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            write.dstSet = m_PointDescSets[frameIndex];
-            write.dstBinding = 0;
-            write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-            write.descriptorCount = 1;
-            write.pBufferInfo = &bufInfo;
-            vkUpdateDescriptorSets(m_Device->GetLogicalDevice(), 1, &write, 0, nullptr);
+            UpdateSSBODescriptor(m_Device->GetLogicalDevice(), m_PointDescSets[frameIndex],
+                                 0, m_PointBuffers[frameIndex]->GetHandle(), pts.size_bytes());
 
             // Set pass-global mode for RecordDraw (it reads RenderMode member).
             const auto oldMode = RenderMode;
