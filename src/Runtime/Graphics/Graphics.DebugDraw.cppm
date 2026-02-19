@@ -9,6 +9,8 @@ module;
 
 export module Graphics:DebugDraw;
 
+import :GpuColor;
+
 export namespace Graphics
 {
     // -------------------------------------------------------------------------
@@ -40,36 +42,28 @@ export namespace Graphics
         static_assert(sizeof(LineSegment) == 32, "LineSegment must be 32 bytes for GPU SSBO alignment");
 
         // ----------------------------------------------------------------
-        // Color Utilities
+        // Color Utilities (delegate to GpuColor — single source of truth)
         // ----------------------------------------------------------------
-        static constexpr uint32_t PackColor(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255)
+        static constexpr uint32_t PackColor(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255) noexcept
         {
-            return static_cast<uint32_t>(r)
-                 | (static_cast<uint32_t>(g) << 8)
-                 | (static_cast<uint32_t>(b) << 16)
-                 | (static_cast<uint32_t>(a) << 24);
+            return GpuColor::PackColor(r, g, b, a);
         }
 
-        static constexpr uint32_t PackColorF(float r, float g, float b, float a = 1.0f)
+        static constexpr uint32_t PackColorF(float r, float g, float b, float a = 1.0f) noexcept
         {
-            auto clamp = [](float v) -> uint8_t {
-                if (v <= 0.0f) return 0;
-                if (v >= 1.0f) return 255;
-                return static_cast<uint8_t>(v * 255.0f + 0.5f);
-            };
-            return PackColor(clamp(r), clamp(g), clamp(b), clamp(a));
+            return GpuColor::PackColorF(r, g, b, a);
         }
 
         // Predefined colors
-        static constexpr uint32_t Red()     { return PackColor(255, 0, 0); }
-        static constexpr uint32_t Green()   { return PackColor(0, 255, 0); }
-        static constexpr uint32_t Blue()    { return PackColor(0, 0, 255); }
-        static constexpr uint32_t Yellow()  { return PackColor(255, 255, 0); }
-        static constexpr uint32_t Cyan()    { return PackColor(0, 255, 255); }
-        static constexpr uint32_t Magenta() { return PackColor(255, 0, 255); }
-        static constexpr uint32_t White()   { return PackColor(255, 255, 255); }
-        static constexpr uint32_t Gray()    { return PackColor(128, 128, 128); }
-        static constexpr uint32_t Orange()  { return PackColor(255, 153, 0); }
+        static constexpr uint32_t Red()     { return GpuColor::PackColor(255, 0, 0); }
+        static constexpr uint32_t Green()   { return GpuColor::PackColor(0, 255, 0); }
+        static constexpr uint32_t Blue()    { return GpuColor::PackColor(0, 0, 255); }
+        static constexpr uint32_t Yellow()  { return GpuColor::PackColor(255, 255, 0); }
+        static constexpr uint32_t Cyan()    { return GpuColor::PackColor(0, 255, 255); }
+        static constexpr uint32_t Magenta() { return GpuColor::PackColor(255, 0, 255); }
+        static constexpr uint32_t White()   { return GpuColor::PackColor(255, 255, 255); }
+        static constexpr uint32_t Gray()    { return GpuColor::PackColor(128, 128, 128); }
+        static constexpr uint32_t Orange()  { return GpuColor::PackColor(255, 153, 0); }
 
         // ----------------------------------------------------------------
         // Primitive Drawing API (depth-tested by default)

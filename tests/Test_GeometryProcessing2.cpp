@@ -9,76 +9,7 @@
 
 import Geometry;
 
-// =============================================================================
-// Test mesh builders (reused from Test_GeometryProcessing.cpp)
-// =============================================================================
-
-static Geometry::Halfedge::Mesh MakeSingleTriangle_CC()
-{
-    Geometry::Halfedge::Mesh mesh;
-    auto v0 = mesh.AddVertex({0.0f, 0.0f, 0.0f});
-    auto v1 = mesh.AddVertex({1.0f, 0.0f, 0.0f});
-    auto v2 = mesh.AddVertex({0.5f, std::sqrt(3.0f) / 2.0f, 0.0f});
-    (void)mesh.AddTriangle(v0, v1, v2);
-    return mesh;
-}
-
-static Geometry::Halfedge::Mesh MakeTetrahedron_CC()
-{
-    Geometry::Halfedge::Mesh mesh;
-    auto v0 = mesh.AddVertex({1.0f, 1.0f, 1.0f});
-    auto v1 = mesh.AddVertex({1.0f, -1.0f, -1.0f});
-    auto v2 = mesh.AddVertex({-1.0f, 1.0f, -1.0f});
-    auto v3 = mesh.AddVertex({-1.0f, -1.0f, 1.0f});
-    (void)mesh.AddTriangle(v0, v1, v2);
-    (void)mesh.AddTriangle(v0, v2, v3);
-    (void)mesh.AddTriangle(v0, v3, v1);
-    (void)mesh.AddTriangle(v1, v3, v2);
-    return mesh;
-}
-
-static Geometry::Halfedge::Mesh MakeIcosahedron_CC()
-{
-    Geometry::Halfedge::Mesh mesh;
-    const float phi = (1.0f + std::sqrt(5.0f)) / 2.0f;
-    const float scale = 1.0f / std::sqrt(1.0f + phi * phi);
-
-    auto v0  = mesh.AddVertex(glm::vec3( 0,  1,  phi) * scale);
-    auto v1  = mesh.AddVertex(glm::vec3( 0, -1,  phi) * scale);
-    auto v2  = mesh.AddVertex(glm::vec3( 0,  1, -phi) * scale);
-    auto v3  = mesh.AddVertex(glm::vec3( 0, -1, -phi) * scale);
-    auto v4  = mesh.AddVertex(glm::vec3( 1,  phi,  0) * scale);
-    auto v5  = mesh.AddVertex(glm::vec3(-1,  phi,  0) * scale);
-    auto v6  = mesh.AddVertex(glm::vec3( 1, -phi,  0) * scale);
-    auto v7  = mesh.AddVertex(glm::vec3(-1, -phi,  0) * scale);
-    auto v8  = mesh.AddVertex(glm::vec3( phi,  0,  1) * scale);
-    auto v9  = mesh.AddVertex(glm::vec3(-phi,  0,  1) * scale);
-    auto v10 = mesh.AddVertex(glm::vec3( phi,  0, -1) * scale);
-    auto v11 = mesh.AddVertex(glm::vec3(-phi,  0, -1) * scale);
-
-    (void)mesh.AddTriangle(v0, v1, v8);
-    (void)mesh.AddTriangle(v0, v8, v4);
-    (void)mesh.AddTriangle(v0, v4, v5);
-    (void)mesh.AddTriangle(v0, v5, v9);
-    (void)mesh.AddTriangle(v0, v9, v1);
-    (void)mesh.AddTriangle(v1, v6, v8);
-    (void)mesh.AddTriangle(v1, v7, v6);
-    (void)mesh.AddTriangle(v1, v9, v7);
-    (void)mesh.AddTriangle(v2, v3, v11);
-    (void)mesh.AddTriangle(v2, v10, v3);
-    (void)mesh.AddTriangle(v2, v4, v10);
-    (void)mesh.AddTriangle(v2, v5, v4);
-    (void)mesh.AddTriangle(v2, v11, v5);
-    (void)mesh.AddTriangle(v3, v6, v7);
-    (void)mesh.AddTriangle(v3, v10, v6);
-    (void)mesh.AddTriangle(v3, v7, v11);
-    (void)mesh.AddTriangle(v4, v8, v10);
-    (void)mesh.AddTriangle(v5, v11, v9);
-    (void)mesh.AddTriangle(v6, v10, v8);
-    (void)mesh.AddTriangle(v7, v9, v11);
-
-    return mesh;
-}
+#include "TestMeshBuilders.h"
 
 static Geometry::Halfedge::Mesh MakeQuad()
 {
@@ -114,18 +45,6 @@ static Geometry::Halfedge::Mesh MakeCube()
     return mesh;
 }
 
-// Mesh with a hole: two triangles sharing an edge, leaving a gap
-static Geometry::Halfedge::Mesh MakeTwoTriangleSquare_CC()
-{
-    Geometry::Halfedge::Mesh mesh;
-    auto v0 = mesh.AddVertex({0.0f, 0.0f, 0.0f});
-    auto v1 = mesh.AddVertex({1.0f, 0.0f, 0.0f});
-    auto v2 = mesh.AddVertex({1.0f, 1.0f, 0.0f});
-    auto v3 = mesh.AddVertex({0.0f, 1.0f, 0.0f});
-    (void)mesh.AddTriangle(v0, v1, v2);
-    (void)mesh.AddTriangle(v0, v2, v3);
-    return mesh;
-}
 
 // Generate unit sphere point cloud
 static std::vector<glm::vec3> MakeSpherePointCloud(std::size_t n)
@@ -174,7 +93,7 @@ static std::vector<glm::vec3> MakePlanarPointCloud(std::size_t nx, std::size_t n
 
 TEST(CatmullClark, SingleTriangleProducesQuads)
 {
-    auto input = MakeSingleTriangle_CC();
+    auto input = MakeSingleTriangle();
     Geometry::Halfedge::Mesh output;
 
     auto result = Geometry::CatmullClark::Subdivide(input, output);
@@ -195,7 +114,7 @@ TEST(CatmullClark, SingleTriangleProducesQuads)
 
 TEST(CatmullClark, TetrahedronProducesAllQuads)
 {
-    auto input = MakeTetrahedron_CC();
+    auto input = MakeTetrahedron();
     Geometry::Halfedge::Mesh output;
 
     auto result = Geometry::CatmullClark::Subdivide(input, output);
@@ -224,7 +143,7 @@ TEST(CatmullClark, CubeProducesAllQuads)
 
 TEST(CatmullClark, PreservesClosedMeshEulerCharacteristic)
 {
-    auto input = MakeTetrahedron_CC();
+    auto input = MakeTetrahedron();
     Geometry::Halfedge::Mesh output;
 
     auto result = Geometry::CatmullClark::Subdivide(input, output);
@@ -255,7 +174,7 @@ TEST(CatmullClark, CubePreservesEulerCharacteristic)
 
 TEST(CatmullClark, TwoIterationsWork)
 {
-    auto input = MakeTetrahedron_CC();
+    auto input = MakeTetrahedron();
     Geometry::Halfedge::Mesh output;
 
     Geometry::CatmullClark::SubdivisionParams params;
@@ -328,7 +247,7 @@ TEST(CatmullClark, EmptyMeshReturnsNullopt)
 
 TEST(CatmullClark, ZeroIterationsReturnsNullopt)
 {
-    auto input = MakeTetrahedron_CC();
+    auto input = MakeTetrahedron();
     Geometry::Halfedge::Mesh output;
 
     Geometry::CatmullClark::SubdivisionParams params;
@@ -341,7 +260,7 @@ TEST(CatmullClark, VertexCountFormula)
 {
     // After one CC iteration:
     // V_new = V_old + E_old + F_old
-    auto input = MakeTetrahedron_CC();
+    auto input = MakeTetrahedron();
     std::size_t Vold = input.VertexCount();
     std::size_t Eold = input.EdgeCount();
     std::size_t Fold = input.FaceCount();
@@ -511,14 +430,14 @@ TEST(NormalEstimation, MinimumThreePoints)
 
 TEST(MeshRepair_BoundaryDetection, ClosedMeshHasNoBoundary)
 {
-    auto mesh = MakeTetrahedron_CC();
+    auto mesh = MakeTetrahedron();
     auto loops = Geometry::MeshRepair::FindBoundaryLoops(mesh);
     EXPECT_TRUE(loops.empty());
 }
 
 TEST(MeshRepair_BoundaryDetection, OpenMeshHasBoundary)
 {
-    auto mesh = MakeSingleTriangle_CC();
+    auto mesh = MakeSingleTriangle();
     auto loops = Geometry::MeshRepair::FindBoundaryLoops(mesh);
     EXPECT_EQ(loops.size(), 1u);
     EXPECT_EQ(loops[0].Vertices.size(), 3u);
@@ -526,7 +445,7 @@ TEST(MeshRepair_BoundaryDetection, OpenMeshHasBoundary)
 
 TEST(MeshRepair_BoundaryDetection, TwoTriangleSquareHasBoundary)
 {
-    auto mesh = MakeTwoTriangleSquare_CC();
+    auto mesh = MakeTwoTriangleSquare();
     auto loops = Geometry::MeshRepair::FindBoundaryLoops(mesh);
     // The two-triangle square has one boundary loop with 4 vertices
     EXPECT_EQ(loops.size(), 1u);
@@ -536,7 +455,7 @@ TEST(MeshRepair_BoundaryDetection, TwoTriangleSquareHasBoundary)
 TEST(MeshRepair_HoleFilling, FillsTriangularHole)
 {
     // Create a tetrahedron, delete one face to create a hole, then fill it
-    auto mesh = MakeTetrahedron_CC();
+    auto mesh = MakeTetrahedron();
 
     // Verify it starts closed
     auto loopsBefore = Geometry::MeshRepair::FindBoundaryLoops(mesh);
@@ -572,7 +491,7 @@ TEST(MeshRepair_HoleFilling, EmptyMeshReturnsNullopt)
 
 TEST(MeshRepair_HoleFilling, ClosedMeshReportsZeroHoles)
 {
-    auto mesh = MakeTetrahedron_CC();
+    auto mesh = MakeTetrahedron();
     auto result = Geometry::MeshRepair::FillHoles(mesh);
     ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result->HolesDetected, 0u);
@@ -596,7 +515,7 @@ TEST(MeshRepair_DegenerateFaces, DetectsZeroAreaTriangle)
 
 TEST(MeshRepair_DegenerateFaces, PreservesValidTriangles)
 {
-    auto mesh = MakeTetrahedron_CC();
+    auto mesh = MakeTetrahedron();
     std::size_t facesBefore = mesh.FaceCount();
 
     auto result = Geometry::MeshRepair::RemoveDegenerateFaces(mesh);
@@ -614,7 +533,7 @@ TEST(MeshRepair_DegenerateFaces, EmptyMeshReturnsNullopt)
 
 TEST(MeshRepair_Orientation, ClosedMeshIsConsistent)
 {
-    auto mesh = MakeTetrahedron_CC();
+    auto mesh = MakeTetrahedron();
     auto result = Geometry::MeshRepair::MakeConsistentOrientation(mesh);
     ASSERT_TRUE(result.has_value());
     EXPECT_TRUE(result->WasConsistent);
@@ -631,7 +550,7 @@ TEST(MeshRepair_Orientation, EmptyMeshReturnsNullopt)
 
 TEST(MeshRepair_Orientation, IcosahedronSingleComponent)
 {
-    auto mesh = MakeIcosahedron_CC();
+    auto mesh = MakeIcosahedron();
     auto result = Geometry::MeshRepair::MakeConsistentOrientation(mesh);
     ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result->ComponentCount, 1u);
@@ -640,7 +559,7 @@ TEST(MeshRepair_Orientation, IcosahedronSingleComponent)
 TEST(MeshRepair_Combined, RepairValidMesh)
 {
     // A valid closed mesh should pass through repair without modification
-    auto mesh = MakeTetrahedron_CC();
+    auto mesh = MakeTetrahedron();
 
     auto result = Geometry::MeshRepair::Repair(mesh);
     ASSERT_TRUE(result.has_value());

@@ -5,6 +5,7 @@ module;
 #include <cstring>
 #include <memory>
 #include <span>
+#include <string_view>
 
 #include <glm/glm.hpp>
 #include "RHI.Vulkan.hpp"
@@ -19,6 +20,8 @@ import Core.Hash;
 import Core.Logging;
 import Core.Filesystem;
 import RHI;
+
+#include "Graphics.PassUtils.hpp"
 
 using namespace Core::Hash;
 
@@ -136,33 +139,8 @@ namespace Graphics::Passes
 
     bool PointCloudRenderPass::EnsureBuffer(uint32_t requiredPoints)
     {
-        if (requiredPoints <= m_BufferCapacity && m_PointBuffers[0] != nullptr)
-            return true;
-
-        // Grow with headroom: next power of 2, minimum 1024 points.
-        uint32_t newCapacity = 1024;
-        while (newCapacity < requiredPoints)
-            newCapacity *= 2;
-
-        const size_t byteSize = static_cast<size_t>(newCapacity) * sizeof(GpuPointData);
-
-        for (uint32_t i = 0; i < FRAMES; ++i)
-        {
-            m_PointBuffers[i] = std::make_unique<RHI::VulkanBuffer>(
-                *m_Device,
-                byteSize,
-                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                VMA_MEMORY_USAGE_CPU_TO_GPU);
-
-            if (!m_PointBuffers[i]->GetMappedData())
-            {
-                Core::Log::Error("PointCloudRenderPass: Failed to allocate point SSBO ({} bytes)", byteSize);
-                return false;
-            }
-        }
-
-        m_BufferCapacity = newCapacity;
-        return true;
+        return EnsurePerFrameBuffer<GpuPointData, FRAMES>(
+            *m_Device, m_PointBuffers, m_BufferCapacity, requiredPoints, 1024, "PointCloudRenderPass");
     }
 
     // =========================================================================
