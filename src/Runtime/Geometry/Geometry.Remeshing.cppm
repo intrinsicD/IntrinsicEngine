@@ -5,6 +5,7 @@ module;
 
 export module Geometry:Remeshing;
 
+import :MeshOperator;
 import :Properties;
 import :HalfedgeMesh;
 
@@ -49,21 +50,9 @@ export namespace Geometry::Remeshing
         bool PreserveBoundary{true};
     };
 
-    struct RemeshingResult
-    {
-        // Number of iterations actually performed
-        std::size_t IterationsPerformed{0};
-
-        // Edge operations performed (cumulative across all iterations)
-        std::size_t SplitCount{0};
-        std::size_t CollapseCount{0};
-        std::size_t FlipCount{0};
-
-        // Final mesh statistics
-        std::size_t FinalVertexCount{0};
-        std::size_t FinalEdgeCount{0};
-        std::size_t FinalFaceCount{0};
-    };
+    // RemeshingResult and AdaptiveRemeshing::AdaptiveRemeshingResult are identical.
+    // Both alias Geometry::RemeshingOperationResult to avoid a duplicated definition.
+    using RemeshingResult = Geometry::RemeshingOperationResult;
 
     // -------------------------------------------------------------------------
     // Remesh a triangle mesh to isotropic quality

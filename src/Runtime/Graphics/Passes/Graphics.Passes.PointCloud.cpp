@@ -94,10 +94,7 @@ namespace Graphics::Passes
             m_Device->GetLogicalDevice(), VK_SHADER_STAGE_VERTEX_BIT, "PointCloudRenderPass");
 
         // Allocate per-frame descriptor sets.
-        for (uint32_t i = 0; i < FRAMES; ++i)
-        {
-            m_PointDescSets[i] = descriptorPool.Allocate(m_PointSetLayout);
-        }
+        AllocatePerFrameSets<FRAMES>(descriptorPool, m_PointSetLayout, m_PointDescSets);
     }
 
     // =========================================================================
@@ -141,18 +138,12 @@ namespace Graphics::Passes
             return nullptr;
         }
 
-        const std::string vertPath = Core::Filesystem::ResolveShaderPathOrExit(
-            [&](Core::Hash::StringID id) { return m_ShaderRegistry->Get(id); },
-            "PointCloud.Vert"_id);
-        const std::string fragPath = Core::Filesystem::ResolveShaderPathOrExit(
-            [&](Core::Hash::StringID id) { return m_ShaderRegistry->Get(id); },
-            "PointCloud.Frag"_id);
+        auto [vertPath, fragPath] = ResolveShaderPaths(*m_ShaderRegistry, "PointCloud.Vert"_id, "PointCloud.Frag"_id);
 
         RHI::ShaderModule vert(*m_Device, vertPath, RHI::ShaderStage::Vertex);
         RHI::ShaderModule frag(*m_Device, fragPath, RHI::ShaderStage::Fragment);
 
-        std::shared_ptr<RHI::VulkanDevice> deviceAlias(m_Device, [](RHI::VulkanDevice*) {});
-        RHI::PipelineBuilder pb(deviceAlias);
+        RHI::PipelineBuilder pb(MakeDeviceAlias(m_Device));
         pb.SetShaders(&vert, &frag);
         pb.SetTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
         pb.SetCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE);

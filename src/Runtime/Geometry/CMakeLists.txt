@@ -24,6 +24,7 @@ target_sources(${target_name}
         Geometry.KDTree.cppm
         Geometry.Raycast.cppm
         Geometry.HalfedgeMesh.cppm
+        Geometry.MeshOperator.cppm
         Geometry.Graph.cppm
         Geometry.DEC.cppm
         Geometry.Curvature.cppm

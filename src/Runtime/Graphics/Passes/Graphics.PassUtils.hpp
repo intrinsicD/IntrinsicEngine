@@ -9,7 +9,9 @@
 
 #include <cstdint>
 #include <memory>
+#include <string>
 #include <string_view>
+#include <utility>
 
 // =============================================================================
 // CheckVkResult — unified Vulkan error logging for render passes.
@@ -246,4 +248,48 @@ bool EnsurePerFrameBuffer(RHI::VulkanDevice& device,
 
     capacity = newCapacity;
     return true;
+}
+
+// =============================================================================
+// MakeDeviceAlias — non-owning shared_ptr wrapper for VulkanDevice.
+// =============================================================================
+// PipelineBuilder takes a std::shared_ptr<VulkanDevice> but render passes only
+// borrow the device. This creates a no-op deleter alias for use in BuildPipeline.
+
+inline std::shared_ptr<RHI::VulkanDevice> MakeDeviceAlias(RHI::VulkanDevice* device)
+{
+    return std::shared_ptr<RHI::VulkanDevice>(device, [](RHI::VulkanDevice*) {});
+}
+
+// =============================================================================
+// AllocatePerFrameSets<N> — fill a fixed-size array with per-frame descriptor sets.
+// =============================================================================
+// Allocates N descriptor sets from the pool, all using the same layout.
+// Use in Initialize() to replace the manual for loop.
+
+template<uint32_t N>
+inline void AllocatePerFrameSets(RHI::DescriptorAllocator& pool,
+                                  VkDescriptorSetLayout layout,
+                                  VkDescriptorSet (&sets)[N])
+{
+    for (uint32_t i = 0; i < N; ++i)
+        sets[i] = pool.Allocate(layout);
+}
+
+// =============================================================================
+// ResolveShaderPaths — resolve a vert/frag shader pair via the ShaderRegistry.
+// =============================================================================
+// Combines the two repeated ResolveShaderPathOrExit calls found in every pass
+// BuildPipeline() into a single expression.
+
+inline std::pair<std::string, std::string> ResolveShaderPaths(
+    const ShaderRegistry& reg,
+    Core::Hash::StringID vertId,
+    Core::Hash::StringID fragId)
+{
+    auto resolver = [&](Core::Hash::StringID id) { return reg.Get(id); };
+    return {
+        Core::Filesystem::ResolveShaderPathOrExit(resolver, vertId),
+        Core::Filesystem::ResolveShaderPathOrExit(resolver, fragId)
+    };
 }
