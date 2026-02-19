@@ -9,31 +9,7 @@
 
 import Geometry;
 
-// =============================================================================
-// Test mesh builders
-// =============================================================================
-
-static Geometry::Halfedge::Mesh MakeSingleTriangle()
-{
-    Geometry::Halfedge::Mesh mesh;
-    auto v0 = mesh.AddVertex({0.0f, 0.0f, 0.0f});
-    auto v1 = mesh.AddVertex({1.0f, 0.0f, 0.0f});
-    auto v2 = mesh.AddVertex({0.5f, std::sqrt(3.0f) / 2.0f, 0.0f});
-    (void)mesh.AddTriangle(v0, v1, v2);
-    return mesh;
-}
-
-static Geometry::Halfedge::Mesh MakeTwoTriangles()
-{
-    Geometry::Halfedge::Mesh mesh;
-    auto v0 = mesh.AddVertex({0.0f, 0.0f, 0.0f});
-    auto v1 = mesh.AddVertex({1.0f, 0.0f, 0.0f});
-    auto v2 = mesh.AddVertex({1.0f, 1.0f, 0.0f});
-    auto v3 = mesh.AddVertex({0.0f, 1.0f, 0.0f});
-    (void)mesh.AddTriangle(v0, v1, v2);
-    (void)mesh.AddTriangle(v0, v2, v3);
-    return mesh;
-}
+#include "TestMeshBuilders.h"
 
 // Create a flat NxN grid of triangles (all in the Z=0 plane)
 static Geometry::Halfedge::Mesh MakeFlatGrid(int n)
@@ -71,49 +47,6 @@ static Geometry::Halfedge::Mesh MakeFlatGrid(int n)
     return mesh;
 }
 
-// Create an icosahedron (unit sphere approximation, uniform curvature)
-static Geometry::Halfedge::Mesh MakeIcosahedron()
-{
-    Geometry::Halfedge::Mesh mesh;
-    const float phi = (1.0f + std::sqrt(5.0f)) / 2.0f;
-    const float scale = 1.0f / std::sqrt(1.0f + phi * phi);
-
-    auto v0  = mesh.AddVertex(glm::vec3( 0,  1,  phi) * scale);
-    auto v1  = mesh.AddVertex(glm::vec3( 0, -1,  phi) * scale);
-    auto v2  = mesh.AddVertex(glm::vec3( 0,  1, -phi) * scale);
-    auto v3  = mesh.AddVertex(glm::vec3( 0, -1, -phi) * scale);
-    auto v4  = mesh.AddVertex(glm::vec3( 1,  phi,  0) * scale);
-    auto v5  = mesh.AddVertex(glm::vec3(-1,  phi,  0) * scale);
-    auto v6  = mesh.AddVertex(glm::vec3( 1, -phi,  0) * scale);
-    auto v7  = mesh.AddVertex(glm::vec3(-1, -phi,  0) * scale);
-    auto v8  = mesh.AddVertex(glm::vec3( phi,  0,  1) * scale);
-    auto v9  = mesh.AddVertex(glm::vec3(-phi,  0,  1) * scale);
-    auto v10 = mesh.AddVertex(glm::vec3( phi,  0, -1) * scale);
-    auto v11 = mesh.AddVertex(glm::vec3(-phi,  0, -1) * scale);
-
-    (void)mesh.AddTriangle(v0, v1, v8);
-    (void)mesh.AddTriangle(v0, v8, v4);
-    (void)mesh.AddTriangle(v0, v4, v5);
-    (void)mesh.AddTriangle(v0, v5, v9);
-    (void)mesh.AddTriangle(v0, v9, v1);
-    (void)mesh.AddTriangle(v1, v6, v8);
-    (void)mesh.AddTriangle(v1, v7, v6);
-    (void)mesh.AddTriangle(v1, v9, v7);
-    (void)mesh.AddTriangle(v2, v3, v11);
-    (void)mesh.AddTriangle(v2, v10, v3);
-    (void)mesh.AddTriangle(v2, v4, v10);
-    (void)mesh.AddTriangle(v2, v5, v4);
-    (void)mesh.AddTriangle(v2, v11, v5);
-    (void)mesh.AddTriangle(v3, v6, v7);
-    (void)mesh.AddTriangle(v3, v10, v6);
-    (void)mesh.AddTriangle(v3, v7, v11);
-    (void)mesh.AddTriangle(v4, v8, v10);
-    (void)mesh.AddTriangle(v5, v11, v9);
-    (void)mesh.AddTriangle(v6, v10, v8);
-    (void)mesh.AddTriangle(v7, v9, v11);
-
-    return mesh;
-}
 
 // =============================================================================
 // Tests

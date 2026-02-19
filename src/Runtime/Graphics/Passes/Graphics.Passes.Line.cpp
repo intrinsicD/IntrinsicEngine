@@ -5,6 +5,7 @@ module;
 #include <cstring>
 #include <memory>
 #include <span>
+#include <string_view>
 
 #include <glm/glm.hpp>
 #include "RHI.Vulkan.hpp"
@@ -20,6 +21,8 @@ import Core.Hash;
 import Core.Logging;
 import Core.Filesystem;
 import RHI;
+
+#include "Graphics.PassUtils.hpp"
 
 using namespace Core::Hash;
 
@@ -104,33 +107,8 @@ namespace Graphics::Passes
     bool LineRenderPass::EnsureBuffer(std::unique_ptr<RHI::VulkanBuffer> buffers[FRAMES],
                                      uint32_t& capacity, uint32_t requiredSegments)
     {
-        if (requiredSegments <= capacity && buffers[0] != nullptr)
-            return true;
-
-        // Grow with headroom: next power of 2, minimum 256 segments.
-        uint32_t newCapacity = 256;
-        while (newCapacity < requiredSegments)
-            newCapacity *= 2;
-
-        const size_t byteSize = static_cast<size_t>(newCapacity) * sizeof(DebugDraw::LineSegment);
-
-        for (uint32_t i = 0; i < FRAMES; ++i)
-        {
-            buffers[i] = std::make_unique<RHI::VulkanBuffer>(
-                *m_Device,
-                byteSize,
-                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                VMA_MEMORY_USAGE_CPU_TO_GPU);
-
-            if (!buffers[i]->GetMappedData())
-            {
-                Core::Log::Error("LineRenderPass: Failed to allocate line SSBO ({} bytes)", byteSize);
-                return false;
-            }
-        }
-
-        capacity = newCapacity;
-        return true;
+        return EnsurePerFrameBuffer<DebugDraw::LineSegment, FRAMES>(
+            *m_Device, buffers, capacity, requiredSegments, 256, "LineRenderPass");
     }
 
     // =========================================================================

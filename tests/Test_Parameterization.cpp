@@ -5,57 +5,7 @@
 
 import Geometry;
 
-// =============================================================================
-// Test mesh builders
-// =============================================================================
-
-// Single triangle (disk topology: 1 boundary loop)
-static Geometry::Halfedge::Mesh MakeSingleTriangle()
-{
-    Geometry::Halfedge::Mesh mesh;
-    auto v0 = mesh.AddVertex({0.0f, 0.0f, 0.0f});
-    auto v1 = mesh.AddVertex({1.0f, 0.0f, 0.0f});
-    auto v2 = mesh.AddVertex({0.5f, std::sqrt(3.0f) / 2.0f, 0.0f});
-    (void)mesh.AddTriangle(v0, v1, v2);
-    return mesh;
-}
-
-// Flat subdivided triangle: 6 vertices, 4 faces, 1 boundary loop (disk topology)
-static Geometry::Halfedge::Mesh MakeSubdividedTriangle()
-{
-    const float s = std::sqrt(3.0f);
-    Geometry::Halfedge::Mesh mesh;
-    auto v0 = mesh.AddVertex({0.0f, 0.0f, 0.0f});
-    auto v1 = mesh.AddVertex({2.0f, 0.0f, 0.0f});
-    auto v2 = mesh.AddVertex({1.0f, s, 0.0f});
-    auto v3 = mesh.AddVertex({1.0f, 0.0f, 0.0f});
-    auto v4 = mesh.AddVertex({1.5f, s / 2.0f, 0.0f});
-    auto v5 = mesh.AddVertex({0.5f, s / 2.0f, 0.0f});
-
-    (void)mesh.AddTriangle(v0, v3, v5);
-    (void)mesh.AddTriangle(v3, v1, v4);
-    (void)mesh.AddTriangle(v5, v4, v2);
-    (void)mesh.AddTriangle(v3, v4, v5);
-
-    return mesh;
-}
-
-// Closed tetrahedron — no boundary, so LSCM should return nullopt
-static Geometry::Halfedge::Mesh MakeTetrahedron()
-{
-    Geometry::Halfedge::Mesh mesh;
-    auto v0 = mesh.AddVertex({1.0f, 1.0f, 1.0f});
-    auto v1 = mesh.AddVertex({1.0f, -1.0f, -1.0f});
-    auto v2 = mesh.AddVertex({-1.0f, 1.0f, -1.0f});
-    auto v3 = mesh.AddVertex({-1.0f, -1.0f, 1.0f});
-
-    (void)mesh.AddTriangle(v0, v1, v2);
-    (void)mesh.AddTriangle(v0, v2, v3);
-    (void)mesh.AddTriangle(v0, v3, v1);
-    (void)mesh.AddTriangle(v1, v3, v2);
-
-    return mesh;
-}
+#include "TestMeshBuilders.h"
 
 // Larger disk mesh: subdivided square (4 triangles, 5 vertices)
 static Geometry::Halfedge::Mesh MakeSquareDisk()

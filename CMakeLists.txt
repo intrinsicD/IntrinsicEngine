@@ -126,6 +126,7 @@ target_compile_definitions(IntrinsicConfig INTERFACE
 )
 
 include(cmake/Dependencies.cmake)
+include(cmake/IntrinsicModule.cmake)
 
 # ------------------------------------------------------------------------------
 # Subdirectories

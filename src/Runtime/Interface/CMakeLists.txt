@@ -1,10 +1,5 @@
+intrinsic_add_module_library(IntrinsicInterface)
 set(target_name IntrinsicInterface)
-add_library(${target_name})
-
-set_target_properties(${target_name} PROPERTIES CXX_SCAN_FOR_MODULES ON)
-target_compile_options(${target_name} PRIVATE ${INTRINSIC_COMPILE_FLAGS})
-target_compile_features(${target_name} PUBLIC cxx_std_23)
-target_link_options(${target_name} PRIVATE ${INTRINSIC_LINK_FLAGS})
 
 target_sources(${target_name}
         PUBLIC

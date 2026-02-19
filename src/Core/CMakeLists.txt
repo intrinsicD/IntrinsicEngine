@@ -1,14 +1,5 @@
-# Define the library
+intrinsic_add_module_library(IntrinsicCore)
 set(target_name IntrinsicCore)
-add_library(${target_name})
-
-# Enable Module Scanning JUST for this target
-set_target_properties(${target_name} PROPERTIES CXX_SCAN_FOR_MODULES ON)
-
-# Apply Strict Flags ONLY to our code
-target_compile_options(${target_name} PRIVATE ${INTRINSIC_COMPILE_FLAGS})
-target_compile_features(${target_name} PUBLIC cxx_std_23)
-target_link_options(${target_name} PRIVATE ${INTRINSIC_LINK_FLAGS})
 
 # Setup Sources
 target_sources(${target_name}
