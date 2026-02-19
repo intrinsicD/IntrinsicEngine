@@ -278,17 +278,49 @@ namespace Graphics
                             {
                                 m_PointCloudPass->RenderMode = vis.VertexRenderMode;
 
+                                // Compute area-weighted vertex normals from mesh triangles (cached).
+                                if (vis.VertexNormalsDirty
+                                    && topology == Graphics::PrimitiveTopology::Triangles
+                                    && !indices.empty())
+                                {
+                                    vis.CachedVertexNormals.assign(positions.size(), glm::vec3(0.0f));
+                                    for (std::size_t t = 0; t + 2 < indices.size(); t += 3)
+                                    {
+                                        uint32_t i0 = indices[t], i1 = indices[t+1], i2 = indices[t+2];
+                                        if (i0 >= positions.size() || i1 >= positions.size() || i2 >= positions.size())
+                                            continue;
+                                        glm::vec3 e1 = positions[i1] - positions[i0];
+                                        glm::vec3 e2 = positions[i2] - positions[i0];
+                                        glm::vec3 fn = glm::cross(e1, e2); // magnitude = 2*triangle area
+                                        vis.CachedVertexNormals[i0] += fn;
+                                        vis.CachedVertexNormals[i1] += fn;
+                                        vis.CachedVertexNormals[i2] += fn;
+                                    }
+                                    for (auto& vn : vis.CachedVertexNormals)
+                                    {
+                                        float len = glm::length(vn);
+                                        vn = (len > 1e-12f) ? (vn / len) : glm::vec3(0.0f, 1.0f, 0.0f);
+                                    }
+                                    vis.VertexNormalsDirty = false;
+                                }
+
                                 const uint32_t vtxColor = Passes::PointCloudRenderPass::PackColorF(
                                     vis.VertexColor.r, vis.VertexColor.g,
                                     vis.VertexColor.b, vis.VertexColor.a);
+
+                                const glm::mat3 normalMatrix = glm::mat3(worldMatrix);
 
                                 for (std::size_t i = 0; i < positions.size(); ++i)
                                 {
                                     glm::vec3 worldPos = glm::vec3(worldMatrix * glm::vec4(positions[i], 1.0f));
 
+                                    glm::vec3 normal(0.0f, 1.0f, 0.0f);
+                                    if (i < vis.CachedVertexNormals.size())
+                                        normal = glm::normalize(normalMatrix * vis.CachedVertexNormals[i]);
+
                                     auto pt = Passes::PointCloudRenderPass::PackPoint(
                                         worldPos.x, worldPos.y, worldPos.z,
-                                        0.0f, 1.0f, 0.0f,    // Default up normal for flat disc.
+                                        normal.x, normal.y, normal.z,
                                         vis.VertexSize,
                                         vtxColor);
                                     m_PointCloudPass->SubmitPoints(&pt, 1);

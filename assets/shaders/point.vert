@@ -45,8 +45,12 @@ void main()
 
     fragColor = unpackUnorm4x8(ptColor);
     fragMode = push.RenderMode;
-    fragNormalWorld = ptNormal;
     fragPosWorld = ptPosition;
+
+    // Normalize world normal (used for lighting in all modes).
+    float n2 = dot(ptNormal, ptNormal);
+    vec3 normalWorld = (n2 > 1e-12) ? (ptNormal * inversesqrt(n2)) : vec3(0.0, 0.0, 1.0);
+    fragNormalWorld = normalWorld;
 
     float radiusWorld = ptSize * push.SizeMultiplier;
     vec4 viewPos = camera.view * vec4(ptPosition, 1.0);
@@ -63,20 +67,27 @@ void main()
     fragUV = localOffset;
     fragDiscUV = localOffset;
 
-    // NOTE: In shaders we transform world -> view.
-    // The view matrix maps view->world? In this engine, camera.view is used as proj*view*worldPos,
-    // so it's a world->view transform. For normals we need its inverse-transpose rotation.
-    // Since it's a rigid transform, inverse rotation = transpose(rotation).
+    // Viewport / projected center (needed by mode 2, safe to set for all).
+    vec2 viewport  = vec2(push.ViewportWidth, push.ViewportHeight);
+    vec2 ndcCenter = clipPos.xy / clipPos.w;
+    vec2 screenCenterPx = (ndcCenter * 0.5 + 0.5) * viewport;
+    fragScreenCenterPx = screenCenterPx;
+
+    // --- Mode 0: Screen-aligned billboard ---
+    // The quad always faces the camera: expand along view-space X and Y axes.
+    if (push.RenderMode == 0) {
+        vec3 cornerView = viewPos.xyz
+            + vec3(localOffset.x, localOffset.y, 0.0) * radiusWorld;
+        gl_Position = camera.proj * vec4(cornerView, 1.0);
+        return;
+    }
+
+    // --- Surface-aligned tangent frame (shared by Mode 1 & 2) ---
+    // camera.view is a world-to-view rigid transform; mat3 extracts the rotation.
     mat3 viewRot = mat3(camera.view);
+    vec3 normalView = normalize(viewRot * normalWorld);
 
-    float n2 = dot(ptNormal, ptNormal);
-    vec3 normalWorld = (n2 > 1e-12) ? (ptNormal * inversesqrt(n2)) : vec3(0.0, 0.0, 1.0);
-    vec3 normalView  = normalize(viewRot * normalWorld);
-
-    fragNormalWorld = normalWorld;
-
-    // --- View-stable tangent frame in view space ---
-    // Build T as the projection of the view direction onto the surfel plane.
+    // View-stable tangent: project the view direction onto the surfel plane.
     // This avoids arbitrary helper-axis selection (which can cause visible 90° flips).
     vec3 Vview = normalize(-viewPos.xyz); // camera at origin in view space
     vec3 Tview = Vview - normalView * dot(Vview, normalView);
@@ -93,38 +104,31 @@ void main()
     }
     vec3 Bview = cross(normalView, Tview);
 
-    vec2 viewport  = vec2(push.ViewportWidth, push.ViewportHeight);
-    vec2 ndcCenter = clipPos.xy / clipPos.w;
-    vec2 screenCenterPx = (ndcCenter * 0.5 + 0.5) * viewport;
-    fragScreenCenterPx = screenCenterPx;
-
-    // Mode 0: Surface-aligned disc (true tilted geometry)
-    if (push.RenderMode == 0) {
-        vec3 cornerView = viewPos.xyz + (Tview * localOffset.x + Bview * localOffset.y) * radiusWorld;
-        gl_Position = camera.proj * vec4(cornerView, 1.0);
-        return;
-    }
-
-    // Mode 1: Surfel (same as 0, but shaded/filtered differently in FS)
+    // --- Mode 1: Surfel — surface-aligned disc ---
     if (push.RenderMode == 1) {
         vec3 cornerView = viewPos.xyz + (Tview * localOffset.x + Bview * localOffset.y) * radiusWorld;
         gl_Position = camera.proj * vec4(cornerView, 1.0);
         return;
     }
 
-    // Mode 2: Surface-aligned EWA ellipse embedded in the tangent plane.
+    // --- Mode 2: EWA splatting — surface-aligned elliptical Gaussian splat ---
     {
-        // Project tangent basis to screen to get ellipse covariance in pixel space.
+        // Perspective Jacobian: maps view-space tangent directions to screen pixels.
+        // Each screen axis has its own focal length from the projection matrix.
         float focalX = camera.proj[0][0] * (push.ViewportWidth * 0.5);
         float focalY = camera.proj[1][1] * (push.ViewportHeight * 0.5);
+        vec2  focal  = vec2(focalX, focalY);
 
-        // d(screen)/d(view) for a direction v is approx: f * (v.xy - (v.z / z) * p.xy) / z
-        vec2 axisU_px = (focalX * (Tview.xy - (Tview.z / viewPos.z) * viewPos.xy)) / viewPos.z;
-        vec2 axisV_px = (focalY * (Bview.xy - (Bview.z / viewPos.z) * viewPos.xy)) / viewPos.z;
+        // d(screen)/d(view) for direction d:
+        //   [focalX * (d.x - d.z * p.x / p.z) / p.z,
+        //    focalY * (d.y - d.z * p.y / p.z) / p.z]
+        vec2 innerU = (Tview.xy - (Tview.z / viewPos.z) * viewPos.xy) / viewPos.z;
+        vec2 innerV = (Bview.xy - (Bview.z / viewPos.z) * viewPos.xy) / viewPos.z;
 
-        axisU_px *= radiusWorld;
-        axisV_px *= radiusWorld;
+        vec2 axisU_px = focal * innerU * radiusWorld;
+        vec2 axisV_px = focal * innerV * radiusWorld;
 
+        // Covariance matrix with 1-pixel low-pass filter (EWA anti-aliasing).
         float uu = dot(axisU_px, axisU_px) + 1.0;
         float vv = dot(axisV_px, axisV_px) + 1.0;
         float uv = dot(axisU_px, axisV_px);
@@ -133,17 +137,13 @@ void main()
         float invDet = 1.0 / det;
         fragConic = vec4(vv * invDet, -uv * invDet, -uv * invDet, uu * invDet);
 
-        // Build a conservative bounding box in *plane space* using principal axes in screen.
-        // We map localOffset in [-1,1]^2 into the plane using the same radiusWorld (keeps it stable).
-        // The discard/conic in FS will handle the true ellipse.
+        // Conservative bounding box: 3σ extent in each principal screen axis.
         float extentU = sqrt(uu) * 3.0;
         float extentV = sqrt(vv) * 3.0;
 
-        // Per-vertex pixel offset from the projected center.
         fragPixelOffset = localOffset * vec2(extentU, extentV);
 
-        // Geometry: emit a plane-aligned quad sized to conservatively cover the ellipse.
-        // Use the larger extent as a scale factor.
+        // Emit a tangent-plane quad sized to conservatively cover the ellipse.
         float extent = max(extentU, extentV);
         float planeScale = radiusWorld * (extent / max(max(length(axisU_px), length(axisV_px)), 1e-6));
 
