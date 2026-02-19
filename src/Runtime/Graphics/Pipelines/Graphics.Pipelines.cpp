@@ -17,6 +17,8 @@ import :Geometry;
 import :DebugDraw;
 import :Passes.Picking;
 import :Passes.Forward;
+import :Passes.Mesh;
+import :Passes.Graph;
 import :Passes.SelectionOutline;
 import :Passes.Line;
 import :Passes.PointCloud;
@@ -36,16 +38,20 @@ namespace Graphics
 {
     void DefaultPipeline::Shutdown()
     {
-        if (m_PickingPass) m_PickingPass->Shutdown();
-        if (m_ForwardPass) m_ForwardPass->Shutdown();
+        if (m_PickingPass)          m_PickingPass->Shutdown();
+        if (m_ForwardPass)          m_ForwardPass->Shutdown();
+        if (m_MeshPass)             m_MeshPass->Shutdown();
+        if (m_GraphPass)            m_GraphPass->Shutdown();
         if (m_SelectionOutlinePass) m_SelectionOutlinePass->Shutdown();
-        if (m_LineRenderPass) m_LineRenderPass->Shutdown();
-        if (m_PointCloudPass) m_PointCloudPass->Shutdown();
-        if (m_DebugViewPass) m_DebugViewPass->Shutdown();
-        if (m_ImGuiPass) m_ImGuiPass->Shutdown();
+        if (m_LineRenderPass)       m_LineRenderPass->Shutdown();
+        if (m_PointCloudPass)       m_PointCloudPass->Shutdown();
+        if (m_DebugViewPass)        m_DebugViewPass->Shutdown();
+        if (m_ImGuiPass)            m_ImGuiPass->Shutdown();
 
         m_PickingPass.reset();
         m_ForwardPass.reset();
+        m_MeshPass.reset();
+        m_GraphPass.reset();
         m_SelectionOutlinePass.reset();
         m_LineRenderPass.reset();
         m_PointCloudPass.reset();
@@ -59,16 +65,20 @@ namespace Graphics
                                     const ShaderRegistry& shaderRegistry,
                                     PipelineLibrary& pipelineLibrary)
     {
-        m_PickingPass = std::make_unique<Passes::PickingPass>();
-        m_ForwardPass = std::make_unique<Passes::ForwardPass>();
+        m_PickingPass          = std::make_unique<Passes::PickingPass>();
+        m_ForwardPass          = std::make_unique<Passes::ForwardPass>();
+        m_MeshPass             = std::make_unique<Passes::MeshRenderPass>();
+        m_GraphPass            = std::make_unique<Passes::GraphRenderPass>();
         m_SelectionOutlinePass = std::make_unique<Passes::SelectionOutlinePass>();
-        m_LineRenderPass = std::make_unique<Passes::LineRenderPass>();
-        m_PointCloudPass = std::make_unique<Passes::PointCloudRenderPass>();
-        m_DebugViewPass = std::make_unique<Passes::DebugViewPass>();
-        m_ImGuiPass = std::make_unique<Passes::ImGuiPass>();
+        m_LineRenderPass       = std::make_unique<Passes::LineRenderPass>();
+        m_PointCloudPass       = std::make_unique<Passes::PointCloudRenderPass>();
+        m_DebugViewPass        = std::make_unique<Passes::DebugViewPass>();
+        m_ImGuiPass            = std::make_unique<Passes::ImGuiPass>();
 
         m_PickingPass->Initialize(device, descriptorPool, globalLayout);
         m_ForwardPass->Initialize(device, descriptorPool, globalLayout);
+        m_MeshPass->Initialize(device, descriptorPool, globalLayout);
+        m_GraphPass->Initialize(device, descriptorPool, globalLayout);
         m_SelectionOutlinePass->Initialize(device, descriptorPool, globalLayout);
         m_LineRenderPass->Initialize(device, descriptorPool, globalLayout);
         m_PointCloudPass->Initialize(device, descriptorPool, globalLayout);
@@ -102,55 +112,97 @@ namespace Graphics
     {
         m_Path.Clear();
 
-        // 1. Picking (Readback) — gated by FeatureRegistry
+        // ==================================================================
+        // 1. Picking (Readback) — entity/primitive ID for click queries.
+        // ==================================================================
         if (m_PickingPass && IsFeatureEnabled("PickingPass"_id))
             m_Path.AddFeature("Picking", m_PickingPass.get());
 
-        // 2. Forward (Main Scene) — gated by FeatureRegistry
+        // ==================================================================
+        // 2. Mesh Pass — face rendering via ForwardPass (triangles / lines /
+        //    point geometry).  ForwardPass is the "surface" sub-stage of the
+        //    mesh pass; wireframe + vertex overlays follow in MeshPass.Viz.
+        // ==================================================================
         if (m_ForwardPass && IsFeatureEnabled("ForwardPass"_id))
-            m_Path.AddFeature("Forward", m_ForwardPass.get());
+            m_Path.AddFeature("MeshPass.Forward", m_ForwardPass.get());
 
-        // 2b. Visualization Collection — unified stage for point clouds,
-        // wireframe overlays, and vertex rendering from any entity type.
+        // ==================================================================
+        // Visualization collection
+        // ==================================================================
         //
-        // Collects data from three sources:
-        //  (a) PointCloudRenderer entities — standard point cloud rendering.
-        //  (b) MeshRenderer entities with RenderVisualization::ShowVertices — mesh
-        //      vertices rendered as points via PointCloudRenderPass.
-        //  (c) MeshRenderer entities with RenderVisualization::ShowWireframe — mesh
-        //      edges rendered as lines via DebugDraw → LineRenderPass.
+        // Three collection passes feed two shared GPU primitive renderers:
+        //   - MeshRenderPass  → wireframe edges + vertex splats from mesh entities.
+        //   - GraphRenderPass → edge lines + node splats from graph entities.
+        //   - PointCloud collect inline → splats from PointCloudRenderer entities.
         //
-        // This decouples the visual representation from the CPU data type:
-        // a mesh can show its surface, wireframe, and vertices independently.
+        // Then the GPU draw passes render all accumulated data:
+        //   - PointCloudRenderPass.AddPasses()  — draws all accumulated splats.
+        //   - LineRenderPass.AddPasses()         — draws all accumulated lines.
+        //
+        // Execution contract: collectors must run after ResetPoints() and before
+        // the GPU draw passes are added to the render graph.
         {
-            const bool pointCloudEnabled = m_PointCloudPass && IsFeatureEnabled("PointCloudRenderPass"_id);
-            const bool lineEnabled = m_LineRenderPass && IsFeatureEnabled("LineRenderPass"_id);
+            const bool pcEnabled    = m_PointCloudPass && IsFeatureEnabled("PointCloudRenderPass"_id);
+            const bool lineEnabled  = m_LineRenderPass  && IsFeatureEnabled("LineRenderPass"_id);
+            const bool meshEnabled  = m_MeshPass        && IsFeatureEnabled("MeshPass"_id);
+            const bool graphEnabled = m_GraphPass       && IsFeatureEnabled("GraphPass"_id);
 
-            if (pointCloudEnabled || lineEnabled)
+            if (pcEnabled || lineEnabled || meshEnabled || graphEnabled)
             {
-                m_Path.AddStage("VisualizationCollect", [this, pointCloudEnabled, lineEnabled](RenderPassContext& ctx)
+                m_Path.AddStage("VisualizationCollect",
+                    [this, pcEnabled, lineEnabled, meshEnabled, graphEnabled](RenderPassContext& ctx)
                 {
-                    if (pointCloudEnabled)
+                    // Reset point splat staging before any collector runs.
+                    if (pcEnabled)
                         m_PointCloudPass->ResetPoints();
 
-                    auto& registry = ctx.Scene.GetRegistry();
-
-                    // --- (a) PointCloudRenderer entities ---
-                    if (pointCloudEnabled)
+                    // ----------------------------------------------------------
+                    // 3. Mesh Pass — visualization overlays (wireframe + vertices)
+                    // ----------------------------------------------------------
+                    // MeshRenderPass extracts edges (→ DebugDraw) and vertex
+                    // positions (→ PointCloudRenderPass) from MeshRenderer entities
+                    // that have a RenderVisualization component.
+                    if (meshEnabled)
                     {
+                        m_MeshPass->SetPointCloudPass(pcEnabled ? m_PointCloudPass.get() : nullptr);
+                        m_MeshPass->AddPasses(ctx);
+                    }
+
+                    // ----------------------------------------------------------
+                    // 4. Graph Pass — node splats + edge lines from graph entities
+                    // ----------------------------------------------------------
+                    // GraphRenderPass submits node positions (→ PointCloudRenderPass)
+                    // and edge segments (→ DebugDraw) for GraphRenderer entities.
+                    if (graphEnabled)
+                    {
+                        m_GraphPass->SetPointCloudPass(pcEnabled ? m_PointCloudPass.get() : nullptr);
+                        m_GraphPass->AddPasses(ctx);
+                    }
+
+                    // ----------------------------------------------------------
+                    // 5. Point Cloud Pass — collect PointCloudRenderer entities
+                    // ----------------------------------------------------------
+                    // Inline collection: iterate PointCloudRenderer::Component entities
+                    // and submit their points to the shared staging buffers, then add
+                    // the GPU draw pass for all accumulated splats.
+                    if (pcEnabled)
+                    {
+                        auto& registry = ctx.Scene.GetRegistry();
                         auto pcView = registry.view<ECS::PointCloudRenderer::Component>();
+
                         for (auto [entity, pc] : pcView.each())
                         {
-                            // Submit points into a mode-batched stream so multiple render modes can coexist.
-                             // RenderVisualization overrides Visible when present.
-                             bool visible = pc.Visible;
-                             if (auto* vis = registry.try_get<ECS::RenderVisualization::Component>(entity))
+                            // RenderVisualization can override point cloud visibility.
+                            bool visible = pc.Visible;
+                            if (auto* vis = registry.try_get<ECS::RenderVisualization::Component>(entity))
                                 visible = vis->ShowVertices;
 
-                            if (!visible || pc.Positions.empty()) continue;
+                            if (!visible || pc.Positions.empty())
+                                continue;
 
                             const uint32_t defaultColor = Passes::PointCloudRenderPass::PackColorF(
-                                pc.DefaultColor.r, pc.DefaultColor.g, pc.DefaultColor.b, pc.DefaultColor.a);
+                                pc.DefaultColor.r, pc.DefaultColor.g,
+                                pc.DefaultColor.b, pc.DefaultColor.a);
 
                             glm::mat4 worldMatrix(1.0f);
                             if (auto* wm = registry.try_get<ECS::Components::Transform::WorldMatrix>(entity))
@@ -158,14 +210,16 @@ namespace Graphics
 
                             for (std::size_t i = 0; i < pc.Positions.size(); ++i)
                             {
-                                glm::vec3 worldPos = glm::vec3(worldMatrix * glm::vec4(pc.Positions[i], 1.0f));
-                                glm::vec3 normal = pc.HasNormals()
+                                const glm::vec3 worldPos =
+                                    glm::vec3(worldMatrix * glm::vec4(pc.Positions[i], 1.0f));
+                                const glm::vec3 normal = pc.HasNormals()
                                     ? glm::normalize(glm::mat3(worldMatrix) * pc.Normals[i])
                                     : glm::vec3(0.0f, 1.0f, 0.0f);
-                                float radius = pc.HasRadii() ? pc.Radii[i] : pc.DefaultRadius;
-                                uint32_t color = pc.HasColors()
+                                const float radius = pc.HasRadii() ? pc.Radii[i] : pc.DefaultRadius;
+                                const uint32_t color = pc.HasColors()
                                     ? Passes::PointCloudRenderPass::PackColorF(
-                                        pc.Colors[i].r, pc.Colors[i].g, pc.Colors[i].b, pc.Colors[i].a)
+                                        pc.Colors[i].r, pc.Colors[i].g,
+                                        pc.Colors[i].b, pc.Colors[i].a)
                                     : defaultColor;
 
                                 auto pt = Passes::PointCloudRenderPass::PackPoint(
@@ -176,199 +230,29 @@ namespace Graphics
                                 m_PointCloudPass->SubmitPoints(pc.RenderMode, &pt, 1);
                             }
                         }
+
+                        // GPU draw: add a render-graph pass for every non-empty mode bucket.
+                        if (m_PointCloudPass->HasContent())
+                            m_PointCloudPass->AddPasses(ctx);
                     }
-
-                    // --- (b) & (c) MeshRenderer entities with visualization overlays ---
-                    {
-                        auto meshView = registry.view<ECS::MeshRenderer::Component,
-                                                      ECS::RenderVisualization::Component>();
-                        for (auto [entity, mr, vis] : meshView.each())
-                        {
-                            if (!vis.ShowWireframe && !vis.ShowVertices)
-                                continue;
-
-                            const bool hasGpuWire = vis.WireframeView.IsValid();
-                            const bool hasGpuVerts = vis.VertexView.IsValid();
-
-                            // If GPU views exist, skip CPU overlay generation entirely.
-                            // Rendering is handled by ForwardPass via GPUScene instances (GeometryViewRenderer).
-                            if ((vis.ShowWireframe && hasGpuWire) || (vis.ShowVertices && hasGpuVerts))
-                            {
-                                const bool needsCpuWire = vis.ShowWireframe && !hasGpuWire;
-                                const bool needsCpuVerts = vis.ShowVertices && !hasGpuVerts;
-                                if (!needsCpuWire && !needsCpuVerts)
-                                    continue;
-                            }
-
-                            // Need CPU mesh data from collision geometry for the CPU overlay implementation.
-                            auto* collider = registry.try_get<ECS::MeshCollider::Component>(entity);
-                            if (!collider || !collider->CollisionRef)
-                                continue;
-
-                            const auto& positions = collider->CollisionRef->Positions;
-                            const auto& indices = collider->CollisionRef->Indices;
-                            if (positions.empty())
-                                continue;
-
-                            glm::mat4 worldMatrix(1.0f);
-                            if (auto* wm = registry.try_get<ECS::Components::Transform::WorldMatrix>(entity))
-                                worldMatrix = wm->Matrix;
-
-                            // Determine topology from GPU geometry data.
-                            Graphics::PrimitiveTopology topology = Graphics::PrimitiveTopology::Triangles;
-                            GeometryGpuData* geo = ctx.GeometryStorage.GetUnchecked(mr.Geometry);
-                            if (geo)
-                                topology = geo->GetTopology();
-
-                            // --- Wireframe: extract edges and submit to DebugDraw ---
-                            const bool doCpuWireframe = vis.ShowWireframe && !hasGpuWire;
-                            if (doCpuWireframe && ctx.DebugDrawPtr && lineEnabled)
-                            {
-                                // Build edge cache lazily.
-                                if (vis.EdgeCacheDirty && !indices.empty())
-                                {
-                                    vis.CachedEdges.clear();
-
-                                    if (topology == Graphics::PrimitiveTopology::Triangles)
-                                    {
-                                        // Triangle mesh: extract unique edges from index triplets.
-                                        // Use a set keyed by (min, max) to deduplicate.
-                                        struct PairHash {
-                                            std::size_t operator()(std::pair<uint32_t, uint32_t> p) const noexcept {
-                                                return std::hash<uint64_t>{}(
-                                                    (uint64_t(p.first) << 32) | uint64_t(p.second));
-                                            }
-                                        };
-                                        std::unordered_set<std::pair<uint32_t, uint32_t>, PairHash> edgeSet;
-                                        edgeSet.reserve(indices.size()); // Upper bound
-
-                                        for (std::size_t t = 0; t + 2 < indices.size(); t += 3)
-                                        {
-                                            uint32_t i0 = indices[t], i1 = indices[t+1], i2 = indices[t+2];
-                                            auto addEdge = [&](uint32_t a, uint32_t b) {
-                                                auto key = (a < b) ? std::pair{a, b} : std::pair{b, a};
-                                                edgeSet.insert(key);
-                                            };
-                                            addEdge(i0, i1);
-                                            addEdge(i1, i2);
-                                            addEdge(i2, i0);
-                                        }
-
-                                        vis.CachedEdges.assign(edgeSet.begin(), edgeSet.end());
-                                    }
-                                    else if (topology == Graphics::PrimitiveTopology::Lines)
-                                    {
-                                        // Line topology: index pairs are already edges.
-                                        vis.CachedEdges.reserve(indices.size() / 2);
-                                        for (std::size_t e = 0; e + 1 < indices.size(); e += 2)
-                                            vis.CachedEdges.emplace_back(indices[e], indices[e+1]);
-                                    }
-
-                                    vis.EdgeCacheDirty = false;
-                                }
-
-                                // Submit cached edges as DebugDraw lines.
-                                const uint32_t wireColor = DebugDraw::PackColorF(
-                                    vis.WireframeColor.r, vis.WireframeColor.g,
-                                    vis.WireframeColor.b, vis.WireframeColor.a);
-
-                                for (const auto& [i0, i1] : vis.CachedEdges)
-                                {
-                                    if (i0 >= positions.size() || i1 >= positions.size())
-                                        continue;
-
-                                    glm::vec3 a = glm::vec3(worldMatrix * glm::vec4(positions[i0], 1.0f));
-                                    glm::vec3 b = glm::vec3(worldMatrix * glm::vec4(positions[i1], 1.0f));
-
-                                    if (vis.WireframeOverlay)
-                                        ctx.DebugDrawPtr->OverlayLine(a, b, wireColor);
-                                    else
-                                        ctx.DebugDrawPtr->Line(a, b, wireColor);
-                                }
-                            }
-
-                            // --- Vertices: submit positions to PointCloudRenderPass ---
-                            const bool doCpuVertices = vis.ShowVertices && !hasGpuVerts;
-                            if (doCpuVertices && pointCloudEnabled)
-                            {
-                                const bool wantsAligned = (vis.VertexRenderMode == Geometry::PointCloud::RenderMode::Surfel) ||
-                                                          (vis.VertexRenderMode == Geometry::PointCloud::RenderMode::EWA);
-
-                                 // Compute area-weighted vertex normals from mesh triangles (cached).
-                                 if (vis.VertexNormalsDirty
-                                    && wantsAligned
-                                     && topology == Graphics::PrimitiveTopology::Triangles
-                                     && !indices.empty())
-                                 {
-                                     vis.CachedVertexNormals.assign(positions.size(), glm::vec3(0.0f));
-                                     for (std::size_t t = 0; t + 2 < indices.size(); t += 3)
-                                     {
-                                         uint32_t i0 = indices[t], i1 = indices[t+1], i2 = indices[t+2];
-                                         if (i0 >= positions.size() || i1 >= positions.size() || i2 >= positions.size())
-                                             continue;
-                                         glm::vec3 e1 = positions[i1] - positions[i0];
-                                         glm::vec3 e2 = positions[i2] - positions[i0];
-                                         glm::vec3 fn = glm::cross(e1, e2); // magnitude = 2*triangle area
-                                         vis.CachedVertexNormals[i0] += fn;
-                                         vis.CachedVertexNormals[i1] += fn;
-                                         vis.CachedVertexNormals[i2] += fn;
-                                     }
-                                     for (auto& vn : vis.CachedVertexNormals)
-                                     {
-                                         float len = glm::length(vn);
-                                         vn = (len > 1e-12f) ? (vn / len) : glm::vec3(0.0f, 1.0f, 0.0f);
-                                     }
-                                     vis.VertexNormalsDirty = false;
-                                 }
-
-                                const uint32_t vtxColor = Passes::PointCloudRenderPass::PackColorF(
-                                    vis.VertexColor.r, vis.VertexColor.g,
-                                    vis.VertexColor.b, vis.VertexColor.a);
-
-                                // Correct normal transform: inverse-transpose of the linear part.
-                                // This is required for non-uniform scale; otherwise surfels/EWA won't align to the surface.
-                                const glm::mat3 normalMatrix = glm::transpose(glm::inverse(glm::mat3(worldMatrix)));
-
-                                for (std::size_t i = 0; i < positions.size(); ++i)
-                                {
-                                    glm::vec3 worldPos = glm::vec3(worldMatrix * glm::vec4(positions[i], 1.0f));
-
-                                    glm::vec3 normal(0.0f, 1.0f, 0.0f);
-                                    if (wantsAligned && i < vis.CachedVertexNormals.size())
-                                    {
-                                        const glm::vec3 n = normalMatrix * vis.CachedVertexNormals[i];
-                                        const float n2 = glm::dot(n, n);
-                                        normal = (n2 > 1e-12f) ? (n * (1.0f / glm::sqrt(n2))) : glm::vec3(0.0f, 1.0f, 0.0f);
-                                    }
-
-                                    auto pt = Passes::PointCloudRenderPass::PackPoint(
-                                        worldPos.x, worldPos.y, worldPos.z,
-                                        normal.x, normal.y, normal.z,
-                                        vis.VertexSize,
-                                        vtxColor);
-                                    m_PointCloudPass->SubmitPoints(vis.VertexRenderMode, &pt, 1);
-                                }
-                            }
-
-                            // --- Vertices: submit points via PointCloudRenderPass when no GPU view exists ---
-                            // (CPU vertex overlay handled above.)
-                        }
-                    }
-
-                    if (pointCloudEnabled && m_PointCloudPass->HasContent())
-                        m_PointCloudPass->AddPasses(ctx);
-                });
+                }); // end VisualizationCollect stage
             }
         }
 
-        // 3. Selection Outline (post-process overlay on selected/hovered entities)
+        // ==================================================================
+        // 6. Selection Outline — post-process overlay for selected entities.
+        // ==================================================================
         if (m_SelectionOutlinePass && IsFeatureEnabled("SelectionOutlinePass"_id))
             m_Path.AddFeature("SelectionOutline", m_SelectionOutlinePass.get());
 
-        // 4. Debug Lines (depth-tested + overlay, consumes DebugDraw accumulator)
+        // ==================================================================
+        // 7. Line Pass — GPU draw for all lines in DebugDraw accumulator.
+        //    Consumes lines submitted by MeshRenderPass (wireframe), GraphRenderPass
+        //    (edges), and any direct DebugDraw submissions from systems/tools.
+        // ==================================================================
         if (m_LineRenderPass && IsFeatureEnabled("LineRenderPass"_id))
         {
-            m_Path.AddStage("DebugLines", [this](RenderPassContext& ctx)
+            m_Path.AddStage("LinePass", [this](RenderPassContext& ctx)
             {
                 if (ctx.DebugDrawPtr)
                 {
@@ -378,19 +262,21 @@ namespace Graphics
             });
         }
 
-        // 5. Debug View (Conditional on both registry and per-frame debug state)
+        // ==================================================================
+        // 8. Debug View — conditional texture inspector overlay.
+        // ==================================================================
         if (m_DebugViewPass && IsFeatureEnabled("DebugViewPass"_id))
         {
             m_Path.AddStage("DebugView", [this](RenderPassContext& ctx)
             {
                 if (ctx.Debug.Enabled)
-                {
                     m_DebugViewPass->AddPasses(ctx);
-                }
             });
         }
 
-        // 6. ImGui (Overlay) — gated by FeatureRegistry
+        // ==================================================================
+        // 9. ImGui — editor UI overlay.
+        // ==================================================================
         if (m_ImGuiPass && IsFeatureEnabled("ImGuiPass"_id))
             m_Path.AddFeature("ImGui", m_ImGuiPass.get());
     }
@@ -410,13 +296,15 @@ namespace Graphics
 
     void DefaultPipeline::OnResize(uint32_t width, uint32_t height)
     {
-        if (m_PickingPass) m_PickingPass->OnResize(width, height);
-        if (m_ForwardPass) m_ForwardPass->OnResize(width, height);
+        if (m_PickingPass)          m_PickingPass->OnResize(width, height);
+        if (m_ForwardPass)          m_ForwardPass->OnResize(width, height);
+        if (m_MeshPass)             m_MeshPass->OnResize(width, height);
+        if (m_GraphPass)            m_GraphPass->OnResize(width, height);
         if (m_SelectionOutlinePass) m_SelectionOutlinePass->OnResize(width, height);
-        if (m_LineRenderPass) m_LineRenderPass->OnResize(width, height);
-        if (m_PointCloudPass) m_PointCloudPass->OnResize(width, height);
-        if (m_DebugViewPass) m_DebugViewPass->OnResize(width, height);
-        if (m_ImGuiPass) m_ImGuiPass->OnResize(width, height);
+        if (m_LineRenderPass)       m_LineRenderPass->OnResize(width, height);
+        if (m_PointCloudPass)       m_PointCloudPass->OnResize(width, height);
+        if (m_DebugViewPass)        m_DebugViewPass->OnResize(width, height);
+        if (m_ImGuiPass)            m_ImGuiPass->OnResize(width, height);
     }
 
     void DefaultPipeline::PostCompile(uint32_t frameIndex,

@@ -23,18 +23,21 @@ export namespace Graphics::Passes
     // -------------------------------------------------------------------------
     //
     // Architecture:
-    // - Collects point cloud data from ECS entities with PointCloudRenderer::Component.
-    // - Uploads point data to a host-visible SSBO each frame (consolidated across entities).
+    // - Collects point cloud data submitted via SubmitPoints() each frame.
+    // - Data may originate from PointCloudRenderer entities, GraphRenderPass nodes,
+    //   or MeshRenderPass vertex overlays — all feed the same per-mode staging buffers.
+    // - Uploads point data to a host-visible SSBO each frame.
     // - Vertex shader expands each point into a screen-space billboard quad (6 verts).
     // - Fragment shader renders circular/elliptical splats with anti-aliasing.
     //
     // Rendering Modes (selectable via push constants):
-    //   0 = Flat Disc     — screen-aligned billboard, constant pixel radius.
+    //   0 = Flat Disc      — screen-aligned billboard, constant pixel radius.
     //   1 = Surfel         — oriented disc aligned to surface normal with lighting.
     //   2 = EWA Splatting  — perspective-correct Gaussian elliptical splats (Zwicker et al. 2001).
+    //   3 = Gaussian Splat — isotropic Gaussian blob with smooth opacity falloff (3DGS-style).
     //
     // Integration:
-    // - Registered in DefaultPipeline after Forward, before SelectionOutline.
+    // - Registered in DefaultPipeline after MeshRenderPass and GraphRenderPass collect stages.
     // - Gated by FeatureRegistry ("PointCloudRenderPass"_id).
     // - Reads camera UBO from global descriptor set (set 0).
     // - Point SSBO bound at set 1.
@@ -90,6 +93,7 @@ export namespace Graphics::Passes
             m_StagingPointsByMode[0].clear();
             m_StagingPointsByMode[1].clear();
             m_StagingPointsByMode[2].clear();
+            m_StagingPointsByMode[3].clear();
         }
 
         // True if any mode has content.
@@ -98,7 +102,8 @@ export namespace Graphics::Passes
             return !m_StagingPoints.empty() ||
                    !m_StagingPointsByMode[0].empty() ||
                    !m_StagingPointsByMode[1].empty() ||
-                   !m_StagingPointsByMode[2].empty();
+                   !m_StagingPointsByMode[2].empty() ||
+                   !m_StagingPointsByMode[3].empty();
         }
 
         // Total number of accumulated points across all modes.
@@ -107,7 +112,8 @@ export namespace Graphics::Passes
             return static_cast<uint32_t>(m_StagingPoints.size() +
                                          m_StagingPointsByMode[0].size() +
                                          m_StagingPointsByMode[1].size() +
-                                         m_StagingPointsByMode[2].size());
+                                         m_StagingPointsByMode[2].size() +
+                                         m_StagingPointsByMode[3].size());
         }
 
         // Convenience: pack a single point from components.
@@ -157,8 +163,9 @@ export namespace Graphics::Passes
         // CPU-side staging buffer — accumulated per frame.
         std::vector<GpuPointData> m_StagingPoints;
 
-        // New: per-mode staging (0..2). Used when callers want different modes in the same frame.
-        std::vector<GpuPointData> m_StagingPointsByMode[3];
+        // Per-mode staging (0..3). Callers select mode via SubmitPoints(mode, ...).
+        // 0=FlatDisc  1=Surfel  2=EWA  3=GaussianSplat
+        std::vector<GpuPointData> m_StagingPointsByMode[4];
 
         // Ensure SSBO has capacity for the given point count.
         bool EnsureBuffer(uint32_t requiredPoints);

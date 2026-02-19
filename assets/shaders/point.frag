@@ -63,5 +63,18 @@ void main()
         float diff = max(dot(normal, normalize(vec3(0.3, 1.0, 0.5))), 0.0) * 0.7 + 0.2;
 
         outColor = vec4(fragColor.rgb * diff, fragColor.a * weight);
+        return;
+    }
+
+    // Mode 3: GaussianSplat — isotropic Gaussian blob, smooth opacity, no hard disc edge.
+    // fragDiscUV in [-1,1]; treat radius=1 as 2-sigma boundary (sigma=0.5 in UV space).
+    // weight = exp(-2*r²) gives ~0.135 alpha at the quad edge — smoothly fades to zero.
+    // No surface lighting: intended for volumetric/density visualization.
+    if (fragMode == 3) {
+        float r2 = dot(fragDiscUV, fragDiscUV);
+        if (r2 > 4.0) discard; // cull beyond 2x radius (well past Gaussian tail)
+
+        float weight = exp(-2.0 * r2);
+        outColor = vec4(fragColor.rgb, fragColor.a * weight);
     }
 }

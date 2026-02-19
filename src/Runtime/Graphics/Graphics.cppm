@@ -26,7 +26,12 @@ export import :KDTreeDebugDraw;
 // NOTE: We intentionally do NOT re-export pipeline implementations here.
 // Import `Graphics.Pipelines` explicitly in apps/tools when you need DefaultPipeline/etc.
 
-// Feature modules still exported for now (useful for custom pipelines)
+// Feature modules exported for custom pipeline construction.
+// The three primary rendering passes (PointCloud, Graph, Mesh) compose the
+// full scene visualization stack via shared primitive passes (Line, PointCloud).
+export import :Passes.PointCloud;  // GPU point splat renderer (FlatDisc/Surfel/EWA/GaussianSplat)
+export import :Passes.Graph;       // Graph entity renderer (nodes→PointCloud, edges→Line)
+export import :Passes.Mesh;        // Mesh entity renderer (vertices→PointCloud, wireframe→Line, faces→Forward)
 export import :Passes.Picking;
 export import :Passes.Forward;
 export import :Passes.Line;

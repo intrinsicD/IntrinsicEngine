@@ -210,6 +210,49 @@ TEST(PointCloudRenderer_Component, MismatchedDataDetected)
     EXPECT_FALSE(comp.HasNormals()); // Size mismatch
 }
 
+// ---- GaussianSplat Mode (mode 3) ----
+
+TEST(PointCloudRenderPass_Contract, GaussianSplatModeSubmitAndCount)
+{
+    Graphics::Passes::PointCloudRenderPass pass;
+
+    auto pt = Graphics::Passes::PointCloudRenderPass::PackPoint(
+        1.0f, 2.0f, 3.0f, 0.0f, 1.0f, 0.0f, 0.05f, 0xFFFFFFFF);
+    pass.SubmitPoints(Geometry::PointCloud::RenderMode::GaussianSplat, &pt, 1);
+
+    EXPECT_TRUE(pass.HasContent());
+    EXPECT_EQ(pass.GetPointCount(), 1u);
+}
+
+TEST(PointCloudRenderPass_Contract, AllFourModesAccumulate)
+{
+    Graphics::Passes::PointCloudRenderPass pass;
+
+    auto pt = Graphics::Passes::PointCloudRenderPass::PackPoint(
+        0, 0, 0, 0, 1, 0, 0.01f, 0xFFFFFFFF);
+
+    pass.SubmitPoints(Geometry::PointCloud::RenderMode::FlatDisc,      &pt, 1);
+    pass.SubmitPoints(Geometry::PointCloud::RenderMode::Surfel,        &pt, 1);
+    pass.SubmitPoints(Geometry::PointCloud::RenderMode::EWA,           &pt, 1);
+    pass.SubmitPoints(Geometry::PointCloud::RenderMode::GaussianSplat, &pt, 1);
+
+    EXPECT_EQ(pass.GetPointCount(), 4u);
+}
+
+TEST(PointCloudRenderPass_Contract, ResetClearsAllFourModes)
+{
+    Graphics::Passes::PointCloudRenderPass pass;
+
+    auto pt = Graphics::Passes::PointCloudRenderPass::PackPoint(
+        0, 0, 0, 0, 1, 0, 0.01f, 0xFFFFFFFF);
+    pass.SubmitPoints(Geometry::PointCloud::RenderMode::GaussianSplat, &pt, 1);
+    EXPECT_TRUE(pass.HasContent());
+
+    pass.ResetPoints();
+    EXPECT_FALSE(pass.HasContent());
+    EXPECT_EQ(pass.GetPointCount(), 0u);
+}
+
 // ---- Integration: PointCloud Cloud → ECS Component ----
 
 TEST(PointCloud_Integration, CloudToComponent)

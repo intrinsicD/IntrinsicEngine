@@ -148,6 +148,46 @@ export namespace ECS::RenderVisualization
     };
 }
 
+// -------------------------------------------------------------------------
+// GraphRenderer — ECS component for graph visualization.
+// -------------------------------------------------------------------------
+//
+// Entities with this component are rendered by GraphRenderPass:
+//   - Nodes rendered via PointCloudRenderPass (all point rendering modes).
+//   - Edges rendered via LineRenderPass (through DebugDraw accumulator).
+//
+// Node data uses SoA layout matching PointCloudRenderer::Component.
+// Optional per-node attributes must match NodePositions.size() when present.
+
+export namespace ECS::GraphRenderer
+{
+    struct Component
+    {
+        // ---- Node Data ----
+        std::vector<glm::vec3> NodePositions;       // Required.
+        std::vector<glm::vec4> NodeColors;          // Optional (empty = use DefaultNodeColor).
+        std::vector<float>     NodeRadii;           // Optional (empty = use DefaultNodeRadius).
+
+        // ---- Edge Data (index pairs into NodePositions) ----
+        std::vector<std::pair<uint32_t, uint32_t>> Edges;
+
+        // ---- Rendering Parameters ----
+        Geometry::PointCloud::RenderMode NodeRenderMode = Geometry::PointCloud::RenderMode::FlatDisc;
+        float     DefaultNodeRadius  = 0.01f;
+        float     NodeSizeMultiplier = 1.0f;
+        glm::vec4 DefaultNodeColor   = {0.8f, 0.5f, 0.0f, 1.0f};
+        glm::vec4 DefaultEdgeColor   = {0.6f, 0.6f, 0.6f, 1.0f};
+        bool      EdgesOverlay       = false;  // true = edges always visible (no depth test).
+        bool      Visible            = true;
+
+        // ---- Queries ----
+        [[nodiscard]] std::size_t NodeCount() const noexcept { return NodePositions.size(); }
+        [[nodiscard]] std::size_t EdgeCount() const noexcept { return Edges.size(); }
+        [[nodiscard]] bool HasNodeColors() const noexcept { return NodeColors.size() == NodePositions.size(); }
+        [[nodiscard]] bool HasNodeRadii()  const noexcept { return NodeRadii.size() == NodePositions.size(); }
+    };
+}
+
 export namespace ECS::GeometryViewRenderer
 {
     struct Component
