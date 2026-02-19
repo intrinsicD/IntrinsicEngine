@@ -5,6 +5,7 @@ module;
 
 export module Geometry:AdaptiveRemeshing;
 
+import :MeshOperator;
 import :Properties;
 import :HalfedgeMesh;
 
@@ -61,21 +62,9 @@ export namespace Geometry::AdaptiveRemeshing
         bool PreserveBoundary{true};
     };
 
-    struct AdaptiveRemeshingResult
-    {
-        // Number of iterations actually performed
-        std::size_t IterationsPerformed{0};
-
-        // Edge operations performed (cumulative across all iterations)
-        std::size_t SplitCount{0};
-        std::size_t CollapseCount{0};
-        std::size_t FlipCount{0};
-
-        // Final mesh statistics
-        std::size_t FinalVertexCount{0};
-        std::size_t FinalEdgeCount{0};
-        std::size_t FinalFaceCount{0};
-    };
+    // AdaptiveRemeshingResult is structurally identical to Remeshing::RemeshingResult.
+    // Both alias Geometry::RemeshingOperationResult to avoid a duplicated definition.
+    using AdaptiveRemeshingResult = Geometry::RemeshingOperationResult;
 
     // -------------------------------------------------------------------------
     // Curvature-driven adaptive remeshing.
