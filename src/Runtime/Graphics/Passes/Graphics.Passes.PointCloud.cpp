@@ -5,7 +5,9 @@ module;
 #include <cstring>
 #include <memory>
 #include <span>
+#include <string>
 #include <string_view>
+#include <utility>
 
 #include <glm/glm.hpp>
 #include "RHI.Vulkan.hpp"
@@ -138,7 +140,9 @@ namespace Graphics::Passes
             return nullptr;
         }
 
-        auto [vertPath, fragPath] = ResolveShaderPaths(*m_ShaderRegistry, "PointCloud.Vert"_id, "PointCloud.Frag"_id);
+        auto [vertPath, fragPath] = ResolveShaderPaths(*m_ShaderRegistry,
+                                                      "PointCloud.Vert"_id,
+                                                      "PointCloud.Frag"_id);
 
         RHI::ShaderModule vert(*m_Device, vertPath, RHI::ShaderStage::Vertex);
         RHI::ShaderModule frag(*m_Device, fragPath, RHI::ShaderStage::Fragment);
@@ -224,7 +228,6 @@ namespace Graphics::Passes
         if (!HasContent()) return;
          if (ctx.Resolution.width == 0 || ctx.Resolution.height == 0) return;
 
-        const uint32_t pointCount = GetPointCount();
         const uint32_t frameIndex = ctx.FrameIndex;
 
         // Lazy pipeline creation (need swapchain format and depth format).

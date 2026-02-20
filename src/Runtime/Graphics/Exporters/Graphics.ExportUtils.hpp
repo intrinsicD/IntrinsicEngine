@@ -7,10 +7,8 @@
 // fragments only — it is not part of any exported module interface.
 // =============================================================================
 
-#include <cstddef>
-#include <cstring>
-#include <string>
-#include <vector>
+// (Intentionally no standard-library includes here; they must live in the
+// including translation unit's global module fragment.)
 
 namespace Graphics::ExportUtils
 {

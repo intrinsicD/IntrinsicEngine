@@ -7,11 +7,8 @@
 // fragments only — it is not part of any exported module interface.
 // =============================================================================
 
-#include <cstdint>
-#include <memory>
-#include <string>
-#include <string_view>
-#include <utility>
+// (Intentionally no standard-library includes here; they must live in the
+// including translation unit's global module fragment.)
 
 // =============================================================================
 // CheckVkResult — unified Vulkan error logging for render passes.
@@ -283,10 +280,12 @@ inline void AllocatePerFrameSets(RHI::DescriptorAllocator& pool,
 // BuildPipeline() into a single expression.
 
 inline std::pair<std::string, std::string> ResolveShaderPaths(
-    const ShaderRegistry& reg,
+    const Graphics::ShaderRegistry& reg,
     Core::Hash::StringID vertId,
     Core::Hash::StringID fragId)
 {
+    // Must match Core::Filesystem::ShaderPathLookup signature:
+    //   std::optional<std::string>(Core::Hash::StringID)
     auto resolver = [&](Core::Hash::StringID id) { return reg.Get(id); };
     return {
         Core::Filesystem::ResolveShaderPathOrExit(resolver, vertId),

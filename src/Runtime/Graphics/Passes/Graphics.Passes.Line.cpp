@@ -5,7 +5,9 @@ module;
 #include <cstring>
 #include <memory>
 #include <span>
+#include <string>
 #include <string_view>
+#include <utility>
 
 #include <glm/glm.hpp>
 #include "RHI.Vulkan.hpp"
@@ -86,8 +88,8 @@ namespace Graphics::Passes
     // EnsureBuffer — grow SSBO capacity if needed
     // =========================================================================
 
-    bool LineRenderPass::EnsureBuffer(std::unique_ptr<RHI::VulkanBuffer> buffers[FRAMES],
-                                     uint32_t& capacity, uint32_t requiredSegments)
+    bool LineRenderPass::EnsureBuffer(std::unique_ptr<RHI::VulkanBuffer> (&buffers)[FRAMES],
+                                      uint32_t& capacity, uint32_t requiredSegments)
     {
         return EnsurePerFrameBuffer<DebugDraw::LineSegment, FRAMES>(
             *m_Device, buffers, capacity, requiredSegments, 256, "LineRenderPass");

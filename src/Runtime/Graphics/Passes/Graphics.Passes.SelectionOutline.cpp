@@ -1,8 +1,12 @@
 module;
 
 #include <algorithm>
+#include <cstdint>
 #include <memory>
 #include <span>
+#include <string>
+#include <string_view>
+#include <utility>
 
 #include <glm/glm.hpp>
 #include <entt/entity/registry.hpp>

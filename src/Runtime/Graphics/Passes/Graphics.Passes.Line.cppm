@@ -84,7 +84,7 @@ export namespace Graphics::Passes
         std::unique_ptr<RHI::GraphicsPipeline> m_OverlayPipeline;  // depth test disabled
 
         // Ensure SSBO has enough capacity. Returns false on failure.
-        bool EnsureBuffer(std::unique_ptr<RHI::VulkanBuffer> buffers[FRAMES],
+        bool EnsureBuffer(std::unique_ptr<RHI::VulkanBuffer> (&buffers)[FRAMES],
                           uint32_t& capacity, uint32_t requiredSegments);
 
         // Build a graphics pipeline for line rendering.
