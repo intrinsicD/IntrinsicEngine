@@ -65,14 +65,14 @@ namespace Graphics::Passes
             return;
 
         const uint32_t m = static_cast<uint32_t>(mode);
-        if (m < 3)
+        if (m < 4)
         {
             auto& dst = m_StagingPointsByMode[m];
             dst.insert(dst.end(), data, data + count);
         }
         else
         {
-            // Fallback: preserve old behavior for unexpected values.
+            // Fallback: preserve old behavior for unexpected mode values.
             m_StagingPoints.insert(m_StagingPoints.end(), data, data + count);
         }
     }
@@ -303,10 +303,11 @@ namespace Graphics::Passes
             RenderMode = oldMode;
         };
 
-        // Mode-batched draws.
+        // Mode-batched draws (one GPU pass per non-empty mode).
         recordBatch(std::span<const GpuPointData>(m_StagingPointsByMode[0].data(), m_StagingPointsByMode[0].size()), Geometry::PointCloud::RenderMode::FlatDisc);
         recordBatch(std::span<const GpuPointData>(m_StagingPointsByMode[1].data(), m_StagingPointsByMode[1].size()), Geometry::PointCloud::RenderMode::Surfel);
         recordBatch(std::span<const GpuPointData>(m_StagingPointsByMode[2].data(), m_StagingPointsByMode[2].size()), Geometry::PointCloud::RenderMode::EWA);
+        recordBatch(std::span<const GpuPointData>(m_StagingPointsByMode[3].data(), m_StagingPointsByMode[3].size()), Geometry::PointCloud::RenderMode::GaussianSplat);
 
         // Back-compat staging bucket (uses current RenderMode).
         if (!m_StagingPoints.empty())

@@ -23,7 +23,7 @@ export namespace Geometry::PointCloud
     //
     //   - Import from PLY, XYZ, PCD, LAS and other point cloud formats.
     //   - Input to geometry operators (normal estimation, surface reconstruction).
-    //   - GPU rendering via PointCloudRenderPass (flat splatting, surfel, EWA).
+    //   - GPU rendering via PointCloudRenderPass (flat splatting, surfel, EWA, Gaussian splat).
     //   - Spatial queries via Octree/KDTree acceleration.
     //
     // Design:
@@ -42,9 +42,10 @@ export namespace Geometry::PointCloud
     // -------------------------------------------------------------------------
     enum class RenderMode : uint32_t
     {
-        FlatDisc    = 0,  // Screen-space constant-size circular splats
-        Surfel      = 1,  // Oriented discs derived from surface normals
-        EWA         = 2,  // Elliptical Weighted Average (Zwicker et al. 2001)
+        FlatDisc      = 0,  // Screen-space constant-size circular splats
+        Surfel        = 1,  // Oriented discs derived from surface normals
+        EWA           = 2,  // Elliptical Weighted Average (Zwicker et al. 2001)
+        GaussianSplat = 3,  // Isotropic Gaussian blob with smooth opacity falloff (3DGS-style)
     };
 
     // -------------------------------------------------------------------------

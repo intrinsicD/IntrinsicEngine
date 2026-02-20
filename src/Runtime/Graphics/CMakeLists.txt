@@ -40,6 +40,8 @@ target_sources(${target_name}
         Passes/Graphics.Passes.SelectionOutline.cppm
         Passes/Graphics.Passes.Line.cppm
         Passes/Graphics.Passes.PointCloud.cppm
+        Passes/Graphics.Passes.Graph.cppm
+        Passes/Graphics.Passes.Mesh.cppm
         Passes/Graphics.Passes.DebugView.cppm
         Passes/Graphics.Passes.ImGui.cppm
         Graphics.IORegistry.cppm
@@ -85,6 +87,8 @@ target_sources(${target_name}
         Passes/Graphics.Passes.SelectionOutline.cpp
         Passes/Graphics.Passes.Line.cpp
         Passes/Graphics.Passes.PointCloud.cpp
+        Passes/Graphics.Passes.Graph.cpp
+        Passes/Graphics.Passes.Mesh.cpp
         Passes/Graphics.Passes.DebugView.cpp
         Graphics.IORegistry.cpp
         Importers/Graphics.Importers.OBJ.cpp

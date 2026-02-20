@@ -111,6 +111,16 @@ void main()
         return;
     }
 
+    // --- Mode 3: GaussianSplat — isotropic Gaussian blob (screen-aligned, Gaussian alpha) ---
+    // Same billboard as mode 0; the fragment shader applies a smooth Gaussian opacity falloff
+    // instead of a hard disc discard.  Suitable for volumetric / density visualization.
+    if (push.RenderMode == 3) {
+        vec3 cornerView = viewPos.xyz
+            + vec3(localOffset.x, localOffset.y, 0.0) * radiusWorld;
+        gl_Position = camera.proj * vec4(cornerView, 1.0);
+        return;
+    }
+
     // --- Mode 2: EWA splatting — surface-aligned elliptical Gaussian splat ---
     {
         // Perspective Jacobian: maps view-space tangent directions to screen pixels.
