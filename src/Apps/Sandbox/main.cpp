@@ -2,6 +2,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <vector>
+#include <functional>
 #include <memory>
 #include <filesystem>
 #include <imgui.h>
@@ -224,12 +225,14 @@ public:
         registerPanelFeature("Stats", "Performance statistics and debug controls");
         registerPanelFeature("View Settings", "Selection outline and viewport display settings");
         registerPanelFeature("Render Target Viewer", "Render target debug visualization");
+        registerPanelFeature("Geometry Processing", "Interactive Geometry Processing operators");
 
         Log::Info("FeatureRegistry: {} total features after client registration", features.Count());
 
         Interface::GUI::RegisterPanel("Hierarchy", [this]() { DrawHierarchyPanel(); });
         Interface::GUI::RegisterPanel("Inspector", [this]() { DrawInspectorPanel(); });
         Interface::GUI::RegisterPanel("Assets", [this]() { GetAssetManager().AssetsUiPanel(); });
+        Interface::GUI::RegisterPanel("Geometry Processing", [this]() { DrawGeometryProcessingPanel(); });
 
         // Register shared editor-facing panels (Feature browser, FrameGraph inspector, Selection config).
         Runtime::EditorUI::RegisterDefaultPanels(*this);
@@ -641,6 +644,284 @@ public:
                 }
             }
             ImGui::EndPopup();
+        }
+
+        ImGui::End();
+    }
+
+    void ApplyGeometryOperator(entt::entity entity, const std::function<void(Geometry::Halfedge::Mesh&)>& op)
+    {
+        auto& reg = GetScene().GetRegistry();
+        auto* collider = reg.try_get<ECS::MeshCollider::Component>(entity);
+        auto* mr = reg.try_get<ECS::MeshRenderer::Component>(entity);
+        if (!collider || !collider->CollisionRef || !mr) return;
+
+        // 1. Build Halfedge::Mesh from CPU data
+        Geometry::Halfedge::Mesh mesh;
+        std::vector<Geometry::VertexHandle> vhs(collider->CollisionRef->Positions.size());
+        for (size_t i = 0; i < collider->CollisionRef->Positions.size(); ++i)
+        {
+            vhs[i] = mesh.AddVertex(collider->CollisionRef->Positions[i]);
+        }
+        for (size_t i = 0; i + 2 < collider->CollisionRef->Indices.size(); i += 3)
+        {
+            mesh.AddTriangle(vhs[collider->CollisionRef->Indices[i]],
+                             vhs[collider->CollisionRef->Indices[i + 1]],
+                             vhs[collider->CollisionRef->Indices[i + 2]]);
+        }
+
+        // 2. Apply operator
+        op(mesh);
+        mesh.GarbageCollection();
+
+        // 3. Extract back
+        std::vector<glm::vec3> newPos;
+        std::vector<uint32_t> newIdx;
+
+        newPos.reserve(mesh.VertexCount());
+        std::vector<uint32_t> vMap(mesh.VerticesSize(), 0);
+        uint32_t currentIdx = 0;
+        for (size_t i = 0; i < mesh.VerticesSize(); ++i)
+        {
+            Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(i)};
+            if (!mesh.IsDeleted(v))
+            {
+                vMap[i] = currentIdx++;
+                newPos.push_back(mesh.Position(v));
+            }
+        }
+
+        newIdx.reserve(mesh.FaceCount() * 3);
+        for (size_t i = 0; i < mesh.FacesSize(); ++i)
+        {
+            Geometry::FaceHandle f{static_cast<Geometry::PropertyIndex>(i)};
+            if (!mesh.IsDeleted(f))
+            {
+                auto h0 = mesh.Halfedge(f);
+                auto h1 = mesh.NextHalfedge(h0);
+                auto h2 = mesh.NextHalfedge(h1);
+
+                newIdx.push_back(vMap[mesh.ToVertex(h0).Index]);
+                newIdx.push_back(vMap[mesh.ToVertex(h1).Index]);
+                newIdx.push_back(vMap[mesh.ToVertex(h2).Index]);
+            }
+        }
+
+        collider->CollisionRef->Positions = std::move(newPos);
+        collider->CollisionRef->Indices = std::move(newIdx);
+
+        std::vector<glm::vec3> newNormals(collider->CollisionRef->Positions.size(), glm::vec3(0, 1, 0));
+        Geometry::MeshUtils::CalculateNormals(collider->CollisionRef->Positions, collider->CollisionRef->Indices, newNormals);
+
+        std::vector<glm::vec4> newAux(collider->CollisionRef->Positions.size(), glm::vec4(0.0f));
+        Geometry::MeshUtils::GenerateUVs(collider->CollisionRef->Positions, newAux);
+
+        auto aabbs = Geometry::Convert(collider->CollisionRef->Positions);
+        collider->CollisionRef->LocalAABB = Geometry::Union(aabbs);
+
+        std::vector<Geometry::AABB> primitiveBounds;
+        primitiveBounds.reserve(collider->CollisionRef->Indices.size() / 3);
+        for (size_t i = 0; i + 2 < collider->CollisionRef->Indices.size(); i += 3)
+        {
+            const uint32_t i0 = collider->CollisionRef->Indices[i];
+            const uint32_t i1 = collider->CollisionRef->Indices[i + 1];
+            const uint32_t i2 = collider->CollisionRef->Indices[i + 2];
+            auto aabb = Geometry::AABB{collider->CollisionRef->Positions[i0], collider->CollisionRef->Positions[i0]};
+            aabb = Geometry::Union(aabb, collider->CollisionRef->Positions[i1]);
+            aabb = Geometry::Union(aabb, collider->CollisionRef->Positions[i2]);
+            primitiveBounds.push_back(aabb);
+        }
+        collider->CollisionRef->LocalOctree.Build(primitiveBounds, Geometry::Octree::SplitPolicy{}, 16, 8);
+
+        Graphics::GeometryUploadRequest uploadReq;
+        uploadReq.Positions = collider->CollisionRef->Positions;
+        uploadReq.Indices = collider->CollisionRef->Indices;
+        uploadReq.Normals = newNormals;
+        uploadReq.Aux = newAux;
+        uploadReq.Topology = Graphics::PrimitiveTopology::Triangles;
+        uploadReq.UploadMode = Graphics::GeometryUploadMode::Staged;
+
+        auto [gpuData, token] = Graphics::GeometryGpuData::CreateAsync(
+            GetDevice(), GetGraphicsBackend().GetTransferManager(), uploadReq, &GetGeometryStorage());
+
+        auto oldHandle = mr->Geometry;
+        mr->Geometry = GetGeometryStorage().Add(std::move(gpuData));
+
+        if (oldHandle.IsValid())
+        {
+            GetGeometryStorage().Remove(oldHandle, GetDevice()->GetGlobalFrameNumber());
+        }
+
+        mr->GpuSlot = ECS::MeshRenderer::Component::kInvalidSlot;
+        reg.emplace_or_replace<ECS::Components::Transform::WorldUpdatedTag>(entity);
+
+        auto* vis = reg.try_get<ECS::RenderVisualization::Component>(entity);
+        if (vis)
+        {
+            vis->WireframeViewDirty = true;
+            vis->VertexViewDirty = true;
+            vis->EdgeCacheDirty = true;
+            vis->VertexNormalsDirty = true;
+        }
+    }
+
+    void DrawGeometryProcessingPanel()
+    {
+        ImGui::Begin("Geometry Processing");
+
+        const entt::entity selected = GetSelection().GetSelectedEntity(GetScene());
+
+        if (selected != entt::null && GetScene().GetRegistry().valid(selected))
+        {
+            auto& reg = GetScene().GetRegistry();
+
+            if (reg.all_of<ECS::MeshRenderer::Component>(selected))
+            {
+                if (ImGui::CollapsingHeader("Remeshing", ImGuiTreeNodeFlags_DefaultOpen))
+                {
+                    static float targetLength = 0.05f;
+                    static int iterations = 5;
+                    static bool preserveBoundary = true;
+                    ImGui::DragFloat("Target Length", &targetLength, 0.01f, 0.001f, 10.0f);
+                    ImGui::DragInt("Iterations##Remesh", &iterations, 1, 1, 20);
+                    ImGui::Checkbox("Preserve Boundary##Remesh", &preserveBoundary);
+                    if (ImGui::Button("Isotropic Remesh"))
+                    {
+                        ApplyGeometryOperator(selected, [](Geometry::Halfedge::Mesh& mesh) {
+                            Geometry::Remeshing::RemeshingParams params;
+                            params.TargetLength = targetLength;
+                            params.Iterations = iterations;
+                            params.PreserveBoundary = preserveBoundary;
+                            Geometry::Remeshing::Remesh(mesh, params);
+                        });
+                    }
+                    if (ImGui::Button("Adaptive Remesh"))
+                    {
+                        ApplyGeometryOperator(selected, [](Geometry::Halfedge::Mesh& mesh) {
+                            Geometry::AdaptiveRemeshing::AdaptiveRemeshingParams params;
+                            params.MinEdgeLength = targetLength * 0.5f;
+                            params.MaxEdgeLength = targetLength * 2.0f;
+                            params.Iterations = iterations;
+                            params.PreserveBoundary = preserveBoundary;
+                            Geometry::AdaptiveRemeshing::AdaptiveRemesh(mesh, params);
+                        });
+                    }
+                }
+
+                if (ImGui::CollapsingHeader("Simplification", ImGuiTreeNodeFlags_DefaultOpen))
+                {
+                    static int targetFaces = 1000;
+                    static bool preserveBoundarySimp = true;
+                    ImGui::DragInt("Target Faces", &targetFaces, 10, 10, 1000000);
+                    ImGui::Checkbox("Preserve Boundary##Simp", &preserveBoundarySimp);
+                    if (ImGui::Button("Simplify (QEM)"))
+                    {
+                        ApplyGeometryOperator(selected, [](Geometry::Halfedge::Mesh& mesh) {
+                            Geometry::Simplification::SimplificationParams params;
+                            params.TargetFaces = targetFaces;
+                            params.PreserveBoundary = preserveBoundarySimp;
+                            Geometry::Simplification::Simplify(mesh, params);
+                        });
+                    }
+                }
+
+                if (ImGui::CollapsingHeader("Smoothing", ImGuiTreeNodeFlags_DefaultOpen))
+                {
+                    static int smoothIterations = 10;
+                    static float lambda = 0.5f;
+                    static bool preserveBoundarySmooth = true;
+                    ImGui::DragInt("Iterations##Smooth", &smoothIterations, 1, 1, 100);
+                    ImGui::DragFloat("Lambda", &lambda, 0.01f, 0.0f, 1.0f);
+                    ImGui::Checkbox("Preserve Boundary##Smooth", &preserveBoundarySmooth);
+
+                    if (ImGui::Button("Uniform Laplacian"))
+                    {
+                        ApplyGeometryOperator(selected, [](Geometry::Halfedge::Mesh& mesh) {
+                            Geometry::Smoothing::SmoothingParams params;
+                            params.Iterations = smoothIterations;
+                            params.Lambda = lambda;
+                            params.PreserveBoundary = preserveBoundarySmooth;
+                            Geometry::Smoothing::UniformLaplacian(mesh, params);
+                        });
+                    }
+                    if (ImGui::Button("Cotan Laplacian"))
+                    {
+                        ApplyGeometryOperator(selected, [](Geometry::Halfedge::Mesh& mesh) {
+                            Geometry::Smoothing::SmoothingParams params;
+                            params.Iterations = smoothIterations;
+                            params.Lambda = lambda;
+                            params.PreserveBoundary = preserveBoundarySmooth;
+                            Geometry::Smoothing::CotanLaplacian(mesh, params);
+                        });
+                    }
+                    if (ImGui::Button("Taubin Smoothing"))
+                    {
+                        ApplyGeometryOperator(selected, [](Geometry::Halfedge::Mesh& mesh) {
+                            Geometry::Smoothing::TaubinParams params;
+                            params.Iterations = smoothIterations;
+                            params.Lambda = lambda;
+                            params.PreserveBoundary = preserveBoundarySmooth;
+                            Geometry::Smoothing::Taubin(mesh, params);
+                        });
+                    }
+                    if (ImGui::Button("Implicit Smoothing"))
+                    {
+                        ApplyGeometryOperator(selected, [](Geometry::Halfedge::Mesh& mesh) {
+                            Geometry::Smoothing::ImplicitSmoothingParams params;
+                            params.Iterations = smoothIterations;
+                            params.Lambda = lambda;
+                            params.PreserveBoundary = preserveBoundarySmooth;
+                            Geometry::Smoothing::ImplicitLaplacian(mesh, params);
+                        });
+                    }
+                }
+
+                if (ImGui::CollapsingHeader("Subdivision", ImGuiTreeNodeFlags_DefaultOpen))
+                {
+                    static int subdivIterations = 1;
+                    ImGui::DragInt("Iterations##Subdiv", &subdivIterations, 1, 1, 5);
+                    if (ImGui::Button("Loop Subdivision"))
+                    {
+                        ApplyGeometryOperator(selected, [](Geometry::Halfedge::Mesh& mesh) {
+                            Geometry::Halfedge::Mesh out;
+                            Geometry::Subdivision::SubdivisionParams params;
+                            params.Iterations = subdivIterations;
+                            if (Geometry::Subdivision::Subdivide(mesh, out, params)) {
+                                mesh = std::move(out);
+                            }
+                        });
+                    }
+                    if (ImGui::Button("Catmull-Clark Subdivision"))
+                    {
+                        ApplyGeometryOperator(selected, [](Geometry::Halfedge::Mesh& mesh) {
+                            Geometry::Halfedge::Mesh out;
+                            Geometry::CatmullClark::SubdivisionParams params;
+                            params.Iterations = subdivIterations;
+                            if (Geometry::CatmullClark::Subdivide(mesh, out, params)) {
+                                mesh = std::move(out);
+                            }
+                        });
+                    }
+                }
+
+                if (ImGui::CollapsingHeader("Mesh Repair", ImGuiTreeNodeFlags_DefaultOpen))
+                {
+                    if (ImGui::Button("Repair Mesh"))
+                    {
+                        ApplyGeometryOperator(selected, [](Geometry::Halfedge::Mesh& mesh) {
+                            Geometry::MeshRepair::Repair(mesh);
+                        });
+                    }
+                }
+            }
+            else
+            {
+                ImGui::Text("Selected entity does not have a MeshRenderer.");
+            }
+        }
+        else
+        {
+            ImGui::TextDisabled("Select an entity to process geometry.");
         }
 
         ImGui::End();
