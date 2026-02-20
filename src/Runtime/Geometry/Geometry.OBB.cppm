@@ -18,7 +18,7 @@ export namespace Geometry
 
         [[nodiscard]] bool IsValid() const
         {
-            return Extents.x > 0.0f && Extents.y > 0.0f && Extents.z > 0.0f;
+            return Extents.x >= 0.0f && Extents.y >= 0.0f && Extents.z >= 0.0f;
         }
 
         [[nodiscard]] glm::vec3 GetSize() const
