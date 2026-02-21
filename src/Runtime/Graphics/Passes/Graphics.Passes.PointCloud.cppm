@@ -157,6 +157,10 @@ export namespace Graphics::Passes
         std::unique_ptr<RHI::VulkanBuffer> m_PointBuffers[FRAMES];
         uint32_t m_BufferCapacity = 0; // in points
 
+        // Per-frame host-visible SSBOs per render-mode (0..3).
+        std::unique_ptr<RHI::VulkanBuffer> m_PointBuffersByMode[4][FRAMES];
+        uint32_t m_BufferCapacityByMode[4] = {0, 0, 0, 0};
+
         // Lazily-built pipeline (with depth test).
         std::unique_ptr<RHI::GraphicsPipeline> m_Pipeline;
 
@@ -169,6 +173,7 @@ export namespace Graphics::Passes
 
         // Ensure SSBO has capacity for the given point count.
         bool EnsureBuffer(uint32_t requiredPoints);
+        bool EnsureBufferMode(uint32_t modeIdx, uint32_t requiredPoints);
 
         // Build the graphics pipeline.
         std::unique_ptr<RHI::GraphicsPipeline> BuildPipeline(

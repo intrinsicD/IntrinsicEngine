@@ -264,6 +264,9 @@ namespace Graphics
     {
         m_RenderGraph.Reset();
 
+        // DebugDraw is transient per-frame. Clear before any features submit.
+        m_DebugDraw->Reset();
+
         const uint32_t frameIndex = m_Presentation.GetFrameIndex();
         const uint32_t imageIndex = m_Presentation.GetImageIndex();
         const auto extent = m_Presentation.GetResolution();
@@ -343,6 +346,7 @@ namespace Graphics
             extent,
             imageIndex,
             m_Swapchain.GetImageFormat(),
+            m_Presentation.GetDepthBuffer().GetFormat(),
             m_Renderer,
             m_GlobalResources.GetCameraUBO(),
             m_GlobalResources.GetGlobalDescriptorSet(),

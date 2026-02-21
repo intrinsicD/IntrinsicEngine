@@ -78,6 +78,9 @@ export namespace Graphics
         uint32_t SwapchainImageIndex = 0;
         VkFormat SwapchainFormat = VK_FORMAT_UNDEFINED;
 
+        // Depth import context (matches the imported "SceneDepth" image)
+        VkFormat DepthFormat = VK_FORMAT_UNDEFINED;
+
         // Command submission helpers
         RHI::SimpleRenderer& Renderer;
 

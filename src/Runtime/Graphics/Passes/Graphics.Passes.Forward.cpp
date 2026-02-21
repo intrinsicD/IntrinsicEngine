@@ -41,34 +41,39 @@ namespace Graphics::Passes
         if (!backbuffer.IsValid() || !depth.IsValid())
             return;
 
-        // Lazily init descriptor pools.
+        // Lazily init descriptor pools (single growing pool per category).
+        // With FRAMES=3 matching VulkanDevice::MAX_FRAMES_IN_FLIGHT, each frame slot
+        // maps to a unique buffer/descriptor slot — no aliasing across in-flight frames.
         if (m_InstanceSetPool == nullptr)
         {
             if (m_InstanceSetLayout == VK_NULL_HANDLE)
             {
-                Core::Log::Error("ForwardPass: Stage 1 instance set layout not set. Did RenderSystem call SetInstanceSetLayout()?");
+                Core::Log::Error("ForwardPass: Stage 1 instance set layout not set.");
                 return;
             }
 
-            m_InstanceSetPool = std::make_unique<RHI::PersistentDescriptorPool>(*m_Device,
-                                                                                ForwardPassConstants::kInstancePoolMaxSets,
-                                                                                ForwardPassConstants::kInstancePoolStorageBuffers,
-                                                                                /*debugName*/ "ForwardPass.Stage1.Instance");
+            m_InstanceSetPool = std::make_unique<RHI::PersistentDescriptorPool>(
+                *m_Device,
+                ForwardPassConstants::kInstancePoolMaxSets,
+                ForwardPassConstants::kInstancePoolStorageBuffers,
+                "ForwardPass.Stage1.Instance");
         }
 
         if (m_CullSetPool == nullptr)
         {
-            m_CullSetPool = std::make_unique<RHI::PersistentDescriptorPool>(*m_Device,
-                                                                            ForwardPassConstants::kCullPoolMaxSets,
-                                                                            ForwardPassConstants::kCullPoolStorageBuffers,
-                                                                            /*debugName*/ "ForwardPass.Cull");
+            m_CullSetPool = std::make_unique<RHI::PersistentDescriptorPool>(
+                *m_Device,
+                ForwardPassConstants::kCullPoolMaxSets,
+                ForwardPassConstants::kCullPoolStorageBuffers,
+                "ForwardPass.Cull");
         }
 
         DrawStream stream = BuildDrawStream(ctx);
         AddRasterPass(ctx, backbuffer, depth, std::move(stream));
     }
 
-    ForwardPass::DrawStream ForwardPass::BuildDrawStream(RenderPassContext& ctx)
+
+    Graphics::Passes::ForwardPass::DrawStream Graphics::Passes::ForwardPass::BuildDrawStream(RenderPassContext& ctx)
     {
          DrawStream out{};
 
@@ -276,10 +281,14 @@ namespace Graphics::Passes
                 VMA_MEMORY_USAGE_GPU_ONLY);
         }
 
+        // Reallocation is required whenever this specific frame-slot's buffer was built with
+        // different parameters — both growth AND shrinkage must retrigger it. Using per-slot
+        // trackers (instead of a single shared max) ensures every slot re-syncs independently
+        // after scene complexity changes, which is the root cause of the flicker.
         const bool needPackedResize = needsResize(m_Stage3IndirectPacked[frame], packedIndirectBytes) ||
                                       needsResize(m_Stage3VisibilityPacked[frame], packedVisibilityBytes) ||
-                                      m_Stage3LastGeometryCount < geometryCount ||
-                                      m_Stage3LastMaxDrawsPerGeometry < maxDrawsPerGeometry;
+                                      m_Stage3LastGeometryCount[frame] != geometryCount ||
+                                      m_Stage3LastMaxDrawsPerGeometry[frame] != maxDrawsPerGeometry;
 
         if (needPackedResize)
         {
@@ -295,15 +304,14 @@ namespace Graphics::Passes
                 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                 VMA_MEMORY_USAGE_GPU_ONLY);
 
-            // IMPORTANT: freshly allocated GPU-only buffers contain undefined memory.
-            // The cull shader only writes the [0..drawCount) prefix per geometry.
-            // If we ever accidentally over-read (or use stale indirect arguments), undefined content manifests as flicker.
-            // We clear here to make the system deterministic.
-            // Note: Actual per-frame counts are already reset via vkCmdFillBuffer(drawCounts).
+            // Freshly allocated GPU-only buffers contain undefined memory. Clear on allocation so
+            // any over-read slot returns 0 (zero drawCount = nothing drawn) rather than garbage.
         }
 
-        m_Stage3LastGeometryCount = std::max(m_Stage3LastGeometryCount, geometryCount);
-        m_Stage3LastMaxDrawsPerGeometry = std::max(m_Stage3LastMaxDrawsPerGeometry, maxDrawsPerGeometry);
+        // Record exact values for this slot (not max) so any future change to either parameter
+        // also triggers a reallocation rather than silently reusing a mismatched buffer.
+        m_Stage3LastGeometryCount[frame] = geometryCount;
+        m_Stage3LastMaxDrawsPerGeometry[frame] = maxDrawsPerGeometry;
 
         // Upload geometry index counts table.
         std::vector<uint32_t> cpuIndexCounts;
@@ -498,7 +506,7 @@ namespace Graphics::Passes
         return out;
     }
 
-    void ForwardPass::AddRasterPass(RenderPassContext& ctx, RGResourceHandle backbuffer, RGResourceHandle depth, DrawStream&& stream)
+    void Graphics::Passes::ForwardPass::AddRasterPass(RenderPassContext& ctx, RGResourceHandle backbuffer, RGResourceHandle depth, DrawStream&& stream)
     {
         // If CPU path injected its own raster pass, do nothing.
         if (stream.Batches.empty())
@@ -710,7 +718,7 @@ namespace Graphics::Passes
     // =========================================================================
     // Stage 3: GPU-driven culling with single shared geometry
     // =========================================================================
-    void ForwardPass::AddStage3Passes(RenderPassContext& ctx,
+    void Graphics::Passes::ForwardPass::AddStage3Passes(RenderPassContext& ctx,
                                       RGResourceHandle /*backbuffer*/,
                                       RGResourceHandle /*depth*/,
                                       Geometry::GeometryHandle singleGeometry)
@@ -908,7 +916,7 @@ namespace Graphics::Passes
 
                                             vkCmdPushConstants(cmd, m_CullPipeline->GetLayout(), VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(CullPC), &pc);
 
-                                            const uint32_t groups = (stage3.InstanceCount + ForwardPassConstants::kCullWorkgroupSize - 1) / ForwardPassConstants::kCullWorkgroupSize;
+                                            const uint32_t groups = (stage3.InstanceCount + ForwardPassConstants::kCullWorkgroupSize - 1) / Graphics::Passes::ForwardPassConstants::kCullWorkgroupSize;
                                             vkCmdDispatch(cmd, groups, 1, 1);
                                         });
 
@@ -917,7 +925,7 @@ namespace Graphics::Passes
         // the produced indirect/count/visibility buffers.
     }
 
-    void ForwardPass::AddStage1And2Passes(RenderPassContext& ctx,
+    void Graphics::Passes::ForwardPass::AddStage1And2Passes(RenderPassContext& ctx,
                                           RGResourceHandle /*backbuffer*/,
                                           RGResourceHandle /*depth*/)
     {

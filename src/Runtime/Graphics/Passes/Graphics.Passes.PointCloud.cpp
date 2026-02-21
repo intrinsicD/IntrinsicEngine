@@ -108,6 +108,11 @@ namespace Graphics::Passes
         if (!m_Device) return;
 
         for (auto& buf : m_PointBuffers) buf.reset();
+        for (auto& buf : m_PointBuffersByMode[0]) buf.reset();
+        for (auto& buf : m_PointBuffersByMode[1]) buf.reset();
+        for (auto& buf : m_PointBuffersByMode[2]) buf.reset();
+        for (auto& buf : m_PointBuffersByMode[3]) buf.reset();
+
         m_Pipeline.reset();
 
         if (m_PointSetLayout != VK_NULL_HANDLE)
@@ -125,6 +130,12 @@ namespace Graphics::Passes
     {
         return EnsurePerFrameBuffer<GpuPointData, FRAMES>(
             *m_Device, m_PointBuffers, m_BufferCapacity, requiredPoints, 1024, "PointCloudRenderPass");
+    }
+
+    bool PointCloudRenderPass::EnsureBufferMode(uint32_t modeIdx, uint32_t requiredPoints)
+    {
+        return EnsurePerFrameBuffer<GpuPointData, FRAMES>(
+            *m_Device, m_PointBuffersByMode[modeIdx], m_BufferCapacityByMode[modeIdx], requiredPoints, 1024, "PointCloudRenderPass");
     }
 
     // =========================================================================
@@ -226,14 +237,14 @@ namespace Graphics::Passes
     void PointCloudRenderPass::AddPasses(RenderPassContext& ctx)
     {
         if (!HasContent()) return;
-         if (ctx.Resolution.width == 0 || ctx.Resolution.height == 0) return;
+        if (ctx.Resolution.width == 0 || ctx.Resolution.height == 0) return;
 
         const uint32_t frameIndex = ctx.FrameIndex;
 
         // Lazy pipeline creation (need swapchain format and depth format).
         if (!m_Pipeline)
         {
-            VkFormat depthFormat = VK_FORMAT_D32_SFLOAT;
+            const VkFormat depthFormat = ctx.DepthFormat;
             m_Pipeline = BuildPipeline(ctx.SwapchainFormat, depthFormat);
 
             if (!m_Pipeline)
@@ -254,15 +265,30 @@ namespace Graphics::Passes
             if (pts.empty())
                 return;
 
-            // Ensure SSBO capacity.
-            const uint32_t batchCount = static_cast<uint32_t>(pts.size());
-            if (!EnsureBuffer(batchCount))
-                return;
+            const uint32_t modeIdx = static_cast<uint32_t>(mode);
 
-            // Upload batch points.
-            m_PointBuffers[frameIndex]->Write(pts.data(), pts.size_bytes());
-            UpdateSSBODescriptor(m_Device->GetLogicalDevice(), m_PointDescSets[frameIndex],
-                                 0, m_PointBuffers[frameIndex]->GetHandle(), pts.size_bytes());
+            // Ensure SSBO capacity for this mode-batch.
+            const uint32_t batchCount = static_cast<uint32_t>(pts.size());
+            if (modeIdx < 4)
+            {
+                if (!EnsureBufferMode(modeIdx, batchCount))
+                    return;
+
+                // Upload batch points into the mode-specific per-frame buffer.
+                m_PointBuffersByMode[modeIdx][frameIndex]->Write(pts.data(), pts.size_bytes());
+                UpdateSSBODescriptor(m_Device->GetLogicalDevice(), m_PointDescSets[frameIndex],
+                                     0, m_PointBuffersByMode[modeIdx][frameIndex]->GetHandle(), pts.size_bytes());
+            }
+            else
+            {
+                // Fallback path: unexpected mode  store in legacy buffer.
+                if (!EnsureBuffer(batchCount))
+                    return;
+
+                m_PointBuffers[frameIndex]->Write(pts.data(), pts.size_bytes());
+                UpdateSSBODescriptor(m_Device->GetLogicalDevice(), m_PointDescSets[frameIndex],
+                                     0, m_PointBuffers[frameIndex]->GetHandle(), pts.size_bytes());
+            }
 
             // Set pass-global mode for RecordDraw (it reads RenderMode member).
             const auto oldMode = RenderMode;

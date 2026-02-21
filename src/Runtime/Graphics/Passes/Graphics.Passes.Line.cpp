@@ -209,7 +209,7 @@ namespace Graphics::Passes
         // Lazy pipeline creation (need swapchain format and depth format).
         if (!m_DepthPipeline || !m_OverlayPipeline)
         {
-            VkFormat depthFormat = VK_FORMAT_D32_SFLOAT; // standard depth format
+            const VkFormat depthFormat = ctx.DepthFormat;
             m_DepthPipeline = BuildPipeline(ctx.SwapchainFormat, depthFormat, true);
             m_OverlayPipeline = BuildPipeline(ctx.SwapchainFormat, depthFormat, false);
 

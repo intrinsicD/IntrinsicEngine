@@ -233,6 +233,7 @@ namespace RHI
         queue.clear();
     }
 
+
     void VulkanDevice::PickPhysicalDevice(VkInstance instance)
     {
         uint32_t deviceCount = 0;

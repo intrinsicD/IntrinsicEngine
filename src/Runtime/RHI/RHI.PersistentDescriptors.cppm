@@ -9,12 +9,14 @@ import :Device;
 
 export namespace RHI
 {
-    // A tiny helper for "long-lived" descriptor sets.
+    // A helper for descriptor set allocation.
     //
     // Why this exists:
     // - DescriptorAllocator is intended for transient allocations and may reset pools.
-    // - Some systems (forward instance SSBO sets, future retained submission bindings)
-    //   need descriptor sets that remain valid across frames.
+    // - Some systems (forward instance SSBO sets, GPUScene update sets) need descriptor
+    //   sets that remain valid for the duration of a frame submission.
+    // - Pools grow on demand (geometric) and are never reset — sets are valid until
+    //   the pool is destroyed (i.e. when the pass shuts down or the pipeline is swapped).
     class PersistentDescriptorPool
     {
     public:
@@ -30,6 +32,7 @@ export namespace RHI
                                           uint32_t maxSets = 64,
                                           uint32_t storageBufferCount = 256,
                                           const char* debugName = nullptr);
+
         ~PersistentDescriptorPool();
 
         PersistentDescriptorPool(const PersistentDescriptorPool&) = delete;

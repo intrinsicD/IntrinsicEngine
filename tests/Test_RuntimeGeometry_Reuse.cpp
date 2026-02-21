@@ -1,5 +1,3 @@
-module;
-
 #include <gtest/gtest.h>
 
 #include <glm/glm.hpp>

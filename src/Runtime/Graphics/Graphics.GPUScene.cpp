@@ -69,7 +69,7 @@ namespace Graphics
         m_UpdateSetPool = std::make_unique<RHI::PersistentDescriptorPool>(m_Device,
                                                                           GPUSceneConstants::kUpdatePoolMaxSets,
                                                                           GPUSceneConstants::kUpdatePoolStorageBuffers,
-                                                                          /*debugName*/ "GPUScene.SceneUpdate");
+                                                                          "GPUScene.SceneUpdate");
     }
 
     GPUScene::~GPUScene() = default;
@@ -172,6 +172,7 @@ namespace Graphics
     {
         // Clamp frame index to valid range.
         const uint32_t fi = frameIndex % kMaxFramesInFlight;
+
 
         // Move updates out under lock so we minimize contention.
         std::vector<GpuUpdatePacket> updates;

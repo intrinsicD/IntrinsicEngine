@@ -168,7 +168,7 @@ TEST(PointCloudRenderPass_Contract, DefaultConfiguration)
 {
     Graphics::Passes::PointCloudRenderPass pass;
     EXPECT_FLOAT_EQ(pass.SizeMultiplier, 1.0f);
-    EXPECT_EQ(pass.RenderMode, 0u); // Flat disc by default
+    EXPECT_EQ(pass.RenderMode, Geometry::PointCloud::RenderMode::FlatDisc); // Flat disc by default
 }
 
 // ---- ECS Component Tests ----
@@ -180,7 +180,7 @@ TEST(PointCloudRenderer_Component, DefaultValues)
     EXPECT_FALSE(comp.HasNormals());
     EXPECT_FALSE(comp.HasColors());
     EXPECT_FALSE(comp.HasRadii());
-    EXPECT_EQ(comp.RenderMode, 0u);
+    EXPECT_EQ(comp.RenderMode, Geometry::PointCloud::RenderMode::FlatDisc);
     EXPECT_FLOAT_EQ(comp.DefaultRadius, 0.005f);
     EXPECT_FLOAT_EQ(comp.SizeMultiplier, 1.0f);
     EXPECT_TRUE(comp.Visible);
@@ -193,7 +193,7 @@ TEST(PointCloudRenderer_Component, WithData)
     comp.Normals = {{0, 1, 0}, {0, 1, 0}, {0, 0, 1}};
     comp.Colors = {{1, 0, 0, 1}, {0, 1, 0, 1}, {0, 0, 1, 1}};
     comp.Radii = {0.01f, 0.02f, 0.03f};
-    comp.RenderMode = 2; // EWA
+    comp.RenderMode = Geometry::PointCloud::RenderMode::EWA;
 
     EXPECT_EQ(comp.PointCount(), 3u);
     EXPECT_TRUE(comp.HasNormals());
@@ -273,7 +273,7 @@ TEST(PointCloud_Integration, CloudToComponent)
     comp.Normals = cloud.Normals;
     comp.Colors = cloud.Colors;
     comp.Radii = radiiResult->Radii;
-    comp.RenderMode = 1; // Surfel
+    comp.RenderMode = Geometry::PointCloud::RenderMode::Surfel;
 
     EXPECT_EQ(comp.PointCount(), 4u);
     EXPECT_TRUE(comp.HasNormals());

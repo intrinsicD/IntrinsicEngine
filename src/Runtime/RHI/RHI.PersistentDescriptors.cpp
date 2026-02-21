@@ -42,14 +42,13 @@ namespace RHI
 
     VkDescriptorPool PersistentDescriptorPool::CreatePool(const uint32_t maxSets, const uint32_t storageBufferCount) const
     {
-        // NOTE: counts are NUMBER OF DESCRIPTORS, and maxSets limits NUMBER OF SETS.
         const VkDescriptorPoolSize sizes[] = {
             { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, storageBufferCount },
         };
 
         VkDescriptorPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-        poolInfo.flags = 0; // Persistent: we don't free individual sets, and never reset.
+        poolInfo.flags = 0;
         poolInfo.maxSets = maxSets;
         poolInfo.poolSizeCount = static_cast<uint32_t>(std::size(sizes));
         poolInfo.pPoolSizes = sizes;
@@ -70,7 +69,6 @@ namespace RHI
 
     bool PersistentDescriptorPool::Grow()
     {
-        // Geometric growth, clamped to avoid accidental runaway from bugs.
         constexpr uint32_t kMaxMaxSets = 1u << 20;
         constexpr uint32_t kMaxStorageBuffers = 1u << 22;
 
@@ -79,9 +77,7 @@ namespace RHI
 
         VkDescriptorPool newPool = CreatePool(newMaxSets, newStorageBuffers);
         if (newPool == VK_NULL_HANDLE)
-        {
             return false;
-        }
 
         m_MaxSets = newMaxSets;
         m_StorageBufferCount = newStorageBuffers;
@@ -104,13 +100,9 @@ namespace RHI
         , m_MaxSets(maxSets)
         , m_StorageBufferCount(storageBufferCount)
     {
-        // Stage 1 only needs a couple of storage buffer descriptors per frame,
-        // but we size this to avoid allocator churn.
         m_CurrentPool = CreatePool(m_MaxSets, m_StorageBufferCount);
         if (m_CurrentPool != VK_NULL_HANDLE)
-        {
             m_AllPools.push_back(m_CurrentPool);
-        }
     }
 
     PersistentDescriptorPool::~PersistentDescriptorPool()
@@ -119,16 +111,12 @@ namespace RHI
             return;
 
         const VkDevice dev = m_Device.GetLogicalDevice();
-        // Move pools out so the lambda captures only the moved vector.
-        // std::vector is nothrow-move-constructible, satisfying InplaceFunction's requirement.
         std::vector<VkDescriptorPool> pools = std::move(m_AllPools);
         m_Device.SafeDestroy([dev, pools = std::move(pools)]()
         {
             for (VkDescriptorPool pool : pools)
-            {
                 if (pool != VK_NULL_HANDLE)
                     vkDestroyDescriptorPool(dev, pool, nullptr);
-            }
         });
         m_CurrentPool = VK_NULL_HANDLE;
     }
@@ -158,14 +146,11 @@ namespace RHI
         VkDescriptorSet set = VK_NULL_HANDLE;
         VkResult res = vkAllocateDescriptorSets(m_Device.GetLogicalDevice(), &allocInfo, &set);
 
-        // Pool exhausted/fragmented: create a new pool and retry once.
         if (res == VK_ERROR_OUT_OF_POOL_MEMORY || res == VK_ERROR_FRAGMENTED_POOL)
         {
-            Core::Log::Warn("PersistentDescriptorPool{}: allocation hit {} ({}); growing and retrying [layout={}, pools={}, maxSets={}, storageBuffers={}, allocations={}]",
+            Core::Log::Warn("PersistentDescriptorPool{}: pool exhausted ({}); growing [allocations={}]",
                               (m_DebugName ? m_DebugName : ""),
-                              static_cast<int>(res), VkResultToString(res),
-                              (void*)layout,
-                              static_cast<uint32_t>(m_AllPools.size()), m_MaxSets, m_StorageBufferCount, m_AllocationCount);
+                              static_cast<int>(res), m_AllocationCount);
 
             if (Grow())
             {
@@ -177,11 +162,9 @@ namespace RHI
 
         if (res != VK_SUCCESS)
         {
-            Core::Log::Error("PersistentDescriptorPool{}: vkAllocateDescriptorSets failed ({}, {}) [layout={}, pools={}, maxSets={}, storageBuffers={}, allocations={}]",
+            Core::Log::Error("PersistentDescriptorPool{}: vkAllocateDescriptorSets failed ({}) [allocations={}]",
                             (m_DebugName ? m_DebugName : ""),
-                            static_cast<int>(res), VkResultToString(res),
-                            (void*)layout,
-                            static_cast<uint32_t>(m_AllPools.size()), m_MaxSets, m_StorageBufferCount, m_AllocationCount);
+                            static_cast<int>(res), m_AllocationCount);
             return VK_NULL_HANDLE;
         }
 

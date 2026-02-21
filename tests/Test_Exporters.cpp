@@ -11,6 +11,8 @@
 #include <variant>
 #include <vector>
 
+#include <glm/glm.hpp>
+
 import Core;
 import Core.IOBackend;
 import Graphics;

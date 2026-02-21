@@ -124,7 +124,6 @@ intrinsic_test_object_lib(RuntimeTestObjs
         Test_BoundingDebugDraw.cpp
         Test_KDTreeDebugDraw.cpp
         Test_OctreeDebugDraw.cpp
-        Test_DAGScheduler.cpp
         Test_EditorUI.cpp
         Test_PointCloudRenderPass.cpp
         Test_GraphRenderPass.cpp

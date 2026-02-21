@@ -86,6 +86,7 @@ namespace RHI
 
         void FlushDeletionQueue(uint32_t frameIndex);
 
+
         // New: execute and clear *all* deferred deletions immediately.
         // Safe to call only when the GPU is idle.
         void FlushAllDeletionQueues();

@@ -90,7 +90,10 @@ export namespace Graphics::Passes
         RHI::ComputePipeline* m_CullPipeline = nullptr; // owned by PipelineLibrary
 
         // Stage 1: SSBO pull-model.
-        static constexpr uint32_t FRAMES = 2;
+        // CRITICAL: must match VulkanDevice::MAX_FRAMES_IN_FLIGHT (3) exactly.
+        // Previously this was 2, which caused frame slot 2 to alias slot 0 while
+        // slot 0 was still in flight — the root cause of all descriptor/buffer hazards.
+        static constexpr uint32_t FRAMES = RHI::VulkanDevice::GetFramesInFlight();
         std::unique_ptr<RHI::VulkanBuffer> m_InstanceBuffer[FRAMES];
         std::unique_ptr<RHI::VulkanBuffer> m_Stage1VisibilityBuffer[FRAMES];
 
@@ -98,7 +101,7 @@ export namespace Graphics::Passes
         std::unique_ptr<RHI::VulkanBuffer> m_VisibilityBuffer[FRAMES];
 
         // Cache the instance descriptor set per frame (updated each frame).
-        VkDescriptorSet m_InstanceSet[FRAMES] = {VK_NULL_HANDLE, VK_NULL_HANDLE};
+        VkDescriptorSet m_InstanceSet[FRAMES] = {};
 
         // Stage 3: compute culling.
         VkDescriptorSetLayout m_CullSetLayout = VK_NULL_HANDLE;
@@ -126,8 +129,12 @@ export namespace Graphics::Passes
         std::unique_ptr<RHI::VulkanBuffer> m_Stage3IndirectPacked[FRAMES];
         std::unique_ptr<RHI::VulkanBuffer> m_Stage3DrawCountsPacked[FRAMES];
 
-        uint32_t m_Stage3LastGeometryCount = 0;
-        uint32_t m_Stage3LastMaxDrawsPerGeometry = 0;
+        // Per-frame-slot tracking: each slot independently records the geometry count and
+        // maxDrawsPerGeometry it was built with so that reallocation is triggered on any change,
+        // not only on growth. Using a single shared value caused stale-buffer flicker when
+        // loading additional meshes (new slot allocated at new size, other slots not updated).
+        uint32_t m_Stage3LastGeometryCount[FRAMES]        = {};
+        uint32_t m_Stage3LastMaxDrawsPerGeometry[FRAMES]  = {};
 
         // Stage 1: allocate per-frame descriptor sets freshly (do not cache across frames).
         VkDescriptorSetLayout m_InstanceSetLayout = VK_NULL_HANDLE;
