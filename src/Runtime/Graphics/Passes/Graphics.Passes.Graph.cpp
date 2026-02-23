@@ -2,6 +2,7 @@ module;
 
 #include <cstdint>
 #include <glm/glm.hpp>
+#include <entt/entity/entity.hpp>
 
 module Graphics:Passes.Graph.Impl;
 
@@ -30,12 +31,12 @@ namespace Graphics::Passes
     void GraphRenderPass::AddPasses(RenderPassContext& ctx)
     {
         auto& registry = ctx.Scene.GetRegistry();
-        auto graphView = registry.view<ECS::GraphRenderer::Component>();
+        auto graphView = registry.view<const ECS::GraphRenderer::Component>();
 
-        for (auto [entity, graph] : graphView.each())
+        graphView.each([&](const entt::entity entity, const ECS::GraphRenderer::Component& graph)
         {
             if (!graph.Visible || graph.NodePositions.empty())
-                continue;
+                return;
 
             // Fetch world transform (identity if not present).
             glm::mat4 worldMatrix(1.0f);
@@ -97,7 +98,7 @@ namespace Graphics::Passes
                         ctx.DebugDrawPtr->Line(a, b, edgeColor);
                 }
             }
-        }
+        });
     }
 
 } // namespace Graphics::Passes
