@@ -40,6 +40,15 @@ A **"Distinguished Scientist" grade** geometry kernel in `src/Runtime/Geometry/`
 - Euler operations: `EdgeCollapse` (Dey-Edelsbrunner link condition), `EdgeFlip`, `EdgeSplit`.
 - Arbitrary polygon support: `AddTriangle`, `AddQuad`, `AddFace(span<VertexHandle>)`.
 - Property system with typed per-element storage and garbage collection.
+- **Attribute propagation contract (PMP-style):**
+  - Topology edits (`Split` / `Collapse`) preserve *typed* per-vertex properties when you opt-in via
+    `Halfedge::Mesh::SetVertexAttributeTransferRules()`.
+  - For each property name (e.g. `"v:texcoord"`, `"v:color"`) you can choose a policy:
+    `Average` (interpolate), `KeepA`, `KeepB`, or `None`.
+  - This is the engine-side equivalent of PMP's “property lifecycle” and is required if you want
+    dependent attributes (texcoords/colors/weights, etc.) to remain valid after remeshing or
+    simplification.
+
 
 **Graph Processing Operators:**
 - **kNN Graph Builders:** `Geometry::Graph::BuildKNNGraph()` (Octree-accelerated neighbor discovery, exact kNN) and `Geometry::Graph::BuildKNNGraphFromIndices()` (manual graph assembly from precomputed kNN index lists) both support Union/Mutual connectivity and epsilon-based coincident-point rejection for degenerate robustness.

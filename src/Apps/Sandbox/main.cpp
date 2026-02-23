@@ -24,6 +24,7 @@ import Core.Assets;
 import Core.FrameGraph;
 import Core.FeatureRegistry;
 import Core.Hash;
+import Core.Input;
 import Graphics;
 import Geometry;
 import ECS;

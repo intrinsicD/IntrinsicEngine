@@ -82,8 +82,19 @@ namespace Core::Input
         }
 
         // Key state transitions (for IsKeyJustPressed).
+        // IMPORTANT: GLFW key space is sparse. Calling glfwGetKey() with unsupported
+        // key values triggers GLFW_ERROR_INVALID_VALUE (65539) spam.
+        // We track only the valid GLFW key range and leave the rest at 0.
         m_PrevKeys = m_CurrKeys;
-        for (int k = 0; k < kMaxTrackedKeys; ++k)
+        m_CurrKeys.fill(0);
+
+        constexpr int kFirstGlfwKey = GLFW_KEY_SPACE; // first printable key
+        constexpr int kLastGlfwKey = GLFW_KEY_LAST;   // last supported key
+
+        static_assert(kLastGlfwKey < kMaxTrackedKeys,
+            "kMaxTrackedKeys must cover GLFW_KEY_LAST for cached key transitions");
+
+        for (int k = kFirstGlfwKey; k <= kLastGlfwKey; ++k)
         {
             const int state = glfwGetKey((GLFWwindow*)m_WindowHandle, k);
             m_CurrKeys[k] = static_cast<uint8_t>(state == GLFW_PRESS || state == GLFW_REPEAT);

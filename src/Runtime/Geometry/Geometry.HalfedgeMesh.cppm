@@ -183,6 +183,48 @@ export namespace Geometry::Halfedge
 
         [[nodiscard]] bool HasGarbage() const noexcept { return m_HasGarbage; }
 
+        // -----------------------------------------------------------------
+        // Property system access (PMP-style)
+        // -----------------------------------------------------------------
+        // Our topology operators (Split/Collapse) can optionally propagate
+        // user-defined vertex properties. This matches the PMP design where
+        // connectivity edits live in the mesh core, while attribute policies
+        // are configured by the caller.
+
+        [[nodiscard]] Vertices& VertexProperties() noexcept { return m_Vertices; }
+        [[nodiscard]] const Vertices& VertexProperties() const noexcept { return m_Vertices; }
+
+        // -----------------------------------------------------------------
+        // Attribute propagation policies for topology edits
+        // -----------------------------------------------------------------
+        struct VertexAttributeTransfer
+        {
+            // Name of the vertex property in the registry (e.g. "v:tex", "v:color").
+            std::string Name;
+
+            enum class Policy : std::uint8_t
+            {
+                // New vertex value = (a + b) / 2, Collapse survivor value = (a + b) / 2.
+                Average,
+
+                // New vertex value = a, Collapse survivor value = a.
+                KeepA,
+
+                // New vertex value = b, Collapse survivor value = b.
+                KeepB,
+
+                // Do not modify the property at all.
+                None,
+            } Rule{Policy::Average};
+        };
+
+        // Configure which vertex properties are propagated by subsequent
+        // Split/Collapse calls.
+        void SetVertexAttributeTransferRules(std::span<const VertexAttributeTransfer> rules);
+
+        // Clears any configured transfer rules (Split/Collapse will only affect topology + v:point).
+        void ClearVertexAttributeTransferRules();
+
     private:
         void EnsureProperties();
         void AdjustOutgoingHalfedge(VertexHandle v);
@@ -222,5 +264,12 @@ export namespace Geometry::Halfedge
         std::vector<bool> m_AddFaceIsNew;
         std::vector<bool> m_AddFaceNeedsAdjust;
         NextCache m_AddFaceNextCache;
+
+        // Cached transfer rules.
+        std::vector<VertexAttributeTransfer> m_VertexAttrTransfer;
+
+        // Helpers used by Split/Collapse.
+        void TransferVertexAttributes_OnSplit(VertexHandle va, VertexHandle vb, VertexHandle vm);
+        void TransferVertexAttributes_OnCollapse(VertexHandle va, VertexHandle vb, VertexHandle vSurvivor);
     };
 }
