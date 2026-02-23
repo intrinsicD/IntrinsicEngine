@@ -91,6 +91,7 @@ namespace Core::Windowing
         m_Window = glfwWindow;
         m_IsValid = true;
         m_InputContext.Initialize(m_Window);
+        m_Data.InputCtx = &m_InputContext;
 
         // Store a pointer to our data struct inside the GLFW window so callbacks can find it
         glfwSetWindowUserPointer(glfwWindow, &m_Data);
@@ -151,6 +152,10 @@ namespace Core::Windowing
         {
             ImGui_ImplGlfw_ScrollCallback(window, xoffset, yoffset);
             WindowData& data = *static_cast<WindowData*>(glfwGetWindowUserPointer(window));
+            if (data.InputCtx)
+            {
+                data.InputCtx->AccumulateScroll(static_cast<float>(xoffset), static_cast<float>(yoffset));
+            }
             if (data.Callback)
             {
                 data.Callback(ScrollEvent{xoffset, yoffset});

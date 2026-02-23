@@ -52,6 +52,14 @@ export namespace Graphics
         float Sensitivity = 0.2f;
         float Distance = 5.0f;
 
+        // WASD panning speed (world units per second).
+        float PanSpeed = 3.0f;
+
+        // Scroll zoom parameters.
+        float ZoomSpeed = 1.0f;
+        float MinDistance = 0.1f;
+        float MaxDistance = 500.0f;
+
         double LastX = 0.0;
         double LastY = 0.0;
         bool FirstMouse = true;

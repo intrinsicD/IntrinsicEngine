@@ -117,6 +117,7 @@ export namespace Core::Windowing
             int FramebufferWidth;
             int FramebufferHeight;
             EventCallbackFn Callback;
+            Input::Context* InputCtx = nullptr;
         };
 
         WindowData m_Data;

@@ -13,6 +13,7 @@ namespace Core::Input
         // Initialize cached state to current GLFW values to avoid a false 'just pressed' on frame 0.
         Update();
         m_PrevMouse = m_CurrMouse;
+        m_PrevKeys = m_CurrKeys;
     }
 
     bool Context::IsKeyPressed(int keycode) const
@@ -20,6 +21,13 @@ namespace Core::Input
         if (!m_WindowHandle) return false;
         int state = glfwGetKey((GLFWwindow*)m_WindowHandle, keycode);
         return state == GLFW_PRESS || state == GLFW_REPEAT;
+    }
+
+    bool Context::IsKeyJustPressed(int keycode) const
+    {
+        if (!m_WindowHandle) return false;
+        if (keycode < 0 || keycode >= kMaxTrackedKeys) return false;
+        return (m_CurrKeys[keycode] != 0) && (m_PrevKeys[keycode] == 0);
     }
 
     bool Context::IsMouseButtonPressed(int button) const
@@ -44,15 +52,41 @@ namespace Core::Input
         return {static_cast<float>(x), static_cast<float>(y)};
     }
 
+    glm::vec2 Context::GetScrollDelta() const
+    {
+        return {m_FrameScrollX, m_FrameScrollY};
+    }
+
+    void Context::AccumulateScroll(float xOffset, float yOffset)
+    {
+        m_ScrollAccumX += xOffset;
+        m_ScrollAccumY += yOffset;
+    }
+
     void Context::Update()
     {
         if (!m_WindowHandle) return;
 
+        // Latch scroll delta for this frame, then reset accumulator.
+        m_FrameScrollX = m_ScrollAccumX;
+        m_FrameScrollY = m_ScrollAccumY;
+        m_ScrollAccumX = 0.0f;
+        m_ScrollAccumY = 0.0f;
+
+        // Mouse button transitions.
         m_PrevMouse = m_CurrMouse;
         for (int b = 0; b < kMouseButtons; ++b)
         {
             const int state = glfwGetMouseButton((GLFWwindow*)m_WindowHandle, b);
             m_CurrMouse[b] = static_cast<uint8_t>(state == GLFW_PRESS);
+        }
+
+        // Key state transitions (for IsKeyJustPressed).
+        m_PrevKeys = m_CurrKeys;
+        for (int k = 0; k < kMaxTrackedKeys; ++k)
+        {
+            const int state = glfwGetKey((GLFWwindow*)m_WindowHandle, k);
+            m_CurrKeys[k] = static_cast<uint8_t>(state == GLFW_PRESS || state == GLFW_REPEAT);
         }
     }
 }
