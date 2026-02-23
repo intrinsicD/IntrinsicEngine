@@ -445,6 +445,48 @@ public:
             {
                 Graphics::OnResize(*cameraComponent, m_Window->GetWindowWidth(), m_Window->GetWindowHeight());
             }
+
+            // --- F Key: Focus camera on selected model ---
+            if (!uiCapturesKeyboard && m_Window->GetInput().IsKeyJustPressed(Core::Input::Key::F))
+            {
+                if (auto* orbit = GetScene().GetRegistry().try_get<Graphics::OrbitControlComponent>(m_CameraEntity))
+                {
+                    const entt::entity selected = GetSelection().GetSelectedEntity(GetScene());
+                    if (selected != entt::null && GetScene().GetRegistry().valid(selected))
+                    {
+                        auto* collider = GetScene().GetRegistry().try_get<ECS::MeshCollider::Component>(selected);
+                        if (collider && collider->CollisionRef)
+                        {
+                            // Use the world-space OBB center as the new orbit target.
+                            orbit->Target = collider->WorldOBB.Center;
+
+                            // Compute an orbit distance that fits the object in view.
+                            float radius = glm::length(collider->WorldOBB.Extents);
+                            if (radius < 0.001f) radius = 1.0f;
+                            float halfFov = glm::radians(cameraComponent->Fov) * 0.5f;
+                            float fitDistance = radius / glm::tan(halfFov);
+                            orbit->Distance = fitDistance * 1.5f; // Add margin.
+
+                            // Reposition camera while preserving current viewing direction.
+                            glm::vec3 viewDir = glm::normalize(cameraComponent->Position - orbit->Target);
+                            cameraComponent->Position = orbit->Target + viewDir * orbit->Distance;
+                        }
+                    }
+                }
+            }
+
+            // --- R Key: Reset camera to defaults ---
+            if (!uiCapturesKeyboard && m_Window->GetInput().IsKeyJustPressed(Core::Input::Key::R))
+            {
+                if (auto* orbit = GetScene().GetRegistry().try_get<Graphics::OrbitControlComponent>(m_CameraEntity))
+                {
+                    // Restore orbit and camera to their struct-default values.
+                    orbit->Target = glm::vec3(0.0f);
+                    orbit->Distance = 5.0f;
+                    cameraComponent->Position = glm::vec3(0.0f, 0.0f, 4.0f);
+                    cameraComponent->Orientation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+                }
+            }
         }
 
         {

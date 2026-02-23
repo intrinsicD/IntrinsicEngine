@@ -85,17 +85,15 @@ namespace Graphics
     void OnUpdate(CameraComponent& camera,
         OrbitControlComponent& orbitControlComponent,
         const Core::Input::Context &inputContext,
-        float, bool disableInput)
+        float dt, bool disableInput)
     {
         if (disableInput) return;
 
         using namespace Core::Input;
 
-        // Zoom logic (Simple W/S for distance for now, mouse scroll later)
-        // Recalculate distance based on current position to stay in sync
         glm::vec3 offset = camera.Position - orbitControlComponent.Target;
 
-        // Handle Rotation
+        // --- 1. Handle Rotation (LMB drag) ---
         if (inputContext.IsMouseButtonPressed(0)) // Left Click
         {
             glm::vec2 pos = inputContext.GetMousePosition();
@@ -110,23 +108,13 @@ namespace Graphics
             float xDelta = static_cast<float>(pos.x - orbitControlComponent.LastX) * orbitControlComponent.Sensitivity;
             float yDelta = static_cast<float>(pos.y - orbitControlComponent.LastY) * orbitControlComponent.Sensitivity;
 
-            // --- Trackball Logic ---
-            // 1. Get Camera Basis Vectors
             glm::vec3 camRight = camera.GetRight();
             glm::vec3 camUp = camera.GetUp();
 
-            // 2. Create rotation quaternions
-            // World Up for stability, OR camUp for free-tumble
-            // For "continuous in any direction" like PMP, usually we rotate around Screen Axes (CamUp/CamRight).
-            // Let's use CamUp to allow tumbling over the pole cleanly.
             glm::quat yawRot = glm::angleAxis(glm::radians(-xDelta), camUp);
-
             glm::quat pitchRot = glm::angleAxis(glm::radians(-yDelta), camRight);
-
-            // 3. Combine rotations (Pitch then Yaw is standard for trackball feel)
             glm::quat rotation = yawRot * pitchRot;
 
-            // 4. Apply rotation to offset and orientation
             offset = rotation * offset;
             camera.Orientation = glm::normalize(rotation * camera.Orientation);
 
@@ -138,8 +126,51 @@ namespace Graphics
             orbitControlComponent.FirstMouse = true;
         }
 
-        // Apply Zoom/Movement (Optional: Add wheel support here in future)
-        // Just ensure position is updated based on Target + Rotated Offset
+        // --- 2. Scroll Zoom ---
+        glm::vec2 scroll = inputContext.GetScrollDelta();
+        if (scroll.y != 0.0f)
+        {
+            float currentDist = glm::length(offset);
+            // Proportional zoom: zoom amount scales with current distance for natural feel.
+            float zoomAmount = scroll.y * orbitControlComponent.ZoomSpeed * currentDist * 0.1f;
+            float newDist = currentDist - zoomAmount;
+            newDist = glm::clamp(newDist, orbitControlComponent.MinDistance, orbitControlComponent.MaxDistance);
+
+            if (currentDist > 0.0001f)
+            {
+                offset = glm::normalize(offset) * newDist;
+            }
+            orbitControlComponent.Distance = newDist;
+        }
+
+        // --- 3. WASD Panning (moves both target and camera) ---
+        {
+            float velocity = orbitControlComponent.PanSpeed * dt;
+            if (inputContext.IsKeyPressed(Key::LeftShift)) velocity *= 2.5f;
+
+            // Project camera forward onto the horizontal plane for W/S movement.
+            glm::vec3 forward = camera.GetForward();
+            glm::vec3 horizontalForward = glm::normalize(glm::vec3(forward.x, 0.0f, forward.z));
+            // If camera is looking straight down/up, use the camera's up projected instead.
+            if (glm::length(glm::vec3(forward.x, 0.0f, forward.z)) < 0.001f)
+            {
+                glm::vec3 up = camera.GetUp();
+                horizontalForward = glm::normalize(glm::vec3(up.x, 0.0f, up.z));
+            }
+
+            glm::vec3 right = camera.GetRight();
+            glm::vec3 horizontalRight = glm::normalize(glm::vec3(right.x, 0.0f, right.z));
+
+            glm::vec3 panDelta{0.0f};
+            if (inputContext.IsKeyPressed(Key::W)) panDelta += horizontalForward * velocity;
+            if (inputContext.IsKeyPressed(Key::S)) panDelta -= horizontalForward * velocity;
+            if (inputContext.IsKeyPressed(Key::D)) panDelta += horizontalRight * velocity;
+            if (inputContext.IsKeyPressed(Key::A)) panDelta -= horizontalRight * velocity;
+
+            orbitControlComponent.Target += panDelta;
+        }
+
+        // --- 4. Update camera position from target + rotated offset ---
         camera.Position = orbitControlComponent.Target + offset;
     }
 }
