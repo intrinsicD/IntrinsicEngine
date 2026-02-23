@@ -264,8 +264,10 @@ namespace Graphics
     {
         m_RenderGraph.Reset();
 
-        // DebugDraw is transient per-frame. Clear before any features submit.
-        m_DebugDraw->Reset();
+        // DebugDraw is transient per-frame and is reset by Engine::Run via
+        // RenderOrchestrator::ResetFrameState() before client OnUpdate emits lines.
+        // Do NOT clear here or we erase client-submitted debug lines (bounds/octree/kdtree)
+        // right before pipeline passes consume them.
 
         const uint32_t frameIndex = m_Presentation.GetFrameIndex();
         const uint32_t imageIndex = m_Presentation.GetImageIndex();

@@ -115,9 +115,14 @@ namespace Runtime
             ? Selection::PickMode::Toggle
             : Selection::PickMode::Replace;
 
-        // 0) Hover highlight: update every frame via CPU raycast.
-        //    We always use CPU for hover since it's latency-insensitive visual feedback.
-        if (camera != nullptr && !uiCapturesMouse)
+        // 0) Hover highlight.
+        // IMPORTANT: CPU hover raycasts are O(total_triangle_count) and can dominate frame time
+        // on larger meshes. We therefore keep continuous hover picking only on CPU backend
+        // (where clicks are already CPU raycasts anyway). On GPU backend we skip per-frame CPU
+        // hover to avoid scaling render cost with model complexity.
+        const bool doCpuHover = (m_Config.Backend == Selection::PickBackend::CPU);
+
+        if (doCpuHover && camera != nullptr && !uiCapturesMouse)
         {
             const uint32_t winW = static_cast<uint32_t>(window.GetWindowWidth());
             const uint32_t winH = static_cast<uint32_t>(window.GetWindowHeight());
@@ -139,7 +144,7 @@ namespace Runtime
         }
         else
         {
-            // UI captures mouse or no camera: clear hover.
+            // UI captures mouse/no camera, or hover raycast disabled for current backend.
             Selection::ApplyHover(scene, entt::null);
         }
 
@@ -199,4 +204,3 @@ namespace Runtime
         }
     }
 }
-
