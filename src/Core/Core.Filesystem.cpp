@@ -137,6 +137,33 @@ namespace Core::Filesystem
         // Normalize input like "shaders/foo.spv".
         const std::filesystem::path rel = relativePath;
 
+        // Absolute path passthrough.
+        if (rel.is_absolute() && std::filesystem::exists(rel))
+            return rel.string();
+
+        // 0) Try relative to executable location first.
+        // This keeps runtime robust even when IDE run configurations use an
+        // unexpected working directory.
+        {
+            const auto exe = GetExecutablePath();
+            const auto exeDir = exe.empty() ? std::filesystem::path{} : exe.parent_path();
+            if (!exeDir.empty())
+            {
+                const std::vector<std::filesystem::path> candidates = {
+                    exeDir / rel,
+                    exeDir.parent_path() / "bin" / rel,
+                    exeDir.parent_path() / rel,
+                    exeDir.parent_path().parent_path() / "bin" / rel,
+                };
+
+                for (const auto& c : candidates)
+                {
+                    if (std::filesystem::exists(c))
+                        return c.string();
+                }
+            }
+        }
+
         // 1) Try as-given relative to CWD.
         if (std::filesystem::exists(rel))
         {
