@@ -121,8 +121,8 @@ export namespace Graphics::Passes
         std::unique_ptr<RHI::VulkanBuffer> m_Stage3GeometryIndexCount[FRAMES];
 
         // Geometry routing table: maps GeometryHandle.Index -> dense geometry id for this frame.
+        // Resized per-frame via needsResize() — no shared capacity scalar (see packed buffers pattern).
         std::unique_ptr<RHI::VulkanBuffer> m_Stage3HandleToDense[FRAMES];
-        uint32_t m_Stage3HandleToDenseCapacity = 0;
 
         // Packed outputs (device-local): [GeometryCount * MaxDrawsPerGeometry]
         std::unique_ptr<RHI::VulkanBuffer> m_Stage3VisibilityPacked[FRAMES];

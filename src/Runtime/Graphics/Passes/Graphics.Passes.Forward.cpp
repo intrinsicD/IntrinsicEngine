@@ -234,14 +234,21 @@ namespace Graphics::Passes
         const uint32_t requiredMapCount = static_cast<uint32_t>(handleToDense.size());
         const size_t requiredMapBytes = std::max<size_t>(size_t(requiredMapCount) * sizeof(uint32_t), GPUSceneConstants::kMinSSBOSize);
 
-        // Upload mapping buffer (CPU->GPU)
-        if (!m_Stage3HandleToDense[frame] || m_Stage3HandleToDenseCapacity < requiredMapCount)
+        // Allocate / resize per-frame buffers.
+        // Each frame slot's buffer is checked independently against the required size.
+        // A shared capacity scalar would only resize the current frame's buffer; other
+        // in-flight frames would keep stale smaller buffers, causing overflow and flicker.
+        const auto needsResize = [](const std::unique_ptr<RHI::VulkanBuffer>& buf, size_t requiredBytes) -> bool
         {
-            m_Stage3HandleToDenseCapacity = std::max(m_Stage3HandleToDenseCapacity, requiredMapCount);
-            const size_t bytes = std::max<size_t>(size_t(m_Stage3HandleToDenseCapacity) * sizeof(uint32_t), GPUSceneConstants::kMinSSBOSize);
+            return !buf || buf->GetSizeBytes() < requiredBytes;
+        };
+
+        // Upload mapping buffer (CPU->GPU)
+        if (needsResize(m_Stage3HandleToDense[frame], requiredMapBytes))
+        {
             m_Stage3HandleToDense[frame] = std::make_unique<RHI::VulkanBuffer>(
                 *m_Device,
-                bytes,
+                requiredMapBytes,
                 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                 VMA_MEMORY_USAGE_CPU_TO_GPU);
         }
@@ -256,12 +263,6 @@ namespace Graphics::Passes
         const size_t packedCapacity = static_cast<size_t>(geometryCount) * static_cast<size_t>(maxDrawsPerGeometry);
         const size_t packedIndirectBytes = std::max<size_t>(packedCapacity * sizeof(VkDrawIndexedIndirectCommand), GPUSceneConstants::kMinSSBOSize);
         const size_t packedVisibilityBytes = std::max<size_t>(packedCapacity * sizeof(uint32_t), GPUSceneConstants::kMinSSBOSize);
-
-        // Allocate / resize per-frame buffers.
-        const auto needsResize = [](const std::unique_ptr<RHI::VulkanBuffer>& buf, size_t requiredBytes) -> bool
-        {
-            return !buf || buf->GetSizeBytes() < requiredBytes;
-        };
 
         if (needsResize(m_Stage3GeometryIndexCount[frame], geoIndexCountBytes))
         {
