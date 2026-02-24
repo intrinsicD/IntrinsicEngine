@@ -1,43 +1,69 @@
 # --- SHADER COMPILATION LOGIC ---
+# This file provides a helper to compile GLSL -> SPIR-V and wire it as a build dependency.
+# Usage:
+#   include(cmake/CompileShaders.cmake)
+#   intrinsic_add_glsl_shaders(<target> [SOURCE_DIR <dir>] [OUTPUT_DIR <dir>])
+
 find_program(GLSL_COMPILER glslc)
-if (NOT GLSL_COMPILER)
-    message(WARNING "glslc not found! Shaders will not compile.")
-else ()
-    set(SHADER_SOURCE_DIR "${CMAKE_SOURCE_DIR}/assets/shaders")
-    set(SHADER_BINARY_DIR "${CMAKE_BINARY_DIR}/bin/shaders")
 
-    file(MAKE_DIRECTORY ${SHADER_BINARY_DIR})
+function(intrinsic_add_glsl_shaders target_name)
+    if (NOT GLSL_COMPILER)
+        message(WARNING "glslc not found! '${target_name}' shaders will not compile.")
+        return()
+    endif()
 
-    # Define shaders
-    set(SHADERS
-            triangle.vert
-            triangle.frag
-            pick_id.vert
-            pick_id.frag
-            debug_view.vert
-            debug_view.frag
-            debug_view.comp
-            selection_outline.frag
-            line.vert
-            line.frag
-            point.vert
-            point.frag
-            instance_cull.comp
-            instance_cull_multigeo.comp
-            scene_update.comp
+    set(options)
+    set(oneValueArgs SOURCE_DIR OUTPUT_DIR)
+    set(multiValueArgs)
+    cmake_parse_arguments(ARG "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+
+    if (NOT ARG_SOURCE_DIR)
+        set(ARG_SOURCE_DIR "${CMAKE_SOURCE_DIR}/assets/shaders")
+    endif()
+
+    # Prefer compiling directly into the runtime output dir so 'Run Sandbox' always sees current SPV.
+    # Works well for single-config generators (Ninja). Multi-config can override by passing OUTPUT_DIR.
+    if (NOT ARG_OUTPUT_DIR)
+        set(ARG_OUTPUT_DIR "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/shaders")
+    endif()
+
+    file(MAKE_DIRECTORY "${ARG_OUTPUT_DIR}")
+
+    # Discover shaders. CONFIGURE_DEPENDS makes CMake re-scan on build if files are added/removed.
+    file(GLOB_RECURSE _INTRINSIC_GLSL
+        CONFIGURE_DEPENDS
+        "${ARG_SOURCE_DIR}/*.vert"
+        "${ARG_SOURCE_DIR}/*.frag"
+        "${ARG_SOURCE_DIR}/*.comp"
     )
 
-    foreach (SHADER ${SHADERS})
-        add_custom_command(
-                OUTPUT ${SHADER_BINARY_DIR}/${SHADER}.spv
-                COMMAND ${GLSL_COMPILER} ${SHADER_SOURCE_DIR}/${SHADER} -o ${SHADER_BINARY_DIR}/${SHADER}.spv --target-env=vulkan1.3
-                DEPENDS ${SHADER_SOURCE_DIR}/${SHADER}
-                COMMENT "Compiling ${SHADER}"
-        )
-        list(APPEND SPV_SHADERS ${SHADER_BINARY_DIR}/${SHADER}.spv)
-    endforeach ()
+    if (NOT _INTRINSIC_GLSL)
+        message(WARNING "No shaders found under '${ARG_SOURCE_DIR}'.")
+        return()
+    endif()
 
-    # Ensure shaders are built before the app
-    add_custom_target(Shaders ALL DEPENDS ${SPV_SHADERS})
-    add_dependencies(${target_name} Shaders)
-endif ()
+    set(_spv_outputs "")
+    foreach(_src IN LISTS _INTRINSIC_GLSL)
+        file(RELATIVE_PATH _rel "${ARG_SOURCE_DIR}" "${_src}")
+        # Preserve subfolders and add .spv suffix (e.g. foo/bar.comp -> foo/bar.comp.spv)
+        set(_out "${ARG_OUTPUT_DIR}/${_rel}.spv")
+        get_filename_component(_out_dir "${_out}" DIRECTORY)
+        file(MAKE_DIRECTORY "${_out_dir}")
+
+        add_custom_command(
+            OUTPUT "${_out}"
+            COMMAND "${GLSL_COMPILER}" "${_src}" -o "${_out}" --target-env=vulkan1.3
+            DEPENDS "${_src}"
+            COMMENT "Compiling GLSL -> SPV: ${_rel}"
+            VERBATIM
+        )
+
+        list(APPEND _spv_outputs "${_out}")
+    endforeach()
+
+    set(_shader_target "${target_name}_Shaders")
+    add_custom_target(${_shader_target} DEPENDS ${_spv_outputs})
+    add_dependencies(${target_name} ${_shader_target})
+
+    set_property(TARGET ${_shader_target} PROPERTY FOLDER "Shaders")
+endfunction()

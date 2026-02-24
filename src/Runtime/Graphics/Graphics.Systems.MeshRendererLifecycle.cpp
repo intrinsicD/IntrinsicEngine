@@ -119,7 +119,18 @@ namespace Graphics::Systems::MeshRendererLifecycle
                                        const bool visible)
             {
                 if (!handle.IsValid())
+                {
+                    // Handle was cleared (e.g. mode switch from FlatDisc to Surfel):
+                    // deactivate and free the orphaned GPU scene slot.
+                    if (slot != ECS::MeshRenderer::Component::kInvalidSlot)
+                    {
+                        GpuInstanceData inst{};
+                        gpuScene.QueueUpdate(slot, inst, /*sphere*/ {0.0f, 0.0f, 0.0f, 0.0f});
+                        gpuScene.FreeSlot(slot);
+                        slot = ECS::MeshRenderer::Component::kInvalidSlot;
+                    }
                     return;
+                }
 
                 GeometryGpuData* geo = geometryStorage.GetUnchecked(handle);
                 if (!geo || geo->GetIndexCount() == 0 || !geo->GetIndexBuffer() || !geo->GetVertexBuffer())

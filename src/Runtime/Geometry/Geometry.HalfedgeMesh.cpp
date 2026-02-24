@@ -887,11 +887,6 @@ namespace Geometry::Halfedge
 
         if (commonCount != expected) return false;
 
-        // Additional check: don't collapse if it would make the mesh degenerate
-        // (e.g., both endpoints are boundary but the edge is interior)
-        if (IsBoundary(v0) && IsBoundary(v1) && !isBoundaryEdge)
-            return false;
-
         return true;
     }
 
@@ -1136,7 +1131,7 @@ namespace Geometry::Halfedge
         VertexHandle vc = ToVertex(h0n);       // opposite vertex in f0
         VertexHandle vd = ToVertex(h1n);       // opposite vertex in f1
 
-        // Update the flipped edge endpoints: h0 becomes c → d, h1 becomes d → c
+        // Update the flipped edge endpoints: h0 becomes c→d, h1 becomes d→c
         SetVertex(h0, vd);   // h0 now points to d
         SetVertex(h1, vc);   // h1 now points to c
 
@@ -1164,7 +1159,6 @@ namespace Geometry::Halfedge
         // Before flip:
         //   f0: h0 (a→b), h0n (b→c), h0p (c→a)
         //   f1: h1 (b→a), h1n (a→d), h1p (d→b)
-        //
         // After flip, edge becomes (c,d):
         //   h0: c → d
         //   h1: d → c
@@ -1194,17 +1188,17 @@ namespace Geometry::Halfedge
         //   f0: h1p, h0, h0n... no.
         //
         // Let me just go step by step.
-        // We have 6 halfedges: h0, h0n, h0p, h1, h1n, h1p
+        // We have 6 halfedges: h0, h0n, h0p, h1, h1n, h1p.
         // Before:
         //   f0: h0→h0n→h0p→h0
         //   f1: h1→h1n→h1p→h1
         // After flip: h0 = c→d, h1 = d→c
-        //   f0 = (a, c, d): h0p(c→a)→h1n(a→d)→h0(... wait, h0 is c→d not d→c)
+        //   f0 = (a, c, d): h0(c→d)→h1n(a→d)→h0(... wait, h0 is c→d, not d→c)
         //   No. f0 = (c, d, a): h0(c→d)→?(d→a)→h0p(... h0p was c→a, but we need a→c)
         //
         // I think the cleaner approach is:
-        //   f0 = {h0, h1p, h0p} with next chain: h0→h1p→h0p→h0
-        //   f1 = {h1, h0n, h1n} with next chain: h1→h0n→h1n→h1
+        //   f0 = {h0, h1p, h0n} with next chain: h0→h1p→h0n→h0
+        //   f1 = {h1, h0p, h1n} with next chain: h1→h0n→h1n→h1
         //   This gives:
         //     f0: c→d (h0), d→(h1p.to)=b → wrong, we want d→a
         //

@@ -15,6 +15,7 @@ import :Passes.PointCloud;
 import :DebugDraw;
 import :Geometry;
 import ECS;
+import Core.Logging;
 
 namespace Graphics::Passes
 {
@@ -57,20 +58,43 @@ namespace Graphics::Passes
                 continue;
 
             const bool hasGpuWire  = vis.WireframeView.IsValid();
-            const bool hasGpuVerts = vis.VertexView.IsValid();
+            // GPU vertex view is only valid for FlatDisc: ForwardPass renders point-list with no
+            // splat shading. Surfel/EWA/GaussianSplat must use the CPU PointCloudRenderPass path.
+            const bool gpuVertexPathValid =
+                vis.VertexView.IsValid() &&
+                (vis.VertexRenderMode == Geometry::PointCloud::RenderMode::FlatDisc);
+            const bool hasGpuVerts = gpuVertexPathValid;
 
-            // If GPU views exist for both requested modes, skip the CPU path entirely.
-            {
-                const bool needsCpuWire  = vis.ShowWireframe && !hasGpuWire;
-                const bool needsCpuVerts = vis.ShowVertices  && !hasGpuVerts;
-                if (!needsCpuWire && !needsCpuVerts)
-                    continue;
-            }
+            const bool needsCpuWire  = vis.ShowWireframe && !hasGpuWire  && canDrawLines;
+            const bool needsCpuVerts = vis.ShowVertices  && !hasGpuVerts && canDrawPoints;
 
-            // CPU path requires collision mesh data (positions + indices).
+            if (!needsCpuWire && !needsCpuVerts)
+                continue;
+
+            // Both CPU paths source positions from the collision mesh (CPU-resident copy).
+            // NOTE: Flat Disc mode never reaches here — it uses the GPU vertex view via ForwardPass.
+            // Surfel/EWA/Gaussian reach here because their GPU vertex view is intentionally cleared.
+            // An entity without a MeshCollider (no collision ref) cannot provide CPU positions for
+            // any of these paths; skip it with a one-time warning so the user knows why it's silent.
             auto* collider = registry.try_get<ECS::MeshCollider::Component>(entity);
             if (!collider || !collider->CollisionRef)
+            {
+                if (needsCpuVerts)
+                {
+                    static bool s_Warned = false;
+                    if (!s_Warned)
+                    {
+                        s_Warned = true;
+                        Core::Log::Warn(
+                            "MeshRenderPass: entity {} has ShowVertices=true with mode={} but no "
+                            "MeshCollider — surfel/EWA/Gaussian modes require CPU positions from "
+                            "the collision mesh. Attach a MeshCollider to enable splat rendering.",
+                            static_cast<uint32_t>(entity),
+                            static_cast<uint32_t>(vis.VertexRenderMode));
+                    }
+                }
                 continue;
+            }
 
             const auto& positions = collider->CollisionRef->Positions;
             const auto& indices   = collider->CollisionRef->Indices;
@@ -90,8 +114,7 @@ namespace Graphics::Passes
             // ------------------------------------------------------------------
             // Wireframe: extract unique edges → DebugDraw → LineRenderPass
             // ------------------------------------------------------------------
-            const bool doCpuWireframe = vis.ShowWireframe && !hasGpuWire && canDrawLines;
-            if (doCpuWireframe && !indices.empty())
+            if (needsCpuWire && !indices.empty())
             {
                 // Build edge cache lazily (invalidated by EdgeCacheDirty flag).
                 if (vis.EdgeCacheDirty)
@@ -156,8 +179,7 @@ namespace Graphics::Passes
             // ------------------------------------------------------------------
             // Vertices: submit positions to PointCloudRenderPass
             // ------------------------------------------------------------------
-            const bool doCpuVertices = vis.ShowVertices && !hasGpuVerts && canDrawPoints;
-            if (doCpuVertices)
+            if (needsCpuVerts)
             {
                 const bool wantsAligned =
                     (vis.VertexRenderMode == Geometry::PointCloud::RenderMode::Surfel) ||

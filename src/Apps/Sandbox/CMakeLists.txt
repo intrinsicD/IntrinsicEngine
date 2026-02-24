@@ -13,3 +13,6 @@ target_link_libraries(${target_name}
 )
 
 include(${CMAKE_SOURCE_DIR}/cmake/CompileShaders.cmake)
+
+# Ensure shaders are always compiled before building/running Sandbox.
+intrinsic_add_glsl_shaders(${target_name})

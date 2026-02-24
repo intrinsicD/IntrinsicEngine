@@ -149,9 +149,14 @@ export namespace Graphics::Passes
         // Global camera layout (set 0) — borrowed.
         VkDescriptorSetLayout m_GlobalSetLayout = VK_NULL_HANDLE;
 
-        // Per-frame descriptor sets.
+        // Per-frame descriptor sets (legacy — back-compat staging bucket).
         static constexpr uint32_t FRAMES = RHI::VulkanDevice::GetFramesInFlight();
         VkDescriptorSet m_PointDescSets[FRAMES] = {};
+
+        // Per-mode per-frame descriptor sets (0..3).
+        // Each mode gets its own descriptor set so multiple modes can coexist
+        // in the same frame without overwriting each other's SSBO binding.
+        VkDescriptorSet m_PointDescSetsByMode[4][FRAMES] = {};
 
         // Per-frame host-visible SSBOs.
         std::unique_ptr<RHI::VulkanBuffer> m_PointBuffers[FRAMES];
@@ -182,6 +187,7 @@ export namespace Graphics::Passes
         // Record draw commands.
         void RecordDraw(VkCommandBuffer cmd, VkDescriptorSet pointSet,
                         VkDescriptorSet globalSet, uint32_t dynamicOffset,
-                        VkExtent2D extent, uint32_t pointCount);
+                        VkExtent2D extent, uint32_t pointCount,
+                        Geometry::PointCloud::RenderMode mode);
     };
 }

@@ -59,6 +59,7 @@ export namespace ECS::MeshCollider
 //   0 = Flat disc (screen-aligned billboard, constant pixel radius)
 //   1 = Surfel (oriented disc from surface normal, with lighting)
 //   2 = EWA splatting (perspective-correct Gaussian elliptical splats)
+//   3 = Gaussian Splat (isotropic Gaussian blob, smooth opacity falloff)
 
 export namespace ECS::PointCloudRenderer
 {
@@ -79,9 +80,9 @@ export namespace ECS::PointCloudRenderer
 
         // ---- Queries ----
         [[nodiscard]] std::size_t PointCount() const noexcept { return Positions.size(); }
-        [[nodiscard]] bool HasNormals() const noexcept { return Normals.size() == Positions.size(); }
-        [[nodiscard]] bool HasColors() const noexcept { return Colors.size() == Positions.size(); }
-        [[nodiscard]] bool HasRadii() const noexcept { return Radii.size() == Positions.size(); }
+        [[nodiscard]] bool HasNormals() const noexcept { return !Normals.empty() && Normals.size() == Positions.size(); }
+        [[nodiscard]] bool HasColors() const noexcept { return !Colors.empty() && Colors.size() == Positions.size(); }
+        [[nodiscard]] bool HasRadii() const noexcept { return !Radii.empty() && Radii.size() == Positions.size(); }
     };
 }
 

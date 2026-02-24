@@ -65,9 +65,9 @@ export namespace Geometry::PointCloud
 
         [[nodiscard]] std::size_t Size() const noexcept { return Positions.size(); }
         [[nodiscard]] bool        Empty() const noexcept { return Positions.empty(); }
-        [[nodiscard]] bool        HasNormals() const noexcept { return Normals.size() == Positions.size(); }
-        [[nodiscard]] bool        HasColors() const noexcept { return Colors.size() == Positions.size(); }
-        [[nodiscard]] bool        HasRadii() const noexcept { return Radii.size() == Positions.size(); }
+        [[nodiscard]] bool        HasNormals() const noexcept { return !Normals.empty() && Normals.size() == Positions.size(); }
+        [[nodiscard]] bool        HasColors() const noexcept { return !Colors.empty() && Colors.size() == Positions.size(); }
+        [[nodiscard]] bool        HasRadii() const noexcept { return !Radii.empty() && Radii.size() == Positions.size(); }
 
         // Validate internal consistency (sizes match).
         [[nodiscard]] bool IsValid() const noexcept
