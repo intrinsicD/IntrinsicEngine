@@ -18,16 +18,6 @@ This document tracks **what's left to do** in IntrinsicEngine's architecture.
 
 ## 1. Open TODOs (What's left)
 
-### ~~1.1 Pre-existing Build Environment Issues~~ — RESOLVED (Clang 20)
-
-The following Clang 18 issues are resolved by the upgrade to Clang 20 as the minimum compiler:
-
-- ~~**Clang 18 `__cpp_concepts` mismatch:**~~ Clang 20 reports the correct value. `CMakeLists.txt` workaround removed.
-- ~~**C++20 module partition visibility:**~~ Clang 20 handles transitive imports correctly. Redundant `import` statements in partition implementations (e.g., `RHI.Device.cpp`) remain as defensive practice but are no longer required.
-- ~~**Clang 18 lambda noexcept deduction:**~~ Clang 20 correctly deduces nothrow-movability. `Core::InplaceFunction` strict `is_nothrow_move_constructible` static_assert restored.
-
----
-
 ## 2. Feature Roadmap
 
 ### 2.1 Rendering Modes
@@ -157,25 +147,6 @@ The following Clang 18 issues are resolved by the upgrade to Clang 20 as the min
 ---
 
 ### 2.2 Selection & Interaction
-
-#### ~~2.2.1 Selection Visual Feedback (Contour Highlight)~~ — DONE
-
-**Implementation:** Post-process outline rendering via `SelectionOutlinePass` (`Graphics.Passes.SelectionOutline.cppm/.cpp`).
-
-- **Approach:** Fullscreen fragment shader reads the PickID buffer (R32_UINT, written by `PickingPass`), samples 8 neighbors at configurable radius, edge-detects selection/hover boundaries, and alpha-blends outlines onto the backbuffer.
-- **Selection outline:** Orange (1.0, 0.6, 0.0) solid outline for entities with `SelectedTag`.
-- **Hover highlight:** Light blue (0.3, 0.7, 1.0) semi-transparent outline for entity with `HoveredTag`.
-- **Configurable:** Outline color, hover color, and width passed via push constants. Supports up to 16 simultaneously selected entities.
-- **Pipeline integration:** Runs as step 3 in `DefaultPipeline::RebuildPath()` (after Forward, before DebugView/ImGui). Gated by `FeatureRegistry` (`"SelectionOutlinePass"_id`). Descriptor set updated via `PostCompile()` after `RenderGraph::Compile()`.
-- **New files:** `selection_outline.frag` shader, `Graphics.Passes.SelectionOutline.cppm/.cpp`.
-- **RHI addition:** `PipelineBuilder::EnableAlphaBlending()` for standard src-alpha/one-minus-src-alpha blending.
-
-**Remaining enhancements (future work):**
-- **Animation:** Pulsing outline via time-based alpha modulation.
-- **JFA-based distance field:** For smoother, glow-style outlines at arbitrary widths (current approach uses discrete neighbor sampling).
-- **Per-entity outline color:** Via per-entity SSBO instead of push constants (for more than 16 selections or custom colors).
-
----
 
 #### 2.2.2 Sub-Entity Selection (Vertex, Edge, Face, Region)
 
@@ -427,23 +398,12 @@ Sub-entity select → Geometry processing (interactive operator input)
 #### Phase 0 — Architecture & Plumbing
 *Everything else plugs into these. Build them first and every subsequent feature snaps in cleanly.*
 
-~~1. **Extension architecture / FeatureRegistry (§2.4 Tier 1)** — DONE.~~ `Core::FeatureRegistry` (`Core.FeatureRegistry.cppm/.cpp`) provides type-erased registration by category (RenderFeature, GeometryOperator, Panel, System) with factory-based instance creation, enable/disable, and query APIs. 27 dedicated tests in `IntrinsicCoreTests`.
-
-~~1. **Data I/O (§2.7)**~~ — DONE (Phase 0).
-   `Core.IOBackend` (`Core.IOBackend.cppm/.cpp`) provides `IIOBackend` interface with `FileIOBackend`. `Graphics:IORegistry` (`Graphics.IORegistry.cppm/.cpp`) provides `IORegistry` with `IAssetLoader`/`IAssetExporter` and `RegisterBuiltinLoaders()`. Five I/O-agnostic importer partitions (OBJ, PLY, XYZ, TGF, GLTF) under `Importers/`. `ModelLoader` new overload routes through the registry. `Engine` owns and wires the subsystem. 21 tests in `IntrinsicTests`. Remaining formats (STL, OFF, PCD, LAS/LAZ, FBX, image, splat) and export pipeline are incremental.
-
 2. **Post-processing pipeline (§2.1.4)**
    *Depends on: nothing (rendering infrastructure). Depended on by: shadow mapping, transparency, mesh rendering modes, point cloud blending.*
    The HDR intermediate render target and the post-pass chain (tone mapping at minimum). Currently the forward pass writes directly to the swapchain — every rendering feature added later assumes an HDR intermediate exists. Establish the plumbing now; individual effects (SSAO, bloom) can be added incrementally alongside other work.
 
-~~3. **Line rendering + DebugDraw API (§2.1.2 infrastructure + §2.3 API)** — DONE.~~ `DebugDraw` (`Graphics.DebugDraw.cppm/.cpp`) provides an immediate-mode CPU-side accumulator with depth-tested and overlay line lists. API: `Line()`, `Box()`, `WireBox()`, `Sphere()`, `Circle()`, `Arrow()`, `Axes()`, `Frustum()`, `Grid()`, `Cross` plus overlay variants. `LineRenderPass` (`Graphics.Passes.Line.cppm/.cpp`) implements `IRenderFeature` with screen-space thick-line expansion in the vertex shader (no geometry shader) — each segment becomes a 6-vertex quad via SSBO. Two pipeline variants: depth-tested (`VK_COMPARE_OP_LESS_OR_EQUAL`, no depth write) and overlay (depth test disabled). Per-frame SSBOs with power-of-2 growth. Anti-aliased edges via smoothstep in fragment shader. Integrated into `DefaultPipeline` (step 4, after SelectionOutline, before DebugView). `RenderOrchestrator` owns `DebugDraw` lifetime, threaded via `RenderSystem` → `RenderPassContext` → `LineRenderPass`. 32 tests in `IntrinsicTests`.
-
----
-
 #### Phase 1 — Core UX
 *Make the engine usable for interactive work. Without these, it's a viewer, not a tool.*
-
-~~5. **Selection visual feedback / contour highlight (§2.2.1)** — DONE.~~ `SelectionOutlinePass` (`Graphics.Passes.SelectionOutline.cppm/.cpp`) provides post-process outline rendering for selected and hovered entities. Reads PickID buffer, edge-detects boundaries, alpha-blends configurable outlines onto backbuffer. Supports up to 16 simultaneous selections. `PipelineBuilder::EnableAlphaBlending()` added to RHI.
 
 6. **Transform gizmos (§2.2.3)**
    *Depends on: line rendering (Phase 0). Depended on by: nothing directly, but every editing workflow uses them.*
@@ -529,7 +489,6 @@ Sub-entity select → Geometry processing (interactive operator input)
 
 #### Ongoing (Carried forward from existing roadmap)
 - **Port-based testing boundaries** — type-erased "port" interfaces for filesystem, windowing, and time so subsystems can be tested without Vulkan. (See §4.1.) Implement opportunistically as new subsystems are added.
-- ~~**Migrate `std::function` hot paths to `Core::InplaceFunction`**~~ — **DONE.** `Graphics::RenderStage::ExecuteFn` (`Graphics.RenderPath.cppm`) and `RHI::VulkanDevice` deferred deletion queues (`RHI.Device.cppm`) now use `Core::InplaceFunction`. `std::function` remains only in cold paths (UI callbacks, asset loading, startup config) per policy. The strict `is_nothrow_move_constructible` static_assert is restored now that Clang 20 is the minimum compiler.
 - **Shader hot-reload (§2.4 Tier 2)** — file-watcher integration for automatic recompilation on save. Implement alongside mesh rendering modes (Phase 2) for fast shader iteration.
 
 ---
@@ -551,31 +510,3 @@ Sub-entity select → Geometry processing (interactive operator input)
 - Use **ports/adapters** (pure virtual or type-erased) for boundary dependencies: filesystem, file watching, OS window/surface creation, time, telemetry sinks, etc.
 
 **Testing model:** instantiate concrete subsystems with fake ports (test doubles) rather than making the whole engine "virtual".
-
----
-
-### ~~4.2 `std::function` in hot loops~~ — RESOLVED
-
-**Answer:** **Ban `std::function` in hot loops.** Three alternatives are standardized:
-
-1. **Thunk + context pointer**: `{ void(*Fn)(void*), void* Ctx }` — already used in FrameGraph.
-2. ~~**`Core::InplaceFunction`**~~ — **DONE.** `Core.InplaceFunction.cppm` provides a move-only, zero-heap, small-buffer owning callable (`InplaceFunction<R(Args...), BufferSize>`). Default 64-byte buffer. 46 dedicated tests in `IntrinsicCoreTests`. **Migration complete:** `Graphics::RenderStage::ExecuteFn` and `RHI::VulkanDevice` deferred deletion queues now use `InplaceFunction`.
-3. **Arena-backed closures** — allocate capture payload out of `ScopeStack` / per-frame arena and store only thunk+ctx.
-
-**Policy:** `std::function` is acceptable in cold paths (editor UI, startup config, tooling) but not in per-frame/per-entity loops.
-
----
-
-### ~~4.3 FrameGraph vs RenderGraph: shared algorithm extracted~~ — DONE
-
-Removed (see Git history). `Core::DAGScheduler` extracts the shared scheduling algorithm; both FrameGraph and RenderGraph delegate to it. 18 dedicated tests.
-
----
-
-### ~~4.4 Clang 18 vtable emission failure with module partitions~~ — RESOLVED (Clang 20)
-
-**Status:** Resolved. The `Sandbox` target links successfully with Clang 20.
-
-**What was the problem:** Clang 18 did not reliably emit vtables when a polymorphic class was declared in a module partition interface (`.cppm`) and its virtual methods were defined in a separate partition implementation (`.cpp`). This caused `undefined reference to 'vtable for ...'` linker errors for `DefaultPipeline`, `ForwardPass`, `PickingPass`, `SelectionOutlinePass`, and `DebugViewPass`.
-
-**Resolution:** Upgraded minimum compiler to Clang 20, which correctly handles vtable emission across module partition boundaries. Existing vtable anchor patterns (out-of-line destructors in `Graphics.Pipelines.cppm` and `Graphics.IORegistry.cpp`) are retained as defensive practice.

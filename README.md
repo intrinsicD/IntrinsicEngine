@@ -117,6 +117,12 @@ Drag-and-drop file loading with automatic format detection via `IORegistry`. Exp
 
 ---
 
+## Architecture Backlog
+
+For the current, living list of *remaining* architectural work, see `ARCHITECTURE_ANALYSIS.md`. Completed milestones are intentionally removed from that document to keep it focused (Git history is the source of truth for what used to be on the list).
+
+---
+
 ## Build Requirements
 
 - **Compiler:** Clang 20+ (C++23 modules)
