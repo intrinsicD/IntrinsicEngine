@@ -204,6 +204,20 @@ Implementation notes:
   **Mitigation:** generational ids and debug-mode poison checks.
 
 
+### C. Duplication follow-ups (from latest duplicate-code hunt)
+
+- [ ] **Consolidate PLY importer parsing paths (High).**
+  - `Graphics.ModelLoader` and `Graphics.Importers.PLY` still contain overlapping token/type/property parsing logic.
+  - Action: extract a shared `Graphics::Importers::PLYCommon` utility partition for scalar-type decoding and vertex-property extraction helpers.
+
+- [ ] **Extract shared face-iteration traversal helpers for geometry operators (Medium).**
+  - Curvature, mesh-quality, parameterization, and simplification modules repeat near-identical `HalfedgeHandle h0/h1/h2` traversal + per-face metric accumulation loops.
+  - Action: add reusable traversal kernels in `Geometry:MeshUtils` (face walk + robust degenerate guards) and call them from operator modules.
+
+- [x] **Deduplicate remeshing valence equalization and tangential smoothing passes (Completed).**
+  - `Geometry.Remeshing` and `Geometry.AdaptiveRemeshing` now share `MeshUtils::EqualizeValenceByEdgeFlip(...)` and `MeshUtils::TangentialSmooth(...)`.
+  - Follow-up: keep future robustness/perf updates in the shared helpers only.
+
 ## 2. Related Documents
 
 - `ROADMAP.md` — feature roadmap, prioritization phases, and long-horizon planning details.

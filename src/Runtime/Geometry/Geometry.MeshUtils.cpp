@@ -234,4 +234,104 @@ namespace Geometry::MeshUtils
     {
         return mesh.IsBoundary(v) ? 4 : 6;
     }
+
+    std::size_t EqualizeValenceByEdgeFlip(Halfedge::Mesh& mesh, bool preserveBoundary)
+    {
+        std::size_t flipCount = 0;
+
+        for (std::size_t ei = 0; ei < mesh.EdgesSize(); ++ei)
+        {
+            EdgeHandle e{static_cast<PropertyIndex>(ei)};
+            if (mesh.IsDeleted(e) || mesh.IsBoundary(e))
+                continue;
+
+            if (!mesh.IsFlipOk(e))
+                continue;
+
+            HalfedgeHandle h0{static_cast<PropertyIndex>(2u * ei)};
+            HalfedgeHandle h1 = mesh.OppositeHalfedge(h0);
+
+            VertexHandle a = mesh.FromVertex(h0);
+            VertexHandle b = mesh.ToVertex(h0);
+            VertexHandle c = mesh.ToVertex(mesh.NextHalfedge(h0));
+            VertexHandle d = mesh.ToVertex(mesh.NextHalfedge(h1));
+
+            if (preserveBoundary)
+            {
+                if (mesh.IsBoundary(a) || mesh.IsBoundary(b) ||
+                    mesh.IsBoundary(c) || mesh.IsBoundary(d))
+                    continue;
+            }
+
+            auto valenceError = [&](VertexHandle v, int delta) -> int {
+                int val = static_cast<int>(mesh.Valence(v)) + delta;
+                return std::abs(val - TargetValence(mesh, v));
+            };
+
+            int devBefore = valenceError(a, 0) + valenceError(b, 0) +
+                            valenceError(c, 0) + valenceError(d, 0);
+            int devAfter = valenceError(a, -1) + valenceError(b, -1) +
+                           valenceError(c, +1) + valenceError(d, +1);
+
+            if (devAfter < devBefore)
+            {
+                (void)mesh.Flip(e);
+                ++flipCount;
+            }
+        }
+
+        return flipCount;
+    }
+
+    void TangentialSmooth(Halfedge::Mesh& mesh, double lambda, bool preserveBoundary)
+    {
+        const std::size_t nV = mesh.VerticesSize();
+        std::vector<glm::vec3> newPositions(nV);
+
+        for (std::size_t vi = 0; vi < nV; ++vi)
+        {
+            VertexHandle vh{static_cast<PropertyIndex>(vi)};
+            if (mesh.IsDeleted(vh) || mesh.IsIsolated(vh) ||
+                (preserveBoundary && mesh.IsBoundary(vh)))
+            {
+                newPositions[vi] = mesh.Position(vh);
+                continue;
+            }
+
+            const glm::vec3 p = mesh.Position(vh);
+            glm::vec3 centroid(0.0f);
+            std::size_t count = 0;
+
+            HalfedgeHandle hStart = mesh.Halfedge(vh);
+            HalfedgeHandle h = hStart;
+            std::size_t safety = 0;
+            do
+            {
+                centroid += mesh.Position(mesh.ToVertex(h));
+                ++count;
+                h = mesh.CWRotatedHalfedge(h);
+                if (++safety > 100) break;
+            } while (h != hStart);
+
+            if (count == 0)
+            {
+                newPositions[vi] = p;
+                continue;
+            }
+
+            centroid /= static_cast<float>(count);
+            glm::vec3 displacement = centroid - p;
+            glm::vec3 n = VertexNormal(mesh, vh);
+            glm::vec3 tangential = displacement - glm::dot(displacement, n) * n;
+            newPositions[vi] = p + static_cast<float>(lambda) * tangential;
+        }
+
+        for (std::size_t vi = 0; vi < nV; ++vi)
+        {
+            VertexHandle vh{static_cast<PropertyIndex>(vi)};
+            if (mesh.IsDeleted(vh) || mesh.IsIsolated(vh))
+                continue;
+            mesh.Position(vh) = newPositions[vi];
+        }
+    }
 }
