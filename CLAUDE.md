@@ -117,6 +117,16 @@ ninja -C build IntrinsicTests
 - **Build the Sandbox target.** The `Sandbox` vtable link failure from Clang 18 (§4.4 in TODO.md) is resolved with Clang 20.
 - **Keep building through the session.** Long compile times are expected for C++23 modules on first build (~2-5 min). Incremental rebuilds after editing a single file are fast (~5-15s). Do not abandon a session because a build takes time — use `--parallel $(nproc)` and wait.
 
+## Architecture Docs Sync Contract
+
+When architecture state changes, keep the three architecture markdown documents synchronized in the same change:
+
+- **`TODO.md`** — open, actionable backlog items only (no long DONE narratives).
+- **`ROADMAP.md`** — medium/long-horizon feature planning and phase ordering.
+- **`DONE.md`** — completed architecture work summaries and historical rationale.
+
+Update these files proactively whenever an architecture task is completed, re-scoped, or moved between backlog and roadmap/history so documentation stays automatically current with implementation progress.
+
 ---
 
 ## Continuous Self-Evaluation
