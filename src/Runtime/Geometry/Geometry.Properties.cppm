@@ -17,17 +17,20 @@ export module Geometry:Properties;
 
 export namespace Geometry
 {
+    /// Stable identifier for a property storage inside a registry.
     using PropertyId = size_t;
 
     class PropertyRegistry;
 
     namespace Internal
     {
+        /// Type tag used for runtime type checks across erased property storages.
         using TypeID = std::uintptr_t;
 
         template <typename T>
         struct TypeInfo
         {
+            /// Returns a per-type unique identifier without RTTI.
             static TypeID ID()
             {
                 // The address of this static variable is unique per type T
@@ -36,6 +39,7 @@ export namespace Geometry
             }
         };
 
+        /// Erased storage interface for property arrays.
         class PropertyStorageBase
         {
         public:
@@ -45,15 +49,23 @@ export namespace Geometry
             PropertyStorageBase(const PropertyStorageBase&) = delete;
             PropertyStorageBase& operator=(const PropertyStorageBase&) = delete;
 
+            /// Clones the concrete storage and its data.
             [[nodiscard]] virtual std::unique_ptr<PropertyStorageBase> Clone() const = 0;
 
+            /// Property name used for lookup and debugging.
             [[nodiscard]] virtual std::string_view Name() const = 0;
+            /// Reserve capacity for n elements.
             virtual void Reserve(size_t n) = 0;
+            /// Resize to n elements, filling with the default value.
             virtual void Resize(size_t n) = 0;
+            /// Reduce capacity to fit current size.
             virtual void ShrinkToFit() = 0;
+            /// Append one element initialized to the default value.
             virtual void PushBack() = 0;
+            /// Swap two elements in the storage.
             virtual void Swap(size_t i0, size_t i1) = 0;
 
+            /// Returns the erased runtime type id for this storage.
             [[nodiscard]] virtual TypeID Type() const noexcept = 0;
         };
 
@@ -61,6 +73,7 @@ export namespace Geometry
         class PropertyStorage final : public PropertyStorageBase
         {
         public:
+            /// Creates typed storage with a name and a default element value.
             PropertyStorage(std::string name, T defaultValue)
                 : PropertyStorageBase(), m_Name(std::move(name)), m_Data(), m_Default(std::move(defaultValue))
             {
@@ -121,6 +134,7 @@ export namespace Geometry
     template <class T>
     class ConstPropertyBuffer;
 
+    /// Registry of named, typed property arrays sharing a common element count.
     class PropertyRegistry
     {
     public:
@@ -132,14 +146,20 @@ export namespace Geometry
         PropertyRegistry& operator=(const PropertyRegistry& other);
         PropertyRegistry& operator=(PropertyRegistry&&) noexcept = default;
 
+        /// Number of elements in each property array.
         [[nodiscard]] size_t Size() const noexcept { return m_Size; }
+        /// Count of property storages (including different types).
         [[nodiscard]] size_t PropertyCount() const noexcept { return m_Storages.size(); }
 
+        /// Returns the names of all properties in insertion order.
         [[nodiscard]] std::vector<std::string> PropertyNames() const;
 
+        /// Clears all properties and their data.
         inline void Clear() { m_Storages.clear(); }
+        /// Reserves storage slots for property arrays.
         inline void Reserve(size_t n) { m_Storages.reserve(n); }
 
+        /// Resizes all properties to n elements, filling with defaults.
         void Resize(size_t n)
         {
             m_Size = n;
@@ -147,20 +167,25 @@ export namespace Geometry
                 if (storage) storage->Resize(n);
         }
 
+        /// Shrinks all property storages to fit.
         void ShrinkToFit() { for (auto& storage : m_Storages) if (storage) storage->ShrinkToFit(); }
+        /// Appends one element to each property storage.
         void PushBack() { for (auto& storage : m_Storages) if (storage) storage->PushBack(); }
 
+        /// Swaps element i0 and i1 across all property arrays.
         void Swap(size_t i0, size_t i1)
         {
             for (auto& storage : m_Storages)
                 if (storage) storage->Swap(i0, i1);
         }
 
+        /// Returns true if a property with this name exists.
         [[nodiscard]] bool Contains(std::string_view name) const
         {
             return Find(name).has_value();
         }
 
+        /// Finds a property by name; returns nullopt if not found.
         [[nodiscard]] std::optional<PropertyId> Find(std::string_view name) const
         {
             for (size_t i = 0; i < m_Storages.size(); ++i)
@@ -170,27 +195,35 @@ export namespace Geometry
             return std::nullopt;
         }
 
+        /// Adds a new property; returns nullopt if the name already exists.
         template <class T>
         [[nodiscard]] std::optional<PropertyBuffer<T>> Add(std::string name, T m_Defaultvalue = T());
 
+        /// Gets a mutable property by name; nullopt if name/type mismatch.
         template <class T>
         [[nodiscard]] std::optional<PropertyBuffer<T>> Get(std::string_view name);
 
+        /// Gets a const property by name; nullopt if name/type mismatch.
         template <class T>
         [[nodiscard]] std::optional<ConstPropertyBuffer<T>> Get(std::string_view name) const;
 
+        /// Gets a mutable property by id; nullopt if id/type mismatch.
         template <class T>
         [[nodiscard]] std::optional<PropertyBuffer<T>> Get(PropertyId id);
 
+        /// Gets a const property by id; nullopt if id/type mismatch.
         template <class T>
         [[nodiscard]] std::optional<ConstPropertyBuffer<T>> Get(PropertyId id) const;
 
+        /// Gets or creates a property by name.
         template <class T>
         [[nodiscard]] PropertyBuffer<T> GetOrAdd(std::string name, T m_Defaultvalue = T());
 
+        /// Removes a property using its buffer handle.
         template <class T>
         bool Remove(PropertyBuffer<T>& handle);
 
+        /// Removes a property by id.
         bool Remove(PropertyId id);
 
     private:
@@ -214,28 +247,34 @@ export namespace Geometry
         size_t m_Size{0};
     };
 
+    /// Mutable view onto a typed property storage.
     template <class T>
     class PropertyBuffer
     {
     public:
         PropertyBuffer() = default;
 
+        /// Returns the underlying property id.
         [[nodiscard]] PropertyId Id() const noexcept { return m_Id; }
 
+        /// Returns the property name; asserts if invalid.
         [[nodiscard]] const std::string& Name() const noexcept
         {
             assert(m_Storage != nullptr);
             return m_Storage->Name();
         }
 
+        /// True if this buffer refers to a valid storage.
         [[nodiscard]] explicit operator bool() const noexcept { return m_Storage != nullptr; }
 
+        /// Direct access to the backing vector; asserts if invalid.
         [[nodiscard]] std::vector<T>& Vector() const noexcept
         {
             assert(m_Storage != nullptr);
             return m_Storage->Data();
         }
 
+        /// Element access; asserts if invalid or index out of range.
         [[nodiscard]] decltype(auto) operator[](size_t index) const
         {
             assert(m_Storage != nullptr);
@@ -243,24 +282,28 @@ export namespace Geometry
             return m_Storage->Data()[index];
         }
 
+        /// Returns a read-only span (unsupported for vector<bool>).
         [[nodiscard]] std::span<const T> Span() const noexcept requires (!std::is_same_v<T, bool>)
         {
             assert(m_Storage != nullptr);
             return std::span<T>(m_Storage->Data());
         }
 
+        /// Returns a mutable span (unsupported for vector<bool>).
         [[nodiscard]] std::span<T> Span() noexcept requires (!std::is_same_v<T, bool>)
         {
             assert(m_Storage != nullptr);
             return std::span<T>(m_Storage->Data());
         }
 
+        /// Returns raw data pointer (unsupported for vector<bool>).
         [[nodiscard]] const T* Data() const noexcept requires (!std::is_same_v<T, bool>)
         {
             assert(m_Storage != nullptr);
             return m_Storage->Data().data();
         }
 
+        /// Clears the handle so it no longer refers to storage.
         void Reset() noexcept
         {
             m_Storage = nullptr;
@@ -278,28 +321,34 @@ export namespace Geometry
         PropertyId m_Id{static_cast<PropertyId>(-1)};
     };
 
+    /// Const view onto a typed property storage.
     template <class T>
     class ConstPropertyBuffer
     {
     public:
         ConstPropertyBuffer() = default;
 
+        /// Returns the underlying property id.
         [[nodiscard]] PropertyId Id() const noexcept { return m_Id; }
 
+        /// Returns the property name; asserts if invalid.
         [[nodiscard]] const std::string& Name() const noexcept
         {
             assert(m_Storage != nullptr);
             return m_Storage->Name();
         }
 
+        /// True if this buffer refers to a valid storage.
         [[nodiscard]] explicit operator bool() const noexcept { return m_Storage != nullptr; }
 
+        /// Direct access to the backing vector; asserts if invalid.
         [[nodiscard]] const std::vector<T>& Vector() const noexcept
         {
             assert(m_Storage != nullptr);
             return m_Storage->Data();
         }
 
+        /// Element access; asserts if invalid or index out of range.
         [[nodiscard]] decltype(auto) operator[](size_t index) const
         {
             assert(m_Storage != nullptr);
@@ -307,12 +356,14 @@ export namespace Geometry
             return m_Storage->Data()[index];
         }
 
+        /// Returns a read-only span (unsupported for vector<bool>).
         [[nodiscard]] std::span<const T> Span() const noexcept requires (!std::is_same_v<T, bool>)
         {
             assert(m_Storage != nullptr);
             return std::span<const T>(m_Storage->Data());
         }
 
+        /// Returns raw data pointer (unsupported for vector<bool>).
         [[nodiscard]] const T* Data() const noexcept requires (!std::is_same_v<T, bool>)
         {
             assert(m_Storage != nullptr);
@@ -432,6 +483,7 @@ export namespace Geometry
         return Remove(id);
     }
 
+    /// Value-semantic wrapper around PropertyBuffer.
     template <class T>
     class Property
     {
@@ -442,32 +494,41 @@ export namespace Geometry
         {
         }
 
+        /// Returns true when this property refers to a valid storage.
         [[nodiscard]] bool IsValid() const noexcept { return static_cast<bool>(m_Buffer); }
         explicit operator bool() const noexcept { return static_cast<bool>(m_Buffer); }
 
+        /// Property name (asserts if invalid).
         [[nodiscard]] const std::string& Name() const { return m_Buffer.Name(); }
 
+        /// Element access (asserts on invalid/out-of-range).
         [[nodiscard]] decltype(auto) operator[](size_t index) const { return m_Buffer[index]; }
         [[nodiscard]] decltype(auto) operator[](size_t index) { return m_Buffer[index]; }
 
+        /// Backing storage access.
         [[nodiscard]] std::vector<T>& Vector() { return m_Buffer.Vector(); }
         [[nodiscard]] const std::vector<T>& Vector() const { return m_Buffer.Vector(); }
 
+        /// Alias for Vector().
         [[nodiscard]] std::vector<T>& Array() { return m_Buffer.Vector(); }
         [[nodiscard]] const std::vector<T>& Array() const { return m_Buffer.Vector(); }
 
+        /// Span view (unsupported for vector<bool>).
         [[nodiscard]] std::span<T> Span() { return m_Buffer.Span(); }
         [[nodiscard]] std::span<const T> Span() const { return m_Buffer.Span(); }
 
+        /// Access to the underlying handle.
         [[nodiscard]] PropertyBuffer<T>& Handle() noexcept { return m_Buffer; }
         [[nodiscard]] const PropertyBuffer<T>& Handle() const noexcept { return m_Buffer; }
 
+        /// Clears the handle so it no longer refers to storage.
         void Reset() noexcept { m_Buffer.Reset(); }
 
     private:
         PropertyBuffer<T> m_Buffer;
     };
 
+    /// Property wrapper that indexes by a handle type (e.g., VertexHandle).
     template <class HandleT, class T>
     class HandleProperty : public Property<T>
     {
@@ -478,6 +539,7 @@ export namespace Geometry
         {
         }
 
+        /// Access by handle index (asserts on invalid/out-of-range).
         [[nodiscard]] decltype(auto) operator[](HandleT handle) { return Property<T>::operator[](handle.Index); }
 
         [[nodiscard]] decltype(auto) operator[](HandleT handle) const
@@ -486,11 +548,13 @@ export namespace Geometry
         }
     };
 
+    /// Convenience wrapper for a PropertyRegistry.
     class PropertySet
     {
     public:
         PropertySet() = default;
 
+        /// Number of elements in each property array.
         [[nodiscard]] size_t Size() const noexcept { return m_Registry.Size(); }
 
         inline void Clear() { m_Registry.Clear(); }
@@ -503,18 +567,23 @@ export namespace Geometry
         [[nodiscard]] inline bool Exists(std::string_view name) const { return m_Registry.Contains(name); }
         [[nodiscard]] inline std::vector<std::string> Properties() const { return m_Registry.PropertyNames(); }
 
+        /// Adds a property; returns invalid Property on name collision.
         template <class T>
         [[nodiscard]] Property<T> Add(std::string name, T default_value = T());
 
+        /// Gets a property by name; returns invalid Property on mismatch.
         template <class T>
         [[nodiscard]] Property<T> Get(std::string_view name);
 
+        /// Const overload; forwards to mutable lookup.
         template <class T>
         [[nodiscard]] Property<T> Get(std::string_view name) const;
 
+        /// Gets or creates a property by name.
         template <class T>
         [[nodiscard]] Property<T> GetOrAdd(std::string name, T default_value = T());
 
+        /// Removes a property and resets the handle.
         template <class T>
         void Remove(Property<T>& property);
 
@@ -567,8 +636,10 @@ export namespace Geometry
 
     using PropertyIndex = std::uint32_t;
 
+    /// Sentinel index used to mark an invalid handle.
     constexpr PropertyIndex kInvalidIndex = std::numeric_limits<PropertyIndex>::max();
 
+    /// Lightweight index handle tagged by a type.
     template <typename Tag>
     struct Handle
     {
@@ -615,21 +686,27 @@ export namespace Geometry
     std::ostream& operator<<(std::ostream& os, FaceHandle f);
     std::ostream& operator<<(std::ostream& os, NodeHandle n);
 
+    /// Property indexed by VertexHandle.
     template <class T>
     using VertexProperty = HandleProperty<VertexHandle, T>;
 
+    /// Property indexed by HalfedgeHandle.
     template <class T>
     using HalfedgeProperty = HandleProperty<HalfedgeHandle, T>;
 
+    /// Property indexed by EdgeHandle.
     template <class T>
     using EdgeProperty = HandleProperty<EdgeHandle, T>;
 
+    /// Property indexed by FaceHandle.
     template <class T>
     using FaceProperty = HandleProperty<FaceHandle, T>;
 
+    /// Property indexed by NodeHandle.
     template <class T>
     using NodeProperty = HandleProperty<NodeHandle, T>;
 
+    /// Standard property sets for topology elements.
     using Vertices = PropertySet;
     using Halfedges = PropertySet;
     using Edges = PropertySet;

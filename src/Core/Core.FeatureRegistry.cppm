@@ -122,13 +122,13 @@ export namespace Core
         // ----- Query -----
 
         // Find feature info by ID. Returns nullptr if not found.
-        const FeatureInfo* Find(Hash::StringID id) const;
+        [[nodiscard]] const FeatureInfo* Find(Hash::StringID id) const;
 
         // Get all features in a category (ordered by registration order).
-        std::vector<const FeatureInfo*> GetByCategory(FeatureCategory category) const;
+        [[nodiscard]] std::vector<const FeatureInfo*> GetByCategory(FeatureCategory category) const;
 
         // Get only enabled features in a category.
-        std::vector<const FeatureInfo*> GetEnabled(FeatureCategory category) const;
+        [[nodiscard]] std::vector<const FeatureInfo*> GetEnabled(FeatureCategory category) const;
 
         // ----- Enable / Disable -----
 
@@ -136,13 +136,13 @@ export namespace Core
         bool SetEnabled(Hash::StringID id, bool enabled);
 
         // Returns false if not found or disabled.
-        bool IsEnabled(Hash::StringID id) const;
+        [[nodiscard]] bool IsEnabled(Hash::StringID id) const;
 
         // ----- Instance Creation -----
 
         // Create a new instance via factory. Caller owns the returned pointer.
         // Returns nullptr if ID not found or feature disabled.
-        void* CreateInstance(Hash::StringID id) const;
+        [[nodiscard]] void* CreateInstance(Hash::StringID id) const;
 
         // Destroy an instance previously created by CreateInstance.
         // No-op if id not found or instance is null.
@@ -150,8 +150,8 @@ export namespace Core
 
         // ----- Metadata -----
 
-        size_t Count() const;
-        size_t CountByCategory(FeatureCategory category) const;
+        [[nodiscard]] size_t Count() const;
+        [[nodiscard]] size_t CountByCategory(FeatureCategory category) const;
 
         // Clear all registrations.
         void Clear();
@@ -191,7 +191,7 @@ export namespace Core
 
         std::vector<Entry> m_Entries;
 
-        const Entry* FindEntry(Hash::StringID id) const;
+        [[nodiscard]] const Entry* FindEntry(Hash::StringID id) const;
         Entry* FindEntry(Hash::StringID id);
     };
 }

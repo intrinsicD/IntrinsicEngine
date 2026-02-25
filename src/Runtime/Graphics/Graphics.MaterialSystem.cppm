@@ -42,7 +42,7 @@ export namespace Graphics
         RHI::TextureSystem& m_TextureSystem;
         Core::Assets::AssetManager& m_AssetManager;
 
-        Core::ResourcePool<MaterialData, MaterialHandle> m_Pool;
+        Core::ResourcePool<MaterialData, MaterialHandle, 3> m_Pool;
 
         struct ListenerEntry
         {

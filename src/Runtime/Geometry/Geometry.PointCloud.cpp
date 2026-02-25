@@ -10,6 +10,7 @@ module;
 #include <random>
 #include <unordered_map>
 #include <vector>
+#include <span>
 
 #include <glm/glm.hpp>
 
@@ -22,6 +23,70 @@ import :Octree;
 namespace Geometry::PointCloud
 {
     // =========================================================================
+    // Cloud — construction
+    // =========================================================================
+
+    Cloud::Cloud()
+    {
+        // Allocate the mandatory position property up-front.
+        m_PPoint = VertexProperty<glm::vec3>(m_Points.Add<glm::vec3>("p:position", glm::vec3(0.f)));
+    }
+
+    void Cloud::Clear()
+    {
+        // Wipe all point data but keep the property slots alive.
+        m_Points.Clear();
+        // Re-initialise so the registry size resets to 0.
+        *this = Cloud();
+    }
+
+    VertexHandle Cloud::AddPoint(glm::vec3 position)
+    {
+        m_Points.PushBack();
+        const VertexHandle p = Handle(m_Points.Size() - 1u);
+        m_PPoint[p] = position;
+        return p;
+    }
+
+    void Cloud::EnableNormals(glm::vec3 defaultNormal)
+    {
+        if (!m_PNormal.IsValid())
+        {
+            m_PNormal = VertexProperty<glm::vec3>(
+                m_Points.GetOrAdd<glm::vec3>("p:normal", defaultNormal));
+        }
+    }
+
+    void Cloud::EnableColors(glm::vec4 defaultColor)
+    {
+        if (!m_PColor.IsValid())
+        {
+            m_PColor = VertexProperty<glm::vec4>(
+                m_Points.GetOrAdd<glm::vec4>("p:color", defaultColor));
+        }
+    }
+
+    void Cloud::EnableRadii(float defaultRadius)
+    {
+        if (!m_PRadius.IsValid())
+        {
+            m_PRadius = VertexProperty<float>(
+                m_Points.GetOrAdd<float>("p:radius", defaultRadius));
+        }
+    }
+
+    bool Cloud::IsValid() const noexcept
+    {
+        // Empty cloud is valid.
+        if (Empty()) return true;
+        // Optional properties must exactly cover all points when present.
+        if (HasNormals() && m_PNormal.Span().size() != Size()) return false;
+        if (HasColors()  && m_PColor.Span().size()  != Size()) return false;
+        if (HasRadii()   && m_PRadius.Span().size() != Size()) return false;
+        return true;
+    }
+
+    // =========================================================================
     // ComputeBoundingBox
     // =========================================================================
 
@@ -30,13 +95,14 @@ namespace Geometry::PointCloud
         if (cloud.Empty())
             return AABB{glm::vec3(0.0f), glm::vec3(0.0f)};
 
-        glm::vec3 mn = cloud.Positions[0];
-        glm::vec3 mx = cloud.Positions[0];
+        auto positions = cloud.Positions();
+        glm::vec3 mn = positions[0];
+        glm::vec3 mx = positions[0];
 
-        for (std::size_t i = 1; i < cloud.Positions.size(); ++i)
+        for (std::size_t i = 1; i < positions.size(); ++i)
         {
-            mn = glm::min(mn, cloud.Positions[i]);
-            mx = glm::max(mx, cloud.Positions[i]);
+            mn = glm::min(mn, positions[i]);
+            mx = glm::max(mx, positions[i]);
         }
 
         return AABB{mn, mx};
@@ -58,9 +124,11 @@ namespace Geometry::PointCloud
         stats.BoundingBox = ComputeBoundingBox(cloud);
         stats.BoundingBoxDiagonal = glm::length(stats.BoundingBox.Max - stats.BoundingBox.Min);
 
+        auto positions = cloud.Positions();
+
         // Centroid
         glm::vec3 sum(0.0f);
-        for (const auto& p : cloud.Positions)
+        for (const auto& p : positions)
             sum += p;
         stats.Centroid = sum / static_cast<float>(stats.PointCount);
 
@@ -75,8 +143,8 @@ namespace Geometry::PointCloud
 
         // Build octree for KNN queries.
         std::vector<AABB> pointAABBs;
-        pointAABBs.reserve(cloud.Positions.size());
-        for (const auto& p : cloud.Positions)
+        pointAABBs.reserve(positions.size());
+        for (const auto& p : positions)
             pointAABBs.emplace_back(AABB{p, p});
 
         Octree octree;
@@ -85,14 +153,12 @@ namespace Geometry::PointCloud
         policy.TightChildren = true;
 
         if (!octree.Build(std::move(pointAABBs), policy, params.OctreeMaxPerNode, params.OctreeMaxDepth))
-            return stats; // Octree build failed — return stats without spacing.
+            return stats;
 
-        // Sample points for spacing computation.
         std::size_t sampleCount = params.SpacingSampleCount;
         if (sampleCount == 0 || sampleCount > stats.PointCount)
             sampleCount = stats.PointCount;
 
-        // Stride-based sampling for deterministic coverage.
         const std::size_t stride = stats.PointCount / sampleCount;
 
         float spacingSum = 0.0f;
@@ -107,14 +173,13 @@ namespace Geometry::PointCloud
             if (idx >= stats.PointCount) break;
 
             knnIndices.clear();
-            octree.QueryKnn(cloud.Positions[idx], 2, knnIndices); // 2 = self + nearest
+            octree.QueryKnn(positions[idx], 2, knnIndices);
 
-            // Filter out self.
             float nearestDist = std::numeric_limits<float>::max();
             for (std::size_t ni : knnIndices)
             {
                 if (ni == idx) continue;
-                float d = glm::length(cloud.Positions[ni] - cloud.Positions[idx]);
+                float d = glm::length(positions[ni] - positions[idx]);
                 nearestDist = std::min(nearestDist, d);
             }
 
@@ -153,19 +218,14 @@ namespace Geometry::PointCloud
 
         const float invVoxel = 1.0f / params.VoxelSize;
 
-        // Hash function for voxel cell indices.
         struct CellHash
         {
             std::size_t operator()(const glm::ivec3& v) const noexcept
             {
-                // FNV-1a inspired mixing.
                 std::size_t h = 2166136261u;
-                h ^= static_cast<std::size_t>(v.x);
-                h *= 16777619u;
-                h ^= static_cast<std::size_t>(v.y);
-                h *= 16777619u;
-                h ^= static_cast<std::size_t>(v.z);
-                h *= 16777619u;
+                h ^= static_cast<std::size_t>(v.x); h *= 16777619u;
+                h ^= static_cast<std::size_t>(v.y); h *= 16777619u;
+                h ^= static_cast<std::size_t>(v.z); h *= 16777619u;
                 return h;
             }
         };
@@ -187,55 +247,58 @@ namespace Geometry::PointCloud
         };
 
         std::unordered_map<glm::ivec3, CellAccum, CellHash, CellEqual> cells;
-        cells.reserve(cloud.Size() / 4); // Heuristic reservation.
+        cells.reserve(cloud.Size() / 4);
 
-        const bool hasNormals = cloud.HasNormals() && params.PreserveNormals;
-        const bool hasColors  = cloud.HasColors() && params.PreserveColors;
-        const bool hasRadii   = cloud.HasRadii() && params.PreserveRadii;
+        const bool doNormals = cloud.HasNormals() && params.PreserveNormals;
+        const bool doColors  = cloud.HasColors()  && params.PreserveColors;
+        const bool doRadii   = cloud.HasRadii()   && params.PreserveRadii;
+
+        auto positions = cloud.Positions();
+        auto normals   = doNormals ? cloud.Normals() : std::span<const glm::vec3>{};
+        auto colors    = doColors  ? cloud.Colors()  : std::span<const glm::vec4>{};
+        auto radii     = doRadii   ? cloud.Radii()   : std::span<const float>{};
 
         for (std::size_t i = 0; i < cloud.Size(); ++i)
         {
-            const glm::vec3& p = cloud.Positions[i];
-            glm::ivec3 cell(
+            const glm::vec3& p = positions[i];
+            const glm::ivec3 cell(
                 static_cast<int>(std::floor(p.x * invVoxel)),
                 static_cast<int>(std::floor(p.y * invVoxel)),
                 static_cast<int>(std::floor(p.z * invVoxel)));
 
             auto& acc = cells[cell];
             acc.PositionSum += p;
-            if (hasNormals) acc.NormalSum += cloud.Normals[i];
-            if (hasColors)  acc.ColorSum += cloud.Colors[i];
-            if (hasRadii)   acc.RadiusSum += cloud.Radii[i];
+            if (doNormals) acc.NormalSum += normals[i];
+            if (doColors)  acc.ColorSum  += colors[i];
+            if (doRadii)   acc.RadiusSum += radii[i];
             acc.Count++;
         }
 
         DownsampleResult result;
         result.OriginalCount = cloud.Size();
-        result.ReducedCount = cells.size();
+        result.ReducedCount  = cells.size();
         result.ReductionRatio = static_cast<float>(result.ReducedCount) /
                                 static_cast<float>(result.OriginalCount);
 
         auto& out = result.Downsampled;
-        out.Positions.reserve(cells.size());
-        if (hasNormals) out.Normals.reserve(cells.size());
-        if (hasColors)  out.Colors.reserve(cells.size());
-        if (hasRadii)   out.Radii.reserve(cells.size());
+        out.Reserve(cells.size());
+        if (doNormals) out.EnableNormals();
+        if (doColors)  out.EnableColors();
+        if (doRadii)   out.EnableRadii();
 
         for (const auto& [cell, acc] : cells)
         {
             const float invCount = 1.0f / static_cast<float>(acc.Count);
-            out.Positions.push_back(acc.PositionSum * invCount);
+            const VertexHandle ph = out.AddPoint(acc.PositionSum * invCount);
 
-            if (hasNormals)
+            if (doNormals)
             {
                 glm::vec3 n = acc.NormalSum * invCount;
-                float len = glm::length(n);
-                out.Normals.push_back(len > 1e-8f ? n / len : glm::vec3(0.0f, 1.0f, 0.0f));
+                const float len = glm::length(n);
+                out.Normal(ph) = (len > 1e-8f) ? n / len : glm::vec3(0.f, 1.f, 0.f);
             }
-            if (hasColors)
-                out.Colors.push_back(acc.ColorSum * invCount);
-            if (hasRadii)
-                out.Radii.push_back(acc.RadiusSum * invCount);
+            if (doColors)  out.Color(ph)  = acc.ColorSum * invCount;
+            if (doRadii)   out.Radius(ph) = acc.RadiusSum * invCount;
         }
 
         return result;
@@ -252,10 +315,11 @@ namespace Geometry::PointCloud
         if (cloud.Size() < 2)
             return std::nullopt;
 
-        // Build octree.
+        auto positions = cloud.Positions();
+
         std::vector<AABB> pointAABBs;
-        pointAABBs.reserve(cloud.Positions.size());
-        for (const auto& p : cloud.Positions)
+        pointAABBs.reserve(positions.size());
+        for (const auto& p : positions)
             pointAABBs.emplace_back(AABB{p, p});
 
         Octree octree;
@@ -266,8 +330,8 @@ namespace Geometry::PointCloud
         if (!octree.Build(std::move(pointAABBs), policy, params.OctreeMaxPerNode, params.OctreeMaxDepth))
             return std::nullopt;
 
-        const std::size_t k = std::max(params.KNeighbors, std::size_t{1});
-        const std::size_t kQuery = k + 1; // Include self in query.
+        const std::size_t k      = std::max(params.KNeighbors, std::size_t{1});
+        const std::size_t kQuery = k + 1;
 
         RadiusEstimationResult result;
         result.Radii.resize(cloud.Size());
@@ -279,22 +343,22 @@ namespace Geometry::PointCloud
         for (std::size_t i = 0; i < cloud.Size(); ++i)
         {
             knnIndices.clear();
-            octree.QueryKnn(cloud.Positions[i], kQuery, knnIndices);
+            octree.QueryKnn(positions[i], kQuery, knnIndices);
 
             float distSum = 0.0f;
             uint32_t neighborCount = 0;
             for (std::size_t ni : knnIndices)
             {
                 if (ni == i) continue;
-                distSum += glm::length(cloud.Positions[ni] - cloud.Positions[i]);
+                distSum += glm::length(positions[ni] - positions[i]);
                 ++neighborCount;
             }
 
-            float avgDist = (neighborCount > 0)
+            const float avgDist = (neighborCount > 0)
                 ? distSum / static_cast<float>(neighborCount)
                 : 0.0f;
 
-            float r = avgDist * params.ScaleFactor;
+            const float r = avgDist * params.ScaleFactor;
             result.Radii[i] = r;
             radiusSum += r;
             minRadius = std::min(minRadius, r);
@@ -319,40 +383,43 @@ namespace Geometry::PointCloud
         if (cloud.Empty())
             return std::nullopt;
 
-        const std::size_t n = cloud.Size();
+        const std::size_t n      = cloud.Size();
         const std::size_t target = std::min(params.TargetCount, n);
 
-        // Generate shuffled indices.
         std::vector<std::size_t> indices(n);
         std::iota(indices.begin(), indices.end(), 0);
 
         std::mt19937 rng(params.Seed);
-        // Fisher-Yates partial shuffle (only need first `target` elements).
         for (std::size_t i = 0; i < target; ++i)
         {
             std::uniform_int_distribution<std::size_t> dist(i, n - 1);
             std::swap(indices[i], indices[dist(rng)]);
         }
 
-        // Sort selected indices for cache-friendly access.
-        std::vector<std::size_t> selected(indices.begin(), indices.begin() + static_cast<std::ptrdiff_t>(target));
+        std::vector<std::size_t> selected(indices.begin(),
+                                           indices.begin() + static_cast<std::ptrdiff_t>(target));
         std::sort(selected.begin(), selected.end());
 
         SubsampleResult result;
         result.SelectedIndices = selected;
 
         auto& out = result.Subsampled;
-        out.Positions.reserve(target);
-        if (cloud.HasNormals()) out.Normals.reserve(target);
-        if (cloud.HasColors())  out.Colors.reserve(target);
-        if (cloud.HasRadii())   out.Radii.reserve(target);
+        out.Reserve(target);
+        if (cloud.HasNormals()) out.EnableNormals();
+        if (cloud.HasColors())  out.EnableColors();
+        if (cloud.HasRadii())   out.EnableRadii();
+
+        auto positions = cloud.Positions();
+        auto normals   = cloud.HasNormals() ? cloud.Normals() : std::span<const glm::vec3>{};
+        auto colors    = cloud.HasColors()  ? cloud.Colors()  : std::span<const glm::vec4>{};
+        auto radii     = cloud.HasRadii()   ? cloud.Radii()   : std::span<const float>{};
 
         for (std::size_t idx : selected)
         {
-            out.Positions.push_back(cloud.Positions[idx]);
-            if (cloud.HasNormals()) out.Normals.push_back(cloud.Normals[idx]);
-            if (cloud.HasColors())  out.Colors.push_back(cloud.Colors[idx]);
-            if (cloud.HasRadii())   out.Radii.push_back(cloud.Radii[idx]);
+            const VertexHandle ph = out.AddPoint(positions[idx]);
+            if (cloud.HasNormals()) out.Normal(ph) = normals[idx];
+            if (cloud.HasColors())  out.Color(ph)  = colors[idx];
+            if (cloud.HasRadii())   out.Radius(ph) = radii[idx];
         }
 
         return result;

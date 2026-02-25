@@ -259,20 +259,37 @@ TEST(PointCloud_Integration, CloudToComponent)
 {
     // Simulate the pipeline: create a Cloud, process it, attach to ECS.
     Geometry::PointCloud::Cloud cloud;
-    cloud.Positions = {{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {1, 1, 0}};
-    cloud.Normals = {{0, 0, 1}, {0, 0, 1}, {0, 0, 1}, {0, 0, 1}};
-    cloud.Colors = {{1, 0, 0, 1}, {0, 1, 0, 1}, {0, 0, 1, 1}, {1, 1, 0, 1}};
+    cloud.EnableNormals();
+    cloud.EnableColors();
+
+    const std::initializer_list<glm::vec3> pts  = {{0,0,0},{1,0,0},{0,1,0},{1,1,0}};
+    const std::initializer_list<glm::vec3> nrms = {{0,0,1},{0,0,1},{0,0,1},{0,0,1}};
+    const std::initializer_list<glm::vec4> cols = {{1,0,0,1},{0,1,0,1},{0,0,1,1},{1,1,0,1}};
+
+    auto pit = pts.begin();
+    auto nit = nrms.begin();
+    auto cit = cols.begin();
+    for (std::size_t i = 0; i < 4u; ++i, ++pit, ++nit, ++cit)
+    {
+        auto ph = cloud.AddPoint(*pit);
+        cloud.Normal(ph) = *nit;
+        cloud.Color(ph)  = *cit;
+    }
 
     // Estimate radii.
     auto radiiResult = Geometry::PointCloud::EstimateRadii(cloud, {});
     ASSERT_TRUE(radiiResult.has_value());
 
     // Create ECS component from cloud.
+    auto positions = cloud.Positions();
+    auto normals   = cloud.Normals();
+    auto colors    = cloud.Colors();
+
     ECS::PointCloudRenderer::Component comp;
-    comp.Positions = cloud.Positions;
-    comp.Normals = cloud.Normals;
-    comp.Colors = cloud.Colors;
-    comp.Radii = radiiResult->Radii;
+    comp.Positions = std::vector<glm::vec3>(positions.begin(), positions.end());
+    comp.Normals   = std::vector<glm::vec3>(normals.begin(),   normals.end());
+    comp.Colors    = std::vector<glm::vec4>(colors.begin(),    colors.end());
+    comp.Radii     = radiiResult->Radii;
     comp.RenderMode = Geometry::PointCloud::RenderMode::Surfel;
 
     EXPECT_EQ(comp.PointCount(), 4u);

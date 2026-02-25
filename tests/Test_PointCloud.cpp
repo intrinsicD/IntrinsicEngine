@@ -63,12 +63,25 @@ static std::vector<glm::vec4> MakeRandomColors(std::size_t n)
     return colors;
 }
 
-static Geometry::PointCloud::Cloud MakeSphereCloud(std::size_t n, float radius = 1.0f, bool withNormals = true, bool withColors = false)
+static Geometry::PointCloud::Cloud MakeSphereCloud(
+    std::size_t n, float radius = 1.0f,
+    bool withNormals = true, bool withColors = false)
 {
+    auto pts = MakeSpherePoints(n, radius);
+    auto nrm = withNormals ? MakeSphereNormals(pts) : std::vector<glm::vec3>{};
+    auto col = withColors  ? MakeRandomColors(n)    : std::vector<glm::vec4>{};
+
     Geometry::PointCloud::Cloud cloud;
-    cloud.Positions = MakeSpherePoints(n, radius);
-    if (withNormals) cloud.Normals = MakeSphereNormals(cloud.Positions);
-    if (withColors)  cloud.Colors = MakeRandomColors(n);
+    cloud.Reserve(n);
+    if (withNormals) cloud.EnableNormals();
+    if (withColors)  cloud.EnableColors();
+
+    for (std::size_t i = 0; i < n; ++i)
+    {
+        auto ph = cloud.AddPoint(pts[i]);
+        if (withNormals) cloud.Normal(ph) = nrm[i];
+        if (withColors)  cloud.Color(ph)  = col[i];
+    }
     return cloud;
 }
 
@@ -90,7 +103,9 @@ TEST(PointCloud_Cloud, EmptyCloudIsValid)
 TEST(PointCloud_Cloud, PositionsOnlyIsValid)
 {
     Geometry::PointCloud::Cloud cloud;
-    cloud.Positions = {{0, 0, 0}, {1, 0, 0}, {0, 1, 0}};
+    cloud.AddPoint({0, 0, 0});
+    cloud.AddPoint({1, 0, 0});
+    cloud.AddPoint({0, 1, 0});
     EXPECT_TRUE(cloud.IsValid());
     EXPECT_FALSE(cloud.Empty());
     EXPECT_EQ(cloud.Size(), 3u);
@@ -100,7 +115,8 @@ TEST(PointCloud_Cloud, PositionsOnlyIsValid)
 TEST(PointCloud_Cloud, FullAttributesAreValid)
 {
     auto cloud = MakeSphereCloud(100, 1.0f, true, true);
-    cloud.Radii.resize(100, 0.01f);
+    cloud.EnableRadii(0.01f);
+    // Radii property is now present but all slots are at default 0.01f.
     EXPECT_TRUE(cloud.IsValid());
     EXPECT_TRUE(cloud.HasNormals());
     EXPECT_TRUE(cloud.HasColors());
@@ -109,18 +125,26 @@ TEST(PointCloud_Cloud, FullAttributesAreValid)
 
 TEST(PointCloud_Cloud, MismatchedNormalsInvalid)
 {
+    // With the PropertySet API the registry always keeps arrays in sync,
+    // so we verify the IsValid() path by exercising a fresh cloud.
     Geometry::PointCloud::Cloud cloud;
-    cloud.Positions = {{0, 0, 0}, {1, 0, 0}};
-    cloud.Normals = {{0, 1, 0}}; // Wrong count
-    EXPECT_FALSE(cloud.IsValid());
+    cloud.AddPoint({0, 0, 0});
+    cloud.AddPoint({1, 0, 0});
+    // Enabling after adding points fills the existing slots with the default
+    // value — arrays stay in sync, cloud must be valid.
+    cloud.EnableNormals();
+    EXPECT_TRUE(cloud.IsValid());
+    EXPECT_EQ(cloud.Normals().size(), 2u);
 }
 
 TEST(PointCloud_Cloud, MismatchedColorsInvalid)
 {
     Geometry::PointCloud::Cloud cloud;
-    cloud.Positions = {{0, 0, 0}, {1, 0, 0}};
-    cloud.Colors = {{1, 1, 1, 1}, {0, 0, 0, 1}, {0.5, 0.5, 0.5, 1}}; // Wrong count
-    EXPECT_FALSE(cloud.IsValid());
+    cloud.AddPoint({0, 0, 0});
+    cloud.AddPoint({1, 0, 0});
+    cloud.EnableColors();
+    EXPECT_TRUE(cloud.IsValid());
+    EXPECT_EQ(cloud.Colors().size(), 2u);
 }
 
 // =============================================================================
@@ -138,7 +162,7 @@ TEST(PointCloud_BoundingBox, EmptyCloudReturnsZeroAABB)
 TEST(PointCloud_BoundingBox, SinglePointBB)
 {
     Geometry::PointCloud::Cloud cloud;
-    cloud.Positions = {{3.0f, -2.0f, 5.0f}};
+    cloud.AddPoint({3.0f, -2.0f, 5.0f});
     auto bb = Geometry::PointCloud::ComputeBoundingBox(cloud);
     EXPECT_FLOAT_EQ(bb.Min.x, 3.0f);
     EXPECT_FLOAT_EQ(bb.Min.y, -2.0f);
@@ -150,7 +174,6 @@ TEST(PointCloud_BoundingBox, UnitSphereBoundedByUnitCube)
     auto cloud = MakeSphereCloud(500);
     auto bb = Geometry::PointCloud::ComputeBoundingBox(cloud);
 
-    // Sphere of radius 1 should have AABB roughly [-1,1]^3.
     EXPECT_NEAR(bb.Min.x, -1.0f, 0.1f);
     EXPECT_NEAR(bb.Min.y, -1.0f, 0.01f);
     EXPECT_NEAR(bb.Min.z, -1.0f, 0.1f);
@@ -173,7 +196,7 @@ TEST(PointCloud_Statistics, EmptyReturnsNullopt)
 TEST(PointCloud_Statistics, SinglePointStats)
 {
     Geometry::PointCloud::Cloud cloud;
-    cloud.Positions = {{1.0f, 2.0f, 3.0f}};
+    cloud.AddPoint({1.0f, 2.0f, 3.0f});
     auto result = Geometry::PointCloud::ComputeStatistics(cloud);
     ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result->PointCount, 1u);
@@ -191,16 +214,10 @@ TEST(PointCloud_Statistics, SphereStatistics)
     ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result->PointCount, 500u);
 
-    // Centroid of uniform sphere should be near origin.
     EXPECT_NEAR(glm::length(result->Centroid), 0.0f, 0.1f);
-
-    // Bounding box diagonal should be ~2*sqrt(3) ~ 3.46.
     EXPECT_NEAR(result->BoundingBoxDiagonal, 2.0f * std::sqrt(3.0f), 0.3f);
-
-    // Average spacing should be positive and reasonable.
     EXPECT_GT(result->AverageSpacing, 0.0f);
-    EXPECT_LT(result->AverageSpacing, 0.5f); // 500 points on unit sphere
-
+    EXPECT_LT(result->AverageSpacing, 0.5f);
     EXPECT_LE(result->MinSpacing, result->AverageSpacing);
     EXPECT_GE(result->MaxSpacing, result->AverageSpacing);
 }
@@ -233,11 +250,10 @@ TEST(PointCloud_Downsample, LargeVoxelCollapsesToFewPoints)
 {
     auto cloud = MakeSphereCloud(500, 1.0f);
     Geometry::PointCloud::DownsampleParams params;
-    params.VoxelSize = 2.0f; // Larger than sphere diameter → very few cells.
+    params.VoxelSize = 2.0f;
     auto result = Geometry::PointCloud::VoxelDownsample(cloud, params);
     ASSERT_TRUE(result.has_value());
 
-    // With voxel size 2 on a unit sphere, expect very few output points.
     EXPECT_LT(result->ReducedCount, 20u);
     EXPECT_EQ(result->OriginalCount, 500u);
     EXPECT_GT(result->ReductionRatio, 0.0f);
@@ -248,11 +264,10 @@ TEST(PointCloud_Downsample, SmallVoxelPreservesPoints)
 {
     auto cloud = MakeSphereCloud(200, 1.0f);
     Geometry::PointCloud::DownsampleParams params;
-    params.VoxelSize = 0.001f; // Very small → almost all points preserved.
+    params.VoxelSize = 0.001f;
     auto result = Geometry::PointCloud::VoxelDownsample(cloud, params);
     ASSERT_TRUE(result.has_value());
 
-    // Should preserve nearly all points.
     EXPECT_EQ(result->ReducedCount, 200u);
     EXPECT_NEAR(result->ReductionRatio, 1.0f, 0.01f);
 }
@@ -266,11 +281,9 @@ TEST(PointCloud_Downsample, PreservesNormals)
     auto result = Geometry::PointCloud::VoxelDownsample(cloud, params);
     ASSERT_TRUE(result.has_value());
 
-    // Output should have normals.
     EXPECT_TRUE(result->Downsampled.HasNormals());
 
-    // All normals should be unit length.
-    for (const auto& n : result->Downsampled.Normals)
+    for (const auto& n : result->Downsampled.Normals())
     {
         float len = glm::length(n);
         EXPECT_NEAR(len, 1.0f, 0.01f);
@@ -291,7 +304,7 @@ TEST(PointCloud_Downsample, PreservesColors)
 TEST(PointCloud_Downsample, OutputCloudIsValid)
 {
     auto cloud = MakeSphereCloud(300, 1.0f, true, true);
-    cloud.Radii.resize(300, 0.01f);
+    cloud.EnableRadii(0.01f);
     Geometry::PointCloud::DownsampleParams params;
     params.VoxelSize = 0.3f;
     auto result = Geometry::PointCloud::VoxelDownsample(cloud, params);
@@ -306,7 +319,7 @@ TEST(PointCloud_Downsample, OutputCloudIsValid)
 TEST(PointCloud_Radius, TooFewPointsReturnsNullopt)
 {
     Geometry::PointCloud::Cloud cloud;
-    cloud.Positions = {{0, 0, 0}};
+    cloud.AddPoint({0, 0, 0});
     auto result = Geometry::PointCloud::EstimateRadii(cloud);
     EXPECT_FALSE(result.has_value());
 }
@@ -326,11 +339,8 @@ TEST(PointCloud_Radius, SphereRadiiReasonable)
     EXPECT_LE(result->MinRadius, result->AverageRadius);
     EXPECT_GE(result->MaxRadius, result->AverageRadius);
 
-    // All radii should be positive.
     for (float r : result->Radii)
-    {
         EXPECT_GE(r, 0.0f);
-    }
 }
 
 TEST(PointCloud_Radius, ScaleFactorMultipliesRadius)
@@ -426,22 +436,19 @@ TEST(PointCloud_Subsample, IndicesAreValid)
     auto result = Geometry::PointCloud::RandomSubsample(cloud, params);
     ASSERT_TRUE(result.has_value());
 
-    // All selected indices must be within bounds.
     for (std::size_t idx : result->SelectedIndices)
-    {
         EXPECT_LT(idx, 300u);
-    }
 
-    // Indices should be sorted (as per implementation).
     EXPECT_TRUE(std::is_sorted(result->SelectedIndices.begin(), result->SelectedIndices.end()));
 
-    // Positions should match originals.
+    auto origPos = cloud.Positions();
+    auto subPos  = result->Subsampled.Positions();
     for (std::size_t i = 0; i < result->SelectedIndices.size(); ++i)
     {
         std::size_t origIdx = result->SelectedIndices[i];
-        EXPECT_FLOAT_EQ(result->Subsampled.Positions[i].x, cloud.Positions[origIdx].x);
-        EXPECT_FLOAT_EQ(result->Subsampled.Positions[i].y, cloud.Positions[origIdx].y);
-        EXPECT_FLOAT_EQ(result->Subsampled.Positions[i].z, cloud.Positions[origIdx].z);
+        EXPECT_FLOAT_EQ(subPos[i].x, origPos[origIdx].x);
+        EXPECT_FLOAT_EQ(subPos[i].y, origPos[origIdx].y);
+        EXPECT_FLOAT_EQ(subPos[i].z, origPos[origIdx].z);
     }
 }
 
@@ -464,22 +471,18 @@ TEST(PointCloud_Integration, DownsampleThenEstimateRadii)
 {
     auto cloud = MakeSphereCloud(1000, 1.0f, true);
 
-    // Downsample.
     Geometry::PointCloud::DownsampleParams dParams;
     dParams.VoxelSize = 0.2f;
     auto dResult = Geometry::PointCloud::VoxelDownsample(cloud, dParams);
     ASSERT_TRUE(dResult.has_value());
     EXPECT_GT(dResult->Downsampled.Size(), 10u);
 
-    // Estimate radii on downsampled cloud.
     Geometry::PointCloud::RadiusEstimationParams rParams;
     rParams.KNeighbors = 6;
     rParams.ScaleFactor = 1.2f;
     auto rResult = Geometry::PointCloud::EstimateRadii(dResult->Downsampled, rParams);
     ASSERT_TRUE(rResult.has_value());
     EXPECT_EQ(rResult->Radii.size(), dResult->Downsampled.Size());
-
-    // Radii on a coarser cloud should be larger than on the dense one.
     EXPECT_GT(rResult->AverageRadius, 0.05f);
 }
 
@@ -491,7 +494,7 @@ TEST(PointCloud_Edge, CollinearPointsDownsample)
 {
     Geometry::PointCloud::Cloud cloud;
     for (int i = 0; i < 100; ++i)
-        cloud.Positions.push_back({static_cast<float>(i) * 0.01f, 0.0f, 0.0f});
+        cloud.AddPoint({static_cast<float>(i) * 0.01f, 0.0f, 0.0f});
 
     EXPECT_TRUE(cloud.IsValid());
 
@@ -506,11 +509,11 @@ TEST(PointCloud_Edge, DuplicatePointsDownsample)
 {
     Geometry::PointCloud::Cloud cloud;
     for (int i = 0; i < 100; ++i)
-        cloud.Positions.push_back({0.0f, 0.0f, 0.0f}); // All same point.
+        cloud.AddPoint({0.0f, 0.0f, 0.0f});
 
     Geometry::PointCloud::DownsampleParams params;
     params.VoxelSize = 0.1f;
     auto result = Geometry::PointCloud::VoxelDownsample(cloud, params);
     ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result->ReducedCount, 1u); // All collapse to one cell.
+    EXPECT_EQ(result->ReducedCount, 1u);
 }

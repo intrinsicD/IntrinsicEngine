@@ -826,9 +826,9 @@ public:
         constexpr float radius = 1.0f;
 
         Geometry::PointCloud::Cloud cloud;
-        cloud.Positions.reserve(N);
-        cloud.Normals.reserve(N);
-        cloud.Colors.reserve(N);
+        cloud.Reserve(N);
+        cloud.EnableNormals();
+        cloud.EnableColors();
 
         const float goldenRatio = (1.0f + std::sqrt(5.0f)) * 0.5f;
         const float goldenAngle = 2.0f * glm::pi<float>() / (goldenRatio * goldenRatio);
@@ -848,11 +848,8 @@ public:
             const float x = sinPhi * std::cos(theta);
             const float z = sinPhi * std::sin(theta);
 
-            const glm::vec3 pos = glm::vec3(x, y, z) * radius;
-            const glm::vec3 normal = glm::normalize(pos); // Sphere normal = position direction
-
-            cloud.Positions.push_back(pos);
-            cloud.Normals.push_back(normal);
+            const glm::vec3 pos    = glm::vec3(x, y, z) * radius;
+            const glm::vec3 normal = glm::normalize(pos);
 
             // Color: height-based gradient (blue at base → orange at top)
             const float h = (y + 0.05f) / 1.05f; // normalize to [0,1]
@@ -860,10 +857,13 @@ public:
                 glm::vec4(0.2f, 0.4f, 0.9f, 1.0f),  // blue
                 glm::vec4(1.0f, 0.6f, 0.1f, 1.0f),  // orange
                 h);
-            cloud.Colors.push_back(color);
+
+            auto ph = cloud.AddPoint(pos);
+            cloud.Normal(ph) = normal;
+            cloud.Color(ph)  = color;
         }
 
-        if (cloud.Positions.empty())
+        if (cloud.Empty())
         {
             Log::Warn("SpawnDemoPointCloud: no points generated.");
             return;
@@ -880,10 +880,14 @@ public:
         entt::entity entity = scene.CreateEntity("Demo Point Cloud");
 
         // PointCloudRenderer component
+        auto positions = cloud.Positions();
+        auto normals   = cloud.Normals();
+        auto colors    = cloud.Colors();
+
         auto& pc = scene.GetRegistry().emplace<ECS::PointCloudRenderer::Component>(entity);
-        pc.Positions = std::move(cloud.Positions);
-        pc.Normals   = std::move(cloud.Normals);
-        pc.Colors    = std::move(cloud.Colors);
+        pc.Positions = std::vector<glm::vec3>(positions.begin(), positions.end());
+        pc.Normals   = std::vector<glm::vec3>(normals.begin(),   normals.end());
+        pc.Colors    = std::vector<glm::vec4>(colors.begin(),    colors.end());
         if (radiiResult)
             pc.Radii = std::move(radiiResult->Radii);
         pc.RenderMode = Geometry::PointCloud::RenderMode::Surfel;

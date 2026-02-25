@@ -51,7 +51,7 @@ export namespace RHI
 
         VulkanDevice& m_Device;
         BindlessDescriptorSystem& m_Bindless;
-        Core::ResourcePool<TextureGpuData, TextureHandle> m_Pool;
+        Core::ResourcePool<TextureGpuData, TextureHandle, 3> m_Pool;
 
         // Bindless slot allocator.
         // Slot 0 is reserved for the engine default/error texture and is never freed.

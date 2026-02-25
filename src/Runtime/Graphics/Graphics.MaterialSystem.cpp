@@ -14,7 +14,6 @@ namespace Graphics
     MaterialSystem::MaterialSystem(RHI::TextureSystem& textureSystem, Core::Assets::AssetManager& assetManager)
         : m_TextureSystem(textureSystem), m_AssetManager(assetManager)
     {
-        m_Pool.Initialize(2); // 2 Frames in flight
         m_Revisions.resize(1024u, 1u);
     }
 

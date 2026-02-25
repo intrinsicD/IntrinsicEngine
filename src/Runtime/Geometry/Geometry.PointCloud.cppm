@@ -3,14 +3,16 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <span>
+#include <string>
 #include <vector>
-#include <unordered_map>
 
 #include <glm/glm.hpp>
 
 export module Geometry:PointCloud;
 
 import :AABB;
+import :Properties;
 
 export namespace Geometry::PointCloud
 {
@@ -27,8 +29,12 @@ export namespace Geometry::PointCloud
     //   - Spatial queries via Octree/KDTree acceleration.
     //
     // Design:
-    //   - SoA (Structure-of-Arrays) layout for cache-friendly batch processing.
-    //   - Positions are mandatory; normals, colors, radii are optional.
+    //   - Storage via PropertySet (same pattern as HalfedgeMesh / Graph).
+    //   - SoA layout for cache-friendly batch processing; each attribute is a
+    //     contiguous vector inside the PropertySet registry.
+    //   - Positions are mandatory (built-in "p:position" property).
+    //   - Normals, colors and radii are optional built-in properties;
+    //     additional per-point attributes may be added via GetOrAddVertexProperty.
     //   - Follows the Geometry operator pattern: Params/Result structs, optional
     //     return for degenerate input.
     //
@@ -51,33 +57,106 @@ export namespace Geometry::PointCloud
     // -------------------------------------------------------------------------
     // Core Point Cloud Data
     // -------------------------------------------------------------------------
-    struct Cloud
+    class Cloud
     {
-        // Mandatory: 3D positions (one per point).
-        std::vector<glm::vec3> Positions;
+    public:
+        Cloud();
+        Cloud(const Cloud&)            = default;
+        Cloud(Cloud&&) noexcept        = default;
+        Cloud& operator=(const Cloud&) = default;
+        Cloud& operator=(Cloud&&) noexcept = default;
+        ~Cloud()                       = default;
 
-        // Optional per-point attributes (empty = not present).
-        std::vector<glm::vec3> Normals;      // Unit-length surface normals.
-        std::vector<glm::vec4> Colors;       // RGBA float colors [0,1].
-        std::vector<float>     Radii;        // Per-point world-space splat radius.
+        // ---- Capacity / sizing ----
 
-        // ---- Queries ----
+        [[nodiscard]] std::size_t Size()  const noexcept { return m_Points.Size(); }
+        [[nodiscard]] bool        Empty() const noexcept { return m_Points.Size() == 0; }
 
-        [[nodiscard]] std::size_t Size() const noexcept { return Positions.size(); }
-        [[nodiscard]] bool        Empty() const noexcept { return Positions.empty(); }
-        [[nodiscard]] bool        HasNormals() const noexcept { return !Normals.empty() && Normals.size() == Positions.size(); }
-        [[nodiscard]] bool        HasColors() const noexcept { return !Colors.empty() && Colors.size() == Positions.size(); }
-        [[nodiscard]] bool        HasRadii() const noexcept { return !Radii.empty() && Radii.size() == Positions.size(); }
+        void Reserve(std::size_t n) { m_Points.Reserve(n); }
+        void Clear();
 
-        // Validate internal consistency (sizes match).
-        [[nodiscard]] bool IsValid() const noexcept
+        // ---- Point addition ----
+
+        // Add a point with a mandatory position. Returns its handle.
+        VertexHandle AddPoint(glm::vec3 position);
+
+        // ---- Built-in attribute presence ----
+
+        [[nodiscard]] bool HasNormals() const noexcept { return m_PNormal.IsValid(); }
+        [[nodiscard]] bool HasColors()  const noexcept { return m_PColor.IsValid(); }
+        [[nodiscard]] bool HasRadii()   const noexcept { return m_PRadius.IsValid(); }
+
+        // ---- Built-in attribute activation ----
+        // Call once to allocate the property; subsequent AddPoint calls will
+        // initialise the slot with the default value supplied here.
+
+        void EnableNormals(glm::vec3 defaultNormal = {0.f, 1.f, 0.f});
+        void EnableColors (glm::vec4 defaultColor  = {1.f, 1.f, 1.f, 1.f});
+        void EnableRadii  (float     defaultRadius = 0.f);
+
+        // ---- Per-point accessors (by handle) ----
+
+        [[nodiscard]] const glm::vec3& Position(VertexHandle p) const { return m_PPoint[p]; }
+        [[nodiscard]]       glm::vec3& Position(VertexHandle p)       { return m_PPoint[p]; }
+
+        [[nodiscard]] const glm::vec3& Normal(VertexHandle p) const { return m_PNormal[p]; }
+        [[nodiscard]]       glm::vec3& Normal(VertexHandle p)       { return m_PNormal[p]; }
+
+        [[nodiscard]] const glm::vec4& Color(VertexHandle p) const { return m_PColor[p]; }
+        [[nodiscard]]       glm::vec4& Color(VertexHandle p)       { return m_PColor[p]; }
+
+        [[nodiscard]] float  Radius(VertexHandle p) const { return m_PRadius[p]; }
+        [[nodiscard]] float& Radius(VertexHandle p)       { return m_PRadius[p]; }
+
+        // ---- Span accessors (for bulk GPU upload / SIMD loops) ----
+
+        [[nodiscard]] std::span<const glm::vec3> Positions() const { return m_PPoint.Span(); }
+        [[nodiscard]] std::span<glm::vec3>       Positions()       { return m_PPoint.Span(); }
+
+        [[nodiscard]] std::span<const glm::vec3> Normals() const { return m_PNormal.Span(); }
+        [[nodiscard]] std::span<glm::vec3>       Normals()       { return m_PNormal.Span(); }
+
+        [[nodiscard]] std::span<const glm::vec4> Colors() const { return m_PColor.Span(); }
+        [[nodiscard]] std::span<glm::vec4>       Colors()       { return m_PColor.Span(); }
+
+        [[nodiscard]] std::span<const float> Radii() const { return m_PRadius.Span(); }
+        [[nodiscard]] std::span<float>       Radii()       { return m_PRadius.Span(); }
+
+        // ---- Handle from index ----
+
+        [[nodiscard]] static constexpr VertexHandle Handle(std::size_t index) noexcept
         {
-            if (Positions.empty()) return true; // Empty cloud is valid.
-            if (!Normals.empty() && Normals.size() != Positions.size()) return false;
-            if (!Colors.empty() && Colors.size() != Positions.size()) return false;
-            if (!Radii.empty() && Radii.size() != Positions.size()) return false;
-            return true;
+            return VertexHandle{static_cast<PropertyIndex>(index)};
         }
+
+        // ---- User-defined per-point properties ----
+
+        template <class T>
+        [[nodiscard]] VertexProperty<T> GetOrAddVertexProperty(std::string name, T defaultValue = T())
+        {
+            return VertexProperty<T>(m_Points.GetOrAdd<T>(std::move(name), std::move(defaultValue)));
+        }
+
+        template <class T>
+        [[nodiscard]] VertexProperty<T> GetVertexProperty(std::string_view name) const
+        {
+            return VertexProperty<T>(m_Points.Get<T>(name));
+        }
+
+        [[nodiscard]] Vertices&       PointProperties()       noexcept { return m_Points; }
+        [[nodiscard]] const Vertices& PointProperties() const noexcept { return m_Points; }
+
+        // Validate internal consistency (built-in optional arrays, if present, match Size()).
+        [[nodiscard]] bool IsValid() const noexcept;
+
+    private:
+        Vertices m_Points;
+
+        // Built-in properties — always present (position) or lazily allocated.
+        VertexProperty<glm::vec3> m_PPoint;   // "p:position"
+        VertexProperty<glm::vec3> m_PNormal;  // "p:normal"   (optional)
+        VertexProperty<glm::vec4> m_PColor;   // "p:color"    (optional)
+        VertexProperty<float>     m_PRadius;  // "p:radius"   (optional)
     };
 
     // -------------------------------------------------------------------------

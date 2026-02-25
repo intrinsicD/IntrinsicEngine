@@ -44,13 +44,10 @@ namespace Runtime
         // 1. MaterialSystem (depends on TextureSystem + AssetManager)
         m_MaterialSystem = std::make_unique<Graphics::MaterialSystem>(textureSystem, assetManager);
 
-        // 2. Initialize GeometryStorage with frames-in-flight for safe deferred deletion
-        m_GeometryStorage.Initialize(m_Device->GetFramesInFlight());
-
-        // 3. Pipelines & RenderSystem
+        // 2. Pipelines & RenderSystem
         InitPipeline(swapchain, renderer, bindless, descriptorPool, descriptorLayout);
 
-        // 4. Retained-mode GPUScene
+        // 3. Retained-mode GPUScene
         if (m_PipelineLibrary && m_Device)
         {
             if (auto* p = m_PipelineLibrary->GetSceneUpdatePipeline();

@@ -17,7 +17,6 @@ namespace RHI
         : m_Device(device)
         , m_Bindless(bindless)
     {
-        m_Pool.Initialize(device.GetFramesInFlight());
 
         // Reserve a modest freelist capacity up-front to avoid reallocs.
         m_FreeBindlessSlots.reserve(1024);

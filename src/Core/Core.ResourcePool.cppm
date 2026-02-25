@@ -20,7 +20,10 @@ export namespace Core
         { h.Generation } -> std::convertible_to<uint32_t>;
     };
 
-    template <typename T, GenerationalHandle Handle>
+    // RetirementFrames: how many frames a slot must age before its memory is reclaimed.
+    // For GPU-facing pools this equals the swapchain frames-in-flight (typically 2 or 3).
+    // For CPU-only pools set it to 0 for immediate reclamation.
+    template <typename T, GenerationalHandle Handle, uint32_t RetirementFrames = 2>
     class ResourcePool
     {
     public:
@@ -32,10 +35,6 @@ export namespace Core
         ResourcePool(ResourcePool&&) noexcept = default;
         ResourcePool& operator=(ResourcePool&&) noexcept = default;
 
-        void Initialize(const uint32_t framesInFlight)
-        {
-            m_FramesInFlight = framesInFlight;
-        }
 
         // Accepts unique_ptr to enforce ownership transfer
         Handle Add(std::unique_ptr<T> resource)
@@ -100,8 +99,9 @@ export namespace Core
 
             std::erase_if(m_PendingKillList, [&](const PendingKill& item)
             {
-                // Wait for FramesInFlight to pass
-                if (currentFrameNumber <= item.KillFrameNumber + m_FramesInFlight)
+                // Wait for RetirementFrames to pass before reclaiming the slot.
+                // For RetirementFrames == 0 (CPU-only pools) this condition is always false → immediate reclaim.
+                if (currentFrameNumber <= item.KillFrameNumber + RetirementFrames)
                     return false;
 
                 // Validate slot is still in the expected state
@@ -184,6 +184,5 @@ export namespace Core
         std::vector<PendingKill> m_PendingKillList;
 
         mutable std::shared_mutex m_Mutex;
-        uint32_t m_FramesInFlight = 2;
     };
 }
