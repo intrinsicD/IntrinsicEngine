@@ -101,6 +101,7 @@ namespace Graphics::Passes
         // Allocate per-mode per-frame descriptor sets.
         for (uint32_t m = 0; m < 4; ++m)
             AllocatePerFrameSets<FRAMES>(descriptorPool, m_PointSetLayout, m_PointDescSetsByMode[m]);
+
     }
 
     // =========================================================================
@@ -245,6 +246,7 @@ namespace Graphics::Passes
         if (!HasContent()) return;
         if (ctx.Resolution.width == 0 || ctx.Resolution.height == 0) return;
 
+
         const uint32_t frameIndex = ctx.FrameIndex;
 
         // Lazy pipeline creation (need swapchain format and depth format).
@@ -278,6 +280,7 @@ namespace Graphics::Passes
 
             // Each mode gets its own descriptor set to avoid the shared-descriptor
             // overwrite bug when multiple modes are active in the same frame.
+
             VkDescriptorSet batchDescSet = VK_NULL_HANDLE;
 
             if (modeIdx < 4)
@@ -287,9 +290,11 @@ namespace Graphics::Passes
 
                 // Upload batch points into the mode-specific per-frame buffer.
                 m_PointBuffersByMode[modeIdx][frameIndex]->Write(pts.data(), pts.size_bytes());
+              
                 batchDescSet = m_PointDescSetsByMode[modeIdx][frameIndex];
-                UpdateSSBODescriptor(m_Device->GetLogicalDevice(), batchDescSet,
-                                     0, m_PointBuffersByMode[modeIdx][frameIndex]->GetHandle(), pts.size_bytes());
+                UpdateSSBODescriptor(m_Device->GetLogicalDevice(), batchDescSet,0, 
+                                     m_PointBuffersByMode[modeIdx][frameIndex]->GetHandle(), pts.size_bytes());
+                batchDescSet = m_PointDescSetsByMode[modeIdx][frameIndex];
             }
             else
             {
@@ -301,6 +306,7 @@ namespace Graphics::Passes
                 batchDescSet = m_PointDescSets[frameIndex];
                 UpdateSSBODescriptor(m_Device->GetLogicalDevice(), batchDescSet,
                                      0, m_PointBuffers[frameIndex]->GetHandle(), pts.size_bytes());
+                batchDescSet = m_PointDescSets[frameIndex];
             }
 
             // Fetch resource handles.
@@ -315,6 +321,7 @@ namespace Graphics::Passes
             const uint32_t localCount = batchCount;
             const auto capturedMode = mode;
             const auto capturedDescSet = batchDescSet;
+
             ctx.Graph.AddPass<PointCloudPassData>("PointCloud",
                 [&](PointCloudPassData& data, RGBuilder& builder)
                 {
@@ -329,6 +336,7 @@ namespace Graphics::Passes
                     data.Depth = builder.WriteDepth(depth, depthInfo);
                 },
                 [this, &ctx, frameIndex, localCount, capturedMode, capturedDescSet](const PointCloudPassData&, const RGRegistry&, VkCommandBuffer cmd)
+
                 {
                     const uint32_t dynamicOffset = static_cast<uint32_t>(ctx.GlobalCameraDynamicOffset);
                     RecordDraw(cmd,

@@ -1,6 +1,20 @@
 
 cmake_minimum_required(VERSION 3.28)
 
+# ------------------------------------------------------------------------------
+# In-source build guard — prevents accidental 'cmake .' from poisoning the
+# source tree with a CMakeCache.txt that blocks CLion / other generators.
+# Always use an out-of-source build directory (cmake-build-debug/, build/, etc.)
+# ------------------------------------------------------------------------------
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
+    message(FATAL_ERROR
+        "In-source builds are not allowed.\n"
+        "Please create a separate build directory and run CMake from there:\n"
+        "  mkdir build && cd build && cmake ..\n"
+        "You may need to delete the CMakeCache.txt and CMakeFiles/ already\n"
+        "created in the source root before this guard can take effect.")
+endif()
+
 # Project Definition
 project(IntrinsicEngine
         VERSION 0.1.0

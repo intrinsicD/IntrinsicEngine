@@ -192,12 +192,14 @@ namespace Graphics
 
                         for (auto [entity, pc] : pcView.each())
                         {
-                            // RenderVisualization can override point cloud visibility.
-                            bool visible = pc.Visible;
-                            if (auto* vis = registry.try_get<ECS::RenderVisualization::Component>(entity))
-                                visible = vis->ShowVertices;
-
-                            if (!visible || pc.Positions.empty())
+                            // Visibility: use pc.Visible directly.
+                            // NOTE: RenderVisualization::ShowVertices is a mesh vertex-overlay
+                            // toggle (controls whether mesh vertex splats are drawn). It must NOT
+                            // override pc.Visible for dedicated PointCloudRenderer entities — doing
+                            // so meant that opening the Visualization panel (which creates
+                            // RenderVisualization with ShowVertices=false) would silently hide the
+                            // point cloud even though its own Visible flag was true.
+                            if (!pc.Visible || pc.Positions.empty())
                                 continue;
 
                             const uint32_t defaultColor = Passes::PointCloudRenderPass::PackColorF(
@@ -208,13 +210,24 @@ namespace Graphics
                             if (auto* wm = registry.try_get<ECS::Components::Transform::WorldMatrix>(entity))
                                 worldMatrix = wm->Matrix;
 
+                            // Inverse-transpose of the linear part for correct normal transform
+                            // under non-uniform scale (matches MeshRenderPass convention).
+                            const glm::mat3 normalMatrix =
+                                glm::transpose(glm::inverse(glm::mat3(worldMatrix)));
+
                             for (std::size_t i = 0; i < pc.Positions.size(); ++i)
                             {
                                 const glm::vec3 worldPos =
                                     glm::vec3(worldMatrix * glm::vec4(pc.Positions[i], 1.0f));
-                                const glm::vec3 normal = pc.HasNormals()
-                                    ? glm::normalize(glm::mat3(worldMatrix) * pc.Normals[i])
-                                    : glm::vec3(0.0f, 1.0f, 0.0f);
+                                glm::vec3 normal(0.0f, 1.0f, 0.0f);
+                                if (pc.HasNormals())
+                                {
+                                    const glm::vec3 n = normalMatrix * pc.Normals[i];
+                                    const float n2 = glm::dot(n, n);
+                                    normal = (n2 > 1e-12f)
+                                        ? (n * (1.0f / glm::sqrt(n2)))
+                                        : glm::vec3(0.0f, 1.0f, 0.0f);
+                                }
                                 const float radius = pc.HasRadii() ? pc.Radii[i] : pc.DefaultRadius;
                                 const uint32_t color = pc.HasColors()
                                     ? Passes::PointCloudRenderPass::PackColorF(

@@ -149,13 +149,14 @@ export namespace Graphics::Passes
         // Global camera layout (set 0) — borrowed.
         VkDescriptorSetLayout m_GlobalSetLayout = VK_NULL_HANDLE;
 
-        // Per-frame descriptor sets.
+        // Per-frame descriptor sets (legacy — back-compat staging bucket).
         static constexpr uint32_t FRAMES = RHI::VulkanDevice::GetFramesInFlight();
         VkDescriptorSet m_PointDescSets[FRAMES] = {};
 
         // Per-mode per-frame descriptor sets (one per render mode × frame).
         // Avoids the shared-descriptor bug where multiple mode batches
         // overwrite the same set before deferred render graph execution.
+
         VkDescriptorSet m_PointDescSetsByMode[4][FRAMES] = {};
 
         // Per-frame host-visible SSBOs.

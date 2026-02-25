@@ -1,6 +1,7 @@
 #version 460
 #extension GL_EXT_scalar_block_layout : require
 
+
 layout(set = 0, binding = 0) uniform CameraBuffer {
     mat4 view;
     mat4 proj;
@@ -87,21 +88,16 @@ void main()
     mat3 viewRot = mat3(camera.view);
     vec3 normalView = normalize(viewRot * normalWorld);
 
-    // View-stable tangent: project the view direction onto the surfel plane.
-    // This avoids arbitrary helper-axis selection (which can cause visible 90° flips).
-    vec3 Vview = normalize(-viewPos.xyz); // camera at origin in view space
-    vec3 Tview = Vview - normalView * dot(Vview, normalView);
-    float t2 = dot(Tview, Tview);
-    if (t2 < 1e-10)
-    {
-        // Degenerate when looking straight down the normal; fall back to a deterministic axis.
-        vec3 a = (abs(normalView.y) < 0.9) ? vec3(0, 1, 0) : vec3(1, 0, 0);
-        Tview = normalize(cross(a, normalView));
-    }
-    else
-    {
-        Tview *= inversesqrt(t2);
-    }
+    // Screen-stable tangent frame: project view-space X onto the surfel plane, then
+    // fall back to view-space Y if the normal is nearly aligned with view-X.
+    // This guarantees Tview/Bview are always perpendicular to normalView, and ensures
+    // the tangent has maximum screen-space coverage (never collapses along view-Z).
+    // Note: the view-stable (view-direction-projected) tangent degenerates to view-Z
+    // when the surfel normal is perpendicular to the view direction (e.g. a horizontal
+    // surfel viewed from the side), causing Mode 1 to appear as a thin sliver and Mode 2
+    // to produce a blown-up/invisible bounding quad.
+    vec3 screenRef = (abs(normalView.x) < 0.9) ? vec3(1, 0, 0) : vec3(0, 1, 0);
+    vec3 Tview = normalize(screenRef - normalView * dot(screenRef, normalView));
     vec3 Bview = cross(normalView, Tview);
 
     // --- Mode 1: Surfel — surface-aligned disc ---
@@ -124,19 +120,45 @@ void main()
     // --- Mode 2: EWA splatting — surface-aligned elliptical Gaussian splat ---
     {
         // Perspective Jacobian: maps view-space tangent directions to screen pixels.
-        // Each screen axis has its own focal length from the projection matrix.
-        float focalX = camera.proj[0][0] * (push.ViewportWidth * 0.5);
-        float focalY = camera.proj[1][1] * (push.ViewportHeight * 0.5);
+        // Use abs(proj[1][1]) because glm::perspective with the Vulkan Y-flip sets
+        // proj[1][1] = -f (negative), which would invert the Y focal length and
+        // corrupt the conic for non-axis-aligned ellipses.
+        float focalX = camera.proj[0][0] * (push.ViewportWidth  * 0.5);
+        float focalY = abs(camera.proj[1][1]) * (push.ViewportHeight * 0.5);
         vec2  focal  = vec2(focalX, focalY);
 
-        // d(screen)/d(view) for direction d:
-        //   [focalX * (d.x - d.z * p.x / p.z) / p.z,
-        //    focalY * (d.y - d.z * p.y / p.z) / p.z]
-        vec2 innerU = (Tview.xy - (Tview.z / viewPos.z) * viewPos.xy) / viewPos.z;
-        vec2 innerV = (Bview.xy - (Bview.z / viewPos.z) * viewPos.xy) / viewPos.z;
+        // Perspective Jacobian of a view-space direction d at view position p:
+        //   screen_delta = focal * (d.xy / (-p.z) - d.z * p.xy / (p.z * p.z))
+        // viewPos.z < 0 for visible objects; negate it for the division.
+        float invNegZ  = 1.0 / (-viewPos.z);
+        vec2 innerU = (Tview.xy * invNegZ) - (Tview.z * invNegZ * invNegZ) * viewPos.xy;
+        vec2 innerV = (Bview.xy * invNegZ) - (Bview.z * invNegZ * invNegZ) * viewPos.xy;
 
         vec2 axisU_px = focal * innerU * radiusWorld;
         vec2 axisV_px = focal * innerV * radiusWorld;
+
+        float lenU = length(axisU_px);
+        float lenV = length(axisV_px);
+
+        // Guard: if either projected axis is near-zero (surfel nearly edge-on to camera),
+        // fall back to a screen-aligned isotropic Gaussian billboard.
+        // This prevents planeScale from exploding to infinity and the quad from covering
+        // the entire scene while producing no visible fragments.
+        if (lenU < 0.5 || lenV < 0.5)
+        {
+            // Estimate screen-space pixel radius from the world radius.
+            float pixelR  = radiusWorld * focalX * invNegZ;
+            float safeR   = max(pixelR, 1.0);
+            float invR2   = 1.0 / (safeR * safeR + 1.0);
+            fragConic       = vec4(invR2, 0.0, 0.0, invR2);
+            float extentPx  = sqrt(1.0 / invR2) * 3.0;
+            fragPixelOffset = localOffset * vec2(extentPx);
+
+            float planeScaleFallback = radiusWorld * (extentPx / max(safeR, 1e-6));
+            vec3 cornerViewFallback  = viewPos.xyz + vec3(localOffset.x, localOffset.y, 0.0) * planeScaleFallback;
+            gl_Position = camera.proj * vec4(cornerViewFallback, 1.0);
+            return;
+        }
 
         // Covariance matrix with 1-pixel low-pass filter (EWA anti-aliasing).
         float uu = dot(axisU_px, axisU_px) + 1.0;
@@ -155,7 +177,7 @@ void main()
 
         // Emit a tangent-plane quad sized to conservatively cover the ellipse.
         float extent = max(extentU, extentV);
-        float planeScale = radiusWorld * (extent / max(max(length(axisU_px), length(axisV_px)), 1e-6));
+        float planeScale = radiusWorld * (extent / max(max(lenU, lenV), 1e-6));
 
         vec3 cornerView = viewPos.xyz + (Tview * localOffset.x + Bview * localOffset.y) * planeScale;
         gl_Position = camera.proj * vec4(cornerView, 1.0);

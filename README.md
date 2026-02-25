@@ -325,20 +325,28 @@ Add a new panel by calling `Interface::GUI::RegisterPanel("My Panel", []{ ... })
 
 ## Point Rendering Modes (PointCloudRenderPass)
 
-The engine currently supports GPU point rendering via `Graphics::Passes::PointCloudRenderPass` with three shader-driven modes:
+The engine currently supports GPU point rendering via `Graphics::Passes::PointCloudRenderPass` with four shader-driven modes:
 
-* **Flat Disc** (`RenderMode = 0`) - Screen-aligned circular splats.
-* **Surfel** (`RenderMode = 1`) - Oriented discs using the per-point normal.
-* **EWA (Elliptical)** (`RenderMode = 2`) - Elliptical Weighted Average splatting (surface splatting style).
+| Mode | ID | Geometry | Lighting | Notes |
+|------|----|----------|----------|-------|
+| **Flat Disc** | 0 | Screen-aligned billboard (always faces camera) | None — pure flat color | Fastest; use for debug overlays |
+| **Surfel** | 1 | Surface-aligned disc coplanar with the surfel plane | Lambertian + ambient | Tangent frame derived from per-point normal; appears as an ellipse when viewed obliquely (correct physical behavior) |
+| **EWA** | 2 | Perspective-correct elliptical Gaussian splat (Zwicker et al. 2001) | Lambertian + ambient | Falls back to isotropic screen-aligned Gaussian for edge-on surfels (degenerate projection guard) |
+| **Gaussian Splat** | 3 | Screen-aligned billboard with smooth Gaussian opacity | None — pure flat color | Soft volumetric appearance; use for density/scalar-field visualization |
+
+### Shader Architecture
+
+- **Vertex shader (`point.vert`):** 6 vertices per point (2 triangles, no geometry shader). Tangent frame uses a **screen-stable basis** — projects view-space X onto the surfel plane (falls back to view-space Y when the normal is nearly aligned with X). This avoids the previous degenerate case where a horizontal surfel viewed from the side would collapse to a zero-area quad. EWA perspective Jacobian uses `abs(proj[1][1])` to compensate for the Vulkan Y-flip in `glm::perspective`. A degenerate-projection guard catches edge-on surfels where projected axis length < 0.5px and substitutes a screen-aligned isotropic Gaussian instead of letting `planeScale` diverge.
+- **Fragment shader (`point.frag`):** Modes are **fully separated** (Mode 0 ≠ Mode 1 — flat discs are unlit). Camera UBO is accessible from the fragment stage (`VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT`) so Modes 1 and 2 can correctly reconstruct the world-space camera position for Lambertian shading.
 
 ### UI
 
 In the Sandbox app (`src/Apps/Sandbox/main.cpp`):
 
-* **Inspector > Visualization > Vertex Settings > Vertex Mode** - controls how *mesh vertices* are drawn when `Show Vertices` is enabled.
-* **Inspector > Point Cloud > Rendering > Render Mode** - controls how *point cloud entities* are drawn.
+* **Inspector > Visualization > Vertex Settings > Vertex Mode** — controls how *mesh vertices* are drawn when `Show Vertices` is enabled.
+* **Inspector > Point Cloud > Rendering > Render Mode** — controls how *point cloud entities* are drawn.
 
-Note: `PointCloudRenderPass` currently exposes a single `RenderMode` for the whole pass. If multiple point sources with different modes are visible in the same frame, the last submitted source wins. (Next step: batch submissions by mode, or add a per-point mode field.)
+Submissions are **batched per-mode**: multiple point sources with different modes coexist correctly in the same frame. Each mode issues its own GPU draw pass with the correct push constant.
 
 ## Graphics Geometry: Shared GPU Ownership (Views)
 

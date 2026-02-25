@@ -1,10 +1,12 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <glm/gtc/constants.hpp>
 #include <vector>
 #include <functional>
 #include <memory>
 #include <filesystem>
+#include <cmath>
 #include <imgui.h>
 #include <entt/entity/registry.hpp>
 #include <tiny_gltf.h>
@@ -677,6 +679,10 @@ public:
             {
                 GetScene().CreateEntity("Empty Entity");
             }
+            if (ImGui::MenuItem("Create Demo Point Cloud"))
+            {
+                SpawnDemoPointCloud();
+            }
             if (ImGui::MenuItem("Remove Entity"))
             {
                 const entt::entity cur = GetSelection().GetSelectedEntity(GetScene());
@@ -806,6 +812,91 @@ public:
             vis->EdgeCacheDirty = true;
             vis->VertexNormalsDirty = true;
         }
+    }
+
+    // =========================================================================
+    // SpawnDemoPointCloud — Create a hemisphere point cloud entity with normals,
+    // colors, and estimated radii for testing surfel/EWA/Gaussian rendering.
+    // =========================================================================
+    void SpawnDemoPointCloud()
+    {
+        // Generate a uniform hemisphere point cloud (Fibonacci lattice on the
+        // upper hemisphere for even angular spacing). N ≈ 500 points.
+        constexpr std::size_t N = 500;
+        constexpr float radius = 1.0f;
+
+        Geometry::PointCloud::Cloud cloud;
+        cloud.Positions.reserve(N);
+        cloud.Normals.reserve(N);
+        cloud.Colors.reserve(N);
+
+        const float goldenRatio = (1.0f + std::sqrt(5.0f)) * 0.5f;
+        const float goldenAngle = 2.0f * glm::pi<float>() / (goldenRatio * goldenRatio);
+
+        for (std::size_t i = 0; i < N; ++i)
+        {
+            // Uniform distribution on the sphere via Fibonacci lattice
+            const float t = static_cast<float>(i) / static_cast<float>(N - 1);
+            const float phi = std::acos(1.0f - 2.0f * t);   // polar angle [0, π]
+            const float theta = goldenAngle * static_cast<float>(i);
+
+            // Only keep upper hemisphere (y > 0)
+            const float y = std::cos(phi);
+            if (y < -0.05f) continue;
+
+            const float sinPhi = std::sin(phi);
+            const float x = sinPhi * std::cos(theta);
+            const float z = sinPhi * std::sin(theta);
+
+            const glm::vec3 pos = glm::vec3(x, y, z) * radius;
+            const glm::vec3 normal = glm::normalize(pos); // Sphere normal = position direction
+
+            cloud.Positions.push_back(pos);
+            cloud.Normals.push_back(normal);
+
+            // Color: height-based gradient (blue at base → orange at top)
+            const float h = (y + 0.05f) / 1.05f; // normalize to [0,1]
+            const glm::vec4 color = glm::mix(
+                glm::vec4(0.2f, 0.4f, 0.9f, 1.0f),  // blue
+                glm::vec4(1.0f, 0.6f, 0.1f, 1.0f),  // orange
+                h);
+            cloud.Colors.push_back(color);
+        }
+
+        if (cloud.Positions.empty())
+        {
+            Log::Warn("SpawnDemoPointCloud: no points generated.");
+            return;
+        }
+
+        // Estimate per-point radii from local density (Octree kNN).
+        Geometry::PointCloud::RadiusEstimationParams radiiParams;
+        radiiParams.KNeighbors = 6;
+        radiiParams.ScaleFactor = 1.2f; // Slight overlap for hole-free rendering
+        auto radiiResult = Geometry::PointCloud::EstimateRadii(cloud, radiiParams);
+
+        // Create the ECS entity
+        auto& scene = GetScene();
+        entt::entity entity = scene.CreateEntity("Demo Point Cloud");
+
+        // PointCloudRenderer component
+        auto& pc = scene.GetRegistry().emplace<ECS::PointCloudRenderer::Component>(entity);
+        pc.Positions = std::move(cloud.Positions);
+        pc.Normals   = std::move(cloud.Normals);
+        pc.Colors    = std::move(cloud.Colors);
+        if (radiiResult)
+            pc.Radii = std::move(radiiResult->Radii);
+        pc.RenderMode = Geometry::PointCloud::RenderMode::Surfel;
+        pc.DefaultRadius = 0.02f;
+        pc.SizeMultiplier = 1.0f;
+
+        // Make it selectable
+        scene.GetRegistry().emplace<ECS::Components::Selection::SelectableTag>(entity);
+        static uint32_t s_PointCloudPickId = 10000u;
+        scene.GetRegistry().emplace<ECS::Components::Selection::PickID>(entity, s_PointCloudPickId++);
+
+        Log::Info("Spawned demo point cloud: {} points, normals={}, radii={}",
+                  pc.PointCount(), pc.HasNormals() ? "yes" : "no", pc.HasRadii() ? "yes" : "no");
     }
 
     void DrawGeometryProcessingPanel()
@@ -1165,10 +1256,25 @@ public:
                             {
                                 ImGui::SeparatorText("Vertex Settings");
                                 {
-                                    const char* modes[] = {"Flat Disc", "Surfel", "EWA (Elliptical)"};
+                                    const char* modes[] = {"Flat Disc", "Surfel", "EWA (Elliptical)", "Gaussian Splat"};
                                     int mode = static_cast<int>(vis->VertexRenderMode);
-                                    if (ImGui::Combo("Vertex Mode", &mode, modes, 3))
+                                    if (ImGui::Combo("Vertex Mode", &mode, modes, 4))
+                                    {
                                         vis->VertexRenderMode = static_cast<Geometry::PointCloud::RenderMode>(mode);
+                                        // Invalidate the GPU vertex view on every mode change.
+                                        // Splat modes (Surfel/EWA/GaussianSplat) require the CPU
+                                        // PointCloudRenderPass path — the GPU ForwardPass point-list
+                                        // path only supports flat unlit points (FlatDisc).
+                                        // Clearing the view forces MeshRenderPass to re-evaluate.
+                                        vis->VertexView = {};
+                                        vis->VertexViewDirty = true;
+                                        // Invalidate the vertex normal cache so MeshRenderPass
+                                        // recomputes normals for the new mode (surfel/EWA need them,
+                                        // flat/gaussian don't but it costs nothing to recompute lazily).
+                                        vis->VertexNormalsDirty = true;
+                                        if (viewR) viewR->Vertices = {};
+                                        reg.emplace_or_replace<ECS::Components::Transform::WorldUpdatedTag>(selected);
+                                    }
                                 }
 
                                 ImGui::SliderFloat("Vertex Size", &vis->VertexSize, 0.0005f, 0.05f, "%.5f", ImGuiSliderFlags_Logarithmic);
@@ -1256,8 +1362,16 @@ public:
                                 }
                             }
 
-                            // (2) Vertex view (Points): generate [0..N-1] once.
-                            if (vis->ShowVertices
+                            // (2) Vertex view (Points): only create the GPU view for FlatDisc.
+                            // Surfel, EWA, and GaussianSplat require the CPU PointCloudRenderPass
+                            // path (normals, per-point conic, Gaussian weight) which ForwardPass
+                            // cannot provide. Keeping VertexView empty forces MeshRenderPass to
+                            // use the CPU splat submission path for those modes.
+                            const bool wantGpuVertexView =
+                                vis->ShowVertices &&
+                                (vis->VertexRenderMode == Geometry::PointCloud::RenderMode::FlatDisc);
+
+                            if (wantGpuVertexView
                                 && (vis->VertexViewDirty || !vis->VertexView.IsValid()))
                             {
                                 if (mrPtr && srcGeo && mrPtr->Geometry.IsValid())
@@ -1293,7 +1407,8 @@ public:
                             if (viewR)
                             {
                                 viewR->Wireframe = vis->WireframeView;
-                                viewR->Vertices = vis->VertexView;
+                                // Only publish the vertex view for FlatDisc; splat modes use the CPU path.
+                                viewR->Vertices = wantGpuVertexView ? vis->VertexView : Geometry::GeometryHandle{};
                             }
                         }
                     }
@@ -1315,9 +1430,9 @@ public:
                     ImGui::Checkbox("Visible", &pc.Visible);
 
                     {
-                        const char* modes[] = {"Flat Disc", "Surfel", "EWA (Elliptical)"};
+                        const char* modes[] = {"Flat Disc", "Surfel", "EWA (Elliptical)", "Gaussian Splat"};
                         int mode = static_cast<int>(pc.RenderMode);
-                        if (ImGui::Combo("Render Mode", &mode, modes, 3))
+                        if (ImGui::Combo("Render Mode", &mode, modes, 4))
                             pc.RenderMode = static_cast<Geometry::PointCloud::RenderMode>(mode);
                     }
 

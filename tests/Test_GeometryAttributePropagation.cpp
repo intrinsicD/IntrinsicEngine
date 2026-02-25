@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <span>
 #include <glm/glm.hpp>
 
 import Geometry;
@@ -19,7 +20,7 @@ TEST(Attributes_TopologyEdits, SplitInterpolatesVertexProperty)
     ASSERT_TRUE(mesh.AddTriangle(v0, v1, v2).has_value());
 
     // Add a "texcoord" property.
-    auto uv = mesh.VertexProperties().GetOrAdd<glm::vec2>("v:texcoord", glm::vec2(0.0f));
+    auto uv = VertexProperty<glm::vec2>(mesh.VertexProperties().GetOrAdd<glm::vec2>("v:texcoord", glm::vec2(0.0f)));
     uv[v0] = glm::vec2(0.0f, 0.0f);
     uv[v1] = glm::vec2(1.0f, 0.0f);
     uv[v2] = glm::vec2(0.0f, 1.0f);
@@ -53,7 +54,7 @@ TEST(Attributes_TopologyEdits, CollapseMergesVertexProperty)
     ASSERT_TRUE(mesh.AddTriangle(v0, v1, v2).has_value());
     ASSERT_TRUE(mesh.AddTriangle(v2, v1, v3).has_value());
 
-    auto uv = mesh.VertexProperties().GetOrAdd<glm::vec2>("v:texcoord", glm::vec2(0.0f));
+    auto uv = VertexProperty<glm::vec2>(mesh.VertexProperties().GetOrAdd<glm::vec2>("v:texcoord", glm::vec2(0.0f)));
     uv[v0] = glm::vec2(0.0f, 0.0f);
     uv[v1] = glm::vec2(1.0f, 0.0f);
     uv[v2] = glm::vec2(0.0f, 1.0f);
@@ -68,11 +69,20 @@ TEST(Attributes_TopologyEdits, CollapseMergesVertexProperty)
     auto eOpt = mesh.FindEdge(v1, v2);
     ASSERT_TRUE(eOpt.has_value());
 
+    // Verify topology is sane before collapse.
+    EXPECT_FALSE(mesh.IsBoundary(*eOpt)) << "edge (v1,v2) should be interior";
+    EXPECT_FALSE(mesh.IsIsolated(v1));
+    EXPECT_FALSE(mesh.IsIsolated(v2));
+    EXPECT_TRUE(mesh.IsCollapseOk(*eOpt)) << "link condition should pass for interior edge in a 2-tri quad";
+
     // Put survivor at midpoint.
     auto h = mesh.Halfedge(*eOpt, 0);
     const VertexHandle a = mesh.FromVertex(h);
     const VertexHandle b = mesh.ToVertex(h);
     const glm::vec3 mid = 0.5f * (mesh.Position(a) + mesh.Position(b));
+
+    // Capture expected UV average BEFORE collapse — the survivor's UV is overwritten.
+    const glm::vec2 expectedAvg = 0.5f * (uv[a] + uv[b]);
 
     auto vSurvivorOpt = mesh.Collapse(*eOpt, mid);
     ASSERT_TRUE(vSurvivorOpt.has_value());
@@ -80,7 +90,6 @@ TEST(Attributes_TopologyEdits, CollapseMergesVertexProperty)
     // The current implementation keeps `FromVertex(h0)` as survivor.
     const VertexHandle vSurvivor = *vSurvivorOpt;
 
-    const glm::vec2 expectedAvg = 0.5f * (uv[a] + uv[b]);
     EXPECT_NEAR(uv[vSurvivor].x, expectedAvg.x, 1e-6f);
     EXPECT_NEAR(uv[vSurvivor].y, expectedAvg.y, 1e-6f);
 }
