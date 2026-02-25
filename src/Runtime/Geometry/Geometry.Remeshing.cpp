@@ -21,22 +21,7 @@ namespace Geometry::Remeshing
 {
     using MeshUtils::EdgeLengthSq;
     using MeshUtils::MeanEdgeLength;
-    using MeshUtils::FaceNormal;
-    using MeshUtils::VertexNormal;
-    using MeshUtils::TargetValence;
-
-    // Compute valence deviation from target for four vertices affected by a flip
-    static int ValenceDeviation(const Halfedge::Mesh& mesh,
-                                VertexHandle a, VertexHandle b,
-                                VertexHandle c, VertexHandle d)
-    {
-        auto dev = [&](VertexHandle v) -> int {
-            int val = static_cast<int>(mesh.Valence(v));
-            int target = TargetValence(mesh, v);
-            return std::abs(val - target);
-        };
-        return dev(a) + dev(b) + dev(c) + dev(d);
-    }
+    using MeshUtils::EqualizeValenceByEdgeFlip;
 
     // =========================================================================
     // Step 1: Split long edges
@@ -146,130 +131,6 @@ namespace Geometry::Remeshing
     }
 
     // =========================================================================
-    // Step 3: Equalize valence via edge flips
-    // =========================================================================
-    static std::size_t EqualizeValence(Halfedge::Mesh& mesh, bool preserveBoundary)
-    {
-        std::size_t flipCount = 0;
-
-        for (std::size_t ei = 0; ei < mesh.EdgesSize(); ++ei)
-        {
-            EdgeHandle e{static_cast<PropertyIndex>(ei)};
-            if (mesh.IsDeleted(e)) continue;
-            if (mesh.IsBoundary(e)) continue;
-
-            if (!mesh.IsFlipOk(e))
-                continue;
-
-            // The four vertices involved in a potential flip
-            HalfedgeHandle h0{static_cast<PropertyIndex>(2u * ei)};
-            HalfedgeHandle h1 = mesh.OppositeHalfedge(h0);
-
-            VertexHandle a = mesh.FromVertex(h0); // endpoint
-            VertexHandle b = mesh.ToVertex(h0);   // endpoint
-            VertexHandle c = mesh.ToVertex(mesh.NextHalfedge(h0)); // opposite in face 0
-            VertexHandle d = mesh.ToVertex(mesh.NextHalfedge(h1)); // opposite in face 1
-
-            if (preserveBoundary)
-            {
-                if (mesh.IsBoundary(a) || mesh.IsBoundary(b) ||
-                    mesh.IsBoundary(c) || mesh.IsBoundary(d))
-                    continue;
-            }
-
-            // Before flip: edge connects a-b
-            int devBefore = ValenceDeviation(mesh, a, b, c, d);
-
-            // After flip: edge would connect c-d
-            // Valence changes: a loses 1, b loses 1, c gains 1, d gains 1
-            auto devAfterFlip = [&]() -> int {
-                auto devSimulated = [&](VertexHandle v, int adjust) -> int {
-                    int val = static_cast<int>(mesh.Valence(v)) + adjust;
-                    int target = TargetValence(mesh, v);
-                    return std::abs(val - target);
-                };
-                return devSimulated(a, -1) + devSimulated(b, -1) +
-                       devSimulated(c, +1) + devSimulated(d, +1);
-            };
-
-            int devAfter = devAfterFlip();
-
-            // Only flip if it improves valence by at least 1
-            if (devAfter < devBefore)
-            {
-                (void)mesh.Flip(e);
-                ++flipCount;
-            }
-        }
-
-        return flipCount;
-    }
-
-    // =========================================================================
-    // Step 4: Tangential Laplacian smoothing
-    // =========================================================================
-    static void TangentialSmooth(Halfedge::Mesh& mesh, double lambda, bool preserveBoundary)
-    {
-        const std::size_t nV = mesh.VerticesSize();
-        std::vector<glm::vec3> newPositions(nV);
-
-        for (std::size_t vi = 0; vi < nV; ++vi)
-        {
-            VertexHandle vh{static_cast<PropertyIndex>(vi)};
-            if (mesh.IsDeleted(vh) || mesh.IsIsolated(vh))
-            {
-                newPositions[vi] = mesh.Position(vh);
-                continue;
-            }
-
-            if (preserveBoundary && mesh.IsBoundary(vh))
-            {
-                newPositions[vi] = mesh.Position(vh);
-                continue;
-            }
-
-            glm::vec3 p = mesh.Position(vh);
-
-            // Compute uniform Laplacian displacement
-            glm::vec3 centroid(0.0f);
-            std::size_t count = 0;
-            HalfedgeHandle hStart = mesh.Halfedge(vh);
-            HalfedgeHandle h = hStart;
-            std::size_t safety = 0;
-            do
-            {
-                centroid += mesh.Position(mesh.ToVertex(h));
-                ++count;
-                h = mesh.CWRotatedHalfedge(h);
-                if (++safety > 100) break;
-            } while (h != hStart);
-
-            if (count == 0)
-            {
-                newPositions[vi] = p;
-                continue;
-            }
-
-            centroid /= static_cast<float>(count);
-            glm::vec3 displacement = centroid - p;
-
-            // Project displacement onto tangent plane
-            glm::vec3 n = VertexNormal(mesh, vh);
-            glm::vec3 tangentialDisp = displacement - glm::dot(displacement, n) * n;
-
-            newPositions[vi] = p + static_cast<float>(lambda) * tangentialDisp;
-        }
-
-        // Apply new positions
-        for (std::size_t vi = 0; vi < nV; ++vi)
-        {
-            VertexHandle vh{static_cast<PropertyIndex>(vi)};
-            if (mesh.IsDeleted(vh) || mesh.IsIsolated(vh)) continue;
-            mesh.Position(vh) = newPositions[vi];
-        }
-    }
-
-    // =========================================================================
     // Main remeshing function
     // =========================================================================
 
@@ -306,10 +167,10 @@ namespace Geometry::Remeshing
                                                        params.PreserveBoundary);
 
             // Step 3: Equalize valence
-            result.FlipCount += EqualizeValence(mesh, params.PreserveBoundary);
+            result.FlipCount += EqualizeValenceByEdgeFlip(mesh, params.PreserveBoundary);
 
             // Step 4: Tangential smoothing
-            TangentialSmooth(mesh, params.SmoothingLambda, params.PreserveBoundary);
+            MeshUtils::TangentialSmooth(mesh, params.SmoothingLambda, params.PreserveBoundary);
 
             result.IterationsPerformed = iter + 1;
         }

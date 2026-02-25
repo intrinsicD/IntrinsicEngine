@@ -47,4 +47,10 @@ export namespace Geometry::MeshUtils
 
     /// Target valence for isotropic remeshing: 6 for interior, 4 for boundary.
     int TargetValence(const Halfedge::Mesh& mesh, VertexHandle v);
+
+    /// Shared edge-flip pass used by remeshing operators to reduce valence error.
+    std::size_t EqualizeValenceByEdgeFlip(Halfedge::Mesh& mesh, bool preserveBoundary);
+
+    /// Shared tangential Laplacian smoothing pass used by remeshing operators.
+    void TangentialSmooth(Halfedge::Mesh& mesh, double lambda, bool preserveBoundary);
 }
