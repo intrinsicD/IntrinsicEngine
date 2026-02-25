@@ -51,7 +51,89 @@ This document tracks **what's left to do** in IntrinsicEngine's architecture.
   - Define measurable targets for DAG compile budget, scheduler contention/tail latency, and frame critical-path timing.
   - Add instrumentation for queue contention, steal ratio, barrier/idle wait time, and per-frame compile/execute split.
 
+## 1.2 2026-02-26 Code Quality Audit (Style/Syntax, Architecture, Duplication)
+
+This section captures **newly observed inconsistencies** and concrete remediation actions.
+
+### A. Coding style & syntax consistency
+
+- [ ] **Eliminate contradictory CMake release-flag assignments (High).**
+  - `INTRINSIC_RELEASE_FLAGS` is assigned twice in top-level `CMakeLists.txt`; the second assignment silently overrides the first.
+  - This introduces configuration drift and makes optimization policy ambiguous (`-march=native` path is partially duplicated then reset).
+  - Action: keep a single source of truth for release flags and gate native-arch only through `INTRINSIC_ENABLE_NATIVE_ARCH`.
+
+- [ ] **Normalize TODO comment policy in production code (Medium).**
+  - There is an inline unresolved TODO in `Runtime.RenderOrchestrator` constructor about `defaultTextureIndex` ownership/use.
+  - TODOs should be tracked in this architecture backlog with acceptance criteria; code comments should reference an issue/backlog item ID, not open-ended questions.
+  - Action: either remove the parameter and call-site plumbing, or wire it to a concrete behavior (fallback material/texture path).
+
+- [ ] **Align modern C++ usage with stated C++23 standards (Medium).**
+  - Current codebase uses `std::expected` but does not use monadic `.and_then/.transform` patterns; explicit object parameters are also absent.
+  - Action: define a focused adoption policy: require monadic chaining for multi-stage expected pipelines (importers/asset loading), and document where explicit object parameters are beneficial vs noisy.
+
+### B. Architecture findings
+
+- [ ] **Close the gap between “fiber parking” goal and current scheduler behavior (High).**
+  - Scheduler currently uses worker-local deques + stealing + global inject queue, but waits are thread-level (`WaitForAll`) rather than dependency-level fiber parking.
+  - Result: potential head-of-line blocking for wait-heavy chains and weaker latency isolation under mixed workloads.
+  - Action: add parked continuation queues keyed by dependency counters/events, with wake-on-ready semantics and telemetry (`park_count`, `park_ns`, `unpark_ns`).
+
+- [ ] **Remove CPU FrameGraph layer barriers that serialize independent work (High).**
+  - `FrameGraph::Execute()` executes per-layer and performs `Tasks::Scheduler::WaitForAll()` barrier after each multi-pass layer.
+  - This preserves correctness but over-serializes the schedule and can inflate frame critical path.
+  - Action: execute ready tasks continuously from indegree counters (Kahn-ready queue) and keep layers only as debug metadata.
+
+- [ ] **Reduce compile-time overhead in `Core::DAGScheduler` hot paths (High).**
+  - `GetResourceState()` and edge dedupe both rely on linear scans (`O(R)` and `O(out_degree)` respectively).
+  - Existing TODO marks this medium priority, but this is on the per-frame compile path and should be treated as a high-priority perf risk as node/resource counts grow.
+  - Action: switch resource-state lookup to flat hash table and use per-node small-set/bit-guard for edge dedupe.
+
+- [ ] **Clarify ownership boundaries and remove avoidable shared ownership in runtime hot paths (Medium).**
+  - Device/runtime orchestration APIs still expose widespread `std::shared_ptr` ownership even when ownership appears single-rooted.
+  - Action: convert to explicit owner + borrowed refs/spans/handles where lifetime is frame- or system-scoped.
+
+- [ ] **Replace manual `new/delete` for core RHI members (Medium).**
+  - `RHI::VulkanDevice` still uses raw `new`/`delete` for `TransientAllocator`.
+  - Action: migrate to `std::unique_ptr` (or arena-owned handle) to tighten exception-safety assumptions and ownership clarity.
+
+### C. Code duplication hotspots
+
+- [ ] **Consolidate importer text parsing boilerplate (Medium).**
+  - Multiple importers repeat near-identical patterns: byte-span → `string_view` → `istringstream` line loop → per-line `stringstream` tokenization.
+  - Action: introduce shared tokenizer/line-reader utilities (non-allocating span parser) to cut duplication and improve parser throughput.
+
+- [ ] **Consolidate importer post-process defaults (Medium).**
+  - Fallback normal/color/aux population and “invalid/empty data” checks are duplicated across loaders.
+  - Action: centralize into `GeometryImportPostProcess` helpers with deterministic policy flags per format.
+
+- [ ] **Unify shader registration and pass wiring declarations (Low).**
+  - `RenderOrchestrator::InitPipeline()` manually registers many shaders via repetitive statements.
+  - Action: switch to table-driven registration (`constexpr` array of `{id,path}`), enabling consistency checks and easier hot-reload integration.
+
+### D. Problems in current TODO governance (meta)
+
+- [ ] **Policy violation: file claims open-TODO-only, but contains large DONE narratives (High).**
+  - The document states completed items should not remain here, yet extensive DONE sections remain in Feature Roadmap and debug visualization sections.
+  - Action: split into two docs:
+    1. `ARCHITECTURE_BACKLOG.md` (open actionable TODOs only, each with owner/severity/exit criteria)
+    2. `ARCHITECTURE_CHANGELOG.md` (DONE history and rationale)
+
+- [ ] **Missing measurable acceptance criteria for several high-impact TODOs (High).**
+  - Items mention goals (fairness/tail behavior/critical path) without explicit thresholds.
+  - Action: for each High item define concrete SLO gates (example: `FrameGraph CPU execute p95 < 0.35 ms @ 2k nodes`, `steal ratio target band`, `compile budget p99`).
+
+- [ ] **Priority calibration mismatch (Medium).**
+  - DAGScheduler compile-path optimization is labeled Medium despite being in per-frame orchestration path.
+  - Action: re-rank based on frame-time impact and CI perf telemetry, not implementation convenience.
+
+- [ ] **Ownership drift TODO duplicates unresolved code-level TODO (Medium).**
+  - Backlog item and inline code TODO point to the same unresolved `defaultTextureIndex` issue.
+  - Action: keep a single source (backlog item with ID), remove ambiguous inline TODO text once linked.
+
+---
+
 ## 2. Feature Roadmap
+
 
 ### 2.1 Rendering Modes
 
