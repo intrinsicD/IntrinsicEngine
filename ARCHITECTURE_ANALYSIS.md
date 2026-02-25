@@ -18,6 +18,40 @@ This document tracks **what's left to do** in IntrinsicEngine's architecture.
 
 ## 1. Open TODOs (What's left)
 
+### 1.1 2026-02-25 Architecture Review Follow-ups
+
+- [ ] **Upgrade `Core::Tasks` toward hybrid work stealing + fiber waits (High).**
+  - Add per-worker Chase-Lev deques for local LIFO execution and tail stealing.
+  - Keep a global inject queue only for external producers.
+  - Introduce fiber parking for dependency waits so OS threads stay runnable under fine-grain synchronization.
+  - Treat global task counters as telemetry/diagnostics, not the primary synchronization contract.
+
+- [ ] **Remove coarse FrameGraph layer barriers (High).**
+  - Replace per-layer `WaitForAll()` execution with dependency-count-driven ready queues.
+  - Preserve layer grouping for diagnostics/visualization only.
+  - Add optional critical-path-aware pass prioritization to reduce frame makespan and tail latency.
+
+- [ ] **Optimize `Core::DAGScheduler` compile-path lookup + dedupe structures (Medium).**
+  - Replace linear `resourceKey` scans with a flat hash/robin-hood table.
+  - Add faster producer-edge dedupe for high-degree nodes (sorted-vector fast path and/or compact bloom/bitset guard).
+  - Keep current pool/high-water-mark reuse strategy while changing lookup structures.
+
+- [ ] **Resolve runtime API/ownership drift in orchestration paths (Medium).**
+  - Remove or fully wire `defaultTextureIndex` in `Runtime.RenderOrchestrator` constructor.
+  - Audit central runtime ownership boundaries and reduce `std::shared_ptr` usage where borrowed references or explicit owners are sufficient.
+
+- [ ] **Add offline dependency mode to CMake configure (Medium).**
+  - Provide an `INTRINSIC_OFFLINE_DEPS=ON` path that avoids network fetch during configure.
+  - Document vendored/mirrored dependency workflows for restricted CI and reproducible local setup.
+
+- [ ] **Tighten architecture backlog governance (Low).**
+  - Keep this file focused on open actions only.
+  - Move DONE narratives/historical context into changelog or release notes.
+
+- [ ] **Establish architecture SLOs + telemetry milestones (Cross-cutting).**
+  - Define measurable targets for DAG compile budget, scheduler contention/tail latency, and frame critical-path timing.
+  - Add instrumentation for queue contention, steal ratio, barrier/idle wait time, and per-frame compile/execute split.
+
 ## 2. Feature Roadmap
 
 ### 2.1 Rendering Modes
