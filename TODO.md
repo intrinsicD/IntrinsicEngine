@@ -53,11 +53,6 @@ This section captures **newly observed inconsistencies** and concrete remediatio
 
 ### A. Coding style & syntax consistency
 
-- [ ] **Eliminate contradictory CMake release-flag assignments (High).**
-  - `INTRINSIC_RELEASE_FLAGS` is assigned twice in top-level `CMakeLists.txt`; the second assignment silently overrides the first.
-  - This introduces configuration drift and makes optimization policy ambiguous (`-march=native` path is partially duplicated then reset).
-  - Action: keep a single source of truth for release flags and gate native-arch only through `INTRINSIC_ENABLE_NATIVE_ARCH`.
-
 - [ ] **Normalize TODO comment policy in production code (Medium).**
   - There is an inline unresolved TODO in `Runtime.RenderOrchestrator` constructor about `defaultTextureIndex` ownership/use.
   - TODOs should be tracked in this architecture backlog with acceptance criteria; code comments should reference an issue/backlog item ID, not open-ended questions.

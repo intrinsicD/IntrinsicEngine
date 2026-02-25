@@ -12,3 +12,11 @@ Completed governance cleanups moved out of the active backlog:
 
 - Tightened backlog governance by moving feature roadmap and phase-planning content from `TODO.md` into `ROADMAP.md`.
 - Resolved the policy violation where the active backlog mixed open actions with DONE narratives; `TODO.md` now remains open-actions-only while historical/completion notes live in `DONE.md`.
+
+## 2026-02-26 CMake Release Flag Consolidation
+
+Completed the code-quality backlog item for release flag drift:
+
+- Removed the duplicate top-level `INTRINSIC_RELEASE_FLAGS` assignment in `CMakeLists.txt` that previously shadowed an earlier value.
+- Kept a single source of truth for release optimization flags (`-O3` for `Release`/`RelWithDebInfo`).
+- Preserved `-march=native` as an explicit opt-in controlled only by `INTRINSIC_ENABLE_NATIVE_ARCH`.
