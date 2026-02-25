@@ -95,8 +95,12 @@ namespace Graphics::Passes
         m_PointSetLayout = CreateSSBODescriptorSetLayout(
             m_Device->GetLogicalDevice(), VK_SHADER_STAGE_VERTEX_BIT, "PointCloudRenderPass");
 
-        // Allocate per-frame descriptor sets.
+        // Allocate per-frame descriptor sets (legacy path).
         AllocatePerFrameSets<FRAMES>(descriptorPool, m_PointSetLayout, m_PointDescSets);
+
+        // Allocate per-mode per-frame descriptor sets.
+        for (uint32_t m = 0; m < 4; ++m)
+            AllocatePerFrameSets<FRAMES>(descriptorPool, m_PointSetLayout, m_PointDescSetsByMode[m]);
     }
 
     // =========================================================================
@@ -197,7 +201,8 @@ namespace Graphics::Passes
                                           VkDescriptorSet globalSet,
                                           uint32_t dynamicOffset,
                                           VkExtent2D extent,
-                                          uint32_t pointCount)
+                                          uint32_t pointCount,
+                                          Geometry::PointCloud::RenderMode mode)
     {
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_Pipeline->GetHandle());
         vkCmdSetPrimitiveTopology(cmd, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
@@ -215,12 +220,13 @@ namespace Graphics::Passes
                                 1, 1, &pointSet,
                                 0, nullptr);
 
-        // Push constants.
+        // Push constants — use the explicit mode, not the member variable,
+        // because this runs deferred during render graph execution.
         PointCloudPushConstants push{};
         push.SizeMultiplier = SizeMultiplier;
         push.ViewportWidth = static_cast<float>(extent.width);
         push.ViewportHeight = static_cast<float>(extent.height);
-        push.RenderMode = static_cast<uint32_t>(RenderMode);
+        push.RenderMode = static_cast<uint32_t>(mode);
 
         vkCmdPushConstants(cmd, m_Pipeline->GetLayout(),
                            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
@@ -269,6 +275,11 @@ namespace Graphics::Passes
 
             // Ensure SSBO capacity for this mode-batch.
             const uint32_t batchCount = static_cast<uint32_t>(pts.size());
+
+            // Each mode gets its own descriptor set to avoid the shared-descriptor
+            // overwrite bug when multiple modes are active in the same frame.
+            VkDescriptorSet batchDescSet = VK_NULL_HANDLE;
+
             if (modeIdx < 4)
             {
                 if (!EnsureBufferMode(modeIdx, batchCount))
@@ -276,35 +287,34 @@ namespace Graphics::Passes
 
                 // Upload batch points into the mode-specific per-frame buffer.
                 m_PointBuffersByMode[modeIdx][frameIndex]->Write(pts.data(), pts.size_bytes());
-                UpdateSSBODescriptor(m_Device->GetLogicalDevice(), m_PointDescSets[frameIndex],
+                batchDescSet = m_PointDescSetsByMode[modeIdx][frameIndex];
+                UpdateSSBODescriptor(m_Device->GetLogicalDevice(), batchDescSet,
                                      0, m_PointBuffersByMode[modeIdx][frameIndex]->GetHandle(), pts.size_bytes());
             }
             else
             {
-                // Fallback path: unexpected mode  store in legacy buffer.
+                // Fallback path: unexpected mode — store in legacy buffer.
                 if (!EnsureBuffer(batchCount))
                     return;
 
                 m_PointBuffers[frameIndex]->Write(pts.data(), pts.size_bytes());
-                UpdateSSBODescriptor(m_Device->GetLogicalDevice(), m_PointDescSets[frameIndex],
+                batchDescSet = m_PointDescSets[frameIndex];
+                UpdateSSBODescriptor(m_Device->GetLogicalDevice(), batchDescSet,
                                      0, m_PointBuffers[frameIndex]->GetHandle(), pts.size_bytes());
             }
-
-            // Set pass-global mode for RecordDraw (it reads RenderMode member).
-            const auto oldMode = RenderMode;
-            RenderMode = mode;
 
             // Fetch resource handles.
             const RGResourceHandle backbuffer = ctx.Blackboard.Get("Backbuffer"_id);
             const RGResourceHandle depth = ctx.Blackboard.Get("SceneDepth"_id);
             if (!backbuffer.IsValid() || !depth.IsValid())
-            {
-                RenderMode = oldMode;
                 return;
-            }
 
-            // Add render graph pass.
+            // Capture mode and descriptor set by value — the execute lambda runs
+            // deferred during render graph execution, so reading from member
+            // variables at that point would see stale/wrong values.
             const uint32_t localCount = batchCount;
+            const auto capturedMode = mode;
+            const auto capturedDescSet = batchDescSet;
             ctx.Graph.AddPass<PointCloudPassData>("PointCloud",
                 [&](PointCloudPassData& data, RGBuilder& builder)
                 {
@@ -318,18 +328,17 @@ namespace Graphics::Passes
                     depthInfo.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
                     data.Depth = builder.WriteDepth(depth, depthInfo);
                 },
-                [this, &ctx, frameIndex, localCount](const PointCloudPassData&, const RGRegistry&, VkCommandBuffer cmd)
+                [this, &ctx, frameIndex, localCount, capturedMode, capturedDescSet](const PointCloudPassData&, const RGRegistry&, VkCommandBuffer cmd)
                 {
                     const uint32_t dynamicOffset = static_cast<uint32_t>(ctx.GlobalCameraDynamicOffset);
                     RecordDraw(cmd,
-                               m_PointDescSets[frameIndex],
+                               capturedDescSet,
                                ctx.GlobalDescriptorSet,
                                dynamicOffset,
                                ctx.Resolution,
-                               localCount);
+                               localCount,
+                               capturedMode);
                 });
-
-            RenderMode = oldMode;
         };
 
         // Mode-batched draws (one GPU pass per non-empty mode).

@@ -153,6 +153,11 @@ export namespace Graphics::Passes
         static constexpr uint32_t FRAMES = RHI::VulkanDevice::GetFramesInFlight();
         VkDescriptorSet m_PointDescSets[FRAMES] = {};
 
+        // Per-mode per-frame descriptor sets (one per render mode × frame).
+        // Avoids the shared-descriptor bug where multiple mode batches
+        // overwrite the same set before deferred render graph execution.
+        VkDescriptorSet m_PointDescSetsByMode[4][FRAMES] = {};
+
         // Per-frame host-visible SSBOs.
         std::unique_ptr<RHI::VulkanBuffer> m_PointBuffers[FRAMES];
         uint32_t m_BufferCapacity = 0; // in points
@@ -179,9 +184,10 @@ export namespace Graphics::Passes
         std::unique_ptr<RHI::GraphicsPipeline> BuildPipeline(
             VkFormat colorFormat, VkFormat depthFormat);
 
-        // Record draw commands.
+        // Record draw commands (explicit mode for deferred render-graph execution).
         void RecordDraw(VkCommandBuffer cmd, VkDescriptorSet pointSet,
                         VkDescriptorSet globalSet, uint32_t dynamicOffset,
-                        VkExtent2D extent, uint32_t pointCount);
+                        VkExtent2D extent, uint32_t pointCount,
+                        Geometry::PointCloud::RenderMode mode);
     };
 }
