@@ -43,11 +43,6 @@ This document tracks **what's left to do** in IntrinsicEngine's architecture.
   - Provide an `INTRINSIC_OFFLINE_DEPS=ON` path that avoids network fetch during configure.
   - Document vendored/mirrored dependency workflows for restricted CI and reproducible local setup.
 
-- [x] **Tighten architecture backlog governance (Low).**
-  - Keep this file focused on open actions only.
-  - Move DONE narratives/historical context into roadmap/history docs.
-  - ✅ 2026-02-26: moved Feature Roadmap and phase planning content to `ROADMAP.md`.
-
 - [ ] **Establish architecture SLOs + telemetry milestones (Cross-cutting).**
   - Define measurable targets for DAG compile budget, scheduler contention/tail latency, and frame critical-path timing.
   - Add instrumentation for queue contention, steal ratio, barrier/idle wait time, and per-frame compile/execute split.
@@ -112,10 +107,6 @@ This section captures **newly observed inconsistencies** and concrete remediatio
   - Action: switch to table-driven registration (`constexpr` array of `{id,path}`), enabling consistency checks and easier hot-reload integration.
 
 ### D. Problems in current TODO governance (meta)
-
-- [x] **Policy violation: file claims open-TODO-only, but contains large DONE narratives (High).**
-  - The document previously mixed active backlog items with roadmap and DONE narrative content.
-  - ✅ 2026-02-26: roadmap content moved to `ROADMAP.md`, leaving this file backlog-focused.
 
 - [ ] **Missing measurable acceptance criteria for several high-impact TODOs (High).**
   - Items mention goals (fairness/tail behavior/critical path) without explicit thresholds.
