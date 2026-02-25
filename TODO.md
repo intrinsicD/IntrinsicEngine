@@ -204,6 +204,67 @@ Implementation notes:
   **Mitigation:** generational ids and debug-mode poison checks.
 
 
+#### Execution work packages (implementation-ready)
+
+**WP1 — Scheduler wait-token substrate (Core::Tasks internals)**
+- Add a compact wait-token abstraction (`wait_kind`, `wait_slot`, `generation`) so parking/unparking paths never pass raw pointers.
+- Store token-indexed intrusive parked lists in SoA-friendly arrays (`head`, `tail`, `next`, `task_state`, `continuation`).
+- Require generational validation on every enqueue/dequeue to prevent ABA resume on recycled slots.
+- Exit criteria: deterministic single-resume behavior for token reuse under adversarial slot recycling tests.
+
+**WP2 — Fiber park/unpark API and worker loop integration**
+- Introduce internal APIs in `Core::Tasks`:
+  - `ParkCurrentFiber(WaitToken token)`
+  - `DrainReadyFromWaitQueues(uint32_t budget)`
+  - `TryTransitionParkedToReady(TaskId id)`
+- Worker main loop policy per tick: `local pop -> steal -> unpark drain -> idle backoff` (never block OS worker on dependency wait).
+- Add fairness tick every `N` local pops to force unpark/steal polling and avoid LIFO starvation.
+- Exit criteria: no blocking waits in worker hot path; runnable parked continuations are observed within bounded polling latency.
+
+**WP3 — Dependency counter wake wiring**
+- On dependency completion, atomically decrement unresolved count; when transition reaches zero, wake exactly once via CAS state change (`Parked -> Ready`).
+- Encode wake path as branch-light fast path:
+  - non-zero result => return
+  - zero result => CAS + ready enqueue
+- Keep wake logic sharded (per-worker/per-token shard) to reduce fan-in cache-line contention.
+- Exit criteria: zero lost wakeups, zero duplicate enqueue on randomized high-fan-in DAG stress.
+
+**WP4 — Telemetry + SLO instrumentation**
+- Emit per-frame counters/histograms:
+  - `tasks.park.count`, `tasks.unpark.count`
+  - `tasks.park.ns.{p50,p95,p99}`, `tasks.unpark.ns.{p50,p95,p99}`
+  - `tasks.deque.depth.{worker}` histogram
+  - `tasks.steal.ratio`, `tasks.idle.wait_ns`
+- Add compile-time telemetry toggle compatible with existing lock-free ring-buffer pipeline.
+- Exit criteria: metrics visible in telemetry export and stable under stress (no counter drift or negative deltas).
+
+**WP5 — FrameGraph orchestration touchpoint (incremental adoption)**
+- First pass: retain current layer metadata but replace dependency waits in hot path with continuation parking where dependency counters already exist.
+- Second pass: prepare migration path to ready-queue execution (TODO 1.1 item 2) without changing debug layer visualization semantics.
+- Exit criteria: existing FrameGraph regression tests pass unchanged; no additional frame stalls introduced.
+
+#### File-level change map (planned)
+
+- `src/Core/Tasks/`
+  - Scheduler internals and worker loop (`Scheduler`, wait queues, state transitions).
+  - Counter/event primitives that currently drive `WaitForAll()` behavior.
+- `src/Core/FrameGraph/`
+  - Narrow integration points where dependency waits currently force thread-level blocking.
+- `src/Core/Telemetry/`
+  - Counter/histogram declarations and per-frame emission plumbing.
+- `tests/` (Core + ECS targets)
+  - Unit tests for wake semantics and duplicate-prevention invariants.
+  - Stress tests for randomized DAG completion order and slot-generation safety.
+
+#### Delivery sequence (PR slicing)
+
+1. **PR-A (mechanics):** wait-token + park/unpark substrate + unit tests.
+2. **PR-B (integration):** dependency-counter wake wiring + worker-loop fairness policy.
+3. **PR-C (observability):** telemetry and SLO dashboards/exports.
+4. **PR-D (orchestration):** FrameGraph hot-path adoption + regression/perf comparison report.
+
+Each PR must remain bisect-safe and keep baseline tests green before proceeding.
+
 ### C. Duplication follow-ups (from latest duplicate-code hunt)
 
 - [ ] **Consolidate PLY importer parsing paths (High).**
