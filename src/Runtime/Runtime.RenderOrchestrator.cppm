@@ -36,7 +36,6 @@ export namespace Runtime
                            RHI::DescriptorLayout& descriptorLayout,
                            RHI::TextureSystem& textureSystem,
                            Core::Assets::AssetManager& assetManager,
-                           uint32_t defaultTextureIndex,
                            Core::FeatureRegistry* featureRegistry = nullptr,
                            size_t frameArenaSize = 1024 * 1024);
         ~RenderOrchestrator();

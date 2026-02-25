@@ -117,7 +117,6 @@ namespace Runtime
             m_GraphicsBackend->GetDescriptorLayout(),
             m_GraphicsBackend->GetTextureSystem(),
             GetAssetManager(),
-            m_GraphicsBackend->GetDefaultTextureIndex(),
             &m_FeatureRegistry,
             config.FrameArenaSize);
 
