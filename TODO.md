@@ -46,7 +46,7 @@ This document tracks **what's left to do** in IntrinsicEngine's architecture.
 - [x] **Tighten architecture backlog governance (Low).**
   - Keep this file focused on open actions only.
   - Move DONE narratives/historical context into roadmap/history docs.
-  - ✅ 2026-02-26: moved Feature Roadmap and phase planning content to `ARCHITECTURE_ROADMAP.md`.
+  - ✅ 2026-02-26: moved Feature Roadmap and phase planning content to `ROADMAP.md`.
 
 - [ ] **Establish architecture SLOs + telemetry milestones (Cross-cutting).**
   - Define measurable targets for DAG compile budget, scheduler contention/tail latency, and frame critical-path timing.
@@ -115,7 +115,7 @@ This section captures **newly observed inconsistencies** and concrete remediatio
 
 - [x] **Policy violation: file claims open-TODO-only, but contains large DONE narratives (High).**
   - The document previously mixed active backlog items with roadmap and DONE narrative content.
-  - ✅ 2026-02-26: roadmap content moved to `ARCHITECTURE_ROADMAP.md`, leaving this file backlog-focused.
+  - ✅ 2026-02-26: roadmap content moved to `ROADMAP.md`, leaving this file backlog-focused.
 
 - [ ] **Missing measurable acceptance criteria for several high-impact TODOs (High).**
   - Items mention goals (fairness/tail behavior/critical path) without explicit thresholds.
@@ -133,5 +133,5 @@ This section captures **newly observed inconsistencies** and concrete remediatio
 
 ## 2. Related Documents
 
-- `ARCHITECTURE_ROADMAP.md` — feature roadmap, prioritization phases, and long-horizon planning details.
-- `ARCHITECTURE_ANALYSIS_HISTORY.md` — historical notes and previously completed architecture narratives.
+- `ROADMAP.md` — feature roadmap, prioritization phases, and long-horizon planning details.
+- `DONE.md` — historical notes and previously completed architecture narratives.
