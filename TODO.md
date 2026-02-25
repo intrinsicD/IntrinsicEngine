@@ -122,6 +122,88 @@ This section captures **newly observed inconsistencies** and concrete remediatio
 
 ---
 
+## 1.3 Next TODO Deep-Dive (Execution Plan)
+
+### Target: Complete `Core::Tasks` fiber parking for dependency waits
+
+This is the **next implementation item** and should be executed before other scheduler/perf backlog entries because it unlocks lower tail latency for all wait-heavy systems (FrameGraph, async streaming, and asset processing).
+
+#### Problem statement
+
+Current behavior relies on worker-level blocking semantics for some dependency waits (e.g., `WaitForAll()` boundaries), which wastes worker throughput when continuations are logically runnable but physically tied to blocked threads.
+
+We want **continuation-level parking**: a task waiting on dependency count `d > 0` should suspend its fiber, release the worker to execute other ready work, and resume only when `d == 0`.
+
+#### Formal model (for correctness)
+
+Represent each task node `i` with:
+
+- unresolved dependency count: $\delta_i \in \mathbb{N}_0$
+- continuation handle (optional): $c_i$
+- state: $s_i \in \{\text{Ready}, \text{Running}, \text{Parked}, \text{Done}\}$
+
+Execution rules:
+
+1. **Ready condition:** $\delta_i = 0 \Rightarrow s_i = \text{Ready}$ and node can enter a runnable deque.
+2. **Park transition:** running node with unresolved wait `w > 0` transitions to $s_i = \text{Parked}$ and stores continuation `c_i` in wait-bucket keyed by dependency/event id.
+3. **Wake transition:** each dependency completion performs atomic decrement on blocked nodes; if a blocked node reaches $\delta_i = 0$, atomically move $s_i: \text{Parked} \to \text{Ready}$ and enqueue continuation exactly once.
+4. **Safety invariant:** each node enters `Ready` from `Parked` at most once per wait epoch (no duplicate enqueue).
+
+Expected complexity targets:
+
+- Parking: amortized $O(1)$ enqueue into wait bucket.
+- Wake: amortized $O(1)$ decrement + conditional ready enqueue.
+- Extra memory: $O(N + W)$ for task records + wait buckets (`N` tasks, `W` active waits).
+
+#### Data-oriented design
+
+Use SoA-style scheduler-side state to minimize cache misses and false sharing:
+
+- `TaskState[]` (byte state + generation)
+- `DependencyCount[]` (atomic `uint32_t`)
+- `ContinuationSlot[]` (fiber id / handle index)
+- `WaitBucketHead[]` (intrusive index list per event/counter)
+
+Implementation notes:
+
+- Keep per-worker ready deques as-is (LIFO local, stealing remote).
+- Add parked continuation queues per wait primitive (counter/event).
+- Guard wake-up with CAS state transition to prevent duplicate enqueue races.
+- Pad high-contention atomics to cache line boundaries to avoid false sharing.
+
+#### Incremental implementation plan
+
+1. **Core primitive:** introduce `ParkCurrentFiber(wait_token)` and `UnparkReady(wait_token)` internal APIs in `Core::Tasks`.
+2. **Counter integration:** wire dependency counters to invoke `UnparkReady` on transition-to-zero.
+3. **Scheduler loop:** ensure workers always prefer local ready tasks, then steal, then poll unpark queues before idle sleep.
+4. **Telemetry:** add `park_count`, `park_ns_p50/p95/p99`, `unpark_ns_p50/p95/p99`, per-worker deque depth histogram, steal ratio.
+5. **FrameGraph touchpoint:** replace layer-level thread waits in hot path with dependency-ready continuations where feasible.
+
+#### Acceptance criteria (must all pass)
+
+- No worker OS thread blocks on fine-grain dependency waits during normal task execution.
+- Zero lost wakeups under stress test (random dependency DAG fuzzing, 10k+ nodes/frame equivalent).
+- No duplicate continuation execution (exactly-once continuation resume guarantee).
+- Tail-latency improvement over baseline: p95 frame task wait time reduced by >= 25% on synthetic wait-heavy benchmark.
+- Telemetry emitted each frame for park/unpark + steal/deque metrics.
+
+#### Verification matrix
+
+- **Unit tests:** dependency counter wake semantics, ABA/generation safety, duplicate enqueue prevention.
+- **Concurrency stress tests:** randomized DAG with adversarial completion order + high worker counts.
+- **Regression tests:** existing task scheduler tests and FrameGraph execution tests unchanged/green.
+- **Perf tests:** A/B benchmark (`baseline` vs `fiber-park`) with fixed workload seeds and p50/p95/p99 reporting.
+
+#### Risks & mitigations
+
+- **Risk:** wake-queue contention under fan-in joins.
+  **Mitigation:** sharded wait buckets + per-worker drain batches.
+- **Risk:** starvation from local LIFO bias.
+  **Mitigation:** periodic fairness tick (force steal/poll interval).
+- **Risk:** lifecycle bugs from stale continuation handles.
+  **Mitigation:** generational ids and debug-mode poison checks.
+
+
 ## 2. Related Documents
 
 - `ROADMAP.md` — feature roadmap, prioritization phases, and long-horizon planning details.
