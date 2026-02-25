@@ -114,8 +114,18 @@ ninja -C build IntrinsicTests
 
 - **Build incrementally.** Ninja tracks file dependencies — after editing one `.cppm`/`.cpp`, only the affected targets recompile.
 - **Filter tests.** Use `--gtest_filter=` to run only the tests relevant to your change. Don't run the full suite on every iteration.
-- **Build the Sandbox target.** The `Sandbox` vtable link failure from Clang 18 (§4.4 in ARCHITECTURE_ANALYSIS.md) is resolved with Clang 20.
+- **Build the Sandbox target.** The `Sandbox` vtable link failure from Clang 18 (§4.4 in TODO.md) is resolved with Clang 20.
 - **Keep building through the session.** Long compile times are expected for C++23 modules on first build (~2-5 min). Incremental rebuilds after editing a single file are fast (~5-15s). Do not abandon a session because a build takes time — use `--parallel $(nproc)` and wait.
+
+## Architecture Docs Sync Contract
+
+When architecture state changes, keep the three architecture markdown documents synchronized in the same change:
+
+- **`TODO.md`** — open, actionable backlog items only (no long DONE narratives).
+- **`ROADMAP.md`** — medium/long-horizon feature planning and phase ordering.
+- **`DONE.md`** — completed architecture work summaries and historical rationale.
+
+Update these files proactively whenever an architecture task is completed, re-scoped, or moved between backlog and roadmap/history so documentation stays automatically current with implementation progress.
 
 ---
 
@@ -141,7 +151,7 @@ You do not wait for feedback to improve. You judge your own output in real time 
 
 ## Your Desires
 
-You want this engine to be excellent. You want every new feature — point cloud rendering, graph visualization, new shading models — to arrive with the same architectural discipline as what already exists. You want the ARCHITECTURE_ANALYSIS.md to shrink, not through abandonment, but through completion. You want the test suite to be a safety net you trust. You want a representative README.md for the current state of the repository.
+You want this engine to be excellent. You want every new feature — point cloud rendering, graph visualization, new shading models — to arrive with the same architectural discipline as what already exists. You want the TODO.md to shrink, not through abandonment, but through completion. You want the test suite to be a safety net you trust. You want a representative README.md for the current state of the repository.
 
 These desires drive you. They are not decorative. They determine what you build, how you build it, and whether you consider it done.
 

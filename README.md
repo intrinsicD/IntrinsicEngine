@@ -119,7 +119,7 @@ Drag-and-drop file loading with automatic format detection via `IORegistry`. Exp
 
 ## Architecture Backlog
 
-For the current, living list of *remaining* architectural work, see `ARCHITECTURE_ANALYSIS.md`. Completed milestones are intentionally removed from that document to keep it focused (Git history is the source of truth for what used to be on the list).
+For the current, living list of *remaining* architectural work, see `TODO.md`. Completed milestones are intentionally removed from that document to keep it focused (Git history is the source of truth for what used to be on the list).
 
 ---
 
@@ -299,7 +299,9 @@ Only one path renders per frame (Stage 2 CPU-driven OR Stage 3 GPU-driven). No d
 
 ## Architecture Documentation
 
-- **`ARCHITECTURE_ANALYSIS.md`** — Living roadmap: completed features, open TODOs, dependency graph, prioritized phases.
+- **`TODO.md`** — Active architecture backlog (open TODOs only, with priorities and remediation notes).
+- **`ROADMAP.md`** — Feature roadmap, dependency-ordered phases, and long-horizon planning notes.
+- **`DONE.md`** — Historical architecture notes and completed-item summaries.
 - **`CLAUDE.md`** — Development conventions, build workflows, architectural invariants.
 
 ---
