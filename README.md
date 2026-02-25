@@ -299,7 +299,9 @@ Only one path renders per frame (Stage 2 CPU-driven OR Stage 3 GPU-driven). No d
 
 ## Architecture Documentation
 
-- **`ARCHITECTURE_ANALYSIS.md`** — Living roadmap: completed features, open TODOs, dependency graph, prioritized phases.
+- **`ARCHITECTURE_ANALYSIS.md`** — Active architecture backlog (open TODOs only, with priorities and remediation notes).
+- **`ARCHITECTURE_ROADMAP.md`** — Feature roadmap, dependency-ordered phases, and long-horizon planning notes.
+- **`ARCHITECTURE_ANALYSIS_HISTORY.md`** — Historical architecture notes and completed-item summaries.
 - **`CLAUDE.md`** — Development conventions, build workflows, architectural invariants.
 
 ---
