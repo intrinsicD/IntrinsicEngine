@@ -153,9 +153,10 @@ export namespace Graphics::Passes
         static constexpr uint32_t FRAMES = RHI::VulkanDevice::GetFramesInFlight();
         VkDescriptorSet m_PointDescSets[FRAMES] = {};
 
-        // Per-mode per-frame descriptor sets (0..3).
-        // Each mode gets its own descriptor set so multiple modes can coexist
-        // in the same frame without overwriting each other's SSBO binding.
+        // Per-mode per-frame descriptor sets (one per render mode × frame).
+        // Avoids the shared-descriptor bug where multiple mode batches
+        // overwrite the same set before deferred render graph execution.
+
         VkDescriptorSet m_PointDescSetsByMode[4][FRAMES] = {};
 
         // Per-frame host-visible SSBOs.
@@ -184,7 +185,7 @@ export namespace Graphics::Passes
         std::unique_ptr<RHI::GraphicsPipeline> BuildPipeline(
             VkFormat colorFormat, VkFormat depthFormat);
 
-        // Record draw commands.
+        // Record draw commands (explicit mode for deferred render-graph execution).
         void RecordDraw(VkCommandBuffer cmd, VkDescriptorSet pointSet,
                         VkDescriptorSet globalSet, uint32_t dynamicOffset,
                         VkExtent2D extent, uint32_t pointCount,

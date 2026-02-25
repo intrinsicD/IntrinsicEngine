@@ -95,12 +95,13 @@ namespace Graphics::Passes
         m_PointSetLayout = CreateSSBODescriptorSetLayout(
             m_Device->GetLogicalDevice(), VK_SHADER_STAGE_VERTEX_BIT, "PointCloudRenderPass");
 
-        // Allocate per-frame descriptor sets (legacy back-compat bucket).
+        // Allocate per-frame descriptor sets (legacy path).
         AllocatePerFrameSets<FRAMES>(descriptorPool, m_PointSetLayout, m_PointDescSets);
 
         // Allocate per-mode per-frame descriptor sets.
-        for (uint32_t mode = 0; mode < 4; ++mode)
-            AllocatePerFrameSets<FRAMES>(descriptorPool, m_PointSetLayout, m_PointDescSetsByMode[mode]);
+        for (uint32_t m = 0; m < 4; ++m)
+            AllocatePerFrameSets<FRAMES>(descriptorPool, m_PointSetLayout, m_PointDescSetsByMode[m]);
+
     }
 
     // =========================================================================
@@ -220,7 +221,8 @@ namespace Graphics::Passes
                                 1, 1, &pointSet,
                                 0, nullptr);
 
-        // Push constants.
+        // Push constants — use the explicit mode, not the member variable,
+        // because this runs deferred during render graph execution.
         PointCloudPushConstants push{};
         push.SizeMultiplier = SizeMultiplier;
         push.ViewportWidth = static_cast<float>(extent.width);
@@ -275,7 +277,10 @@ namespace Graphics::Passes
 
             // Ensure SSBO capacity for this mode-batch.
             const uint32_t batchCount = static_cast<uint32_t>(pts.size());
-            // Select the correct descriptor set for this mode.
+
+            // Each mode gets its own descriptor set to avoid the shared-descriptor
+            // overwrite bug when multiple modes are active in the same frame.
+
             VkDescriptorSet batchDescSet = VK_NULL_HANDLE;
 
             if (modeIdx < 4)
@@ -285,8 +290,10 @@ namespace Graphics::Passes
 
                 // Upload batch points into the mode-specific per-frame buffer.
                 m_PointBuffersByMode[modeIdx][frameIndex]->Write(pts.data(), pts.size_bytes());
-                UpdateSSBODescriptor(m_Device->GetLogicalDevice(), m_PointDescSetsByMode[modeIdx][frameIndex],
-                                     0, m_PointBuffersByMode[modeIdx][frameIndex]->GetHandle(), pts.size_bytes());
+              
+                batchDescSet = m_PointDescSetsByMode[modeIdx][frameIndex];
+                UpdateSSBODescriptor(m_Device->GetLogicalDevice(), batchDescSet,0, 
+                                     m_PointBuffersByMode[modeIdx][frameIndex]->GetHandle(), pts.size_bytes());
                 batchDescSet = m_PointDescSetsByMode[modeIdx][frameIndex];
             }
             else
@@ -296,7 +303,8 @@ namespace Graphics::Passes
                     return;
 
                 m_PointBuffers[frameIndex]->Write(pts.data(), pts.size_bytes());
-                UpdateSSBODescriptor(m_Device->GetLogicalDevice(), m_PointDescSets[frameIndex],
+                batchDescSet = m_PointDescSets[frameIndex];
+                UpdateSSBODescriptor(m_Device->GetLogicalDevice(), batchDescSet,
                                      0, m_PointBuffers[frameIndex]->GetHandle(), pts.size_bytes());
                 batchDescSet = m_PointDescSets[frameIndex];
             }
@@ -307,12 +315,13 @@ namespace Graphics::Passes
             if (!backbuffer.IsValid() || !depth.IsValid())
                 return;
 
-            // Add render graph pass. Capture mode and descriptor set by value so the
-            // deferred lambda records the correct push constant and SSBO binding
-            // regardless of when it executes.
+            // Capture mode and descriptor set by value — the execute lambda runs
+            // deferred during render graph execution, so reading from member
+            // variables at that point would see stale/wrong values.
             const uint32_t localCount = batchCount;
             const auto capturedMode = mode;
-            const VkDescriptorSet capturedDescSet = batchDescSet;
+            const auto capturedDescSet = batchDescSet;
+
             ctx.Graph.AddPass<PointCloudPassData>("PointCloud",
                 [&](PointCloudPassData& data, RGBuilder& builder)
                 {
@@ -326,7 +335,8 @@ namespace Graphics::Passes
                     depthInfo.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
                     data.Depth = builder.WriteDepth(depth, depthInfo);
                 },
-                [this, &ctx, localCount, capturedMode, capturedDescSet](const PointCloudPassData&, const RGRegistry&, VkCommandBuffer cmd)
+                [this, &ctx, frameIndex, localCount, capturedMode, capturedDescSet](const PointCloudPassData&, const RGRegistry&, VkCommandBuffer cmd)
+
                 {
                     const uint32_t dynamicOffset = static_cast<uint32_t>(ctx.GlobalCameraDynamicOffset);
                     RecordDraw(cmd,
