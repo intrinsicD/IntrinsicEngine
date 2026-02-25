@@ -101,13 +101,6 @@ if(INTRINSIC_ENABLE_SANITIZERS)
 else()
     message(STATUS "Sanitizers DISABLED (libclang_rt.asan not found or manually turned off)")
 endif()
-set(INTRINSIC_RELEASE_FLAGS
-        $<$<CONFIG:Release>:-O3>
-        $<$<CONFIG:RelWithDebInfo>:-O3>
-
-        # Optional: Optimize for the specific CPU you are compiling on (Faster, but not portable)
-        $<$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>>:-march=native>
-)
 option(INTRINSIC_ENABLE_NATIVE_ARCH "Enable -march=native for local profiling builds" OFF)
 
 set(INTRINSIC_RELEASE_FLAGS
