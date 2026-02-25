@@ -6,6 +6,8 @@ This document contains medium/long-horizon feature planning and phase prioritiza
 
 Backlog hygiene update (2026-02-26): release-flag consolidation is complete; `INTRINSIC_RELEASE_FLAGS` now has a single authoritative assignment, with native-arch tuning gated only by `INTRINSIC_ENABLE_NATIVE_ARCH`.
 
+Backlog completion update (2026-02-26): configure-time offline dependency mode is now available via `-DINTRINSIC_OFFLINE_DEPS=ON`, which forces local `external/cache/<dep>-src` sources and disables FetchContent network updates.
+
 1. **Core::Tasks fiber parking for dependency waits** (current top priority).
    - Deliver continuation-level park/unpark semantics so wait-heavy graphs do not block worker OS threads.
    - Gate completion on telemetry-backed SLO checks (park/unpark latency, steal ratio, deque depth, tail wait reduction).

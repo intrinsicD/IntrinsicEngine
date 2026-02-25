@@ -102,6 +102,10 @@ else()
     message(STATUS "Sanitizers DISABLED (libclang_rt.asan not found or manually turned off)")
 endif()
 option(INTRINSIC_ENABLE_NATIVE_ARCH "Enable -march=native for local profiling builds" OFF)
+option(INTRINSIC_OFFLINE_DEPS
+    "Disable network dependency fetches and require pre-populated external/cache/<name>-src trees"
+    OFF
+)
 
 set(INTRINSIC_RELEASE_FLAGS
         $<$<CONFIG:Release>:-O3>
