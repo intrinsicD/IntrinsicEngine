@@ -2,6 +2,18 @@
 
 This document contains medium/long-horizon feature planning and phase prioritization that were previously co-located with the architecture TODO backlog.
 
+## 1. Near-Term Execution Order (Architecture)
+
+1. **Core::Tasks fiber parking for dependency waits** (current top priority).
+   - Deliver continuation-level park/unpark semantics so wait-heavy graphs do not block worker OS threads.
+   - Gate completion on telemetry-backed SLO checks (park/unpark latency, steal ratio, deque depth, tail wait reduction).
+2. **FrameGraph ready-queue execution (remove coarse layer barriers).**
+   - Preserve layers as diagnostics only; schedule by dependency readiness.
+3. **DAGScheduler compile-path lookup/edge-dedupe optimization.**
+   - Move resource lookup and dedupe structures to flat-hash/small-set style to control per-frame compile cost growth.
+
+This order is intentional: item (1) improves scheduler substrate, item (2) unlocks orchestration-level gains on top of that substrate, and item (3) reduces compile overhead once execution-path parallelism is no longer barrier-limited.
+
 ## 2. Feature Roadmap
 
 
