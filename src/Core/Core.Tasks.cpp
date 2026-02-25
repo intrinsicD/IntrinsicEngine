@@ -7,6 +7,7 @@ module;
 #include <atomic>
 #include <memory>
 #include <coroutine>
+#include <optional>
 
 #if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
   #include <immintrin.h> // _mm_pause
@@ -44,6 +45,11 @@ namespace Core::Tasks
     struct SpinLock
     {
         std::atomic<bool> locked = false;
+
+        [[nodiscard]] bool try_lock()
+        {
+            return !locked.exchange(true, std::memory_order_acquire);
+        }
 
         void lock()
         {
@@ -124,23 +130,137 @@ namespace Core::Tasks
 
     struct alignas(64) SchedulerContext
     {
-        std::vector<std::thread> workers;
+        struct alignas(64) WorkerState
+        {
+            SpinLock localLock{};
+            std::deque<LocalTask> localDeque{};
+            std::atomic<uint64_t> stealCount{0};
+        };
 
-        // 1. FAST PATH: MPMC Lock-Free Queue
-        // 65536 slots = power of 2, sufficient for high throughput
+        std::vector<std::thread> workers;
+        std::vector<WorkerState> workerStates;
+
+        // Inject queue for external producers (main thread / IO threads).
         Utils::LockFreeQueue<LocalTask> globalQueue{65536};
-        // 2. SLOW PATH: Unbounded Overflow Queue
         std::mutex overflowMutex;
         std::deque<LocalTask> overflowQueue;
-        std::atomic<bool> hasOverflow{false}; // Optimization: Atomic flag to avoid locking mutex on read
+        std::atomic<bool> hasOverflow{false};
 
         alignas(64) std::atomic<uint32_t> workSignal{0};
         alignas(64) std::atomic<bool> isRunning{false};
+
+        // Synchronization contract.
+        alignas(64) std::atomic<uint64_t> inFlightTasks{0};
+
+        // Telemetry counters (non-authoritative for completion).
         alignas(64) std::atomic<int> activeTaskCount{0};
         alignas(64) std::atomic<int> queuedTaskCount{0};
     };
 
     static std::unique_ptr<SchedulerContext> s_Ctx = nullptr;
+    static thread_local int s_WorkerIndex = -1;
+
+    [[nodiscard]] static bool EnqueueInject(LocalTask&& task)
+    {
+        bool pushed = s_Ctx->globalQueue.Push(std::move(task));
+        if (pushed)
+            return true;
+
+        std::lock_guard lock(s_Ctx->overflowMutex);
+        s_Ctx->overflowQueue.push_back(std::move(task));
+        s_Ctx->hasOverflow.store(true, std::memory_order_release);
+        return true;
+    }
+
+    [[nodiscard]] static bool TryPopInject(LocalTask& outTask)
+    {
+        if (s_Ctx->globalQueue.Pop(outTask))
+            return true;
+
+        if (!s_Ctx->hasOverflow.load(std::memory_order_acquire))
+            return false;
+
+        std::lock_guard lock(s_Ctx->overflowMutex);
+        if (s_Ctx->overflowQueue.empty())
+        {
+            s_Ctx->hasOverflow.store(false, std::memory_order_release);
+            return false;
+        }
+
+        outTask = std::move(s_Ctx->overflowQueue.front());
+        s_Ctx->overflowQueue.pop_front();
+        if (s_Ctx->overflowQueue.empty())
+            s_Ctx->hasOverflow.store(false, std::memory_order_release);
+        return true;
+    }
+
+    [[nodiscard]] static bool TryPopLocal(unsigned workerIndex, LocalTask& outTask)
+    {
+        auto& worker = s_Ctx->workerStates[workerIndex];
+        std::lock_guard lock(worker.localLock);
+        if (worker.localDeque.empty())
+            return false;
+
+        outTask = std::move(worker.localDeque.back());
+        worker.localDeque.pop_back();
+        return true;
+    }
+
+    [[nodiscard]] static bool TrySteal(unsigned thiefIndex, LocalTask& outTask)
+    {
+        const unsigned workerCount = static_cast<unsigned>(s_Ctx->workerStates.size());
+        if (workerCount <= 1)
+            return false;
+
+        for (unsigned offset = 1; offset < workerCount; ++offset)
+        {
+            const unsigned victimIndex = (thiefIndex + offset) % workerCount;
+            auto& victim = s_Ctx->workerStates[victimIndex];
+            if (!victim.localLock.try_lock())
+                continue;
+
+            bool stole = false;
+            if (!victim.localDeque.empty())
+            {
+                outTask = std::move(victim.localDeque.front());
+                victim.localDeque.pop_front();
+                victim.stealCount.fetch_add(1, std::memory_order_relaxed);
+                stole = true;
+            }
+            victim.localLock.unlock();
+
+            if (stole)
+                return true;
+        }
+
+        return false;
+    }
+
+    [[nodiscard]] static bool TryPopTask(LocalTask& outTask, std::optional<unsigned> workerIndex)
+    {
+        if (workerIndex.has_value() && TryPopLocal(*workerIndex, outTask))
+            return true;
+
+        if (TryPopInject(outTask))
+            return true;
+
+        if (workerIndex.has_value() && TrySteal(*workerIndex, outTask))
+            return true;
+
+        return false;
+    }
+
+    static void OnTaskDequeuedAndRun(LocalTask& task)
+    {
+        s_Ctx->queuedTaskCount.fetch_sub(1, std::memory_order_relaxed);
+        if (task.Valid())
+            task();
+
+        s_Ctx->activeTaskCount.fetch_sub(1, std::memory_order_relaxed);
+        const auto remaining = s_Ctx->inFlightTasks.fetch_sub(1, std::memory_order_acq_rel) - 1;
+        if (remaining == 0)
+            s_Ctx->inFlightTasks.notify_all();
+    }
 
     // ---------------------------------------------------------------------
     // Coroutine support
@@ -214,6 +334,8 @@ namespace Core::Tasks
 
         Log::Info("Initializing Scheduler with {} worker threads.", threadCount);
 
+        s_Ctx->workerStates.resize(threadCount);
+
         for (unsigned i = 0; i < threadCount; ++i)
         {
             s_Ctx->workers.emplace_back([i] { WorkerEntry(i); });
@@ -241,125 +363,66 @@ namespace Core::Tasks
     {
         if (!s_Ctx || !s_Ctx->isRunning) return;
 
-        // Increment active counters immediately
+        s_Ctx->inFlightTasks.fetch_add(1, std::memory_order_release);
         s_Ctx->activeTaskCount.fetch_add(1, std::memory_order_relaxed);
-        s_Ctx->queuedTaskCount.fetch_add(1, std::memory_order_release);
+        s_Ctx->queuedTaskCount.fetch_add(1, std::memory_order_relaxed);
 
-        // 1. Try Fast Path (Lock-Free)
-        // No lock_guard here anymore!
-        bool pushed = s_Ctx->globalQueue.Push(std::move(task));
-
-        // 2. Fallback to Slow Path (Overflow)
-        if (!pushed)
+        // Worker-produced tasks go to local deque (LIFO) for cache locality.
+        if (s_WorkerIndex >= 0)
         {
-            // Performance Warning: This should ideally not happen every frame.
-            // Consider logging strictly once per second if this path is hit to alert developers.
-            {
-                std::lock_guard lock(s_Ctx->overflowMutex);
-                s_Ctx->overflowQueue.push_back(std::move(task));
-            }
-            s_Ctx->hasOverflow.store(true, std::memory_order_release);
+            auto& worker = s_Ctx->workerStates[static_cast<unsigned>(s_WorkerIndex)];
+            std::lock_guard lock(worker.localLock);
+            worker.localDeque.push_back(std::move(task));
+        }
+        else
+        {
+            EnqueueInject(std::move(task));
         }
 
-        // 3. Wake up workers
         s_Ctx->workSignal.fetch_add(1, std::memory_order_release);
         s_Ctx->workSignal.notify_one();
-    }
-
-    static bool TryPopTask(LocalTask& outTask)
-    {
-        // 1. Try Fast Path (Lock-Free)
-        // No lock_guard here anymore!
-        if (s_Ctx->globalQueue.Pop(outTask)) return true;
-
-        // 2. Try Slow Path (Overflow)
-        // Optimization: Check atomic flag before acquiring mutex
-        if (s_Ctx->hasOverflow.load(std::memory_order_acquire))
-        {
-            std::lock_guard lock(s_Ctx->overflowMutex);
-            if (!s_Ctx->overflowQueue.empty())
-            {
-                outTask = std::move(s_Ctx->overflowQueue.front());
-                s_Ctx->overflowQueue.pop_front();
-
-                // Update flag if empty
-                if (s_Ctx->overflowQueue.empty())
-                    s_Ctx->hasOverflow.store(false, std::memory_order_release);
-
-                return true;
-            }
-            else
-            {
-                // Race condition handle: flag was true, but queue is empty now
-                s_Ctx->hasOverflow.store(false, std::memory_order_release);
-            }
-        }
-
-        return false;
     }
 
     void Scheduler::WaitForAll()
     {
         if (!s_Ctx) return;
 
-        // Work Stealing Loop
-        while (s_Ctx->queuedTaskCount.load(std::memory_order_acquire) > 0)
+        while (s_Ctx->inFlightTasks.load(std::memory_order_acquire) > 0)
         {
             LocalTask task;
-            if (TryPopTask(task))
+            if (TryPopTask(task, std::nullopt))
             {
-                // Decrement queued count (item removed from storage)
-                s_Ctx->queuedTaskCount.fetch_sub(1, std::memory_order_release);
-
-                if (task.Valid())
-                {
-                    task();
-                    // Decrement active count (execution finished)
-                    s_Ctx->activeTaskCount.fetch_sub(1, std::memory_order_release);
-                    s_Ctx->activeTaskCount.notify_all();
-                }
+                OnTaskDequeuedAndRun(task);
             }
             else
             {
-                // Yield if we see count > 0 but failed to pop (contention)
-                std::this_thread::yield();
+                const auto observed = s_Ctx->inFlightTasks.load(std::memory_order_acquire);
+                if (observed > 0)
+                    s_Ctx->inFlightTasks.wait(observed, std::memory_order_relaxed);
             }
-        }
-
-        // Wait for Active Tasks (other threads executing)
-        int active = s_Ctx->activeTaskCount.load(std::memory_order_acquire);
-        while (active > 0)
-        {
-            s_Ctx->activeTaskCount.wait(active);
-            active = s_Ctx->activeTaskCount.load(std::memory_order_acquire);
         }
     }
 
-    void Scheduler::WorkerEntry(unsigned)
+    void Scheduler::WorkerEntry(unsigned threadIndex)
     {
+        s_WorkerIndex = static_cast<int>(threadIndex);
         uint32_t lastSignal = s_Ctx->workSignal.load(std::memory_order_acquire);
 
         while (s_Ctx->isRunning)
         {
             LocalTask task;
 
-            if (TryPopTask(task))
+            if (TryPopTask(task, threadIndex))
             {
-                s_Ctx->queuedTaskCount.fetch_sub(1, std::memory_order_release);
-
-                if (task.Valid())
-                {
-                    task();
-                    s_Ctx->activeTaskCount.fetch_sub(1, std::memory_order_release);
-                    s_Ctx->activeTaskCount.notify_all();
-                }
+                OnTaskDequeuedAndRun(task);
             }
             else
             {
-                // Sleep until signaled
                 s_Ctx->workSignal.wait(lastSignal);
                 lastSignal = s_Ctx->workSignal.load(std::memory_order_acquire);
             }
         }
+
+        s_WorkerIndex = -1;
     }
 }

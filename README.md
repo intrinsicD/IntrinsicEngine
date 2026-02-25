@@ -15,7 +15,7 @@ Built on **C++23 Modules**, **Vulkan 1.3** bindless rendering, coroutine-based t
   - `LinearArena` — O(1) monotonic frame allocator with O(1) bulk deallocation.
   - `ScopeStack` — LIFO allocator with destructor support for complex per-frame objects.
   - `InplaceFunction` — Small-buffer-optimized callable (64B SBO, move-only, zero-heap).
-- **Coroutine Task Scheduler:** C++20 `std::coroutine` with work-stealing queues. `Job` and `Yield()` for cooperative multitasking.
+- **Hybrid Work-Stealing Task Scheduler:** Per-worker local deques execute local work in LIFO order, cross-worker stealing improves load balance, and an external inject queue handles non-worker producers. `Job` and `Yield()` provide cooperative coroutine multitasking.
 - **Lock-Free Telemetry:** Ring-buffered telemetry system for real-time CPU frame times, draw calls, and triangle counts.
 - **FrameGraph + DAG Scheduler:** ECS systems declare explicit data dependencies; `DAGScheduler` resolves topological execution order. Shared scheduling algorithm between FrameGraph and RenderGraph.
 - **AssetManager Read Phases:**

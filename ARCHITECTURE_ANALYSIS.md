@@ -20,11 +20,10 @@ This document tracks **what's left to do** in IntrinsicEngine's architecture.
 
 ### 1.1 2026-02-25 Architecture Review Follow-ups
 
-- [ ] **Upgrade `Core::Tasks` toward hybrid work stealing + fiber waits (High).**
-  - Add per-worker Chase-Lev deques for local LIFO execution and tail stealing.
-  - Keep a global inject queue only for external producers.
-  - Introduce fiber parking for dependency waits so OS threads stay runnable under fine-grain synchronization.
-  - Treat global task counters as telemetry/diagnostics, not the primary synchronization contract.
+- [ ] **Complete `Core::Tasks` fiber parking for dependency waits (High).**
+  - Hybrid work-stealing foundations are now in place (worker-local LIFO deques + cross-worker stealing + external inject queue).
+  - Add true fiber parking/unparking for wait-heavy dependency chains so worker OS threads never block on fine-grain sync.
+  - Extend telemetry with per-worker deque depth, steal ratio, and park/unpark latency to validate fairness and tail behavior.
 
 - [ ] **Remove coarse FrameGraph layer barriers (High).**
   - Replace per-layer `WaitForAll()` execution with dependency-count-driven ready queues.
