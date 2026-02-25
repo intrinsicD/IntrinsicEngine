@@ -13,6 +13,15 @@ Completed governance cleanups moved out of the active backlog:
 - Tightened backlog governance by moving feature roadmap and phase-planning content from `TODO.md` into `ROADMAP.md`.
 - Resolved the policy violation where the active backlog mixed open actions with DONE narratives; `TODO.md` now remains open-actions-only while historical/completion notes live in `DONE.md`.
 
+## 2026-02-26 Offline Dependency Configure Mode
+
+Completed the CMake dependency-offline backlog item:
+
+- Added `INTRINSIC_OFFLINE_DEPS` option in the top-level configure path.
+- Added FetchContent offline enforcement in `cmake/Dependencies.cmake` via `FETCHCONTENT_FULLY_DISCONNECTED=ON`.
+- Added per-dependency local source validation (`external/cache/<dep>-src`) with clear fatal diagnostics when sources are missing.
+- Documented offline configure invocation in `README.md`.
+
 ## 2026-02-26 CMake Release Flag Consolidation
 
 Completed the code-quality backlog item for release flag drift:

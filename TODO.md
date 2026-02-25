@@ -39,10 +39,6 @@ This document tracks **what's left to do** in IntrinsicEngine's architecture.
   - Remove or fully wire `defaultTextureIndex` in `Runtime.RenderOrchestrator` constructor.
   - Audit central runtime ownership boundaries and reduce `std::shared_ptr` usage where borrowed references or explicit owners are sufficient.
 
-- [ ] **Add offline dependency mode to CMake configure (Medium).**
-  - Provide an `INTRINSIC_OFFLINE_DEPS=ON` path that avoids network fetch during configure.
-  - Document vendored/mirrored dependency workflows for restricted CI and reproducible local setup.
-
 - [ ] **Establish architecture SLOs + telemetry milestones (Cross-cutting).**
   - Define measurable targets for DAG compile budget, scheduler contention/tail latency, and frame critical-path timing.
   - Add instrumentation for queue contention, steal ratio, barrier/idle wait time, and per-frame compile/execute split.

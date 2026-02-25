@@ -155,6 +155,19 @@ sudo apt install clang-tools-20 libstdc++-14-dev
 cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug \
     -DCMAKE_C_COMPILER=clang-20 -DCMAKE_CXX_COMPILER=clang++-20
 
+# Offline configure (no network access during FetchContent)
+# Requires pre-populated external/cache/<dep>-src directories.
+cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug \
+    -DCMAKE_C_COMPILER=clang-20 -DCMAKE_CXX_COMPILER=clang++-20 \
+    -DINTRINSIC_OFFLINE_DEPS=ON
+
+# Optional: keep an existing mirror elsewhere and point each dependency at it
+# with CMake cache overrides (example for GLM):
+cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug \
+    -DCMAKE_C_COMPILER=clang-20 -DCMAKE_CXX_COMPILER=clang++-20 \
+    -DINTRINSIC_OFFLINE_DEPS=ON \
+    -DFETCHCONTENT_SOURCE_DIR_GLM=/path/to/mirror/glm
+
 # Build everything
 ninja -C build
 
@@ -166,6 +179,17 @@ ninja -C build Sandbox                # application
 # Run
 ./build/bin/Sandbox
 ```
+
+#### Offline dependency cache workflow
+
+When using `-DINTRINSIC_OFFLINE_DEPS=ON`, configure never performs network fetches.
+Prepare one source tree per dependency under `external/cache/<name>-src` (for example `external/cache/glm-src`, `external/cache/googletest-src`, `external/cache/stb-src`).
+
+Practical options:
+- Run one online configure once to populate `external/cache`, then archive/sync that folder for offline reuse.
+- Mirror each dependency in your own artifact store and map specific dependencies with `-DFETCHCONTENT_SOURCE_DIR_<DEP>=/mirror/path`.
+
+If any required source directory is missing or empty, CMake now fails fast with a clear diagnostic.
 
 **Sanitizers:** ASan + UBSan are auto-detected in Debug builds. If `libclang_rt.asan` is not installed, sanitizers are automatically disabled.
 

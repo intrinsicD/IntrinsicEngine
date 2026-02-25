@@ -14,6 +14,49 @@ endif()
 
 include(FetchContent)
 
+if(INTRINSIC_OFFLINE_DEPS)
+    set(FETCHCONTENT_FULLY_DISCONNECTED ON CACHE BOOL "Disable all FetchContent network updates" FORCE)
+    message(STATUS "INTRINSIC_OFFLINE_DEPS=ON: using only local dependency sources")
+endif()
+
+function(intrinsic_require_offline_source dep_name)
+    string(TOUPPER "${dep_name}" dep_name_upper)
+
+    set(dep_override_var "FETCHCONTENT_SOURCE_DIR_${dep_name_upper}")
+    if(DEFINED ${dep_override_var} AND NOT "${${dep_override_var}}" STREQUAL "")
+        set(dep_source_dir "${${dep_override_var}}")
+    else()
+        set(dep_source_dir "${FETCHCONTENT_BASE_DIR}/${dep_name}-src")
+        set(${dep_override_var}
+            "${dep_source_dir}"
+            CACHE PATH "Offline source directory for ${dep_name}" FORCE)
+    endif()
+
+    if(NOT IS_DIRECTORY "${dep_source_dir}")
+        message(FATAL_ERROR
+            "INTRINSIC_OFFLINE_DEPS=ON requires pre-populated dependency sources.\n"
+            "Missing dependency '${dep_name}' at: ${dep_source_dir}\n"
+            "Populate external/cache first (e.g. run configure once online or mirror repositories there)."
+        )
+    endif()
+
+    file(GLOB dep_entries LIST_DIRECTORIES true "${dep_source_dir}/*")
+    list(LENGTH dep_entries dep_entry_count)
+    if(dep_entry_count EQUAL 0)
+        message(FATAL_ERROR
+            "INTRINSIC_OFFLINE_DEPS=ON found an empty directory for '${dep_name}' at: ${dep_source_dir}\n"
+            "Populate this dependency source tree before configuring offline."
+        )
+    endif()
+endfunction()
+
+function(intrinsic_make_available dep_name)
+    if(INTRINSIC_OFFLINE_DEPS)
+        intrinsic_require_offline_source(${dep_name})
+    endif()
+    FetchContent_MakeAvailable(${dep_name})
+endfunction()
+
 # --- GLM ---
 set(GLM_QUIET ON CACHE BOOL "" FORCE)
 if(POLICY CMP0074)
@@ -25,7 +68,7 @@ FetchContent_Declare(
         GIT_REPOSITORY https://github.com/g-truc/glm.git
         GIT_TAG 1.0.0
 )
-FetchContent_MakeAvailable(glm)
+intrinsic_make_available(glm)
 #target_link_libraries(glm PUBLIC GLM_FORCE_RADIANS GLM_FORCE_DEPTH_ZERO_TO_ONE GLM_ENABLE_EXPERIMENTAL GLM_RIGHT_HANDED)
 #target_link_libraries(glm PUBLIC IntrinsicConfig)
 
@@ -41,7 +84,7 @@ FetchContent_Declare(
 )
 set(gtest_disable_pthreads ON CACHE BOOL "" FORCE)
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(googletest)
+intrinsic_make_available(googletest)
 
 # --- GLFW ---
 FetchContent_Declare(
@@ -52,7 +95,7 @@ FetchContent_Declare(
 set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(glfw)
+intrinsic_make_available(glfw)
 
 # --- Volk (Vulkan Meta Loader) ---
 # Pin to stable commit instead of master
@@ -61,7 +104,7 @@ FetchContent_Declare(
         GIT_REPOSITORY https://github.com/zeux/volk.git
         GIT_TAG vulkan-sdk-1.3.268.0
 )
-FetchContent_MakeAvailable(volk)
+intrinsic_make_available(volk)
 find_package(Vulkan REQUIRED)
 
 # VulkanMemoryAllocator is header-only for engine usage.
@@ -75,7 +118,7 @@ FetchContent_Declare(
         GIT_TAG v3.1.0
 )
 
-FetchContent_MakeAvailable(vma)
+intrinsic_make_available(vma)
 
 
 # Pin STB to specific commit for reproducible builds
@@ -85,7 +128,7 @@ FetchContent_Declare(
         GIT_TAG 5736b15f7ea0ffb08dd38af21067c314d6a3aae9  # 2023-01-30
 )
 
-FetchContent_MakeAvailable(stb)
+intrinsic_make_available(stb)
 
 add_library(stb INTERFACE)
 target_include_directories(stb INTERFACE ${stb_SOURCE_DIR})
@@ -95,7 +138,7 @@ FetchContent_Declare(
         GIT_REPOSITORY https://github.com/skypjack/entt.git
         GIT_TAG v3.13.0 # Use a stable tag
 )
-FetchContent_MakeAvailable(entt)
+intrinsic_make_available(entt)
 
 # --- JSON (Required for TinyGLTF) ---
 FetchContent_Declare(
@@ -103,7 +146,7 @@ FetchContent_Declare(
         GIT_REPOSITORY https://github.com/nlohmann/json.git
         GIT_TAG v3.11.3
 )
-FetchContent_MakeAvailable(json)
+intrinsic_make_available(json)
 
 # --- TinyGLTF ---
 FetchContent_Declare(
@@ -111,7 +154,7 @@ FetchContent_Declare(
         GIT_REPOSITORY https://github.com/syoyo/tinygltf.git
         GIT_TAG v2.9.0
 )
-FetchContent_MakeAvailable(tinygltf)
+intrinsic_make_available(tinygltf)
 
 # --- ImGui (Docking Branch) ---
 # Pin to specific docking branch commit for stability
@@ -120,7 +163,7 @@ FetchContent_Declare(
         GIT_REPOSITORY https://github.com/ocornut/imgui.git
         GIT_TAG v1.92.5-docking
 )
-FetchContent_MakeAvailable(imgui)
+intrinsic_make_available(imgui)
 
 # Create a library for ImGui to make linking easier
 # We also include the backend sources for GLFW and Vulkan
