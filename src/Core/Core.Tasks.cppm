@@ -7,6 +7,7 @@ module;
 #include <coroutine>
 #include <atomic>
 #include <vector>
+#include <cstdint>
 
 export module Core.Tasks;
 import Core.Logging;
@@ -90,6 +91,14 @@ namespace Core::Tasks
     export class Scheduler
     {
     public:
+        struct WaitToken
+        {
+            uint32_t Slot = 0;
+            uint32_t Generation = 0;
+
+            [[nodiscard]] bool Valid() const { return Generation != 0; }
+        };
+
         struct Stats
         {
             uint64_t InFlightTasks = 0;
@@ -101,6 +110,10 @@ namespace Core::Tasks
             uint64_t StealPopCount = 0;
             uint64_t TotalStealAttempts = 0;
             uint64_t SuccessfulStealAttempts = 0;
+            uint64_t ParkCount = 0;
+            uint64_t UnparkCount = 0;
+            uint64_t ParkLatencyTotalNs = 0;
+            uint64_t UnparkLatencyTotalNs = 0;
             std::vector<uint32_t> WorkerLocalDepths{};
             std::vector<uint64_t> WorkerVictimStealCounts{};
         };
@@ -126,10 +139,49 @@ namespace Core::Tasks
         static void WaitForAll();
         [[nodiscard]] static Stats GetStats();
 
+        static WaitToken AcquireWaitToken();
+        static void ReleaseWaitToken(WaitToken token);
+        static void ParkCurrentFiber(WaitToken token, std::coroutine_handle<> h,
+                                     std::shared_ptr<std::atomic<bool>> alive = nullptr);
+        static uint32_t UnparkReady(WaitToken token);
+
     private:
         static void DispatchInternal(LocalTask&& task);
         static void WorkerEntry(unsigned threadIndex);
     };
+
+    export class CounterEvent
+    {
+    public:
+        explicit CounterEvent(uint32_t initialCount = 0);
+        ~CounterEvent();
+
+        void Add(uint32_t value = 1);
+        void Signal(uint32_t value = 1);
+        [[nodiscard]] bool IsReady() const { return m_Count.load(std::memory_order_acquire) == 0; }
+        [[nodiscard]] Scheduler::WaitToken Token() const { return m_Token; }
+
+    private:
+        std::atomic<uint32_t> m_Count{0};
+        Scheduler::WaitToken m_Token{};
+    };
+
+    export struct WaitCounterAwaiter
+    {
+        CounterEvent& Counter;
+
+        [[nodiscard]] bool await_ready() const noexcept { return Counter.IsReady(); }
+        void await_suspend(std::coroutine_handle<> h) const noexcept
+        {
+            Scheduler::ParkCurrentFiber(Counter.Token(), h);
+        }
+        void await_resume() const noexcept {}
+    };
+
+    export [[nodiscard]] inline WaitCounterAwaiter WaitFor(CounterEvent& counter) noexcept
+    {
+        return WaitCounterAwaiter{counter};
+    }
 
     // ---------------------------------------------------------------------
     // Coroutine Job (MVP)
