@@ -199,7 +199,7 @@ This order is intentional: item (1) improves scheduler substrate, item (2) unloc
 - **BVH (Bounding Volume Hierarchy):** Wireframe AABBs/OBBs at each BVH node level, with configurable max display depth.
 - **Uniform grid:** Wireframe cells with occupancy coloring.
 - ~~**Bounding volumes:**~~ — **DONE.** Sandbox can render selected `MeshCollider` bounds as world AABB, world OBB, and conservative bounding sphere overlays. Per-type toggles, independent colors, alpha, and overlay/depth-tested routing are exposed in `View Settings → Spatial Debug`.
-- **Contact manifolds:** Render contact points and normals from `Geometry.ContactManifold`.
+- ~~**Contact manifolds:**~~ — **DONE.** Sandbox now renders selected-entity contact manifolds against other `MeshCollider` OBBs: paired contact points, contact segment, and contact normal vector, with depth-tested/overlay modes and scale controls in `View Settings → Spatial Debug`.
 
 **Architecture notes:**
 - Use the `LineRenderFeature` (from §2.1.2) as the backend for all debug drawing.
@@ -207,7 +207,7 @@ This order is intentional: item (1) improves scheduler substrate, item (2) unloc
 - All debug geometry is transient — rebuilt each frame from `LinearArena`.
 - Toggled per-category via the UI (§2.5).
 
-**Status:** Core API and rendering backend are DONE — see Phase 0 item 3. `DebugDraw` provides the immediate-mode accumulator with `Line`, `Box`, `WireBox`, `Sphere`, `Circle`, `Arrow`, `Axes`, `Frustum`, `Grid`, `Cross` plus overlay variants. Convex hull geometry backend is now available via `Geometry::ConvexHullBuilder::Build()` (§2.6) — the debug overlay just needs to iterate hull faces and emit wireframe triangles via `DebugDraw::Line()`. Remaining work: per-category UI toggles (§2.5), contact manifold rendering, convex hull overlay wiring. These are incremental additions to the existing `DebugDraw` API.
+**Status:** Core API and rendering backend are DONE — see Phase 0 item 3. `DebugDraw` provides the immediate-mode accumulator with `Line`, `Box`, `WireBox`, `Sphere`, `Circle`, `Arrow`, `Axes`, `Frustum`, `Grid`, `Cross` plus overlay variants. Convex hull geometry backend is now available via `Geometry::ConvexHullBuilder::Build()` (§2.6) — the debug overlay just needs to iterate hull faces and emit wireframe triangles via `DebugDraw::Line()`. Remaining work: per-category UI toggles (§2.5) and convex hull overlay wiring. These are incremental additions to the existing `DebugDraw` API.
 
 ---
 

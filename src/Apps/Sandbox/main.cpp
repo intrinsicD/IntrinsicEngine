@@ -69,6 +69,10 @@ public:
 
     Graphics::KDTreeDebugDrawSettings m_KDTreeDebugSettings{};
     bool m_DrawSelectedColliderKDTree = false;
+    bool m_DrawSelectedColliderContacts = false;
+    bool m_ContactDebugOverlay = true;
+    float m_ContactNormalScale = 0.3f;
+    float m_ContactPointRadius = 0.03f;
 
     Geometry::KDTree m_SelectedColliderKDTree{};
     entt::entity m_SelectedKDTreeEntity = entt::null;
@@ -337,6 +341,7 @@ public:
             ImGui::Checkbox("Draw Selected MeshCollider Octree", &m_DrawSelectedColliderOctree);
             ImGui::Checkbox("Draw Selected MeshCollider Bounds", &m_DrawSelectedColliderBounds);
             ImGui::Checkbox("Draw Selected MeshCollider KD-Tree", &m_DrawSelectedColliderKDTree);
+            ImGui::Checkbox("Draw Contact Manifolds", &m_DrawSelectedColliderContacts);
             ImGui::Checkbox("Bounds Overlay (no depth test)", &m_BoundsDebugSettings.Overlay);
             ImGui::Checkbox("Draw World AABB", &m_BoundsDebugSettings.DrawAABB);
             ImGui::Checkbox("Draw World OBB", &m_BoundsDebugSettings.DrawOBB);
@@ -390,6 +395,11 @@ public:
                 if (ImGui::ColorEdit3("Base Color", base))
                     m_OctreeDebugSettings.BaseColor = glm::vec3(base[0], base[1], base[2]);
             }
+
+            ImGui::SeparatorText("Contact Manifold");
+            ImGui::Checkbox("Contact Overlay (no depth test)", &m_ContactDebugOverlay);
+            ImGui::SliderFloat("Normal Scale", &m_ContactNormalScale, 0.05f, 2.0f, "%.2f");
+            ImGui::SliderFloat("Point Radius", &m_ContactPointRadius, 0.005f, 0.2f, "%.3f");
 
             // NOTE: Actual DrawOctree() emission happens in OnUpdate() BEFORE renderSys.OnUpdate(),
             // because ImGui panels run AFTER the render graph has already executed.
@@ -539,7 +549,7 @@ public:
         // Debug Visualization: emit DebugDraw geometry BEFORE render system runs.
         // ImGui panels run AFTER render, so we emit here using settings from last frame.
         // ---------------------------------------------------------------------
-        if (m_DrawSelectedColliderOctree || m_DrawSelectedColliderBounds || m_DrawSelectedColliderKDTree)
+        if (m_DrawSelectedColliderOctree || m_DrawSelectedColliderBounds || m_DrawSelectedColliderKDTree || m_DrawSelectedColliderContacts)
         {
             const entt::entity selected = GetSelection().GetSelectedEntity(GetScene());
             if (selected != entt::null && GetScene().GetRegistry().valid(selected))
@@ -580,6 +590,44 @@ public:
                                        m_SelectedColliderKDTree,
                                        m_KDTreeDebugSettings,
                                        worldMatrix);
+                        }
+                    }
+
+                    if (m_DrawSelectedColliderContacts)
+                    {
+                        auto& dd = GetRenderOrchestrator().GetDebugDraw();
+                        auto colliders = reg.view<ECS::MeshCollider::Component>();
+
+                        const uint32_t pointAColor = Graphics::DebugDraw::PackColorF(1.0f, 0.85f, 0.2f, 1.0f);
+                        const uint32_t pointBColor = Graphics::DebugDraw::PackColorF(1.0f, 0.2f, 0.2f, 1.0f);
+                        const uint32_t normalColor = Graphics::DebugDraw::PackColorF(0.2f, 0.85f, 1.0f, 1.0f);
+
+                        for (auto [otherEntity, otherCollider] : colliders.each())
+                        {
+                            if (otherEntity == selected || !otherCollider.CollisionRef)
+                                continue;
+
+                            auto manifold = Geometry::ComputeContact(collider->WorldOBB, otherCollider.WorldOBB);
+                            if (!manifold)
+                                continue;
+
+                            const glm::vec3 mid = (manifold->ContactPointA + manifold->ContactPointB) * 0.5f;
+                            const glm::vec3 normalEnd = mid + manifold->Normal * (m_ContactNormalScale + manifold->PenetrationDepth);
+
+                            if (m_ContactDebugOverlay)
+                            {
+                                dd.OverlaySphere(manifold->ContactPointA, m_ContactPointRadius, pointAColor, 12);
+                                dd.OverlaySphere(manifold->ContactPointB, m_ContactPointRadius, pointBColor, 12);
+                                dd.OverlayLine(manifold->ContactPointA, manifold->ContactPointB, pointAColor, pointBColor);
+                                dd.OverlayLine(mid, normalEnd, normalColor);
+                            }
+                            else
+                            {
+                                dd.Sphere(manifold->ContactPointA, m_ContactPointRadius, pointAColor, 12);
+                                dd.Sphere(manifold->ContactPointB, m_ContactPointRadius, pointBColor, 12);
+                                dd.Line(manifold->ContactPointA, manifold->ContactPointB, pointAColor, pointBColor);
+                                dd.Arrow(mid, normalEnd, glm::max(0.02f, m_ContactPointRadius), normalColor);
+                            }
                         }
                     }
                 }
