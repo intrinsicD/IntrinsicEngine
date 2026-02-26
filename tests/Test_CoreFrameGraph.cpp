@@ -2,7 +2,9 @@
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <string>
+#include <thread>
 #include <vector>
 
 import Core;
@@ -275,6 +277,68 @@ TEST(CoreFrameGraph, DiamondDependency)
     ExpectOrder(log, "Input", "AI");
     ExpectOrder(log, "Physics", "RenderPrep");
     ExpectOrder(log, "AI", "RenderPrep");
+}
+
+// =========================================================================
+// Test: Dependency-ready execution should not wait on unrelated same-layer work
+// =========================================================================
+TEST(CoreFrameGraph, ReadyQueueExecutionBypassesCoarseLayerBarrier)
+{
+    // Graph:
+    //   Root -> SlowBranch -> SlowConsumer
+    //        \-> FastBranch -> FastConsumer
+    //
+    // SlowBranch and FastBranch are in the same topological layer.
+    // FastConsumer depends only on FastBranch. Under old coarse layer barriers,
+    // FastConsumer would wait for SlowBranch to finish. With dependency-ready
+    // execution it should run as soon as FastBranch completes.
+
+    Memory::ScopeStack scope(1024 * 64);
+    FrameGraph graph(scope);
+
+    std::atomic<bool> slowFinished{false};
+    std::atomic<bool> fastConsumerRanBeforeSlowFinished{false};
+
+    graph.AddPass("Root",
+        [](FrameGraphBuilder& b) { b.Write<Transform>(); },
+        []() {});
+
+    graph.AddPass("SlowBranch",
+        [](FrameGraphBuilder& b) { b.Read<Transform>(); b.Write<Velocity>(); },
+        [&]() {
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            slowFinished.store(true, std::memory_order_release);
+        });
+
+    graph.AddPass("FastBranch",
+        [](FrameGraphBuilder& b) { b.Read<Transform>(); b.Write<Health>(); },
+        []() {});
+
+    graph.AddPass("FastConsumer",
+        [](FrameGraphBuilder& b) { b.Read<Health>(); },
+        [&]() {
+            const bool sawSlowFinished = slowFinished.load(std::memory_order_acquire);
+            fastConsumerRanBeforeSlowFinished.store(!sawSlowFinished, std::memory_order_release);
+        });
+
+    graph.AddPass("SlowConsumer",
+        [](FrameGraphBuilder& b) { b.Read<Velocity>(); },
+        []() {});
+
+    auto result = graph.Compile();
+    ASSERT_TRUE(result.has_value());
+
+    const auto& layers = graph.GetExecutionLayers();
+    ASSERT_EQ(layers.size(), 3u);
+    EXPECT_EQ(layers[0].size(), 1u);
+    EXPECT_EQ(layers[1].size(), 2u);
+    EXPECT_EQ(layers[2].size(), 2u);
+
+    Tasks::Scheduler::Initialize(2);
+    graph.Execute();
+    Tasks::Scheduler::Shutdown();
+
+    EXPECT_TRUE(fastConsumerRanBeforeSlowFinished.load(std::memory_order_acquire));
 }
 
 // =========================================================================
