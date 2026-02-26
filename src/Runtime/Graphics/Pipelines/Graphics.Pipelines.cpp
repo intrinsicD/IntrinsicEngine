@@ -259,8 +259,13 @@ namespace Graphics
         // 7. Line Pass — GPU draw for all lines in DebugDraw accumulator.
         //    Consumes lines submitted by MeshRenderPass (wireframe), GraphRenderPass
         //    (edges), and any direct DebugDraw submissions from systems/tools.
+        //
+        // NOTE: Keep this stage always present when the pass exists.
+        // Wireframe/graph/octree debug visuals are authored as line submissions,
+        // so gating the draw stage behind a feature toggle can silently drop
+        // all debug-line output even when per-entity visualization toggles are on.
         // ==================================================================
-        if (m_LineRenderPass && IsFeatureEnabled("LineRenderPass"_id))
+        if (m_LineRenderPass)
         {
             m_Path.AddStage("LinePass", [this](RenderPassContext& ctx)
             {
