@@ -1,6 +1,7 @@
 module;
 
 #include <cassert>
+#include <atomic>
 #include <cstdint>
 #include <vector>
 
@@ -69,33 +70,64 @@ namespace Core
 
     void FrameGraph::Execute()
     {
-        const auto& layers = m_Scheduler.GetExecutionLayers();
+        const uint32_t nodeCount = m_Scheduler.GetNodeCount();
+        if (nodeCount == 0)
+            return;
 
-        for (const auto& layer : layers)
+        if (nodeCount == 1)
         {
-            if (layer.empty()) continue;
+            auto& pass = m_PassPool[0];
+            pass.ExecuteFn(pass.ExecuteUserData);
+            return;
+        }
 
-            if (layer.size() == 1)
+        // Execute dependency-ready passes continuously. Layer data remains available
+        // via DAGScheduler introspection for diagnostics/visualization only.
+        struct FrameGraphExecutionState
+        {
+            std::vector<std::atomic<uint32_t>> RemainingDependencies;
+        };
+
+        FrameGraphExecutionState state{};
+        state.RemainingDependencies.resize(nodeCount);
+
+        for (uint32_t nodeIdx = 0; nodeIdx < nodeCount; ++nodeIdx)
+        {
+            state.RemainingDependencies[nodeIdx].store(m_Scheduler.GetIndegree(nodeIdx), std::memory_order_relaxed);
+        }
+
+        auto executePassAndReleaseDependents = [&](auto&& self, uint32_t nodeIdx) -> void
+        {
+            auto& pass = m_PassPool[nodeIdx];
+            pass.ExecuteFn(pass.ExecuteUserData);
+
+            for (uint32_t dependent : m_Scheduler.GetDependents(nodeIdx))
             {
-                // Single task in layer: run inline on this thread (avoid dispatch overhead).
-                auto& pass = m_PassPool[layer[0]];
-                pass.ExecuteFn(pass.ExecuteUserData);
-            }
-            else
-            {
-                // Dispatch all tasks in this layer to the scheduler.
-                for (uint32_t nodeIdx : layer)
+                const uint32_t prior = state.RemainingDependencies[dependent].fetch_sub(1, std::memory_order_acq_rel);
+                assert(prior > 0 && "FrameGraph dependent indegree underflow");
+
+                if (prior == 1)
                 {
-                    auto& pass = m_PassPool[nodeIdx];
-                    // Capture by value - thunk and pointer are trivially copyable.
-                    auto thunk = pass.ExecuteFn;
-                    auto* data = pass.ExecuteUserData;
-                    Tasks::Scheduler::Dispatch([thunk, data]() { thunk(data); });
+                    Tasks::Scheduler::Dispatch([&self, dependent]() {
+                        self(self, dependent);
+                    });
                 }
+            }
+        };
 
-                // Barrier: wait for this layer to finish before the next.
-                Tasks::Scheduler::WaitForAll();
+        uint32_t readyCount = 0;
+        for (uint32_t nodeIdx = 0; nodeIdx < nodeCount; ++nodeIdx)
+        {
+            if (state.RemainingDependencies[nodeIdx].load(std::memory_order_relaxed) == 0)
+            {
+                ++readyCount;
+                Tasks::Scheduler::Dispatch([&executePassAndReleaseDependents, nodeIdx]() {
+                    executePassAndReleaseDependents(executePassAndReleaseDependents, nodeIdx);
+                });
             }
         }
+
+        assert(readyCount > 0 && "FrameGraph::Execute expected at least one ready root node after successful compile");
+        Tasks::Scheduler::WaitForAll();
     }
 }
