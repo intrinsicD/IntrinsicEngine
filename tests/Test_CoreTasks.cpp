@@ -429,6 +429,7 @@ TEST(CoreTasks, SchedulerStatsExposeQueueAndStealTelemetry)
     EXPECT_LE(stats.StealSuccessRatio, 1.0);
     EXPECT_GE(stats.IdleWaitCount, 0u);
     EXPECT_GE(stats.IdleWaitTotalNs, 0u);
+    EXPECT_GE(stats.QueueContentionCount, 0u);
 
     Scheduler::Shutdown();
 }
@@ -456,6 +457,7 @@ TEST(CoreTasks, SchedulerStatsCanBeExportedToFrameTelemetry)
     auto& telemetry = Core::Telemetry::TelemetrySystem::Get();
     telemetry.BeginFrame();
     telemetry.SetTaskSchedulerStats(schedulerStats);
+    telemetry.SetFrameGraphTimings(100, 200, 150);
     telemetry.EndFrame();
 
     const auto& frameStats = telemetry.GetFrameStats(0);
@@ -469,7 +471,11 @@ TEST(CoreTasks, SchedulerStatsCanBeExportedToFrameTelemetry)
     EXPECT_EQ(frameStats.TaskUnparkP99Ns, schedulerStats.UnparkLatencyP99Ns);
     EXPECT_EQ(frameStats.TaskIdleWaitCount, schedulerStats.IdleWaitCount);
     EXPECT_EQ(frameStats.TaskIdleWaitTotalNs, schedulerStats.IdleWaitTotalNs);
+    EXPECT_EQ(frameStats.TaskQueueContentionCount, schedulerStats.QueueContentionCount);
     EXPECT_DOUBLE_EQ(frameStats.TaskStealSuccessRatio, schedulerStats.StealSuccessRatio);
+    EXPECT_EQ(frameStats.FrameGraphCompileTimeNs, 100u);
+    EXPECT_EQ(frameStats.FrameGraphExecuteTimeNs, 200u);
+    EXPECT_EQ(frameStats.FrameGraphCriticalPathTimeNs, 150u);
 
     Scheduler::Shutdown();
 }

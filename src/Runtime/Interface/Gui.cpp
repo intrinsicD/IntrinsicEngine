@@ -190,6 +190,8 @@ namespace Interface::GUI
                 ImGui::Text("Steal Success Ratio: %.3f", static_cast<float>(stats.TaskStealSuccessRatio));
                 ImGui::Text("Idle waits: %llu (%.3f ms total)",
                             static_cast<unsigned long long>(stats.TaskIdleWaitCount), idleWaitMs);
+                ImGui::Text("Queue contention: %llu lock misses",
+                            static_cast<unsigned long long>(stats.TaskQueueContentionCount));
 
                 if (ImGui::BeginTable("TaskWaitLatencyTable", 4,
                     ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit))
@@ -215,6 +217,19 @@ namespace Interface::GUI
                     ImGui::EndTable();
                 }
 
+                ImGui::TreePop();
+            }
+
+            ImGui::Separator();
+
+            if (ImGui::TreeNodeEx("FrameGraph Telemetry", ImGuiTreeNodeFlags_DefaultOpen))
+            {
+                const float compileMs = ToMs(stats.FrameGraphCompileTimeNs);
+                const float executeMs = ToMs(stats.FrameGraphExecuteTimeNs);
+                const float criticalPathMs = ToMs(stats.FrameGraphCriticalPathTimeNs);
+                ImGui::Text("Compile: %.3f ms", compileMs);
+                ImGui::Text("Execute: %.3f ms", executeMs);
+                ImGui::Text("Critical Path (sum of DAG chain): %.3f ms", criticalPathMs);
                 ImGui::TreePop();
             }
 

@@ -44,7 +44,11 @@ export namespace Core::Telemetry
         uint64_t TaskUnparkP99Ns = 0;
         uint64_t TaskIdleWaitCount = 0;
         uint64_t TaskIdleWaitTotalNs = 0;
+        uint64_t TaskQueueContentionCount = 0;
         double TaskStealSuccessRatio = 0.0;
+        uint64_t FrameGraphCompileTimeNs = 0;
+        uint64_t FrameGraphExecuteTimeNs = 0;
+        uint64_t FrameGraphCriticalPathTimeNs = 0;
     };
 
     struct TimingCategory
@@ -84,6 +88,7 @@ export namespace Core::Telemetry
         void RecordDrawCall(uint32_t triangles = 0);
         void SetGpuFrameTimeNs(uint64_t gpuTimeNs);
         void SetTaskSchedulerStats(const Core::Tasks::Scheduler::Stats& stats);
+        void SetFrameGraphTimings(uint64_t compileTimeNs, uint64_t executeTimeNs, uint64_t criticalPathTimeNs);
 
         [[nodiscard]] const FrameStats& GetFrameStats(size_t framesAgo = 0) const
         {
@@ -121,7 +126,11 @@ export namespace Core::Telemetry
         std::atomic<uint64_t> m_TaskUnparkP99Ns{0};
         std::atomic<uint64_t> m_TaskIdleWaitCount{0};
         std::atomic<uint64_t> m_TaskIdleWaitTotalNs{0};
+        std::atomic<uint64_t> m_TaskQueueContentionCount{0};
         std::atomic<double> m_TaskStealSuccessRatio{0.0};
+        std::atomic<uint64_t> m_FrameGraphCompileTimeNs{0};
+        std::atomic<uint64_t> m_FrameGraphExecuteTimeNs{0};
+        std::atomic<uint64_t> m_FrameGraphCriticalPathTimeNs{0};
 
         std::array<FrameStats, MAX_FRAME_HISTORY> m_FrameHistory{};
         std::array<TimingCategory, MAX_CATEGORIES> m_Categories{};

@@ -338,6 +338,9 @@ namespace Runtime
         {
             // Begin frame telemetry
             Core::Telemetry::TelemetrySystem::Get().BeginFrame();
+            uint64_t frameGraphCompileNsTotal = 0;
+            uint64_t frameGraphExecuteNsTotal = 0;
+            uint64_t frameGraphCriticalPathNs = 0;
 
             auto currentTime = Clock::now();
             double frameTime = std::chrono::duration<double>(currentTime - lastTime).count();
@@ -399,11 +402,14 @@ namespace Runtime
                         OnRegisterFixedSystems(fixedGraph, dtF);
 
                         auto compileResult = fixedGraph.Compile();
+                        frameGraphCompileNsTotal += fixedGraph.GetLastCompileTimeNs();
                         if (compileResult)
                         {
                             GetAssetManager().BeginReadPhase();
                             fixedGraph.Execute();
                             GetAssetManager().EndReadPhase();
+                            frameGraphExecuteNsTotal += fixedGraph.GetLastExecuteTimeNs();
+                            frameGraphCriticalPathNs += fixedGraph.GetLastCriticalPathTimeNs();
                         }
                     }
 
@@ -465,11 +471,14 @@ namespace Runtime
                 }
 
                 auto compileResult = frameGraph.Compile();
+                frameGraphCompileNsTotal += frameGraph.GetLastCompileTimeNs();
                 if (compileResult)
                 {
                     GetAssetManager().BeginReadPhase();
                     frameGraph.Execute();
                     GetAssetManager().EndReadPhase();
+                    frameGraphExecuteNsTotal += frameGraph.GetLastExecuteTimeNs();
+                    frameGraphCriticalPathNs += frameGraph.GetLastCriticalPathTimeNs();
                 }
             }
 
@@ -488,6 +497,8 @@ namespace Runtime
             }
 
             Core::Telemetry::TelemetrySystem::Get().SetTaskSchedulerStats(Core::Tasks::Scheduler::GetStats());
+            Core::Telemetry::TelemetrySystem::Get().SetFrameGraphTimings(
+                frameGraphCompileNsTotal, frameGraphExecuteNsTotal, frameGraphCriticalPathNs);
 
             // End frame telemetry
             Core::Telemetry::TelemetrySystem::Get().EndFrame();
