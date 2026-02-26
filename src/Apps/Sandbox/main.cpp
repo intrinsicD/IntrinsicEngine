@@ -807,7 +807,6 @@ public:
         auto* vis = reg.try_get<ECS::RenderVisualization::Component>(entity);
         if (vis)
         {
-            vis->WireframeViewDirty = true;
             vis->VertexViewDirty = true;
             vis->EdgeCacheDirty = true;
             vis->VertexNormalsDirty = true;
@@ -1268,85 +1267,24 @@ public:
                             }
 
                             // Mirror visibility into the GPU view renderer (if present).
+                            // ShowWireframe is NOT mirrored — wireframe is CPU-driven via
+                            // DebugDraw and has no corresponding GPU scene instance.
                             if (viewR)
                             {
                                 viewR->ShowSurface = vis->ShowSurface;
-                                viewR->ShowWireframe = vis->ShowWireframe;
                                 viewR->ShowVertices = vis->ShowVertices;
                             }
 
                             // -----------------------------------------------------------------
                             // Lazily create GPU views (one-time allocations/uploads)
                             // -----------------------------------------------------------------
+                            // NOTE: Wireframe has NO GPU view. It is rendered entirely by the
+                            // MeshRenderPass CPU path → DebugDraw accumulator → LineRenderPass,
+                            // which correctly applies WireframeColor and WireframeOverlay.
+                            // The previous GPU view approach used triangle.frag which ignores
+                            // WireframeColor and produced invisible/incorrect output.
 
-                            // (1) Wireframe view (Lines) for triangle meshes: build edges from collision indices once.
-                            if (vis->ShowWireframe
-                                && isTriangleMesh
-                                && (vis->WireframeViewDirty || !vis->WireframeView.IsValid()))
-                            {
-                                if (mrPtr && srcGeo && mrPtr->Geometry.IsValid()
-                                    && reg.all_of<ECS::MeshCollider::Component>(selected))
-                                {
-                                    const auto& col = reg.get<ECS::MeshCollider::Component>(selected);
-                                    if (col.CollisionRef)
-                                    {
-                                        const auto& idx = col.CollisionRef->Indices;
-                                        if (!idx.empty())
-                                        {
-                                            struct PairHash
-                                            {
-                                                size_t operator()(const std::pair<uint32_t, uint32_t>& p) const
-                                                {
-                                                    return (static_cast<size_t>(p.first) << 32) ^ static_cast<size_t>(p.second);
-                                                }
-                                            };
-
-                                            std::unordered_set<std::pair<uint32_t, uint32_t>, PairHash> edgeSet;
-                                            edgeSet.reserve(idx.size());
-
-                                            for (size_t t = 0; t + 2 < idx.size(); t += 3)
-                                            {
-                                                const uint32_t i0 = idx[t], i1 = idx[t + 1], i2 = idx[t + 2];
-                                                auto add = [&](uint32_t a, uint32_t b)
-                                                {
-                                                    auto key = (a < b) ? std::pair{a, b} : std::pair{b, a};
-                                                    edgeSet.insert(key);
-                                                };
-                                                add(i0, i1);
-                                                add(i1, i2);
-                                                add(i2, i0);
-                                            }
-
-                                            std::vector<uint32_t> lineIndices;
-                                            lineIndices.reserve(edgeSet.size() * 2);
-                                            for (const auto& e : edgeSet)
-                                            {
-                                                lineIndices.push_back(e.first);
-                                                lineIndices.push_back(e.second);
-                                            }
-
-                                            auto [h, token] = GetRenderOrchestrator().CreateGeometryView(
-                                                GetGraphicsBackend().GetTransferManager(),
-                                                mrPtr->Geometry,
-                                                lineIndices,
-                                                Graphics::PrimitiveTopology::Lines,
-                                                Graphics::GeometryUploadMode::Staged);
-
-                                            if (h.IsValid())
-                                            {
-                                                vis->WireframeView = h;
-                                                vis->WireframeViewDirty = false;
-                                                if (viewR) viewR->Wireframe = h;
-
-                                                // Force a GPUScene refresh for this entity so the new view becomes visible immediately.
-                                                reg.emplace_or_replace<ECS::Components::Transform::WorldUpdatedTag>(selected);
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            // (2) Vertex view (Points): create the GPU view for FlatDisc points.
+                            // Vertex view (Points): create the GPU view for FlatDisc points.
                             const bool wantGpuVertexView =
                                 vis->ShowVertices &&
                                 (vis->VertexRenderMode == Geometry::PointCloud::RenderMode::FlatDisc);
@@ -1384,9 +1322,9 @@ public:
                             }
 
                             // Publish handles (keep in sync even if created elsewhere).
+                            // Wireframe handle is intentionally left empty — wireframe is CPU-driven.
                             if (viewR)
                             {
-                                viewR->Wireframe = vis->WireframeView;
                                 // Only publish the vertex view for FlatDisc.
                                 viewR->Vertices = wantGpuVertexView ? vis->VertexView : Geometry::GeometryHandle{};
                             }

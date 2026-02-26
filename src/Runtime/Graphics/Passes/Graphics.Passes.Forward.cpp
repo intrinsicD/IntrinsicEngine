@@ -122,7 +122,8 @@ namespace Graphics::Passes
             }
         }
 
-        // Also include view geometries (wireframe/vertices) so their GeometryID values are mapped.
+        // Also include view geometries (surface/vertices) so their GeometryID values are mapped.
+        // NOTE: Wireframe has no GPU view — it is CPU-driven via DebugDraw → LineRenderPass.
          {
              auto view = ctx.Scene.GetRegistry().view<ECS::GeometryViewRenderer::Component>();
              for (auto entity : view)
@@ -150,7 +151,6 @@ namespace Graphics::Passes
                 };
 
                 tryAdd(vr.Surface);
-                tryAdd(vr.Wireframe);
                 tryAdd(vr.Vertices);
              }
          }

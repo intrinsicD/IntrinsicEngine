@@ -56,7 +56,6 @@ namespace
         };
 
         freeSlot(vr.SurfaceGpuSlot);
-        freeSlot(vr.WireframeGpuSlot);
         freeSlot(vr.VerticesGpuSlot);
     }
 }

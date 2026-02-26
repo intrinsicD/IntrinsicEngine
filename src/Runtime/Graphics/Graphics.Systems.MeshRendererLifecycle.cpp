@@ -109,7 +109,8 @@ namespace Graphics::Systems::MeshRendererLifecycle
         }
 
         // -----------------------------------------------------------------
-        // GeometryViewRenderer: additional GPU instances for wireframe/vertices
+        // GeometryViewRenderer: additional GPU instances for surface/vertices.
+        // NOTE: Wireframe has no GPU view — it is CPU-driven via DebugDraw.
         // -----------------------------------------------------------------
         auto viewViews = registry.view<ECS::GeometryViewRenderer::Component, ECS::Components::Transform::WorldMatrix>();
         for (auto [entity, vr, world] : viewViews.each())
@@ -162,10 +163,14 @@ namespace Graphics::Systems::MeshRendererLifecycle
             };
 
             enqueueInstance(vr.Surface, vr.SurfaceGpuSlot, vr.ShowSurface);
-            enqueueInstance(vr.Wireframe, vr.WireframeGpuSlot, vr.ShowWireframe);
             enqueueInstance(vr.Vertices, vr.VerticesGpuSlot, vr.ShowVertices);
 
-            registry.remove<ECS::Components::Transform::WorldUpdatedTag>(entt::entity(entity));
+            // NOTE: WorldUpdatedTag is intentionally NOT removed here.
+            // The GeometryViewRenderer loop runs unconditionally every frame for all
+            // such entities (no tag guard), so the tag is not needed to drive updates here.
+            // GPUSceneSync consumes the tag for surface mesh transform updates — removing
+            // it here would cause GPUSceneSync to miss transform changes on entities that
+            // also have a GeometryViewRenderer component.
         }
 
         // NOTE: Slot reclamation for destroyed entities is now handled by an EnTT on_destroy

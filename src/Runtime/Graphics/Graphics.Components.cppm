@@ -117,13 +117,12 @@ export namespace ECS::RenderVisualization
         Geometry::PointCloud::RenderMode VertexRenderMode = Geometry::PointCloud::RenderMode::FlatDisc;
 
         // ---- Derived Geometry Views (GPU, shared-vertex) ----
-        // Lazily populated when the user toggles visualization modes.
-        // These are optional GPU-side "views" that reuse vertex buffers from
-        // the entity’s base geometry but provide alternative topology/indices.
-        Geometry::GeometryHandle WireframeView{}; // Lines
+        // Wireframe has NO GPU view — it is rendered by the CPU DebugDraw path
+        // (MeshRenderPass → LineRenderPass) which correctly applies WireframeColor.
+        //
+        // Vertex view is lazily created once for FlatDisc point rendering via ForwardPass.
         Geometry::GeometryHandle VertexView{};    // Points
 
-        bool WireframeViewDirty = true;
         bool VertexViewDirty = true;
 
         // ---- Edge Cache (internal, rebuilt lazily) ----
@@ -193,16 +192,13 @@ export namespace ECS::GeometryViewRenderer
         Geometry::GeometryHandle Surface{};
         uint32_t SurfaceGpuSlot = MeshRenderer::Component::kInvalidSlot;
 
-        // Optional view geometries.
-        Geometry::GeometryHandle Wireframe{}; // Lines
-        uint32_t WireframeGpuSlot = MeshRenderer::Component::kInvalidSlot;
-
+        // Optional vertex point-cloud view geometry (FlatDisc mode via ForwardPass).
+        // Wireframe has NO GPU view — it is always CPU-driven via DebugDraw → LineRenderPass.
         Geometry::GeometryHandle Vertices{}; // Points
         uint32_t VerticesGpuSlot = MeshRenderer::Component::kInvalidSlot;
 
         // Visibility toggles mirrored from RenderVisualization.
         bool ShowSurface = true;
-        bool ShowWireframe = false;
         bool ShowVertices = false;
     };
 }

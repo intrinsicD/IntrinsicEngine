@@ -31,14 +31,13 @@ namespace Graphics::Passes
     //     Extracts unique edges from the collision mesh (lazily cached per entity)
     //     and submits them to ctx.DebugDrawPtr (→ LineRenderPass GPU draw).
     //     Uses OverlayLine when vis.WireframeOverlay is true.
+    //     This path always runs when ShowWireframe is true; there is no GPU geometry
+    //     view for wireframe (the ForwardPass triangle shader ignores WireframeColor).
     //
     //   ShowVertices:
-    //     Submits mesh vertex positions for point rendering.
+    //     Submits mesh vertex positions for point rendering
     //     to PointCloudRenderPass staging buffers.
-    //
-    // Entities for which GPU-side derived geometry views already exist
-    // (vis.WireframeView.IsValid() / vis.VertexView.IsValid()) skip the CPU path —
-    // their rendering is handled by ForwardPass via GPUScene geometry instances.
+    //     Skipped when a GPU vertex view exists (vis.VertexView.IsValid()) for FlatDisc mode.
 
     void MeshRenderPass::AddPasses(RenderPassContext& ctx)
     {
@@ -57,15 +56,20 @@ namespace Graphics::Passes
             if (!vis.ShowWireframe && !vis.ShowVertices)
                 continue;
 
-            const bool hasGpuWire  = vis.WireframeView.IsValid();
+            // Wireframe is always rendered via the CPU DebugDraw → LineRenderPass path.
+            // WireframeView (GPU geometry view) is intentionally NOT used to gate this path:
+            // the ForwardPass triangle shader does not apply WireframeColor and produces no
+            // visible colored lines. The CPU path gives correct, colored, anti-aliased lines
+            // via LineRenderPass immediately with no frame-allocation delay.
+            const bool needsCpuWire = vis.ShowWireframe && canDrawLines;
+
             // GPU vertex view is valid for FlatDisc point rendering.
             const bool gpuVertexPathValid =
                 vis.VertexView.IsValid() &&
                 (vis.VertexRenderMode == Geometry::PointCloud::RenderMode::FlatDisc);
             const bool hasGpuVerts = gpuVertexPathValid;
 
-            const bool needsCpuWire  = vis.ShowWireframe && !hasGpuWire  && canDrawLines;
-            const bool needsCpuVerts = vis.ShowVertices  && !hasGpuVerts && canDrawPoints;
+            const bool needsCpuVerts = vis.ShowVertices && !hasGpuVerts && canDrawPoints;
 
             if (!needsCpuWire && !needsCpuVerts)
                 continue;
