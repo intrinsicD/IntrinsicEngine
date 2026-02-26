@@ -271,6 +271,7 @@ public:
         registerPanelFeature("View Settings", "Selection outline and viewport display settings");
         registerPanelFeature("Render Target Viewer", "Render target debug visualization");
         registerPanelFeature("Geometry Processing", "Interactive Geometry Processing operators");
+        registerPanelFeature("Status Bar", "Bottom-of-viewport frame summary (frame time, entity count, active renderer)");
 
         Log::Info("FeatureRegistry: {} total features after client registration", features.Count());
 
@@ -322,6 +323,40 @@ public:
                 ImGui::Text("Components: MeshRenderer=%d MeshCollider=%d", (int)hasMeshRenderer, (int)hasMeshCollider);
             }
         });
+
+        Interface::GUI::RegisterPanel("Status Bar", [this]()
+        {
+            const ImGuiViewport* viewport = ImGui::GetMainViewport();
+            const float statusBarHeight = ImGui::GetFrameHeight() + 10.0f;
+
+            ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x, viewport->WorkPos.y + viewport->WorkSize.y - statusBarHeight));
+            ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x, statusBarHeight));
+
+            ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration |
+                                     ImGuiWindowFlags_NoMove |
+                                     ImGuiWindowFlags_NoSavedSettings |
+                                     ImGuiWindowFlags_NoBringToFrontOnFocus |
+                                     ImGuiWindowFlags_NoNavFocus;
+
+            const float fps = ImGui::GetIO().Framerate;
+            const float frameMs = fps > 0.0f ? (1000.0f / fps) : 0.0f;
+
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.0f, 4.0f));
+            if (ImGui::Begin("##IntrinsicStatusBar", nullptr, flags))
+            {
+                ImGui::Text("Frame: %.2f ms (%.1f FPS)", frameMs, fps);
+                ImGui::SameLine();
+                ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
+                ImGui::SameLine();
+                ImGui::Text("Entities: %d", static_cast<int>(GetScene().Size()));
+                ImGui::SameLine();
+                ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
+                ImGui::SameLine();
+                ImGui::Text("Render Mode: DefaultPipeline");
+            }
+            ImGui::End();
+            ImGui::PopStyleVar();
+        }, false, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoSavedSettings);
 
         // View Settings panel for configuring selection outline, etc.
         Interface::GUI::RegisterPanel("View Settings", [this]()

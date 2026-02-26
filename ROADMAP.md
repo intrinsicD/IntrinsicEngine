@@ -254,7 +254,7 @@ This order is intentional: item (1) improves scheduler substrate; ready-queue Fr
   - Drag-and-drop for asset assignment (drag a material onto a mesh).
 - **Asset browser:** Thumbnail previews, drag-and-drop import, directory navigation. Replace the current flat list.
 - **Console / log panel:** Scrollable, filterable log output in the UI (currently logs go to stdout only).
-- **Status bar:** Frame time, entity count, GPU memory, active render mode at a glance.
+- ~~**Status bar:**~~ — **DONE (baseline).** Sandbox now renders a persistent bottom status strip with frame time/FPS, live entity count, and active renderer label for at-a-glance viewport context. Remaining follow-up: wire GPU memory telemetry into the strip once allocator-level usage counters are exposed.
 - **Keyboard shortcuts:** Configurable hotkeys for common operations (select mode, transform mode, render mode toggle).
 - **Dark/light theme:** Configurable ImGui theme with presets.
 - **Context menus:** Right-click menus on entities (delete, duplicate, rename, focus camera).
