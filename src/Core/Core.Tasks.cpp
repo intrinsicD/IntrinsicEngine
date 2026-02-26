@@ -136,6 +136,31 @@ namespace Core::Tasks
             SpinLock localLock{};
             std::deque<LocalTask> localDeque{};
             std::atomic<uint64_t> stealCount{0};
+
+            WorkerState() = default;
+            WorkerState(const WorkerState&) = delete;
+            WorkerState& operator=(const WorkerState&) = delete;
+
+            WorkerState(WorkerState&& other) noexcept
+                : localLock{}
+                , localDeque(std::move(other.localDeque))
+                , stealCount(other.stealCount.load(std::memory_order_relaxed))
+            {
+                other.stealCount.store(0, std::memory_order_relaxed);
+            }
+
+            WorkerState& operator=(WorkerState&& other) noexcept
+            {
+                if (this != &other)
+                {
+                    // Note: we intentionally don't attempt to transfer lock state.
+                    // Vector moves can only happen during initialization/resizing.
+                    localDeque = std::move(other.localDeque);
+                    stealCount.store(other.stealCount.load(std::memory_order_relaxed), std::memory_order_relaxed);
+                    other.stealCount.store(0, std::memory_order_relaxed);
+                }
+                return *this;
+            }
         };
 
         std::vector<std::thread> workers;
@@ -423,7 +448,7 @@ namespace Core::Tasks
         }
         else
         {
-            EnqueueInject(std::move(task));
+            (void)EnqueueInject(std::move(task));
         }
 
         s_Ctx->workSignal.fetch_add(1, std::memory_order_release);

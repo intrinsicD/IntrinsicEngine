@@ -3,7 +3,16 @@
 # ------------------------------------------------------------------------------
 # This prevents re-downloading/unzipping when you clean the build folder.
 get_filename_component(ROOT_DIR ${CMAKE_SOURCE_DIR} ABSOLUTE)
-set(FETCHCONTENT_BASE_DIR "${ROOT_DIR}/external/cache")
+
+# IMPORTANT: FetchContent only honors FETCHCONTENT_BASE_DIR when it's a CACHE variable.
+# If it's a normal variable, CMake will default to <build>/_deps and <name>_SOURCE_DIR
+# can end up unset/empty in some policy/config combinations.
+if(NOT DEFINED FETCHCONTENT_BASE_DIR OR "${FETCHCONTENT_BASE_DIR}" STREQUAL "")
+    set(FETCHCONTENT_BASE_DIR "${ROOT_DIR}/external/cache" CACHE PATH "FetchContent base directory" FORCE)
+else()
+    # Re-export it as a cache variable to ensure FetchContent honors it.
+    set(FETCHCONTENT_BASE_DIR "${FETCHCONTENT_BASE_DIR}" CACHE PATH "FetchContent base directory" FORCE)
+endif()
 
 find_program(CCACHE_PROGRAM ccache)
 if(CCACHE_PROGRAM)
@@ -163,19 +172,39 @@ FetchContent_Declare(
         GIT_REPOSITORY https://github.com/ocornut/imgui.git
         GIT_TAG v1.92.5-docking
 )
-intrinsic_make_available(imgui)
+
+# ImGui is not a first-class CMake project; depending on CMake policies/version,
+# FetchContent_MakeAvailable(imgui) may not leave us with a reliable imgui_SOURCE_DIR.
+# We therefore ensure the content is populated and then resolve the source path.
+if(NOT imgui_POPULATED)
+    FetchContent_Populate(imgui)
+endif()
+
+# Prefer the path returned by FetchContent_Populate; fall back to our offline cache layout.
+set(IMGUI_SOURCE_DIR "${imgui_SOURCE_DIR}")
+if("${IMGUI_SOURCE_DIR}" STREQUAL "")
+    set(IMGUI_SOURCE_DIR "${FETCHCONTENT_BASE_DIR}/imgui-src")
+endif()
+
+if(NOT IS_DIRECTORY "${IMGUI_SOURCE_DIR}" OR NOT EXISTS "${IMGUI_SOURCE_DIR}/imgui.cpp")
+    message(FATAL_ERROR
+        "ImGui sources not found. Expected at: ${IMGUI_SOURCE_DIR}\n"
+        "Missing file: ${IMGUI_SOURCE_DIR}/imgui.cpp\n"
+        "If configuring offline, ensure external/cache/imgui-src is populated and non-empty."
+    )
+endif()
 
 # Create a library for ImGui to make linking easier
 # We also include the backend sources for GLFW and Vulkan
 add_library(imgui_lib STATIC
-        ${imgui_SOURCE_DIR}/imgui.cpp
-        ${imgui_SOURCE_DIR}/imgui_demo.cpp
-        ${imgui_SOURCE_DIR}/imgui_draw.cpp
-        ${imgui_SOURCE_DIR}/imgui_tables.cpp
-        ${imgui_SOURCE_DIR}/imgui_widgets.cpp
-        ${imgui_SOURCE_DIR}/backends/imgui_impl_glfw.cpp
-        ${imgui_SOURCE_DIR}/backends/imgui_impl_vulkan.cpp
+        ${IMGUI_SOURCE_DIR}/imgui.cpp
+        ${IMGUI_SOURCE_DIR}/imgui_demo.cpp
+        ${IMGUI_SOURCE_DIR}/imgui_draw.cpp
+        ${IMGUI_SOURCE_DIR}/imgui_tables.cpp
+        ${IMGUI_SOURCE_DIR}/imgui_widgets.cpp
+        ${IMGUI_SOURCE_DIR}/backends/imgui_impl_glfw.cpp
+        ${IMGUI_SOURCE_DIR}/backends/imgui_impl_vulkan.cpp
 )
-target_include_directories(imgui_lib PUBLIC ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends)
+target_include_directories(imgui_lib PUBLIC ${IMGUI_SOURCE_DIR} ${IMGUI_SOURCE_DIR}/backends)
 target_compile_definitions(imgui_lib PUBLIC IMGUI_IMPL_VULKAN_NO_PROTOTYPES GLFW_INCLUDE_NONE)
 target_link_libraries(imgui_lib PUBLIC glfw volk)

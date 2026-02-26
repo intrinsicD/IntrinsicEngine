@@ -4,6 +4,7 @@ module;
 #include <cstdint>
 #include <unordered_set>
 #include <vector>
+#include <memory>
 
 module Core.DAGScheduler;
 import Core.Error;

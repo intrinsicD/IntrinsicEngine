@@ -3,6 +3,7 @@ module;
 #include <cassert>
 #include <atomic>
 #include <cstdint>
+#include <memory>
 #include <vector>
 
 module Core.FrameGraph;
@@ -85,11 +86,13 @@ namespace Core
         // via DAGScheduler introspection for diagnostics/visualization only.
         struct FrameGraphExecutionState
         {
-            std::vector<std::atomic<uint32_t>> RemainingDependencies;
+            std::unique_ptr<std::atomic<uint32_t>[]> RemainingDependencies;
+            uint32_t NodeCount = 0;
         };
 
         FrameGraphExecutionState state{};
-        state.RemainingDependencies.resize(nodeCount);
+        state.NodeCount = nodeCount;
+        state.RemainingDependencies = std::make_unique<std::atomic<uint32_t>[]>(nodeCount);
 
         for (uint32_t nodeIdx = 0; nodeIdx < nodeCount; ++nodeIdx)
         {

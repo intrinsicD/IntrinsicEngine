@@ -4,6 +4,7 @@ module;
 #include <cstddef>
 #include <limits>
 #include <span>
+#include <vector>
 
 #include <glm/glm.hpp>
 #define GLM_ENABLE_EXPERIMENTAL

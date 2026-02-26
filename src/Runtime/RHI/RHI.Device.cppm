@@ -13,7 +13,7 @@ import Core.InplaceFunction;
 
 namespace RHI
 {
-    class TransientAllocator;
+    export class TransientAllocator;
 
     export struct QueueFamilyIndices
     {
