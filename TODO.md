@@ -57,10 +57,6 @@ This section captures **newly observed inconsistencies** and concrete remediatio
   - Fallback normal/color/aux population and “invalid/empty data” checks are duplicated across loaders.
   - Action: centralize into `GeometryImportPostProcess` helpers with deterministic policy flags per format.
 
-- [ ] **Unify shader registration and pass wiring declarations (Low).**
-  - `RenderOrchestrator::InitPipeline()` manually registers many shaders via repetitive statements.
-  - Action: switch to table-driven registration (`constexpr` array of `{id,path}`), enabling consistency checks and easier hot-reload integration.
-
 ### D. Problems in current TODO governance (meta)
 
 - [ ] **Missing measurable acceptance criteria for several high-impact TODOs (High).**
