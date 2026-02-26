@@ -155,6 +155,14 @@ namespace Core::Tasks
         // Telemetry counters (non-authoritative for completion).
         alignas(64) std::atomic<int> activeTaskCount{0};
         alignas(64) std::atomic<int> queuedTaskCount{0};
+
+        // Scheduler telemetry counters.
+        alignas(64) std::atomic<uint64_t> injectPushCount{0};
+        alignas(64) std::atomic<uint64_t> injectPopCount{0};
+        alignas(64) std::atomic<uint64_t> localPopCount{0};
+        alignas(64) std::atomic<uint64_t> stealPopCount{0};
+        alignas(64) std::atomic<uint64_t> totalStealAttempts{0};
+        alignas(64) std::atomic<uint64_t> successfulStealAttempts{0};
     };
 
     static std::unique_ptr<SchedulerContext> s_Ctx = nullptr;
@@ -163,6 +171,7 @@ namespace Core::Tasks
     [[nodiscard]] static bool EnqueueInject(LocalTask&& task)
     {
         bool pushed = s_Ctx->globalQueue.Push(std::move(task));
+        s_Ctx->injectPushCount.fetch_add(1, std::memory_order_relaxed);
         if (pushed)
             return true;
 
@@ -175,7 +184,10 @@ namespace Core::Tasks
     [[nodiscard]] static bool TryPopInject(LocalTask& outTask)
     {
         if (s_Ctx->globalQueue.Pop(outTask))
+        {
+            s_Ctx->injectPopCount.fetch_add(1, std::memory_order_relaxed);
             return true;
+        }
 
         if (!s_Ctx->hasOverflow.load(std::memory_order_acquire))
             return false;
@@ -189,6 +201,7 @@ namespace Core::Tasks
 
         outTask = std::move(s_Ctx->overflowQueue.front());
         s_Ctx->overflowQueue.pop_front();
+        s_Ctx->injectPopCount.fetch_add(1, std::memory_order_relaxed);
         if (s_Ctx->overflowQueue.empty())
             s_Ctx->hasOverflow.store(false, std::memory_order_release);
         return true;
@@ -203,6 +216,7 @@ namespace Core::Tasks
 
         outTask = std::move(worker.localDeque.back());
         worker.localDeque.pop_back();
+        s_Ctx->localPopCount.fetch_add(1, std::memory_order_relaxed);
         return true;
     }
 
@@ -214,6 +228,7 @@ namespace Core::Tasks
 
         for (unsigned offset = 1; offset < workerCount; ++offset)
         {
+            s_Ctx->totalStealAttempts.fetch_add(1, std::memory_order_relaxed);
             const unsigned victimIndex = (thiefIndex + offset) % workerCount;
             auto& victim = s_Ctx->workerStates[victimIndex];
             if (!victim.localLock.try_lock())
@@ -225,6 +240,8 @@ namespace Core::Tasks
                 outTask = std::move(victim.localDeque.front());
                 victim.localDeque.pop_front();
                 victim.stealCount.fetch_add(1, std::memory_order_relaxed);
+                s_Ctx->stealPopCount.fetch_add(1, std::memory_order_relaxed);
+                s_Ctx->successfulStealAttempts.fetch_add(1, std::memory_order_relaxed);
                 stole = true;
             }
             victim.localLock.unlock();
@@ -401,6 +418,33 @@ namespace Core::Tasks
                     s_Ctx->inFlightTasks.wait(observed, std::memory_order_relaxed);
             }
         }
+    }
+
+    Scheduler::Stats Scheduler::GetStats()
+    {
+        Stats stats{};
+        if (!s_Ctx)
+            return stats;
+
+        stats.InFlightTasks = s_Ctx->inFlightTasks.load(std::memory_order_acquire);
+        stats.QueuedTasks = static_cast<uint64_t>(s_Ctx->queuedTaskCount.load(std::memory_order_relaxed));
+        stats.ActiveTasks = static_cast<uint64_t>(s_Ctx->activeTaskCount.load(std::memory_order_relaxed));
+        stats.InjectPushCount = s_Ctx->injectPushCount.load(std::memory_order_relaxed);
+        stats.InjectPopCount = s_Ctx->injectPopCount.load(std::memory_order_relaxed);
+        stats.LocalPopCount = s_Ctx->localPopCount.load(std::memory_order_relaxed);
+        stats.StealPopCount = s_Ctx->stealPopCount.load(std::memory_order_relaxed);
+        stats.TotalStealAttempts = s_Ctx->totalStealAttempts.load(std::memory_order_relaxed);
+        stats.SuccessfulStealAttempts = s_Ctx->successfulStealAttempts.load(std::memory_order_relaxed);
+
+        stats.WorkerLocalDepths.reserve(s_Ctx->workerStates.size());
+        stats.WorkerVictimStealCounts.reserve(s_Ctx->workerStates.size());
+        for (auto& worker : s_Ctx->workerStates)
+        {
+            std::lock_guard lock(worker.localLock);
+            stats.WorkerLocalDepths.push_back(static_cast<uint32_t>(worker.localDeque.size()));
+            stats.WorkerVictimStealCounts.push_back(worker.stealCount.load(std::memory_order_relaxed));
+        }
+        return stats;
     }
 
     void Scheduler::WorkerEntry(unsigned threadIndex)

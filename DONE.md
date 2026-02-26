@@ -54,3 +54,12 @@ Completed the FrameGraph execution-model backlog item:
 - Replaced per-layer `WaitForAll()` barriers with dependency-count-driven ready dispatch in `FrameGraph::Execute()`.
 - Added atomic indegree countdown release semantics so dependents are scheduled immediately when their final prerequisite completes.
 - Preserved execution-layer data in `DAGScheduler` for diagnostics/visualization while using a single terminal scheduler wait for completion.
+
+## 2026-02-26 Scheduler Telemetry Milestone (Deque/Steal Metrics)
+
+Completed the first telemetry milestone under the Core::Tasks fiber-parking backlog item:
+
+- Added `Core::Tasks::Scheduler::GetStats()` to expose scheduler-level counters for queue behavior and stealing.
+- Added per-worker deque depth snapshots and per-worker victim steal counters for fairness diagnostics.
+- Added aggregate counters for inject push/pop, local pops, steal pops, and steal attempt/success totals.
+- Added `CoreTasks` regression coverage validating that stats are populated during normal dispatch/execute flow.

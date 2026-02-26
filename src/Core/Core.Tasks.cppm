@@ -6,6 +6,7 @@ module;
 #include <memory>
 #include <coroutine>
 #include <atomic>
+#include <vector>
 
 export module Core.Tasks;
 import Core.Logging;
@@ -89,6 +90,21 @@ namespace Core::Tasks
     export class Scheduler
     {
     public:
+        struct Stats
+        {
+            uint64_t InFlightTasks = 0;
+            uint64_t QueuedTasks = 0;
+            uint64_t ActiveTasks = 0;
+            uint64_t InjectPushCount = 0;
+            uint64_t InjectPopCount = 0;
+            uint64_t LocalPopCount = 0;
+            uint64_t StealPopCount = 0;
+            uint64_t TotalStealAttempts = 0;
+            uint64_t SuccessfulStealAttempts = 0;
+            std::vector<uint32_t> WorkerLocalDepths{};
+            std::vector<uint64_t> WorkerVictimStealCounts{};
+        };
+
         static void Initialize(unsigned threadCount = 0);
         static void Shutdown();
 
@@ -108,6 +124,7 @@ namespace Core::Tasks
                                std::shared_ptr<std::atomic<bool>> alive = nullptr);
 
         static void WaitForAll();
+        [[nodiscard]] static Stats GetStats();
 
     private:
         static void DispatchInternal(LocalTask&& task);
