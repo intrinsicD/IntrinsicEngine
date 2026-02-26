@@ -3,12 +3,11 @@ module;
 #include <cstdint>
 #include <expected>
 #include <span>
-#include <sstream>
-#include <string>
 #include <string_view>
 #include <unordered_map>
 #include <vector>
 #include <glm/glm.hpp>
+#include "Graphics.Importers.TextParse.hpp"
 
 module Graphics:Importers.TGF.Impl;
 import :Importers.TGF;
@@ -33,45 +32,68 @@ namespace Graphics
         const LoadContext& /*ctx*/)
     {
         std::string_view text(reinterpret_cast<const char*>(data.data()), data.size());
-        std::istringstream stream{std::string{text}};
 
         GeometryCpuData outData;
         outData.Topology = PrimitiveTopology::Lines;
-        std::string line;
+        std::string_view line;
+        size_t lineCursor = 0;
         bool parsingEdges = false;
         std::unordered_map<int, uint32_t> idMap;
+        std::vector<std::string_view> tokens;
+        tokens.reserve(8);
 
-        while (std::getline(stream, line))
+        while (Importers::TextParse::NextLine(text, lineCursor, line))
         {
-            if (line.empty()) continue;
-            if (line[0] == '#')
+            line = Importers::TextParse::Trim(line);
+            if (line.empty())
+                continue;
+
+            if (line.front() == '#')
             {
                 parsingEdges = true;
                 continue;
             }
 
-            std::stringstream ss(line);
+            Importers::TextParse::SplitWhitespace(line, tokens);
+            if (tokens.empty())
+                continue;
+
             if (!parsingEdges)
             {
-                int id;
-                ss >> id;
+                const auto id = Importers::TextParse::ParseNumber<int>(tokens[0]);
+                if (!id)
+                    continue;
+
                 glm::vec3 p{0.0f};
-                if (!ss.eof()) ss >> p.x >> p.y >> p.z;
+                if (tokens.size() >= 4)
+                {
+                    const auto x = Importers::TextParse::ParseNumber<float>(tokens[1]);
+                    const auto y = Importers::TextParse::ParseNumber<float>(tokens[2]);
+                    const auto z = Importers::TextParse::ParseNumber<float>(tokens[3]);
+                    if (x && y && z)
+                        p = glm::vec3(*x, *y, *z);
+                }
 
                 auto idx = static_cast<uint32_t>(outData.Positions.size());
-                idMap[id] = idx;
+                idMap[*id] = idx;
                 outData.Positions.push_back(p);
                 outData.Normals.emplace_back(0, 1, 0);
                 outData.Aux.emplace_back(1);
             }
             else
             {
-                int from, to;
-                ss >> from >> to;
-                if (idMap.count(from) && idMap.count(to))
+                if (tokens.size() < 2)
+                    continue;
+
+                const auto from = Importers::TextParse::ParseNumber<int>(tokens[0]);
+                const auto to = Importers::TextParse::ParseNumber<int>(tokens[1]);
+                if (!from || !to)
+                    continue;
+
+                if (idMap.count(*from) && idMap.count(*to))
                 {
-                    outData.Indices.push_back(idMap[from]);
-                    outData.Indices.push_back(idMap[to]);
+                    outData.Indices.push_back(idMap[*from]);
+                    outData.Indices.push_back(idMap[*to]);
                 }
             }
         }

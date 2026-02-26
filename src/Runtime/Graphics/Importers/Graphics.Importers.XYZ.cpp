@@ -2,11 +2,10 @@ module;
 #include <cstddef>
 #include <expected>
 #include <span>
-#include <sstream>
-#include <string>
 #include <string_view>
 #include <vector>
 #include <glm/glm.hpp>
+#include "Graphics.Importers.TextParse.hpp"
 
 module Graphics:Importers.XYZ.Impl;
 import :Importers.XYZ;
@@ -32,26 +31,43 @@ namespace Graphics
         const LoadContext& /*ctx*/)
     {
         std::string_view text(reinterpret_cast<const char*>(data.data()), data.size());
-        std::istringstream stream{std::string{text}};
 
         GeometryCpuData outData;
         outData.Topology = PrimitiveTopology::Points;
-        std::string line;
+        std::string_view line;
+        size_t lineCursor = 0;
+        std::vector<std::string_view> tokens;
+        tokens.reserve(8);
 
-        while (std::getline(stream, line))
+        while (Importers::TextParse::NextLine(text, lineCursor, line))
         {
-            if (line.empty() || line[0] == '#') continue;
-            std::stringstream ss(line);
-            glm::vec3 p;
-            ss >> p.x >> p.y >> p.z;
+            line = Importers::TextParse::Trim(line);
+            if (line.empty() || line.front() == '#')
+                continue;
+
+            Importers::TextParse::SplitWhitespace(line, tokens);
+            if (tokens.size() < 3)
+                continue;
+
+            const auto px = Importers::TextParse::ParseNumber<float>(tokens[0]);
+            const auto py = Importers::TextParse::ParseNumber<float>(tokens[1]);
+            const auto pz = Importers::TextParse::ParseNumber<float>(tokens[2]);
+            if (!px || !py || !pz)
+                continue;
+
+            glm::vec3 p{*px, *py, *pz};
             outData.Positions.push_back(p);
             outData.Normals.emplace_back(0, 1, 0);
 
-            if (!ss.eof())
+            if (tokens.size() >= 6)
             {
-                float r, g, b;
-                ss >> r >> g >> b;
-                outData.Aux.emplace_back(r, g, b, 1.0f);
+                const auto r = Importers::TextParse::ParseNumber<float>(tokens[3]);
+                const auto g = Importers::TextParse::ParseNumber<float>(tokens[4]);
+                const auto b = Importers::TextParse::ParseNumber<float>(tokens[5]);
+                if (r && g && b)
+                    outData.Aux.emplace_back(*r, *g, *b, 1.0f);
+                else
+                    outData.Aux.emplace_back(1.0f);
             }
             else
             {
