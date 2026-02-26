@@ -122,6 +122,7 @@ namespace Core::Tasks
             uint64_t UnparkLatencyP99Ns = 0;
             uint64_t IdleWaitCount = 0;
             uint64_t IdleWaitTotalNs = 0;
+            uint64_t QueueContentionCount = 0;
             double StealSuccessRatio = 0.0;
             std::vector<uint32_t> WorkerLocalDepths{};
             std::vector<uint64_t> WorkerVictimStealCounts{};

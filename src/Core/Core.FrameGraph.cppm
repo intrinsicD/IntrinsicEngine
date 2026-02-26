@@ -4,6 +4,7 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <expected>
+#include <chrono>
 #include <string_view>
 #include <vector>
 
@@ -159,6 +160,10 @@ export namespace Core
         // ----- Introspection -----
         [[nodiscard]] uint32_t GetPassCount() const { return m_Scheduler.GetNodeCount(); }
         [[nodiscard]] const std::vector<std::vector<uint32_t>>& GetExecutionLayers() const { return m_Scheduler.GetExecutionLayers(); }
+        [[nodiscard]] uint64_t GetLastCompileTimeNs() const { return m_LastCompileTimeNs; }
+        [[nodiscard]] uint64_t GetLastExecuteTimeNs() const { return m_LastExecuteTimeNs; }
+        [[nodiscard]] uint64_t GetLastCriticalPathTimeNs() const { return m_LastCriticalPathTimeNs; }
+        [[nodiscard]] uint32_t GetLastRootReadyCount() const { return m_LastRootReadyCount; }
 
         // Get the name of a pass by index (for debugging/telemetry).
         [[nodiscard]] std::string_view GetPassName(uint32_t index) const
@@ -191,6 +196,10 @@ export namespace Core
 
         // Pass pool (recycled across frames, grows to high-water mark)
         std::vector<PassNode> m_PassPool;
+        uint64_t m_LastCompileTimeNs = 0;
+        uint64_t m_LastExecuteTimeNs = 0;
+        uint64_t m_LastCriticalPathTimeNs = 0;
+        uint32_t m_LastRootReadyCount = 0;
     };
 
     // =========================================================================

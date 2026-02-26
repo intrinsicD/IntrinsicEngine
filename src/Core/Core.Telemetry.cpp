@@ -71,7 +71,11 @@ namespace Core::Telemetry
         m_FrameHistory[idx].TaskUnparkP99Ns = m_TaskUnparkP99Ns.load(std::memory_order_relaxed);
         m_FrameHistory[idx].TaskIdleWaitCount = m_TaskIdleWaitCount.load(std::memory_order_relaxed);
         m_FrameHistory[idx].TaskIdleWaitTotalNs = m_TaskIdleWaitTotalNs.load(std::memory_order_relaxed);
+        m_FrameHistory[idx].TaskQueueContentionCount = m_TaskQueueContentionCount.load(std::memory_order_relaxed);
         m_FrameHistory[idx].TaskStealSuccessRatio = m_TaskStealSuccessRatio.load(std::memory_order_relaxed);
+        m_FrameHistory[idx].FrameGraphCompileTimeNs = m_FrameGraphCompileTimeNs.load(std::memory_order_relaxed);
+        m_FrameHistory[idx].FrameGraphExecuteTimeNs = m_FrameGraphExecuteTimeNs.load(std::memory_order_relaxed);
+        m_FrameHistory[idx].FrameGraphCriticalPathTimeNs = m_FrameGraphCriticalPathTimeNs.load(std::memory_order_relaxed);
 
         m_CurrentFrame++;
         m_DrawCallCount.store(0, std::memory_order_relaxed);
@@ -121,7 +125,15 @@ namespace Core::Telemetry
         m_TaskUnparkP99Ns.store(stats.UnparkLatencyP99Ns, std::memory_order_relaxed);
         m_TaskIdleWaitCount.store(stats.IdleWaitCount, std::memory_order_relaxed);
         m_TaskIdleWaitTotalNs.store(stats.IdleWaitTotalNs, std::memory_order_relaxed);
+        m_TaskQueueContentionCount.store(stats.QueueContentionCount, std::memory_order_relaxed);
         m_TaskStealSuccessRatio.store(stats.StealSuccessRatio, std::memory_order_relaxed);
+    }
+
+    void TelemetrySystem::SetFrameGraphTimings(uint64_t compileTimeNs, uint64_t executeTimeNs, uint64_t criticalPathTimeNs)
+    {
+        m_FrameGraphCompileTimeNs.store(compileTimeNs, std::memory_order_relaxed);
+        m_FrameGraphExecuteTimeNs.store(executeTimeNs, std::memory_order_relaxed);
+        m_FrameGraphCriticalPathTimeNs.store(criticalPathTimeNs, std::memory_order_relaxed);
     }
 
     double TelemetrySystem::GetAverageFrameTimeMs(size_t frameCount) const

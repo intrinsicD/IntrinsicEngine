@@ -203,6 +203,7 @@ namespace Core::Tasks
         std::array<std::atomic<uint64_t>, LatencyBucketCount> unparkLatencyHistogram{};
         alignas(64) std::atomic<uint64_t> idleWaitCount{0};
         alignas(64) std::atomic<uint64_t> idleWaitTotalNs{0};
+        alignas(64) std::atomic<uint64_t> queueContentionCount{0};
 
         struct ParkedContinuation
         {
@@ -350,7 +351,10 @@ namespace Core::Tasks
             const unsigned victimIndex = (thiefIndex + offset) % workerCount;
             auto& victim = s_Ctx->workerStates[victimIndex];
             if (!victim.localLock.try_lock())
+            {
+                s_Ctx->queueContentionCount.fetch_add(1, std::memory_order_relaxed);
                 continue;
+            }
 
             bool stole = false;
             if (!victim.localDeque.empty())
@@ -589,6 +593,7 @@ namespace Core::Tasks
         stats.UnparkLatencyP99Ns = EstimateLatencyPercentile(unparkHistogram, stats.UnparkCount, 0.99);
         stats.IdleWaitCount = s_Ctx->idleWaitCount.load(std::memory_order_relaxed);
         stats.IdleWaitTotalNs = s_Ctx->idleWaitTotalNs.load(std::memory_order_relaxed);
+        stats.QueueContentionCount = s_Ctx->queueContentionCount.load(std::memory_order_relaxed);
         if (stats.TotalStealAttempts > 0)
         {
             stats.StealSuccessRatio =

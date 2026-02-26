@@ -5,6 +5,8 @@ module;
 #include <cstdint>
 #include <memory>
 #include <vector>
+#include <chrono>
+#include <algorithm>
 
 module Core.FrameGraph;
 import Core.Error;
@@ -33,6 +35,10 @@ namespace Core
     void FrameGraph::Reset()
     {
         m_Scheduler.Reset();
+        m_LastCompileTimeNs = 0;
+        m_LastExecuteTimeNs = 0;
+        m_LastCriticalPathTimeNs = 0;
+        m_LastRootReadyCount = 0;
         // Note: m_PassPool is kept at high-water mark and recycled.
         // ScopeStack::Reset() is the caller's responsibility (frame-level).
     }
@@ -62,7 +68,11 @@ namespace Core
 
     Result FrameGraph::Compile()
     {
-        return m_Scheduler.Compile();
+        const auto compileStart = std::chrono::steady_clock::now();
+        auto result = m_Scheduler.Compile();
+        m_LastCompileTimeNs = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::steady_clock::now() - compileStart).count());
+        return result;
     }
 
     // -------------------------------------------------------------------------
@@ -75,6 +85,9 @@ namespace Core
         if (nodeCount == 0)
             return;
 
+        const auto executeStart = std::chrono::steady_clock::now();
+        std::vector<uint64_t> nodeDurationsNs(nodeCount, 0);
+
         // Fast path: single pass or no scheduler — run inline in layer order.
         if (nodeCount == 1 || !Tasks::Scheduler::IsInitialized())
         {
@@ -83,61 +96,98 @@ namespace Core
                 for (uint32_t nodeIdx : layer)
                 {
                     auto& pass = m_PassPool[nodeIdx];
+                    const auto passStart = std::chrono::steady_clock::now();
                     pass.ExecuteFn(pass.ExecuteUserData);
+                    nodeDurationsNs[nodeIdx] = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
+                        std::chrono::steady_clock::now() - passStart).count());
                 }
             }
-            return;
         }
-
-        // Execute dependency-ready passes continuously. Layer data remains available
-        // via DAGScheduler introspection for diagnostics/visualization only.
-        struct FrameGraphExecutionState
+        else
         {
-            std::unique_ptr<std::atomic<uint32_t>[]> RemainingDependencies;
-            uint32_t NodeCount = 0;
-        };
-
-        FrameGraphExecutionState state{};
-        state.NodeCount = nodeCount;
-        state.RemainingDependencies = std::make_unique<std::atomic<uint32_t>[]>(nodeCount);
-
-        for (uint32_t nodeIdx = 0; nodeIdx < nodeCount; ++nodeIdx)
-        {
-            state.RemainingDependencies[nodeIdx].store(m_Scheduler.GetIndegree(nodeIdx), std::memory_order_relaxed);
-        }
-
-        auto executePassAndReleaseDependents = [&](auto&& self, uint32_t nodeIdx) -> void
-        {
-            auto& pass = m_PassPool[nodeIdx];
-            pass.ExecuteFn(pass.ExecuteUserData);
-
-            for (uint32_t dependent : m_Scheduler.GetDependents(nodeIdx))
+            // Execute dependency-ready passes continuously. Layer data remains available
+            // via DAGScheduler introspection for diagnostics/visualization only.
+            struct FrameGraphExecutionState
             {
-                const uint32_t prior = state.RemainingDependencies[dependent].fetch_sub(1, std::memory_order_acq_rel);
-                assert(prior > 0 && "FrameGraph dependent indegree underflow");
+                std::unique_ptr<std::atomic<uint32_t>[]> RemainingDependencies;
+                uint32_t NodeCount = 0;
+            };
 
-                if (prior == 1)
+            FrameGraphExecutionState state{};
+            state.NodeCount = nodeCount;
+            state.RemainingDependencies = std::make_unique<std::atomic<uint32_t>[]>(nodeCount);
+
+            for (uint32_t nodeIdx = 0; nodeIdx < nodeCount; ++nodeIdx)
+            {
+                state.RemainingDependencies[nodeIdx].store(m_Scheduler.GetIndegree(nodeIdx), std::memory_order_relaxed);
+            }
+
+            auto executePassAndReleaseDependents = [&](auto&& self, uint32_t nodeIdx) -> void
+            {
+                auto& pass = m_PassPool[nodeIdx];
+                const auto passStart = std::chrono::steady_clock::now();
+                pass.ExecuteFn(pass.ExecuteUserData);
+                nodeDurationsNs[nodeIdx] = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
+                    std::chrono::steady_clock::now() - passStart).count());
+
+                for (uint32_t dependent : m_Scheduler.GetDependents(nodeIdx))
                 {
-                    Tasks::Scheduler::Dispatch([&self, dependent]() {
-                        self(self, dependent);
+                    const uint32_t prior = state.RemainingDependencies[dependent].fetch_sub(1, std::memory_order_acq_rel);
+                    assert(prior > 0 && "FrameGraph dependent indegree underflow");
+
+                    if (prior == 1)
+                    {
+                        Tasks::Scheduler::Dispatch([&self, dependent]() {
+                            self(self, dependent);
+                        });
+                    }
+                }
+            };
+
+            uint32_t readyCount = 0;
+            for (uint32_t nodeIdx = 0; nodeIdx < nodeCount; ++nodeIdx)
+            {
+                if (state.RemainingDependencies[nodeIdx].load(std::memory_order_relaxed) == 0)
+                {
+                    ++readyCount;
+                    Tasks::Scheduler::Dispatch([&executePassAndReleaseDependents, nodeIdx]() {
+                        executePassAndReleaseDependents(executePassAndReleaseDependents, nodeIdx);
                     });
                 }
             }
-        };
 
-        uint32_t readyCount = 0;
+            m_LastRootReadyCount = readyCount;
+            assert(readyCount > 0 && "FrameGraph::Execute expected at least one ready root node after successful compile");
+            Tasks::Scheduler::WaitForAll();
+        }
+
+        m_LastExecuteTimeNs = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::steady_clock::now() - executeStart).count());
+
+        std::vector<uint64_t> longestPathNs(nodeCount, 0);
         for (uint32_t nodeIdx = 0; nodeIdx < nodeCount; ++nodeIdx)
         {
-            if (state.RemainingDependencies[nodeIdx].load(std::memory_order_relaxed) == 0)
+            if (m_Scheduler.GetIndegree(nodeIdx) == 0)
+                longestPathNs[nodeIdx] = nodeDurationsNs[nodeIdx];
+        }
+
+        for (const auto& layer : m_Scheduler.GetExecutionLayers())
+        {
+            for (uint32_t nodeIdx : layer)
             {
-                ++readyCount;
-                Tasks::Scheduler::Dispatch([&executePassAndReleaseDependents, nodeIdx]() {
-                    executePassAndReleaseDependents(executePassAndReleaseDependents, nodeIdx);
-                });
+                const uint64_t prefix = longestPathNs[nodeIdx];
+                for (uint32_t dependent : m_Scheduler.GetDependents(nodeIdx))
+                {
+                    const uint64_t candidate = prefix + nodeDurationsNs[dependent];
+                    longestPathNs[dependent] = std::max(longestPathNs[dependent], candidate);
+                }
             }
         }
 
-        assert(readyCount > 0 && "FrameGraph::Execute expected at least one ready root node after successful compile");
-        Tasks::Scheduler::WaitForAll();
+        uint64_t criticalPathNs = 0;
+        for (uint64_t value : longestPathNs)
+            criticalPathNs = std::max(criticalPathNs, value);
+        m_LastCriticalPathTimeNs = criticalPathNs;
     }
+
 }
