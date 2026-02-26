@@ -37,12 +37,6 @@ This section captures **newly observed inconsistencies** and concrete remediatio
   - Device/runtime orchestration APIs still expose widespread `std::shared_ptr` ownership even when ownership appears single-rooted.
   - Action: convert to explicit owner + borrowed refs/spans/handles where lifetime is frame- or system-scoped.
 
-### C. Code duplication hotspots
-
-- [ ] **Consolidate importer post-process defaults (Medium).**
-  - Fallback normal/color/aux population and “invalid/empty data” checks are duplicated across loaders.
-  - Action: centralize into `GeometryImportPostProcess` helpers with deterministic policy flags per format.
-
 ### D. Problems in current TODO governance (meta)
 
 - [ ] **Missing measurable acceptance criteria for several high-impact TODOs (High).**

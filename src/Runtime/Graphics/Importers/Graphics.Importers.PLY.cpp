@@ -24,6 +24,8 @@ import :AssetErrors;
 import Core.Logging;
 import Geometry;
 
+#include "Graphics.Importers.PostProcess.hpp"
+
 namespace Graphics
 {
     namespace
@@ -828,13 +830,14 @@ namespace Graphics
                 outData.Topology = PrimitiveTopology::Points;
         }
 
-        if (!hasNormals && outData.Topology == PrimitiveTopology::Triangles)
+        if (!Importers::ApplyGeometryImportPostProcess(
+                outData,
+                hasNormals,
+                hasUVs,
+                Geometry::MeshUtils::CalculateNormals,
+                Geometry::MeshUtils::GenerateUVs))
         {
-            Geometry::MeshUtils::CalculateNormals(outData.Positions, outData.Indices, outData.Normals);
-        }
-        if (!hasUVs)
-        {
-            Geometry::MeshUtils::GenerateUVs(outData.Positions, outData.Aux);
+            return std::unexpected(AssetError::InvalidData);
         }
 
         MeshImportData result;

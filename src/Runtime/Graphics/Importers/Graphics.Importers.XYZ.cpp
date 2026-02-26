@@ -14,6 +14,8 @@ import :Geometry;
 import :AssetErrors;
 import Geometry;
 
+#include "Graphics.Importers.PostProcess.hpp"
+
 namespace Graphics
 {
     namespace
@@ -75,10 +77,19 @@ namespace Graphics
             }
         }
 
-        if (outData.Positions.empty())
+        Importers::GeometryImportPostProcessPolicy policy;
+        policy.GenerateNormalsForTrianglesIfMissing = false;
+        policy.GenerateUVsIfMissing = false;
+        if (!Importers::ApplyGeometryImportPostProcess(
+                outData,
+                true,
+                true,
+                Geometry::MeshUtils::CalculateNormals,
+                Geometry::MeshUtils::GenerateUVs,
+                policy))
+        {
             return std::unexpected(AssetError::InvalidData);
-
-        Geometry::MeshUtils::GenerateUVs(outData.Positions, outData.Aux);
+        }
 
         MeshImportData result;
         result.Meshes.push_back(std::move(outData));
