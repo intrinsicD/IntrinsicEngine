@@ -197,6 +197,88 @@ TEST(CoreTasks, CounterEventParksAndUnparksContinuation)
     Scheduler::Shutdown();
 }
 
+
+TEST(CoreTasks, CounterEventMultipleWaitersResumeExactlyOnce)
+{
+    Scheduler::Initialize(4);
+
+    CounterEvent event{1};
+    std::atomic<int> resumedCount = 0;
+    constexpr int waiterCount = 64;
+
+    auto waiter = [&]() -> Job {
+        co_await WaitFor(event);
+        resumedCount.fetch_add(1, std::memory_order_relaxed);
+        co_return;
+    };
+
+    for (int i = 0; i < waiterCount; ++i)
+        Scheduler::Dispatch(waiter());
+
+    event.Signal();
+    Scheduler::WaitForAll();
+
+    EXPECT_EQ(resumedCount.load(std::memory_order_relaxed), waiterCount);
+
+    const auto stats = Scheduler::GetStats();
+    EXPECT_GE(stats.ParkCount, static_cast<uint64_t>(waiterCount));
+    EXPECT_GE(stats.UnparkCount, static_cast<uint64_t>(waiterCount));
+
+    Scheduler::Shutdown();
+}
+
+TEST(CoreTasks, StaleWaitTokenUnparkDoesNotResumeNewWaiters)
+{
+    Scheduler::Initialize(2);
+
+    Scheduler::WaitToken staleToken{};
+    {
+        CounterEvent firstEvent{1};
+        std::atomic<int> firstStage = 0;
+        staleToken = firstEvent.Token();
+
+        auto firstWaiter = [&]() -> Job {
+            firstStage.store(1, std::memory_order_release);
+            co_await WaitFor(firstEvent);
+            firstStage.store(2, std::memory_order_release);
+            co_return;
+        };
+
+        Scheduler::Dispatch(firstWaiter());
+        while (firstStage.load(std::memory_order_acquire) < 1)
+            std::this_thread::yield();
+
+        firstEvent.Signal();
+        Scheduler::WaitForAll();
+        EXPECT_EQ(firstStage.load(std::memory_order_acquire), 2);
+    }
+
+    CounterEvent secondEvent{1};
+    std::atomic<int> secondStage = 0;
+
+    auto secondWaiter = [&]() -> Job {
+        secondStage.store(1, std::memory_order_release);
+        co_await WaitFor(secondEvent);
+        secondStage.store(2, std::memory_order_release);
+        co_return;
+    };
+
+    Scheduler::Dispatch(secondWaiter());
+    while (secondStage.load(std::memory_order_acquire) < 1)
+        std::this_thread::yield();
+
+    (void)Scheduler::UnparkReady(staleToken);
+    for (int i = 0; i < 512; ++i)
+        std::this_thread::yield();
+
+    EXPECT_EQ(secondStage.load(std::memory_order_acquire), 1);
+
+    secondEvent.Signal();
+    Scheduler::WaitForAll();
+    EXPECT_EQ(secondStage.load(std::memory_order_acquire), 2);
+
+    Scheduler::Shutdown();
+}
 TEST(CoreTasks, OverflowHandling)
 {
     // Initialize with 1 thread to force accumulation

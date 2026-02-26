@@ -9,6 +9,7 @@ module;
 #include <coroutine>
 #include <optional>
 #include <chrono>
+#include <limits>
 
 #if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
   #include <immintrin.h> // _mm_pause
@@ -201,16 +202,28 @@ namespace Core::Tasks
             std::chrono::steady_clock::time_point ParkedAt{};
         };
 
+        static constexpr uint32_t InvalidParkedNode = std::numeric_limits<uint32_t>::max();
+
         struct WaitSlot
         {
             uint32_t generation = 1;
             bool inUse = false;
-            std::vector<ParkedContinuation> parked{};
+            uint32_t parkedHead = InvalidParkedNode;
+            uint32_t parkedTail = InvalidParkedNode;
+            uint32_t parkedCount = 0;
+        };
+
+        struct ParkedNode
+        {
+            uint32_t next = InvalidParkedNode;
+            ParkedContinuation continuation{};
         };
 
         std::mutex waitMutex;
         std::vector<WaitSlot> waitSlots;
         std::vector<uint32_t> freeWaitSlots;
+        std::vector<ParkedNode> parkedNodes;
+        std::vector<uint32_t> freeParkedNodes;
     };
 
     static std::unique_ptr<SchedulerContext> s_Ctx = nullptr;
@@ -549,7 +562,9 @@ namespace Core::Tasks
 
         auto& waitSlot = s_Ctx->waitSlots[slot];
         waitSlot.inUse = true;
-        waitSlot.parked.clear();
+        waitSlot.parkedHead = SchedulerContext::InvalidParkedNode;
+        waitSlot.parkedTail = SchedulerContext::InvalidParkedNode;
+        waitSlot.parkedCount = 0;
         return WaitToken{slot, waitSlot.generation};
     }
 
@@ -567,7 +582,20 @@ namespace Core::Tasks
             return;
 
         slot.inUse = false;
-        slot.parked.clear();
+        uint32_t node = slot.parkedHead;
+        while (node != SchedulerContext::InvalidParkedNode)
+        {
+            auto& parkedNode = s_Ctx->parkedNodes[node];
+            const uint32_t next = parkedNode.next;
+            parkedNode.next = SchedulerContext::InvalidParkedNode;
+            parkedNode.continuation = {};
+            s_Ctx->freeParkedNodes.push_back(node);
+            node = next;
+        }
+
+        slot.parkedHead = SchedulerContext::InvalidParkedNode;
+        slot.parkedTail = SchedulerContext::InvalidParkedNode;
+        slot.parkedCount = 0;
         slot.generation++;
         if (slot.generation == 0)
             slot.generation = 1;
@@ -589,12 +617,40 @@ namespace Core::Tasks
             if (!slot.inUse || slot.generation != token.Generation)
                 return;
 
-            s_Ctx->inFlightTasks.fetch_add(1, std::memory_order_release);
-            slot.parked.push_back(SchedulerContext::ParkedContinuation{
+            uint32_t parkedNodeIndex = SchedulerContext::InvalidParkedNode;
+            if (!s_Ctx->freeParkedNodes.empty())
+            {
+                parkedNodeIndex = s_Ctx->freeParkedNodes.back();
+                s_Ctx->freeParkedNodes.pop_back();
+            }
+            else
+            {
+                parkedNodeIndex = static_cast<uint32_t>(s_Ctx->parkedNodes.size());
+                s_Ctx->parkedNodes.emplace_back();
+            }
+
+            auto& parkedNode = s_Ctx->parkedNodes[parkedNodeIndex];
+            parkedNode.next = SchedulerContext::InvalidParkedNode;
+            parkedNode.continuation = SchedulerContext::ParkedContinuation{
                 .Handle = h,
                 .Alive = std::move(alive),
                 .ParkedAt = parkStart,
-            });
+            };
+
+            if (slot.parkedTail == SchedulerContext::InvalidParkedNode)
+            {
+                slot.parkedHead = parkedNodeIndex;
+                slot.parkedTail = parkedNodeIndex;
+            }
+            else
+            {
+                s_Ctx->parkedNodes[slot.parkedTail].next = parkedNodeIndex;
+                slot.parkedTail = parkedNodeIndex;
+            }
+
+            slot.parkedCount += 1;
+
+            s_Ctx->inFlightTasks.fetch_add(1, std::memory_order_release);
             s_Ctx->parkCount.fetch_add(1, std::memory_order_relaxed);
         }
         const auto parkNs = std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -613,11 +669,26 @@ namespace Core::Tasks
             if (token.Slot >= s_Ctx->waitSlots.size())
                 return 0;
             auto& slot = s_Ctx->waitSlots[token.Slot];
-            if (!slot.inUse || slot.generation != token.Generation || slot.parked.empty())
+            if (!slot.inUse || slot.generation != token.Generation ||
+                slot.parkedHead == SchedulerContext::InvalidParkedNode)
                 return 0;
 
-            continuations = std::move(slot.parked);
-            slot.parked.clear();
+            continuations.reserve(slot.parkedCount);
+            uint32_t node = slot.parkedHead;
+            while (node != SchedulerContext::InvalidParkedNode)
+            {
+                auto& parkedNode = s_Ctx->parkedNodes[node];
+                const uint32_t next = parkedNode.next;
+                parkedNode.next = SchedulerContext::InvalidParkedNode;
+                continuations.push_back(std::move(parkedNode.continuation));
+                parkedNode.continuation = {};
+                s_Ctx->freeParkedNodes.push_back(node);
+                node = next;
+            }
+
+            slot.parkedHead = SchedulerContext::InvalidParkedNode;
+            slot.parkedTail = SchedulerContext::InvalidParkedNode;
+            slot.parkedCount = 0;
         }
 
         const auto now = std::chrono::steady_clock::now();
