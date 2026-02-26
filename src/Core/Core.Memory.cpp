@@ -16,7 +16,7 @@ namespace Core::Memory
     LinearArena::LinearArena(size_t sizeBytes)
         : m_TotalSize((sizeBytes + CACHE_LINE - 1) & ~(CACHE_LINE - 1))
           , m_OwningThread(std::this_thread::get_id())
-          , m_Generation(Detail::g_NextArenaGeneration.fetch_add(1, std::memory_order_relaxed))
+          , m_Token(Detail::ArenaLifetimeToken::CreateAlive())
     {
         if (sizeBytes == 0)
         {
@@ -42,9 +42,12 @@ namespace Core::Memory
 
     LinearArena::~LinearArena()
     {
-        // Invalidate generation so any ArenaAllocator still holding a pointer
-        // to this arena will detect the lifetime violation on next allocate().
-        m_Generation = 0;
+        if (m_Token)
+        {
+            m_Token->MarkDead();
+            delete m_Token;
+            m_Token = nullptr;
+        }
 
         if (m_Start)
         {
@@ -57,20 +60,24 @@ namespace Core::Memory
     }
 
     LinearArena::LinearArena(LinearArena&& other) noexcept
-        : m_Start(other.m_Start),
-          m_TotalSize(other.m_TotalSize),
-          m_Offset(other.m_Offset),
-          // The thread receiving the move is the new owner.
-          m_OwningThread(std::this_thread::get_id()),
-          // New generation — any ArenaAllocator holding the old generation will detect the move.
-          m_Generation(Detail::g_NextArenaGeneration.fetch_add(1, std::memory_order_relaxed))
+        : m_Start(other.m_Start)
+          , m_TotalSize(other.m_TotalSize)
+          , m_Offset(other.m_Offset)
+          , m_OwningThread(other.m_OwningThread)
+          , m_Token(Detail::ArenaLifetimeToken::CreateAlive())
     {
-        // Invalidate the moved-from arena's generation.
-        other.m_Generation = 0;
+        if (other.m_Token)
+        {
+            // Preserve the token object so any pre-existing ArenaAllocator can still read it,
+            // but mark it dead so allocations trip the intended lifetime violation check.
+            other.m_Token->MarkDead();
+        }
+
         other.m_Start = nullptr;
         other.m_TotalSize = 0;
         other.m_Offset = 0;
         other.m_OwningThread = std::thread::id();
+        // Intentionally keep other.m_Token non-null (marked-dead) for debug safety.
     }
 
     // Move Assignment
@@ -78,8 +85,12 @@ namespace Core::Memory
     {
         if (this != &other)
         {
-            // Invalidate our own generation first (any allocators pointing at us are now stale).
-            m_Generation = 0;
+            if (m_Token)
+            {
+                m_Token->MarkDead();
+                delete m_Token;
+                m_Token = nullptr;
+            }
 
             // Free our own memory first
             if (m_Start)
@@ -91,21 +102,25 @@ namespace Core::Memory
 #endif
             }
 
-            // Steal resources
             m_Start = other.m_Start;
             m_TotalSize = other.m_TotalSize;
             m_Offset = other.m_Offset;
-            // The thread receiving the move is the new owner.
-            m_OwningThread = std::this_thread::get_id();
-            // New generation for the new identity.
-            m_Generation = Detail::g_NextArenaGeneration.fetch_add(1, std::memory_order_relaxed);
+            m_OwningThread = other.m_OwningThread;
 
-            // Nullify source
-            other.m_Generation = 0;
+            m_Token = Detail::ArenaLifetimeToken::CreateAlive();
+
+            if (other.m_Token)
+            {
+                // Preserve the token object so any pre-existing ArenaAllocator can still read it,
+                // but mark it dead so allocations trip the intended lifetime violation check.
+                other.m_Token->MarkDead();
+            }
+
             other.m_Start = nullptr;
             other.m_TotalSize = 0;
             other.m_Offset = 0;
             other.m_OwningThread = std::thread::id();
+            // Intentionally keep other.m_Token non-null (marked-dead) for debug safety.
         }
         return *this;
     }

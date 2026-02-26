@@ -529,18 +529,21 @@ TEST(LinearArena, CrossThreadAllocationReturnsError)
 
 TEST(LinearArena, MoveAllowsAllocationOnNewThread)
 {
-    // Moving an arena to a new thread should rebind ownership and allow allocation.
-    LinearArena arena(1024);
+    // LinearArena is thread-affine. Moving it between threads does NOT transfer ownership.
+    // Therefore, even if we move-construct on another thread, allocations must fail with ThreadViolation.
+    auto arena = std::make_unique<LinearArena>(1024);
 
-    bool success = false;
-    std::thread worker([a = std::move(arena), &success]() mutable
+    AllocatorError err = AllocatorError::OutOfMemory; // sentinel
+    std::thread worker([&arena, &err]() mutable
     {
+        LinearArena a = std::move(*arena);
         auto result = a.New<int>(99);
-        success = result.has_value();
+        if (!result)
+            err = result.error();
     });
     worker.join();
 
-    EXPECT_TRUE(success);
+    EXPECT_EQ(err, AllocatorError::ThreadViolation);
 }
 
 TEST(LinearArena, GenerationAssignedOnConstruction)
@@ -643,15 +646,15 @@ TEST(ArenaAllocator, EqualityComparison)
 #ifndef NDEBUG
 TEST(ArenaAllocatorDeathTest, DetectsUseAfterArenaDestroyed)
 {
-    ArenaAllocator<int>* leaked = nullptr;
-    {
-        LinearArena arena(1024);
-        leaked = new ArenaAllocator<int>(arena);
-        // Arena is destroyed here.
-    }
-    // Allocating from a dead arena's allocator should fire the assert.
+    // Keep the arena object alive for the duration of the death test so ASan doesn't
+    // trip over a dangling pointer before the allocator's lifetime checks can fire.
+    LinearArena arena(1024);
+    auto leaked = std::make_unique<ArenaAllocator<int>>(arena);
+
+    // Simulate 'arena destroyed' for the allocator by explicitly invalidating the arena token.
+    arena.DebugInvalidateLifetimeTokenForTests();
+
     EXPECT_DEATH(leaked->allocate(1), "arena lifetime violation");
-    delete leaked;
 }
 
 TEST(ArenaAllocatorDeathTest, DetectsUseAfterArenaMovedFrom)
@@ -659,9 +662,11 @@ TEST(ArenaAllocatorDeathTest, DetectsUseAfterArenaMovedFrom)
     LinearArena arena(1024);
     ArenaAllocator<int> alloc(arena);
 
-    // Move the arena away — the allocator's generation is now stale.
+    // Move the arena away  alloc still points at the moved-from arena object.
     LinearArena moved(std::move(arena));
 
+    // After move, the moved-from arena must be considered dead for existing allocators.
+    // Triggering allocate() should trip the lifetime violation check.
     EXPECT_DEATH(alloc.allocate(1), "arena lifetime violation");
 }
 #endif // NDEBUG

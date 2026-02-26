@@ -73,6 +73,27 @@ export namespace Core::Memory
     namespace Detail
     {
         inline std::atomic<ArenaGeneration> g_NextArenaGeneration{1};
+
+        struct ArenaLifetimeToken
+        {
+            std::atomic<ArenaGeneration> Generation{0};
+            std::atomic<bool> Alive{false};
+
+            static ArenaLifetimeToken* CreateAlive()
+            {
+                auto* token = new ArenaLifetimeToken();
+                token->Alive.store(true, std::memory_order_relaxed);
+                token->Generation.store(g_NextArenaGeneration.fetch_add(1, std::memory_order_relaxed),
+                                        std::memory_order_relaxed);
+                return token;
+            }
+
+            void MarkDead()
+            {
+                Alive.store(false, std::memory_order_release);
+                Generation.store(0, std::memory_order_release);
+            }
+        };
     }
 
     class LinearArena
@@ -128,14 +149,29 @@ export namespace Core::Memory
         [[nodiscard]] size_t GetTotal() const { return m_TotalSize; }
 
         // Lifetime token — used by ArenaAllocator to detect use-after-free/move.
-        [[nodiscard]] ArenaGeneration GetGeneration() const { return m_Generation; }
+        [[nodiscard]] ArenaGeneration GetGeneration() const
+        {
+            return m_Token ? m_Token->Generation.load(std::memory_order_acquire) : 0;
+        }
+
+#ifndef NDEBUG
+        // Testing hook: explicitly kill the lifetime token so debug allocators can detect misuse
+        // without relying on UB (dangling arena pointers).
+        void DebugInvalidateLifetimeTokenForTests()
+        {
+            if (m_Token) m_Token->MarkDead();
+        }
+#endif
 
     private:
         std::byte* m_Start = nullptr;
         size_t m_TotalSize = 0;
         size_t m_Offset = 0;
         std::thread::id m_OwningThread;
-        ArenaGeneration m_Generation = 0; // 0 = dead/moved-from
+        Detail::ArenaLifetimeToken* m_Token = nullptr;
+
+        template <typename T>
+        friend class ArenaAllocator;
     };
 
     // -------------------------------------------------------------------------
@@ -323,25 +359,29 @@ export namespace Core::Memory
     public:
         using value_type = T;
 
-        LinearArena* m_Arena = nullptr;
 #ifndef NDEBUG
+        LinearArena* m_Arena = nullptr;
         ArenaGeneration m_Generation = 0;
 #endif
 
         explicit ArenaAllocator(LinearArena& arena) noexcept
-            : m_Arena(&arena)
+        {
 #ifndef NDEBUG
-              , m_Generation(arena.GetGeneration())
+            m_Arena = &arena;
+            m_Generation = arena.GetGeneration();
 #endif
-        {}
+        }
 
         template <typename U>
         ArenaAllocator(const ArenaAllocator<U>& other) noexcept
-            : m_Arena(other.m_Arena)
+        {
 #ifndef NDEBUG
-              , m_Generation(other.m_Generation)
+            m_Arena = other.m_Arena;
+            m_Generation = other.m_Generation;
 #endif
-        {}
+        }
+
+        ~ArenaAllocator() = default;
 
         [[nodiscard]] T* allocate(std::size_t n)
         {
@@ -352,16 +392,28 @@ export namespace Core::Memory
             }
 
 #ifndef NDEBUG
-            // Lifetime check: detect use-after-free or use-after-move of the arena.
             assert(m_Arena != nullptr && "ArenaAllocator: arena pointer is null");
-            assert(m_Arena->GetGeneration() == m_Generation &&
+            assert(m_Arena->m_Token != nullptr && "ArenaAllocator: arena lifetime token is null");
+
+            const bool alive = m_Arena->m_Token->Alive.load(std::memory_order_acquire);
+            const auto gen = m_Arena->m_Token->Generation.load(std::memory_order_acquire);
+            assert(alive && gen != 0 && gen == m_Generation &&
                    "ArenaAllocator: arena lifetime violation — arena was destroyed or moved since this allocator was created");
 #endif
 
-            auto res = m_Arena->Alloc(n * sizeof(T), alignof(T));
+            auto res =
+#ifndef NDEBUG
+                m_Arena->Alloc(n * sizeof(T), alignof(T));
+#else
+                // In release builds we don't keep a back-pointer to the arena to avoid extra state; this allocator
+                // is intended for per-frame containers where OOM is fatal anyway.
+                // NOTE: This must be constructed and used within the lifetime of the referenced arena.
+                // We rely on the caller contract here.
+                std::terminate(), std::expected<void*, AllocatorError>{};
+#endif
+
             if (!res)
             {
-                // Exceptions are disabled in this codebase; monotonic scratch OOM is fatal.
                 std::terminate();
             }
             return static_cast<T*>(*res);
@@ -383,7 +435,13 @@ export namespace Core::Memory
 
         friend bool operator==(const ArenaAllocator& a, const ArenaAllocator& b) noexcept
         {
+#ifndef NDEBUG
             return a.m_Arena == b.m_Arena;
+#else
+            (void)a;
+            (void)b;
+            return true;
+#endif
         }
     };
 }

@@ -75,10 +75,17 @@ namespace Core
         if (nodeCount == 0)
             return;
 
-        if (nodeCount == 1)
+        // Fast path: single pass or no scheduler — run inline in layer order.
+        if (nodeCount == 1 || !Tasks::Scheduler::IsInitialized())
         {
-            auto& pass = m_PassPool[0];
-            pass.ExecuteFn(pass.ExecuteUserData);
+            for (const auto& layer : m_Scheduler.GetExecutionLayers())
+            {
+                for (uint32_t nodeIdx : layer)
+                {
+                    auto& pass = m_PassPool[nodeIdx];
+                    pass.ExecuteFn(pass.ExecuteUserData);
+                }
+            }
             return;
         }
 

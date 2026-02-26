@@ -150,63 +150,54 @@ namespace Graphics
         // Execution contract: collectors must run after ResetPoints() and before
         // the GPU draw passes are added to the render graph.
         {
-            const bool pcEnabled    = m_PointCloudPass && IsFeatureEnabled("PointCloudRenderPass"_id);
+            const bool pcDrawEnabled = m_PointCloudPass && IsFeatureEnabled("PointCloudRenderPass"_id);
             const bool lineEnabled  = m_LineRenderPass  && IsFeatureEnabled("LineRenderPass"_id);
             const bool meshEnabled  = m_MeshPass        && IsFeatureEnabled("MeshPass"_id);
             const bool graphEnabled = m_GraphPass       && IsFeatureEnabled("GraphPass"_id);
 
-            if (pcEnabled || lineEnabled || meshEnabled || graphEnabled)
+            // Collection should run if any visualization feature is enabled.
+            // Point staging is cheap and ensures stable semantics across feature toggles.
+            const bool collectEnabled = pcDrawEnabled || lineEnabled || meshEnabled || graphEnabled;
+
+            if (collectEnabled)
             {
                 m_Path.AddStage("VisualizationCollect",
-                    [this, pcEnabled, meshEnabled, graphEnabled](RenderPassContext& ctx)
+                    [this, pcDrawEnabled, meshEnabled, graphEnabled](RenderPassContext& ctx)
                 {
                     // Reset point splat staging before any collector runs.
-                    if (pcEnabled)
+                    // Do this as long as the point cloud pass object exists.
+                    if (m_PointCloudPass)
                         m_PointCloudPass->ResetPoints();
 
                     // ----------------------------------------------------------
                     // 3. Mesh Pass — visualization overlays (wireframe + vertices)
                     // ----------------------------------------------------------
-                    // MeshRenderPass extracts edges (→ DebugDraw) and vertex
-                    // positions (→ PointCloudRenderPass) from MeshRenderer entities
-                    // that have a RenderVisualization component.
                     if (meshEnabled)
                     {
-                        m_MeshPass->SetPointCloudPass(pcEnabled ? m_PointCloudPass.get() : nullptr);
+                        // Allow collectors to submit vertex splats even if drawing is disabled this frame.
+                        m_MeshPass->SetPointCloudPass(m_PointCloudPass.get());
                         m_MeshPass->AddPasses(ctx);
                     }
 
                     // ----------------------------------------------------------
                     // 4. Graph Pass — node splats + edge lines from graph entities
                     // ----------------------------------------------------------
-                    // GraphRenderPass submits node positions (→ PointCloudRenderPass)
-                    // and edge segments (→ DebugDraw) for GraphRenderer entities.
                     if (graphEnabled)
                     {
-                        m_GraphPass->SetPointCloudPass(pcEnabled ? m_PointCloudPass.get() : nullptr);
+                        m_GraphPass->SetPointCloudPass(m_PointCloudPass.get());
                         m_GraphPass->AddPasses(ctx);
                     }
 
                     // ----------------------------------------------------------
                     // 5. Point Cloud Pass — collect PointCloudRenderer entities
                     // ----------------------------------------------------------
-                    // Inline collection: iterate PointCloudRenderer::Component entities
-                    // and submit their points to the shared staging buffers, then add
-                    // the GPU draw pass for all accumulated splats.
-                    if (pcEnabled)
+                    if (m_PointCloudPass)
                     {
                         auto& registry = ctx.Scene.GetRegistry();
                         auto pcView = registry.view<ECS::PointCloudRenderer::Component>();
 
                         for (auto [entity, pc] : pcView.each())
                         {
-                            // Visibility: use pc.Visible directly.
-                            // NOTE: RenderVisualization::ShowVertices is a mesh vertex-overlay
-                            // toggle (controls whether mesh vertex splats are drawn). It must NOT
-                            // override pc.Visible for dedicated PointCloudRenderer entities — doing
-                            // so meant that opening the Visualization panel (which creates
-                            // RenderVisualization with ShowVertices=false) would silently hide the
-                            // point cloud even though its own Visible flag was true.
                             if (!pc.Visible || pc.Positions.empty())
                                 continue;
 
@@ -218,8 +209,6 @@ namespace Graphics
                             if (auto* wm = registry.try_get<ECS::Components::Transform::WorldMatrix>(entity))
                                 worldMatrix = wm->Matrix;
 
-                            // Inverse-transpose of the linear part for correct normal transform
-                            // under non-uniform scale (matches MeshRenderPass convention).
                             const glm::mat3 normalMatrix =
                                 glm::transpose(glm::inverse(glm::mat3(worldMatrix)));
 
@@ -252,11 +241,11 @@ namespace Graphics
                             }
                         }
 
-                        // GPU draw: add a render-graph pass for every non-empty mode bucket.
-                        if (m_PointCloudPass->HasContent())
+                        // GPU draw: only add point cloud draw passes if the feature is enabled.
+                        if (pcDrawEnabled && m_PointCloudPass->HasContent())
                             m_PointCloudPass->AddPasses(ctx);
                     }
-                }); // end VisualizationCollect stage
+                });
             }
         }
 

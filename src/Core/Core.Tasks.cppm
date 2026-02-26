@@ -120,6 +120,7 @@ namespace Core::Tasks
 
         static void Initialize(unsigned threadCount = 0);
         static void Shutdown();
+        [[nodiscard]] static bool IsInitialized() noexcept;
 
         template <typename F>
         static void Dispatch(F&& task)
@@ -139,10 +140,22 @@ namespace Core::Tasks
         static void WaitForAll();
         [[nodiscard]] static Stats GetStats();
 
+        // Lightweight accessors for tests/telemetry that need a single counter
+        // without the overhead of snapshotting the full Stats struct.
+        [[nodiscard]] static uint64_t GetParkCount() noexcept;
+        [[nodiscard]] static uint64_t GetUnparkCount() noexcept;
+
+        // Returns a reference to the underlying park-count atomic so callers
+        // can use atomic::wait() for zero-spin blocking until the first park.
+        // Only valid while the Scheduler is initialized.
+        [[nodiscard]] static const std::atomic<uint64_t>& ParkCountAtomic() noexcept;
+
         static WaitToken AcquireWaitToken();
         static void ReleaseWaitToken(WaitToken token);
         static void ParkCurrentFiber(WaitToken token, std::coroutine_handle<> h,
                                      std::shared_ptr<std::atomic<bool>> alive = nullptr);
+        static bool ParkCurrentFiberIfNotReady(WaitToken token, std::coroutine_handle<> h,
+                                               std::shared_ptr<std::atomic<bool>> alive = nullptr);
         static uint32_t UnparkReady(WaitToken token);
         static uint32_t DrainReadyFromWaitQueues(uint32_t budget = 16);
 
@@ -172,10 +185,14 @@ namespace Core::Tasks
         CounterEvent& Counter;
 
         [[nodiscard]] bool await_ready() const noexcept { return Counter.IsReady(); }
-        void await_suspend(std::coroutine_handle<> h) const noexcept
+
+        [[nodiscard]] bool await_suspend(std::coroutine_handle<> h) const noexcept
         {
-            Scheduler::ParkCurrentFiber(Counter.Token(), h);
+            // Avoid lost wakeups: if the counter reached zero and signaled between await_ready()
+            // and here, we must not park. Returning false means: do not suspend.
+            return Scheduler::ParkCurrentFiberIfNotReady(Counter.Token(), h);
         }
+
         void await_resume() const noexcept {}
     };
 

@@ -212,6 +212,7 @@ namespace Core::Tasks
             uint32_t parkedHead = InvalidParkedNode;
             uint32_t parkedTail = InvalidParkedNode;
             uint32_t parkedCount = 0;
+            bool ready = false;
         };
 
         struct ParkedNode
@@ -448,6 +449,11 @@ namespace Core::Tasks
         s_Ctx.reset();
     }
 
+    bool Scheduler::IsInitialized() noexcept
+    {
+        return s_Ctx != nullptr;
+    }
+
     void Scheduler::DispatchInternal(LocalTask&& task)
     {
         if (!s_Ctx || !s_Ctx->isRunning) return;
@@ -476,21 +482,31 @@ namespace Core::Tasks
     {
         if (!s_Ctx) return;
 
-        while (s_Ctx->inFlightTasks.load(std::memory_order_acquire) > 0)
+        for (;;)
         {
-            (void)DrainReadyFromWaitQueues(32);
+            // Always drain wait-queue first: parked continuations are logically runnable work.
+            (void)DrainReadyFromWaitQueues(64);
+
+            // If there's no in-flight work AND the ready-wait-queue is empty, we're done.
+            if (s_Ctx->inFlightTasks.load(std::memory_order_acquire) == 0)
+            {
+                std::lock_guard readyLock(s_Ctx->readyWaitQueueMutex);
+                if (s_Ctx->readyWaitQueue.empty())
+                    break;
+            }
 
             LocalTask task;
             if (TryPopTask(task, std::nullopt))
             {
                 OnTaskDequeuedAndRun(task);
+                continue;
             }
+
+            const auto observed = s_Ctx->inFlightTasks.load(std::memory_order_acquire);
+            if (observed > 0)
+                s_Ctx->inFlightTasks.wait(observed, std::memory_order_relaxed);
             else
-            {
-                const auto observed = s_Ctx->inFlightTasks.load(std::memory_order_acquire);
-                if (observed > 0)
-                    s_Ctx->inFlightTasks.wait(observed, std::memory_order_relaxed);
-            }
+                CpuRelaxOrYield();
         }
     }
 
@@ -523,6 +539,24 @@ namespace Core::Tasks
             stats.WorkerVictimStealCounts.push_back(worker.stealCount.load(std::memory_order_relaxed));
         }
         return stats;
+    }
+
+    uint64_t Scheduler::GetParkCount() noexcept
+    {
+        if (!s_Ctx) return 0;
+        return s_Ctx->parkCount.load(std::memory_order_acquire);
+    }
+
+    uint64_t Scheduler::GetUnparkCount() noexcept
+    {
+        if (!s_Ctx) return 0;
+        return s_Ctx->unparkCount.load(std::memory_order_acquire);
+    }
+
+    const std::atomic<uint64_t>& Scheduler::ParkCountAtomic() noexcept
+    {
+        // Caller must ensure Scheduler is initialized (s_Ctx != nullptr).
+        return s_Ctx->parkCount;
     }
 
     void Scheduler::WorkerEntry(unsigned threadIndex)
@@ -602,6 +636,7 @@ namespace Core::Tasks
         waitSlot.parkedHead = SchedulerContext::InvalidParkedNode;
         waitSlot.parkedTail = SchedulerContext::InvalidParkedNode;
         waitSlot.parkedCount = 0;
+        waitSlot.ready = false;
         return WaitToken{slot, waitSlot.generation};
     }
 
@@ -633,6 +668,7 @@ namespace Core::Tasks
         slot.parkedHead = SchedulerContext::InvalidParkedNode;
         slot.parkedTail = SchedulerContext::InvalidParkedNode;
         slot.parkedCount = 0;
+        slot.ready = false;
         slot.generation++;
         if (slot.generation == 0)
             slot.generation = 1;
@@ -642,17 +678,28 @@ namespace Core::Tasks
     void Scheduler::ParkCurrentFiber(WaitToken token, std::coroutine_handle<> h,
                                      std::shared_ptr<std::atomic<bool>> alive)
     {
+        // Legacy API: unconditional park (kept for compatibility). Prefer ParkCurrentFiberIfNotReady.
+        (void)ParkCurrentFiberIfNotReady(token, h, std::move(alive));
+    }
+
+    bool Scheduler::ParkCurrentFiberIfNotReady(WaitToken token, std::coroutine_handle<> h,
+                                               std::shared_ptr<std::atomic<bool>> alive)
+    {
         if (!s_Ctx || !token.Valid() || !h)
-            return;
+            return false;
 
         const auto parkStart = std::chrono::steady_clock::now();
         {
             std::lock_guard lock(s_Ctx->waitMutex);
             if (token.Slot >= s_Ctx->waitSlots.size())
-                return;
+                return false;
             auto& slot = s_Ctx->waitSlots[token.Slot];
             if (!slot.inUse || slot.generation != token.Generation)
-                return;
+                return false;
+
+            // If already marked ready, do not park (prevents lost wakeups).
+            if (slot.ready)
+                return false;
 
             uint32_t parkedNodeIndex = SchedulerContext::InvalidParkedNode;
             if (!s_Ctx->freeParkedNodes.empty())
@@ -687,12 +734,17 @@ namespace Core::Tasks
 
             slot.parkedCount += 1;
 
-            s_Ctx->inFlightTasks.fetch_add(1, std::memory_order_release);
+            // Parking transfers ownership from the *current running task* to the wait slot.
+            // It does NOT create a new in-flight task. The in-flight token that was acquired
+            // when the coroutine slice was scheduled will be released when this slice returns
+            // via OnTaskDequeuedAndRun().
             s_Ctx->parkCount.fetch_add(1, std::memory_order_relaxed);
         }
+
         const auto parkNs = std::chrono::duration_cast<std::chrono::nanoseconds>(
             std::chrono::steady_clock::now() - parkStart).count();
         s_Ctx->parkLatencyTotalNs.fetch_add(static_cast<uint64_t>(parkNs), std::memory_order_relaxed);
+        return true;
     }
 
     uint32_t Scheduler::UnparkReady(WaitToken token)
@@ -706,8 +758,13 @@ namespace Core::Tasks
             if (token.Slot >= s_Ctx->waitSlots.size())
                 return 0;
             auto& slot = s_Ctx->waitSlots[token.Slot];
-            if (!slot.inUse || slot.generation != token.Generation ||
-                slot.parkedHead == SchedulerContext::InvalidParkedNode)
+            if (!slot.inUse || slot.generation != token.Generation)
+                return 0;
+
+            // Mark ready first, so concurrent Park attempts will observe readiness and not park.
+            slot.ready = true;
+
+            if (slot.parkedHead == SchedulerContext::InvalidParkedNode)
                 return 0;
 
             continuations.reserve(slot.parkedCount);
@@ -768,7 +825,10 @@ namespace Core::Tasks
             s_Ctx->unparkLatencyTotalNs.fetch_add(static_cast<uint64_t>(unparkNs), std::memory_order_relaxed);
             s_Ctx->unparkCount.fetch_add(1, std::memory_order_relaxed);
 
-            ReleaseInFlightToken();
+            // Parking does NOT hold an in-flight token (removed in ParkCurrentFiberIfNotReady).
+            // Unparking re-injects the continuation as a brand-new scheduled task.
+            // DispatchInternal (called inside Reschedule) issues the +1, and
+            // OnTaskDequeuedAndRun issues the matching -1 when the slice completes.
             Reschedule(continuation.Handle, std::move(continuation.Alive));
         }
 
