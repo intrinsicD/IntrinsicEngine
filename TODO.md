@@ -55,9 +55,8 @@ This section captures **newly observed inconsistencies** and concrete remediatio
   - Resolved the inline unresolved TODO in `Runtime.RenderOrchestrator` by removing the dead `defaultTextureIndex` constructor parameter and associated ambiguity.
   - TODOs should remain tracked in this architecture backlog with acceptance criteria; production code comments should reference a backlog item ID when intentionally deferred.
 
-- [ ] **Align modern C++ usage with stated C++23 standards (Medium).**
-  - Current codebase uses `std::expected` but does not use monadic `.and_then/.transform` patterns; explicit object parameters are also absent.
-  - Action: define a focused adoption policy: require monadic chaining for multi-stage expected pipelines (importers/asset loading), and document where explicit object parameters are beneficial vs noisy.
+- [x] **Align modern C++ usage with stated C++23 standards (Medium).**
+  - Status: added `docs/CXX23_ADOPTION_POLICY.md` with concrete adoption rules for `std::expected` monadic chaining and explicit object parameters (deducing `this`), including rollout and reviewer checklist.
 
 ### B. Architecture findings
 

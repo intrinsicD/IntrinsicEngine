@@ -121,6 +121,8 @@ Drag-and-drop file loading with automatic format detection via `IORegistry`. Exp
 
 For the current, living list of *remaining* architectural work, see `TODO.md`. Completed milestones are intentionally removed from that document to keep it focused (Git history is the source of truth for what used to be on the list).
 
+C++23 style/convergence guidance for contributors is tracked in `docs/CXX23_ADOPTION_POLICY.md` (monadic `std::expected` usage + explicit object parameter adoption rules).
+
 ---
 
 ## Build Requirements
