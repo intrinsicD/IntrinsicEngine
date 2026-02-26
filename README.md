@@ -96,9 +96,10 @@ All operators follow a consistent contract: `Params` struct with defaults, `Resu
   - No loader thread ever calls `vkWaitForFences` for texture uploads.
 - **GPUScene:** Retained-mode instance table with independent slot allocation/deallocation.
 - **Dynamic Rendering:** No `VkRenderPass` or `VkFramebuffer`; fully dynamic attachment binding.
-- **DebugDraw:** Immediate-mode line/shape rendering with screen-space thick-line expansion (SSBO-based, no geometry shader). Depth-tested and overlay variants. **Note:** Line rendering (`LineRenderPass`) and wireframe rendering are currently broken and pending robust re-implementation.
-- **Graph Processing:** Halfedge-based graph topology with robust Octree-accelerated kNN construction, force-directed 2D layout (`ComputeForceDirectedLayout`), spectral embedding (`ComputeSpectralLayout`) with combinatorial or symmetric-normalized Laplacian iteration, hierarchical layered layout (`ComputeHierarchicalLayout`) for connectivity visualization workflows, and a reusable embedding diagnostic (`CountEdgeCrossings`) for geometry-level crossing measurement. Hierarchical layouts retain diameter-aware auto-rooting for better-balanced disconnected component embeddings plus inversion-based crossing diagnostics (`HierarchicalLayoutResult::CrossingCount`) computed from final per-layer x-ordering.
-- **Point Cloud Rendering:** Currently broken — pending a full re-implementation from scratch. The `Geometry.PointCloud` CPU module (data structures, downsampling, statistics) remains functional.
+- **Line/Graph Rendering:** First-class retained-mode line entities (same tier as meshes) via `GeometryGpuData` with `PrimitiveTopology::Lines`, `GPUScene` slots, and lifecycle systems. Wireframe as a persistent "view" sharing mesh vertex buffers with edge index topology. Graph entities (`GraphRenderer::Component`) wrap `Geometry::Graph` with CPU-side layout algorithms (force-directed, spectral, hierarchical) and persistent GPU buffers. **Currently broken — pending re-implementation under this retained-mode architecture.**
+- **Point Cloud Rendering:** First-class retained-mode point entities via `GeometryGpuData` with `PrimitiveTopology::Points`. Rendering modes: flat disc, surfel, EWA splatting. **Currently broken — pending re-implementation.** The `Geometry.PointCloud` CPU module (data structures, downsampling, statistics) remains functional.
+- **DebugDraw:** Immediate-mode transient overlay for debug visualization (octree, KD-tree, bounds, contact manifolds, convex hulls) via per-frame SSBO upload + `LineRenderPass`. **Currently broken — depends on line rendering re-implementation.**
+- **Graph Processing (CPU):** Halfedge-based graph topology with Octree-accelerated kNN construction, force-directed 2D layout, spectral embedding (combinatorial/symmetric-normalized Laplacian), hierarchical layered layout with crossing diagnostics and diameter-aware auto-rooting.
 - **Selection Outlines:** Post-process contour highlight for selected/hovered entities.
 
 ### 4. Data I/O
@@ -354,9 +355,11 @@ Common editor panels live in `src/Runtime/EditorUI/` and are registered from the
 
 Add a new panel by calling `Interface::GUI::RegisterPanel("My Panel", []{ ... });` from `Runtime.EditorUI`.
 
-## Point Cloud Rendering
+## Non-Mesh Rendering (Lines, Graphs, Point Clouds)
 
-Point cloud GPU rendering (`PointCloudRenderPass`) is currently **broken** and pending a full re-implementation from scratch. The CPU-side `Geometry.PointCloud` module (data structures, downsampling, statistics, radius estimation) remains functional. See `TODO.md` for the re-implementation plan.
+Lines, graphs, and point clouds are being re-architected as **first-class retained-mode renderables** — the same tier as triangle meshes. This means persistent device-local GPU buffers, `GPUScene` slots, transform sync, and frustum culling rather than per-frame transient rebuilds. The existing `GeometryPool`/`GPUScene` infrastructure is topology-agnostic (`PrimitiveTopology::Lines`, `Points`, `Triangles`), and the `GeometryViewRenderer` "view" pattern enables wireframes to share vertex buffers with their source mesh.
+
+**Current status:** All three rendering pipelines (`LineRenderPass`, wireframe, `PointCloudRenderPass`) are **broken** and pending re-implementation under this architecture. CPU-side modules (`Geometry.PointCloud`, `Geometry.Graph` layout algorithms) remain functional. See `TODO.md` for the detailed re-implementation plan.
 
 ## Graphics Geometry: Shared GPU Ownership (Views)
 
