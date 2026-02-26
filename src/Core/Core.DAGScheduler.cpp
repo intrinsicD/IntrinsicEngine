@@ -2,6 +2,7 @@ module;
 
 #include <cassert>
 #include <cstdint>
+#include <unordered_set>
 #include <vector>
 
 module Core.DAGScheduler;
@@ -18,6 +19,7 @@ namespace Core
     {
         m_NodePool.reserve(64);
         m_ResourceStates.reserve(32);
+        m_ResourceStateLookup.reserve(32);
     }
 
     // -------------------------------------------------------------------------
@@ -29,6 +31,7 @@ namespace Core
         m_ActiveNodeCount = 0;
         m_ExecutionLayers.clear();
         m_ResourceStates.clear();
+        m_ResourceStateLookup.clear();
         // Note: m_NodePool is kept at high-water mark and recycled.
     }
 
@@ -47,6 +50,8 @@ namespace Core
 
         auto& node = m_NodePool[index];
         node.Dependents.clear();
+        if (node.DependentSet)
+            node.DependentSet->clear();
         node.Indegree = 0;
 
         ++m_ActiveNodeCount;
@@ -59,13 +64,13 @@ namespace Core
 
     DAGScheduler::ResourceState& DAGScheduler::GetResourceState(size_t key)
     {
-        // Linear scan is fine for typical counts (< 30 resource types).
-        for (auto& [k, state] : m_ResourceStates)
-        {
-            if (k == key) return state;
-        }
-        m_ResourceStates.emplace_back(key, ResourceState{});
-        return m_ResourceStates.back().second;
+        if (const auto it = m_ResourceStateLookup.find(key); it != m_ResourceStateLookup.end())
+            return m_ResourceStates[it->second];
+
+        const uint32_t stateIndex = static_cast<uint32_t>(m_ResourceStates.size());
+        m_ResourceStates.emplace_back();
+        m_ResourceStateLookup.emplace(key, stateIndex);
+        return m_ResourceStates.back();
     }
 
     // -------------------------------------------------------------------------
@@ -79,13 +84,32 @@ namespace Core
 
         auto& prodNode = m_NodePool[producer];
 
-        // Deduplicate (linear scan is fine for typical dependency counts < 10).
-        for (uint32_t dep : prodNode.Dependents)
+        constexpr size_t kLinearDedupThreshold = 16;
+        if (prodNode.DependentSet)
         {
-            if (dep == consumer) return;
+            if (prodNode.DependentSet->contains(consumer))
+                return;
+        }
+        else
+        {
+            for (uint32_t dep : prodNode.Dependents)
+            {
+                if (dep == consumer)
+                    return;
+            }
+
+            if (prodNode.Dependents.size() >= kLinearDedupThreshold)
+            {
+                prodNode.DependentSet = std::make_unique<std::unordered_set<uint32_t>>();
+                prodNode.DependentSet->reserve(prodNode.Dependents.size() + 1);
+                for (uint32_t dep : prodNode.Dependents)
+                    prodNode.DependentSet->insert(dep);
+            }
         }
 
         prodNode.Dependents.push_back(consumer);
+        if (prodNode.DependentSet)
+            prodNode.DependentSet->insert(consumer);
         m_NodePool[consumer].Indegree++;
     }
 

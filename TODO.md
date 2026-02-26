@@ -30,7 +30,7 @@ This document tracks **what's left to do** in IntrinsicEngine's architecture.
   - Preserve layer grouping for diagnostics/visualization only.
   - Add optional critical-path-aware pass prioritization to reduce frame makespan and tail latency.
 
-- [ ] **Optimize `Core::DAGScheduler` compile-path lookup + dedupe structures (Medium).**
+- [x] **Optimize `Core::DAGScheduler` compile-path lookup + dedupe structures (Medium).**
   - Replace linear `resourceKey` scans with a flat hash/robin-hood table.
   - Add faster producer-edge dedupe for high-degree nodes (sorted-vector fast path and/or compact bloom/bitset guard).
   - Keep current pool/high-water-mark reuse strategy while changing lookup structures.
@@ -70,7 +70,7 @@ This section captures **newly observed inconsistencies** and concrete remediatio
   - This preserves correctness but over-serializes the schedule and can inflate frame critical path.
   - Action: execute ready tasks continuously from indegree counters (Kahn-ready queue) and keep layers only as debug metadata.
 
-- [ ] **Reduce compile-time overhead in `Core::DAGScheduler` hot paths (High).**
+- [x] **Reduce compile-time overhead in `Core::DAGScheduler` hot paths (High).**
   - `GetResourceState()` and edge dedupe both rely on linear scans (`O(R)` and `O(out_degree)` respectively).
   - Existing TODO marks this medium priority, but this is on the per-frame compile path and should be treated as a high-priority perf risk as node/resource counts grow.
   - Action: switch resource-state lookup to flat hash table and use per-node small-set/bit-guard for edge dedupe.
