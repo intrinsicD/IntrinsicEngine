@@ -874,11 +874,21 @@ namespace Core::Tasks
 
     void CounterEvent::Signal(uint32_t value)
     {
-        const uint32_t previous = m_Count.fetch_sub(value, std::memory_order_acq_rel);
-        if (previous <= value)
+        if (value == 0)
+            return;
+
+        uint32_t observed = m_Count.load(std::memory_order_acquire);
+        while (observed != 0)
         {
-            m_Count.store(0, std::memory_order_release);
-            Scheduler::UnparkReady(m_Token);
+            const uint32_t next = (observed <= value) ? 0u : (observed - value);
+            if (m_Count.compare_exchange_weak(observed, next,
+                                              std::memory_order_acq_rel,
+                                              std::memory_order_acquire))
+            {
+                if (next == 0)
+                    Scheduler::UnparkReady(m_Token);
+                return;
+            }
         }
     }
 

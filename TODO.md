@@ -140,16 +140,8 @@ Implementation notes:
 
 #### Execution work packages (implementation-ready)
 
-**WP1 — Scheduler wait-token substrate (Core::Tasks internals)**
-- Add a compact wait-token abstraction (`wait_kind`, `wait_slot`, `generation`) so parking/unparking paths never pass raw pointers.
-- Store token-indexed intrusive parked lists in SoA-friendly arrays (`head`, `tail`, `next`, `task_state`, `continuation`).
-- Require generational validation on every enqueue/dequeue to prevent ABA resume on recycled slots.
-- Exit criteria: deterministic single-resume behavior for token reuse under adversarial slot recycling tests.
-- **Status (2026-02-26): Partially implemented.** `Core::Tasks` now uses pooled intrusive parked-node queues (`parkedHead`/`parkedTail` + free-list recycling) and generation checks across acquire/release/park/unpark paths, with regression tests for exactly-once multi-waiter resume and stale-token wake isolation (`CounterEventMultipleWaitersResumeExactlyOnce`, `StaleWaitTokenUnparkDoesNotResumeNewWaiters`).
-
 **WP3 — Dependency counter wake wiring**
-- **Status (2026-02-26): In progress.** Counter wake path now rearms wait tokens correctly when `CounterEvent::Add()` transitions from ready (`count == 0`) back to pending (`count > 0`), preventing stale-ready fast-path escapes and preserving exactly-once continuation wakeups across reuse epochs.
-- On dependency completion, atomically decrement unresolved count; when transition reaches zero, wake exactly once via CAS state change (`Parked -> Ready`).
+- **Status (2026-02-26): In progress.** Counter wake path rearms wait tokens correctly when `CounterEvent::Add()` transitions from ready (`count == 0`) back to pending (`count > 0`), and `CounterEvent::Signal()` now performs saturating CAS decrement so wakeups only occur on the true transition to zero.
 - Encode wake path as branch-light fast path:
   - non-zero result => return
   - zero result => CAS + ready enqueue
@@ -185,10 +177,9 @@ Implementation notes:
 
 #### Delivery sequence (PR slicing)
 
-1. **PR-A (mechanics):** wait-token + park/unpark substrate + unit tests.
-2. **PR-B (integration):** dependency-counter wake wiring + worker-loop fairness policy.
-3. **PR-C (observability):** telemetry and SLO dashboards/exports.
-4. **PR-D (orchestration):** FrameGraph hot-path adoption + regression/perf comparison report.
+1. **PR-B (integration):** dependency-counter wake wiring + worker-loop fairness policy.
+2. **PR-C (observability):** telemetry and SLO dashboards/exports.
+3. **PR-D (orchestration):** FrameGraph hot-path adoption + regression/perf comparison report.
 
 Each PR must remain bisect-safe and keep baseline tests green before proceeding.
 
