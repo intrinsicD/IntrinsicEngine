@@ -241,6 +241,7 @@ namespace Interface::GUI
                 const float unparkP95Us = static_cast<float>(stats.TaskUnparkP95Ns) / 1000.0f;
                 const float unparkP99Us = static_cast<float>(stats.TaskUnparkP99Ns) / 1000.0f;
                 const float idleWaitMs = static_cast<float>(stats.TaskIdleWaitTotalNs) / 1'000'000.0f;
+                const float unparkTailSpreadUs = static_cast<float>(stats.TaskUnparkTailSpreadNs) / 1000.0f;
 
                 ImGui::Text("Parks: %llu   Unparks: %llu",
                             static_cast<unsigned long long>(stats.TaskParkCount),
@@ -248,6 +249,7 @@ namespace Interface::GUI
                 ImGui::Text("Steal Success Ratio: %.3f", static_cast<float>(stats.TaskStealSuccessRatio));
                 ImGui::Text("Idle waits: %llu (%.3f ms total)",
                             static_cast<unsigned long long>(stats.TaskIdleWaitCount), idleWaitMs);
+                ImGui::Text("Unpark tail spread (p99 - p50): %.2f us", unparkTailSpreadUs);
                 ImGui::Text("Queue contention: %llu lock misses",
                             static_cast<unsigned long long>(stats.TaskQueueContentionCount));
 

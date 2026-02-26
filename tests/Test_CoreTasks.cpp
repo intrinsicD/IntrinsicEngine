@@ -201,6 +201,8 @@ TEST(CoreTasks, CounterEventParksAndUnparksContinuation)
     EXPECT_GE(stats.UnparkLatencyP50Ns, 0u);
     EXPECT_GE(stats.UnparkLatencyP95Ns, stats.UnparkLatencyP50Ns);
     EXPECT_GE(stats.UnparkLatencyP99Ns, stats.UnparkLatencyP95Ns);
+    EXPECT_EQ(stats.UnparkLatencyTailSpreadNs,
+              stats.UnparkLatencyP99Ns - stats.UnparkLatencyP50Ns);
 
     Scheduler::Shutdown();
 }

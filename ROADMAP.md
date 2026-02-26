@@ -17,7 +17,7 @@ Backlog completion update (2026-02-26): pathological fan-out edge-dedupe scaling
 1. **Core::Tasks fiber parking for dependency waits** (current top priority).
    - Deliver continuation-level park/unpark semantics so wait-heavy graphs do not block worker OS threads.
    - Telemetry milestone progress: scheduler now exposes deque-depth snapshots and steal attempt/success metrics via `Scheduler::GetStats()`.
-   - Remaining telemetry gate: park/unpark latency distributions and tail wait reduction once continuations can park.
+   - Telemetry gate is now instrumented: scheduler stats expose park/unpark percentiles and unpark tail-spread (`p99 - p50`) for wait-tail tracking.
 2. **FrameGraph ready-queue execution (remove coarse layer barriers).**
    - Preserve layers as diagnostics only; schedule by dependency readiness.
 This order is intentional: item (1) improves scheduler substrate, and item (2) unlocks orchestration-level gains on top of that substrate.

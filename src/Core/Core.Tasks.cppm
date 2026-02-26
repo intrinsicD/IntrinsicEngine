@@ -120,6 +120,7 @@ namespace Core::Tasks
             uint64_t UnparkLatencyP50Ns = 0;
             uint64_t UnparkLatencyP95Ns = 0;
             uint64_t UnparkLatencyP99Ns = 0;
+            uint64_t UnparkLatencyTailSpreadNs = 0;
             uint64_t IdleWaitCount = 0;
             uint64_t IdleWaitTotalNs = 0;
             uint64_t QueueContentionCount = 0;
