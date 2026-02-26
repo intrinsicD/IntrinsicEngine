@@ -10,7 +10,8 @@ Backlog completion update (2026-02-26): configure-time offline dependency mode i
 
 1. **Core::Tasks fiber parking for dependency waits** (current top priority).
    - Deliver continuation-level park/unpark semantics so wait-heavy graphs do not block worker OS threads.
-   - Gate completion on telemetry-backed SLO checks (park/unpark latency, steal ratio, deque depth, tail wait reduction).
+   - Telemetry milestone progress: scheduler now exposes deque-depth snapshots and steal attempt/success metrics via `Scheduler::GetStats()`.
+   - Remaining telemetry gate: park/unpark latency distributions and tail wait reduction once continuations can park.
 2. **FrameGraph ready-queue execution (remove coarse layer barriers).**
    - Preserve layers as diagnostics only; schedule by dependency readiness.
 3. **DAGScheduler compile-path lookup/edge-dedupe optimization.**

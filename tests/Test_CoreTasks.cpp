@@ -185,6 +185,32 @@ TEST(CoreTasks, OverflowHandling)
     Scheduler::Shutdown();
 }
 
+TEST(CoreTasks, SchedulerStatsExposeQueueAndStealTelemetry)
+{
+    Scheduler::Initialize(2);
+
+    std::atomic<int> counter = 0;
+    constexpr int taskCount = 2000;
+    for (int i = 0; i < taskCount; ++i)
+    {
+        Scheduler::Dispatch([&counter] {
+            counter.fetch_add(1, std::memory_order_relaxed);
+        });
+    }
+
+    Scheduler::WaitForAll();
+    const auto stats = Scheduler::GetStats();
+
+    EXPECT_EQ(counter.load(std::memory_order_relaxed), taskCount);
+    EXPECT_GE(stats.InjectPushCount, static_cast<uint64_t>(taskCount));
+    EXPECT_GE(stats.InjectPopCount + stats.LocalPopCount + stats.StealPopCount,
+              static_cast<uint64_t>(taskCount));
+    EXPECT_EQ(stats.WorkerLocalDepths.size(), 2u);
+    EXPECT_EQ(stats.WorkerVictimStealCounts.size(), 2u);
+
+    Scheduler::Shutdown();
+}
+
 // --- Coroutine lifetime safety tests (Issue 2.3) ---
 
 TEST(CoreTasks, UndispatchedJobDestruction_NoLeak)
