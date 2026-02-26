@@ -433,6 +433,47 @@ TEST(CoreTasks, SchedulerStatsExposeQueueAndStealTelemetry)
     Scheduler::Shutdown();
 }
 
+TEST(CoreTasks, SchedulerStatsCanBeExportedToFrameTelemetry)
+{
+    Scheduler::Initialize(2);
+
+    CounterEvent event{1};
+    auto waiter = [&]() -> Job {
+        co_await WaitFor(event);
+        co_return;
+    };
+
+    Scheduler::Dispatch(waiter());
+    Scheduler::ParkCountAtomic().wait(0, std::memory_order_acquire);
+
+    event.Signal();
+    Scheduler::WaitForAll();
+
+    auto schedulerStats = Scheduler::GetStats();
+    ASSERT_GE(schedulerStats.ParkCount, 1u);
+    ASSERT_GE(schedulerStats.UnparkCount, 1u);
+
+    auto& telemetry = Core::Telemetry::TelemetrySystem::Get();
+    telemetry.BeginFrame();
+    telemetry.SetTaskSchedulerStats(schedulerStats);
+    telemetry.EndFrame();
+
+    const auto& frameStats = telemetry.GetFrameStats(0);
+    EXPECT_EQ(frameStats.TaskParkCount, schedulerStats.ParkCount);
+    EXPECT_EQ(frameStats.TaskUnparkCount, schedulerStats.UnparkCount);
+    EXPECT_EQ(frameStats.TaskParkP50Ns, schedulerStats.ParkLatencyP50Ns);
+    EXPECT_EQ(frameStats.TaskParkP95Ns, schedulerStats.ParkLatencyP95Ns);
+    EXPECT_EQ(frameStats.TaskParkP99Ns, schedulerStats.ParkLatencyP99Ns);
+    EXPECT_EQ(frameStats.TaskUnparkP50Ns, schedulerStats.UnparkLatencyP50Ns);
+    EXPECT_EQ(frameStats.TaskUnparkP95Ns, schedulerStats.UnparkLatencyP95Ns);
+    EXPECT_EQ(frameStats.TaskUnparkP99Ns, schedulerStats.UnparkLatencyP99Ns);
+    EXPECT_EQ(frameStats.TaskIdleWaitCount, schedulerStats.IdleWaitCount);
+    EXPECT_EQ(frameStats.TaskIdleWaitTotalNs, schedulerStats.IdleWaitTotalNs);
+    EXPECT_DOUBLE_EQ(frameStats.TaskStealSuccessRatio, schedulerStats.StealSuccessRatio);
+
+    Scheduler::Shutdown();
+}
+
 // --- Coroutine lifetime safety tests (Issue 2.3) ---
 
 TEST(CoreTasks, UndispatchedJobDestruction_NoLeak)

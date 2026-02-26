@@ -172,6 +172,55 @@ namespace Interface::GUI
             ImGui::Separator();
 
             // -----------------------------------------------------------------
+            // Task scheduler parking telemetry
+            // -----------------------------------------------------------------
+            if (ImGui::TreeNodeEx("Task Scheduler Wait Metrics", ImGuiTreeNodeFlags_DefaultOpen))
+            {
+                const float parkP50Us = static_cast<float>(stats.TaskParkP50Ns) / 1000.0f;
+                const float parkP95Us = static_cast<float>(stats.TaskParkP95Ns) / 1000.0f;
+                const float parkP99Us = static_cast<float>(stats.TaskParkP99Ns) / 1000.0f;
+                const float unparkP50Us = static_cast<float>(stats.TaskUnparkP50Ns) / 1000.0f;
+                const float unparkP95Us = static_cast<float>(stats.TaskUnparkP95Ns) / 1000.0f;
+                const float unparkP99Us = static_cast<float>(stats.TaskUnparkP99Ns) / 1000.0f;
+                const float idleWaitMs = static_cast<float>(stats.TaskIdleWaitTotalNs) / 1'000'000.0f;
+
+                ImGui::Text("Parks: %llu   Unparks: %llu",
+                            static_cast<unsigned long long>(stats.TaskParkCount),
+                            static_cast<unsigned long long>(stats.TaskUnparkCount));
+                ImGui::Text("Steal Success Ratio: %.3f", static_cast<float>(stats.TaskStealSuccessRatio));
+                ImGui::Text("Idle waits: %llu (%.3f ms total)",
+                            static_cast<unsigned long long>(stats.TaskIdleWaitCount), idleWaitMs);
+
+                if (ImGui::BeginTable("TaskWaitLatencyTable", 4,
+                    ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit))
+                {
+                    ImGui::TableSetupColumn("Operation");
+                    ImGui::TableSetupColumn("p50 (us)");
+                    ImGui::TableSetupColumn("p95 (us)");
+                    ImGui::TableSetupColumn("p99 (us)");
+                    ImGui::TableHeadersRow();
+
+                    ImGui::TableNextRow();
+                    ImGui::TableNextColumn(); ImGui::TextUnformatted("park");
+                    ImGui::TableNextColumn(); ImGui::Text("%.2f", parkP50Us);
+                    ImGui::TableNextColumn(); ImGui::Text("%.2f", parkP95Us);
+                    ImGui::TableNextColumn(); ImGui::Text("%.2f", parkP99Us);
+
+                    ImGui::TableNextRow();
+                    ImGui::TableNextColumn(); ImGui::TextUnformatted("unpark");
+                    ImGui::TableNextColumn(); ImGui::Text("%.2f", unparkP50Us);
+                    ImGui::TableNextColumn(); ImGui::Text("%.2f", unparkP95Us);
+                    ImGui::TableNextColumn(); ImGui::Text("%.2f", unparkP99Us);
+
+                    ImGui::EndTable();
+                }
+
+                ImGui::TreePop();
+            }
+
+            ImGui::Separator();
+
+            // -----------------------------------------------------------------
             // CPU timing categories
             // -----------------------------------------------------------------
             if (ImGui::TreeNodeEx("CPU Timing Breakdown", ImGuiTreeNodeFlags_DefaultOpen))

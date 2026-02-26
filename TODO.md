@@ -22,7 +22,7 @@ This document tracks **what's left to do** in IntrinsicEngine's architecture.
 
 - [ ] **Complete `Core::Tasks` fiber parking for dependency waits (High).**
   - Add true fiber parking/unparking for wait-heavy dependency chains so worker OS threads never block on fine-grain sync.
-  - Remaining: complete dependency-level continuation parking integration across scheduler wait-heavy boundaries and finalize park/unpark percentile telemetry.
+  - Remaining: complete dependency-level continuation parking integration across scheduler wait-heavy boundaries.
 
 - [ ] **Resolve runtime API/ownership drift in orchestration paths (Medium).**
   - Audit central runtime ownership boundaries and reduce `std::shared_ptr` usage where borrowed references or explicit owners are sufficient.
@@ -138,15 +138,6 @@ Implementation notes:
 
 
 #### Execution work packages (implementation-ready)
-
-**WP4 — Telemetry + SLO instrumentation**
-- **Status (2026-02-26): In progress.** Park/unpark percentile buckets remain to be wired into the telemetry export path.
-- Emit per-frame counters/histograms:
-  - `tasks.park.count`, `tasks.unpark.count`
-  - `tasks.park.ns.{p50,p95,p99}`, `tasks.unpark.ns.{p50,p95,p99}`
-  - `tasks.deque.depth.{worker}` histogram
-- Add compile-time telemetry toggle compatible with existing lock-free ring-buffer pipeline.
-- Exit criteria: metrics visible in telemetry export and stable under stress (no counter drift or negative deltas).
 
 **WP5 — FrameGraph orchestration touchpoint (incremental adoption)**
 - First pass: retain current layer metadata but replace dependency waits in hot path with continuation parking where dependency counters already exist.
