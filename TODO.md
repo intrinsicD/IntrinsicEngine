@@ -18,12 +18,6 @@ This document tracks **what's left to do** in IntrinsicEngine's architecture.
 
 ## 1. Open TODOs (What's left)
 
-### 1.1 2026-02-25 Architecture Review Follow-ups
-
-No open items.
-
-## 1.2 2026-02-26 Code Quality Audit (Style/Syntax, Architecture, Duplication)
-
 No open items.
 
 ## 2. Related Documents
