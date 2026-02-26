@@ -210,7 +210,7 @@ This order is intentional: item (1) improves scheduler substrate, and item (2) u
 - All debug geometry is transient — rebuilt each frame from `LinearArena`.
 - Toggled per-category via the UI (§2.5).
 
-**Status:** Core API and rendering backend are DONE — see Phase 0 item 3. `DebugDraw` provides the immediate-mode accumulator with `Line`, `Box`, `WireBox`, `Sphere`, `Circle`, `Arrow`, `Axes`, `Frustum`, `Grid`, `Cross` plus overlay variants. Convex hull geometry backend is now available via `Geometry::ConvexHullBuilder::Build()` (§2.6) — the debug overlay just needs to iterate hull faces and emit wireframe triangles via `DebugDraw::Line()`. Remaining work: per-category UI toggles (§2.5) and convex hull overlay wiring. These are incremental additions to the existing `DebugDraw` API.
+**Status:** Core API and rendering backend are DONE — see Phase 0 item 3. `DebugDraw` provides the immediate-mode accumulator with `Line`, `Box`, `WireBox`, `Sphere`, `Circle`, `Arrow`, `Axes`, `Frustum`, `Grid`, `Cross` plus overlay variants. Convex hull geometry backend is now available via `Geometry::ConvexHullBuilder::Build()` (§2.6), and the Sandbox now includes a selected-collider convex-hull wire overlay (`Graphics::DrawConvexHull`) with overlay/depth-tested routing and color/alpha controls in `View Settings → Spatial Debug`. Remaining work: broader per-category UI polish (§2.5) and additional spatial overlays (BVH/uniform grid).
 
 ---
 
