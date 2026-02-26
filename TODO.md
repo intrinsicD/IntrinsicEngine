@@ -158,6 +158,7 @@ Implementation notes:
 - Store token-indexed intrusive parked lists in SoA-friendly arrays (`head`, `tail`, `next`, `task_state`, `continuation`).
 - Require generational validation on every enqueue/dequeue to prevent ABA resume on recycled slots.
 - Exit criteria: deterministic single-resume behavior for token reuse under adversarial slot recycling tests.
+- **Status (2026-02-26): Partially implemented.** `Core::Tasks` now uses pooled intrusive parked-node queues (`parkedHead`/`parkedTail` + free-list recycling) and generation checks across acquire/release/park/unpark paths, with regression tests for exactly-once multi-waiter resume and stale-token wake isolation (`CounterEventMultipleWaitersResumeExactlyOnce`, `StaleWaitTokenUnparkDoesNotResumeNewWaiters`).
 
 **WP2 — Fiber park/unpark API and worker loop integration**
 - Introduce internal APIs in `Core::Tasks`:
