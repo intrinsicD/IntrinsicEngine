@@ -8,14 +8,16 @@ Backlog hygiene update (2026-02-26): release-flag consolidation is complete; `IN
 
 Backlog completion update (2026-02-26): configure-time offline dependency mode is now available via `-DINTRINSIC_OFFLINE_DEPS=ON`, which forces local `external/cache/<dep>-src` sources and disables FetchContent network updates.
 
+Backlog completion update (2026-02-26): `Core::DAGScheduler` compile-path resource lookup now uses a frame-reused flat open-addressing table (`std::vector` buckets/keys/values) instead of per-frame `std::unordered_map` node churn, reducing allocator pressure on large dependency sets.
+
 1. **Core::Tasks fiber parking for dependency waits** (current top priority).
    - Deliver continuation-level park/unpark semantics so wait-heavy graphs do not block worker OS threads.
    - Telemetry milestone progress: scheduler now exposes deque-depth snapshots and steal attempt/success metrics via `Scheduler::GetStats()`.
    - Remaining telemetry gate: park/unpark latency distributions and tail wait reduction once continuations can park.
 2. **FrameGraph ready-queue execution (remove coarse layer barriers).**
    - Preserve layers as diagnostics only; schedule by dependency readiness.
-3. **DAGScheduler compile-path lookup/edge-dedupe optimization.**
-   - Move resource lookup and dedupe structures to flat-hash/small-set style to control per-frame compile cost growth.
+3. **DAGScheduler compile-path edge-dedupe optimization follow-up.**
+   - Resource lookup flat-hash migration is complete; remaining work is tightening high-outdegree edge dedupe structures to small-set style and validating compile-time scaling envelopes.
 
 This order is intentional: item (1) improves scheduler substrate, item (2) unlocks orchestration-level gains on top of that substrate, and item (3) reduces compile overhead once execution-path parallelism is no longer barrier-limited.
 

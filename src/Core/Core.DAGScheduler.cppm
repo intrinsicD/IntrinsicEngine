@@ -6,7 +6,6 @@ module;
 #include <expected>
 #include <memory>
 #include <span>
-#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -118,13 +117,21 @@ export namespace Core
 
         // Resource state tracking (cleared each Reset)
         std::vector<ResourceState> m_ResourceStates;
-        std::unordered_map<size_t, uint32_t> m_ResourceStateLookup;
+
+        // Flat open-addressing hash map used for resource-key -> state-index lookup.
+        // We keep this allocator-stable across frames and reset occupancy in O(bucket_count)
+        // to avoid per-frame heap churn from std::unordered_map node allocations.
+        static constexpr uint32_t kEmptyBucket = ~0u;
+        std::vector<uint32_t> m_ResourceLookupBuckets;
+        std::vector<size_t> m_ResourceLookupKeys;
+        std::vector<uint32_t> m_ResourceLookupValues;
 
         // Compiled execution layers
         std::vector<std::vector<uint32_t>> m_ExecutionLayers;
 
         // ----- Helpers -----
         ResourceState& GetResourceState(size_t key);
+        void EnsureResourceLookupCapacity(size_t desiredEntryCount);
         void AddEdgeInternal(uint32_t producer, uint32_t consumer);
     };
 }
