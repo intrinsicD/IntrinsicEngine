@@ -55,3 +55,6 @@ jobs:
 
       - name: Test
         run: ctest --test-dir build --output-on-failure
+
+      - name: SLO performance gate (FrameGraph 2k-node scenario)
+        run: ./build/bin/IntrinsicCoreTests --gtest_filter=ArchitectureSLO.FrameGraphP95P99BudgetsAt2000Nodes

@@ -66,6 +66,7 @@ intrinsic_test_object_lib(CoreTestObjs
         Test_CoreHandle.cpp
         Test_CoreHash.cpp
         Test_CoreFrameGraph.cpp
+        Test_ArchitectureSLO.cpp
         Test_DAGScheduler.cpp
         Test_CoreAssetSafety.cpp
         Test_FeatureRegistry.cpp

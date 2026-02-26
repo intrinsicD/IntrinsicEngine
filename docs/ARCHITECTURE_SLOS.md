@@ -27,4 +27,4 @@ This document defines concrete service-level objectives (SLOs) for engine orches
   - `FrameGraphExecuteTimeNs`
   - `FrameGraphCriticalPathTimeNs`
 - **Milestone B (implemented):** Performance panel now computes rolling p95/p99 values from frame telemetry and surfaces PASS/ALERT status against the SLO gates.
-- **Milestone C:** Add CI perf scenario with budget assertions and trend regression checks.
+- **Milestone C (implemented):** CI now runs `ArchitectureSLO.FrameGraphP95P99BudgetsAt2000Nodes`, a 2,000-node FrameGraph performance scenario that asserts p99/p95 compile/execute/critical-path budgets from this document.
