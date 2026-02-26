@@ -38,6 +38,9 @@ jobs:
           # CRITICAL: Install clang-tools-20 for Module Scanning and GCC-14 STL for <format> support
           sudo apt-get install -y clang-tools-20 libstdc++-14-dev
 
+      - name: Enforce TODO policy
+        run: ./tools/check_todo_active_only.sh
+
       - name: Configure CMake
         # We must explicitly point to the scanner we just installed
         run: |
