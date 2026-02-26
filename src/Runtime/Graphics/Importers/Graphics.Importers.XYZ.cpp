@@ -20,7 +20,7 @@ namespace Graphics
 {
     namespace
     {
-        static constexpr std::string_view s_Extensions[] = { ".xyz", ".pcd" };
+        static constexpr std::string_view s_Extensions[] = { ".xyz" };
     }
 
     std::span<const std::string_view> XYZLoader::Extensions() const

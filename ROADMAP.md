@@ -307,14 +307,14 @@ The geometry module now includes `Geometry::KDTree`, an Octree-inspired accelera
 **What exists:**
 - `Core.IOBackend` — `IIOBackend` interface + `FileIOBackend` (Phase 0: `std::ifstream` read, `std::ofstream` write).
 - `Graphics:IORegistry` — `IORegistry`, `IAssetLoader` / `IAssetExporter` interfaces, `ImportResult` variant (`MeshImportData`, `PointCloudImportData`, `GraphImportData`), `LoadContext`, `RegisterBuiltinLoaders()`, `RegisterBuiltinExporters()`.
-- **7 I/O-agnostic importer partitions:** OBJ, PLY (ASCII + binary), XYZ, TGF, glTF 2.0 / GLB, STL (ASCII + binary), OFF.
+- **8 I/O-agnostic importer partitions:** OBJ, PLY (ASCII + binary), XYZ, PCD (ASCII), TGF, glTF 2.0 / GLB, STL (ASCII + binary), OFF.
 - **3 exporter partitions:** OBJ (ASCII), PLY (binary + ASCII), STL (binary + ASCII). `IAssetExporter::Export()` returns `std::expected<std::vector<std::byte>, AssetError>`. `IORegistry::Export()` convenience method finds exporter by extension, serializes, writes via `IIOBackend::Write()`.
 - `ModelLoader` new overload accepting `IORegistry` + `IIOBackend`; `Engine` owns both, populates at startup.
 - `Engine::LoadDroppedAsset` uses `IORegistry::CanImport()` instead of hardcoded extension list.
 - 31 tests covering `FileIOBackend`, `AssetId`, `IORegistry` mechanics, in-memory byte parsing for all 7 import formats, and round-trip export/re-import for OBJ, PLY, STL.
 
 **Remaining format support (incremental):**
-- **Point cloud formats:** PCD (Point Cloud Library format), LAS/LAZ (LiDAR).
+- **Point cloud formats:** LAS/LAZ (LiDAR).
 - **Scene formats:** FBX (via Assimp or ufbx), glTF materials/hierarchy/cameras/lights extraction.
 - **Image formats:** PNG, JPEG, HDR/EXR (for environment maps and HDR textures).
 - **Gaussian splat formats:** `.ply` (3DGS standard), `.splat` (compressed variants).
