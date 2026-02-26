@@ -120,7 +120,7 @@ public:
         auto textureLoader = [this, &gfx](const std::filesystem::path& path, Core::Assets::AssetHandle handle)
             -> std::shared_ptr<RHI::Texture>
         {
-            auto result = Graphics::TextureLoader::LoadAsync(path, *GetDevice(),
+            auto result = Graphics::TextureLoader::LoadAsync(path, GetDevice(),
                 gfx.GetTransferManager(), gfx.GetTextureSystem());
 
             if (result)
@@ -152,7 +152,7 @@ public:
             -> std::unique_ptr<Graphics::Model>
         {
             auto result = Graphics::ModelLoader::LoadAsync(
-                GetDevice(), gfx.GetTransferManager(), GetGeometryStorage(), path,
+                GetDeviceShared(), gfx.GetTransferManager(), GetGeometryStorage(), path,
                 GetIORegistry(), GetIOBackend());
 
             if (result)
@@ -791,14 +791,14 @@ public:
         uploadReq.UploadMode = Graphics::GeometryUploadMode::Staged;
 
         auto [gpuData, token] = Graphics::GeometryGpuData::CreateAsync(
-            GetDevice(), GetGraphicsBackend().GetTransferManager(), uploadReq, &GetGeometryStorage());
+            GetDeviceShared(), GetGraphicsBackend().GetTransferManager(), uploadReq, &GetGeometryStorage());
 
         auto oldHandle = mr->Geometry;
         mr->Geometry = GetGeometryStorage().Add(std::move(gpuData));
 
         if (oldHandle.IsValid())
         {
-            GetGeometryStorage().Remove(oldHandle, GetDevice()->GetGlobalFrameNumber());
+            GetGeometryStorage().Remove(oldHandle, GetDevice().GetGlobalFrameNumber());
         }
 
         mr->GpuSlot = ECS::MeshRenderer::Component::kInvalidSlot;

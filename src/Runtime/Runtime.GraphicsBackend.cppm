@@ -38,7 +38,10 @@ export namespace Runtime
 
         // --- Accessors (non-owning references) ---
         [[nodiscard]] RHI::VulkanContext& GetContext() const { return *m_Context; }
-        [[nodiscard]] std::shared_ptr<RHI::VulkanDevice> GetDevice() const { return m_Device; }
+        // Borrowed device access for runtime hot paths.
+        [[nodiscard]] RHI::VulkanDevice& GetDevice() const { return *m_Device; }
+        // Explicit owning access for APIs that still require shared ownership.
+        [[nodiscard]] const std::shared_ptr<RHI::VulkanDevice>& GetDeviceShared() const { return m_Device; }
         [[nodiscard]] RHI::VulkanSwapchain& GetSwapchain() const { return *m_Swapchain; }
         [[nodiscard]] RHI::SimpleRenderer& GetRenderer() const { return *m_Renderer; }
         [[nodiscard]] RHI::TransferManager& GetTransferManager() const { return *m_TransferManager; }
