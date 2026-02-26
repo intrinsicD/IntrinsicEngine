@@ -303,6 +303,8 @@ namespace Runtime
 
         // --- Render Features ---
         reg("ForwardPass",           Cat::RenderFeature, "Main forward PBR rendering pass");
+        reg("MeshPass",              Cat::RenderFeature, "Mesh visualization collection pass (wireframe + vertex overlays)");
+        reg("GraphPass",             Cat::RenderFeature, "Graph visualization collection pass (nodes + edges)");
         reg("PickingPass",           Cat::RenderFeature, "Entity ID picking for mouse selection");
         reg("SelectionOutlinePass",  Cat::RenderFeature, "Selection outline overlay for selected/hovered entities");
         reg("LineRenderPass",        Cat::RenderFeature, "Immediate-mode debug line rendering (DebugDraw → LineRenderPass)");
