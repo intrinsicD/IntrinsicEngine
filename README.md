@@ -96,9 +96,9 @@ All operators follow a consistent contract: `Params` struct with defaults, `Resu
   - No loader thread ever calls `vkWaitForFences` for texture uploads.
 - **GPUScene:** Retained-mode instance table with independent slot allocation/deallocation.
 - **Dynamic Rendering:** No `VkRenderPass` or `VkFramebuffer`; fully dynamic attachment binding.
-- **DebugDraw:** Immediate-mode line/shape rendering with screen-space thick-line expansion (SSBO-based, no geometry shader). Depth-tested and overlay variants.
+- **DebugDraw:** Immediate-mode line/shape rendering with screen-space thick-line expansion (SSBO-based, no geometry shader). Depth-tested and overlay variants. **Note:** Line rendering (`LineRenderPass`) and wireframe rendering are currently broken and pending robust re-implementation.
 - **Graph Processing:** Halfedge-based graph topology with robust Octree-accelerated kNN construction, force-directed 2D layout (`ComputeForceDirectedLayout`), spectral embedding (`ComputeSpectralLayout`) with combinatorial or symmetric-normalized Laplacian iteration, hierarchical layered layout (`ComputeHierarchicalLayout`) for connectivity visualization workflows, and a reusable embedding diagnostic (`CountEdgeCrossings`) for geometry-level crossing measurement. Hierarchical layouts retain diameter-aware auto-rooting for better-balanced disconnected component embeddings plus inversion-based crossing diagnostics (`HierarchicalLayoutResult::CrossingCount`) computed from final per-layer x-ordering.
-- **Point Cloud Rendering:** SSBO-based multi-mode point splatting via `PointCloudRenderPass`. Three modes: flat disc (screen-aligned billboard), surfel (normal-oriented disc with lighting), and EWA splatting (Zwicker et al. 2001, perspective-correct Gaussian elliptical splats). Vertex-shader billboard expansion (6 verts/point, no geometry shader). Integrated via `PointCloudRenderer::Component` ECS, gated by `FeatureRegistry`.
+- **Point Cloud Rendering:** Currently broken — pending a full re-implementation from scratch. The `Geometry.PointCloud` CPU module (data structures, downsampling, statistics) remains functional.
 - **Selection Outlines:** Post-process contour highlight for selected/hovered entities.
 
 ### 4. Data I/O
@@ -110,7 +110,7 @@ Two-layer architecture: I/O backend (byte transport) separated from format loade
 |---|---|
 | **Mesh (Import)** | glTF 2.0 / GLB, OBJ, PLY (ASCII + binary), STL (ASCII + binary), OFF |
 | **Mesh (Export)** | OBJ, PLY (binary + ASCII), STL (binary + ASCII) |
-| **Point Cloud** | XYZ, PLY |
+| **Point Cloud** | XYZ, PCD (ASCII), PLY |
 | **Graph** | TGF |
 | **Texture** | PNG, JPG, KTX (via stb/KTX loaders) |
 
@@ -229,7 +229,7 @@ Four test targets with clear GPU/no-GPU boundaries:
 
 - **Left Click + Drag:** Orbit camera.
 - **Right Click + WASD:** Fly camera mode.
-- **Drag & Drop:** Drop `.glb`, `.gltf`, `.ply`, `.obj`, `.xyz`, or `.tgf` files to load asynchronously.
+- **Drag & Drop:** Drop `.glb`, `.gltf`, `.ply`, `.obj`, `.xyz`, `.pcd`, or `.tgf` files to load asynchronously.
 - **ImGui Panels:**
   - **Hierarchy:** View and select entities.
   - **Inspector:** Modify transforms, view mesh stats.
@@ -354,30 +354,9 @@ Common editor panels live in `src/Runtime/EditorUI/` and are registered from the
 
 Add a new panel by calling `Interface::GUI::RegisterPanel("My Panel", []{ ... });` from `Runtime.EditorUI`.
 
-## Point Rendering Modes (PointCloudRenderPass)
+## Point Cloud Rendering
 
-The engine currently supports GPU point rendering via `Graphics::Passes::PointCloudRenderPass` with four shader-driven modes:
-
-| Mode | ID | Geometry | Lighting | Notes |
-|------|----|----------|----------|-------|
-| **Flat Disc** | 0 | Screen-aligned billboard (always faces camera) | None — pure flat color | Fastest; use for debug overlays |
-| **Surfel** | 1 | Surface-aligned disc coplanar with the surfel plane | Lambertian + ambient | Tangent frame derived from per-point normal; appears as an ellipse when viewed obliquely (correct physical behavior) |
-| **EWA** | 2 | Perspective-correct elliptical Gaussian splat (Zwicker et al. 2001) | Lambertian + ambient | Falls back to isotropic screen-aligned Gaussian for edge-on surfels (degenerate projection guard) |
-| **Gaussian Splat** | 3 | Screen-aligned billboard with smooth Gaussian opacity | None — pure flat color | Soft volumetric appearance; use for density/scalar-field visualization |
-
-### Shader Architecture
-
-- **Vertex shader (`point.vert`):** 6 vertices per point (2 triangles, no geometry shader). Tangent frame uses a **screen-stable basis** — projects view-space X onto the surfel plane (falls back to view-space Y when the normal is nearly aligned with X). This avoids the previous degenerate case where a horizontal surfel viewed from the side would collapse to a zero-area quad. EWA perspective Jacobian uses `abs(proj[1][1])` to compensate for the Vulkan Y-flip in `glm::perspective`. A degenerate-projection guard catches edge-on surfels where projected axis length < 0.5px and substitutes a screen-aligned isotropic Gaussian instead of letting `planeScale` diverge.
-- **Fragment shader (`point.frag`):** Modes are **fully separated** (Mode 0 ≠ Mode 1 — flat discs are unlit). Camera UBO is accessible from the fragment stage (`VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT`) so Modes 1 and 2 can correctly reconstruct the world-space camera position for Lambertian shading.
-
-### UI
-
-In the Sandbox app (`src/Apps/Sandbox/main.cpp`):
-
-* **Inspector > Visualization > Vertex Settings > Vertex Mode** — controls how *mesh vertices* are drawn when `Show Vertices` is enabled.
-* **Inspector > Point Cloud > Rendering > Render Mode** — controls how *point cloud entities* are drawn.
-
-Submissions are **batched per-mode**: multiple point sources with different modes coexist correctly in the same frame. Each mode issues its own GPU draw pass with the correct push constant.
+Point cloud GPU rendering (`PointCloudRenderPass`) is currently **broken** and pending a full re-implementation from scratch. The CPU-side `Geometry.PointCloud` module (data structures, downsampling, statistics, radius estimation) remains functional. See `TODO.md` for the re-implementation plan.
 
 ## Graphics Geometry: Shared GPU Ownership (Views)
 
