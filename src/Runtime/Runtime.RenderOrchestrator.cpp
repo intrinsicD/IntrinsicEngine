@@ -1,6 +1,8 @@
 module;
+#include <array>
 #include <memory>
 #include <span>
+#include <string_view>
 #include "RHI.Vulkan.hpp"
 
 module Runtime.RenderOrchestrator;
@@ -87,30 +89,32 @@ namespace Runtime
         RHI::DescriptorAllocator& descriptorPool,
         RHI::DescriptorLayout& descriptorLayout)
     {
-        // Shader policy (data-driven)
-        m_ShaderRegistry.Register("Forward.Vert"_id, "shaders/triangle.vert.spv");
-        m_ShaderRegistry.Register("Forward.Frag"_id, "shaders/triangle.frag.spv");
-        m_ShaderRegistry.Register("Picking.Vert"_id, "shaders/pick_id.vert.spv");
-        m_ShaderRegistry.Register("Picking.Frag"_id, "shaders/pick_id.frag.spv");
-        m_ShaderRegistry.Register("Debug.Vert"_id, "shaders/debug_view.vert.spv");
-        m_ShaderRegistry.Register("Debug.Frag"_id, "shaders/debug_view.frag.spv");
-        m_ShaderRegistry.Register("Debug.Comp"_id, "shaders/debug_view.comp.spv");
-        m_ShaderRegistry.Register("Outline.Vert"_id, "shaders/debug_view.vert.spv"); // Reuse fullscreen triangle
-        m_ShaderRegistry.Register("Outline.Frag"_id, "shaders/selection_outline.frag.spv");
+        struct ShaderRegistration
+        {
+            Core::Hash::StringID Id;
+            std::string_view Path;
+        };
 
-        // Line rendering (debug draw)
-        m_ShaderRegistry.Register("Line.Vert"_id, "shaders/line.vert.spv");
-        m_ShaderRegistry.Register("Line.Frag"_id, "shaders/line.frag.spv");
+        constexpr std::array kShaderRegistrations = {
+            ShaderRegistration{"Forward.Vert"_id, "shaders/triangle.vert.spv"},
+            ShaderRegistration{"Forward.Frag"_id, "shaders/triangle.frag.spv"},
+            ShaderRegistration{"Picking.Vert"_id, "shaders/pick_id.vert.spv"},
+            ShaderRegistration{"Picking.Frag"_id, "shaders/pick_id.frag.spv"},
+            ShaderRegistration{"Debug.Vert"_id, "shaders/debug_view.vert.spv"},
+            ShaderRegistration{"Debug.Frag"_id, "shaders/debug_view.frag.spv"},
+            ShaderRegistration{"Debug.Comp"_id, "shaders/debug_view.comp.spv"},
+            ShaderRegistration{"Outline.Vert"_id, "shaders/debug_view.vert.spv"}, // Reuse fullscreen triangle
+            ShaderRegistration{"Outline.Frag"_id, "shaders/selection_outline.frag.spv"},
+            ShaderRegistration{"Line.Vert"_id, "shaders/line.vert.spv"},
+            ShaderRegistration{"Line.Frag"_id, "shaders/line.frag.spv"},
+            ShaderRegistration{"PointCloud.Vert"_id, "shaders/point.vert.spv"},
+            ShaderRegistration{"PointCloud.Frag"_id, "shaders/point.frag.spv"},
+            ShaderRegistration{"Cull.Comp"_id, "shaders/instance_cull_multigeo.comp.spv"},
+            ShaderRegistration{"SceneUpdate.Comp"_id, "shaders/scene_update.comp.spv"},
+        };
 
-        // Point cloud rendering (billboard/surfel/EWA splatting)
-        m_ShaderRegistry.Register("PointCloud.Vert"_id, "shaders/point.vert.spv");
-        m_ShaderRegistry.Register("PointCloud.Frag"_id, "shaders/point.frag.spv");
-
-        // Stage 3 compute
-        m_ShaderRegistry.Register("Cull.Comp"_id, "shaders/instance_cull_multigeo.comp.spv");
-
-        // GPUScene scatter update
-        m_ShaderRegistry.Register("SceneUpdate.Comp"_id, "shaders/scene_update.comp.spv");
+        for (const auto& registration : kShaderRegistrations)
+            m_ShaderRegistry.Register(registration.Id, registration.Path.data());
 
         // Pipeline library (owns PSOs)
         m_PipelineLibrary = std::make_unique<Graphics::PipelineLibrary>(
