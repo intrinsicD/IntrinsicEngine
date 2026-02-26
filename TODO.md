@@ -254,9 +254,10 @@ Each PR must remain bisect-safe and keep baseline tests green before proceeding.
 
 ### C. Duplication follow-ups (from latest duplicate-code hunt)
 
-- [ ] **Consolidate PLY importer parsing paths (High).**
+- [x] **Consolidate PLY importer parsing paths (High).**
   - `Graphics.ModelLoader` and `Graphics.Importers.PLY` still contain overlapping token/type/property parsing logic.
-  - Action: extract a shared `Graphics::Importers::PLYCommon` utility partition for scalar-type decoding and vertex-property extraction helpers.
+  - Status: legacy `ModelLoader::LoadAsync(...)` now delegates through `IORegistry` + built-in loaders, so `.ply` imports execute the `Graphics.Importers.PLY` path instead of the duplicate in-module parser.
+  - Follow-up: remove dead legacy parser code and extract `Graphics::Importers::PLYCommon` if we keep any cross-loader scalar/property utilities.
 
 - [ ] **Extract shared face-iteration traversal helpers for geometry operators (Medium).**
   - Curvature, mesh-quality, parameterization, and simplification modules repeat near-identical `HalfedgeHandle h0/h1/h2` traversal + per-face metric accumulation loops.
