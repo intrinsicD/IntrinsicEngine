@@ -20,11 +20,9 @@ Backlog completion update (2026-02-26): FrameGraph runtime execution now dispatc
 
 Backlog completion update (2026-02-26): `Geometry.Boolean` now provides baseline CSG operations for closed halfedge meshes with exact handling for disjoint and full-containment cases (union/intersection/difference where topologically trivial), plus conservative nullopt fallback for partial-overlap configurations that still require robust triangle clipping/stitching.
 
-1. **Core::Tasks fiber parking for dependency waits** (current top priority).
-   - Deliver continuation-level park/unpark semantics so wait-heavy graphs do not block worker OS threads.
-   - Telemetry milestone progress: scheduler now exposes deque-depth snapshots and steal attempt/success metrics via `Scheduler::GetStats()`.
-   - Telemetry gate is now instrumented: scheduler stats expose park/unpark percentiles and unpark tail-spread (`p99 - p50`) for wait-tail tracking.
-This order is intentional: item (1) improves scheduler substrate; ready-queue FrameGraph execution has now landed and is treated as completed foundation work.
+Backlog completion update (2026-02-26): Core task dependency waits now use continuation-level park/unpark semantics (`CounterEvent` + scheduler wait tokens), so coroutine-heavy waits no longer pin worker OS threads. Coverage includes single/multi-waiter wake-up behavior, stale-token safety, and scheduler wake-tail telemetry/SLO gates (`tests/Test_CoreTasks.cpp`, `tests/Test_ArchitectureSLO.cpp`).
+
+Near-term architecture priority now shifts from scheduler substrate work to remaining rendering/editor roadmap items in §2.
 
 ## 2. Feature Roadmap
 
