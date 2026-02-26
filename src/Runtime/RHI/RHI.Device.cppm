@@ -13,6 +13,8 @@ import Core.InplaceFunction;
 
 namespace RHI
 {
+    class TransientAllocator;
+
     export struct QueueFamilyIndices
     {
         std::optional<uint32_t> GraphicsFamily;
@@ -164,8 +166,8 @@ namespace RHI
         QueueFamilyIndices FindQueueFamilies(VkPhysicalDevice device);
         bool CheckDeviceExtensionSupport(VkPhysicalDevice device);
 
-        // Opaque pointer to device-owned transient allocator (defined + managed in RHI.Device.cpp).
-        void* m_TransientAllocator = nullptr;
+        // Device-owned transient allocator (lifetime managed by unique_ptr).
+        std::unique_ptr<TransientAllocator> m_TransientAllocator;
 
         // Timeline semaphore to track completion on the graphics queue.
         VkSemaphore m_GraphicsTimelineSemaphore = VK_NULL_HANDLE;

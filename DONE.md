@@ -29,3 +29,12 @@ Completed the code-quality backlog item for release flag drift:
 - Removed the duplicate top-level `INTRINSIC_RELEASE_FLAGS` assignment in `CMakeLists.txt` that previously shadowed an earlier value.
 - Kept a single source of truth for release optimization flags (`-O3` for `Release`/`RelWithDebInfo`).
 - Preserved `-march=native` as an explicit opt-in controlled only by `INTRINSIC_ENABLE_NATIVE_ARCH`.
+
+## 2026-02-26 RHI TransientAllocator Ownership Cleanup
+
+Completed the RHI ownership cleanup backlog item for manual allocator lifetime management:
+
+- `RHI::VulkanDevice` no longer stores `TransientAllocator` as an opaque raw pointer.
+- Ownership was migrated to `std::unique_ptr<TransientAllocator>` in the module interface.
+- Construction now uses `std::make_unique`, and teardown uses `.reset()` instead of manual `delete`.
+- This removes manual memory management from the device path while preserving existing destruction ordering.

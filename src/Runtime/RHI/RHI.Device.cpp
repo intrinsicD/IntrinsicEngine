@@ -63,7 +63,7 @@ namespace RHI
         }
 
         // Create transient allocator AFTER device creation (it owns VkDeviceMemory pages).
-        m_TransientAllocator = new TransientAllocator(*this);
+        m_TransientAllocator = std::make_unique<TransientAllocator>(*this);
 
         CreateCommandPool();
     }
@@ -121,8 +121,7 @@ namespace RHI
         }
 
         // 3) Destroy transient allocator pages (raw VkDeviceMemory pages).
-        delete static_cast<TransientAllocator*>(m_TransientAllocator);
-        m_TransientAllocator = nullptr;
+        m_TransientAllocator.reset();
 
         // 4) One more flush in case any destructors enqueued work during step (3).
         FlushAllDeletionQueues();
