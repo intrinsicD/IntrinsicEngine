@@ -5,6 +5,7 @@ module;
 #include <cstdint>
 #include <expected>
 #include <memory>
+#include <span>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -81,6 +82,16 @@ export namespace Core
         // ----- Results -----
         [[nodiscard]] uint32_t GetNodeCount() const { return m_ActiveNodeCount; }
         [[nodiscard]] const std::vector<std::vector<uint32_t>>& GetExecutionLayers() const { return m_ExecutionLayers; }
+        [[nodiscard]] std::span<const uint32_t> GetDependents(uint32_t nodeIndex) const
+        {
+            assert(nodeIndex < m_ActiveNodeCount);
+            return m_NodePool[nodeIndex].Dependents;
+        }
+        [[nodiscard]] uint32_t GetIndegree(uint32_t nodeIndex) const
+        {
+            assert(nodeIndex < m_ActiveNodeCount);
+            return m_NodePool[nodeIndex].Indegree;
+        }
 
         // ----- Reset for next frame -----
         void Reset();

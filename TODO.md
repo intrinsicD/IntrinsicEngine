@@ -25,7 +25,7 @@ This document tracks **what's left to do** in IntrinsicEngine's architecture.
   - Add true fiber parking/unparking for wait-heavy dependency chains so worker OS threads never block on fine-grain sync.
   - Extend telemetry with per-worker deque depth, steal ratio, and park/unpark latency to validate fairness and tail behavior.
 
-- [ ] **Remove coarse FrameGraph layer barriers (High).**
+- [x] **Remove coarse FrameGraph layer barriers (High).**
   - Replace per-layer `WaitForAll()` execution with dependency-count-driven ready queues.
   - Preserve layer grouping for diagnostics/visualization only.
   - Add optional critical-path-aware pass prioritization to reduce frame makespan and tail latency.
@@ -65,10 +65,10 @@ This section captures **newly observed inconsistencies** and concrete remediatio
   - Result: potential head-of-line blocking for wait-heavy chains and weaker latency isolation under mixed workloads.
   - Action: add parked continuation queues keyed by dependency counters/events, with wake-on-ready semantics and telemetry (`park_count`, `park_ns`, `unpark_ns`).
 
-- [ ] **Remove CPU FrameGraph layer barriers that serialize independent work (High).**
+- [x] **Remove CPU FrameGraph layer barriers that serialize independent work (High).**
   - `FrameGraph::Execute()` executes per-layer and performs `Tasks::Scheduler::WaitForAll()` barrier after each multi-pass layer.
   - This preserves correctness but over-serializes the schedule and can inflate frame critical path.
-  - Action: execute ready tasks continuously from indegree counters (Kahn-ready queue) and keep layers only as debug metadata.
+  - Status: `FrameGraph::Execute()` now dispatches indegree-ready passes and unlocks dependents via atomic dependency counters, using a single terminal scheduler wait while retaining layer metadata for diagnostics.
 
 - [x] **Reduce compile-time overhead in `Core::DAGScheduler` hot paths (High).**
   - `GetResourceState()` and edge dedupe both rely on linear scans (`O(R)` and `O(out_degree)` respectively).

@@ -46,3 +46,11 @@ Completed the DAGScheduler compile-path optimization backlog items:
 - Replaced linear resource-state lookup with an O(1)-average hash index (`resourceKey -> stateIndex`) while preserving frame-reset semantics and high-water reuse for pooled storage.
 - Added adaptive edge dedupe for high-degree producer nodes: linear scan for small out-degree, then automatic promotion to a hash-backed membership set for faster duplicate detection.
 - Preserved existing scheduling semantics and execution-layer output while reducing per-frame compile overhead growth for large resource/node counts.
+
+## 2026-02-26 FrameGraph Ready-Queue Execution (Layer Barrier Removal)
+
+Completed the FrameGraph execution-model backlog item:
+
+- Replaced per-layer `WaitForAll()` barriers with dependency-count-driven ready dispatch in `FrameGraph::Execute()`.
+- Added atomic indegree countdown release semantics so dependents are scheduled immediately when their final prerequisite completes.
+- Preserved execution-layer data in `DAGScheduler` for diagnostics/visualization while using a single terminal scheduler wait for completion.
