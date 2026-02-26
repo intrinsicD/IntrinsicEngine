@@ -289,7 +289,7 @@ namespace Graphics::Passes
                     depthInfo.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
                     data.Depth = builder.WriteDepth(depth, depthInfo);
                 },
-                [this, &ctx, frameIndex, localCount, capturedDescSet](const PointCloudPassData&, const RGRegistry&, VkCommandBuffer cmd)
+                [this, &ctx, localCount, capturedDescSet](const PointCloudPassData&, const RGRegistry&, VkCommandBuffer cmd)
 
                 {
                     const uint32_t dynamicOffset = static_cast<uint32_t>(ctx.GlobalCameraDynamicOffset);

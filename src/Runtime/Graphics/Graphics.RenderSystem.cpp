@@ -364,7 +364,7 @@ namespace Graphics
             camera.ViewMatrix,
             camera.ProjectionMatrix,
             m_Interaction.GetReadbackBuffer(frameIndex),
-            m_DebugDraw
+            /* DebugDrawPtr */ m_DebugDraw
         };
 
         // IMPORTANT: RenderGraph executes passes on worker threads *after* BuildGraph() returns.

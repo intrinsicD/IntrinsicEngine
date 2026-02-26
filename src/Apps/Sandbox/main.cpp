@@ -714,9 +714,9 @@ public:
         }
         for (size_t i = 0; i + 2 < collider->CollisionRef->Indices.size(); i += 3)
         {
-            mesh.AddTriangle(vhs[collider->CollisionRef->Indices[i]],
-                             vhs[collider->CollisionRef->Indices[i + 1]],
-                             vhs[collider->CollisionRef->Indices[i + 2]]);
+            static_cast<void>(mesh.AddTriangle(vhs[collider->CollisionRef->Indices[i]],
+                              vhs[collider->CollisionRef->Indices[i + 1]],
+                              vhs[collider->CollisionRef->Indices[i + 2]]));
         }
 
         // 2. Apply operator
@@ -780,7 +780,7 @@ public:
             aabb = Geometry::Union(aabb, collider->CollisionRef->Positions[i2]);
             primitiveBounds.push_back(aabb);
         }
-        collider->CollisionRef->LocalOctree.Build(primitiveBounds, Geometry::Octree::SplitPolicy{}, 16, 8);
+        static_cast<void>(collider->CollisionRef->LocalOctree.Build(primitiveBounds, Geometry::Octree::SplitPolicy{}, 16, 8));
 
         Graphics::GeometryUploadRequest uploadReq;
         uploadReq.Positions = collider->CollisionRef->Positions;
@@ -930,7 +930,7 @@ public:
                             params.TargetLength = targetLength;
                             params.Iterations = iterations;
                             params.PreserveBoundary = preserveBoundary;
-                            Geometry::Remeshing::Remesh(mesh, params);
+                            static_cast<void>(Geometry::Remeshing::Remesh(mesh, params));
                         });
                     }
                     if (ImGui::Button("Adaptive Remesh"))
@@ -941,7 +941,7 @@ public:
                             params.MaxEdgeLength = targetLength * 2.0f;
                             params.Iterations = iterations;
                             params.PreserveBoundary = preserveBoundary;
-                            Geometry::AdaptiveRemeshing::AdaptiveRemesh(mesh, params);
+                            static_cast<void>(Geometry::AdaptiveRemeshing::AdaptiveRemesh(mesh, params));
                         });
                     }
                 }
@@ -958,7 +958,7 @@ public:
                             Geometry::Simplification::SimplificationParams params;
                             params.TargetFaces = targetFaces;
                             params.PreserveBoundary = preserveBoundarySimp;
-                            Geometry::Simplification::Simplify(mesh, params);
+                            static_cast<void>(Geometry::Simplification::Simplify(mesh, params));
                         });
                     }
                 }
@@ -979,7 +979,7 @@ public:
                             params.Iterations = smoothIterations;
                             params.Lambda = lambda;
                             params.PreserveBoundary = preserveBoundarySmooth;
-                            Geometry::Smoothing::UniformLaplacian(mesh, params);
+                            static_cast<void>(Geometry::Smoothing::UniformLaplacian(mesh, params));
                         });
                     }
                     if (ImGui::Button("Cotan Laplacian"))
@@ -989,7 +989,7 @@ public:
                             params.Iterations = smoothIterations;
                             params.Lambda = lambda;
                             params.PreserveBoundary = preserveBoundarySmooth;
-                            Geometry::Smoothing::CotanLaplacian(mesh, params);
+                            static_cast<void>(Geometry::Smoothing::CotanLaplacian(mesh, params));
                         });
                     }
                     if (ImGui::Button("Taubin Smoothing"))
@@ -999,7 +999,7 @@ public:
                             params.Iterations = smoothIterations;
                             params.Lambda = lambda;
                             params.PreserveBoundary = preserveBoundarySmooth;
-                            Geometry::Smoothing::Taubin(mesh, params);
+                            static_cast<void>(Geometry::Smoothing::Taubin(mesh, params));
                         });
                     }
                     if (ImGui::Button("Implicit Smoothing"))
@@ -1009,7 +1009,7 @@ public:
                             params.Iterations = smoothIterations;
                             params.Lambda = lambda;
                             params.PreserveBoundary = preserveBoundarySmooth;
-                            Geometry::Smoothing::ImplicitLaplacian(mesh, params);
+                            static_cast<void>(Geometry::Smoothing::ImplicitLaplacian(mesh, params));
                         });
                     }
                 }

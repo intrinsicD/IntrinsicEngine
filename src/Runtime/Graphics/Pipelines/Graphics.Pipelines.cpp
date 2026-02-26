@@ -150,7 +150,7 @@ namespace Graphics
             if (pcEnabled || lineEnabled || meshEnabled || graphEnabled)
             {
                 m_Path.AddStage("VisualizationCollect",
-                    [this, pcEnabled, lineEnabled, meshEnabled, graphEnabled](RenderPassContext& ctx)
+                    [this, pcEnabled, meshEnabled, graphEnabled](RenderPassContext& ctx)
                 {
                     // Reset point splat staging before any collector runs.
                     if (pcEnabled)

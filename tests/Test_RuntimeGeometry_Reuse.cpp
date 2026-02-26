@@ -28,7 +28,7 @@ namespace
             m_Device = std::make_shared<RHI::VulkanDevice>(*m_Context, VK_NULL_HANDLE);
             m_TransferManager = std::make_unique<RHI::TransferManager>(*m_Device);
 
-            m_Pool.Initialize(64);
+            // GeometryPool is a Core::ResourcePool; it doesn't require explicit initialization.
         }
 
         void TearDown() override
@@ -68,8 +68,8 @@ TEST_F(GeometryReuseTest, ReuseSharesVertexBufferAndCreatesUniqueIndexBuffer)
     ASSERT_NE(gpu1->GetVertexBuffer(), nullptr);
     ASSERT_NE(gpu1->GetIndexBuffer(), nullptr);
 
-    const VkBuffer vb1 = gpu1->GetVertexBuffer()->GetHandle();
-    const VkBuffer ib1 = gpu1->GetIndexBuffer()->GetHandle();
+    VkBuffer vb1 = gpu1->GetVertexBuffer()->GetHandle();
+    VkBuffer ib1 = gpu1->GetIndexBuffer()->GetHandle();
 
     const auto h1 = m_Pool.Add(std::move(gpu1));
     ASSERT_TRUE(h1.IsValid());
@@ -88,8 +88,8 @@ TEST_F(GeometryReuseTest, ReuseSharesVertexBufferAndCreatesUniqueIndexBuffer)
     ASSERT_NE(gpu2->GetVertexBuffer(), nullptr);
     ASSERT_NE(gpu2->GetIndexBuffer(), nullptr);
 
-    const VkBuffer vb2 = gpu2->GetVertexBuffer()->GetHandle();
-    const VkBuffer ib2 = gpu2->GetIndexBuffer()->GetHandle();
+    VkBuffer vb2 = gpu2->GetVertexBuffer()->GetHandle();
+    VkBuffer ib2 = gpu2->GetIndexBuffer()->GetHandle();
 
     // The heavy vertex memory is shared.
     EXPECT_EQ(vb1, vb2);

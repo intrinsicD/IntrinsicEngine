@@ -57,29 +57,8 @@ namespace Graphics
         }
     };
 
-    // Fast float parsing from string_view
-    static float ParseFloat(std::string_view sv)
-    {
-        float val = 0.0f;
-        std::from_chars(sv.data(), sv.data() + sv.size(), val);
-        return val;
-    }
-
-    // Split string by delimiter
-    static std::vector<std::string_view> Split(std::string_view str, const char delimiter)
-    {
-        std::vector<std::string_view> result;
-        size_t first = 0;
-        while (first < str.size())
-        {
-            const auto second = str.find(delimiter, first);
-            if (first != second)
-                result.emplace_back(str.substr(first, second - first));
-            if (second == std::string_view::npos) break;
-            first = second + 1;
-        }
-        return result;
-    }
+    // NOTE: Legacy OBJ helpers (ParseFloat/Split) were removed.
+    // The engine now routes parsing through IORegistry importer modules.
 
     inline void RecalculateNormals(GeometryCpuData& mesh)
     {
@@ -153,10 +132,62 @@ namespace Graphics
             }
         }
     }
+
+    // =====================================================================
+    // ModelLoader API
+    // =====================================================================
+
+    std::expected<ModelLoadResult, AssetError> ModelLoader::LoadAsync(
+        std::shared_ptr<RHI::VulkanDevice> device,
+        RHI::TransferManager& transferManager,
+        GeometryPool& geometryStorage,
+        const std::string& filepath,
+        const IORegistry& registry,
+        Core::IO::IIOBackend& backend)
+    {
+        if (!device)
+            return std::unexpected(AssetError::InvalidData);
+
+        // 1) Import CPU geometry via IORegistry (format chosen by extension)
+        auto importExp = registry.Import(filepath, backend, ImportOptions{.Hint = ImportHint::MeshOnly});
+        if (!importExp)
+            return std::unexpected(importExp.error());
+
+        const MeshImportData* meshImport = std::get_if<MeshImportData>(&(*importExp));
+        if (!meshImport || meshImport->Meshes.empty())
+            return std::unexpected(AssetError::InvalidData);
+
+        // 2) Create model + upload geometry async via transfer manager
+        auto outModel = std::make_unique<Model>(geometryStorage, device);
+
+        RHI::TransferToken lastToken{};
+
+        for (auto cpu : meshImport->Meshes)
+        {
+            // Hygiene: if the asset has no normals/uvs, generate deterministic defaults.
+            if (cpu.Normals.empty())
+                RecalculateNormals(cpu);
+            if (cpu.Aux.empty())
+                GenerateUVs(cpu);
+
+            GeometryUploadRequest upload{};
+            upload.Positions = cpu.Positions;
+            upload.Indices = cpu.Indices;
+            upload.Normals = cpu.Normals;
+            upload.Aux = cpu.Aux;
+            upload.Topology = cpu.Topology;
+            upload.UploadMode = GeometryUploadMode::Staged;
+
+            auto [gpuData, token] = GeometryGpuData::CreateAsync(device, transferManager, upload, &geometryStorage);
+            lastToken = token;
+
+            auto geomHandle = geometryStorage.Add(std::move(gpuData));
+
+            auto seg = std::make_shared<MeshSegment>();
+            seg->Handle = geomHandle;
+            outModel->Meshes.push_back(std::move(seg));
+        }
+
+        return ModelLoadResult{.ModelData = std::move(outModel), .Token = lastToken};
+    }
 }
-
-    // --- Format Parsers ---
-
-    // NOTE: Legacy per-format parsers previously lived here (LoadOBJ/LoadPLY/LoadXYZ/LoadTGF/LoadGLTF).
-    // They were superseded by the IORegistry + *Loader implementations and were unused.
-    // We rely on the registry path to avoid duplicated parsing logic.

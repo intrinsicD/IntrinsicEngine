@@ -116,9 +116,8 @@ TEST_F(RenderOrchestratorHeadlessTest, MaterialSystemCreatable)
 
 TEST_F(RenderOrchestratorHeadlessTest, GeometryPoolInitializable)
 {
-    // GeometryPool is initialized by RenderOrchestrator with frames-in-flight.
+    // GeometryPool is a Core::ResourcePool; it doesn't require explicit initialization.
     Graphics::GeometryPool pool;
-    pool.Initialize(m_Device->GetFramesInFlight());
     pool.Clear();
     SUCCEED();
 }

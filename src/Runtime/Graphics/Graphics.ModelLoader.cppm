@@ -32,13 +32,5 @@ export namespace Graphics
             const std::string& filepath,
             const IORegistry& registry,
             Core::IO::IIOBackend& backend);
-
-        // Legacy signature: uses built-in parsers (for backward compatibility during transition).
-        [[nodiscard]]
-        static std::expected<ModelLoadResult, AssetError> LoadAsync(
-            std::shared_ptr<RHI::VulkanDevice> device,
-            RHI::TransferManager& transferManager,
-            GeometryPool& geometryStorage,
-            const std::string& filepath);
     };
 }
