@@ -116,14 +116,14 @@ TEST(GraphRenderPass_Contract, NodeSubmissionDelegatesToPointCloud)
     EXPECT_TRUE(pcPass.HasContent());
 }
 
-TEST(GraphRenderPass_Contract, GaussianSplatNodesAccumulate)
+TEST(GraphRenderPass_Contract, FlatDiscNodesAccumulate)
 {
-    // Graph nodes can use any rendering mode including GaussianSplat.
+    // Graph nodes use flat-disc point rendering.
     Graphics::Passes::PointCloudRenderPass pcPass;
 
     auto pt = Graphics::Passes::PointCloudRenderPass::PackPoint(
         0, 0, 0, 0, 1, 0, 0.02f, 0xFFFFFFFF);
-    pcPass.SubmitPoints(Geometry::PointCloud::RenderMode::GaussianSplat, &pt, 1);
+    pcPass.SubmitPoints(Geometry::PointCloud::RenderMode::FlatDisc, &pt, 1);
 
     EXPECT_EQ(pcPass.GetPointCount(), 1u);
 }
@@ -146,21 +146,18 @@ TEST(GraphRenderPass_Contract, ResetBeforeCollect)
     EXPECT_FALSE(pcPass.HasContent());
 
     // Re-submit for new frame.
-    pcPass.SubmitPoints(Geometry::PointCloud::RenderMode::GaussianSplat, &pt, 1);
+    pcPass.SubmitPoints(Geometry::PointCloud::RenderMode::FlatDisc, &pt, 1);
     EXPECT_EQ(pcPass.GetPointCount(), 1u);
 }
 
 // ---- RenderMode Enum Coverage ----
 
-TEST(GraphRenderer_RenderMode, AllModesAvailable)
+TEST(GraphRenderer_RenderMode, FlatDiscAvailable)
 {
-    // Verify all four render modes are accessible.
+    // Verify the supported render mode.
     using RM = Geometry::PointCloud::RenderMode;
 
-    EXPECT_EQ(static_cast<uint32_t>(RM::FlatDisc),      0u);
-    EXPECT_EQ(static_cast<uint32_t>(RM::Surfel),        1u);
-    EXPECT_EQ(static_cast<uint32_t>(RM::EWA),           2u);
-    EXPECT_EQ(static_cast<uint32_t>(RM::GaussianSplat), 3u);
+    EXPECT_EQ(static_cast<uint32_t>(RM::FlatDisc), 0u);
 }
 
 TEST(GraphRenderer_Component, NodeRenderModeDefault)
@@ -169,9 +166,9 @@ TEST(GraphRenderer_Component, NodeRenderModeDefault)
     EXPECT_EQ(comp.NodeRenderMode, Geometry::PointCloud::RenderMode::FlatDisc);
 }
 
-TEST(GraphRenderer_Component, NodeRenderModeGaussianSplat)
+TEST(GraphRenderer_Component, NodeRenderModeSetFlatDisc)
 {
     ECS::GraphRenderer::Component comp;
-    comp.NodeRenderMode = Geometry::PointCloud::RenderMode::GaussianSplat;
-    EXPECT_EQ(comp.NodeRenderMode, Geometry::PointCloud::RenderMode::GaussianSplat);
+    comp.NodeRenderMode = Geometry::PointCloud::RenderMode::FlatDisc;
+    EXPECT_EQ(comp.NodeRenderMode, Geometry::PointCloud::RenderMode::FlatDisc);
 }

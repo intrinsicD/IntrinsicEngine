@@ -193,7 +193,7 @@ TEST(PointCloudRenderer_Component, WithData)
     comp.Normals = {{0, 1, 0}, {0, 1, 0}, {0, 0, 1}};
     comp.Colors = {{1, 0, 0, 1}, {0, 1, 0, 1}, {0, 0, 1, 1}};
     comp.Radii = {0.01f, 0.02f, 0.03f};
-    comp.RenderMode = Geometry::PointCloud::RenderMode::EWA;
+    comp.RenderMode = Geometry::PointCloud::RenderMode::FlatDisc;
 
     EXPECT_EQ(comp.PointCount(), 3u);
     EXPECT_TRUE(comp.HasNormals());
@@ -210,42 +210,42 @@ TEST(PointCloudRenderer_Component, MismatchedDataDetected)
     EXPECT_FALSE(comp.HasNormals()); // Size mismatch
 }
 
-// ---- GaussianSplat Mode (mode 3) ----
+// ---- Explicit mode submit ----
 
-TEST(PointCloudRenderPass_Contract, GaussianSplatModeSubmitAndCount)
+TEST(PointCloudRenderPass_Contract, FlatDiscModeSubmitAndCount)
 {
     Graphics::Passes::PointCloudRenderPass pass;
 
     auto pt = Graphics::Passes::PointCloudRenderPass::PackPoint(
         1.0f, 2.0f, 3.0f, 0.0f, 1.0f, 0.0f, 0.05f, 0xFFFFFFFF);
-    pass.SubmitPoints(Geometry::PointCloud::RenderMode::GaussianSplat, &pt, 1);
+    pass.SubmitPoints(Geometry::PointCloud::RenderMode::FlatDisc, &pt, 1);
 
     EXPECT_TRUE(pass.HasContent());
     EXPECT_EQ(pass.GetPointCount(), 1u);
 }
 
-TEST(PointCloudRenderPass_Contract, AllFourModesAccumulate)
+TEST(PointCloudRenderPass_Contract, NonFlatModesAreIgnored)
 {
     Graphics::Passes::PointCloudRenderPass pass;
 
     auto pt = Graphics::Passes::PointCloudRenderPass::PackPoint(
         0, 0, 0, 0, 1, 0, 0.01f, 0xFFFFFFFF);
 
-    pass.SubmitPoints(Geometry::PointCloud::RenderMode::FlatDisc,      &pt, 1);
-    pass.SubmitPoints(Geometry::PointCloud::RenderMode::Surfel,        &pt, 1);
-    pass.SubmitPoints(Geometry::PointCloud::RenderMode::EWA,           &pt, 1);
-    pass.SubmitPoints(Geometry::PointCloud::RenderMode::GaussianSplat, &pt, 1);
+    pass.SubmitPoints(Geometry::PointCloud::RenderMode::FlatDisc, &pt, 1);
+    pass.SubmitPoints(static_cast<Geometry::PointCloud::RenderMode>(1u), &pt, 1);
+    pass.SubmitPoints(static_cast<Geometry::PointCloud::RenderMode>(2u), &pt, 1);
+    pass.SubmitPoints(static_cast<Geometry::PointCloud::RenderMode>(3u), &pt, 1);
 
-    EXPECT_EQ(pass.GetPointCount(), 4u);
+    EXPECT_EQ(pass.GetPointCount(), 1u);
 }
 
-TEST(PointCloudRenderPass_Contract, ResetClearsAllFourModes)
+TEST(PointCloudRenderPass_Contract, ResetClearsStaging)
 {
     Graphics::Passes::PointCloudRenderPass pass;
 
     auto pt = Graphics::Passes::PointCloudRenderPass::PackPoint(
         0, 0, 0, 0, 1, 0, 0.01f, 0xFFFFFFFF);
-    pass.SubmitPoints(Geometry::PointCloud::RenderMode::GaussianSplat, &pt, 1);
+    pass.SubmitPoints(Geometry::PointCloud::RenderMode::FlatDisc, &pt, 1);
     EXPECT_TRUE(pass.HasContent());
 
     pass.ResetPoints();
@@ -290,7 +290,7 @@ TEST(PointCloud_Integration, CloudToComponent)
     comp.Normals   = std::vector<glm::vec3>(normals.begin(),   normals.end());
     comp.Colors    = std::vector<glm::vec4>(colors.begin(),    colors.end());
     comp.Radii     = radiiResult->Radii;
-    comp.RenderMode = Geometry::PointCloud::RenderMode::Surfel;
+    comp.RenderMode = Geometry::PointCloud::RenderMode::FlatDisc;
 
     EXPECT_EQ(comp.PointCount(), 4u);
     EXPECT_TRUE(comp.HasNormals());

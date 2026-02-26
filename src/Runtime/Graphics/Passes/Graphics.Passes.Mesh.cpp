@@ -33,7 +33,7 @@ namespace Graphics::Passes
     //     Uses OverlayLine when vis.WireframeOverlay is true.
     //
     //   ShowVertices:
-    //     Submits mesh vertex positions (with area-weighted normals for surfel/EWA modes)
+    //     Submits mesh vertex positions for point rendering.
     //     to PointCloudRenderPass staging buffers.
     //
     // Entities for which GPU-side derived geometry views already exist
@@ -58,8 +58,7 @@ namespace Graphics::Passes
                 continue;
 
             const bool hasGpuWire  = vis.WireframeView.IsValid();
-            // GPU vertex view is only valid for FlatDisc: ForwardPass renders point-list with no
-            // splat shading. Surfel/EWA/GaussianSplat must use the CPU PointCloudRenderPass path.
+            // GPU vertex view is valid for FlatDisc point rendering.
             const bool gpuVertexPathValid =
                 vis.VertexView.IsValid() &&
                 (vis.VertexRenderMode == Geometry::PointCloud::RenderMode::FlatDisc);
@@ -72,10 +71,8 @@ namespace Graphics::Passes
                 continue;
 
             // Both CPU paths source positions from the collision mesh (CPU-resident copy).
-            // NOTE: Flat Disc mode never reaches here — it uses the GPU vertex view via ForwardPass.
-            // Surfel/EWA/Gaussian reach here because their GPU vertex view is intentionally cleared.
             // An entity without a MeshCollider (no collision ref) cannot provide CPU positions for
-            // any of these paths; skip it with a one-time warning so the user knows why it's silent.
+            // wireframe/vertex CPU paths; skip it with a one-time warning.
             auto* collider = registry.try_get<ECS::MeshCollider::Component>(entity);
             if (!collider || !collider->CollisionRef)
             {
@@ -87,8 +84,7 @@ namespace Graphics::Passes
                         s_Warned = true;
                         Core::Log::Warn(
                             "MeshRenderPass: entity {} has ShowVertices=true with mode={} but no "
-                            "MeshCollider — surfel/EWA/Gaussian modes require CPU positions from "
-                            "the collision mesh. Attach a MeshCollider to enable splat rendering.",
+                            "MeshCollider. Attach a MeshCollider to enable CPU vertex submission.",
                             static_cast<uint32_t>(entity),
                             static_cast<uint32_t>(vis.VertexRenderMode));
                     }
@@ -181,13 +177,7 @@ namespace Graphics::Passes
             // ------------------------------------------------------------------
             if (needsCpuVerts)
             {
-                const bool wantsAligned =
-                    (vis.VertexRenderMode == Geometry::PointCloud::RenderMode::Surfel) ||
-                    (vis.VertexRenderMode == Geometry::PointCloud::RenderMode::EWA);
-
-                // Compute area-weighted vertex normals lazily (needed for surfel/EWA).
                 if (vis.VertexNormalsDirty
-                    && wantsAligned
                     && topology == Graphics::PrimitiveTopology::Triangles
                     && !indices.empty())
                 {
@@ -226,7 +216,7 @@ namespace Graphics::Passes
                         glm::vec3(worldMatrix * glm::vec4(positions[i], 1.0f));
 
                     glm::vec3 normal(0.0f, 1.0f, 0.0f);
-                    if (wantsAligned && i < vis.CachedVertexNormals.size())
+                    if (i < vis.CachedVertexNormals.size())
                     {
                         const glm::vec3 n  = normalMatrix * vis.CachedVertexNormals[i];
                         const float     n2 = glm::dot(n, n);

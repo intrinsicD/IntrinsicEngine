@@ -120,7 +120,7 @@ namespace Graphics::Systems::MeshRendererLifecycle
             {
                 if (!handle.IsValid())
                 {
-                    // Handle was cleared (e.g. mode switch from FlatDisc to Surfel):
+                    // Handle was cleared (e.g. vertex visualization mode change):
                     // deactivate and free the orphaned GPU scene slot.
                     if (slot != ECS::MeshRenderer::Component::kInvalidSlot)
                     {
