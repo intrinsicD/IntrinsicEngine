@@ -201,7 +201,7 @@ Near-term architecture priority now shifts from scheduler substrate work to rema
 **Required debug overlays:**
 - ~~**Octree:**~~ — **DONE.** Sandbox can render the selected entity’s `MeshCollider` `Geometry::Octree` as color-by-depth wire boxes via `Graphics::DebugDraw` + `LineRenderPass`. Controls live in `View Settings → Spatial Debug` (max depth, leaf-only, occupied-only, overlay/depth-tested).
 - ~~**KD-tree:**~~ — **DONE.** Core geometry accelerator (`Geometry::KDTree`) now includes Sandbox debug overlays through `Graphics::DrawKDTree()` (leaf/internal AABB wires + split-plane rectangles), routed through `DebugDraw` + `LineRenderPass` with UI knobs for max depth, overlay/depth-tested mode, and per-category colors.
-- **BVH (Bounding Volume Hierarchy):** Wireframe AABBs/OBBs at each BVH node level, with configurable max display depth.
+- ~~**BVH (Bounding Volume Hierarchy):**~~ — **DONE.** Sandbox now renders selected `MeshCollider` triangle BVHs as wireframe node AABBs with configurable max depth, leaf/internal filtering, per-category colors/alpha, and overlay/depth-tested routing via `Graphics::DrawBVH()` + `DebugDraw` + `LineRenderPass`.
 - **Uniform grid:** Wireframe cells with occupancy coloring.
 - ~~**Bounding volumes:**~~ — **DONE.** Sandbox can render selected `MeshCollider` bounds as world AABB, world OBB, and conservative bounding sphere overlays. Per-type toggles, independent colors, alpha, and overlay/depth-tested routing are exposed in `View Settings → Spatial Debug`.
 - ~~**Contact manifolds:**~~ — **DONE.** Sandbox now renders selected-entity contact manifolds against other `MeshCollider` OBBs: paired contact points, contact segment, and contact normal vector, with depth-tested/overlay modes and scale controls in `View Settings → Spatial Debug`.
@@ -212,7 +212,7 @@ Near-term architecture priority now shifts from scheduler substrate work to rema
 - All debug geometry is transient — rebuilt each frame from `LinearArena`.
 - Toggled per-category via the UI (§2.5).
 
-**Status:** Core API and rendering backend are DONE — see Phase 0 item 3. `DebugDraw` provides the immediate-mode accumulator with `Line`, `Box`, `WireBox`, `Sphere`, `Circle`, `Arrow`, `Axes`, `Frustum`, `Grid`, `Cross` plus overlay variants. Convex hull geometry backend is now available via `Geometry::ConvexHullBuilder::Build()` (§2.6), and the Sandbox now includes a selected-collider convex-hull wire overlay (`Graphics::DrawConvexHull`) with overlay/depth-tested routing and color/alpha controls in `View Settings → Spatial Debug`. Remaining work: broader per-category UI polish (§2.5) and additional spatial overlays (BVH/uniform grid).
+**Status:** Core API and rendering backend are DONE — see Phase 0 item 3. `DebugDraw` provides the immediate-mode accumulator with `Line`, `Box`, `WireBox`, `Sphere`, `Circle`, `Arrow`, `Axes`, `Frustum`, `Grid`, `Cross` plus overlay variants. Convex hull geometry backend is now available via `Geometry::ConvexHullBuilder::Build()` (§2.6), and the Sandbox now includes a selected-collider convex-hull wire overlay (`Graphics::DrawConvexHull`) with overlay/depth-tested routing and color/alpha controls in `View Settings → Spatial Debug`. Remaining work: broader per-category UI polish (§2.5) and additional spatial overlays (uniform grid).
 
 ---
 

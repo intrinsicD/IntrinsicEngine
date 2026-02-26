@@ -29,6 +29,7 @@ target_sources(${target_name}
         Graphics.OctreeDebugDraw.cppm
         Graphics.BoundingDebugDraw.cppm
         Graphics.KDTreeDebugDraw.cppm
+        Graphics.BVHDebugDraw.cppm
         Graphics.ConvexHullDebugDraw.cppm
         Graphics.Interaction.cppm
         Graphics.Presentation.cppm
@@ -79,6 +80,7 @@ target_sources(${target_name}
         Graphics.OctreeDebugDraw.cpp
         Graphics.BoundingDebugDraw.cpp
         Graphics.KDTreeDebugDraw.cpp
+        Graphics.BVHDebugDraw.cpp
         Graphics.ConvexHullDebugDraw.cpp
         Graphics.Interaction.cpp
         Graphics.Presentation.cpp
