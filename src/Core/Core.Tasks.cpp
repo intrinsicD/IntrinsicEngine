@@ -195,6 +195,8 @@ namespace Core::Tasks
         alignas(64) std::atomic<uint64_t> unparkCount{0};
         alignas(64) std::atomic<uint64_t> parkLatencyTotalNs{0};
         alignas(64) std::atomic<uint64_t> unparkLatencyTotalNs{0};
+        alignas(64) std::atomic<uint64_t> idleWaitCount{0};
+        alignas(64) std::atomic<uint64_t> idleWaitTotalNs{0};
 
         struct ParkedContinuation
         {
@@ -529,6 +531,14 @@ namespace Core::Tasks
         stats.UnparkCount = s_Ctx->unparkCount.load(std::memory_order_relaxed);
         stats.ParkLatencyTotalNs = s_Ctx->parkLatencyTotalNs.load(std::memory_order_relaxed);
         stats.UnparkLatencyTotalNs = s_Ctx->unparkLatencyTotalNs.load(std::memory_order_relaxed);
+        stats.IdleWaitCount = s_Ctx->idleWaitCount.load(std::memory_order_relaxed);
+        stats.IdleWaitTotalNs = s_Ctx->idleWaitTotalNs.load(std::memory_order_relaxed);
+        if (stats.TotalStealAttempts > 0)
+        {
+            stats.StealSuccessRatio =
+                static_cast<double>(stats.SuccessfulStealAttempts) /
+                static_cast<double>(stats.TotalStealAttempts);
+        }
 
         stats.WorkerLocalDepths.reserve(s_Ctx->workerStates.size());
         stats.WorkerVictimStealCounts.reserve(s_Ctx->workerStates.size());
@@ -604,7 +614,12 @@ namespace Core::Tasks
             }
             else
             {
+                const auto idleWaitStart = std::chrono::steady_clock::now();
                 s_Ctx->workSignal.wait(lastSignal);
+                const auto idleWaitNs = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                    std::chrono::steady_clock::now() - idleWaitStart).count();
+                s_Ctx->idleWaitCount.fetch_add(1, std::memory_order_relaxed);
+                s_Ctx->idleWaitTotalNs.fetch_add(static_cast<uint64_t>(idleWaitNs), std::memory_order_relaxed);
                 lastSignal = s_Ctx->workSignal.load(std::memory_order_acquire);
                 localPopBudget = FairnessInterval;
             }

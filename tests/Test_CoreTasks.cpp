@@ -418,6 +418,10 @@ TEST(CoreTasks, SchedulerStatsExposeQueueAndStealTelemetry)
               static_cast<uint64_t>(taskCount));
     EXPECT_EQ(stats.WorkerLocalDepths.size(), 2u);
     EXPECT_EQ(stats.WorkerVictimStealCounts.size(), 2u);
+    EXPECT_GE(stats.StealSuccessRatio, 0.0);
+    EXPECT_LE(stats.StealSuccessRatio, 1.0);
+    EXPECT_GE(stats.IdleWaitCount, 0u);
+    EXPECT_GE(stats.IdleWaitTotalNs, 0u);
 
     Scheduler::Shutdown();
 }

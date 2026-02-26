@@ -140,15 +140,8 @@ Implementation notes:
 
 #### Execution work packages (implementation-ready)
 
-**WP3 — Dependency counter wake wiring**
-- **Status (2026-02-26): In progress.** Counter wake path rearms wait tokens correctly when `CounterEvent::Add()` transitions from ready (`count == 0`) back to pending (`count > 0`), and `CounterEvent::Signal()` now performs saturating CAS decrement so wakeups only occur on the true transition to zero.
-- Encode wake path as branch-light fast path:
-  - non-zero result => return
-  - zero result => CAS + ready enqueue
-- Keep wake logic sharded (per-worker/per-token shard) to reduce fan-in cache-line contention.
-- Exit criteria: zero lost wakeups, zero duplicate enqueue on randomized high-fan-in DAG stress.
-
 **WP4 — Telemetry + SLO instrumentation**
+- **Status (2026-02-26): In progress.** Scheduler stats now publish steal success ratio and idle wait totals/counts; park/unpark percentile buckets remain to be wired into the telemetry export path.
 - Emit per-frame counters/histograms:
   - `tasks.park.count`, `tasks.unpark.count`
   - `tasks.park.ns.{p50,p95,p99}`, `tasks.unpark.ns.{p50,p95,p99}`
