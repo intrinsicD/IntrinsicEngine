@@ -34,12 +34,13 @@ Near-term priority now shifts from scheduler substrate work to rendering infrast
 **What still works (CPU-side only):**
 - **`Geometry.PointCloud` module** (`Geometry.PointCloud.cppm/.cpp`): First-class `Cloud` data structure with positions, normals, colors, radii. Operations: `ComputeBoundingBox`, `ComputeStatistics` (with KNN-based spacing), `VoxelDownsample` (O(n) hash-based), `EstimateRadii` (Octree-accelerated kNN density estimation), `RandomSubsample` (deterministic Fisher-Yates).
 
-**Re-implementation plan (retained-mode, shared-buffer-first):**
+**Re-implementation plan (retained-mode, BDA vertex pulling, shared-buffer-first):**
 - `PointCloudRenderer::Component` holds a `GeometryHandle` pointing to `GeometryGpuData` with `PrimitiveTopology::Points`.
-- **Shared-buffer contract:** For mesh-derived vertex visualization, `ReuseVertexBuffersFrom = meshHandle` — zero additional vertex upload, shares the same `std::shared_ptr<VulkanBuffer>`. For standalone point clouds (`.xyz`, `.pcd`, `.ply`), upload positions/normals once via `GeometryUploadRequest` → `GeometryGpuData::CreateAsync()` → device-local. No per-frame re-upload.
+- **BDA-based shared-buffer contract:** For mesh-derived vertex visualization, `ReuseVertexBuffersFrom = meshHandle` — zero additional vertex upload, shares the same `std::shared_ptr<VulkanBuffer>` and device address. The point cloud vertex shader reads positions from the mesh's existing buffer via `GL_EXT_buffer_reference` (BDA pointer in push constants), exactly as `ForwardPass` already reads mesh vertex data. For standalone point clouds (`.xyz`, `.pcd`, `.ply`), upload positions/normals once via `GeometryUploadRequest` → `GeometryGpuData::CreateAsync()` → device-local with `VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT`. No per-frame re-upload.
+- **Separate VkPipeline:** Point cloud rendering needs its own pipeline with a billboard-expansion vertex shader (6 verts/point). `VK_PRIMITIVE_TOPOLOGY_POINT_LIST` alone gives 1px dots — the expansion shader is required for visible, properly-sized points.
 - Lifecycle system allocates `GPUScene` slots, syncs transforms, participates in frustum culling — same path as `MeshRendererLifecycle`.
 - GPU point layout: 32 bytes `{vec3 pos, float size, vec3 normal, uint packedColor}`.
-- Vertex-shader billboard expansion (6 verts/point, no geometry shader).
+- Vertex-shader billboard expansion (6 verts/point, no geometry shader). Positions read via BDA from shared buffer.
 - Rendering modes: flat disc (screen-aligned billboard), surfel (normal-oriented disc), EWA splatting (Zwicker et al. 2001).
 - Pipeline registration in `DefaultPipeline`, gated by `FeatureRegistry`.
 - Future work: Gaussian Splatting (3DGS) compute rasterizer, Potree-style octree LOD streaming, depth peeling for OIT.
@@ -73,15 +74,16 @@ Near-term priority now shifts from scheduler substrate work to rendering infrast
 - Hierarchical layered embedding (`ComputeHierarchicalLayout()`) with crossing diagnostics and diameter-aware auto-rooting.
 - General 2D embedding crossing counter (`CountEdgeCrossings()`).
 
-**Re-implementation plan (two-tier architecture):**
+**Re-implementation plan (two-tier architecture, BDA vertex pulling):**
 
-*Tier 1 — Retained-mode views (shared-buffer-first, like meshes):*
-- **Shared-buffer contract:** One vertex buffer on the GPU, multiple index buffers with different topologies. A mesh uploads positions/normals once; wireframe, vertex, and graph views all `ReuseVertexBuffersFrom` that mesh handle — zero vertex duplication. Each view owns its own index buffer and `GeometryHandle`.
-- Wireframe view: extract unique edge pairs once → `GeometryViewRenderer` with `ReuseVertexBuffersFrom = meshHandle`, `PrimitiveTopology::Lines`, persisted edge index buffer. No per-frame CPU extraction.
-- Vertex view: `ReuseVertexBuffersFrom = meshHandle`, `PrimitiveTopology::Points`, trivial or direct draw.
-- `GraphRenderer::Component`: wraps `Geometry::Graph` as a line view (edges) + point view (nodes) sharing vertex buffers. Layout algorithms produce positions; GPU upload once, update only on layout change.
+*Tier 1 — Retained-mode views (BDA shared-buffer-first, like meshes):*
+- **BDA-based shared-buffer contract:** One device-local vertex buffer on the GPU, multiple index buffers with different topologies. A mesh uploads positions/normals once; wireframe, vertex, and graph views all `ReuseVertexBuffersFrom` that mesh handle — zero vertex duplication. Each topology view gets its **own VkPipeline** with its own vertex shader that reads from the shared buffer via BDA (`GL_EXT_buffer_reference` pointer in push constants), exactly as `ForwardPass` does for triangle meshes. The sharing is at the data level (same `VulkanBuffer`, same device address), not at the pipeline level.
+- **Separate pipelines required:** `VK_PRIMITIVE_TOPOLOGY_LINE_LIST` gives 1px lines, `POINT_LIST` gives 1px dots. Thick anti-aliased lines and billboard points each need their own shader pipeline with vertex-shader expansion (6 verts/primitive).
+- Wireframe view: extract unique edge pairs once → `GeometryViewRenderer` with `ReuseVertexBuffersFrom = meshHandle`, persisted edge index buffer. Line vertex shader reads positions from mesh buffer via BDA, expands each segment to screen-space quad. No per-frame CPU extraction.
+- Vertex view: `ReuseVertexBuffersFrom = meshHandle`. Point vertex shader reads positions via BDA, expands to billboard quad.
+- `GraphRenderer::Component`: wraps `Geometry::Graph` as a line view (edges) + point view (nodes) sharing vertex buffers via BDA. Layout algorithms produce positions; GPU upload once, update only on layout change.
 - Lifecycle system allocates `GPUScene` slots per view, syncs transforms, frustum culling — same path as `MeshRendererLifecycle`.
-- Thick-line vertex shader expansion (6 verts/segment), anti-aliased fragment shader, push constants for line width + viewport.
+- Thick-line vertex shader expansion (6 verts/segment), anti-aliased fragment shader, push constants for line width + viewport + BDA pointers.
 
 *Tier 2 — Transient debug overlay (DebugDraw, rebuilt per frame):*
 - `DebugDraw` immediate-mode accumulator remains for genuinely transient debug visualization (octree, KD-tree, bounds, contact manifolds, convex hulls).

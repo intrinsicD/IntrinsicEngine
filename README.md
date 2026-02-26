@@ -96,8 +96,8 @@ All operators follow a consistent contract: `Params` struct with defaults, `Resu
   - No loader thread ever calls `vkWaitForFences` for texture uploads.
 - **GPUScene:** Retained-mode instance table with independent slot allocation/deallocation.
 - **Dynamic Rendering:** No `VkRenderPass` or `VkFramebuffer`; fully dynamic attachment binding.
-- **Line/Graph Rendering:** First-class retained-mode line entities (same tier as meshes) via `GeometryGpuData` with `PrimitiveTopology::Lines`, `GPUScene` slots, and lifecycle systems. Wireframe as a persistent "view" sharing mesh vertex buffers with edge index topology. Graph entities (`GraphRenderer::Component`) wrap `Geometry::Graph` with CPU-side layout algorithms (force-directed, spectral, hierarchical) and persistent GPU buffers. **Currently broken — pending re-implementation under this retained-mode architecture.**
-- **Point Cloud Rendering:** First-class retained-mode point entities via `GeometryGpuData` with `PrimitiveTopology::Points`. Rendering modes: flat disc, surfel, EWA splatting. **Currently broken — pending re-implementation.** The `Geometry.PointCloud` CPU module (data structures, downsampling, statistics) remains functional.
+- **Line/Graph Rendering:** First-class retained-mode line entities (same tier as meshes) with own `VkPipeline` reading shared vertex buffers via BDA, `GPUScene` slots, and lifecycle systems. Wireframe as a persistent "view" sharing mesh vertex buffers (same device address) with edge index topology; vertex shader expands segments to screen-space quads (6 verts/segment). Graph entities (`GraphRenderer::Component`) wrap `Geometry::Graph` with CPU-side layout algorithms (force-directed, spectral, hierarchical) and persistent GPU buffers. **Currently broken — pending re-implementation under this BDA shared-buffer architecture.**
+- **Point Cloud Rendering:** First-class retained-mode point entities with own `VkPipeline` reading shared vertex buffers via BDA. Vertex shader expands points to billboard quads (6 verts/point). Rendering modes: flat disc, surfel, EWA splatting. **Currently broken — pending re-implementation.** The `Geometry.PointCloud` CPU module (data structures, downsampling, statistics) remains functional.
 - **DebugDraw:** Immediate-mode transient overlay for debug visualization (octree, KD-tree, bounds, contact manifolds, convex hulls) via per-frame SSBO upload + `LineRenderPass`. **Currently broken — depends on line rendering re-implementation.**
 - **Graph Processing (CPU):** Halfedge-based graph topology with Octree-accelerated kNN construction, force-directed 2D layout, spectral embedding (combinatorial/symmetric-normalized Laplacian), hierarchical layered layout with crossing diagnostics and diameter-aware auto-rooting.
 - **Selection Outlines:** Post-process contour highlight for selected/hovered entities.
@@ -355,33 +355,34 @@ Common editor panels live in `src/Runtime/EditorUI/` and are registered from the
 
 Add a new panel by calling `Interface::GUI::RegisterPanel("My Panel", []{ ... });` from `Runtime.EditorUI`.
 
-## Shared-Buffer Multi-Topology Rendering
+## Shared-Buffer Multi-Topology Rendering (BDA Vertex Pulling)
 
-One vertex buffer on the GPU, multiple index buffers with different topologies referencing into it. This is the core rendering architecture for all geometry types — not just meshes.
+One device-local vertex buffer on the GPU, multiple index buffers with different topologies referencing into it. This is the core rendering architecture for all geometry types — not just meshes.
 
-A mesh entity uploads positions/normals **once**. All visualization modes are **views** sharing that same `std::shared_ptr<VulkanBuffer>`:
+**Data sharing works via buffer device addresses (BDA), not `vkCmdBindVertexBuffers`.** The engine uses programmable vertex pulling throughout — `ForwardPass` reads positions/normals via `GL_EXT_buffer_reference` pointers passed in push constants. Each topology view gets its own `VkPipeline` with its own vertex shader that reads from the shared buffer via the same BDA pointer:
 
-| View | Topology | Index buffer | Vertex buffer |
-|------|----------|-------------|---------------|
-| Surface mesh | `Triangles` | Triangle indices (original) | Shared |
-| Wireframe | `Lines` | Unique edge pairs (extracted once) | Shared |
-| Vertex visualization | `Points` | Identity / direct draw | Shared |
-| kNN graph | `Lines` | Neighbor edge pairs | Shared |
-| Standalone point cloud | `Points` | Direct draw | Own (uploaded once) |
+| View | Pipeline | Vertex shader reads via BDA | Index buffer |
+|------|----------|-----------------------------|-------------|
+| Surface mesh | `ForwardPass` | `positions[gl_VertexIndex]` | Triangle indices |
+| Wireframe | `LineRenderPass` (retained) | `positions[edgeIdx]` → expand to quad (6v/seg) | Unique edge pairs |
+| Vertex visualization | `PointCloudRenderPass` | `positions[pointID]` → expand to billboard (6v/pt) | Identity / direct draw |
+| kNN graph | `LineRenderPass` (retained) | Same line shader | Neighbor edge pairs |
+| Standalone point cloud | `PointCloudRenderPass` | Own buffer via BDA | Direct draw |
 
-Zero vertex duplication for mesh-derived views. Each view owns its own `GeometryHandle`, `GPUScene` slot, and participates in frustum culling independently. The `GeometryPool`/`GPUScene` retained-mode system is topology-agnostic.
+Zero vertex duplication for mesh-derived views — same `std::shared_ptr<VulkanBuffer>`, same device address. Each topology requires a separate shader pipeline because thick lines and billboard points need vertex-shader expansion (6 verts/primitive); `VK_PRIMITIVE_TOPOLOGY_LINE_LIST`/`POINT_LIST` alone produce only 1px primitives.
 
-Only `DebugDraw` content (octree, bounds, contact manifold overlays) uses per-frame transient SSBO uploads — everything else is retained.
+Each view owns its own `GeometryHandle`, `GPUScene` slot, and participates in frustum culling independently. The `GeometryPool`/`GPUScene` retained-mode system is topology-agnostic. Only `DebugDraw` content (octree, bounds, contact manifold overlays) uses per-frame transient SSBO uploads — everything else is retained.
 
-**Current status:** All non-mesh rendering pipelines (`LineRenderPass`, wireframe, `PointCloudRenderPass`) are **broken** and pending re-implementation under this architecture. CPU-side modules (`Geometry.PointCloud`, `Geometry.Graph` layout algorithms) remain functional. See `TODO.md` for the detailed plan.
+**Current status:** All non-mesh rendering pipelines (`LineRenderPass`, wireframe, `PointCloudRenderPass`) are **broken** and pending re-implementation under this BDA shared-buffer architecture. CPU-side modules (`Geometry.PointCloud`, `Geometry.Graph` layout algorithms) remain functional. See `TODO.md` for the detailed plan.
 
 ### Key API
 
 - `Graphics::GeometryUploadRequest`:
   - `Geometry::GeometryHandle ReuseVertexBuffersFrom` (optional)
-    - If valid, the upload request **reuses the vertex buffer + layout** from the referenced geometry.
+    - If valid, the upload request **reuses the vertex buffer (same `std::shared_ptr<VulkanBuffer>`, same device address)** from the referenced geometry.
     - When set, `Positions/Normals/Aux` spans are ignored.
     - `Indices` are **always uploaded** and remain unique per view.
+    - The view's vertex shader reads from the shared buffer via BDA — the same `uint64_t` device address as the source mesh.
 
 - `Graphics::GeometryGpuData::CreateAsync(...)`:
   - Adds an optional `const Graphics::GeometryPool* existingPool` argument.
@@ -390,20 +391,25 @@ Only `DebugDraw` content (octree, bounds, contact manifold overlays) uses per-fr
 ### Example: Create a wireframe view from an existing mesh
 
 ```cpp
+// CPU side: create the view with shared vertex buffer
 Graphics::GeometryUploadRequest req;
 req.ReuseVertexBuffersFrom = sourceMeshHandle;
 req.Indices = edgeIndexPairs;  // unique edges, extracted once
 req.Topology = Graphics::PrimitiveTopology::Lines;
 
 auto [gpuData, token] = Graphics::GeometryGpuData::CreateAsync(
-    device,
-    transferManager,
-    req,
-    &geometryPool);
+    device, transferManager, req, &geometryPool);
 
 auto wireframeHandle = geometryPool.Add(std::move(gpuData));
+
+// GPU side: the line vertex shader reads positions via BDA
+// (same device address as ForwardPass uses for the mesh):
+//   PosBuf pBuf = PosBuf(push.ptrPos);  // GL_EXT_buffer_reference
+//   vec3 p0 = pBuf.v[edgeIndices[lineID * 2 + 0]];
+//   vec3 p1 = pBuf.v[edgeIndices[lineID * 2 + 1]];
+//   // ... expand to screen-space quad (6 verts/segment)
 ```
 
 ### Lifetime semantics
 
-Because the vertex/index buffers are stored as `std::shared_ptr<RHI::VulkanBuffer>` inside `GeometryGpuData`, GPU memory remains alive until **all** views using that buffer are destroyed.
+Because the vertex/index buffers are stored as `std::shared_ptr<RHI::VulkanBuffer>` inside `GeometryGpuData`, GPU memory remains alive until **all** views using that buffer are destroyed. The BDA pointer remains valid as long as the underlying `VulkanBuffer` is alive.
