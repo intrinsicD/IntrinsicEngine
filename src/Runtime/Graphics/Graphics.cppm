@@ -22,6 +22,7 @@ export import :DebugDraw;
 export import :OctreeDebugDraw;
 export import :BoundingDebugDraw;
 export import :KDTreeDebugDraw;
+export import :ConvexHullDebugDraw;
 
 // NOTE: We intentionally do NOT re-export pipeline implementations here.
 // Import `Graphics.Pipelines` explicitly in apps/tools when you need DefaultPipeline/etc.

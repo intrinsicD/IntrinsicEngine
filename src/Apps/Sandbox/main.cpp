@@ -69,6 +69,7 @@ public:
 
     Graphics::KDTreeDebugDrawSettings m_KDTreeDebugSettings{};
     bool m_DrawSelectedColliderKDTree = false;
+    bool m_DrawSelectedColliderConvexHull = false;
     bool m_DrawSelectedColliderContacts = false;
     bool m_ContactDebugOverlay = true;
     float m_ContactNormalScale = 0.3f;
@@ -77,6 +78,11 @@ public:
     Geometry::KDTree m_SelectedColliderKDTree{};
     entt::entity m_SelectedKDTreeEntity = entt::null;
     const Graphics::GeometryCollisionData* m_SelectedKDTreeSource = nullptr;
+
+    Graphics::ConvexHullDebugDrawSettings m_ConvexHullDebugSettings{};
+    Geometry::Halfedge::Mesh m_SelectedColliderHullMesh{};
+    entt::entity m_SelectedHullEntity = entt::null;
+    const Graphics::GeometryCollisionData* m_SelectedHullSource = nullptr;
 
 
     bool EnsureSelectedColliderKDTree(entt::entity selected,
@@ -107,6 +113,38 @@ public:
 
         m_SelectedKDTreeEntity = selected;
         m_SelectedKDTreeSource = &collision;
+        return true;
+    }
+
+    bool EnsureSelectedColliderConvexHull(entt::entity selected,
+                                         const Graphics::GeometryCollisionData& collision)
+    {
+        const bool cacheValid =
+            (m_SelectedHullEntity == selected) &&
+            (m_SelectedHullSource == &collision) &&
+            !m_SelectedColliderHullMesh.IsEmpty();
+
+        if (cacheValid)
+            return true;
+
+        m_SelectedColliderHullMesh = Geometry::Halfedge::Mesh{};
+        m_SelectedHullEntity = entt::null;
+        m_SelectedHullSource = nullptr;
+
+        if (collision.Positions.size() < 4)
+            return false;
+
+        Geometry::ConvexHullBuilder::ConvexHullParams params{};
+        params.BuildMesh = true;
+        params.ComputePlanes = false;
+
+        auto hull = Geometry::ConvexHullBuilder::Build(collision.Positions, params);
+        if (!hull || hull->Mesh.IsEmpty())
+            return false;
+
+        m_SelectedColliderHullMesh = std::move(hull->Mesh);
+        m_SelectedHullEntity = selected;
+        m_SelectedHullSource = &collision;
         return true;
     }
 
@@ -341,6 +379,7 @@ public:
             ImGui::Checkbox("Draw Selected MeshCollider Octree", &m_DrawSelectedColliderOctree);
             ImGui::Checkbox("Draw Selected MeshCollider Bounds", &m_DrawSelectedColliderBounds);
             ImGui::Checkbox("Draw Selected MeshCollider KD-Tree", &m_DrawSelectedColliderKDTree);
+            ImGui::Checkbox("Draw Selected MeshCollider Convex Hull", &m_DrawSelectedColliderConvexHull);
             ImGui::Checkbox("Draw Contact Manifolds", &m_DrawSelectedColliderContacts);
             ImGui::Checkbox("Bounds Overlay (no depth test)", &m_BoundsDebugSettings.Overlay);
             ImGui::Checkbox("Draw World AABB", &m_BoundsDebugSettings.DrawAABB);
@@ -381,6 +420,13 @@ public:
             if (ImGui::ColorEdit3("KD Split Color", kdSplitColor))
                 m_KDTreeDebugSettings.SplitPlaneColor = glm::vec3(kdSplitColor[0], kdSplitColor[1], kdSplitColor[2]);
 
+            ImGui::SeparatorText("Convex Hull");
+            ImGui::Checkbox("Hull Overlay (no depth test)", &m_ConvexHullDebugSettings.Overlay);
+            ImGui::SliderFloat("Hull Alpha", &m_ConvexHullDebugSettings.Alpha, 0.05f, 1.0f, "%.2f");
+            float hullColor[3] = {m_ConvexHullDebugSettings.Color.r, m_ConvexHullDebugSettings.Color.g, m_ConvexHullDebugSettings.Color.b};
+            if (ImGui::ColorEdit3("Hull Color", hullColor))
+                m_ConvexHullDebugSettings.Color = glm::vec3(hullColor[0], hullColor[1], hullColor[2]);
+
             ImGui::SeparatorText("Octree");
             ImGui::Checkbox("Overlay (no depth test)", &m_OctreeDebugSettings.Overlay);
             ImGui::Checkbox("Leaf Only", &m_OctreeDebugSettings.LeafOnly);
@@ -406,7 +452,7 @@ public:
             // The settings above will take effect on the next frame.
 
             // Show status feedback
-            if (m_DrawSelectedColliderOctree || m_DrawSelectedColliderBounds || m_DrawSelectedColliderKDTree)
+            if (m_DrawSelectedColliderOctree || m_DrawSelectedColliderBounds || m_DrawSelectedColliderKDTree || m_DrawSelectedColliderConvexHull)
             {
                 const entt::entity selected = GetSelection().GetSelectedEntity(GetScene());
                 if (selected == entt::null || !GetScene().GetRegistry().valid(selected))
@@ -549,7 +595,7 @@ public:
         // Debug Visualization: emit DebugDraw geometry BEFORE render system runs.
         // ImGui panels run AFTER render, so we emit here using settings from last frame.
         // ---------------------------------------------------------------------
-        if (m_DrawSelectedColliderOctree || m_DrawSelectedColliderBounds || m_DrawSelectedColliderKDTree || m_DrawSelectedColliderContacts)
+        if (m_DrawSelectedColliderOctree || m_DrawSelectedColliderBounds || m_DrawSelectedColliderKDTree || m_DrawSelectedColliderConvexHull || m_DrawSelectedColliderContacts)
         {
             const entt::entity selected = GetSelection().GetSelectedEntity(GetScene());
             if (selected != entt::null && GetScene().GetRegistry().valid(selected))
@@ -590,6 +636,20 @@ public:
                                        m_SelectedColliderKDTree,
                                        m_KDTreeDebugSettings,
                                        worldMatrix);
+                        }
+                    }
+
+
+                    if (m_DrawSelectedColliderConvexHull)
+                    {
+                        m_ConvexHullDebugSettings.Enabled = true;
+                        if (EnsureSelectedColliderConvexHull(selected, *collider->CollisionRef))
+                        {
+                            const glm::mat4 worldMatrix = GetMatrix(*xf);
+                            DrawConvexHull(GetRenderOrchestrator().GetDebugDraw(),
+                                           m_SelectedColliderHullMesh,
+                                           m_ConvexHullDebugSettings,
+                                           worldMatrix);
                         }
                     }
 
