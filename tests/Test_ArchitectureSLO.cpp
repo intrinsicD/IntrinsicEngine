@@ -2,7 +2,9 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cstdint>
+#include <thread>
 #include <vector>
 
 import Core;
@@ -89,4 +91,70 @@ TEST(ArchitectureSLO, FrameGraphP95P99BudgetsAt2000Nodes)
     EXPECT_LT(compileP99, kCompileP99BudgetNs);
     EXPECT_LT(executeP95, kExecuteP95BudgetNs);
     EXPECT_LT(criticalP95, kCriticalP95BudgetNs);
+}
+
+TEST(ArchitectureSLO, TaskSchedulerContentionAndWakeLatencyBudgets)
+{
+    constexpr int kWorkerCount = 8;
+    constexpr int kDispatchThreads = 4;
+    constexpr int kTasksPerThread = 3000;
+
+    Tasks::Scheduler::Initialize(kWorkerCount);
+
+    std::atomic<uint64_t> executed{0};
+    std::vector<std::thread> dispatchers;
+    dispatchers.reserve(kDispatchThreads);
+
+    for (int t = 0; t < kDispatchThreads; ++t)
+    {
+        dispatchers.emplace_back([&executed] {
+            for (int i = 0; i < kTasksPerThread; ++i)
+            {
+                Tasks::Scheduler::Dispatch([&executed] {
+                    // Keep this tiny to maintain a saturated queue with frequent steals/contention.
+                    executed.fetch_add(1, std::memory_order_relaxed);
+                });
+            }
+        });
+    }
+
+    for (auto& dispatcher : dispatchers)
+        dispatcher.join();
+
+    Tasks::CounterEvent event{1};
+    constexpr int kWaiterCount = 512;
+    std::atomic<uint64_t> resumedWaiters{0};
+    for (int i = 0; i < kWaiterCount; ++i)
+    {
+        Tasks::Scheduler::Dispatch([&event, &resumedWaiters]() -> Tasks::Job {
+            co_await Tasks::WaitFor(event);
+            resumedWaiters.fetch_add(1, std::memory_order_relaxed);
+            co_return;
+        }());
+    }
+
+    // Block without spin until at least one coroutine has parked.
+    Tasks::Scheduler::ParkCountAtomic().wait(0, std::memory_order_acquire);
+    event.Signal();
+
+    Tasks::Scheduler::WaitForAll();
+    const auto stats = Tasks::Scheduler::GetStats();
+    Tasks::Scheduler::Shutdown();
+
+    EXPECT_EQ(executed.load(std::memory_order_relaxed),
+              static_cast<uint64_t>(kDispatchThreads * kTasksPerThread));
+    EXPECT_EQ(resumedWaiters.load(std::memory_order_relaxed), static_cast<uint64_t>(kWaiterCount));
+
+    // SLO gates from docs/ARCHITECTURE_SLOS.md section 2.
+    constexpr double kStealRatioMin = 0.20;
+    constexpr double kStealRatioMax = 0.65;
+    constexpr uint64_t kQueueContentionP95Ceiling = 4'096;
+    constexpr uint64_t kIdleWaitCeilingNs = 700'000;
+    constexpr uint64_t kWakeLatencyTailCeilingNs = 80'000;
+
+    EXPECT_GE(stats.StealSuccessRatio, kStealRatioMin);
+    EXPECT_LE(stats.StealSuccessRatio, kStealRatioMax);
+    EXPECT_LT(stats.QueueContentionCount, kQueueContentionP95Ceiling);
+    EXPECT_LT(stats.IdleWaitTotalNs, kIdleWaitCeilingNs);
+    EXPECT_LT(stats.UnparkLatencyP99Ns, kWakeLatencyTailCeilingNs);
 }
