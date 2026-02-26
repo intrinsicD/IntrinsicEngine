@@ -157,6 +157,7 @@ namespace Core::Tasks
         static bool ParkCurrentFiberIfNotReady(WaitToken token, std::coroutine_handle<> h,
                                                std::shared_ptr<std::atomic<bool>> alive = nullptr);
         static uint32_t UnparkReady(WaitToken token);
+        static void MarkWaitTokenNotReady(WaitToken token);
         static uint32_t DrainReadyFromWaitQueues(uint32_t budget = 16);
 
     private:
