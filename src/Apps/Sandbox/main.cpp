@@ -816,7 +816,7 @@ public:
 
     // =========================================================================
     // SpawnDemoPointCloud — Create a hemisphere point cloud entity with normals,
-    // colors, and estimated radii for testing surfel/EWA/Gaussian rendering.
+    // colors, and estimated radii for testing point rendering.
     // =========================================================================
     void SpawnDemoPointCloud()
     {
@@ -890,7 +890,7 @@ public:
         pc.Colors    = std::vector<glm::vec4>(colors.begin(),    colors.end());
         if (radiiResult)
             pc.Radii = std::move(radiiResult->Radii);
-        pc.RenderMode = Geometry::PointCloud::RenderMode::Surfel;
+        pc.RenderMode = Geometry::PointCloud::RenderMode::FlatDisc;
         pc.DefaultRadius = 0.02f;
         pc.SizeMultiplier = 1.0f;
 
@@ -1259,27 +1259,7 @@ public:
                             if (vis->ShowVertices)
                             {
                                 ImGui::SeparatorText("Vertex Settings");
-                                {
-                                    const char* modes[] = {"Flat Disc", "Surfel", "EWA (Elliptical)", "Gaussian Splat"};
-                                    int mode = static_cast<int>(vis->VertexRenderMode);
-                                    if (ImGui::Combo("Vertex Mode", &mode, modes, 4))
-                                    {
-                                        vis->VertexRenderMode = static_cast<Geometry::PointCloud::RenderMode>(mode);
-                                        // Invalidate the GPU vertex view on every mode change.
-                                        // Splat modes (Surfel/EWA/GaussianSplat) require the CPU
-                                        // PointCloudRenderPass path — the GPU ForwardPass point-list
-                                        // path only supports flat unlit points (FlatDisc).
-                                        // Clearing the view forces MeshRenderPass to re-evaluate.
-                                        vis->VertexView = {};
-                                        vis->VertexViewDirty = true;
-                                        // Invalidate the vertex normal cache so MeshRenderPass
-                                        // recomputes normals for the new mode (surfel/EWA need them,
-                                        // flat/gaussian don't but it costs nothing to recompute lazily).
-                                        vis->VertexNormalsDirty = true;
-                                        if (viewR) viewR->Vertices = {};
-                                        reg.emplace_or_replace<ECS::Components::Transform::WorldUpdatedTag>(selected);
-                                    }
-                                }
+                                vis->VertexRenderMode = Geometry::PointCloud::RenderMode::FlatDisc;
 
                                 ImGui::SliderFloat("Vertex Size", &vis->VertexSize, 0.0005f, 0.05f, "%.5f", ImGuiSliderFlags_Logarithmic);
                                 float vc[4] = {vis->VertexColor.r, vis->VertexColor.g, vis->VertexColor.b, vis->VertexColor.a};
@@ -1366,11 +1346,7 @@ public:
                                 }
                             }
 
-                            // (2) Vertex view (Points): only create the GPU view for FlatDisc.
-                            // Surfel, EWA, and GaussianSplat require the CPU PointCloudRenderPass
-                            // path (normals, per-point conic, Gaussian weight) which ForwardPass
-                            // cannot provide. Keeping VertexView empty forces MeshRenderPass to
-                            // use the CPU splat submission path for those modes.
+                            // (2) Vertex view (Points): create the GPU view for FlatDisc points.
                             const bool wantGpuVertexView =
                                 vis->ShowVertices &&
                                 (vis->VertexRenderMode == Geometry::PointCloud::RenderMode::FlatDisc);
@@ -1411,7 +1387,7 @@ public:
                             if (viewR)
                             {
                                 viewR->Wireframe = vis->WireframeView;
-                                // Only publish the vertex view for FlatDisc; splat modes use the CPU path.
+                                // Only publish the vertex view for FlatDisc.
                                 viewR->Vertices = wantGpuVertexView ? vis->VertexView : Geometry::GeometryHandle{};
                             }
                         }
@@ -1433,12 +1409,7 @@ public:
                     ImGui::SeparatorText("Rendering");
                     ImGui::Checkbox("Visible", &pc.Visible);
 
-                    {
-                        const char* modes[] = {"Flat Disc", "Surfel", "EWA (Elliptical)", "Gaussian Splat"};
-                        int mode = static_cast<int>(pc.RenderMode);
-                        if (ImGui::Combo("Render Mode", &mode, modes, 4))
-                            pc.RenderMode = static_cast<Geometry::PointCloud::RenderMode>(mode);
-                    }
+                    pc.RenderMode = Geometry::PointCloud::RenderMode::FlatDisc;
 
                     ImGui::SliderFloat("Default Radius", &pc.DefaultRadius, 0.0005f, 0.1f, "%.5f", ImGuiSliderFlags_Logarithmic);
                     ImGui::SliderFloat("Size Multiplier", &pc.SizeMultiplier, 0.1f, 10.0f, "%.2f", ImGuiSliderFlags_Logarithmic);

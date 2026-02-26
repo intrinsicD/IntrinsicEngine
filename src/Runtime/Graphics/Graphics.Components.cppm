@@ -57,9 +57,6 @@ export namespace ECS::MeshCollider
 //
 // Rendering modes:
 //   0 = Flat disc (screen-aligned billboard, constant pixel radius)
-//   1 = Surfel (oriented disc from surface normal, with lighting)
-//   2 = EWA splatting (perspective-correct Gaussian elliptical splats)
-//   3 = Gaussian Splat (isotropic Gaussian blob, smooth opacity falloff)
 
 export namespace ECS::PointCloudRenderer
 {
@@ -138,7 +135,6 @@ export namespace ECS::RenderVisualization
 
         // ---- Vertex Normal Cache (internal, rebuilt lazily) ----
         // Area-weighted vertex normals computed from collision mesh triangles.
-        // Used by PointCloudRenderPass for surfel/EWA orientation.
         std::vector<glm::vec3> CachedVertexNormals;
         bool VertexNormalsDirty = true;
 

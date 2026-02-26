@@ -459,8 +459,6 @@ TEST(PointCloud_Subsample, IndicesAreValid)
 TEST(PointCloud_RenderMode, EnumValues)
 {
     EXPECT_EQ(static_cast<uint32_t>(Geometry::PointCloud::RenderMode::FlatDisc), 0u);
-    EXPECT_EQ(static_cast<uint32_t>(Geometry::PointCloud::RenderMode::Surfel), 1u);
-    EXPECT_EQ(static_cast<uint32_t>(Geometry::PointCloud::RenderMode::EWA), 2u);
 }
 
 // =============================================================================

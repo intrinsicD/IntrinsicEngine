@@ -66,17 +66,10 @@ namespace Graphics::Passes
         if (!data || count == 0)
             return;
 
-        const uint32_t m = static_cast<uint32_t>(mode);
-        if (m < 4)
-        {
-            auto& dst = m_StagingPointsByMode[m];
-            dst.insert(dst.end(), data, data + count);
-        }
-        else
-        {
-            // Fallback: preserve old behavior for unexpected mode values.
-            m_StagingPoints.insert(m_StagingPoints.end(), data, data + count);
-        }
+        if (mode != Geometry::PointCloud::RenderMode::FlatDisc)
+            return;
+
+        m_StagingPoints.insert(m_StagingPoints.end(), data, data + count);
     }
 
     // =========================================================================
@@ -98,10 +91,6 @@ namespace Graphics::Passes
         // Allocate per-frame descriptor sets (legacy path).
         AllocatePerFrameSets<FRAMES>(descriptorPool, m_PointSetLayout, m_PointDescSets);
 
-        // Allocate per-mode per-frame descriptor sets.
-        for (uint32_t m = 0; m < 4; ++m)
-            AllocatePerFrameSets<FRAMES>(descriptorPool, m_PointSetLayout, m_PointDescSetsByMode[m]);
-
     }
 
     // =========================================================================
@@ -113,10 +102,6 @@ namespace Graphics::Passes
         if (!m_Device) return;
 
         for (auto& buf : m_PointBuffers) buf.reset();
-        for (auto& buf : m_PointBuffersByMode[0]) buf.reset();
-        for (auto& buf : m_PointBuffersByMode[1]) buf.reset();
-        for (auto& buf : m_PointBuffersByMode[2]) buf.reset();
-        for (auto& buf : m_PointBuffersByMode[3]) buf.reset();
 
         m_Pipeline.reset();
 
@@ -135,12 +120,6 @@ namespace Graphics::Passes
     {
         return EnsurePerFrameBuffer<GpuPointData, FRAMES>(
             *m_Device, m_PointBuffers, m_BufferCapacity, requiredPoints, 1024, "PointCloudRenderPass");
-    }
-
-    bool PointCloudRenderPass::EnsureBufferMode(uint32_t modeIdx, uint32_t requiredPoints)
-    {
-        return EnsurePerFrameBuffer<GpuPointData, FRAMES>(
-            *m_Device, m_PointBuffersByMode[modeIdx], m_BufferCapacityByMode[modeIdx], requiredPoints, 1024, "PointCloudRenderPass");
     }
 
     // =========================================================================
@@ -267,47 +246,23 @@ namespace Graphics::Passes
             }
         }
 
-        // Helper: record one point draw batch for the given span and mode.
-        auto recordBatch = [&](std::span<const GpuPointData> pts, Geometry::PointCloud::RenderMode mode)
+        // Helper: record one point draw batch.
+        auto recordBatch = [&](std::span<const GpuPointData> pts)
         {
             if (pts.empty())
                 return;
 
-            const uint32_t modeIdx = static_cast<uint32_t>(mode);
-
             // Ensure SSBO capacity for this mode-batch.
             const uint32_t batchCount = static_cast<uint32_t>(pts.size());
 
-            // Each mode gets its own descriptor set to avoid the shared-descriptor
-            // overwrite bug when multiple modes are active in the same frame.
 
-            VkDescriptorSet batchDescSet = VK_NULL_HANDLE;
+            if (!EnsureBuffer(batchCount))
+                return;
 
-            if (modeIdx < 4)
-            {
-                if (!EnsureBufferMode(modeIdx, batchCount))
-                    return;
-
-                // Upload batch points into the mode-specific per-frame buffer.
-                m_PointBuffersByMode[modeIdx][frameIndex]->Write(pts.data(), pts.size_bytes());
-              
-                batchDescSet = m_PointDescSetsByMode[modeIdx][frameIndex];
-                UpdateSSBODescriptor(m_Device->GetLogicalDevice(), batchDescSet,0, 
-                                     m_PointBuffersByMode[modeIdx][frameIndex]->GetHandle(), pts.size_bytes());
-                batchDescSet = m_PointDescSetsByMode[modeIdx][frameIndex];
-            }
-            else
-            {
-                // Fallback path: unexpected mode — store in legacy buffer.
-                if (!EnsureBuffer(batchCount))
-                    return;
-
-                m_PointBuffers[frameIndex]->Write(pts.data(), pts.size_bytes());
-                batchDescSet = m_PointDescSets[frameIndex];
-                UpdateSSBODescriptor(m_Device->GetLogicalDevice(), batchDescSet,
-                                     0, m_PointBuffers[frameIndex]->GetHandle(), pts.size_bytes());
-                batchDescSet = m_PointDescSets[frameIndex];
-            }
+            m_PointBuffers[frameIndex]->Write(pts.data(), pts.size_bytes());
+            VkDescriptorSet batchDescSet = m_PointDescSets[frameIndex];
+            UpdateSSBODescriptor(m_Device->GetLogicalDevice(), batchDescSet,
+                                 0, m_PointBuffers[frameIndex]->GetHandle(), pts.size_bytes());
 
             // Fetch resource handles.
             const RGResourceHandle backbuffer = ctx.Blackboard.Get("Backbuffer"_id);
@@ -319,7 +274,6 @@ namespace Graphics::Passes
             // deferred during render graph execution, so reading from member
             // variables at that point would see stale/wrong values.
             const uint32_t localCount = batchCount;
-            const auto capturedMode = mode;
             const auto capturedDescSet = batchDescSet;
 
             ctx.Graph.AddPass<PointCloudPassData>("PointCloud",
@@ -335,7 +289,7 @@ namespace Graphics::Passes
                     depthInfo.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
                     data.Depth = builder.WriteDepth(depth, depthInfo);
                 },
-                [this, &ctx, frameIndex, localCount, capturedMode, capturedDescSet](const PointCloudPassData&, const RGRegistry&, VkCommandBuffer cmd)
+                [this, &ctx, frameIndex, localCount, capturedDescSet](const PointCloudPassData&, const RGRegistry&, VkCommandBuffer cmd)
 
                 {
                     const uint32_t dynamicOffset = static_cast<uint32_t>(ctx.GlobalCameraDynamicOffset);
@@ -345,18 +299,11 @@ namespace Graphics::Passes
                                dynamicOffset,
                                ctx.Resolution,
                                localCount,
-                               capturedMode);
+                               Geometry::PointCloud::RenderMode::FlatDisc);
                 });
         };
 
-        // Mode-batched draws (one GPU pass per non-empty mode).
-        recordBatch(std::span<const GpuPointData>(m_StagingPointsByMode[0].data(), m_StagingPointsByMode[0].size()), Geometry::PointCloud::RenderMode::FlatDisc);
-        recordBatch(std::span<const GpuPointData>(m_StagingPointsByMode[1].data(), m_StagingPointsByMode[1].size()), Geometry::PointCloud::RenderMode::Surfel);
-        recordBatch(std::span<const GpuPointData>(m_StagingPointsByMode[2].data(), m_StagingPointsByMode[2].size()), Geometry::PointCloud::RenderMode::EWA);
-        recordBatch(std::span<const GpuPointData>(m_StagingPointsByMode[3].data(), m_StagingPointsByMode[3].size()), Geometry::PointCloud::RenderMode::GaussianSplat);
-
-        // Back-compat staging bucket (uses current RenderMode).
         if (!m_StagingPoints.empty())
-            recordBatch(std::span<const GpuPointData>(m_StagingPoints.data(), m_StagingPoints.size()), RenderMode);
+            recordBatch(std::span<const GpuPointData>(m_StagingPoints.data(), m_StagingPoints.size()));
     }
 }

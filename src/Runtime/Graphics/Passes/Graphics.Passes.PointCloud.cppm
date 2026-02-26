@@ -19,22 +19,16 @@ import Geometry;
 export namespace Graphics::Passes
 {
     // -------------------------------------------------------------------------
-    // PointCloudRenderPass — GPU point cloud rendering with multi-mode splatting.
+    // PointCloudRenderPass — GPU point cloud rendering with flat-disc splats.
     // -------------------------------------------------------------------------
     //
     // Architecture:
     // - Collects point cloud data submitted via SubmitPoints() each frame.
     // - Data may originate from PointCloudRenderer entities, GraphRenderPass nodes,
-    //   or MeshRenderPass vertex overlays — all feed the same per-mode staging buffers.
+    //   or MeshRenderPass vertex overlays.
     // - Uploads point data to a host-visible SSBO each frame.
     // - Vertex shader expands each point into a screen-space billboard quad (6 verts).
-    // - Fragment shader renders circular/elliptical splats with anti-aliasing.
-    //
-    // Rendering Modes (selectable via push constants):
-    //   0 = Flat Disc      — screen-aligned billboard, constant pixel radius.
-    //   1 = Surfel         — oriented disc aligned to surface normal with lighting.
-    //   2 = EWA Splatting  — perspective-correct Gaussian elliptical splats (Zwicker et al. 2001).
-    //   3 = Gaussian Splat — isotropic Gaussian blob with smooth opacity falloff (3DGS-style).
+    // - Fragment shader renders circular flat-disc splats with anti-aliasing.
     //
     // Integration:
     // - Registered in DefaultPipeline after MeshRenderPass and GraphRenderPass collect stages.
@@ -90,30 +84,18 @@ export namespace Graphics::Passes
         void ResetPoints()
         {
             m_StagingPoints.clear();
-            m_StagingPointsByMode[0].clear();
-            m_StagingPointsByMode[1].clear();
-            m_StagingPointsByMode[2].clear();
-            m_StagingPointsByMode[3].clear();
         }
 
         // True if any mode has content.
         [[nodiscard]] bool HasContent() const
         {
-            return !m_StagingPoints.empty() ||
-                   !m_StagingPointsByMode[0].empty() ||
-                   !m_StagingPointsByMode[1].empty() ||
-                   !m_StagingPointsByMode[2].empty() ||
-                   !m_StagingPointsByMode[3].empty();
+            return !m_StagingPoints.empty();
         }
 
         // Total number of accumulated points across all modes.
         [[nodiscard]] uint32_t GetPointCount() const
         {
-            return static_cast<uint32_t>(m_StagingPoints.size() +
-                                         m_StagingPointsByMode[0].size() +
-                                         m_StagingPointsByMode[1].size() +
-                                         m_StagingPointsByMode[2].size() +
-                                         m_StagingPointsByMode[3].size());
+            return static_cast<uint32_t>(m_StagingPoints.size());
         }
 
         // Convenience: pack a single point from components.
@@ -153,19 +135,9 @@ export namespace Graphics::Passes
         static constexpr uint32_t FRAMES = RHI::VulkanDevice::GetFramesInFlight();
         VkDescriptorSet m_PointDescSets[FRAMES] = {};
 
-        // Per-mode per-frame descriptor sets (one per render mode × frame).
-        // Avoids the shared-descriptor bug where multiple mode batches
-        // overwrite the same set before deferred render graph execution.
-
-        VkDescriptorSet m_PointDescSetsByMode[4][FRAMES] = {};
-
         // Per-frame host-visible SSBOs.
         std::unique_ptr<RHI::VulkanBuffer> m_PointBuffers[FRAMES];
         uint32_t m_BufferCapacity = 0; // in points
-
-        // Per-frame host-visible SSBOs per render-mode (0..3).
-        std::unique_ptr<RHI::VulkanBuffer> m_PointBuffersByMode[4][FRAMES];
-        uint32_t m_BufferCapacityByMode[4] = {0, 0, 0, 0};
 
         // Lazily-built pipeline (with depth test).
         std::unique_ptr<RHI::GraphicsPipeline> m_Pipeline;
@@ -173,13 +145,8 @@ export namespace Graphics::Passes
         // CPU-side staging buffer — accumulated per frame.
         std::vector<GpuPointData> m_StagingPoints;
 
-        // Per-mode staging (0..3). Callers select mode via SubmitPoints(mode, ...).
-        // 0=FlatDisc  1=Surfel  2=EWA  3=GaussianSplat
-        std::vector<GpuPointData> m_StagingPointsByMode[4];
-
         // Ensure SSBO has capacity for the given point count.
         bool EnsureBuffer(uint32_t requiredPoints);
-        bool EnsureBufferMode(uint32_t modeIdx, uint32_t requiredPoints);
 
         // Build the graphics pipeline.
         std::unique_ptr<RHI::GraphicsPipeline> BuildPipeline(
