@@ -37,8 +37,9 @@ This document tracks **what's left to do** in IntrinsicEngine's architecture.
   - Keep current pool/high-water-mark reuse strategy while changing lookup structures.
 
 - [ ] **Resolve runtime API/ownership drift in orchestration paths (Medium).**
-  - Remove or fully wire `defaultTextureIndex` in `Runtime.RenderOrchestrator` constructor.
-  - Audit central runtime ownership boundaries and reduce `std::shared_ptr` usage where borrowed references or explicit owners are sufficient.
+  - [x] Remove or fully wire `defaultTextureIndex` in `Runtime.RenderOrchestrator` constructor.
+    - Status: constructor interface now omits the unused parameter; orchestration setup uses explicit subsystem ownership only.
+  - [ ] Audit central runtime ownership boundaries and reduce `std::shared_ptr` usage where borrowed references or explicit owners are sufficient.
 
 - [ ] **Establish architecture SLOs + telemetry milestones (Cross-cutting).**
   - Define measurable targets for DAG compile budget, scheduler contention/tail latency, and frame critical-path timing.
@@ -50,10 +51,9 @@ This section captures **newly observed inconsistencies** and concrete remediatio
 
 ### A. Coding style & syntax consistency
 
-- [ ] **Normalize TODO comment policy in production code (Medium).**
-  - There is an inline unresolved TODO in `Runtime.RenderOrchestrator` constructor about `defaultTextureIndex` ownership/use.
-  - TODOs should be tracked in this architecture backlog with acceptance criteria; code comments should reference an issue/backlog item ID, not open-ended questions.
-  - Action: either remove the parameter and call-site plumbing, or wire it to a concrete behavior (fallback material/texture path).
+- [x] **Normalize TODO comment policy in production code (Medium).**
+  - Resolved the inline unresolved TODO in `Runtime.RenderOrchestrator` by removing the dead `defaultTextureIndex` constructor parameter and associated ambiguity.
+  - TODOs should remain tracked in this architecture backlog with acceptance criteria; production code comments should reference a backlog item ID when intentionally deferred.
 
 - [ ] **Align modern C++ usage with stated C++23 standards (Medium).**
   - Current codebase uses `std::expected` but does not use monadic `.and_then/.transform` patterns; explicit object parameters are also absent.

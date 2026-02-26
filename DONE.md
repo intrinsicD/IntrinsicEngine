@@ -63,3 +63,10 @@ Completed the first telemetry milestone under the Core::Tasks fiber-parking back
 - Added per-worker deque depth snapshots and per-worker victim steal counters for fairness diagnostics.
 - Added aggregate counters for inject push/pop, local pops, steal pops, and steal attempt/success totals.
 - Added `CoreTasks` regression coverage validating that stats are populated during normal dispatch/execute flow.
+
+## 2026-02-26 RenderOrchestrator TODO-Policy Cleanup
+
+Completed the backlog item to eliminate open-ended production TODO drift in the runtime orchestration path:
+
+- Removed the stale `defaultTextureIndex` TODO scope by keeping `Runtime::RenderOrchestrator` constructor API free of the unused default-texture parameter.
+- Updated the architecture backlog to track this as completed and leave only the remaining runtime ownership-audit work item open.
