@@ -123,14 +123,16 @@ When architecture state changes, keep the architecture markdown documents synchr
 
 - **`TODO.md`** — open, actionable backlog items only (no long DONE narratives).
 - **`ROADMAP.md`** — medium/long-horizon feature planning and phase ordering.
-- **`DONE.md`** — completed architecture work summaries and historical rationale.
+- **Git history** — authoritative completion history and rationale for closed architecture work.
 
 For any implementation/configuration change that affects developer workflow, also update user-facing markdown docs in the same PR (at minimum **`README.md`**, and **`CLAUDE.md`** when agent behavior/contracts change).
 
 Do not leave markdown drift:
-- If a TODO is completed, remove it from `TODO.md` and record completion context in `DONE.md` (and roadmap ordering impact in `ROADMAP.md` when relevant).
+- If a TODO is completed, remove it from `TODO.md` and capture any roadmap ordering impact in `ROADMAP.md` when relevant (completion details remain in git history).
 - If build/configure flags or commands change, update README examples immediately.
 - If coding/review contracts change, update `CLAUDE.md` in the same commit series.
+
+`TODO.md` active-only policy is enforced automatically in CI by `tools/check_todo_active_only.sh`.
 
 ---
 

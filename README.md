@@ -327,8 +327,10 @@ Only one path renders per frame (Stage 2 CPU-driven OR Stage 3 GPU-driven). No d
 
 - **`TODO.md`** — Active architecture backlog (open TODOs only, with priorities and remediation notes).
 - **`ROADMAP.md`** — Feature roadmap, dependency-ordered phases, and long-horizon planning notes.
-- **`DONE.md`** — Historical architecture notes and completed-item summaries.
+- **Git history** — Historical architecture notes and completion summaries for closed backlog items.
 - **`CLAUDE.md`** — Development conventions, build workflows, architectural invariants.
+
+Backlog hygiene is CI-enforced: pull requests fail if `TODO.md` contains completed/historical markers instead of active unfinished items.
 
 ---
 

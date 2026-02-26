@@ -215,4 +215,3 @@ Each PR must remain bisect-safe and keep baseline tests green before proceeding.
 ## 2. Related Documents
 
 - `ROADMAP.md` — feature roadmap, prioritization phases, and long-horizon planning details.
-- `DONE.md` — historical notes and previously completed architecture narratives.
