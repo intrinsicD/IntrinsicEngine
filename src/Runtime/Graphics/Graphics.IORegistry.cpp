@@ -19,6 +19,7 @@ import :Geometry;
 import :Importers.OBJ;
 import :Importers.PLY;
 import :Importers.XYZ;
+import :Importers.PCD;
 import :Importers.TGF;
 import :Importers.GLTF;
 import :Importers.STL;
@@ -231,6 +232,7 @@ namespace Graphics
     OBJLoader::~OBJLoader() = default;
     PLYLoader::~PLYLoader() = default;
     XYZLoader::~XYZLoader() = default;
+    PCDLoader::~PCDLoader() = default;
     TGFLoader::~TGFLoader() = default;
     GLTFLoader::~GLTFLoader() = default;
     STLLoader::~STLLoader() = default;
@@ -244,6 +246,7 @@ namespace Graphics
         registry.RegisterLoader(std::make_unique<OBJLoader>());
         registry.RegisterLoader(std::make_unique<PLYLoader>());
         registry.RegisterLoader(std::make_unique<XYZLoader>());
+        registry.RegisterLoader(std::make_unique<PCDLoader>());
         registry.RegisterLoader(std::make_unique<TGFLoader>());
         registry.RegisterLoader(std::make_unique<GLTFLoader>());
         registry.RegisterLoader(std::make_unique<STLLoader>());

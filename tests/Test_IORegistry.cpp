@@ -365,6 +365,44 @@ TEST(XYZLoader, ParseFromBytes)
     EXPECT_EQ(meshImport->Meshes[0].Topology, PrimitiveTopology::Points);
 }
 
+TEST(PCDLoader, ParseAsciiFromBytes)
+{
+    const char* pcdText =
+        "# .PCD v0.7 - Point Cloud Data file format\n"
+        "VERSION 0.7\n"
+        "FIELDS x y z r g b\n"
+        "SIZE 4 4 4 4 4 4\n"
+        "TYPE F F F F F F\n"
+        "COUNT 1 1 1 1 1 1\n"
+        "WIDTH 2\n"
+        "HEIGHT 1\n"
+        "POINTS 2\n"
+        "DATA ascii\n"
+        "0.0 1.0 2.0 255 0 0\n"
+        "3.0 4.0 5.0 0 255 0\n";
+
+    std::span<const std::byte> bytes(reinterpret_cast<const std::byte*>(pcdText), std::strlen(pcdText));
+
+    IORegistry registry;
+    RegisterBuiltinLoaders(registry);
+
+    auto* loader = registry.FindLoader(".pcd");
+    ASSERT_NE(loader, nullptr);
+
+    LoadContext ctx{};
+    auto result = loader->Load(bytes, ctx);
+    ASSERT_TRUE(result.has_value()) << "PCD parse failed";
+
+    auto* meshImport = std::get_if<MeshImportData>(&*result);
+    ASSERT_NE(meshImport, nullptr);
+    ASSERT_EQ(meshImport->Meshes.size(), 1u);
+    EXPECT_EQ(meshImport->Meshes[0].Positions.size(), 2u);
+    EXPECT_EQ(meshImport->Meshes[0].Topology, PrimitiveTopology::Points);
+    EXPECT_NEAR(meshImport->Meshes[0].Aux[0].x, 1.0f, 1e-6f);
+    EXPECT_NEAR(meshImport->Meshes[0].Aux[0].y, 0.0f, 1e-6f);
+    EXPECT_NEAR(meshImport->Meshes[0].Aux[1].y, 1.0f, 1e-6f);
+}
+
 TEST(TGFLoader, ParseFromBytes)
 {
     const char* tgfText =

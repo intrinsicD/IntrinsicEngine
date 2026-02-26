@@ -49,6 +49,7 @@ target_sources(${target_name}
         Importers/Graphics.Importers.OBJ.cppm
         Importers/Graphics.Importers.PLY.cppm
         Importers/Graphics.Importers.XYZ.cppm
+        Importers/Graphics.Importers.PCD.cppm
         Importers/Graphics.Importers.TGF.cppm
         Importers/Graphics.Importers.GLTF.cppm
         Importers/Graphics.Importers.STL.cppm
@@ -96,6 +97,7 @@ target_sources(${target_name}
         Importers/Graphics.Importers.OBJ.cpp
         Importers/Graphics.Importers.PLY.cpp
         Importers/Graphics.Importers.XYZ.cpp
+        Importers/Graphics.Importers.PCD.cpp
         Importers/Graphics.Importers.TGF.cpp
         Importers/Graphics.Importers.GLTF.cpp
         Importers/Graphics.Importers.STL.cpp
