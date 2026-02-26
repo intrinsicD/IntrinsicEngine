@@ -4,9 +4,7 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <expected>
-#include <memory>
 #include <span>
-#include <unordered_set>
 #include <vector>
 
 export module Core.DAGScheduler;
@@ -101,7 +99,7 @@ export namespace Core
         struct NodeData
         {
             std::vector<uint32_t> Dependents; // Outgoing edges
-            std::unique_ptr<std::unordered_set<uint32_t>> DependentSet;
+            std::vector<uint32_t> DedupSortedDependents;
             uint32_t Indegree = 0;
         };
 
