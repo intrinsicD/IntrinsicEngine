@@ -38,11 +38,6 @@ This section captures **newly observed inconsistencies** and concrete remediatio
 
 ### B. Architecture findings
 
-- [ ] **Close the gap between “fiber parking” goal and current scheduler behavior (High).**
-  - Scheduler currently uses worker-local deques + stealing + global inject queue, but waits are thread-level (`WaitForAll`) rather than dependency-level fiber parking.
-  - Result: potential head-of-line blocking for wait-heavy chains and weaker latency isolation under mixed workloads.
-  - Action: add parked continuation queues keyed by dependency counters/events, with wake-on-ready semantics and telemetry (`park_count`, `park_ns`, `unpark_ns`).
-
 - [ ] **Clarify ownership boundaries and remove avoidable shared ownership in runtime hot paths (Medium).**
   - Device/runtime orchestration APIs still expose widespread `std::shared_ptr` ownership even when ownership appears single-rooted.
   - Action: convert to explicit owner + borrowed refs/spans/handles where lifetime is frame- or system-scoped.
@@ -157,6 +152,7 @@ Implementation notes:
 - **Status (2026-02-26): Partially implemented.** `Core::Tasks` now uses pooled intrusive parked-node queues (`parkedHead`/`parkedTail` + free-list recycling) and generation checks across acquire/release/park/unpark paths, with regression tests for exactly-once multi-waiter resume and stale-token wake isolation (`CounterEventMultipleWaitersResumeExactlyOnce`, `StaleWaitTokenUnparkDoesNotResumeNewWaiters`).
 
 **WP2 — Fiber park/unpark API and worker loop integration**
+- **Status (2026-02-26): Completed.** Added `DrainReadyFromWaitQueues(budget)` and integrated a fairness tick in the worker loop (`local pop -> steal/inject -> unpark drain -> idle wait`) so continuation wakeups no longer depend on blocking waits.
 - Introduce internal APIs in `Core::Tasks`:
   - `ParkCurrentFiber(WaitToken token)`
   - `DrainReadyFromWaitQueues(uint32_t budget)`

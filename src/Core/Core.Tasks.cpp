@@ -1,4 +1,5 @@
 module;
+#include <algorithm>
 #include <vector>
 #include <deque>
 #include <thread>
@@ -224,6 +225,9 @@ namespace Core::Tasks
         std::vector<uint32_t> freeWaitSlots;
         std::vector<ParkedNode> parkedNodes;
         std::vector<uint32_t> freeParkedNodes;
+
+        std::mutex readyWaitQueueMutex;
+        std::deque<ParkedContinuation> readyWaitQueue;
     };
 
     static std::unique_ptr<SchedulerContext> s_Ctx = nullptr;
@@ -474,6 +478,8 @@ namespace Core::Tasks
 
         while (s_Ctx->inFlightTasks.load(std::memory_order_acquire) > 0)
         {
+            (void)DrainReadyFromWaitQueues(32);
+
             LocalTask task;
             if (TryPopTask(task, std::nullopt))
             {
@@ -521,14 +527,44 @@ namespace Core::Tasks
 
     void Scheduler::WorkerEntry(unsigned threadIndex)
     {
+        static constexpr uint32_t FairnessInterval = 32;
         s_WorkerIndex = static_cast<int>(threadIndex);
         uint32_t lastSignal = s_Ctx->workSignal.load(std::memory_order_acquire);
+        uint32_t localPopBudget = FairnessInterval;
 
         while (s_Ctx->isRunning)
         {
             LocalTask task;
 
-            if (TryPopTask(task, threadIndex))
+            const bool shouldForceFairness = localPopBudget == 0;
+            const bool canUseLocal = !shouldForceFairness;
+            bool hasTask = false;
+
+            if (canUseLocal && TryPopLocal(threadIndex, task))
+            {
+                hasTask = true;
+                if (localPopBudget > 0)
+                    localPopBudget -= 1;
+            }
+            else
+            {
+                if (TrySteal(threadIndex, task) || TryPopInject(task))
+                {
+                    hasTask = true;
+                    localPopBudget = FairnessInterval;
+                }
+                else
+                {
+                    const uint32_t drained = DrainReadyFromWaitQueues(8);
+                    if (drained > 0 && TryPopTask(task, threadIndex))
+                    {
+                        hasTask = true;
+                        localPopBudget = FairnessInterval;
+                    }
+                }
+            }
+
+            if (hasTask)
             {
                 OnTaskDequeuedAndRun(task);
             }
@@ -536,6 +572,7 @@ namespace Core::Tasks
             {
                 s_Ctx->workSignal.wait(lastSignal);
                 lastSignal = s_Ctx->workSignal.load(std::memory_order_acquire);
+                localPopBudget = FairnessInterval;
             }
         }
 
@@ -691,8 +728,40 @@ namespace Core::Tasks
             slot.parkedCount = 0;
         }
 
+        if (continuations.empty())
+            return 0;
+
+        {
+            std::lock_guard readyLock(s_Ctx->readyWaitQueueMutex);
+            for (auto& continuation : continuations)
+                s_Ctx->readyWaitQueue.push_back(std::move(continuation));
+        }
+
+        s_Ctx->workSignal.fetch_add(1, std::memory_order_release);
+        s_Ctx->workSignal.notify_all();
+        return static_cast<uint32_t>(continuations.size());
+    }
+
+    uint32_t Scheduler::DrainReadyFromWaitQueues(uint32_t budget)
+    {
+        if (!s_Ctx || budget == 0)
+            return 0;
+
+        std::vector<SchedulerContext::ParkedContinuation> ready;
+        ready.reserve(budget);
+        {
+            std::lock_guard readyLock(s_Ctx->readyWaitQueueMutex);
+            const uint32_t available = static_cast<uint32_t>(s_Ctx->readyWaitQueue.size());
+            const uint32_t drainCount = std::min(budget, available);
+            for (uint32_t i = 0; i < drainCount; ++i)
+            {
+                ready.push_back(std::move(s_Ctx->readyWaitQueue.front()));
+                s_Ctx->readyWaitQueue.pop_front();
+            }
+        }
+
         const auto now = std::chrono::steady_clock::now();
-        for (auto& continuation : continuations)
+        for (auto& continuation : ready)
         {
             const auto unparkNs = std::chrono::duration_cast<std::chrono::nanoseconds>(
                 now - continuation.ParkedAt).count();
@@ -703,7 +772,7 @@ namespace Core::Tasks
             Reschedule(continuation.Handle, std::move(continuation.Alive));
         }
 
-        return static_cast<uint32_t>(continuations.size());
+        return static_cast<uint32_t>(ready.size());
     }
 
     CounterEvent::CounterEvent(uint32_t initialCount)
