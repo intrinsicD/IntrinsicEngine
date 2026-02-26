@@ -4,9 +4,7 @@ module;
 #include <bit>
 #include <cstdint>
 #include <algorithm>
-#include <unordered_set>
 #include <vector>
-#include <memory>
 
 module Core.DAGScheduler;
 import Core.Error;
@@ -75,8 +73,7 @@ namespace Core
 
         auto& node = m_NodePool[index];
         node.Dependents.clear();
-        if (node.DependentSet)
-            node.DependentSet->clear();
+        node.DedupSortedDependents.clear();
         node.Indegree = 0;
 
         ++m_ActiveNodeCount;
@@ -125,10 +122,16 @@ namespace Core
         auto& prodNode = m_NodePool[producer];
 
         constexpr size_t kLinearDedupThreshold = 16;
-        if (prodNode.DependentSet)
+        if (!prodNode.DedupSortedDependents.empty())
         {
-            if (prodNode.DependentSet->contains(consumer))
+            const auto it = std::lower_bound(
+                prodNode.DedupSortedDependents.begin(),
+                prodNode.DedupSortedDependents.end(),
+                consumer);
+            if (it != prodNode.DedupSortedDependents.end() && *it == consumer)
                 return;
+
+            prodNode.DedupSortedDependents.insert(it, consumer);
         }
         else
         {
@@ -140,16 +143,27 @@ namespace Core
 
             if (prodNode.Dependents.size() >= kLinearDedupThreshold)
             {
-                prodNode.DependentSet = std::make_unique<std::unordered_set<uint32_t>>();
-                prodNode.DependentSet->reserve(prodNode.Dependents.size() + 1);
-                for (uint32_t dep : prodNode.Dependents)
-                    prodNode.DependentSet->insert(dep);
+                prodNode.DedupSortedDependents.assign(
+                    prodNode.Dependents.begin(),
+                    prodNode.Dependents.end());
+                std::sort(
+                    prodNode.DedupSortedDependents.begin(),
+                    prodNode.DedupSortedDependents.end());
+                prodNode.DedupSortedDependents.erase(
+                    std::unique(
+                        prodNode.DedupSortedDependents.begin(),
+                        prodNode.DedupSortedDependents.end()),
+                    prodNode.DedupSortedDependents.end());
+
+                auto it = std::lower_bound(
+                    prodNode.DedupSortedDependents.begin(),
+                    prodNode.DedupSortedDependents.end(),
+                    consumer);
+                prodNode.DedupSortedDependents.insert(it, consumer);
             }
         }
 
         prodNode.Dependents.push_back(consumer);
-        if (prodNode.DependentSet)
-            prodNode.DependentSet->insert(consumer);
         m_NodePool[consumer].Indegree++;
     }
 
