@@ -38,3 +38,11 @@ Completed the RHI ownership cleanup backlog item for manual allocator lifetime m
 - Ownership was migrated to `std::unique_ptr<TransientAllocator>` in the module interface.
 - Construction now uses `std::make_unique`, and teardown uses `.reset()` instead of manual `delete`.
 - This removes manual memory management from the device path while preserving existing destruction ordering.
+
+## 2026-02-26 DAGScheduler Compile-Path Lookup + Dedupe Optimization
+
+Completed the DAGScheduler compile-path optimization backlog items:
+
+- Replaced linear resource-state lookup with an O(1)-average hash index (`resourceKey -> stateIndex`) while preserving frame-reset semantics and high-water reuse for pooled storage.
+- Added adaptive edge dedupe for high-degree producer nodes: linear scan for small out-degree, then automatic promotion to a hash-backed membership set for faster duplicate detection.
+- Preserved existing scheduling semantics and execution-layer output while reducing per-frame compile overhead growth for large resource/node counts.
