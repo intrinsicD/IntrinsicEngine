@@ -79,10 +79,6 @@ This section captures **newly observed inconsistencies** and concrete remediatio
   - Device/runtime orchestration APIs still expose widespread `std::shared_ptr` ownership even when ownership appears single-rooted.
   - Action: convert to explicit owner + borrowed refs/spans/handles where lifetime is frame- or system-scoped.
 
-- [ ] **Replace manual `new/delete` for core RHI members (Medium).**
-  - `RHI::VulkanDevice` still uses raw `new`/`delete` for `TransientAllocator`.
-  - Action: migrate to `std::unique_ptr` (or arena-owned handle) to tighten exception-safety assumptions and ownership clarity.
-
 ### C. Code duplication hotspots
 
 - [ ] **Consolidate importer text parsing boilerplate (Medium).**
