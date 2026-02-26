@@ -628,6 +628,7 @@ namespace Core::Tasks
     void Scheduler::WorkerEntry(unsigned threadIndex)
     {
         static constexpr uint32_t FairnessInterval = 32;
+        static constexpr uint32_t ReadyDrainBudget = 8;
         s_WorkerIndex = static_cast<int>(threadIndex);
         uint32_t lastSignal = s_Ctx->workSignal.load(std::memory_order_acquire);
         uint32_t localPopBudget = FairnessInterval;
@@ -639,6 +640,12 @@ namespace Core::Tasks
             const bool shouldForceFairness = localPopBudget == 0;
             const bool canUseLocal = !shouldForceFairness;
             bool hasTask = false;
+
+            // Poll continuation wake queues before attempting cross-worker steal/inject.
+            // This keeps park->unpark latency low for dependency-heavy workloads.
+            const uint32_t drainedReady = DrainReadyFromWaitQueues(ReadyDrainBudget);
+            if (drainedReady > 0)
+                lastSignal = s_Ctx->workSignal.load(std::memory_order_acquire);
 
             if (canUseLocal && TryPopLocal(threadIndex, task))
             {
@@ -653,15 +660,12 @@ namespace Core::Tasks
                     hasTask = true;
                     localPopBudget = FairnessInterval;
                 }
-                else
-                {
-                    const uint32_t drained = DrainReadyFromWaitQueues(8);
-                    if (drained > 0 && TryPopTask(task, threadIndex))
-                    {
-                        hasTask = true;
-                        localPopBudget = FairnessInterval;
-                    }
-                }
+            }
+
+            if (!hasTask && drainedReady > 0 && TryPopTask(task, threadIndex))
+            {
+                hasTask = true;
+                localPopBudget = FairnessInterval;
             }
 
             if (hasTask)
