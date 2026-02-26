@@ -34,8 +34,9 @@ Near-term priority now shifts from scheduler substrate work to rendering infrast
 **What still works (CPU-side only):**
 - **`Geometry.PointCloud` module** (`Geometry.PointCloud.cppm/.cpp`): First-class `Cloud` data structure with positions, normals, colors, radii. Operations: `ComputeBoundingBox`, `ComputeStatistics` (with KNN-based spacing), `VoxelDownsample` (O(n) hash-based), `EstimateRadii` (Octree-accelerated kNN density estimation), `RandomSubsample` (deterministic Fisher-Yates).
 
-**Re-implementation plan (retained-mode, from scratch):**
-- `PointCloudRenderer::Component` holds a `GeometryHandle` pointing to `GeometryGpuData` with `PrimitiveTopology::Points` — persistent device-local GPU buffers uploaded once via `GeometryUploadRequest` → `GeometryGpuData::CreateAsync()`. No per-frame re-upload for static clouds.
+**Re-implementation plan (retained-mode, shared-buffer-first):**
+- `PointCloudRenderer::Component` holds a `GeometryHandle` pointing to `GeometryGpuData` with `PrimitiveTopology::Points`.
+- **Shared-buffer contract:** For mesh-derived vertex visualization, `ReuseVertexBuffersFrom = meshHandle` — zero additional vertex upload, shares the same `std::shared_ptr<VulkanBuffer>`. For standalone point clouds (`.xyz`, `.pcd`, `.ply`), upload positions/normals once via `GeometryUploadRequest` → `GeometryGpuData::CreateAsync()` → device-local. No per-frame re-upload.
 - Lifecycle system allocates `GPUScene` slots, syncs transforms, participates in frustum culling — same path as `MeshRendererLifecycle`.
 - GPU point layout: 32 bytes `{vec3 pos, float size, vec3 normal, uint packedColor}`.
 - Vertex-shader billboard expansion (6 verts/point, no geometry shader).
@@ -74,11 +75,12 @@ Near-term priority now shifts from scheduler substrate work to rendering infrast
 
 **Re-implementation plan (two-tier architecture):**
 
-*Tier 1 — Retained-mode line entities (first-class, like meshes):*
-- `LineRenderer::Component` ECS component holding a `GeometryHandle` with `PrimitiveTopology::Lines`, persistent device-local GPU buffers uploaded via `GeometryUploadRequest`. No per-frame rebuild.
-- Lifecycle system allocates `GPUScene` slots, syncs transforms, frustum culling — same path as `MeshRendererLifecycle`.
-- `GraphRenderer::Component`: wraps `Geometry::Graph` as a line entity (edges) + optional point entity (nodes). Layout algorithms produce positions; GPU buffers uploaded once and updated only on layout change.
-- Wireframe as a "view": `GeometryViewRenderer` with `ReuseVertexBuffersFrom` (shared vertex buffer from mesh) + edge index buffer + `PrimitiveTopology::Lines`. Edge indices computed once and persisted — no per-frame CPU extraction.
+*Tier 1 — Retained-mode views (shared-buffer-first, like meshes):*
+- **Shared-buffer contract:** One vertex buffer on the GPU, multiple index buffers with different topologies. A mesh uploads positions/normals once; wireframe, vertex, and graph views all `ReuseVertexBuffersFrom` that mesh handle — zero vertex duplication. Each view owns its own index buffer and `GeometryHandle`.
+- Wireframe view: extract unique edge pairs once → `GeometryViewRenderer` with `ReuseVertexBuffersFrom = meshHandle`, `PrimitiveTopology::Lines`, persisted edge index buffer. No per-frame CPU extraction.
+- Vertex view: `ReuseVertexBuffersFrom = meshHandle`, `PrimitiveTopology::Points`, trivial or direct draw.
+- `GraphRenderer::Component`: wraps `Geometry::Graph` as a line view (edges) + point view (nodes) sharing vertex buffers. Layout algorithms produce positions; GPU upload once, update only on layout change.
+- Lifecycle system allocates `GPUScene` slots per view, syncs transforms, frustum culling — same path as `MeshRendererLifecycle`.
 - Thick-line vertex shader expansion (6 verts/segment), anti-aliased fragment shader, push constants for line width + viewport.
 
 *Tier 2 — Transient debug overlay (DebugDraw, rebuilt per frame):*

@@ -18,40 +18,44 @@ This document tracks **what's left to do** in IntrinsicEngine's architecture.
 
 ## 1. Open TODOs (What's left)
 
-### 1.1 Line/Graph Rendering — First-Class Retained-Mode (Broken, Re-architect)
+### 1.1 Shared-Buffer Multi-Topology Rendering (Broken, Re-architect)
 
-Lines and graphs must be **first-class retained-mode renderables** — the same architectural tier as triangle meshes. Not transient debug overlays rebuilt every frame, but persistent GPU-resident entities with their own ECS components, `GeometryGpuData` buffers, `GPUScene` slots, and lifecycle systems.
+**Core principle:** One vertex buffer on the GPU, multiple index buffers with different topologies referencing into it. A mesh entity uploads positions/normals once, then all visualization modes are **views** sharing that same `std::shared_ptr<VulkanBuffer>` via `GeometryViewRenderer` + `ReuseVertexBuffersFrom`:
 
-The existing infrastructure already supports this: `PrimitiveTopology::Lines` exists, `GeometryViewRenderer::Component` provides the "view" pattern (shared vertex buffer, independent index buffer with different topology), and the `GeometryPool`/`GPUScene` retained-mode slot system is topology-agnostic.
+| View | Topology | Index buffer | Shared vertex buffer |
+|------|----------|-------------|---------------------|
+| Surface mesh | `PrimitiveTopology::Triangles` | Triangle indices (original) | Positions, normals, aux |
+| Wireframe | `PrimitiveTopology::Lines` | Unique edge pairs (extracted once, persisted) | Same |
+| Vertex visualization | `PrimitiveTopology::Points` | Trivial identity or direct draw | Same |
+| kNN graph | `PrimitiveTopology::Lines` | Neighbor edge pairs (separate buffer) | Same |
 
-**Two rendering tiers:**
+Zero vertex duplication. The `GeometryPool`/`GPUScene` retained-mode slot system is topology-agnostic — each view gets its own `GeometryHandle`, `GPUScene` slot, and participates in frustum culling independently.
 
-**Tier 1 — Retained-mode line entities** (first-class, like meshes):
-- [ ] `LineRenderer::Component` ECS component: holds `GeometryHandle` pointing to a `GeometryGpuData` with `PrimitiveTopology::Lines`, persistent GPU buffers (device-local SSBO or vertex buffer via `GeometryUploadRequest`).
-- [ ] Lifecycle system: allocates `GPUScene` slots, syncs transforms, participates in frustum culling — same path as `MeshRendererLifecycle`.
-- [ ] `ForwardPass` already collects `GeometryViewRenderer::Component` with `PrimitiveTopology::Lines` — verify this path renders correctly with thick-line vertex shader expansion.
+**Line/graph rendering (Tier 1 — retained-mode, first-class):**
+- [ ] Wireframe view: when a mesh is loaded, extract unique edges once → create a `GeometryViewRenderer` with `ReuseVertexBuffersFrom = meshHandle`, `PrimitiveTopology::Lines`, edge index buffer. Persisted alongside the mesh entity.
+- [ ] Vertex view: same pattern with `PrimitiveTopology::Points`, trivial index buffer or vertex count direct draw.
+- [ ] `GraphRenderer::Component`: wraps `Geometry::Graph` as a line view (edges) + point view (nodes) sharing the same vertex buffer. Layout algorithms produce positions uploaded once; updated only on layout change.
 - [ ] Thick-line shader: vertex shader expands each line segment into a screen-space quad (6 verts/segment), fragment shader anti-aliases via signed-distance smoothstep. Push constants: line width, viewport dimensions.
-- [ ] `GraphRenderer::Component` ECS component: wraps a `Geometry::Graph` as a line entity (edges) + optional point entity (nodes). CPU-side layout algorithms (`ComputeForceDirectedLayout`, `ComputeSpectralLayout`, `ComputeHierarchicalLayout`) produce positions; GPU buffers are uploaded once and updated only on layout change.
-- [ ] Wireframe as a "view": mesh wireframe overlay uses `GeometryViewRenderer` with `ReuseVertexBuffersFrom` (shared vertex buffer) + edge index buffer + `PrimitiveTopology::Lines`. No per-frame CPU edge extraction — the edge indices are computed once and persisted.
+- [ ] Lifecycle system: same path as `MeshRendererLifecycle` — `GPUScene` slot allocation, transform sync, frustum culling.
 
-**Tier 2 — Transient debug overlay** (DebugDraw, rebuilt per frame):
-- [ ] `DebugDraw` immediate-mode accumulator remains for debug visualization (octree, KD-tree, bounds, contact manifolds, convex hulls) — these are genuinely transient.
-- [ ] `LineRenderPass` renders `DebugDraw` content via per-frame host-visible SSBO upload. This is the only per-frame path — everything else is retained.
-- [ ] Depth-tested + overlay sub-passes (two draw calls: one with depth test, one without).
+**Debug overlay (Tier 2 — transient, DebugDraw only):**
+- [ ] `DebugDraw` immediate-mode accumulator remains for genuinely transient visualization (octree, KD-tree, bounds, contact manifolds, convex hulls).
+- [ ] `LineRenderPass` renders `DebugDraw` content via per-frame host-visible SSBO. Depth-tested + overlay sub-passes.
 - [ ] Verify all debug overlays render correctly once `LineRenderPass` is restored.
 
 ### 1.2 Point Cloud Rendering — First-Class Retained-Mode (Broken, Re-architect)
 
-Point clouds must be **first-class retained-mode renderables** — same tier as meshes and line entities.
+Point clouds follow the same shared-buffer philosophy. A point cloud entity uploads positions/normals once to a persistent device-local buffer. If a mesh already has those positions on the GPU, the point cloud view can `ReuseVertexBuffersFrom` the mesh handle.
 
 **Retained-mode point cloud entities:**
-- [ ] `PointCloudRenderer::Component` ECS component: holds `GeometryHandle` pointing to `GeometryGpuData` with `PrimitiveTopology::Points`, persistent device-local GPU buffers. GPU point layout: 32 bytes `{vec3 pos, float size, vec3 normal, uint packedColor}`.
-- [ ] Lifecycle system: allocates `GPUScene` slots, syncs transforms, participates in frustum culling — same path as `MeshRendererLifecycle`.
-- [ ] Geometry upload via `GeometryUploadRequest` → `GeometryGpuData::CreateAsync()` → async transfer to device-local memory. No per-frame re-upload for static clouds.
+- [ ] `PointCloudRenderer::Component` holds `GeometryHandle` pointing to `GeometryGpuData` with `PrimitiveTopology::Points`. GPU point layout: 32 bytes `{vec3 pos, float size, vec3 normal, uint packedColor}`.
+- [ ] For mesh-derived vertex visualization: `ReuseVertexBuffersFrom = meshHandle` — zero additional vertex upload.
+- [ ] For standalone point clouds (`.xyz`, `.pcd`, `.ply`): upload positions/normals once via `GeometryUploadRequest` → `GeometryGpuData::CreateAsync()` → device-local. No per-frame re-upload.
+- [ ] Lifecycle system: `GPUScene` slot allocation, transform sync, frustum culling — same path as meshes.
 - [ ] Vertex shader: billboard expansion (6 verts/point, no geometry shader).
-- [ ] Fragment shader: mode-separated rendering — flat disc (unlit), surfel (Lambertian + ambient), EWA splatting (Zwicker et al. 2001, perspective-correct Gaussian elliptical splats).
+- [ ] Fragment shader: mode-separated — flat disc (unlit), surfel (Lambertian + ambient), EWA splatting (Zwicker et al. 2001).
 - [ ] Pipeline registration in `DefaultPipeline`, gated by `FeatureRegistry`.
-- [ ] Test: GPU point data layout, color packing, retained buffer lifecycle, render contract.
+- [ ] Test: GPU point data layout, color packing, shared-buffer lifecycle, render contract.
 
 ## 2. Related Documents
 

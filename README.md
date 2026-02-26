@@ -355,15 +355,25 @@ Common editor panels live in `src/Runtime/EditorUI/` and are registered from the
 
 Add a new panel by calling `Interface::GUI::RegisterPanel("My Panel", []{ ... });` from `Runtime.EditorUI`.
 
-## Non-Mesh Rendering (Lines, Graphs, Point Clouds)
+## Shared-Buffer Multi-Topology Rendering
 
-Lines, graphs, and point clouds are being re-architected as **first-class retained-mode renderables** — the same tier as triangle meshes. This means persistent device-local GPU buffers, `GPUScene` slots, transform sync, and frustum culling rather than per-frame transient rebuilds. The existing `GeometryPool`/`GPUScene` infrastructure is topology-agnostic (`PrimitiveTopology::Lines`, `Points`, `Triangles`), and the `GeometryViewRenderer` "view" pattern enables wireframes to share vertex buffers with their source mesh.
+One vertex buffer on the GPU, multiple index buffers with different topologies referencing into it. This is the core rendering architecture for all geometry types — not just meshes.
 
-**Current status:** All three rendering pipelines (`LineRenderPass`, wireframe, `PointCloudRenderPass`) are **broken** and pending re-implementation under this architecture. CPU-side modules (`Geometry.PointCloud`, `Geometry.Graph` layout algorithms) remain functional. See `TODO.md` for the detailed re-implementation plan.
+A mesh entity uploads positions/normals **once**. All visualization modes are **views** sharing that same `std::shared_ptr<VulkanBuffer>`:
 
-## Graphics Geometry: Shared GPU Ownership (Views)
+| View | Topology | Index buffer | Vertex buffer |
+|------|----------|-------------|---------------|
+| Surface mesh | `Triangles` | Triangle indices (original) | Shared |
+| Wireframe | `Lines` | Unique edge pairs (extracted once) | Shared |
+| Vertex visualization | `Points` | Identity / direct draw | Shared |
+| kNN graph | `Lines` | Neighbor edge pairs | Shared |
+| Standalone point cloud | `Points` | Direct draw | Own (uploaded once) |
 
-`Graphics::GeometryGpuData` now supports a **shared ownership** model for heavy GPU buffers. This enables the **“view” pattern**: multiple geometries (mesh / graph / point cloud) can reference the *same* vertex memory while owning their own index buffers.
+Zero vertex duplication for mesh-derived views. Each view owns its own `GeometryHandle`, `GPUScene` slot, and participates in frustum culling independently. The `GeometryPool`/`GPUScene` retained-mode system is topology-agnostic.
+
+Only `DebugDraw` content (octree, bounds, contact manifold overlays) uses per-frame transient SSBO uploads — everything else is retained.
+
+**Current status:** All non-mesh rendering pipelines (`LineRenderPass`, wireframe, `PointCloudRenderPass`) are **broken** and pending re-implementation under this architecture. CPU-side modules (`Geometry.PointCloud`, `Geometry.Graph` layout algorithms) remain functional. See `TODO.md` for the detailed plan.
 
 ### Key API
 
@@ -377,12 +387,12 @@ Lines, graphs, and point clouds are being re-architected as **first-class retain
   - Adds an optional `const Graphics::GeometryPool* existingPool` argument.
   - When `ReuseVertexBuffersFrom` is valid, `existingPool` must be provided so the source geometry can be looked up.
 
-### Example: Create a line-graph view from an existing mesh
+### Example: Create a wireframe view from an existing mesh
 
 ```cpp
 Graphics::GeometryUploadRequest req;
 req.ReuseVertexBuffersFrom = sourceMeshHandle;
-req.Indices = lineIndexPairs;
+req.Indices = edgeIndexPairs;  // unique edges, extracted once
 req.Topology = Graphics::PrimitiveTopology::Lines;
 
 auto [gpuData, token] = Graphics::GeometryGpuData::CreateAsync(
@@ -391,7 +401,7 @@ auto [gpuData, token] = Graphics::GeometryGpuData::CreateAsync(
     req,
     &geometryPool);
 
-auto graphHandle = geometryPool.Add(std::move(gpuData));
+auto wireframeHandle = geometryPool.Add(std::move(gpuData));
 ```
 
 ### Lifetime semantics
