@@ -3,6 +3,9 @@
 #include <thread>
 #include <vector>
 #include <coroutine>
+#include <algorithm>
+#include <numeric>
+#include <random>
 
 import Core;
 
@@ -326,6 +329,49 @@ TEST(CoreTasks, StaleWaitTokenUnparkDoesNotResumeNewWaiters)
 
     Scheduler::Shutdown();
 }
+
+TEST(CoreTasks, CounterEventHighFanInRandomizedSignalsResumeExactlyOnce)
+{
+    Scheduler::Initialize(4);
+
+    constexpr int waiterCount = 96;
+    constexpr int signalCount = 4096;
+
+    CounterEvent event{static_cast<uint32_t>(signalCount)};
+    std::atomic<int> resumedCount = 0;
+
+    auto waiter = [&]() -> Job {
+        co_await WaitFor(event);
+        resumedCount.fetch_add(1, std::memory_order_relaxed);
+        co_return;
+    };
+
+    for (int i = 0; i < waiterCount; ++i)
+        Scheduler::Dispatch(waiter());
+
+    std::vector<int> signalOrder(signalCount);
+    std::iota(signalOrder.begin(), signalOrder.end(), 0);
+    std::mt19937 rng(1337u);
+    std::shuffle(signalOrder.begin(), signalOrder.end(), rng);
+
+    for (int i : signalOrder)
+    {
+        Scheduler::Dispatch([&event, i] {
+            if ((i & 1) == 0)
+                std::this_thread::yield();
+            event.Signal(1);
+        });
+    }
+
+    Scheduler::WaitForAll();
+
+    EXPECT_EQ(resumedCount.load(std::memory_order_relaxed), waiterCount);
+    const auto stats = Scheduler::GetStats();
+    EXPECT_EQ(stats.ParkCount, stats.UnparkCount);
+
+    Scheduler::Shutdown();
+}
+
 TEST(CoreTasks, OverflowHandling)
 {
     // Initialize with 1 thread to force accumulation
