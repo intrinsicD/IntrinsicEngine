@@ -18,6 +18,36 @@ import Core.Logging;
 
 namespace Geometry::MeshUtils
 {
+    bool TryGetTriangleFaceView(const Halfedge::Mesh& mesh, FaceHandle f, TriangleFaceView& out)
+    {
+        if (!f.IsValid() || mesh.IsDeleted(f))
+            return false;
+
+        const HalfedgeHandle h0 = mesh.Halfedge(f);
+        if (!h0.IsValid())
+            return false;
+
+        const HalfedgeHandle h1 = mesh.NextHalfedge(h0);
+        const HalfedgeHandle h2 = mesh.NextHalfedge(h1);
+        const HalfedgeHandle h3 = mesh.NextHalfedge(h2);
+
+        // Restrict helper to pure triangle faces to keep downstream logic explicit.
+        if (h3 != h0)
+            return false;
+
+        out.Face = f;
+        out.H0 = h0;
+        out.H1 = h1;
+        out.H2 = h2;
+        out.V0 = mesh.ToVertex(h0);
+        out.V1 = mesh.ToVertex(h1);
+        out.V2 = mesh.ToVertex(h2);
+        out.P0 = mesh.Position(out.V0);
+        out.P1 = mesh.Position(out.V1);
+        out.P2 = mesh.Position(out.V2);
+        return true;
+    }
+
     void CalculateNormals(std::span<const glm::vec3> positions, std::span<const uint32_t> indices,
                           std::span<glm::vec3> normals)
     {
