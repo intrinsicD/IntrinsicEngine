@@ -105,7 +105,15 @@ namespace Graphics
     bool DefaultPipeline::IsFeatureEnabled(Core::Hash::StringID id) const
     {
         if (!m_Registry) return true; // No registry → all features enabled
-        return m_Registry->IsEnabled(id);
+
+        // Render-path resilience: when a new pass is added but not yet registered
+        // in the FeatureRegistry catalog, keep the pass enabled by default rather
+        // than silently dropping it from the pipeline.
+        const Core::FeatureInfo* info = m_Registry->Find(id);
+        if (!info)
+            return true;
+
+        return info->Enabled;
     }
 
     void DefaultPipeline::RebuildPath()
