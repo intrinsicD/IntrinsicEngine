@@ -276,6 +276,10 @@ namespace Graphics::Passes
             const uint32_t localCount = batchCount;
             const auto capturedDescSet = batchDescSet;
 
+            const VkDescriptorSet globalSet = ctx.GlobalDescriptorSet;
+            const uint32_t dynamicOffset = static_cast<uint32_t>(ctx.GlobalCameraDynamicOffset);
+            const VkExtent2D resolution = ctx.Resolution;
+
             ctx.Graph.AddPass<PointCloudPassData>("PointCloud",
                 [&](PointCloudPassData& data, RGBuilder& builder)
                 {
@@ -289,15 +293,15 @@ namespace Graphics::Passes
                     depthInfo.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
                     data.Depth = builder.WriteDepth(depth, depthInfo);
                 },
-                [this, &ctx, localCount, capturedDescSet](const PointCloudPassData&, const RGRegistry&, VkCommandBuffer cmd)
+                [this, localCount, capturedDescSet, globalSet, dynamicOffset, resolution]
+                (const PointCloudPassData&, const RGRegistry&, VkCommandBuffer cmd)
 
                 {
-                    const uint32_t dynamicOffset = static_cast<uint32_t>(ctx.GlobalCameraDynamicOffset);
                     RecordDraw(cmd,
                                capturedDescSet,
-                               ctx.GlobalDescriptorSet,
+                               globalSet,
                                dynamicOffset,
-                               ctx.Resolution,
+                               resolution,
                                localCount,
                                Geometry::PointCloud::RenderMode::FlatDisc);
                 });
