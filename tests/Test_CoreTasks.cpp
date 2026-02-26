@@ -236,6 +236,44 @@ TEST(CoreTasks, CounterEventMultipleWaitersResumeExactlyOnce)
     Scheduler::Shutdown();
 }
 
+
+TEST(CoreTasks, CounterEventCanBeRearmedAfterReady)
+{
+    Scheduler::Initialize(2);
+
+    CounterEvent event{1};
+    std::atomic<int> resumedCount = 0;
+
+    auto waiter = [&]() -> Job {
+        co_await WaitFor(event);
+        resumedCount.fetch_add(1, std::memory_order_relaxed);
+        co_return;
+    };
+
+    Scheduler::Dispatch(waiter());
+    Scheduler::ParkCountAtomic().wait(0, std::memory_order_acquire);
+
+    event.Signal();
+    Scheduler::WaitForAll();
+    EXPECT_EQ(resumedCount.load(std::memory_order_relaxed), 1);
+
+    event.Add(1);
+    Scheduler::Dispatch(waiter());
+
+    const auto parksBeforeSecondSignal = Scheduler::GetParkCount();
+    while (Scheduler::GetParkCount() == parksBeforeSecondSignal)
+        std::this_thread::yield();
+
+    EXPECT_EQ(resumedCount.load(std::memory_order_relaxed), 1);
+
+    event.Signal();
+    Scheduler::WaitForAll();
+
+    EXPECT_EQ(resumedCount.load(std::memory_order_relaxed), 2);
+
+    Scheduler::Shutdown();
+}
+
 TEST(CoreTasks, StaleWaitTokenUnparkDoesNotResumeNewWaiters)
 {
     Scheduler::Initialize(2);

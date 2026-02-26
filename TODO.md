@@ -162,6 +162,7 @@ Implementation notes:
 - Exit criteria: no blocking waits in worker hot path; runnable parked continuations are observed within bounded polling latency.
 
 **WP3 — Dependency counter wake wiring**
+- **Status (2026-02-26): In progress.** Counter wake path now rearms wait tokens correctly when `CounterEvent::Add()` transitions from ready (`count == 0`) back to pending (`count > 0`), preventing stale-ready fast-path escapes and preserving exactly-once continuation wakeups across reuse epochs.
 - On dependency completion, atomically decrement unresolved count; when transition reaches zero, wake exactly once via CAS state change (`Parked -> Ready`).
 - Encode wake path as branch-light fast path:
   - non-zero result => return

@@ -799,6 +799,22 @@ namespace Core::Tasks
         return static_cast<uint32_t>(continuations.size());
     }
 
+    void Scheduler::MarkWaitTokenNotReady(WaitToken token)
+    {
+        if (!s_Ctx || !token.Valid())
+            return;
+
+        std::lock_guard lock(s_Ctx->waitMutex);
+        if (token.Slot >= s_Ctx->waitSlots.size())
+            return;
+
+        auto& slot = s_Ctx->waitSlots[token.Slot];
+        if (!slot.inUse || slot.generation != token.Generation)
+            return;
+
+        slot.ready = false;
+    }
+
     uint32_t Scheduler::DrainReadyFromWaitQueues(uint32_t budget)
     {
         if (!s_Ctx || budget == 0)
@@ -848,7 +864,12 @@ namespace Core::Tasks
 
     void CounterEvent::Add(uint32_t value)
     {
-        m_Count.fetch_add(value, std::memory_order_acq_rel);
+        if (value == 0)
+            return;
+
+        const uint32_t previous = m_Count.fetch_add(value, std::memory_order_acq_rel);
+        if (previous == 0)
+            Scheduler::MarkWaitTokenNotReady(m_Token);
     }
 
     void CounterEvent::Signal(uint32_t value)
