@@ -467,6 +467,52 @@ TEST(DAGScheduler, WideFanout)
 }
 
 // =========================================================================
+// Test: Pathological fan-out with repeated read declarations
+// =========================================================================
+TEST(DAGScheduler, FanoutDedupScaling)
+{
+    constexpr uint32_t kReaderCount = 2048;
+    constexpr uint32_t kRepeatedReadsPerNode = 8;
+
+    DAGScheduler sched;
+    const uint32_t producer = sched.AddNode();
+    sched.DeclareWrite(producer, kResA);
+
+    std::vector<uint32_t> readers;
+    readers.reserve(kReaderCount);
+
+    for (uint32_t i = 0; i < kReaderCount; ++i)
+    {
+        const uint32_t reader = sched.AddNode();
+        readers.push_back(reader);
+
+        for (uint32_t duplicate = 0; duplicate < kRepeatedReadsPerNode; ++duplicate)
+        {
+            // Repeated reads on the same resource should not create duplicate
+            // dependency edges from producer -> reader.
+            sched.DeclareRead(reader, kResA);
+        }
+    }
+
+    auto result = sched.Compile();
+    ASSERT_TRUE(result.has_value());
+
+    // One outgoing edge per reader, even though each reader declared the same
+    // read multiple times.
+    EXPECT_EQ(sched.GetDependents(producer).size(), kReaderCount);
+
+    for (uint32_t reader : readers)
+    {
+        EXPECT_EQ(sched.GetIndegree(reader), 1u);
+    }
+
+    const auto& layers = sched.GetExecutionLayers();
+    ASSERT_EQ(layers.size(), 2u);
+    EXPECT_EQ(layers[0].size(), 1u);
+    EXPECT_EQ(layers[1].size(), kReaderCount);
+}
+
+// =========================================================================
 // Test: Multiple resources with interleaved access
 // =========================================================================
 TEST(DAGScheduler, MultipleResources)

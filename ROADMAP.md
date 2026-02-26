@@ -12,16 +12,15 @@ Backlog completion update (2026-02-26): `Core::DAGScheduler` compile-path resour
 
 Backlog completion update (2026-02-26): `Core::DAGScheduler` compile-path edge dedupe now uses a cache-local sorted small-set (`std::vector` + `std::lower_bound`) instead of per-node `std::unordered_set` heap nodes once fan-out crosses threshold, reducing high-outdegree compile churn.
 
+Backlog completion update (2026-02-26): pathological fan-out edge-dedupe scaling validation is now covered by `tests/Test_DAGScheduler.cpp::FanoutDedupScaling`, stress-testing 2,048 consumers with repeated resource reads and asserting deduped indegree/dependent invariants.
+
 1. **Core::Tasks fiber parking for dependency waits** (current top priority).
    - Deliver continuation-level park/unpark semantics so wait-heavy graphs do not block worker OS threads.
    - Telemetry milestone progress: scheduler now exposes deque-depth snapshots and steal attempt/success metrics via `Scheduler::GetStats()`.
    - Remaining telemetry gate: park/unpark latency distributions and tail wait reduction once continuations can park.
 2. **FrameGraph ready-queue execution (remove coarse layer barriers).**
    - Preserve layers as diagnostics only; schedule by dependency readiness.
-3. **DAGScheduler compile-path edge-dedupe scaling validation.**
-   - High-outdegree edge dedupe now uses a sorted small-set structure; remaining work is targeted scaling validation under pathological fan-out workloads.
-
-This order is intentional: item (1) improves scheduler substrate, item (2) unlocks orchestration-level gains on top of that substrate, and item (3) reduces compile overhead once execution-path parallelism is no longer barrier-limited.
+This order is intentional: item (1) improves scheduler substrate, and item (2) unlocks orchestration-level gains on top of that substrate.
 
 ## 2. Feature Roadmap
 
