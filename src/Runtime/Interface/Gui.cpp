@@ -11,6 +11,8 @@ module;
 #include <backends/imgui_impl_glfw.h>
 #include <backends/imgui_impl_vulkan.h>
 #include <GLFW/glfw3.h> // Required for glfwGetInstanceProcAddress
+#include <algorithm>
+#include <array>
 #include <vector>
 #include <filesystem>
 
@@ -50,6 +52,62 @@ namespace Interface::GUI
     static bool s_ShowTelemetryPanel = false;
 
     static float ToMs(uint64_t ns) { return static_cast<float>(static_cast<double>(ns) / 1'000'000.0); }
+
+    struct RollingSloStats
+    {
+        float P95 = 0.0f;
+        float P99 = 0.0f;
+        size_t SampleCount = 0;
+    };
+
+    static RollingSloStats ComputeRollingNsPercentiles(const Core::Telemetry::TelemetrySystem& telemetry,
+                                                       size_t window,
+                                                       uint64_t Core::Telemetry::FrameStats::* field)
+    {
+        std::array<uint64_t, Core::Telemetry::TelemetrySystem::MAX_FRAME_HISTORY> samples{};
+        const size_t clampedWindow = std::min(window, Core::Telemetry::TelemetrySystem::MAX_FRAME_HISTORY);
+        size_t sampleCount = 0;
+        for (size_t i = 0; i < clampedWindow; ++i)
+        {
+            const auto& frame = telemetry.GetFrameStats(i);
+            const uint64_t value = frame.*field;
+            if (value == 0)
+            {
+                continue;
+            }
+            samples[sampleCount++] = value;
+        }
+
+        if (sampleCount == 0)
+        {
+            return {};
+        }
+
+        auto percentileNs = [&](float q)
+        {
+            const size_t rank = std::min(sampleCount - 1,
+                                         static_cast<size_t>(q * static_cast<float>(sampleCount - 1)));
+            std::nth_element(samples.begin(), samples.begin() + static_cast<std::ptrdiff_t>(rank), samples.begin() + static_cast<std::ptrdiff_t>(sampleCount));
+            return samples[rank];
+        };
+
+        return {
+            .P95 = ToMs(percentileNs(0.95f)),
+            .P99 = ToMs(percentileNs(0.99f)),
+            .SampleCount = sampleCount,
+        };
+    }
+
+    static void DrawSloStatusRow(const char* label, float value, float budget, bool inBand = true)
+    {
+        const bool pass = inBand && (value <= budget);
+        const ImVec4 color = pass ? ImVec4(0.20f, 0.80f, 0.25f, 1.0f) : ImVec4(0.95f, 0.25f, 0.20f, 1.0f);
+        ImGui::TableNextRow();
+        ImGui::TableNextColumn(); ImGui::TextUnformatted(label);
+        ImGui::TableNextColumn(); ImGui::Text("%.3f", value);
+        ImGui::TableNextColumn(); ImGui::Text("%.3f", budget);
+        ImGui::TableNextColumn(); ImGui::TextColored(color, pass ? "PASS" : "ALERT");
+    }
 
     // Simple horizontal bar for time in ms (clamped to a target window).
     static void DrawTimeBar(const char* label, float ms, float targetMs)
@@ -230,6 +288,83 @@ namespace Interface::GUI
                 ImGui::Text("Compile: %.3f ms", compileMs);
                 ImGui::Text("Execute: %.3f ms", executeMs);
                 ImGui::Text("Critical Path (sum of DAG chain): %.3f ms", criticalPathMs);
+                ImGui::TreePop();
+            }
+
+            ImGui::Separator();
+
+            if (ImGui::TreeNodeEx("SLO Alerts (rolling p95/p99)", ImGuiTreeNodeFlags_DefaultOpen))
+            {
+                constexpr size_t kWindowFrames = 120;
+                constexpr float kFrameGraphCompileP99BudgetMs = 0.35f;
+                constexpr float kFrameGraphExecuteP95BudgetMs = 1.50f;
+                constexpr float kFrameGraphCriticalPathP95BudgetMs = 0.90f;
+                constexpr float kTaskIdleWaitP95BudgetMs = 0.70f;
+                constexpr float kTaskUnparkP99BudgetMs = 0.08f;
+
+                constexpr float kStealRatioMin = 0.20f;
+                constexpr float kStealRatioMax = 0.65f;
+
+                const auto compileRolling = ComputeRollingNsPercentiles(
+                    telemetry, kWindowFrames, &Core::Telemetry::FrameStats::FrameGraphCompileTimeNs);
+                const auto executeRolling = ComputeRollingNsPercentiles(
+                    telemetry, kWindowFrames, &Core::Telemetry::FrameStats::FrameGraphExecuteTimeNs);
+                const auto criticalRolling = ComputeRollingNsPercentiles(
+                    telemetry, kWindowFrames, &Core::Telemetry::FrameStats::FrameGraphCriticalPathTimeNs);
+                const auto idleRolling = ComputeRollingNsPercentiles(
+                    telemetry, kWindowFrames, &Core::Telemetry::FrameStats::TaskIdleWaitTotalNs);
+                const auto unparkRolling = ComputeRollingNsPercentiles(
+                    telemetry, kWindowFrames, &Core::Telemetry::FrameStats::TaskUnparkP99Ns);
+
+                float stealRatioSum = 0.0f;
+                size_t stealRatioSamples = 0;
+                for (size_t i = 0; i < kWindowFrames; ++i)
+                {
+                    const double ratio = telemetry.GetFrameStats(i).TaskStealSuccessRatio;
+                    if (ratio <= 0.0)
+                    {
+                        continue;
+                    }
+                    stealRatioSum += static_cast<float>(ratio);
+                    ++stealRatioSamples;
+                }
+                const float stealRatioAvg = (stealRatioSamples > 0) ? (stealRatioSum / static_cast<float>(stealRatioSamples)) : 0.0f;
+
+                ImGui::TextDisabled("Window: %zu frames", kWindowFrames);
+
+                if (ImGui::BeginTable("SloTable", 4,
+                    ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit))
+                {
+                    ImGui::TableSetupColumn("Metric");
+                    ImGui::TableSetupColumn("Rolling Value (ms)");
+                    ImGui::TableSetupColumn("Budget (ms)");
+                    ImGui::TableSetupColumn("Status");
+                    ImGui::TableHeadersRow();
+
+                    DrawSloStatusRow("FrameGraph compile p99", compileRolling.P99, kFrameGraphCompileP99BudgetMs);
+                    DrawSloStatusRow("FrameGraph execute p95", executeRolling.P95, kFrameGraphExecuteP95BudgetMs);
+                    DrawSloStatusRow("FrameGraph critical path p95", criticalRolling.P95, kFrameGraphCriticalPathP95BudgetMs);
+                    DrawSloStatusRow("Task idle wait p95", idleRolling.P95, kTaskIdleWaitP95BudgetMs);
+                    DrawSloStatusRow("Task unpark p99", unparkRolling.P99, kTaskUnparkP99BudgetMs);
+
+                    const bool stealRatioInBand = (stealRatioAvg >= kStealRatioMin) && (stealRatioAvg <= kStealRatioMax);
+                    const ImVec4 stealColor = stealRatioInBand ? ImVec4(0.20f, 0.80f, 0.25f, 1.0f) : ImVec4(0.95f, 0.25f, 0.20f, 1.0f);
+                    ImGui::TableNextRow();
+                    ImGui::TableNextColumn(); ImGui::TextUnformatted("Task steal success ratio avg");
+                    ImGui::TableNextColumn(); ImGui::Text("%.3f", stealRatioAvg);
+                    ImGui::TableNextColumn(); ImGui::Text("[%.2f, %.2f]", kStealRatioMin, kStealRatioMax);
+                    ImGui::TableNextColumn(); ImGui::TextColored(stealColor, stealRatioInBand ? "PASS" : "ALERT");
+
+                    ImGui::EndTable();
+                }
+
+                ImGui::TextDisabled("Samples used (compile/execute/critical/idle/unpark): %zu / %zu / %zu / %zu / %zu",
+                                    compileRolling.SampleCount,
+                                    executeRolling.SampleCount,
+                                    criticalRolling.SampleCount,
+                                    idleRolling.SampleCount,
+                                    unparkRolling.SampleCount);
+
                 ImGui::TreePop();
             }
 
