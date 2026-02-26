@@ -161,6 +161,42 @@ TEST(CoreTasks, CoroutinesActuallyYield)
     Scheduler::Shutdown();
 }
 
+
+TEST(CoreTasks, CounterEventParksAndUnparksContinuation)
+{
+    Scheduler::Initialize(2);
+
+    CounterEvent event{1};
+    std::atomic<int> stage = 0;
+
+    auto waiter = [&]() -> Job {
+        stage.store(1, std::memory_order_release);
+        co_await WaitFor(event);
+        stage.store(2, std::memory_order_release);
+        co_return;
+    };
+
+    Scheduler::Dispatch(waiter());
+
+    while (stage.load(std::memory_order_acquire) < 1)
+        std::this_thread::yield();
+
+    for (int i = 0; i < 200 && stage.load(std::memory_order_acquire) != 1; ++i)
+        std::this_thread::yield();
+
+    EXPECT_EQ(stage.load(std::memory_order_acquire), 1);
+
+    event.Signal();
+    Scheduler::WaitForAll();
+
+    const auto stats = Scheduler::GetStats();
+    EXPECT_EQ(stage.load(std::memory_order_acquire), 2);
+    EXPECT_GE(stats.ParkCount, 1u);
+    EXPECT_GE(stats.UnparkCount, 1u);
+
+    Scheduler::Shutdown();
+}
+
 TEST(CoreTasks, OverflowHandling)
 {
     // Initialize with 1 thread to force accumulation

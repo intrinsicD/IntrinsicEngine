@@ -23,23 +23,10 @@ This document tracks **what's left to do** in IntrinsicEngine's architecture.
 - [ ] **Complete `Core::Tasks` fiber parking for dependency waits (High).**
   - Hybrid work-stealing foundations are now in place (worker-local LIFO deques + cross-worker stealing + external inject queue).
   - Add true fiber parking/unparking for wait-heavy dependency chains so worker OS threads never block on fine-grain sync.
-  - [x] Extend telemetry with scheduler queue instrumentation (per-worker deque depth snapshots + steal attempt/success counters).
-  - [ ] Add park/unpark latency telemetry once continuation parking lands.
-
-- [x] **Remove coarse FrameGraph layer barriers (High).**
-  - Replace per-layer `WaitForAll()` execution with dependency-count-driven ready queues.
-  - Preserve layer grouping for diagnostics/visualization only.
-  - Add optional critical-path-aware pass prioritization to reduce frame makespan and tail latency.
-
-- [x] **Optimize `Core::DAGScheduler` compile-path lookup + dedupe structures (Medium).**
-  - Replace linear `resourceKey` scans with a flat hash/robin-hood table.
-  - Add faster producer-edge dedupe for high-degree nodes (sorted-vector fast path and/or compact bloom/bitset guard).
-  - Keep current pool/high-water-mark reuse strategy while changing lookup structures.
+  - Remaining: complete dependency-level continuation parking integration across scheduler wait-heavy boundaries and finalize park/unpark percentile telemetry.
 
 - [ ] **Resolve runtime API/ownership drift in orchestration paths (Medium).**
-  - [x] Remove or fully wire `defaultTextureIndex` in `Runtime.RenderOrchestrator` constructor.
-    - Status: constructor interface now omits the unused parameter; orchestration setup uses explicit subsystem ownership only.
-  - [ ] Audit central runtime ownership boundaries and reduce `std::shared_ptr` usage where borrowed references or explicit owners are sufficient.
+  - Audit central runtime ownership boundaries and reduce `std::shared_ptr` usage where borrowed references or explicit owners are sufficient.
 
 - [ ] **Establish architecture SLOs + telemetry milestones (Cross-cutting).**
   - Define measurable targets for DAG compile budget, scheduler contention/tail latency, and frame critical-path timing.
@@ -49,31 +36,12 @@ This document tracks **what's left to do** in IntrinsicEngine's architecture.
 
 This section captures **newly observed inconsistencies** and concrete remediation actions.
 
-### A. Coding style & syntax consistency
-
-- [x] **Normalize TODO comment policy in production code (Medium).**
-  - Resolved the inline unresolved TODO in `Runtime.RenderOrchestrator` by removing the dead `defaultTextureIndex` constructor parameter and associated ambiguity.
-  - TODOs should remain tracked in this architecture backlog with acceptance criteria; production code comments should reference a backlog item ID when intentionally deferred.
-
-- [x] **Align modern C++ usage with stated C++23 standards (Medium).**
-  - Status: added `docs/CXX23_ADOPTION_POLICY.md` with concrete adoption rules for `std::expected` monadic chaining and explicit object parameters (deducing `this`), including rollout and reviewer checklist.
-
 ### B. Architecture findings
 
 - [ ] **Close the gap between “fiber parking” goal and current scheduler behavior (High).**
   - Scheduler currently uses worker-local deques + stealing + global inject queue, but waits are thread-level (`WaitForAll`) rather than dependency-level fiber parking.
   - Result: potential head-of-line blocking for wait-heavy chains and weaker latency isolation under mixed workloads.
   - Action: add parked continuation queues keyed by dependency counters/events, with wake-on-ready semantics and telemetry (`park_count`, `park_ns`, `unpark_ns`).
-
-- [x] **Remove CPU FrameGraph layer barriers that serialize independent work (High).**
-  - `FrameGraph::Execute()` executes per-layer and performs `Tasks::Scheduler::WaitForAll()` barrier after each multi-pass layer.
-  - This preserves correctness but over-serializes the schedule and can inflate frame critical path.
-  - Status: `FrameGraph::Execute()` now dispatches indegree-ready passes and unlocks dependents via atomic dependency counters, using a single terminal scheduler wait while retaining layer metadata for diagnostics.
-
-- [x] **Reduce compile-time overhead in `Core::DAGScheduler` hot paths (High).**
-  - `GetResourceState()` and edge dedupe both rely on linear scans (`O(R)` and `O(out_degree)` respectively).
-  - Existing TODO marks this medium priority, but this is on the per-frame compile path and should be treated as a high-priority perf risk as node/resource counts grow.
-  - Action: switch resource-state lookup to flat hash table and use per-node small-set/bit-guard for edge dedupe.
 
 - [ ] **Clarify ownership boundaries and remove avoidable shared ownership in runtime hot paths (Medium).**
   - Device/runtime orchestration APIs still expose widespread `std::shared_ptr` ownership even when ownership appears single-rooted.
@@ -98,14 +66,6 @@ This section captures **newly observed inconsistencies** and concrete remediatio
 - [ ] **Missing measurable acceptance criteria for several high-impact TODOs (High).**
   - Items mention goals (fairness/tail behavior/critical path) without explicit thresholds.
   - Action: for each High item define concrete SLO gates (example: `FrameGraph CPU execute p95 < 0.35 ms @ 2k nodes`, `steal ratio target band`, `compile budget p99`).
-
-- [ ] **Priority calibration mismatch (Medium).**
-  - DAGScheduler compile-path optimization is labeled Medium despite being in per-frame orchestration path.
-  - Action: re-rank based on frame-time impact and CI perf telemetry, not implementation convenience.
-
-- [ ] **Ownership drift TODO duplicates unresolved code-level TODO (Medium).**
-  - Backlog item and inline code TODO point to the same unresolved `defaultTextureIndex` issue.
-  - Action: keep a single source (backlog item with ID), remove ambiguous inline TODO text once linked.
 
 ---
 
@@ -251,21 +211,6 @@ Implementation notes:
 4. **PR-D (orchestration):** FrameGraph hot-path adoption + regression/perf comparison report.
 
 Each PR must remain bisect-safe and keep baseline tests green before proceeding.
-
-### C. Duplication follow-ups (from latest duplicate-code hunt)
-
-- [x] **Consolidate PLY importer parsing paths (High).**
-  - `Graphics.ModelLoader` and `Graphics.Importers.PLY` still contain overlapping token/type/property parsing logic.
-  - Status: legacy `ModelLoader::LoadAsync(...)` now delegates through `IORegistry` + built-in loaders, so `.ply` imports execute the `Graphics.Importers.PLY` path instead of the duplicate in-module parser.
-  - Follow-up: remove dead legacy parser code and extract `Graphics::Importers::PLYCommon` if we keep any cross-loader scalar/property utilities.
-
-- [x] **Extract shared face-iteration traversal helpers for geometry operators (Medium).**
-  - Added `MeshUtils::TriangleFaceView` + `MeshUtils::TryGetTriangleFaceView(...)` to centralize robust face-walk extraction (valid/deleted guard + triangle-loop verification).
-  - Integrated helper into `Geometry.MeshQuality` and `Geometry.Simplification` per-face traversal sites; remaining modules can migrate incrementally to the same kernel.
-
-- [x] **Deduplicate remeshing valence equalization and tangential smoothing passes (Completed).**
-  - `Geometry.Remeshing` and `Geometry.AdaptiveRemeshing` now share `MeshUtils::EqualizeValenceByEdgeFlip(...)` and `MeshUtils::TangentialSmooth(...)`.
-  - Follow-up: keep future robustness/perf updates in the shared helpers only.
 
 ## 2. Related Documents
 

@@ -8,6 +8,7 @@ module;
 #include <memory>
 #include <coroutine>
 #include <optional>
+#include <chrono>
 
 #if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
   #include <immintrin.h> // _mm_pause
@@ -163,10 +164,39 @@ namespace Core::Tasks
         alignas(64) std::atomic<uint64_t> stealPopCount{0};
         alignas(64) std::atomic<uint64_t> totalStealAttempts{0};
         alignas(64) std::atomic<uint64_t> successfulStealAttempts{0};
+        alignas(64) std::atomic<uint64_t> parkCount{0};
+        alignas(64) std::atomic<uint64_t> unparkCount{0};
+        alignas(64) std::atomic<uint64_t> parkLatencyTotalNs{0};
+        alignas(64) std::atomic<uint64_t> unparkLatencyTotalNs{0};
+
+        struct ParkedContinuation
+        {
+            std::coroutine_handle<> Handle{};
+            std::shared_ptr<std::atomic<bool>> Alive{};
+            std::chrono::steady_clock::time_point ParkedAt{};
+        };
+
+        struct WaitSlot
+        {
+            uint32_t generation = 1;
+            bool inUse = false;
+            std::vector<ParkedContinuation> parked{};
+        };
+
+        std::mutex waitMutex;
+        std::vector<WaitSlot> waitSlots;
+        std::vector<uint32_t> freeWaitSlots;
     };
 
     static std::unique_ptr<SchedulerContext> s_Ctx = nullptr;
     static thread_local int s_WorkerIndex = -1;
+
+    static void ReleaseInFlightToken()
+    {
+        const auto remaining = s_Ctx->inFlightTasks.fetch_sub(1, std::memory_order_acq_rel) - 1;
+        if (remaining == 0)
+            s_Ctx->inFlightTasks.notify_all();
+    }
 
     [[nodiscard]] static bool EnqueueInject(LocalTask&& task)
     {
@@ -435,6 +465,10 @@ namespace Core::Tasks
         stats.StealPopCount = s_Ctx->stealPopCount.load(std::memory_order_relaxed);
         stats.TotalStealAttempts = s_Ctx->totalStealAttempts.load(std::memory_order_relaxed);
         stats.SuccessfulStealAttempts = s_Ctx->successfulStealAttempts.load(std::memory_order_relaxed);
+        stats.ParkCount = s_Ctx->parkCount.load(std::memory_order_relaxed);
+        stats.UnparkCount = s_Ctx->unparkCount.load(std::memory_order_relaxed);
+        stats.ParkLatencyTotalNs = s_Ctx->parkLatencyTotalNs.load(std::memory_order_relaxed);
+        stats.UnparkLatencyTotalNs = s_Ctx->unparkLatencyTotalNs.load(std::memory_order_relaxed);
 
         stats.WorkerLocalDepths.reserve(s_Ctx->workerStates.size());
         stats.WorkerVictimStealCounts.reserve(s_Ctx->workerStates.size());
@@ -469,4 +503,137 @@ namespace Core::Tasks
 
         s_WorkerIndex = -1;
     }
+
+    Scheduler::WaitToken Scheduler::AcquireWaitToken()
+    {
+        if (!s_Ctx)
+            return {};
+
+        std::lock_guard lock(s_Ctx->waitMutex);
+        uint32_t slot = 0;
+        if (!s_Ctx->freeWaitSlots.empty())
+        {
+            slot = s_Ctx->freeWaitSlots.back();
+            s_Ctx->freeWaitSlots.pop_back();
+        }
+        else
+        {
+            slot = static_cast<uint32_t>(s_Ctx->waitSlots.size());
+            s_Ctx->waitSlots.emplace_back();
+        }
+
+        auto& waitSlot = s_Ctx->waitSlots[slot];
+        waitSlot.inUse = true;
+        waitSlot.parked.clear();
+        return WaitToken{slot, waitSlot.generation};
+    }
+
+    void Scheduler::ReleaseWaitToken(WaitToken token)
+    {
+        if (!s_Ctx || !token.Valid())
+            return;
+
+        std::lock_guard lock(s_Ctx->waitMutex);
+        if (token.Slot >= s_Ctx->waitSlots.size())
+            return;
+
+        auto& slot = s_Ctx->waitSlots[token.Slot];
+        if (!slot.inUse || slot.generation != token.Generation)
+            return;
+
+        slot.inUse = false;
+        slot.parked.clear();
+        slot.generation++;
+        if (slot.generation == 0)
+            slot.generation = 1;
+        s_Ctx->freeWaitSlots.push_back(token.Slot);
+    }
+
+    void Scheduler::ParkCurrentFiber(WaitToken token, std::coroutine_handle<> h,
+                                     std::shared_ptr<std::atomic<bool>> alive)
+    {
+        if (!s_Ctx || !token.Valid() || !h)
+            return;
+
+        const auto parkStart = std::chrono::steady_clock::now();
+        {
+            std::lock_guard lock(s_Ctx->waitMutex);
+            if (token.Slot >= s_Ctx->waitSlots.size())
+                return;
+            auto& slot = s_Ctx->waitSlots[token.Slot];
+            if (!slot.inUse || slot.generation != token.Generation)
+                return;
+
+            s_Ctx->inFlightTasks.fetch_add(1, std::memory_order_release);
+            slot.parked.push_back(SchedulerContext::ParkedContinuation{
+                .Handle = h,
+                .Alive = std::move(alive),
+                .ParkedAt = parkStart,
+            });
+            s_Ctx->parkCount.fetch_add(1, std::memory_order_relaxed);
+        }
+        const auto parkNs = std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::steady_clock::now() - parkStart).count();
+        s_Ctx->parkLatencyTotalNs.fetch_add(static_cast<uint64_t>(parkNs), std::memory_order_relaxed);
+    }
+
+    uint32_t Scheduler::UnparkReady(WaitToken token)
+    {
+        if (!s_Ctx || !token.Valid())
+            return 0;
+
+        std::vector<SchedulerContext::ParkedContinuation> continuations;
+        {
+            std::lock_guard lock(s_Ctx->waitMutex);
+            if (token.Slot >= s_Ctx->waitSlots.size())
+                return 0;
+            auto& slot = s_Ctx->waitSlots[token.Slot];
+            if (!slot.inUse || slot.generation != token.Generation || slot.parked.empty())
+                return 0;
+
+            continuations = std::move(slot.parked);
+            slot.parked.clear();
+        }
+
+        const auto now = std::chrono::steady_clock::now();
+        for (auto& continuation : continuations)
+        {
+            const auto unparkNs = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                now - continuation.ParkedAt).count();
+            s_Ctx->unparkLatencyTotalNs.fetch_add(static_cast<uint64_t>(unparkNs), std::memory_order_relaxed);
+            s_Ctx->unparkCount.fetch_add(1, std::memory_order_relaxed);
+
+            ReleaseInFlightToken();
+            Reschedule(continuation.Handle, std::move(continuation.Alive));
+        }
+
+        return static_cast<uint32_t>(continuations.size());
+    }
+
+    CounterEvent::CounterEvent(uint32_t initialCount)
+        : m_Count(initialCount)
+        , m_Token(Scheduler::AcquireWaitToken())
+    {
+    }
+
+    CounterEvent::~CounterEvent()
+    {
+        Scheduler::ReleaseWaitToken(m_Token);
+    }
+
+    void CounterEvent::Add(uint32_t value)
+    {
+        m_Count.fetch_add(value, std::memory_order_acq_rel);
+    }
+
+    void CounterEvent::Signal(uint32_t value)
+    {
+        const uint32_t previous = m_Count.fetch_sub(value, std::memory_order_acq_rel);
+        if (previous <= value)
+        {
+            m_Count.store(0, std::memory_order_release);
+            Scheduler::UnparkReady(m_Token);
+        }
+    }
+
 }

@@ -70,3 +70,16 @@ Completed the backlog item to eliminate open-ended production TODO drift in the 
 
 - Removed the stale `defaultTextureIndex` TODO scope by keeping `Runtime::RenderOrchestrator` constructor API free of the unused default-texture parameter.
 - Updated the architecture backlog to track this as completed and leave only the remaining runtime ownership-audit work item open.
+
+
+## 2026-02-26 Backlog Hygiene + Fiber-Park Telemetry Completion
+
+Completed governance cleanup to keep the active backlog strictly open-only and moved closed status to history:
+
+- Pruned completed `[x]` architecture items from `TODO.md` so the file contains active work only.
+- Recorded completion status exclusively in `DONE.md`/git history to avoid policy drift between open backlog and historical narrative.
+
+Completed the next telemetry milestone under the scheduler fiber-parking effort:
+
+- Added park/unpark telemetry exposure in `Core::Tasks::Scheduler::GetStats()` (`ParkCount`, `UnparkCount`, and cumulative park/unpark latency nanoseconds).
+- Landed coroutine wait-token parking substrate and `CounterEvent`-driven continuation resume flow.
