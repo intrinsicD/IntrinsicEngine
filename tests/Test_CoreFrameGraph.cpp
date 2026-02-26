@@ -631,6 +631,76 @@ TEST(CoreFrameGraph, ParallelExecutionStress)
 }
 
 // =========================================================================
+// Test: Dependency-ready execution is not blocked by same-layer siblings
+// =========================================================================
+TEST(CoreFrameGraph, ReadyQueueExecutionDoesNotWaitForSlowSiblingLayerBarrier)
+{
+    // Graph topology:
+    //   Root -> SlowSibling
+    //   Root -> FastA -> FastB
+    //
+    // DAGScheduler layers still place SlowSibling and FastA together, with FastB
+    // in the next layer. A legacy "execute full layer, then advance" strategy
+    // would delay FastB until SlowSibling finishes. The ready-queue runtime path
+    // should instead run FastB as soon as FastA completes.
+
+    Memory::ScopeStack scope(1024 * 64);
+    FrameGraph graph(scope);
+
+    std::atomic<uint64_t> slowFinishNs{0};
+    std::atomic<uint64_t> fastBRunNs{0};
+    const auto runStart = std::chrono::steady_clock::now();
+
+    graph.AddPass("Root",
+        [](FrameGraphBuilder& b) { b.Write<Transform>(); },
+        []() {});
+
+    graph.AddPass("SlowSibling",
+        [](FrameGraphBuilder& b) { b.Read<Transform>(); b.Write<Health>(); },
+        [&]() {
+            std::this_thread::sleep_for(std::chrono::milliseconds(120));
+            const uint64_t elapsedNs = static_cast<uint64_t>(
+                std::chrono::duration_cast<std::chrono::nanoseconds>(
+                    std::chrono::steady_clock::now() - runStart).count());
+            slowFinishNs.store(elapsedNs, std::memory_order_release);
+        });
+
+    graph.AddPass("FastA",
+        [](FrameGraphBuilder& b) { b.Read<Transform>(); b.Write<Velocity>(); },
+        []() {});
+
+    graph.AddPass("FastB",
+        [](FrameGraphBuilder& b) { b.Read<Velocity>(); b.Write<Collider>(); },
+        [&]() {
+            const uint64_t elapsedNs = static_cast<uint64_t>(
+                std::chrono::duration_cast<std::chrono::nanoseconds>(
+                    std::chrono::steady_clock::now() - runStart).count());
+            fastBRunNs.store(elapsedNs, std::memory_order_release);
+        });
+
+    auto result = graph.Compile();
+    ASSERT_TRUE(result.has_value());
+
+    const auto& layers = graph.GetExecutionLayers();
+    ASSERT_EQ(layers.size(), 3u);
+    EXPECT_EQ(layers[0].size(), 1u); // Root
+    EXPECT_EQ(layers[1].size(), 2u); // SlowSibling + FastA
+    EXPECT_EQ(layers[2].size(), 1u); // FastB
+
+    Tasks::Scheduler::Initialize(4);
+    graph.Execute();
+    Tasks::Scheduler::Shutdown();
+
+    const uint64_t slowDone = slowFinishNs.load(std::memory_order_acquire);
+    const uint64_t fastBDone = fastBRunNs.load(std::memory_order_acquire);
+    ASSERT_GT(slowDone, 0u);
+    ASSERT_GT(fastBDone, 0u);
+
+    EXPECT_LT(fastBDone, slowDone)
+        << "FastB should run as soon as FastA releases it, without waiting for SlowSibling";
+}
+
+// =========================================================================
 // Test: Complex real-world-like frame
 // =========================================================================
 TEST(CoreFrameGraph, RealisticFrame)
