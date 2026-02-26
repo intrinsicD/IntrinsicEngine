@@ -10,6 +10,24 @@ import :HalfedgeMesh;
 
 export namespace Geometry::MeshUtils
 {
+    struct TriangleFaceView
+    {
+        FaceHandle Face{};
+        HalfedgeHandle H0{};
+        HalfedgeHandle H1{};
+        HalfedgeHandle H2{};
+        VertexHandle V0{};
+        VertexHandle V1{};
+        VertexHandle V2{};
+        glm::vec3 P0{};
+        glm::vec3 P1{};
+        glm::vec3 P2{};
+    };
+
+    /// Gather canonical triangle traversal data for a face.
+    /// Returns false for invalid/deleted faces and non-triangular face loops.
+    bool TryGetTriangleFaceView(const Halfedge::Mesh& mesh, FaceHandle f, TriangleFaceView& out);
+
     // --- Index-buffer mesh utilities ---
 
     int GenerateUVs(std::span<const glm::vec3> positions, std::span<glm::vec4> aux);

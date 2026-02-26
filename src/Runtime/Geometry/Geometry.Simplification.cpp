@@ -16,6 +16,7 @@ module Geometry:Simplification.Impl;
 import :Simplification;
 import :Properties;
 import :HalfedgeMesh;
+import :MeshUtils;
 
 namespace Geometry::Simplification
 {
@@ -219,22 +220,11 @@ namespace Geometry::Simplification
         for (std::size_t fi = 0; fi < mesh.FacesSize(); ++fi)
         {
             FaceHandle fh{static_cast<PropertyIndex>(fi)};
-            if (mesh.IsDeleted(fh)) continue;
-
-            HalfedgeHandle h0 = mesh.Halfedge(fh);
-            HalfedgeHandle h1 = mesh.NextHalfedge(h0);
-            HalfedgeHandle h2 = mesh.NextHalfedge(h1);
-
-            VertexHandle va = mesh.ToVertex(h0);
-            VertexHandle vb = mesh.ToVertex(h1);
-            VertexHandle vc = mesh.ToVertex(h2);
-
-            glm::vec3 pa = mesh.Position(va);
-            glm::vec3 pb = mesh.Position(vb);
-            glm::vec3 pc = mesh.Position(vc);
+            MeshUtils::TriangleFaceView tri{};
+            if (!MeshUtils::TryGetTriangleFaceView(mesh, fh, tri)) continue;
 
             // Compute face plane: n · x + d = 0
-            glm::vec3 normal = glm::cross(pb - pa, pc - pa);
+            glm::vec3 normal = glm::cross(tri.P1 - tri.P0, tri.P2 - tri.P0);
             float len = glm::length(normal);
             if (len < 1e-10f) continue;
             normal /= len;
@@ -242,13 +232,13 @@ namespace Geometry::Simplification
             double a = static_cast<double>(normal.x);
             double b = static_cast<double>(normal.y);
             double c = static_cast<double>(normal.z);
-            double d = -static_cast<double>(glm::dot(normal, pa));
+            double d = -static_cast<double>(glm::dot(normal, tri.P0));
 
             Quadric Kf(a, b, c, d);
 
-            vertexQuadrics[va.Index] += Kf;
-            vertexQuadrics[vb.Index] += Kf;
-            vertexQuadrics[vc.Index] += Kf;
+            vertexQuadrics[tri.V0.Index] += Kf;
+            vertexQuadrics[tri.V1.Index] += Kf;
+            vertexQuadrics[tri.V2.Index] += Kf;
         }
 
         // Optional: add boundary constraint planes
@@ -273,15 +263,10 @@ namespace Geometry::Simplification
                 FaceHandle f = mesh.Face(hInt);
                 if (!f.IsValid()) continue;
 
-                HalfedgeHandle fh0 = mesh.Halfedge(f);
-                HalfedgeHandle fh1 = mesh.NextHalfedge(fh0);
-                HalfedgeHandle fh2 = mesh.NextHalfedge(fh1);
+                MeshUtils::TriangleFaceView tri{};
+                if (!MeshUtils::TryGetTriangleFaceView(mesh, f, tri)) continue;
 
-                glm::vec3 fa = mesh.Position(mesh.ToVertex(fh0));
-                glm::vec3 fb = mesh.Position(mesh.ToVertex(fh1));
-                glm::vec3 fc = mesh.Position(mesh.ToVertex(fh2));
-
-                glm::vec3 faceNormal = glm::normalize(glm::cross(fb - fa, fc - fa));
+                glm::vec3 faceNormal = glm::normalize(glm::cross(tri.P1 - tri.P0, tri.P2 - tri.P0));
 
                 // Boundary plane: perpendicular to face normal and along the edge
                 glm::vec3 edgeDir = glm::normalize(mesh.Position(vj) - mesh.Position(vi));

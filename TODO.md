@@ -259,9 +259,9 @@ Each PR must remain bisect-safe and keep baseline tests green before proceeding.
   - Status: legacy `ModelLoader::LoadAsync(...)` now delegates through `IORegistry` + built-in loaders, so `.ply` imports execute the `Graphics.Importers.PLY` path instead of the duplicate in-module parser.
   - Follow-up: remove dead legacy parser code and extract `Graphics::Importers::PLYCommon` if we keep any cross-loader scalar/property utilities.
 
-- [ ] **Extract shared face-iteration traversal helpers for geometry operators (Medium).**
-  - Curvature, mesh-quality, parameterization, and simplification modules repeat near-identical `HalfedgeHandle h0/h1/h2` traversal + per-face metric accumulation loops.
-  - Action: add reusable traversal kernels in `Geometry:MeshUtils` (face walk + robust degenerate guards) and call them from operator modules.
+- [x] **Extract shared face-iteration traversal helpers for geometry operators (Medium).**
+  - Added `MeshUtils::TriangleFaceView` + `MeshUtils::TryGetTriangleFaceView(...)` to centralize robust face-walk extraction (valid/deleted guard + triangle-loop verification).
+  - Integrated helper into `Geometry.MeshQuality` and `Geometry.Simplification` per-face traversal sites; remaining modules can migrate incrementally to the same kernel.
 
 - [x] **Deduplicate remeshing valence equalization and tangential smoothing passes (Completed).**
   - `Geometry.Remeshing` and `Geometry.AdaptiveRemeshing` now share `MeshUtils::EqualizeValenceByEdgeFlip(...)` and `MeshUtils::TangentialSmooth(...)`.

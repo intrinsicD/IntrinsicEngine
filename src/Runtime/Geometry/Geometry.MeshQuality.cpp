@@ -183,22 +183,11 @@ namespace Geometry::MeshQuality
             for (std::size_t fi = 0; fi < mesh.FacesSize(); ++fi)
             {
                 FaceHandle fh{static_cast<PropertyIndex>(fi)};
-                if (mesh.IsDeleted(fh)) continue;
-
-                HalfedgeHandle h0 = mesh.Halfedge(fh);
-                HalfedgeHandle h1 = mesh.NextHalfedge(h0);
-                HalfedgeHandle h2 = mesh.NextHalfedge(h1);
-
-                VertexHandle va = mesh.ToVertex(h0);
-                VertexHandle vb = mesh.ToVertex(h1);
-                VertexHandle vc = mesh.ToVertex(h2);
-
-                glm::vec3 pa = mesh.Position(va);
-                glm::vec3 pb = mesh.Position(vb);
-                glm::vec3 pc = mesh.Position(vc);
+                MeshUtils::TriangleFaceView tri{};
+                if (!MeshUtils::TryGetTriangleFaceView(mesh, fh, tri)) continue;
 
                 // Area
-                double area = TriangleArea(pa, pb, pc);
+                double area = TriangleArea(tri.P0, tri.P1, tri.P2);
                 if (params.ComputeAreas)
                 {
                     if (area < minArea) minArea = area;
@@ -210,16 +199,16 @@ namespace Geometry::MeshQuality
                 // Volume contribution (divergence theorem)
                 if (params.ComputeVolume)
                 {
-                    volumeSum += static_cast<double>(glm::dot(pa, glm::cross(pb, pc)));
+                    volumeSum += static_cast<double>(glm::dot(tri.P0, glm::cross(tri.P1, tri.P2)));
                 }
 
                 // Angles
                 if (params.ComputeAngles)
                 {
                     double angles[3] = {
-                        TriangleAngleAt(pb, pa, pc) * kRadToDeg,
-                        TriangleAngleAt(pa, pb, pc) * kRadToDeg,
-                        TriangleAngleAt(pa, pc, pb) * kRadToDeg
+                        TriangleAngleAt(tri.P1, tri.P0, tri.P2) * kRadToDeg,
+                        TriangleAngleAt(tri.P0, tri.P1, tri.P2) * kRadToDeg,
+                        TriangleAngleAt(tri.P0, tri.P2, tri.P1) * kRadToDeg
                     };
 
                     for (double ang : angles)
@@ -238,9 +227,9 @@ namespace Geometry::MeshQuality
                 // inradius = area / semi-perimeter
                 if (params.ComputeAspectRatios && area > params.DegenerateAreaEpsilon)
                 {
-                    double la = static_cast<double>(glm::distance(pb, pc));
-                    double lb = static_cast<double>(glm::distance(pa, pc));
-                    double lc = static_cast<double>(glm::distance(pa, pb));
+                    double la = static_cast<double>(glm::distance(tri.P1, tri.P2));
+                    double lb = static_cast<double>(glm::distance(tri.P0, tri.P2));
+                    double lc = static_cast<double>(glm::distance(tri.P0, tri.P1));
                     double longest = std::max({la, lb, lc});
                     double s = (la + lb + lc) / 2.0;
                     double inradius = area / s;
