@@ -21,7 +21,6 @@ This document tracks **what's left to do** in IntrinsicEngine's architecture.
 ### 1.1 2026-02-25 Architecture Review Follow-ups
 
 - [ ] **Complete `Core::Tasks` fiber parking for dependency waits (High).**
-  - Hybrid work-stealing foundations are now in place (worker-local LIFO deques + cross-worker stealing + external inject queue).
   - Add true fiber parking/unparking for wait-heavy dependency chains so worker OS threads never block on fine-grain sync.
   - Remaining: complete dependency-level continuation parking integration across scheduler wait-heavy boundaries and finalize park/unpark percentile telemetry.
 
@@ -141,12 +140,11 @@ Implementation notes:
 #### Execution work packages (implementation-ready)
 
 **WP4 — Telemetry + SLO instrumentation**
-- **Status (2026-02-26): In progress.** Scheduler stats now publish steal success ratio and idle wait totals/counts; park/unpark percentile buckets remain to be wired into the telemetry export path.
+- **Status (2026-02-26): In progress.** Park/unpark percentile buckets remain to be wired into the telemetry export path.
 - Emit per-frame counters/histograms:
   - `tasks.park.count`, `tasks.unpark.count`
   - `tasks.park.ns.{p50,p95,p99}`, `tasks.unpark.ns.{p50,p95,p99}`
   - `tasks.deque.depth.{worker}` histogram
-  - `tasks.steal.ratio`, `tasks.idle.wait_ns`
 - Add compile-time telemetry toggle compatible with existing lock-free ring-buffer pipeline.
 - Exit criteria: metrics visible in telemetry export and stable under stress (no counter drift or negative deltas).
 

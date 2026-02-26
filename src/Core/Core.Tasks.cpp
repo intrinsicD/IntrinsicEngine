@@ -11,6 +11,9 @@ module;
 #include <optional>
 #include <chrono>
 #include <limits>
+#include <array>
+#include <bit>
+#include <cmath>
 
 #if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
   #include <immintrin.h> // _mm_pause
@@ -195,6 +198,9 @@ namespace Core::Tasks
         alignas(64) std::atomic<uint64_t> unparkCount{0};
         alignas(64) std::atomic<uint64_t> parkLatencyTotalNs{0};
         alignas(64) std::atomic<uint64_t> unparkLatencyTotalNs{0};
+        static constexpr size_t LatencyBucketCount = 64;
+        std::array<std::atomic<uint64_t>, LatencyBucketCount> parkLatencyHistogram{};
+        std::array<std::atomic<uint64_t>, LatencyBucketCount> unparkLatencyHistogram{};
         alignas(64) std::atomic<uint64_t> idleWaitCount{0};
         alignas(64) std::atomic<uint64_t> idleWaitTotalNs{0};
 
@@ -235,6 +241,43 @@ namespace Core::Tasks
 
     static std::unique_ptr<SchedulerContext> s_Ctx = nullptr;
     static thread_local int s_WorkerIndex = -1;
+
+    [[nodiscard]] static size_t LatencyBucketIndex(uint64_t latencyNs)
+    {
+        if (latencyNs == 0)
+            return 0;
+
+        const uint32_t msb = std::bit_width(latencyNs) - 1;
+        return std::min<size_t>(msb + 1, SchedulerContext::LatencyBucketCount - 1);
+    }
+
+    static void RecordLatencySample(
+        std::array<std::atomic<uint64_t>, SchedulerContext::LatencyBucketCount>& histogram,
+        uint64_t latencyNs)
+    {
+        histogram[LatencyBucketIndex(latencyNs)].fetch_add(1, std::memory_order_relaxed);
+    }
+
+    [[nodiscard]] static uint64_t EstimateLatencyPercentile(
+        const std::array<uint64_t, SchedulerContext::LatencyBucketCount>& histogram,
+        uint64_t totalSamples,
+        double percentile)
+    {
+        if (totalSamples == 0)
+            return 0;
+
+        const uint64_t targetRank = static_cast<uint64_t>(
+            std::ceil(std::clamp(percentile, 0.0, 1.0) * static_cast<double>(totalSamples)));
+        uint64_t prefix = 0;
+        for (size_t i = 0; i < histogram.size(); ++i)
+        {
+            prefix += histogram[i];
+            if (prefix >= targetRank)
+                return (i == 0) ? 0 : (1ull << (i - 1));
+        }
+
+        return 1ull << (histogram.size() - 2);
+    }
 
     static void ReleaseInFlightToken()
     {
@@ -531,6 +574,19 @@ namespace Core::Tasks
         stats.UnparkCount = s_Ctx->unparkCount.load(std::memory_order_relaxed);
         stats.ParkLatencyTotalNs = s_Ctx->parkLatencyTotalNs.load(std::memory_order_relaxed);
         stats.UnparkLatencyTotalNs = s_Ctx->unparkLatencyTotalNs.load(std::memory_order_relaxed);
+        std::array<uint64_t, SchedulerContext::LatencyBucketCount> parkHistogram{};
+        std::array<uint64_t, SchedulerContext::LatencyBucketCount> unparkHistogram{};
+        for (size_t i = 0; i < SchedulerContext::LatencyBucketCount; ++i)
+        {
+            parkHistogram[i] = s_Ctx->parkLatencyHistogram[i].load(std::memory_order_relaxed);
+            unparkHistogram[i] = s_Ctx->unparkLatencyHistogram[i].load(std::memory_order_relaxed);
+        }
+        stats.ParkLatencyP50Ns = EstimateLatencyPercentile(parkHistogram, stats.ParkCount, 0.50);
+        stats.ParkLatencyP95Ns = EstimateLatencyPercentile(parkHistogram, stats.ParkCount, 0.95);
+        stats.ParkLatencyP99Ns = EstimateLatencyPercentile(parkHistogram, stats.ParkCount, 0.99);
+        stats.UnparkLatencyP50Ns = EstimateLatencyPercentile(unparkHistogram, stats.UnparkCount, 0.50);
+        stats.UnparkLatencyP95Ns = EstimateLatencyPercentile(unparkHistogram, stats.UnparkCount, 0.95);
+        stats.UnparkLatencyP99Ns = EstimateLatencyPercentile(unparkHistogram, stats.UnparkCount, 0.99);
         stats.IdleWaitCount = s_Ctx->idleWaitCount.load(std::memory_order_relaxed);
         stats.IdleWaitTotalNs = s_Ctx->idleWaitTotalNs.load(std::memory_order_relaxed);
         if (stats.TotalStealAttempts > 0)
@@ -759,6 +815,7 @@ namespace Core::Tasks
         const auto parkNs = std::chrono::duration_cast<std::chrono::nanoseconds>(
             std::chrono::steady_clock::now() - parkStart).count();
         s_Ctx->parkLatencyTotalNs.fetch_add(static_cast<uint64_t>(parkNs), std::memory_order_relaxed);
+        RecordLatencySample(s_Ctx->parkLatencyHistogram, static_cast<uint64_t>(parkNs));
         return true;
     }
 
@@ -855,6 +912,7 @@ namespace Core::Tasks
                 now - continuation.ParkedAt).count();
             s_Ctx->unparkLatencyTotalNs.fetch_add(static_cast<uint64_t>(unparkNs), std::memory_order_relaxed);
             s_Ctx->unparkCount.fetch_add(1, std::memory_order_relaxed);
+            RecordLatencySample(s_Ctx->unparkLatencyHistogram, static_cast<uint64_t>(unparkNs));
 
             // Parking does NOT hold an in-flight token (removed in ParkCurrentFiberIfNotReady).
             // Unparking re-injects the continuation as a brand-new scheduled task.
