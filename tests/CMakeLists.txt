@@ -101,6 +101,7 @@ intrinsic_test_object_lib(GeometryTestObjs
         Test_AdaptiveRemeshing.cpp
         Test_ConvexHull.cpp
         Test_PointCloud.cpp
+        Test_Boolean.cpp
         Test_GeometryAttributePropagation.cpp
     DEPS IntrinsicCore IntrinsicGeometry
 )

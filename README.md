@@ -73,6 +73,7 @@ A **"Distinguished Scientist" grade** geometry kernel in `src/Runtime/Geometry/`
 | **Parameterization** | LSCM (Least Squares Conformal Maps) with auto boundary pinning | Lévy et al. 2002 |
 | **Mesh Quality** | Angle, aspect ratio, edge length, valence, area, volume diagnostics | — |
 | **Convex Hull** | Quickhull 3D (V-Rep + H-Rep + optional Halfedge::Mesh output) | Barber et al. 1996 |
+| **Boolean CSG (baseline)** | Union/intersection/difference for disjoint/full-containment meshes, conservative fallback on partial overlaps | — |
 
 **Discrete Exterior Calculus (DEC):**
 - Exterior derivatives d0, d1 in CSR sparse matrix format.
