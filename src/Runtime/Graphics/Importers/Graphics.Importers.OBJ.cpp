@@ -4,12 +4,11 @@ module;
 #include <cstdint>
 #include <expected>
 #include <span>
-#include <sstream>
-#include <string>
 #include <string_view>
 #include <unordered_map>
 #include <vector>
 #include <glm/glm.hpp>
+#include "Graphics.Importers.TextParse.hpp"
 
 module Graphics:Importers.OBJ.Impl;
 import :Importers.OBJ;
@@ -49,7 +48,6 @@ namespace Graphics
         const LoadContext& /*ctx*/)
     {
         std::string_view text(reinterpret_cast<const char*>(data.data()), data.size());
-        std::istringstream stream{std::string{text}};
 
         GeometryCpuData outData;
         std::vector<glm::vec3> tempPos;
@@ -58,65 +56,96 @@ namespace Graphics
         std::unordered_map<VertexKey, uint32_t, VertexKeyHash> uniqueVertices;
 
         outData.Topology = PrimitiveTopology::Triangles;
-        std::string line;
+        std::string_view line;
+        size_t lineCursor = 0;
         bool hasNormals = false;
         bool hasUVs = false;
+        std::vector<std::string_view> tokens;
+        tokens.reserve(16);
 
-        while (std::getline(stream, line))
+        while (Importers::TextParse::NextLine(text, lineCursor, line))
         {
-            if (line.empty() || line[0] == '#') continue;
-            std::stringstream ss(line);
-            std::string type;
-            ss >> type;
+            line = Importers::TextParse::Trim(line);
+            if (line.empty() || line.front() == '#')
+                continue;
+
+            Importers::TextParse::SplitWhitespace(line, tokens);
+            if (tokens.empty())
+                continue;
+
+            const std::string_view type = tokens.front();
 
             if (type == "v")
             {
-                glm::vec3 v;
-                ss >> v.x >> v.y >> v.z;
-                tempPos.push_back(v);
+                if (tokens.size() < 4)
+                    continue;
+
+                const auto x = Importers::TextParse::ParseNumber<float>(tokens[1]);
+                const auto y = Importers::TextParse::ParseNumber<float>(tokens[2]);
+                const auto z = Importers::TextParse::ParseNumber<float>(tokens[3]);
+                if (x && y && z)
+                    tempPos.emplace_back(*x, *y, *z);
             }
             else if (type == "vn")
             {
-                glm::vec3 vn;
-                ss >> vn.x >> vn.y >> vn.z;
-                tempNorm.push_back(vn);
-                hasNormals = true;
+                if (tokens.size() < 4)
+                    continue;
+
+                const auto x = Importers::TextParse::ParseNumber<float>(tokens[1]);
+                const auto y = Importers::TextParse::ParseNumber<float>(tokens[2]);
+                const auto z = Importers::TextParse::ParseNumber<float>(tokens[3]);
+                if (x && y && z)
+                {
+                    tempNorm.emplace_back(*x, *y, *z);
+                    hasNormals = true;
+                }
             }
             else if (type == "vt")
             {
-                glm::vec2 vt;
-                ss >> vt.x >> vt.y;
-                tempUV.push_back(vt);
-                hasUVs = true;
+                if (tokens.size() < 3)
+                    continue;
+
+                const auto u = Importers::TextParse::ParseNumber<float>(tokens[1]);
+                const auto v = Importers::TextParse::ParseNumber<float>(tokens[2]);
+                if (u && v)
+                {
+                    tempUV.emplace_back(*u, *v);
+                    hasUVs = true;
+                }
             }
             else if (type == "f")
             {
-                std::string vertexStr;
                 std::vector<uint32_t> faceIndices;
+                faceIndices.reserve(tokens.size());
 
-                while (ss >> vertexStr)
+                for (size_t tokenIndex = 1; tokenIndex < tokens.size(); ++tokenIndex)
                 {
+                    const std::string_view vertexStr = tokens[tokenIndex];
                     VertexKey key;
-                    size_t s1 = vertexStr.find('/');
-                    size_t s2 = vertexStr.find('/', s1 + 1);
+                    const size_t s1 = vertexStr.find('/');
+                    const size_t s2 = vertexStr.find('/', s1 == std::string_view::npos ? vertexStr.size() : s1 + 1);
 
                     std::from_chars(vertexStr.data(),
-                                    vertexStr.data() + (s1 == std::string::npos ? vertexStr.size() : s1), key.p);
+                                    vertexStr.data() + (s1 == std::string_view::npos ? vertexStr.size() : s1),
+                                    key.p);
                     key.p--;
 
-                    if (s1 != std::string::npos)
+                    if (s1 != std::string_view::npos)
                     {
-                        if (s2 != std::string::npos && s2 - s1 > 1)
+                        if (s2 != std::string_view::npos && s2 - s1 > 1)
                         {
                             std::from_chars(vertexStr.data() + s1 + 1, vertexStr.data() + s2, key.t);
                             key.t--;
                         }
-                        if (s2 != std::string::npos && s2 + 1 < vertexStr.size())
+                        if (s2 != std::string_view::npos && s2 + 1 < vertexStr.size())
                         {
                             std::from_chars(vertexStr.data() + s2 + 1, vertexStr.data() + vertexStr.size(), key.n);
                             key.n--;
                         }
                     }
+
+                    if (key.p < 0 || static_cast<size_t>(key.p) >= tempPos.size())
+                        continue;
 
                     if (uniqueVertices.find(key) == uniqueVertices.end())
                     {
