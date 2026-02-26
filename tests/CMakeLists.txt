@@ -126,6 +126,7 @@ intrinsic_test_object_lib(RuntimeTestObjs
         Test_DebugDraw.cpp
         Test_BoundingDebugDraw.cpp
         Test_KDTreeDebugDraw.cpp
+        Test_BVHDebugDraw.cpp
         Test_ConvexHullDebugDraw.cpp
         Test_OctreeDebugDraw.cpp
         Test_EditorUI.cpp

@@ -69,6 +69,10 @@ public:
 
     Graphics::KDTreeDebugDrawSettings m_KDTreeDebugSettings{};
     bool m_DrawSelectedColliderKDTree = false;
+
+    Graphics::BVHDebugDrawSettings m_BVHDebugSettings{};
+    bool m_DrawSelectedColliderBVH = false;
+
     bool m_DrawSelectedColliderConvexHull = false;
     bool m_DrawSelectedColliderContacts = false;
     bool m_ContactDebugOverlay = true;
@@ -414,6 +418,7 @@ public:
             ImGui::Checkbox("Draw Selected MeshCollider Octree", &m_DrawSelectedColliderOctree);
             ImGui::Checkbox("Draw Selected MeshCollider Bounds", &m_DrawSelectedColliderBounds);
             ImGui::Checkbox("Draw Selected MeshCollider KD-Tree", &m_DrawSelectedColliderKDTree);
+            ImGui::Checkbox("Draw Selected MeshCollider BVH", &m_DrawSelectedColliderBVH);
             ImGui::Checkbox("Draw Selected MeshCollider Convex Hull", &m_DrawSelectedColliderConvexHull);
             ImGui::Checkbox("Draw Contact Manifolds", &m_DrawSelectedColliderContacts);
             ImGui::Checkbox("Bounds Overlay (no depth test)", &m_BoundsDebugSettings.Overlay);
@@ -462,6 +467,23 @@ public:
             if (ImGui::ColorEdit3("Hull Color", hullColor))
                 m_ConvexHullDebugSettings.Color = glm::vec3(hullColor[0], hullColor[1], hullColor[2]);
 
+
+            ImGui::SeparatorText("BVH");
+            ImGui::Checkbox("BVH Overlay (no depth test)", &m_BVHDebugSettings.Overlay);
+            ImGui::Checkbox("BVH Leaf Only", &m_BVHDebugSettings.LeafOnly);
+            ImGui::Checkbox("BVH Draw Internal", &m_BVHDebugSettings.DrawInternal);
+            ImGui::SliderInt("BVH Max Depth", reinterpret_cast<int*>(&m_BVHDebugSettings.MaxDepth), 0, 32);
+            ImGui::SliderInt("BVH Leaf Triangles", reinterpret_cast<int*>(&m_BVHDebugSettings.LeafTriangleCount), 1, 64);
+            ImGui::SliderFloat("BVH Alpha", &m_BVHDebugSettings.Alpha, 0.05f, 1.0f, "%.2f");
+
+            float bvhLeafColor[3] = {m_BVHDebugSettings.LeafColor.r, m_BVHDebugSettings.LeafColor.g, m_BVHDebugSettings.LeafColor.b};
+            if (ImGui::ColorEdit3("BVH Leaf Color", bvhLeafColor))
+                m_BVHDebugSettings.LeafColor = glm::vec3(bvhLeafColor[0], bvhLeafColor[1], bvhLeafColor[2]);
+
+            float bvhInternalColor[3] = {m_BVHDebugSettings.InternalColor.r, m_BVHDebugSettings.InternalColor.g, m_BVHDebugSettings.InternalColor.b};
+            if (ImGui::ColorEdit3("BVH Internal Color", bvhInternalColor))
+                m_BVHDebugSettings.InternalColor = glm::vec3(bvhInternalColor[0], bvhInternalColor[1], bvhInternalColor[2]);
+
             ImGui::SeparatorText("Octree");
             ImGui::Checkbox("Overlay (no depth test)", &m_OctreeDebugSettings.Overlay);
             ImGui::Checkbox("Leaf Only", &m_OctreeDebugSettings.LeafOnly);
@@ -487,7 +509,7 @@ public:
             // The settings above will take effect on the next frame.
 
             // Show status feedback
-            if (m_DrawSelectedColliderOctree || m_DrawSelectedColliderBounds || m_DrawSelectedColliderKDTree || m_DrawSelectedColliderConvexHull)
+            if (m_DrawSelectedColliderOctree || m_DrawSelectedColliderBounds || m_DrawSelectedColliderKDTree || m_DrawSelectedColliderBVH || m_DrawSelectedColliderConvexHull)
             {
                 const entt::entity selected = GetSelection().GetSelectedEntity(GetScene());
                 if (selected == entt::null || !GetScene().GetRegistry().valid(selected))
@@ -630,7 +652,7 @@ public:
         // Debug Visualization: emit DebugDraw geometry BEFORE render system runs.
         // ImGui panels run AFTER render, so we emit here using settings from last frame.
         // ---------------------------------------------------------------------
-        if (m_DrawSelectedColliderOctree || m_DrawSelectedColliderBounds || m_DrawSelectedColliderKDTree || m_DrawSelectedColliderConvexHull || m_DrawSelectedColliderContacts)
+        if (m_DrawSelectedColliderOctree || m_DrawSelectedColliderBounds || m_DrawSelectedColliderKDTree || m_DrawSelectedColliderBVH || m_DrawSelectedColliderConvexHull || m_DrawSelectedColliderContacts)
         {
             const entt::entity selected = GetSelection().GetSelectedEntity(GetScene());
             if (selected != entt::null && GetScene().GetRegistry().valid(selected))
@@ -674,6 +696,16 @@ public:
                         }
                     }
 
+                    if (m_DrawSelectedColliderBVH)
+                    {
+                        m_BVHDebugSettings.Enabled = true;
+                        const glm::mat4 worldMatrix = GetMatrix(*xf);
+                        DrawBVH(GetRenderOrchestrator().GetDebugDraw(),
+                                collider->CollisionRef->Positions,
+                                collider->CollisionRef->Indices,
+                                m_BVHDebugSettings,
+                                worldMatrix);
+                    }
 
                     if (m_DrawSelectedColliderConvexHull)
                     {
