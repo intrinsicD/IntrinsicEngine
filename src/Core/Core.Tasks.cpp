@@ -905,8 +905,12 @@ namespace Core::Tasks
         if (!s_Ctx || budget == 0)
             return 0;
 
-        std::vector<SchedulerContext::ParkedContinuation> ready;
-        ready.reserve(budget);
+        // Hot path for dependency-heavy coroutine workloads: avoid per-drain
+        // heap churn by reusing a per-thread scratch buffer.
+        thread_local std::vector<SchedulerContext::ParkedContinuation> ready;
+        ready.clear();
+        if (ready.capacity() < budget)
+            ready.reserve(budget);
         {
             std::lock_guard readyLock(s_Ctx->readyWaitQueueMutex);
             const uint32_t available = static_cast<uint32_t>(s_Ctx->readyWaitQueue.size());

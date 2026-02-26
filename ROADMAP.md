@@ -14,6 +14,8 @@ Backlog completion update (2026-02-26): `Core::DAGScheduler` compile-path edge d
 
 Backlog completion update (2026-02-26): pathological fan-out edge-dedupe scaling validation is now covered by `tests/Test_DAGScheduler.cpp::FanoutDedupScaling`, stress-testing 2,048 consumers with repeated resource reads and asserting deduped indegree/dependent invariants.
 
+Backlog completion update (2026-02-26): scheduler wait-queue draining now reuses per-thread continuation scratch buffers instead of allocating a fresh `std::vector` per drain, reducing allocator churn on park/unpark-heavy coroutine workloads.
+
 1. **Core::Tasks fiber parking for dependency waits** (current top priority).
    - Deliver continuation-level park/unpark semantics so wait-heavy graphs do not block worker OS threads.
    - Telemetry milestone progress: scheduler now exposes deque-depth snapshots and steal attempt/success metrics via `Scheduler::GetStats()`.
