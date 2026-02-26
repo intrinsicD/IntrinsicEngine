@@ -8,6 +8,7 @@ module;
 #include <vector>
 
 export module Core.Telemetry;
+import Core.Tasks;
 
 export namespace Core::Telemetry
 {
@@ -33,6 +34,17 @@ export namespace Core::Telemetry
         uint32_t DrawCalls = 0;
         uint32_t TriangleCount = 0;
         uint32_t SampleCount = 0;
+        uint64_t TaskParkCount = 0;
+        uint64_t TaskUnparkCount = 0;
+        uint64_t TaskParkP50Ns = 0;
+        uint64_t TaskParkP95Ns = 0;
+        uint64_t TaskParkP99Ns = 0;
+        uint64_t TaskUnparkP50Ns = 0;
+        uint64_t TaskUnparkP95Ns = 0;
+        uint64_t TaskUnparkP99Ns = 0;
+        uint64_t TaskIdleWaitCount = 0;
+        uint64_t TaskIdleWaitTotalNs = 0;
+        double TaskStealSuccessRatio = 0.0;
     };
 
     struct TimingCategory
@@ -71,6 +83,7 @@ export namespace Core::Telemetry
         void RecordSample(uint32_t nameHash, const char* name, uint64_t durationNs, uint16_t depth = 0);
         void RecordDrawCall(uint32_t triangles = 0);
         void SetGpuFrameTimeNs(uint64_t gpuTimeNs);
+        void SetTaskSchedulerStats(const Core::Tasks::Scheduler::Stats& stats);
 
         [[nodiscard]] const FrameStats& GetFrameStats(size_t framesAgo = 0) const
         {
@@ -98,6 +111,17 @@ export namespace Core::Telemetry
         std::atomic<uint32_t> m_DrawCallCount{0};
         std::atomic<uint32_t> m_TriangleCount{0};
         std::atomic<size_t> m_CategoryCount{0};
+        std::atomic<uint64_t> m_TaskParkCount{0};
+        std::atomic<uint64_t> m_TaskUnparkCount{0};
+        std::atomic<uint64_t> m_TaskParkP50Ns{0};
+        std::atomic<uint64_t> m_TaskParkP95Ns{0};
+        std::atomic<uint64_t> m_TaskParkP99Ns{0};
+        std::atomic<uint64_t> m_TaskUnparkP50Ns{0};
+        std::atomic<uint64_t> m_TaskUnparkP95Ns{0};
+        std::atomic<uint64_t> m_TaskUnparkP99Ns{0};
+        std::atomic<uint64_t> m_TaskIdleWaitCount{0};
+        std::atomic<uint64_t> m_TaskIdleWaitTotalNs{0};
+        std::atomic<double> m_TaskStealSuccessRatio{0.0};
 
         std::array<FrameStats, MAX_FRAME_HISTORY> m_FrameHistory{};
         std::array<TimingCategory, MAX_CATEGORIES> m_Categories{};

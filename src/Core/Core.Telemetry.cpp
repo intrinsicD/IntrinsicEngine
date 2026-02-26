@@ -61,6 +61,17 @@ namespace Core::Telemetry
         m_FrameHistory[idx].SampleCount = m_CurrentFrameSampleCount.load(std::memory_order_relaxed);
         m_FrameHistory[idx].DrawCalls = m_DrawCallCount.load(std::memory_order_relaxed);
         m_FrameHistory[idx].TriangleCount = m_TriangleCount.load(std::memory_order_relaxed);
+        m_FrameHistory[idx].TaskParkCount = m_TaskParkCount.load(std::memory_order_relaxed);
+        m_FrameHistory[idx].TaskUnparkCount = m_TaskUnparkCount.load(std::memory_order_relaxed);
+        m_FrameHistory[idx].TaskParkP50Ns = m_TaskParkP50Ns.load(std::memory_order_relaxed);
+        m_FrameHistory[idx].TaskParkP95Ns = m_TaskParkP95Ns.load(std::memory_order_relaxed);
+        m_FrameHistory[idx].TaskParkP99Ns = m_TaskParkP99Ns.load(std::memory_order_relaxed);
+        m_FrameHistory[idx].TaskUnparkP50Ns = m_TaskUnparkP50Ns.load(std::memory_order_relaxed);
+        m_FrameHistory[idx].TaskUnparkP95Ns = m_TaskUnparkP95Ns.load(std::memory_order_relaxed);
+        m_FrameHistory[idx].TaskUnparkP99Ns = m_TaskUnparkP99Ns.load(std::memory_order_relaxed);
+        m_FrameHistory[idx].TaskIdleWaitCount = m_TaskIdleWaitCount.load(std::memory_order_relaxed);
+        m_FrameHistory[idx].TaskIdleWaitTotalNs = m_TaskIdleWaitTotalNs.load(std::memory_order_relaxed);
+        m_FrameHistory[idx].TaskStealSuccessRatio = m_TaskStealSuccessRatio.load(std::memory_order_relaxed);
 
         m_CurrentFrame++;
         m_DrawCallCount.store(0, std::memory_order_relaxed);
@@ -96,6 +107,21 @@ namespace Core::Telemetry
     {
         size_t idx = (m_CurrentFrame - 1) % MAX_FRAME_HISTORY;
         m_FrameHistory[idx].GpuTimeNs = gpuTimeNs;
+    }
+
+    void TelemetrySystem::SetTaskSchedulerStats(const Core::Tasks::Scheduler::Stats& stats)
+    {
+        m_TaskParkCount.store(stats.ParkCount, std::memory_order_relaxed);
+        m_TaskUnparkCount.store(stats.UnparkCount, std::memory_order_relaxed);
+        m_TaskParkP50Ns.store(stats.ParkLatencyP50Ns, std::memory_order_relaxed);
+        m_TaskParkP95Ns.store(stats.ParkLatencyP95Ns, std::memory_order_relaxed);
+        m_TaskParkP99Ns.store(stats.ParkLatencyP99Ns, std::memory_order_relaxed);
+        m_TaskUnparkP50Ns.store(stats.UnparkLatencyP50Ns, std::memory_order_relaxed);
+        m_TaskUnparkP95Ns.store(stats.UnparkLatencyP95Ns, std::memory_order_relaxed);
+        m_TaskUnparkP99Ns.store(stats.UnparkLatencyP99Ns, std::memory_order_relaxed);
+        m_TaskIdleWaitCount.store(stats.IdleWaitCount, std::memory_order_relaxed);
+        m_TaskIdleWaitTotalNs.store(stats.IdleWaitTotalNs, std::memory_order_relaxed);
+        m_TaskStealSuccessRatio.store(stats.StealSuccessRatio, std::memory_order_relaxed);
     }
 
     double TelemetrySystem::GetAverageFrameTimeMs(size_t frameCount) const

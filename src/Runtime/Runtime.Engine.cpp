@@ -487,6 +487,8 @@ namespace Runtime
                 OnRender();
             }
 
+            Core::Telemetry::TelemetrySystem::Get().SetTaskSchedulerStats(Core::Tasks::Scheduler::GetStats());
+
             // End frame telemetry
             Core::Telemetry::TelemetrySystem::Get().EndFrame();
         }
