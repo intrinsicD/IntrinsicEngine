@@ -24,6 +24,8 @@ import Core.IOBackend;
 import Core.Logging;
 import Geometry;
 
+#include "Graphics.Importers.PostProcess.hpp"
+
 namespace Graphics
 {
     namespace
@@ -279,13 +281,14 @@ namespace Graphics
                     }
                 }
 
-                if (!hasNormals && meshData.Topology == PrimitiveTopology::Triangles)
+                if (!Importers::ApplyGeometryImportPostProcess(
+                        meshData,
+                        hasNormals,
+                        uvIt != primitive.attributes.end(),
+                        Geometry::MeshUtils::CalculateNormals,
+                        Geometry::MeshUtils::GenerateUVs))
                 {
-                    Geometry::MeshUtils::CalculateNormals(meshData.Positions, meshData.Indices, meshData.Normals);
-                }
-                if (uvIt == primitive.attributes.end())
-                {
-                    Geometry::MeshUtils::GenerateUVs(meshData.Positions, meshData.Aux);
+                    continue;
                 }
 
                 meshes.push_back(std::move(meshData));

@@ -16,6 +16,8 @@ import :Geometry;
 import :AssetErrors;
 import Geometry;
 
+#include "Graphics.Importers.PostProcess.hpp"
+
 namespace Graphics
 {
     namespace
@@ -157,17 +159,18 @@ namespace Graphics
             }
         }
 
-        if (outData.Indices.empty())
-            return std::unexpected(AssetError::InvalidData);
-
-        // Compute normals if not provided
-        if (!hasNormals)
+        Importers::GeometryImportPostProcessPolicy policy;
+        policy.RequireIndicesForTriangles = true;
+        if (!Importers::ApplyGeometryImportPostProcess(
+                outData,
+                hasNormals,
+                false,
+                Geometry::MeshUtils::CalculateNormals,
+                Geometry::MeshUtils::GenerateUVs,
+                policy))
         {
-            Geometry::MeshUtils::CalculateNormals(outData.Positions, outData.Indices, outData.Normals);
+            return std::unexpected(AssetError::InvalidData);
         }
-
-        // Generate UVs
-        Geometry::MeshUtils::GenerateUVs(outData.Positions, outData.Aux);
 
         MeshImportData result;
         result.Meshes.push_back(std::move(outData));

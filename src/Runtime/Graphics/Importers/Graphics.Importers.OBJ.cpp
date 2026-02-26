@@ -17,6 +17,8 @@ import :Geometry;
 import :AssetErrors;
 import Geometry;
 
+#include "Graphics.Importers.PostProcess.hpp"
+
 namespace Graphics
 {
     namespace
@@ -175,16 +177,14 @@ namespace Graphics
             }
         }
 
-        if (outData.Positions.empty())
+        if (!Importers::ApplyGeometryImportPostProcess(
+                outData,
+                hasNormals,
+                hasUVs,
+                Geometry::MeshUtils::CalculateNormals,
+                Geometry::MeshUtils::GenerateUVs))
+        {
             return std::unexpected(AssetError::InvalidData);
-
-        if (!hasNormals && outData.Topology == PrimitiveTopology::Triangles)
-        {
-            Geometry::MeshUtils::CalculateNormals(outData.Positions, outData.Indices, outData.Normals);
-        }
-        if (!hasUVs)
-        {
-            Geometry::MeshUtils::GenerateUVs(outData.Positions, outData.Aux);
         }
 
         MeshImportData result;
