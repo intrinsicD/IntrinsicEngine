@@ -190,10 +190,17 @@ TEST(CoreTasks, CounterEventParksAndUnparksContinuation)
 
     event.Signal();
     Scheduler::WaitForAll();
+    const auto stats = Scheduler::GetStats();
 
     EXPECT_EQ(stage.load(std::memory_order_acquire), 2);
-    EXPECT_GE(Scheduler::GetParkCount(),   1u);
-    EXPECT_GE(Scheduler::GetUnparkCount(), 1u);
+    EXPECT_GE(stats.ParkCount,   1u);
+    EXPECT_GE(stats.UnparkCount, 1u);
+    EXPECT_GE(stats.ParkLatencyP50Ns, 0u);
+    EXPECT_GE(stats.ParkLatencyP95Ns, stats.ParkLatencyP50Ns);
+    EXPECT_GE(stats.ParkLatencyP99Ns, stats.ParkLatencyP95Ns);
+    EXPECT_GE(stats.UnparkLatencyP50Ns, 0u);
+    EXPECT_GE(stats.UnparkLatencyP95Ns, stats.UnparkLatencyP50Ns);
+    EXPECT_GE(stats.UnparkLatencyP99Ns, stats.UnparkLatencyP95Ns);
 
     Scheduler::Shutdown();
 }

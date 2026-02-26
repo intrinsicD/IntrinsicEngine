@@ -114,6 +114,12 @@ namespace Core::Tasks
             uint64_t UnparkCount = 0;
             uint64_t ParkLatencyTotalNs = 0;
             uint64_t UnparkLatencyTotalNs = 0;
+            uint64_t ParkLatencyP50Ns = 0;
+            uint64_t ParkLatencyP95Ns = 0;
+            uint64_t ParkLatencyP99Ns = 0;
+            uint64_t UnparkLatencyP50Ns = 0;
+            uint64_t UnparkLatencyP95Ns = 0;
+            uint64_t UnparkLatencyP99Ns = 0;
             uint64_t IdleWaitCount = 0;
             uint64_t IdleWaitTotalNs = 0;
             double StealSuccessRatio = 0.0;
