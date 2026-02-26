@@ -69,6 +69,7 @@ namespace Core::Telemetry
         m_FrameHistory[idx].TaskUnparkP50Ns = m_TaskUnparkP50Ns.load(std::memory_order_relaxed);
         m_FrameHistory[idx].TaskUnparkP95Ns = m_TaskUnparkP95Ns.load(std::memory_order_relaxed);
         m_FrameHistory[idx].TaskUnparkP99Ns = m_TaskUnparkP99Ns.load(std::memory_order_relaxed);
+        m_FrameHistory[idx].TaskUnparkTailSpreadNs = m_TaskUnparkTailSpreadNs.load(std::memory_order_relaxed);
         m_FrameHistory[idx].TaskIdleWaitCount = m_TaskIdleWaitCount.load(std::memory_order_relaxed);
         m_FrameHistory[idx].TaskIdleWaitTotalNs = m_TaskIdleWaitTotalNs.load(std::memory_order_relaxed);
         m_FrameHistory[idx].TaskQueueContentionCount = m_TaskQueueContentionCount.load(std::memory_order_relaxed);
@@ -123,6 +124,7 @@ namespace Core::Telemetry
         m_TaskUnparkP50Ns.store(stats.UnparkLatencyP50Ns, std::memory_order_relaxed);
         m_TaskUnparkP95Ns.store(stats.UnparkLatencyP95Ns, std::memory_order_relaxed);
         m_TaskUnparkP99Ns.store(stats.UnparkLatencyP99Ns, std::memory_order_relaxed);
+        m_TaskUnparkTailSpreadNs.store(stats.UnparkLatencyTailSpreadNs, std::memory_order_relaxed);
         m_TaskIdleWaitCount.store(stats.IdleWaitCount, std::memory_order_relaxed);
         m_TaskIdleWaitTotalNs.store(stats.IdleWaitTotalNs, std::memory_order_relaxed);
         m_TaskQueueContentionCount.store(stats.QueueContentionCount, std::memory_order_relaxed);

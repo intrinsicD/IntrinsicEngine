@@ -591,6 +591,10 @@ namespace Core::Tasks
         stats.UnparkLatencyP50Ns = EstimateLatencyPercentile(unparkHistogram, stats.UnparkCount, 0.50);
         stats.UnparkLatencyP95Ns = EstimateLatencyPercentile(unparkHistogram, stats.UnparkCount, 0.95);
         stats.UnparkLatencyP99Ns = EstimateLatencyPercentile(unparkHistogram, stats.UnparkCount, 0.99);
+        stats.UnparkLatencyTailSpreadNs =
+            (stats.UnparkLatencyP99Ns >= stats.UnparkLatencyP50Ns)
+            ? (stats.UnparkLatencyP99Ns - stats.UnparkLatencyP50Ns)
+            : 0;
         stats.IdleWaitCount = s_Ctx->idleWaitCount.load(std::memory_order_relaxed);
         stats.IdleWaitTotalNs = s_Ctx->idleWaitTotalNs.load(std::memory_order_relaxed);
         stats.QueueContentionCount = s_Ctx->queueContentionCount.load(std::memory_order_relaxed);

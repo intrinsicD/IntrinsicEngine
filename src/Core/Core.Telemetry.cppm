@@ -42,6 +42,7 @@ export namespace Core::Telemetry
         uint64_t TaskUnparkP50Ns = 0;
         uint64_t TaskUnparkP95Ns = 0;
         uint64_t TaskUnparkP99Ns = 0;
+        uint64_t TaskUnparkTailSpreadNs = 0;
         uint64_t TaskIdleWaitCount = 0;
         uint64_t TaskIdleWaitTotalNs = 0;
         uint64_t TaskQueueContentionCount = 0;
@@ -124,6 +125,7 @@ export namespace Core::Telemetry
         std::atomic<uint64_t> m_TaskUnparkP50Ns{0};
         std::atomic<uint64_t> m_TaskUnparkP95Ns{0};
         std::atomic<uint64_t> m_TaskUnparkP99Ns{0};
+        std::atomic<uint64_t> m_TaskUnparkTailSpreadNs{0};
         std::atomic<uint64_t> m_TaskIdleWaitCount{0};
         std::atomic<uint64_t> m_TaskIdleWaitTotalNs{0};
         std::atomic<uint64_t> m_TaskQueueContentionCount{0};
