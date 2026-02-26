@@ -102,14 +102,14 @@ namespace Runtime
 
         // 5. ImGui
         Interface::GUI::Init(*m_Window,
-                             *m_GraphicsBackend->GetDevice(),
+                             m_GraphicsBackend->GetDevice(),
                              m_GraphicsBackend->GetSwapchain(),
                              m_GraphicsBackend->GetContext().GetInstance(),
-                             m_GraphicsBackend->GetDevice()->GetGraphicsQueue());
+                             m_GraphicsBackend->GetDevice().GetGraphicsQueue());
 
         // 6. RenderOrchestrator (MaterialSystem, GeometryStorage, Pipelines, RenderSystem, GPUScene, FrameGraph)
         m_RenderOrchestrator = std::make_unique<RenderOrchestrator>(
-            m_GraphicsBackend->GetDevice(),
+            m_GraphicsBackend->GetDeviceShared(),
             m_GraphicsBackend->GetSwapchain(),
             m_GraphicsBackend->GetRenderer(),
             m_GraphicsBackend->GetBindlessSystem(),
@@ -149,7 +149,7 @@ namespace Runtime
 
         // Process material deletions before RenderOrchestrator destroys MaterialSystem.
         auto& matSys = m_RenderOrchestrator->GetMaterialSystem();
-        matSys.ProcessDeletions(m_GraphicsBackend->GetDevice()->GetGlobalFrameNumber());
+        matSys.ProcessDeletions(m_GraphicsBackend->GetDevice().GetGlobalFrameNumber());
 
         Interface::GUI::Shutdown();
 
@@ -223,7 +223,7 @@ namespace Runtime
             {
                 // [Worker Thread] I/O-agnostic parsing via IORegistry
                 auto loadResult = Graphics::ModelLoader::LoadAsync(
-                    GetDevice(), m_GraphicsBackend->GetTransferManager(),
+                    GetDeviceShared(), m_GraphicsBackend->GetTransferManager(),
                     m_RenderOrchestrator->GetGeometryStorage(), path,
                     m_IORegistry, *m_IOBackend);
 
@@ -370,7 +370,7 @@ namespace Runtime
 
             {
                 auto& matSys = m_RenderOrchestrator->GetMaterialSystem();
-                matSys.ProcessDeletions(m_GraphicsBackend->GetDevice()->GetGlobalFrameNumber());
+                matSys.ProcessDeletions(m_GraphicsBackend->GetDevice().GetGlobalFrameNumber());
             }
 
             // -----------------------------------------------------------------

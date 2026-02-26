@@ -20,9 +20,6 @@ This document tracks **what's left to do** in IntrinsicEngine's architecture.
 
 ### 1.1 2026-02-25 Architecture Review Follow-ups
 
-- [ ] **Resolve runtime API/ownership drift in orchestration paths (Medium).**
-  - Audit central runtime ownership boundaries and reduce `std::shared_ptr` usage where borrowed references or explicit owners are sufficient.
-
 - [ ] **Establish architecture SLOs + telemetry milestones (Cross-cutting).**
   - Define measurable targets for DAG compile budget, scheduler contention/tail latency, and frame critical-path timing.
   - Add instrumentation for queue contention, steal ratio, barrier/idle wait time, and per-frame compile/execute split.
@@ -32,10 +29,6 @@ This document tracks **what's left to do** in IntrinsicEngine's architecture.
 This section captures **newly observed inconsistencies** and concrete remediation actions.
 
 ### B. Architecture findings
-
-- [ ] **Clarify ownership boundaries and remove avoidable shared ownership in runtime hot paths (Medium).**
-  - Device/runtime orchestration APIs still expose widespread `std::shared_ptr` ownership even when ownership appears single-rooted.
-  - Action: convert to explicit owner + borrowed refs/spans/handles where lifetime is frame- or system-scoped.
 
 ### D. Problems in current TODO governance (meta)
 

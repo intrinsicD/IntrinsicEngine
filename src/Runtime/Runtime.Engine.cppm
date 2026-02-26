@@ -131,7 +131,8 @@ export namespace Runtime
         [[nodiscard]] RHI::VulkanBuffer* GetGlobalUBO() const { return m_RenderOrchestrator->GetRenderSystem().GetGlobalUBO(); }
 
         // Convenience accessors that delegate to GraphicsBackend.
-        [[nodiscard]] std::shared_ptr<RHI::VulkanDevice> GetDevice() const { return m_GraphicsBackend->GetDevice(); }
+        [[nodiscard]] RHI::VulkanDevice& GetDevice() const { return m_GraphicsBackend->GetDevice(); }
+        [[nodiscard]] const std::shared_ptr<RHI::VulkanDevice>& GetDeviceShared() const { return m_GraphicsBackend->GetDeviceShared(); }
         [[nodiscard]] RHI::DescriptorAllocator& GetDescriptorPool() const { return m_GraphicsBackend->GetDescriptorPool(); }
         [[nodiscard]] RHI::DescriptorLayout& GetDescriptorLayout() const { return m_GraphicsBackend->GetDescriptorLayout(); }
         [[nodiscard]] RHI::VulkanSwapchain& GetSwapchain() const { return m_GraphicsBackend->GetSwapchain(); }
