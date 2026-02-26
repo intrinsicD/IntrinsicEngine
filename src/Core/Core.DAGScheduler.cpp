@@ -1,7 +1,9 @@
 module;
 
 #include <cassert>
+#include <bit>
 #include <cstdint>
+#include <algorithm>
 #include <unordered_set>
 #include <vector>
 #include <memory>
@@ -20,7 +22,7 @@ namespace Core
     {
         m_NodePool.reserve(64);
         m_ResourceStates.reserve(32);
-        m_ResourceStateLookup.reserve(32);
+        EnsureResourceLookupCapacity(32);
     }
 
     // -------------------------------------------------------------------------
@@ -32,8 +34,30 @@ namespace Core
         m_ActiveNodeCount = 0;
         m_ExecutionLayers.clear();
         m_ResourceStates.clear();
-        m_ResourceStateLookup.clear();
+        std::fill(m_ResourceLookupBuckets.begin(), m_ResourceLookupBuckets.end(), kEmptyBucket);
+        m_ResourceLookupKeys.clear();
+        m_ResourceLookupValues.clear();
         // Note: m_NodePool is kept at high-water mark and recycled.
+    }
+
+    void DAGScheduler::EnsureResourceLookupCapacity(size_t desiredEntryCount)
+    {
+        const size_t minBucketCount = std::max<size_t>(16, desiredEntryCount * 2);
+        const size_t bucketCount = static_cast<size_t>(std::bit_ceil(minBucketCount));
+        if (bucketCount <= m_ResourceLookupBuckets.size())
+            return;
+
+        std::vector<uint32_t> newBuckets(bucketCount, kEmptyBucket);
+        for (uint32_t i = 0; i < m_ResourceLookupKeys.size(); ++i)
+        {
+            const size_t key = m_ResourceLookupKeys[i];
+            size_t bucket = key & (bucketCount - 1);
+            while (newBuckets[bucket] != kEmptyBucket)
+                bucket = (bucket + 1) & (bucketCount - 1);
+            newBuckets[bucket] = i;
+        }
+
+        m_ResourceLookupBuckets = std::move(newBuckets);
     }
 
     // -------------------------------------------------------------------------
@@ -65,12 +89,27 @@ namespace Core
 
     DAGScheduler::ResourceState& DAGScheduler::GetResourceState(size_t key)
     {
-        if (const auto it = m_ResourceStateLookup.find(key); it != m_ResourceStateLookup.end())
-            return m_ResourceStates[it->second];
+        EnsureResourceLookupCapacity(m_ResourceLookupKeys.size() + 1);
+
+        const size_t mask = m_ResourceLookupBuckets.size() - 1;
+        size_t bucket = key & mask;
+        while (true)
+        {
+            const uint32_t entryIndex = m_ResourceLookupBuckets[bucket];
+            if (entryIndex == kEmptyBucket)
+                break;
+            if (m_ResourceLookupKeys[entryIndex] == key)
+                return m_ResourceStates[m_ResourceLookupValues[entryIndex]];
+            bucket = (bucket + 1) & mask;
+        }
 
         const uint32_t stateIndex = static_cast<uint32_t>(m_ResourceStates.size());
         m_ResourceStates.emplace_back();
-        m_ResourceStateLookup.emplace(key, stateIndex);
+
+        const uint32_t newEntryIndex = static_cast<uint32_t>(m_ResourceLookupKeys.size());
+        m_ResourceLookupKeys.push_back(key);
+        m_ResourceLookupValues.push_back(stateIndex);
+        m_ResourceLookupBuckets[bucket] = newEntryIndex;
         return m_ResourceStates.back();
     }
 
