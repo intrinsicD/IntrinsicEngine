@@ -4,25 +4,9 @@ This document contains medium/long-horizon feature planning and phase prioritiza
 
 ## 1. Near-Term Execution Order (Architecture)
 
-Backlog hygiene update (2026-02-26): release-flag consolidation is complete; `INTRINSIC_RELEASE_FLAGS` now has a single authoritative assignment, with native-arch tuning gated only by `INTRINSIC_ENABLE_NATIVE_ARCH`.
+Recent completions (2026-02-26, details in git history): release-flag consolidation, offline dependency mode (`-DINTRINSIC_OFFLINE_DEPS=ON`), DAGScheduler flat-hash resource lookup + sorted-set edge dedupe with pathological fan-out validation, scheduler wait-queue scratch reuse, FrameGraph ready-queue execution (dependency-readiness dispatch), baseline Boolean CSG (disjoint/full-containment), and core task park/unpark semantics with SLO gates.
 
-Backlog completion update (2026-02-26): configure-time offline dependency mode is now available via `-DINTRINSIC_OFFLINE_DEPS=ON`, which forces local `external/cache/<dep>-src` sources and disables FetchContent network updates.
-
-Backlog completion update (2026-02-26): `Core::DAGScheduler` compile-path resource lookup now uses a frame-reused flat open-addressing table (`std::vector` buckets/keys/values) instead of per-frame `std::unordered_map` node churn, reducing allocator pressure on large dependency sets.
-
-Backlog completion update (2026-02-26): `Core::DAGScheduler` compile-path edge dedupe now uses a cache-local sorted small-set (`std::vector` + `std::lower_bound`) instead of per-node `std::unordered_set` heap nodes once fan-out crosses threshold, reducing high-outdegree compile churn.
-
-Backlog completion update (2026-02-26): pathological fan-out edge-dedupe scaling validation is now covered by `tests/Test_DAGScheduler.cpp::FanoutDedupScaling`, stress-testing 2,048 consumers with repeated resource reads and asserting deduped indegree/dependent invariants.
-
-Backlog completion update (2026-02-26): scheduler wait-queue draining now reuses per-thread continuation scratch buffers instead of allocating a fresh `std::vector` per drain, reducing allocator churn on park/unpark-heavy coroutine workloads.
-
-Backlog completion update (2026-02-26): FrameGraph runtime execution now dispatches by dependency-readiness (not coarse layer barriers), and `tests/Test_CoreFrameGraph.cpp::ReadyQueueExecutionDoesNotWaitForSlowSiblingLayerBarrier` guards against regressions where a slow sibling pass would stall an otherwise-ready dependent chain.
-
-Backlog completion update (2026-02-26): `Geometry.Boolean` now provides baseline CSG operations for closed halfedge meshes with exact handling for disjoint and full-containment cases (union/intersection/difference where topologically trivial), plus conservative nullopt fallback for partial-overlap configurations that still require robust triangle clipping/stitching.
-
-Backlog completion update (2026-02-26): Core task dependency waits now use continuation-level park/unpark semantics (`CounterEvent` + scheduler wait tokens), so coroutine-heavy waits no longer pin worker OS threads. Coverage includes single/multi-waiter wake-up behavior, stale-token safety, and scheduler wake-tail telemetry/SLO gates (`tests/Test_CoreTasks.cpp`, `tests/Test_ArchitectureSLO.cpp`).
-
-Near-term architecture priority now shifts from scheduler substrate work to remaining rendering/editor roadmap items in §2.
+Near-term priority now shifts from scheduler substrate work to rendering infrastructure repairs (point cloud, line, wireframe — see §2.1) and remaining editor roadmap items.
 
 ## 2. Feature Roadmap
 
@@ -45,16 +29,21 @@ Near-term architecture priority now shifts from scheduler substrate work to rema
 - A `PointCloudRenderFeature` registered via the render pipeline system, with a config struct selecting the variant and parameters (splat size, LOD budget, etc.).
 - Large point clouds need streaming — integrate with `TransferManager` for async chunk uploads.
 
-**Status:** Core point cloud rendering infrastructure is DONE:
+**Status:** The GPU rendering pipeline is **BROKEN** and needs a full re-implementation as a **first-class retained-mode renderable** — the same architectural tier as triangle meshes, not a per-frame transient overlay.
+
+**What still works (CPU-side only):**
 - **`Geometry.PointCloud` module** (`Geometry.PointCloud.cppm/.cpp`): First-class `Cloud` data structure with positions, normals, colors, radii. Operations: `ComputeBoundingBox`, `ComputeStatistics` (with KNN-based spacing), `VoxelDownsample` (O(n) hash-based), `EstimateRadii` (Octree-accelerated kNN density estimation), `RandomSubsample` (deterministic Fisher-Yates).
-- **`PointCloudRenderPass`** (`Graphics.Passes.PointCloud.cppm/.cpp`): `IRenderFeature` implementation following the `LineRenderPass` SSBO pattern. Three rendering modes selectable via push constant:
-  - Mode 0: **Flat Disc** — screen-aligned billboard with perspective-correct pixel radius, smooth AA edges.
-  - Mode 1: **Surfel** — world-space oriented disc from surface normal, Lambertian + hemisphere ambient + rim lighting.
-  - Mode 2: **EWA Splatting** (Zwicker et al. 2001) — perspective-correct Gaussian elliptical splats via view-space Jacobian of the surfel tangent frame, with degenerate-angle clamping.
-- **`PointCloudRenderer::Component`** (ECS): Per-entity point cloud data (positions, normals, colors, radii) with rendering parameters (mode, default radius, size multiplier, visibility toggle).
-- **Shaders** (`pointcloud.vert`, `pointcloud.frag`): Vertex-shader billboard expansion (6 verts/point, no geometry shader), 32-byte GPU point layout (2 x vec4), multi-mode fragment shading.
-- **Pipeline integration:** Registered in `DefaultPipeline` after Forward pass, gated by `FeatureRegistry` ("PointCloudRenderPass"). Shader paths registered in `RenderOrchestrator`. ECS component collection + world transform application in `RebuildPath()`.
-- Remaining work: Gaussian Splatting (3DGS) compute rasterizer, Potree-style octree LOD streaming, depth peeling for order-independent transparency, persistent device-local SSBO for large static clouds.
+
+**Re-implementation plan (retained-mode, BDA vertex pulling, shared-buffer-first):**
+- `PointCloudRenderer::Component` holds a `GeometryHandle` pointing to `GeometryGpuData` with `PrimitiveTopology::Points`.
+- **BDA-based shared-buffer contract:** For mesh-derived vertex visualization, `ReuseVertexBuffersFrom = meshHandle` — zero additional vertex upload, shares the same `std::shared_ptr<VulkanBuffer>` and device address. The point cloud vertex shader reads positions from the mesh's existing buffer via `GL_EXT_buffer_reference` (BDA pointer in push constants), exactly as `ForwardPass` already reads mesh vertex data. For standalone point clouds (`.xyz`, `.pcd`, `.ply`), upload positions/normals once via `GeometryUploadRequest` → `GeometryGpuData::CreateAsync()` → device-local with `VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT`. No per-frame re-upload.
+- **Separate VkPipeline:** Point cloud rendering needs its own pipeline with a billboard-expansion vertex shader (6 verts/point). `VK_PRIMITIVE_TOPOLOGY_POINT_LIST` alone gives 1px dots — the expansion shader is required for visible, properly-sized points.
+- Lifecycle system allocates `GPUScene` slots, syncs transforms, participates in frustum culling — same path as `MeshRendererLifecycle`.
+- GPU point layout: 32 bytes `{vec3 pos, float size, vec3 normal, uint packedColor}`.
+- Vertex-shader billboard expansion (6 verts/point, no geometry shader). Positions read via BDA from shared buffer.
+- Rendering modes: flat disc (screen-aligned billboard), surfel (normal-oriented disc), EWA splatting (Zwicker et al. 2001).
+- Pipeline registration in `DefaultPipeline`, gated by `FeatureRegistry`.
+- Future work: Gaussian Splatting (3DGS) compute rasterizer, Potree-style octree LOD streaming, depth peeling for OIT.
 
 ---
 
@@ -76,7 +65,31 @@ Near-term architecture priority now shifts from scheduler substrate work to rema
 - Thick lines via screen-space expansion in vertex shader (Vulkan has no guaranteed wide-line support).
 - Node rendering can reuse point splatting infrastructure.
 
-**Status:** Core line rendering infrastructure is DONE — see Phase 0 item 3. `LineRenderPass` provides the SSBO-based thick-line backend. **kNN graph construction is now available as an Octree-accelerated exact builder (`Geometry::Graph::BuildKNNGraph()`) and as manual build from precomputed neighbor index lists (`Geometry::Graph::BuildKNNGraphFromIndices()`) with Union/Mutual connectivity and degenerate-pair filtering.** `BuildKNNGraph()` now uses `Geometry::Octree::QueryKnn()` per source vertex, improving expected neighborhood-construction complexity from $O(n^2)$ brute force toward $O(n \log n + nk)$ on well-distributed point sets while preserving exact top-$k$ neighbor ordering. The graph module now also exposes **Fruchterman-Reingold force-directed embedding** (`Geometry::Graph::ComputeForceDirectedLayout()`), including degenerate-distance stabilization for coincident initial layouts. The graph module now also exposes **spectral 2D embedding** (`Geometry::Graph::ComputeSpectralLayout()`) via projected orthogonal iteration with selectable combinatorial or symmetric-normalized Laplacian operators, improving stability on irregular-degree graphs while preserving deterministic low-frequency embeddings. **A deterministic hierarchical layered embedding is now available** (`Geometry::Graph::ComputeHierarchicalLayout()`), combining BFS level assignment with barycentric crossing-minimization sweeps for stable DAG/tree-style visualization. The layout result now includes **crossing diagnostics** (`HierarchicalLayoutResult::CrossingCount`) computed by layer-wise inversion counting over the final post-sweep x-ordering, making crossing reduction measurable in tests and tooling. The graph module now also exposes a **general 2D embedding crossing counter** (`Geometry::Graph::CountEdgeCrossings()`) with configurable incident-edge and collinear-overlap policy, so non-layered layout experiments can reuse the same regression metric. The auto-root policy now uses an approximate component diameter (two-sweep BFS) and places the root at the diameter midpoint, improving depth balance on chain-like graphs without sacrificing determinism. Remaining work: mesh wireframe overlay (barycentric), render-feature/UI integration for kNN + layout visualization, halfedge debug view. All build on the existing `DebugDraw` + `LineRenderPass` primitives.
+**Status:** Line and wireframe rendering are currently **BROKEN** and need re-implementation as **first-class retained-mode renderables** — the same architectural tier as triangle meshes, not transient per-frame debug overlays. The graph/layout algorithms (CPU-side) remain functional.
+
+**What still works (CPU-side graph algorithms):**
+- kNN graph construction: Octree-accelerated exact builder (`Geometry::Graph::BuildKNNGraph()`) and manual build from precomputed neighbor index lists (`Geometry::Graph::BuildKNNGraphFromIndices()`) with Union/Mutual connectivity and degenerate-pair filtering.
+- Fruchterman-Reingold force-directed embedding (`ComputeForceDirectedLayout()`).
+- Spectral 2D embedding (`ComputeSpectralLayout()`) with combinatorial or symmetric-normalized Laplacian.
+- Hierarchical layered embedding (`ComputeHierarchicalLayout()`) with crossing diagnostics and diameter-aware auto-rooting.
+- General 2D embedding crossing counter (`CountEdgeCrossings()`).
+
+**Re-implementation plan (two-tier architecture, BDA vertex pulling):**
+
+*Tier 1 — Retained-mode views (BDA shared-buffer-first, like meshes):*
+- **BDA-based shared-buffer contract:** One device-local vertex buffer on the GPU, multiple index buffers with different topologies. A mesh uploads positions/normals once; wireframe, vertex, and graph views all `ReuseVertexBuffersFrom` that mesh handle — zero vertex duplication. Each topology view gets its **own VkPipeline** with its own vertex shader that reads from the shared buffer via BDA (`GL_EXT_buffer_reference` pointer in push constants), exactly as `ForwardPass` does for triangle meshes. The sharing is at the data level (same `VulkanBuffer`, same device address), not at the pipeline level.
+- **Separate pipelines required:** `VK_PRIMITIVE_TOPOLOGY_LINE_LIST` gives 1px lines, `POINT_LIST` gives 1px dots. Thick anti-aliased lines and billboard points each need their own shader pipeline with vertex-shader expansion (6 verts/primitive).
+- Wireframe view: extract unique edge pairs once → `GeometryViewRenderer` with `ReuseVertexBuffersFrom = meshHandle`, persisted edge index buffer. Line vertex shader reads positions from mesh buffer via BDA, expands each segment to screen-space quad. No per-frame CPU extraction.
+- Vertex view: `ReuseVertexBuffersFrom = meshHandle`. Point vertex shader reads positions via BDA, expands to billboard quad.
+- `GraphRenderer::Component`: wraps `Geometry::Graph` as a line view (edges) + point view (nodes) sharing vertex buffers via BDA. Layout algorithms produce positions; GPU upload once, update only on layout change.
+- Lifecycle system allocates `GPUScene` slots per view, syncs transforms, frustum culling — same path as `MeshRendererLifecycle`.
+- Thick-line vertex shader expansion (6 verts/segment), anti-aliased fragment shader, push constants for line width + viewport + BDA pointers.
+
+*Tier 2 — Transient debug overlay (DebugDraw, rebuilt per frame):*
+- `DebugDraw` immediate-mode accumulator remains for genuinely transient debug visualization (octree, KD-tree, bounds, contact manifolds, convex hulls).
+- `LineRenderPass` renders `DebugDraw` content via per-frame host-visible SSBO. Depth-tested + overlay sub-passes.
+
+Remaining work after both tiers: mesh wireframe overlay (barycentric shader alternative), halfedge debug view, render-feature/UI integration for kNN + layout visualization.
 
 ---
 
@@ -212,7 +225,7 @@ Near-term architecture priority now shifts from scheduler substrate work to rema
 - All debug geometry is transient — rebuilt each frame from `LinearArena`.
 - Toggled per-category via the UI (§2.5).
 
-**Status:** Core API and rendering backend are DONE — see Phase 0 item 3. `DebugDraw` provides the immediate-mode accumulator with `Line`, `Box`, `WireBox`, `Sphere`, `Circle`, `Arrow`, `Axes`, `Frustum`, `Grid`, `Cross` plus overlay variants. Convex hull geometry backend is now available via `Geometry::ConvexHullBuilder::Build()` (§2.6), and the Sandbox now includes a selected-collider convex-hull wire overlay (`Graphics::DrawConvexHull`) with overlay/depth-tested routing and color/alpha controls in `View Settings → Spatial Debug`. Remaining work: broader per-category UI polish (§2.5) and additional spatial overlays (uniform grid).
+**Status:** `DebugDraw` provides the immediate-mode accumulator with `Line`, `Box`, `WireBox`, `Sphere`, `Circle`, `Arrow`, `Axes`, `Frustum`, `Grid`, `Cross` plus overlay variants. Convex hull geometry backend is now available via `Geometry::ConvexHullBuilder::Build()` (§2.6), and the Sandbox includes a selected-collider convex-hull wire overlay (`Graphics::DrawConvexHull`) with overlay/depth-tested routing and color/alpha controls in `View Settings → Spatial Debug`. Sandbox debug overlays (octree, KD-tree, bounds, contact manifolds, convex hulls) all emit geometry through `DebugDraw`. However, the rendering backend (`LineRenderPass`) is currently **broken** — all debug visualization is non-functional until the line rendering re-implementation is complete (see §2.1.2). Remaining work after line rendering is restored: broader per-category UI polish (§2.5) and additional spatial overlays (uniform grid).
 
 ---
 
@@ -311,7 +324,7 @@ The geometry module now includes `Geometry::KDTree`, an Octree-inspired accelera
 - **3 exporter partitions:** OBJ (ASCII), PLY (binary + ASCII), STL (binary + ASCII). `IAssetExporter::Export()` returns `std::expected<std::vector<std::byte>, AssetError>`. `IORegistry::Export()` convenience method finds exporter by extension, serializes, writes via `IIOBackend::Write()`.
 - `ModelLoader` new overload accepting `IORegistry` + `IIOBackend`; `Engine` owns both, populates at startup.
 - `Engine::LoadDroppedAsset` uses `IORegistry::CanImport()` instead of hardcoded extension list.
-- 31 tests covering `FileIOBackend`, `AssetId`, `IORegistry` mechanics, in-memory byte parsing for all 7 import formats, and round-trip export/re-import for OBJ, PLY, STL.
+- 32 tests covering `FileIOBackend`, `AssetId`, `IORegistry` mechanics, in-memory byte parsing for all 8 import formats, and round-trip export/re-import for OBJ, PLY, STL.
 
 **Remaining format support (incremental):**
 - **Point cloud formats:** LAS/LAZ (LiDAR).
