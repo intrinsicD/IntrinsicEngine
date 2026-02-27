@@ -1,21 +1,27 @@
-// point.frag — Point cloud fragment shader with render mode support.
+// point_retained.frag — Point cloud fragment shader for retained-mode BDA points.
 //
-// Render modes (selected via push.RenderMode):
-//   0 = FlatDisc:  Unlit circular disc with anti-aliased edge.
-//   1 = Surfel:    Normal-oriented disc with Lambertian + ambient lighting.
+// Push constant layout matches point_retained.vert. The fragment shader only
+// reads RenderMode for mode-dependent shading.
 
 #version 460
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 
 layout(location = 0) in vec4 fragColor;
 layout(location = 1) in vec2 fragDiscUV;
 layout(location = 2) in vec3 fragNormal;
 layout(location = 3) in vec3 fragWorldPos;
 
+// Push constant layout must match point_retained.vert exactly.
 layout(push_constant) uniform PushConsts {
-    float SizeMultiplier;
-    float ViewportWidth;
-    float ViewportHeight;
-    uint  RenderMode;       // 0 = FlatDisc, 1 = Surfel
+    mat4     Model;
+    uint64_t PtrPositions;
+    uint64_t PtrNormals;
+    float    PointSize;
+    float    SizeMultiplier;
+    float    ViewportWidth;
+    float    ViewportHeight;
+    uint     RenderMode;       // 0 = FlatDisc, 1 = Surfel
+    uint     Color;
 } push;
 
 layout(location = 0) out vec4 outColor;

@@ -66,10 +66,17 @@ namespace Graphics::Passes
         if (!data || count == 0)
             return;
 
-        if (mode != Geometry::PointCloud::RenderMode::FlatDisc)
+        // Accept FlatDisc and Surfel modes; reject unknown modes.
+        if (mode != Geometry::PointCloud::RenderMode::FlatDisc &&
+            mode != Geometry::PointCloud::RenderMode::Surfel)
             return;
 
-        m_StagingPoints.insert(m_StagingPoints.end(), data, data + count);
+        // Route to mode-specific staging buffers so each can be drawn
+        // with the correct push constant RenderMode value.
+        if (mode == Geometry::PointCloud::RenderMode::Surfel)
+            m_StagingSurfels.insert(m_StagingSurfels.end(), data, data + count);
+        else
+            m_StagingPoints.insert(m_StagingPoints.end(), data, data + count);
     }
 
     // =========================================================================
@@ -88,9 +95,9 @@ namespace Graphics::Passes
         m_PointSetLayout = CreateSSBODescriptorSetLayout(
             m_Device->GetLogicalDevice(), VK_SHADER_STAGE_VERTEX_BIT, "PointCloudRenderPass");
 
-        // Allocate per-frame descriptor sets (legacy path).
+        // Allocate per-frame descriptor sets for FlatDisc and Surfel staging.
         AllocatePerFrameSets<FRAMES>(descriptorPool, m_PointSetLayout, m_PointDescSets);
-
+        AllocatePerFrameSets<FRAMES>(descriptorPool, m_PointSetLayout, m_SurfelDescSets);
     }
 
     // =========================================================================
@@ -102,6 +109,7 @@ namespace Graphics::Passes
         if (!m_Device) return;
 
         for (auto& buf : m_PointBuffers) buf.reset();
+        for (auto& buf : m_SurfelBuffers) buf.reset();
 
         m_Pipeline.reset();
 
@@ -225,7 +233,6 @@ namespace Graphics::Passes
         if (!HasContent()) return;
         if (ctx.Resolution.width == 0 || ctx.Resolution.height == 0) return;
 
-
         const uint32_t frameIndex = ctx.FrameIndex;
 
         // Lazy pipeline creation (need swapchain format and depth format).
@@ -246,41 +253,40 @@ namespace Graphics::Passes
             }
         }
 
-        // Helper: record one point draw batch.
-        auto recordBatch = [&](std::span<const GpuPointData> pts)
+        // Helper: record one point draw batch with explicit mode, SSBO, and descriptor set.
+        auto recordBatch = [&](std::span<const GpuPointData> pts,
+                               Geometry::PointCloud::RenderMode mode,
+                               std::unique_ptr<RHI::VulkanBuffer> (&buffers)[FRAMES],
+                               uint32_t& capacity,
+                               VkDescriptorSet (&descSets)[FRAMES],
+                               const char* passName)
         {
             if (pts.empty())
                 return;
 
-            // Ensure SSBO capacity for this mode-batch.
             const uint32_t batchCount = static_cast<uint32_t>(pts.size());
 
-
-            if (!EnsureBuffer(batchCount))
+            if (!EnsurePerFrameBuffer<GpuPointData, FRAMES>(
+                    *m_Device, buffers, capacity, batchCount, 1024, passName))
                 return;
 
-            m_PointBuffers[frameIndex]->Write(pts.data(), pts.size_bytes());
-            VkDescriptorSet batchDescSet = m_PointDescSets[frameIndex];
-            UpdateSSBODescriptor(m_Device->GetLogicalDevice(), batchDescSet,
-                                 0, m_PointBuffers[frameIndex]->GetHandle(), pts.size_bytes());
+            buffers[frameIndex]->Write(pts.data(), pts.size_bytes());
+            UpdateSSBODescriptor(m_Device->GetLogicalDevice(), descSets[frameIndex],
+                                 0, buffers[frameIndex]->GetHandle(), pts.size_bytes());
 
-            // Fetch resource handles.
             const RGResourceHandle backbuffer = ctx.Blackboard.Get("Backbuffer"_id);
             const RGResourceHandle depth = ctx.Blackboard.Get("SceneDepth"_id);
             if (!backbuffer.IsValid() || !depth.IsValid())
                 return;
 
-            // Capture mode and descriptor set by value — the execute lambda runs
-            // deferred during render graph execution, so reading from member
-            // variables at that point would see stale/wrong values.
             const uint32_t localCount = batchCount;
-            const auto capturedDescSet = batchDescSet;
-
+            const auto capturedDescSet = descSets[frameIndex];
+            const auto capturedMode = mode;
             const VkDescriptorSet globalSet = ctx.GlobalDescriptorSet;
             const uint32_t dynamicOffset = static_cast<uint32_t>(ctx.GlobalCameraDynamicOffset);
             const VkExtent2D resolution = ctx.Resolution;
 
-            ctx.Graph.AddPass<PointCloudPassData>("PointCloud",
+            ctx.Graph.AddPass<PointCloudPassData>(passName,
                 [&](PointCloudPassData& data, RGBuilder& builder)
                 {
                     RGAttachmentInfo colorInfo{};
@@ -293,21 +299,22 @@ namespace Graphics::Passes
                     depthInfo.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
                     data.Depth = builder.WriteDepth(depth, depthInfo);
                 },
-                [this, localCount, capturedDescSet, globalSet, dynamicOffset, resolution]
+                [this, localCount, capturedDescSet, globalSet, dynamicOffset, resolution, capturedMode]
                 (const PointCloudPassData&, const RGRegistry&, VkCommandBuffer cmd)
-
                 {
-                    RecordDraw(cmd,
-                               capturedDescSet,
-                               globalSet,
-                               dynamicOffset,
-                               resolution,
-                               localCount,
-                               Geometry::PointCloud::RenderMode::FlatDisc);
+                    RecordDraw(cmd, capturedDescSet, globalSet, dynamicOffset,
+                               resolution, localCount, capturedMode);
                 });
         };
 
+        // Draw FlatDisc points.
         if (!m_StagingPoints.empty())
-            recordBatch(std::span<const GpuPointData>(m_StagingPoints.data(), m_StagingPoints.size()));
+            recordBatch(m_StagingPoints, Geometry::PointCloud::RenderMode::FlatDisc,
+                        m_PointBuffers, m_BufferCapacity, m_PointDescSets, "PointCloud_FlatDisc");
+
+        // Draw Surfel points.
+        if (!m_StagingSurfels.empty())
+            recordBatch(m_StagingSurfels, Geometry::PointCloud::RenderMode::Surfel,
+                        m_SurfelBuffers, m_SurfelBufferCapacity, m_SurfelDescSets, "PointCloud_Surfel");
     }
 }

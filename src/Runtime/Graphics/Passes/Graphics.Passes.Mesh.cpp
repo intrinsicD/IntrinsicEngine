@@ -56,22 +56,32 @@ namespace Graphics::Passes
             if (!vis.ShowWireframe && !vis.ShowVertices)
                 continue;
 
-            // Wireframe is always rendered via the CPU DebugDraw → LineRenderPass path.
-            // WireframeView (GPU geometry view) is intentionally NOT used to gate this path:
-            // the ForwardPass triangle shader does not apply WireframeColor and produces no
-            // visible colored lines. The CPU path gives correct, colored, anti-aliased lines
-            // via LineRenderPass immediately with no frame-allocation delay.
-            const bool needsCpuWire = vis.ShowWireframe && canDrawLines;
+            // Check if this entity has valid GPU geometry (device-local vertex buffer).
+            // When GPU geometry exists, the RetainedLineRenderPass and RetainedPointCloudRenderPass
+            // handle wireframe/vertex rendering via BDA — skip the CPU path to avoid double-draw.
+            GeometryGpuData* geo = ctx.GeometryStorage.GetUnchecked(mr.Geometry);
+            const bool hasRetainedGpuGeometry = (geo && geo->GetVertexBuffer());
 
-            // GPU vertex view is valid for FlatDisc point rendering.
+            // Wireframe: CPU path only when no GPU geometry (retained pass handles the rest).
+            // Edge caching still runs unconditionally so the retained pass has CachedEdges.
+            const bool needsCpuWire = vis.ShowWireframe && canDrawLines && !hasRetainedGpuGeometry;
+
+            // GPU vertex view is valid for FlatDisc and Surfel point rendering.
+            // When retained GPU geometry exists, RetainedPointCloudRenderPass handles vertices.
             const bool gpuVertexPathValid =
-                vis.VertexView.IsValid() &&
-                (vis.VertexRenderMode == Geometry::PointCloud::RenderMode::FlatDisc);
+                (vis.VertexView.IsValid() &&
+                 (vis.VertexRenderMode == Geometry::PointCloud::RenderMode::FlatDisc ||
+                  vis.VertexRenderMode == Geometry::PointCloud::RenderMode::Surfel))
+                || hasRetainedGpuGeometry;
             const bool hasGpuVerts = gpuVertexPathValid;
 
             const bool needsCpuVerts = vis.ShowVertices && !hasGpuVerts && canDrawPoints;
 
-            if (!needsCpuWire && !needsCpuVerts)
+            // Edge caching is needed for both the CPU (DebugDraw) and GPU (retained BDA) wireframe paths.
+            // Always populate CachedEdges when ShowWireframe is true.
+            const bool needEdgeCache = vis.ShowWireframe;
+
+            if (!needsCpuWire && !needsCpuVerts && !needEdgeCache)
                 continue;
 
             // Both CPU paths source positions from the collision mesh (CPU-resident copy).
@@ -105,56 +115,58 @@ namespace Graphics::Passes
             if (auto* wm = registry.try_get<ECS::Components::Transform::WorldMatrix>(entity))
                 worldMatrix = wm->Matrix;
 
-            // Determine topology from GPU geometry.
+            // Determine topology from GPU geometry (reuse the geo pointer from the retained check above).
             Graphics::PrimitiveTopology topology = Graphics::PrimitiveTopology::Triangles;
-            GeometryGpuData* geo = ctx.GeometryStorage.GetUnchecked(mr.Geometry);
             if (geo)
                 topology = geo->GetTopology();
 
             // ------------------------------------------------------------------
-            // Wireframe: extract unique edges → DebugDraw → LineRenderPass
+            // Edge cache: build lazily (needed by both CPU and retained GPU wireframe paths).
             // ------------------------------------------------------------------
-            if (needsCpuWire && !indices.empty())
+            if (needEdgeCache && !indices.empty() && vis.EdgeCacheDirty)
             {
-                // Build edge cache lazily (invalidated by EdgeCacheDirty flag).
-                if (vis.EdgeCacheDirty)
+                vis.CachedEdges.clear();
+
+                if (topology == Graphics::PrimitiveTopology::Triangles)
                 {
-                    vis.CachedEdges.clear();
-
-                    if (topology == Graphics::PrimitiveTopology::Triangles)
-                    {
-                        struct PairHash {
-                            std::size_t operator()(std::pair<uint32_t, uint32_t> p) const noexcept {
-                                return std::hash<uint64_t>{}(
-                                    (uint64_t(p.first) << 32) | uint64_t(p.second));
-                            }
-                        };
-                        std::unordered_set<std::pair<uint32_t, uint32_t>, PairHash> edgeSet;
-                        edgeSet.reserve(indices.size());
-
-                        for (std::size_t t = 0; t + 2 < indices.size(); t += 3)
-                        {
-                            const uint32_t i0 = indices[t], i1 = indices[t + 1], i2 = indices[t + 2];
-                            auto addEdge = [&](uint32_t a, uint32_t b) {
-                                auto key = (a < b) ? std::pair{a, b} : std::pair{b, a};
-                                edgeSet.insert(key);
-                            };
-                            addEdge(i0, i1);
-                            addEdge(i1, i2);
-                            addEdge(i2, i0);
+                    struct PairHash {
+                        std::size_t operator()(std::pair<uint32_t, uint32_t> p) const noexcept {
+                            return std::hash<uint64_t>{}(
+                                (uint64_t(p.first) << 32) | uint64_t(p.second));
                         }
-                        vis.CachedEdges.assign(edgeSet.begin(), edgeSet.end());
-                    }
-                    else if (topology == Graphics::PrimitiveTopology::Lines)
-                    {
-                        vis.CachedEdges.reserve(indices.size() / 2);
-                        for (std::size_t e = 0; e + 1 < indices.size(); e += 2)
-                            vis.CachedEdges.emplace_back(indices[e], indices[e + 1]);
-                    }
+                    };
+                    std::unordered_set<std::pair<uint32_t, uint32_t>, PairHash> edgeSet;
+                    edgeSet.reserve(indices.size());
 
-                    vis.EdgeCacheDirty = false;
+                    for (std::size_t t = 0; t + 2 < indices.size(); t += 3)
+                    {
+                        const uint32_t i0 = indices[t], i1 = indices[t + 1], i2 = indices[t + 2];
+                        auto addEdge = [&](uint32_t a, uint32_t b) {
+                            auto key = (a < b) ? std::pair{a, b} : std::pair{b, a};
+                            edgeSet.insert(key);
+                        };
+                        addEdge(i0, i1);
+                        addEdge(i1, i2);
+                        addEdge(i2, i0);
+                    }
+                    vis.CachedEdges.assign(edgeSet.begin(), edgeSet.end());
+                }
+                else if (topology == Graphics::PrimitiveTopology::Lines)
+                {
+                    vis.CachedEdges.reserve(indices.size() / 2);
+                    for (std::size_t e = 0; e + 1 < indices.size(); e += 2)
+                        vis.CachedEdges.emplace_back(indices[e], indices[e + 1]);
                 }
 
+                vis.EdgeCacheDirty = false;
+            }
+
+            // ------------------------------------------------------------------
+            // Wireframe: CPU path — submit edges to DebugDraw → LineRenderPass.
+            // Skipped when retained GPU geometry exists (RetainedLineRenderPass handles it).
+            // ------------------------------------------------------------------
+            if (needsCpuWire && !vis.CachedEdges.empty())
+            {
                 const uint32_t wireColor = DebugDraw::PackColorF(
                     vis.WireframeColor.r, vis.WireframeColor.g,
                     vis.WireframeColor.b, vis.WireframeColor.a);
