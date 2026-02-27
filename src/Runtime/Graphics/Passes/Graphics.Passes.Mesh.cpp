@@ -57,22 +57,25 @@ namespace Graphics::Passes
                 continue;
 
             // Check if this entity has valid GPU geometry (device-local vertex buffer).
-            // When GPU geometry exists, the RetainedLineRenderPass and RetainedPointCloudRenderPass
-            // handle wireframe/vertex rendering via BDA — skip the CPU path to avoid double-draw.
+            // When GPU geometry exists AND the corresponding retained pass is active,
+            // skip the CPU path to avoid double-draw. If the retained pass is disabled
+            // via FeatureRegistry, fall through to the CPU path so visuals aren't lost.
             GeometryGpuData* geo = ctx.GeometryStorage.GetUnchecked(mr.Geometry);
             const bool hasRetainedGpuGeometry = (geo && geo->GetVertexBuffer());
+            const bool retainedWireActive = hasRetainedGpuGeometry && m_RetainedLinesActive;
+            const bool retainedPointActive = hasRetainedGpuGeometry && m_RetainedPointsActive;
 
-            // Wireframe: CPU path only when no GPU geometry (retained pass handles the rest).
+            // Wireframe: CPU path only when no retained pass will handle it.
             // Edge caching still runs unconditionally so the retained pass has CachedEdges.
-            const bool needsCpuWire = vis.ShowWireframe && canDrawLines && !hasRetainedGpuGeometry;
+            const bool needsCpuWire = vis.ShowWireframe && canDrawLines && !retainedWireActive;
 
             // GPU vertex view is valid for FlatDisc and Surfel point rendering.
-            // When retained GPU geometry exists, RetainedPointCloudRenderPass handles vertices.
+            // When retained GPU geometry exists AND the retained point pass is active, skip CPU.
             const bool gpuVertexPathValid =
                 (vis.VertexView.IsValid() &&
                  (vis.VertexRenderMode == Geometry::PointCloud::RenderMode::FlatDisc ||
                   vis.VertexRenderMode == Geometry::PointCloud::RenderMode::Surfel))
-                || hasRetainedGpuGeometry;
+                || retainedPointActive;
             const bool hasGpuVerts = gpuVertexPathValid;
 
             const bool needsCpuVerts = vis.ShowVertices && !hasGpuVerts && canDrawPoints;
@@ -149,13 +152,15 @@ namespace Graphics::Passes
                         addEdge(i1, i2);
                         addEdge(i2, i0);
                     }
-                    vis.CachedEdges.assign(edgeSet.begin(), edgeSet.end());
+                    vis.CachedEdges.reserve(edgeSet.size());
+                    for (const auto& [a, b] : edgeSet)
+                        vis.CachedEdges.push_back({a, b});
                 }
                 else if (topology == Graphics::PrimitiveTopology::Lines)
                 {
                     vis.CachedEdges.reserve(indices.size() / 2);
                     for (std::size_t e = 0; e + 1 < indices.size(); e += 2)
-                        vis.CachedEdges.emplace_back(indices[e], indices[e + 1]);
+                        vis.CachedEdges.push_back({indices[e], indices[e + 1]});
                 }
 
                 vis.EdgeCacheDirty = false;

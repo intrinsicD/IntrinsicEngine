@@ -166,6 +166,8 @@ namespace Graphics
             const bool lineEnabled  = m_LineRenderPass  && IsFeatureEnabled("LineRenderPass"_id);
             const bool meshEnabled  = m_MeshPass        && IsFeatureEnabled("MeshPass"_id);
             const bool graphEnabled = m_GraphPass       && IsFeatureEnabled("GraphPass"_id);
+            const bool retainedLinesEnabled = m_RetainedLinePass && IsFeatureEnabled("RetainedLineRenderPass"_id);
+            const bool retainedPointsEnabled = m_RetainedPointPass && IsFeatureEnabled("RetainedPointCloudRenderPass"_id);
 
             // Collection should run if any visualization feature is enabled.
             // Point staging is cheap and ensures stable semantics across feature toggles.
@@ -174,7 +176,8 @@ namespace Graphics
             if (collectEnabled)
             {
                 m_Path.AddStage("VisualizationCollect",
-                    [this, pcDrawEnabled, meshEnabled, graphEnabled](RenderPassContext& ctx)
+                    [this, pcDrawEnabled, meshEnabled, graphEnabled,
+                     retainedLinesEnabled, retainedPointsEnabled](RenderPassContext& ctx)
                 {
                     // Reset point splat staging before any collector runs.
                     // Do this as long as the point cloud pass object exists.
@@ -188,6 +191,7 @@ namespace Graphics
                     {
                         // Allow collectors to submit vertex splats even if drawing is disabled this frame.
                         m_MeshPass->SetPointCloudPass(m_PointCloudPass.get());
+                        m_MeshPass->SetRetainedPassesActive(retainedLinesEnabled, retainedPointsEnabled);
                         m_MeshPass->AddPasses(ctx);
                     }
 
