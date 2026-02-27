@@ -57,7 +57,19 @@ export namespace Graphics::Passes
         // Pass nullptr to disable vertex point rendering.
         void SetPointCloudPass(PointCloudRenderPass* pass) { m_PointCloudPass = pass; }
 
+        // Inform this pass whether the retained BDA passes are active this frame.
+        // When a retained pass is active, entities with GPU geometry skip the CPU
+        // path to avoid double-draw. When disabled (e.g. feature-toggled off),
+        // the CPU path takes over so visuals aren't silently lost.
+        void SetRetainedPassesActive(bool lines, bool points)
+        {
+            m_RetainedLinesActive = lines;
+            m_RetainedPointsActive = points;
+        }
+
     private:
         PointCloudRenderPass* m_PointCloudPass = nullptr;
+        bool m_RetainedLinesActive = false;
+        bool m_RetainedPointsActive = false;
     };
 }

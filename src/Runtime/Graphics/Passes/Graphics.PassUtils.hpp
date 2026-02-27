@@ -230,6 +230,13 @@ bool EnsurePerFrameBuffer(RHI::VulkanDevice& device,
 
     for (uint32_t i = 0; i < FRAMES; ++i)
     {
+        // Defer destruction of old buffer — it may still be referenced by
+        // an in-flight command buffer on a previous frame.  The unique_ptr
+        // is moved into the SafeDestroy lambda; the buffer is freed once
+        // the GPU timeline confirms the previous frame has completed.
+        if (buffers[i])
+            device.SafeDestroy([old = std::move(buffers[i])]() { /* freed on lambda destruction */ });
+
         buffers[i] = std::make_unique<RHI::VulkanBuffer>(
             device,
             byteSize,

@@ -46,13 +46,8 @@ namespace Graphics::Passes
     };
     static_assert(sizeof(RetainedLinePushConstants) == 88);
 
-    // Edge pair: two uint32 indices into the shared position buffer.
-    struct EdgePair
-    {
-        uint32_t i0;
-        uint32_t i1;
-    };
-    static_assert(sizeof(EdgePair) == 8);
+    // Use EdgePair from the component — identical layout, eliminates type mismatch.
+    using EdgePair = ECS::RenderVisualization::EdgePair;
 
     // =========================================================================
     // Initialize
@@ -182,6 +177,7 @@ namespace Graphics::Passes
             uint32_t EdgeCount;
             uint32_t EdgeOffset; // offset in edge pairs within the SSBO
             uint32_t Color;
+            float    LineWidth;  // per-entity wireframe width (pixels)
         };
 
         std::vector<EdgePair> allEdges;
@@ -218,14 +214,11 @@ namespace Graphics::Passes
             di.EdgeCount = static_cast<uint32_t>(vis.CachedEdges.size());
             di.EdgeOffset = static_cast<uint32_t>(allEdges.size());
             di.Color = wireColor;
+            di.LineWidth = vis.WireframeWidth;
             draws.push_back(di);
 
-            // Append edge pairs with explicit field copy.
-            // NOTE: std::pair memory layout is not guaranteed by the standard,
-            // so avoid reinterpret_cast here.
-            allEdges.reserve(allEdges.size() + vis.CachedEdges.size());
-            for (const auto& [i0, i1] : vis.CachedEdges)
-                allEdges.push_back(EdgePair{i0, i1});
+            // CachedEdges uses the same EdgePair type — insert directly.
+            allEdges.insert(allEdges.end(), vis.CachedEdges.begin(), vis.CachedEdges.end());
         }
 
         if (draws.empty())
@@ -254,7 +247,6 @@ namespace Graphics::Passes
         const VkDescriptorSet globalSet = ctx.GlobalDescriptorSet;
         const uint32_t dynamicOffset = static_cast<uint32_t>(ctx.GlobalCameraDynamicOffset);
         const VkExtent2D resolution = ctx.Resolution;
-        const float lineWidth = LineWidth;
 
         // Move draws into shared storage for lambda capture.
         auto capturedDraws = std::make_shared<std::vector<DrawInfo>>(std::move(draws));
@@ -272,7 +264,7 @@ namespace Graphics::Passes
                 depthInfo.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
                 data.Depth = builder.WriteDepth(depth, depthInfo);
             },
-            [this, capturedEdgeSet, globalSet, dynamicOffset, resolution, lineWidth, capturedDraws]
+            [this, capturedEdgeSet, globalSet, dynamicOffset, resolution, capturedDraws]
             (const PassData&, const RGRegistry&, VkCommandBuffer cmd)
             {
                 vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_Pipeline->GetHandle());
@@ -296,7 +288,7 @@ namespace Graphics::Passes
                     RetainedLinePushConstants push{};
                     push.Model = di.Model;
                     push.PtrPositions = di.PtrPositions;
-                    push.LineWidth = lineWidth;
+                    push.LineWidth = di.LineWidth;
                     push.ViewportWidth = static_cast<float>(resolution.width);
                     push.ViewportHeight = static_cast<float>(resolution.height);
                     push.Color = di.Color;

@@ -99,6 +99,15 @@ export namespace ECS::PointCloudRenderer
 
 export namespace ECS::RenderVisualization
 {
+    // Edge index pair: two uint32 vertex indices into the collision position array.
+    // Used by CachedEdges and consumed directly by RetainedLineRenderPass SSBO uploads.
+    struct EdgePair
+    {
+        uint32_t i0;
+        uint32_t i1;
+    };
+    static_assert(sizeof(EdgePair) == 8);
+
     struct Component
     {
         // ---- Mode Toggles ----
@@ -129,7 +138,7 @@ export namespace ECS::RenderVisualization
         // Populated from MeshCollider collision data when wireframe is first
         // enabled.  Stores unique edge pairs as index offsets into the
         // collision position array.
-        std::vector<std::pair<uint32_t, uint32_t>> CachedEdges;
+        std::vector<EdgePair> CachedEdges;
         bool EdgeCacheDirty = true;
 
         // ---- Vertex Normal Cache (internal, rebuilt lazily) ----
