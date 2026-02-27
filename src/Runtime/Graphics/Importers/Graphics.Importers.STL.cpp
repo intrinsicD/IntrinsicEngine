@@ -278,15 +278,20 @@ namespace Graphics
         std::span<const std::byte> data,
         const LoadContext& /*ctx*/)
     {
-        if (data.empty())
-            return std::unexpected(AssetError::InvalidData);
+        auto decodeGeometry = [](std::span<const std::byte> bytes) -> std::expected<GeometryCpuData, AssetError>
+        {
+            if (bytes.empty())
+                return std::unexpected(AssetError::InvalidData);
 
-        auto result = IsBinarySTL(data) ? ParseBinary(data) : ParseAscii(data);
-        if (!result)
-            return std::unexpected(result.error());
+            return IsBinarySTL(bytes) ? ParseBinary(bytes) : ParseAscii(bytes);
+        };
 
-        MeshImportData importData;
-        importData.Meshes.push_back(std::move(*result));
-        return ImportResult{std::move(importData)};
+        return decodeGeometry(data)
+            .transform([](GeometryCpuData&& geometry) -> ImportResult
+            {
+                MeshImportData importData;
+                importData.Meshes.push_back(std::move(geometry));
+                return ImportResult{std::move(importData)};
+            });
     }
 }
