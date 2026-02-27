@@ -346,16 +346,26 @@ public:
             const float frameMs = fps > 0.0f ? (1000.0f / fps) : 0.0f;
 
             ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.0f, 4.0f));
+            // Draws a vertical separator line at the current cursor position (no SeparatorEx in this ImGui version).
+            auto VerticalSeparator = []()
+            {
+                ImGui::SameLine();
+                const ImVec2 pos = ImGui::GetCursorScreenPos();
+                const float h    = ImGui::GetFrameHeight();
+                ImGui::GetWindowDrawList()->AddLine(
+                    ImVec2(pos.x, pos.y),
+                    ImVec2(pos.x, pos.y + h),
+                    ImGui::GetColorU32(ImGuiCol_Separator));
+                ImGui::Dummy(ImVec2(1.0f, h));
+                ImGui::SameLine();
+            };
+
             if (ImGui::Begin("##IntrinsicStatusBar", nullptr, flags))
             {
                 ImGui::Text("Frame: %.2f ms (%.1f FPS)", frameMs, fps);
-                ImGui::SameLine();
-                ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
-                ImGui::SameLine();
+                VerticalSeparator();
                 ImGui::Text("Entities: %d", static_cast<int>(GetScene().Size()));
-                ImGui::SameLine();
-                ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);
-                ImGui::SameLine();
+                VerticalSeparator();
                 ImGui::Text("Render Mode: DefaultPipeline");
             }
             ImGui::End();
@@ -1221,7 +1231,7 @@ public:
                     if (ImGui::Button("Repair Mesh"))
                     {
                         ApplyGeometryOperator(selected, [](Geometry::Halfedge::Mesh& mesh) {
-                            Geometry::MeshRepair::Repair(mesh);
+                            static_cast<void>(Geometry::MeshRepair::Repair(mesh));
                         });
                     }
                 }
