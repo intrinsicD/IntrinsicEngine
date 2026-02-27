@@ -220,10 +220,12 @@ namespace Graphics::Passes
             di.Color = wireColor;
             draws.push_back(di);
 
-            // Append edge pairs. std::pair<uint32_t, uint32_t> has the same layout as EdgePair.
-            static_assert(sizeof(std::pair<uint32_t, uint32_t>) == sizeof(EdgePair));
-            const auto* edgeSrc = reinterpret_cast<const EdgePair*>(vis.CachedEdges.data());
-            allEdges.insert(allEdges.end(), edgeSrc, edgeSrc + vis.CachedEdges.size());
+            // Append edge pairs with explicit field copy.
+            // NOTE: std::pair memory layout is not guaranteed by the standard,
+            // so avoid reinterpret_cast here.
+            allEdges.reserve(allEdges.size() + vis.CachedEdges.size());
+            for (const auto& [i0, i1] : vis.CachedEdges)
+                allEdges.push_back(EdgePair{i0, i1});
         }
 
         if (draws.empty())
