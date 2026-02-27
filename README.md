@@ -330,6 +330,7 @@ Only one path renders per frame (Stage 2 CPU-driven OR Stage 3 GPU-driven). No d
 - **`ROADMAP.md`** — Feature roadmap, dependency-ordered phases, and long-horizon planning notes.
 - **Git history** — Historical architecture notes and completion summaries for closed backlog items.
 - **`CLAUDE.md`** — Development conventions, build workflows, architectural invariants.
+- **`docs/RENDERING_MODALITY_REDESIGN_PLAN.md`** — Thorough architecture plan for first-class mesh/graph/point rendering approaches and mode toggling.
 
 Backlog hygiene is CI-enforced: pull requests fail if `TODO.md` contains completed/historical markers instead of active unfinished items.
 
