@@ -22,6 +22,8 @@ import :Passes.Graph;
 import :Passes.SelectionOutline;
 import :Passes.Line;
 import :Passes.PointCloud;
+import :Passes.RetainedLine;
+import :Passes.RetainedPointCloud;
 import :Passes.DebugView;
 import :Passes.ImGui;
 import :PipelineLibrary;
@@ -45,6 +47,8 @@ namespace Graphics
         if (m_SelectionOutlinePass) m_SelectionOutlinePass->Shutdown();
         if (m_LineRenderPass)       m_LineRenderPass->Shutdown();
         if (m_PointCloudPass)       m_PointCloudPass->Shutdown();
+        if (m_RetainedLinePass)     m_RetainedLinePass->Shutdown();
+        if (m_RetainedPointPass)    m_RetainedPointPass->Shutdown();
         if (m_DebugViewPass)        m_DebugViewPass->Shutdown();
         if (m_ImGuiPass)            m_ImGuiPass->Shutdown();
 
@@ -55,6 +59,8 @@ namespace Graphics
         m_SelectionOutlinePass.reset();
         m_LineRenderPass.reset();
         m_PointCloudPass.reset();
+        m_RetainedLinePass.reset();
+        m_RetainedPointPass.reset();
         m_DebugViewPass.reset();
         m_ImGuiPass.reset();
     }
@@ -72,6 +78,8 @@ namespace Graphics
         m_SelectionOutlinePass = std::make_unique<Passes::SelectionOutlinePass>();
         m_LineRenderPass       = std::make_unique<Passes::LineRenderPass>();
         m_PointCloudPass       = std::make_unique<Passes::PointCloudRenderPass>();
+        m_RetainedLinePass     = std::make_unique<Passes::RetainedLineRenderPass>();
+        m_RetainedPointPass    = std::make_unique<Passes::RetainedPointCloudRenderPass>();
         m_DebugViewPass        = std::make_unique<Passes::DebugViewPass>();
         m_ImGuiPass            = std::make_unique<Passes::ImGuiPass>();
 
@@ -82,6 +90,8 @@ namespace Graphics
         m_SelectionOutlinePass->Initialize(device, descriptorPool, globalLayout);
         m_LineRenderPass->Initialize(device, descriptorPool, globalLayout);
         m_PointCloudPass->Initialize(device, descriptorPool, globalLayout);
+        m_RetainedLinePass->Initialize(device, descriptorPool, globalLayout);
+        m_RetainedPointPass->Initialize(device, descriptorPool, globalLayout);
         m_DebugViewPass->Initialize(device, descriptorPool, globalLayout);
         m_ImGuiPass->Initialize(device, descriptorPool, globalLayout);
 
@@ -97,6 +107,8 @@ namespace Graphics
         m_SelectionOutlinePass->SetShaderRegistry(shaderRegistry);
         m_LineRenderPass->SetShaderRegistry(shaderRegistry);
         m_PointCloudPass->SetShaderRegistry(shaderRegistry);
+        m_RetainedLinePass->SetShaderRegistry(shaderRegistry);
+        m_RetainedPointPass->SetShaderRegistry(shaderRegistry);
         m_DebugViewPass->SetShaderRegistry(shaderRegistry);
         
         m_PathDirty = true;
@@ -250,7 +262,30 @@ namespace Graphics
         }
 
         // ==================================================================
-        // 6. Selection Outline — post-process overlay for selected entities.
+        // 6. Retained-Mode BDA Passes — persistent GPU geometry rendering.
+        //    These passes render wireframe edges and mesh vertex points from
+        //    GPU-resident vertex buffers via BDA, with zero per-frame position upload.
+        // ==================================================================
+        if (m_RetainedLinePass && IsFeatureEnabled("RetainedLineRenderPass"_id))
+        {
+            m_Path.AddStage("RetainedLines", [this](RenderPassContext& ctx)
+            {
+                m_RetainedLinePass->SetGeometryStorage(&ctx.GeometryStorage);
+                m_RetainedLinePass->AddPasses(ctx);
+            });
+        }
+
+        if (m_RetainedPointPass && IsFeatureEnabled("RetainedPointCloudRenderPass"_id))
+        {
+            m_Path.AddStage("RetainedPoints", [this](RenderPassContext& ctx)
+            {
+                m_RetainedPointPass->SetGeometryStorage(&ctx.GeometryStorage);
+                m_RetainedPointPass->AddPasses(ctx);
+            });
+        }
+
+        // ==================================================================
+        // 7. Selection Outline — post-process overlay for selected entities.
         // ==================================================================
         if (m_SelectionOutlinePass && IsFeatureEnabled("SelectionOutlinePass"_id))
             m_Path.AddFeature("SelectionOutline", m_SelectionOutlinePass.get());
