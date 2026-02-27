@@ -84,18 +84,19 @@ export namespace Graphics::Passes
         void ResetPoints()
         {
             m_StagingPoints.clear();
+            m_StagingSurfels.clear();
         }
 
         // True if any mode has content.
         [[nodiscard]] bool HasContent() const
         {
-            return !m_StagingPoints.empty();
+            return !m_StagingPoints.empty() || !m_StagingSurfels.empty();
         }
 
         // Total number of accumulated points across all modes.
         [[nodiscard]] uint32_t GetPointCount() const
         {
-            return static_cast<uint32_t>(m_StagingPoints.size());
+            return static_cast<uint32_t>(m_StagingPoints.size() + m_StagingSurfels.size());
         }
 
         // Convenience: pack a single point from components.
@@ -131,19 +132,23 @@ export namespace Graphics::Passes
         // Global camera layout (set 0) — borrowed.
         VkDescriptorSetLayout m_GlobalSetLayout = VK_NULL_HANDLE;
 
-        // Per-frame descriptor sets (legacy — back-compat staging bucket).
+        // Per-frame descriptor sets and SSBOs for FlatDisc mode.
         static constexpr uint32_t FRAMES = RHI::VulkanDevice::GetFramesInFlight();
         VkDescriptorSet m_PointDescSets[FRAMES] = {};
-
-        // Per-frame host-visible SSBOs.
         std::unique_ptr<RHI::VulkanBuffer> m_PointBuffers[FRAMES];
         uint32_t m_BufferCapacity = 0; // in points
+
+        // Per-frame descriptor sets and SSBOs for Surfel mode.
+        VkDescriptorSet m_SurfelDescSets[FRAMES] = {};
+        std::unique_ptr<RHI::VulkanBuffer> m_SurfelBuffers[FRAMES];
+        uint32_t m_SurfelBufferCapacity = 0;
 
         // Lazily-built pipeline (with depth test).
         std::unique_ptr<RHI::GraphicsPipeline> m_Pipeline;
 
-        // CPU-side staging buffer — accumulated per frame.
-        std::vector<GpuPointData> m_StagingPoints;
+        // CPU-side staging buffers — accumulated per frame, one per render mode.
+        std::vector<GpuPointData> m_StagingPoints;   // FlatDisc
+        std::vector<GpuPointData> m_StagingSurfels;   // Surfel
 
         // Ensure SSBO has capacity for the given point count.
         bool EnsureBuffer(uint32_t requiredPoints);

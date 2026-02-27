@@ -63,10 +63,11 @@ namespace Graphics::Passes
             // via LineRenderPass immediately with no frame-allocation delay.
             const bool needsCpuWire = vis.ShowWireframe && canDrawLines;
 
-            // GPU vertex view is valid for FlatDisc point rendering.
+            // GPU vertex view is valid for FlatDisc and Surfel point rendering.
             const bool gpuVertexPathValid =
                 vis.VertexView.IsValid() &&
-                (vis.VertexRenderMode == Geometry::PointCloud::RenderMode::FlatDisc);
+                (vis.VertexRenderMode == Geometry::PointCloud::RenderMode::FlatDisc ||
+                 vis.VertexRenderMode == Geometry::PointCloud::RenderMode::Surfel);
             const bool hasGpuVerts = gpuVertexPathValid;
 
             const bool needsCpuVerts = vis.ShowVertices && !hasGpuVerts && canDrawPoints;

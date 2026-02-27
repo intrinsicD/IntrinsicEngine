@@ -47,7 +47,8 @@ export namespace Geometry::PointCloud
     // -------------------------------------------------------------------------
     enum class RenderMode : uint32_t
     {
-        FlatDisc = 0,  // Screen-space constant-size circular splats
+        FlatDisc = 0,  // Screen-space constant-size circular splats (camera-facing billboard)
+        Surfel   = 1,  // Normal-oriented disc with Lambertian shading
     };
 
     // -------------------------------------------------------------------------
