@@ -57,7 +57,13 @@ void main()
     {
         NormBuf normBuf = NormBuf(push.PtrNormals);
         vec3 localNorm = normBuf.v[pointIndex];
-        worldNorm = normalize(mat3(push.Model) * localNorm);
+
+        // Correct normal transform under non-uniform scale / shear:
+        // N_world = normalize((M^{-1})^T * N_local)
+        mat3 normalMatrix = transpose(inverse(mat3(push.Model)));
+        vec3 transformed = normalMatrix * localNorm;
+        float nLen = length(transformed);
+        worldNorm = (nLen > 1e-6) ? (transformed / nLen) : vec3(0.0, 1.0, 0.0);
     }
 
     fragColor = unpackUnorm4x8(push.Color);
