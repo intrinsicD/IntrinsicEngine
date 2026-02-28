@@ -2,28 +2,128 @@
 
 ## Goal
 
-Replace the dual-path (transient CPU + retained GPU) rendering with a **single unified path per primitive type**. Each visualization is one self-contained pass: own pipeline, own shaders, own ECS query. No routing logic. Adding a new rendering method = new shader + pipeline variant + register in DefaultPipeline.
+Replace the dual-path (transient CPU + retained GPU) rendering with a **single unified path per primitive type**. Each visualization is one self-contained pass with its own pipeline, shaders, ECS component, and both retained + transient data paths internally. No routing logic between passes. Adding a new rendering method = new shader + pipeline variant + register in DefaultPipeline.
 
 ---
 
-## Architecture: Three Primitive Passes + Debug Overlay
+## Architecture: Three Primitive Passes
 
-| Pass | Primitives | Data Source | Modes |
-|------|-----------|-------------|-------|
-| **SurfacePass** | Filled triangles | BDA from `GeometryGpuData` | Vertex colors, face colors, textured |
-| **LinePass** | Thick anti-aliased edges | BDA positions + edge index SSBO | Uniform color, per-vertex interpolated, per-edge discrete |
-| **PointPass** | Expanded billboard quads | BDA positions + normals | FlatDisc, Surfel, (future: EWA, Gaussian) |
-| **DebugLinePass** | Thin overlay lines | Transient SSBO from DebugDraw | Uniform color (debug only) |
+| Pass | Primitives | Retained Data | Transient Data | Modes |
+|------|-----------|---------------|----------------|-------|
+| **SurfacePass** | Filled triangles | BDA from `GeometryGpuData` | `SubmitTriangles()` (future) | Vertex colors, face colors, textured |
+| **LinePass** | Thick anti-aliased edges | BDA positions + edge index SSBO | `SubmitLine(a, b, color)` | Uniform color, per-vertex, per-edge |
+| **PointPass** | Expanded billboard quads | BDA positions + normals | `SubmitPoint(pos, normal, size, color)` | FlatDisc, Surfel, (future: EWA, Gaussian) |
 
-Each retained pass reads vertex data via BDA from the **shared device-local vertex buffer** uploaded once by `GeometryGpuData`. No CPU-side position transforms. No per-frame SSBO uploads for mesh/graph data.
+**No separate DebugLinePass.** Each pass handles both retained and transient data internally. The rendering technique is identical — the data lifetime is an internal detail, not a separate pass.
 
-`DebugLinePass` is the **only** transient path, reserved exclusively for ephemeral debug overlays (octree bounds, contact manifolds, convex hulls). It is not used for mesh wireframe or graph edges.
+- **Retained path**: device-local vertex buffer uploaded once, read via BDA every frame. Used for mesh geometry, graph geometry, point cloud geometry.
+- **Transient path**: per-frame CPU submission API (`SubmitLine()`, `SubmitPoint()`, future `SubmitTriangles()`). Data packed into a host-visible SSBO each frame. Used for debug overlays (octree bounds, contact manifolds, convex hulls).
+
+Same pipeline, same shaders, same fragment output. Two internal data sources, one draw call sequence.
+
+---
+
+## ECS: Per-Pass Typed Components
+
+Each pass owns a dedicated component type. The **toggle is presence/absence of the component** — no boolean flags. Attaching a component enables that visualization, removing it disables it. EnTT is optimized for this pattern.
+
+### Component Types
+
+```cpp
+// Owned by SurfacePass — mesh triangle rendering.
+namespace ECS::Surface {
+    struct Component {
+        Geometry::GeometryHandle Geometry{};
+        Core::Assets::AssetHandle Material{};
+
+        // GPU-driven culling state (inherited from current MeshRenderer)
+        uint32_t GpuSlot = kInvalidSlot;
+        Graphics::MaterialHandle CachedMaterialHandle{};
+        // ... (same culling/instance cache fields as current MeshRenderer)
+    };
+}
+
+// Owned by LinePass — edge/wireframe rendering.
+namespace ECS::Line {
+    struct Component {
+        Geometry::GeometryHandle Geometry{};     // shared vertex buffer (BDA)
+
+        // Edge data
+        std::vector<EdgePair> CachedEdges;       // index pairs into position buffer
+        bool EdgeCacheDirty = true;              // triggers re-extraction from indices
+
+        // Appearance
+        glm::vec4 Color = {0.85f, 0.85f, 0.85f, 1.0f};
+        float     Width = 1.5f;
+        bool      Overlay = false;               // true = no depth test
+    };
+}
+
+// Owned by PointPass — vertex/node/point cloud rendering.
+namespace ECS::Point {
+    struct Component {
+        Geometry::GeometryHandle Geometry{};     // shared vertex buffer (BDA)
+
+        // Appearance
+        glm::vec4 Color = {1.0f, 0.6f, 0.0f, 1.0f};
+        float     Size  = 0.008f;               // world-space radius
+        PointRenderMode Mode = PointRenderMode::FlatDisc;
+    };
+}
+```
+
+### Entity Composition Examples
+
+```
+Mesh entity (Bunny):
+  ├─ ECS::Surface::Component  { Geometry=bunnyHandle, Material=pbrMat }
+  ├─ ECS::Line::Component     { Geometry=bunnyHandle, Color=white }     ← attached when wireframe enabled
+  └─ ECS::Point::Component    { Geometry=bunnyHandle, Mode=Surfel }     ← attached when vertices enabled
+
+Graph entity (kNN graph):
+  ├─ ECS::Line::Component     { Geometry=graphHandle, Color=gray }      ← edges
+  └─ ECS::Point::Component    { Geometry=graphHandle, Mode=FlatDisc }   ← nodes
+
+Point cloud entity (scan.ply):
+  └─ ECS::Point::Component    { Geometry=cloudHandle, Mode=Surfel }
+
+Debug entity (octree visualization):
+  └─ (no components — uses LinePass::SubmitLine() transient API directly)
+```
+
+**Key insight:** The `Geometry` handle is shared across components on the same entity — same `GeometryGpuData`, same device-local buffer, same BDA. Zero vertex duplication.
+
+### What Gets Replaced
+
+| Current | New |
+|---------|-----|
+| `ECS::MeshRenderer::Component` | `ECS::Surface::Component` |
+| `ECS::RenderVisualization::Component` | Split into `ECS::Line::Component` + `ECS::Point::Component` (attached/detached instead of bool toggles) |
+| `ECS::GraphRenderer::Component` | `ECS::Line::Component` + `ECS::Point::Component` (graph-specific data like edges stays, geometry gets a handle) |
+| `ECS::PointCloudRenderer::Component` | `ECS::Point::Component` (with device-local GeometryHandle) |
+| `ECS::GeometryViewRenderer::Component` | **deleted** (each component carries its own GeometryHandle) |
+
+### Graph-Specific Data
+
+Graphs need edge index pairs and node-specific data (radii, colors) beyond what the generic `ECS::Line::Component` and `ECS::Point::Component` carry. Two options:
+
+**Option A:** Extra graph-specific component alongside the generic ones:
+```
+Graph entity:
+  ├─ ECS::Line::Component   { Geometry=graphHandle }
+  ├─ ECS::Point::Component  { Geometry=graphHandle }
+  └─ ECS::Graph::Data       { Edges, NodeRadii, NodeColors, ... }
+```
+
+**Option B:** The generic components are sufficient — edges go in `Line::Component.CachedEdges`, per-node colors/radii go in the vertex buffer's Aux channel.
+
+Option A is cleaner — the passes don't need to know about graph-specific semantics. `ECS::Graph::Data` is a pure data component that systems use to populate the `Line` and `Point` components.
 
 ---
 
 ## Naming Convention
 
-Everything that belongs together shares a prefix. Files, classes, shaders, registry IDs all follow the same pattern.
+Everything that belongs together shares a prefix.
 
 ### Passes (C++)
 
@@ -32,29 +132,31 @@ Everything that belongs together shares a prefix. Files, classes, shaders, regis
 | `ForwardPass` | `SurfacePass` | `Graphics:Passes.Surface` |
 | `RetainedLineRenderPass` | `LinePass` | `Graphics:Passes.Line` |
 | `RetainedPointCloudRenderPass` | `PointPass` | `Graphics:Passes.Point` |
-| `LineRenderPass` | `DebugLinePass` | `Graphics:Passes.DebugLine` |
 | `MeshRenderPass` | **deleted** | — |
+| `GraphRenderPass` | **deleted** | — |
 | `PointCloudRenderPass` | **deleted** | — |
-| `GraphRenderPass` | **deleted** (logic absorbed) | — |
+| `LineRenderPass` | **deleted** | — |
 
 ### Shaders
 
 | Current | New | Purpose |
 |---------|-----|---------|
 | `triangle.vert/frag` | `surface.vert/frag` | Mesh surface rendering |
-| `line_retained.vert/frag` | `line.vert/frag` | Thick edge rendering (BDA) |
-| `point_retained.vert/frag` | `point.vert/frag` | Point/vertex rendering (BDA) |
-| `line.vert/frag` | `debug_line.vert/frag` | Debug overlay lines (transient SSBO) |
-| `point.vert/frag` | **deleted** | Was transient SSBO point path |
+| `line_retained.vert/frag` | `line.vert/frag` | Thick edge rendering (retained BDA + transient) |
+| `point_retained.vert/frag` | `point_flatdisc.vert/frag` | FlatDisc point rendering |
+| *(new)* | `point_surfel.vert/frag` | Surfel point rendering |
+| `line.vert/frag` | **deleted** | Was transient-only SSBO line path |
+| `point.vert/frag` | **deleted** | Was transient-only SSBO point path |
 
 ### ShaderRegistry IDs
 
-| Pass | Vertex | Fragment |
-|------|--------|----------|
-| SurfacePass | `"Surface.Vert"_id` | `"Surface.Frag"_id` |
-| LinePass | `"Line.Vert"_id` | `"Line.Frag"_id` |
-| PointPass | `"Point.Vert"_id` | `"Point.Frag"_id` |
-| DebugLinePass | `"DebugLine.Vert"_id` | `"DebugLine.Frag"_id` |
+| Pass | Mode | Vertex | Fragment |
+|------|------|--------|----------|
+| SurfacePass | — | `"Surface.Vert"_id` | `"Surface.Frag"_id` |
+| LinePass | — | `"Line.Vert"_id` | `"Line.Frag"_id` |
+| PointPass | FlatDisc | `"Point.FlatDisc.Vert"_id` | `"Point.FlatDisc.Frag"_id` |
+| PointPass | Surfel | `"Point.Surfel.Vert"_id` | `"Point.Surfel.Frag"_id` |
+| PointPass | EWA | `"Point.EWA.Vert"_id` | `"Point.EWA.Frag"_id` |
 
 ### FeatureRegistry IDs
 
@@ -63,7 +165,6 @@ Everything that belongs together shares a prefix. Files, classes, shaders, regis
 | SurfacePass | `"SurfacePass"_id` |
 | LinePass | `"LinePass"_id` |
 | PointPass | `"PointPass"_id` |
-| DebugLinePass | `"DebugLinePass"_id` |
 | PickingPass | `"PickingPass"_id` (unchanged) |
 | SelectionOutlinePass | `"SelectionOutlinePass"_id` (unchanged) |
 | ImGuiPass | `"ImGuiPass"_id` (unchanged) |
@@ -72,47 +173,39 @@ Everything that belongs together shares a prefix. Files, classes, shaders, regis
 
 ```
 src/Runtime/Graphics/Passes/
-  Graphics.Passes.Surface.cppm      # interface
-  Graphics.Passes.Surface.cpp       # implementation
-  Graphics.Passes.Line.cppm
-  Graphics.Passes.Line.cpp
-  Graphics.Passes.Point.cppm
-  Graphics.Passes.Point.cpp
-  Graphics.Passes.DebugLine.cppm
-  Graphics.Passes.DebugLine.cpp
-  Graphics.Passes.Picking.cppm      # unchanged
-  Graphics.Passes.Picking.cpp
-  Graphics.Passes.SelectionOutline.cppm  # unchanged
-  Graphics.Passes.SelectionOutline.cpp
-  Graphics.Passes.DebugView.cppm    # unchanged
-  Graphics.Passes.DebugView.cpp
-  Graphics.Passes.ImGui.cppm        # unchanged
-  Graphics.Passes.ImGui.cpp
+  Graphics.Passes.Surface.cppm / .cpp
+  Graphics.Passes.Line.cppm / .cpp
+  Graphics.Passes.Point.cppm / .cpp
+  Graphics.Passes.Picking.cppm / .cpp         # unchanged
+  Graphics.Passes.SelectionOutline.cppm / .cpp # unchanged
+  Graphics.Passes.DebugView.cppm / .cpp        # unchanged
+  Graphics.Passes.ImGui.cppm / .cpp            # unchanged
 
 assets/shaders/
   surface.vert / surface.frag
   line.vert / line.frag
-  point.vert / point.frag
-  debug_line.vert / debug_line.frag
-  picking.vert / picking.frag       # unchanged
+  point_flatdisc.vert / point_flatdisc.frag
+  point_surfel.vert / point_surfel.frag
+  picking.vert / picking.frag                  # unchanged
 ```
 
 ### Deleted Files
 
 ```
-# Passes (dual-path routing removed)
+# Passes
 Graphics.Passes.Mesh.cppm / .cpp
 Graphics.Passes.Graph.cppm / .cpp
 Graphics.Passes.PointCloud.cppm / .cpp
 Graphics.Passes.RetainedLine.cppm / .cpp
 Graphics.Passes.RetainedPointCloud.cppm / .cpp
+Graphics.Passes.Line.cppm / .cpp              # old transient-only LineRenderPass
 
-# Shaders (transient SSBO paths removed)
-point.vert / point.frag             # was transient SSBO points
-line.vert / line.frag               # renamed to debug_line.*
-triangle.vert / triangle.frag       # renamed to surface.*
-line_retained.vert / line_retained.frag    # renamed to line.*
-point_retained.vert / point_retained.frag  # renamed to point.*
+# Shaders
+line.vert / line.frag                         # old transient SSBO
+point.vert / point.frag                       # old transient SSBO
+line_retained.vert / line_retained.frag       # renamed to line.*
+point_retained.vert / point_retained.frag     # split into point_flatdisc.* / point_surfel.*
+triangle.vert / triangle.frag                 # renamed to surface.*
 ```
 
 ---
@@ -123,31 +216,56 @@ point_retained.vert / point_retained.frag  # renamed to point.*
 
 **Replaces:** `ForwardPass` (renamed, same GPU-driven culling architecture).
 
-**What changes:** Name only (ForwardPass → SurfacePass). The GPU-driven culling pipeline, instance SSBO, compute cull shader, bindless texture array — all stay as-is. The shader is renamed `triangle.* → surface.*` but the code is identical.
+**What changes from current ForwardPass:**
+- Renamed for consistency (ForwardPass → SurfacePass)
+- Shader renamed (`triangle.* → surface.*`, code identical)
+- Queries `ECS::Surface::Component` instead of `ECS::MeshRenderer::Component`
+- Line/point topology variants dropped (those go to LinePass/PointPass)
 
-**Why keep it simple:** The surface pass already works correctly. Renaming it for consistency is all that's needed now. The rendering modes (vertex color, face color, textured) are a shader/material concern that can evolve independently.
+**GPU-driven culling, instance SSBO, bindless textures — all preserved.** This pass already works correctly; renaming is the primary change.
 
-**ECS query:** `MeshRenderer::Component` + `RenderVisualization::Component` (ShowSurface=true).
+**Transient API (future):**
+```cpp
+void SubmitTriangles(std::span<const TransientVertex> verts,
+                     std::span<const uint32_t> indices);
+```
+Deferred to a later phase. Use case: procedural preview geometry, collision mesh debug visualization.
+
+**ECS query:** `registry.view<ECS::Surface::Component>()`
 
 ### 2. LinePass
 
-**Replaces:** `RetainedLineRenderPass` + the wireframe part of `MeshRenderPass` + the edge part of `GraphRenderPass`.
+**Replaces:** `RetainedLineRenderPass` + wireframe from `MeshRenderPass` + edges from `GraphRenderPass` + `LineRenderPass` (transient debug).
 
-**Architecture:**
-- Self-contained: iterates all entities that need edge rendering
-- Sources: mesh wireframe (from `RenderVisualization::ShowWireframe`) AND graph edges (from `GraphRenderer::Component`)
-- Reads positions from shared vertex buffer via BDA
-- Edge indices uploaded to per-frame SSBO (same as current RetainedLineRenderPass)
-- Vertex shader expands each edge to a screen-space quad (6 verts/segment)
-- Anti-aliased fragment shader
+**Architecture — two internal data sources, one draw path:**
 
-**Edge caching moves into LinePass:**
-The edge extraction logic (currently in `MeshRenderPass` lines 129-167) moves into `LinePass::AddPasses()`. The pass lazily builds `CachedEdges` from the collision mesh when `EdgeCacheDirty=true`, then uploads to the edge SSBO.
+```cpp
+class LinePass final : public IRenderFeature {
+public:
+    // --- Transient API (debug overlays, per-frame) ---
+    void SubmitLine(glm::vec3 a, glm::vec3 b, uint32_t color);
+    void SubmitOverlayLine(glm::vec3 a, glm::vec3 b, uint32_t color);
+    void ResetTransient();
 
-**Graph edges:**
-`LinePass` also iterates `GraphRenderer::Component` entities. Graph edges are index pairs into the node position array. Since graph nodes are uploaded as a `GeometryGpuData` (device-local vertex buffer), graph edges work the same way as mesh edges: BDA position pointer + edge index SSBO.
+    // --- Retained path (automatic from ECS::Line::Component) ---
+    // Handled internally in AddPasses()
 
-**This requires:** Graph node positions get their own `GeometryHandle` / `GeometryGpuData`. This is the prerequisite for making graph edges retained BDA. The graph layout algorithm produces positions; these get uploaded once to a device-local buffer. On layout change, the buffer is re-uploaded.
+    void AddPasses(RenderPassContext& ctx) override;
+    // ...
+};
+```
+
+**AddPasses() flow:**
+1. Iterate `ECS::Line::Component` entities → build retained draws (BDA + edge SSBO)
+2. Collect transient lines from staging buffer → pack into a separate per-frame SSBO
+3. Record draw commands: retained entities first (per-entity push constants), then transient batch (identity model matrix, positions already in world space)
+
+Both use the same pipeline and shaders. The transient lines just use an internal position buffer instead of a BDA pointer to an entity's vertex buffer. In the shader, this is transparent — it reads positions from whatever BDA pointer the push constants provide.
+
+**Edge caching** moves into this pass. When `Line::Component.EdgeCacheDirty == true`, the pass extracts unique edges from the collision mesh (via `MeshCollider::Component`) and caches them. Same algorithm as current `MeshRenderPass`.
+
+**Transient line implementation detail:**
+Transient lines carry inline world-space positions (no separate vertex buffer). The pass maintains a per-frame host-visible buffer with interleaved `{vec3 posA, vec3 posB}` pairs. A BDA pointer to this buffer is passed to the shader. The edge SSBO for transient lines is trivial: `{0,1}, {2,3}, {4,5}, ...` (sequential pairs). Alternatively, the shader can detect transient mode via a flag and read positions directly from the SSBO without indirection.
 
 **Push constants:**
 ```cpp
@@ -157,38 +275,43 @@ struct LinePushConstants {
     float     LineWidth;       //  4 bytes
     float     ViewportWidth;   //  4 bytes
     float     ViewportHeight;  //  4 bytes
-    uint32_t  Color;           //  4 bytes  (uniform fallback)
-    uint32_t  ColorMode;       //  4 bytes  (0=uniform, 1=per-vertex, 2=per-edge)
+    uint32_t  Color;           //  4 bytes
+    uint32_t  Flags;           //  4 bytes  (overlay bit, color mode bits)
     uint32_t  _pad;            //  4 bytes
 };  // 96 bytes
 ```
 
-**Color modes** (future, initial implementation uses uniform color only):
-- `0 = Uniform`: single color from push constants (current behavior)
-- `1 = PerVertex`: color interpolated from endpoint vertex colors (requires aux buffer)
-- `2 = PerEdge`: each edge has its own color (requires color data in edge SSBO)
-
 ### 3. PointPass
 
-**Replaces:** `RetainedPointCloudRenderPass` + the vertex part of `MeshRenderPass` + the node part of `GraphRenderPass` + `PointCloudRenderPass`.
+**Replaces:** `RetainedPointCloudRenderPass` + vertex part of `MeshRenderPass` + node part of `GraphRenderPass` + `PointCloudRenderPass`.
 
-**Architecture:**
-- Self-contained: iterates all entities that need point rendering
-- Sources:
-  - Mesh vertices (`MeshRenderer` + `RenderVisualization::ShowVertices`)
-  - Graph nodes (`GraphRenderer::Component`)
-  - Standalone point clouds (`PointCloudRenderer::Component`)
-- ALL sources use BDA from device-local vertex buffers
-- Vertex shader expands each point to a billboard quad (6 verts)
-- Fragment shader renders circular splats with mode-dependent shading
+**Architecture — pipeline-per-mode, two internal data sources:**
 
-**Standalone point clouds get device-local upload:**
-`PointCloudRenderer::Component` entities get a `GeometryHandle` pointing to `GeometryGpuData`. Positions/normals are uploaded once to device-local memory. On data change, the buffer is re-uploaded. This makes standalone point clouds identical to mesh-derived points from the pass's perspective — just another entity with BDA pointers.
+```cpp
+class PointPass final : public IRenderFeature {
+public:
+    // --- Transient API (debug markers, per-frame) ---
+    void SubmitPoint(glm::vec3 pos, glm::vec3 normal, float size,
+                     uint32_t color, PointRenderMode mode);
+    void ResetTransient();
 
-**Rendering modes — separate pipelines, NOT mega-shader branching:**
+    // --- Retained path (automatic from ECS::Point::Component) ---
+    // Handled internally in AddPasses()
 
-Each rendering mode gets its own pipeline with its own vertex/fragment shaders:
+    void AddPasses(RenderPassContext& ctx) override;
 
+private:
+    // One pipeline per rendering mode
+    std::unique_ptr<RHI::GraphicsPipeline> m_Pipelines[kModeCount];
+};
+```
+
+**AddPasses() flow:**
+1. Iterate `ECS::Point::Component` entities → group by `Mode`
+2. Collect transient points from staging buffer → group by mode
+3. For each active mode: bind pipeline, draw retained entities, then draw transient batch
+
+**Separate pipelines per mode:**
 ```
 point_flatdisc.vert / point_flatdisc.frag   — camera-facing billboard
 point_surfel.vert   / point_surfel.frag     — normal-oriented disc
@@ -196,48 +319,25 @@ point_ewa.vert      / point_ewa.frag        — EWA splatting (future)
 point_gaussian.vert / point_gaussian.frag   — Gaussian splatting (future)
 ```
 
-**Why separate pipelines instead of push constant RenderMode:**
-- FlatDisc, Surfel, EWA, and Gaussian splatting have fundamentally different vertex expansion and fragment shading logic
-- A mega-shader with `if (mode == 0) ... else if (mode == 1) ...` branches wastes GPU cycles and becomes unmaintainable
-- Separate pipelines allow per-mode optimizations (e.g., Gaussian splatting needs different blending state)
-- Extensibility: adding a new mode = new shader pair + new pipeline entry. Zero changes to existing shaders.
+Each mode has fundamentally different vertex expansion logic. Separate pipelines avoid mega-shader branching and allow per-mode blend state (Gaussian needs alpha blending, surfels may want depth write).
 
-**PointPass stores a pipeline per mode:**
-```cpp
-class PointPass final : public IRenderFeature {
-    // One pipeline per active rendering mode.
-    std::unique_ptr<RHI::GraphicsPipeline> m_Pipelines[kModeCount];
-    // ...
-};
-```
-
-The pass groups entities by mode, then issues one draw batch per mode with the correct pipeline bound.
-
-**Push constants (shared across all point modes):**
+**Push constants (shared layout across all point modes):**
 ```cpp
 struct PointPushConstants {
     glm::mat4 Model;           // 64 bytes
     uint64_t  PtrPositions;    //  8 bytes
     uint64_t  PtrNormals;      //  8 bytes
-    uint64_t  PtrAux;          //  8 bytes  (UVs for textured mode)
+    uint64_t  PtrAux;          //  8 bytes
     float     PointSize;       //  4 bytes
     float     SizeMultiplier;  //  4 bytes
     float     ViewportWidth;   //  4 bytes
     float     ViewportHeight;  //  4 bytes
-    uint32_t  Color;           //  4 bytes  (uniform fallback)
+    uint32_t  Color;           //  4 bytes
     uint32_t  ColorMode;       //  4 bytes  (0=uniform, 1=per-vertex, 2=textured)
-    uint32_t  TextureID;       //  4 bytes  (bindless texture index for textured mode)
+    uint32_t  TextureID;       //  4 bytes
     uint32_t  _pad;            //  4 bytes
-};  // 128 bytes (within Vulkan push constant limit)
+};  // 128 bytes
 ```
-
-### 4. DebugLinePass
-
-**Replaces:** `LineRenderPass` (renamed, same transient SSBO architecture).
-
-**What changes:** Renamed from `LineRenderPass` → `DebugLinePass`. The `line.vert/frag` shaders are renamed to `debug_line.vert/frag`. Internal logic is unchanged.
-
-**Scope:** ONLY renders `DebugDraw` content (octree bounds, contact manifolds, convex hull overlays, kNN graph debug, etc.). Never mesh wireframe. Never graph edges.
 
 ---
 
@@ -248,221 +348,129 @@ DefaultPipeline::RebuildPath()
 │
 ├── 1. PickingPass           — entity/primitive ID readback
 ├── 2. SurfacePass           — filled triangles (GPU-driven culling)
-├── 3. LinePass              — thick wireframe + graph edges (BDA)
-├── 4. PointPass             — vertex/node/point cloud splats (BDA)
+├── 3. LinePass              — thick edges (retained + transient)
+├── 4. PointPass             — points/vertices (retained + transient)
 ├── 5. SelectionOutlinePass  — post-process selection overlay
-├── 6. DebugLinePass         — transient debug overlays
-├── 7. DebugViewPass         — render target inspector
-└── 8. ImGuiPass             — editor UI
+├── 6. DebugViewPass         — render target inspector
+└── 7. ImGuiPass             — editor UI
 ```
 
-No VisualizationCollect composite stage. No collector passes feeding shared staging buffers. Each pass is a self-contained stage that queries ECS, gathers data, and draws.
+No VisualizationCollect composite stage. No collector passes. No DebugLinePass. Each pass is self-contained.
+
+`DebugDraw` becomes a thin API that delegates to `LinePass::SubmitLine()` and `PointPass::SubmitPoint()`. The `DebugDraw` class itself no longer owns staging buffers — it's just a convenience wrapper.
 
 ---
 
 ## Shared Data Contract
 
-All three retained passes (SurfacePass, LinePass, PointPass) share vertex data via **BDA pointers into the same device-local vertex buffer**.
+All three passes share vertex data via **BDA pointers into the same device-local vertex buffer**.
 
 **Contract:**
 1. `GeometryGpuData` owns the vertex buffer (`std::shared_ptr<VulkanBuffer>`)
-2. Multiple views can share the same vertex buffer via `ReuseVertexBuffersFrom`
-3. Each pass reads `GetVertexBuffer()->GetDeviceAddress() + layout.PositionsOffset` etc.
-4. The vertex buffer is immutable after upload (no per-frame writes)
-5. Buffer lifetime is managed by `GeometryPool` with retirement frames matching frames-in-flight
+2. Multiple components on the same entity reference the same `GeometryHandle`
+3. Each pass reads `GetVertexBuffer()->GetDeviceAddress() + layout.{Positions,Normals,Aux}Offset`
+4. Retained vertex buffers are immutable after upload (no per-frame writes)
+5. Buffer lifetime managed by `GeometryPool` with retirement frames matching frames-in-flight
+6. Transient data uses separate per-frame host-visible buffers owned by each pass
 
 **Who uploads what:**
 - Mesh entity: `ModelLoader` uploads positions/normals/aux + triangle indices → `GeometryGpuData`
-- Graph entity: layout algorithm uploads node positions → `GeometryGpuData` (new)
-- Point cloud entity: `PointCloudRenderer` uploads positions/normals → `GeometryGpuData` (new)
-
-Once uploaded, all three passes can read from the same buffer. Zero duplication.
+- Graph entity: layout system uploads node positions (+ optional normals) → `GeometryGpuData` (new)
+- Point cloud entity: load system uploads positions/normals → `GeometryGpuData` (new)
 
 ---
 
-## ECS Component Changes
+## Extensibility
 
-### `RenderVisualization::Component` — simplified
+### Adding a new point mode (e.g., Gaussian Splatting)
 
-```cpp
-struct Component {
-    // Mode toggles
-    bool ShowSurface   = true;
-    bool ShowWireframe = false;
-    bool ShowVertices  = false;
+1. Add enum value: `PointRenderMode::Gaussian = 3`
+2. Write shaders: `point_gaussian.vert` / `point_gaussian.frag`
+3. Register in ShaderRegistry: `"Point.Gaussian.Vert"_id`, `"Point.Gaussian.Frag"_id`
+4. Add pipeline in `PointPass::BuildPipelines()` — may use custom blend state
+5. Expose in UI: add to render mode combo
 
-    // Wireframe settings
-    glm::vec4 WireframeColor = {0.85f, 0.85f, 0.85f, 1.0f};
-    float     WireframeWidth = 1.5f;
-    bool      WireframeOverlay = false;
+No routing changes. No new passes. No new components.
 
-    // Vertex settings
-    glm::vec4 VertexColor = {1.0f, 0.6f, 0.0f, 1.0f};
-    float     VertexSize  = 0.008f;
-    PointRenderMode VertexRenderMode = PointRenderMode::FlatDisc;
+### Adding a completely new primitive type (e.g., volume rendering)
 
-    // Edge cache (populated by LinePass, lazily)
-    std::vector<EdgePair> CachedEdges;
-    bool EdgeCacheDirty = true;
+1. Create `VolumePass` class implementing `IRenderFeature`
+2. Create `ECS::Volume::Component`
+3. Write shaders: `volume.vert` / `volume.frag`
+4. Register in `DefaultPipeline::Initialize()` + `RebuildPath()`
+5. Register in `FeatureRegistry`: `"VolumePass"_id`
 
-    // Sync state
-    bool CachedShowSurface = true;
-
-    // DELETED: CachedVertexNormals, VertexNormalsDirty (normals from GPU buffer)
-    // DELETED: VertexView, VertexViewDirty (no separate ForwardPass point-list path)
-};
-```
-
-### `PointRenderMode` enum — moved to top-level, extensible
-
-```cpp
-// In Graphics:Passes.Point or a shared header
-enum class PointRenderMode : uint32_t {
-    FlatDisc  = 0,
-    Surfel    = 1,
-    // Future:
-    // EWA       = 2,
-    // Gaussian  = 3,
-};
-```
-
-### `GraphRenderer::Component` — gains GeometryHandle
-
-```cpp
-struct Component {
-    // Node data
-    std::vector<glm::vec3> NodePositions;
-    std::vector<glm::vec4> NodeColors;
-    std::vector<float>     NodeRadii;
-
-    // Edge data (index pairs into NodePositions)
-    std::vector<std::pair<uint32_t, uint32_t>> Edges;
-
-    // GPU geometry (device-local, uploaded on layout change)
-    Geometry::GeometryHandle NodeGeometry{};   // NEW — positions/normals in device-local buffer
-    bool GeometryDirty = true;                 // NEW — triggers re-upload
-
-    // Rendering parameters
-    PointRenderMode NodeRenderMode = PointRenderMode::FlatDisc;
-    float     DefaultNodeRadius  = 0.01f;
-    // ... (rest unchanged)
-};
-```
-
-### `PointCloudRenderer::Component` — gains GeometryHandle
-
-```cpp
-struct Component {
-    // Point cloud data
-    std::vector<glm::vec3> Positions;
-    std::vector<glm::vec3> Normals;
-    std::vector<glm::vec4> Colors;
-    std::vector<float>     Radii;
-
-    // GPU geometry (device-local, uploaded once)
-    Geometry::GeometryHandle PointGeometry{};  // NEW
-    bool GeometryDirty = true;                 // NEW
-
-    // Rendering parameters
-    PointRenderMode RenderMode = PointRenderMode::FlatDisc;
-    // ... (rest unchanged)
-};
-```
-
-### `GeometryViewRenderer::Component` — simplified
-
-```cpp
-struct Component {
-    Geometry::GeometryHandle Surface{};
-    uint32_t SurfaceGpuSlot = kInvalidSlot;
-    bool ShowSurface = true;
-
-    // DELETED: Vertices handle (PointPass reads from same buffer via BDA directly)
-    // DELETED: VerticesGpuSlot
-    // DELETED: ShowVertices (lives in RenderVisualization)
-};
-```
-
----
-
-## Extensibility: Adding a New Point Mode (e.g., Gaussian Splatting)
-
-1. **Add enum value:**
-   ```cpp
-   enum class PointRenderMode : uint32_t {
-       FlatDisc = 0, Surfel = 1, EWA = 2, Gaussian = 3,
-   };
-   ```
-
-2. **Write shaders:** `point_gaussian.vert` / `point_gaussian.frag`
-
-3. **Register shaders:** Add to `CompileShaders.cmake` glob (auto-discovered) and `ShaderRegistry`
-
-4. **Add pipeline in PointPass:**
-   ```cpp
-   // In PointPass::BuildPipelines() — one pipeline per mode
-   m_Pipelines[Gaussian] = BuildPipeline(colorFmt, depthFmt, "Point.Gaussian.Vert", "Point.Gaussian.Frag",
-                                          /* custom blend state for Gaussian */);
-   ```
-
-5. **Expose in UI:** Add to the render mode combo in Inspector
-
-That's it. No routing changes. No new passes. No new components. The PointPass already groups entities by mode and draws each batch with the correct pipeline.
+Each pass is self-contained. No existing code changes.
 
 ---
 
 ## Migration Order (Implementation Steps)
 
-### Phase 1: Rename and consolidate (no behavior change)
+### Phase 1: Per-pass typed components
 
-1. Rename `ForwardPass` → `SurfacePass` (class, files, shaders, registry IDs)
-2. Rename `RetainedLineRenderPass` → `LinePass` (class, files, shaders, registry IDs)
-3. Rename `RetainedPointCloudRenderPass` → `PointPass` (class, files, shaders, registry IDs)
-4. Rename `LineRenderPass` → `DebugLinePass` (class, files, shaders, registry IDs)
-5. Update `DefaultPipeline`, `FeatureRegistry`, `ShaderRegistry`, `CMakeLists.txt`
-6. Update all imports/references
-7. Build + verify tests pass
+1. Define `ECS::Surface::Component` (initially mirrors `MeshRenderer::Component`)
+2. Define `ECS::Line::Component` (wireframe settings from `RenderVisualization`)
+3. Define `ECS::Point::Component` (vertex settings from `RenderVisualization`)
+4. Define `ECS::Graph::Data` (graph-specific edge/node data)
+5. Migration system: attach new components alongside old ones during transition
 
-### Phase 2: Make LinePass self-contained
+### Phase 2: Rename and consolidate passes
 
-8. Move edge caching logic from `MeshRenderPass` into `LinePass::AddPasses()`
-9. Add graph edge iteration to `LinePass` (iterate `GraphRenderer` entities)
-10. Remove wireframe submission from `MeshRenderPass` → DebugDraw
-11. Remove `MeshRenderPass::SetRetainedPassesActive()` and all routing booleans
-12. Remove graph edge submission from `GraphRenderPass` → DebugDraw
+6. Rename `ForwardPass` → `SurfacePass` (class, files, shaders, registry IDs)
+7. Rename `RetainedLineRenderPass` → `LinePass` (class, files, shaders, registry IDs)
+8. Rename `RetainedPointCloudRenderPass` → `PointPass` (class, files, shaders, registry IDs)
+9. Update `DefaultPipeline`, `FeatureRegistry`, `ShaderRegistry`, `CMakeLists.txt`
+10. Build + verify tests pass
 
-### Phase 3: Make PointPass self-contained
+### Phase 3: LinePass absorbs all line rendering
 
-13. Add graph node iteration to `PointPass` (iterate `GraphRenderer` entities with `NodeGeometry`)
-14. Add `PointCloudRenderer` iteration to `PointPass` (iterate entities with `PointGeometry`)
-15. Add device-local upload for `GraphRenderer::NodeGeometry` (on layout change)
-16. Add device-local upload for `PointCloudRenderer::PointGeometry` (on data change)
-17. Remove vertex submission from `MeshRenderPass` → `PointCloudRenderPass`
-18. Remove node submission from `GraphRenderPass` → `PointCloudRenderPass`
-19. Remove inline `PointCloudRenderer` collection from `DefaultPipeline`
+11. Move edge caching into `LinePass::AddPasses()` (from `MeshRenderPass`)
+12. Add `ECS::Line::Component` iteration (replaces `RenderVisualization::ShowWireframe` check)
+13. Add graph edge iteration (replaces `GraphRenderPass` edge submission)
+14. Add `SubmitLine()` / `SubmitOverlayLine()` transient API
+15. Route `DebugDraw` to `LinePass` transient API
+16. Delete wireframe code from `MeshRenderPass` and `GraphRenderPass`
 
-### Phase 4: Delete dead code
+### Phase 4: PointPass absorbs all point rendering
 
-20. Delete `MeshRenderPass` (class, files, module partition)
-21. Delete `GraphRenderPass` (class, files, module partition)
-22. Delete `PointCloudRenderPass` (class, files, module partition, shaders)
-23. Delete old transient shader files (`point.vert/frag` for SSBO path)
-24. Clean up `RenderVisualization::Component` (remove `CachedVertexNormals`, `VertexView`, etc.)
-25. Clean up `GeometryViewRenderer::Component` (remove `Vertices` handle)
-26. Remove `VisualizationCollect` composite stage from `DefaultPipeline::RebuildPath()`
+17. Add `ECS::Point::Component` iteration (replaces `RenderVisualization::ShowVertices` check)
+18. Add graph node iteration (replaces `GraphRenderPass` node submission)
+19. Add standalone point cloud iteration (replaces `PointCloudRenderPass`)
+20. Add device-local upload for graph node positions → `GeometryHandle`
+21. Add device-local upload for point cloud positions → `GeometryHandle`
+22. Add `SubmitPoint()` transient API
+23. Delete vertex/node code from `MeshRenderPass`, `GraphRenderPass`, `PointCloudRenderPass`
 
-### Phase 5: Pipeline-per-mode for PointPass
+### Phase 5: Delete dead code
 
-27. Split `point.vert/frag` into `point_flatdisc.vert/frag` and `point_surfel.vert/frag`
-28. PointPass stores pipeline array indexed by `PointRenderMode`
-29. Group entities by mode, draw each batch with correct pipeline
-30. Add `PointRenderMode` UI selector (ImGui combo in Inspector)
+24. Delete `MeshRenderPass` (class, files, module partition)
+25. Delete `GraphRenderPass` (class, files, module partition)
+26. Delete `PointCloudRenderPass` (class, files, module partition)
+27. Delete `LineRenderPass` (old transient-only pass)
+28. Delete old transient shaders (`point.vert/frag`, `line.vert/frag` SSBO versions)
+29. Delete `RenderVisualization::Component` (replaced by typed components)
+30. Delete `GeometryViewRenderer::Component` (each component carries its own handle)
+31. Remove `VisualizationCollect` composite stage from `DefaultPipeline`
+32. Clean up `DebugDraw` to be a thin wrapper over `LinePass`/`PointPass` transient APIs
 
-### Phase 6: Update docs
+### Phase 6: Pipeline-per-mode for PointPass
 
-31. Update `TODO.md` — remove completed items, add new remaining work
-32. Update `CLAUDE.md` — document new pass naming and architecture
-33. Update `README.md` — update rendering architecture description
+33. Split `point.vert/frag` into `point_flatdisc.vert/frag` and `point_surfel.vert/frag`
+34. PointPass stores pipeline array indexed by `PointRenderMode`
+35. Group entities by mode, draw each batch with correct pipeline
+36. Add `PointRenderMode` UI combo selector in Inspector
+
+### Phase 7: SurfacePass query migration
+
+37. SurfacePass queries `ECS::Surface::Component` instead of `MeshRenderer::Component`
+38. Migrate `GPUSceneSync` to use new component types
+39. Remove old `MeshRenderer::Component` (or alias it during transition)
+
+### Phase 8: Update docs
+
+40. Update `TODO.md` — remove completed items, add new remaining work
+41. Update `CLAUDE.md` — document new pass naming and architecture
+42. Update `README.md` — update rendering architecture description
 
 ---
 
@@ -475,8 +483,8 @@ That's it. No routing changes. No new passes. No new components. The PointPass a
 - `GeometryGpuData` / `GeometryPool` / `GeometryUploadRequest` — unchanged
 - `RHI` layer — unchanged
 - `RenderGraph` — unchanged
-- `GPUScene` / `GPUSceneSync` — unchanged (SurfacePass inherits ForwardPass's culling)
+- `GPUScene` / `GPUSceneSync` — adapts to new component names but same architecture
 - `PipelineLibrary` — unchanged (SurfacePass uses same compiled pipelines)
-- `DebugDraw` accumulator — unchanged (still feeds DebugLinePass)
+- `MeshCollider::Component` — unchanged (still provides collision data for edge extraction)
 - All geometry algorithms — unchanged
 - All test targets — unchanged (but tests may need updated imports)
