@@ -251,14 +251,6 @@ Use cases: debug planes/quads, collision mesh preview, marching cubes iso-surfac
 ```cpp
 class LinePass final : public IRenderFeature {
 public:
-    // --- Transient API (debug overlays, per-frame) ---
-    void SubmitLine(glm::vec3 a, glm::vec3 b, uint32_t color);
-    void SubmitOverlayLine(glm::vec3 a, glm::vec3 b, uint32_t color);
-    void ResetTransient();
-
-    // --- Retained path (automatic from ECS::Line::Component) ---
-    // Handled internally in AddPasses()
-
     void AddPasses(RenderPassContext& ctx) override;
     // ...
 };
@@ -266,10 +258,10 @@ public:
 
 **AddPasses() flow:**
 1. Iterate `ECS::Line::Component` entities → build retained draws (BDA + edge SSBO)
-2. Collect transient lines from staging buffer → pack into a separate per-frame SSBO
+2. Read `ctx.DebugDraw->GetLines()` and `GetOverlayLines()` → pack into a per-frame host-visible SSBO
 3. Record draw commands: retained entities first (per-entity push constants), then transient batch (identity model matrix, positions already in world space)
 
-Both use the same pipeline and shaders. The transient lines just use an internal position buffer instead of a BDA pointer to an entity's vertex buffer. In the shader, this is transparent — it reads positions from whatever BDA pointer the push constants provide.
+Both use the same pipeline and shaders. The transient lines use an internal position buffer; the shader reads from whatever BDA pointer the push constants provide — it doesn't distinguish retained from transient.
 
 **Edge caching** moves into this pass. When `Line::Component.EdgeCacheDirty == true`, the pass extracts unique edges from the collision mesh (via `MeshCollider::Component`) and caches them. Same algorithm as current `MeshRenderPass`.
 
@@ -299,14 +291,6 @@ struct LinePushConstants {
 ```cpp
 class PointPass final : public IRenderFeature {
 public:
-    // --- Transient API (debug markers, per-frame) ---
-    void SubmitPoint(glm::vec3 pos, glm::vec3 normal, float size,
-                     uint32_t color, PointRenderMode mode);
-    void ResetTransient();
-
-    // --- Retained path (automatic from ECS::Point::Component) ---
-    // Handled internally in AddPasses()
-
     void AddPasses(RenderPassContext& ctx) override;
 
 private:
@@ -317,7 +301,7 @@ private:
 
 **AddPasses() flow:**
 1. Iterate `ECS::Point::Component` entities → group by `Mode`
-2. Collect transient points from staging buffer → group by mode
+2. Read `ctx.DebugDraw->GetPoints()` → group by mode into transient batch
 3. For each active mode: bind pipeline, draw retained entities, then draw transient batch
 
 **Separate pipelines per mode:**
@@ -366,22 +350,35 @@ DefaultPipeline::RebuildPath()
 
 No VisualizationCollect composite stage. No collector passes. No DebugLinePass. Each pass is self-contained.
 
-`DebugDraw` becomes a thin API that delegates to `SurfacePass::SubmitTriangles()`, `LinePass::SubmitLine()`, and `PointPass::SubmitPoint()`. The `DebugDraw` class itself no longer owns staging buffers — it's just a convenience wrapper.
+`DebugDraw` stays as a **dumb accumulator** — it stores lines, points, and triangles submitted during the frame but has no knowledge of rendering passes. Each pass **pulls** from DebugDraw in its `AddPasses()`:
+
+```
+LinePass::AddPasses():
+    1. Iterate ECS::Line::Component → retained draws (BDA)
+    2. Read ctx.DebugDraw->GetLines()      → transient draws
+    3. Read ctx.DebugDraw->GetOverlayLines() → transient overlay draws
+
+PointPass::AddPasses():
+    1. Iterate ECS::Point::Component → retained draws (BDA)
+    2. Read ctx.DebugDraw->GetPoints() → transient draws
+
+SurfacePass::AddPasses():
+    1. Iterate ECS::Surface::Component → retained draws (GPU-driven culling)
+    2. Read ctx.DebugDraw->GetTriangles() → transient draws (direct draw)
+```
+
+DebugDraw never needs pass pointers. Each pass reads what it needs. No coupling.
 
 **Uniform pass shape — all three passes follow the same pattern:**
 ```
 class XxxPass final : public IRenderFeature {
 public:
-    // Retained: automatic from ECS::Xxx::Component in AddPasses()
-    // Transient: per-frame CPU submission API
-    void SubmitXxx(...);    // accepts world-space data
-    void ResetTransient();  // called once per frame before collection
-
     void AddPasses(RenderPassContext& ctx) override;
     // AddPasses flow:
-    //   1. Iterate ECS components → build retained draws (BDA)
-    //   2. Collect transient staging → pack into per-frame SSBO
-    //   3. Record draw commands: retained first, then transient batch
+    //   1. Iterate ECS::Xxx::Component → build retained draws (BDA)
+    //   2. Read ctx.DebugDraw transient data for this primitive type
+    //   3. Pack transient data into per-frame SSBO
+    //   4. Record draw commands: retained first, then transient batch
 };
 ```
 
@@ -471,40 +468,42 @@ Each pass is self-contained. No existing code changes.
 24. Add `SubmitPoint()` / `ResetTransient()` transient API
 25. Delete vertex/node code from `MeshRenderPass`, `GraphRenderPass`, `PointCloudRenderPass`
 
-### Phase 4: Route DebugDraw through pass transient APIs
+### Phase 4: DebugDraw as accumulator, passes pull transient data
 
-26. `DebugDraw` delegates to `LinePass::SubmitLine()` / `PointPass::SubmitPoint()` / `SurfacePass::SubmitTriangles()`
-27. Remove staging buffers from `DebugDraw` — becomes a thin convenience wrapper
+26. Add `GetTriangles()` to `DebugDraw` (alongside existing `GetLines()` / `GetOverlayLines()`)
+27. Add `GetPoints()` to `DebugDraw` for transient point markers
+28. Each pass reads from `ctx.DebugDraw` in `AddPasses()` — no pass pointers in DebugDraw
+29. Remove old `LineRenderPass` consumption of DebugDraw (replaced by LinePass pull)
 
 ### Phase 5: Delete dead code
 
-28. Delete `MeshRenderPass` (class, files, module partition)
-29. Delete `GraphRenderPass` (class, files, module partition)
-30. Delete `PointCloudRenderPass` (class, files, module partition)
-31. Delete `LineRenderPass` (old transient-only pass)
-32. Delete old transient shaders (`point.vert/frag`, `line.vert/frag` SSBO versions)
-33. Delete `RenderVisualization::Component` (replaced by typed components)
-34. Delete `GeometryViewRenderer::Component` (each component carries its own handle)
-35. Remove `VisualizationCollect` composite stage from `DefaultPipeline`
+30. Delete `MeshRenderPass` (class, files, module partition)
+31. Delete `GraphRenderPass` (class, files, module partition)
+32. Delete `PointCloudRenderPass` (class, files, module partition)
+33. Delete `LineRenderPass` (old transient-only pass)
+34. Delete old transient shaders (`point.vert/frag`, `line.vert/frag` SSBO versions)
+35. Delete `RenderVisualization::Component` (replaced by typed components)
+36. Delete `GeometryViewRenderer::Component` (each component carries its own handle)
+37. Remove `VisualizationCollect` composite stage from `DefaultPipeline`
 
 ### Phase 6: Pipeline-per-mode for PointPass
 
-36. Split `point.vert/frag` into `point_flatdisc.vert/frag` and `point_surfel.vert/frag`
-37. PointPass stores pipeline array indexed by `PointRenderMode`
-38. Group entities by mode, draw each batch with correct pipeline
-39. Add `PointRenderMode` UI combo selector in Inspector
+38. Split `point.vert/frag` into `point_flatdisc.vert/frag` and `point_surfel.vert/frag`
+39. PointPass stores pipeline array indexed by `PointRenderMode`
+40. Group entities by mode, draw each batch with correct pipeline
+41. Add `PointRenderMode` UI combo selector in Inspector
 
 ### Phase 7: SurfacePass query migration
 
-40. SurfacePass queries `ECS::Surface::Component` instead of `MeshRenderer::Component`
-41. Migrate `GPUSceneSync` to use new component types
-42. Remove old `MeshRenderer::Component` (or alias it during transition)
+42. SurfacePass queries `ECS::Surface::Component` instead of `MeshRenderer::Component`
+43. Migrate `GPUSceneSync` to use new component types
+44. Remove old `MeshRenderer::Component` (or alias it during transition)
 
 ### Phase 8: Update docs
 
-43. Update `TODO.md` — remove completed items, add new remaining work
-44. Update `CLAUDE.md` — document new pass naming and architecture
-45. Update `README.md` — update rendering architecture description
+45. Update `TODO.md` — remove completed items, add new remaining work
+46. Update `CLAUDE.md` — document new pass naming and architecture
+47. Update `README.md` — update rendering architecture description
 
 ---
 
