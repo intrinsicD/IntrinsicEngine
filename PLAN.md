@@ -10,14 +10,14 @@ Replace the dual-path (transient CPU + retained GPU) rendering with a **single u
 
 | Pass | Primitives | Retained Data | Transient Data | Modes |
 |------|-----------|---------------|----------------|-------|
-| **SurfacePass** | Filled triangles | BDA from `GeometryGpuData` | `SubmitTriangles()` (future) | Vertex colors, face colors, textured |
+| **SurfacePass** | Filled triangles | BDA from `GeometryGpuData` | `SubmitTriangles()` | Vertex colors, face colors, textured |
 | **LinePass** | Thick anti-aliased edges | BDA positions + edge index SSBO | `SubmitLine(a, b, color)` | Uniform color, per-vertex, per-edge |
 | **PointPass** | Expanded billboard quads | BDA positions + normals | `SubmitPoint(pos, normal, size, color)` | FlatDisc, Surfel, (future: EWA, Gaussian) |
 
 **No separate DebugLinePass.** Each pass handles both retained and transient data internally. The rendering technique is identical — the data lifetime is an internal detail, not a separate pass.
 
 - **Retained path**: device-local vertex buffer uploaded once, read via BDA every frame. Used for mesh geometry, graph geometry, point cloud geometry.
-- **Transient path**: per-frame CPU submission API (`SubmitLine()`, `SubmitPoint()`, future `SubmitTriangles()`). Data packed into a host-visible SSBO each frame. Used for debug overlays (octree bounds, contact manifolds, convex hulls).
+- **Transient path**: per-frame CPU submission API (`SubmitTriangles()`, `SubmitLine()`, `SubmitPoint()`). Data packed into a host-visible SSBO each frame. Used for debug overlays (octree bounds, contact manifolds, convex hulls, debug planes/quads, procedural preview geometry).
 
 Same pipeline, same shaders, same fragment output. Two internal data sources, one draw call sequence.
 
@@ -221,15 +221,24 @@ triangle.vert / triangle.frag                 # renamed to surface.*
 - Shader renamed (`triangle.* → surface.*`, code identical)
 - Queries `ECS::Surface::Component` instead of `ECS::MeshRenderer::Component`
 - Line/point topology variants dropped (those go to LinePass/PointPass)
+- Gains transient submission API (same architecture as LinePass/PointPass)
 
-**GPU-driven culling, instance SSBO, bindless textures — all preserved.** This pass already works correctly; renaming is the primary change.
+**GPU-driven culling, instance SSBO, bindless textures — all preserved** for the retained path.
 
-**Transient API (future):**
+**Transient API:**
 ```cpp
+struct TransientVertex {
+    glm::vec3 Position;
+    glm::vec3 Normal;
+    uint32_t  Color;     // packed ABGR
+};
+
 void SubmitTriangles(std::span<const TransientVertex> verts,
                      std::span<const uint32_t> indices);
+void ResetTransient();
 ```
-Deferred to a later phase. Use case: procedural preview geometry, collision mesh debug visualization.
+
+Use cases: debug planes/quads, collision mesh preview, marching cubes iso-surface while adjusting parameters, clipping plane visualization. Data packed into a per-frame host-visible buffer, BDA pointer passed via push constants with identity model matrix. The surface shader already reads positions/normals via BDA — it doesn't distinguish retained from transient.
 
 **ECS query:** `registry.view<ECS::Surface::Component>()`
 
@@ -357,7 +366,24 @@ DefaultPipeline::RebuildPath()
 
 No VisualizationCollect composite stage. No collector passes. No DebugLinePass. Each pass is self-contained.
 
-`DebugDraw` becomes a thin API that delegates to `LinePass::SubmitLine()` and `PointPass::SubmitPoint()`. The `DebugDraw` class itself no longer owns staging buffers — it's just a convenience wrapper.
+`DebugDraw` becomes a thin API that delegates to `SurfacePass::SubmitTriangles()`, `LinePass::SubmitLine()`, and `PointPass::SubmitPoint()`. The `DebugDraw` class itself no longer owns staging buffers — it's just a convenience wrapper.
+
+**Uniform pass shape — all three passes follow the same pattern:**
+```
+class XxxPass final : public IRenderFeature {
+public:
+    // Retained: automatic from ECS::Xxx::Component in AddPasses()
+    // Transient: per-frame CPU submission API
+    void SubmitXxx(...);    // accepts world-space data
+    void ResetTransient();  // called once per frame before collection
+
+    void AddPasses(RenderPassContext& ctx) override;
+    // AddPasses flow:
+    //   1. Iterate ECS components → build retained draws (BDA)
+    //   2. Collect transient staging → pack into per-frame SSBO
+    //   3. Record draw commands: retained first, then transient batch
+};
+```
 
 ---
 
@@ -422,55 +448,63 @@ Each pass is self-contained. No existing code changes.
 9. Update `DefaultPipeline`, `FeatureRegistry`, `ShaderRegistry`, `CMakeLists.txt`
 10. Build + verify tests pass
 
-### Phase 3: LinePass absorbs all line rendering
+### Phase 3: Each pass becomes self-contained (retained + transient)
 
-11. Move edge caching into `LinePass::AddPasses()` (from `MeshRenderPass`)
-12. Add `ECS::Line::Component` iteration (replaces `RenderVisualization::ShowWireframe` check)
-13. Add graph edge iteration (replaces `GraphRenderPass` edge submission)
-14. Add `SubmitLine()` / `SubmitOverlayLine()` transient API
-15. Route `DebugDraw` to `LinePass` transient API
-16. Delete wireframe code from `MeshRenderPass` and `GraphRenderPass`
+**SurfacePass:**
+11. Add `SubmitTriangles()` / `ResetTransient()` transient API to SurfacePass
+12. Internal per-frame host-visible buffer for transient triangle data
+13. SurfacePass draws retained entities (GPU-driven culling) then transient batch (direct draw)
 
-### Phase 4: PointPass absorbs all point rendering
+**LinePass:**
+14. Move edge caching into `LinePass::AddPasses()` (from `MeshRenderPass`)
+15. Add `ECS::Line::Component` iteration (replaces `RenderVisualization::ShowWireframe` check)
+16. Add graph edge iteration (replaces `GraphRenderPass` edge submission)
+17. Add `SubmitLine()` / `SubmitOverlayLine()` / `ResetTransient()` transient API
+18. Delete wireframe code from `MeshRenderPass` and `GraphRenderPass`
 
-17. Add `ECS::Point::Component` iteration (replaces `RenderVisualization::ShowVertices` check)
-18. Add graph node iteration (replaces `GraphRenderPass` node submission)
-19. Add standalone point cloud iteration (replaces `PointCloudRenderPass`)
-20. Add device-local upload for graph node positions → `GeometryHandle`
-21. Add device-local upload for point cloud positions → `GeometryHandle`
-22. Add `SubmitPoint()` transient API
-23. Delete vertex/node code from `MeshRenderPass`, `GraphRenderPass`, `PointCloudRenderPass`
+**PointPass:**
+19. Add `ECS::Point::Component` iteration (replaces `RenderVisualization::ShowVertices` check)
+20. Add graph node iteration (replaces `GraphRenderPass` node submission)
+21. Add standalone point cloud iteration (replaces `PointCloudRenderPass`)
+22. Add device-local upload for graph node positions → `GeometryHandle`
+23. Add device-local upload for point cloud positions → `GeometryHandle`
+24. Add `SubmitPoint()` / `ResetTransient()` transient API
+25. Delete vertex/node code from `MeshRenderPass`, `GraphRenderPass`, `PointCloudRenderPass`
+
+### Phase 4: Route DebugDraw through pass transient APIs
+
+26. `DebugDraw` delegates to `LinePass::SubmitLine()` / `PointPass::SubmitPoint()` / `SurfacePass::SubmitTriangles()`
+27. Remove staging buffers from `DebugDraw` — becomes a thin convenience wrapper
 
 ### Phase 5: Delete dead code
 
-24. Delete `MeshRenderPass` (class, files, module partition)
-25. Delete `GraphRenderPass` (class, files, module partition)
-26. Delete `PointCloudRenderPass` (class, files, module partition)
-27. Delete `LineRenderPass` (old transient-only pass)
-28. Delete old transient shaders (`point.vert/frag`, `line.vert/frag` SSBO versions)
-29. Delete `RenderVisualization::Component` (replaced by typed components)
-30. Delete `GeometryViewRenderer::Component` (each component carries its own handle)
-31. Remove `VisualizationCollect` composite stage from `DefaultPipeline`
-32. Clean up `DebugDraw` to be a thin wrapper over `LinePass`/`PointPass` transient APIs
+28. Delete `MeshRenderPass` (class, files, module partition)
+29. Delete `GraphRenderPass` (class, files, module partition)
+30. Delete `PointCloudRenderPass` (class, files, module partition)
+31. Delete `LineRenderPass` (old transient-only pass)
+32. Delete old transient shaders (`point.vert/frag`, `line.vert/frag` SSBO versions)
+33. Delete `RenderVisualization::Component` (replaced by typed components)
+34. Delete `GeometryViewRenderer::Component` (each component carries its own handle)
+35. Remove `VisualizationCollect` composite stage from `DefaultPipeline`
 
 ### Phase 6: Pipeline-per-mode for PointPass
 
-33. Split `point.vert/frag` into `point_flatdisc.vert/frag` and `point_surfel.vert/frag`
-34. PointPass stores pipeline array indexed by `PointRenderMode`
-35. Group entities by mode, draw each batch with correct pipeline
-36. Add `PointRenderMode` UI combo selector in Inspector
+36. Split `point.vert/frag` into `point_flatdisc.vert/frag` and `point_surfel.vert/frag`
+37. PointPass stores pipeline array indexed by `PointRenderMode`
+38. Group entities by mode, draw each batch with correct pipeline
+39. Add `PointRenderMode` UI combo selector in Inspector
 
 ### Phase 7: SurfacePass query migration
 
-37. SurfacePass queries `ECS::Surface::Component` instead of `MeshRenderer::Component`
-38. Migrate `GPUSceneSync` to use new component types
-39. Remove old `MeshRenderer::Component` (or alias it during transition)
+40. SurfacePass queries `ECS::Surface::Component` instead of `MeshRenderer::Component`
+41. Migrate `GPUSceneSync` to use new component types
+42. Remove old `MeshRenderer::Component` (or alias it during transition)
 
 ### Phase 8: Update docs
 
-40. Update `TODO.md` — remove completed items, add new remaining work
-41. Update `CLAUDE.md` — document new pass naming and architecture
-42. Update `README.md` — update rendering architecture description
+43. Update `TODO.md` — remove completed items, add new remaining work
+44. Update `CLAUDE.md` — document new pass naming and architecture
+45. Update `README.md` — update rendering architecture description
 
 ---
 
