@@ -28,11 +28,11 @@ namespace Graphics::Passes
     // and performs CPU-side data collection for:
     //
     //   ShowWireframe:
-    //     Extracts unique edges from the collision mesh (lazily cached per entity)
-    //     and submits them to ctx.DebugDrawPtr (→ LineRenderPass GPU draw).
+    //     Extracts unique edges from the collision mesh (lazily cached per entity).
+    //     When RetainedLineRenderPass is active, edges are rendered via BDA from
+    //     persistent device-local buffers — the CPU path is skipped. Otherwise,
+    //     edges are submitted to ctx.DebugDrawPtr (→ LineRenderPass GPU draw).
     //     Uses OverlayLine when vis.WireframeOverlay is true.
-    //     This path always runs when ShowWireframe is true; there is no GPU geometry
-    //     view for wireframe (the ForwardPass triangle shader ignores WireframeColor).
     //
     //   ShowVertices:
     //     Submits mesh vertex positions for point rendering

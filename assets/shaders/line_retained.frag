@@ -13,6 +13,7 @@ layout(location = 1) in float fragDistanceToCenter; // pixel distance from cente
 layout(push_constant) uniform PushConsts {
     mat4     Model;
     uint64_t PtrPositions;
+    uint64_t PtrEdges;
     float    LineWidth;
     float    ViewportWidth;
     float    ViewportHeight;
