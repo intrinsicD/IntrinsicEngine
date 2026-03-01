@@ -81,7 +81,7 @@ Near-term priority now shifts from scheduler substrate work to rendering infrast
 - **Separate pipelines required:** `VK_PRIMITIVE_TOPOLOGY_LINE_LIST` gives 1px lines, `POINT_LIST` gives 1px dots. Thick anti-aliased lines and billboard points each need their own shader pipeline with vertex-shader expansion (6 verts/primitive).
 - Wireframe view: extract unique edge pairs once → `GeometryViewRenderer` with `ReuseVertexBuffersFrom = meshHandle`, persisted edge index buffer. Line vertex shader reads positions from mesh buffer via BDA, expands each segment to screen-space quad. No per-frame CPU extraction.
 - Vertex view: `ReuseVertexBuffersFrom = meshHandle`. Point vertex shader reads positions via BDA, expands to billboard quad.
-- `GraphRenderer::Component`: wraps `Geometry::Graph` as a line view (edges) + point view (nodes) sharing vertex buffers via BDA. Layout algorithms produce positions; GPU upload once, update only on layout change.
+- `ECS::Graph::Data`: PropertySet-backed data authority wrapping `shared_ptr<Geometry::Graph>` — replaces old `GraphRenderer::Component` vector copies. Renders as a line view (edges) + point view (nodes) sharing vertex buffers via BDA. Layout algorithms produce positions; GPU upload once, update only on layout change.
 - Lifecycle system allocates `GPUScene` slots per view, syncs transforms, frustum culling — same path as `MeshRendererLifecycle`.
 - Thick-line vertex shader expansion (6 verts/segment), anti-aliased fragment shader, push constants for line width + viewport + BDA pointers.
 

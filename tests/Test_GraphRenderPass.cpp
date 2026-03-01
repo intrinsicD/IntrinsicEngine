@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 #include <cstdint>
-#include <vector>
+#include <memory>
 
 #include <glm/glm.hpp>
 
@@ -12,66 +12,134 @@ import Geometry;
 // =============================================================================
 //
 // These tests validate the CPU-side contract of GraphRenderPass and the
-// ECS::GraphRenderer::Component without requiring a GPU device.  They verify:
-//   - GraphRenderer component default values and data accessors.
-//   - Node color / radius optional attribute detection.
+// ECS::Graph::Data component without requiring a GPU device.  They verify:
+//   - Graph::Data component default values and PropertySet-backed queries.
+//   - Node color / radius optional attribute detection via PropertySets.
 //   - GraphRenderPass instantiation and configuration (no GPU calls).
 //   - GraphRenderPass correctly delegates node submission to PointCloudRenderPass.
 
-// ---- ECS::GraphRenderer::Component Tests ----
+// ---- Helper: create a Graph with vertices and edges ----
 
-TEST(GraphRenderer_Component, DefaultValues)
+static std::shared_ptr<Geometry::Graph::Graph> MakeTriangleGraph()
 {
-    ECS::GraphRenderer::Component comp;
-    EXPECT_EQ(comp.NodeCount(), 0u);
-    EXPECT_EQ(comp.EdgeCount(), 0u);
-    EXPECT_FALSE(comp.HasNodeColors());
-    EXPECT_FALSE(comp.HasNodeRadii());
-    EXPECT_FLOAT_EQ(comp.DefaultNodeRadius,  0.01f);
-    EXPECT_FLOAT_EQ(comp.NodeSizeMultiplier, 1.0f);
-    EXPECT_TRUE(comp.Visible);
-    EXPECT_FALSE(comp.EdgesOverlay);
+    auto g = std::make_shared<Geometry::Graph::Graph>();
+    auto v0 = g->AddVertex(glm::vec3(0, 0, 0));
+    auto v1 = g->AddVertex(glm::vec3(1, 0, 0));
+    auto v2 = g->AddVertex(glm::vec3(0, 1, 0));
+    g->AddEdge(v0, v1);
+    g->AddEdge(v1, v2);
+    g->AddEdge(v2, v0);
+    return g;
 }
 
-TEST(GraphRenderer_Component, WithNodes)
-{
-    ECS::GraphRenderer::Component comp;
-    comp.NodePositions = {{0, 0, 0}, {1, 0, 0}, {0, 1, 0}};
+// ---- ECS::Graph::Data Tests ----
 
-    EXPECT_EQ(comp.NodeCount(), 3u);
-    EXPECT_FALSE(comp.HasNodeColors()); // empty colors → false
-    EXPECT_FALSE(comp.HasNodeRadii());
+TEST(Graph_Data, DefaultValues)
+{
+    ECS::Graph::Data data;
+    EXPECT_EQ(data.NodeCount(), 0u);
+    EXPECT_EQ(data.EdgeCount(), 0u);
+    EXPECT_FALSE(data.HasNodeColors());
+    EXPECT_FALSE(data.HasNodeRadii());
+    EXPECT_FLOAT_EQ(data.DefaultNodeRadius,  0.01f);
+    EXPECT_FLOAT_EQ(data.NodeSizeMultiplier, 1.0f);
+    EXPECT_TRUE(data.Visible);
+    EXPECT_FALSE(data.EdgesOverlay);
+    EXPECT_EQ(data.GraphRef, nullptr);
 }
 
-TEST(GraphRenderer_Component, WithOptionalAttributes)
+TEST(Graph_Data, WithGraphRef)
 {
-    ECS::GraphRenderer::Component comp;
-    comp.NodePositions = {{0, 0, 0}, {1, 0, 0}};
-    comp.NodeColors    = {{1, 0, 0, 1}, {0, 1, 0, 1}};
-    comp.NodeRadii     = {0.02f, 0.04f};
+    ECS::Graph::Data data;
+    data.GraphRef = MakeTriangleGraph();
 
-    EXPECT_EQ(comp.NodeCount(), 2u);
-    EXPECT_TRUE(comp.HasNodeColors());
-    EXPECT_TRUE(comp.HasNodeRadii());
+    EXPECT_EQ(data.NodeCount(), 3u);
+    EXPECT_EQ(data.EdgeCount(), 3u);
+    EXPECT_FALSE(data.HasNodeColors());
+    EXPECT_FALSE(data.HasNodeRadii());
 }
 
-TEST(GraphRenderer_Component, MismatchedAttributeSize)
+TEST(Graph_Data, NullGraphRefIsHandled)
 {
-    ECS::GraphRenderer::Component comp;
-    comp.NodePositions = {{0, 0, 0}, {1, 0, 0}, {0, 1, 0}};
-    comp.NodeColors    = {{1, 0, 0, 1}}; // wrong count
+    ECS::Graph::Data data;
+    data.GraphRef = nullptr;
 
-    EXPECT_FALSE(comp.HasNodeColors()); // size mismatch → false
+    EXPECT_EQ(data.NodeCount(), 0u);
+    EXPECT_EQ(data.EdgeCount(), 0u);
+    EXPECT_FALSE(data.HasNodeColors());
+    EXPECT_FALSE(data.HasNodeRadii());
 }
 
-TEST(GraphRenderer_Component, WithEdges)
+TEST(Graph_Data, PropertySetBackedColors)
 {
-    ECS::GraphRenderer::Component comp;
-    comp.NodePositions = {{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {1, 1, 0}};
-    comp.Edges = {{0, 1}, {1, 2}, {2, 3}, {3, 0}};
+    ECS::Graph::Data data;
+    data.GraphRef = MakeTriangleGraph();
+    EXPECT_FALSE(data.HasNodeColors());
 
-    EXPECT_EQ(comp.NodeCount(), 4u);
-    EXPECT_EQ(comp.EdgeCount(), 4u);
+    // Add per-node colors via PropertySet.
+    auto colorProp = data.GraphRef->GetOrAddVertexProperty<glm::vec4>("v:color",
+        glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
+    EXPECT_TRUE(data.HasNodeColors());
+}
+
+TEST(Graph_Data, PropertySetBackedRadii)
+{
+    ECS::Graph::Data data;
+    data.GraphRef = MakeTriangleGraph();
+    EXPECT_FALSE(data.HasNodeRadii());
+
+    // Add per-node radii via PropertySet.
+    auto radiusProp = data.GraphRef->GetOrAddVertexProperty<float>("v:radius", 0.02f);
+    EXPECT_TRUE(data.HasNodeRadii());
+}
+
+TEST(Graph_Data, SharedPtrSemantics)
+{
+    auto graph = MakeTriangleGraph();
+
+    ECS::Graph::Data data1;
+    data1.GraphRef = graph;
+
+    ECS::Graph::Data data2;
+    data2.GraphRef = graph;
+
+    // Both reference the same authoritative graph.
+    EXPECT_EQ(data1.GraphRef.get(), data2.GraphRef.get());
+    EXPECT_EQ(data1.NodeCount(), data2.NodeCount());
+
+    // Mutation through one reference is visible to the other.
+    graph->AddVertex(glm::vec3(1, 1, 0));
+    EXPECT_EQ(data1.NodeCount(), 4u);
+    EXPECT_EQ(data2.NodeCount(), 4u);
+}
+
+TEST(Graph_Data, EmptyGraph)
+{
+    ECS::Graph::Data data;
+    data.GraphRef = std::make_shared<Geometry::Graph::Graph>();
+
+    EXPECT_EQ(data.NodeCount(), 0u);
+    EXPECT_EQ(data.EdgeCount(), 0u);
+}
+
+TEST(Graph_Data, GraphWithDeletedVertices)
+{
+    auto g = std::make_shared<Geometry::Graph::Graph>();
+    auto v0 = g->AddVertex(glm::vec3(0, 0, 0));
+    auto v1 = g->AddVertex(glm::vec3(1, 0, 0));
+    auto v2 = g->AddVertex(glm::vec3(0, 1, 0));
+    g->AddEdge(v0, v1);
+    g->AddEdge(v1, v2);
+
+    ECS::Graph::Data data;
+    data.GraphRef = g;
+    EXPECT_EQ(data.NodeCount(), 3u);
+    EXPECT_EQ(data.EdgeCount(), 2u);
+
+    // Delete a vertex — adjacent edges are removed too.
+    g->DeleteVertex(v0);
+    EXPECT_EQ(data.NodeCount(), 2u);
+    EXPECT_EQ(data.EdgeCount(), 1u);
 }
 
 // ---- GraphRenderPass Instantiation ----
@@ -152,7 +220,7 @@ TEST(GraphRenderPass_Contract, ResetBeforeCollect)
 
 // ---- RenderMode Enum Coverage ----
 
-TEST(GraphRenderer_RenderMode, FlatDiscAvailable)
+TEST(Graph_RenderMode, FlatDiscAvailable)
 {
     // Verify the supported render mode.
     using RM = Geometry::PointCloud::RenderMode;
@@ -160,15 +228,47 @@ TEST(GraphRenderer_RenderMode, FlatDiscAvailable)
     EXPECT_EQ(static_cast<uint32_t>(RM::FlatDisc), 0u);
 }
 
-TEST(GraphRenderer_Component, NodeRenderModeDefault)
+TEST(Graph_Data, NodeRenderModeDefault)
 {
-    ECS::GraphRenderer::Component comp;
-    EXPECT_EQ(comp.NodeRenderMode, Geometry::PointCloud::RenderMode::FlatDisc);
+    ECS::Graph::Data data;
+    EXPECT_EQ(data.NodeRenderMode, Geometry::PointCloud::RenderMode::FlatDisc);
 }
 
-TEST(GraphRenderer_Component, NodeRenderModeSetFlatDisc)
+TEST(Graph_Data, NodeRenderModeSetFlatDisc)
 {
-    ECS::GraphRenderer::Component comp;
-    comp.NodeRenderMode = Geometry::PointCloud::RenderMode::FlatDisc;
-    EXPECT_EQ(comp.NodeRenderMode, Geometry::PointCloud::RenderMode::FlatDisc);
+    ECS::Graph::Data data;
+    data.NodeRenderMode = Geometry::PointCloud::RenderMode::FlatDisc;
+    EXPECT_EQ(data.NodeRenderMode, Geometry::PointCloud::RenderMode::FlatDisc);
+}
+
+// ---- PropertySet Accessor Tests ----
+
+TEST(Graph_PropertySetAccessors, VertexPropertiesAccessible)
+{
+    auto g = MakeTriangleGraph();
+    const auto& constG = *g;
+
+    // Mutable access.
+    EXPECT_EQ(g->VertexProperties().Size(), g->VerticesSize());
+
+    // Const access.
+    EXPECT_EQ(constG.VertexProperties().Size(), constG.VerticesSize());
+}
+
+TEST(Graph_PropertySetAccessors, EdgePropertiesAccessible)
+{
+    auto g = MakeTriangleGraph();
+    const auto& constG = *g;
+
+    EXPECT_EQ(g->EdgeProperties().Size(), g->EdgesSize());
+    EXPECT_EQ(constG.EdgeProperties().Size(), constG.EdgesSize());
+}
+
+TEST(Graph_PropertySetAccessors, PropertyExistsCheck)
+{
+    auto g = MakeTriangleGraph();
+
+    EXPECT_FALSE(g->VertexProperties().Exists("v:color"));
+    g->GetOrAddVertexProperty<glm::vec4>("v:color");
+    EXPECT_TRUE(g->VertexProperties().Exists("v:color"));
 }

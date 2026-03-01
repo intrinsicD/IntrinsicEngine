@@ -154,29 +154,30 @@ export namespace ECS::RenderVisualization
 }
 
 // -------------------------------------------------------------------------
-// GraphRenderer — ECS component for graph visualization.
+// Graph::Data — ECS component for graph visualization (PropertySet-backed).
 // -------------------------------------------------------------------------
+//
+// Holds a shared_ptr to an authoritative Geometry::Graph::Graph instance.
+// Node positions, colors, radii, and edge topology are sourced directly from
+// the Graph's PropertySets — no std::vector copies.
 //
 // Entities with this component are rendered by GraphRenderPass:
 //   - Nodes rendered via PointCloudRenderPass (all point rendering modes).
 //   - Edges rendered via LineRenderPass (through DebugDraw accumulator).
 //
-// Node data uses SoA layout matching PointCloudRenderer::Component.
-// Optional per-node attributes must match NodePositions.size() when present.
+// Optional per-node attributes (colors, radii) are stored as named vertex
+// properties on the Graph:
+//   "v:color"  — glm::vec4 per-node color
+//   "v:radius" — float per-node radius
 
-export namespace ECS::GraphRenderer
+export namespace ECS::Graph
 {
-    struct Component
+    struct Data
     {
-        // ---- Node Data ----
-        std::vector<glm::vec3> NodePositions;       // Required.
-        std::vector<glm::vec4> NodeColors;          // Optional (empty = use DefaultNodeColor).
-        std::vector<float>     NodeRadii;           // Optional (empty = use DefaultNodeRadius).
+        // ---- Authoritative Data Source ----
+        std::shared_ptr<Geometry::Graph::Graph> GraphRef;
 
-        // ---- Edge Data (index pairs into NodePositions) ----
-        std::vector<std::pair<uint32_t, uint32_t>> Edges;
-
-        // ---- Rendering Parameters ----
+        // ---- Rendering Parameters (not data — data lives in PropertySets) ----
         Geometry::PointCloud::RenderMode NodeRenderMode = Geometry::PointCloud::RenderMode::FlatDisc;
         float     DefaultNodeRadius  = 0.01f;
         float     NodeSizeMultiplier = 1.0f;
@@ -185,11 +186,23 @@ export namespace ECS::GraphRenderer
         bool      EdgesOverlay       = false;  // true = edges always visible (no depth test).
         bool      Visible            = true;
 
-        // ---- Queries ----
-        [[nodiscard]] std::size_t NodeCount() const noexcept { return NodePositions.size(); }
-        [[nodiscard]] std::size_t EdgeCount() const noexcept { return Edges.size(); }
-        [[nodiscard]] bool HasNodeColors() const noexcept { return NodeColors.size() == NodePositions.size(); }
-        [[nodiscard]] bool HasNodeRadii()  const noexcept { return NodeRadii.size() == NodePositions.size(); }
+        // ---- Queries (delegate to GraphRef) ----
+        [[nodiscard]] std::size_t NodeCount() const noexcept
+        {
+            return GraphRef ? GraphRef->VertexCount() : 0;
+        }
+        [[nodiscard]] std::size_t EdgeCount() const noexcept
+        {
+            return GraphRef ? GraphRef->EdgeCount() : 0;
+        }
+        [[nodiscard]] bool HasNodeColors() const noexcept
+        {
+            return GraphRef && GraphRef->VertexProperties().Exists("v:color");
+        }
+        [[nodiscard]] bool HasNodeRadii() const noexcept
+        {
+            return GraphRef && GraphRef->VertexProperties().Exists("v:radius");
+        }
     };
 }
 

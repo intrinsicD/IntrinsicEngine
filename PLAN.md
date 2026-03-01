@@ -15,7 +15,7 @@ This section tracks where runtime code currently stands relative to this plan/sp
 
 | Area | Planned direction | Current state | Status |
 |------|-------------------|---------------|--------|
-| ECS render components | Replace `MeshRenderer`/`RenderVisualization`/`GraphRenderer`/`PointCloudRenderer` with `ECS::Surface`, `ECS::Line`, `ECS::Point`, `ECS::Graph::Data` | Legacy components are still authoritative and actively used by render passes | **Not started** |
+| ECS render components | Replace `MeshRenderer`/`RenderVisualization`/`GraphRenderer`/`PointCloudRenderer` with `ECS::Surface`, `ECS::Line`, `ECS::Point`, `ECS::Graph::Data` | `ECS::Graph::Data` replaces `GraphRenderer::Component` with `shared_ptr<Graph>` PropertySet-backed authority. `GraphRenderPass` reads from Graph PropertySets. Legacy `MeshRenderer`/`RenderVisualization`/`PointCloudRenderer` still active. | **Partial (Graph done)** |
 | Pass topology | Collapse into `SurfacePass`, `LinePass`, `PointPass` each owning retained + transient internally | Pipeline still instantiates `ForwardPass`, `MeshRenderPass`, `GraphRenderPass`, `LineRenderPass`, `PointCloudRenderPass`, `RetainedLineRenderPass`, `RetainedPointCloudRenderPass` | **Not started** |
 | Shader naming/registration | `surface.*`, unified `line.*`, `point_flatdisc.*`, `point_surfel.*` IDs | Runtime still registers `triangle.*`, `line_retained.*`, `point_retained.*` and keeps transient `line.*` / `point.*` paths | **Not started** |
 | CPU geometry authority | PropertySet-backed CPU sources for cloud/graph/mesh topology and attributes | **Implemented in geometry domain types** (`PointCloud::Cloud`, `Graph`, `Halfedge::Mesh`). All four PropertySet domains (`VertexProperties()`, `EdgeProperties()`, `FaceProperties()`, `HalfedgeProperties()`) are publicly accessible. Bulk edge extraction via `ExtractEdgeVertexPairs()` provides span-compatible GPU upload. | **Complete** |
@@ -26,7 +26,7 @@ This section tracks where runtime code currently stands relative to this plan/sp
 ### Gap implications
 
 1. The current renderer still uses a mixed collector architecture with parallel retained/transient passes, so the plan's "single pass per primitive" invariant is not yet enforced.
-2. Graph and point cloud render components still own CPU arrays in renderer-facing components (`GraphRenderer::Component` holds `std::vector` copies, `PointCloudRenderer::Component` holds `std::vector` copies), which duplicates authority away from PropertySets.
+2. ~~Graph render components own CPU arrays~~ **Resolved for graphs** — `ECS::Graph::Data` holds `shared_ptr<Graph>`, reads from PropertySets. Point cloud render component (`PointCloudRenderer::Component`) still holds `std::vector` copies, duplicating authority away from PropertySets.
 3. Wireframe currently depends on cached edge extraction in visualization components rather than direct PropertySet-to-SSBO sync.
 4. No geometry view lifecycle systems exist — no automated creation of edge/vertex view `GeometryHandle` instances when rendering components are attached.
 5. Per-edge and per-face attribute rendering is not yet supported — only uniform colors via push constants.
@@ -37,7 +37,7 @@ This section tracks where runtime code currently stands relative to this plan/sp
 Treat this plan as the target architecture; implementation should migrate in this order:
 
 1. Introduce new ECS component set (`Surface/Line/Point/Graph::Data`) behind compatibility adapters.
-2. Move graph/point-cloud CPU payload ownership out of render-only components into geometry PropertySet-backed assets/components.
+2. Move graph/point-cloud CPU payload ownership out of render-only components into geometry PropertySet-backed assets/components. **Partial** — Graph done (`ECS::Graph::Data`), PointCloud pending.
 3. ~~Add public `EdgeProperties()`, `FaceProperties()`, `HalfedgeProperties()` accessors to `Halfedge::Mesh`.~~ **Done** — all four PropertySet domains public, plus `ExtractEdgeVertexPairs()` bulk extraction.
 4. Introduce dirty-domain geometry sync system for CPU→GPU range updates (per vertex/edge/face domain).
 5. Collapse pass graph to `SurfacePass`, `LinePass`, `PointPass` and retire legacy pass feature IDs.
@@ -232,7 +232,7 @@ Debug entity (octree visualization):
 |---------|-----|
 | `ECS::MeshRenderer::Component` | `ECS::Surface::Component` |
 | `ECS::RenderVisualization::Component` | Split into `ECS::Line::Component` + `ECS::Point::Component` (attached/detached instead of bool toggles) |
-| `ECS::GraphRenderer::Component` | `ECS::Line::Component` + `ECS::Point::Component` + `ECS::Graph::Data` (holds `Graph` reference, not data copies) |
+| ~~`ECS::GraphRenderer::Component`~~ | **Done** — replaced by `ECS::Graph::Data` (holds `shared_ptr<Graph>`, PropertySet-backed). Future: add sibling `ECS::Line::Component` + `ECS::Point::Component` for retained rendering. |
 | `ECS::PointCloudRenderer::Component` | `ECS::Point::Component` (with device-local GeometryHandle) |
 | `ECS::GeometryViewRenderer::Component` | **deleted** (each component carries its own GeometryHandle) |
 

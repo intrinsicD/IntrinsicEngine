@@ -1,9 +1,11 @@
 #include <gtest/gtest.h>
+#include <memory>
 
 #include <glm/glm.hpp>
 
 import Graphics; // RenderPassContext, DebugDraw
 import ECS;
+import Geometry;
 import Core.Hash;
 
 import Graphics:Passes.Graph;
@@ -25,15 +27,19 @@ TEST(Graphics_GraphDebugDraw, GraphEdgesAreEmittedToDebugDraw)
 {
     ECS::Scene scene;
 
-    // Create one graph entity.
+    // Create one graph entity using PropertySet-backed ECS::Graph::Data.
     auto& reg = scene.GetRegistry();
     const entt::entity e = reg.create();
 
-    ECS::GraphRenderer::Component graph{};
-    graph.Visible = true;
-    graph.NodePositions = {glm::vec3(0.0f), glm::vec3(1.0f, 0.0f, 0.0f)};
-    graph.Edges = {{0u, 1u}};
-    reg.emplace<ECS::GraphRenderer::Component>(e, graph);
+    auto graph = std::make_shared<Geometry::Graph::Graph>();
+    auto v0 = graph->AddVertex(glm::vec3(0.0f));
+    auto v1 = graph->AddVertex(glm::vec3(1.0f, 0.0f, 0.0f));
+    graph->AddEdge(v0, v1);
+
+    ECS::Graph::Data graphData{};
+    graphData.Visible = true;
+    graphData.GraphRef = graph;
+    reg.emplace<ECS::Graph::Data>(e, graphData);
 
     Graphics::DebugDraw dd;
 
@@ -74,4 +80,3 @@ TEST(Graphics_GraphDebugDraw, GraphEdgesAreEmittedToDebugDraw)
     // This keeps the test from failing while still keeping the file in place.
     EXPECT_EQ(dd.GetLineCount(), 0u);
 }
-

@@ -205,6 +205,16 @@ export namespace Geometry::Graph
             return Geometry::EdgeProperty<T>(m_Edges.GetOrAdd<T>(std::move(name), std::move(defaultValue)));
         }
 
+        // Public PropertySet accessors (mirrors Halfedge::Mesh pattern).
+        [[nodiscard]] Vertices& VertexProperties() noexcept { return m_Vertices; }
+        [[nodiscard]] const Vertices& VertexProperties() const noexcept { return m_Vertices; }
+
+        [[nodiscard]] Edges& EdgeProperties() noexcept { return m_Edges; }
+        [[nodiscard]] const Edges& EdgeProperties() const noexcept { return m_Edges; }
+
+        [[nodiscard]] Halfedges& HalfedgeProperties() noexcept { return m_Halfedges; }
+        [[nodiscard]] const Halfedges& HalfedgeProperties() const noexcept { return m_Halfedges; }
+
     private:
         struct VertexConnectivity
         {
