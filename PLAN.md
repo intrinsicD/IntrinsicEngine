@@ -18,7 +18,7 @@ This section tracks where runtime code currently stands relative to this plan/sp
 | ECS render components | Replace `MeshRenderer`/`RenderVisualization`/`GraphRenderer`/`PointCloudRenderer` with `ECS::Surface`, `ECS::Line`, `ECS::Point`, `ECS::Graph::Data` | Legacy components are still authoritative and actively used by render passes | **Not started** |
 | Pass topology | Collapse into `SurfacePass`, `LinePass`, `PointPass` each owning retained + transient internally | Pipeline still instantiates `ForwardPass`, `MeshRenderPass`, `GraphRenderPass`, `LineRenderPass`, `PointCloudRenderPass`, `RetainedLineRenderPass`, `RetainedPointCloudRenderPass` | **Not started** |
 | Shader naming/registration | `surface.*`, unified `line.*`, `point_flatdisc.*`, `point_surfel.*` IDs | Runtime still registers `triangle.*`, `line_retained.*`, `point_retained.*` and keeps transient `line.*` / `point.*` paths | **Not started** |
-| CPU geometry authority | PropertySet-backed CPU sources for cloud/graph/mesh topology and attributes | **Implemented in geometry domain types** (`PointCloud::Cloud`, `Graph`, `Halfedge::Mesh`). However, `Mesh` only exposes `VertexProperties()` publicly — edge/face/halfedge PropertySet accessors are missing. | **Partial** (vertex yes, edge/face/halfedge accessors missing) |
+| CPU geometry authority | PropertySet-backed CPU sources for cloud/graph/mesh topology and attributes | **Implemented in geometry domain types** (`PointCloud::Cloud`, `Graph`, `Halfedge::Mesh`). All four PropertySet domains (`VertexProperties()`, `EdgeProperties()`, `FaceProperties()`, `HalfedgeProperties()`) are publicly accessible. Bulk edge extraction via `ExtractEdgeVertexPairs()` provides span-compatible GPU upload. | **Complete** |
 | PropertySet-driven edge source | Mesh/graph edge rendering sourced from topology PropertySets | Plan/spec defined, but runtime still has `RenderVisualization::CachedEdges` + dirty cache fields | **Partial (spec yes, runtime no)** |
 | Automatic CPU→GPU sync | Per-frame dirty-domain sync (`GeometryDirty`/`TopologyDirty`/`AttributesDirty`) patches SSBO ranges and renderable offsets | No generic dirty-domain sync system yet; current flow is pass/component-local invalidation and per-feature staging | **Not started** |
 | Subcomponent hierarchy | Named sub-mesh/sub-graph/sub-cloud components with offsets/sizes and renderable slice references | No dedicated hierarchy/slice component model in rendering ECS yet | **Not started** |
@@ -29,9 +29,8 @@ This section tracks where runtime code currently stands relative to this plan/sp
 2. Graph and point cloud render components still own CPU arrays in renderer-facing components (`GraphRenderer::Component` holds `std::vector` copies, `PointCloudRenderer::Component` holds `std::vector` copies), which duplicates authority away from PropertySets.
 3. Wireframe currently depends on cached edge extraction in visualization components rather than direct PropertySet-to-SSBO sync.
 4. No geometry view lifecycle systems exist — no automated creation of edge/vertex view `GeometryHandle` instances when rendering components are attached.
-5. `Halfedge::Mesh` lacks public `EdgeProperties()`, `FaceProperties()`, `HalfedgeProperties()` accessors needed for bulk GPU sync.
-6. Per-edge and per-face attribute rendering is not yet supported — only uniform colors via push constants.
-7. Point clouds and graphs lack device-local upload paths, forcing per-frame transient CPU submission.
+5. Per-edge and per-face attribute rendering is not yet supported — only uniform colors via push constants.
+6. Point clouds and graphs lack device-local upload paths, forcing per-frame transient CPU submission.
 
 ### Execution note
 
@@ -39,7 +38,7 @@ Treat this plan as the target architecture; implementation should migrate in thi
 
 1. Introduce new ECS component set (`Surface/Line/Point/Graph::Data`) behind compatibility adapters.
 2. Move graph/point-cloud CPU payload ownership out of render-only components into geometry PropertySet-backed assets/components.
-3. Add public `EdgeProperties()`, `FaceProperties()`, `HalfedgeProperties()` accessors to `Halfedge::Mesh`.
+3. ~~Add public `EdgeProperties()`, `FaceProperties()`, `HalfedgeProperties()` accessors to `Halfedge::Mesh`.~~ **Done** — all four PropertySet domains public, plus `ExtractEdgeVertexPairs()` bulk extraction.
 4. Introduce dirty-domain geometry sync system for CPU→GPU range updates (per vertex/edge/face domain).
 5. Collapse pass graph to `SurfacePass`, `LinePass`, `PointPass` and retire legacy pass feature IDs.
 6. Implement geometry view lifecycle systems so all three geometry types have device-local retained-mode rendering (equal treatment — not deferred for point clouds/graphs).
@@ -71,7 +70,7 @@ All CPU-side geometric topology/attributes are sourced from **PropertySets**; re
 
 - **Point clouds:** `m_Points` PropertySet (typed `Vertices`). Property names use `"p:"` prefix: `"p:position"`, `"p:normal"`, `"p:color"`, `"p:radius"`. Accessed via `Cloud::PointProperties()`.
 - **Graphs:** `m_Vertices` + `m_Halfedges` + `m_Edges` PropertySets. Property names use `"v:"` prefix for vertices (`"v:point"`, `"v:connectivity"`). Accessed via `Graph::GetOrAddVertexProperty<T>()` / `GetOrAddEdgeProperty<T>()`.
-- **Halfedge meshes:** `m_Vertices` + `m_Halfedges` + `m_Edges` + `m_Faces` PropertySets. Property names use `"v:"` for vertices, `"h:"` for halfedges, `"e:"` for edges, `"f:"` for faces. Currently only `Mesh::VertexProperties()` is public — **`EdgeProperties()`, `FaceProperties()`, and `HalfedgeProperties()` accessors must be added** for bulk span extraction in GPU sync systems.
+- **Halfedge meshes:** `m_Vertices` + `m_Halfedges` + `m_Edges` + `m_Faces` PropertySets. Property names use `"v:"` for vertices, `"h:"` for halfedges, `"e:"` for edges, `"f:"` for faces. All four domains are publicly accessible via `VertexProperties()`, `EdgeProperties()`, `FaceProperties()`, `HalfedgeProperties()`. Bulk edge extraction via `ExtractEdgeVertexPairs()` provides span-compatible GPU upload.
 
 This is the canonical ownership model for scene entities and geometric assets (asset-registry `entt::registry`). Render systems must not introduce alternate authoritative CPU caches for these domains. All three geometry types are treated as **equal peers** — none is privileged over the others in upload mode, buffer residency, or pass scheduling.
 
@@ -787,7 +786,7 @@ Each pass is self-contained. No existing code changes.
 
 All three geometry types must reach device-local retained-mode rendering at the same phase — point clouds and graphs are not second-class citizens.
 
-43. Expose `EdgeProperties()`, `FaceProperties()`, `HalfedgeProperties()` on `Halfedge::Mesh` for bulk span extraction
+43. ~~Expose `EdgeProperties()`, `FaceProperties()`, `HalfedgeProperties()` on `Halfedge::Mesh` for bulk span extraction~~ **Done**
 44. Add `MeshViewLifecycleSystem`: on `Line`/`Point` component attach, create edge/vertex views via `ReuseVertexBuffersFrom(meshHandle)`, manage handle lifecycle + `GPUScene` slot allocation
 45. Add `PointCloudGeometrySyncSystem`: upload `Cloud::Positions()`/`Normals()` spans to device-local `GeometryGpuData` via `GeometryUploadRequest` (staged one-shot), assign handle to `ECS::Point::Component::Geometry`
 46. Add `GraphGeometrySyncSystem`: upload graph node positions to persistent-mapped `GeometryGpuData` (dynamic — layout changes), upload edge index pairs as edge index buffer, populate sibling `Line`/`Point` component handles
@@ -848,7 +847,7 @@ All three geometry types must reach device-local retained-mode rendering at the 
 - `GPUScene` / `GPUSceneSync` — adapts to new component names but same architecture
 - `PipelineLibrary` — unchanged (SurfacePass uses same compiled pipelines)
 - `MeshCollider::Component` — unchanged (collision data unaffected; edge data comes from Mesh/Graph PropertySets)
-- `Halfedge::Mesh` / `Graph` PropertySets — edges are already first-class elements; **however**, `Mesh` needs new public `EdgeProperties()`, `FaceProperties()`, `HalfedgeProperties()` accessors for bulk span extraction (currently only `VertexProperties()` is public)
+- `Halfedge::Mesh` / `Graph` PropertySets — edges are already first-class elements; all four PropertySet domains are publicly accessible via `VertexProperties()`, `EdgeProperties()`, `FaceProperties()`, `HalfedgeProperties()`, plus `ExtractEdgeVertexPairs()` for bulk GPU upload
 - All geometry algorithms — unchanged
 - All test targets — unchanged (but tests may need updated imports)
 

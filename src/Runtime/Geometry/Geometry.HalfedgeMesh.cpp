@@ -1486,4 +1486,60 @@ namespace Geometry::Halfedge
 
         return vm;
     }
+
+    // -------------------------------------------------------------------------
+    // Bulk edge extraction for GPU upload
+    // -------------------------------------------------------------------------
+
+    std::vector<EdgeVertexPair> Mesh::ExtractEdgeVertexPairs() const
+    {
+        const std::size_t nEdges = EdgesSize();
+        if (nEdges == 0)
+            return {};
+
+        // Direct span access to halfedge connectivity — avoids per-edge function calls.
+        // m_EDeleted is Property<bool> (vector<bool>), so use operator[] instead of Span().
+        const auto hConn = m_HConn.Span();
+
+        std::vector<EdgeVertexPair> result;
+        result.reserve(EdgeCount());
+
+        for (std::size_t i = 0; i < nEdges; ++i)
+        {
+            if (m_EDeleted[EdgeHandle{static_cast<PropertyIndex>(i)}])
+                continue;
+
+            // Edge i has halfedges at indices 2*i and 2*i+1.
+            // ToVertex(halfedge 2*i)   = hConn[2*i].Vertex   (one endpoint)
+            // ToVertex(halfedge 2*i+1) = hConn[2*i+1].Vertex (other endpoint)
+            const auto v0 = static_cast<uint32_t>(hConn[2 * i + 1].Vertex.Index);
+            const auto v1 = static_cast<uint32_t>(hConn[2 * i].Vertex.Index);
+            result.push_back({v0, v1});
+        }
+
+        return result;
+    }
+
+    std::size_t Mesh::ExtractEdgeVertexPairs(std::span<EdgeVertexPair> out) const
+    {
+        const std::size_t nEdges = EdgesSize();
+        if (nEdges == 0 || out.empty())
+            return 0;
+
+        const auto hConn = m_HConn.Span();
+
+        std::size_t written = 0;
+
+        for (std::size_t i = 0; i < nEdges && written < out.size(); ++i)
+        {
+            if (m_EDeleted[EdgeHandle{static_cast<PropertyIndex>(i)}])
+                continue;
+
+            const auto v0 = static_cast<uint32_t>(hConn[2 * i + 1].Vertex.Index);
+            const auto v1 = static_cast<uint32_t>(hConn[2 * i].Vertex.Index);
+            out[written++] = {v0, v1};
+        }
+
+        return written;
+    }
 }

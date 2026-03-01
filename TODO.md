@@ -60,16 +60,7 @@ Standalone point clouds (`.xyz`, `.pcd`, `.ply`) that arrive without an existing
 - [ ] Lifecycle system: `GPUScene` slot allocation, transform sync, frustum culling — same path as meshes.
 - [ ] Pipeline registration in `DefaultPipeline`, gated by `FeatureRegistry`.
 
-### 1.3 PropertySet Public Accessors on Halfedge::Mesh
-
-`Halfedge::Mesh` currently only exposes `VertexProperties()` publicly. The rendering architecture requires bulk span access to all PropertySet domains for GPU sync.
-
-- [ ] Add `EdgeProperties()` / `const EdgeProperties()` returning `Edges&` / `const Edges&` to `Halfedge::Mesh` public interface.
-- [ ] Add `FaceProperties()` / `const FaceProperties()` returning `Faces&` / `const Faces&` to `Halfedge::Mesh` public interface.
-- [ ] Add `HalfedgeProperties()` / `const HalfedgeProperties()` returning `Halfedges&` / `const Halfedges&` to `Halfedge::Mesh` public interface.
-- [ ] Ensure edge iteration produces `std::span`-compatible bulk vertex-pair extraction for edge index buffer upload (avoid per-edge `FromVertex`/`ToVertex` calls in hot path).
-
-### 1.4 Per-Edge and Per-Face Attribute Rendering
+### 1.3 Per-Edge and Per-Face Attribute Rendering
 
 The rendering plan requires per-element attribute data from PropertySets flowing to GPU BDA channels, not just uniform colors via push constants.
 
@@ -83,7 +74,7 @@ The rendering plan requires per-element attribute data from PropertySets flowing
 - [ ] Shader support: `surface.frag` reads per-face color via `gl_PrimitiveID` indexing into face attribute BDA channel.
 - [ ] Face attribute buffer upload from `Mesh::FaceProperties()` spans.
 
-### 1.5 Geometry View Lifecycle Systems
+### 1.4 Geometry View Lifecycle Systems
 
 Automated creation/destruction of GPU geometry views when rendering components are attached/detached. Applies equally to all three geometry types.
 
@@ -92,7 +83,7 @@ Automated creation/destruction of GPU geometry views when rendering components a
 - [ ] `PointCloudGeometrySyncSystem`: on `ECS::Point::Component` attach with `PointCloud::Cloud` source → upload `Cloud::Positions()`/`Normals()` spans to device-local `GeometryGpuData`, assign handle.
 - [ ] All lifecycle systems allocate `GPUScene` slots, sync transforms, participate in frustum culling — same contract as `MeshRendererLifecycle`.
 
-### 1.6 PropertySet Dirty-Domain Sync System
+### 1.5 PropertySet Dirty-Domain Sync System
 
 Per-frame CPU→GPU synchronization driven by PropertySet change detection, with independent dirty tracking per data domain (vertex/edge/face).
 
@@ -101,7 +92,7 @@ Per-frame CPU→GPU synchronization driven by PropertySet change detection, with
 - [ ] Topology-dirty domains trigger index buffer rebuild; attribute-dirty domains trigger attribute buffer re-upload.
 - [ ] Clear dirty tags after upload. Multiple simultaneous dirty domains handled independently (face color change doesn't re-upload vertex buffer).
 
-### 1.7 ECS::Graph::Data — PropertySet-Backed Authority
+### 1.6 ECS::Graph::Data — PropertySet-Backed Authority
 
 Current `GraphRenderer::Component` holds `std::vector` copies of node positions, colors, and edge pairs — duplicating data from `Geometry::Graph` PropertySets.
 
