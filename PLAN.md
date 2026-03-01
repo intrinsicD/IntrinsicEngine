@@ -15,7 +15,7 @@ Replace the dual-path (transient CPU + retained GPU) rendering with a **single u
 | Pass | Primitives | Retained Data | Transient Data | Modes |
 |------|-----------|---------------|----------------|-------|
 | **SurfacePass** | Filled triangles | BDA from `GeometryGpuData` | `SubmitTriangles()` | Vertex colors, face colors, textured |
-| **LinePass** | Thick anti-aliased edges | BDA positions + edge index SSBO | `SubmitLine(a, b, color)` | Uniform color, per-vertex, per-edge |
+| **LinePass** | Thick anti-aliased edges | BDA positions + edge index buffer (from PropertySets) | `SubmitLine(a, b, color)` | Uniform color, per-vertex, per-edge |
 | **PointPass** | Expanded billboard quads | BDA positions + normals | `SubmitPoint(pos, normal, size, color)` | FlatDisc, Surfel, (future: EWA, Gaussian) |
 
 **No separate DebugLinePass.** Each pass handles both retained and transient data internally. The rendering technique is identical — the data lifetime is an internal detail, not a separate pass.
@@ -57,8 +57,8 @@ namespace ECS::Line {
         float     Width = 1.5f;
         bool      Overlay = false;               // true = no depth test
     };
-    // NOTE: Edge cache (CachedEdges) lives in LinePass-local storage,
-    // NOT in the ECS component. See §Edge Cache Contract.
+    // Edge data comes from PropertySets on the source geometry (Halfedge::Mesh
+    // or Graph), not from a pass-local cache. See §Edge Data Contract.
 }
 
 // Owned by PointPass — vertex/node/point cloud rendering.
@@ -262,17 +262,26 @@ public:
 ```
 
 **AddPasses() flow:**
-1. Iterate `ECS::Line::Component` entities → build retained draws (BDA + edge SSBO)
+1. Iterate `ECS::Line::Component` entities → build retained draws (BDA positions from shared vertex buffer + edge index buffer from PropertySet-derived upload)
 2. Read `ctx.DebugDraw->GetLines()` and `GetOverlayLines()` → pack into a per-frame host-visible SSBO
 3. Record draw commands: retained entities first (per-entity push constants), then transient batch (identity model matrix, positions already in world space)
 
 Both use the same pipeline and shaders. The transient lines use an internal position buffer; the shader reads from whatever BDA pointer the push constants provide — it doesn't distinguish retained from transient.
 
 **Transient line implementation detail:**
-Transient lines carry inline world-space positions (no separate vertex buffer). The pass maintains a per-frame host-visible buffer with interleaved `{vec3 posA, vec3 posB}` pairs. A BDA pointer to this buffer is passed to the shader. The edge SSBO for transient lines uses sequential pairs: `{0,1}, {2,3}, {4,5}, ...`. The retained shader (`line_retained.vert`) already reads positions via `BDA[edgePair.i0/i1]` — the transient path provides the same interface with sequential indices into inline position data. No shader-side mode flag needed.
+Transient lines carry inline world-space positions (no separate vertex buffer). The pass maintains a per-frame host-visible buffer with interleaved `{vec3 posA, vec3 posB}` pairs. A BDA pointer to this buffer is passed to the shader. The edge index buffer for transient lines uses sequential pairs: `{0,1}, {2,3}, {4,5}, ...`. The retained shader (`line_retained.vert`) already reads positions via `BDA[edgePair.i0/i1]` — the transient path provides the same interface with sequential indices into inline position data. No shader-side mode flag needed.
 
-**Edge Cache Contract:**
-`GeometryCollisionData` gains a `uint32_t TopologyVersion` field, incremented on index buffer changes (simplification, remeshing). LinePass caches edges keyed by `(GeometryHandle, TopologyVersion)` in pass-local storage (`robin_map<GeometryHandle, CachedEdgeData>`). Edge pairs are NOT stored in the ECS component — this avoids `std::vector` in hot iteration. Maximum `kMaxEdgeRebuildsPerFrame = 2` to prevent CPU spikes when many meshes dirty simultaneously. Same hash-based unique-edge extraction algorithm as current `MeshRenderPass` (`O(T)` expected, `O(E)` memory).
+**Descriptor set layout:** Set 0 = global camera UBO (`m_GlobalSetLayout`), Set 1 = edge index SSBO (`m_EdgeSetLayout`). The retained path binds the edge index buffer from `GeometryGpuData` (uploaded from PropertySets). The transient path binds the per-frame host-visible edge buffer with sequential pairs. Both paths bind the same pipeline and set layout — only the descriptor contents differ per draw call.
+
+**Edge Data Contract:**
+Edges come from **PropertySets** on the source geometry — the primary data source for all CPU and GPU data:
+
+- **Meshes:** `Halfedge::Mesh` already stores edges as first-class elements in its `m_Edges` PropertySet. Each edge gives a vertex pair via halfedge connectivity: `FromVertex(Halfedge(e, 0))`, `ToVertex(Halfedge(e, 0))`. No hash-based extraction from triangle indices needed — the mesh data structure already knows its edges.
+- **Graphs:** `Graph` has the same halfedge-based edge PropertySet (`m_Edges`). Edges are explicit topology, iterable the same way.
+
+When wireframe is enabled, edge pairs are extracted from the PropertySet and uploaded as an edge index buffer via `ReuseVertexBuffersFrom()` — sharing the mesh's device-local vertex buffer, with a separate edge index buffer (topology `Lines`). The `ECS::Line::Component::Geometry` handle points to this edge view.
+
+**No pass-local edge cache.** The PropertySet IS the edge data. When topology changes (simplification, remeshing, edge collapse), the mesh operations update the PropertySet directly — edges are added/removed as part of the halfedge operation itself. A re-upload of the edge index buffer is triggered by re-creating the edge view handle. No separate invalidation scheme, no version tracking, no per-frame rebuild budget.
 
 **Push constants:**
 ```cpp
@@ -412,7 +421,7 @@ DefaultPipeline::RebuildPath()
 │
 ├── 1. PickingPass           — entity/primitive ID readback
 ├── 2. SurfacePass           — filled triangles (GPU-driven culling retained, then transient direct draw)
-├── 3. LinePass              — thick edges (retained BDA + transient DebugDraw)
+├── 3. LinePass              — thick edges (retained BDA + edge index buffer from PropertySets, transient DebugDraw)
 ├── 4. PointPass             — points/vertices (retained BDA + transient DebugDraw)
 ├── 5. SelectionOutlinePass  — post-process selection overlay
 ├── 6. DebugViewPass         — render target inspector
@@ -429,7 +438,7 @@ SurfacePass::AddPasses():
     2. Read ctx.DebugDraw->GetTriangles() → transient draws (direct draw, no culling)
 
 LinePass::AddPasses():
-    1. Iterate ECS::Line::Component → retained draws (BDA)
+    1. Iterate ECS::Line::Component → retained draws (BDA positions + edge index buffer)
     2. Read ctx.DebugDraw->GetLines()      → transient draws
     3. Read ctx.DebugDraw->GetOverlayLines() → transient overlay draws (no depth test)
 
@@ -493,7 +502,6 @@ For a research-grade geometry engine, all primitive submission paths enforce:
 
 **CPU target:** <2ms total CPU contribution per frame.
 - ECS iteration + retained draw build: <0.5ms for 10k entities.
-- Edge extraction (budgeted): `kMaxEdgeRebuildsPerFrame = 2` large meshes per frame.
 - Transient data packing: <0.1ms for typical debug overlay counts.
 
 **GPU:**
@@ -506,7 +514,6 @@ For a research-grade geometry engine, all primitive submission paths enforce:
 - `Render/LinePass.AddPasses` — CPU time for retained + transient build.
 - `Render/PointPass.AddPasses` — CPU time for retained + transient build.
 - `Render/TransientOverflow.<Pass>` — overflow skip counter per pass.
-- `Render/EdgeCacheRebuilds` — edge extraction count per frame.
 
 ---
 
@@ -539,7 +546,7 @@ Each pass is self-contained. No existing code changes.
 ### Phase 1: Per-pass typed components
 
 1. Define `ECS::Surface::Component` (initially mirrors `MeshRenderer::Component`)
-2. Define `ECS::Line::Component` (wireframe settings from `RenderVisualization`, WITHOUT edge cache)
+2. Define `ECS::Line::Component` (wireframe settings from `RenderVisualization`; edge data comes from PropertySets)
 3. Define `ECS::Point::Component` (vertex settings from `RenderVisualization`)
 4. Define `ECS::Graph::Data` (replaces `GraphRenderer::Component` data fields)
 5. Migration system: attach new components alongside old ones during transition
@@ -562,67 +569,66 @@ Each pass is self-contained. No existing code changes.
 
 13. Delete old transient `line.vert/frag` (SSBO version) FIRST
 14. Rename `RetainedLineRenderPass` → `LinePass`, rename `line_retained.* → line.*`
-15. Move edge caching into LinePass-local `robin_map` (from `MeshRenderPass`)
-16. Add topology version check for cache invalidation
-17. Add `ECS::Line::Component` iteration (replaces `RenderVisualization::ShowWireframe`)
-18. Add graph edge iteration (replaces `GraphRenderPass` edge submission)
-19. LinePass reads `ctx.DebugDraw->GetLines()/GetOverlayLines()` for transient data
-20. Delete wireframe code from `MeshRenderPass`
-21. Delete edge submission from `GraphRenderPass`
-22. Delete old `LineRenderPass` (transient-only pass)
-23. Delete `RetainedLineRenderPass` files (already renamed)
+15. Add edge view creation: extract edge pairs from `Halfedge::Mesh` / `Graph` PropertySets, upload as edge index buffer via `ReuseVertexBuffersFrom()`
+16. Add `ECS::Line::Component` iteration (replaces `RenderVisualization::ShowWireframe`)
+17. Add graph edge iteration (replaces `GraphRenderPass` edge submission)
+18. LinePass reads `ctx.DebugDraw->GetLines()/GetOverlayLines()` for transient data
+19. Delete wireframe code from `MeshRenderPass`
+20. Delete edge submission from `GraphRenderPass`
+21. Delete old `LineRenderPass` (transient-only pass)
+22. Delete `RetainedLineRenderPass` files (already renamed)
 
 **Gate:** `IntrinsicTests` pass. Wireframe, graph edges, debug lines all render correctly.
 
 ### Phase 4: PointPass (atomic — consolidate all point sources)
 
-24. Rename `RetainedPointCloudRenderPass` → `PointPass`
-25. Split `point_retained.*` into `point_flatdisc.*` and `point_surfel.*`
-26. PointPass stores pipeline array indexed by `PointRenderMode`
-27. Add `ECS::Point::Component` iteration (replaces `RenderVisualization::ShowVertices`)
-28. Add graph node iteration (replaces `GraphRenderPass` node submission)
-29. Add standalone point cloud iteration (replaces `PointCloudRenderPass`)
-30. Add `GetPoints()` to `DebugDraw` for transient point markers
-31. PointPass reads `ctx.DebugDraw->GetPoints()` for transient data
-32. Delete vertex/node code from `MeshRenderPass`, `GraphRenderPass`, `PointCloudRenderPass`
-33. Delete `RetainedPointCloudRenderPass` files (already renamed)
-34. Delete old transient `point.vert/frag`
+23. Rename `RetainedPointCloudRenderPass` → `PointPass`
+24. Split `point_retained.*` into `point_flatdisc.*` and `point_surfel.*`
+25. PointPass stores pipeline array indexed by `PointRenderMode`
+26. Add `ECS::Point::Component` iteration (replaces `RenderVisualization::ShowVertices`)
+27. Add graph node iteration (replaces `GraphRenderPass` node submission)
+28. Add standalone point cloud iteration (replaces `PointCloudRenderPass`)
+29. Add `GetPoints()` to `DebugDraw` for transient point markers
+30. PointPass reads `ctx.DebugDraw->GetPoints()` for transient data
+31. Delete vertex/node code from `MeshRenderPass`, `GraphRenderPass`, `PointCloudRenderPass`
+32. Delete `RetainedPointCloudRenderPass` files (already renamed)
+33. Delete old transient `point.vert/frag`
 
 **Gate:** `IntrinsicTests` pass. Vertex visualization, graph nodes, point clouds all render correctly.
 
 ### Phase 5: Delete dead code
 
-35. Delete `MeshRenderPass` (class, files, module partition)
-36. Delete `GraphRenderPass` (class, files, module partition)
-37. Delete `PointCloudRenderPass` (class, files, module partition)
-38. Delete `RenderVisualization::Component` (replaced by typed components)
-39. Delete `GeometryViewRenderer::Component` (each component carries its own handle)
-40. Delete `MeshRenderer::Component` (aliased to `Surface::Component` if needed during transition)
-41. Remove `VisualizationCollect` composite stage from `DefaultPipeline`
+34. Delete `MeshRenderPass` (class, files, module partition)
+35. Delete `GraphRenderPass` (class, files, module partition)
+36. Delete `PointCloudRenderPass` (class, files, module partition)
+37. Delete `RenderVisualization::Component` (replaced by typed components)
+38. Delete `GeometryViewRenderer::Component` (each component carries its own handle)
+39. Delete `MeshRenderer::Component` (aliased to `Surface::Component` if needed during transition)
+40. Remove `VisualizationCollect` composite stage from `DefaultPipeline`
 
 **Gate:** `IntrinsicTests` pass. Clean build with no dead code references.
 
 ### Phase 6: Graph/point-cloud device-local upload (post-migration optimization)
 
-42. Add device-local upload path for standalone point cloud positions → `GeometryHandle`
-43. Add persistent-mapped upload path for graph node positions → `GeometryHandle`
-44. `PointCloudRenderer::Component` CPU vectors → device-local `GeometryGpuData`
-45. `GraphRenderer::Component` CPU vectors → persistent-mapped `GeometryGpuData`
-46. Graph/point entities participate in `GPUScene` slot-based frustum culling
+41. Add device-local upload path for standalone point cloud positions → `GeometryHandle`
+42. Add persistent-mapped upload path for graph node positions → `GeometryHandle`
+43. `PointCloudRenderer::Component` CPU vectors → device-local `GeometryGpuData`
+44. `GraphRenderer::Component` CPU vectors → persistent-mapped `GeometryGpuData`
+45. Graph/point entities participate in `GPUScene` slot-based frustum culling
 
 **Note:** During Phases 2-5, graph and point cloud data remains CPU-resident, submitted via the transient APIs (`SubmitLine()`, `SubmitPoint()`). This avoids blocking the pass consolidation on upload infrastructure changes. Device-local retained-mode rendering for these data types is a post-migration optimization.
 
 ### Phase 7: UI and inspector integration
 
-47. Add `PointRenderMode` UI combo selector in Inspector
-48. Per-entity component attach/detach for wireframe and vertex visualization
-49. Graph visualization mode controls
+46. Add `PointRenderMode` UI combo selector in Inspector
+47. Per-entity component attach/detach for wireframe and vertex visualization
+48. Graph visualization mode controls
 
 ### Phase 8: Update docs
 
-50. Update `TODO.md` — remove completed items
-51. Update `CLAUDE.md` — document new pass naming and architecture
-52. Update `README.md` — update rendering architecture description
+49. Update `TODO.md` — remove completed items
+50. Update `CLAUDE.md` — document new pass naming and architecture
+51. Update `README.md` — update rendering architecture description
 
 ---
 
@@ -636,7 +642,6 @@ Each pass is self-contained. No existing code changes.
 ### Performance
 - CPU timings per pass (`AddPasses`) logged via existing telemetry.
 - Transient upload byte counters and overflow counters.
-- Edge cache rebuild counter per frame.
 
 ### GPU Validation
 - Vulkan validation layer clean runs for synchronization and descriptor indexing after each migration phase.
@@ -650,12 +655,13 @@ Each pass is self-contained. No existing code changes.
 - `SelectionOutlinePass` — unchanged
 - `DebugViewPass` — unchanged
 - `ImGuiPass` — unchanged
-- `GeometryGpuData` / `GeometryPool` / `GeometryUploadRequest` — unchanged (TopologyVersion field added to `GeometryCollisionData`)
+- `GeometryGpuData` / `GeometryPool` / `GeometryUploadRequest` — unchanged
 - `RHI` layer — unchanged (push constant validation added to `PipelineBuilder`)
 - `RenderGraph` — unchanged
 - `GPUScene` / `GPUSceneSync` — adapts to new component names but same architecture
 - `PipelineLibrary` — unchanged (SurfacePass uses same compiled pipelines)
-- `MeshCollider::Component` — unchanged (still provides collision data for edge extraction)
+- `MeshCollider::Component` — unchanged (collision data unaffected; edge data comes from Mesh/Graph PropertySets)
+- `Halfedge::Mesh` / `Graph` PropertySets — edges are already first-class elements, no changes needed
 - All geometry algorithms — unchanged
 - All test targets — unchanged (but tests may need updated imports)
 
