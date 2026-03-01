@@ -34,14 +34,14 @@ This document tracks **what's left to do** in IntrinsicEngine's architecture.
 Zero vertex duplication. Each topology needs separate shader pipelines because thick lines and billboard points require vertex-shader expansion (6 verts/primitive) — `VK_PRIMITIVE_TOPOLOGY_LINE_LIST` and `POINT_LIST` only produce 1px primitives without expansion.
 
 **Completed (retained-mode BDA path):**
-- `RetainedLineRenderPass` — iterates mesh entities with `ShowWireframe` + valid `GeometryGpuData`, reads positions via BDA, uploads edge pairs from `CachedEdges` to per-frame SSBO, expands to screen-space quads. Anti-aliased via `line_retained.frag`.
-- `RetainedPointCloudRenderPass` — iterates mesh entities with `ShowVertices` + valid `GeometryGpuData`, reads positions/normals via BDA, expands to billboard quads. Supports FlatDisc and Surfel modes via `point_retained.frag`.
+- `RetainedLineRenderPass` — iterates mesh entities with `ShowWireframe` + valid `GeometryGpuData`, reads positions via BDA, uploads edge pairs from `CachedEdges` to per-frame SSBO, expands to screen-space quads. Anti-aliased via `line_retained.frag`. Also iterates `ECS::Graph::Data` entities with valid `GpuGeometry` for graph edge rendering.
+- `RetainedPointCloudRenderPass` — iterates mesh entities with `ShowVertices` + valid `GeometryGpuData`, reads positions/normals via BDA, expands to billboard quads. Supports FlatDisc and Surfel modes via `point_retained.frag`. Also iterates `ECS::Graph::Data` entities for graph node rendering.
 - `MeshRenderPass` edge caching decoupled from DebugDraw submission — `CachedEdges` is always populated when `ShowWireframe=true`, shared between CPU and retained GPU paths.
+- `GraphGeometrySyncSystem` — uploads graph node positions to device-local vertex buffer (Direct mode, CPU_TO_GPU), extracts edge pairs from graph topology with vertex compaction/remapping. Both retained passes read from the shared buffer via BDA. `GraphRenderPass` skips entities with valid `GpuGeometry` when retained passes are active (no double-draw).
 - Both passes registered in `DefaultPipeline` render path (stages 6a/6b), gated by `FeatureRegistry`.
 - Shader compilation auto-discovered via `CompileShaders.cmake` glob.
 
 **Remaining work:**
-- [ ] `ECS::Graph::Data` retained-mode rendering: retained line view (edges) + point view (nodes) sharing the same vertex buffer via BDA. Layout algorithms produce positions uploaded once; updated only on layout change. *(Data authority migrated from `GraphRenderer::Component` vector copies to PropertySet-backed `ECS::Graph::Data` — see git history.)*
 - [ ] Fully retained edge SSBO: upload edge pairs once to device-local storage when the mesh loads (currently re-uploaded per-frame from `CachedEdges`). Requires `GeometryViewRenderer` wireframe handle + lifecycle management.
 - [ ] Frustum culling integration: retained line/point views should participate in `GPUScene` slot-based frustum culling alongside surface meshes.
 - [ ] EWA splatting mode (Zwicker et al. 2001) for point clouds.
@@ -79,7 +79,7 @@ The rendering plan requires per-element attribute data from PropertySets flowing
 Automated creation/destruction of GPU geometry views when rendering components are attached/detached. Applies equally to all three geometry types.
 
 - [ ] `MeshViewLifecycleSystem`: on `ECS::Line::Component` attach to mesh entity → extract edge pairs from `Mesh::EdgeProperties()`, create edge index buffer via `ReuseVertexBuffersFrom(meshHandle)`, assign to `Line::Component::EdgeView`. On `ECS::Point::Component` attach → create vertex view via `ReuseVertexBuffersFrom`. On detach → release handle, free `GPUScene` slot.
-- [ ] `GraphGeometrySyncSystem`: on `ECS::Graph::Data` attach or graph layout update → upload node positions from `Graph::VertexProperties()` to persistent-mapped `GeometryGpuData`, upload edge pairs from `Graph::EdgeProperties()` as index buffer, populate sibling `Line`/`Point` handles.
+- [ ] `GraphGeometrySyncSystem` enhancements: current system uploads positions and edge pairs on `GpuDirty=true` via Direct mode. Remaining: staged (device-local) upload for large static graphs, `GPUScene` slot allocation for frustum culling, per-node attribute BDA channels (colors, radii).
 - [ ] `PointCloudGeometrySyncSystem`: on `ECS::Point::Component` attach with `PointCloud::Cloud` source → upload `Cloud::Positions()`/`Normals()` spans to device-local `GeometryGpuData`, assign handle.
 - [ ] All lifecycle systems allocate `GPUScene` slots, sync transforms, participate in frustum culling — same contract as `MeshRendererLifecycle`.
 

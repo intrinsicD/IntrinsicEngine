@@ -221,6 +221,49 @@ namespace Graphics::Passes
             allEdges.insert(allEdges.end(), vis.CachedEdges.begin(), vis.CachedEdges.end());
         }
 
+        // -----------------------------------------------------------------
+        // Graph entities — retained-mode edge rendering via BDA.
+        // Same pattern as mesh wireframe: read positions via BDA from the
+        // shared vertex buffer, upload edge pairs to the shared SSBO.
+        // -----------------------------------------------------------------
+        auto graphView = registry.view<ECS::Graph::Data>();
+        for (auto [entity, graphData] : graphView.each())
+        {
+            if (!graphData.Visible || !graphData.GpuGeometry.IsValid())
+                continue;
+
+            if (graphData.CachedEdgePairs.empty())
+                continue;
+
+            GeometryGpuData* geo = m_GeometryStorage->GetUnchecked(graphData.GpuGeometry);
+            if (!geo || !geo->GetVertexBuffer())
+                continue;
+
+            glm::mat4 worldMatrix(1.0f);
+            if (auto* wm = registry.try_get<ECS::Components::Transform::WorldMatrix>(entity))
+                worldMatrix = wm->Matrix;
+
+            const uint64_t baseAddr = geo->GetVertexBuffer()->GetDeviceAddress();
+            const uint64_t posAddr = baseAddr + geo->GetLayout().PositionsOffset;
+
+            const uint32_t edgeColor = GpuColor::PackColorF(
+                graphData.DefaultEdgeColor.r, graphData.DefaultEdgeColor.g,
+                graphData.DefaultEdgeColor.b, graphData.DefaultEdgeColor.a);
+
+            DrawInfo di{};
+            di.Model = worldMatrix;
+            di.PtrPositions = posAddr;
+            di.EdgeCount = static_cast<uint32_t>(graphData.CachedEdgePairs.size());
+            di.EdgeOffset = static_cast<uint32_t>(allEdges.size());
+            di.Color = edgeColor;
+            di.LineWidth = graphData.EdgeWidth;
+            draws.push_back(di);
+
+            allEdges.insert(allEdges.end(),
+                            graphData.CachedEdgePairs.begin(),
+                            graphData.CachedEdgePairs.end());
+        }
+
         if (draws.empty())
             return;
 

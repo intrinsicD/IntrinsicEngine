@@ -27,8 +27,10 @@ namespace Graphics::Passes
     //   - Submits node positions (transformed to world space) to PointCloudRenderPass.
     //   - Submits edge segments to ctx.DebugDrawPtr.
     //
-    // Node positions, colors, and radii are sourced from the Graph's PropertySets
-    // (no std::vector copies). Edge topology is read via Graph::EdgeVertices().
+    // When retained-mode passes are active, entities with valid GpuGeometry are
+    // skipped — the RetainedLineRenderPass and RetainedPointCloudRenderPass
+    // handle them via BDA. Only entities that lack GPU state (e.g., before
+    // GraphGeometrySyncSystem runs) fall through to this CPU path.
     //
     // This method does NOT add any GPU render graph passes. Actual GPU drawing is
     // performed by PointCloudRenderPass::AddPasses() and LineRenderPass::AddPasses()
@@ -42,6 +44,18 @@ namespace Graphics::Passes
         graphView.each([&](const entt::entity entity, const ECS::Graph::Data& graphData)
         {
             if (!graphData.Visible || !graphData.GraphRef || graphData.GraphRef->VertexCount() == 0)
+                return;
+
+            // Skip entities that the retained BDA passes will handle.
+            // An entity has retained GPU state when GpuGeometry is valid (uploaded by
+            // GraphGeometrySyncSystem). Only fall through to the CPU path if the
+            // retained pass for that primitive type is disabled.
+            const bool hasRetainedGpu = graphData.GpuGeometry.IsValid();
+            const bool retainedHandlesEdges = hasRetainedGpu && m_RetainedLinesActive;
+            const bool retainedHandlesNodes = hasRetainedGpu && m_RetainedPointsActive;
+
+            // If both primitive types are handled by retained passes, skip entirely.
+            if (retainedHandlesEdges && retainedHandlesNodes)
                 return;
 
             const auto& graph = *graphData.GraphRef;
@@ -69,8 +83,8 @@ namespace Graphics::Passes
                 radiusProp = const_cast<Geometry::Graph::Graph&>(graph)
                     .GetOrAddVertexProperty<float>("v:radius");
 
-            // --- Submit nodes to PointCloudRenderPass ---
-            if (m_PointCloudPass)
+            // --- Submit nodes to PointCloudRenderPass (CPU fallback) ---
+            if (m_PointCloudPass && !retainedHandlesNodes)
             {
                 const uint32_t defaultColor = PointCloudRenderPass::PackColorF(
                     graphData.DefaultNodeColor.r, graphData.DefaultNodeColor.g,
@@ -107,8 +121,8 @@ namespace Graphics::Passes
                 }
             }
 
-            // --- Submit edges to DebugDraw (→ LineRenderPass) ---
-            if (ctx.DebugDrawPtr && graph.EdgeCount() > 0)
+            // --- Submit edges to DebugDraw (CPU fallback → LineRenderPass) ---
+            if (ctx.DebugDrawPtr && graph.EdgeCount() > 0 && !retainedHandlesEdges)
             {
                 const uint32_t edgeColor = DebugDraw::PackColorF(
                     graphData.DefaultEdgeColor.r, graphData.DefaultEdgeColor.g,

@@ -197,10 +197,13 @@ namespace Graphics
 
                     // ----------------------------------------------------------
                     // 4. Graph Pass — node splats + edge lines from graph entities
+                    //    Skips entities with valid GpuGeometry when retained passes
+                    //    are active (GraphGeometrySyncSystem uploaded their data).
                     // ----------------------------------------------------------
                     if (graphEnabled)
                     {
                         m_GraphPass->SetPointCloudPass(m_PointCloudPass.get());
+                        m_GraphPass->SetRetainedPassesActive(retainedLinesEnabled, retainedPointsEnabled);
                         m_GraphPass->AddPasses(ctx);
                     }
 

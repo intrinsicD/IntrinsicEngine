@@ -13,17 +13,19 @@ import RHI;
 export namespace Graphics::Passes
 {
     // -------------------------------------------------------------------------
-    // GraphRenderPass — GPU graph rendering via composited primitive passes.
+    // GraphRenderPass — CPU-side data-collection fallback for graph rendering.
     // -------------------------------------------------------------------------
     //
     // Renders entities with ECS::Graph::Data:
-    //   - Nodes rendered as point splats via PointCloudRenderPass (all 4 modes).
+    //   - Nodes rendered as point splats via PointCloudRenderPass (all modes).
     //   - Edges rendered as anti-aliased thick lines via LineRenderPass
     //     (submitted to DebugDraw accumulator in RenderPassContext).
     //
-    // This pass has no GPU resources of its own — it is a data-collection pass
-    // that feeds the shared PointCloudRenderPass and LineRenderPass staging buffers.
-    // GPU drawing is performed by those passes after all collectors run.
+    // When retained-mode rendering is active (RetainedLineRenderPass +
+    // RetainedPointCloudRenderPass), this pass skips entities that have valid
+    // GpuGeometry — the retained passes handle them via BDA. This prevents
+    // double-draw while maintaining the CPU fallback for entities without
+    // GPU state (e.g., disabled GraphGeometrySyncSystem).
     //
     // Usage in DefaultPipeline:
     //   Call AddPasses() before PointCloudRenderPass.AddPasses() so that node data
@@ -52,7 +54,18 @@ export namespace Graphics::Passes
         // Pass nullptr to disable node rendering (edges still submitted to DebugDraw).
         void SetPointCloudPass(PointCloudRenderPass* pass) { m_PointCloudPass = pass; }
 
+        // When true, entities with valid GpuGeometry are skipped — the retained
+        // BDA passes handle them. Set by DefaultPipeline when both retained passes
+        // are active and the GraphGeometrySyncSystem is enabled.
+        void SetRetainedPassesActive(bool lines, bool points)
+        {
+            m_RetainedLinesActive = lines;
+            m_RetainedPointsActive = points;
+        }
+
     private:
         PointCloudRenderPass* m_PointCloudPass = nullptr;
+        bool m_RetainedLinesActive = false;
+        bool m_RetainedPointsActive = false;
     };
 }
