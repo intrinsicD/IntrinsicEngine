@@ -60,6 +60,55 @@ Standalone point clouds (`.xyz`, `.pcd`, `.ply`) that arrive without an existing
 - [ ] Lifecycle system: `GPUScene` slot allocation, transform sync, frustum culling — same path as meshes.
 - [ ] Pipeline registration in `DefaultPipeline`, gated by `FeatureRegistry`.
 
+### 1.3 PropertySet Public Accessors on Halfedge::Mesh
+
+`Halfedge::Mesh` currently only exposes `VertexProperties()` publicly. The rendering architecture requires bulk span access to all PropertySet domains for GPU sync.
+
+- [ ] Add `EdgeProperties()` / `const EdgeProperties()` returning `Edges&` / `const Edges&` to `Halfedge::Mesh` public interface.
+- [ ] Add `FaceProperties()` / `const FaceProperties()` returning `Faces&` / `const Faces&` to `Halfedge::Mesh` public interface.
+- [ ] Add `HalfedgeProperties()` / `const HalfedgeProperties()` returning `Halfedges&` / `const Halfedges&` to `Halfedge::Mesh` public interface.
+- [ ] Ensure edge iteration produces `std::span`-compatible bulk vertex-pair extraction for edge index buffer upload (avoid per-edge `FromVertex`/`ToVertex` calls in hot path).
+
+### 1.4 Per-Edge and Per-Face Attribute Rendering
+
+The rendering plan requires per-element attribute data from PropertySets flowing to GPU BDA channels, not just uniform colors via push constants.
+
+**Per-edge attributes (LinePass):**
+- [ ] Add `PtrEdgeAux` BDA channel to `LinePushConstants` for per-edge colors/widths from edge PropertySets.
+- [ ] Shader support: `line.vert`/`line.frag` read per-edge color/width from `PtrEdgeAux` when `Flags` indicate per-edge mode.
+- [ ] Edge attribute buffer upload in `LinePass` from `Mesh::EdgeProperties()` or `Graph::GetOrAddEdgeProperty()` spans.
+
+**Per-face attributes (SurfacePass):**
+- [ ] Add per-face attribute buffer support in `SurfacePass` for flat shading, curvature visualization, segmentation labels.
+- [ ] Shader support: `surface.frag` reads per-face color via `gl_PrimitiveID` indexing into face attribute BDA channel.
+- [ ] Face attribute buffer upload from `Mesh::FaceProperties()` spans.
+
+### 1.5 Geometry View Lifecycle Systems
+
+Automated creation/destruction of GPU geometry views when rendering components are attached/detached. Applies equally to all three geometry types.
+
+- [ ] `MeshViewLifecycleSystem`: on `ECS::Line::Component` attach to mesh entity → extract edge pairs from `Mesh::EdgeProperties()`, create edge index buffer via `ReuseVertexBuffersFrom(meshHandle)`, assign to `Line::Component::EdgeView`. On `ECS::Point::Component` attach → create vertex view via `ReuseVertexBuffersFrom`. On detach → release handle, free `GPUScene` slot.
+- [ ] `GraphGeometrySyncSystem`: on `ECS::Graph::Data` attach or graph layout update → upload node positions from `Graph` PropertySets to persistent-mapped `GeometryGpuData`, upload edge pairs as index buffer, populate sibling `Line`/`Point` handles.
+- [ ] `PointCloudGeometrySyncSystem`: on `ECS::Point::Component` attach with `PointCloud::Cloud` source → upload `Cloud::Positions()`/`Normals()` spans to device-local `GeometryGpuData`, assign handle.
+- [ ] All lifecycle systems allocate `GPUScene` slots, sync transforms, participate in frustum culling — same contract as `MeshRendererLifecycle`.
+
+### 1.6 PropertySet Dirty-Domain Sync System
+
+Per-frame CPU→GPU synchronization driven by PropertySet change detection, with independent dirty tracking per data domain (vertex/edge/face).
+
+- [ ] Define dirty tag components: `VertexPositionsDirty`, `VertexAttributesDirty`, `EdgeTopologyDirty`, `EdgeAttributesDirty`, `FaceTopologyDirty`, `FaceAttributesDirty`.
+- [ ] Sync system detects dirty tags, re-uploads only affected PropertySet spans to GPU buffers.
+- [ ] Topology-dirty domains trigger index buffer rebuild; attribute-dirty domains trigger attribute buffer re-upload.
+- [ ] Clear dirty tags after upload. Multiple simultaneous dirty domains handled independently (face color change doesn't re-upload vertex buffer).
+
+### 1.7 ECS::Graph::Data — PropertySet-Backed Authority
+
+Current `GraphRenderer::Component` holds `std::vector` copies of node positions, colors, and edge pairs — duplicating data from `Geometry::Graph` PropertySets.
+
+- [ ] Replace `GraphRenderer::Component` with `ECS::Graph::Data` holding a `std::shared_ptr<Geometry::Graph>` reference (not data copies).
+- [ ] Node positions, colors, radii sourced from Graph's vertex PropertySet. Edge pairs sourced from Graph's edge PropertySet.
+- [ ] `GraphGeometrySyncSystem` reads PropertySet spans for GPU upload, eliminating the vector-copy anti-pattern.
+
 ## 2. Related Documents
 
 - `ROADMAP.md` — feature roadmap, prioritization phases, and long-horizon planning details.

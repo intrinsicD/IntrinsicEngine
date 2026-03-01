@@ -18,7 +18,7 @@ This section tracks where runtime code currently stands relative to this plan/sp
 | ECS render components | Replace `MeshRenderer`/`RenderVisualization`/`GraphRenderer`/`PointCloudRenderer` with `ECS::Surface`, `ECS::Line`, `ECS::Point`, `ECS::Graph::Data` | Legacy components are still authoritative and actively used by render passes | **Not started** |
 | Pass topology | Collapse into `SurfacePass`, `LinePass`, `PointPass` each owning retained + transient internally | Pipeline still instantiates `ForwardPass`, `MeshRenderPass`, `GraphRenderPass`, `LineRenderPass`, `PointCloudRenderPass`, `RetainedLineRenderPass`, `RetainedPointCloudRenderPass` | **Not started** |
 | Shader naming/registration | `surface.*`, unified `line.*`, `point_flatdisc.*`, `point_surfel.*` IDs | Runtime still registers `triangle.*`, `line_retained.*`, `point_retained.*` and keeps transient `line.*` / `point.*` paths | **Not started** |
-| CPU geometry authority | PropertySet-backed CPU sources for cloud/graph/mesh topology and attributes | **Implemented in geometry domain types** (`PointCloud::Cloud`, `Graph`, `Halfedge::Mesh`) | **Implemented** |
+| CPU geometry authority | PropertySet-backed CPU sources for cloud/graph/mesh topology and attributes | **Implemented in geometry domain types** (`PointCloud::Cloud`, `Graph`, `Halfedge::Mesh`). However, `Mesh` only exposes `VertexProperties()` publicly — edge/face/halfedge PropertySet accessors are missing. | **Partial** (vertex yes, edge/face/halfedge accessors missing) |
 | PropertySet-driven edge source | Mesh/graph edge rendering sourced from topology PropertySets | Plan/spec defined, but runtime still has `RenderVisualization::CachedEdges` + dirty cache fields | **Partial (spec yes, runtime no)** |
 | Automatic CPU→GPU sync | Per-frame dirty-domain sync (`GeometryDirty`/`TopologyDirty`/`AttributesDirty`) patches SSBO ranges and renderable offsets | No generic dirty-domain sync system yet; current flow is pass/component-local invalidation and per-feature staging | **Not started** |
 | Subcomponent hierarchy | Named sub-mesh/sub-graph/sub-cloud components with offsets/sizes and renderable slice references | No dedicated hierarchy/slice component model in rendering ECS yet | **Not started** |
@@ -26,8 +26,12 @@ This section tracks where runtime code currently stands relative to this plan/sp
 ### Gap implications
 
 1. The current renderer still uses a mixed collector architecture with parallel retained/transient passes, so the plan's "single pass per primitive" invariant is not yet enforced.
-2. Graph and point cloud render components still own CPU arrays in renderer-facing components, which duplicates authority away from PropertySets.
+2. Graph and point cloud render components still own CPU arrays in renderer-facing components (`GraphRenderer::Component` holds `std::vector` copies, `PointCloudRenderer::Component` holds `std::vector` copies), which duplicates authority away from PropertySets.
 3. Wireframe currently depends on cached edge extraction in visualization components rather than direct PropertySet-to-SSBO sync.
+4. No geometry view lifecycle systems exist — no automated creation of edge/vertex view `GeometryHandle` instances when rendering components are attached.
+5. `Halfedge::Mesh` lacks public `EdgeProperties()`, `FaceProperties()`, `HalfedgeProperties()` accessors needed for bulk GPU sync.
+6. Per-edge and per-face attribute rendering is not yet supported — only uniform colors via push constants.
+7. Point clouds and graphs lack device-local upload paths, forcing per-frame transient CPU submission.
 
 ### Execution note
 
@@ -35,8 +39,10 @@ Treat this plan as the target architecture; implementation should migrate in thi
 
 1. Introduce new ECS component set (`Surface/Line/Point/Graph::Data`) behind compatibility adapters.
 2. Move graph/point-cloud CPU payload ownership out of render-only components into geometry PropertySet-backed assets/components.
-3. Introduce dirty-domain geometry sync system for CPU→GPU range updates.
-4. Collapse pass graph to `SurfacePass`, `LinePass`, `PointPass` and retire legacy pass feature IDs.
+3. Add public `EdgeProperties()`, `FaceProperties()`, `HalfedgeProperties()` accessors to `Halfedge::Mesh`.
+4. Introduce dirty-domain geometry sync system for CPU→GPU range updates (per vertex/edge/face domain).
+5. Collapse pass graph to `SurfacePass`, `LinePass`, `PointPass` and retire legacy pass feature IDs.
+6. Implement geometry view lifecycle systems so all three geometry types have device-local retained-mode rendering (equal treatment — not deferred for point clouds/graphs).
 
 ---
 
@@ -63,11 +69,11 @@ All CPU-side geometric topology/attributes are sourced from **PropertySets**; re
 
 ### CPU canonical sources (PropertySets only)
 
-- **Point clouds:** `Vertices` PropertySet.
-- **Graphs:** `Vertices` + `Edges` (+ optional `Halfedges`) PropertySets.
-- **Halfedge meshes:** `Vertices` + `Edges` + `Halfedges` + `Faces` PropertySets.
+- **Point clouds:** `m_Points` PropertySet (typed `Vertices`). Property names use `"p:"` prefix: `"p:position"`, `"p:normal"`, `"p:color"`, `"p:radius"`. Accessed via `Cloud::PointProperties()`.
+- **Graphs:** `m_Vertices` + `m_Halfedges` + `m_Edges` PropertySets. Property names use `"v:"` prefix for vertices (`"v:point"`, `"v:connectivity"`). Accessed via `Graph::GetOrAddVertexProperty<T>()` / `GetOrAddEdgeProperty<T>()`.
+- **Halfedge meshes:** `m_Vertices` + `m_Halfedges` + `m_Edges` + `m_Faces` PropertySets. Property names use `"v:"` for vertices, `"h:"` for halfedges, `"e:"` for edges, `"f:"` for faces. Currently only `Mesh::VertexProperties()` is public — **`EdgeProperties()`, `FaceProperties()`, and `HalfedgeProperties()` accessors must be added** for bulk span extraction in GPU sync systems.
 
-This is the canonical ownership model for scene entities and geometric assets (asset-registry `entt::registry`). Render systems must not introduce alternate authoritative CPU caches for these domains.
+This is the canonical ownership model for scene entities and geometric assets (asset-registry `entt::registry`). Render systems must not introduce alternate authoritative CPU caches for these domains. All three geometry types are treated as **equal peers** — none is privileged over the others in upload mode, buffer residency, or pass scheduling.
 
 ### Component composition is intentionally orthogonal
 
@@ -86,16 +92,39 @@ SSBO content is built by querying PropertySet spans (`std::span`) and packing th
 - `StartIndex` / `Count` (or equivalent) per primitive domain.
 - Buffer binding/index metadata for positions, topology pairs, and optional attributes.
 
+This applies uniformly to all three data domains:
+
+| Domain | PropertySet source | GPU buffer target | BDA channel |
+|--------|-------------------|-------------------|-------------|
+| **Vertex data** (positions, normals, colors) | `m_Vertices` / `m_Points` | Device-local vertex buffer | `PtrPositions`, `PtrNormals`, `PtrAux` |
+| **Edge data** (index pairs, per-edge colors/widths) | `m_Edges` (mesh/graph) | Edge index buffer + per-edge attribute SSBO | Edge index SSBO + `PtrEdgeAux` |
+| **Face data** (per-face colors, normals, scalar fields) | `m_Faces` (mesh only) | Per-face attribute buffer | `PtrFaceAux` (flat-shading / visualization modes) |
+
+Per-face attributes are critical for a geometry processing research engine: segmentation labels, curvature visualization, quality metrics, flat shading colors. The GPU sync system must handle face-domain data alongside vertex and edge data.
+
 This allows one packed SSBO to back many renderables (scene + asset preview + subcomponents) while preserving stable addressability.
 
 ### Per-frame sync via explicit dirty signaling
 
-CPU PropertySet changes must propagate to GPU automatically through a frame system. Introduce dirty signaling at component/domain granularity (e.g., `GeometryDirty`, `TopologyDirty`, `AttributesDirty`) so sync systems can:
+CPU PropertySet changes must propagate to GPU automatically through a frame system. Introduce dirty signaling at **per-PropertySet domain** granularity so sync systems can selectively re-upload only what changed:
 
-1. detect changed PropertySet spans,
+| Dirty domain | What changed | GPU action |
+|--------------|-------------|------------|
+| `VertexPositionsDirty` | Vertex positions (e.g., smoothing, deformation) | Re-upload position span to vertex buffer |
+| `VertexAttributesDirty` | Vertex normals, colors, radii | Re-upload affected attribute spans |
+| `EdgeTopologyDirty` | Edge connectivity (collapse, split, remesh) | Rebuild edge index buffer |
+| `EdgeAttributesDirty` | Per-edge colors, widths, scalar fields | Re-upload edge attribute SSBO |
+| `FaceTopologyDirty` | Face connectivity (remesh, subdivision) | Rebuild triangle index buffer + face attribute buffer |
+| `FaceAttributesDirty` | Per-face colors, normals, scalar fields | Re-upload face attribute buffer |
+
+Sync system flow per domain:
+
+1. detect changed PropertySet spans via dirty tags,
 2. re-pack only affected ranges,
 3. patch renderable `StartIndex/Count`,
 4. clear dirty state after upload.
+
+Each domain is independent — a per-face color change does not trigger a vertex buffer re-upload. A topology change (edge collapse) may dirty multiple domains simultaneously (vertices + edges + faces).
 
 No manual per-feature reupload calls in gameplay/processing code; systems own synchronization.
 
@@ -135,14 +164,20 @@ namespace ECS::Surface {
 namespace ECS::Line {
     struct Component {
         Geometry::GeometryHandle Geometry{};     // shared vertex buffer (BDA)
+        Geometry::GeometryHandle EdgeView{};     // edge index buffer (separate from vertex buffer)
 
-        // Appearance
+        // Appearance (defaults; overridden by per-edge attributes when present)
         glm::vec4 Color = {0.85f, 0.85f, 0.85f, 1.0f};
         float     Width = 1.5f;
         bool      Overlay = false;               // true = no depth test
+
+        // Per-edge attribute flags (set by geometry view lifecycle system)
+        bool HasPerEdgeColors = false;
+        bool HasPerEdgeWidths = false;
     };
     // Edge data comes from PropertySets on the source geometry (Halfedge::Mesh
     // or Graph), not from a pass-local cache. See §Edge Data Contract.
+    // Per-edge attributes (colors, widths) are uploaded to a separate BDA channel.
 }
 
 // Owned by PointPass — vertex/node/point cloud rendering.
@@ -150,10 +185,16 @@ namespace ECS::Point {
     struct Component {
         Geometry::GeometryHandle Geometry{};     // shared vertex buffer (BDA)
 
-        // Appearance
+        // Appearance (defaults; overridden by per-point attributes when present)
         glm::vec4 Color = {1.0f, 0.6f, 0.0f, 1.0f};
         float     Size  = 0.008f;               // world-space radius
+        float     SizeMultiplier = 1.0f;         // per-entity size scaling
         PointRenderMode Mode = PointRenderMode::FlatDisc;
+
+        // Per-point attribute flags (set by geometry view lifecycle system)
+        bool HasPerPointColors = false;
+        bool HasPerPointRadii  = false;
+        bool HasPerPointNormals = false;         // required for Surfel mode
     };
 }
 ```
@@ -163,20 +204,26 @@ namespace ECS::Point {
 ```
 Mesh entity (Bunny):
   ├─ ECS::Surface::Component  { Geometry=bunnyHandle, Material=pbrMat }
-  ├─ ECS::Line::Component     { Geometry=bunnyHandle, Color=white }     ← attached when wireframe enabled
-  └─ ECS::Point::Component    { Geometry=bunnyHandle, Mode=Surfel }     ← attached when vertices enabled
+  ├─ ECS::Line::Component     { Geometry=bunnyHandle, EdgeView=wireframeHandle }   ← attached when wireframe enabled
+  └─ ECS::Point::Component    { Geometry=bunnyHandle, Mode=Surfel }                ← attached when vertices enabled
 
 Graph entity (kNN graph):
-  ├─ ECS::Line::Component     { Geometry=graphHandle, Color=gray }      ← edges
-  ├─ ECS::Point::Component    { Geometry=graphHandle, Mode=FlatDisc }   ← nodes
-  └─ ECS::Graph::Data         { Edges, NodeRadii, NodeColors, ... }     ← graph-specific semantics
+  ├─ ECS::Line::Component     { Geometry=graphHandle, EdgeView=graphEdgeHandle }   ← edges
+  ├─ ECS::Point::Component    { Geometry=graphHandle, Mode=FlatDisc }              ← nodes
+  └─ ECS::Graph::Data         { GraphRef=graphPtr, DefaultNodeColor=orange }       ← graph-specific semantics
 
 Point cloud entity (scan.ply):
-  └─ ECS::Point::Component    { Geometry=cloudHandle, Mode=Surfel }
+  └─ ECS::Point::Component    { Geometry=cloudHandle, Mode=Surfel, HasPerPointColors=true }
+
+Point cloud + reconstructed mesh entity:
+  ├─ ECS::Surface::Component  { Geometry=meshHandle, Material=defaultMat }         ← reconstructed surface
+  └─ ECS::Point::Component    { Geometry=cloudHandle, Mode=FlatDisc }              ← original scan data
 
 Debug entity (octree visualization):
   └─ (no components — uses LinePass transient API via DebugDraw accumulator)
 ```
+
+**Equal treatment principle:** Every entity composition above follows the same pattern — PropertySet-backed CPU data → device-local GPU buffer → BDA-addressed rendering. The `Geometry` handle is always a first-class `GeometryGpuData` with `GPUScene` slot and frustum culling, regardless of whether the source is a mesh, graph, or point cloud.
 
 **Key insight:** The `Geometry` handle is shared across components on the same entity — same `GeometryGpuData`, same device-local buffer, same BDA. Zero vertex duplication.
 
@@ -186,7 +233,7 @@ Debug entity (octree visualization):
 |---------|-----|
 | `ECS::MeshRenderer::Component` | `ECS::Surface::Component` |
 | `ECS::RenderVisualization::Component` | Split into `ECS::Line::Component` + `ECS::Point::Component` (attached/detached instead of bool toggles) |
-| `ECS::GraphRenderer::Component` | `ECS::Line::Component` + `ECS::Point::Component` + `ECS::Graph::Data` (replaces `GraphRenderer::Component`) |
+| `ECS::GraphRenderer::Component` | `ECS::Line::Component` + `ECS::Point::Component` + `ECS::Graph::Data` (holds `Graph` reference, not data copies) |
 | `ECS::PointCloudRenderer::Component` | `ECS::Point::Component` (with device-local GeometryHandle) |
 | `ECS::GeometryViewRenderer::Component` | **deleted** (each component carries its own GeometryHandle) |
 
@@ -199,10 +246,46 @@ Graphs need edge index pairs and node-specific data (radii, colors) beyond what 
 Graph entity:
   ├─ ECS::Line::Component   { Geometry=graphHandle }
   ├─ ECS::Point::Component  { Geometry=graphHandle }
-  └─ ECS::Graph::Data       { Edges, NodeRadii, NodeColors, ... }
+  └─ ECS::Graph::Data       { GraphRef, ... }
 ```
 
-`ECS::Graph::Data` replaces `ECS::GraphRenderer::Component`. It is a pure data component — the passes don't need to know about graph-specific semantics. Systems use `Graph::Data` to populate the `Line` and `Point` components.
+`ECS::Graph::Data` replaces `ECS::GraphRenderer::Component`. It holds a **reference to the authoritative `Geometry::Graph` instance** (via shared pointer or asset handle), not duplicated `std::vector` copies. Edge pairs, node positions, and per-node/per-edge attributes are all sourced from the Graph's PropertySets. The component may cache rendering parameters (default colors, overlay flags) but never duplicates the graph topology or positions.
+
+```cpp
+namespace ECS::Graph {
+    struct Data {
+        std::shared_ptr<Geometry::Graph> GraphRef;   // authoritative source
+
+        // Rendering parameters (not data — data lives in PropertySets)
+        glm::vec4 DefaultNodeColor = {0.8f, 0.5f, 0.0f, 1.0f};
+        glm::vec4 DefaultEdgeColor = {0.6f, 0.6f, 0.6f, 1.0f};
+        float     DefaultNodeRadius = 0.01f;
+        bool      EdgesOverlay = false;
+    };
+}
+```
+
+A `GraphGeometrySyncSystem` reads `Graph::Data`, extracts positions/edges from the Graph's PropertySets, uploads to `GeometryGpuData`, and populates the sibling `ECS::Line::Component` and `ECS::Point::Component` handles. Passes don't need to know about graph-specific semantics.
+
+### Geometry view lifecycle systems
+
+Attaching/detaching rendering components must be automated by **lifecycle systems** — the same pattern as `MeshRendererLifecycle` which manages `GPUScene` slot allocation for mesh entities. Each geometry type needs its own system:
+
+**`MeshViewLifecycleSystem`** — manages derived views for mesh entities:
+- On `ECS::Line::Component` attach (wireframe enabled): extract edge pairs from `Mesh::EdgeProperties()`, upload as edge index buffer via `ReuseVertexBuffersFrom(meshHandle)`, assign handle to `Line::Component::EdgeView`.
+- On `ECS::Point::Component` attach (vertex visualization enabled): create vertex view via `ReuseVertexBuffersFrom(meshHandle)` with `Topology::Points`, assign handle to `Point::Component::Geometry`.
+- On component detach: release the view `GeometryHandle`, free `GPUScene` slot.
+
+**`GraphGeometrySyncSystem`** — manages graph entity geometry:
+- On `ECS::Graph::Data` attach or graph layout update: extract node positions from `Graph::GetOrAddVertexProperty<glm::vec3>("v:point")`, extract edge pairs via `Graph::EdgeVertices()`, upload node positions to `GeometryGpuData` (persistent-mapped for dynamic layouts), upload edges as index buffer.
+- Populate sibling `ECS::Line::Component` and `ECS::Point::Component` with the resulting handles.
+- On layout change (force-directed iteration): re-upload positions to the persistent-mapped buffer. BDA pointer stays stable.
+
+**`PointCloudGeometrySyncSystem`** — manages standalone point cloud entities:
+- On `ECS::Point::Component` attach with `PointCloud::Cloud` source: upload positions/normals from `Cloud::Positions()`/`Cloud::Normals()` spans to device-local `GeometryGpuData`, assign handle.
+- On point cloud data update (e.g., downsampling applied): re-upload via dirty domain sync.
+
+All three systems follow the same contract: read PropertySet spans → upload to GPU → assign handles → manage lifetime. The key difference is upload mode (staged one-shot vs persistent-mapped for dynamic data).
 
 ---
 
@@ -329,6 +412,9 @@ void ResetTransient();
 
 Use cases: debug planes/quads, collision mesh preview, marching cubes iso-surface while adjusting parameters, clipping plane visualization. Data packed into a per-frame host-visible buffer, BDA pointer passed via push constants with identity model matrix. The surface shader already reads positions/normals via BDA — it doesn't distinguish retained from transient.
 
+**Per-face attribute support:**
+The SurfacePass must support per-face data from the `Faces` PropertySet (per-face colors, per-face normals for flat shading, per-face scalar fields for visualization). Per-face attributes are packed into a face attribute buffer uploaded alongside the triangle index buffer. The shader reads per-face data via `gl_PrimitiveID` indexing into the face attribute BDA channel (`PtrAux` or a dedicated `PtrFaceAux`). This is critical for geometry processing visualization modes (curvature display, segmentation labels, quality metrics).
+
 **ECS query:** `registry.view<ECS::Surface::Component>()`
 
 ### 2. LinePass
@@ -372,13 +458,14 @@ When wireframe is enabled, edge pairs are extracted from the PropertySet and upl
 struct LinePushConstants {
     glm::mat4 Model;           // 64 bytes
     uint64_t  PtrPositions;    //  8 bytes
+    uint64_t  PtrEdgeAux;      //  8 bytes  (per-edge colors/widths; 0 = uniform)
     float     LineWidth;       //  4 bytes
     float     ViewportWidth;   //  4 bytes
     float     ViewportHeight;  //  4 bytes
     uint32_t  Color;           //  4 bytes
-    uint32_t  Flags;           //  4 bytes  (overlay bit, color mode bits)
-    uint32_t  _pad;            //  4 bytes
-};  // 96 bytes
+    uint32_t  Flags;           //  4 bytes  (overlay bit, color mode bits, per-edge attr bits)
+    uint32_t  EdgeCount;       //  4 bytes
+};  // 104 bytes
 static_assert(sizeof(LinePushConstants) <= 128);
 ```
 
@@ -455,10 +542,12 @@ All three passes share vertex data via **BDA pointers into the same device-local
 5. Buffer lifetime managed by `GeometryPool` with retirement frames = 3 matching `VulkanDevice::MAX_FRAMES_IN_FLIGHT`
 6. Transient data uses separate per-frame host-visible buffers owned by each pass
 
-**Who uploads what:**
-- Mesh entity: `ModelLoader` uploads positions/normals/aux + triangle indices → `GeometryGpuData`
-- Graph entity: layout system uploads node positions (+ optional normals) → `GeometryGpuData` (new)
-- Point cloud entity: load system uploads positions/normals → `GeometryGpuData` (new)
+**Who uploads what — all three geometry types follow the same pattern:**
+- Mesh entity: `ModelLoader` uploads positions/normals/aux + triangle indices → `GeometryGpuData` (staged one-shot)
+- Point cloud entity: `PointCloudGeometrySyncSystem` uploads positions/normals from `Cloud` PropertySets → `GeometryGpuData` (staged one-shot, same as mesh)
+- Graph entity: `GraphGeometrySyncSystem` uploads node positions (+ optional normals) → `GeometryGpuData` (persistent-mapped for dynamic layout updates)
+
+All three types produce a `GeometryHandle` that participates in `GPUScene` slot-based lifecycle, transform sync, and frustum culling. The difference is upload mode (staged vs persistent-mapped), not architectural tier.
 
 ### Upload Mode Semantics
 
@@ -657,62 +746,76 @@ Each pass is self-contained. No existing code changes.
 16. Add `ECS::Line::Component` iteration (replaces `RenderVisualization::ShowWireframe`)
 17. Add graph edge iteration (replaces `GraphRenderPass` edge submission)
 18. LinePass reads `ctx.DebugDraw->GetLines()/GetOverlayLines()` for transient data
-19. Delete wireframe code from `MeshRenderPass`
-20. Delete edge submission from `GraphRenderPass`
-21. Delete old `LineRenderPass` (transient-only pass)
-22. Delete `RetainedLineRenderPass` files (already renamed)
+19. Add per-edge attribute BDA channel (`PtrEdgeAux`) for per-edge colors/widths from edge PropertySets
+20. Delete wireframe code from `MeshRenderPass`
+21. Delete edge submission from `GraphRenderPass`
+22. Delete old `LineRenderPass` (transient-only pass)
+23. Delete `RetainedLineRenderPass` files (already renamed)
 
-**Gate:** `IntrinsicTests` pass. Wireframe, graph edges, debug lines all render correctly.
+**Gate:** `IntrinsicTests` pass. Wireframe, graph edges, debug lines all render correctly. Per-edge coloring works.
 
 ### Phase 4: PointPass (atomic — consolidate all point sources)
 
-23. Rename `RetainedPointCloudRenderPass` → `PointPass`
-24. Split `point_retained.*` into `point_flatdisc.*` and `point_surfel.*`
-25. PointPass stores pipeline array indexed by `PointRenderMode`
-26. Add `ECS::Point::Component` iteration (replaces `RenderVisualization::ShowVertices`)
-27. Add graph node iteration (replaces `GraphRenderPass` node submission)
-28. Add standalone point cloud iteration (replaces `PointCloudRenderPass`)
-29. Add `GetPoints()` to `DebugDraw` for transient point markers
-30. PointPass reads `ctx.DebugDraw->GetPoints()` for transient data
-31. Delete vertex/node code from `MeshRenderPass`, `GraphRenderPass`, `PointCloudRenderPass`
-32. Delete `RetainedPointCloudRenderPass` files (already renamed)
-33. Delete old transient `point.vert/frag`
+24. Rename `RetainedPointCloudRenderPass` → `PointPass`
+25. Split `point_retained.*` into `point_flatdisc.*` and `point_surfel.*`
+26. PointPass stores pipeline array indexed by `PointRenderMode`
+27. Add `ECS::Point::Component` iteration (replaces `RenderVisualization::ShowVertices`)
+28. Add graph node iteration (replaces `GraphRenderPass` node submission)
+29. Add standalone point cloud iteration (replaces `PointCloudRenderPass`)
+30. Add `GetPoints()` to `DebugDraw` for transient point markers
+31. PointPass reads `ctx.DebugDraw->GetPoints()` for transient data
+32. Support per-point attributes (colors, radii, normals) from point PropertySets via `PtrAux` BDA channel
+33. Delete vertex/node code from `MeshRenderPass`, `GraphRenderPass`, `PointCloudRenderPass`
+34. Delete `RetainedPointCloudRenderPass` files (already renamed)
+35. Delete old transient `point.vert/frag`
 
-**Gate:** `IntrinsicTests` pass. Vertex visualization, graph nodes, point clouds all render correctly.
+**Gate:** `IntrinsicTests` pass. Vertex visualization, graph nodes, point clouds all render correctly. Per-point coloring and radii work.
 
 ### Phase 5: Delete dead code
 
-34. Delete `MeshRenderPass` (class, files, module partition)
-35. Delete `GraphRenderPass` (class, files, module partition)
-36. Delete `PointCloudRenderPass` (class, files, module partition)
-37. Delete `RenderVisualization::Component` (replaced by typed components)
-38. Delete `GeometryViewRenderer::Component` (each component carries its own handle)
-39. Delete `MeshRenderer::Component` (aliased to `Surface::Component` if needed during transition)
-40. Remove `VisualizationCollect` composite stage from `DefaultPipeline`
+36. Delete `MeshRenderPass` (class, files, module partition)
+37. Delete `GraphRenderPass` (class, files, module partition)
+38. Delete `PointCloudRenderPass` (class, files, module partition)
+39. Delete `RenderVisualization::Component` (replaced by typed components)
+40. Delete `GeometryViewRenderer::Component` (each component carries its own handle)
+41. Delete `MeshRenderer::Component` (aliased to `Surface::Component` if needed during transition)
+42. Remove `VisualizationCollect` composite stage from `DefaultPipeline`
 
 **Gate:** `IntrinsicTests` pass. Clean build with no dead code references.
 
-### Phase 6: Graph/point-cloud device-local upload (post-migration optimization)
+### Phase 6: Geometry view lifecycle systems + retained upload for all types
 
-41. Add device-local upload path for standalone point cloud positions → `GeometryHandle`
-42. Add persistent-mapped upload path for graph node positions → `GeometryHandle`
-43. `PointCloudRenderer::Component` CPU vectors → device-local `GeometryGpuData`
-44. `GraphRenderer::Component` CPU vectors → persistent-mapped `GeometryGpuData`
-45. Graph/point entities participate in `GPUScene` slot-based frustum culling
+All three geometry types must reach device-local retained-mode rendering at the same phase — point clouds and graphs are not second-class citizens.
 
-**Note:** During Phases 2-5, graph and point cloud data remains CPU-resident, submitted via the transient APIs (`SubmitLine()`, `SubmitPoint()`). This avoids blocking the pass consolidation on upload infrastructure changes. Device-local retained-mode rendering for these data types is a post-migration optimization.
+43. Expose `EdgeProperties()`, `FaceProperties()`, `HalfedgeProperties()` on `Halfedge::Mesh` for bulk span extraction
+44. Add `MeshViewLifecycleSystem`: on `Line`/`Point` component attach, create edge/vertex views via `ReuseVertexBuffersFrom(meshHandle)`, manage handle lifecycle + `GPUScene` slot allocation
+45. Add `PointCloudGeometrySyncSystem`: upload `Cloud::Positions()`/`Normals()` spans to device-local `GeometryGpuData` via `GeometryUploadRequest` (staged one-shot), assign handle to `ECS::Point::Component::Geometry`
+46. Add `GraphGeometrySyncSystem`: upload graph node positions to persistent-mapped `GeometryGpuData` (dynamic — layout changes), upload edge index pairs as edge index buffer, populate sibling `Line`/`Point` component handles
+47. All three systems allocate `GPUScene` slots, sync transforms, participate in frustum culling — same path as `MeshRendererLifecycle`
 
-### Phase 7: UI and inspector integration
+**Principle:** The pass consolidation (Phases 2-5) establishes the unified pass structure. Phase 6 ensures all geometry types have equal device-local residency and retained-mode rendering. No geometry type should rely on per-frame transient CPU submission as its permanent rendering path.
 
-46. Add `PointRenderMode` UI combo selector in Inspector
-47. Per-entity component attach/detach for wireframe and vertex visualization
-48. Graph visualization mode controls
+### Phase 7: Per-face attribute support
 
-### Phase 8: Update docs
+48. Add per-face attribute buffer upload in `SurfacePass` (from `Faces` PropertySet)
+49. Add `PtrFaceAux` BDA channel to surface push constants (or repurpose `PtrAux` with mode flag)
+50. Shader support for per-face color via `gl_PrimitiveID` indexing into face attribute buffer
+51. Test: flat-shading per-face colors, curvature visualization, segmentation labels
 
-49. Update `TODO.md` — remove completed items
-50. Update `CLAUDE.md` — document new pass naming and architecture
-51. Update `README.md` — update rendering architecture description
+**Gate:** `IntrinsicTests` pass. Per-face coloring renders correctly.
+
+### Phase 8: UI and inspector integration
+
+52. Add `PointRenderMode` UI combo selector in Inspector
+53. Per-entity component attach/detach for wireframe and vertex visualization
+54. Graph visualization mode controls
+55. Per-edge/per-face attribute visualization toggles
+
+### Phase 9: Update docs
+
+56. Update `TODO.md` — remove completed items
+57. Update `CLAUDE.md` — document new pass naming and architecture
+58. Update `README.md` — update rendering architecture description
 
 ---
 
@@ -745,7 +848,7 @@ Each pass is self-contained. No existing code changes.
 - `GPUScene` / `GPUSceneSync` — adapts to new component names but same architecture
 - `PipelineLibrary` — unchanged (SurfacePass uses same compiled pipelines)
 - `MeshCollider::Component` — unchanged (collision data unaffected; edge data comes from Mesh/Graph PropertySets)
-- `Halfedge::Mesh` / `Graph` PropertySets — edges are already first-class elements, no changes needed
+- `Halfedge::Mesh` / `Graph` PropertySets — edges are already first-class elements; **however**, `Mesh` needs new public `EdgeProperties()`, `FaceProperties()`, `HalfedgeProperties()` accessors for bulk span extraction (currently only `VertexProperties()` is public)
 - All geometry algorithms — unchanged
 - All test targets — unchanged (but tests may need updated imports)
 
