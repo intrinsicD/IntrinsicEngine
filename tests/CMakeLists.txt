@@ -103,6 +103,7 @@ intrinsic_test_object_lib(GeometryTestObjs
         Test_PointCloud.cpp
         Test_Boolean.cpp
         Test_GeometryAttributePropagation.cpp
+        Test_HalfedgeMeshPropertyAccess.cpp
     DEPS IntrinsicCore IntrinsicGeometry
 )
 

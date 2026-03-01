@@ -43,8 +43,14 @@ install_system_deps() {
     # C++23 <format> / <expected> support (GCC 14 stdlib)
     dpkg -s libstdc++-14-dev &>/dev/null || missing+=(libstdc++-14-dev)
 
-    # Clang tools for C++23 module dependency scanning
-    dpkg -s clang-tools-20  &>/dev/null || missing+=(clang-tools-20)
+    # Clang compiler + tools for C++23 modules
+    # Try clang-22 first (latest), fall back to clang-20.
+    if ! dpkg -s clang-22 &>/dev/null && ! dpkg -s clang-20 &>/dev/null; then
+        missing+=(clang-20)
+    fi
+    if ! dpkg -s clang-tools-22 &>/dev/null && ! dpkg -s clang-tools-20 &>/dev/null; then
+        missing+=(clang-tools-20)
+    fi
 
     if [ ${#missing[@]} -gt 0 ]; then
         echo "==> Installing missing packages: ${missing[*]}"
@@ -59,7 +65,7 @@ install_system_deps() {
 # 2. Detect the best available Clang version (require 20+)
 # --------------------------------------------------------------------------
 detect_clang() {
-    for ver in 20; do
+    for ver in 22 20; do
         if command -v "clang++-${ver}" &>/dev/null; then
             CLANG_VER="$ver"
             CC="clang-${ver}"
@@ -99,6 +105,13 @@ configure_build() {
     fi
 
     if [ ! -f "$BUILD_DIR/build.ninja" ]; then
+        # Remove stale cache from a previously failed configure — a leftover
+        # CMakeCache.txt can override our compiler arguments and cause cryptic
+        # "not found in PATH" errors.
+        if [ -f "$BUILD_DIR/CMakeCache.txt" ]; then
+            echo "==> Removing stale CMakeCache.txt (no build.ninja present)."
+            rm -rf "$BUILD_DIR/CMakeCache.txt" "$BUILD_DIR/CMakeFiles"
+        fi
         echo "==> Configuring CMake build …"
         cmake "${cmake_args[@]}" "$PROJECT_ROOT"
     else

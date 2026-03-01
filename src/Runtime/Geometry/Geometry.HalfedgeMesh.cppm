@@ -35,6 +35,15 @@ export namespace Geometry::Halfedge
         HalfedgeHandle Halfedge{};
     };
 
+    // GPU-friendly edge representation: pair of vertex indices.
+    // Layout-compatible with the SSBO EdgePair struct consumed by line shaders.
+    struct EdgeVertexPair
+    {
+        uint32_t i0;
+        uint32_t i1;
+    };
+    static_assert(sizeof(EdgeVertexPair) == 8);
+
     class Mesh
     {
     public:
@@ -193,6 +202,29 @@ export namespace Geometry::Halfedge
 
         [[nodiscard]] Vertices& VertexProperties() noexcept { return m_Vertices; }
         [[nodiscard]] const Vertices& VertexProperties() const noexcept { return m_Vertices; }
+
+        [[nodiscard]] Edges& EdgeProperties() noexcept { return m_Edges; }
+        [[nodiscard]] const Edges& EdgeProperties() const noexcept { return m_Edges; }
+
+        [[nodiscard]] Faces& FaceProperties() noexcept { return m_Faces; }
+        [[nodiscard]] const Faces& FaceProperties() const noexcept { return m_Faces; }
+
+        [[nodiscard]] Halfedges& HalfedgeProperties() noexcept { return m_Halfedges; }
+        [[nodiscard]] const Halfedges& HalfedgeProperties() const noexcept { return m_Halfedges; }
+
+        // -----------------------------------------------------------------
+        // Bulk edge extraction for GPU upload
+        // -----------------------------------------------------------------
+        // Returns all non-deleted edges as (FromVertex, ToVertex) index pairs.
+        // Uses direct halfedge connectivity array access — O(1) per edge, no
+        // per-edge function call overhead. Output is contiguous and ready for
+        // SSBO upload as edge index buffer.
+        [[nodiscard]] std::vector<EdgeVertexPair> ExtractEdgeVertexPairs() const;
+
+        // Writes non-deleted edge pairs into a pre-allocated output span.
+        // Returns the number of pairs actually written (≤ out.size()).
+        // Useful when the caller owns the buffer (e.g., staging belt region).
+        std::size_t ExtractEdgeVertexPairs(std::span<EdgeVertexPair> out) const;
 
         // -----------------------------------------------------------------
         // Attribute propagation policies for topology edits
