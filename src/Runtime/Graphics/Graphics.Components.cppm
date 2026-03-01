@@ -161,9 +161,15 @@ export namespace ECS::RenderVisualization
 // Node positions, colors, radii, and edge topology are sourced directly from
 // the Graph's PropertySets — no std::vector copies.
 //
-// Entities with this component are rendered by GraphRenderPass:
-//   - Nodes rendered via PointCloudRenderPass (all point rendering modes).
-//   - Edges rendered via LineRenderPass (through DebugDraw accumulator).
+// Rendering: retained-mode via BDA shared-buffer architecture.
+//   - Nodes rendered via RetainedPointCloudRenderPass (BDA position pull).
+//   - Edges rendered via RetainedLineRenderPass (BDA position pull + edge SSBO).
+//   - Falls back to CPU path (GraphRenderPass → PointCloudRenderPass + DebugDraw)
+//     when retained passes are disabled via FeatureRegistry.
+//
+// GPU state is managed by GraphGeometrySyncSystem: positions are uploaded once
+// to a device-local vertex buffer (GpuGeometry), edge pairs are extracted from
+// graph topology (CachedEdgePairs). Re-upload triggers on GpuDirty = true.
 //
 // Optional per-node attributes (colors, radii) are stored as named vertex
 // properties on the Graph:
@@ -183,8 +189,29 @@ export namespace ECS::Graph
         float     NodeSizeMultiplier = 1.0f;
         glm::vec4 DefaultNodeColor   = {0.8f, 0.5f, 0.0f, 1.0f};
         glm::vec4 DefaultEdgeColor   = {0.6f, 0.6f, 0.6f, 1.0f};
+        float     EdgeWidth          = 1.5f;   // Screen-space edge width in pixels.
         bool      EdgesOverlay       = false;  // true = edges always visible (no depth test).
         bool      Visible            = true;
+
+        // ---- GPU State (managed by GraphGeometrySyncSystem) ----
+        // Shared vertex buffer holding compacted node positions + normals.
+        // Both RetainedLineRenderPass (edges) and RetainedPointCloudRenderPass
+        // (nodes) read from this buffer via BDA push constants.
+        Geometry::GeometryHandle GpuGeometry{};
+
+        // Edge index pairs into the compacted vertex buffer.
+        // Consumed by RetainedLineRenderPass in the same way as
+        // RenderVisualization::CachedEdges for mesh wireframe.
+        std::vector<ECS::RenderVisualization::EdgePair> CachedEdgePairs;
+
+        // When true, GraphGeometrySyncSystem re-uploads positions and rebuilds
+        // edge pairs. Set on first attach, or by layout algorithms that modify
+        // graph vertex positions.
+        bool GpuDirty = true;
+
+        // Vertex count in the GPU buffer (matches compacted vertex count at
+        // upload time — deleted vertices are excluded via remapping).
+        uint32_t GpuVertexCount = 0;
 
         // ---- Queries (delegate to GraphRef) ----
         [[nodiscard]] std::size_t NodeCount() const noexcept

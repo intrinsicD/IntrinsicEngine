@@ -207,6 +207,48 @@ namespace Graphics::Passes
             draws.push_back(di);
         }
 
+        // -----------------------------------------------------------------
+        // Graph entities — retained-mode node rendering via BDA.
+        // Same pattern as mesh vertex visualization: read positions/normals
+        // via BDA from the shared vertex buffer, render as billboard quads.
+        // -----------------------------------------------------------------
+        auto graphView = registry.view<ECS::Graph::Data>();
+        for (auto [entity, graphData] : graphView.each())
+        {
+            if (!graphData.Visible || !graphData.GpuGeometry.IsValid())
+                continue;
+
+            if (graphData.GpuVertexCount == 0)
+                continue;
+
+            GeometryGpuData* geo = m_GeometryStorage->GetUnchecked(graphData.GpuGeometry);
+            if (!geo || !geo->GetVertexBuffer())
+                continue;
+
+            glm::mat4 worldMatrix(1.0f);
+            if (auto* wm = registry.try_get<ECS::Components::Transform::WorldMatrix>(entity))
+                worldMatrix = wm->Matrix;
+
+            const uint64_t baseAddr = geo->GetVertexBuffer()->GetDeviceAddress();
+            const auto& layout = geo->GetLayout();
+            const uint64_t posAddr = baseAddr + layout.PositionsOffset;
+            const uint64_t normAddr = (layout.NormalsSize > 0) ? (baseAddr + layout.NormalsOffset) : 0;
+
+            const uint32_t nodeColor = GpuColor::PackColorF(
+                graphData.DefaultNodeColor.r, graphData.DefaultNodeColor.g,
+                graphData.DefaultNodeColor.b, graphData.DefaultNodeColor.a);
+
+            DrawInfo di{};
+            di.Model = worldMatrix;
+            di.PtrPositions = posAddr;
+            di.PtrNormals = normAddr;
+            di.VertexCount = graphData.GpuVertexCount;
+            di.PointSize = graphData.DefaultNodeRadius;
+            di.RenderMode = static_cast<uint32_t>(graphData.NodeRenderMode);
+            di.Color = nodeColor;
+            draws.push_back(di);
+        }
+
         if (draws.empty())
             return;
 

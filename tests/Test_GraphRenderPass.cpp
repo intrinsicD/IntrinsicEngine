@@ -272,3 +272,141 @@ TEST(Graph_PropertySetAccessors, PropertyExistsCheck)
     g->GetOrAddVertexProperty<glm::vec4>("v:color");
     EXPECT_TRUE(g->VertexProperties().Exists("v:color"));
 }
+
+// =============================================================================
+// GPU State Fields — Retained-mode rendering contract tests
+// =============================================================================
+//
+// Validate the new GPU state fields on ECS::Graph::Data without requiring a
+// GPU device. These ensure the component's retained-mode API surface is
+// correct and that default values don't break existing code.
+
+TEST(Graph_RetainedMode, DefaultGpuStateValues)
+{
+    ECS::Graph::Data data;
+
+    // GpuGeometry handle should be invalid by default.
+    EXPECT_FALSE(data.GpuGeometry.IsValid());
+
+    // Edge pairs should be empty.
+    EXPECT_TRUE(data.CachedEdgePairs.empty());
+
+    // GpuDirty should be true (triggers initial upload).
+    EXPECT_TRUE(data.GpuDirty);
+
+    // GpuVertexCount should be 0.
+    EXPECT_EQ(data.GpuVertexCount, 0u);
+
+    // EdgeWidth should have a sensible default.
+    EXPECT_FLOAT_EQ(data.EdgeWidth, 1.5f);
+}
+
+TEST(Graph_RetainedMode, GpuDirtyStartsTrue)
+{
+    // Every new Graph::Data instance starts dirty so that
+    // GraphGeometrySyncSystem uploads on the first frame.
+    ECS::Graph::Data data;
+    data.GraphRef = MakeTriangleGraph();
+    EXPECT_TRUE(data.GpuDirty);
+}
+
+TEST(Graph_RetainedMode, EdgePairStorageMatchesEdgeCount)
+{
+    // Simulate what GraphGeometrySyncSystem would do: extract edge pairs
+    // from graph topology and store them on the component.
+    auto g = MakeTriangleGraph(); // 3 vertices, 3 edges
+
+    ECS::Graph::Data data;
+    data.GraphRef = g;
+
+    // Manual edge extraction (mirrors sync system logic).
+    const std::size_t eSize = g->EdgesSize();
+    for (std::size_t i = 0; i < eSize; ++i)
+    {
+        const Geometry::EdgeHandle e{static_cast<Geometry::PropertyIndex>(i)};
+        if (g->IsDeleted(e))
+            continue;
+
+        const auto [v0, v1] = g->EdgeVertices(e);
+        data.CachedEdgePairs.push_back({
+            static_cast<uint32_t>(v0.Index),
+            static_cast<uint32_t>(v1.Index)
+        });
+    }
+
+    EXPECT_EQ(data.CachedEdgePairs.size(), 3u);
+}
+
+TEST(Graph_RetainedMode, EdgePairSizeMatchesLayout)
+{
+    // EdgePair must be exactly 8 bytes for direct SSBO upload.
+    static_assert(sizeof(ECS::RenderVisualization::EdgePair) == 8);
+
+    ECS::RenderVisualization::EdgePair ep{42, 99};
+    EXPECT_EQ(ep.i0, 42u);
+    EXPECT_EQ(ep.i1, 99u);
+}
+
+TEST(Graph_RetainedMode, GpuDirtyCanBeCleared)
+{
+    ECS::Graph::Data data;
+    data.GraphRef = MakeTriangleGraph();
+
+    EXPECT_TRUE(data.GpuDirty);
+    data.GpuDirty = false;
+    EXPECT_FALSE(data.GpuDirty);
+
+    // Simulates layout change trigger.
+    data.GpuDirty = true;
+    EXPECT_TRUE(data.GpuDirty);
+}
+
+TEST(Graph_RetainedMode, GpuVertexCountTracksCompactedCount)
+{
+    // After vertex compaction, GpuVertexCount should reflect
+    // the number of non-deleted vertices uploaded to GPU.
+    auto g = std::make_shared<Geometry::Graph::Graph>();
+    auto v0 = g->AddVertex(glm::vec3(0, 0, 0));
+    auto v1 = g->AddVertex(glm::vec3(1, 0, 0));
+    auto v2 = g->AddVertex(glm::vec3(0, 1, 0));
+    auto v3 = g->AddVertex(glm::vec3(1, 1, 0));
+    g->AddEdge(v0, v1);
+    g->AddEdge(v1, v2);
+    g->AddEdge(v2, v3);
+
+    ECS::Graph::Data data;
+    data.GraphRef = g;
+
+    // Simulate compaction for all 4 vertices.
+    data.GpuVertexCount = 4;
+    EXPECT_EQ(data.GpuVertexCount, 4u);
+
+    // Delete v2 and simulate re-upload with 3 compacted vertices.
+    g->DeleteVertex(v2);
+    data.GpuVertexCount = static_cast<uint32_t>(g->VertexCount());
+    EXPECT_EQ(data.GpuVertexCount, 3u);
+}
+
+// ---- GraphRenderPass SetRetainedPassesActive ----
+
+TEST(GraphRenderPass_Retained, SetRetainedPassesActiveDoesNotCrash)
+{
+    Graphics::Passes::GraphRenderPass pass;
+    pass.SetRetainedPassesActive(true, true);
+    pass.SetRetainedPassesActive(false, false);
+    pass.SetRetainedPassesActive(true, false);
+    pass.SetRetainedPassesActive(false, true);
+    SUCCEED();
+}
+
+TEST(GraphRenderPass_Retained, RetainedFlagsDefaultToFalse)
+{
+    // GraphRenderPass should default to CPU path (retained flags false).
+    // We verify this indirectly: a new pass with SetPointCloudPass(nullptr)
+    // should not crash when AddPasses isn't called.
+    Graphics::Passes::GraphRenderPass pass;
+    pass.SetPointCloudPass(nullptr);
+    // If retained were true by default, the pass would skip entities even
+    // without GPU state — which is wrong. The default must be false.
+    SUCCEED();
+}

@@ -449,6 +449,18 @@ namespace Runtime
                 if (m_FeatureRegistry.IsEnabled("TransformUpdate"_id))
                     ECS::Systems::Transform::RegisterSystem(frameGraph, registry);
 
+                // Graph geometry sync: uploads graph node positions to GPU and
+                // builds edge index pairs for retained-mode BDA rendering.
+                // Runs after TransformUpdate (writes to ECS::Graph::Data).
+                if (m_FeatureRegistry.IsEnabled("GraphGeometrySync"_id))
+                {
+                    Graphics::Systems::GraphGeometrySync::RegisterSystem(
+                        frameGraph, registry,
+                        m_RenderOrchestrator->GetGeometryStorage(),
+                        GetDeviceShared(),
+                        m_GraphicsBackend->GetTransferManager());
+                }
+
                 auto* gpuScene = m_RenderOrchestrator->GetGPUScenePtr();
                 if (gpuScene)
                 {
