@@ -16,7 +16,7 @@ export namespace Graphics::Passes
     // GraphRenderPass — GPU graph rendering via composited primitive passes.
     // -------------------------------------------------------------------------
     //
-    // Renders entities with ECS::GraphRenderer::Component:
+    // Renders entities with ECS::Graph::Data:
     //   - Nodes rendered as point splats via PointCloudRenderPass (all 4 modes).
     //   - Edges rendered as anti-aliased thick lines via LineRenderPass
     //     (submitted to DebugDraw accumulator in RenderPassContext).

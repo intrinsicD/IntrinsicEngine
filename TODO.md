@@ -41,7 +41,7 @@ Zero vertex duplication. Each topology needs separate shader pipelines because t
 - Shader compilation auto-discovered via `CompileShaders.cmake` glob.
 
 **Remaining work:**
-- [ ] `GraphRenderer::Component`: wraps `Geometry::Graph` as a retained line view (edges) + point view (nodes) sharing the same vertex buffer. Layout algorithms produce positions uploaded once; updated only on layout change.
+- [ ] `ECS::Graph::Data` retained-mode rendering: retained line view (edges) + point view (nodes) sharing the same vertex buffer via BDA. Layout algorithms produce positions uploaded once; updated only on layout change. *(Data authority migrated from `GraphRenderer::Component` vector copies to PropertySet-backed `ECS::Graph::Data` — see git history.)*
 - [ ] Fully retained edge SSBO: upload edge pairs once to device-local storage when the mesh loads (currently re-uploaded per-frame from `CachedEdges`). Requires `GeometryViewRenderer` wireframe handle + lifecycle management.
 - [ ] Frustum culling integration: retained line/point views should participate in `GPUScene` slot-based frustum culling alongside surface meshes.
 - [ ] EWA splatting mode (Zwicker et al. 2001) for point clouds.
@@ -79,7 +79,7 @@ The rendering plan requires per-element attribute data from PropertySets flowing
 Automated creation/destruction of GPU geometry views when rendering components are attached/detached. Applies equally to all three geometry types.
 
 - [ ] `MeshViewLifecycleSystem`: on `ECS::Line::Component` attach to mesh entity → extract edge pairs from `Mesh::EdgeProperties()`, create edge index buffer via `ReuseVertexBuffersFrom(meshHandle)`, assign to `Line::Component::EdgeView`. On `ECS::Point::Component` attach → create vertex view via `ReuseVertexBuffersFrom`. On detach → release handle, free `GPUScene` slot.
-- [ ] `GraphGeometrySyncSystem`: on `ECS::Graph::Data` attach or graph layout update → upload node positions from `Graph` PropertySets to persistent-mapped `GeometryGpuData`, upload edge pairs as index buffer, populate sibling `Line`/`Point` handles.
+- [ ] `GraphGeometrySyncSystem`: on `ECS::Graph::Data` attach or graph layout update → upload node positions from `Graph::VertexProperties()` to persistent-mapped `GeometryGpuData`, upload edge pairs from `Graph::EdgeProperties()` as index buffer, populate sibling `Line`/`Point` handles.
 - [ ] `PointCloudGeometrySyncSystem`: on `ECS::Point::Component` attach with `PointCloud::Cloud` source → upload `Cloud::Positions()`/`Normals()` spans to device-local `GeometryGpuData`, assign handle.
 - [ ] All lifecycle systems allocate `GPUScene` slots, sync transforms, participate in frustum culling — same contract as `MeshRendererLifecycle`.
 
@@ -91,14 +91,6 @@ Per-frame CPU→GPU synchronization driven by PropertySet change detection, with
 - [ ] Sync system detects dirty tags, re-uploads only affected PropertySet spans to GPU buffers.
 - [ ] Topology-dirty domains trigger index buffer rebuild; attribute-dirty domains trigger attribute buffer re-upload.
 - [ ] Clear dirty tags after upload. Multiple simultaneous dirty domains handled independently (face color change doesn't re-upload vertex buffer).
-
-### 1.6 ECS::Graph::Data — PropertySet-Backed Authority
-
-Current `GraphRenderer::Component` holds `std::vector` copies of node positions, colors, and edge pairs — duplicating data from `Geometry::Graph` PropertySets.
-
-- [ ] Replace `GraphRenderer::Component` with `ECS::Graph::Data` holding a `std::shared_ptr<Geometry::Graph>` reference (not data copies).
-- [ ] Node positions, colors, radii sourced from Graph's vertex PropertySet. Edge pairs sourced from Graph's edge PropertySet.
-- [ ] `GraphGeometrySyncSystem` reads PropertySet spans for GPU upload, eliminating the vector-copy anti-pattern.
 
 ## 2. Related Documents
 

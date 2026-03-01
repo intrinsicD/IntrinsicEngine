@@ -1,6 +1,8 @@
 module;
 
+#include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <glm/glm.hpp>
 #include <entt/entity/entity.hpp>
 
@@ -12,6 +14,7 @@ import :Components;
 import :Passes.PointCloud;
 import :DebugDraw;
 import ECS;
+import Geometry;
 
 namespace Graphics::Passes
 {
@@ -20,9 +23,12 @@ namespace Graphics::Passes
     // AddPasses
     // =========================================================================
     //
-    // Iterates all ECS::GraphRenderer::Component entities and:
+    // Iterates all ECS::Graph::Data entities and:
     //   - Submits node positions (transformed to world space) to PointCloudRenderPass.
-    //   - Submits edge segments (index pairs) to ctx.DebugDrawPtr.
+    //   - Submits edge segments to ctx.DebugDrawPtr.
+    //
+    // Node positions, colors, and radii are sourced from the Graph's PropertySets
+    // (no std::vector copies). Edge topology is read via Graph::EdgeVertices().
     //
     // This method does NOT add any GPU render graph passes. Actual GPU drawing is
     // performed by PointCloudRenderPass::AddPasses() and LineRenderPass::AddPasses()
@@ -31,68 +37,97 @@ namespace Graphics::Passes
     void GraphRenderPass::AddPasses(RenderPassContext& ctx)
     {
         auto& registry = ctx.Scene.GetRegistry();
-        auto graphView = registry.view<const ECS::GraphRenderer::Component>();
+        auto graphView = registry.view<const ECS::Graph::Data>();
 
-        graphView.each([&](const entt::entity entity, const ECS::GraphRenderer::Component& graph)
+        graphView.each([&](const entt::entity entity, const ECS::Graph::Data& graphData)
         {
-            if (!graph.Visible || graph.NodePositions.empty())
+            if (!graphData.Visible || !graphData.GraphRef || graphData.GraphRef->VertexCount() == 0)
                 return;
+
+            const auto& graph = *graphData.GraphRef;
 
             // Fetch world transform (identity if not present).
             glm::mat4 worldMatrix(1.0f);
             if (auto* wm = registry.try_get<ECS::Components::Transform::WorldMatrix>(entity))
                 worldMatrix = wm->Matrix;
 
+            // Resolve optional per-node properties from PropertySets.
+            const auto& vProps = graph.VertexProperties();
+            const bool hasColors = vProps.Exists("v:color");
+            const bool hasRadii  = vProps.Exists("v:radius");
+
+            // Cache property accessors outside the vertex loop (avoids per-vertex lookup).
+            // GetOrAdd is used only when the property is confirmed to exist.
+            // We const_cast because GetOrAddVertexProperty is non-const, but we
+            // only read — the property already exists per the Exists() check above.
+            std::optional<Geometry::VertexProperty<glm::vec4>> colorProp;
+            std::optional<Geometry::VertexProperty<float>> radiusProp;
+            if (hasColors)
+                colorProp = const_cast<Geometry::Graph::Graph&>(graph)
+                    .GetOrAddVertexProperty<glm::vec4>("v:color");
+            if (hasRadii)
+                radiusProp = const_cast<Geometry::Graph::Graph&>(graph)
+                    .GetOrAddVertexProperty<float>("v:radius");
+
             // --- Submit nodes to PointCloudRenderPass ---
             if (m_PointCloudPass)
             {
                 const uint32_t defaultColor = PointCloudRenderPass::PackColorF(
-                    graph.DefaultNodeColor.r, graph.DefaultNodeColor.g,
-                    graph.DefaultNodeColor.b, graph.DefaultNodeColor.a);
+                    graphData.DefaultNodeColor.r, graphData.DefaultNodeColor.g,
+                    graphData.DefaultNodeColor.b, graphData.DefaultNodeColor.a);
 
-                for (std::size_t i = 0; i < graph.NodePositions.size(); ++i)
+                const std::size_t vSize = graph.VerticesSize();
+                for (std::size_t i = 0; i < vSize; ++i)
                 {
+                    const Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(i)};
+                    if (graph.IsDeleted(v))
+                        continue;
+
+                    const glm::vec3 localPos = graph.VertexPosition(v);
                     const glm::vec3 worldPos =
-                        glm::vec3(worldMatrix * glm::vec4(graph.NodePositions[i], 1.0f));
+                        glm::vec3(worldMatrix * glm::vec4(localPos, 1.0f));
 
-                    const float radius = graph.HasNodeRadii()
-                        ? graph.NodeRadii[i]
-                        : graph.DefaultNodeRadius;
+                    const float radius = (hasRadii && radiusProp)
+                        ? (*radiusProp)[v]
+                        : graphData.DefaultNodeRadius;
 
-                    const uint32_t color = graph.HasNodeColors()
+                    const uint32_t color = (hasColors && colorProp)
                         ? PointCloudRenderPass::PackColorF(
-                            graph.NodeColors[i].r, graph.NodeColors[i].g,
-                            graph.NodeColors[i].b, graph.NodeColors[i].a)
+                            (*colorProp)[v].r, (*colorProp)[v].g,
+                            (*colorProp)[v].b, (*colorProp)[v].a)
                         : defaultColor;
 
                     // Nodes have no meaningful surface normal — use world-up as default.
                     auto pt = PointCloudRenderPass::PackPoint(
                         worldPos.x, worldPos.y, worldPos.z,
                         0.0f, 1.0f, 0.0f,
-                        radius * graph.NodeSizeMultiplier,
+                        radius * graphData.NodeSizeMultiplier,
                         color);
-                    m_PointCloudPass->SubmitPoints(graph.NodeRenderMode, &pt, 1);
+                    m_PointCloudPass->SubmitPoints(graphData.NodeRenderMode, &pt, 1);
                 }
             }
 
             // --- Submit edges to DebugDraw (→ LineRenderPass) ---
-            if (ctx.DebugDrawPtr && !graph.Edges.empty())
+            if (ctx.DebugDrawPtr && graph.EdgeCount() > 0)
             {
                 const uint32_t edgeColor = DebugDraw::PackColorF(
-                    graph.DefaultEdgeColor.r, graph.DefaultEdgeColor.g,
-                    graph.DefaultEdgeColor.b, graph.DefaultEdgeColor.a);
+                    graphData.DefaultEdgeColor.r, graphData.DefaultEdgeColor.g,
+                    graphData.DefaultEdgeColor.b, graphData.DefaultEdgeColor.a);
 
-                for (const auto& [i0, i1] : graph.Edges)
+                const std::size_t eSize = graph.EdgesSize();
+                for (std::size_t i = 0; i < eSize; ++i)
                 {
-                    if (i0 >= graph.NodePositions.size() || i1 >= graph.NodePositions.size())
+                    const Geometry::EdgeHandle e{static_cast<Geometry::PropertyIndex>(i)};
+                    if (graph.IsDeleted(e))
                         continue;
 
+                    const auto [v0, v1] = graph.EdgeVertices(e);
                     const glm::vec3 a =
-                        glm::vec3(worldMatrix * glm::vec4(graph.NodePositions[i0], 1.0f));
+                        glm::vec3(worldMatrix * glm::vec4(graph.VertexPosition(v0), 1.0f));
                     const glm::vec3 b =
-                        glm::vec3(worldMatrix * glm::vec4(graph.NodePositions[i1], 1.0f));
+                        glm::vec3(worldMatrix * glm::vec4(graph.VertexPosition(v1), 1.0f));
 
-                    if (graph.EdgesOverlay)
+                    if (graphData.EdgesOverlay)
                         ctx.DebugDrawPtr->OverlayLine(a, b, edgeColor);
                     else
                         ctx.DebugDrawPtr->Line(a, b, edgeColor);
