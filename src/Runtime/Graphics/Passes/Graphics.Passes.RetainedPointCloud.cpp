@@ -149,6 +149,16 @@ namespace Graphics::Passes
 
         // Collect entities that need retained vertex point rendering.
         auto& registry = ctx.Scene.GetRegistry();
+
+        // -----------------------------------------------------------------
+        // Frustum extraction — CPU-side culling for retained-mode draws.
+        // Uses the same plane-vs-sphere test as instance_cull.comp on the GPU.
+        // -----------------------------------------------------------------
+        const bool cullingEnabled = !ctx.Debug.DisableCulling;
+        const Geometry::Frustum frustum = cullingEnabled
+            ? Geometry::Frustum::CreateFromMatrix(ctx.CameraProj * ctx.CameraView)
+            : Geometry::Frustum{};
+
         auto meshView = registry.view<ECS::MeshRenderer::Component,
                                       ECS::RenderVisualization::Component>();
 
@@ -187,6 +197,10 @@ namespace Graphics::Passes
             glm::mat4 worldMatrix(1.0f);
             if (auto* wm = registry.try_get<ECS::Components::Transform::WorldMatrix>(entity))
                 worldMatrix = wm->Matrix;
+
+            // Frustum cull: skip draw if the entity's bounding sphere is outside the camera frustum.
+            if (cullingEnabled && !FrustumCullSphere(worldMatrix, geo->GetLocalBoundingSphere(), frustum))
+                continue;
 
             const uint64_t baseAddr = geo->GetVertexBuffer()->GetDeviceAddress();
             const uint64_t posAddr = baseAddr + layout.PositionsOffset;
@@ -228,6 +242,10 @@ namespace Graphics::Passes
             glm::mat4 worldMatrix(1.0f);
             if (auto* wm = registry.try_get<ECS::Components::Transform::WorldMatrix>(entity))
                 worldMatrix = wm->Matrix;
+
+            // Frustum cull: skip draw if graph geometry is outside the camera frustum.
+            if (cullingEnabled && !FrustumCullSphere(worldMatrix, geo->GetLocalBoundingSphere(), frustum))
+                continue;
 
             const uint64_t baseAddr = geo->GetVertexBuffer()->GetDeviceAddress();
             const auto& layout = geo->GetLayout();

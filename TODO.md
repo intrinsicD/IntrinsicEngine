@@ -41,9 +41,9 @@ Zero vertex duplication. Each topology needs separate shader pipelines because t
 - Both passes registered in `DefaultPipeline` render path (stages 6a/6b), gated by `FeatureRegistry`.
 - Shader compilation auto-discovered via `CompileShaders.cmake` glob.
 - `GeometryViewRenderer::Component::WireframeEdgeCount` tracks persistent edge buffer lifecycle.
+- CPU-side frustum culling in `RetainedLineRenderPass` and `RetainedPointCloudRenderPass` — extracts camera frustum from view-projection matrix, tests each entity's world-space bounding sphere via `Geometry::TestOverlap(Frustum, Sphere)`, skips draws for culled entities. Mirrors the GPU `instance_cull.comp` sphere-plane test. `GeometryGpuData` now stores precomputed local bounding spheres from CPU vertex positions at upload time (AABB-enclosing sphere), replacing the conservative 10,000-radius fallback in `MeshRendererLifecycle`. Respects `Debug.DisableCulling` toggle.
 
 **Remaining work:**
-- [ ] Frustum culling integration: retained line/point views should participate in `GPUScene` slot-based frustum culling alongside surface meshes.
 - [ ] EWA splatting mode (Zwicker et al. 2001) for point clouds.
 - [ ] Test: GPU point data layout, color packing, BDA shared-buffer lifecycle, render contract.
 

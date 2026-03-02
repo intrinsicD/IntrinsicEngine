@@ -1,9 +1,12 @@
 // src/Runtime/Graphics/Graphics.Geometry.cpp
 module;
+#include <algorithm>
+#include <cmath>
 #include <cstring>
 #include <memory>
 #include <numeric>
 #include <vector>
+#include <glm/glm.hpp>
 #include "RHI.Vulkan.hpp"
 
 module Graphics:Geometry.Impl;
@@ -17,6 +20,28 @@ namespace Graphics
     static VkDeviceSize AlignSize(VkDeviceSize size, VkDeviceSize alignment)
     {
         return (size + alignment - 1) & ~(alignment - 1);
+    }
+
+    // Compute a tight AABB-based bounding sphere from CPU vertex positions.
+    // Returns (center.xyz, radius) — radius > 0 for non-empty input, 0 for empty.
+    static glm::vec4 ComputeBoundingSphereFromPositions(std::span<const glm::vec3> positions)
+    {
+        if (positions.empty())
+            return {0.0f, 0.0f, 0.0f, 0.0f};
+
+        glm::vec3 minP = positions[0];
+        glm::vec3 maxP = positions[0];
+        for (const auto& p : positions)
+        {
+            minP = glm::min(minP, p);
+            maxP = glm::max(maxP, p);
+        }
+
+        const glm::vec3 center = (minP + maxP) * 0.5f;
+        const float radius = glm::length(maxP - center);
+
+        // Clamp to a small epsilon to avoid degenerate zero-radius spheres for point geometry.
+        return {center.x, center.y, center.z, std::max(radius, 1e-3f)};
     }
 
     std::pair<std::unique_ptr<GeometryGpuData>, RHI::TransferToken>
@@ -90,6 +115,9 @@ namespace Graphics
             result->m_Layout = source->m_Layout;
             result->m_Layout.Topology = topo;
 
+            // Inherit bounding sphere from source (same vertex data).
+            result->m_LocalBoundingSphere = source->m_LocalBoundingSphere;
+
             totalVertexSize = sourceTotal;
         }
         else
@@ -107,6 +135,9 @@ namespace Graphics
             result->m_Layout.AuxSize = auxSize;
 
             totalVertexSize = result->m_Layout.AuxOffset + result->m_Layout.AuxSize;
+
+            // Compute bounding sphere from CPU positions before they go to GPU.
+            result->m_LocalBoundingSphere = ComputeBoundingSphereFromPositions(data.Positions);
         }
 
         const VkDeviceSize idxSize = data.Indices.size_bytes();

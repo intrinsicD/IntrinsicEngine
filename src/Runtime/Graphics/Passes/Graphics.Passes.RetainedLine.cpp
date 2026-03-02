@@ -22,6 +22,7 @@ import :Geometry;
 import :Components;
 import :ShaderRegistry;
 import :GpuColor;
+import Geometry;
 import Core.Hash;
 import Core.Logging;
 import Core.Filesystem;
@@ -207,6 +208,15 @@ namespace Graphics::Passes
 
         auto& registry = ctx.Scene.GetRegistry();
 
+        // -----------------------------------------------------------------
+        // Frustum extraction — CPU-side culling for retained-mode draws.
+        // Uses the same plane-vs-sphere test as instance_cull.comp on the GPU.
+        // -----------------------------------------------------------------
+        const bool cullingEnabled = !ctx.Debug.DisableCulling;
+        const Geometry::Frustum frustum = cullingEnabled
+            ? Geometry::Frustum::CreateFromMatrix(ctx.CameraProj * ctx.CameraView)
+            : Geometry::Frustum{};
+
         // Per-entity draw command — each entity has its own persistent edge buffer.
         struct DrawInfo
         {
@@ -244,6 +254,15 @@ namespace Graphics::Passes
             const uint32_t entityKey = static_cast<uint32_t>(entity);
             activeKeys.push_back(entityKey);
 
+            // Frustum cull: skip draw if the entity's bounding sphere is outside the camera frustum.
+            // Edge buffers are still maintained (activeKeys tracks them) — only the draw is skipped.
+            glm::mat4 worldMatrix(1.0f);
+            if (auto* wm = registry.try_get<ECS::Components::Transform::WorldMatrix>(entity))
+                worldMatrix = wm->Matrix;
+
+            if (cullingEnabled && !FrustumCullSphere(worldMatrix, geo->GetLocalBoundingSphere(), frustum))
+                continue;
+
             // Ensure persistent edge buffer exists (create on first frame, reuse after).
             // Mesh geometry handle is stable — edges only change when EdgeCacheDirty is set.
             const uint32_t edgeCount = static_cast<uint32_t>(vis.CachedEdges.size());
@@ -251,10 +270,6 @@ namespace Graphics::Passes
                 entityKey, vis.CachedEdges.data(), edgeCount, mr.Geometry.Index);
             if (edgeAddr == 0)
                 continue;
-
-            glm::mat4 worldMatrix(1.0f);
-            if (auto* wm = registry.try_get<ECS::Components::Transform::WorldMatrix>(entity))
-                worldMatrix = wm->Matrix;
 
             const uint64_t baseAddr = geo->GetVertexBuffer()->GetDeviceAddress();
             const uint64_t posAddr = baseAddr + geo->GetLayout().PositionsOffset;
@@ -298,6 +313,14 @@ namespace Graphics::Passes
             const uint32_t entityKey = static_cast<uint32_t>(entity) | 0x80000000u;
             activeKeys.push_back(entityKey);
 
+            glm::mat4 worldMatrix(1.0f);
+            if (auto* wm = registry.try_get<ECS::Components::Transform::WorldMatrix>(entity))
+                worldMatrix = wm->Matrix;
+
+            // Frustum cull: skip draw if graph geometry is outside the camera frustum.
+            if (cullingEnabled && !FrustumCullSphere(worldMatrix, geo->GetLocalBoundingSphere(), frustum))
+                continue;
+
             // Graph edges may change when layout algorithms run (GpuDirty resets CachedEdgePairs).
             // EnsureEdgeBuffer detects geometry handle changes (re-uploaded by GraphGeometrySyncSystem)
             // and recreates the buffer even if the edge count stays the same.
@@ -306,10 +329,6 @@ namespace Graphics::Passes
                 entityKey, graphData.CachedEdgePairs.data(), edgeCount, graphData.GpuGeometry.Index);
             if (edgeAddr == 0)
                 continue;
-
-            glm::mat4 worldMatrix(1.0f);
-            if (auto* wm = registry.try_get<ECS::Components::Transform::WorldMatrix>(entity))
-                worldMatrix = wm->Matrix;
 
             const uint64_t baseAddr = geo->GetVertexBuffer()->GetDeviceAddress();
             const uint64_t posAddr = baseAddr + geo->GetLayout().PositionsOffset;
