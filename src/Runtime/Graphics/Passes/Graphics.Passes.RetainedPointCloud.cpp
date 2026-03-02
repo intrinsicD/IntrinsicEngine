@@ -180,31 +180,60 @@ namespace Graphics::Passes
             if (!vis.ShowVertices)
                 continue;
 
-            // Need valid GPU geometry for BDA position access.
-            GeometryGpuData* geo = m_GeometryStorage->GetUnchecked(mr.Geometry);
-            if (!geo || !geo->GetVertexBuffer())
-                continue;
+            // Check for a first-class MeshVertexView with ready GPU geometry.
+            auto* vtxViewComp = registry.try_get<ECS::MeshVertexView::Component>(entity);
+            const bool useVertexView = vtxViewComp
+                && vtxViewComp->HasGpuGeometry()
+                && vtxViewComp->VertexCount > 0;
 
-            // Compute vertex count from position data size.
-            const auto& layout = geo->GetLayout();
-            if (layout.PositionsSize == 0)
-                continue;
+            uint32_t vertexCount = 0;
+            uint64_t posAddr = 0;
+            uint64_t normAddr = 0;
+            glm::vec4 localBounds{0.0f, 0.0f, 0.0f, 0.0f};
 
-            const uint32_t vertexCount = static_cast<uint32_t>(layout.PositionsSize / sizeof(glm::vec3));
-            if (vertexCount == 0)
-                continue;
+            if (useVertexView)
+            {
+                // Read vertex data via BDA from the MeshVertexView's GeometryGpuData.
+                // The vertex buffer is shared from the source mesh (via ReuseVertexBuffersFrom).
+                GeometryGpuData* vtxGeo = m_GeometryStorage->GetUnchecked(vtxViewComp->Geometry);
+                if (!vtxGeo || !vtxGeo->GetVertexBuffer())
+                    continue;
+
+                vertexCount = vtxViewComp->VertexCount;
+                const auto& vtxLayout = vtxGeo->GetLayout();
+                const uint64_t baseAddr = vtxGeo->GetVertexBuffer()->GetDeviceAddress();
+                posAddr = baseAddr + vtxLayout.PositionsOffset;
+                normAddr = (vtxLayout.NormalsSize > 0) ? (baseAddr + vtxLayout.NormalsOffset) : 0;
+                localBounds = vtxGeo->GetLocalBoundingSphere();
+            }
+            else
+            {
+                // Fallback: read directly from MeshRenderer::Geometry.
+                GeometryGpuData* geo = m_GeometryStorage->GetUnchecked(mr.Geometry);
+                if (!geo || !geo->GetVertexBuffer())
+                    continue;
+
+                const auto& layout = geo->GetLayout();
+                if (layout.PositionsSize == 0)
+                    continue;
+
+                vertexCount = static_cast<uint32_t>(layout.PositionsSize / sizeof(glm::vec3));
+                if (vertexCount == 0)
+                    continue;
+
+                const uint64_t baseAddr = geo->GetVertexBuffer()->GetDeviceAddress();
+                posAddr = baseAddr + layout.PositionsOffset;
+                normAddr = (layout.NormalsSize > 0) ? (baseAddr + layout.NormalsOffset) : 0;
+                localBounds = geo->GetLocalBoundingSphere();
+            }
 
             glm::mat4 worldMatrix(1.0f);
             if (auto* wm = registry.try_get<ECS::Components::Transform::WorldMatrix>(entity))
                 worldMatrix = wm->Matrix;
 
             // Frustum cull: skip draw if the entity's bounding sphere is outside the camera frustum.
-            if (cullingEnabled && !FrustumCullSphere(worldMatrix, geo->GetLocalBoundingSphere(), frustum))
+            if (cullingEnabled && !FrustumCullSphere(worldMatrix, localBounds, frustum))
                 continue;
-
-            const uint64_t baseAddr = geo->GetVertexBuffer()->GetDeviceAddress();
-            const uint64_t posAddr = baseAddr + layout.PositionsOffset;
-            const uint64_t normAddr = (layout.NormalsSize > 0) ? (baseAddr + layout.NormalsOffset) : 0;
 
             const uint32_t vtxColor = GpuColor::PackColorF(
                 vis.VertexColor.r, vis.VertexColor.g,

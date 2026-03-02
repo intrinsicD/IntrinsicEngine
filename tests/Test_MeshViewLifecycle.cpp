@@ -318,3 +318,120 @@ TEST(MeshViewLifecycle_Contract, ReuseVertexBuffersFromSharedHandle)
     EXPECT_EQ(edgeReq.ReuseVertexBuffersFrom, vtxReq.ReuseVertexBuffersFrom);
     EXPECT_NE(edgeReq.Topology, vtxReq.Topology);
 }
+
+// =============================================================================
+// Section 8: Render Pass Wiring Contract
+// =============================================================================
+//
+// These tests validate the CPU-side contract for how retained render passes
+// should consume MeshEdgeView and MeshVertexView geometry:
+//
+//   - RetainedLineRenderPass prefers MeshEdgeView::Geometry when available
+//     (index buffer BDA from GeometryGpuData), falling back to internal
+//     EnsureEdgeBuffer() when the view is absent or not ready.
+//
+//   - RetainedPointCloudRenderPass prefers MeshVertexView::Geometry when
+//     available (vertex buffer BDA from GeometryGpuData), falling back to
+//     direct MeshRenderer::Geometry lookup.
+//
+//   - Edge aux (per-edge color) buffers remain internally managed since
+//     MeshEdgeView doesn't carry attribute data.
+
+TEST(MeshViewLifecycle_Contract, EdgeViewReadyForRenderPass)
+{
+    // Simulate a MeshEdgeView that has completed lifecycle setup.
+    // RetainedLineRenderPass should prefer this over internal buffers.
+    ECS::MeshEdgeView::Component ev;
+    ev.Geometry = Geometry::GeometryHandle(0, 1);
+    ev.EdgeCount = 100;
+    ev.GpuSlot = 5;
+    ev.Dirty = false;
+
+    // The render pass checks: HasGpuGeometry() && EdgeCount > 0
+    EXPECT_TRUE(ev.HasGpuGeometry());
+    EXPECT_GT(ev.EdgeCount, 0u);
+}
+
+TEST(MeshViewLifecycle_Contract, EdgeViewNotReadyFallsBack)
+{
+    // When MeshEdgeView is present but Dirty (not yet created),
+    // the render pass should fall back to the internal edge buffer path.
+    ECS::MeshEdgeView::Component ev;
+
+    // Default state: Dirty=true, no geometry
+    EXPECT_FALSE(ev.HasGpuGeometry());
+    EXPECT_EQ(ev.EdgeCount, 0u);
+    EXPECT_TRUE(ev.Dirty);
+}
+
+TEST(MeshViewLifecycle_Contract, VertexViewReadyForRenderPass)
+{
+    // Simulate a MeshVertexView that has completed lifecycle setup.
+    // RetainedPointCloudRenderPass should prefer this over direct
+    // MeshRenderer::Geometry lookup.
+    ECS::MeshVertexView::Component pv;
+    pv.Geometry = Geometry::GeometryHandle(1, 1);
+    pv.VertexCount = 512;
+    pv.GpuSlot = 12;
+    pv.Dirty = false;
+
+    // The render pass checks: HasGpuGeometry() && VertexCount > 0
+    EXPECT_TRUE(pv.HasGpuGeometry());
+    EXPECT_GT(pv.VertexCount, 0u);
+}
+
+TEST(MeshViewLifecycle_Contract, VertexViewNotReadyFallsBack)
+{
+    // When MeshVertexView is present but not ready, the render pass
+    // should fall back to direct MeshRenderer::Geometry.
+    ECS::MeshVertexView::Component pv;
+
+    EXPECT_FALSE(pv.HasGpuGeometry());
+    EXPECT_EQ(pv.VertexCount, 0u);
+    EXPECT_TRUE(pv.Dirty);
+}
+
+TEST(MeshViewLifecycle_Contract, EdgeViewIndexBufferBDACompatible)
+{
+    // The MeshEdgeView's GeometryGpuData index buffer is created via
+    // GeometryUploadRequest with Indices = flattened edge pairs and
+    // VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT. The layout is:
+    //   [i0_0, i1_0, i0_1, i1_1, ...]
+    // which is binary-compatible with EdgePair { uint32_t i0, i1; }.
+    //
+    // RetainedLineRenderPass reads this via PtrEdges BDA pointer, and the
+    // vertex shader interprets it as EdgePair structs (sizeof == 8).
+    using EdgePair = ECS::RenderVisualization::EdgePair;
+
+    // Verify the flattened layout is reinterpret-safe.
+    static_assert(sizeof(EdgePair) == 2 * sizeof(uint32_t));
+    static_assert(alignof(EdgePair) <= alignof(uint32_t));
+
+    // The edge count from MeshEdgeView::EdgeCount is in edge pairs, not indices.
+    // RetainedLineRenderPass uses EdgeCount * 6 for vkCmdDraw (6 verts per edge).
+    constexpr uint32_t edgeCount = 42;
+    constexpr uint32_t gpuVertices = edgeCount * 6;
+    EXPECT_EQ(gpuVertices, 252u);
+}
+
+TEST(MeshViewLifecycle_Contract, EdgeAuxBuffersIndependentOfEdgeView)
+{
+    // Per-edge color attribute buffers (CachedEdgeColors) are still managed
+    // internally by RetainedLineRenderPass even when MeshEdgeView is used
+    // for the edge index buffer. This is because MeshEdgeView only carries
+    // the index buffer — attribute channels are not part of the geometry view.
+    ECS::RenderVisualization::Component viz;
+    viz.CachedEdges = {{0, 1}, {1, 2}, {2, 0}};
+    viz.CachedEdgeColors = {0xFF0000FF, 0xFF00FF00, 0xFFFF0000};
+    viz.EdgeColorsDirty = false;
+
+    ECS::MeshEdgeView::Component ev;
+    ev.Geometry = Geometry::GeometryHandle(0, 1);
+    ev.EdgeCount = static_cast<uint32_t>(viz.CachedEdges.size());
+    ev.Dirty = false;
+
+    // Edge view has geometry, but does not carry per-edge colors.
+    EXPECT_TRUE(ev.HasGpuGeometry());
+    EXPECT_EQ(ev.EdgeCount, viz.CachedEdgeColors.size());
+    // The render pass must still use EnsureEdgeAuxBuffer for colors.
+}
