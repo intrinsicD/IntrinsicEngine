@@ -10,7 +10,9 @@ Recent completions (2026-03-02, details in git history): standalone retained-mod
 
 Recent completions (2026-03-02, details in git history): per-edge and per-face attribute rendering — `PtrEdgeAux` BDA channel in `RetainedLinePushConstants` for per-edge colors from PropertySets, `PtrFaceAttr` BDA channel in `MeshPushConstants` for per-face colors via `gl_PrimitiveID`, persistent attribute buffers in `RetainedLineRenderPass` and `ForwardPass`, `CachedEdgeColors`/`CachedFaceColors` on ECS components, `GraphGeometrySyncSystem` edge color extraction from `"e:color"` PropertySet. Contract tests in `Test_BDASharedBufferContract.cpp`.
 
-Near-term priority now shifts to geometry view lifecycle automation (TODO §1.2) and PropertySet dirty-domain sync (TODO §1.3).
+Recent completions (2026-03-02, details in git history): `MeshViewLifecycleSystem` — `MeshEdgeView::Component` and `MeshVertexView::Component` for mesh-derived GPU geometry views, lifecycle system creates edge index buffers and vertex point views via `ReuseVertexBuffersFrom(meshHandle)`, GPUScene slot allocation, EnTT `on_destroy` hooks for automatic cleanup, FeatureRegistry-gated registration in `Engine::Run()`, contract tests in `Test_MeshViewLifecycle.cpp`.
+
+Near-term priority now shifts to wiring retained render passes to use `MeshEdgeView`/`MeshVertexView` geometry handles (TODO §1.2), remaining lifecycle system enhancements (GraphGeometrySync, PointCloudGeometrySync), and PropertySet dirty-domain sync (TODO §1.3).
 
 ## 2. Feature Roadmap
 

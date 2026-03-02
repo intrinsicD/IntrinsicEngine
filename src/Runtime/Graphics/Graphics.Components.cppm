@@ -292,3 +292,74 @@ export namespace ECS::GeometryViewRenderer
         bool ShowVertices = false;
     };
 }
+
+// -------------------------------------------------------------------------
+// MeshEdgeView — Edge view derived from a mesh via ReuseVertexBuffersFrom.
+// -------------------------------------------------------------------------
+//
+// Attached to entities with MeshRenderer to request wireframe edge rendering
+// as a first-class GPU geometry view. MeshViewLifecycleSystem creates the
+// edge index buffer (sharing the mesh's vertex buffer via BDA) and manages
+// the GPUScene slot lifecycle.
+//
+// Edge pairs are flattened from RenderVisualization::CachedEdges into a
+// contiguous uint32_t index buffer with topology Lines. The index buffer
+// is BDA-accessible, allowing RetainedLineRenderPass to read edge pairs
+// directly from the GeometryGpuData without maintaining internal buffers.
+
+export namespace ECS::MeshEdgeView
+{
+    struct Component
+    {
+        // Edge view geometry handle — index buffer of edge pairs sharing mesh
+        // vertex buffer via ReuseVertexBuffersFrom. Topology = Lines.
+        Geometry::GeometryHandle Geometry{};
+
+        // GPUScene slot for frustum culling of this edge view.
+        static constexpr uint32_t kInvalidSlot = ~0u;
+        uint32_t GpuSlot = kInvalidSlot;
+
+        // Number of edges in the uploaded buffer.
+        uint32_t EdgeCount = 0;
+
+        // true when the edge buffer needs (re-)creation.
+        // Set on first attach, or when CachedEdges change.
+        bool Dirty = true;
+
+        // ---- Queries ----
+        [[nodiscard]] bool HasGpuGeometry() const noexcept { return Geometry.IsValid(); }
+    };
+}
+
+// -------------------------------------------------------------------------
+// MeshVertexView — Vertex point view derived from a mesh via
+//                  ReuseVertexBuffersFrom.
+// -------------------------------------------------------------------------
+//
+// Attached to entities with MeshRenderer to request vertex point rendering
+// as a first-class GPU geometry view. MeshViewLifecycleSystem creates the
+// view (sharing the mesh's vertex buffer via BDA, topology Points) and
+// manages the GPUScene slot lifecycle.
+
+export namespace ECS::MeshVertexView
+{
+    struct Component
+    {
+        // Vertex view geometry handle — sharing mesh vertex buffer via
+        // ReuseVertexBuffersFrom. Topology = Points, no index buffer.
+        Geometry::GeometryHandle Geometry{};
+
+        // GPUScene slot for frustum culling of this vertex view.
+        static constexpr uint32_t kInvalidSlot = ~0u;
+        uint32_t GpuSlot = kInvalidSlot;
+
+        // Number of vertices in the view (derived from source mesh layout).
+        uint32_t VertexCount = 0;
+
+        // true when the vertex view needs (re-)creation.
+        bool Dirty = true;
+
+        // ---- Queries ----
+        [[nodiscard]] bool HasGpuGeometry() const noexcept { return Geometry.IsValid(); }
+    };
+}
