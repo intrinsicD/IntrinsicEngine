@@ -1,6 +1,7 @@
 module;
 
 #include <algorithm>
+#include <unordered_map>
 #include <vector>
 #include <array>
 #include <entt/entity/registry.hpp>
@@ -453,6 +454,32 @@ namespace Graphics::Passes
                                             });
         }
 
+        // -----------------------------------------------------------------
+        // Resolve per-face attribute buffers from RenderVisualization components.
+        // Maps geometry handle index → face attribute BDA address.
+        // First entity with CachedFaceColors for a geometry wins.
+        // -----------------------------------------------------------------
+        std::unordered_map<uint32_t, uint64_t> faceAttrByGeoIndex;
+        {
+            auto visView = ctx.Scene.GetRegistry().view<ECS::MeshRenderer::Component,
+                                                        ECS::RenderVisualization::Component>();
+            for (auto [entity, mr, vis] : visView.each())
+            {
+                if (!mr.Geometry.IsValid() || vis.CachedFaceColors.empty())
+                    continue;
+
+                // Only process the first entity per geometry (all instances share face colors).
+                if (faceAttrByGeoIndex.contains(mr.Geometry.Index))
+                    continue;
+
+                const uint32_t faceCount = static_cast<uint32_t>(vis.CachedFaceColors.size());
+                const uint64_t addr = EnsureFaceAttrBuffer(
+                    mr.Geometry.Index, vis.CachedFaceColors.data(), faceCount);
+                if (addr != 0)
+                    faceAttrByGeoIndex[mr.Geometry.Index] = addr;
+            }
+        }
+
         // Build draw batches: one per geometry, slicing packed buffers.
         // NOTE: VisibilityBuffer is bound at offset 0 (alignment), and we pass VisibilityBase (element index)
         // via push constants so the vertex shader indexes the packed table correctly.
@@ -488,6 +515,10 @@ namespace Graphics::Passes
                 else
                     b.PointSizePx = 4.0f;
             }
+
+            // Per-face attribute buffer (0 = standard shading).
+            auto faceIt = faceAttrByGeoIndex.find(g.Handle.Index);
+            b.PtrFaceAttr = (faceIt != faceAttrByGeoIndex.end()) ? faceIt->second : 0;
 
             // Packed buffers.
             b.InstanceBuffer = &ctx.GpuScene->GetSceneBuffer();
@@ -670,7 +701,7 @@ namespace Graphics::Passes
                                                 .PtrAux = b.PtrAux,
                                                 .VisibilityBase = b.VisibilityBase,
                                                 .PointSizePx = (b.Topology == VK_PRIMITIVE_TOPOLOGY_POINT_LIST) ? b.PointSizePx : 1.0f,
-                                                ._pad = {}
+                                                .PtrFaceAttr = b.PtrFaceAttr
                                             };
                                             vkCmdPushConstants(cmd, desired->GetLayout(),
                                                                VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
@@ -934,5 +965,52 @@ namespace Graphics::Passes
         // CPU producer is implemented directly in BuildDrawStream().
         // This function is kept only as an ABI-stable stub while we transition away from the old design.
         // Intentionally empty.
+    }
+
+    // =========================================================================
+    // EnsureFaceAttrBuffer
+    // =========================================================================
+    // Creates or updates a persistent BDA-addressable per-face attribute buffer
+    // for a geometry. Data is an array of packed ABGR uint32_t, one per face.
+    // Returns the buffer device address, or 0 on failure.
+
+    uint64_t ForwardPass::EnsureFaceAttrBuffer(
+        uint32_t geoIndex,
+        const uint32_t* colorData,
+        uint32_t faceCount)
+    {
+        auto it = m_FaceAttrBuffers.find(geoIndex);
+
+        // Buffer exists and face count matches — update data in-place.
+        if (it != m_FaceAttrBuffers.end() && it->second.FaceCount == faceCount && it->second.Buffer)
+        {
+            it->second.Buffer->Write(colorData, static_cast<size_t>(faceCount) * sizeof(uint32_t));
+            return it->second.Buffer->GetDeviceAddress();
+        }
+
+        // Need to create or recreate (count changed).
+        if (it != m_FaceAttrBuffers.end() && it->second.Buffer)
+        {
+            m_Device->SafeDestroy([old = std::move(it->second.Buffer)]() {});
+            it->second.FaceCount = 0;
+        }
+
+        const VkDeviceSize size = static_cast<VkDeviceSize>(faceCount) * sizeof(uint32_t);
+        auto buf = std::make_unique<RHI::VulkanBuffer>(
+            *m_Device, size,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+            VMA_MEMORY_USAGE_CPU_TO_GPU);
+
+        if (!buf->GetMappedData())
+        {
+            Core::Log::Error("ForwardPass: Failed to allocate face attribute buffer ({} bytes)", size);
+            return 0;
+        }
+
+        buf->Write(colorData, static_cast<size_t>(size));
+        const uint64_t addr = buf->GetDeviceAddress();
+
+        m_FaceAttrBuffers[geoIndex] = { std::move(buf), faceCount };
+        return addr;
     }
 }

@@ -46,8 +46,9 @@ namespace Graphics::Passes
         float     ViewportWidth;   //  4 bytes, offset 84
         float     ViewportHeight;  //  4 bytes, offset 88
         uint32_t  Color;           //  4 bytes, offset 92
+        uint64_t  PtrEdgeAux;      //  8 bytes, offset 96 — BDA to per-edge packed ABGR colors (0 = uniform Color)
     };
-    static_assert(sizeof(RetainedLinePushConstants) == 96);
+    static_assert(sizeof(RetainedLinePushConstants) == 104);
 
     // Use EdgePair from the component — identical layout, eliminates type mismatch.
     using EdgePair = ECS::RenderVisualization::EdgePair;
@@ -102,6 +103,53 @@ namespace Graphics::Passes
     }
 
     // =========================================================================
+    // EnsureEdgeAuxBuffer
+    // =========================================================================
+    // Creates or updates a persistent BDA-addressable per-edge attribute buffer.
+    // Data: array of packed ABGR uint32_t, one per edge.
+    // Returns the buffer device address, or 0 on failure.
+
+    uint64_t RetainedLineRenderPass::EnsureEdgeAuxBuffer(
+        uint32_t entityKey,
+        const uint32_t* colorData,
+        uint32_t edgeCount)
+    {
+        auto it = m_EdgeAuxBuffers.find(entityKey);
+
+        // Buffer exists and edge count matches — update data in-place.
+        if (it != m_EdgeAuxBuffers.end() && it->second.EdgeCount == edgeCount && it->second.Buffer)
+        {
+            it->second.Buffer->Write(colorData, static_cast<size_t>(edgeCount) * sizeof(uint32_t));
+            return it->second.Buffer->GetDeviceAddress();
+        }
+
+        // Need to create or recreate (count changed).
+        if (it != m_EdgeAuxBuffers.end() && it->second.Buffer)
+        {
+            m_Device->SafeDestroy([old = std::move(it->second.Buffer)]() {});
+            it->second.EdgeCount = 0;
+        }
+
+        const VkDeviceSize size = static_cast<VkDeviceSize>(edgeCount) * sizeof(uint32_t);
+        auto buf = std::make_unique<RHI::VulkanBuffer>(
+            *m_Device, size,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+            VMA_MEMORY_USAGE_CPU_TO_GPU);
+
+        if (!buf->GetMappedData())
+        {
+            Core::Log::Error("RetainedLineRenderPass: Failed to allocate edge aux buffer ({} bytes)", size);
+            return 0;
+        }
+
+        buf->Write(colorData, static_cast<size_t>(size));
+        const uint64_t addr = buf->GetDeviceAddress();
+
+        m_EdgeAuxBuffers[entityKey] = { std::move(buf), edgeCount };
+        return addr;
+    }
+
+    // =========================================================================
     // Initialize
     // =========================================================================
 
@@ -128,6 +176,14 @@ namespace Graphics::Passes
                 m_Device->SafeDestroy([old = std::move(entry.Buffer)]() {});
         }
         m_EdgeBuffers.clear();
+
+        // Deferred-destroy all persistent edge attribute buffers.
+        for (auto& [key, entry] : m_EdgeAuxBuffers)
+        {
+            if (entry.Buffer)
+                m_Device->SafeDestroy([old = std::move(entry.Buffer)]() {});
+        }
+        m_EdgeAuxBuffers.clear();
 
         m_Pipeline.reset();
     }
@@ -226,6 +282,7 @@ namespace Graphics::Passes
             uint32_t EdgeCount;
             uint32_t Color;
             float    LineWidth;
+            uint64_t PtrEdgeAux;   // 0 = use uniform Color; non-zero = per-edge BDA colors
         };
 
         std::vector<DrawInfo> draws;
@@ -278,6 +335,14 @@ namespace Graphics::Passes
                 vis.WireframeColor.r, vis.WireframeColor.g,
                 vis.WireframeColor.b, vis.WireframeColor.a);
 
+            // Per-edge color attribute buffer (optional — when CachedEdgeColors is populated).
+            uint64_t edgeAuxAddr = 0;
+            if (!vis.CachedEdgeColors.empty() && vis.CachedEdgeColors.size() == edgeCount)
+            {
+                edgeAuxAddr = EnsureEdgeAuxBuffer(
+                    entityKey, vis.CachedEdgeColors.data(), edgeCount);
+            }
+
             DrawInfo di{};
             di.Model = worldMatrix;
             di.PtrPositions = posAddr;
@@ -285,6 +350,7 @@ namespace Graphics::Passes
             di.EdgeCount = edgeCount;
             di.Color = wireColor;
             di.LineWidth = vis.WireframeWidth;
+            di.PtrEdgeAux = edgeAuxAddr;
             draws.push_back(di);
 
             // Update wireframe edge count on the GeometryViewRenderer component.
@@ -337,6 +403,14 @@ namespace Graphics::Passes
                 graphData.DefaultEdgeColor.r, graphData.DefaultEdgeColor.g,
                 graphData.DefaultEdgeColor.b, graphData.DefaultEdgeColor.a);
 
+            // Per-edge color attribute buffer (optional — when CachedEdgeColors is populated).
+            uint64_t edgeAuxAddr = 0;
+            if (!graphData.CachedEdgeColors.empty() && graphData.CachedEdgeColors.size() == edgeCount)
+            {
+                edgeAuxAddr = EnsureEdgeAuxBuffer(
+                    entityKey, graphData.CachedEdgeColors.data(), edgeCount);
+            }
+
             DrawInfo di{};
             di.Model = worldMatrix;
             di.PtrPositions = posAddr;
@@ -344,11 +418,12 @@ namespace Graphics::Passes
             di.EdgeCount = edgeCount;
             di.Color = edgeColor;
             di.LineWidth = graphData.EdgeWidth;
+            di.PtrEdgeAux = edgeAuxAddr;
             draws.push_back(di);
         }
 
         // -----------------------------------------------------------------
-        // Cleanup orphaned edge buffers (entities destroyed or wireframe disabled).
+        // Cleanup orphaned edge buffers and edge aux buffers.
         // -----------------------------------------------------------------
         if (!m_EdgeBuffers.empty())
         {
@@ -362,6 +437,21 @@ namespace Graphics::Passes
                     if (it->second.Buffer)
                         m_Device->SafeDestroy([old = std::move(it->second.Buffer)]() {});
                     it = m_EdgeBuffers.erase(it);
+                }
+                else
+                {
+                    ++it;
+                }
+            }
+
+            // Cleanup orphaned edge aux buffers (same active key set).
+            for (auto it = m_EdgeAuxBuffers.begin(); it != m_EdgeAuxBuffers.end(); )
+            {
+                if (!std::binary_search(activeKeys.begin(), activeKeys.end(), it->first))
+                {
+                    if (it->second.Buffer)
+                        m_Device->SafeDestroy([old = std::move(it->second.Buffer)]() {});
+                    it = m_EdgeAuxBuffers.erase(it);
                 }
                 else
                 {
@@ -422,6 +512,7 @@ namespace Graphics::Passes
                     push.ViewportWidth = static_cast<float>(resolution.width);
                     push.ViewportHeight = static_cast<float>(resolution.height);
                     push.Color = di.Color;
+                    push.PtrEdgeAux = di.PtrEdgeAux;
 
                     vkCmdPushConstants(cmd, m_Pipeline->GetLayout(),
                                        VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,

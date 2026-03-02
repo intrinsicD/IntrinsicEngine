@@ -2,6 +2,7 @@ module;
 
 #include <algorithm>
 #include <memory>
+#include <unordered_map>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -162,6 +163,9 @@ export namespace Graphics::Passes
             uint64_t PtrNormals = 0;
             uint64_t PtrAux = 0;
 
+            // Per-face attribute buffer device address (0 = standard shading).
+            uint64_t PtrFaceAttr = 0;
+
             // Packed-slice offsets (bytes) into Indirect buffers.
             VkDeviceSize IndirectOffsetBytes = 0;
             VkDeviceSize CountOffsetBytes = 0;
@@ -197,5 +201,24 @@ export namespace Graphics::Passes
         void AddStage1And2Passes(RenderPassContext& ctx, RGResourceHandle backbuffer, RGResourceHandle depth);
         void AddStage3Passes(RenderPassContext& ctx, RGResourceHandle backbuffer, RGResourceHandle depth,
                              Geometry::GeometryHandle singleGeometry);
+
+        // -----------------------------------------------------------------
+        // Per-face attribute buffers — persistent BDA-addressable GPU buffers
+        // keyed by GeometryHandle::Index. Created lazily when an entity with
+        // CachedFaceColors is encountered during draw stream build.
+        // -----------------------------------------------------------------
+        struct FaceAttrEntry
+        {
+            std::unique_ptr<RHI::VulkanBuffer> Buffer;
+            uint32_t FaceCount = 0;
+        };
+        std::unordered_map<uint32_t, FaceAttrEntry> m_FaceAttrBuffers;
+
+        // Create or update a persistent per-face attribute buffer for a geometry.
+        // Data is an array of packed ABGR uint32_t, one per face.
+        // Returns the BDA device address, or 0 on failure.
+        uint64_t EnsureFaceAttrBuffer(uint32_t geoIndex,
+                                      const uint32_t* colorData,
+                                      uint32_t faceCount);
     };
 }

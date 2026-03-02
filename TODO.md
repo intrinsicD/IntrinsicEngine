@@ -49,21 +49,7 @@ Zero vertex duplication. Each topology needs separate shader pipelines because t
 
 **Status:** All retained-mode rendering items for §1.1 are complete (including standalone point cloud rendering).
 
-### 1.2 Per-Edge and Per-Face Attribute Rendering
-
-The rendering plan requires per-element attribute data from PropertySets flowing to GPU BDA channels, not just uniform colors via push constants.
-
-**Per-edge attributes (LinePass):**
-- [ ] Add `PtrEdgeAux` BDA channel to `LinePushConstants` for per-edge colors/widths from edge PropertySets.
-- [ ] Shader support: `line.vert`/`line.frag` read per-edge color/width from `PtrEdgeAux` when `Flags` indicate per-edge mode.
-- [ ] Edge attribute buffer upload in `LinePass` from `Mesh::EdgeProperties()` or `Graph::GetOrAddEdgeProperty()` spans.
-
-**Per-face attributes (SurfacePass):**
-- [ ] Add per-face attribute buffer support in `SurfacePass` for flat shading, curvature visualization, segmentation labels.
-- [ ] Shader support: `surface.frag` reads per-face color via `gl_PrimitiveID` indexing into face attribute BDA channel.
-- [ ] Face attribute buffer upload from `Mesh::FaceProperties()` spans.
-
-### 1.3 Geometry View Lifecycle Systems
+### 1.2 Geometry View Lifecycle Systems
 
 Automated creation/destruction of GPU geometry views when rendering components are attached/detached. Applies equally to all three geometry types.
 
@@ -72,7 +58,7 @@ Automated creation/destruction of GPU geometry views when rendering components a
 - [ ] `PointCloudGeometrySyncSystem`: on `ECS::Point::Component` attach with `PointCloud::Cloud` source → upload `Cloud::Positions()`/`Normals()` spans to device-local `GeometryGpuData`, assign handle.
 - [ ] All lifecycle systems allocate `GPUScene` slots, sync transforms, participate in frustum culling — same contract as `MeshRendererLifecycle`.
 
-### 1.4 PropertySet Dirty-Domain Sync System
+### 1.3 PropertySet Dirty-Domain Sync System
 
 Per-frame CPU→GPU synchronization driven by PropertySet change detection, with independent dirty tracking per data domain (vertex/edge/face).
 

@@ -8,7 +8,9 @@ Recent completions (2026-02-26, details in git history): release-flag consolidat
 
 Recent completions (2026-03-02, details in git history): standalone retained-mode point cloud rendering — `PointCloudRendererLifecycle` system, `PointCloudRenderer::Component` with `GeometryHandle`, file-loaded and code-originated upload paths, `RetainedPointCloudRenderPass` iteration, `SceneManager` topology routing, `GPUSceneSync` transform sync, entity destroy hooks.
 
-Near-term priority now shifts to per-edge/face attribute rendering (TODO §1.2) and geometry view lifecycle automation (TODO §1.3).
+Recent completions (2026-03-02, details in git history): per-edge and per-face attribute rendering — `PtrEdgeAux` BDA channel in `RetainedLinePushConstants` for per-edge colors from PropertySets, `PtrFaceAttr` BDA channel in `MeshPushConstants` for per-face colors via `gl_PrimitiveID`, persistent attribute buffers in `RetainedLineRenderPass` and `ForwardPass`, `CachedEdgeColors`/`CachedFaceColors` on ECS components, `GraphGeometrySyncSystem` edge color extraction from `"e:color"` PropertySet. Contract tests in `Test_BDASharedBufferContract.cpp`.
+
+Near-term priority now shifts to geometry view lifecycle automation (TODO §1.2) and PropertySet dirty-domain sync (TODO §1.3).
 
 ## 2. Feature Roadmap
 

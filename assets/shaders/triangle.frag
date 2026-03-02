@@ -11,6 +11,20 @@ layout(location = 2) flat in uint fragTexID;
 
 layout(location = 0) out vec4 outColor;
 
+// Per-face color buffer (optional BDA — when ptrFaceAttr != 0).
+layout(buffer_reference, scalar) readonly buffer FaceAttrBuf { uint color[]; };
+
+// Push constant layout must match triangle.vert exactly.
+layout(push_constant) uniform PushConsts {
+    mat4 _unusedModel;
+    uint64_t ptrPos;
+    uint64_t ptrNorm;
+    uint64_t ptrAux;
+    uint VisibilityBase;
+    float PointSizePx;
+    uint64_t ptrFaceAttr;
+} push;
+
 // Binding 0 = Camera (UBO), Binding 1 = Bindless Array
 // Note: We don't declare Binding 0 here if we don't use it in Frag,
 // but usually it's good practice to keep set layouts consistent.
@@ -26,9 +40,21 @@ void main() {
     float diff = max(dot(norm, lightDir), 0.0);
     vec3 diffuse = diff * lightColor;
 
-    vec4 textureColor = texture(globalTextures[nonuniformEXT(fragTexID)], fragTexCoord);
+    // Per-face color: when ptrFaceAttr is valid, read per-face packed ABGR color
+    // indexed by gl_PrimitiveID. The face color replaces the texture color,
+    // but lighting is still applied on top.
+    vec4 baseColor;
+    if (push.ptrFaceAttr != 0ul)
+    {
+        FaceAttrBuf fBuf = FaceAttrBuf(push.ptrFaceAttr);
+        baseColor = unpackUnorm4x8(fBuf.color[gl_PrimitiveID]);
+    }
+    else
+    {
+        baseColor = texture(globalTextures[nonuniformEXT(fragTexID)], fragTexCoord);
+    }
 
-    vec3 result = (ambient + diffuse) * textureColor.rgb;
+    vec3 result = (ambient + diffuse) * baseColor.rgb;
 
-    outColor = vec4(result, 1.0);
+    outColor = vec4(result, baseColor.a);
 }

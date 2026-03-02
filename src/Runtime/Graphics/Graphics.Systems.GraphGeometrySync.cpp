@@ -3,6 +3,7 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -13,6 +14,7 @@ module Graphics:Systems.GraphGeometrySync.Impl;
 import :Systems.GraphGeometrySync;
 import :Components;
 import :Geometry;
+import :GpuColor;
 
 import Core.Hash;
 import Core.Logging;
@@ -102,6 +104,17 @@ namespace Graphics::Systems::GraphGeometrySync
             std::vector<ECS::RenderVisualization::EdgePair> edgePairs;
             edgePairs.reserve(eSize);
 
+            // Check for per-edge color property ("e:color" as glm::vec4).
+            const bool hasEdgeColors = graph.EdgeProperties().Exists("e:color");
+            std::optional<Geometry::EdgeProperty<glm::vec4>> edgeColorProp;
+            if (hasEdgeColors)
+                edgeColorProp = Geometry::EdgeProperty<glm::vec4>(
+                    graph.EdgeProperties().Get<glm::vec4>("e:color").value());
+
+            std::vector<uint32_t> edgeColors;
+            if (hasEdgeColors)
+                edgeColors.reserve(eSize);
+
             for (std::size_t i = 0; i < eSize; ++i)
             {
                 const Geometry::EdgeHandle e{static_cast<Geometry::PropertyIndex>(i)};
@@ -116,6 +129,13 @@ namespace Graphics::Systems::GraphGeometrySync
                     continue; // Edge references a deleted vertex — skip.
 
                 edgePairs.push_back({ci0, ci1});
+
+                // Extract per-edge color (pack to ABGR uint32).
+                if (hasEdgeColors && edgeColorProp)
+                {
+                    const glm::vec4& c = (*edgeColorProp)[e];
+                    edgeColors.push_back(Graphics::GpuColor::PackColorF(c.r, c.g, c.b, c.a));
+                }
             }
 
             // Release previous geometry before allocating new.
@@ -150,6 +170,7 @@ namespace Graphics::Systems::GraphGeometrySync
 
             graphData.GpuGeometry = geometryStorage.Add(std::move(newGpuData));
             graphData.CachedEdgePairs = std::move(edgePairs);
+            graphData.CachedEdgeColors = std::move(edgeColors);
             graphData.GpuVertexCount = compactIdx;
             graphData.GpuDirty = false;
         }
