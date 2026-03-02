@@ -6,7 +6,9 @@ This document contains medium/long-horizon feature planning and phase prioritiza
 
 Recent completions (2026-02-26, details in git history): release-flag consolidation, offline dependency mode (`-DINTRINSIC_OFFLINE_DEPS=ON`), DAGScheduler flat-hash resource lookup + sorted-set edge dedupe with pathological fan-out validation, scheduler wait-queue scratch reuse, FrameGraph ready-queue execution (dependency-readiness dispatch), baseline Boolean CSG (disjoint/full-containment), and core task park/unpark semantics with SLO gates.
 
-Near-term priority now shifts from scheduler substrate work to rendering infrastructure repairs (point cloud, line, wireframe — see §2.1) and remaining editor roadmap items.
+Recent completions (2026-03-02, details in git history): standalone retained-mode point cloud rendering — `PointCloudRendererLifecycle` system, `PointCloudRenderer::Component` with `GeometryHandle`, file-loaded and code-originated upload paths, `RetainedPointCloudRenderPass` iteration, `SceneManager` topology routing, `GPUSceneSync` transform sync, entity destroy hooks.
+
+Near-term priority now shifts to per-edge/face attribute rendering (TODO §1.2) and geometry view lifecycle automation (TODO §1.3).
 
 ## 2. Feature Roadmap
 
@@ -29,21 +31,15 @@ Near-term priority now shifts from scheduler substrate work to rendering infrast
 - A `PointCloudRenderFeature` registered via the render pipeline system, with a config struct selecting the variant and parameters (splat size, LOD budget, etc.).
 - Large point clouds need streaming — integrate with `TransferManager` for async chunk uploads.
 
-**Status:** The GPU rendering pipeline is **BROKEN** and needs a full re-implementation as a **first-class retained-mode renderable** — the same architectural tier as triangle meshes, not a per-frame transient overlay.
+**Status:** Standalone retained-mode point cloud rendering is **complete** (2026-03-02). Point clouds are now first-class retained-mode renderables, same architectural tier as triangle meshes.
 
-**What still works (CPU-side only):**
+**What works:**
 - **`Geometry.PointCloud` module** (`Geometry.PointCloud.cppm/.cpp`): First-class `Cloud` data structure with positions, normals, colors, radii. Operations: `ComputeBoundingBox`, `ComputeStatistics` (with KNN-based spacing), `VoxelDownsample` (O(n) hash-based), `EstimateRadii` (Octree-accelerated kNN density estimation), `RandomSubsample` (deterministic Fisher-Yates).
+- **Standalone retained-mode rendering:** `PointCloudRenderer::Component` holds `GeometryHandle` → `GeometryGpuData` with `PrimitiveTopology::Points`. Two creation paths: (a) file-loaded via `ModelLoader` (pre-uploaded, handle assigned directly), (b) code-originated (CPU data uploaded once by `PointCloudRendererLifecycle`, then freed). `RetainedPointCloudRenderPass` iterates standalone point cloud entities alongside mesh vertex vis and graph nodes — zero per-frame position upload. Billboard expansion, FlatDisc/Surfel/EWA splatting, CPU frustum culling, `GPUScene` slot allocation, transform sync, entity destroy hooks.
+- **BDA-based shared-buffer contract:** For mesh-derived vertex visualization, positions read via BDA from the mesh's existing buffer. For standalone point clouds, device-local buffer with `SHADER_DEVICE_ADDRESS_BIT`.
 
-**Re-implementation plan (retained-mode, BDA vertex pulling, shared-buffer-first):**
-- `PointCloudRenderer::Component` holds a `GeometryHandle` pointing to `GeometryGpuData` with `PrimitiveTopology::Points`.
-- **BDA-based shared-buffer contract:** For mesh-derived vertex visualization, `ReuseVertexBuffersFrom = meshHandle` — zero additional vertex upload, shares the same `std::shared_ptr<VulkanBuffer>` and device address. The point cloud vertex shader reads positions from the mesh's existing buffer via `GL_EXT_buffer_reference` (BDA pointer in push constants), exactly as `ForwardPass` already reads mesh vertex data. For standalone point clouds (`.xyz`, `.pcd`, `.ply`), upload positions/normals once via `GeometryUploadRequest` → `GeometryGpuData::CreateAsync()` → device-local with `VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT`. No per-frame re-upload.
-- **Separate VkPipeline:** Point cloud rendering needs its own pipeline with a billboard-expansion vertex shader (6 verts/point). `VK_PRIMITIVE_TOPOLOGY_POINT_LIST` alone gives 1px dots — the expansion shader is required for visible, properly-sized points.
-- Lifecycle system allocates `GPUScene` slots, syncs transforms, participates in frustum culling — same path as `MeshRendererLifecycle`.
-- GPU point layout: 32 bytes `{vec3 pos, float size, vec3 normal, uint packedColor}`.
-- Vertex-shader billboard expansion (6 verts/point, no geometry shader). Positions read via BDA from shared buffer.
-- Rendering modes: flat disc (screen-aligned billboard), surfel (normal-oriented disc), EWA splatting (Zwicker et al. 2001).
-- Pipeline registration in `DefaultPipeline`, gated by `FeatureRegistry`.
-- Future work: Gaussian Splatting (3DGS) compute rasterizer, Potree-style octree LOD streaming, depth peeling for OIT.
+**Remaining future work:**
+- Gaussian Splatting (3DGS) compute rasterizer, Potree-style octree LOD streaming, depth peeling for OIT.
 
 ---
 

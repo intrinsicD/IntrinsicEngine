@@ -26,11 +26,11 @@ This section tracks where runtime code currently stands relative to this plan/sp
 ### Gap implications
 
 1. The current renderer still uses a mixed collector architecture with parallel retained/transient passes, so the plan's "single pass per primitive" invariant is not yet enforced.
-2. ~~Graph render components own CPU arrays~~ **Resolved for graphs** — `ECS::Graph::Data` holds `shared_ptr<Graph>`, reads from PropertySets. Point cloud render component (`PointCloudRenderer::Component`) still holds `std::vector` copies, duplicating authority away from PropertySets.
+2. ~~Graph render components own CPU arrays~~ **Resolved for graphs** — `ECS::Graph::Data` holds `shared_ptr<Graph>`, reads from PropertySets. ~~Point cloud render component still holds `std::vector` copies~~ **Resolved** — `PointCloudRenderer::Component` now holds `GeometryHandle` for device-local GPU data; CPU vectors are freed after initial upload by `PointCloudRendererLifecycle`.
 3. Wireframe currently depends on cached edge extraction in visualization components rather than direct PropertySet-to-SSBO sync.
 4. No geometry view lifecycle systems exist — no automated creation of edge/vertex view `GeometryHandle` instances when rendering components are attached.
 5. Per-edge and per-face attribute rendering is not yet supported — only uniform colors via push constants.
-6. Point clouds and graphs lack device-local upload paths, forcing per-frame transient CPU submission.
+6. ~~Point clouds and graphs lack device-local upload paths~~ **Resolved** — standalone point clouds use staged device-local upload via `PointCloudRendererLifecycle`; graphs use `GraphGeometrySyncSystem` with Direct mode.
 
 ### Execution note
 

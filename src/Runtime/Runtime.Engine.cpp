@@ -121,6 +121,8 @@ namespace Runtime
             config.FrameArenaSize);
 
         // 7. Connect EnTT on_destroy hook for immediate GPU slot reclaim (via SceneManager).
+        //    Also provide the geometry pool so SpawnModel can inspect topology.
+        m_SceneManager->SetGeometryStorage(&m_RenderOrchestrator->GetGeometryStorage());
         if (m_RenderOrchestrator->GetGPUScenePtr())
         {
             m_SceneManager->ConnectGpuHooks(m_RenderOrchestrator->GetGPUScene());
@@ -313,9 +315,10 @@ namespace Runtime
         reg("ImGuiPass",             Cat::RenderFeature, "ImGui UI overlay");
 
         // --- ECS Systems ---
-        reg("TransformUpdate",        Cat::System, "Propagates local transforms to world matrices");
-        reg("MeshRendererLifecycle",   Cat::System, "Allocates/deallocates GPU slots for mesh renderers");
-        reg("GPUSceneSync",           Cat::System, "Synchronizes CPU entity data to GPU scene buffers");
+        reg("TransformUpdate",                Cat::System, "Propagates local transforms to world matrices");
+        reg("MeshRendererLifecycle",           Cat::System, "Allocates/deallocates GPU slots for mesh renderers");
+        reg("PointCloudRendererLifecycle",     Cat::System, "Uploads point clouds to GPU and allocates GPUScene slots");
+        reg("GPUSceneSync",                   Cat::System, "Synchronizes CPU entity data to GPU scene buffers");
 
         Core::Log::Info("FeatureRegistry: Registered {} core features", m_FeatureRegistry.Count());
     }
@@ -472,6 +475,17 @@ namespace Runtime
                             frameGraph, registry, *gpuScene, GetAssetManager(),
                             matSys, m_RenderOrchestrator->GetGeometryStorage(),
                             m_GraphicsBackend->GetDefaultTextureIndex());
+                    }
+
+                    // Point cloud lifecycle: uploads CPU point data to GPU and
+                    // allocates GPUScene slots for standalone point cloud entities.
+                    if (m_FeatureRegistry.IsEnabled("PointCloudRendererLifecycle"_id))
+                    {
+                        Graphics::Systems::PointCloudRendererLifecycle::RegisterSystem(
+                            frameGraph, registry, *gpuScene,
+                            m_RenderOrchestrator->GetGeometryStorage(),
+                            GetDeviceShared(),
+                            m_GraphicsBackend->GetTransferManager());
                     }
 
                     if (m_FeatureRegistry.IsEnabled("GPUSceneSync"_id))

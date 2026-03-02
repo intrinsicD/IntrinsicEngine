@@ -58,6 +58,21 @@ namespace
         freeSlot(vr.SurfaceGpuSlot);
         freeSlot(vr.VerticesGpuSlot);
     }
+
+    void OnPointCloudRendererDestroyed(entt::registry& registry, entt::entity entity)
+    {
+        if (!g_GpuSceneForDestroyHook)
+            return;
+
+        auto& pc = registry.get<ECS::PointCloudRenderer::Component>(entity);
+        if (pc.GpuSlot == ECS::PointCloudRenderer::Component::kInvalidSlot)
+            return;
+
+        Graphics::GpuInstanceData inst{};
+        g_GpuSceneForDestroyHook->QueueUpdate(pc.GpuSlot, inst, /*sphere*/ {0.0f, 0.0f, 0.0f, 0.0f});
+        g_GpuSceneForDestroyHook->FreeSlot(pc.GpuSlot);
+        pc.GpuSlot = ECS::PointCloudRenderer::Component::kInvalidSlot;
+    }
 }
 
 namespace Runtime
@@ -81,6 +96,9 @@ namespace Runtime
 
         m_Scene.GetRegistry().on_destroy<ECS::GeometryViewRenderer::Component>()
             .connect<&OnGeometryViewRendererDestroyed>();
+
+        m_Scene.GetRegistry().on_destroy<ECS::PointCloudRenderer::Component>()
+            .connect<&OnPointCloudRendererDestroyed>();
     }
 
     void SceneManager::DisconnectGpuHooks()
@@ -90,6 +108,9 @@ namespace Runtime
 
         m_Scene.GetRegistry().on_destroy<ECS::GeometryViewRenderer::Component>()
             .disconnect<&OnGeometryViewRendererDestroyed>();
+
+        m_Scene.GetRegistry().on_destroy<ECS::PointCloudRenderer::Component>()
+            .disconnect<&OnPointCloudRendererDestroyed>();
         g_GpuSceneForDestroyHook = nullptr;
     }
 
@@ -117,7 +138,7 @@ namespace Runtime
                 m_Scene.GetRegistry().emplace<ECS::Components::Selection::PickID>(root, s_NextPickId++);
             }
 
-            // 3. Create Submeshes
+            // 3. Create Submeshes / Point Clouds
             for (size_t i = 0; i < model->Meshes.size(); i++)
             {
                 entt::entity targetEntity = root;
@@ -129,17 +150,31 @@ namespace Runtime
                     ECS::Components::Hierarchy::Attach(m_Scene.GetRegistry(), targetEntity, root);
                 }
 
-                // Add Renderer
-                auto& mr = m_Scene.GetRegistry().emplace<ECS::MeshRenderer::Component>(targetEntity);
-                mr.Geometry = model->Meshes[i]->Handle;
-                mr.Material = materialHandle;
+                // Route point topologies to PointCloudRenderer for billboard
+                // expansion via RetainedPointCloudRenderPass. Meshes/lines use
+                // the standard MeshRenderer path.
+                const auto handle = model->Meshes[i]->Handle;
+                const auto* geo = m_GeometryStorage ? m_GeometryStorage->GetUnchecked(handle) : nullptr;
 
-                // Add Collider
-                if (model->Meshes[i]->CollisionGeometry)
+                if (geo && geo->GetTopology() == Graphics::PrimitiveTopology::Points)
                 {
-                    auto& col = m_Scene.GetRegistry().emplace<ECS::MeshCollider::Component>(targetEntity);
-                    col.CollisionRef = model->Meshes[i]->CollisionGeometry;
-                    col.WorldOBB.Center = col.CollisionRef->LocalAABB.GetCenter();
+                    auto& pc = m_Scene.GetRegistry().emplace<ECS::PointCloudRenderer::Component>(targetEntity);
+                    pc.Geometry = handle;
+                    pc.GpuDirty = false; // Already uploaded by ModelLoader.
+                }
+                else
+                {
+                    auto& mr = m_Scene.GetRegistry().emplace<ECS::MeshRenderer::Component>(targetEntity);
+                    mr.Geometry = handle;
+                    mr.Material = materialHandle;
+
+                    // Add Collider
+                    if (model->Meshes[i]->CollisionGeometry)
+                    {
+                        auto& col = m_Scene.GetRegistry().emplace<ECS::MeshCollider::Component>(targetEntity);
+                        col.CollisionRef = model->Meshes[i]->CollisionGeometry;
+                        col.WorldOBB.Center = col.CollisionRef->LocalAABB.GetCenter();
+                    }
                 }
 
                 // Add Selectable Tag

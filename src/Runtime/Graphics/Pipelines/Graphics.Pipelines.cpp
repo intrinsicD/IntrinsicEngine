@@ -208,59 +208,14 @@ namespace Graphics
                     }
 
                     // ----------------------------------------------------------
-                    // 5. Point Cloud Pass — collect PointCloudRenderer entities
+                    // 5. Point Cloud Pass — GPU draw for any SSBO-staged
+                    //    splats submitted by MeshPass or GraphPass collectors.
+                    //    Standalone PointCloudRenderer entities are now rendered
+                    //    by RetainedPointCloudRenderPass via BDA (zero per-frame
+                    //    upload) — see PointCloudRendererLifecycle.
                     // ----------------------------------------------------------
                     if (m_PointCloudPass)
                     {
-                        auto& registry = ctx.Scene.GetRegistry();
-                        auto pcView = registry.view<ECS::PointCloudRenderer::Component>();
-
-                        for (auto [entity, pc] : pcView.each())
-                        {
-                            if (!pc.Visible || pc.Positions.empty())
-                                continue;
-
-                            const uint32_t defaultColor = Passes::PointCloudRenderPass::PackColorF(
-                                pc.DefaultColor.r, pc.DefaultColor.g,
-                                pc.DefaultColor.b, pc.DefaultColor.a);
-
-                            glm::mat4 worldMatrix(1.0f);
-                            if (auto* wm = registry.try_get<ECS::Components::Transform::WorldMatrix>(entity))
-                                worldMatrix = wm->Matrix;
-
-                            const glm::mat3 normalMatrix =
-                                glm::transpose(glm::inverse(glm::mat3(worldMatrix)));
-
-                            for (std::size_t i = 0; i < pc.Positions.size(); ++i)
-                            {
-                                const glm::vec3 worldPos =
-                                    glm::vec3(worldMatrix * glm::vec4(pc.Positions[i], 1.0f));
-                                glm::vec3 normal(0.0f, 1.0f, 0.0f);
-                                if (pc.HasNormals())
-                                {
-                                    const glm::vec3 n = normalMatrix * pc.Normals[i];
-                                    const float n2 = glm::dot(n, n);
-                                    normal = (n2 > 1e-12f)
-                                        ? (n * (1.0f / glm::sqrt(n2)))
-                                        : glm::vec3(0.0f, 1.0f, 0.0f);
-                                }
-                                const float radius = pc.HasRadii() ? pc.Radii[i] : pc.DefaultRadius;
-                                const uint32_t color = pc.HasColors()
-                                    ? Passes::PointCloudRenderPass::PackColorF(
-                                        pc.Colors[i].r, pc.Colors[i].g,
-                                        pc.Colors[i].b, pc.Colors[i].a)
-                                    : defaultColor;
-
-                                auto pt = Passes::PointCloudRenderPass::PackPoint(
-                                    worldPos.x, worldPos.y, worldPos.z,
-                                    normal.x, normal.y, normal.z,
-                                    radius * pc.SizeMultiplier,
-                                    color);
-                                m_PointCloudPass->SubmitPoints(pc.RenderMode, &pt, 1);
-                            }
-                        }
-
-                        // GPU draw: only add point cloud draw passes if the feature is enabled.
                         if (pcDrawEnabled && m_PointCloudPass->HasContent())
                             m_PointCloudPass->AddPasses(ctx);
                     }

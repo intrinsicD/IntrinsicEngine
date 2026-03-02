@@ -45,28 +45,38 @@ export namespace ECS::MeshCollider
 }
 
 // -------------------------------------------------------------------------
-// PointCloudRenderer — ECS component for point cloud visualization.
+// PointCloudRenderer — ECS component for standalone point cloud rendering.
 // -------------------------------------------------------------------------
 //
-// Entities with this component are rendered by PointCloudRenderPass.
-// The component holds the actual point data (positions, normals, colors, radii)
-// and per-entity rendering parameters.
+// Entities with this component are rendered by RetainedPointCloudRenderPass
+// via BDA from a device-local vertex buffer. CPU point data is uploaded once
+// by PointCloudRendererLifecycle and then freed.
 //
-// Point data is uploaded to a consolidated SSBO each frame by the
-// PointCloudRenderPass during AddPasses().
+// Two creation paths:
+//   a) File loading (ModelLoader): Geometry handle is pre-populated by the
+//      loader; GpuDirty=false, CPU vectors are empty.
+//   b) Code-originated (demo, algorithms): CPU vectors are filled, GpuDirty=true.
+//      PointCloudRendererLifecycle uploads on first frame, stores handle,
+//      and clears CPU vectors to free memory.
 //
 // Rendering modes:
-//   0 = Flat disc (screen-aligned billboard, constant pixel radius)
+//   0 = FlatDisc, 1 = Surfel, 2 = EWA
 
 export namespace ECS::PointCloudRenderer
 {
     struct Component
     {
-        // ---- Point Cloud Data ----
-        std::vector<glm::vec3> Positions;           // Required.
+        // ---- Point Cloud Data (CPU-side, consumed by initial upload) ----
+        std::vector<glm::vec3> Positions;           // Required for CPU-originated clouds.
         std::vector<glm::vec3> Normals;             // Optional (empty = use default up).
         std::vector<glm::vec4> Colors;              // Optional (empty = use DefaultColor).
         std::vector<float>     Radii;               // Optional (empty = use DefaultRadius).
+
+        // ---- GPU State (managed by PointCloudRendererLifecycle) ----
+        Geometry::GeometryHandle Geometry{};         // Handle to device-local GeometryGpuData.
+        static constexpr uint32_t kInvalidSlot = ~0u;
+        uint32_t GpuSlot = kInvalidSlot;             // GPUScene slot for frustum culling.
+        bool GpuDirty = true;                        // true = needs initial GPU upload.
 
         // ---- Rendering Parameters ----
         Geometry::PointCloud::RenderMode RenderMode = Geometry::PointCloud::RenderMode::FlatDisc;
@@ -80,6 +90,7 @@ export namespace ECS::PointCloudRenderer
         [[nodiscard]] bool HasNormals() const noexcept { return !Normals.empty() && Normals.size() == Positions.size(); }
         [[nodiscard]] bool HasColors() const noexcept { return !Colors.empty() && Colors.size() == Positions.size(); }
         [[nodiscard]] bool HasRadii() const noexcept { return !Radii.empty() && Radii.size() == Positions.size(); }
+        [[nodiscard]] bool HasGpuGeometry() const noexcept { return Geometry.IsValid(); }
     };
 }
 

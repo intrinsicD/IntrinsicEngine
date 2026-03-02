@@ -222,6 +222,55 @@ namespace Graphics::Passes
         }
 
         // -----------------------------------------------------------------
+        // Standalone point cloud entities — retained-mode rendering via BDA.
+        // PointCloudRendererLifecycle uploads positions/normals once to a
+        // device-local vertex buffer; we read via BDA with zero per-frame cost.
+        // -----------------------------------------------------------------
+        auto pcView = registry.view<ECS::PointCloudRenderer::Component>();
+        for (auto [entity, pc] : pcView.each())
+        {
+            if (!pc.Visible || !pc.Geometry.IsValid())
+                continue;
+
+            GeometryGpuData* geo = m_GeometryStorage->GetUnchecked(pc.Geometry);
+            if (!geo || !geo->GetVertexBuffer())
+                continue;
+
+            const auto& pcLayout = geo->GetLayout();
+            if (pcLayout.PositionsSize == 0)
+                continue;
+
+            const uint32_t pcVertexCount = static_cast<uint32_t>(pcLayout.PositionsSize / sizeof(glm::vec3));
+            if (pcVertexCount == 0)
+                continue;
+
+            glm::mat4 pcWorldMatrix(1.0f);
+            if (auto* wm = registry.try_get<ECS::Components::Transform::WorldMatrix>(entity))
+                pcWorldMatrix = wm->Matrix;
+
+            if (cullingEnabled && !FrustumCullSphere(pcWorldMatrix, geo->GetLocalBoundingSphere(), frustum))
+                continue;
+
+            const uint64_t pcBaseAddr = geo->GetVertexBuffer()->GetDeviceAddress();
+            const uint64_t pcPosAddr = pcBaseAddr + pcLayout.PositionsOffset;
+            const uint64_t pcNormAddr = (pcLayout.NormalsSize > 0) ? (pcBaseAddr + pcLayout.NormalsOffset) : 0;
+
+            const uint32_t ptColor = GpuColor::PackColorF(
+                pc.DefaultColor.r, pc.DefaultColor.g,
+                pc.DefaultColor.b, pc.DefaultColor.a);
+
+            DrawInfo di{};
+            di.Model = pcWorldMatrix;
+            di.PtrPositions = pcPosAddr;
+            di.PtrNormals = pcNormAddr;
+            di.VertexCount = pcVertexCount;
+            di.PointSize = pc.DefaultRadius;
+            di.RenderMode = static_cast<uint32_t>(pc.RenderMode);
+            di.Color = ptColor;
+            draws.push_back(di);
+        }
+
+        // -----------------------------------------------------------------
         // Graph entities — retained-mode node rendering via BDA.
         // Same pattern as mesh vertex visualization: read positions/normals
         // via BDA from the shared vertex buffer, render as billboard quads.
