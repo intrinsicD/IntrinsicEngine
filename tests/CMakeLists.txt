@@ -71,6 +71,7 @@ intrinsic_test_object_lib(CoreTestObjs
         Test_CoreAssetSafety.cpp
         Test_FeatureRegistry.cpp
         Test_InplaceFunction.cpp
+        Test_ResourcePool.cpp
     DEPS IntrinsicCore
 )
 
@@ -134,6 +135,7 @@ intrinsic_test_object_lib(RuntimeTestObjs
         Test_PointCloudRenderPass.cpp
         Test_GraphRenderPass.cpp
         Test_RuntimeGeometry_Reuse.cpp
+        Test_BDASharedBufferContract.cpp
 
     DEPS IntrinsicCore IntrinsicRuntime
 )

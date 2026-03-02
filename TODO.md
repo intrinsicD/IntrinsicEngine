@@ -42,14 +42,12 @@ Zero vertex duplication. Each topology needs separate shader pipelines because t
 - Shader compilation auto-discovered via `CompileShaders.cmake` glob.
 - `GeometryViewRenderer::Component::WireframeEdgeCount` tracks persistent edge buffer lifecycle.
 - CPU-side frustum culling in `RetainedLineRenderPass` and `RetainedPointCloudRenderPass` — extracts camera frustum from view-projection matrix, tests each entity's world-space bounding sphere via `Geometry::TestOverlap(Frustum, Sphere)`, skips draws for culled entities. Mirrors the GPU `instance_cull.comp` sphere-plane test. `GeometryGpuData` now stores precomputed local bounding spheres from CPU vertex positions at upload time (AABB-enclosing sphere), replacing the conservative 10,000-radius fallback in `MeshRendererLifecycle`. Respects `Debug.DisableCulling` toggle.
+- `DebugDraw` immediate-mode accumulator for transient visualization (octree, KD-tree, bounds, contact manifolds, convex hulls). Depth-tested and overlay line APIs. Tested in `Test_DebugDraw.cpp`, `Test_BoundingDebugDraw.cpp`, `Test_OctreeDebugDraw.cpp`, `Test_KDTreeDebugDraw.cpp`, `Test_BVHDebugDraw.cpp`, `Test_ConvexHullDebugDraw.cpp`.
+- `LineRenderPass` renders `DebugDraw` content via per-frame host-visible SSBO. Two sub-passes: depth-tested + overlay (no depth test). Registered in `DefaultPipeline` after visualization collection.
+- GPU point data layout, color packing, BDA shared-buffer lifecycle, and render contract tests: `Test_PointCloudRenderPass.cpp`, `Test_RuntimeGeometry_Reuse.cpp`, `Test_ResourcePool.cpp`, `Test_BDASharedBufferContract.cpp`.
 
 **Remaining work:**
 - [ ] EWA splatting mode (Zwicker et al. 2001) for point clouds.
-- [ ] Test: GPU point data layout, color packing, BDA shared-buffer lifecycle, render contract.
-
-**Debug overlay (Tier 2 — transient, DebugDraw only):**
-- [ ] `DebugDraw` immediate-mode accumulator remains for genuinely transient visualization (octree, KD-tree, bounds, contact manifolds, convex hulls).
-- [ ] `LineRenderPass` renders `DebugDraw` content via per-frame host-visible SSBO. Depth-tested + overlay sub-passes.
 
 ### 1.2 Point Cloud Rendering — Standalone Retained-Mode
 
