@@ -530,3 +530,36 @@ TEST(BDA_GraphData, GpuDirtyDefaultTrue)
     ECS::Graph::Data data;
     EXPECT_TRUE(data.GpuDirty);
 }
+
+// =============================================================================
+// Section 11: EWA Render Mode Contract
+// =============================================================================
+
+TEST(BDA_EWA, RenderModeEnumValues)
+{
+    // Verify the three render mode enum values are stable.
+    EXPECT_EQ(static_cast<uint32_t>(Geometry::PointCloud::RenderMode::FlatDisc), 0u);
+    EXPECT_EQ(static_cast<uint32_t>(Geometry::PointCloud::RenderMode::Surfel), 1u);
+    EXPECT_EQ(static_cast<uint32_t>(Geometry::PointCloud::RenderMode::EWA), 2u);
+}
+
+TEST(BDA_EWA, RenderVisualizationAcceptsEWA)
+{
+    ECS::RenderVisualization::Component viz;
+    viz.VertexRenderMode = Geometry::PointCloud::RenderMode::EWA;
+    EXPECT_EQ(viz.VertexRenderMode, Geometry::PointCloud::RenderMode::EWA);
+}
+
+TEST(BDA_EWA, GraphDataAcceptsEWA)
+{
+    ECS::Graph::Data data;
+    data.NodeRenderMode = Geometry::PointCloud::RenderMode::EWA;
+    EXPECT_EQ(data.NodeRenderMode, Geometry::PointCloud::RenderMode::EWA);
+}
+
+TEST(BDA_EWA, PointCloudRendererAcceptsEWA)
+{
+    ECS::PointCloudRenderer::Component pc;
+    pc.RenderMode = Geometry::PointCloud::RenderMode::EWA;
+    EXPECT_EQ(pc.RenderMode, Geometry::PointCloud::RenderMode::EWA);
+}

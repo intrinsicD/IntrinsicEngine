@@ -66,17 +66,15 @@ namespace Graphics::Passes
         if (!data || count == 0)
             return;
 
-        // Accept FlatDisc and Surfel modes; reject unknown modes.
-        if (mode != Geometry::PointCloud::RenderMode::FlatDisc &&
-            mode != Geometry::PointCloud::RenderMode::Surfel)
-            return;
-
         // Route to mode-specific staging buffers so each can be drawn
         // with the correct push constant RenderMode value.
-        if (mode == Geometry::PointCloud::RenderMode::Surfel)
+        if (mode == Geometry::PointCloud::RenderMode::EWA)
+            m_StagingEWA.insert(m_StagingEWA.end(), data, data + count);
+        else if (mode == Geometry::PointCloud::RenderMode::Surfel)
             m_StagingSurfels.insert(m_StagingSurfels.end(), data, data + count);
-        else
+        else if (mode == Geometry::PointCloud::RenderMode::FlatDisc)
             m_StagingPoints.insert(m_StagingPoints.end(), data, data + count);
+        // Unknown modes are silently rejected.
     }
 
     // =========================================================================
@@ -95,9 +93,10 @@ namespace Graphics::Passes
         m_PointSetLayout = CreateSSBODescriptorSetLayout(
             m_Device->GetLogicalDevice(), VK_SHADER_STAGE_VERTEX_BIT, "PointCloudRenderPass");
 
-        // Allocate per-frame descriptor sets for FlatDisc and Surfel staging.
+        // Allocate per-frame descriptor sets for FlatDisc, Surfel, and EWA staging.
         AllocatePerFrameSets<FRAMES>(descriptorPool, m_PointSetLayout, m_PointDescSets);
         AllocatePerFrameSets<FRAMES>(descriptorPool, m_PointSetLayout, m_SurfelDescSets);
+        AllocatePerFrameSets<FRAMES>(descriptorPool, m_PointSetLayout, m_EWADescSets);
     }
 
     // =========================================================================
@@ -110,6 +109,7 @@ namespace Graphics::Passes
 
         for (auto& buf : m_PointBuffers) buf.reset();
         for (auto& buf : m_SurfelBuffers) buf.reset();
+        for (auto& buf : m_EWABuffers) buf.reset();
 
         m_Pipeline.reset();
 
@@ -316,5 +316,10 @@ namespace Graphics::Passes
         if (!m_StagingSurfels.empty())
             recordBatch(m_StagingSurfels, Geometry::PointCloud::RenderMode::Surfel,
                         m_SurfelBuffers, m_SurfelBufferCapacity, m_SurfelDescSets, "PointCloud_Surfel");
+
+        // Draw EWA points.
+        if (!m_StagingEWA.empty())
+            recordBatch(m_StagingEWA, Geometry::PointCloud::RenderMode::EWA,
+                        m_EWABuffers, m_EWABufferCapacity, m_EWADescSets, "PointCloud_EWA");
     }
 }

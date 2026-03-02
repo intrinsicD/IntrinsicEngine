@@ -1443,7 +1443,13 @@ public:
                             if (vis->ShowVertices)
                             {
                                 ImGui::SeparatorText("Vertex Settings");
-                                vis->VertexRenderMode = Geometry::PointCloud::RenderMode::FlatDisc;
+
+                                // Render mode selector: FlatDisc / Surfel / EWA.
+                                const char* modeNames[] = { "Flat Disc", "Surfel", "EWA Splatting" };
+                                int modeIdx = static_cast<int>(vis->VertexRenderMode);
+                                if (modeIdx < 0 || modeIdx > 2) modeIdx = 0;
+                                if (ImGui::Combo("Render Mode", &modeIdx, modeNames, 3))
+                                    vis->VertexRenderMode = static_cast<Geometry::PointCloud::RenderMode>(modeIdx);
 
                                 ImGui::SliderFloat("Vertex Size", &vis->VertexSize, 0.0005f, 0.05f, "%.5f", ImGuiSliderFlags_Logarithmic);
                                 float vc[4] = {vis->VertexColor.r, vis->VertexColor.g, vis->VertexColor.b, vis->VertexColor.a};
@@ -1469,10 +1475,12 @@ public:
                             // The previous GPU view approach used triangle.frag which ignores
                             // WireframeColor and produced invisible/incorrect output.
 
-                            // Vertex view (Points): create the GPU view for FlatDisc points.
+                            // Vertex view (Points): create the GPU view for point rendering modes.
                             const bool wantGpuVertexView =
                                 vis->ShowVertices &&
-                                (vis->VertexRenderMode == Geometry::PointCloud::RenderMode::FlatDisc);
+                                (vis->VertexRenderMode == Geometry::PointCloud::RenderMode::FlatDisc ||
+                                 vis->VertexRenderMode == Geometry::PointCloud::RenderMode::Surfel ||
+                                 vis->VertexRenderMode == Geometry::PointCloud::RenderMode::EWA);
 
                             if (wantGpuVertexView
                                 && (vis->VertexViewDirty || !vis->VertexView.IsValid()))

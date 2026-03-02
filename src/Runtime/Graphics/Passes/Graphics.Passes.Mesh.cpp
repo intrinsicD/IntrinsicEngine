@@ -69,12 +69,13 @@ namespace Graphics::Passes
             // Edge caching still runs unconditionally so the retained pass has CachedEdges.
             const bool needsCpuWire = vis.ShowWireframe && canDrawLines && !retainedWireActive;
 
-            // GPU vertex view is valid for FlatDisc and Surfel point rendering.
+            // GPU vertex view is valid for FlatDisc, Surfel, and EWA point rendering.
             // When retained GPU geometry exists AND the retained point pass is active, skip CPU.
             const bool gpuVertexPathValid =
                 (vis.VertexView.IsValid() &&
                  (vis.VertexRenderMode == Geometry::PointCloud::RenderMode::FlatDisc ||
-                  vis.VertexRenderMode == Geometry::PointCloud::RenderMode::Surfel))
+                  vis.VertexRenderMode == Geometry::PointCloud::RenderMode::Surfel ||
+                  vis.VertexRenderMode == Geometry::PointCloud::RenderMode::EWA))
                 || retainedPointActive;
             const bool hasGpuVerts = gpuVertexPathValid;
 
