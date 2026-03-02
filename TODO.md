@@ -53,10 +53,11 @@ Zero vertex duplication. Each topology needs separate shader pipelines because t
 
 Automated creation/destruction of GPU geometry views when rendering components are attached/detached. Applies equally to all three geometry types.
 
-- [ ] `MeshViewLifecycleSystem`: on `ECS::Line::Component` attach to mesh entity → extract edge pairs from `Mesh::EdgeProperties()`, create edge index buffer via `ReuseVertexBuffersFrom(meshHandle)`, assign to `Line::Component::EdgeView`. On `ECS::Point::Component` attach → create vertex view via `ReuseVertexBuffersFrom`. On detach → release handle, free `GPUScene` slot.
 - [ ] `GraphGeometrySyncSystem` enhancements: current system uploads positions and edge pairs on `GpuDirty=true` via Direct mode. Remaining: staged (device-local) upload for large static graphs, `GPUScene` slot allocation for frustum culling, per-node attribute BDA channels (colors, radii).
 - [ ] `PointCloudGeometrySyncSystem`: on `ECS::Point::Component` attach with `PointCloud::Cloud` source → upload `Cloud::Positions()`/`Normals()` spans to device-local `GeometryGpuData`, assign handle.
 - [ ] All lifecycle systems allocate `GPUScene` slots, sync transforms, participate in frustum culling — same contract as `MeshRendererLifecycle`.
+- [ ] Wire `RetainedLineRenderPass` to read edge index buffer from `MeshEdgeView::Geometry` via `GeometryGpuData::GetIndexBuffer()` BDA, replacing internal `m_EdgeBuffers` map for mesh entities.
+- [ ] Wire `RetainedPointCloudRenderPass` to read vertex data from `MeshVertexView::Geometry` when present, replacing direct `MeshRenderer::Geometry` lookup for vertex visualization.
 
 ### 1.3 PropertySet Dirty-Domain Sync System
 

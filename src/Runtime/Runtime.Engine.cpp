@@ -318,6 +318,7 @@ namespace Runtime
         reg("TransformUpdate",                Cat::System, "Propagates local transforms to world matrices");
         reg("MeshRendererLifecycle",           Cat::System, "Allocates/deallocates GPU slots for mesh renderers");
         reg("PointCloudRendererLifecycle",     Cat::System, "Uploads point clouds to GPU and allocates GPUScene slots");
+        reg("MeshViewLifecycle",              Cat::System, "Creates GPU edge/vertex views from mesh via ReuseVertexBuffersFrom");
         reg("GPUSceneSync",                   Cat::System, "Synchronizes CPU entity data to GPU scene buffers");
 
         Core::Log::Info("FeatureRegistry: Registered {} core features", m_FeatureRegistry.Count());
@@ -482,6 +483,18 @@ namespace Runtime
                     if (m_FeatureRegistry.IsEnabled("PointCloudRendererLifecycle"_id))
                     {
                         Graphics::Systems::PointCloudRendererLifecycle::RegisterSystem(
+                            frameGraph, registry, *gpuScene,
+                            m_RenderOrchestrator->GetGeometryStorage(),
+                            GetDeviceShared(),
+                            m_GraphicsBackend->GetTransferManager());
+                    }
+
+                    // Mesh view lifecycle: creates GPU geometry views (edge index
+                    // buffers, vertex point views) for entities with MeshEdgeView
+                    // or MeshVertexView components via ReuseVertexBuffersFrom.
+                    if (m_FeatureRegistry.IsEnabled("MeshViewLifecycle"_id))
+                    {
+                        Graphics::Systems::MeshViewLifecycle::RegisterSystem(
                             frameGraph, registry, *gpuScene,
                             m_RenderOrchestrator->GetGeometryStorage(),
                             GetDeviceShared(),

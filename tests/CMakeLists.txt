@@ -137,6 +137,7 @@ intrinsic_test_object_lib(RuntimeTestObjs
         Test_RuntimeGeometry_Reuse.cpp
         Test_BDASharedBufferContract.cpp
         Test_PointCloudRendererLifecycle.cpp
+        Test_MeshViewLifecycle.cpp
 
     DEPS IntrinsicCore IntrinsicRuntime
 )
