@@ -9,6 +9,7 @@
 
 import Graphics;
 import Geometry;
+import RHI;
 
 // =============================================================================
 // BDA Shared-Buffer Render Contract Tests
@@ -562,4 +563,128 @@ TEST(BDA_EWA, PointCloudRendererAcceptsEWA)
     ECS::PointCloudRenderer::Component pc;
     pc.RenderMode = Geometry::PointCloud::RenderMode::EWA;
     EXPECT_EQ(pc.RenderMode, Geometry::PointCloud::RenderMode::EWA);
+}
+
+// =============================================================================
+// Section 12: Per-Edge Attribute Rendering Contract
+// =============================================================================
+
+TEST(BDA_PerEdgeAttr, RenderVisualizationEdgeColorsDefaultEmpty)
+{
+    ECS::RenderVisualization::Component viz;
+
+    // Edge colors start empty (uniform WireframeColor is used).
+    EXPECT_TRUE(viz.CachedEdgeColors.empty());
+    EXPECT_TRUE(viz.EdgeColorsDirty);
+}
+
+TEST(BDA_PerEdgeAttr, RenderVisualizationEdgeColorPopulation)
+{
+    ECS::RenderVisualization::Component viz;
+
+    // Simulate edge cache + per-edge color population.
+    viz.CachedEdges = {{0, 1}, {1, 2}, {2, 0}};
+    viz.EdgeCacheDirty = false;
+
+    // Per-edge colors: one packed ABGR per edge.
+    viz.CachedEdgeColors = {
+        Graphics::GpuColor::PackColorF(1.0f, 0.0f, 0.0f, 1.0f), // red
+        Graphics::GpuColor::PackColorF(0.0f, 1.0f, 0.0f, 1.0f), // green
+        Graphics::GpuColor::PackColorF(0.0f, 0.0f, 1.0f, 1.0f), // blue
+    };
+    viz.EdgeColorsDirty = false;
+
+    EXPECT_EQ(viz.CachedEdgeColors.size(), viz.CachedEdges.size());
+    EXPECT_EQ(viz.CachedEdgeColors.size(), 3u);
+}
+
+TEST(BDA_PerEdgeAttr, GraphDataEdgeColorsDefaultEmpty)
+{
+    ECS::Graph::Data data;
+
+    EXPECT_TRUE(data.CachedEdgeColors.empty());
+    EXPECT_FALSE(data.HasEdgeColors());
+}
+
+TEST(BDA_PerEdgeAttr, GraphDataEdgeColorFromPropertySet)
+{
+    auto graph = std::make_shared<Geometry::Graph::Graph>();
+    auto v0 = graph->AddVertex({0, 0, 0});
+    auto v1 = graph->AddVertex({1, 0, 0});
+    auto v2 = graph->AddVertex({0, 1, 0});
+    graph->AddEdge(v0, v1);
+    graph->AddEdge(v1, v2);
+
+    ECS::Graph::Data data;
+    data.GraphRef = graph;
+
+    // Before adding edge color property.
+    EXPECT_FALSE(data.HasEdgeColors());
+
+    // Add per-edge color property.
+    auto edgeColors = graph->GetOrAddEdgeProperty<glm::vec4>(
+        "e:color", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
+    EXPECT_TRUE(data.HasEdgeColors());
+    EXPECT_EQ(data.EdgeCount(), 2u);
+}
+
+// =============================================================================
+// Section 13: Per-Face Attribute Rendering Contract
+// =============================================================================
+
+TEST(BDA_PerFaceAttr, RenderVisualizationFaceColorsDefaultEmpty)
+{
+    ECS::RenderVisualization::Component viz;
+
+    // Face colors start empty (standard texture/material shading).
+    EXPECT_TRUE(viz.CachedFaceColors.empty());
+    EXPECT_TRUE(viz.FaceColorsDirty);
+}
+
+TEST(BDA_PerFaceAttr, RenderVisualizationFaceColorPopulation)
+{
+    ECS::RenderVisualization::Component viz;
+
+    // Simulate per-face color population (e.g., from curvature visualization).
+    viz.CachedFaceColors = {
+        Graphics::GpuColor::PackColorF(1.0f, 0.0f, 0.0f, 1.0f), // face 0 = red
+        Graphics::GpuColor::PackColorF(0.0f, 1.0f, 0.0f, 1.0f), // face 1 = green
+        Graphics::GpuColor::PackColorF(0.0f, 0.0f, 1.0f, 1.0f), // face 2 = blue
+        Graphics::GpuColor::PackColorF(1.0f, 1.0f, 0.0f, 1.0f), // face 3 = yellow
+    };
+    viz.FaceColorsDirty = false;
+
+    EXPECT_EQ(viz.CachedFaceColors.size(), 4u);
+}
+
+TEST(BDA_PerFaceAttr, MeshPushConstantsSizeUnchanged)
+{
+    // MeshPushConstants must remain 104 bytes (PtrFaceAttr replaces _pad[2]).
+    // This ensures push constant range compatibility with the pipeline.
+    EXPECT_EQ(sizeof(RHI::MeshPushConstants), 104u);
+}
+
+TEST(BDA_PerFaceAttr, MeshPushConstantsPtrFaceAttrDefaultZero)
+{
+    RHI::MeshPushConstants pc{};
+
+    // PtrFaceAttr defaults to 0 (standard shading — no per-face override).
+    EXPECT_EQ(pc.PtrFaceAttr, 0u);
+}
+
+TEST(BDA_PerFaceAttr, FaceColorPackingRoundTrip)
+{
+    // Verify that face colors survive the pack/unpack cycle.
+    uint32_t packed = Graphics::GpuColor::PackColorF(0.5f, 0.25f, 0.75f, 1.0f);
+
+    uint8_t r = (packed >> 0) & 0xFF;
+    uint8_t g = (packed >> 8) & 0xFF;
+    uint8_t b = (packed >> 16) & 0xFF;
+    uint8_t a = (packed >> 24) & 0xFF;
+
+    // Same precision as existing BDA_ColorConsistency.PackColorFRoundTrip.
+    EXPECT_NEAR(r, 128, 1);
+    EXPECT_NEAR(g, 64, 1);
+    EXPECT_NEAR(b, 191, 1);
+    EXPECT_EQ(a, 255);
 }

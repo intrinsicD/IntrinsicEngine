@@ -18,6 +18,7 @@ layout(push_constant) uniform PushConsts {
     float    ViewportWidth;
     float    ViewportHeight;
     uint     Color;
+    uint64_t PtrEdgeAux;
 } push;
 
 layout(location = 0) out vec4 outColor;

@@ -38,8 +38,7 @@ layout(push_constant) uniform PushConsts {
     uint64_t ptrAux;
     uint VisibilityBase; // Base offset into VisibleRemap[] for this geometry batch
     float PointSizePx;  // Used when drawing VK_PRIMITIVE_TOPOLOGY_POINT_LIST via the Forward pass.
-    uint _pad0;
-    uint _pad1;
+    uint64_t ptrFaceAttr; // BDA to per-face packed ABGR colors (0 = standard shading)
 } push;
 
 layout(location = 0) out vec3 fragNormal;

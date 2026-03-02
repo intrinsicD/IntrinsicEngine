@@ -152,6 +152,22 @@ export namespace ECS::RenderVisualization
         std::vector<EdgePair> CachedEdges;
         bool EdgeCacheDirty = true;
 
+        // ---- Per-Edge Color Cache (optional) ----
+        // Packed ABGR per edge, sourced from Mesh::EdgeProperties("e:color")
+        // or set programmatically (e.g., curvature visualization).
+        // Must be same length as CachedEdges when non-empty.
+        // When empty, RetainedLineRenderPass uses uniform WireframeColor.
+        std::vector<uint32_t> CachedEdgeColors;
+        bool EdgeColorsDirty = true;
+
+        // ---- Per-Face Color Cache (optional) ----
+        // Packed ABGR per face, sourced from Mesh::FaceProperties("f:color")
+        // or set programmatically (e.g., segmentation labels, curvature).
+        // Indexed by triangle index (gl_PrimitiveID in fragment shader).
+        // When empty, ForwardPass uses standard texture/material shading.
+        std::vector<uint32_t> CachedFaceColors;
+        bool FaceColorsDirty = true;
+
         // ---- Vertex Normal Cache (internal, rebuilt lazily) ----
         // Area-weighted vertex normals computed from collision mesh triangles.
         std::vector<glm::vec3> CachedVertexNormals;
@@ -215,6 +231,11 @@ export namespace ECS::Graph
         // RenderVisualization::CachedEdges for mesh wireframe.
         std::vector<ECS::RenderVisualization::EdgePair> CachedEdgePairs;
 
+        // Per-edge colors (packed ABGR), one per edge in CachedEdgePairs order.
+        // Extracted from Graph::EdgeProperties("e:color") by GraphGeometrySyncSystem.
+        // When empty, RetainedLineRenderPass uses uniform DefaultEdgeColor.
+        std::vector<uint32_t> CachedEdgeColors;
+
         // When true, GraphGeometrySyncSystem re-uploads positions and rebuilds
         // edge pairs. Set on first attach, or by layout algorithms that modify
         // graph vertex positions.
@@ -240,6 +261,10 @@ export namespace ECS::Graph
         [[nodiscard]] bool HasNodeRadii() const noexcept
         {
             return GraphRef && GraphRef->VertexProperties().Exists("v:radius");
+        }
+        [[nodiscard]] bool HasEdgeColors() const noexcept
+        {
+            return GraphRef && GraphRef->EdgeProperties().Exists("e:color");
         }
     };
 }

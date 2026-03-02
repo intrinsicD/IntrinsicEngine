@@ -84,10 +84,22 @@ export namespace Graphics::Passes
             uint32_t SourceGeometryIndex = 0; // Tracks source geometry changes
         };
 
+        // Per-entity persistent edge attribute buffer (packed ABGR per edge).
+        // Separate from the edge index buffer because attribute data changes
+        // independently (e.g. edge color update without topology change).
+        struct RetainedEdgeAuxEntry
+        {
+            std::unique_ptr<RHI::VulkanBuffer> Buffer;
+            uint32_t EdgeCount = 0;
+        };
+
         // Entity ID → persistent edge buffer.
         // Mesh entities: keyed by entt::entity value.
         // Graph entities: keyed by entt::entity value (separate namespace via bit 31).
         std::unordered_map<uint32_t, RetainedEdgeEntry> m_EdgeBuffers;
+
+        // Entity ID → persistent edge attribute buffer.
+        std::unordered_map<uint32_t, RetainedEdgeAuxEntry> m_EdgeAuxBuffers;
 
         // Create or update a persistent edge buffer for an entity.
         // sourceGeoIdx: geometry handle index of the source vertex buffer. When this
@@ -98,6 +110,13 @@ export namespace Graphics::Passes
                                   const void* edgeData,
                                   uint32_t edgeCount,
                                   uint32_t sourceGeoIdx);
+
+        // Create or update a persistent per-edge attribute buffer for an entity.
+        // Data is an array of packed ABGR uint32_t, one per edge.
+        // Returns the BDA device address, or 0 on failure.
+        uint64_t EnsureEdgeAuxBuffer(uint32_t entityKey,
+                                     const uint32_t* colorData,
+                                     uint32_t edgeCount);
 
         // Build the graphics pipeline.
         std::unique_ptr<RHI::GraphicsPipeline> BuildPipeline(
