@@ -85,18 +85,19 @@ export namespace Graphics::Passes
         {
             m_StagingPoints.clear();
             m_StagingSurfels.clear();
+            m_StagingEWA.clear();
         }
 
         // True if any mode has content.
         [[nodiscard]] bool HasContent() const
         {
-            return !m_StagingPoints.empty() || !m_StagingSurfels.empty();
+            return !m_StagingPoints.empty() || !m_StagingSurfels.empty() || !m_StagingEWA.empty();
         }
 
         // Total number of accumulated points across all modes.
         [[nodiscard]] uint32_t GetPointCount() const
         {
-            return static_cast<uint32_t>(m_StagingPoints.size() + m_StagingSurfels.size());
+            return static_cast<uint32_t>(m_StagingPoints.size() + m_StagingSurfels.size() + m_StagingEWA.size());
         }
 
         // Convenience: pack a single point from components.
@@ -143,12 +144,18 @@ export namespace Graphics::Passes
         std::unique_ptr<RHI::VulkanBuffer> m_SurfelBuffers[FRAMES];
         uint32_t m_SurfelBufferCapacity = 0;
 
+        // Per-frame descriptor sets and SSBOs for EWA mode.
+        VkDescriptorSet m_EWADescSets[FRAMES] = {};
+        std::unique_ptr<RHI::VulkanBuffer> m_EWABuffers[FRAMES];
+        uint32_t m_EWABufferCapacity = 0;
+
         // Lazily-built pipeline (with depth test).
         std::unique_ptr<RHI::GraphicsPipeline> m_Pipeline;
 
         // CPU-side staging buffers — accumulated per frame, one per render mode.
         std::vector<GpuPointData> m_StagingPoints;   // FlatDisc
-        std::vector<GpuPointData> m_StagingSurfels;   // Surfel
+        std::vector<GpuPointData> m_StagingSurfels;  // Surfel
+        std::vector<GpuPointData> m_StagingEWA;      // EWA
 
         // Ensure SSBO has capacity for the given point count.
         bool EnsureBuffer(uint32_t requiredPoints);

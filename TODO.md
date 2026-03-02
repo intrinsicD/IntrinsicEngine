@@ -35,7 +35,7 @@ Zero vertex duplication. Each topology needs separate shader pipelines because t
 
 **Completed (retained-mode BDA path):**
 - `RetainedLineRenderPass` — iterates mesh entities with `ShowWireframe` + valid `GeometryGpuData`, reads positions via BDA, creates persistent per-entity edge buffers from `CachedEdges` (uploaded once, reused each frame via BDA). Expands to screen-space quads. Anti-aliased via `line_retained.frag`. Also iterates `ECS::Graph::Data` entities with valid `GpuGeometry` for graph edge rendering. Edge buffers are recreated automatically when edge count changes (e.g. graph re-layout). Orphaned buffers cleaned up via deferred GPU-safe destruction.
-- `RetainedPointCloudRenderPass` — iterates mesh entities with `ShowVertices` + valid `GeometryGpuData`, reads positions/normals via BDA, expands to billboard quads. Supports FlatDisc and Surfel modes via `point_retained.frag`. Also iterates `ECS::Graph::Data` entities for graph node rendering.
+- `RetainedPointCloudRenderPass` — iterates mesh entities with `ShowVertices` + valid `GeometryGpuData`, reads positions/normals via BDA, expands to billboard quads. Supports FlatDisc, Surfel, and EWA splatting modes via `point_retained.frag`. EWA mode (Zwicker et al. 2001) computes per-surfel perspective Jacobian in the vertex shader, producing perspective-correct elliptical Gaussian splats with a 1px² low-pass anti-aliasing filter. Also iterates `ECS::Graph::Data` entities for graph node rendering.
 - `MeshRenderPass` edge caching decoupled from DebugDraw submission — `CachedEdges` is always populated when `ShowWireframe=true`, shared between CPU and retained GPU paths.
 - `GraphGeometrySyncSystem` — uploads graph node positions to device-local vertex buffer (Direct mode, CPU_TO_GPU), extracts edge pairs from graph topology with vertex compaction/remapping. Both retained passes read from the shared buffer via BDA. `GraphRenderPass` skips entities with valid `GpuGeometry` when retained passes are active (no double-draw).
 - Both passes registered in `DefaultPipeline` render path (stages 6a/6b), gated by `FeatureRegistry`.
@@ -46,8 +46,7 @@ Zero vertex duplication. Each topology needs separate shader pipelines because t
 - `LineRenderPass` renders `DebugDraw` content via per-frame host-visible SSBO. Two sub-passes: depth-tested + overlay (no depth test). Registered in `DefaultPipeline` after visualization collection.
 - GPU point data layout, color packing, BDA shared-buffer lifecycle, and render contract tests: `Test_PointCloudRenderPass.cpp`, `Test_RuntimeGeometry_Reuse.cpp`, `Test_ResourcePool.cpp`, `Test_BDASharedBufferContract.cpp`.
 
-**Remaining work:**
-- [ ] EWA splatting mode (Zwicker et al. 2001) for point clouds.
+**Status:** All retained-mode rendering items for §1.1 are complete.
 
 ### 1.2 Point Cloud Rendering — Standalone Retained-Mode
 

@@ -1,8 +1,9 @@
-// point.vert — Billboard / surfel point cloud rendering via vertex-shader expansion.
+// point.vert — Billboard / surfel / EWA point cloud rendering via vertex-shader expansion.
 //
 // Render modes (selected via push.RenderMode):
 //   0 = FlatDisc:  camera-facing billboard, constant world-space radius.
 //   1 = Surfel:    normal-oriented disc with Lambertian shading.
+//   2 = EWA:       perspective-correct elliptical Gaussian splats (Zwicker et al. 2001).
 //
 // Technique: Each point is expanded into a screen-space billboard quad
 // (2 triangles, 6 vertices). No geometry shader required.
@@ -10,6 +11,10 @@
 // For surfel mode, the quad is oriented perpendicular to the surface normal
 // and expanded in world space using a tangent frame derived from the normal.
 // The fragment shader applies Lambertian + ambient lighting.
+//
+// For EWA mode, the quad is expanded in clip space to bound the 3-sigma
+// elliptical Gaussian footprint. The perspective Jacobian maps the surfel's
+// tangent-plane Gaussian to a screen-space ellipse.
 
 #version 460
 #extension GL_EXT_scalar_block_layout : require
@@ -32,13 +37,14 @@ layout(push_constant) uniform PushConsts {
     float SizeMultiplier;
     float ViewportWidth;
     float ViewportHeight;
-    uint  RenderMode;       // 0 = FlatDisc, 1 = Surfel
+    uint  RenderMode;       // 0 = FlatDisc, 1 = Surfel, 2 = EWA
 } push;
 
 layout(location = 0) out vec4 fragColor;
 layout(location = 1) out vec2 fragDiscUV;
-layout(location = 2) out vec3 fragNormal;       // world-space normal (surfel mode)
-layout(location = 3) out vec3 fragWorldPos;     // world-space position (surfel mode)
+layout(location = 2) out vec3 fragNormal;       // world-space normal (surfel/EWA mode)
+layout(location = 3) out vec3 fragWorldPos;     // world-space position
+layout(location = 4) flat out vec3 fragEwaCovInv;  // UV-space inverse covariance (xx, xy, yy)
 
 void main()
 {
@@ -60,7 +66,80 @@ void main()
 
     float radiusWorld = ptSize * push.SizeMultiplier;
 
-    if (push.RenderMode == 1u)
+    // Default: no EWA covariance.
+    fragEwaCovInv = vec3(0.0);
+
+    if (push.RenderMode == 2u)
+    {
+        // ---- EWA Splatting mode ----
+        float nLen = length(ptNormal);
+        vec3 N = (nLen > 1e-6) ? (ptNormal / nLen) : vec3(0.0, 1.0, 0.0);
+
+        vec3 ref = (abs(N.y) < 0.99) ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
+        vec3 T = normalize(cross(N, ref));
+        vec3 B = cross(N, T);
+
+        // Transform to view space (points are in world space for SSBO path).
+        vec4 viewPos4 = camera.view * vec4(ptPosition, 1.0);
+        vec3 viewPos = viewPos4.xyz;
+        mat3 viewRot = mat3(camera.view);
+        vec3 viewT = viewRot * (T * radiusWorld);
+        vec3 viewB = viewRot * (B * radiusWorld);
+
+        float z = max(-viewPos.z, 1e-4);
+        float invZ2 = 1.0 / (z * z);
+        float fx = camera.proj[0][0];
+        float fy = camera.proj[1][1];
+        float sx = 0.5 * push.ViewportWidth;
+        float sy = 0.5 * push.ViewportHeight;
+
+        vec2 scrT = vec2(
+            sx * fx * (viewT.x * z + viewT.z * viewPos.x) * invZ2,
+            sy * fy * (viewT.y * z + viewT.z * viewPos.y) * invZ2
+        );
+        vec2 scrB = vec2(
+            sx * fx * (viewB.x * z + viewB.z * viewPos.x) * invZ2,
+            sy * fy * (viewB.y * z + viewB.z * viewPos.y) * invZ2
+        );
+
+        float c00 = scrT.x * scrT.x + scrB.x * scrB.x;
+        float c01 = scrT.x * scrT.y + scrB.x * scrB.y;
+        float c11 = scrT.y * scrT.y + scrB.y * scrB.y;
+
+        // Low-pass filter.
+        c00 += 1.0;
+        c11 += 1.0;
+
+        float det = c00 * c11 - c01 * c01;
+        float invDet = 1.0 / max(det, 1e-6);
+        float ci00 =  c11 * invDet;
+        float ci01 = -c01 * invDet;
+        float ci11 =  c00 * invDet;
+
+        const float CUTOFF = 3.0;
+        float extX = CUTOFF * sqrt(max(c00, 0.0));
+        float extY = CUTOFF * sqrt(max(c11, 0.0));
+        extX = min(extX, push.ViewportWidth * 0.5);
+        extY = min(extY, push.ViewportHeight * 0.5);
+
+        fragEwaCovInv = vec3(
+            ci00 * extX * extX,
+            ci01 * extX * extY,
+            ci11 * extY * extY
+        );
+
+        vec4 clipCenter = camera.proj * viewPos4;
+        float pixToClipX = 2.0 * clipCenter.w / push.ViewportWidth;
+        float pixToClipY = 2.0 * clipCenter.w / push.ViewportHeight;
+
+        gl_Position = clipCenter;
+        gl_Position.x += localOffset.x * extX * pixToClipX;
+        gl_Position.y += localOffset.y * extY * pixToClipY;
+
+        fragNormal = N;
+        fragWorldPos = ptPosition;
+    }
+    else if (push.RenderMode == 1u)
     {
         // ---- Surfel mode: normal-oriented disc in world space ----
         // Build a tangent frame from the surface normal.

@@ -224,7 +224,7 @@ TEST(PointCloudRenderPass_Contract, FlatDiscModeSubmitAndCount)
     EXPECT_EQ(pass.GetPointCount(), 1u);
 }
 
-TEST(PointCloudRenderPass_Contract, NonFlatModesAreIgnored)
+TEST(PointCloudRenderPass_Contract, AllThreeModesAccepted)
 {
     Graphics::Passes::PointCloudRenderPass pass;
 
@@ -232,11 +232,24 @@ TEST(PointCloudRenderPass_Contract, NonFlatModesAreIgnored)
         0, 0, 0, 0, 1, 0, 0.01f, 0xFFFFFFFF);
 
     pass.SubmitPoints(Geometry::PointCloud::RenderMode::FlatDisc, &pt, 1);
-    pass.SubmitPoints(static_cast<Geometry::PointCloud::RenderMode>(1u), &pt, 1);
-    pass.SubmitPoints(static_cast<Geometry::PointCloud::RenderMode>(2u), &pt, 1);
-    pass.SubmitPoints(static_cast<Geometry::PointCloud::RenderMode>(3u), &pt, 1);
+    pass.SubmitPoints(Geometry::PointCloud::RenderMode::Surfel, &pt, 1);
+    pass.SubmitPoints(Geometry::PointCloud::RenderMode::EWA, &pt, 1);
 
-    EXPECT_EQ(pass.GetPointCount(), 1u);
+    // All three known modes are accepted.
+    EXPECT_EQ(pass.GetPointCount(), 3u);
+}
+
+TEST(PointCloudRenderPass_Contract, UnknownModesAreIgnored)
+{
+    Graphics::Passes::PointCloudRenderPass pass;
+
+    auto pt = Graphics::Passes::PointCloudRenderPass::PackPoint(
+        0, 0, 0, 0, 1, 0, 0.01f, 0xFFFFFFFF);
+
+    pass.SubmitPoints(static_cast<Geometry::PointCloud::RenderMode>(3u), &pt, 1);
+    pass.SubmitPoints(static_cast<Geometry::PointCloud::RenderMode>(99u), &pt, 1);
+
+    EXPECT_EQ(pass.GetPointCount(), 0u);
 }
 
 TEST(PointCloudRenderPass_Contract, ResetClearsStaging)
@@ -296,4 +309,82 @@ TEST(PointCloud_Integration, CloudToComponent)
     EXPECT_TRUE(comp.HasNormals());
     EXPECT_TRUE(comp.HasColors());
     EXPECT_TRUE(comp.HasRadii());
+}
+
+// ---- EWA Render Mode Tests ----
+
+TEST(PointCloudRenderPass_EWA, EnumValue)
+{
+    // EWA is mode 2, following FlatDisc (0) and Surfel (1).
+    EXPECT_EQ(static_cast<uint32_t>(Geometry::PointCloud::RenderMode::EWA), 2u);
+}
+
+TEST(PointCloudRenderPass_EWA, SubmitEWAPoints)
+{
+    Graphics::Passes::PointCloudRenderPass pass;
+
+    auto pt = Graphics::Passes::PointCloudRenderPass::PackPoint(
+        1.0f, 2.0f, 3.0f, 0.0f, 1.0f, 0.0f, 0.05f, 0xFFFFFFFF);
+    pass.SubmitPoints(Geometry::PointCloud::RenderMode::EWA, &pt, 1);
+
+    EXPECT_TRUE(pass.HasContent());
+    EXPECT_EQ(pass.GetPointCount(), 1u);
+}
+
+TEST(PointCloudRenderPass_EWA, EWAResetClears)
+{
+    Graphics::Passes::PointCloudRenderPass pass;
+
+    auto pt = Graphics::Passes::PointCloudRenderPass::PackPoint(
+        0, 0, 0, 0, 0, 1, 0.01f, 0xFFFFFFFF);
+    pass.SubmitPoints(Geometry::PointCloud::RenderMode::EWA, &pt, 1);
+    EXPECT_TRUE(pass.HasContent());
+
+    pass.ResetPoints();
+    EXPECT_FALSE(pass.HasContent());
+    EXPECT_EQ(pass.GetPointCount(), 0u);
+}
+
+TEST(PointCloudRenderPass_EWA, EWABatchIsSeparate)
+{
+    // EWA points are batched separately from FlatDisc and Surfel.
+    Graphics::Passes::PointCloudRenderPass pass;
+
+    auto pt = Graphics::Passes::PointCloudRenderPass::PackPoint(
+        0, 0, 0, 0, 1, 0, 0.01f, 0xFFFFFFFF);
+
+    pass.SubmitPoints(Geometry::PointCloud::RenderMode::FlatDisc, &pt, 1);
+    pass.SubmitPoints(Geometry::PointCloud::RenderMode::Surfel, &pt, 1);
+    pass.SubmitPoints(Geometry::PointCloud::RenderMode::EWA, &pt, 1);
+
+    // All three modes contribute independently.
+    EXPECT_EQ(pass.GetPointCount(), 3u);
+}
+
+TEST(PointCloudRenderer_Component, EWAModeAssignable)
+{
+    ECS::PointCloudRenderer::Component comp;
+    comp.RenderMode = Geometry::PointCloud::RenderMode::EWA;
+    EXPECT_EQ(comp.RenderMode, Geometry::PointCloud::RenderMode::EWA);
+}
+
+TEST(PointCloud_Integration, CloudToComponentEWA)
+{
+    // Verify that EWA mode can be assigned to the component after cloud creation.
+    Geometry::PointCloud::Cloud cloud;
+    cloud.EnableNormals();
+
+    cloud.AddPoint({0, 0, 0});
+    cloud.AddPoint({1, 0, 0});
+
+    ECS::PointCloudRenderer::Component comp;
+    auto positions = cloud.Positions();
+    auto normals   = cloud.Normals();
+    comp.Positions = std::vector<glm::vec3>(positions.begin(), positions.end());
+    comp.Normals   = std::vector<glm::vec3>(normals.begin(),   normals.end());
+    comp.RenderMode = Geometry::PointCloud::RenderMode::EWA;
+
+    EXPECT_EQ(comp.PointCount(), 2u);
+    EXPECT_TRUE(comp.HasNormals());
+    EXPECT_EQ(comp.RenderMode, Geometry::PointCloud::RenderMode::EWA);
 }
