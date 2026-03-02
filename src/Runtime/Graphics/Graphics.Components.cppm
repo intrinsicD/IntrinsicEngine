@@ -242,9 +242,14 @@ export namespace ECS::GeometryViewRenderer
         uint32_t SurfaceGpuSlot = MeshRenderer::Component::kInvalidSlot;
 
         // Optional vertex point-cloud view geometry (FlatDisc mode via ForwardPass).
-        // Wireframe has NO GPU view — it is always CPU-driven via DebugDraw → LineRenderPass.
         Geometry::GeometryHandle Vertices{}; // Points
         uint32_t VerticesGpuSlot = MeshRenderer::Component::kInvalidSlot;
+
+        // Wireframe edge count — set by RetainedLineRenderPass when a persistent
+        // BDA-addressable edge buffer exists for this entity. The actual buffer is
+        // owned by the pass; this field tracks edge count for lifecycle awareness.
+        // 0 = no persistent wireframe buffer exists.
+        uint32_t WireframeEdgeCount = 0;
 
         // Visibility toggles mirrored from RenderVisualization.
         bool ShowSurface = true;

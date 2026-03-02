@@ -1,18 +1,17 @@
 // line_retained.vert — Retained-mode thick line rendering via BDA vertex pulling.
 //
-// Unlike the SSBO-based line.vert which receives fully-transformed endpoints,
-// this shader reads positions from a shared vertex buffer via buffer device
-// address (BDA) and line segment indices from a separate SSBO. This enables
-// retained-mode rendering where vertex data is uploaded once and shared
-// across mesh surface, wireframe, and point visualization.
+// Both positions and edge indices are read via buffer device address (BDA).
+// Positions come from the shared mesh vertex buffer; edge index pairs come
+// from a persistent device-local edge buffer uploaded once when wireframe
+// is enabled. This enables fully retained-mode rendering with zero per-frame
+// CPU→GPU edge uploads.
 //
 // Each line segment is expanded into a screen-space quad (2 triangles, 6 vertices)
 // for thick-line rendering with anti-aliased edges.
 //
 // Integration:
-//   - Push constants carry BDA pointer to position buffer + line config.
+//   - Push constants carry BDA pointers to position + edge buffers + line config.
 //   - Set 0: Camera UBO (shared across all passes).
-//   - Set 1: Edge index SSBO (pairs of uint32 vertex indices).
 //   - Per-entity transform via push constants (model matrix).
 
 #version 460
@@ -26,23 +25,20 @@ layout(set = 0, binding = 0) uniform CameraBuffer {
     mat4 proj;
 } camera;
 
-// Buffer device address reference to shared position buffer.
+// Buffer device address references for shared position and edge buffers.
 layout(buffer_reference, scalar) readonly buffer PosBuf { vec3 v[]; };
 
-// Edge index buffer: pairs of vertex indices into the shared position buffer.
 struct EdgePair {
     uint i0;
     uint i1;
 };
-
-layout(std430, set = 1, binding = 0) readonly buffer EdgeBuffer {
-    EdgePair edges[];
-} edgeData;
+layout(buffer_reference, scalar) readonly buffer EdgeBuf { EdgePair e[]; };
 
 // Push constants.
 layout(push_constant) uniform PushConsts {
     mat4     Model;           // per-entity world transform
     uint64_t PtrPositions;    // BDA to shared position buffer
+    uint64_t PtrEdges;        // BDA to persistent edge pair buffer
     float    LineWidth;       // in pixels
     float    ViewportWidth;
     float    ViewportHeight;
@@ -57,8 +53,9 @@ void main()
     uint segmentIndex = gl_VertexIndex / 6;
     uint vertexInQuad = gl_VertexIndex % 6;
 
-    // Read edge indices.
-    EdgePair edge = edgeData.edges[segmentIndex];
+    // Read edge indices via BDA from the persistent edge buffer.
+    EdgeBuf eBuf = EdgeBuf(push.PtrEdges);
+    EdgePair edge = eBuf.e[segmentIndex];
 
     // Read positions via BDA from the shared vertex buffer.
     PosBuf posBuf = PosBuf(push.PtrPositions);

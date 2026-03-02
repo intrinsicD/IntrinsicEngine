@@ -110,7 +110,8 @@ namespace Graphics::Systems::MeshRendererLifecycle
 
         // -----------------------------------------------------------------
         // GeometryViewRenderer: additional GPU instances for surface/vertices.
-        // NOTE: Wireframe has no GPU view — it is CPU-driven via DebugDraw.
+        // NOTE: Wireframe edge buffers are managed by RetainedLineRenderPass
+        // (persistent BDA-addressable buffers, not GPUScene instances).
         // -----------------------------------------------------------------
         auto viewViews = registry.view<ECS::GeometryViewRenderer::Component, ECS::Components::Transform::WorldMatrix>();
         for (auto [entity, vr, world] : viewViews.each())
