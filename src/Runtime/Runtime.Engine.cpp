@@ -318,6 +318,7 @@ namespace Runtime
         reg("TransformUpdate",                Cat::System, "Propagates local transforms to world matrices");
         reg("MeshRendererLifecycle",           Cat::System, "Allocates/deallocates GPU slots for mesh renderers");
         reg("PointCloudRendererLifecycle",     Cat::System, "Uploads point clouds to GPU and allocates GPUScene slots");
+        reg("GraphGeometrySync",              Cat::System, "Uploads graph geometry to GPU and allocates GPUScene slots");
         reg("MeshViewLifecycle",              Cat::System, "Creates GPU edge/vertex views from mesh via ReuseVertexBuffersFrom");
         reg("GPUSceneSync",                   Cat::System, "Synchronizes CPU entity data to GPU scene buffers");
 
@@ -453,22 +454,22 @@ namespace Runtime
                 if (m_FeatureRegistry.IsEnabled("TransformUpdate"_id))
                     ECS::Systems::Transform::RegisterSystem(frameGraph, registry);
 
-                // Graph geometry sync: uploads graph node positions to GPU and
-                // builds edge index pairs for retained-mode BDA rendering.
-                // Runs after TransformUpdate (writes to ECS::Graph::Data).
-                if (m_FeatureRegistry.IsEnabled("GraphGeometrySync"_id))
-                {
-                    Graphics::Systems::GraphGeometrySync::RegisterSystem(
-                        frameGraph, registry,
-                        m_RenderOrchestrator->GetGeometryStorage(),
-                        GetDeviceShared(),
-                        m_GraphicsBackend->GetTransferManager());
-                }
-
                 auto* gpuScene = m_RenderOrchestrator->GetGPUScenePtr();
                 if (gpuScene)
                 {
                     auto& matSys = m_RenderOrchestrator->GetMaterialSystem();
+
+                    // Graph geometry sync: uploads graph node positions to GPU,
+                    // builds edge index pairs, extracts per-node attributes,
+                    // and allocates GPUScene slots for retained-mode BDA rendering.
+                    if (m_FeatureRegistry.IsEnabled("GraphGeometrySync"_id))
+                    {
+                        Graphics::Systems::GraphGeometrySync::RegisterSystem(
+                            frameGraph, registry, *gpuScene,
+                            m_RenderOrchestrator->GetGeometryStorage(),
+                            GetDeviceShared(),
+                            m_GraphicsBackend->GetTransferManager());
+                    }
 
                     if (m_FeatureRegistry.IsEnabled("MeshRendererLifecycle"_id))
                     {

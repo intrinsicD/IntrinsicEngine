@@ -37,7 +37,7 @@ Zero vertex duplication. Each topology needs separate shader pipelines because t
 - `RetainedLineRenderPass` — iterates mesh entities with `ShowWireframe` + valid `GeometryGpuData`, reads positions via BDA, creates persistent per-entity edge buffers from `CachedEdges` (uploaded once, reused each frame via BDA). Expands to screen-space quads. Anti-aliased via `line_retained.frag`. Also iterates `ECS::Graph::Data` entities with valid `GpuGeometry` for graph edge rendering. Edge buffers are recreated automatically when edge count changes (e.g. graph re-layout). Orphaned buffers cleaned up via deferred GPU-safe destruction.
 - `RetainedPointCloudRenderPass` — iterates mesh entities with `ShowVertices` + valid `GeometryGpuData`, reads positions/normals via BDA, expands to billboard quads. Supports FlatDisc, Surfel, and EWA splatting modes via `point_retained.frag`. EWA mode (Zwicker et al. 2001) computes per-surfel perspective Jacobian in the vertex shader, producing perspective-correct elliptical Gaussian splats with a 1px² low-pass anti-aliasing filter. Also iterates `ECS::Graph::Data` entities for graph node rendering.
 - `MeshRenderPass` edge caching decoupled from DebugDraw submission — `CachedEdges` is always populated when `ShowWireframe=true`, shared between CPU and retained GPU paths.
-- `GraphGeometrySyncSystem` — uploads graph node positions to device-local vertex buffer (Direct mode, CPU_TO_GPU), extracts edge pairs from graph topology with vertex compaction/remapping. Both retained passes read from the shared buffer via BDA. `GraphRenderPass` skips entities with valid `GpuGeometry` when retained passes are active (no double-draw).
+- `GraphGeometrySyncSystem` — uploads graph node positions to device-local vertex buffer (Direct mode, CPU_TO_GPU), extracts edge pairs from graph topology with vertex compaction/remapping, extracts per-node colors (`"v:color"` → `CachedNodeColors`) and radii (`"v:radius"` → `CachedNodeRadii`) from PropertySets, allocates `GPUScene` slots for frustum culling, participates in `GPUSceneSync` transform sync. `on_destroy` hook in `SceneManager` frees slots on entity destruction. Registered in `FeatureRegistry` as `"GraphGeometrySync"`. Both retained passes read from the shared buffer via BDA. `GraphRenderPass` skips entities with valid `GpuGeometry` when retained passes are active (no double-draw). Contract tests in `Test_GraphRenderPass.cpp`, `Test_BDASharedBufferContract.cpp`.
 - Both passes registered in `DefaultPipeline` render path (stages 6a/6b), gated by `FeatureRegistry`.
 - Shader compilation auto-discovered via `CompileShaders.cmake` glob.
 - `GeometryViewRenderer::Component::WireframeEdgeCount` tracks persistent edge buffer lifecycle.
@@ -53,9 +53,8 @@ Zero vertex duplication. Each topology needs separate shader pipelines because t
 
 Automated creation/destruction of GPU geometry views when rendering components are attached/detached. Applies equally to all three geometry types.
 
-- [ ] `GraphGeometrySyncSystem` enhancements: current system uploads positions and edge pairs on `GpuDirty=true` via Direct mode. Remaining: staged (device-local) upload for large static graphs, `GPUScene` slot allocation for frustum culling, per-node attribute BDA channels (colors, radii).
 - [ ] `PointCloudGeometrySyncSystem`: on `ECS::Point::Component` attach with `PointCloud::Cloud` source → upload `Cloud::Positions()`/`Normals()` spans to device-local `GeometryGpuData`, assign handle.
-- [ ] All lifecycle systems allocate `GPUScene` slots, sync transforms, participate in frustum culling — same contract as `MeshRendererLifecycle`.
+- [ ] Staged (device-local) upload path for large static graphs in `GraphGeometrySyncSystem` (current Direct mode is suitable for dynamic re-layout; staged path for static graphs would reduce host-visible memory).
 
 ### 1.3 PropertySet Dirty-Domain Sync System
 
