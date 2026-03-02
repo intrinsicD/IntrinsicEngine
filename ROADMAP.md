@@ -12,7 +12,9 @@ Recent completions (2026-03-02, details in git history): per-edge and per-face a
 
 Recent completions (2026-03-02, details in git history): `MeshViewLifecycleSystem` — `MeshEdgeView::Component` and `MeshVertexView::Component` for mesh-derived GPU geometry views, lifecycle system creates edge index buffers and vertex point views via `ReuseVertexBuffersFrom(meshHandle)`, GPUScene slot allocation, EnTT `on_destroy` hooks for automatic cleanup, FeatureRegistry-gated registration in `Engine::Run()`, contract tests in `Test_MeshViewLifecycle.cpp`.
 
-Near-term priority now shifts to wiring retained render passes to use `MeshEdgeView`/`MeshVertexView` geometry handles (TODO §1.2), remaining lifecycle system enhancements (GraphGeometrySync, PointCloudGeometrySync), and PropertySet dirty-domain sync (TODO §1.3).
+Recent completions (2026-03-02, details in git history): retained render pass wiring to `MeshEdgeView`/`MeshVertexView` geometry handles — `RetainedLineRenderPass` now prefers `MeshEdgeView::Geometry` BDA index buffer (via `GeometryGpuData::GetIndexBuffer()->GetDeviceAddress()`) for mesh wireframe, falling back to internal `EnsureEdgeBuffer()` when the view is absent. `RetainedPointCloudRenderPass` now prefers `MeshVertexView::Geometry` BDA vertex buffer for mesh vertex visualization, falling back to direct `MeshRenderer::Geometry` lookup. Per-edge attribute buffers remain internally managed. Contract tests extended in `Test_MeshViewLifecycle.cpp`.
+
+Near-term priority now shifts to remaining lifecycle system enhancements (GraphGeometrySync staged upload + GPUScene slots, PointCloudGeometrySync), and PropertySet dirty-domain sync (TODO §1.3).
 
 ## 2. Feature Roadmap
 

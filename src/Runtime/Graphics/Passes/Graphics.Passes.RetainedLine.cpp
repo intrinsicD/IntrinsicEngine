@@ -291,7 +291,9 @@ namespace Graphics::Passes
         std::vector<uint32_t> activeKeys;
 
         // -----------------------------------------------------------------
-        // Mesh entities — persistent edge buffers from CachedEdges.
+        // Mesh entities — prefer MeshEdgeView::Geometry (BDA index buffer
+        // from MeshViewLifecycleSystem) when available; fall back to
+        // internal EnsureEdgeBuffer() for entities without the view.
         // -----------------------------------------------------------------
         auto meshView = registry.view<ECS::MeshRenderer::Component,
                                       ECS::RenderVisualization::Component>();
@@ -305,11 +307,21 @@ namespace Graphics::Passes
             if (!geo || !geo->GetVertexBuffer())
                 continue;
 
-            if (vis.CachedEdges.empty())
+            // Check for a first-class MeshEdgeView with ready GPU geometry.
+            auto* edgeViewComp = registry.try_get<ECS::MeshEdgeView::Component>(entity);
+            const bool useEdgeView = edgeViewComp
+                && edgeViewComp->HasGpuGeometry()
+                && edgeViewComp->EdgeCount > 0;
+
+            // If no edge view, fall back to CachedEdges (old path).
+            if (!useEdgeView && vis.CachedEdges.empty())
                 continue;
 
             const uint32_t entityKey = static_cast<uint32_t>(entity);
-            activeKeys.push_back(entityKey);
+            // Only track in activeKeys when using the fallback path (internal buffers).
+            // MeshEdgeView-backed entities don't have internal buffers to clean up.
+            if (!useEdgeView)
+                activeKeys.push_back(entityKey);
 
             // Frustum cull: skip draw if the entity's bounding sphere is outside the camera frustum.
             // Edge buffers are still maintained (activeKeys tracks them) — only the draw is skipped.
@@ -320,25 +332,50 @@ namespace Graphics::Passes
             if (cullingEnabled && !FrustumCullSphere(worldMatrix, geo->GetLocalBoundingSphere(), frustum))
                 continue;
 
-            // Ensure persistent edge buffer exists (create on first frame, reuse after).
-            // Mesh geometry handle is stable — edges only change when EdgeCacheDirty is set.
-            const uint32_t edgeCount = static_cast<uint32_t>(vis.CachedEdges.size());
-            const uint64_t edgeAddr = EnsureEdgeBuffer(
-                entityKey, vis.CachedEdges.data(), edgeCount, mr.Geometry.Index);
-            if (edgeAddr == 0)
-                continue;
+            uint32_t edgeCount = 0;
+            uint64_t edgeAddr = 0;
+            uint64_t posAddr = 0;
 
-            const uint64_t baseAddr = geo->GetVertexBuffer()->GetDeviceAddress();
-            const uint64_t posAddr = baseAddr + geo->GetLayout().PositionsOffset;
+            if (useEdgeView)
+            {
+                // Read edge index buffer via BDA from the MeshEdgeView's GeometryGpuData.
+                // The index buffer layout is [i0_0, i1_0, i0_1, i1_1, ...] — binary-compatible
+                // with the EdgePair struct the vertex shader reads via PtrEdges BDA.
+                GeometryGpuData* edgeGeo = m_GeometryStorage->GetUnchecked(edgeViewComp->Geometry);
+                if (!edgeGeo || !edgeGeo->GetIndexBuffer() || !edgeGeo->GetVertexBuffer())
+                    continue;
+
+                edgeCount = edgeViewComp->EdgeCount;
+                edgeAddr = edgeGeo->GetIndexBuffer()->GetDeviceAddress();
+
+                const uint64_t baseAddr = edgeGeo->GetVertexBuffer()->GetDeviceAddress();
+                posAddr = baseAddr + edgeGeo->GetLayout().PositionsOffset;
+            }
+            else
+            {
+                // Fallback: internal persistent edge buffer from CachedEdges.
+                edgeCount = static_cast<uint32_t>(vis.CachedEdges.size());
+                edgeAddr = EnsureEdgeBuffer(
+                    entityKey, vis.CachedEdges.data(), edgeCount, mr.Geometry.Index);
+                if (edgeAddr == 0)
+                    continue;
+
+                const uint64_t baseAddr = geo->GetVertexBuffer()->GetDeviceAddress();
+                posAddr = baseAddr + geo->GetLayout().PositionsOffset;
+            }
 
             const uint32_t wireColor = GpuColor::PackColorF(
                 vis.WireframeColor.r, vis.WireframeColor.g,
                 vis.WireframeColor.b, vis.WireframeColor.a);
 
             // Per-edge color attribute buffer (optional — when CachedEdgeColors is populated).
+            // Edge aux buffers are still managed internally since MeshEdgeView doesn't carry them.
             uint64_t edgeAuxAddr = 0;
             if (!vis.CachedEdgeColors.empty() && vis.CachedEdgeColors.size() == edgeCount)
             {
+                // Track entity key for aux buffer orphan cleanup.
+                if (useEdgeView)
+                    activeKeys.push_back(entityKey);
                 edgeAuxAddr = EnsureEdgeAuxBuffer(
                     entityKey, vis.CachedEdgeColors.data(), edgeCount);
             }
