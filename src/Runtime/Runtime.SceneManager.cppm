@@ -38,6 +38,9 @@ export namespace Runtime
         void ConnectGpuHooks(Graphics::GPUScene& gpuScene);
         void DisconnectGpuHooks();
 
+        // Provide the geometry pool so SpawnModel can inspect topology.
+        void SetGeometryStorage(Graphics::GeometryPool* storage) { m_GeometryStorage = storage; }
+
         // --- Entity lifetime ---
 
         // Spawn an entity hierarchy for a loaded model asset.
@@ -54,5 +57,6 @@ export namespace Runtime
 
     private:
         ECS::Scene m_Scene;
+        Graphics::GeometryPool* m_GeometryStorage = nullptr;
     };
 }

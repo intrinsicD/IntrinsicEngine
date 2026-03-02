@@ -45,19 +45,11 @@ Zero vertex duplication. Each topology needs separate shader pipelines because t
 - `DebugDraw` immediate-mode accumulator for transient visualization (octree, KD-tree, bounds, contact manifolds, convex hulls). Depth-tested and overlay line APIs. Tested in `Test_DebugDraw.cpp`, `Test_BoundingDebugDraw.cpp`, `Test_OctreeDebugDraw.cpp`, `Test_KDTreeDebugDraw.cpp`, `Test_BVHDebugDraw.cpp`, `Test_ConvexHullDebugDraw.cpp`.
 - `LineRenderPass` renders `DebugDraw` content via per-frame host-visible SSBO. Two sub-passes: depth-tested + overlay (no depth test). Registered in `DefaultPipeline` after visualization collection.
 - GPU point data layout, color packing, BDA shared-buffer lifecycle, and render contract tests: `Test_PointCloudRenderPass.cpp`, `Test_RuntimeGeometry_Reuse.cpp`, `Test_ResourcePool.cpp`, `Test_BDASharedBufferContract.cpp`.
+- **Standalone point cloud rendering (§1.2 → merged):** `PointCloudRenderer::Component` holds `GeometryHandle` for device-local GPU data. `PointCloudRendererLifecycle` system uploads CPU data once, allocates `GPUScene` slots, clears CPU vectors. `RetainedPointCloudRenderPass` iterates standalone point cloud entities alongside mesh vertex vis and graph nodes. `SceneManager::SpawnModel()` routes `PrimitiveTopology::Points` to `PointCloudRenderer::Component`. `GPUSceneSync` handles point cloud transform sync. Contract tests in `Test_PointCloudRendererLifecycle.cpp`.
 
-**Status:** All retained-mode rendering items for §1.1 are complete.
+**Status:** All retained-mode rendering items for §1.1 are complete (including standalone point cloud rendering).
 
-### 1.2 Point Cloud Rendering — Standalone Retained-Mode
-
-Standalone point clouds (`.xyz`, `.pcd`, `.ply`) that arrive without an existing mesh vertex buffer still need their own device-local upload path.
-
-- [ ] `PointCloudRenderer::Component` holds `GeometryHandle` pointing to `GeometryGpuData` with `PrimitiveTopology::Points`. Upload positions/normals once via `GeometryUploadRequest` → `GeometryGpuData::CreateAsync()` → device-local with `SHADER_DEVICE_ADDRESS_BIT`.
-- [ ] For mesh-derived vertex visualization: `ReuseVertexBuffersFrom = meshHandle` — zero additional vertex upload, shared BDA pointer to same device-local buffer.  *(Currently handled by `RetainedPointCloudRenderPass` reading directly from mesh geometry.)*
-- [ ] Lifecycle system: `GPUScene` slot allocation, transform sync, frustum culling — same path as meshes.
-- [ ] Pipeline registration in `DefaultPipeline`, gated by `FeatureRegistry`.
-
-### 1.3 Per-Edge and Per-Face Attribute Rendering
+### 1.2 Per-Edge and Per-Face Attribute Rendering
 
 The rendering plan requires per-element attribute data from PropertySets flowing to GPU BDA channels, not just uniform colors via push constants.
 
@@ -71,7 +63,7 @@ The rendering plan requires per-element attribute data from PropertySets flowing
 - [ ] Shader support: `surface.frag` reads per-face color via `gl_PrimitiveID` indexing into face attribute BDA channel.
 - [ ] Face attribute buffer upload from `Mesh::FaceProperties()` spans.
 
-### 1.4 Geometry View Lifecycle Systems
+### 1.3 Geometry View Lifecycle Systems
 
 Automated creation/destruction of GPU geometry views when rendering components are attached/detached. Applies equally to all three geometry types.
 
@@ -80,7 +72,7 @@ Automated creation/destruction of GPU geometry views when rendering components a
 - [ ] `PointCloudGeometrySyncSystem`: on `ECS::Point::Component` attach with `PointCloud::Cloud` source → upload `Cloud::Positions()`/`Normals()` spans to device-local `GeometryGpuData`, assign handle.
 - [ ] All lifecycle systems allocate `GPUScene` slots, sync transforms, participate in frustum culling — same contract as `MeshRendererLifecycle`.
 
-### 1.5 PropertySet Dirty-Domain Sync System
+### 1.4 PropertySet Dirty-Domain Sync System
 
 Per-frame CPU→GPU synchronization driven by PropertySet change detection, with independent dirty tracking per data domain (vertex/edge/face).
 

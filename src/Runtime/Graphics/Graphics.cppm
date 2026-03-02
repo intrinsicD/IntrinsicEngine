@@ -18,6 +18,7 @@ export import :Pipelines;
 export import :GPUScene;
 export import :Systems.GPUSceneSync;
 export import :Systems.MeshRendererLifecycle;
+export import :Systems.PointCloudRendererLifecycle;
 export import :Systems.GraphGeometrySync;
 export import :DebugDraw;
 export import :OctreeDebugDraw;

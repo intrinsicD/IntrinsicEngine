@@ -374,7 +374,7 @@ Zero vertex duplication for mesh-derived views — same `std::shared_ptr<VulkanB
 
 Each view owns its own `GeometryHandle`, `GPUScene` slot, and participates in frustum culling independently. The `GeometryPool`/`GPUScene` retained-mode system is topology-agnostic. Only `DebugDraw` content (octree, bounds, contact manifold overlays) uses per-frame transient SSBO uploads — everything else is retained.
 
-**Current status:** Retained-mode BDA rendering is operational for wireframe (`RetainedLineRenderPass`), vertex visualization (`RetainedPointCloudRenderPass` with FlatDisc/Surfel/EWA modes), and graph geometry. Transient `DebugDraw` → `LineRenderPass` overlay path is functional. Standalone point cloud retained-mode upload (`.xyz`/`.pcd`/`.ply` without mesh vertex buffer) is pending — see `TODO.md`.
+**Current status:** Retained-mode BDA rendering is operational for wireframe (`RetainedLineRenderPass`), vertex visualization and standalone point clouds (`RetainedPointCloudRenderPass` with FlatDisc/Surfel/EWA modes), and graph geometry. Standalone point clouds (`.xyz`/`.pcd`/`.ply`) are first-class retained-mode renderables via `PointCloudRendererLifecycle` — uploaded once to device-local memory, rendered via BDA with zero per-frame cost. Transient `DebugDraw` → `LineRenderPass` overlay path is functional.
 
 ### Key API
 
