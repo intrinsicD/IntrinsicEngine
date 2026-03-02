@@ -25,16 +25,16 @@ namespace Graphics::Systems::MeshRendererLifecycle
     {
         [[nodiscard]] auto ComputeLocalBoundingSphere(const GeometryGpuData& geo) -> glm::vec4
         {
-            // Robust fallback:
-            //  - The culler treats radius <= 0 as "inactive" and will skip the instance entirely.
-            //  - GeometryGpuData currently doesn't ship precomputed bounds.
-            //
-            // Until ModelLoader plumbs local AABB/sphere into GeometryGpuData, we use a conservative
-            // "safety sphere" to effectively disable culling for typical assets (fixes Invisible Duck).
             if (geo.GetIndexCount() == 0)
                 return {0.0f, 0.0f, 0.0f, 0.0f};
 
-            // Massive radius = always visible under any sane camera frustum.
+            // Use precomputed bounds from GeometryGpuData (computed from CPU vertex data at upload time).
+            const glm::vec4 bounds = geo.GetLocalBoundingSphere();
+            if (bounds.w > 0.0f)
+                return bounds;
+
+            // Fallback for geometry without precomputed bounds (e.g. reused buffers
+            // where the source had no positions at upload time).
             return {0.0f, 0.0f, 0.0f, GPUSceneConstants::kDefaultBoundingSphereRadius};
         }
     }

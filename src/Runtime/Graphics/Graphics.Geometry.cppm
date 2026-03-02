@@ -112,6 +112,11 @@ export namespace Graphics
         [[nodiscard]] const GeometryBufferLayout& GetLayout() const { return m_Layout; }
         [[nodiscard]] PrimitiveTopology GetTopology() const { return m_Layout.Topology; }
 
+        // Local-space bounding sphere: (center.xyz, radius).
+        // Computed from CPU vertex positions at upload time.
+        // radius > 0 = valid bounds; radius <= 0 = empty/unknown geometry.
+        [[nodiscard]] glm::vec4 GetLocalBoundingSphere() const { return m_LocalBoundingSphere; }
+
     private:
         // Shared ownership enables multiple GeometryGpuData instances (views) to reference the same heavy buffers.
         std::shared_ptr<RHI::VulkanBuffer> m_VertexBuffer;
@@ -119,6 +124,7 @@ export namespace Graphics
 
         GeometryBufferLayout m_Layout{};
         uint32_t m_IndexCount = 0;
+        glm::vec4 m_LocalBoundingSphere{0.0f, 0.0f, 0.0f, 0.0f};
     };
 
 }

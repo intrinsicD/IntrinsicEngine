@@ -281,6 +281,40 @@ inline void AllocatePerFrameSets(RHI::DescriptorAllocator& pool,
 }
 
 // =============================================================================
+// FrustumCullSphere — CPU-side sphere-vs-frustum visibility test.
+// =============================================================================
+// Transforms a local-space bounding sphere into world space using the entity's
+// model matrix, then tests against 6 camera frustum planes.
+// Returns true if the sphere is visible (overlaps the frustum).
+//
+// This mirrors the GPU culling logic in instance_cull.comp:
+//   worldCenter = Model * localCenter
+//   worldRadius = localRadius * max(scaleX, scaleY, scaleZ)
+//   for each plane: if dot(normal, worldCenter) + d < -worldRadius → culled
+//
+// Requires: import Geometry; in the including TU (for Frustum, Sphere, TestOverlap).
+
+inline bool FrustumCullSphere(const glm::mat4& worldMatrix,
+                               const glm::vec4& localBounds,
+                               const Geometry::Frustum& frustum)
+{
+    const float localRadius = localBounds.w;
+    if (localRadius <= 0.0f)
+        return false; // Empty/inactive geometry — treat as culled.
+
+    const glm::vec3 localCenter{localBounds.x, localBounds.y, localBounds.z};
+    const glm::vec3 worldCenter = glm::vec3(worldMatrix * glm::vec4(localCenter, 1.0f));
+
+    // Scale radius by maximum axis scale of the model matrix.
+    const float sx = glm::length(glm::vec3(worldMatrix[0]));
+    const float sy = glm::length(glm::vec3(worldMatrix[1]));
+    const float sz = glm::length(glm::vec3(worldMatrix[2]));
+    const float worldRadius = localRadius * glm::max(sx, glm::max(sy, sz));
+
+    return Geometry::TestOverlap(frustum, Geometry::Sphere{worldCenter, worldRadius});
+}
+
+// =============================================================================
 // ResolveShaderPaths — resolve a vert/frag shader pair via the ShaderRegistry.
 // =============================================================================
 // Combines the two repeated ResolveShaderPathOrExit calls found in every pass
