@@ -61,7 +61,7 @@ TEST(FeatureRegistry, EmptyRegistryIsEmpty)
 TEST(FeatureRegistry, RegisterSingleFeature)
 {
     FeatureRegistry registry;
-    bool ok = registry.Register<MockRenderFeature>("ForwardPass", FeatureCategory::RenderFeature, "Main forward rendering");
+    bool ok = registry.Register<MockRenderFeature>("SurfacePass", FeatureCategory::RenderFeature, "Main forward rendering");
     EXPECT_TRUE(ok);
     EXPECT_EQ(registry.Count(), 1u);
     EXPECT_EQ(registry.CountByCategory(FeatureCategory::RenderFeature), 1u);
@@ -73,11 +73,11 @@ TEST(FeatureRegistry, RegisterSingleFeature)
 TEST(FeatureRegistry, FindByStringID)
 {
     FeatureRegistry registry;
-    registry.Register<MockRenderFeature>("ForwardPass", FeatureCategory::RenderFeature);
+    registry.Register<MockRenderFeature>("SurfacePass", FeatureCategory::RenderFeature);
 
-    const FeatureInfo* info = registry.Find("ForwardPass"_id);
+    const FeatureInfo* info = registry.Find("SurfacePass"_id);
     ASSERT_NE(info, nullptr);
-    EXPECT_EQ(info->Name, "ForwardPass");
+    EXPECT_EQ(info->Name, "SurfacePass");
     EXPECT_EQ(info->Category, FeatureCategory::RenderFeature);
     EXPECT_TRUE(info->Enabled);
 }
@@ -97,8 +97,8 @@ TEST(FeatureRegistry, FindUnknownReturnsNull)
 TEST(FeatureRegistry, DuplicateRegistrationRejected)
 {
     FeatureRegistry registry;
-    bool first = registry.Register<MockRenderFeature>("ForwardPass", FeatureCategory::RenderFeature);
-    bool second = registry.Register<MockRenderFeature>("ForwardPass", FeatureCategory::RenderFeature);
+    bool first = registry.Register<MockRenderFeature>("SurfacePass", FeatureCategory::RenderFeature);
+    bool second = registry.Register<MockRenderFeature>("SurfacePass", FeatureCategory::RenderFeature);
     EXPECT_TRUE(first);
     EXPECT_FALSE(second);
     EXPECT_EQ(registry.Count(), 1u);
@@ -110,7 +110,7 @@ TEST(FeatureRegistry, DuplicateRegistrationRejected)
 TEST(FeatureRegistry, MultipleCategoriesWork)
 {
     FeatureRegistry registry;
-    registry.Register<MockRenderFeature>("ForwardPass", FeatureCategory::RenderFeature);
+    registry.Register<MockRenderFeature>("SurfacePass", FeatureCategory::RenderFeature);
     registry.Register<MockRenderFeature>("PickingPass", FeatureCategory::RenderFeature);
     registry.Register<MockGeometryOp>("Simplify", FeatureCategory::GeometryOperator);
     registry.Register<MockPanel>("Inspector", FeatureCategory::Panel);
@@ -129,7 +129,7 @@ TEST(FeatureRegistry, MultipleCategoriesWork)
 TEST(FeatureRegistry, GetByCategoryFilters)
 {
     FeatureRegistry registry;
-    registry.Register<MockRenderFeature>("ForwardPass", FeatureCategory::RenderFeature);
+    registry.Register<MockRenderFeature>("SurfacePass", FeatureCategory::RenderFeature);
     registry.Register<MockRenderFeature>("PickingPass", FeatureCategory::RenderFeature);
     registry.Register<MockGeometryOp>("Simplify", FeatureCategory::GeometryOperator);
 
@@ -167,16 +167,16 @@ TEST(FeatureRegistry, GetByCategoryPreservesOrder)
 TEST(FeatureRegistry, EnableDisable)
 {
     FeatureRegistry registry;
-    registry.Register<MockRenderFeature>("ForwardPass", FeatureCategory::RenderFeature);
+    registry.Register<MockRenderFeature>("SurfacePass", FeatureCategory::RenderFeature);
 
-    EXPECT_TRUE(registry.IsEnabled("ForwardPass"_id));
+    EXPECT_TRUE(registry.IsEnabled("SurfacePass"_id));
 
-    bool changed = registry.SetEnabled("ForwardPass"_id, false);
+    bool changed = registry.SetEnabled("SurfacePass"_id, false);
     EXPECT_TRUE(changed);
-    EXPECT_FALSE(registry.IsEnabled("ForwardPass"_id));
+    EXPECT_FALSE(registry.IsEnabled("SurfacePass"_id));
 
-    registry.SetEnabled("ForwardPass"_id, true);
-    EXPECT_TRUE(registry.IsEnabled("ForwardPass"_id));
+    registry.SetEnabled("SurfacePass"_id, true);
+    EXPECT_TRUE(registry.IsEnabled("SurfacePass"_id));
 }
 
 // =========================================================================
@@ -203,7 +203,7 @@ TEST(FeatureRegistry, IsEnabledUnknownReturnsFalse)
 TEST(FeatureRegistry, GetEnabledFiltersDisabled)
 {
     FeatureRegistry registry;
-    registry.Register<MockRenderFeature>("ForwardPass", FeatureCategory::RenderFeature);
+    registry.Register<MockRenderFeature>("SurfacePass", FeatureCategory::RenderFeature);
     registry.Register<MockRenderFeature>("PickingPass", FeatureCategory::RenderFeature);
     registry.Register<MockRenderFeature>("DebugView", FeatureCategory::RenderFeature);
 
@@ -211,7 +211,7 @@ TEST(FeatureRegistry, GetEnabledFiltersDisabled)
 
     auto enabled = registry.GetEnabled(FeatureCategory::RenderFeature);
     EXPECT_EQ(enabled.size(), 2u);
-    EXPECT_EQ(enabled[0]->Name, "ForwardPass");
+    EXPECT_EQ(enabled[0]->Name, "SurfacePass");
     EXPECT_EQ(enabled[1]->Name, "DebugView");
 }
 
@@ -221,15 +221,15 @@ TEST(FeatureRegistry, GetEnabledFiltersDisabled)
 TEST(FeatureRegistry, CreateInstanceWorks)
 {
     FeatureRegistry registry;
-    registry.Register<MockRenderFeature>("ForwardPass", FeatureCategory::RenderFeature);
+    registry.Register<MockRenderFeature>("SurfacePass", FeatureCategory::RenderFeature);
 
-    void* raw = registry.CreateInstance("ForwardPass"_id);
+    void* raw = registry.CreateInstance("SurfacePass"_id);
     ASSERT_NE(raw, nullptr);
 
     auto* feature = static_cast<MockRenderFeature*>(raw);
     EXPECT_EQ(feature->Value, 42);
 
-    registry.DestroyInstance("ForwardPass"_id, raw);
+    registry.DestroyInstance("SurfacePass"_id, raw);
 }
 
 // =========================================================================
@@ -238,10 +238,10 @@ TEST(FeatureRegistry, CreateInstanceWorks)
 TEST(FeatureRegistry, CreateInstanceDisabledReturnsNull)
 {
     FeatureRegistry registry;
-    registry.Register<MockRenderFeature>("ForwardPass", FeatureCategory::RenderFeature);
-    registry.SetEnabled("ForwardPass"_id, false);
+    registry.Register<MockRenderFeature>("SurfacePass", FeatureCategory::RenderFeature);
+    registry.SetEnabled("SurfacePass"_id, false);
 
-    EXPECT_EQ(registry.CreateInstance("ForwardPass"_id), nullptr);
+    EXPECT_EQ(registry.CreateInstance("SurfacePass"_id), nullptr);
 }
 
 // =========================================================================
@@ -259,9 +259,9 @@ TEST(FeatureRegistry, CreateInstanceUnknownReturnsNull)
 TEST(FeatureRegistry, DestroyNullIsSafe)
 {
     FeatureRegistry registry;
-    registry.Register<MockRenderFeature>("ForwardPass", FeatureCategory::RenderFeature);
+    registry.Register<MockRenderFeature>("SurfacePass", FeatureCategory::RenderFeature);
     // Should not crash
-    registry.DestroyInstance("ForwardPass"_id, nullptr);
+    registry.DestroyInstance("SurfacePass"_id, nullptr);
 }
 
 // =========================================================================
@@ -292,13 +292,13 @@ TEST(FeatureRegistry, RegisterWithFactoryWorks)
 TEST(FeatureRegistry, UnregisterRemovesEntry)
 {
     FeatureRegistry registry;
-    registry.Register<MockRenderFeature>("ForwardPass", FeatureCategory::RenderFeature);
+    registry.Register<MockRenderFeature>("SurfacePass", FeatureCategory::RenderFeature);
     EXPECT_EQ(registry.Count(), 1u);
 
-    bool removed = registry.Unregister("ForwardPass"_id);
+    bool removed = registry.Unregister("SurfacePass"_id);
     EXPECT_TRUE(removed);
     EXPECT_EQ(registry.Count(), 0u);
-    EXPECT_EQ(registry.Find("ForwardPass"_id), nullptr);
+    EXPECT_EQ(registry.Find("SurfacePass"_id), nullptr);
 }
 
 // =========================================================================
@@ -316,14 +316,14 @@ TEST(FeatureRegistry, UnregisterUnknownReturnsFalse)
 TEST(FeatureRegistry, ReregisterAfterUnregister)
 {
     FeatureRegistry registry;
-    registry.Register<MockRenderFeature>("ForwardPass", FeatureCategory::RenderFeature);
-    registry.Unregister("ForwardPass"_id);
+    registry.Register<MockRenderFeature>("SurfacePass", FeatureCategory::RenderFeature);
+    registry.Unregister("SurfacePass"_id);
 
-    bool ok = registry.Register<MockGeometryOp>("ForwardPass", FeatureCategory::GeometryOperator);
+    bool ok = registry.Register<MockGeometryOp>("SurfacePass", FeatureCategory::GeometryOperator);
     EXPECT_TRUE(ok);
     EXPECT_EQ(registry.Count(), 1u);
 
-    const FeatureInfo* info = registry.Find("ForwardPass"_id);
+    const FeatureInfo* info = registry.Find("SurfacePass"_id);
     ASSERT_NE(info, nullptr);
     EXPECT_EQ(info->Category, FeatureCategory::GeometryOperator);
 }
@@ -391,10 +391,10 @@ TEST(FeatureRegistry, ForEachInCategoryFilters)
 TEST(FeatureRegistry, DescriptionStored)
 {
     FeatureRegistry registry;
-    registry.Register<MockRenderFeature>("ForwardPass", FeatureCategory::RenderFeature,
+    registry.Register<MockRenderFeature>("SurfacePass", FeatureCategory::RenderFeature,
                                           "Main PBR forward rendering pass");
 
-    const FeatureInfo* info = registry.Find("ForwardPass"_id);
+    const FeatureInfo* info = registry.Find("SurfacePass"_id);
     ASSERT_NE(info, nullptr);
     EXPECT_EQ(info->Description, "Main PBR forward rendering pass");
 }
@@ -405,10 +405,10 @@ TEST(FeatureRegistry, DescriptionStored)
 TEST(FeatureRegistry, MultipleInstancesAreIndependent)
 {
     FeatureRegistry registry;
-    registry.Register<MockRenderFeature>("ForwardPass", FeatureCategory::RenderFeature);
+    registry.Register<MockRenderFeature>("SurfacePass", FeatureCategory::RenderFeature);
 
-    void* a = registry.CreateInstance("ForwardPass"_id);
-    void* b = registry.CreateInstance("ForwardPass"_id);
+    void* a = registry.CreateInstance("SurfacePass"_id);
+    void* b = registry.CreateInstance("SurfacePass"_id);
 
     ASSERT_NE(a, nullptr);
     ASSERT_NE(b, nullptr);
@@ -419,8 +419,8 @@ TEST(FeatureRegistry, MultipleInstancesAreIndependent)
     fa->Value = 100;
     EXPECT_EQ(fb->Value, 42); // Independent
 
-    registry.DestroyInstance("ForwardPass"_id, a);
-    registry.DestroyInstance("ForwardPass"_id, b);
+    registry.DestroyInstance("SurfacePass"_id, a);
+    registry.DestroyInstance("SurfacePass"_id, b);
 }
 
 // =========================================================================

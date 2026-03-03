@@ -27,13 +27,14 @@ namespace Graphics::Systems::GPUSceneSync
                   uint32_t defaultTextureId)
     {
         // Fast path: only entities that either changed transform OR need material refresh.
+        // Queries Surface::Component (migrated from MeshRenderer::Component in Phase 2).
         auto view = registry.view<
             ECS::Components::Transform::WorldMatrix,
-            ECS::MeshRenderer::Component>();
+            ECS::Surface::Component>();
 
-        for (auto [entity, world, mr] : view.each())
+        for (auto [entity, world, sc] : view.each())
         {
-            if (mr.GpuSlot == ECS::MeshRenderer::Component::kInvalidSlot)
+            if (sc.GpuSlot == ECS::Surface::Component::kInvalidSlot)
                 continue;
 
             const bool transformDirty = registry.all_of<ECS::Components::Transform::WorldUpdatedTag>(entity);
@@ -51,25 +52,25 @@ namespace Graphics::Systems::GPUSceneSync
                 }
             }
 
-            // Resolve material handle once and cache it inside the MeshRenderer component as intended.
-            if (!mr.CachedMaterialHandle.IsValid())
+            // Resolve material handle once and cache it inside the Surface component.
+            if (!sc.CachedMaterialHandle.IsValid())
             {
-                if (auto* mat = assetManager.TryGetFast<Graphics::Material>(mr.Material))
+                if (auto* mat = assetManager.TryGetFast<Graphics::Material>(sc.Material))
                 {
-                    mr.CachedMaterialHandle = mat->GetHandle();
+                    sc.CachedMaterialHandle = mat->GetHandle();
                 }
             }
 
             uint32_t matRev = 0u;
             const MaterialData* matData = nullptr;
-            if (mr.CachedMaterialHandle.IsValid())
+            if (sc.CachedMaterialHandle.IsValid())
             {
-                matRev = materialSystem.GetRevision(mr.CachedMaterialHandle);
-                matData = materialSystem.GetData(mr.CachedMaterialHandle);
+                matRev = materialSystem.GetRevision(sc.CachedMaterialHandle);
+                matData = materialSystem.GetData(sc.CachedMaterialHandle);
             }
 
-            const bool materialDirty = (mr.CachedMaterialHandle != mr.CachedMaterialHandleForInstance) ||
-                                       (matRev != mr.CachedMaterialRevisionForInstance);
+            const bool materialDirty = (sc.CachedMaterialHandle != sc.CachedMaterialHandleForInstance) ||
+                                       (matRev != sc.CachedMaterialRevisionForInstance);
 
             if (!transformDirty && !materialDirty && !visibilityDirty)
                 continue;
@@ -123,10 +124,10 @@ namespace Graphics::Systems::GPUSceneSync
                 }
             }
 
-            gpuScene.QueueUpdate(mr.GpuSlot, inst, sphereBounds);
+            gpuScene.QueueUpdate(sc.GpuSlot, inst, sphereBounds);
 
-            mr.CachedMaterialHandleForInstance = mr.CachedMaterialHandle;
-            mr.CachedMaterialRevisionForInstance = matRev;
+            sc.CachedMaterialHandleForInstance = sc.CachedMaterialHandle;
+            sc.CachedMaterialRevisionForInstance = matRev;
 
             if (transformDirty)
                 registry.remove<ECS::Components::Transform::WorldUpdatedTag>(entt::entity(entity));
@@ -228,7 +229,7 @@ namespace Graphics::Systems::GPUSceneSync
             [](Core::FrameGraphBuilder& builder)
             {
                 builder.Read<ECS::Components::Transform::WorldMatrix>();
-                builder.Read<ECS::MeshRenderer::Component>();
+                builder.Read<ECS::Surface::Component>();
                 builder.Write<ECS::Components::Transform::WorldUpdatedTag>();
                 builder.WaitFor("TransformUpdate"_id);
                 builder.Signal("GPUSceneReady"_id);

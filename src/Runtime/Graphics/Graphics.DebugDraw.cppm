@@ -104,6 +104,28 @@ export namespace Graphics
         void Cross(const glm::vec3& center, float size, uint32_t color);
 
         // ----------------------------------------------------------------
+        // Triangle Drawing API (depth-tested)
+        // ----------------------------------------------------------------
+
+        // GPU-aligned triangle vertex: 32 bytes.
+        struct alignas(16) TriangleVertex
+        {
+            glm::vec3 Position;
+            uint32_t Color;   // packed ABGR
+            glm::vec3 Normal;
+            float _pad;
+        };
+        static_assert(sizeof(TriangleVertex) == 32, "TriangleVertex must be 32 bytes for GPU SSBO alignment");
+
+        // Submit a single filled triangle (depth-tested).
+        void Triangle(const glm::vec3& a, const glm::vec3& b, const glm::vec3& c,
+                      const glm::vec3& normal, uint32_t color);
+
+        // Submit a filled quad as two triangles (depth-tested).
+        void Quad(const glm::vec3& a, const glm::vec3& b, const glm::vec3& c, const glm::vec3& d,
+                  const glm::vec3& normal, uint32_t color);
+
+        // ----------------------------------------------------------------
         // Overlay API (no depth test — always drawn on top)
         // ----------------------------------------------------------------
 
@@ -123,9 +145,11 @@ export namespace Graphics
         // Access accumulated geometry for GPU upload.
         [[nodiscard]] std::span<const LineSegment> GetLines() const;
         [[nodiscard]] std::span<const LineSegment> GetOverlayLines() const;
+        [[nodiscard]] std::span<const TriangleVertex> GetTriangles() const;
         [[nodiscard]] uint32_t GetLineCount() const { return static_cast<uint32_t>(m_Lines.size()); }
         [[nodiscard]] uint32_t GetOverlayLineCount() const { return static_cast<uint32_t>(m_OverlayLines.size()); }
-        [[nodiscard]] bool HasContent() const { return !m_Lines.empty() || !m_OverlayLines.empty(); }
+        [[nodiscard]] uint32_t GetTriangleCount() const { return static_cast<uint32_t>(m_Triangles.size() / 3); }
+        [[nodiscard]] bool HasContent() const { return !m_Lines.empty() || !m_OverlayLines.empty() || !m_Triangles.empty(); }
 
     private:
         // Depth-tested lines (rendered with depth test enabled).
@@ -133,6 +157,9 @@ export namespace Graphics
 
         // Overlay lines (rendered without depth test — always on top).
         std::vector<LineSegment> m_OverlayLines;
+
+        // Depth-tested triangles (filled surface primitives).
+        std::vector<TriangleVertex> m_Triangles;
 
         // Shared implementation for sphere drawing.
         void SphereImpl(std::vector<LineSegment>& target,

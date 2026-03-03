@@ -1,14 +1,16 @@
 module;
 
 #include <algorithm>
+#include <cstdint>
 #include <memory>
+#include <span>
 #include <unordered_map>
 #include <vector>
 
 #include <glm/glm.hpp>
 #include "RHI.Vulkan.hpp"
 
-export module Graphics:Passes.Forward;
+export module Graphics:Passes.Surface;
 
 import :RenderPipeline;
 import :RenderGraph;
@@ -20,9 +22,9 @@ import RHI;
 export namespace Graphics::Passes
 {
     // -----------------------------------------------------------------
-    // Forward Pass Constants
+    // Surface Pass Constants
     // -----------------------------------------------------------------
-    namespace ForwardPassConstants
+    namespace SurfacePassConstants
     {
         // Compute shader workgroup size — must match instance_cull*.comp local_size_x.
         constexpr uint32_t kCullWorkgroupSize = 64;
@@ -36,10 +38,10 @@ export namespace Graphics::Passes
         constexpr uint32_t kCullPoolStorageBuffers = kCullPoolMaxSets * 5;
     }
 
-    class ForwardPass final : public IRenderFeature
+    class SurfacePass final : public IRenderFeature
     {
     public:
-        ForwardPass() = default;
+        SurfacePass() = default;
 
         void Initialize(RHI::VulkanDevice& device,
                         RHI::DescriptorAllocator& descriptorPool, RHI::DescriptorLayout&) override
@@ -60,6 +62,40 @@ export namespace Graphics::Passes
         void SetCullSetLayout(VkDescriptorSetLayout layout) { m_CullSetLayout = layout; }
 
         void SetEnableGpuCulling(bool enable) { m_EnableGpuCulling = enable; }
+
+        // -----------------------------------------------------------------
+        // Transient triangle submission API (PLAN.md Phase 2)
+        // -----------------------------------------------------------------
+        // GPU-aligned triangle vertex: 32 bytes.
+        struct alignas(16) TransientVertex
+        {
+            glm::vec3 Position;
+            uint32_t Color;   // packed ABGR
+            glm::vec3 Normal;
+            float _pad;
+        };
+        static_assert(sizeof(TransientVertex) == 32, "TransientVertex must be 32 bytes for GPU SSBO alignment");
+
+        // Submit a single triangle for transient (per-frame) rendering.
+        // Transient triangles are rendered with the same pipeline as retained
+        // surface geometry but from a host-visible SSBO that is rebuilt each frame.
+        void SubmitTriangle(const glm::vec3& a, const glm::vec3& b, const glm::vec3& c,
+                            const glm::vec3& normal, uint32_t color);
+
+        // Reset transient triangle buffer. Called at the start of each frame
+        // before any SubmitTriangle() calls.
+        void ResetTransient();
+
+        // Query transient triangle data for GPU upload.
+        [[nodiscard]] std::span<const TransientVertex> GetTransientVertices() const
+        {
+            return {m_TransientVertices.data(), m_TransientVertices.size()};
+        }
+        [[nodiscard]] uint32_t GetTransientTriangleCount() const
+        {
+            return static_cast<uint32_t>(m_TransientVertices.size() / 3);
+        }
+        [[nodiscard]] bool HasTransientContent() const { return !m_TransientVertices.empty(); }
 
     private:
         struct PassData
@@ -142,6 +178,9 @@ export namespace Graphics::Passes
         std::unique_ptr<RHI::PersistentDescriptorPool> m_InstanceSetPool;
 
         bool m_EnableGpuCulling = true;
+
+        // Transient triangle vertex buffer (rebuilt each frame).
+        std::vector<TransientVertex> m_TransientVertices;
 
         // ---------------------------------------------------------------------
         // Unified draw-stream contract (long-term error-resistant design)

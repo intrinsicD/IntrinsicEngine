@@ -38,9 +38,9 @@ export import :ConvexHullDebugDraw;
 // full scene visualization stack via shared primitive passes (Line, PointCloud).
 export import :Passes.PointCloud;  // GPU point renderer (FlatDisc)
 export import :Passes.Graph;       // Graph entity renderer (nodes→PointCloud, edges→Line)
-export import :Passes.Mesh;        // Mesh entity renderer (vertices→PointCloud, wireframe→Line, faces→Forward)
+export import :Passes.Mesh;        // Mesh entity renderer (vertices→PointCloud, wireframe→Line, faces→Surface)
 export import :Passes.Picking;
-export import :Passes.Forward;
+export import :Passes.Surface;
 export import :Passes.Line;
 export import :Passes.DebugView;
 export import :Passes.ImGui;

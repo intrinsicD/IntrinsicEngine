@@ -68,15 +68,15 @@ namespace Graphics
                                        VkFormat depthFormat)
     {
         // ---------------------------------------------------------------------
-        // Forward pipeline (Textured + BDA)
+        // Surface pipeline (Textured + BDA)
         // ---------------------------------------------------------------------
         {
             const std::string vertPath = Core::Filesystem::ResolveShaderPathOrExit(
                 [&](Core::Hash::StringID id) { return shaderRegistry.Get(id); },
-                "Forward.Vert"_id);
+                "Surface.Vert"_id);
             const std::string fragPath = Core::Filesystem::ResolveShaderPathOrExit(
                 [&](Core::Hash::StringID id) { return shaderRegistry.Get(id); },
-                "Forward.Frag"_id);
+                "Surface.Frag"_id);
 
             RHI::ShaderModule vert(*m_Device, vertPath, RHI::ShaderStage::Vertex);
             RHI::ShaderModule frag(*m_Device, fragPath, RHI::ShaderStage::Fragment);
@@ -119,7 +119,7 @@ namespace Graphics
                                                     &m_Stage1InstanceSetLayout));
 
                 // NOTE: Do NOT SafeDestroy() this layout. SafeDestroy schedules deletion a frame later,
-                // which will invalidate descriptor allocations while the pipeline (and ForwardPass) are still live.
+                // which will invalidate descriptor allocations while the pipeline (and SurfacePass) are still live.
             }
 
             builder.AddDescriptorSetLayout(m_Stage1InstanceSetLayout);
@@ -133,35 +133,35 @@ namespace Graphics
             auto pipelineResult = builder.Build();
             if (!pipelineResult)
             {
-                Core::Log::Error("Failed to build Forward pipeline: {}", (int)pipelineResult.error());
+                Core::Log::Error("Failed to build Surface pipeline: {}", (int)pipelineResult.error());
                 std::exit(1);
             }
 
-            m_Pipelines[kPipeline_Forward] = std::move(*pipelineResult);
+            m_Pipelines[kPipeline_Surface] = std::move(*pipelineResult);
         }
 
         // ---------------------------------------------------------------------
-        // Forward pipeline variants for Lines and Points.
+        // Surface pipeline variants for Lines and Points.
         //
         // Rationale: VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY is enabled globally in PipelineBuilder,
         // but most drivers run with dynamicPrimitiveTopologyUnrestricted = VK_FALSE.
         // That means vkCmdSetPrimitiveTopology() must stay within the same topology class as
         // the pipeline’s VkPipelineInputAssemblyStateCreateInfo::topology.
         //
-        // Our base forward pipeline is created with TRIANGLE_LIST, so using it to draw LINE_LIST
+        // Our base surface pipeline is created with TRIANGLE_LIST, so using it to draw LINE_LIST
         // or POINT_LIST triggers validation errors and undefined behavior (flicker).
         //
-        // Solution: create dedicated forward pipelines with matching base topology.
+        // Solution: create dedicated surface pipelines with matching base topology.
         // ---------------------------------------------------------------------
         {
             // Lines
             {
                 const std::string vertPath = Core::Filesystem::ResolveShaderPathOrExit(
                     [&](Core::Hash::StringID id) { return shaderRegistry.Get(id); },
-                    "Forward.Vert"_id);
+                    "Surface.Vert"_id);
                 const std::string fragPath = Core::Filesystem::ResolveShaderPathOrExit(
                     [&](Core::Hash::StringID id) { return shaderRegistry.Get(id); },
-                    "Forward.Frag"_id);
+                    "Surface.Frag"_id);
 
                 RHI::ShaderModule vert(*m_Device, vertPath, RHI::ShaderStage::Vertex);
                 RHI::ShaderModule frag(*m_Device, fragPath, RHI::ShaderStage::Fragment);
@@ -188,21 +188,21 @@ namespace Graphics
                 auto pipelineResult = builder.Build();
                 if (!pipelineResult)
                 {
-                    Core::Log::Error("Failed to build ForwardLines pipeline: {}", (int)pipelineResult.error());
+                    Core::Log::Error("Failed to build SurfaceLines pipeline: {}", (int)pipelineResult.error());
                     std::exit(1);
                 }
 
-                m_Pipelines[kPipeline_ForwardLines] = std::move(*pipelineResult);
+                m_Pipelines[kPipeline_SurfaceLines] = std::move(*pipelineResult);
             }
 
             // Points
             {
                 const std::string vertPath = Core::Filesystem::ResolveShaderPathOrExit(
                     [&](Core::Hash::StringID id) { return shaderRegistry.Get(id); },
-                    "Forward.Vert"_id);
+                    "Surface.Vert"_id);
                 const std::string fragPath = Core::Filesystem::ResolveShaderPathOrExit(
                     [&](Core::Hash::StringID id) { return shaderRegistry.Get(id); },
-                    "Forward.Frag"_id);
+                    "Surface.Frag"_id);
 
                 RHI::ShaderModule vert(*m_Device, vertPath, RHI::ShaderStage::Vertex);
                 RHI::ShaderModule frag(*m_Device, fragPath, RHI::ShaderStage::Fragment);
@@ -229,11 +229,11 @@ namespace Graphics
                 auto pipelineResult = builder.Build();
                 if (!pipelineResult)
                 {
-                    Core::Log::Error("Failed to build ForwardPoints pipeline: {}", (int)pipelineResult.error());
+                    Core::Log::Error("Failed to build SurfacePoints pipeline: {}", (int)pipelineResult.error());
                     std::exit(1);
                 }
 
-                m_Pipelines[Graphics::kPipeline_ForwardPoints] = std::move(*pipelineResult);
+                m_Pipelines[Graphics::kPipeline_SurfacePoints] = std::move(*pipelineResult);
             }
         }
 
@@ -258,7 +258,7 @@ namespace Graphics
             builder.SetColorFormats({VK_FORMAT_R32_UINT});
             builder.SetDepthFormat(depthFormat);
 
-            // Keep winding convention consistent with the main Forward pass.
+            // Keep winding convention consistent with the main Surface pass.
             builder.SetCullMode(VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE);
 
             builder.AddDescriptorSetLayout(m_GlobalSetLayout.GetHandle());

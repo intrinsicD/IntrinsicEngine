@@ -75,8 +75,8 @@ export namespace Graphics
     using namespace Core::Hash;
     // Canonical pipeline IDs used across the engine.
     // (You can move these into a dedicated IDs module later.)
-    inline constexpr StringID kPipeline_Forward = "Pipeline.Forward"_id;
-    inline constexpr StringID kPipeline_ForwardLines = "Pipeline.ForwardLines"_id;
-    inline constexpr StringID kPipeline_ForwardPoints = "Pipeline.ForwardPoints"_id;
+    inline constexpr StringID kPipeline_Surface = "Pipeline.Surface"_id;
+    inline constexpr StringID kPipeline_SurfaceLines = "Pipeline.SurfaceLines"_id;
+    inline constexpr StringID kPipeline_SurfacePoints = "Pipeline.SurfacePoints"_id;
     inline constexpr StringID kPipeline_Picking = "Pipeline.Picking"_id;
 }

@@ -16,8 +16,8 @@ This section tracks where runtime code currently stands relative to this plan/sp
 | Area | Planned direction | Current state | Status |
 |------|-------------------|---------------|--------|
 | ECS render components | Replace `MeshRenderer`/`RenderVisualization`/`GraphRenderer`/`PointCloudRenderer` with `ECS::Surface`, `ECS::Line`, `ECS::Point`, `ECS::Graph::Data` | `ECS::Surface::Component`, `ECS::Line::Component`, `ECS::Point::Component` defined alongside legacy components. `ComponentMigration` system syncs legacy → new each frame. `ECS::Graph::Data` replaces `GraphRenderer::Component` with `shared_ptr<Graph>` PropertySet-backed authority. Legacy components still active (transition period). | **Phase 1 complete** |
-| Pass topology | Collapse into `SurfacePass`, `LinePass`, `PointPass` each owning retained + transient internally | Pipeline still instantiates `ForwardPass`, `MeshRenderPass`, `GraphRenderPass`, `LineRenderPass`, `PointCloudRenderPass`, `RetainedLineRenderPass`, `RetainedPointCloudRenderPass` | **Not started** |
-| Shader naming/registration | `surface.*`, unified `line.*`, `point_flatdisc.*`, `point_surfel.*` IDs | Runtime still registers `triangle.*`, `line_retained.*`, `point_retained.*` and keeps transient `line.*` / `point.*` paths | **Not started** |
+| Pass topology | Collapse into `SurfacePass`, `LinePass`, `PointPass` each owning retained + transient internally | `SurfacePass` (renamed from `ForwardPass`, Phase 2 complete). Pipeline still instantiates `MeshRenderPass`, `GraphRenderPass`, `LineRenderPass`, `PointCloudRenderPass`, `RetainedLineRenderPass`, `RetainedPointCloudRenderPass` alongside `SurfacePass` | **Phase 2 complete** |
+| Shader naming/registration | `surface.*`, unified `line.*`, `point_flatdisc.*`, `point_surfel.*` IDs | `triangle.vert/frag` renamed to `surface.vert/frag` (Phase 2). Runtime registers `Surface.Vert/Frag`. Still keeps `line_retained.*`, `point_retained.*` and transient `line.*` / `point.*` paths | **Phase 2 complete** |
 | CPU geometry authority | PropertySet-backed CPU sources for cloud/graph/mesh topology and attributes | **Implemented in geometry domain types** (`PointCloud::Cloud`, `Graph`, `Halfedge::Mesh`). All four PropertySet domains (`VertexProperties()`, `EdgeProperties()`, `FaceProperties()`, `HalfedgeProperties()`) are publicly accessible. Bulk edge extraction via `ExtractEdgeVertexPairs()` provides span-compatible GPU upload. | **Complete** |
 | PropertySet-driven edge source | Mesh/graph edge rendering sourced from topology PropertySets | Plan/spec defined, but runtime still has `RenderVisualization::CachedEdges` + dirty cache fields | **Partial (spec yes, runtime no)** |
 | Automatic CPU→GPU sync | Per-frame dirty-domain sync (`GeometryDirty`/`TopologyDirty`/`AttributesDirty`) patches SSBO ranges and renderable offsets | No generic dirty-domain sync system yet; current flow is pass/component-local invalidation and per-feature staging | **Not started** |
@@ -296,7 +296,7 @@ Everything that belongs together shares a prefix.
 
 | Current | New | Module Partition |
 |---------|-----|-----------------|
-| `ForwardPass` | `SurfacePass` | `Graphics:Passes.Surface` |
+| ~~`ForwardPass`~~ | `SurfacePass` (**done**) | `Graphics:Passes.Surface` |
 | `RetainedLineRenderPass` | `LinePass` | `Graphics:Passes.Line` |
 | `RetainedPointCloudRenderPass` | `PointPass` | `Graphics:Passes.Point` |
 | `MeshRenderPass` | **deleted** | — |
@@ -383,9 +383,9 @@ triangle.vert / triangle.frag                 # renamed to surface.*
 
 ### 1. SurfacePass
 
-**Replaces:** `ForwardPass` (renamed, same GPU-driven culling architecture).
+**Replaces:** `ForwardPass` (renamed, same GPU-driven culling architecture). **Phase 2 rename complete.**
 
-**What changes from current ForwardPass:**
+**What changed from ForwardPass (Phase 2, complete):**
 - Renamed for consistency (ForwardPass → SurfacePass)
 - Shader renamed (`triangle.* → surface.*`). Push constant layout preserved: `mat4 Model + 3×uint64_t BDA + uint32_t flags + viewport floats` (104 bytes total — same as current `triangle.vert`).
 - Queries `ECS::Surface::Component` instead of `ECS::MeshRenderer::Component`
@@ -725,15 +725,15 @@ Each pass is self-contained. No existing code changes.
 
 **Gate:** `IntrinsicTests` pass. New components coexist with old ones.
 
-### Phase 2: SurfacePass (atomic — rename + consolidate + migrate query)
+### Phase 2: SurfacePass (atomic — rename + consolidate + migrate query) ✅ COMPLETE
 
-6. Rename `ForwardPass` → `SurfacePass` (class, files, module partition)
-7. Rename shaders (`triangle.* → surface.*`)
-8. Add `SubmitTriangles()` / `ResetTransient()` transient API
-9. Add `GetTriangles()` to `DebugDraw`
-10. SurfacePass queries `ECS::Surface::Component` instead of `MeshRenderer::Component`
-11. Migrate `GPUSceneSync` to use `ECS::Surface::Component`
-12. Update `DefaultPipeline`, `FeatureRegistry`, `ShaderRegistry`, `CMakeLists.txt`
+6. ~~Rename `ForwardPass` → `SurfacePass` (class, files, module partition)~~
+7. ~~Rename shaders (`triangle.* → surface.*`)~~
+8. ~~Add `SubmitTriangles()` / `ResetTransient()` transient API~~
+9. ~~Add `GetTriangles()` to `DebugDraw`~~
+10. ~~SurfacePass queries `ECS::Surface::Component` instead of `MeshRenderer::Component`~~
+11. ~~Migrate `GPUSceneSync` to use `ECS::Surface::Component`~~
+12. ~~Update `DefaultPipeline`, `FeatureRegistry`, `ShaderRegistry`, `CMakeLists.txt`~~
 
 **Gate:** `IntrinsicTests` pass. Surface rendering visually identical to before.
 

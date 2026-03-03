@@ -96,8 +96,8 @@ namespace Runtime
         };
 
         constexpr std::array kShaderRegistrations = {
-            ShaderRegistration{"Forward.Vert"_id, "shaders/triangle.vert.spv"},
-            ShaderRegistration{"Forward.Frag"_id, "shaders/triangle.frag.spv"},
+            ShaderRegistration{"Surface.Vert"_id, "shaders/surface.vert.spv"},
+            ShaderRegistration{"Surface.Frag"_id, "shaders/surface.frag.spv"},
             ShaderRegistration{"Picking.Vert"_id, "shaders/pick_id.vert.spv"},
             ShaderRegistration{"Picking.Frag"_id, "shaders/pick_id.frag.spv"},
             ShaderRegistration{"Debug.Vert"_id, "shaders/debug_view.vert.spv"},

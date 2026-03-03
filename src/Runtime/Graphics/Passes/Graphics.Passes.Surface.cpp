@@ -10,11 +10,11 @@ module;
 #include "RHI.Vulkan.hpp"
 
 // Optional: enable extremely verbose per-entity material/texture tracing.
-// #define INTRINSIC_FORWARDPASS_TRACE_TEXTURES
+// #define INTRINSIC_SURFACEPASS_TRACE_TEXTURES
 
-module Graphics:Passes.Forward.Impl;
+module Graphics:Passes.Surface.Impl;
 
-import :Passes.Forward;
+import :Passes.Surface;
 
 import :RenderPipeline;
 import :RenderGraph;
@@ -32,7 +32,7 @@ using namespace Core::Hash;
 
 namespace Graphics::Passes
 {
-    void ForwardPass::AddPasses(RenderPassContext& ctx)
+    void SurfacePass::AddPasses(RenderPassContext& ctx)
     {
         if (!m_Pipeline)
             return;
@@ -49,24 +49,24 @@ namespace Graphics::Passes
         {
             if (m_InstanceSetLayout == VK_NULL_HANDLE)
             {
-                Core::Log::Error("ForwardPass: Stage 1 instance set layout not set.");
+                Core::Log::Error("SurfacePass: Stage 1 instance set layout not set.");
                 return;
             }
 
             m_InstanceSetPool = std::make_unique<RHI::PersistentDescriptorPool>(
                 *m_Device,
-                ForwardPassConstants::kInstancePoolMaxSets,
-                ForwardPassConstants::kInstancePoolStorageBuffers,
-                "ForwardPass.Stage1.Instance");
+                SurfacePassConstants::kInstancePoolMaxSets,
+                SurfacePassConstants::kInstancePoolStorageBuffers,
+                "SurfacePass.Stage1.Instance");
         }
 
         if (m_CullSetPool == nullptr)
         {
             m_CullSetPool = std::make_unique<RHI::PersistentDescriptorPool>(
                 *m_Device,
-                ForwardPassConstants::kCullPoolMaxSets,
-                ForwardPassConstants::kCullPoolStorageBuffers,
-                "ForwardPass.Cull");
+                SurfacePassConstants::kCullPoolMaxSets,
+                SurfacePassConstants::kCullPoolStorageBuffers,
+                "SurfacePass.Cull");
         }
 
         DrawStream stream = BuildDrawStream(ctx);
@@ -74,7 +74,7 @@ namespace Graphics::Passes
     }
 
 
-    Graphics::Passes::ForwardPass::DrawStream Graphics::Passes::ForwardPass::BuildDrawStream(RenderPassContext& ctx)
+    Graphics::Passes::SurfacePass::DrawStream Graphics::Passes::SurfacePass::BuildDrawStream(RenderPassContext& ctx)
     {
          DrawStream out{};
 
@@ -96,30 +96,30 @@ namespace Graphics::Passes
 
         uint32_t maxHandleIndex = 0;
 
-        // Build unique geometry list from ECS.
+        // Build unique geometry list from ECS (queries Surface::Component).
         {
-            auto view = ctx.Scene.GetRegistry().view<ECS::MeshRenderer::Component>();
+            auto view = ctx.Scene.GetRegistry().view<ECS::Surface::Component>();
             for (auto entity : view)
             {
-                const auto& mr = view.get<ECS::MeshRenderer::Component>(entity);
-                if (!mr.Geometry.IsValid())
+                const auto& sc = view.get<ECS::Surface::Component>(entity);
+                if (!sc.Geometry.IsValid())
                     continue;
 
-                maxHandleIndex = std::max(maxHandleIndex, mr.Geometry.Index);
+                maxHandleIndex = std::max(maxHandleIndex, sc.Geometry.Index);
 
                 bool seen = false;
                 for (const DenseGeo& g : dense)
                 {
-                    if (g.Handle == mr.Geometry) { seen = true; break; }
+                    if (g.Handle == sc.Geometry) { seen = true; break; }
                 }
                 if (seen)
                     continue;
 
-                GeometryGpuData* geo = ctx.GeometryStorage.GetUnchecked(mr.Geometry);
+                GeometryGpuData* geo = ctx.GeometryStorage.GetUnchecked(sc.Geometry);
                 if (!geo || geo->GetIndexCount() == 0 || !geo->GetIndexBuffer() || !geo->GetVertexBuffer())
                     continue;
 
-                dense.push_back({.Handle = mr.Geometry, .Geo = geo});
+                dense.push_back({.Handle = sc.Geometry, .Geo = geo});
             }
         }
 
@@ -203,23 +203,23 @@ namespace Graphics::Passes
             uint32_t invalidGeometryHandle = 0;
             uint32_t invalidGeometryMapping = 0;
 
-            auto view = ctx.Scene.GetRegistry().view<ECS::MeshRenderer::Component>();
+            auto view = ctx.Scene.GetRegistry().view<ECS::Surface::Component>();
             for (auto entity : view)
             {
-                const auto& mr = view.get<ECS::MeshRenderer::Component>(entity);
-                if (!mr.Geometry.IsValid())
+                const auto& sc = view.get<ECS::Surface::Component>(entity);
+                if (!sc.Geometry.IsValid())
                 {
                     ++invalidGeometryHandle;
                     continue;
                 }
 
-                if (mr.Geometry.Index >= handleToDense.size())
+                if (sc.Geometry.Index >= handleToDense.size())
                 {
                     ++invalidGeometryMapping;
                     continue;
                 }
 
-                if (handleToDense[mr.Geometry.Index] == GPUSceneConstants::kPreserveGeometryId)
+                if (handleToDense[sc.Geometry.Index] == GPUSceneConstants::kPreserveGeometryId)
                     ++invalidGeometryMapping;
             }
 
@@ -449,7 +449,7 @@ namespace Graphics::Passes
 
                                                 vkCmdPushConstants(cmd, m_CullPipeline->GetLayout(), VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(CullPC), &pc);
 
-                                                const uint32_t groups = (totalInstanceCount + ForwardPassConstants::kCullWorkgroupSize - 1) / ForwardPassConstants::kCullWorkgroupSize;
+                                                const uint32_t groups = (totalInstanceCount + SurfacePassConstants::kCullWorkgroupSize - 1) / SurfacePassConstants::kCullWorkgroupSize;
                                                 vkCmdDispatch(cmd, groups, 1, 1);
                                             });
         }
@@ -461,22 +461,22 @@ namespace Graphics::Passes
         // -----------------------------------------------------------------
         std::unordered_map<uint32_t, uint64_t> faceAttrByGeoIndex;
         {
-            auto visView = ctx.Scene.GetRegistry().view<ECS::MeshRenderer::Component,
+            auto visView = ctx.Scene.GetRegistry().view<ECS::Surface::Component,
                                                         ECS::RenderVisualization::Component>();
-            for (auto [entity, mr, vis] : visView.each())
+            for (auto [entity, sc, vis] : visView.each())
             {
-                if (!mr.Geometry.IsValid() || vis.CachedFaceColors.empty())
+                if (!sc.Geometry.IsValid() || vis.CachedFaceColors.empty())
                     continue;
 
                 // Only process the first entity per geometry (all instances share face colors).
-                if (faceAttrByGeoIndex.contains(mr.Geometry.Index))
+                if (faceAttrByGeoIndex.contains(sc.Geometry.Index))
                     continue;
 
                 const uint32_t faceCount = static_cast<uint32_t>(vis.CachedFaceColors.size());
                 const uint64_t addr = EnsureFaceAttrBuffer(
-                    mr.Geometry.Index, vis.CachedFaceColors.data(), faceCount);
+                    sc.Geometry.Index, vis.CachedFaceColors.data(), faceCount);
                 if (addr != 0)
-                    faceAttrByGeoIndex[mr.Geometry.Index] = addr;
+                    faceAttrByGeoIndex[sc.Geometry.Index] = addr;
             }
         }
 
@@ -538,7 +538,7 @@ namespace Graphics::Passes
         return out;
     }
 
-    void Graphics::Passes::ForwardPass::AddRasterPass(RenderPassContext& ctx, RGResourceHandle backbuffer, RGResourceHandle depth, DrawStream&& stream)
+    void Graphics::Passes::SurfacePass::AddRasterPass(RenderPassContext& ctx, RGResourceHandle backbuffer, RGResourceHandle depth, DrawStream&& stream)
     {
         // If CPU path injected its own raster pass, do nothing.
         if (stream.Batches.empty())
@@ -750,7 +750,7 @@ namespace Graphics::Passes
     // =========================================================================
     // Stage 3: GPU-driven culling with single shared geometry
     // =========================================================================
-    void Graphics::Passes::ForwardPass::AddStage3Passes(RenderPassContext& ctx,
+    void Graphics::Passes::SurfacePass::AddStage3Passes(RenderPassContext& ctx,
                                       RGResourceHandle /*backbuffer*/,
                                       RGResourceHandle /*depth*/,
                                       Geometry::GeometryHandle singleGeometry)
@@ -948,7 +948,7 @@ namespace Graphics::Passes
 
                                             vkCmdPushConstants(cmd, m_CullPipeline->GetLayout(), VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(CullPC), &pc);
 
-                                            const uint32_t groups = (stage3.InstanceCount + ForwardPassConstants::kCullWorkgroupSize - 1) / Graphics::Passes::ForwardPassConstants::kCullWorkgroupSize;
+                                            const uint32_t groups = (stage3.InstanceCount + SurfacePassConstants::kCullWorkgroupSize - 1) / Graphics::Passes::SurfacePassConstants::kCullWorkgroupSize;
                                             vkCmdDispatch(cmd, groups, 1, 1);
                                         });
 
@@ -957,7 +957,7 @@ namespace Graphics::Passes
         // the produced indirect/count/visibility buffers.
     }
 
-    void Graphics::Passes::ForwardPass::AddStage1And2Passes(RenderPassContext& ctx,
+    void Graphics::Passes::SurfacePass::AddStage1And2Passes(RenderPassContext& ctx,
                                           RGResourceHandle /*backbuffer*/,
                                           RGResourceHandle /*depth*/)
     {
@@ -974,7 +974,7 @@ namespace Graphics::Passes
     // for a geometry. Data is an array of packed ABGR uint32_t, one per face.
     // Returns the buffer device address, or 0 on failure.
 
-    uint64_t ForwardPass::EnsureFaceAttrBuffer(
+    uint64_t SurfacePass::EnsureFaceAttrBuffer(
         uint32_t geoIndex,
         const uint32_t* colorData,
         uint32_t faceCount)
@@ -1003,7 +1003,7 @@ namespace Graphics::Passes
 
         if (!buf->GetMappedData())
         {
-            Core::Log::Error("ForwardPass: Failed to allocate face attribute buffer ({} bytes)", size);
+            Core::Log::Error("SurfacePass: Failed to allocate face attribute buffer ({} bytes)", size);
             return 0;
         }
 
@@ -1012,5 +1012,22 @@ namespace Graphics::Passes
 
         m_FaceAttrBuffers[geoIndex] = { std::move(buf), faceCount };
         return addr;
+    }
+
+    // -----------------------------------------------------------------
+    // Transient triangle submission (PLAN.md Phase 2)
+    // -----------------------------------------------------------------
+
+    void SurfacePass::SubmitTriangle(const glm::vec3& a, const glm::vec3& b, const glm::vec3& c,
+                                     const glm::vec3& normal, uint32_t color)
+    {
+        m_TransientVertices.push_back({a, color, normal, 0.0f});
+        m_TransientVertices.push_back({b, color, normal, 0.0f});
+        m_TransientVertices.push_back({c, color, normal, 0.0f});
+    }
+
+    void SurfacePass::ResetTransient()
+    {
+        m_TransientVertices.clear();
     }
 }

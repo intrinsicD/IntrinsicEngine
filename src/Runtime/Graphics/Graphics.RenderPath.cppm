@@ -60,7 +60,7 @@ export namespace Graphics
         }
 
         // Helper to add a legacy IRenderFeature directly.
-        // Example: path.AddFeature("Forward", m_ForwardPass.get());
+        // Example: path.AddFeature("Surface", m_SurfacePass.get());
         void AddFeature(std::string_view name, IRenderFeature* feature)
         {
             if (feature)

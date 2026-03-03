@@ -29,11 +29,11 @@ import Core.Logging;
 //
 // Usage:
 //   Core::FeatureRegistry registry;
-//   registry.Register<MyForwardPass>("ForwardPass", FeatureCategory::RenderFeature);
-//   auto* info = registry.Find("ForwardPass"_id);
-//   void* instance = registry.CreateInstance("ForwardPass"_id);
+//   registry.Register<MySurfacePass>("SurfacePass", FeatureCategory::RenderFeature);
+//   auto* info = registry.Find("SurfacePass"_id);
+//   void* instance = registry.CreateInstance("SurfacePass"_id);
 //   // ... use instance as concrete type ...
-//   registry.DestroyInstance("ForwardPass"_id, instance);
+//   registry.DestroyInstance("SurfacePass"_id, instance);
 // -------------------------------------------------------------------------
 
 export namespace Core

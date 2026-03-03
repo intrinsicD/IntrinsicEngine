@@ -11,7 +11,7 @@ import :RenderGraph;
 import :ShaderRegistry;
 import :PipelineLibrary;
 import :Passes.DebugView;
-import :Passes.Forward;
+import :Passes.Surface;
 import :Passes.Graph;
 import :Passes.ImGui;
 import :Passes.Line;
@@ -65,7 +65,7 @@ export namespace Graphics
         const Core::FeatureRegistry* m_Registry = nullptr;
 
         std::unique_ptr<Passes::PickingPass> m_PickingPass;
-        std::unique_ptr<Passes::ForwardPass> m_ForwardPass;
+        std::unique_ptr<Passes::SurfacePass> m_SurfacePass;
         std::unique_ptr<Passes::MeshRenderPass> m_MeshPass;
         std::unique_ptr<Passes::GraphRenderPass> m_GraphPass;
         std::unique_ptr<Passes::SelectionOutlinePass> m_SelectionOutlinePass;

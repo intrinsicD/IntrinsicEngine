@@ -15,7 +15,7 @@ export namespace Graphics::Systems::GPUSceneSync
     // Contract:
     //  - Consumes ECS::Components::Transform::WorldUpdatedTag emitted by TransformSystem.
     //  - Clears WorldUpdatedTag after processing.
-    //  - Updates only entities that have an allocated MeshRenderer::GpuSlot.
+    //  - Updates only entities that have an allocated Surface::GpuSlot.
     //
     // Extended contract:
     //  - Also refreshes instance TextureID when the referenced material changes (MaterialSystem revision bump).
@@ -26,7 +26,7 @@ export namespace Graphics::Systems::GPUSceneSync
                   uint32_t defaultTextureId);
 
     // Register this system into a FrameGraph with its dependency declarations.
-    // Declares: Read<Transform::WorldMatrix>, Read<MeshRenderer::Component>,
+    // Declares: Read<Transform::WorldMatrix>, Read<Surface::Component>,
     //           Write<Transform::WorldUpdatedTag>, WaitFor("TransformUpdate"), Signal("GPUSceneReady").
     void RegisterSystem(Core::FrameGraph& graph,
                         entt::registry& registry,
