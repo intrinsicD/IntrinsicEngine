@@ -88,16 +88,20 @@ namespace Graphics::Systems::MeshViewLifecycle
                   RHI::TransferManager& transferManager)
     {
         // -----------------------------------------------------------------
-        // Phase 0: Auto-attach/detach MeshEdgeView based on Line::Component
+        // Phase 0: Auto-attach/detach internal view components based on
+        //          Line/Point::Component presence.
         // -----------------------------------------------------------------
         // Ensures MeshEdgeView::Component exists when Line::Component is
-        // present, and is removed when it is absent. This runs before
-        // Phase 1 so that new edge views are processed in the same frame.
+        // present, and MeshVertexView::Component exists when
+        // Point::Component is present (on Surface entities only). Removed
+        // when the corresponding per-pass component is detached. This runs
+        // before Phase 1/2 so new views are processed in the same frame.
         {
             auto surfView = registry.view<ECS::Surface::Component>();
 
             for (auto [entity, sc] : surfView.each())
             {
+                // Edge view ↔ Line::Component
                 const bool wantEdges = registry.all_of<ECS::Line::Component>(entity);
                 const bool hasEdgeView = registry.all_of<ECS::MeshEdgeView::Component>(entity);
 
@@ -105,6 +109,15 @@ namespace Graphics::Systems::MeshViewLifecycle
                     registry.emplace<ECS::MeshEdgeView::Component>(entity);
                 else if (!wantEdges && hasEdgeView)
                     registry.remove<ECS::MeshEdgeView::Component>(entity);
+
+                // Vertex view ↔ Point::Component
+                const bool wantVertices = registry.all_of<ECS::Point::Component>(entity);
+                const bool hasVertexView = registry.all_of<ECS::MeshVertexView::Component>(entity);
+
+                if (wantVertices && !hasVertexView)
+                    registry.emplace<ECS::MeshVertexView::Component>(entity);
+                else if (!wantVertices && hasVertexView)
+                    registry.remove<ECS::MeshVertexView::Component>(entity);
             }
         }
 
@@ -201,6 +214,26 @@ namespace Graphics::Systems::MeshViewLifecycle
         }
 
         // -----------------------------------------------------------------
+        // Phase 1b: Populate Line::Component from completed edge views.
+        // -----------------------------------------------------------------
+        // Idempotent: runs every frame for all entities with valid edge
+        // geometry, ensuring Line::Component always has current handles.
+        // Replaces the ComponentMigration bridge for mesh wireframe.
+        for (auto [entity, ev, sc] : edgeView.each())
+        {
+            if (!ev.Geometry.IsValid())
+                continue;
+
+            auto* lineComp = registry.try_get<ECS::Line::Component>(entity);
+            if (lineComp)
+            {
+                lineComp->Geometry  = sc.Geometry;   // Shared vertex buffer (BDA)
+                lineComp->EdgeView  = ev.Geometry;   // Edge index buffer
+                lineComp->EdgeCount = ev.EdgeCount;
+            }
+        }
+
+        // -----------------------------------------------------------------
         // Phase 2: Vertex View Lifecycle
         // -----------------------------------------------------------------
         // Iterate entities with MeshVertexView + Surface.
@@ -275,6 +308,28 @@ namespace Graphics::Systems::MeshViewLifecycle
                 gpuScene.QueueUpdate(pv.GpuSlot, inst, sphere);
             }
         }
+
+        // -----------------------------------------------------------------
+        // Phase 2b: Populate Point::Component from completed vertex views.
+        // -----------------------------------------------------------------
+        // Idempotent: runs every frame for all entities with valid vertex
+        // view geometry, ensuring Point::Component always has current handles.
+        for (auto [entity, pv, sc] : vtxView.each())
+        {
+            if (!pv.Geometry.IsValid())
+                continue;
+
+            auto* pointComp = registry.try_get<ECS::Point::Component>(entity);
+            if (pointComp)
+            {
+                pointComp->Geometry = pv.Geometry;  // Vertex view (Points topology)
+
+                // Propagate normals availability from source mesh.
+                GeometryGpuData* geo = geometryStorage.GetUnchecked(pv.Geometry);
+                if (geo)
+                    pointComp->HasPerPointNormals = (geo->GetLayout().NormalsSize > 0);
+            }
+        }
     }
 
     void RegisterSystem(Core::FrameGraph& graph,
@@ -290,6 +345,8 @@ namespace Graphics::Systems::MeshViewLifecycle
                 builder.Read<ECS::Components::Transform::WorldMatrix>();
                 builder.Write<ECS::MeshEdgeView::Component>();
                 builder.Write<ECS::MeshVertexView::Component>();
+                builder.Write<ECS::Line::Component>();
+                builder.Write<ECS::Point::Component>();
                 builder.WaitFor("MeshRendererLifecycle"_id);
             },
             [&registry, &gpuScene, &geometryStorage, device, &transferManager]()

@@ -66,8 +66,10 @@ namespace Graphics::Systems::PointCloudGeometrySync
                     pcData.CachedRadii.clear();
                     pcData.GpuPointCount = 0;
                     pcData.GpuDirty = false;
-                    continue;
+                    // Fall through to Phase 3 (GpuGeometry invalid → skip).
                 }
+                else
+                {
 
                 auto& cloud = *pcData.CloudRef;
 
@@ -134,15 +136,20 @@ namespace Graphics::Systems::PointCloudGeometrySync
                     Core::Log::Error("PointCloudGeometrySync: Failed to create GPU geometry for entity {}",
                                      static_cast<uint32_t>(entity));
                     pcData.GpuDirty = false;
-                    continue;
+                    // Fall through to Phase 3 (GpuGeometry invalid → skip).
                 }
+                else
+                {
 
                 pcData.GpuGeometry = geometryStorage.Add(std::move(newGpuData));
                 pcData.CachedColors = std::move(pointColors);
                 pcData.CachedRadii = std::move(pointRadii);
                 pcData.GpuPointCount = static_cast<uint32_t>(positions.size());
                 pcData.GpuDirty = false;
-            }
+
+                } // else (upload succeeded)
+                } // else (cloud not empty)
+            } // if (GpuDirty)
 
             // -----------------------------------------------------------------
             // Phase 2: Allocate GPUScene slot for entities with valid GPU geometry.
@@ -152,35 +159,54 @@ namespace Graphics::Systems::PointCloudGeometrySync
             if (pcData.GpuSlot == ECS::PointCloud::Data::kInvalidSlot && pcData.GpuGeometry.IsValid())
             {
                 GeometryGpuData* geo = geometryStorage.GetUnchecked(pcData.GpuGeometry);
-                if (!geo || !geo->GetVertexBuffer())
-                    continue;
+                if (geo && geo->GetVertexBuffer())
+                {
+                    const uint32_t slot = gpuScene.AllocateSlot();
+                    if (slot != ECS::PointCloud::Data::kInvalidSlot)
+                    {
+                        pcData.GpuSlot = slot;
 
-                const uint32_t slot = gpuScene.AllocateSlot();
-                if (slot == ECS::PointCloud::Data::kInvalidSlot)
-                    continue;
+                        GpuInstanceData inst{};
 
-                pcData.GpuSlot = slot;
+                        auto* wm = registry.try_get<ECS::Components::Transform::WorldMatrix>(entity);
+                        if (wm)
+                            inst.Model = wm->Matrix;
 
-                GpuInstanceData inst{};
+                        inst.GeometryID = pcData.GpuGeometry.Index;
 
-                auto* wm = registry.try_get<ECS::Components::Transform::WorldMatrix>(entity);
-                if (wm)
-                    inst.Model = wm->Matrix;
+                        if (auto* pick = registry.try_get<ECS::Components::Selection::PickID>(entity))
+                            inst.EntityID = pick->Value;
 
-                inst.GeometryID = pcData.GpuGeometry.Index;
+                        glm::vec4 sphere = ComputeLocalBoundingSphere(*geo);
+                        if (sphere.w <= 0.0f)
+                            sphere.w = GPUSceneConstants::kMinBoundingSphereRadius;
 
-                if (auto* pick = registry.try_get<ECS::Components::Selection::PickID>(entity))
-                    inst.EntityID = pick->Value;
+                        gpuScene.QueueUpdate(pcData.GpuSlot, inst, sphere);
 
-                glm::vec4 sphere = ComputeLocalBoundingSphere(*geo);
-                if (sphere.w <= 0.0f)
-                    sphere.w = GPUSceneConstants::kMinBoundingSphereRadius;
+                        // Clear the WorldUpdatedTag so GPUSceneSync doesn't double-update
+                        // on the same frame.
+                        registry.remove<ECS::Components::Transform::WorldUpdatedTag>(entity);
+                    }
+                }
+            }
 
-                gpuScene.QueueUpdate(pcData.GpuSlot, inst, sphere);
-
-                // Clear the WorldUpdatedTag so GPUSceneSync doesn't double-update
-                // on the same frame.
-                registry.remove<ECS::Components::Transform::WorldUpdatedTag>(entity);
+            // -----------------------------------------------------------------
+            // Phase 3: Populate Point::Component from PointCloud::Data.
+            // -----------------------------------------------------------------
+            // Directly populates Point::Component, replacing
+            // ComponentMigration's point cloud bridging. Idempotent — runs
+            // every frame for all visible cloud entities with valid GPU geometry.
+            if (pcData.Visible && pcData.GpuGeometry.IsValid())
+            {
+                auto& pt = registry.get_or_emplace<ECS::Point::Component>(entity);
+                pt.Geometry          = pcData.GpuGeometry;
+                pt.Color             = pcData.DefaultColor;
+                pt.Size              = pcData.DefaultRadius;
+                pt.SizeMultiplier    = pcData.SizeMultiplier;
+                pt.Mode              = pcData.RenderMode;
+                pt.HasPerPointColors = pcData.HasColors();
+                pt.HasPerPointRadii  = pcData.HasRadii();
+                pt.HasPerPointNormals = pcData.HasNormals();
             }
         }
     }
@@ -196,6 +222,7 @@ namespace Graphics::Systems::PointCloudGeometrySync
             [](Core::FrameGraphBuilder& builder)
             {
                 builder.Write<ECS::PointCloud::Data>();
+                builder.Write<ECS::Point::Component>();
                 builder.WaitFor("TransformUpdate"_id);
             },
             [&registry, &gpuScene, &geometryStorage, device, &transferManager]()

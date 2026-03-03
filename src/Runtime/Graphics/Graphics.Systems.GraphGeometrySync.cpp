@@ -75,8 +75,10 @@ namespace Graphics::Systems::GraphGeometrySync
                     graphData.CachedNodeRadii.clear();
                     graphData.GpuVertexCount = 0;
                     graphData.GpuDirty = false;
-                    continue;
+                    // Fall through to Phase 3 (GpuGeometry invalid → skip).
                 }
+                else
+                {
 
                 auto& graph = *graphData.GraphRef;
 
@@ -164,8 +166,10 @@ namespace Graphics::Systems::GraphGeometrySync
                     graphData.CachedNodeRadii.clear();
                     graphData.GpuVertexCount = 0;
                     graphData.GpuDirty = false;
-                    continue;
+                    // Fall through to Phase 3 (GpuGeometry invalid → skip).
                 }
+                else
+                {
 
                 // --- Extract edge pairs (remapped to compacted indices) ---
                 const std::size_t eSize = graph.EdgesSize();
@@ -230,8 +234,10 @@ namespace Graphics::Systems::GraphGeometrySync
                     Core::Log::Error("GraphGeometrySync: Failed to create GPU geometry for entity {}",
                                      static_cast<uint32_t>(entity));
                     graphData.GpuDirty = false;
-                    continue;
+                    // Fall through to Phase 3 (GpuGeometry invalid → skip).
                 }
+                else
+                {
 
                 graphData.GpuGeometry = geometryStorage.Add(std::move(newGpuData));
 
@@ -284,7 +290,11 @@ namespace Graphics::Systems::GraphGeometrySync
                 graphData.CachedNodeRadii = std::move(nodeRadii);
                 graphData.GpuVertexCount = compactIdx;
                 graphData.GpuDirty = false;
-            }
+
+                } // else (upload succeeded)
+                } // else (positions not empty)
+                } // else (graph not empty)
+            } // if (GpuDirty)
 
             // -----------------------------------------------------------------
             // Phase 2: Allocate GPUScene slot for entities with valid GPU geometry.
@@ -294,35 +304,65 @@ namespace Graphics::Systems::GraphGeometrySync
             if (graphData.GpuSlot == ECS::Graph::Data::kInvalidSlot && graphData.GpuGeometry.IsValid())
             {
                 GeometryGpuData* geo = geometryStorage.GetUnchecked(graphData.GpuGeometry);
-                if (!geo || !geo->GetVertexBuffer())
-                    continue;
+                if (geo && geo->GetVertexBuffer())
+                {
+                    const uint32_t slot = gpuScene.AllocateSlot();
+                    if (slot != ECS::Graph::Data::kInvalidSlot)
+                    {
+                        graphData.GpuSlot = slot;
 
-                const uint32_t slot = gpuScene.AllocateSlot();
-                if (slot == ECS::Graph::Data::kInvalidSlot)
-                    continue;
+                        GpuInstanceData inst{};
 
-                graphData.GpuSlot = slot;
+                        auto* wm = registry.try_get<ECS::Components::Transform::WorldMatrix>(entity);
+                        if (wm)
+                            inst.Model = wm->Matrix;
 
-                GpuInstanceData inst{};
+                        inst.GeometryID = graphData.GpuGeometry.Index;
 
-                auto* wm = registry.try_get<ECS::Components::Transform::WorldMatrix>(entity);
-                if (wm)
-                    inst.Model = wm->Matrix;
+                        if (auto* pick = registry.try_get<ECS::Components::Selection::PickID>(entity))
+                            inst.EntityID = pick->Value;
 
-                inst.GeometryID = graphData.GpuGeometry.Index;
+                        glm::vec4 sphere = ComputeLocalBoundingSphere(*geo);
+                        if (sphere.w <= 0.0f)
+                            sphere.w = GPUSceneConstants::kMinBoundingSphereRadius;
 
-                if (auto* pick = registry.try_get<ECS::Components::Selection::PickID>(entity))
-                    inst.EntityID = pick->Value;
+                        gpuScene.QueueUpdate(graphData.GpuSlot, inst, sphere);
 
-                glm::vec4 sphere = ComputeLocalBoundingSphere(*geo);
-                if (sphere.w <= 0.0f)
-                    sphere.w = GPUSceneConstants::kMinBoundingSphereRadius;
+                        // Clear the WorldUpdatedTag so GPUSceneSync doesn't double-update
+                        // on the same frame.
+                        registry.remove<ECS::Components::Transform::WorldUpdatedTag>(entity);
+                    }
+                }
+            }
 
-                gpuScene.QueueUpdate(graphData.GpuSlot, inst, sphere);
+            // -----------------------------------------------------------------
+            // Phase 3: Populate per-pass typed ECS components.
+            // -----------------------------------------------------------------
+            // Directly populates Line::Component (edges) and Point::Component
+            // (nodes) from Graph::Data, replacing ComponentMigration's graph
+            // bridging. Idempotent — runs every frame for all visible graph
+            // entities with valid GPU geometry.
+            if (graphData.Visible && graphData.GpuGeometry.IsValid())
+            {
+                // Edges → Line
+                auto& line = registry.get_or_emplace<ECS::Line::Component>(entity);
+                line.Geometry         = graphData.GpuGeometry;
+                line.EdgeView         = graphData.GpuEdgeGeometry;
+                line.EdgeCount        = graphData.GpuEdgeCount;
+                line.Color            = graphData.DefaultEdgeColor;
+                line.Width            = graphData.EdgeWidth;
+                line.Overlay          = graphData.EdgesOverlay;
+                line.HasPerEdgeColors = !graphData.CachedEdgeColors.empty();
 
-                // Clear the WorldUpdatedTag so GPUSceneSync doesn't double-update
-                // on the same frame.
-                registry.remove<ECS::Components::Transform::WorldUpdatedTag>(entity);
+                // Nodes → Point
+                auto& pt = registry.get_or_emplace<ECS::Point::Component>(entity);
+                pt.Geometry          = graphData.GpuGeometry;
+                pt.Color             = graphData.DefaultNodeColor;
+                pt.Size              = graphData.DefaultNodeRadius;
+                pt.SizeMultiplier    = graphData.NodeSizeMultiplier;
+                pt.Mode              = graphData.NodeRenderMode;
+                pt.HasPerPointColors = !graphData.CachedNodeColors.empty();
+                pt.HasPerPointRadii  = !graphData.CachedNodeRadii.empty();
             }
         }
     }
@@ -338,6 +378,8 @@ namespace Graphics::Systems::GraphGeometrySync
             [](Core::FrameGraphBuilder& builder)
             {
                 builder.Write<ECS::Graph::Data>();
+                builder.Write<ECS::Line::Component>();
+                builder.Write<ECS::Point::Component>();
                 builder.WaitFor("TransformUpdate"_id);
             },
             [&registry, &gpuScene, &geometryStorage, device, &transferManager]()

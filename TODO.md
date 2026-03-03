@@ -20,15 +20,6 @@ This document tracks **what's left to do** in IntrinsicEngine's architecture.
 
 Replace the dual-path (transient CPU + retained GPU) rendering with a **single unified path per primitive type** (`SurfacePass`, `LinePass`, `PointPass`). Full spec in `PLAN.md`.
 
-### 1.6 Adapt Geometry View Lifecycle Systems (PLAN.md Phase 6)
-
-Lifecycle systems already exist (`MeshViewLifecycleSystem`, `GraphGeometrySyncSystem`, `PointCloudGeometrySyncSystem`). They must be migrated to populate the new `ECS::Surface/Line/Point::Component` types and work with the unified pass architecture.
-
-- [ ] Migrate `MeshViewLifecycleSystem` to create/populate `ECS::Line::Component` and `ECS::Point::Component` on attach/detach (replaces current `MeshEdgeView`/`MeshVertexView` intermediaries).
-- [ ] Migrate `GraphGeometrySyncSystem` to populate sibling `ECS::Line::Component` + `ECS::Point::Component` handles (instead of relying on pass-specific iteration).
-- [ ] Migrate `PointCloudGeometrySyncSystem` to populate `ECS::Point::Component` handle (instead of `PointCloudRenderer::Component`).
-- [ ] All three systems allocate `GPUScene` slots, sync transforms, frustum culling — same path as `MeshRendererLifecycle`.
-
 ### 1.7 Per-Face Attribute Support (PLAN.md Phase 7)
 
 Per-face attribute rendering infrastructure exists (per-face colors via `gl_PrimitiveID`). Needs adaptation for the new SurfacePass naming.

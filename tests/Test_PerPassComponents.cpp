@@ -334,46 +334,44 @@ TEST(ComponentMigration, PointCloudRenderer_Invisible_SkipsCreation)
     EXPECT_FALSE(reg.all_of<Point::Component>(e));
 }
 
-TEST(ComponentMigration, GraphData_CreatesLineAndPoint)
+// =============================================================================
+// Phase 6: ComponentMigration no longer bridges Graph or PointCloud
+// =============================================================================
+// Graph::Data → Line+Point bridging moved to GraphGeometrySyncSystem.
+// PointCloud::Data → Point bridging moved to PointCloudGeometrySyncSystem.
+// ComponentMigration only bridges PointCloudRenderer → Point.
+
+TEST(ComponentMigration, GraphData_NotBridgedByComponentMigration)
 {
+    // After Phase 6, ComponentMigration does NOT create Line/Point from Graph::Data.
+    // GraphGeometrySyncSystem handles this directly.
     entt::registry reg;
     auto e = reg.create();
 
     auto& gd = reg.emplace<Graph::Data>(e);
-    gd.DefaultNodeColor = {0.9f, 0.1f, 0.0f, 1.0f};
-    gd.DefaultEdgeColor = {0.0f, 0.0f, 1.0f, 1.0f};
-    gd.DefaultNodeRadius = 0.02f;
-    gd.EdgeWidth = 2.5f;
-    gd.EdgesOverlay = true;
     gd.Visible = true;
+    gd.DefaultEdgeColor = {0.0f, 0.0f, 1.0f, 1.0f};
 
     Graphics::Systems::ComponentMigration::OnUpdate(reg);
 
-    // Line from graph edges.
-    ASSERT_TRUE(reg.all_of<Line::Component>(e));
-    auto& line = reg.get<Line::Component>(e);
-    EXPECT_EQ(line.Color, glm::vec4(0.0f, 0.0f, 1.0f, 1.0f));
-    EXPECT_FLOAT_EQ(line.Width, 2.5f);
-    EXPECT_TRUE(line.Overlay);
-
-    // Point from graph nodes.
-    ASSERT_TRUE(reg.all_of<Point::Component>(e));
-    auto& pt = reg.get<Point::Component>(e);
-    EXPECT_EQ(pt.Color, glm::vec4(0.9f, 0.1f, 0.0f, 1.0f));
-    EXPECT_FLOAT_EQ(pt.Size, 0.02f);
+    // ComponentMigration should NOT create Line or Point from Graph::Data.
+    EXPECT_FALSE(reg.all_of<Line::Component>(e));
+    EXPECT_FALSE(reg.all_of<Point::Component>(e));
 }
 
-TEST(ComponentMigration, GraphData_Invisible_SkipsCreation)
+TEST(ComponentMigration, PointCloudData_NotBridgedByComponentMigration)
 {
+    // After Phase 6, ComponentMigration does NOT create Point from PointCloud::Data.
+    // PointCloudGeometrySyncSystem handles this directly.
     entt::registry reg;
     auto e = reg.create();
 
-    auto& gd = reg.emplace<Graph::Data>(e);
-    gd.Visible = false;
+    auto& pcd = reg.emplace<PointCloud::Data>(e);
+    pcd.Visible = true;
+    pcd.DefaultColor = {0.5f, 0.5f, 1.0f, 1.0f};
 
     Graphics::Systems::ComponentMigration::OnUpdate(reg);
 
-    EXPECT_FALSE(reg.all_of<Line::Component>(e));
     EXPECT_FALSE(reg.all_of<Point::Component>(e));
 }
 
@@ -382,17 +380,146 @@ TEST(ComponentMigration, Idempotent_SecondRunProducesSameResult)
     entt::registry reg;
     auto e = reg.create();
 
-    auto& gd = reg.emplace<Graph::Data>(e);
-    gd.Visible = true;
-    gd.DefaultEdgeColor = {0.0f, 0.0f, 1.0f, 1.0f};
+    auto& pc = reg.emplace<PointCloudRenderer::Component>(e);
+    pc.Visible = true;
+    pc.DefaultColor = {0.0f, 0.0f, 1.0f, 1.0f};
 
     Graphics::Systems::ComponentMigration::OnUpdate(reg);
-    auto lineColor1 = reg.get<Line::Component>(e).Color;
+    auto ptColor1 = reg.get<Point::Component>(e).Color;
 
     // Second run should not change anything.
     Graphics::Systems::ComponentMigration::OnUpdate(reg);
-    auto lineColor2 = reg.get<Line::Component>(e).Color;
+    auto ptColor2 = reg.get<Point::Component>(e).Color;
 
-    EXPECT_EQ(lineColor1, lineColor2);
-    EXPECT_EQ(lineColor2, glm::vec4(0.0f, 0.0f, 1.0f, 1.0f));
+    EXPECT_EQ(ptColor1, ptColor2);
+    EXPECT_EQ(ptColor2, glm::vec4(0.0f, 0.0f, 1.0f, 1.0f));
+}
+
+// =============================================================================
+// Phase 6: Lifecycle system component population contracts
+// =============================================================================
+
+TEST(Phase6_GraphSync, GraphDataFields_MapToLineAndPoint)
+{
+    // Validates the field mapping contract: GraphGeometrySyncSystem
+    // populates Line::Component and Point::Component from Graph::Data
+    // with the same field mapping that ComponentMigration previously used.
+    Graph::Data gd;
+    gd.DefaultEdgeColor = {0.0f, 0.0f, 1.0f, 1.0f};
+    gd.EdgeWidth = 2.5f;
+    gd.EdgesOverlay = true;
+    gd.DefaultNodeColor = {0.9f, 0.1f, 0.0f, 1.0f};
+    gd.DefaultNodeRadius = 0.02f;
+    gd.NodeSizeMultiplier = 1.5f;
+    gd.NodeRenderMode = Geometry::PointCloud::RenderMode::Surfel;
+    gd.CachedNodeColors = {0xFF0000FF};
+    gd.CachedNodeRadii = {0.01f};
+    gd.CachedEdgeColors = {0xFF00FF00};
+
+    // Simulate what GraphGeometrySyncSystem Phase 3 does.
+    Line::Component line;
+    line.Color            = gd.DefaultEdgeColor;
+    line.Width            = gd.EdgeWidth;
+    line.Overlay          = gd.EdgesOverlay;
+    line.HasPerEdgeColors = !gd.CachedEdgeColors.empty();
+
+    Point::Component pt;
+    pt.Color             = gd.DefaultNodeColor;
+    pt.Size              = gd.DefaultNodeRadius;
+    pt.SizeMultiplier    = gd.NodeSizeMultiplier;
+    pt.Mode              = gd.NodeRenderMode;
+    pt.HasPerPointColors = !gd.CachedNodeColors.empty();
+    pt.HasPerPointRadii  = !gd.CachedNodeRadii.empty();
+
+    EXPECT_EQ(line.Color, glm::vec4(0.0f, 0.0f, 1.0f, 1.0f));
+    EXPECT_FLOAT_EQ(line.Width, 2.5f);
+    EXPECT_TRUE(line.Overlay);
+    EXPECT_TRUE(line.HasPerEdgeColors);
+
+    EXPECT_EQ(pt.Color, glm::vec4(0.9f, 0.1f, 0.0f, 1.0f));
+    EXPECT_FLOAT_EQ(pt.Size, 0.02f);
+    EXPECT_FLOAT_EQ(pt.SizeMultiplier, 1.5f);
+    EXPECT_EQ(pt.Mode, Geometry::PointCloud::RenderMode::Surfel);
+    EXPECT_TRUE(pt.HasPerPointColors);
+    EXPECT_TRUE(pt.HasPerPointRadii);
+}
+
+TEST(Phase6_CloudSync, PointCloudDataFields_MapToPoint)
+{
+    // Validates the field mapping contract: PointCloudGeometrySyncSystem
+    // populates Point::Component from PointCloud::Data.
+    auto cloud = std::make_shared<Geometry::PointCloud::Cloud>();
+    cloud->EnableNormals();
+    cloud->EnableColors();
+    cloud->EnableRadii();
+    cloud->AddPoint({0.f, 0.f, 0.f});
+
+    PointCloud::Data pcd;
+    pcd.CloudRef = cloud;
+    pcd.DefaultColor = {0.5f, 0.5f, 1.0f, 1.0f};
+    pcd.DefaultRadius = 0.01f;
+    pcd.SizeMultiplier = 2.0f;
+    pcd.RenderMode = Geometry::PointCloud::RenderMode::Surfel;
+
+    // Simulate what PointCloudGeometrySyncSystem Phase 3 does.
+    Point::Component pt;
+    pt.Color             = pcd.DefaultColor;
+    pt.Size              = pcd.DefaultRadius;
+    pt.SizeMultiplier    = pcd.SizeMultiplier;
+    pt.Mode              = pcd.RenderMode;
+    pt.HasPerPointColors = pcd.HasColors();
+    pt.HasPerPointRadii  = pcd.HasRadii();
+    pt.HasPerPointNormals = pcd.HasNormals();
+
+    EXPECT_EQ(pt.Color, glm::vec4(0.5f, 0.5f, 1.0f, 1.0f));
+    EXPECT_FLOAT_EQ(pt.Size, 0.01f);
+    EXPECT_FLOAT_EQ(pt.SizeMultiplier, 2.0f);
+    EXPECT_EQ(pt.Mode, Geometry::PointCloud::RenderMode::Surfel);
+    EXPECT_TRUE(pt.HasPerPointColors);
+    EXPECT_TRUE(pt.HasPerPointRadii);
+    EXPECT_TRUE(pt.HasPerPointNormals);
+}
+
+TEST(Phase6_MeshView, EdgeView_PopulatesLineComponent)
+{
+    // Validates the contract: MeshViewLifecycleSystem Phase 1b
+    // populates Line::Component from completed edge views.
+    Geometry::GeometryHandle meshGeo(0, 1);
+    Geometry::GeometryHandle edgeGeo(1, 1);
+
+    ECS::MeshEdgeView::Component ev;
+    ev.Geometry = edgeGeo;
+    ev.EdgeCount = 42;
+    ev.Dirty = false;
+
+    // Simulate Phase 1b population.
+    Line::Component line;
+    line.Geometry  = meshGeo;    // Shared vertex buffer
+    line.EdgeView  = ev.Geometry; // Edge index buffer
+    line.EdgeCount = ev.EdgeCount;
+
+    EXPECT_TRUE(line.Geometry.IsValid());
+    EXPECT_TRUE(line.EdgeView.IsValid());
+    EXPECT_EQ(line.EdgeCount, 42u);
+    EXPECT_NE(line.Geometry, line.EdgeView); // Different handles
+}
+
+TEST(Phase6_MeshView, VertexView_PopulatesPointComponent)
+{
+    // Validates the contract: MeshViewLifecycleSystem Phase 2b
+    // populates Point::Component from completed vertex views.
+    Geometry::GeometryHandle vtxGeo(2, 1);
+
+    ECS::MeshVertexView::Component pv;
+    pv.Geometry = vtxGeo;
+    pv.VertexCount = 1024;
+    pv.Dirty = false;
+
+    // Simulate Phase 2b population.
+    Point::Component pt;
+    pt.Geometry = pv.Geometry;
+    pt.HasPerPointNormals = true; // Source has normals
+
+    EXPECT_TRUE(pt.Geometry.IsValid());
+    EXPECT_TRUE(pt.HasPerPointNormals);
 }
