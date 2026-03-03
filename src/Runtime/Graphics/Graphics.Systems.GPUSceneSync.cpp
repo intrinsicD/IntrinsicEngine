@@ -187,6 +187,34 @@ namespace Graphics::Systems::GPUSceneSync
 
             registry.remove<ECS::Components::Transform::WorldUpdatedTag>(entt::entity(entity));
         }
+
+        // --- Cloud-backed point cloud entities: transform-only sync (no materials). ---
+        auto cloudView = registry.view<
+            ECS::Components::Transform::WorldMatrix,
+            ECS::PointCloud::Data>();
+
+        for (auto [entity, world, pcData] : cloudView.each())
+        {
+            if (pcData.GpuSlot == ECS::PointCloud::Data::kInvalidSlot)
+                continue;
+
+            const bool transformDirty = registry.all_of<ECS::Components::Transform::WorldUpdatedTag>(entity);
+            if (!transformDirty)
+                continue;
+
+            GpuInstanceData inst{};
+            inst.Model = world.Matrix;
+            inst.GeometryID = GPUSceneConstants::kPreserveGeometryId;
+            inst.TextureID = 0xFFFFFFFFu; // Preserve existing.
+
+            if (auto* pick = registry.try_get<ECS::Components::Selection::PickID>(entt::entity(entity)))
+                inst.EntityID = pick->Value;
+
+            glm::vec4 sphereBounds{0.0f, 0.0f, 0.0f, -1.0f}; // Preserve existing bounds.
+            gpuScene.QueueUpdate(pcData.GpuSlot, inst, sphereBounds);
+
+            registry.remove<ECS::Components::Transform::WorldUpdatedTag>(entt::entity(entity));
+        }
     }
 
     void RegisterSystem(Core::FrameGraph& graph,

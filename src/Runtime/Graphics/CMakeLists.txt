@@ -24,6 +24,7 @@ target_sources(${target_name}
         Graphics.Systems.MeshRendererLifecycle.cppm
         Graphics.Systems.PointCloudRendererLifecycle.cppm
         Graphics.Systems.GraphGeometrySync.cppm
+        Graphics.Systems.PointCloudGeometrySync.cppm
         Graphics.Systems.MeshViewLifecycle.cppm
         # New Modules
         Graphics.RenderPath.cppm
@@ -82,6 +83,7 @@ target_sources(${target_name}
         Graphics.Systems.MeshRendererLifecycle.cpp
         Graphics.Systems.PointCloudRendererLifecycle.cpp
         Graphics.Systems.GraphGeometrySync.cpp
+        Graphics.Systems.PointCloudGeometrySync.cpp
         Graphics.Systems.MeshViewLifecycle.cpp
         # New Implementations
         Graphics.DebugDraw.cpp

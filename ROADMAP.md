@@ -16,7 +16,9 @@ Recent completions (2026-03-02, details in git history): retained render pass wi
 
 Recent completions (2026-03-02, details in git history): `GraphGeometrySyncSystem` GPUScene integration — `GpuSlot` field on `ECS::Graph::Data` with `AllocateSlot()`/`FreeSlot()` lifecycle matching `PointCloudRendererLifecycle` pattern, per-node attribute extraction (`"v:color"` → `CachedNodeColors`, `"v:radius"` → `CachedNodeRadii`) from PropertySets, `GPUSceneSync` transform-only sync for graph entities, `on_destroy` hook in `SceneManager` for automatic slot reclamation, `FeatureRegistry` registration as `"GraphGeometrySync"`. Contract tests extended in `Test_GraphRenderPass.cpp` and `Test_BDASharedBufferContract.cpp`.
 
-Near-term priority now shifts to remaining lifecycle system enhancements (PointCloudGeometrySync, optional staged upload path for static graphs), and PropertySet dirty-domain sync (TODO §1.3).
+Recent completions (2026-03-03, details in git history): `PointCloudGeometrySyncSystem` — `ECS::PointCloud::Data` component holding `shared_ptr<Geometry::PointCloud::Cloud>` as PropertySet-backed data authority (analogous to `ECS::Graph::Data`), `PointCloudGeometrySyncSystem` uploads `Cloud::Positions()`/`Normals()` spans to device-local `GeometryGpuData` via Staged upload, per-point attribute extraction (`"p:color"` → `CachedColors`, `"p:radius"` → `CachedRadii`) from Cloud PropertySets, `GPUScene` slot allocation, `GPUSceneSync` transform-only sync, `on_destroy` hook in `SceneManager` for automatic slot reclamation, `RetainedPointCloudRenderPass` iteration of `ECS::PointCloud::Data` entities, `FeatureRegistry` registration as `"PointCloudGeometrySync"`. Contract tests in `Test_PointCloudGeometrySync.cpp`.
+
+Near-term priority now shifts to remaining lifecycle system enhancements (optional staged upload path for static graphs), and PropertySet dirty-domain sync (TODO §1.3).
 
 ## 2. Feature Roadmap
 

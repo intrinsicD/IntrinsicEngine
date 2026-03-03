@@ -118,6 +118,21 @@ namespace
         g_GpuSceneForDestroyHook->FreeSlot(graphData.GpuSlot);
         graphData.GpuSlot = ECS::Graph::Data::kInvalidSlot;
     }
+
+    void OnPointCloudDataDestroyed(entt::registry& registry, entt::entity entity)
+    {
+        if (!g_GpuSceneForDestroyHook)
+            return;
+
+        auto& pcData = registry.get<ECS::PointCloud::Data>(entity);
+        if (pcData.GpuSlot == ECS::PointCloud::Data::kInvalidSlot)
+            return;
+
+        Graphics::GpuInstanceData inst{};
+        g_GpuSceneForDestroyHook->QueueUpdate(pcData.GpuSlot, inst, /*sphere*/ {0.0f, 0.0f, 0.0f, 0.0f});
+        g_GpuSceneForDestroyHook->FreeSlot(pcData.GpuSlot);
+        pcData.GpuSlot = ECS::PointCloud::Data::kInvalidSlot;
+    }
 }
 
 namespace Runtime
@@ -153,6 +168,9 @@ namespace Runtime
 
         m_Scene.GetRegistry().on_destroy<ECS::Graph::Data>()
             .connect<&OnGraphDataDestroyed>();
+
+        m_Scene.GetRegistry().on_destroy<ECS::PointCloud::Data>()
+            .connect<&OnPointCloudDataDestroyed>();
     }
 
     void SceneManager::DisconnectGpuHooks()
@@ -174,6 +192,9 @@ namespace Runtime
 
         m_Scene.GetRegistry().on_destroy<ECS::Graph::Data>()
             .disconnect<&OnGraphDataDestroyed>();
+
+        m_Scene.GetRegistry().on_destroy<ECS::PointCloud::Data>()
+            .disconnect<&OnPointCloudDataDestroyed>();
 
         g_GpuSceneForDestroyHook = nullptr;
     }
