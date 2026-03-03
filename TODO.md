@@ -20,16 +20,8 @@ This document tracks **what's left to do** in IntrinsicEngine's architecture.
 
 Replace the dual-path (transient CPU + retained GPU) rendering with a **single unified path per primitive type** (`SurfacePass`, `LinePass`, `PointPass`). Full spec in `PLAN.md`.
 
-### 1.8 UI and Inspector Integration (PLAN.md Phase 8)
-
-- [ ] Add `PointRenderMode` UI combo selector in Inspector.
-- [ ] Per-entity component attach/detach for wireframe and vertex visualization (replaces boolean toggles).
-- [ ] Graph visualization mode controls.
-- [ ] Per-edge/per-face attribute visualization toggles.
-
 ### 1.9 Documentation Update (PLAN.md Phase 9)
 
-- [ ] Update `TODO.md` — remove completed items.
 - [ ] Update `CLAUDE.md` — document new pass naming, ECS component types, and architecture.
 - [ ] Update `README.md` — update rendering architecture description.
 

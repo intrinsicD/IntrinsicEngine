@@ -1328,97 +1328,85 @@ public:
                 }
             }
 
-            // 4. Visualization — per-entity rendering mode toggles.
-            // Shown for any entity with renderable data (mesh, point cloud, graph).
-            // Toggle is presence/absence of Line::Component and Point::Component.
-            // Surface visibility is controlled via Surface::Component::Visible.
-            // GPU view creation is handled by MeshViewLifecycleSystem — no manual
-            // allocation needed in the Inspector.
+            // 4. Graph — rendering controls for graph entities.
+            // Graph::Data fields propagate to Line/Point components via
+            // GraphGeometrySyncSystem each frame, so edits here take effect
+            // immediately without manual component manipulation.
+            if (reg.all_of<ECS::Graph::Data>(selected))
             {
-                const bool hasMesh = reg.all_of<ECS::Surface::Component>(selected);
-                const bool hasPointCloud = reg.all_of<ECS::PointCloudRenderer::Component>(selected);
-
-                if (hasMesh || hasPointCloud)
+                if (ImGui::CollapsingHeader("Graph", ImGuiTreeNodeFlags_DefaultOpen))
                 {
-                    // Determine topology for context-appropriate labels.
-                    Graphics::PrimitiveTopology topology = Graphics::PrimitiveTopology::Triangles;
-                    if (hasMesh)
+                    auto& gd = reg.get<ECS::Graph::Data>(selected);
+                    ImGui::Text("Nodes: %zu", gd.NodeCount());
+                    ImGui::Text("Edges: %zu", gd.EdgeCount());
+                    ImGui::Text("Has Node Colors: %s", gd.HasNodeColors() ? "Yes" : "No");
+                    ImGui::Text("Has Edge Colors: %s", gd.HasEdgeColors() ? "Yes" : "No");
+
+                    ImGui::Checkbox("Visible##Graph", &gd.Visible);
+
+                    ImGui::SeparatorText("Node Settings");
+                    const char* modeNames[] = { "Flat Disc", "Surfel", "EWA Splatting" };
+                    int modeIdx = static_cast<int>(gd.NodeRenderMode);
+                    if (modeIdx < 0 || modeIdx > 2) modeIdx = 0;
+                    if (ImGui::Combo("Node Render Mode", &modeIdx, modeNames, 3))
+                        gd.NodeRenderMode = static_cast<Geometry::PointCloud::RenderMode>(modeIdx);
+                    ImGui::SliderFloat("Node Size", &gd.DefaultNodeRadius, 0.0005f, 0.05f, "%.5f", ImGuiSliderFlags_Logarithmic);
+                    ImGui::SliderFloat("Node Size Multiplier", &gd.NodeSizeMultiplier, 0.1f, 10.0f, "%.2f", ImGuiSliderFlags_Logarithmic);
+                    float nc[4] = {gd.DefaultNodeColor.r, gd.DefaultNodeColor.g, gd.DefaultNodeColor.b, gd.DefaultNodeColor.a};
+                    if (ImGui::ColorEdit4("Node Color", nc))
+                        gd.DefaultNodeColor = glm::vec4(nc[0], nc[1], nc[2], nc[3]);
+
+                    ImGui::SeparatorText("Edge Settings");
+                    float ec[4] = {gd.DefaultEdgeColor.r, gd.DefaultEdgeColor.g, gd.DefaultEdgeColor.b, gd.DefaultEdgeColor.a};
+                    if (ImGui::ColorEdit4("Edge Color", ec))
+                        gd.DefaultEdgeColor = glm::vec4(ec[0], ec[1], ec[2], ec[3]);
+                    ImGui::SliderFloat("Edge Width", &gd.EdgeWidth, 0.5f, 5.0f);
+                    ImGui::Checkbox("Edge Overlay", &gd.EdgesOverlay);
+
+                    // Per-edge color toggle (shown when per-edge color data exists).
+                    if (gd.HasEdgeColors())
                     {
-                        auto& sc = reg.get<ECS::Surface::Component>(selected);
-                        if (auto* geo = GetGeometryStorage().GetUnchecked(sc.Geometry))
-                            topology = geo->GetTopology();
-                    }
-
-                    const bool isTriangleMesh = hasMesh && (topology == Graphics::PrimitiveTopology::Triangles);
-                    const bool isLineMesh = hasMesh && (topology == Graphics::PrimitiveTopology::Lines);
-
-                    if (ImGui::CollapsingHeader("Visualization", ImGuiTreeNodeFlags_DefaultOpen))
-                    {
-                        if (hasMesh)
-                        {
-                            auto& sc = reg.get<ECS::Surface::Component>(selected);
-
-                            if (isTriangleMesh)
-                            {
-                                ImGui::Checkbox("Show Surface", &sc.Visible);
-
-                                bool showWireframe = reg.all_of<ECS::Line::Component>(selected);
-                                if (ImGui::Checkbox("Show Wireframe", &showWireframe))
-                                {
-                                    if (showWireframe)
-                                        reg.emplace<ECS::Line::Component>(selected);
-                                    else
-                                        reg.remove<ECS::Line::Component>(selected);
-                                }
-                            }
-                            else if (isLineMesh)
-                            {
-                                ImGui::Checkbox("Show Edges", &sc.Visible);
-                            }
-                        }
-
-                        bool showVertices = reg.all_of<ECS::Point::Component>(selected);
-                        if (ImGui::Checkbox("Show Vertices", &showVertices))
-                        {
-                            if (showVertices)
-                            {
-                                auto& pt = reg.emplace<ECS::Point::Component>(selected);
-                                if (hasMesh)
-                                    pt.Geometry = reg.get<ECS::Surface::Component>(selected).Geometry;
-                            }
-                            else
-                                reg.remove<ECS::Point::Component>(selected);
-                        }
-
                         if (auto* line = reg.try_get<ECS::Line::Component>(selected))
-                        {
-                            ImGui::SeparatorText("Wireframe Settings");
-                            float wc[4] = {line->Color.r, line->Color.g, line->Color.b, line->Color.a};
-                            if (ImGui::ColorEdit4("Wire Color", wc))
-                                line->Color = glm::vec4(wc[0], wc[1], wc[2], wc[3]);
-                            ImGui::SliderFloat("Wire Width", &line->Width, 0.5f, 5.0f);
-                            ImGui::Checkbox("Overlay##Wire", &line->Overlay);
-                        }
-
-                        if (auto* pt = reg.try_get<ECS::Point::Component>(selected))
-                        {
-                            ImGui::SeparatorText("Vertex Settings");
-                            const char* modeNames[] = { "Flat Disc", "Surfel", "EWA Splatting" };
-                            int modeIdx = static_cast<int>(pt->Mode);
-                            if (modeIdx < 0 || modeIdx > 2) modeIdx = 0;
-                            if (ImGui::Combo("Render Mode", &modeIdx, modeNames, 3))
-                                pt->Mode = static_cast<Geometry::PointCloud::RenderMode>(modeIdx);
-                            ImGui::SliderFloat("Vertex Size", &pt->Size, 0.0005f, 0.05f, "%.5f", ImGuiSliderFlags_Logarithmic);
-                            float vc[4] = {pt->Color.r, pt->Color.g, pt->Color.b, pt->Color.a};
-                            if (ImGui::ColorEdit4("Vertex Color", vc))
-                                pt->Color = glm::vec4(vc[0], vc[1], vc[2], vc[3]);
-                        }
+                            ImGui::Checkbox("Per-Edge Colors##Graph", &line->ShowPerEdgeColors);
                     }
                 }
             }
 
-            // 5. Point Cloud Info
-            if (reg.all_of<ECS::PointCloudRenderer::Component>(selected))
+            // 5. Point Cloud — PropertySet-backed (PointCloud::Data).
+            // PointCloud::Data fields propagate to Point::Component via
+            // PointCloudGeometrySyncSystem each frame.
+            if (reg.all_of<ECS::PointCloud::Data>(selected))
+            {
+                if (ImGui::CollapsingHeader("Point Cloud", ImGuiTreeNodeFlags_DefaultOpen))
+                {
+                    auto& pcd = reg.get<ECS::PointCloud::Data>(selected);
+                    ImGui::Text("Points: %zu", pcd.PointCount());
+                    ImGui::Text("Has Normals: %s", pcd.HasNormals() ? "Yes" : "No");
+                    ImGui::Text("Has Colors: %s", pcd.HasColors() ? "Yes" : "No");
+                    ImGui::Text("Has Radii: %s", pcd.HasRadii() ? "Yes" : "No");
+
+                    ImGui::SeparatorText("Rendering");
+                    ImGui::Checkbox("Visible##PCD", &pcd.Visible);
+
+                    const char* modeNames[] = { "Flat Disc", "Surfel", "EWA Splatting" };
+                    int modeIdx = static_cast<int>(pcd.RenderMode);
+                    if (modeIdx < 0 || modeIdx > 2) modeIdx = 0;
+                    if (ImGui::Combo("Render Mode##PCD", &modeIdx, modeNames, 3))
+                        pcd.RenderMode = static_cast<Geometry::PointCloud::RenderMode>(modeIdx);
+
+                    ImGui::SliderFloat("Default Radius##PCD", &pcd.DefaultRadius, 0.0005f, 0.1f, "%.5f", ImGuiSliderFlags_Logarithmic);
+                    ImGui::SliderFloat("Size Multiplier##PCD", &pcd.SizeMultiplier, 0.1f, 10.0f, "%.2f", ImGuiSliderFlags_Logarithmic);
+
+                    float dc[4] = {pcd.DefaultColor.r, pcd.DefaultColor.g, pcd.DefaultColor.b, pcd.DefaultColor.a};
+                    if (ImGui::ColorEdit4("Default Color##PCD", dc))
+                        pcd.DefaultColor = glm::vec4(dc[0], dc[1], dc[2], dc[3]);
+                }
+            }
+
+            // 6. Point Cloud (Legacy) — PointCloudRenderer::Component.
+            // Shown only when PointCloud::Data is absent (avoids duplicate UI).
+            if (reg.all_of<ECS::PointCloudRenderer::Component>(selected) &&
+                !reg.all_of<ECS::PointCloud::Data>(selected))
             {
                 if (ImGui::CollapsingHeader("Point Cloud", ImGuiTreeNodeFlags_DefaultOpen))
                 {
@@ -1429,16 +1417,104 @@ public:
                     ImGui::Text("Has Radii: %s", pc.HasRadii() ? "Yes" : "No");
 
                     ImGui::SeparatorText("Rendering");
-                    ImGui::Checkbox("Visible", &pc.Visible);
+                    ImGui::Checkbox("Visible##PCR", &pc.Visible);
 
-                    pc.RenderMode = Geometry::PointCloud::RenderMode::FlatDisc;
+                    const char* modeNames[] = { "Flat Disc", "Surfel", "EWA Splatting" };
+                    int modeIdx = static_cast<int>(pc.RenderMode);
+                    if (modeIdx < 0 || modeIdx > 2) modeIdx = 0;
+                    if (ImGui::Combo("Render Mode##PCR", &modeIdx, modeNames, 3))
+                        pc.RenderMode = static_cast<Geometry::PointCloud::RenderMode>(modeIdx);
 
-                    ImGui::SliderFloat("Default Radius", &pc.DefaultRadius, 0.0005f, 0.1f, "%.5f", ImGuiSliderFlags_Logarithmic);
-                    ImGui::SliderFloat("Size Multiplier", &pc.SizeMultiplier, 0.1f, 10.0f, "%.2f", ImGuiSliderFlags_Logarithmic);
+                    ImGui::SliderFloat("Default Radius##PCR", &pc.DefaultRadius, 0.0005f, 0.1f, "%.5f", ImGuiSliderFlags_Logarithmic);
+                    ImGui::SliderFloat("Size Multiplier##PCR", &pc.SizeMultiplier, 0.1f, 10.0f, "%.2f", ImGuiSliderFlags_Logarithmic);
 
                     float dc[4] = {pc.DefaultColor.r, pc.DefaultColor.g, pc.DefaultColor.b, pc.DefaultColor.a};
-                    if (ImGui::ColorEdit4("Default Color", dc))
+                    if (ImGui::ColorEdit4("Default Color##PCR", dc))
                         pc.DefaultColor = glm::vec4(dc[0], dc[1], dc[2], dc[3]);
+                }
+            }
+
+            // 7. Visualization — per-entity rendering mode toggles for meshes.
+            // Toggle is presence/absence of Line::Component and Point::Component.
+            // Surface visibility is controlled via Surface::Component::Visible.
+            // GPU view creation is handled by MeshViewLifecycleSystem — no manual
+            // allocation needed in the Inspector.
+            // (Graph and PointCloud entities manage their Line/Point components
+            // via lifecycle systems — their controls are in sections 4/5/6 above.)
+            if (reg.all_of<ECS::Surface::Component>(selected))
+            {
+                // Determine topology for context-appropriate labels.
+                auto& sc = reg.get<ECS::Surface::Component>(selected);
+                Graphics::PrimitiveTopology topology = Graphics::PrimitiveTopology::Triangles;
+                if (auto* geo = GetGeometryStorage().GetUnchecked(sc.Geometry))
+                    topology = geo->GetTopology();
+
+                const bool isTriangleMesh = (topology == Graphics::PrimitiveTopology::Triangles);
+                const bool isLineMesh = (topology == Graphics::PrimitiveTopology::Lines);
+
+                if (ImGui::CollapsingHeader("Visualization", ImGuiTreeNodeFlags_DefaultOpen))
+                {
+                    if (isTriangleMesh)
+                    {
+                        ImGui::Checkbox("Show Surface", &sc.Visible);
+
+                        bool showWireframe = reg.all_of<ECS::Line::Component>(selected);
+                        if (ImGui::Checkbox("Show Wireframe", &showWireframe))
+                        {
+                            if (showWireframe)
+                                reg.emplace<ECS::Line::Component>(selected);
+                            else
+                                reg.remove<ECS::Line::Component>(selected);
+                        }
+
+                        // Per-face color toggle (shown when face color data exists).
+                        if (!sc.CachedFaceColors.empty())
+                            ImGui::Checkbox("Per-Face Colors", &sc.ShowPerFaceColors);
+                    }
+                    else if (isLineMesh)
+                    {
+                        ImGui::Checkbox("Show Edges", &sc.Visible);
+                    }
+
+                    bool showVertices = reg.all_of<ECS::Point::Component>(selected);
+                    if (ImGui::Checkbox("Show Vertices", &showVertices))
+                    {
+                        if (showVertices)
+                        {
+                            auto& pt = reg.emplace<ECS::Point::Component>(selected);
+                            pt.Geometry = sc.Geometry;
+                        }
+                        else
+                            reg.remove<ECS::Point::Component>(selected);
+                    }
+
+                    if (auto* line = reg.try_get<ECS::Line::Component>(selected))
+                    {
+                        ImGui::SeparatorText("Wireframe Settings");
+                        float wc[4] = {line->Color.r, line->Color.g, line->Color.b, line->Color.a};
+                        if (ImGui::ColorEdit4("Wire Color", wc))
+                            line->Color = glm::vec4(wc[0], wc[1], wc[2], wc[3]);
+                        ImGui::SliderFloat("Wire Width", &line->Width, 0.5f, 5.0f);
+                        ImGui::Checkbox("Overlay##Wire", &line->Overlay);
+
+                        // Per-edge color toggle (shown when per-edge data exists).
+                        if (line->HasPerEdgeColors)
+                            ImGui::Checkbox("Per-Edge Colors", &line->ShowPerEdgeColors);
+                    }
+
+                    if (auto* pt = reg.try_get<ECS::Point::Component>(selected))
+                    {
+                        ImGui::SeparatorText("Vertex Settings");
+                        const char* modeNames[] = { "Flat Disc", "Surfel", "EWA Splatting" };
+                        int modeIdx = static_cast<int>(pt->Mode);
+                        if (modeIdx < 0 || modeIdx > 2) modeIdx = 0;
+                        if (ImGui::Combo("Render Mode", &modeIdx, modeNames, 3))
+                            pt->Mode = static_cast<Geometry::PointCloud::RenderMode>(modeIdx);
+                        ImGui::SliderFloat("Vertex Size", &pt->Size, 0.0005f, 0.05f, "%.5f", ImGuiSliderFlags_Logarithmic);
+                        float vc[4] = {pt->Color.r, pt->Color.g, pt->Color.b, pt->Color.a};
+                        if (ImGui::ColorEdit4("Vertex Color", vc))
+                            pt->Color = glm::vec4(vc[0], vc[1], vc[2], vc[3]);
+                    }
                 }
             }
         }
