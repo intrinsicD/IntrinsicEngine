@@ -123,63 +123,6 @@ namespace Graphics::Passes
             }
         }
 
-        // Also include view geometries (surface/vertices) so their GeometryID values are mapped.
-        // NOTE: Wireframe has no GPU view — it is CPU-driven via DebugDraw → LinePass.
-         {
-             auto view = ctx.Scene.GetRegistry().view<ECS::GeometryViewRenderer::Component>();
-             for (auto entity : view)
-             {
-                 const auto& vr = view.get<ECS::GeometryViewRenderer::Component>(entity);
-
-                auto tryAdd = [&](Geometry::GeometryHandle h)
-                {
-                    if (!h.IsValid())
-                        return;
-
-                    maxHandleIndex = std::max(maxHandleIndex, h.Index);
-
-                    for (const DenseGeo& g : dense)
-                    {
-                        if (g.Handle == h)
-                            return;
-                    }
-
-                    GeometryGpuData* geo = ctx.GeometryStorage.GetUnchecked(h);
-                    if (!geo || geo->GetIndexCount() == 0 || !geo->GetIndexBuffer() || !geo->GetVertexBuffer())
-                        return;
-
-                    dense.push_back({.Handle = h, .Geo = geo});
-                };
-
-                tryAdd(vr.Surface);
-                tryAdd(vr.Vertices);
-             }
-         }
-
-        // Point size routing (by GeometryHandle.Index) for point-view geometries.
-        // We interpret RenderVisualization::VertexSize (a world-ish radius in the UI) as an artist-friendly scalar
-        // and map it into a pixel radius here.
-        std::vector<float> pointSizePxByHandleIndex;
-        pointSizePxByHandleIndex.assign(static_cast<size_t>(maxHandleIndex) + 1u, 4.0f);
-        {
-            auto view = ctx.Scene.GetRegistry().view<ECS::GeometryViewRenderer::Component, ECS::RenderVisualization::Component>();
-            for (auto entity : view)
-            {
-                const auto& vr = view.get<ECS::GeometryViewRenderer::Component>(entity);
-                const auto& vis = view.get<ECS::RenderVisualization::Component>(entity);
-
-                if (!vr.Vertices.IsValid())
-                    continue;
-
-                if (vr.Vertices.Index < pointSizePxByHandleIndex.size())
-                {
-                    // Slider is in world units for CPU splats; for forward points we want stable pixels.
-                    // This mapping is intentionally simple and clamped.
-                    pointSizePxByHandleIndex[vr.Vertices.Index] = std::clamp(vis.VertexSize * 1000.0f, 1.0f, 64.0f);
-                }
-            }
-        }
-
          // IMPORTANT: ensure deterministic ordering.
         // Dense IDs are used to slice packed indirect/visibility buffers.
         // If dense order changes frame-to-frame, geometry will read the wrong slice → flicker.
@@ -455,26 +398,25 @@ namespace Graphics::Passes
         }
 
         // -----------------------------------------------------------------
-        // Resolve per-face attribute buffers from RenderVisualization components.
+        // Resolve per-face attribute buffers from Surface components.
         // Maps geometry handle index → face attribute BDA address.
         // First entity with CachedFaceColors for a geometry wins.
         // -----------------------------------------------------------------
         std::unordered_map<uint32_t, uint64_t> faceAttrByGeoIndex;
         {
-            auto visView = ctx.Scene.GetRegistry().view<ECS::Surface::Component,
-                                                        ECS::RenderVisualization::Component>();
-            for (auto [entity, sc, vis] : visView.each())
+            auto visView = ctx.Scene.GetRegistry().view<ECS::Surface::Component>();
+            for (auto [entity, sc] : visView.each())
             {
-                if (!sc.Geometry.IsValid() || vis.CachedFaceColors.empty())
+                if (!sc.Geometry.IsValid() || sc.CachedFaceColors.empty())
                     continue;
 
                 // Only process the first entity per geometry (all instances share face colors).
                 if (faceAttrByGeoIndex.contains(sc.Geometry.Index))
                     continue;
 
-                const uint32_t faceCount = static_cast<uint32_t>(vis.CachedFaceColors.size());
+                const uint32_t faceCount = static_cast<uint32_t>(sc.CachedFaceColors.size());
                 const uint64_t addr = EnsureFaceAttrBuffer(
-                    sc.Geometry.Index, vis.CachedFaceColors.data(), faceCount);
+                    sc.Geometry.Index, sc.CachedFaceColors.data(), faceCount);
                 if (addr != 0)
                     faceAttrByGeoIndex[sc.Geometry.Index] = addr;
             }

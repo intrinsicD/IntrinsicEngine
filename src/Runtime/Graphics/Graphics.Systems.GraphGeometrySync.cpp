@@ -169,7 +169,7 @@ namespace Graphics::Systems::GraphGeometrySync
 
                 // --- Extract edge pairs (remapped to compacted indices) ---
                 const std::size_t eSize = graph.EdgesSize();
-                std::vector<ECS::RenderVisualization::EdgePair> edgePairs;
+                std::vector<ECS::EdgePair> edgePairs;
                 edgePairs.reserve(eSize);
 
                 // Check for per-edge color property ("e:color" as glm::vec4).

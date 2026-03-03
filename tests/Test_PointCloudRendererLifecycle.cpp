@@ -17,7 +17,7 @@ import Geometry;
 //   - HasGpuGeometry() query correctness.
 //   - GpuDirty lifecycle transitions.
 //   - Component coexistence with GeometryHandle from ModelLoader.
-//   - PointCloudRenderer::Component vs MeshRenderer::Component routing.
+//   - PointCloudRenderer::Component vs Surface::Component routing.
 
 // ---- Component GPU State Defaults ----
 
@@ -33,10 +33,10 @@ TEST(PointCloudRendererLifecycle_Contract, DefaultGpuStateFields)
 
 TEST(PointCloudRendererLifecycle_Contract, InvalidSlotSentinel)
 {
-    // kInvalidSlot must be ~0u (same as MeshRenderer).
+    // kInvalidSlot must be ~0u (same as Surface).
     EXPECT_EQ(ECS::PointCloudRenderer::Component::kInvalidSlot, ~0u);
     EXPECT_EQ(ECS::PointCloudRenderer::Component::kInvalidSlot,
-              ECS::MeshRenderer::Component::kInvalidSlot);
+              ECS::Surface::Component::kInvalidSlot);
 }
 
 // ---- HasGpuGeometry Query ----
@@ -116,7 +116,7 @@ TEST(PointCloudRendererLifecycle_Contract, VisibilityToggle)
 
 TEST(PointCloudRendererLifecycle_Contract, TopologyRouting)
 {
-    // Point topology should produce PointCloudRenderer, not MeshRenderer.
+    // Point topology should produce PointCloudRenderer, not Surface.
     // This test validates the semantic intent — actual routing happens in SceneManager.
     EXPECT_EQ(static_cast<int>(Graphics::PrimitiveTopology::Points), 2);
     EXPECT_NE(static_cast<int>(Graphics::PrimitiveTopology::Points),

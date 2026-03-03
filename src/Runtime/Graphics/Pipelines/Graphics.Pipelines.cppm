@@ -12,11 +12,8 @@ import :ShaderRegistry;
 import :PipelineLibrary;
 import :Passes.DebugView;
 import :Passes.Surface;
-import :Passes.Graph;
 import :Passes.ImGui;
 import :Passes.Line;
-import :Passes.Mesh;
-import :Passes.PointCloud;
 import :Passes.Picking;
 import :Passes.Point;
 import :Passes.SelectionOutline;
@@ -65,11 +62,8 @@ export namespace Graphics
 
         std::unique_ptr<Passes::PickingPass> m_PickingPass;
         std::unique_ptr<Passes::SurfacePass> m_SurfacePass;
-        std::unique_ptr<Passes::MeshRenderPass> m_MeshPass;
-        std::unique_ptr<Passes::GraphRenderPass> m_GraphPass;
         std::unique_ptr<Passes::SelectionOutlinePass> m_SelectionOutlinePass;
         std::unique_ptr<Passes::LinePass> m_LinePass;
-        std::unique_ptr<Passes::PointCloudRenderPass> m_PointCloudPass;
         std::unique_ptr<Passes::PointPass> m_PointPass;
         std::unique_ptr<Passes::DebugViewPass> m_DebugViewPass;
         std::unique_ptr<Passes::ImGuiPass> m_ImGuiPass;

@@ -39,7 +39,7 @@ TEST(PointCloudGeometrySync_Contract, InvalidSlotSentinel)
     // kInvalidSlot must be ~0u (same as other components).
     EXPECT_EQ(ECS::PointCloud::Data::kInvalidSlot, ~0u);
     EXPECT_EQ(ECS::PointCloud::Data::kInvalidSlot,
-              ECS::MeshRenderer::Component::kInvalidSlot);
+              ECS::Surface::Component::kInvalidSlot);
     EXPECT_EQ(ECS::PointCloud::Data::kInvalidSlot,
               ECS::PointCloudRenderer::Component::kInvalidSlot);
     EXPECT_EQ(ECS::PointCloud::Data::kInvalidSlot,

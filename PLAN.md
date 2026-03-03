@@ -15,9 +15,9 @@ This section tracks where runtime code currently stands relative to this plan/sp
 
 | Area | Planned direction | Current state | Status |
 |------|-------------------|---------------|--------|
-| ECS render components | Replace `MeshRenderer`/`RenderVisualization`/`GraphRenderer`/`PointCloudRenderer` with `ECS::Surface`, `ECS::Line`, `ECS::Point`, `ECS::Graph::Data` | `ECS::Surface::Component`, `ECS::Line::Component`, `ECS::Point::Component` defined alongside legacy components. `ComponentMigration` system syncs legacy → new each frame. `ECS::Graph::Data` replaces `GraphRenderer::Component` with `shared_ptr<Graph>` PropertySet-backed authority. Legacy components still active (transition period). | **Phase 1 complete** |
-| Pass topology | Collapse into `SurfacePass`, `LinePass`, `PointPass` each owning retained + transient internally | `SurfacePass` (Phase 2). `LinePass` iterates `ECS::Line::Component` for all retained-mode edge draws + transient DebugDraw (Phase 3 complete). `PointPass` iterates `ECS::Point::Component` for all retained-mode point draws (mesh vertices, graph nodes, point clouds) + transient `DebugDraw::GetPoints()`, per-mode pipelines (FlatDisc/Surfel/EWA), `PtrAux` BDA for per-point colors (Phase 4 complete). `MeshRenderPass` reduced to edge cache only. `GraphRenderPass` is a stub. `PointCloudRenderPass` (SSBO) retained but unused. | **Phase 4 complete** |
-| Shader naming/registration | `surface.*`, unified `line.*`, `point_flatdisc.*`, `point_surfel.*` IDs | `surface.vert/frag` (Phase 2). `line.vert/frag` (Phase 3). `point_flatdisc.vert/frag` (FlatDisc billboard, Phase 4). `point_surfel.vert/frag` (Surfel + EWA normal-oriented, Phase 4). Runtime registers `Point.FlatDisc.Vert/Frag` and `Point.Surfel.Vert/Frag`. Legacy `point_retained.*` retained for now. | **Phase 4 complete** |
+| ECS render components | Replace `MeshRenderer`/`RenderVisualization`/`GraphRenderer`/`PointCloudRenderer` with `ECS::Surface`, `ECS::Line`, `ECS::Point`, `ECS::Graph::Data` | `ECS::Surface::Component`, `ECS::Line::Component`, `ECS::Point::Component` are the sole render component types. Legacy `MeshRenderer`, `RenderVisualization`, `GeometryViewRenderer` deleted (Phase 5). `ComponentMigration` bridges remaining legacy components (`PointCloudRenderer`, `Graph::Data`, `PointCloud::Data`) to typed components. `EdgePair` moved to standalone `ECS::EdgePair`. | **Phase 5 complete** |
+| Pass topology | Collapse into `SurfacePass`, `LinePass`, `PointPass` each owning retained + transient internally | `SurfacePass` (Phase 2). `LinePass` (Phase 3). `PointPass` (Phase 4). Legacy passes (`MeshRenderPass`, `GraphRenderPass`, `PointCloudRenderPass`, `RetainedPointCloudRenderPass`) deleted (Phase 5). `DefaultPipeline` has 7 passes: Picking, Surface, Line, Point, SelectionOutline, DebugView, ImGui. | **Phase 5 complete** |
+| Shader naming/registration | `surface.*`, unified `line.*`, `point_flatdisc.*`, `point_surfel.*` IDs | `surface.vert/frag` (Phase 2). `line.vert/frag` (Phase 3). `point_flatdisc.vert/frag` (FlatDisc billboard, Phase 4). `point_surfel.vert/frag` (Surfel + EWA normal-oriented, Phase 4). Runtime registers `Point.FlatDisc.Vert/Frag` and `Point.Surfel.Vert/Frag`. Legacy shaders cleaned up. | **Phase 5 complete** |
 | CPU geometry authority | PropertySet-backed CPU sources for cloud/graph/mesh topology and attributes | **Implemented in geometry domain types** (`PointCloud::Cloud`, `Graph`, `Halfedge::Mesh`). All four PropertySet domains (`VertexProperties()`, `EdgeProperties()`, `FaceProperties()`, `HalfedgeProperties()`) are publicly accessible. Bulk edge extraction via `ExtractEdgeVertexPairs()` provides span-compatible GPU upload. | **Complete** |
 | PropertySet-driven edge source | Mesh/graph edge rendering sourced from topology PropertySets | `GraphGeometrySyncSystem` creates edge index buffers via `ReuseVertexBuffersFrom` from graph topology. `MeshViewLifecycleSystem` auto-attaches `MeshEdgeView` and creates edge index buffers from collision data. LinePass requires valid `EdgeView` — no internal `CachedEdges`/`EnsureEdgeBuffer` fallback. | **Complete** |
 | Automatic CPU→GPU sync | Per-frame dirty-domain sync (`GeometryDirty`/`TopologyDirty`/`AttributesDirty`) patches SSBO ranges and renderable offsets | No generic dirty-domain sync system yet; current flow is pass/component-local invalidation and per-feature staging | **Not started** |
@@ -25,7 +25,7 @@ This section tracks where runtime code currently stands relative to this plan/sp
 
 ### Gap implications
 
-1. ~~The current renderer still uses a mixed collector architecture with parallel retained/transient passes~~ **Resolved** — `PointPass` consolidates all point sources (mesh vertices, graph nodes, standalone point clouds, Cloud-backed clouds) into a single pass iterating `ECS::Point::Component`. `MeshRenderPass` reduced to edge cache only; `GraphRenderPass` is a stub. The three-pass architecture (`SurfacePass`, `LinePass`, `PointPass`) is now the active rendering path.
+1. ~~The current renderer still uses a mixed collector architecture with parallel retained/transient passes~~ **Resolved** — The three-pass architecture (`SurfacePass`, `LinePass`, `PointPass`) is the sole rendering path. Legacy passes (`MeshRenderPass`, `GraphRenderPass`, `PointCloudRenderPass`) deleted in Phase 5. Legacy components (`MeshRenderer`, `RenderVisualization`, `GeometryViewRenderer`) deleted.
 2. ~~Graph render components own CPU arrays~~ **Resolved for graphs** — `ECS::Graph::Data` holds `shared_ptr<Graph>`, reads from PropertySets. ~~Point cloud render component still holds `std::vector` copies~~ **Resolved** — `PointCloudRenderer::Component` now holds `GeometryHandle` for device-local GPU data; CPU vectors are freed after initial upload by `PointCloudRendererLifecycle`.
 3. ~~Wireframe currently depends on cached edge extraction in visualization components rather than direct PropertySet-to-SSBO sync.~~ **Resolved** — `MeshViewLifecycleSystem` auto-attaches `MeshEdgeView` with edge index buffer from collision data; `GraphGeometrySyncSystem` creates `GpuEdgeGeometry` via `ReuseVertexBuffersFrom`. LinePass internal `EnsureEdgeBuffer` fallback eliminated.
 4. ~~No geometry view lifecycle systems exist~~ **Resolved** — `MeshViewLifecycleSystem` creates edge/vertex view `GeometryHandle` instances via `ReuseVertexBuffersFrom`.
@@ -770,17 +770,19 @@ Each pass is self-contained. No existing code changes.
 
 **Gate:** `IntrinsicTests` pass. Vertex visualization, graph nodes, point clouds all render correctly. Per-point coloring and radii work.
 
-### Phase 5: Delete dead code
+### Phase 5: Delete dead code ✓
 
-36. Delete `MeshRenderPass` (class, files, module partition)
-37. Delete `GraphRenderPass` (class, files, module partition)
-38. Delete `PointCloudRenderPass` (class, files, module partition)
-39. Delete `RenderVisualization::Component` (replaced by typed components)
-40. Delete `GeometryViewRenderer::Component` (each component carries its own handle)
-41. Delete `MeshRenderer::Component` (aliased to `Surface::Component` if needed during transition)
-42. Remove `VisualizationCollect` composite stage from `DefaultPipeline`
+36. ~~Delete `MeshRenderPass` (class, files, module partition)~~ **Done**
+37. ~~Delete `GraphRenderPass` (class, files, module partition)~~ **Done**
+38. ~~Delete `PointCloudRenderPass` (class, files, module partition)~~ **Done**
+39. ~~Delete `RenderVisualization::Component` (replaced by typed components)~~ **Done**
+40. ~~Delete `GeometryViewRenderer::Component` (each component carries its own handle)~~ **Done**
+41. ~~Delete `MeshRenderer::Component` (aliased to `Surface::Component` if needed during transition)~~ **Done**
+42. ~~Remove `VisualizationCollect` composite stage from `DefaultPipeline`~~ **Done**
 
-**Gate:** `IntrinsicTests` pass. Clean build with no dead code references.
+Also completed: `EdgePair` moved to standalone `ECS::EdgePair`, `Surface::Component` enriched with `Visible`/`CachedVisible`/`CachedFaceColors`/`FaceColorsDirty`, `Line::Component` enriched with `CachedEdgeColors`, `ComponentMigration` reduced to 3 sections, `MeshViewLifecycle` checks `Line::Component` presence, `GPUSceneSync` reads `Surface::Visible`, Sandbox UI uses direct component attach/detach.
+
+**Gate:** Clean build with no dead code references. All test files updated.
 
 ### Phase 6: Geometry view lifecycle systems + retained upload for all types
 

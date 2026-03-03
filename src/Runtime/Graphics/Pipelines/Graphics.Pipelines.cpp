@@ -17,11 +17,8 @@ import :Geometry;
 import :DebugDraw;
 import :Passes.Picking;
 import :Passes.Surface;
-import :Passes.Mesh;
-import :Passes.Graph;
 import :Passes.SelectionOutline;
 import :Passes.Line;
-import :Passes.PointCloud;
 import :Passes.Point;
 import :Passes.DebugView;
 import :Passes.ImGui;
@@ -41,22 +38,16 @@ namespace Graphics
     {
         if (m_PickingPass)          m_PickingPass->Shutdown();
         if (m_SurfacePass)          m_SurfacePass->Shutdown();
-        if (m_MeshPass)             m_MeshPass->Shutdown();
-        if (m_GraphPass)            m_GraphPass->Shutdown();
         if (m_SelectionOutlinePass) m_SelectionOutlinePass->Shutdown();
         if (m_LinePass)             m_LinePass->Shutdown();
-        if (m_PointCloudPass)       m_PointCloudPass->Shutdown();
         if (m_PointPass)            m_PointPass->Shutdown();
         if (m_DebugViewPass)        m_DebugViewPass->Shutdown();
         if (m_ImGuiPass)            m_ImGuiPass->Shutdown();
 
         m_PickingPass.reset();
         m_SurfacePass.reset();
-        m_MeshPass.reset();
-        m_GraphPass.reset();
         m_SelectionOutlinePass.reset();
         m_LinePass.reset();
-        m_PointCloudPass.reset();
         m_PointPass.reset();
         m_DebugViewPass.reset();
         m_ImGuiPass.reset();
@@ -70,22 +61,16 @@ namespace Graphics
     {
         m_PickingPass          = std::make_unique<Passes::PickingPass>();
         m_SurfacePass          = std::make_unique<Passes::SurfacePass>();
-        m_MeshPass             = std::make_unique<Passes::MeshRenderPass>();
-        m_GraphPass            = std::make_unique<Passes::GraphRenderPass>();
         m_SelectionOutlinePass = std::make_unique<Passes::SelectionOutlinePass>();
         m_LinePass             = std::make_unique<Passes::LinePass>();
-        m_PointCloudPass       = std::make_unique<Passes::PointCloudRenderPass>();
         m_PointPass            = std::make_unique<Passes::PointPass>();
         m_DebugViewPass        = std::make_unique<Passes::DebugViewPass>();
         m_ImGuiPass            = std::make_unique<Passes::ImGuiPass>();
 
         m_PickingPass->Initialize(device, descriptorPool, globalLayout);
         m_SurfacePass->Initialize(device, descriptorPool, globalLayout);
-        m_MeshPass->Initialize(device, descriptorPool, globalLayout);
-        m_GraphPass->Initialize(device, descriptorPool, globalLayout);
         m_SelectionOutlinePass->Initialize(device, descriptorPool, globalLayout);
         m_LinePass->Initialize(device, descriptorPool, globalLayout);
-        m_PointCloudPass->Initialize(device, descriptorPool, globalLayout);
         m_PointPass->Initialize(device, descriptorPool, globalLayout);
         m_DebugViewPass->Initialize(device, descriptorPool, globalLayout);
         m_ImGuiPass->Initialize(device, descriptorPool, globalLayout);
@@ -101,10 +86,9 @@ namespace Graphics
 
         m_SelectionOutlinePass->SetShaderRegistry(shaderRegistry);
         m_LinePass->SetShaderRegistry(shaderRegistry);
-        m_PointCloudPass->SetShaderRegistry(shaderRegistry);
         m_PointPass->SetShaderRegistry(shaderRegistry);
         m_DebugViewPass->SetShaderRegistry(shaderRegistry);
-        
+
         m_PathDirty = true;
     }
 
@@ -134,40 +118,13 @@ namespace Graphics
 
         // ==================================================================
         // 2. Surface Pass — face rendering via SurfacePass (triangles / lines /
-        //    point geometry).  SurfacePass is the "surface" sub-stage of the
-        //    mesh pass; wireframe + vertex overlays follow in MeshPass.Viz.
+        //    point geometry).
         // ==================================================================
         if (m_SurfacePass && IsFeatureEnabled("SurfacePass"_id))
             m_Path.AddFeature("MeshPass.Surface", m_SurfacePass.get());
 
         // ==================================================================
-        // Visualization collection
-        // ==================================================================
-        //
-        // Collection passes feed shared GPU primitive renderers:
-        //   - MeshRenderPass  → wireframe edges + vertex splats from mesh entities.
-        //   - GraphRenderPass → edge lines + node splats from graph entities.
-        //   - PointCloud collect inline → splats from PointCloudRenderer entities.
-        //
-        // Execution contract: collectors must run after ResetPoints() and before
-        // the GPU draw passes are added to the render graph.
-        {
-            const bool meshEnabled  = m_MeshPass  && IsFeatureEnabled("MeshPass"_id);
-
-            // MeshRenderPass now only builds edge caches (Phase 4).
-            // Vertex/node point submission is handled by PointPass.
-            if (meshEnabled)
-            {
-                m_Path.AddStage("VisualizationCollect",
-                    [this](RenderPassContext& ctx)
-                {
-                    m_MeshPass->AddPasses(ctx);
-                });
-            }
-        }
-
-        // ==================================================================
-        // 6. LinePass — unified BDA-based line rendering.
+        // 3. LinePass — unified BDA-based line rendering.
         //    Consolidates retained wireframe/graph edges and transient DebugDraw
         //    lines into a single pass. Always present when the pass exists so
         //    debug-line output is not silently dropped.
@@ -183,7 +140,7 @@ namespace Graphics
         }
 
         // ==================================================================
-        // 7. PointPass — unified BDA-based point rendering (PLAN.md Phase 4).
+        // 4. PointPass — unified BDA-based point rendering.
         //    Iterates ECS::Point::Component for retained draws and
         //    DebugDraw::GetPoints() for transient markers.
         // ==================================================================
@@ -198,13 +155,13 @@ namespace Graphics
         }
 
         // ==================================================================
-        // 8. Selection Outline — post-process overlay for selected entities.
+        // 5. Selection Outline — post-process overlay for selected entities.
         // ==================================================================
         if (m_SelectionOutlinePass && IsFeatureEnabled("SelectionOutlinePass"_id))
             m_Path.AddFeature("SelectionOutline", m_SelectionOutlinePass.get());
 
         // ==================================================================
-        // 8. Debug View — conditional texture inspector overlay.
+        // 6. Debug View — conditional texture inspector overlay.
         // ==================================================================
         if (m_DebugViewPass && IsFeatureEnabled("DebugViewPass"_id))
         {
@@ -216,7 +173,7 @@ namespace Graphics
         }
 
         // ==================================================================
-        // 9. ImGui — editor UI overlay.
+        // 7. ImGui — editor UI overlay.
         // ==================================================================
         if (m_ImGuiPass && IsFeatureEnabled("ImGuiPass"_id))
             m_Path.AddFeature("ImGui", m_ImGuiPass.get());
@@ -239,11 +196,9 @@ namespace Graphics
     {
         if (m_PickingPass)          m_PickingPass->OnResize(width, height);
         if (m_SurfacePass)          m_SurfacePass->OnResize(width, height);
-        if (m_MeshPass)             m_MeshPass->OnResize(width, height);
-        if (m_GraphPass)            m_GraphPass->OnResize(width, height);
         if (m_SelectionOutlinePass) m_SelectionOutlinePass->OnResize(width, height);
         if (m_LinePass)             m_LinePass->OnResize(width, height);
-        if (m_PointCloudPass)       m_PointCloudPass->OnResize(width, height);
+        if (m_PointPass)            m_PointPass->OnResize(width, height);
         if (m_DebugViewPass)        m_DebugViewPass->OnResize(width, height);
         if (m_ImGuiPass)            m_ImGuiPass->OnResize(width, height);
     }

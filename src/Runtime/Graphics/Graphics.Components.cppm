@@ -13,26 +13,21 @@ import :Material;
 import Geometry;
 import Core.Assets;
 
-export namespace ECS::MeshRenderer
+// =========================================================================
+// EdgePair — Standalone edge index pair type (formerly in RenderVisualization).
+// =========================================================================
+// Two uint32 vertex indices referencing into a position array.
+// Used by Graph::Data::CachedEdgePairs, LinePass BDA uploads,
+// MeshViewLifecycleSystem, and GraphGeometrySyncSystem.
+
+export namespace ECS
 {
-    struct Component
+    struct EdgePair
     {
-        Geometry::GeometryHandle Geometry;
-        Core::Assets::AssetHandle Material;
-
-        // --- Retained Mode Slot ---
-        static constexpr uint32_t kInvalidSlot = ~0u;
-        uint32_t GpuSlot = kInvalidSlot;
-
-        // --- Render Cache ---
-        // Allows RenderSystem to avoid AssetManager lookups once resolved.
-        Graphics::MaterialHandle CachedMaterialHandle = {};
-
-        // Cached snapshot used by GPUSceneSync to detect when instance TextureID must be refreshed.
-        Graphics::MaterialHandle CachedMaterialHandleForInstance = {};
-        uint32_t CachedMaterialRevisionForInstance = 0u;
-        bool CachedIsSelectedForInstance = false;
+        uint32_t i0;
+        uint32_t i1;
     };
+    static_assert(sizeof(EdgePair) == 8);
 }
 
 export namespace ECS::MeshCollider
@@ -95,92 +90,6 @@ export namespace ECS::PointCloudRenderer
 }
 
 // -------------------------------------------------------------------------
-// RenderVisualization — Per-entity rendering mode control.
-// -------------------------------------------------------------------------
-//
-// Decouples the visual representation from the CPU data type.  Any entity
-// with spatial data (mesh, graph, point cloud) can independently toggle:
-//   - Surface rendering  (filled faces — SurfacePass)
-//   - Wireframe rendering (edges — LinePass, retained BDA)
-//   - Vertex rendering   (points — PointCloudRenderPass)
-//
-// The component is attached lazily when the user first toggles a mode in
-// the Inspector.  Entities without this component use defaults:
-// surface=on, wireframe=off, vertices=off.
-
-export namespace ECS::RenderVisualization
-{
-    // Edge index pair: two uint32 vertex indices into the collision position array.
-    // Used by CachedEdges and consumed directly by LinePass BDA uploads.
-    struct EdgePair
-    {
-        uint32_t i0;
-        uint32_t i1;
-    };
-    static_assert(sizeof(EdgePair) == 8);
-
-    struct Component
-    {
-        // ---- Mode Toggles ----
-        bool ShowSurface   = true;   // SurfacePass mesh/line rendering.
-        bool ShowWireframe = false;  // Edge overlay via LinePass (retained BDA).
-        bool ShowVertices  = false;  // Vertex points via PointCloudRenderPass.
-
-        // ---- Wireframe Settings ----
-        glm::vec4 WireframeColor = {0.85f, 0.85f, 0.85f, 1.0f};
-        float     WireframeWidth = 1.5f;
-        bool      WireframeOverlay = false;  // true = no depth test (always visible).
-
-        // ---- Vertex Settings ----
-        glm::vec4 VertexColor      = {1.0f, 0.6f, 0.0f, 1.0f};
-        float     VertexSize       = 0.008f;  // World-space radius.
-        Geometry::PointCloud::RenderMode VertexRenderMode = Geometry::PointCloud::RenderMode::FlatDisc;
-
-        // ---- Derived Geometry Views (GPU, shared-vertex) ----
-        // Wireframe has NO GPU view — it is rendered by LinePass which reads
-        // CachedEdges via BDA from persistent GPU buffers. WireframeColor is applied.
-        //
-        // Vertex view is lazily created once for FlatDisc point rendering via SurfacePass.
-        Geometry::GeometryHandle VertexView{};    // Points
-
-        bool VertexViewDirty = true;
-
-        // ---- Edge Cache (internal, rebuilt lazily) ----
-        // Populated from MeshCollider collision data when wireframe is first
-        // enabled.  Stores unique edge pairs as index offsets into the
-        // collision position array.
-        std::vector<EdgePair> CachedEdges;
-        bool EdgeCacheDirty = true;
-
-        // ---- Per-Edge Color Cache (optional) ----
-        // Packed ABGR per edge, sourced from Mesh::EdgeProperties("e:color")
-        // or set programmatically (e.g., curvature visualization).
-        // Must be same length as CachedEdges when non-empty.
-        // When empty, LinePass uses uniform WireframeColor.
-        std::vector<uint32_t> CachedEdgeColors;
-        bool EdgeColorsDirty = true;
-
-        // ---- Per-Face Color Cache (optional) ----
-        // Packed ABGR per face, sourced from Mesh::FaceProperties("f:color")
-        // or set programmatically (e.g., segmentation labels, curvature).
-        // Indexed by triangle index (gl_PrimitiveID in fragment shader).
-        // When empty, SurfacePass uses standard texture/material shading.
-        std::vector<uint32_t> CachedFaceColors;
-        bool FaceColorsDirty = true;
-
-        // ---- Vertex Normal Cache (internal, rebuilt lazily) ----
-        // Area-weighted vertex normals computed from collision mesh triangles.
-        std::vector<glm::vec3> CachedVertexNormals;
-        bool VertexNormalsDirty = true;
-
-        // ---- Sync State (internal) ----
-        // Tracks the last ShowSurface value written to GPUScene so that
-        // GPUSceneSync can detect transitions.
-        bool CachedShowSurface = true;
-    };
-}
-
-// -------------------------------------------------------------------------
 // Graph::Data — ECS component for graph visualization (PropertySet-backed).
 // -------------------------------------------------------------------------
 //
@@ -191,8 +100,6 @@ export namespace ECS::RenderVisualization
 // Rendering: retained-mode via BDA shared-buffer architecture.
 //   - Nodes rendered via PointPass (BDA position pull).
 //   - Edges rendered via LinePass (BDA position pull + edge buffer).
-//   - Falls back to CPU path (GraphRenderPass → PointCloudRenderPass + DebugDraw)
-//     when retained passes are disabled via FeatureRegistry.
 //
 // GPU state is managed by GraphGeometrySyncSystem: positions are uploaded once
 // to a device-local vertex buffer (GpuGeometry), edge pairs are extracted from
@@ -241,7 +148,7 @@ export namespace ECS::Graph
 
         // Edge index pairs into the compacted vertex buffer (CPU-side).
         // Retained for non-rendering consumers (layout algorithms, selection).
-        std::vector<ECS::RenderVisualization::EdgePair> CachedEdgePairs;
+        std::vector<ECS::EdgePair> CachedEdgePairs;
 
         // Per-edge colors (packed ABGR), one per edge in CachedEdgePairs order.
         // Extracted from Graph::EdgeProperties("e:color") by GraphGeometrySyncSystem.
@@ -386,40 +293,16 @@ export namespace ECS::PointCloud
     };
 }
 
-export namespace ECS::GeometryViewRenderer
-{
-    struct Component
-    {
-        // Base (surface / primary) geometry.
-        Geometry::GeometryHandle Surface{};
-        uint32_t SurfaceGpuSlot = MeshRenderer::Component::kInvalidSlot;
-
-        // Optional vertex point-cloud view geometry (FlatDisc mode via SurfacePass).
-        Geometry::GeometryHandle Vertices{}; // Points
-        uint32_t VerticesGpuSlot = MeshRenderer::Component::kInvalidSlot;
-
-        // Wireframe edge count — set by LinePass when a persistent BDA-addressable
-        // edge buffer exists for this entity. The actual buffer is owned by the
-        // pass; this field tracks edge count for lifecycle awareness.
-        // 0 = no persistent wireframe buffer exists.
-        uint32_t WireframeEdgeCount = 0;
-
-        // Visibility toggles mirrored from RenderVisualization.
-        bool ShowSurface = true;
-        bool ShowVertices = false;
-    };
-}
-
 // -------------------------------------------------------------------------
 // MeshEdgeView — Edge view derived from a mesh via ReuseVertexBuffersFrom.
 // -------------------------------------------------------------------------
 //
-// Attached to entities with MeshRenderer to request wireframe edge rendering
-// as a first-class GPU geometry view. MeshViewLifecycleSystem creates the
-// edge index buffer (sharing the mesh's vertex buffer via BDA) and manages
-// the GPUScene slot lifecycle.
+// Attached to entities with Surface::Component to request wireframe edge
+// rendering as a first-class GPU geometry view. MeshViewLifecycleSystem
+// creates the edge index buffer (sharing the mesh's vertex buffer via BDA)
+// and manages the GPUScene slot lifecycle.
 //
-// Edge pairs are flattened from RenderVisualization::CachedEdges into a
+// Edge pairs are extracted from collision data and uploaded into a
 // contiguous uint32_t index buffer with topology Lines. The index buffer
 // is BDA-accessible, allowing LinePass to read edge pairs directly from
 // the GeometryGpuData without maintaining internal buffers.
@@ -440,7 +323,7 @@ export namespace ECS::MeshEdgeView
         uint32_t EdgeCount = 0;
 
         // true when the edge buffer needs (re-)creation.
-        // Set on first attach, or when CachedEdges change.
+        // Set on first attach, or when collision data changes.
         bool Dirty = true;
 
         // ---- Queries ----
@@ -453,10 +336,10 @@ export namespace ECS::MeshEdgeView
 //                  ReuseVertexBuffersFrom.
 // -------------------------------------------------------------------------
 //
-// Attached to entities with MeshRenderer to request vertex point rendering
-// as a first-class GPU geometry view. MeshViewLifecycleSystem creates the
-// view (sharing the mesh's vertex buffer via BDA, topology Points) and
-// manages the GPUScene slot lifecycle.
+// Attached to entities with Surface::Component to request vertex point
+// rendering as a first-class GPU geometry view. MeshViewLifecycleSystem
+// creates the view (sharing the mesh's vertex buffer via BDA, topology
+// Points) and manages the GPUScene slot lifecycle.
 
 export namespace ECS::MeshVertexView
 {
@@ -482,27 +365,21 @@ export namespace ECS::MeshVertexView
 }
 
 // =========================================================================
-// Per-Pass Typed ECS Components (PLAN.md Phase 1)
+// Per-Pass Typed ECS Components
 // =========================================================================
 //
 // These components implement the three-pass rendering architecture described
 // in PLAN.md. Each pass owns a dedicated component type; the toggle is
 // presence/absence of the component — no boolean flags. Attaching a
 // component enables that visualization, removing it disables it.
-//
-// During the transition period, these components coexist alongside the
-// legacy components (MeshRenderer, RenderVisualization, PointCloudRenderer).
-// A migration system (ComponentMigration) keeps them synchronized until
-// the legacy components can be retired.
 
 // -------------------------------------------------------------------------
 // Surface::Component — Owned by SurfacePass (filled triangle rendering).
 // -------------------------------------------------------------------------
 //
-// Mirrors MeshRenderer::Component initially. During transition, both
-// components coexist; the migration system keeps them in sync. After
-// Phase 5 (dead code deletion), MeshRenderer::Component is retired and
-// Surface::Component becomes the sole authority.
+// The sole authority for surface/mesh rendering. Created by SceneManager
+// when spawning mesh entities, managed by MeshRendererLifecycle for GPU
+// slot allocation, and consumed by SurfacePass and GPUSceneSync.
 
 export namespace ECS::Surface
 {
@@ -521,6 +398,23 @@ export namespace ECS::Surface
         Graphics::MaterialHandle CachedMaterialHandleForInstance{};
         uint32_t CachedMaterialRevisionForInstance = 0u;
         bool CachedIsSelectedForInstance = false;
+
+        // ---- Visibility ----
+        // Runtime visibility toggle. When false, the GPU scene slot is
+        // deactivated (radius=0) so the culler skips this instance.
+        bool Visible = true;
+
+        // Tracks the last Visible value written to GPUScene so that
+        // GPUSceneSync can detect transitions.
+        bool CachedVisible = true;
+
+        // ---- Per-Face Color Cache (optional) ----
+        // Packed ABGR per face, sourced from Mesh::FaceProperties("f:color")
+        // or set programmatically (e.g., segmentation labels, curvature).
+        // Indexed by triangle index (gl_PrimitiveID in fragment shader).
+        // When empty, SurfacePass uses standard texture/material shading.
+        std::vector<uint32_t> CachedFaceColors;
+        bool FaceColorsDirty = true;
     };
 }
 
@@ -528,10 +422,10 @@ export namespace ECS::Surface
 // Line::Component — Owned by LinePass (thick anti-aliased edge rendering).
 // -------------------------------------------------------------------------
 //
-// Replaces RenderVisualization wireframe fields and the ShowWireframe
-// boolean toggle. Edge data comes from PropertySets on the source geometry
-// (Halfedge::Mesh or Graph), not from a pass-local cache. Per-edge
-// attributes (colors, widths) are uploaded to a separate BDA channel.
+// Presence of this component enables wireframe/edge rendering for the entity.
+// Removal disables it. Edge data comes from MeshViewLifecycleSystem (for
+// meshes) or GraphGeometrySyncSystem (for graphs). Per-edge attributes
+// (colors, widths) are uploaded to a separate BDA channel by LinePass.
 
 export namespace ECS::Line
 {
@@ -549,8 +443,7 @@ export namespace ECS::Line
         // LinePass to render edges — no internal fallback.
         Geometry::GeometryHandle EdgeView{};
 
-        // Number of edges to render. Populated by ComponentMigration
-        // from the edge view geometry source.
+        // Number of edges to render.
         uint32_t EdgeCount = 0;
 
         // ---- Appearance (defaults; overridden by per-edge attributes) ----
@@ -559,10 +452,16 @@ export namespace ECS::Line
         bool      Overlay = false;  // true = no depth test (always visible)
 
         // ---- Per-Edge Attribute Flags ----
-        // Set by geometry view lifecycle systems when PropertySet data
-        // contains per-edge attributes.
         bool HasPerEdgeColors = false;
         bool HasPerEdgeWidths = false;
+
+        // ---- Per-Edge Color Cache (optional) ----
+        // Packed ABGR per edge, sourced from mesh edge PropertySets
+        // or set programmatically (e.g., curvature visualization).
+        // Must be same length as EdgeCount when non-empty.
+        // When empty, LinePass uses uniform Color.
+        // For graph entities, edge colors come from Graph::Data::CachedEdgeColors.
+        std::vector<uint32_t> CachedEdgeColors;
     };
 }
 
@@ -570,9 +469,9 @@ export namespace ECS::Line
 // Point::Component — Owned by PointPass (vertex/node/point cloud rendering).
 // -------------------------------------------------------------------------
 //
-// Replaces RenderVisualization vertex fields, PointCloudRenderer rendering
-// parameters, and GraphRenderer node parameters. The render mode selects
-// the pipeline variant (FlatDisc, Surfel, EWA).
+// Presence of this component enables point rendering for the entity.
+// Removal disables it. The render mode selects the pipeline variant
+// (FlatDisc, Surfel, EWA).
 
 export namespace ECS::Point
 {

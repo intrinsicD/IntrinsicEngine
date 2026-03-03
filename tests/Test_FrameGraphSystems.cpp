@@ -231,7 +231,7 @@ TEST(FrameGraphSystems, FullPipeline_CorrectLayerStructure)
     //   Layer 3: GPUSceneSync (reads WorldMatrix + MeshRenderer, writes WorldUpdatedTag, waits TransformUpdate)
     //
     // Note: MeshRendererLifecycle and GPUSceneSync could potentially be in the same layer
-    // depending on exact dependency analysis. GPUSceneSync reads MeshRenderer::Component
+    // depending on exact dependency analysis. GPUSceneSync reads Surface::Component
     // while MeshRendererLifecycle writes it, so GPUSceneSync must come after.
 
     // Execute and verify ordering.

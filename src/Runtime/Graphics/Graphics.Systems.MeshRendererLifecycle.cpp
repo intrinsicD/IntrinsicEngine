@@ -47,12 +47,12 @@ namespace Graphics::Systems::MeshRendererLifecycle
                   uint32_t defaultTextureId)
     {
 
-        auto view = registry.view<ECS::MeshRenderer::Component, ECS::Components::Transform::WorldMatrix>();
+        auto view = registry.view<ECS::Surface::Component, ECS::Components::Transform::WorldMatrix>();
 
         for (auto [entity, mr, world] : view.each())
         {
             // Allocate slot for newly-added components.
-            if (mr.GpuSlot == ECS::MeshRenderer::Component::kInvalidSlot)
+            if (mr.GpuSlot == ECS::Surface::Component::kInvalidSlot)
             {
                 if (!mr.Geometry.IsValid())
                     continue;
@@ -62,7 +62,7 @@ namespace Graphics::Systems::MeshRendererLifecycle
                     continue;
 
                 const uint32_t slot = gpuScene.AllocateSlot();
-                if (slot == ECS::MeshRenderer::Component::kInvalidSlot)
+                if (slot == ECS::Surface::Component::kInvalidSlot)
                     continue;
 
                 mr.GpuSlot = slot;
@@ -108,72 +108,6 @@ namespace Graphics::Systems::MeshRendererLifecycle
             }
         }
 
-        // -----------------------------------------------------------------
-        // GeometryViewRenderer: additional GPU instances for surface/vertices.
-        // NOTE: Wireframe edge buffers are managed by LinePass (persistent
-        // BDA-addressable buffers, not GPUScene instances).
-        // -----------------------------------------------------------------
-        auto viewViews = registry.view<ECS::GeometryViewRenderer::Component, ECS::Components::Transform::WorldMatrix>();
-        for (auto [entity, vr, world] : viewViews.each())
-        {
-            auto enqueueInstance = [&](Geometry::GeometryHandle handle,
-                                       uint32_t& slot,
-                                       const bool visible)
-            {
-                if (!handle.IsValid())
-                {
-                    // Handle was cleared (e.g. vertex visualization mode change):
-                    // deactivate and free the orphaned GPU scene slot.
-                    if (slot != ECS::MeshRenderer::Component::kInvalidSlot)
-                    {
-                        GpuInstanceData inst{};
-                        gpuScene.QueueUpdate(slot, inst, /*sphere*/ {0.0f, 0.0f, 0.0f, 0.0f});
-                        gpuScene.FreeSlot(slot);
-                        slot = ECS::MeshRenderer::Component::kInvalidSlot;
-                    }
-                    return;
-                }
-
-                GeometryGpuData* geo = geometryStorage.GetUnchecked(handle);
-                if (!geo || geo->GetIndexCount() == 0 || !geo->GetIndexBuffer() || !geo->GetVertexBuffer())
-                    return;
-
-                if (slot == ECS::MeshRenderer::Component::kInvalidSlot)
-                {
-                    slot = gpuScene.AllocateSlot();
-                    if (slot == ECS::MeshRenderer::Component::kInvalidSlot)
-                        return;
-                }
-
-                GpuInstanceData inst{};
-                inst.Model = world.Matrix;
-                inst.GeometryID = handle.Index;
-                inst.TextureID = defaultTextureId;
-
-                if (auto* pick = registry.try_get<ECS::Components::Selection::PickID>(entt::entity(entity)))
-                    inst.EntityID = pick->Value;
-
-                glm::vec4 sphere = ComputeLocalBoundingSphere(*geo);
-                if (sphere.w <= 0.0f)
-                    sphere.w = GPUSceneConstants::kMinBoundingSphereRadius;
-
-                if (!visible)
-                    sphere = {0.0f, 0.0f, 0.0f, 0.0f};
-
-                gpuScene.QueueUpdate(slot, inst, sphere);
-            };
-
-            enqueueInstance(vr.Surface, vr.SurfaceGpuSlot, vr.ShowSurface);
-            enqueueInstance(vr.Vertices, vr.VerticesGpuSlot, vr.ShowVertices);
-
-            // NOTE: WorldUpdatedTag is intentionally NOT removed here.
-            // The GeometryViewRenderer loop runs unconditionally every frame for all
-            // such entities (no tag guard), so the tag is not needed to drive updates here.
-            // GPUSceneSync consumes the tag for surface mesh transform updates — removing
-            // it here would cause GPUSceneSync to miss transform changes on entities that
-            // also have a GeometryViewRenderer component.
-        }
-
         // NOTE: Slot reclamation for destroyed entities is now handled by an EnTT on_destroy
         // signal registered in Engine. This provides O(1) immediate cleanup instead of the
         // one-frame-late orphan sweep that was previously here.
@@ -191,7 +125,7 @@ namespace Graphics::Systems::MeshRendererLifecycle
             [](Core::FrameGraphBuilder& builder)
             {
                 builder.Read<ECS::Components::Transform::WorldMatrix>();
-                builder.Write<ECS::MeshRenderer::Component>();
+                builder.Write<ECS::Surface::Component>();
                 builder.WaitFor("TransformUpdate"_id);
             },
             [&registry, &gpuScene, &assetManager, &materialSystem, &geometryStorage, defaultTextureId]()

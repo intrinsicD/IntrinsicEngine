@@ -58,7 +58,6 @@ TEST(PerPassComponents_Point, DefaultConstruction)
 
 TEST(PerPassComponents_SlotSentinel, AllComponentsShareSameKInvalidSlot)
 {
-    EXPECT_EQ(Surface::Component::kInvalidSlot, MeshRenderer::Component::kInvalidSlot);
     EXPECT_EQ(Surface::Component::kInvalidSlot, PointCloudRenderer::Component::kInvalidSlot);
     EXPECT_EQ(Surface::Component::kInvalidSlot, Graph::Data::kInvalidSlot);
     EXPECT_EQ(Surface::Component::kInvalidSlot, PointCloud::Data::kInvalidSlot);
@@ -174,20 +173,16 @@ TEST(PerPassComponents_Composition, PointCloudEntity_PointOnly)
     EXPECT_FALSE(reg.all_of<Line::Component>(e));
 }
 
-TEST(PerPassComponents_Composition, CoexistWithLegacyComponents)
+TEST(PerPassComponents_Composition, AllThreeComponentsCoexist)
 {
-    // During migration, new components coexist with legacy ones.
+    // New per-pass typed components coexist on the same entity.
     entt::registry reg;
     auto e = reg.create();
 
-    reg.emplace<MeshRenderer::Component>(e);
-    reg.emplace<RenderVisualization::Component>(e);
     reg.emplace<Surface::Component>(e);
     reg.emplace<Line::Component>(e);
     reg.emplace<Point::Component>(e);
 
-    EXPECT_TRUE(reg.all_of<MeshRenderer::Component>(e));
-    EXPECT_TRUE(reg.all_of<RenderVisualization::Component>(e));
     EXPECT_TRUE(reg.all_of<Surface::Component>(e));
     EXPECT_TRUE(reg.all_of<Line::Component>(e));
     EXPECT_TRUE(reg.all_of<Point::Component>(e));
@@ -304,92 +299,6 @@ TEST(PerPassComponents_Iteration, PointPassView)
 // ComponentMigration System — bridge from legacy to new components
 // =============================================================================
 
-TEST(ComponentMigration, MeshRenderer_CreatesSurface)
-{
-    entt::registry reg;
-    auto e = reg.create();
-
-    auto& mr = reg.emplace<MeshRenderer::Component>(e);
-    mr.GpuSlot = 42;
-
-    // Before migration: no Surface component.
-    EXPECT_FALSE(reg.all_of<Surface::Component>(e));
-
-    Graphics::Systems::ComponentMigration::OnUpdate(reg);
-
-    ASSERT_TRUE(reg.all_of<Surface::Component>(e));
-    auto& surf = reg.get<Surface::Component>(e);
-    EXPECT_EQ(surf.Geometry, mr.Geometry);
-    EXPECT_EQ(surf.Material, mr.Material);
-    EXPECT_EQ(surf.GpuSlot, 42u);
-}
-
-TEST(ComponentMigration, RenderVisualization_WireframeOn_CreatesLine)
-{
-    entt::registry reg;
-    auto e = reg.create();
-
-    auto& vis = reg.emplace<RenderVisualization::Component>(e);
-    vis.ShowWireframe = true;
-    vis.WireframeColor = {1.0f, 0.0f, 0.0f, 1.0f};
-    vis.WireframeWidth = 3.0f;
-    vis.WireframeOverlay = true;
-
-    Graphics::Systems::ComponentMigration::OnUpdate(reg);
-
-    ASSERT_TRUE(reg.all_of<Line::Component>(e));
-    auto& line = reg.get<Line::Component>(e);
-    EXPECT_EQ(line.Color, glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
-    EXPECT_FLOAT_EQ(line.Width, 3.0f);
-    EXPECT_TRUE(line.Overlay);
-}
-
-TEST(ComponentMigration, RenderVisualization_WireframeOff_NoLine)
-{
-    entt::registry reg;
-    auto e = reg.create();
-
-    auto& vis = reg.emplace<RenderVisualization::Component>(e);
-    vis.ShowWireframe = false;
-
-    Graphics::Systems::ComponentMigration::OnUpdate(reg);
-
-    EXPECT_FALSE(reg.all_of<Line::Component>(e));
-}
-
-TEST(ComponentMigration, RenderVisualization_VerticesOn_CreatesPoint)
-{
-    entt::registry reg;
-    auto e = reg.create();
-
-    auto& vis = reg.emplace<RenderVisualization::Component>(e);
-    vis.ShowVertices = true;
-    vis.VertexColor = {0.0f, 1.0f, 0.0f, 1.0f};
-    vis.VertexSize = 0.015f;
-    vis.VertexRenderMode = Geometry::PointCloud::RenderMode::Surfel;
-
-    Graphics::Systems::ComponentMigration::OnUpdate(reg);
-
-    ASSERT_TRUE(reg.all_of<Point::Component>(e));
-    auto& pt = reg.get<Point::Component>(e);
-    EXPECT_EQ(pt.Color, glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
-    EXPECT_FLOAT_EQ(pt.Size, 0.015f);
-    EXPECT_EQ(pt.Mode, Geometry::PointCloud::RenderMode::Surfel);
-}
-
-TEST(ComponentMigration, RenderVisualization_VerticesOff_NoPoint)
-{
-    entt::registry reg;
-    auto e = reg.create();
-
-    auto& vis = reg.emplace<RenderVisualization::Component>(e);
-    vis.ShowVertices = false;
-
-    Graphics::Systems::ComponentMigration::OnUpdate(reg);
-
-    EXPECT_FALSE(reg.all_of<Point::Component>(e));
-}
-
 TEST(ComponentMigration, PointCloudRenderer_CreatesPoint)
 {
     entt::registry reg;
@@ -473,52 +382,17 @@ TEST(ComponentMigration, Idempotent_SecondRunProducesSameResult)
     entt::registry reg;
     auto e = reg.create();
 
-    auto& mr = reg.emplace<MeshRenderer::Component>(e);
-    mr.GpuSlot = 7;
+    auto& gd = reg.emplace<Graph::Data>(e);
+    gd.Visible = true;
+    gd.DefaultEdgeColor = {0.0f, 0.0f, 1.0f, 1.0f};
 
     Graphics::Systems::ComponentMigration::OnUpdate(reg);
-    auto surfSlot1 = reg.get<Surface::Component>(e).GpuSlot;
+    auto lineColor1 = reg.get<Line::Component>(e).Color;
 
     // Second run should not change anything.
     Graphics::Systems::ComponentMigration::OnUpdate(reg);
-    auto surfSlot2 = reg.get<Surface::Component>(e).GpuSlot;
+    auto lineColor2 = reg.get<Line::Component>(e).Color;
 
-    EXPECT_EQ(surfSlot1, surfSlot2);
-    EXPECT_EQ(surfSlot2, 7u);
-}
-
-TEST(ComponentMigration, WireframeToggle_RemovesLineOnDisable)
-{
-    entt::registry reg;
-    auto e = reg.create();
-
-    auto& vis = reg.emplace<RenderVisualization::Component>(e);
-    vis.ShowWireframe = true;
-
-    Graphics::Systems::ComponentMigration::OnUpdate(reg);
-    EXPECT_TRUE(reg.all_of<Line::Component>(e));
-
-    // Disable wireframe.
-    vis.ShowWireframe = false;
-
-    Graphics::Systems::ComponentMigration::OnUpdate(reg);
-    EXPECT_FALSE(reg.all_of<Line::Component>(e));
-}
-
-TEST(ComponentMigration, GraphKeepsLineEvenIfVisShowWireframeOff)
-{
-    // Graph entities always have Line (edges), regardless of RenderVisualization.
-    entt::registry reg;
-    auto e = reg.create();
-
-    auto& gd = reg.emplace<Graph::Data>(e);
-    gd.Visible = true;
-
-    auto& vis = reg.emplace<RenderVisualization::Component>(e);
-    vis.ShowWireframe = false;  // wireframe off
-
-    Graphics::Systems::ComponentMigration::OnUpdate(reg);
-
-    // Graph::Data migration runs after RenderVisualization, so Line should exist.
-    EXPECT_TRUE(reg.all_of<Line::Component>(e));
+    EXPECT_EQ(lineColor1, lineColor2);
+    EXPECT_EQ(lineColor2, glm::vec4(0.0f, 0.0f, 1.0f, 1.0f));
 }

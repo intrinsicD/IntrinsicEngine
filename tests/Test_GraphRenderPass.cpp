@@ -8,15 +8,15 @@ import Graphics;
 import Geometry;
 
 // =============================================================================
-// GraphRenderPass — Compile-time contract tests
+// Graph Data — Compile-time contract tests
 // =============================================================================
 //
-// These tests validate the CPU-side contract of GraphRenderPass and the
-// ECS::Graph::Data component without requiring a GPU device.  They verify:
+// These tests validate the CPU-side contract of the ECS::Graph::Data component
+// without requiring a GPU device.  They verify:
 //   - Graph::Data component default values and PropertySet-backed queries.
 //   - Node color / radius optional attribute detection via PropertySets.
-//   - GraphRenderPass instantiation and configuration (no GPU calls).
-//   - GraphRenderPass correctly delegates node submission to PointCloudRenderPass.
+//   - GPU state fields for retained-mode rendering.
+//   - GPUScene slot integration.
 
 // ---- Helper: create a Graph with vertices and edges ----
 
@@ -140,82 +140,6 @@ TEST(Graph_Data, GraphWithDeletedVertices)
     g->DeleteVertex(v0);
     EXPECT_EQ(data.NodeCount(), 2u);
     EXPECT_EQ(data.EdgeCount(), 1u);
-}
-
-// ---- GraphRenderPass Instantiation ----
-
-TEST(GraphRenderPass_Contract, CanBeInstantiated)
-{
-    // GraphRenderPass has no GPU resources — instantiation should always succeed.
-    Graphics::Passes::GraphRenderPass pass;
-    SUCCEED(); // No crash = pass.
-}
-
-TEST(GraphRenderPass_Contract, SetPointCloudPassDoesNotCrash)
-{
-    Graphics::Passes::GraphRenderPass pass;
-    pass.SetPointCloudPass(nullptr); // nullptr is valid (disables node rendering).
-    SUCCEED();
-}
-
-// ---- Node Submission via PointCloudRenderPass ----
-
-TEST(GraphRenderPass_Contract, NodeSubmissionDelegatesToPointCloud)
-{
-    // Verify that GraphRenderPass correctly calls PointCloudRenderPass::SubmitPoints
-    // for each node in the graph component.
-    // We can't run AddPasses() without ECS, but we can verify the count math
-    // by direct PointCloudRenderPass staging.
-
-    Graphics::Passes::PointCloudRenderPass pcPass;
-
-    // Simulate what GraphRenderPass does for 3 nodes in FlatDisc mode.
-    for (int i = 0; i < 3; ++i)
-    {
-        auto pt = Graphics::Passes::PointCloudRenderPass::PackPoint(
-            static_cast<float>(i), 0, 0,
-            0, 1, 0,
-            0.01f,
-            Graphics::Passes::PointCloudRenderPass::PackColor(255, 128, 0));
-        pcPass.SubmitPoints(Geometry::PointCloud::RenderMode::FlatDisc, &pt, 1);
-    }
-
-    EXPECT_EQ(pcPass.GetPointCount(), 3u);
-    EXPECT_TRUE(pcPass.HasContent());
-}
-
-TEST(GraphRenderPass_Contract, FlatDiscNodesAccumulate)
-{
-    // Graph nodes use flat-disc point rendering.
-    Graphics::Passes::PointCloudRenderPass pcPass;
-
-    auto pt = Graphics::Passes::PointCloudRenderPass::PackPoint(
-        0, 0, 0, 0, 1, 0, 0.02f, 0xFFFFFFFF);
-    pcPass.SubmitPoints(Geometry::PointCloud::RenderMode::FlatDisc, &pt, 1);
-
-    EXPECT_EQ(pcPass.GetPointCount(), 1u);
-}
-
-// ---- GraphRenderPass + PointCloudRenderPass Reset Integration ----
-
-TEST(GraphRenderPass_Contract, ResetBeforeCollect)
-{
-    Graphics::Passes::PointCloudRenderPass pcPass;
-
-    // Submit some points (simulating a previous frame).
-    auto pt = Graphics::Passes::PointCloudRenderPass::PackPoint(
-        0, 0, 0, 0, 1, 0, 0.01f, 0xFFFFFFFF);
-    pcPass.SubmitPoints(&pt, 1);
-    ASSERT_EQ(pcPass.GetPointCount(), 1u);
-
-    // Frame boundary: reset before new collection.
-    pcPass.ResetPoints();
-    EXPECT_EQ(pcPass.GetPointCount(), 0u);
-    EXPECT_FALSE(pcPass.HasContent());
-
-    // Re-submit for new frame.
-    pcPass.SubmitPoints(Geometry::PointCloud::RenderMode::FlatDisc, &pt, 1);
-    EXPECT_EQ(pcPass.GetPointCount(), 1u);
 }
 
 // ---- RenderMode Enum Coverage ----
@@ -358,9 +282,9 @@ TEST(Graph_RetainedMode, EdgePairStorageMatchesEdgeCount)
 TEST(Graph_RetainedMode, EdgePairSizeMatchesLayout)
 {
     // EdgePair must be exactly 8 bytes for direct SSBO upload.
-    static_assert(sizeof(ECS::RenderVisualization::EdgePair) == 8);
+    static_assert(sizeof(ECS::EdgePair) == 8);
 
-    ECS::RenderVisualization::EdgePair ep{42, 99};
+    ECS::EdgePair ep{42, 99};
     EXPECT_EQ(ep.i0, 42u);
     EXPECT_EQ(ep.i1, 99u);
 }
@@ -405,30 +329,6 @@ TEST(Graph_RetainedMode, GpuVertexCountTracksCompactedCount)
     EXPECT_EQ(data.GpuVertexCount, 3u);
 }
 
-// ---- GraphRenderPass SetRetainedPassesActive ----
-
-TEST(GraphRenderPass_Retained, SetRetainedPassesActiveDoesNotCrash)
-{
-    Graphics::Passes::GraphRenderPass pass;
-    pass.SetRetainedPassesActive(true, true);
-    pass.SetRetainedPassesActive(false, false);
-    pass.SetRetainedPassesActive(true, false);
-    pass.SetRetainedPassesActive(false, true);
-    SUCCEED();
-}
-
-TEST(GraphRenderPass_Retained, RetainedFlagsDefaultToFalse)
-{
-    // GraphRenderPass should default to CPU path (retained flags false).
-    // We verify this indirectly: a new pass with SetPointCloudPass(nullptr)
-    // should not crash when AddPasses isn't called.
-    Graphics::Passes::GraphRenderPass pass;
-    pass.SetPointCloudPass(nullptr);
-    // If retained were true by default, the pass would skip entities even
-    // without GPU state — which is wrong. The default must be false.
-    SUCCEED();
-}
-
 // =============================================================================
 // GPUScene Slot Integration — Contract tests
 // =============================================================================
@@ -437,7 +337,7 @@ TEST(Graph_GPUSceneSlot, InvalidSlotConstantMatchesOtherComponents)
 {
     // All renderer components must use the same kInvalidSlot sentinel (0xFFFFFFFF).
     EXPECT_EQ(ECS::Graph::Data::kInvalidSlot,
-              ECS::MeshRenderer::Component::kInvalidSlot);
+              ECS::Surface::Component::kInvalidSlot);
     EXPECT_EQ(ECS::Graph::Data::kInvalidSlot,
               ECS::PointCloudRenderer::Component::kInvalidSlot);
     EXPECT_EQ(ECS::Graph::Data::kInvalidSlot, ~0u);
