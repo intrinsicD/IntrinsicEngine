@@ -236,8 +236,8 @@ namespace Runtime
                 }
 
                 // Route point topologies to PointCloudRenderer for billboard
-                // expansion via RetainedPointCloudRenderPass. Meshes/lines use
-                // the standard MeshRenderer path.
+                // expansion via PointPass. Meshes/lines use the standard
+                // MeshRenderer path.
                 const auto handle = model->Meshes[i]->Handle;
                 const auto* geo = m_GeometryStorage ? m_GeometryStorage->GetUnchecked(handle) : nullptr;
 

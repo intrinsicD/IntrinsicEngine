@@ -113,6 +113,10 @@ namespace Runtime
             ShaderRegistration{"SceneUpdate.Comp"_id, "shaders/scene_update.comp.spv"},
             ShaderRegistration{"RetainedPoint.Vert"_id, "shaders/point_retained.vert.spv"},
             ShaderRegistration{"RetainedPoint.Frag"_id, "shaders/point_retained.frag.spv"},
+            ShaderRegistration{"Point.FlatDisc.Vert"_id, "shaders/point_flatdisc.vert.spv"},
+            ShaderRegistration{"Point.FlatDisc.Frag"_id, "shaders/point_flatdisc.frag.spv"},
+            ShaderRegistration{"Point.Surfel.Vert"_id, "shaders/point_surfel.vert.spv"},
+            ShaderRegistration{"Point.Surfel.Frag"_id, "shaders/point_surfel.frag.spv"},
         };
 
         for (const auto& registration : kShaderRegistrations)

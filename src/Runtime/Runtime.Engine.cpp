@@ -310,7 +310,8 @@ namespace Runtime
         reg("PickingPass",           Cat::RenderFeature, "Entity ID picking for mouse selection");
         reg("SelectionOutlinePass",  Cat::RenderFeature, "Selection outline overlay for selected/hovered entities");
         reg("LinePass",              Cat::RenderFeature, "Unified BDA line rendering (retained wireframe/graph edges + transient DebugDraw)");
-        reg("PointCloudRenderPass",  Cat::RenderFeature, "Point cloud rendering (flat disc)");
+        reg("PointCloudRenderPass",  Cat::RenderFeature, "Point cloud rendering (flat disc) — legacy SSBO path");
+        reg("PointPass",             Cat::RenderFeature, "Unified BDA point rendering (retained points/nodes/vertices + transient DebugDraw)");
         reg("DebugViewPass",         Cat::RenderFeature, "Render target debug visualization");
         reg("ImGuiPass",             Cat::RenderFeature, "ImGui UI overlay");
 

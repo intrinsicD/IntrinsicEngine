@@ -20,20 +20,6 @@ This document tracks **what's left to do** in IntrinsicEngine's architecture.
 
 Replace the dual-path (transient CPU + retained GPU) rendering with a **single unified path per primitive type** (`SurfacePass`, `LinePass`, `PointPass`). Full spec in `PLAN.md`.
 
-### 1.4 PointPass — Consolidate All Point Sources (PLAN.md Phase 4)
-
-- [ ] Rename `RetainedPointCloudRenderPass` → `PointPass`.
-- [ ] Split `point_retained.vert/frag` into `point_flatdisc.vert/frag` and `point_surfel.vert/frag`.
-- [ ] PointPass stores pipeline array indexed by `PointRenderMode`.
-- [ ] Add `ECS::Point::Component` iteration (replaces `RenderVisualization::ShowVertices` boolean).
-- [ ] Add graph node iteration (replaces `GraphRenderPass` node submission).
-- [ ] Add standalone point cloud iteration (replaces `PointCloudRenderPass`).
-- [ ] Add `GetPoints()` to `DebugDraw` for transient point markers.
-- [ ] PointPass reads `ctx.DebugDraw->GetPoints()` for transient data.
-- [ ] Support per-point attributes (colors, radii, normals) from point PropertySets via `PtrAux` BDA channel.
-- [ ] Delete vertex/node code from `MeshRenderPass`, `GraphRenderPass`, `PointCloudRenderPass`.
-- [ ] Delete `RetainedPointCloudRenderPass` files (already renamed) and old transient `point.vert/frag`.
-
 ### 1.5 Delete Dead Code (PLAN.md Phase 5)
 
 - [ ] Delete `MeshRenderPass` (class, files, module partition).
