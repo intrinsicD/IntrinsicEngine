@@ -111,8 +111,6 @@ namespace Runtime
             ShaderRegistration{"PointCloud.Frag"_id, "shaders/point.frag.spv"},
             ShaderRegistration{"Cull.Comp"_id, "shaders/instance_cull_multigeo.comp.spv"},
             ShaderRegistration{"SceneUpdate.Comp"_id, "shaders/scene_update.comp.spv"},
-            ShaderRegistration{"RetainedLine.Vert"_id, "shaders/line_retained.vert.spv"},
-            ShaderRegistration{"RetainedLine.Frag"_id, "shaders/line_retained.frag.spv"},
             ShaderRegistration{"RetainedPoint.Vert"_id, "shaders/point_retained.vert.spv"},
             ShaderRegistration{"RetainedPoint.Frag"_id, "shaders/point_retained.frag.spv"},
         };
@@ -153,7 +151,7 @@ namespace Runtime
             std::exit(1);
         }
 
-        // Wire DebugDraw accumulator to RenderSystem (consumed by LineRenderPass).
+        // Wire DebugDraw accumulator to RenderSystem (consumed by LinePass).
         m_RenderSystem->SetDebugDraw(&m_DebugDraw);
 
         // Default Render Pipeline (hot-swappable)

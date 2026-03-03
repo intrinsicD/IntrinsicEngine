@@ -29,9 +29,9 @@ namespace Graphics::Passes
     //
     //   ShowWireframe:
     //     Extracts unique edges from the collision mesh (lazily cached per entity).
-    //     When RetainedLineRenderPass is active, edges are rendered via BDA from
+    //     When LinePass is active, edges are rendered via BDA from
     //     persistent device-local buffers — the CPU path is skipped. Otherwise,
-    //     edges are submitted to ctx.DebugDrawPtr (→ LineRenderPass GPU draw).
+    //     edges are submitted to ctx.DebugDrawPtr (→ LinePass GPU draw).
     //     Uses OverlayLine when vis.WireframeOverlay is true.
     //
     //   ShowVertices:
@@ -168,8 +168,8 @@ namespace Graphics::Passes
             }
 
             // ------------------------------------------------------------------
-            // Wireframe: CPU path — submit edges to DebugDraw → LineRenderPass.
-            // Skipped when retained GPU geometry exists (RetainedLineRenderPass handles it).
+            // Wireframe: CPU path — submit edges to DebugDraw → LinePass.
+            // Skipped when retained GPU geometry exists (LinePass handles it).
             // ------------------------------------------------------------------
             if (needsCpuWire && !vis.CachedEdges.empty())
             {

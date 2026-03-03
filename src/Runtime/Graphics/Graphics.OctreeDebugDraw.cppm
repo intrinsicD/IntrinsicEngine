@@ -12,7 +12,7 @@ import :DebugDraw;
 export namespace Graphics
 {
     // -------------------------------------------------------------------------
-    // Octree Debug Visualization (CPU → DebugDraw → LineRenderPass)
+    // Octree Debug Visualization (CPU → DebugDraw → LinePass)
     // -------------------------------------------------------------------------
 
     struct OctreeDebugDrawSettings

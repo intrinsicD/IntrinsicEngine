@@ -28,12 +28,12 @@ namespace Graphics::Passes
     //   - Submits edge segments to ctx.DebugDrawPtr.
     //
     // When retained-mode passes are active, entities with valid GpuGeometry are
-    // skipped — the RetainedLineRenderPass and RetainedPointCloudRenderPass
+    // skipped — the LinePass and RetainedPointCloudRenderPass
     // handle them via BDA. Only entities that lack GPU state (e.g., before
     // GraphGeometrySyncSystem runs) fall through to this CPU path.
     //
     // This method does NOT add any GPU render graph passes. Actual GPU drawing is
-    // performed by PointCloudRenderPass::AddPasses() and LineRenderPass::AddPasses()
+    // performed by PointCloudRenderPass::AddPasses() and LinePass::AddPasses()
     // after all collection stages complete.
 
     void GraphRenderPass::AddPasses(RenderPassContext& ctx)
@@ -121,7 +121,7 @@ namespace Graphics::Passes
                 }
             }
 
-            // --- Submit edges to DebugDraw (CPU fallback → LineRenderPass) ---
+            // --- Submit edges to DebugDraw (CPU fallback → LinePass) ---
             if (ctx.DebugDrawPtr && graph.EdgeCount() > 0 && !retainedHandlesEdges)
             {
                 const uint32_t edgeColor = DebugDraw::PackColorF(

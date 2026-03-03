@@ -18,7 +18,6 @@ import :Passes.Line;
 import :Passes.Mesh;
 import :Passes.PointCloud;
 import :Passes.Picking;
-import :Passes.RetainedLine;
 import :Passes.RetainedPointCloud;
 import :Passes.SelectionOutline;
 import :Passes.SelectionOutlineSettings;
@@ -69,9 +68,8 @@ export namespace Graphics
         std::unique_ptr<Passes::MeshRenderPass> m_MeshPass;
         std::unique_ptr<Passes::GraphRenderPass> m_GraphPass;
         std::unique_ptr<Passes::SelectionOutlinePass> m_SelectionOutlinePass;
-        std::unique_ptr<Passes::LineRenderPass> m_LineRenderPass;
+        std::unique_ptr<Passes::LinePass> m_LinePass;
         std::unique_ptr<Passes::PointCloudRenderPass> m_PointCloudPass;
-        std::unique_ptr<Passes::RetainedLineRenderPass> m_RetainedLinePass;
         std::unique_ptr<Passes::RetainedPointCloudRenderPass> m_RetainedPointPass;
         std::unique_ptr<Passes::DebugViewPass> m_DebugViewPass;
         std::unique_ptr<Passes::ImGuiPass> m_ImGuiPass;

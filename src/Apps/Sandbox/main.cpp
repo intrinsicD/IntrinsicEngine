@@ -1469,9 +1469,9 @@ public:
                             // -----------------------------------------------------------------
                             // Lazily create GPU views (one-time allocations/uploads)
                             // -----------------------------------------------------------------
-                            // NOTE: Wireframe has NO GPU view. It is rendered entirely by the
-                            // MeshRenderPass CPU path → DebugDraw accumulator → LineRenderPass,
-                            // which correctly applies WireframeColor and WireframeOverlay.
+                            // NOTE: Wireframe has NO GPU view. It is rendered by LinePass
+                            // which reads CachedEdges via BDA from persistent GPU buffers.
+                            // WireframeColor and WireframeOverlay are correctly applied.
                             // The previous GPU view approach used surface.frag which ignores
                             // WireframeColor and produced invisible/incorrect output.
 

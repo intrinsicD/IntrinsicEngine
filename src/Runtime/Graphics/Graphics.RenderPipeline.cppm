@@ -125,7 +125,7 @@ export namespace Graphics
 
         // Immediate-mode debug drawing accumulator.
         // Populated by ECS systems and other subsystems before rendering.
-        // Consumed by LineRenderPass during graph setup.
+        // Consumed by LinePass during graph setup.
         DebugDraw* DebugDrawPtr = nullptr;
     };
 

@@ -1,150 +1,150 @@
-// line.vert — Screen-space thick line rendering via vertex-shader expansion.
+// line.vert — Unified thick line rendering via BDA vertex pulling.
 //
-// Technique: Each line segment (2 endpoints) is expanded into a screen-space
-// quad (2 triangles, 6 vertices). The vertex shader generates all vertex
-// positions procedurally from the SSBO line data using gl_VertexIndex.
+// Both positions and edge indices are read via buffer device address (BDA).
+// Supports both retained-mode (persistent device-local edge buffers uploaded
+// once) and transient (per-frame DebugDraw line uploads).
 //
-// This avoids geometry shaders (slow, poorly supported on some mobile/tile-based
-// GPUs) and avoids wide-line extensions (not guaranteed in Vulkan).
+// Each line segment is expanded into a screen-space quad (2 triangles, 6 vertices)
+// for thick-line rendering with anti-aliased edges.
 //
-// References:
-//   - Rougier, "Antialiased 2D Grid, Marker, and Arrow Shaders" (JCGT 2014)
-//   - Cozzi & Ring, "3D Engine Design for Virtual Globes" (CRC Press 2011)
-//   - Three.js LineMaterial / Cesium polyline rendering
+// Integration:
+//   - Push constants carry BDA pointers to position + edge buffers + line config.
+//   - Set 0: Camera UBO (shared across all passes).
+//   - Per-entity transform via push constants (model matrix).
 
 #version 460
 #extension GL_EXT_scalar_block_layout : require
+#extension GL_EXT_buffer_reference : require
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 
-// Camera UBO (shared across all passes)
+// Camera UBO (shared across all passes).
 layout(set = 0, binding = 0) uniform CameraBuffer {
     mat4 view;
     mat4 proj;
 } camera;
 
-// Line segment SSBO: one entry per line segment.
-struct LineSegment {
-    vec3 Start;
-    uint ColorStart;
-    vec3 End;
-    uint ColorEnd;
+// Buffer device address references for shared position and edge buffers.
+layout(buffer_reference, scalar) readonly buffer PosBuf { vec3 v[]; };
+
+struct EdgePair {
+    uint i0;
+    uint i1;
 };
+layout(buffer_reference, scalar) readonly buffer EdgeBuf { EdgePair e[]; };
 
-layout(std430, set = 1, binding = 0) readonly buffer LineBuffer {
-    LineSegment segments[];
-} lines;
+// Per-edge color buffer (optional BDA — when PtrEdgeAux != 0).
+layout(buffer_reference, scalar) readonly buffer EdgeAuxBuf { uint color[]; };
 
-// Push constants: line width and viewport dimensions.
+// Push constants.
 layout(push_constant) uniform PushConsts {
-    float LineWidth;        // in pixels (screen-space half-width)
-    float ViewportWidth;
-    float ViewportHeight;
-    float _pad;
+    mat4     Model;           // per-entity world transform
+    uint64_t PtrPositions;    // BDA to shared position buffer
+    uint64_t PtrEdges;        // BDA to persistent edge pair buffer
+    float    LineWidth;       // in pixels
+    float    ViewportWidth;
+    float    ViewportHeight;
+    uint     Color;           // packed ABGR (uniform color for all edges)
+    uint64_t PtrEdgeAux;      // BDA to per-edge packed ABGR colors (0 = use uniform Color)
 } push;
 
 layout(location = 0) out vec4 fragColor;
-layout(location = 1) out float fragDistanceToCenter; // signed distance for AA
+layout(location = 1) out float fragDistanceToCenter;
 
 void main()
 {
-    // Each line segment uses 6 vertices (2 triangles).
-    // Vertex layout within a segment:
-    //   0,1,2 = first triangle;  3,4,5 = second triangle
-    //   Positions form a quad: [start-left, start-right, end-right, start-left, end-right, end-left]
     uint segmentIndex = gl_VertexIndex / 6;
     uint vertexInQuad = gl_VertexIndex % 6;
 
-    LineSegment seg = lines.segments[segmentIndex];
+    // Read edge indices via BDA from the persistent edge buffer.
+    EdgeBuf eBuf = EdgeBuf(push.PtrEdges);
+    EdgePair edge = eBuf.e[segmentIndex];
 
-    // Project endpoints to clip space
-    vec4 clipA = camera.proj * camera.view * vec4(seg.Start, 1.0);
-    vec4 clipB = camera.proj * camera.view * vec4(seg.End, 1.0);
+    // Read positions via BDA from the shared vertex buffer.
+    PosBuf posBuf = PosBuf(push.PtrPositions);
+    vec3 posA = posBuf.v[edge.i0];
+    vec3 posB = posBuf.v[edge.i1];
 
-    // Convert to NDC
+    // Transform to world space.
+    vec3 worldA = vec3(push.Model * vec4(posA, 1.0));
+    vec3 worldB = vec3(push.Model * vec4(posB, 1.0));
+
+    // Project endpoints to clip space.
+    vec4 clipA = camera.proj * camera.view * vec4(worldA, 1.0);
+    vec4 clipB = camera.proj * camera.view * vec4(worldB, 1.0);
+
+    // Convert to NDC.
     vec2 ndcA = clipA.xy / clipA.w;
     vec2 ndcB = clipB.xy / clipB.w;
 
-    // Screen-space positions (pixels)
+    // Screen-space positions (pixels).
     vec2 viewport = vec2(push.ViewportWidth, push.ViewportHeight);
     vec2 screenA = (ndcA * 0.5 + 0.5) * viewport;
     vec2 screenB = (ndcB * 0.5 + 0.5) * viewport;
 
-    // Screen-space direction and perpendicular
+    // Screen-space direction and perpendicular.
     vec2 dir = screenB - screenA;
     float len = length(dir);
 
-    // Degenerate line: collapse to zero-area quad
+    // Per-edge color: read from BDA buffer when PtrEdgeAux != 0, otherwise use uniform Color.
+    if (push.PtrEdgeAux != 0ul)
+    {
+        EdgeAuxBuf auxBuf = EdgeAuxBuf(push.PtrEdgeAux);
+        fragColor = unpackUnorm4x8(auxBuf.color[segmentIndex]);
+    }
+    else
+    {
+        fragColor = unpackUnorm4x8(push.Color);
+    }
+
     if (len < 0.001)
     {
         gl_Position = clipA;
-        fragColor = unpackUnorm4x8(seg.ColorStart);
         fragDistanceToCenter = 0.0;
         return;
     }
 
-    dir /= len; // normalize
-    vec2 perp = vec2(-dir.y, dir.x); // perpendicular (90° CCW)
+    dir /= len;
+    vec2 perp = vec2(-dir.y, dir.x);
 
-    // Half-width in pixels (push.LineWidth is the total width)
     float halfWidth = push.LineWidth * 0.5;
+    float capExtend = halfWidth;
 
-    // Expand the quad: 4 corner positions in screen space
-    //  0 = start - perp * halfWidth  (start-left)
-    //  1 = start + perp * halfWidth  (start-right)
-    //  2 = end   + perp * halfWidth  (end-right)
-    //  3 = end   - perp * halfWidth  (end-left)
-    //
-    // With small extension along direction for round caps:
-    float capExtend = halfWidth; // extend by half-width for round/square caps
-
-    vec2 screenPos;
-    float side; // -1 = left, +1 = right (for distance-to-center)
-    vec4 clipPos;
-    vec4 color;
-
-    // Map the 6 vertices to quad corners
-    //  Triangle 1: 0, 1, 2  → start-left, start-right, end-right
-    //  Triangle 2: 3, 4, 5  → start-left, end-right, end-left
-    // Remapped: vertex 0,3 = corner 0; vertex 1 = corner 1; vertex 2,4 = corner 2; vertex 5 = corner 3
+    // Map 6 vertices to 4 quad corners.
     uint cornerIndex;
     if      (vertexInQuad == 0 || vertexInQuad == 3) cornerIndex = 0;
     else if (vertexInQuad == 1)                      cornerIndex = 1;
     else if (vertexInQuad == 2 || vertexInQuad == 4) cornerIndex = 2;
-    else                                             cornerIndex = 3; // vertexInQuad == 5
+    else                                             cornerIndex = 3;
+
+    vec2 screenPos;
+    float side;
+    vec4 clipPos;
 
     switch (cornerIndex)
     {
-    case 0: // start - left
+    case 0:
         screenPos = screenA - dir * capExtend - perp * halfWidth;
         side = -1.0;
         clipPos = clipA;
-        color = unpackUnorm4x8(seg.ColorStart);
         break;
-    case 1: // start + right
+    case 1:
         screenPos = screenA - dir * capExtend + perp * halfWidth;
         side = 1.0;
         clipPos = clipA;
-        color = unpackUnorm4x8(seg.ColorStart);
         break;
-    case 2: // end + right
+    case 2:
         screenPos = screenB + dir * capExtend + perp * halfWidth;
         side = 1.0;
         clipPos = clipB;
-        color = unpackUnorm4x8(seg.ColorEnd);
         break;
-    case 3: // end - left
+    case 3:
         screenPos = screenB + dir * capExtend - perp * halfWidth;
         side = -1.0;
         clipPos = clipB;
-        color = unpackUnorm4x8(seg.ColorEnd);
         break;
     }
 
-    // Convert screen position back to NDC
     vec2 ndc = (screenPos / viewport) * 2.0 - 1.0;
-
-    // Reconstruct clip-space with original depth (w)
     gl_Position = vec4(ndc * clipPos.w, clipPos.z, clipPos.w);
-
-    fragColor = color;
-    fragDistanceToCenter = side * halfWidth; // pixel distance from center line
+    fragDistanceToCenter = side * halfWidth;
 }

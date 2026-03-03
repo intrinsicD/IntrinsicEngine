@@ -204,9 +204,9 @@ namespace Graphics::Systems::GraphGeometrySync
                 // --- Upload to GPU via Direct mode (CPU_TO_GPU for dynamic graphs) ---
                 // Direct mode creates host-visible buffers with SHADER_DEVICE_ADDRESS_BIT
                 // for BDA access. Suitable for graphs that may re-layout frequently.
-                // Edge pairs are stored in CachedEdgePairs; RetainedLineRenderPass creates
-                // persistent BDA-addressable edge buffers from them on first use and
-                // recreates them when the edge count changes (e.g. after re-layout).
+                // Edge pairs are stored in CachedEdgePairs; LinePass creates persistent
+                // BDA-addressable edge buffers from them on first use and recreates
+                // them when the edge count changes (e.g. after re-layout).
                 GeometryUploadRequest directUpload{};
                 directUpload.Positions = positions;
                 directUpload.Normals = normals;
