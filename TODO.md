@@ -53,7 +53,6 @@ Zero vertex duplication. Each topology needs separate shader pipelines because t
 
 Automated creation/destruction of GPU geometry views when rendering components are attached/detached. Applies equally to all three geometry types.
 
-- [ ] `PointCloudGeometrySyncSystem`: on `ECS::Point::Component` attach with `PointCloud::Cloud` source → upload `Cloud::Positions()`/`Normals()` spans to device-local `GeometryGpuData`, assign handle.
 - [ ] Staged (device-local) upload path for large static graphs in `GraphGeometrySyncSystem` (current Direct mode is suitable for dynamic re-layout; staged path for static graphs would reduce host-visible memory).
 
 ### 1.3 PropertySet Dirty-Domain Sync System

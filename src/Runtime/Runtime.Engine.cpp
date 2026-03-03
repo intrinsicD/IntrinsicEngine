@@ -319,6 +319,7 @@ namespace Runtime
         reg("MeshRendererLifecycle",           Cat::System, "Allocates/deallocates GPU slots for mesh renderers");
         reg("PointCloudRendererLifecycle",     Cat::System, "Uploads point clouds to GPU and allocates GPUScene slots");
         reg("GraphGeometrySync",              Cat::System, "Uploads graph geometry to GPU and allocates GPUScene slots");
+        reg("PointCloudGeometrySync",        Cat::System, "Uploads Cloud-backed point clouds to GPU and allocates GPUScene slots");
         reg("MeshViewLifecycle",              Cat::System, "Creates GPU edge/vertex views from mesh via ReuseVertexBuffersFrom");
         reg("GPUSceneSync",                   Cat::System, "Synchronizes CPU entity data to GPU scene buffers");
 
@@ -484,6 +485,18 @@ namespace Runtime
                     if (m_FeatureRegistry.IsEnabled("PointCloudRendererLifecycle"_id))
                     {
                         Graphics::Systems::PointCloudRendererLifecycle::RegisterSystem(
+                            frameGraph, registry, *gpuScene,
+                            m_RenderOrchestrator->GetGeometryStorage(),
+                            GetDeviceShared(),
+                            m_GraphicsBackend->GetTransferManager());
+                    }
+
+                    // Cloud-backed point cloud sync: uploads Cloud::Positions/Normals
+                    // spans to device-local GPU buffers for entities with
+                    // ECS::PointCloud::Data (PropertySet-backed point clouds).
+                    if (m_FeatureRegistry.IsEnabled("PointCloudGeometrySync"_id))
+                    {
+                        Graphics::Systems::PointCloudGeometrySync::RegisterSystem(
                             frameGraph, registry, *gpuScene,
                             m_RenderOrchestrator->GetGeometryStorage(),
                             GetDeviceShared(),

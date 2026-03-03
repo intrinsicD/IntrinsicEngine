@@ -345,6 +345,51 @@ namespace Graphics::Passes
             draws.push_back(di);
         }
 
+        // -----------------------------------------------------------------
+        // Cloud-backed point cloud entities — retained-mode rendering via BDA.
+        // PointCloudGeometrySyncSystem uploads Cloud::Positions/Normals to a
+        // device-local vertex buffer; we read via BDA with zero per-frame cost.
+        // -----------------------------------------------------------------
+        auto cloudView = registry.view<ECS::PointCloud::Data>();
+        for (auto [entity, pcData] : cloudView.each())
+        {
+            if (!pcData.Visible || !pcData.GpuGeometry.IsValid())
+                continue;
+
+            if (pcData.GpuPointCount == 0)
+                continue;
+
+            GeometryGpuData* geo = m_GeometryStorage->GetUnchecked(pcData.GpuGeometry);
+            if (!geo || !geo->GetVertexBuffer())
+                continue;
+
+            glm::mat4 worldMatrix(1.0f);
+            if (auto* wm = registry.try_get<ECS::Components::Transform::WorldMatrix>(entity))
+                worldMatrix = wm->Matrix;
+
+            if (cullingEnabled && !FrustumCullSphere(worldMatrix, geo->GetLocalBoundingSphere(), frustum))
+                continue;
+
+            const uint64_t baseAddr = geo->GetVertexBuffer()->GetDeviceAddress();
+            const auto& layout = geo->GetLayout();
+            const uint64_t posAddr = baseAddr + layout.PositionsOffset;
+            const uint64_t normAddr = (layout.NormalsSize > 0) ? (baseAddr + layout.NormalsOffset) : 0;
+
+            const uint32_t ptColor = GpuColor::PackColorF(
+                pcData.DefaultColor.r, pcData.DefaultColor.g,
+                pcData.DefaultColor.b, pcData.DefaultColor.a);
+
+            DrawInfo di{};
+            di.Model = worldMatrix;
+            di.PtrPositions = posAddr;
+            di.PtrNormals = normAddr;
+            di.VertexCount = pcData.GpuPointCount;
+            di.PointSize = pcData.DefaultRadius;
+            di.RenderMode = static_cast<uint32_t>(pcData.RenderMode);
+            di.Color = ptColor;
+            draws.push_back(di);
+        }
+
         if (draws.empty())
             return;
 

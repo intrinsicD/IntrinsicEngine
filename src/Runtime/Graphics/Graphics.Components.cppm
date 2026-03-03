@@ -285,6 +285,101 @@ export namespace ECS::Graph
     };
 }
 
+// -------------------------------------------------------------------------
+// PointCloud::Data — ECS component for PropertySet-backed point cloud
+//                    rendering (Cloud source).
+// -------------------------------------------------------------------------
+//
+// Holds a shared_ptr to an authoritative Geometry::PointCloud::Cloud
+// instance. Positions, normals, colors, and radii are sourced directly
+// from the Cloud's PropertySets — no std::vector copies on the component.
+//
+// Rendering: retained-mode via BDA shared-buffer architecture.
+//   - Points rendered via RetainedPointCloudRenderPass (BDA position pull).
+//   - GPU state managed by PointCloudGeometrySyncSystem: positions/normals
+//     are uploaded to a device-local vertex buffer (GpuGeometry), per-point
+//     attributes extracted from PropertySets.
+//   - Re-upload triggers on GpuDirty = true.
+//
+// Two creation paths:
+//   a) Algorithm output: Cloud is populated from geometry operators (normal
+//      estimation, surface reconstruction, downsampling); GpuDirty = true.
+//   b) File loading: Cloud is populated by loaders; GpuDirty = true.
+//
+// Key difference from PointCloudRenderer::Component:
+//   - PointCloudRenderer::Component owns raw CPU vectors and frees them
+//     after upload (one-shot lifecycle, managed by PointCloudRendererLifecycle).
+//   - PointCloud::Data borrows from a shared Cloud instance; the Cloud
+//     remains alive for re-upload when its data changes (sync lifecycle,
+//     managed by PointCloudGeometrySyncSystem).
+
+export namespace ECS::PointCloud
+{
+    struct Data
+    {
+        // ---- Authoritative Data Source ----
+        std::shared_ptr<Geometry::PointCloud::Cloud> CloudRef;
+
+        // ---- Rendering Parameters (not data — data lives in PropertySets) ----
+        Geometry::PointCloud::RenderMode RenderMode = Geometry::PointCloud::RenderMode::FlatDisc;
+        float     DefaultRadius    = 0.005f;         // World-space radius.
+        float     SizeMultiplier   = 1.0f;           // Per-entity size multiplier.
+        glm::vec4 DefaultColor     = {1.f, 1.f, 1.f, 1.f}; // RGBA when colors absent.
+        bool      Visible          = true;            // Runtime visibility toggle.
+
+        // ---- GPU State (managed by PointCloudGeometrySyncSystem) ----
+        // Device-local vertex buffer holding positions + normals.
+        // RetainedPointCloudRenderPass reads from this buffer via BDA.
+        Geometry::GeometryHandle GpuGeometry{};
+
+        // GPUScene slot for frustum culling and GPU-driven batching.
+        // Allocated by PointCloudGeometrySyncSystem after successful upload.
+        // Freed by on_destroy hook in SceneManager.
+        static constexpr uint32_t kInvalidSlot = ~0u;
+        uint32_t GpuSlot = kInvalidSlot;
+
+        // Per-point colors (packed ABGR), one per point.
+        // Extracted from Cloud's "p:color" by PointCloudGeometrySyncSystem.
+        // When empty, RetainedPointCloudRenderPass uses uniform DefaultColor.
+        std::vector<uint32_t> CachedColors;
+
+        // Per-point radii (world-space), one per point.
+        // Extracted from Cloud's "p:radius" by PointCloudGeometrySyncSystem.
+        // When empty, RetainedPointCloudRenderPass uses uniform DefaultRadius.
+        std::vector<float> CachedRadii;
+
+        // When true, PointCloudGeometrySyncSystem re-uploads positions/normals
+        // and re-extracts per-point attributes. Set on first attach, or when
+        // Cloud data changes.
+        bool GpuDirty = true;
+
+        // Point count in the GPU buffer (matches Cloud::Size() at upload time).
+        uint32_t GpuPointCount = 0;
+
+        // ---- Queries (delegate to CloudRef) ----
+        [[nodiscard]] std::size_t PointCount() const noexcept
+        {
+            return CloudRef ? CloudRef->Size() : 0;
+        }
+        [[nodiscard]] bool HasNormals() const noexcept
+        {
+            return CloudRef && CloudRef->HasNormals();
+        }
+        [[nodiscard]] bool HasColors() const noexcept
+        {
+            return CloudRef && CloudRef->HasColors();
+        }
+        [[nodiscard]] bool HasRadii() const noexcept
+        {
+            return CloudRef && CloudRef->HasRadii();
+        }
+        [[nodiscard]] bool HasGpuGeometry() const noexcept
+        {
+            return GpuGeometry.IsValid();
+        }
+    };
+}
+
 export namespace ECS::GeometryViewRenderer
 {
     struct Component
