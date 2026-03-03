@@ -52,7 +52,7 @@ namespace Graphics::Passes
     static_assert(sizeof(LinePushConstants) == 104);
 
     // Use EdgePair from the component — identical layout, eliminates type mismatch.
-    using EdgePair = ECS::RenderVisualization::EdgePair;
+    using EdgePair = ECS::EdgePair;
 
     // =========================================================================
     // EnsureEdgeAuxBuffer
@@ -409,14 +409,11 @@ namespace Graphics::Passes
 
                     if (!colorData)
                     {
-                        if (const auto* vis = registry.try_get<ECS::RenderVisualization::Component>(entity))
+                        if (!line.CachedEdgeColors.empty() &&
+                            line.CachedEdgeColors.size() == edgeCount)
                         {
-                            if (!vis->CachedEdgeColors.empty() &&
-                                vis->CachedEdgeColors.size() == edgeCount)
-                            {
-                                colorData = vis->CachedEdgeColors.data();
-                                colorCount = edgeCount;
-                            }
+                            colorData = line.CachedEdgeColors.data();
+                            colorCount = edgeCount;
                         }
                     }
 
@@ -441,9 +438,6 @@ namespace Graphics::Passes
                 else
                     depthDraws.push_back(di);
 
-                // Write back edge count for diagnostics.
-                if (auto* vr = registry.try_get<ECS::GeometryViewRenderer::Component>(entity))
-                    vr->WireframeEdgeCount = edgeCount;
             }
 
             // Cleanup orphaned edge aux buffers.

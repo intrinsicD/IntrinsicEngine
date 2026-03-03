@@ -88,51 +88,47 @@ namespace Graphics::Systems::MeshViewLifecycle
                   RHI::TransferManager& transferManager)
     {
         // -----------------------------------------------------------------
-        // Phase 0: Auto-attach/detach MeshEdgeView based on ShowWireframe
+        // Phase 0: Auto-attach/detach MeshEdgeView based on Line::Component
         // -----------------------------------------------------------------
-        // Ensures MeshEdgeView::Component exists when wireframe is enabled,
-        // and is removed when wireframe is disabled. This runs before
+        // Ensures MeshEdgeView::Component exists when Line::Component is
+        // present, and is removed when it is absent. This runs before
         // Phase 1 so that new edge views are processed in the same frame.
         {
-            auto visView = registry.view<ECS::RenderVisualization::Component,
-                                         ECS::MeshRenderer::Component>();
+            auto surfView = registry.view<ECS::Surface::Component>();
 
-            for (auto [entity, vis, mr] : visView.each())
+            for (auto [entity, sc] : surfView.each())
             {
-                if (vis.ShowWireframe)
-                {
-                    if (!registry.all_of<ECS::MeshEdgeView::Component>(entity))
-                        registry.emplace<ECS::MeshEdgeView::Component>(entity);
-                }
-                else
-                {
-                    if (registry.all_of<ECS::MeshEdgeView::Component>(entity))
-                        registry.remove<ECS::MeshEdgeView::Component>(entity);
-                }
+                const bool wantEdges = registry.all_of<ECS::Line::Component>(entity);
+                const bool hasEdgeView = registry.all_of<ECS::MeshEdgeView::Component>(entity);
+
+                if (wantEdges && !hasEdgeView)
+                    registry.emplace<ECS::MeshEdgeView::Component>(entity);
+                else if (!wantEdges && hasEdgeView)
+                    registry.remove<ECS::MeshEdgeView::Component>(entity);
             }
         }
 
         // -----------------------------------------------------------------
         // Phase 1: Edge View Lifecycle
         // -----------------------------------------------------------------
-        // Iterate entities with MeshEdgeView + MeshRenderer + MeshCollider.
+        // Iterate entities with MeshEdgeView + Surface + MeshCollider.
         // When Dirty: extract unique edge pairs from collision data triangle
         // indices, create an edge index buffer via ReuseVertexBuffersFrom,
         // allocate GPUScene slot.
 
         auto edgeView = registry.view<ECS::MeshEdgeView::Component,
-                                      ECS::MeshRenderer::Component>();
+                                      ECS::Surface::Component>();
 
-        for (auto [entity, ev, mr] : edgeView.each())
+        for (auto [entity, ev, sc] : edgeView.each())
         {
             if (!ev.Dirty)
                 continue;
 
             // Source mesh must have valid GPU geometry.
-            if (!mr.Geometry.IsValid())
+            if (!sc.Geometry.IsValid())
                 continue;
 
-            GeometryGpuData* srcGeo = geometryStorage.GetUnchecked(mr.Geometry);
+            GeometryGpuData* srcGeo = geometryStorage.GetUnchecked(sc.Geometry);
             if (!srcGeo || !srcGeo->GetVertexBuffer())
                 continue;
 
@@ -158,7 +154,7 @@ namespace Graphics::Systems::MeshViewLifecycle
             }
 
             GeometryUploadRequest req{};
-            req.ReuseVertexBuffersFrom = mr.Geometry;
+            req.ReuseVertexBuffersFrom = sc.Geometry;
             req.Indices = indices;
             req.Topology = PrimitiveTopology::Lines;
             req.UploadMode = GeometryUploadMode::Direct;
@@ -207,22 +203,22 @@ namespace Graphics::Systems::MeshViewLifecycle
         // -----------------------------------------------------------------
         // Phase 2: Vertex View Lifecycle
         // -----------------------------------------------------------------
-        // Iterate entities with MeshVertexView + MeshRenderer.
+        // Iterate entities with MeshVertexView + Surface.
         // When Dirty: create a vertex point view via ReuseVertexBuffersFrom
         // (topology Points, no index buffer), allocate GPUScene slot.
 
         auto vtxView = registry.view<ECS::MeshVertexView::Component,
-                                     ECS::MeshRenderer::Component>();
+                                     ECS::Surface::Component>();
 
-        for (auto [entity, pv, mr] : vtxView.each())
+        for (auto [entity, pv, sc] : vtxView.each())
         {
             if (!pv.Dirty)
                 continue;
 
-            if (!mr.Geometry.IsValid())
+            if (!sc.Geometry.IsValid())
                 continue;
 
-            GeometryGpuData* srcGeo = geometryStorage.GetUnchecked(mr.Geometry);
+            GeometryGpuData* srcGeo = geometryStorage.GetUnchecked(sc.Geometry);
             if (!srcGeo || !srcGeo->GetVertexBuffer())
                 continue;
 
@@ -235,7 +231,7 @@ namespace Graphics::Systems::MeshViewLifecycle
 
             // Create vertex view — shares vertex buffer, no index buffer.
             GeometryUploadRequest req{};
-            req.ReuseVertexBuffersFrom = mr.Geometry;
+            req.ReuseVertexBuffersFrom = sc.Geometry;
             req.Topology = PrimitiveTopology::Points;
             req.UploadMode = GeometryUploadMode::Direct;
 

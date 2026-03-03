@@ -23,8 +23,7 @@ import RHI;
 //   - GeometryUploadRequest / GeometryBufferLayout defaults.
 //   - ECS component defaults and render contract invariants.
 //   - Cross-module color packing consistency.
-//   - DebugDraw ↔ LinePass data compatibility.
-//   - GeometryViewRenderer lifecycle tracking invariants.
+//   - DebugDraw <-> LinePass data compatibility.
 //
 // No GPU device is needed — these are pure compile-time/contract tests.
 
@@ -44,58 +43,23 @@ TEST(BDA_DataLayout, LineSegmentAlignedTo16)
     EXPECT_EQ(alignof(Graphics::DebugDraw::LineSegment), 16u);
 }
 
-TEST(BDA_DataLayout, GpuPointDataIs32Bytes)
-{
-    // GpuPointData must be 32 bytes (2 x vec4) for GPU SSBO alignment.
-    EXPECT_EQ(sizeof(Graphics::Passes::PointCloudRenderPass::GpuPointData), 32u);
-}
-
-TEST(BDA_DataLayout, GpuPointDataAlignedTo16)
-{
-    EXPECT_EQ(alignof(Graphics::Passes::PointCloudRenderPass::GpuPointData), 16u);
-}
-
-TEST(BDA_DataLayout, LineSegmentAndGpuPointDataSameStride)
-{
-    // Both GPU types have identical stride so that EnsurePerFrameBuffer<T>
-    // growth calculations remain compatible across pass types.
-    EXPECT_EQ(sizeof(Graphics::DebugDraw::LineSegment),
-              sizeof(Graphics::Passes::PointCloudRenderPass::GpuPointData));
-}
-
 TEST(BDA_DataLayout, EdgePairIs8Bytes)
 {
     // EdgePair must be 8 bytes: two uint32_t vertex indices.
     // Consumed by LinePass SSBO as edge index pairs.
-    EXPECT_EQ(sizeof(ECS::RenderVisualization::EdgePair), 8u);
+    EXPECT_EQ(sizeof(ECS::EdgePair), 8u);
 }
 
 TEST(BDA_DataLayout, EdgePairMemberLayout)
 {
     // Verify the edge pair fields are at expected offsets for GPU SSBO.
-    ECS::RenderVisualization::EdgePair ep{100, 200};
+    ECS::EdgePair ep{100, 200};
     EXPECT_EQ(ep.i0, 100u);
     EXPECT_EQ(ep.i1, 200u);
 
     // Verify contiguous layout (no padding between members).
-    EXPECT_EQ(offsetof(ECS::RenderVisualization::EdgePair, i0), 0u);
-    EXPECT_EQ(offsetof(ECS::RenderVisualization::EdgePair, i1), 4u);
-}
-
-TEST(BDA_DataLayout, GpuPointDataFieldPacking)
-{
-    // Verify the GPU point struct fields match the shader expectation:
-    //   vec4(PosX, PosY, PosZ, Size) | vec4(NormX, NormY, NormZ, Color)
-    using GPD = Graphics::Passes::PointCloudRenderPass::GpuPointData;
-
-    EXPECT_EQ(offsetof(GPD, PosX), 0u);
-    EXPECT_EQ(offsetof(GPD, PosY), 4u);
-    EXPECT_EQ(offsetof(GPD, PosZ), 8u);
-    EXPECT_EQ(offsetof(GPD, Size), 12u);
-    EXPECT_EQ(offsetof(GPD, NormX), 16u);
-    EXPECT_EQ(offsetof(GPD, NormY), 20u);
-    EXPECT_EQ(offsetof(GPD, NormZ), 24u);
-    EXPECT_EQ(offsetof(GPD, Color), 28u);
+    EXPECT_EQ(offsetof(ECS::EdgePair, i0), 0u);
+    EXPECT_EQ(offsetof(ECS::EdgePair, i1), 4u);
 }
 
 // =============================================================================
@@ -210,17 +174,17 @@ TEST(BDA_Handle, DifferentGenerationsNotEqual)
 // Section 5: Cross-Module Color Packing Consistency
 // =============================================================================
 
-TEST(BDA_ColorConsistency, DebugDrawAndPointCloudSameConvention)
+TEST(BDA_ColorConsistency, DebugDrawDelegatesToGpuColor)
 {
-    // Both DebugDraw and PointCloudRenderPass delegate to GpuColor.
+    // DebugDraw delegates to GpuColor.
     // Verify they produce identical results for the same input.
     uint32_t ddRed = Graphics::DebugDraw::PackColor(255, 0, 0, 255);
-    uint32_t pcRed = Graphics::Passes::PointCloudRenderPass::PackColor(255, 0, 0, 255);
-    EXPECT_EQ(ddRed, pcRed);
+    uint32_t gcRed = Graphics::GpuColor::PackColor(255, 0, 0, 255);
+    EXPECT_EQ(ddRed, gcRed);
 
     uint32_t ddGreen = Graphics::DebugDraw::PackColorF(0.0f, 1.0f, 0.0f, 1.0f);
-    uint32_t pcGreen = Graphics::Passes::PointCloudRenderPass::PackColorF(0.0f, 1.0f, 0.0f, 1.0f);
-    EXPECT_EQ(ddGreen, pcGreen);
+    uint32_t gcGreen = Graphics::GpuColor::PackColorF(0.0f, 1.0f, 0.0f, 1.0f);
+    EXPECT_EQ(ddGreen, gcGreen);
 }
 
 TEST(BDA_ColorConsistency, PackColorABGRByteOrder)
@@ -236,7 +200,7 @@ TEST(BDA_ColorConsistency, PackColorABGRByteOrder)
 
 TEST(BDA_ColorConsistency, PackColorFRoundTrip)
 {
-    // Test float → packed → channel extraction roundtrip for mid-range values.
+    // Test float -> packed -> channel extraction roundtrip for mid-range values.
     uint32_t c = Graphics::GpuColor::PackColorF(0.5f, 0.25f, 0.75f, 1.0f);
     uint8_t r = (c >> 0) & 0xFF;
     uint8_t g = (c >> 8) & 0xFF;
@@ -253,62 +217,13 @@ TEST(BDA_ColorConsistency, PackColorFRoundTrip)
 // Section 6: ECS Component Defaults — Render Contract
 // =============================================================================
 
-TEST(BDA_Components, MeshRendererDefaults)
+TEST(BDA_Components, SurfaceDefaults)
 {
-    ECS::MeshRenderer::Component comp;
+    ECS::Surface::Component comp;
 
     EXPECT_FALSE(comp.Geometry.IsValid());
-    EXPECT_EQ(comp.GpuSlot, ECS::MeshRenderer::Component::kInvalidSlot);
+    EXPECT_EQ(comp.GpuSlot, ECS::Surface::Component::kInvalidSlot);
     EXPECT_EQ(comp.GpuSlot, ~0u);
-}
-
-TEST(BDA_Components, RenderVisualizationDefaults)
-{
-    ECS::RenderVisualization::Component viz;
-
-    // Default visibility: surface on, wireframe off, vertices off.
-    EXPECT_TRUE(viz.ShowSurface);
-    EXPECT_FALSE(viz.ShowWireframe);
-    EXPECT_FALSE(viz.ShowVertices);
-
-    // Wireframe defaults
-    EXPECT_FLOAT_EQ(viz.WireframeWidth, 1.5f);
-    EXPECT_FALSE(viz.WireframeOverlay);
-
-    // Vertex defaults
-    EXPECT_FLOAT_EQ(viz.VertexSize, 0.008f);
-    EXPECT_EQ(viz.VertexRenderMode, Geometry::PointCloud::RenderMode::FlatDisc);
-
-    // GPU views initially invalid/dirty
-    EXPECT_FALSE(viz.VertexView.IsValid());
-    EXPECT_TRUE(viz.VertexViewDirty);
-    EXPECT_TRUE(viz.EdgeCacheDirty);
-    EXPECT_TRUE(viz.VertexNormalsDirty);
-    EXPECT_TRUE(viz.CachedEdges.empty());
-    EXPECT_TRUE(viz.CachedVertexNormals.empty());
-
-    // Sync state default
-    EXPECT_TRUE(viz.CachedShowSurface);
-}
-
-TEST(BDA_Components, GeometryViewRendererDefaults)
-{
-    ECS::GeometryViewRenderer::Component gvr;
-
-    // All handles invalid by default
-    EXPECT_FALSE(gvr.Surface.IsValid());
-    EXPECT_FALSE(gvr.Vertices.IsValid());
-
-    // GPU slots invalid
-    EXPECT_EQ(gvr.SurfaceGpuSlot, ECS::MeshRenderer::Component::kInvalidSlot);
-    EXPECT_EQ(gvr.VerticesGpuSlot, ECS::MeshRenderer::Component::kInvalidSlot);
-
-    // No wireframe edge buffer
-    EXPECT_EQ(gvr.WireframeEdgeCount, 0u);
-
-    // Default visibility
-    EXPECT_TRUE(gvr.ShowSurface);
-    EXPECT_FALSE(gvr.ShowVertices);
 }
 
 TEST(BDA_Components, GraphDataDefaults)
@@ -388,7 +303,7 @@ TEST(BDA_SharedBuffer, ReuseVertexBuffersFromFlagIgnoresPositionSpans)
 TEST(BDA_SharedBuffer, ThreeTopologyViewsFromSameSource)
 {
     // Verify that three different topology requests can be constructed
-    // from the same source handle (triangle mesh → wireframe + vertices).
+    // from the same source handle (triangle mesh -> wireframe + vertices).
     Geometry::GeometryHandle meshHandle(0, 1);
 
     // Wireframe view
@@ -410,7 +325,7 @@ TEST(BDA_SharedBuffer, ThreeTopologyViewsFromSameSource)
 }
 
 // =============================================================================
-// Section 8: DebugDraw → LinePass Data Contract
+// Section 8: DebugDraw -> LinePass Data Contract
 // =============================================================================
 
 TEST(BDA_DebugDrawContract, DepthTestedAndOverlayAreSeparate)
@@ -454,45 +369,7 @@ TEST(BDA_DebugDrawContract, ResetBetweenFrames)
 }
 
 // =============================================================================
-// Section 9: Retained-Mode Edge Buffer Lifecycle
-// =============================================================================
-
-TEST(BDA_EdgeBuffer, EdgeCacheLazyInit)
-{
-    // RenderVisualization edge cache starts empty and dirty.
-    // LinePass creates the GPU edge buffer lazily when
-    // ShowWireframe=true and EdgeCacheDirty=true.
-    ECS::RenderVisualization::Component viz;
-
-    EXPECT_TRUE(viz.CachedEdges.empty());
-    EXPECT_TRUE(viz.EdgeCacheDirty);
-
-    // Simulate edge cache population (as MeshRenderPass does).
-    viz.CachedEdges = {{0, 1}, {1, 2}, {2, 0}};
-    viz.EdgeCacheDirty = false;
-
-    EXPECT_EQ(viz.CachedEdges.size(), 3u);
-    EXPECT_FALSE(viz.EdgeCacheDirty);
-}
-
-TEST(BDA_EdgeBuffer, WireframeEdgeCountTracksLifecycle)
-{
-    ECS::GeometryViewRenderer::Component gvr;
-
-    // Initially no wireframe buffer.
-    EXPECT_EQ(gvr.WireframeEdgeCount, 0u);
-
-    // Simulate LinePass creating a persistent edge buffer.
-    gvr.WireframeEdgeCount = 150;
-    EXPECT_EQ(gvr.WireframeEdgeCount, 150u);
-
-    // Simulate edge topology change (remesh) → buffer needs rebuild.
-    gvr.WireframeEdgeCount = 0;
-    EXPECT_EQ(gvr.WireframeEdgeCount, 0u);
-}
-
-// =============================================================================
-// Section 10: Graph Data — PropertySet-backed Authority
+// Section 9: Graph Data — PropertySet-backed Authority
 // =============================================================================
 
 TEST(BDA_GraphData, PropertySetBackedColors)
@@ -539,7 +416,7 @@ TEST(BDA_GraphData, GpuDirtyDefaultTrue)
 }
 
 // =============================================================================
-// Section 11: EWA Render Mode Contract
+// Section 10: EWA Render Mode Contract
 // =============================================================================
 
 TEST(BDA_EWA, RenderModeEnumValues)
@@ -548,13 +425,6 @@ TEST(BDA_EWA, RenderModeEnumValues)
     EXPECT_EQ(static_cast<uint32_t>(Geometry::PointCloud::RenderMode::FlatDisc), 0u);
     EXPECT_EQ(static_cast<uint32_t>(Geometry::PointCloud::RenderMode::Surfel), 1u);
     EXPECT_EQ(static_cast<uint32_t>(Geometry::PointCloud::RenderMode::EWA), 2u);
-}
-
-TEST(BDA_EWA, RenderVisualizationAcceptsEWA)
-{
-    ECS::RenderVisualization::Component viz;
-    viz.VertexRenderMode = Geometry::PointCloud::RenderMode::EWA;
-    EXPECT_EQ(viz.VertexRenderMode, Geometry::PointCloud::RenderMode::EWA);
 }
 
 TEST(BDA_EWA, GraphDataAcceptsEWA)
@@ -572,36 +442,16 @@ TEST(BDA_EWA, PointCloudRendererAcceptsEWA)
 }
 
 // =============================================================================
-// Section 12: Per-Edge Attribute Rendering Contract
+// Section 11: Per-Edge Attribute Rendering Contract
 // =============================================================================
 
-TEST(BDA_PerEdgeAttr, RenderVisualizationEdgeColorsDefaultEmpty)
+TEST(BDA_PerEdgeAttr, LineComponentEdgeColorsDefaultEmpty)
 {
-    ECS::RenderVisualization::Component viz;
+    ECS::Line::Component line;
 
-    // Edge colors start empty (uniform WireframeColor is used).
-    EXPECT_TRUE(viz.CachedEdgeColors.empty());
-    EXPECT_TRUE(viz.EdgeColorsDirty);
-}
-
-TEST(BDA_PerEdgeAttr, RenderVisualizationEdgeColorPopulation)
-{
-    ECS::RenderVisualization::Component viz;
-
-    // Simulate edge cache + per-edge color population.
-    viz.CachedEdges = {{0, 1}, {1, 2}, {2, 0}};
-    viz.EdgeCacheDirty = false;
-
-    // Per-edge colors: one packed ABGR per edge.
-    viz.CachedEdgeColors = {
-        Graphics::GpuColor::PackColorF(1.0f, 0.0f, 0.0f, 1.0f), // red
-        Graphics::GpuColor::PackColorF(0.0f, 1.0f, 0.0f, 1.0f), // green
-        Graphics::GpuColor::PackColorF(0.0f, 0.0f, 1.0f, 1.0f), // blue
-    };
-    viz.EdgeColorsDirty = false;
-
-    EXPECT_EQ(viz.CachedEdgeColors.size(), viz.CachedEdges.size());
-    EXPECT_EQ(viz.CachedEdgeColors.size(), 3u);
+    // Edge colors start empty (uniform Color is used).
+    EXPECT_TRUE(line.CachedEdgeColors.empty());
+    EXPECT_FALSE(line.HasPerEdgeColors);
 }
 
 TEST(BDA_PerEdgeAttr, GraphDataEdgeColorsDefaultEmpty)
@@ -635,32 +485,32 @@ TEST(BDA_PerEdgeAttr, GraphDataEdgeColorFromPropertySet)
 }
 
 // =============================================================================
-// Section 13: Per-Face Attribute Rendering Contract
+// Section 12: Per-Face Attribute Rendering Contract
 // =============================================================================
 
-TEST(BDA_PerFaceAttr, RenderVisualizationFaceColorsDefaultEmpty)
+TEST(BDA_PerFaceAttr, SurfaceFaceColorsDefaultEmpty)
 {
-    ECS::RenderVisualization::Component viz;
+    ECS::Surface::Component surf;
 
     // Face colors start empty (standard texture/material shading).
-    EXPECT_TRUE(viz.CachedFaceColors.empty());
-    EXPECT_TRUE(viz.FaceColorsDirty);
+    EXPECT_TRUE(surf.CachedFaceColors.empty());
+    EXPECT_TRUE(surf.FaceColorsDirty);
 }
 
-TEST(BDA_PerFaceAttr, RenderVisualizationFaceColorPopulation)
+TEST(BDA_PerFaceAttr, SurfaceFaceColorPopulation)
 {
-    ECS::RenderVisualization::Component viz;
+    ECS::Surface::Component surf;
 
     // Simulate per-face color population (e.g., from curvature visualization).
-    viz.CachedFaceColors = {
+    surf.CachedFaceColors = {
         Graphics::GpuColor::PackColorF(1.0f, 0.0f, 0.0f, 1.0f), // face 0 = red
         Graphics::GpuColor::PackColorF(0.0f, 1.0f, 0.0f, 1.0f), // face 1 = green
         Graphics::GpuColor::PackColorF(0.0f, 0.0f, 1.0f, 1.0f), // face 2 = blue
         Graphics::GpuColor::PackColorF(1.0f, 1.0f, 0.0f, 1.0f), // face 3 = yellow
     };
-    viz.FaceColorsDirty = false;
+    surf.FaceColorsDirty = false;
 
-    EXPECT_EQ(viz.CachedFaceColors.size(), 4u);
+    EXPECT_EQ(surf.CachedFaceColors.size(), 4u);
 }
 
 TEST(BDA_PerFaceAttr, MeshPushConstantsSizeUnchanged)

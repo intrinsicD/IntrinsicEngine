@@ -39,17 +39,14 @@ namespace Graphics::Systems::GPUSceneSync
 
             const bool transformDirty = registry.all_of<ECS::Components::Transform::WorldUpdatedTag>(entity);
 
-            // --- Surface visibility via RenderVisualization ---
-            // When ShowSurface transitions, we deactivate (radius=0) or reactivate
+            // --- Surface visibility ---
+            // When Visible transitions, we deactivate (radius=0) or reactivate
             // the GPU scene slot so the culling shader skips/includes the instance.
             bool visibilityDirty = false;
-            if (auto* vis = registry.try_get<ECS::RenderVisualization::Component>(entt::entity(entity)))
+            if (sc.Visible != sc.CachedVisible)
             {
-                if (vis->ShowSurface != vis->CachedShowSurface)
-                {
-                    visibilityDirty = true;
-                    vis->CachedShowSurface = vis->ShowSurface;
-                }
+                visibilityDirty = true;
+                sc.CachedVisible = sc.Visible;
             }
 
             // Resolve material handle once and cache it inside the Surface component.
@@ -105,14 +102,13 @@ namespace Graphics::Systems::GPUSceneSync
             //  - radius < 0 => keep existing bounds
             //  - radius == 0 => slot inactive (culler skips)
             //
-            // When ShowSurface is toggled off, we deactivate by sending radius=0.
+            // When Visible is toggled off, we deactivate by sending radius=0.
             // When toggled back on, we restore the conservative default radius.
             glm::vec4 sphereBounds{0.0f, 0.0f, 0.0f, -1.0f}; // Default: preserve existing bounds.
 
             if (visibilityDirty)
             {
-                auto* vis = registry.try_get<ECS::RenderVisualization::Component>(entt::entity(entity));
-                if (vis && !vis->ShowSurface)
+                if (!sc.Visible)
                 {
                     // Deactivate: radius = 0 makes the culler skip this instance.
                     sphereBounds = {0.0f, 0.0f, 0.0f, 0.0f};

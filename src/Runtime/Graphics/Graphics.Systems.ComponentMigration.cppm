@@ -8,28 +8,27 @@ import Core.FrameGraph;
 
 export namespace Graphics::Systems::ComponentMigration
 {
-    // Transition system: attaches new per-pass typed ECS components
-    // (Surface, Line, Point) alongside legacy components (MeshRenderer,
-    // RenderVisualization, PointCloudRenderer) during the PLAN.md Phase 1
-    // migration period.
+    // Transition system: attaches per-pass typed ECS components (Line, Point)
+    // from source components (PointCloudRenderer, Graph::Data, PointCloud::Data)
+    // during the PLAN.md migration period.
     //
     // On each frame:
-    //  - Entities with MeshRenderer::Component get Surface::Component
-    //    (mirrored Geometry + Material + GpuSlot).
-    //  - Entities with RenderVisualization::Component where ShowWireframe=true
-    //    get Line::Component; where ShowVertices=true get Point::Component.
-    //    Removal of the visualization flag removes the corresponding component.
     //  - Entities with PointCloudRenderer::Component get Point::Component
     //    (mirrored Geometry + rendering parameters).
     //  - Entities with Graph::Data get Line::Component (edges) and
     //    Point::Component (nodes) (mirrored from graph rendering parameters).
     //  - Entities with PointCloud::Data get Point::Component.
     //
+    // MeshRenderer→Surface bridging was removed: SceneManager now creates
+    // Surface::Component directly. RenderVisualization→Line/Point bridging
+    // was removed: Line and Point components are managed directly by
+    // application code and lifecycle systems (MeshViewLifecycleSystem).
+    //
     // This system is idempotent: re-running it with unchanged source
     // components produces no additional work.
     //
-    // Retirement: Once Phases 2-5 of PLAN.md complete and legacy components
-    // are deleted, this system is removed.
+    // Retirement: Once remaining legacy components are deleted, this system
+    // is removed.
     void OnUpdate(entt::registry& registry);
 
     // Register this system into a FrameGraph.

@@ -20,16 +20,6 @@ This document tracks **what's left to do** in IntrinsicEngine's architecture.
 
 Replace the dual-path (transient CPU + retained GPU) rendering with a **single unified path per primitive type** (`SurfacePass`, `LinePass`, `PointPass`). Full spec in `PLAN.md`.
 
-### 1.5 Delete Dead Code (PLAN.md Phase 5)
-
-- [ ] Delete `MeshRenderPass` (class, files, module partition).
-- [ ] Delete `GraphRenderPass` (class, files, module partition).
-- [ ] Delete `PointCloudRenderPass` (class, files, module partition).
-- [ ] Delete `RenderVisualization::Component` (replaced by typed components).
-- [ ] Delete `GeometryViewRenderer::Component` (each component carries its own handle).
-- [ ] Delete `MeshRenderer::Component` (aliased to `Surface::Component` during transition).
-- [ ] Remove `VisualizationCollect` composite stage from `DefaultPipeline`.
-
 ### 1.6 Adapt Geometry View Lifecycle Systems (PLAN.md Phase 6)
 
 Lifecycle systems already exist (`MeshViewLifecycleSystem`, `GraphGeometrySyncSystem`, `PointCloudGeometrySyncSystem`). They must be migrated to populate the new `ECS::Surface/Line/Point::Component` types and work with the unified pass architecture.

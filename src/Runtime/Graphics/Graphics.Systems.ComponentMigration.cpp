@@ -16,102 +16,6 @@ namespace Graphics::Systems::ComponentMigration
 void OnUpdate(entt::registry& registry)
 {
     // -----------------------------------------------------------------------
-    // 1. MeshRenderer → Surface
-    // -----------------------------------------------------------------------
-    // Every entity with MeshRenderer::Component gets a mirrored
-    // Surface::Component. Fields are copied each frame (cheap — no
-    // allocation, just a few scalars).
-    {
-        auto view = registry.view<ECS::MeshRenderer::Component>();
-        for (auto entity : view)
-        {
-            const auto& mr = view.get<ECS::MeshRenderer::Component>(entity);
-            auto& surf = registry.get_or_emplace<ECS::Surface::Component>(entity);
-            surf.Geometry                          = mr.Geometry;
-            surf.Material                          = mr.Material;
-            surf.GpuSlot                           = mr.GpuSlot;
-            surf.CachedMaterialHandle              = mr.CachedMaterialHandle;
-            surf.CachedMaterialHandleForInstance    = mr.CachedMaterialHandleForInstance;
-            surf.CachedMaterialRevisionForInstance  = mr.CachedMaterialRevisionForInstance;
-            surf.CachedIsSelectedForInstance        = mr.CachedIsSelectedForInstance;
-        }
-    }
-
-    // -----------------------------------------------------------------------
-    // 2. RenderVisualization → Line / Point (attach/detach by toggle)
-    // -----------------------------------------------------------------------
-    {
-        auto view = registry.view<ECS::RenderVisualization::Component>();
-        for (auto entity : view)
-        {
-            const auto& vis = view.get<ECS::RenderVisualization::Component>(entity);
-
-            // --- Wireframe → Line ---
-            if (vis.ShowWireframe)
-            {
-                auto& line = registry.get_or_emplace<ECS::Line::Component>(entity);
-                // Mirror wireframe settings.
-                line.Color   = vis.WireframeColor;
-                line.Width   = vis.WireframeWidth;
-                line.Overlay = vis.WireframeOverlay;
-                line.HasPerEdgeColors = !vis.CachedEdgeColors.empty();
-
-                // MeshEdgeView is auto-attached by MeshViewLifecycleSystem
-                // when ShowWireframe=true. Use its geometry handle and edge count.
-                if (const auto* ev = registry.try_get<ECS::MeshEdgeView::Component>(entity))
-                {
-                    line.EdgeView  = ev->Geometry;
-                    line.EdgeCount = ev->EdgeCount;
-                }
-
-                // If MeshRenderer exists, use its geometry handle for shared vertex buffer.
-                if (const auto* mr = registry.try_get<ECS::MeshRenderer::Component>(entity))
-                {
-                    line.Geometry = mr->Geometry;
-                }
-            }
-            else
-            {
-                // ShowWireframe=false → remove Line component (if not from another source).
-                // Only remove if this entity doesn't have Graph::Data (which also provides lines).
-                if (!registry.all_of<ECS::Graph::Data>(entity))
-                {
-                    registry.remove<ECS::Line::Component>(entity);
-                }
-            }
-
-            // --- Vertices → Point ---
-            if (vis.ShowVertices)
-            {
-                auto& pt = registry.get_or_emplace<ECS::Point::Component>(entity);
-                pt.Color = vis.VertexColor;
-                pt.Size  = vis.VertexSize;
-                pt.Mode  = vis.VertexRenderMode;
-
-                // If MeshVertexView exists, use its geometry handle.
-                if (const auto* vv = registry.try_get<ECS::MeshVertexView::Component>(entity))
-                {
-                    pt.Geometry = vv->Geometry;
-                }
-                else if (const auto* mr = registry.try_get<ECS::MeshRenderer::Component>(entity))
-                {
-                    pt.Geometry = mr->Geometry;
-                }
-            }
-            else
-            {
-                // ShowVertices=false → remove Point component (if not from another source).
-                if (!registry.all_of<ECS::Graph::Data>(entity) &&
-                    !registry.all_of<ECS::PointCloudRenderer::Component>(entity) &&
-                    !registry.all_of<ECS::PointCloud::Data>(entity))
-                {
-                    registry.remove<ECS::Point::Component>(entity);
-                }
-            }
-        }
-    }
-
-    // -----------------------------------------------------------------------
     // 3. PointCloudRenderer → Point
     // -----------------------------------------------------------------------
     {
@@ -204,7 +108,6 @@ void RegisterSystem(Core::FrameGraph& graph,
             builder.WaitFor("PointCloudRendererLifecycle"_id);
             builder.WaitFor("GraphGeometrySync"_id);
             builder.WaitFor("PointCloudGeometrySync"_id);
-            builder.WaitFor("MeshViewLifecycle"_id);
             builder.Signal("ComponentMigration"_id);
         },
         [&registry]()

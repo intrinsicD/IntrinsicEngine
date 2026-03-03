@@ -320,11 +320,11 @@ public:
                 const auto& reg = GetScene().GetRegistry();
                 const bool hasSelectedTag = reg.all_of<ECS::Components::Selection::SelectedTag>(selected);
                 const bool hasSelectableTag = reg.all_of<ECS::Components::Selection::SelectableTag>(selected);
-                const bool hasMeshRenderer = reg.all_of<ECS::MeshRenderer::Component>(selected);
+                const bool hasSurface = reg.all_of<ECS::Surface::Component>(selected);
                 const bool hasMeshCollider = reg.all_of<ECS::MeshCollider::Component>(selected);
 
                 ImGui::Text("Tags: Selectable=%d Selected=%d", (int)hasSelectableTag, (int)hasSelectedTag);
-                ImGui::Text("Components: MeshRenderer=%d MeshCollider=%d", (int)hasMeshRenderer, (int)hasMeshCollider);
+                ImGui::Text("Components: Surface=%d MeshCollider=%d", (int)hasSurface, (int)hasMeshCollider);
             }
         });
 
@@ -887,8 +887,8 @@ public:
     {
         auto& reg = GetScene().GetRegistry();
         auto* collider = reg.try_get<ECS::MeshCollider::Component>(entity);
-        auto* mr = reg.try_get<ECS::MeshRenderer::Component>(entity);
-        if (!collider || !collider->CollisionRef || !mr) return;
+        auto* sc = reg.try_get<ECS::Surface::Component>(entity);
+        if (!collider || !collider->CollisionRef || !sc) return;
 
         // 1. Build Halfedge::Mesh from CPU data
         Geometry::Halfedge::Mesh mesh;
@@ -978,24 +978,21 @@ public:
         auto [gpuData, token] = Graphics::GeometryGpuData::CreateAsync(
             GetDeviceShared(), GetGraphicsBackend().GetTransferManager(), uploadReq, &GetGeometryStorage());
 
-        auto oldHandle = mr->Geometry;
-        mr->Geometry = GetGeometryStorage().Add(std::move(gpuData));
+        auto oldHandle = sc->Geometry;
+        sc->Geometry = GetGeometryStorage().Add(std::move(gpuData));
 
         if (oldHandle.IsValid())
         {
             GetGeometryStorage().Remove(oldHandle, GetDevice().GetGlobalFrameNumber());
         }
 
-        mr->GpuSlot = ECS::MeshRenderer::Component::kInvalidSlot;
+        sc->GpuSlot = ECS::Surface::Component::kInvalidSlot;
         reg.emplace_or_replace<ECS::Components::Transform::WorldUpdatedTag>(entity);
 
-        auto* vis = reg.try_get<ECS::RenderVisualization::Component>(entity);
-        if (vis)
-        {
-            vis->VertexViewDirty = true;
-            vis->EdgeCacheDirty = true;
-            vis->VertexNormalsDirty = true;
-        }
+        if (auto* ev = reg.try_get<ECS::MeshEdgeView::Component>(entity))
+            ev->Dirty = true;
+        if (auto* pv = reg.try_get<ECS::MeshVertexView::Component>(entity))
+            pv->Dirty = true;
     }
 
     // =========================================================================
@@ -1097,7 +1094,7 @@ public:
         {
             auto& reg = GetScene().GetRegistry();
 
-            if (reg.all_of<ECS::MeshRenderer::Component>(selected))
+            if (reg.all_of<ECS::Surface::Component>(selected))
             {
                 if (ImGui::CollapsingHeader("Remeshing", ImGuiTreeNodeFlags_DefaultOpen))
                 {
@@ -1238,7 +1235,7 @@ public:
             }
             else
             {
-                ImGui::Text("Selected entity does not have a MeshRenderer.");
+                ImGui::Text("Selected entity does not have a Surface component.");
             }
         }
         else
@@ -1300,12 +1297,12 @@ public:
             }
 
             // 3. Mesh Info
-            if (reg.all_of<ECS::MeshRenderer::Component>(selected))
+            if (reg.all_of<ECS::Surface::Component>(selected))
             {
-                if (ImGui::CollapsingHeader("Mesh Renderer", ImGuiTreeNodeFlags_DefaultOpen))
+                if (ImGui::CollapsingHeader("Surface", ImGuiTreeNodeFlags_DefaultOpen))
                 {
-                    auto& mr = reg.get<ECS::MeshRenderer::Component>(selected);
-                    Graphics::GeometryGpuData* geo = GetGeometryStorage().GetUnchecked(mr.Geometry);
+                    auto& sc = reg.get<ECS::Surface::Component>(selected);
+                    Graphics::GeometryGpuData* geo = GetGeometryStorage().GetUnchecked(sc.Geometry);
 
                     if (geo)
                     {
@@ -1333,8 +1330,12 @@ public:
 
             // 4. Visualization — per-entity rendering mode toggles.
             // Shown for any entity with renderable data (mesh, point cloud, graph).
+            // Toggle is presence/absence of Line::Component and Point::Component.
+            // Surface visibility is controlled via Surface::Component::Visible.
+            // GPU view creation is handled by MeshViewLifecycleSystem — no manual
+            // allocation needed in the Inspector.
             {
-                const bool hasMesh = reg.all_of<ECS::MeshRenderer::Component>(selected);
+                const bool hasMesh = reg.all_of<ECS::Surface::Component>(selected);
                 const bool hasPointCloud = reg.all_of<ECS::PointCloudRenderer::Component>(selected);
 
                 if (hasMesh || hasPointCloud)
@@ -1343,8 +1344,8 @@ public:
                     Graphics::PrimitiveTopology topology = Graphics::PrimitiveTopology::Triangles;
                     if (hasMesh)
                     {
-                        auto& mr = reg.get<ECS::MeshRenderer::Component>(selected);
-                        if (auto* geo = GetGeometryStorage().GetUnchecked(mr.Geometry))
+                        auto& sc = reg.get<ECS::Surface::Component>(selected);
+                        if (auto* geo = GetGeometryStorage().GetUnchecked(sc.Geometry))
                             topology = geo->GetTopology();
                     }
 
@@ -1353,172 +1354,64 @@ public:
 
                     if (ImGui::CollapsingHeader("Visualization", ImGuiTreeNodeFlags_DefaultOpen))
                     {
-                        // Lazily attach RenderVisualization component on first interaction.
-                        auto* vis = reg.try_get<ECS::RenderVisualization::Component>(selected);
-                        bool justCreated = false;
-                        if (!vis)
+                        if (hasMesh)
                         {
-                            // Show defaults until user interacts.
-                            // Create with appropriate defaults for the entity type.
-                            bool defaultShowSurface = hasMesh;
-                            bool defaultShowVertices = hasPointCloud && !hasMesh;
+                            auto& sc = reg.get<ECS::Surface::Component>(selected);
 
-                            // For lazy display without creating component yet, use temp values.
-                            bool showSurface = defaultShowSurface;
-                            bool showWireframe = false;
-                            bool showVertices = defaultShowVertices;
-
-                            bool changed = false;
-
-                            if (hasMesh)
+                            if (isTriangleMesh)
                             {
-                                if (isTriangleMesh)
+                                ImGui::Checkbox("Show Surface", &sc.Visible);
+
+                                bool showWireframe = reg.all_of<ECS::Line::Component>(selected);
+                                if (ImGui::Checkbox("Show Wireframe", &showWireframe))
                                 {
-                                    changed |= ImGui::Checkbox("Show Surface", &showSurface);
-                                    changed |= ImGui::Checkbox("Show Wireframe", &showWireframe);
-                                }
-                                else if (isLineMesh)
-                                {
-                                    changed |= ImGui::Checkbox("Show Edges", &showSurface);
+                                    if (showWireframe)
+                                        reg.emplace<ECS::Line::Component>(selected);
+                                    else
+                                        reg.remove<ECS::Line::Component>(selected);
                                 }
                             }
-
-                            changed |= ImGui::Checkbox("Show Vertices", &showVertices);
-
-                            if (changed)
+                            else if (isLineMesh)
                             {
-                                auto& newVis = reg.emplace<ECS::RenderVisualization::Component>(selected);
-                                newVis.ShowSurface = showSurface;
-                                newVis.ShowWireframe = showWireframe;
-                                newVis.ShowVertices = showVertices;
-                                // For point cloud entities, default ShowSurface is irrelevant.
-                                if (hasPointCloud && !hasMesh)
-                                    newVis.ShowSurface = true;
-                                vis = &newVis;
-                                justCreated = true;
+                                ImGui::Checkbox("Show Edges", &sc.Visible);
                             }
                         }
 
-                        if (vis && !justCreated)
+                        bool showVertices = reg.all_of<ECS::Point::Component>(selected);
+                        if (ImGui::Checkbox("Show Vertices", &showVertices))
                         {
-                            // Ensure the entity has a GeometryViewRenderer when it has a MeshRenderer.
-                            ECS::GeometryViewRenderer::Component* viewR = nullptr;
-                            ECS::MeshRenderer::Component* mrPtr = nullptr;
-                            Graphics::GeometryGpuData* srcGeo = nullptr;
-
-                            if (hasMesh)
+                            if (showVertices)
                             {
-                                mrPtr = &reg.get<ECS::MeshRenderer::Component>(selected);
-                                srcGeo = GetGeometryStorage().GetUnchecked(mrPtr->Geometry);
-
-                                viewR = reg.try_get<ECS::GeometryViewRenderer::Component>(selected);
-                                if (!viewR)
-                                {
-                                    auto& vr = reg.emplace<ECS::GeometryViewRenderer::Component>(selected);
-                                    vr.Surface = mrPtr->Geometry;
-                                    viewR = &vr;
-                                }
-                                else
-                                {
-                                    viewR->Surface = mrPtr->Geometry;
-                                }
+                                auto& pt = reg.emplace<ECS::Point::Component>(selected);
+                                if (hasMesh)
+                                    pt.Geometry = reg.get<ECS::Surface::Component>(selected).Geometry;
                             }
+                            else
+                                reg.remove<ECS::Point::Component>(selected);
+                        }
 
-                            // --- Mode Toggles ---
-                            if (hasMesh)
-                            {
-                                if (isTriangleMesh)
-                                {
-                                    ImGui::Checkbox("Show Surface", &vis->ShowSurface);
-                                    ImGui::Checkbox("Show Wireframe", &vis->ShowWireframe);
-                                }
-                                else if (isLineMesh)
-                                {
-                                    ImGui::Checkbox("Show Edges", &vis->ShowSurface);
-                                }
-                            }
+                        if (auto* line = reg.try_get<ECS::Line::Component>(selected))
+                        {
+                            ImGui::SeparatorText("Wireframe Settings");
+                            float wc[4] = {line->Color.r, line->Color.g, line->Color.b, line->Color.a};
+                            if (ImGui::ColorEdit4("Wire Color", wc))
+                                line->Color = glm::vec4(wc[0], wc[1], wc[2], wc[3]);
+                            ImGui::SliderFloat("Wire Width", &line->Width, 0.5f, 5.0f);
+                            ImGui::Checkbox("Overlay##Wire", &line->Overlay);
+                        }
 
-                            ImGui::Checkbox("Show Vertices", &vis->ShowVertices);
-
-                            if (vis->ShowVertices)
-                            {
-                                ImGui::SeparatorText("Vertex Settings");
-
-                                // Render mode selector: FlatDisc / Surfel / EWA.
-                                const char* modeNames[] = { "Flat Disc", "Surfel", "EWA Splatting" };
-                                int modeIdx = static_cast<int>(vis->VertexRenderMode);
-                                if (modeIdx < 0 || modeIdx > 2) modeIdx = 0;
-                                if (ImGui::Combo("Render Mode", &modeIdx, modeNames, 3))
-                                    vis->VertexRenderMode = static_cast<Geometry::PointCloud::RenderMode>(modeIdx);
-
-                                ImGui::SliderFloat("Vertex Size", &vis->VertexSize, 0.0005f, 0.05f, "%.5f", ImGuiSliderFlags_Logarithmic);
-                                float vc[4] = {vis->VertexColor.r, vis->VertexColor.g, vis->VertexColor.b, vis->VertexColor.a};
-                                if (ImGui::ColorEdit4("Vertex Color", vc))
-                                    vis->VertexColor = glm::vec4(vc[0], vc[1], vc[2], vc[3]);
-                            }
-
-                            // Mirror visibility into the GPU view renderer (if present).
-                            // ShowWireframe is NOT mirrored — wireframe rendering is managed
-                            // by MeshViewLifecycleSystem (auto-attaches MeshEdgeView when
-                            // ShowWireframe=true) and LinePass reads edge BDA index buffers.
-                            if (viewR)
-                            {
-                                viewR->ShowSurface = vis->ShowSurface;
-                                viewR->ShowVertices = vis->ShowVertices;
-                            }
-
-                            // -----------------------------------------------------------------
-                            // Lazily create GPU views (one-time allocations/uploads)
-                            // -----------------------------------------------------------------
-                            // NOTE: Wireframe GPU views (MeshEdgeView) are auto-managed by
-                            // MeshViewLifecycleSystem. No manual creation needed here.
-
-                            // Vertex view (Points): create the GPU view for point rendering modes.
-                            const bool wantGpuVertexView =
-                                vis->ShowVertices &&
-                                (vis->VertexRenderMode == Geometry::PointCloud::RenderMode::FlatDisc ||
-                                 vis->VertexRenderMode == Geometry::PointCloud::RenderMode::Surfel ||
-                                 vis->VertexRenderMode == Geometry::PointCloud::RenderMode::EWA);
-
-                            if (wantGpuVertexView
-                                && (vis->VertexViewDirty || !vis->VertexView.IsValid()))
-                            {
-                                if (mrPtr && srcGeo && mrPtr->Geometry.IsValid())
-                                {
-                                    const uint32_t vertexCount = static_cast<uint32_t>(srcGeo->GetLayout().PositionsSize / sizeof(glm::vec3));
-                                    if (vertexCount > 0)
-                                    {
-                                        std::vector<uint32_t> pointIndices(vertexCount);
-                                        for (uint32_t i = 0; i < vertexCount; ++i)
-                                            pointIndices[i] = i;
-
-                                        auto [h, token] = GetRenderOrchestrator().CreateGeometryView(
-                                            GetGraphicsBackend().GetTransferManager(),
-                                            mrPtr->Geometry,
-                                            pointIndices,
-                                            Graphics::PrimitiveTopology::Points,
-                                            Graphics::GeometryUploadMode::Staged);
-
-                                        if (h.IsValid())
-                                        {
-                                            vis->VertexView = h;
-                                            vis->VertexViewDirty = false;
-                                            if (viewR) viewR->Vertices = h;
-
-                                            // Force a GPUScene refresh for this entity so the new view becomes visible immediately.
-                                            reg.emplace_or_replace<ECS::Components::Transform::WorldUpdatedTag>(selected);
-                                        }
-                                    }
-                                }
-                            }
-
-                            // Publish handles (keep in sync even if created elsewhere).
-                            // Wireframe handle is intentionally left empty — wireframe is CPU-driven.
-                            if (viewR)
-                            {
-                                // Only publish the vertex view for FlatDisc.
-                                viewR->Vertices = wantGpuVertexView ? vis->VertexView : Geometry::GeometryHandle{};
-                            }
+                        if (auto* pt = reg.try_get<ECS::Point::Component>(selected))
+                        {
+                            ImGui::SeparatorText("Vertex Settings");
+                            const char* modeNames[] = { "Flat Disc", "Surfel", "EWA Splatting" };
+                            int modeIdx = static_cast<int>(pt->Mode);
+                            if (modeIdx < 0 || modeIdx > 2) modeIdx = 0;
+                            if (ImGui::Combo("Render Mode", &modeIdx, modeNames, 3))
+                                pt->Mode = static_cast<Geometry::PointCloud::RenderMode>(modeIdx);
+                            ImGui::SliderFloat("Vertex Size", &pt->Size, 0.0005f, 0.05f, "%.5f", ImGuiSliderFlags_Logarithmic);
+                            float vc[4] = {pt->Color.r, pt->Color.g, pt->Color.b, pt->Color.a};
+                            if (ImGui::ColorEdit4("Vertex Color", vc))
+                                pt->Color = glm::vec4(vc[0], vc[1], vc[2], vc[3]);
                         }
                     }
                 }

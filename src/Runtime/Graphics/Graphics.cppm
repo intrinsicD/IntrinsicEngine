@@ -34,13 +34,10 @@ export import :ConvexHullDebugDraw;
 // Import `Graphics.Pipelines` explicitly in apps/tools when you need DefaultPipeline/etc.
 
 // Feature modules exported for custom pipeline construction.
-// The three primary rendering passes (PointCloud, Graph, Mesh) compose the
-// full scene visualization stack via shared primitive passes (Line, PointCloud).
-export import :Passes.PointCloud;  // GPU point renderer (FlatDisc)
-export import :Passes.Graph;       // Graph entity renderer (nodes→PointCloud, edges→Line)
-export import :Passes.Mesh;        // Mesh entity renderer (vertices→PointCloud, wireframe→Line, faces→Surface)
+// The three primary rendering passes compose the full scene visualization stack.
 export import :Passes.Picking;
 export import :Passes.Surface;
 export import :Passes.Line;
+export import :Passes.Point;
 export import :Passes.DebugView;
 export import :Passes.ImGui;

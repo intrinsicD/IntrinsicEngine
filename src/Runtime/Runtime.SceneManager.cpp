@@ -17,46 +17,22 @@ namespace
     // Safe because there is exactly one SceneManager instance per process.
     Graphics::GPUScene* g_GpuSceneForDestroyHook = nullptr;
 
-    void OnMeshRendererDestroyed(entt::registry& registry, entt::entity entity)
+    void OnSurfaceDestroyed(entt::registry& registry, entt::entity entity)
     {
-        // NOTE: This hook is invoked for every MeshRenderer component destroyed.
-        // With Geometry views (wireframe/vertex) we may attach additional MeshRenderer
-        // components to the same entity (or helper entities). Each one owns its own
-        // GPUScene slot and must be freed here.
+        // NOTE: This hook is invoked for every Surface component destroyed.
+        // Each one owns its own GPUScene slot and must be freed here.
         if (!g_GpuSceneForDestroyHook)
             return;
 
-        auto& mr = registry.get<ECS::MeshRenderer::Component>(entity);
-        if (mr.GpuSlot == ECS::MeshRenderer::Component::kInvalidSlot)
+        auto& sc = registry.get<ECS::Surface::Component>(entity);
+        if (sc.GpuSlot == ECS::Surface::Component::kInvalidSlot)
             return;
 
         // Deactivate slot (radius = 0 => culler skips it) and free.
         Graphics::GpuInstanceData inst{};
-        g_GpuSceneForDestroyHook->QueueUpdate(mr.GpuSlot, inst, /*sphere*/ {0.0f, 0.0f, 0.0f, 0.0f});
-        g_GpuSceneForDestroyHook->FreeSlot(mr.GpuSlot);
-        mr.GpuSlot = ECS::MeshRenderer::Component::kInvalidSlot;
-    }
-
-    void OnGeometryViewRendererDestroyed(entt::registry& registry, entt::entity entity)
-    {
-        if (!g_GpuSceneForDestroyHook)
-            return;
-
-        auto& vr = registry.get<ECS::GeometryViewRenderer::Component>(entity);
-
-        auto freeSlot = [&](uint32_t& slot)
-        {
-            if (slot == ECS::MeshRenderer::Component::kInvalidSlot)
-                return;
-
-            Graphics::GpuInstanceData inst{};
-            g_GpuSceneForDestroyHook->QueueUpdate(slot, inst, /*sphere*/ {0.0f, 0.0f, 0.0f, 0.0f});
-            g_GpuSceneForDestroyHook->FreeSlot(slot);
-            slot = ECS::MeshRenderer::Component::kInvalidSlot;
-        };
-
-        freeSlot(vr.SurfaceGpuSlot);
-        freeSlot(vr.VerticesGpuSlot);
+        g_GpuSceneForDestroyHook->QueueUpdate(sc.GpuSlot, inst, /*sphere*/ {0.0f, 0.0f, 0.0f, 0.0f});
+        g_GpuSceneForDestroyHook->FreeSlot(sc.GpuSlot);
+        sc.GpuSlot = ECS::Surface::Component::kInvalidSlot;
     }
 
     void OnPointCloudRendererDestroyed(entt::registry& registry, entt::entity entity)
@@ -151,11 +127,8 @@ namespace Runtime
     void SceneManager::ConnectGpuHooks(Graphics::GPUScene& gpuScene)
     {
         g_GpuSceneForDestroyHook = &gpuScene;
-        m_Scene.GetRegistry().on_destroy<ECS::MeshRenderer::Component>()
-            .connect<&OnMeshRendererDestroyed>();
-
-        m_Scene.GetRegistry().on_destroy<ECS::GeometryViewRenderer::Component>()
-            .connect<&OnGeometryViewRendererDestroyed>();
+        m_Scene.GetRegistry().on_destroy<ECS::Surface::Component>()
+            .connect<&OnSurfaceDestroyed>();
 
         m_Scene.GetRegistry().on_destroy<ECS::PointCloudRenderer::Component>()
             .connect<&OnPointCloudRendererDestroyed>();
@@ -175,11 +148,8 @@ namespace Runtime
 
     void SceneManager::DisconnectGpuHooks()
     {
-        m_Scene.GetRegistry().on_destroy<ECS::MeshRenderer::Component>()
-            .disconnect<&OnMeshRendererDestroyed>();
-
-        m_Scene.GetRegistry().on_destroy<ECS::GeometryViewRenderer::Component>()
-            .disconnect<&OnGeometryViewRendererDestroyed>();
+        m_Scene.GetRegistry().on_destroy<ECS::Surface::Component>()
+            .disconnect<&OnSurfaceDestroyed>();
 
         m_Scene.GetRegistry().on_destroy<ECS::PointCloudRenderer::Component>()
             .disconnect<&OnPointCloudRendererDestroyed>();
@@ -237,7 +207,7 @@ namespace Runtime
 
                 // Route point topologies to PointCloudRenderer for billboard
                 // expansion via PointPass. Meshes/lines use the standard
-                // MeshRenderer path.
+                // Surface path.
                 const auto handle = model->Meshes[i]->Handle;
                 const auto* geo = m_GeometryStorage ? m_GeometryStorage->GetUnchecked(handle) : nullptr;
 
@@ -249,9 +219,9 @@ namespace Runtime
                 }
                 else
                 {
-                    auto& mr = m_Scene.GetRegistry().emplace<ECS::MeshRenderer::Component>(targetEntity);
-                    mr.Geometry = handle;
-                    mr.Material = materialHandle;
+                    auto& sc = m_Scene.GetRegistry().emplace<ECS::Surface::Component>(targetEntity);
+                    sc.Geometry = handle;
+                    sc.Material = materialHandle;
 
                     // Add Collider
                     if (model->Meshes[i]->CollisionGeometry)

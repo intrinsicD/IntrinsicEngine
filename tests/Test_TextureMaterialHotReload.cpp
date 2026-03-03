@@ -45,7 +45,7 @@ namespace
     // If you want full end-to-end coverage, we can later add a headless Vulkan GPUScene integration test.
 }
 
-TEST(TextureHotReload, MeshRendererCachesMaterialRevision_ChangesRequireInstanceRefresh)
+TEST(TextureHotReload, SurfaceCachesMaterialRevision_ChangesRequireInstanceRefresh)
 {
     using namespace Core;
 
@@ -58,7 +58,7 @@ TEST(TextureHotReload, MeshRendererCachesMaterialRevision_ChangesRequireInstance
     world.Matrix = glm::mat4(1.0f);
     reg.emplace<ECS::Components::Transform::WorldMatrix>(e, world);
 
-    auto& mr = reg.emplace<ECS::MeshRenderer::Component>(e);
+    auto& mr = reg.emplace<ECS::Surface::Component>(e);
     mr.GpuSlot = 7;
 
     // Setup cached material state.

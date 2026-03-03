@@ -107,7 +107,7 @@ namespace Graphics::Passes
 
                                             auto view = ctx.Scene.GetRegistry().view<
                                                 ECS::Components::Transform::Component,
-                                                ECS::MeshRenderer::Component>();
+                                                ECS::Surface::Component>();
 
                                             for (auto [entity, transform, renderable] : view.each())
                                             {
