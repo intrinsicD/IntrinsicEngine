@@ -12,10 +12,14 @@ import RHI;
 
 export namespace Graphics::Systems::GraphGeometrySync
 {
-    // Uploads graph node positions to device-local vertex buffers, extracts
-    // edge index pairs from graph topology, extracts per-node attributes
-    // (colors, radii) from PropertySets, and allocates GPUScene slots for
-    // frustum culling — for retained-mode BDA rendering.
+    // Uploads graph node positions to vertex buffers, extracts edge index pairs
+    // from graph topology, extracts per-node attributes (colors, radii) from
+    // PropertySets, and allocates GPUScene slots for frustum culling — for
+    // retained-mode BDA rendering.
+    //
+    // Upload mode is selected per-entity by ECS::Graph::Data::StaticGeometry:
+    //   false (default) → Direct (host-visible, CPU_TO_GPU) for dynamic graphs.
+    //   true            → Staged (device-local, GPU_ONLY) for static graphs.
     //
     // Phase 6 migration: directly populates per-pass typed components
     // (Line::Component for edges, Point::Component for nodes) from
@@ -24,7 +28,7 @@ export namespace Graphics::Systems::GraphGeometrySync
     // Contract:
     //  - Iterates entities with ECS::Graph::Data where GpuDirty == true.
     //  - Compacts positions (skips deleted vertices, builds remap table).
-    //  - Creates GeometryGpuData via Direct upload (CPU_TO_GPU for dynamic graphs).
+    //  - Creates GeometryGpuData via Direct or Staged upload (per StaticGeometry).
     //  - Extracts per-node colors ("v:color") and radii ("v:radius") from
     //    graph PropertySets into CachedNodeColors / CachedNodeRadii.
     //  - Stores the GeometryHandle, edge pairs, and node attributes on the component.

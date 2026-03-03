@@ -101,9 +101,11 @@ export namespace ECS::PointCloudRenderer
 //   - Nodes rendered via PointPass (BDA position pull).
 //   - Edges rendered via LinePass (BDA position pull + edge buffer).
 //
-// GPU state is managed by GraphGeometrySyncSystem: positions are uploaded once
-// to a device-local vertex buffer (GpuGeometry), edge pairs are extracted from
-// graph topology (CachedEdgePairs). Re-upload triggers on GpuDirty = true.
+// GPU state is managed by GraphGeometrySyncSystem: positions are uploaded to
+// a vertex buffer (GpuGeometry) in either Staged mode (device-local, optimal
+// for static graphs — controlled by StaticGeometry flag) or Direct mode
+// (host-visible, suitable for dynamic re-layout). Edge pairs are extracted
+// from graph topology (CachedEdgePairs). Re-upload triggers on GpuDirty = true.
 //
 // Optional per-node attributes (colors, radii) are stored as named vertex
 // properties on the Graph:
@@ -126,6 +128,14 @@ export namespace ECS::Graph
         float     EdgeWidth          = 1.5f;   // Screen-space edge width in pixels.
         bool      EdgesOverlay       = false;  // true = edges always visible (no depth test).
         bool      Visible            = true;
+
+        // When true, GraphGeometrySyncSystem uploads via Staged mode
+        // (device-local, VMA_MEMORY_USAGE_GPU_ONLY) — optimal for graphs
+        // that don't change every frame (file-loaded, computed once).
+        // When false (default), Direct mode (host-visible,
+        // VMA_MEMORY_USAGE_CPU_TO_GPU) is used — suitable for dynamic
+        // graphs undergoing frequent re-layout.
+        bool      StaticGeometry     = false;
 
         // ---- GPU State (managed by GraphGeometrySyncSystem) ----
         // Shared vertex buffer holding compacted node positions + normals.

@@ -217,17 +217,24 @@ namespace Graphics::Systems::GraphGeometrySync
                     graphData.GpuGeometry = {};
                 }
 
-                // --- Upload to GPU via Direct mode (CPU_TO_GPU for dynamic graphs) ---
-                // Direct mode creates host-visible buffers with SHADER_DEVICE_ADDRESS_BIT
-                // for BDA access. Suitable for graphs that may re-layout frequently.
-                GeometryUploadRequest directUpload{};
-                directUpload.Positions = positions;
-                directUpload.Normals = normals;
-                directUpload.Topology = PrimitiveTopology::Points;
-                directUpload.UploadMode = GeometryUploadMode::Direct;
+                // --- Upload to GPU ---
+                // Upload mode is selected by the StaticGeometry flag on the component:
+                //   StaticGeometry = true  → Staged (device-local, GPU_ONLY) — optimal
+                //     for graphs that don't change every frame (file-loaded, computed once).
+                //   StaticGeometry = false → Direct (host-visible, CPU_TO_GPU) — suitable
+                //     for dynamic graphs undergoing frequent re-layout.
+                const auto uploadMode = graphData.StaticGeometry
+                    ? GeometryUploadMode::Staged
+                    : GeometryUploadMode::Direct;
+
+                GeometryUploadRequest vertexUpload{};
+                vertexUpload.Positions = positions;
+                vertexUpload.Normals = normals;
+                vertexUpload.Topology = PrimitiveTopology::Points;
+                vertexUpload.UploadMode = uploadMode;
 
                 auto [newGpuData, token] = GeometryGpuData::CreateAsync(
-                    device, transferManager, directUpload, &geometryStorage);
+                    device, transferManager, vertexUpload, &geometryStorage);
 
                 if (!newGpuData || !newGpuData->GetVertexBuffer())
                 {
@@ -267,7 +274,7 @@ namespace Graphics::Systems::GraphGeometrySync
                     edgeReq.ReuseVertexBuffersFrom = graphData.GpuGeometry;
                     edgeReq.Indices = edgeIndices;
                     edgeReq.Topology = PrimitiveTopology::Lines;
-                    edgeReq.UploadMode = GeometryUploadMode::Direct;
+                    edgeReq.UploadMode = uploadMode;
 
                     auto [edgeGpuData, edgeToken] = GeometryGpuData::CreateAsync(
                         device, transferManager, edgeReq, &geometryStorage);
