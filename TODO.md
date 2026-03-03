@@ -20,11 +20,6 @@ This document tracks **what's left to do** in IntrinsicEngine's architecture.
 
 Replace the dual-path (transient CPU + retained GPU) rendering with a **single unified path per primitive type** (`SurfacePass`, `LinePass`, `PointPass`). Full spec in `PLAN.md`.
 
-### 1.9 Documentation Update (PLAN.md Phase 9)
-
-- [ ] Update `CLAUDE.md` — document new pass naming, ECS component types, and architecture.
-- [ ] Update `README.md` — update rendering architecture description.
-
 ### 1.10 Push Constant Runtime Validation
 
 - [ ] Add `maxPushConstantsSize` validation to `PipelineBuilder::Build()` (currently no runtime check exists in `RHI.Pipeline.cpp`).
