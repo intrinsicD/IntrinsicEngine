@@ -798,12 +798,12 @@ All three geometry types reach device-local retained-mode rendering — point cl
 
 **Principle:** The pass consolidation (Phases 2-5) establishes the unified pass structure. Phase 6 ensures all geometry types have equal device-local residency and retained-mode rendering. No geometry type should rely on per-frame transient CPU submission as its permanent rendering path.
 
-### Phase 7: Per-face attribute support
+### Phase 7: Per-face attribute support (**Complete**)
 
-48. Add per-face attribute buffer upload in `SurfacePass` (from `Faces` PropertySet)
-49. Add `PtrFaceAux` BDA channel to surface push constants (or repurpose `PtrAux` with mode flag)
-50. Shader support for per-face color via `gl_PrimitiveID` indexing into face attribute buffer
-51. Test: flat-shading per-face colors, curvature visualization, segmentation labels
+48. ~~Add per-face attribute buffer upload in `SurfacePass` (from `Faces` PropertySet)~~ — `SurfacePass::EnsureFaceAttrBuffer()` creates persistent BDA-addressable GPU buffers from `Surface::Component::CachedFaceColors`.
+49. ~~Add `PtrFaceAux` BDA channel to surface push constants~~ — `MeshPushConstants::PtrFaceAttr` at offset 96, total 104 bytes. Shader reads via `gl_PrimitiveID`.
+50. ~~Shader support for per-face color via `gl_PrimitiveID` indexing into face attribute buffer~~ — `surface.frag` conditionally reads `FaceAttrBuf` when `ptrFaceAttr != 0`.
+51. ~~Test: flat-shading per-face colors, curvature visualization, segmentation labels~~ — `Test_PerFaceAttributes.cpp` covers all three use cases plus edge cases.
 
 **Gate:** `IntrinsicTests` pass. Per-face coloring renders correctly.
 

@@ -140,6 +140,7 @@ intrinsic_test_object_lib(RuntimeTestObjs
         Test_PointCloudGeometrySync.cpp
         Test_MeshViewLifecycle.cpp
         Test_PerPassComponents.cpp
+        Test_PerFaceAttributes.cpp
 
     DEPS IntrinsicCore IntrinsicRuntime
 )
