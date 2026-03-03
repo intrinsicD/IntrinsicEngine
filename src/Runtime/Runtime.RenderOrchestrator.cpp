@@ -107,8 +107,6 @@ namespace Runtime
             ShaderRegistration{"Outline.Frag"_id, "shaders/selection_outline.frag.spv"},
             ShaderRegistration{"Line.Vert"_id, "shaders/line.vert.spv"},
             ShaderRegistration{"Line.Frag"_id, "shaders/line.frag.spv"},
-            ShaderRegistration{"PointCloud.Vert"_id, "shaders/point.vert.spv"},
-            ShaderRegistration{"PointCloud.Frag"_id, "shaders/point.frag.spv"},
             ShaderRegistration{"Cull.Comp"_id, "shaders/instance_cull_multigeo.comp.spv"},
             ShaderRegistration{"SceneUpdate.Comp"_id, "shaders/scene_update.comp.spv"},
             ShaderRegistration{"Point.FlatDisc.Vert"_id, "shaders/point_flatdisc.vert.spv"},

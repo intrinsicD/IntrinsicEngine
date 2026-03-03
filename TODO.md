@@ -20,14 +20,6 @@ This document tracks **what's left to do** in IntrinsicEngine's architecture.
 
 Replace the dual-path (transient CPU + retained GPU) rendering with a **single unified path per primitive type** (`SurfacePass`, `LinePass`, `PointPass`). Full spec in `PLAN.md`.
 
-### 1.4 PointPass — Consolidate All Point Sources (PLAN.md Phase 4)
-
-Completed items removed — see git history for details.
-
-Remaining:
-- [ ] Delete vertex/node code from `MeshRenderPass`, `GraphRenderPass`, `PointCloudRenderPass`.
-- [ ] Delete old `RetainedPointCloudRenderPass` files and transient `point.vert/frag` shaders.
-
 ### 1.5 Delete Dead Code (PLAN.md Phase 5)
 
 - [ ] Delete `MeshRenderPass` (class, files, module partition).

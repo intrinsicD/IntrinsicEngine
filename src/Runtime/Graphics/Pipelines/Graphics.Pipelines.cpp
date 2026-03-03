@@ -141,67 +141,25 @@ namespace Graphics
             m_Path.AddFeature("MeshPass.Surface", m_SurfacePass.get());
 
         // ==================================================================
-        // Visualization collection
+        // Visualization collection — edge cache building.
         // ==================================================================
         //
-        // Collection passes feed shared GPU primitive renderers:
-        //   - MeshRenderPass  → wireframe edges + vertex splats from mesh entities.
-        //   - GraphRenderPass → edge lines + node splats from graph entities.
-        //   - PointCloud collect inline → splats from PointCloudRenderer entities.
+        // MeshRenderPass builds wireframe edge caches (consumed by LinePass
+        // via ECS::Line::Component / ComponentMigration).
         //
-        // Execution contract: collectors must run after ResetPoints() and before
-        // the GPU draw passes are added to the render graph.
+        // Vertex/node point rendering and edge rendering are now fully handled
+        // by PointPass and LinePass respectively (BDA retained-mode).
+        // GraphRenderPass is a no-op shell (deletion in TODO §1.5).
+        // PointCloudRenderPass has no submitters (deletion in TODO §1.5).
         {
-            const bool pcDrawEnabled = m_PointCloudPass && IsFeatureEnabled("PointCloudRenderPass"_id);
-            const bool meshEnabled  = m_MeshPass        && IsFeatureEnabled("MeshPass"_id);
-            const bool graphEnabled = m_GraphPass       && IsFeatureEnabled("GraphPass"_id);
-            const bool linePassEnabled = m_LinePass     && IsFeatureEnabled("LinePass"_id);
-            const bool pointPassEnabled = m_PointPass && IsFeatureEnabled("PointPass"_id);
+            const bool meshEnabled = m_MeshPass && IsFeatureEnabled("MeshPass"_id);
 
-            // Collection should run if any visualization feature is enabled.
-            const bool collectEnabled = pcDrawEnabled || meshEnabled || graphEnabled;
-
-            if (collectEnabled)
+            if (meshEnabled)
             {
                 m_Path.AddStage("VisualizationCollect",
-                    [this, pcDrawEnabled, meshEnabled, graphEnabled,
-                     linePassEnabled, pointPassEnabled](RenderPassContext& ctx)
+                    [this](RenderPassContext& ctx)
                 {
-                    // Reset point splat staging before any collector runs.
-                    if (m_PointCloudPass)
-                        m_PointCloudPass->ResetPoints();
-
-                    // ----------------------------------------------------------
-                    // 3. Mesh Pass — visualization overlays (wireframe + vertices)
-                    // ----------------------------------------------------------
-                    if (meshEnabled)
-                    {
-                        m_MeshPass->SetPointCloudPass(m_PointCloudPass.get());
-                        m_MeshPass->SetRetainedPassesActive(linePassEnabled, pointPassEnabled);
-                        m_MeshPass->AddPasses(ctx);
-                    }
-
-                    // ----------------------------------------------------------
-                    // 4. Graph Pass — node splats + edge lines from graph entities
-                    //    Skips entities with valid GpuGeometry when retained passes
-                    //    are active (GraphGeometrySyncSystem uploaded their data).
-                    // ----------------------------------------------------------
-                    if (graphEnabled)
-                    {
-                        m_GraphPass->SetPointCloudPass(m_PointCloudPass.get());
-                        m_GraphPass->SetRetainedPassesActive(linePassEnabled, pointPassEnabled);
-                        m_GraphPass->AddPasses(ctx);
-                    }
-
-                    // ----------------------------------------------------------
-                    // 5. Point Cloud Pass — GPU draw for any SSBO-staged
-                    //    splats submitted by MeshPass or GraphPass collectors.
-                    // ----------------------------------------------------------
-                    if (m_PointCloudPass)
-                    {
-                        if (pcDrawEnabled && m_PointCloudPass->HasContent())
-                            m_PointCloudPass->AddPasses(ctx);
-                    }
+                    m_MeshPass->AddPasses(ctx);
                 });
             }
         }

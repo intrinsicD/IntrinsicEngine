@@ -25,7 +25,7 @@ export namespace Geometry::PointCloud
     //
     //   - Import from PLY, XYZ, PCD, LAS and other point cloud formats.
     //   - Input to geometry operators (normal estimation, surface reconstruction).
-    //   - GPU rendering via PointCloudRenderPass (flat disc splats).
+    //   - GPU rendering via PointPass (BDA retained-mode, per-mode pipelines).
     //   - Spatial queries via Octree/KDTree acceleration.
     //
     // Design:

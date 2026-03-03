@@ -102,7 +102,7 @@ export namespace ECS::PointCloudRenderer
 // with spatial data (mesh, graph, point cloud) can independently toggle:
 //   - Surface rendering  (filled faces — SurfacePass)
 //   - Wireframe rendering (edges — LinePass, retained BDA)
-//   - Vertex rendering   (points — PointCloudRenderPass)
+//   - Vertex rendering   (points — PointPass, BDA retained-mode)
 //
 // The component is attached lazily when the user first toggles a mode in
 // the Inspector.  Entities without this component use defaults:
@@ -124,7 +124,7 @@ export namespace ECS::RenderVisualization
         // ---- Mode Toggles ----
         bool ShowSurface   = true;   // SurfacePass mesh/line rendering.
         bool ShowWireframe = false;  // Edge overlay via LinePass (retained BDA).
-        bool ShowVertices  = false;  // Vertex points via PointCloudRenderPass.
+        bool ShowVertices  = false;  // Vertex points via PointPass (BDA retained-mode).
 
         // ---- Wireframe Settings ----
         glm::vec4 WireframeColor = {0.85f, 0.85f, 0.85f, 1.0f};
@@ -191,8 +191,7 @@ export namespace ECS::RenderVisualization
 // Rendering: retained-mode via BDA shared-buffer architecture.
 //   - Nodes rendered via PointPass (BDA position pull).
 //   - Edges rendered via LinePass (BDA position pull + edge buffer).
-//   - Falls back to CPU path (GraphRenderPass → PointCloudRenderPass + DebugDraw)
-//     when retained passes are disabled via FeatureRegistry.
+//   - Falls back to no rendering when retained passes are disabled via FeatureRegistry.
 //
 // GPU state is managed by GraphGeometrySyncSystem: positions are uploaded once
 // to a device-local vertex buffer (GpuGeometry), edge pairs are extracted from

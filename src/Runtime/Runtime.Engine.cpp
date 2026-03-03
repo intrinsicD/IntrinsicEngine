@@ -305,12 +305,12 @@ namespace Runtime
 
         // --- Render Features ---
         reg("SurfacePass",           Cat::RenderFeature, "Main surface PBR rendering pass");
-        reg("MeshPass",              Cat::RenderFeature, "Mesh visualization collection pass (wireframe + vertex overlays)");
-        reg("GraphPass",             Cat::RenderFeature, "Graph visualization collection pass (nodes + edges)");
+        reg("MeshPass",              Cat::RenderFeature, "Mesh wireframe edge cache building");
+        reg("GraphPass",             Cat::RenderFeature, "Graph visualization (no-op shell, deletion pending TODO §1.5)");
         reg("PickingPass",           Cat::RenderFeature, "Entity ID picking for mouse selection");
         reg("SelectionOutlinePass",  Cat::RenderFeature, "Selection outline overlay for selected/hovered entities");
         reg("LinePass",              Cat::RenderFeature, "Unified BDA line rendering (retained wireframe/graph edges + transient DebugDraw)");
-        reg("PointCloudRenderPass",  Cat::RenderFeature, "Point cloud rendering (transient SSBO, legacy)");
+        reg("PointCloudRenderPass",  Cat::RenderFeature, "Point cloud rendering (transient SSBO, dead — deletion pending TODO §1.5)");
         reg("PointPass",             Cat::RenderFeature, "Unified BDA point rendering (retained + transient DebugDraw)");
         reg("DebugViewPass",         Cat::RenderFeature, "Render target debug visualization");
         reg("ImGuiPass",             Cat::RenderFeature, "ImGui UI overlay");
