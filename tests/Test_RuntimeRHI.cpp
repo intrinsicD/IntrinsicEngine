@@ -6,9 +6,7 @@
 #include <atomic>
 
 #include "RHI.Vulkan.hpp"
-
-// Ensure VMA memory usage enums are visible to this TU.
-#include <vk_mem_alloc.h>
+// VMA types/enums are already pulled in transitively via RHI.Vulkan.hpp → RHI.VmaConfig.hpp.
 
 import RHI;
 import Core;
