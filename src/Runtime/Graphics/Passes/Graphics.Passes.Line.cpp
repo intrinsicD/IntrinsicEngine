@@ -387,16 +387,19 @@ namespace Graphics::Passes
             uint64_t PtrEdgeAux;   // 0 = use uniform Color; non-zero = per-edge BDA colors
         };
 
-        std::vector<DrawInfo> draws;          // depth-tested retained draws
-        std::vector<DrawInfo> transientDraws; // depth-tested transient draws
-        std::vector<DrawInfo> overlayDraws;   // no-depth-test transient draws
+        std::vector<DrawInfo> depthDraws;    // depth-tested draws (retained + transient)
+        std::vector<DrawInfo> overlayDraws;  // no-depth-test draws (retained overlay + transient overlay)
 
         // Track which entity keys are active this frame (for orphan cleanup).
         std::vector<uint32_t> activeKeys;
 
         // =================================================================
-        // Retained-mode draws (mesh wireframe + graph edges)
+        // Retained-mode draws via ECS::Line::Component
         // =================================================================
+        // LinePass now iterates the unified Line::Component rather than
+        // querying legacy MeshRenderer/RenderVisualization/Graph::Data
+        // directly. ComponentMigration populates Line::Component from all
+        // edge sources each frame.
         if (m_GeometryStorage)
         {
             auto& registry = ctx.Scene.GetRegistry();
@@ -407,30 +410,17 @@ namespace Graphics::Passes
                 ? Geometry::Frustum::CreateFromMatrix(ctx.CameraProj * ctx.CameraView)
                 : Geometry::Frustum{};
 
-            // --- Mesh entities ---
-            auto meshView = registry.view<ECS::MeshRenderer::Component,
-                                          ECS::RenderVisualization::Component>();
+            auto lineView = registry.view<ECS::Line::Component>();
 
-            for (auto [entity, mr, vis] : meshView.each())
+            for (auto [entity, line] : lineView.each())
             {
-                if (!vis.ShowWireframe)
+                // Skip entities without valid geometry or edges.
+                if (!line.Geometry.IsValid() || line.EdgeCount == 0)
                     continue;
 
-                GeometryGpuData* geo = m_GeometryStorage->GetUnchecked(mr.Geometry);
+                GeometryGpuData* geo = m_GeometryStorage->GetUnchecked(line.Geometry);
                 if (!geo || !geo->GetVertexBuffer())
                     continue;
-
-                auto* edgeViewComp = registry.try_get<ECS::MeshEdgeView::Component>(entity);
-                const bool useEdgeView = edgeViewComp
-                    && edgeViewComp->HasGpuGeometry()
-                    && edgeViewComp->EdgeCount > 0;
-
-                if (!useEdgeView && vis.CachedEdges.empty())
-                    continue;
-
-                const uint32_t entityKey = static_cast<uint32_t>(entity);
-                if (!useEdgeView)
-                    activeKeys.push_back(entityKey);
 
                 glm::mat4 worldMatrix(1.0f);
                 if (auto* wm = registry.try_get<ECS::Components::Transform::WorldMatrix>(entity))
@@ -439,45 +429,105 @@ namespace Graphics::Passes
                 if (cullingEnabled && !FrustumCullSphere(worldMatrix, geo->GetLocalBoundingSphere(), frustum))
                     continue;
 
-                uint32_t edgeCount = 0;
+                const uint32_t entityKey = static_cast<uint32_t>(entity);
+                uint32_t edgeCount = line.EdgeCount;
                 uint64_t edgeAddr = 0;
                 uint64_t posAddr = 0;
 
-                if (useEdgeView)
+                // Path 1: EdgeView is valid — use BDA from the edge view geometry.
+                if (line.EdgeView.IsValid())
                 {
-                    GeometryGpuData* edgeGeo = m_GeometryStorage->GetUnchecked(edgeViewComp->Geometry);
+                    GeometryGpuData* edgeGeo = m_GeometryStorage->GetUnchecked(line.EdgeView);
                     if (!edgeGeo || !edgeGeo->GetIndexBuffer() || !edgeGeo->GetVertexBuffer())
                         continue;
 
-                    edgeCount = edgeViewComp->EdgeCount;
                     edgeAddr = edgeGeo->GetIndexBuffer()->GetDeviceAddress();
 
                     const uint64_t baseAddr = edgeGeo->GetVertexBuffer()->GetDeviceAddress();
                     posAddr = baseAddr + edgeGeo->GetLayout().PositionsOffset;
                 }
+                // Path 2: No EdgeView — fall back to cached edge data from
+                //          legacy components (transition period).
                 else
                 {
-                    edgeCount = static_cast<uint32_t>(vis.CachedEdges.size());
+                    // Source edge data: Graph::Data or RenderVisualization.
+                    const void* edgeData = nullptr;
+
+                    if (const auto* gd = registry.try_get<ECS::Graph::Data>(entity))
+                    {
+                        if (!gd->CachedEdgePairs.empty())
+                        {
+                            edgeData = gd->CachedEdgePairs.data();
+                            edgeCount = static_cast<uint32_t>(gd->CachedEdgePairs.size());
+                        }
+                    }
+
+                    if (!edgeData)
+                    {
+                        if (const auto* vis = registry.try_get<ECS::RenderVisualization::Component>(entity))
+                        {
+                            if (!vis->CachedEdges.empty())
+                            {
+                                edgeData = vis->CachedEdges.data();
+                                edgeCount = static_cast<uint32_t>(vis->CachedEdges.size());
+                            }
+                        }
+                    }
+
+                    if (!edgeData || edgeCount == 0)
+                        continue;
+
                     edgeAddr = EnsureEdgeBuffer(
-                        entityKey, vis.CachedEdges.data(), edgeCount, mr.Geometry.Index);
+                        entityKey, edgeData, edgeCount, line.Geometry.Index);
                     if (edgeAddr == 0)
                         continue;
+
+                    activeKeys.push_back(entityKey);
 
                     const uint64_t baseAddr = geo->GetVertexBuffer()->GetDeviceAddress();
                     posAddr = baseAddr + geo->GetLayout().PositionsOffset;
                 }
 
                 const uint32_t wireColor = GpuColor::PackColorF(
-                    vis.WireframeColor.r, vis.WireframeColor.g,
-                    vis.WireframeColor.b, vis.WireframeColor.a);
+                    line.Color.r, line.Color.g, line.Color.b, line.Color.a);
 
+                // Per-edge color aux buffer (sourced from legacy components).
                 uint64_t edgeAuxAddr = 0;
-                if (!vis.CachedEdgeColors.empty() && vis.CachedEdgeColors.size() == edgeCount)
+                if (line.HasPerEdgeColors)
                 {
-                    if (useEdgeView)
-                        activeKeys.push_back(entityKey);
-                    edgeAuxAddr = EnsureEdgeAuxBuffer(
-                        entityKey, vis.CachedEdgeColors.data(), edgeCount);
+                    const uint32_t* colorData = nullptr;
+                    uint32_t colorCount = 0;
+
+                    if (const auto* gd = registry.try_get<ECS::Graph::Data>(entity))
+                    {
+                        if (!gd->CachedEdgeColors.empty() &&
+                            gd->CachedEdgeColors.size() == edgeCount)
+                        {
+                            colorData = gd->CachedEdgeColors.data();
+                            colorCount = edgeCount;
+                        }
+                    }
+
+                    if (!colorData)
+                    {
+                        if (const auto* vis = registry.try_get<ECS::RenderVisualization::Component>(entity))
+                        {
+                            if (!vis->CachedEdgeColors.empty() &&
+                                vis->CachedEdgeColors.size() == edgeCount)
+                            {
+                                colorData = vis->CachedEdgeColors.data();
+                                colorCount = edgeCount;
+                            }
+                        }
+                    }
+
+                    if (colorData)
+                    {
+                        // Track for orphan cleanup if not already tracked.
+                        if (line.EdgeView.IsValid())
+                            activeKeys.push_back(entityKey);
+                        edgeAuxAddr = EnsureEdgeAuxBuffer(entityKey, colorData, colorCount);
+                    }
                 }
 
                 DrawInfo di{};
@@ -486,71 +536,21 @@ namespace Graphics::Passes
                 di.PtrEdges = edgeAddr;
                 di.EdgeCount = edgeCount;
                 di.Color = wireColor;
-                di.LineWidth = vis.WireframeWidth;
+                di.LineWidth = line.Width;
                 di.PtrEdgeAux = edgeAuxAddr;
-                draws.push_back(di);
 
+                if (line.Overlay)
+                    overlayDraws.push_back(di);
+                else
+                    depthDraws.push_back(di);
+
+                // Write back edge count for diagnostics.
                 if (auto* vr = registry.try_get<ECS::GeometryViewRenderer::Component>(entity))
                     vr->WireframeEdgeCount = edgeCount;
             }
 
-            // --- Graph entities ---
-            auto graphView = registry.view<ECS::Graph::Data>();
-            for (auto [entity, graphData] : graphView.each())
-            {
-                if (!graphData.Visible || !graphData.GpuGeometry.IsValid())
-                    continue;
-
-                if (graphData.CachedEdgePairs.empty())
-                    continue;
-
-                GeometryGpuData* geo = m_GeometryStorage->GetUnchecked(graphData.GpuGeometry);
-                if (!geo || !geo->GetVertexBuffer())
-                    continue;
-
-                const uint32_t entityKey = static_cast<uint32_t>(entity) | 0x80000000u;
-                activeKeys.push_back(entityKey);
-
-                glm::mat4 worldMatrix(1.0f);
-                if (auto* wm = registry.try_get<ECS::Components::Transform::WorldMatrix>(entity))
-                    worldMatrix = wm->Matrix;
-
-                if (cullingEnabled && !FrustumCullSphere(worldMatrix, geo->GetLocalBoundingSphere(), frustum))
-                    continue;
-
-                const uint32_t edgeCount = static_cast<uint32_t>(graphData.CachedEdgePairs.size());
-                const uint64_t edgeAddr = EnsureEdgeBuffer(
-                    entityKey, graphData.CachedEdgePairs.data(), edgeCount, graphData.GpuGeometry.Index);
-                if (edgeAddr == 0)
-                    continue;
-
-                const uint64_t baseAddr = geo->GetVertexBuffer()->GetDeviceAddress();
-                const uint64_t posAddr = baseAddr + geo->GetLayout().PositionsOffset;
-
-                const uint32_t edgeColor = GpuColor::PackColorF(
-                    graphData.DefaultEdgeColor.r, graphData.DefaultEdgeColor.g,
-                    graphData.DefaultEdgeColor.b, graphData.DefaultEdgeColor.a);
-
-                uint64_t edgeAuxAddr = 0;
-                if (!graphData.CachedEdgeColors.empty() && graphData.CachedEdgeColors.size() == edgeCount)
-                {
-                    edgeAuxAddr = EnsureEdgeAuxBuffer(
-                        entityKey, graphData.CachedEdgeColors.data(), edgeCount);
-                }
-
-                DrawInfo di{};
-                di.Model = worldMatrix;
-                di.PtrPositions = posAddr;
-                di.PtrEdges = edgeAddr;
-                di.EdgeCount = edgeCount;
-                di.Color = edgeColor;
-                di.LineWidth = graphData.EdgeWidth;
-                di.PtrEdgeAux = edgeAuxAddr;
-                draws.push_back(di);
-            }
-
             // Cleanup orphaned edge buffers and edge aux buffers.
-            if (!m_EdgeBuffers.empty())
+            if (!m_EdgeBuffers.empty() || !m_EdgeAuxBuffers.empty())
             {
                 std::sort(activeKeys.begin(), activeKeys.end());
 
@@ -651,7 +651,7 @@ namespace Graphics::Passes
                         di.Color = 0xFFFFFFFFu; // white fallback (unused when PtrEdgeAux != 0)
                         di.LineWidth = LineWidth;
                         di.PtrEdgeAux = colorAddr;
-                        transientDraws.push_back(di);
+                        depthDraws.push_back(di);
                     }
 
                     // Emit overlay transient draw (starts after depth-tested lines).
@@ -681,7 +681,7 @@ namespace Graphics::Passes
             }
         }
 
-        const bool hasDepthDraws = !draws.empty() || !transientDraws.empty();
+        const bool hasDepthDraws = !depthDraws.empty();
         const bool hasOverlayDraws = !overlayDraws.empty();
 
         if (!hasDepthDraws && !hasOverlayDraws)
@@ -703,10 +703,7 @@ namespace Graphics::Passes
         // =================================================================
         if (hasDepthDraws && depth.IsValid())
         {
-            // Merge retained and transient depth-tested draws.
-            auto allDepthDraws = std::make_shared<std::vector<DrawInfo>>(std::move(draws));
-            allDepthDraws->insert(allDepthDraws->end(),
-                                  transientDraws.begin(), transientDraws.end());
+            auto allDepthDraws = std::make_shared<std::vector<DrawInfo>>(std::move(depthDraws));
 
             ctx.Graph.AddPass<PassData>("Lines_Depth",
                 [&](PassData& data, RGBuilder& builder)

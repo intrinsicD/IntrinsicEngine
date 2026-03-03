@@ -22,11 +22,7 @@ Replace the dual-path (transient CPU + retained GPU) rendering with a **single u
 
 ### 1.3 LinePass — Consolidate All Line/Edge Sources (PLAN.md Phase 3)
 
-- [ ] Add edge view creation: extract edge pairs from `Halfedge::Mesh` / `Graph` PropertySets, upload as edge index buffer via `ReuseVertexBuffersFrom()`.
-- [ ] Add `ECS::Line::Component` iteration (replaces `RenderVisualization::ShowWireframe` boolean).
-- [ ] Add graph edge iteration (replaces `GraphRenderPass` edge submission).
-- [ ] Delete wireframe code from `MeshRenderPass`.
-- [ ] Delete edge submission from `GraphRenderPass`.
+- [ ] Add edge view creation: extract edge pairs from `Halfedge::Mesh` / `Graph` PropertySets, upload as edge index buffer via `ReuseVertexBuffersFrom()` (eliminates `CachedEdges`/`CachedEdgePairs` fallback in LinePass).
 
 ### 1.4 PointPass — Consolidate All Point Sources (PLAN.md Phase 4)
 

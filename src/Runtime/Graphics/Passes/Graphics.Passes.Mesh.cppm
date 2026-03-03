@@ -13,29 +13,28 @@ import RHI;
 export namespace Graphics::Passes
 {
     // -------------------------------------------------------------------------
-    // MeshRenderPass — Mesh visualization overlay via composited primitive passes.
+    // MeshRenderPass — Mesh visualization data collection.
     // -------------------------------------------------------------------------
     //
-    // Renders the non-face visualization overlays for entities with both
+    // Performs CPU-side data collection for entities with both
     // ECS::MeshRenderer::Component and ECS::RenderVisualization::Component:
-    //   - Wireframe edges  → submitted to DebugDraw accumulator → LinePass.
-    //   - Vertex points    → submitted to PointCloudRenderPass (all 4 modes).
+    //   - Edge cache building (lazily extracts unique edges from collision mesh,
+    //     consumed by LinePass via ECS::Line::Component).
+    //   - Vertex points → submitted to PointCloudRenderPass (all 4 modes).
     //
-    // Face rendering (solid triangles) is the responsibility of SurfacePass, which
-    // runs before this pass in the DefaultPipeline.  Together, SurfacePass (faces)
-    // + MeshRenderPass (wireframe + vertices) constitute the complete mesh pass.
+    // Wireframe edge rendering is fully owned by LinePass which iterates
+    // ECS::Line::Component directly. This pass only builds the edge cache.
     //
-    // This pass has no GPU resources of its own — it is a data-collection pass
-    // that feeds the shared PointCloudRenderPass and LinePass staging buffers.
-    // GPU drawing is performed by those passes after all collectors run.
+    // Face rendering (solid triangles) is the responsibility of SurfacePass.
+    //
+    // This pass has no GPU resources of its own — it is a data-collection pass.
     //
     // Usage in DefaultPipeline:
     //   Call AddPasses() after PointCloudRenderPass::ResetPoints() and before
-    //   PointCloudRenderPass::AddPasses() / LinePass::AddPasses().
+    //   PointCloudRenderPass::AddPasses().
     //
     // Dependencies:
     //   SetPointCloudPass() must be called with a non-null pointer for vertex draw.
-    //   DebugDraw is read from ctx.DebugDrawPtr each frame for wireframe lines.
     //   ctx.GeometryStorage is used to determine mesh topology (triangles vs. lines).
 
     class MeshRenderPass final : public IRenderFeature
@@ -48,7 +47,7 @@ export namespace Graphics::Passes
 
         // Collect mesh visualization data into shared staging buffers.
         // Must be called after PointCloudRenderPass::ResetPoints() and before
-        // PointCloudRenderPass::AddPasses() / LinePass::AddPasses().
+        // PointCloudRenderPass::AddPasses().
         void AddPasses(RenderPassContext& ctx) override;
 
         void Shutdown() override {}
@@ -57,19 +56,15 @@ export namespace Graphics::Passes
         // Pass nullptr to disable vertex point rendering.
         void SetPointCloudPass(PointCloudRenderPass* pass) { m_PointCloudPass = pass; }
 
-        // Inform this pass whether the retained BDA passes are active this frame.
-        // When a retained pass is active, entities with GPU geometry skip the CPU
-        // path to avoid double-draw. When disabled (e.g. feature-toggled off),
-        // the CPU path takes over so visuals aren't silently lost.
-        void SetRetainedPassesActive(bool lines, bool points)
+        // Inform this pass whether the retained BDA point pass is active.
+        // When active, entities with GPU geometry skip the CPU vertex path.
+        void SetRetainedPassesActive(bool /*lines*/, bool points)
         {
-            m_RetainedLinesActive = lines;
             m_RetainedPointsActive = points;
         }
 
     private:
         PointCloudRenderPass* m_PointCloudPass = nullptr;
-        bool m_RetainedLinesActive = false;
         bool m_RetainedPointsActive = false;
     };
 }

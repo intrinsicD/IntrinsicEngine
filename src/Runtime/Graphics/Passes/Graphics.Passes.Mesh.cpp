@@ -12,7 +12,6 @@ import :Passes.Mesh;
 import :RenderPipeline;
 import :Components;
 import :Passes.PointCloud;
-import :DebugDraw;
 import :Geometry;
 import ECS;
 import Core.Logging;
@@ -29,10 +28,8 @@ namespace Graphics::Passes
     //
     //   ShowWireframe:
     //     Extracts unique edges from the collision mesh (lazily cached per entity).
-    //     When LinePass is active, edges are rendered via BDA from
-    //     persistent device-local buffers — the CPU path is skipped. Otherwise,
-    //     edges are submitted to ctx.DebugDrawPtr (→ LinePass GPU draw).
-    //     Uses OverlayLine when vis.WireframeOverlay is true.
+    //     Edge rendering is handled by LinePass via ECS::Line::Component.
+    //     This pass only builds the edge cache — no CPU wireframe submission.
     //
     //   ShowVertices:
     //     Submits mesh vertex positions for point rendering
@@ -42,10 +39,6 @@ namespace Graphics::Passes
     void MeshRenderPass::AddPasses(RenderPassContext& ctx)
     {
         const bool canDrawPoints = (m_PointCloudPass != nullptr);
-        const bool canDrawLines  = (ctx.DebugDrawPtr != nullptr);
-
-        if (!canDrawPoints && !canDrawLines)
-            return;
 
         auto& registry = ctx.Scene.GetRegistry();
         auto meshView  = registry.view<ECS::MeshRenderer::Component,
@@ -56,18 +49,9 @@ namespace Graphics::Passes
             if (!vis.ShowWireframe && !vis.ShowVertices)
                 continue;
 
-            // Check if this entity has valid GPU geometry (device-local vertex buffer).
-            // When GPU geometry exists AND the corresponding retained pass is active,
-            // skip the CPU path to avoid double-draw. If the retained pass is disabled
-            // via FeatureRegistry, fall through to the CPU path so visuals aren't lost.
             GeometryGpuData* geo = ctx.GeometryStorage.GetUnchecked(mr.Geometry);
             const bool hasRetainedGpuGeometry = (geo && geo->GetVertexBuffer());
-            const bool retainedWireActive = hasRetainedGpuGeometry && m_RetainedLinesActive;
             const bool retainedPointActive = hasRetainedGpuGeometry && m_RetainedPointsActive;
-
-            // Wireframe: CPU path only when no retained pass will handle it.
-            // Edge caching still runs unconditionally so the retained pass has CachedEdges.
-            const bool needsCpuWire = vis.ShowWireframe && canDrawLines && !retainedWireActive;
 
             // GPU vertex view is valid for FlatDisc, Surfel, and EWA point rendering.
             // When retained GPU geometry exists AND the retained point pass is active, skip CPU.
@@ -77,20 +61,17 @@ namespace Graphics::Passes
                   vis.VertexRenderMode == Geometry::PointCloud::RenderMode::Surfel ||
                   vis.VertexRenderMode == Geometry::PointCloud::RenderMode::EWA))
                 || retainedPointActive;
-            const bool hasGpuVerts = gpuVertexPathValid;
 
-            const bool needsCpuVerts = vis.ShowVertices && !hasGpuVerts && canDrawPoints;
+            const bool needsCpuVerts = vis.ShowVertices && !gpuVertexPathValid && canDrawPoints;
 
-            // Edge caching is needed for both the CPU (DebugDraw) and GPU (retained BDA) wireframe paths.
+            // Edge caching is needed by the retained LinePass (via Line::Component fallback).
             // Always populate CachedEdges when ShowWireframe is true.
             const bool needEdgeCache = vis.ShowWireframe;
 
-            if (!needsCpuWire && !needsCpuVerts && !needEdgeCache)
+            if (!needsCpuVerts && !needEdgeCache)
                 continue;
 
-            // Both CPU paths source positions from the collision mesh (CPU-resident copy).
-            // An entity without a MeshCollider (no collision ref) cannot provide CPU positions for
-            // wireframe/vertex CPU paths; skip it with a one-time warning.
+            // CPU paths source positions from the collision mesh (CPU-resident copy).
             auto* collider = registry.try_get<ECS::MeshCollider::Component>(entity);
             if (!collider || !collider->CollisionRef)
             {
@@ -115,17 +96,13 @@ namespace Graphics::Passes
             if (positions.empty())
                 continue;
 
-            glm::mat4 worldMatrix(1.0f);
-            if (auto* wm = registry.try_get<ECS::Components::Transform::WorldMatrix>(entity))
-                worldMatrix = wm->Matrix;
-
-            // Determine topology from GPU geometry (reuse the geo pointer from the retained check above).
+            // Determine topology from GPU geometry.
             Graphics::PrimitiveTopology topology = Graphics::PrimitiveTopology::Triangles;
             if (geo)
                 topology = geo->GetTopology();
 
             // ------------------------------------------------------------------
-            // Edge cache: build lazily (needed by both CPU and retained GPU wireframe paths).
+            // Edge cache: build lazily (consumed by LinePass via Line::Component).
             // ------------------------------------------------------------------
             if (needEdgeCache && !indices.empty() && vis.EdgeCacheDirty)
             {
@@ -168,37 +145,14 @@ namespace Graphics::Passes
             }
 
             // ------------------------------------------------------------------
-            // Wireframe: CPU path — submit edges to DebugDraw → LinePass.
-            // Skipped when retained GPU geometry exists (LinePass handles it).
-            // ------------------------------------------------------------------
-            if (needsCpuWire && !vis.CachedEdges.empty())
-            {
-                const uint32_t wireColor = DebugDraw::PackColorF(
-                    vis.WireframeColor.r, vis.WireframeColor.g,
-                    vis.WireframeColor.b, vis.WireframeColor.a);
-
-                for (const auto& [i0, i1] : vis.CachedEdges)
-                {
-                    if (i0 >= positions.size() || i1 >= positions.size())
-                        continue;
-
-                    const glm::vec3 a =
-                        glm::vec3(worldMatrix * glm::vec4(positions[i0], 1.0f));
-                    const glm::vec3 b =
-                        glm::vec3(worldMatrix * glm::vec4(positions[i1], 1.0f));
-
-                    if (vis.WireframeOverlay)
-                        ctx.DebugDrawPtr->OverlayLine(a, b, wireColor);
-                    else
-                        ctx.DebugDrawPtr->Line(a, b, wireColor);
-                }
-            }
-
-            // ------------------------------------------------------------------
             // Vertices: submit positions to PointCloudRenderPass
             // ------------------------------------------------------------------
             if (needsCpuVerts)
             {
+                glm::mat4 worldMatrix(1.0f);
+                if (auto* wm = registry.try_get<ECS::Components::Transform::WorldMatrix>(entity))
+                    worldMatrix = wm->Matrix;
+
                 if (vis.VertexNormalsDirty
                     && topology == Graphics::PrimitiveTopology::Triangles
                     && !indices.empty())
