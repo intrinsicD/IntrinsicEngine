@@ -96,9 +96,10 @@ All operators follow a consistent contract: `Params` struct with defaults, `Resu
   - No loader thread ever calls `vkWaitForFences` for texture uploads.
 - **GPUScene:** Retained-mode instance table with independent slot allocation/deallocation.
 - **Dynamic Rendering:** No `VkRenderPass` or `VkFramebuffer`; fully dynamic attachment binding.
-- **Line/Graph Rendering:** Retained-mode line rendering (`RetainedLineRenderPass`) via BDA shared vertex buffers with persistent per-entity edge index buffers. Wireframe edges share mesh vertex buffers (same device address) with edge topology view. `line_retained.vert` expands segments to screen-space quads (6 verts/segment) with anti-aliasing. Graph entities (`ECS::Graph::Data`) hold `shared_ptr<Geometry::Graph>` with PropertySet-backed data authority, CPU-side layout algorithms (force-directed, spectral, hierarchical), and persistent GPU buffers managed by `GraphGeometrySyncSystem`. Both retained passes do CPU-side frustum culling.
-- **Point Cloud Rendering:** Retained-mode point rendering (`RetainedPointCloudRenderPass`) via BDA shared vertex buffers. `point_retained.vert` expands points to billboard quads (6 verts/point). Three render modes: FlatDisc (camera-facing billboard), Surfel (normal-oriented disc with Lambertian shading), and EWA splatting (Zwicker et al. 2001 — perspective-correct elliptical Gaussian splats via per-surfel Jacobian projection with 1px² low-pass anti-aliasing). Transient per-frame point submission also supported via `PointCloudRenderPass` SSBO path. The `Geometry.PointCloud` CPU module (data structures, downsampling, statistics) remains functional.
-- **DebugDraw:** Immediate-mode transient overlay for debug visualization (octree, KD-tree, bounds, contact manifolds, convex hulls) via per-frame SSBO upload + `LineRenderPass`. Depth-tested and overlay sub-passes. Comprehensive test coverage.
+- **Three-Pass Architecture:** Unified `SurfacePass` (filled triangles), `LinePass` (thick anti-aliased edges), and `PointPass` (billboard/surfel points) — each handling both retained BDA and transient debug data internally. Per-pass ECS components (`ECS::Surface::Component`, `ECS::Line::Component`, `ECS::Point::Component`) gate rendering via presence/absence. `DefaultPipeline` registers 7 passes: Picking, Surface, Line, Point, SelectionOutline, DebugView, ImGui.
+- **Line/Graph Rendering:** `LinePass` renders via BDA shared vertex buffers with persistent per-entity edge index buffers. Wireframe edges share mesh vertex buffers (same device address) with edge topology view. `line.vert` expands segments to screen-space quads (6 verts/segment) with anti-aliasing. Graph entities (`ECS::Graph::Data`) hold `shared_ptr<Geometry::Graph>` with PropertySet-backed data authority, CPU-side layout algorithms (force-directed, spectral, hierarchical), and persistent GPU buffers managed by `GraphGeometrySyncSystem`. All retained passes do CPU-side frustum culling.
+- **Point Cloud Rendering:** `PointPass` renders via BDA shared vertex buffers. `point_flatdisc.vert` / `point_surfel.vert` expand points to billboard quads (6 verts/point). Three render modes: FlatDisc (camera-facing billboard), Surfel (normal-oriented disc with Lambertian shading), and EWA splatting (Zwicker et al. 2001 — perspective-correct elliptical Gaussian splats via per-surfel Jacobian projection with 1px² low-pass anti-aliasing). The `Geometry.PointCloud` CPU module (data structures, downsampling, statistics) remains functional.
+- **DebugDraw:** Immediate-mode transient overlay for debug visualization (octree, KD-tree, bounds, contact manifolds, convex hulls) rendered by `LinePass` and `PointPass` transient paths. Depth-tested and overlay sub-passes. Comprehensive test coverage.
 - **Graph Processing (CPU):** Halfedge-based graph topology with Octree-accelerated kNN construction, force-directed 2D layout, spectral embedding (combinatorial/symmetric-normalized Laplacian), hierarchical layered layout with crossing diagnostics and diameter-aware auto-rooting.
 - **Selection Outlines:** Post-process contour highlight for selected/hovered entities.
 
@@ -258,11 +259,11 @@ Concrete service-level objectives for engine orchestration, verified by CI:
 
 ## Debug Visualization
 
-Intrinsic includes an immediate-mode debug visualization layer (`Graphics::DebugDraw`) rendered by `LineRenderPass`.
+Intrinsic includes an immediate-mode debug visualization layer (`Graphics::DebugDraw`) rendered by `LinePass` and `PointPass` transient paths.
 
 ### Spatial Debug Overlays
 
-The Sandbox app can visualize selected `MeshCollider` acceleration/bounds data using `Graphics::DebugDraw` + `LineRenderPass`.
+The Sandbox app can visualize selected `MeshCollider` acceleration/bounds data using `Graphics::DebugDraw` + `LinePass`.
 
 - **Octree overlay UI:** `View Settings` → `Spatial Debug` → `Draw Selected MeshCollider Octree`
 - **Octree source:** selected entity’s `ECS::MeshCollider::Component::CollisionRef->LocalOctree`
@@ -382,16 +383,16 @@ One device-local vertex buffer on the GPU, multiple index buffers with different
 | View | Pipeline | Vertex shader reads via BDA | Index buffer |
 |------|----------|-----------------------------|-------------|
 | Surface mesh | `SurfacePass` | `positions[gl_VertexIndex]` | Triangle indices |
-| Wireframe | `LineRenderPass` (retained) | `positions[edgeIdx]` → expand to quad (6v/seg) | Unique edge pairs |
-| Vertex visualization | `PointCloudRenderPass` | `positions[pointID]` → expand to billboard (6v/pt) | Identity / direct draw |
-| kNN graph | `LineRenderPass` (retained) | Same line shader | Neighbor edge pairs |
-| Standalone point cloud | `PointCloudRenderPass` | Own buffer via BDA | Direct draw |
+| Wireframe | `LinePass` | `positions[edgeIdx]` → expand to quad (6v/seg) | Unique edge pairs |
+| Vertex visualization | `PointPass` | `positions[pointID]` → expand to billboard (6v/pt) | Identity / direct draw |
+| kNN graph | `LinePass` | Same line shader | Neighbor edge pairs |
+| Standalone point cloud | `PointPass` | Own buffer via BDA | Direct draw |
 
 Zero vertex duplication for mesh-derived views — same `std::shared_ptr<VulkanBuffer>`, same device address. Each topology requires a separate shader pipeline because thick lines and billboard points need vertex-shader expansion (6 verts/primitive); `VK_PRIMITIVE_TOPOLOGY_LINE_LIST`/`POINT_LIST` alone produce only 1px primitives.
 
 Each view owns its own `GeometryHandle`, `GPUScene` slot, and participates in frustum culling independently. The `GeometryPool`/`GPUScene` retained-mode system is topology-agnostic. Only `DebugDraw` content (octree, bounds, contact manifold overlays) uses per-frame transient SSBO uploads — everything else is retained.
 
-**Current status:** Retained-mode BDA rendering is operational for wireframe (`RetainedLineRenderPass`), vertex visualization and standalone point clouds (`RetainedPointCloudRenderPass` with FlatDisc/Surfel/EWA modes), and graph geometry. Standalone point clouds (`.xyz`/`.pcd`/`.ply`) are first-class retained-mode renderables via `PointCloudRendererLifecycle` — uploaded once to device-local memory, rendered via BDA with zero per-frame cost. Transient `DebugDraw` → `LineRenderPass` overlay path is functional. `MeshViewLifecycleSystem` automates GPU geometry view creation for mesh-derived edge and vertex views via `MeshEdgeView::Component` / `MeshVertexView::Component`, with GPUScene slot management and EnTT destroy hooks.
+Retained-mode BDA rendering is the sole path for all geometry types: wireframe edges (`LinePass`), vertex visualization and standalone point clouds (`PointPass` with FlatDisc/Surfel/EWA modes), and graph geometry. Standalone point clouds (`.xyz`/`.pcd`/`.ply`) are first-class retained-mode renderables via `PointCloudRendererLifecycle` — uploaded once to device-local memory, rendered via BDA with zero per-frame cost. Transient `DebugDraw` lines and points are rendered by `LinePass` and `PointPass` internal transient paths. `MeshViewLifecycleSystem` automates GPU geometry view creation for mesh-derived edge and vertex views via `MeshEdgeView::Component` / `MeshVertexView::Component`, with GPUScene slot management and EnTT destroy hooks.
 
 ### Key API
 
