@@ -136,6 +136,26 @@ export namespace Graphics
         void OverlayAxes(const glm::vec3& origin, float size);
 
         // ----------------------------------------------------------------
+        // Point Drawing API (depth-tested)
+        // ----------------------------------------------------------------
+
+        // GPU-aligned point marker: 32 bytes.
+        struct alignas(16) PointMarker
+        {
+            glm::vec3 Position;
+            uint32_t Color;       // packed ABGR
+            glm::vec3 Normal;     // for Surfel mode; (0,1,0) default
+            float Size;           // world-space radius
+        };
+        static_assert(sizeof(PointMarker) == 32, "PointMarker must be 32 bytes for GPU alignment");
+
+        // Submit a single debug point (depth-tested, FlatDisc mode).
+        void Point(const glm::vec3& pos, float size, uint32_t color);
+
+        // Submit a debug point with explicit normal (for Surfel mode).
+        void Point(const glm::vec3& pos, float size, uint32_t color, const glm::vec3& normal);
+
+        // ----------------------------------------------------------------
         // Frame Lifecycle
         // ----------------------------------------------------------------
 
@@ -146,10 +166,12 @@ export namespace Graphics
         [[nodiscard]] std::span<const LineSegment> GetLines() const;
         [[nodiscard]] std::span<const LineSegment> GetOverlayLines() const;
         [[nodiscard]] std::span<const TriangleVertex> GetTriangles() const;
+        [[nodiscard]] std::span<const PointMarker> GetPoints() const;
         [[nodiscard]] uint32_t GetLineCount() const { return static_cast<uint32_t>(m_Lines.size()); }
         [[nodiscard]] uint32_t GetOverlayLineCount() const { return static_cast<uint32_t>(m_OverlayLines.size()); }
         [[nodiscard]] uint32_t GetTriangleCount() const { return static_cast<uint32_t>(m_Triangles.size() / 3); }
-        [[nodiscard]] bool HasContent() const { return !m_Lines.empty() || !m_OverlayLines.empty() || !m_Triangles.empty(); }
+        [[nodiscard]] uint32_t GetPointCount() const { return static_cast<uint32_t>(m_Points.size()); }
+        [[nodiscard]] bool HasContent() const { return !m_Lines.empty() || !m_OverlayLines.empty() || !m_Triangles.empty() || !m_Points.empty(); }
 
     private:
         // Depth-tested lines (rendered with depth test enabled).
@@ -160,6 +182,9 @@ export namespace Graphics
 
         // Depth-tested triangles (filled surface primitives).
         std::vector<TriangleVertex> m_Triangles;
+
+        // Depth-tested point markers (rendered by PointPass).
+        std::vector<PointMarker> m_Points;
 
         // Shared implementation for sphere drawing.
         void SphereImpl(std::vector<LineSegment>& target,

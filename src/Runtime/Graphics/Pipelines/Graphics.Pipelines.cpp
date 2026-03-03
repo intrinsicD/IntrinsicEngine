@@ -22,7 +22,7 @@ import :Passes.Graph;
 import :Passes.SelectionOutline;
 import :Passes.Line;
 import :Passes.PointCloud;
-import :Passes.RetainedPointCloud;
+import :Passes.Point;
 import :Passes.DebugView;
 import :Passes.ImGui;
 import :PipelineLibrary;
@@ -46,7 +46,7 @@ namespace Graphics
         if (m_SelectionOutlinePass) m_SelectionOutlinePass->Shutdown();
         if (m_LinePass)             m_LinePass->Shutdown();
         if (m_PointCloudPass)       m_PointCloudPass->Shutdown();
-        if (m_RetainedPointPass)    m_RetainedPointPass->Shutdown();
+        if (m_PointPass)            m_PointPass->Shutdown();
         if (m_DebugViewPass)        m_DebugViewPass->Shutdown();
         if (m_ImGuiPass)            m_ImGuiPass->Shutdown();
 
@@ -57,7 +57,7 @@ namespace Graphics
         m_SelectionOutlinePass.reset();
         m_LinePass.reset();
         m_PointCloudPass.reset();
-        m_RetainedPointPass.reset();
+        m_PointPass.reset();
         m_DebugViewPass.reset();
         m_ImGuiPass.reset();
     }
@@ -75,7 +75,7 @@ namespace Graphics
         m_SelectionOutlinePass = std::make_unique<Passes::SelectionOutlinePass>();
         m_LinePass             = std::make_unique<Passes::LinePass>();
         m_PointCloudPass       = std::make_unique<Passes::PointCloudRenderPass>();
-        m_RetainedPointPass    = std::make_unique<Passes::RetainedPointCloudRenderPass>();
+        m_PointPass            = std::make_unique<Passes::PointPass>();
         m_DebugViewPass        = std::make_unique<Passes::DebugViewPass>();
         m_ImGuiPass            = std::make_unique<Passes::ImGuiPass>();
 
@@ -86,7 +86,7 @@ namespace Graphics
         m_SelectionOutlinePass->Initialize(device, descriptorPool, globalLayout);
         m_LinePass->Initialize(device, descriptorPool, globalLayout);
         m_PointCloudPass->Initialize(device, descriptorPool, globalLayout);
-        m_RetainedPointPass->Initialize(device, descriptorPool, globalLayout);
+        m_PointPass->Initialize(device, descriptorPool, globalLayout);
         m_DebugViewPass->Initialize(device, descriptorPool, globalLayout);
         m_ImGuiPass->Initialize(device, descriptorPool, globalLayout);
 
@@ -102,7 +102,7 @@ namespace Graphics
         m_SelectionOutlinePass->SetShaderRegistry(shaderRegistry);
         m_LinePass->SetShaderRegistry(shaderRegistry);
         m_PointCloudPass->SetShaderRegistry(shaderRegistry);
-        m_RetainedPointPass->SetShaderRegistry(shaderRegistry);
+        m_PointPass->SetShaderRegistry(shaderRegistry);
         m_DebugViewPass->SetShaderRegistry(shaderRegistry);
         
         m_PathDirty = true;
@@ -156,7 +156,7 @@ namespace Graphics
             const bool meshEnabled  = m_MeshPass        && IsFeatureEnabled("MeshPass"_id);
             const bool graphEnabled = m_GraphPass       && IsFeatureEnabled("GraphPass"_id);
             const bool linePassEnabled = m_LinePass     && IsFeatureEnabled("LinePass"_id);
-            const bool retainedPointsEnabled = m_RetainedPointPass && IsFeatureEnabled("RetainedPointCloudRenderPass"_id);
+            const bool pointPassEnabled = m_PointPass && IsFeatureEnabled("PointPass"_id);
 
             // Collection should run if any visualization feature is enabled.
             const bool collectEnabled = pcDrawEnabled || meshEnabled || graphEnabled;
@@ -165,7 +165,7 @@ namespace Graphics
             {
                 m_Path.AddStage("VisualizationCollect",
                     [this, pcDrawEnabled, meshEnabled, graphEnabled,
-                     linePassEnabled, retainedPointsEnabled](RenderPassContext& ctx)
+                     linePassEnabled, pointPassEnabled](RenderPassContext& ctx)
                 {
                     // Reset point splat staging before any collector runs.
                     if (m_PointCloudPass)
@@ -177,7 +177,7 @@ namespace Graphics
                     if (meshEnabled)
                     {
                         m_MeshPass->SetPointCloudPass(m_PointCloudPass.get());
-                        m_MeshPass->SetRetainedPassesActive(linePassEnabled, retainedPointsEnabled);
+                        m_MeshPass->SetRetainedPassesActive(linePassEnabled, pointPassEnabled);
                         m_MeshPass->AddPasses(ctx);
                     }
 
@@ -189,7 +189,7 @@ namespace Graphics
                     if (graphEnabled)
                     {
                         m_GraphPass->SetPointCloudPass(m_PointCloudPass.get());
-                        m_GraphPass->SetRetainedPassesActive(linePassEnabled, retainedPointsEnabled);
+                        m_GraphPass->SetRetainedPassesActive(linePassEnabled, pointPassEnabled);
                         m_GraphPass->AddPasses(ctx);
                     }
 
@@ -223,14 +223,17 @@ namespace Graphics
         }
 
         // ==================================================================
-        // 7. Retained-Mode Point Pass — persistent GPU point geometry via BDA.
+        // 7. PointPass — unified BDA-based point rendering.
+        //    Consolidates retained vertex/node/cloud points and transient
+        //    DebugDraw points into a single pass with per-mode pipelines.
         // ==================================================================
-        if (m_RetainedPointPass && IsFeatureEnabled("RetainedPointCloudRenderPass"_id))
+        if (m_PointPass && IsFeatureEnabled("PointPass"_id))
         {
-            m_Path.AddStage("RetainedPoints", [this](RenderPassContext& ctx)
+            m_Path.AddStage("Points", [this](RenderPassContext& ctx)
             {
-                m_RetainedPointPass->SetGeometryStorage(&ctx.GeometryStorage);
-                m_RetainedPointPass->AddPasses(ctx);
+                m_PointPass->SetGeometryStorage(&ctx.GeometryStorage);
+                m_PointPass->SetDebugDraw(ctx.DebugDrawPtr);
+                m_PointPass->AddPasses(ctx);
             });
         }
 

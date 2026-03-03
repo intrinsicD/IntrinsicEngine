@@ -48,7 +48,7 @@ export namespace ECS::MeshCollider
 // PointCloudRenderer — ECS component for standalone point cloud rendering.
 // -------------------------------------------------------------------------
 //
-// Entities with this component are rendered by RetainedPointCloudRenderPass
+// Entities with this component are rendered by PointPass
 // via BDA from a device-local vertex buffer. CPU point data is uploaded once
 // by PointCloudRendererLifecycle and then freed.
 //
@@ -189,7 +189,7 @@ export namespace ECS::RenderVisualization
 // the Graph's PropertySets — no std::vector copies.
 //
 // Rendering: retained-mode via BDA shared-buffer architecture.
-//   - Nodes rendered via RetainedPointCloudRenderPass (BDA position pull).
+//   - Nodes rendered via PointPass (BDA position pull).
 //   - Edges rendered via LinePass (BDA position pull + edge buffer).
 //   - Falls back to CPU path (GraphRenderPass → PointCloudRenderPass + DebugDraw)
 //     when retained passes are disabled via FeatureRegistry.
@@ -222,7 +222,7 @@ export namespace ECS::Graph
 
         // ---- GPU State (managed by GraphGeometrySyncSystem) ----
         // Shared vertex buffer holding compacted node positions + normals.
-        // Both LinePass (edges) and RetainedPointCloudRenderPass (nodes) read
+        // Both LinePass (edges) and PointPass (nodes) read
         // from this buffer via BDA push constants.
         Geometry::GeometryHandle GpuGeometry{};
 
@@ -250,12 +250,12 @@ export namespace ECS::Graph
 
         // Per-node colors (packed ABGR), one per compacted vertex.
         // Extracted from Graph::VertexProperties("v:color") by GraphGeometrySyncSystem.
-        // When empty, RetainedPointCloudRenderPass uses uniform DefaultNodeColor.
+        // When empty, PointPass uses uniform DefaultNodeColor.
         std::vector<uint32_t> CachedNodeColors;
 
         // Per-node radii (world-space), one per compacted vertex.
         // Extracted from Graph::VertexProperties("v:radius") by GraphGeometrySyncSystem.
-        // When empty, RetainedPointCloudRenderPass uses uniform DefaultNodeRadius.
+        // When empty, PointPass uses uniform DefaultNodeRadius.
         std::vector<float> CachedNodeRadii;
 
         // When true, GraphGeometrySyncSystem re-uploads positions and rebuilds
@@ -301,7 +301,7 @@ export namespace ECS::Graph
 // from the Cloud's PropertySets — no std::vector copies on the component.
 //
 // Rendering: retained-mode via BDA shared-buffer architecture.
-//   - Points rendered via RetainedPointCloudRenderPass (BDA position pull).
+//   - Points rendered via PointPass (BDA position pull).
 //   - GPU state managed by PointCloudGeometrySyncSystem: positions/normals
 //     are uploaded to a device-local vertex buffer (GpuGeometry), per-point
 //     attributes extracted from PropertySets.
@@ -335,7 +335,7 @@ export namespace ECS::PointCloud
 
         // ---- GPU State (managed by PointCloudGeometrySyncSystem) ----
         // Device-local vertex buffer holding positions + normals.
-        // RetainedPointCloudRenderPass reads from this buffer via BDA.
+        // PointPass reads from this buffer via BDA.
         Geometry::GeometryHandle GpuGeometry{};
 
         // GPUScene slot for frustum culling and GPU-driven batching.
@@ -346,12 +346,12 @@ export namespace ECS::PointCloud
 
         // Per-point colors (packed ABGR), one per point.
         // Extracted from Cloud's "p:color" by PointCloudGeometrySyncSystem.
-        // When empty, RetainedPointCloudRenderPass uses uniform DefaultColor.
+        // When empty, PointPass uses uniform DefaultColor.
         std::vector<uint32_t> CachedColors;
 
         // Per-point radii (world-space), one per point.
         // Extracted from Cloud's "p:radius" by PointCloudGeometrySyncSystem.
-        // When empty, RetainedPointCloudRenderPass uses uniform DefaultRadius.
+        // When empty, PointPass uses uniform DefaultRadius.
         std::vector<float> CachedRadii;
 
         // When true, PointCloudGeometrySyncSystem re-uploads positions/normals

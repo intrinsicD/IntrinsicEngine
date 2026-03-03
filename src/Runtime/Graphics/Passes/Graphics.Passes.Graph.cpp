@@ -29,7 +29,7 @@ namespace Graphics::Passes
     // ECS::Line::Component directly — no CPU edge submission here.
     //
     // When the retained point pass is active, entities with valid GpuGeometry
-    // are skipped — RetainedPointCloudRenderPass handles them via BDA.
+    // are skipped — PointPass handles them via BDA.
 
     void GraphRenderPass::AddPasses(RenderPassContext& ctx)
     {

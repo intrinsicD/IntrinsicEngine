@@ -226,6 +226,20 @@ namespace Graphics
     }
 
     // =========================================================================
+    // Point primitives (depth-tested, rendered by PointPass)
+    // =========================================================================
+
+    void DebugDraw::Point(const glm::vec3& pos, float size, uint32_t color)
+    {
+        m_Points.push_back({pos, color, glm::vec3(0.0f, 1.0f, 0.0f), size});
+    }
+
+    void DebugDraw::Point(const glm::vec3& pos, float size, uint32_t color, const glm::vec3& normal)
+    {
+        m_Points.push_back({pos, color, normal, size});
+    }
+
+    // =========================================================================
     // Overlay primitives (no depth test)
     // =========================================================================
 
@@ -263,6 +277,7 @@ namespace Graphics
         m_Lines.clear();
         m_OverlayLines.clear();
         m_Triangles.clear();
+        m_Points.clear();
     }
 
     std::span<const DebugDraw::LineSegment> DebugDraw::GetLines() const
@@ -278,6 +293,11 @@ namespace Graphics
     std::span<const DebugDraw::TriangleVertex> DebugDraw::GetTriangles() const
     {
         return m_Triangles;
+    }
+
+    std::span<const DebugDraw::PointMarker> DebugDraw::GetPoints() const
+    {
+        return m_Points;
     }
 
     // =========================================================================

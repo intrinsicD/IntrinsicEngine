@@ -81,7 +81,7 @@ TEST(Culling, RoutingTable_SparseHandleToDense)
 // CPU-side frustum culling for retained-mode render passes.
 // =============================================================================
 // These tests validate the FrustumCullSphere logic used by
-// LinePass and RetainedPointCloudRenderPass. The logic mirrors
+// LinePass and PointPass. The logic mirrors
 // instance_cull.comp: transform local bounding sphere to world space, then
 // test against 6 frustum planes.
 

@@ -332,7 +332,7 @@ TEST(MeshViewLifecycle_Contract, ReuseVertexBuffersFromSharedHandle)
 //     from collision data. GraphGeometrySyncSystem creates edge index buffers
 //     via ReuseVertexBuffersFrom. No LinePass-internal fallback buffers.
 //
-//   - RetainedPointCloudRenderPass prefers MeshVertexView::Geometry when
+//   - PointPass prefers MeshVertexView::Geometry when
 //     available (vertex buffer BDA from GeometryGpuData), falling back to
 //     direct MeshRenderer::Geometry lookup.
 //
@@ -369,7 +369,7 @@ TEST(MeshViewLifecycle_Contract, EdgeViewNotReadySkipsRendering)
 TEST(MeshViewLifecycle_Contract, VertexViewReadyForRenderPass)
 {
     // Simulate a MeshVertexView that has completed lifecycle setup.
-    // RetainedPointCloudRenderPass should prefer this over direct
+    // PointPass should prefer this over direct
     // MeshRenderer::Geometry lookup.
     ECS::MeshVertexView::Component pv;
     pv.Geometry = Geometry::GeometryHandle(1, 1);

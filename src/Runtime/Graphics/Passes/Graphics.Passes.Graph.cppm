@@ -21,7 +21,7 @@ export namespace Graphics::Passes
     // ECS::Line::Component directly — no edge submission here.
     //
     // When retained-mode point rendering is active, entities with valid
-    // GpuGeometry are skipped — RetainedPointCloudRenderPass handles them
+    // GpuGeometry are skipped — PointPass handles them
     // via BDA.
     //
     // Usage in DefaultPipeline:
