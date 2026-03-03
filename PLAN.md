@@ -1,6 +1,6 @@
 # Rendering Architecture Refactor — Plan
 
-**Relationship to other documents:** This plan is the near-term execution plan for rendering architecture consolidation. `docs/RENDERING_MODALITY_REDESIGN_PLAN.md` describes the long-term approach/mode framework that this refactor enables — the three-pass architecture here is a stepping stone toward that vision. `TODO.md §1` tracks the actionable backlog items for all 9 migration phases. `ROADMAP.md` Phase 0a references this plan as the first execution priority.
+**Relationship to other documents:** This plan is the near-term execution plan for rendering architecture consolidation. `ROADMAP.md §5` describes the long-term approach/mode framework that this refactor enables — the three-pass architecture here is a stepping stone toward that vision. `TODO.md §1` tracks the actionable backlog items for all 9 migration phases. `ROADMAP.md` Phase 0a references this plan as the first execution priority.
 
 ## Goal
 
@@ -855,7 +855,7 @@ All three geometry types must reach device-local retained-mode rendering at the 
 
 ## Future Direction
 
-This three-pass architecture is a stepping stone toward the full approach/mode framework described in `docs/RENDERING_MODALITY_REDESIGN_PLAN.md`. The key compatibility properties:
+This three-pass architecture is a stepping stone toward the full approach/mode framework described in `ROADMAP.md §5`. The key compatibility properties:
 
 - `PointRenderMode` enum → directly extends to the mode parameter table.
 - Pipeline-per-mode pattern → directly supports the bindless mode dispatch.
