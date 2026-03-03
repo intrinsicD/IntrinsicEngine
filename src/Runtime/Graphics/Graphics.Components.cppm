@@ -474,3 +474,114 @@ export namespace ECS::MeshVertexView
         [[nodiscard]] bool HasGpuGeometry() const noexcept { return Geometry.IsValid(); }
     };
 }
+
+// =========================================================================
+// Per-Pass Typed ECS Components (PLAN.md Phase 1)
+// =========================================================================
+//
+// These components implement the three-pass rendering architecture described
+// in PLAN.md. Each pass owns a dedicated component type; the toggle is
+// presence/absence of the component — no boolean flags. Attaching a
+// component enables that visualization, removing it disables it.
+//
+// During the transition period, these components coexist alongside the
+// legacy components (MeshRenderer, RenderVisualization, PointCloudRenderer).
+// A migration system (ComponentMigration) keeps them synchronized until
+// the legacy components can be retired.
+
+// -------------------------------------------------------------------------
+// Surface::Component — Owned by SurfacePass (filled triangle rendering).
+// -------------------------------------------------------------------------
+//
+// Mirrors MeshRenderer::Component initially. During transition, both
+// components coexist; the migration system keeps them in sync. After
+// Phase 5 (dead code deletion), MeshRenderer::Component is retired and
+// Surface::Component becomes the sole authority.
+
+export namespace ECS::Surface
+{
+    struct Component
+    {
+        // ---- Geometry & Material ----
+        Geometry::GeometryHandle Geometry{};
+        Core::Assets::AssetHandle Material{};
+
+        // ---- Retained Mode Slot ----
+        static constexpr uint32_t kInvalidSlot = ~0u;
+        uint32_t GpuSlot = kInvalidSlot;
+
+        // ---- Render Cache ----
+        Graphics::MaterialHandle CachedMaterialHandle{};
+        Graphics::MaterialHandle CachedMaterialHandleForInstance{};
+        uint32_t CachedMaterialRevisionForInstance = 0u;
+        bool CachedIsSelectedForInstance = false;
+    };
+}
+
+// -------------------------------------------------------------------------
+// Line::Component — Owned by LinePass (thick anti-aliased edge rendering).
+// -------------------------------------------------------------------------
+//
+// Replaces RenderVisualization wireframe fields and the ShowWireframe
+// boolean toggle. Edge data comes from PropertySets on the source geometry
+// (Halfedge::Mesh or Graph), not from a pass-local cache. Per-edge
+// attributes (colors, widths) are uploaded to a separate BDA channel.
+
+export namespace ECS::Line
+{
+    struct Component
+    {
+        // ---- Geometry Handles ----
+        // Shared vertex buffer (BDA) — same device-local buffer as the
+        // source mesh/graph, referenced via ReuseVertexBuffersFrom.
+        Geometry::GeometryHandle Geometry{};
+
+        // Edge index buffer (separate from vertex buffer). Contains
+        // flattened uint32_t pairs from PropertySet edge topology.
+        Geometry::GeometryHandle EdgeView{};
+
+        // ---- Appearance (defaults; overridden by per-edge attributes) ----
+        glm::vec4 Color = {0.85f, 0.85f, 0.85f, 1.0f};
+        float     Width = 1.5f;
+        bool      Overlay = false;  // true = no depth test (always visible)
+
+        // ---- Per-Edge Attribute Flags ----
+        // Set by geometry view lifecycle systems when PropertySet data
+        // contains per-edge attributes.
+        bool HasPerEdgeColors = false;
+        bool HasPerEdgeWidths = false;
+    };
+}
+
+// -------------------------------------------------------------------------
+// Point::Component — Owned by PointPass (vertex/node/point cloud rendering).
+// -------------------------------------------------------------------------
+//
+// Replaces RenderVisualization vertex fields, PointCloudRenderer rendering
+// parameters, and GraphRenderer node parameters. The render mode selects
+// the pipeline variant (FlatDisc, Surfel, EWA).
+
+export namespace ECS::Point
+{
+    struct Component
+    {
+        // ---- Geometry Handle ----
+        // Shared vertex buffer (BDA) — same device-local buffer as the
+        // source mesh/graph/cloud. For mesh-derived vertex views, created
+        // via ReuseVertexBuffersFrom with topology Points.
+        Geometry::GeometryHandle Geometry{};
+
+        // ---- Appearance (defaults; overridden by per-point attributes) ----
+        glm::vec4 Color = {1.0f, 0.6f, 0.0f, 1.0f};
+        float     Size  = 0.008f;         // World-space radius
+        float     SizeMultiplier = 1.0f;  // Per-entity size scaling
+        Geometry::PointCloud::RenderMode Mode = Geometry::PointCloud::RenderMode::FlatDisc;
+
+        // ---- Per-Point Attribute Flags ----
+        // Set by geometry view lifecycle systems when PropertySet data
+        // contains per-point attributes.
+        bool HasPerPointColors  = false;
+        bool HasPerPointRadii   = false;
+        bool HasPerPointNormals = false;  // Required for Surfel mode
+    };
+}

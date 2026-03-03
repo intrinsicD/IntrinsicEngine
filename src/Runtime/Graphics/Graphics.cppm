@@ -22,6 +22,7 @@ export import :Systems.PointCloudRendererLifecycle;
 export import :Systems.GraphGeometrySync;
 export import :Systems.PointCloudGeometrySync;
 export import :Systems.MeshViewLifecycle;
+export import :Systems.ComponentMigration;
 export import :DebugDraw;
 export import :OctreeDebugDraw;
 export import :BoundingDebugDraw;

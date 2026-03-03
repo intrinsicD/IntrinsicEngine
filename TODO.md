@@ -20,13 +20,6 @@ This document tracks **what's left to do** in IntrinsicEngine's architecture.
 
 Replace the dual-path (transient CPU + retained GPU) rendering with a **single unified path per primitive type** (`SurfacePass`, `LinePass`, `PointPass`). Full spec in `PLAN.md`.
 
-### 1.1 Per-Pass Typed ECS Components (PLAN.md Phase 1)
-
-- [ ] Define `ECS::Surface::Component` (mirrors `MeshRenderer::Component` initially).
-- [ ] Define `ECS::Line::Component` (wireframe settings; edge data from PropertySets, not pass-local cache).
-- [ ] Define `ECS::Point::Component` (vertex/node/point cloud settings with `PointRenderMode`).
-- [ ] Migration system: attach new components alongside old ones during transition period.
-
 ### 1.2 SurfacePass — Rename + Consolidate (PLAN.md Phase 2)
 
 - [ ] Rename `ForwardPass` → `SurfacePass` (class, files, module partition `Graphics:Passes.Surface`).
