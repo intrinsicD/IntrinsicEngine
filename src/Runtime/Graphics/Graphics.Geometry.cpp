@@ -4,7 +4,7 @@ module;
 #include <cmath>
 #include <cstring>
 #include <memory>
-#include <numeric>
+#include <span>
 #include <vector>
 #include <glm/glm.hpp>
 #include "RHI.Vulkan.hpp"

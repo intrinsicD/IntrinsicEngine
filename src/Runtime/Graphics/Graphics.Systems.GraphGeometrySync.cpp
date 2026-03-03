@@ -97,14 +97,14 @@ namespace Graphics::Systems::GraphGeometrySync
                 std::optional<Geometry::VertexProperty<glm::vec4>> nodeColorProp;
                 if (hasNodeColors)
                     nodeColorProp = Geometry::VertexProperty<glm::vec4>(
-                        graph.VertexProperties().Get<glm::vec4>("v:color").value());
+                        graph.VertexProperties().Get<glm::vec4>("v:color"));
 
                 // Check for per-node radius property ("v:radius" as float).
                 const bool hasNodeRadii = graph.VertexProperties().Exists("v:radius");
                 std::optional<Geometry::VertexProperty<float>> nodeRadiusProp;
                 if (hasNodeRadii)
                     nodeRadiusProp = Geometry::VertexProperty<float>(
-                        graph.VertexProperties().Get<float>("v:radius").value());
+                        graph.VertexProperties().Get<float>("v:radius"));
 
                 std::vector<uint32_t> nodeColors;
                 if (hasNodeColors)
@@ -165,7 +165,7 @@ namespace Graphics::Systems::GraphGeometrySync
                 std::optional<Geometry::EdgeProperty<glm::vec4>> edgeColorProp;
                 if (hasEdgeColors)
                     edgeColorProp = Geometry::EdgeProperty<glm::vec4>(
-                        graph.EdgeProperties().Get<glm::vec4>("e:color").value());
+                        graph.EdgeProperties().Get<glm::vec4>("e:color"));
 
                 std::vector<uint32_t> edgeColors;
                 if (hasEdgeColors)

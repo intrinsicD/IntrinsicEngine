@@ -1,6 +1,6 @@
 module;
 
-#include <cstddef>
+#include <span>
 #include <cstdint>
 #include <memory>
 #include <vector>

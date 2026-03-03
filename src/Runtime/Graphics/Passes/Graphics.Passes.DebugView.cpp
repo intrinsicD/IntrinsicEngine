@@ -1,13 +1,14 @@
 module;
 
-#include <cstdint>
 #include <memory>
 #include <span>
 #include <string>
 #include <string_view>
 #include <utility>
+#include <glm/glm.hpp>
 
 #include "RHI.Vulkan.hpp"
+
 
 module Graphics:Passes.DebugView.Impl;
 
