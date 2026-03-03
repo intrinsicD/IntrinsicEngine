@@ -4,6 +4,7 @@
 #include <thread>
 #include <vector>
 #include <atomic>
+#include <cstdint>
 
 #include "RHI.Vulkan.hpp"
 // VMA types/enums are already pulled in transitively via RHI.Vulkan.hpp → RHI.VmaConfig.hpp.
@@ -391,4 +392,114 @@ TEST_F(TransferTest, UploadBufferBatchHelper)
 
     m_TransferMgr->GarbageCollect();
     SUCCEED();
+}
+
+// ---------------------------------------------------------------------------
+// Push Constant Runtime Validation (TODO §1.10)
+// ---------------------------------------------------------------------------
+
+TEST(RHIPipeline, BuilderTakesDeviceBySharedPtr)
+{
+    static_assert(std::is_constructible_v<RHI::PipelineBuilder, std::shared_ptr<RHI::VulkanDevice>>);
+    SUCCEED();
+}
+
+TEST(RHIPipeline, ComputeBuilderTakesDeviceBySharedPtr)
+{
+    static_assert(std::is_constructible_v<RHI::ComputePipelineBuilder, std::shared_ptr<RHI::VulkanDevice>>);
+    SUCCEED();
+}
+
+class PipelineBuilderTest : public ::testing::Test
+{
+protected:
+    void SetUp() override
+    {
+        RHI::ContextConfig config{
+            .AppName = "PipelineBuilderTest",
+            .EnableValidation = true,
+            .Headless = true,
+        };
+        m_Context = std::make_unique<RHI::VulkanContext>(config);
+        m_Device = std::make_shared<RHI::VulkanDevice>(*m_Context, VK_NULL_HANDLE);
+
+        VkPhysicalDeviceProperties props{};
+        vkGetPhysicalDeviceProperties(m_Device->GetPhysicalDevice(), &props);
+        m_MaxPushConstantsSize = props.limits.maxPushConstantsSize;
+    }
+
+    std::unique_ptr<RHI::VulkanContext> m_Context;
+    std::shared_ptr<RHI::VulkanDevice> m_Device;
+    uint32_t m_MaxPushConstantsSize = 0;
+};
+
+TEST_F(PipelineBuilderTest, PushConstantValidation_ExceedsLimit_ReturnsError)
+{
+    // A push constant range that exceeds the device limit must fail early.
+    RHI::PipelineBuilder pb(m_Device);
+
+    VkPushConstantRange range{};
+    range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    range.offset = 0;
+    range.size = m_MaxPushConstantsSize + 4; // Exceed by 4 bytes
+    pb.AddPushConstantRange(range);
+
+    auto result = pb.Build();
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), VK_ERROR_UNKNOWN);
+}
+
+TEST_F(PipelineBuilderTest, PushConstantValidation_OffsetPlusSizeExceedsLimit_ReturnsError)
+{
+    // offset + size exceeding the limit must also be caught.
+    RHI::PipelineBuilder pb(m_Device);
+
+    VkPushConstantRange range{};
+    range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    range.offset = m_MaxPushConstantsSize - 4;
+    range.size = 8; // offset + size = maxPushConstantsSize + 4
+    pb.AddPushConstantRange(range);
+
+    auto result = pb.Build();
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), VK_ERROR_UNKNOWN);
+}
+
+TEST_F(PipelineBuilderTest, PushConstantValidation_WithinLimit_PassesValidation)
+{
+    // A push constant range within the device limit must pass validation.
+    // Note: Build() will still fail because we have no shaders, but it must
+    // not fail with VK_ERROR_UNKNOWN (our validation sentinel).
+    RHI::PipelineBuilder pb(m_Device);
+
+    VkPushConstantRange range{};
+    range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    range.offset = 0;
+    range.size = 128; // Well within any device's limit (min guaranteed: 128)
+    pb.AddPushConstantRange(range);
+
+    auto result = pb.Build();
+    // Build may fail for other reasons (no shaders, no color format, etc.)
+    // but if it fails, it must NOT be due to push constant validation.
+    if (!result.has_value())
+    {
+        EXPECT_NE(result.error(), VK_ERROR_UNKNOWN)
+            << "Build failed with VK_ERROR_UNKNOWN, which indicates "
+               "push constant validation rejected a valid range";
+    }
+}
+
+TEST_F(PipelineBuilderTest, ComputePushConstantValidation_ExceedsLimit_ReturnsError)
+{
+    RHI::ComputePipelineBuilder cpb(m_Device);
+
+    VkPushConstantRange range{};
+    range.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    range.offset = 0;
+    range.size = m_MaxPushConstantsSize + 4;
+    cpb.AddPushConstantRange(range);
+
+    auto result = cpb.Build();
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), VK_ERROR_UNKNOWN);
 }

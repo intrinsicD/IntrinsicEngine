@@ -16,23 +16,13 @@ This document tracks **what's left to do** in IntrinsicEngine's architecture.
 
 ---
 
-## 1. Rendering Architecture Refactor (PLAN.md)
-
-Replace the dual-path (transient CPU + retained GPU) rendering with a **single unified path per primitive type** (`SurfacePass`, `LinePass`, `PointPass`). Full spec in `PLAN.md`.
-
-### 1.10 Push Constant Runtime Validation
-
-- [ ] Add `maxPushConstantsSize` validation to `PipelineBuilder::Build()` (currently no runtime check exists in `RHI.Pipeline.cpp`).
-
----
-
-## 2. Geometry View Lifecycle — Remaining Enhancement
+## 1. Geometry View Lifecycle — Remaining Enhancement
 
 - [ ] Staged (device-local) upload path for large static graphs in `GraphGeometrySyncSystem` (current Direct mode is suitable for dynamic re-layout; staged path for static graphs would reduce host-visible memory).
 
 ---
 
-## 3. PropertySet Dirty-Domain Sync System
+## 2. PropertySet Dirty-Domain Sync System
 
 Per-frame CPU→GPU synchronization driven by PropertySet change detection, with independent dirty tracking per data domain (vertex/edge/face). Aligns with PLAN.md "Automatic CPU→GPU sync" requirement.
 
@@ -43,7 +33,7 @@ Per-frame CPU→GPU synchronization driven by PropertySet change detection, with
 
 ---
 
-## 4. Subcomponent Hierarchy (PLAN.md)
+## 3. Subcomponent Hierarchy (PLAN.md)
 
 Support named sub-meshes/sub-graphs/sub-clouds as first-class components over a base geometry component.
 
@@ -53,7 +43,7 @@ Support named sub-meshes/sub-graphs/sub-clouds as first-class components over a 
 
 ---
 
-## 5. Robustness & Numerical Safeguards (PLAN.md)
+## 4. Robustness & Numerical Safeguards (PLAN.md)
 
 - [ ] Position sanitization: reject/skip non-finite positions (`NaN`, `Inf`) before upload in both retained and transient paths.
 - [ ] Normal safety: renormalize with epsilon guard in point and surface shaders (fallback to camera-facing basis).
@@ -66,7 +56,7 @@ Support named sub-meshes/sub-graphs/sub-clouds as first-class components over a 
 
 ---
 
-## 6. Related Documents
+## 5. Related Documents
 
 - `PLAN.md` — detailed rendering architecture refactor spec (three-pass architecture, ECS component design, migration phases).
 - `ROADMAP.md` — feature roadmap, prioritization phases, long-horizon planning, rendering modality redesign vision (§5), and architecture SLOs.

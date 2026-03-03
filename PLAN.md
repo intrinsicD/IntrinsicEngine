@@ -643,7 +643,7 @@ public:
 All push constant structs enforce the following invariants:
 
 1. **Compile-time:** `static_assert(sizeof(XxxPushConstants) <= 128)` on every struct.
-2. **Runtime:** `PipelineBuilder::Build()` validates total push constant range against `VkPhysicalDeviceLimits::maxPushConstantsSize` and returns `std::unexpected` on violation. (Currently no such check exists in `RHI.Pipeline.cpp` — must be added.)
+2. **Runtime:** `PipelineBuilder::Build()` and `ComputePipelineBuilder::Build()` validate each push constant range (`offset + size`) against `VkPhysicalDeviceLimits::maxPushConstantsSize` and return `std::unexpected(VK_ERROR_UNKNOWN)` on violation.
 3. **Alignment:** 16-byte aligned, ABI-pack verified.
 
 The Vulkan 1.0 spec guarantees `maxPushConstantsSize >= 128`. All desktop GPUs (NVIDIA, AMD, Intel) support 256+. The engine targets Vulkan 1.3 + desktop only. No fallback UBO/SSBO path needed.
@@ -848,7 +848,7 @@ All three geometry types reach device-local retained-mode rendering — point cl
 - `DebugViewPass` — unchanged
 - `ImGuiPass` — unchanged
 - `GeometryGpuData` / `GeometryPool` / `GeometryUploadRequest` — unchanged
-- `RHI` layer — unchanged (push constant validation added to `PipelineBuilder`)
+- `RHI` layer — `maxPushConstantsSize` runtime validation added to both `PipelineBuilder::Build()` and `ComputePipelineBuilder::Build()`
 - `RenderGraph` — unchanged
 - `GPUScene` / `GPUSceneSync` — adapts to new component names but same architecture
 - `PipelineLibrary` — unchanged (SurfacePass uses same compiled pipelines)
