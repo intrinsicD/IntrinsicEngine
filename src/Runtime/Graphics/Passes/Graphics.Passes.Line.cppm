@@ -23,19 +23,24 @@ export namespace Graphics::Passes
     // LinePass — Unified BDA-based line rendering for all line sources.
     // -------------------------------------------------------------------------
     //
-    // Consolidates retained-mode wireframe/graph edges and transient DebugDraw
-    // lines into a single pass. All data is read via BDA push constants.
+    // Iterates ECS::Line::Component for retained-mode edge rendering and
+    // pulls from DebugDraw for transient lines. All data is read via BDA
+    // push constants.
     //
-    // Sources:
-    // - Retained: mesh wireframe edges (MeshEdgeView or CachedEdges fallback),
-    //   graph edges (CachedEdgePairs from GraphGeometrySyncSystem).
-    // - Transient: DebugDraw lines (octree overlays, bounds, contact manifolds,
-    //   etc.) uploaded per-frame to host-visible BDA buffers.
+    // Retained sources (via ECS::Line::Component, populated by ComponentMigration):
+    // - Mesh wireframe edges (MeshEdgeView BDA index buffer, or CachedEdges fallback)
+    // - Graph edges (CachedEdgePairs from GraphGeometrySyncSystem)
+    // - Standalone line entities (future)
+    //
+    // Transient sources:
+    // - DebugDraw lines (octree overlays, bounds, contact manifolds, etc.)
+    //   uploaded per-frame to host-visible BDA buffers.
     //
     // Architecture:
     // - Vertex positions + edge indices read via BDA from push constants.
-    // - Two pipelines: depth-tested (retained + depth-tested debug lines)
-    //   and overlay (no depth test — DebugDraw overlay lines).
+    // - Two pipelines: depth-tested and overlay (no depth test).
+    // - Both retained and transient draws are dispatched to the correct
+    //   pipeline based on their overlay flag.
     // - Per-entity model matrix pushed for retained draws; identity for transient.
     // - Set 0: Camera UBO (shared across all passes).
     // - Push constants: Model + BDA pointers + line config (104 bytes).

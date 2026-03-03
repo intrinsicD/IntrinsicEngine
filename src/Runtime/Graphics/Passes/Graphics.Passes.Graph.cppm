@@ -13,19 +13,16 @@ import RHI;
 export namespace Graphics::Passes
 {
     // -------------------------------------------------------------------------
-    // GraphRenderPass — CPU-side data-collection fallback for graph rendering.
+    // GraphRenderPass — CPU-side node data collection for graph rendering.
     // -------------------------------------------------------------------------
     //
-    // Renders entities with ECS::Graph::Data:
-    //   - Nodes rendered as point splats via PointCloudRenderPass (all modes).
-    //   - Edges rendered as anti-aliased thick lines via LinePass
-    //     (submitted to DebugDraw accumulator in RenderPassContext).
+    // Submits graph node positions to PointCloudRenderPass as a CPU fallback.
+    // Edge rendering is fully owned by LinePass which iterates
+    // ECS::Line::Component directly — no edge submission here.
     //
-    // When retained-mode rendering is active (LinePass +
-    // RetainedPointCloudRenderPass), this pass skips entities that have valid
-    // GpuGeometry — the retained passes handle them via BDA. This prevents
-    // double-draw while maintaining the CPU fallback for entities without
-    // GPU state (e.g., disabled GraphGeometrySyncSystem).
+    // When retained-mode point rendering is active, entities with valid
+    // GpuGeometry are skipped — RetainedPointCloudRenderPass handles them
+    // via BDA.
     //
     // Usage in DefaultPipeline:
     //   Call AddPasses() before PointCloudRenderPass.AddPasses() so that node data
@@ -33,7 +30,6 @@ export namespace Graphics::Passes
     //
     // Dependencies:
     //   SetPointCloudPass() must be called before AddPasses() (non-null for node draw).
-    //   DebugDraw is read from ctx.DebugDrawPtr each frame for edge submission.
 
     class GraphRenderPass final : public IRenderFeature
     {
@@ -43,29 +39,22 @@ export namespace Graphics::Passes
                         RHI::DescriptorAllocator&,
                         RHI::DescriptorLayout&) override {}
 
-        // Collect graph entity data into shared staging buffers.
-        // Must be called after PointCloudRenderPass::ResetPoints() and before
-        // PointCloudRenderPass::AddPasses() / LinePass::AddPasses().
+        // Collect graph node data into shared staging buffers.
         void AddPasses(RenderPassContext& ctx) override;
 
         void Shutdown() override {}
 
         // Set the shared PointCloudRenderPass that accumulates node splat data.
-        // Pass nullptr to disable node rendering (edges still submitted to DebugDraw).
         void SetPointCloudPass(PointCloudRenderPass* pass) { m_PointCloudPass = pass; }
 
-        // When true, entities with valid GpuGeometry are skipped — the retained
-        // BDA passes handle them. Set by DefaultPipeline when both retained passes
-        // are active and the GraphGeometrySyncSystem is enabled.
-        void SetRetainedPassesActive(bool lines, bool points)
+        // When point pass is active, entities with valid GpuGeometry are skipped.
+        void SetRetainedPassesActive(bool /*lines*/, bool points)
         {
-            m_RetainedLinesActive = lines;
             m_RetainedPointsActive = points;
         }
 
     private:
         PointCloudRenderPass* m_PointCloudPass = nullptr;
-        bool m_RetainedLinesActive = false;
         bool m_RetainedPointsActive = false;
     };
 }

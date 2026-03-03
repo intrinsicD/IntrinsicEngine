@@ -538,7 +538,13 @@ export namespace ECS::Line
 
         // Edge index buffer (separate from vertex buffer). Contains
         // flattened uint32_t pairs from PropertySet edge topology.
+        // When invalid, LinePass falls back to cached edge data from
+        // legacy components (RenderVisualization or Graph::Data).
         Geometry::GeometryHandle EdgeView{};
+
+        // Number of edges to render. Populated by ComponentMigration
+        // from the edge view or cached edge data.
+        uint32_t EdgeCount = 0;
 
         // ---- Appearance (defaults; overridden by per-edge attributes) ----
         glm::vec4 Color = {0.85f, 0.85f, 0.85f, 1.0f};

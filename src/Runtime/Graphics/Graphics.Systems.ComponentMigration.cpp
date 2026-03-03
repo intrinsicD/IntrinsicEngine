@@ -56,10 +56,16 @@ void OnUpdate(entt::registry& registry)
                 line.Overlay = vis.WireframeOverlay;
                 line.HasPerEdgeColors = !vis.CachedEdgeColors.empty();
 
-                // If MeshEdgeView exists, use its geometry handle.
+                // If MeshEdgeView exists, use its geometry handle and edge count.
                 if (const auto* ev = registry.try_get<ECS::MeshEdgeView::Component>(entity))
                 {
-                    line.EdgeView = ev->Geometry;
+                    line.EdgeView  = ev->Geometry;
+                    line.EdgeCount = ev->EdgeCount;
+                }
+                else
+                {
+                    line.EdgeView  = {};
+                    line.EdgeCount = static_cast<uint32_t>(vis.CachedEdges.size());
                 }
 
                 // If MeshRenderer exists, use its geometry handle for shared vertex buffer.
@@ -144,10 +150,12 @@ void OnUpdate(entt::registry& registry)
             // Edges → Line
             {
                 auto& line = registry.get_or_emplace<ECS::Line::Component>(entity);
-                line.Geometry        = gd.GpuGeometry;
-                line.Color           = gd.DefaultEdgeColor;
-                line.Width           = gd.EdgeWidth;
-                line.Overlay         = gd.EdgesOverlay;
+                line.Geometry         = gd.GpuGeometry;
+                line.EdgeView         = {};  // Graphs use CachedEdgePairs via LinePass internal buffers
+                line.EdgeCount        = static_cast<uint32_t>(gd.CachedEdgePairs.size());
+                line.Color            = gd.DefaultEdgeColor;
+                line.Width            = gd.EdgeWidth;
+                line.Overlay          = gd.EdgesOverlay;
                 line.HasPerEdgeColors = !gd.CachedEdgeColors.empty();
             }
 
