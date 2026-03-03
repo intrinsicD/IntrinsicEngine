@@ -1,6 +1,6 @@
 # Rendering Architecture Refactor — Plan
 
-**Relationship to other documents:** This plan is the near-term execution plan for rendering architecture consolidation. `docs/RENDERING_MODALITY_REDESIGN_PLAN.md` describes the long-term approach/mode framework that this refactor enables — the three-pass architecture here is a stepping stone toward that vision. `TODO.md §1.1-1.2` tracks the current backlog items this plan addresses.
+**Relationship to other documents:** This plan is the near-term execution plan for rendering architecture consolidation. `docs/RENDERING_MODALITY_REDESIGN_PLAN.md` describes the long-term approach/mode framework that this refactor enables — the three-pass architecture here is a stepping stone toward that vision. `TODO.md §1` tracks the actionable backlog items for all 9 migration phases. `ROADMAP.md` Phase 0a references this plan as the first execution priority.
 
 ## Goal
 

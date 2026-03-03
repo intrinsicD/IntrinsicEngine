@@ -18,7 +18,7 @@ Recent completions (2026-03-02, details in git history): `GraphGeometrySyncSyste
 
 Recent completions (2026-03-03, details in git history): `PointCloudGeometrySyncSystem` — `ECS::PointCloud::Data` component holding `shared_ptr<Geometry::PointCloud::Cloud>` as PropertySet-backed data authority (analogous to `ECS::Graph::Data`), `PointCloudGeometrySyncSystem` uploads `Cloud::Positions()`/`Normals()` spans to device-local `GeometryGpuData` via Staged upload, per-point attribute extraction (`"p:color"` → `CachedColors`, `"p:radius"` → `CachedRadii`) from Cloud PropertySets, `GPUScene` slot allocation, `GPUSceneSync` transform-only sync, `on_destroy` hook in `SceneManager` for automatic slot reclamation, `RetainedPointCloudRenderPass` iteration of `ECS::PointCloud::Data` entities, `FeatureRegistry` registration as `"PointCloudGeometrySync"`. Contract tests in `Test_PointCloudGeometrySync.cpp`.
 
-Near-term priority now shifts to remaining lifecycle system enhancements (optional staged upload path for static graphs), and PropertySet dirty-domain sync (TODO §1.3).
+Near-term priority is the **rendering architecture refactor** defined in `PLAN.md` (TODO §1): consolidate into three unified passes (`SurfacePass`, `LinePass`, `PointPass`), migrate ECS components (`Surface/Line/Point::Component`), and delete legacy pass/component code. Secondary priorities: staged upload path for static graphs (TODO §2), PropertySet dirty-domain sync (TODO §3).
 
 ## 2. Feature Roadmap
 
@@ -41,15 +41,17 @@ Near-term priority now shifts to remaining lifecycle system enhancements (option
 - A `PointCloudRenderFeature` registered via the render pipeline system, with a config struct selecting the variant and parameters (splat size, LOD budget, etc.).
 - Large point clouds need streaming — integrate with `TransferManager` for async chunk uploads.
 
-**Status:** Standalone retained-mode point cloud rendering is **complete** (2026-03-02). Point clouds are now first-class retained-mode renderables, same architectural tier as triangle meshes.
+**Status:** Standalone retained-mode point cloud rendering is **complete** (2026-03-02). Point clouds are now first-class retained-mode renderables, same architectural tier as triangle meshes. The current implementation uses `PointCloudRenderer::Component` and `RetainedPointCloudRenderPass` — these will be migrated to `ECS::Point::Component` and `PointPass` as part of the `PLAN.md` rendering refactor (TODO §1.4).
 
 **What works:**
 - **`Geometry.PointCloud` module** (`Geometry.PointCloud.cppm/.cpp`): First-class `Cloud` data structure with positions, normals, colors, radii. Operations: `ComputeBoundingBox`, `ComputeStatistics` (with KNN-based spacing), `VoxelDownsample` (O(n) hash-based), `EstimateRadii` (Octree-accelerated kNN density estimation), `RandomSubsample` (deterministic Fisher-Yates).
 - **Standalone retained-mode rendering:** `PointCloudRenderer::Component` holds `GeometryHandle` → `GeometryGpuData` with `PrimitiveTopology::Points`. Two creation paths: (a) file-loaded via `ModelLoader` (pre-uploaded, handle assigned directly), (b) code-originated (CPU data uploaded once by `PointCloudRendererLifecycle`, then freed). `RetainedPointCloudRenderPass` iterates standalone point cloud entities alongside mesh vertex vis and graph nodes — zero per-frame position upload. Billboard expansion, FlatDisc/Surfel/EWA splatting, CPU frustum culling, `GPUScene` slot allocation, transform sync, entity destroy hooks.
 - **BDA-based shared-buffer contract:** For mesh-derived vertex visualization, positions read via BDA from the mesh's existing buffer. For standalone point clouds, device-local buffer with `SHADER_DEVICE_ADDRESS_BIT`.
 
+**Migration note:** After `PLAN.md` refactor, `PointPass` replaces `RetainedPointCloudRenderPass` and unifies all point sources (standalone clouds, mesh vertex vis, graph nodes, transient debug points) into one pass with pipeline-per-mode (`FlatDisc`, `Surfel`, `EWA`, future `Gaussian`). See `PLAN.md` §PointPass for full spec.
+
 **Remaining future work:**
-- Gaussian Splatting (3DGS) compute rasterizer, Potree-style octree LOD streaming, depth peeling for OIT.
+- Gaussian Splatting (3DGS) compute rasterizer (new `PointPass` mode), Potree-style octree LOD streaming, depth peeling for OIT.
 
 ---
 
@@ -67,11 +69,11 @@ Near-term priority now shifts to remaining lifecycle system enhancements (option
 - **Halfedge visualization:** Debug view of the halfedge data structure — vertices as points, edges as directed arrows, face normals.
 
 **Architecture notes:**
-- Line rendering needs a dedicated `LineRenderFeature` with GPU-side line storage (SSBO of segments).
+- Line rendering is handled by `LinePass` (see `PLAN.md`) — a unified pass with both retained BDA and transient DebugDraw data paths internally.
 - Thick lines via screen-space expansion in vertex shader (Vulkan has no guaranteed wide-line support).
-- Node rendering can reuse point splatting infrastructure.
+- Node rendering handled by `PointPass` — reuses point splatting infrastructure with pipeline-per-mode (`FlatDisc`, `Surfel`, `EWA`).
 
-**Status:** Line and wireframe rendering are currently **BROKEN** and need re-implementation as **first-class retained-mode renderables** — the same architectural tier as triangle meshes, not transient per-frame debug overlays. The graph/layout algorithms (CPU-side) remain functional.
+**Status:** Line and wireframe rendering are currently **BROKEN** and need re-implementation via the unified `LinePass` architecture defined in `PLAN.md`. The current codebase has intermediate retained passes (`RetainedLineRenderPass`, `RetainedPointCloudRenderPass`) that will be consolidated into `LinePass` and `PointPass` respectively, each handling both retained BDA data and transient DebugDraw data in a single pass. The graph/layout algorithms (CPU-side) remain functional.
 
 **What still works (CPU-side graph algorithms):**
 - kNN graph construction: Octree-accelerated exact builder (`Geometry::Graph::BuildKNNGraph()`) and manual build from precomputed neighbor index lists (`Geometry::Graph::BuildKNNGraphFromIndices()`) with Union/Mutual connectivity and degenerate-pair filtering.
@@ -80,22 +82,22 @@ Near-term priority now shifts to remaining lifecycle system enhancements (option
 - Hierarchical layered embedding (`ComputeHierarchicalLayout()`) with crossing diagnostics and diameter-aware auto-rooting.
 - General 2D embedding crossing counter (`CountEdgeCrossings()`).
 
-**Re-implementation plan (two-tier architecture, BDA vertex pulling):**
+**Re-implementation plan (unified pass architecture, per `PLAN.md`):**
 
-*Tier 1 — Retained-mode views (BDA shared-buffer-first, like meshes):*
-- **BDA-based shared-buffer contract:** One device-local vertex buffer on the GPU, multiple index buffers with different topologies. A mesh uploads positions/normals once; wireframe, vertex, and graph views all `ReuseVertexBuffersFrom` that mesh handle — zero vertex duplication. Each topology view gets its **own VkPipeline** with its own vertex shader that reads from the shared buffer via BDA (`GL_EXT_buffer_reference` pointer in push constants), exactly as `ForwardPass` does for triangle meshes. The sharing is at the data level (same `VulkanBuffer`, same device address), not at the pipeline level.
+The target architecture consolidates all line/edge/wireframe rendering into a single **`LinePass`** that handles both retained and transient data internally. No separate debug line pass. Full spec in `PLAN.md`.
+
+*Unified `LinePass` — retained + transient in one pass:*
+- **BDA-based shared-buffer contract:** One device-local vertex buffer on the GPU, multiple index buffers with different topologies. A mesh uploads positions/normals once; wireframe, vertex, and graph views all `ReuseVertexBuffersFrom` that mesh handle — zero vertex duplication. Each topology view gets its **own VkPipeline** with its own vertex shader that reads from the shared buffer via BDA (`GL_EXT_buffer_reference` pointer in push constants). The sharing is at the data level (same `VulkanBuffer`, same device address), not at the pipeline level.
 - **Separate pipelines required:** `VK_PRIMITIVE_TOPOLOGY_LINE_LIST` gives 1px lines, `POINT_LIST` gives 1px dots. Thick anti-aliased lines and billboard points each need their own shader pipeline with vertex-shader expansion (6 verts/primitive).
-- Wireframe view: extract unique edge pairs once → `GeometryViewRenderer` with `ReuseVertexBuffersFrom = meshHandle`, persisted edge index buffer. Line vertex shader reads positions from mesh buffer via BDA, expands each segment to screen-space quad. No per-frame CPU extraction.
-- Vertex view: `ReuseVertexBuffersFrom = meshHandle`. Point vertex shader reads positions via BDA, expands to billboard quad.
-- `ECS::Graph::Data`: PropertySet-backed data authority wrapping `shared_ptr<Geometry::Graph>` — replaces old `GraphRenderer::Component` vector copies. Renders as a line view (edges) + point view (nodes) sharing vertex buffers via BDA. Layout algorithms produce positions; GPU upload once, update only on layout change.
-- Lifecycle system allocates `GPUScene` slots per view, syncs transforms, frustum culling — same path as `MeshRendererLifecycle`.
-- Thick-line vertex shader expansion (6 verts/segment), anti-aliased fragment shader, push constants for line width + viewport + BDA pointers.
+- **Retained path:** `LinePass` iterates `ECS::Line::Component` entities — mesh wireframe (edge pairs from `Halfedge::Mesh` PropertySets), graph edges (edge pairs from `Graph` PropertySets), standalone line entities. Edge pairs uploaded as persistent index buffers via `ReuseVertexBuffersFrom`. BDA-addressed position reads from shared vertex buffer.
+- **Transient path (same pass, same pipeline):** `LinePass` reads `DebugDraw::GetLines()`/`GetOverlayLines()` → packs into per-frame host-visible SSBO → draws with identity model matrix. Same shader reads same BDA pointer — data lifetime is an internal detail, not a separate pass.
+- `ECS::Graph::Data`: PropertySet-backed data authority wrapping `shared_ptr<Geometry::Graph>`. `GraphGeometrySyncSystem` populates sibling `ECS::Line::Component` + `ECS::Point::Component` handles — passes don't need graph-specific knowledge.
+- Lifecycle systems allocate `GPUScene` slots per view, sync transforms, frustum culling — same path as `MeshRendererLifecycle`.
+- Thick-line vertex shader expansion (6 verts/segment), anti-aliased fragment shader, push constants for line width + viewport + BDA pointers + per-edge attribute BDA channel.
 
-*Tier 2 — Transient debug overlay (DebugDraw, rebuilt per frame):*
-- `DebugDraw` immediate-mode accumulator remains for genuinely transient debug visualization (octree, KD-tree, bounds, contact manifolds, convex hulls).
-- `LineRenderPass` renders `DebugDraw` content via per-frame host-visible SSBO. Depth-tested + overlay sub-passes.
+*`DebugDraw` remains a dumb accumulator* — stores lines, points, and triangles submitted during the frame. Each unified pass **pulls** from DebugDraw in its `AddPasses()`. No coupling between DebugDraw and any specific pass.
 
-Remaining work after both tiers: mesh wireframe overlay (barycentric shader alternative), halfedge debug view, render-feature/UI integration for kNN + layout visualization.
+Remaining work after `LinePass` consolidation: mesh wireframe overlay (barycentric shader alternative), halfedge debug view, render-feature/UI integration for kNN + layout visualization.
 
 ---
 
@@ -218,20 +220,20 @@ Remaining work after both tiers: mesh wireframe overlay (barycentric shader alte
 **Context:** `DebugViewPass` exists but is minimal (depth/picking debug only). The engine has `Geometry.Octree`, `Geometry.AABB`, `Geometry.OBB`, and other spatial structures but no way to visualize them.
 
 **Required debug overlays:**
-- ~~**Octree:**~~ — **DONE.** Sandbox can render the selected entity’s `MeshCollider` `Geometry::Octree` as color-by-depth wire boxes via `Graphics::DebugDraw` + `LineRenderPass`. Controls live in `View Settings → Spatial Debug` (max depth, leaf-only, occupied-only, overlay/depth-tested).
-- ~~**KD-tree:**~~ — **DONE.** Core geometry accelerator (`Geometry::KDTree`) now includes Sandbox debug overlays through `Graphics::DrawKDTree()` (leaf/internal AABB wires + split-plane rectangles), routed through `DebugDraw` + `LineRenderPass` with UI knobs for max depth, overlay/depth-tested mode, and per-category colors.
-- ~~**BVH (Bounding Volume Hierarchy):**~~ — **DONE.** Sandbox now renders selected `MeshCollider` triangle BVHs as wireframe node AABBs with configurable max depth, leaf/internal filtering, per-category colors/alpha, and overlay/depth-tested routing via `Graphics::DrawBVH()` + `DebugDraw` + `LineRenderPass`.
+- ~~**Octree:**~~ — **DONE.** Sandbox can render the selected entity’s `MeshCollider` `Geometry::Octree` as color-by-depth wire boxes via `Graphics::DebugDraw` + `LinePass` (transient path). Controls live in `View Settings → Spatial Debug` (max depth, leaf-only, occupied-only, overlay/depth-tested).
+- ~~**KD-tree:**~~ — **DONE.** Core geometry accelerator (`Geometry::KDTree`) now includes Sandbox debug overlays through `Graphics::DrawKDTree()` (leaf/internal AABB wires + split-plane rectangles), routed through `DebugDraw` + `LinePass` (transient path) with UI knobs for max depth, overlay/depth-tested mode, and per-category colors.
+- ~~**BVH (Bounding Volume Hierarchy):**~~ — **DONE.** Sandbox now renders selected `MeshCollider` triangle BVHs as wireframe node AABBs with configurable max depth, leaf/internal filtering, per-category colors/alpha, and overlay/depth-tested routing via `Graphics::DrawBVH()` + `DebugDraw` + `LinePass` (transient path).
 - **Uniform grid:** Wireframe cells with occupancy coloring.
 - ~~**Bounding volumes:**~~ — **DONE.** Sandbox can render selected `MeshCollider` bounds as world AABB, world OBB, and conservative bounding sphere overlays. Per-type toggles, independent colors, alpha, and overlay/depth-tested routing are exposed in `View Settings → Spatial Debug`.
 - ~~**Contact manifolds:**~~ — **DONE.** Sandbox now renders selected-entity contact manifolds against other `MeshCollider` OBBs: paired contact points, contact segment, and contact normal vector, with depth-tested/overlay modes and scale controls in `View Settings → Spatial Debug`.
 
 **Architecture notes:**
-- Use the `LineRenderFeature` (from §2.1.2) as the backend for all debug drawing.
-- Debug draw calls should go through an immediate-mode API: `DebugDraw::Line(a, b, color)`, `DebugDraw::Box(aabb, color)`, `DebugDraw::Sphere(center, radius, color)`, etc.
+- Debug drawing uses the transient path of `LinePass` (from §2.1.2 / `PLAN.md`). Each unified pass pulls from `DebugDraw` in its `AddPasses()` — no separate debug pass.
+- Debug draw calls go through an immediate-mode API: `DebugDraw::Line(a, b, color)`, `DebugDraw::Box(aabb, color)`, `DebugDraw::Sphere(center, radius, color)`, etc.
 - All debug geometry is transient — rebuilt each frame from `LinearArena`.
 - Toggled per-category via the UI (§2.5).
 
-**Status:** `DebugDraw` provides the immediate-mode accumulator with `Line`, `Box`, `WireBox`, `Sphere`, `Circle`, `Arrow`, `Axes`, `Frustum`, `Grid`, `Cross` plus overlay variants. Convex hull geometry backend is now available via `Geometry::ConvexHullBuilder::Build()` (§2.6), and the Sandbox includes a selected-collider convex-hull wire overlay (`Graphics::DrawConvexHull`) with overlay/depth-tested routing and color/alpha controls in `View Settings → Spatial Debug`. Sandbox debug overlays (octree, KD-tree, bounds, contact manifolds, convex hulls) all emit geometry through `DebugDraw`. However, the rendering backend (`LineRenderPass`) is currently **broken** — all debug visualization is non-functional until the line rendering re-implementation is complete (see §2.1.2). Remaining work after line rendering is restored: broader per-category UI polish (§2.5) and additional spatial overlays (uniform grid).
+**Status:** `DebugDraw` provides the immediate-mode accumulator with `Line`, `Box`, `WireBox`, `Sphere`, `Circle`, `Arrow`, `Axes`, `Frustum`, `Grid`, `Cross` plus overlay variants. Convex hull geometry backend is now available via `Geometry::ConvexHullBuilder::Build()` (§2.6), and the Sandbox includes a selected-collider convex-hull wire overlay (`Graphics::DrawConvexHull`) with overlay/depth-tested routing and color/alpha controls in `View Settings → Spatial Debug`. Sandbox debug overlays (octree, KD-tree, bounds, contact manifolds, convex hulls) all emit geometry through `DebugDraw`. However, the rendering backend is currently **broken** — all debug visualization is non-functional until the `LinePass` consolidation from `PLAN.md` is complete (see §2.1.2). Remaining work after `LinePass` is operational: broader per-category UI polish (§2.5) and additional spatial overlays (uniform grid).
 
 ---
 
@@ -312,7 +314,7 @@ The geometry module now includes `Geometry::KDTree`, an Octree-inspired accelera
 - Long-running operators should execute on the task scheduler (`Core::Tasks`) with progress reporting.
 
 **Lessons learned during implementation:**
-- **Spatial debug should be DebugDraw-first:** keep visualization CPU-side and transient (`DebugDraw`) and reuse `LineRenderPass` for rendering; always provide coarse culling knobs (`MaxDepth`, `LeafOnly`, `OccupiedOnly`) to prevent debug visualizations from becoming the performance bottleneck.
+- **Spatial debug should be DebugDraw-first:** keep visualization CPU-side and transient (`DebugDraw`) and reuse the transient path of `LinePass` for rendering; always provide coarse culling knobs (`MaxDepth`, `LeafOnly`, `OccupiedOnly`) to prevent debug visualizations from becoming the performance bottleneck.
 - **Shader/C++ descriptor set index must match:** When adding new descriptor set layouts to a pipeline, the order of `AddDescriptorSetLayout()` calls must match the `set = N` indices declared in the shader. If the C++ adds layouts in order [globalSet, lineSSBOSet], the shader must use `set = 0` for globalSet and `set = 1` for lineSSBOSet. A mismatch (e.g., shader declares `set = 2` but only 2 layouts are added) causes "descriptor set N is out of bounds" validation errors.
 - **DebugDraw timing is critical:** `DrawXxx()` calls that emit geometry into `DebugDraw` must happen **before** `RenderSystem::BuildGraph()` executes. If emission happens in ImGui panel callbacks (which run after render), the geometry appears one frame late or not at all (cleared by `DebugDraw.Reset()` before use). Move debug emission into `OnUpdate()` before the render system call.
 - **Convex hull builder fills a V-Rep/H-Rep gap:** The `Geometry::ConvexHull` struct existed as a consumer type (GJK support, SDF evaluation, SAT, containment) with both V-Rep (vertices) and H-Rep (planes) — but the geometry kernel had no way to *build* one from raw points. The `ConvexHullBuilder` module closes this loop. When adding new primitives or spatial types, check whether the type is read-only in existing modules and needs a corresponding builder/cooker in the geometry kernel.
@@ -405,41 +407,55 @@ FeatureRegistry ──→ [DONE] All dependents can now use Core::FeatureRegistr
 
 Data I/O ─────────→ everything (can't render what you can't load)
 
+Rendering refactor → Post-processing (build HDR pipeline on clean pass architecture)
+(PLAN.md)         → All subsequent rendering features (built on SurfacePass/LinePass/PointPass)
+
 Post-processing ──→ Shadow mapping (composites into HDR buffer)
                 ──→ Transparency / OIT (needs HDR blend target)
                 ──→ Mesh rendering modes (HDR output assumed)
                 ──→ Point cloud rendering (blending, tone mapping)
 
-Line rendering ───→ Transform gizmos (axis arrows, rings, handles)
-               ───→ Debug visualization (wireframe boxes, lines, arrows)
-               ───→ Graph / wireframe rendering (edges, layout)
-               ───→ Measurement tools (leader lines, angle arcs)
-               ───→ Clipping plane visualization (plane outlines)
-               ───→ Normal / tangent visualization (hedgehog lines)
+LinePass ─────────→ Transform gizmos (axis arrows, rings, handles)
+                 ──→ Debug visualization (wireframe boxes, lines, arrows)
+                 ──→ Graph / wireframe rendering (edges, layout)
+                 ──→ Measurement tools (leader lines, angle arcs)
+                 ──→ Clipping plane visualization (plane outlines)
+                 ──→ Normal / tangent visualization (hedgehog lines)
 
 Sub-entity select → Geometry processing (interactive operator input)
                   → Measurement tools (click-to-pick points)
 ```
 
-#### Phase 0 — Architecture & Plumbing
-*Everything else plugs into these. Build them first and every subsequent feature snaps in cleanly.*
+#### Phase 0a — Rendering Architecture Refactor (PLAN.md)
+*Consolidate the rendering pass architecture before adding new features. Building post-processing, shadows, and rendering modes on the old multi-pass architecture would require double-work when the refactor lands. Do the refactor first so all subsequent features are built on the clean three-pass foundation.*
+
+1. **Unified pass consolidation (`PLAN.md` Phases 1–5)**
+   *Depends on: nothing. Depended on by: everything — all rendering features should target the new pass architecture.*
+   Define `ECS::Surface/Line/Point::Component`, consolidate `ForwardPass` → `SurfacePass`, `RetainedLineRenderPass` + `LineRenderPass` → `LinePass`, `RetainedPointCloudRenderPass` + `PointCloudRenderPass` → `PointPass`. Delete `MeshRenderPass`, `GraphRenderPass`, `RenderVisualization::Component`, `GeometryViewRenderer::Component`. Migrate lifecycle systems. Full migration spec in `PLAN.md`, actionable items in `TODO.md §1`.
+
+#### Phase 0b — Architecture & Plumbing
+*HDR pipeline and dirty-domain sync. Built on the refactored pass architecture.*
 
 2. **Post-processing pipeline (§2.1.4)**
-   *Depends on: nothing (rendering infrastructure). Depended on by: shadow mapping, transparency, mesh rendering modes, point cloud blending.*
-   The HDR intermediate render target and the post-pass chain (tone mapping at minimum). Currently the forward pass writes directly to the swapchain — every rendering feature added later assumes an HDR intermediate exists. Establish the plumbing now; individual effects (SSAO, bloom) can be added incrementally alongside other work.
+   *Depends on: rendering refactor (Phase 0a — builds on `SurfacePass`). Depended on by: shadow mapping, transparency, mesh rendering modes, point cloud blending.*
+   The HDR intermediate render target and the post-pass chain (tone mapping at minimum). `SurfacePass` currently writes directly to the swapchain — every rendering feature added later assumes an HDR intermediate exists. Establish the plumbing now; individual effects (SSAO, bloom) can be added incrementally alongside other work.
+
+3. **PropertySet dirty-domain sync (`TODO.md §3`)**
+   *Depends on: rendering refactor (Phase 0a — sync system targets new component types). Depended on by: interactive geometry processing (operators that modify mesh topology/attributes need automatic GPU re-upload).*
+   Per-frame CPU→GPU synchronization with independent dirty tracking per data domain (vertex/edge/face). Six dirty tag components, selective re-upload of affected PropertySet spans.
 
 #### Phase 1 — Core UX
 *Make the engine usable for interactive work. Without these, it's a viewer, not a tool.*
 
-6. **Transform gizmos (§2.2.3)**
-   *Depends on: line rendering (Phase 0). Depended on by: nothing directly, but every editing workflow uses them.*
-   Translate/rotate/scale handles. Without these, the only way to move objects is typing numbers into the Inspector panel. The line rendering infrastructure from Phase 0 provides the axis arrows and rings.
+4. **Transform gizmos (§2.2.3)**
+   *Depends on: `LinePass` (Phase 0a). Depended on by: nothing directly, but every editing workflow uses them.*
+   Translate/rotate/scale handles. Without these, the only way to move objects is typing numbers into the Inspector panel. The `LinePass` transient path provides the axis arrows and rings.
 
-7. **UI improvements (§2.5)**
+5. **UI improvements (§2.5)**
    *Depends on: nothing (ImGui exists). Depended on by: all interactive workflows (usability multiplier).*
    Dockable panels (ImGui docking branch), viewport toolbar for render mode switching, keyboard shortcuts, console/log panel, context menus. Each improvement is independent — can be done incrementally alongside other work.
 
-8. **Scene serialization + undo/redo (§2.11)**
+6. **Scene serialization + undo/redo (§2.11)**
    *Depends on: Data I/O (Phase 0, for asset references). Depended on by: any practical editing workflow.*
    Save/load scenes + command-pattern undo stack. Without this, all interactive editing is lost on exit. Becomes critical once gizmos and property editing exist.
 
@@ -448,19 +464,19 @@ Sub-entity select → Geometry processing (interactive operator input)
 #### Phase 2 — Rendering Variety
 *Expand what the engine can show. Each item is a render feature registered via FeatureRegistry.*
 
-9. **Mesh rendering modes (§2.1.3)**
-   *Depends on: FeatureRegistry (DONE), post-processing / HDR target (Phase 0). Depended on by: nothing (leaf features).*
-   PBR extensions, flat, Gouraud/Phong, matcap, NPR (toon, Gooch, hatching), curvature/scalar field visualization, normal visualization, UV checker. Each shading mode is a variant PSO registered as a render feature. Share vertex pipeline, swap fragment shaders.
+7. **Mesh rendering modes (§2.1.3)**
+   *Depends on: FeatureRegistry (DONE), post-processing / HDR target (Phase 0b). Depended on by: nothing (leaf features).*
+   PBR extensions, flat, Gouraud/Phong, matcap, NPR (toon, Gooch, hatching), curvature/scalar field visualization, normal visualization, UV checker. Each shading mode is a variant PSO on `SurfacePass`. Share vertex pipeline, swap fragment shaders.
 
-10. **Shadow mapping (§2.1.5)**
-    *Depends on: post-processing pipeline (Phase 0). Depended on by: nothing directly.*
-    Cascaded shadow maps for directional lights. Critical for depth/spatial perception — without shadows, 3D scenes look flat. Shadow pass reuses existing geometry pipeline, writes depth only.
+8. **Shadow mapping (§2.1.5)**
+    *Depends on: post-processing pipeline (Phase 0b). Depended on by: nothing directly.*
+    Cascaded shadow maps for directional lights. Critical for depth/spatial perception — without shadows, 3D scenes look flat. Shadow pass reuses `SurfacePass` geometry pipeline, writes depth only.
 
-11. **Debug visualization of spatial structures (§2.3.1)**
-    *Depends on: line rendering + DebugDraw API (Phase 0). Depended on by: nothing (development tool).*
-    Octree, BVH, bounding volumes, contact manifolds, normals/tangent frames, convex hulls — all rendered via DebugDraw. Toggled per-category in the UI. Essential for debugging every algorithm you build afterward.
+9. **Debug visualization of spatial structures (§2.3.1)**
+    *Depends on: `LinePass` + DebugDraw API (Phase 0a). Depended on by: nothing (development tool).*
+    Octree, BVH, bounding volumes, contact manifolds, normals/tangent frames, convex hulls — all rendered via DebugDraw transient path in `LinePass`. Toggled per-category in the UI. Essential for debugging every algorithm you build afterward.
 
-12. **Benchmarking & profiling (§2.8)**
+10. **Benchmarking & profiling (§2.8)**
     *Depends on: nothing (Vulkan timestamp queries, `Core::Telemetry` exists). Depended on by: nothing directly, but establishes baselines before Phase 3+ adds heavy features.*
     GPU per-pass timing, CPU per-system timing, reproducible benchmark scenes, automated runner, regression detection. Best to establish baselines now so you can measure the cost of every feature added in later phases.
 
@@ -469,16 +485,16 @@ Sub-entity select → Geometry processing (interactive operator input)
 #### Phase 3 — Advanced Rendering
 *New geometry types and rendering techniques. Each is a substantial feature building on Phase 0–2 infrastructure.*
 
-13. **Point cloud rendering (§2.1.1)**
-    *Depends on: FeatureRegistry, Data I/O (PLY/PCD/LAS loaders), post-processing (blending, tone mapping). Depended on by: graph rendering (kNN-graph), transparency (splat blending).*
-    3DGS, Potree-style LOD, flat splatting, EWA splatting, surfels. Point clouds as a first-class `GeometryType` with dedicated GPU buffer layout. The largest single feature — start with flat splatting, iterate toward 3DGS.
+11. **Point cloud rendering — advanced modes (§2.1.1)**
+    *Depends on: FeatureRegistry, Data I/O (PLY/PCD/LAS loaders), `PointPass` (Phase 0a), post-processing (blending, tone mapping). Depended on by: transparency (splat blending).*
+    Advanced `PointPass` modes: 3DGS compute rasterizer, Potree-style octree LOD streaming. Basic modes (FlatDisc, Surfel, EWA) already exist in the retained point rendering path. Each new mode = new shader + pipeline variant registered in `PointPass` (see `PLAN.md` extensibility model).
 
-14. **Graph / wireframe rendering — full (§2.1.2 advanced)**
-    *Depends on: line rendering (Phase 0), point cloud rendering (for kNN-graph on point clouds). Depended on by: nothing.*
-    Layout algorithms (force-directed, spectral, hierarchical) for abstract graphs, kNN-graph visualization, halfedge debug view. The line rendering infrastructure from Phase 0 handles the GPU side; this phase adds the algorithms.
+12. **Graph / wireframe rendering — full (§2.1.2 advanced)**
+    *Depends on: `LinePass` + `PointPass` (Phase 0a). Depended on by: nothing.*
+    Layout algorithm UI integration (force-directed, spectral, hierarchical), kNN-graph visualization, halfedge debug view, barycentric wireframe shader alternative. The `LinePass`/`PointPass` infrastructure handles the GPU side; this phase adds the interactive algorithms and UI.
 
-15. **Transparency / OIT (§2.1.6)**
-    *Depends on: post-processing pipeline (Phase 0, HDR blend target). Depended on by: nothing directly, but improves point cloud and translucent surface rendering.*
+13. **Transparency / OIT (§2.1.6)**
+    *Depends on: post-processing pipeline (Phase 0b, HDR blend target). Depended on by: nothing directly, but improves point cloud and translucent surface rendering.*
     Weighted blended OIT as the default (simple, fast). Exact methods (linked lists, depth peeling) as alternatives.
 
 ---
@@ -486,20 +502,20 @@ Sub-entity select → Geometry processing (interactive operator input)
 #### Phase 4 — Advanced Interaction & Geometry Processing
 *Sub-mesh selection and geometry operators for research workflows.*
 
-16. **Sub-entity selection — vertex, edge, face, region (§2.2.2)**
-    *Depends on: line rendering (Phase 0, for highlighting edges/vertices), HalfedgeMesh (exists). Depended on by: geometry processing operators, measurement tools.*
+14. **Sub-entity selection — vertex, edge, face, region (§2.2.2)**
+    *Depends on: `LinePass` + `PointPass` (Phase 0a, for highlighting edges/vertices), HalfedgeMesh (exists). Depended on by: geometry processing operators, measurement tools.*
     Dedicated GPU picking pass writing `(EntityID, PrimitiveID, BarycentricCoords)`. Lasso/box/paint-brush/flood-fill/region-growing selection modes. Per-entity bitsets for selected sub-elements. This is the gateway to interactive geometry processing.
 
-17. **Geometry processing operators (§2.6)** — **PARTIALLY DONE**
+15. **Geometry processing operators (§2.6)** — **PARTIALLY DONE**
     *Depends on: FeatureRegistry (DONE), sub-entity selection (Phase 4, for interactive input). Depended on by: nothing (leaf features).*
     **Done:** Topological editing (collapse/flip/split), simplification (QEM), smoothing (Laplacian/cotan/Taubin), curvature computation (mean/Gaussian/principal), CG solver, Loop subdivision, isotropic remeshing, adaptive remeshing (curvature-driven sizing), geodesic distance, Catmull-Clark subdivision, normal estimation (PCA + MST orientation), mesh repair (hole filling, degenerate removal, consistent orientation), surface reconstruction (Marching Cubes + Hoppe SDF), parameterization (LSCM), mesh quality metrics, convex hull construction (Quickhull), and baseline Boolean operations for disjoint/full-containment CSG cases. **Remaining:** Exact partial-overlap Boolean clipping + stitched remeshing. Each operator follows the pattern: input → params → output + diagnostics. Registered via FeatureRegistry, invokable from UI and (later) scripting.
 
-18. **Clipping planes & cross-sections (§2.9)**
-    *Depends on: line rendering (Phase 0, for plane visualization). Depended on by: nothing.*
+16. **Clipping planes & cross-sections (§2.9)**
+    *Depends on: `LinePass` (Phase 0a, for plane visualization). Depended on by: nothing.*
     User-defined clip planes with gizmo positioning, cross-section fill, clip volumes.
 
-19. **Measurement & annotation tools (§2.10)**
-    *Depends on: sub-entity selection (Phase 4, for click-to-pick), line rendering (Phase 0, for leader lines). Depended on by: nothing.*
+17. **Measurement & annotation tools (§2.10)**
+    *Depends on: sub-entity selection (Phase 4, for click-to-pick), `LinePass` (Phase 0a, for leader lines). Depended on by: nothing.*
     Point-to-point distance, angle, area, volume measurement. Persistent 3D annotations as ECS components.
 
 ---
@@ -507,7 +523,7 @@ Sub-entity select → Geometry processing (interactive operator input)
 #### Phase 5 — Long-term
 *High-effort features that unlock new usage patterns.*
 
-20. **Scripting layer (§2.4 Tier 3)**
+18. **Scripting layer (§2.4 Tier 3)**
     *Depends on: FeatureRegistry (DONE, stable API to bind). Depended on by: nothing.*
     Python (pybind11) or Lua (sol2) bindings for ECS manipulation, geometry operators, UI panels, and custom per-frame logic. Highest effort, but unlocks rapid prototyping of novel rendering and geometry methods without recompiling C++. Python especially valuable for ML/scientific workflow integration.
 
