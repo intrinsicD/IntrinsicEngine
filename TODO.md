@@ -20,14 +20,6 @@ This document tracks **what's left to do** in IntrinsicEngine's architecture.
 
 Replace the dual-path (transient CPU + retained GPU) rendering with a **single unified path per primitive type** (`SurfacePass`, `LinePass`, `PointPass`). Full spec in `PLAN.md`.
 
-### 1.7 Per-Face Attribute Support (PLAN.md Phase 7)
-
-Per-face attribute rendering infrastructure exists (per-face colors via `gl_PrimitiveID`). Needs adaptation for the new SurfacePass naming.
-
-- [ ] Verify per-face attribute buffer upload works in `SurfacePass` (from `Faces` PropertySet).
-- [ ] Verify `PtrFaceAux` BDA channel in surface push constants.
-- [ ] Test: flat-shading per-face colors, curvature visualization, segmentation labels.
-
 ### 1.8 UI and Inspector Integration (PLAN.md Phase 8)
 
 - [ ] Add `PointRenderMode` UI combo selector in Inspector.
