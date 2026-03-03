@@ -249,6 +249,7 @@ TEST(BDA_Components, GraphDataDefaults)
     EXPECT_FLOAT_EQ(data.NodeSizeMultiplier, 1.0f);
     EXPECT_FLOAT_EQ(data.EdgeWidth, 1.5f);
     EXPECT_FALSE(data.EdgesOverlay);
+    EXPECT_FALSE(data.StaticGeometry);  // Default: Dynamic (Direct upload mode).
 
     // Queries on null graph
     EXPECT_EQ(data.NodeCount(), 0u);

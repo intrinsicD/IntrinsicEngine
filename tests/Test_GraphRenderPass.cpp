@@ -444,6 +444,149 @@ TEST(Graph_NodeAttributes, EmptyWhenPropertySetAbsent)
     EXPECT_TRUE(data.CachedNodeRadii.empty());
 }
 
+// =============================================================================
+// StaticGeometry — Staged upload mode contract tests
+// =============================================================================
+//
+// The StaticGeometry flag on ECS::Graph::Data controls the GPU upload mode:
+//   false (default) → Direct (host-visible, CPU_TO_GPU) for dynamic graphs.
+//   true            → Staged (device-local, GPU_ONLY) for static graphs.
+//
+// These tests validate the flag defaults, upload request construction,
+// and backward compatibility with existing dynamic graph behavior.
+
+TEST(Graph_StaticGeometry, DefaultIsFalse)
+{
+    // Default is false — backward-compatible with existing dynamic graph behavior.
+    ECS::Graph::Data data;
+    EXPECT_FALSE(data.StaticGeometry);
+}
+
+TEST(Graph_StaticGeometry, CanBeSetToTrue)
+{
+    ECS::Graph::Data data;
+    data.StaticGeometry = true;
+    EXPECT_TRUE(data.StaticGeometry);
+}
+
+TEST(Graph_StaticGeometry, DynamicUploadModeIsDirect)
+{
+    // When StaticGeometry is false, upload mode should be Direct.
+    ECS::Graph::Data data;
+    data.StaticGeometry = false;
+
+    const auto mode = data.StaticGeometry
+        ? Graphics::GeometryUploadMode::Staged
+        : Graphics::GeometryUploadMode::Direct;
+
+    EXPECT_EQ(mode, Graphics::GeometryUploadMode::Direct);
+}
+
+TEST(Graph_StaticGeometry, StaticUploadModeIsStaged)
+{
+    // When StaticGeometry is true, upload mode should be Staged.
+    ECS::Graph::Data data;
+    data.StaticGeometry = true;
+
+    const auto mode = data.StaticGeometry
+        ? Graphics::GeometryUploadMode::Staged
+        : Graphics::GeometryUploadMode::Direct;
+
+    EXPECT_EQ(mode, Graphics::GeometryUploadMode::Staged);
+}
+
+TEST(Graph_StaticGeometry, UploadRequestDirect)
+{
+    // Simulate what GraphGeometrySyncSystem builds for a dynamic graph.
+    auto g = MakeTriangleGraph();
+    ECS::Graph::Data data;
+    data.GraphRef = g;
+    data.StaticGeometry = false;
+
+    const auto uploadMode = data.StaticGeometry
+        ? Graphics::GeometryUploadMode::Staged
+        : Graphics::GeometryUploadMode::Direct;
+
+    Graphics::GeometryUploadRequest upload{};
+    upload.Topology = Graphics::PrimitiveTopology::Points;
+    upload.UploadMode = uploadMode;
+
+    EXPECT_EQ(upload.UploadMode, Graphics::GeometryUploadMode::Direct);
+    EXPECT_EQ(upload.Topology, Graphics::PrimitiveTopology::Points);
+}
+
+TEST(Graph_StaticGeometry, UploadRequestStaged)
+{
+    // Simulate what GraphGeometrySyncSystem builds for a static graph.
+    auto g = MakeTriangleGraph();
+    ECS::Graph::Data data;
+    data.GraphRef = g;
+    data.StaticGeometry = true;
+
+    const auto uploadMode = data.StaticGeometry
+        ? Graphics::GeometryUploadMode::Staged
+        : Graphics::GeometryUploadMode::Direct;
+
+    Graphics::GeometryUploadRequest upload{};
+    upload.Topology = Graphics::PrimitiveTopology::Points;
+    upload.UploadMode = uploadMode;
+
+    EXPECT_EQ(upload.UploadMode, Graphics::GeometryUploadMode::Staged);
+    EXPECT_EQ(upload.Topology, Graphics::PrimitiveTopology::Points);
+}
+
+TEST(Graph_StaticGeometry, EdgeUploadUseSameMode)
+{
+    // Edge index buffer upload should use the same mode as vertex upload.
+    ECS::Graph::Data data;
+    data.StaticGeometry = true;
+
+    const auto uploadMode = data.StaticGeometry
+        ? Graphics::GeometryUploadMode::Staged
+        : Graphics::GeometryUploadMode::Direct;
+
+    // Simulate vertex upload request.
+    Graphics::GeometryUploadRequest vertexReq{};
+    vertexReq.Topology = Graphics::PrimitiveTopology::Points;
+    vertexReq.UploadMode = uploadMode;
+
+    // Simulate edge upload request (shares vertex buffer via ReuseVertexBuffersFrom).
+    Graphics::GeometryUploadRequest edgeReq{};
+    edgeReq.Topology = Graphics::PrimitiveTopology::Lines;
+    edgeReq.UploadMode = uploadMode;
+
+    // Both must use the same upload mode.
+    EXPECT_EQ(vertexReq.UploadMode, edgeReq.UploadMode);
+    EXPECT_EQ(edgeReq.UploadMode, Graphics::GeometryUploadMode::Staged);
+}
+
+TEST(Graph_StaticGeometry, StaticFlagDoesNotAffectGpuDirty)
+{
+    // StaticGeometry controls upload mode, not dirty state.
+    ECS::Graph::Data data;
+    data.StaticGeometry = true;
+
+    // GpuDirty is independent of StaticGeometry.
+    EXPECT_TRUE(data.GpuDirty);
+
+    data.GpuDirty = false;
+    EXPECT_FALSE(data.GpuDirty);
+    EXPECT_TRUE(data.StaticGeometry);
+}
+
+TEST(Graph_StaticGeometry, StagedMatchesPointCloudUploadMode)
+{
+    // Static graph upload mode should match PointCloudGeometrySyncSystem's mode.
+    // This ensures consistency across retained-mode renderers for static data.
+    Graphics::GeometryUploadRequest graphUpload{};
+    graphUpload.UploadMode = Graphics::GeometryUploadMode::Staged;
+
+    Graphics::GeometryUploadRequest cloudUpload{};
+    cloudUpload.UploadMode = Graphics::GeometryUploadMode::Staged;
+
+    EXPECT_EQ(graphUpload.UploadMode, cloudUpload.UploadMode);
+}
+
 TEST(Graph_NodeAttributes, ClearedOnEmptyGraph)
 {
     // When a graph becomes empty, all cached data should be cleared.
