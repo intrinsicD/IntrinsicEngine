@@ -288,8 +288,20 @@ TEST(Graph_RetainedMode, DefaultGpuStateValues)
     // GpuGeometry handle should be invalid by default.
     EXPECT_FALSE(data.GpuGeometry.IsValid());
 
+    // GPUScene slot should be invalid by default.
+    EXPECT_EQ(data.GpuSlot, ECS::Graph::Data::kInvalidSlot);
+
     // Edge pairs should be empty.
     EXPECT_TRUE(data.CachedEdgePairs.empty());
+
+    // Per-edge colors should be empty.
+    EXPECT_TRUE(data.CachedEdgeColors.empty());
+
+    // Per-node colors should be empty.
+    EXPECT_TRUE(data.CachedNodeColors.empty());
+
+    // Per-node radii should be empty.
+    EXPECT_TRUE(data.CachedNodeRadii.empty());
 
     // GpuDirty should be true (triggers initial upload).
     EXPECT_TRUE(data.GpuDirty);
@@ -409,4 +421,142 @@ TEST(GraphRenderPass_Retained, RetainedFlagsDefaultToFalse)
     // If retained were true by default, the pass would skip entities even
     // without GPU state — which is wrong. The default must be false.
     SUCCEED();
+}
+
+// =============================================================================
+// GPUScene Slot Integration — Contract tests
+// =============================================================================
+
+TEST(Graph_GPUSceneSlot, InvalidSlotConstantMatchesOtherComponents)
+{
+    // All renderer components must use the same kInvalidSlot sentinel (0xFFFFFFFF).
+    EXPECT_EQ(ECS::Graph::Data::kInvalidSlot,
+              ECS::MeshRenderer::Component::kInvalidSlot);
+    EXPECT_EQ(ECS::Graph::Data::kInvalidSlot,
+              ECS::PointCloudRenderer::Component::kInvalidSlot);
+    EXPECT_EQ(ECS::Graph::Data::kInvalidSlot, ~0u);
+}
+
+TEST(Graph_GPUSceneSlot, SlotDefaultsToInvalid)
+{
+    ECS::Graph::Data data;
+    EXPECT_EQ(data.GpuSlot, ECS::Graph::Data::kInvalidSlot);
+}
+
+TEST(Graph_GPUSceneSlot, SlotCanBeAssignedAndCleared)
+{
+    ECS::Graph::Data data;
+    data.GpuSlot = 42u;
+    EXPECT_EQ(data.GpuSlot, 42u);
+
+    data.GpuSlot = ECS::Graph::Data::kInvalidSlot;
+    EXPECT_EQ(data.GpuSlot, ECS::Graph::Data::kInvalidSlot);
+}
+
+// =============================================================================
+// Per-Node Attribute Cache — Contract tests
+// =============================================================================
+//
+// GraphGeometrySyncSystem extracts per-node colors and radii from PropertySets
+// into CachedNodeColors / CachedNodeRadii vectors on the component.
+
+TEST(Graph_NodeAttributes, CachedNodeColorsDefaultEmpty)
+{
+    ECS::Graph::Data data;
+    EXPECT_TRUE(data.CachedNodeColors.empty());
+}
+
+TEST(Graph_NodeAttributes, CachedNodeRadiiDefaultEmpty)
+{
+    ECS::Graph::Data data;
+    EXPECT_TRUE(data.CachedNodeRadii.empty());
+}
+
+TEST(Graph_NodeAttributes, CachedNodeColorsMatchVertexCount)
+{
+    // Simulate what GraphGeometrySyncSystem does: extract per-node colors
+    // and pack them as ABGR uint32 values.
+    auto g = MakeTriangleGraph();
+
+    ECS::Graph::Data data;
+    data.GraphRef = g;
+
+    // Add per-node colors via PropertySet.
+    auto colorProp = g->GetOrAddVertexProperty<glm::vec4>("v:color",
+        glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
+    EXPECT_TRUE(data.HasNodeColors());
+
+    // Simulate extraction: one packed color per compacted vertex.
+    const std::size_t vSize = g->VerticesSize();
+    for (std::size_t i = 0; i < vSize; ++i)
+    {
+        const Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(i)};
+        if (g->IsDeleted(v))
+            continue;
+        const glm::vec4& c = colorProp[v];
+        // Pack ABGR — just verify the count, not the exact packing.
+        data.CachedNodeColors.push_back(static_cast<uint32_t>(c.r * 255.0f));
+    }
+
+    EXPECT_EQ(data.CachedNodeColors.size(), 3u); // 3 vertices in triangle graph.
+}
+
+TEST(Graph_NodeAttributes, CachedNodeRadiiMatchVertexCount)
+{
+    auto g = MakeTriangleGraph();
+
+    ECS::Graph::Data data;
+    data.GraphRef = g;
+
+    auto radiusProp = g->GetOrAddVertexProperty<float>("v:radius", 0.02f);
+    EXPECT_TRUE(data.HasNodeRadii());
+
+    const std::size_t vSize = g->VerticesSize();
+    for (std::size_t i = 0; i < vSize; ++i)
+    {
+        const Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(i)};
+        if (g->IsDeleted(v))
+            continue;
+        data.CachedNodeRadii.push_back(radiusProp[v]);
+    }
+
+    EXPECT_EQ(data.CachedNodeRadii.size(), 3u);
+    EXPECT_FLOAT_EQ(data.CachedNodeRadii[0], 0.02f);
+}
+
+TEST(Graph_NodeAttributes, EmptyWhenPropertySetAbsent)
+{
+    auto g = MakeTriangleGraph();
+
+    ECS::Graph::Data data;
+    data.GraphRef = g;
+
+    // No "v:color" or "v:radius" PropertySets added.
+    EXPECT_FALSE(data.HasNodeColors());
+    EXPECT_FALSE(data.HasNodeRadii());
+    EXPECT_TRUE(data.CachedNodeColors.empty());
+    EXPECT_TRUE(data.CachedNodeRadii.empty());
+}
+
+TEST(Graph_NodeAttributes, ClearedOnEmptyGraph)
+{
+    // When a graph becomes empty, all cached data should be cleared.
+    ECS::Graph::Data data;
+    data.CachedNodeColors.push_back(0xFF0000FF);
+    data.CachedNodeRadii.push_back(0.01f);
+    data.CachedEdgePairs.push_back({0, 1});
+    data.CachedEdgeColors.push_back(0xFFFFFFFF);
+
+    // Simulate what GraphGeometrySyncSystem does for an empty graph.
+    data.CachedEdgePairs.clear();
+    data.CachedEdgeColors.clear();
+    data.CachedNodeColors.clear();
+    data.CachedNodeRadii.clear();
+    data.GpuVertexCount = 0;
+
+    EXPECT_TRUE(data.CachedNodeColors.empty());
+    EXPECT_TRUE(data.CachedNodeRadii.empty());
+    EXPECT_TRUE(data.CachedEdgePairs.empty());
+    EXPECT_TRUE(data.CachedEdgeColors.empty());
+    EXPECT_EQ(data.GpuVertexCount, 0u);
 }

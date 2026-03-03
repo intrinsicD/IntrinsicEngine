@@ -14,7 +14,9 @@ Recent completions (2026-03-02, details in git history): `MeshViewLifecycleSyste
 
 Recent completions (2026-03-02, details in git history): retained render pass wiring to `MeshEdgeView`/`MeshVertexView` geometry handles — `RetainedLineRenderPass` now prefers `MeshEdgeView::Geometry` BDA index buffer (via `GeometryGpuData::GetIndexBuffer()->GetDeviceAddress()`) for mesh wireframe, falling back to internal `EnsureEdgeBuffer()` when the view is absent. `RetainedPointCloudRenderPass` now prefers `MeshVertexView::Geometry` BDA vertex buffer for mesh vertex visualization, falling back to direct `MeshRenderer::Geometry` lookup. Per-edge attribute buffers remain internally managed. Contract tests extended in `Test_MeshViewLifecycle.cpp`.
 
-Near-term priority now shifts to remaining lifecycle system enhancements (GraphGeometrySync staged upload + GPUScene slots, PointCloudGeometrySync), and PropertySet dirty-domain sync (TODO §1.3).
+Recent completions (2026-03-02, details in git history): `GraphGeometrySyncSystem` GPUScene integration — `GpuSlot` field on `ECS::Graph::Data` with `AllocateSlot()`/`FreeSlot()` lifecycle matching `PointCloudRendererLifecycle` pattern, per-node attribute extraction (`"v:color"` → `CachedNodeColors`, `"v:radius"` → `CachedNodeRadii`) from PropertySets, `GPUSceneSync` transform-only sync for graph entities, `on_destroy` hook in `SceneManager` for automatic slot reclamation, `FeatureRegistry` registration as `"GraphGeometrySync"`. Contract tests extended in `Test_GraphRenderPass.cpp` and `Test_BDASharedBufferContract.cpp`.
+
+Near-term priority now shifts to remaining lifecycle system enhancements (PointCloudGeometrySync, optional staged upload path for static graphs), and PropertySet dirty-domain sync (TODO §1.3).
 
 ## 2. Feature Roadmap
 

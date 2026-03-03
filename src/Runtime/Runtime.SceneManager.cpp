@@ -103,6 +103,21 @@ namespace
         g_GpuSceneForDestroyHook->FreeSlot(pv.GpuSlot);
         pv.GpuSlot = ECS::MeshVertexView::Component::kInvalidSlot;
     }
+
+    void OnGraphDataDestroyed(entt::registry& registry, entt::entity entity)
+    {
+        if (!g_GpuSceneForDestroyHook)
+            return;
+
+        auto& graphData = registry.get<ECS::Graph::Data>(entity);
+        if (graphData.GpuSlot == ECS::Graph::Data::kInvalidSlot)
+            return;
+
+        Graphics::GpuInstanceData inst{};
+        g_GpuSceneForDestroyHook->QueueUpdate(graphData.GpuSlot, inst, /*sphere*/ {0.0f, 0.0f, 0.0f, 0.0f});
+        g_GpuSceneForDestroyHook->FreeSlot(graphData.GpuSlot);
+        graphData.GpuSlot = ECS::Graph::Data::kInvalidSlot;
+    }
 }
 
 namespace Runtime
@@ -135,6 +150,9 @@ namespace Runtime
 
         m_Scene.GetRegistry().on_destroy<ECS::MeshVertexView::Component>()
             .connect<&OnMeshVertexViewDestroyed>();
+
+        m_Scene.GetRegistry().on_destroy<ECS::Graph::Data>()
+            .connect<&OnGraphDataDestroyed>();
     }
 
     void SceneManager::DisconnectGpuHooks()
@@ -153,6 +171,9 @@ namespace Runtime
 
         m_Scene.GetRegistry().on_destroy<ECS::MeshVertexView::Component>()
             .disconnect<&OnMeshVertexViewDestroyed>();
+
+        m_Scene.GetRegistry().on_destroy<ECS::Graph::Data>()
+            .disconnect<&OnGraphDataDestroyed>();
 
         g_GpuSceneForDestroyHook = nullptr;
     }

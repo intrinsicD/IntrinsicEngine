@@ -317,9 +317,13 @@ TEST(BDA_Components, GraphDataDefaults)
 
     EXPECT_EQ(data.GraphRef, nullptr);
     EXPECT_FALSE(data.GpuGeometry.IsValid());
+    EXPECT_EQ(data.GpuSlot, ECS::Graph::Data::kInvalidSlot);
     EXPECT_TRUE(data.GpuDirty);
     EXPECT_EQ(data.GpuVertexCount, 0u);
     EXPECT_TRUE(data.CachedEdgePairs.empty());
+    EXPECT_TRUE(data.CachedEdgeColors.empty());
+    EXPECT_TRUE(data.CachedNodeColors.empty());
+    EXPECT_TRUE(data.CachedNodeRadii.empty());
     EXPECT_TRUE(data.Visible);
 
     // Default rendering params

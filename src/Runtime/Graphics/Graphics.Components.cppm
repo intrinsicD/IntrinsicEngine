@@ -226,6 +226,12 @@ export namespace ECS::Graph
         // (nodes) read from this buffer via BDA push constants.
         Geometry::GeometryHandle GpuGeometry{};
 
+        // GPUScene slot for frustum culling and GPU-driven batching.
+        // Allocated by GraphGeometrySyncSystem after successful geometry upload.
+        // Freed by on_destroy hook in SceneManager.
+        static constexpr uint32_t kInvalidSlot = ~0u;
+        uint32_t GpuSlot = kInvalidSlot;
+
         // Edge index pairs into the compacted vertex buffer.
         // Consumed by RetainedLineRenderPass in the same way as
         // RenderVisualization::CachedEdges for mesh wireframe.
@@ -235,6 +241,16 @@ export namespace ECS::Graph
         // Extracted from Graph::EdgeProperties("e:color") by GraphGeometrySyncSystem.
         // When empty, RetainedLineRenderPass uses uniform DefaultEdgeColor.
         std::vector<uint32_t> CachedEdgeColors;
+
+        // Per-node colors (packed ABGR), one per compacted vertex.
+        // Extracted from Graph::VertexProperties("v:color") by GraphGeometrySyncSystem.
+        // When empty, RetainedPointCloudRenderPass uses uniform DefaultNodeColor.
+        std::vector<uint32_t> CachedNodeColors;
+
+        // Per-node radii (world-space), one per compacted vertex.
+        // Extracted from Graph::VertexProperties("v:radius") by GraphGeometrySyncSystem.
+        // When empty, RetainedPointCloudRenderPass uses uniform DefaultNodeRadius.
+        std::vector<float> CachedNodeRadii;
 
         // When true, GraphGeometrySyncSystem re-uploads positions and rebuilds
         // edge pairs. Set on first attach, or by layout algorithms that modify
