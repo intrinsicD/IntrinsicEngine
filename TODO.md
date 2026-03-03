@@ -153,6 +153,6 @@ Support named sub-meshes/sub-graphs/sub-clouds as first-class components over a 
 ## 6. Related Documents
 
 - `PLAN.md` — detailed rendering architecture refactor spec (three-pass architecture, ECS component design, migration phases).
-- `ROADMAP.md` — feature roadmap, prioritization phases, and long-horizon planning (rendering modes, post-processing, shadows, selection, UI, I/O, geometry operators, benchmarking).
-- `docs/ARCHITECTURE_SLOS.md` — measurable SLO thresholds and telemetry milestones for orchestration and scheduler health.
-- `docs/RENDERING_MODALITY_REDESIGN_PLAN.md` — long-term approach/mode framework that the three-pass refactor enables.
+- `ROADMAP.md` — feature roadmap, prioritization phases, long-horizon planning, rendering modality redesign vision (§5), and architecture SLOs.
+- `README.md` — architecture SLOs section with measurable SLO thresholds and telemetry milestones.
+- `CLAUDE.md` — development conventions, C++23 adoption policy, architectural invariants.

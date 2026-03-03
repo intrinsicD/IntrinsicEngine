@@ -123,7 +123,7 @@ Drag-and-drop file loading with automatic format detection via `IORegistry`. Exp
 
 For the current, living list of *remaining* architectural work, see `TODO.md`. Completed milestones are intentionally removed from that document to keep it focused (Git history is the source of truth for what used to be on the list).
 
-C++23 style/convergence guidance for contributors is tracked in `docs/CXX23_ADOPTION_POLICY.md` (monadic `std::expected` usage + explicit object parameter adoption rules).
+C++23 style/convergence guidance for contributors is tracked in `CLAUDE.md` §C++23 Adoption Policy (monadic `std::expected` usage + explicit object parameter adoption rules).
 
 ---
 
@@ -209,6 +209,23 @@ Four test targets with clear GPU/no-GPU boundaries:
 | `IntrinsicGeometryTests` | Core + Geometry | DEC, mesh operations, collision, graphs, all geometry operators | ~240 |
 | `IntrinsicECSTests` | Core + ECS | FrameGraph system integration | ~15 |
 | `IntrinsicTests` | Full Runtime | Graphics, I/O, rendering, integration | ~270 |
+
+### Architecture SLOs
+
+Concrete service-level objectives for engine orchestration, verified by CI:
+
+**FrameGraph (CPU DAG):**
+- p99 `FrameGraphCompileTimeNs < 350,000 ns` (0.35 ms) at 2,000 nodes.
+- p95 `FrameGraphExecuteTimeNs < 1,500,000 ns` (1.5 ms) at 2,000 nodes.
+- p95 `FrameGraphCriticalPathTimeNs < 900,000 ns` (0.9 ms) at 2,000 nodes.
+
+**Task scheduler contention and tail behavior:**
+- `0.20 <= TaskStealSuccessRatio <= 0.65` under saturated synthetic load.
+- p95 `TaskQueueContentionCount < 4,096` lock misses / frame on 16-worker stress profile.
+- p95 `TaskIdleWaitTotalNs < 700,000 ns` (0.7 ms) during active gameplay frames.
+- p99 `TaskUnparkP99Ns < 80,000 ns` (80 us).
+
+**Telemetry:** Per-frame export for contention, steal ratio, idle wait, compile/execute/critical-path times. Performance panel surfaces rolling p95/p99 PASS/ALERT status. CI runs `ArchitectureSLO.FrameGraphP95P99BudgetsAt2000Nodes` and `ArchitectureSLO.TaskSchedulerContentionAndWakeLatencyBudgets`.
 
 ```bash
 # Run all geometry tests
@@ -328,10 +345,10 @@ Only one path renders per frame (Stage 2 CPU-driven OR Stage 3 GPU-driven). No d
 ## Architecture Documentation
 
 - **`TODO.md`** — Active architecture backlog (open TODOs only, with priorities and remediation notes).
-- **`ROADMAP.md`** — Feature roadmap, dependency-ordered phases, and long-horizon planning notes.
+- **`ROADMAP.md`** — Feature roadmap, dependency-ordered phases, long-horizon planning notes, and the rendering modality redesign vision.
+- **`PLAN.md`** — Near-term rendering architecture refactor spec (three-pass architecture, ECS component design, migration phases).
+- **`CLAUDE.md`** — Development conventions, build workflows, architectural invariants, C++23 adoption policy.
 - **Git history** — Historical architecture notes and completion summaries for closed backlog items.
-- **`CLAUDE.md`** — Development conventions, build workflows, architectural invariants.
-- **`docs/RENDERING_MODALITY_REDESIGN_PLAN.md`** — Thorough architecture plan for first-class mesh/graph/point rendering approaches and mode toggling.
 
 Backlog hygiene is CI-enforced: pull requests fail if `TODO.md` contains completed/historical markers instead of active unfinished items.
 
