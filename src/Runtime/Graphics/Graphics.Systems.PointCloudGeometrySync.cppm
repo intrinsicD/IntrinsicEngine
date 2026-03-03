@@ -17,6 +17,9 @@ export namespace Graphics::Systems::PointCloudGeometrySync
     // PropertySets, and allocates GPUScene slots for frustum culling —
     // for retained-mode BDA rendering.
     //
+    // Phase 6 migration: directly populates Point::Component from
+    // PointCloud::Data, replacing ComponentMigration's cloud bridging.
+    //
     // Contract:
     //  - Iterates entities with ECS::PointCloud::Data where GpuDirty == true.
     //  - Reads positions and normals directly from Cloud spans (zero copy).
@@ -27,6 +30,8 @@ export namespace Graphics::Systems::PointCloudGeometrySync
     //  - Allocates a GPUScene slot after successful upload (if not yet allocated),
     //    queues initial instance data with bounding sphere for frustum culling.
     //  - Clears GpuDirty after successful upload.
+    //  - Populates sibling Point::Component every frame for visible entities
+    //    with valid GPU geometry.
     //
     // Thread model: main thread only (writes ECS components + GPU resources).
     void OnUpdate(entt::registry& registry,
@@ -36,7 +41,8 @@ export namespace Graphics::Systems::PointCloudGeometrySync
                   RHI::TransferManager& transferManager);
 
     // Register this system into a FrameGraph with its dependency declarations.
-    // Declares: Write<ECS::PointCloud::Data>, WaitFor("TransformUpdate").
+    // Declares: Write<ECS::PointCloud::Data>, Write<ECS::Point::Component>,
+    //           WaitFor("TransformUpdate").
     void RegisterSystem(Core::FrameGraph& graph,
                         entt::registry& registry,
                         GPUScene& gpuScene,

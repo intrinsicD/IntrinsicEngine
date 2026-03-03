@@ -8,32 +8,28 @@ import Core.FrameGraph;
 
 export namespace Graphics::Systems::ComponentMigration
 {
-    // Transition system: attaches per-pass typed ECS components (Line, Point)
-    // from source components (PointCloudRenderer, Graph::Data, PointCloud::Data)
-    // during the PLAN.md migration period.
+    // Transition system: attaches Point::Component from
+    // PointCloudRenderer::Component during the PLAN.md migration period.
+    //
+    // Phase 6 reduced scope: Graph::Data → Line+Point and
+    // PointCloud::Data → Point bridging moved to their respective
+    // lifecycle systems (GraphGeometrySyncSystem, PointCloudGeometrySyncSystem).
+    // MeshViewLifecycleSystem directly populates Line/Point for mesh entities.
     //
     // On each frame:
     //  - Entities with PointCloudRenderer::Component get Point::Component
     //    (mirrored Geometry + rendering parameters).
-    //  - Entities with Graph::Data get Line::Component (edges) and
-    //    Point::Component (nodes) (mirrored from graph rendering parameters).
-    //  - Entities with PointCloud::Data get Point::Component.
-    //
-    // MeshRenderer→Surface bridging was removed: SceneManager now creates
-    // Surface::Component directly. RenderVisualization→Line/Point bridging
-    // was removed: Line and Point components are managed directly by
-    // application code and lifecycle systems (MeshViewLifecycleSystem).
     //
     // This system is idempotent: re-running it with unchanged source
     // components produces no additional work.
     //
-    // Retirement: Once remaining legacy components are deleted, this system
-    // is removed.
+    // Retirement: Once PointCloudRenderer::Component is deleted, this
+    // system is removed.
     void OnUpdate(entt::registry& registry);
 
     // Register this system into a FrameGraph.
-    // Declares: WaitFor("TransformUpdate"), WaitFor("MeshRendererLifecycle").
-    // Runs after all legacy lifecycle systems so GPU state is populated.
+    // Declares: WaitFor("PointCloudRendererLifecycle").
+    // Runs after the point cloud renderer lifecycle so GPU state is populated.
     void RegisterSystem(Core::FrameGraph& graph,
                         entt::registry& registry);
 }

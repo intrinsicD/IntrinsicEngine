@@ -14,21 +14,33 @@ export namespace Graphics::Systems::MeshViewLifecycle
 {
     // Lifecycle glue for mesh-derived geometry views (edge + vertex).
     //
-    // Contract:
-    //  - Auto-attaches MeshEdgeView::Component when ShowWireframe=true on
-    //    entities with RenderVisualization + MeshRenderer. Auto-detaches
-    //    when ShowWireframe=false.
+    // Phase 6 migration: directly populates per-pass typed components
+    // (Line::Component, Point::Component) from internal edge/vertex views,
+    // replacing the ComponentMigration intermediary for mesh wireframe and
+    // vertex visualization.
     //
-    //  - Iterates entities with MeshEdgeView::Component + MeshRenderer.
+    // Contract:
+    //  - Auto-attaches MeshEdgeView::Component when Line::Component is
+    //    present on Surface entities. Auto-detaches when Line is removed.
+    //  - Auto-attaches MeshVertexView::Component when Point::Component is
+    //    present on Surface entities. Auto-detaches when Point is removed.
+    //
+    //  - Iterates entities with MeshEdgeView + Surface.
     //    If Dirty: extracts unique edge pairs from MeshCollider collision
     //    data (triangle indices), creates an edge index buffer via
     //    ReuseVertexBuffersFrom(meshHandle), stores the handle, allocates
     //    a GPUScene slot, and clears Dirty.
     //
-    //  - Iterates entities with MeshVertexView::Component + MeshRenderer.
+    //  - Populates Line::Component (Geometry, EdgeView, EdgeCount) from
+    //    completed edge views every frame (idempotent).
+    //
+    //  - Iterates entities with MeshVertexView + Surface.
     //    If Dirty: creates a vertex view via ReuseVertexBuffersFrom(meshHandle)
     //    with Topology::Points, stores the handle, allocates a GPUScene slot,
     //    and clears Dirty.
+    //
+    //  - Populates Point::Component (Geometry, HasPerPointNormals) from
+    //    completed vertex views every frame (idempotent).
     //
     //  - On entity destruction: GPUScene slots are freed by on_destroy hooks
     //    registered in SceneManager.
@@ -42,7 +54,8 @@ export namespace Graphics::Systems::MeshViewLifecycle
 
     // Register this system into a FrameGraph with its dependency declarations.
     // Declares: Read<Transform::WorldMatrix>, Write<MeshEdgeView::Component>,
-    //           Write<MeshVertexView::Component>, WaitFor("MeshRendererLifecycle").
+    //           Write<MeshVertexView::Component>, Write<Line::Component>,
+    //           Write<Point::Component>, WaitFor("MeshRendererLifecycle").
     void RegisterSystem(Core::FrameGraph& graph,
                         entt::registry& registry,
                         GPUScene& gpuScene,

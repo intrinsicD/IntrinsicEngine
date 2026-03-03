@@ -15,7 +15,7 @@ This section tracks where runtime code currently stands relative to this plan/sp
 
 | Area | Planned direction | Current state | Status |
 |------|-------------------|---------------|--------|
-| ECS render components | Replace `MeshRenderer`/`RenderVisualization`/`GraphRenderer`/`PointCloudRenderer` with `ECS::Surface`, `ECS::Line`, `ECS::Point`, `ECS::Graph::Data` | `ECS::Surface::Component`, `ECS::Line::Component`, `ECS::Point::Component` are the sole render component types. Legacy `MeshRenderer`, `RenderVisualization`, `GeometryViewRenderer` deleted (Phase 5). `ComponentMigration` bridges remaining legacy components (`PointCloudRenderer`, `Graph::Data`, `PointCloud::Data`) to typed components. `EdgePair` moved to standalone `ECS::EdgePair`. | **Phase 5 complete** |
+| ECS render components | Replace `MeshRenderer`/`RenderVisualization`/`GraphRenderer`/`PointCloudRenderer` with `ECS::Surface`, `ECS::Line`, `ECS::Point`, `ECS::Graph::Data` | `ECS::Surface::Component`, `ECS::Line::Component`, `ECS::Point::Component` are the sole render component types. Legacy `MeshRenderer`, `RenderVisualization`, `GeometryViewRenderer` deleted (Phase 5). Lifecycle systems directly populate per-pass typed components (Phase 6): `MeshViewLifecycle` → Line+Point, `GraphGeometrySync` → Line+Point, `PointCloudGeometrySync` → Point. `ComponentMigration` reduced to PointCloudRenderer→Point only. `EdgePair` moved to standalone `ECS::EdgePair`. | **Phase 6 complete** |
 | Pass topology | Collapse into `SurfacePass`, `LinePass`, `PointPass` each owning retained + transient internally | `SurfacePass` (Phase 2). `LinePass` (Phase 3). `PointPass` (Phase 4). Legacy passes (`MeshRenderPass`, `GraphRenderPass`, `PointCloudRenderPass`, `RetainedPointCloudRenderPass`) deleted (Phase 5). `DefaultPipeline` has 7 passes: Picking, Surface, Line, Point, SelectionOutline, DebugView, ImGui. | **Phase 5 complete** |
 | Shader naming/registration | `surface.*`, unified `line.*`, `point_flatdisc.*`, `point_surfel.*` IDs | `surface.vert/frag` (Phase 2). `line.vert/frag` (Phase 3). `point_flatdisc.vert/frag` (FlatDisc billboard, Phase 4). `point_surfel.vert/frag` (Surfel + EWA normal-oriented, Phase 4). Runtime registers `Point.FlatDisc.Vert/Frag` and `Point.Surfel.Vert/Frag`. Legacy shaders cleaned up. | **Phase 5 complete** |
 | CPU geometry authority | PropertySet-backed CPU sources for cloud/graph/mesh topology and attributes | **Implemented in geometry domain types** (`PointCloud::Cloud`, `Graph`, `Halfedge::Mesh`). All four PropertySet domains (`VertexProperties()`, `EdgeProperties()`, `FaceProperties()`, `HalfedgeProperties()`) are publicly accessible. Bulk edge extraction via `ExtractEdgeVertexPairs()` provides span-compatible GPU upload. | **Complete** |
@@ -37,11 +37,11 @@ This section tracks where runtime code currently stands relative to this plan/sp
 Treat this plan as the target architecture; implementation should migrate in this order:
 
 1. ~~Introduce new ECS component set (`Surface/Line/Point/Graph::Data`) behind compatibility adapters.~~ **Done** — `Surface::Component`, `Line::Component`, `Point::Component` defined in `Graphics.Components.cppm`. `ComponentMigration` system bridges legacy → new components each frame.
-2. Move graph/point-cloud CPU payload ownership out of render-only components into geometry PropertySet-backed assets/components. **Partial** — Graph done (`ECS::Graph::Data`), PointCloud pending.
+2. ~~Move graph/point-cloud CPU payload ownership out of render-only components into geometry PropertySet-backed assets/components.~~ **Done** — Graph (`ECS::Graph::Data`), PointCloud (`ECS::PointCloud::Data` with `shared_ptr<Cloud>`).
 3. ~~Add public `EdgeProperties()`, `FaceProperties()`, `HalfedgeProperties()` accessors to `Halfedge::Mesh`.~~ **Done** — all four PropertySet domains public, plus `ExtractEdgeVertexPairs()` bulk extraction.
 4. Introduce dirty-domain geometry sync system for CPU→GPU range updates (per vertex/edge/face domain).
-5. Collapse pass graph to `SurfacePass`, `LinePass`, `PointPass` and retire legacy pass feature IDs.
-6. Implement geometry view lifecycle systems so all three geometry types have device-local retained-mode rendering (equal treatment — not deferred for point clouds/graphs).
+5. ~~Collapse pass graph to `SurfacePass`, `LinePass`, `PointPass` and retire legacy pass feature IDs.~~ **Done** — Phases 2-5 complete.
+6. ~~Implement geometry view lifecycle systems so all three geometry types have device-local retained-mode rendering (equal treatment — not deferred for point clouds/graphs).~~ **Done** — Phase 6 complete. All lifecycle systems directly populate per-pass typed components.
 
 ---
 
@@ -784,15 +784,17 @@ Also completed: `EdgePair` moved to standalone `ECS::EdgePair`, `Surface::Compon
 
 **Gate:** Clean build with no dead code references. All test files updated.
 
-### Phase 6: Geometry view lifecycle systems + retained upload for all types
+### Phase 6: Geometry view lifecycle systems + retained upload for all types — **COMPLETE**
 
-All three geometry types must reach device-local retained-mode rendering at the same phase — point clouds and graphs are not second-class citizens.
+All three geometry types reach device-local retained-mode rendering — point clouds and graphs are not second-class citizens.
 
 43. ~~Expose `EdgeProperties()`, `FaceProperties()`, `HalfedgeProperties()` on `Halfedge::Mesh` for bulk span extraction~~ **Done**
-44. Add `MeshViewLifecycleSystem`: on `Line`/`Point` component attach, create edge/vertex views via `ReuseVertexBuffersFrom(meshHandle)`, manage handle lifecycle + `GPUScene` slot allocation
-45. Add `PointCloudGeometrySyncSystem`: upload `Cloud::Positions()`/`Normals()` spans to device-local `GeometryGpuData` via `GeometryUploadRequest` (staged one-shot), assign handle to `ECS::Point::Component::Geometry`
-46. Add `GraphGeometrySyncSystem`: upload graph node positions to persistent-mapped `GeometryGpuData` (dynamic — layout changes), upload edge index pairs as edge index buffer, populate sibling `Line`/`Point` component handles
-47. All three systems allocate `GPUScene` slots, sync transforms, participate in frustum culling — same path as `MeshRendererLifecycle`
+44. ~~Add `MeshViewLifecycleSystem`: on `Line`/`Point` component attach, create edge/vertex views via `ReuseVertexBuffersFrom(meshHandle)`, manage handle lifecycle + `GPUScene` slot allocation~~ **Done** — Phase 0 auto-attaches `MeshEdgeView`/`MeshVertexView` from `Line`/`Point` presence. Phase 1b/2b populates `Line::Component` (Geometry, EdgeView, EdgeCount) and `Point::Component` (Geometry, HasPerPointNormals) from completed views.
+45. ~~Add `PointCloudGeometrySyncSystem`: upload `Cloud::Positions()`/`Normals()` spans to device-local `GeometryGpuData` via `GeometryUploadRequest` (staged one-shot), assign handle to `ECS::Point::Component::Geometry`~~ **Done** — Phase 3 populates `Point::Component` from `PointCloud::Data` (Geometry, Color, Size, SizeMultiplier, Mode, per-point attribute flags).
+46. ~~Add `GraphGeometrySyncSystem`: upload graph node positions to persistent-mapped `GeometryGpuData` (dynamic — layout changes), upload edge index pairs as edge index buffer, populate sibling `Line`/`Point` component handles~~ **Done** — Phase 3 populates `Line::Component` (Geometry, EdgeView, EdgeCount, Color, Width, Overlay, HasPerEdgeColors) and `Point::Component` (Geometry, Color, Size, SizeMultiplier, Mode, per-point attribute flags) from `Graph::Data`.
+47. ~~All three systems allocate `GPUScene` slots, sync transforms, participate in frustum culling — same path as `MeshRendererLifecycle`~~ **Done** — all three systems already had GPUScene slot allocation; Phase 6 adds direct per-pass component population.
+
+`ComponentMigration` reduced scope: only bridges `PointCloudRenderer::Component` → `Point::Component`. Graph and PointCloud data flows moved to their respective lifecycle systems. Contract tests in `Test_PerPassComponents.cpp`.
 
 **Principle:** The pass consolidation (Phases 2-5) establishes the unified pass structure. Phase 6 ensures all geometry types have equal device-local residency and retained-mode rendering. No geometry type should rely on per-frame transient CPU submission as its permanent rendering path.
 
