@@ -18,7 +18,7 @@ export namespace Graphics::Passes
     //
     // Renders the non-face visualization overlays for entities with both
     // ECS::MeshRenderer::Component and ECS::RenderVisualization::Component:
-    //   - Wireframe edges  → submitted to DebugDraw accumulator → LineRenderPass.
+    //   - Wireframe edges  → submitted to DebugDraw accumulator → LinePass.
     //   - Vertex points    → submitted to PointCloudRenderPass (all 4 modes).
     //
     // Face rendering (solid triangles) is the responsibility of SurfacePass, which
@@ -26,12 +26,12 @@ export namespace Graphics::Passes
     // + MeshRenderPass (wireframe + vertices) constitute the complete mesh pass.
     //
     // This pass has no GPU resources of its own — it is a data-collection pass
-    // that feeds the shared PointCloudRenderPass and LineRenderPass staging buffers.
+    // that feeds the shared PointCloudRenderPass and LinePass staging buffers.
     // GPU drawing is performed by those passes after all collectors run.
     //
     // Usage in DefaultPipeline:
     //   Call AddPasses() after PointCloudRenderPass::ResetPoints() and before
-    //   PointCloudRenderPass::AddPasses() / LineRenderPass::AddPasses().
+    //   PointCloudRenderPass::AddPasses() / LinePass::AddPasses().
     //
     // Dependencies:
     //   SetPointCloudPass() must be called with a non-null pointer for vertex draw.
@@ -48,7 +48,7 @@ export namespace Graphics::Passes
 
         // Collect mesh visualization data into shared staging buffers.
         // Must be called after PointCloudRenderPass::ResetPoints() and before
-        // PointCloudRenderPass::AddPasses() / LineRenderPass::AddPasses().
+        // PointCloudRenderPass::AddPasses() / LinePass::AddPasses().
         void AddPasses(RenderPassContext& ctx) override;
 
         void Shutdown() override {}

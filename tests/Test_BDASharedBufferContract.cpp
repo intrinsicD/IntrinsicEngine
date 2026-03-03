@@ -23,7 +23,7 @@ import RHI;
 //   - GeometryUploadRequest / GeometryBufferLayout defaults.
 //   - ECS component defaults and render contract invariants.
 //   - Cross-module color packing consistency.
-//   - DebugDraw ↔ LineRenderPass data compatibility.
+//   - DebugDraw ↔ LinePass data compatibility.
 //   - GeometryViewRenderer lifecycle tracking invariants.
 //
 // No GPU device is needed — these are pure compile-time/contract tests.
@@ -35,7 +35,7 @@ import RHI;
 TEST(BDA_DataLayout, LineSegmentIs32Bytes)
 {
     // LineSegment must be 32 bytes (2 x vec4) for GPU SSBO alignment.
-    // Consumed by line.vert SSBO: struct { vec3 Start; uint ColorStart; vec3 End; uint ColorEnd; }
+    // Consumed by LinePass (transient BDA path): struct { vec3 Start; uint ColorStart; vec3 End; uint ColorEnd; }
     EXPECT_EQ(sizeof(Graphics::DebugDraw::LineSegment), 32u);
 }
 
@@ -66,7 +66,7 @@ TEST(BDA_DataLayout, LineSegmentAndGpuPointDataSameStride)
 TEST(BDA_DataLayout, EdgePairIs8Bytes)
 {
     // EdgePair must be 8 bytes: two uint32_t vertex indices.
-    // Consumed by RetainedLineRenderPass SSBO as edge index pairs.
+    // Consumed by LinePass SSBO as edge index pairs.
     EXPECT_EQ(sizeof(ECS::RenderVisualization::EdgePair), 8u);
 }
 
@@ -408,7 +408,7 @@ TEST(BDA_SharedBuffer, ThreeTopologyViewsFromSameSource)
 }
 
 // =============================================================================
-// Section 8: DebugDraw → LineRenderPass Data Contract
+// Section 8: DebugDraw → LinePass Data Contract
 // =============================================================================
 
 TEST(BDA_DebugDrawContract, DepthTestedAndOverlayAreSeparate)
@@ -418,7 +418,7 @@ TEST(BDA_DebugDrawContract, DepthTestedAndOverlayAreSeparate)
     dd.Line({0, 0, 0}, {1, 0, 0}, Graphics::DebugDraw::Red());
     dd.OverlayLine({0, 0, 0}, {0, 1, 0}, Graphics::DebugDraw::Green());
 
-    // LineRenderPass creates two sub-passes: one for depth-tested, one for overlay.
+    // LinePass creates two sub-passes: one for depth-tested, one for overlay.
     // The data must be kept separate so each sub-pass gets its own SSBO.
     EXPECT_EQ(dd.GetLineCount(), 1u);
     EXPECT_EQ(dd.GetOverlayLineCount(), 1u);
@@ -458,7 +458,7 @@ TEST(BDA_DebugDrawContract, ResetBetweenFrames)
 TEST(BDA_EdgeBuffer, EdgeCacheLazyInit)
 {
     // RenderVisualization edge cache starts empty and dirty.
-    // RetainedLineRenderPass creates the GPU edge buffer lazily when
+    // LinePass creates the GPU edge buffer lazily when
     // ShowWireframe=true and EdgeCacheDirty=true.
     ECS::RenderVisualization::Component viz;
 
@@ -480,7 +480,7 @@ TEST(BDA_EdgeBuffer, WireframeEdgeCountTracksLifecycle)
     // Initially no wireframe buffer.
     EXPECT_EQ(gvr.WireframeEdgeCount, 0u);
 
-    // Simulate RetainedLineRenderPass creating a persistent edge buffer.
+    // Simulate LinePass creating a persistent edge buffer.
     gvr.WireframeEdgeCount = 150;
     EXPECT_EQ(gvr.WireframeEdgeCount, 150u);
 
