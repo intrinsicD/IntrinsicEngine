@@ -326,7 +326,7 @@ TEST(MeshViewLifecycle_Contract, ReuseVertexBuffersFromSharedHandle)
 // These tests validate the CPU-side contract for how retained render passes
 // should consume MeshEdgeView and MeshVertexView geometry:
 //
-//   - RetainedLineRenderPass prefers MeshEdgeView::Geometry when available
+//   - LinePass prefers MeshEdgeView::Geometry when available
 //     (index buffer BDA from GeometryGpuData), falling back to internal
 //     EnsureEdgeBuffer() when the view is absent or not ready.
 //
@@ -340,7 +340,7 @@ TEST(MeshViewLifecycle_Contract, ReuseVertexBuffersFromSharedHandle)
 TEST(MeshViewLifecycle_Contract, EdgeViewReadyForRenderPass)
 {
     // Simulate a MeshEdgeView that has completed lifecycle setup.
-    // RetainedLineRenderPass should prefer this over internal buffers.
+    // LinePass should prefer this over internal buffers.
     ECS::MeshEdgeView::Component ev;
     ev.Geometry = Geometry::GeometryHandle(0, 1);
     ev.EdgeCount = 100;
@@ -399,7 +399,7 @@ TEST(MeshViewLifecycle_Contract, EdgeViewIndexBufferBDACompatible)
     //   [i0_0, i1_0, i0_1, i1_1, ...]
     // which is binary-compatible with EdgePair { uint32_t i0, i1; }.
     //
-    // RetainedLineRenderPass reads this via PtrEdges BDA pointer, and the
+    // LinePass reads this via PtrEdges BDA pointer, and the
     // vertex shader interprets it as EdgePair structs (sizeof == 8).
     using EdgePair = ECS::RenderVisualization::EdgePair;
 
@@ -408,7 +408,7 @@ TEST(MeshViewLifecycle_Contract, EdgeViewIndexBufferBDACompatible)
     static_assert(alignof(EdgePair) <= alignof(uint32_t));
 
     // The edge count from MeshEdgeView::EdgeCount is in edge pairs, not indices.
-    // RetainedLineRenderPass uses EdgeCount * 6 for vkCmdDraw (6 verts per edge).
+    // LinePass uses EdgeCount * 6 for vkCmdDraw (6 verts per edge).
     constexpr uint32_t edgeCount = 42;
     constexpr uint32_t gpuVertices = edgeCount * 6;
     EXPECT_EQ(gpuVertices, 252u);
@@ -417,7 +417,7 @@ TEST(MeshViewLifecycle_Contract, EdgeViewIndexBufferBDACompatible)
 TEST(MeshViewLifecycle_Contract, EdgeAuxBuffersIndependentOfEdgeView)
 {
     // Per-edge color attribute buffers (CachedEdgeColors) are still managed
-    // internally by RetainedLineRenderPass even when MeshEdgeView is used
+    // internally by LinePass even when MeshEdgeView is used
     // for the edge index buffer. This is because MeshEdgeView only carries
     // the index buffer — attribute channels are not part of the geometry view.
     ECS::RenderVisualization::Component viz;

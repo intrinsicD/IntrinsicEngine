@@ -20,8 +20,8 @@ export namespace Graphics
     // Contract:
     // - Main-thread only (respects the single-writer contract).
     // - Transient: all geometry is rebuilt each frame.
-    // - Call Reset() at frame start, submit geometry, then the LineRenderPass
-    //   reads GetLines()/GetDepthTestedLines() and uploads to GPU SSBO.
+    // - Call Reset() at frame start, submit geometry, then LinePass
+    //   reads GetLines()/GetOverlayLines() and uploads to GPU via BDA.
     //
     // GPU data layout:
     //   struct LineSegment { vec3 Start; uint32 ColorStart; vec3 End; uint32 ColorEnd; }

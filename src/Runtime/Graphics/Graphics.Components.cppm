@@ -101,7 +101,7 @@ export namespace ECS::PointCloudRenderer
 // Decouples the visual representation from the CPU data type.  Any entity
 // with spatial data (mesh, graph, point cloud) can independently toggle:
 //   - Surface rendering  (filled faces — SurfacePass)
-//   - Wireframe rendering (edges — LineRenderPass via DebugDraw)
+//   - Wireframe rendering (edges — LinePass, retained BDA)
 //   - Vertex rendering   (points — PointCloudRenderPass)
 //
 // The component is attached lazily when the user first toggles a mode in
@@ -111,7 +111,7 @@ export namespace ECS::PointCloudRenderer
 export namespace ECS::RenderVisualization
 {
     // Edge index pair: two uint32 vertex indices into the collision position array.
-    // Used by CachedEdges and consumed directly by RetainedLineRenderPass SSBO uploads.
+    // Used by CachedEdges and consumed directly by LinePass BDA uploads.
     struct EdgePair
     {
         uint32_t i0;
@@ -123,7 +123,7 @@ export namespace ECS::RenderVisualization
     {
         // ---- Mode Toggles ----
         bool ShowSurface   = true;   // SurfacePass mesh/line rendering.
-        bool ShowWireframe = false;  // Edge overlay via DebugDraw → LineRenderPass.
+        bool ShowWireframe = false;  // Edge overlay via LinePass (retained BDA).
         bool ShowVertices  = false;  // Vertex points via PointCloudRenderPass.
 
         // ---- Wireframe Settings ----
@@ -137,8 +137,8 @@ export namespace ECS::RenderVisualization
         Geometry::PointCloud::RenderMode VertexRenderMode = Geometry::PointCloud::RenderMode::FlatDisc;
 
         // ---- Derived Geometry Views (GPU, shared-vertex) ----
-        // Wireframe has NO GPU view — it is rendered by the CPU DebugDraw path
-        // (MeshRenderPass → LineRenderPass) which correctly applies WireframeColor.
+        // Wireframe has NO GPU view — it is rendered by LinePass which reads
+        // CachedEdges via BDA from persistent GPU buffers. WireframeColor is applied.
         //
         // Vertex view is lazily created once for FlatDisc point rendering via SurfacePass.
         Geometry::GeometryHandle VertexView{};    // Points
@@ -156,7 +156,7 @@ export namespace ECS::RenderVisualization
         // Packed ABGR per edge, sourced from Mesh::EdgeProperties("e:color")
         // or set programmatically (e.g., curvature visualization).
         // Must be same length as CachedEdges when non-empty.
-        // When empty, RetainedLineRenderPass uses uniform WireframeColor.
+        // When empty, LinePass uses uniform WireframeColor.
         std::vector<uint32_t> CachedEdgeColors;
         bool EdgeColorsDirty = true;
 
@@ -190,7 +190,7 @@ export namespace ECS::RenderVisualization
 //
 // Rendering: retained-mode via BDA shared-buffer architecture.
 //   - Nodes rendered via RetainedPointCloudRenderPass (BDA position pull).
-//   - Edges rendered via RetainedLineRenderPass (BDA position pull + edge SSBO).
+//   - Edges rendered via LinePass (BDA position pull + edge buffer).
 //   - Falls back to CPU path (GraphRenderPass → PointCloudRenderPass + DebugDraw)
 //     when retained passes are disabled via FeatureRegistry.
 //
@@ -222,8 +222,8 @@ export namespace ECS::Graph
 
         // ---- GPU State (managed by GraphGeometrySyncSystem) ----
         // Shared vertex buffer holding compacted node positions + normals.
-        // Both RetainedLineRenderPass (edges) and RetainedPointCloudRenderPass
-        // (nodes) read from this buffer via BDA push constants.
+        // Both LinePass (edges) and RetainedPointCloudRenderPass (nodes) read
+        // from this buffer via BDA push constants.
         Geometry::GeometryHandle GpuGeometry{};
 
         // GPUScene slot for frustum culling and GPU-driven batching.
@@ -233,13 +233,13 @@ export namespace ECS::Graph
         uint32_t GpuSlot = kInvalidSlot;
 
         // Edge index pairs into the compacted vertex buffer.
-        // Consumed by RetainedLineRenderPass in the same way as
+        // Consumed by LinePass in the same way as
         // RenderVisualization::CachedEdges for mesh wireframe.
         std::vector<ECS::RenderVisualization::EdgePair> CachedEdgePairs;
 
         // Per-edge colors (packed ABGR), one per edge in CachedEdgePairs order.
         // Extracted from Graph::EdgeProperties("e:color") by GraphGeometrySyncSystem.
-        // When empty, RetainedLineRenderPass uses uniform DefaultEdgeColor.
+        // When empty, LinePass uses uniform DefaultEdgeColor.
         std::vector<uint32_t> CachedEdgeColors;
 
         // Per-node colors (packed ABGR), one per compacted vertex.
@@ -392,9 +392,9 @@ export namespace ECS::GeometryViewRenderer
         Geometry::GeometryHandle Vertices{}; // Points
         uint32_t VerticesGpuSlot = MeshRenderer::Component::kInvalidSlot;
 
-        // Wireframe edge count — set by RetainedLineRenderPass when a persistent
-        // BDA-addressable edge buffer exists for this entity. The actual buffer is
-        // owned by the pass; this field tracks edge count for lifecycle awareness.
+        // Wireframe edge count — set by LinePass when a persistent BDA-addressable
+        // edge buffer exists for this entity. The actual buffer is owned by the
+        // pass; this field tracks edge count for lifecycle awareness.
         // 0 = no persistent wireframe buffer exists.
         uint32_t WireframeEdgeCount = 0;
 
@@ -415,8 +415,8 @@ export namespace ECS::GeometryViewRenderer
 //
 // Edge pairs are flattened from RenderVisualization::CachedEdges into a
 // contiguous uint32_t index buffer with topology Lines. The index buffer
-// is BDA-accessible, allowing RetainedLineRenderPass to read edge pairs
-// directly from the GeometryGpuData without maintaining internal buffers.
+// is BDA-accessible, allowing LinePass to read edge pairs directly from
+// the GeometryGpuData without maintaining internal buffers.
 
 export namespace ECS::MeshEdgeView
 {

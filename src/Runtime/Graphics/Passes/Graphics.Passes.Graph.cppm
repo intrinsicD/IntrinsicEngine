@@ -18,10 +18,10 @@ export namespace Graphics::Passes
     //
     // Renders entities with ECS::Graph::Data:
     //   - Nodes rendered as point splats via PointCloudRenderPass (all modes).
-    //   - Edges rendered as anti-aliased thick lines via LineRenderPass
+    //   - Edges rendered as anti-aliased thick lines via LinePass
     //     (submitted to DebugDraw accumulator in RenderPassContext).
     //
-    // When retained-mode rendering is active (RetainedLineRenderPass +
+    // When retained-mode rendering is active (LinePass +
     // RetainedPointCloudRenderPass), this pass skips entities that have valid
     // GpuGeometry — the retained passes handle them via BDA. This prevents
     // double-draw while maintaining the CPU fallback for entities without
@@ -45,7 +45,7 @@ export namespace Graphics::Passes
 
         // Collect graph entity data into shared staging buffers.
         // Must be called after PointCloudRenderPass::ResetPoints() and before
-        // PointCloudRenderPass::AddPasses() / LineRenderPass::AddPasses().
+        // PointCloudRenderPass::AddPasses() / LinePass::AddPasses().
         void AddPasses(RenderPassContext& ctx) override;
 
         void Shutdown() override {}
