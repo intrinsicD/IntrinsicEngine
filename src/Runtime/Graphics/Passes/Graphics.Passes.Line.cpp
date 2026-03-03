@@ -392,7 +392,7 @@ namespace Graphics::Passes
 
                 // Per-edge color aux buffer (sourced from legacy components).
                 uint64_t edgeAuxAddr = 0;
-                if (line.HasPerEdgeColors)
+                if (line.HasPerEdgeColors && line.ShowPerEdgeColors)
                 {
                     const uint32_t* colorData = nullptr;
                     uint32_t colorCount = 0;

@@ -415,6 +415,12 @@ export namespace ECS::Surface
         // When empty, SurfacePass uses standard texture/material shading.
         std::vector<uint32_t> CachedFaceColors;
         bool FaceColorsDirty = true;
+
+        // ---- Attribute Visualization Toggle ----
+        // When true and CachedFaceColors is non-empty, SurfacePass uses
+        // per-face colors. When false, standard texture/material shading
+        // is used even if face color data exists. Toggled via Inspector UI.
+        bool ShowPerFaceColors = true;
     };
 }
 
@@ -454,6 +460,12 @@ export namespace ECS::Line
         // ---- Per-Edge Attribute Flags ----
         bool HasPerEdgeColors = false;
         bool HasPerEdgeWidths = false;
+
+        // ---- Attribute Visualization Toggle ----
+        // When true and HasPerEdgeColors is true, LinePass uses per-edge
+        // colors from the aux buffer. When false, uniform Color is used
+        // even if per-edge data exists. Toggled via Inspector UI.
+        bool ShowPerEdgeColors = true;
 
         // ---- Per-Edge Color Cache (optional) ----
         // Packed ABGR per edge, sourced from mesh edge PropertySets

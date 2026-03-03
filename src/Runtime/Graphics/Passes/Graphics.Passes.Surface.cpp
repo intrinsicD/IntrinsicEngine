@@ -407,7 +407,7 @@ namespace Graphics::Passes
             auto visView = ctx.Scene.GetRegistry().view<ECS::Surface::Component>();
             for (auto [entity, sc] : visView.each())
             {
-                if (!sc.Geometry.IsValid() || sc.CachedFaceColors.empty())
+                if (!sc.Geometry.IsValid() || sc.CachedFaceColors.empty() || !sc.ShowPerFaceColors)
                     continue;
 
                 // Only process the first entity per geometry (all instances share face colors).
