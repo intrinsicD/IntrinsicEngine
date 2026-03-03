@@ -8,6 +8,7 @@ module RHI:ComputePipeline.Impl;
 import :ComputePipeline;
 import :Device;
 import :Shader;
+import Core.Logging;
 
 namespace RHI
 {
@@ -66,6 +67,27 @@ namespace RHI
 
     std::expected<std::unique_ptr<ComputePipeline>, VkResult> ComputePipelineBuilder::Build()
     {
+        // Validate push constant ranges against device limits
+        if (!m_PushConstants.empty())
+        {
+            VkPhysicalDeviceProperties props{};
+            vkGetPhysicalDeviceProperties(m_Device->GetPhysicalDevice(), &props);
+            const uint32_t maxSize = props.limits.maxPushConstantsSize;
+
+            for (const auto& range : m_PushConstants)
+            {
+                const uint32_t rangeEnd = range.offset + range.size;
+                if (rangeEnd > maxSize)
+                {
+                    Core::Log::Error("ComputePipelineBuilder::Build(): push constant range "
+                                     "(offset={}, size={}, end={}) exceeds device "
+                                     "maxPushConstantsSize ({} bytes)",
+                                     range.offset, range.size, rangeEnd, maxSize);
+                    return std::unexpected(VK_ERROR_UNKNOWN);
+                }
+            }
+        }
+
         VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
         pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
         pipelineLayoutInfo.setLayoutCount = (uint32_t)m_DescriptorSetLayouts.size();
