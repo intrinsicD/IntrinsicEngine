@@ -321,6 +321,7 @@ namespace Runtime
         reg("GraphGeometrySync",              Cat::System, "Uploads graph geometry to GPU and allocates GPUScene slots");
         reg("PointCloudGeometrySync",        Cat::System, "Uploads Cloud-backed point clouds to GPU and allocates GPUScene slots");
         reg("MeshViewLifecycle",              Cat::System, "Creates GPU edge/vertex views from mesh via ReuseVertexBuffersFrom");
+        reg("ComponentMigration",             Cat::System, "Syncs legacy components to per-pass typed components (PLAN.md Phase 1)");
         reg("GPUSceneSync",                   Cat::System, "Synchronizes CPU entity data to GPU scene buffers");
 
         Core::Log::Info("FeatureRegistry: Registered {} core features", m_FeatureRegistry.Count());
@@ -513,6 +514,14 @@ namespace Runtime
                             m_RenderOrchestrator->GetGeometryStorage(),
                             GetDeviceShared(),
                             m_GraphicsBackend->GetTransferManager());
+                    }
+
+                    // Component migration: syncs legacy components to new per-pass
+                    // typed components (Surface, Line, Point) during PLAN.md Phase 1.
+                    if (m_FeatureRegistry.IsEnabled("ComponentMigration"_id))
+                    {
+                        Graphics::Systems::ComponentMigration::RegisterSystem(
+                            frameGraph, registry);
                     }
 
                     if (m_FeatureRegistry.IsEnabled("GPUSceneSync"_id))

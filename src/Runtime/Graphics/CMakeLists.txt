@@ -26,6 +26,7 @@ target_sources(${target_name}
         Graphics.Systems.GraphGeometrySync.cppm
         Graphics.Systems.PointCloudGeometrySync.cppm
         Graphics.Systems.MeshViewLifecycle.cppm
+        Graphics.Systems.ComponentMigration.cppm
         # New Modules
         Graphics.RenderPath.cppm
         Graphics.GpuColor.cppm
@@ -85,6 +86,7 @@ target_sources(${target_name}
         Graphics.Systems.GraphGeometrySync.cpp
         Graphics.Systems.PointCloudGeometrySync.cpp
         Graphics.Systems.MeshViewLifecycle.cpp
+        Graphics.Systems.ComponentMigration.cpp
         # New Implementations
         Graphics.DebugDraw.cpp
         Graphics.OctreeDebugDraw.cpp
