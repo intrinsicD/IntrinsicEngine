@@ -1458,8 +1458,9 @@ public:
                             }
 
                             // Mirror visibility into the GPU view renderer (if present).
-                            // ShowWireframe is NOT mirrored — wireframe is CPU-driven via
-                            // DebugDraw and has no corresponding GPU scene instance.
+                            // ShowWireframe is NOT mirrored — wireframe rendering is managed
+                            // by MeshViewLifecycleSystem (auto-attaches MeshEdgeView when
+                            // ShowWireframe=true) and LinePass reads edge BDA index buffers.
                             if (viewR)
                             {
                                 viewR->ShowSurface = vis->ShowSurface;
@@ -1469,11 +1470,8 @@ public:
                             // -----------------------------------------------------------------
                             // Lazily create GPU views (one-time allocations/uploads)
                             // -----------------------------------------------------------------
-                            // NOTE: Wireframe has NO GPU view. It is rendered by LinePass
-                            // which reads CachedEdges via BDA from persistent GPU buffers.
-                            // WireframeColor and WireframeOverlay are correctly applied.
-                            // The previous GPU view approach used surface.frag which ignores
-                            // WireframeColor and produced invisible/incorrect output.
+                            // NOTE: Wireframe GPU views (MeshEdgeView) are auto-managed by
+                            // MeshViewLifecycleSystem. No manual creation needed here.
 
                             // Vertex view (Points): create the GPU view for point rendering modes.
                             const bool wantGpuVertexView =

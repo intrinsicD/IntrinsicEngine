@@ -55,55 +55,6 @@ namespace Graphics::Passes
     using EdgePair = ECS::RenderVisualization::EdgePair;
 
     // =========================================================================
-    // EnsureEdgeBuffer
-    // =========================================================================
-    // Creates or updates a persistent BDA-addressable edge buffer for an entity.
-    // Returns the buffer device address, or 0 on failure.
-
-    uint64_t LinePass::EnsureEdgeBuffer(
-        uint32_t entityKey,
-        const void* edgeData,
-        uint32_t edgeCount,
-        uint32_t sourceGeoIdx)
-    {
-        auto it = m_EdgeBuffers.find(entityKey);
-
-        // Buffer exists, edge count matches, and source geometry hasn't changed — reuse.
-        if (it != m_EdgeBuffers.end()
-            && it->second.EdgeCount == edgeCount
-            && it->second.SourceGeometryIndex == sourceGeoIdx)
-        {
-            return it->second.Buffer->GetDeviceAddress();
-        }
-
-        // Need to create or recreate (count changed or source geometry was re-uploaded).
-        if (it != m_EdgeBuffers.end() && it->second.Buffer)
-        {
-            // Deferred-destroy old buffer — may still be referenced by in-flight frames.
-            m_Device->SafeDestroy([old = std::move(it->second.Buffer)]() {});
-            it->second.EdgeCount = 0;
-        }
-
-        const VkDeviceSize size = static_cast<VkDeviceSize>(edgeCount) * sizeof(EdgePair);
-        auto buf = std::make_unique<RHI::VulkanBuffer>(
-            *m_Device, size,
-            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-            VMA_MEMORY_USAGE_CPU_TO_GPU);
-
-        if (!buf->GetMappedData())
-        {
-            Core::Log::Error("LinePass: Failed to allocate edge buffer ({} bytes)", size);
-            return 0;
-        }
-
-        buf->Write(edgeData, static_cast<size_t>(size));
-        const uint64_t addr = buf->GetDeviceAddress();
-
-        m_EdgeBuffers[entityKey] = { std::move(buf), edgeCount, sourceGeoIdx };
-        return addr;
-    }
-
-    // =========================================================================
     // EnsureEdgeAuxBuffer
     // =========================================================================
     // Creates or updates a persistent BDA-addressable per-edge attribute buffer.
@@ -269,14 +220,6 @@ namespace Graphics::Passes
     {
         if (!m_Device) return;
 
-        // Deferred-destroy all persistent edge buffers.
-        for (auto& [key, entry] : m_EdgeBuffers)
-        {
-            if (entry.Buffer)
-                m_Device->SafeDestroy([old = std::move(entry.Buffer)]() {});
-        }
-        m_EdgeBuffers.clear();
-
         // Deferred-destroy all persistent edge attribute buffers.
         for (auto& [key, entry] : m_EdgeAuxBuffers)
         {
@@ -375,7 +318,7 @@ namespace Graphics::Passes
             }
         }
 
-        // Per-entity draw command — each entity has its own persistent edge buffer.
+        // Per-entity draw command.
         struct DrawInfo
         {
             glm::mat4 Model;
@@ -390,16 +333,15 @@ namespace Graphics::Passes
         std::vector<DrawInfo> depthDraws;    // depth-tested draws (retained + transient)
         std::vector<DrawInfo> overlayDraws;  // no-depth-test draws (retained overlay + transient overlay)
 
-        // Track which entity keys are active this frame (for orphan cleanup).
-        std::vector<uint32_t> activeKeys;
+        // Track which entity keys have active aux buffers this frame.
+        std::vector<uint32_t> activeAuxKeys;
 
         // =================================================================
         // Retained-mode draws via ECS::Line::Component
         // =================================================================
-        // LinePass now iterates the unified Line::Component rather than
-        // querying legacy MeshRenderer/RenderVisualization/Graph::Data
-        // directly. ComponentMigration populates Line::Component from all
-        // edge sources each frame.
+        // All retained edge sources provide a valid EdgeView geometry
+        // handle with a BDA-addressable index buffer (created by
+        // MeshViewLifecycleSystem or GraphGeometrySyncSystem).
         if (m_GeometryStorage)
         {
             auto& registry = ctx.Scene.GetRegistry();
@@ -418,8 +360,17 @@ namespace Graphics::Passes
                 if (!line.Geometry.IsValid() || line.EdgeCount == 0)
                     continue;
 
+                // EdgeView must be valid — all edge sources create proper
+                // BDA index buffers via ReuseVertexBuffersFrom.
+                if (!line.EdgeView.IsValid())
+                    continue;
+
                 GeometryGpuData* geo = m_GeometryStorage->GetUnchecked(line.Geometry);
                 if (!geo || !geo->GetVertexBuffer())
+                    continue;
+
+                GeometryGpuData* edgeGeo = m_GeometryStorage->GetUnchecked(line.EdgeView);
+                if (!edgeGeo || !edgeGeo->GetIndexBuffer() || !edgeGeo->GetVertexBuffer())
                     continue;
 
                 glm::mat4 worldMatrix(1.0f);
@@ -430,63 +381,11 @@ namespace Graphics::Passes
                     continue;
 
                 const uint32_t entityKey = static_cast<uint32_t>(entity);
-                uint32_t edgeCount = line.EdgeCount;
-                uint64_t edgeAddr = 0;
-                uint64_t posAddr = 0;
+                const uint32_t edgeCount = line.EdgeCount;
 
-                // Path 1: EdgeView is valid — use BDA from the edge view geometry.
-                if (line.EdgeView.IsValid())
-                {
-                    GeometryGpuData* edgeGeo = m_GeometryStorage->GetUnchecked(line.EdgeView);
-                    if (!edgeGeo || !edgeGeo->GetIndexBuffer() || !edgeGeo->GetVertexBuffer())
-                        continue;
-
-                    edgeAddr = edgeGeo->GetIndexBuffer()->GetDeviceAddress();
-
-                    const uint64_t baseAddr = edgeGeo->GetVertexBuffer()->GetDeviceAddress();
-                    posAddr = baseAddr + edgeGeo->GetLayout().PositionsOffset;
-                }
-                // Path 2: No EdgeView — fall back to cached edge data from
-                //          legacy components (transition period).
-                else
-                {
-                    // Source edge data: Graph::Data or RenderVisualization.
-                    const void* edgeData = nullptr;
-
-                    if (const auto* gd = registry.try_get<ECS::Graph::Data>(entity))
-                    {
-                        if (!gd->CachedEdgePairs.empty())
-                        {
-                            edgeData = gd->CachedEdgePairs.data();
-                            edgeCount = static_cast<uint32_t>(gd->CachedEdgePairs.size());
-                        }
-                    }
-
-                    if (!edgeData)
-                    {
-                        if (const auto* vis = registry.try_get<ECS::RenderVisualization::Component>(entity))
-                        {
-                            if (!vis->CachedEdges.empty())
-                            {
-                                edgeData = vis->CachedEdges.data();
-                                edgeCount = static_cast<uint32_t>(vis->CachedEdges.size());
-                            }
-                        }
-                    }
-
-                    if (!edgeData || edgeCount == 0)
-                        continue;
-
-                    edgeAddr = EnsureEdgeBuffer(
-                        entityKey, edgeData, edgeCount, line.Geometry.Index);
-                    if (edgeAddr == 0)
-                        continue;
-
-                    activeKeys.push_back(entityKey);
-
-                    const uint64_t baseAddr = geo->GetVertexBuffer()->GetDeviceAddress();
-                    posAddr = baseAddr + geo->GetLayout().PositionsOffset;
-                }
+                const uint64_t edgeAddr = edgeGeo->GetIndexBuffer()->GetDeviceAddress();
+                const uint64_t baseAddr = edgeGeo->GetVertexBuffer()->GetDeviceAddress();
+                const uint64_t posAddr = baseAddr + edgeGeo->GetLayout().PositionsOffset;
 
                 const uint32_t wireColor = GpuColor::PackColorF(
                     line.Color.r, line.Color.g, line.Color.b, line.Color.a);
@@ -523,9 +422,7 @@ namespace Graphics::Passes
 
                     if (colorData)
                     {
-                        // Track for orphan cleanup if not already tracked.
-                        if (line.EdgeView.IsValid())
-                            activeKeys.push_back(entityKey);
+                        activeAuxKeys.push_back(entityKey);
                         edgeAuxAddr = EnsureEdgeAuxBuffer(entityKey, colorData, colorCount);
                     }
                 }
@@ -549,28 +446,14 @@ namespace Graphics::Passes
                     vr->WireframeEdgeCount = edgeCount;
             }
 
-            // Cleanup orphaned edge buffers and edge aux buffers.
-            if (!m_EdgeBuffers.empty() || !m_EdgeAuxBuffers.empty())
+            // Cleanup orphaned edge aux buffers.
+            if (!m_EdgeAuxBuffers.empty())
             {
-                std::sort(activeKeys.begin(), activeKeys.end());
-
-                for (auto it = m_EdgeBuffers.begin(); it != m_EdgeBuffers.end(); )
-                {
-                    if (!std::binary_search(activeKeys.begin(), activeKeys.end(), it->first))
-                    {
-                        if (it->second.Buffer)
-                            m_Device->SafeDestroy([old = std::move(it->second.Buffer)]() {});
-                        it = m_EdgeBuffers.erase(it);
-                    }
-                    else
-                    {
-                        ++it;
-                    }
-                }
+                std::sort(activeAuxKeys.begin(), activeAuxKeys.end());
 
                 for (auto it = m_EdgeAuxBuffers.begin(); it != m_EdgeAuxBuffers.end(); )
                 {
-                    if (!std::binary_search(activeKeys.begin(), activeKeys.end(), it->first))
+                    if (!std::binary_search(activeAuxKeys.begin(), activeAuxKeys.end(), it->first))
                     {
                         if (it->second.Buffer)
                             m_Device->SafeDestroy([old = std::move(it->second.Buffer)]() {});

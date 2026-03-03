@@ -15,9 +15,14 @@ export namespace Graphics::Systems::MeshViewLifecycle
     // Lifecycle glue for mesh-derived geometry views (edge + vertex).
     //
     // Contract:
+    //  - Auto-attaches MeshEdgeView::Component when ShowWireframe=true on
+    //    entities with RenderVisualization + MeshRenderer. Auto-detaches
+    //    when ShowWireframe=false.
+    //
     //  - Iterates entities with MeshEdgeView::Component + MeshRenderer.
-    //    If Dirty and CachedEdges are available: creates an edge index buffer
-    //    via ReuseVertexBuffersFrom(meshHandle), stores the handle, allocates
+    //    If Dirty: extracts unique edge pairs from MeshCollider collision
+    //    data (triangle indices), creates an edge index buffer via
+    //    ReuseVertexBuffersFrom(meshHandle), stores the handle, allocates
     //    a GPUScene slot, and clears Dirty.
     //
     //  - Iterates entities with MeshVertexView::Component + MeshRenderer.

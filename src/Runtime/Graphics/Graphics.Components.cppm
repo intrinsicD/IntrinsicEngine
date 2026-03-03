@@ -232,9 +232,15 @@ export namespace ECS::Graph
         static constexpr uint32_t kInvalidSlot = ~0u;
         uint32_t GpuSlot = kInvalidSlot;
 
-        // Edge index pairs into the compacted vertex buffer.
-        // Consumed by LinePass in the same way as
-        // RenderVisualization::CachedEdges for mesh wireframe.
+        // Edge index buffer (via ReuseVertexBuffersFrom of GpuGeometry).
+        // Contains flattened uint32_t edge pairs. Created by
+        // GraphGeometrySyncSystem alongside positions. LinePass reads
+        // edge indices from this geometry's index buffer via BDA.
+        Geometry::GeometryHandle GpuEdgeGeometry{};
+        uint32_t GpuEdgeCount = 0;
+
+        // Edge index pairs into the compacted vertex buffer (CPU-side).
+        // Retained for non-rendering consumers (layout algorithms, selection).
         std::vector<ECS::RenderVisualization::EdgePair> CachedEdgePairs;
 
         // Per-edge colors (packed ABGR), one per edge in CachedEdgePairs order.
@@ -537,13 +543,14 @@ export namespace ECS::Line
         Geometry::GeometryHandle Geometry{};
 
         // Edge index buffer (separate from vertex buffer). Contains
-        // flattened uint32_t pairs from PropertySet edge topology.
-        // When invalid, LinePass falls back to cached edge data from
-        // legacy components (RenderVisualization or Graph::Data).
+        // flattened uint32_t pairs. Created by MeshViewLifecycleSystem
+        // (from collision data) or GraphGeometrySyncSystem (from graph
+        // topology via ReuseVertexBuffersFrom). Must be valid for
+        // LinePass to render edges — no internal fallback.
         Geometry::GeometryHandle EdgeView{};
 
         // Number of edges to render. Populated by ComponentMigration
-        // from the edge view or cached edge data.
+        // from the edge view geometry source.
         uint32_t EdgeCount = 0;
 
         // ---- Appearance (defaults; overridden by per-edge attributes) ----

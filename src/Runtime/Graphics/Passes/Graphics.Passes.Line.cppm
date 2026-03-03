@@ -28,9 +28,12 @@ export namespace Graphics::Passes
     // push constants.
     //
     // Retained sources (via ECS::Line::Component, populated by ComponentMigration):
-    // - Mesh wireframe edges (MeshEdgeView BDA index buffer, or CachedEdges fallback)
-    // - Graph edges (CachedEdgePairs from GraphGeometrySyncSystem)
+    // - Mesh wireframe edges (MeshEdgeView BDA index buffer)
+    // - Graph edges (GpuEdgeGeometry BDA index buffer from GraphGeometrySyncSystem)
     // - Standalone line entities (future)
+    //
+    // All retained edge sources provide a valid EdgeView geometry handle with
+    // a BDA-addressable index buffer. No internal LinePass edge buffer fallback.
     //
     // Transient sources:
     // - DebugDraw lines (octree overlays, bounds, contact manifolds, etc.)
@@ -87,23 +90,12 @@ export namespace Graphics::Passes
         std::unique_ptr<RHI::GraphicsPipeline> m_Pipeline;        // depth test enabled
         std::unique_ptr<RHI::GraphicsPipeline> m_OverlayPipeline; // depth test disabled
 
-        // Per-entity persistent edge buffer: uploaded once, read via BDA each frame.
-        struct RetainedEdgeEntry
-        {
-            std::unique_ptr<RHI::VulkanBuffer> Buffer;
-            uint32_t EdgeCount = 0;
-            uint32_t SourceGeometryIndex = 0; // Tracks source geometry changes
-        };
-
         // Per-entity persistent edge attribute buffer (packed ABGR per edge).
         struct RetainedEdgeAuxEntry
         {
             std::unique_ptr<RHI::VulkanBuffer> Buffer;
             uint32_t EdgeCount = 0;
         };
-
-        // Entity ID → persistent edge buffer.
-        std::unordered_map<uint32_t, RetainedEdgeEntry> m_EdgeBuffers;
 
         // Entity ID → persistent edge attribute buffer.
         std::unordered_map<uint32_t, RetainedEdgeAuxEntry> m_EdgeAuxBuffers;
@@ -122,12 +114,6 @@ export namespace Graphics::Passes
         // Per-edge color buffer: packed ABGR per segment
         std::unique_ptr<RHI::VulkanBuffer> m_TransientColorBuffer[FRAMES];
         uint32_t m_TransientColorCapacity = 0; // in segments
-
-        // Create or update a persistent edge buffer for an entity.
-        uint64_t EnsureEdgeBuffer(uint32_t entityKey,
-                                  const void* edgeData,
-                                  uint32_t edgeCount,
-                                  uint32_t sourceGeoIdx);
 
         // Create or update a persistent per-edge attribute buffer for an entity.
         uint64_t EnsureEdgeAuxBuffer(uint32_t entityKey,
