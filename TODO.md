@@ -20,10 +20,6 @@ This document tracks **what's left to do** in IntrinsicEngine's architecture.
 
 Replace the dual-path (transient CPU + retained GPU) rendering with a **single unified path per primitive type** (`SurfacePass`, `LinePass`, `PointPass`). Full spec in `PLAN.md`.
 
-### 1.3 LinePass — Consolidate All Line/Edge Sources (PLAN.md Phase 3)
-
-- [ ] Add edge view creation: extract edge pairs from `Halfedge::Mesh` / `Graph` PropertySets, upload as edge index buffer via `ReuseVertexBuffersFrom()` (eliminates `CachedEdges`/`CachedEdgePairs` fallback in LinePass).
-
 ### 1.4 PointPass — Consolidate All Point Sources (PLAN.md Phase 4)
 
 - [ ] Rename `RetainedPointCloudRenderPass` → `PointPass`.

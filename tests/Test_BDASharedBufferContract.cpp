@@ -317,6 +317,8 @@ TEST(BDA_Components, GraphDataDefaults)
 
     EXPECT_EQ(data.GraphRef, nullptr);
     EXPECT_FALSE(data.GpuGeometry.IsValid());
+    EXPECT_FALSE(data.GpuEdgeGeometry.IsValid());
+    EXPECT_EQ(data.GpuEdgeCount, 0u);
     EXPECT_EQ(data.GpuSlot, ECS::Graph::Data::kInvalidSlot);
     EXPECT_TRUE(data.GpuDirty);
     EXPECT_EQ(data.GpuVertexCount, 0u);

@@ -63,6 +63,12 @@ namespace Graphics::Systems::GraphGeometrySync
                         geometryStorage.Remove(graphData.GpuGeometry, device->GetGlobalFrameNumber());
                         graphData.GpuGeometry = {};
                     }
+                    if (graphData.GpuEdgeGeometry.IsValid())
+                    {
+                        geometryStorage.Remove(graphData.GpuEdgeGeometry, device->GetGlobalFrameNumber());
+                        graphData.GpuEdgeGeometry = {};
+                        graphData.GpuEdgeCount = 0;
+                    }
                     graphData.CachedEdgePairs.clear();
                     graphData.CachedEdgeColors.clear();
                     graphData.CachedNodeColors.clear();
@@ -146,6 +152,12 @@ namespace Graphics::Systems::GraphGeometrySync
                         geometryStorage.Remove(graphData.GpuGeometry, device->GetGlobalFrameNumber());
                         graphData.GpuGeometry = {};
                     }
+                    if (graphData.GpuEdgeGeometry.IsValid())
+                    {
+                        geometryStorage.Remove(graphData.GpuEdgeGeometry, device->GetGlobalFrameNumber());
+                        graphData.GpuEdgeGeometry = {};
+                        graphData.GpuEdgeCount = 0;
+                    }
                     graphData.CachedEdgePairs.clear();
                     graphData.CachedEdgeColors.clear();
                     graphData.CachedNodeColors.clear();
@@ -204,9 +216,6 @@ namespace Graphics::Systems::GraphGeometrySync
                 // --- Upload to GPU via Direct mode (CPU_TO_GPU for dynamic graphs) ---
                 // Direct mode creates host-visible buffers with SHADER_DEVICE_ADDRESS_BIT
                 // for BDA access. Suitable for graphs that may re-layout frequently.
-                // Edge pairs are stored in CachedEdgePairs; LinePass creates persistent
-                // BDA-addressable edge buffers from them on first use and recreates
-                // them when the edge count changes (e.g. after re-layout).
                 GeometryUploadRequest directUpload{};
                 directUpload.Positions = positions;
                 directUpload.Normals = normals;
@@ -225,6 +234,50 @@ namespace Graphics::Systems::GraphGeometrySync
                 }
 
                 graphData.GpuGeometry = geometryStorage.Add(std::move(newGpuData));
+
+                // --- Create edge index buffer via ReuseVertexBuffersFrom ---
+                // Shares the vertex buffer (positions) with the node geometry.
+                // LinePass reads edge pairs from this geometry's index buffer
+                // via BDA — no LinePass-internal edge buffer management needed.
+                if (graphData.GpuEdgeGeometry.IsValid())
+                {
+                    geometryStorage.Remove(graphData.GpuEdgeGeometry, device->GetGlobalFrameNumber());
+                    graphData.GpuEdgeGeometry = {};
+                    graphData.GpuEdgeCount = 0;
+                }
+
+                if (!edgePairs.empty())
+                {
+                    // Flatten EdgePair array to contiguous uint32_t indices.
+                    std::vector<uint32_t> edgeIndices;
+                    edgeIndices.reserve(edgePairs.size() * 2);
+                    for (const auto& [i0, i1] : edgePairs)
+                    {
+                        edgeIndices.push_back(i0);
+                        edgeIndices.push_back(i1);
+                    }
+
+                    GeometryUploadRequest edgeReq{};
+                    edgeReq.ReuseVertexBuffersFrom = graphData.GpuGeometry;
+                    edgeReq.Indices = edgeIndices;
+                    edgeReq.Topology = PrimitiveTopology::Lines;
+                    edgeReq.UploadMode = GeometryUploadMode::Direct;
+
+                    auto [edgeGpuData, edgeToken] = GeometryGpuData::CreateAsync(
+                        device, transferManager, edgeReq, &geometryStorage);
+
+                    if (edgeGpuData && edgeGpuData->GetIndexBuffer())
+                    {
+                        graphData.GpuEdgeGeometry = geometryStorage.Add(std::move(edgeGpuData));
+                        graphData.GpuEdgeCount = static_cast<uint32_t>(edgePairs.size());
+                    }
+                    else
+                    {
+                        Core::Log::Warn("GraphGeometrySync: Failed to create edge index buffer for entity {}",
+                                        static_cast<uint32_t>(entity));
+                    }
+                }
+
                 graphData.CachedEdgePairs = std::move(edgePairs);
                 graphData.CachedEdgeColors = std::move(edgeColors);
                 graphData.CachedNodeColors = std::move(nodeColors);

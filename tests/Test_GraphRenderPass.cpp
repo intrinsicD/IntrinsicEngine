@@ -303,6 +303,12 @@ TEST(Graph_RetainedMode, DefaultGpuStateValues)
     // Per-node radii should be empty.
     EXPECT_TRUE(data.CachedNodeRadii.empty());
 
+    // GpuEdgeGeometry handle should be invalid by default.
+    EXPECT_FALSE(data.GpuEdgeGeometry.IsValid());
+
+    // GpuEdgeCount should be 0.
+    EXPECT_EQ(data.GpuEdgeCount, 0u);
+
     // GpuDirty should be true (triggers initial upload).
     EXPECT_TRUE(data.GpuDirty);
 

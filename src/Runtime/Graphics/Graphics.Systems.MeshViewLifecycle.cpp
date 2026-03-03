@@ -2,6 +2,8 @@ module;
 
 #include <cstdint>
 #include <memory>
+#include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -35,6 +37,48 @@ namespace Graphics::Systems::MeshViewLifecycle
 
             return {0.0f, 0.0f, 0.0f, GPUSceneConstants::kDefaultBoundingSphereRadius};
         }
+
+        // Extract unique edges from triangle indices.
+        // Returns flattened uint32_t indices: [i0_0, i1_0, i0_1, i1_1, ...]
+        [[nodiscard]] auto ExtractUniqueEdgesFromTriangles(
+            const std::vector<uint32_t>& triIndices) -> std::vector<uint32_t>
+        {
+            struct PairHash {
+                std::size_t operator()(std::pair<uint32_t, uint32_t> p) const noexcept {
+                    return std::hash<uint64_t>{}(
+                        (static_cast<uint64_t>(p.first) << 32) | static_cast<uint64_t>(p.second));
+                }
+            };
+
+            std::unordered_set<std::pair<uint32_t, uint32_t>, PairHash> edgeSet;
+            edgeSet.reserve(triIndices.size());
+
+            for (std::size_t t = 0; t + 2 < triIndices.size(); t += 3)
+            {
+                const uint32_t i0 = triIndices[t];
+                const uint32_t i1 = triIndices[t + 1];
+                const uint32_t i2 = triIndices[t + 2];
+
+                auto addEdge = [&](uint32_t a, uint32_t b) {
+                    auto key = (a < b) ? std::pair{a, b} : std::pair{b, a};
+                    edgeSet.insert(key);
+                };
+
+                addEdge(i0, i1);
+                addEdge(i1, i2);
+                addEdge(i2, i0);
+            }
+
+            std::vector<uint32_t> result;
+            result.reserve(edgeSet.size() * 2);
+            for (const auto& [a, b] : edgeSet)
+            {
+                result.push_back(a);
+                result.push_back(b);
+            }
+
+            return result;
+        }
     }
 
     void OnUpdate(entt::registry& registry,
@@ -44,12 +88,37 @@ namespace Graphics::Systems::MeshViewLifecycle
                   RHI::TransferManager& transferManager)
     {
         // -----------------------------------------------------------------
+        // Phase 0: Auto-attach/detach MeshEdgeView based on ShowWireframe
+        // -----------------------------------------------------------------
+        // Ensures MeshEdgeView::Component exists when wireframe is enabled,
+        // and is removed when wireframe is disabled. This runs before
+        // Phase 1 so that new edge views are processed in the same frame.
+        {
+            auto visView = registry.view<ECS::RenderVisualization::Component,
+                                         ECS::MeshRenderer::Component>();
+
+            for (auto [entity, vis, mr] : visView.each())
+            {
+                if (vis.ShowWireframe)
+                {
+                    if (!registry.all_of<ECS::MeshEdgeView::Component>(entity))
+                        registry.emplace<ECS::MeshEdgeView::Component>(entity);
+                }
+                else
+                {
+                    if (registry.all_of<ECS::MeshEdgeView::Component>(entity))
+                        registry.remove<ECS::MeshEdgeView::Component>(entity);
+                }
+            }
+        }
+
+        // -----------------------------------------------------------------
         // Phase 1: Edge View Lifecycle
         // -----------------------------------------------------------------
-        // Iterate entities with MeshEdgeView + MeshRenderer.
-        // When Dirty: extract edge pairs from RenderVisualization::CachedEdges,
-        // create an edge index buffer via ReuseVertexBuffersFrom, allocate
-        // GPUScene slot.
+        // Iterate entities with MeshEdgeView + MeshRenderer + MeshCollider.
+        // When Dirty: extract unique edge pairs from collision data triangle
+        // indices, create an edge index buffer via ReuseVertexBuffersFrom,
+        // allocate GPUScene slot.
 
         auto edgeView = registry.view<ECS::MeshEdgeView::Component,
                                       ECS::MeshRenderer::Component>();
@@ -67,22 +136,25 @@ namespace Graphics::Systems::MeshViewLifecycle
             if (!srcGeo || !srcGeo->GetVertexBuffer())
                 continue;
 
-            // Edge pairs come from RenderVisualization::CachedEdges (populated
-            // by MeshRenderPass when ShowWireframe is enabled).
-            auto* vis = registry.try_get<ECS::RenderVisualization::Component>(entity);
-            if (!vis || vis->CachedEdges.empty())
+            // Extract edge pairs directly from collision data (triangle indices).
+            // The collision mesh indices reference into the same position array
+            // as the GPU vertex buffer.
+            auto* collider = registry.try_get<ECS::MeshCollider::Component>(entity);
+            if (!collider || !collider->CollisionRef || collider->CollisionRef->Indices.empty())
                 continue;
 
-            // Flatten EdgePair array to contiguous uint32_t indices.
+            const auto& triIndices = collider->CollisionRef->Indices;
+
+            // Extract unique edges from triangle indices.
             // Layout: [i0_0, i1_0, i0_1, i1_1, ...] — compatible with
             // Lines topology and BDA EdgePair reads.
-            const uint32_t edgeCount = static_cast<uint32_t>(vis->CachedEdges.size());
-            std::vector<uint32_t> indices;
-            indices.reserve(static_cast<size_t>(edgeCount) * 2);
-            for (const auto& [i0, i1] : vis->CachedEdges)
+            std::vector<uint32_t> indices = ExtractUniqueEdgesFromTriangles(triIndices);
+            const uint32_t edgeCount = static_cast<uint32_t>(indices.size() / 2);
+
+            if (edgeCount == 0)
             {
-                indices.push_back(i0);
-                indices.push_back(i1);
+                ev.Dirty = false;
+                continue;
             }
 
             GeometryUploadRequest req{};

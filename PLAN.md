@@ -16,10 +16,10 @@ This section tracks where runtime code currently stands relative to this plan/sp
 | Area | Planned direction | Current state | Status |
 |------|-------------------|---------------|--------|
 | ECS render components | Replace `MeshRenderer`/`RenderVisualization`/`GraphRenderer`/`PointCloudRenderer` with `ECS::Surface`, `ECS::Line`, `ECS::Point`, `ECS::Graph::Data` | `ECS::Surface::Component`, `ECS::Line::Component`, `ECS::Point::Component` defined alongside legacy components. `ComponentMigration` system syncs legacy → new each frame. `ECS::Graph::Data` replaces `GraphRenderer::Component` with `shared_ptr<Graph>` PropertySet-backed authority. Legacy components still active (transition period). | **Phase 1 complete** |
-| Pass topology | Collapse into `SurfacePass`, `LinePass`, `PointPass` each owning retained + transient internally | `SurfacePass` (Phase 2). `LinePass` iterates `ECS::Line::Component` for all retained-mode edge draws (mesh wireframe + graph edges), unified with transient DebugDraw (Phase 3 near-complete). CPU wireframe/edge fallback paths deleted from `MeshRenderPass`/`GraphRenderPass`. Pipeline still instantiates `MeshRenderPass` (edge cache + vertex collection), `GraphRenderPass` (node collection), `PointCloudRenderPass`, `RetainedPointCloudRenderPass` | **Phase 3 near-complete** |
+| Pass topology | Collapse into `SurfacePass`, `LinePass`, `PointPass` each owning retained + transient internally | `SurfacePass` (Phase 2). `LinePass` iterates `ECS::Line::Component` for all retained-mode edge draws (mesh wireframe + graph edges), unified with transient DebugDraw — edge view creation from PropertySets complete, internal fallback eliminated (Phase 3 complete). Pipeline still instantiates `MeshRenderPass` (edge cache + vertex collection), `GraphRenderPass` (node collection), `PointCloudRenderPass`, `RetainedPointCloudRenderPass` | **Phase 3 complete** |
 | Shader naming/registration | `surface.*`, unified `line.*`, `point_flatdisc.*`, `point_surfel.*` IDs | `surface.vert/frag` (Phase 2). `line.vert/frag` (unified BDA shaders, Phase 3). Runtime registers `Line.Vert/Frag` (single pair). Still keeps `point_retained.*` path | **Phase 3 partial** |
 | CPU geometry authority | PropertySet-backed CPU sources for cloud/graph/mesh topology and attributes | **Implemented in geometry domain types** (`PointCloud::Cloud`, `Graph`, `Halfedge::Mesh`). All four PropertySet domains (`VertexProperties()`, `EdgeProperties()`, `FaceProperties()`, `HalfedgeProperties()`) are publicly accessible. Bulk edge extraction via `ExtractEdgeVertexPairs()` provides span-compatible GPU upload. | **Complete** |
-| PropertySet-driven edge source | Mesh/graph edge rendering sourced from topology PropertySets | Plan/spec defined, but runtime still has `RenderVisualization::CachedEdges` + dirty cache fields | **Partial (spec yes, runtime no)** |
+| PropertySet-driven edge source | Mesh/graph edge rendering sourced from topology PropertySets | `GraphGeometrySyncSystem` creates edge index buffers via `ReuseVertexBuffersFrom` from graph topology. `MeshViewLifecycleSystem` auto-attaches `MeshEdgeView` and creates edge index buffers from collision data. LinePass requires valid `EdgeView` — no internal `CachedEdges`/`EnsureEdgeBuffer` fallback. | **Complete** |
 | Automatic CPU→GPU sync | Per-frame dirty-domain sync (`GeometryDirty`/`TopologyDirty`/`AttributesDirty`) patches SSBO ranges and renderable offsets | No generic dirty-domain sync system yet; current flow is pass/component-local invalidation and per-feature staging | **Not started** |
 | Subcomponent hierarchy | Named sub-mesh/sub-graph/sub-cloud components with offsets/sizes and renderable slice references | No dedicated hierarchy/slice component model in rendering ECS yet | **Not started** |
 
@@ -27,7 +27,7 @@ This section tracks where runtime code currently stands relative to this plan/sp
 
 1. The current renderer still uses a mixed collector architecture with parallel retained/transient passes, so the plan's "single pass per primitive" invariant is not yet enforced.
 2. ~~Graph render components own CPU arrays~~ **Resolved for graphs** — `ECS::Graph::Data` holds `shared_ptr<Graph>`, reads from PropertySets. ~~Point cloud render component still holds `std::vector` copies~~ **Resolved** — `PointCloudRenderer::Component` now holds `GeometryHandle` for device-local GPU data; CPU vectors are freed after initial upload by `PointCloudRendererLifecycle`.
-3. Wireframe currently depends on cached edge extraction in visualization components rather than direct PropertySet-to-SSBO sync.
+3. ~~Wireframe currently depends on cached edge extraction in visualization components rather than direct PropertySet-to-SSBO sync.~~ **Resolved** — `MeshViewLifecycleSystem` auto-attaches `MeshEdgeView` with edge index buffer from collision data; `GraphGeometrySyncSystem` creates `GpuEdgeGeometry` via `ReuseVertexBuffersFrom`. LinePass internal `EnsureEdgeBuffer` fallback eliminated.
 4. ~~No geometry view lifecycle systems exist~~ **Resolved** — `MeshViewLifecycleSystem` creates edge/vertex view `GeometryHandle` instances via `ReuseVertexBuffersFrom`.
 5. ~~Per-edge and per-face attribute rendering is not yet supported~~ **Resolved** — `PtrEdgeAux` BDA channel for per-edge colors, `PtrFaceAttr` BDA channel for per-face colors via `gl_PrimitiveID`.
 6. ~~Point clouds and graphs lack device-local upload paths~~ **Resolved** — standalone point clouds use staged device-local upload via `PointCloudRendererLifecycle`; graphs use `GraphGeometrySyncSystem` with Direct mode.
@@ -739,17 +739,17 @@ Each pass is self-contained. No existing code changes.
 
 ### Phase 3: LinePass (atomic — consolidate all line/edge sources)
 
-13. Delete old transient `line.vert/frag` (SSBO version) FIRST
-14. Rename `RetainedLineRenderPass` → `LinePass`, rename `line_retained.* → line.*`
-15. Add edge view creation: extract edge pairs from `Halfedge::Mesh` / `Graph` PropertySets, upload as edge index buffer via `ReuseVertexBuffersFrom()`
-16. Add `ECS::Line::Component` iteration (replaces `RenderVisualization::ShowWireframe`)
-17. Add graph edge iteration (replaces `GraphRenderPass` edge submission)
-18. LinePass reads `ctx.DebugDraw->GetLines()/GetOverlayLines()` for transient data
-19. Add per-edge attribute BDA channel (`PtrEdgeAux`) for per-edge colors/widths from edge PropertySets
-20. Delete wireframe code from `MeshRenderPass`
-21. Delete edge submission from `GraphRenderPass`
-22. Delete old `LineRenderPass` (transient-only pass)
-23. Delete `RetainedLineRenderPass` files (already renamed)
+13. ~~Delete old transient `line.vert/frag` (SSBO version) FIRST~~ **Done**
+14. ~~Rename `RetainedLineRenderPass` → `LinePass`, rename `line_retained.* → line.*`~~ **Done**
+15. ~~Add edge view creation: extract edge pairs from `Halfedge::Mesh` / `Graph` PropertySets, upload as edge index buffer via `ReuseVertexBuffersFrom()`~~ **Done** — `GraphGeometrySyncSystem` creates `GpuEdgeGeometry` via `ReuseVertexBuffersFrom`; `MeshViewLifecycleSystem` auto-attaches `MeshEdgeView` from collision data. LinePass internal `EnsureEdgeBuffer` fallback eliminated.
+16. ~~Add `ECS::Line::Component` iteration (replaces `RenderVisualization::ShowWireframe`)~~ **Done**
+17. ~~Add graph edge iteration (replaces `GraphRenderPass` edge submission)~~ **Done**
+18. ~~LinePass reads `ctx.DebugDraw->GetLines()/GetOverlayLines()` for transient data~~ **Done**
+19. ~~Add per-edge attribute BDA channel (`PtrEdgeAux`) for per-edge colors/widths from edge PropertySets~~ **Done**
+20. ~~Delete wireframe code from `MeshRenderPass`~~ **Done**
+21. ~~Delete edge submission from `GraphRenderPass`~~ **Done**
+22. ~~Delete old `LineRenderPass` (transient-only pass)~~ **Done**
+23. ~~Delete `RetainedLineRenderPass` files (already renamed)~~ **Done**
 
 **Gate:** `IntrinsicTests` pass. Wireframe, graph edges, debug lines all render correctly. Per-edge coloring works.
 

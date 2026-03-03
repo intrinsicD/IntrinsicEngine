@@ -324,11 +324,13 @@ TEST(MeshViewLifecycle_Contract, ReuseVertexBuffersFromSharedHandle)
 // =============================================================================
 //
 // These tests validate the CPU-side contract for how retained render passes
-// should consume MeshEdgeView and MeshVertexView geometry:
+// consume MeshEdgeView and MeshVertexView geometry:
 //
-//   - LinePass prefers MeshEdgeView::Geometry when available
-//     (index buffer BDA from GeometryGpuData), falling back to internal
-//     EnsureEdgeBuffer() when the view is absent or not ready.
+//   - LinePass requires a valid EdgeView geometry handle (BDA index buffer)
+//     for all retained edge sources. MeshViewLifecycleSystem auto-attaches
+//     MeshEdgeView when ShowWireframe=true and creates the edge index buffer
+//     from collision data. GraphGeometrySyncSystem creates edge index buffers
+//     via ReuseVertexBuffersFrom. No LinePass-internal fallback buffers.
 //
 //   - RetainedPointCloudRenderPass prefers MeshVertexView::Geometry when
 //     available (vertex buffer BDA from GeometryGpuData), falling back to
@@ -340,7 +342,7 @@ TEST(MeshViewLifecycle_Contract, ReuseVertexBuffersFromSharedHandle)
 TEST(MeshViewLifecycle_Contract, EdgeViewReadyForRenderPass)
 {
     // Simulate a MeshEdgeView that has completed lifecycle setup.
-    // LinePass should prefer this over internal buffers.
+    // LinePass reads edge BDA from this geometry's index buffer.
     ECS::MeshEdgeView::Component ev;
     ev.Geometry = Geometry::GeometryHandle(0, 1);
     ev.EdgeCount = 100;
@@ -352,10 +354,10 @@ TEST(MeshViewLifecycle_Contract, EdgeViewReadyForRenderPass)
     EXPECT_GT(ev.EdgeCount, 0u);
 }
 
-TEST(MeshViewLifecycle_Contract, EdgeViewNotReadyFallsBack)
+TEST(MeshViewLifecycle_Contract, EdgeViewNotReadySkipsRendering)
 {
     // When MeshEdgeView is present but Dirty (not yet created),
-    // the render pass should fall back to the internal edge buffer path.
+    // LinePass skips the entity (no fallback — EdgeView must be valid).
     ECS::MeshEdgeView::Component ev;
 
     // Default state: Dirty=true, no geometry
