@@ -2,7 +2,7 @@ module;
 
 #include <entt/entity/registry.hpp>
 
-module Graphics:Systems.ComponentMigration;
+module Graphics:Systems.ComponentMigration.Impl;
 
 import :Components;
 import Core.FrameGraph;
@@ -192,7 +192,7 @@ void RegisterSystem(Core::FrameGraph& graph,
                     entt::registry& registry)
 {
     graph.AddPass("ComponentMigration",
-        [&registry](Core::FrameGraph::PassBuilder& builder)
+        [&registry](Core::FrameGraphBuilder& builder)
         {
             // Run after all legacy lifecycle systems so GPU state is populated.
             builder.WaitFor("TransformUpdate"_id);
