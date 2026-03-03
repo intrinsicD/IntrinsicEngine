@@ -100,7 +100,7 @@ export namespace ECS::PointCloudRenderer
 //
 // Decouples the visual representation from the CPU data type.  Any entity
 // with spatial data (mesh, graph, point cloud) can independently toggle:
-//   - Surface rendering  (filled faces — ForwardPass)
+//   - Surface rendering  (filled faces — SurfacePass)
 //   - Wireframe rendering (edges — LineRenderPass via DebugDraw)
 //   - Vertex rendering   (points — PointCloudRenderPass)
 //
@@ -122,7 +122,7 @@ export namespace ECS::RenderVisualization
     struct Component
     {
         // ---- Mode Toggles ----
-        bool ShowSurface   = true;   // ForwardPass mesh/line rendering.
+        bool ShowSurface   = true;   // SurfacePass mesh/line rendering.
         bool ShowWireframe = false;  // Edge overlay via DebugDraw → LineRenderPass.
         bool ShowVertices  = false;  // Vertex points via PointCloudRenderPass.
 
@@ -140,7 +140,7 @@ export namespace ECS::RenderVisualization
         // Wireframe has NO GPU view — it is rendered by the CPU DebugDraw path
         // (MeshRenderPass → LineRenderPass) which correctly applies WireframeColor.
         //
-        // Vertex view is lazily created once for FlatDisc point rendering via ForwardPass.
+        // Vertex view is lazily created once for FlatDisc point rendering via SurfacePass.
         Geometry::GeometryHandle VertexView{};    // Points
 
         bool VertexViewDirty = true;
@@ -164,7 +164,7 @@ export namespace ECS::RenderVisualization
         // Packed ABGR per face, sourced from Mesh::FaceProperties("f:color")
         // or set programmatically (e.g., segmentation labels, curvature).
         // Indexed by triangle index (gl_PrimitiveID in fragment shader).
-        // When empty, ForwardPass uses standard texture/material shading.
+        // When empty, SurfacePass uses standard texture/material shading.
         std::vector<uint32_t> CachedFaceColors;
         bool FaceColorsDirty = true;
 
@@ -388,7 +388,7 @@ export namespace ECS::GeometryViewRenderer
         Geometry::GeometryHandle Surface{};
         uint32_t SurfaceGpuSlot = MeshRenderer::Component::kInvalidSlot;
 
-        // Optional vertex point-cloud view geometry (FlatDisc mode via ForwardPass).
+        // Optional vertex point-cloud view geometry (FlatDisc mode via SurfacePass).
         Geometry::GeometryHandle Vertices{}; // Points
         uint32_t VerticesGpuSlot = MeshRenderer::Component::kInvalidSlot;
 

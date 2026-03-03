@@ -20,7 +20,9 @@ Recent completions (2026-03-03, details in git history): `PointCloudGeometrySync
 
 Recent completions (2026-03-03, details in git history): per-pass typed ECS components (PLAN.md Phase 1) — `ECS::Surface::Component`, `ECS::Line::Component`, `ECS::Point::Component` defined in `Graphics.Components.cppm` alongside legacy components. `ComponentMigration` system (`Graphics.Systems.ComponentMigration`) syncs legacy → new components each frame (MeshRenderer→Surface, RenderVisualization wireframe→Line / vertices→Point, PointCloudRenderer→Point, Graph::Data→Line+Point, PointCloud::Data→Point). FeatureRegistry-gated registration in `Engine::Run()`. Contract tests in `Test_PerPassComponents.cpp`.
 
-Near-term priority is the **rendering architecture refactor** defined in `PLAN.md` (TODO §1): consolidate into three unified passes (`SurfacePass`, `LinePass`, `PointPass`), rename/migrate existing passes to use new `ECS::Surface/Line/Point::Component` types, and delete legacy pass/component code. Phase 1 (component definitions + migration system) is complete. Next: Phase 2 (SurfacePass rename + consolidation). Secondary priorities: staged upload path for static graphs (TODO §2), PropertySet dirty-domain sync (TODO §3).
+Recent completions (2026-03-03, details in git history): SurfacePass rename + consolidation (PLAN.md Phase 2) — `ForwardPass` → `SurfacePass` (class, files, module partition `Graphics:Passes.Surface`), shaders `triangle.vert/frag` → `surface.vert/frag`, transient triangle API (`SubmitTriangle()`/`ResetTransient()`/`GetTransientVertices()`) on `SurfacePass`, `GetTriangles()`/`Triangle()`/`Quad()` on `DebugDraw`, `SurfacePass` queries `ECS::Surface::Component` instead of `MeshRenderer::Component`, `GPUSceneSync` migrated to `Surface::Component`, pipeline constants renamed (`kPipeline_Surface/SurfaceLines/SurfacePoints`), `FeatureRegistry` entry renamed to `"SurfacePass"`, shader registry updated (`Surface.Vert/Frag`).
+
+Near-term priority is the **rendering architecture refactor** defined in `PLAN.md` (TODO §1): consolidate into three unified passes (`SurfacePass`, `LinePass`, `PointPass`), rename/migrate existing passes to use new `ECS::Surface/Line/Point::Component` types, and delete legacy pass/component code. Phases 1–2 complete. Next: Phase 3 (LinePass consolidation). Secondary priorities: staged upload path for static graphs (TODO §2), PropertySet dirty-domain sync (TODO §3).
 
 ## 2. Feature Roadmap
 
@@ -105,7 +107,7 @@ Remaining work after `LinePass` consolidation: mesh wireframe overlay (barycentr
 
 #### 2.1.3 Mesh Rendering Modes
 
-**Context:** Currently only a single forward PBR pass (metallic-roughness) exists via `ForwardPass`. Need configurable shading for research and artistic workflows.
+**Context:** Currently only a single forward PBR pass (metallic-roughness) exists via `SurfacePass`. Need configurable shading for research and artistic workflows.
 
 **Required shading models:**
 - **Physically-based (PBR):** Already implemented (metallic-roughness). Extend with clearcoat, sheen, transmission for glTF PBR extensions.
@@ -433,7 +435,7 @@ Sub-entity select → Geometry processing (interactive operator input)
 
 1. **Unified pass consolidation (`PLAN.md` Phases 1–5)**
    *Depends on: nothing. Depended on by: everything — all rendering features should target the new pass architecture.*
-   Define `ECS::Surface/Line/Point::Component`, consolidate `ForwardPass` → `SurfacePass`, `RetainedLineRenderPass` + `LineRenderPass` → `LinePass`, `RetainedPointCloudRenderPass` + `PointCloudRenderPass` → `PointPass`. Delete `MeshRenderPass`, `GraphRenderPass`, `RenderVisualization::Component`, `GeometryViewRenderer::Component`. Migrate lifecycle systems. Full migration spec in `PLAN.md`, actionable items in `TODO.md §1`.
+   Define `ECS::Surface/Line/Point::Component` (done), consolidate ~~`ForwardPass` → `SurfacePass`~~ (done), `RetainedLineRenderPass` + `LineRenderPass` → `LinePass`, `RetainedPointCloudRenderPass` + `PointCloudRenderPass` → `PointPass`. Delete `MeshRenderPass`, `GraphRenderPass`, `RenderVisualization::Component`, `GeometryViewRenderer::Component`. Migrate lifecycle systems. Full migration spec in `PLAN.md`, actionable items in `TODO.md §1`.
 
 #### Phase 0b — Architecture & Plumbing
 *HDR pipeline and dirty-domain sync. Built on the refactored pass architecture.*

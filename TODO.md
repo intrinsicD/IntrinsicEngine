@@ -20,16 +20,6 @@ This document tracks **what's left to do** in IntrinsicEngine's architecture.
 
 Replace the dual-path (transient CPU + retained GPU) rendering with a **single unified path per primitive type** (`SurfacePass`, `LinePass`, `PointPass`). Full spec in `PLAN.md`.
 
-### 1.2 SurfacePass — Rename + Consolidate (PLAN.md Phase 2)
-
-- [ ] Rename `ForwardPass` → `SurfacePass` (class, files, module partition `Graphics:Passes.Surface`).
-- [ ] Rename shaders `triangle.vert/frag` → `surface.vert/frag`.
-- [ ] Add `SubmitTriangles()` / `ResetTransient()` transient API on SurfacePass.
-- [ ] Add `GetTriangles()` to `DebugDraw` for transient surface primitives.
-- [ ] SurfacePass queries `ECS::Surface::Component` instead of `MeshRenderer::Component`.
-- [ ] Migrate `GPUSceneSync` to use `ECS::Surface::Component`.
-- [ ] Update `DefaultPipeline`, `FeatureRegistry`, `ShaderRegistry`, `CMakeLists.txt`.
-
 ### 1.3 LinePass — Consolidate All Line/Edge Sources (PLAN.md Phase 3)
 
 - [ ] Delete old transient `line.vert/frag` (SSBO version) FIRST (name collision with retained rename target).

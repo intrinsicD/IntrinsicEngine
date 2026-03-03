@@ -377,11 +377,11 @@ Add a new panel by calling `Interface::GUI::RegisterPanel("My Panel", []{ ... })
 
 One device-local vertex buffer on the GPU, multiple index buffers with different topologies referencing into it. This is the core rendering architecture for all geometry types — not just meshes.
 
-**Data sharing works via buffer device addresses (BDA), not `vkCmdBindVertexBuffers`.** The engine uses programmable vertex pulling throughout — `ForwardPass` reads positions/normals via `GL_EXT_buffer_reference` pointers passed in push constants. Each topology view gets its own `VkPipeline` with its own vertex shader that reads from the shared buffer via the same BDA pointer:
+**Data sharing works via buffer device addresses (BDA), not `vkCmdBindVertexBuffers`.** The engine uses programmable vertex pulling throughout — `SurfacePass` reads positions/normals via `GL_EXT_buffer_reference` pointers passed in push constants. Each topology view gets its own `VkPipeline` with its own vertex shader that reads from the shared buffer via the same BDA pointer:
 
 | View | Pipeline | Vertex shader reads via BDA | Index buffer |
 |------|----------|-----------------------------|-------------|
-| Surface mesh | `ForwardPass` | `positions[gl_VertexIndex]` | Triangle indices |
+| Surface mesh | `SurfacePass` | `positions[gl_VertexIndex]` | Triangle indices |
 | Wireframe | `LineRenderPass` (retained) | `positions[edgeIdx]` → expand to quad (6v/seg) | Unique edge pairs |
 | Vertex visualization | `PointCloudRenderPass` | `positions[pointID]` → expand to billboard (6v/pt) | Identity / direct draw |
 | kNN graph | `LineRenderPass` (retained) | Same line shader | Neighbor edge pairs |
@@ -421,7 +421,7 @@ auto [gpuData, token] = Graphics::GeometryGpuData::CreateAsync(
 auto wireframeHandle = geometryPool.Add(std::move(gpuData));
 
 // GPU side: the line vertex shader reads positions via BDA
-// (same device address as ForwardPass uses for the mesh):
+// (same device address as SurfacePass uses for the mesh):
 //   PosBuf pBuf = PosBuf(push.ptrPos);  // GL_EXT_buffer_reference
 //   vec3 p0 = pBuf.v[edgeIndices[lineID * 2 + 0]];
 //   vec3 p1 = pBuf.v[edgeIndices[lineID * 2 + 1]];

@@ -16,7 +16,7 @@ import :Components;
 import :Geometry;
 import :DebugDraw;
 import :Passes.Picking;
-import :Passes.Forward;
+import :Passes.Surface;
 import :Passes.Mesh;
 import :Passes.Graph;
 import :Passes.SelectionOutline;
@@ -41,7 +41,7 @@ namespace Graphics
     void DefaultPipeline::Shutdown()
     {
         if (m_PickingPass)          m_PickingPass->Shutdown();
-        if (m_ForwardPass)          m_ForwardPass->Shutdown();
+        if (m_SurfacePass)          m_SurfacePass->Shutdown();
         if (m_MeshPass)             m_MeshPass->Shutdown();
         if (m_GraphPass)            m_GraphPass->Shutdown();
         if (m_SelectionOutlinePass) m_SelectionOutlinePass->Shutdown();
@@ -53,7 +53,7 @@ namespace Graphics
         if (m_ImGuiPass)            m_ImGuiPass->Shutdown();
 
         m_PickingPass.reset();
-        m_ForwardPass.reset();
+        m_SurfacePass.reset();
         m_MeshPass.reset();
         m_GraphPass.reset();
         m_SelectionOutlinePass.reset();
@@ -72,7 +72,7 @@ namespace Graphics
                                     PipelineLibrary& pipelineLibrary)
     {
         m_PickingPass          = std::make_unique<Passes::PickingPass>();
-        m_ForwardPass          = std::make_unique<Passes::ForwardPass>();
+        m_SurfacePass          = std::make_unique<Passes::SurfacePass>();
         m_MeshPass             = std::make_unique<Passes::MeshRenderPass>();
         m_GraphPass            = std::make_unique<Passes::GraphRenderPass>();
         m_SelectionOutlinePass = std::make_unique<Passes::SelectionOutlinePass>();
@@ -84,7 +84,7 @@ namespace Graphics
         m_ImGuiPass            = std::make_unique<Passes::ImGuiPass>();
 
         m_PickingPass->Initialize(device, descriptorPool, globalLayout);
-        m_ForwardPass->Initialize(device, descriptorPool, globalLayout);
+        m_SurfacePass->Initialize(device, descriptorPool, globalLayout);
         m_MeshPass->Initialize(device, descriptorPool, globalLayout);
         m_GraphPass->Initialize(device, descriptorPool, globalLayout);
         m_SelectionOutlinePass->Initialize(device, descriptorPool, globalLayout);
@@ -97,12 +97,12 @@ namespace Graphics
 
         m_PickingPass->SetPipeline(&pipelineLibrary.GetOrDie(kPipeline_Picking));
 
-        m_ForwardPass->SetPipeline(&pipelineLibrary.GetOrDie(kPipeline_Forward));
-        m_ForwardPass->SetLinePipeline(&pipelineLibrary.GetOrDie(kPipeline_ForwardLines));
-        m_ForwardPass->SetPointPipeline(&pipelineLibrary.GetOrDie(kPipeline_ForwardPoints));
-        m_ForwardPass->SetInstanceSetLayout(pipelineLibrary.GetStage1InstanceSetLayout());
-        m_ForwardPass->SetCullPipeline(pipelineLibrary.GetCullPipeline());
-        m_ForwardPass->SetCullSetLayout(pipelineLibrary.GetCullSetLayout());
+        m_SurfacePass->SetPipeline(&pipelineLibrary.GetOrDie(kPipeline_Surface));
+        m_SurfacePass->SetLinePipeline(&pipelineLibrary.GetOrDie(kPipeline_SurfaceLines));
+        m_SurfacePass->SetPointPipeline(&pipelineLibrary.GetOrDie(kPipeline_SurfacePoints));
+        m_SurfacePass->SetInstanceSetLayout(pipelineLibrary.GetStage1InstanceSetLayout());
+        m_SurfacePass->SetCullPipeline(pipelineLibrary.GetCullPipeline());
+        m_SurfacePass->SetCullSetLayout(pipelineLibrary.GetCullSetLayout());
 
         m_SelectionOutlinePass->SetShaderRegistry(shaderRegistry);
         m_LineRenderPass->SetShaderRegistry(shaderRegistry);
@@ -139,12 +139,12 @@ namespace Graphics
             m_Path.AddFeature("Picking", m_PickingPass.get());
 
         // ==================================================================
-        // 2. Mesh Pass — face rendering via ForwardPass (triangles / lines /
-        //    point geometry).  ForwardPass is the "surface" sub-stage of the
+        // 2. Surface Pass — face rendering via SurfacePass (triangles / lines /
+        //    point geometry).  SurfacePass is the "surface" sub-stage of the
         //    mesh pass; wireframe + vertex overlays follow in MeshPass.Viz.
         // ==================================================================
-        if (m_ForwardPass && IsFeatureEnabled("ForwardPass"_id))
-            m_Path.AddFeature("MeshPass.Forward", m_ForwardPass.get());
+        if (m_SurfacePass && IsFeatureEnabled("SurfacePass"_id))
+            m_Path.AddFeature("MeshPass.Surface", m_SurfacePass.get());
 
         // ==================================================================
         // Visualization collection
@@ -309,7 +309,7 @@ namespace Graphics
     void DefaultPipeline::OnResize(uint32_t width, uint32_t height)
     {
         if (m_PickingPass)          m_PickingPass->OnResize(width, height);
-        if (m_ForwardPass)          m_ForwardPass->OnResize(width, height);
+        if (m_SurfacePass)          m_SurfacePass->OnResize(width, height);
         if (m_MeshPass)             m_MeshPass->OnResize(width, height);
         if (m_GraphPass)            m_GraphPass->OnResize(width, height);
         if (m_SelectionOutlinePass) m_SelectionOutlinePass->OnResize(width, height);

@@ -21,8 +21,8 @@ export namespace Graphics::Passes
     //   - Wireframe edges  → submitted to DebugDraw accumulator → LineRenderPass.
     //   - Vertex points    → submitted to PointCloudRenderPass (all 4 modes).
     //
-    // Face rendering (solid triangles) is the responsibility of ForwardPass, which
-    // runs before this pass in the DefaultPipeline.  Together, ForwardPass (faces)
+    // Face rendering (solid triangles) is the responsibility of SurfacePass, which
+    // runs before this pass in the DefaultPipeline.  Together, SurfacePass (faces)
     // + MeshRenderPass (wireframe + vertices) constitute the complete mesh pass.
     //
     // This pass has no GPU resources of its own — it is a data-collection pass

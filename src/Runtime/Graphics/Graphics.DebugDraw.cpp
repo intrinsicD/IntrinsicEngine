@@ -207,6 +207,25 @@ namespace Graphics
     }
 
     // =========================================================================
+    // Triangle primitives (depth-tested)
+    // =========================================================================
+
+    void DebugDraw::Triangle(const glm::vec3& a, const glm::vec3& b, const glm::vec3& c,
+                             const glm::vec3& normal, uint32_t color)
+    {
+        m_Triangles.push_back({a, color, normal, 0.0f});
+        m_Triangles.push_back({b, color, normal, 0.0f});
+        m_Triangles.push_back({c, color, normal, 0.0f});
+    }
+
+    void DebugDraw::Quad(const glm::vec3& a, const glm::vec3& b, const glm::vec3& c, const glm::vec3& d,
+                         const glm::vec3& normal, uint32_t color)
+    {
+        Triangle(a, b, c, normal, color);
+        Triangle(a, c, d, normal, color);
+    }
+
+    // =========================================================================
     // Overlay primitives (no depth test)
     // =========================================================================
 
@@ -243,6 +262,7 @@ namespace Graphics
     {
         m_Lines.clear();
         m_OverlayLines.clear();
+        m_Triangles.clear();
     }
 
     std::span<const DebugDraw::LineSegment> DebugDraw::GetLines() const
@@ -253,6 +273,11 @@ namespace Graphics
     std::span<const DebugDraw::LineSegment> DebugDraw::GetOverlayLines() const
     {
         return m_OverlayLines;
+    }
+
+    std::span<const DebugDraw::TriangleVertex> DebugDraw::GetTriangles() const
+    {
+        return m_Triangles;
     }
 
     // =========================================================================

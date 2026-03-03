@@ -1472,7 +1472,7 @@ public:
                             // NOTE: Wireframe has NO GPU view. It is rendered entirely by the
                             // MeshRenderPass CPU path → DebugDraw accumulator → LineRenderPass,
                             // which correctly applies WireframeColor and WireframeOverlay.
-                            // The previous GPU view approach used triangle.frag which ignores
+                            // The previous GPU view approach used surface.frag which ignores
                             // WireframeColor and produced invisible/incorrect output.
 
                             // Vertex view (Points): create the GPU view for point rendering modes.
