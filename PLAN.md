@@ -129,16 +129,6 @@ Each domain is independent — a per-face color change does not trigger a vertex
 
 No manual per-feature reupload calls in gameplay/processing code; systems own synchronization.
 
-### Subcomponent hierarchy contract
-
-Support named sub-meshes/sub-graphs/sub-clouds as first-class components over a base geometry component:
-
-- Store hierarchy nodes as `{NameId, BaseOffset(s), Size(s), Parent(optional)}`.
-- Offsets/sizes are domain-specific (vertex/edge/halfedge/face ranges).
-- Renderables reference hierarchy slices so command building can issue draws for whole objects or named subcomponents.
-
-`NameId` should be stable string-id (`StringId`/hashed id) to integrate with selection, tooling, and material overrides.
-
 ---
 
 ## ECS: Per-Pass Typed Components

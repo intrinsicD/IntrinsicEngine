@@ -16,17 +16,7 @@ This document tracks **what's left to do** in IntrinsicEngine's architecture.
 
 ---
 
-## 1. Subcomponent Hierarchy (PLAN.md)
-
-Support named sub-meshes/sub-graphs/sub-clouds as first-class components over a base geometry component.
-
-- [ ] Define hierarchy node struct: `{NameId, BaseOffset(s), Size(s), Parent(optional)}` with domain-specific offsets (vertex/edge/halfedge/face ranges).
-- [ ] `NameId` as `StringId`/hashed id for integration with selection, tooling, and material overrides.
-- [ ] Renderables reference hierarchy slices so command building can issue draws for whole objects or named subcomponents.
-
----
-
-## 2. Robustness & Numerical Safeguards (PLAN.md)
+## 1. Robustness & Numerical Safeguards (PLAN.md)
 
 - [ ] Position sanitization: reject/skip non-finite positions (`NaN`, `Inf`) before upload in both retained and transient paths.
 - [ ] Normal safety: renormalize with epsilon guard in point and surface shaders (fallback to camera-facing basis).
@@ -39,7 +29,7 @@ Support named sub-meshes/sub-graphs/sub-clouds as first-class components over a 
 
 ---
 
-## 3. Related Documents
+## 2. Related Documents
 
 - `PLAN.md` — detailed rendering architecture refactor spec (three-pass architecture, ECS component design, migration phases).
 - `ROADMAP.md` — feature roadmap, prioritization phases, long-horizon planning, rendering modality redesign vision (§5), and architecture SLOs.
