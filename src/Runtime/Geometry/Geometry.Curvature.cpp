@@ -184,6 +184,8 @@ namespace Geometry::Curvature
                 glm::dvec3 normal(0.0);
                 HalfedgeHandle h = mesh.Halfedge(vh);
                 HalfedgeHandle start = h;
+                std::size_t safety = 0;
+                const std::size_t safetyLimit = std::max<std::size_t>(mesh.HalfedgesSize(), 1u);
                 do
                 {
                     if (!mesh.IsBoundary(h))
@@ -195,6 +197,7 @@ namespace Geometry::Curvature
                         normal += glm::cross(e1, e2);
                     }
                     h = mesh.CWRotatedHalfedge(h);
+                    if (++safety > safetyLimit) break;
                 } while (h != start);
 
                 if (glm::dot(normal, laplaceB) < 0.0)
@@ -367,6 +370,8 @@ namespace Geometry::Curvature
             glm::dvec3 normal(0.0);
             HalfedgeHandle h = mesh.Halfedge(vh);
             HalfedgeHandle start = h;
+            std::size_t safety = 0;
+            const std::size_t safetyLimit = std::max<std::size_t>(mesh.HalfedgesSize(), 1u);
             do
             {
                 if (!mesh.IsBoundary(h))
@@ -378,6 +383,7 @@ namespace Geometry::Curvature
                     normal += glm::cross(e1, e2);
                 }
                 h = mesh.CWRotatedHalfedge(h);
+                if (++safety > safetyLimit) break;
             } while (h != start);
 
             if (glm::dot(normal, laplaceB) < 0.0)

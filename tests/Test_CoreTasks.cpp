@@ -11,6 +11,26 @@ import Core;
 
 using namespace Core::Tasks;
 
+namespace
+{
+    Job WaitForCounterAndIncrement(CounterEvent* event, std::atomic<int>* resumedCount) noexcept
+    {
+        co_await WaitFor(*event);
+        resumedCount->fetch_add(1, std::memory_order_relaxed);
+        co_return;
+    }
+
+    Job WaitForCounterTrackStartAndIncrement(CounterEvent* event,
+                                             std::atomic<int>* startedCount,
+                                             std::atomic<int>* resumedCount) noexcept
+    {
+        startedCount->fetch_add(1, std::memory_order_release);
+        co_await WaitFor(*event);
+        resumedCount->fetch_add(1, std::memory_order_release);
+        co_return;
+    }
+}
+
 TEST(CoreTasks, BasicDispatch) {
     Scheduler::Initialize(2);
     
@@ -254,34 +274,32 @@ TEST(CoreTasks, CounterEventCanBeRearmedAfterReady)
     Scheduler::Initialize(2);
 
     CounterEvent event{1};
+    std::atomic<int> startedCount = 0;
     std::atomic<int> resumedCount = 0;
 
-    auto waiter = [&]() -> Job {
-        co_await WaitFor(event);
-        resumedCount.fetch_add(1, std::memory_order_relaxed);
-        co_return;
-    };
-
-    Scheduler::Dispatch(waiter());
-    Scheduler::ParkCountAtomic().wait(0, std::memory_order_acquire);
-
-    event.Signal();
-    Scheduler::WaitForAll();
-    EXPECT_EQ(resumedCount.load(std::memory_order_relaxed), 1);
-
-    event.Add(1);
-    Scheduler::Dispatch(waiter());
-
-    const auto parksBeforeSecondSignal = Scheduler::GetParkCount();
-    while (Scheduler::GetParkCount() == parksBeforeSecondSignal)
+    Scheduler::Dispatch(WaitForCounterTrackStartAndIncrement(&event, &startedCount, &resumedCount));
+    while (startedCount.load(std::memory_order_acquire) < 1)
         std::this_thread::yield();
 
-    EXPECT_EQ(resumedCount.load(std::memory_order_relaxed), 1);
+    event.Signal();
+    Scheduler::WaitForAll();
+    EXPECT_EQ(resumedCount.load(std::memory_order_acquire), 1);
+    EXPECT_TRUE(event.IsReady());
+
+    event.Add(1);
+    EXPECT_FALSE(event.IsReady());
+
+    Scheduler::Dispatch(WaitForCounterTrackStartAndIncrement(&event, &startedCount, &resumedCount));
+    while (startedCount.load(std::memory_order_acquire) < 2)
+        std::this_thread::yield();
+
+    EXPECT_EQ(resumedCount.load(std::memory_order_acquire), 1);
 
     event.Signal();
     Scheduler::WaitForAll();
 
-    EXPECT_EQ(resumedCount.load(std::memory_order_relaxed), 2);
+    EXPECT_TRUE(event.IsReady());
+    EXPECT_EQ(resumedCount.load(std::memory_order_acquire), 2);
 
     Scheduler::Shutdown();
 }

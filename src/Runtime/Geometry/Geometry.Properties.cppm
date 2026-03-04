@@ -155,7 +155,7 @@ export namespace Geometry
         [[nodiscard]] std::vector<std::string> PropertyNames() const;
 
         /// Clears all properties and their data.
-        inline void Clear() { m_Storages.clear(); }
+        inline void Clear() { m_Size = 0; m_Storages.clear(); }
         /// Reserves storage slots for property arrays.
         inline void Reserve(size_t n) { m_Storages.reserve(n); }
 
@@ -170,7 +170,7 @@ export namespace Geometry
         /// Shrinks all property storages to fit.
         void ShrinkToFit() { for (auto& storage : m_Storages) if (storage) storage->ShrinkToFit(); }
         /// Appends one element to each property storage.
-        void PushBack() { for (auto& storage : m_Storages) if (storage) storage->PushBack(); }
+        void PushBack() { m_Size += 1; for (auto& storage : m_Storages) if (storage) storage->PushBack(); }
 
         /// Swaps element i0 and i1 across all property arrays.
         void Swap(size_t i0, size_t i1)

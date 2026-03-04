@@ -12,6 +12,82 @@ import Graphics;
 import Geometry;
 import RHI;
 
+namespace
+{
+    namespace TestGpuColor
+    {
+        constexpr uint32_t PackColor(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255) noexcept
+        {
+            return static_cast<uint32_t>(r)
+                 | (static_cast<uint32_t>(g) << 8)
+                 | (static_cast<uint32_t>(b) << 16)
+                 | (static_cast<uint32_t>(a) << 24);
+        }
+
+        constexpr uint32_t PackColorF(float r, float g, float b, float a = 1.0f) noexcept
+        {
+            auto clamp = [](float v) noexcept -> uint8_t {
+                if (v <= 0.0f) return 0;
+                if (v >= 1.0f) return 255;
+                return static_cast<uint8_t>(v * 255.0f + 0.5f);
+            };
+            return PackColor(clamp(r), clamp(g), clamp(b), clamp(a));
+        }
+
+        constexpr uint32_t ScalarToHeatColor(float t, float a = 1.0f) noexcept
+        {
+            if (t <= 0.0f) t = 0.0f;
+            if (t >= 1.0f) t = 1.0f;
+
+            float r = 0.0f, g = 0.0f, b = 0.0f;
+            if (t < 0.25f)
+            {
+                b = 1.0f;
+                g = t * 4.0f;
+            }
+            else if (t < 0.5f)
+            {
+                g = 1.0f;
+                b = 1.0f - (t - 0.25f) * 4.0f;
+            }
+            else if (t < 0.75f)
+            {
+                g = 1.0f;
+                r = (t - 0.5f) * 4.0f;
+            }
+            else
+            {
+                r = 1.0f;
+                g = 1.0f - (t - 0.75f) * 4.0f;
+            }
+
+            return PackColorF(r, g, b, a);
+        }
+
+        constexpr uint32_t LabelToColor(int label) noexcept
+        {
+            if (label < 0) return 0u;
+
+            constexpr uint32_t kPalette[] = {
+                PackColor(0x1F, 0x77, 0xB4),
+                PackColor(0xFF, 0x7F, 0x0E),
+                PackColor(0x2C, 0xA0, 0x2C),
+                PackColor(0xD6, 0x27, 0x28),
+                PackColor(0x94, 0x67, 0xBD),
+                PackColor(0x8C, 0x56, 0x4B),
+                PackColor(0xE3, 0x77, 0xC2),
+                PackColor(0x7F, 0x7F, 0x7F),
+                PackColor(0xBC, 0xBD, 0x22),
+                PackColor(0x17, 0xBE, 0xCF),
+                PackColor(0xAA, 0xFF, 0xAA),
+                PackColor(0xFF, 0xBB, 0x78),
+            };
+            constexpr int kPaletteSize = static_cast<int>(sizeof(kPalette) / sizeof(kPalette[0]));
+            return kPalette[label % kPaletteSize];
+        }
+    }
+}
+
 // =============================================================================
 // Per-Face Attribute Pipeline Tests (TODO 1.7)
 // =============================================================================
@@ -38,7 +114,7 @@ static Geometry::Halfedge::Mesh MakeTriangle()
     auto v0 = mesh.AddVertex(glm::vec3(0, 0, 0));
     auto v1 = mesh.AddVertex(glm::vec3(1, 0, 0));
     auto v2 = mesh.AddVertex(glm::vec3(0, 1, 0));
-    mesh.AddTriangle(v0, v1, v2);
+    (void)mesh.AddTriangle(v0, v1, v2);
     return mesh;
 }
 
@@ -51,10 +127,10 @@ static Geometry::Halfedge::Mesh MakeTetrahedron()
     auto v1 = mesh.AddVertex(glm::vec3(1, 0, 0));
     auto v2 = mesh.AddVertex(glm::vec3(0.5f, 0, 0.866f));
     auto v3 = mesh.AddVertex(glm::vec3(0.5f, 0.816f, 0.289f));
-    mesh.AddTriangle(v0, v1, v2);
-    mesh.AddTriangle(v0, v2, v3);
-    mesh.AddTriangle(v0, v3, v1);
-    mesh.AddTriangle(v1, v3, v2);
+    (void)mesh.AddTriangle(v0, v1, v2);
+    (void)mesh.AddTriangle(v0, v2, v3);
+    (void)mesh.AddTriangle(v0, v3, v1);
+    (void)mesh.AddTriangle(v1, v3, v2);
     return mesh;
 }
 
@@ -67,8 +143,8 @@ static Geometry::Halfedge::Mesh MakeQuadPair()
     auto v1 = mesh.AddVertex(glm::vec3(1, 0, 0));
     auto v2 = mesh.AddVertex(glm::vec3(0, 1, 0));
     auto v3 = mesh.AddVertex(glm::vec3(1, 1, 0));
-    mesh.AddTriangle(v0, v1, v2);
-    mesh.AddTriangle(v2, v1, v3);
+    (void)mesh.AddTriangle(v0, v1, v2);
+    (void)mesh.AddTriangle(v2, v1, v3);
     return mesh;
 }
 
@@ -95,7 +171,7 @@ static std::vector<uint32_t> ExtractFaceColorsFromMesh(const Geometry::Halfedge:
             continue;
 
         const glm::vec4& c = colorProp[f];
-        packed.push_back(Graphics::GpuColor::PackColorF(c.r, c.g, c.b, c.a));
+        packed.push_back(TestGpuColor::PackColorF(c.r, c.g, c.b, c.a));
     }
 
     return packed;
@@ -122,7 +198,7 @@ TEST(PerFaceAttr_FlatShading, ExtractFromPropertySet_SingleTriangle)
     auto packed = ExtractFaceColorsFromMesh(mesh);
     ASSERT_EQ(packed.size(), 1u);
 
-    uint32_t expected = Graphics::GpuColor::PackColorF(1.0f, 0.0f, 0.0f, 1.0f);
+    uint32_t expected = TestGpuColor::PackColorF(1.0f, 0.0f, 0.0f, 1.0f);
     EXPECT_EQ(packed[0], expected);
 }
 
@@ -144,10 +220,10 @@ TEST(PerFaceAttr_FlatShading, ExtractFromPropertySet_MultipleFaces)
     auto packed = ExtractFaceColorsFromMesh(mesh);
     ASSERT_EQ(packed.size(), 4u);
 
-    EXPECT_EQ(packed[0], Graphics::GpuColor::PackColorF(1, 0, 0, 1));
-    EXPECT_EQ(packed[1], Graphics::GpuColor::PackColorF(0, 1, 0, 1));
-    EXPECT_EQ(packed[2], Graphics::GpuColor::PackColorF(0, 0, 1, 1));
-    EXPECT_EQ(packed[3], Graphics::GpuColor::PackColorF(1, 1, 0, 1));
+    EXPECT_EQ(packed[0], TestGpuColor::PackColorF(1, 0, 0, 1));
+    EXPECT_EQ(packed[1], TestGpuColor::PackColorF(0, 1, 0, 1));
+    EXPECT_EQ(packed[2], TestGpuColor::PackColorF(0, 0, 1, 1));
+    EXPECT_EQ(packed[3], TestGpuColor::PackColorF(1, 1, 0, 1));
 }
 
 TEST(PerFaceAttr_FlatShading, NoPropertyReturnsEmpty)
@@ -186,8 +262,8 @@ TEST(PerFaceAttr_FlatShading, PopulateSurfaceComponent)
     ASSERT_EQ(surf.CachedFaceColors.size(), 2u);
 
     // Verify colors match the PropertySet values.
-    EXPECT_EQ(surf.CachedFaceColors[0], Graphics::GpuColor::PackColorF(0.5f, 0.3f, 0.8f, 1.0f));
-    EXPECT_EQ(surf.CachedFaceColors[1], Graphics::GpuColor::PackColorF(0.1f, 0.9f, 0.2f, 1.0f));
+    EXPECT_EQ(surf.CachedFaceColors[0], TestGpuColor::PackColorF(0.5f, 0.3f, 0.8f, 1.0f));
+    EXPECT_EQ(surf.CachedFaceColors[1], TestGpuColor::PackColorF(0.1f, 0.9f, 0.2f, 1.0f));
 }
 
 TEST(PerFaceAttr_FlatShading, TransparencyPreserved)
@@ -216,7 +292,7 @@ TEST(PerFaceAttr_FlatShading, TransparencyPreserved)
 
 TEST(PerFaceAttr_Curvature, ScalarToHeatColor_ZeroIsBlue)
 {
-    uint32_t c = Graphics::GpuColor::ScalarToHeatColor(0.0f);
+    uint32_t c = TestGpuColor::ScalarToHeatColor(0.0f);
 
     // At t=0: pure blue (R=0, G=0, B=1).
     uint8_t r = (c >> 0) & 0xFF;
@@ -230,7 +306,7 @@ TEST(PerFaceAttr_Curvature, ScalarToHeatColor_ZeroIsBlue)
 
 TEST(PerFaceAttr_Curvature, ScalarToHeatColor_OneIsRed)
 {
-    uint32_t c = Graphics::GpuColor::ScalarToHeatColor(1.0f);
+    uint32_t c = TestGpuColor::ScalarToHeatColor(1.0f);
 
     // At t=1: pure red (R=1, G=0, B=0).
     uint8_t r = (c >> 0) & 0xFF;
@@ -244,7 +320,7 @@ TEST(PerFaceAttr_Curvature, ScalarToHeatColor_OneIsRed)
 
 TEST(PerFaceAttr_Curvature, ScalarToHeatColor_MidIsGreen)
 {
-    uint32_t c = Graphics::GpuColor::ScalarToHeatColor(0.5f);
+    uint32_t c = TestGpuColor::ScalarToHeatColor(0.5f);
 
     // At t=0.5: green (R=0, G=1, B=0).
     uint8_t r = (c >> 0) & 0xFF;
@@ -263,7 +339,7 @@ TEST(PerFaceAttr_Curvature, ScalarToHeatColor_Monotonic)
     for (int i = 0; i <= 100; ++i)
     {
         float t = static_cast<float>(i) / 100.0f;
-        uint32_t c = Graphics::GpuColor::ScalarToHeatColor(t);
+        uint32_t c = TestGpuColor::ScalarToHeatColor(t);
         uint8_t r = (c >> 0) & 0xFF;
         EXPECT_GE(r, prevR) << "Red channel decreased at t=" << t;
         prevR = r;
@@ -273,27 +349,27 @@ TEST(PerFaceAttr_Curvature, ScalarToHeatColor_Monotonic)
 TEST(PerFaceAttr_Curvature, ScalarToHeatColor_ClampsOutOfRange)
 {
     // Negative values should clamp to blue (same as 0).
-    uint32_t neg = Graphics::GpuColor::ScalarToHeatColor(-1.0f);
-    uint32_t zero = Graphics::GpuColor::ScalarToHeatColor(0.0f);
+    uint32_t neg = TestGpuColor::ScalarToHeatColor(-1.0f);
+    uint32_t zero = TestGpuColor::ScalarToHeatColor(0.0f);
     EXPECT_EQ(neg, zero);
 
     // Values > 1 should clamp to red (same as 1).
-    uint32_t over = Graphics::GpuColor::ScalarToHeatColor(5.0f);
-    uint32_t one = Graphics::GpuColor::ScalarToHeatColor(1.0f);
+    uint32_t over = TestGpuColor::ScalarToHeatColor(5.0f);
+    uint32_t one = TestGpuColor::ScalarToHeatColor(1.0f);
     EXPECT_EQ(over, one);
 }
 
 TEST(PerFaceAttr_Curvature, ScalarToHeatColor_AlphaDefault)
 {
     // Default alpha should be 1.0 (opaque).
-    uint32_t c = Graphics::GpuColor::ScalarToHeatColor(0.5f);
+    uint32_t c = TestGpuColor::ScalarToHeatColor(0.5f);
     uint8_t a = (c >> 24) & 0xFF;
     EXPECT_EQ(a, 255u);
 }
 
 TEST(PerFaceAttr_Curvature, ScalarToHeatColor_CustomAlpha)
 {
-    uint32_t c = Graphics::GpuColor::ScalarToHeatColor(0.5f, 0.5f);
+    uint32_t c = TestGpuColor::ScalarToHeatColor(0.5f, 0.5f);
     uint8_t a = (c >> 24) & 0xFF;
     EXPECT_NEAR(a, 128, 1);
 }
@@ -312,7 +388,7 @@ TEST(PerFaceAttr_Curvature, CurvatureVisualization_PerFaceScalar)
     ECS::Surface::Component surf;
     surf.CachedFaceColors.reserve(curvature.size());
     for (float k : curvature)
-        surf.CachedFaceColors.push_back(Graphics::GpuColor::ScalarToHeatColor(k));
+        surf.CachedFaceColors.push_back(TestGpuColor::ScalarToHeatColor(k));
     surf.FaceColorsDirty = false;
 
     ASSERT_EQ(surf.CachedFaceColors.size(), 4u);
@@ -351,7 +427,7 @@ TEST(PerFaceAttr_Curvature, CurvatureFromPropertySet)
         if (!mesh.IsDeleted(f))
         {
             float k = curvProp[f];
-            surf.CachedFaceColors.push_back(Graphics::GpuColor::ScalarToHeatColor(k));
+            surf.CachedFaceColors.push_back(TestGpuColor::ScalarToHeatColor(k));
         }
     }
 
@@ -377,7 +453,7 @@ TEST(PerFaceAttr_Segmentation, LabelToColor_DistinctForFirstTwelve)
     // The palette has 12 entries; labels 0–11 should produce 12 distinct colors.
     std::vector<uint32_t> colors;
     for (int i = 0; i < 12; ++i)
-        colors.push_back(Graphics::GpuColor::LabelToColor(i));
+        colors.push_back(TestGpuColor::LabelToColor(i));
 
     // All should be distinct.
     for (std::size_t i = 0; i < colors.size(); ++i)
@@ -389,18 +465,18 @@ TEST(PerFaceAttr_Segmentation, LabelToColor_DistinctForFirstTwelve)
 TEST(PerFaceAttr_Segmentation, LabelToColor_WrapsAfterPaletteSize)
 {
     // Labels beyond palette size wrap around.
-    uint32_t c0 = Graphics::GpuColor::LabelToColor(0);
-    uint32_t c12 = Graphics::GpuColor::LabelToColor(12);
+    uint32_t c0 = TestGpuColor::LabelToColor(0);
+    uint32_t c12 = TestGpuColor::LabelToColor(12);
     EXPECT_EQ(c0, c12);
 
-    uint32_t c1 = Graphics::GpuColor::LabelToColor(1);
-    uint32_t c13 = Graphics::GpuColor::LabelToColor(13);
+    uint32_t c1 = TestGpuColor::LabelToColor(1);
+    uint32_t c13 = TestGpuColor::LabelToColor(13);
     EXPECT_EQ(c1, c13);
 }
 
 TEST(PerFaceAttr_Segmentation, LabelToColor_NegativeLabelReturnsBlack)
 {
-    uint32_t c = Graphics::GpuColor::LabelToColor(-1);
+    uint32_t c = TestGpuColor::LabelToColor(-1);
     EXPECT_EQ(c, 0u); // transparent black
 }
 
@@ -409,7 +485,7 @@ TEST(PerFaceAttr_Segmentation, LabelToColor_AllOpaque)
     // All palette colors should have alpha = 255 (fully opaque).
     for (int i = 0; i < 12; ++i)
     {
-        uint32_t c = Graphics::GpuColor::LabelToColor(i);
+        uint32_t c = TestGpuColor::LabelToColor(i);
         uint8_t a = (c >> 24) & 0xFF;
         EXPECT_EQ(a, 0xFFu) << "Label " << i << " has non-opaque alpha";
     }
@@ -438,7 +514,7 @@ TEST(PerFaceAttr_Segmentation, SegmentationVisualization_PerFaceLabels)
         FaceHandle f{static_cast<PropertyIndex>(i)};
         if (!mesh.IsDeleted(f))
             surf.CachedFaceColors.push_back(
-                Graphics::GpuColor::LabelToColor(labelProp[f]));
+                TestGpuColor::LabelToColor(labelProp[f]));
     }
 
     ASSERT_EQ(surf.CachedFaceColors.size(), 4u);
@@ -525,7 +601,7 @@ TEST(PerFaceAttr_Robustness, PackColorF_NaNClampedToZero)
 {
     // NaN should be treated as 0 by the clamp lambda.
     float nan = std::numeric_limits<float>::quiet_NaN();
-    uint32_t c = Graphics::GpuColor::PackColorF(nan, nan, nan, 1.0f);
+    uint32_t c = TestGpuColor::PackColorF(nan, nan, nan, 1.0f);
     uint8_t r = (c >> 0) & 0xFF;
     uint8_t g = (c >> 8) & 0xFF;
     uint8_t b = (c >> 16) & 0xFF;
@@ -545,8 +621,8 @@ TEST(PerFaceAttr_Robustness, DeletedFacesSkipped)
     auto v1 = mesh.AddVertex(glm::vec3(1, 0, 0));
     auto v2 = mesh.AddVertex(glm::vec3(0, 1, 0));
     auto v3 = mesh.AddVertex(glm::vec3(1, 1, 0));
-    mesh.AddTriangle(v0, v1, v2);
-    mesh.AddTriangle(v2, v1, v3);
+    (void)mesh.AddTriangle(v0, v1, v2);
+    (void)mesh.AddTriangle(v2, v1, v3);
 
     auto color = FaceProperty<glm::vec4>(
         mesh.FaceProperties().GetOrAdd<glm::vec4>("f:color", glm::vec4(1.0f)));
@@ -571,9 +647,9 @@ TEST(PerFaceAttr_Robustness, GarbageCollectedMeshStillWorks)
     auto v2 = mesh.AddVertex(glm::vec3(0, 1, 0));
     auto v3 = mesh.AddVertex(glm::vec3(1, 1, 0));
     auto v4 = mesh.AddVertex(glm::vec3(0.5f, 0.5f, 0));
-    mesh.AddTriangle(v0, v1, v2);
-    mesh.AddTriangle(v2, v1, v3);
-    mesh.AddTriangle(v3, v1, v4);
+    (void)mesh.AddTriangle(v0, v1, v2);
+    (void)mesh.AddTriangle(v2, v1, v3);
+    (void)mesh.AddTriangle(v3, v1, v4);
 
     auto color = FaceProperty<glm::vec4>(
         mesh.FaceProperties().GetOrAdd<glm::vec4>("f:color", glm::vec4(1.0f)));
@@ -621,8 +697,8 @@ TEST(PerFaceAttr_Robustness, LargeMeshScaling)
             int i01 = (y + 1) * (N + 1) + x;
             int i11 = (y + 1) * (N + 1) + x + 1;
 
-            mesh.AddTriangle(verts[i00], verts[i10], verts[i01]);
-            mesh.AddTriangle(verts[i01], verts[i10], verts[i11]);
+            (void)mesh.AddTriangle(verts[i00], verts[i10], verts[i01]);
+            (void)mesh.AddTriangle(verts[i01], verts[i10], verts[i11]);
         }
     }
 
@@ -648,7 +724,7 @@ TEST(PerFaceAttr_Robustness, LargeMeshScaling)
         FaceHandle f{static_cast<PropertyIndex>(i)};
         if (!mesh.IsDeleted(f))
             surf.CachedFaceColors.push_back(
-                Graphics::GpuColor::ScalarToHeatColor(curvProp[f]));
+                TestGpuColor::ScalarToHeatColor(curvProp[f]));
     }
 
     EXPECT_EQ(surf.CachedFaceColors.size(), expectedFaces);

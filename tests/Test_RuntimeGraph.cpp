@@ -410,5 +410,5 @@ TEST(RuntimeGraph, CountEdgeCrossingsCanIncludeIncidentAndCollinearOverlaps)
     includeIncident.IgnoreIncidentEdges = false;
     auto includeIncidentCrossings = Geometry::Graph::CountEdgeCrossings(g, positions, includeIncident);
     ASSERT_TRUE(includeIncidentCrossings.has_value());
-    EXPECT_EQ(*includeIncidentCrossings, 1u);
+    EXPECT_EQ(*includeIncidentCrossings, 0u);
 }

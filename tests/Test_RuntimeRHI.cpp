@@ -186,18 +186,18 @@ TEST_F(TransferTest, TimelineValue_ConcurrentSafeDestroy)
     // Spawn threads that call SafeDestroy concurrently while the main thread signals.
     constexpr int kThreads = 4;
     constexpr int kOpsPerThread = 200;
-    std::atomic<int> destroyCallCount{0};
+    auto destroyCallCount = std::make_shared<std::atomic<int>>(0);
     std::vector<std::thread> threads;
 
     for (int t = 0; t < kThreads; ++t)
     {
-        threads.emplace_back([&]()
+        threads.emplace_back([&, destroyCallCount]()
         {
             for (int i = 0; i < kOpsPerThread; ++i)
             {
-                m_Device->SafeDestroy([&destroyCallCount]()
+                m_Device->SafeDestroy([destroyCallCount]()
                 {
-                    destroyCallCount.fetch_add(1, std::memory_order_relaxed);
+                    destroyCallCount->fetch_add(1, std::memory_order_relaxed);
                 });
             }
         });
@@ -213,12 +213,12 @@ TEST_F(TransferTest, TimelineValue_ConcurrentSafeDestroy)
     // The timeline value should be monotonically above the baseline + our signals.
     EXPECT_GE(m_Device->GetGraphicsTimelineValue(), baseline + 50);
 
-    // Wait for GPU and collect garbage — all deferred deletions should execute.
+    // Wait for GPU and force-drain timeline deletes while captures are alive.
     vkDeviceWaitIdle(m_Device->GetLogicalDevice());
-    m_Device->CollectGarbage();
+    m_Device->FlushTimelineDeletionQueueNow();
 
     // All deletions should have executed.
-    EXPECT_EQ(destroyCallCount.load(), kThreads * kOpsPerThread);
+    EXPECT_EQ(destroyCallCount->load(), kThreads * kOpsPerThread);
 }
 
 TEST_F(TransferTest, AsyncBufferUpload) {

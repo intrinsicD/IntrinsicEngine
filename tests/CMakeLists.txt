@@ -44,6 +44,7 @@ function(intrinsic_test_executable name)
     foreach(obj ${ARG_OBJECTS})
         target_link_libraries(${name} PRIVATE ${obj})
     endforeach()
+    target_link_libraries(${name} PRIVATE TestSupportObjs)
     # Link against the actual libraries for symbol resolution
     target_link_libraries(${name} PRIVATE IntrinsicConfig ${ARG_LINK_LIBS} GTest::gtest_main dl)
     gtest_discover_tests(${name}
@@ -144,6 +145,13 @@ intrinsic_test_object_lib(RuntimeTestObjs
         Test_PropertySetDirtySync.cpp
 
     DEPS IntrinsicCore IntrinsicRuntime
+)
+
+# Shared support for all test executables (sanitizer defaults, shared test hooks).
+intrinsic_test_object_lib(TestSupportObjs
+    SOURCES
+        Test_SanitizerConfig.cpp
+    DEPS IntrinsicCore
 )
 
 # =============================================================================

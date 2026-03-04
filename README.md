@@ -83,6 +83,9 @@ A **"Distinguished Scientist" grade** geometry kernel in `src/Runtime/Geometry/`
 
 All operators follow a consistent contract: `Params` struct with defaults, `Result` struct with diagnostics, `std::optional<Result>` return for degenerate input.
 
+Adaptive remeshing now exposes runtime safety controls in `AdaptiveRemeshingParams` for robustness on pathological inputs:
+`MaxOpsPerIteration` bounds split/collapse work per pass, and `MaxTopologyGrowthFactor` caps vertex/edge growth relative to the input mesh.
+
 ### 3. Rendering (Vulkan 1.3)
 
 - **Bindless Architecture:** Full `VK_EXT_descriptor_indexing` for bindless textures.

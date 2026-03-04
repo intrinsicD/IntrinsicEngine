@@ -1,8 +1,8 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
-#include <array>
 #include <atomic>
+#include <coroutine>
 #include <cstdint>
 #include <thread>
 #include <vector>
@@ -17,17 +17,41 @@ namespace
     constexpr int kWarmupFrames = 6;
     constexpr int kMeasuredFrames = 40;
 
+#if defined(__has_feature)
+#if __has_feature(address_sanitizer) || __has_feature(undefined_behavior_sanitizer)
+    constexpr bool kSanitizerBuild = true;
+#else
+    constexpr bool kSanitizerBuild = false;
+#endif
+#elif defined(__SANITIZE_ADDRESS__) || defined(__SANITIZE_UNDEFINED__)
+    constexpr bool kSanitizerBuild = true;
+#else
+    constexpr bool kSanitizerBuild = false;
+#endif
+
+    Tasks::Job WaitOnCounterAndBump(Tasks::CounterEvent* event,
+                                    std::atomic<uint64_t>* resumed) noexcept
+    {
+        co_await Tasks::WaitFor(*event);
+        resumed->fetch_add(1, std::memory_order_relaxed);
+        co_return;
+    }
+
     uint64_t Percentile(std::vector<uint64_t> values, double p)
     {
         if (values.empty()) return 0;
         std::sort(values.begin(), values.end());
-        const size_t idx = static_cast<size_t>(std::clamp(p, 0.0, 1.0) * static_cast<double>(values.size() - 1));
+        const auto idx = static_cast<size_t>(
+            std::clamp(p, 0.0, 1.0) * static_cast<double>(values.size() - 1));
         return values[idx];
     }
 }
 
 TEST(ArchitectureSLO, FrameGraphP95P99BudgetsAt2000Nodes)
 {
+    if (kSanitizerBuild)
+        GTEST_SKIP() << "Architecture SLO thresholds are calibrated for non-sanitized builds.";
+
     Memory::ScopeStack scope(1024 * 512);
     FrameGraph graph(scope);
 
@@ -85,8 +109,8 @@ TEST(ArchitectureSLO, FrameGraphP95P99BudgetsAt2000Nodes)
     const uint64_t criticalP95 = Percentile(criticalNs, 0.95);
 
     constexpr uint64_t kCompileP99BudgetNs = 350'000;
-    constexpr uint64_t kExecuteP95BudgetNs = 1'500'000;
-    constexpr uint64_t kCriticalP95BudgetNs = 900'000;
+    constexpr uint64_t kExecuteP95BudgetNs = kSanitizerBuild ? 2'000'000 : 1'500'000;
+    constexpr uint64_t kCriticalP95BudgetNs = kSanitizerBuild ? 1'200'000 : 900'000;
 
     EXPECT_LT(compileP99, kCompileP99BudgetNs);
     EXPECT_LT(executeP95, kExecuteP95BudgetNs);
@@ -95,6 +119,9 @@ TEST(ArchitectureSLO, FrameGraphP95P99BudgetsAt2000Nodes)
 
 TEST(ArchitectureSLO, TaskSchedulerContentionAndWakeLatencyBudgets)
 {
+    if (kSanitizerBuild)
+        GTEST_SKIP() << "Task scheduler SLO thresholds are calibrated for non-sanitized builds.";
+
     constexpr int kWorkerCount = 8;
     constexpr int kDispatchThreads = 4;
     constexpr int kTasksPerThread = 3000;
@@ -125,13 +152,7 @@ TEST(ArchitectureSLO, TaskSchedulerContentionAndWakeLatencyBudgets)
     constexpr int kWaiterCount = 512;
     std::atomic<uint64_t> resumedWaiters{0};
     for (int i = 0; i < kWaiterCount; ++i)
-    {
-        Tasks::Scheduler::Dispatch([&event, &resumedWaiters]() -> Tasks::Job {
-            co_await Tasks::WaitFor(event);
-            resumedWaiters.fetch_add(1, std::memory_order_relaxed);
-            co_return;
-        }());
-    }
+        Tasks::Scheduler::Dispatch(WaitOnCounterAndBump(&event, &resumedWaiters));
 
     // Block without spin until at least one coroutine has parked.
     Tasks::Scheduler::ParkCountAtomic().wait(0, std::memory_order_acquire);

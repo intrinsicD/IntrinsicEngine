@@ -1,6 +1,5 @@
 #include <gtest/gtest.h>
 
-#include <cstdint>
 #include <cmath>
 #include <limits>
 #include <span>
@@ -338,7 +337,7 @@ TEST(DebugDraw, GridLineCount)
     dd.Grid({0, 0, 0}, {1, 0, 0}, {0, 0, 1}, countU, countV, 1.0f, DebugDraw::Gray());
 
     // (countU + 1) lines in V direction + (countV + 1) lines in U direction
-    uint32_t expected = static_cast<uint32_t>((countU + 1) + (countV + 1));
+    const auto expected = static_cast<uint32_t>((countU + 1) + (countV + 1));
     EXPECT_EQ(dd.GetLineCount(), expected);
 }
 

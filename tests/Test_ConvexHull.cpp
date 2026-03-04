@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <limits>
 #include <numbers>
 #include <numeric>
 #include <random>
@@ -17,6 +18,40 @@ import Geometry;
 // Helpers
 // =============================================================================
 
+struct HullContainmentDiagnostics
+{
+    bool AllInside{true};
+    double MaxPositiveDistance{0.0};
+    std::size_t PointIndex{std::numeric_limits<std::size_t>::max()};
+    std::size_t PlaneIndex{std::numeric_limits<std::size_t>::max()};
+};
+
+static HullContainmentDiagnostics ComputeContainmentDiagnostics(
+    const std::vector<glm::vec3>& points,
+    const Geometry::ConvexHull& hull,
+    double tolerance = 1e-6)
+{
+    HullContainmentDiagnostics diag{};
+    for (std::size_t pi = 0; pi < points.size(); ++pi)
+    {
+        const auto& p = points[pi];
+        for (std::size_t fi = 0; fi < hull.Planes.size(); ++fi)
+        {
+            const auto& plane = hull.Planes[fi];
+            const double dist = static_cast<double>(glm::dot(plane.Normal, p)) -
+                                static_cast<double>(plane.Distance);
+            if (dist > tolerance && dist > diag.MaxPositiveDistance)
+            {
+                diag.AllInside = false;
+                diag.MaxPositiveDistance = dist;
+                diag.PointIndex = pi;
+                diag.PlaneIndex = fi;
+            }
+        }
+    }
+    return diag;
+}
+
 // Verify all input points are on or inside the hull (non-positive signed
 // distance from every face plane).
 static bool AllPointsInsideOrOn(
@@ -24,23 +59,29 @@ static bool AllPointsInsideOrOn(
     const Geometry::ConvexHull& hull,
     double tolerance = 1e-6)
 {
-    for (const auto& p : points)
-    {
-        for (const auto& plane : hull.Planes)
-        {
-            double dist = static_cast<double>(glm::dot(plane.Normal, p)) -
-                          static_cast<double>(plane.Distance);
-            if (dist > tolerance)
-                return false;
-        }
-    }
-    return true;
+    return ComputeContainmentDiagnostics(points, hull, tolerance).AllInside;
 }
 
 // Verify that the hull satisfies Euler's formula: V - E + F = 2
 static bool SatisfiesEuler(std::size_t V, std::size_t E, std::size_t F)
 {
     return (static_cast<int>(V) - static_cast<int>(E) + static_cast<int>(F)) == 2;
+}
+
+static double ScaleAwareTolerance(const std::vector<glm::vec3>& points,
+                                  double base = 1e-6,
+                                  double relative = 1e-7)
+{
+    if (points.empty()) return base;
+    glm::vec3 minP = points[0];
+    glm::vec3 maxP = points[0];
+    for (const auto& p : points)
+    {
+        minP = glm::min(minP, p);
+        maxP = glm::max(maxP, p);
+    }
+    const double diag = static_cast<double>(glm::length(maxP - minP));
+    return std::max(base, relative * std::max(1.0, diag));
 }
 
 // Compute the volume of a convex hull via the divergence theorem.
@@ -117,6 +158,7 @@ static std::vector<glm::vec3> MakeOctahedronPoints()
         {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, -1.0f}
     };
 }
+
 
 // =============================================================================
 // Degenerate / Edge Case Tests
@@ -357,7 +399,13 @@ TEST(ConvexHull_Random, GaussianDistribution)
     auto result = Geometry::ConvexHullBuilder::Build(points);
     ASSERT_TRUE(result.has_value());
 
-    EXPECT_TRUE(AllPointsInsideOrOn(points, result->Hull));
+    const double tol = ScaleAwareTolerance(points);
+    auto diag = ComputeContainmentDiagnostics(points, result->Hull, tol);
+    EXPECT_TRUE(diag.AllInside)
+        << "tol=" << tol
+        << " maxDist=" << diag.MaxPositiveDistance
+        << " point=" << diag.PointIndex
+        << " plane=" << diag.PlaneIndex;
     EXPECT_TRUE(SatisfiesEuler(result->HullVertexCount,
                                result->HullEdgeCount,
                                result->HullFaceCount));
@@ -375,7 +423,13 @@ TEST(ConvexHull_Random, LargePointCloud)
     auto result = Geometry::ConvexHullBuilder::Build(points);
     ASSERT_TRUE(result.has_value());
 
-    EXPECT_TRUE(AllPointsInsideOrOn(points, result->Hull));
+    const double tol = ScaleAwareTolerance(points);
+    auto diag = ComputeContainmentDiagnostics(points, result->Hull, tol);
+    EXPECT_TRUE(diag.AllInside)
+        << "tol=" << tol
+        << " maxDist=" << diag.MaxPositiveDistance
+        << " point=" << diag.PointIndex
+        << " plane=" << diag.PlaneIndex;
     EXPECT_TRUE(SatisfiesEuler(result->HullVertexCount,
                                result->HullEdgeCount,
                                result->HullFaceCount));

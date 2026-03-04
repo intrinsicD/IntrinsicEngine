@@ -159,20 +159,20 @@ namespace Geometry::Graph
             const int s2 = sign(o2);
             const int s3 = sign(o3);
 
+            const bool collinear = s0 == 0 && s1 == 0 && s2 == 0 && s3 == 0;
+            if (collinear)
+            {
+                if (!params.CountCollinearOverlap) return false;
+                return RangesOverlap(a0.x, a1.x, b0.x, b1.x, epsilon)
+                    && RangesOverlap(a0.y, a1.y, b0.y, b1.y, epsilon);
+            }
+
             if (s0 == 0 && OnSegment(a0, a1, b0, epsilon)) return true;
             if (s1 == 0 && OnSegment(a0, a1, b1, epsilon)) return true;
             if (s2 == 0 && OnSegment(b0, b1, a0, epsilon)) return true;
             if (s3 == 0 && OnSegment(b0, b1, a1, epsilon)) return true;
 
-            if ((s0 * s1 < 0) && (s2 * s3 < 0)) return true;
-
-            if (!params.CountCollinearOverlap) return false;
-
-            const bool collinear = s0 == 0 && s1 == 0 && s2 == 0 && s3 == 0;
-            if (!collinear) return false;
-
-            return RangesOverlap(a0.x, a1.x, b0.x, b1.x, epsilon)
-                && RangesOverlap(a0.y, a1.y, b0.y, b1.y, epsilon);
+            return (s0 * s1 < 0) && (s2 * s3 < 0);
         }
     }
 

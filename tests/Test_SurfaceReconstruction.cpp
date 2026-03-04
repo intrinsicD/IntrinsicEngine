@@ -291,14 +291,14 @@ TEST(MarchingCubes, VertexWelding_NoduplicateVertices)
 
 TEST(MarchingCubes, CustomIsovalue)
 {
-    // Sphere SDF with non-zero isovalue = larger/smaller sphere
+    // Sphere SDF with non-zero isovalue shifts the extracted radius.
     auto grid = MakeSphereSDF(15, 15, 15, 1.0f);
 
     Geometry::MarchingCubes::MarchingCubesParams paramsSmall;
-    paramsSmall.Isovalue = 0.3f; // outer surface -> smaller sphere
+    paramsSmall.Isovalue = 0.3f; // d(x)=0.3 => radius ~= 1.3 (larger sphere)
 
     Geometry::MarchingCubes::MarchingCubesParams paramsLarge;
-    paramsLarge.Isovalue = -0.3f; // inner surface -> larger sphere
+    paramsLarge.Isovalue = -0.3f; // d(x)=-0.3 => radius ~= 0.7 (smaller sphere)
 
     auto resultSmall = Geometry::MarchingCubes::Extract(grid, paramsSmall);
     auto resultLarge = Geometry::MarchingCubes::Extract(grid, paramsLarge);
@@ -317,8 +317,8 @@ TEST(MarchingCubes, CustomIsovalue)
         avgRadiusLarge += glm::length(v);
     avgRadiusLarge /= static_cast<float>(resultLarge->VertexCount);
 
-    // Smaller isovalue -> larger sphere radius
-    EXPECT_LT(avgRadiusSmall, avgRadiusLarge);
+    // Higher isovalue for this SDF produces a larger extracted radius.
+    EXPECT_GT(avgRadiusSmall, avgRadiusLarge);
 }
 
 // =============================================================================

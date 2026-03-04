@@ -899,9 +899,9 @@ public:
         }
         for (size_t i = 0; i + 2 < collider->CollisionRef->Indices.size(); i += 3)
         {
-            static_cast<void>(mesh.AddTriangle(vhs[collider->CollisionRef->Indices[i]],
+           (void)mesh.AddTriangle(vhs[collider->CollisionRef->Indices[i]],
                               vhs[collider->CollisionRef->Indices[i + 1]],
-                              vhs[collider->CollisionRef->Indices[i + 2]]));
+                              vhs[collider->CollisionRef->Indices[i + 2]]);
         }
 
         // 2. Apply operator

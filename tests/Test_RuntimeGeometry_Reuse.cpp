@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <limits>
 #include <memory>
+#include <thread>
 #include <vector>
 
 #include "RHI.Vulkan.hpp"
@@ -34,9 +35,22 @@ namespace
 
         void TearDown() override
         {
+            if (m_Device && m_Device->GetLogicalDevice() != VK_NULL_HANDLE)
+                vkDeviceWaitIdle(m_Device->GetLogicalDevice());
+
+            if (m_TransferManager)
+                m_TransferManager->GarbageCollect();
             m_TransferManager.reset();
+
+            // Ensure GeometryGpuData instances are destroyed before VulkanDevice teardown.
+            m_Pool.Clear();
+
             if (m_Device)
+            {
+                m_Device->FlushTimelineDeletionQueueNow();
                 m_Device->FlushAllDeletionQueues();
+            }
+
             m_Device.reset();
             m_Context.reset();
         }
@@ -69,6 +83,16 @@ TEST_F(GeometryReuseTest, ReuseSharesVertexBufferAndCreatesUniqueIndexBuffer)
     ASSERT_NE(gpu1->GetVertexBuffer(), nullptr);
     ASSERT_NE(gpu1->GetIndexBuffer(), nullptr);
 
+    if (t1.IsValid())
+    {
+        while (!m_TransferManager->IsCompleted(t1))
+        {
+            m_TransferManager->GarbageCollect();
+            std::this_thread::yield();
+        }
+        m_TransferManager->GarbageCollect();
+    }
+
     VkBuffer vb1 = gpu1->GetVertexBuffer()->GetHandle();
     VkBuffer ib1 = gpu1->GetIndexBuffer()->GetHandle();
 
@@ -88,6 +112,16 @@ TEST_F(GeometryReuseTest, ReuseSharesVertexBufferAndCreatesUniqueIndexBuffer)
     ASSERT_NE(gpu2, nullptr);
     ASSERT_NE(gpu2->GetVertexBuffer(), nullptr);
     ASSERT_NE(gpu2->GetIndexBuffer(), nullptr);
+
+    if (t2.IsValid())
+    {
+        while (!m_TransferManager->IsCompleted(t2))
+        {
+            m_TransferManager->GarbageCollect();
+            std::this_thread::yield();
+        }
+        m_TransferManager->GarbageCollect();
+    }
 
     VkBuffer vb2 = gpu2->GetVertexBuffer()->GetHandle();
     VkBuffer ib2 = gpu2->GetIndexBuffer()->GetHandle();

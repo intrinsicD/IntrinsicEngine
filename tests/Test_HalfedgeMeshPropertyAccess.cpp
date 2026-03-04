@@ -22,7 +22,7 @@ static Geometry::Halfedge::Mesh MakeTriangle()
     auto v0 = mesh.AddVertex(glm::vec3(0, 0, 0));
     auto v1 = mesh.AddVertex(glm::vec3(1, 0, 0));
     auto v2 = mesh.AddVertex(glm::vec3(0, 1, 0));
-    mesh.AddTriangle(v0, v1, v2);
+    (void)mesh.AddTriangle(v0, v1, v2);
     return mesh;
 }
 
@@ -35,8 +35,8 @@ static Geometry::Halfedge::Mesh MakeQuadPair()
     auto v1 = mesh.AddVertex(glm::vec3(1, 0, 0));
     auto v2 = mesh.AddVertex(glm::vec3(0, 1, 0));
     auto v3 = mesh.AddVertex(glm::vec3(1, 1, 0));
-    mesh.AddTriangle(v0, v1, v2);
-    mesh.AddTriangle(v2, v1, v3);
+    (void)mesh.AddTriangle(v0, v1, v2);
+    (void)mesh.AddTriangle(v2, v1, v3);
     return mesh;
 }
 
@@ -258,7 +258,7 @@ TEST(HalfedgeMesh_EdgeExtraction, MatchesFromVertex_ToVertex)
 
         auto h0 = mesh.Halfedge(e, 0);
         auto from = mesh.FromVertex(h0).Index;
-        auto to   = mesh.ToVertex(h0).Index;
+        auto to = mesh.ToVertex(h0).Index;
 
         ASSERT_LT(idx, extracted.size());
         EXPECT_EQ(extracted[idx].i0, from);
@@ -313,8 +313,8 @@ TEST(HalfedgeMesh_EdgeExtraction, AfterEdgeDelete_SkipsDeletedEdge)
     auto v1 = mesh.AddVertex(glm::vec3(1, 0, 0));
     auto v2 = mesh.AddVertex(glm::vec3(0, 1, 0));
     auto v3 = mesh.AddVertex(glm::vec3(1, 1, 0));
-    mesh.AddTriangle(v0, v1, v2);
-    mesh.AddTriangle(v2, v1, v3);
+    (void)mesh.AddTriangle(v0, v1, v2);
+    (void)mesh.AddTriangle(v2, v1, v3);
 
     // 5 edges before deletion.
     ASSERT_EQ(mesh.ExtractEdgeVertexPairs().size(), 5u);

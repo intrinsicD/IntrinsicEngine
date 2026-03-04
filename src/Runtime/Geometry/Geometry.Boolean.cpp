@@ -167,6 +167,21 @@ namespace Geometry::Boolean
                    (a.Min.y <= b.Max.y && a.Max.y >= b.Min.y) &&
                    (a.Min.z <= b.Max.z && a.Max.z >= b.Min.z);
         }
+
+        [[nodiscard]] bool AllVerticesInsideMesh(const MeshExtract& container,
+                                                 const MeshExtract& candidate,
+                                                 const float eps)
+        {
+            if (candidate.Vertices.empty())
+                return false;
+
+            for (const glm::vec3& v : candidate.Vertices)
+            {
+                if (!IsPointInsideMesh(container, v, eps))
+                    return false;
+            }
+            return true;
+        }
     }
 
     std::optional<BooleanResult> Compute(const Halfedge::Mesh& a, const Halfedge::Mesh& b, const Operation op,
@@ -181,9 +196,9 @@ namespace Geometry::Boolean
             return std::nullopt;
 
         const bool aabbOverlap = AABBOverlap(ma.Bounds, mb.Bounds);
-        const bool aInsideB = IsPointInsideMesh(mb, ma.Vertices.front(), params.Epsilon);
-        const bool bInsideA = IsPointInsideMesh(ma, mb.Vertices.front(), params.Epsilon);
-        const bool overlap = aabbOverlap && !(!aInsideB && !bInsideA);
+        const bool aInsideB = AllVerticesInsideMesh(mb, ma, params.Epsilon);
+        const bool bInsideA = AllVerticesInsideMesh(ma, mb, params.Epsilon);
+        const bool overlap = aabbOverlap && (aInsideB || bInsideA);
 
         out.Clear();
         BooleanResult result{};

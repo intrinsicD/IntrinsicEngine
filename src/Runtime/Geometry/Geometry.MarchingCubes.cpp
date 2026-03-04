@@ -567,10 +567,10 @@ namespace Geometry::MarchingCubes
                                 glm::vec3 g1 = gradients[grid.LinearIndex(x1, y1, z1)];
                                 glm::vec3 grad = g0 + t * (g1 - g0);
                                 float len = glm::length(grad);
-                                // Normal points from inside (negative) to outside (positive).
-                                // Negate to get outward normal for the "inside < iso" convention.
+                                // For signed fields with inside < iso, grad points toward increasing
+                                // values (inside -> outside), i.e. outward for standard SDFs.
                                 if (len > 1e-10f)
-                                    result.Normals.push_back(-grad / len);
+                                    result.Normals.push_back(grad / len);
                                 else
                                     result.Normals.push_back({0.0f, 1.0f, 0.0f});
                             }
@@ -609,35 +609,51 @@ namespace Geometry::MarchingCubes
 
     std::optional<Halfedge::Mesh> ToMesh(const MarchingCubesResult& result)
     {
-        if (result.Triangles.empty())
+        if (result.Triangles.empty() || result.VertexCount == 0)
             return std::nullopt;
 
         Halfedge::Mesh mesh;
         mesh.Reserve(result.VertexCount, result.TriangleCount * 3, result.TriangleCount);
 
-        // Add all vertices
+        constexpr std::size_t kInvalidIndex = std::numeric_limits<std::size_t>::max();
+        std::vector<std::size_t> remap(result.VertexCount, kInvalidIndex);
         std::vector<VertexHandle> vertexHandles;
         vertexHandles.reserve(result.VertexCount);
-        for (const auto& pos : result.Vertices)
-        {
-            vertexHandles.push_back(mesh.AddVertex(pos));
-        }
 
-        // Add triangles (some may fail for non-manifold configurations)
+        const auto mapVertex = [&](std::size_t srcIndex) -> VertexHandle
+        {
+            if (remap[srcIndex] == kInvalidIndex)
+            {
+                remap[srcIndex] = vertexHandles.size();
+                vertexHandles.push_back(mesh.AddVertex(result.Vertices[srcIndex]));
+            }
+            return vertexHandles[remap[srcIndex]];
+        };
+
         for (const auto& tri : result.Triangles)
         {
-            // Skip degenerate triangles
+            if (tri[0] >= result.VertexCount || tri[1] >= result.VertexCount || tri[2] >= result.VertexCount)
+                continue;
             if (tri[0] == tri[1] || tri[1] == tri[2] || tri[0] == tri[2])
                 continue;
 
             (void)mesh.AddTriangle(
-                vertexHandles[tri[0]],
-                vertexHandles[tri[1]],
-                vertexHandles[tri[2]]);
+                mapVertex(tri[0]),
+                mapVertex(tri[1]),
+                mapVertex(tri[2]));
         }
 
         if (mesh.FaceCount() == 0)
             return std::nullopt;
+
+        // Remove vertices that ended up isolated due to skipped/failed face insertions.
+        for (const VertexHandle v : vertexHandles)
+        {
+            if (mesh.IsValid(v) && !mesh.IsDeleted(v) && mesh.IsIsolated(v))
+                mesh.DeleteVertex(v);
+        }
+        if (mesh.HasGarbage())
+            mesh.GarbageCollection();
 
         return mesh;
     }

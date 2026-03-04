@@ -179,11 +179,11 @@ TEST(BDA_ColorConsistency, DebugDrawDelegatesToGpuColor)
     // DebugDraw delegates to GpuColor.
     // Verify they produce identical results for the same input.
     uint32_t ddRed = Graphics::DebugDraw::PackColor(255, 0, 0, 255);
-    uint32_t gcRed = Graphics::GpuColor::PackColor(255, 0, 0, 255);
+    uint32_t gcRed = Graphics::DebugDraw::PackColor(255, 0, 0, 255);
     EXPECT_EQ(ddRed, gcRed);
 
     uint32_t ddGreen = Graphics::DebugDraw::PackColorF(0.0f, 1.0f, 0.0f, 1.0f);
-    uint32_t gcGreen = Graphics::GpuColor::PackColorF(0.0f, 1.0f, 0.0f, 1.0f);
+    uint32_t gcGreen = Graphics::DebugDraw::PackColorF(0.0f, 1.0f, 0.0f, 1.0f);
     EXPECT_EQ(ddGreen, gcGreen);
 }
 
@@ -191,7 +191,7 @@ TEST(BDA_ColorConsistency, PackColorABGRByteOrder)
 {
     // Vulkan convention: R in low bits (ABGR packing).
     // GPU shader uses unpackUnorm4x8() which reads R from byte 0.
-    uint32_t c = Graphics::GpuColor::PackColor(0xAA, 0xBB, 0xCC, 0xDD);
+    uint32_t c = Graphics::DebugDraw::PackColor(0xAA, 0xBB, 0xCC, 0xDD);
     EXPECT_EQ((c >>  0) & 0xFF, 0xAAu); // R in byte 0
     EXPECT_EQ((c >>  8) & 0xFF, 0xBBu); // G in byte 1
     EXPECT_EQ((c >> 16) & 0xFF, 0xCCu); // B in byte 2
@@ -201,7 +201,7 @@ TEST(BDA_ColorConsistency, PackColorABGRByteOrder)
 TEST(BDA_ColorConsistency, PackColorFRoundTrip)
 {
     // Test float -> packed -> channel extraction roundtrip for mid-range values.
-    uint32_t c = Graphics::GpuColor::PackColorF(0.5f, 0.25f, 0.75f, 1.0f);
+    uint32_t c = Graphics::DebugDraw::PackColorF(0.5f, 0.25f, 0.75f, 1.0f);
     uint8_t r = (c >> 0) & 0xFF;
     uint8_t g = (c >> 8) & 0xFF;
     uint8_t b = (c >> 16) & 0xFF;
@@ -310,7 +310,8 @@ TEST(BDA_SharedBuffer, ThreeTopologyViewsFromSameSource)
     // Wireframe view
     Graphics::GeometryUploadRequest wireReq;
     wireReq.ReuseVertexBuffersFrom = meshHandle;
-    wireReq.Indices = {0, 1, 1, 2, 2, 0};
+    const std::vector<uint32_t> wireIndices = {0, 1, 1, 2, 2, 0};
+    wireReq.Indices = wireIndices;
     wireReq.Topology = Graphics::PrimitiveTopology::Lines;
 
     // Vertex view (identity / direct draw — no indices needed in practice,
@@ -504,10 +505,10 @@ TEST(BDA_PerFaceAttr, SurfaceFaceColorPopulation)
 
     // Simulate per-face color population (e.g., from curvature visualization).
     surf.CachedFaceColors = {
-        Graphics::GpuColor::PackColorF(1.0f, 0.0f, 0.0f, 1.0f), // face 0 = red
-        Graphics::GpuColor::PackColorF(0.0f, 1.0f, 0.0f, 1.0f), // face 1 = green
-        Graphics::GpuColor::PackColorF(0.0f, 0.0f, 1.0f, 1.0f), // face 2 = blue
-        Graphics::GpuColor::PackColorF(1.0f, 1.0f, 0.0f, 1.0f), // face 3 = yellow
+        Graphics::DebugDraw::PackColorF(1.0f, 0.0f, 0.0f, 1.0f), // face 0 = red
+        Graphics::DebugDraw::PackColorF(0.0f, 1.0f, 0.0f, 1.0f), // face 1 = green
+        Graphics::DebugDraw::PackColorF(0.0f, 0.0f, 1.0f, 1.0f), // face 2 = blue
+        Graphics::DebugDraw::PackColorF(1.0f, 1.0f, 0.0f, 1.0f), // face 3 = yellow
     };
     surf.FaceColorsDirty = false;
 
@@ -532,7 +533,7 @@ TEST(BDA_PerFaceAttr, MeshPushConstantsPtrFaceAttrDefaultZero)
 TEST(BDA_PerFaceAttr, FaceColorPackingRoundTrip)
 {
     // Verify that face colors survive the pack/unpack cycle.
-    uint32_t packed = Graphics::GpuColor::PackColorF(0.5f, 0.25f, 0.75f, 1.0f);
+    uint32_t packed = Graphics::DebugDraw::PackColorF(0.5f, 0.25f, 0.75f, 1.0f);
 
     uint8_t r = (packed >> 0) & 0xFF;
     uint8_t g = (packed >> 8) & 0xFF;

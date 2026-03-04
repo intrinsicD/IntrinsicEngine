@@ -528,8 +528,8 @@ TEST(PropertySetDirtySync, MultipleDomains_AllProcessed)
     auto e = reg.create();
 
     auto graph = std::make_shared<Geometry::Graph::Graph>();
-    auto v0 = graph->AddVertex({0, 0, 0});
-    graph->GetOrAddVertexProperty<glm::vec4>("v:color", {1, 0, 0, 1});
+    (void)graph->AddVertex({0, 0, 0});
+    (void)graph->GetOrAddVertexProperty<glm::vec4>("v:color", {1, 0, 0, 1});
 
     auto& gd = reg.emplace<Graph::Data>(e);
     gd.GraphRef = graph;
