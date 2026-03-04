@@ -133,6 +133,9 @@ namespace Graphics
         }
     }
 
+    // Build collision-side acceleration data from imported CPU mesh data.
+    [[nodiscard]] std::shared_ptr<GeometryCollisionData> BuildCollisionData(const GeometryCpuData& cpu);
+
     // =====================================================================
     // ModelLoader API
     // =====================================================================
@@ -185,9 +188,54 @@ namespace Graphics
 
             auto seg = std::make_shared<MeshSegment>();
             seg->Handle = geomHandle;
+            seg->CollisionGeometry = BuildCollisionData(cpu);
             outModel->Meshes.push_back(std::move(seg));
         }
 
         return ModelLoadResult{.ModelData = std::move(outModel), .Token = lastToken};
+    }
+
+    // Build collision-side acceleration data from imported CPU mesh data.
+    [[nodiscard]] std::shared_ptr<GeometryCollisionData> BuildCollisionData(const GeometryCpuData& cpu)
+    {
+        auto collision = std::make_shared<GeometryCollisionData>();
+        collision->Positions = cpu.Positions;
+        collision->Indices = cpu.Indices;
+
+        if (!collision->Positions.empty())
+        {
+            collision->LocalAABB = Geometry::Union(Geometry::Convert(collision->Positions));
+        }
+
+        if (cpu.Topology == PrimitiveTopology::Triangles && collision->Indices.size() >= 3)
+        {
+            std::vector<Geometry::AABB> primitiveBounds;
+            primitiveBounds.reserve(collision->Indices.size() / 3);
+
+            for (size_t i = 0; i + 2 < collision->Indices.size(); i += 3)
+            {
+                const uint32_t i0 = collision->Indices[i + 0];
+                const uint32_t i1 = collision->Indices[i + 1];
+                const uint32_t i2 = collision->Indices[i + 2];
+
+                if (i0 >= collision->Positions.size() ||
+                    i1 >= collision->Positions.size() ||
+                    i2 >= collision->Positions.size())
+                    continue;
+
+                auto triAabb = Geometry::AABB{collision->Positions[i0], collision->Positions[i0]};
+                triAabb = Geometry::Union(triAabb, collision->Positions[i1]);
+                triAabb = Geometry::Union(triAabb, collision->Positions[i2]);
+                primitiveBounds.push_back(triAabb);
+            }
+
+            if (!primitiveBounds.empty())
+            {
+                static_cast<void>(collision->LocalOctree.Build(
+                    primitiveBounds, Geometry::Octree::SplitPolicy{}, 16, 8));
+            }
+        }
+
+        return collision;
     }
 }

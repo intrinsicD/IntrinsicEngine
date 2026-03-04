@@ -452,8 +452,8 @@ namespace Graphics::Passes
             b.PointSizePx = 1.0f;
             if (b.Topology == VK_PRIMITIVE_TOPOLOGY_POINT_LIST)
             {
-                if (b.GeoHandle.IsValid() && b.GeoHandle.Index < pointSizePxByHandleIndex.size())
-                    b.PointSizePx = pointSizePxByHandleIndex[b.GeoHandle.Index];
+                if (b.GeoHandle.IsValid() && b.GeoHandle.Index < m_PointSizePxByHandleIndex.size())
+                    b.PointSizePx = m_PointSizePxByHandleIndex[b.GeoHandle.Index];
                 else
                     b.PointSizePx = 4.0f;
             }

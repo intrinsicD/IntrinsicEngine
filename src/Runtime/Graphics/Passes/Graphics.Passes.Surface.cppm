@@ -97,6 +97,15 @@ export namespace Graphics::Passes
         }
         [[nodiscard]] bool HasTransientContent() const { return !m_TransientVertices.empty(); }
 
+        // Set the rendered point size (px) for a specific geometry handle index.
+        // Grows the table on demand; called by PointCloudRenderer or similar owners.
+        void SetPointSize(uint32_t handleIndex, float sizePx)
+        {
+            if (handleIndex >= m_PointSizePxByHandleIndex.size())
+                m_PointSizePxByHandleIndex.resize(handleIndex + 1, 0.0f);
+            m_PointSizePxByHandleIndex[handleIndex] = sizePx;
+        }
+
     private:
         struct PassData
         {
@@ -252,6 +261,10 @@ export namespace Graphics::Passes
             uint32_t FaceCount = 0;
         };
         std::unordered_map<uint32_t, FaceAttrEntry> m_FaceAttrBuffers;
+
+        // Sparse table: GeometryHandle::Index → point size in pixels.
+        // Grown on demand by SetPointSize(); default 0.0f means "not set" (falls back to 4.0f).
+        std::vector<float> m_PointSizePxByHandleIndex;
 
         // Create or update a persistent per-face attribute buffer for a geometry.
         // Data is an array of packed ABGR uint32_t, one per face.
