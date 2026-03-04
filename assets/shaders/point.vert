@@ -64,16 +64,20 @@ void main()
     vec2 localOffset = vec2[](vec2(-1,-1), vec2(1,-1), vec2(1,1), vec2(-1,1))[cornerIdx];
     fragDiscUV = localOffset;
 
-    float radiusWorld = ptSize * push.SizeMultiplier;
+    // Clamp point radius to safe world-space range [0.0001, 1.0].
+    float radiusWorld = clamp(ptSize, 0.0001, 1.0) * push.SizeMultiplier;
 
     // Default: no EWA covariance.
     fragEwaCovInv = vec3(0.0);
+
+    // Camera-facing fallback for degenerate or missing normals.
+    vec3 cameraFwd = -vec3(camera.view[0][2], camera.view[1][2], camera.view[2][2]);
 
     if (push.RenderMode == 2u)
     {
         // ---- EWA Splatting mode ----
         float nLen = length(ptNormal);
-        vec3 N = (nLen > 1e-6) ? (ptNormal / nLen) : vec3(0.0, 1.0, 0.0);
+        vec3 N = (nLen > 1e-6) ? (ptNormal / nLen) : cameraFwd;
 
         vec3 ref = (abs(N.y) < 0.99) ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
         vec3 T = normalize(cross(N, ref));
@@ -144,7 +148,7 @@ void main()
         // ---- Surfel mode: normal-oriented disc in world space ----
         // Build a tangent frame from the surface normal.
         float nLen = length(ptNormal);
-        vec3 N = (nLen > 1e-6) ? (ptNormal / nLen) : vec3(0.0, 1.0, 0.0);
+        vec3 N = (nLen > 1e-6) ? (ptNormal / nLen) : cameraFwd;
 
         // Choose a reference vector not parallel to N for cross product.
         vec3 ref = (abs(N.y) < 0.99) ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);

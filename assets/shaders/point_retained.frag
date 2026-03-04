@@ -50,7 +50,9 @@ void main()
         float weight = exp(-0.5 * mahal);
 
         // Lambertian + ambient lighting (same as Surfel mode).
-        vec3 N = normalize(fragNormal);
+        // Epsilon-guarded renormalization with camera-facing fallback.
+        float nLenE = length(fragNormal);
+        vec3 N = (nLenE > 1e-6) ? (fragNormal / nLenE) : vec3(0.0, 0.0, 1.0);
         vec3 lightDir = normalize(vec3(1.0, 1.0, 1.0));
         float NdotL = dot(N, lightDir);
         float diffuse = max(abs(NdotL), 0.0);
@@ -72,7 +74,9 @@ void main()
         if (push.RenderMode == 1u)
         {
             // ---- Surfel mode: Lambertian + ambient lighting ----
-            vec3 N = normalize(fragNormal);
+            // Epsilon-guarded renormalization with camera-facing fallback.
+            float nLenS = length(fragNormal);
+            vec3 N = (nLenS > 1e-6) ? (fragNormal / nLenS) : vec3(0.0, 0.0, 1.0);
             vec3 lightDir = normalize(vec3(1.0, 1.0, 1.0));
 
             // Two-sided lighting: flip normal if facing away from light.

@@ -106,7 +106,9 @@ void main()
     dir /= len;
     vec2 perp = vec2(-dir.y, dir.x);
 
-    float halfWidth = push.LineWidth * 0.5;
+    // Clamp line width to safe pixel range [0.5, 32.0].
+    float clampedWidth = clamp(push.LineWidth, 0.5, 32.0);
+    float halfWidth = clampedWidth * 0.5;
     float capExtend = halfWidth;
 
     // Map 6 vertices to 4 quad corners.

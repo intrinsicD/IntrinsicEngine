@@ -200,6 +200,19 @@ namespace Graphics::Systems::GraphGeometrySync
                     if (ci0 == UINT32_MAX || ci1 == UINT32_MAX)
                         continue; // Edge references a deleted vertex — skip.
 
+                    // Skip zero-length edges (coincident endpoints) — these would
+                    // produce degenerate line quads. Nodes are still rendered as
+                    // points via Point::Component.
+                    if (ci0 == ci1)
+                        continue;
+                    {
+                        const glm::vec3& p0 = positions[ci0];
+                        const glm::vec3& p1 = positions[ci1];
+                        const glm::vec3 d = p1 - p0;
+                        if (glm::dot(d, d) < 1e-12f)
+                            continue;
+                    }
+
                     edgePairs.push_back({ci0, ci1});
 
                     // Extract per-edge color (pack to ABGR uint32).

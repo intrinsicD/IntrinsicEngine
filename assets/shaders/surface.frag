@@ -36,7 +36,10 @@ void main() {
     float ambientStrength = 0.1;
     vec3 ambient = ambientStrength * lightColor;
 
-    vec3 norm = normalize(fragNormal);
+    // Epsilon-guarded renormalization: interpolation across a triangle can
+    // produce near-zero normals when adjacent vertices have opposing directions.
+    float nLen = length(fragNormal);
+    vec3 norm = (nLen > 1e-6) ? (fragNormal / nLen) : vec3(0.0, 0.0, 1.0);
     float diff = max(dot(norm, lightDir), 0.0);
     vec3 diffuse = diff * lightColor;
 

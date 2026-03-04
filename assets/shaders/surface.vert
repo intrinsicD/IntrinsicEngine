@@ -68,7 +68,17 @@ void main() {
     // Note: This is independent of PointCloudRenderPass splat modes.
     gl_PointSize = max(push.PointSizePx, 1.0);
 
-    fragNormal = mat3(inst.Model) * inNorm;
+    // Correct normal transform under non-uniform scale / shear.
+    mat3 normalMatrix = transpose(inverse(mat3(inst.Model)));
+    vec3 transformedNorm = normalMatrix * inNorm;
+    float nLen = length(transformedNorm);
+    if (nLen > 1e-6) {
+        fragNormal = transformedNorm / nLen;
+    } else {
+        // Fallback to camera-facing basis (view forward in world space).
+        fragNormal = -vec3(camera.view[0][2], camera.view[1][2], camera.view[2][2]);
+    }
+
     fragTexCoord = inUV;
     fragTexID = inst.TextureID;
 }

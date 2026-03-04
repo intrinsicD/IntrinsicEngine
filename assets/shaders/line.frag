@@ -25,7 +25,9 @@ layout(location = 0) out vec4 outColor;
 
 void main()
 {
-    float halfWidth = push.LineWidth * 0.5;
+    // Clamp line width to safe pixel range [0.5, 32.0].
+    float clampedWidth = clamp(push.LineWidth, 0.5, 32.0);
+    float halfWidth = clampedWidth * 0.5;
 
     // Signed distance from center of line, in pixels.
     float dist = abs(fragDistanceToCenter);
