@@ -457,7 +457,7 @@ Sub-entity select → Geometry processing (interactive operator input)
 
 1. **Unified pass consolidation (`PLAN.md` Phases 1–5)**
    *Depends on: nothing. Depended on by: everything — all rendering features should target the new pass architecture.*
-   Define `ECS::Surface/Line/Point::Component` (done), consolidate ~~`ForwardPass` → `SurfacePass`~~ (done), ~~`RetainedLineRenderPass` + `LineRenderPass` → `LinePass`~~ (done), ~~`RetainedPointCloudRenderPass` + `PointCloudRenderPass` → `PointPass`~~ (done). ~~Delete `MeshRenderPass`, `GraphRenderPass`, `RenderVisualization::Component`, `GeometryViewRenderer::Component`~~ (done). ~~Migrate lifecycle systems~~ (done — Phase 6). Full migration spec in `PLAN.md`, actionable items in `TODO.md §1`. **Phases 1–6 complete.** Remaining: Phase 7 (per-face attributes), Phase 8 (UI), Phase 9 (docs).
+   Define `ECS::Surface/Line/Point::Component` (done), consolidate ~~`ForwardPass` → `SurfacePass`~~ (done), ~~`RetainedLineRenderPass` + `LineRenderPass` → `LinePass`~~ (done), ~~`RetainedPointCloudRenderPass` + `PointCloudRenderPass` → `PointPass`~~ (done). ~~Delete `MeshRenderPass`, `GraphRenderPass`, `RenderVisualization::Component`, `GeometryViewRenderer::Component`~~ (done). ~~Migrate lifecycle systems~~ (done — Phase 6). ~~Per-face attributes~~ (done — Phase 7). ~~UI/Inspector integration~~ (done — Phase 8). ~~Documentation~~ (done — Phase 9). ~~Push constant runtime validation~~ (done — TODO §1.10). Full migration spec in `PLAN.md`. **All 9 phases complete** (plus push constant runtime validation, 2026-03-03). The rendering architecture refactor is complete.
 
 #### Phase 0b — Architecture & Plumbing
 *HDR pipeline and dirty-domain sync. Built on the refactored pass architecture.*

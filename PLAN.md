@@ -1,6 +1,6 @@
 # Rendering Architecture Refactor — Plan
 
-**Relationship to other documents:** This plan is the near-term execution plan for rendering architecture consolidation. `ROADMAP.md §5` describes the long-term approach/mode framework that this refactor enables — the three-pass architecture here is a stepping stone toward that vision. `TODO.md §1` tracks the actionable backlog items for all 9 migration phases. `ROADMAP.md` Phase 0a references this plan as the first execution priority.
+**Relationship to other documents:** This plan is the near-term execution plan for rendering architecture consolidation. `ROADMAP.md §5` describes the long-term approach/mode framework that this refactor enables — the three-pass architecture here is a stepping stone toward that vision. `TODO.md §1` tracks open robustness and numerical safeguard items. The 9 rendering migration phases were completed 2026-03-03; see git history and `ROADMAP.md §1` recent completions for details. `ROADMAP.md` Phase 0a records this plan as the first execution priority (complete).
 
 ## Goal
 
@@ -21,7 +21,7 @@ This section tracks where runtime code currently stands relative to this plan/sp
 | CPU geometry authority | PropertySet-backed CPU sources for cloud/graph/mesh topology and attributes | **Implemented in geometry domain types** (`PointCloud::Cloud`, `Graph`, `Halfedge::Mesh`). All four PropertySet domains (`VertexProperties()`, `EdgeProperties()`, `FaceProperties()`, `HalfedgeProperties()`) are publicly accessible. Bulk edge extraction via `ExtractEdgeVertexPairs()` provides span-compatible GPU upload. | **Complete** |
 | PropertySet-driven edge source | Mesh/graph edge rendering sourced from topology PropertySets | `GraphGeometrySyncSystem` creates edge index buffers via `ReuseVertexBuffersFrom` from graph topology. `MeshViewLifecycleSystem` auto-attaches `MeshEdgeView` and creates edge index buffers from collision data. LinePass requires valid `EdgeView` — no internal `CachedEdges`/`EnsureEdgeBuffer` fallback. | **Complete** |
 | UI/Inspector integration | `PointRenderMode` combo, per-entity component attach/detach, graph controls, per-edge/per-face attribute toggles | Inspector panel has: Graph section (node/edge rendering controls, per-edge color toggle), PointCloud::Data section (render mode combo, radius/color controls), PointCloudRenderer section (render mode combo replacing hardcoded FlatDisc), mesh Visualization section (wireframe/vertex attach/detach, per-face color toggle, per-edge color toggle). `ShowPerEdgeColors`/`ShowPerFaceColors` flags on Line/Surface components gate attribute rendering. | **Phase 8 complete** |
-| Automatic CPU→GPU sync | Per-frame dirty-domain sync (`GeometryDirty`/`TopologyDirty`/`AttributesDirty`) patches SSBO ranges and renderable offsets | No generic dirty-domain sync system yet; current flow is pass/component-local invalidation and per-feature staging | **Not started** |
+| Automatic CPU→GPU sync | Per-frame dirty-domain sync (`GeometryDirty`/`TopologyDirty`/`AttributesDirty`) patches SSBO ranges and renderable offsets | `PropertySetDirtySyncSystem` (`Graphics.Systems.PropertySetDirtySync`) — six `ECS::DirtyTag` tag components (`VertexPositions`, `VertexAttributes`, `EdgeTopology`, `EdgeAttributes`, `FaceTopology`, `FaceAttributes`) for per-domain dirty tracking. Position/topology tags escalate to `GpuDirty` for full re-upload by lifecycle systems; attribute tags re-extract cached colors/radii from PropertySets without full vertex buffer re-upload. Count-divergence safety escalates to full re-upload. Runs before lifecycle systems via FrameGraph `Signal/WaitFor` ordering. Contract tests in `Test_PropertySetDirtySync.cpp`. | **Complete (2026-03-04)** |
 | Subcomponent hierarchy | Named sub-mesh/sub-graph/sub-cloud components with offsets/sizes and renderable slice references | No dedicated hierarchy/slice component model in rendering ECS yet | **Not started** |
 | Documentation | Update `CLAUDE.md` + `README.md` with new pass naming, ECS component types, architecture | `CLAUDE.md` restructured: BDA rendering section replaced with `## Three-Pass Rendering Architecture` (passes, ECS components, lifecycle systems, frustum culling, transient debug). `README.md` updated: all legacy pass names (`RetainedLineRenderPass`, `RetainedPointCloudRenderPass`, `LineRenderPass`, `PointCloudRenderPass`) replaced with unified `LinePass`/`PointPass`. Three-pass summary added to §3. | **Phase 9 complete** |
 
@@ -41,7 +41,7 @@ Treat this plan as the target architecture; implementation should migrate in thi
 1. ~~Introduce new ECS component set (`Surface/Line/Point/Graph::Data`) behind compatibility adapters.~~ **Done** — `Surface::Component`, `Line::Component`, `Point::Component` defined in `Graphics.Components.cppm`. `ComponentMigration` system bridges legacy → new components each frame.
 2. ~~Move graph/point-cloud CPU payload ownership out of render-only components into geometry PropertySet-backed assets/components.~~ **Done** — Graph (`ECS::Graph::Data`), PointCloud (`ECS::PointCloud::Data` with `shared_ptr<Cloud>`).
 3. ~~Add public `EdgeProperties()`, `FaceProperties()`, `HalfedgeProperties()` accessors to `Halfedge::Mesh`.~~ **Done** — all four PropertySet domains public, plus `ExtractEdgeVertexPairs()` bulk extraction.
-4. Introduce dirty-domain geometry sync system for CPU→GPU range updates (per vertex/edge/face domain).
+4. ~~Introduce dirty-domain geometry sync system for CPU→GPU range updates (per vertex/edge/face domain).~~ **Done** — `PropertySetDirtySyncSystem` with six `ECS::DirtyTag` tag components; position/topology tags escalate to full re-upload by lifecycle systems, attribute tags re-extract PropertySet data (colors, radii) incrementally without full vertex buffer re-upload.
 5. ~~Collapse pass graph to `SurfacePass`, `LinePass`, `PointPass` and retire legacy pass feature IDs.~~ **Done** — Phases 2-5 complete.
 6. ~~Implement geometry view lifecycle systems so all three geometry types have device-local retained-mode rendering (equal treatment — not deferred for point clouds/graphs).~~ **Done** — Phase 6 complete. All lifecycle systems directly populate per-pass typed components.
 
@@ -799,18 +799,18 @@ All three geometry types reach device-local retained-mode rendering — point cl
 
 **Gate:** `IntrinsicTests` pass. Per-face coloring renders correctly.
 
-### Phase 8: UI and inspector integration
+### Phase 8: UI and inspector integration (**Complete**)
 
-52. Add `PointRenderMode` UI combo selector in Inspector
-53. Per-entity component attach/detach for wireframe and vertex visualization
-54. Graph visualization mode controls
-55. Per-edge/per-face attribute visualization toggles
+52. ~~Add `PointRenderMode` UI combo selector in Inspector~~ — Done: combo for `PointCloudRenderer`, `PointCloud::Data`, and mesh vertex view entities.
+53. ~~Per-entity component attach/detach for wireframe and vertex visualization~~ — Done: Sandbox Inspector attach/detach `Line::Component` (wireframe) and `Point::Component` (vertices) on mesh entities.
+54. ~~Graph visualization mode controls~~ — Done: Graph Inspector section with node render mode, color, size, size multiplier, edge color/width/overlay, per-edge color toggle.
+55. ~~Per-edge/per-face attribute visualization toggles~~ — Done: `ShowPerEdgeColors` on `Line::Component`, `ShowPerFaceColors` on `Surface::Component`, gated in `LinePass`/`SurfacePass`.
 
-### Phase 9: Update docs
+### Phase 9: Update docs (**Complete**)
 
-56. Update `TODO.md` — remove completed items
-57. Update `CLAUDE.md` — document new pass naming and architecture
-58. Update `README.md` — update rendering architecture description
+56. ~~Update `TODO.md` — remove completed items~~ — Done.
+57. ~~Update `CLAUDE.md` — document new pass naming and architecture~~ — Done: `## Three-Pass Rendering Architecture` section with passes, ECS component types, BDA design, lifecycle systems, frustum culling, and transient debug content.
+58. ~~Update `README.md` — update rendering architecture description~~ — Done: legacy pass names replaced with `LinePass`/`PointPass`, three-pass summary added to §3.
 
 ---
 
