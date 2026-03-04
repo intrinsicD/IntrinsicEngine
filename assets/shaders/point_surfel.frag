@@ -4,7 +4,7 @@
 //   Surfel (default): Normal-oriented disc with Lambertian + ambient lighting.
 //   EWA (Flags bit 1): Elliptical Gaussian splat with Lambertian shading.
 //
-// Part of the PointPass pipeline array (PLAN.md Phase 4).
+// Part of the PointPass pipeline array in the three-pass rendering architecture.
 
 #version 460
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require

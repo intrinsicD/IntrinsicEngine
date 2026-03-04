@@ -9,7 +9,7 @@ import Core.FrameGraph;
 export namespace Graphics::Systems::ComponentMigration
 {
     // Transition system: attaches Point::Component from
-    // PointCloudRenderer::Component during the PLAN.md migration period.
+    // PointCloudRenderer::Component during the compatibility migration period.
     //
     // Phase 6 reduced scope: Graph::Data → Line+Point and
     // PointCloud::Data → Point bridging moved to their respective

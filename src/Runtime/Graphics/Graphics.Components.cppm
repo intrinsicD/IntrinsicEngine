@@ -410,9 +410,9 @@ export namespace ECS::MeshVertexView
 // =========================================================================
 //
 // These components implement the three-pass rendering architecture described
-// in PLAN.md. Each pass owns a dedicated component type; the toggle is
-// presence/absence of the component — no boolean flags. Attaching a
-// component enables that visualization, removing it disables it.
+// in docs/architecture/rendering-three-pass.md. Each pass owns a dedicated
+// component type; the toggle is presence/absence of the component — no boolean
+// flags. Attaching a component enables that visualization, removing it disables it.
 
 // -------------------------------------------------------------------------
 // Surface::Component — Owned by SurfacePass (filled triangle rendering).

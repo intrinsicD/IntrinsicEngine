@@ -25,19 +25,11 @@ Sub-entity select → Geometry processing (interactive operator input)
 
 ### Post-Processing Pipeline
 
-The forward pass currently writes directly to the swapchain. An HDR intermediate render target (R16G16B16A16_SFLOAT) is the prerequisite for nearly every visual feature that follows.
+The forward pass currently writes directly to the swapchain. An HDR intermediate render target (`R16G16B16A16_SFLOAT`) remains the prerequisite for most rendering work that follows.
 
-**Minimum viable chain:**
-- **Tone mapping:** HDR → LDR conversion (ACES, Reinhard, filmic, AgX).
-- **FXAA / TAA:** Anti-aliasing. TAA is important for temporal stability on thin geometry like wireframes and point clouds.
+**Execution detail moved:** Active implementation breakdown (ToneMap/FXAA MVP, pass resources, acceptance gates) now lives in `TODO.md` under `## 2. Near-Term Epics (from ROADMAP.md)` (Epic 1).
 
-**Incremental additions (can land alongside later phases):**
-- SSAO (HBAO+ or GTAO) for contact shadows.
-- Bloom (bright-pass threshold + Gaussian blur cascade + additive blend).
-- Depth of field (optional, for presentation renders).
-- Color grading (LUT-based or parametric).
-
-**Architecture:** Post-processing should be a chain of `RenderGraph` passes on the HDR color buffer. Each effect is an independent, runtime-toggleable pass.
+Long-horizon additions (after MVP): SSAO, bloom, DOF, color grading.
 
 ---
 
@@ -47,14 +39,9 @@ These features turn the engine from a viewer into an interactive tool.
 
 ### Transform Gizmos
 
-Translate/rotate/scale handles rendered via `LinePass` transient path. Without these, the only way to move objects is typing numbers into the Inspector.
+Translate/rotate/scale handles rendered via `LinePass` transient path remain a core UX dependency.
 
-- Three axis arrows + plane handles + center sphere (translate).
-- Three axis rings / trackball (rotate).
-- Three axis handles with cube endpoints (scale).
-- Snap modes: grid snap, angle snap.
-- Space modes: world-space vs. local-space orientation.
-- Multi-object pivot: centroid, first-selected, or custom.
+**Execution detail moved:** Interactive baseline scope (TRS, snap, world/local, multi-object pivot, toolbar integration) is tracked in `TODO.md` under `## 2. Near-Term Epics (from ROADMAP.md)` (Epic 3).
 
 ### UI Improvements
 
@@ -71,16 +58,23 @@ Each improvement is independent and can land incrementally:
 
 ### Scene Serialization
 
-No save/load mechanism exists. Required for any practical workflow.
+No save/load mechanism exists; this remains required for practical workflows.
 
-- **Scene save/load:** Serialize entity hierarchy, component data, asset references (JSON, binary, or glTF extension).
-- **Project files:** Scene + asset references + editor layout as a project bundle.
+**Execution detail moved:** Scene/project serialization MVP scope, schema, and acceptance criteria are tracked in `TODO.md` under `## 2. Near-Term Epics (from ROADMAP.md)` (Epic 2).
 
 ---
 
 ## Phase 3 — Rendering Variety
 
 Each item is a render feature registered via `FeatureRegistry`.
+
+### Rendering Modes
+
+When an entity has at least one of the point cloud, graph, or mesh components (meaning Vertices, Edges or Faces) the UI allows to select 1d or 3d properties to be visualized on their respective geometric domains.
+- **Scalar field visualization:** Per-vertex, Per-edge, Per-face scalar -> colormap (viridis, jet, coolwarm).
+- **Scalar field controls:** Optional isolines/contours, value binning (quantization), and clamping/windowing for robust range control.
+- **Vector field visualization:** Per-vertex, Per-edge, Per-face vector -> RGB color or glyphs (arrows, hedgehogs).
+- **RGB color visualization:** Per-vertex, Per-edge, Per-face RGB color (e.g. from vertex colors or point cloud attributes).
 
 ### Mesh Rendering Modes
 
@@ -91,9 +85,6 @@ Currently only a single forward PBR pass (metallic-roughness) exists via `Surfac
 - **Gouraud / Phong:** Classic per-vertex and per-fragment Blinn-Phong.
 - **Matcap:** View-space normal → texture lookup. Fast artistic shading, no lights needed.
 - **NPR:** Toon/cel shading, Gooch shading, hatching/cross-hatching, pencil/sketch style.
-- **Curvature visualization:** Per-vertex mean/Gaussian curvature → diverging colormap.
-- **Scalar field visualization:** Arbitrary per-vertex scalars → configurable colormaps (viridis, jet, coolwarm).
-- **Normal visualization:** Normals as color (world/view-space RGB) or hedgehog lines.
 - **UV checker:** Checkerboard pattern via UVs for parameterization quality inspection.
 
 ### Shadow Mapping
@@ -107,15 +98,9 @@ No shadow support exists. Shadows are critical for spatial understanding.
 
 ### Benchmarking & Profiling
 
-`Core::Telemetry` provides basic lock-free ring-buffered metrics. No GPU profiling or reproducible benchmark infrastructure exists.
+`Core::Telemetry` provides basic lock-free ring-buffered metrics. Robust GPU/CPU profiling and reproducible benchmark infrastructure remain required.
 
-- **GPU timing:** Vulkan timestamp queries per render pass, surfaced in the Performance panel.
-- **Pipeline statistics:** Vertex/fragment invocations, clipping primitives.
-- **CPU frame profiling:** Per-system timing in the FrameGraph, exposed via telemetry.
-- **Reproducible benchmark scenes:** Known entity counts, geometry complexity, camera paths.
-- **Benchmark runner:** Automated N-frame run, min/avg/max/p99 frame times, JSON/CSV output.
-- **Regression detection:** Cross-commit comparison with configurable threshold.
-- **Memory profiling:** GPU allocation tracking (VMA statistics), CPU allocator high watermarks.
+**Execution detail moved:** Timestamp instrumentation, benchmark runner, and regression gating are tracked in `TODO.md` under `## 2. Near-Term Epics (from ROADMAP.md)` (Epic 4).
 
 ### Debug Visualization — Remaining
 
@@ -158,7 +143,7 @@ No transparency support. Required for translucent surfaces, point cloud blending
 
 Sub-mesh selection and geometry operators for research workflows.
 
-### Sub-Entity Selection
+### Primitive Selection
 
 Current selection is entity-level only. `HalfedgeMesh` provides the topological foundation.
 
@@ -169,10 +154,33 @@ Current selection is entity-level only. `HalfedgeMesh` provides the topological 
 
 **Architecture:** Dedicated GPU picking pass writing `(EntityID, PrimitiveID, BarycentricCoords)`. CPU-side adjacency traversal via `HalfedgeMesh`. Per-entity bitsets for selected sub-elements.
 
+### GPU Geometry Processing Backend
+
+Infrastructure required to move heavyweight geometry operators from CPU to GPU.
+
+- **CUDA support:** Add a CUDA compute backend for geometry-processing operators (staged rollout, starting with point cloud and spectral kernels).
+- **CUDA-Vulkan interop (mandatory):** Use zero-copy shared GPU buffers and explicit cross-API synchronization to avoid unnecessary CPU-GPU traffic.
+
 ### Geometry Processing — Remaining
 
 18 operators are complete. Remaining:
 - **Exact Boolean CSG:** Robust triangle clipping + stitched remeshing for partial-overlap union/intersection/difference. The baseline (disjoint/full-containment) is done.
+- **Ultra-fast GPU K-means clustering:** CUDA-accelerated k-means for point clouds and feature-space segmentation workflows.
+- **Mesh and point cloud denoising:** Edge-aware/spectral denoising operators for scanned and reconstructed data.
+- **Mesh parameterization:** Robust UV/atlas generation and distortion-controlled parameterization methods.
+- **Spectral mesh processing:** Laplacian/eigendecomposition-driven filters, embeddings, and editing operators.
+- **Shape and point cloud registration (ICP variants):** Point-to-point, point-to-plane, and robust weighted ICP pipelines.
+- **Additional state-of-the-art geometry processing methods:** Continue integrating current research-grade operators as first-class runtime tools.
+
+**Top 8 next (dependency-ordered):** Ordered from foundational geometry robustness and correspondence to advanced deformation/reconstruction so later operators can reuse earlier data products and solvers.
+- **Heat method + vector heat geodesics:** Fast distance/transport primitives for segmentation, correspondence, and brush tools.
+- **Robust global registration (TEASER++/FGR/Super4PCS):** Outlier-tolerant coarse alignment before local ICP refinement.
+- **Non-rigid registration (CPD/embedded deformation):** Deformable alignment for temporal scans and articulated shapes.
+- **Field-aligned quad remeshing (MIQ/Instant Meshes class):** Direction-field-driven quad dominant remeshing for downstream UV/edit workflows.
+- **Direction/frame field design (N-RoSy/cross fields):** Foundational orientation fields powering remeshing and anisotropic operators.
+- **ARAP/projective-dynamics deformation:** Interactive constrained editing with stable, physically plausible deformations.
+- **Fast winding number + signed distance pipelines:** Robust inside/outside queries for booleans, repair, and collision preprocessing.
+- **TSDF volumetric fusion + meshing:** Multi-view scan fusion and high-quality surface extraction for reconstruction workflows.
 
 ### Clipping Planes & Cross-Sections
 

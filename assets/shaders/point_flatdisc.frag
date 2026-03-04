@@ -1,7 +1,7 @@
 // point_flatdisc.frag — FlatDisc point cloud fragment shader.
 //
 // Unlit circular disc with anti-aliased edge.
-// Part of the PointPass pipeline array (PLAN.md Phase 4).
+// Part of the PointPass pipeline array in the three-pass rendering architecture.
 
 #version 460
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require

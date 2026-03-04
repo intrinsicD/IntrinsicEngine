@@ -1,6 +1,6 @@
 // ============================================================================
-// Test_PerPassComponents.cpp — Contract tests for PLAN.md Phase 1 per-pass
-// typed ECS components (Surface, Line, Point) and the ComponentMigration
+// Test_PerPassComponents.cpp — Contract tests for per-pass typed ECS
+// components (Surface, Line, Point) and the ComponentMigration
 // system that bridges legacy components to the new types.
 // ============================================================================
 
@@ -189,7 +189,7 @@ TEST(PerPassComponents_Composition, AllThreeComponentsCoexist)
 }
 
 // =============================================================================
-// Toggle by Presence/Absence — the PLAN.md principle
+// Toggle by Presence/Absence — three-pass architecture principle
 // =============================================================================
 
 TEST(PerPassComponents_Toggle, WireframeToggle_ByPresence)

@@ -319,7 +319,7 @@ namespace Runtime
         reg("GraphGeometrySync",              Cat::System, "Uploads graph geometry to GPU and allocates GPUScene slots");
         reg("PointCloudGeometrySync",        Cat::System, "Uploads Cloud-backed point clouds to GPU and allocates GPUScene slots");
         reg("MeshViewLifecycle",              Cat::System, "Creates GPU edge/vertex views from mesh via ReuseVertexBuffersFrom");
-        reg("ComponentMigration",             Cat::System, "Syncs legacy components to per-pass typed components (PLAN.md Phase 1)");
+        reg("ComponentMigration",             Cat::System, "Syncs legacy components to per-pass typed components");
         reg("GPUSceneSync",                   Cat::System, "Synchronizes CPU entity data to GPU scene buffers");
         reg("PropertySetDirtySync",           Cat::System, "Syncs PropertySet dirty domains to GPU buffers (per-domain incremental)");
 
@@ -528,7 +528,7 @@ namespace Runtime
                     }
 
                     // Component migration: syncs legacy components to new per-pass
-                    // typed components (Surface, Line, Point) during PLAN.md Phase 1.
+                    // typed components (Surface, Line, Point) during the migration window.
                     if (m_FeatureRegistry.IsEnabled("ComponentMigration"_id))
                     {
                         Graphics::Systems::ComponentMigration::RegisterSystem(

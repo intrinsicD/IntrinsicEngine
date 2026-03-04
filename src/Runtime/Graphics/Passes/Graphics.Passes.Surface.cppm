@@ -64,7 +64,7 @@ export namespace Graphics::Passes
         void SetEnableGpuCulling(bool enable) { m_EnableGpuCulling = enable; }
 
         // -----------------------------------------------------------------
-        // Transient triangle submission API (PLAN.md Phase 2)
+        // Transient triangle submission API (three-pass architecture)
         // -----------------------------------------------------------------
         // GPU-aligned triangle vertex: 32 bytes.
         struct alignas(16) TransientVertex

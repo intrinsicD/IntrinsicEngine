@@ -958,7 +958,7 @@ namespace Graphics::Passes
     }
 
     // -----------------------------------------------------------------
-    // Transient triangle submission (PLAN.md Phase 2)
+    // Transient triangle submission (three-pass architecture)
     // -----------------------------------------------------------------
 
     void SurfacePass::SubmitTriangle(const glm::vec3& a, const glm::vec3& b, const glm::vec3& c,

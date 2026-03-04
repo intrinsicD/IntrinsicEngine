@@ -7,7 +7,7 @@
 //   Surfel (default): normal-oriented disc with Lambertian shading.
 //   EWA (Flags bit 1): perspective-correct elliptical Gaussian splats (Zwicker et al. 2001).
 //
-// Part of the PointPass pipeline array (PLAN.md Phase 4).
+// Part of the PointPass pipeline array in the three-pass rendering architecture.
 
 #version 460
 #extension GL_EXT_scalar_block_layout : require

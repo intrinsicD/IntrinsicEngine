@@ -355,7 +355,8 @@ Only one path renders per frame (Stage 2 CPU-driven OR Stage 3 GPU-driven). No d
 
 - **`TODO.md`** — Active architecture backlog (open TODOs only, with priorities and remediation notes).
 - **`ROADMAP.md`** — Feature roadmap with dependency-ordered phases and the long-term rendering modality redesign vision.
-- **`PLAN.md`** — Near-term rendering architecture refactor spec (three-pass architecture, ECS component design, migration phases).
+- **`docs/architecture/rendering-three-pass.md`** — Canonical three-pass rendering architecture spec (pass contracts, data contracts, invariants).
+- **`PLAN.md`** — Archival index for the completed rendering refactor.
 - **`CLAUDE.md`** — Development conventions, build workflows, architectural invariants, C++23 adoption policy.
 - **Git history** — Historical architecture notes and completion summaries for closed backlog items.
 

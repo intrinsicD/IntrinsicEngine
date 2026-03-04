@@ -24,7 +24,7 @@ export namespace Graphics::Passes
     // PointPass — Unified BDA-based point rendering for all point sources.
     // -------------------------------------------------------------------------
     //
-    // Consolidates all point rendering (PLAN.md Phase 4):
+    // Consolidates all point rendering in the three-pass architecture:
     // - Mesh vertex visualization (from ECS::Point::Component via MeshVertexView)
     // - Graph node rendering (from ECS::Point::Component via GraphGeometrySyncSystem)
     // - Standalone point cloud rendering (from ECS::Point::Component via PointCloudRendererLifecycle)
