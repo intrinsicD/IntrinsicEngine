@@ -707,13 +707,13 @@ Each pass is self-contained. No existing code changes.
 
 ## Migration Order (Implementation Steps)
 
-### Phase 1: Per-pass typed components
+### Phase 1: Per-pass typed components (**Complete**)
 
-1. Define `ECS::Surface::Component` (initially mirrors `MeshRenderer::Component`)
-2. Define `ECS::Line::Component` (wireframe settings from `RenderVisualization`; edge data comes from PropertySets)
-3. Define `ECS::Point::Component` (vertex settings from `RenderVisualization`)
-4. Define `ECS::Graph::Data` (replaces `GraphRenderer::Component` data fields)
-5. Migration system: attach new components alongside old ones during transition
+1. ~~Define `ECS::Surface::Component` (initially mirrors `MeshRenderer::Component`)~~ **Done**
+2. ~~Define `ECS::Line::Component` (wireframe settings from `RenderVisualization`; edge data comes from PropertySets)~~ **Done**
+3. ~~Define `ECS::Point::Component` (vertex settings from `RenderVisualization`)~~ **Done**
+4. ~~Define `ECS::Graph::Data` (replaces `GraphRenderer::Component` data fields)~~ **Done**
+5. ~~Migration system: attach new components alongside old ones during transition~~ **Done**
 
 **Gate:** `IntrinsicTests` pass. New components coexist with old ones.
 
@@ -729,7 +729,7 @@ Each pass is self-contained. No existing code changes.
 
 **Gate:** `IntrinsicTests` pass. Surface rendering visually identical to before.
 
-### Phase 3: LinePass (atomic — consolidate all line/edge sources)
+### Phase 3: LinePass (atomic — consolidate all line/edge sources) (**Complete**)
 
 13. ~~Delete old transient `line.vert/frag` (SSBO version) FIRST~~ **Done**
 14. ~~Rename `RetainedLineRenderPass` → `LinePass`, rename `line_retained.* → line.*`~~ **Done**
@@ -745,20 +745,20 @@ Each pass is self-contained. No existing code changes.
 
 **Gate:** `IntrinsicTests` pass. Wireframe, graph edges, debug lines all render correctly. Per-edge coloring works.
 
-### Phase 4: PointPass (atomic — consolidate all point sources)
+### Phase 4: PointPass (atomic — consolidate all point sources) (**Complete**)
 
-24. Rename `RetainedPointCloudRenderPass` → `PointPass`
-25. Split `point_retained.*` into `point_flatdisc.*` and `point_surfel.*`
-26. PointPass stores pipeline array indexed by `PointRenderMode`
-27. Add `ECS::Point::Component` iteration (replaces `RenderVisualization::ShowVertices`)
-28. Add graph node iteration (replaces `GraphRenderPass` node submission)
-29. Add standalone point cloud iteration (replaces `PointCloudRenderPass`)
-30. Add `GetPoints()` to `DebugDraw` for transient point markers
-31. PointPass reads `ctx.DebugDraw->GetPoints()` for transient data
-32. Support per-point attributes (colors, radii, normals) from point PropertySets via `PtrAux` BDA channel
-33. Delete vertex/node code from `MeshRenderPass`, `GraphRenderPass`, `PointCloudRenderPass`
-34. Delete `RetainedPointCloudRenderPass` files (already renamed)
-35. Delete old transient `point.vert/frag`
+24. ~~Rename `RetainedPointCloudRenderPass` → `PointPass`~~ **Done**
+25. ~~Split `point_retained.*` into `point_flatdisc.*` and `point_surfel.*`~~ **Done**
+26. ~~PointPass stores pipeline array indexed by `PointRenderMode`~~ **Done**
+27. ~~Add `ECS::Point::Component` iteration (replaces `RenderVisualization::ShowVertices`)~~ **Done**
+28. ~~Add graph node iteration (replaces `GraphRenderPass` node submission)~~ **Done**
+29. ~~Add standalone point cloud iteration (replaces `PointCloudRenderPass`)~~ **Done**
+30. ~~Add `GetPoints()` to `DebugDraw` for transient point markers~~ **Done**
+31. ~~PointPass reads `ctx.DebugDraw->GetPoints()` for transient data~~ **Done**
+32. ~~Support per-point attributes (colors, radii, normals) from point PropertySets via `PtrAux` BDA channel~~ **Done**
+33. ~~Delete vertex/node code from `MeshRenderPass`, `GraphRenderPass`, `PointCloudRenderPass`~~ **Done**
+34. ~~Delete `RetainedPointCloudRenderPass` files (already renamed)~~ **Done**
+35. ~~Delete old transient `point.vert/frag`~~ **Done**
 
 **Gate:** `IntrinsicTests` pass. Vertex visualization, graph nodes, point clouds all render correctly. Per-point coloring and radii work.
 
