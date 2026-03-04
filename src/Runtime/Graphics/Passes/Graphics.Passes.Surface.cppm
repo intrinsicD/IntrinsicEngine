@@ -98,7 +98,7 @@ export namespace Graphics::Passes
         [[nodiscard]] bool HasTransientContent() const { return !m_TransientVertices.empty(); }
 
         // Set the rendered point size (px) for a specific geometry handle index.
-        // Grows the table on demand; called by PointCloudRenderer or similar owners.
+        // Grows the table on demand; called by point-cloud sync/lifecycle owners.
         void SetPointSize(uint32_t handleIndex, float sizePx)
         {
             if (handleIndex >= m_PointSizePxByHandleIndex.size())

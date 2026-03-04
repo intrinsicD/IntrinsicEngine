@@ -69,177 +69,6 @@ export namespace ECS::MeshCollider
 }
 
 // -------------------------------------------------------------------------
-// PointCloudRenderer — ECS component for standalone point cloud rendering.
-// -------------------------------------------------------------------------
-//
-// Entities with this component are rendered by PointPass
-// via BDA from a device-local vertex buffer. CPU point data is uploaded once
-// by PointCloudRendererLifecycle and then freed.
-//
-// Two creation paths:
-//   a) File loading (ModelLoader): Geometry handle is pre-populated by the
-//      loader; GpuDirty=false, CPU vectors are empty.
-//   b) Code-originated (demo, algorithms): CPU vectors are filled, GpuDirty=true.
-//      PointCloudRendererLifecycle uploads on first frame, stores handle,
-//      and clears CPU vectors to free memory.
-//
-// Rendering modes:
-//   0 = FlatDisc, 1 = Surfel, 2 = EWA
-
-export namespace ECS::PointCloudRenderer
-{
-    struct Component
-    {
-        // ---- Point Cloud Data (CPU-side, consumed by initial upload) ----
-        std::vector<glm::vec3> Positions;           // Required for CPU-originated clouds.
-        std::vector<glm::vec3> Normals;             // Optional. Surfel/EWA require valid normals.
-        std::vector<glm::vec4> Colors;              // Optional (empty = use DefaultColor).
-        std::vector<float>     Radii;               // Optional (empty = use DefaultRadius).
-
-        // ---- GPU State (managed by PointCloudRendererLifecycle) ----
-        Geometry::GeometryHandle Geometry{};         // Handle to device-local GeometryGpuData.
-        static constexpr uint32_t kInvalidSlot = ~0u;
-        uint32_t GpuSlot = kInvalidSlot;             // GPUScene slot for frustum culling.
-        bool GpuDirty = true;                        // true = needs initial GPU upload.
-        bool HasGpuNormals = false;                  // true when uploaded/reused GPU geometry contains normals.
-
-        // ---- Rendering Parameters ----
-        Geometry::PointCloud::RenderMode RenderMode = Geometry::PointCloud::RenderMode::FlatDisc;
-        float    DefaultRadius    = 0.005f;         // World-space radius when Radii is empty.
-        float    SizeMultiplier   = 1.0f;           // Per-entity size multiplier.
-        glm::vec4 DefaultColor    = {1.f, 1.f, 1.f, 1.f}; // RGBA when Colors is empty.
-        bool     Visible          = true;           // Runtime visibility toggle.
-
-        // ---- Queries ----
-        [[nodiscard]] std::size_t PointCount() const noexcept { return Positions.size(); }
-        [[nodiscard]] bool HasNormals() const noexcept { return !Normals.empty() && Normals.size() == Positions.size(); }
-        [[nodiscard]] bool HasRenderableNormals() const noexcept { return HasNormals() || HasGpuNormals; }
-        [[nodiscard]] bool HasColors() const noexcept { return !Colors.empty() && Colors.size() == Positions.size(); }
-        [[nodiscard]] bool HasRadii() const noexcept { return !Radii.empty() && Radii.size() == Positions.size(); }
-        [[nodiscard]] bool HasGpuGeometry() const noexcept { return Geometry.IsValid(); }
-    };
-}
-
-// -------------------------------------------------------------------------
-// Graph::Data — ECS component for graph visualization (PropertySet-backed).
-// -------------------------------------------------------------------------
-//
-// Holds a shared_ptr to an authoritative Geometry::Graph::Graph instance.
-// Node positions, colors, radii, and edge topology are sourced directly from
-// the Graph's PropertySets — no std::vector copies.
-//
-// Rendering: retained-mode via BDA shared-buffer architecture.
-//   - Nodes rendered via PointPass (BDA position pull).
-//   - Edges rendered via LinePass (BDA position pull + edge buffer).
-//
-// GPU state is managed by GraphGeometrySyncSystem: positions are uploaded to
-// a vertex buffer (GpuGeometry) in either Staged mode (device-local, optimal
-// for static graphs — controlled by StaticGeometry flag) or Direct mode
-// (host-visible, suitable for dynamic re-layout). Edge pairs are extracted
-// from graph topology (CachedEdgePairs). Re-upload triggers on GpuDirty = true.
-//
-// Optional per-node attributes (colors, radii) are stored as named vertex
-// properties on the Graph:
-//   "v:color"  — glm::vec4 per-node color
-//   "v:radius" — float per-node radius
-
-export namespace ECS::Graph
-{
-    struct Data
-    {
-        // ---- Authoritative Data Source ----
-        std::shared_ptr<Geometry::Graph::Graph> GraphRef;
-
-        // ---- Rendering Parameters (not data — data lives in PropertySets) ----
-        Geometry::PointCloud::RenderMode NodeRenderMode = Geometry::PointCloud::RenderMode::FlatDisc;
-        float     DefaultNodeRadius  = 0.01f;
-        float     NodeSizeMultiplier = 1.0f;
-        glm::vec4 DefaultNodeColor   = {0.8f, 0.5f, 0.0f, 1.0f};
-        glm::vec4 DefaultEdgeColor   = {0.6f, 0.6f, 0.6f, 1.0f};
-        float     EdgeWidth          = 1.5f;   // Screen-space edge width in pixels.
-        bool      EdgesOverlay       = false;  // true = edges always visible (no depth test).
-        bool      Visible            = true;
-
-        // When true, GraphGeometrySyncSystem uploads via Staged mode
-        // (device-local, VMA_MEMORY_USAGE_GPU_ONLY) — optimal for graphs
-        // that don't change every frame (file-loaded, computed once).
-        // When false (default), Direct mode (host-visible,
-        // VMA_MEMORY_USAGE_CPU_TO_GPU) is used — suitable for dynamic
-        // graphs undergoing frequent re-layout.
-        bool      StaticGeometry     = false;
-
-        // ---- GPU State (managed by GraphGeometrySyncSystem) ----
-        // Shared vertex buffer holding compacted node positions + normals.
-        // Both LinePass (edges) and PointPass (nodes) read
-        // from this buffer via BDA push constants.
-        Geometry::GeometryHandle GpuGeometry{};
-
-        // GPUScene slot for frustum culling and GPU-driven batching.
-        // Allocated by GraphGeometrySyncSystem after successful geometry upload.
-        // Freed by on_destroy hook in SceneManager.
-        static constexpr uint32_t kInvalidSlot = ~0u;
-        uint32_t GpuSlot = kInvalidSlot;
-
-        // Edge index buffer (via ReuseVertexBuffersFrom of GpuGeometry).
-        // Contains flattened uint32_t edge pairs. Created by
-        // GraphGeometrySyncSystem alongside positions. LinePass reads
-        // edge indices from this geometry's index buffer via BDA.
-        Geometry::GeometryHandle GpuEdgeGeometry{};
-        uint32_t GpuEdgeCount = 0;
-
-        // Edge index pairs into the compacted vertex buffer (CPU-side).
-        // Retained for non-rendering consumers (layout algorithms, selection).
-        std::vector<ECS::EdgePair> CachedEdgePairs;
-
-        // Per-edge colors (packed ABGR), one per edge in CachedEdgePairs order.
-        // Extracted from Graph::EdgeProperties("e:color") by GraphGeometrySyncSystem.
-        // When empty, LinePass uses uniform DefaultEdgeColor.
-        std::vector<uint32_t> CachedEdgeColors;
-
-        // Per-node colors (packed ABGR), one per compacted vertex.
-        // Extracted from Graph::VertexProperties("v:color") by GraphGeometrySyncSystem.
-        // When empty, PointPass uses uniform DefaultNodeColor.
-        std::vector<uint32_t> CachedNodeColors;
-
-        // Per-node radii (world-space), one per compacted vertex.
-        // Extracted from Graph::VertexProperties("v:radius") by GraphGeometrySyncSystem.
-        // When empty, PointPass uses uniform DefaultNodeRadius.
-        std::vector<float> CachedNodeRadii;
-
-        // When true, GraphGeometrySyncSystem re-uploads positions and rebuilds
-        // edge pairs. Set on first attach, or by layout algorithms that modify
-        // graph vertex positions.
-        bool GpuDirty = true;
-
-        // Vertex count in the GPU buffer (matches compacted vertex count at
-        // upload time — deleted vertices are excluded via remapping).
-        uint32_t GpuVertexCount = 0;
-
-        // ---- Queries (delegate to GraphRef) ----
-        [[nodiscard]] std::size_t NodeCount() const noexcept
-        {
-            return GraphRef ? GraphRef->VertexCount() : 0;
-        }
-        [[nodiscard]] std::size_t EdgeCount() const noexcept
-        {
-            return GraphRef ? GraphRef->EdgeCount() : 0;
-        }
-        [[nodiscard]] bool HasNodeColors() const noexcept
-        {
-            return GraphRef && GraphRef->VertexProperties().Exists("v:color");
-        }
-        [[nodiscard]] bool HasNodeRadii() const noexcept
-        {
-            return GraphRef && GraphRef->VertexProperties().Exists("v:radius");
-        }
-        [[nodiscard]] bool HasEdgeColors() const noexcept
-        {
-            return GraphRef && GraphRef->EdgeProperties().Exists("e:color");
-        }
-    };
-}
-
-// -------------------------------------------------------------------------
 // PointCloud::Data — ECS component for PropertySet-backed point cloud
 //                    rendering (Cloud source).
 // -------------------------------------------------------------------------
@@ -256,16 +85,12 @@ export namespace ECS::Graph
 //   - Re-upload triggers on GpuDirty = true.
 //
 // Two creation paths:
-//   a) Algorithm output: Cloud is populated from geometry operators (normal
-//      estimation, surface reconstruction, downsampling); GpuDirty = true.
-//   b) File loading: Cloud is populated by loaders; GpuDirty = true.
+//   a) Cloud-backed: CloudRef is populated by loaders/algorithms, GpuDirty=true.
+//   b) Preloaded geometry-backed: GpuGeometry is pre-populated (e.g., model point
+//      topology), CloudRef may be null, GpuDirty=false.
 //
-// Key difference from PointCloudRenderer::Component:
-//   - PointCloudRenderer::Component owns raw CPU vectors and frees them
-//     after upload (one-shot lifecycle, managed by PointCloudRendererLifecycle).
-//   - PointCloud::Data borrows from a shared Cloud instance; the Cloud
-//     remains alive for re-upload when its data changes (sync lifecycle,
-//     managed by PointCloudGeometrySyncSystem).
+// PointCloud::Data is the single point-cloud ECS data path.
+// It supports both Cloud-backed entities and preloaded GPU point topologies.
 
 export namespace ECS::PointCloud
 {
@@ -310,6 +135,10 @@ export namespace ECS::PointCloud
         // Point count in the GPU buffer (matches Cloud::Size() at upload time).
         uint32_t GpuPointCount = 0;
 
+        // When geometry is pre-populated without CloudRef, this tracks whether
+        // the uploaded GPU layout contains normals (Surfel/EWA eligibility).
+        bool HasGpuNormals = false;
+
         // ---- Queries (delegate to CloudRef) ----
         [[nodiscard]] std::size_t PointCount() const noexcept
         {
@@ -318,6 +147,10 @@ export namespace ECS::PointCloud
         [[nodiscard]] bool HasNormals() const noexcept
         {
             return CloudRef && CloudRef->HasNormals();
+        }
+        [[nodiscard]] bool HasRenderableNormals() const noexcept
+        {
+            return HasNormals() || HasGpuNormals;
         }
         [[nodiscard]] bool HasColors() const noexcept
         {
@@ -330,6 +163,76 @@ export namespace ECS::PointCloud
         [[nodiscard]] bool HasGpuGeometry() const noexcept
         {
             return GpuGeometry.IsValid();
+        }
+    };
+}
+
+// -------------------------------------------------------------------------
+// Graph::Data — ECS component for graph visualization (PropertySet-backed).
+// -------------------------------------------------------------------------
+//
+// Holds a shared_ptr to an authoritative Geometry::Graph::Graph instance.
+// Node positions, colors, radii, and edge topology are sourced directly from
+// the Graph's PropertySets — no std::vector copies.
+//
+// Rendering: retained-mode via BDA shared-buffer architecture.
+//   - Nodes rendered via PointPass (BDA position pull).
+//   - Edges rendered via LinePass (BDA position pull + edge buffer).
+
+export namespace ECS::Graph
+{
+    struct Data
+    {
+        // ---- Authoritative Data Source ----
+        std::shared_ptr<Geometry::Graph::Graph> GraphRef;
+
+        // ---- Rendering Parameters (not data — data lives in PropertySets) ----
+        Geometry::PointCloud::RenderMode NodeRenderMode = Geometry::PointCloud::RenderMode::FlatDisc;
+        float     DefaultNodeRadius  = 0.01f;
+        float     NodeSizeMultiplier = 1.0f;
+        glm::vec4 DefaultNodeColor   = {0.8f, 0.5f, 0.0f, 1.0f};
+        glm::vec4 DefaultEdgeColor   = {0.6f, 0.6f, 0.6f, 1.0f};
+        float     EdgeWidth          = 1.5f;
+        bool      EdgesOverlay       = false;
+        bool      Visible            = true;
+        bool      StaticGeometry     = false;
+
+        // ---- GPU State (managed by GraphGeometrySyncSystem) ----
+        Geometry::GeometryHandle GpuGeometry{};
+        static constexpr uint32_t kInvalidSlot = ~0u;
+        uint32_t GpuSlot = kInvalidSlot;
+
+        Geometry::GeometryHandle GpuEdgeGeometry{};
+        uint32_t GpuEdgeCount = 0;
+
+        std::vector<ECS::EdgePair> CachedEdgePairs;
+        std::vector<uint32_t> CachedEdgeColors;
+        std::vector<uint32_t> CachedNodeColors;
+        std::vector<float> CachedNodeRadii;
+
+        bool GpuDirty = true;
+        uint32_t GpuVertexCount = 0;
+
+        // ---- Queries (delegate to GraphRef) ----
+        [[nodiscard]] std::size_t NodeCount() const noexcept
+        {
+            return GraphRef ? GraphRef->VertexCount() : 0;
+        }
+        [[nodiscard]] std::size_t EdgeCount() const noexcept
+        {
+            return GraphRef ? GraphRef->EdgeCount() : 0;
+        }
+        [[nodiscard]] bool HasNodeColors() const noexcept
+        {
+            return GraphRef && GraphRef->VertexProperties().Exists("v:color");
+        }
+        [[nodiscard]] bool HasNodeRadii() const noexcept
+        {
+            return GraphRef && GraphRef->VertexProperties().Exists("v:radius");
+        }
+        [[nodiscard]] bool HasEdgeColors() const noexcept
+        {
+            return GraphRef && GraphRef->EdgeProperties().Exists("e:color");
         }
     };
 }

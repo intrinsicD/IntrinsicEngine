@@ -1,7 +1,6 @@
 // ============================================================================
 // Test_PerPassComponents.cpp — Contract tests for per-pass typed ECS
-// components (Surface, Line, Point) and the ComponentMigration
-// system that bridges legacy components to the new types.
+// components (Surface, Line, Point) and lifecycle mapping contracts.
 // ============================================================================
 
 #include <gtest/gtest.h>
@@ -58,7 +57,6 @@ TEST(PerPassComponents_Point, DefaultConstruction)
 
 TEST(PerPassComponents_SlotSentinel, AllComponentsShareSameKInvalidSlot)
 {
-    EXPECT_EQ(Surface::Component::kInvalidSlot, PointCloudRenderer::Component::kInvalidSlot);
     EXPECT_EQ(Surface::Component::kInvalidSlot, Graph::Data::kInvalidSlot);
     EXPECT_EQ(Surface::Component::kInvalidSlot, PointCloud::Data::kInvalidSlot);
     EXPECT_EQ(Surface::Component::kInvalidSlot, MeshEdgeView::Component::kInvalidSlot);
@@ -293,126 +291,6 @@ TEST(PerPassComponents_Iteration, PointPassView)
         ++count;
     }
     EXPECT_EQ(count, 3);
-}
-
-// =============================================================================
-// ComponentMigration System — bridge from legacy to new components
-// =============================================================================
-
-TEST(ComponentMigration, PointCloudRenderer_CreatesPoint)
-{
-    entt::registry reg;
-    auto e = reg.create();
-
-    auto& pc = reg.emplace<PointCloudRenderer::Component>(e);
-    pc.DefaultColor = {0.5f, 0.5f, 1.0f, 1.0f};
-    pc.DefaultRadius = 0.01f;
-    pc.SizeMultiplier = 2.0f;
-    pc.RenderMode = Geometry::PointCloud::RenderMode::Surfel;
-    pc.Visible = true;
-
-    Graphics::Systems::ComponentMigration::OnUpdate(reg);
-
-    ASSERT_TRUE(reg.all_of<Point::Component>(e));
-    auto& pt = reg.get<Point::Component>(e);
-    EXPECT_EQ(pt.Color, glm::vec4(0.5f, 0.5f, 1.0f, 1.0f));
-    EXPECT_FLOAT_EQ(pt.Size, 0.01f);
-    EXPECT_FLOAT_EQ(pt.SizeMultiplier, 2.0f);
-    EXPECT_EQ(pt.Mode, Geometry::PointCloud::RenderMode::Surfel);
-}
-
-TEST(ComponentMigration, PointCloudRenderer_Invisible_SkipsCreation)
-{
-    entt::registry reg;
-    auto e = reg.create();
-
-    auto& pc = reg.emplace<PointCloudRenderer::Component>(e);
-    pc.Visible = false;
-
-    Graphics::Systems::ComponentMigration::OnUpdate(reg);
-
-    EXPECT_FALSE(reg.all_of<Point::Component>(e));
-}
-
-TEST(ComponentMigration, PointCloudRenderer_UsesGpuNormalState)
-{
-    entt::registry reg;
-    auto e = reg.create();
-
-    auto& pc = reg.emplace<PointCloudRenderer::Component>(e);
-    pc.Visible = true;
-    pc.RenderMode = Geometry::PointCloud::RenderMode::Surfel;
-    pc.HasGpuNormals = true;
-
-    // Simulate post-upload legacy component: no CPU vectors remain.
-    EXPECT_FALSE(pc.HasNormals());
-    EXPECT_TRUE(pc.HasRenderableNormals());
-
-    Graphics::Systems::ComponentMigration::OnUpdate(reg);
-
-    ASSERT_TRUE(reg.all_of<Point::Component>(e));
-    EXPECT_TRUE(reg.get<Point::Component>(e).HasPerPointNormals);
-}
-
-// =============================================================================
-// Phase 6: ComponentMigration no longer bridges Graph or PointCloud
-// =============================================================================
-// Graph::Data → Line+Point bridging moved to GraphGeometrySyncSystem.
-// PointCloud::Data → Point bridging moved to PointCloudGeometrySyncSystem.
-// ComponentMigration only bridges PointCloudRenderer → Point.
-
-TEST(ComponentMigration, GraphData_NotBridgedByComponentMigration)
-{
-    // After Phase 6, ComponentMigration does NOT create Line/Point from Graph::Data.
-    // GraphGeometrySyncSystem handles this directly.
-    entt::registry reg;
-    auto e = reg.create();
-
-    auto& gd = reg.emplace<Graph::Data>(e);
-    gd.Visible = true;
-    gd.DefaultEdgeColor = {0.0f, 0.0f, 1.0f, 1.0f};
-
-    Graphics::Systems::ComponentMigration::OnUpdate(reg);
-
-    // ComponentMigration should NOT create Line or Point from Graph::Data.
-    EXPECT_FALSE(reg.all_of<Line::Component>(e));
-    EXPECT_FALSE(reg.all_of<Point::Component>(e));
-}
-
-TEST(ComponentMigration, PointCloudData_NotBridgedByComponentMigration)
-{
-    // After Phase 6, ComponentMigration does NOT create Point from PointCloud::Data.
-    // PointCloudGeometrySyncSystem handles this directly.
-    entt::registry reg;
-    auto e = reg.create();
-
-    auto& pcd = reg.emplace<PointCloud::Data>(e);
-    pcd.Visible = true;
-    pcd.DefaultColor = {0.5f, 0.5f, 1.0f, 1.0f};
-
-    Graphics::Systems::ComponentMigration::OnUpdate(reg);
-
-    EXPECT_FALSE(reg.all_of<Point::Component>(e));
-}
-
-TEST(ComponentMigration, Idempotent_SecondRunProducesSameResult)
-{
-    entt::registry reg;
-    auto e = reg.create();
-
-    auto& pc = reg.emplace<PointCloudRenderer::Component>(e);
-    pc.Visible = true;
-    pc.DefaultColor = {0.0f, 0.0f, 1.0f, 1.0f};
-
-    Graphics::Systems::ComponentMigration::OnUpdate(reg);
-    auto ptColor1 = reg.get<Point::Component>(e).Color;
-
-    // Second run should not change anything.
-    Graphics::Systems::ComponentMigration::OnUpdate(reg);
-    auto ptColor2 = reg.get<Point::Component>(e).Color;
-
-    EXPECT_EQ(ptColor1, ptColor2);
-    EXPECT_EQ(ptColor2, glm::vec4(0.0f, 0.0f, 1.0f, 1.0f));
 }
 
 // =============================================================================

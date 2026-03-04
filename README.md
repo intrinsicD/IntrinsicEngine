@@ -168,6 +168,13 @@ sudo apt install clang-tools-20 libstdc++-14-dev
 cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug \
     -DCMAKE_C_COMPILER=clang-20 -DCMAKE_CXX_COMPILER=clang++-20
 
+# Fast local iteration profile (smaller build graph, no sanitizers)
+cmake -B build-fast -G Ninja -DCMAKE_BUILD_TYPE=Debug \
+    -DCMAKE_C_COMPILER=clang-20 -DCMAKE_CXX_COMPILER=clang++-20 \
+    -DINTRINSIC_BUILD_TESTS=OFF \
+    -DINTRINSIC_BUILD_SANDBOX=OFF \
+    -DINTRINSIC_ENABLE_SANITIZERS=OFF
+
 # Offline configure (no network access during FetchContent)
 # Requires pre-populated external/cache/<dep>-src directories.
 cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug \
@@ -189,9 +196,18 @@ ninja -C build IntrinsicGeometry      # geometry library only
 ninja -C build IntrinsicGeometryTests # geometry tests
 ninja -C build Sandbox                # application
 
+# Fast-profile targeted build example
+ninja -C build-fast IntrinsicRuntime
+
 # Run
 ./build/bin/Sandbox
 ```
+
+Common configure options for compile-time control:
+
+- `-DINTRINSIC_BUILD_TESTS=OFF` skips `tests/` targets.
+- `-DINTRINSIC_BUILD_SANDBOX=OFF` skips `Sandbox` app target.
+- `-DINTRINSIC_ENABLE_SANITIZERS=OFF` removes ASan/UBSan instrumentation overhead in dev loops.
 
 #### Offline dependency cache workflow
 
@@ -401,7 +417,7 @@ Zero vertex duplication for mesh-derived views — same `std::shared_ptr<VulkanB
 
 Each view owns its own `GeometryHandle`, `GPUScene` slot, and participates in frustum culling independently. The `GeometryPool`/`GPUScene` retained-mode system is topology-agnostic. Only `DebugDraw` content (octree, bounds, contact manifold overlays) uses per-frame transient SSBO uploads — everything else is retained.
 
-Retained-mode BDA rendering is the sole path for all geometry types: wireframe edges (`LinePass`), vertex visualization and standalone point clouds (`PointPass` with FlatDisc/Surfel/EWA modes), and graph geometry. Standalone point clouds (`.xyz`/`.pcd`/`.ply`) are first-class retained-mode renderables via `PointCloudRendererLifecycle` — uploaded once to device-local memory, rendered via BDA with zero per-frame cost. Transient `DebugDraw` lines and points are rendered by `LinePass` and `PointPass` internal transient paths. `MeshViewLifecycleSystem` automates GPU geometry view creation for mesh-derived edge and vertex views via `MeshEdgeView::Component` / `MeshVertexView::Component`, with GPUScene slot management and EnTT destroy hooks.
+Retained-mode BDA rendering is the sole path for all geometry types: wireframe edges (`LinePass`), vertex visualization and point clouds (`PointPass` with FlatDisc/Surfel/EWA modes), and graph geometry. Standalone point clouds (`.xyz`/`.pcd`/`.ply`) and preloaded point-topology meshes are first-class retained-mode renderables via `ECS::PointCloud::Data` + `PointCloudGeometrySyncSystem` (cloud-backed or preloaded-geometry path), rendered via BDA with zero per-frame vertex upload cost. Transient `DebugDraw` lines and points are rendered by `LinePass` and `PointPass` internal transient paths. `MeshViewLifecycleSystem` automates GPU geometry view creation for mesh-derived edge and vertex views via `MeshEdgeView::Component` / `MeshVertexView::Component`, with GPUScene slot management and EnTT destroy hooks.
 
 ### Key API
 

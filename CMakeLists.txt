@@ -1,4 +1,3 @@
-
 cmake_minimum_required(VERSION 3.28)
 
 # ------------------------------------------------------------------------------
@@ -102,6 +101,8 @@ else()
     message(STATUS "Sanitizers DISABLED (libclang_rt.asan not found or manually turned off)")
 endif()
 option(INTRINSIC_ENABLE_NATIVE_ARCH "Enable -march=native for local profiling builds" OFF)
+option(INTRINSIC_BUILD_SANDBOX "Build Sandbox application target" ON)
+option(INTRINSIC_BUILD_TESTS "Build test targets" ON)
 option(INTRINSIC_OFFLINE_DEPS
     "Disable network dependency fetches and require pre-populated external/cache/<name>-src trees"
     OFF
@@ -139,10 +140,18 @@ target_compile_definitions(IntrinsicConfig INTERFACE
 include(cmake/Dependencies.cmake)
 include(cmake/IntrinsicModule.cmake)
 
+if(INTRINSIC_BUILD_TESTS)
+    include(CTest)
+endif()
+
 # ------------------------------------------------------------------------------
 # Subdirectories
 # ------------------------------------------------------------------------------
 add_subdirectory(src/Core)
 add_subdirectory(src/Runtime)
-add_subdirectory(src/Apps/Sandbox)
-add_subdirectory(tests)
+if(INTRINSIC_BUILD_SANDBOX)
+    add_subdirectory(src/Apps/Sandbox)
+endif()
+if(INTRINSIC_BUILD_TESTS AND BUILD_TESTING)
+    add_subdirectory(tests)
+endif()

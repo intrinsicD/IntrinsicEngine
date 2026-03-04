@@ -45,7 +45,7 @@ TEST(MeshViewLifecycle_Contract, EdgeViewInvalidSlotSentinel)
     EXPECT_EQ(ECS::MeshEdgeView::Component::kInvalidSlot,
               ECS::Surface::Component::kInvalidSlot);
     EXPECT_EQ(ECS::MeshEdgeView::Component::kInvalidSlot,
-              ECS::PointCloudRenderer::Component::kInvalidSlot);
+              ECS::PointCloud::Data::kInvalidSlot);
 }
 
 TEST(MeshViewLifecycle_Contract, EdgeViewHasGpuGeometryFalseByDefault)

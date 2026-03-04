@@ -27,7 +27,7 @@ export namespace Graphics::Passes
     // pulls from DebugDraw for transient lines. All data is read via BDA
     // push constants.
     //
-    // Retained sources (via ECS::Line::Component, populated by ComponentMigration):
+    // Retained sources (via ECS::Line::Component, populated by lifecycle systems):
     // - Mesh wireframe edges (MeshEdgeView BDA index buffer)
     // - Graph edges (GpuEdgeGeometry BDA index buffer from GraphGeometrySyncSystem)
     // - Standalone line entities (future)

@@ -1,4 +1,7 @@
-enable_testing()
+# CTest owns BUILD_TESTING; top-level CMake decides when tests are added.
+if(NOT BUILD_TESTING)
+    return()
+endif()
 
 # Helper to run tests via CTest
 include(GoogleTest)
@@ -137,7 +140,6 @@ intrinsic_test_object_lib(RuntimeTestObjs
         Test_GraphRenderPass.cpp
         Test_RuntimeGeometry_Reuse.cpp
         Test_BDASharedBufferContract.cpp
-        Test_PointCloudRendererLifecycle.cpp
         Test_PointCloudGeometrySync.cpp
         Test_MeshViewLifecycle.cpp
         Test_PerPassComponents.cpp

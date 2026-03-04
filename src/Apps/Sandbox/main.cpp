@@ -1060,20 +1060,13 @@ public:
         auto& scene = GetScene();
         entt::entity entity = scene.CreateEntity("Demo Point Cloud");
 
-        // PointCloudRenderer component
-        auto positions = cloud.Positions();
-        auto normals   = cloud.Normals();
-        auto colors    = cloud.Colors();
-
-        auto& pc = scene.GetRegistry().emplace<ECS::PointCloudRenderer::Component>(entity);
-        pc.Positions = std::vector<glm::vec3>(positions.begin(), positions.end());
-        pc.Normals   = std::vector<glm::vec3>(normals.begin(),   normals.end());
-        pc.Colors    = std::vector<glm::vec4>(colors.begin(),    colors.end());
-        if (radiiResult)
-            pc.Radii = std::move(radiiResult->Radii);
-        pc.RenderMode = Geometry::PointCloud::RenderMode::FlatDisc;
-        pc.DefaultRadius = 0.02f;
-        pc.SizeMultiplier = 1.0f;
+        // PointCloud::Data component (Cloud-backed canonical path)
+        auto& pcd = scene.GetRegistry().emplace<ECS::PointCloud::Data>(entity);
+        pcd.CloudRef = std::make_shared<Geometry::PointCloud::Cloud>(std::move(cloud));
+        pcd.GpuDirty = true;
+        pcd.RenderMode = Geometry::PointCloud::RenderMode::FlatDisc;
+        pcd.DefaultRadius = 0.02f;
+        pcd.SizeMultiplier = 1.0f;
 
         // Make it selectable
         scene.GetRegistry().emplace<ECS::Components::Selection::SelectableTag>(entity);
@@ -1081,7 +1074,7 @@ public:
         scene.GetRegistry().emplace<ECS::Components::Selection::PickID>(entity, s_PointCloudPickId++);
 
         Log::Info("Spawned demo point cloud: {} points, normals={}, radii={}",
-                  pc.PointCount(), pc.HasNormals() ? "yes" : "no", pc.HasRadii() ? "yes" : "no");
+                  pcd.PointCount(), pcd.HasNormals() ? "yes" : "no", pcd.HasRadii() ? "yes" : "no");
     }
 
     void DrawGeometryProcessingPanel()
@@ -1381,7 +1374,7 @@ public:
                 {
                     auto& pcd = reg.get<ECS::PointCloud::Data>(selected);
                     ImGui::Text("Points: %zu", pcd.PointCount());
-                    ImGui::Text("Has Normals: %s", pcd.HasNormals() ? "Yes" : "No");
+                    ImGui::Text("Has Normals: %s", pcd.HasRenderableNormals() ? "Yes" : "No");
                     ImGui::Text("Has Colors: %s", pcd.HasColors() ? "Yes" : "No");
                     ImGui::Text("Has Radii: %s", pcd.HasRadii() ? "Yes" : "No");
 
@@ -1403,38 +1396,7 @@ public:
                 }
             }
 
-            // 6. Point Cloud (Legacy) — PointCloudRenderer::Component.
-            // Shown only when PointCloud::Data is absent (avoids duplicate UI).
-            if (reg.all_of<ECS::PointCloudRenderer::Component>(selected) &&
-                !reg.all_of<ECS::PointCloud::Data>(selected))
-            {
-                if (ImGui::CollapsingHeader("Point Cloud", ImGuiTreeNodeFlags_DefaultOpen))
-                {
-                    auto& pc = reg.get<ECS::PointCloudRenderer::Component>(selected);
-                    ImGui::Text("Points: %zu", pc.PointCount());
-                    ImGui::Text("Has Normals: %s", pc.HasNormals() ? "Yes" : "No");
-                    ImGui::Text("Has Colors: %s", pc.HasColors() ? "Yes" : "No");
-                    ImGui::Text("Has Radii: %s", pc.HasRadii() ? "Yes" : "No");
-
-                    ImGui::SeparatorText("Rendering");
-                    ImGui::Checkbox("Visible##PCR", &pc.Visible);
-
-                    const char* modeNames[] = { "Flat Disc", "Surfel", "EWA Splatting" };
-                    int modeIdx = static_cast<int>(pc.RenderMode);
-                    if (modeIdx < 0 || modeIdx > 2) modeIdx = 0;
-                    if (ImGui::Combo("Render Mode##PCR", &modeIdx, modeNames, 3))
-                        pc.RenderMode = static_cast<Geometry::PointCloud::RenderMode>(modeIdx);
-
-                    ImGui::SliderFloat("Default Radius##PCR", &pc.DefaultRadius, 0.0005f, 0.1f, "%.5f", ImGuiSliderFlags_Logarithmic);
-                    ImGui::SliderFloat("Size Multiplier##PCR", &pc.SizeMultiplier, 0.1f, 10.0f, "%.2f", ImGuiSliderFlags_Logarithmic);
-
-                    float dc[4] = {pc.DefaultColor.r, pc.DefaultColor.g, pc.DefaultColor.b, pc.DefaultColor.a};
-                    if (ImGui::ColorEdit4("Default Color##PCR", dc))
-                        pc.DefaultColor = glm::vec4(dc[0], dc[1], dc[2], dc[3]);
-                }
-            }
-
-            // 7. Visualization — per-entity rendering mode toggles for meshes.
+            // 6. Visualization — per-entity rendering mode toggles for meshes.
             // Toggle is presence/absence of Line::Component and Point::Component.
             // Surface visibility is controlled via Surface::Component::Visible.
             // GPU view creation is handled by MeshViewLifecycleSystem — no manual

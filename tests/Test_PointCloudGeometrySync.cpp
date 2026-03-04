@@ -19,7 +19,7 @@ import Geometry;
 //   - GpuDirty lifecycle transitions.
 //   - Cloud span accessors for zero-copy upload.
 //   - Per-point attribute extraction readiness (colors, radii).
-//   - Distinction from PointCloudRenderer::Component (vector-backed one-shot).
+//   - Cloud-backed and preloaded-geometry point-cloud paths.
 
 // ---- Component GPU State Defaults ----
 
@@ -40,8 +40,6 @@ TEST(PointCloudGeometrySync_Contract, InvalidSlotSentinel)
     EXPECT_EQ(ECS::PointCloud::Data::kInvalidSlot, ~0u);
     EXPECT_EQ(ECS::PointCloud::Data::kInvalidSlot,
               ECS::Surface::Component::kInvalidSlot);
-    EXPECT_EQ(ECS::PointCloud::Data::kInvalidSlot,
-              ECS::PointCloudRenderer::Component::kInvalidSlot);
     EXPECT_EQ(ECS::PointCloud::Data::kInvalidSlot,
               ECS::Graph::Data::kInvalidSlot);
 }
@@ -259,36 +257,22 @@ TEST(PointCloudGeometrySync_Contract, CachedRadiiInitiallyEmpty)
     EXPECT_TRUE(comp.CachedRadii.empty());
 }
 
-// ---- Component Type Distinction ----
+// ---- Single-Path PointCloud Contract ----
 
-TEST(PointCloudGeometrySync_Contract, DistinctFromPointCloudRenderer)
+TEST(PointCloudGeometrySync_Contract, PointCloudDataIsSinglePointCloudPath)
 {
-    // PointCloud::Data (Cloud-backed sync) is a different component than
-    // PointCloudRenderer::Component (vector-backed one-shot). They coexist
-    // independently on different entities.
     ECS::PointCloud::Data cloudComp;
     cloudComp.CloudRef = std::make_shared<Geometry::PointCloud::Cloud>();
     cloudComp.CloudRef->AddPoint({0.f, 0.f, 0.f});
 
-    ECS::PointCloudRenderer::Component vectorComp;
-    vectorComp.Positions = {{0.f, 0.f, 0.f}};
-
-    // Cloud-backed component delegates to Cloud.
     EXPECT_EQ(cloudComp.PointCount(), 1u);
-
-    // Vector-backed component counts its own vectors.
-    EXPECT_EQ(vectorComp.PointCount(), 1u);
-
-    // Both start dirty.
     EXPECT_TRUE(cloudComp.GpuDirty);
-    EXPECT_TRUE(vectorComp.GpuDirty);
 }
 
 // ---- Cloud Data Survives After Upload (not freed) ----
 
 TEST(PointCloudGeometrySync_Contract, CloudDataSurvivesAfterUpload)
 {
-    // Unlike PointCloudRenderer which clears CPU vectors after upload,
     // PointCloud::Data keeps the Cloud alive for potential re-upload.
     auto cloud = std::make_shared<Geometry::PointCloud::Cloud>();
     cloud->AddPoint({1.f, 2.f, 3.f});
@@ -332,4 +316,13 @@ TEST(PointCloudGeometrySync_Contract, ReUploadOnDataChange)
     EXPECT_TRUE(comp.GpuDirty);
     EXPECT_EQ(comp.PointCount(), 2u);
     EXPECT_EQ(comp.GpuPointCount, 1u); // Stale until sync runs.
+}
+
+TEST(PointCloudGeometrySync_Contract, PreloadedGpuNormalsContract)
+{
+    ECS::PointCloud::Data comp;
+    comp.HasGpuNormals = true;
+
+    EXPECT_FALSE(comp.HasNormals());
+    EXPECT_TRUE(comp.HasRenderableNormals());
 }

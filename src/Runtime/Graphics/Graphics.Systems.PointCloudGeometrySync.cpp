@@ -54,7 +54,15 @@ namespace Graphics::Systems::PointCloudGeometrySync
             // -----------------------------------------------------------------
             if (pcData.GpuDirty)
             {
-                if (!pcData.CloudRef || pcData.CloudRef->Empty())
+                // Preloaded geometry path: keep existing GPU geometry and infer
+                // normals from uploaded layout when CloudRef is absent.
+                if (pcData.GpuGeometry.IsValid() && !pcData.CloudRef)
+                {
+                    if (GeometryGpuData* geo = geometryStorage.GetUnchecked(pcData.GpuGeometry))
+                        pcData.HasGpuNormals = (geo->GetLayout().NormalsSize > 0);
+                    pcData.GpuDirty = false;
+                }
+                else if (!pcData.CloudRef || pcData.CloudRef->Empty())
                 {
                     // Cloud is empty or null — release any existing GPU geometry.
                     if (pcData.GpuGeometry.IsValid())
@@ -65,8 +73,9 @@ namespace Graphics::Systems::PointCloudGeometrySync
                     pcData.CachedColors.clear();
                     pcData.CachedRadii.clear();
                     pcData.GpuPointCount = 0;
+                    pcData.HasGpuNormals = false;
                     pcData.GpuDirty = false;
-                    // Fall through to Phase 3 (GpuGeometry invalid → skip).
+                    // Fall through to Phase 3 (GpuGeometry invalid -> skip).
                 }
                 else
                 {
@@ -135,6 +144,7 @@ namespace Graphics::Systems::PointCloudGeometrySync
                 pcData.CachedColors = std::move(pointColors);
                 pcData.CachedRadii = std::move(pointRadii);
                 pcData.GpuPointCount = static_cast<uint32_t>(positions.size());
+                pcData.HasGpuNormals = hasNormals;
                 pcData.GpuDirty = false;
 
                 } // else (upload succeeded)
@@ -143,8 +153,7 @@ namespace Graphics::Systems::PointCloudGeometrySync
 
             // -----------------------------------------------------------------
             // Phase 2: Allocate GPUScene slot for entities with valid GPU geometry.
-            // Same contract as PointCloudRendererLifecycle: allocate once, then
-            // GPUSceneSync handles subsequent transform-only updates.
+            // Allocate once, then GPUSceneSync handles subsequent transform-only updates.
             // -----------------------------------------------------------------
             if (pcData.GpuSlot == ECS::PointCloud::Data::kInvalidSlot && pcData.GpuGeometry.IsValid())
             {
@@ -183,20 +192,19 @@ namespace Graphics::Systems::PointCloudGeometrySync
             // -----------------------------------------------------------------
             // Phase 3: Populate Point::Component from PointCloud::Data.
             // -----------------------------------------------------------------
-            // Directly populates Point::Component, replacing
-            // ComponentMigration's point cloud bridging. Idempotent — runs
-            // every frame for all visible cloud entities with valid GPU geometry.
+            // Idempotent: runs every frame for visible cloud entities with
+            // valid GPU geometry.
             if (pcData.Visible && pcData.GpuGeometry.IsValid())
             {
                 auto& pt = registry.get_or_emplace<ECS::Point::Component>(entity);
-                pt.Geometry          = pcData.GpuGeometry;
-                pt.Color             = pcData.DefaultColor;
-                pt.Size              = pcData.DefaultRadius;
-                pt.SizeMultiplier    = pcData.SizeMultiplier;
-                pt.Mode              = pcData.RenderMode;
-                pt.HasPerPointColors = pcData.HasColors();
-                pt.HasPerPointRadii  = pcData.HasRadii();
-                pt.HasPerPointNormals = pcData.HasNormals();
+                pt.Geometry           = pcData.GpuGeometry;
+                pt.Color              = pcData.DefaultColor;
+                pt.Size               = pcData.DefaultRadius;
+                pt.SizeMultiplier     = pcData.SizeMultiplier;
+                pt.Mode               = pcData.RenderMode;
+                pt.HasPerPointColors  = pcData.HasColors();
+                pt.HasPerPointRadii   = pcData.HasRadii();
+                pt.HasPerPointNormals = pcData.HasRenderableNormals();
             }
         }
     }

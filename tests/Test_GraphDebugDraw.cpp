@@ -12,7 +12,7 @@ import Geometry;
 // =============================================================================
 //
 // Graph edge rendering is handled by LinePass reading ECS::Line::Component
-// (populated by ComponentMigration from Graph::Data). This test validates
+// (populated by GraphGeometrySyncSystem from Graph::Data). This test validates
 // the DebugDraw API for transient graph debug overlays.
 
 TEST(Graphics_GraphDebugDraw, GraphEntityWithDebugDraw)

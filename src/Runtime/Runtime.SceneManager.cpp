@@ -35,21 +35,6 @@ namespace
         sc.GpuSlot = ECS::Surface::Component::kInvalidSlot;
     }
 
-    void OnPointCloudRendererDestroyed(entt::registry& registry, entt::entity entity)
-    {
-        if (!g_GpuSceneForDestroyHook)
-            return;
-
-        auto& pc = registry.get<ECS::PointCloudRenderer::Component>(entity);
-        if (pc.GpuSlot == ECS::PointCloudRenderer::Component::kInvalidSlot)
-            return;
-
-        Graphics::GpuInstanceData inst{};
-        g_GpuSceneForDestroyHook->QueueUpdate(pc.GpuSlot, inst, /*sphere*/ {0.0f, 0.0f, 0.0f, 0.0f});
-        g_GpuSceneForDestroyHook->FreeSlot(pc.GpuSlot);
-        pc.GpuSlot = ECS::PointCloudRenderer::Component::kInvalidSlot;
-    }
-
     void OnMeshEdgeViewDestroyed(entt::registry& registry, entt::entity entity)
     {
         if (!g_GpuSceneForDestroyHook)
@@ -130,9 +115,6 @@ namespace Runtime
         m_Scene.GetRegistry().on_destroy<ECS::Surface::Component>()
             .connect<&OnSurfaceDestroyed>();
 
-        m_Scene.GetRegistry().on_destroy<ECS::PointCloudRenderer::Component>()
-            .connect<&OnPointCloudRendererDestroyed>();
-
         m_Scene.GetRegistry().on_destroy<ECS::MeshEdgeView::Component>()
             .connect<&OnMeshEdgeViewDestroyed>();
 
@@ -150,9 +132,6 @@ namespace Runtime
     {
         m_Scene.GetRegistry().on_destroy<ECS::Surface::Component>()
             .disconnect<&OnSurfaceDestroyed>();
-
-        m_Scene.GetRegistry().on_destroy<ECS::PointCloudRenderer::Component>()
-            .disconnect<&OnPointCloudRendererDestroyed>();
 
         m_Scene.GetRegistry().on_destroy<ECS::MeshEdgeView::Component>()
             .disconnect<&OnMeshEdgeViewDestroyed>();
@@ -205,17 +184,19 @@ namespace Runtime
                     ECS::Components::Hierarchy::Attach(m_Scene.GetRegistry(), targetEntity, root);
                 }
 
-                // Route point topologies to PointCloudRenderer for billboard
-                // expansion via PointPass. Meshes/lines use the standard
-                // Surface path.
+                // Route point topologies to PointCloud::Data for PointPass
+                // rendering. Meshes/lines use the standard Surface path.
                 const auto handle = model->Meshes[i]->Handle;
                 const auto* geo = m_GeometryStorage ? m_GeometryStorage->GetUnchecked(handle) : nullptr;
 
                 if (geo && geo->GetTopology() == Graphics::PrimitiveTopology::Points)
                 {
-                    auto& pc = m_Scene.GetRegistry().emplace<ECS::PointCloudRenderer::Component>(targetEntity);
-                    pc.Geometry = handle;
-                    pc.GpuDirty = false; // Already uploaded by ModelLoader.
+                    auto& pcd = m_Scene.GetRegistry().emplace<ECS::PointCloud::Data>(targetEntity);
+                    pcd.GpuGeometry = handle;
+                    pcd.GpuDirty = false; // Already uploaded by ModelLoader.
+                    pcd.CloudRef.reset();
+                    pcd.HasGpuNormals = (geo->GetLayout().NormalsSize > 0);
+                    pcd.GpuPointCount = static_cast<uint32_t>(geo->GetLayout().PositionsSize / sizeof(glm::vec3));
                 }
                 else
                 {

@@ -318,8 +318,7 @@ namespace Graphics::Systems::GraphGeometrySync
 
             // -----------------------------------------------------------------
             // Phase 2: Allocate GPUScene slot for entities with valid GPU geometry.
-            // Same contract as PointCloudRendererLifecycle: allocate once, then
-            // GPUSceneSync handles subsequent transform-only updates.
+            // Allocate once, then GPUSceneSync handles subsequent transform-only updates.
             // -----------------------------------------------------------------
             if (graphData.GpuSlot == ECS::Graph::Data::kInvalidSlot && graphData.GpuGeometry.IsValid())
             {
@@ -359,9 +358,8 @@ namespace Graphics::Systems::GraphGeometrySync
             // Phase 3: Populate per-pass typed ECS components.
             // -----------------------------------------------------------------
             // Directly populates Line::Component (edges) and Point::Component
-            // (nodes) from Graph::Data, replacing ComponentMigration's graph
-            // bridging. Idempotent — runs every frame for all visible graph
-            // entities with valid GPU geometry.
+            // (nodes) from Graph::Data. Idempotent — runs every frame for
+            // visible graph entities with valid GPU geometry.
             if (graphData.Visible && graphData.GpuGeometry.IsValid())
             {
                 // Edges → Line

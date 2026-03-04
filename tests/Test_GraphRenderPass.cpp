@@ -339,7 +339,7 @@ TEST(Graph_GPUSceneSlot, InvalidSlotConstantMatchesOtherComponents)
     EXPECT_EQ(ECS::Graph::Data::kInvalidSlot,
               ECS::Surface::Component::kInvalidSlot);
     EXPECT_EQ(ECS::Graph::Data::kInvalidSlot,
-              ECS::PointCloudRenderer::Component::kInvalidSlot);
+              ECS::PointCloud::Data::kInvalidSlot);
     EXPECT_EQ(ECS::Graph::Data::kInvalidSlot, ~0u);
 }
 

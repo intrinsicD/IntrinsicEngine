@@ -258,14 +258,13 @@ TEST(BDA_Components, GraphDataDefaults)
     EXPECT_FALSE(data.HasNodeRadii());
 }
 
-TEST(BDA_Components, PointCloudRendererDefaults)
+TEST(BDA_Components, PointCloudDataDefaults)
 {
-    ECS::PointCloudRenderer::Component pc;
+    ECS::PointCloud::Data pc;
 
-    EXPECT_TRUE(pc.Positions.empty());
-    EXPECT_TRUE(pc.Normals.empty());
-    EXPECT_TRUE(pc.Colors.empty());
-    EXPECT_TRUE(pc.Radii.empty());
+    EXPECT_FALSE(pc.CloudRef);
+    EXPECT_TRUE(pc.CachedColors.empty());
+    EXPECT_TRUE(pc.CachedRadii.empty());
 
     EXPECT_EQ(pc.RenderMode, Geometry::PointCloud::RenderMode::FlatDisc);
     EXPECT_FLOAT_EQ(pc.DefaultRadius, 0.005f);
@@ -274,6 +273,7 @@ TEST(BDA_Components, PointCloudRendererDefaults)
 
     EXPECT_EQ(pc.PointCount(), 0u);
     EXPECT_FALSE(pc.HasNormals());
+    EXPECT_FALSE(pc.HasRenderableNormals());
     EXPECT_FALSE(pc.HasColors());
     EXPECT_FALSE(pc.HasRadii());
 }
@@ -436,9 +436,9 @@ TEST(BDA_EWA, GraphDataAcceptsEWA)
     EXPECT_EQ(data.NodeRenderMode, Geometry::PointCloud::RenderMode::EWA);
 }
 
-TEST(BDA_EWA, PointCloudRendererAcceptsEWA)
+TEST(BDA_EWA, PointCloudDataAcceptsEWA)
 {
-    ECS::PointCloudRenderer::Component pc;
+    ECS::PointCloud::Data pc;
     pc.RenderMode = Geometry::PointCloud::RenderMode::EWA;
     EXPECT_EQ(pc.RenderMode, Geometry::PointCloud::RenderMode::EWA);
 }

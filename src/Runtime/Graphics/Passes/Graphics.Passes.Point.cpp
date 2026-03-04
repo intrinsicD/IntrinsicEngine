@@ -334,11 +334,9 @@ namespace Graphics::Passes
         // =================================================================
         // Retained-mode draws via ECS::Point::Component
         // =================================================================
-        // ComponentMigration populates Point::Component from all sources:
-        // - MeshRenderer + RenderVisualization (ShowVertices=true)
-        // - PointCloudRenderer
-        // - Graph::Data (nodes)
-        // - PointCloud::Data (cloud points)
+        // Point::Component is populated by lifecycle systems:
+        // - MeshViewLifecycle (mesh vertex views)
+        // - GraphGeometrySyncSystem (graph nodes)
         {
             auto pointView = registry.view<ECS::Point::Component>();
 
