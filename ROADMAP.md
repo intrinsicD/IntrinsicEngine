@@ -38,7 +38,9 @@ Recent completions (2026-03-03, details in git history): push constant runtime v
 
 Recent completions (2026-03-03, details in git history): Phase 9 documentation update — restructured `CLAUDE.md` BDA rendering section into `## Three-Pass Rendering Architecture` with subsections for passes/DefaultPipeline, ECS render component types, BDA shared-buffer design, lifecycle systems, CPU-side frustum culling, and transient debug content. Updated `README.md` to replace all legacy pass names (`RetainedLineRenderPass`, `RetainedPointCloudRenderPass`, `LineRenderPass`, `PointCloudRenderPass`) with unified `LinePass`/`PointPass`, added three-pass architecture summary to §3 Rendering, and updated BDA vertex pulling table and debug visualization sections.
 
-The **rendering architecture refactor** defined in `PLAN.md` (TODO §1) is complete: all 9 phases delivered, plus push constant runtime validation (§1.10, completed 2026-03-03). The three unified passes (`SurfacePass`, `LinePass`, `PointPass`) with `ECS::Surface/Line/Point::Component` types are the sole rendering path. Near-term priority: PropertySet dirty-domain sync (TODO §1).
+The **rendering architecture refactor** defined in `PLAN.md` (TODO §1) is complete: all 9 phases delivered, plus push constant runtime validation (§1.10, completed 2026-03-03). The three unified passes (`SurfacePass`, `LinePass`, `PointPass`) with `ECS::Surface/Line/Point::Component` types are the sole rendering path.
+
+Recent completions (2026-03-04, details in git history): PropertySet dirty-domain sync system (PLAN.md Phase 1) — six zero-size `ECS::DirtyTag` tag components (`VertexPositions`, `VertexAttributes`, `EdgeTopology`, `EdgeAttributes`, `FaceTopology`, `FaceAttributes`) for independent per-domain dirty tracking. `PropertySetDirtySyncSystem` (`Graphics.Systems.PropertySetDirtySync`) processes each domain independently: position/topology tags escalate to `GpuDirty` for full re-upload by existing lifecycle systems; attribute tags perform incremental re-extraction from PropertySets into cached attribute vectors (colors, radii) without full vertex buffer re-upload. Count-divergence safety: if element count doesn't match last upload, escalates to full re-upload. Runs before lifecycle systems via FrameGraph `Signal("PropertySetDirtySync")` / `WaitFor("PropertySetDirtySync")` ordering. FeatureRegistry-gated as `"PropertySetDirtySync"`. Contract tests in `Test_PropertySetDirtySync.cpp`.
 
 Recent completions (2026-03-03, details in git history): staged (device-local) upload path for static graphs in `GraphGeometrySyncSystem` — `ECS::Graph::Data::StaticGeometry` flag selects upload mode per-entity: `false` (default) → Direct (host-visible, `CPU_TO_GPU`) for dynamic graphs undergoing frequent re-layout; `true` → Staged (device-local, `GPU_ONLY`) via TransferManager staging belt, optimal for file-loaded or computed-once graphs. Both vertex buffer and edge index buffer uploads respect the flag. Contract tests in `Test_GraphRenderPass.cpp` and `Test_BDASharedBufferContract.cpp`.
 
@@ -464,9 +466,8 @@ Sub-entity select → Geometry processing (interactive operator input)
    *Depends on: rendering refactor (Phase 0a — builds on `SurfacePass`). Depended on by: shadow mapping, transparency, mesh rendering modes, point cloud blending.*
    The HDR intermediate render target and the post-pass chain (tone mapping at minimum). `SurfacePass` currently writes directly to the swapchain — every rendering feature added later assumes an HDR intermediate exists. Establish the plumbing now; individual effects (SSAO, bloom) can be added incrementally alongside other work.
 
-3. **PropertySet dirty-domain sync (`TODO.md §3`)**
-   *Depends on: rendering refactor (Phase 0a — sync system targets new component types). Depended on by: interactive geometry processing (operators that modify mesh topology/attributes need automatic GPU re-upload).*
-   Per-frame CPU→GPU synchronization with independent dirty tracking per data domain (vertex/edge/face). Six dirty tag components, selective re-upload of affected PropertySet spans.
+3. ~~**PropertySet dirty-domain sync**~~ **(done, 2026-03-04)**
+   Six `ECS::DirtyTag` tag components, `PropertySetDirtySyncSystem` with per-domain incremental re-extraction, count-divergence safety, FrameGraph-ordered before lifecycle systems.
 
 #### Phase 1 — Core UX
 *Make the engine usable for interactive work. Without these, it's a viewer, not a tool.*

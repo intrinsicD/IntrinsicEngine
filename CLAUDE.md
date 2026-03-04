@@ -129,6 +129,7 @@ Each pass iterates a dedicated ECS component type. The **toggle is presence/abse
 - **`ECS::PointCloud::Data`** — geometry data authority for point clouds. Holds `shared_ptr<Geometry::PointCloud::Cloud>` with PropertySet-backed data. Per-point attributes (`"p:color"` → `CachedColors`, `"p:radius"` → `CachedRadii`) extracted from Cloud PropertySets. Its lifecycle system populates `Point::Component`.
 - **`ECS::MeshEdgeView::Component`** / **`ECS::MeshVertexView::Component`** — edge/vertex views derived from mesh geometry via `ReuseVertexBuffersFrom`. Auto-attached/detached by `MeshViewLifecycleSystem` when `Line::Component`/`Point::Component` is present/absent.
 - **`ECS::EdgePair`** — standalone component for edge pair data, decoupled from any specific pass.
+- **`ECS::DirtyTag::*`** — six zero-size tag components for per-domain dirty tracking: `VertexPositions`, `VertexAttributes`, `EdgeTopology`, `EdgeAttributes`, `FaceTopology`, `FaceAttributes`. Consumed by `PropertySetDirtySyncSystem`; cleared after sync. Multiple tags can coexist independently on the same entity.
 
 ### BDA Shared-Buffer Design
 
@@ -149,6 +150,7 @@ Lifecycle systems create GPU geometry and populate per-pass ECS components. All 
 - **`PointCloudRendererLifecycle`**: Handles legacy `PointCloudRenderer::Component` GPU upload (file-loaded and code-originated paths). CPU vectors freed after upload.
 - **`ComponentMigration`**: Bridges legacy `PointCloudRenderer::Component` → `Point::Component` only. All other data flows handled by their respective lifecycle systems.
 - **`GPUSceneSync`**: Handles transform-only updates for all entity types with GPUScene slots.
+- **`PropertySetDirtySyncSystem`** (`"PropertySetDirtySync"`): Per-domain dirty tracking for incremental CPU→GPU sync. Six `ECS::DirtyTag` tag components (`VertexPositions`, `VertexAttributes`, `EdgeTopology`, `EdgeAttributes`, `FaceTopology`, `FaceAttributes`). Position/topology tags escalate to `GpuDirty` for full re-upload by existing lifecycle systems. Attribute tags re-extract cached vectors (colors, radii) from PropertySets without full vertex buffer re-upload. Count-divergence safety escalates to full re-upload. Runs before lifecycle systems via FrameGraph ordering. Tags cleared after processing.
 
 ### CPU-Side Frustum Culling
 

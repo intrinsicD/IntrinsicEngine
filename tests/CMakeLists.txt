@@ -141,6 +141,7 @@ intrinsic_test_object_lib(RuntimeTestObjs
         Test_MeshViewLifecycle.cpp
         Test_PerPassComponents.cpp
         Test_PerFaceAttributes.cpp
+        Test_PropertySetDirtySync.cpp
 
     DEPS IntrinsicCore IntrinsicRuntime
 )

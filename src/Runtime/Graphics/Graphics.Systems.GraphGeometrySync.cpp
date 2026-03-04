@@ -388,6 +388,7 @@ namespace Graphics::Systems::GraphGeometrySync
                 builder.Write<ECS::Line::Component>();
                 builder.Write<ECS::Point::Component>();
                 builder.WaitFor("TransformUpdate"_id);
+                builder.WaitFor("PropertySetDirtySync"_id);
             },
             [&registry, &gpuScene, &geometryStorage, device, &transferManager]()
             {
