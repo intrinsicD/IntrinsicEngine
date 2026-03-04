@@ -45,7 +45,7 @@ export namespace Graphics::GpuColor
         if (t <= 0.0f) t = 0.0f;
         if (t >= 1.0f) t = 1.0f;
 
-        // 5-segment piecewise-linear heat ramp:
+        // 4-segment piecewise-linear heat ramp:
         //   [0.00, 0.25) blue → cyan     (B=1, G increases)
         //   [0.25, 0.50) cyan → green    (B decreases, G=1)
         //   [0.50, 0.75) green → yellow  (G=1, R increases)

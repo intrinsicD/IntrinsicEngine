@@ -10,19 +10,17 @@ module;
 module Graphics:DebugDraw.Impl;
 
 import :DebugDraw;
+import Geometry;
 
 namespace Graphics
 {
     namespace
     {
-        bool IsFiniteVec3(const glm::vec3& v)
-        {
-            return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z);
-        }
+        using Geometry::Validation::IsFinite;
 
         bool IsFiniteLine(const glm::vec3& a, const glm::vec3& b)
         {
-            return IsFiniteVec3(a) && IsFiniteVec3(b);
+            return IsFinite(a) && IsFinite(b);
         }
 
         void PushLineIfFinite(std::vector<DebugDraw::LineSegment>& target,
@@ -97,12 +95,12 @@ namespace Graphics
                            uint32_t color, uint32_t segments)
     {
         if (segments < 3) segments = 3;
-        if (!IsFiniteVec3(center) || !IsFiniteVec3(normal) || !std::isfinite(radius))
+        if (!IsFinite(center) || !IsFinite(normal) || !std::isfinite(radius))
             return;
 
         // Build an orthonormal basis from the normal
         glm::vec3 n = glm::normalize(normal);
-        if (!IsFiniteVec3(n))
+        if (!IsFinite(n))
             return;
 
         glm::vec3 up = (std::abs(n.y) < 0.999f) ? glm::vec3(0, 1, 0) : glm::vec3(1, 0, 0);
@@ -239,7 +237,7 @@ namespace Graphics
 
     void DebugDraw::Point(const glm::vec3& position, float size, uint32_t color)
     {
-        if (!IsFiniteVec3(position) || !std::isfinite(size))
+        if (!IsFinite(position) || !std::isfinite(size))
             return;
         m_Points.push_back({position, size, color, {0.0f, 0.0f, 0.0f}});
     }
@@ -251,7 +249,7 @@ namespace Graphics
     void DebugDraw::Triangle(const glm::vec3& a, const glm::vec3& b, const glm::vec3& c,
                              const glm::vec3& normal, uint32_t color)
     {
-        if (!IsFiniteVec3(a) || !IsFiniteVec3(b) || !IsFiniteVec3(c) || !IsFiniteVec3(normal))
+        if (!IsFinite(a) || !IsFinite(b) || !IsFinite(c) || !IsFinite(normal))
             return;
         m_Triangles.push_back({a, color, normal, 0.0f});
         m_Triangles.push_back({b, color, normal, 0.0f});
@@ -365,7 +363,7 @@ namespace Graphics
                                uint32_t color, uint32_t segments)
     {
         if (segments < 4) segments = 4;
-        if (!IsFiniteVec3(center) || !std::isfinite(radius))
+        if (!IsFinite(center) || !std::isfinite(radius))
             return;
 
         const float step = glm::two_pi<float>() / static_cast<float>(segments);

@@ -11,11 +11,14 @@ module;
 
 module Graphics:Geometry.Impl;
 import :Geometry;
+import Geometry;
 import RHI;
 import Core.Logging;
 
 namespace Graphics
 {
+    using Geometry::Validation::IsFinite;
+
     // Helper to align offsets to 16 bytes for SIMD safety
     static VkDeviceSize AlignSize(VkDeviceSize size, VkDeviceSize alignment)
     {
@@ -44,11 +47,6 @@ namespace Graphics
         return {center.x, center.y, center.z, std::max(radius, 1e-3f)};
     }
 
-    static bool IsFiniteVec3(const glm::vec3& v)
-    {
-        return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z);
-    }
-
     std::pair<std::unique_ptr<GeometryGpuData>, RHI::TransferToken>
     GeometryGpuData::CreateAsync(std::shared_ptr<RHI::VulkanDevice> device,
                                  RHI::TransferManager& transferManager,
@@ -65,7 +63,7 @@ namespace Graphics
         {
             for (size_t i = 0; i < data.Positions.size(); ++i)
             {
-                if (!IsFiniteVec3(data.Positions[i]))
+                if (!IsFinite(data.Positions[i]))
                 {
                     Core::Log::Error(
                         "GeometryGpuData::CreateAsync: Non-finite position at vertex {}. Upload rejected.",
