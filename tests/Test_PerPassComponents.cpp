@@ -334,6 +334,26 @@ TEST(ComponentMigration, PointCloudRenderer_Invisible_SkipsCreation)
     EXPECT_FALSE(reg.all_of<Point::Component>(e));
 }
 
+TEST(ComponentMigration, PointCloudRenderer_UsesGpuNormalState)
+{
+    entt::registry reg;
+    auto e = reg.create();
+
+    auto& pc = reg.emplace<PointCloudRenderer::Component>(e);
+    pc.Visible = true;
+    pc.RenderMode = Geometry::PointCloud::RenderMode::Surfel;
+    pc.HasGpuNormals = true;
+
+    // Simulate post-upload legacy component: no CPU vectors remain.
+    EXPECT_FALSE(pc.HasNormals());
+    EXPECT_TRUE(pc.HasRenderableNormals());
+
+    Graphics::Systems::ComponentMigration::OnUpdate(reg);
+
+    ASSERT_TRUE(reg.all_of<Point::Component>(e));
+    EXPECT_TRUE(reg.get<Point::Component>(e).HasPerPointNormals);
+}
+
 // =============================================================================
 // Phase 6: ComponentMigration no longer bridges Graph or PointCloud
 // =============================================================================

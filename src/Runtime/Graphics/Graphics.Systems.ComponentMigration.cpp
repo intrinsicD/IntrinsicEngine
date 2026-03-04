@@ -37,7 +37,7 @@ void OnUpdate(entt::registry& registry)
             pt.Mode            = pc.RenderMode;
             pt.HasPerPointColors  = pc.HasColors();
             pt.HasPerPointRadii   = pc.HasRadii();
-            pt.HasPerPointNormals = pc.HasNormals();
+            pt.HasPerPointNormals = pc.HasRenderableNormals();
         }
     }
 }

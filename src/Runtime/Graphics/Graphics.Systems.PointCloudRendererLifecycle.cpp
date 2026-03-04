@@ -52,20 +52,13 @@ namespace Graphics::Systems::PointCloudRendererLifecycle
             // -----------------------------------------------------------------
             if (pc.GpuDirty && !pc.Geometry.IsValid() && !pc.Positions.empty())
             {
-                // Build normals if missing (default up vector).
-                std::vector<glm::vec3> normals;
-                if (pc.HasNormals())
-                {
-                    normals = pc.Normals;
-                }
-                else
-                {
-                    normals.resize(pc.Positions.size(), glm::vec3(0.0f, 1.0f, 0.0f));
-                }
+                // Surfel/EWA require real normals; do not synthesize default-up normals.
+                const bool hasInputNormals = pc.HasNormals();
 
                 GeometryUploadRequest upload{};
                 upload.Positions = pc.Positions;
-                upload.Normals = normals;
+                if (hasInputNormals)
+                    upload.Normals = pc.Normals;
                 upload.Topology = PrimitiveTopology::Points;
                 upload.UploadMode = GeometryUploadMode::Staged;
 
@@ -81,6 +74,7 @@ namespace Graphics::Systems::PointCloudRendererLifecycle
                 }
 
                 pc.Geometry = geometryStorage.Add(std::move(gpuData));
+                pc.HasGpuNormals = hasInputNormals;
 
                 // Free CPU data — it is now on the GPU.
                 pc.Positions.clear();
@@ -96,7 +90,12 @@ namespace Graphics::Systems::PointCloudRendererLifecycle
             }
             else if (pc.GpuDirty && pc.Geometry.IsValid())
             {
-                // Handle already assigned (e.g. from ModelLoader) — just clear dirty flag.
+                // Handle already assigned (e.g. from ModelLoader) — infer whether
+                // this reused/preloaded geometry has normals, then clear dirty.
+                if (GeometryGpuData* geo = geometryStorage.GetUnchecked(pc.Geometry))
+                {
+                    pc.HasGpuNormals = geo->GetLayout().NormalsSize > 0;
+                }
                 pc.GpuDirty = false;
             }
 

@@ -28,6 +28,7 @@ TEST(PointCloudRendererLifecycle_Contract, DefaultGpuStateFields)
     EXPECT_FALSE(comp.Geometry.IsValid());
     EXPECT_EQ(comp.GpuSlot, ECS::PointCloudRenderer::Component::kInvalidSlot);
     EXPECT_TRUE(comp.GpuDirty);
+    EXPECT_FALSE(comp.HasGpuNormals);
     EXPECT_FALSE(comp.HasGpuGeometry());
 }
 
@@ -73,10 +74,12 @@ TEST(PointCloudRendererLifecycle_Contract, FileLoadedCloudIsNotDirty)
     // When ModelLoader pre-uploads geometry, GpuDirty is set to false.
     ECS::PointCloudRenderer::Component comp;
     comp.Geometry = Geometry::GeometryHandle(0, 1);
+    comp.HasGpuNormals = true;
     comp.GpuDirty = false;
 
     EXPECT_FALSE(comp.GpuDirty);
     EXPECT_TRUE(comp.HasGpuGeometry());
+    EXPECT_TRUE(comp.HasRenderableNormals());
     EXPECT_EQ(comp.PointCount(), 0u); // No CPU data.
 }
 
@@ -146,16 +149,18 @@ TEST(PointCloudRendererLifecycle_Contract, UploadRequestFromComponent)
     EXPECT_TRUE(upload.Indices.empty());
 }
 
-TEST(PointCloudRendererLifecycle_Contract, UploadRequestDefaultNormals)
+TEST(PointCloudRendererLifecycle_Contract, UploadRequestOmitsNormalsWhenMissing)
 {
-    // When normals are missing, lifecycle generates default up vectors.
+    // Missing normals now remain absent in the upload request.
     ECS::PointCloudRenderer::Component comp;
     comp.Positions = {{0, 0, 0}, {1, 0, 0}};
     EXPECT_FALSE(comp.HasNormals());
 
-    std::vector<glm::vec3> normals(comp.Positions.size(), glm::vec3(0.0f, 1.0f, 0.0f));
-    EXPECT_EQ(normals.size(), 2u);
-    EXPECT_FLOAT_EQ(normals[0].y, 1.0f);
+    Graphics::GeometryUploadRequest upload{};
+    upload.Positions = comp.Positions;
+
+    EXPECT_EQ(upload.Positions.size(), 2u);
+    EXPECT_TRUE(upload.Normals.empty());
 }
 
 // ---- CPU Data Clearing After Upload ----
@@ -185,4 +190,22 @@ TEST(PointCloudRendererLifecycle_Contract, CpuDataClearedAfterUpload)
     EXPECT_FALSE(comp.HasNormals());
     EXPECT_FALSE(comp.HasColors());
     EXPECT_FALSE(comp.HasRadii());
+}
+
+TEST(PointCloudRendererLifecycle_Contract, HasRenderableNormalsPersistsAfterCpuCleanup)
+{
+    ECS::PointCloudRenderer::Component comp;
+    comp.Positions = {{0, 0, 0}};
+    comp.Normals = {{0, 1, 0}};
+
+    EXPECT_TRUE(comp.HasNormals());
+    EXPECT_TRUE(comp.HasRenderableNormals());
+
+    // Simulate lifecycle upload completion and CPU vector cleanup.
+    comp.HasGpuNormals = true;
+    comp.Positions.clear();
+    comp.Normals.clear();
+
+    EXPECT_FALSE(comp.HasNormals());
+    EXPECT_TRUE(comp.HasRenderableNormals());
 }

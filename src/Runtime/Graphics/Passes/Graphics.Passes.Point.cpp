@@ -367,13 +367,22 @@ namespace Graphics::Passes
 
                 const uint64_t baseAddr = geo->GetVertexBuffer()->GetDeviceAddress();
                 const uint64_t posAddr = baseAddr + layout.PositionsOffset;
-                const uint64_t normAddr = (layout.NormalsSize > 0) ? (baseAddr + layout.NormalsOffset) : 0;
+
+                // Only expose normals to shaders when the component explicitly reports
+                // per-point normals and the uploaded layout actually contains them.
+                const bool hasValidNormals = pt.HasPerPointNormals && (layout.NormalsSize > 0);
+                const uint64_t normAddr = hasValidNormals ? (baseAddr + layout.NormalsOffset) : 0;
 
                 const uint32_t ptColor = GpuColor::PackColorF(
                     pt.Color.r, pt.Color.g, pt.Color.b, pt.Color.a);
 
-                const uint32_t modeIdx = static_cast<uint32_t>(pt.Mode);
-                const bool isEWA = (modeIdx == 2);
+                const uint32_t requestedModeIdx = static_cast<uint32_t>(pt.Mode);
+                const bool requestedNormalOrientedMode = (requestedModeIdx == 1u || requestedModeIdx == 2u);
+
+                // Surfel/EWA require geometric normals; otherwise render as FlatDisc.
+                const uint32_t effectiveModeIdx =
+                    (requestedNormalOrientedMode && !hasValidNormals) ? 0u : requestedModeIdx;
+                const bool isEWA = (effectiveModeIdx == 2u);
 
                 // Per-point color aux buffer (sourced from legacy components).
                 uint64_t auxAddr = 0;
@@ -429,7 +438,7 @@ namespace Graphics::Passes
                 di.SizeMultiplier = pt.SizeMultiplier;
                 di.Color = ptColor;
                 di.Flags = flags;
-                di.PipelineIndex = (modeIdx == 0) ? 0 : 1; // FlatDisc=0, Surfel/EWA=1
+                di.PipelineIndex = (effectiveModeIdx == 0u) ? 0u : 1u; // FlatDisc=0, Surfel/EWA=1
                 draws.push_back(di);
             }
         }

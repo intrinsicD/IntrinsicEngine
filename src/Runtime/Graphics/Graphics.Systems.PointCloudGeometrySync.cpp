@@ -77,19 +77,8 @@ namespace Graphics::Systems::PointCloudGeometrySync
                 // Cloud provides contiguous span accessors for zero-copy upload.
                 const auto positions = cloud.Positions();
 
-                // Build normals: use Cloud's normals if present, otherwise default up.
-                std::vector<glm::vec3> defaultNormals;
-                std::span<const glm::vec3> normals;
-
-                if (cloud.HasNormals())
-                {
-                    normals = cloud.Normals();
-                }
-                else
-                {
-                    defaultNormals.resize(positions.size(), glm::vec3(0.0f, 1.0f, 0.0f));
-                    normals = defaultNormals;
-                }
+                // Surfel/EWA require real normals; no synthetic default-up normals.
+                const bool hasNormals = cloud.HasNormals();
 
                 // --- Extract per-point colors from PropertySet ---
                 std::vector<uint32_t> pointColors;
@@ -124,7 +113,8 @@ namespace Graphics::Systems::PointCloudGeometrySync
                 // optimal for clouds that don't change every frame.
                 GeometryUploadRequest upload{};
                 upload.Positions = positions;
-                upload.Normals = normals;
+                if (hasNormals)
+                    upload.Normals = cloud.Normals();
                 upload.Topology = PrimitiveTopology::Points;
                 upload.UploadMode = GeometryUploadMode::Staged;
 

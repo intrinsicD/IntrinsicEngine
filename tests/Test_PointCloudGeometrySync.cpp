@@ -169,17 +169,18 @@ TEST(PointCloudGeometrySync_Contract, UploadRequestFromCloudSpans)
     EXPECT_TRUE(upload.Indices.empty());
 }
 
-TEST(PointCloudGeometrySync_Contract, DefaultNormalsWhenCloudHasNone)
+TEST(PointCloudGeometrySync_Contract, UploadRequestOmitsNormalsWhenCloudHasNone)
 {
     auto cloud = std::make_shared<Geometry::PointCloud::Cloud>();
     cloud->AddPoint({0.f, 0.f, 0.f});
     cloud->AddPoint({1.f, 0.f, 0.f});
     EXPECT_FALSE(cloud->HasNormals());
 
-    // Lifecycle generates default up vectors when Cloud has no normals.
-    std::vector<glm::vec3> defaultNormals(cloud->Size(), glm::vec3(0.0f, 1.0f, 0.0f));
-    EXPECT_EQ(defaultNormals.size(), 2u);
-    EXPECT_FLOAT_EQ(defaultNormals[0].y, 1.0f);
+    Graphics::GeometryUploadRequest upload{};
+    upload.Positions = cloud->Positions();
+
+    EXPECT_EQ(upload.Positions.size(), 2u);
+    EXPECT_TRUE(upload.Normals.empty());
 }
 
 // ---- GpuDirty Lifecycle Transitions ----

@@ -92,7 +92,7 @@ export namespace ECS::PointCloudRenderer
     {
         // ---- Point Cloud Data (CPU-side, consumed by initial upload) ----
         std::vector<glm::vec3> Positions;           // Required for CPU-originated clouds.
-        std::vector<glm::vec3> Normals;             // Optional (empty = use default up).
+        std::vector<glm::vec3> Normals;             // Optional. Surfel/EWA require valid normals.
         std::vector<glm::vec4> Colors;              // Optional (empty = use DefaultColor).
         std::vector<float>     Radii;               // Optional (empty = use DefaultRadius).
 
@@ -101,6 +101,7 @@ export namespace ECS::PointCloudRenderer
         static constexpr uint32_t kInvalidSlot = ~0u;
         uint32_t GpuSlot = kInvalidSlot;             // GPUScene slot for frustum culling.
         bool GpuDirty = true;                        // true = needs initial GPU upload.
+        bool HasGpuNormals = false;                  // true when uploaded/reused GPU geometry contains normals.
 
         // ---- Rendering Parameters ----
         Geometry::PointCloud::RenderMode RenderMode = Geometry::PointCloud::RenderMode::FlatDisc;
@@ -112,6 +113,7 @@ export namespace ECS::PointCloudRenderer
         // ---- Queries ----
         [[nodiscard]] std::size_t PointCount() const noexcept { return Positions.size(); }
         [[nodiscard]] bool HasNormals() const noexcept { return !Normals.empty() && Normals.size() == Positions.size(); }
+        [[nodiscard]] bool HasRenderableNormals() const noexcept { return HasNormals() || HasGpuNormals; }
         [[nodiscard]] bool HasColors() const noexcept { return !Colors.empty() && Colors.size() == Positions.size(); }
         [[nodiscard]] bool HasRadii() const noexcept { return !Radii.empty() && Radii.size() == Positions.size(); }
         [[nodiscard]] bool HasGpuGeometry() const noexcept { return Geometry.IsValid(); }
