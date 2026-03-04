@@ -105,6 +105,11 @@ Adaptive remeshing now exposes runtime safety controls in `AdaptiveRemeshingPara
 - **DebugDraw:** Immediate-mode transient overlay for debug visualization (octree, KD-tree, bounds, contact manifolds, convex hulls) rendered by `LinePass` and `PointPass` transient paths. Depth-tested and overlay sub-passes. Comprehensive test coverage.
 - **Graph Processing (CPU):** Halfedge-based graph topology with Octree-accelerated kNN construction, force-directed 2D layout, spectral embedding (combinatorial/symmetric-normalized Laplacian), hierarchical layered layout with crossing diagnostics and diameter-aware auto-rooting.
 - **Selection Outlines:** Post-process contour highlight for selected/hovered entities.
+- **Per-Element Attribute Rendering:** Per-edge colors via `PtrEdgeAux` BDA channel in `LinePass`, per-face colors via `PtrFaceAttr` BDA channel and `gl_PrimitiveID` in `SurfacePass`. Scalar-to-heat and label-to-categorical color utilities (`ScalarToHeatColor`, `LabelToColor`) for curvature visualization and segmentation coloring.
+- **PropertySet Dirty Tracking:** Six zero-size `ECS::DirtyTag` tag components (`VertexPositions`, `VertexAttributes`, `EdgeTopology`, `EdgeAttributes`, `FaceTopology`, `FaceAttributes`) for incremental CPU→GPU sync. Attribute-only changes re-extract cached vectors without full vertex buffer re-upload.
+- **Numerical Safeguards:** Epsilon-guarded normal renormalization with camera-facing fallback in all shaders, degenerate triangle filtering during edge extraction, line width clamping [0.5, 32.0] px, point radius clamping [0.0001, 1.0] world-space, zero-length graph edge filtering, EWA covariance conditioning (eigenvalue floor, isotropic fallback), and per-pass depth bias to prevent z-fighting.
+- **Push Constant Validation:** `PipelineBuilder::Build()` validates each push constant range against device limits before pipeline creation, returning `std::unexpected` on violation.
+- **Status Bar:** Persistent bottom strip with frame time/FPS, live entity count, and active renderer label.
 
 ### 4. Data I/O
 
@@ -349,7 +354,7 @@ Only one path renders per frame (Stage 2 CPU-driven OR Stage 3 GPU-driven). No d
 ## Architecture Documentation
 
 - **`TODO.md`** — Active architecture backlog (open TODOs only, with priorities and remediation notes).
-- **`ROADMAP.md`** — Feature roadmap, dependency-ordered phases, long-horizon planning notes, and the rendering modality redesign vision.
+- **`ROADMAP.md`** — Feature roadmap with dependency-ordered phases and the long-term rendering modality redesign vision.
 - **`PLAN.md`** — Near-term rendering architecture refactor spec (three-pass architecture, ECS component design, migration phases).
 - **`CLAUDE.md`** — Development conventions, build workflows, architectural invariants, C++23 adoption policy.
 - **Git history** — Historical architecture notes and completion summaries for closed backlog items.
