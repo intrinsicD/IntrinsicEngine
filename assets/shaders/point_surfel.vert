@@ -55,7 +55,9 @@ void main()
     vec3 worldPos = vec3(push.Model * vec4(localPos, 1.0));
 
     // Read normal via BDA (if available).
-    vec3 worldNorm = vec3(0.0, 1.0, 0.0);
+    // Fallback to camera-facing basis for degenerate or missing normals.
+    vec3 cameraFwd = -vec3(camera.view[0][2], camera.view[1][2], camera.view[2][2]);
+    vec3 worldNorm = cameraFwd;
     if (push.PtrNormals != 0ul)
     {
         NormBuf normBuf = NormBuf(push.PtrNormals);
@@ -65,7 +67,7 @@ void main()
         mat3 normalMatrix = transpose(inverse(mat3(push.Model)));
         vec3 transformed = normalMatrix * localNorm;
         float nLen = length(transformed);
-        worldNorm = (nLen > 1e-6) ? (transformed / nLen) : vec3(0.0, 1.0, 0.0);
+        worldNorm = (nLen > 1e-6) ? (transformed / nLen) : cameraFwd;
     }
 
     // Resolve color: per-point aux or uniform.
@@ -84,7 +86,8 @@ void main()
     vec2 localOffset = vec2[](vec2(-1,-1), vec2(1,-1), vec2(1,1), vec2(-1,1))[cornerIdx];
     fragDiscUV = localOffset;
 
-    float radiusWorld = push.PointSize * push.SizeMultiplier;
+    // Clamp point radius to safe world-space range [0.0001, 1.0].
+    float radiusWorld = clamp(push.PointSize, 0.0001, 1.0) * push.SizeMultiplier;
 
     // Default: no EWA covariance.
     fragEwaCovInv = vec3(0.0);
@@ -129,8 +132,31 @@ void main()
         float c01 = scrT.x * scrT.y + scrB.x * scrB.y;
         float c11 = scrT.y * scrT.y + scrB.y * scrB.y + 1.0;
 
-        // Invert covariance.
+        // Eigenvalue floor: ensure minimum splat size to avoid degenerate ellipses.
+        // Eigenvalues of 2x2 symmetric: lambda = 0.5*(tr +/- sqrt(tr^2 - 4*det))
+        float tr = c00 + c11;
         float det = c00 * c11 - c01 * c01;
+        float disc = max(tr * tr - 4.0 * det, 0.0);
+        float sqrtDisc = sqrt(disc);
+        float lambdaMin = 0.5 * (tr - sqrtDisc);
+
+        // If the smaller eigenvalue is below the floor, the covariance is
+        // ill-conditioned — fall back to isotropic FlatDisc rendering.
+        const float EIGENVALUE_FLOOR = 0.25; // quarter-pixel^2
+        bool illConditioned = (lambdaMin < EIGENVALUE_FLOOR) || (det < 1e-6);
+
+        if (illConditioned)
+        {
+            // Fallback: camera-facing billboard (FlatDisc behavior).
+            fragEwaCovInv = vec3(0.0); // zero covariance → fragment shader uses disc test
+            vec4 viewPosFB = camera.view * vec4(worldPos, 1.0);
+            vec3 cornerView = viewPosFB.xyz + vec3(localOffset.x, localOffset.y, 0.0) * radiusWorld;
+            gl_Position = camera.proj * vec4(cornerView, 1.0);
+            fragNormal = N;
+        }
+        else
+        {
+        // Invert covariance.
         float invDet = 1.0 / max(det, 1e-6);
         float ci00 =  c11 * invDet;
         float ci01 = -c01 * invDet;
@@ -158,6 +184,7 @@ void main()
         gl_Position.y += localOffset.y * extY * pixToClipY;
 
         fragNormal = N;
+        }
         fragWorldPos = worldPos;
     }
     else

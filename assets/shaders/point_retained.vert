@@ -54,7 +54,9 @@ void main()
     vec3 worldPos = vec3(push.Model * vec4(localPos, 1.0));
 
     // Read normal via BDA (if available).
-    vec3 worldNorm = vec3(0.0, 1.0, 0.0);
+    // Fallback to camera-facing basis for degenerate or missing normals.
+    vec3 cameraFwd = -vec3(camera.view[0][2], camera.view[1][2], camera.view[2][2]);
+    vec3 worldNorm = cameraFwd;
     if (push.PtrNormals != 0ul)
     {
         NormBuf normBuf = NormBuf(push.PtrNormals);
@@ -65,7 +67,7 @@ void main()
         mat3 normalMatrix = transpose(inverse(mat3(push.Model)));
         vec3 transformed = normalMatrix * localNorm;
         float nLen = length(transformed);
-        worldNorm = (nLen > 1e-6) ? (transformed / nLen) : vec3(0.0, 1.0, 0.0);
+        worldNorm = (nLen > 1e-6) ? (transformed / nLen) : cameraFwd;
     }
 
     fragColor = unpackUnorm4x8(push.Color);
@@ -75,7 +77,8 @@ void main()
     vec2 localOffset = vec2[](vec2(-1,-1), vec2(1,-1), vec2(1,1), vec2(-1,1))[cornerIdx];
     fragDiscUV = localOffset;
 
-    float radiusWorld = push.PointSize * push.SizeMultiplier;
+    // Clamp point radius to safe world-space range [0.0001, 1.0].
+    float radiusWorld = clamp(push.PointSize, 0.0001, 1.0) * push.SizeMultiplier;
 
     // Default: no EWA covariance (unused by FlatDisc/Surfel fragment paths).
     fragEwaCovInv = vec3(0.0);

@@ -156,6 +156,10 @@ Lifecycle systems create GPU geometry and populate per-pass ECS components. All 
 
 All three retained passes extract camera frustum planes from `CameraProj * CameraView`, transform each entity's local bounding sphere to world space (center via model matrix, radius scaled by max axis scale), and test with `Geometry::TestOverlap(Frustum, Sphere)`. Culled entities skip draws but retain buffers. Respects `Debug.DisableCulling` toggle. `FrustumCullSphere()` helper in `PassUtils.hpp` implements the world-space transform + plane test.
 
+### Numerical Safeguards
+
+All shaders handling normals use epsilon-guarded renormalization (`length > 1e-6`) with a camera-facing fallback direction (`-view[*][2]` = world-space view forward) for degenerate inputs. Surface vertex shaders use `transpose(inverse(mat3(Model)))` for correct non-uniform scale. Line widths are clamped to `[0.5, 32.0]` pixels (C++ and shader). Point radii are clamped to `[0.0001, 1.0]` world-space. Zero-area triangles (duplicate vertex indices) are filtered during edge extraction. Zero-length graph edges (coincident endpoints, `dot(d,d) < 1e-12`) are filtered during `GraphGeometrySyncSystem` sync. EWA covariance conditioning: analytic 2×2 eigendecomposition with eigenvalue floor (0.25 px²); ill-conditioned splats fall back to isotropic FlatDisc rendering. Mode-specific depth bias prevents z-fighting: `LinePass` uses `(-1.0, -1.0)` constant/slope bias, `PointPass` uses `(-2.0, -2.0)` via `PipelineBuilder::EnableDepthBias()`.
+
 ### Transient Debug Content
 
 Only `DebugDraw` content uses per-frame transient uploads. `LinePass` uploads transient lines as flat position arrays with identity edge pairs, reusing the same BDA shader path. `PointPass` uploads transient points via per-frame host-visible BDA buffers. All retained geometry uses persistent device-local buffers.

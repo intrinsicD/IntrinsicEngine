@@ -269,6 +269,8 @@ namespace Graphics::Passes
             // Depth test enabled, depth write disabled (lines overlay geometry).
             pb.SetDepthFormat(depthFormat);
             pb.EnableDepthTest(false, VK_COMPARE_OP_LESS_OR_EQUAL);
+            // Depth bias to prevent z-fighting between edges and mesh surfaces.
+            pb.EnableDepthBias(-1.0f, -1.0f);
         }
         else
         {
@@ -430,7 +432,8 @@ namespace Graphics::Passes
                 di.PtrEdges = edgeAddr;
                 di.EdgeCount = edgeCount;
                 di.Color = wireColor;
-                di.LineWidth = line.Width;
+                // Clamp line width to safe pixel range [0.5, 32.0].
+                di.LineWidth = std::clamp(line.Width, 0.5f, 32.0f);
                 di.PtrEdgeAux = edgeAuxAddr;
 
                 if (line.Overlay)
@@ -526,7 +529,7 @@ namespace Graphics::Passes
                         di.PtrEdges = edgeAddr;
                         di.EdgeCount = depthLineCount;
                         di.Color = 0xFFFFFFFFu; // white fallback (unused when PtrEdgeAux != 0)
-                        di.LineWidth = LineWidth;
+                        di.LineWidth = std::clamp(LineWidth, 0.5f, 32.0f);
                         di.PtrEdgeAux = colorAddr;
                         depthDraws.push_back(di);
                     }
@@ -550,7 +553,7 @@ namespace Graphics::Passes
                         di.PtrEdges = overlayEdgeAddr;
                         di.EdgeCount = overlayLineCount;
                         di.Color = 0xFFFFFFFFu;
-                        di.LineWidth = LineWidth;
+                        di.LineWidth = std::clamp(LineWidth, 0.5f, 32.0f);
                         di.PtrEdgeAux = overlayColorAddr;
                         overlayDraws.push_back(di);
                     }

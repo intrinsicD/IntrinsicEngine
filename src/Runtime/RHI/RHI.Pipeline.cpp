@@ -158,6 +158,15 @@ namespace RHI
         return *this;
     }
 
+    PipelineBuilder& PipelineBuilder::EnableDepthBias(float constantFactor, float slopeFactor)
+    {
+        m_Rasterizer.depthBiasEnable = VK_TRUE;
+        m_Rasterizer.depthBiasConstantFactor = constantFactor;
+        m_Rasterizer.depthBiasSlopeFactor = slopeFactor;
+        m_Rasterizer.depthBiasClamp = 0.0f;
+        return *this;
+    }
+
     PipelineBuilder& PipelineBuilder::EnableAlphaBlending()
     {
         m_ColorBlendAttachment.blendEnable = VK_TRUE;

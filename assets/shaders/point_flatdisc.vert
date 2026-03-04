@@ -62,7 +62,8 @@ void main()
     vec2 localOffset = vec2[](vec2(-1,-1), vec2(1,-1), vec2(1,1), vec2(-1,1))[cornerIdx];
     fragDiscUV = localOffset;
 
-    float radiusWorld = push.PointSize * push.SizeMultiplier;
+    // Clamp point radius to safe world-space range [0.0001, 1.0].
+    float radiusWorld = clamp(push.PointSize, 0.0001, 1.0) * push.SizeMultiplier;
 
     // FlatDisc mode: camera-facing billboard.
     vec4 viewPos = camera.view * vec4(worldPos, 1.0);

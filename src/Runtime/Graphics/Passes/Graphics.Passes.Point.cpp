@@ -242,6 +242,8 @@ namespace Graphics::Passes
         // Depth test enabled, depth write enabled (points occlude each other).
         pb.SetDepthFormat(depthFormat);
         pb.EnableDepthTest(true, VK_COMPARE_OP_LESS_OR_EQUAL);
+        // Depth bias to prevent z-fighting between points and mesh surfaces.
+        pb.EnableDepthBias(-2.0f, -2.0f);
 
         // Set 0: global camera layout. No set 1 — all data via BDA push constants.
         pb.AddDescriptorSetLayout(m_GlobalSetLayout);
@@ -434,7 +436,8 @@ namespace Graphics::Passes
                 di.PtrNormals = normAddr;
                 di.PtrAux = auxAddr;
                 di.VertexCount = vertexCount;
-                di.PointSize = pt.Size;
+                // Clamp point radius to safe world-space range [0.0001, 1.0].
+                di.PointSize = std::clamp(pt.Size, 0.0001f, 1.0f);
                 di.SizeMultiplier = pt.SizeMultiplier;
                 di.Color = ptColor;
                 di.Flags = flags;

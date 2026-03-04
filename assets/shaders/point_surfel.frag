@@ -38,6 +38,27 @@ void main()
 
     if (isEWA)
     {
+        // Check if the vertex shader fell back to isotropic FlatDisc due to
+        // ill-conditioned covariance (fragEwaCovInv == 0).
+        bool isIsotropicFallback = (fragEwaCovInv.x == 0.0 && fragEwaCovInv.y == 0.0 && fragEwaCovInv.z == 0.0);
+
+        if (isIsotropicFallback)
+        {
+            // Render as flat disc (same as surfel mode disc test).
+            float r2 = dot(fragDiscUV, fragDiscUV);
+            if (r2 > 1.0) discard;
+            float alpha = 1.0 - smoothstep(0.85, 1.0, sqrt(r2));
+
+            float nLenF = length(fragNormal);
+            vec3 N = (nLenF > 1e-6) ? (fragNormal / nLenF) : vec3(0.0, 0.0, 1.0);
+            vec3 lightDir = normalize(vec3(1.0, 1.0, 1.0));
+            float diffuse = max(abs(dot(N, lightDir)), 0.0);
+            float ambient = 0.15;
+            vec3 lit = fragColor.rgb * (ambient + (1.0 - ambient) * diffuse);
+            outColor = vec4(lit, fragColor.a * alpha);
+        }
+        else
+        {
         // ---- EWA mode: Gaussian splat evaluation ----
         vec2 uv = fragDiscUV;
         float mahal = fragEwaCovInv.x * uv.x * uv.x
@@ -50,13 +71,16 @@ void main()
         float weight = exp(-0.5 * mahal);
 
         // Lambertian + ambient lighting.
-        vec3 N = normalize(fragNormal);
+        // Epsilon-guarded renormalization with camera-facing fallback.
+        float nLenE = length(fragNormal);
+        vec3 N = (nLenE > 1e-6) ? (fragNormal / nLenE) : vec3(0.0, 0.0, 1.0);
         vec3 lightDir = normalize(vec3(1.0, 1.0, 1.0));
         float diffuse = max(abs(dot(N, lightDir)), 0.0);
         float ambient = 0.15;
         vec3 lit = fragColor.rgb * (ambient + (1.0 - ambient) * diffuse);
 
         outColor = vec4(lit, fragColor.a * weight);
+        }
     }
     else
     {
@@ -66,7 +90,9 @@ void main()
 
         float alpha = 1.0 - smoothstep(0.85, 1.0, sqrt(r2));
 
-        vec3 N = normalize(fragNormal);
+        // Epsilon-guarded renormalization with camera-facing fallback.
+        float nLenS = length(fragNormal);
+        vec3 N = (nLenS > 1e-6) ? (fragNormal / nLenS) : vec3(0.0, 0.0, 1.0);
         vec3 lightDir = normalize(vec3(1.0, 1.0, 1.0));
         float diffuse = max(abs(dot(N, lightDir)), 0.0);
         float ambient = 0.15;

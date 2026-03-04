@@ -59,6 +59,10 @@ namespace Graphics::Systems::MeshViewLifecycle
                 const uint32_t i1 = triIndices[t + 1];
                 const uint32_t i2 = triIndices[t + 2];
 
+                // Skip degenerate (zero-area) triangles with duplicate vertex indices.
+                if (i0 == i1 || i1 == i2 || i0 == i2)
+                    continue;
+
                 auto addEdge = [&](uint32_t a, uint32_t b) {
                     auto key = (a < b) ? std::pair{a, b} : std::pair{b, a};
                     edgeSet.insert(key);

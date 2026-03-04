@@ -16,19 +16,7 @@ This document tracks **what's left to do** in IntrinsicEngine's architecture.
 
 ---
 
-## 1. Robustness & Numerical Safeguards (PLAN.md)
-
-- [ ] Normal safety: renormalize with epsilon guard in point and surface shaders (fallback to camera-facing basis).
-- [ ] Triangle degeneracy: skip zero-area triangles during edge extraction and surface rendering.
-- [ ] Line width clamping: `[0.5, 32.0]` pixel range.
-- [ ] Point radius clamping: `clamp(size, 0.0001, 1.0)` world-space.
-- [ ] Zero-length graph edges: collapse to point primitive path.
-- [ ] EWA covariance conditioning: eigenvalue floor + fallback to isotropic FlatDisc on ill-conditioned covariance.
-- [ ] Depth conflicts: mode-specific depth bias for edge/point z-fighting against mesh surfaces.
-
----
-
-## 2. Related Documents
+## 1. Related Documents
 
 - `PLAN.md` — detailed rendering architecture refactor spec (three-pass architecture, ECS component design, migration phases).
 - `ROADMAP.md` — feature roadmap, prioritization phases, long-horizon planning, rendering modality redesign vision (§5), and architecture SLOs.
