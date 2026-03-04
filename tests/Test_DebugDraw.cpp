@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <cmath>
+#include <limits>
 #include <span>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -433,4 +434,25 @@ TEST(DebugDraw, AccumulationCorrectCount)
     dd.Axes({0, 0, 0}, 1.0f);                              // +3
 
     EXPECT_EQ(dd.GetLineCount(), 20u);
+}
+
+// =========================================================================
+// Transient Sanitization: verify DebugDraw skips non-finite submissions
+// =========================================================================
+
+TEST(DebugDraw, NonFinitePrimitivesAreSkipped)
+{
+    DebugDraw dd;
+    const float nan = std::numeric_limits<float>::quiet_NaN();
+
+    dd.Line({nan, 0, 0}, {1, 0, 0}, DebugDraw::Red());
+    dd.OverlayLine({0, 0, 0}, {nan, 1, 0}, DebugDraw::Green());
+    dd.Point({0, nan, 0}, 1.0f, DebugDraw::Blue());
+    dd.Triangle({0, 0, 0}, {1, 0, 0}, {0, nan, 0}, {0, 0, 1}, DebugDraw::White());
+
+    EXPECT_EQ(dd.GetLineCount(), 0u);
+    EXPECT_EQ(dd.GetOverlayLineCount(), 0u);
+    EXPECT_EQ(dd.GetPointCount(), 0u);
+    EXPECT_EQ(dd.GetTriangleCount(), 0u);
+    EXPECT_FALSE(dd.HasContent());
 }

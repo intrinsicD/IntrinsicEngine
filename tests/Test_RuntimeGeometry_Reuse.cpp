@@ -3,6 +3,7 @@
 #include <glm/glm.hpp>
 
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <vector>
 
@@ -103,4 +104,24 @@ TEST_F(GeometryReuseTest, ReuseSharesVertexBufferAndCreatesUniqueIndexBuffer)
     EXPECT_EQ(gpu2->GetLayout().PositionsOffset, source->GetLayout().PositionsOffset);
     EXPECT_EQ(gpu2->GetLayout().PositionsSize, source->GetLayout().PositionsSize);
     EXPECT_EQ(gpu2->GetTopology(), Graphics::PrimitiveTopology::Lines);
+}
+
+TEST_F(GeometryReuseTest, RejectsUploadWhenPositionsContainNonFiniteValues)
+{
+    const float nan = std::numeric_limits<float>::quiet_NaN();
+
+    std::vector<glm::vec3> positions = { {0, 0, 0}, {nan, 1, 0}, {0, 1, 0} };
+    std::vector<glm::vec3> normals = { {0, 0, 1}, {0, 0, 1}, {0, 0, 1} };
+    std::vector<uint32_t> tri = { 0, 1, 2 };
+
+    Graphics::GeometryUploadRequest req;
+    req.Positions = positions;
+    req.Normals = normals;
+    req.Indices = tri;
+    req.Topology = Graphics::PrimitiveTopology::Triangles;
+    req.UploadMode = Graphics::GeometryUploadMode::Staged;
+
+    auto [gpu, token] = Graphics::GeometryGpuData::CreateAsync(m_Device, *m_TransferManager, req, &m_Pool);
+    EXPECT_EQ(gpu, nullptr);
+    (void)token;
 }

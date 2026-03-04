@@ -1,6 +1,7 @@
 module;
 
 #include <algorithm>
+#include <cmath>
 #include <unordered_map>
 #include <vector>
 #include <array>
@@ -963,6 +964,14 @@ namespace Graphics::Passes
     void SurfacePass::SubmitTriangle(const glm::vec3& a, const glm::vec3& b, const glm::vec3& c,
                                      const glm::vec3& normal, uint32_t color)
     {
+        const auto isFiniteVec3 = [](const glm::vec3& v)
+        {
+            return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z);
+        };
+
+        if (!isFiniteVec3(a) || !isFiniteVec3(b) || !isFiniteVec3(c) || !isFiniteVec3(normal))
+            return;
+
         m_TransientVertices.push_back({a, color, normal, 0.0f});
         m_TransientVertices.push_back({b, color, normal, 0.0f});
         m_TransientVertices.push_back({c, color, normal, 0.0f});

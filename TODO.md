@@ -18,7 +18,6 @@ This document tracks **what's left to do** in IntrinsicEngine's architecture.
 
 ## 1. Robustness & Numerical Safeguards (PLAN.md)
 
-- [ ] Position sanitization: reject/skip non-finite positions (`NaN`, `Inf`) before upload in both retained and transient paths.
 - [ ] Normal safety: renormalize with epsilon guard in point and surface shaders (fallback to camera-facing basis).
 - [ ] Triangle degeneracy: skip zero-area triangles during edge extraction and surface rendering.
 - [ ] Line width clamping: `[0.5, 32.0]` pixel range.

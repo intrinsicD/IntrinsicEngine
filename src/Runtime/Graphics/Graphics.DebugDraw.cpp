@@ -13,18 +13,40 @@ import :DebugDraw;
 
 namespace Graphics
 {
+    namespace
+    {
+        bool IsFiniteVec3(const glm::vec3& v)
+        {
+            return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z);
+        }
+
+        bool IsFiniteLine(const glm::vec3& a, const glm::vec3& b)
+        {
+            return IsFiniteVec3(a) && IsFiniteVec3(b);
+        }
+
+        void PushLineIfFinite(std::vector<DebugDraw::LineSegment>& target,
+                              const glm::vec3& a, uint32_t colorA,
+                              const glm::vec3& b, uint32_t colorB)
+        {
+            if (!IsFiniteLine(a, b))
+                return;
+            target.push_back({a, colorA, b, colorB});
+        }
+    }
+
     // =========================================================================
     // Depth-tested primitives
     // =========================================================================
 
     void DebugDraw::Line(const glm::vec3& from, const glm::vec3& to, uint32_t color)
     {
-        m_Lines.push_back({from, color, to, color});
+        PushLineIfFinite(m_Lines, from, color, to, color);
     }
 
     void DebugDraw::Line(const glm::vec3& from, const glm::vec3& to, uint32_t colorStart, uint32_t colorEnd)
     {
-        m_Lines.push_back({from, colorStart, to, colorEnd});
+        PushLineIfFinite(m_Lines, from, colorStart, to, colorEnd);
     }
 
     void DebugDraw::Box(const glm::vec3& min, const glm::vec3& max, uint32_t color)
@@ -48,22 +70,22 @@ namespace Graphics
 
         // 12 edges of the box (bit-difference edges of the 3-bit corner index)
         // Edges along X (bit 0 differs): 0-1, 2-3, 4-5, 6-7
-        m_Lines.push_back({corners[0], color, corners[1], color});
-        m_Lines.push_back({corners[2], color, corners[3], color});
-        m_Lines.push_back({corners[4], color, corners[5], color});
-        m_Lines.push_back({corners[6], color, corners[7], color});
+        Line(corners[0], corners[1], color);
+        Line(corners[2], corners[3], color);
+        Line(corners[4], corners[5], color);
+        Line(corners[6], corners[7], color);
 
         // Edges along Y (bit 1 differs): 0-2, 1-3, 4-6, 5-7
-        m_Lines.push_back({corners[0], color, corners[2], color});
-        m_Lines.push_back({corners[1], color, corners[3], color});
-        m_Lines.push_back({corners[4], color, corners[6], color});
-        m_Lines.push_back({corners[5], color, corners[7], color});
+        Line(corners[0], corners[2], color);
+        Line(corners[1], corners[3], color);
+        Line(corners[4], corners[6], color);
+        Line(corners[5], corners[7], color);
 
         // Edges along Z (bit 2 differs): 0-4, 1-5, 2-6, 3-7
-        m_Lines.push_back({corners[0], color, corners[4], color});
-        m_Lines.push_back({corners[1], color, corners[5], color});
-        m_Lines.push_back({corners[2], color, corners[6], color});
-        m_Lines.push_back({corners[3], color, corners[7], color});
+        Line(corners[0], corners[4], color);
+        Line(corners[1], corners[5], color);
+        Line(corners[2], corners[6], color);
+        Line(corners[3], corners[7], color);
     }
 
     void DebugDraw::Sphere(const glm::vec3& center, float radius, uint32_t color, uint32_t segments)
@@ -75,9 +97,14 @@ namespace Graphics
                            uint32_t color, uint32_t segments)
     {
         if (segments < 3) segments = 3;
+        if (!IsFiniteVec3(center) || !IsFiniteVec3(normal) || !std::isfinite(radius))
+            return;
 
         // Build an orthonormal basis from the normal
         glm::vec3 n = glm::normalize(normal);
+        if (!IsFiniteVec3(n))
+            return;
+
         glm::vec3 up = (std::abs(n.y) < 0.999f) ? glm::vec3(0, 1, 0) : glm::vec3(1, 0, 0);
         glm::vec3 u = glm::normalize(glm::cross(n, up));
         glm::vec3 v = glm::cross(n, u);
@@ -91,7 +118,7 @@ namespace Graphics
             float cs = std::cos(angle);
             float sn = std::sin(angle);
             glm::vec3 curr = center + (u * cs + v * sn) * radius;
-            m_Lines.push_back({prev, color, curr, color});
+            Line(prev, curr, color);
             prev = curr;
         }
     }
@@ -100,11 +127,11 @@ namespace Graphics
     {
         glm::vec3 dir = to - from;
         float len = glm::length(dir);
-        if (len < 1e-6f) return;
+        if (len < 1e-6f || !std::isfinite(len)) return;
         dir /= len;
 
         // Shaft
-        m_Lines.push_back({from, color, to, color});
+        Line(from, to, color);
 
         // Arrowhead: two lines forming a V
         glm::vec3 up = (std::abs(dir.y) < 0.999f) ? glm::vec3(0, 1, 0) : glm::vec3(1, 0, 0);
@@ -114,10 +141,10 @@ namespace Graphics
         glm::vec3 headBase = to - dir * headSize;
         float headWidth = headSize * 0.4f;
 
-        m_Lines.push_back({to, color, headBase + right * headWidth, color});
-        m_Lines.push_back({to, color, headBase - right * headWidth, color});
-        m_Lines.push_back({to, color, headBase + upDir * headWidth, color});
-        m_Lines.push_back({to, color, headBase - upDir * headWidth, color});
+        Line(to, headBase + right * headWidth, color);
+        Line(to, headBase - right * headWidth, color);
+        Line(to, headBase + upDir * headWidth, color);
+        Line(to, headBase - upDir * headWidth, color);
     }
 
     void DebugDraw::Axes(const glm::vec3& origin, float size)
@@ -132,9 +159,9 @@ namespace Graphics
         glm::vec3 y = glm::vec3(transform[1]) * size;
         glm::vec3 z = glm::vec3(transform[2]) * size;
 
-        m_Lines.push_back({origin, Red(),   origin + x, Red()});
-        m_Lines.push_back({origin, Green(), origin + y, Green()});
-        m_Lines.push_back({origin, Blue(),  origin + z, Blue()});
+        Line(origin, origin + x, Red());
+        Line(origin, origin + y, Green());
+        Line(origin, origin + z, Blue());
     }
 
     void DebugDraw::Frustum(const glm::mat4& invViewProj, uint32_t color)
@@ -153,22 +180,22 @@ namespace Graphics
         }
 
         // Near plane
-        m_Lines.push_back({corners[0], color, corners[1], color});
-        m_Lines.push_back({corners[1], color, corners[2], color});
-        m_Lines.push_back({corners[2], color, corners[3], color});
-        m_Lines.push_back({corners[3], color, corners[0], color});
+        Line(corners[0], corners[1], color);
+        Line(corners[1], corners[2], color);
+        Line(corners[2], corners[3], color);
+        Line(corners[3], corners[0], color);
 
         // Far plane
-        m_Lines.push_back({corners[4], color, corners[5], color});
-        m_Lines.push_back({corners[5], color, corners[6], color});
-        m_Lines.push_back({corners[6], color, corners[7], color});
-        m_Lines.push_back({corners[7], color, corners[4], color});
+        Line(corners[4], corners[5], color);
+        Line(corners[5], corners[6], color);
+        Line(corners[6], corners[7], color);
+        Line(corners[7], corners[4], color);
 
         // Connecting edges
-        m_Lines.push_back({corners[0], color, corners[4], color});
-        m_Lines.push_back({corners[1], color, corners[5], color});
-        m_Lines.push_back({corners[2], color, corners[6], color});
-        m_Lines.push_back({corners[3], color, corners[7], color});
+        Line(corners[0], corners[4], color);
+        Line(corners[1], corners[5], color);
+        Line(corners[2], corners[6], color);
+        Line(corners[3], corners[7], color);
     }
 
     void DebugDraw::Grid(const glm::vec3& origin, const glm::vec3& axisU, const glm::vec3& axisV,
@@ -185,7 +212,7 @@ namespace Graphics
             float t = static_cast<float>(i) * spacing - halfU;
             glm::vec3 a = origin + u * t - v * halfV;
             glm::vec3 b = origin + u * t + v * halfV;
-            m_Lines.push_back({a, color, b, color});
+            Line(a, b, color);
         }
 
         // Lines along U direction (varying V position)
@@ -194,16 +221,16 @@ namespace Graphics
             float t = static_cast<float>(j) * spacing - halfV;
             glm::vec3 a = origin + v * t - u * halfU;
             glm::vec3 b = origin + v * t + u * halfU;
-            m_Lines.push_back({a, color, b, color});
+            Line(a, b, color);
         }
     }
 
     void DebugDraw::Cross(const glm::vec3& center, float size, uint32_t color)
     {
         float half = size * 0.5f;
-        m_Lines.push_back({center - glm::vec3(half, 0, 0), color, center + glm::vec3(half, 0, 0), color});
-        m_Lines.push_back({center - glm::vec3(0, half, 0), color, center + glm::vec3(0, half, 0), color});
-        m_Lines.push_back({center - glm::vec3(0, 0, half), color, center + glm::vec3(0, 0, half), color});
+        Line(center - glm::vec3(half, 0, 0), center + glm::vec3(half, 0, 0), color);
+        Line(center - glm::vec3(0, half, 0), center + glm::vec3(0, half, 0), color);
+        Line(center - glm::vec3(0, 0, half), center + glm::vec3(0, 0, half), color);
     }
 
     // =========================================================================
@@ -212,6 +239,8 @@ namespace Graphics
 
     void DebugDraw::Point(const glm::vec3& position, float size, uint32_t color)
     {
+        if (!IsFiniteVec3(position) || !std::isfinite(size))
+            return;
         m_Points.push_back({position, size, color, {0.0f, 0.0f, 0.0f}});
     }
 
@@ -222,6 +251,8 @@ namespace Graphics
     void DebugDraw::Triangle(const glm::vec3& a, const glm::vec3& b, const glm::vec3& c,
                              const glm::vec3& normal, uint32_t color)
     {
+        if (!IsFiniteVec3(a) || !IsFiniteVec3(b) || !IsFiniteVec3(c) || !IsFiniteVec3(normal))
+            return;
         m_Triangles.push_back({a, color, normal, 0.0f});
         m_Triangles.push_back({b, color, normal, 0.0f});
         m_Triangles.push_back({c, color, normal, 0.0f});
@@ -240,12 +271,12 @@ namespace Graphics
 
     void DebugDraw::OverlayLine(const glm::vec3& from, const glm::vec3& to, uint32_t color)
     {
-        m_OverlayLines.push_back({from, color, to, color});
+        PushLineIfFinite(m_OverlayLines, from, color, to, color);
     }
 
     void DebugDraw::OverlayLine(const glm::vec3& from, const glm::vec3& to, uint32_t colorStart, uint32_t colorEnd)
     {
-        m_OverlayLines.push_back({from, colorStart, to, colorEnd});
+        PushLineIfFinite(m_OverlayLines, from, colorStart, to, colorEnd);
     }
 
     void DebugDraw::OverlayBox(const glm::vec3& min, const glm::vec3& max, uint32_t color)
@@ -311,22 +342,22 @@ namespace Graphics
         };
 
         // Bottom face
-        target.push_back({c[0], color, c[1], color});
-        target.push_back({c[1], color, c[2], color});
-        target.push_back({c[2], color, c[3], color});
-        target.push_back({c[3], color, c[0], color});
+        PushLineIfFinite(target, c[0], color, c[1], color);
+        PushLineIfFinite(target, c[1], color, c[2], color);
+        PushLineIfFinite(target, c[2], color, c[3], color);
+        PushLineIfFinite(target, c[3], color, c[0], color);
 
         // Top face
-        target.push_back({c[4], color, c[5], color});
-        target.push_back({c[5], color, c[6], color});
-        target.push_back({c[6], color, c[7], color});
-        target.push_back({c[7], color, c[4], color});
+        PushLineIfFinite(target, c[4], color, c[5], color);
+        PushLineIfFinite(target, c[5], color, c[6], color);
+        PushLineIfFinite(target, c[6], color, c[7], color);
+        PushLineIfFinite(target, c[7], color, c[4], color);
 
         // Vertical edges
-        target.push_back({c[0], color, c[4], color});
-        target.push_back({c[1], color, c[5], color});
-        target.push_back({c[2], color, c[6], color});
-        target.push_back({c[3], color, c[7], color});
+        PushLineIfFinite(target, c[0], color, c[4], color);
+        PushLineIfFinite(target, c[1], color, c[5], color);
+        PushLineIfFinite(target, c[2], color, c[6], color);
+        PushLineIfFinite(target, c[3], color, c[7], color);
     }
 
     void DebugDraw::SphereImpl(std::vector<LineSegment>& target,
@@ -334,6 +365,8 @@ namespace Graphics
                                uint32_t color, uint32_t segments)
     {
         if (segments < 4) segments = 4;
+        if (!IsFiniteVec3(center) || !std::isfinite(radius))
+            return;
 
         const float step = glm::two_pi<float>() / static_cast<float>(segments);
 
@@ -344,7 +377,7 @@ namespace Graphics
             {
                 float angle = step * static_cast<float>(i);
                 glm::vec3 curr = center + glm::vec3(std::cos(angle), std::sin(angle), 0.0f) * radius;
-                target.push_back({prev, color, curr, color});
+                PushLineIfFinite(target, prev, color, curr, color);
                 prev = curr;
             }
         }
@@ -356,7 +389,7 @@ namespace Graphics
             {
                 float angle = step * static_cast<float>(i);
                 glm::vec3 curr = center + glm::vec3(std::cos(angle), 0.0f, std::sin(angle)) * radius;
-                target.push_back({prev, color, curr, color});
+                PushLineIfFinite(target, prev, color, curr, color);
                 prev = curr;
             }
         }
@@ -367,8 +400,8 @@ namespace Graphics
             for (uint32_t i = 1; i <= segments; ++i)
             {
                 float angle = step * static_cast<float>(i);
-                glm::vec3 curr = center + glm::vec3(0.0f, std::cos(angle), std::sin(angle)) * radius;
-                target.push_back({prev, color, curr, color});
+                glm::vec3 curr = center + glm::vec3(0.0f, std::cos(angle) * radius, std::sin(angle) * radius);
+                PushLineIfFinite(target, prev, color, curr, color);
                 prev = curr;
             }
         }
@@ -377,8 +410,8 @@ namespace Graphics
     void DebugDraw::AxesImpl(std::vector<LineSegment>& target,
                              const glm::vec3& origin, float size)
     {
-        target.push_back({origin, Red(),   origin + glm::vec3(size, 0, 0), Red()});
-        target.push_back({origin, Green(), origin + glm::vec3(0, size, 0), Green()});
-        target.push_back({origin, Blue(),  origin + glm::vec3(0, 0, size), Blue()});
+        PushLineIfFinite(target, origin, Red(),   origin + glm::vec3(size, 0, 0), Red());
+        PushLineIfFinite(target, origin, Green(), origin + glm::vec3(0, size, 0), Green());
+        PushLineIfFinite(target, origin, Blue(),  origin + glm::vec3(0, 0, size), Blue());
     }
 }
