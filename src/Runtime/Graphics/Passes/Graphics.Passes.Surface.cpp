@@ -38,9 +38,10 @@ namespace Graphics::Passes
         if (!m_Pipeline)
             return;
 
-        const RGResourceHandle backbuffer = ctx.Blackboard.Get("Backbuffer"_id);
+        // Scene passes render to the HDR SceneColor target (not the swapchain backbuffer).
+        const RGResourceHandle sceneColor = ctx.Blackboard.Get("SceneColor"_id);
         const RGResourceHandle depth = ctx.Blackboard.Get("SceneDepth"_id);
-        if (!backbuffer.IsValid() || !depth.IsValid())
+        if (!sceneColor.IsValid() || !depth.IsValid())
             return;
 
         // Lazily init descriptor pools (single growing pool per category).
@@ -71,7 +72,7 @@ namespace Graphics::Passes
         }
 
         DrawStream stream = BuildDrawStream(ctx);
-        AddRasterPass(ctx, backbuffer, depth, std::move(stream));
+        AddRasterPass(ctx, sceneColor, depth, std::move(stream));
     }
 
 

@@ -23,11 +23,9 @@ Sub-entity select → Geometry processing (interactive operator input)
 
 ## Phase 1 — Foundation
 
-### Post-Processing Pipeline
+### Post-Processing Pipeline (**MVP complete**)
 
-The forward pass currently writes directly to the swapchain. An HDR intermediate render target (`R16G16B16A16_SFLOAT`) remains the prerequisite for most rendering work that follows.
-
-**Execution detail moved:** Active implementation breakdown (ToneMap/FXAA MVP, pass resources, acceptance gates) now lives in `TODO.md` under `## 2. Near-Term Epics (from ROADMAP.md)` (Epic 1).
+The HDR post-processing foundation is in place. Scene passes render to an `R16G16B16A16_SFLOAT` intermediate target ("SceneColor"), and the `PostProcessPass` converts to LDR via tone mapping (ACES / Reinhard selectable) with optional FXAA. Runtime toggles are exposed via `FeatureRegistry`.
 
 Long-horizon additions (after MVP): SSAO, bloom, DOF, color grading.
 

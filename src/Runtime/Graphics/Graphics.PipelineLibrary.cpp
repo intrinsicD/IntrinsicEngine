@@ -65,10 +65,12 @@ namespace Graphics
 
     void PipelineLibrary::BuildDefaults(const ShaderRegistry& shaderRegistry,
                                        VkFormat swapchainFormat,
-                                       VkFormat depthFormat)
+                                       VkFormat depthFormat,
+                                       VkFormat sceneColorFormat)
     {
         // ---------------------------------------------------------------------
         // Surface pipeline (Textured + BDA)
+        // Renders to HDR SceneColor target (sceneColorFormat), NOT the swapchain.
         // ---------------------------------------------------------------------
         {
             const std::string vertPath = Core::Filesystem::ResolveShaderPathOrExit(
@@ -85,7 +87,7 @@ namespace Graphics
             RHI::PipelineBuilder builder(m_DeviceOwner);
             builder.SetShaders(&vert, &frag);
             builder.SetInputLayout(inputLayout);
-            builder.SetColorFormats({swapchainFormat});
+            builder.SetColorFormats({sceneColorFormat});
             builder.SetDepthFormat(depthFormat);
 
             // Current asset winding is CCW in clip space; use CCW front-face.
@@ -170,7 +172,7 @@ namespace Graphics
                 RHI::PipelineBuilder builder(m_DeviceOwner);
                 builder.SetShaders(&vert, &frag);
                 builder.SetInputLayout(inputLayout);
-                builder.SetColorFormats({swapchainFormat});
+                builder.SetColorFormats({sceneColorFormat});
                 builder.SetDepthFormat(depthFormat);
                 builder.SetTopology(VK_PRIMITIVE_TOPOLOGY_LINE_LIST);
 
@@ -211,7 +213,7 @@ namespace Graphics
                 RHI::PipelineBuilder builder(m_DeviceOwner);
                 builder.SetShaders(&vert, &frag);
                 builder.SetInputLayout(inputLayout);
-                builder.SetColorFormats({swapchainFormat});
+                builder.SetColorFormats({sceneColorFormat});
                 builder.SetDepthFormat(depthFormat);
                 builder.SetTopology(VK_PRIMITIVE_TOPOLOGY_POINT_LIST);
 

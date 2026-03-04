@@ -110,13 +110,14 @@ The engine uses a unified three-pass rendering architecture with one pass per pr
 
 ### Passes and DefaultPipeline
 
-`DefaultPipeline` registers 7 passes in order: Picking, `SurfacePass`, `LinePass`, `PointPass`, SelectionOutline, DebugView, ImGui.
+`DefaultPipeline` registers 8 passes in order: Picking, `SurfacePass`, `LinePass`, `PointPass`, `PostProcessPass`, SelectionOutline, DebugView, ImGui.
 
 | Pass | Primitives | Retained Data | Transient Data | Shaders | Feature Gate |
 |------|-----------|---------------|----------------|---------|--------------|
 | **SurfacePass** | Filled triangles | BDA from `GeometryGpuData` | — | `surface.vert/frag` | `"SurfacePass"` |
 | **LinePass** | Thick anti-aliased edges | BDA positions + edge index buffer | `DebugDraw::GetLines()` | `line.vert/frag` | `"LinePass"` |
 | **PointPass** | Expanded billboard quads | BDA positions + normals | `DebugDraw::GetPoints()` | `point_flatdisc.vert/frag`, `point_surfel.vert/frag` | `"PointPass"` |
+| **PostProcessPass** | Fullscreen triangle | — | — | `post_fullscreen.vert`, `post_tonemap.frag`, `post_fxaa.frag` | `"PostProcessPass"` |
 
 ### ECS Render Component Types
 

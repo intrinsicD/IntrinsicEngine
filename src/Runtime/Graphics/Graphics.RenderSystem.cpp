@@ -277,11 +277,12 @@ namespace Graphics
         const auto& pendingPick = m_Interaction.GetPendingPick();
         const auto& debugView = m_Interaction.GetDebugViewState();
 
-        // Frame setup pass — imports backbuffer and depth into the render graph.
+        // Frame setup pass — imports backbuffer and depth, creates HDR scene color target.
         struct FrameSetupData
         {
             RGResourceHandle Backbuffer;
             RGResourceHandle Depth;
+            RGResourceHandle SceneColor;
         };
         m_RenderGraph.AddPass<FrameSetupData>("FrameSetup",
                                               [&](FrameSetupData& data, RGBuilder& builder)
@@ -303,8 +304,20 @@ namespace Graphics
                                                       extent,
                                                       VK_IMAGE_LAYOUT_UNDEFINED);
 
+                                                  // HDR scene color — scene passes render here,
+                                                  // post-processing reads it for tone mapping.
+                                                  RGTextureDesc hdrDesc{};
+                                                  hdrDesc.Width = extent.width;
+                                                  hdrDesc.Height = extent.height;
+                                                  hdrDesc.Format = VK_FORMAT_R16G16B16A16_SFLOAT;
+                                                  hdrDesc.Usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT
+                                                                | VK_IMAGE_USAGE_SAMPLED_BIT;
+                                                  hdrDesc.Aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+                                                  data.SceneColor = builder.CreateTexture("SceneColor"_id, hdrDesc);
+
                                                   blackboard.Add("Backbuffer"_id, data.Backbuffer);
                                                   blackboard.Add("SceneDepth"_id, data.Depth);
+                                                  blackboard.Add("SceneColor"_id, data.SceneColor);
                                               },
                                               [](const FrameSetupData&, const RGRegistry&, VkCommandBuffer)
                                               {

@@ -18,6 +18,7 @@ import :Passes.Picking;
 import :Passes.Point;
 import :Passes.SelectionOutline;
 import :Passes.SelectionOutlineSettings;
+import :Passes.PostProcess;
 import RHI;
 import Core.Hash;
 import Core.FeatureRegistry;
@@ -67,6 +68,7 @@ export namespace Graphics
         std::unique_ptr<Passes::PointPass> m_PointPass;
         std::unique_ptr<Passes::DebugViewPass> m_DebugViewPass;
         std::unique_ptr<Passes::ImGuiPass> m_ImGuiPass;
+        std::unique_ptr<Passes::PostProcessPass> m_PostProcessPass;
 
         // Modern Data-Driven Render Path
         RenderPath m_Path;

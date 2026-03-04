@@ -281,7 +281,7 @@ namespace Graphics::Passes
         {
             if (!m_Pipelines[i])
             {
-                m_Pipelines[i] = BuildPipeline(ctx.SwapchainFormat, ctx.DepthFormat, i);
+                m_Pipelines[i] = BuildPipeline(ctx.SceneColorFormat, ctx.DepthFormat, i);
                 if (!m_Pipelines[i])
                 {
                     pipelinesReady = false;
@@ -522,10 +522,10 @@ namespace Graphics::Passes
         if (draws.empty())
             return;
 
-        // Fetch render targets.
-        const RGResourceHandle backbuffer = ctx.Blackboard.Get("Backbuffer"_id);
+        // Fetch render targets — scene passes render to HDR SceneColor.
+        const RGResourceHandle sceneColor = ctx.Blackboard.Get("SceneColor"_id);
         const RGResourceHandle depth = ctx.Blackboard.Get("SceneDepth"_id);
-        if (!backbuffer.IsValid() || !depth.IsValid())
+        if (!sceneColor.IsValid() || !depth.IsValid())
             return;
 
         const VkDescriptorSet globalSet = ctx.GlobalDescriptorSet;
@@ -546,7 +546,7 @@ namespace Graphics::Passes
                 RGAttachmentInfo colorInfo{};
                 colorInfo.LoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
                 colorInfo.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
-                data.Color = builder.WriteColor(backbuffer, colorInfo);
+                data.Color = builder.WriteColor(sceneColor, colorInfo);
 
                 RGAttachmentInfo depthInfo{};
                 depthInfo.LoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
