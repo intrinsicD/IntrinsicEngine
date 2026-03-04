@@ -224,6 +224,7 @@ namespace Graphics::Systems::PointCloudGeometrySync
                 builder.Write<ECS::PointCloud::Data>();
                 builder.Write<ECS::Point::Component>();
                 builder.WaitFor("TransformUpdate"_id);
+                builder.WaitFor("PropertySetDirtySync"_id);
             },
             [&registry, &gpuScene, &geometryStorage, device, &transferManager]()
             {

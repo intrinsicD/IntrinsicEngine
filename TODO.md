@@ -16,18 +16,7 @@ This document tracks **what's left to do** in IntrinsicEngine's architecture.
 
 ---
 
-## 1. PropertySet Dirty-Domain Sync System
-
-Per-frame CPU→GPU synchronization driven by PropertySet change detection, with independent dirty tracking per data domain (vertex/edge/face). Aligns with PLAN.md "Automatic CPU→GPU sync" requirement.
-
-- [ ] Define dirty tag components: `VertexPositionsDirty`, `VertexAttributesDirty`, `EdgeTopologyDirty`, `EdgeAttributesDirty`, `FaceTopologyDirty`, `FaceAttributesDirty`.
-- [ ] Sync system detects dirty tags, re-uploads only affected PropertySet spans to GPU buffers.
-- [ ] Topology-dirty domains trigger index buffer rebuild; attribute-dirty domains trigger attribute buffer re-upload.
-- [ ] Clear dirty tags after upload. Multiple simultaneous dirty domains handled independently (face color change doesn't re-upload vertex buffer).
-
----
-
-## 2. Subcomponent Hierarchy (PLAN.md)
+## 1. Subcomponent Hierarchy (PLAN.md)
 
 Support named sub-meshes/sub-graphs/sub-clouds as first-class components over a base geometry component.
 
@@ -37,7 +26,7 @@ Support named sub-meshes/sub-graphs/sub-clouds as first-class components over a 
 
 ---
 
-## 3. Robustness & Numerical Safeguards (PLAN.md)
+## 2. Robustness & Numerical Safeguards (PLAN.md)
 
 - [ ] Position sanitization: reject/skip non-finite positions (`NaN`, `Inf`) before upload in both retained and transient paths.
 - [ ] Normal safety: renormalize with epsilon guard in point and surface shaders (fallback to camera-facing basis).
@@ -50,7 +39,7 @@ Support named sub-meshes/sub-graphs/sub-clouds as first-class components over a 
 
 ---
 
-## 4. Related Documents
+## 3. Related Documents
 
 - `PLAN.md` — detailed rendering architecture refactor spec (three-pass architecture, ECS component design, migration phases).
 - `ROADMAP.md` — feature roadmap, prioritization phases, long-horizon planning, rendering modality redesign vision (§5), and architecture SLOs.

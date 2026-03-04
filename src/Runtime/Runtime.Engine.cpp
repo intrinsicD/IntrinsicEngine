@@ -321,6 +321,7 @@ namespace Runtime
         reg("MeshViewLifecycle",              Cat::System, "Creates GPU edge/vertex views from mesh via ReuseVertexBuffersFrom");
         reg("ComponentMigration",             Cat::System, "Syncs legacy components to per-pass typed components (PLAN.md Phase 1)");
         reg("GPUSceneSync",                   Cat::System, "Synchronizes CPU entity data to GPU scene buffers");
+        reg("PropertySetDirtySync",           Cat::System, "Syncs PropertySet dirty domains to GPU buffers (per-domain incremental)");
 
         Core::Log::Info("FeatureRegistry: Registered {} core features", m_FeatureRegistry.Count());
     }
@@ -453,6 +454,18 @@ namespace Runtime
                 // toggled at runtime (e.g. for debugging or profiling).
                 if (m_FeatureRegistry.IsEnabled("TransformUpdate"_id))
                     ECS::Systems::Transform::RegisterSystem(frameGraph, registry);
+
+                // PropertySet dirty-domain sync: processes per-domain dirty
+                // tags (VertexPositions, VertexAttributes, EdgeTopology,
+                // EdgeAttributes, FaceTopology, FaceAttributes) and either
+                // escalates to GpuDirty or performs incremental attribute
+                // re-extraction. Runs before lifecycle systems so GpuDirty
+                // flags are consumed in the same frame.
+                if (m_FeatureRegistry.IsEnabled("PropertySetDirtySync"_id))
+                {
+                    Graphics::Systems::PropertySetDirtySync::RegisterSystem(
+                        frameGraph, registry);
+                }
 
                 auto* gpuScene = m_RenderOrchestrator->GetGPUScenePtr();
                 if (gpuScene)
