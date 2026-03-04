@@ -543,3 +543,98 @@ TEST(Phase6_MeshView, VertexView_PopulatesPointComponent)
     EXPECT_TRUE(pt.Geometry.IsValid());
     EXPECT_TRUE(pt.HasPerPointNormals);
 }
+
+// =============================================================================
+// Attribute Visualization Toggle Tests — ShowPerFaceColors / ShowPerEdgeColors
+// =============================================================================
+
+TEST(PerPassComponents_AttributeToggle, ShowPerFaceColors_DefaultTrue)
+{
+    Surface::Component sc{};
+    EXPECT_TRUE(sc.ShowPerFaceColors);
+}
+
+TEST(PerPassComponents_AttributeToggle, ShowPerEdgeColors_DefaultTrue)
+{
+    Line::Component lc{};
+    EXPECT_TRUE(lc.ShowPerEdgeColors);
+}
+
+TEST(PerPassComponents_AttributeToggle, ShowPerFaceColors_TogglePreservesData)
+{
+    // Toggling ShowPerFaceColors off does not clear CachedFaceColors.
+    Surface::Component sc{};
+    sc.CachedFaceColors = {0xFF0000FF, 0x00FF00FF, 0x0000FFFF};
+    sc.ShowPerFaceColors = false;
+
+    EXPECT_FALSE(sc.ShowPerFaceColors);
+    EXPECT_EQ(sc.CachedFaceColors.size(), 3u);
+}
+
+TEST(PerPassComponents_AttributeToggle, ShowPerEdgeColors_TogglePreservesData)
+{
+    // Toggling ShowPerEdgeColors off does not clear CachedEdgeColors.
+    Line::Component lc{};
+    lc.HasPerEdgeColors = true;
+    lc.CachedEdgeColors = {0xFF0000FF, 0x00FF00FF};
+    lc.ShowPerEdgeColors = false;
+
+    EXPECT_FALSE(lc.ShowPerEdgeColors);
+    EXPECT_TRUE(lc.HasPerEdgeColors);
+    EXPECT_EQ(lc.CachedEdgeColors.size(), 2u);
+}
+
+TEST(PerPassComponents_AttributeToggle, SurfacePassGating_SkipWhenToggleOff)
+{
+    // Simulate the SurfacePass gating condition:
+    // skip when !ShowPerFaceColors even if CachedFaceColors is non-empty.
+    Surface::Component sc{};
+    sc.CachedFaceColors = {0xFF0000FF};
+    sc.ShowPerFaceColors = false;
+
+    // This mirrors the SurfacePass early-out:
+    // if (!sc.Geometry.IsValid() || sc.CachedFaceColors.empty() || !sc.ShowPerFaceColors) continue;
+    bool shouldSkip = !sc.Geometry.IsValid() || sc.CachedFaceColors.empty() || !sc.ShowPerFaceColors;
+    EXPECT_TRUE(shouldSkip);
+
+    // Re-enable: with valid data and toggle on, gating passes (except geometry validity).
+    sc.ShowPerFaceColors = true;
+    bool dataReady = !sc.CachedFaceColors.empty() && sc.ShowPerFaceColors;
+    EXPECT_TRUE(dataReady);
+}
+
+TEST(PerPassComponents_AttributeToggle, LinePassGating_SkipWhenToggleOff)
+{
+    // Simulate the LinePass gating condition:
+    // if (line.HasPerEdgeColors && line.ShowPerEdgeColors) { ... }
+    Line::Component lc{};
+    lc.HasPerEdgeColors = true;
+    lc.ShowPerEdgeColors = false;
+
+    bool shouldUsePerEdge = lc.HasPerEdgeColors && lc.ShowPerEdgeColors;
+    EXPECT_FALSE(shouldUsePerEdge);
+
+    // Re-enable.
+    lc.ShowPerEdgeColors = true;
+    shouldUsePerEdge = lc.HasPerEdgeColors && lc.ShowPerEdgeColors;
+    EXPECT_TRUE(shouldUsePerEdge);
+}
+
+TEST(PerPassComponents_AttributeToggle, IndependentPerEntity)
+{
+    // Multiple entities can have independent toggle states.
+    entt::registry reg;
+    auto e1 = reg.create();
+    auto e2 = reg.create();
+
+    auto& s1 = reg.emplace<Surface::Component>(e1);
+    auto& s2 = reg.emplace<Surface::Component>(e2);
+
+    s1.CachedFaceColors = {0xFF};
+    s1.ShowPerFaceColors = false;
+    s2.CachedFaceColors = {0xAA};
+    s2.ShowPerFaceColors = true;
+
+    EXPECT_FALSE(reg.get<Surface::Component>(e1).ShowPerFaceColors);
+    EXPECT_TRUE(reg.get<Surface::Component>(e2).ShowPerFaceColors);
+}

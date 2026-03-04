@@ -20,16 +20,14 @@ import :HalfedgeMesh;
 import :AABB;
 import :Octree;
 import :Primitives;
+import :Validation;
 
 namespace Geometry::SurfaceReconstruction
 {
     static constexpr float kDistanceEpsilon = 1e-8f;
     static constexpr float kNormalLengthEpsilon = 1e-8f;
 
-    [[nodiscard]] static bool IsFiniteVec3(const glm::vec3& v)
-    {
-        return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z);
-    }
+    using Validation::IsFinite;
 
     [[nodiscard]] static bool NormalizeSafe(glm::vec3& n)
     {
@@ -160,7 +158,7 @@ namespace Geometry::SurfaceReconstruction
         {
             for (std::size_t i = 0; i < n; ++i)
             {
-                if (!IsFiniteVec3(points[i]))
+                if (!IsFinite(points[i]))
                     continue;
 
                 glm::vec3 nrm = normals[i];
@@ -188,7 +186,7 @@ namespace Geometry::SurfaceReconstruction
 
             for (std::size_t i = 0; i < n; ++i)
             {
-                if (!IsFiniteVec3(points[i]))
+                if (!IsFinite(points[i]))
                     continue;
 
                 glm::vec3 nrm = neResult->Normals[i];
