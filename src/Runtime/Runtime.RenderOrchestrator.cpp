@@ -117,6 +117,9 @@ namespace Runtime
             ShaderRegistration{"Point.FlatDisc.Frag"_id, "shaders/point_flatdisc.frag.spv"},
             ShaderRegistration{"Point.Surfel.Vert"_id, "shaders/point_surfel.vert.spv"},
             ShaderRegistration{"Point.Surfel.Frag"_id, "shaders/point_surfel.frag.spv"},
+            ShaderRegistration{"Post.Fullscreen.Vert"_id, "shaders/post_fullscreen.vert.spv"},
+            ShaderRegistration{"Post.ToneMap.Frag"_id, "shaders/post_tonemap.frag.spv"},
+            ShaderRegistration{"Post.FXAA.Frag"_id, "shaders/post_fxaa.frag.spv"},
         };
 
         for (const auto& registration : kShaderRegistrations)

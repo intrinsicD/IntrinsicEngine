@@ -22,6 +22,7 @@ import :Passes.Line;
 import :Passes.Point;
 import :Passes.DebugView;
 import :Passes.ImGui;
+import :Passes.PostProcess;
 import :PipelineLibrary;
 import :ShaderRegistry;
 import :Pipelines;
@@ -41,6 +42,7 @@ namespace Graphics
         if (m_SelectionOutlinePass) m_SelectionOutlinePass->Shutdown();
         if (m_LinePass)             m_LinePass->Shutdown();
         if (m_PointPass)            m_PointPass->Shutdown();
+        if (m_PostProcessPass)      m_PostProcessPass->Shutdown();
         if (m_DebugViewPass)        m_DebugViewPass->Shutdown();
         if (m_ImGuiPass)            m_ImGuiPass->Shutdown();
 
@@ -49,6 +51,7 @@ namespace Graphics
         m_SelectionOutlinePass.reset();
         m_LinePass.reset();
         m_PointPass.reset();
+        m_PostProcessPass.reset();
         m_DebugViewPass.reset();
         m_ImGuiPass.reset();
     }
@@ -66,12 +69,14 @@ namespace Graphics
         m_PointPass            = std::make_unique<Passes::PointPass>();
         m_DebugViewPass        = std::make_unique<Passes::DebugViewPass>();
         m_ImGuiPass            = std::make_unique<Passes::ImGuiPass>();
+        m_PostProcessPass      = std::make_unique<Passes::PostProcessPass>();
 
         m_PickingPass->Initialize(device, descriptorPool, globalLayout);
         m_SurfacePass->Initialize(device, descriptorPool, globalLayout);
         m_SelectionOutlinePass->Initialize(device, descriptorPool, globalLayout);
         m_LinePass->Initialize(device, descriptorPool, globalLayout);
         m_PointPass->Initialize(device, descriptorPool, globalLayout);
+        m_PostProcessPass->Initialize(device, descriptorPool, globalLayout);
         m_DebugViewPass->Initialize(device, descriptorPool, globalLayout);
         m_ImGuiPass->Initialize(device, descriptorPool, globalLayout);
 
@@ -88,6 +93,7 @@ namespace Graphics
         m_LinePass->SetShaderRegistry(shaderRegistry);
         m_PointPass->SetShaderRegistry(shaderRegistry);
         m_DebugViewPass->SetShaderRegistry(shaderRegistry);
+        m_PostProcessPass->SetShaderRegistry(shaderRegistry);
 
         m_PathDirty = true;
     }
@@ -155,13 +161,20 @@ namespace Graphics
         }
 
         // ==================================================================
-        // 5. Selection Outline — post-process overlay for selected entities.
+        // 5. Post-Processing — HDR tone mapping + optional FXAA.
+        //    Reads HDR SceneColor, writes LDR to Backbuffer.
+        // ==================================================================
+        if (m_PostProcessPass && IsFeatureEnabled("PostProcessPass"_id))
+            m_Path.AddFeature("PostProcess", m_PostProcessPass.get());
+
+        // ==================================================================
+        // 6. Selection Outline — post-process overlay for selected entities.
         // ==================================================================
         if (m_SelectionOutlinePass && IsFeatureEnabled("SelectionOutlinePass"_id))
             m_Path.AddFeature("SelectionOutline", m_SelectionOutlinePass.get());
 
         // ==================================================================
-        // 6. Debug View — conditional texture inspector overlay.
+        // 7. Debug View — conditional texture inspector overlay.
         // ==================================================================
         if (m_DebugViewPass && IsFeatureEnabled("DebugViewPass"_id))
         {
@@ -173,7 +186,7 @@ namespace Graphics
         }
 
         // ==================================================================
-        // 7. ImGui — editor UI overlay.
+        // 8. ImGui — editor UI overlay.
         // ==================================================================
         if (m_ImGuiPass && IsFeatureEnabled("ImGuiPass"_id))
             m_Path.AddFeature("ImGui", m_ImGuiPass.get());
@@ -199,6 +212,7 @@ namespace Graphics
         if (m_SelectionOutlinePass) m_SelectionOutlinePass->OnResize(width, height);
         if (m_LinePass)             m_LinePass->OnResize(width, height);
         if (m_PointPass)            m_PointPass->OnResize(width, height);
+        if (m_PostProcessPass)      m_PostProcessPass->OnResize(width, height);
         if (m_DebugViewPass)        m_DebugViewPass->OnResize(width, height);
         if (m_ImGuiPass)            m_ImGuiPass->OnResize(width, height);
     }
@@ -207,6 +221,8 @@ namespace Graphics
                                      std::span<const RenderGraphDebugImage> debugImages,
                                      std::span<const RenderGraphDebugPass>)
     {
+        if (m_PostProcessPass)
+            m_PostProcessPass->PostCompile(frameIndex, debugImages);
         if (m_SelectionOutlinePass)
             m_SelectionOutlinePass->PostCompile(frameIndex, debugImages);
         if (m_DebugViewPass)

@@ -81,6 +81,10 @@ export namespace Graphics
         // Depth import context (matches the imported "SceneDepth" image)
         VkFormat DepthFormat = VK_FORMAT_UNDEFINED;
 
+        // HDR scene color format for scene passes (Surface, Line, Point).
+        // R16G16B16A16_SFLOAT when HDR pipeline is active.
+        VkFormat SceneColorFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
+
         // Command submission helpers
         RHI::SimpleRenderer& Renderer;
 

@@ -30,30 +30,6 @@ This document tracks **what's left to do** in IntrinsicEngine's architecture.
 
 This is the active dependency-ordered execution queue. Complete top-to-bottom unless sequencing rules explicitly allow overlap.
 
-### Epic 1 — HDR Post-Processing Foundation (P0)
-
-**Why now:** Most rendering features in `ROADMAP.md` depend on an HDR intermediate target and post chain.
-
-**Scope (MVP):**
-- Add HDR scene color target (`R16G16B16A16_SFLOAT`) and move forward shading output off swapchain.
-- Add `RenderGraph` post chain with at least:
-  - `Post.ToneMap` (ACES + Reinhard selectable).
-  - `Post.FXAA` (toggleable pass).
-- Present path consumes only LDR post output.
-- Add runtime pass toggles in editor viewport panel.
-
-**Implementation tasks:**
-- Introduce explicit pass resources (`HdrColor`, `LdrColor`, sampled depth when needed).
-- Add post constants UBO/push constants (exposure, tone-operator enum, FXAA params).
-- Ensure pass order and barriers are encoded in render graph (no implicit sync).
-- Add shader permutation registration and hot-reload plumbing for post shaders.
-
-**Acceptance criteria:**
-- Forward pass no longer writes directly to swapchain.
-- Disabling post chain still routes through HDR->LDR conversion (identity-safe path).
-- Visual parity at default settings, with measurable anti-aliasing improvement on thin wireframe edges.
-- Automated test coverage: pass registration + graph compile smoke test.
-
 ---
 
 ### Epic 2 — Scene Serialization MVP (P1)
@@ -123,9 +99,9 @@ This is the active dependency-ordered execution queue. Complete top-to-bottom un
 
 ### Sequencing Rules
 
-- Start Epic 2 only after Epic 1 HDR/LDR route is merged (render output contract stability).
+- Epic 1 (HDR Post-Processing) is complete. Epic 2 is unblocked.
 - Epic 3 can overlap late Epic 2, but selection/picking changes must not block scene I/O.
-- Epic 4 instrumentation starts once Epic 1 is in place so timing baselines include post chain.
+- Epic 4 instrumentation is unblocked (timing baselines now include post chain).
 
 ### Cross-Epic Definition of Done
 

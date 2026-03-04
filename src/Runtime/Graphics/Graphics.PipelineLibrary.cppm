@@ -28,9 +28,12 @@ export namespace Graphics
 
         // Build the engine's baseline pipelines (Forward + Picking), keyed by stable IDs.
         // This is intended to be called from the composition root.
+        // sceneColorFormat: format for scene rendering passes (HDR R16G16B16A16_SFLOAT).
+        // swapchainFormat: format for UI/overlay passes (Picking writes R32_UINT).
         void BuildDefaults(const ShaderRegistry& shaderRegistry,
                            VkFormat swapchainFormat,
-                           VkFormat depthFormat);
+                           VkFormat depthFormat,
+                           VkFormat sceneColorFormat = VK_FORMAT_R16G16B16A16_SFLOAT);
 
         // Retrieve a pipeline by name.
         [[nodiscard]] std::optional<std::reference_wrapper<RHI::GraphicsPipeline>>

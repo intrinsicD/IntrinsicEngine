@@ -306,8 +306,8 @@ namespace Graphics::Passes
         // Lazy pipeline creation.
         if (!m_Pipeline || !m_OverlayPipeline)
         {
-            m_Pipeline = BuildPipeline(ctx.SwapchainFormat, ctx.DepthFormat, true);
-            m_OverlayPipeline = BuildPipeline(ctx.SwapchainFormat, ctx.DepthFormat, false);
+            m_Pipeline = BuildPipeline(ctx.SceneColorFormat, ctx.DepthFormat, true);
+            m_OverlayPipeline = BuildPipeline(ctx.SceneColorFormat, ctx.DepthFormat, false);
             if (!m_Pipeline || !m_OverlayPipeline)
             {
                 static bool s_Logged = false;
@@ -567,10 +567,10 @@ namespace Graphics::Passes
         if (!hasDepthDraws && !hasOverlayDraws)
             return;
 
-        // Fetch render targets.
-        const RGResourceHandle backbuffer = ctx.Blackboard.Get("Backbuffer"_id);
+        // Fetch render targets — scene passes render to HDR SceneColor.
+        const RGResourceHandle sceneColor = ctx.Blackboard.Get("SceneColor"_id);
         const RGResourceHandle depth = ctx.Blackboard.Get("SceneDepth"_id);
-        if (!backbuffer.IsValid())
+        if (!sceneColor.IsValid())
             return;
 
         // Capture values for the lambdas.
@@ -591,7 +591,7 @@ namespace Graphics::Passes
                     RGAttachmentInfo colorInfo{};
                     colorInfo.LoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
                     colorInfo.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
-                    data.Color = builder.WriteColor(backbuffer, colorInfo);
+                    data.Color = builder.WriteColor(sceneColor, colorInfo);
 
                     RGAttachmentInfo depthInfo{};
                     depthInfo.LoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
@@ -644,7 +644,7 @@ namespace Graphics::Passes
                     RGAttachmentInfo colorInfo{};
                     colorInfo.LoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
                     colorInfo.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
-                    data.Color = builder.WriteColor(backbuffer, colorInfo);
+                    data.Color = builder.WriteColor(sceneColor, colorInfo);
                     data.Depth = {}; // No depth attachment.
                 },
                 [this, globalSet, dynamicOffset, resolution, capturedOverlay]
