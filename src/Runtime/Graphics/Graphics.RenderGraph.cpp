@@ -1,6 +1,7 @@
 // Graphics.RenderGraph.cpp
 module;
 #include "RHI.Vulkan.hpp"
+#include <chrono>
 #include <string>
 #include <vector>
 #include <memory>
@@ -762,6 +763,9 @@ namespace Graphics
             BuildSchedulerGraph();
         }
 
+        m_LastPassTimings.clear();
+        m_LastPassTimings.reserve(m_ActivePassCount);
+
         for (const auto& layer : m_Scheduler.GetExecutionLayers())
         {
             if (!layer.empty())
@@ -841,10 +845,22 @@ namespace Graphics
         Core::Tasks::Scheduler::WaitForAll();
 
         // 3. Record barriers, begin rendering, and execute secondaries on the primary buffer.
+        //    GPU timestamp scopes are written on the primary cmd buffer around each pass.
+        //    CPU timing is measured around the barrier+render+execute block per pass.
         for (size_t i = 0; i < layer.size(); ++i)
         {
             const uint32_t passIdx = layer[i];
             const auto& pass = m_PassPool[passIdx];
+
+            const auto cpuStart = std::chrono::high_resolution_clock::now();
+
+            // GPU scope begin (on primary, before any barriers/rendering for this pass).
+            uint32_t gpuScopeIdx = ~0u;
+            if (m_GpuProfiler)
+            {
+                gpuScopeIdx = m_GpuProfiler->BeginScope(pass.Name);
+                m_GpuProfiler->WriteScopeBegin(cmd, gpuScopeIdx, VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT);
+            }
 
             // Barriers (computed in Compile, hoisted to primary).
             if (!pass.ImageBarriers.empty() || !pass.BufferBarriers.empty())
@@ -914,6 +930,18 @@ namespace Graphics
 
             if (isRaster)
                 vkCmdEndRendering(cmd);
+
+            // GPU scope end (on primary, after rendering for this pass).
+            if (m_GpuProfiler && gpuScopeIdx != ~0u)
+            {
+                m_GpuProfiler->WriteScopeEnd(cmd, gpuScopeIdx, VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT);
+            }
+
+            const auto cpuEnd = std::chrono::high_resolution_clock::now();
+            const uint64_t cpuNs = static_cast<uint64_t>(
+                std::chrono::duration_cast<std::chrono::nanoseconds>(cpuEnd - cpuStart).count());
+
+            m_LastPassTimings.push_back(PassTiming{pass.Name, cpuNs});
         }
     }
 

@@ -295,6 +295,63 @@ namespace Interface::GUI
 
             ImGui::Separator();
 
+            // -----------------------------------------------------------------
+            // Per-Pass GPU + CPU Timing Timeline
+            // -----------------------------------------------------------------
+            if (ImGui::TreeNodeEx("Render Pass Timings", ImGuiTreeNodeFlags_DefaultOpen))
+            {
+                const auto& passTimings = telemetry.GetPassTimings();
+                if (passTimings.empty())
+                {
+                    ImGui::TextDisabled("No per-pass timing data (GPU profiler may be unavailable).");
+                }
+                else
+                {
+                    if (ImGui::BeginTable("PassTimingTable", 4,
+                        ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
+                        ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_ScrollY,
+                        ImVec2(0.0f, 180.0f)))
+                    {
+                        ImGui::TableSetupScrollFreeze(0, 1);
+                        ImGui::TableSetupColumn("Pass", ImGuiTableColumnFlags_WidthStretch);
+                        ImGui::TableSetupColumn("GPU (ms)", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+                        ImGui::TableSetupColumn("CPU (ms)", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+                        ImGui::TableSetupColumn("GPU Bar", ImGuiTableColumnFlags_WidthFixed, 120.0f);
+                        ImGui::TableHeadersRow();
+
+                        // Find max GPU time for bar scaling.
+                        uint64_t maxGpuNs = 1;
+                        for (const auto& pt : passTimings)
+                            if (pt.GpuTimeNs > maxGpuNs) maxGpuNs = pt.GpuTimeNs;
+
+                        for (const auto& pt : passTimings)
+                        {
+                            const float passGpuMs = static_cast<float>(pt.GpuTimeNs) / 1'000'000.0f;
+                            const float passCpuMs = static_cast<float>(pt.CpuTimeNs) / 1'000'000.0f;
+                            const float barFrac = static_cast<float>(pt.GpuTimeNs) / static_cast<float>(maxGpuNs);
+
+                            ImGui::TableNextRow();
+                            ImGui::TableNextColumn();
+                            ImGui::TextUnformatted(pt.Name.c_str());
+
+                            ImGui::TableNextColumn();
+                            ImGui::Text("%.3f", passGpuMs);
+
+                            ImGui::TableNextColumn();
+                            ImGui::Text("%.3f", passCpuMs);
+
+                            ImGui::TableNextColumn();
+                            ImGui::ProgressBar(barFrac, ImVec2(-1.0f, 0.0f), "");
+                        }
+
+                        ImGui::EndTable();
+                    }
+                }
+                ImGui::TreePop();
+            }
+
+            ImGui::Separator();
+
             if (ImGui::TreeNodeEx("SLO Alerts (rolling p95/p99)", ImGuiTreeNodeFlags_DefaultOpen))
             {
                 constexpr size_t kWindowFrames = 120;

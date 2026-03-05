@@ -4,6 +4,7 @@ module;
 
 #include <cstdint>
 #include <memory>
+#include <string>
 #include <string_view>
 #include <vector>
 #include <expected>
@@ -31,6 +32,7 @@ export namespace RHI
         uint32_t NameHash = 0;
         uint32_t BeginQuery = 0;
         uint32_t EndQuery = 0;
+        std::string Name{};
     };
 
     struct GpuTimestampFrame
@@ -40,6 +42,8 @@ export namespace RHI
         uint64_t GpuFrameTimeNs = 0;
         // Flat list of per-scope durations in ns (same order as scopes registered this frame)
         std::vector<uint64_t> ScopeDurationsNs{};
+        // Parallel list of per-scope names (same order)
+        std::vector<std::string> ScopeNames{};
     };
 
     class GpuProfiler

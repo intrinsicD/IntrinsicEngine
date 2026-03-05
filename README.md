@@ -16,7 +16,8 @@ Built on **C++23 Modules**, **Vulkan 1.3** bindless rendering, coroutine-based t
   - `ScopeStack` — LIFO allocator with destructor support for complex per-frame objects.
   - `InplaceFunction` — Small-buffer-optimized callable (64B SBO, move-only, zero-heap).
 - **Hybrid Work-Stealing Task Scheduler:** Per-worker local deques execute local work in LIFO order, cross-worker stealing improves load balance, and an external inject queue handles non-worker producers. `Job` and `Yield()` provide cooperative coroutine multitasking.
-- **Lock-Free Telemetry:** Ring-buffered telemetry system for real-time CPU frame times, draw calls, and triangle counts.
+- **Lock-Free Telemetry:** Ring-buffered telemetry system for real-time CPU frame times, draw calls, triangle counts, and per-pass GPU/CPU timing entries.
+- **Benchmark Runner:** Deterministic `Core::Benchmark::BenchmarkRunner` captures per-frame snapshots (CPU/GPU/frame time, draw calls, triangles) with configurable warmup, computes percentile stats (avg/min/max/p95/p99), and writes structured JSON. Headless mode via `--benchmark <frames> --out file.json`. Threshold-based regression gate: `tools/check_perf_regression.sh`.
 - **FrameGraph + DAG Scheduler:** ECS systems declare explicit data dependencies; `DAGScheduler` resolves topological execution order. Shared scheduling algorithm between FrameGraph and RenderGraph.
 - **AssetManager Read Phases:**
   - `AssetManager::Update()` is the single-writer phase on the main thread.
@@ -206,6 +207,12 @@ ninja -C build-fast IntrinsicRuntime
 
 # Run
 ./build/bin/Sandbox
+
+# Benchmark mode (run 300 frames after 30 warmup, output JSON)
+./build/bin/Sandbox --benchmark 300 --warmup 30 --out benchmark.json
+
+# Check for performance regressions
+./tools/check_perf_regression.sh benchmark.json --avg-ms 16.67 --p99-ms 33.33 --min-fps 60
 ```
 
 Common configure options for compile-time control:
@@ -287,7 +294,7 @@ Concrete service-level objectives for engine orchestration, verified by CI:
   - **Inspector:** Modify transforms, view mesh stats.
   - **Viewport Toolbar:** Transform gizmo mode, space, pivot, and snap configuration.
   - **Assets:** Monitor async loading queues and asset states.
-  - **Performance:** Real-time telemetry graphs.
+  - **Performance:** Real-time telemetry graphs, per-pass GPU/CPU timings table, and SLO alert indicators.
 
 ---
 

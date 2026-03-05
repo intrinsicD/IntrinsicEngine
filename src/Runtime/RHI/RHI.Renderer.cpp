@@ -267,7 +267,21 @@ namespace RHI
 
             if (auto resolved = m_GpuProfiler->Resolve(resolveFrame); resolved.has_value())
             {
-                Core::Telemetry::TelemetrySystem::Get().SetGpuFrameTimeNs(resolved->GpuFrameTimeNs);
+                auto& telemetry = Core::Telemetry::TelemetrySystem::Get();
+                telemetry.SetGpuFrameTimeNs(resolved->GpuFrameTimeNs);
+
+                // Build per-pass GPU timing entries from resolved scopes.
+                std::vector<Core::Telemetry::PassTimingEntry> passTimings;
+                passTimings.reserve(resolved->ScopeCount);
+                for (uint32_t s = 0; s < resolved->ScopeCount; ++s)
+                {
+                    passTimings.push_back(Core::Telemetry::PassTimingEntry{
+                        resolved->ScopeNames[s],
+                        resolved->ScopeDurationsNs[s],
+                        0 // CPU time merged separately
+                    });
+                }
+                telemetry.SetPassGpuTimings(std::move(passTimings));
             }
         }
 

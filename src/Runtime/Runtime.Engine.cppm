@@ -17,6 +17,7 @@ import Core.Assets;
 import Core.Memory;
 import Core.FeatureRegistry;
 import Core.IOBackend;
+import Core.Benchmark;
 import RHI;
 import Graphics;
 import ECS;
@@ -34,6 +35,13 @@ export namespace Runtime
         int Width = 1600;
         int Height = 900;
         size_t FrameArenaSize = 1024 * 1024; // Configurable frame arena (default: 1 MB)
+
+        // Benchmark mode: when enabled, the engine runs for a fixed number of frames
+        // and writes timing data to a JSON file, then exits.
+        bool BenchmarkMode = false;
+        uint32_t BenchmarkFrames = 300;
+        uint32_t BenchmarkWarmupFrames = 30;
+        std::string BenchmarkOutputPath = "benchmark.json";
     };
 
     class Engine
@@ -165,9 +173,14 @@ export namespace Runtime
         bool m_Running = true;
         bool m_FramebufferResized = false;
 
+        // Benchmark runner (active when EngineConfig::BenchmarkMode is true).
+        Core::Benchmark::BenchmarkRunner m_BenchmarkRunner;
+
         void LoadDroppedAsset(const std::string& path);
 
     private:
+        EngineConfig m_EngineConfig;
+
         // Populate the FeatureRegistry with all core engine features
         // (render passes, ECS systems). Called once at the end of the constructor.
         void RegisterCoreFeatures();
