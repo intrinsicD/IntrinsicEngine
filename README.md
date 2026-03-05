@@ -124,8 +124,11 @@ Two-layer architecture: I/O backend (byte transport) separated from format loade
 | **Point Cloud** | XYZ, PCD (ASCII), PLY |
 | **Graph** | TGF |
 | **Texture** | PNG, JPG, KTX (via stb/KTX loaders) |
+| **Scene** | JSON (`.json`) — save/load via `Runtime::SceneSerializer` |
 
 Drag-and-drop file loading with automatic format detection via `IORegistry`. Export pipeline with symmetric `IORegistry::Export()` API.
+
+**Scene Serialization (JSON):** `Runtime::SaveScene()` / `Runtime::LoadScene()` serialize the full entity hierarchy — names, transforms, parent-child relationships, asset source paths, visibility flags, and per-component rendering parameters (point cloud modes, graph settings, wireframe/vertex display). GPU state is NOT serialized; it is reconstructed on load by re-importing assets from their recorded source paths. Missing asset files are gracefully skipped with structured log diagnostics. Dirty-state tracking (`SceneDirtyTracker`) warns before discarding unsaved changes.
 
 ---
 
@@ -386,7 +389,11 @@ Backlog hygiene is CI-enforced: pull requests fail if `TODO.md` contains complet
 The sandbox app ships with a lightweight editor UI built on Dear ImGui.
 Panels are registered via `Interface::GUI::RegisterPanel()`.
 
-### New panels
+### Menus
+
+- `File` → `Save Scene` / `Save Scene As...` / `Load Scene` — JSON scene serialization with dirty-state warning.
+
+### Panels
 
 - `Features` — browse and toggle `Core::FeatureRegistry` categories (RenderFeatures, Systems, Panels, GeometryOperators).
 - `Frame Graph` — inspect the current `Core::FrameGraph` execution layers (pass names grouped by parallel layer).

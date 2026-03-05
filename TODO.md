@@ -32,27 +32,6 @@ This is the active dependency-ordered execution queue. Complete top-to-bottom un
 
 ---
 
-### Epic 2 — Scene Serialization MVP (P1)
-
-**Why now:** Unlocks practical workflows and test reproducibility for all subsequent editor features.
-
-**Scope (MVP):**
-- Deterministic scene save/load for entity hierarchy + core component payloads + asset references.
-- Project file references scene path and editor layout preset.
-
-**Implementation tasks:**
-- Define stable scene schema (`version`, `entities`, `components`, `assetRefs`).
-- Add serializer/deserializer in `Runtime` with explicit component adapters.
-- Implement asset-handle remap/validation on load with structured diagnostics.
-- Add "Save Scene", "Load Scene", and dirty-state prompt wiring in editor UI.
-
-**Acceptance criteria:**
-- Save->load->save round-trip is byte-stable (or canonicalized-text stable) for unchanged scenes.
-- Missing assets do not crash load; failures are surfaced in UI/log with entity/component context.
-- Integration test verifies hierarchy/component parity after reload.
-
----
-
 ### Epic 3 — Transform Gizmos + Viewport Toolbar Baseline (P1)
 
 **Why now:** Immediate usability multiplier for all geometry and rendering workflows.
@@ -99,8 +78,8 @@ This is the active dependency-ordered execution queue. Complete top-to-bottom un
 
 ### Sequencing Rules
 
-- Epic 1 (HDR Post-Processing) is complete. Epic 2 is unblocked.
-- Epic 3 can overlap late Epic 2, but selection/picking changes must not block scene I/O.
+- Epic 1 (HDR Post-Processing) is complete. Epic 2 (Scene Serialization) is complete.
+- Epic 3 is unblocked.
 - Epic 4 instrumentation is unblocked (timing baselines now include post chain).
 
 ### Cross-Epic Definition of Done

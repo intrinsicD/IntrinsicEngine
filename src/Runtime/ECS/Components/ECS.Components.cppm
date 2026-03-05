@@ -1,6 +1,7 @@
 module;
 
 export module ECS:Components;
+export import :Components.AssetSourceRef;
 export import :Components.AxisRotator;
 export import :Components.Hierarchy;
 export import :Components.NameTag;
