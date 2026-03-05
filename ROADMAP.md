@@ -102,11 +102,11 @@ No shadow support exists. Shadows are critical for spatial understanding.
 - PCF or variance shadow maps for soft edges.
 - Shadow pass reuses `SurfacePass` geometry, writes depth only.
 
-### Benchmarking & Profiling
+### Benchmarking & Profiling (**MVP complete**)
 
-`Core::Telemetry` provides basic lock-free ring-buffered metrics. Robust GPU/CPU profiling and reproducible benchmark infrastructure remain required.
+GPU timestamp queries per major render pass via `RHI::GpuProfiler`, CPU per-system timings via `RenderGraph` instrumentation, and a deterministic benchmark runner (`Core::Benchmark::BenchmarkRunner`) with JSON output are in place. The Performance panel shows per-pass GPU+CPU timings. Headless benchmark mode (`--benchmark <frames> --out file.json`) runs a fixed frame count and exits. Threshold-based regression checking via `tools/check_perf_regression.sh` supports avg/p99 frame time and min FPS gates.
 
-**Execution detail moved:** Timestamp instrumentation, benchmark runner, and regression gating are tracked in `TODO.md` under `## 2. Near-Term Epics (from ROADMAP.md)` (Epic 4).
+Long-horizon additions: GPU-driven pass culling profiling, multi-scene benchmark suites, historical regression tracking with baseline storage.
 
 ### Debug Visualization — Remaining
 

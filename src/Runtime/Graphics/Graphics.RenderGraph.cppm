@@ -14,6 +14,7 @@ import Core.Hash;
 import Core.Memory;
 import Core.Logging;
 import Core.DAGScheduler;
+import Core.Telemetry;
 
 export namespace Graphics
 {
@@ -251,6 +252,17 @@ export namespace Graphics
         // This avoids file-static allocators that can outlive VkDevice at shutdown.
         void SetTransientAllocator(RHI::TransientAllocator& allocator) { m_TransientAllocator = &allocator; }
 
+        // Inject optional GPU profiler for per-pass timestamp scoping.
+        void SetGpuProfiler(RHI::GpuProfiler* profiler) { m_GpuProfiler = profiler; }
+
+        // Per-pass CPU timing: valid after Execute() until Reset().
+        struct PassTiming
+        {
+            std::string Name{};
+            uint64_t CpuTimeNs = 0;
+        };
+        [[nodiscard]] const std::vector<PassTiming>& GetLastPassTimings() const { return m_LastPassTimings; }
+
         // Debug/introspection for tests/tools: valid after Compile() until Reset().
         [[nodiscard]] const std::vector<std::vector<uint32_t>>& GetExecutionLayers() const { return m_Scheduler.GetExecutionLayers(); }
 
@@ -441,5 +453,11 @@ export namespace Graphics
         // Frame index associated with the most recent Compile().
         // Used for per-thread secondary command buffer reuse.
         uint32_t m_CompiledFrameIndex = ~0u;
+
+        // Optional GPU profiler for per-pass timestamp scoping (non-owning).
+        RHI::GpuProfiler* m_GpuProfiler = nullptr;
+
+        // Per-pass CPU timing from the most recent Execute().
+        std::vector<PassTiming> m_LastPassTimings;
     };
 }

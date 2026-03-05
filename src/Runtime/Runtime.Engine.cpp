@@ -21,6 +21,7 @@ import Core.Window;
 import Core.Filesystem;
 import Core.Assets;
 import Core.Telemetry;
+import Core.Benchmark;
 import Core.FrameGraph;
 import Core.Hash;
 import Core.Profiling;
@@ -40,7 +41,19 @@ using namespace Core::Hash;
 namespace Runtime
 {
     Engine::Engine(const EngineConfig& config)
+        : m_EngineConfig(config)
     {
+        // Configure benchmark runner if benchmark mode is enabled.
+        if (config.BenchmarkMode)
+        {
+            Core::Benchmark::BenchmarkConfig benchCfg{};
+            benchCfg.FrameCount = config.BenchmarkFrames;
+            benchCfg.WarmupFrames = config.BenchmarkWarmupFrames;
+            benchCfg.OutputPath = config.BenchmarkOutputPath;
+            m_BenchmarkRunner.Configure(benchCfg);
+            Core::Log::Info("Benchmark mode enabled: {} frames + {} warmup -> {}",
+                            config.BenchmarkFrames, config.BenchmarkWarmupFrames, config.BenchmarkOutputPath);
+        }
         Core::Tasks::Scheduler::Initialize();
         Core::Filesystem::FileWatcher::Initialize();
 
@@ -564,6 +577,17 @@ namespace Runtime
 
             // End frame telemetry
             Core::Telemetry::TelemetrySystem::Get().EndFrame();
+
+            // Benchmark mode: record frame and exit when complete.
+            if (m_EngineConfig.BenchmarkMode)
+            {
+                m_BenchmarkRunner.RecordFrame(Core::Telemetry::TelemetrySystem::Get());
+                if (m_BenchmarkRunner.IsComplete())
+                {
+                    m_BenchmarkRunner.Finalize();
+                    m_Running = false;
+                }
+            }
         }
 
         Core::Tasks::Scheduler::WaitForAll();

@@ -138,6 +138,35 @@ namespace Core::Telemetry
         m_FrameGraphCriticalPathTimeNs.store(criticalPathTimeNs, std::memory_order_relaxed);
     }
 
+    void TelemetrySystem::SetPassGpuTimings(std::vector<PassTimingEntry> timings)
+    {
+        m_PassTimings = std::move(timings);
+    }
+
+    void TelemetrySystem::MergePassCpuTimings(const std::vector<std::pair<std::string, uint64_t>>& cpuTimings)
+    {
+        // Merge CPU timings into existing pass timing entries by matching name.
+        // If a pass has GPU timing but no CPU entry, the CPU time stays 0.
+        // If a pass has CPU timing but no GPU entry, create a new entry.
+        for (const auto& [name, cpuNs] : cpuTimings)
+        {
+            bool found = false;
+            for (auto& entry : m_PassTimings)
+            {
+                if (entry.Name == name)
+                {
+                    entry.CpuTimeNs = cpuNs;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found)
+            {
+                m_PassTimings.push_back(PassTimingEntry{name, 0, cpuNs});
+            }
+        }
+    }
+
     double TelemetrySystem::GetAverageFrameTimeMs(size_t frameCount) const
     {
         uint64_t total = 0;

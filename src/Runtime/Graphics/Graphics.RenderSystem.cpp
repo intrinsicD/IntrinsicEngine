@@ -32,6 +32,7 @@ import Core.Hash;
 import Core.Memory;
 import Core.Assets;
 import Core.Logging;
+import Core.Telemetry;
 import RHI;
 import ECS;
 import Interface;
@@ -69,6 +70,9 @@ namespace Graphics
           , m_MaterialSystem(materialSystem)
 
     {
+        // Wire GPU profiler into RenderGraph for per-pass timestamp scoping.
+        if (auto* profiler = renderer.GetGpuProfiler())
+            m_RenderGraph.SetGpuProfiler(profiler);
         // Register UI panel
         Interface::GUI::RegisterPanel("Render Target Viewer",
                                       [this]()
@@ -412,6 +416,17 @@ namespace Graphics
             m_ActivePipeline->PostCompile(frameIndex, m_LastDebugImages, m_LastDebugPasses);
 
         m_RenderGraph.Execute(m_Presentation.GetCommandBuffer());
+
+        // Feed per-pass CPU timings from RenderGraph into Telemetry.
+        const auto& passTimings = m_RenderGraph.GetLastPassTimings();
+        if (!passTimings.empty())
+        {
+            std::vector<std::pair<std::string, uint64_t>> cpuTimings;
+            cpuTimings.reserve(passTimings.size());
+            for (const auto& pt : passTimings)
+                cpuTimings.emplace_back(pt.Name, pt.CpuTimeNs);
+            Core::Telemetry::TelemetrySystem::Get().MergePassCpuTimings(cpuTimings);
+        }
     }
 
     void RenderSystem::EndFrame()

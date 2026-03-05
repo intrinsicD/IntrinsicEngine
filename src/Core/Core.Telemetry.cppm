@@ -68,6 +68,16 @@ export namespace Core::Telemetry
     };
 
     // -------------------------------------------------------------------------
+    // Per-Pass Timing Entry (GPU + CPU combined)
+    // -------------------------------------------------------------------------
+    struct PassTimingEntry
+    {
+        std::string Name{};
+        uint64_t GpuTimeNs = 0;
+        uint64_t CpuTimeNs = 0;
+    };
+
+    // -------------------------------------------------------------------------
     // Telemetry System - Thread-Safe Singleton
     // -------------------------------------------------------------------------
     class TelemetrySystem
@@ -76,6 +86,7 @@ export namespace Core::Telemetry
         static constexpr size_t MAX_SAMPLES_PER_FRAME = 4096;
         static constexpr size_t MAX_FRAME_HISTORY = 120;
         static constexpr size_t MAX_CATEGORIES = 256;
+        static constexpr size_t MAX_PASS_TIMINGS = 32;
 
         static TelemetrySystem& Get()
         {
@@ -90,6 +101,15 @@ export namespace Core::Telemetry
         void SetGpuFrameTimeNs(uint64_t gpuTimeNs);
         void SetTaskSchedulerStats(const Core::Tasks::Scheduler::Stats& stats);
         void SetFrameGraphTimings(uint64_t compileTimeNs, uint64_t executeTimeNs, uint64_t criticalPathTimeNs);
+
+        // Set per-pass GPU timings (from GpuProfiler::Resolve).
+        void SetPassGpuTimings(std::vector<PassTimingEntry> timings);
+
+        // Set per-pass CPU timings (from RenderGraph::GetLastPassTimings).
+        void MergePassCpuTimings(const std::vector<std::pair<std::string, uint64_t>>& cpuTimings);
+
+        // Get current frame's per-pass timing entries.
+        [[nodiscard]] const std::vector<PassTimingEntry>& GetPassTimings() const { return m_PassTimings; }
 
         [[nodiscard]] const FrameStats& GetFrameStats(size_t framesAgo = 0) const
         {
@@ -137,6 +157,9 @@ export namespace Core::Telemetry
         std::array<FrameStats, MAX_FRAME_HISTORY> m_FrameHistory{};
         std::array<TimingCategory, MAX_CATEGORIES> m_Categories{};
         std::array<TimingSample, MAX_SAMPLES_PER_FRAME * MAX_FRAME_HISTORY> m_SampleBuffer{};
+
+        // Per-pass timing data (updated each frame, consumed by Performance panel).
+        std::vector<PassTimingEntry> m_PassTimings;
     };
 
     // -------------------------------------------------------------------------

@@ -7,6 +7,7 @@
 #include <memory>
 #include <filesystem>
 #include <cmath>
+#include <string>
 #include <imgui.h>
 #include <entt/entity/registry.hpp>
 #include <tiny_gltf.h>
@@ -40,7 +41,8 @@ using namespace Runtime;
 class SandboxApp : public Engine
 {
 public:
-    SandboxApp() : Engine({"Sandbox", 1600, 900})
+    explicit SandboxApp(const Runtime::EngineConfig& config = {"Sandbox", 1600, 900})
+        : Engine(config)
     {
     }
 
@@ -1580,9 +1582,33 @@ public:
     }
 };
 
-int main()
+int main(int argc, char* argv[])
 {
-    SandboxApp app;
+    Runtime::EngineConfig config{};
+    config.AppName = "Sandbox";
+    config.Width = 1600;
+    config.Height = 900;
+
+    // Parse command-line arguments for benchmark mode.
+    for (int i = 1; i < argc; ++i)
+    {
+        const std::string arg = argv[i];
+        if (arg == "--benchmark" && i + 1 < argc)
+        {
+            config.BenchmarkMode = true;
+            config.BenchmarkFrames = static_cast<uint32_t>(std::stoul(argv[++i]));
+        }
+        else if (arg == "--warmup" && i + 1 < argc)
+        {
+            config.BenchmarkWarmupFrames = static_cast<uint32_t>(std::stoul(argv[++i]));
+        }
+        else if (arg == "--out" && i + 1 < argc)
+        {
+            config.BenchmarkOutputPath = argv[++i];
+        }
+    }
+
+    SandboxApp app(config);
     app.Run();
     return 0;
 }

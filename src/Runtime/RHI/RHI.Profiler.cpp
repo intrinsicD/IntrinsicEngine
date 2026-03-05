@@ -6,6 +6,7 @@ module;
 #include <limits>
 #include <memory>
 #include <expected>
+#include <string>
 #include <vector>
 
 module RHI:Profiler.Impl;
@@ -131,6 +132,7 @@ namespace RHI
             .NameHash = Core::Telemetry::HashString(name.data()),
             .BeginQuery = beginQuery,
             .EndQuery = endQuery,
+            .Name = std::string(name),
         });
 
         return scopeIndex;
@@ -213,6 +215,9 @@ namespace RHI
         out.FrameNumber = fs.FrameNumber;
         out.ScopeCount = scopeCount;
         out.ScopeDurationsNs.resize(scopeCount);
+        out.ScopeNames.resize(scopeCount);
+        for (uint32_t s = 0; s < scopeCount; ++s)
+            out.ScopeNames[s] = fs.Scopes[s].Name;
 
         const double tickToNs = m_TimestampPeriodNs;
         if (frameEnd > frameStart)

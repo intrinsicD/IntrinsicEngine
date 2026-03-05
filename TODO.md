@@ -32,32 +32,9 @@ This is the active dependency-ordered execution queue. Complete top-to-bottom un
 
 ---
 
-### Epic 4 — Profiling & Benchmark Harness (P2)
-
-**Why now:** Establishes objective regression guardrails before expanding expensive render features.
-
-**Scope (MVP):**
-- GPU timestamp queries per major render pass.
-- CPU per-system frame timings exposed in telemetry panel.
-- Deterministic benchmark runner for fixed scene/camera trajectories with JSON output.
-
-**Implementation tasks:**
-- Add timestamp write/resolve around pass boundaries and map to pass IDs.
-- Extend telemetry schema for min/avg/max/p95/p99 frame and pass timings.
-- Add headless benchmark mode (`--benchmark <scene> --frames N --out file.json`).
-- Add threshold-based regression check script for CI/local use.
-
-**Acceptance criteria:**
-- Performance panel shows per-pass GPU timings and per-system CPU timings in one frame timeline.
-- Benchmark runs are reproducible (same scene seed/path => low variance envelope).
-- Regression gate fails when threshold is exceeded and prints offending metrics.
-
----
-
 ### Sequencing Rules
 
-- Epic 1 (HDR Post-Processing) is complete. Epic 2 (Scene Serialization) is complete. Epic 3 (Transform Gizmos) is complete.
-- Epic 4 instrumentation is unblocked (timing baselines now include post chain).
+- Epic 1 (HDR Post-Processing) is complete. Epic 2 (Scene Serialization) is complete. Epic 3 (Transform Gizmos) is complete. Epic 4 (Profiling & Benchmark) is complete.
 
 ### Cross-Epic Definition of Done
 

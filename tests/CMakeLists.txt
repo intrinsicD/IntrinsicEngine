@@ -76,6 +76,7 @@ intrinsic_test_object_lib(CoreTestObjs
         Test_FeatureRegistry.cpp
         Test_InplaceFunction.cpp
         Test_ResourcePool.cpp
+        Test_Benchmark.cpp
     DEPS IntrinsicCore
 )
 
