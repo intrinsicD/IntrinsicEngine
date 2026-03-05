@@ -146,6 +146,7 @@ intrinsic_test_object_lib(RuntimeTestObjs
         Test_PerFaceAttributes.cpp
         Test_PropertySetDirtySync.cpp
         Test_SceneSerializer.cpp
+        Test_TransformGizmo.cpp
 
     DEPS IntrinsicCore IntrinsicRuntime
 )

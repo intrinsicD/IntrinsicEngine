@@ -32,28 +32,6 @@ This is the active dependency-ordered execution queue. Complete top-to-bottom un
 
 ---
 
-### Epic 3 — Transform Gizmos + Viewport Toolbar Baseline (P1)
-
-**Why now:** Immediate usability multiplier for all geometry and rendering workflows.
-
-**Scope (MVP):**
-- Translate/rotate/scale gizmos rendered via `LinePass` transient path.
-- Viewport toolbar for mode switching + snap toggles + world/local orientation.
-
-**Implementation tasks:**
-- Implement interaction state machine (idle/hover/active) with deterministic picking priority.
-- Add local/world transform basis support and configurable snap increments.
-- Add multi-selection pivot strategy (`Centroid`, `FirstSelected`).
-- Bind toolbar controls to existing inspector selection model.
-
-**Acceptance criteria:**
-- Dragging gizmo updates transform in real time without inspector-only edits.
-- Snap and orientation toggles affect manipulation immediately and predictably.
-- Multi-object transform applies from selected pivot mode with no entity drift.
-- UI smoke tests cover toolbar toggle persistence.
-
----
-
 ### Epic 4 — Profiling & Benchmark Harness (P2)
 
 **Why now:** Establishes objective regression guardrails before expanding expensive render features.
@@ -78,8 +56,7 @@ This is the active dependency-ordered execution queue. Complete top-to-bottom un
 
 ### Sequencing Rules
 
-- Epic 1 (HDR Post-Processing) is complete. Epic 2 (Scene Serialization) is complete.
-- Epic 3 is unblocked.
+- Epic 1 (HDR Post-Processing) is complete. Epic 2 (Scene Serialization) is complete. Epic 3 (Transform Gizmos) is complete.
 - Epic 4 instrumentation is unblocked (timing baselines now include post chain).
 
 ### Cross-Epic Definition of Done

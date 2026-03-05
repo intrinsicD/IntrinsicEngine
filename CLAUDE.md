@@ -104,6 +104,24 @@ New geometry operators follow a consistent interface contract (see `Geometry::Si
 - **Surface reconstruction** (point cloud → mesh) pipelines through: normals (estimate if needed) → bounding box with padding → scalar grid → octree KNN → signed distance field → Marching Cubes → HalfedgeMesh. The signed distance at each grid vertex is `dot(p - nearest, normal_at_nearest)` (Hoppe et al. 1992). For `KNeighbors > 1`, inverse-distance-weighted averaging smooths noisy data.
 - **Robust weighted SDF policy:** sanitize input normals first (finite + non-zero length), then for `KNeighbors > 1` use adaptive Gaussian spatial weighting with normal-consistency weighting (`max(0, n_i·n_ref)^p`) instead of pure inverse-distance averaging. This reduces sign instability near conflicting neighborhoods and degenerate scans.
 - **Convex hull construction** uses the Quickhull algorithm (Barber, Dobkin & Huhdanpaa 1996). The `ConvexHullBuilder` module populates the `Geometry::ConvexHull` struct (both V-Rep vertices and H-Rep face planes) that was previously a consumer-only type in GJK/SDF/SAT/Containment. Key implementation details: (1) initial tetrahedron via 6-axis extreme points → most-distant pair → farthest from line → farthest from plane, (2) conflict-list partitioning assigns each remaining point to the face it's most above, (3) iterative expansion picks the globally farthest conflict point, BFS-discovers all visible faces, extracts ordered horizon edges, creates new faces, redistributes orphaned conflict points. Use the initial tetrahedron centroid as an interior reference for outward-normal verification throughout. Edge-to-face adjacency tracked via `(min(v0,v1), max(v0,v1))` packed as `uint64_t` key.
+## Transform Gizmo System
+
+`Graphics::TransformGizmo` provides interactive translate/rotate/scale manipulation rendered via the `DebugDraw` overlay path (no depth test). The system follows a strict state machine:
+
+- **Idle:** No axis highlighted. Hit-testing disabled when ImGui captures mouse.
+- **Hovered:** Mouse is over a gizmo axis/plane. Axis color changes to highlight yellow.
+- **Active:** Mouse button is held after clicking a hovered axis. Transform deltas applied per frame.
+
+Key design decisions:
+- **Rendering via DebugDraw overlay:** Gizmo lines are always-on-top (no depth test), transient per frame. No retained GPU state needed.
+- **Deterministic picking priority:** Plane handles (XY/XZ/YZ) take priority over axis lines. Closest axis wins ties.
+- **Pivot computation:** Supports `Centroid` (average of selected positions) and `FirstSelected` pivot strategies.
+- **Snap:** Applied as post-processing on the delta value. Translation snaps per-axis, rotation snaps in degrees, scale snaps on the scale factor.
+- **Mouse consumption:** `Update()` returns `true` when the gizmo consumed the click, which blocks entity selection.
+- **Multi-entity support:** All selected entities with `Transform::Component` + `SelectedTag` are transformed together, preserving relative offsets during rotation/translation.
+
+Keyboard shortcuts (set in Sandbox app): `W`=Translate, `E`=Rotate, `R`=Scale, `X`=Toggle World/Local.
+
 ## Three-Pass Rendering Architecture
 
 The engine uses a unified three-pass rendering architecture with one pass per primitive type. Each pass owns its own pipeline, shaders, and ECS component type, handling both retained-mode and transient data internally. No routing logic between passes. Adding a new rendering method = new shader + pipeline variant + register in `DefaultPipeline`.

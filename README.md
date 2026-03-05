@@ -105,6 +105,7 @@ Adaptive remeshing now exposes runtime safety controls in `AdaptiveRemeshingPara
 - **Point Cloud Rendering:** `PointPass` renders via BDA shared vertex buffers. `point_flatdisc.vert` / `point_surfel.vert` expand points to billboard quads (6 verts/point). Three render modes: FlatDisc (camera-facing billboard), Surfel (normal-oriented disc with Lambertian shading), and EWA splatting (Zwicker et al. 2001 — perspective-correct elliptical Gaussian splats via per-surfel Jacobian projection with 1px² low-pass anti-aliasing). Surfel/EWA require real per-point normals; if normals are absent, runtime falls back to FlatDisc. The `Geometry.PointCloud` CPU module (data structures, downsampling, statistics) remains functional.
 - **DebugDraw:** Immediate-mode transient overlay for debug visualization (octree, KD-tree, bounds, contact manifolds, convex hulls) rendered by `LinePass` and `PointPass` transient paths. Depth-tested and overlay sub-passes. Comprehensive test coverage.
 - **Graph Processing (CPU):** Halfedge-based graph topology with Octree-accelerated kNN construction, force-directed 2D layout, spectral embedding (combinatorial/symmetric-normalized Laplacian), hierarchical layered layout with crossing diagnostics and diameter-aware auto-rooting.
+- **Transform Gizmos:** `Graphics::TransformGizmo` renders translate/rotate/scale handles via `DebugDraw` overlay lines. Three-state interaction machine (idle/hovered/active) with deterministic axis picking, world/local space, configurable snap increments, and multi-entity pivot strategies (centroid, first-selected). Viewport toolbar panel for runtime configuration. Keyboard shortcuts: W/E/R for mode, X for space toggle.
 - **Selection Outlines:** Post-process contour highlight for selected/hovered entities.
 - **Per-Element Attribute Rendering:** Per-edge colors via `PtrEdgeAux` BDA channel in `LinePass`, per-face colors via `PtrFaceAttr` BDA channel and `gl_PrimitiveID` in `SurfacePass`. Scalar-to-heat and label-to-categorical color utilities (`ScalarToHeatColor`, `LabelToColor`) for curvature visualization and segmentation coloring.
 - **PropertySet Dirty Tracking:** Six zero-size `ECS::DirtyTag` tag components (`VertexPositions`, `VertexAttributes`, `EdgeTopology`, `EdgeAttributes`, `FaceTopology`, `FaceAttributes`) for incremental CPU→GPU sync. Attribute-only changes re-extract cached vectors without full vertex buffer re-upload.
@@ -274,12 +275,17 @@ Concrete service-level objectives for engine orchestration, verified by CI:
 
 ## Controls
 
-- **Left Click + Drag:** Orbit camera.
+- **Left Click + Drag:** Orbit camera / interact with transform gizmo.
 - **Right Click + WASD:** Fly camera mode.
 - **Drag & Drop:** Drop `.glb`, `.gltf`, `.ply`, `.obj`, `.xyz`, `.pcd`, or `.tgf` files to load asynchronously.
+- **W / E / R:** Switch gizmo mode (Translate / Rotate / Scale).
+- **X:** Toggle gizmo space (World / Local).
+- **F:** Focus camera on selected entity.
+- **Q:** Reset camera to defaults.
 - **ImGui Panels:**
   - **Hierarchy:** View and select entities.
   - **Inspector:** Modify transforms, view mesh stats.
+  - **Viewport Toolbar:** Transform gizmo mode, space, pivot, and snap configuration.
   - **Assets:** Monitor async loading queues and asset states.
   - **Performance:** Real-time telemetry graphs.
 
