@@ -35,6 +35,7 @@ target_sources(${target_name}
         Graphics.KDTreeDebugDraw.cppm
         Graphics.BVHDebugDraw.cppm
         Graphics.ConvexHullDebugDraw.cppm
+        Graphics.TransformGizmo.cppm
         Graphics.Interaction.cppm
         Graphics.Presentation.cppm
         Graphics.GlobalResources.cppm
@@ -89,6 +90,7 @@ target_sources(${target_name}
         Graphics.KDTreeDebugDraw.cpp
         Graphics.BVHDebugDraw.cpp
         Graphics.ConvexHullDebugDraw.cpp
+        Graphics.TransformGizmo.cpp
         Graphics.Interaction.cpp
         Graphics.Presentation.cpp
         Graphics.GlobalResources.cpp

@@ -35,11 +35,19 @@ Long-horizon additions (after MVP): SSAO, bloom, DOF, color grading.
 
 These features turn the engine from a viewer into an interactive tool.
 
-### Transform Gizmos
+### Transform Gizmos (**MVP complete**)
 
-Translate/rotate/scale handles rendered via `LinePass` transient path remain a core UX dependency.
+Translate/rotate/scale gizmos are implemented via the `DebugDraw` overlay path (`LinePass` transient, no depth test). The `Graphics::TransformGizmo` module provides a deterministic interaction state machine (idle → hovered → active) with:
 
-**Execution detail moved:** Interactive baseline scope (TRS, snap, world/local, multi-object pivot, toolbar integration) is tracked in `TODO.md` under `## 2. Near-Term Epics (from ROADMAP.md)` (Epic 3).
+- **Three modes:** Translate (arrows + plane handles), Rotate (circles per axis), Scale (axis lines + uniform center cube).
+- **World/local space:** Gizmo orientation follows entity rotation in local mode.
+- **Snap:** Configurable increments for translation, rotation (degrees), and scale.
+- **Multi-selection:** Centroid or first-selected pivot strategy. All selected entities transform together.
+- **Viewport toolbar:** ImGui panel for mode switching, space toggle, pivot selection, and snap configuration.
+- **Keyboard shortcuts:** W=Translate, E=Rotate, R=Scale, X=Toggle World/Local.
+- **Mouse integration:** Gizmo consumes LMB input during drag, blocking entity selection.
+
+Future: undo/redo integration, visual refinement (arrowhead cones, rotation arc feedback).
 
 ### UI Improvements
 

@@ -73,6 +73,9 @@ public:
     Graphics::BVHDebugDrawSettings m_BVHDebugSettings{};
     bool m_DrawSelectedColliderBVH = false;
 
+    // Transform Gizmo
+    Graphics::TransformGizmo m_Gizmo;
+
     bool m_DrawSelectedColliderConvexHull = false;
     bool m_DrawSelectedColliderContacts = false;
     bool m_ContactDebugOverlay = true;
@@ -372,6 +375,58 @@ public:
             ImGui::PopStyleVar();
         }, false, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoSavedSettings);
 
+        registerPanelFeature("Viewport Toolbar", "Transform gizmo mode switching and snap controls");
+
+        Interface::GUI::RegisterPanel("Viewport Toolbar", [this]()
+        {
+            auto& cfg = m_Gizmo.GetConfig();
+
+            // --- Mode selection (horizontal radio buttons) ---
+            ImGui::SeparatorText("Gizmo Mode");
+
+            int mode = static_cast<int>(cfg.Mode);
+            if (ImGui::RadioButton("Translate (W)", mode == 0)) cfg.Mode = Graphics::GizmoMode::Translate;
+            ImGui::SameLine();
+            if (ImGui::RadioButton("Rotate (E)", mode == 1)) cfg.Mode = Graphics::GizmoMode::Rotate;
+            ImGui::SameLine();
+            if (ImGui::RadioButton("Scale (R)", mode == 2)) cfg.Mode = Graphics::GizmoMode::Scale;
+
+            // --- Space toggle ---
+            ImGui::SeparatorText("Transform Space");
+            int space = static_cast<int>(cfg.Space);
+            if (ImGui::RadioButton("World", space == 0)) cfg.Space = Graphics::GizmoSpace::World;
+            ImGui::SameLine();
+            if (ImGui::RadioButton("Local (X)", space == 1)) cfg.Space = Graphics::GizmoSpace::Local;
+
+            // --- Pivot strategy ---
+            ImGui::SeparatorText("Pivot");
+            int pivot = static_cast<int>(cfg.Pivot);
+            if (ImGui::RadioButton("Centroid", pivot == 0)) cfg.Pivot = Graphics::GizmoPivot::Centroid;
+            ImGui::SameLine();
+            if (ImGui::RadioButton("First Selected", pivot == 1)) cfg.Pivot = Graphics::GizmoPivot::FirstSelected;
+
+            // --- Snap settings ---
+            ImGui::SeparatorText("Snapping");
+            ImGui::Checkbox("Enable Snap", &cfg.SnapEnabled);
+
+            if (cfg.SnapEnabled)
+            {
+                ImGui::DragFloat("Translate Snap", &cfg.TranslateSnap, 0.05f, 0.01f, 10.0f, "%.2f");
+                ImGui::DragFloat("Rotate Snap (deg)", &cfg.RotateSnap, 1.0f, 1.0f, 90.0f, "%.1f");
+                ImGui::DragFloat("Scale Snap", &cfg.ScaleSnap, 0.01f, 0.01f, 1.0f, "%.2f");
+            }
+
+            // --- Visual settings ---
+            ImGui::SeparatorText("Appearance");
+            ImGui::SliderFloat("Handle Size", &cfg.HandleLength, 0.3f, 3.0f, "%.1f");
+            ImGui::SliderFloat("Pick Radius", &cfg.PickRadius, 0.02f, 0.2f, "%.3f");
+
+            // --- Status ---
+            ImGui::Separator();
+            const char* stateNames[] = { "Idle", "Hovered", "Active" };
+            ImGui::Text("State: %s", stateNames[static_cast<int>(m_Gizmo.GetState())]);
+        });
+
         // View Settings panel for configuring selection outline, etc.
         Interface::GUI::RegisterPanel("View Settings", [this]()
         {
@@ -601,8 +656,8 @@ public:
                 }
             }
 
-            // --- R Key: Reset camera to defaults ---
-            if (!uiCapturesKeyboard && m_Window->GetInput().IsKeyJustPressed(Core::Input::Key::R))
+            // --- Q Key: Reset camera to defaults ---
+            if (!uiCapturesKeyboard && m_Window->GetInput().IsKeyJustPressed(Core::Input::Key::Q))
             {
                 if (auto* orbit = GetScene().GetRegistry().try_get<Graphics::OrbitControlComponent>(m_CameraEntity))
                 {
@@ -611,6 +666,25 @@ public:
                     orbit->Distance = 5.0f;
                     cameraComponent->Position = glm::vec3(0.0f, 0.0f, 4.0f);
                     cameraComponent->Orientation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+                }
+            }
+
+            // --- Gizmo mode shortcuts: W=Translate, E=Rotate, R=Scale ---
+            if (!uiCapturesKeyboard && !m_Gizmo.IsActive())
+            {
+                if (m_Window->GetInput().IsKeyJustPressed(Core::Input::Key::W))
+                    m_Gizmo.GetConfig().Mode = Graphics::GizmoMode::Translate;
+                if (m_Window->GetInput().IsKeyJustPressed(Core::Input::Key::E))
+                    m_Gizmo.GetConfig().Mode = Graphics::GizmoMode::Rotate;
+                if (m_Window->GetInput().IsKeyJustPressed(Core::Input::Key::R))
+                    m_Gizmo.GetConfig().Mode = Graphics::GizmoMode::Scale;
+                // X toggles world/local space.
+                if (m_Window->GetInput().IsKeyJustPressed(Core::Input::Key::X))
+                {
+                    m_Gizmo.GetConfig().Space =
+                        (m_Gizmo.GetConfig().Space == Graphics::GizmoSpace::World)
+                            ? Graphics::GizmoSpace::Local
+                            : Graphics::GizmoSpace::World;
                 }
             }
         }
@@ -656,6 +730,23 @@ public:
                 // Rotation: object rotation in world space.
                 collider.WorldOBB.Rotation = transform.Rotation;
             }
+        }
+
+        // ---------------------------------------------------------------------
+        // Transform Gizmo: update BEFORE debug draw and selection.
+        // The gizmo returns true if it consumed the mouse click (blocks selection).
+        // ---------------------------------------------------------------------
+        bool gizmoConsumedMouse = false;
+        if (cameraComponent != nullptr)
+        {
+            gizmoConsumedMouse = m_Gizmo.Update(
+                GetScene().GetRegistry(),
+                GetRenderOrchestrator().GetDebugDraw(),
+                *cameraComponent,
+                m_Window->GetInput(),
+                static_cast<uint32_t>(m_Window->GetWindowWidth()),
+                static_cast<uint32_t>(m_Window->GetWindowHeight()),
+                uiCapturesMouse);
         }
 
         // ---------------------------------------------------------------------
@@ -786,7 +877,7 @@ public:
                 renderSys,
                 cameraComponent,
                 *m_Window,
-                uiCapturesMouse);
+                uiCapturesMouse || gizmoConsumedMouse);
 
             // Draw
             renderSys.OnUpdate(GetScene(), *cameraComponent, GetAssetManager());
