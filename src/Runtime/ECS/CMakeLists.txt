@@ -5,6 +5,7 @@ target_sources(${target_name}
         PUBLIC
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
         ECS.cppm
+        Components/ECS.Components.AssetSourceRef.cppm
         Components/ECS.Components.AxisRotator.cppm
         Components/ECS.Components.Hierarchy.cppm
         Components/ECS.Components.NameTag.cppm

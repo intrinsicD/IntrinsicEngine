@@ -262,7 +262,14 @@ namespace Runtime
                     auto defaultMaterialHandle = GetAssetManager().Create(materialName, std::move(defaultMat));
                     m_AssetPipeline->TrackMaterial(defaultMaterialHandle);
 
-                    SpawnModel(modelHandle, defaultMaterialHandle, glm::vec3(0.0f), glm::vec3(0.01f));
+                    entt::entity root = SpawnModel(modelHandle, defaultMaterialHandle, glm::vec3(0.0f), glm::vec3(0.01f));
+
+                    // Record the asset source path on the root entity for scene serialization.
+                    if (root != entt::null)
+                    {
+                        GetScene().GetRegistry().emplace_or_replace<ECS::Components::AssetSourceRef::Component>(
+                            root, path);
+                    }
 
                     Core::Log::Info("Successfully spawned: {}", assetName);
                 });

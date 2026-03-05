@@ -11,6 +11,7 @@ target_sources(${target_name}
         Runtime.RenderOrchestrator.cppm
         Runtime.Selection.cppm
         Runtime.SelectionModule.cppm
+        Runtime.SceneSerializer.cppm
         EditorUI/Runtime.EditorUI.cppm
         PRIVATE
         Runtime.Engine.cpp
@@ -20,6 +21,7 @@ target_sources(${target_name}
         Runtime.RenderOrchestrator.cpp
         Runtime.Selection.cpp
         Runtime.SelectionModule.cpp
+        Runtime.SceneSerializer.cpp
         EditorUI/Runtime.EditorUI.cpp
 )
 
@@ -39,6 +41,7 @@ target_link_libraries(${target_name}
         IntrinsicRHI
         PRIVATE
         glfw
+        nlohmann_json::nlohmann_json
 )
 
 add_subdirectory(Geometry)

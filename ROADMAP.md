@@ -54,11 +54,11 @@ Each improvement is independent and can land incrementally:
 - **Context menus:** Right-click on entities for delete, duplicate, rename, focus camera.
 - **Dark/light theme:** Configurable ImGui theme presets.
 
-### Scene Serialization
+### Scene Serialization (**MVP complete**)
 
-No save/load mechanism exists; this remains required for practical workflows.
+JSON-based scene save/load is implemented (`Runtime::SaveScene()` / `Runtime::LoadScene()`). The serializer covers entity names, transforms, hierarchy, asset source paths, visibility, and rendering parameters. GPU state is reconstructed on load by re-importing assets from recorded source paths. Editor UI exposes File → Save/Load Scene with dirty-state prompts.
 
-**Execution detail moved:** Scene/project serialization MVP scope, schema, and acceptance criteria are tracked in `TODO.md` under `## 2. Near-Term Epics (from ROADMAP.md)` (Epic 2).
+Future extensions: project-level files (scene path + editor layout + camera preset), binary scene format for large scenes, undo/redo integration.
 
 ---
 
