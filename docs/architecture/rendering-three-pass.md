@@ -10,7 +10,7 @@ The renderer uses three primitive-owned passes:
 2. `LinePass` (edges/wire/debug lines)
 3. `PointPass` (points/nodes/point clouds/debug points)
 
-Each pass owns both retained and transient sources internally. There are no parallel legacy collector passes.
+These primitive-owned passes feed later composition/overlay stages. There are no parallel legacy collector passes.
 
 ## Core Invariants
 
@@ -27,6 +27,7 @@ Each pass owns both retained and transient sources internally. There are no para
 | `SurfacePass` | `ECS::Surface::Component` + `GeometryGpuData` | `SubmitTriangle` buffer | Per-face attributes via face attribute BDA channel |
 | `LinePass` | `ECS::Line::Component` (`Geometry` + `EdgeView`) | `DebugDraw::GetLines()` / overlays | Edge topology sourced from PropertySets |
 | `PointPass` | `ECS::Point::Component` | `DebugDraw::GetPoints()` | Mode pipelines: FlatDisc, Surfel (future: EWA/Gaussian variants) |
+| `PostProcessPass` | `SceneColor` HDR intermediate | — | Tone mapping + optional FXAA, writes LDR presentation target |
 
 ## Data Contract (CPU -> GPU)
 
@@ -55,9 +56,10 @@ Position/topology changes may escalate to full re-upload; pure attribute changes
 2. `SurfacePass`
 3. `LinePass`
 4. `PointPass`
-5. `SelectionOutlinePass`
-6. `DebugViewPass`
-7. `ImGuiPass`
+5. `PostProcessPass`
+6. `SelectionOutlinePass`
+7. `DebugViewPass`
+8. `ImGuiPass`
 
 ## Robustness Requirements
 
@@ -75,7 +77,6 @@ Position/topology changes may escalate to full re-upload; pure attribute changes
 
 ## Where Active Work Lives
 
-- Near-term execution queue: `TODO.md` (`## 2. Near-Term Epics (from ROADMAP.md)`).
+- Near-term execution queue: `TODO.md` (`Now / Next / Later / Planned`).
 - Medium/long-horizon planning: `ROADMAP.md`.
 - Historical migration narrative: `PLAN.md` (archival index).
-
