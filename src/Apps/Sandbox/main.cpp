@@ -1054,14 +1054,25 @@ public:
                     ImGui::SliderFloat("Bloom Radius", &postSettings->BloomFilterRadius, 0.5f, 3.0f, "%.2f");
                 }
 
-                // FXAA
+                // Anti-Aliasing
                 ImGui::Spacing();
-                ImGui::Checkbox("FXAA", &postSettings->FXAAEnabled);
-                if (postSettings->FXAAEnabled)
+                {
+                    const char* aaModeNames[] = { "None", "FXAA", "SMAA" };
+                    int aaIdx = static_cast<int>(postSettings->AntiAliasingMode);
+                    if (ImGui::Combo("Anti-Aliasing", &aaIdx, aaModeNames, 3))
+                        postSettings->AntiAliasingMode = static_cast<Graphics::Passes::AAMode>(aaIdx);
+                }
+                if (postSettings->AntiAliasingMode == Graphics::Passes::AAMode::FXAA)
                 {
                     ImGui::SliderFloat("FXAA Contrast", &postSettings->FXAAContrastThreshold, 0.01f, 0.1f, "%.4f");
                     ImGui::SliderFloat("FXAA Relative", &postSettings->FXAARelativeThreshold, 0.01f, 0.2f, "%.4f");
                     ImGui::SliderFloat("FXAA Subpixel", &postSettings->FXAASubpixelBlending, 0.0f, 1.0f, "%.2f");
+                }
+                if (postSettings->AntiAliasingMode == Graphics::Passes::AAMode::SMAA)
+                {
+                    ImGui::SliderFloat("SMAA Edge Threshold", &postSettings->SMAAEdgeThreshold, 0.01f, 0.5f, "%.3f");
+                    ImGui::SliderInt("SMAA Search Steps", &postSettings->SMAAMaxSearchSteps, 4, 32);
+                    ImGui::SliderInt("SMAA Diag Steps", &postSettings->SMAAMaxSearchStepsDiag, 0, 16);
                 }
 
                 // Luminance Histogram

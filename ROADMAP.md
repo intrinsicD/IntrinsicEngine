@@ -25,7 +25,7 @@ Sub-entity select → Geometry processing (interactive operator input)
 
 ### Post-Processing Pipeline (**MVP complete**)
 
-The HDR post-processing foundation is in place. Scene passes render to an `R16G16B16A16_SFLOAT` intermediate target ("SceneColor"), and the `PostProcessPass` converts to LDR via tone mapping with optional FXAA. Runtime toggles are exposed via `FeatureRegistry`.
+The HDR post-processing foundation is in place. Scene passes render to an `R16G16B16A16_SFLOAT` intermediate target ("SceneColor"), and the `PostProcessPass` converts to LDR via tone mapping with selectable anti-aliasing (None, FXAA, or SMAA). Runtime toggles are exposed via `FeatureRegistry`.
 
 **Tone mapping:** ACES, Reinhard, and Uncharted 2 (Hable 2010 filmic) operators are selectable at runtime. Exposure is adjustable via UI slider.
 
@@ -37,7 +37,9 @@ The HDR post-processing foundation is in place. Scene passes render to an `R16G1
 
 **Render target inspection:** Enhanced Render Target Viewer panel with human-readable resource names, per-attachment format/load/store tooltips, and a resource lifetime table (dimensions, format, imported vs. transient, alive-range). Click any resource to select it for debug visualization.
 
-Long-horizon additions (after MVP): SSAO, DOF, debug histogram.
+**Anti-aliasing:** Selectable via `AAMode` enum — None, FXAA, or SMAA (Jimenez et al. 2012). SMAA is a 3-pass morphological AA: luma-based edge detection → blend weight calculation (with procedurally generated area and search lookup textures) → neighborhood blending. Default is SMAA. Configurable edge threshold and search step counts via View Settings panel.
+
+Long-horizon additions (after MVP): SSAO, DOF.
 
 ---
 

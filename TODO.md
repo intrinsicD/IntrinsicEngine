@@ -60,10 +60,6 @@ These are not required to finish the first wave, but they should begin soon afte
 - [ ] Improve primitive/submesh selection.
 - [ ] Add mask visualization in the editor.
 
-### B5. Post Stack Expansion
-
-- [ ] Add an improved AA path.
-
 ---
 
 ## 4. Later (P2) — Planned Downstream Work
