@@ -455,3 +455,20 @@ TEST(DebugDraw, NonFinitePrimitivesAreSkipped)
     EXPECT_EQ(dd.GetTriangleCount(), 0u);
     EXPECT_FALSE(dd.HasContent());
 }
+
+TEST(DebugDraw, MaxLineSegmentsCapsEmissionAndTracksDrops)
+{
+    DebugDraw dd;
+    dd.SetMaxLineSegments(4);
+    dd.Box({-1, -1, -1}, {1, 1, 1}, DebugDraw::Green());
+
+    EXPECT_EQ(dd.GetLineCount(), 4u);
+    EXPECT_EQ(dd.GetOverlayLineCount(), 0u);
+    EXPECT_EQ(dd.GetUsedLineSegments(), 4u);
+    EXPECT_EQ(dd.GetRemainingLineCapacity(), 0u);
+    EXPECT_EQ(dd.GetDroppedLineCount(), 8u);
+
+    dd.Reset();
+    EXPECT_EQ(dd.GetDroppedLineCount(), 0u);
+    EXPECT_EQ(dd.GetRemainingLineCapacity(), 4u);
+}

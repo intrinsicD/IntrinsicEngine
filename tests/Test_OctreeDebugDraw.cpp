@@ -125,3 +125,22 @@ TEST(OctreeDebugDraw, TransformOverloadAppliesMatrix)
     }
 }
 
+TEST(OctreeDebugDraw, RespectsDebugDrawBudget)
+{
+    DebugDraw dd;
+    dd.SetMaxLineSegments(12);
+    Octree o = MakeSimpleOctree();
+
+    Graphics::OctreeDebugDrawSettings s;
+    s.Enabled = true;
+    s.Overlay = true;
+    s.OccupiedOnly = true;
+    s.LeafOnly = true;
+    s.DrawInternal = false;
+    s.MaxDepth = 8;
+
+    DrawOctree(dd, o, s);
+
+    EXPECT_EQ(dd.GetOverlayLineCount(), 12u);
+    EXPECT_EQ(dd.GetRemainingLineCapacity(), 0u);
+}

@@ -8,6 +8,8 @@
 #include <filesystem>
 #include <cmath>
 #include <string>
+#include <array>
+#include <limits>
 #include <imgui.h>
 #include <entt/entity/registry.hpp>
 #include <tiny_gltf.h>
@@ -37,6 +39,92 @@ import Interface;
 using namespace Core;
 using namespace Runtime;
 
+namespace
+{
+    struct HiddenEditorEntityTag {};
+    struct RetainedLineOverlaySlot
+    {
+        entt::entity Entity = entt::null;
+        Geometry::GeometryHandle Geometry{};
+    };
+
+    [[nodiscard]] bool MatricesNearlyEqual(const glm::mat4& a, const glm::mat4& b, float eps = 1e-4f)
+    {
+        for (int c = 0; c < 4; ++c)
+        {
+            for (int r = 0; r < 4; ++r)
+            {
+                if (std::abs(a[c][r] - b[c][r]) > eps)
+                    return false;
+            }
+        }
+        return true;
+    }
+
+    [[nodiscard]] bool Vec3NearlyEqual(const glm::vec3& a, const glm::vec3& b, float eps = 1e-4f)
+    {
+        return glm::all(glm::lessThanEqual(glm::abs(a - b), glm::vec3(eps)));
+    }
+
+    [[nodiscard]] bool OctreeSettingsEqual(const Graphics::OctreeDebugDrawSettings& a,
+                                           const Graphics::OctreeDebugDrawSettings& b)
+    {
+        return a.Enabled == b.Enabled &&
+               a.Overlay == b.Overlay &&
+               a.ColorByDepth == b.ColorByDepth &&
+               a.MaxDepth == b.MaxDepth &&
+               a.LeafOnly == b.LeafOnly &&
+               a.DrawInternal == b.DrawInternal &&
+               a.OccupiedOnly == b.OccupiedOnly &&
+               std::abs(a.Alpha - b.Alpha) <= 1e-4f &&
+               Vec3NearlyEqual(a.BaseColor, b.BaseColor);
+    }
+
+    [[nodiscard]] glm::vec3 DepthRamp(float t)
+    {
+        t = std::clamp(t, 0.0f, 1.0f);
+        constexpr std::array<glm::vec3, 5> k = {
+            glm::vec3{0.267f, 0.005f, 0.329f},
+            glm::vec3{0.230f, 0.322f, 0.546f},
+            glm::vec3{0.128f, 0.566f, 0.550f},
+            glm::vec3{0.369f, 0.788f, 0.382f},
+            glm::vec3{0.993f, 0.906f, 0.144f},
+        };
+
+        const float x = t * 4.0f;
+        const int i0 = std::clamp(static_cast<int>(x), 0, 3);
+        const int i1 = i0 + 1;
+        const float alpha = x - static_cast<float>(i0);
+        return k[i0] * (1.0f - alpha) + k[i1] * alpha;
+    }
+
+    [[nodiscard]] uint32_t PackWithAlpha(const glm::vec3& rgb, float alpha)
+    {
+        return Graphics::DebugDraw::PackColorF(rgb.r, rgb.g, rgb.b, alpha);
+    }
+
+    void TransformAABB(const glm::vec3& lo, const glm::vec3& hi, const glm::mat4& m,
+                      glm::vec3& outLo, glm::vec3& outHi)
+    {
+        glm::vec3 corners[8] = {
+            {lo.x, lo.y, lo.z}, {hi.x, lo.y, lo.z},
+            {lo.x, hi.y, lo.z}, {hi.x, hi.y, lo.z},
+            {lo.x, lo.y, hi.z}, {hi.x, lo.y, hi.z},
+            {lo.x, hi.y, hi.z}, {hi.x, hi.y, hi.z},
+        };
+
+        outLo = glm::vec3(std::numeric_limits<float>::max());
+        outHi = glm::vec3(std::numeric_limits<float>::lowest());
+
+        for (const glm::vec3& corner : corners)
+        {
+            const glm::vec3 transformed = glm::vec3(m * glm::vec4(corner, 1.0f));
+            outLo = glm::min(outLo, transformed);
+            outHi = glm::max(outHi, transformed);
+        }
+    }
+}
+
 // --- The Application Class ---
 class SandboxApp : public Engine
 {
@@ -65,15 +153,41 @@ public:
     // Octree Debug Visualization Settings (shared between UI and OnUpdate)
     Graphics::OctreeDebugDrawSettings m_OctreeDebugSettings{};
     bool m_DrawSelectedColliderOctree = false;
+    entt::entity m_OctreeOverlayEntity = entt::null;
+    Geometry::GeometryHandle m_OctreeOverlayGeometry{};
+    entt::entity m_OctreeOverlaySourceEntity = entt::null;
+    const Graphics::GeometryCollisionData* m_OctreeOverlaySource = nullptr;
+    Graphics::OctreeDebugDrawSettings m_CachedOctreeOverlaySettings{};
+    glm::mat4 m_CachedOctreeOverlayWorld{1.0f};
+    Geometry::AABB m_CachedOctreeOverlayLocalAABB{};
+    bool m_HasCachedOctreeOverlayAabb = false;
 
     Graphics::BoundingDebugDrawSettings m_BoundsDebugSettings{};
     bool m_DrawSelectedColliderBounds = false;
+    RetainedLineOverlaySlot m_BoundsOverlay{};
+    entt::entity m_BoundsOverlaySourceEntity = entt::null;
+    Graphics::BoundingDebugDrawSettings m_CachedBoundsOverlaySettings{};
+    glm::mat4 m_CachedBoundsOverlayWorld{1.0f};
+    Geometry::AABB m_CachedBoundsOverlayLocalAabb{};
+    bool m_HasCachedBoundsOverlayAabb = false;
 
     Graphics::KDTreeDebugDrawSettings m_KDTreeDebugSettings{};
     bool m_DrawSelectedColliderKDTree = false;
+    RetainedLineOverlaySlot m_KDTreeOverlay{};
+    entt::entity m_KDTreeOverlaySourceEntity = entt::null;
+    const Graphics::GeometryCollisionData* m_KDTreeOverlaySource = nullptr;
+    Graphics::KDTreeDebugDrawSettings m_CachedKDTreeOverlaySettings{};
+    glm::mat4 m_CachedKDTreeOverlayWorld{1.0f};
 
     Graphics::BVHDebugDrawSettings m_BVHDebugSettings{};
     bool m_DrawSelectedColliderBVH = false;
+    RetainedLineOverlaySlot m_BVHOverlay{};
+    entt::entity m_BVHOverlaySourceEntity = entt::null;
+    const Graphics::GeometryCollisionData* m_BVHOverlaySource = nullptr;
+    Graphics::BVHDebugDrawSettings m_CachedBVHOverlaySettings{};
+    glm::mat4 m_CachedBVHOverlayWorld{1.0f};
+    size_t m_CachedBVHOverlayPositionCount = 0;
+    size_t m_CachedBVHOverlayIndexCount = 0;
 
     // Transform Gizmo
     Graphics::TransformGizmo m_Gizmo;
@@ -92,6 +206,11 @@ public:
     Geometry::Halfedge::Mesh m_SelectedColliderHullMesh{};
     entt::entity m_SelectedHullEntity = entt::null;
     const Graphics::GeometryCollisionData* m_SelectedHullSource = nullptr;
+    RetainedLineOverlaySlot m_ConvexHullOverlay{};
+    entt::entity m_ConvexHullOverlaySourceEntity = entt::null;
+    const Graphics::GeometryCollisionData* m_ConvexHullOverlaySource = nullptr;
+    Graphics::ConvexHullDebugDrawSettings m_CachedConvexHullOverlaySettings{};
+    glm::mat4 m_CachedConvexHullOverlayWorld{1.0f};
 
 
     bool EnsureSelectedColliderKDTree(entt::entity selected,
@@ -154,6 +273,482 @@ public:
         m_SelectedColliderHullMesh = std::move(hull->Mesh);
         m_SelectedHullEntity = selected;
         m_SelectedHullSource = &collision;
+        return true;
+    }
+
+    void ReleaseCachedOctreeOverlay()
+    {
+        auto& reg = GetScene().GetRegistry();
+        if (m_OctreeOverlayEntity != entt::null && reg.valid(m_OctreeOverlayEntity))
+            reg.destroy(m_OctreeOverlayEntity);
+
+        if (m_OctreeOverlayGeometry.IsValid())
+        {
+            GetGeometryStorage().Remove(m_OctreeOverlayGeometry, GetDevice().GetGlobalFrameNumber());
+            m_OctreeOverlayGeometry = {};
+        }
+
+        m_OctreeOverlayEntity = entt::null;
+        m_OctreeOverlaySourceEntity = entt::null;
+        m_OctreeOverlaySource = nullptr;
+        m_CachedOctreeOverlayWorld = glm::mat4(1.0f);
+        m_CachedOctreeOverlaySettings = {};
+        m_CachedOctreeOverlayLocalAABB = {};
+        m_HasCachedOctreeOverlayAabb = false;
+    }
+
+    void ReleaseRetainedLineOverlay(RetainedLineOverlaySlot& slot)
+    {
+        auto& reg = GetScene().GetRegistry();
+        if (slot.Entity != entt::null && reg.valid(slot.Entity))
+            reg.destroy(slot.Entity);
+
+        if (slot.Geometry.IsValid())
+            GetGeometryStorage().Remove(slot.Geometry, GetDevice().GetGlobalFrameNumber());
+
+        slot = {};
+    }
+
+    bool UpdateRetainedLineOverlay(RetainedLineOverlaySlot& slot,
+                                   const std::function<void(Graphics::DebugDraw&)>& emit)
+    {
+        Graphics::DebugDraw capture;
+        emit(capture);
+
+        if (!capture.GetTriangles().empty() || !capture.GetPoints().empty())
+        {
+            ReleaseRetainedLineOverlay(slot);
+            return false;
+        }
+
+        const auto depthLines = capture.GetLines();
+        const auto overlayLines = capture.GetOverlayLines();
+        if (depthLines.empty() && overlayLines.empty())
+        {
+            ReleaseRetainedLineOverlay(slot);
+            return false;
+        }
+        if (!depthLines.empty() && !overlayLines.empty())
+        {
+            ReleaseRetainedLineOverlay(slot);
+            return false;
+        }
+
+        const auto segments = !overlayLines.empty() ? overlayLines : depthLines;
+        const bool overlay = !overlayLines.empty();
+
+        std::vector<glm::vec3> positions;
+        std::vector<uint32_t> indices;
+        std::vector<uint32_t> edgeColors;
+        positions.reserve(segments.size() * 2u);
+        indices.reserve(segments.size() * 2u);
+        edgeColors.reserve(segments.size());
+
+        auto appendSegment = [&](const glm::vec3& a, const glm::vec3& b, uint32_t color)
+        {
+            const auto base = static_cast<uint32_t>(positions.size());
+            positions.push_back(a);
+            positions.push_back(b);
+            indices.push_back(base + 0u);
+            indices.push_back(base + 1u);
+            edgeColors.push_back(color);
+        };
+
+        for (const auto& seg : segments)
+        {
+            if (seg.ColorStart == seg.ColorEnd)
+            {
+                appendSegment(seg.Start, seg.End, seg.ColorStart);
+            }
+            else
+            {
+                const glm::vec3 mid = (seg.Start + seg.End) * 0.5f;
+                appendSegment(seg.Start, mid, seg.ColorStart);
+                appendSegment(mid, seg.End, seg.ColorEnd);
+            }
+        }
+
+        Graphics::GeometryUploadRequest upload{};
+        upload.Positions = positions;
+        upload.Indices = indices;
+        upload.Topology = Graphics::PrimitiveTopology::Lines;
+        upload.UploadMode = Graphics::GeometryUploadMode::Direct;
+
+        auto [gpuData, token] = Graphics::GeometryGpuData::CreateAsync(
+            GetDeviceShared(), GetGraphicsBackend().GetTransferManager(), upload, &GetGeometryStorage());
+        (void)token;
+        if (!gpuData)
+        {
+            ReleaseRetainedLineOverlay(slot);
+            return false;
+        }
+
+        const Geometry::GeometryHandle oldGeometry = slot.Geometry;
+        const Geometry::GeometryHandle newGeometry = GetGeometryStorage().Add(std::move(gpuData));
+
+        auto& reg = GetScene().GetRegistry();
+        if (slot.Entity == entt::null || !reg.valid(slot.Entity))
+        {
+            slot.Entity = reg.create();
+            reg.emplace<HiddenEditorEntityTag>(slot.Entity);
+        }
+
+        auto& line = reg.emplace_or_replace<ECS::Line::Component>(slot.Entity);
+        line.Geometry = newGeometry;
+        line.EdgeView = newGeometry;
+        line.EdgeCount = static_cast<uint32_t>(indices.size() / 2u);
+        line.Color = glm::vec4(1.0f);
+        line.Width = 1.5f;
+        line.Overlay = overlay;
+        line.HasPerEdgeColors = true;
+        line.ShowPerEdgeColors = true;
+        line.CachedEdgeColors = std::move(edgeColors);
+
+        slot.Geometry = newGeometry;
+        if (oldGeometry.IsValid() && oldGeometry != newGeometry)
+            GetGeometryStorage().Remove(oldGeometry, GetDevice().GetGlobalFrameNumber());
+
+        return true;
+    }
+
+    bool EnsureRetainedOctreeOverlay(entt::entity selected,
+                                     const Graphics::GeometryCollisionData& collision,
+                                     const ECS::Components::Transform::Component& xf)
+    {
+        Graphics::OctreeDebugDrawSettings settings = m_OctreeDebugSettings;
+        settings.Enabled = true;
+
+        const glm::mat4 worldMatrix = GetMatrix(xf);
+        const bool cacheValid =
+            (m_OctreeOverlayEntity != entt::null) &&
+            GetScene().GetRegistry().valid(m_OctreeOverlayEntity) &&
+            m_OctreeOverlayGeometry.IsValid() &&
+            (m_OctreeOverlaySourceEntity == selected) &&
+            (m_OctreeOverlaySource == &collision) &&
+            OctreeSettingsEqual(m_CachedOctreeOverlaySettings, settings) &&
+            MatricesNearlyEqual(m_CachedOctreeOverlayWorld, worldMatrix) &&
+            m_HasCachedOctreeOverlayAabb &&
+            Vec3NearlyEqual(m_CachedOctreeOverlayLocalAABB.Min, collision.LocalAABB.Min) &&
+            Vec3NearlyEqual(m_CachedOctreeOverlayLocalAABB.Max, collision.LocalAABB.Max);
+
+        if (cacheValid)
+            return true;
+
+        if (collision.LocalOctree.m_Nodes.empty())
+        {
+            ReleaseCachedOctreeOverlay();
+            return false;
+        }
+
+        constexpr std::array<uint32_t, 24> kBoxEdges = {
+            0u, 1u, 1u, 3u, 3u, 2u, 2u, 0u,
+            4u, 5u, 5u, 7u, 7u, 6u, 6u, 4u,
+            0u, 4u, 1u, 5u, 2u, 6u, 3u, 7u,
+        };
+
+        std::vector<glm::vec3> positions;
+        std::vector<uint32_t> indices;
+        std::vector<uint32_t> edgeColors;
+
+        auto appendBox = [&](const glm::vec3& lo, const glm::vec3& hi, uint32_t color)
+        {
+            const uint32_t base = static_cast<uint32_t>(positions.size());
+            positions.push_back({lo.x, lo.y, lo.z});
+            positions.push_back({hi.x, lo.y, lo.z});
+            positions.push_back({lo.x, hi.y, lo.z});
+            positions.push_back({hi.x, hi.y, lo.z});
+            positions.push_back({lo.x, lo.y, hi.z});
+            positions.push_back({hi.x, lo.y, hi.z});
+            positions.push_back({lo.x, hi.y, hi.z});
+            positions.push_back({hi.x, hi.y, hi.z});
+
+            for (uint32_t edge : kBoxEdges)
+                indices.push_back(base + edge);
+
+            edgeColors.insert(edgeColors.end(), kBoxEdges.size() / 2u, color);
+        };
+
+        struct StackItem { Geometry::Octree::NodeIndex Node; std::uint32_t Depth; };
+        std::array<StackItem, 512> stack{};
+        std::size_t sp = 0;
+        stack[sp++] = {0u, 0u};
+
+        const auto& nodes = collision.LocalOctree.m_Nodes;
+        while (sp > 0)
+        {
+            const StackItem item = stack[--sp];
+            if (item.Node >= nodes.size())
+                continue;
+
+            const auto& node = nodes[item.Node];
+            if (item.Depth > settings.MaxDepth)
+                continue;
+
+            const bool isLeaf = node.IsLeaf;
+            const bool drawThis =
+                (!settings.OccupiedOnly || node.NumElements > 0) &&
+                ((settings.LeafOnly && isLeaf) || (!settings.LeafOnly && (isLeaf || settings.DrawInternal)));
+
+            if (drawThis)
+            {
+                const float t = (settings.MaxDepth > 0u)
+                    ? (static_cast<float>(item.Depth) / static_cast<float>(settings.MaxDepth))
+                    : 0.0f;
+                const glm::vec3 rgb = settings.ColorByDepth ? DepthRamp(t) : settings.BaseColor;
+                const uint32_t color = PackWithAlpha(rgb, settings.Alpha);
+
+                glm::vec3 lo, hi;
+                TransformAABB(node.Aabb.Min, node.Aabb.Max, worldMatrix, lo, hi);
+                appendBox(lo, hi, color);
+            }
+
+            if (!node.IsLeaf && node.BaseChildIndex != Geometry::Octree::kInvalidIndex)
+            {
+                std::uint32_t childOffset = 0;
+                for (int child = 0; child < 8; ++child)
+                {
+                    if (!node.ChildExists(child))
+                        continue;
+
+                    const auto childIndex = node.BaseChildIndex + childOffset;
+                    ++childOffset;
+                    if (sp < stack.size())
+                        stack[sp++] = {childIndex, item.Depth + 1u};
+                }
+            }
+        }
+
+        if (positions.empty() || indices.empty())
+        {
+            ReleaseCachedOctreeOverlay();
+            return false;
+        }
+
+        Graphics::GeometryUploadRequest upload{};
+        upload.Positions = positions;
+        upload.Indices = indices;
+        upload.Topology = Graphics::PrimitiveTopology::Lines;
+        upload.UploadMode = Graphics::GeometryUploadMode::Direct;
+
+        auto [gpuData, token] = Graphics::GeometryGpuData::CreateAsync(
+            GetDeviceShared(), GetGraphicsBackend().GetTransferManager(), upload, &GetGeometryStorage());
+        (void)token;
+        if (!gpuData)
+        {
+            ReleaseCachedOctreeOverlay();
+            return false;
+        }
+
+        const Geometry::GeometryHandle oldGeometry = m_OctreeOverlayGeometry;
+        const Geometry::GeometryHandle newGeometry = GetGeometryStorage().Add(std::move(gpuData));
+
+        auto& reg = GetScene().GetRegistry();
+        if (m_OctreeOverlayEntity == entt::null || !reg.valid(m_OctreeOverlayEntity))
+        {
+            m_OctreeOverlayEntity = reg.create();
+            reg.emplace<HiddenEditorEntityTag>(m_OctreeOverlayEntity);
+        }
+
+        auto& line = reg.emplace_or_replace<ECS::Line::Component>(m_OctreeOverlayEntity);
+        line.Geometry = newGeometry;
+        line.EdgeView = newGeometry;
+        line.EdgeCount = static_cast<uint32_t>(indices.size() / 2u);
+        line.Color = glm::vec4(1.0f);
+        line.Width = 1.5f;
+        line.Overlay = settings.Overlay;
+        line.HasPerEdgeColors = true;
+        line.ShowPerEdgeColors = true;
+        line.CachedEdgeColors = std::move(edgeColors);
+
+        m_OctreeOverlayGeometry = newGeometry;
+        m_OctreeOverlaySourceEntity = selected;
+        m_OctreeOverlaySource = &collision;
+        m_CachedOctreeOverlaySettings = settings;
+        m_CachedOctreeOverlayWorld = worldMatrix;
+        m_CachedOctreeOverlayLocalAABB = collision.LocalAABB;
+        m_HasCachedOctreeOverlayAabb = true;
+
+        if (oldGeometry.IsValid() && oldGeometry != newGeometry)
+            GetGeometryStorage().Remove(oldGeometry, GetDevice().GetGlobalFrameNumber());
+
+        return true;
+    }
+
+    bool EnsureRetainedBoundsOverlay(entt::entity selected,
+                                     const Geometry::AABB& localAabb,
+                                     const Geometry::OBB& worldObb,
+                                     const ECS::Components::Transform::Component& xf)
+    {
+        const glm::mat4 worldMatrix = GetMatrix(xf);
+        const bool cacheValid =
+            (m_BoundsOverlaySourceEntity == selected) &&
+            m_BoundsOverlay.Geometry.IsValid() &&
+            OctreeSettingsEqual(
+                { .Enabled = true, .Overlay = m_CachedBoundsOverlaySettings.Overlay, .ColorByDepth = false, .MaxDepth = 0u, .LeafOnly = false, .DrawInternal = false, .OccupiedOnly = false, .Alpha = m_CachedBoundsOverlaySettings.Alpha, .BaseColor = m_CachedBoundsOverlaySettings.AABBColor },
+                { .Enabled = true, .Overlay = m_BoundsDebugSettings.Overlay, .ColorByDepth = false, .MaxDepth = 0u, .LeafOnly = false, .DrawInternal = false, .OccupiedOnly = false, .Alpha = m_BoundsDebugSettings.Alpha, .BaseColor = m_BoundsDebugSettings.AABBColor }) &&
+            m_CachedBoundsOverlaySettings.DrawAABB == m_BoundsDebugSettings.DrawAABB &&
+            m_CachedBoundsOverlaySettings.DrawOBB == m_BoundsDebugSettings.DrawOBB &&
+            m_CachedBoundsOverlaySettings.DrawBoundingSphere == m_BoundsDebugSettings.DrawBoundingSphere &&
+            Vec3NearlyEqual(m_CachedBoundsOverlaySettings.AABBColor, m_BoundsDebugSettings.AABBColor) &&
+            Vec3NearlyEqual(m_CachedBoundsOverlaySettings.OBBColor, m_BoundsDebugSettings.OBBColor) &&
+            Vec3NearlyEqual(m_CachedBoundsOverlaySettings.SphereColor, m_BoundsDebugSettings.SphereColor) &&
+            MatricesNearlyEqual(m_CachedBoundsOverlayWorld, worldMatrix) &&
+            m_HasCachedBoundsOverlayAabb &&
+            Vec3NearlyEqual(m_CachedBoundsOverlayLocalAabb.Min, localAabb.Min) &&
+            Vec3NearlyEqual(m_CachedBoundsOverlayLocalAabb.Max, localAabb.Max);
+
+        if (cacheValid)
+            return true;
+
+        Graphics::BoundingDebugDrawSettings settings = m_BoundsDebugSettings;
+        settings.Enabled = true;
+        const bool ok = UpdateRetainedLineOverlay(m_BoundsOverlay, [&](Graphics::DebugDraw& dd)
+        {
+            DrawBoundingVolumes(dd, localAabb, worldObb, settings);
+        });
+
+        if (!ok)
+            return false;
+
+        m_BoundsOverlaySourceEntity = selected;
+        m_CachedBoundsOverlaySettings = settings;
+        m_CachedBoundsOverlayWorld = worldMatrix;
+        m_CachedBoundsOverlayLocalAabb = localAabb;
+        m_HasCachedBoundsOverlayAabb = true;
+        return true;
+    }
+
+    bool EnsureRetainedKDTreeOverlay(entt::entity selected,
+                                     const Graphics::GeometryCollisionData& collision,
+                                     const ECS::Components::Transform::Component& xf)
+    {
+        if (!EnsureSelectedColliderKDTree(selected, collision))
+        {
+            ReleaseRetainedLineOverlay(m_KDTreeOverlay);
+            m_KDTreeOverlaySourceEntity = entt::null;
+            m_KDTreeOverlaySource = nullptr;
+            return false;
+        }
+
+        const glm::mat4 worldMatrix = GetMatrix(xf);
+        const bool cacheValid =
+            (m_KDTreeOverlaySourceEntity == selected) &&
+            (m_KDTreeOverlaySource == &collision) &&
+            m_KDTreeOverlay.Geometry.IsValid() &&
+            m_CachedKDTreeOverlaySettings.Overlay == m_KDTreeDebugSettings.Overlay &&
+            m_CachedKDTreeOverlaySettings.LeafOnly == m_KDTreeDebugSettings.LeafOnly &&
+            m_CachedKDTreeOverlaySettings.DrawInternal == m_KDTreeDebugSettings.DrawInternal &&
+            m_CachedKDTreeOverlaySettings.OccupiedOnly == m_KDTreeDebugSettings.OccupiedOnly &&
+            m_CachedKDTreeOverlaySettings.DrawSplitPlanes == m_KDTreeDebugSettings.DrawSplitPlanes &&
+            m_CachedKDTreeOverlaySettings.MaxDepth == m_KDTreeDebugSettings.MaxDepth &&
+            std::abs(m_CachedKDTreeOverlaySettings.Alpha - m_KDTreeDebugSettings.Alpha) <= 1e-4f &&
+            Vec3NearlyEqual(m_CachedKDTreeOverlaySettings.LeafColor, m_KDTreeDebugSettings.LeafColor) &&
+            Vec3NearlyEqual(m_CachedKDTreeOverlaySettings.InternalColor, m_KDTreeDebugSettings.InternalColor) &&
+            Vec3NearlyEqual(m_CachedKDTreeOverlaySettings.SplitPlaneColor, m_KDTreeDebugSettings.SplitPlaneColor) &&
+            MatricesNearlyEqual(m_CachedKDTreeOverlayWorld, worldMatrix);
+
+        if (cacheValid)
+            return true;
+
+        Graphics::KDTreeDebugDrawSettings settings = m_KDTreeDebugSettings;
+        settings.Enabled = true;
+        const bool ok = UpdateRetainedLineOverlay(m_KDTreeOverlay, [&](Graphics::DebugDraw& dd)
+        {
+            DrawKDTree(dd, m_SelectedColliderKDTree, settings, worldMatrix);
+        });
+
+        if (!ok)
+            return false;
+
+        m_KDTreeOverlaySourceEntity = selected;
+        m_KDTreeOverlaySource = &collision;
+        m_CachedKDTreeOverlaySettings = settings;
+        m_CachedKDTreeOverlayWorld = worldMatrix;
+        return true;
+    }
+
+    bool EnsureRetainedBVHOverlay(entt::entity selected,
+                                  const Graphics::GeometryCollisionData& collision,
+                                  const ECS::Components::Transform::Component& xf)
+    {
+        const glm::mat4 worldMatrix = GetMatrix(xf);
+        const bool cacheValid =
+            (m_BVHOverlaySourceEntity == selected) &&
+            (m_BVHOverlaySource == &collision) &&
+            m_BVHOverlay.Geometry.IsValid() &&
+            m_CachedBVHOverlaySettings.Overlay == m_BVHDebugSettings.Overlay &&
+            m_CachedBVHOverlaySettings.LeafOnly == m_BVHDebugSettings.LeafOnly &&
+            m_CachedBVHOverlaySettings.DrawInternal == m_BVHDebugSettings.DrawInternal &&
+            m_CachedBVHOverlaySettings.MaxDepth == m_BVHDebugSettings.MaxDepth &&
+            m_CachedBVHOverlaySettings.LeafTriangleCount == m_BVHDebugSettings.LeafTriangleCount &&
+            std::abs(m_CachedBVHOverlaySettings.Alpha - m_BVHDebugSettings.Alpha) <= 1e-4f &&
+            Vec3NearlyEqual(m_CachedBVHOverlaySettings.LeafColor, m_BVHDebugSettings.LeafColor) &&
+            Vec3NearlyEqual(m_CachedBVHOverlaySettings.InternalColor, m_BVHDebugSettings.InternalColor) &&
+            MatricesNearlyEqual(m_CachedBVHOverlayWorld, worldMatrix) &&
+            m_CachedBVHOverlayPositionCount == collision.Positions.size() &&
+            m_CachedBVHOverlayIndexCount == collision.Indices.size();
+
+        if (cacheValid)
+            return true;
+
+        Graphics::BVHDebugDrawSettings settings = m_BVHDebugSettings;
+        settings.Enabled = true;
+        const bool ok = UpdateRetainedLineOverlay(m_BVHOverlay, [&](Graphics::DebugDraw& dd)
+        {
+            DrawBVH(dd, collision.Positions, collision.Indices, settings, worldMatrix);
+        });
+
+        if (!ok)
+            return false;
+
+        m_BVHOverlaySourceEntity = selected;
+        m_BVHOverlaySource = &collision;
+        m_CachedBVHOverlaySettings = settings;
+        m_CachedBVHOverlayWorld = worldMatrix;
+        m_CachedBVHOverlayPositionCount = collision.Positions.size();
+        m_CachedBVHOverlayIndexCount = collision.Indices.size();
+        return true;
+    }
+
+    bool EnsureRetainedConvexHullOverlay(entt::entity selected,
+                                         const Graphics::GeometryCollisionData& collision,
+                                         const ECS::Components::Transform::Component& xf)
+    {
+        if (!EnsureSelectedColliderConvexHull(selected, collision))
+        {
+            ReleaseRetainedLineOverlay(m_ConvexHullOverlay);
+            m_ConvexHullOverlaySourceEntity = entt::null;
+            m_ConvexHullOverlaySource = nullptr;
+            return false;
+        }
+
+        const glm::mat4 worldMatrix = GetMatrix(xf);
+        const bool cacheValid =
+            (m_ConvexHullOverlaySourceEntity == selected) &&
+            (m_ConvexHullOverlaySource == &collision) &&
+            m_ConvexHullOverlay.Geometry.IsValid() &&
+            m_CachedConvexHullOverlaySettings.Overlay == m_ConvexHullDebugSettings.Overlay &&
+            std::abs(m_CachedConvexHullOverlaySettings.Alpha - m_ConvexHullDebugSettings.Alpha) <= 1e-4f &&
+            Vec3NearlyEqual(m_CachedConvexHullOverlaySettings.Color, m_ConvexHullDebugSettings.Color) &&
+            MatricesNearlyEqual(m_CachedConvexHullOverlayWorld, worldMatrix);
+
+        if (cacheValid)
+            return true;
+
+        Graphics::ConvexHullDebugDrawSettings settings = m_ConvexHullDebugSettings;
+        settings.Enabled = true;
+        const bool ok = UpdateRetainedLineOverlay(m_ConvexHullOverlay, [&](Graphics::DebugDraw& dd)
+        {
+            DrawConvexHull(dd, m_SelectedColliderHullMesh, settings, worldMatrix);
+        });
+
+        if (!ok)
+            return false;
+
+        m_ConvexHullOverlaySourceEntity = selected;
+        m_ConvexHullOverlaySource = &collision;
+        m_CachedConvexHullOverlaySettings = settings;
+        m_CachedConvexHullOverlayWorld = worldMatrix;
         return true;
     }
 
@@ -387,11 +982,11 @@ public:
             ImGui::SeparatorText("Gizmo Mode");
 
             int mode = static_cast<int>(cfg.Mode);
-            if (ImGui::RadioButton("Translate (W)", mode == 0)) cfg.Mode = Graphics::GizmoMode::Translate;
+            if (ImGui::RadioButton("Translate (W)", mode == 0)) m_Gizmo.SetMode(Graphics::GizmoMode::Translate);
             ImGui::SameLine();
-            if (ImGui::RadioButton("Rotate (E)", mode == 1)) cfg.Mode = Graphics::GizmoMode::Rotate;
+            if (ImGui::RadioButton("Rotate (E)", mode == 1)) m_Gizmo.SetMode(Graphics::GizmoMode::Rotate);
             ImGui::SameLine();
-            if (ImGui::RadioButton("Scale (R)", mode == 2)) cfg.Mode = Graphics::GizmoMode::Scale;
+            if (ImGui::RadioButton("Scale (R)", mode == 2)) m_Gizmo.SetMode(Graphics::GizmoMode::Scale);
 
             // --- Space toggle ---
             ImGui::SeparatorText("Transform Space");
@@ -417,6 +1012,7 @@ public:
                 ImGui::DragFloat("Rotate Snap (deg)", &cfg.RotateSnap, 1.0f, 1.0f, 90.0f, "%.1f");
                 ImGui::DragFloat("Scale Snap", &cfg.ScaleSnap, 0.01f, 0.01f, 1.0f, "%.2f");
             }
+
 
             // --- Visual settings ---
             ImGui::SeparatorText("Appearance");
@@ -675,11 +1271,11 @@ public:
             if (!uiCapturesKeyboard && !m_Gizmo.IsActive())
             {
                 if (m_Window->GetInput().IsKeyJustPressed(Core::Input::Key::W))
-                    m_Gizmo.GetConfig().Mode = Graphics::GizmoMode::Translate;
+                    m_Gizmo.SetMode(Graphics::GizmoMode::Translate);
                 if (m_Window->GetInput().IsKeyJustPressed(Core::Input::Key::E))
-                    m_Gizmo.GetConfig().Mode = Graphics::GizmoMode::Rotate;
+                    m_Gizmo.SetMode(Graphics::GizmoMode::Rotate);
                 if (m_Window->GetInput().IsKeyJustPressed(Core::Input::Key::R))
-                    m_Gizmo.GetConfig().Mode = Graphics::GizmoMode::Scale;
+                    m_Gizmo.SetMode(Graphics::GizmoMode::Scale);
                 // X toggles world/local space.
                 if (m_Window->GetInput().IsKeyJustPressed(Core::Input::Key::X))
                 {
@@ -767,61 +1363,29 @@ public:
                 if (collider && collider->CollisionRef && xf)
                 {
                     if (m_DrawSelectedColliderOctree)
-                    {
-                        m_OctreeDebugSettings.Enabled = true;
-
-                        // Compute world transform matrix from transform component
-                        const glm::mat4 worldMatrix = GetMatrix(*xf);
-                        DrawOctree(GetRenderOrchestrator().GetDebugDraw(), collider->CollisionRef->LocalOctree,
-                                   m_OctreeDebugSettings, worldMatrix);
-                    }
+                        EnsureRetainedOctreeOverlay(selected, *collider->CollisionRef, *xf);
+                    else
+                        ReleaseCachedOctreeOverlay();
 
                     if (m_DrawSelectedColliderBounds)
-                    {
-                        m_BoundsDebugSettings.Enabled = true;
-                        DrawBoundingVolumes(GetRenderOrchestrator().GetDebugDraw(),
-                                            collider->CollisionRef->LocalAABB,
-                                            collider->WorldOBB,
-                                            m_BoundsDebugSettings);
-                    }
-
+                        EnsureRetainedBoundsOverlay(selected, collider->CollisionRef->LocalAABB, collider->WorldOBB, *xf);
+                    else
+                        ReleaseRetainedLineOverlay(m_BoundsOverlay);
 
                     if (m_DrawSelectedColliderKDTree)
-                    {
-                        m_KDTreeDebugSettings.Enabled = true;
-                        if (EnsureSelectedColliderKDTree(selected, *collider->CollisionRef))
-                        {
-                            const glm::mat4 worldMatrix = GetMatrix(*xf);
-                            DrawKDTree(GetRenderOrchestrator().GetDebugDraw(),
-                                       m_SelectedColliderKDTree,
-                                       m_KDTreeDebugSettings,
-                                       worldMatrix);
-                        }
-                    }
+                        EnsureRetainedKDTreeOverlay(selected, *collider->CollisionRef, *xf);
+                    else
+                        ReleaseRetainedLineOverlay(m_KDTreeOverlay);
 
                     if (m_DrawSelectedColliderBVH)
-                    {
-                        m_BVHDebugSettings.Enabled = true;
-                        const glm::mat4 worldMatrix = GetMatrix(*xf);
-                        DrawBVH(GetRenderOrchestrator().GetDebugDraw(),
-                                collider->CollisionRef->Positions,
-                                collider->CollisionRef->Indices,
-                                m_BVHDebugSettings,
-                                worldMatrix);
-                    }
+                        EnsureRetainedBVHOverlay(selected, *collider->CollisionRef, *xf);
+                    else
+                        ReleaseRetainedLineOverlay(m_BVHOverlay);
 
                     if (m_DrawSelectedColliderConvexHull)
-                    {
-                        m_ConvexHullDebugSettings.Enabled = true;
-                        if (EnsureSelectedColliderConvexHull(selected, *collider->CollisionRef))
-                        {
-                            const glm::mat4 worldMatrix = GetMatrix(*xf);
-                            DrawConvexHull(GetRenderOrchestrator().GetDebugDraw(),
-                                           m_SelectedColliderHullMesh,
-                                           m_ConvexHullDebugSettings,
-                                           worldMatrix);
-                        }
-                    }
+                        EnsureRetainedConvexHullOverlay(selected, *collider->CollisionRef, *xf);
+                    else
+                        ReleaseRetainedLineOverlay(m_ConvexHullOverlay);
 
                     if (m_DrawSelectedColliderContacts)
                     {
@@ -861,7 +1425,31 @@ public:
                         }
                     }
                 }
+                else
+                {
+                    ReleaseCachedOctreeOverlay();
+                    ReleaseRetainedLineOverlay(m_BoundsOverlay);
+                    ReleaseRetainedLineOverlay(m_KDTreeOverlay);
+                    ReleaseRetainedLineOverlay(m_BVHOverlay);
+                    ReleaseRetainedLineOverlay(m_ConvexHullOverlay);
+                }
             }
+            else
+            {
+                ReleaseCachedOctreeOverlay();
+                ReleaseRetainedLineOverlay(m_BoundsOverlay);
+                ReleaseRetainedLineOverlay(m_KDTreeOverlay);
+                ReleaseRetainedLineOverlay(m_BVHOverlay);
+                ReleaseRetainedLineOverlay(m_ConvexHullOverlay);
+            }
+        }
+        else
+        {
+            ReleaseCachedOctreeOverlay();
+            ReleaseRetainedLineOverlay(m_BoundsOverlay);
+            ReleaseRetainedLineOverlay(m_KDTreeOverlay);
+            ReleaseRetainedLineOverlay(m_BVHOverlay);
+            ReleaseRetainedLineOverlay(m_ConvexHullOverlay);
         }
 
         // ---------------------------------------------------------------------
@@ -917,6 +1505,9 @@ public:
 
         GetScene().GetRegistry().view<entt::entity>().each([&](auto entityID)
         {
+            if (GetScene().GetRegistry().all_of<HiddenEditorEntityTag>(entityID))
+                return;
+
             // Try to get tag, default to "Entity"
             std::string name = "Entity";
             if (GetScene().GetRegistry().all_of<ECS::Components::NameTag::Component>(entityID))

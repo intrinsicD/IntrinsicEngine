@@ -30,14 +30,30 @@ export namespace Graphics
     class DebugDraw
     {
     public:
+        static constexpr uint32_t DefaultMaxLineSegments = 32u * 1024u;
+
+        DebugDraw()
+            : m_Lines{},
+              m_OverlayLines{},
+              m_Triangles{},
+              m_Points{},
+              m_MaxLineSegments{DefaultMaxLineSegments},
+              m_DroppedLineSegments{0}
+        {
+            m_Lines.reserve(DefaultMaxLineSegments);
+            m_OverlayLines.reserve(DefaultMaxLineSegments);
+            m_Triangles.reserve(256u * 3u);
+            m_Points.reserve(256u);
+        }
+
         // GPU-aligned line segment: 32 bytes (2 x vec4).
         // Layout: [Start.x, Start.y, Start.z, ColorStart | End.x, End.y, End.z, ColorEnd]
         struct alignas(16) LineSegment
         {
-            glm::vec3 Start;
-            uint32_t ColorStart; // packed ABGR (Vulkan byte order: R in low bits)
-            glm::vec3 End;
-            uint32_t ColorEnd;
+            glm::vec3 Start{0.0f};
+            uint32_t ColorStart{0}; // packed ABGR (Vulkan byte order: R in low bits)
+            glm::vec3 End{0.0f};
+            uint32_t ColorEnd{0};
         };
         static_assert(sizeof(LineSegment) == 32, "LineSegment must be 32 bytes for GPU SSBO alignment");
 
@@ -111,10 +127,10 @@ export namespace Graphics
         // Layout: [Position.x, Position.y, Position.z, Size | Color, pad, pad, pad]
         struct alignas(16) PointMarker
         {
-            glm::vec3 Position;
-            float     Size;      // world-space radius
-            uint32_t  Color;     // packed ABGR
-            float     _pad[3];
+            glm::vec3 Position{0.0f};
+            float     Size{0.0f};      // world-space radius
+            uint32_t  Color{0};        // packed ABGR
+            float     _pad[3]{0.0f, 0.0f, 0.0f};
         };
         static_assert(sizeof(PointMarker) == 32, "PointMarker must be 32 bytes for GPU alignment");
 
@@ -128,10 +144,10 @@ export namespace Graphics
         // GPU-aligned triangle vertex: 32 bytes.
         struct alignas(16) TriangleVertex
         {
-            glm::vec3 Position;
-            uint32_t Color;   // packed ABGR
-            glm::vec3 Normal;
-            float _pad;
+            glm::vec3 Position{0.0f};
+            uint32_t Color{0};
+            glm::vec3 Normal{0.0f};
+            float _pad{0.0f};
         };
         static_assert(sizeof(TriangleVertex) == 32, "TriangleVertex must be 32 bytes for GPU SSBO alignment");
 
@@ -160,6 +176,19 @@ export namespace Graphics
         // Clear all accumulated geometry. Call at the start of each frame.
         void Reset();
 
+        void SetMaxLineSegments(uint32_t maxSegments) noexcept;
+        [[nodiscard]] uint32_t GetMaxLineSegments() const noexcept { return m_MaxLineSegments; }
+        [[nodiscard]] uint32_t GetUsedLineSegments() const noexcept
+        {
+            return static_cast<uint32_t>(m_Lines.size() + m_OverlayLines.size());
+        }
+        [[nodiscard]] uint32_t GetRemainingLineCapacity() const noexcept
+        {
+            const uint32_t used = GetUsedLineSegments();
+            return (used < m_MaxLineSegments) ? (m_MaxLineSegments - used) : 0u;
+        }
+        [[nodiscard]] uint32_t GetDroppedLineCount() const noexcept { return m_DroppedLineSegments; }
+
         // Access accumulated geometry for GPU upload.
         [[nodiscard]] std::span<const LineSegment> GetLines() const;
         [[nodiscard]] std::span<const LineSegment> GetOverlayLines() const;
@@ -173,16 +202,22 @@ export namespace Graphics
 
     private:
         // Depth-tested lines (rendered with depth test enabled).
-        std::vector<LineSegment> m_Lines;
+        std::vector<LineSegment> m_Lines{};
 
         // Overlay lines (rendered without depth test — always on top).
-        std::vector<LineSegment> m_OverlayLines;
+        std::vector<LineSegment> m_OverlayLines{};
 
         // Depth-tested triangles (filled surface primitives).
-        std::vector<TriangleVertex> m_Triangles;
+        std::vector<TriangleVertex> m_Triangles{};
 
         // Depth-tested point markers (rendered by PointPass).
-        std::vector<PointMarker> m_Points;
+        std::vector<PointMarker> m_Points{};
+        uint32_t m_MaxLineSegments{DefaultMaxLineSegments};
+        uint32_t m_DroppedLineSegments{0};
+
+        void PushLine(std::vector<LineSegment>& target,
+                      const glm::vec3& a, uint32_t colorA,
+                      const glm::vec3& b, uint32_t colorB);
 
         // Shared implementation for sphere drawing.
         void SphereImpl(std::vector<LineSegment>& target,

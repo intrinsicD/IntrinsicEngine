@@ -5,7 +5,6 @@ module;
 #include <cstring>
 #include <memory>
 #include <string>
-#include <string_view>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -40,14 +39,14 @@ namespace Graphics::Passes
     // Push constants layout (must match line.vert / line.frag).
     struct LinePushConstants
     {
-        glm::mat4 Model;           // 64 bytes, offset  0
-        uint64_t  PtrPositions;    //  8 bytes, offset 64
-        uint64_t  PtrEdges;        //  8 bytes, offset 72
-        float     LineWidth;       //  4 bytes, offset 80
-        float     ViewportWidth;   //  4 bytes, offset 84
-        float     ViewportHeight;  //  4 bytes, offset 88
-        uint32_t  Color;           //  4 bytes, offset 92
-        uint64_t  PtrEdgeAux;      //  8 bytes, offset 96 — BDA to per-edge packed ABGR colors (0 = uniform Color)
+        glm::mat4 Model{1.0f};           // 64 bytes, offset  0
+        uint64_t  PtrPositions{0};    //  8 bytes, offset 64
+        uint64_t  PtrEdges{0};        //  8 bytes, offset 72
+        float     LineWidth{0.0f};       //  4 bytes, offset 80
+        float     ViewportWidth{0.0f};   //  4 bytes, offset 84
+        float     ViewportHeight{0.0f};  //  4 bytes, offset 88
+        uint32_t  Color{0};           //  4 bytes, offset 92
+        uint64_t  PtrEdgeAux{0};      //  8 bytes, offset 96 — BDA to per-edge packed ABGR colors (0 = uniform Color)
     };
     static_assert(sizeof(LinePushConstants) == 104);
 
@@ -488,74 +487,82 @@ namespace Graphics::Passes
                     auto depthLines = m_DebugDraw->GetLines();
                     auto overlayLines = m_DebugDraw->GetOverlayLines();
 
-                    // Build flat position array and color array from LineSegments.
-                    std::vector<glm::vec3> positions;
-                    std::vector<uint32_t> colors;
-                    positions.reserve(static_cast<size_t>(totalTransient) * 2);
-                    colors.reserve(totalTransient);
-
-                    // Depth-tested lines first.
-                    for (const auto& seg : depthLines)
+                    auto* mappedPositions = static_cast<glm::vec3*>(m_TransientPosBuffer[frameIndex]->GetMappedData());
+                    auto* mappedColors = static_cast<uint32_t*>(m_TransientColorBuffer[frameIndex]->GetMappedData());
+                    if (!mappedPositions || !mappedColors)
                     {
-                        positions.push_back(seg.Start);
-                        positions.push_back(seg.End);
-                        colors.push_back(seg.ColorStart);
+                        Core::Log::Error("LinePass: Transient line buffers are not mapped.");
                     }
-
-                    // Overlay lines second.
-                    for (const auto& seg : overlayLines)
+                    else
                     {
-                        positions.push_back(seg.Start);
-                        positions.push_back(seg.End);
-                        colors.push_back(seg.ColorStart);
-                    }
+                        uint32_t segmentIndex = 0;
 
-                    // Upload to per-frame buffers.
-                    m_TransientPosBuffer[frameIndex]->Write(
-                        positions.data(), positions.size() * sizeof(glm::vec3));
-                    m_TransientColorBuffer[frameIndex]->Write(
-                        colors.data(), colors.size() * sizeof(uint32_t));
+                        // Depth-tested lines first.
+                        for (const auto& seg : depthLines)
+                        {
+                            const uint32_t vertexIndex = segmentIndex * 2u;
+                            mappedPositions[vertexIndex + 0u] = seg.Start;
+                            mappedPositions[vertexIndex + 1u] = seg.End;
+                            mappedColors[segmentIndex] = seg.ColorStart;
+                            ++segmentIndex;
+                        }
 
-                    const uint64_t posAddr = m_TransientPosBuffer[frameIndex]->GetDeviceAddress();
-                    const uint64_t edgeAddr = m_TransientEdgeBuffer->GetDeviceAddress();
-                    const uint64_t colorAddr = m_TransientColorBuffer[frameIndex]->GetDeviceAddress();
+                        // Overlay lines second.
+                        for (const auto& seg : overlayLines)
+                        {
+                            const uint32_t vertexIndex = segmentIndex * 2u;
+                            mappedPositions[vertexIndex + 0u] = seg.Start;
+                            mappedPositions[vertexIndex + 1u] = seg.End;
+                            mappedColors[segmentIndex] = seg.ColorStart;
+                            ++segmentIndex;
+                        }
 
-                    // Emit depth-tested transient draw (identity model, world-space positions).
-                    if (depthLineCount > 0)
-                    {
-                        DrawInfo di{};
-                        di.Model = glm::mat4(1.0f);
-                        di.PtrPositions = posAddr;
-                        di.PtrEdges = edgeAddr;
-                        di.EdgeCount = depthLineCount;
-                        di.Color = 0xFFFFFFFFu; // white fallback (unused when PtrEdgeAux != 0)
-                        di.LineWidth = std::clamp(LineWidth, 0.5f, 32.0f);
-                        di.PtrEdgeAux = colorAddr;
-                        depthDraws.push_back(di);
-                    }
+                        const size_t positionBytes = static_cast<size_t>(totalTransient) * 2u * sizeof(glm::vec3);
+                        const size_t colorBytes = static_cast<size_t>(totalTransient) * sizeof(uint32_t);
+                        m_TransientPosBuffer[frameIndex]->Flush(0u, positionBytes);
+                        m_TransientColorBuffer[frameIndex]->Flush(0u, colorBytes);
 
-                    // Emit overlay transient draw (starts after depth-tested lines).
-                    if (overlayLineCount > 0)
-                    {
-                        // Overlay positions start at offset depthLineCount * 2 vertices.
-                        const uint64_t overlayPosAddr = posAddr
-                            + static_cast<uint64_t>(depthLineCount) * 2 * sizeof(glm::vec3);
-                        // Overlay edge pairs start at offset depthLineCount edges.
-                        const uint64_t overlayEdgeAddr = edgeAddr
-                            + static_cast<uint64_t>(depthLineCount) * sizeof(EdgePair);
-                        // Overlay colors start at offset depthLineCount.
-                        const uint64_t overlayColorAddr = colorAddr
-                            + static_cast<uint64_t>(depthLineCount) * sizeof(uint32_t);
+                        const uint64_t posAddr = m_TransientPosBuffer[frameIndex]->GetDeviceAddress();
+                        const uint64_t edgeAddr = m_TransientEdgeBuffer->GetDeviceAddress();
+                        const uint64_t colorAddr = m_TransientColorBuffer[frameIndex]->GetDeviceAddress();
 
-                        DrawInfo di{};
-                        di.Model = glm::mat4(1.0f);
-                        di.PtrPositions = overlayPosAddr;
-                        di.PtrEdges = overlayEdgeAddr;
-                        di.EdgeCount = overlayLineCount;
-                        di.Color = 0xFFFFFFFFu;
-                        di.LineWidth = std::clamp(LineWidth, 0.5f, 32.0f);
-                        di.PtrEdgeAux = overlayColorAddr;
-                        overlayDraws.push_back(di);
+                        // Emit depth-tested transient draw (identity model, world-space positions).
+                        if (depthLineCount > 0)
+                        {
+                            DrawInfo di{};
+                            di.Model = glm::mat4(1.0f);
+                            di.PtrPositions = posAddr;
+                            di.PtrEdges = edgeAddr;
+                            di.EdgeCount = depthLineCount;
+                            di.Color = 0xFFFFFFFFu; // white fallback (unused when PtrEdgeAux != 0)
+                            di.LineWidth = std::clamp(LineWidth, 0.5f, 32.0f);
+                            di.PtrEdgeAux = colorAddr;
+                            depthDraws.push_back(di);
+                        }
+
+                        // Emit overlay transient draw (starts after depth-tested lines).
+                        if (overlayLineCount > 0)
+                        {
+                            // Overlay positions start at offset depthLineCount * 2 vertices.
+                            const uint64_t overlayPosAddr = posAddr
+                                + static_cast<uint64_t>(depthLineCount) * 2 * sizeof(glm::vec3);
+                            // Overlay edge pairs start at offset depthLineCount edges.
+                            const uint64_t overlayEdgeAddr = edgeAddr
+                                + static_cast<uint64_t>(depthLineCount) * sizeof(EdgePair);
+                            // Overlay colors start at offset depthLineCount.
+                            const uint64_t overlayColorAddr = colorAddr
+                                + static_cast<uint64_t>(depthLineCount) * sizeof(uint32_t);
+
+                            DrawInfo di{};
+                            di.Model = glm::mat4(1.0f);
+                            di.PtrPositions = overlayPosAddr;
+                            di.PtrEdges = overlayEdgeAddr;
+                            di.EdgeCount = overlayLineCount;
+                            di.Color = 0xFFFFFFFFu;
+                            di.LineWidth = std::clamp(LineWidth, 0.5f, 32.0f);
+                            di.PtrEdgeAux = overlayColorAddr;
+                            overlayDraws.push_back(di);
+                        }
                     }
                 }
             }

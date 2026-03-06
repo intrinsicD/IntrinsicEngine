@@ -22,29 +22,34 @@ namespace Graphics
         {
             return IsFinite(a) && IsFinite(b);
         }
-
-        void PushLineIfFinite(std::vector<DebugDraw::LineSegment>& target,
-                              const glm::vec3& a, uint32_t colorA,
-                              const glm::vec3& b, uint32_t colorB)
-        {
-            if (!IsFiniteLine(a, b))
-                return;
-            target.push_back({a, colorA, b, colorB});
-        }
     }
 
     // =========================================================================
     // Depth-tested primitives
     // =========================================================================
 
+    void DebugDraw::PushLine(std::vector<LineSegment>& target,
+                             const glm::vec3& a, uint32_t colorA,
+                             const glm::vec3& b, uint32_t colorB)
+    {
+        if (!IsFiniteLine(a, b))
+            return;
+        if (GetUsedLineSegments() >= m_MaxLineSegments)
+        {
+            ++m_DroppedLineSegments;
+            return;
+        }
+        target.push_back({a, colorA, b, colorB});
+    }
+
     void DebugDraw::Line(const glm::vec3& from, const glm::vec3& to, uint32_t color)
     {
-        PushLineIfFinite(m_Lines, from, color, to, color);
+        PushLine(m_Lines, from, color, to, color);
     }
 
     void DebugDraw::Line(const glm::vec3& from, const glm::vec3& to, uint32_t colorStart, uint32_t colorEnd)
     {
-        PushLineIfFinite(m_Lines, from, colorStart, to, colorEnd);
+        PushLine(m_Lines, from, colorStart, to, colorEnd);
     }
 
     void DebugDraw::Box(const glm::vec3& min, const glm::vec3& max, uint32_t color)
@@ -269,12 +274,12 @@ namespace Graphics
 
     void DebugDraw::OverlayLine(const glm::vec3& from, const glm::vec3& to, uint32_t color)
     {
-        PushLineIfFinite(m_OverlayLines, from, color, to, color);
+        PushLine(m_OverlayLines, from, color, to, color);
     }
 
     void DebugDraw::OverlayLine(const glm::vec3& from, const glm::vec3& to, uint32_t colorStart, uint32_t colorEnd)
     {
-        PushLineIfFinite(m_OverlayLines, from, colorStart, to, colorEnd);
+        PushLine(m_OverlayLines, from, colorStart, to, colorEnd);
     }
 
     void DebugDraw::OverlayBox(const glm::vec3& min, const glm::vec3& max, uint32_t color)
@@ -302,6 +307,14 @@ namespace Graphics
         m_OverlayLines.clear();
         m_Triangles.clear();
         m_Points.clear();
+        m_DroppedLineSegments = 0;
+    }
+
+    void DebugDraw::SetMaxLineSegments(const uint32_t maxSegments) noexcept
+    {
+        m_MaxLineSegments = maxSegments;
+        m_Lines.reserve(maxSegments);
+        m_OverlayLines.reserve(maxSegments);
     }
 
     std::span<const DebugDraw::LineSegment> DebugDraw::GetLines() const
@@ -340,22 +353,22 @@ namespace Graphics
         };
 
         // Bottom face
-        PushLineIfFinite(target, c[0], color, c[1], color);
-        PushLineIfFinite(target, c[1], color, c[2], color);
-        PushLineIfFinite(target, c[2], color, c[3], color);
-        PushLineIfFinite(target, c[3], color, c[0], color);
+        PushLine(target, c[0], color, c[1], color);
+        PushLine(target, c[1], color, c[2], color);
+        PushLine(target, c[2], color, c[3], color);
+        PushLine(target, c[3], color, c[0], color);
 
         // Top face
-        PushLineIfFinite(target, c[4], color, c[5], color);
-        PushLineIfFinite(target, c[5], color, c[6], color);
-        PushLineIfFinite(target, c[6], color, c[7], color);
-        PushLineIfFinite(target, c[7], color, c[4], color);
+        PushLine(target, c[4], color, c[5], color);
+        PushLine(target, c[5], color, c[6], color);
+        PushLine(target, c[6], color, c[7], color);
+        PushLine(target, c[7], color, c[4], color);
 
         // Vertical edges
-        PushLineIfFinite(target, c[0], color, c[4], color);
-        PushLineIfFinite(target, c[1], color, c[5], color);
-        PushLineIfFinite(target, c[2], color, c[6], color);
-        PushLineIfFinite(target, c[3], color, c[7], color);
+        PushLine(target, c[0], color, c[4], color);
+        PushLine(target, c[1], color, c[5], color);
+        PushLine(target, c[2], color, c[6], color);
+        PushLine(target, c[3], color, c[7], color);
     }
 
     void DebugDraw::SphereImpl(std::vector<LineSegment>& target,
@@ -375,7 +388,7 @@ namespace Graphics
             {
                 float angle = step * static_cast<float>(i);
                 glm::vec3 curr = center + glm::vec3(std::cos(angle), std::sin(angle), 0.0f) * radius;
-                PushLineIfFinite(target, prev, color, curr, color);
+                PushLine(target, prev, color, curr, color);
                 prev = curr;
             }
         }
@@ -387,7 +400,7 @@ namespace Graphics
             {
                 float angle = step * static_cast<float>(i);
                 glm::vec3 curr = center + glm::vec3(std::cos(angle), 0.0f, std::sin(angle)) * radius;
-                PushLineIfFinite(target, prev, color, curr, color);
+                PushLine(target, prev, color, curr, color);
                 prev = curr;
             }
         }
@@ -399,7 +412,7 @@ namespace Graphics
             {
                 float angle = step * static_cast<float>(i);
                 glm::vec3 curr = center + glm::vec3(0.0f, std::cos(angle) * radius, std::sin(angle) * radius);
-                PushLineIfFinite(target, prev, color, curr, color);
+                PushLine(target, prev, color, curr, color);
                 prev = curr;
             }
         }
@@ -408,8 +421,8 @@ namespace Graphics
     void DebugDraw::AxesImpl(std::vector<LineSegment>& target,
                              const glm::vec3& origin, float size)
     {
-        PushLineIfFinite(target, origin, Red(),   origin + glm::vec3(size, 0, 0), Red());
-        PushLineIfFinite(target, origin, Green(), origin + glm::vec3(0, size, 0), Green());
-        PushLineIfFinite(target, origin, Blue(),  origin + glm::vec3(0, 0, size), Blue());
+        PushLine(target, origin, Red(),   origin + glm::vec3(size, 0, 0), Red());
+        PushLine(target, origin, Green(), origin + glm::vec3(0, size, 0), Green());
+        PushLine(target, origin, Blue(),  origin + glm::vec3(0, 0, size), Blue());
     }
 }

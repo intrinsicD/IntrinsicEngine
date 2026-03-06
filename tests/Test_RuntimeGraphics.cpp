@@ -93,7 +93,8 @@ TEST(RenderResources, DefaultPipelineRecipeAllocatesOnlyRequiredCanonicalTargets
     EXPECT_TRUE(recipe.Requires(RenderResource::Material0));
     EXPECT_TRUE(recipe.Requires(RenderResource::SceneColorHDR));
     EXPECT_TRUE(recipe.Requires(RenderResource::SceneColorLDR));
-    EXPECT_TRUE(recipe.Requires(RenderResource::SelectionOutline));
+    EXPECT_FALSE(recipe.Requires(RenderResource::SelectionMask));
+    EXPECT_FALSE(recipe.Requires(RenderResource::SelectionOutline));
     EXPECT_FALSE(recipe.Requires(RenderResource::PrimitiveId));
     EXPECT_FALSE(recipe.Requires(RenderResource::SceneNormal));
 }

@@ -341,7 +341,12 @@ namespace Graphics::Passes
                                                     vkCmdFillBuffer(cmd, m_Stage3VisibilityPacked[fi]->GetHandle(), 0, VK_WHOLE_SIZE, 0);
                                                 }
 
-                                                VkDescriptorSet cullSet = m_CullSetPool->Allocate(m_CullSetLayout);
+                                                VkDescriptorSet cullSet = m_CullSet[fi];
+                                                if (cullSet == VK_NULL_HANDLE)
+                                                {
+                                                    cullSet = m_CullSetPool->Allocate(m_CullSetLayout);
+                                                    m_CullSet[fi] = cullSet;
+                                                }
                                                 if (cullSet == VK_NULL_HANDLE)
                                                     return;
 
@@ -524,7 +529,7 @@ namespace Graphics::Passes
                                             builder.Read(instances, VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT, VK_ACCESS_2_SHADER_STORAGE_READ_BIT);
                                         }
                                     },
-                                    [this, &ctx, pipeline = m_Pipeline, stream = std::move(stream)](const PassData&, const RGRegistry&, VkCommandBuffer cmd) mutable
+                                    [this, &ctx, pipeline = m_Pipeline, stream = std::move(stream), fi = ctx.FrameIndex % FRAMES](const PassData&, const RGRegistry&, VkCommandBuffer cmd) mutable
                                     {
                                         if (stream.Batches.empty())
                                             return;
@@ -561,8 +566,15 @@ namespace Graphics::Passes
                                                                 1, 1, &globalTextures,
                                                                 0, nullptr);
 
-                                        // Allocate once per pass.
-                                        VkDescriptorSet instanceSet = VK_NULL_HANDLE;
+                                        // Reuse one persistent instance descriptor set per frame slot.
+                                        VkDescriptorSet instanceSet = m_InstanceSet[fi];
+                                        if (instanceSet == VK_NULL_HANDLE)
+                                        {
+                                            instanceSet = m_InstanceSetPool->Allocate(m_InstanceSetLayout);
+                                            m_InstanceSet[fi] = instanceSet;
+                                            if (instanceSet == VK_NULL_HANDLE)
+                                                return;
+                                        }
                                         VkBuffer currentInstBuffer = VK_NULL_HANDLE;
                                         VkBuffer currentVisBuffer = VK_NULL_HANDLE;
 
@@ -591,13 +603,6 @@ namespace Graphics::Passes
                                             {
                                                 vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, desired->GetHandle());
                                                 currentPipeline = desired;
-                                            }
-
-                                            if (instanceSet == VK_NULL_HANDLE)
-                                            {
-                                                instanceSet = m_InstanceSetPool->Allocate(m_InstanceSetLayout);
-                                                if (instanceSet == VK_NULL_HANDLE)
-                                                    continue;
                                             }
 
                                             const VkBuffer instHandle = b.InstanceBuffer->GetHandle();
@@ -846,7 +851,12 @@ namespace Graphics::Passes
 
                                             vkCmdFillBuffer(cmd, m_DrawCountBuffer[fi]->GetHandle(), 0, sizeof(uint32_t), 0);
 
-                                            VkDescriptorSet cullSet = m_CullSetPool->Allocate(m_CullSetLayout);
+                                            VkDescriptorSet cullSet = m_CullSet[fi];
+                                            if (cullSet == VK_NULL_HANDLE)
+                                            {
+                                                cullSet = m_CullSetPool->Allocate(m_CullSetLayout);
+                                                m_CullSet[fi] = cullSet;
+                                            }
                                             if (cullSet == VK_NULL_HANDLE)
                                                 return;
 

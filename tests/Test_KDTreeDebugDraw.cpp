@@ -99,3 +99,24 @@ TEST(KDTreeDebugDraw, DepthTestedRouteUsesDepthLines)
     EXPECT_EQ(dd.GetLineCount(), 16u);
     EXPECT_EQ(dd.GetOverlayLineCount(), 0u);
 }
+
+TEST(KDTreeDebugDraw, RespectsDebugDrawBudget)
+{
+    DebugDraw dd;
+    dd.SetMaxLineSegments(12);
+    Geometry::KDTree tree = MakeSimpleKDTree();
+
+    Graphics::KDTreeDebugDrawSettings s;
+    s.Enabled = true;
+    s.Overlay = true;
+    s.MaxDepth = 0;
+    s.LeafOnly = false;
+    s.DrawInternal = true;
+    s.DrawSplitPlanes = true;
+    s.OccupiedOnly = false;
+
+    DrawKDTree(dd, tree, s);
+
+    EXPECT_EQ(dd.GetOverlayLineCount(), 12u);
+    EXPECT_EQ(dd.GetRemainingLineCapacity(), 0u);
+}

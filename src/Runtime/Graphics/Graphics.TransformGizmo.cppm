@@ -5,7 +5,6 @@ module;
 #include <glm/glm.hpp>
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtc/quaternion.hpp>
-#include <glm/gtx/quaternion.hpp>
 #include <entt/entity/entity.hpp>
 #include <entt/entity/registry.hpp>
 
@@ -91,7 +90,18 @@ export namespace Graphics
     class TransformGizmo
     {
     public:
-        TransformGizmo() = default;
+        TransformGizmo()
+            : m_Config{},
+              m_State{GizmoState::Idle},
+              m_HoveredAxis{GizmoAxis::None},
+              m_ActiveAxis{GizmoAxis::None},
+              m_DragStart{0.0f},
+              m_DragStartMouseNDC{0.0f},
+              m_PivotPosition{0.0f},
+              m_PivotRotation{1.0f, 0.0f, 0.0f, 0.0f},
+              m_InitialRotateAngle{0.0f},
+              m_CachedTransforms{}
+        {}
 
         // Per-frame update: handles input, updates state, emits debug geometry.
         // Returns true if the gizmo consumed the mouse input (blocks selection).
@@ -102,6 +112,9 @@ export namespace Graphics
                     uint32_t viewportWidth,
                     uint32_t viewportHeight,
                     bool uiCapturesMouse);
+
+        void SetMode(GizmoMode mode);
+        void ResetInteraction();
 
         [[nodiscard]] GizmoConfig& GetConfig() { return m_Config; }
         [[nodiscard]] const GizmoConfig& GetConfig() const { return m_Config; }
@@ -121,10 +134,15 @@ export namespace Graphics
 
         // Interaction state
         glm::vec3   m_DragStart{0.0f};    // World-space drag start point
+        glm::vec2   m_DragStartMouseNDC{0.0f};
         glm::vec3   m_PivotPosition{0.0f};
         glm::quat   m_PivotRotation{1.0f, 0.0f, 0.0f, 0.0f};
         float       m_InitialRotateAngle = 0.0f;
-        glm::vec3   m_InitialScale{1.0f};
+
+        // Frozen drag-start anchor used during active manipulation.
+        glm::vec3   m_DragPivotPosition{0.0f};
+        glm::quat   m_DragPivotRotation{1.0f, 0.0f, 0.0f, 0.0f};
+        float       m_DragHandleScale = 1.0f;
 
         // Cache for multi-selection initial transforms
         struct EntityTransformCache
@@ -134,10 +152,10 @@ export namespace Graphics
             glm::quat    InitialRotation{1.0f, 0.0f, 0.0f, 0.0f};
             glm::vec3    InitialScale{1.0f};
         };
-        std::vector<EntityTransformCache> m_CachedTransforms;
+        std::vector<EntityTransformCache> m_CachedTransforms{};
 
         // Compute the pivot point from selected entities.
-        [[nodiscard]] bool ComputePivot(entt::registry& registry);
+        [[nodiscard]] bool ComputePivot(entt::registry& registry, bool refreshCachedTransforms = true);
 
         // Hit-test the mouse against gizmo axes.
         [[nodiscard]] GizmoAxis HitTest(const glm::vec2& mouseNDC,

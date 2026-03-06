@@ -192,7 +192,7 @@ export namespace Graphics
             case SceneColorHDR: return LightingPath != FrameLightingPath::None || Post;
             case SceneColorLDR: return this->SceneColorLDR;
             case SelectionMask:
-            case SelectionOutline: return Selection;
+            case SelectionOutline: return false;
             }
             return false;
         }

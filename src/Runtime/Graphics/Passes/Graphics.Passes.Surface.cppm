@@ -35,7 +35,7 @@ export namespace Graphics::Passes
 
         // Descriptor pool sizes for compute culling descriptor sets.
         constexpr uint32_t kCullPoolMaxSets = 64;
-        constexpr uint32_t kCullPoolStorageBuffers = kCullPoolMaxSets * 5;
+        constexpr uint32_t kCullPoolStorageBuffers = kCullPoolMaxSets * 7;
     }
 
     class SurfacePass final : public IRenderFeature
@@ -146,12 +146,13 @@ export namespace Graphics::Passes
         // Stage 3: visibility/remap (GPU-written) lives in m_VisibilityBuffer[].
         std::unique_ptr<RHI::VulkanBuffer> m_VisibilityBuffer[FRAMES];
 
-        // Cache the instance descriptor set per frame (updated each frame).
+        // Cache the instance descriptor set per frame (updated in place and reused across submissions).
         VkDescriptorSet m_InstanceSet[FRAMES] = {};
 
         // Stage 3: compute culling.
         VkDescriptorSetLayout m_CullSetLayout = VK_NULL_HANDLE;
         std::unique_ptr<RHI::PersistentDescriptorPool> m_CullSetPool;
+        VkDescriptorSet m_CullSet[FRAMES] = {};
 
         // Per-frame buffers for compute culling.
         std::unique_ptr<RHI::VulkanBuffer> m_BoundsBuffer[FRAMES];
@@ -182,7 +183,7 @@ export namespace Graphics::Passes
         uint32_t m_Stage3LastGeometryCount[FRAMES]        = {};
         uint32_t m_Stage3LastMaxDrawsPerGeometry[FRAMES]  = {};
 
-        // Stage 1: allocate per-frame descriptor sets freshly (do not cache across frames).
+        // Stage 1: persistent descriptor sets are cached per frame slot and rewritten in place.
         VkDescriptorSetLayout m_InstanceSetLayout = VK_NULL_HANDLE;
         std::unique_ptr<RHI::PersistentDescriptorPool> m_InstanceSetPool;
 

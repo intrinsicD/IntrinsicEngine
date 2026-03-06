@@ -102,13 +102,13 @@ Adaptive remeshing now exposes runtime safety controls in `AdaptiveRemeshingPara
 - **GPUScene:** Retained-mode instance table with independent slot allocation/deallocation.
 - **Dynamic Rendering:** No `VkRenderPass` or `VkFramebuffer`; fully dynamic attachment binding.
 - **Three-Pass Architecture:** Unified `SurfacePass` (filled triangles), `LinePass` (thick anti-aliased edges), and `PointPass` (billboard/surfel points) — each handling both retained BDA and transient debug data internally. Per-pass ECS components (`ECS::Surface::Component`, `ECS::Line::Component`, `ECS::Point::Component`) gate rendering via presence/absence. `DefaultPipeline` currently schedules: Picking, Surface, Line, Point, PostProcess, SelectionOutline, DebugView, ImGui, then a final `Present` blit when an intermediate LDR target is active.
-- **Canonical Render Resources + Frame Recipe:** Render setup is now recipe-driven rather than hard-coded in `RenderSystem`. `FrameRecipe` declares which canonical targets are needed for a frame (`SceneDepth`, `EntityId`, `PrimitiveId`, `SceneNormal`, `Albedo`, `Material0`, `SceneColorHDR`, `SceneColorLDR`, `SelectionMask`, `SelectionOutline`). A single `FrameSetup` pass imports the swapchain backbuffer and depth image, creates only the requested transient intermediates, and seeds the blackboard with stable resource IDs.
+- **Canonical Render Resources + Frame Recipe:** Render setup is now recipe-driven rather than hard-coded in `RenderSystem`. `FrameRecipe` declares which canonical targets are needed for a frame (`SceneDepth`, `EntityId`, `PrimitiveId`, `SceneNormal`, `Albedo`, `Material0`, `SceneColorHDR`, `SceneColorLDR`). `SelectionMask` and `SelectionOutline` remain reserved canonical resource definitions for a future split-outline path, but they are not required by the current selection recipe. A single `FrameSetup` pass imports the swapchain backbuffer and depth image, creates only the requested transient intermediates, and seeds the blackboard with stable resource IDs.
 - **HDR Post-Processing / Presentation:** Scene geometry writes to canonical `SceneColorHDR`. `PostProcessPass` tone maps into canonical `SceneColorLDR` (with an internal temporary when FXAA is enabled). Overlay passes (`SelectionOutline`, viewport `DebugView`, `ImGui`) compose onto the current presentation target, which is `SceneColorLDR` when post/overlay stages are active and otherwise the imported backbuffer. A final `Present` stage copies `SceneColorLDR` into the swapchain image explicitly, eliminating implicit backbuffer ownership assumptions from earlier passes.
 - **Line/Graph Rendering:** `LinePass` renders via BDA shared vertex buffers with persistent per-entity edge index buffers. Wireframe edges share mesh vertex buffers (same device address) with edge topology view. `line.vert` expands segments to screen-space quads (6 verts/segment) with anti-aliasing. Graph entities (`ECS::Graph::Data`) hold `shared_ptr<Geometry::Graph>` with PropertySet-backed data authority, CPU-side layout algorithms (force-directed, spectral, hierarchical), and persistent GPU buffers managed by `GraphGeometrySyncSystem`. All retained passes do CPU-side frustum culling.
 - **Point Cloud Rendering:** `PointPass` renders via BDA shared vertex buffers. `point_flatdisc.vert` / `point_surfel.vert` expand points to billboard quads (6 verts/point). Three render modes: FlatDisc (camera-facing billboard), Surfel (normal-oriented disc with Lambertian shading), and EWA splatting (Zwicker et al. 2001 — perspective-correct elliptical Gaussian splats via per-surfel Jacobian projection with 1px² low-pass anti-aliasing). Surfel/EWA require real per-point normals; if normals are absent, runtime falls back to FlatDisc. The `Geometry.PointCloud` CPU module (data structures, downsampling, statistics) remains functional.
-- **DebugDraw:** Immediate-mode transient overlay for debug visualization (octree, KD-tree, bounds, contact manifolds, convex hulls) rendered by `LinePass` and `PointPass` transient paths. Depth-tested and overlay sub-passes. Comprehensive test coverage.
+- **DebugDraw:** Immediate-mode transient overlay for dynamic debug visualization (contact manifolds, transform gizmos, ad hoc instrumentation) rendered by `LinePass` and `PointPass` transient paths. Depth-tested and overlay sub-passes. Comprehensive test coverage.
 - **Graph Processing (CPU):** Halfedge-based graph topology with Octree-accelerated kNN construction, force-directed 2D layout, spectral embedding (combinatorial/symmetric-normalized Laplacian), hierarchical layered layout with crossing diagnostics and diameter-aware auto-rooting.
-- **Transform Gizmos:** `Graphics::TransformGizmo` renders translate/rotate/scale handles via `DebugDraw` overlay lines. Three-state interaction machine (idle/hovered/active) with deterministic axis picking, world/local space, configurable snap increments, and multi-entity pivot strategies (centroid, first-selected). Viewport toolbar panel for runtime configuration. Keyboard shortcuts: W/E/R for mode, X for space toggle.
+- **Transform Gizmos:** `Graphics::TransformGizmo` renders translate/rotate/scale handles via `DebugDraw` overlay lines. Three-state interaction machine (idle/hovered/active) with deterministic axis picking, world/local space, configurable snap increments, and multi-entity pivot strategies (centroid, first-selected). Once a handle is engaged, dragging follows an ImGuizmo-like screen-space mapping evaluated against a frozen drag-start anchor: axis and plane motion are derived from the projected handle basis in NDC, rotation is driven from the cursor angle around the projected pivot, and scale follows the projected axis or vertical screen drag for uniform scaling. The live gizmo pose can update for display, but the target transform is always solved from the drag-start pivot, rotation, cached transforms, and handle scale, preventing feedback that would otherwise push the entity out of frame. World-space projection remains as a fallback for degenerate camera/handle alignments. Axis translation uses a camera-aligned drag plane for stable fallback motion, rotation deltas are wrapped across $[-\pi, \pi]$, and scale avoids tiny-denominator instability. Viewport toolbar panel for runtime configuration. Keyboard shortcuts: W/E/R for mode, X for space toggle.
 - **Selection Outlines:** Post-process contour highlight for selected/hovered entities using canonical `EntityId` input rather than an ad hoc pick image alias.
 - **Per-Element Attribute Rendering:** Per-edge colors via `PtrEdgeAux` BDA channel in `LinePass`, per-face colors via `PtrFaceAttr` BDA channel and `gl_PrimitiveID` in `SurfacePass`. Scalar-to-heat and label-to-categorical color utilities (`ScalarToHeatColor`, `LabelToColor`) for curvature visualization and segmentation coloring.
 - **PropertySet Dirty Tracking:** Six zero-size `ECS::DirtyTag` tag components (`VertexPositions`, `VertexAttributes`, `EdgeTopology`, `EdgeAttributes`, `FaceTopology`, `FaceAttributes`) for incremental CPU→GPU sync. Attribute-only changes re-extract cached vectors without full vertex buffer re-upload.
@@ -306,24 +306,39 @@ Intrinsic includes an immediate-mode debug visualization layer (`Graphics::Debug
 
 ### Spatial Debug Overlays
 
-The Sandbox app can visualize selected `MeshCollider` acceleration/bounds data using `Graphics::DebugDraw` + `LinePass`.
+The Sandbox app can visualize selected `MeshCollider` acceleration/bounds data. Static-ish spatial overlays are now cached as retained `ECS::Line::Component` geometry so they behave like wireframe instead of repacking transient `DebugDraw` data every frame.
 
 - **Octree overlay UI:** `View Settings` → `Spatial Debug` → `Draw Selected MeshCollider Octree`
 - **Octree source:** selected entity’s `ECS::MeshCollider::Component::CollisionRef->LocalOctree`
 - **Octree knobs:** max depth, leaf-only, occupied-only, overlay vs depth-tested, depth-based color ramp, alpha
+- **Retained overlay path:** Sandbox octree visualization now builds a cached retained `ECS::Line::Component` overlay instead of re-emitting all octree boxes through transient `DebugDraw` every frame. The line geometry is rebuilt only when the selected collider, octree settings, or selected transform change, which keeps the steady-state frame cost much closer to mesh wireframe than to transient debug overlays.
 
 - **Bounds overlay UI:** `View Settings` → `Spatial Debug` → `Draw Selected MeshCollider Bounds`
 - **Bounds variants:** world AABB, world OBB, conservative bounding sphere (independent toggles)
 - **Bounds knobs:** overlay vs depth-tested, alpha, per-primitive colors
+- **Retained overlay path:** bounds visualization is captured once into retained line geometry and rebuilt only when the selected collider, bounds settings, or selected transform/local bounds change.
 
 **KD-tree overlay UI:** `View Settings` → `Spatial Debug` → `Draw Selected MeshCollider KD-Tree`
 - **KD-tree source:** built lazily from selected entity's `ECS::MeshCollider::Component::CollisionRef->Positions`, then cached per selected collider
-- **KD-tree knobs:** leaf/internal visibility, split-plane overlay, max depth, overlay vs depth-tested, alpha, per-category colors
+- **KD-tree knobs:** leaf/internal visibility, split-plane overlay, max depth, overlay vs. depth-tested, alpha, per-category colors
+- **Retained overlay path:** KD-tree lines are emitted through the existing debug-draw helper into an off-screen capture and uploaded as retained line geometry only when the selected collider, KD-tree settings, or selected transform change.
 
-**Performance note:** drawing deep octrees/KD-trees can generate thousands of line segments. Use `Max Depth` and `Leaf Only` to cap cost.
+- **BVH overlay UI:** `View Settings` → `Spatial Debug` → `Draw Selected MeshCollider BVH`
+- **BVH source:** transient build from selected collider triangles for visualization only
+- **BVH knobs:** leaf/internal visibility, leaf triangle budget, max depth, overlay vs depth-tested, alpha, per-category colors
+- **Retained overlay path:** the BVH visualization capture is rebuilt only when the selected collider source, BVH settings, selected transform, or mesh index/vertex counts change.
+
+- **Convex hull overlay UI:** `View Settings` → `Spatial Debug` → `Draw Selected MeshCollider Convex Hull`
+- **Convex hull source:** cached hull mesh derived from the selected collider positions
+- **Convex hull knobs:** overlay vs depth-tested, alpha, line color
+- **Retained overlay path:** convex hull edges are cached as retained line geometry and rebuilt only when the selected collider, hull settings, or selected transform change.
+
+- **Contact manifold overlay UI:** `View Settings` → `Spatial Debug` → `Draw Contact Manifolds`
+- **Transient path note:** contact manifolds still use immediate-mode `DebugDraw` because they are derived from pairwise collider state each frame and include short-lived point/normal instrumentation.
+
+**Performance note:** drawing deep octrees/KD-trees can generate thousands of line segments. Use `Max Depth` and `Leaf Only` to cap cost. `Graphics::DebugDraw` now enforces a per-frame line budget (32,768 segments by default), and the octree/KD-tree emitters stop traversal once that budget is exhausted, so overlay cost is bounded by $O(\min(N, B))$ emitted segments instead of unbounded $O(N)$ growth for pathological trees.
 
 ---
-
 
 ### KD-Tree Spatial Queries
 

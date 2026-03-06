@@ -126,6 +126,7 @@ namespace Graphics
                     const glm::mat4& worldTransform)
     {
         if (!settings.Enabled) return;
+        if (dd.GetRemainingLineCapacity() == 0u) return;
 
         const auto& nodes = tree.Nodes();
         if (nodes.empty()) return;
@@ -146,6 +147,9 @@ namespace Graphics
 
         while (!stack.empty())
         {
+            if (dd.GetRemainingLineCapacity() == 0u)
+                break;
+
             const StackItem item = stack.back();
             stack.pop_back();
             if (item.Node >= nodes.size()) continue;
@@ -159,11 +163,15 @@ namespace Graphics
 
             if (shouldDrawNode)
             {
+                if (dd.GetRemainingLineCapacity() < 12u)
+                    break;
                 EmitBox(dd, n.Aabb, settings.Overlay, n.IsLeaf ? leafColor : internalColor, worldTransform);
             }
 
             if (!n.IsLeaf && settings.DrawSplitPlanes)
             {
+                if (dd.GetRemainingLineCapacity() < 4u)
+                    break;
                 EmitSplitPlane(dd, n, settings.Overlay, splitColor, worldTransform);
             }
 
@@ -177,4 +185,3 @@ namespace Graphics
         }
     }
 }
-

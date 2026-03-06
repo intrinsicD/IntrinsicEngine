@@ -6,6 +6,7 @@ module;
 
 #include <glm/glm.hpp>
 #define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtc/constants.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtx/quaternion.hpp>
@@ -78,22 +79,6 @@ namespace
         return t1;
     }
 
-    // Project a world point to NDC.
-    glm::vec2 WorldToNDC(const glm::vec3& p, const Graphics::CameraComponent& camera)
-    {
-        glm::vec4 clip = camera.ProjectionMatrix * camera.ViewMatrix * glm::vec4(p, 1.0f);
-        if (std::abs(clip.w) < 1e-6f) return glm::vec2(0.0f);
-        return glm::vec2(clip.x / clip.w, clip.y / clip.w);
-    }
-
-    // Closest point on a ray to a point in world space.
-    glm::vec3 ClosestPointOnRayToPoint(const Ray& ray, const glm::vec3& point)
-    {
-        float t = glm::dot(point - ray.Origin, ray.Direction);
-        t = std::max(t, 0.0f);
-        return ray.Origin + ray.Direction * t;
-    }
-
     // Ray-plane intersection. Returns distance along ray or -1 if parallel.
     float RayPlaneIntersect(const Ray& ray, const glm::vec3& planePoint, const glm::vec3& planeNormal)
     {
@@ -101,17 +86,134 @@ namespace
         if (std::abs(denom) < 1e-6f) return -1.0f;
         return glm::dot(planePoint - ray.Origin, planeNormal) / denom;
     }
+
+    [[nodiscard]] glm::vec3 BuildAxisDragPlaneNormal(const Graphics::CameraComponent& camera,
+                                                     const glm::vec3& axisDir)
+    {
+        glm::vec3 planeNormal = camera.GetForward() - axisDir * glm::dot(camera.GetForward(), axisDir);
+
+        if (glm::dot(planeNormal, planeNormal) < 1e-6f)
+        {
+            planeNormal = camera.GetUp() - axisDir * glm::dot(camera.GetUp(), axisDir);
+        }
+        if (glm::dot(planeNormal, planeNormal) < 1e-6f)
+        {
+            planeNormal = camera.GetRight() - axisDir * glm::dot(camera.GetRight(), axisDir);
+        }
+        if (glm::dot(planeNormal, planeNormal) < 1e-6f)
+        {
+            planeNormal = glm::cross(axisDir, glm::vec3(0.0f, 1.0f, 0.0f));
+        }
+        if (glm::dot(planeNormal, planeNormal) < 1e-6f)
+        {
+            planeNormal = glm::cross(axisDir, glm::vec3(1.0f, 0.0f, 0.0f));
+        }
+
+        return glm::normalize(planeNormal);
+    }
+
+    [[nodiscard]] float WrapAngleDelta(float radians)
+    {
+        return std::atan2(std::sin(radians), std::cos(radians));
+    }
+
+    [[nodiscard]] glm::vec2 WorldToNDC(const Graphics::CameraComponent& camera, const glm::vec3& p)
+    {
+        const glm::vec4 clip = camera.ProjectionMatrix * camera.ViewMatrix * glm::vec4(p, 1.0f);
+        if (std::abs(clip.w) < 1e-6f)
+            return {0.0f, 0.0f};
+        return {clip.x / clip.w, clip.y / clip.w};
+    }
+
+    [[nodiscard]] bool ProjectWorldVectorToScreen(const Graphics::CameraComponent& camera,
+                                                  const glm::vec3& pivot,
+                                                  const glm::vec3& worldVector,
+                                                  glm::vec2& outVector)
+    {
+        const glm::vec2 pivotNDC = WorldToNDC(camera, pivot);
+        const glm::vec2 endNDC = WorldToNDC(camera, pivot + worldVector);
+        outVector = endNDC - pivotNDC;
+        return glm::dot(outVector, outVector) > 1e-8f;
+    }
+
+    [[nodiscard]] float ProjectMouseDeltaOntoHandle(const glm::vec2& mouseDeltaNDC,
+                                                    const glm::vec2& handleVectorNDC)
+    {
+        const float denom = glm::dot(handleVectorNDC, handleVectorNDC);
+        if (denom < 1e-8f)
+            return 0.0f;
+        return glm::dot(mouseDeltaNDC, handleVectorNDC) / denom;
+    }
+
+    [[nodiscard]] bool SolvePlaneDragDelta(const glm::vec2& mouseDeltaNDC,
+                                           const glm::vec2& uNDC,
+                                           const glm::vec2& vNDC,
+                                           glm::vec2& outCoefficients)
+    {
+        const float det = uNDC.x * vNDC.y - uNDC.y * vNDC.x;
+        if (std::abs(det) < 1e-8f)
+            return false;
+
+        outCoefficients.x = ( mouseDeltaNDC.x * vNDC.y - mouseDeltaNDC.y * vNDC.x) / det;
+        outCoefficients.y = (-mouseDeltaNDC.x * uNDC.y + mouseDeltaNDC.y * uNDC.x) / det;
+        return true;
+    }
+
+    [[nodiscard]] float ComputeScreenRotationDelta(const Graphics::CameraComponent& camera,
+                                                   const glm::vec3& pivot,
+                                                   const glm::vec3& axisDir,
+                                                   const glm::vec2& startMouseNDC,
+                                                   const glm::vec2& currentMouseNDC)
+    {
+        const glm::vec2 pivotNDC = WorldToNDC(camera, pivot);
+        const glm::vec2 startVec = startMouseNDC - pivotNDC;
+        const glm::vec2 currentVec = currentMouseNDC - pivotNDC;
+
+        const float startLenSq = glm::dot(startVec, startVec);
+        const float currentLenSq = glm::dot(currentVec, currentVec);
+        if (startLenSq < 1e-8f || currentLenSq < 1e-8f)
+            return std::numeric_limits<float>::quiet_NaN();
+
+        const float angle = std::atan2(startVec.x * currentVec.y - startVec.y * currentVec.x,
+                                       glm::dot(startVec, currentVec));
+        const float orientation = (glm::dot(glm::normalize(axisDir), camera.GetForward()) <= 0.0f) ? 1.0f : -1.0f;
+        return angle * orientation;
+    }
 }
 
 namespace Graphics
 {
 
-bool TransformGizmo::ComputePivot(entt::registry& registry)
+void TransformGizmo::ResetInteraction()
+{
+    m_State = GizmoState::Idle;
+    m_HoveredAxis = GizmoAxis::None;
+    m_ActiveAxis = GizmoAxis::None;
+    m_DragStart = glm::vec3(0.0f);
+    m_DragStartMouseNDC = glm::vec2(0.0f);
+    m_InitialRotateAngle = 0.0f;
+    m_DragPivotPosition = glm::vec3(0.0f);
+    m_DragPivotRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+    m_DragHandleScale = 1.0f;
+    m_CachedTransforms.clear();
+}
+
+void TransformGizmo::SetMode(GizmoMode mode)
+{
+    if (m_Config.Mode == mode)
+        return;
+
+    m_Config.Mode = mode;
+    ResetInteraction();
+}
+
+bool TransformGizmo::ComputePivot(entt::registry& registry, bool refreshCachedTransforms)
 {
     auto view = registry.view<ECS::Components::Selection::SelectedTag,
                               ECS::Components::Transform::Component>();
 
-    m_CachedTransforms.clear();
+    if (refreshCachedTransforms)
+        m_CachedTransforms.clear();
 
     bool first = true;
     glm::vec3 centroid{0.0f};
@@ -119,12 +221,15 @@ bool TransformGizmo::ComputePivot(entt::registry& registry)
 
     for (auto [entity, transform] : view.each())
     {
-        EntityTransformCache cache;
-        cache.Entity = entity;
-        cache.InitialPosition = transform.Position;
-        cache.InitialRotation = transform.Rotation;
-        cache.InitialScale = transform.Scale;
-        m_CachedTransforms.push_back(cache);
+        if (refreshCachedTransforms)
+        {
+            EntityTransformCache cache;
+            cache.Entity = entity;
+            cache.InitialPosition = transform.Position;
+            cache.InitialRotation = transform.Rotation;
+            cache.InitialScale = transform.Scale;
+            m_CachedTransforms.push_back(cache);
+        }
 
         centroid += transform.Position;
         ++count;
@@ -141,8 +246,20 @@ bool TransformGizmo::ComputePivot(entt::registry& registry)
 
     if (m_Config.Pivot == GizmoPivot::Centroid)
         m_PivotPosition = centroid / static_cast<float>(count);
-    else if (!m_CachedTransforms.empty())
+    else if (refreshCachedTransforms && !m_CachedTransforms.empty())
         m_PivotPosition = m_CachedTransforms[0].InitialPosition;
+
+    if (!refreshCachedTransforms && m_Config.Pivot == GizmoPivot::FirstSelected)
+    {
+        auto firstView = registry.view<ECS::Components::Selection::SelectedTag,
+                                       ECS::Components::Transform::Component>();
+        for (auto [entity, transform] : firstView.each())
+        {
+            (void)entity;
+            m_PivotPosition = transform.Position;
+            break;
+        }
+    }
 
     if (m_Config.Space == GizmoSpace::World)
         m_PivotRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
@@ -170,7 +287,8 @@ glm::vec3 TransformGizmo::GetAxisDirection(GizmoAxis axis) const
     default: return dir;
     }
 
-    return glm::rotate(m_PivotRotation, dir);
+    const glm::quat rotation = (m_State == GizmoState::Active) ? m_DragPivotRotation : m_PivotRotation;
+    return glm::rotate(rotation, dir);
 }
 
 uint32_t TransformGizmo::GetAxisColor(GizmoAxis axis) const
@@ -250,7 +368,6 @@ GizmoAxis TransformGizmo::HitTest(const glm::vec2& mouseNDC,
         auto testPlane = [&](GizmoAxis planeAxis, const glm::vec3& normal, const glm::vec3& u, const glm::vec3& v)
         {
             const float sz = handleScale * 0.3f;
-            const glm::vec3 center = m_PivotPosition + (u + v) * sz * 0.5f;
 
             float t = RayPlaneIntersect(ray, m_PivotPosition, normal);
             if (t < 0.0f) return;
@@ -303,24 +420,19 @@ glm::vec3 TransformGizmo::ProjectMouseToAxis(const glm::vec2& mouseNDC,
                                               GizmoAxis axis,
                                               float handleScale) const
 {
+    (void)handleScale;
     const Ray ray = RayFromNDC(camera, mouseNDC);
+    const glm::vec3 pivotPosition = (m_State == GizmoState::Active) ? m_DragPivotPosition : m_PivotPosition;
 
     if (axis == GizmoAxis::X || axis == GizmoAxis::Y || axis == GizmoAxis::Z)
     {
-        // Project onto the axis line.
-        const glm::vec3 dir = GetAxisDirection(axis);
-        const glm::vec3 w = ray.Origin - m_PivotPosition;
-        const float a = glm::dot(dir, dir);
-        const float b = glm::dot(dir, ray.Direction);
-        const float c = glm::dot(ray.Direction, ray.Direction);
-        const float d = glm::dot(dir, w);
-        const float e = glm::dot(ray.Direction, w);
+        const glm::vec3 dir = glm::normalize(GetAxisDirection(axis));
+        const glm::vec3 planeNormal = BuildAxisDragPlaneNormal(camera, dir);
+        const float t = RayPlaneIntersect(ray, pivotPosition, planeNormal);
+        if (t < 0.0f) return pivotPosition;
 
-        const float det = a * c - b * b;
-        if (std::abs(det) < 1e-10f) return m_PivotPosition;
-
-        const float t = (b * e - c * d) / det;
-        return m_PivotPosition + dir * t;
+        const glm::vec3 hitPoint = ray.Origin + ray.Direction * t;
+        return pivotPosition + dir * glm::dot(hitPoint - pivotPosition, dir);
     }
     else
     {
@@ -331,11 +443,11 @@ glm::vec3 TransformGizmo::ProjectMouseToAxis(const glm::vec2& mouseNDC,
         case GizmoAxis::XY: normal = GetAxisDirection(GizmoAxis::Z); break;
         case GizmoAxis::XZ: normal = GetAxisDirection(GizmoAxis::Y); break;
         case GizmoAxis::YZ: normal = GetAxisDirection(GizmoAxis::X); break;
-        default: return m_PivotPosition;
+        default: return pivotPosition;
         }
 
-        float t = RayPlaneIntersect(ray, m_PivotPosition, normal);
-        if (t < 0.0f) return m_PivotPosition;
+        float t = RayPlaneIntersect(ray, pivotPosition, normal);
+        if (t < 0.0f) return pivotPosition;
         return ray.Origin + ray.Direction * t;
     }
 }
@@ -345,15 +457,17 @@ float TransformGizmo::ProjectMouseToRotation(const glm::vec2& mouseNDC,
                                               GizmoAxis axis,
                                               float handleScale) const
 {
+    (void)handleScale;
     if (axis != GizmoAxis::X && axis != GizmoAxis::Y && axis != GizmoAxis::Z)
         return 0.0f;
 
+    const glm::vec3 pivotPosition = (m_State == GizmoState::Active) ? m_DragPivotPosition : m_PivotPosition;
     const glm::vec3 normal = GetAxisDirection(axis);
     const Ray ray = RayFromNDC(camera, mouseNDC);
-    float t = RayPlaneIntersect(ray, m_PivotPosition, normal);
+    float t = RayPlaneIntersect(ray, pivotPosition, normal);
     if (t < 0.0f) return 0.0f;
 
-    const glm::vec3 hitPt = ray.Origin + ray.Direction * t - m_PivotPosition;
+    const glm::vec3 hitPt = ray.Origin + ray.Direction * t - pivotPosition;
     if (glm::length(hitPt) < 1e-6f) return 0.0f;
 
     // Build local 2D basis on the rotation plane.
@@ -382,21 +496,31 @@ float TransformGizmo::ProjectMouseToScale(const glm::vec2& mouseNDC,
                                            GizmoAxis axis,
                                            float handleScale) const
 {
+    const float anchoredHandleScale = (m_State == GizmoState::Active) ? m_DragHandleScale : handleScale;
+    const glm::vec3 pivotPosition = (m_State == GizmoState::Active) ? m_DragPivotPosition : m_PivotPosition;
+
     if (axis == GizmoAxis::All)
     {
-        // Uniform scale based on vertical mouse delta from pivot NDC.
-        const glm::vec2 pivotNDC = WorldToNDC(m_PivotPosition, camera);
-        return 1.0f + (mouseNDC.y - pivotNDC.y);
+        const glm::vec2 mouseDeltaNDC = mouseNDC - m_DragStartMouseNDC;
+        return 1.0f + mouseDeltaNDC.y;
     }
 
-    // Single-axis scale: project along axis.
-    const glm::vec3 projected = ProjectMouseToAxis(mouseNDC, camera, axis, handleScale);
-    const glm::vec3 dir = GetAxisDirection(axis);
-    const float dist = glm::dot(projected - m_PivotPosition, dir);
-    const float startDist = glm::dot(m_DragStart - m_PivotPosition, dir);
+    if (axis == GizmoAxis::X || axis == GizmoAxis::Y || axis == GizmoAxis::Z)
+    {
+        const glm::vec3 axisVector = glm::normalize(GetAxisDirection(axis)) * anchoredHandleScale;
+        glm::vec2 axisNDC{0.0f};
+        if (ProjectWorldVectorToScreen(camera, pivotPosition, axisVector, axisNDC))
+        {
+            const float scalar = ProjectMouseDeltaOntoHandle(mouseNDC - m_DragStartMouseNDC, axisNDC);
+            return 1.0f + scalar;
+        }
+    }
 
-    if (std::abs(startDist) < 1e-6f) return 1.0f;
-    return dist / startDist;
+    const glm::vec3 projected = ProjectMouseToAxis(mouseNDC, camera, axis, anchoredHandleScale);
+    const glm::vec3 dir = glm::normalize(GetAxisDirection(axis));
+    const float dragDistance = glm::dot(projected - m_DragStart, dir);
+    const float normalizedDrag = dragDistance / std::max(anchoredHandleScale, 1e-4f);
+    return 1.0f + normalizedDrag;
 }
 
 float TransformGizmo::ApplySnap(float value, float snapIncrement) const
@@ -457,7 +581,6 @@ void TransformGizmo::DrawRotateGizmo(DebugDraw& dd, float handleScale) const
 
     auto drawCircle = [&](GizmoAxis axis)
     {
-        const glm::vec3 normal = GetAxisDirection(axis);
         const uint32_t color = GetAxisColor(axis);
 
         // Build perpendicular basis.
@@ -531,11 +654,12 @@ bool TransformGizmo::Update(entt::registry& registry,
                              bool uiCapturesMouse)
 {
     // Early exit if no selected entities with transforms.
-    if (!ComputePivot(registry))
+    if (!ComputePivot(registry, m_State != GizmoState::Active))
     {
         m_State = GizmoState::Idle;
         m_HoveredAxis = GizmoAxis::None;
         m_ActiveAxis = GizmoAxis::None;
+        m_CachedTransforms.clear();
         return false;
     }
 
@@ -569,19 +693,26 @@ bool TransformGizmo::Update(entt::registry& registry,
             {
                 m_ActiveAxis = m_HoveredAxis;
                 m_State = GizmoState::Active;
+                m_DragStartMouseNDC = mouseNDC;
 
-                // Cache transforms at drag start.
-                ComputePivot(registry);
+                // Cache transforms and drag anchor at drag start.
+                if (!ComputePivot(registry, true))
+                {
+                    m_State = GizmoState::Idle;
+                    m_ActiveAxis = GizmoAxis::None;
+                    break;
+                }
+                m_DragPivotPosition = m_PivotPosition;
+                m_DragPivotRotation = m_PivotRotation;
+                m_DragHandleScale = handleScale;
 
                 if (m_Config.Mode == GizmoMode::Translate)
-                    m_DragStart = ProjectMouseToAxis(mouseNDC, camera, m_ActiveAxis, handleScale);
+                    m_DragStart = ProjectMouseToAxis(mouseNDC, camera, m_ActiveAxis, m_DragHandleScale);
                 else if (m_Config.Mode == GizmoMode::Rotate)
-                    m_InitialRotateAngle = ProjectMouseToRotation(mouseNDC, camera, m_ActiveAxis, handleScale);
+                    m_InitialRotateAngle = ProjectMouseToRotation(mouseNDC, camera, m_ActiveAxis, m_DragHandleScale);
                 else if (m_Config.Mode == GizmoMode::Scale)
                 {
-                    m_DragStart = ProjectMouseToAxis(mouseNDC, camera, m_ActiveAxis, handleScale);
-                    for (auto& cache : m_CachedTransforms)
-                        m_InitialScale = cache.InitialScale;
+                    m_DragStart = ProjectMouseToAxis(mouseNDC, camera, m_ActiveAxis, m_DragHandleScale);
                 }
 
                 consumed = true;
@@ -610,8 +741,53 @@ bool TransformGizmo::Update(entt::registry& registry,
         // Apply transform based on mode.
         if (m_Config.Mode == GizmoMode::Translate)
         {
-            const glm::vec3 currentPoint = ProjectMouseToAxis(mouseNDC, camera, m_ActiveAxis, handleScale);
-            glm::vec3 delta = currentPoint - m_DragStart;
+            glm::vec3 delta{0.0f};
+            const glm::vec2 mouseDeltaNDC = mouseNDC - m_DragStartMouseNDC;
+
+            if (m_ActiveAxis == GizmoAxis::X || m_ActiveAxis == GizmoAxis::Y || m_ActiveAxis == GizmoAxis::Z)
+            {
+                const glm::vec3 axisDir = glm::normalize(GetAxisDirection(m_ActiveAxis));
+                glm::vec2 axisNDC{0.0f};
+                if (ProjectWorldVectorToScreen(camera, m_DragPivotPosition, axisDir * m_DragHandleScale, axisNDC))
+                {
+                    const float scalar = ProjectMouseDeltaOntoHandle(mouseDeltaNDC, axisNDC);
+                    delta = axisDir * (scalar * m_DragHandleScale);
+                }
+                else
+                {
+                    const glm::vec3 currentPoint = ProjectMouseToAxis(mouseNDC, camera, m_ActiveAxis, m_DragHandleScale);
+                    delta = currentPoint - m_DragStart;
+                }
+            }
+            else
+            {
+                GizmoAxis uAxis = GizmoAxis::X;
+                GizmoAxis vAxis = GizmoAxis::Y;
+                switch (m_ActiveAxis)
+                {
+                case GizmoAxis::XY: uAxis = GizmoAxis::X; vAxis = GizmoAxis::Y; break;
+                case GizmoAxis::XZ: uAxis = GizmoAxis::X; vAxis = GizmoAxis::Z; break;
+                case GizmoAxis::YZ: uAxis = GizmoAxis::Y; vAxis = GizmoAxis::Z; break;
+                default: break;
+                }
+
+                const glm::vec3 uDir = glm::normalize(GetAxisDirection(uAxis));
+                const glm::vec3 vDir = glm::normalize(GetAxisDirection(vAxis));
+                glm::vec2 uNDC{0.0f};
+                glm::vec2 vNDC{0.0f};
+                glm::vec2 coeffs{0.0f};
+                if (ProjectWorldVectorToScreen(camera, m_DragPivotPosition, uDir * m_DragHandleScale, uNDC) &&
+                    ProjectWorldVectorToScreen(camera, m_DragPivotPosition, vDir * m_DragHandleScale, vNDC) &&
+                    SolvePlaneDragDelta(mouseDeltaNDC, uNDC, vNDC, coeffs))
+                {
+                    delta = uDir * (coeffs.x * m_DragHandleScale) + vDir * (coeffs.y * m_DragHandleScale);
+                }
+                else
+                {
+                    const glm::vec3 currentPoint = ProjectMouseToAxis(mouseNDC, camera, m_ActiveAxis, m_DragHandleScale);
+                    delta = currentPoint - m_DragStart;
+                }
+            }
 
             // Apply snap per-axis.
             if (m_Config.SnapEnabled)
@@ -633,17 +809,23 @@ bool TransformGizmo::Update(entt::registry& registry,
         }
         else if (m_Config.Mode == GizmoMode::Rotate)
         {
-            const float currentAngle = ProjectMouseToRotation(mouseNDC, camera, m_ActiveAxis, handleScale);
-            float deltaAngle = currentAngle - m_InitialRotateAngle;
+            float deltaAngle = ComputeScreenRotationDelta(
+                camera,
+                m_DragPivotPosition,
+                GetAxisDirection(m_ActiveAxis),
+                m_DragStartMouseNDC,
+                mouseNDC);
+
+            if (!std::isfinite(deltaAngle))
+            {
+                const float currentAngle = ProjectMouseToRotation(mouseNDC, camera, m_ActiveAxis, m_DragHandleScale);
+                deltaAngle = WrapAngleDelta(currentAngle - m_InitialRotateAngle);
+            }
 
             if (m_Config.SnapEnabled)
-                deltaAngle = ApplySnap(glm::degrees(deltaAngle), m_Config.RotateSnap);
-            else
-                deltaAngle = glm::degrees(deltaAngle);
+                deltaAngle = glm::radians(ApplySnap(glm::degrees(deltaAngle), m_Config.RotateSnap));
 
-            const float radians = glm::radians(deltaAngle);
-            const glm::vec3 axis = GetAxisDirection(m_ActiveAxis);
-            const glm::quat rotation = glm::angleAxis(radians, axis);
+            const glm::quat rotation = glm::angleAxis(deltaAngle, GetAxisDirection(m_ActiveAxis));
 
             for (auto& cache : m_CachedTransforms)
             {
@@ -651,16 +833,16 @@ bool TransformGizmo::Update(entt::registry& registry,
                 auto* transform = registry.try_get<ECS::Components::Transform::Component>(cache.Entity);
                 if (!transform) continue;
 
-                // Rotate around pivot.
-                const glm::vec3 offset = cache.InitialPosition - m_PivotPosition;
-                transform->Position = m_PivotPosition + rotation * offset;
+                // Rotate around drag-start pivot.
+                const glm::vec3 offset = cache.InitialPosition - m_DragPivotPosition;
+                transform->Position = m_DragPivotPosition + rotation * offset;
                 transform->Rotation = rotation * cache.InitialRotation;
                 registry.emplace_or_replace<ECS::Components::Transform::IsDirtyTag>(cache.Entity);
             }
         }
         else if (m_Config.Mode == GizmoMode::Scale)
         {
-            float scaleFactor = ProjectMouseToScale(mouseNDC, camera, m_ActiveAxis, handleScale);
+            float scaleFactor = ProjectMouseToScale(mouseNDC, camera, m_ActiveAxis, m_DragHandleScale);
 
             if (m_Config.SnapEnabled)
                 scaleFactor = ApplySnap(scaleFactor, m_Config.ScaleSnap);
@@ -681,8 +863,6 @@ bool TransformGizmo::Update(entt::registry& registry,
                 else
                 {
                     transform->Scale = cache.InitialScale;
-                    const glm::vec3 dir = GetAxisDirection(m_ActiveAxis);
-                    // Apply scale along the specific axis.
                     if (m_ActiveAxis == GizmoAxis::X)
                         transform->Scale.x = cache.InitialScale.x * scaleFactor;
                     else if (m_ActiveAxis == GizmoAxis::Y)

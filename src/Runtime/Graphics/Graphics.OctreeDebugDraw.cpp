@@ -77,6 +77,7 @@ namespace Graphics
     {
         if (!settings.Enabled) return;
         if (octree.m_Nodes.empty()) return;
+        if (dd.GetRemainingLineCapacity() == 0u) return;
 
         const std::uint32_t maxDepth = settings.MaxDepth;
 
@@ -90,6 +91,9 @@ namespace Graphics
 
         while (sp > 0)
         {
+            if (dd.GetRemainingLineCapacity() < 12u)
+                break;
+
             const StackItem it = stack[--sp];
             if (it.Node >= octree.m_Nodes.size()) continue;
 
@@ -104,6 +108,9 @@ namespace Graphics
 
             if (drawThis)
             {
+                if (dd.GetRemainingLineCapacity() < 12u)
+                    break;
+
                 const float t = (maxDepth > 0) ? (static_cast<float>(it.Depth) / static_cast<float>(maxDepth)) : 0.0f;
                 const glm::vec3 rgb = settings.ColorByDepth ? DepthRamp(t) : settings.BaseColor;
                 const std::uint32_t color = PackWithAlpha(rgb, settings.Alpha);
