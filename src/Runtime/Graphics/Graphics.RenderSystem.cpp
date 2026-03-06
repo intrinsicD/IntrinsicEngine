@@ -708,6 +708,11 @@ namespace Graphics
         return m_ActivePipeline ? m_ActivePipeline->GetPostProcessSettings() : nullptr;
     }
 
+    const Passes::HistogramReadback* RenderSystem::GetHistogramReadback() const
+    {
+        return m_ActivePipeline ? m_ActivePipeline->GetHistogramReadback() : nullptr;
+    }
+
     // -------------------------------------------------------------------------
     // OnUpdate sub-steps
     // -------------------------------------------------------------------------

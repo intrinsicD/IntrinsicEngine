@@ -76,6 +76,11 @@ export namespace Graphics
             return m_PostProcessPass ? &m_PostProcessPass->GetSettings() : nullptr;
         }
 
+        const Passes::HistogramReadback* GetHistogramReadback() const override
+        {
+            return m_PostProcessPass ? &m_PostProcessPass->GetHistogram() : nullptr;
+        }
+
     private:
         const Core::FeatureRegistry* m_Registry = nullptr;
 

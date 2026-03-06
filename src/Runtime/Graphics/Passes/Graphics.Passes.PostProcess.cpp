@@ -7,6 +7,7 @@ module;
 #include <cstring>
 #include <algorithm>
 #include <format>
+#include <cmath>
 #include <glm/glm.hpp>
 
 #include "RHI.Vulkan.hpp"
@@ -136,6 +137,47 @@ namespace Graphics::Passes
                 UpdateImageDescriptor(dev, m_BloomUpSets[fi][m], 0, m_LinearSampler, dummyView, readLayout);
                 UpdateImageDescriptor(dev, m_BloomUpSets[fi][m], 1, m_LinearSampler, dummyView, readLayout);
             }
+        }
+
+        // Histogram: descriptor layout with 1 combined-image-sampler + 1 SSBO.
+        {
+            VkDescriptorSetLayoutBinding bindings[2] = {};
+            bindings[0].binding = 0;
+            bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            bindings[0].descriptorCount = 1;
+            bindings[0].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+            bindings[1].binding = 1;
+            bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+            bindings[1].descriptorCount = 1;
+            bindings[1].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+            VkDescriptorSetLayoutCreateInfo layoutInfo{};
+            layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+            layoutInfo.bindingCount = 2;
+            layoutInfo.pBindings = bindings;
+
+            CheckVkResult(vkCreateDescriptorSetLayout(dev, &layoutInfo, nullptr, &m_HistogramSetLayout),
+                          "PostProcess.Histogram", "vkCreateDescriptorSetLayout");
+        }
+
+        // Allocate per-frame histogram descriptor sets and SSBO buffers.
+        constexpr size_t kHistogramBytes = kHistogramBinCount * sizeof(uint32_t);
+        for (uint32_t fi = 0; fi < 3; ++fi)
+        {
+            m_HistogramSets[fi] = descriptorPool.Allocate(m_HistogramSetLayout);
+
+            m_HistogramBuffers[fi] = std::make_unique<RHI::VulkanBuffer>(
+                device, kHistogramBytes,
+                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                VMA_MEMORY_USAGE_GPU_TO_CPU);
+
+            // Bind the SSBO to the histogram descriptor set.
+            UpdateSSBODescriptor(dev, m_HistogramSets[fi], 1,
+                                 m_HistogramBuffers[fi]->GetHandle(), kHistogramBytes);
+
+            // Bind dummy image for the sampler binding.
+            UpdateImageDescriptor(dev, m_HistogramSets[fi], 0, m_LinearSampler, dummyView, readLayout);
         }
     }
 
@@ -472,6 +514,166 @@ namespace Graphics::Passes
     }
 
     // =====================================================================
+    // BuildHistogramPipeline
+    // =====================================================================
+    std::unique_ptr<RHI::ComputePipeline> PostProcessPass::BuildHistogramPipeline()
+    {
+        auto compPathOpt = m_ShaderRegistry->Get("Post.Histogram.Comp"_id);
+        if (!compPathOpt)
+        {
+            Core::Log::Error("PostProcess: histogram compute shader not registered.");
+            return nullptr;
+        }
+
+        std::string compPath = Core::Filesystem::ResolveShaderPathOrExit(
+            [&](Core::Hash::StringID id) { return m_ShaderRegistry->Get(id); },
+            "Post.Histogram.Comp"_id);
+
+        RHI::ShaderModule comp(*m_Device, compPath, RHI::ShaderStage::Compute);
+
+        auto deviceAlias = MakeDeviceAlias(m_Device);
+        RHI::ComputePipelineBuilder cb(deviceAlias);
+        cb.SetShader(&comp);
+        cb.AddDescriptorSetLayout(m_HistogramSetLayout);
+
+        VkPushConstantRange pcr{};
+        pcr.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+        pcr.offset = 0;
+        pcr.size = sizeof(float) * 4; // InvWidth, InvHeight, MinLogLum, RangeLogLum
+        cb.AddPushConstantRange(pcr);
+
+        auto built = cb.Build();
+        if (!built)
+        {
+            Core::Log::Error("PostProcess: failed to build Histogram pipeline (VkResult={})", (int)built.error());
+            return nullptr;
+        }
+        return std::move(*built);
+    }
+
+    // =====================================================================
+    // AddHistogramPass — compute shader to build luminance histogram.
+    // =====================================================================
+    void PostProcessPass::AddHistogramPass(RenderPassContext& ctx, RGResourceHandle sceneColor)
+    {
+        if (!m_HistogramPipeline)
+            m_HistogramPipeline = BuildHistogramPipeline();
+        if (!m_HistogramPipeline)
+            return;
+
+        constexpr uint32_t kFrames = RHI::VulkanDevice::GetFramesInFlight();
+        const uint32_t fi = ctx.FrameIndex % kFrames;
+        const VkExtent2D resolution = ctx.Resolution;
+        const float minEV = m_Settings.HistogramMinEV;
+        const float maxEV = m_Settings.HistogramMaxEV;
+        const float rangeEV = (maxEV - minEV);
+        const float invRange = (rangeEV > 1e-6f) ? (1.0f / rangeEV) : 1.0f;
+
+        // Read back the previous frame's histogram before we overwrite it.
+        // We read from the current frame-in-flight buffer which was last written
+        // 3 frames ago (ring buffer with 3 frames in flight).
+        if (m_HistogramBuffers[fi])
+        {
+            const auto* mappedData = static_cast<const uint32_t*>(m_HistogramBuffers[fi]->GetMappedData());
+            if (mappedData)
+            {
+                std::memcpy(m_HistogramReadback.Bins, mappedData,
+                            kHistogramBinCount * sizeof(uint32_t));
+
+                // Compute average luminance from histogram.
+                uint64_t totalPixels = 0;
+                double weightedSum = 0.0;
+                for (uint32_t i = 0; i < kHistogramBinCount; ++i)
+                {
+                    if (m_HistogramReadback.Bins[i] > 0)
+                    {
+                        totalPixels += m_HistogramReadback.Bins[i];
+                        float binCenter = minEV + (static_cast<float>(i) + 0.5f) / 254.0f * rangeEV;
+                        weightedSum += static_cast<double>(m_HistogramReadback.Bins[i]) * binCenter;
+                    }
+                }
+                if (totalPixels > 0)
+                    m_HistogramReadback.AverageLuminance = std::exp2(
+                        static_cast<float>(weightedSum / static_cast<double>(totalPixels)));
+                else
+                    m_HistogramReadback.AverageLuminance = 0.0f;
+
+                m_HistogramReadback.Valid = true;
+            }
+        }
+
+        struct HistogramData { RGResourceHandle Src; RGResourceHandle Buf; };
+
+        ctx.Graph.AddPass<HistogramData>("Post.Histogram",
+            [&, sceneColor, fi](HistogramData& data, RGBuilder& builder)
+            {
+                data.Src = builder.Read(sceneColor,
+                                        VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                                        VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
+
+                data.Buf = builder.ImportBuffer("HistogramSSBO"_id, *m_HistogramBuffers[fi]);
+                builder.Write(data.Buf,
+                              VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                              VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT);
+
+                // Cache the read handle so PostCompile can patch the descriptor.
+                m_LastSceneColorHandle = data.Src;
+            },
+            [this, fi, resolution, minEV, invRange]
+            (const HistogramData&, const RGRegistry&, VkCommandBuffer cmd)
+            {
+                constexpr size_t kHistogramBytes = kHistogramBinCount * sizeof(uint32_t);
+
+                // Clear the histogram buffer to zero before accumulation.
+                vkCmdFillBuffer(cmd, m_HistogramBuffers[fi]->GetHandle(),
+                                0, kHistogramBytes, 0);
+
+                // Barrier: transfer write -> compute read/write.
+                VkBufferMemoryBarrier2 clearBarrier{};
+                clearBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
+                clearBarrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+                clearBarrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+                clearBarrier.dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
+                clearBarrier.dstAccessMask = VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
+                clearBarrier.buffer = m_HistogramBuffers[fi]->GetHandle();
+                clearBarrier.offset = 0;
+                clearBarrier.size = kHistogramBytes;
+
+                VkDependencyInfo dep{};
+                dep.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+                dep.bufferMemoryBarrierCount = 1;
+                dep.pBufferMemoryBarriers = &clearBarrier;
+                vkCmdPipelineBarrier2(cmd, &dep);
+
+                // Bind and dispatch.
+                vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE,
+                                  m_HistogramPipeline->GetHandle());
+                vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE,
+                                        m_HistogramPipeline->GetLayout(),
+                                        0, 1, &m_HistogramSets[fi], 0, nullptr);
+
+                struct {
+                    float InvWidth;
+                    float InvHeight;
+                    float MinLogLum;
+                    float RangeLogLum;
+                } pc{
+                    1.0f / static_cast<float>(resolution.width),
+                    1.0f / static_cast<float>(resolution.height),
+                    minEV,
+                    invRange
+                };
+                vkCmdPushConstants(cmd, m_HistogramPipeline->GetLayout(),
+                                   VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(pc), &pc);
+
+                const uint32_t groupsX = (resolution.width + 15) / 16;
+                const uint32_t groupsY = (resolution.height + 15) / 16;
+                vkCmdDispatch(cmd, groupsX, groupsY, 1);
+            }
+        );
+    }
+
+    // =====================================================================
     // AddPasses
     // =====================================================================
     void PostProcessPass::AddPasses(RenderPassContext& ctx)
@@ -495,6 +697,10 @@ namespace Graphics::Passes
 
         if (!m_ToneMapPipeline)
             return;
+
+        // Add histogram compute pass (reads HDR scene color, builds luminance histogram).
+        if (m_Settings.HistogramEnabled)
+            AddHistogramPass(ctx, sceneColor);
 
         // Add bloom passes before tone mapping (operates in HDR space).
         const bool bloomEnabled = m_Settings.BloomEnabled;
@@ -737,6 +943,13 @@ namespace Graphics::Passes
                 UpdateImageDescriptor(dev, m_BloomDownSets[frameIndex][mip], 0, m_LinearSampler, view, readLayout);
         }
 
+        // Update histogram descriptor: binding 0 = SceneColor sampler.
+        if (m_Settings.HistogramEnabled)
+        {
+            if (VkImageView sceneView = findView(m_LastSceneColorHandle))
+                UpdateImageDescriptor(dev, m_HistogramSets[frameIndex], 0, m_LinearSampler, sceneView, readLayout);
+        }
+
         // Update bloom upsample descriptors.
         // Each upsample pass reads: binding 0 = coarser upsampled, binding 1 = current downsample.
         // We need to find the actual image views from the render graph debug images.
@@ -780,7 +993,11 @@ namespace Graphics::Passes
         m_FXAAPipeline.reset();
         m_BloomDownPipeline.reset();
         m_BloomUpPipeline.reset();
+        m_HistogramPipeline.reset();
         m_DummySampled.reset();
+
+        for (auto& buf : m_HistogramBuffers)
+            buf.reset();
 
         if (m_LinearSampler != VK_NULL_HANDLE)
         {
@@ -807,6 +1024,11 @@ namespace Graphics::Passes
             vkDestroyDescriptorSetLayout(dev, m_BloomUpSetLayout, nullptr);
             m_BloomUpSetLayout = VK_NULL_HANDLE;
         }
+        if (m_HistogramSetLayout != VK_NULL_HANDLE)
+        {
+            vkDestroyDescriptorSetLayout(dev, m_HistogramSetLayout, nullptr);
+            m_HistogramSetLayout = VK_NULL_HANDLE;
+        }
     }
 
     // =====================================================================
@@ -818,5 +1040,6 @@ namespace Graphics::Passes
         m_FXAAPipeline.reset();
         m_BloomDownPipeline.reset();
         m_BloomUpPipeline.reset();
+        m_HistogramPipeline.reset();
     }
 }

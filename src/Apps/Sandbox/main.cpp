@@ -1064,6 +1064,43 @@ public:
                     ImGui::SliderFloat("FXAA Subpixel", &postSettings->FXAASubpixelBlending, 0.0f, 1.0f, "%.2f");
                 }
 
+                // Luminance Histogram
+                ImGui::Spacing();
+                ImGui::Checkbox("Exposure Histogram", &postSettings->HistogramEnabled);
+                if (postSettings->HistogramEnabled)
+                {
+                    ImGui::SliderFloat("Min EV", &postSettings->HistogramMinEV, -20.0f, 0.0f, "%.1f");
+                    ImGui::SliderFloat("Max EV", &postSettings->HistogramMaxEV, 0.0f, 20.0f, "%.1f");
+
+                    const auto* histo = GetRenderOrchestrator().GetRenderSystem().GetHistogramReadback();
+                    if (histo && histo->Valid)
+                    {
+                        // Find max bin for normalization.
+                        uint32_t maxBin = 1;
+                        for (uint32_t i = 0; i < Graphics::Passes::kHistogramBinCount; ++i)
+                            maxBin = std::max(maxBin, histo->Bins[i]);
+
+                        // Convert to float array for ImGui plot.
+                        float plotData[Graphics::Passes::kHistogramBinCount];
+                        for (uint32_t i = 0; i < Graphics::Passes::kHistogramBinCount; ++i)
+                            plotData[i] = static_cast<float>(histo->Bins[i]) / static_cast<float>(maxBin);
+
+                        ImGui::PlotHistogram("##LumHist", plotData,
+                                             static_cast<int>(Graphics::Passes::kHistogramBinCount),
+                                             0, nullptr, 0.0f, 1.0f, ImVec2(0, 80));
+
+                        // Show average luminance and EV.
+                        float avgEV = (histo->AverageLuminance > 1e-6f)
+                                        ? std::log2(histo->AverageLuminance)
+                                        : postSettings->HistogramMinEV;
+                        ImGui::Text("Avg Luminance: %.4f  (%.1f EV)", histo->AverageLuminance, avgEV);
+                    }
+                    else
+                    {
+                        ImGui::TextDisabled("Histogram data not available yet.");
+                    }
+                }
+
                 // Color Grading
                 ImGui::Spacing();
                 ImGui::Checkbox("Color Grading", &postSettings->ColorGradingEnabled);

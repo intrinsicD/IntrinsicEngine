@@ -3,6 +3,7 @@ module;
 #include <memory>
 #include <span>
 #include <array>
+#include <cstdint>
 #include "RHI.Vulkan.hpp"
 
 export module Graphics:Passes.PostProcess;
@@ -58,6 +59,9 @@ export namespace Graphics::Passes
         PostProcessSettings& GetSettings() { return m_Settings; }
         const PostProcessSettings& GetSettings() const { return m_Settings; }
 
+        // Access CPU-side histogram readback for UI display.
+        [[nodiscard]] const HistogramReadback& GetHistogram() const { return m_HistogramReadback; }
+
     private:
         RHI::VulkanDevice*   m_Device          = nullptr;
         const ShaderRegistry* m_ShaderRegistry  = nullptr;
@@ -95,11 +99,20 @@ export namespace Graphics::Passes
         std::array<RGResourceHandle, kBloomMipCount> m_LastBloomDownHandles{};
         std::array<RGResourceHandle, kBloomMipCount> m_LastBloomUpSrcHandles{};
 
+        // Histogram compute pipeline + storage
+        VkDescriptorSetLayout m_HistogramSetLayout = VK_NULL_HANDLE;
+        VkDescriptorSet       m_HistogramSets[3]   = {};
+        std::unique_ptr<RHI::ComputePipeline> m_HistogramPipeline;
+        std::unique_ptr<RHI::VulkanBuffer>    m_HistogramBuffers[3]; // per-frame SSBO
+        HistogramReadback m_HistogramReadback;
+
         std::unique_ptr<RHI::GraphicsPipeline> BuildToneMapPipeline(VkFormat outputFormat);
         std::unique_ptr<RHI::GraphicsPipeline> BuildFXAAPipeline(VkFormat outputFormat);
         std::unique_ptr<RHI::GraphicsPipeline> BuildBloomDownsamplePipeline();
         std::unique_ptr<RHI::GraphicsPipeline> BuildBloomUpsamplePipeline();
+        std::unique_ptr<RHI::ComputePipeline>  BuildHistogramPipeline();
 
         void AddBloomPasses(RenderPassContext& ctx, RGResourceHandle sceneColor);
+        void AddHistogramPass(RenderPassContext& ctx, RGResourceHandle sceneColor);
     };
 }

@@ -361,6 +361,7 @@ export namespace Graphics
 
         virtual Passes::SelectionOutlineSettings* GetSelectionOutlineSettings() { return nullptr; }
         virtual Passes::PostProcessSettings* GetPostProcessSettings() { return nullptr; }
+        virtual const Passes::HistogramReadback* GetHistogramReadback() const { return nullptr; }
     };
 
     // ---------------------------------------------------------------------

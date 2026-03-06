@@ -144,7 +144,7 @@ The engine uses a unified three-pass rendering architecture with one pass per pr
 | **SurfacePass** | Filled triangles | BDA from `GeometryGpuData` | — | `surface.vert/frag` | `"SurfacePass"` |
 | **LinePass** | Thick anti-aliased edges | BDA positions + edge index buffer | `DebugDraw::GetLines()` | `line.vert/frag` | `"LinePass"` |
 | **PointPass** | Expanded billboard quads | BDA positions + normals | `DebugDraw::GetPoints()` | `point_flatdisc.vert/frag`, `point_surfel.vert/frag` | `"PointPass"` |
-| **PostProcessPass** | Fullscreen triangle | — | — | `post_fullscreen.vert`, `post_tonemap.frag`, `post_fxaa.frag` | `"PostProcessPass"` |
+| **PostProcessPass** | Fullscreen triangle + compute | — | — | `post_fullscreen.vert`, `post_tonemap.frag`, `post_fxaa.frag`, `post_histogram.comp` | `"PostProcessPass"` |
 
 ### ECS Render Component Types
 

@@ -1,5 +1,7 @@
 module;
 
+#include <cstdint>
+
 export module Graphics:Passes.PostProcessSettings;
 
 export namespace Graphics::Passes
@@ -44,5 +46,20 @@ export namespace Graphics::Passes
         float FXAAContrastThreshold  = 0.0312f;
         float FXAARelativeThreshold  = 0.063f;
         float FXAASubpixelBlending   = 0.75f;
+
+        // Luminance Histogram (debug exposure tool)
+        bool  HistogramEnabled     = false;
+        float HistogramMinEV       = -10.0f;  // log2(min luminance) for binning range
+        float HistogramMaxEV       =  10.0f;  // log2(max luminance) for binning range
+    };
+
+    // CPU-side histogram readback data for UI display.
+    inline constexpr uint32_t kHistogramBinCount = 256;
+
+    struct HistogramReadback
+    {
+        uint32_t Bins[kHistogramBinCount] = {};
+        float    AverageLuminance = 0.0f;
+        bool     Valid            = false;
     };
 }

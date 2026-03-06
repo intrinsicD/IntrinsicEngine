@@ -1,0 +1,83 @@
+#version 460
+
+// =============================================================================
+// Luminance histogram compute shader.
+//
+// Reads the HDR scene color buffer and builds a 256-bin log-luminance histogram
+// in a storage buffer. Each workgroup uses shared memory for local accumulation
+// before a single atomic merge into the global histogram.
+//
+// Push constants provide the input resolution and the log-luminance range to bin
+// over.  Pixels outside the range are clamped to the first/last bin.
+//
+// Dispatch: ceil(width/16) x ceil(height/16) x 1
+// =============================================================================
+
+layout(local_size_x = 16, local_size_y = 16) in;
+
+layout(set = 0, binding = 0) uniform sampler2D uSceneColor;
+
+layout(std430, set = 0, binding = 1) buffer HistogramBuffer
+{
+    uint bins[256];
+} histogram;
+
+layout(push_constant) uniform PushConstants
+{
+    float InvWidth;
+    float InvHeight;
+    float MinLogLum;   // log2(minLuminance)
+    float RangeLogLum; // 1.0 / (log2(maxLuminance) - log2(minLuminance))
+};
+
+shared uint sharedBins[256];
+
+void main()
+{
+    // Clear shared histogram bins (one thread per bin for 256 threads = 16x16).
+    uint localIdx = gl_LocalInvocationIndex;
+    if (localIdx < 256)
+        sharedBins[localIdx] = 0;
+
+    barrier();
+
+    uvec2 pixel = gl_GlobalInvocationID.xy;
+    uint width  = uint(1.0 / InvWidth + 0.5);
+    uint height = uint(1.0 / InvHeight + 0.5);
+
+    if (pixel.x < width && pixel.y < height)
+    {
+        // Sample at pixel center.
+        vec2 uv = (vec2(pixel) + 0.5) * vec2(InvWidth, InvHeight);
+        vec3 color = texture(uSceneColor, uv).rgb;
+
+        // Rec. 709 luminance.
+        float lum = dot(color, vec3(0.2126, 0.7152, 0.0722));
+
+        // Map luminance to bin index via log2.
+        // Clamp to epsilon to avoid log2(0).
+        uint binIdx;
+        if (lum < 1e-5)
+        {
+            binIdx = 0;
+        }
+        else
+        {
+            float logLum = log2(lum);
+            float normalized = (logLum - MinLogLum) * RangeLogLum;
+            normalized = clamp(normalized, 0.0, 1.0);
+            binIdx = uint(normalized * 254.0 + 0.5); // bins 0..254, 255 reserved for overflow
+        }
+
+        atomicAdd(sharedBins[binIdx], 1);
+    }
+
+    barrier();
+
+    // Merge shared bins into global histogram.
+    if (localIdx < 256)
+    {
+        if (sharedBins[localIdx] > 0)
+            atomicAdd(histogram.bins[localIdx], sharedBins[localIdx]);
+    }
+}
