@@ -3,6 +3,7 @@ module;
 #include <glm/glm.hpp>
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/component_wise.hpp>
+#include <array>
 #include <span>
 #include <vector>
 #include <cfloat>
@@ -53,7 +54,22 @@ export namespace Geometry
             const glm::vec3 size = GetSize();
             return glm::compMax(size);
         }
+
+        [[nodiscard]] std::array<glm::vec3, 8> GetCorners() const
+        {
+            return {
+                glm::vec3{Min.x, Min.y, Min.z}, glm::vec3{Max.x, Min.y, Min.z},
+                glm::vec3{Max.x, Max.y, Min.z}, glm::vec3{Min.x, Max.y, Min.z},
+                glm::vec3{Min.x, Min.y, Max.z}, glm::vec3{Max.x, Min.y, Max.z},
+                glm::vec3{Max.x, Max.y, Max.z}, glm::vec3{Min.x, Max.y, Max.z}
+            };
+        }
     };
+
+    [[nodiscard]] glm::vec3 ClosestPoint(const AABB& aabb, const glm::vec3& point)
+    {
+        return glm::clamp(point, aabb.Min, aabb.Max);
+    }
 
     AABB Union(std::span<const AABB> aabbs)
     {
@@ -110,7 +126,7 @@ export namespace Geometry
     // Returns 0 if point is inside or on the surface.
     double Distance(const AABB& a, const glm::vec3& p)
     {
-        glm::vec3 delta = glm::max(glm::max(a.Min - p, p - a.Max), glm::vec3(0.0f));
+        const glm::vec3 delta = p - ClosestPoint(a, p);
         return glm::length(delta);
     }
 
@@ -124,7 +140,18 @@ export namespace Geometry
 
     double SquaredDistance(const AABB& a, const glm::vec3& p)
     {
-        glm::vec3 delta = glm::max(glm::max(a.Min - p, p - a.Max), glm::vec3(0.0f));
+        const glm::vec3 delta = p - ClosestPoint(a, p);
         return glm::dot(delta, delta);
+    }
+
+    double SquaredDistance(const AABB& a, const AABB& b)
+    {
+        const glm::vec3 delta = glm::max(glm::max(a.Min - b.Max, b.Min - a.Max), glm::vec3(0.0f));
+        return glm::dot(delta, delta);
+    }
+
+    double Distance(const AABB& a, const AABB& b)
+    {
+        return glm::length(glm::max(glm::max(a.Min - b.Max, b.Min - a.Max), glm::vec3(0.0f)));
     }
 }

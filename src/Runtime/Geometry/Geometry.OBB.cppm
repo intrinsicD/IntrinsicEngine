@@ -2,11 +2,14 @@ module;
 
 #include <glm/glm.hpp>
 #define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/component_wise.hpp>
 #include <glm/gtx/quaternion.hpp>
 #include <span>
 #include <array>
 
 export module Geometry:OBB;
+
+import :AABB;
 
 export namespace Geometry
 {
@@ -44,6 +47,15 @@ export namespace Geometry
             return glm::compMax(size);
         }
 
+        [[nodiscard]] std::array<glm::vec3, 3> GetAxes() const
+        {
+            return {
+                glm::rotate(Rotation, glm::vec3(1.0f, 0.0f, 0.0f)),
+                glm::rotate(Rotation, glm::vec3(0.0f, 1.0f, 0.0f)),
+                glm::rotate(Rotation, glm::vec3(0.0f, 0.0f, 1.0f))
+            };
+        }
+
         // Get the 8 corners in World Space
         [[nodiscard]] std::array<glm::vec3, 8> GetCorners() const
         {
@@ -76,6 +88,12 @@ export namespace Geometry
             return Center + (Rotation * localPos);
         }
     };
+
+    [[nodiscard]] glm::vec3 ClosestPoint(const OBB& obb, const glm::vec3& point)
+    {
+        const glm::vec3 local = obb.ToLocal(point);
+        return obb.ToWorld(glm::clamp(local, -obb.Extents, obb.Extents));
+    }
 
     OBB Union(const OBB& obb, const glm::vec3& point)
     {
@@ -155,19 +173,32 @@ export namespace Geometry
         return obb.GetVolume();
     }
 
+    double SignedDistance(const OBB& a, const glm::vec3& p)
+    {
+        const glm::vec3 localP = a.ToLocal(p);
+        const glm::vec3 d = glm::abs(localP) - a.Extents;
+        return glm::length(glm::max(d, glm::vec3(0.0f))) + glm::min(glm::max(d.x, glm::max(d.y, d.z)), 0.0f);
+    }
+
     double Distance(const OBB& a, const glm::vec3& p)
     {
-        glm::vec3 localP = a.ToLocal(p);
-        glm::vec3 d = glm::abs(localP) - a.Extents;
-        return glm::length(glm::max(d, glm::vec3(0.0))) + glm::min(glm::max(d.x, glm::max(d.y, d.z)), 0.0f);
+        const glm::vec3 delta = p - ClosestPoint(a, p);
+        return glm::length(delta);
     }
 
     double SquaredDistance(const OBB& a, const glm::vec3& p)
     {
-        glm::vec3 localP = a.ToLocal(p);
-        glm::vec3 d = glm::abs(localP) - a.Extents;
-        // Clamp to 0 (only care about outside distance for squared)
-        d = glm::max(d, glm::vec3(0.0f));
-        return glm::dot(d, d);
+        const glm::vec3 delta = p - ClosestPoint(a, p);
+        return glm::dot(delta, delta);
+    }
+
+    [[nodiscard]] AABB ComputeAABB(const OBB& obb)
+    {
+        AABB bounds;
+        for (const glm::vec3& corner : obb.GetCorners())
+        {
+            bounds = Union(bounds, corner);
+        }
+        return bounds;
     }
 }

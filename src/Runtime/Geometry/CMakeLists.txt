@@ -7,6 +7,16 @@ target_sources(${target_name}
         Geometry.cppm
         Geometry.AABB.cppm
         Geometry.OBB.cppm
+        Geometry.Sphere.cppm
+        Geometry.Capsule.cppm
+        Geometry.Cylinder.cppm
+        Geometry.Ellipsoid.cppm
+        Geometry.Segment.cppm
+        Geometry.Triangle.cppm
+        Geometry.Plane.cppm
+        Geometry.ConvexHull.cppm
+        Geometry.Frustum.cppm
+        Geometry.Ray.cppm
         Geometry.ContactManifold.cppm
         Geometry.Containment.cppm
         Geometry.GJK.cppm

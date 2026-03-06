@@ -67,7 +67,7 @@ namespace Geometry::ConvexHullBuilder
         return Plane{normal, dist};
     }
 
-    static double SignedDistance(const Plane& plane, glm::vec3 point)
+    static double HullPlaneSignedDistance(const Plane& plane, glm::vec3 point)
     {
         return static_cast<double>(glm::dot(plane.Normal, point)) -
                static_cast<double>(plane.Distance);
@@ -109,7 +109,7 @@ namespace Geometry::ConvexHullBuilder
 
         for (uint32_t idx : candidates)
         {
-            double dist = std::abs(SignedDistance(plane, points[idx]));
+            double dist = std::abs(HullPlaneSignedDistance(plane, points[idx]));
             if (dist > bestDist)
             {
                 bestDist = dist;
@@ -191,14 +191,14 @@ namespace Geometry::ConvexHullBuilder
         uint32_t p3 = FarthestFromPlane(points, allIndices, triPlane);
 
         // Check that p3 is not coplanar
-        double p3Dist = std::abs(SignedDistance(triPlane, points[p3]));
+        double p3Dist = std::abs(HullPlaneSignedDistance(triPlane, points[p3]));
         if (p3Dist < epsilon)
             return result; // All points are coplanar
 
         // Step 5: Orient the tetrahedron so all faces have outward normals.
         // If p3 is on the positive side of the triangle (p0, p1, p2), we need
         // to flip the winding of the base triangle so p3 is "inside".
-        if (SignedDistance(triPlane, points[p3]) > 0.0)
+        if (HullPlaneSignedDistance(triPlane, points[p3]) > 0.0)
         {
             // p3 is above (p0, p1, p2) — swap p0 and p1 to flip the base
             std::swap(p0, p1);
@@ -262,7 +262,7 @@ namespace Geometry::ConvexHullBuilder
         glm::vec3 centroid = (points[i0] + points[i1] + points[i2] + points[i3]) * 0.25f;
         for (std::size_t fi : {f0, f1, f2, f3})
         {
-            if (SignedDistance(faces[fi].FacePlane, centroid) > 0.0)
+            if (HullPlaneSignedDistance(faces[fi].FacePlane, centroid) > 0.0)
             {
                 // Flip the face
                 std::swap(faces[fi].Vertices[0], faces[fi].Vertices[1]);
@@ -286,7 +286,7 @@ namespace Geometry::ConvexHullBuilder
 
             for (std::size_t fi = 0; fi < faces.size(); ++fi)
             {
-                double dist = SignedDistance(faces[fi].FacePlane, points[pi]);
+                double dist = HullPlaneSignedDistance(faces[fi].FacePlane, points[pi]);
                 if (dist > eps && dist > bestDist)
                 {
                     bestDist = dist;
@@ -376,7 +376,7 @@ namespace Geometry::ConvexHullBuilder
                 // Find the farthest point in this face's conflict list
                 for (uint32_t pi : faces[fi].ConflictPoints)
                 {
-                    double dist = SignedDistance(faces[fi].FacePlane, points[pi]);
+                    double dist = HullPlaneSignedDistance(faces[fi].FacePlane, points[pi]);
                     if (dist > bestEyeDist)
                     {
                         bestEyeDist = dist;
@@ -424,7 +424,7 @@ namespace Geometry::ConvexHullBuilder
                             if (faces[neighbor].Deleted)
                                 continue;
 
-                            double dist = SignedDistance(faces[neighbor].FacePlane,
+                            double dist = HullPlaneSignedDistance(faces[neighbor].FacePlane,
                                                         points[eyePoint]);
                             if (dist > eps)
                             {
@@ -538,7 +538,7 @@ namespace Geometry::ConvexHullBuilder
                 newFaceIndices.push_back(fi);
 
                 // Verify outward orientation
-                if (SignedDistance(faces[fi].FacePlane, centroid) > eps)
+                if (HullPlaneSignedDistance(faces[fi].FacePlane, centroid) > eps)
                 {
                     std::swap(faces[fi].Vertices[0], faces[fi].Vertices[1]);
                     faces[fi].FacePlane = MakePlane(
@@ -558,7 +558,7 @@ namespace Geometry::ConvexHullBuilder
 
                 for (std::size_t fi : newFaceIndices)
                 {
-                    double dist = SignedDistance(faces[fi].FacePlane, points[pi]);
+                    double dist = HullPlaneSignedDistance(faces[fi].FacePlane, points[pi]);
                     if (dist > eps && dist > bestDist)
                     {
                         bestDist = dist;

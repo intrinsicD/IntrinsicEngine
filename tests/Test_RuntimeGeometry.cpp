@@ -1110,3 +1110,62 @@ TEST(HalfedgeMesh, DeleteFace_ThenGarbageCollect)
     EXPECT_EQ(m.FaceCount(), 1u);
 }
 
+TEST(GeometryPrimitives, AABB_CommonUtils)
+{
+    const AABB box{{-1.0f, -2.0f, -3.0f}, {3.0f, 2.0f, 1.0f}};
+
+    const glm::vec3 closest = ClosestPoint(box, {5.0f, 0.5f, -4.0f});
+    ExpectVec3Near(closest, {3.0f, 0.5f, -3.0f}, 1e-5f);
+    EXPECT_NEAR(Distance(box, glm::vec3{5.0f, 0.5f, -4.0f}), std::sqrt(5.0), 1e-5);
+    EXPECT_NEAR(SquaredDistance(box, glm::vec3{5.0f, 0.5f, -4.0f}), 5.0, 1e-5);
+    EXPECT_NEAR(SignedDistance(box, glm::vec3{0.0f, 0.0f, 0.0f}), -1.0, 1e-5);
+
+    const auto corners = box.GetCorners();
+    EXPECT_EQ(corners.size(), 8u);
+    ExpectVec3Near(corners[0], {-1.0f, -2.0f, -3.0f}, 1e-5f);
+    ExpectVec3Near(corners[6], {3.0f, 2.0f, 1.0f}, 1e-5f);
+}
+
+TEST(GeometryPrimitives, OBB_CommonUtils)
+{
+    OBB box;
+    box.Center = {2.0f, 0.0f, 0.0f};
+    box.Extents = {1.0f, 2.0f, 0.5f};
+    box.Rotation = glm::angleAxis(glm::half_pi<float>(), glm::vec3{0.0f, 0.0f, 1.0f});
+
+    const glm::vec3 closest = ClosestPoint(box, {4.5f, 0.0f, 0.25f});
+    ExpectVec3Near(closest, {4.0f, 0.0f, 0.25f}, 1e-4f);
+    EXPECT_NEAR(Distance(box, glm::vec3{4.5f, 0.0f, 0.25f}), 0.5, 1e-5);
+    EXPECT_NEAR(SignedDistance(box, glm::vec3{2.0f, 0.0f, 0.0f}), -0.5, 1e-5);
+
+    const auto axes = box.GetAxes();
+    ExpectVec3Near(axes[0], {0.0f, 1.0f, 0.0f}, 1e-5f);
+    ExpectVec3Near(axes[1], {-1.0f, 0.0f, 0.0f}, 1e-5f);
+
+    const AABB aabb = ComputeAABB(box);
+    ExpectVec3Near(aabb.Min, {0.0f, -1.0f, -0.5f}, 1e-4f);
+    ExpectVec3Near(aabb.Max, {4.0f, 1.0f, 0.5f}, 1e-4f);
+}
+
+TEST(GeometryPrimitives, Plane_CommonUtils)
+{
+    Plane plane{{0.0f, 2.0f, 0.0f}, -4.0f};
+    plane.Normalize();
+
+    EXPECT_NEAR(SignedDistance(plane, {1.0f, 5.0f, -2.0f}), 3.0, 1e-5);
+    EXPECT_NEAR(Distance(plane, {1.0f, -1.0f, -2.0f}), 3.0, 1e-5);
+    ExpectVec3Near(ClosestPoint(plane, {1.0f, 5.0f, -2.0f}), {1.0f, 2.0f, -2.0f}, 1e-5f);
+}
+
+TEST(GeometryPrimitives, Segment_And_Triangle_ClosestPoint)
+{
+    const Segment segment{{0.0f, 0.0f, 0.0f}, {4.0f, 0.0f, 0.0f}};
+    EXPECT_NEAR(ClosestPointParameter(segment, {3.0f, 2.0f, 0.0f}), 0.75f, 1e-6f);
+    ExpectVec3Near(ClosestPoint(segment, {3.0f, 2.0f, 0.0f}), {3.0f, 0.0f, 0.0f}, 1e-5f);
+    EXPECT_NEAR(Distance(segment, {3.0f, 2.0f, 0.0f}), 2.0, 1e-5);
+
+    const Triangle triangle{{0.0f, 0.0f, 0.0f}, {2.0f, 0.0f, 0.0f}, {0.0f, 2.0f, 0.0f}};
+    ExpectVec3Near(ClosestPoint(triangle, {0.5f, 0.5f, 3.0f}), {0.5f, 0.5f, 0.0f}, 1e-5f);
+    EXPECT_NEAR(Distance(triangle, {0.5f, 0.5f, 3.0f}), 3.0, 1e-5);
+}
+

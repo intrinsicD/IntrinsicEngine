@@ -1,13 +1,23 @@
 export module Geometry;
 
 export import :AABB;
+export import :OBB;
+export import :Sphere;
+export import :Capsule;
+export import :Cylinder;
+export import :Ellipsoid;
+export import :Segment;
+export import :Triangle;
+export import :Plane;
+export import :ConvexHull;
+export import :Frustum;
+export import :Ray;
 export import :Contact;
 export import :Containment;
 export import :GJK;
 export import :EPA;
 export import :Handle;
 export import :MeshUtils;
-export import :OBB;
 export import :Octree;
 export import :KDTree;
 export import :Raycast;
