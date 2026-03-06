@@ -284,26 +284,149 @@ namespace Graphics
                                           ImGui::Checkbox("Disable GPU culling", &debugView.DisableCulling);
                                           ImGui::Separator();
 
-                                          for (const auto& pass : m_LastDebugPasses)
+                                          // --- Resource List (flat, with details) ---
+                                          // Build a mapping from known RenderResource StringIDs to readable names.
+                                          auto resolveName = [](Core::Hash::StringID id) -> const char*
                                           {
-                                              if (!ImGui::TreeNode(pass.Name))
-                                                  continue;
-
-                                              for (const auto& att : pass.Attachments)
+                                              using enum RenderResource;
+                                              for (RenderResource r : {SceneDepth, EntityId, PrimitiveId,
+                                                   SceneNormal, Albedo, Material0, SceneColorHDR,
+                                                   SceneColorLDR, SelectionMask, SelectionOutline})
                                               {
-                                                  const bool isSelected = (att.ResourceName == debugView.
-                                                      SelectedResource);
-                                                  char label[128];
-                                                  snprintf(label, sizeof(label), "0x%08X%s", att.ResourceName.Value,
-                                                           att.IsDepth ? " (Depth)" : "");
-
-                                                  if (ImGui::Selectable(label, isSelected))
+                                                  if (GetRenderResourceName(r) == id)
                                                   {
-                                                      debugView.SelectedResource = att.ResourceName;
+                                                      switch (r)
+                                                      {
+                                                      case SceneDepth:       return "SceneDepth";
+                                                      case EntityId:         return "EntityId";
+                                                      case PrimitiveId:      return "PrimitiveId";
+                                                      case SceneNormal:      return "SceneNormal";
+                                                      case Albedo:           return "Albedo";
+                                                      case Material0:        return "Material0";
+                                                      case SceneColorHDR:    return "SceneColorHDR";
+                                                      case SceneColorLDR:    return "SceneColorLDR";
+                                                      case SelectionMask:    return "SelectionMask";
+                                                      case SelectionOutline: return "SelectionOutline";
+                                                      }
                                                   }
                                               }
+                                              // Check well-known non-enum names
+                                              if (id == "Backbuffer"_id) return "Backbuffer";
+                                              if (id == "PostLdrTemp"_id) return "PostLdrTemp";
+                                              return nullptr;
+                                          };
 
-                                              ImGui::TreePop();
+                                          auto formatName = [](VkFormat fmt) -> const char*
+                                          {
+                                              switch (fmt)
+                                              {
+                                              case VK_FORMAT_R32_UINT:              return "R32_UINT";
+                                              case VK_FORMAT_R8_UNORM:              return "R8_UNORM";
+                                              case VK_FORMAT_R8G8B8A8_UNORM:        return "RGBA8";
+                                              case VK_FORMAT_R8G8B8A8_SRGB:         return "RGBA8_SRGB";
+                                              case VK_FORMAT_B8G8R8A8_UNORM:        return "BGRA8";
+                                              case VK_FORMAT_B8G8R8A8_SRGB:         return "BGRA8_SRGB";
+                                              case VK_FORMAT_R16G16B16A16_SFLOAT:   return "RGBA16F";
+                                              case VK_FORMAT_D32_SFLOAT:            return "D32F";
+                                              case VK_FORMAT_D24_UNORM_S8_UINT:     return "D24S8";
+                                              case VK_FORMAT_D32_SFLOAT_S8_UINT:    return "D32FS8";
+                                              default:                              return "Unknown";
+                                              }
+                                          };
+
+                                          // --- Pass-organized resource browser ---
+                                          if (ImGui::CollapsingHeader("Per-Pass Attachments", ImGuiTreeNodeFlags_DefaultOpen))
+                                          {
+                                              for (const auto& pass : m_LastDebugPasses)
+                                              {
+                                                  if (!ImGui::TreeNode(pass.Name))
+                                                      continue;
+
+                                                  for (const auto& att : pass.Attachments)
+                                                  {
+                                                      const bool isSelected = (att.ResourceName == debugView.SelectedResource);
+                                                      const char* name = resolveName(att.ResourceName);
+                                                      char label[192];
+                                                      if (name)
+                                                          snprintf(label, sizeof(label), "%s [%s]%s",
+                                                                   name, formatName(att.Format),
+                                                                   att.IsDepth ? " (Depth)" : "");
+                                                      else
+                                                          snprintf(label, sizeof(label), "0x%08X [%s]%s",
+                                                                   att.ResourceName.Value, formatName(att.Format),
+                                                                   att.IsDepth ? " (Depth)" : "");
+
+                                                      if (ImGui::Selectable(label, isSelected))
+                                                          debugView.SelectedResource = att.ResourceName;
+
+                                                      // Tooltip with details
+                                                      if (ImGui::IsItemHovered())
+                                                      {
+                                                          ImGui::BeginTooltip();
+                                                          ImGui::Text("Format: %s", formatName(att.Format));
+                                                          ImGui::Text("Load: %s",
+                                                              att.LoadOp == VK_ATTACHMENT_LOAD_OP_LOAD ? "LOAD" :
+                                                              att.LoadOp == VK_ATTACHMENT_LOAD_OP_CLEAR ? "CLEAR" : "DONT_CARE");
+                                                          ImGui::Text("Store: %s",
+                                                              att.StoreOp == VK_ATTACHMENT_STORE_OP_STORE ? "STORE" : "DONT_CARE");
+                                                          if (att.IsImported)
+                                                              ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "Imported");
+                                                          ImGui::EndTooltip();
+                                                      }
+                                                  }
+
+                                                  ImGui::TreePop();
+                                              }
+                                          }
+
+                                          // --- Resource lifetime summary ---
+                                          if (ImGui::CollapsingHeader("Resource Lifetimes"))
+                                          {
+                                              if (ImGui::BeginTable("##res_lifetimes", 5,
+                                                  ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable | ImGuiTableFlags_SizingStretchProp))
+                                              {
+                                                  ImGui::TableSetupColumn("Resource", ImGuiTableColumnFlags_WidthStretch);
+                                                  ImGui::TableSetupColumn("Size", ImGuiTableColumnFlags_WidthFixed, 90.0f);
+                                                  ImGui::TableSetupColumn("Format", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+                                                  ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 70.0f);
+                                                  ImGui::TableSetupColumn("Alive", ImGuiTableColumnFlags_WidthFixed, 60.0f);
+                                                  ImGui::TableHeadersRow();
+
+                                                  for (const auto& img : m_LastDebugImages)
+                                                  {
+                                                      ImGui::TableNextRow();
+
+                                                      // Name
+                                                      ImGui::TableSetColumnIndex(0);
+                                                      const char* readableName = resolveName(img.Name);
+                                                      const bool isSelected = (img.Name == debugView.SelectedResource);
+                                                      char nameLabel[128];
+                                                      if (readableName)
+                                                          snprintf(nameLabel, sizeof(nameLabel), "%s##%u", readableName, img.Name.Value);
+                                                      else
+                                                          snprintf(nameLabel, sizeof(nameLabel), "0x%08X", img.Name.Value);
+                                                      if (ImGui::Selectable(nameLabel, isSelected, ImGuiSelectableFlags_SpanAllColumns))
+                                                          debugView.SelectedResource = img.Name;
+
+                                                      // Size
+                                                      ImGui::TableSetColumnIndex(1);
+                                                      ImGui::Text("%ux%u", img.Extent.width, img.Extent.height);
+
+                                                      // Format
+                                                      ImGui::TableSetColumnIndex(2);
+                                                      ImGui::TextUnformatted(formatName(img.Format));
+
+                                                      // Type
+                                                      ImGui::TableSetColumnIndex(3);
+                                                      ImGui::TextUnformatted(img.IsImported ? "Imported" : "Transient");
+
+                                                      // Alive range
+                                                      ImGui::TableSetColumnIndex(4);
+                                                      ImGui::Text("[%u,%u]", img.StartPass, img.EndPass);
+                                                  }
+
+                                                  ImGui::EndTable();
+                                              }
                                           }
 
                                           ImGui::Separator();

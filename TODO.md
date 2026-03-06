@@ -61,18 +61,15 @@ These are not required to finish the first wave, but they should begin soon afte
 - [ ] Add configurable outline styles.
 - [ ] Add hover highlighting.
 - [ ] Add mask visualization in the editor.
-- [ ] Add editor-side pass/resource inspection tools.
 
 ### B4. Debugging and Profiling Improvements
 
 - [ ] Add GPU timing markers per stage.
-- [ ] Add render-target inspection UI.
 - [ ] Add transient resource lifetime visualization.
 - [ ] Add memory/bandwidth reporting for intermediate targets.
 
 ### B5. Post Stack Expansion
 
-- [ ] Add color grading.
 - [ ] Add an improved AA path.
 - [ ] Add a debug histogram for exposure.
 
@@ -168,7 +165,6 @@ These are the explicit constraints agents must preserve during the refactor even
 - [ ] Leave room for motion vectors/history buffers.
 - [ ] Leave room for clustered/tiled lighting.
 - [ ] Leave room for effect passes like SSAO, decals, and bloom.
-- [ ] Leave room for render-target inspection tooling.
 - [ ] Leave room for future GPU-driven visibility integration.
 
 ---
