@@ -1027,9 +1027,45 @@ public:
             ImGui::Text("State: %s", stateNames[static_cast<int>(m_Gizmo.GetState())]);
         });
 
-        // View Settings panel for configuring selection outline, etc.
+        // View Settings panel for configuring selection outline, post-process, etc.
         Interface::GUI::RegisterPanel("View Settings", [this]()
         {
+            // --- Post-Processing ---
+            auto* postSettings = GetRenderOrchestrator().GetRenderSystem().GetPostProcessSettings();
+            if (postSettings)
+            {
+                ImGui::SeparatorText("Post Processing");
+
+                // Tone mapping
+                const char* toneMapOps[] = { "ACES", "Reinhard", "Uncharted 2" };
+                int toneOp = static_cast<int>(postSettings->ToneOperator);
+                if (ImGui::Combo("Tone Mapping", &toneOp, toneMapOps, 3))
+                    postSettings->ToneOperator = static_cast<Graphics::Passes::ToneMapOperator>(toneOp);
+
+                ImGui::SliderFloat("Exposure", &postSettings->Exposure, 0.1f, 10.0f, "%.2f");
+
+                // Bloom
+                ImGui::Spacing();
+                ImGui::Checkbox("Bloom", &postSettings->BloomEnabled);
+                if (postSettings->BloomEnabled)
+                {
+                    ImGui::SliderFloat("Bloom Threshold", &postSettings->BloomThreshold, 0.0f, 5.0f, "%.2f");
+                    ImGui::SliderFloat("Bloom Intensity", &postSettings->BloomIntensity, 0.0f, 1.0f, "%.3f");
+                    ImGui::SliderFloat("Bloom Radius", &postSettings->BloomFilterRadius, 0.5f, 3.0f, "%.2f");
+                }
+
+                // FXAA
+                ImGui::Spacing();
+                ImGui::Checkbox("FXAA", &postSettings->FXAAEnabled);
+                if (postSettings->FXAAEnabled)
+                {
+                    ImGui::SliderFloat("FXAA Contrast", &postSettings->FXAAContrastThreshold, 0.01f, 0.1f, "%.4f");
+                    ImGui::SliderFloat("FXAA Relative", &postSettings->FXAARelativeThreshold, 0.01f, 0.2f, "%.4f");
+                    ImGui::SliderFloat("FXAA Subpixel", &postSettings->FXAASubpixelBlending, 0.0f, 1.0f, "%.2f");
+                }
+            }
+
+            // --- Selection Outline ---
             auto* outlineSettings = GetRenderOrchestrator().GetRenderSystem().GetSelectionOutlineSettings();
             if (!outlineSettings)
             {

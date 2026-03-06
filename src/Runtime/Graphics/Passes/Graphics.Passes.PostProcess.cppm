@@ -2,6 +2,7 @@ module;
 
 #include <memory>
 #include <span>
+#include <array>
 #include "RHI.Vulkan.hpp"
 
 export module Graphics:Passes.PostProcess;
@@ -9,48 +10,31 @@ export module Graphics:Passes.PostProcess;
 import :RenderPipeline;
 import :RenderGraph;
 import :ShaderRegistry;
+import :Passes.PostProcessSettings;
 import RHI;
 
 export namespace Graphics::Passes
 {
     // -----------------------------------------------------------------
-    // Tone-mapping operator selection (push constant enum).
-    // -----------------------------------------------------------------
-    enum class ToneMapOperator : int
-    {
-        ACES     = 0,
-        Reinhard = 1,
-    };
-
-    // -----------------------------------------------------------------
-    // Post-processing settings exposed to the editor UI.
-    // -----------------------------------------------------------------
-    struct PostProcessSettings
-    {
-        // Tone mapping
-        float            Exposure     = 1.0f;
-        ToneMapOperator  ToneOperator = ToneMapOperator::ACES;
-
-        // FXAA
-        bool  FXAAEnabled          = true;
-        float FXAAContrastThreshold  = 0.0312f;
-        float FXAARelativeThreshold  = 0.063f;
-        float FXAASubpixelBlending   = 0.75f;
-    };
-
-    // -----------------------------------------------------------------
-    // PostProcessPass — HDR tone mapping + optional FXAA.
+    // PostProcessPass — Bloom + HDR tone mapping + optional FXAA.
     //
     // Reads canonical `SceneColorHDR` from the blackboard.
     // Writes canonical `SceneColorLDR` for later overlays and final presentation.
     //
+    // Bloom chain (when enabled):
+    //   Downsample: SceneColorHDR -> BloomMip0 -> ... -> BloomMipN
+    //   Upsample:   BloomMipN -> ... -> BloomMip0 (additive accumulation)
+    //
     // When FXAA is enabled:
-    //   ToneMap: SceneColorHDR -> PostLdrTemp (transient, swapchain format)
-    //   FXAA:    PostLdrTemp   -> SceneColorLDR
+    //   ToneMap: SceneColorHDR + BloomMip0 -> PostLdrTemp
+    //   FXAA:    PostLdrTemp -> SceneColorLDR
     //
     // When FXAA is disabled:
-    //   ToneMap: SceneColorHDR -> SceneColorLDR
+    //   ToneMap: SceneColorHDR + BloomMip0 -> SceneColorLDR
     // -----------------------------------------------------------------
+
+    static constexpr uint32_t kBloomMipCount = 5;
+
     class PostProcessPass final : public IRenderFeature
     {
     public:
@@ -80,7 +64,7 @@ export namespace Graphics::Passes
 
         PostProcessSettings m_Settings;
 
-        // Tone map pipeline + descriptors
+        // Tone map pipeline + descriptors (2 bindings: scene color + bloom)
         VkDescriptorSetLayout m_ToneMapSetLayout = VK_NULL_HANDLE;
         VkSampler             m_LinearSampler    = VK_NULL_HANDLE;
         VkDescriptorSet       m_ToneMapSets[3]   = {};
@@ -91,14 +75,31 @@ export namespace Graphics::Passes
         VkDescriptorSet       m_FXAASets[3]   = {};
         std::unique_ptr<RHI::GraphicsPipeline> m_FXAAPipeline;
 
+        // Bloom downsample pipeline + descriptors
+        VkDescriptorSetLayout m_BloomDownSetLayout = VK_NULL_HANDLE;
+        VkDescriptorSet       m_BloomDownSets[3][kBloomMipCount] = {};
+        std::unique_ptr<RHI::GraphicsPipeline> m_BloomDownPipeline;
+
+        // Bloom upsample pipeline + descriptors
+        VkDescriptorSetLayout m_BloomUpSetLayout = VK_NULL_HANDLE;
+        VkDescriptorSet       m_BloomUpSets[3][kBloomMipCount] = {};
+        std::unique_ptr<RHI::GraphicsPipeline> m_BloomUpPipeline;
+
         // Safe default binding used until PostCompile patches in the frame's actual image views.
         std::unique_ptr<RHI::VulkanImage> m_DummySampled;
 
         // Cached resource handles for PostCompile descriptor update.
         RGResourceHandle m_LastSceneColorHandle{};
         RGResourceHandle m_LastPostLdrHandle{};
+        RGResourceHandle m_LastBloomMip0Handle{};
+        std::array<RGResourceHandle, kBloomMipCount> m_LastBloomDownHandles{};
+        std::array<RGResourceHandle, kBloomMipCount> m_LastBloomUpSrcHandles{};
 
         std::unique_ptr<RHI::GraphicsPipeline> BuildToneMapPipeline(VkFormat outputFormat);
         std::unique_ptr<RHI::GraphicsPipeline> BuildFXAAPipeline(VkFormat outputFormat);
+        std::unique_ptr<RHI::GraphicsPipeline> BuildBloomDownsamplePipeline();
+        std::unique_ptr<RHI::GraphicsPipeline> BuildBloomUpsamplePipeline();
+
+        void AddBloomPasses(RenderPassContext& ctx, RGResourceHandle sceneColor);
     };
 }

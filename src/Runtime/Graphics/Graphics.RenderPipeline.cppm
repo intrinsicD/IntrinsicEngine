@@ -20,6 +20,7 @@ import :ShaderRegistry;
 import :PipelineLibrary;
 import :DebugDraw;
 import :Passes.SelectionOutlineSettings;
+import :Passes.PostProcessSettings;
 import Core.Hash;
 import Core.Assets;
 import ECS;
@@ -359,6 +360,7 @@ export namespace Graphics
         }
 
         virtual Passes::SelectionOutlineSettings* GetSelectionOutlineSettings() { return nullptr; }
+        virtual Passes::PostProcessSettings* GetPostProcessSettings() { return nullptr; }
     };
 
     // ---------------------------------------------------------------------

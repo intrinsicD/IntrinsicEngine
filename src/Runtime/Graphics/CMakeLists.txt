@@ -48,6 +48,7 @@ target_sources(${target_name}
         Passes/Graphics.Passes.Line.cppm
         Passes/Graphics.Passes.Point.cppm
         Passes/Graphics.Passes.DebugView.cppm
+        Passes/Graphics.Passes.PostProcessSettings.cppm
         Passes/Graphics.Passes.PostProcess.cppm
         Passes/Graphics.Passes.ImGui.cppm
         Graphics.IORegistry.cppm

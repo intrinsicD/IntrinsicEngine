@@ -71,6 +71,11 @@ export namespace Graphics
             return m_SelectionOutlinePass ? &m_SelectionOutlinePass->GetSettings() : nullptr;
         }
 
+        Passes::PostProcessSettings* GetPostProcessSettings() override
+        {
+            return m_PostProcessPass ? &m_PostProcessPass->GetSettings() : nullptr;
+        }
+
     private:
         const Core::FeatureRegistry* m_Registry = nullptr;
 

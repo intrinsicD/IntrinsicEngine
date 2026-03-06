@@ -416,6 +416,11 @@ namespace Graphics
         return m_ActivePipeline ? m_ActivePipeline->GetSelectionOutlineSettings() : nullptr;
     }
 
+    Passes::PostProcessSettings* RenderSystem::GetPostProcessSettings()
+    {
+        return m_ActivePipeline ? m_ActivePipeline->GetPostProcessSettings() : nullptr;
+    }
+
     // -------------------------------------------------------------------------
     // OnUpdate sub-steps
     // -------------------------------------------------------------------------
@@ -703,5 +708,71 @@ namespace Graphics
         m_Presentation.OnResize();
         auto extent = m_Presentation.GetResolution();
         if (m_ActivePipeline) m_ActivePipeline->OnResize(extent.width, extent.height);
+    }
+
+    // -------------------------------------------------------------------------
+    // DumpRenderGraphToString — human-readable render graph snapshot
+    // -------------------------------------------------------------------------
+
+    std::string RenderSystem::DumpRenderGraphToString() const
+    {
+        std::string out;
+        out.reserve(4096);
+
+        auto loadOpStr = [](VkAttachmentLoadOp op) -> const char* {
+            switch (op) {
+                case VK_ATTACHMENT_LOAD_OP_LOAD:      return "LOAD";
+                case VK_ATTACHMENT_LOAD_OP_CLEAR:     return "CLEAR";
+                case VK_ATTACHMENT_LOAD_OP_DONT_CARE: return "DONT_CARE";
+                default:                              return "?";
+            }
+        };
+        auto storeOpStr = [](VkAttachmentStoreOp op) -> const char* {
+            switch (op) {
+                case VK_ATTACHMENT_STORE_OP_STORE:     return "STORE";
+                case VK_ATTACHMENT_STORE_OP_DONT_CARE: return "DONT_CARE";
+                default:                               return "?";
+            }
+        };
+
+        // --- Pass execution order ---
+        out += std::format("=== Render Graph Dump ({} passes, {} images) ===\n\n",
+                           m_LastDebugPasses.size(), m_LastDebugImages.size());
+
+        out += "--- Pass Execution Order ---\n";
+        for (const auto& pass : m_LastDebugPasses)
+        {
+            out += std::format("  [{}] {}\n", pass.PassIndex, pass.Name);
+            for (const auto& att : pass.Attachments)
+            {
+                out += std::format("      {} 0x{:08X}  fmt={}  load={}  store={}  {}{}\n",
+                                   att.IsDepth ? "depth" : "color",
+                                   att.ResourceName.Value,
+                                   static_cast<int>(att.Format),
+                                   loadOpStr(att.LoadOp),
+                                   storeOpStr(att.StoreOp),
+                                   att.IsImported ? "[imported]" : "",
+                                   att.LoadOp == VK_ATTACHMENT_LOAD_OP_CLEAR ? " [initializer]" : "");
+            }
+        }
+
+        // --- Resource lifetimes ---
+        out += "\n--- Resource Lifetimes ---\n";
+        for (const auto& img : m_LastDebugImages)
+        {
+            out += std::format("  0x{:08X}  {}x{}  fmt={}  {}  alive=[{},{}]",
+                               img.Name.Value,
+                               img.Extent.width, img.Extent.height,
+                               static_cast<int>(img.Format),
+                               img.IsImported ? "imported" : "transient",
+                               img.StartPass, img.EndPass);
+            if (img.FirstWritePass != ~0u || img.LastWritePass != ~0u)
+                out += std::format("  write=[{},{}]", img.FirstWritePass, img.LastWritePass);
+            if (img.FirstReadPass != ~0u || img.LastReadPass != ~0u)
+                out += std::format("  read=[{},{}]", img.FirstReadPass, img.LastReadPass);
+            out += "\n";
+        }
+
+        return out;
     }
 }

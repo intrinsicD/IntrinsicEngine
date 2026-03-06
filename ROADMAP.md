@@ -25,9 +25,15 @@ Sub-entity select → Geometry processing (interactive operator input)
 
 ### Post-Processing Pipeline (**MVP complete**)
 
-The HDR post-processing foundation is in place. Scene passes render to an `R16G16B16A16_SFLOAT` intermediate target ("SceneColor"), and the `PostProcessPass` converts to LDR via tone mapping (ACES / Reinhard selectable) with optional FXAA. Runtime toggles are exposed via `FeatureRegistry`.
+The HDR post-processing foundation is in place. Scene passes render to an `R16G16B16A16_SFLOAT` intermediate target ("SceneColor"), and the `PostProcessPass` converts to LDR via tone mapping with optional FXAA. Runtime toggles are exposed via `FeatureRegistry`.
 
-Long-horizon additions (after MVP): SSAO, bloom, DOF, color grading.
+**Tone mapping:** ACES, Reinhard, and Uncharted 2 (Hable 2010 filmic) operators are selectable at runtime. Exposure is adjustable via UI slider.
+
+**Bloom:** 5-level progressive downsample/upsample chain (Jimenez 2014, 13-tap downsample + 9-tap tent upsample). Soft threshold with configurable knee curve. Composited additively in HDR space before tone mapping. Threshold, intensity, and filter radius exposed via UI.
+
+**Render graph debug dump:** `DumpRenderGraphToString()` produces a human-readable snapshot of pass execution order (with per-pass attachment metadata) and resource lifetimes (with read/write pass ranges).
+
+Long-horizon additions (after MVP): SSAO, DOF, color grading, debug histogram.
 
 ---
 

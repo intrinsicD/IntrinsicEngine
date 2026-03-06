@@ -65,7 +65,6 @@ These are not required to finish the first wave, but they should begin soon afte
 
 ### B4. Debugging and Profiling Improvements
 
-- [ ] Add graph dumps to human-readable debug output.
 - [ ] Add GPU timing markers per stage.
 - [ ] Add render-target inspection UI.
 - [ ] Add transient resource lifetime visualization.
@@ -73,11 +72,9 @@ These are not required to finish the first wave, but they should begin soon afte
 
 ### B5. Post Stack Expansion
 
-- [ ] Add bloom.
 - [ ] Add color grading.
-- [ ] Add tone-mapping options.
 - [ ] Add an improved AA path.
-- [ ] Add exposure controls and a debug histogram later.
+- [ ] Add a debug histogram for exposure.
 
 ---
 
