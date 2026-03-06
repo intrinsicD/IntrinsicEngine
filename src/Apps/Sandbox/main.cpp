@@ -191,12 +191,14 @@ public:
 
     // Transform Gizmo
     Graphics::TransformGizmo m_Gizmo;
+    RetainedLineOverlaySlot m_GizmoOverlay{};
 
     bool m_DrawSelectedColliderConvexHull = false;
     bool m_DrawSelectedColliderContacts = false;
     bool m_ContactDebugOverlay = true;
     float m_ContactNormalScale = 0.3f;
     float m_ContactPointRadius = 0.03f;
+    RetainedLineOverlaySlot m_ContactOverlay{};
 
     Geometry::KDTree m_SelectedColliderKDTree{};
     entt::entity m_SelectedKDTreeEntity = entt::null;
@@ -1337,14 +1339,34 @@ public:
         bool gizmoConsumedMouse = false;
         if (cameraComponent != nullptr)
         {
+            Graphics::DebugDraw gizmoCapture;
             gizmoConsumedMouse = m_Gizmo.Update(
                 GetScene().GetRegistry(),
-                GetRenderOrchestrator().GetDebugDraw(),
+                gizmoCapture,
                 *cameraComponent,
                 m_Window->GetInput(),
                 static_cast<uint32_t>(m_Window->GetWindowWidth()),
                 static_cast<uint32_t>(m_Window->GetWindowHeight()),
                 uiCapturesMouse);
+
+            if (gizmoCapture.HasContent())
+            {
+                UpdateRetainedLineOverlay(m_GizmoOverlay, [&](Graphics::DebugDraw& dd)
+                {
+                    for (const auto& seg : gizmoCapture.GetOverlayLines())
+                        dd.OverlayLine(seg.Start, seg.End, seg.ColorStart, seg.ColorEnd);
+                    for (const auto& seg : gizmoCapture.GetLines())
+                        dd.Line(seg.Start, seg.End, seg.ColorStart, seg.ColorEnd);
+                });
+            }
+            else
+            {
+                ReleaseRetainedLineOverlay(m_GizmoOverlay);
+            }
+        }
+        else
+        {
+            ReleaseRetainedLineOverlay(m_GizmoOverlay);
         }
 
         // ---------------------------------------------------------------------
@@ -1389,40 +1411,46 @@ public:
 
                     if (m_DrawSelectedColliderContacts)
                     {
-                        auto& dd = GetRenderOrchestrator().GetDebugDraw();
-                        auto colliders = reg.view<ECS::MeshCollider::Component>();
-
-                        const uint32_t pointAColor = Graphics::DebugDraw::PackColorF(1.0f, 0.85f, 0.2f, 1.0f);
-                        const uint32_t pointBColor = Graphics::DebugDraw::PackColorF(1.0f, 0.2f, 0.2f, 1.0f);
-                        const uint32_t normalColor = Graphics::DebugDraw::PackColorF(0.2f, 0.85f, 1.0f, 1.0f);
-
-                        for (auto [otherEntity, otherCollider] : colliders.each())
+                        UpdateRetainedLineOverlay(m_ContactOverlay, [&](Graphics::DebugDraw& dd)
                         {
-                            if (otherEntity == selected || !otherCollider.CollisionRef)
-                                continue;
+                            auto colliders = reg.view<ECS::MeshCollider::Component>();
 
-                            auto manifold = Geometry::ComputeContact(collider->WorldOBB, otherCollider.WorldOBB);
-                            if (!manifold)
-                                continue;
+                            const uint32_t pointAColor = Graphics::DebugDraw::PackColorF(1.0f, 0.85f, 0.2f, 1.0f);
+                            const uint32_t pointBColor = Graphics::DebugDraw::PackColorF(1.0f, 0.2f, 0.2f, 1.0f);
+                            const uint32_t normalColor = Graphics::DebugDraw::PackColorF(0.2f, 0.85f, 1.0f, 1.0f);
 
-                            const glm::vec3 mid = (manifold->ContactPointA + manifold->ContactPointB) * 0.5f;
-                            const glm::vec3 normalEnd = mid + manifold->Normal * (m_ContactNormalScale + manifold->PenetrationDepth);
-
-                            if (m_ContactDebugOverlay)
+                            for (auto [otherEntity, otherCollider] : colliders.each())
                             {
-                                dd.OverlaySphere(manifold->ContactPointA, m_ContactPointRadius, pointAColor, 12);
-                                dd.OverlaySphere(manifold->ContactPointB, m_ContactPointRadius, pointBColor, 12);
-                                dd.OverlayLine(manifold->ContactPointA, manifold->ContactPointB, pointAColor, pointBColor);
-                                dd.OverlayLine(mid, normalEnd, normalColor);
+                                if (otherEntity == selected || !otherCollider.CollisionRef)
+                                    continue;
+
+                                auto manifold = Geometry::ComputeContact(collider->WorldOBB, otherCollider.WorldOBB);
+                                if (!manifold)
+                                    continue;
+
+                                const glm::vec3 mid = (manifold->ContactPointA + manifold->ContactPointB) * 0.5f;
+                                const glm::vec3 normalEnd = mid + manifold->Normal * (m_ContactNormalScale + manifold->PenetrationDepth);
+
+                                if (m_ContactDebugOverlay)
+                                {
+                                    dd.OverlaySphere(manifold->ContactPointA, m_ContactPointRadius, pointAColor, 12);
+                                    dd.OverlaySphere(manifold->ContactPointB, m_ContactPointRadius, pointBColor, 12);
+                                    dd.OverlayLine(manifold->ContactPointA, manifold->ContactPointB, pointAColor, pointBColor);
+                                    dd.OverlayLine(mid, normalEnd, normalColor);
+                                }
+                                else
+                                {
+                                    dd.Sphere(manifold->ContactPointA, m_ContactPointRadius, pointAColor, 12);
+                                    dd.Sphere(manifold->ContactPointB, m_ContactPointRadius, pointBColor, 12);
+                                    dd.Line(manifold->ContactPointA, manifold->ContactPointB, pointAColor, pointBColor);
+                                    dd.Arrow(mid, normalEnd, glm::max(0.02f, m_ContactPointRadius), normalColor);
+                                }
                             }
-                            else
-                            {
-                                dd.Sphere(manifold->ContactPointA, m_ContactPointRadius, pointAColor, 12);
-                                dd.Sphere(manifold->ContactPointB, m_ContactPointRadius, pointBColor, 12);
-                                dd.Line(manifold->ContactPointA, manifold->ContactPointB, pointAColor, pointBColor);
-                                dd.Arrow(mid, normalEnd, glm::max(0.02f, m_ContactPointRadius), normalColor);
-                            }
-                        }
+                        });
+                    }
+                    else
+                    {
+                        ReleaseRetainedLineOverlay(m_ContactOverlay);
                     }
                 }
                 else
@@ -1432,6 +1460,7 @@ public:
                     ReleaseRetainedLineOverlay(m_KDTreeOverlay);
                     ReleaseRetainedLineOverlay(m_BVHOverlay);
                     ReleaseRetainedLineOverlay(m_ConvexHullOverlay);
+                    ReleaseRetainedLineOverlay(m_ContactOverlay);
                 }
             }
             else
@@ -1441,6 +1470,7 @@ public:
                 ReleaseRetainedLineOverlay(m_KDTreeOverlay);
                 ReleaseRetainedLineOverlay(m_BVHOverlay);
                 ReleaseRetainedLineOverlay(m_ConvexHullOverlay);
+                ReleaseRetainedLineOverlay(m_ContactOverlay);
             }
         }
         else
@@ -1450,6 +1480,7 @@ public:
             ReleaseRetainedLineOverlay(m_KDTreeOverlay);
             ReleaseRetainedLineOverlay(m_BVHOverlay);
             ReleaseRetainedLineOverlay(m_ConvexHullOverlay);
+            ReleaseRetainedLineOverlay(m_ContactOverlay);
         }
 
         // ---------------------------------------------------------------------
