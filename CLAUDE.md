@@ -104,6 +104,15 @@ New geometry operators follow a consistent interface contract (see `Geometry::Si
 - **Surface reconstruction** (point cloud → mesh) pipelines through: normals (estimate if needed) → bounding box with padding → scalar grid → octree KNN → signed distance field → Marching Cubes → HalfedgeMesh. The signed distance at each grid vertex is `dot(p - nearest, normal_at_nearest)` (Hoppe et al. 1992). For `KNeighbors > 1`, inverse-distance-weighted averaging smooths noisy data.
 - **Robust weighted SDF policy:** sanitize input normals first (finite + non-zero length), then for `KNeighbors > 1` use adaptive Gaussian spatial weighting with normal-consistency weighting (`max(0, n_i·n_ref)^p`) instead of pure inverse-distance averaging. This reduces sign instability near conflicting neighborhoods and degenerate scans.
 - **Convex hull construction** uses the Quickhull algorithm (Barber, Dobkin & Huhdanpaa 1996). The `ConvexHullBuilder` module populates the `Geometry::ConvexHull` struct (both V-Rep vertices and H-Rep face planes) that was previously a consumer-only type in GJK/SDF/SAT/Containment. Key implementation details: (1) initial tetrahedron via 6-axis extreme points → most-distant pair → farthest from line → farthest from plane, (2) conflict-list partitioning assigns each remaining point to the face it's most above, (3) iterative expansion picks the globally farthest conflict point, BFS-discovers all visible faces, extracts ordered horizon edges, creates new faces, redistributes orphaned conflict points. Use the initial tetrahedron centroid as an interior reference for outward-normal verification throughout. Edge-to-face adjacency tracked via `(min(v0,v1), max(v0,v1))` packed as `uint64_t` key.
+## Render Graph Validation
+
+`ValidateCompiledGraph()` returns `RenderGraphValidationResult` with structured diagnostics:
+
+- **Errors** (not warnings): missing required resources, transient resources without producers, unauthorized imported-resource writes.
+- **Warnings**: multiple re-initializations of transient resources.
+- `ImportedResourceWritePolicy` enforces which passes may write to imported resources. Default: only `Present.LDR` may write to the Backbuffer.
+- Custom policies can be passed via the `writePolicies` parameter; when empty, `GetDefaultImportedWritePolicies()` is used.
+
 ## Transform Gizmo System
 
 `Graphics::TransformGizmo` provides interactive translate/rotate/scale manipulation rendered via the `DebugDraw` overlay path (no depth test). The system follows a strict state machine:

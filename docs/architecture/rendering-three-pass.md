@@ -82,11 +82,14 @@ Position/topology changes may escalate to full re-upload; pure attribute changes
 2. `SurfacePass`
 3. `LinePass`
 4. `PointPass`
-5. `PostProcessPass`
-6. `SelectionOutlinePass`
-7. `DebugViewPass`
-8. `ImGuiPass`
-9. `Present`
+5. *(Composition insertion point — reserved for future deferred/hybrid lighting)*
+6. `PostProcessPass`
+7. `SelectionOutlinePass`
+8. `DebugViewPass`
+9. `ImGuiPass`
+10. `Present`
+
+Currently all geometry passes write directly to `SceneColorHDR` (forward path). When a deferred or hybrid lighting path is implemented, a composition stage will be added at position 5 to produce `SceneColorHDR` from G-buffer channels. No abstraction exists for this yet — it will be introduced when the second concrete implementation demands it.
 
 ## Validation / Audit Expectations
 
@@ -94,6 +97,10 @@ Position/topology changes may escalate to full re-upload; pure attribute changes
 - Render-graph introspection reports per-resource first/last read and write pass indices.
 - Temporary audit logging may dump pass order, resource creation, transitions, and formats from `RenderSystem`.
 - Any pass using `LOAD` without a guaranteed earlier write in-frame or an imported resource should emit a warning.
+- `ValidateCompiledGraph()` returns `RenderGraphValidationResult` with structured diagnostics (error/warning severity).
+- Missing required resources and transient resources without producers are validation **errors** (not warnings).
+- Imported-resource write policies (`ImportedResourceWritePolicy`) enforce authorized writers per imported resource. Unauthorized writes are validation **errors**.
+- Default policy: only `Present.LDR` may write to the imported Backbuffer.
 
 ## Robustness Requirements
 

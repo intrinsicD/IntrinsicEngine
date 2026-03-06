@@ -165,7 +165,16 @@ namespace Graphics
         }
 
         // ==================================================================
-        // 5. Post-Processing — HDR tone mapping + optional FXAA.
+        // 5. Composition insertion point (future).
+        //    When a deferred or hybrid lighting path is implemented, a
+        //    composition stage would be added here — after geometry passes
+        //    and before post-processing — to produce SceneColorHDR from
+        //    G-buffer channels. For the current forward path, geometry
+        //    passes write directly to SceneColorHDR; no composition needed.
+        // ==================================================================
+
+        // ==================================================================
+        // 6. Post-Processing — HDR tone mapping + optional FXAA.
         //    Reads canonical SceneColorHDR and writes canonical SceneColorLDR.
         //    Final presentation to the imported swapchain image happens in the
         //    dedicated Present stage below.

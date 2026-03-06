@@ -32,23 +32,7 @@ This document tracks the **active rendering-architecture backlog** for Intrinsic
 
 ## 2. Now (P0) — Current Rendering Refactor Target
 
-These are the tasks to do **now**. Complete them in dependency order unless a lower item is pure documentation/test support for an earlier item.
-
-### A6. Split Lighting/Composition from Geometry
-
-- [ ] Introduce a distinct lighting/composition stage.
-- [ ] Standardize its output as `SceneColorHDR`.
-- [ ] Keep the initial implementation simple:
-  - [ ] Current forward-style scene composition may remain first.
-- [ ] Define a future-compatible composition interface for:
-  - [ ] Forward+
-  - [ ] Deferred
-  - [ ] Hybrid paths.
-
-### A10. Strengthen Render Graph Validation
-
-- [ ] Extend imported-resource write validation beyond the dedicated `Backbuffer` policy (for example, formalize which imported resources may be written by which stages).
-- [ ] Promote critical validation failures from warnings to structured build/compile errors where safe.
+No active P0 tasks remain. Promote P1 items as needed.
 
 ---
 

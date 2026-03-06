@@ -5,9 +5,11 @@ module;
 #include <algorithm>
 #include <memory>
 #include <string>
+#include <format>
 #include <cstdio>
 #include <array>
 #include <span>
+#include <unordered_map>
 #include <glm/glm.hpp>
 #include <entt/entt.hpp>
 #include <imgui.h>
@@ -94,97 +96,142 @@ namespace Graphics
             }
         }
 
-        void ValidateCompiledGraph(const FrameRecipe& recipe,
-                                  std::span<const RenderGraphDebugPass> passes,
-                                  std::span<const RenderGraphDebugImage> images)
+    }
+
+    // -----------------------------------------------------------------
+    // ValidateCompiledGraph — exported structured validation
+    // -----------------------------------------------------------------
+    RenderGraphValidationResult ValidateCompiledGraph(
+        const FrameRecipe& recipe,
+        std::span<const RenderGraphDebugPass> passes,
+        std::span<const RenderGraphDebugImage> images,
+        std::span<const ImportedResourceWritePolicy> writePolicies)
+    {
+        RenderGraphValidationResult result{};
+
+        auto addDiag = [&](RenderGraphValidationSeverity sev, std::string msg)
         {
-            auto findImage = [&](RenderResource resource) -> const RenderGraphDebugImage*
+            result.Diagnostics.push_back({sev, std::move(msg)});
+        };
+
+        // --- 1. Required-resource existence and producer checks ---
+
+        auto findImage = [&](RenderResource resource) -> const RenderGraphDebugImage*
+        {
+            const Core::Hash::StringID name = GetRenderResourceName(resource);
+            for (const auto& image : images)
             {
-                const Core::Hash::StringID name = GetRenderResourceName(resource);
-                for (const auto& image : images)
-                {
-                    if (image.Name == name)
-                        return &image;
-                }
-                return nullptr;
-            };
+                if (image.Name == name)
+                    return &image;
+            }
+            return nullptr;
+        };
 
-            for (RenderResource resource : {
-                     RenderResource::SceneDepth,
-                     RenderResource::EntityId,
-                     RenderResource::PrimitiveId,
-                     RenderResource::SceneNormal,
-                     RenderResource::Albedo,
-                     RenderResource::Material0,
-                     RenderResource::SceneColorHDR,
-                     RenderResource::SceneColorLDR,
-                     RenderResource::SelectionMask,
-                     RenderResource::SelectionOutline,
-                 })
+        for (RenderResource resource : {
+                 RenderResource::SceneDepth,
+                 RenderResource::EntityId,
+                 RenderResource::PrimitiveId,
+                 RenderResource::SceneNormal,
+                 RenderResource::Albedo,
+                 RenderResource::Material0,
+                 RenderResource::SceneColorHDR,
+                 RenderResource::SceneColorLDR,
+                 RenderResource::SelectionMask,
+                 RenderResource::SelectionOutline,
+             })
+        {
+            if (!recipe.Requires(resource))
+                continue;
+
+            const auto def = GetRenderResourceDefinition(resource);
+            const auto* image = findImage(resource);
+            if (!image)
             {
-                if (!recipe.Requires(resource))
-                    continue;
-
-                const auto def = GetRenderResourceDefinition(resource);
-                const auto* image = findImage(resource);
-                if (!image)
-                {
-                    Core::Log::Warn("RenderGraph validation: required resource 0x{:08X} is missing from the compiled image list.",
-                                    def.Name.Value);
-                    continue;
-                }
-
-                if (def.Lifetime != RenderResourceLifetime::Imported && image->FirstWritePass == ~0u)
-                {
-                    Core::Log::Warn("RenderGraph validation: required transient resource 0x{:08X} has no producer in this frame.",
-                                    def.Name.Value);
-                }
+                // A required resource missing from the compiled graph is an error.
+                addDiag(RenderGraphValidationSeverity::Error,
+                        std::format("required resource 0x{:08X} is missing from the compiled image list.",
+                                    def.Name.Value));
+                continue;
             }
 
-            struct WriteSummary
+            if (def.Lifetime != RenderResourceLifetime::Imported && image->FirstWritePass == ~0u)
             {
-                Core::Hash::StringID Name{};
-                bool IsImported = false;
-                bool IsDepth = false;
-                uint32_t InitializeCount = 0;
-                uint32_t AttachmentWrites = 0;
-            };
-            std::unordered_map<ResourceID, WriteSummary> writeSummaries;
+                // A required transient resource without a producer is an error.
+                addDiag(RenderGraphValidationSeverity::Error,
+                        std::format("required transient resource 0x{:08X} has no producer in this frame.",
+                                    def.Name.Value));
+            }
+        }
 
-            for (const auto& pass : passes)
+        // --- 2. Per-pass attachment analysis ---
+
+        struct WriteSummary
+        {
+            Core::Hash::StringID Name{};
+            bool IsImported = false;
+            bool IsDepth = false;
+            uint32_t InitializeCount = 0;
+            uint32_t AttachmentWrites = 0;
+        };
+        std::unordered_map<ResourceID, WriteSummary> writeSummaries;
+
+        // Build the default write policies if none were provided.
+        const auto defaultPolicies = writePolicies.empty()
+            ? GetDefaultImportedWritePolicies()
+            : std::vector<ImportedResourceWritePolicy>{};
+        const auto effectivePolicies = writePolicies.empty()
+            ? std::span<const ImportedResourceWritePolicy>(defaultPolicies)
+            : writePolicies;
+
+        for (const auto& pass : passes)
+        {
+            for (const auto& att : pass.Attachments)
             {
-                for (const auto& att : pass.Attachments)
+                auto& summary = writeSummaries[att.Resource];
+                summary.Name = att.ResourceName;
+                summary.IsImported = att.IsImported;
+                summary.IsDepth = att.IsDepth;
+                ++summary.AttachmentWrites;
+                if (att.LoadOp != VK_ATTACHMENT_LOAD_OP_LOAD)
+                    ++summary.InitializeCount;
+
+                // Check imported-resource write policies.
+                if (att.IsImported)
                 {
-                    auto& summary = writeSummaries[att.Resource];
-                    summary.Name = att.ResourceName;
-                    summary.IsImported = att.IsImported;
-                    summary.IsDepth = att.IsDepth;
-                    ++summary.AttachmentWrites;
-                    if (att.LoadOp != VK_ATTACHMENT_LOAD_OP_LOAD)
-                        ++summary.InitializeCount;
-
-                    if (att.IsImported && att.ResourceName == Core::Hash::StringID{"Backbuffer"} &&
-                        std::string_view(pass.Name) != "Present.LDR")
+                    for (const auto& policy : effectivePolicies)
                     {
-                        Core::Log::Warn("RenderGraph validation: imported Backbuffer is written by '{}' instead of the dedicated Present stage.",
-                                        pass.Name);
+                        if (att.ResourceName == policy.ResourceName &&
+                            !policy.AuthorizedWriter.empty() &&
+                            std::string_view(pass.Name) != policy.AuthorizedWriter)
+                        {
+                            addDiag(RenderGraphValidationSeverity::Error,
+                                    std::format("imported resource 0x{:08X} is written by '{}' but only '{}' is authorized.",
+                                                att.ResourceName.Value,
+                                                pass.Name,
+                                                policy.AuthorizedWriter));
+                        }
                     }
                 }
             }
+        }
 
-            for (const auto& [resource, summary] : writeSummaries)
+        // --- 3. Multiple-initialization check for transient resources ---
+
+        for (const auto& [resource, summary] : writeSummaries)
+        {
+            if (summary.IsImported)
+                continue;
+
+            if (summary.InitializeCount > 1)
             {
-                if (summary.IsImported)
-                    continue;
-
-                if (summary.InitializeCount > 1)
-                {
-                    Core::Log::Warn("RenderGraph validation: resource 0x{:08X} is re-initialized {} times in one frame; check for multiple first-writers.",
+                addDiag(RenderGraphValidationSeverity::Warning,
+                        std::format("resource 0x{:08X} is re-initialized {} times in one frame; check for multiple first-writers.",
                                     summary.Name.Value,
-                                    summary.InitializeCount);
-                }
+                                    summary.InitializeCount));
             }
         }
+
+        return result;
     }
 
     RenderSystem::RenderSystem(const RenderSystemConfig& config,
@@ -582,7 +629,16 @@ namespace Graphics
         m_LastDebugPasses = m_RenderGraph.BuildDebugPassList();
         m_LastDebugImages = m_RenderGraph.BuildDebugImageList();
 
-        ValidateCompiledGraph(m_LastFrameRecipe, m_LastDebugPasses, m_LastDebugImages);
+        // Structured render graph validation with imported-resource write policies.
+        const auto validationResult = ValidateCompiledGraph(
+            m_LastFrameRecipe, m_LastDebugPasses, m_LastDebugImages);
+        for (const auto& diag : validationResult.Diagnostics)
+        {
+            if (diag.Severity == RenderGraphValidationSeverity::Error)
+                Core::Log::Error("RenderGraph validation: {}", diag.Message);
+            else
+                Core::Log::Warn("RenderGraph validation: {}", diag.Message);
+        }
 
         if (m_Config.EnableRenderAuditLogging)
             LogRenderAudit(m_LastDebugPasses, m_LastDebugImages);

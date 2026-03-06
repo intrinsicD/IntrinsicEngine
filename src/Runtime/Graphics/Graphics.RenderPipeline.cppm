@@ -5,6 +5,8 @@ module;
 #include <span>
 #include <array>
 #include <optional>
+#include <string>
+#include <vector>
 #include <glm/glm.hpp>
 
 #include "RHI.Vulkan.hpp"
@@ -358,4 +360,91 @@ export namespace Graphics
 
         virtual Passes::SelectionOutlineSettings* GetSelectionOutlineSettings() { return nullptr; }
     };
+
+    // ---------------------------------------------------------------------
+    // Render Graph Validation
+    // ---------------------------------------------------------------------
+
+    enum class RenderGraphValidationSeverity : uint8_t
+    {
+        Warning,
+        Error,
+    };
+
+    struct RenderGraphValidationDiagnostic
+    {
+        RenderGraphValidationSeverity Severity = RenderGraphValidationSeverity::Warning;
+        std::string Message{};
+    };
+
+    struct RenderGraphValidationResult
+    {
+        std::vector<RenderGraphValidationDiagnostic> Diagnostics{};
+
+        [[nodiscard]] bool HasErrors() const
+        {
+            for (const auto& d : Diagnostics)
+            {
+                if (d.Severity == RenderGraphValidationSeverity::Error)
+                    return true;
+            }
+            return false;
+        }
+
+        [[nodiscard]] uint32_t ErrorCount() const
+        {
+            uint32_t count = 0;
+            for (const auto& d : Diagnostics)
+            {
+                if (d.Severity == RenderGraphValidationSeverity::Error)
+                    ++count;
+            }
+            return count;
+        }
+
+        [[nodiscard]] uint32_t WarningCount() const
+        {
+            uint32_t count = 0;
+            for (const auto& d : Diagnostics)
+            {
+                if (d.Severity == RenderGraphValidationSeverity::Warning)
+                    ++count;
+            }
+            return count;
+        }
+    };
+
+    // -------------------------------------------------------------------------
+    // Imported-resource write policy
+    // -------------------------------------------------------------------------
+    // Defines which passes are authorized to write to an imported resource.
+    // Used by ValidateCompiledGraph to enforce the producer/consumer contract.
+    struct ImportedResourceWritePolicy
+    {
+        Core::Hash::StringID ResourceName{};
+        // Pass name that is the sole authorized writer. Empty means any pass
+        // may write (no restriction beyond the standard validation).
+        std::string AuthorizedWriter{};
+    };
+
+    // Returns the default write policies for the engine's imported resources.
+    [[nodiscard]] inline std::vector<ImportedResourceWritePolicy> GetDefaultImportedWritePolicies()
+    {
+        return {
+            // Backbuffer: only Present.LDR may write.
+            {Core::Hash::StringID{"Backbuffer"}, "Present.LDR"},
+            // SceneDepth: imported but written by scene passes (Picking,
+            // MeshPass, Lines, Points). No single-writer restriction — scene
+            // depth is shared among geometry passes by design. Leave
+            // AuthorizedWriter empty to allow multiple scene pass writers.
+        };
+    }
+
+    // Validate a compiled render graph against the frame recipe and write
+    // policies. Returns structured diagnostics instead of logging directly.
+    [[nodiscard]] RenderGraphValidationResult ValidateCompiledGraph(
+        const FrameRecipe& recipe,
+        std::span<const RenderGraphDebugPass> passes,
+        std::span<const RenderGraphDebugImage> images,
+        std::span<const ImportedResourceWritePolicy> writePolicies = {});
 }
