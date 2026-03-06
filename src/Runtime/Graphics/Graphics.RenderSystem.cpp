@@ -382,13 +382,37 @@ namespace Graphics
                                           // --- Resource lifetime summary ---
                                           if (ImGui::CollapsingHeader("Resource Lifetimes"))
                                           {
-                                              if (ImGui::BeginTable("##res_lifetimes", 5,
+                                              auto estimateBytes = [](const RenderGraphDebugImage& img) -> uint64_t
+                                              {
+                                                  uint32_t bpp = 4; // default
+                                                  switch (img.Format)
+                                                  {
+                                                  case VK_FORMAT_R32_UINT:              bpp = 4; break;
+                                                  case VK_FORMAT_R8_UNORM:              bpp = 1; break;
+                                                  case VK_FORMAT_R8G8B8A8_UNORM:
+                                                  case VK_FORMAT_R8G8B8A8_SRGB:
+                                                  case VK_FORMAT_B8G8R8A8_UNORM:
+                                                  case VK_FORMAT_B8G8R8A8_SRGB:         bpp = 4; break;
+                                                  case VK_FORMAT_R16G16B16A16_SFLOAT:   bpp = 8; break;
+                                                  case VK_FORMAT_D32_SFLOAT:            bpp = 4; break;
+                                                  case VK_FORMAT_D24_UNORM_S8_UINT:     bpp = 4; break;
+                                                  case VK_FORMAT_D32_SFLOAT_S8_UINT:    bpp = 5; break;
+                                                  default: break;
+                                                  }
+                                                  return uint64_t(img.Extent.width) * img.Extent.height * bpp;
+                                              };
+
+                                              uint64_t totalTransientBytes = 0;
+                                              uint64_t totalImportedBytes  = 0;
+
+                                              if (ImGui::BeginTable("##res_lifetimes", 6,
                                                   ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable | ImGuiTableFlags_SizingStretchProp))
                                               {
                                                   ImGui::TableSetupColumn("Resource", ImGuiTableColumnFlags_WidthStretch);
                                                   ImGui::TableSetupColumn("Size", ImGuiTableColumnFlags_WidthFixed, 90.0f);
                                                   ImGui::TableSetupColumn("Format", ImGuiTableColumnFlags_WidthFixed, 80.0f);
                                                   ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 70.0f);
+                                                  ImGui::TableSetupColumn("Memory", ImGuiTableColumnFlags_WidthFixed, 70.0f);
                                                   ImGui::TableSetupColumn("Alive", ImGuiTableColumnFlags_WidthFixed, 60.0f);
                                                   ImGui::TableHeadersRow();
 
@@ -420,12 +444,152 @@ namespace Graphics
                                                       ImGui::TableSetColumnIndex(3);
                                                       ImGui::TextUnformatted(img.IsImported ? "Imported" : "Transient");
 
-                                                      // Alive range
+                                                      // Memory estimate
                                                       ImGui::TableSetColumnIndex(4);
+                                                      const uint64_t bytes = estimateBytes(img);
+                                                      if (bytes >= 1024 * 1024)
+                                                          ImGui::Text("%.1f MB", bytes / (1024.0 * 1024.0));
+                                                      else
+                                                          ImGui::Text("%.0f KB", bytes / 1024.0);
+                                                      if (img.IsImported)
+                                                          totalImportedBytes += bytes;
+                                                      else
+                                                          totalTransientBytes += bytes;
+
+                                                      // Alive range
+                                                      ImGui::TableSetColumnIndex(5);
                                                       ImGui::Text("[%u,%u]", img.StartPass, img.EndPass);
                                                   }
 
                                                   ImGui::EndTable();
+                                              }
+
+                                              // Memory summary
+                                              ImGui::TextDisabled("Transient: %.1f MB  |  Imported: %.1f MB",
+                                                  totalTransientBytes / (1024.0 * 1024.0),
+                                                  totalImportedBytes / (1024.0 * 1024.0));
+                                          }
+
+                                          // --- Resource Lifetime Timeline ---
+                                          if (ImGui::CollapsingHeader("Lifetime Timeline"))
+                                          {
+                                              // Determine total pass count for scaling
+                                              uint32_t maxPass = 0;
+                                              for (const auto& img : m_LastDebugImages)
+                                                  maxPass = std::max(maxPass, img.EndPass);
+                                              const uint32_t totalPasses = maxPass + 1;
+
+                                              if (totalPasses > 0 && !m_LastDebugImages.empty())
+                                              {
+                                                  // Pass name header
+                                                  const float labelWidth = 120.0f;
+                                                  const float barHeight  = 16.0f;
+                                                  const float rowSpacing = 2.0f;
+                                                  const float availWidth = ImGui::GetContentRegionAvail().x - labelWidth - 8.0f;
+                                                  const float passWidth  = availWidth / static_cast<float>(totalPasses);
+
+                                                  // Column headers: pass indices
+                                                  ImGui::Dummy(ImVec2(labelWidth, 0.0f));
+                                                  ImGui::SameLine();
+                                                  ImVec2 headerPos = ImGui::GetCursorScreenPos();
+                                                  for (uint32_t p = 0; p < totalPasses && p < m_LastDebugPasses.size(); p++)
+                                                  {
+                                                      float x = headerPos.x + p * passWidth;
+                                                      if (passWidth >= 30.0f) // Only show labels if enough room
+                                                      {
+                                                          ImGui::GetWindowDrawList()->AddText(
+                                                              ImVec2(x + 2.0f, headerPos.y),
+                                                              IM_COL32(180, 180, 180, 200),
+                                                              m_LastDebugPasses[p].Name);
+                                                      }
+                                                  }
+                                                  ImGui::Dummy(ImVec2(availWidth, barHeight));
+
+                                                  // Resource bars
+                                                  auto* drawList = ImGui::GetWindowDrawList();
+                                                  for (const auto& img : m_LastDebugImages)
+                                                  {
+                                                      // Resource name label
+                                                      const char* rName = resolveName(img.Name);
+                                                      char label[64];
+                                                      if (rName)
+                                                          snprintf(label, sizeof(label), "%s", rName);
+                                                      else
+                                                          snprintf(label, sizeof(label), "0x%08X", img.Name.Value);
+                                                      ImGui::TextUnformatted(label);
+                                                      ImGui::SameLine(labelWidth);
+
+                                                      ImVec2 cursor = ImGui::GetCursorScreenPos();
+
+                                                      // Background (full timeline)
+                                                      drawList->AddRectFilled(
+                                                          cursor,
+                                                          ImVec2(cursor.x + availWidth, cursor.y + barHeight),
+                                                          IM_COL32(40, 40, 40, 180));
+
+                                                      // Alive range bar
+                                                      if (img.StartPass <= img.EndPass)
+                                                      {
+                                                          float x0 = cursor.x + img.StartPass * passWidth;
+                                                          float x1 = cursor.x + (img.EndPass + 1) * passWidth;
+                                                          ImU32 barColor = img.IsImported
+                                                              ? IM_COL32(80, 160, 220, 200)   // Blue for imported
+                                                              : IM_COL32(100, 200, 100, 200); // Green for transient
+                                                          drawList->AddRectFilled(
+                                                              ImVec2(x0, cursor.y + 1),
+                                                              ImVec2(x1, cursor.y + barHeight - 1),
+                                                              barColor, 2.0f);
+
+                                                          // Write range highlight (brighter overlay)
+                                                          if (img.FirstWritePass != ~0u && img.LastWritePass != ~0u)
+                                                          {
+                                                              float wx0 = cursor.x + img.FirstWritePass * passWidth;
+                                                              float wx1 = cursor.x + (img.LastWritePass + 1) * passWidth;
+                                                              drawList->AddRectFilled(
+                                                                  ImVec2(wx0, cursor.y + 1),
+                                                                  ImVec2(wx1, cursor.y + barHeight / 2),
+                                                                  IM_COL32(255, 200, 80, 120), 1.0f);
+                                                          }
+                                                      }
+
+                                                      // Tooltip on hover
+                                                      ImGui::Dummy(ImVec2(availWidth, barHeight + rowSpacing));
+                                                      if (ImGui::IsItemHovered())
+                                                      {
+                                                          ImGui::BeginTooltip();
+                                                          ImGui::Text("%s", label);
+                                                          ImGui::Text("Alive: [%u, %u]", img.StartPass, img.EndPass);
+                                                          if (img.FirstWritePass != ~0u)
+                                                              ImGui::Text("Write: [%u, %u]", img.FirstWritePass, img.LastWritePass);
+                                                          if (img.FirstReadPass != ~0u)
+                                                              ImGui::Text("Read:  [%u, %u]", img.FirstReadPass, img.LastReadPass);
+                                                          ImGui::Text("Size: %ux%u  Format: %s",
+                                                              img.Extent.width, img.Extent.height, formatName(img.Format));
+                                                          ImGui::Text("%s", img.IsImported ? "Imported" : "Transient");
+                                                          ImGui::EndTooltip();
+                                                      }
+                                                  }
+
+                                                  // Legend
+                                                  ImGui::Spacing();
+                                                  ImVec2 legendPos = ImGui::GetCursorScreenPos();
+                                                  drawList->AddRectFilled(legendPos, ImVec2(legendPos.x + 12, legendPos.y + 12), IM_COL32(100, 200, 100, 200), 2.0f);
+                                                  ImGui::Dummy(ImVec2(14, 12)); ImGui::SameLine();
+                                                  ImGui::TextDisabled("Transient");
+                                                  ImGui::SameLine();
+                                                  legendPos = ImGui::GetCursorScreenPos();
+                                                  drawList->AddRectFilled(legendPos, ImVec2(legendPos.x + 12, legendPos.y + 12), IM_COL32(80, 160, 220, 200), 2.0f);
+                                                  ImGui::Dummy(ImVec2(14, 12)); ImGui::SameLine();
+                                                  ImGui::TextDisabled("Imported");
+                                                  ImGui::SameLine();
+                                                  legendPos = ImGui::GetCursorScreenPos();
+                                                  drawList->AddRectFilled(legendPos, ImVec2(legendPos.x + 12, legendPos.y + 6), IM_COL32(255, 200, 80, 120), 1.0f);
+                                                  ImGui::Dummy(ImVec2(14, 12)); ImGui::SameLine();
+                                                  ImGui::TextDisabled("Write range");
+                                              }
+                                              else
+                                              {
+                                                  ImGui::TextDisabled("No render graph data available.");
                                               }
                                           }
 

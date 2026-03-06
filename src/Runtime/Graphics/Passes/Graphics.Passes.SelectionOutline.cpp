@@ -1,6 +1,7 @@
 module;
 
 #include <algorithm>
+#include <chrono>
 #include <cstdint>
 #include <memory>
 #include <span>
@@ -142,7 +143,7 @@ namespace Graphics::Passes
             VkPushConstantRange pcr{};
             pcr.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
             pcr.offset = 0;
-            pcr.size = 112; // 2*vec4 + float + 3*uint + 16*uint = 32 + 16 + 64 = 112
+            pcr.size = 144; // 2*vec4(32) + float+uint+uint+uint(16) + 5*float+2*uint(28 → pad to 32) + 16*uint(64) = 144
             pb.AddPushConstantRange(pcr);
 
             auto built = pb.Build();
@@ -212,21 +213,46 @@ namespace Graphics::Passes
                 // Push constants matching the shader layout
                 struct PushConstants
                 {
-                    glm::vec4 OutlineColor;
-                    glm::vec4 HoverColor;
-                    float OutlineWidth;
-                    uint32_t SelectedCount;
-                    uint32_t HoveredId;
-                    uint32_t _pad;
-                    uint32_t SelectedIds[kMaxSelectedIds];
+                    glm::vec4 OutlineColor;         // 0
+                    glm::vec4 HoverColor;           // 16
+                    float OutlineWidth;             // 32
+                    uint32_t SelectedCount;         // 36
+                    uint32_t HoveredId;             // 40
+                    uint32_t OutlineMode;           // 44
+                    float SelectionFillAlpha;       // 48
+                    float HoverFillAlpha;           // 52
+                    float PulsePhase;               // 56
+                    float PulseMin;                 // 60
+                    float PulseMax;                 // 64
+                    float GlowFalloff;              // 68
+                    uint32_t _pad0;                 // 72
+                    uint32_t _pad1;                 // 76
+                    uint32_t SelectedIds[kMaxSelectedIds]; // 80..143
                 } push{};
+                static_assert(sizeof(PushConstants) == 144);
 
                 push.OutlineColor = m_Settings.SelectionColor;
                 push.HoverColor = m_Settings.HoverColor;
                 push.OutlineWidth = m_Settings.OutlineWidth;
                 push.SelectedCount = selState.SelectedCount;
                 push.HoveredId = selState.HoveredId;
-                push._pad = 0;
+                push.OutlineMode = static_cast<uint32_t>(m_Settings.Mode);
+                push.SelectionFillAlpha = m_Settings.SelectionFillAlpha;
+                push.HoverFillAlpha = m_Settings.HoverFillAlpha;
+                push.PulseMin = m_Settings.PulseMin;
+                push.PulseMax = m_Settings.PulseMax;
+                push.GlowFalloff = m_Settings.GlowFalloff;
+                push._pad0 = 0;
+                push._pad1 = 0;
+
+                // Compute pulse phase from elapsed time
+                {
+                    using Clock = std::chrono::steady_clock;
+                    static const auto sStart = Clock::now();
+                    const float elapsed = std::chrono::duration<float>(Clock::now() - sStart).count();
+                    push.PulsePhase = elapsed * m_Settings.PulseSpeed * 6.28318530718f;
+                }
+
                 std::copy_n(selState.SelectedIds, kMaxSelectedIds, push.SelectedIds);
 
                 vkCmdPushConstants(cmd, pipeline->GetLayout(),
