@@ -27,7 +27,6 @@ target_sources(${target_name}
         Graphics.Systems.MeshViewLifecycle.cppm
         Graphics.Systems.PropertySetDirtySync.cppm
         # New Modules
-        Graphics.CompositionStrategy.cppm
         Graphics.RenderPath.cppm
         Graphics.GpuColor.cppm
         Graphics.DebugDraw.cppm

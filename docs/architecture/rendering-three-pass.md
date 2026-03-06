@@ -82,23 +82,14 @@ Position/topology changes may escalate to full re-upload; pure attribute changes
 2. `SurfacePass`
 3. `LinePass`
 4. `PointPass`
-5. `Composition` (lighting/composition stage via `ICompositionStrategy`)
+5. *(Composition insertion point — reserved for future deferred/hybrid lighting)*
 6. `PostProcessPass`
 7. `SelectionOutlinePass`
 8. `DebugViewPass`
 9. `ImGuiPass`
 10. `Present`
 
-### Composition Stage
-
-The `ICompositionStrategy` interface sits between geometry passes and post-processing. It abstracts how scene geometry is composed into `SceneColorHDR`:
-
-- **Forward** (`ForwardComposition`): Geometry passes write directly to `SceneColorHDR` with lighting in the fragment shader. The composition stage is a no-op.
-- **Deferred** (future): Geometry writes to G-buffer channels. The composition stage runs fullscreen lighting passes to produce `SceneColorHDR`.
-- **Hybrid** (future): Some geometry deferred, some forward, then merge into `SceneColorHDR`.
-- **Forward+** (future): Clustered/tiled light culling with forward shading.
-
-The active strategy is selected by `FrameLightingPath` and created via `CreateCompositionStrategy()`.
+Currently all geometry passes write directly to `SceneColorHDR` (forward path). When a deferred or hybrid lighting path is implemented, a composition stage will be added at position 5 to produce `SceneColorHDR` from G-buffer channels. No abstraction exists for this yet — it will be introduced when the second concrete implementation demands it.
 
 ## Validation / Audit Expectations
 

@@ -17,7 +17,6 @@ import :RenderGraph;
 import :Components;
 import :Geometry;
 import :DebugDraw;
-import :CompositionStrategy;
 import :Passes.Picking;
 import :Passes.Surface;
 import :Passes.SelectionOutline;
@@ -59,7 +58,6 @@ namespace Graphics
         m_PostProcessPass.reset();
         m_DebugViewPass.reset();
         m_ImGuiPass.reset();
-        m_Composition.reset();
     }
 
     void DefaultPipeline::Initialize(RHI::VulkanDevice& device,
@@ -122,22 +120,6 @@ namespace Graphics
     {
         m_Path.Clear();
 
-        // Create or update the composition strategy based on whether geometry
-        // passes are active. The strategy determines how scene color is
-        // produced (forward: direct write, deferred: G-buffer + lighting pass).
-        const bool hasGeometry = (m_SurfacePass && IsFeatureEnabled("SurfacePass"_id)) ||
-                                  m_LinePass ||
-                                  (m_PointPass && IsFeatureEnabled("PointPass"_id));
-        if (hasGeometry)
-        {
-            if (!m_Composition || m_Composition->GetLightingPath() != FrameLightingPath::Forward)
-                m_Composition = CreateCompositionStrategy(FrameLightingPath::Forward);
-        }
-        else
-        {
-            m_Composition.reset();
-        }
-
         // ==================================================================
         // 1. Picking (Readback) — entity/primitive ID for click queries.
         // ==================================================================
@@ -183,22 +165,16 @@ namespace Graphics
         }
 
         // ==================================================================
-        // 4b. Composition — lighting/composition stage.
-        //     For forward rendering this is a no-op (geometry passes already
-        //     wrote lit color to SceneColorHDR). For deferred/hybrid rendering
-        //     (future) this would add fullscreen lighting passes that read
-        //     G-buffer channels and produce SceneColorHDR.
+        // 5. Composition insertion point (future).
+        //    When a deferred or hybrid lighting path is implemented, a
+        //    composition stage would be added here — after geometry passes
+        //    and before post-processing — to produce SceneColorHDR from
+        //    G-buffer channels. For the current forward path, geometry
+        //    passes write directly to SceneColorHDR; no composition needed.
         // ==================================================================
-        if (m_Composition)
-        {
-            m_Path.AddStage("Composition", [this](RenderPassContext& ctx)
-            {
-                m_Composition->AddCompositionPasses(ctx);
-            });
-        }
 
         // ==================================================================
-        // 5. Post-Processing — HDR tone mapping + optional FXAA.
+        // 6. Post-Processing — HDR tone mapping + optional FXAA.
         //    Reads canonical SceneColorHDR and writes canonical SceneColorLDR.
         //    Final presentation to the imported swapchain image happens in the
         //    dedicated Present stage below.

@@ -1,8 +1,8 @@
 // tests/Test_CompositionAndValidation.cpp
 //
-// Tests for A6 (ICompositionStrategy / ForwardComposition) and A10
-// (RenderGraphValidationResult / imported-resource write policies).
-// These are CPU-side contract tests — no Vulkan device required.
+// Tests for render graph validation (RenderGraphValidationResult,
+// imported-resource write policies). CPU-side contract tests — no Vulkan
+// device required.
 
 #include <gtest/gtest.h>
 #include <string>
@@ -17,69 +17,7 @@ using namespace Graphics;
 using namespace Core::Hash;
 
 // =========================================================================
-// A6: Composition Strategy Tests
-// =========================================================================
-
-TEST(CompositionStrategy, ForwardComposition_LightingPath)
-{
-    ForwardComposition fwd;
-    EXPECT_EQ(fwd.GetLightingPath(), FrameLightingPath::Forward);
-}
-
-TEST(CompositionStrategy, ForwardComposition_GeometryTarget_IsSceneColorHDR)
-{
-    ForwardComposition fwd;
-    EXPECT_EQ(fwd.GetGeometryColorTarget(), RenderResource::SceneColorHDR);
-}
-
-TEST(CompositionStrategy, ForwardComposition_DoesNotRequireGBuffer)
-{
-    ForwardComposition fwd;
-    EXPECT_FALSE(fwd.RequiresGBuffer());
-}
-
-TEST(CompositionStrategy, ForwardComposition_ConfigureRecipe_SetsForwardPath)
-{
-    ForwardComposition fwd;
-    FrameRecipe recipe{};
-    EXPECT_EQ(recipe.LightingPath, FrameLightingPath::None);
-
-    fwd.ConfigureRecipe(recipe);
-    EXPECT_EQ(recipe.LightingPath, FrameLightingPath::Forward);
-}
-
-TEST(CompositionStrategy, Factory_Forward_ReturnsForwardComposition)
-{
-    auto strategy = CreateCompositionStrategy(FrameLightingPath::Forward);
-    ASSERT_NE(strategy, nullptr);
-    EXPECT_EQ(strategy->GetLightingPath(), FrameLightingPath::Forward);
-    EXPECT_EQ(strategy->GetGeometryColorTarget(), RenderResource::SceneColorHDR);
-    EXPECT_FALSE(strategy->RequiresGBuffer());
-}
-
-TEST(CompositionStrategy, Factory_None_ReturnsNull)
-{
-    auto strategy = CreateCompositionStrategy(FrameLightingPath::None);
-    EXPECT_EQ(strategy, nullptr);
-}
-
-TEST(CompositionStrategy, Factory_Deferred_FallsBackToForward)
-{
-    // Until deferred is implemented, the factory falls back to forward.
-    auto strategy = CreateCompositionStrategy(FrameLightingPath::Deferred);
-    ASSERT_NE(strategy, nullptr);
-    EXPECT_EQ(strategy->GetLightingPath(), FrameLightingPath::Forward);
-}
-
-TEST(CompositionStrategy, Factory_Hybrid_FallsBackToForward)
-{
-    auto strategy = CreateCompositionStrategy(FrameLightingPath::Hybrid);
-    ASSERT_NE(strategy, nullptr);
-    EXPECT_EQ(strategy->GetLightingPath(), FrameLightingPath::Forward);
-}
-
-// =========================================================================
-// A10: Render Graph Validation Tests
+// Render Graph Validation Tests
 // =========================================================================
 
 // Helper: build a minimal RenderGraphDebugImage for a known resource.
@@ -343,10 +281,6 @@ TEST(RenderGraphValidation, ValidForwardPipeline_NoDiagnostics)
     EXPECT_FALSE(result.HasErrors());
     EXPECT_EQ(result.WarningCount(), 0u);
 }
-
-// =========================================================================
-// DefaultPipelineRecipe integration: composition strategy impact
-// =========================================================================
 
 TEST(RenderGraphValidation, DefaultImportedWritePolicies_ContainsBackbuffer)
 {
