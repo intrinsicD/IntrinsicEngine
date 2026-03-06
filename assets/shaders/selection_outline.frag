@@ -9,11 +9,19 @@ layout(push_constant) uniform Push
 {
     vec4 OutlineColor;     // RGBA color for selected entities
     vec4 HoverColor;       // RGBA color for hovered entity
-    float OutlineWidth;    // Width in texels (1-4 recommended)
+    float OutlineWidth;    // Width in texels (1-10 recommended)
     uint SelectedCount;    // Number of valid entries in SelectedIds
     uint HoveredId;        // PickID of the hovered entity (0 = none)
-    uint _pad;
-    uint SelectedIds[16];  // PickIDs of selected entities
+    uint OutlineMode;      // 0=Solid, 1=Pulse, 2=Glow
+    float SelectionFillAlpha; // Fill overlay alpha for selected entities
+    float HoverFillAlpha;     // Fill overlay alpha for hovered entity
+    float PulsePhase;         // Current pulse animation phase (0..2*PI)
+    float PulseMin;           // Minimum alpha during pulse
+    float PulseMax;           // Maximum alpha during pulse
+    float GlowFalloff;       // Exponential falloff rate for glow mode
+    uint _pad0;
+    uint _pad1;
+    uint SelectedIds[16]; // PickIDs of selected entities
 } pc;
 
 bool IsSelected(uint id)
@@ -44,9 +52,11 @@ void main()
     }
 
     // Sample 8 neighbors at distances from 1 to OutlineWidth.
-    // If the selection/hover state differs from the center, it's an edge.
+    // Track edge detection and minimum edge distance for glow mode.
     bool selectionEdge = false;
     bool hoverEdge = false;
+    float minSelDist = float(max(int(pc.OutlineWidth), 1) + 1);
+    float minHoverDist = minSelDist;
 
     const ivec2 offsets[8] = ivec2[8](
         ivec2(-1,  0), ivec2( 1,  0), ivec2( 0, -1), ivec2( 0,  1),
@@ -65,19 +75,68 @@ void main()
 
             bool neighborSelected = IsSelected(neighborId);
             if (centerSelected != neighborSelected)
+            {
                 selectionEdge = true;
+                float dist = (i < 4) ? float(r) : float(r) * 1.41421356;
+                minSelDist = min(minSelDist, dist);
+            }
 
             bool neighborHovered = (neighborId != 0u && neighborId == pc.HoveredId);
             if (centerHovered != neighborHovered)
+            {
                 hoverEdge = true;
+                float dist = (i < 4) ? float(r) : float(r) * 1.41421356;
+                minHoverDist = min(minHoverDist, dist);
+            }
         }
     }
 
-    // Selection outline takes priority over hover
+    // Compute outline contribution based on mode
+    vec4 result = vec4(0.0);
+
     if (selectionEdge)
-        outColor = pc.OutlineColor;
+    {
+        vec4 col = pc.OutlineColor;
+        if (pc.OutlineMode == 1u) // Pulse
+        {
+            float t = sin(pc.PulsePhase) * 0.5 + 0.5; // [0, 1]
+            col.a *= mix(pc.PulseMin, pc.PulseMax, t);
+        }
+        else if (pc.OutlineMode == 2u) // Glow
+        {
+            float normDist = minSelDist / max(float(width), 1.0);
+            col.a *= exp(-pc.GlowFalloff * normDist);
+        }
+        result = col;
+    }
     else if (hoverEdge)
-        outColor = pc.HoverColor;
-    else
-        outColor = vec4(0.0);
+    {
+        vec4 col = pc.HoverColor;
+        if (pc.OutlineMode == 1u) // Pulse
+        {
+            float t = sin(pc.PulsePhase) * 0.5 + 0.5;
+            col.a *= mix(pc.PulseMin, pc.PulseMax, t);
+        }
+        else if (pc.OutlineMode == 2u) // Glow
+        {
+            float normDist = minHoverDist / max(float(width), 1.0);
+            col.a *= exp(-pc.GlowFalloff * normDist);
+        }
+        result = col;
+    }
+
+    // Fill overlay: tint inside selected/hovered entities
+    if (result.a < 0.001)
+    {
+        if (centerSelected && pc.SelectionFillAlpha > 0.0)
+        {
+            result = vec4(pc.OutlineColor.rgb, pc.SelectionFillAlpha);
+        }
+        else if (centerHovered && pc.HoverFillAlpha > 0.0)
+        {
+            result = vec4(pc.HoverColor.rgb, pc.HoverFillAlpha);
+        }
+    }
+
+    outColor = result;
 }

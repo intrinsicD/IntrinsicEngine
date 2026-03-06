@@ -1113,6 +1113,14 @@ public:
 
             ImGui::SeparatorText("Selection Outline");
 
+            // Outline mode
+            {
+                const char* modeNames[] = {"Solid", "Pulse", "Glow"};
+                int currentMode = static_cast<int>(outlineSettings->Mode);
+                if (ImGui::Combo("Outline Mode", &currentMode, modeNames, 3))
+                    outlineSettings->Mode = static_cast<Graphics::Passes::OutlineMode>(currentMode);
+            }
+
             // Selection color
             float selColor[4] = {
                 outlineSettings->SelectionColor.r,
@@ -1140,12 +1148,26 @@ public:
             // Outline width
             ImGui::SliderFloat("Outline Width", &outlineSettings->OutlineWidth, 1.0f, 10.0f, "%.1f px");
 
-            // Reset button
-            if (ImGui::Button("Reset to Defaults"))
+            // Fill overlay
+            ImGui::SliderFloat("Selection Fill", &outlineSettings->SelectionFillAlpha, 0.0f, 0.5f, "%.2f");
+            ImGui::SliderFloat("Hover Fill", &outlineSettings->HoverFillAlpha, 0.0f, 0.5f, "%.2f");
+
+            // Mode-specific settings
+            if (outlineSettings->Mode == Graphics::Passes::OutlineMode::Pulse)
             {
-                outlineSettings->SelectionColor = glm::vec4(1.0f, 0.6f, 0.0f, 1.0f);
-                outlineSettings->HoverColor = glm::vec4(0.3f, 0.7f, 1.0f, 0.8f);
-                outlineSettings->OutlineWidth = 2.0f;
+                ImGui::SliderFloat("Pulse Speed", &outlineSettings->PulseSpeed, 0.5f, 10.0f, "%.1f");
+                ImGui::SliderFloat("Pulse Min Alpha", &outlineSettings->PulseMin, 0.0f, 1.0f, "%.2f");
+                ImGui::SliderFloat("Pulse Max Alpha", &outlineSettings->PulseMax, 0.0f, 1.0f, "%.2f");
+            }
+            else if (outlineSettings->Mode == Graphics::Passes::OutlineMode::Glow)
+            {
+                ImGui::SliderFloat("Glow Falloff", &outlineSettings->GlowFalloff, 0.5f, 8.0f, "%.1f");
+            }
+
+            // Reset button
+            if (ImGui::Button("Reset Outline Defaults"))
+            {
+                *outlineSettings = Graphics::Passes::SelectionOutlineSettings{};
             }
 
             // ---------------------------------------------------------------------

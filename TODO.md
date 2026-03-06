@@ -58,15 +58,11 @@ These are not required to finish the first wave, but they should begin soon afte
 ### B3. Selection and Editor Tooling Improvements
 
 - [ ] Improve primitive/submesh selection.
-- [ ] Add configurable outline styles.
-- [ ] Add hover highlighting.
 - [ ] Add mask visualization in the editor.
 
 ### B4. Debugging and Profiling Improvements
 
 - [ ] Add GPU timing markers per stage.
-- [ ] Add transient resource lifetime visualization.
-- [ ] Add memory/bandwidth reporting for intermediate targets.
 
 ### B5. Post Stack Expansion
 
