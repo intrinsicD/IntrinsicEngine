@@ -31,9 +31,13 @@ The HDR post-processing foundation is in place. Scene passes render to an `R16G1
 
 **Bloom:** 5-level progressive downsample/upsample chain (Jimenez 2014, 13-tap downsample + 9-tap tent upsample). Soft threshold with configurable knee curve. Composited additively in HDR space before tone mapping. Threshold, intensity, and filter radius exposed via UI.
 
+**Color grading:** Full lift/gamma/gain (ASC CDL-style) color grading applied in linear space after tone mapping. Controls: saturation, contrast (midtone pivot at 0.18), per-channel lift (shadow tint), gamma (midtone power), gain (highlight multiplier), white balance (color temperature + green-magenta tint). All parameters exposed via View Settings panel with one-click reset to neutral.
+
 **Render graph debug dump:** `DumpRenderGraphToString()` produces a human-readable snapshot of pass execution order (with per-pass attachment metadata) and resource lifetimes (with read/write pass ranges).
 
-Long-horizon additions (after MVP): SSAO, DOF, color grading, debug histogram.
+**Render target inspection:** Enhanced Render Target Viewer panel with human-readable resource names, per-attachment format/load/store tooltips, and a resource lifetime table (dimensions, format, imported vs. transient, alive-range). Click any resource to select it for debug visualization.
+
+Long-horizon additions (after MVP): SSAO, DOF, debug histogram.
 
 ---
 

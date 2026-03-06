@@ -160,11 +160,11 @@ namespace Graphics::Passes
         pb.SetColorFormats({outputFormat});
         pb.AddDescriptorSetLayout(m_ToneMapSetLayout); // set = 0
 
-        // Push constants: Exposure (float) + Operator (int) + BloomIntensity (float) + pad
+        // Push constants: ToneMap base (16B) + ColorGrading (64B) = 80 bytes.
         VkPushConstantRange pcr{};
         pcr.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
         pcr.offset = 0;
-        pcr.size = sizeof(float) * 4; // Exposure, Operator(as int), BloomIntensity, pad
+        pcr.size = 80;
         pb.AddPushConstantRange(pcr);
 
         auto built = pb.Build();
@@ -516,6 +516,37 @@ namespace Graphics::Passes
         const float fxaaRelative = m_Settings.FXAARelativeThreshold;
         const float fxaaSubpixel = m_Settings.FXAASubpixelBlending;
 
+        // Color grading push constant block (must match shader layout, 80B total).
+        struct ToneMapPC
+        {
+            float Exposure;        // offset  0
+            int   Operator;        // offset  4
+            float BloomIntensity;  // offset  8
+            int   ColorGradingOn;  // offset 12
+            float Saturation;      // offset 16
+            float Contrast;        // offset 20
+            float ColorTempOffset; // offset 24
+            float TintOffset;      // offset 28
+            float LiftR, LiftG, LiftB, _pad0;   // offset 32
+            float GammaR, GammaG, GammaB, _pad1; // offset 48
+            float GainR, GainG, GainB, _pad2;     // offset 64
+        };
+        static_assert(sizeof(ToneMapPC) == 80, "ToneMapPC must be 80 bytes");
+
+        const bool cgEnabled = m_Settings.ColorGradingEnabled;
+        ToneMapPC toneMapPC{};
+        toneMapPC.Exposure       = exposure;
+        toneMapPC.Operator       = toneOp;
+        toneMapPC.BloomIntensity = bloomIntensity;
+        toneMapPC.ColorGradingOn = cgEnabled ? 1 : 0;
+        toneMapPC.Saturation     = m_Settings.Saturation;
+        toneMapPC.Contrast       = m_Settings.Contrast;
+        toneMapPC.ColorTempOffset = m_Settings.ColorTempOffset;
+        toneMapPC.TintOffset     = m_Settings.TintOffset;
+        toneMapPC.LiftR = m_Settings.LiftR; toneMapPC.LiftG = m_Settings.LiftG; toneMapPC.LiftB = m_Settings.LiftB;
+        toneMapPC.GammaR = m_Settings.GammaR; toneMapPC.GammaG = m_Settings.GammaG; toneMapPC.GammaB = m_Settings.GammaB;
+        toneMapPC.GainR = m_Settings.GainR; toneMapPC.GainG = m_Settings.GainG; toneMapPC.GainB = m_Settings.GainB;
+
         // Capture bloom handle for read dependency.
         const RGResourceHandle bloomResult = m_LastBloomMip0Handle;
 
@@ -556,7 +587,7 @@ namespace Graphics::Passes
                     m_LastSceneColorHandle = data.Src;
                     m_LastPostLdrHandle = data.Dst;
                 },
-                [this, fi, resolution, exposure, toneOp, bloomIntensity]
+                [this, fi, resolution, toneMapPC]
                 (const ToneMapData&, const RGRegistry&, VkCommandBuffer cmd)
                 {
                     SetViewportScissor(cmd, resolution);
@@ -567,10 +598,8 @@ namespace Graphics::Passes
                                             m_ToneMapPipeline->GetLayout(),
                                             0, 1, &m_ToneMapSets[fi], 0, nullptr);
 
-                    struct { float Exposure; int Operator; float BloomIntensity; float _pad; } pc{
-                        exposure, toneOp, bloomIntensity, 0.0f};
                     vkCmdPushConstants(cmd, m_ToneMapPipeline->GetLayout(),
-                                       VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
+                                       VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(toneMapPC), &toneMapPC);
                     vkCmdDraw(cmd, 3, 1, 0, 0);
                 }
             );
@@ -644,7 +673,7 @@ namespace Graphics::Passes
                     m_LastSceneColorHandle = data.Src;
                     m_LastPostLdrHandle = {};
                 },
-                [this, fi, resolution, exposure, toneOp, bloomIntensity]
+                [this, fi, resolution, toneMapPC]
                 (const ToneMapData&, const RGRegistry&, VkCommandBuffer cmd)
                 {
                     SetViewportScissor(cmd, resolution);
@@ -655,10 +684,8 @@ namespace Graphics::Passes
                                             m_ToneMapPipeline->GetLayout(),
                                             0, 1, &m_ToneMapSets[fi], 0, nullptr);
 
-                    struct { float Exposure; int Operator; float BloomIntensity; float _pad; } pc{
-                        exposure, toneOp, bloomIntensity, 0.0f};
                     vkCmdPushConstants(cmd, m_ToneMapPipeline->GetLayout(),
-                                       VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
+                                       VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(toneMapPC), &toneMapPC);
                     vkCmdDraw(cmd, 3, 1, 0, 0);
                 }
             );

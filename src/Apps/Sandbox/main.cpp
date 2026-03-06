@@ -1063,6 +1063,44 @@ public:
                     ImGui::SliderFloat("FXAA Relative", &postSettings->FXAARelativeThreshold, 0.01f, 0.2f, "%.4f");
                     ImGui::SliderFloat("FXAA Subpixel", &postSettings->FXAASubpixelBlending, 0.0f, 1.0f, "%.2f");
                 }
+
+                // Color Grading
+                ImGui::Spacing();
+                ImGui::Checkbox("Color Grading", &postSettings->ColorGradingEnabled);
+                if (postSettings->ColorGradingEnabled)
+                {
+                    ImGui::SliderFloat("Saturation", &postSettings->Saturation, 0.0f, 2.0f, "%.2f");
+                    ImGui::SliderFloat("Contrast##CG", &postSettings->Contrast, 0.5f, 2.0f, "%.2f");
+                    ImGui::SliderFloat("Temperature", &postSettings->ColorTempOffset, -1.0f, 1.0f, "%.2f");
+                    ImGui::SliderFloat("Tint", &postSettings->TintOffset, -1.0f, 1.0f, "%.2f");
+
+                    ImGui::Spacing();
+                    ImGui::TextDisabled("Lift (Shadows)");
+                    ImGui::SliderFloat("Lift R", &postSettings->LiftR, -0.5f, 0.5f, "%.3f");
+                    ImGui::SliderFloat("Lift G", &postSettings->LiftG, -0.5f, 0.5f, "%.3f");
+                    ImGui::SliderFloat("Lift B", &postSettings->LiftB, -0.5f, 0.5f, "%.3f");
+
+                    ImGui::TextDisabled("Gamma (Midtones)");
+                    ImGui::SliderFloat("Gamma R", &postSettings->GammaR, 0.2f, 3.0f, "%.2f");
+                    ImGui::SliderFloat("Gamma G", &postSettings->GammaG, 0.2f, 3.0f, "%.2f");
+                    ImGui::SliderFloat("Gamma B", &postSettings->GammaB, 0.2f, 3.0f, "%.2f");
+
+                    ImGui::TextDisabled("Gain (Highlights)");
+                    ImGui::SliderFloat("Gain R", &postSettings->GainR, 0.0f, 3.0f, "%.2f");
+                    ImGui::SliderFloat("Gain G", &postSettings->GainG, 0.0f, 3.0f, "%.2f");
+                    ImGui::SliderFloat("Gain B", &postSettings->GainB, 0.0f, 3.0f, "%.2f");
+
+                    if (ImGui::Button("Reset Color Grading"))
+                    {
+                        postSettings->Saturation = 1.0f;
+                        postSettings->Contrast = 1.0f;
+                        postSettings->ColorTempOffset = 0.0f;
+                        postSettings->TintOffset = 0.0f;
+                        postSettings->LiftR = postSettings->LiftG = postSettings->LiftB = 0.0f;
+                        postSettings->GammaR = postSettings->GammaG = postSettings->GammaB = 1.0f;
+                        postSettings->GainR = postSettings->GainG = postSettings->GainB = 1.0f;
+                    }
+                }
             }
 
             // --- Selection Outline ---
