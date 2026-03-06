@@ -82,11 +82,23 @@ Position/topology changes may escalate to full re-upload; pure attribute changes
 2. `SurfacePass`
 3. `LinePass`
 4. `PointPass`
-5. `PostProcessPass`
-6. `SelectionOutlinePass`
-7. `DebugViewPass`
-8. `ImGuiPass`
-9. `Present`
+5. `Composition` (lighting/composition stage via `ICompositionStrategy`)
+6. `PostProcessPass`
+7. `SelectionOutlinePass`
+8. `DebugViewPass`
+9. `ImGuiPass`
+10. `Present`
+
+### Composition Stage
+
+The `ICompositionStrategy` interface sits between geometry passes and post-processing. It abstracts how scene geometry is composed into `SceneColorHDR`:
+
+- **Forward** (`ForwardComposition`): Geometry passes write directly to `SceneColorHDR` with lighting in the fragment shader. The composition stage is a no-op.
+- **Deferred** (future): Geometry writes to G-buffer channels. The composition stage runs fullscreen lighting passes to produce `SceneColorHDR`.
+- **Hybrid** (future): Some geometry deferred, some forward, then merge into `SceneColorHDR`.
+- **Forward+** (future): Clustered/tiled light culling with forward shading.
+
+The active strategy is selected by `FrameLightingPath` and created via `CreateCompositionStrategy()`.
 
 ## Validation / Audit Expectations
 
@@ -94,6 +106,10 @@ Position/topology changes may escalate to full re-upload; pure attribute changes
 - Render-graph introspection reports per-resource first/last read and write pass indices.
 - Temporary audit logging may dump pass order, resource creation, transitions, and formats from `RenderSystem`.
 - Any pass using `LOAD` without a guaranteed earlier write in-frame or an imported resource should emit a warning.
+- `ValidateCompiledGraph()` returns `RenderGraphValidationResult` with structured diagnostics (error/warning severity).
+- Missing required resources and transient resources without producers are validation **errors** (not warnings).
+- Imported-resource write policies (`ImportedResourceWritePolicy`) enforce authorized writers per imported resource. Unauthorized writes are validation **errors**.
+- Default policy: only `Present.LDR` may write to the imported Backbuffer.
 
 ## Robustness Requirements
 

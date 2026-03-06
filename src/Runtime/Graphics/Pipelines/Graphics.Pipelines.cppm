@@ -10,6 +10,7 @@ import :RenderPath;
 import :RenderGraph;
 import :ShaderRegistry;
 import :PipelineLibrary;
+import :CompositionStrategy;
 import :Passes.DebugView;
 import :Passes.Surface;
 import :Passes.ImGui;
@@ -71,6 +72,14 @@ export namespace Graphics
             return m_SelectionOutlinePass ? &m_SelectionOutlinePass->GetSettings() : nullptr;
         }
 
+        // Returns the active composition strategy (non-null when geometry
+        // passes are enabled). Passes may query this to determine which
+        // canonical resource to write their color output to.
+        [[nodiscard]] const ICompositionStrategy* GetCompositionStrategy() const
+        {
+            return m_Composition.get();
+        }
+
     private:
         const Core::FeatureRegistry* m_Registry = nullptr;
 
@@ -82,6 +91,10 @@ export namespace Graphics
         std::unique_ptr<Passes::DebugViewPass> m_DebugViewPass;
         std::unique_ptr<Passes::ImGuiPass> m_ImGuiPass;
         std::unique_ptr<Passes::PostProcessPass> m_PostProcessPass;
+
+        // Active lighting/composition strategy. Created by RebuildPath()
+        // based on the FrameLightingPath determined by the recipe.
+        std::unique_ptr<ICompositionStrategy> m_Composition;
 
         RenderPath m_Path;
         bool m_PathDirty = true;

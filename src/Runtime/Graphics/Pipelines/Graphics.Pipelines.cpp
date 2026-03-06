@@ -17,6 +17,7 @@ import :RenderGraph;
 import :Components;
 import :Geometry;
 import :DebugDraw;
+import :CompositionStrategy;
 import :Passes.Picking;
 import :Passes.Surface;
 import :Passes.SelectionOutline;
@@ -58,6 +59,7 @@ namespace Graphics
         m_PostProcessPass.reset();
         m_DebugViewPass.reset();
         m_ImGuiPass.reset();
+        m_Composition.reset();
     }
 
     void DefaultPipeline::Initialize(RHI::VulkanDevice& device,
@@ -120,6 +122,22 @@ namespace Graphics
     {
         m_Path.Clear();
 
+        // Create or update the composition strategy based on whether geometry
+        // passes are active. The strategy determines how scene color is
+        // produced (forward: direct write, deferred: G-buffer + lighting pass).
+        const bool hasGeometry = (m_SurfacePass && IsFeatureEnabled("SurfacePass"_id)) ||
+                                  m_LinePass ||
+                                  (m_PointPass && IsFeatureEnabled("PointPass"_id));
+        if (hasGeometry)
+        {
+            if (!m_Composition || m_Composition->GetLightingPath() != FrameLightingPath::Forward)
+                m_Composition = CreateCompositionStrategy(FrameLightingPath::Forward);
+        }
+        else
+        {
+            m_Composition.reset();
+        }
+
         // ==================================================================
         // 1. Picking (Readback) — entity/primitive ID for click queries.
         // ==================================================================
@@ -161,6 +179,21 @@ namespace Graphics
                 m_PointPass->SetGeometryStorage(&ctx.GeometryStorage);
                 m_PointPass->SetDebugDraw(ctx.DebugDrawPtr);
                 m_PointPass->AddPasses(ctx);
+            });
+        }
+
+        // ==================================================================
+        // 4b. Composition — lighting/composition stage.
+        //     For forward rendering this is a no-op (geometry passes already
+        //     wrote lit color to SceneColorHDR). For deferred/hybrid rendering
+        //     (future) this would add fullscreen lighting passes that read
+        //     G-buffer channels and produce SceneColorHDR.
+        // ==================================================================
+        if (m_Composition)
+        {
+            m_Path.AddStage("Composition", [this](RenderPassContext& ctx)
+            {
+                m_Composition->AddCompositionPasses(ctx);
             });
         }
 

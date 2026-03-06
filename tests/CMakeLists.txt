@@ -148,6 +148,7 @@ intrinsic_test_object_lib(RuntimeTestObjs
         Test_PropertySetDirtySync.cpp
         Test_SceneSerializer.cpp
         Test_TransformGizmo.cpp
+        Test_CompositionAndValidation.cpp
 
     DEPS IntrinsicCore IntrinsicRuntime nlohmann_json::nlohmann_json
 )
