@@ -17,6 +17,16 @@ export namespace Graphics::Passes
     };
 
     // -----------------------------------------------------------------
+    // Anti-aliasing mode selection.
+    // -----------------------------------------------------------------
+    enum class AAMode : int
+    {
+        None = 0,
+        FXAA = 1,
+        SMAA = 2,
+    };
+
+    // -----------------------------------------------------------------
     // Post-processing settings exposed to the editor UI.
     // -----------------------------------------------------------------
     struct PostProcessSettings
@@ -41,11 +51,22 @@ export namespace Graphics::Passes
         float BloomIntensity    = 0.04f;  // Bloom contribution strength
         float BloomFilterRadius = 1.0f;   // Upsample tent filter radius
 
-        // FXAA
-        bool  FXAAEnabled          = true;
+        // Anti-aliasing
+        AAMode AntiAliasingMode = AAMode::SMAA; // Default to SMAA (higher quality)
+
+        // FXAA settings (used when AntiAliasingMode == FXAA)
         float FXAAContrastThreshold  = 0.0312f;
         float FXAARelativeThreshold  = 0.063f;
         float FXAASubpixelBlending   = 0.75f;
+
+        // SMAA settings (used when AntiAliasingMode == SMAA)
+        float SMAAEdgeThreshold      = 0.1f;   // Luma edge detection threshold
+        int   SMAAMaxSearchSteps     = 16;     // Max orthogonal search distance
+        int   SMAAMaxSearchStepsDiag = 8;      // Max diagonal search distance
+
+        // Legacy accessor for backwards compatibility.
+        [[nodiscard]] bool FXAAEnabled() const { return AntiAliasingMode == AAMode::FXAA; }
+        [[nodiscard]] bool SMAAEnabled() const { return AntiAliasingMode == AAMode::SMAA; }
 
         // Luminance Histogram (debug exposure tool)
         bool  HistogramEnabled     = false;

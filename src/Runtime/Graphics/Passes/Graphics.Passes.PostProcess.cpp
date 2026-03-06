@@ -8,6 +8,7 @@ module;
 #include <algorithm>
 #include <format>
 #include <cmath>
+#include <vector>
 #include <glm/glm.hpp>
 
 #include "RHI.Vulkan.hpp"
@@ -26,6 +27,7 @@ import RHI;
 using namespace Core::Hash;
 
 #include "Graphics.PassUtils.hpp"
+#include "Graphics.SMAALookupTextures.hpp"
 
 namespace Graphics::Passes
 {
@@ -89,6 +91,18 @@ namespace Graphics::Passes
         m_FXAASetLayout = CreateSamplerDescriptorSetLayout(
             dev, VK_SHADER_STAGE_FRAGMENT_BIT, "PostProcess.FXAA");
 
+        // SMAA Edge Detection: 1 binding (LDR input).
+        m_SMAAEdgeSetLayout = CreateSamplerDescriptorSetLayout(
+            dev, VK_SHADER_STAGE_FRAGMENT_BIT, "PostProcess.SMAA.Edge");
+
+        // SMAA Blend Weight: 3 bindings (edges, area tex, search tex).
+        m_SMAABlendSetLayout = CreateMultiSamplerSetLayout(
+            dev, 3, VK_SHADER_STAGE_FRAGMENT_BIT, "PostProcess.SMAA.Blend");
+
+        // SMAA Neighborhood Blending: 2 bindings (LDR input, blend weights).
+        m_SMAAResolveSetLayout = CreateMultiSamplerSetLayout(
+            dev, 2, VK_SHADER_STAGE_FRAGMENT_BIT, "PostProcess.SMAA.Resolve");
+
         // Bloom downsample: 1 binding (source mip).
         m_BloomDownSetLayout = CreateSamplerDescriptorSetLayout(
             dev, VK_SHADER_STAGE_FRAGMENT_BIT, "PostProcess.BloomDown");
@@ -100,6 +114,9 @@ namespace Graphics::Passes
         // Allocate per-frame descriptor sets.
         AllocatePerFrameSets<3>(descriptorPool, m_ToneMapSetLayout, m_ToneMapSets);
         AllocatePerFrameSets<3>(descriptorPool, m_FXAASetLayout, m_FXAASets);
+        AllocatePerFrameSets<3>(descriptorPool, m_SMAAEdgeSetLayout, m_SMAAEdgeSets);
+        AllocatePerFrameSets<3>(descriptorPool, m_SMAABlendSetLayout, m_SMAABlendSets);
+        AllocatePerFrameSets<3>(descriptorPool, m_SMAAResolveSetLayout, m_SMAAResolveSets);
 
         for (uint32_t fi = 0; fi < 3; ++fi)
         {
@@ -128,6 +145,22 @@ namespace Graphics::Passes
         }
         for (auto& set : m_FXAASets)
             UpdateImageDescriptor(dev, set, 0, m_LinearSampler, dummyView, readLayout);
+
+        for (auto& set : m_SMAAEdgeSets)
+            UpdateImageDescriptor(dev, set, 0, m_LinearSampler, dummyView, readLayout);
+
+        for (auto& set : m_SMAABlendSets)
+        {
+            UpdateImageDescriptor(dev, set, 0, m_LinearSampler, dummyView, readLayout);
+            UpdateImageDescriptor(dev, set, 1, m_LinearSampler, dummyView, readLayout);
+            UpdateImageDescriptor(dev, set, 2, m_LinearSampler, dummyView, readLayout);
+        }
+
+        for (auto& set : m_SMAAResolveSets)
+        {
+            UpdateImageDescriptor(dev, set, 0, m_LinearSampler, dummyView, readLayout);
+            UpdateImageDescriptor(dev, set, 1, m_LinearSampler, dummyView, readLayout);
+        }
 
         for (uint32_t fi = 0; fi < 3; ++fi)
         {
@@ -179,6 +212,146 @@ namespace Graphics::Passes
             // Bind dummy image for the sampler binding.
             UpdateImageDescriptor(dev, m_HistogramSets[fi], 0, m_LinearSampler, dummyView, readLayout);
         }
+
+        // SMAA lookup textures (area + search).
+        InitializeSMAALookupTextures();
+
+        // Bind SMAA lookup textures to blend weight descriptor sets.
+        if (m_SMAAAreaTex && m_SMAASearchTex)
+        {
+            for (auto& set : m_SMAABlendSets)
+            {
+                UpdateImageDescriptor(dev, set, 1, m_LinearSampler, m_SMAAAreaTex->GetView(), readLayout);
+                UpdateImageDescriptor(dev, set, 2, m_LinearSampler, m_SMAASearchTex->GetView(), readLayout);
+            }
+        }
+    }
+
+    // =====================================================================
+    // InitializeSMAALookupTextures
+    // =====================================================================
+    void PostProcessPass::InitializeSMAALookupTextures()
+    {
+        using namespace Graphics::SMAA;
+
+        VkDevice dev = m_Device->GetLogicalDevice();
+
+        // Generate area texture data (160x560, RG8).
+        auto areaData = GenerateAreaTexture();
+        m_SMAAAreaTex = std::make_unique<RHI::VulkanImage>(
+            *m_Device,
+            kAreaTexWidth, kAreaTexHeight, 1,
+            VK_FORMAT_R8G8_UNORM,
+            VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+            VK_IMAGE_ASPECT_COLOR_BIT);
+
+        // Upload area texture data via staging buffer.
+        {
+            const size_t dataSize = areaData.size();
+            RHI::VulkanBuffer staging(*m_Device, dataSize,
+                VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
+
+            std::memcpy(staging.GetMappedData(), areaData.data(), dataSize);
+
+            VkCommandBuffer cmd = RHI::CommandUtils::BeginSingleTimeCommands(*m_Device);
+
+            // Transition to TRANSFER_DST.
+            VkImageMemoryBarrier2 barrier{};
+            barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+            barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+            barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            barrier.image = m_SMAAAreaTex->GetHandle();
+            barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+            barrier.srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
+            barrier.srcAccessMask = 0;
+            barrier.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+            barrier.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+
+            VkDependencyInfo dep{};
+            dep.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+            dep.imageMemoryBarrierCount = 1;
+            dep.pImageMemoryBarriers = &barrier;
+            vkCmdPipelineBarrier2(cmd, &dep);
+
+            VkBufferImageCopy region{};
+            region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+            region.imageExtent = {static_cast<uint32_t>(kAreaTexWidth),
+                                  static_cast<uint32_t>(kAreaTexHeight), 1};
+            vkCmdCopyBufferToImage(cmd, staging.GetHandle(), m_SMAAAreaTex->GetHandle(),
+                                   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+
+            // Transition to SHADER_READ_ONLY.
+            barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+            barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            barrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+            barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+            barrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+            barrier.dstAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
+            vkCmdPipelineBarrier2(cmd, &dep);
+
+            RHI::CommandUtils::EndSingleTimeCommands(*m_Device, cmd);
+        }
+
+        // Generate search texture data (66x33, R8).
+        auto searchData = GenerateSearchTexture();
+        m_SMAASearchTex = std::make_unique<RHI::VulkanImage>(
+            *m_Device,
+            kSearchTexWidth, kSearchTexHeight, 1,
+            VK_FORMAT_R8_UNORM,
+            VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+            VK_IMAGE_ASPECT_COLOR_BIT);
+
+        // Upload search texture data via staging buffer.
+        {
+            const size_t dataSize = searchData.size();
+            RHI::VulkanBuffer staging(*m_Device, dataSize,
+                VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
+
+            std::memcpy(staging.GetMappedData(), searchData.data(), dataSize);
+
+            VkCommandBuffer cmd = RHI::CommandUtils::BeginSingleTimeCommands(*m_Device);
+
+            VkImageMemoryBarrier2 barrier{};
+            barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+            barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+            barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            barrier.image = m_SMAASearchTex->GetHandle();
+            barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+            barrier.srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
+            barrier.srcAccessMask = 0;
+            barrier.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+            barrier.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+
+            VkDependencyInfo dep{};
+            dep.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+            dep.imageMemoryBarrierCount = 1;
+            dep.pImageMemoryBarriers = &barrier;
+            vkCmdPipelineBarrier2(cmd, &dep);
+
+            VkBufferImageCopy region{};
+            region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+            region.imageExtent = {static_cast<uint32_t>(kSearchTexWidth),
+                                  static_cast<uint32_t>(kSearchTexHeight), 1};
+            vkCmdCopyBufferToImage(cmd, staging.GetHandle(), m_SMAASearchTex->GetHandle(),
+                                   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+
+            barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+            barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            barrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+            barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+            barrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+            barrier.dstAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
+            vkCmdPipelineBarrier2(cmd, &dep);
+
+            RHI::CommandUtils::EndSingleTimeCommands(*m_Device, cmd);
+        }
+
+        Core::Log::Info("PostProcess: SMAA lookup textures initialized (Area {}x{}, Search {}x{})",
+                        kAreaTexWidth, kAreaTexHeight, kSearchTexWidth, kSearchTexHeight);
     }
 
     // =====================================================================
@@ -249,6 +422,117 @@ namespace Graphics::Passes
         if (!built)
         {
             Core::Log::Error("PostProcess: failed to build FXAA pipeline (VkResult={})", (int)built.error());
+            return nullptr;
+        }
+        return std::move(*built);
+    }
+
+    // =====================================================================
+    // BuildSMAAEdgePipeline
+    // =====================================================================
+    std::unique_ptr<RHI::GraphicsPipeline> PostProcessPass::BuildSMAAEdgePipeline(VkFormat edgeFormat)
+    {
+        auto [vertPath, fragPath] = ResolveShaderPaths(*m_ShaderRegistry,
+                                                        "Post.Fullscreen.Vert"_id,
+                                                        "Post.SMAA.Edge.Frag"_id);
+
+        RHI::ShaderModule vert(*m_Device, vertPath, RHI::ShaderStage::Vertex);
+        RHI::ShaderModule frag(*m_Device, fragPath, RHI::ShaderStage::Fragment);
+
+        auto deviceAlias = MakeDeviceAlias(m_Device);
+        RHI::PipelineBuilder pb(deviceAlias);
+        pb.SetShaders(&vert, &frag);
+        pb.SetTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+        pb.DisableDepthTest();
+        pb.SetCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE);
+        pb.SetColorFormats({edgeFormat});
+        pb.AddDescriptorSetLayout(m_SMAAEdgeSetLayout); // set = 0
+
+        // Push constants: InvResolution (vec2) + EdgeThreshold (float) + pad (float) = 16B
+        VkPushConstantRange pcr{};
+        pcr.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        pcr.offset = 0;
+        pcr.size = sizeof(float) * 4;
+        pb.AddPushConstantRange(pcr);
+
+        auto built = pb.Build();
+        if (!built)
+        {
+            Core::Log::Error("PostProcess: failed to build SMAA Edge pipeline (VkResult={})", (int)built.error());
+            return nullptr;
+        }
+        return std::move(*built);
+    }
+
+    // =====================================================================
+    // BuildSMAABlendPipeline
+    // =====================================================================
+    std::unique_ptr<RHI::GraphicsPipeline> PostProcessPass::BuildSMAABlendPipeline(VkFormat weightFormat)
+    {
+        auto [vertPath, fragPath] = ResolveShaderPaths(*m_ShaderRegistry,
+                                                        "Post.Fullscreen.Vert"_id,
+                                                        "Post.SMAA.Blend.Frag"_id);
+
+        RHI::ShaderModule vert(*m_Device, vertPath, RHI::ShaderStage::Vertex);
+        RHI::ShaderModule frag(*m_Device, fragPath, RHI::ShaderStage::Fragment);
+
+        auto deviceAlias = MakeDeviceAlias(m_Device);
+        RHI::PipelineBuilder pb(deviceAlias);
+        pb.SetShaders(&vert, &frag);
+        pb.SetTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+        pb.DisableDepthTest();
+        pb.SetCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE);
+        pb.SetColorFormats({weightFormat});
+        pb.AddDescriptorSetLayout(m_SMAABlendSetLayout); // set = 0
+
+        // Push constants: InvResolution (vec2) + MaxSearchSteps (int) + MaxSearchStepsDiag (int) = 16B
+        VkPushConstantRange pcr{};
+        pcr.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        pcr.offset = 0;
+        pcr.size = sizeof(float) * 4;
+        pb.AddPushConstantRange(pcr);
+
+        auto built = pb.Build();
+        if (!built)
+        {
+            Core::Log::Error("PostProcess: failed to build SMAA Blend pipeline (VkResult={})", (int)built.error());
+            return nullptr;
+        }
+        return std::move(*built);
+    }
+
+    // =====================================================================
+    // BuildSMAAResolvePipeline
+    // =====================================================================
+    std::unique_ptr<RHI::GraphicsPipeline> PostProcessPass::BuildSMAAResolvePipeline(VkFormat outputFormat)
+    {
+        auto [vertPath, fragPath] = ResolveShaderPaths(*m_ShaderRegistry,
+                                                        "Post.Fullscreen.Vert"_id,
+                                                        "Post.SMAA.Resolve.Frag"_id);
+
+        RHI::ShaderModule vert(*m_Device, vertPath, RHI::ShaderStage::Vertex);
+        RHI::ShaderModule frag(*m_Device, fragPath, RHI::ShaderStage::Fragment);
+
+        auto deviceAlias = MakeDeviceAlias(m_Device);
+        RHI::PipelineBuilder pb(deviceAlias);
+        pb.SetShaders(&vert, &frag);
+        pb.SetTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+        pb.DisableDepthTest();
+        pb.SetCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE);
+        pb.SetColorFormats({outputFormat});
+        pb.AddDescriptorSetLayout(m_SMAAResolveSetLayout); // set = 0
+
+        // Push constants: InvResolution (vec2) + 2 pad (float) = 16B
+        VkPushConstantRange pcr{};
+        pcr.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        pcr.offset = 0;
+        pcr.size = sizeof(float) * 4;
+        pb.AddPushConstantRange(pcr);
+
+        auto built = pb.Build();
+        if (!built)
+        {
+            Core::Log::Error("PostProcess: failed to build SMAA Resolve pipeline (VkResult={})", (int)built.error());
             return nullptr;
         }
         return std::move(*built);
@@ -674,6 +958,184 @@ namespace Graphics::Passes
     }
 
     // =====================================================================
+    // AddSMAAPasses — 3-pass SMAA: edge detection, blend weight, resolve.
+    // =====================================================================
+    void PostProcessPass::AddSMAAPasses(RenderPassContext& ctx,
+                                         RGResourceHandle postLdr,
+                                         RGResourceHandle sceneColorLdr)
+    {
+        if (!m_SMAAEdgePipeline)
+            m_SMAAEdgePipeline = BuildSMAAEdgePipeline(VK_FORMAT_R8G8_UNORM);
+        if (!m_SMAABlendPipeline)
+            m_SMAABlendPipeline = BuildSMAABlendPipeline(VK_FORMAT_R8G8B8A8_UNORM);
+        if (!m_SMAAResolvePipeline)
+            m_SMAAResolvePipeline = BuildSMAAResolvePipeline(ctx.SwapchainFormat);
+
+        if (!m_SMAAEdgePipeline || !m_SMAABlendPipeline || !m_SMAAResolvePipeline)
+            return;
+
+        constexpr uint32_t kFrames = RHI::VulkanDevice::GetFramesInFlight();
+        const uint32_t fi = ctx.FrameIndex % kFrames;
+        const VkExtent2D resolution = ctx.Resolution;
+        const float edgeThreshold = m_Settings.SMAAEdgeThreshold;
+        const int maxSearch = m_Settings.SMAAMaxSearchSteps;
+        const int maxSearchDiag = m_Settings.SMAAMaxSearchStepsDiag;
+
+        // --- Pass 1: Edge Detection ---
+        struct SMAAEdgeData { RGResourceHandle Src; RGResourceHandle Dst; };
+        RGResourceHandle smaaEdges{};
+
+        ctx.Graph.AddPass<SMAAEdgeData>("Post.SMAA.Edge",
+            [&](SMAAEdgeData& data, RGBuilder& builder)
+            {
+                RGTextureDesc edgeDesc{};
+                edgeDesc.Width = resolution.width;
+                edgeDesc.Height = resolution.height;
+                edgeDesc.Format = VK_FORMAT_R8G8_UNORM;
+                edgeDesc.Usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+                edgeDesc.Aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+
+                smaaEdges = builder.CreateTexture("SMAAEdges"_id, edgeDesc);
+
+                data.Src = builder.Read(postLdr,
+                                        VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                                        VK_ACCESS_2_SHADER_SAMPLED_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT);
+
+                RGAttachmentInfo colorInfo{};
+                colorInfo.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+                colorInfo.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+                colorInfo.ClearValue.color = {{0.0f, 0.0f, 0.0f, 0.0f}};
+                data.Dst = builder.WriteColor(smaaEdges, colorInfo);
+
+                m_LastSMAAEdgesHandle = data.Src;
+            },
+            [this, fi, resolution, edgeThreshold]
+            (const SMAAEdgeData&, const RGRegistry&, VkCommandBuffer cmd)
+            {
+                SetViewportScissor(cmd, resolution);
+                vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                  m_SMAAEdgePipeline->GetHandle());
+                vkCmdSetPrimitiveTopology(cmd, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+                vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                        m_SMAAEdgePipeline->GetLayout(),
+                                        0, 1, &m_SMAAEdgeSets[fi], 0, nullptr);
+
+                struct {
+                    float InvResX, InvResY;
+                    float EdgeThreshold;
+                    float _pad0;
+                } pc{
+                    1.0f / static_cast<float>(resolution.width),
+                    1.0f / static_cast<float>(resolution.height),
+                    edgeThreshold, 0.0f
+                };
+                vkCmdPushConstants(cmd, m_SMAAEdgePipeline->GetLayout(),
+                                   VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
+                vkCmdDraw(cmd, 3, 1, 0, 0);
+            }
+        );
+
+        // --- Pass 2: Blend Weight Calculation ---
+        struct SMAABlendData { RGResourceHandle Edges; RGResourceHandle Dst; };
+        RGResourceHandle smaaWeights{};
+
+        ctx.Graph.AddPass<SMAABlendData>("Post.SMAA.Blend",
+            [&](SMAABlendData& data, RGBuilder& builder)
+            {
+                RGTextureDesc weightDesc{};
+                weightDesc.Width = resolution.width;
+                weightDesc.Height = resolution.height;
+                weightDesc.Format = VK_FORMAT_R8G8B8A8_UNORM;
+                weightDesc.Usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+                weightDesc.Aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+
+                smaaWeights = builder.CreateTexture("SMAAWeights"_id, weightDesc);
+
+                data.Edges = builder.Read(smaaEdges,
+                                          VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                                          VK_ACCESS_2_SHADER_SAMPLED_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT);
+
+                RGAttachmentInfo colorInfo{};
+                colorInfo.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+                colorInfo.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+                colorInfo.ClearValue.color = {{0.0f, 0.0f, 0.0f, 0.0f}};
+                data.Dst = builder.WriteColor(smaaWeights, colorInfo);
+
+                m_LastSMAAEdgesHandle = data.Edges;
+            },
+            [this, fi, resolution, maxSearch, maxSearchDiag]
+            (const SMAABlendData&, const RGRegistry&, VkCommandBuffer cmd)
+            {
+                SetViewportScissor(cmd, resolution);
+                vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                  m_SMAABlendPipeline->GetHandle());
+                vkCmdSetPrimitiveTopology(cmd, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+                vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                        m_SMAABlendPipeline->GetLayout(),
+                                        0, 1, &m_SMAABlendSets[fi], 0, nullptr);
+
+                struct {
+                    float InvResX, InvResY;
+                    int   MaxSearchSteps;
+                    int   MaxSearchStepsDiag;
+                } pc{
+                    1.0f / static_cast<float>(resolution.width),
+                    1.0f / static_cast<float>(resolution.height),
+                    maxSearch, maxSearchDiag
+                };
+                vkCmdPushConstants(cmd, m_SMAABlendPipeline->GetLayout(),
+                                   VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
+                vkCmdDraw(cmd, 3, 1, 0, 0);
+            }
+        );
+
+        // --- Pass 3: Neighborhood Blending ---
+        struct SMAAResolveData { RGResourceHandle Src; RGResourceHandle Weights; RGResourceHandle Dst; };
+
+        ctx.Graph.AddPass<SMAAResolveData>("Post.SMAA.Resolve",
+            [&](SMAAResolveData& data, RGBuilder& builder)
+            {
+                data.Src = builder.Read(postLdr,
+                                        VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                                        VK_ACCESS_2_SHADER_SAMPLED_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT);
+                data.Weights = builder.Read(smaaWeights,
+                                            VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                                            VK_ACCESS_2_SHADER_SAMPLED_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT);
+
+                RGAttachmentInfo colorInfo{};
+                colorInfo.LoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+                colorInfo.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+                data.Dst = builder.WriteColor(sceneColorLdr, colorInfo);
+
+                m_LastSMAAWeightsHandle = data.Weights;
+            },
+            [this, fi, resolution]
+            (const SMAAResolveData&, const RGRegistry&, VkCommandBuffer cmd)
+            {
+                SetViewportScissor(cmd, resolution);
+                vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                  m_SMAAResolvePipeline->GetHandle());
+                vkCmdSetPrimitiveTopology(cmd, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+                vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                        m_SMAAResolvePipeline->GetLayout(),
+                                        0, 1, &m_SMAAResolveSets[fi], 0, nullptr);
+
+                struct {
+                    float InvResX, InvResY;
+                    float _pad0, _pad1;
+                } pc{
+                    1.0f / static_cast<float>(resolution.width),
+                    1.0f / static_cast<float>(resolution.height),
+                    0.0f, 0.0f
+                };
+                vkCmdPushConstants(cmd, m_SMAAResolvePipeline->GetLayout(),
+                                   VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
+                vkCmdDraw(cmd, 3, 1, 0, 0);
+            }
+        );
+    }
+
+    // =====================================================================
     // AddPasses
     // =====================================================================
     void PostProcessPass::AddPasses(RenderPassContext& ctx)
@@ -712,7 +1174,10 @@ namespace Graphics::Passes
         constexpr uint32_t kFrames = RHI::VulkanDevice::GetFramesInFlight();
         const uint32_t fi = ctx.FrameIndex % kFrames;
         const VkExtent2D resolution = ctx.Resolution;
-        const bool fxaaEnabled = m_Settings.FXAAEnabled && m_FXAAPipeline;
+
+        const AAMode aaMode = m_Settings.AntiAliasingMode;
+        const bool fxaaEnabled = (aaMode == AAMode::FXAA) && m_FXAAPipeline;
+        const bool smaaEnabled = (aaMode == AAMode::SMAA);
 
         // Capture settings for lambda.
         const float exposure = m_Settings.Exposure;
@@ -756,9 +1221,9 @@ namespace Graphics::Passes
         // Capture bloom handle for read dependency.
         const RGResourceHandle bloomResult = m_LastBloomMip0Handle;
 
-        if (fxaaEnabled)
+        if (fxaaEnabled || smaaEnabled)
         {
-            // --- Two-pass: ToneMap -> PostLdrTemp, FXAA -> SceneColorLDR ---
+            // --- Multi-pass: ToneMap -> PostLdrTemp, then AA -> SceneColorLDR ---
             RGTextureDesc ldrDesc{};
             ldrDesc.Width = resolution.width;
             ldrDesc.Height = resolution.height;
@@ -810,51 +1275,59 @@ namespace Graphics::Passes
                 }
             );
 
-            // --- PASS 2: FXAA ---
-            struct FXAAData { RGResourceHandle Src; RGResourceHandle Dst; };
+            if (smaaEnabled)
+            {
+                // --- SMAA 3-pass ---
+                AddSMAAPasses(ctx, postLdr, sceneColorLdr);
+            }
+            else
+            {
+                // --- FXAA single pass ---
+                struct FXAAData { RGResourceHandle Src; RGResourceHandle Dst; };
 
-            ctx.Graph.AddPass<FXAAData>("Post.FXAA",
-                [&](FXAAData& data, RGBuilder& builder)
-                {
-                    data.Src = builder.Read(postLdr,
-                                            VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-                                            VK_ACCESS_2_SHADER_SAMPLED_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT);
+                ctx.Graph.AddPass<FXAAData>("Post.FXAA",
+                    [&](FXAAData& data, RGBuilder& builder)
+                    {
+                        data.Src = builder.Read(postLdr,
+                                                VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                                                VK_ACCESS_2_SHADER_SAMPLED_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT);
 
-                    RGAttachmentInfo colorInfo{};
-                    colorInfo.LoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-                    colorInfo.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
-                    data.Dst = builder.WriteColor(sceneColorLdr, colorInfo);
-                },
-                [this, fi, resolution, fxaaContrast, fxaaRelative, fxaaSubpixel]
-                (const FXAAData&, const RGRegistry&, VkCommandBuffer cmd)
-                {
-                    SetViewportScissor(cmd, resolution);
-                    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                      m_FXAAPipeline->GetHandle());
-                    vkCmdSetPrimitiveTopology(cmd, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-                    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                            m_FXAAPipeline->GetLayout(),
-                                            0, 1, &m_FXAASets[fi], 0, nullptr);
+                        RGAttachmentInfo colorInfo{};
+                        colorInfo.LoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+                        colorInfo.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+                        data.Dst = builder.WriteColor(sceneColorLdr, colorInfo);
+                    },
+                    [this, fi, resolution, fxaaContrast, fxaaRelative, fxaaSubpixel]
+                    (const FXAAData&, const RGRegistry&, VkCommandBuffer cmd)
+                    {
+                        SetViewportScissor(cmd, resolution);
+                        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                          m_FXAAPipeline->GetHandle());
+                        vkCmdSetPrimitiveTopology(cmd, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+                        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                                m_FXAAPipeline->GetLayout(),
+                                                0, 1, &m_FXAASets[fi], 0, nullptr);
 
-                    struct {
-                        float InvResX, InvResY;
-                        float ContrastThreshold;
-                        float RelativeThreshold;
-                        float SubpixelBlending;
-                    } pc{
-                        1.0f / static_cast<float>(resolution.width),
-                        1.0f / static_cast<float>(resolution.height),
-                        fxaaContrast, fxaaRelative, fxaaSubpixel
-                    };
-                    vkCmdPushConstants(cmd, m_FXAAPipeline->GetLayout(),
-                                       VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
-                    vkCmdDraw(cmd, 3, 1, 0, 0);
-                }
-            );
+                        struct {
+                            float InvResX, InvResY;
+                            float ContrastThreshold;
+                            float RelativeThreshold;
+                            float SubpixelBlending;
+                        } pc{
+                            1.0f / static_cast<float>(resolution.width),
+                            1.0f / static_cast<float>(resolution.height),
+                            fxaaContrast, fxaaRelative, fxaaSubpixel
+                        };
+                        vkCmdPushConstants(cmd, m_FXAAPipeline->GetLayout(),
+                                           VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pc), &pc);
+                        vkCmdDraw(cmd, 3, 1, 0, 0);
+                    }
+                );
+            }
         }
         else
         {
-            // --- Single pass: ToneMap -> SceneColorLDR ---
+            // --- Single pass: ToneMap -> SceneColorLDR (no AA) ---
             struct ToneMapData { RGResourceHandle Src; RGResourceHandle Bloom; RGResourceHandle Dst; };
 
             ctx.Graph.AddPass<ToneMapData>("Post.ToneMap",
@@ -936,6 +1409,39 @@ namespace Graphics::Passes
         if (VkImageView ldrView = findView(m_LastPostLdrHandle))
             UpdateImageDescriptor(dev, m_FXAASets[frameIndex], 0, m_LinearSampler, ldrView, readLayout);
 
+        // Update SMAA descriptors.
+        if (m_Settings.SMAAEnabled())
+        {
+            // SMAA Edge: binding 0 = PostLdr.
+            if (VkImageView ldrView = findView(m_LastPostLdrHandle))
+                UpdateImageDescriptor(dev, m_SMAAEdgeSets[frameIndex], 0, m_LinearSampler, ldrView, readLayout);
+
+            // SMAA Blend: binding 0 = edges texture.
+            // Search for "SMAAEdges" resource in debug images.
+            for (const auto& img : debugImages)
+            {
+                if (img.Name == "SMAAEdges"_id && img.View != VK_NULL_HANDLE)
+                {
+                    UpdateImageDescriptor(dev, m_SMAABlendSets[frameIndex], 0, m_LinearSampler, img.View, readLayout);
+                    break;
+                }
+            }
+            // Bindings 1 and 2 (area/search textures) are set once in Initialize.
+
+            // SMAA Resolve: binding 0 = PostLdr, binding 1 = weights.
+            if (VkImageView ldrView = findView(m_LastPostLdrHandle))
+                UpdateImageDescriptor(dev, m_SMAAResolveSets[frameIndex], 0, m_LinearSampler, ldrView, readLayout);
+
+            for (const auto& img : debugImages)
+            {
+                if (img.Name == "SMAAWeights"_id && img.View != VK_NULL_HANDLE)
+                {
+                    UpdateImageDescriptor(dev, m_SMAAResolveSets[frameIndex], 1, m_LinearSampler, img.View, readLayout);
+                    break;
+                }
+            }
+        }
+
         // Update bloom downsample descriptors.
         for (uint32_t mip = 0; mip < kBloomMipCount; ++mip)
         {
@@ -991,6 +1497,11 @@ namespace Graphics::Passes
 
         m_ToneMapPipeline.reset();
         m_FXAAPipeline.reset();
+        m_SMAAEdgePipeline.reset();
+        m_SMAABlendPipeline.reset();
+        m_SMAAResolvePipeline.reset();
+        m_SMAAAreaTex.reset();
+        m_SMAASearchTex.reset();
         m_BloomDownPipeline.reset();
         m_BloomUpPipeline.reset();
         m_HistogramPipeline.reset();
@@ -1013,6 +1524,21 @@ namespace Graphics::Passes
         {
             vkDestroyDescriptorSetLayout(dev, m_FXAASetLayout, nullptr);
             m_FXAASetLayout = VK_NULL_HANDLE;
+        }
+        if (m_SMAAEdgeSetLayout != VK_NULL_HANDLE)
+        {
+            vkDestroyDescriptorSetLayout(dev, m_SMAAEdgeSetLayout, nullptr);
+            m_SMAAEdgeSetLayout = VK_NULL_HANDLE;
+        }
+        if (m_SMAABlendSetLayout != VK_NULL_HANDLE)
+        {
+            vkDestroyDescriptorSetLayout(dev, m_SMAABlendSetLayout, nullptr);
+            m_SMAABlendSetLayout = VK_NULL_HANDLE;
+        }
+        if (m_SMAAResolveSetLayout != VK_NULL_HANDLE)
+        {
+            vkDestroyDescriptorSetLayout(dev, m_SMAAResolveSetLayout, nullptr);
+            m_SMAAResolveSetLayout = VK_NULL_HANDLE;
         }
         if (m_BloomDownSetLayout != VK_NULL_HANDLE)
         {
@@ -1038,6 +1564,9 @@ namespace Graphics::Passes
     {
         m_ToneMapPipeline.reset();
         m_FXAAPipeline.reset();
+        m_SMAAEdgePipeline.reset();
+        m_SMAABlendPipeline.reset();
+        m_SMAAResolvePipeline.reset();
         m_BloomDownPipeline.reset();
         m_BloomUpPipeline.reset();
         m_HistogramPipeline.reset();
