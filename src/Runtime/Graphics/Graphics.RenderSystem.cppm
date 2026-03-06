@@ -81,6 +81,13 @@ export namespace Graphics
         // Access selection outline settings (returns nullptr if not available)
         [[nodiscard]] Passes::SelectionOutlineSettings* GetSelectionOutlineSettings();
 
+        // Access post-process settings (returns nullptr if not available)
+        [[nodiscard]] Passes::PostProcessSettings* GetPostProcessSettings();
+
+        // Dump the last compiled render graph to a human-readable string.
+        // Returns pass execution order, resource lifetimes, and dependency info.
+        [[nodiscard]] std::string DumpRenderGraphToString() const;
+
     private:
         RenderSystemConfig m_Config;
 

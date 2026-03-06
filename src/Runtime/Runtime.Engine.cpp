@@ -329,7 +329,7 @@ namespace Runtime
         reg("SelectionOutlinePass",  Cat::RenderFeature, "Selection outline overlay for selected/hovered entities");
         reg("LinePass",              Cat::RenderFeature, "Unified BDA line rendering (retained wireframe/graph edges + transient DebugDraw)");
         reg("PointPass",             Cat::RenderFeature, "Unified BDA point rendering (retained points/nodes/vertices + transient DebugDraw)");
-        reg("PostProcessPass",       Cat::RenderFeature, "HDR tone mapping (ACES/Reinhard) + optional FXAA");
+        reg("PostProcessPass",       Cat::RenderFeature, "Bloom + HDR tone mapping (ACES/Reinhard/Uncharted2) + optional FXAA");
         reg("DebugViewPass",         Cat::RenderFeature, "Render target debug visualization");
         reg("ImGuiPass",             Cat::RenderFeature, "ImGui UI overlay");
 
