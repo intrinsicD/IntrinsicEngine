@@ -60,14 +60,9 @@ These are not required to finish the first wave, but they should begin soon afte
 - [ ] Improve primitive/submesh selection.
 - [ ] Add mask visualization in the editor.
 
-### B4. Debugging and Profiling Improvements
-
-- [ ] Add GPU timing markers per stage.
-
 ### B5. Post Stack Expansion
 
 - [ ] Add an improved AA path.
-- [ ] Add a debug histogram for exposure.
 
 ---
 

@@ -84,6 +84,9 @@ export namespace Graphics
         // Access post-process settings (returns nullptr if not available)
         [[nodiscard]] Passes::PostProcessSettings* GetPostProcessSettings();
 
+        // Access histogram readback data (returns nullptr if not available)
+        [[nodiscard]] const Passes::HistogramReadback* GetHistogramReadback() const;
+
         // Dump the last compiled render graph to a human-readable string.
         // Returns pass execution order, resource lifetimes, and dependency info.
         [[nodiscard]] std::string DumpRenderGraphToString() const;

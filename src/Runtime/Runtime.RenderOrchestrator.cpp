@@ -122,6 +122,7 @@ namespace Runtime
             ShaderRegistration{"Post.FXAA.Frag"_id, "shaders/post_fxaa.frag.spv"},
             ShaderRegistration{"Post.BloomDown.Frag"_id, "shaders/post_bloom_downsample.frag.spv"},
             ShaderRegistration{"Post.BloomUp.Frag"_id, "shaders/post_bloom_upsample.frag.spv"},
+            ShaderRegistration{"Post.Histogram.Comp"_id, "shaders/post_histogram.comp.spv"},
         };
 
         for (const auto& registration : kShaderRegistrations)
