@@ -161,7 +161,8 @@ namespace Graphics::Passes
         {
             for (const auto& img : ctx.PrevFrameDebugImages)
             {
-                if (img.Name == "PickID"_id && (img.Usage & VK_IMAGE_USAGE_SAMPLED_BIT) != 0)
+                if (img.Name == GetRenderResourceName(RenderResource::EntityId) &&
+                    (img.Usage & VK_IMAGE_USAGE_SAMPLED_BIT) != 0)
                 {
                     srcInfo = &img;
                     ctx.Debug.SelectedResource = img.Name;
@@ -300,11 +301,10 @@ namespace Graphics::Passes
             ctx.Graph.AddPass<BlitData>("DebugViewBlit",
                                         [&](BlitData& data, RGBuilder& builder)
                                         {
-                                            const RGResourceHandle intermediate = ctx.Blackboard.
-                                                Get("DebugViewRGBA"_id);
-                                            const RGResourceHandle backbuffer = ctx.Blackboard.Get("Backbuffer"_id);
+                                            const RGResourceHandle intermediate = ctx.Blackboard.Get("DebugViewRGBA"_id);
+                                            const RGResourceHandle target = GetPresentationTarget(ctx);
 
-                                            if (intermediate.IsValid() && backbuffer.IsValid())
+                                            if (intermediate.IsValid() && target.IsValid())
                                             {
                                                 // Blit requires TRANSFER_READ on source and TRANSFER_WRITE on dest
                                                 // IMPORTANT: OR-in MEMORY_WRITE so the DAG scheduler treats this
@@ -315,7 +315,7 @@ namespace Graphics::Passes
                                                 data.Src = builder.Read(intermediate, VK_PIPELINE_STAGE_2_TRANSFER_BIT,
                                                                         VK_ACCESS_2_TRANSFER_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT);
                                                 data.Dst = builder.Write(
-                                                    backbuffer, VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+                                                    target, VK_PIPELINE_STAGE_2_TRANSFER_BIT,
                                                     VK_ACCESS_2_TRANSFER_WRITE_BIT);
                                             }
                                         },

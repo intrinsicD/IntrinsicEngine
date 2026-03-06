@@ -149,7 +149,7 @@ intrinsic_test_object_lib(RuntimeTestObjs
         Test_SceneSerializer.cpp
         Test_TransformGizmo.cpp
 
-    DEPS IntrinsicCore IntrinsicRuntime
+    DEPS IntrinsicCore IntrinsicRuntime nlohmann_json::nlohmann_json
 )
 
 # Shared support for all test executables (sanitizer defaults, shared test hooks).

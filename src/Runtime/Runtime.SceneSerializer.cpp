@@ -28,6 +28,7 @@ import Runtime.SceneManager;
 import Runtime.AssetPipeline;
 import Runtime.RenderOrchestrator;
 import Runtime.GraphicsBackend;
+import Geometry;
 
 using json = nlohmann::json;
 

@@ -40,26 +40,16 @@ namespace Graphics::Passes
         if (ctx.GlobalDescriptorSet == VK_NULL_HANDLE)
             return;
 
-        const RGResourceHandle depth = ctx.Blackboard.Get("SceneDepth"_id);
-        if (!depth.IsValid())
+        const RGResourceHandle depth = ctx.Blackboard.Get(RenderResource::SceneDepth);
+        const RGResourceHandle entityId = ctx.Blackboard.Get(RenderResource::EntityId);
+        if (!depth.IsValid() || !entityId.IsValid())
             return;
 
-        RGResourceHandle pickIdHandle{};
+        RGResourceHandle pickIdHandle = entityId;
 
         ctx.Graph.AddPass<PickPassData>("PickID",
                                         [&](PickPassData& data, RGBuilder& builder)
                                         {
-                                            RGTextureDesc idDesc{};
-                                            idDesc.Width = ctx.Resolution.width;
-                                            idDesc.Height = ctx.Resolution.height;
-                                            idDesc.Format = VK_FORMAT_R32_UINT;
-                                            idDesc.Usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
-                                                VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
-                                                VK_IMAGE_USAGE_SAMPLED_BIT;
-                                            idDesc.Aspect = VK_IMAGE_ASPECT_COLOR_BIT;
-
-                                            auto idTex = builder.CreateTexture("PickID"_id, idDesc);
-
                                             RGAttachmentInfo idInfo{};
                                             idInfo.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
                                             idInfo.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -68,11 +58,8 @@ namespace Graphics::Passes
                                             RGAttachmentInfo depthInfo{};
                                             depthInfo.ClearValue.depthStencil = {1.0f, 0};
 
-                                            data.IdBuffer = builder.WriteColor(idTex, idInfo);
+                                            data.IdBuffer = builder.WriteColor(entityId, idInfo);
                                             data.Depth = builder.WriteDepth(depth, depthInfo);
-
-                                            pickIdHandle = data.IdBuffer;
-                                            ctx.Blackboard.Add("PickID"_id, data.IdBuffer);
                                         },
                                         [&, pipeline = m_Pipeline](const PickPassData&, const RGRegistry&, VkCommandBuffer cmd)
                                         {

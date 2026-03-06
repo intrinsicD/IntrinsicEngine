@@ -155,10 +155,10 @@ namespace Graphics::Passes
             }
         }
 
-        const RGResourceHandle pickId = ctx.Blackboard.Get("PickID"_id);
-        const RGResourceHandle backbuffer = ctx.Blackboard.Get("Backbuffer"_id);
+        const RGResourceHandle entityId = ctx.Blackboard.Get(RenderResource::EntityId);
+        const RGResourceHandle target = GetPresentationTarget(ctx);
 
-        if (!pickId.IsValid() || !backbuffer.IsValid())
+        if (!entityId.IsValid() || !target.IsValid())
             return;
 
         // Capture selection state for the execute lambda
@@ -177,24 +177,22 @@ namespace Graphics::Passes
         ctx.Graph.AddPass<OutlinePassData>("SelectionOutline",
             [&](OutlinePassData& data, RGBuilder& builder)
             {
-                // Read the PickID buffer as a sampled texture
-                data.PickID = builder.Read(pickId,
+                data.EntityId = builder.Read(entityId,
                     VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
                     VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
 
-                // Write (alpha-blend) onto the backbuffer, preserving existing content
                 RGAttachmentInfo info{};
                 info.LoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
                 info.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
-                data.Backbuffer = builder.WriteColor(backbuffer, info);
+                data.Target = builder.WriteColor(target, info);
 
-                m_LastPickIdHandle = data.PickID;
+                m_LastPickIdHandle = data.EntityId;
             },
             [&, selState, pipeline = m_Pipeline.get()](
                 const OutlinePassData& data, const RGRegistry&, VkCommandBuffer cmd)
             {
                 if (!pipeline) return;
-                if (!data.PickID.IsValid() || !data.Backbuffer.IsValid()) return;
+                if (!data.EntityId.IsValid() || !data.Target.IsValid()) return;
                 if (ctx.Resolution.width == 0 || ctx.Resolution.height == 0) return;
 
                 vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->GetHandle());

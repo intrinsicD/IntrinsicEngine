@@ -6,10 +6,13 @@ module;
 #include <memory>
 #include <string>
 #include <cstdio>
+#include <array>
+#include <span>
 #include <glm/glm.hpp>
 #include <entt/entt.hpp>
-#include "RHI.Vulkan.hpp"
 #include <imgui.h>
+
+#include "RHI.Vulkan.hpp"
 
 module Graphics:RenderSystem.Impl;
 
@@ -41,6 +44,149 @@ using namespace Core::Hash;
 
 namespace Graphics
 {
+    namespace
+    {
+        [[nodiscard]] bool HasSelectionWork(ECS::Scene& scene)
+        {
+            auto& registry = scene.GetRegistry();
+            return !registry.view<ECS::Components::Selection::SelectedTag>().empty() ||
+                   !registry.view<ECS::Components::Selection::HoveredTag>().empty();
+        }
+
+        void LogRenderAudit(const std::vector<RenderGraphDebugPass>& passes,
+                            const std::vector<RenderGraphDebugImage>& images)
+        {
+            Core::Log::Info("RenderAudit: {} passes, {} images", passes.size(), images.size());
+            for (const auto& pass : passes)
+            {
+                Core::Log::Info("RenderAudit.Pass[{}] {}", pass.PassIndex, pass.Name);
+                for (const auto& att : pass.Attachments)
+                {
+                    Core::Log::Info("  attachment name=0x{:08X} resource={} format={} loadOp={} storeOp={} depth={} imported={}",
+                                    att.ResourceName.Value,
+                                    att.Resource,
+                                    static_cast<int>(att.Format),
+                                    static_cast<int>(att.LoadOp),
+                                    static_cast<int>(att.StoreOp),
+                                    att.IsDepth,
+                                    att.IsImported);
+                }
+            }
+
+            for (const auto& image : images)
+            {
+                Core::Log::Info(
+                    "RenderAudit.Image name=0x{:08X} resource={} extent={}x{} format={} usage=0x{:08X} layout={} imported={} firstWrite={} lastWrite={} firstRead={} lastRead={} startPass={} endPass={}",
+                    image.Name.Value,
+                    image.Resource,
+                    image.Extent.width,
+                    image.Extent.height,
+                    static_cast<int>(image.Format),
+                    static_cast<uint32_t>(image.Usage),
+                    static_cast<int>(image.CurrentLayout),
+                    image.IsImported,
+                    image.FirstWritePass,
+                    image.LastWritePass,
+                    image.FirstReadPass,
+                    image.LastReadPass,
+                    image.StartPass,
+                    image.EndPass);
+            }
+        }
+
+        void ValidateCompiledGraph(const FrameRecipe& recipe,
+                                  std::span<const RenderGraphDebugPass> passes,
+                                  std::span<const RenderGraphDebugImage> images)
+        {
+            auto findImage = [&](RenderResource resource) -> const RenderGraphDebugImage*
+            {
+                const Core::Hash::StringID name = GetRenderResourceName(resource);
+                for (const auto& image : images)
+                {
+                    if (image.Name == name)
+                        return &image;
+                }
+                return nullptr;
+            };
+
+            for (RenderResource resource : {
+                     RenderResource::SceneDepth,
+                     RenderResource::EntityId,
+                     RenderResource::PrimitiveId,
+                     RenderResource::SceneNormal,
+                     RenderResource::Albedo,
+                     RenderResource::Material0,
+                     RenderResource::SceneColorHDR,
+                     RenderResource::SceneColorLDR,
+                     RenderResource::SelectionMask,
+                     RenderResource::SelectionOutline,
+                 })
+            {
+                if (!recipe.Requires(resource))
+                    continue;
+
+                const auto def = GetRenderResourceDefinition(resource);
+                const auto* image = findImage(resource);
+                if (!image)
+                {
+                    Core::Log::Warn("RenderGraph validation: required resource 0x{:08X} is missing from the compiled image list.",
+                                    def.Name.Value);
+                    continue;
+                }
+
+                if (def.Lifetime != RenderResourceLifetime::Imported && image->FirstWritePass == ~0u)
+                {
+                    Core::Log::Warn("RenderGraph validation: required transient resource 0x{:08X} has no producer in this frame.",
+                                    def.Name.Value);
+                }
+            }
+
+            struct WriteSummary
+            {
+                Core::Hash::StringID Name{};
+                bool IsImported = false;
+                bool IsDepth = false;
+                uint32_t InitializeCount = 0;
+                uint32_t AttachmentWrites = 0;
+            };
+            std::unordered_map<ResourceID, WriteSummary> writeSummaries;
+
+            for (const auto& pass : passes)
+            {
+                for (const auto& att : pass.Attachments)
+                {
+                    auto& summary = writeSummaries[att.Resource];
+                    summary.Name = att.ResourceName;
+                    summary.IsImported = att.IsImported;
+                    summary.IsDepth = att.IsDepth;
+                    ++summary.AttachmentWrites;
+                    if (att.LoadOp != VK_ATTACHMENT_LOAD_OP_LOAD)
+                        ++summary.InitializeCount;
+
+                    if (att.IsImported && att.ResourceName == Core::Hash::StringID{"Backbuffer"} &&
+                        std::string_view(pass.Name) != "Present.LDR")
+                    {
+                        Core::Log::Warn("RenderGraph validation: imported Backbuffer is written by '{}' instead of the dedicated Present stage.",
+                                        pass.Name);
+                    }
+                }
+            }
+
+            for (const auto& [resource, summary] : writeSummaries)
+            {
+                if (summary.IsImported)
+                    continue;
+
+                if (summary.InitializeCount > 1)
+                {
+                    Core::Log::Warn("RenderGraph validation: resource 0x{:08X} is re-initialized {} times in one frame; check for multiple first-writers.",
+                                    summary.Name.Value,
+                                    summary.InitializeCount);
+                }
+            }
+        }
+    }
+
     RenderSystem::RenderSystem(const RenderSystemConfig& config,
                                std::shared_ptr<RHI::VulkanDevice> device,
                                RHI::VulkanSwapchain& swapchain,
@@ -281,12 +427,57 @@ namespace Graphics
         const auto& pendingPick = m_Interaction.GetPendingPick();
         const auto& debugView = m_Interaction.GetDebugViewState();
 
-        // Frame setup pass — imports backbuffer and depth, creates HDR scene color target.
+        RenderPassContext ctx{
+            m_RenderGraph,
+            blackboard,
+            scene,
+            assetManager,
+            m_GeometryStorage,
+            m_MaterialSystem,
+            m_GpuScene,
+            frameIndex,
+            extent,
+            {},
+            imageIndex,
+            m_Swapchain.GetImageFormat(),
+            m_Presentation.GetDepthBuffer().GetFormat(),
+            VK_FORMAT_R16G16B16A16_SFLOAT,
+            m_Renderer,
+            m_GlobalResources.GetCameraUBO(),
+            m_GlobalResources.GetGlobalDescriptorSet(),
+            m_GlobalResources.GetDynamicUBOOffset(frameIndex),
+            m_GlobalResources.GetBindlessSystem(),
+            {pendingPick.Pending, pendingPick.X, pendingPick.Y},
+            {
+                debugView.Enabled, debugView.ShowInViewport, debugView.DisableCulling, debugView.SelectedResource,
+                debugView.DepthNear, debugView.DepthFar
+            },
+            m_LastDebugImages,
+            m_LastDebugPasses,
+            camera.ViewMatrix,
+            camera.ProjectionMatrix,
+            m_Interaction.GetReadbackBuffer(frameIndex),
+            m_DebugDraw
+        };
+
+        if (m_ActivePipeline)
+            ctx.Recipe = m_ActivePipeline->BuildFrameRecipe(ctx);
+        else
+        {
+            ctx.Recipe.Depth = true;
+            ctx.Recipe.EntityId = pendingPick.Pending || HasSelectionWork(scene) || debugView.Enabled;
+            ctx.Recipe.DebugVisualization = debugView.Enabled;
+            ctx.Recipe.Selection = HasSelectionWork(scene);
+            ctx.Recipe.LightingPath = FrameLightingPath::Forward;
+            ctx.Recipe.Post = true;
+            ctx.Recipe.SceneColorLDR = true;
+        }
+        m_LastFrameRecipe = ctx.Recipe;
+
         struct FrameSetupData
         {
+            std::array<RGResourceHandle, 10> Resources{};
             RGResourceHandle Backbuffer;
-            RGResourceHandle Depth;
-            RGResourceHandle SceneColor;
         };
         m_RenderGraph.AddPass<FrameSetupData>("FrameSetup",
                                               [&](FrameSetupData& data, RGBuilder& builder)
@@ -298,30 +489,45 @@ namespace Graphics
                                                       m_Presentation.GetBackbufferFormat(),
                                                       extent,
                                                       VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-
-                                                  auto& depthImg = m_Presentation.GetDepthBuffer();
-                                                  data.Depth = builder.ImportTexture(
-                                                      "SceneDepth"_id,
-                                                      depthImg.GetHandle(),
-                                                      depthImg.GetView(),
-                                                      depthImg.GetFormat(),
-                                                      extent,
-                                                      VK_IMAGE_LAYOUT_UNDEFINED);
-
-                                                  // HDR scene color — scene passes render here,
-                                                  // post-processing reads it for tone mapping.
-                                                  RGTextureDesc hdrDesc{};
-                                                  hdrDesc.Width = extent.width;
-                                                  hdrDesc.Height = extent.height;
-                                                  hdrDesc.Format = VK_FORMAT_R16G16B16A16_SFLOAT;
-                                                  hdrDesc.Usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT
-                                                                | VK_IMAGE_USAGE_SAMPLED_BIT;
-                                                  hdrDesc.Aspect = VK_IMAGE_ASPECT_COLOR_BIT;
-                                                  data.SceneColor = builder.CreateTexture("SceneColor"_id, hdrDesc);
-
                                                   blackboard.Add("Backbuffer"_id, data.Backbuffer);
-                                                  blackboard.Add("SceneDepth"_id, data.Depth);
-                                                  blackboard.Add("SceneColor"_id, data.SceneColor);
+
+                                                  for (RenderResource resource : {
+                                                           RenderResource::SceneDepth,
+                                                           RenderResource::EntityId,
+                                                           RenderResource::PrimitiveId,
+                                                           RenderResource::SceneNormal,
+                                                           RenderResource::Albedo,
+                                                           RenderResource::Material0,
+                                                           RenderResource::SceneColorHDR,
+                                                           RenderResource::SceneColorLDR,
+                                                           RenderResource::SelectionMask,
+                                                           RenderResource::SelectionOutline,
+                                                       })
+                                                  {
+                                                      if (!ctx.Recipe.Requires(resource))
+                                                          continue;
+
+                                                      const auto index = static_cast<size_t>(resource);
+                                                      const auto def = GetRenderResourceDefinition(resource);
+                                                      if (def.Lifetime == RenderResourceLifetime::Imported)
+                                                      {
+                                                          auto& depthImg = m_Presentation.GetDepthBuffer();
+                                                          data.Resources[index] = builder.ImportTexture(
+                                                              def.Name,
+                                                              depthImg.GetHandle(),
+                                                              depthImg.GetView(),
+                                                              depthImg.GetFormat(),
+                                                              extent,
+                                                              VK_IMAGE_LAYOUT_UNDEFINED);
+                                                      }
+                                                      else
+                                                      {
+                                                          data.Resources[index] = builder.CreateTexture(
+                                                              def.Name,
+                                                              BuildRenderResourceTextureDesc(resource, ctx));
+                                                      }
+                                                      blackboard.Add(resource, data.Resources[index]);
+                                                  }
                                               },
                                               [](const FrameSetupData&, const RGRegistry&, VkCommandBuffer)
                                               {
@@ -352,42 +558,6 @@ namespace Graphics
                                                    if (m_GpuScene) m_GpuScene->Sync(cmd, frameIndex);
                                                });
 
-        // Let the active pipeline register its passes.
-        RenderPassContext ctx{
-            m_RenderGraph,
-            blackboard,
-            scene,
-            assetManager,
-            m_GeometryStorage,
-            m_MaterialSystem,
-            m_GpuScene,
-            frameIndex,
-            extent,
-            imageIndex,
-            m_Swapchain.GetImageFormat(),
-            m_Presentation.GetDepthBuffer().GetFormat(),
-            m_Renderer,
-            m_GlobalResources.GetCameraUBO(),
-            m_GlobalResources.GetGlobalDescriptorSet(),
-            m_GlobalResources.GetDynamicUBOOffset(frameIndex),
-            m_GlobalResources.GetBindlessSystem(),
-            {pendingPick.Pending, pendingPick.X, pendingPick.Y},
-            {
-                debugView.Enabled, debugView.ShowInViewport, debugView.DisableCulling, debugView.SelectedResource,
-                debugView.DepthNear, debugView.DepthFar
-            },
-            m_LastDebugImages,
-            m_LastDebugPasses,
-            camera.ViewMatrix,
-            camera.ProjectionMatrix,
-            m_Interaction.GetReadbackBuffer(frameIndex),
-            /* DebugDrawPtr */ m_DebugDraw
-        };
-
-        // IMPORTANT: RenderGraph executes passes on worker threads *after* BuildGraph() returns.
-        // Any execute lambda that captures RenderPassContext by reference will dangle.
-        // We copy the context into RenderGraph's per-frame ScopeStack so captures can safely
-        // take a pointer/reference to a stable object for the lifetime of this graph.
         auto stable = m_FrameScope.New<RenderPassContext>(ctx);
         if (stable)
         {
@@ -411,6 +581,11 @@ namespace Graphics
 
         m_LastDebugPasses = m_RenderGraph.BuildDebugPassList();
         m_LastDebugImages = m_RenderGraph.BuildDebugImageList();
+
+        ValidateCompiledGraph(m_LastFrameRecipe, m_LastDebugPasses, m_LastDebugImages);
+
+        if (m_Config.EnableRenderAuditLogging)
+            LogRenderAudit(m_LastDebugPasses, m_LastDebugImages);
 
         if (m_ActivePipeline)
             m_ActivePipeline->PostCompile(frameIndex, m_LastDebugImages, m_LastDebugPasses);

@@ -10,6 +10,7 @@ module;
 #include <utility>
 
 module Graphics:RenderGraph.Impl;
+
 import :RenderGraph;
 import Core.Hash;
 import Core.Memory;
@@ -91,6 +92,8 @@ namespace Graphics
         auto& resNode = m_Graph.m_ResourcePool[resource.ID];
         if (resNode.StartPass == ~0u) resNode.StartPass = m_PassIndex;
         resNode.EndPass = std::max(resNode.EndPass, m_PassIndex);
+        if (resNode.FirstReadPass == ~0u) resNode.FirstReadPass = m_PassIndex;
+        resNode.LastReadPass = m_PassIndex;
         return resource;
     }
 
@@ -111,6 +114,8 @@ namespace Graphics
         auto& resNode = m_Graph.m_ResourcePool[resource.ID];
         if (resNode.StartPass == ~0u) resNode.StartPass = m_PassIndex;
         resNode.EndPass = std::max(resNode.EndPass, m_PassIndex);
+        if (resNode.FirstWritePass == ~0u) resNode.FirstWritePass = m_PassIndex;
+        resNode.LastWritePass = m_PassIndex;
         return resource;
     }
 
@@ -339,37 +344,20 @@ namespace Graphics
         // 2. Query Requirements
         VkMemoryRequirements reqs = unboundImg.GetMemoryRequirements();
 
-        // 3. Find Memory
-        VkDeviceMemory memory = VK_NULL_HANDLE;
-        VkDeviceSize offset = 0;
-
-        // AllocateOrReuseMemory now returns the memory handle but also stores the sub-offset in the chunk.
-        // For now we bind at offset 0 unless we find a chunk with non-zero BaseOffset.
-        VkDeviceMemory memHandle = AllocateOrReuseMemory(reqs, node.StartPass, node.EndPass, frameIndex);
-        memory = memHandle;
-
-        // NOTE: our current API returns only VkDeviceMemory; ResolveImage binds offset=0.
-        // We upgrade by looking up the last chunk we just allocated in the pool.
-        // This is safe because AllocateOrReuseMemory always pushes the new chunk at the end.
-        if (memory != VK_NULL_HANDLE)
+        // 3. Find Memory + exact suballocation offset
+        const TransientMemoryBinding binding = AllocateOrReuseMemory(reqs, node.StartPass, node.EndPass, frameIndex);
+        if (!binding.IsValid())
         {
-            auto& bucket = m_MemoryPool[reqs.memoryTypeBits];
-            if (!bucket.empty())
-            {
-                // Find the chunk matching this memory for current frame.
-                for (auto it = bucket.rbegin(); it != bucket.rend(); ++it)
-                {
-                    if ((*it)->Memory == memory && (*it)->LastFrameIndex == frameIndex)
-                    {
-                        offset = (*it)->BaseOffset;
-                        break;
-                    }
-                }
-            }
+            Core::Log::Error("RenderGraph: Failed to acquire transient memory binding for image resource 0x{:08X} ({}x{}, format={}).",
+                             node.Name.Value,
+                             node.Extent.width,
+                             node.Extent.height,
+                             static_cast<int>(node.Format));
+            return nullptr;
         }
 
-        // 4. Bind with offset
-        unboundImg.BindMemory(memory, offset);
+        // 4. Bind with the exact offset returned by the allocator
+        unboundImg.BindMemory(binding.Memory, binding.Offset);
 
         // 5. Move to Frame Scope
         auto allocation = m_Scope.New<RHI::VulkanImage>(std::move(unboundImg));
@@ -425,8 +413,10 @@ namespace Graphics
         return stack.Buffers.back().Resource.get();
     }
 
-    VkDeviceMemory RenderGraph::AllocateOrReuseMemory(const VkMemoryRequirements& reqs, uint32_t startPass,
-                                                      uint32_t endPass, uint32_t frameIndex)
+    RenderGraph::TransientMemoryBinding RenderGraph::AllocateOrReuseMemory(const VkMemoryRequirements& reqs,
+                                                                           uint32_t startPass,
+                                                                           uint32_t endPass,
+                                                                           uint32_t frameIndex)
     {
         // 1. Look for a compatible bucket (Memory Type Bits)
         auto& bucket = m_MemoryPool[reqs.memoryTypeBits];
@@ -458,7 +448,7 @@ namespace Graphics
             if (!overlaps)
             {
                 chunk->AllocatedIntervals.emplace_back(startPass, endPass);
-                return chunk->Memory;
+                return {chunk->Memory, chunk->BaseOffset, chunk->Size};
             }
         }
 
@@ -466,14 +456,14 @@ namespace Graphics
         if (!m_TransientAllocator)
         {
             Core::Log::Error("RenderGraph: TransientAllocator not set. Call RenderGraph::SetTransientAllocator().");
-            return VK_NULL_HANDLE;
+            return {};
         }
 
         auto allocation = m_TransientAllocator->Allocate(reqs, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
         if (!allocation.IsValid())
         {
             Core::Log::Error("RenderGraph: Failed to allocate transient memory.");
-            return VK_NULL_HANDLE;
+            return {};
         }
 
         auto newChunk = std::make_unique<MemoryChunk>();
@@ -485,10 +475,9 @@ namespace Graphics
         newChunk->LastUsedGlobalFrame = globalFrame;
         newChunk->AllocatedIntervals.emplace_back(startPass, endPass);
 
-        VkDeviceMemory result = newChunk->Memory;
+        const TransientMemoryBinding binding{newChunk->Memory, newChunk->BaseOffset, newChunk->Size};
         bucket.push_back(std::move(newChunk));
-
-        return result;
+        return binding;
     }
 
     namespace
@@ -625,6 +614,19 @@ namespace Graphics
             {
                 if (att->ID >= m_ActiveResourceCount) continue;
                 auto& res = m_ResourcePool[att->ID];
+
+                if (att->Info.LoadOp == VK_ATTACHMENT_LOAD_OP_LOAD)
+                {
+                    const bool hasPriorWrite = (res.FirstWritePass != ~0u && res.FirstWritePass < passIdx) ||
+                                               (res.Type == ResourceType::Import);
+                    if (!hasPriorWrite)
+                    {
+                        Core::Log::Warn(
+                            "RenderGraph: pass '{}' uses LOAD on resource 0x{:08X} without a guaranteed prior write in this frame.",
+                            pass.Name,
+                            res.Name.Value);
+                    }
+                }
 
                 if (att->IsDepth)
                 {
@@ -961,7 +963,13 @@ namespace Graphics
             {
                 if (att->ID >= m_ResourcePool.size()) continue;
                 const auto& res = m_ResourcePool[att->ID];
-                dp.Attachments.push_back({res.Name, att->ID, att->IsDepth});
+                dp.Attachments.push_back({res.Name,
+                                          att->ID,
+                                          res.Format,
+                                          att->Info.LoadOp,
+                                          att->Info.StoreOp,
+                                          att->IsDepth,
+                                          res.Type == ResourceType::Import});
             }
             out.push_back(std::move(dp));
         }
@@ -989,6 +997,11 @@ namespace Graphics
             di.CurrentLayout = res.CurrentLayout;
             di.Image = res.PhysicalImage;
             di.View = res.PhysicalView;
+            di.IsImported = (res.Type == ResourceType::Import);
+            di.FirstWritePass = res.FirstWritePass;
+            di.LastWritePass = res.LastWritePass;
+            di.FirstReadPass = res.FirstReadPass;
+            di.LastReadPass = res.LastReadPass;
             di.StartPass = res.StartPass;
             di.EndPass = res.EndPass;
 

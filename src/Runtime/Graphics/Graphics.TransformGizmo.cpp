@@ -11,7 +11,8 @@ module;
 #include <glm/gtx/quaternion.hpp>
 #include <entt/entity/registry.hpp>
 
-module Graphics;
+module Graphics:TransformGizmo.Impl;
+
 import :TransformGizmo;
 import :DebugDraw;
 import :Camera;
@@ -116,7 +117,7 @@ bool TransformGizmo::ComputePivot(entt::registry& registry)
     glm::vec3 centroid{0.0f};
     int count = 0;
 
-    for (auto [entity, sel, transform] : view.each())
+    for (auto [entity, transform] : view.each())
     {
         EntityTransformCache cache;
         cache.Entity = entity;

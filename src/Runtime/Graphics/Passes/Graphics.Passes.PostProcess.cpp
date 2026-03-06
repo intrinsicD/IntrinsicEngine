@@ -4,6 +4,7 @@ module;
 #include <span>
 #include <string>
 #include <cstring>
+#include <glm/glm.hpp>
 
 #include "RHI.Vulkan.hpp"
 
@@ -59,6 +60,26 @@ namespace Graphics::Passes
         // Allocate per-frame descriptor sets.
         AllocatePerFrameSets<3>(descriptorPool, m_ToneMapSetLayout, m_ToneMapSets);
         AllocatePerFrameSets<3>(descriptorPool, m_FXAASetLayout, m_FXAASets);
+
+        m_DummySampled = std::make_unique<RHI::VulkanImage>(
+            *m_Device, 1, 1, 1,
+            VK_FORMAT_R16G16B16A16_SFLOAT,
+            VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+            VK_IMAGE_ASPECT_COLOR_BIT);
+        TransitionImageToShaderRead(*m_Device, m_DummySampled->GetHandle(), VK_IMAGE_ASPECT_COLOR_BIT);
+
+        for (auto& set : m_ToneMapSets)
+        {
+            UpdateImageDescriptor(m_Device->GetLogicalDevice(), set, 0,
+                                  m_LinearSampler, m_DummySampled->GetView(),
+                                  VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        }
+        for (auto& set : m_FXAASets)
+        {
+            UpdateImageDescriptor(m_Device->GetLogicalDevice(), set, 0,
+                                  m_LinearSampler, m_DummySampled->GetView(),
+                                  VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        }
     }
 
     // =====================================================================
@@ -145,9 +166,9 @@ namespace Graphics::Passes
             return;
         }
 
-        const RGResourceHandle sceneColor = ctx.Blackboard.Get("SceneColor"_id);
-        const RGResourceHandle backbuffer = ctx.Blackboard.Get("Backbuffer"_id);
-        if (!sceneColor.IsValid() || !backbuffer.IsValid())
+        const RGResourceHandle sceneColor = ctx.Blackboard.Get(RenderResource::SceneColorHDR);
+        const RGResourceHandle sceneColorLdr = ctx.Blackboard.Get(RenderResource::SceneColorLDR);
+        if (!sceneColor.IsValid() || !sceneColorLdr.IsValid())
             return;
 
         // Lazy pipeline creation once we know swapchain format.
@@ -159,7 +180,8 @@ namespace Graphics::Passes
         if (!m_ToneMapPipeline)
             return;
 
-        const uint32_t fi = ctx.FrameIndex;
+        constexpr uint32_t kFrames = RHI::VulkanDevice::GetFramesInFlight();
+        const uint32_t fi = ctx.FrameIndex % kFrames;
         const VkExtent2D resolution = ctx.Resolution;
         const bool fxaaEnabled = m_Settings.FXAAEnabled && m_FXAAPipeline;
 
@@ -172,7 +194,7 @@ namespace Graphics::Passes
 
         if (fxaaEnabled)
         {
-            // --- Two-pass: ToneMap → PostLdr, FXAA → Backbuffer ---
+            // --- Two-pass: ToneMap -> PostLdrTemp, FXAA -> SceneColorLDR ---
 
             // Create transient LDR intermediate.
             RGTextureDesc ldrDesc{};
@@ -193,11 +215,11 @@ namespace Graphics::Passes
             ctx.Graph.AddPass<ToneMapData>("Post.ToneMap",
                 [&](ToneMapData& data, RGBuilder& builder)
                 {
-                    postLdr = builder.CreateTexture("PostLdr"_id, ldrDesc);
+                    postLdr = builder.CreateTexture("PostLdrTemp"_id, ldrDesc);
 
                     data.Src = builder.Read(sceneColor,
                                             VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-                                            VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
+                                            VK_ACCESS_2_SHADER_SAMPLED_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT);
 
                     RGAttachmentInfo colorInfo{};
                     colorInfo.LoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -206,8 +228,6 @@ namespace Graphics::Passes
 
                     m_LastSceneColorHandle = data.Src;
                     m_LastPostLdrHandle = data.Dst;
-
-                    ctx.Blackboard.Add("PostLdr"_id, postLdr);
                 },
                 [this, fi, resolution, exposure, toneOp]
                 (const ToneMapData&, const RGRegistry&, VkCommandBuffer cmd)
@@ -215,6 +235,7 @@ namespace Graphics::Passes
                     SetViewportScissor(cmd, resolution);
                     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                       m_ToneMapPipeline->GetHandle());
+                    vkCmdSetPrimitiveTopology(cmd, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
                     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                             m_ToneMapPipeline->GetLayout(),
                                             0, 1, &m_ToneMapSets[fi], 0, nullptr);
@@ -239,12 +260,12 @@ namespace Graphics::Passes
                 {
                     data.Src = builder.Read(postLdr,
                                             VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-                                            VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
+                                            VK_ACCESS_2_SHADER_SAMPLED_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT);
 
                     RGAttachmentInfo colorInfo{};
                     colorInfo.LoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
                     colorInfo.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
-                    data.Dst = builder.WriteColor(backbuffer, colorInfo);
+                    data.Dst = builder.WriteColor(sceneColorLdr, colorInfo);
                 },
                 [this, fi, resolution, fxaaContrast, fxaaRelative, fxaaSubpixel]
                 (const FXAAData&, const RGRegistry&, VkCommandBuffer cmd)
@@ -252,6 +273,7 @@ namespace Graphics::Passes
                     SetViewportScissor(cmd, resolution);
                     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                       m_FXAAPipeline->GetHandle());
+                    vkCmdSetPrimitiveTopology(cmd, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
                     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                             m_FXAAPipeline->GetLayout(),
                                             0, 1, &m_FXAASets[fi], 0, nullptr);
@@ -275,7 +297,7 @@ namespace Graphics::Passes
         }
         else
         {
-            // --- Single pass: ToneMap → Backbuffer ---
+            // --- Single pass: ToneMap -> SceneColorLDR ---
             struct ToneMapData
             {
                 RGResourceHandle Src;
@@ -287,12 +309,12 @@ namespace Graphics::Passes
                 {
                     data.Src = builder.Read(sceneColor,
                                             VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-                                            VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
+                                            VK_ACCESS_2_SHADER_SAMPLED_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT);
 
                     RGAttachmentInfo colorInfo{};
                     colorInfo.LoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
                     colorInfo.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
-                    data.Dst = builder.WriteColor(backbuffer, colorInfo);
+                    data.Dst = builder.WriteColor(sceneColorLdr, colorInfo);
 
                     m_LastSceneColorHandle = data.Src;
                     m_LastPostLdrHandle = {};
@@ -303,6 +325,7 @@ namespace Graphics::Passes
                     SetViewportScissor(cmd, resolution);
                     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                       m_ToneMapPipeline->GetHandle());
+                    vkCmdSetPrimitiveTopology(cmd, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
                     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                             m_ToneMapPipeline->GetLayout(),
                                             0, 1, &m_ToneMapSets[fi], 0, nullptr);
@@ -325,6 +348,9 @@ namespace Graphics::Passes
     {
         if (!m_Device || !m_LinearSampler)
             return;
+
+        constexpr uint32_t kFrames = RHI::VulkanDevice::GetFramesInFlight();
+        frameIndex %= kFrames;
 
         // Update tone map descriptor: bind SceneColor.
         if (m_LastSceneColorHandle.IsValid())
@@ -370,6 +396,7 @@ namespace Graphics::Passes
 
         m_ToneMapPipeline.reset();
         m_FXAAPipeline.reset();
+        m_DummySampled.reset();
 
         if (m_LinearSampler != VK_NULL_HANDLE)
         {

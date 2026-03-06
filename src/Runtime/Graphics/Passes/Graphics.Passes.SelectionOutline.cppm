@@ -45,8 +45,8 @@ export namespace Graphics::Passes
     private:
         struct OutlinePassData
         {
-            RGResourceHandle PickID;
-            RGResourceHandle Backbuffer;
+            RGResourceHandle EntityId;
+            RGResourceHandle Target;
         };
 
         RHI::VulkanDevice* m_Device = nullptr;

@@ -3,6 +3,8 @@ module;
 #include <unordered_map>
 #include <memory>
 #include <span>
+#include <array>
+#include <optional>
 #include <glm/glm.hpp>
 
 #include "RHI.Vulkan.hpp"
@@ -26,23 +28,191 @@ export namespace Graphics
     // Forward declaration (keeps include graph minimal).
     class GPUScene;
 
+    enum class RenderResource : uint8_t
+    {
+        SceneDepth,
+        EntityId,
+        PrimitiveId,
+        SceneNormal,
+        Albedo,
+        Material0,
+        SceneColorHDR,
+        SceneColorLDR,
+        SelectionMask,
+        SelectionOutline,
+    };
+
+    enum class RenderResourceFormatSource : uint8_t
+    {
+        Fixed,
+        Swapchain,
+        Depth,
+    };
+
+    enum class RenderResourceLifetime : uint8_t
+    {
+        Imported,
+        FrameTransient,
+    };
+
+    enum class FrameLightingPath : uint8_t
+    {
+        None,
+        Forward,
+        Deferred,
+        Hybrid,
+    };
+
+    struct RenderResourceDefinition
+    {
+        RenderResource Id{};
+        Core::Hash::StringID Name{};
+        VkFormat FixedFormat = VK_FORMAT_UNDEFINED;
+        RenderResourceFormatSource FormatSource = RenderResourceFormatSource::Fixed;
+        VkImageUsageFlags Usage = 0;
+        VkImageAspectFlags Aspect = 0;
+        RenderResourceLifetime Lifetime = RenderResourceLifetime::FrameTransient;
+        bool Optional = true;
+    };
+
+    [[nodiscard]] constexpr RenderResourceDefinition GetRenderResourceDefinition(RenderResource resource)
+    {
+        using enum RenderResource;
+        switch (resource)
+        {
+        case SceneDepth:
+            return {resource, "SceneDepth"_id, VK_FORMAT_UNDEFINED, RenderResourceFormatSource::Depth,
+                    VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                    VK_IMAGE_ASPECT_DEPTH_BIT, RenderResourceLifetime::Imported, false};
+        case EntityId:
+            return {resource, "EntityId"_id, VK_FORMAT_R32_UINT, RenderResourceFormatSource::Fixed,
+                    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                    VK_IMAGE_ASPECT_COLOR_BIT, RenderResourceLifetime::FrameTransient, true};
+        case PrimitiveId:
+            return {resource, "PrimitiveId"_id, VK_FORMAT_R32_UINT, RenderResourceFormatSource::Fixed,
+                    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                    VK_IMAGE_ASPECT_COLOR_BIT, RenderResourceLifetime::FrameTransient, true};
+        case SceneNormal:
+            return {resource, "SceneNormal"_id, VK_FORMAT_R16G16B16A16_SFLOAT, RenderResourceFormatSource::Fixed,
+                    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                    VK_IMAGE_ASPECT_COLOR_BIT, RenderResourceLifetime::FrameTransient, true};
+        case Albedo:
+            return {resource, "Albedo"_id, VK_FORMAT_R8G8B8A8_UNORM, RenderResourceFormatSource::Fixed,
+                    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                    VK_IMAGE_ASPECT_COLOR_BIT, RenderResourceLifetime::FrameTransient, true};
+        case Material0:
+            return {resource, "Material0"_id, VK_FORMAT_R16G16B16A16_SFLOAT, RenderResourceFormatSource::Fixed,
+                    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                    VK_IMAGE_ASPECT_COLOR_BIT, RenderResourceLifetime::FrameTransient, true};
+        case SceneColorHDR:
+            return {resource, "SceneColorHDR"_id, VK_FORMAT_R16G16B16A16_SFLOAT, RenderResourceFormatSource::Fixed,
+                    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                    VK_IMAGE_ASPECT_COLOR_BIT, RenderResourceLifetime::FrameTransient, false};
+        case SceneColorLDR:
+            return {resource, "SceneColorLDR"_id, VK_FORMAT_UNDEFINED, RenderResourceFormatSource::Swapchain,
+                    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
+                        VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+                    VK_IMAGE_ASPECT_COLOR_BIT, RenderResourceLifetime::FrameTransient, true};
+        case SelectionMask:
+            return {resource, "SelectionMask"_id, VK_FORMAT_R8_UNORM, RenderResourceFormatSource::Fixed,
+                    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                    VK_IMAGE_ASPECT_COLOR_BIT, RenderResourceLifetime::FrameTransient, true};
+        case SelectionOutline:
+            return {resource, "SelectionOutline"_id, VK_FORMAT_UNDEFINED, RenderResourceFormatSource::Swapchain,
+                    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                    VK_IMAGE_ASPECT_COLOR_BIT, RenderResourceLifetime::FrameTransient, true};
+        }
+        return {};
+    }
+
+    [[nodiscard]] constexpr Core::Hash::StringID GetRenderResourceName(RenderResource resource)
+    {
+        return GetRenderResourceDefinition(resource).Name;
+    }
+
+    [[nodiscard]] constexpr VkFormat ResolveRenderResourceFormat(RenderResource resource,
+                                                                 VkFormat swapchainFormat,
+                                                                 VkFormat depthFormat)
+    {
+        const auto def = GetRenderResourceDefinition(resource);
+        switch (def.FormatSource)
+        {
+        case RenderResourceFormatSource::Fixed: return def.FixedFormat;
+        case RenderResourceFormatSource::Swapchain: return swapchainFormat;
+        case RenderResourceFormatSource::Depth: return depthFormat;
+        }
+        return VK_FORMAT_UNDEFINED;
+    }
+
+    [[nodiscard]] inline std::optional<RenderResource> TryGetRenderResourceByName(Core::Hash::StringID name)
+    {
+        for (RenderResource resource : {
+                 RenderResource::SceneDepth,
+                 RenderResource::EntityId,
+                 RenderResource::PrimitiveId,
+                 RenderResource::SceneNormal,
+                 RenderResource::Albedo,
+                 RenderResource::Material0,
+                 RenderResource::SceneColorHDR,
+                 RenderResource::SceneColorLDR,
+                 RenderResource::SelectionMask,
+                 RenderResource::SelectionOutline,
+             })
+        {
+            if (GetRenderResourceName(resource) == name)
+                return resource;
+        }
+        return std::nullopt;
+    }
+
+    struct FrameRecipe
+    {
+        bool Depth = false;
+        bool EntityId = false;
+        bool PrimitiveId = false;
+        bool Normals = false;
+        bool MaterialChannels = false;
+        bool Selection = false;
+        bool Post = false;
+        bool DebugVisualization = false;
+        bool SceneColorLDR = false;
+        FrameLightingPath LightingPath = FrameLightingPath::None;
+
+        [[nodiscard]] bool Requires(RenderResource resource) const
+        {
+            using enum RenderResource;
+            switch (resource)
+            {
+            case SceneDepth: return Depth;
+            case EntityId: return this->EntityId;
+            case PrimitiveId: return this->PrimitiveId;
+            case SceneNormal: return Normals;
+            case Albedo:
+            case Material0: return MaterialChannels;
+            case SceneColorHDR: return LightingPath != FrameLightingPath::None || Post;
+            case SceneColorLDR: return this->SceneColorLDR;
+            case SelectionMask:
+            case SelectionOutline: return Selection;
+            }
+            return false;
+        }
+    };
+
     // ---------------------------------------------------------------------
     // RenderBlackboard
     // ---------------------------------------------------------------------
-    // A tiny, frame-local dictionary for sharing RenderGraph resource handles between features.
-    //
-    // Contract:
-    // - Keys are stable hashed IDs (StringID) to avoid per-frame allocations.
-    // - Values are lightweight RenderGraph handles (no ownership).
-    // - Blackboard is reset/overwritten by the active pipeline each frame.
     struct RenderBlackboard
     {
         std::unordered_map<Core::Hash::StringID, RGResourceHandle> Resources;
 
-
         void Add(Core::Hash::StringID name, RGResourceHandle handle)
         {
             Resources[name] = handle;
+        }
+
+        void Add(RenderResource resource, RGResourceHandle handle)
+        {
+            Add(GetRenderResourceName(resource), handle);
         }
 
         [[nodiscard]] RGResourceHandle Get(Core::Hash::StringID name) const
@@ -50,6 +220,11 @@ export namespace Graphics
             if (auto it = Resources.find(name); it != Resources.end())
                 return it->second;
             return {};
+        }
+
+        [[nodiscard]] RGResourceHandle Get(RenderResource resource) const
+        {
+            return Get(GetRenderResourceName(resource));
         }
     };
 
@@ -73,6 +248,7 @@ export namespace Graphics
         // Frame
         uint32_t FrameIndex = 0;
         VkExtent2D Resolution{};
+        FrameRecipe Recipe{};
 
         // Swapchain/backbuffer import context
         uint32_t SwapchainImageIndex = 0;
@@ -82,7 +258,6 @@ export namespace Graphics
         VkFormat DepthFormat = VK_FORMAT_UNDEFINED;
 
         // HDR scene color format for scene passes (Surface, Line, Point).
-        // R16G16B16A16_SFLOAT when HDR pipeline is active.
         VkFormat SceneColorFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
 
         // Command submission helpers
@@ -91,11 +266,10 @@ export namespace Graphics
         // Global GPU state
         RHI::VulkanBuffer* GlobalCameraUBO = nullptr;
         VkDescriptorSet GlobalDescriptorSet = VK_NULL_HANDLE;
-        size_t GlobalCameraDynamicOffset = 0; // byte offset (dynamic UBO)
+        size_t GlobalCameraDynamicOffset = 0;
 
         RHI::BindlessDescriptorSystem& Bindless;
 
-        // Interaction state
         struct PickRequestState
         {
             bool Pending = false;
@@ -103,35 +277,45 @@ export namespace Graphics
             uint32_t Y = 0;
         } PickRequest;
 
-        // Debug state
         struct DebugState
         {
             bool Enabled = false;
             bool ShowInViewport = false;
             bool DisableCulling = false;
-            Core::Hash::StringID SelectedResource = Core::Hash::StringID{"PickID"};
+            Core::Hash::StringID SelectedResource = GetRenderResourceName(RenderResource::EntityId);
             float DepthNear = 0.1f;
             float DepthFar = 1000.0f;
         } Debug;
 
-        // Previous frame compiled debug lists (used because features run before compile).
         std::span<const RenderGraphDebugImage> PrevFrameDebugImages{};
         std::span<const RenderGraphDebugPass> PrevFrameDebugPasses{};
 
-        // CPU camera matrices for passes that need analytic camera data (e.g., frustum culling).
-        // These mirror what is uploaded to RHI::CameraBufferObject each frame.
         glm::mat4 CameraView{1.0f};
         glm::mat4 CameraProj{1.0f};
 
-        // Picking readback destination for *this frame slot* (owned by RenderSystem).
-        // The PickingPass uses this for vkCmdCopyImageToBuffer.
         RHI::VulkanBuffer* PickReadbackBuffer = nullptr;
-
-        // Immediate-mode debug drawing accumulator.
-        // Populated by ECS systems and other subsystems before rendering.
-        // Consumed by LinePass during graph setup.
         DebugDraw* DebugDrawPtr = nullptr;
     };
+
+    [[nodiscard]] inline RGTextureDesc BuildRenderResourceTextureDesc(RenderResource resource,
+                                                                      const RenderPassContext& ctx)
+    {
+        const auto def = GetRenderResourceDefinition(resource);
+        RGTextureDesc desc{};
+        desc.Width = ctx.Resolution.width;
+        desc.Height = ctx.Resolution.height;
+        desc.Format = ResolveRenderResourceFormat(resource, ctx.SwapchainFormat, ctx.DepthFormat);
+        desc.Usage = def.Usage;
+        desc.Aspect = def.Aspect;
+        return desc;
+    }
+
+    [[nodiscard]] inline RGResourceHandle GetPresentationTarget(const RenderPassContext& ctx)
+    {
+        if (const auto ldr = ctx.Blackboard.Get(RenderResource::SceneColorLDR); ldr.IsValid())
+            return ldr;
+        return ctx.Blackboard.Get("Backbuffer"_id);
+    }
 
     // ---------------------------------------------------------------------
     // Feature interface
@@ -140,29 +324,19 @@ export namespace Graphics
     {
     public:
         virtual ~IRenderFeature() = default;
-
-        // Called once at startup (create pipelines, persistent GPU resources).
         virtual void Initialize(RHI::VulkanDevice& device,
                                 RHI::DescriptorAllocator& descriptorPool,
                                 RHI::DescriptorLayout& globalLayout) = 0;
-
-        // Called every frame to inject passes into the graph.
         virtual void AddPasses(RenderPassContext& ctx) = 0;
-
-        // Optional lifecycle.
         virtual void Shutdown() {}
         virtual void OnResize(uint32_t width, uint32_t height) { (void)width; (void)height; }
     };
 
-    // ---------------------------------------------------------------------
-    // RenderPipeline interface (owns features, hot-swappable)
-    // ---------------------------------------------------------------------
     class RenderPipeline
     {
     public:
         virtual ~RenderPipeline() = default;
 
-        // Called when this pipeline becomes active.
         virtual void Initialize(RHI::VulkanDevice& device,
                                 RHI::DescriptorAllocator& descriptorPool,
                                 RHI::DescriptorLayout& globalLayout,
@@ -170,13 +344,9 @@ export namespace Graphics
                                 PipelineLibrary& pipelineLibrary) = 0;
 
         virtual void Shutdown() {}
-
-        // Declare passes for this frame.
+        [[nodiscard]] virtual FrameRecipe BuildFrameRecipe(const RenderPassContext&) const { return {}; }
         virtual void SetupFrame(RenderPassContext& ctx) = 0;
-
         virtual void OnResize(uint32_t width, uint32_t height) { (void)width; (void)height; }
-
-        // Called after RenderGraph::Compile() but before Execute().
         virtual void PostCompile(uint32_t frameIndex,
                                  std::span<const RenderGraphDebugImage> debugImages,
                                  std::span<const RenderGraphDebugPass> debugPasses)
@@ -186,7 +356,6 @@ export namespace Graphics
             (void)debugPasses;
         }
 
-        // Access selection outline settings (returns nullptr if not supported by this pipeline)
         virtual Passes::SelectionOutlineSettings* GetSelectionOutlineSettings() { return nullptr; }
     };
 }

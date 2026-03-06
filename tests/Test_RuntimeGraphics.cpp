@@ -6,6 +6,7 @@
 #include <fstream>
 #include <array>
 #include <cstring>
+#include "RHI.Vulkan.hpp"
 
 import Graphics;
 import RHI;
@@ -30,6 +31,71 @@ TEST(Geometry, CpuDataToRequest)
     EXPECT_EQ(req.Normals.size(), 2);
     EXPECT_EQ(req.Aux.size(), 2);
     EXPECT_EQ(req.Indices.size(), 2);
+}
+
+TEST(RenderResources, CanonicalDefinitionsExposeExpectedContracts)
+{
+    using namespace Graphics;
+
+    const auto entityId = GetRenderResourceDefinition(RenderResource::EntityId);
+    EXPECT_EQ(entityId.Name, Core::Hash::StringID{"EntityId"});
+    EXPECT_EQ(entityId.FixedFormat, VK_FORMAT_R32_UINT);
+    EXPECT_EQ(entityId.Lifetime, RenderResourceLifetime::FrameTransient);
+    EXPECT_TRUE(entityId.Optional);
+
+    const auto sceneDepth = GetRenderResourceDefinition(RenderResource::SceneDepth);
+    EXPECT_EQ(sceneDepth.Name, Core::Hash::StringID{"SceneDepth"});
+    EXPECT_EQ(sceneDepth.FormatSource, RenderResourceFormatSource::Depth);
+    EXPECT_EQ(sceneDepth.Lifetime, RenderResourceLifetime::Imported);
+    EXPECT_FALSE(sceneDepth.Optional);
+
+    const auto sceneHdr = GetRenderResourceDefinition(RenderResource::SceneColorHDR);
+    EXPECT_EQ(sceneHdr.Name, Core::Hash::StringID{"SceneColorHDR"});
+    EXPECT_EQ(sceneHdr.FixedFormat, VK_FORMAT_R16G16B16A16_SFLOAT);
+    EXPECT_FALSE(sceneHdr.Optional);
+
+    EXPECT_EQ(TryGetRenderResourceByName(entityId.Name), RenderResource::EntityId);
+    EXPECT_EQ(TryGetRenderResourceByName(sceneHdr.Name), RenderResource::SceneColorHDR);
+    EXPECT_FALSE(TryGetRenderResourceByName(Core::Hash::StringID{"NotAResource"}).has_value());
+}
+
+TEST(RenderResources, DefaultPipelineRecipeAllocatesOnlyRequiredCanonicalTargets)
+{
+    using namespace Graphics;
+
+    DefaultPipelineRecipeInputs inputs{};
+    inputs.SurfacePassEnabled = true;
+    inputs.LinePassEnabled = true;
+    inputs.PointPassEnabled = false;
+    inputs.PickingPassEnabled = true;
+    inputs.PostProcessPassEnabled = true;
+    inputs.SelectionOutlinePassEnabled = true;
+    inputs.DebugViewPassEnabled = true;
+    inputs.ImGuiPassEnabled = true;
+    inputs.HasSelectionWork = true;
+    inputs.DebugViewEnabled = true;
+    inputs.DebugResource = GetRenderResourceName(RenderResource::Albedo);
+
+    const FrameRecipe recipe = BuildDefaultPipelineRecipe(inputs);
+
+    EXPECT_EQ(recipe.LightingPath, FrameLightingPath::Forward);
+    EXPECT_TRUE(recipe.Depth);
+    EXPECT_TRUE(recipe.EntityId);
+    EXPECT_TRUE(recipe.MaterialChannels);
+    EXPECT_TRUE(recipe.Post);
+    EXPECT_TRUE(recipe.SceneColorLDR);
+    EXPECT_TRUE(recipe.Selection);
+    EXPECT_TRUE(recipe.DebugVisualization);
+
+    EXPECT_TRUE(recipe.Requires(RenderResource::SceneDepth));
+    EXPECT_TRUE(recipe.Requires(RenderResource::EntityId));
+    EXPECT_TRUE(recipe.Requires(RenderResource::Albedo));
+    EXPECT_TRUE(recipe.Requires(RenderResource::Material0));
+    EXPECT_TRUE(recipe.Requires(RenderResource::SceneColorHDR));
+    EXPECT_TRUE(recipe.Requires(RenderResource::SceneColorLDR));
+    EXPECT_TRUE(recipe.Requires(RenderResource::SelectionOutline));
+    EXPECT_FALSE(recipe.Requires(RenderResource::PrimitiveId));
+    EXPECT_FALSE(recipe.Requires(RenderResource::SceneNormal));
 }
 
 // Full GPU test requires Vulkan Context, handled in Integration tests.

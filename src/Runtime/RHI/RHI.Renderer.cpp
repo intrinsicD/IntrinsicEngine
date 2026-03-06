@@ -1,7 +1,9 @@
 module;
-#include "RHI.Vulkan.hpp"
 #include <memory>
 #include <algorithm>
+#include <vector>
+
+#include "RHI.Vulkan.hpp"
 
 module RHI:Renderer.Impl;
 import :Renderer;

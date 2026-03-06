@@ -8,6 +8,7 @@
 
 import ECS;
 import Graphics;
+import Core.Input;
 
 // =============================================================================
 // TransformGizmo — Unit and Integration Tests

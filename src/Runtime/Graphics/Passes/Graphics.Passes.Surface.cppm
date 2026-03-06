@@ -243,7 +243,7 @@ export namespace Graphics::Passes
         [[nodiscard]] DrawStream BuildDrawStream(RenderPassContext& ctx);
 
         // Record a single raster pass that consumes the draw stream exactly once.
-        void AddRasterPass(RenderPassContext& ctx, RGResourceHandle backbuffer, RGResourceHandle depth, DrawStream&& stream);
+        void AddRasterPass(RenderPassContext& ctx, RGResourceHandle sceneColor, RGResourceHandle depth, DrawStream&& stream);
 
         // Legacy helpers (will be folded into BuildDrawStream/AddRasterPass).
         void AddStage1And2Passes(RenderPassContext& ctx, RGResourceHandle backbuffer, RGResourceHandle depth);

@@ -19,15 +19,41 @@ These primitive-owned passes feed later composition/overlay stages. There are no
 - CPU geometry authority is PropertySet-backed (`PointCloud::Cloud`, `Graph`, `Halfedge::Mesh`).
 - GPU rendering is BDA-driven from shared `GeometryGpuData` buffers.
 - Mesh/graph/point-cloud paths are equal peers in lifecycle, upload, and scheduling.
+- Frame construction is recipe-driven: resource allocation/import happens once in `FrameSetup`, then later passes only consume canonical blackboard handles.
+
+## Canonical Frame Resources
+
+The render graph blackboard exposes a fixed canonical resource vocabulary:
+
+| Resource | Format | Lifetime | Producer / Use |
+|----------|--------|----------|----------------|
+| `SceneDepth` | Swapchain/device depth format | Imported | Depth-tested scene + picking |
+| `EntityId` | `R32_UINT` | Frame transient | `PickingPass`, selection/debug sampling |
+| `PrimitiveId` | `R32_UINT` | Frame transient | Reserved for future primitive picking/debug |
+| `SceneNormal` | `R16G16B16A16_SFLOAT` | Frame transient | Reserved for future lighting/debug |
+| `Albedo` | `R8G8B8A8_UNORM` | Frame transient | Reserved for future material/debug |
+| `Material0` | `R16G16B16A16_SFLOAT` | Frame transient | Reserved for future material/debug |
+| `SceneColorHDR` | `R16G16B16A16_SFLOAT` | Frame transient | Geometry/lighting output |
+| `SceneColorLDR` | Swapchain format | Frame transient | Post-process + overlay composition target |
+| `SelectionMask` | `R8_UNORM` | Frame transient | Reserved for future outline mask split |
+| `SelectionOutline` | Swapchain format | Frame transient | Reserved for future standalone outline target |
+| `Backbuffer` | Swapchain format | Imported | Final presentation destination only |
+
+`FrameRecipe` determines which of these are allocated for a frame. Unused optional resources are not created.
 
 ## Pass Contract
 
-| Pass | Retained Source | Transient Source | Notes |
-|------|------------------|------------------|-------|
-| `SurfacePass` | `ECS::Surface::Component` + `GeometryGpuData` | `SubmitTriangle` buffer | Per-face attributes via face attribute BDA channel |
-| `LinePass` | `ECS::Line::Component` (`Geometry` + `EdgeView`) | `DebugDraw::GetLines()` / overlays | Edge topology sourced from PropertySets |
-| `PointPass` | `ECS::Point::Component` | `DebugDraw::GetPoints()` | Mode pipelines: FlatDisc, Surfel (future: EWA/Gaussian variants) |
-| `PostProcessPass` | `SceneColor` HDR intermediate | — | Tone mapping + optional FXAA, writes LDR presentation target |
+| Pass | Inputs | Outputs | Initialization / Ownership |
+|------|--------|---------|----------------------------|
+| `PickingPass` | `SceneDepth` | `EntityId` | Clears both; no swapchain ownership |
+| `SurfacePass` | `SceneDepth`, GPUScene buffers | `SceneColorHDR`, `SceneDepth` | First HDR writer; clears color+depth |
+| `LinePass` | `SceneColorHDR`, `SceneDepth` | `SceneColorHDR`, `SceneDepth` | Accumulates via `LOAD` onto scene targets |
+| `PointPass` | `SceneColorHDR`, `SceneDepth` | `SceneColorHDR`, `SceneDepth` | Accumulates via `LOAD` onto scene targets |
+| `PostProcessPass` | `SceneColorHDR` | `SceneColorLDR` | Initializes LDR target; internal temp when FXAA enabled |
+| `SelectionOutlinePass` | `EntityId`, presentation target | presentation target | Alpha-blends via `LOAD` |
+| `DebugViewPass` | selected sampled resource | `DebugViewRGBA`, optional presentation target | Writes preview image, optional viewport composite |
+| `ImGuiPass` | presentation target | presentation target | UI overlay via `LOAD` |
+| `Present` | `SceneColorLDR` | `Backbuffer` | Explicit final blit/copy |
 
 ## Data Contract (CPU -> GPU)
 
@@ -60,6 +86,14 @@ Position/topology changes may escalate to full re-upload; pure attribute changes
 6. `SelectionOutlinePass`
 7. `DebugViewPass`
 8. `ImGuiPass`
+9. `Present`
+
+## Validation / Audit Expectations
+
+- Render-graph introspection reports per-pass attachment metadata (resource name, format, load/store ops, imported flag).
+- Render-graph introspection reports per-resource first/last read and write pass indices.
+- Temporary audit logging may dump pass order, resource creation, transitions, and formats from `RenderSystem`.
+- Any pass using `LOAD` without a guaranteed earlier write in-frame or an imported resource should emit a warning.
 
 ## Robustness Requirements
 
@@ -68,12 +102,14 @@ Position/topology changes may escalate to full re-upload; pure attribute changes
 - Clamp line widths and point radii to safe ranges.
 - Condition EWA covariance (when active) and fall back safely if ill-conditioned.
 - Keep push constants within device limits (compile/runtime checks).
+- Keep backbuffer ownership explicit: only `FrameSetup` imports it, only `Present` finalizes it when `SceneColorLDR` exists.
 
 ## Performance Intent
 
 - CPU frame contribution target for rendering systems: under 2 ms.
 - Retained rendering avoids per-frame geometry rebuilds.
 - Transient paths use per-frame host-visible buffers with bounded growth and telemetry overflow counters.
+- Recipe-driven setup avoids allocating optional G-buffer/debug targets when they are not requested.
 
 ## Where Active Work Lives
 

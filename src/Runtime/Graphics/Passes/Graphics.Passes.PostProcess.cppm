@@ -41,15 +41,15 @@ export namespace Graphics::Passes
     // -----------------------------------------------------------------
     // PostProcessPass — HDR tone mapping + optional FXAA.
     //
-    // Reads "SceneColor" (HDR R16G16B16A16_SFLOAT) from the blackboard.
-    // Writes the final LDR result to "Backbuffer" (swapchain).
+    // Reads canonical `SceneColorHDR` from the blackboard.
+    // Writes canonical `SceneColorLDR` for later overlays and final presentation.
     //
     // When FXAA is enabled:
-    //   ToneMap: SceneColor → PostLdr (transient, swapchain format)
-    //   FXAA:    PostLdr    → Backbuffer
+    //   ToneMap: SceneColorHDR -> PostLdrTemp (transient, swapchain format)
+    //   FXAA:    PostLdrTemp   -> SceneColorLDR
     //
     // When FXAA is disabled:
-    //   ToneMap: SceneColor → Backbuffer
+    //   ToneMap: SceneColorHDR -> SceneColorLDR
     // -----------------------------------------------------------------
     class PostProcessPass final : public IRenderFeature
     {
@@ -90,6 +90,9 @@ export namespace Graphics::Passes
         VkDescriptorSetLayout m_FXAASetLayout = VK_NULL_HANDLE;
         VkDescriptorSet       m_FXAASets[3]   = {};
         std::unique_ptr<RHI::GraphicsPipeline> m_FXAAPipeline;
+
+        // Safe default binding used until PostCompile patches in the frame's actual image views.
+        std::unique_ptr<RHI::VulkanImage> m_DummySampled;
 
         // Cached resource handles for PostCompile descriptor update.
         RGResourceHandle m_LastSceneColorHandle{};

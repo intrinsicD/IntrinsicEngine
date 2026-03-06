@@ -10,6 +10,7 @@ module;
 export module Graphics:RenderGraph;
 
 import RHI;
+
 import Core.Hash;
 import Core.Memory;
 import Core.Logging;
@@ -135,6 +136,11 @@ export namespace Graphics
         VkImage Image{VK_NULL_HANDLE};
         VkImageView View{VK_NULL_HANDLE};
 
+        bool IsImported{false};
+        uint32_t FirstWritePass{~0u};
+        uint32_t LastWritePass{~0u};
+        uint32_t FirstReadPass{~0u};
+        uint32_t LastReadPass{~0u};
         uint32_t StartPass{~0u};
         uint32_t EndPass{0u};
     };
@@ -148,7 +154,11 @@ export namespace Graphics
         {
             Core::Hash::StringID ResourceName{};
             ResourceID Resource{};
+            VkFormat Format{VK_FORMAT_UNDEFINED};
+            VkAttachmentLoadOp LoadOp{VK_ATTACHMENT_LOAD_OP_DONT_CARE};
+            VkAttachmentStoreOp StoreOp{VK_ATTACHMENT_STORE_OP_DONT_CARE};
             bool IsDepth = false;
+            bool IsImported = false;
         };
 
         std::vector<Attachment> Attachments{};
@@ -326,6 +336,10 @@ export namespace Graphics
 
             uint32_t StartPass = ~0u;
             uint32_t EndPass = 0;
+            uint32_t FirstWritePass = ~0u;
+            uint32_t LastWritePass = ~0u;
+            uint32_t FirstReadPass = ~0u;
+            uint32_t LastReadPass = ~0u;
         };
 
         struct PooledImage
@@ -409,6 +423,15 @@ export namespace Graphics
             std::vector<std::pair<uint32_t, uint32_t>> AllocatedIntervals;
         };
 
+        struct TransientMemoryBinding
+        {
+            VkDeviceMemory Memory = VK_NULL_HANDLE;
+            VkDeviceSize Offset = 0;
+            VkDeviceSize Size = 0;
+
+            [[nodiscard]] bool IsValid() const { return Memory != VK_NULL_HANDLE; }
+        };
+
         std::shared_ptr<RHI::VulkanDevice> m_Device;
         Core::Memory::LinearArena& m_Arena;      // POD pass data
         Core::Memory::ScopeStack& m_Scope;       // destructor-safe pass closures
@@ -436,7 +459,7 @@ export namespace Graphics
 
         RHI::VulkanImage* ResolveImage(uint32_t frameIndex, const ResourceNode& node);
         RHI::VulkanBuffer* ResolveBuffer(uint32_t frameIndex, const ResourceNode& node);
-        VkDeviceMemory AllocateOrReuseMemory(const VkMemoryRequirements& reqs, uint32_t startPass, uint32_t endPass, uint32_t frameIndex);
+        TransientMemoryBinding AllocateOrReuseMemory(const VkMemoryRequirements& reqs, uint32_t startPass, uint32_t endPass, uint32_t frameIndex);
 
         // DAG scheduling: hazard tracking + topological sort (shared with FrameGraph).
         Core::DAGScheduler m_Scheduler;

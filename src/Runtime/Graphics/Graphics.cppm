@@ -7,6 +7,7 @@ export import :MaterialSystem;
 export import :Model;
 export import :ModelLoader;
 export import :RenderSystem;
+export import :RenderPipeline;
 export import :TextureLoader;
 export import :RenderGraph;
 export import :Components;

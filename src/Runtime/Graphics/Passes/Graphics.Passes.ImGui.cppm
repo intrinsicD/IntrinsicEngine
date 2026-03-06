@@ -27,18 +27,18 @@ export namespace Graphics::Passes
         {
             struct Data
             {
-                RGResourceHandle Backbuffer;
+                RGResourceHandle Target;
             };
 
             ctx.Graph.AddPass<Data>("ImGuiPass",
                                     [&](Data& data, RGBuilder& builder)
                                     {
-                                        const RGResourceHandle bb = ctx.Blackboard.Get("Backbuffer"_id);
-                                        if (!bb.IsValid())
+                                        const RGResourceHandle target = GetPresentationTarget(ctx);
+                                        if (!target.IsValid())
                                             return;
 
                                         RGAttachmentInfo info{VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_STORE};
-                                        data.Backbuffer = builder.WriteColor(bb, info);
+                                        data.Target = builder.WriteColor(target, info);
                                     },
                                     [](const Data&, const RGRegistry&, VkCommandBuffer cmd)
                                     {

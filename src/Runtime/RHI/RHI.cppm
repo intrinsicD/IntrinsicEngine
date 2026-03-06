@@ -10,6 +10,7 @@ export import :Descriptors;
 export import :Device;
 export import :Image;
 export import :Pipeline;
+export import :Profiler;
 export import :Renderer;
 export import :Shader;
 export import :Swapchain;

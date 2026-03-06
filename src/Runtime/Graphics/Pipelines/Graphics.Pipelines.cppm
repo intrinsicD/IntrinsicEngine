@@ -25,15 +25,28 @@ import Core.FeatureRegistry;
 
 export namespace Graphics
 {
-    // Default pipeline that replicates current hard-coded RenderSystem feature order.
-    // When a FeatureRegistry is provided, RebuildPath() checks IsEnabled() for each
-    // feature, allowing runtime toggling without pipeline recreation.
+    struct DefaultPipelineRecipeInputs
+    {
+        bool PickingPassEnabled = true;
+        bool SurfacePassEnabled = true;
+        bool LinePassEnabled = true;
+        bool PointPassEnabled = true;
+        bool PostProcessPassEnabled = true;
+        bool SelectionOutlinePassEnabled = true;
+        bool DebugViewPassEnabled = true;
+        bool ImGuiPassEnabled = true;
+        bool HasSelectionWork = false;
+        bool DebugViewEnabled = false;
+        Core::Hash::StringID DebugResource = GetRenderResourceName(RenderResource::EntityId);
+    };
+
+    [[nodiscard]] FrameRecipe BuildDefaultPipelineRecipe(const DefaultPipelineRecipeInputs& inputs);
+
     class DefaultPipeline final : public RenderPipeline
     {
     public:
         ~DefaultPipeline() override;
 
-        // Provide an optional FeatureRegistry for runtime enable/disable of features.
         void SetFeatureRegistry(const Core::FeatureRegistry* registry) { m_Registry = registry; }
 
         void Initialize(RHI::VulkanDevice& device,
@@ -44,6 +57,7 @@ export namespace Graphics
 
         void Shutdown() override;
 
+        [[nodiscard]] FrameRecipe BuildFrameRecipe(const RenderPassContext& ctx) const override;
         void SetupFrame(RenderPassContext& ctx) override;
 
         void OnResize(uint32_t width, uint32_t height) override;
@@ -52,7 +66,6 @@ export namespace Graphics
                          std::span<const RenderGraphDebugImage> debugImages,
                          std::span<const RenderGraphDebugPass> debugPasses) override;
 
-        // Access selection outline settings for UI configuration
         Passes::SelectionOutlineSettings* GetSelectionOutlineSettings() override
         {
             return m_SelectionOutlinePass ? &m_SelectionOutlinePass->GetSettings() : nullptr;
@@ -70,20 +83,13 @@ export namespace Graphics
         std::unique_ptr<Passes::ImGuiPass> m_ImGuiPass;
         std::unique_ptr<Passes::PostProcessPass> m_PostProcessPass;
 
-        // Modern Data-Driven Render Path
         RenderPath m_Path;
         bool m_PathDirty = true;
 
-        // Check if a feature is enabled via the registry (defaults to true if no registry).
-        bool IsFeatureEnabled(Core::Hash::StringID id) const;
+        [[nodiscard]] bool IsFeatureEnabled(Core::Hash::StringID id) const;
 
         void RebuildPath();
     };
 
-    // -------------------------------------------------------------------------
-    // Vtable anchor: destructor defined out-of-line so the vtable for
-    // DefaultPipeline is emitted in this TU. Retained as defensive practice
-    // for robust vtable emission across module partition boundaries.
-    // -------------------------------------------------------------------------
-    DefaultPipeline::~DefaultPipeline() {}
+    DefaultPipeline::~DefaultPipeline() = default;
 }

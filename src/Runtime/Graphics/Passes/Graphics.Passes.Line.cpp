@@ -107,7 +107,7 @@ namespace Graphics::Passes
     // Ensures per-frame transient buffers (positions, identity edges, colors)
     // have enough capacity for the given segment count.
 
-    bool LinePass::EnsureTransientBuffers(uint32_t segmentCount, uint32_t frameIndex)
+    bool LinePass::EnsureTransientBuffers(uint32_t segmentCount, [[maybe_unused]] uint32_t frameIndex)
     {
         if (segmentCount == 0)
             return true;
@@ -567,9 +567,9 @@ namespace Graphics::Passes
         if (!hasDepthDraws && !hasOverlayDraws)
             return;
 
-        // Fetch render targets — scene passes render to HDR SceneColor.
-        const RGResourceHandle sceneColor = ctx.Blackboard.Get("SceneColor"_id);
-        const RGResourceHandle depth = ctx.Blackboard.Get("SceneDepth"_id);
+        // Fetch canonical render targets — line passes render to HDR scene color.
+        const RGResourceHandle sceneColor = ctx.Blackboard.Get(RenderResource::SceneColorHDR);
+        const RGResourceHandle depth = ctx.Blackboard.Get(RenderResource::SceneDepth);
         if (!sceneColor.IsValid())
             return;
 

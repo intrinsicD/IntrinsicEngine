@@ -3,6 +3,7 @@ module;
 #include <memory>
 #include <vector>
 #include <optional>
+
 #include "RHI.Vulkan.hpp"
 
 export module Graphics:RenderSystem;
@@ -29,6 +30,7 @@ export namespace Graphics
 {
     struct RenderSystemConfig
     {
+        bool EnableRenderAuditLogging = false;
         // Future: MSAA settings, Shadow resolution, etc.
     };
 
@@ -112,6 +114,7 @@ export namespace Graphics
         // Cached frame lists for UI and debug resolve selection.
         std::vector<RenderGraphDebugPass> m_LastDebugPasses;
         std::vector<RenderGraphDebugImage> m_LastDebugImages;
+        FrameRecipe m_LastFrameRecipe{};
 
         // Pipeline (hot-swappable)
         std::unique_ptr<RenderPipeline> m_ActivePipeline;

@@ -275,7 +275,7 @@ namespace Graphics::Passes
 
         const uint32_t frameIndex = ctx.FrameIndex;
 
-        // Lazy per-mode pipeline creation.
+        // Lazy per-mode pipeline creation;
         bool pipelinesReady = true;
         for (uint32_t i = 0; i < kModeCount; ++i)
         {
@@ -522,9 +522,9 @@ namespace Graphics::Passes
         if (draws.empty())
             return;
 
-        // Fetch render targets — scene passes render to HDR SceneColor.
-        const RGResourceHandle sceneColor = ctx.Blackboard.Get("SceneColor"_id);
-        const RGResourceHandle depth = ctx.Blackboard.Get("SceneDepth"_id);
+        // Fetch canonical render targets — point passes render to HDR scene color.
+        const RGResourceHandle sceneColor = ctx.Blackboard.Get(RenderResource::SceneColorHDR);
+        const RGResourceHandle depth = ctx.Blackboard.Get(RenderResource::SceneDepth);
         if (!sceneColor.IsValid() || !depth.IsValid())
             return;
 

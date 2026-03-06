@@ -8,6 +8,8 @@ module;
 #include <glm/glm.hpp>
 #include <entt/entt.hpp>
 
+#include <RHI.Vulkan.hpp>
+
 module Graphics:Pipelines.Impl;
 
 import :RenderPipeline;
@@ -30,8 +32,10 @@ import RHI;
 import ECS;
 import Core.Hash;
 import Core.FeatureRegistry;
+import Core.Logging;
 
 using namespace Core::Hash;
+
 
 namespace Graphics
 {
@@ -162,7 +166,9 @@ namespace Graphics
 
         // ==================================================================
         // 5. Post-Processing — HDR tone mapping + optional FXAA.
-        //    Reads HDR SceneColor, writes LDR to Backbuffer.
+        //    Reads canonical SceneColorHDR and writes canonical SceneColorLDR.
+        //    Final presentation to the imported swapchain image happens in the
+        //    dedicated Present stage below.
         // ==================================================================
         if (m_PostProcessPass && IsFeatureEnabled("PostProcessPass"_id))
             m_Path.AddFeature("PostProcess", m_PostProcessPass.get());
@@ -190,6 +196,80 @@ namespace Graphics
         // ==================================================================
         if (m_ImGuiPass && IsFeatureEnabled("ImGuiPass"_id))
             m_Path.AddFeature("ImGui", m_ImGuiPass.get());
+
+        m_Path.AddStage("Present", [](RenderPassContext& ctx)
+        {
+            const RGResourceHandle src = ctx.Blackboard.Get(RenderResource::SceneColorLDR);
+            const RGResourceHandle dst = ctx.Blackboard.Get("Backbuffer"_id);
+            if (!src.IsValid() || !dst.IsValid())
+                return;
+
+            struct PresentData
+            {
+                RGResourceHandle Src;
+                RGResourceHandle Dst;
+            };
+
+            ctx.Graph.AddPass<PresentData>("Present.LDR",
+                                           [&](PresentData& data, RGBuilder& builder)
+                                           {
+                                               data.Src = builder.Read(src,
+                                                                       VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+                                                                       VK_ACCESS_2_TRANSFER_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT);
+                                               data.Dst = builder.Write(dst,
+                                                                        VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+                                                                        VK_ACCESS_2_TRANSFER_WRITE_BIT);
+                                           },
+                                           [resolution = ctx.Resolution](const PresentData& data,
+                                                                         const RGRegistry& reg,
+                                                                         VkCommandBuffer cmd)
+                                           {
+                                               if (!data.Src.IsValid() || !data.Dst.IsValid())
+                                                   return;
+
+                                               VkImageBlit blit{};
+                                               blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                                               blit.srcSubresource.layerCount = 1;
+                                               blit.srcOffsets[1] = {
+                                                   static_cast<int32_t>(resolution.width),
+                                                   static_cast<int32_t>(resolution.height),
+                                                   1
+                                               };
+                                               blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                                               blit.dstSubresource.layerCount = 1;
+                                               blit.dstOffsets[1] = {
+                                                   static_cast<int32_t>(resolution.width),
+                                                   static_cast<int32_t>(resolution.height),
+                                                   1
+                                               };
+
+                                               vkCmdBlitImage(cmd,
+                                                              reg.GetImage(data.Src), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                                                              reg.GetImage(data.Dst), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                                                              1, &blit, VK_FILTER_NEAREST);
+
+                                               VkImageMemoryBarrier2 restoreBarrier{};
+                                               restoreBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+                                               restoreBarrier.image = reg.GetImage(data.Dst);
+                                               restoreBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+                                               restoreBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                                               restoreBarrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+                                               restoreBarrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+                                               restoreBarrier.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+                                               restoreBarrier.dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+                                               restoreBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                                               restoreBarrier.subresourceRange.baseMipLevel = 0;
+                                               restoreBarrier.subresourceRange.levelCount = 1;
+                                               restoreBarrier.subresourceRange.baseArrayLayer = 0;
+                                               restoreBarrier.subresourceRange.layerCount = 1;
+
+                                               VkDependencyInfo restoreInfo{};
+                                               restoreInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+                                               restoreInfo.imageMemoryBarrierCount = 1;
+                                               restoreInfo.pImageMemoryBarriers = &restoreBarrier;
+                                               vkCmdPipelineBarrier2(cmd, &restoreInfo);
+                                           });
+        });
     }
 
     void DefaultPipeline::SetupFrame(RenderPassContext& ctx)
@@ -227,5 +307,101 @@ namespace Graphics
             m_SelectionOutlinePass->PostCompile(frameIndex, debugImages);
         if (m_DebugViewPass)
             m_DebugViewPass->PostCompile(frameIndex, debugImages);
+    }
+
+    [[nodiscard]] FrameRecipe BuildDefaultPipelineRecipe(const DefaultPipelineRecipeInputs& inputs)
+    {
+        FrameRecipe recipe{};
+
+        const bool hasGeometry = inputs.SurfacePassEnabled || inputs.LinePassEnabled || inputs.PointPassEnabled;
+        if (hasGeometry)
+        {
+            recipe.Depth = true;
+            recipe.LightingPath = FrameLightingPath::Forward;
+        }
+
+        if (inputs.PickingPassEnabled)
+        {
+            recipe.Depth = true;
+            recipe.EntityId = true;
+        }
+
+        if (inputs.PostProcessPassEnabled)
+        {
+            recipe.Post = true;
+            recipe.SceneColorLDR = true;
+        }
+
+        if (inputs.SelectionOutlinePassEnabled && inputs.HasSelectionWork)
+        {
+            recipe.Selection = true;
+            recipe.EntityId = true;
+            recipe.SceneColorLDR = true;
+        }
+
+        if (inputs.DebugViewPassEnabled && inputs.DebugViewEnabled)
+        {
+            recipe.DebugVisualization = true;
+            recipe.SceneColorLDR = true;
+            if (const auto selected = TryGetRenderResourceByName(inputs.DebugResource))
+            {
+                switch (*selected)
+                {
+                case RenderResource::SceneDepth: recipe.Depth = true; break;
+                case RenderResource::EntityId: recipe.EntityId = true; break;
+                case RenderResource::PrimitiveId: recipe.PrimitiveId = true; break;
+                case RenderResource::SceneNormal: recipe.Normals = true; break;
+                case RenderResource::Albedo:
+                case RenderResource::Material0: recipe.MaterialChannels = true; break;
+                case RenderResource::SceneColorHDR:
+                    if (recipe.LightingPath == FrameLightingPath::None)
+                        recipe.LightingPath = FrameLightingPath::Forward;
+                    break;
+                case RenderResource::SceneColorLDR: recipe.SceneColorLDR = true; break;
+                case RenderResource::SelectionMask:
+                case RenderResource::SelectionOutline:
+                    recipe.Selection = true;
+                    break;
+                }
+            }
+        }
+
+        if (inputs.ImGuiPassEnabled)
+            recipe.SceneColorLDR = recipe.SceneColorLDR || inputs.PostProcessPassEnabled;
+
+        return recipe;
+    }
+
+    FrameRecipe DefaultPipeline::BuildFrameRecipe(const RenderPassContext& ctx) const
+    {
+        bool hasSelectionWork = false;
+        if (m_SelectionOutlinePass && IsFeatureEnabled("SelectionOutlinePass"_id))
+        {
+            auto& registry = ctx.Scene.GetRegistry();
+            hasSelectionWork = !registry.view<ECS::Components::Selection::SelectedTag>().empty() ||
+                               !registry.view<ECS::Components::Selection::HoveredTag>().empty();
+        }
+
+        DefaultPipelineRecipeInputs inputs{};
+        inputs.PickingPassEnabled = m_PickingPass && IsFeatureEnabled("PickingPass"_id);
+        inputs.SurfacePassEnabled = m_SurfacePass && IsFeatureEnabled("SurfacePass"_id);
+        inputs.LinePassEnabled = m_LinePass != nullptr;
+        inputs.PointPassEnabled = m_PointPass && IsFeatureEnabled("PointPass"_id);
+        inputs.PostProcessPassEnabled = m_PostProcessPass && IsFeatureEnabled("PostProcessPass"_id);
+        inputs.SelectionOutlinePassEnabled = m_SelectionOutlinePass && IsFeatureEnabled("SelectionOutlinePass"_id);
+        inputs.DebugViewPassEnabled = m_DebugViewPass && IsFeatureEnabled("DebugViewPass"_id);
+        inputs.ImGuiPassEnabled = m_ImGuiPass && IsFeatureEnabled("ImGuiPass"_id);
+        inputs.HasSelectionWork = hasSelectionWork;
+        inputs.DebugViewEnabled = ctx.Debug.Enabled;
+        inputs.DebugResource = ctx.Debug.SelectedResource;
+
+        FrameRecipe recipe = BuildDefaultPipelineRecipe(inputs);
+
+        if ((recipe.Selection || recipe.DebugVisualization) && !inputs.PickingPassEnabled && recipe.EntityId)
+        {
+            Core::Log::Warn("DefaultPipeline: EntityId requested by selection/debug recipe but PickingPass is disabled; resource will exist without a producer.");
+        }
+
+        return recipe;
     }
 }

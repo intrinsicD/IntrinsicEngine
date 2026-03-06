@@ -38,9 +38,9 @@ namespace Graphics::Passes
         if (!m_Pipeline)
             return;
 
-        // Scene passes render to the HDR SceneColor target (not the swapchain backbuffer).
-        const RGResourceHandle sceneColor = ctx.Blackboard.Get("SceneColor"_id);
-        const RGResourceHandle depth = ctx.Blackboard.Get("SceneDepth"_id);
+        // Scene passes render to the canonical HDR scene color target.
+        const RGResourceHandle sceneColor = ctx.Blackboard.Get(RenderResource::SceneColorHDR);
+        const RGResourceHandle depth = ctx.Blackboard.Get(RenderResource::SceneDepth);
         if (!sceneColor.IsValid() || !depth.IsValid())
             return;
 
@@ -482,15 +482,13 @@ namespace Graphics::Passes
         return out;
     }
 
-    void Graphics::Passes::SurfacePass::AddRasterPass(RenderPassContext& ctx, RGResourceHandle backbuffer, RGResourceHandle depth, DrawStream&& stream)
+    void Graphics::Passes::SurfacePass::AddRasterPass(RenderPassContext& ctx, RGResourceHandle sceneColor, RGResourceHandle depth, DrawStream&& stream)
     {
-        // If CPU path injected its own raster pass, do nothing.
-        if (stream.Batches.empty())
-            return;
-
-        // Single raster pass consuming the draw stream.
+        // Single raster pass consuming the draw stream. Even with no batches, we still
+        // clear/write the canonical HDR scene target so downstream post-processing has
+        // a valid producer in empty-scene frames.
         ctx.Graph.AddPass<PassData>("ForwardRaster",
-                                    [this, &ctx, backbuffer, depth, fi = ctx.FrameIndex % FRAMES](PassData& data, RGBuilder& builder)
+                                    [this, &ctx, sceneColor, depth, fi = ctx.FrameIndex % FRAMES](PassData& data, RGBuilder& builder)
                                     {
                                         RGAttachmentInfo colorInfo{};
                                         colorInfo.ClearValue = {{{0.1f, 0.3f, 0.6f, 1.0f}}};
@@ -500,9 +498,8 @@ namespace Graphics::Passes
                                         RGAttachmentInfo depthInfo{};
                                         depthInfo.ClearValue.depthStencil = {1.0f, 0};
 
-                                        data.Color = builder.WriteColor(backbuffer, colorInfo);
+                                        data.Color = builder.WriteColor(sceneColor, colorInfo);
                                         data.Depth = builder.WriteDepth(depth, depthInfo);
-                                        ctx.Blackboard.Add("SceneColor"_id, data.Color);
 
                                         // Declare dependencies on the GPU-culled buffers to enforce
                                         // compute→graphics barriers between ForwardCull and ForwardRaster.
@@ -529,6 +526,9 @@ namespace Graphics::Passes
                                     },
                                     [this, &ctx, pipeline = m_Pipeline, stream = std::move(stream)](const PassData&, const RGRegistry&, VkCommandBuffer cmd) mutable
                                     {
+                                        if (stream.Batches.empty())
+                                            return;
+
                                         // NOTE: We bind pipelines per-batch based on topology.
                                         // Vulkan restricts dynamic topology switches unless dynamicPrimitiveTopologyUnrestricted is enabled.
 
