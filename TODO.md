@@ -30,9 +30,19 @@ This document tracks the **active rendering-architecture backlog** for Intrinsic
 
 ---
 
-## 2. Now (P0) — Current Rendering Refactor Target
+## 2. Now (P0) — Bugs & Correctness Issues
 
-No active P0 tasks remain. Promote P1 items as needed.
+### A1. SMAA Lookup Textures
+
+- [ ] Validate custom area/search texture generators in `Graphics.SMAALookupTextures.hpp` against the Jimenez et al. reference precomputed tables, or replace with canonical binary data from the original SMAA distribution.
+
+### A2. Bloom Downsample Dead Code
+
+- [ ] Fix dead code in `assets/shaders/post_bloom_downsample.frag` (~lines 119-123): the first `result` computation (Karis average threshold path) is immediately overwritten by the second.
+
+### A3. Contact Manifold Retained Overlay
+
+- [ ] Fix silent failure in contact manifold retained overlay rendering — verify the DebugDraw overlay path correctly displays manifold data when toggled on.
 
 ---
 
@@ -59,6 +69,28 @@ These are not required to finish the first wave, but they should begin soon afte
 
 - [ ] Improve primitive/submesh selection.
 - [ ] Add mask visualization in the editor.
+
+### B4. Post-Processing Correctness & Cleanup
+
+- [ ] Remove spurious `VK_ACCESS_2_MEMORY_WRITE_BIT` from `builder.Read()` calls in `Graphics.Passes.PostProcess.cpp` — reads should not declare write access.
+- [ ] Replace string-based resource lookups in PostCompile (bloom upsample binding 1, SMAA edge/weight bindings) with cached handles.
+- [ ] Remove dead write to `m_LastSMAAEdgesHandle` (assigned in edge pass setup, overwritten in blend pass setup, never used).
+- [ ] Pass integer `width`/`height` directly to histogram compute shader instead of reconstructing from inverse floats.
+
+### B5. Post-Processing Test Coverage
+
+- [ ] Add contract tests for post-processing push constant struct sizes (`static_assert`).
+- [ ] Add descriptor layout / pipeline build success tests for bloom, SMAA, and tone mapping passes.
+
+### B6. Render Graph & Frame Construction
+
+- [ ] Add tests for `CanonicalResources` registration and recipe-driven allocation.
+- [ ] Add tests for `ValidateCompiledGraph()` with the new post-processing passes included.
+
+### B7. Markdown Sync Drift
+
+- [ ] Update CLAUDE.md to reflect vtable anchor changes (removal of `DefaultPipeline` destructor anchor, if applicable).
+- [ ] Audit README.md for accuracy against current post-processing stack (bloom, SMAA, tone mapping, histogram).
 
 ---
 
@@ -125,7 +157,12 @@ These items should be **planned now** so the current refactor leaves room for th
 - [ ] Plan decal insertion points in the graph.
 - [ ] Plan debug output for effect intermediates.
 
-### C7. Render Asset / Shader System Cleanup
+### C7. PostProcessPass Factoring
+
+- [ ] Factor `PostProcessPass` into sub-pass classes (bloom, SMAA, tone mapping, histogram) to reduce single-class complexity.
+- [ ] Use `glm::vec3` for color grading lift/gamma/gain instead of individual `float` fields.
+
+### C9. Render Asset / Shader System Cleanup
 
 - [ ] Plan shader registration refactor.
 - [ ] Plan shader hot-reload boundaries by pass/stage.
@@ -133,7 +170,7 @@ These items should be **planned now** so the current refactor leaves room for th
 - [ ] Plan shader feature-key derivation from material/frame recipe.
 - [ ] Plan pipeline-cache invalidation strategy.
 
-### C8. Scene Serialization Compatibility
+### C10. Scene Serialization Compatibility
 
 - [ ] Ensure render settings serialize cleanly.
 - [ ] Ensure frame-recipe-relevant settings are serializable where appropriate.
