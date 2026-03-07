@@ -15,6 +15,8 @@ import :Components;
 import :Geometry;
 import :GPUScene;
 import :GpuColor;
+import :ColorMapper;
+import :VisualizationConfig;
 
 import Core.Hash;
 import Core.Logging;
@@ -89,15 +91,18 @@ namespace Graphics::Systems::PointCloudGeometrySync
                 // Surfel/EWA require real normals; no synthetic default-up normals.
                 const bool hasNormals = cloud.HasNormals();
 
-                // --- Extract per-point colors from PropertySet ---
+                // --- Extract per-point colors via ColorMapper ---
                 std::vector<uint32_t> pointColors;
-                if (cloud.HasColors())
                 {
-                    const auto colors = cloud.Colors();
-                    pointColors.reserve(colors.size());
-                    for (const auto& c : colors)
+                    auto& vtxConfig = pcData.Visualization.VertexColors;
+                    // Default fallback: use "p:color" when no property is explicitly selected.
+                    if (vtxConfig.PropertyName.empty() && cloud.HasColors())
+                        vtxConfig.PropertyName = "p:color";
+
+                    if (auto mapped = ColorMapper::MapProperty(
+                            cloud.PointProperties(), vtxConfig))
                     {
-                        pointColors.push_back(GpuColor::PackColorF(c.r, c.g, c.b, c.a));
+                        pointColors = std::move(mapped->Colors);
                     }
                 }
 
@@ -202,7 +207,7 @@ namespace Graphics::Systems::PointCloudGeometrySync
                 pt.Size               = pcData.DefaultRadius;
                 pt.SizeMultiplier     = pcData.SizeMultiplier;
                 pt.Mode               = pcData.RenderMode;
-                pt.HasPerPointColors  = pcData.HasColors();
+                pt.HasPerPointColors  = !pcData.CachedColors.empty();
                 pt.HasPerPointRadii   = pcData.HasRadii();
                 pt.HasPerPointNormals = pcData.HasRenderableNormals();
             }

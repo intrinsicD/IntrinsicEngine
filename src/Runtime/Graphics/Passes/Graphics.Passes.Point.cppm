@@ -80,8 +80,8 @@ export namespace Graphics::Passes
         VkDescriptorSetLayout m_GlobalSetLayout = VK_NULL_HANDLE;
 
         // Per-mode pipelines (indexed by PointRenderMode).
-        // [0] = FlatDisc, [1] = Surfel, [2] = EWA (uses surfel shader with mode flag).
-        static constexpr uint32_t kModeCount = 3;
+        // [0] = FlatDisc, [1] = Surfel, [2] = EWA (surfel shader + flag), [3] = Sphere.
+        static constexpr uint32_t kModeCount = 4;
         std::unique_ptr<RHI::GraphicsPipeline> m_Pipelines[kModeCount];
 
         // Per-entity persistent per-point color attribute buffer (packed ABGR).
@@ -91,6 +91,14 @@ export namespace Graphics::Passes
             uint32_t PointCount = 0;
         };
         std::unordered_map<uint32_t, RetainedPointAuxEntry> m_PointAuxBuffers;
+
+        // Per-entity persistent per-point radii buffer (float per point).
+        struct RetainedPointRadiiEntry
+        {
+            std::unique_ptr<RHI::VulkanBuffer> Buffer;
+            uint32_t PointCount = 0;
+        };
+        std::unordered_map<uint32_t, RetainedPointRadiiEntry> m_PointRadiiBuffers;
 
         // --- Transient DebugDraw buffers (per-frame, host-visible, BDA) ---
         static constexpr uint32_t FRAMES = RHI::VulkanDevice::GetFramesInFlight();
@@ -111,6 +119,11 @@ export namespace Graphics::Passes
         uint64_t EnsurePointAuxBuffer(uint32_t entityKey,
                                       const uint32_t* colorData,
                                       uint32_t pointCount);
+
+        // Create or update a persistent per-point radii buffer.
+        uint64_t EnsurePointRadiiBuffer(uint32_t entityKey,
+                                        const float* radiiData,
+                                        uint32_t pointCount);
 
         // Ensure transient buffers have enough capacity.
         bool EnsureTransientBuffers(uint32_t pointCount, uint32_t frameIndex);

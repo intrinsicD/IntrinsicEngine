@@ -72,6 +72,7 @@ export namespace RHI
         uint32_t VisibilityBase; // Base offset into VisibleRemap[] for multi-geometry batching
         float    PointSizePx = 1.0f; // Used by Forward pass when drawing point-list topology.
         uint64_t PtrFaceAttr = 0; // BDA to per-face packed ABGR colors (0 = standard shading)
+        uint64_t PtrVertexAttr = 0; // BDA to per-vertex packed ABGR colors (0 = no per-vertex colors)
     };
 
     struct VertexInputDescription

@@ -8,6 +8,7 @@
 layout(location = 0) in vec3 fragNormal;
 layout(location = 1) in vec2 fragTexCoord;
 layout(location = 2) flat in uint fragTexID;
+layout(location = 3) in vec4 fragVertexColor;
 
 layout(location = 0) out vec4 outColor;
 
@@ -23,6 +24,7 @@ layout(push_constant) uniform PushConsts {
     uint VisibilityBase;
     float PointSizePx;
     uint64_t ptrFaceAttr;
+    uint64_t ptrVertexAttr;
 } push;
 
 // Binding 0 = Camera (UBO), Binding 1 = Bindless Array
@@ -43,11 +45,17 @@ void main() {
     float diff = max(dot(norm, lightDir), 0.0);
     vec3 diffuse = diff * lightColor;
 
-    // Per-face color: when ptrFaceAttr is valid, read per-face packed ABGR color
-    // indexed by gl_PrimitiveID. The face color replaces the texture color,
-    // but lighting is still applied on top.
+    // Color priority: per-vertex color > per-face color > texture.
+    //
+    // Per-vertex colors are interpolated across the triangle by the rasterizer,
+    // providing smooth scalar field / RGB visualization on mesh surfaces.
+    // Per-face colors are flat (one color per triangle via gl_PrimitiveID).
     vec4 baseColor;
-    if (push.ptrFaceAttr != 0ul)
+    if (push.ptrVertexAttr != 0ul)
+    {
+        baseColor = fragVertexColor;
+    }
+    else if (push.ptrFaceAttr != 0ul)
     {
         FaceAttrBuf fBuf = FaceAttrBuf(push.ptrFaceAttr);
         baseColor = unpackUnorm4x8(fBuf.color[gl_PrimitiveID]);

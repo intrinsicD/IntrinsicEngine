@@ -49,9 +49,8 @@ namespace Graphics::Passes
         float     ViewportWidth;   //  4 bytes, offset 96
         float     ViewportHeight;  //  4 bytes, offset 100
         uint32_t  Color;           //  4 bytes, offset 104
-        uint32_t  Flags;           //  4 bytes, offset 108 — bit 0: has per-point colors, bit 1: EWA mode
-        uint32_t  _pad0;           //  4 bytes, offset 112
-        uint32_t  _pad1;           //  4 bytes, offset 116
+        uint32_t  Flags;           //  4 bytes, offset 108 — bit 0: per-point colors, bit 1: EWA, bit 2: per-point radii
+        uint64_t  PtrRadii;       //  8 bytes, offset 112 — per-point float radii (0 = uniform PointSize)
     };
     static_assert(sizeof(PointPushConstants) == 120);
 
@@ -96,6 +95,50 @@ namespace Graphics::Passes
         const uint64_t addr = buf->GetDeviceAddress();
 
         m_PointAuxBuffers[entityKey] = { std::move(buf), pointCount };
+        return addr;
+    }
+
+    // =========================================================================
+    // EnsurePointRadiiBuffer
+    // =========================================================================
+
+    uint64_t PointPass::EnsurePointRadiiBuffer(
+        uint32_t entityKey,
+        const float* radiiData,
+        uint32_t pointCount)
+    {
+        auto it = m_PointRadiiBuffers.find(entityKey);
+
+        // Buffer exists and count matches — update data in-place.
+        if (it != m_PointRadiiBuffers.end() && it->second.PointCount == pointCount && it->second.Buffer)
+        {
+            it->second.Buffer->Write(radiiData, static_cast<size_t>(pointCount) * sizeof(float));
+            return it->second.Buffer->GetDeviceAddress();
+        }
+
+        // Need to create or recreate (count changed).
+        if (it != m_PointRadiiBuffers.end() && it->second.Buffer)
+        {
+            m_Device->SafeDestroy([old = std::move(it->second.Buffer)]() {});
+            it->second.PointCount = 0;
+        }
+
+        const VkDeviceSize size = static_cast<VkDeviceSize>(pointCount) * sizeof(float);
+        auto buf = std::make_unique<RHI::VulkanBuffer>(
+            *m_Device, size,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+            VMA_MEMORY_USAGE_CPU_TO_GPU);
+
+        if (!buf->GetMappedData())
+        {
+            Core::Log::Error("PointPass: Failed to allocate point radii buffer ({} bytes)", size);
+            return 0;
+        }
+
+        buf->Write(radiiData, static_cast<size_t>(size));
+        const uint64_t addr = buf->GetDeviceAddress();
+
+        m_PointRadiiBuffers[entityKey] = { std::move(buf), pointCount };
         return addr;
     }
 
@@ -192,6 +235,14 @@ namespace Graphics::Passes
         }
         m_PointAuxBuffers.clear();
 
+        // Deferred-destroy persistent point radii buffers.
+        for (auto& [key, entry] : m_PointRadiiBuffers)
+        {
+            if (entry.Buffer)
+                m_Device->SafeDestroy([old = std::move(entry.Buffer)]() {});
+        }
+        m_PointRadiiBuffers.clear();
+
         // Destroy transient buffers.
         for (auto& buf : m_TransientPosBuffer) buf.reset();
         for (auto& buf : m_TransientNormBuffer) buf.reset();
@@ -219,6 +270,12 @@ namespace Graphics::Passes
             // FlatDisc mode.
             vertId = "Point.FlatDisc.Vert"_id;
             fragId = "Point.FlatDisc.Frag"_id;
+        }
+        else if (mode == 3)
+        {
+            // Sphere (impostor) mode — writes gl_FragDepth for correct depth.
+            vertId = "Point.Sphere.Vert"_id;
+            fragId = "Point.Sphere.Frag"_id;
         }
         else
         {
@@ -312,7 +369,8 @@ namespace Graphics::Passes
             float    PointSize;
             float    SizeMultiplier;
             uint32_t Color;
-            uint32_t Flags;         // bit 0: has per-point colors, bit 1: EWA mode
+            uint32_t Flags;         // bit 0: has per-point colors, bit 1: EWA, bit 2: per-point radii
+            uint64_t PtrRadii;      // BDA to per-point float radii (0 = uniform PointSize)
             uint32_t PipelineIndex; // 0=FlatDisc, 1=Surfel, 2=EWA (uses pipeline[1])
         };
 
@@ -424,9 +482,48 @@ namespace Graphics::Passes
                     }
                 }
 
+                // Per-point radii buffer (sourced from Graph::Data or PointCloud::Data).
+                uint64_t radiiAddr = 0;
+                {
+                    const uint32_t entityKey = static_cast<uint32_t>(entity);
+                    const float* radiiData = nullptr;
+                    uint32_t radiiCount = 0;
+
+                    // Try Graph::Data.CachedNodeRadii
+                    if (const auto* gd = registry.try_get<ECS::Graph::Data>(entity))
+                    {
+                        if (!gd->CachedNodeRadii.empty() &&
+                            gd->CachedNodeRadii.size() == vertexCount)
+                        {
+                            radiiData = gd->CachedNodeRadii.data();
+                            radiiCount = vertexCount;
+                        }
+                    }
+
+                    // Try PointCloud::Data.CachedRadii
+                    if (!radiiData)
+                    {
+                        if (const auto* pcd = registry.try_get<ECS::PointCloud::Data>(entity))
+                        {
+                            if (!pcd->CachedRadii.empty() &&
+                                pcd->CachedRadii.size() == vertexCount)
+                            {
+                                radiiData = pcd->CachedRadii.data();
+                                radiiCount = vertexCount;
+                            }
+                        }
+                    }
+
+                    if (radiiData)
+                    {
+                        radiiAddr = EnsurePointRadiiBuffer(entityKey + 0x80000000u, radiiData, radiiCount);
+                    }
+                }
+
                 uint32_t flags = 0;
-                if (auxAddr != 0) flags |= 1u; // has per-point colors
-                if (isEWA)        flags |= 2u; // EWA mode
+                if (auxAddr != 0)   flags |= 1u; // has per-point colors
+                if (isEWA)          flags |= 2u; // EWA mode
+                if (radiiAddr != 0) flags |= 4u; // has per-point radii
 
                 DrawInfo di{};
                 di.Model = worldMatrix;
@@ -439,7 +536,10 @@ namespace Graphics::Passes
                 di.SizeMultiplier = pt.SizeMultiplier;
                 di.Color = ptColor;
                 di.Flags = flags;
-                di.PipelineIndex = (effectiveModeIdx == 0u) ? 0u : 1u; // FlatDisc=0, Surfel/EWA=1
+                di.PtrRadii = radiiAddr;
+                // Pipeline index: FlatDisc=0, Surfel/EWA=1, Sphere=3
+                di.PipelineIndex = (effectiveModeIdx == 0u) ? 0u
+                                 : (effectiveModeIdx == 3u) ? 3u : 1u;
                 draws.push_back(di);
             }
         }
@@ -588,6 +688,7 @@ namespace Graphics::Passes
                     push.ViewportHeight = static_cast<float>(resolution.height);
                     push.Color = di.Color;
                     push.Flags = di.Flags;
+                    push.PtrRadii = di.PtrRadii;
 
                     vkCmdPushConstants(cmd, pipelineLayout,
                                        VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,

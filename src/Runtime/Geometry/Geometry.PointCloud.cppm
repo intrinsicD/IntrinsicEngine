@@ -50,6 +50,7 @@ export namespace Geometry::PointCloud
         FlatDisc = 0,  // Screen-space constant-size circular splats (camera-facing billboard)
         Surfel   = 1,  // Normal-oriented disc with Lambertian shading
         EWA      = 2,  // Elliptical Weighted Average splatting (Zwicker et al. 2001)
+        Sphere   = 3,  // Impostor spheres with gl_FragDepth for correct depth occlusion
     };
 
     // -------------------------------------------------------------------------
