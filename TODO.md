@@ -87,11 +87,6 @@ These are not required to finish the first wave, but they should begin soon afte
 - [ ] Add tests for `CanonicalResources` registration and recipe-driven allocation.
 - [ ] Add tests for `ValidateCompiledGraph()` with the new post-processing passes included.
 
-### B7. Markdown Sync Drift
-
-- [ ] Update CLAUDE.md to reflect vtable anchor changes (removal of `DefaultPipeline` destructor anchor, if applicable).
-- [ ] Audit README.md for accuracy against current post-processing stack (bloom, SMAA, tone mapping, histogram).
-
 ---
 
 ## 4. Later (P2) — Planned Downstream Work
