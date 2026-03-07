@@ -15,11 +15,13 @@ import :Components;
 import :GpuColor;
 import :ColorMapper;
 import :VisualizationConfig;
+import :VectorFieldManager;
 
 import Core.Hash;
 import Core.Logging;
 import Core.FrameGraph;
 import Geometry;
+import ECS;
 
 using namespace Core::Hash;
 
@@ -208,7 +210,62 @@ namespace Graphics::Systems::PropertySetDirtySync
     }
 
     // =====================================================================
+    // Helper: sync vector fields for an entity if it has any configured.
+    // Rebuilds child Graph entities with updated base positions.
+    // =====================================================================
+    static void SyncVectorFieldsForEntity(entt::registry& registry, entt::entity entity)
+    {
+        std::string entityName;
+        if (auto* name = registry.try_get<ECS::Components::NameTag::Component>(entity))
+            entityName = name->Name;
+
+        if (auto* md = registry.try_get<ECS::Mesh::Data>(entity))
+        {
+            if (md->MeshRef && !md->Visualization.VectorFields.empty())
+            {
+                VectorFieldManager::SyncVectorFields(
+                    registry, entity, md->MeshRef->Positions(),
+                    md->MeshRef->VertexProperties(), md->Visualization, entityName);
+            }
+            return;
+        }
+
+        if (auto* gd = registry.try_get<ECS::Graph::Data>(entity))
+        {
+            if (gd->GraphRef && !gd->Visualization.VectorFields.empty())
+            {
+                auto& graph = *gd->GraphRef;
+                std::vector<glm::vec3> positions;
+                positions.reserve(graph.VertexCount());
+                const std::size_t vSize = graph.VerticesSize();
+                for (std::size_t i = 0; i < vSize; ++i)
+                {
+                    const Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(i)};
+                    if (!graph.IsDeleted(v))
+                        positions.push_back(graph.VertexPosition(v));
+                }
+                VectorFieldManager::SyncVectorFields(
+                    registry, entity, positions, graph.VertexProperties(),
+                    gd->Visualization, entityName);
+            }
+            return;
+        }
+
+        if (auto* pcd = registry.try_get<ECS::PointCloud::Data>(entity))
+        {
+            if (pcd->CloudRef && !pcd->Visualization.VectorFields.empty())
+            {
+                VectorFieldManager::SyncVectorFields(
+                    registry, entity, pcd->CloudRef->Positions(),
+                    pcd->CloudRef->PointProperties(), pcd->Visualization, entityName);
+            }
+            return;
+        }
+    }
+
+    // =====================================================================
     // Position-dirty: escalate to full re-upload via GpuDirty.
+    // Also re-sync vector fields whose arrows depend on base positions.
     // =====================================================================
     static void SyncPositionsDirty(entt::registry& registry)
     {
@@ -218,6 +275,7 @@ namespace Graphics::Systems::PropertySetDirtySync
             for (auto [entity, graphData] : view.each())
             {
                 graphData.GpuDirty = true;
+                SyncVectorFieldsForEntity(registry, entity);
             }
         }
 
@@ -227,6 +285,16 @@ namespace Graphics::Systems::PropertySetDirtySync
             for (auto [entity, pcData] : view.each())
             {
                 pcData.GpuDirty = true;
+                SyncVectorFieldsForEntity(registry, entity);
+            }
+        }
+
+        // Mesh entities (positions dirty → re-sync vector fields)
+        {
+            auto view = registry.view<ECS::DirtyTag::VertexPositions, ECS::Mesh::Data>();
+            for (auto [entity, meshData] : view.each())
+            {
+                SyncVectorFieldsForEntity(registry, entity);
             }
         }
     }
@@ -310,6 +378,33 @@ namespace Graphics::Systems::PropertySetDirtySync
     }
 
     // =====================================================================
+    // Mesh edge attributes dirty: extract per-edge colors from Mesh::Data
+    // PropertySets into Line::Component::CachedEdgeColors.
+    // =====================================================================
+    static void SyncMeshEdgeAttributes(entt::registry& registry)
+    {
+        auto view = registry.view<ECS::DirtyTag::EdgeAttributes, ECS::Mesh::Data, ECS::Line::Component>();
+        for (auto [entity, meshData, lineComp] : view.each())
+        {
+            if (!meshData.MeshRef)
+                continue;
+
+            auto& edgeConfig = meshData.Visualization.EdgeColors;
+            lineComp.CachedEdgeColors.clear();
+
+            if (!edgeConfig.PropertyName.empty())
+            {
+                auto result = ColorMapper::MapProperty(
+                    meshData.MeshRef->EdgeProperties(), edgeConfig);
+                if (result)
+                    lineComp.CachedEdgeColors = std::move(result->Colors);
+            }
+
+            lineComp.HasPerEdgeColors = !lineComp.CachedEdgeColors.empty();
+        }
+    }
+
+    // =====================================================================
     // Face attributes dirty: signal face color SSBO re-upload.
     // =====================================================================
     static void SyncFaceAttributesDirty(entt::registry& registry)
@@ -342,6 +437,7 @@ namespace Graphics::Systems::PropertySetDirtySync
         SyncGraphEdgeAttributes(registry);
         SyncPointCloudAttributes(registry);
         SyncMeshVertexAttributes(registry);
+        SyncMeshEdgeAttributes(registry);
         SyncMeshFaceAttributes(registry);
         SyncFaceAttributesDirty(registry);
 

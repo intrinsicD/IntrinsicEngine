@@ -214,6 +214,10 @@ public:
     Graphics::ConvexHullDebugDrawSettings m_CachedConvexHullOverlaySettings{};
     glm::mat4 m_CachedConvexHullOverlayWorld{1.0f};
 
+    // Isoline overlay — per-entity retained overlay for scalar field contours.
+    RetainedLineOverlaySlot m_IsolineOverlay{};
+    entt::entity m_IsolineOverlaySourceEntity = entt::null;
+
 
     bool EnsureSelectedColliderKDTree(entt::entity selected,
                                      const Graphics::GeometryCollisionData& collision)
@@ -1628,6 +1632,27 @@ public:
         }
 
         // ---------------------------------------------------------------------
+        // Isoline overlay: update when selected entity changes or is deselected.
+        // The overlay uses settings from the Mesh::Data::Visualization::Isolines
+        // configuration. When enabled, IsolineExtractor produces line segments
+        // that are rendered as a retained line overlay.
+        // ---------------------------------------------------------------------
+        {
+            const entt::entity selected = GetSelection().GetSelectedEntity(GetScene());
+            if (selected != m_IsolineOverlaySourceEntity)
+            {
+                // Selection changed — update overlay for new entity (or release).
+                if (selected != entt::null && GetScene().GetRegistry().valid(selected))
+                    UpdateIsolineOverlay(selected);
+                else
+                {
+                    ReleaseRetainedLineOverlay(m_IsolineOverlay);
+                    m_IsolineOverlaySourceEntity = entt::null;
+                }
+            }
+        }
+
+        // ---------------------------------------------------------------------
         // Selection: delegate click-to-pick-to-registry-tags to the Engine module.
         // ---------------------------------------------------------------------
         if (cameraComponent != nullptr)
@@ -2307,6 +2332,228 @@ public:
         return changed;
     }
 
+    // =========================================================================
+    // IsolineWidget — UI for isoline overlay settings on scalar fields.
+    // Only applicable to mesh entities with vertex-domain scalar properties.
+    // =========================================================================
+    static bool IsolineWidget(Graphics::IsolineConfig& iso,
+                              const Geometry::PropertySet* ps, const char* suffix)
+    {
+        bool changed = false;
+        char idBuf[128];
+
+        ImGui::SeparatorText("Isolines");
+
+        snprintf(idBuf, sizeof(idBuf), "Enable Isolines##%s", suffix);
+        if (ImGui::Checkbox(idBuf, &iso.Enabled))
+            changed = true;
+
+        if (!iso.Enabled)
+            return changed;
+
+        // Scalar property selector.
+        if (ps)
+        {
+            auto scalarProps = Graphics::EnumerateScalarProperties(*ps);
+
+            snprintf(idBuf, sizeof(idBuf), "Scalar Property##Iso%s", suffix);
+            const char* currentName = iso.PropertyName.empty() ? "(none)" : iso.PropertyName.c_str();
+            if (ImGui::BeginCombo(idBuf, currentName))
+            {
+                if (ImGui::Selectable("(none)", iso.PropertyName.empty()))
+                {
+                    iso.PropertyName.clear();
+                    changed = true;
+                }
+                for (const auto& p : scalarProps)
+                {
+                    if (ImGui::Selectable(p.Name.c_str(), iso.PropertyName == p.Name))
+                    {
+                        iso.PropertyName = p.Name;
+                        iso.AutoRange = true;
+                        changed = true;
+                    }
+                }
+                ImGui::EndCombo();
+            }
+        }
+
+        if (iso.PropertyName.empty())
+            return changed;
+
+        // Count slider.
+        snprintf(idBuf, sizeof(idBuf), "Count##Iso%s", suffix);
+        int count = static_cast<int>(iso.Count);
+        if (ImGui::SliderInt(idBuf, &count, 1, 50))
+        {
+            iso.Count = static_cast<uint32_t>(std::max(1, count));
+            changed = true;
+        }
+
+        // Auto-range checkbox.
+        snprintf(idBuf, sizeof(idBuf), "Auto Range##Iso%s", suffix);
+        if (ImGui::Checkbox(idBuf, &iso.AutoRange))
+            changed = true;
+
+        if (!iso.AutoRange)
+        {
+            snprintf(idBuf, sizeof(idBuf), "Range Min##Iso%s", suffix);
+            if (ImGui::DragFloat(idBuf, &iso.RangeMin, 0.01f))
+                changed = true;
+            snprintf(idBuf, sizeof(idBuf), "Range Max##Iso%s", suffix);
+            if (ImGui::DragFloat(idBuf, &iso.RangeMax, 0.01f))
+                changed = true;
+        }
+        else
+        {
+            ImGui::Text("Range: [%.4f, %.4f]", iso.RangeMin, iso.RangeMax);
+        }
+
+        // Color picker.
+        snprintf(idBuf, sizeof(idBuf), "Color##Iso%s", suffix);
+        float ic[4] = {iso.Color.r, iso.Color.g, iso.Color.b, iso.Color.a};
+        if (ImGui::ColorEdit4(idBuf, ic))
+        {
+            iso.Color = glm::vec4(ic[0], ic[1], ic[2], ic[3]);
+            changed = true;
+        }
+
+        // Width slider.
+        snprintf(idBuf, sizeof(idBuf), "Width##Iso%s", suffix);
+        if (ImGui::SliderFloat(idBuf, &iso.Width, 0.5f, 5.0f))
+            changed = true;
+
+        return changed;
+    }
+
+    // =========================================================================
+    // SyncEntityVectorFields — call VectorFieldManager::SyncVectorFields
+    // for an entity that has a VisualizationConfig and vertex positions.
+    // =========================================================================
+    void SyncEntityVectorFields(entt::entity entity)
+    {
+        auto& reg = GetScene().GetRegistry();
+        std::string entityName;
+        if (auto* name = reg.try_get<ECS::Components::NameTag::Component>(entity))
+            entityName = name->Name;
+
+        // Mesh entities.
+        if (auto* md = reg.try_get<ECS::Mesh::Data>(entity))
+        {
+            if (md->MeshRef)
+            {
+                Graphics::VectorFieldManager::SyncVectorFields(
+                    reg, entity, md->MeshRef->Positions(),
+                    md->MeshRef->VertexProperties(), md->Visualization, entityName);
+            }
+            return;
+        }
+
+        // Graph entities.
+        if (auto* gd = reg.try_get<ECS::Graph::Data>(entity))
+        {
+            if (gd->GraphRef)
+            {
+                // Graph positions need to be collected (skipping deleted vertices).
+                auto& graph = *gd->GraphRef;
+                std::vector<glm::vec3> positions;
+                positions.reserve(graph.VertexCount());
+                const std::size_t vSize = graph.VerticesSize();
+                for (std::size_t i = 0; i < vSize; ++i)
+                {
+                    const Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(i)};
+                    if (!graph.IsDeleted(v))
+                        positions.push_back(graph.VertexPosition(v));
+                }
+                Graphics::VectorFieldManager::SyncVectorFields(
+                    reg, entity, positions, graph.VertexProperties(),
+                    gd->Visualization, entityName);
+            }
+            return;
+        }
+
+        // Point cloud entities.
+        if (auto* pcd = reg.try_get<ECS::PointCloud::Data>(entity))
+        {
+            if (pcd->CloudRef)
+            {
+                Graphics::VectorFieldManager::SyncVectorFields(
+                    reg, entity, pcd->CloudRef->Positions(),
+                    pcd->CloudRef->PointProperties(), pcd->Visualization, entityName);
+            }
+            return;
+        }
+    }
+
+    // =========================================================================
+    // UpdateIsolineOverlay — extract and render isolines as a retained overlay.
+    // =========================================================================
+    void UpdateIsolineOverlay(entt::entity entity)
+    {
+        auto& reg = GetScene().GetRegistry();
+        auto* md = reg.try_get<ECS::Mesh::Data>(entity);
+
+        if (!md || !md->MeshRef)
+        {
+            ReleaseRetainedLineOverlay(m_IsolineOverlay);
+            m_IsolineOverlaySourceEntity = entt::null;
+            return;
+        }
+
+        auto& iso = md->Visualization.Isolines;
+        if (!iso.Enabled || iso.PropertyName.empty())
+        {
+            ReleaseRetainedLineOverlay(m_IsolineOverlay);
+            m_IsolineOverlaySourceEntity = entt::null;
+            return;
+        }
+
+        // Compute auto-range if needed.
+        if (iso.AutoRange)
+        {
+            auto prop = md->MeshRef->VertexProperties().Get<float>(iso.PropertyName);
+            if (prop.IsValid())
+            {
+                const auto& values = prop.Vector();
+                float mn = std::numeric_limits<float>::max();
+                float mx = std::numeric_limits<float>::lowest();
+                for (float v : values)
+                {
+                    if (std::isfinite(v))
+                    {
+                        mn = std::min(mn, v);
+                        mx = std::max(mx, v);
+                    }
+                }
+                if (mn < mx)
+                {
+                    iso.RangeMin = mn;
+                    iso.RangeMax = mx;
+                }
+            }
+        }
+
+        auto result = Graphics::IsolineExtractor::Extract(
+            *md->MeshRef, iso.PropertyName, iso.Count, iso.RangeMin, iso.RangeMax);
+
+        if (result.Points.empty())
+        {
+            ReleaseRetainedLineOverlay(m_IsolineOverlay);
+            m_IsolineOverlaySourceEntity = entt::null;
+            return;
+        }
+
+        const uint32_t color = Graphics::DebugDraw::PackColorF(
+            iso.Color.r, iso.Color.g, iso.Color.b, iso.Color.a);
+
+        UpdateRetainedLineOverlay(m_IsolineOverlay, [&](Graphics::DebugDraw& dd)
+        {
+            for (size_t i = 0; i + 1 < result.Points.size(); i += 2)
+                dd.OverlayLine(result.Points[i], result.Points[i + 1], color, color);
+        });
+        m_IsolineOverlaySourceEntity = entity;
+    }
+
     void DrawInspectorPanel()
     {
         ImGui::Begin("Inspector");
@@ -2442,7 +2689,8 @@ public:
                         if (ColorSourceWidget("Edge Color Source", gd.Visualization.EdgeColors, edgePs, "GraphEdge"))
                             reg.emplace_or_replace<ECS::DirtyTag::EdgeAttributes>(selected);
 
-                        VectorFieldWidget(gd.Visualization, vtxPs, "GraphVF");
+                        if (VectorFieldWidget(gd.Visualization, vtxPs, "GraphVF"))
+                            SyncEntityVectorFields(selected);
                     }
                 }
             }
@@ -2484,7 +2732,8 @@ public:
                         if (ColorSourceWidget("Point Color Source", pcd.Visualization.VertexColors, ptPs, "PCDVtx"))
                             reg.emplace_or_replace<ECS::DirtyTag::VertexAttributes>(selected);
 
-                        VectorFieldWidget(pcd.Visualization, ptPs, "PCDVF");
+                        if (VectorFieldWidget(pcd.Visualization, ptPs, "PCDVF"))
+                            SyncEntityVectorFields(selected);
                     }
                 }
             }
@@ -2599,7 +2848,11 @@ public:
                                 reg.emplace_or_replace<ECS::DirtyTag::FaceAttributes>(selected);
                             }
 
-                            VectorFieldWidget(md->Visualization, vtxPs, "MeshVF");
+                            if (VectorFieldWidget(md->Visualization, vtxPs, "MeshVF"))
+                                SyncEntityVectorFields(selected);
+
+                            if (IsolineWidget(md->Visualization.Isolines, vtxPs, "MeshIso"))
+                                UpdateIsolineOverlay(selected);
                         }
                     }
                 }
