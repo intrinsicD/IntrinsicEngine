@@ -13,6 +13,8 @@ module Graphics:Systems.PropertySetDirtySync.Impl;
 import :Systems.PropertySetDirtySync;
 import :Components;
 import :GpuColor;
+import :ColorMapper;
+import :VisualizationConfig;
 
 import Core.Hash;
 import Core.Logging;
@@ -53,25 +55,21 @@ namespace Graphics::Systems::PropertySetDirtySync
                 continue;
             }
 
-            // --- Re-extract per-node colors ---
+            // --- Re-extract per-node colors via ColorMapper ---
             graphData.CachedNodeColors.clear();
-            if (graph.VertexProperties().Exists("v:color"))
             {
-                auto colorProp = Geometry::VertexProperty<glm::vec4>(
-                    graph.VertexProperties().Get<glm::vec4>("v:color"));
+                auto& vtxConfig = graphData.Visualization.VertexColors;
+                if (vtxConfig.PropertyName.empty() && graph.VertexProperties().Exists("v:color"))
+                    vtxConfig.PropertyName = "v:color";
 
-                graphData.CachedNodeColors.reserve(graphData.GpuVertexCount);
-
-                const std::size_t vSize = graph.VerticesSize();
-                for (std::size_t i = 0; i < vSize; ++i)
+                auto skipDeleted = [&graph](size_t i) -> bool {
+                    return graph.IsDeleted(
+                        Geometry::VertexHandle{static_cast<Geometry::PropertyIndex>(i)});
+                };
+                if (auto mapped = ColorMapper::MapProperty(
+                        graph.VertexProperties(), vtxConfig, skipDeleted))
                 {
-                    const Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(i)};
-                    if (graph.IsDeleted(v))
-                        continue;
-
-                    const glm::vec4& c = colorProp[v];
-                    graphData.CachedNodeColors.push_back(
-                        GpuColor::PackColorF(c.r, c.g, c.b, c.a));
+                    graphData.CachedNodeColors = std::move(mapped->Colors);
                 }
             }
 
@@ -128,25 +126,21 @@ namespace Graphics::Systems::PropertySetDirtySync
                 continue;
             }
 
-            // --- Re-extract per-edge colors ---
+            // --- Re-extract per-edge colors via ColorMapper ---
             graphData.CachedEdgeColors.clear();
-            if (graph.EdgeProperties().Exists("e:color"))
             {
-                auto colorProp = Geometry::EdgeProperty<glm::vec4>(
-                    graph.EdgeProperties().Get<glm::vec4>("e:color"));
+                auto& edgeConfig = graphData.Visualization.EdgeColors;
+                if (edgeConfig.PropertyName.empty() && graph.EdgeProperties().Exists("e:color"))
+                    edgeConfig.PropertyName = "e:color";
 
-                graphData.CachedEdgeColors.reserve(graphData.GpuEdgeCount);
-
-                const std::size_t eSize = graph.EdgesSize();
-                for (std::size_t i = 0; i < eSize; ++i)
+                auto skipDeleted = [&graph](size_t i) -> bool {
+                    return graph.IsDeleted(
+                        Geometry::EdgeHandle{static_cast<Geometry::PropertyIndex>(i)});
+                };
+                if (auto mapped = ColorMapper::MapProperty(
+                        graph.EdgeProperties(), edgeConfig, skipDeleted))
                 {
-                    const Geometry::EdgeHandle e{static_cast<Geometry::PropertyIndex>(i)};
-                    if (graph.IsDeleted(e))
-                        continue;
-
-                    const glm::vec4& c = colorProp[e];
-                    graphData.CachedEdgeColors.push_back(
-                        GpuColor::PackColorF(c.r, c.g, c.b, c.a));
+                    graphData.CachedEdgeColors = std::move(mapped->Colors);
                 }
             }
 
@@ -184,14 +178,15 @@ namespace Graphics::Systems::PropertySetDirtySync
 
             // --- Re-extract per-point colors ---
             pcData.CachedColors.clear();
-            if (cloud.HasColors())
             {
-                const auto colors = cloud.Colors();
-                pcData.CachedColors.reserve(colors.size());
-                for (const auto& c : colors)
+                auto& vtxConfig = pcData.Visualization.VertexColors;
+                if (vtxConfig.PropertyName.empty() && cloud.HasColors())
+                    vtxConfig.PropertyName = "p:color";
+
+                if (auto mapped = ColorMapper::MapProperty(
+                        cloud.PointProperties(), vtxConfig))
                 {
-                    pcData.CachedColors.push_back(
-                        GpuColor::PackColorF(c.r, c.g, c.b, c.a));
+                    pcData.CachedColors = std::move(mapped->Colors);
                 }
             }
 
@@ -206,7 +201,7 @@ namespace Graphics::Systems::PropertySetDirtySync
             // --- Update Point::Component flags ---
             if (auto* pt = registry.try_get<ECS::Point::Component>(entity))
             {
-                pt->HasPerPointColors = pcData.HasColors();
+                pt->HasPerPointColors = !pcData.CachedColors.empty();
                 pt->HasPerPointRadii  = pcData.HasRadii();
             }
         }

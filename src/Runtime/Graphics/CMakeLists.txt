@@ -39,6 +39,12 @@ target_sources(${target_name}
         Graphics.Interaction.cppm
         Graphics.Presentation.cppm
         Graphics.GlobalResources.cppm
+        Graphics.Colormap.cppm
+        Graphics.VisualizationConfig.cppm
+        Graphics.PropertyEnumerator.cppm
+        Graphics.ColorMapper.cppm
+        Graphics.VectorFieldManager.cppm
+        Graphics.IsolineExtractor.cppm
 
         Pipelines/Graphics.Pipelines.cppm
         Passes/Graphics.Passes.Picking.cppm
@@ -95,6 +101,11 @@ target_sources(${target_name}
         Graphics.Interaction.cpp
         Graphics.Presentation.cpp
         Graphics.GlobalResources.cpp
+        Graphics.Colormap.cpp
+        Graphics.PropertyEnumerator.cpp
+        Graphics.ColorMapper.cpp
+        Graphics.VectorFieldManager.cpp
+        Graphics.IsolineExtractor.cpp
 
         Pipelines/Graphics.Pipelines.cpp
         Passes/Graphics.Passes.Picking.cpp

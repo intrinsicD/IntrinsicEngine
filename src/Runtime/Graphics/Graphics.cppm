@@ -30,6 +30,12 @@ export import :KDTreeDebugDraw;
 export import :BVHDebugDraw;
 export import :ConvexHullDebugDraw;
 export import :TransformGizmo;
+export import :Colormap;
+export import :VisualizationConfig;
+export import :PropertyEnumerator;
+export import :ColorMapper;
+export import :VectorFieldManager;
+export import :IsolineExtractor;
 
 // NOTE: We intentionally do NOT re-export pipeline implementations here.
 // Import `Graphics.Pipelines` explicitly in apps/tools when you need DefaultPipeline/etc.

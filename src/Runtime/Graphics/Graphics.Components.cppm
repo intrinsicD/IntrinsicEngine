@@ -1,6 +1,7 @@
 module;
 #include <memory>
 #include <cstdint>
+#include <string>
 #include <vector>
 #include <utility>
 
@@ -10,6 +11,7 @@ export module Graphics:Components;
 
 import :Geometry;
 import :Material;
+import :VisualizationConfig;
 import Geometry;
 import Core.Assets;
 
@@ -69,6 +71,51 @@ export namespace ECS::MeshCollider
 }
 
 // -------------------------------------------------------------------------
+// Mesh::Data — ECS component for PropertySet-backed mesh visualization.
+// -------------------------------------------------------------------------
+//
+// Holds a shared_ptr to an authoritative Geometry::Halfedge::Mesh instance.
+// Retaining the mesh on the entity enables:
+//   - Enumeration of vertex/edge/face PropertySet properties for the UI.
+//   - Mapping arbitrary properties to per-element colors via ColorMapper.
+//   - Isoline extraction from vertex-domain scalar fields.
+//   - Vector field visualization from vertex-domain vec3 properties.
+//
+// Created by importers (or geometry operators) when PropertySet data is
+// available. Entities without Mesh::Data fall back to programmatic color
+// setting on Surface::Component::CachedFaceColors.
+
+export namespace ECS::Mesh
+{
+    struct Data
+    {
+        // ---- Authoritative Data Source ----
+        std::shared_ptr<Geometry::Halfedge::Mesh> MeshRef;
+
+        // ---- Visualization Configuration ----
+        // Selects which PropertySet properties drive per-vertex/edge/face colors.
+        Graphics::VisualizationConfig Visualization;
+
+        // When true, re-extract colors from MeshRef's PropertySets.
+        bool AttributesDirty = true;
+
+        // ---- Queries (delegate to MeshRef) ----
+        [[nodiscard]] std::size_t VertexCount() const noexcept
+        {
+            return MeshRef ? MeshRef->VertexCount() : 0;
+        }
+        [[nodiscard]] std::size_t EdgeCount() const noexcept
+        {
+            return MeshRef ? MeshRef->EdgeCount() : 0;
+        }
+        [[nodiscard]] std::size_t FaceCount() const noexcept
+        {
+            return MeshRef ? MeshRef->FaceCount() : 0;
+        }
+    };
+}
+
+// -------------------------------------------------------------------------
 // PointCloud::Data — ECS component for PropertySet-backed point cloud
 //                    rendering (Cloud source).
 // -------------------------------------------------------------------------
@@ -105,6 +152,11 @@ export namespace ECS::PointCloud
         float     SizeMultiplier   = 1.0f;           // Per-entity size multiplier.
         glm::vec4 DefaultColor     = {1.f, 1.f, 1.f, 1.f}; // RGBA when colors absent.
         bool      Visible          = true;            // Runtime visibility toggle.
+
+        // ---- Visualization Configuration ----
+        // Selects which PropertySet properties drive per-point color rendering.
+        // When VertexColors.PropertyName is empty, falls back to Cloud::Colors().
+        Graphics::VisualizationConfig Visualization;
 
         // ---- GPU State (managed by PointCloudGeometrySyncSystem) ----
         // Device-local vertex buffer holding positions + normals.
@@ -196,6 +248,12 @@ export namespace ECS::Graph
         bool      EdgesOverlay       = false;
         bool      Visible            = true;
         bool      StaticGeometry     = false;
+
+        // ---- Visualization Configuration ----
+        // Selects which PropertySet properties drive per-node/edge color rendering.
+        // When VertexColors.PropertyName is empty, falls back to "v:color".
+        // When EdgeColors.PropertyName is empty, falls back to "e:color".
+        Graphics::VisualizationConfig Visualization;
 
         // ---- GPU State (managed by GraphGeometrySyncSystem) ----
         Geometry::GeometryHandle GpuGeometry{};

@@ -149,6 +149,10 @@ intrinsic_test_object_lib(RuntimeTestObjs
         Test_SceneSerializer.cpp
         Test_TransformGizmo.cpp
         Test_CompositionAndValidation.cpp
+        Test_Colormap.cpp
+        Test_ColorMapper.cpp
+        Test_PropertyEnumerator.cpp
+        Test_IsolineExtractor.cpp
 
     DEPS IntrinsicCore IntrinsicRuntime nlohmann_json::nlohmann_json
 )
