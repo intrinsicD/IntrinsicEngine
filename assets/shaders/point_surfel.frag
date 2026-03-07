@@ -25,9 +25,8 @@ layout(push_constant) uniform PushConsts {
     float    ViewportWidth;
     float    ViewportHeight;
     uint     Color;
-    uint     Flags;             // bit 0: has per-point colors, bit 1: EWA mode
-    uint     _pad0;
-    uint     _pad1;
+    uint     Flags;             // bit 0: per-point colors, bit 1: EWA mode, bit 2: per-point radii
+    uint64_t PtrRadii;          // per-point float radii (0 = uniform PointSize)
 } push;
 
 layout(location = 0) out vec4 outColor;

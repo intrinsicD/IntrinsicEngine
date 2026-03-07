@@ -14,6 +14,9 @@ layout(buffer_reference, scalar) readonly buffer PosBuf  { vec3 v[]; };
 layout(buffer_reference, scalar) readonly buffer NormBuf { vec3 v[]; };
 layout(buffer_reference, scalar) readonly buffer AuxBuf  { vec4 v[]; };
 
+// Per-vertex color buffer (optional BDA — when ptrVertexAttr != 0).
+layout(buffer_reference, scalar) readonly buffer VertexAttrBuf { uint color[]; };
+
 struct InstanceData {
     mat4 Model;
     uint TextureID;
@@ -39,11 +42,13 @@ layout(push_constant) uniform PushConsts {
     uint VisibilityBase; // Base offset into VisibleRemap[] for this geometry batch
     float PointSizePx;  // Used when drawing VK_PRIMITIVE_TOPOLOGY_POINT_LIST via the Forward pass.
     uint64_t ptrFaceAttr; // BDA to per-face packed ABGR colors (0 = standard shading)
+    uint64_t ptrVertexAttr; // BDA to per-vertex packed ABGR colors (0 = no per-vertex colors)
 } push;
 
 layout(location = 0) out vec3 fragNormal;
 layout(location = 1) out vec2 fragTexCoord;
 layout(location = 2) flat out uint fragTexID;
+layout(location = 3) out vec4 fragVertexColor;
 
 void main() {
     PosBuf  pBuf = PosBuf(push.ptrPos);
@@ -77,6 +82,18 @@ void main() {
     } else {
         // Fallback to camera-facing basis (view forward in world space).
         fragNormal = -vec3(camera.view[0][2], camera.view[1][2], camera.view[2][2]);
+    }
+
+    // Per-vertex color: read from BDA buffer when ptrVertexAttr != 0.
+    // Interpolated across the triangle to the fragment shader.
+    if (push.ptrVertexAttr != 0ul)
+    {
+        VertexAttrBuf vaBuf = VertexAttrBuf(push.ptrVertexAttr);
+        fragVertexColor = unpackUnorm4x8(vaBuf.color[gl_VertexIndex]);
+    }
+    else
+    {
+        fragVertexColor = vec4(0.0);
     }
 
     fragTexCoord = inUV;

@@ -1,7 +1,8 @@
-// point_flatdisc.vert — Camera-facing billboard point rendering via BDA.
+// point_sphere.vert — Impostor sphere rendering via BDA.
 //
-// FlatDisc mode: each point is expanded into a camera-facing billboard quad
-// (2 triangles, 6 vertices) with constant world-space radius.
+// Sphere mode: each point is expanded into a camera-facing billboard quad
+// (2 triangles, 6 vertices). The fragment shader ray-traces a sphere against
+// the billboard to compute correct gl_FragDepth and per-pixel normals.
 //
 // Part of the PointPass pipeline array in the three-pass rendering architecture.
 
@@ -35,6 +36,8 @@ layout(push_constant) uniform PushConsts {
 
 layout(location = 0) out vec4 fragColor;
 layout(location = 1) out vec2 fragDiscUV;
+layout(location = 2) out vec3 fragViewCenter;   // view-space sphere center
+layout(location = 3) out float fragRadiusView;  // view-space sphere radius
 
 void main()
 {
@@ -72,9 +75,12 @@ void main()
     // Clamp point radius to safe world-space range [0.0001, 1.0].
     float radiusWorld = clamp(baseRadius, 0.0001, 1.0) * push.SizeMultiplier;
 
-    // FlatDisc mode: camera-facing billboard.
+    // View-space sphere center and radius for fragment depth computation.
     vec4 viewPos = camera.view * vec4(worldPos, 1.0);
-    vec3 cornerView = viewPos.xyz + vec3(localOffset.x, localOffset.y, 0.0) * radiusWorld;
+    fragViewCenter = viewPos.xyz;
+    fragRadiusView = radiusWorld;
 
+    // Camera-facing billboard (same as FlatDisc).
+    vec3 cornerView = viewPos.xyz + vec3(localOffset.x, localOffset.y, 0.0) * radiusWorld;
     gl_Position = camera.proj * vec4(cornerView, 1.0);
 }

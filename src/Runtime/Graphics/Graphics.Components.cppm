@@ -410,6 +410,15 @@ export namespace ECS::Surface
         // GPUSceneSync can detect transitions.
         bool CachedVisible = true;
 
+        // ---- Per-Vertex Color Cache (optional) ----
+        // Packed ABGR per vertex, sourced from vertex PropertySet properties
+        // (scalar fields via colormap, or direct vec3/vec4 RGB/RGBA).
+        // Interpolated across triangles by the rasterizer for smooth
+        // scalar field visualization on mesh surfaces.
+        // When empty, falls back to per-face colors or texture.
+        std::vector<uint32_t> CachedVertexColors;
+        bool VertexColorsDirty = true;
+
         // ---- Per-Face Color Cache (optional) ----
         // Packed ABGR per face, sourced from Mesh::FaceProperties("f:color")
         // or set programmatically (e.g., segmentation labels, curvature).
@@ -418,7 +427,9 @@ export namespace ECS::Surface
         std::vector<uint32_t> CachedFaceColors;
         bool FaceColorsDirty = true;
 
-        // ---- Attribute Visualization Toggle ----
+        // ---- Attribute Visualization Toggles ----
+        // Per-vertex colors take priority over per-face colors.
+        bool ShowPerVertexColors = true;
         // When true and CachedFaceColors is non-empty, SurfacePass uses
         // per-face colors. When false, standard texture/material shading
         // is used even if face color data exists. Toggled via Inspector UI.

@@ -2255,6 +2255,51 @@ public:
                 vf.Color = glm::vec4(vc[0], vc[1], vc[2], vc[3]);
             ImGui::Checkbox("Overlay", &vf.Overlay);
 
+            // Per-vector color property selector.
+            if (ps)
+            {
+                auto colorableProps = Graphics::EnumerateColorableProperties(*ps);
+                const char* colorPreview = vf.ColorPropertyName.empty() ? "(Uniform)" : vf.ColorPropertyName.c_str();
+                if (ImGui::BeginCombo("Arrow Color", colorPreview))
+                {
+                    if (ImGui::Selectable("(Uniform)", vf.ColorPropertyName.empty()))
+                    {
+                        vf.ColorPropertyName.clear();
+                        changed = true;
+                    }
+                    for (const auto& cp : colorableProps)
+                    {
+                        if (ImGui::Selectable(cp.Name.c_str(), vf.ColorPropertyName == cp.Name))
+                        {
+                            vf.ColorPropertyName = cp.Name;
+                            changed = true;
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
+
+                // Per-vector length property selector.
+                auto scalarProps = Graphics::EnumerateScalarProperties(*ps);
+                const char* lenPreview = vf.LengthPropertyName.empty() ? "(Uniform)" : vf.LengthPropertyName.c_str();
+                if (ImGui::BeginCombo("Arrow Length", lenPreview))
+                {
+                    if (ImGui::Selectable("(Uniform)", vf.LengthPropertyName.empty()))
+                    {
+                        vf.LengthPropertyName.clear();
+                        changed = true;
+                    }
+                    for (const auto& sp : scalarProps)
+                    {
+                        if (ImGui::Selectable(sp.Name.c_str(), vf.LengthPropertyName == sp.Name))
+                        {
+                            vf.LengthPropertyName = sp.Name;
+                            changed = true;
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
+            }
+
             ImGui::PopID();
             ++i;
         }
@@ -2361,10 +2406,10 @@ public:
                     ImGui::Checkbox("Visible##Graph", &gd.Visible);
 
                     ImGui::SeparatorText("Node Settings");
-                    const char* modeNames[] = { "Flat Disc", "Surfel", "EWA Splatting" };
+                    const char* modeNames[] = { "Flat Disc", "Surfel", "EWA Splatting", "Sphere" };
                     int modeIdx = static_cast<int>(gd.NodeRenderMode);
-                    if (modeIdx < 0 || modeIdx > 2) modeIdx = 0;
-                    if (ImGui::Combo("Node Render Mode", &modeIdx, modeNames, 3))
+                    if (modeIdx < 0 || modeIdx > 3) modeIdx = 0;
+                    if (ImGui::Combo("Node Render Mode", &modeIdx, modeNames, 4))
                         gd.NodeRenderMode = static_cast<Geometry::PointCloud::RenderMode>(modeIdx);
                     ImGui::SliderFloat("Node Size", &gd.DefaultNodeRadius, 0.0005f, 0.05f, "%.5f", ImGuiSliderFlags_Logarithmic);
                     ImGui::SliderFloat("Node Size Multiplier", &gd.NodeSizeMultiplier, 0.1f, 10.0f, "%.2f", ImGuiSliderFlags_Logarithmic);
@@ -2418,10 +2463,10 @@ public:
                     ImGui::SeparatorText("Rendering");
                     ImGui::Checkbox("Visible##PCD", &pcd.Visible);
 
-                    const char* modeNames[] = { "Flat Disc", "Surfel", "EWA Splatting" };
+                    const char* modeNames[] = { "Flat Disc", "Surfel", "EWA Splatting", "Sphere" };
                     int modeIdx = static_cast<int>(pcd.RenderMode);
-                    if (modeIdx < 0 || modeIdx > 2) modeIdx = 0;
-                    if (ImGui::Combo("Render Mode##PCD", &modeIdx, modeNames, 3))
+                    if (modeIdx < 0 || modeIdx > 3) modeIdx = 0;
+                    if (ImGui::Combo("Render Mode##PCD", &modeIdx, modeNames, 4))
                         pcd.RenderMode = static_cast<Geometry::PointCloud::RenderMode>(modeIdx);
 
                     ImGui::SliderFloat("Default Radius##PCD", &pcd.DefaultRadius, 0.0005f, 0.1f, "%.5f", ImGuiSliderFlags_Logarithmic);
@@ -2477,6 +2522,9 @@ public:
                                 reg.remove<ECS::Line::Component>(selected);
                         }
 
+                        // Per-vertex color toggle (shown when vertex color data exists).
+                        if (!sc.CachedVertexColors.empty())
+                            ImGui::Checkbox("Per-Vertex Colors", &sc.ShowPerVertexColors);
                         // Per-face color toggle (shown when face color data exists).
                         if (!sc.CachedFaceColors.empty())
                             ImGui::Checkbox("Per-Face Colors", &sc.ShowPerFaceColors);

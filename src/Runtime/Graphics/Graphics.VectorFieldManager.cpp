@@ -15,6 +15,8 @@ module Graphics:VectorFieldManager.Impl;
 import :VectorFieldManager;
 import :Components;
 import :VisualizationConfig;
+import :ColorMapper;
+import :GpuColor;
 
 import Geometry;
 import ECS;
@@ -26,6 +28,7 @@ namespace
     /// Build a Graph from base positions + vec3 offsets.
     /// Nodes: 0..N-1 = base, N..2N-1 = target.
     /// Edges: base[i] → target[i].
+    /// Supports per-vector length scaling via a scalar property.
     [[nodiscard]] std::shared_ptr<Geometry::Graph::Graph> BuildVectorFieldGraph(
         std::span<const glm::vec3> positions,
         const Geometry::PropertySet& vertexProps,
@@ -40,6 +43,18 @@ namespace
         if (N == 0)
             return nullptr;
 
+        // Optional per-vector length scaling from a scalar property.
+        const float* lengthScales = nullptr;
+        std::vector<float> lengthBuf;
+        if (!entry.LengthPropertyName.empty())
+        {
+            auto lenProp = vertexProps.Get<float>(entry.LengthPropertyName);
+            if (lenProp.IsValid() && lenProp.Vector().size() >= N)
+            {
+                lengthScales = lenProp.Vector().data();
+            }
+        }
+
         auto graph = std::make_shared<Geometry::Graph::Graph>();
 
         // Add base points and target points.
@@ -48,8 +63,9 @@ namespace
 
         for (size_t i = 0; i < N; ++i)
         {
+            const float scale = entry.Scale * (lengthScales ? lengthScales[i] : 1.0f);
             baseVerts[i] = graph->AddVertex(positions[i]);
-            targetVerts[i] = graph->AddVertex(positions[i] + vectors[i] * entry.Scale);
+            targetVerts[i] = graph->AddVertex(positions[i] + vectors[i] * scale);
         }
 
         // Add edges from base to target.
@@ -110,6 +126,27 @@ void VectorFieldManager::SyncVectorFields(
             ECS::Components::Hierarchy::Attach(registry, entry.ChildEntity, sourceEntity);
         }
 
+        // Per-vector colors: map a source property to per-edge colors on the child graph.
+        bool hasPerVectorColors = false;
+        std::vector<uint32_t> perEdgeColors;
+        if (!entry.ColorPropertyName.empty())
+        {
+            ColorSource colorConfig;
+            colorConfig.PropertyName = entry.ColorPropertyName;
+            colorConfig.AutoRange = true;
+
+            auto mapped = ColorMapper::MapProperty(vertexProps, colorConfig);
+            if (mapped && mapped->Colors.size() >= static_cast<size_t>(graph->EdgeCount()))
+            {
+                // Each edge i corresponds to base vertex i. Use base vertex color.
+                const size_t edgeCount = graph->EdgeCount();
+                perEdgeColors.resize(edgeCount);
+                for (size_t i = 0; i < edgeCount; ++i)
+                    perEdgeColors[i] = mapped->Colors[i];
+                hasPerVectorColors = true;
+            }
+        }
+
         // Set up Graph::Data on the child entity.
         auto& graphData = registry.get_or_emplace<ECS::Graph::Data>(entry.ChildEntity);
         graphData.GraphRef = std::move(graph);
@@ -120,6 +157,18 @@ void VectorFieldManager::SyncVectorFields(
         graphData.EdgesOverlay = entry.Overlay;
         graphData.Visible = true;
         graphData.GpuDirty = true;
+
+        // Apply per-edge colors if available.
+        if (hasPerVectorColors)
+        {
+            graphData.CachedEdgeColors = std::move(perEdgeColors);
+            graphData.ShowPerEdgeColors = true;
+        }
+        else
+        {
+            graphData.CachedEdgeColors.clear();
+            graphData.ShowPerEdgeColors = false;
+        }
     }
 }
 

@@ -57,6 +57,8 @@ export namespace Graphics
         float EdgeWidth = 1.5f;
         bool Overlay = true;                         ///< No depth test
         entt::entity ChildEntity = entt::null;       ///< Managed child Graph entity
+        std::string ColorPropertyName;               ///< "" = uniform Color; scalar/vec3/vec4 property for per-arrow color
+        std::string LengthPropertyName;              ///< "" = uniform Scale; scalar property for per-arrow length
     };
 
     /// Per-entity visualization configuration.

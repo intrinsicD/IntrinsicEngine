@@ -19,9 +19,10 @@ layout(set = 0, binding = 0) uniform CameraBuffer {
     mat4 proj;
 } camera;
 
-layout(buffer_reference, scalar) readonly buffer PosBuf  { vec3 v[]; };
-layout(buffer_reference, scalar) readonly buffer NormBuf { vec3 v[]; };
-layout(buffer_reference, scalar) readonly buffer AuxBuf  { uint v[]; };
+layout(buffer_reference, scalar) readonly buffer PosBuf   { vec3  v[]; };
+layout(buffer_reference, scalar) readonly buffer NormBuf  { vec3  v[]; };
+layout(buffer_reference, scalar) readonly buffer AuxBuf   { uint  v[]; };
+layout(buffer_reference, scalar) readonly buffer RadiiBuf { float v[]; };
 
 layout(push_constant) uniform PushConsts {
     mat4     Model;
@@ -33,9 +34,8 @@ layout(push_constant) uniform PushConsts {
     float    ViewportWidth;
     float    ViewportHeight;
     uint     Color;             // packed ABGR (uniform color)
-    uint     Flags;             // bit 0: has per-point colors, bit 1: EWA mode
-    uint     _pad0;
-    uint     _pad1;
+    uint     Flags;             // bit 0: per-point colors, bit 1: EWA mode, bit 2: per-point radii
+    uint64_t PtrRadii;          // per-point float radii (0 = uniform PointSize)
 } push;
 
 layout(location = 0) out vec4 fragColor;
@@ -86,8 +86,15 @@ void main()
     vec2 localOffset = vec2[](vec2(-1,-1), vec2(1,-1), vec2(1,1), vec2(-1,1))[cornerIdx];
     fragDiscUV = localOffset;
 
+    // Resolve point radius: per-point or uniform.
+    float baseRadius = push.PointSize;
+    if (push.PtrRadii != 0ul && (push.Flags & 4u) != 0u)
+    {
+        RadiiBuf radiiBuf = RadiiBuf(push.PtrRadii);
+        baseRadius = radiiBuf.v[pointIndex];
+    }
     // Clamp point radius to safe world-space range [0.0001, 1.0].
-    float radiusWorld = clamp(push.PointSize, 0.0001, 1.0) * push.SizeMultiplier;
+    float radiusWorld = clamp(baseRadius, 0.0001, 1.0) * push.SizeMultiplier;
 
     // Default: no EWA covariance.
     fragEwaCovInv = vec3(0.0);

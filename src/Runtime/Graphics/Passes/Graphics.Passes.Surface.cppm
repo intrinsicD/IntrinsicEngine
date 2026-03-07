@@ -215,6 +215,9 @@ export namespace Graphics::Passes
             // Per-face attribute buffer device address (0 = standard shading).
             uint64_t PtrFaceAttr = 0;
 
+            // Per-vertex attribute buffer device address (0 = no per-vertex colors).
+            uint64_t PtrVertexAttr = 0;
+
             // Packed-slice offsets (bytes) into Indirect buffers.
             VkDeviceSize IndirectOffsetBytes = 0;
             VkDeviceSize CountOffsetBytes = 0;
@@ -273,5 +276,23 @@ export namespace Graphics::Passes
         uint64_t EnsureFaceAttrBuffer(uint32_t geoIndex,
                                       const uint32_t* colorData,
                                       uint32_t faceCount);
+
+        // -----------------------------------------------------------------
+        // Per-vertex attribute buffers — persistent BDA-addressable GPU buffers
+        // keyed by GeometryHandle::Index. Same pattern as FaceAttrEntry.
+        // -----------------------------------------------------------------
+        struct VertexAttrEntry
+        {
+            std::unique_ptr<RHI::VulkanBuffer> Buffer;
+            uint32_t VertexCount = 0;
+        };
+        std::unordered_map<uint32_t, VertexAttrEntry> m_VertexAttrBuffers;
+
+        // Create or update a persistent per-vertex attribute buffer for a geometry.
+        // Data is an array of packed ABGR uint32_t, one per vertex.
+        // Returns the BDA device address, or 0 on failure.
+        uint64_t EnsureVertexAttrBuffer(uint32_t geoIndex,
+                                        const uint32_t* colorData,
+                                        uint32_t vertexCount);
     };
 }

@@ -256,6 +256,60 @@ namespace Graphics::Systems::PropertySetDirtySync
     }
 
     // =====================================================================
+    // Mesh vertex attributes dirty: extract per-vertex colors from Mesh::Data
+    // PropertySets into Surface::Component::CachedVertexColors.
+    // =====================================================================
+    static void SyncMeshVertexAttributes(entt::registry& registry)
+    {
+        auto view = registry.view<ECS::DirtyTag::VertexAttributes, ECS::Mesh::Data, ECS::Surface::Component>();
+        for (auto [entity, meshData, surfComp] : view.each())
+        {
+            if (!meshData.MeshRef)
+                continue;
+
+            auto& vtxConfig = meshData.Visualization.VertexColors;
+            surfComp.CachedVertexColors.clear();
+
+            if (!vtxConfig.PropertyName.empty())
+            {
+                auto result = ColorMapper::MapProperty(
+                    meshData.MeshRef->VertexProperties(), vtxConfig);
+                if (result)
+                    surfComp.CachedVertexColors = std::move(result->Colors);
+            }
+
+            surfComp.VertexColorsDirty = true;
+        }
+    }
+
+    // =====================================================================
+    // Mesh face attributes dirty: extract per-face colors from Mesh::Data
+    // PropertySets into Surface::Component::CachedFaceColors.
+    // =====================================================================
+    static void SyncMeshFaceAttributes(entt::registry& registry)
+    {
+        auto view = registry.view<ECS::DirtyTag::FaceAttributes, ECS::Mesh::Data, ECS::Surface::Component>();
+        for (auto [entity, meshData, surfComp] : view.each())
+        {
+            if (!meshData.MeshRef)
+                continue;
+
+            auto& faceConfig = meshData.Visualization.FaceColors;
+            surfComp.CachedFaceColors.clear();
+
+            if (!faceConfig.PropertyName.empty())
+            {
+                auto result = ColorMapper::MapProperty(
+                    meshData.MeshRef->FaceProperties(), faceConfig);
+                if (result)
+                    surfComp.CachedFaceColors = std::move(result->Colors);
+            }
+
+            surfComp.FaceColorsDirty = true;
+        }
+    }
+
+    // =====================================================================
     // Face attributes dirty: signal face color SSBO re-upload.
     // =====================================================================
     static void SyncFaceAttributesDirty(entt::registry& registry)
@@ -287,6 +341,8 @@ namespace Graphics::Systems::PropertySetDirtySync
         SyncGraphVertexAttributes(registry);
         SyncGraphEdgeAttributes(registry);
         SyncPointCloudAttributes(registry);
+        SyncMeshVertexAttributes(registry);
+        SyncMeshFaceAttributes(registry);
         SyncFaceAttributesDirty(registry);
 
         // 3. Clear all dirty tags. Bulk clear is efficient with EnTT.

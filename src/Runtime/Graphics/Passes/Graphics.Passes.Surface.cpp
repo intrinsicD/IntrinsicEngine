@@ -429,6 +429,30 @@ namespace Graphics::Passes
             }
         }
 
+        // -----------------------------------------------------------------
+        // Resolve per-vertex attribute buffers from Surface components.
+        // Maps geometry handle index → vertex attribute BDA address.
+        // First entity with CachedVertexColors for a geometry wins.
+        // -----------------------------------------------------------------
+        std::unordered_map<uint32_t, uint64_t> vertexAttrByGeoIndex;
+        {
+            auto visView = ctx.Scene.GetRegistry().view<ECS::Surface::Component>();
+            for (auto [entity, sc] : visView.each())
+            {
+                if (!sc.Geometry.IsValid() || sc.CachedVertexColors.empty() || !sc.ShowPerVertexColors)
+                    continue;
+
+                if (vertexAttrByGeoIndex.contains(sc.Geometry.Index))
+                    continue;
+
+                const uint32_t vertexCount = static_cast<uint32_t>(sc.CachedVertexColors.size());
+                const uint64_t addr = EnsureVertexAttrBuffer(
+                    sc.Geometry.Index, sc.CachedVertexColors.data(), vertexCount);
+                if (addr != 0)
+                    vertexAttrByGeoIndex[sc.Geometry.Index] = addr;
+            }
+        }
+
         // Build draw batches: one per geometry, slicing packed buffers.
         // NOTE: VisibilityBuffer is bound at offset 0 (alignment), and we pass VisibilityBase (element index)
         // via push constants so the vertex shader indexes the packed table correctly.
@@ -468,6 +492,10 @@ namespace Graphics::Passes
             // Per-face attribute buffer (0 = standard shading).
             auto faceIt = faceAttrByGeoIndex.find(g.Handle.Index);
             b.PtrFaceAttr = (faceIt != faceAttrByGeoIndex.end()) ? faceIt->second : 0;
+
+            // Per-vertex attribute buffer (0 = no per-vertex colors).
+            auto vertexIt = vertexAttrByGeoIndex.find(g.Handle.Index);
+            b.PtrVertexAttr = (vertexIt != vertexAttrByGeoIndex.end()) ? vertexIt->second : 0;
 
             // Packed buffers.
             b.InstanceBuffer = &ctx.GpuScene->GetSceneBuffer();
@@ -650,7 +678,8 @@ namespace Graphics::Passes
                                                 .PtrAux = b.PtrAux,
                                                 .VisibilityBase = b.VisibilityBase,
                                                 .PointSizePx = (b.Topology == VK_PRIMITIVE_TOPOLOGY_POINT_LIST) ? b.PointSizePx : 1.0f,
-                                                .PtrFaceAttr = b.PtrFaceAttr
+                                                .PtrFaceAttr = b.PtrFaceAttr,
+                                                .PtrVertexAttr = b.PtrVertexAttr
                                             };
                                             vkCmdPushConstants(cmd, desired->GetLayout(),
                                                                VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
@@ -965,6 +994,52 @@ namespace Graphics::Passes
         const uint64_t addr = buf->GetDeviceAddress();
 
         m_FaceAttrBuffers[geoIndex] = { std::move(buf), faceCount };
+        return addr;
+    }
+
+    // =========================================================================
+    // EnsureVertexAttrBuffer
+    // =========================================================================
+    // Creates or updates a persistent BDA-addressable per-vertex attribute buffer
+    // for a geometry. Same pattern as EnsureFaceAttrBuffer.
+
+    uint64_t SurfacePass::EnsureVertexAttrBuffer(
+        uint32_t geoIndex,
+        const uint32_t* colorData,
+        uint32_t vertexCount)
+    {
+        auto it = m_VertexAttrBuffers.find(geoIndex);
+
+        // Buffer exists and vertex count matches — update data in-place.
+        if (it != m_VertexAttrBuffers.end() && it->second.VertexCount == vertexCount && it->second.Buffer)
+        {
+            it->second.Buffer->Write(colorData, static_cast<size_t>(vertexCount) * sizeof(uint32_t));
+            return it->second.Buffer->GetDeviceAddress();
+        }
+
+        // Need to create or recreate (count changed).
+        if (it != m_VertexAttrBuffers.end() && it->second.Buffer)
+        {
+            m_Device->SafeDestroy([old = std::move(it->second.Buffer)]() {});
+            it->second.VertexCount = 0;
+        }
+
+        const VkDeviceSize size = static_cast<VkDeviceSize>(vertexCount) * sizeof(uint32_t);
+        auto buf = std::make_unique<RHI::VulkanBuffer>(
+            *m_Device, size,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+            VMA_MEMORY_USAGE_CPU_TO_GPU);
+
+        if (!buf->GetMappedData())
+        {
+            Core::Log::Error("SurfacePass: Failed to allocate vertex attribute buffer ({} bytes)", size);
+            return 0;
+        }
+
+        buf->Write(colorData, static_cast<size_t>(size));
+        const uint64_t addr = buf->GetDeviceAddress();
+
+        m_VertexAttrBuffers[geoIndex] = { std::move(buf), vertexCount };
         return addr;
     }
 
