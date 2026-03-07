@@ -67,7 +67,7 @@ Avoid when: it obscures a hot-path class API, virtual interfaces are involved, o
 
 When a class with virtual functions is declared in a module partition interface (`.cppm`) and its methods are defined elsewhere, vtable emission can be fragile across compilers. As defensive practice, this codebase anchors vtables explicitly:
 
-- **Pure-virtual base classes** (e.g., `IAssetLoader`): Define the destructor in a single known TU (e.g., `Graphics.IORegistry.cpp` defines all five loader destructors).
+- **Pure-virtual base classes** (e.g., `IAssetLoader`, `IAssetExporter`): Define the destructor in a single known TU (e.g., `Graphics.IORegistry.cpp` defines all eight loader and three exporter destructors).
 - **Non-pure-virtual base classes** (e.g., `RenderPipeline`, `IRenderFeature`): The `DefaultPipeline` destructor is defined out-of-line in `Graphics.Pipelines.cppm` as a vtable anchor.
 
 This pattern is retained for robustness even though Clang 20 has resolved the vtable emission bugs that affected Clang 18.
@@ -137,14 +137,14 @@ The engine uses a unified three-pass rendering architecture with one pass per pr
 
 ### Passes and DefaultPipeline
 
-`DefaultPipeline` registers 8 passes in order: Picking, `SurfacePass`, `LinePass`, `PointPass`, `PostProcessPass`, SelectionOutline, DebugView, ImGui.
+`DefaultPipeline` registers 9 stages in order: Picking, `SurfacePass`, `LinePass`, `PointPass`, (Composition placeholder for future deferred/hybrid paths), `PostProcessPass`, SelectionOutline, DebugView, ImGui, Present.
 
 | Pass | Primitives | Retained Data | Transient Data | Shaders | Feature Gate |
 |------|-----------|---------------|----------------|---------|--------------|
 | **SurfacePass** | Filled triangles | BDA from `GeometryGpuData` | — | `surface.vert/frag` | `"SurfacePass"` |
 | **LinePass** | Thick anti-aliased edges | BDA positions + edge index buffer | `DebugDraw::GetLines()` | `line.vert/frag` | `"LinePass"` |
 | **PointPass** | Expanded billboard quads | BDA positions + normals | `DebugDraw::GetPoints()` | `point_flatdisc.vert/frag`, `point_surfel.vert/frag` | `"PointPass"` |
-| **PostProcessPass** | Fullscreen triangle + compute | — | — | `post_fullscreen.vert`, `post_tonemap.frag`, `post_fxaa.frag`, `post_histogram.comp` | `"PostProcessPass"` |
+| **PostProcessPass** | Fullscreen triangle + compute | — | — | `post_fullscreen.vert`, `post_tonemap.frag`, `post_fxaa.frag`, `post_bloom_downsample.frag`, `post_bloom_upsample.frag`, `post_smaa_edge.frag`, `post_smaa_blend.frag`, `post_smaa_resolve.frag`, `post_histogram.comp` | `"PostProcessPass"` |
 
 ### ECS Render Component Types
 
