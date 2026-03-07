@@ -280,12 +280,6 @@ namespace Core::Tasks
         return 1ull << (histogram.size() - 2);
     }
 
-    static void ReleaseInFlightToken() //TODO: do we really need this function? It is currently unused.
-    {
-        const auto remaining = s_Ctx->inFlightTasks.fetch_sub(1, std::memory_order_acq_rel) - 1;
-        if (remaining == 0)
-            s_Ctx->inFlightTasks.notify_all();
-    }
 
     [[nodiscard]] static bool EnqueueInject(LocalTask&& task)
     {

@@ -133,8 +133,7 @@ namespace Graphics::SMAA
                 {
                     float e2 = float(e2q) * 0.25f;
 
-                    int subtexX = e1q * subtexW + e2q; // This isn't quite right, let me
-                    // reorganize: the texture layout is:
+                    // The texture layout is:
                     // X: e2 * maxDist * 2 patterns → 5 * 32 = 160
                     // Y: (e1 * subtexels + subtex) * 32 patterns → 5 * 7 * 32 = 1120? No.
                     // Per the SMAA reference:

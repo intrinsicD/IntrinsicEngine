@@ -36,6 +36,8 @@ export import :PropertyEnumerator;
 export import :ColorMapper;
 export import :VectorFieldManager;
 export import :IsolineExtractor;
+export import :Passes.PostProcessSettings;
+export import :Passes.SelectionOutlineSettings;
 
 // NOTE: We intentionally do NOT re-export pipeline implementations here.
 // Import `Graphics.Pipelines` explicitly in apps/tools when you need DefaultPipeline/etc.

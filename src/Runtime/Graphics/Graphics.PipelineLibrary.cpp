@@ -68,6 +68,8 @@ namespace Graphics
                                        VkFormat depthFormat,
                                        VkFormat sceneColorFormat)
     {
+        (void)swapchainFormat;
+
         // ---------------------------------------------------------------------
         // Surface pipeline (Textured + BDA)
         // Renders to HDR SceneColor target (sceneColorFormat), NOT the swapchain.

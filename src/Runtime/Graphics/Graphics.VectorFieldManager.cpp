@@ -1,5 +1,6 @@
 module;
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -45,7 +46,6 @@ namespace
 
         // Optional per-vector length scaling from a scalar property.
         const float* lengthScales = nullptr;
-        std::vector<float> lengthBuf;
         if (!entry.LengthPropertyName.empty())
         {
             auto lenProp = vertexProps.Get<float>(entry.LengthPropertyName);
@@ -162,13 +162,14 @@ void VectorFieldManager::SyncVectorFields(
         if (hasPerVectorColors)
         {
             graphData.CachedEdgeColors = std::move(perEdgeColors);
-            graphData.ShowPerEdgeColors = true;
         }
         else
         {
             graphData.CachedEdgeColors.clear();
-            graphData.ShowPerEdgeColors = false;
         }
+
+        if (auto* line = registry.try_get<ECS::Line::Component>(entry.ChildEntity))
+            line->ShowPerEdgeColors = hasPerVectorColors;
     }
 }
 

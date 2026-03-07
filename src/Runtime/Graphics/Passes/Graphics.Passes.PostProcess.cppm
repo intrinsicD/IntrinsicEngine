@@ -40,7 +40,7 @@ export namespace Graphics::Passes
     //   ToneMap: SceneColorHDR + BloomMip0 -> SceneColorLDR
     // -----------------------------------------------------------------
 
-    static constexpr uint32_t kBloomMipCount = 5;
+    inline constexpr uint32_t kBloomMipCount = 5;
 
     class PostProcessPass final : public IRenderFeature
     {
@@ -62,8 +62,8 @@ export namespace Graphics::Passes
         void PostCompile(uint32_t frameIndex,
                          std::span<const RenderGraphDebugImage> debugImages);
 
-        PostProcessSettings& GetSettings() { return m_Settings; }
-        const PostProcessSettings& GetSettings() const { return m_Settings; }
+        [[nodiscard]] PostProcessSettings& GetSettings() { return m_Settings; }
+        [[nodiscard]] const PostProcessSettings& GetSettings() const { return m_Settings; }
 
         // Access CPU-side histogram readback for UI display.
         [[nodiscard]] const HistogramReadback& GetHistogram() const { return m_HistogramReadback; }

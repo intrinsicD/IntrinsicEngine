@@ -12,6 +12,7 @@ module;
 #include <glm/glm.hpp>
 
 #include "RHI.Vulkan.hpp"
+#include "Graphics.SMAALookupTextures.hpp"
 
 module Graphics:Passes.PostProcess.Impl;
 
@@ -27,7 +28,6 @@ import RHI;
 using namespace Core::Hash;
 
 #include "Graphics.PassUtils.hpp"
-#include "Graphics.SMAALookupTextures.hpp"
 
 namespace Graphics::Passes
 {
@@ -234,7 +234,6 @@ namespace Graphics::Passes
     {
         using namespace Graphics::SMAA;
 
-        VkDevice dev = m_Device->GetLogicalDevice();
 
         // Generate area texture data (160x560, RG8).
         auto areaData = GenerateAreaTexture();
