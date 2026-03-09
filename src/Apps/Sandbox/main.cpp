@@ -2185,16 +2185,10 @@ public:
                   pcd.PointCount(), pcd.HasNormals() ? "yes" : "no", pcd.HasRadii() ? "yes" : "no");
     }
 
-    void DrawGeometryProcessingPanel()
-    {
-        ImGui::Begin("Geometry Workflow");
-        DrawGeometryWorkflowPanel();
-        ImGui::End();
-    }
+    // Removed obsolete DrawGeometryProcessingPanel (no longer needed).
 
     void DrawGeometryRemeshingPanel()
     {
-        ImGui::Begin("Geometry - Remeshing");
         const auto context = GetGeometrySelectionContext();
         if (DrawGeometryOperatorPanelHeader(context,
                 "Use remeshing to regularize edge lengths. Isotropic remeshing targets a uniform metric; adaptive remeshing keeps room for size-field-driven workflows while still sharing the same mesh pipeline."))
@@ -2232,12 +2226,10 @@ public:
                 });
             }
         }
-        ImGui::End();
     }
 
     void DrawGeometrySimplificationPanel()
     {
-        ImGui::Begin("Geometry - Simplification");
         const auto context = GetGeometrySelectionContext();
         if (DrawGeometryOperatorPanelHeader(context,
                 "Simplification reduces triangle count while preserving overall shape. Keep this panel separate from remeshing and smoothing so decimation can be inserted wherever a workflow needs it."))
@@ -2255,12 +2247,10 @@ public:
                 });
             }
         }
-        ImGui::End();
     }
 
     void DrawGeometrySmoothingPanel()
     {
-        ImGui::Begin("Geometry - Smoothing");
         const auto context = GetGeometrySelectionContext();
         if (DrawGeometryOperatorPanelHeader(context,
                 "Smoothing approaches stay together so you can compare differential operators without hunting through unrelated UI. They remain independently accessible from the Geometry menu and can still be chained after remeshing or before subdivision."))
@@ -2315,12 +2305,10 @@ public:
                 });
             }
         }
-        ImGui::End();
     }
 
     void DrawGeometrySubdivisionPanel()
     {
-        ImGui::Begin("Geometry - Subdivision");
         const auto context = GetGeometrySelectionContext();
         if (DrawGeometryOperatorPanelHeader(context,
                 "Subdivision is kept distinct from smoothing and remeshing because it changes topology with a refinement-first workflow. Open it alongside repair or smoothing when building higher-resolution assets."))
@@ -2349,12 +2337,10 @@ public:
                 });
             }
         }
-        ImGui::End();
     }
 
     void DrawGeometryRepairPanel()
     {
-        ImGui::Begin("Geometry - Repair");
         const auto context = GetGeometrySelectionContext();
         if (DrawGeometryOperatorPanelHeader(context,
                 "Repair stays as a standalone cleanup pass so it can be inserted before or after heavier operators without dragging the rest of the geometry UI along."))
@@ -2366,8 +2352,6 @@ public:
                 });
             }
         }
-
-        ImGui::End();
     }
 
     // =========================================================================
