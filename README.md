@@ -426,18 +426,33 @@ Panels are registered via `Interface::GUI::RegisterPanel()`.
 ### Menus
 
 - `File` → `Save Scene` / `Save Scene As...` / `Load Scene` — JSON scene serialization with dirty-state warning.
+- `Geometry` → workflow-oriented entry points for geometry tools:
+  - `Workflow` → `Overview` / `Open Workflow Stack`
+  - `Remeshing` → `Isotropic Remeshing` / `Adaptive Remeshing`
+  - `Simplification` → `QEM Simplification`
+  - `Smoothing` → `Uniform Laplacian` / `Cotan Laplacian` / `Taubin Smoothing` / `Implicit Smoothing`
+  - `Subdivision` → `Loop Subdivision` / `Catmull-Clark Subdivision`
+  - `Repair` → `Mesh Repair`
 
 ### Panels
 
 - `Features` — browse and toggle `Core::FeatureRegistry` categories (RenderFeatures, Systems, Panels, GeometryOperators).
 - `Frame Graph` — inspect the current `Core::FrameGraph` execution layers (pass names grouped by parallel layer).
 - `Selection` — configure selection backend (CPU/GPU), mouse button, and clear selection.
+- `Geometry Workflow` — overview panel for geometry processing, current selection state, and one-click opening of focused operator panels.
+- `Geometry - Remeshing` — isotropic and adaptive remeshing controls.
+- `Geometry - Simplification` — QEM-based mesh simplification controls.
+- `Geometry - Smoothing` — grouped Laplacian/Taubin/implicit smoothing controls for side-by-side comparison.
+- `Geometry - Subdivision` — Loop and Catmull-Clark subdivision controls.
+- `Geometry - Repair` — standalone mesh repair / cleanup pass.
 
 ### Extending
 
 Common editor panels live in `src/Runtime/EditorUI/` and are registered from the app via:
 
 - `Runtime::EditorUI::RegisterDefaultPanels(engine)`
+
+Sandbox-specific geometry workflow panels are registered by the app and surfaced through the `Geometry` main menu so operator families can be opened independently or composed together as a workflow stack.
 
 Add a new panel by calling `Interface::GUI::RegisterPanel("My Panel", []{ ... });` from `Runtime.EditorUI`.
 

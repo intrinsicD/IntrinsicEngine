@@ -134,6 +134,38 @@ public:
     {
     }
 
+    struct GeometryRemeshingUiState
+    {
+        float TargetLength = 0.05f;
+        int Iterations = 5;
+        bool PreserveBoundary = true;
+    };
+
+    struct GeometrySimplificationUiState
+    {
+        int TargetFaces = 1000;
+        bool PreserveBoundary = true;
+    };
+
+    struct GeometrySmoothingUiState
+    {
+        int Iterations = 10;
+        float Lambda = 0.5f;
+        bool PreserveBoundary = true;
+    };
+
+    struct GeometrySubdivisionUiState
+    {
+        int Iterations = 1;
+    };
+
+    struct GeometrySelectionContext
+    {
+        entt::entity Selected = entt::null;
+        bool HasSelection = false;
+        bool HasSurface = false;
+    };
+
     // Resources
     Assets::AssetHandle m_DuckModel{};
     Assets::AssetHandle m_DuckTexture{};
@@ -150,6 +182,10 @@ public:
 
     // Editor / Selection Settings
     int m_SelectMouseButton = 1; // 0=LMB, 1=RMB, 2=MMB. Default: RMB to avoid conflict with LMB-drag orbit.
+    GeometryRemeshingUiState m_GeometryRemeshingUi{};
+    GeometrySimplificationUiState m_GeometrySimplificationUi{};
+    GeometrySmoothingUiState m_GeometrySmoothingUi{};
+    GeometrySubdivisionUiState m_GeometrySubdivisionUi{};
 
     // Octree Debug Visualization Settings (shared between UI and OnUpdate)
     Graphics::OctreeDebugDrawSettings m_OctreeDebugSettings{};
@@ -213,6 +249,191 @@ public:
     const Graphics::GeometryCollisionData* m_ConvexHullOverlaySource = nullptr;
     Graphics::ConvexHullDebugDrawSettings m_CachedConvexHullOverlaySettings{};
     glm::mat4 m_CachedConvexHullOverlayWorld{1.0f};
+
+    [[nodiscard]] GeometrySelectionContext GetGeometrySelectionContext()
+    {
+        GeometrySelectionContext context{};
+        context.Selected = GetSelection().GetSelectedEntity(GetScene());
+
+        auto& reg = GetScene().GetRegistry();
+        context.HasSelection = context.Selected != entt::null && reg.valid(context.Selected);
+        context.HasSurface = context.HasSelection && reg.all_of<ECS::Surface::Component>(context.Selected);
+        return context;
+    }
+
+    [[nodiscard]] bool DrawGeometryOperatorPanelHeader(const GeometrySelectionContext& context,
+                                                       const char* description)
+    {
+        if (description != nullptr && description[0] != '\0')
+        {
+            ImGui::TextWrapped("%s", description);
+            ImGui::Spacing();
+        }
+
+        if (!context.HasSelection)
+        {
+            ImGui::TextDisabled("Select an entity to process geometry.");
+            return false;
+        }
+
+        ImGui::Text("Selected Entity: %u",
+                    static_cast<uint32_t>(static_cast<entt::id_type>(context.Selected)));
+
+        if (!context.HasSurface)
+        {
+            ImGui::TextDisabled("Selected entity does not have a Surface component.");
+            return false;
+        }
+
+        ImGui::TextDisabled("Operators apply in sequence to the selected surface mesh, so panels can be mixed into one workflow.");
+        ImGui::Separator();
+        return true;
+    }
+
+    void OpenGeometryWorkflowPanel()
+    {
+        Interface::GUI::RegisterPanel("Geometry Workflow", [this]() { DrawGeometryWorkflowPanel(); });
+    }
+
+    void OpenGeometryRemeshingPanel()
+    {
+        Interface::GUI::RegisterPanel("Geometry - Remeshing", [this]() { DrawGeometryRemeshingPanel(); });
+    }
+
+    void OpenGeometrySimplificationPanel()
+    {
+        Interface::GUI::RegisterPanel("Geometry - Simplification", [this]() { DrawGeometrySimplificationPanel(); });
+    }
+
+    void OpenGeometrySmoothingPanel()
+    {
+        Interface::GUI::RegisterPanel("Geometry - Smoothing", [this]() { DrawGeometrySmoothingPanel(); });
+    }
+
+    void OpenGeometrySubdivisionPanel()
+    {
+        Interface::GUI::RegisterPanel("Geometry - Subdivision", [this]() { DrawGeometrySubdivisionPanel(); });
+    }
+
+    void OpenGeometryRepairPanel()
+    {
+        Interface::GUI::RegisterPanel("Geometry - Repair", [this]() { DrawGeometryRepairPanel(); });
+    }
+
+    void OpenGeometryWorkflowStack()
+    {
+        OpenGeometryWorkflowPanel();
+        OpenGeometryRemeshingPanel();
+        OpenGeometrySimplificationPanel();
+        OpenGeometrySmoothingPanel();
+        OpenGeometrySubdivisionPanel();
+        OpenGeometryRepairPanel();
+    }
+
+    void DrawGeometryMenu()
+    {
+        if (!ImGui::BeginMenu("Geometry"))
+            return;
+
+        if (ImGui::BeginMenu("Workflow"))
+        {
+            if (ImGui::MenuItem("Overview"))
+                OpenGeometryWorkflowPanel();
+            if (ImGui::MenuItem("Open Workflow Stack"))
+                OpenGeometryWorkflowStack();
+            ImGui::EndMenu();
+        }
+
+        if (ImGui::BeginMenu("Remeshing"))
+        {
+            if (ImGui::MenuItem("Isotropic Remeshing"))
+                OpenGeometryRemeshingPanel();
+            if (ImGui::MenuItem("Adaptive Remeshing"))
+                OpenGeometryRemeshingPanel();
+            ImGui::EndMenu();
+        }
+
+        if (ImGui::BeginMenu("Simplification"))
+        {
+            if (ImGui::MenuItem("QEM Simplification"))
+                OpenGeometrySimplificationPanel();
+            ImGui::EndMenu();
+        }
+
+        if (ImGui::BeginMenu("Smoothing"))
+        {
+            if (ImGui::MenuItem("Uniform Laplacian"))
+                OpenGeometrySmoothingPanel();
+            if (ImGui::MenuItem("Cotan Laplacian"))
+                OpenGeometrySmoothingPanel();
+            if (ImGui::MenuItem("Taubin Smoothing"))
+                OpenGeometrySmoothingPanel();
+            if (ImGui::MenuItem("Implicit Smoothing"))
+                OpenGeometrySmoothingPanel();
+            ImGui::EndMenu();
+        }
+
+        if (ImGui::BeginMenu("Subdivision"))
+        {
+            if (ImGui::MenuItem("Loop Subdivision"))
+                OpenGeometrySubdivisionPanel();
+            if (ImGui::MenuItem("Catmull-Clark Subdivision"))
+                OpenGeometrySubdivisionPanel();
+            ImGui::EndMenu();
+        }
+
+        if (ImGui::BeginMenu("Repair"))
+        {
+            if (ImGui::MenuItem("Mesh Repair"))
+                OpenGeometryRepairPanel();
+            ImGui::EndMenu();
+        }
+
+        ImGui::EndMenu();
+    }
+
+    void DrawGeometryWorkflowPanel()
+    {
+        const auto context = GetGeometrySelectionContext();
+
+        ImGui::TextWrapped("Geometry tools are organized by workflow and algorithm family. Open only the panels you need, or open the full stack when chaining remeshing, smoothing, simplification, subdivision, and repair together.");
+        ImGui::SeparatorText("Selection");
+        if (context.HasSelection)
+        {
+            ImGui::Text("Selected Entity: %u",
+                        static_cast<uint32_t>(static_cast<entt::id_type>(context.Selected)));
+            ImGui::TextDisabled(context.HasSurface
+                ? "Surface mesh detected. Geometry operators are available."
+                : "Selected entity does not have a Surface component.");
+        }
+        else
+        {
+            ImGui::TextDisabled("Select an entity with a surface mesh to apply geometry operators.");
+        }
+
+        ImGui::SeparatorText("Open Panels");
+        if (ImGui::Button("Open Workflow Stack"))
+            OpenGeometryWorkflowStack();
+        if (ImGui::Button("Open Remeshing"))
+            OpenGeometryRemeshingPanel();
+        ImGui::SameLine();
+        if (ImGui::Button("Open Simplification"))
+            OpenGeometrySimplificationPanel();
+        ImGui::SameLine();
+        if (ImGui::Button("Open Smoothing"))
+            OpenGeometrySmoothingPanel();
+        if (ImGui::Button("Open Subdivision"))
+            OpenGeometrySubdivisionPanel();
+        ImGui::SameLine();
+        if (ImGui::Button("Open Repair"))
+            OpenGeometryRepairPanel();
+
+        ImGui::SeparatorText("Approach Map");
+        ImGui::BulletText("Remeshing: Isotropic and Adaptive remeshing share the same workflow surface.");
+        ImGui::BulletText("Smoothing: Uniform, Cotan, Taubin, and Implicit smoothing stay grouped together for side-by-side comparison.");
+        ImGui::BulletText("Simplification, Subdivision, and Repair remain focused single-purpose panels.");
+        ImGui::BulletText("Panels compose naturally because each operator rewrites the selected surface mesh in place.");
+    }
 
 
     bool EnsureSelectedColliderKDTree(entt::entity selected,
@@ -876,7 +1097,12 @@ public:
         registerPanelFeature("Stats", "Performance statistics and debug controls");
         registerPanelFeature("View Settings", "Selection outline and viewport display settings");
         registerPanelFeature("Render Target Viewer", "Render target debug visualization");
-        registerPanelFeature("Geometry Processing", "Interactive Geometry Processing operators");
+        registerPanelFeature("Geometry Workflow", "Workflow hub for geometry processing tools");
+        registerPanelFeature("Geometry - Remeshing", "Remeshing operators: isotropic and adaptive workflows");
+        registerPanelFeature("Geometry - Simplification", "Mesh simplification operators");
+        registerPanelFeature("Geometry - Smoothing", "Surface smoothing operators grouped by approach");
+        registerPanelFeature("Geometry - Subdivision", "Subdivision operators for surface refinement");
+        registerPanelFeature("Geometry - Repair", "Mesh cleanup and repair operators");
         registerPanelFeature("Status Bar", "Bottom-of-viewport frame summary (frame time, entity count, active renderer)");
 
         Log::Info("FeatureRegistry: {} total features after client registration", features.Count());
@@ -884,10 +1110,11 @@ public:
         Interface::GUI::RegisterPanel("Hierarchy", [this]() { DrawHierarchyPanel(); });
         Interface::GUI::RegisterPanel("Inspector", [this]() { DrawInspectorPanel(); });
         Interface::GUI::RegisterPanel("Assets", [this]() { GetAssetManager().AssetsUiPanel(); });
-        Interface::GUI::RegisterPanel("Geometry Processing", [this]() { DrawGeometryProcessingPanel(); });
+        OpenGeometryWorkflowPanel();
 
         // Register shared editor-facing panels (Feature browser, FrameGraph inspector, Selection config).
         Runtime::EditorUI::RegisterDefaultPanels(*this);
+        Interface::GUI::RegisterMainMenuBar("Geometry", [this]() { DrawGeometryMenu(); });
 
         Interface::GUI::RegisterPanel("Stats", [this]()
         {
@@ -1960,161 +2187,184 @@ public:
 
     void DrawGeometryProcessingPanel()
     {
-        ImGui::Begin("Geometry Processing");
+        ImGui::Begin("Geometry Workflow");
+        DrawGeometryWorkflowPanel();
+        ImGui::End();
+    }
 
-        const entt::entity selected = GetSelection().GetSelectedEntity(GetScene());
-
-        if (selected != entt::null && GetScene().GetRegistry().valid(selected))
+    void DrawGeometryRemeshingPanel()
+    {
+        ImGui::Begin("Geometry - Remeshing");
+        const auto context = GetGeometrySelectionContext();
+        if (DrawGeometryOperatorPanelHeader(context,
+                "Use remeshing to regularize edge lengths. Isotropic remeshing targets a uniform metric; adaptive remeshing keeps room for size-field-driven workflows while still sharing the same mesh pipeline."))
         {
-            auto& reg = GetScene().GetRegistry();
+            ImGui::DragFloat("Target Length", &m_GeometryRemeshingUi.TargetLength, 0.01f, 0.001f, 10.0f);
+            ImGui::DragInt("Iterations", &m_GeometryRemeshingUi.Iterations, 1.0f, 1, 20);
+            ImGui::Checkbox("Preserve Boundary", &m_GeometryRemeshingUi.PreserveBoundary);
 
-            if (reg.all_of<ECS::Surface::Component>(selected))
+            ImGui::SeparatorText("Approaches");
+            ImGui::TextDisabled("Uniform target edge length for evenly distributed tessellation.");
+            if (ImGui::Button("Run Isotropic Remeshing"))
             {
-                if (ImGui::CollapsingHeader("Remeshing", ImGuiTreeNodeFlags_DefaultOpen))
-                {
-                    static float targetLength = 0.05f;
-                    static int iterations = 5;
-                    static bool preserveBoundary = true;
-                    ImGui::DragFloat("Target Length", &targetLength, 0.01f, 0.001f, 10.0f);
-                    ImGui::DragInt("Iterations##Remesh", &iterations, 1, 1, 20);
-                    ImGui::Checkbox("Preserve Boundary##Remesh", &preserveBoundary);
-                    if (ImGui::Button("Isotropic Remesh"))
-                    {
-                        ApplyGeometryOperator(selected, [](Geometry::Halfedge::Mesh& mesh) {
-                            Geometry::Remeshing::RemeshingParams params;
-                            params.TargetLength = targetLength;
-                            params.Iterations = iterations;
-                            params.PreserveBoundary = preserveBoundary;
-                            static_cast<void>(Geometry::Remeshing::Remesh(mesh, params));
-                        });
-                    }
-                    if (ImGui::Button("Adaptive Remesh"))
-                    {
-                        ApplyGeometryOperator(selected, [](Geometry::Halfedge::Mesh& mesh) {
-                            Geometry::AdaptiveRemeshing::AdaptiveRemeshingParams params;
-                            params.MinEdgeLength = targetLength * 0.5f;
-                            params.MaxEdgeLength = targetLength * 2.0f;
-                            params.Iterations = iterations;
-                            params.PreserveBoundary = preserveBoundary;
-                            static_cast<void>(Geometry::AdaptiveRemeshing::AdaptiveRemesh(mesh, params));
-                        });
-                    }
-                }
-
-                if (ImGui::CollapsingHeader("Simplification", ImGuiTreeNodeFlags_DefaultOpen))
-                {
-                    static int targetFaces = 1000;
-                    static bool preserveBoundarySimp = true;
-                    ImGui::DragInt("Target Faces", &targetFaces, 10, 10, 1000000);
-                    ImGui::Checkbox("Preserve Boundary##Simp", &preserveBoundarySimp);
-                    if (ImGui::Button("Simplify (QEM)"))
-                    {
-                        ApplyGeometryOperator(selected, [](Geometry::Halfedge::Mesh& mesh) {
-                            Geometry::Simplification::SimplificationParams params;
-                            params.TargetFaces = targetFaces;
-                            params.PreserveBoundary = preserveBoundarySimp;
-                            static_cast<void>(Geometry::Simplification::Simplify(mesh, params));
-                        });
-                    }
-                }
-
-                if (ImGui::CollapsingHeader("Smoothing", ImGuiTreeNodeFlags_DefaultOpen))
-                {
-                    static int smoothIterations = 10;
-                    static float lambda = 0.5f;
-                    static bool preserveBoundarySmooth = true;
-                    ImGui::DragInt("Iterations##Smooth", &smoothIterations, 1, 1, 100);
-                    ImGui::DragFloat("Lambda", &lambda, 0.01f, 0.0f, 1.0f);
-                    ImGui::Checkbox("Preserve Boundary##Smooth", &preserveBoundarySmooth);
-
-                    if (ImGui::Button("Uniform Laplacian"))
-                    {
-                        ApplyGeometryOperator(selected, [](Geometry::Halfedge::Mesh& mesh) {
-                            Geometry::Smoothing::SmoothingParams params;
-                            params.Iterations = smoothIterations;
-                            params.Lambda = lambda;
-                            params.PreserveBoundary = preserveBoundarySmooth;
-                            static_cast<void>(Geometry::Smoothing::UniformLaplacian(mesh, params));
-                        });
-                    }
-                    if (ImGui::Button("Cotan Laplacian"))
-                    {
-                        ApplyGeometryOperator(selected, [](Geometry::Halfedge::Mesh& mesh) {
-                            Geometry::Smoothing::SmoothingParams params;
-                            params.Iterations = smoothIterations;
-                            params.Lambda = lambda;
-                            params.PreserveBoundary = preserveBoundarySmooth;
-                            static_cast<void>(Geometry::Smoothing::CotanLaplacian(mesh, params));
-                        });
-                    }
-                    if (ImGui::Button("Taubin Smoothing"))
-                    {
-                        ApplyGeometryOperator(selected, [](Geometry::Halfedge::Mesh& mesh) {
-                            Geometry::Smoothing::TaubinParams params;
-                            params.Iterations = smoothIterations;
-                            params.Lambda = lambda;
-                            params.PreserveBoundary = preserveBoundarySmooth;
-                            static_cast<void>(Geometry::Smoothing::Taubin(mesh, params));
-                        });
-                    }
-                    if (ImGui::Button("Implicit Smoothing"))
-                    {
-                        ApplyGeometryOperator(selected, [](Geometry::Halfedge::Mesh& mesh) {
-                            Geometry::Smoothing::ImplicitSmoothingParams params;
-                            params.Iterations = smoothIterations;
-                            params.Lambda = lambda;
-                            params.PreserveBoundary = preserveBoundarySmooth;
-                            static_cast<void>(Geometry::Smoothing::ImplicitLaplacian(mesh, params));
-                        });
-                    }
-                }
-
-                if (ImGui::CollapsingHeader("Subdivision", ImGuiTreeNodeFlags_DefaultOpen))
-                {
-                    static int subdivIterations = 1;
-                    ImGui::DragInt("Iterations##Subdiv", &subdivIterations, 1, 1, 5);
-                    if (ImGui::Button("Loop Subdivision"))
-                    {
-                        ApplyGeometryOperator(selected, [](Geometry::Halfedge::Mesh& mesh) {
-                            Geometry::Halfedge::Mesh out;
-                            Geometry::Subdivision::SubdivisionParams params;
-                            params.Iterations = subdivIterations;
-                            if (Geometry::Subdivision::Subdivide(mesh, out, params)) {
-                                mesh = std::move(out);
-                            }
-                        });
-                    }
-                    if (ImGui::Button("Catmull-Clark Subdivision"))
-                    {
-                        ApplyGeometryOperator(selected, [](Geometry::Halfedge::Mesh& mesh) {
-                            Geometry::Halfedge::Mesh out;
-                            Geometry::CatmullClark::SubdivisionParams params;
-                            params.Iterations = subdivIterations;
-                            if (Geometry::CatmullClark::Subdivide(mesh, out, params)) {
-                                mesh = std::move(out);
-                            }
-                        });
-                    }
-                }
-
-                if (ImGui::CollapsingHeader("Mesh Repair", ImGuiTreeNodeFlags_DefaultOpen))
-                {
-                    if (ImGui::Button("Repair Mesh"))
-                    {
-                        ApplyGeometryOperator(selected, [](Geometry::Halfedge::Mesh& mesh) {
-                            static_cast<void>(Geometry::MeshRepair::Repair(mesh));
-                        });
-                    }
-                }
+                const auto ui = m_GeometryRemeshingUi;
+                ApplyGeometryOperator(context.Selected, [ui](Geometry::Halfedge::Mesh& mesh) {
+                    Geometry::Remeshing::RemeshingParams params;
+                    params.TargetLength = ui.TargetLength;
+                    params.Iterations = ui.Iterations;
+                    params.PreserveBoundary = ui.PreserveBoundary;
+                    static_cast<void>(Geometry::Remeshing::Remesh(mesh, params));
+                });
             }
-            else
+
+            ImGui::Spacing();
+            ImGui::TextDisabled("Curvature-aware min/max edge lengths for adaptive workflows.");
+            if (ImGui::Button("Run Adaptive Remeshing"))
             {
-                ImGui::Text("Selected entity does not have a Surface component.");
+                const auto ui = m_GeometryRemeshingUi;
+                ApplyGeometryOperator(context.Selected, [ui](Geometry::Halfedge::Mesh& mesh) {
+                    Geometry::AdaptiveRemeshing::AdaptiveRemeshingParams params;
+                    params.MinEdgeLength = ui.TargetLength * 0.5f;
+                    params.MaxEdgeLength = ui.TargetLength * 2.0f;
+                    params.Iterations = ui.Iterations;
+                    params.PreserveBoundary = ui.PreserveBoundary;
+                    static_cast<void>(Geometry::AdaptiveRemeshing::AdaptiveRemesh(mesh, params));
+                });
             }
         }
-        else
+        ImGui::End();
+    }
+
+    void DrawGeometrySimplificationPanel()
+    {
+        ImGui::Begin("Geometry - Simplification");
+        const auto context = GetGeometrySelectionContext();
+        if (DrawGeometryOperatorPanelHeader(context,
+                "Simplification reduces triangle count while preserving overall shape. Keep this panel separate from remeshing and smoothing so decimation can be inserted wherever a workflow needs it."))
         {
-            ImGui::TextDisabled("Select an entity to process geometry.");
+            ImGui::DragInt("Target Faces", &m_GeometrySimplificationUi.TargetFaces, 10.0f, 10, 1000000);
+            ImGui::Checkbox("Preserve Boundary", &m_GeometrySimplificationUi.PreserveBoundary);
+            if (ImGui::Button("Run QEM Simplification"))
+            {
+                const auto ui = m_GeometrySimplificationUi;
+                ApplyGeometryOperator(context.Selected, [ui](Geometry::Halfedge::Mesh& mesh) {
+                    Geometry::Simplification::SimplificationParams params;
+                    params.TargetFaces = ui.TargetFaces;
+                    params.PreserveBoundary = ui.PreserveBoundary;
+                    static_cast<void>(Geometry::Simplification::Simplify(mesh, params));
+                });
+            }
+        }
+        ImGui::End();
+    }
+
+    void DrawGeometrySmoothingPanel()
+    {
+        ImGui::Begin("Geometry - Smoothing");
+        const auto context = GetGeometrySelectionContext();
+        if (DrawGeometryOperatorPanelHeader(context,
+                "Smoothing approaches stay together so you can compare differential operators without hunting through unrelated UI. They remain independently accessible from the Geometry menu and can still be chained after remeshing or before subdivision."))
+        {
+            ImGui::DragInt("Iterations", &m_GeometrySmoothingUi.Iterations, 1.0f, 1, 100);
+            ImGui::DragFloat("Lambda", &m_GeometrySmoothingUi.Lambda, 0.01f, 0.0f, 1.0f);
+            ImGui::Checkbox("Preserve Boundary", &m_GeometrySmoothingUi.PreserveBoundary);
+
+            ImGui::SeparatorText("Approaches");
+            if (ImGui::Button("Run Uniform Laplacian"))
+            {
+                const auto ui = m_GeometrySmoothingUi;
+                ApplyGeometryOperator(context.Selected, [ui](Geometry::Halfedge::Mesh& mesh) {
+                    Geometry::Smoothing::SmoothingParams params;
+                    params.Iterations = ui.Iterations;
+                    params.Lambda = ui.Lambda;
+                    params.PreserveBoundary = ui.PreserveBoundary;
+                    static_cast<void>(Geometry::Smoothing::UniformLaplacian(mesh, params));
+                });
+            }
+            if (ImGui::Button("Run Cotan Laplacian"))
+            {
+                const auto ui = m_GeometrySmoothingUi;
+                ApplyGeometryOperator(context.Selected, [ui](Geometry::Halfedge::Mesh& mesh) {
+                    Geometry::Smoothing::SmoothingParams params;
+                    params.Iterations = ui.Iterations;
+                    params.Lambda = ui.Lambda;
+                    params.PreserveBoundary = ui.PreserveBoundary;
+                    static_cast<void>(Geometry::Smoothing::CotanLaplacian(mesh, params));
+                });
+            }
+            if (ImGui::Button("Run Taubin Smoothing"))
+            {
+                const auto ui = m_GeometrySmoothingUi;
+                ApplyGeometryOperator(context.Selected, [ui](Geometry::Halfedge::Mesh& mesh) {
+                    Geometry::Smoothing::TaubinParams params;
+                    params.Iterations = ui.Iterations;
+                    params.Lambda = ui.Lambda;
+                    params.PreserveBoundary = ui.PreserveBoundary;
+                    static_cast<void>(Geometry::Smoothing::Taubin(mesh, params));
+                });
+            }
+            if (ImGui::Button("Run Implicit Smoothing"))
+            {
+                const auto ui = m_GeometrySmoothingUi;
+                ApplyGeometryOperator(context.Selected, [ui](Geometry::Halfedge::Mesh& mesh) {
+                    Geometry::Smoothing::ImplicitSmoothingParams params;
+                    params.Iterations = ui.Iterations;
+                    params.Lambda = ui.Lambda;
+                    params.PreserveBoundary = ui.PreserveBoundary;
+                    static_cast<void>(Geometry::Smoothing::ImplicitLaplacian(mesh, params));
+                });
+            }
+        }
+        ImGui::End();
+    }
+
+    void DrawGeometrySubdivisionPanel()
+    {
+        ImGui::Begin("Geometry - Subdivision");
+        const auto context = GetGeometrySelectionContext();
+        if (DrawGeometryOperatorPanelHeader(context,
+                "Subdivision is kept distinct from smoothing and remeshing because it changes topology with a refinement-first workflow. Open it alongside repair or smoothing when building higher-resolution assets."))
+        {
+            ImGui::DragInt("Iterations", &m_GeometrySubdivisionUi.Iterations, 1.0f, 1, 5);
+            if (ImGui::Button("Run Loop Subdivision"))
+            {
+                const auto ui = m_GeometrySubdivisionUi;
+                ApplyGeometryOperator(context.Selected, [ui](Geometry::Halfedge::Mesh& mesh) {
+                    Geometry::Halfedge::Mesh out;
+                    Geometry::Subdivision::SubdivisionParams params;
+                    params.Iterations = ui.Iterations;
+                    if (Geometry::Subdivision::Subdivide(mesh, out, params))
+                        mesh = std::move(out);
+                });
+            }
+            if (ImGui::Button("Run Catmull-Clark Subdivision"))
+            {
+                const auto ui = m_GeometrySubdivisionUi;
+                ApplyGeometryOperator(context.Selected, [ui](Geometry::Halfedge::Mesh& mesh) {
+                    Geometry::Halfedge::Mesh out;
+                    Geometry::CatmullClark::SubdivisionParams params;
+                    params.Iterations = ui.Iterations;
+                    if (Geometry::CatmullClark::Subdivide(mesh, out, params))
+                        mesh = std::move(out);
+                });
+            }
+        }
+        ImGui::End();
+    }
+
+    void DrawGeometryRepairPanel()
+    {
+        ImGui::Begin("Geometry - Repair");
+        const auto context = GetGeometrySelectionContext();
+        if (DrawGeometryOperatorPanelHeader(context,
+                "Repair stays as a standalone cleanup pass so it can be inserted before or after heavier operators without dragging the rest of the geometry UI along."))
+        {
+            if (ImGui::Button("Run Mesh Repair"))
+            {
+                ApplyGeometryOperator(context.Selected, [](Geometry::Halfedge::Mesh& mesh) {
+                    static_cast<void>(Geometry::MeshRepair::Repair(mesh));
+                });
+            }
         }
 
         ImGui::End();
