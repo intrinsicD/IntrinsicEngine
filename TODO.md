@@ -54,13 +54,6 @@ These are not required to finish the first wave, but they should begin soon afte
 - [ ] Improve primitive/submesh selection.
 - [ ] Add mask visualization in the editor.
 
-### B4. Post-Processing Correctness & Cleanup
-
-- [ ] Remove spurious `VK_ACCESS_2_MEMORY_WRITE_BIT` from `builder.Read()` calls in `Graphics.Passes.PostProcess.cpp` — reads should not declare write access.
-- [ ] Replace string-based resource lookups in PostCompile (bloom upsample binding 1, SMAA edge/weight bindings) with cached handles.
-- [ ] Remove dead write to `m_LastSMAAEdgesHandle` (assigned in edge pass setup, overwritten in blend pass setup, never used).
-- [ ] Pass integer `width`/`height` directly to histogram compute shader instead of reconstructing from inverse floats.
-
 ### B5. Post-Processing Test Coverage
 
 - [ ] Add contract tests for post-processing push constant struct sizes (`static_assert`).

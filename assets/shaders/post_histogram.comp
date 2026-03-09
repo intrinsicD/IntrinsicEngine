@@ -24,8 +24,8 @@ layout(std430, set = 0, binding = 1) buffer HistogramBuffer
 
 layout(push_constant) uniform PushConstants
 {
-    float InvWidth;
-    float InvHeight;
+    uint  Width;
+    uint  Height;
     float MinLogLum;   // log2(minLuminance)
     float RangeLogLum; // 1.0 / (log2(maxLuminance) - log2(minLuminance))
 };
@@ -42,13 +42,11 @@ void main()
     barrier();
 
     uvec2 pixel = gl_GlobalInvocationID.xy;
-    uint width  = uint(1.0 / InvWidth + 0.5);
-    uint height = uint(1.0 / InvHeight + 0.5);
 
-    if (pixel.x < width && pixel.y < height)
+    if (pixel.x < Width && pixel.y < Height)
     {
         // Sample at pixel center.
-        vec2 uv = (vec2(pixel) + 0.5) * vec2(InvWidth, InvHeight);
+        vec2 uv = (vec2(pixel) + 0.5) / vec2(float(Width), float(Height));
         vec3 color = texture(uSceneColor, uv).rgb;
 
         // Rec. 709 luminance.
