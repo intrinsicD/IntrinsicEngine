@@ -1795,48 +1795,46 @@ public:
                     else
                         ReleaseRetainedLineOverlay(m_ConvexHullOverlay);
 
+                    // Contact manifolds use the transient DebugDraw path (not retained
+                    // overlay) because they are derived from pairwise collider state each
+                    // frame and include short-lived point/normal instrumentation.
+                    ReleaseRetainedLineOverlay(m_ContactOverlay);
                     if (m_DrawSelectedColliderContacts)
                     {
-                        UpdateRetainedLineOverlay(m_ContactOverlay, [&](Graphics::DebugDraw& dd)
+                        auto& dd = GetRenderOrchestrator().GetDebugDraw();
+                        auto colliders = reg.view<ECS::MeshCollider::Component>();
+
+                        const uint32_t pointAColor = Graphics::DebugDraw::PackColorF(1.0f, 0.85f, 0.2f, 1.0f);
+                        const uint32_t pointBColor = Graphics::DebugDraw::PackColorF(1.0f, 0.2f, 0.2f, 1.0f);
+                        const uint32_t normalColor = Graphics::DebugDraw::PackColorF(0.2f, 0.85f, 1.0f, 1.0f);
+
+                        for (auto [otherEntity, otherCollider] : colliders.each())
                         {
-                            auto colliders = reg.view<ECS::MeshCollider::Component>();
+                            if (otherEntity == selected || !otherCollider.CollisionRef)
+                                continue;
 
-                            const uint32_t pointAColor = Graphics::DebugDraw::PackColorF(1.0f, 0.85f, 0.2f, 1.0f);
-                            const uint32_t pointBColor = Graphics::DebugDraw::PackColorF(1.0f, 0.2f, 0.2f, 1.0f);
-                            const uint32_t normalColor = Graphics::DebugDraw::PackColorF(0.2f, 0.85f, 1.0f, 1.0f);
+                            auto manifold = Geometry::ComputeContact(collider->WorldOBB, otherCollider.WorldOBB);
+                            if (!manifold)
+                                continue;
 
-                            for (auto [otherEntity, otherCollider] : colliders.each())
+                            const glm::vec3 mid = (manifold->ContactPointA + manifold->ContactPointB) * 0.5f;
+                            const glm::vec3 normalEnd = mid + manifold->Normal * (m_ContactNormalScale + manifold->PenetrationDepth);
+
+                            if (m_ContactDebugOverlay)
                             {
-                                if (otherEntity == selected || !otherCollider.CollisionRef)
-                                    continue;
-
-                                auto manifold = Geometry::ComputeContact(collider->WorldOBB, otherCollider.WorldOBB);
-                                if (!manifold)
-                                    continue;
-
-                                const glm::vec3 mid = (manifold->ContactPointA + manifold->ContactPointB) * 0.5f;
-                                const glm::vec3 normalEnd = mid + manifold->Normal * (m_ContactNormalScale + manifold->PenetrationDepth);
-
-                                if (m_ContactDebugOverlay)
-                                {
-                                    dd.OverlaySphere(manifold->ContactPointA, m_ContactPointRadius, pointAColor, 12);
-                                    dd.OverlaySphere(manifold->ContactPointB, m_ContactPointRadius, pointBColor, 12);
-                                    dd.OverlayLine(manifold->ContactPointA, manifold->ContactPointB, pointAColor, pointBColor);
-                                    dd.OverlayLine(mid, normalEnd, normalColor);
-                                }
-                                else
-                                {
-                                    dd.Sphere(manifold->ContactPointA, m_ContactPointRadius, pointAColor, 12);
-                                    dd.Sphere(manifold->ContactPointB, m_ContactPointRadius, pointBColor, 12);
-                                    dd.Line(manifold->ContactPointA, manifold->ContactPointB, pointAColor, pointBColor);
-                                    dd.Arrow(mid, normalEnd, glm::max(0.02f, m_ContactPointRadius), normalColor);
-                                }
+                                dd.OverlaySphere(manifold->ContactPointA, m_ContactPointRadius, pointAColor, 12);
+                                dd.OverlaySphere(manifold->ContactPointB, m_ContactPointRadius, pointBColor, 12);
+                                dd.OverlayLine(manifold->ContactPointA, manifold->ContactPointB, pointAColor, pointBColor);
+                                dd.OverlayLine(mid, normalEnd, normalColor);
                             }
-                        });
-                    }
-                    else
-                    {
-                        ReleaseRetainedLineOverlay(m_ContactOverlay);
+                            else
+                            {
+                                dd.Sphere(manifold->ContactPointA, m_ContactPointRadius, pointAColor, 12);
+                                dd.Sphere(manifold->ContactPointB, m_ContactPointRadius, pointBColor, 12);
+                                dd.Line(manifold->ContactPointA, manifold->ContactPointB, pointAColor, pointBColor);
+                                dd.Arrow(mid, normalEnd, glm::max(0.02f, m_ContactPointRadius), normalColor);
+                            }
+                        }
                     }
                 }
                 else

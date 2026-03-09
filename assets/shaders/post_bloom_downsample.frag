@@ -60,22 +60,15 @@ void main()
     vec3 l = texture(uInput, uv + vec2( 0.0,  2.0) * ts).rgb;
     vec3 m = texture(uInput, uv + vec2( 2.0,  2.0) * ts).rgb;
 
-    // Weighted combination to reduce firefly artifacts:
-    // Center diamond (d+e+i+j) gets 0.5 weight
-    // Four corner quads each get 0.125 weight
-    vec3 result = (d + e + i + j) * 0.25 * 0.5;
-    result += (a + b + d + g) * 0.25 * 0.125;  // top-left quad
-    result += (b + c + e + g) * 0.25 * 0.125;  // top-right quad
-    result += (g + f + i + k) * 0.25 * 0.125;  // bottom-left quad — corrected
-    result += (g + h + j + m) * 0.25 * 0.125;  // bottom-right quad — corrected
-
-    // For the first mip, correct the corner quads to use proper samples
-    // Recompute with correct groupings:
-    result = (d + e + i + j) * 0.125;
-    result += (a + b + f + g) * 0.03125;
-    result += (b + c + g + h) * 0.03125;
-    result += (f + g + k + l) * 0.03125;
-    result += (g + h + l + m) * 0.03125;
+    // Weighted combination (Jimenez 2014):
+    // Center diamond (d+e+i+j) gets 0.5 weight total (0.125 per sample).
+    // Four overlapping 2x2 corner quads each get 0.125 weight total (0.03125 per sample).
+    // g (center) participates in all four corner quads — receives highest effective weight.
+    vec3 result = (d + e + i + j) * 0.125;
+    result += (a + b + f + g) * 0.03125;  // top-left quad
+    result += (b + c + g + h) * 0.03125;  // top-right quad
+    result += (f + g + k + l) * 0.03125;  // bottom-left quad
+    result += (g + h + l + m) * 0.03125;  // bottom-right quad
 
     // Apply brightness threshold on first mip only
     if (pc.IsFirstMip != 0)
