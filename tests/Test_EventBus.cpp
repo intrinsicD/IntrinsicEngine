@@ -176,3 +176,71 @@ TEST(EventBus, MultipleEventsPerFrame)
     EXPECT_EQ(received[0].Entity, e1);
     EXPECT_EQ(received[1].Entity, e2);
 }
+
+// -----------------------------------------------------------------------------
+// EntitySpawned / GeometryModified — Dispatcher Contract Tests
+// -----------------------------------------------------------------------------
+
+TEST(EventBus, EntitySpawned_SinkReceivesEnqueuedEvent)
+{
+    Scene scene;
+    entt::entity e = scene.CreateEntity("Spawned");
+
+    std::vector<EntitySpawned> received;
+    scene.GetDispatcher().sink<EntitySpawned>().connect<
+        [](std::vector<EntitySpawned>& out, const EntitySpawned& evt) {
+            out.push_back(evt);
+        }>(received);
+
+    scene.GetDispatcher().enqueue<EntitySpawned>({e});
+    EXPECT_TRUE(received.empty()); // Deferred.
+
+    scene.GetDispatcher().update();
+    ASSERT_EQ(received.size(), 1u);
+    EXPECT_EQ(received[0].Entity, e);
+}
+
+TEST(EventBus, GeometryModified_SinkReceivesEnqueuedEvent)
+{
+    Scene scene;
+    entt::entity e = scene.CreateEntity("Mesh");
+
+    std::vector<GeometryModified> received;
+    scene.GetDispatcher().sink<GeometryModified>().connect<
+        [](std::vector<GeometryModified>& out, const GeometryModified& evt) {
+            out.push_back(evt);
+        }>(received);
+
+    scene.GetDispatcher().enqueue<GeometryModified>({e});
+    scene.GetDispatcher().update();
+
+    ASSERT_EQ(received.size(), 1u);
+    EXPECT_EQ(received[0].Entity, e);
+}
+
+TEST(EventBus, SelectionChanged_CachedEntityUpdatedBySink)
+{
+    Scene scene;
+    auto& reg = scene.GetRegistry();
+
+    entt::entity e = scene.CreateEntity("Target");
+    reg.emplace<Components::Selection::SelectableTag>(e);
+
+    // Simulate the Sandbox pattern: cache entity via sink.
+    entt::entity cached = entt::null;
+    scene.GetDispatcher().sink<SelectionChanged>().connect<
+        [](entt::entity& out, const SelectionChanged& evt) {
+            out = evt.Entity;
+        }>(cached);
+
+    Runtime::Selection::ApplySelection(scene, e, Runtime::Selection::PickMode::Replace);
+    EXPECT_EQ(cached, entt::null); // Still deferred.
+
+    scene.GetDispatcher().update();
+    EXPECT_EQ(cached, e); // Now updated.
+
+    // Deselect updates cache to null.
+    Runtime::Selection::ApplySelection(scene, entt::null, Runtime::Selection::PickMode::Replace);
+    scene.GetDispatcher().update();
+    EXPECT_EQ(cached, entt::null);
+}
