@@ -30,23 +30,7 @@ This document tracks the **active rendering-architecture backlog** for Intrinsic
 
 ---
 
-## 2. Now (P0) — Bugs & Correctness Issues
-
-### A1. SMAA Lookup Textures
-
-- [ ] Validate custom area/search texture generators in `Graphics.SMAALookupTextures.hpp` against the Jimenez et al. reference precomputed tables, or replace with canonical binary data from the original SMAA distribution.
-
-### A2. Bloom Downsample Dead Code
-
-- [ ] Fix dead code in `assets/shaders/post_bloom_downsample.frag` (~lines 119-123): the first `result` computation (Karis average threshold path) is immediately overwritten by the second.
-
-### A3. Contact Manifold Retained Overlay
-
-- [ ] Fix silent failure in contact manifold retained overlay rendering — verify the DebugDraw overlay path correctly displays manifold data when toggled on.
-
----
-
-## 3. Next (P1) — Near-Term Follow-Up After the Refactor Lands
+## 2. Next (P1) — Near-Term Follow-Up After the Refactor Lands
 
 These are not required to finish the first wave, but they should begin soon after P0 is stable.
 
@@ -102,7 +86,7 @@ These are not required to finish the first wave, but they should begin soon afte
 
 ---
 
-## 4. Later (P2) — Planned Downstream Work
+## 3. Later (P2) — Planned Downstream Work
 
 These items should be **planned now** so the current refactor leaves room for them, but they should be implemented later.
 
@@ -187,7 +171,7 @@ These items should be **planned now** so the current refactor leaves room for th
 
 ---
 
-## 5. Planned Constraints — Design Now, Build Later
+## 4. Planned Constraints — Design Now, Build Later
 
 These are the explicit constraints agents must preserve during the refactor even when the underlying features are not being implemented yet.
 
@@ -201,7 +185,7 @@ These are the explicit constraints agents must preserve during the refactor even
 
 ---
 
-## 6. Sequencing & Definition of Done
+## 5. Sequencing & Definition of Done
 
 ### Sequencing Rules
 

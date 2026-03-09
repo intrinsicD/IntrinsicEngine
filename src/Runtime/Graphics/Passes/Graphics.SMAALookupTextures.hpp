@@ -14,211 +14,494 @@
 //     Encodes edge-end-search offsets for bilinear acceleration.
 //
 // These are generated once at initialization and uploaded as GPU textures.
+//
+// Reference: https://github.com/iryoku/smaa (Jimenez et al. 2012)
 // =============================================================================
 
 #include <cmath>
+#include <cstdint>
 #include <cstring>
 #include <vector>
 #include <algorithm>
+#include <array>
+#include <utility>
 
 namespace Graphics::SMAA
 {
     // Area texture dimensions (from SMAA reference).
     inline constexpr int kAreaTexWidth  = 160;
     inline constexpr int kAreaTexHeight = 560;
-    inline constexpr int kAreaTexMaxDist = 16;
+    inline constexpr int kAreaTexMaxDist = 16; // Subtexture side length
     inline constexpr int kAreaTexSubtexels = 7; // 1 + 6 subpixel offsets
 
     // Search texture dimensions (from SMAA reference).
     inline constexpr int kSearchTexWidth  = 66;
     inline constexpr int kSearchTexHeight = 33;
 
+    // Number of orthogonal edge patterns: 4-bit = 16 patterns.
+    inline constexpr int kNumOrthoPatterns = 16;
+
+    // Smooth area max distance for U-patterns (reference: SMOOTH_MAX_DISTANCE).
+    inline constexpr float kSmoothMaxDist = 32.0f;
+
     // -------------------------------------------------------------------------
-    // Area texture generation.
+    // Internal helpers.
     // -------------------------------------------------------------------------
-
-    // Compute the area under the line segment [a, b] for a unit pixel at
-    // position d from the center. Returns coverage in [0, 1].
-    inline float AreaUnderSegment(float d, float e1, float e2)
+    namespace Internal
     {
-        // This approximates the area integral for SMAA's morphological pattern.
-        // The area is the coverage of the pixel when the edge crosses through it.
-        // Simple trapezoidal approximation from the SMAA reference.
-        float dist = d;
-        if (dist < 0.0f) dist = 0.0f;
-        if (dist > float(kAreaTexMaxDist)) dist = float(kAreaTexMaxDist);
+        // Saturate to [0, 1].
+        inline float Saturate(float x) { return std::clamp(x, 0.0f, 1.0f); }
 
-        // For non-matching edge patterns (e1==0 && e2==0), return zero.
-        if (e1 == 0.0f && e2 == 0.0f) return 0.0f;
+        // Linear interpolation.
+        inline float Lerp(float a, float b, float t) { return a + (b - a) * t; }
 
-        return 0.0f; // Base case — overridden by pattern-specific logic below.
-    }
+        // 2D vector for area computation.
+        struct Vec2 { float x, y; };
 
-    // Analytical area computation for an orthogonal crossing pattern.
-    // d1, d2: distances to left/right (or top/bottom) edge ends.
-    // e1, e2: edge crossing indicators at the ends (0 or 1).
-    // Returns (weight_left, weight_right).
-    inline std::pair<float, float> AreaOrtho(float d1, float d2, float e1, float e2)
-    {
-        // SMAA area is computed analytically from the trapezoidal integration of
-        // the edge crossing line across the pixel footprint.
-        //
-        // For a line from (0, e1) to (d1+d2, e2), the coverage at each pixel
-        // is computed via signed trapezoidal area.
-        float totalDist = d1 + d2;
-        if (totalDist < 1e-6f) return {0.0f, 0.0f};
-
-        // The crossing line goes from y = e1 (at -d1) to y = e2 (at +d2).
-        // At the center pixel (d=0), the coverage depends on the interpolated y.
-        float t = d1 / totalDist;
-        float y = e1 * (1.0f - t) + e2 * t;
-
-        // Simple smooth coverage model used by SMAA.
-        float a1 = 0.0f, a2 = 0.0f;
-
-        if (e1 > 0.0f || e2 > 0.0f)
+        // Compute the signed area contribution of a line segment from p1 to p2
+        // within the pixel column [x, x+1]. Returns (area_below, area_above)
+        // where "below" means the edge line is below y=0 and "above" is above.
+        // This is the core of the SMAA reference area computation.
+        inline Vec2 AreaUnderLine(Vec2 p1, Vec2 p2, float x)
         {
-            // Coverage is proportional to the perpendicular distance from the edge line.
-            // Use the SMAA trapezoidal formula.
-            float h = y - 0.5f;
+            // Line direction.
+            float dx = p2.x - p1.x;
+            float dy = p2.y - p1.y;
 
-            // Left/right weights: the edge line splits the pixel.
-            a1 = std::clamp(0.5f - h, 0.0f, 1.0f) * std::clamp(d1 / 2.0f, 0.0f, 1.0f);
-            a2 = std::clamp(0.5f + h, 0.0f, 1.0f) * std::clamp(d2 / 2.0f, 0.0f, 1.0f);
+            // y values at left and right pixel boundaries.
+            float x0 = x;       // Left pixel edge
+            float x1 = x + 1.0f; // Right pixel edge
 
-            // Scale down for larger distances.
-            if (d1 > 1.0f) a1 /= d1;
-            if (d2 > 1.0f) a2 /= d2;
+            // Clamp to line segment range.
+            if (x0 < p1.x) x0 = p1.x;
+            if (x1 > p2.x) x1 = p2.x;
+            if (x0 >= x1) return {0.0f, 0.0f};
 
-            // Apply Gaussian falloff for quality.
-            float sigma = 0.5f * totalDist;
-            if (sigma > 0.0f)
+            // y values at clamped boundaries via linear interpolation.
+            float t0 = (std::abs(dx) > 1e-9f) ? (x0 - p1.x) / dx : 0.0f;
+            float t1 = (std::abs(dx) > 1e-9f) ? (x1 - p1.x) / dx : 0.0f;
+            float y0 = p1.y + dy * t0;
+            float y1 = p1.y + dy * t1;
+
+            // Width of the covered portion of this pixel column.
+            float width = x1 - x0;
+
+            // If both y values have the same sign, it's a simple trapezoid.
+            if (y0 >= 0.0f && y1 >= 0.0f)
             {
-                float gauss1 = std::exp(-d1 * d1 / (2.0f * sigma * sigma + 1e-6f));
-                float gauss2 = std::exp(-d2 * d2 / (2.0f * sigma * sigma + 1e-6f));
-                a1 *= gauss1;
-                a2 *= gauss2;
+                // Entirely above y=0.
+                float area = (y0 + y1) * 0.5f * width;
+                return {0.0f, area};
             }
+            if (y0 <= 0.0f && y1 <= 0.0f)
+            {
+                // Entirely below y=0.
+                float area = -(y0 + y1) * 0.5f * width;
+                return {area, 0.0f};
+            }
+
+            // The line crosses y=0 within this pixel. Split into two triangles.
+            float xCross = x0 + (-y0 / (y1 - y0)) * width;
+            float wLeft  = xCross - x0;
+            float wRight = x1 - xCross;
+
+            float areaLeft  = std::abs(y0) * wLeft * 0.5f;
+            float areaRight = std::abs(y1) * wRight * 0.5f;
+
+            if (y0 < 0.0f)
+                return {areaLeft, areaRight};  // Below first, then above
+            else
+                return {areaRight, areaLeft};  // Above first, then below
         }
 
-        return {std::clamp(a1, 0.0f, 1.0f), std::clamp(a2, 0.0f, 1.0f)};
-    }
+        // Smooth area adjustment for U-shaped patterns (patterns 3, 12).
+        // Reduces artifacts at short distances by replacing the raw area with
+        // a sqrt-based approximation, blending back to the raw area at larger
+        // distances. Reference: smootharea() in AreaTex.py.
+        inline Vec2 SmoothArea(float d, Vec2 area)
+        {
+            Vec2 smoothed;
+            smoothed.x = std::sqrt(area.x * 2.0f) * 0.5f;
+            smoothed.y = std::sqrt(area.y * 2.0f) * 0.5f;
+            float t = Saturate(d / kSmoothMaxDist);
+            return {Lerp(smoothed.x, area.x, t), Lerp(smoothed.y, area.y, t)};
+        }
+
+        // Compute the orthogonal area for a given 4-bit edge pattern.
+        // Pattern bits:
+        //   bit 0: left-bottom edge
+        //   bit 1: right-bottom edge
+        //   bit 2: left-top edge
+        //   bit 3: right-top edge
+        // d1 = distance to left end, d2 = distance to right end.
+        // offset = subpixel vertical offset.
+        inline Vec2 AreaOrthoPattern(int pattern, float left, float right, float offset)
+        {
+            float d = left + right + 1.0f;
+
+            float o1 = 0.5f + offset;        // Top edge y-offset
+            float o2 = 0.5f + offset - 1.0f; // Bottom edge y-offset
+
+            Vec2 result = {0.0f, 0.0f};
+
+            switch (pattern)
+            {
+            case 0:  // No edges
+                break;
+
+            case 1:  // Bottom-left L
+            {
+                if (left <= right)
+                {
+                    Vec2 p1 = {0.0f, o2};
+                    Vec2 p2 = {d * 0.5f, 0.0f};
+                    auto a = AreaUnderLine(p1, p2, left);
+                    result = {a.x, a.y};
+                }
+                break;
+            }
+            case 2:  // Bottom-right L
+            {
+                if (left >= right)
+                {
+                    Vec2 p1 = {d * 0.5f, 0.0f};
+                    Vec2 p2 = {d, o2};
+                    auto a = AreaUnderLine(p1, p2, left);
+                    result = {a.x, a.y};
+                }
+                break;
+            }
+            case 3:  // U-shape bottom
+            {
+                Vec2 p1 = {0.0f, o2};
+                Vec2 mid = {d * 0.5f, 0.0f};
+                Vec2 p2 = {d, o2};
+                auto a1 = AreaUnderLine(p1, mid, left);
+                auto a2 = AreaUnderLine(mid, p2, left);
+                Vec2 combined = {a1.x + a2.x, a1.y + a2.y};
+                result = SmoothArea(d, combined);
+                break;
+            }
+            case 4:  // Top-left L
+            {
+                if (left <= right)
+                {
+                    Vec2 p1 = {0.0f, o1};
+                    Vec2 p2 = {d * 0.5f, 0.0f};
+                    auto a = AreaUnderLine(p1, p2, left);
+                    result = {a.x, a.y};
+                }
+                break;
+            }
+            case 5:  // Straight-through horizontal (no blend needed)
+                break;
+
+            case 6:  // Z-shape (top-left + bottom-right)
+            {
+                Vec2 p1 = {0.0f, o1};
+                Vec2 p2 = {d, o2};
+                auto aFull = AreaUnderLine(p1, p2, left);
+
+                if (std::abs(offset) > 1e-6f)
+                {
+                    // Blend with L decomposition for subpixel accuracy.
+                    Vec2 mid = {d * 0.5f, 0.0f};
+                    auto aL1 = AreaUnderLine(p1, mid, left);
+                    auto aL2 = AreaUnderLine(mid, p2, left);
+                    Vec2 aL = {aL1.x + aL2.x, aL1.y + aL2.y};
+                    result = {(aFull.x + aL.x) * 0.5f, (aFull.y + aL.y) * 0.5f};
+                }
+                else
+                {
+                    result = aFull;
+                }
+                break;
+            }
+            case 7:  // T-shape (bottom-left + bottom-right + top-left)
+            {
+                Vec2 p1 = {0.0f, o1};
+                Vec2 p2 = {d, o2};
+                auto a = AreaUnderLine(p1, p2, left);
+                result = {a.x, a.y};
+                break;
+            }
+            case 8:  // Top-right L
+            {
+                if (left >= right)
+                {
+                    Vec2 p1 = {d * 0.5f, 0.0f};
+                    Vec2 p2 = {d, o1};
+                    auto a = AreaUnderLine(p1, p2, left);
+                    result = {a.x, a.y};
+                }
+                break;
+            }
+            case 9:  // Z-shape (bottom-left + top-right)
+            {
+                Vec2 p1 = {0.0f, o2};
+                Vec2 p2 = {d, o1};
+                auto aFull = AreaUnderLine(p1, p2, left);
+
+                if (std::abs(offset) > 1e-6f)
+                {
+                    Vec2 mid = {d * 0.5f, 0.0f};
+                    auto aL1 = AreaUnderLine(p1, mid, left);
+                    auto aL2 = AreaUnderLine(mid, p2, left);
+                    Vec2 aL = {aL1.x + aL2.x, aL1.y + aL2.y};
+                    result = {(aFull.x + aL.x) * 0.5f, (aFull.y + aL.y) * 0.5f};
+                }
+                else
+                {
+                    result = aFull;
+                }
+                break;
+            }
+            case 10: // Straight-through vertical (no blend needed)
+                break;
+
+            case 11: // T-shape
+            {
+                Vec2 p1 = {0.0f, o2};
+                Vec2 p2 = {d, o1};
+                auto a = AreaUnderLine(p1, p2, left);
+                result = {a.x, a.y};
+                break;
+            }
+            case 12: // U-shape top
+            {
+                Vec2 p1 = {0.0f, o1};
+                Vec2 mid = {d * 0.5f, 0.0f};
+                Vec2 p2 = {d, o1};
+                auto a1 = AreaUnderLine(p1, mid, left);
+                auto a2 = AreaUnderLine(mid, p2, left);
+                Vec2 combined = {a1.x + a2.x, a1.y + a2.y};
+                result = SmoothArea(d, combined);
+                break;
+            }
+            case 13: // T-shape
+            {
+                Vec2 p1 = {0.0f, o2};
+                Vec2 p2 = {d, o1};
+                auto a = AreaUnderLine(p1, p2, left);
+                result = {a.x, a.y};
+                break;
+            }
+            case 14: // T-shape
+            {
+                Vec2 p1 = {0.0f, o1};
+                Vec2 p2 = {d, o2};
+                auto a = AreaUnderLine(p1, p2, left);
+                result = {a.x, a.y};
+                break;
+            }
+            case 15: // All four edges — fully covered (no blend needed)
+                break;
+            }
+
+            return result;
+        }
+
+        // Pattern tile positions in the area texture atlas.
+        // Maps 4-bit pattern index to (col, row) tile position in units of
+        // kAreaTexMaxDist. Reference: edgesortho[] in AreaTex.py.
+        inline constexpr std::array<std::pair<int,int>, 16> kOrthoTilePos = {{
+            {0, 0}, {3, 0}, {0, 3}, {3, 3},
+            {1, 0}, {4, 0}, {1, 3}, {4, 3},
+            {0, 1}, {3, 1}, {0, 4}, {3, 4},
+            {1, 1}, {4, 1}, {1, 4}, {4, 4}
+        }};
+
+        // Subpixel offsets for area texture subtexel rows.
+        // Reference: subsample_offsets_ortho in AreaTex.py.
+        inline constexpr std::array<float, 7> kOrthoSubpixelOffsets = {
+            0.0f, -0.25f, 0.25f, -0.125f, 0.125f, -0.375f, 0.375f
+        };
+
+        // -------------------------------------------------------------------------
+        // Search texture bilinear decode helpers.
+        // -------------------------------------------------------------------------
+
+        // The search texture exploits hardware bilinear filtering to decode a 2x2
+        // edge neighborhood from a single texture fetch at (-0.25, -0.125) relative
+        // to the pixel. The bilinear function computes the expected fetch result for
+        // binary edge inputs e[0..3].
+        inline float BilinearDecode(float e0, float e1, float e2, float e3)
+        {
+            float a = Lerp(e0, e1, 0.75f);     // = e0*0.25 + e1*0.75
+            float b = Lerp(e2, e3, 0.75f);     // = e2*0.25 + e3*0.75
+            return Lerp(a, b, 0.875f);          // = a*0.125 + b*0.875
+        }
+
+        // Delta-left: how many extra pixels to advance searching left.
+        inline int DeltaLeft(const float left[4], const float top[4])
+        {
+            int delta = 0;
+            if (top[3] == 1.0f) delta = 1;
+            if (delta == 1 && top[2] == 1.0f &&
+                left[1] != 1.0f && left[3] != 1.0f)
+                delta = 2;
+            return delta;
+        }
+
+        // Delta-right: how many extra pixels to advance searching right.
+        inline int DeltaRight(const float left[4], const float top[4])
+        {
+            int delta = 0;
+            if (top[3] == 1.0f &&
+                left[1] != 1.0f && left[3] != 1.0f)
+                delta = 1;
+            if (delta == 1 && top[2] == 1.0f &&
+                left[0] != 1.0f && left[2] != 1.0f)
+                delta = 2;
+            return delta;
+        }
+
+    } // namespace Internal
+
+    // =========================================================================
+    // Area texture generation.
+    // =========================================================================
 
     // Generate the area texture data (160x560 pixels, 2 bytes per pixel: RG8_UNORM).
+    // The texture is an atlas of 16×16 subtextures, one per edge pattern per
+    // subpixel offset. Distances are quadratically compressed: the texel at
+    // (d1, d2) stores the area for actual distances (d1², d2²), and the shader
+    // applies sqrt() before lookup.
     inline std::vector<uint8_t> GenerateAreaTexture()
     {
         std::vector<uint8_t> data(kAreaTexWidth * kAreaTexHeight * 2, 0);
 
-        // The area texture is organized as a grid of 5x5 subtextures.
-        // Each subtexture is 2*kAreaTexMaxDist x 2*kAreaTexMaxDist = 32x32 pixels.
-        // Columns select crossing patterns (e1, e2 in {0, 0.25, 0.5, 0.75, 1.0}).
-        // Rows select subpixel offsets.
-        // Total: 5 columns * 32 = 160 width, (5*kAreaTexSubtexels) * 32 = 560 height
-        // Actually the reference uses 4 rounded values for e: {0.0, 0.25, 0.5, 0.75, 1.0}
-        // mapped to 5 slots.
+        int subtexSize = kAreaTexMaxDist; // 16 — each subtexture is 16x16
 
-        int subtexW = 2 * kAreaTexMaxDist; // 32
-        int subtexH = 2 * kAreaTexMaxDist; // 32
-
-        // e values: quantized to 4 * val, so {0, 1, 2, 3, 4} → {0.0, 0.25, 0.5, 0.75, 1.0}
         for (int subtex = 0; subtex < kAreaTexSubtexels; ++subtex)
         {
-            float subpixelOffset = float(subtex) / float(kAreaTexSubtexels);
+            float offset = Internal::kOrthoSubpixelOffsets[subtex];
 
-            for (int e1q = 0; e1q < 5; ++e1q)
+            for (int pattern = 0; pattern < kNumOrthoPatterns; ++pattern)
             {
-                float e1 = float(e1q) * 0.25f;
+                auto [tileCol, tileRow] = Internal::kOrthoTilePos[pattern];
 
-                for (int e2q = 0; e2q < 5; ++e2q)
+                // Fill the subtexture for this (pattern, subpixel offset).
+                for (int y = 0; y < subtexSize; ++y)
                 {
-                    float e2 = float(e2q) * 0.25f;
-
-                    // The texture layout is:
-                    // X: e2 * maxDist * 2 patterns → 5 * 32 = 160
-                    // Y: (e1 * subtexels + subtex) * 32 patterns → 5 * 7 * 32 = 1120? No.
-                    // Per the SMAA reference:
-                    //   X = d2 + e2 * (AREATEX_MAX_DISTANCE * 2)
-                    //   Y = d1 + e1 * (AREATEX_MAX_DISTANCE * 2) + subtex * (5 * AREATEX_MAX_DISTANCE * 2)
-
-                    // Fill the d1 x d2 subtexture for this (e1, e2, subtex) combination.
-                    for (int d1 = 0; d1 < subtexW; ++d1)
+                    for (int x = 0; x < subtexSize; ++x)
                     {
-                        for (int d2 = 0; d2 < subtexW; ++d2)
+                        // Quadratic distance compression: actual distances are
+                        // d1 = y², d2 = x². This allows reaching distance 15²=225
+                        // with only 16 texels.
+                        float d1 = static_cast<float>(y * y);
+                        float d2 = static_cast<float>(x * x);
+
+                        auto area = Internal::AreaOrthoPattern(
+                            pattern, d1, d2, offset);
+
+                        // Pixel coordinates in the full atlas.
+                        // X: d2_texel + tileCol * subtexSize
+                        // Y: d1_texel + (tileRow + subtex * 5) * subtexSize
+                        int px = x + tileCol * subtexSize;
+                        int py = y + (tileRow + subtex * 5) * subtexSize;
+
+                        if (px >= 0 && px < kAreaTexWidth &&
+                            py >= 0 && py < kAreaTexHeight)
                         {
-                            auto [w1, w2] = AreaOrtho(
-                                float(d1) + subpixelOffset,
-                                float(d2) + subpixelOffset,
-                                e1, e2);
-
-                            // Pixel coordinates in the area texture.
-                            int px = d2 + e2q * subtexW;
-                            int py = d1 + (e1q + subtex * 5) * subtexH;
-
-                            if (px >= 0 && px < kAreaTexWidth &&
-                                py >= 0 && py < kAreaTexHeight)
-                            {
-                                int idx = (py * kAreaTexWidth + px) * 2;
-                                data[idx + 0] = static_cast<uint8_t>(std::clamp(w1 * 255.0f, 0.0f, 255.0f));
-                                data[idx + 1] = static_cast<uint8_t>(std::clamp(w2 * 255.0f, 0.0f, 255.0f));
-                            }
+                            int idx = (py * kAreaTexWidth + px) * 2;
+                            data[idx + 0] = static_cast<uint8_t>(
+                                std::clamp(area.x * 255.0f, 0.0f, 255.0f));
+                            data[idx + 1] = static_cast<uint8_t>(
+                                std::clamp(area.y * 255.0f, 0.0f, 255.0f));
                         }
                     }
                 }
             }
         }
 
+        // The right half (columns 80-159) is for diagonal patterns.
+        // The current SMAA shader does not use diagonal pattern search,
+        // so the right half remains zeroed (no diagonal blend weights).
+
         return data;
     }
 
-    // -------------------------------------------------------------------------
+    // =========================================================================
     // Search texture generation.
-    // -------------------------------------------------------------------------
-    // The search texture encodes the offset to the edge end for bilinear
-    // filtering acceleration. For each 2-bit edge pattern (left + right crossing),
-    // it stores the search offset that would be found by walking along the edge.
+    // =========================================================================
 
+    // Generate the search texture data (66x33 pixels, 1 byte per pixel: R8_UNORM).
+    // The texture encodes delta distances (0, 1, or 2 extra pixels) for the final
+    // step of the SMAA edge search algorithm. Values are stored as 127 * delta
+    // to maximize dynamic range.
+    //
+    // Layout: left half (cols 0-32) = delta-left, right half (cols 33-65) = delta-right.
+    // X axis: quantized bilinear fetch for "left" edge neighborhood.
+    // Y axis: quantized bilinear fetch for "top" edge neighborhood.
     inline std::vector<uint8_t> GenerateSearchTexture()
     {
         std::vector<uint8_t> data(kSearchTexWidth * kSearchTexHeight, 0);
 
-        // The search texture maps 2-bit edge patterns to search offsets.
-        // For each possible combination of left/right edges, encode the
-        // relative position where the edge terminates.
-        //
-        // Following the SMAA reference: the texture contains 33 rows x 66 cols.
-        // Each texel encodes a bilinear-safe search offset for one edge config.
+        // Build the reverse lookup: bilinear value → edge[4] configuration.
+        // There are 16 possible 4-bit edge configurations.
+        struct EdgeConfig
+        {
+            float e[4];      // The 4 edge values
+            float bilinear;  // Expected bilinear fetch result
+        };
+
+        std::array<EdgeConfig, 16> configs;
+        for (int i = 0; i < 16; ++i)
+        {
+            float e0 = (i & 1) ? 1.0f : 0.0f;
+            float e1 = (i & 2) ? 1.0f : 0.0f;
+            float e2 = (i & 4) ? 1.0f : 0.0f;
+            float e3 = (i & 8) ? 1.0f : 0.0f;
+            configs[i] = {{e0, e1, e2, e3},
+                          Internal::BilinearDecode(e0, e1, e2, e3)};
+        }
+
+        // For each (x, y) texel, quantize to find the matching edge configs
+        // and compute the delta distance.
+        float quantStep = 1.0f / 32.0f; // 0.03125
 
         for (int y = 0; y < kSearchTexHeight; ++y)
         {
+            float topBilinear = static_cast<float>(y) * quantStep;
+
             for (int x = 0; x < kSearchTexWidth; ++x)
             {
+                bool isRight = (x >= 33);
+                int localX = isRight ? (x - 33) : x;
+                float leftBilinear = static_cast<float>(localX) * quantStep;
+
+                // Find the closest matching edge configuration for each axis.
+                auto findClosest = [&](float target) -> int {
+                    int best = 0;
+                    float bestDist = std::abs(configs[0].bilinear - target);
+                    for (int i = 1; i < 16; ++i)
+                    {
+                        float dist = std::abs(configs[i].bilinear - target);
+                        if (dist < bestDist)
+                        {
+                            bestDist = dist;
+                            best = i;
+                        }
+                    }
+                    return best;
+                };
+
+                int leftIdx = findClosest(leftBilinear);
+                int topIdx  = findClosest(topBilinear);
+
+                const float* leftEdges = configs[leftIdx].e;
+                const float* topEdges  = configs[topIdx].e;
+
+                int delta;
+                if (isRight)
+                    delta = Internal::DeltaRight(leftEdges, topEdges);
+                else
+                    delta = Internal::DeltaLeft(leftEdges, topEdges);
+
+                // Encode as 127 * delta (0, 127, or 254).
                 int idx = y * kSearchTexWidth + x;
-
-                // The bilinear search offset. For the simple SMAA 1x case,
-                // most texels are 0 (no offset) or 0.5 (half-pixel offset).
-                // The exact generation follows the SMAA reference logic.
-
-                // Simplified: encode the edge-end delta as normalized offset.
-                // For a 2-sample bilinear fetch along the edge:
-                //   0.0 = no edge continuation
-                //   0.5 = edge continues (shift by half-texel for bilinear fetch)
-                float val = 0.0f;
-
-                // The x coordinate encodes the 2-bit edge pattern (sampled edges).
-                // The y coordinate selects the search direction variant.
-                // For the default pattern where both edges are present, the offset is 0.5.
-                int pattern = x % 33;
-                bool leftEdge  = (pattern & 1) != 0;
-                bool rightEdge = (pattern & 2) != 0;
-
-                if (leftEdge && !rightEdge)
-                    val = 0.25f;
-                else if (!leftEdge && rightEdge)
-                    val = 0.75f;
-                else if (leftEdge && rightEdge)
-                    val = 0.5f;
-
-                data[idx] = static_cast<uint8_t>(std::clamp(val * 255.0f, 0.0f, 255.0f));
+                data[idx] = static_cast<uint8_t>(std::clamp(127 * delta, 0, 255));
             }
         }
 
