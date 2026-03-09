@@ -6,6 +6,7 @@ module;
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtc/quaternion.hpp>
 #include <entt/entity/registry.hpp>
+#include <entt/signal/dispatcher.hpp>
 
 module Runtime.Selection;
 
@@ -144,7 +145,11 @@ namespace Runtime::Selection
         }
 
         if (hitEntity == entt::null || !reg.valid(hitEntity))
+        {
+            // Deselect-all: notify with null entity.
+            scene.GetDispatcher().enqueue<ECS::Events::SelectionChanged>({entt::null});
             return;
+        }
         if (!IsSelectable(reg, hitEntity))
             return;
 
@@ -164,6 +169,8 @@ namespace Runtime::Selection
                 reg.emplace<ECS::Components::Selection::SelectedTag>(hitEntity);
             break;
         }
+
+        scene.GetDispatcher().enqueue<ECS::Events::SelectionChanged>({hitEntity});
     }
 
     void ApplyHover(ECS::Scene& scene, entt::entity hoveredEntity)
@@ -175,11 +182,15 @@ namespace Runtime::Selection
             reg.remove<ECS::Components::Selection::HoveredTag>(e);
 
         if (hoveredEntity == entt::null || !reg.valid(hoveredEntity))
+        {
+            scene.GetDispatcher().enqueue<ECS::Events::HoverChanged>({entt::null});
             return;
+        }
         if (!IsSelectable(reg, hoveredEntity))
             return;
 
         reg.emplace<ECS::Components::Selection::HoveredTag>(hoveredEntity);
+        scene.GetDispatcher().enqueue<ECS::Events::HoverChanged>({hoveredEntity});
     }
 }
 

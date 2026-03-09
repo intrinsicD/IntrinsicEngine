@@ -56,26 +56,20 @@ These are not required to finish the first wave, but they should begin soon afte
 
 ### B5. Post-Processing Test Coverage
 
-- [ ] Add contract tests for post-processing push constant struct sizes (`static_assert`).
 - [ ] Add descriptor layout / pipeline build success tests for bloom, SMAA, and tone mapping passes.
 
 ### B6. Render Graph & Frame Construction
 
 - [ ] Add tests for `CanonicalResources` registration and recipe-driven allocation.
-- [ ] Add tests for `ValidateCompiledGraph()` with the new post-processing passes included.
 
-### B7. Application Event Bus (`entt::dispatcher`)
+### B7. Application Event Bus (`entt::dispatcher`) — Remaining
 
-- [ ] Add `entt::dispatcher` to `ECS::Scene` with `GetDispatcher()` accessors.
-- [ ] Create `ECS.Components.Events.cppm` with initial event struct definitions.
-- [ ] Add `dispatcher.update()` drain point in `Engine::Run()` main loop.
-- [ ] Fire `SelectionChanged` / `HoverChanged` from `ApplySelection` / `ApplyHover`.
+Core infrastructure is in place (`ECS::Scene` dispatcher, `ECS::Events` module, drain point in `Engine::Run()`, `SelectionChanged`/`HoverChanged` events from `ApplySelection`/`ApplyHover`, contract tests). Remaining work:
+
 - [ ] Replace `GetSelectedEntity()` polling in Sandbox panels with `SelectionChanged` sink.
 - [ ] Fire `GpuPickCompleted` from readback completion, replace polling in `SelectionModule`.
 - [ ] Fire `EntitySpawned` from `SceneManager::SpawnModel()` and `LoadDroppedAsset`.
 - [ ] Fire `GeometryModified` from centralized geometry operator helper.
-- [ ] Add contract tests for event delivery.
-- [ ] Document event communication policy in `CLAUDE.md`.
 
 ---
 
