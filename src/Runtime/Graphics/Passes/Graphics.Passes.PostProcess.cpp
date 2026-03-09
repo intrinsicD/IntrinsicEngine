@@ -66,6 +66,8 @@ namespace Graphics::Passes
                                      RHI::DescriptorLayout&)
     {
         m_Device = &device;
+        m_DebugState.Initialized = true;
+
         VkDevice dev = m_Device->GetLogicalDevice();
 
         // Create linear sampler (shared by all post-process stages).
@@ -130,9 +132,11 @@ namespace Graphics::Passes
         // Dummy image for safe default bindings.
         m_DummySampled = std::make_unique<RHI::VulkanImage>(
             *m_Device, 1, 1, 1,
-            VK_FORMAT_R16G16B16A16_SFLOAT,
+            VK_FORMAT_R8G8B8A8_UNORM,
             VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
             VK_IMAGE_ASPECT_COLOR_BIT);
+        m_DebugState.DummySampledAllocated = static_cast<bool>(m_DummySampled);
+
         TransitionImageToShaderRead(*m_Device, m_DummySampled->GetHandle(), VK_IMAGE_ASPECT_COLOR_BIT);
 
         VkImageView dummyView = m_DummySampled->GetView();
@@ -1139,6 +1143,27 @@ namespace Graphics::Passes
     // =====================================================================
     void PostProcessPass::AddPasses(RenderPassContext& ctx)
     {
+        m_DebugState.LastFrameIndex = ctx.FrameIndex;
+        m_DebugState.LastResolutionWidth = ctx.Resolution.width;
+        m_DebugState.LastResolutionHeight = ctx.Resolution.height;
+        m_DebugState.LastOutputFormat = ctx.SwapchainFormat;
+        m_DebugState.BloomEnabled = m_Settings.BloomEnabled;
+        m_DebugState.HistogramEnabled = m_Settings.HistogramEnabled;
+        m_DebugState.FXAAEnabled = m_Settings.AntiAliasingMode == AAMode::FXAA;
+        m_DebugState.SMAAEnabled = m_Settings.AntiAliasingMode == AAMode::SMAA;
+        m_DebugState.LastSceneColorHandleValid = false;
+        m_DebugState.LastPostLdrHandleValid = false;
+        m_DebugState.LastBloomMip0HandleValid = false;
+        m_DebugState.LastSMAAEdgesHandleValid = false;
+        m_DebugState.LastSMAAWeightsHandleValid = false;
+        m_DebugState.LastSceneColorHandle = 0;
+        m_DebugState.LastPostLdrHandle = 0;
+        m_DebugState.LastBloomMip0Handle = 0;
+        m_DebugState.LastSMAAEdgesHandle = 0;
+        m_DebugState.LastSMAAWeightsHandle = 0;
+        m_DebugState.LastBloomDownHandles.fill(0u);
+        m_DebugState.LastBloomUpSourceHandles.fill(0u);
+
         if (!m_ShaderRegistry)
         {
             Core::Log::Error("PostProcess: ShaderRegistry not configured.");
@@ -1147,6 +1172,8 @@ namespace Graphics::Passes
 
         const RGResourceHandle sceneColor = ctx.Blackboard.Get(RenderResource::SceneColorHDR);
         const RGResourceHandle sceneColorLdr = ctx.Blackboard.Get(RenderResource::SceneColorLDR);
+        m_DebugState.LastSceneColorHandleValid = sceneColor.IsValid();
+        m_DebugState.LastSceneColorHandle = sceneColor.IsValid() ? sceneColor.ID : 0u;
         if (!sceneColor.IsValid() || !sceneColorLdr.IsValid())
             return;
 
@@ -1155,6 +1182,8 @@ namespace Graphics::Passes
             m_ToneMapPipeline = BuildToneMapPipeline(ctx.SwapchainFormat);
         if (!m_FXAAPipeline)
             m_FXAAPipeline = BuildFXAAPipeline(ctx.SwapchainFormat);
+        m_DebugState.ToneMapPipelineBuilt = static_cast<bool>(m_ToneMapPipeline);
+        m_DebugState.FXAAPipelineBuilt = static_cast<bool>(m_FXAAPipeline);
 
         if (!m_ToneMapPipeline)
             return;
@@ -1177,6 +1206,8 @@ namespace Graphics::Passes
         const AAMode aaMode = m_Settings.AntiAliasingMode;
         const bool fxaaEnabled = (aaMode == AAMode::FXAA) && m_FXAAPipeline;
         const bool smaaEnabled = (aaMode == AAMode::SMAA);
+        m_DebugState.FXAAEnabled = fxaaEnabled;
+        m_DebugState.SMAAEnabled = smaaEnabled;
 
         // Capture settings for lambda.
         const float exposure = m_Settings.Exposure;
@@ -1219,6 +1250,8 @@ namespace Graphics::Passes
 
         // Capture bloom handle for read dependency.
         const RGResourceHandle bloomResult = m_LastBloomMip0Handle;
+        m_DebugState.LastBloomMip0HandleValid = bloomResult.IsValid();
+        m_DebugState.LastBloomMip0Handle = bloomResult.IsValid() ? bloomResult.ID : 0u;
 
         if (fxaaEnabled || smaaEnabled)
         {
@@ -1256,6 +1289,10 @@ namespace Graphics::Passes
 
                     m_LastSceneColorHandle = data.Src;
                     m_LastPostLdrHandle = data.Dst;
+                    m_DebugState.LastSceneColorHandleValid = data.Src.IsValid();
+                    m_DebugState.LastSceneColorHandle = data.Src.IsValid() ? data.Src.ID : 0u;
+                    m_DebugState.LastPostLdrHandleValid = data.Dst.IsValid();
+                    m_DebugState.LastPostLdrHandle = data.Dst.IsValid() ? data.Dst.ID : 0u;
                 },
                 [this, fi, resolution, toneMapPC]
                 (const ToneMapData&, const RGRegistry&, VkCommandBuffer cmd)
@@ -1350,6 +1387,10 @@ namespace Graphics::Passes
 
                     m_LastSceneColorHandle = data.Src;
                     m_LastPostLdrHandle = {};
+                    m_DebugState.LastSceneColorHandleValid = data.Src.IsValid();
+                    m_DebugState.LastSceneColorHandle = data.Src.IsValid() ? data.Src.ID : 0u;
+                    m_DebugState.LastPostLdrHandleValid = false;
+                    m_DebugState.LastPostLdrHandle = 0u;
                 },
                 [this, fi, resolution, toneMapPC]
                 (const ToneMapData&, const RGRegistry&, VkCommandBuffer cmd)
@@ -1368,6 +1409,22 @@ namespace Graphics::Passes
                 }
             );
         }
+
+        m_DebugState.BloomDownPipelineBuilt = static_cast<bool>(m_BloomDownPipeline);
+        m_DebugState.BloomUpPipelineBuilt = static_cast<bool>(m_BloomUpPipeline);
+        m_DebugState.HistogramPipelineBuilt = static_cast<bool>(m_HistogramPipeline);
+        m_DebugState.SMAAEdgePipelineBuilt = static_cast<bool>(m_SMAAEdgePipeline);
+        m_DebugState.SMAABlendPipelineBuilt = static_cast<bool>(m_SMAABlendPipeline);
+        m_DebugState.SMAAResolvePipelineBuilt = static_cast<bool>(m_SMAAResolvePipeline);
+        m_DebugState.LastSMAAEdgesHandleValid = m_LastSMAAEdgesHandle.IsValid();
+        m_DebugState.LastSMAAEdgesHandle = m_LastSMAAEdgesHandle.IsValid() ? m_LastSMAAEdgesHandle.ID : 0u;
+        m_DebugState.LastSMAAWeightsHandleValid = m_LastSMAAWeightsHandle.IsValid();
+        m_DebugState.LastSMAAWeightsHandle = m_LastSMAAWeightsHandle.IsValid() ? m_LastSMAAWeightsHandle.ID : 0u;
+        for (uint32_t mip = 0; mip < kBloomMipCount; ++mip)
+        {
+            m_DebugState.LastBloomDownHandles[mip] = m_LastBloomDownHandles[mip].IsValid() ? m_LastBloomDownHandles[mip].ID : 0u;
+            m_DebugState.LastBloomUpSourceHandles[mip] = m_LastBloomUpSrcHandles[mip].IsValid() ? m_LastBloomUpSrcHandles[mip].ID : 0u;
+        }
     }
 
     // =====================================================================
@@ -1376,6 +1433,8 @@ namespace Graphics::Passes
     void PostProcessPass::PostCompile(uint32_t frameIndex,
                                       std::span<const RenderGraphDebugImage> debugImages)
     {
+        m_DebugState.LastFrameIndex = frameIndex;
+
         if (!m_Device || !m_LinearSampler)
             return;
 
@@ -1490,6 +1549,9 @@ namespace Graphics::Passes
     // =====================================================================
     void PostProcessPass::Shutdown()
     {
+        m_DebugState.Initialized = false;
+        m_DebugState.DummySampledAllocated = false;
+
         if (!m_Device) return;
 
         VkDevice dev = m_Device->GetLogicalDevice();
@@ -1559,8 +1621,11 @@ namespace Graphics::Passes
     // =====================================================================
     // OnResize — invalidate cached pipelines (format may change).
     // =====================================================================
-    void PostProcessPass::OnResize(uint32_t, uint32_t)
+    void PostProcessPass::OnResize(uint32_t width, uint32_t height)
     {
+        ++m_DebugState.ResizeCount;
+        m_DebugState.LastResizeWidth = width;
+        m_DebugState.LastResizeHeight = height;
         m_ToneMapPipeline.reset();
         m_FXAAPipeline.reset();
         m_SMAAEdgePipeline.reset();
@@ -1569,5 +1634,13 @@ namespace Graphics::Passes
         m_BloomDownPipeline.reset();
         m_BloomUpPipeline.reset();
         m_HistogramPipeline.reset();
+        m_DebugState.ToneMapPipelineBuilt = false;
+        m_DebugState.FXAAPipelineBuilt = false;
+        m_DebugState.SMAAEdgePipelineBuilt = false;
+        m_DebugState.SMAABlendPipelineBuilt = false;
+        m_DebugState.SMAAResolvePipelineBuilt = false;
+        m_DebugState.BloomDownPipelineBuilt = false;
+        m_DebugState.BloomUpPipelineBuilt = false;
+        m_DebugState.HistogramPipelineBuilt = false;
     }
 }

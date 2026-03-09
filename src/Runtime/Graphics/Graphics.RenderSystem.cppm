@@ -125,6 +125,12 @@ export namespace Graphics
         std::vector<RenderGraphDebugPass> m_LastDebugPasses;
         std::vector<RenderGraphDebugImage> m_LastDebugImages;
         FrameRecipe m_LastFrameRecipe{};
+        uint32_t m_ResizeCount = 0;
+        VkExtent2D m_LastResizeExtent{};
+        uint64_t m_LastResizeGlobalFrame = 0;
+        VkExtent2D m_LastBuiltGraphExtent{};
+        uint32_t m_LastBuiltFrameIndex = 0;
+        uint32_t m_LastBuiltImageIndex = 0;
 
         // Pipeline (hot-swappable)
         std::unique_ptr<RenderPipeline> m_ActivePipeline;

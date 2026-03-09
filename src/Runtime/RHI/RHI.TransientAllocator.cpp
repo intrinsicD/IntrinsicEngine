@@ -21,14 +21,17 @@ namespace RHI
     TransientAllocator::TransientAllocator(VulkanDevice& device, VkDeviceSize pageSizeBytes)
         : m_Device(device)
           , m_PageSize(pageSizeBytes)
+          , m_FramesInFlight(std::max(1u, device.GetFramesInFlight()))
     {
         VkPhysicalDeviceMemoryProperties memProps{};
         vkGetPhysicalDeviceMemoryProperties(m_Device.GetPhysicalDevice(), &memProps);
 
-        m_Buckets.resize(memProps.memoryTypeCount);
-        for (uint32_t i = 0; i < memProps.memoryTypeCount; ++i)
+        m_FrameBuckets.resize(m_FramesInFlight);
+        for (auto& frameBuckets : m_FrameBuckets)
         {
-            m_Buckets[i].MemoryTypeIndex = i;
+            frameBuckets.resize(memProps.memoryTypeCount);
+            for (uint32_t i = 0; i < memProps.memoryTypeCount; ++i)
+                frameBuckets[i].MemoryTypeIndex = i;
         }
     }
 
@@ -38,41 +41,42 @@ namespace RHI
         // We can destroy immediately since allocator lifetime matches device lifetime.
         VkDevice device = m_Device.GetLogicalDevice();
 
-        for (auto& bucket : m_Buckets)
+        for (auto& frameBuckets : m_FrameBuckets)
         {
-            for (auto& page : bucket.Pages)
+            for (auto& bucket : frameBuckets)
             {
-                if (page.Memory != VK_NULL_HANDLE)
+                for (auto& page : bucket.Pages)
                 {
-                    vkFreeMemory(device, page.Memory, nullptr);
-                    page.Memory = VK_NULL_HANDLE;
+                    if (page.Memory != VK_NULL_HANDLE)
+                    {
+                        vkFreeMemory(device, page.Memory, nullptr);
+                        page.Memory = VK_NULL_HANDLE;
+                    }
                 }
+                bucket.Pages.clear();
             }
-            bucket.Pages.clear();
         }
     }
 
-    void TransientAllocator::Reset()
+    void TransientAllocator::Reset(uint32_t frameIndex)
     {
         std::lock_guard lock(m_Mutex);
 
-        for (auto& bucket : m_Buckets)
+        auto& frameBuckets = m_FrameBuckets[NormalizeFrameIndex(frameIndex)];
+        for (auto& bucket : frameBuckets)
         {
             for (auto& page : bucket.Pages)
-            {
                 page.UsedOffset = 0;
-            }
             bucket.ActivePageIndex = 0;
         }
     }
 
-    TransientAllocator::Allocation TransientAllocator::Allocate(const VkMemoryRequirements& reqs,
+    TransientAllocator::Allocation TransientAllocator::Allocate(uint32_t frameIndex,
+                                                                const VkMemoryRequirements& reqs,
                                                                 VkMemoryPropertyFlags preferredFlags)
     {
         if (reqs.size == 0)
-        {
             return {};
-        }
 
         const VkDeviceSize alignment = std::max<VkDeviceSize>(reqs.alignment, 1);
 
@@ -98,7 +102,8 @@ namespace RHI
         }
 
         std::lock_guard lock(m_Mutex);
-        auto& bucket = m_Buckets[typeIndex];
+        auto& frameBuckets = m_FrameBuckets[NormalizeFrameIndex(frameIndex)];
+        auto& bucket = frameBuckets[typeIndex];
 
         // Try to allocate from existing pages.
         for (size_t i = bucket.ActivePageIndex; i < bucket.Pages.size(); ++i)
@@ -118,9 +123,7 @@ namespace RHI
         const VkDeviceSize newPageSize = std::max(m_PageSize, reqs.size);
         Page newPage = CreatePage(typeIndex, newPageSize);
         if (newPage.Memory == VK_NULL_HANDLE)
-        {
             return {};
-        }
 
         // Place at offset 0 (0 is aligned for any power-of-two alignment).
         newPage.UsedOffset = reqs.size;
@@ -172,5 +175,12 @@ namespace RHI
         }
 
         return page;
+    }
+
+    uint32_t TransientAllocator::NormalizeFrameIndex(uint32_t frameIndex) const
+    {
+        if (m_FramesInFlight == 0)
+            return 0;
+        return frameIndex % m_FramesInFlight;
     }
 }

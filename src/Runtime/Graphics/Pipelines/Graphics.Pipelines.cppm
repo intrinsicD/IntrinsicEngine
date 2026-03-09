@@ -81,6 +81,17 @@ export namespace Graphics
             return m_PostProcessPass ? &m_PostProcessPass->GetHistogram() : nullptr;
         }
 
+        [[nodiscard]] RenderPipelineDebugState GetDebugState() const override;
+        [[nodiscard]] const Passes::SelectionOutlineDebugState* GetSelectionOutlineDebugState() const override
+        {
+            return m_SelectionOutlinePass ? &m_SelectionOutlinePass->GetDebugState() : nullptr;
+        }
+
+        [[nodiscard]] const Passes::PostProcessDebugState* GetPostProcessDebugState() const override
+        {
+            return m_PostProcessPass ? &m_PostProcessPass->GetDebugState() : nullptr;
+        }
+
     private:
         const Core::FeatureRegistry* m_Registry = nullptr;
 

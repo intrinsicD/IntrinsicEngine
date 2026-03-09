@@ -28,11 +28,12 @@ export namespace RHI
         TransientAllocator(const TransientAllocator&) = delete;
         TransientAllocator& operator=(const TransientAllocator&) = delete;
 
-        // Called at frame begin / RenderGraph compile.
-        void Reset();
+        // Reset only the allocator state for the frame slot being recorded.
+        void Reset(uint32_t frameIndex);
 
         // O(1) bump allocation (amortized O(1) including occasionally growing pages).
-        [[nodiscard]] Allocation Allocate(const VkMemoryRequirements& reqs,
+        [[nodiscard]] Allocation Allocate(uint32_t frameIndex,
+                                          const VkMemoryRequirements& reqs,
                                           VkMemoryPropertyFlags preferredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
     private:
@@ -53,12 +54,15 @@ export namespace RHI
 
         [[nodiscard]] uint32_t FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) const;
         [[nodiscard]] Page CreatePage(uint32_t memoryTypeIndex, VkDeviceSize sizeBytes) const;
+        [[nodiscard]] uint32_t NormalizeFrameIndex(uint32_t frameIndex) const;
 
         VulkanDevice& m_Device;
         VkDeviceSize m_PageSize = 0;
+        uint32_t m_FramesInFlight = 0;
 
-        // One bucket per memory type index (Vulkan spec max is 32, but query exact count).
-        std::vector<PageBucket> m_Buckets;
+        // One bucket set per frame-in-flight so transient memory is never reused
+        // while an older submitted frame can still reference it on the GPU.
+        std::vector<std::vector<PageBucket>> m_FrameBuckets;
 
         std::mutex m_Mutex;
     };

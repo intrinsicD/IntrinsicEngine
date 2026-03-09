@@ -112,10 +112,10 @@ export namespace Core::Windowing
         struct WindowData
         {
             std::string Title;
-            int WindowWidth;
-            int WindowHeight;
-            int FramebufferWidth;
-            int FramebufferHeight;
+            int WindowWidth = 0;
+            int WindowHeight = 0;
+            int FramebufferWidth = 0;
+            int FramebufferHeight = 0;
             EventCallbackFn Callback;
             Input::Context* InputCtx = nullptr;
         };

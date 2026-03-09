@@ -93,6 +93,11 @@ namespace Core::Windowing
         m_InputContext.Initialize(m_Window);
         m_Data.InputCtx = &m_InputContext;
 
+        // Seed cached dimensions immediately so swapchain creation sees the real framebuffer extent
+        // before the first per-frame OnUpdate() poll.
+        glfwGetWindowSize(glfwWindow, &m_Data.WindowWidth, &m_Data.WindowHeight);
+        glfwGetFramebufferSize(glfwWindow, &m_Data.FramebufferWidth, &m_Data.FramebufferHeight);
+
         // Store a pointer to our data struct inside the GLFW window so callbacks can find it
         glfwSetWindowUserPointer(glfwWindow, &m_Data);
 
@@ -102,9 +107,33 @@ namespace Core::Windowing
         glfwSetFramebufferSizeCallback(glfwWindow, [](GLFWwindow* window, int width, int height)
         {
             WindowData& data = *static_cast<WindowData*>(glfwGetWindowUserPointer(window));
+            data.FramebufferWidth = width;
+            data.FramebufferHeight = height;
             if (data.Callback)
             {
                 data.Callback(WindowResizeEvent{width, height});
+            }
+        });
+
+        // 1b. Content-scale / monitor-DPI change.
+        // Moving a window between monitors can change framebuffer size without a meaningful logical
+        // window-size change. Re-query the framebuffer extent here so the engine can recreate the
+        // swapchain and all framebuffer-sized render targets immediately.
+        glfwSetWindowContentScaleCallback(glfwWindow, [](GLFWwindow* window, float, float)
+        {
+            WindowData& data = *static_cast<WindowData*>(glfwGetWindowUserPointer(window));
+            int fbWidth = data.FramebufferWidth;
+            int fbHeight = data.FramebufferHeight;
+            glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
+
+            if (fbWidth == data.FramebufferWidth && fbHeight == data.FramebufferHeight)
+                return;
+
+            data.FramebufferWidth = fbWidth;
+            data.FramebufferHeight = fbHeight;
+            if (data.Callback)
+            {
+                data.Callback(WindowResizeEvent{fbWidth, fbHeight});
             }
         });
 

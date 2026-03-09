@@ -32,6 +32,7 @@ import :Interaction;
 import :Presentation;
 import :GlobalResources;
 import :Passes.SelectionOutlineSettings;
+import :Pipelines;
 
 import Core.Hash;
 import Core.Memory;
@@ -96,6 +97,63 @@ namespace Graphics
             }
         }
 
+        [[nodiscard]] const char* ResolveRenderResourceDebugName(Core::Hash::StringID id)
+        {
+            using enum RenderResource;
+            for (RenderResource r : {SceneDepth, EntityId, PrimitiveId,
+                 SceneNormal, Albedo, Material0, SceneColorHDR,
+                 SceneColorLDR, SelectionMask, SelectionOutline})
+            {
+                if (GetRenderResourceName(r) != id)
+                    continue;
+                switch (r)
+                {
+                case SceneDepth:       return "SceneDepth";
+                case EntityId:         return "EntityId";
+                case PrimitiveId:      return "PrimitiveId";
+                case SceneNormal:      return "SceneNormal";
+                case Albedo:           return "Albedo";
+                case Material0:        return "Material0";
+                case SceneColorHDR:    return "SceneColorHDR";
+                case SceneColorLDR:    return "SceneColorLDR";
+                case SelectionMask:    return "SelectionMask";
+                case SelectionOutline: return "SelectionOutline";
+                }
+            }
+            if (id == "Backbuffer"_id) return "Backbuffer";
+            if (id == "PostLdrTemp"_id) return "PostLdrTemp";
+            if (id == "SMAAEdges"_id) return "SMAAEdges";
+            if (id == "SMAAWeights"_id) return "SMAAWeights";
+            return nullptr;
+        }
+
+        [[nodiscard]] const char* FormatVkFormatName(VkFormat fmt)
+        {
+            switch (fmt)
+            {
+            case VK_FORMAT_R32_UINT:              return "R32_UINT";
+            case VK_FORMAT_R8_UNORM:              return "R8_UNORM";
+            case VK_FORMAT_R8G8_UNORM:            return "RG8_UNORM";
+            case VK_FORMAT_R8G8B8A8_UNORM:        return "RGBA8";
+            case VK_FORMAT_R8G8B8A8_SRGB:         return "RGBA8_SRGB";
+            case VK_FORMAT_B8G8R8A8_UNORM:        return "BGRA8";
+            case VK_FORMAT_B8G8R8A8_SRGB:         return "BGRA8_SRGB";
+            case VK_FORMAT_R16G16B16A16_SFLOAT:   return "RGBA16F";
+            case VK_FORMAT_D32_SFLOAT:            return "D32F";
+            case VK_FORMAT_D24_UNORM_S8_UINT:     return "D24S8";
+            case VK_FORMAT_D32_SFLOAT_S8_UINT:    return "D32FS8";
+            default:                              return "Unknown";
+            }
+        }
+
+        [[nodiscard]] bool CompiledPassNameContains(std::span<const RenderGraphDebugPass> passes, std::string_view needle)
+        {
+            return std::any_of(passes.begin(), passes.end(),
+                               [&](const RenderGraphDebugPass& pass)
+                               {
+                                   return std::string_view(pass.Name).find(needle) != std::string_view::npos;
+                               });
+        }
     }
 
     // -----------------------------------------------------------------
@@ -271,67 +329,208 @@ namespace Graphics
                                       [this]()
                                       {
                                           auto& debugView = m_Interaction.GetDebugViewStateMut();
-                                          ImGui::Checkbox("Enable Debug View", &debugView.Enabled);
+                                          const VkExtent2D presentationExtent = m_Presentation.GetResolution();
+                                          const VkExtent2D swapchainExtent = m_Swapchain.GetExtent();
+                                          const auto lastPick = m_Interaction.GetLastPickResult();
+                                          const auto pipelineDebug = m_ActivePipeline
+                                              ? std::optional<RenderPipelineDebugState>(m_ActivePipeline->GetDebugState())
+                                              : std::nullopt;
+                                          const auto* outlineDebug = m_ActivePipeline ? m_ActivePipeline->GetSelectionOutlineDebugState() : nullptr;
+                                          const auto* postDebug = m_ActivePipeline ? m_ActivePipeline->GetPostProcessDebugState() : nullptr;
 
-                                          if (!debugView.Enabled)
+                                          auto drawBool = [](const char* label, bool value)
                                           {
-                                              ImGui::TextDisabled(
-                                                  "Debug view disabled. Enable to visualize render targets.");
-                                              return;
+                                              ImGui::Text("%s:", label);
+                                              ImGui::SameLine();
+                                              ImGui::TextColored(value ? ImVec4(0.45f, 0.9f, 0.45f, 1.0f) : ImVec4(0.95f, 0.45f, 0.45f, 1.0f),
+                                                                 value ? "true" : "false");
+                                          };
+
+                                          auto drawRecipeFlag = [&](const char* label, bool value)
+                                          {
+                                              ImGui::TableNextRow();
+                                              ImGui::TableSetColumnIndex(0);
+                                              ImGui::TextUnformatted(label);
+                                              ImGui::TableSetColumnIndex(1);
+                                              ImGui::TextUnformatted(value ? "yes" : "no");
+                                          };
+
+                                          auto drawHandleLine = [&](const char* label, bool valid, uint32_t handle)
+                                          {
+                                              ImGui::Text("%s: %s", label, valid ? "valid" : "invalid");
+                                              if (valid)
+                                              {
+                                                  ImGui::SameLine();
+                                                  ImGui::TextDisabled("(resource=%u)", handle);
+                                              }
+                                          };
+
+                                          auto drawFeatureRow = [&](const char* name,
+                                                                    const RenderPipelineFeatureDebugState& state,
+                                                                    bool compiled)
+                                          {
+                                              ImGui::TableNextRow();
+                                              ImGui::TableSetColumnIndex(0);
+                                              ImGui::TextUnformatted(name);
+                                              ImGui::TableSetColumnIndex(1);
+                                              ImGui::TextUnformatted(state.Exists ? "yes" : "no");
+                                              ImGui::TableSetColumnIndex(2);
+                                              ImGui::TextUnformatted(state.Enabled ? "yes" : "no");
+                                              ImGui::TableSetColumnIndex(3);
+                                              ImGui::TextUnformatted(compiled ? "yes" : "no");
+                                          };
+
+                                          if (ImGui::CollapsingHeader("Frame State", ImGuiTreeNodeFlags_DefaultOpen))
+                                          {
+                                              ImGui::Text("Global Frame: %llu", static_cast<unsigned long long>(m_Device->GetGlobalFrameNumber()));
+                                              ImGui::Text("Presentation Frame/Image: %u / %u", m_Presentation.GetFrameIndex(), m_Presentation.GetImageIndex());
+                                              ImGui::Text("Last Built Frame/Image: %u / %u", m_LastBuiltFrameIndex, m_LastBuiltImageIndex);
+                                              ImGui::Text("Swapchain Extent: %ux%u", swapchainExtent.width, swapchainExtent.height);
+                                              ImGui::Text("Presentation Extent: %ux%u", presentationExtent.width, presentationExtent.height);
+                                              ImGui::Text("Last Graph Extent: %ux%u", m_LastBuiltGraphExtent.width, m_LastBuiltGraphExtent.height);
+                                              ImGui::Text("Swapchain Format: %s", FormatVkFormatName(m_Swapchain.GetImageFormat()));
+                                              ImGui::Text("Backbuffer Format: %s", FormatVkFormatName(m_Presentation.GetBackbufferFormat()));
+                                              ImGui::Text("Resize Count: %u", m_ResizeCount);
+                                              ImGui::Text("Last Resize Extent: %ux%u", m_LastResizeExtent.width, m_LastResizeExtent.height);
+                                              ImGui::Text("Last Resize Global Frame: %llu", static_cast<unsigned long long>(m_LastResizeGlobalFrame));
+                                              ImGui::Text("Last Pick Result: hit=%s entity=%u", lastPick.HasHit ? "true" : "false", lastPick.EntityID);
+                                              ImGui::Text("Compiled Passes / Images: %zu / %zu", m_LastDebugPasses.size(), m_LastDebugImages.size());
+
+                                              if (ImGui::BeginTable("##frame_recipe", 2,
+                                                  ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp))
+                                              {
+                                                  ImGui::TableSetupColumn("Recipe Flag");
+                                                  ImGui::TableSetupColumn("Enabled", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+                                                  ImGui::TableHeadersRow();
+                                                  drawRecipeFlag("Depth", m_LastFrameRecipe.Depth);
+                                                  drawRecipeFlag("EntityId", m_LastFrameRecipe.EntityId);
+                                                  drawRecipeFlag("PrimitiveId", m_LastFrameRecipe.PrimitiveId);
+                                                  drawRecipeFlag("Normals", m_LastFrameRecipe.Normals);
+                                                  drawRecipeFlag("MaterialChannels", m_LastFrameRecipe.MaterialChannels);
+                                                  drawRecipeFlag("Post", m_LastFrameRecipe.Post);
+                                                  drawRecipeFlag("SceneColorLDR", m_LastFrameRecipe.SceneColorLDR);
+                                                  drawRecipeFlag("Selection", m_LastFrameRecipe.Selection);
+                                                  drawRecipeFlag("DebugVisualization", m_LastFrameRecipe.DebugVisualization);
+                                                  ImGui::EndTable();
+                                              }
                                           }
 
+                                          if (pipelineDebug && ImGui::CollapsingHeader("Pipeline Feature State", ImGuiTreeNodeFlags_DefaultOpen))
+                                          {
+                                              drawBool("Has Feature Registry", pipelineDebug->HasFeatureRegistry);
+                                              drawBool("Path Dirty", pipelineDebug->PathDirty);
+                                              if (ImGui::BeginTable("##pipeline_features", 4,
+                                                  ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp))
+                                              {
+                                                  ImGui::TableSetupColumn("Feature");
+                                                  ImGui::TableSetupColumn("Exists", ImGuiTableColumnFlags_WidthFixed, 70.0f);
+                                                  ImGui::TableSetupColumn("Enabled", ImGuiTableColumnFlags_WidthFixed, 70.0f);
+                                                  ImGui::TableSetupColumn("Compiled", ImGuiTableColumnFlags_WidthFixed, 70.0f);
+                                                  ImGui::TableHeadersRow();
+                                                  drawFeatureRow("PickingPass", pipelineDebug->PickingPass,
+                                                                 CompiledPassNameContains(m_LastDebugPasses, "Pick"));
+                                                  drawFeatureRow("SurfacePass", pipelineDebug->SurfacePass,
+                                                                 CompiledPassNameContains(m_LastDebugPasses, "Surface"));
+                                                  drawFeatureRow("SelectionOutlinePass", pipelineDebug->SelectionOutlinePass,
+                                                                 CompiledPassNameContains(m_LastDebugPasses, "SelectionOutline"));
+                                                  drawFeatureRow("LinePass", pipelineDebug->LinePass,
+                                                                 CompiledPassNameContains(m_LastDebugPasses, "Line"));
+                                                  drawFeatureRow("PointPass", pipelineDebug->PointPass,
+                                                                 CompiledPassNameContains(m_LastDebugPasses, "Point"));
+                                                  drawFeatureRow("PostProcessPass", pipelineDebug->PostProcessPass,
+                                                                 CompiledPassNameContains(m_LastDebugPasses, "Post."));
+                                                  drawFeatureRow("DebugViewPass", pipelineDebug->DebugViewPass,
+                                                                 CompiledPassNameContains(m_LastDebugPasses, "DebugView"));
+                                                  drawFeatureRow("ImGuiPass", pipelineDebug->ImGuiPass,
+                                                                 CompiledPassNameContains(m_LastDebugPasses, "ImGui"));
+                                                  ImGui::EndTable();
+                                              }
+                                          }
+
+                                          if (outlineDebug && ImGui::CollapsingHeader("Selection Outline Internals", ImGuiTreeNodeFlags_DefaultOpen))
+                                          {
+                                              drawBool("Initialized", outlineDebug->Initialized);
+                                              drawBool("Shader Registry Configured", outlineDebug->ShaderRegistryConfigured);
+                                              drawBool("Pipeline Built", outlineDebug->PipelineBuilt);
+                                              drawBool("Dummy Pick ID Allocated", outlineDebug->DummyPickIdAllocated);
+                                              drawBool("Last Pass Requested", outlineDebug->LastPassRequested);
+                                              drawBool("Last Pass Added", outlineDebug->LastPassAdded);
+                                              drawBool("Last Descriptor Patched", outlineDebug->LastDescriptorPatched);
+                                              ImGui::Text("Descriptor Sets: %u", outlineDebug->DescriptorSetCount);
+                                              ImGui::Text("Last Frame Index: %u", outlineDebug->LastFrameIndex);
+                                              ImGui::Text("Last Resolution: %ux%u", outlineDebug->LastResolutionWidth, outlineDebug->LastResolutionHeight);
+                                              ImGui::Text("Last Color Format: %s", FormatVkFormatName(outlineDebug->LastColorFormat));
+                                              ImGui::Text("Last Selected Count / Hovered ID: %u / %u",
+                                                          outlineDebug->LastSelectedCount, outlineDebug->LastHoveredId);
+                                              drawHandleLine("EntityId Handle", outlineDebug->LastEntityIdHandleValid, outlineDebug->LastEntityIdHandle);
+                                              drawHandleLine("Target Handle", outlineDebug->LastTargetHandleValid, outlineDebug->LastTargetHandle);
+                                              ImGui::Text("Resize Count: %u", outlineDebug->ResizeCount);
+                                              ImGui::Text("Last Resize: %ux%u", outlineDebug->LastResizeWidth, outlineDebug->LastResizeHeight);
+                                              if (outlineDebug->LastSelectedCount > 0)
+                                              {
+                                                  ImGui::TextUnformatted("Selected Pick IDs:");
+                                                  for (uint32_t i = 0; i < std::min(outlineDebug->LastSelectedCount, Passes::kSelectionOutlineDebugMaxSelectedIds); ++i)
+                                                      ImGui::BulletText("[%u] %u", i, outlineDebug->LastSelectedIds[i]);
+                                              }
+                                          }
+
+                                          if (postDebug && ImGui::CollapsingHeader("Post Process Internals", ImGuiTreeNodeFlags_DefaultOpen))
+                                          {
+                                              drawBool("Initialized", postDebug->Initialized);
+                                              drawBool("Shader Registry Configured", postDebug->ShaderRegistryConfigured);
+                                              drawBool("Dummy Sampled Allocated", postDebug->DummySampledAllocated);
+                                              drawBool("ToneMap Pipeline Built", postDebug->ToneMapPipelineBuilt);
+                                              drawBool("FXAA Pipeline Built", postDebug->FXAAPipelineBuilt);
+                                              drawBool("SMAA Edge Pipeline Built", postDebug->SMAAEdgePipelineBuilt);
+                                              drawBool("SMAA Blend Pipeline Built", postDebug->SMAABlendPipelineBuilt);
+                                              drawBool("SMAA Resolve Pipeline Built", postDebug->SMAAResolvePipelineBuilt);
+                                              drawBool("Bloom Down Pipeline Built", postDebug->BloomDownPipelineBuilt);
+                                              drawBool("Bloom Up Pipeline Built", postDebug->BloomUpPipelineBuilt);
+                                              drawBool("Histogram Pipeline Built", postDebug->HistogramPipelineBuilt);
+                                              drawBool("Bloom Enabled", postDebug->BloomEnabled);
+                                              drawBool("Histogram Enabled", postDebug->HistogramEnabled);
+                                              drawBool("FXAA Enabled", postDebug->FXAAEnabled);
+                                              drawBool("SMAA Enabled", postDebug->SMAAEnabled);
+                                              ImGui::Text("Last Frame Index: %u", postDebug->LastFrameIndex);
+                                              ImGui::Text("Last Resolution: %ux%u", postDebug->LastResolutionWidth, postDebug->LastResolutionHeight);
+                                              ImGui::Text("Last Output Format: %s", FormatVkFormatName(postDebug->LastOutputFormat));
+                                              drawHandleLine("SceneColor Handle", postDebug->LastSceneColorHandleValid, postDebug->LastSceneColorHandle);
+                                              drawHandleLine("PostLdr Handle", postDebug->LastPostLdrHandleValid, postDebug->LastPostLdrHandle);
+                                              drawHandleLine("BloomMip0 Handle", postDebug->LastBloomMip0HandleValid, postDebug->LastBloomMip0Handle);
+                                              drawHandleLine("SMAAEdges Handle", postDebug->LastSMAAEdgesHandleValid, postDebug->LastSMAAEdgesHandle);
+                                              drawHandleLine("SMAAWeights Handle", postDebug->LastSMAAWeightsHandleValid, postDebug->LastSMAAWeightsHandle);
+                                              ImGui::Text("Resize Count: %u", postDebug->ResizeCount);
+                                              ImGui::Text("Last Resize: %ux%u", postDebug->LastResizeWidth, postDebug->LastResizeHeight);
+                                              if (ImGui::TreeNode("Bloom Handle Arrays"))
+                                              {
+                                                  for (uint32_t mip = 0; mip < Passes::kPostProcessDebugBloomMipCount; ++mip)
+                                                  {
+                                                      ImGui::BulletText("Down[%u]=%u  UpSrc[%u]=%u",
+                                                                        mip, postDebug->LastBloomDownHandles[mip],
+                                                                        mip, postDebug->LastBloomUpSourceHandles[mip]);
+                                                  }
+                                                  ImGui::TreePop();
+                                              }
+                                          }
+
+                                          ImGui::Separator();
+                                          ImGui::Checkbox("Enable Debug View", &debugView.Enabled);
                                           ImGui::Checkbox("Show debug view in viewport", &debugView.ShowInViewport);
                                           ImGui::Checkbox("Disable GPU culling", &debugView.DisableCulling);
+                                          if (!debugView.Enabled)
+                                              ImGui::TextDisabled("Debug-view visualization is disabled; internal diagnostics remain available below.");
                                           ImGui::Separator();
 
                                           // --- Resource List (flat, with details) ---
                                           // Build a mapping from known RenderResource StringIDs to readable names.
                                           auto resolveName = [](Core::Hash::StringID id) -> const char*
                                           {
-                                              using enum RenderResource;
-                                              for (RenderResource r : {SceneDepth, EntityId, PrimitiveId,
-                                                   SceneNormal, Albedo, Material0, SceneColorHDR,
-                                                   SceneColorLDR, SelectionMask, SelectionOutline})
-                                              {
-                                                  if (GetRenderResourceName(r) == id)
-                                                  {
-                                                      switch (r)
-                                                      {
-                                                      case SceneDepth:       return "SceneDepth";
-                                                      case EntityId:         return "EntityId";
-                                                      case PrimitiveId:      return "PrimitiveId";
-                                                      case SceneNormal:      return "SceneNormal";
-                                                      case Albedo:           return "Albedo";
-                                                      case Material0:        return "Material0";
-                                                      case SceneColorHDR:    return "SceneColorHDR";
-                                                      case SceneColorLDR:    return "SceneColorLDR";
-                                                      case SelectionMask:    return "SelectionMask";
-                                                      case SelectionOutline: return "SelectionOutline";
-                                                      }
-                                                  }
-                                              }
-                                              // Check well-known non-enum names
-                                              if (id == "Backbuffer"_id) return "Backbuffer";
-                                              if (id == "PostLdrTemp"_id) return "PostLdrTemp";
-                                              return nullptr;
+                                              return ResolveRenderResourceDebugName(id);
                                           };
 
                                           auto formatName = [](VkFormat fmt) -> const char*
                                           {
-                                              switch (fmt)
-                                              {
-                                              case VK_FORMAT_R32_UINT:              return "R32_UINT";
-                                              case VK_FORMAT_R8_UNORM:              return "R8_UNORM";
-                                              case VK_FORMAT_R8G8B8A8_UNORM:        return "RGBA8";
-                                              case VK_FORMAT_R8G8B8A8_SRGB:         return "RGBA8_SRGB";
-                                              case VK_FORMAT_B8G8R8A8_UNORM:        return "BGRA8";
-                                              case VK_FORMAT_B8G8R8A8_SRGB:         return "BGRA8_SRGB";
-                                              case VK_FORMAT_R16G16B16A16_SFLOAT:   return "RGBA16F";
-                                              case VK_FORMAT_D32_SFLOAT:            return "D32F";
-                                              case VK_FORMAT_D24_UNORM_S8_UINT:     return "D24S8";
-                                              case VK_FORMAT_D32_SFLOAT_S8_UINT:    return "D32FS8";
-                                              default:                              return "Unknown";
-                                              }
+                                              return FormatVkFormatName(fmt);
                                           };
 
                                           // --- Pass-organized resource browser ---
@@ -756,16 +955,19 @@ namespace Graphics
     void RenderSystem::BuildGraph(ECS::Scene& scene, Core::Assets::AssetManager& assetManager,
                                   const CameraComponent& camera)
     {
-        m_RenderGraph.Reset();
+        const uint32_t frameIndex = m_Presentation.GetFrameIndex();
+        m_RenderGraph.Reset(frameIndex);
 
         // DebugDraw is transient per-frame and is reset by Engine::Run via
         // RenderOrchestrator::ResetFrameState() before client OnUpdate emits lines.
         // Do NOT clear here or we erase client-submitted debug lines (bounds/octree/kdtree)
         // right before pipeline passes consume them.
 
-        const uint32_t frameIndex = m_Presentation.GetFrameIndex();
         const uint32_t imageIndex = m_Presentation.GetImageIndex();
         const auto extent = m_Presentation.GetResolution();
+        m_LastBuiltFrameIndex = frameIndex;
+        m_LastBuiltImageIndex = imageIndex;
+        m_LastBuiltGraphExtent = extent;
         RenderBlackboard blackboard;
 
         const auto& pendingPick = m_Interaction.GetPendingPick();
@@ -996,9 +1198,13 @@ namespace Graphics
 
     void RenderSystem::OnResize()
     {
+        ++m_ResizeCount;
+        m_LastResizeExtent = m_Presentation.GetResolution();
+        m_LastResizeGlobalFrame = m_Device ? m_Device->GetGlobalFrameNumber() : 0;
         m_RenderGraph.Trim();
         m_Presentation.OnResize();
         auto extent = m_Presentation.GetResolution();
+        m_LastResizeExtent = extent;
         if (m_ActivePipeline) m_ActivePipeline->OnResize(extent.width, extent.height);
     }
 

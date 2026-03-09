@@ -8,6 +8,7 @@ module;
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #include <glm/glm.hpp>
 #include <entt/entity/registry.hpp>
@@ -16,6 +17,7 @@ module;
 module Graphics:Passes.SelectionOutline.Impl;
 
 import :Passes.SelectionOutline;
+import :Components;
 import :RenderPipeline;
 import :RenderGraph;
 import :ShaderRegistry;
@@ -31,11 +33,93 @@ using namespace Core::Hash;
 
 namespace Graphics::Passes
 {
+    namespace
+    {
+        template <typename Fn>
+        void ForEachOutlineCandidateInSubtree(const entt::registry& registry, entt::entity root, Fn&& fn)
+        {
+            if (!registry.valid(root))
+                return;
+
+            std::vector<entt::entity> stack;
+            stack.push_back(root);
+
+            while (!stack.empty())
+            {
+                const entt::entity current = stack.back();
+                stack.pop_back();
+
+                fn(current);
+
+                const auto* hierarchy = registry.try_get<ECS::Components::Hierarchy::Component>(current);
+                if (!hierarchy)
+                    continue;
+
+                for (entt::entity child = hierarchy->FirstChild; child != entt::null;)
+                {
+                    entt::entity nextSibling = entt::null;
+                    if (const auto* childHierarchy = registry.try_get<ECS::Components::Hierarchy::Component>(child))
+                        nextSibling = childHierarchy->NextSibling;
+                    stack.push_back(child);
+                    child = nextSibling;
+                }
+            }
+        }
+
+        [[nodiscard]] bool CanEmitOutlinePickId(const entt::registry& registry, entt::entity entity)
+        {
+            return registry.valid(entity) &&
+                   registry.all_of<ECS::Surface::Component, ECS::Components::Selection::PickID>(entity);
+        }
+    }
+
+    uint32_t AppendOutlineRenderablePickIds(const entt::registry& registry,
+                                            entt::entity root,
+                                            std::span<uint32_t> outIds,
+                                            uint32_t count)
+    {
+        if (count >= outIds.size())
+            return count;
+
+        ForEachOutlineCandidateInSubtree(registry, root,
+            [&](entt::entity candidate)
+            {
+                if (count >= outIds.size() || !CanEmitOutlinePickId(registry, candidate))
+                    return;
+
+                const uint32_t pickId = registry.get<ECS::Components::Selection::PickID>(candidate).Value;
+                if (pickId == 0u)
+                    return;
+
+                if (std::find(outIds.begin(), outIds.begin() + static_cast<std::ptrdiff_t>(count), pickId) !=
+                    outIds.begin() + static_cast<std::ptrdiff_t>(count))
+                    return;
+
+                outIds[count++] = pickId;
+            });
+
+        return count;
+    }
+
+    uint32_t ResolveOutlineRenderablePickId(const entt::registry& registry, entt::entity root)
+    {
+        uint32_t result = 0u;
+        ForEachOutlineCandidateInSubtree(registry, root,
+            [&](entt::entity candidate)
+            {
+                if (result != 0u || !CanEmitOutlinePickId(registry, candidate))
+                    return;
+                result = registry.get<ECS::Components::Selection::PickID>(candidate).Value;
+            });
+        return result;
+    }
+
     void SelectionOutlinePass::Initialize(RHI::VulkanDevice& device,
                                           RHI::DescriptorAllocator& descriptorPool,
                                           RHI::DescriptorLayout&)
     {
         m_Device = &device;
+        m_DebugState.Initialized = true;
 
         m_Sampler = CreateNearestSampler(m_Device->GetLogicalDevice(), "SelectionOutline");
         m_DescriptorSetLayout = CreateSamplerDescriptorSetLayout(
@@ -45,6 +129,7 @@ namespace Graphics::Passes
         m_DescriptorSets.resize(RHI::VulkanDevice::GetFramesInFlight());
         for (auto& set : m_DescriptorSets)
             set = descriptorPool.Allocate(m_DescriptorSetLayout);
+        m_DebugState.DescriptorSetCount = static_cast<uint32_t>(m_DescriptorSets.size());
 
         // Create a dummy 1x1 R32_UINT image for initial descriptor binding
         m_DummyPickId = std::make_unique<RHI::VulkanImage>(
@@ -52,6 +137,7 @@ namespace Graphics::Passes
             VK_FORMAT_R32_UINT,
             VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
             VK_IMAGE_ASPECT_COLOR_BIT);
+        m_DebugState.DummyPickIdAllocated = static_cast<bool>(m_DummyPickId);
 
         // Transition dummy to SHADER_READ_ONLY_OPTIMAL
         TransitionImageToShaderRead(*m_Device, m_DummyPickId->GetHandle(), VK_IMAGE_ASPECT_COLOR_BIT);
@@ -72,32 +158,43 @@ namespace Graphics::Passes
         // Skip if no entities are selected or hovered
         auto& registry = ctx.Scene.GetRegistry();
 
-        // Count selected entities and collect their PickIDs
+        // Count selected entities and collect their PickIDs.
+        // Selection can target non-renderable hierarchy parents from the editor tree,
+        // while the PickID buffer is written by renderable descendants.
         uint32_t selectedCount = 0;
         uint32_t selectedIds[kMaxSelectedIds] = {};
         uint32_t hoveredId = 0;
         bool hasHovered = false;
 
-        auto selectedView = registry.view<
-            ECS::Components::Selection::SelectedTag,
-            ECS::Components::Selection::PickID>();
+        auto selectedView = registry.view<ECS::Components::Selection::SelectedTag>();
 
-        for (auto [entity, pid] : selectedView.each())
+        for (auto entity : selectedView)
+            selectedCount = AppendOutlineRenderablePickIds(registry, entity, selectedIds, selectedCount);
+
+        auto hoveredView = registry.view<ECS::Components::Selection::HoveredTag>();
+
+        for (auto entity : hoveredView)
         {
-            if (selectedCount < kMaxSelectedIds)
-                selectedIds[selectedCount++] = pid.Value;
+            hoveredId = ResolveOutlineRenderablePickId(registry, entity);
+            hasHovered = hoveredId != 0u;
+            if (hasHovered)
+                break; // Only one hovered entity at a time
         }
 
-        auto hoveredView = registry.view<
-            ECS::Components::Selection::HoveredTag,
-            ECS::Components::Selection::PickID>();
-
-        for (auto [entity, pid] : hoveredView.each())
-        {
-            hoveredId = pid.Value;
-            hasHovered = true;
-            break; // Only one hovered entity at a time
-        }
+        m_DebugState.LastFrameIndex = ctx.FrameIndex;
+        m_DebugState.LastResolutionWidth = ctx.Resolution.width;
+        m_DebugState.LastResolutionHeight = ctx.Resolution.height;
+        m_DebugState.LastSelectedCount = selectedCount;
+        m_DebugState.LastHoveredId = hoveredId;
+        std::copy_n(selectedIds, kMaxSelectedIds, m_DebugState.LastSelectedIds.begin());
+        m_DebugState.LastPassRequested = (selectedCount != 0u) || hasHovered;
+        m_DebugState.LastPassAdded = false;
+        m_DebugState.LastDescriptorPatched = false;
+        m_DebugState.LastEntityIdHandleValid = false;
+        m_DebugState.LastTargetHandleValid = false;
+        m_DebugState.LastEntityIdHandle = 0;
+        m_DebugState.LastTargetHandle = 0;
+        m_DebugState.LastColorFormat = ctx.SwapchainFormat;
 
         // Clear the cached handle unless we add the pass.
         m_LastPickIdHandle = {};
@@ -148,16 +245,27 @@ namespace Graphics::Passes
 
             auto built = pb.Build();
             if (built)
+            {
                 m_Pipeline = std::move(*built);
+                m_DebugState.PipelineBuilt = true;
+            }
             else
             {
                 Core::Log::Error("SelectionOutline: failed to build pipeline (VkResult={})", (int)built.error());
                 return;
             }
         }
+        else
+        {
+            m_DebugState.PipelineBuilt = true;
+        }
 
         const RGResourceHandle entityId = ctx.Blackboard.Get(RenderResource::EntityId);
         const RGResourceHandle target = GetPresentationTarget(ctx);
+        m_DebugState.LastEntityIdHandleValid = entityId.IsValid();
+        m_DebugState.LastTargetHandleValid = target.IsValid();
+        m_DebugState.LastEntityIdHandle = entityId.IsValid() ? entityId.ID : 0u;
+        m_DebugState.LastTargetHandle = target.IsValid() ? target.ID : 0u;
 
         if (!entityId.IsValid() || !target.IsValid())
             return;
@@ -188,6 +296,11 @@ namespace Graphics::Passes
                 data.Target = builder.WriteColor(target, info);
 
                 m_LastPickIdHandle = data.EntityId;
+                m_DebugState.LastPassAdded = true;
+                m_DebugState.LastEntityIdHandleValid = data.EntityId.IsValid();
+                m_DebugState.LastTargetHandleValid = data.Target.IsValid();
+                m_DebugState.LastEntityIdHandle = data.EntityId.IsValid() ? data.EntityId.ID : 0u;
+                m_DebugState.LastTargetHandle = data.Target.IsValid() ? data.Target.ID : 0u;
             },
             [&, selState, pipeline = m_Pipeline.get()](
                 const OutlinePassData& data, const RGRegistry&, VkCommandBuffer cmd)
@@ -266,6 +379,8 @@ namespace Graphics::Passes
     void SelectionOutlinePass::PostCompile(uint32_t frameIndex,
                                            std::span<const RenderGraphDebugImage> debugImages)
     {
+        m_DebugState.LastFrameIndex = frameIndex;
+        m_DebugState.LastDescriptorPatched = false;
         if (!m_Device) return;
         if (frameIndex >= m_DescriptorSets.size()) return;
         if (!m_LastPickIdHandle.IsValid()) return;
@@ -280,15 +395,26 @@ namespace Graphics::Passes
                 UpdateImageDescriptor(m_Device->GetLogicalDevice(), currentSet, 0,
                                       m_Sampler, img.View,
                                       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                m_DebugState.LastDescriptorPatched = true;
                 break;
             }
         }
+    }
+
+    void SelectionOutlinePass::OnResize(uint32_t width, uint32_t height)
+    {
+        ++m_DebugState.ResizeCount;
+        m_DebugState.LastResizeWidth = width;
+        m_DebugState.LastResizeHeight = height;
     }
 
     void SelectionOutlinePass::Shutdown()
     {
         if (!m_Device) return;
         m_DummyPickId.reset();
+        m_DebugState.DummyPickIdAllocated = false;
+        m_DebugState.PipelineBuilt = false;
+        m_DebugState.Initialized = false;
         if (m_DescriptorSetLayout)
             vkDestroyDescriptorSetLayout(m_Device->GetLogicalDevice(), m_DescriptorSetLayout, nullptr);
         if (m_Sampler)

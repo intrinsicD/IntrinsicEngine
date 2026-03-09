@@ -1,8 +1,10 @@
 module;
 
+#include <array>
 #include <memory>
 #include <span>
 #include <vector>
+#include <entt/entity/registry.hpp>
 
 #include <glm/glm.hpp>
 #include "RHI.Vulkan.hpp"
@@ -19,20 +21,60 @@ import RHI;
 
 export namespace Graphics::Passes
 {
+    inline constexpr uint32_t kSelectionOutlineDebugMaxSelectedIds = 16;
+
+    struct SelectionOutlineDebugState
+    {
+        bool Initialized = false;
+        bool ShaderRegistryConfigured = false;
+        bool PipelineBuilt = false;
+        bool DummyPickIdAllocated = false;
+        bool LastPassRequested = false;
+        bool LastPassAdded = false;
+        bool LastDescriptorPatched = false;
+        bool LastEntityIdHandleValid = false;
+        bool LastTargetHandleValid = false;
+        uint32_t DescriptorSetCount = 0;
+        uint32_t ResizeCount = 0;
+        uint32_t LastResizeWidth = 0;
+        uint32_t LastResizeHeight = 0;
+        uint32_t LastFrameIndex = ~0u;
+        uint32_t LastResolutionWidth = 0;
+        uint32_t LastResolutionHeight = 0;
+        uint32_t LastSelectedCount = 0;
+        uint32_t LastHoveredId = 0;
+        uint32_t LastEntityIdHandle = 0;
+        uint32_t LastTargetHandle = 0;
+        VkFormat LastColorFormat = VK_FORMAT_UNDEFINED;
+        std::array<uint32_t, kSelectionOutlineDebugMaxSelectedIds> LastSelectedIds{};
+    };
+
+    [[nodiscard]] uint32_t AppendOutlineRenderablePickIds(const entt::registry& registry,
+                                                          entt::entity root,
+                                                          std::span<uint32_t> outIds,
+                                                          uint32_t count = 0u);
+
+    [[nodiscard]] uint32_t ResolveOutlineRenderablePickId(const entt::registry& registry,
+                                                          entt::entity root);
 
     class SelectionOutlinePass final : public IRenderFeature
     {
     public:
-        static constexpr uint32_t kMaxSelectedIds = 16;
+        static constexpr uint32_t kMaxSelectedIds = kSelectionOutlineDebugMaxSelectedIds;
 
         void Initialize(RHI::VulkanDevice& device,
                         RHI::DescriptorAllocator& descriptorPool,
                         RHI::DescriptorLayout&) override;
 
-        void SetShaderRegistry(const ShaderRegistry& shaderRegistry) { m_ShaderRegistry = &shaderRegistry; }
+        void SetShaderRegistry(const ShaderRegistry& shaderRegistry)
+        {
+            m_ShaderRegistry = &shaderRegistry;
+            m_DebugState.ShaderRegistryConfigured = true;
+        }
 
         void AddPasses(RenderPassContext& ctx) override;
         void Shutdown() override;
+        void OnResize(uint32_t width, uint32_t height) override;
 
         // Must be called after RenderGraph::Compile() to update per-frame descriptor
         // bindings to point at the actual PickID image view for this frame.
@@ -41,6 +83,7 @@ export namespace Graphics::Passes
         // Configuration accessors
         SelectionOutlineSettings& GetSettings() { return m_Settings; }
         [[nodiscard]] const SelectionOutlineSettings& GetSettings() const { return m_Settings; }
+        [[nodiscard]] const SelectionOutlineDebugState& GetDebugState() const { return m_DebugState; }
 
     private:
         struct OutlinePassData
@@ -62,5 +105,6 @@ export namespace Graphics::Passes
 
         // User-configurable settings
         SelectionOutlineSettings m_Settings;
+        SelectionOutlineDebugState m_DebugState;
     };
 }

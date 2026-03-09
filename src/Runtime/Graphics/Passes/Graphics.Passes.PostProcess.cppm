@@ -41,6 +41,45 @@ export namespace Graphics::Passes
     // -----------------------------------------------------------------
 
     inline constexpr uint32_t kBloomMipCount = 5;
+    inline constexpr uint32_t kPostProcessDebugBloomMipCount = kBloomMipCount;
+
+    struct PostProcessDebugState
+    {
+        bool Initialized = false;
+        bool ShaderRegistryConfigured = false;
+        bool ToneMapPipelineBuilt = false;
+        bool FXAAPipelineBuilt = false;
+        bool SMAAEdgePipelineBuilt = false;
+        bool SMAABlendPipelineBuilt = false;
+        bool SMAAResolvePipelineBuilt = false;
+        bool BloomDownPipelineBuilt = false;
+        bool BloomUpPipelineBuilt = false;
+        bool HistogramPipelineBuilt = false;
+        bool DummySampledAllocated = false;
+        bool BloomEnabled = false;
+        bool HistogramEnabled = false;
+        bool FXAAEnabled = false;
+        bool SMAAEnabled = false;
+        bool LastSceneColorHandleValid = false;
+        bool LastPostLdrHandleValid = false;
+        bool LastBloomMip0HandleValid = false;
+        bool LastSMAAEdgesHandleValid = false;
+        bool LastSMAAWeightsHandleValid = false;
+        uint32_t ResizeCount = 0;
+        uint32_t LastResizeWidth = 0;
+        uint32_t LastResizeHeight = 0;
+        uint32_t LastFrameIndex = ~0u;
+        uint32_t LastResolutionWidth = 0;
+        uint32_t LastResolutionHeight = 0;
+        uint32_t LastSceneColorHandle = 0;
+        uint32_t LastPostLdrHandle = 0;
+        uint32_t LastBloomMip0Handle = 0;
+        uint32_t LastSMAAEdgesHandle = 0;
+        uint32_t LastSMAAWeightsHandle = 0;
+        VkFormat LastOutputFormat = VK_FORMAT_UNDEFINED;
+        std::array<uint32_t, kPostProcessDebugBloomMipCount> LastBloomDownHandles{};
+        std::array<uint32_t, kPostProcessDebugBloomMipCount> LastBloomUpSourceHandles{};
+    };
 
     class PostProcessPass final : public IRenderFeature
     {
@@ -52,6 +91,7 @@ export namespace Graphics::Passes
         void SetShaderRegistry(const ShaderRegistry& shaderRegistry)
         {
             m_ShaderRegistry = &shaderRegistry;
+            m_DebugState.ShaderRegistryConfigured = true;
         }
 
         void AddPasses(RenderPassContext& ctx) override;
@@ -64,6 +104,7 @@ export namespace Graphics::Passes
 
         [[nodiscard]] PostProcessSettings& GetSettings() { return m_Settings; }
         [[nodiscard]] const PostProcessSettings& GetSettings() const { return m_Settings; }
+        [[nodiscard]] const PostProcessDebugState& GetDebugState() const { return m_DebugState; }
 
         // Access CPU-side histogram readback for UI display.
         [[nodiscard]] const HistogramReadback& GetHistogram() const { return m_HistogramReadback; }
@@ -73,6 +114,7 @@ export namespace Graphics::Passes
         const ShaderRegistry* m_ShaderRegistry  = nullptr;
 
         PostProcessSettings m_Settings;
+        PostProcessDebugState m_DebugState;
 
         // Tone map pipeline + descriptors (2 bindings: scene color + bloom)
         VkDescriptorSetLayout m_ToneMapSetLayout = VK_NULL_HANDLE;

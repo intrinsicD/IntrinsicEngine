@@ -142,6 +142,7 @@ public:
 
     // State to track if we have spawned the entity yet
     bool m_IsEntitySpawned = false;
+    entt::entity m_DuckEntity = entt::null;
 
     // Camera State
     entt::entity m_CameraEntity = entt::null;
@@ -923,9 +924,29 @@ public:
                 const bool hasSelectableTag = reg.all_of<ECS::Components::Selection::SelectableTag>(selected);
                 const bool hasSurface = reg.all_of<ECS::Surface::Component>(selected);
                 const bool hasMeshCollider = reg.all_of<ECS::MeshCollider::Component>(selected);
+                const bool hasGraph = reg.all_of<ECS::Graph::Data>(selected);
+                const bool hasPointCloud = reg.all_of<ECS::PointCloud::Data>(selected);
 
                 ImGui::Text("Tags: Selectable=%d Selected=%d", (int)hasSelectableTag, (int)hasSelectedTag);
-                ImGui::Text("Components: Surface=%d MeshCollider=%d", (int)hasSurface, (int)hasMeshCollider);
+                ImGui::Text("Components: Surface=%d MeshCollider=%d Graph=%d PointCloud=%d",
+                            (int)hasSurface, (int)hasMeshCollider, (int)hasGraph, (int)hasPointCloud);
+
+                uint32_t selfPickId = 0u;
+                if (const auto* pid = reg.try_get<ECS::Components::Selection::PickID>(selected))
+                    selfPickId = pid->Value;
+
+                uint32_t outlineIds[Graphics::Passes::SelectionOutlinePass::kMaxSelectedIds] = {};
+                const uint32_t outlineCount = Graphics::Passes::AppendOutlineRenderablePickIds(reg, selected, outlineIds);
+                ImGui::Text("PickIDs: Self=%u OutlineResolved=%u", selfPickId, outlineCount);
+                for (uint32_t i = 0; i < outlineCount; ++i)
+                    ImGui::BulletText("Outline PickID[%u] = %u", i, outlineIds[i]);
+
+                if (outlineCount == 0u)
+                    ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.2f, 1.0f),
+                                       "No renderable outline PickIDs resolved for this selection.");
+
+                const auto gpuPick = GetRenderOrchestrator().GetRenderSystem().GetLastPickResult();
+                ImGui::Text("Last GPU Pick: Hit=%d EntityID=%u", (int)gpuPick.HasHit, gpuPick.EntityID);
             }
         });
 
@@ -1445,7 +1466,9 @@ public:
             if (GetAssetManager().GetState(m_DuckModel) == Assets::LoadState::Ready)
             {
                 // One line to rule them all
-                SpawnModel(m_DuckModel, m_DuckMaterialHandle, glm::vec3(0.0f), glm::vec3(0.01f));
+                m_DuckEntity = SpawnModel(m_DuckModel, m_DuckMaterialHandle, glm::vec3(0.0f), glm::vec3(0.01f));
+                if (m_DuckEntity != entt::null)
+                    GetSelection().SetSelectedEntity(GetScene(), m_DuckEntity);
 
                 // (Optional) If you need to add specific behaviors like rotation:
                 // entt::entity duck = SpawnModel(...);

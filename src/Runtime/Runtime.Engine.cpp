@@ -350,6 +350,13 @@ namespace Runtime
         Core::Log::Info("Engine::Run starting...");
         OnStart();
 
+        // Bootstrap the renderer through the same path as a real framebuffer resize.
+        // In practice this is what makes the selection outline appear today: swapchain
+        // recreation, render-graph pool trim, presentation depth invalidation, and
+        // per-pipeline resize callbacks. Some WSI state only settles after the first
+        // event poll, so prime the flag here and let the first frame consume it once.
+        m_FramebufferResized = true;
+
         using Clock = std::chrono::high_resolution_clock;
         auto lastTime = Clock::now();
 
@@ -384,6 +391,37 @@ namespace Runtime
             {
                 PROFILE_SCOPE("Window::OnUpdate");
                 m_Window->OnUpdate();
+            }
+
+            {
+                const int fbWidth = m_Window->GetFramebufferWidth();
+                const int fbHeight = m_Window->GetFramebufferHeight();
+                const VkExtent2D swapExtent = m_GraphicsBackend->GetSwapchain().GetExtent();
+                const bool framebufferExtentMismatch =
+                    fbWidth > 0 && fbHeight > 0 &&
+                    (swapExtent.width != static_cast<uint32_t>(fbWidth) ||
+                     swapExtent.height != static_cast<uint32_t>(fbHeight));
+
+                if (framebufferExtentMismatch)
+                    m_FramebufferResized = true;
+
+                // Monitor moves can change framebuffer extent/content scale without a reliable
+                // resize callback on every platform. Apply resize before per-frame update/render
+                // so picking, EntityId, and post-process overlays all use the current extent.
+                if (m_FramebufferResized && fbWidth > 0 && fbHeight > 0)
+                {
+                    Core::Log::Info(
+                        "Engine resize trigger: framebuffer={}x{} swapchainBefore={}x{} resizedFlag={} mismatch={}",
+                        fbWidth,
+                        fbHeight,
+                        swapExtent.width,
+                        swapExtent.height,
+                        m_FramebufferResized,
+                        framebufferExtentMismatch);
+                    m_GraphicsBackend->OnResize();
+                    m_RenderOrchestrator->OnResize();
+                    m_FramebufferResized = false;
+                }
             }
 
             m_AssetPipeline->ProcessMainThreadQueue();
@@ -557,12 +595,8 @@ namespace Runtime
                 }
             }
 
-            if (m_FramebufferResized)
-            {
-                m_GraphicsBackend->OnResize();
-                m_RenderOrchestrator->OnResize();
-                m_FramebufferResized = false;
-            }
+            // Resize is synchronized immediately after Window::OnUpdate() so render/update
+            // always see the current framebuffer extent on monitor moves and DPI changes.
 
             m_GraphicsBackend->GarbageCollectTransfers();
 

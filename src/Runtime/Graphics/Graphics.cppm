@@ -36,6 +36,7 @@ export import :PropertyEnumerator;
 export import :ColorMapper;
 export import :VectorFieldManager;
 export import :IsolineExtractor;
+export import :Passes.SelectionOutline;
 export import :Passes.PostProcessSettings;
 export import :Passes.SelectionOutlineSettings;
 

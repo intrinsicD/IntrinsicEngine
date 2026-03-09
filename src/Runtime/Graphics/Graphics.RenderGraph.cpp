@@ -300,7 +300,7 @@ namespace Graphics
         return {id, true};
     }
 
-    void RenderGraph::Reset()
+    void RenderGraph::Reset(uint32_t frameIndex)
     {
         // 0. Reset DAG scheduler state
         m_Scheduler.Reset();
@@ -309,11 +309,9 @@ namespace Graphics
         m_Scope.Reset();
         m_Arena.Reset();
 
-        // Reset transient GPU pages too (bump pointers only; no frees)
+        // Reset transient GPU pages only for the frame slot being recorded.
         if (m_TransientAllocator)
-        {
-            m_TransientAllocator->Reset();
-        }
+            m_TransientAllocator->Reset(frameIndex);
 
         // 2. Soft-reset passes
         for (uint32_t i = 0; i < m_ActivePassCount; ++i)
@@ -459,7 +457,7 @@ namespace Graphics
             return {};
         }
 
-        auto allocation = m_TransientAllocator->Allocate(reqs, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+        auto allocation = m_TransientAllocator->Allocate(frameIndex, reqs, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
         if (!allocation.IsValid())
         {
             Core::Log::Error("RenderGraph: Failed to allocate transient memory.");

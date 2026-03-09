@@ -6,11 +6,13 @@
 #include <fstream>
 #include <array>
 #include <cstring>
+#include <entt/entity/entity.hpp>
 #include "RHI.Vulkan.hpp"
 
 import Graphics;
 import RHI;
 import Core;
+import ECS;
 // Mock Device would be needed for a full GPU test,
 // but here we verify logic correctness via unit tests on CpuData
 
@@ -500,4 +502,66 @@ TEST(GraphicsMaterial, ConstructorTakesDeviceByRef)
                                           Core::Assets::AssetManager&>);
 
     SUCCEED();
+}
+
+TEST(SelectionOutline, HierarchySelectionResolvesRenderableChildPickIds)
+{
+    ECS::Scene scene;
+    auto& reg = scene.GetRegistry();
+
+    const entt::entity root = scene.CreateEntity("Root");
+    const entt::entity child = scene.CreateEntity("ChildMesh");
+
+    reg.emplace<ECS::Components::Selection::SelectedTag>(root);
+    reg.emplace<ECS::Components::Selection::HoveredTag>(root);
+    reg.emplace<ECS::Components::Selection::PickID>(root, 7u);
+
+    reg.emplace<ECS::Surface::Component>(child);
+    reg.emplace<ECS::Components::Selection::PickID>(child, 42u);
+    ECS::Components::Hierarchy::Attach(reg, child, root);
+
+    uint32_t selectedIds[Graphics::Passes::SelectionOutlinePass::kMaxSelectedIds] = {};
+    const uint32_t count = Graphics::Passes::AppendOutlineRenderablePickIds(reg, root, selectedIds);
+
+    ASSERT_EQ(count, 1u);
+    EXPECT_EQ(selectedIds[0], 42u);
+    EXPECT_EQ(Graphics::Passes::ResolveOutlineRenderablePickId(reg, root), 42u);
+}
+
+TEST(SelectionOutline, DebugStateDefaultsToSafeValues)
+{
+    Graphics::Passes::SelectionOutlinePass pass;
+    const auto& debug = pass.GetDebugState();
+
+    EXPECT_FALSE(debug.Initialized);
+    EXPECT_FALSE(debug.PipelineBuilt);
+    EXPECT_FALSE(debug.LastPassRequested);
+    EXPECT_EQ(debug.DescriptorSetCount, 0u);
+    EXPECT_EQ(debug.ResizeCount, 0u);
+    EXPECT_EQ(debug.LastFrameIndex, ~0u);
+}
+
+TEST(PostProcess, DebugStateDefaultsToSafeValues)
+{
+    Graphics::Passes::PostProcessPass pass;
+    const auto& debug = pass.GetDebugState();
+
+    EXPECT_FALSE(debug.Initialized);
+    EXPECT_FALSE(debug.ToneMapPipelineBuilt);
+    EXPECT_FALSE(debug.FXAAPipelineBuilt);
+    EXPECT_FALSE(debug.BloomEnabled);
+    EXPECT_EQ(debug.ResizeCount, 0u);
+    EXPECT_EQ(debug.LastFrameIndex, ~0u);
+}
+
+TEST(DefaultPipeline, DebugStateReportsFeatureAvailability)
+{
+    Graphics::DefaultPipeline pipeline;
+    const auto debug = pipeline.GetDebugState();
+
+    EXPECT_FALSE(debug.HasFeatureRegistry);
+    EXPECT_TRUE(debug.PathDirty);
+    EXPECT_FALSE(debug.PickingPass.Exists);
+    EXPECT_FALSE(debug.SelectionOutlinePass.Exists);
+    EXPECT_FALSE(debug.PostProcessPass.Exists);
 }

@@ -413,4 +413,21 @@ namespace Graphics
 
         return recipe;
     }
+
+    [[nodiscard]] RenderPipelineDebugState DefaultPipeline::GetDebugState() const
+    {
+        RenderPipelineDebugState state{};
+        state.HasFeatureRegistry = (m_Registry != nullptr);
+        state.PathDirty = m_PathDirty;
+
+        state.PickingPass = {m_PickingPass != nullptr, m_PickingPass && IsFeatureEnabled("PickingPass"_id)};
+        state.SurfacePass = {m_SurfacePass != nullptr, m_SurfacePass && IsFeatureEnabled("SurfacePass"_id)};
+        state.SelectionOutlinePass = {m_SelectionOutlinePass != nullptr, m_SelectionOutlinePass && IsFeatureEnabled("SelectionOutlinePass"_id)};
+        state.LinePass = {m_LinePass != nullptr, m_LinePass != nullptr};
+        state.PointPass = {m_PointPass != nullptr, m_PointPass && IsFeatureEnabled("PointPass"_id)};
+        state.PostProcessPass = {m_PostProcessPass != nullptr, m_PostProcessPass && IsFeatureEnabled("PostProcessPass"_id)};
+        state.DebugViewPass = {m_DebugViewPass != nullptr, m_DebugViewPass && IsFeatureEnabled("DebugViewPass"_id)};
+        state.ImGuiPass = {m_ImGuiPass != nullptr, m_ImGuiPass && IsFeatureEnabled("ImGuiPass"_id)};
+        return state;
+    }
 }

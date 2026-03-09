@@ -31,6 +31,12 @@ export namespace Graphics
     // Forward declaration (keeps include graph minimal).
     class GPUScene;
 
+    namespace Passes
+    {
+        struct SelectionOutlineDebugState;
+        struct PostProcessDebugState;
+    }
+
     enum class RenderResource : uint8_t
     {
         SceneDepth,
@@ -335,6 +341,26 @@ export namespace Graphics
         virtual void OnResize(uint32_t width, uint32_t height) { (void)width; (void)height; }
     };
 
+    struct RenderPipelineFeatureDebugState
+    {
+        bool Exists = false;
+        bool Enabled = false;
+    };
+
+    struct RenderPipelineDebugState
+    {
+        bool HasFeatureRegistry = false;
+        bool PathDirty = false;
+        RenderPipelineFeatureDebugState PickingPass{};
+        RenderPipelineFeatureDebugState SurfacePass{};
+        RenderPipelineFeatureDebugState SelectionOutlinePass{};
+        RenderPipelineFeatureDebugState LinePass{};
+        RenderPipelineFeatureDebugState PointPass{};
+        RenderPipelineFeatureDebugState PostProcessPass{};
+        RenderPipelineFeatureDebugState DebugViewPass{};
+        RenderPipelineFeatureDebugState ImGuiPass{};
+    };
+
     class RenderPipeline
     {
     public:
@@ -362,6 +388,9 @@ export namespace Graphics
         virtual Passes::SelectionOutlineSettings* GetSelectionOutlineSettings() { return nullptr; }
         virtual Passes::PostProcessSettings* GetPostProcessSettings() { return nullptr; }
         virtual const Passes::HistogramReadback* GetHistogramReadback() const { return nullptr; }
+        [[nodiscard]] virtual RenderPipelineDebugState GetDebugState() const { return {}; }
+        [[nodiscard]] virtual const Passes::SelectionOutlineDebugState* GetSelectionOutlineDebugState() const { return nullptr; }
+        [[nodiscard]] virtual const Passes::PostProcessDebugState* GetPostProcessDebugState() const { return nullptr; }
     };
 
     // ---------------------------------------------------------------------
