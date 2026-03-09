@@ -87,6 +87,19 @@ These are not required to finish the first wave, but they should begin soon afte
 - [ ] Add tests for `CanonicalResources` registration and recipe-driven allocation.
 - [ ] Add tests for `ValidateCompiledGraph()` with the new post-processing passes included.
 
+### B7. Application Event Bus (`entt::dispatcher`)
+
+- [ ] Add `entt::dispatcher` to `ECS::Scene` with `GetDispatcher()` accessors.
+- [ ] Create `ECS.Components.Events.cppm` with initial event struct definitions.
+- [ ] Add `dispatcher.update()` drain point in `Engine::Run()` main loop.
+- [ ] Fire `SelectionChanged` / `HoverChanged` from `ApplySelection` / `ApplyHover`.
+- [ ] Replace `GetSelectedEntity()` polling in Sandbox panels with `SelectionChanged` sink.
+- [ ] Fire `GpuPickCompleted` from readback completion, replace polling in `SelectionModule`.
+- [ ] Fire `EntitySpawned` from `SceneManager::SpawnModel()` and `LoadDroppedAsset`.
+- [ ] Fire `GeometryModified` from centralized geometry operator helper.
+- [ ] Add contract tests for event delivery.
+- [ ] Document event communication policy in `CLAUDE.md`.
+
 ---
 
 ## 4. Later (P2) — Planned Downstream Work
