@@ -1,149 +1,206 @@
 # Algorithm Variant Dispatch Pattern
 
-Runtime backend selection (CPU / GPU Compute) for parallelizable algorithms,
-without virtual inheritance. Fits the existing Params/Result free-function
-pattern used throughout `Geometry::*`.
+Runtime selection of **algorithm variants** and **compute backends** for
+parallelizable algorithms — without virtual inheritance. Built on
+`std::variant` + `std::visit` for compile-time-exhaustive, type-safe dispatch.
 
 ---
 
-## Core Idea
+## Two Orthogonal Axes
 
-1. **`Backend` enum in Params** — same pattern as `Runtime::Selection::PickBackend`.
-2. **Function overloading** — CPU-only overload (no GPU dependency) and GPU-capable overload (takes `RHI::VulkanDevice&`).
-3. **`ActualBackend` in Result** — transparent fallback reporting.
-4. **No inheritance, no vtable, no CRTP** — dispatch is a `switch` inside the implementation.
+Every dispatchable algorithm has two independent selection dimensions:
+
+| Axis | Mechanism | Example |
+|------|-----------|---------|
+| **Strategy** — *what* algorithm runs | `std::variant<Lloyd, MiniBatch, KMeansPP>` | Lloyd's vs. mini-batch vs. K-Means++ init |
+| **Backend** — *where* it runs | `enum class Backend : uint8_t { CPU, GPU }` | CPU sequential vs. Vulkan compute |
+
+Separating them avoids combinatorial explosion (`LloydCPU`, `LloydGPU`, `MiniBatchCPU`, …).
 
 ---
 
 ## Pattern Structure
 
-### 1. Shared Types (module partition, no GPU dependency)
+### 1. Module Interface (no GPU dependency)
 
 ```cpp
-// Geometry.KMeans.cppm  (partition of Geometry module)
-export module Geometry:KMeans;
+// Geometry.Clustering.cppm  (partition of Geometry module)
+module;
+#include <cstdint>
+#include <optional>
+#include <span>
+#include <variant>
+#include <vector>
+#include <glm/glm.hpp>
 
-export namespace Geometry::KMeans
+export module Geometry:Clustering;
+
+export namespace Geometry::Clustering
 {
+    // -----------------------------------------------------------------
+    // Backend — WHERE the algorithm executes
+    // -----------------------------------------------------------------
     enum class Backend : uint8_t
     {
         CPU = 0,
-        GPU = 1   // Vulkan compute shader
+        GPU = 1,          // Vulkan compute shader
+        // CPUParallel = 2, // future: std::execution::par_unseq
     };
 
-    struct Params
+    // -----------------------------------------------------------------
+    // Strategies — WHAT algorithm runs (each carries its own params)
+    // -----------------------------------------------------------------
+    struct Lloyd
     {
-        uint32_t K              = 8;
         uint32_t MaxIterations  = 300;
         float    ConvergenceEps = 1e-4f;
-        Backend  ComputeBackend = Backend::CPU;
     };
 
+    struct MiniBatch
+    {
+        uint32_t MaxIterations = 300;
+        uint32_t BatchSize     = 100;
+        float    ConvergenceEps = 1e-4f;
+    };
+
+    struct KMeansPP
+    {
+        uint32_t MaxIterations  = 300;
+        float    ConvergenceEps = 1e-4f;
+        // KMeans++ only changes initialization, then runs Lloyd
+    };
+
+    using Strategy = std::variant<Lloyd, MiniBatch, KMeansPP>;
+
+    // -----------------------------------------------------------------
+    // Params (combines both axes + shared config)
+    // -----------------------------------------------------------------
+    struct Params
+    {
+        uint32_t K       = 8;
+        Strategy Algo    = Lloyd{};        // algorithm variant
+        Backend  Compute = Backend::CPU;   // execution backend
+    };
+
+    // -----------------------------------------------------------------
+    // Result (always includes diagnostics + what actually ran)
+    // -----------------------------------------------------------------
     struct Result
     {
-        std::vector<uint32_t>  Assignments;   // per-point cluster index
-        std::vector<glm::vec3> Centroids;     // final centroid positions
-        uint32_t               Iterations = 0;
-        bool                   Converged  = false;
-        Backend                ActualBackend = Backend::CPU; // what actually ran
+        std::vector<uint32_t>  Assignments;  // per-point cluster index [0, K)
+        std::vector<glm::vec3> Centroids;    // final centroid positions
+        uint32_t Iterations    = 0;
+        bool     Converged     = false;
+        Backend  ActualBackend = Backend::CPU;
     };
-}
-```
 
-### 2. CPU Implementation (links into `IntrinsicGeometry`, testable without GPU)
+    // -----------------------------------------------------------------
+    // Entry points
+    // -----------------------------------------------------------------
 
-```cpp
-// Geometry.KMeans.cpp
-module Geometry;
-import :KMeans;
-
-namespace Geometry::KMeans
-{
-    // CPU-only entry point. Always runs on CPU regardless of Params::ComputeBackend.
-    // This is what IntrinsicGeometryTests calls directly.
-    std::optional<Result> Cluster(
+    // CPU-only overload — links into IntrinsicGeometry, testable without GPU.
+    [[nodiscard]] std::optional<Result> Cluster(
         std::span<const glm::vec3> points,
-        const Params& params)
-    {
-        if (points.empty() || params.K == 0) return std::nullopt;
+        const Params& params);
 
-        // ... Lloyd's algorithm implementation ...
-
-        Result r;
-        r.ActualBackend = Backend::CPU;
-        return r;
-    }
-}
-```
-
-### 3. GPU-Capable Dispatch (links into `IntrinsicRuntime`, needs RHI)
-
-```cpp
-// Geometry.KMeansGpu.cpp  (or a Runtime-level wrapper)
-module Geometry;
-import :KMeans;
-
-// Forward: GPU implementation in a separate TU
-namespace Geometry::KMeans::Internal
-{
-    std::optional<Result> ClusterGpu(
+    // GPU-capable overload — links into IntrinsicRuntime.
+    // Falls back to CPU if GPU path fails or is unavailable.
+    [[nodiscard]] std::optional<Result> Cluster(
         std::span<const glm::vec3> points,
         const Params& params,
         RHI::VulkanDevice& device);
 }
+```
 
-namespace Geometry::KMeans
+### 2. CPU Implementation — `std::visit` Dispatch
+
+```cpp
+// Geometry.Clustering.cpp
+module Geometry;
+import :Clustering;
+
+namespace Geometry::Clustering
 {
-    // GPU-capable overload. Falls back to CPU if GPU unavailable or fails.
-    std::optional<Result> Cluster(
-        std::span<const glm::vec3> points,
-        const Params& params,
-        RHI::VulkanDevice& device)
+    namespace Internal
     {
-        switch (params.ComputeBackend)
+        std::optional<Result> ClusterLloyd(
+            std::span<const glm::vec3> points, uint32_t k, const Lloyd& s)
         {
-        case Backend::GPU:
+            // Lloyd's iterative assignment + centroid update
+            Result r;
+            r.ActualBackend = Backend::CPU;
+            // ...
+            return r;
+        }
+
+        std::optional<Result> ClusterMiniBatch(
+            std::span<const glm::vec3> points, uint32_t k, const MiniBatch& s)
         {
-            auto result = Internal::ClusterGpu(points, params, device);
-            if (result) return result;
-            // GPU failed — fall through to CPU
-            [[fallthrough]];
+            // Sculley 2010: subsample BatchSize points per iteration
+            Result r;
+            r.ActualBackend = Backend::CPU;
+            // ...
+            return r;
         }
-        case Backend::CPU:
+
+        std::optional<Result> ClusterKMeansPP(
+            std::span<const glm::vec3> points, uint32_t k, const KMeansPP& s)
         {
-            // Delegate to the CPU-only overload
-            auto result = Cluster(points, params);
-            if (result) result->ActualBackend = Backend::CPU;
-            return result;
+            // D² seeding (Arthur & Vassilvitskii 2007), then Lloyd
+            Result r;
+            r.ActualBackend = Backend::CPU;
+            // ...
+            return r;
         }
-        }
-        return std::nullopt; // unreachable
+    }
+
+    std::optional<Result> Cluster(
+        std::span<const glm::vec3> points, const Params& params)
+    {
+        if (points.empty() || params.K == 0) return std::nullopt;
+
+        return std::visit([&](const auto& strategy) -> std::optional<Result> {
+            using S = std::decay_t<decltype(strategy)>;
+
+            if constexpr (std::same_as<S, Lloyd>)
+                return Internal::ClusterLloyd(points, params.K, strategy);
+            else if constexpr (std::same_as<S, MiniBatch>)
+                return Internal::ClusterMiniBatch(points, params.K, strategy);
+            else if constexpr (std::same_as<S, KMeansPP>)
+                return Internal::ClusterKMeansPP(points, params.K, strategy);
+        }, params.Algo);
     }
 }
 ```
 
-### 4. GPU Compute Implementation (Vulkan compute shader)
+### 3. GPU-Capable Overload — Backend × Strategy Dispatch
 
 ```cpp
-// Geometry.KMeansGpu.cpp
-namespace Geometry::KMeans::Internal
+// In Runtime (links against RHI)
+std::optional<Result> Cluster(
+    std::span<const glm::vec3> points,
+    const Params& params,
+    RHI::VulkanDevice& device)
 {
-    std::optional<Result> ClusterGpu(
-        std::span<const glm::vec3> points,
-        const Params& params,
-        RHI::VulkanDevice& device)
+    if (params.Compute == Backend::GPU)
     {
-        // 1. Upload points to SSBO
-        // 2. Create/cache compute pipeline (kmeans_assign.comp, kmeans_update.comp)
-        // 3. Dispatch assignment step: each invocation assigns one point
-        // 4. Dispatch centroid update step: parallel reduction per cluster
-        // 5. Iterate until convergence or MaxIterations
-        // 6. Readback assignments + centroids
+        // Not every strategy has a GPU implementation.
+        // std::visit returns nullopt for unimplemented GPU paths.
+        auto gpuResult = std::visit([&](const auto& strategy) -> std::optional<Result> {
+            using S = std::decay_t<decltype(strategy)>;
 
-        Result r;
-        r.ActualBackend = Backend::GPU;
-        return r;
+            if constexpr (std::same_as<S, Lloyd>)
+                return Internal::ClusterLloydGpu(points, params.K, strategy, device);
+            else
+                return std::nullopt;  // no GPU impl for this strategy
+        }, params.Algo);
+
+        if (gpuResult) return gpuResult;
+        // GPU failed or unavailable → fall through to CPU
     }
+
+    // CPU fallback
+    return Cluster(points, params);
 }
 ```
 
@@ -151,137 +208,174 @@ namespace Geometry::KMeans::Internal
 
 ## Call Sites
 
-### In Tests (no GPU, `IntrinsicGeometryTests`)
+### Test (no GPU, `IntrinsicGeometryTests`)
 
 ```cpp
-TEST(KMeans, ConvergesOnSimpleData)
+TEST(Clustering, LloydConvergesOnBlobs)
 {
-    std::vector<glm::vec3> points = GenerateBlobs(3, 100);
+    auto points = GenerateBlobs(3, 100);
 
-    Geometry::KMeans::Params params;
-    params.K = 3;
-    // No Backend field needed — CPU-only overload has no Backend dispatch
-    auto result = Geometry::KMeans::Cluster(points, params);
+    Clustering::Params p;
+    p.K = 3;
+    p.Algo = Clustering::Lloyd{ .MaxIterations = 500 };
 
+    auto result = Clustering::Cluster(points, p);
     ASSERT_TRUE(result.has_value());
     EXPECT_TRUE(result->Converged);
     EXPECT_EQ(result->Centroids.size(), 3u);
-    EXPECT_EQ(result->ActualBackend, Geometry::KMeans::Backend::CPU);
+}
+
+TEST(Clustering, MiniBatchMatchesLloyd)
+{
+    auto points = GenerateBlobs(3, 1000);
+
+    Clustering::Params lloyd;
+    lloyd.K = 3;
+    lloyd.Algo = Clustering::Lloyd{};
+    auto rLloyd = Clustering::Cluster(points, lloyd);
+
+    Clustering::Params mini;
+    mini.K = 3;
+    mini.Algo = Clustering::MiniBatch{ .BatchSize = 200 };
+    auto rMini = Clustering::Cluster(points, mini);
+
+    // Both should find roughly the same centroids
+    ASSERT_TRUE(rLloyd && rMini);
+    EXPECT_EQ(rLloyd->Centroids.size(), rMini->Centroids.size());
 }
 ```
 
-### In Runtime (with GPU available)
+### Runtime (GPU with fallback)
 
 ```cpp
-void SomeSystem::ClusterPointCloud(std::span<const glm::vec3> points,
-                                   RHI::VulkanDevice& device)
-{
-    Geometry::KMeans::Params params;
-    params.K = 16;
-    params.ComputeBackend = Geometry::KMeans::Backend::GPU;
+Clustering::Params p;
+p.K = 16;
+p.Algo = Clustering::Lloyd{};
+p.Compute = Clustering::Backend::GPU;
 
-    auto result = Geometry::KMeans::Cluster(points, params, device);
-    if (!result) return;
+auto result = Clustering::Cluster(points, p, device);
+if (result && result->ActualBackend != p.Compute)
+    LOG_WARN("Clustering: fell back to CPU");
+```
 
-    if (result->ActualBackend != params.ComputeBackend)
-    {
-        LOG_WARN("KMeans: GPU unavailable, fell back to CPU");
-    }
-    // Use result->Assignments, result->Centroids ...
-}
+### UI-Driven Strategy Selection
+
+```cpp
+// strategies array for ImGui combo box
+constexpr std::array<Clustering::Strategy, 3> kStrategies = {
+    Clustering::Lloyd{},
+    Clustering::MiniBatch{ .BatchSize = 200 },
+    Clustering::KMeansPP{},
+};
+constexpr std::array<const char*, 3> kNames = { "Lloyd", "Mini-Batch", "K-Means++" };
+
+// In UI code
+static int selected = 0;
+ImGui::Combo("Algorithm", &selected, kNames.data(), kNames.size());
+
+Clustering::Params p;
+p.K = userK;
+p.Algo = kStrategies[selected];
+p.Compute = useGpu ? Clustering::Backend::GPU : Clustering::Backend::CPU;
+auto result = Clustering::Cluster(points, p, device);
 ```
 
 ---
 
-## Key Design Decisions
+## Why `std::variant` (and Not the Alternatives)
 
-### Why function overloading instead of `std::variant`?
+### Considered Alternatives
 
-- `std::variant<CpuCtx, GpuCtx>` introduces a type not used elsewhere for polymorphism in this codebase.
-- Function overloading is already the primary dispatch mechanism (`Support()` overloads, `TestOverlap()` overloads).
-- The "has GPU" vs "no GPU" distinction maps naturally to an overload with/without `VulkanDevice&`.
+| Approach | Verdict |
+|----------|---------|
+| **Virtual base class** (`IClusterStrategy`) | Works, but user explicitly wants to avoid inheritance. Also: vtable overhead, heap allocation for polymorphic ownership. |
+| **`InplaceFunction` type erasure** | Open extension (good for plugins), but loses type information — can't inspect "what strategy is active?", no compile-time exhaustiveness. |
+| **Enum + switch** | Flat — all strategy params must live in one struct with unused fields. No per-variant parameter types. |
+| **Concepts + templates** | Compile-time only. Doesn't support runtime strategy selection (UI combo, config file). |
+| **`entt::dispatcher`** | Broadcast mechanism (all listeners fire), no return value. Wrong abstraction for "call one strategy, get a result." |
 
-### Why not templates + concepts?
+### Why `std::variant` Wins
 
-- Templates would force compile-time backend selection. The user explicitly needs **runtime** dispatch (e.g., GPU availability detected at startup, user toggle in UI).
-- Concepts are still useful to constrain what qualifies as valid input data (e.g., a `ClusterableData` concept for different point representations).
+1. **Each variant carries its own parameters.** `MiniBatch` has `BatchSize`, `Lloyd` doesn't. No unused fields, no `std::optional<uint32_t> BatchSize` in a flat struct.
 
-### Why enum in Params, not a separate argument?
+2. **Compile-time exhaustiveness.** When you add `DBSCAN{}` to the variant, `std::visit` produces a compile error at every dispatch point until you handle it. No silent fallthrough.
 
-- Matches the existing `PickBackend` pattern in `Runtime::Selection::PickRequest`.
-- Params structs with sensible defaults are the canonical pattern — `Backend = CPU` is the safe default.
-- Result carries `ActualBackend` so callers always know what ran, enabling fallback transparency.
+3. **No vtable, no heap, no inheritance.** Just tagged union + visitor. Aligns with the engine's value-type philosophy.
 
-### Why separate CPU and GPU TUs?
+4. **Runtime selection is trivial.** `params.Algo = strategies[comboIndex]` — works with UI, config files, command-line args.
 
-- **Link boundary isolation.** `IntrinsicGeometryTests` links against `IntrinsicGeometry` (no RHI). The CPU implementation lives in the Geometry library. The GPU dispatch wrapper lives in Runtime.
-- **Incremental compilation.** Touching a compute shader or the GPU codepath doesn't rebuild the CPU algorithm.
+5. **Two axes stay orthogonal.** Strategy (`variant`) × Backend (`enum`) — adding a new strategy doesn't touch backend dispatch, adding a new backend doesn't touch strategy logic.
+
+6. **Testable in isolation.** Each `Internal::ClusterX()` function is independently testable. The `std::visit` layer is pure dispatch, trivially correct.
 
 ---
 
-## Applying to a New Algorithm
+## Applying to a New Algorithm Family
 
-1. **Create the partition**: `Geometry.YourAlgo.cppm` with `Backend` enum, `Params`, `Result`.
-2. **Write CPU impl**: `Geometry.YourAlgo.cpp` — free function, `std::optional<Result>` return, no GPU dependency.
-3. **Write GPU dispatch**: `Geometry.YourAlgoGpu.cpp` (or in Runtime) — overload with `VulkanDevice&`, switch on `Backend`, fallthrough to CPU.
-4. **Write compute shader**: `shaders/youralgo.comp`, register in ShaderRegistry.
-5. **Add to CMakeLists.txt**: `.cppm` in `FILE_SET CXX_MODULES`, `.cpp` in `PRIVATE`.
-6. **Tests**: `IntrinsicGeometryTests` tests CPU path directly. `IntrinsicTests` tests GPU path with device.
+### Template
 
-### Checklist for new algorithm variants
+```
+Namespace:  Geometry::<AlgorithmFamily>
+Strategies: std::variant<VariantA, VariantB, VariantC>
+Backend:    enum class Backend : uint8_t { CPU, GPU }
+Params:     { shared config + Strategy Algo + Backend Compute }
+Result:     { output data + diagnostics + Backend ActualBackend }
+Entry:      std::optional<Result> Execute(input, Params)           // CPU-only
+            std::optional<Result> Execute(input, Params, Device&)  // GPU-capable
+```
 
-- [ ] `Backend` enum with `CPU` and `GPU` values
-- [ ] `Params` struct with `Backend ComputeBackend = Backend::CPU` default
-- [ ] `Result` struct with `Backend ActualBackend` diagnostic field
-- [ ] CPU-only overload (no `VulkanDevice&` parameter)
+### Examples of Algorithm Families
+
+| Family | Strategies | Notes |
+|--------|-----------|-------|
+| `Clustering` | `Lloyd`, `MiniBatch`, `KMeansPP`, `DBSCAN` | Point cloud segmentation |
+| `Simplification` | `QEM`, `EdgeLength`, `Voxel` | Different quality/speed tradeoffs |
+| `NormalEstimation` | `PCA`, `JetFitting`, `VoronoiBased` | Different robustness profiles |
+| `SpatialIndex` | `Octree`, `KDTree`, `BVH` | Different query patterns |
+| `Parameterization` | `LSCM`, `ARAP`, `Tutte` | UV unwrapping variants |
+
+### Checklist
+
+- [ ] Define strategy structs with variant-specific parameters
+- [ ] Define `using Strategy = std::variant<...>` in the module interface
+- [ ] `Params` struct with `Strategy Algo` + `Backend Compute` + shared config
+- [ ] `Result` struct with `Backend ActualBackend` diagnostic
+- [ ] CPU-only free function (no RHI dependency)
 - [ ] GPU-capable overload with automatic CPU fallback
-- [ ] GPU failure → fallthrough to CPU (never crash on missing GPU)
-- [ ] Tests for CPU path in `IntrinsicGeometryTests`
+- [ ] `std::visit` dispatch — compiler enforces exhaustiveness
+- [ ] `Internal::` namespace for per-variant implementations
+- [ ] Tests for each strategy in `IntrinsicGeometryTests`
 - [ ] Tests for GPU path + fallback in `IntrinsicTests`
 
 ---
 
-## Future Extensions
+## Link Boundary Design
 
-### Additional Backends
+```
+┌─────────────────────────────────┐
+│  IntrinsicGeometry              │  ← No RHI dependency
+│                                 │
+│  Clustering.cppm   (types)      │
+│  Clustering.cpp    (CPU impls)  │
+│  ClusteringLloyd.cpp            │  ← One TU per complex strategy
+│  ClusteringMiniBatch.cpp        │
+└──────────────┬──────────────────┘
+               │ links into
+┌──────────────▼──────────────────┐
+│  IntrinsicRuntime               │  ← Has RHI
+│                                 │
+│  ClusteringGpu.cpp  (GPU impls) │
+│  kmeans_assign.comp (shader)    │
+│  kmeans_update.comp (shader)    │
+└─────────────────────────────────┘
 
-```cpp
-enum class Backend : uint8_t
-{
-    CPU        = 0,
-    GPU        = 1,  // Vulkan compute
-    CPUParallel = 2, // std::execution::par_unseq
-};
+┌─────────────────────────────────┐
+│  IntrinsicGeometryTests         │  ← Tests CPU path directly
+│  IntrinsicTests                 │  ← Tests GPU path + fallback
+└─────────────────────────────────┘
 ```
 
-Add a new case to the switch. No interface change for callers using `Backend::CPU` or `Backend::GPU`.
-
-### Backend Capabilities Query
-
-```cpp
-// At startup or on demand
-struct BackendCapabilities
-{
-    bool HasGpuCompute = false;
-    uint32_t MaxWorkgroupSize = 0;
-    uint64_t MaxSSBOSize = 0;
-};
-
-BackendCapabilities QueryCapabilities(RHI::VulkanDevice& device);
-```
-
-Callers can check capabilities before selecting `Backend::GPU`, or just request it and check `ActualBackend` in the result.
-
-### Shared Concept for Input Data
-
-```cpp
-template <typename T>
-concept ClusterableData = requires(const T& data)
-{
-    { data.size() }         -> std::convertible_to<std::size_t>;
-    { data[0] }             -> std::convertible_to<glm::vec3>;
-    { std::span(data) }; // must be contiguous for GPU upload
-};
-```
-
-This keeps the algorithm generic over `std::vector<vec3>`, `std::span<vec3>`, or custom point containers.
+CPU implementations live in the Geometry library (no GPU dependency). GPU
+dispatch lives in Runtime. `IntrinsicGeometryTests` tests all strategies on
+CPU without requiring a Vulkan device. `IntrinsicTests` adds GPU path and
+fallback coverage.
