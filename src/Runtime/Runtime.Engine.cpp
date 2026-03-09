@@ -595,6 +595,11 @@ namespace Runtime
                 }
             }
 
+            // Drain deferred events enqueued during this frame's system updates.
+            // All dispatcher sinks run synchronously on the main thread here,
+            // after ECS systems and before rendering (see CLAUDE.md Event Communication Policy).
+            m_SceneManager->GetScene().GetDispatcher().update();
+
             // Resize is synchronized immediately after Window::OnUpdate() so render/update
             // always see the current framebuffer extent on monitor moves and DPI changes.
 

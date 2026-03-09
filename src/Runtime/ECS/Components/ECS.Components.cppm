@@ -8,3 +8,4 @@ export import :Components.NameTag;
 export import :Components.Transform;
 export import :Components.Selection;
 export import :Components.DEC;
+export import :Components.Events;

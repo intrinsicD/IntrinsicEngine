@@ -699,11 +699,13 @@ namespace Graphics::Passes
                                             m_BloomDownPipeline->GetLayout(),
                                             0, 1, &m_BloomDownSets[fi][capMip], 0, nullptr);
 
-                    struct {
+                    struct BloomDownPC {
                         float InvSrcResX, InvSrcResY;
                         float Threshold;
                         int   IsFirstMip;
-                    } pc{
+                    };
+                    static_assert(sizeof(BloomDownPC) == 16, "BloomDownPC must be 16 bytes");
+                    BloomDownPC pc{
                         1.0f / static_cast<float>(srcW),
                         1.0f / static_cast<float>(srcH),
                         threshold,
@@ -778,11 +780,13 @@ namespace Graphics::Passes
                                             m_BloomUpPipeline->GetLayout(),
                                             0, 1, &m_BloomUpSets[fi][capMip], 0, nullptr);
 
-                    struct {
+                    struct BloomUpPC {
                         float InvCoarserResX, InvCoarserResY;
                         float FilterRadius;
                         float _pad0;
-                    } pc{
+                    };
+                    static_assert(sizeof(BloomUpPC) == 16, "BloomUpPC must be 16 bytes");
+                    BloomUpPC pc{
                         1.0f / static_cast<float>(coarserW),
                         1.0f / static_cast<float>(coarserH),
                         filterRadius,
@@ -940,12 +944,14 @@ namespace Graphics::Passes
                                         m_HistogramPipeline->GetLayout(),
                                         0, 1, &m_HistogramSets[fi], 0, nullptr);
 
-                struct {
+                struct HistogramPC {
                     uint32_t Width;
                     uint32_t Height;
                     float    MinLogLum;
                     float    RangeLogLum;
-                } pc{
+                };
+                static_assert(sizeof(HistogramPC) == 16, "HistogramPC must be 16 bytes");
+                HistogramPC pc{
                     resolution.width,
                     resolution.height,
                     minEV,
@@ -1022,11 +1028,13 @@ namespace Graphics::Passes
                                         m_SMAAEdgePipeline->GetLayout(),
                                         0, 1, &m_SMAAEdgeSets[fi], 0, nullptr);
 
-                struct {
+                struct SMAAEdgePC {
                     float InvResX, InvResY;
                     float EdgeThreshold;
                     float _pad0;
-                } pc{
+                };
+                static_assert(sizeof(SMAAEdgePC) == 16, "SMAAEdgePC must be 16 bytes");
+                SMAAEdgePC pc{
                     1.0f / static_cast<float>(resolution.width),
                     1.0f / static_cast<float>(resolution.height),
                     edgeThreshold, 0.0f
@@ -1076,11 +1084,13 @@ namespace Graphics::Passes
                                         m_SMAABlendPipeline->GetLayout(),
                                         0, 1, &m_SMAABlendSets[fi], 0, nullptr);
 
-                struct {
+                struct SMAABlendPC {
                     float InvResX, InvResY;
                     int   MaxSearchSteps;
                     int   MaxSearchStepsDiag;
-                } pc{
+                };
+                static_assert(sizeof(SMAABlendPC) == 16, "SMAABlendPC must be 16 bytes");
+                SMAABlendPC pc{
                     1.0f / static_cast<float>(resolution.width),
                     1.0f / static_cast<float>(resolution.height),
                     maxSearch, maxSearchDiag
@@ -1122,10 +1132,12 @@ namespace Graphics::Passes
                                         m_SMAAResolvePipeline->GetLayout(),
                                         0, 1, &m_SMAAResolveSets[fi], 0, nullptr);
 
-                struct {
+                struct SMAAResolvePC {
                     float InvResX, InvResY;
                     float _pad0, _pad1;
-                } pc{
+                };
+                static_assert(sizeof(SMAAResolvePC) == 16, "SMAAResolvePC must be 16 bytes");
+                SMAAResolvePC pc{
                     1.0f / static_cast<float>(resolution.width),
                     1.0f / static_cast<float>(resolution.height),
                     0.0f, 0.0f
@@ -1343,12 +1355,14 @@ namespace Graphics::Passes
                                                 m_FXAAPipeline->GetLayout(),
                                                 0, 1, &m_FXAASets[fi], 0, nullptr);
 
-                        struct {
+                        struct FXAAPC {
                             float InvResX, InvResY;
                             float ContrastThreshold;
                             float RelativeThreshold;
                             float SubpixelBlending;
-                        } pc{
+                        };
+                        static_assert(sizeof(FXAAPC) == 20, "FXAAPC must be 20 bytes");
+                        FXAAPC pc{
                             1.0f / static_cast<float>(resolution.width),
                             1.0f / static_cast<float>(resolution.height),
                             fxaaContrast, fxaaRelative, fxaaSubpixel
