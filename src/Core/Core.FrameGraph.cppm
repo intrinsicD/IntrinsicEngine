@@ -5,6 +5,7 @@ module;
 #include <cstdint>
 #include <expected>
 #include <chrono>
+#include <limits>
 #include <string_view>
 #include <vector>
 
@@ -52,13 +53,43 @@ export namespace Core
 {
     class FrameGraph;
 
+    namespace Detail
+    {
+        [[nodiscard]] consteval uint64_t HashTypeTokenString(std::string_view str)
+        {
+            uint64_t hash = 14695981039346656037ull;
+            for (unsigned char c : str)
+            {
+                hash ^= static_cast<uint64_t>(c);
+                hash *= 1099511628211ull;
+            }
+            return hash;
+        }
+
+        template <typename T>
+        [[nodiscard]] consteval std::string_view TypeTokenSignature()
+        {
+#if defined(__clang__) || defined(__GNUC__)
+            return __PRETTY_FUNCTION__;
+#elif defined(_MSC_VER)
+            return __FUNCSIG__;
+#else
+            return "Core::TypeToken<unknown>";
+#endif
+        }
+    }
+
     // Compile-time type ID without RTTI.
-    // Uses the address of a per-type static as a unique token.
+    // Uses a deterministic hash of the compiler's type signature instead of a
+    // per-TU static anchor so the token remains stable across translation units
+    // and named-module boundaries.
     template <typename T>
     size_t TypeToken()
     {
-        static const char s_Anchor{};
-        return reinterpret_cast<size_t>(&s_Anchor);
+        constexpr size_t kTypeTokenMask = (std::numeric_limits<size_t>::max() >> 1);
+        static constexpr size_t s_Token = static_cast<size_t>(
+            Detail::HashTypeTokenString(Detail::TypeTokenSignature<T>())) & kTypeTokenMask;
+        return s_Token;
     }
 
     // -------------------------------------------------------------------------

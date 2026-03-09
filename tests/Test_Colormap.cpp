@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include <cstdint>
 #include <cmath>
+#include <cstring>
 
 import Graphics;
 

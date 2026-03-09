@@ -6,6 +6,7 @@ module;
 #include <string_view>
 #include <memory>
 #include <algorithm>
+#include <array>
 
 #include "RHI.Vulkan.hpp"
 
@@ -19,6 +20,17 @@ import Core.InplaceFunction;
 
 namespace RHI
 {
+    namespace
+    {
+        void ExecuteDeferredDeletes(std::vector<Core::InplaceFunction<void()>>& deletes)
+        {
+            for (auto& fn : deletes)
+            {
+                if (fn) fn();
+            }
+        }
+    }
+
     const std::vector<const char*> DEVICE_EXTENSIONS = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         VK_KHR_DRAW_INDIRECT_COUNT_EXTENSION_NAME
@@ -70,29 +82,35 @@ namespace RHI
 
     void VulkanDevice::FlushAllDeletionQueues()
     {
-        std::lock_guard lock(m_DeletionMutex);
-        for (auto& queue : m_DeletionQueue)
+        std::array<std::vector<Core::InplaceFunction<void()>>, MAX_FRAMES_IN_FLIGHT> frameDeletes;
+        std::vector<DeferredDelete> timelineDeletes;
         {
-            for (auto& fn : queue) fn();
-            queue.clear();
+            std::lock_guard lock(m_DeletionMutex);
+            for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
+                frameDeletes[i].swap(m_DeletionQueue[i]);
+            timelineDeletes.swap(m_TimelineDeletionQueue);
         }
 
-        // Drain timeline-based queue too (caller must ensure GPU idle).
-        for (auto& item : m_TimelineDeletionQueue)
+        for (auto& queue : frameDeletes)
+            ExecuteDeferredDeletes(queue);
+        for (auto& item : timelineDeletes)
         {
             if (item.Fn) item.Fn();
         }
-        m_TimelineDeletionQueue.clear();
     }
 
     void VulkanDevice::FlushTimelineDeletionQueueNow()
     {
-        std::lock_guard lock(m_DeletionMutex);
-        for (auto& item : m_TimelineDeletionQueue)
+        std::vector<DeferredDelete> deletes;
+        {
+            std::lock_guard lock(m_DeletionMutex);
+            deletes.swap(m_TimelineDeletionQueue);
+        }
+
+        for (auto& item : deletes)
         {
             if (item.Fn) item.Fn();
         }
-        m_TimelineDeletionQueue.clear();
     }
 
     VulkanDevice::~VulkanDevice()
@@ -102,16 +120,6 @@ namespace RHI
 
         // 2) Execute all deferred deletions while the device + VMA allocator are still valid.
         FlushAllDeletionQueues();
-
-        // Also flush timeline-based deletions.
-        {
-            std::lock_guard lock(m_DeletionMutex);
-            for (auto& item : m_TimelineDeletionQueue)
-            {
-                if (item.Fn) item.Fn();
-            }
-            m_TimelineDeletionQueue.clear();
-        }
 
         // Destroy timeline semaphore while device is still alive.
         if (m_GraphicsTimelineSemaphore)
@@ -125,16 +133,6 @@ namespace RHI
 
         // 4) One more flush in case any destructors enqueued work during step (3).
         FlushAllDeletionQueues();
-
-        // ALSO: if any destructor enqueued SafeDestroy() (timeline-based) during step (3), flush it too.
-        {
-            std::lock_guard lock(m_DeletionMutex);
-            for (auto& item : m_TimelineDeletionQueue)
-            {
-                if (item.Fn) item.Fn();
-            }
-            m_TimelineDeletionQueue.clear();
-        }
 
         // 5) Destroy Thread Pools
         {
@@ -173,21 +171,32 @@ namespace RHI
     {
         const uint64_t completed = GetGraphicsTimelineCompletedValue();
 
-        std::lock_guard lock(m_DeletionMutex);
-
-        if (m_TimelineDeletionQueue.empty())
-            return;
-
-        // Keep order; destroys are typically small, so a single pass erase is fine.
-        std::erase_if(m_TimelineDeletionQueue, [&](DeferredDelete& item)
+        std::vector<DeferredDelete> readyDeletes;
         {
-            if (item.Value <= completed)
+            std::lock_guard lock(m_DeletionMutex);
+
+            if (m_TimelineDeletionQueue.empty())
+                return;
+
+            std::vector<DeferredDelete> pendingDeletes;
+            pendingDeletes.reserve(m_TimelineDeletionQueue.size());
+            readyDeletes.reserve(m_TimelineDeletionQueue.size());
+
+            for (auto& item : m_TimelineDeletionQueue)
             {
-                if (item.Fn) item.Fn();
-                return true;
+                if (item.Value <= completed)
+                    readyDeletes.push_back(std::move(item));
+                else
+                    pendingDeletes.push_back(std::move(item));
             }
-            return false;
-        });
+
+            m_TimelineDeletionQueue = std::move(pendingDeletes);
+        }
+
+        for (auto& item : readyDeletes)
+        {
+            if (item.Fn) item.Fn();
+        }
     }
 
     void VulkanDevice::SafeDestroyAfter(uint64_t value, Core::InplaceFunction<void()>&& deleteFn)
@@ -223,13 +232,15 @@ namespace RHI
 
     void VulkanDevice::FlushDeletionQueue(uint32_t frameIndex)
     {
-        std::lock_guard lock(m_DeletionMutex);
+        std::vector<Core::InplaceFunction<void()>> deletes;
+        {
+            std::lock_guard lock(m_DeletionMutex);
 
-        m_CurrentSafeDestroyFrame = frameIndex;
+            m_CurrentSafeDestroyFrame = frameIndex;
+            deletes.swap(m_DeletionQueue[frameIndex]);
+        }
 
-        auto& queue = m_DeletionQueue[frameIndex];
-        for (auto& fn : queue) fn();
-        queue.clear();
+        ExecuteDeferredDeletes(deletes);
     }
 
 

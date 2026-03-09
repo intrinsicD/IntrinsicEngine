@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include "Test_FrameGraphTypeTokenHelper.hpp"
+
 #include <algorithm>
 #include <atomic>
 #include <chrono>
@@ -44,6 +46,18 @@ namespace
         ASSERT_GE(b, 0) << after << " not found in log";
         EXPECT_LT(a, b) << before << " should execute before " << after;
     }
+}
+
+// =========================================================================
+// Test: TypeToken is stable across translation units
+// =========================================================================
+TEST(CoreFrameGraph, TypeTokenStableAcrossTranslationUnits)
+{
+    const size_t localToken = TypeToken<FrameGraphSharedTypeTokenFixtureType>();
+    const size_t helperToken = GetFrameGraphSharedTypeTokenFromHelperTU();
+
+    EXPECT_NE(localToken, 0u);
+    EXPECT_EQ(localToken, helperToken);
 }
 
 // =========================================================================

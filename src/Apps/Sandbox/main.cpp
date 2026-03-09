@@ -191,7 +191,6 @@ public:
 
     // Transform Gizmo
     Graphics::TransformGizmo m_Gizmo;
-    RetainedLineOverlaySlot m_GizmoOverlay{};
 
     bool m_DrawSelectedColliderConvexHull = false;
     bool m_DrawSelectedColliderContacts = false;
@@ -1495,22 +1494,15 @@ public:
 
             if (gizmoCapture.HasContent())
             {
-                UpdateRetainedLineOverlay(m_GizmoOverlay, [&](Graphics::DebugDraw& dd)
-                {
-                    for (const auto& seg : gizmoCapture.GetOverlayLines())
-                        dd.OverlayLine(seg.Start, seg.End, seg.ColorStart, seg.ColorEnd);
-                    for (const auto& seg : gizmoCapture.GetLines())
-                        dd.Line(seg.Start, seg.End, seg.ColorStart, seg.ColorEnd);
-                });
+                // Keep gizmo rendering on the transient DebugDraw path.
+                // Rebuilding retained ECS::Line geometry every frame causes buffer churn,
+                // deferred-destruction pressure, and visible stalls when switching modes.
+                auto& frameDebugDraw = GetRenderOrchestrator().GetDebugDraw();
+                for (const auto& seg : gizmoCapture.GetOverlayLines())
+                    frameDebugDraw.OverlayLine(seg.Start, seg.End, seg.ColorStart, seg.ColorEnd);
+                for (const auto& seg : gizmoCapture.GetLines())
+                    frameDebugDraw.Line(seg.Start, seg.End, seg.ColorStart, seg.ColorEnd);
             }
-            else
-            {
-                ReleaseRetainedLineOverlay(m_GizmoOverlay);
-            }
-        }
-        else
-        {
-            ReleaseRetainedLineOverlay(m_GizmoOverlay);
         }
 
         // ---------------------------------------------------------------------
