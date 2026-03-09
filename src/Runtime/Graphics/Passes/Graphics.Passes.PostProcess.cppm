@@ -170,6 +170,7 @@ export namespace Graphics::Passes
         RGResourceHandle m_LastBloomMip0Handle{};
         std::array<RGResourceHandle, kBloomMipCount> m_LastBloomDownHandles{};
         std::array<RGResourceHandle, kBloomMipCount> m_LastBloomUpSrcHandles{};
+        std::array<RGResourceHandle, kBloomMipCount> m_LastBloomMipWriteHandles{};
 
         // Histogram compute pipeline + storage
         VkDescriptorSetLayout m_HistogramSetLayout = VK_NULL_HANDLE;
