@@ -104,6 +104,36 @@ New geometry operators follow a consistent interface contract (see `Geometry::Si
 - **Surface reconstruction** (point cloud → mesh) pipelines through: normals (estimate if needed) → bounding box with padding → scalar grid → octree KNN → signed distance field → Marching Cubes → HalfedgeMesh. The signed distance at each grid vertex is `dot(p - nearest, normal_at_nearest)` (Hoppe et al. 1992). For `KNeighbors > 1`, inverse-distance-weighted averaging smooths noisy data.
 - **Robust weighted SDF policy:** sanitize input normals first (finite + non-zero length), then for `KNeighbors > 1` use adaptive Gaussian spatial weighting with normal-consistency weighting (`max(0, n_i·n_ref)^p`) instead of pure inverse-distance averaging. This reduces sign instability near conflicting neighborhoods and degenerate scans.
 - **Convex hull construction** uses the Quickhull algorithm (Barber, Dobkin & Huhdanpaa 1996). The `ConvexHullBuilder` module populates the `Geometry::ConvexHull` struct (both V-Rep vertices and H-Rep face planes) that was previously a consumer-only type in GJK/SDF/SAT/Containment. Key implementation details: (1) initial tetrahedron via 6-axis extreme points → most-distant pair → farthest from line → farthest from plane, (2) conflict-list partitioning assigns each remaining point to the face it's most above, (3) iterative expansion picks the globally farthest conflict point, BFS-discovers all visible faces, extracts ordered horizon edges, creates new faces, redistributes orphaned conflict points. Use the initial tetrahedron centroid as an interior reference for outward-normal verification throughout. Edge-to-face adjacency tracked via `(min(v0,v1), max(v0,v1))` packed as `uint64_t` key.
+## Event Communication Policy
+
+The engine has three mechanisms for inter-system communication. Use the right one:
+
+### `entt::dispatcher` (Application Events)
+
+Use for **cross-system notifications** where the producer does not know or care about the consumers. Events are value-type structs in `ECS::Events`. All sinks run on the main thread during `dispatcher.update()` (once per frame, after system updates, before rendering).
+
+**Use when:**
+- Selection/hover changed (UI panels, gizmo, property editor react).
+- Entity spawned/destroyed (hierarchy, dirty tracker, undo).
+- Geometry modified (edge/vertex views re-sync, scene dirty state).
+- Async operation completed on main thread (GPU pick readback).
+
+**Do NOT use when:**
+- Per-component incremental dirty tracking → use `DirtyTag::*` components.
+- GPU resource reclamation on component removal → use `on_destroy` hooks.
+- High-frequency per-entity data flow within a single frame → use direct ECS queries.
+- Cross-thread notifications → use `RunOnMainThread()` queue, then fire dispatcher event from the main-thread callback.
+
+### `ECS::DirtyTag::*` (Per-Entity Dirty Tracking)
+
+Use for **incremental CPU→GPU sync** scoped to a single entity. Tags are zero-size components consumed by `PropertySetDirtySyncSystem` and cleared after processing. Efficient when many entities may be dirty simultaneously.
+
+### `entt::registry::on_destroy` Hooks (Lifecycle Cleanup)
+
+Use for **deterministic resource cleanup** that must happen synchronously and immediately when a component is removed. The hook fires during `reg.remove<T>()` or `reg.destroy()`.
+
+**Key difference:** `on_destroy` is synchronous and immediate. Dispatcher events are deferred to `update()`. Never use deferred events for cleanup that must complete before the next allocation.
+
 ## Render Graph Validation
 
 `ValidateCompiledGraph()` returns `RenderGraphValidationResult` with structured diagnostics:
