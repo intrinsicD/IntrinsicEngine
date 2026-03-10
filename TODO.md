@@ -122,7 +122,6 @@ These items should be **planned now** so the current refactor leaves room for th
 ### C7. PostProcessPass Factoring
 
 - [ ] Factor `PostProcessPass` into sub-pass classes (bloom, SMAA, tone mapping, histogram) to reduce single-class complexity.
-- [ ] Use `glm::vec3` for color grading lift/gamma/gain instead of individual `float` fields.
 
 ### C9. Render Asset / Shader System Cleanup
 

@@ -2518,19 +2518,13 @@ public:
 
                     ImGui::Spacing();
                     ImGui::TextDisabled("Lift (Shadows)");
-                    ImGui::SliderFloat("Lift R", &postSettings->LiftR, -0.5f, 0.5f, "%.3f");
-                    ImGui::SliderFloat("Lift G", &postSettings->LiftG, -0.5f, 0.5f, "%.3f");
-                    ImGui::SliderFloat("Lift B", &postSettings->LiftB, -0.5f, 0.5f, "%.3f");
+                    ImGui::SliderFloat3("Lift", &postSettings->Lift.x, -0.5f, 0.5f, "%.3f");
 
                     ImGui::TextDisabled("Gamma (Midtones)");
-                    ImGui::SliderFloat("Gamma R", &postSettings->GammaR, 0.2f, 3.0f, "%.2f");
-                    ImGui::SliderFloat("Gamma G", &postSettings->GammaG, 0.2f, 3.0f, "%.2f");
-                    ImGui::SliderFloat("Gamma B", &postSettings->GammaB, 0.2f, 3.0f, "%.2f");
+                    ImGui::SliderFloat3("Gamma", &postSettings->Gamma.x, 0.2f, 3.0f, "%.2f");
 
                     ImGui::TextDisabled("Gain (Highlights)");
-                    ImGui::SliderFloat("Gain R", &postSettings->GainR, 0.0f, 3.0f, "%.2f");
-                    ImGui::SliderFloat("Gain G", &postSettings->GainG, 0.0f, 3.0f, "%.2f");
-                    ImGui::SliderFloat("Gain B", &postSettings->GainB, 0.0f, 3.0f, "%.2f");
+                    ImGui::SliderFloat3("Gain", &postSettings->Gain.x, 0.0f, 3.0f, "%.2f");
 
                     if (ImGui::Button("Reset Color Grading"))
                     {
@@ -2538,9 +2532,9 @@ public:
                         postSettings->Contrast = 1.0f;
                         postSettings->ColorTempOffset = 0.0f;
                         postSettings->TintOffset = 0.0f;
-                        postSettings->LiftR = postSettings->LiftG = postSettings->LiftB = 0.0f;
-                        postSettings->GammaR = postSettings->GammaG = postSettings->GammaB = 1.0f;
-                        postSettings->GainR = postSettings->GainG = postSettings->GainB = 1.0f;
+                        postSettings->Lift  = glm::vec3(0.0f);
+                        postSettings->Gamma = glm::vec3(1.0f);
+                        postSettings->Gain  = glm::vec3(1.0f);
                     }
                 }
             }
