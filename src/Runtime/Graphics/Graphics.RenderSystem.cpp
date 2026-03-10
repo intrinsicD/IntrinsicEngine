@@ -888,15 +888,6 @@ namespace Graphics
         return {res.HasHit, res.EntityID};
     }
 
-    std::optional<RenderSystem::PickResultGpu> RenderSystem::TryConsumePickResult()
-    {
-        if (auto res = m_Interaction.TryConsumePickResult())
-        {
-            return RenderSystem::PickResultGpu{res->HasHit, res->EntityID};
-        }
-        return std::nullopt;
-    }
-
     Passes::SelectionOutlineSettings* RenderSystem::GetSelectionOutlineSettings()
     {
         return m_ActivePipeline ? m_ActivePipeline->GetSelectionOutlineSettings() : nullptr;
@@ -1188,6 +1179,14 @@ namespace Graphics
                 ? (currentFrame - framesInFlight)
                 : 0;
             m_Interaction.ProcessReadbacks(safeCompleted);
+
+            // Fire GpuPickCompleted event when a readback result is available.
+            // Consumers (SelectionModule) receive this via dispatcher sink instead of polling.
+            if (auto pick = m_Interaction.TryConsumePickResult())
+            {
+                scene.GetDispatcher().enqueue<ECS::Events::GpuPickCompleted>(
+                    {pick->EntityID, pick->HasHit});
+            }
         }
 
         UpdateGlobals(camera);

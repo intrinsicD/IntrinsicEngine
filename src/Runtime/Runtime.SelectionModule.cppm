@@ -1,5 +1,6 @@
 module;
 #include <cstdint>
+#include <optional>
 
 #include <glm/glm.hpp>
 #include <entt/entity/entity.hpp>
@@ -17,7 +18,7 @@ export namespace Runtime
     // High-level selection controller owned by the Engine.
     // Bridges:
     //  - platform input (GLFW via Core::Input)
-    //  - RenderSystem GPU picking (async)
+    //  - GpuPickCompleted dispatcher event (from RenderSystem readback)
     //  - registry tags (SelectedTag/HoveredTag)
     class SelectionModule
     {
@@ -47,10 +48,14 @@ export namespace Runtime
         SelectionModule();
         explicit SelectionModule(const Config& cfg);
 
+        // Connect the GpuPickCompleted dispatcher sink to this module.
+        // Must be called once after the scene is available (e.g. during app init).
+        void ConnectToScene(ECS::Scene& scene);
+
         // Per-frame update.
         // Contract:
         //  - Call this once per frame, before/after RenderSystem update is fine.
-        //  - For GPU: schedules pick on click and consumes results when ready.
+        //  - For GPU: schedules pick on click; results arrive via GpuPickCompleted event.
         //  - For CPU: performs a raycast immediately on click.
         void Update(ECS::Scene& scene,
                     Graphics::RenderSystem& renderSystem,
@@ -68,8 +73,20 @@ export namespace Runtime
     private:
         Config m_Config;
 
+        // Click mode captured at the time the GPU pick was requested,
+        // so the correct mode is applied when the async result arrives.
+        Selection::PickMode m_PendingGpuClickMode = Selection::PickMode::Replace;
+
+        // Cached GPU pick result received via GpuPickCompleted dispatcher event.
+        struct CachedGpuPick
+        {
+            uint32_t PickID = 0;
+            bool HasHit = false;
+        };
+        std::optional<CachedGpuPick> m_CachedGpuPick;
+
         static void ApplyFromGpuPick(ECS::Scene& scene,
-                                    const Graphics::RenderSystem::PickResultGpu& pick,
+                                    uint32_t pickID, bool hasHit,
                                     Runtime::Selection::PickMode mode);
 
         [[nodiscard]] static glm::uvec2 WindowToFramebufferPixel(const Core::Windowing::Window& window,

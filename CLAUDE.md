@@ -116,7 +116,7 @@ Use for **cross-system notifications** where the producer does not know or care 
 - Selection/hover changed (UI panels, gizmo, property editor react).
 - Entity spawned/destroyed (hierarchy, dirty tracker, undo).
 - Geometry modified (edge/vertex views re-sync, scene dirty state).
-- Async operation completed on main thread (GPU pick readback).
+- Async operation completed on main thread (`GpuPickCompleted` from GPU pick readback).
 
 **Do NOT use when:**
 - Per-component incremental dirty tracking → use `DirtyTag::*` components.

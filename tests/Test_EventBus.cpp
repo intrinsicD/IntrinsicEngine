@@ -244,3 +244,45 @@ TEST(EventBus, SelectionChanged_CachedEntityUpdatedBySink)
     scene.GetDispatcher().update();
     EXPECT_EQ(cached, entt::null);
 }
+
+// -----------------------------------------------------------------------------
+// GpuPickCompleted — Dispatcher Contract Tests
+// -----------------------------------------------------------------------------
+
+TEST(EventBus, GpuPickCompleted_SinkReceivesEnqueuedEvent)
+{
+    Scene scene;
+
+    std::vector<GpuPickCompleted> received;
+    scene.GetDispatcher().sink<GpuPickCompleted>().connect<
+        [](std::vector<GpuPickCompleted>& out, const GpuPickCompleted& evt) {
+            out.push_back(evt);
+        }>(received);
+
+    scene.GetDispatcher().enqueue<GpuPickCompleted>({42u, true});
+    EXPECT_TRUE(received.empty()); // Deferred.
+
+    scene.GetDispatcher().update();
+    ASSERT_EQ(received.size(), 1u);
+    EXPECT_EQ(received[0].PickID, 42u);
+    EXPECT_TRUE(received[0].HasHit);
+}
+
+TEST(EventBus, GpuPickCompleted_BackgroundHitHasZeroPickID)
+{
+    Scene scene;
+
+    std::vector<GpuPickCompleted> received;
+    scene.GetDispatcher().sink<GpuPickCompleted>().connect<
+        [](std::vector<GpuPickCompleted>& out, const GpuPickCompleted& evt) {
+            out.push_back(evt);
+        }>(received);
+
+    // Background click: no hit, PickID == 0.
+    scene.GetDispatcher().enqueue<GpuPickCompleted>({0u, false});
+    scene.GetDispatcher().update();
+
+    ASSERT_EQ(received.size(), 1u);
+    EXPECT_EQ(received[0].PickID, 0u);
+    EXPECT_FALSE(received[0].HasHit);
+}

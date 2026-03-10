@@ -1,4 +1,5 @@
 module;
+#include <cstdint>
 #include <entt/entity/entity.hpp>
 
 export module ECS:Components.Events;
@@ -24,7 +25,8 @@ export namespace ECS::Events
     // Consumers: SelectionModule (to apply the pick result).
     struct GpuPickCompleted
     {
-        entt::entity Entity = entt::null;
+        uint32_t PickID = 0;
+        bool HasHit = false;
     };
 
     // Fired after a new entity is spawned via SceneManager or asset drop.
