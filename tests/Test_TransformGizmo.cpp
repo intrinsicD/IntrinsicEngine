@@ -63,6 +63,14 @@ namespace
 
         return entity;
     }
+
+    [[nodiscard]] const Graphics::DebugDraw::LineSegment& GetPrimaryTranslateAxisLine(const Graphics::DebugDraw& dd,
+                                                                                      size_t axisIndex)
+    {
+        const auto lines = dd.GetOverlayLines();
+        EXPECT_GE(lines.size(), 6u);
+        return lines[axisIndex * 2u];
+    }
 }
 
 // =============================================================================
@@ -302,4 +310,93 @@ TEST(TransformGizmo, MultiSelection_DrawsSingleGizmo)
 
     // Should draw one gizmo (same number of lines regardless of entity count).
     EXPECT_GT(dd.GetOverlayLineCount(), 0u);
+}
+
+TEST(TransformGizmo, LocalSpace_UsesWorldPivotAndOrientationForParentedEntity)
+{
+    ECS::Scene scene;
+    auto& reg = scene.GetRegistry();
+
+    const entt::entity parent = scene.CreateEntity("Parent");
+    const entt::entity child = CreateSelectedEntity(scene, glm::vec3(0.0f));
+    ECS::Components::Hierarchy::Attach(reg, child, parent);
+
+    auto& parentTransform = reg.get<ECS::Components::Transform::Component>(parent);
+    parentTransform.Position = {10.0f, 0.0f, 0.0f};
+    parentTransform.Rotation = glm::angleAxis(glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+
+    auto& childTransform = reg.get<ECS::Components::Transform::Component>(child);
+    childTransform.Position = {2.0f, 0.0f, 0.0f};
+    childTransform.Rotation = glm::angleAxis(glm::radians(45.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+
+    reg.emplace_or_replace<ECS::Components::Transform::IsDirtyTag>(parent);
+    reg.emplace_or_replace<ECS::Components::Transform::IsDirtyTag>(child);
+    ECS::Systems::Transform::OnUpdate(reg);
+
+    const auto& childWorld = reg.get<ECS::Components::Transform::WorldMatrix>(child);
+    const glm::vec3 expectedPivot = glm::vec3(childWorld.Matrix[3]);
+    const glm::vec3 expectedXAxis = glm::normalize(parentTransform.Rotation * childTransform.Rotation * glm::vec3(1.0f, 0.0f, 0.0f));
+
+    Graphics::DebugDraw dd;
+    Graphics::TransformGizmo gizmo;
+    gizmo.GetConfig().Mode = Graphics::GizmoMode::Translate;
+    gizmo.GetConfig().Space = Graphics::GizmoSpace::Local;
+    auto cam = MakeTestCamera();
+    Core::Input::Context input;
+
+    gizmo.Update(reg, dd, cam, input, 800, 600, false);
+
+    const auto& xAxisLine = GetPrimaryTranslateAxisLine(dd, 0);
+    const glm::vec3 actualXAxis = glm::normalize(xAxisLine.End - xAxisLine.Start);
+
+    EXPECT_NEAR(xAxisLine.Start.x, expectedPivot.x, 1e-3f);
+    EXPECT_NEAR(xAxisLine.Start.y, expectedPivot.y, 1e-3f);
+    EXPECT_NEAR(xAxisLine.Start.z, expectedPivot.z, 1e-3f);
+    EXPECT_NEAR(actualXAxis.x, expectedXAxis.x, 1e-3f);
+    EXPECT_NEAR(actualXAxis.y, expectedXAxis.y, 1e-3f);
+    EXPECT_NEAR(actualXAxis.z, expectedXAxis.z, 1e-3f);
+}
+
+TEST(TransformGizmo, WorldSpace_UsesWorldPivotButKeepsWorldAxesForParentedEntity)
+{
+    ECS::Scene scene;
+    auto& reg = scene.GetRegistry();
+
+    const entt::entity parent = scene.CreateEntity("Parent");
+    const entt::entity child = CreateSelectedEntity(scene, glm::vec3(0.0f));
+    ECS::Components::Hierarchy::Attach(reg, child, parent);
+
+    auto& parentTransform = reg.get<ECS::Components::Transform::Component>(parent);
+    parentTransform.Position = {3.0f, -4.0f, 1.0f};
+    parentTransform.Rotation = glm::angleAxis(glm::radians(60.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+
+    auto& childTransform = reg.get<ECS::Components::Transform::Component>(child);
+    childTransform.Position = {1.5f, 0.0f, 0.0f};
+    childTransform.Rotation = glm::angleAxis(glm::radians(30.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+
+    reg.emplace_or_replace<ECS::Components::Transform::IsDirtyTag>(parent);
+    reg.emplace_or_replace<ECS::Components::Transform::IsDirtyTag>(child);
+    ECS::Systems::Transform::OnUpdate(reg);
+
+    const auto& childWorld = reg.get<ECS::Components::Transform::WorldMatrix>(child);
+    const glm::vec3 expectedPivot = glm::vec3(childWorld.Matrix[3]);
+
+    Graphics::DebugDraw dd;
+    Graphics::TransformGizmo gizmo;
+    gizmo.GetConfig().Mode = Graphics::GizmoMode::Translate;
+    gizmo.GetConfig().Space = Graphics::GizmoSpace::World;
+    auto cam = MakeTestCamera();
+    Core::Input::Context input;
+
+    gizmo.Update(reg, dd, cam, input, 800, 600, false);
+
+    const auto& xAxisLine = GetPrimaryTranslateAxisLine(dd, 0);
+    const glm::vec3 actualXAxis = glm::normalize(xAxisLine.End - xAxisLine.Start);
+
+    EXPECT_NEAR(xAxisLine.Start.x, expectedPivot.x, 1e-3f);
+    EXPECT_NEAR(xAxisLine.Start.y, expectedPivot.y, 1e-3f);
+    EXPECT_NEAR(xAxisLine.Start.z, expectedPivot.z, 1e-3f);
+    EXPECT_NEAR(actualXAxis.x, 1.0f, 1e-3f);
+    EXPECT_NEAR(actualXAxis.y, 0.0f, 1e-3f);
+    EXPECT_NEAR(actualXAxis.z, 0.0f, 1e-3f);
 }

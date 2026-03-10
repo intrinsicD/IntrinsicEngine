@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <cmath>
 #include <glm/glm.hpp>
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/quaternion.hpp>
@@ -373,6 +374,42 @@ TEST(ECS_Transform, GetMatrix_Combined)
     EXPECT_NEAR(origin.x, 5.0f, 0.001f);
     EXPECT_NEAR(origin.y, 0.0f, 0.001f);
     EXPECT_NEAR(origin.z, 0.0f, 0.001f);
+}
+
+TEST(ECS_Transform, TryComputeLocalTransform_RoundTripsParentSpace)
+{
+    Transform::Component parent;
+    parent.Position = {4.0f, -2.0f, 1.5f};
+    parent.Rotation = glm::angleAxis(glm::radians(35.0f), glm::normalize(glm::vec3{0.0f, 0.0f, 1.0f}));
+    parent.Scale = {2.0f, 1.5f, 0.75f};
+
+    Transform::Component expectedLocal;
+    expectedLocal.Position = {1.25f, -0.5f, 3.0f};
+    expectedLocal.Rotation = glm::angleAxis(glm::radians(-20.0f), glm::normalize(glm::vec3{0.0f, 1.0f, 0.0f}));
+    expectedLocal.Scale = {0.5f, 2.0f, 1.25f};
+
+    const glm::mat4 parentWorld = Transform::GetMatrix(parent);
+    const glm::mat4 targetWorld = parentWorld * Transform::GetMatrix(expectedLocal);
+
+    Transform::Component solvedLocal;
+    ASSERT_TRUE(Transform::TryComputeLocalTransform(targetWorld, parentWorld, solvedLocal));
+
+    EXPECT_NEAR(solvedLocal.Position.x, expectedLocal.Position.x, 1e-4f);
+    EXPECT_NEAR(solvedLocal.Position.y, expectedLocal.Position.y, 1e-4f);
+    EXPECT_NEAR(solvedLocal.Position.z, expectedLocal.Position.z, 1e-4f);
+    EXPECT_NEAR(solvedLocal.Scale.x, expectedLocal.Scale.x, 1e-4f);
+    EXPECT_NEAR(solvedLocal.Scale.y, expectedLocal.Scale.y, 1e-4f);
+    EXPECT_NEAR(solvedLocal.Scale.z, expectedLocal.Scale.z, 1e-4f);
+    EXPECT_NEAR(std::abs(glm::dot(glm::normalize(solvedLocal.Rotation), glm::normalize(expectedLocal.Rotation))), 1.0f, 1e-4f);
+}
+
+TEST(ECS_Transform, TryComputeLocalTransform_SingularParentRejected)
+{
+    Transform::Component parent;
+    parent.Scale = {0.0f, 0.0f, 0.0f};
+
+    Transform::Component local;
+    EXPECT_FALSE(Transform::TryComputeLocalTransform(glm::mat4(1.0f), Transform::GetMatrix(parent), local));
 }
 
 // -----------------------------------------------------------------------------

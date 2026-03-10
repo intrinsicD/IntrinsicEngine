@@ -123,37 +123,22 @@ namespace ECS::Components::Hierarchy
         }
 
         if (registry.all_of<Transform::Component, Transform::WorldMatrix>(child) &&
-       registry.all_of<Transform::WorldMatrix>(newParent))
+            registry.all_of<Transform::WorldMatrix>(newParent))
         {
             auto& childLocal = registry.get<Transform::Component>(child);
             const auto& childWorld = registry.get<Transform::WorldMatrix>(child);
             const auto& parentWorld = registry.get<Transform::WorldMatrix>(newParent);
 
-            // Math: Local = Inverse(ParentWorld) * CurrentWorld
-            glm::mat4 invParent = glm::inverse(parentWorld.Matrix);
-            glm::mat4 newLocalMat = invParent * childWorld.Matrix;
-
-            // Decompose newLocalMat back into Position/Rotation/Scale
-            glm::vec3 skew;
-            glm::vec4 perspective;
-            glm::decompose(newLocalMat, childLocal.Scale, childLocal.Rotation, childLocal.Position, skew, perspective);
-
-            // Validate decomposition result: singular parent matrices (scale=0) produce NaN.
-            if (glm::any(glm::isnan(childLocal.Position)) ||
-                glm::any(glm::isnan(childLocal.Scale)) ||
-                glm::any(glm::isnan(glm::vec4(childLocal.Rotation.x, childLocal.Rotation.y,
-                                               childLocal.Rotation.z, childLocal.Rotation.w))))
+            if (!Transform::TryComputeLocalTransform(childWorld.Matrix, parentWorld.Matrix, childLocal))
             {
                 Core::Log::Warn("Hierarchy::Attach -- matrix decomposition produced NaN "
                                 "(singular parent matrix?), keeping original local transform for entity {}",
                                 static_cast<uint32_t>(child));
-                // Restore identity-ish local transform rather than propagating NaN.
                 childLocal.Position = glm::vec3(0.0f);
                 childLocal.Rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
                 childLocal.Scale = glm::vec3(1.0f);
             }
 
-            // Mark for next frame update using tag component
             registry.emplace_or_replace<Transform::IsDirtyTag>(child);
         }
 

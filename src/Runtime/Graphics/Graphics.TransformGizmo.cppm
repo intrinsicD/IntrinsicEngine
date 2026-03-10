@@ -26,8 +26,8 @@ export namespace Graphics
     //
     // Contract:
     //  - Call Update() once per frame before DebugDraw is consumed.
-    //  - Reads from the ECS registry to find selected entities.
-    //  - Writes transform changes directly to ECS Transform components.
+    //  - Reads selected world pose from ECS Transform::WorldMatrix when available.
+    //  - Writes parent-local ECS Transform components after solving the world-space gizmo target.
     //  - Main-thread only.
 
     enum class GizmoMode : uint8_t
@@ -151,6 +151,11 @@ export namespace Graphics
             glm::vec3    InitialPosition{0.0f};
             glm::quat    InitialRotation{1.0f, 0.0f, 0.0f, 0.0f};
             glm::vec3    InitialScale{1.0f};
+            glm::vec3    InitialWorldPosition{0.0f};
+            glm::quat    InitialWorldRotation{1.0f, 0.0f, 0.0f, 0.0f};
+            glm::vec3    InitialWorldScale{1.0f};
+            glm::mat4    InitialParentWorldMatrix{1.0f};
+            bool         HasInitialParentWorldMatrix = false;
         };
         std::vector<EntityTransformCache> m_CachedTransforms{};
 

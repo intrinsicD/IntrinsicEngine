@@ -179,6 +179,42 @@ namespace
         const float orientation = (glm::dot(glm::normalize(axisDir), camera.GetForward()) <= 0.0f) ? 1.0f : -1.0f;
         return angle * orientation;
     }
+
+    [[nodiscard]] ECS::Components::Transform::Component ResolveWorldTransform(entt::registry& registry, entt::entity entity)
+    {
+        ECS::Components::Transform::Component worldTransform{};
+        if (const auto* world = registry.try_get<ECS::Components::Transform::WorldMatrix>(entity);
+            world && ECS::Components::Transform::TryDecomposeMatrix(world->Matrix, worldTransform))
+        {
+            return worldTransform;
+        }
+
+        if (const auto* local = registry.try_get<ECS::Components::Transform::Component>(entity))
+            return *local;
+
+        return worldTransform;
+    }
+
+    [[nodiscard]] glm::mat4 ResolveWorldMatrix(entt::registry& registry, entt::entity entity)
+    {
+        if (const auto* world = registry.try_get<ECS::Components::Transform::WorldMatrix>(entity))
+            return world->Matrix;
+        if (const auto* local = registry.try_get<ECS::Components::Transform::Component>(entity))
+            return ECS::Components::Transform::GetMatrix(*local);
+        return glm::mat4(1.0f);
+    }
+
+    [[nodiscard]] bool TryResolveParentWorldMatrix(entt::registry& registry,
+                                                   entt::entity entity,
+                                                   glm::mat4& outParentWorldMatrix)
+    {
+        const auto* hierarchy = registry.try_get<ECS::Components::Hierarchy::Component>(entity);
+        if (!hierarchy || hierarchy->Parent == entt::null || !registry.valid(hierarchy->Parent))
+            return false;
+
+        outParentWorldMatrix = ResolveWorldMatrix(registry, hierarchy->Parent);
+        return true;
+    }
 }
 
 namespace Graphics
@@ -221,6 +257,8 @@ bool TransformGizmo::ComputePivot(entt::registry& registry, bool refreshCachedTr
 
     for (auto [entity, transform] : view.each())
     {
+        const ECS::Components::Transform::Component worldTransform = ResolveWorldTransform(registry, entity);
+
         if (refreshCachedTransforms)
         {
             EntityTransformCache cache;
@@ -228,16 +266,20 @@ bool TransformGizmo::ComputePivot(entt::registry& registry, bool refreshCachedTr
             cache.InitialPosition = transform.Position;
             cache.InitialRotation = transform.Rotation;
             cache.InitialScale = transform.Scale;
+            cache.InitialWorldPosition = worldTransform.Position;
+            cache.InitialWorldRotation = worldTransform.Rotation;
+            cache.InitialWorldScale = worldTransform.Scale;
+            cache.HasInitialParentWorldMatrix = TryResolveParentWorldMatrix(registry, entity, cache.InitialParentWorldMatrix);
             m_CachedTransforms.push_back(cache);
         }
 
-        centroid += transform.Position;
+        centroid += worldTransform.Position;
         ++count;
 
         if (first)
         {
             if (m_Config.Space == GizmoSpace::Local)
-                m_PivotRotation = transform.Rotation;
+                m_PivotRotation = worldTransform.Rotation;
             first = false;
         }
     }
@@ -247,7 +289,7 @@ bool TransformGizmo::ComputePivot(entt::registry& registry, bool refreshCachedTr
     if (m_Config.Pivot == GizmoPivot::Centroid)
         m_PivotPosition = centroid / static_cast<float>(count);
     else if (refreshCachedTransforms && !m_CachedTransforms.empty())
-        m_PivotPosition = m_CachedTransforms[0].InitialPosition;
+        m_PivotPosition = m_CachedTransforms[0].InitialWorldPosition;
 
     if (!refreshCachedTransforms && m_Config.Pivot == GizmoPivot::FirstSelected)
     {
@@ -255,8 +297,8 @@ bool TransformGizmo::ComputePivot(entt::registry& registry, bool refreshCachedTr
                                        ECS::Components::Transform::Component>();
         for (auto [entity, transform] : firstView.each())
         {
-            (void)entity;
-            m_PivotPosition = transform.Position;
+            (void)transform;
+            m_PivotPosition = ResolveWorldTransform(registry, entity).Position;
             break;
         }
     }
@@ -739,6 +781,37 @@ bool TransformGizmo::Update(entt::registry& registry,
         }
 
         // Apply transform based on mode.
+        const auto restoreInitialLocal = [](ECS::Components::Transform::Component& localTransform,
+                                            const EntityTransformCache& cache)
+        {
+            localTransform.Position = cache.InitialPosition;
+            localTransform.Rotation = cache.InitialRotation;
+            localTransform.Scale = cache.InitialScale;
+        };
+        const auto applyTargetWorldTransform = [&](ECS::Components::Transform::Component& localTransform,
+                                                   const EntityTransformCache& cache,
+                                                   const ECS::Components::Transform::Component& targetWorldTransform)
+        {
+            if (!cache.HasInitialParentWorldMatrix)
+            {
+                localTransform = targetWorldTransform;
+                return true;
+            }
+
+            ECS::Components::Transform::Component solvedLocalTransform{};
+            if (!ECS::Components::Transform::TryComputeLocalTransform(
+                    ECS::Components::Transform::GetMatrix(targetWorldTransform),
+                    cache.InitialParentWorldMatrix,
+                    solvedLocalTransform))
+            {
+                restoreInitialLocal(localTransform, cache);
+                return false;
+            }
+
+            localTransform = solvedLocalTransform;
+            return true;
+        };
+
         if (m_Config.Mode == GizmoMode::Translate)
         {
             glm::vec3 delta{0.0f};
@@ -803,8 +876,12 @@ bool TransformGizmo::Update(entt::registry& registry,
                 auto* transform = registry.try_get<ECS::Components::Transform::Component>(cache.Entity);
                 if (!transform) continue;
 
-                transform->Position = cache.InitialPosition + delta;
-                registry.emplace_or_replace<ECS::Components::Transform::IsDirtyTag>(cache.Entity);
+                ECS::Components::Transform::Component targetWorldTransform;
+                targetWorldTransform.Position = cache.InitialWorldPosition + delta;
+                targetWorldTransform.Rotation = cache.InitialWorldRotation;
+                targetWorldTransform.Scale = cache.InitialWorldScale;
+                if (applyTargetWorldTransform(*transform, cache, targetWorldTransform))
+                    registry.emplace_or_replace<ECS::Components::Transform::IsDirtyTag>(cache.Entity);
             }
         }
         else if (m_Config.Mode == GizmoMode::Rotate)
@@ -833,11 +910,13 @@ bool TransformGizmo::Update(entt::registry& registry,
                 auto* transform = registry.try_get<ECS::Components::Transform::Component>(cache.Entity);
                 if (!transform) continue;
 
-                // Rotate around drag-start pivot.
-                const glm::vec3 offset = cache.InitialPosition - m_DragPivotPosition;
-                transform->Position = m_DragPivotPosition + rotation * offset;
-                transform->Rotation = rotation * cache.InitialRotation;
-                registry.emplace_or_replace<ECS::Components::Transform::IsDirtyTag>(cache.Entity);
+                ECS::Components::Transform::Component targetWorldTransform;
+                const glm::vec3 offset = cache.InitialWorldPosition - m_DragPivotPosition;
+                targetWorldTransform.Position = m_DragPivotPosition + rotation * offset;
+                targetWorldTransform.Rotation = glm::normalize(rotation * cache.InitialWorldRotation);
+                targetWorldTransform.Scale = cache.InitialWorldScale;
+                if (applyTargetWorldTransform(*transform, cache, targetWorldTransform))
+                    registry.emplace_or_replace<ECS::Components::Transform::IsDirtyTag>(cache.Entity);
             }
         }
         else if (m_Config.Mode == GizmoMode::Scale)

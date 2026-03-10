@@ -10,6 +10,14 @@ import Runtime.Selection;
 using namespace ECS;
 using namespace ECS::Events;
 
+namespace
+{
+    [[nodiscard]] bool IsNullEntity(entt::entity entity)
+    {
+        return entity == entt::null;
+    }
+}
+
 // -----------------------------------------------------------------------------
 // Event Bus — Scene Dispatcher Contract Tests
 // -----------------------------------------------------------------------------
@@ -59,7 +67,7 @@ TEST(EventBus, SelectionChanged_FiredOnDeselectAll)
     scene.GetDispatcher().update();
 
     ASSERT_EQ(received.size(), 1u);
-    EXPECT_EQ(received[0].Entity, entt::null);
+    EXPECT_TRUE(IsNullEntity(received[0].Entity));
 }
 
 TEST(EventBus, SelectionChanged_FiredOnToggle)
@@ -124,7 +132,7 @@ TEST(EventBus, HoverChanged_FiredOnClearHover)
     scene.GetDispatcher().update();
 
     ASSERT_EQ(received.size(), 1u);
-    EXPECT_EQ(received[0].Entity, entt::null);
+    EXPECT_TRUE(IsNullEntity(received[0].Entity));
 }
 
 TEST(EventBus, EventsAreDeferredUntilUpdate)
@@ -234,7 +242,7 @@ TEST(EventBus, SelectionChanged_CachedEntityUpdatedBySink)
         }>(cached);
 
     Runtime::Selection::ApplySelection(scene, e, Runtime::Selection::PickMode::Replace);
-    EXPECT_EQ(cached, entt::null); // Still deferred.
+    EXPECT_TRUE(IsNullEntity(cached)); // Still deferred.
 
     scene.GetDispatcher().update();
     EXPECT_EQ(cached, e); // Now updated.
@@ -242,7 +250,7 @@ TEST(EventBus, SelectionChanged_CachedEntityUpdatedBySink)
     // Deselect updates cache to null.
     Runtime::Selection::ApplySelection(scene, entt::null, Runtime::Selection::PickMode::Replace);
     scene.GetDispatcher().update();
-    EXPECT_EQ(cached, entt::null);
+    EXPECT_TRUE(IsNullEntity(cached));
 }
 
 // -----------------------------------------------------------------------------
