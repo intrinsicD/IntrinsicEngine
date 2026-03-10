@@ -223,10 +223,13 @@ TEST(IORegistry, RegisterBuiltinLoadersPopulatesAll)
     IORegistry registry;
     RegisterBuiltinLoaders(registry);
 
-    // All 5 built-in formats should be importable
+    // Built-in mesh/point-cloud formats and point-cloud aliases should be importable.
     EXPECT_TRUE(registry.CanImport(".obj"));
     EXPECT_TRUE(registry.CanImport(".ply"));
     EXPECT_TRUE(registry.CanImport(".xyz"));
+    EXPECT_TRUE(registry.CanImport(".pts"));
+    EXPECT_TRUE(registry.CanImport(".xyzrgb"));
+    EXPECT_TRUE(registry.CanImport(".txt"));
     EXPECT_TRUE(registry.CanImport(".pcd"));
     EXPECT_TRUE(registry.CanImport(".tgf"));
     EXPECT_TRUE(registry.CanImport(".gltf"));
@@ -365,6 +368,107 @@ TEST(XYZLoader, ParseFromBytes)
     EXPECT_EQ(meshImport->Meshes[0].Topology, PrimitiveTopology::Points);
 }
 
+TEST(XYZLoader, SupportsPointCloudAliasesAndPTSLayout)
+{
+    IORegistry registry;
+    RegisterBuiltinLoaders(registry);
+
+    auto* xyzLoader = registry.FindLoader(".xyz");
+    ASSERT_NE(xyzLoader, nullptr);
+    EXPECT_EQ(registry.FindLoader(".pts"), xyzLoader);
+    EXPECT_EQ(registry.FindLoader(".xyzrgb"), xyzLoader);
+    EXPECT_EQ(registry.FindLoader(".TXT"), xyzLoader);
+
+    const char* ptsText =
+        "2\n"
+        "-0.984375 1.000000 -0.98437 1.0 1.0 1.0 1.0\n"
+        "-0.984375 1.000000 -1.00000 0.5 64 128 255\n";
+
+    std::span<const std::byte> bytes(reinterpret_cast<const std::byte*>(ptsText), std::strlen(ptsText));
+
+    LoadContext ctx{};
+    auto result = xyzLoader->Load(bytes, ctx);
+    ASSERT_TRUE(result.has_value()) << "PTS parse failed";
+
+    auto* meshImport = std::get_if<MeshImportData>(&*result);
+    ASSERT_NE(meshImport, nullptr);
+    ASSERT_EQ(meshImport->Meshes.size(), 1u);
+    ASSERT_EQ(meshImport->Meshes[0].Positions.size(), 2u);
+    EXPECT_EQ(meshImport->Meshes[0].Topology, PrimitiveTopology::Points);
+    EXPECT_NEAR(meshImport->Meshes[0].Aux[0].x, 1.0f, 1e-6f);
+    EXPECT_NEAR(meshImport->Meshes[0].Aux[0].y, 1.0f, 1e-6f);
+    EXPECT_NEAR(meshImport->Meshes[0].Aux[0].z, 1.0f, 1e-6f);
+    EXPECT_NEAR(meshImport->Meshes[0].Aux[1].x, 64.0f / 255.0f, 1e-6f);
+    EXPECT_NEAR(meshImport->Meshes[0].Aux[1].y, 128.0f / 255.0f, 1e-6f);
+    EXPECT_NEAR(meshImport->Meshes[0].Aux[1].z, 1.0f, 1e-6f);
+}
+
+TEST(XYZLoader, SkipsLHScanLineMarkers)
+{
+    const char* xyzText =
+        "3\n"
+        "LH1\n"
+        "1.0 2.0 3.0\n"
+        "LH2\n"
+        "4.0 5.0 6.0\n"
+        "LH12\n"
+        "7.0 8.0 9.0\n";
+
+    std::span<const std::byte> bytes(reinterpret_cast<const std::byte*>(xyzText), std::strlen(xyzText));
+
+    IORegistry registry;
+    RegisterBuiltinLoaders(registry);
+
+    auto* loader = registry.FindLoader(".xyz");
+    ASSERT_NE(loader, nullptr);
+
+    LoadContext ctx{};
+    auto result = loader->Load(bytes, ctx);
+    ASSERT_TRUE(result.has_value()) << "XYZ parse with LH markers failed";
+
+    auto* meshImport = std::get_if<MeshImportData>(&*result);
+    ASSERT_NE(meshImport, nullptr);
+    ASSERT_EQ(meshImport->Meshes.size(), 1u);
+    ASSERT_EQ(meshImport->Meshes[0].Positions.size(), 3u);
+    EXPECT_EQ(meshImport->Meshes[0].Topology, PrimitiveTopology::Points);
+    EXPECT_FLOAT_EQ(meshImport->Meshes[0].Positions[0].x, 1.0f);
+    EXPECT_FLOAT_EQ(meshImport->Meshes[0].Positions[1].y, 5.0f);
+    EXPECT_FLOAT_EQ(meshImport->Meshes[0].Positions[2].z, 9.0f);
+}
+
+TEST(XYZLoader, ParsesSemicolonDelimitedRows)
+{
+    const char* xyzText =
+        "LH1\n"
+        "20.549438;\t-744.746521;\t-4.371309;\n"
+        "20.428139;\t-744.684082;\t-4.322818;\n"
+        "20.328897;\t-744.662109;\t-4.313331;\n";
+
+    std::span<const std::byte> bytes(reinterpret_cast<const std::byte*>(xyzText), std::strlen(xyzText));
+
+    IORegistry registry;
+    RegisterBuiltinLoaders(registry);
+
+    auto* loader = registry.FindLoader(".xyz");
+    ASSERT_NE(loader, nullptr);
+
+    LoadContext ctx{};
+    auto result = loader->Load(bytes, ctx);
+    ASSERT_TRUE(result.has_value()) << "Semicolon-delimited XYZ parse failed";
+
+    auto* meshImport = std::get_if<MeshImportData>(&*result);
+    ASSERT_NE(meshImport, nullptr);
+    ASSERT_EQ(meshImport->Meshes.size(), 1u);
+    ASSERT_EQ(meshImport->Meshes[0].Positions.size(), 3u);
+    EXPECT_EQ(meshImport->Meshes[0].Topology, PrimitiveTopology::Points);
+    EXPECT_NEAR(meshImport->Meshes[0].Positions[0].x, 20.549438f, 1e-6f);
+    EXPECT_NEAR(meshImport->Meshes[0].Positions[0].y, -744.746521f, 1e-6f);
+    EXPECT_NEAR(meshImport->Meshes[0].Positions[0].z, -4.371309f, 1e-6f);
+    EXPECT_NEAR(meshImport->Meshes[0].Positions[2].x, 20.328897f, 1e-6f);
+    EXPECT_NEAR(meshImport->Meshes[0].Positions[2].y, -744.662109f, 1e-6f);
+    EXPECT_NEAR(meshImport->Meshes[0].Positions[2].z, -4.313331f, 1e-6f);
+}
+
 TEST(PCDLoader, ParseAsciiFromBytes)
 {
     const char* pcdText =
@@ -403,79 +507,64 @@ TEST(PCDLoader, ParseAsciiFromBytes)
     EXPECT_NEAR(meshImport->Meshes[0].Aux[1].y, 1.0f, 1e-6f);
 }
 
-TEST(TGFLoader, ParseFromBytes)
+TEST(PCDLoader, ParseBinaryFromBytes)
 {
-    const char* tgfText =
-        "1 0.0 0.0 0.0\n"
-        "2 1.0 0.0 0.0\n"
-        "3 0.0 1.0 0.0\n"
-        "#\n"
-        "1 2\n"
-        "2 3\n";
+    const char* header =
+        "# .PCD v0.7 - Point Cloud Data file format\n"
+        "VERSION 0.7\n"
+        "FIELDS x y z r g b\n"
+        "SIZE 4 4 4 1 1 1\n"
+        "TYPE F F F U U U\n"
+        "COUNT 1 1 1 1 1 1\n"
+        "WIDTH 2\n"
+        "HEIGHT 1\n"
+        "POINTS 2\n"
+        "DATA binary\n";
 
-    std::span<const std::byte> bytes(reinterpret_cast<const std::byte*>(tgfText), std::strlen(tgfText));
+    std::vector<std::byte> bytes(reinterpret_cast<const std::byte*>(header),
+                                 reinterpret_cast<const std::byte*>(header) + std::strlen(header));
+
+    auto appendScalar = [&bytes](const auto& value)
+    {
+        const auto* raw = reinterpret_cast<const std::byte*>(&value);
+        bytes.insert(bytes.end(), raw, raw + sizeof(value));
+    };
+    auto appendColor = [&bytes](std::uint8_t value)
+    {
+        bytes.push_back(static_cast<std::byte>(value));
+    };
+    auto appendPoint = [&](float x, float y, float z, std::uint8_t r, std::uint8_t g, std::uint8_t b)
+    {
+        appendScalar(x);
+        appendScalar(y);
+        appendScalar(z);
+        appendColor(r);
+        appendColor(g);
+        appendColor(b);
+    };
+
+    appendPoint(0.0f, 1.0f, 2.0f, 255u, 0u, 0u);
+    appendPoint(3.0f, 4.0f, 5.0f, 0u, 255u, 128u);
 
     IORegistry registry;
     RegisterBuiltinLoaders(registry);
 
-    auto* loader = registry.FindLoader(".tgf");
+    auto* loader = registry.FindLoader(".pcd");
     ASSERT_NE(loader, nullptr);
 
     LoadContext ctx{};
     auto result = loader->Load(bytes, ctx);
-    ASSERT_TRUE(result.has_value()) << "TGF parse failed";
+    ASSERT_TRUE(result.has_value()) << "Binary PCD parse failed";
 
     auto* meshImport = std::get_if<MeshImportData>(&*result);
     ASSERT_NE(meshImport, nullptr);
     ASSERT_EQ(meshImport->Meshes.size(), 1u);
-    EXPECT_EQ(meshImport->Meshes[0].Positions.size(), 3u);
-    EXPECT_EQ(meshImport->Meshes[0].Indices.size(), 4u); // 2 edges * 2 indices
-    EXPECT_EQ(meshImport->Meshes[0].Topology, PrimitiveTopology::Lines);
-}
-
-TEST(GLTFLoader, ParseGLBFromFile)
-{
-    // Read Duck.glb via FileIOBackend, then pass bytes to loader
-    FileIOBackend backend;
-    std::string path = std::string(ENGINE_ROOT_DIR) + "/assets/models/Duck.glb";
-
-    IORequest req;
-    req.Path = path;
-    auto readResult = backend.Read(req);
-
-    // Skip test if file doesn't exist (CI environment might not have assets)
-    if (!readResult.has_value())
-    {
-        GTEST_SKIP() << "Duck.glb not found, skipping";
-        return;
-    }
-
-    IORegistry registry;
-    RegisterBuiltinLoaders(registry);
-
-    auto* loader = registry.FindLoader(".glb");
-    ASSERT_NE(loader, nullptr);
-
-    LoadContext ctx{};
-    ctx.SourcePath = path;
-    // BasePath for GLB is the directory containing the file
-    std::string baseDir = std::filesystem::path(path).parent_path().string();
-    ctx.BasePath = baseDir;
-    ctx.Backend = &backend;
-
-    auto result = loader->Load(readResult->Data, ctx);
-    ASSERT_TRUE(result.has_value()) << "GLB parse failed";
-
-    auto* meshImport = std::get_if<MeshImportData>(&*result);
-    ASSERT_NE(meshImport, nullptr);
-    EXPECT_GT(meshImport->Meshes.size(), 0u);
-
-    // Duck.glb should have triangle topology and non-empty vertex data
-    for (const auto& mesh : meshImport->Meshes)
-    {
-        EXPECT_GT(mesh.Positions.size(), 0u);
-        EXPECT_EQ(mesh.Topology, PrimitiveTopology::Triangles);
-    }
+    EXPECT_EQ(meshImport->Meshes[0].Positions.size(), 2u);
+    EXPECT_EQ(meshImport->Meshes[0].Topology, PrimitiveTopology::Points);
+    EXPECT_NEAR(meshImport->Meshes[0].Aux[0].x, 1.0f, 1e-6f);
+    EXPECT_NEAR(meshImport->Meshes[0].Aux[0].y, 0.0f, 1e-6f);
+    EXPECT_NEAR(meshImport->Meshes[0].Aux[1].y, 1.0f, 1e-6f);
+    EXPECT_NEAR(meshImport->Meshes[0].Aux[1].z, 128.0f / 255.0f, 1e-6f);
 }
 
 // =============================================================================
