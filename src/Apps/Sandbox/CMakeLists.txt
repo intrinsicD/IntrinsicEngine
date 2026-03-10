@@ -1,5 +1,11 @@
 set(target_name Sandbox)
-add_executable(${target_name} main.cpp)
+add_executable(${target_name}
+        main.cpp
+        SandboxCommon.h
+        SpatialDebugController.h
+        GeometryWorkflowController.h
+        InspectorController.h
+)
 
 # Standard strict flags
 target_compile_options(${target_name} PRIVATE ${INTRINSIC_COMPILE_FLAGS})

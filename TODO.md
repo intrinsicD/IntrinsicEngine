@@ -31,26 +31,19 @@ This document tracks the **active rendering-architecture backlog** for Intrinsic
 ---
 
 ## P0 — Critical Refactor
-- [ ] src/Apps/Sandbox/main.cpp is overloaded with app lifecycle code, editor panel registration, panel implementations, debug controllers, and frame-update helpers.
-- [ ] Refactor incrementally so:
-  - [ ]main() contains only CLI/config/bootstrap.
-  - [ ] SandboxApp contains only high-level orchestration.
-  - [ ] Reusable editor/runtime panels move to Runtime.EditorUI or adjacent runtime modules.
-  - [ ] Sandbox-only panels/tools stay under src/Apps/Sandbox/.
-  - [ ] OnStart() becomes subsystem wiring + composition only.
-  - [ ] OnUpdate() becomes an ordered orchestration pipeline with extracted helpers.
-- [ ] Migrate in low-risk stages:
-  - [ ] Extract panel/overlay/menu registration first.
-  - [ ] Extract simple panel bodies next.
-  - [ ] Move existing controller classes into dedicated files.
-  - [ ] Decompose OnUpdate() without changing execution order.
+
+Stage 1 (file extraction) is complete — see git history. Remaining work:
+
+- [ ] Move reusable editor/runtime panels from Sandbox headers to `Runtime.EditorUI` module:
+  - [ ] `InspectorController` → `Runtime.EditorUI` (general property inspector, ColorSourceWidget, VectorFieldWidget).
+  - [ ] `GeometryWorkflowController` → `Runtime.EditorUI` or adjacent `Runtime.GeometryUI` module.
+  - [ ] `SpatialDebugController` → `Runtime.EditorUI` or `Graphics` debug visualization module.
 - [ ] Preserve stability with tests:
   - [ ] panel registration coverage
   - [ ] headless app smoke test
   - [ ] selection/gizmo interaction regression coverage
   - [ ] render/update integration smoke test
-- [ ] Remove superseded code immediately and update README.md when the ownership split lands.
-- 
+
 ## 2. Next (P1) — Near-Term Follow-Up After the Refactor Lands
 
 These are not required to finish the first wave, but they should begin soon after P0 is stable.
