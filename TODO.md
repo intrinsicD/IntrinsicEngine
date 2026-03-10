@@ -54,14 +54,6 @@ These are not required to finish the first wave, but they should begin soon afte
 - [ ] Improve primitive/submesh selection.
 - [ ] Add mask visualization in the editor.
 
-### B5. Post-Processing Test Coverage
-
-- [ ] Add descriptor layout / pipeline build success tests for bloom, SMAA, and tone mapping passes.
-
-### B6. Render Graph & Frame Construction
-
-- [ ] Add tests for `CanonicalResources` registration and recipe-driven allocation.
-
 ---
 
 ## 3. Later (P2) — Planned Downstream Work
