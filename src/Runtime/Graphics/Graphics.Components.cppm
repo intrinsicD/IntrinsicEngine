@@ -1,6 +1,5 @@
 module;
 #include <memory>
-#include <cstdint>
 #include <string>
 #include <vector>
 #include <utility>
@@ -65,8 +64,8 @@ export namespace ECS::MeshCollider
 {
     struct Component
     {
-        std::shared_ptr<Graphics::GeometryCollisionData> CollisionRef;
-        Geometry::OBB WorldOBB;
+        std::shared_ptr<Graphics::GeometryCollisionData> CollisionRef{};
+        Geometry::OBB WorldOBB{};
     };
 }
 
@@ -90,11 +89,11 @@ export namespace ECS::Mesh
     struct Data
     {
         // ---- Authoritative Data Source ----
-        std::shared_ptr<Geometry::Halfedge::Mesh> MeshRef;
+        std::shared_ptr<Geometry::Halfedge::Mesh> MeshRef{};
 
         // ---- Visualization Configuration ----
         // Selects which PropertySet properties drive per-vertex/edge/face colors.
-        Graphics::VisualizationConfig Visualization;
+        Graphics::VisualizationConfig Visualization{};
 
         // When true, re-extract colors from MeshRef's PropertySets.
         bool AttributesDirty = true;
@@ -416,7 +415,7 @@ export namespace ECS::Surface
         // Interpolated across triangles by the rasterizer for smooth
         // scalar field visualization on mesh surfaces.
         // When empty, falls back to per-face colors or texture.
-        std::vector<uint32_t> CachedVertexColors;
+        std::vector<uint32_t> CachedVertexColors{};
         bool VertexColorsDirty = true;
 
         // ---- Per-Face Color Cache (optional) ----
@@ -424,7 +423,7 @@ export namespace ECS::Surface
         // or set programmatically (e.g., segmentation labels, curvature).
         // Indexed by triangle index (gl_PrimitiveID in fragment shader).
         // When empty, SurfacePass uses standard texture/material shading.
-        std::vector<uint32_t> CachedFaceColors;
+        std::vector<uint32_t> CachedFaceColors{};
         bool FaceColorsDirty = true;
 
         // ---- Attribute Visualization Toggles ----
