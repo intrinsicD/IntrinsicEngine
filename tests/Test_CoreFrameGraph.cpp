@@ -885,3 +885,65 @@ TEST(CoreFrameGraph, ErrorRecovery_ResetAfterFailedCompile)
 
     EXPECT_TRUE(ran);
 }
+
+// =========================================================================
+// Test: High-worker, multi-iteration ready-queue stress test
+// =========================================================================
+TEST(CoreFrameGraph, ReadyQueueNestedDispatchStressHighWorkerCount)
+{
+    constexpr uint32_t kBranchCount = 96;
+    constexpr uint32_t kIterations = 48;
+    const unsigned workerCount = std::min<unsigned>(16u, std::max(2u, std::thread::hardware_concurrency()));
+
+    Memory::ScopeStack scope(1024 * 512);
+    FrameGraph graph(scope);
+    Tasks::Scheduler::Initialize(workerCount);
+
+    for (uint32_t iteration = 0; iteration < kIterations; ++iteration)
+    {
+        scope.Reset();
+        graph.Reset();
+
+        std::atomic<uint32_t> executed{0};
+
+        graph.AddPass("Root",
+            [](FrameGraphBuilder& b) { b.Write<Transform>(); },
+            [&]() {
+                executed.fetch_add(1, std::memory_order_relaxed);
+            });
+
+        for (uint32_t branchIndex = 0; branchIndex < kBranchCount; ++branchIndex)
+        {
+            const Hash::StringID label(1000u + branchIndex);
+
+            graph.AddPass("Branch",
+                [label](FrameGraphBuilder& b) {
+                    b.Read<Transform>();
+                    b.Signal(label);
+                },
+                [&, branchIndex]() {
+                    std::this_thread::sleep_for(std::chrono::microseconds(25 + (branchIndex % 5) * 10));
+                    executed.fetch_add(1, std::memory_order_relaxed);
+                });
+
+            graph.AddPass("Leaf",
+                [label](FrameGraphBuilder& b) {
+                    b.WaitFor(label);
+                },
+                [&]() {
+                    executed.fetch_add(1, std::memory_order_relaxed);
+                });
+        }
+
+        auto result = graph.Compile();
+        ASSERT_TRUE(result.has_value()) << "Compile failed on iteration " << iteration;
+
+        graph.Execute();
+
+        EXPECT_EQ(executed.load(std::memory_order_relaxed), 1u + 2u * kBranchCount)
+            << "Each pass must execute exactly once on iteration " << iteration;
+    }
+
+    Tasks::Scheduler::Shutdown();
+}
+

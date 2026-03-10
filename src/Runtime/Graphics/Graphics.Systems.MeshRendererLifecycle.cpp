@@ -127,6 +127,7 @@ namespace Graphics::Systems::MeshRendererLifecycle
                 builder.Read<ECS::Components::Transform::WorldMatrix>();
                 builder.Write<ECS::Surface::Component>();
                 builder.WaitFor("TransformUpdate"_id);
+                builder.Signal("MeshRendererLifecycle"_id);
             },
             [&registry, &gpuScene, &assetManager, &materialSystem, &geometryStorage, defaultTextureId]()
             {

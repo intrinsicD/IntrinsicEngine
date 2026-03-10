@@ -113,6 +113,13 @@ namespace Core
                 uint32_t NodeCount = 0;
             };
 
+            struct ExecutionContext
+            {
+                FrameGraph& Graph;
+                FrameGraphExecutionState& State;
+                std::vector<uint64_t>& NodeDurationsNs;
+            };
+
             FrameGraphExecutionState state{};
             state.NodeCount = nodeCount;
             state.RemainingDependencies = std::make_unique<std::atomic<uint32_t>[]>(nodeCount);
@@ -122,36 +129,37 @@ namespace Core
                 state.RemainingDependencies[nodeIdx].store(m_Scheduler.GetIndegree(nodeIdx), std::memory_order_relaxed);
             }
 
-            auto executePassAndReleaseDependents = [&](auto&& self, uint32_t nodeIdx) -> void
+            const auto executePassAndReleaseDependents = [](ExecutionContext ctx, uint32_t nodeIdx, auto dispatchSelf) -> void
             {
-                auto& pass = m_PassPool[nodeIdx];
+                auto& pass = ctx.Graph.m_PassPool[nodeIdx];
                 const auto passStart = std::chrono::steady_clock::now();
                 pass.ExecuteFn(pass.ExecuteUserData);
-                nodeDurationsNs[nodeIdx] = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
+                ctx.NodeDurationsNs[nodeIdx] = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
                     std::chrono::steady_clock::now() - passStart).count());
 
-                for (uint32_t dependent : m_Scheduler.GetDependents(nodeIdx))
+                for (uint32_t dependent : ctx.Graph.m_Scheduler.GetDependents(nodeIdx))
                 {
-                    const uint32_t prior = state.RemainingDependencies[dependent].fetch_sub(1, std::memory_order_acq_rel);
+                    const uint32_t prior = ctx.State.RemainingDependencies[dependent].fetch_sub(1, std::memory_order_acq_rel);
                     assert(prior > 0 && "FrameGraph dependent indegree underflow");
 
                     if (prior == 1)
                     {
-                        Tasks::Scheduler::Dispatch([&self, dependent]() {
-                            self(self, dependent);
+                        Tasks::Scheduler::Dispatch([ctx, dependent, dispatchSelf]() {
+                            dispatchSelf(ctx, dependent, dispatchSelf);
                         });
                     }
                 }
             };
 
+            const ExecutionContext execCtx{*this, state, nodeDurationsNs};
             uint32_t readyCount = 0;
             for (uint32_t nodeIdx = 0; nodeIdx < nodeCount; ++nodeIdx)
             {
                 if (state.RemainingDependencies[nodeIdx].load(std::memory_order_relaxed) == 0)
                 {
                     ++readyCount;
-                    Tasks::Scheduler::Dispatch([&executePassAndReleaseDependents, nodeIdx]() {
-                        executePassAndReleaseDependents(executePassAndReleaseDependents, nodeIdx);
+                    Tasks::Scheduler::Dispatch([execCtx, nodeIdx, executePassAndReleaseDependents]() {
+                        executePassAndReleaseDependents(execCtx, nodeIdx, executePassAndReleaseDependents);
                     });
                 }
             }
