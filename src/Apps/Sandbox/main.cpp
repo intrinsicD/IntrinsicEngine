@@ -2185,7 +2185,7 @@ public:
                   pcd.PointCount(), pcd.HasNormals() ? "yes" : "no", pcd.HasRadii() ? "yes" : "no");
     }
 
-    // Removed obsolete DrawGeometryProcessingPanel (no longer needed).
+t    // Removed obsolete DrawGeometryProcessingPanel (no longer needed).
 
     void DrawGeometryRemeshingPanel()
     {
