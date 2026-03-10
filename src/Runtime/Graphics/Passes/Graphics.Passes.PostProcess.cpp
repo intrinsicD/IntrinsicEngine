@@ -1231,33 +1231,33 @@ namespace Graphics::Passes
         // Color grading push constant block (must match shader layout, 80B total).
         struct ToneMapPC
         {
-            float Exposure;        // offset  0
-            int   Operator;        // offset  4
-            float BloomIntensity;  // offset  8
-            int   ColorGradingOn;  // offset 12
-            float Saturation;      // offset 16
-            float Contrast;        // offset 20
-            float ColorTempOffset; // offset 24
-            float TintOffset;      // offset 28
-            float LiftR, LiftG, LiftB, _pad0;   // offset 32
-            float GammaR, GammaG, GammaB, _pad1; // offset 48
-            float GainR, GainG, GainB, _pad2;     // offset 64
+            float     Exposure;        // offset  0
+            int       Operator;        // offset  4
+            float     BloomIntensity;  // offset  8
+            int       ColorGradingOn;  // offset 12
+            float     Saturation;      // offset 16
+            float     Contrast;        // offset 20
+            float     ColorTempOffset; // offset 24
+            float     TintOffset;      // offset 28
+            glm::vec3 Lift;  float _pad0; // offset 32
+            glm::vec3 Gamma; float _pad1; // offset 48
+            glm::vec3 Gain;  float _pad2; // offset 64
         };
         static_assert(sizeof(ToneMapPC) == 80, "ToneMapPC must be 80 bytes");
 
         const bool cgEnabled = m_Settings.ColorGradingEnabled;
         ToneMapPC toneMapPC{};
-        toneMapPC.Exposure       = exposure;
-        toneMapPC.Operator       = toneOp;
-        toneMapPC.BloomIntensity = bloomIntensity;
-        toneMapPC.ColorGradingOn = cgEnabled ? 1 : 0;
-        toneMapPC.Saturation     = m_Settings.Saturation;
-        toneMapPC.Contrast       = m_Settings.Contrast;
+        toneMapPC.Exposure        = exposure;
+        toneMapPC.Operator        = toneOp;
+        toneMapPC.BloomIntensity  = bloomIntensity;
+        toneMapPC.ColorGradingOn  = cgEnabled ? 1 : 0;
+        toneMapPC.Saturation      = m_Settings.Saturation;
+        toneMapPC.Contrast        = m_Settings.Contrast;
         toneMapPC.ColorTempOffset = m_Settings.ColorTempOffset;
-        toneMapPC.TintOffset     = m_Settings.TintOffset;
-        toneMapPC.LiftR = m_Settings.LiftR; toneMapPC.LiftG = m_Settings.LiftG; toneMapPC.LiftB = m_Settings.LiftB;
-        toneMapPC.GammaR = m_Settings.GammaR; toneMapPC.GammaG = m_Settings.GammaG; toneMapPC.GammaB = m_Settings.GammaB;
-        toneMapPC.GainR = m_Settings.GainR; toneMapPC.GainG = m_Settings.GainG; toneMapPC.GainB = m_Settings.GainB;
+        toneMapPC.TintOffset      = m_Settings.TintOffset;
+        toneMapPC.Lift             = m_Settings.Lift;
+        toneMapPC.Gamma            = m_Settings.Gamma;
+        toneMapPC.Gain             = m_Settings.Gain;
 
         // Capture bloom handle for read dependency.
         const RGResourceHandle bloomResult = m_LastBloomMip0Handle;

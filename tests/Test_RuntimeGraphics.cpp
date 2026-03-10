@@ -614,15 +614,9 @@ TEST(PostProcess, SettingsDefaultsAreSane)
     EXPECT_FALSE(settings.ColorGradingEnabled);
     EXPECT_FLOAT_EQ(settings.Saturation, 1.0f);
     EXPECT_FLOAT_EQ(settings.Contrast, 1.0f);
-    EXPECT_FLOAT_EQ(settings.LiftR, 0.0f);
-    EXPECT_FLOAT_EQ(settings.LiftG, 0.0f);
-    EXPECT_FLOAT_EQ(settings.LiftB, 0.0f);
-    EXPECT_FLOAT_EQ(settings.GammaR, 1.0f);
-    EXPECT_FLOAT_EQ(settings.GammaG, 1.0f);
-    EXPECT_FLOAT_EQ(settings.GammaB, 1.0f);
-    EXPECT_FLOAT_EQ(settings.GainR, 1.0f);
-    EXPECT_FLOAT_EQ(settings.GainG, 1.0f);
-    EXPECT_FLOAT_EQ(settings.GainB, 1.0f);
+    EXPECT_EQ(settings.Lift, glm::vec3(0.0f));
+    EXPECT_EQ(settings.Gamma, glm::vec3(1.0f));
+    EXPECT_EQ(settings.Gain, glm::vec3(1.0f));
     EXPECT_FLOAT_EQ(settings.ColorTempOffset, 0.0f);
     EXPECT_FLOAT_EQ(settings.TintOffset, 0.0f);
 
