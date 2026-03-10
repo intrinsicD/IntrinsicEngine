@@ -89,15 +89,6 @@ export namespace RHI::CommandUtils
         vkFreeCommandBuffers(device.GetLogicalDevice(), ctx.CommandPool, 1, &commandBuffer);
     }
 
-    // Thread-Safe Immediate Execution using Thread-Local Pools
-    [[deprecated("Use BeginSingleTimeCommands / EndSingleTimeCommands for more control")]]
-    void ExecuteImmediate(VulkanDevice& device, auto&& function)
-    {
-        VkCommandBuffer cmd = BeginSingleTimeCommands(device);
-        function(cmd);
-        EndSingleTimeCommands(device, cmd);
-    }
-
     // Helper for barriers (unchanged logic)
     void TransitionImageLayout(VkCommandBuffer cmd, VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout)
     {

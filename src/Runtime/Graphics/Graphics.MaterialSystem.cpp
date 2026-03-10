@@ -126,7 +126,8 @@ namespace Graphics
         if (auto* data = const_cast<MaterialData*>(GetData(matHandle)))
         {
             if (slotType == 0) data->AlbedoID = bindlessID;
-            // if (slotType == 1) data->NormalID = bindlessID;
+            // Normal map binding (slotType == 1) deferred to Material System Rewrite (TODO C1).
+            // MaterialData::NormalID exists but no shader reads it yet.
 
             if (matHandle.Index >= m_Revisions.size())
                 m_Revisions.resize(static_cast<size_t>(matHandle.Index) + 1u, 1u);

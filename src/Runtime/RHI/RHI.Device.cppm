@@ -72,13 +72,6 @@ namespace RHI
             m_CurrentFrameIndex = (m_CurrentFrameIndex + 1) % MAX_FRAMES_IN_FLIGHT;
         }
 
-        // Backward-compat: previously did both (global++ and index++). Prefer the split APIs.
-        [[deprecated("Use IncrementGlobalFrame() and/or AdvanceFrameIndex()")]]
-        void IncrementFrame() {
-            IncrementGlobalFrame();
-            AdvanceFrameIndex();
-        }
-
         // Helper to query swapchain support (used later by Swapchain module)
         [[nodiscard]] SwapchainSupportDetails QuerySwapchainSupport() const;
 
