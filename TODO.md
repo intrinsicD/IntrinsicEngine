@@ -196,25 +196,11 @@ Identified via full codebase sweep (March 2026). Grouped by priority.
 - [ ] Add bounds check to fixed-size octree traversal stack in `main.cpp` line 697 (currently `std::array<StackItem, 512>` with no overflow guard).
 - [ ] Move `static char[]` ImGui buffers in `Runtime.EditorUI.cpp` (lines 39, 203, 241, 269) to a persistent state struct to avoid stale state across panel hide/show cycles.
 
-### D5. Deprecated API Removal (Low)
-
-- [ ] Remove deprecated `RHI::CommandUtils::ExecuteImmediate()` (RHI.CommandUtils.cppm:93) — callers should use `BeginSingleTimeCommands()`/`EndSingleTimeCommands()`.
-- [ ] Remove deprecated `RHI::VulkanDevice::IncrementFrame()` (RHI.Device.cppm:76) — callers should use `IncrementGlobalFrame()` and `AdvanceFrameIndex()`.
-
-### D6. Dead / Commented-Out Code (Low)
-
-- [ ] Resolve commented-out normal map texture slot in `Graphics.MaterialSystem.cpp:129` (`// if (slotType == 1) data->NormalID = bindlessID;`) — either implement normal map support or document the omission.
-- [ ] Clarify or remove dead callback invocation in `Core.Filesystem.cpp:283` (`//entry.Callback(entry.Path.string());`).
-
 ### D7. Test Coverage Gaps (Low)
 
 - [ ] Expand `Test_Boolean.cpp` (currently 3 tests / 64 lines): add `Operation::Difference` tests, degenerate input tests (coplanar faces, coincident vertices, inverted winding), and edge-contact tests.
 - [ ] Add `AxisRotator` system unit tests (rotation correctness, dirty tag emission).
 - [ ] Improve `Test_EditorUI.cpp` beyond symbolic function-pointer check — add at least panel registration and state validation tests.
-
-### D8. Build & Tooling Hardening (Low)
-
-- [ ] Harden `tools/check_perf_regression.sh` JSON extraction (lines 58–66): regex fails on standard `"field": value` JSON format; add numeric validation so empty extraction doesn't silently report PASS.
 
 ### D9. Sandbox Architecture (Opportunistic)
 

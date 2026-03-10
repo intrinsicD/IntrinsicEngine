@@ -275,12 +275,9 @@ namespace Core::Filesystem
                     {
                         entry.LastTime = currentTime;
 
-                        // Fixed: No try-catch block.
-                        // We assume the callback is safe.
                         if (entry.Callback)
                         {
                             change_entries.push_back(entry);
-                            //entry.Callback(entry.Path.string());
                         }
 
                         Log::Info("[HotReload] Detected change: {}", entry.Path.string());

@@ -54,28 +54,42 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-# Extract values from JSON using grep+sed (no jq dependency).
+# Extract a numeric value from JSON using grep+sed (no jq dependency).
+# Returns the first numeric value associated with the given field name.
 extract_field() {
     local field="$1"
-    grep "\"${field}\"" "$JSON_FILE" | head -1 | sed 's/.*: *\([0-9.]*\).*/\1/'
+    local value
+    value=$(grep "\"${field}\"" "$JSON_FILE" | head -1 | sed 's/.*"'"${field}"'" *: *\([0-9][0-9.]*\).*/\1/')
+
+    # Validate: must be a non-empty numeric string (integer or decimal).
+    if [ -z "$value" ] || ! echo "$value" | grep -qE '^[0-9]+\.?[0-9]*$'; then
+        echo ""
+        return 1
+    fi
+    echo "$value"
 }
 
-ACTUAL_AVG_MS=$(extract_field "avgFrameTimeMs")
-ACTUAL_P99_MS=$(extract_field "p99FrameTimeMs")
-ACTUAL_FPS=$(extract_field "avgFPS")
-TOTAL_FRAMES=$(extract_field "totalFrames")
+ACTUAL_AVG_MS=$(extract_field "avgFrameTimeMs") || true
+ACTUAL_P99_MS=$(extract_field "p99FrameTimeMs") || true
+ACTUAL_FPS=$(extract_field "avgFPS") || true
+TOTAL_FRAMES=$(extract_field "totalFrames") || true
 
 echo "=== Performance Regression Check ==="
 echo "File:   $JSON_FILE"
-echo "Frames: $TOTAL_FRAMES"
-echo "Avg:    ${ACTUAL_AVG_MS} ms (${ACTUAL_FPS} FPS)"
-echo "P99:    ${ACTUAL_P99_MS} ms"
+echo "Frames: ${TOTAL_FRAMES:-(missing)}"
+echo "Avg:    ${ACTUAL_AVG_MS:-(missing)} ms (${ACTUAL_FPS:-(missing)} FPS)"
+echo "P99:    ${ACTUAL_P99_MS:-(missing)} ms"
 echo ""
 
 FAILED=0
 
 check_max() {
     local name="$1" actual="$2" threshold="$3"
+    if [ -z "$actual" ]; then
+        echo "FAIL: $name could not be extracted from JSON (missing or non-numeric)"
+        FAILED=1
+        return
+    fi
     # Use awk for floating-point comparison (no bc dependency).
     if echo "$actual $threshold" | awk '{exit !($1 > $2)}'; then
         echo "FAIL: $name = ${actual} ms exceeds threshold ${threshold} ms"
@@ -87,6 +101,11 @@ check_max() {
 
 check_min() {
     local name="$1" actual="$2" threshold="$3"
+    if [ -z "$actual" ]; then
+        echo "FAIL: $name could not be extracted from JSON (missing or non-numeric)"
+        FAILED=1
+        return
+    fi
     if echo "$actual $threshold" | awk '{exit !($1 < $2)}'; then
         echo "FAIL: $name = ${actual} below minimum ${threshold}"
         FAILED=1
