@@ -72,6 +72,8 @@ namespace Geometry::Subdivision
 
                 HalfedgeHandle hStart = input.Halfedge(vh);
                 HalfedgeHandle h = hStart;
+                std::size_t safety = 0;
+                const std::size_t maxIter = input.HalfedgesSize();
                 do
                 {
                     if (input.IsBoundary(input.Edge(h)))
@@ -80,6 +82,7 @@ namespace Geometry::Subdivision
                         ++boundaryCount;
                     }
                     h = input.CWRotatedHalfedge(h);
+                    if (++safety > maxIter) break;
                 } while (h != hStart);
 
                 if (boundaryCount == 2)
@@ -101,10 +104,13 @@ namespace Geometry::Subdivision
                 glm::vec3 neighborSum(0.0f);
                 HalfedgeHandle hStart = input.Halfedge(vh);
                 HalfedgeHandle h = hStart;
+                std::size_t safety = 0;
+                const std::size_t maxIter = input.HalfedgesSize();
                 do
                 {
                     neighborSum += input.Position(input.ToVertex(h));
                     h = input.CWRotatedHalfedge(h);
+                    if (++safety > maxIter) break;
                 } while (h != hStart);
 
                 evenPositions[vi] = fw * p + fb * neighborSum;

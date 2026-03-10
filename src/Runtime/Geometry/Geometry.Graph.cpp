@@ -357,10 +357,13 @@ namespace Geometry::Graph
 
         if (h.IsValid())
         {
+            std::size_t safety = 0;
+            const std::size_t maxIter = HalfedgesSize();
             do
             {
                 if (ToVertex(h) == end) return h;
                 h = NextHalfedge(OppositeHalfedge(h));
+                if (++safety > maxIter) break;
             } while (h != startH);
         }
 
@@ -1315,10 +1318,13 @@ namespace Geometry::Graph
         const HalfedgeHandle startH = h;
         if (h.IsValid())
         {
+            std::size_t safety = 0;
+            const std::size_t maxIter = HalfedgesSize();
             do
             {
                 DeleteEdge(Edge(h));
                 h = NextHalfedge(OppositeHalfedge(h));
+                if (++safety > maxIter) break;
             } while (h != startH);
         }
 

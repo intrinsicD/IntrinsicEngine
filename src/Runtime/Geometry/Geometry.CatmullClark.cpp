@@ -50,7 +50,7 @@ namespace Geometry::CatmullClark
                 sum += input.Position(input.ToVertex(h));
                 ++count;
                 h = input.NextHalfedge(h);
-                if (++safety > 1000) break;
+                if (++safety > std::max<std::size_t>(input.HalfedgesSize(), 1000u)) break;
             } while (h != hStart);
 
             if (count > 0)
@@ -125,7 +125,7 @@ namespace Geometry::CatmullClark
                         ++boundaryCount;
                     }
                     h = input.CWRotatedHalfedge(h);
-                    if (++safety > 1000) break;
+                    if (++safety > std::max<std::size_t>(input.HalfedgesSize(), 1000u)) break;
                 } while (h != hStart);
 
                 if (boundaryCount == 2)
@@ -162,7 +162,7 @@ namespace Geometry::CatmullClark
 
                     ++count;
                     h = input.CWRotatedHalfedge(h);
-                    if (++safety > 1000) break;
+                    if (++safety > std::max<std::size_t>(input.HalfedgesSize(), 1000u)) break;
                 } while (h != hStart);
 
                 if (count > 0 && count == n)
@@ -254,7 +254,7 @@ namespace Geometry::CatmullClark
                 (void)output.AddQuad(vp, ep_curr, faceVert, ep_prev);
 
                 h = input.NextHalfedge(h);
-                if (++safety > 1000) break;
+                if (++safety > std::max<std::size_t>(input.HalfedgesSize(), 1000u)) break;
             } while (h != hStart);
         }
 
