@@ -178,11 +178,4 @@ These are the explicit constraints agents must preserve during the refactor even
 
 Identified via full codebase sweep (March 2026). Grouped by priority.
 
-### D3. Core Module Cleanup (Medium)
-
-- [ ] Replace raw `new`/`delete` of `ArenaLifetimeToken` in `Core.Memory.cpp` (lines 48, 84, 92, 110) with `std::unique_ptr`. Note: the current design intentionally leaks tokens in move operations for debug safety — `unique_ptr` would require `.release()` at every move site with no net improvement. Consider a custom deleter or accept the current pattern.
-
-### D9. Sandbox Architecture (Opportunistic)
-
-- [ ] Replace boolean debug-visualization flags with ECS presence/absence pattern per CLAUDE.md convention. **Review note (2026-03):** The six flags in `SpatialDebugController` are editor-level global settings, not per-entity state. Converting them to ECS tags would conflate entity data with transient editor preferences. The controller is already extracted from the main app class — the boolean pattern is acceptable here. Revisit only if debug viz becomes per-entity.
-- [ ] Extract remaining subsystems (geometry workflow UI state, inspector component panels) into dedicated classes to complete the god-object decomposition.
+No active items. Previous findings (D3 Core.Memory token pattern, D9 SpatialDebugController boolean flags, D9 god-object decomposition) have been resolved — see git history for details.
