@@ -1,21 +1,139 @@
 #include <gtest/gtest.h>
 
-// This test intentionally avoids touching ImGui itself.
-// It only validates that the Runtime.EditorUI module is linkable and callable.
+// This test avoids touching ImGui directly (requires Vulkan context).
+// It validates linkability of the EditorUI module and exercises the
+// SceneDirtyTracker state machine, which is pure CPU state.
 
 import Runtime.Engine;
 import Runtime.EditorUI;
+import Runtime.SceneSerializer;
 
 using namespace Runtime;
 
-TEST(EditorUI, RegistersWithoutCrashing)
-{
-    // We can't instantiate a full Engine here (requires graphics backend).
-    // The contract we can validate in a unit test is simply that the symbol exists.
-    // If this compiles/links, registration is at least well-formed.
+// =========================================================================
+// Symbol linkability
+// =========================================================================
 
-    // NOLINTNEXTLINE(readability-identifier-length)
+TEST(EditorUI, RegisterDefaultPanels_IsLinkable)
+{
     auto* fn = &Runtime::EditorUI::RegisterDefaultPanels;
     ASSERT_NE(fn, nullptr);
 }
 
+TEST(EditorUI, GetSceneDirtyTracker_IsLinkable)
+{
+    auto* fn = &Runtime::EditorUI::GetSceneDirtyTracker;
+    ASSERT_NE(fn, nullptr);
+}
+
+// =========================================================================
+// SceneDirtyTracker state machine
+// =========================================================================
+
+TEST(SceneDirtyTracker, InitiallyClean)
+{
+    SceneDirtyTracker tracker;
+    EXPECT_FALSE(tracker.IsDirty());
+}
+
+TEST(SceneDirtyTracker, MarkDirty_SetsDirtyState)
+{
+    SceneDirtyTracker tracker;
+    tracker.MarkDirty();
+    EXPECT_TRUE(tracker.IsDirty());
+}
+
+TEST(SceneDirtyTracker, ClearDirty_ResetsState)
+{
+    SceneDirtyTracker tracker;
+    tracker.MarkDirty();
+    EXPECT_TRUE(tracker.IsDirty());
+
+    tracker.ClearDirty();
+    EXPECT_FALSE(tracker.IsDirty());
+}
+
+TEST(SceneDirtyTracker, MarkDirty_IsIdempotent)
+{
+    SceneDirtyTracker tracker;
+    tracker.MarkDirty();
+    tracker.MarkDirty();
+    tracker.MarkDirty();
+    EXPECT_TRUE(tracker.IsDirty());
+
+    tracker.ClearDirty();
+    EXPECT_FALSE(tracker.IsDirty());
+}
+
+TEST(SceneDirtyTracker, InitialPathIsEmpty)
+{
+    SceneDirtyTracker tracker;
+    EXPECT_TRUE(tracker.GetCurrentPath().empty());
+}
+
+TEST(SceneDirtyTracker, SetCurrentPath_StoresPath)
+{
+    SceneDirtyTracker tracker;
+    tracker.SetCurrentPath("scenes/test.json");
+    EXPECT_EQ(tracker.GetCurrentPath(), "scenes/test.json");
+}
+
+TEST(SceneDirtyTracker, SetCurrentPath_Overwrites)
+{
+    SceneDirtyTracker tracker;
+    tracker.SetCurrentPath("first.json");
+    tracker.SetCurrentPath("second.json");
+    EXPECT_EQ(tracker.GetCurrentPath(), "second.json");
+}
+
+TEST(SceneDirtyTracker, PathAndDirtyAreIndependent)
+{
+    SceneDirtyTracker tracker;
+
+    tracker.SetCurrentPath("scene.json");
+    EXPECT_FALSE(tracker.IsDirty());
+
+    tracker.MarkDirty();
+    EXPECT_EQ(tracker.GetCurrentPath(), "scene.json");
+
+    tracker.ClearDirty();
+    EXPECT_EQ(tracker.GetCurrentPath(), "scene.json");
+    EXPECT_FALSE(tracker.IsDirty());
+}
+
+TEST(SceneDirtyTracker, ClearDirty_DoesNotClearPath)
+{
+    SceneDirtyTracker tracker;
+    tracker.SetCurrentPath("my_scene.json");
+    tracker.MarkDirty();
+    tracker.ClearDirty();
+
+    EXPECT_FALSE(tracker.IsDirty());
+    EXPECT_EQ(tracker.GetCurrentPath(), "my_scene.json");
+}
+
+// =========================================================================
+// Global tracker accessed via EditorUI
+// =========================================================================
+
+TEST(EditorUI, GlobalDirtyTracker_RoundTrip)
+{
+    auto& tracker = Runtime::EditorUI::GetSceneDirtyTracker();
+
+    // Save original state to restore after test.
+    const bool wasDirty = tracker.IsDirty();
+    const auto origPath = tracker.GetCurrentPath();
+
+    tracker.SetCurrentPath("test_roundtrip.json");
+    tracker.MarkDirty();
+    EXPECT_TRUE(tracker.IsDirty());
+    EXPECT_EQ(tracker.GetCurrentPath(), "test_roundtrip.json");
+
+    tracker.ClearDirty();
+    EXPECT_FALSE(tracker.IsDirty());
+
+    // Restore original state.
+    tracker.SetCurrentPath(origPath);
+    if (wasDirty) tracker.MarkDirty();
+    else tracker.ClearDirty();
+}

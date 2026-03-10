@@ -247,9 +247,9 @@ Four test targets with clear GPU/no-GPU boundaries:
 | Target | Dependencies | Scope | Tests |
 |---|---|---|---|
 | `IntrinsicCoreTests` | Core only | Memory, tasks, handles, frame graph, DAG scheduler | ~80 |
-| `IntrinsicGeometryTests` | Core + Geometry | DEC, mesh operations, collision, graphs, all geometry operators | ~240 |
-| `IntrinsicECSTests` | Core + ECS | FrameGraph system integration | ~15 |
-| `IntrinsicTests` | Full Runtime | Graphics, I/O, rendering, integration | ~270 |
+| `IntrinsicGeometryTests` | Core + Geometry | DEC, mesh operations, collision, graphs, all geometry operators | ~265 |
+| `IntrinsicECSTests` | Core + ECS | FrameGraph system integration | ~20 |
+| `IntrinsicTests` | Full Runtime | Graphics, I/O, rendering, integration | ~285 |
 
 ### Architecture SLOs
 
