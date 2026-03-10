@@ -64,12 +64,9 @@ These are not required to finish the first wave, but they should begin soon afte
 
 ### B7. Application Event Bus (`entt::dispatcher`) — Remaining
 
-Core infrastructure is in place (`ECS::Scene` dispatcher, `ECS::Events` module, drain point in `Engine::Run()`, `SelectionChanged`/`HoverChanged` events from `ApplySelection`/`ApplyHover`, contract tests). Remaining work:
+Core infrastructure is in place (`ECS::Scene` dispatcher, `ECS::Events` module, drain point in `Engine::Run()`, `SelectionChanged`/`HoverChanged` events from `ApplySelection`/`ApplyHover`, contract tests). `EntitySpawned` fires from `SceneManager::SpawnModel()`. `GeometryModified` fires from `ApplyGeometryOperator()`. Sandbox panels use a `SelectionChanged` sink instead of per-frame polling. Remaining work:
 
-- [ ] Replace `GetSelectedEntity()` polling in Sandbox panels with `SelectionChanged` sink.
 - [ ] Fire `GpuPickCompleted` from readback completion, replace polling in `SelectionModule`.
-- [ ] Fire `EntitySpawned` from `SceneManager::SpawnModel()` and `LoadDroppedAsset`.
-- [ ] Fire `GeometryModified` from centralized geometry operator helper.
 
 ---
 

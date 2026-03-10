@@ -2,6 +2,7 @@ module;
 #include <string>
 #include <cstdint>
 #include <entt/entity/registry.hpp>
+#include <entt/signal/dispatcher.hpp>
 #include <glm/glm.hpp>
 
 module Runtime.SceneManager;
@@ -223,6 +224,7 @@ namespace Runtime
                 }
             }
 
+            m_Scene.GetDispatcher().enqueue<ECS::Events::EntitySpawned>({root});
             return root;
         }
 
