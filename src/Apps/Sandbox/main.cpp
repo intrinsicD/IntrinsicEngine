@@ -195,7 +195,6 @@ public:
     entt::entity m_OctreeOverlayEntity = entt::null;
     Geometry::GeometryHandle m_OctreeOverlayGeometry{};
     entt::entity m_OctreeOverlaySourceEntity = entt::null;
-    const Graphics::GeometryCollisionData* m_OctreeOverlaySource = nullptr;
     Graphics::OctreeDebugDrawSettings m_CachedOctreeOverlaySettings{};
     glm::mat4 m_CachedOctreeOverlayWorld{1.0f};
     Geometry::AABB m_CachedOctreeOverlayLocalAABB{};
@@ -214,7 +213,6 @@ public:
     bool m_DrawSelectedColliderKDTree = false;
     RetainedLineOverlaySlot m_KDTreeOverlay{};
     entt::entity m_KDTreeOverlaySourceEntity = entt::null;
-    const Graphics::GeometryCollisionData* m_KDTreeOverlaySource = nullptr;
     Graphics::KDTreeDebugDrawSettings m_CachedKDTreeOverlaySettings{};
     glm::mat4 m_CachedKDTreeOverlayWorld{1.0f};
 
@@ -222,7 +220,6 @@ public:
     bool m_DrawSelectedColliderBVH = false;
     RetainedLineOverlaySlot m_BVHOverlay{};
     entt::entity m_BVHOverlaySourceEntity = entt::null;
-    const Graphics::GeometryCollisionData* m_BVHOverlaySource = nullptr;
     Graphics::BVHDebugDrawSettings m_CachedBVHOverlaySettings{};
     glm::mat4 m_CachedBVHOverlayWorld{1.0f};
     size_t m_CachedBVHOverlayPositionCount = 0;
@@ -240,15 +237,12 @@ public:
 
     Geometry::KDTree m_SelectedColliderKDTree{};
     entt::entity m_SelectedKDTreeEntity = entt::null;
-    const Graphics::GeometryCollisionData* m_SelectedKDTreeSource = nullptr;
 
     Graphics::ConvexHullDebugDrawSettings m_ConvexHullDebugSettings{};
     Geometry::Halfedge::Mesh m_SelectedColliderHullMesh{};
     entt::entity m_SelectedHullEntity = entt::null;
-    const Graphics::GeometryCollisionData* m_SelectedHullSource = nullptr;
     RetainedLineOverlaySlot m_ConvexHullOverlay{};
     entt::entity m_ConvexHullOverlaySourceEntity = entt::null;
-    const Graphics::GeometryCollisionData* m_ConvexHullOverlaySource = nullptr;
     Graphics::ConvexHullDebugDrawSettings m_CachedConvexHullOverlaySettings{};
     glm::mat4 m_CachedConvexHullOverlayWorld{1.0f};
 
@@ -443,7 +437,6 @@ public:
     {
         const bool cacheValid =
             (m_SelectedKDTreeEntity == selected) &&
-            (m_SelectedKDTreeSource == &collision) &&
             !m_SelectedColliderKDTree.Nodes().empty();
 
         if (cacheValid)
@@ -451,7 +444,6 @@ public:
 
         m_SelectedColliderKDTree = Geometry::KDTree{};
         m_SelectedKDTreeEntity = entt::null;
-        m_SelectedKDTreeSource = nullptr;
 
         if (collision.Positions.empty())
             return false;
@@ -465,7 +457,6 @@ public:
             return false;
 
         m_SelectedKDTreeEntity = selected;
-        m_SelectedKDTreeSource = &collision;
         return true;
     }
 
@@ -474,7 +465,6 @@ public:
     {
         const bool cacheValid =
             (m_SelectedHullEntity == selected) &&
-            (m_SelectedHullSource == &collision) &&
             !m_SelectedColliderHullMesh.IsEmpty();
 
         if (cacheValid)
@@ -482,7 +472,6 @@ public:
 
         m_SelectedColliderHullMesh = Geometry::Halfedge::Mesh{};
         m_SelectedHullEntity = entt::null;
-        m_SelectedHullSource = nullptr;
 
         if (collision.Positions.size() < 4)
             return false;
@@ -497,7 +486,6 @@ public:
 
         m_SelectedColliderHullMesh = std::move(hull->Mesh);
         m_SelectedHullEntity = selected;
-        m_SelectedHullSource = &collision;
         return true;
     }
 
@@ -515,7 +503,6 @@ public:
 
         m_OctreeOverlayEntity = entt::null;
         m_OctreeOverlaySourceEntity = entt::null;
-        m_OctreeOverlaySource = nullptr;
         m_CachedOctreeOverlayWorld = glm::mat4(1.0f);
         m_CachedOctreeOverlaySettings = {};
         m_CachedOctreeOverlayLocalAABB = {};
@@ -649,7 +636,6 @@ public:
             GetScene().GetRegistry().valid(m_OctreeOverlayEntity) &&
             m_OctreeOverlayGeometry.IsValid() &&
             (m_OctreeOverlaySourceEntity == selected) &&
-            (m_OctreeOverlaySource == &collision) &&
             OctreeSettingsEqual(m_CachedOctreeOverlaySettings, settings) &&
             MatricesNearlyEqual(m_CachedOctreeOverlayWorld, worldMatrix) &&
             m_HasCachedOctreeOverlayAabb &&
@@ -787,7 +773,6 @@ public:
 
         m_OctreeOverlayGeometry = newGeometry;
         m_OctreeOverlaySourceEntity = selected;
-        m_OctreeOverlaySource = &collision;
         m_CachedOctreeOverlaySettings = settings;
         m_CachedOctreeOverlayWorld = worldMatrix;
         m_CachedOctreeOverlayLocalAABB = collision.LocalAABB;
@@ -851,14 +836,12 @@ public:
         {
             ReleaseRetainedLineOverlay(m_KDTreeOverlay);
             m_KDTreeOverlaySourceEntity = entt::null;
-            m_KDTreeOverlaySource = nullptr;
             return false;
         }
 
         const glm::mat4 worldMatrix = GetMatrix(xf);
         const bool cacheValid =
             (m_KDTreeOverlaySourceEntity == selected) &&
-            (m_KDTreeOverlaySource == &collision) &&
             m_KDTreeOverlay.Geometry.IsValid() &&
             m_CachedKDTreeOverlaySettings.Overlay == m_KDTreeDebugSettings.Overlay &&
             m_CachedKDTreeOverlaySettings.LeafOnly == m_KDTreeDebugSettings.LeafOnly &&
@@ -886,7 +869,6 @@ public:
             return false;
 
         m_KDTreeOverlaySourceEntity = selected;
-        m_KDTreeOverlaySource = &collision;
         m_CachedKDTreeOverlaySettings = settings;
         m_CachedKDTreeOverlayWorld = worldMatrix;
         return true;
@@ -899,7 +881,6 @@ public:
         const glm::mat4 worldMatrix = GetMatrix(xf);
         const bool cacheValid =
             (m_BVHOverlaySourceEntity == selected) &&
-            (m_BVHOverlaySource == &collision) &&
             m_BVHOverlay.Geometry.IsValid() &&
             m_CachedBVHOverlaySettings.Overlay == m_BVHDebugSettings.Overlay &&
             m_CachedBVHOverlaySettings.LeafOnly == m_BVHDebugSettings.LeafOnly &&
@@ -927,7 +908,6 @@ public:
             return false;
 
         m_BVHOverlaySourceEntity = selected;
-        m_BVHOverlaySource = &collision;
         m_CachedBVHOverlaySettings = settings;
         m_CachedBVHOverlayWorld = worldMatrix;
         m_CachedBVHOverlayPositionCount = collision.Positions.size();
@@ -943,14 +923,12 @@ public:
         {
             ReleaseRetainedLineOverlay(m_ConvexHullOverlay);
             m_ConvexHullOverlaySourceEntity = entt::null;
-            m_ConvexHullOverlaySource = nullptr;
             return false;
         }
 
         const glm::mat4 worldMatrix = GetMatrix(xf);
         const bool cacheValid =
             (m_ConvexHullOverlaySourceEntity == selected) &&
-            (m_ConvexHullOverlaySource == &collision) &&
             m_ConvexHullOverlay.Geometry.IsValid() &&
             m_CachedConvexHullOverlaySettings.Overlay == m_ConvexHullDebugSettings.Overlay &&
             std::abs(m_CachedConvexHullOverlaySettings.Alpha - m_ConvexHullDebugSettings.Alpha) <= 1e-4f &&
@@ -971,7 +949,6 @@ public:
             return false;
 
         m_ConvexHullOverlaySourceEntity = selected;
-        m_ConvexHullOverlaySource = &collision;
         m_CachedConvexHullOverlaySettings = settings;
         m_CachedConvexHullOverlayWorld = worldMatrix;
         return true;

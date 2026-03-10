@@ -190,12 +190,6 @@ Identified via full codebase sweep (March 2026). Grouped by priority.
 
 - [ ] Replace raw `new`/`delete` of `ArenaLifetimeToken` in `Core.Memory.cpp` (lines 48, 84, 92, 110) with `std::unique_ptr`. Note: the current design intentionally leaks tokens in move operations for debug safety — `unique_ptr` would require `.release()` at every move site with no net improvement. Consider a custom deleter or accept the current pattern.
 
-### D4. Sandbox App Robustness (Medium)
-
-- [ ] Replace dangling raw pointers to `GeometryCollisionData` in `main.cpp` (lines 198, 217, 225, 243, 248, 251) with `entt::entity` handles validated via `registry.try_get<>()` before use.
-- [ ] Add bounds check to fixed-size octree traversal stack in `main.cpp` line 697 (currently `std::array<StackItem, 512>` with no overflow guard).
-- [ ] Move `static char[]` ImGui buffers in `Runtime.EditorUI.cpp` (lines 39, 203, 241, 269) to a persistent state struct to avoid stale state across panel hide/show cycles.
-
 ### D7. Test Coverage Gaps (Low)
 
 - [ ] Expand `Test_Boolean.cpp` (currently 3 tests / 64 lines): add `Operation::Difference` tests, degenerate input tests (coplanar faces, coincident vertices, inverted winding), and edge-contact tests.
