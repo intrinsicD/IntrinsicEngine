@@ -62,12 +62,6 @@ These are not required to finish the first wave, but they should begin soon afte
 
 - [ ] Add tests for `CanonicalResources` registration and recipe-driven allocation.
 
-### B7. Application Event Bus (`entt::dispatcher`) — Remaining
-
-Core infrastructure is in place (`ECS::Scene` dispatcher, `ECS::Events` module, drain point in `Engine::Run()`, `SelectionChanged`/`HoverChanged` events from `ApplySelection`/`ApplyHover`, contract tests). `EntitySpawned` fires from `SceneManager::SpawnModel()`. `GeometryModified` fires from `ApplyGeometryOperator()`. Sandbox panels use a `SelectionChanged` sink instead of per-frame polling. Remaining work:
-
-- [ ] Fire `GpuPickCompleted` from readback completion, replace polling in `SelectionModule`.
-
 ---
 
 ## 3. Later (P2) — Planned Downstream Work

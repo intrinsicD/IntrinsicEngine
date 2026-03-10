@@ -994,6 +994,10 @@ public:
                 cached = evt.Entity;
             }>(m_CachedSelectedEntity);
 
+        // Connect SelectionModule to the scene dispatcher so GPU pick results
+        // arrive via GpuPickCompleted event instead of per-frame polling.
+        GetSelection().ConnectToScene(GetScene());
+
         auto textureLoader = [this, &gfx](const std::filesystem::path& path, Core::Assets::AssetHandle handle)
             -> std::shared_ptr<RHI::Texture>
         {
