@@ -190,12 +190,6 @@ Identified via full codebase sweep (March 2026). Grouped by priority.
 
 - [ ] Replace raw `new`/`delete` of `ArenaLifetimeToken` in `Core.Memory.cpp` (lines 48, 84, 92, 110) with `std::unique_ptr`. Note: the current design intentionally leaks tokens in move operations for debug safety — `unique_ptr` would require `.release()` at every move site with no net improvement. Consider a custom deleter or accept the current pattern.
 
-### D7. Test Coverage Gaps (Low)
-
-- [ ] Expand `Test_Boolean.cpp` (currently 3 tests / 64 lines): add `Operation::Difference` tests, degenerate input tests (coplanar faces, coincident vertices, inverted winding), and edge-contact tests.
-- [ ] Add `AxisRotator` system unit tests (rotation correctness, dirty tag emission).
-- [ ] Improve `Test_EditorUI.cpp` beyond symbolic function-pointer check — add at least panel registration and state validation tests.
-
 ### D9. Sandbox Architecture (Opportunistic)
 
 - [ ] Extract debug visualization subsystems (Octree, KDTree, BVH, ConvexHull, Bounds, Contacts) from `SandboxApp` god object (~80 members, 2700+ lines) into dedicated classes.

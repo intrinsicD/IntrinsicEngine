@@ -249,6 +249,136 @@ TEST(FrameGraphSystems, FullPipeline_CorrectLayerStructure)
 }
 
 // =========================================================================
+// AxisRotator: Direct OnUpdate unit tests
+// =========================================================================
+
+TEST(AxisRotator, RotationAngleIsCorrect)
+{
+    // After dt = 1.0s at 45 deg/s around Y, the rotation should be 45 degrees.
+    entt::registry registry;
+    auto e = registry.create();
+    registry.emplace<ECS::Components::Transform::Component>(e);
+    registry.emplace<ECS::Components::AxisRotator::Component>(e,
+        ECS::Components::AxisRotator::Component::Y());
+
+    ECS::Systems::AxisRotator::OnUpdate(registry, 1.0f);
+
+    const auto& t = registry.get<ECS::Components::Transform::Component>(e);
+    // Expected: angleAxis(radians(45), Y) applied to identity quaternion.
+    const glm::quat expected = glm::angleAxis(glm::radians(45.0f), glm::vec3{0.0f, 1.0f, 0.0f});
+    EXPECT_NEAR(t.Rotation.x, expected.x, 1e-5f);
+    EXPECT_NEAR(t.Rotation.y, expected.y, 1e-5f);
+    EXPECT_NEAR(t.Rotation.z, expected.z, 1e-5f);
+    EXPECT_NEAR(t.Rotation.w, expected.w, 1e-5f);
+}
+
+TEST(AxisRotator, DirtyTagIsEmitted)
+{
+    entt::registry registry;
+    auto e = registry.create();
+    registry.emplace<ECS::Components::Transform::Component>(e);
+    registry.emplace<ECS::Components::AxisRotator::Component>(e,
+        ECS::Components::AxisRotator::Component::Y());
+
+    EXPECT_FALSE(registry.all_of<ECS::Components::Transform::IsDirtyTag>(e));
+
+    ECS::Systems::AxisRotator::OnUpdate(registry, 1.0f / 60.0f);
+
+    EXPECT_TRUE(registry.all_of<ECS::Components::Transform::IsDirtyTag>(e));
+}
+
+TEST(AxisRotator, ZeroSpeedProducesNoRotation)
+{
+    entt::registry registry;
+    auto e = registry.create();
+    registry.emplace<ECS::Components::Transform::Component>(e);
+
+    ECS::Components::AxisRotator::Component rotator;
+    rotator.Speed = 0.0f;
+    rotator.axis = {0.0f, 1.0f, 0.0f};
+    registry.emplace<ECS::Components::AxisRotator::Component>(e, rotator);
+
+    const auto origRot = registry.get<ECS::Components::Transform::Component>(e).Rotation;
+
+    ECS::Systems::AxisRotator::OnUpdate(registry, 1.0f);
+
+    const auto& t = registry.get<ECS::Components::Transform::Component>(e);
+    // With zero speed, the delta quaternion is identity — rotation unchanged.
+    EXPECT_NEAR(t.Rotation.x, origRot.x, 1e-6f);
+    EXPECT_NEAR(t.Rotation.y, origRot.y, 1e-6f);
+    EXPECT_NEAR(t.Rotation.z, origRot.z, 1e-6f);
+    EXPECT_NEAR(t.Rotation.w, origRot.w, 1e-6f);
+}
+
+TEST(AxisRotator, MultipleEntitiesRotateIndependently)
+{
+    entt::registry registry;
+
+    auto eX = registry.create();
+    registry.emplace<ECS::Components::Transform::Component>(eX);
+    registry.emplace<ECS::Components::AxisRotator::Component>(eX,
+        ECS::Components::AxisRotator::Component::X());
+
+    auto eZ = registry.create();
+    registry.emplace<ECS::Components::Transform::Component>(eZ);
+    registry.emplace<ECS::Components::AxisRotator::Component>(eZ,
+        ECS::Components::AxisRotator::Component::Z());
+
+    ECS::Systems::AxisRotator::OnUpdate(registry, 1.0f);
+
+    const auto& tX = registry.get<ECS::Components::Transform::Component>(eX);
+    const auto& tZ = registry.get<ECS::Components::Transform::Component>(eZ);
+
+    // Each should have rotated around its own axis.
+    const glm::quat expectedX = glm::angleAxis(glm::radians(45.0f), glm::vec3{1.0f, 0.0f, 0.0f});
+    const glm::quat expectedZ = glm::angleAxis(glm::radians(45.0f), glm::vec3{0.0f, 0.0f, 1.0f});
+
+    EXPECT_NEAR(tX.Rotation.x, expectedX.x, 1e-5f);
+    EXPECT_NEAR(tX.Rotation.y, expectedX.y, 1e-5f);
+    EXPECT_NEAR(tX.Rotation.z, expectedX.z, 1e-5f);
+    EXPECT_NEAR(tX.Rotation.w, expectedX.w, 1e-5f);
+
+    EXPECT_NEAR(tZ.Rotation.x, expectedZ.x, 1e-5f);
+    EXPECT_NEAR(tZ.Rotation.y, expectedZ.y, 1e-5f);
+    EXPECT_NEAR(tZ.Rotation.z, expectedZ.z, 1e-5f);
+    EXPECT_NEAR(tZ.Rotation.w, expectedZ.w, 1e-5f);
+}
+
+TEST(AxisRotator, AccumulatesOverMultipleUpdates)
+{
+    entt::registry registry;
+    auto e = registry.create();
+    registry.emplace<ECS::Components::Transform::Component>(e);
+    registry.emplace<ECS::Components::AxisRotator::Component>(e,
+        ECS::Components::AxisRotator::Component::Y());
+
+    // Two updates of 0.5s at 45 deg/s = two 22.5-degree increments = 45 degrees total.
+    ECS::Systems::AxisRotator::OnUpdate(registry, 0.5f);
+    ECS::Systems::AxisRotator::OnUpdate(registry, 0.5f);
+
+    const auto& t = registry.get<ECS::Components::Transform::Component>(e);
+    const glm::quat expected = glm::angleAxis(glm::radians(45.0f), glm::vec3{0.0f, 1.0f, 0.0f});
+
+    EXPECT_NEAR(t.Rotation.x, expected.x, 1e-4f);
+    EXPECT_NEAR(t.Rotation.y, expected.y, 1e-4f);
+    EXPECT_NEAR(t.Rotation.z, expected.z, 1e-4f);
+    EXPECT_NEAR(t.Rotation.w, expected.w, 1e-4f);
+}
+
+TEST(AxisRotator, EntityWithoutTransform_IsSkipped)
+{
+    // AxisRotator queries for entities with both Transform::Component and
+    // AxisRotator::Component. An entity with only the rotator should be skipped.
+    entt::registry registry;
+    auto e = registry.create();
+    registry.emplace<ECS::Components::AxisRotator::Component>(e,
+        ECS::Components::AxisRotator::Component::Y());
+
+    // Should not crash — the view simply yields no matches.
+    ECS::Systems::AxisRotator::OnUpdate(registry, 1.0f);
+}
+
+// =========================================================================
 // Test: Multi-frame reset and re-registration
 // =========================================================================
 TEST(FrameGraphSystems, MultiFrame_ResetAndReRegister)
