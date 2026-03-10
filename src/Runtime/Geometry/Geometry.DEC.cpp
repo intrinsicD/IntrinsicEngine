@@ -202,6 +202,8 @@ namespace Geometry::DEC
 
             HalfedgeHandle hStart = mesh.Halfedge(fh);
             HalfedgeHandle h = hStart;
+            std::size_t safety = 0;
+            const std::size_t maxIter = mesh.HalfedgesSize();
             do
             {
                 std::size_t eIdx = h.Index >> 1u;
@@ -210,6 +212,7 @@ namespace Geometry::DEC
 
                 entries.push_back({eIdx, sign});
                 h = mesh.NextHalfedge(h);
+                if (++safety > maxIter) break;
             } while (h != hStart);
 
             // Sort by column index for CSR consistency
@@ -479,10 +482,13 @@ namespace Geometry::DEC
             rowNnz[vi] = 1;  // diagonal
             HalfedgeHandle hStart = mesh.Halfedge(vh);
             HalfedgeHandle h = hStart;
+            std::size_t safety = 0;
+            const std::size_t maxIter = mesh.HalfedgesSize();
             do
             {
                 rowNnz[vi] += 1;
                 h = mesh.CWRotatedHalfedge(h);
+                if (++safety > maxIter) break;
             } while (h != hStart);
         }
 
@@ -525,6 +531,7 @@ namespace Geometry::DEC
 
             HalfedgeHandle hStart = mesh.Halfedge(vh);
             HalfedgeHandle h = hStart;
+            std::size_t safety2 = 0;
             do
             {
                 EdgeHandle e = mesh.Edge(h);
@@ -536,6 +543,7 @@ namespace Geometry::DEC
                 diagSum += w;
 
                 h = mesh.CWRotatedHalfedge(h);
+                if (++safety2 > mesh.HalfedgesSize()) break;
             } while (h != hStart);
 
             // Add diagonal

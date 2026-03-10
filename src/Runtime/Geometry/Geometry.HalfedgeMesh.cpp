@@ -239,10 +239,13 @@ namespace Geometry::Halfedge
         const HalfedgeHandle start = h;
         if (h.IsValid())
         {
+            std::size_t safety = 0;
+            const std::size_t maxIter = HalfedgesSize();
             do
             {
                 if (IsBoundary(h)) ++gaps;
                 h = CWRotatedHalfedge(h);
+                if (++safety > maxIter) break;
             } while (h != start);
         }
         return gaps < 2;
@@ -263,10 +266,13 @@ namespace Geometry::Halfedge
     {
         HalfedgeHandle h = Halfedge(f);
         const HalfedgeHandle start = h;
+        std::size_t safety = 0;
+        const std::size_t maxIter = HalfedgesSize();
         do
         {
             if (IsBoundary(OppositeHalfedge(h))) return true;
             h = NextHalfedge(h);
+            if (++safety > maxIter) break;
         } while (h != start);
         return false;
     }
@@ -528,10 +534,12 @@ namespace Geometry::Halfedge
         const HalfedgeHandle start = h;
         if (h.IsValid())
         {
+            const std::size_t maxIter = HalfedgesSize();
             do
             {
                 ++count;
                 h = NextHalfedge(h);
+                if (count > maxIter) break;
             } while (h != start);
         }
         return count;
@@ -549,11 +557,14 @@ namespace Geometry::Halfedge
         const HalfedgeHandle start = h;
         if (h.IsValid())
         {
+            std::size_t safety = 0;
+            const std::size_t maxIter = HalfedgesSize();
             do
             {
                 const FaceHandle f = Face(h);
                 if (f.IsValid()) incident.push_back(f);
                 h = CWRotatedHalfedge(h);
+                if (++safety > maxIter) break;
             } while (h != start);
         }
 
@@ -593,6 +604,8 @@ namespace Geometry::Halfedge
 
         HalfedgeHandle h = Halfedge(f);
         const HalfedgeHandle start = h;
+        std::size_t safety = 0;
+        const std::size_t maxIter = HalfedgesSize();
         do
         {
             SetFace(h, {});
@@ -604,6 +617,7 @@ namespace Geometry::Halfedge
 
             verts.push_back(ToVertex(h));
             h = NextHalfedge(h);
+            if (++safety > maxIter) break;
         } while (h != start);
 
         if (!deleted_edges.empty())

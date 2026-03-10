@@ -56,11 +56,14 @@ namespace Geometry::Smoothing
 
             HalfedgeHandle h = mesh.Halfedge(vh);
             HalfedgeHandle start = h;
+            std::size_t safety = 0;
+            const std::size_t maxIter = mesh.HalfedgesSize();
             do
             {
                 centroid += glm::dvec3(mesh.Position(mesh.ToVertex(h)));
                 ++count;
                 h = mesh.CWRotatedHalfedge(h);
+                if (++safety > maxIter) break;
             } while (h != start);
 
             if (count == 0) continue;
