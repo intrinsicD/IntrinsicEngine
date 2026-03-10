@@ -192,6 +192,5 @@ Identified via full codebase sweep (March 2026). Grouped by priority.
 
 ### D9. Sandbox Architecture (Opportunistic)
 
-- [ ] Extract debug visualization subsystems (Octree, KDTree, BVH, ConvexHull, Bounds, Contacts) from `SandboxApp` god object (~80 members, 2700+ lines) into dedicated classes.
 - [ ] Replace boolean debug-visualization flags with ECS presence/absence pattern per CLAUDE.md convention.
-- [ ] Replace hardcoded buffer sizes (512, 128, 256) with named constants documenting their rationale.
+- [ ] Extract remaining subsystems (geometry workflow UI state, inspector component panels) into dedicated classes to complete the god-object decomposition.
