@@ -565,3 +565,551 @@ TEST(DefaultPipeline, DebugStateReportsFeatureAvailability)
     EXPECT_FALSE(debug.SelectionOutlinePass.Exists);
     EXPECT_FALSE(debug.PostProcessPass.Exists);
 }
+
+// =========================================================================
+// B5 — PostProcessPass Contract Tests
+// =========================================================================
+
+TEST(PostProcess, DebugStateNoPipelinesBuiltBeforeInitialize)
+{
+    Graphics::Passes::PostProcessPass pass;
+    const auto& debug = pass.GetDebugState();
+
+    EXPECT_FALSE(debug.ShaderRegistryConfigured);
+    EXPECT_FALSE(debug.ToneMapPipelineBuilt);
+    EXPECT_FALSE(debug.FXAAPipelineBuilt);
+    EXPECT_FALSE(debug.SMAAEdgePipelineBuilt);
+    EXPECT_FALSE(debug.SMAABlendPipelineBuilt);
+    EXPECT_FALSE(debug.SMAAResolvePipelineBuilt);
+    EXPECT_FALSE(debug.BloomDownPipelineBuilt);
+    EXPECT_FALSE(debug.BloomUpPipelineBuilt);
+    EXPECT_FALSE(debug.HistogramPipelineBuilt);
+    EXPECT_FALSE(debug.DummySampledAllocated);
+}
+
+TEST(PostProcess, DebugStateResourceHandlesInvalidBeforeRender)
+{
+    Graphics::Passes::PostProcessPass pass;
+    const auto& debug = pass.GetDebugState();
+
+    EXPECT_FALSE(debug.LastSceneColorHandleValid);
+    EXPECT_FALSE(debug.LastPostLdrHandleValid);
+    EXPECT_FALSE(debug.LastBloomMip0HandleValid);
+    EXPECT_FALSE(debug.LastSMAAEdgesHandleValid);
+    EXPECT_FALSE(debug.LastSMAAWeightsHandleValid);
+    EXPECT_EQ(debug.LastOutputFormat, VK_FORMAT_UNDEFINED);
+    EXPECT_EQ(debug.LastResolutionWidth, 0u);
+    EXPECT_EQ(debug.LastResolutionHeight, 0u);
+}
+
+TEST(PostProcess, SettingsDefaultsAreSane)
+{
+    Graphics::Passes::PostProcessSettings settings;
+
+    // Tone mapping defaults
+    EXPECT_GT(settings.Exposure, 0.0f);
+    EXPECT_EQ(settings.ToneOperator, Graphics::Passes::ToneMapOperator::ACES);
+
+    // Color grading neutral defaults
+    EXPECT_FALSE(settings.ColorGradingEnabled);
+    EXPECT_FLOAT_EQ(settings.Saturation, 1.0f);
+    EXPECT_FLOAT_EQ(settings.Contrast, 1.0f);
+    EXPECT_FLOAT_EQ(settings.LiftR, 0.0f);
+    EXPECT_FLOAT_EQ(settings.LiftG, 0.0f);
+    EXPECT_FLOAT_EQ(settings.LiftB, 0.0f);
+    EXPECT_FLOAT_EQ(settings.GammaR, 1.0f);
+    EXPECT_FLOAT_EQ(settings.GammaG, 1.0f);
+    EXPECT_FLOAT_EQ(settings.GammaB, 1.0f);
+    EXPECT_FLOAT_EQ(settings.GainR, 1.0f);
+    EXPECT_FLOAT_EQ(settings.GainG, 1.0f);
+    EXPECT_FLOAT_EQ(settings.GainB, 1.0f);
+    EXPECT_FLOAT_EQ(settings.ColorTempOffset, 0.0f);
+    EXPECT_FLOAT_EQ(settings.TintOffset, 0.0f);
+
+    // Bloom defaults
+    EXPECT_TRUE(settings.BloomEnabled);
+    EXPECT_GT(settings.BloomThreshold, 0.0f);
+    EXPECT_GT(settings.BloomIntensity, 0.0f);
+    EXPECT_GT(settings.BloomFilterRadius, 0.0f);
+
+    // AA defaults: SMAA is the default
+    EXPECT_EQ(settings.AntiAliasingMode, Graphics::Passes::AAMode::SMAA);
+    EXPECT_TRUE(settings.SMAAEnabled());
+    EXPECT_FALSE(settings.FXAAEnabled());
+
+    // SMAA settings are positive
+    EXPECT_GT(settings.SMAAEdgeThreshold, 0.0f);
+    EXPECT_GT(settings.SMAAMaxSearchSteps, 0);
+    EXPECT_GT(settings.SMAAMaxSearchStepsDiag, 0);
+
+    // Histogram off by default
+    EXPECT_FALSE(settings.HistogramEnabled);
+    EXPECT_LT(settings.HistogramMinEV, settings.HistogramMaxEV);
+}
+
+TEST(PostProcess, AAModeAccessorsAreConsistent)
+{
+    Graphics::Passes::PostProcessSettings settings;
+
+    settings.AntiAliasingMode = Graphics::Passes::AAMode::None;
+    EXPECT_FALSE(settings.FXAAEnabled());
+    EXPECT_FALSE(settings.SMAAEnabled());
+
+    settings.AntiAliasingMode = Graphics::Passes::AAMode::FXAA;
+    EXPECT_TRUE(settings.FXAAEnabled());
+    EXPECT_FALSE(settings.SMAAEnabled());
+
+    settings.AntiAliasingMode = Graphics::Passes::AAMode::SMAA;
+    EXPECT_FALSE(settings.FXAAEnabled());
+    EXPECT_TRUE(settings.SMAAEnabled());
+}
+
+TEST(PostProcess, BloomMipCountConstant)
+{
+    EXPECT_GE(Graphics::Passes::kBloomMipCount, 3u);
+    EXPECT_LE(Graphics::Passes::kBloomMipCount, 8u);
+    EXPECT_EQ(Graphics::Passes::kPostProcessDebugBloomMipCount, Graphics::Passes::kBloomMipCount);
+}
+
+TEST(PostProcess, HistogramReadbackDefaultsToInvalid)
+{
+    Graphics::Passes::HistogramReadback readback;
+
+    EXPECT_FALSE(readback.Valid);
+    EXPECT_FLOAT_EQ(readback.AverageLuminance, 0.0f);
+
+    // All bins should be zero by default.
+    for (uint32_t i = 0; i < Graphics::Passes::kHistogramBinCount; ++i)
+        EXPECT_EQ(readback.Bins[i], 0u);
+}
+
+// =========================================================================
+// B6 — FrameRecipe Combination Tests
+// =========================================================================
+
+TEST(RenderResources, MinimalRecipe_NoPasses_EmptyRecipe)
+{
+    using namespace Graphics;
+
+    DefaultPipelineRecipeInputs inputs{};
+    inputs.PickingPassEnabled = false;
+    inputs.SurfacePassEnabled = false;
+    inputs.LinePassEnabled = false;
+    inputs.PointPassEnabled = false;
+    inputs.PostProcessPassEnabled = false;
+    inputs.SelectionOutlinePassEnabled = false;
+    inputs.DebugViewPassEnabled = false;
+    inputs.ImGuiPassEnabled = false;
+
+    const FrameRecipe recipe = BuildDefaultPipelineRecipe(inputs);
+
+    EXPECT_FALSE(recipe.Depth);
+    EXPECT_FALSE(recipe.EntityId);
+    EXPECT_FALSE(recipe.PrimitiveId);
+    EXPECT_FALSE(recipe.Normals);
+    EXPECT_FALSE(recipe.MaterialChannels);
+    EXPECT_FALSE(recipe.Selection);
+    EXPECT_FALSE(recipe.Post);
+    EXPECT_FALSE(recipe.DebugVisualization);
+    EXPECT_FALSE(recipe.SceneColorLDR);
+    EXPECT_EQ(recipe.LightingPath, FrameLightingPath::None);
+
+    // No resources should be required.
+    for (auto r : {RenderResource::SceneDepth, RenderResource::EntityId,
+                   RenderResource::PrimitiveId, RenderResource::SceneNormal,
+                   RenderResource::Albedo, RenderResource::Material0,
+                   RenderResource::SceneColorHDR, RenderResource::SceneColorLDR,
+                   RenderResource::SelectionMask, RenderResource::SelectionOutline})
+    {
+        EXPECT_FALSE(recipe.Requires(r)) << "Resource should not be required in empty recipe";
+    }
+}
+
+TEST(RenderResources, GeometryOnlyRecipe_ImpliesDepthAndForwardPath)
+{
+    using namespace Graphics;
+
+    DefaultPipelineRecipeInputs inputs{};
+    inputs.SurfacePassEnabled = true;
+    inputs.LinePassEnabled = false;
+    inputs.PointPassEnabled = false;
+    inputs.PickingPassEnabled = false;
+    inputs.PostProcessPassEnabled = false;
+    inputs.SelectionOutlinePassEnabled = false;
+    inputs.DebugViewPassEnabled = false;
+    inputs.ImGuiPassEnabled = false;
+
+    const FrameRecipe recipe = BuildDefaultPipelineRecipe(inputs);
+
+    EXPECT_TRUE(recipe.Depth);
+    EXPECT_EQ(recipe.LightingPath, FrameLightingPath::Forward);
+    EXPECT_TRUE(recipe.Requires(RenderResource::SceneDepth));
+    EXPECT_TRUE(recipe.Requires(RenderResource::SceneColorHDR));
+    EXPECT_FALSE(recipe.EntityId);
+    EXPECT_FALSE(recipe.Post);
+    EXPECT_FALSE(recipe.SceneColorLDR);
+}
+
+TEST(RenderResources, PickingOnlyRecipe_ImpliesDepthAndEntityId)
+{
+    using namespace Graphics;
+
+    DefaultPipelineRecipeInputs inputs{};
+    inputs.PickingPassEnabled = true;
+    inputs.SurfacePassEnabled = false;
+    inputs.LinePassEnabled = false;
+    inputs.PointPassEnabled = false;
+    inputs.PostProcessPassEnabled = false;
+    inputs.SelectionOutlinePassEnabled = false;
+    inputs.DebugViewPassEnabled = false;
+    inputs.ImGuiPassEnabled = false;
+
+    const FrameRecipe recipe = BuildDefaultPipelineRecipe(inputs);
+
+    EXPECT_TRUE(recipe.Depth);
+    EXPECT_TRUE(recipe.EntityId);
+    EXPECT_TRUE(recipe.Requires(RenderResource::SceneDepth));
+    EXPECT_TRUE(recipe.Requires(RenderResource::EntityId));
+    // No geometry → no lighting path
+    EXPECT_EQ(recipe.LightingPath, FrameLightingPath::None);
+    EXPECT_FALSE(recipe.Requires(RenderResource::SceneColorHDR));
+}
+
+TEST(RenderResources, PostOnlyRecipe_ImpliesLDR)
+{
+    using namespace Graphics;
+
+    DefaultPipelineRecipeInputs inputs{};
+    inputs.PickingPassEnabled = false;
+    inputs.SurfacePassEnabled = false;
+    inputs.LinePassEnabled = false;
+    inputs.PointPassEnabled = false;
+    inputs.PostProcessPassEnabled = true;
+    inputs.SelectionOutlinePassEnabled = false;
+    inputs.DebugViewPassEnabled = false;
+    inputs.ImGuiPassEnabled = false;
+
+    const FrameRecipe recipe = BuildDefaultPipelineRecipe(inputs);
+
+    EXPECT_TRUE(recipe.Post);
+    EXPECT_TRUE(recipe.SceneColorLDR);
+    EXPECT_TRUE(recipe.Requires(RenderResource::SceneColorLDR));
+    // Post alone needs HDR input
+    EXPECT_TRUE(recipe.Requires(RenderResource::SceneColorHDR));
+    // No geometry passes → no depth/entityid unless picking enabled
+    EXPECT_FALSE(recipe.Depth);
+}
+
+TEST(RenderResources, SelectionOutlineWithoutSelectionWork_DoesNotEnableSelection)
+{
+    using namespace Graphics;
+
+    DefaultPipelineRecipeInputs inputs{};
+    inputs.SurfacePassEnabled = true;
+    inputs.SelectionOutlinePassEnabled = true;
+    inputs.HasSelectionWork = false;
+    inputs.PickingPassEnabled = false;
+    inputs.PostProcessPassEnabled = false;
+    inputs.DebugViewPassEnabled = false;
+    inputs.ImGuiPassEnabled = false;
+
+    const FrameRecipe recipe = BuildDefaultPipelineRecipe(inputs);
+
+    EXPECT_FALSE(recipe.Selection);
+    // EntityId should not be required just because outline pass is enabled
+    // (only when there's actual selection work).
+    EXPECT_FALSE(recipe.EntityId);
+}
+
+TEST(RenderResources, SelectionOutlineWithSelectionWork_EnablesEntityIdAndLDR)
+{
+    using namespace Graphics;
+
+    DefaultPipelineRecipeInputs inputs{};
+    inputs.SurfacePassEnabled = true;
+    inputs.SelectionOutlinePassEnabled = true;
+    inputs.HasSelectionWork = true;
+    inputs.PickingPassEnabled = false;
+    inputs.PostProcessPassEnabled = false;
+    inputs.DebugViewPassEnabled = false;
+    inputs.ImGuiPassEnabled = false;
+
+    const FrameRecipe recipe = BuildDefaultPipelineRecipe(inputs);
+
+    EXPECT_TRUE(recipe.Selection);
+    EXPECT_TRUE(recipe.EntityId);
+    EXPECT_TRUE(recipe.SceneColorLDR);
+    EXPECT_TRUE(recipe.Requires(RenderResource::EntityId));
+    EXPECT_TRUE(recipe.Requires(RenderResource::SceneColorLDR));
+}
+
+TEST(RenderResources, DebugViewEachResourceType_SetsCorrectRecipeFlags)
+{
+    using namespace Graphics;
+
+    // Debug view requesting SceneDepth → Depth flag
+    {
+        DefaultPipelineRecipeInputs inputs{};
+        inputs.SurfacePassEnabled = false;
+        inputs.PickingPassEnabled = false;
+        inputs.PostProcessPassEnabled = false;
+        inputs.SelectionOutlinePassEnabled = false;
+        inputs.ImGuiPassEnabled = false;
+        inputs.DebugViewPassEnabled = true;
+        inputs.DebugViewEnabled = true;
+        inputs.DebugResource = GetRenderResourceName(RenderResource::SceneDepth);
+
+        const FrameRecipe recipe = BuildDefaultPipelineRecipe(inputs);
+        EXPECT_TRUE(recipe.DebugVisualization);
+        EXPECT_TRUE(recipe.Depth);
+        EXPECT_TRUE(recipe.SceneColorLDR);
+    }
+
+    // Debug view requesting PrimitiveId → PrimitiveId flag
+    {
+        DefaultPipelineRecipeInputs inputs{};
+        inputs.SurfacePassEnabled = false;
+        inputs.PickingPassEnabled = false;
+        inputs.PostProcessPassEnabled = false;
+        inputs.SelectionOutlinePassEnabled = false;
+        inputs.ImGuiPassEnabled = false;
+        inputs.DebugViewPassEnabled = true;
+        inputs.DebugViewEnabled = true;
+        inputs.DebugResource = GetRenderResourceName(RenderResource::PrimitiveId);
+
+        const FrameRecipe recipe = BuildDefaultPipelineRecipe(inputs);
+        EXPECT_TRUE(recipe.PrimitiveId);
+    }
+
+    // Debug view requesting SceneNormal → Normals flag
+    {
+        DefaultPipelineRecipeInputs inputs{};
+        inputs.SurfacePassEnabled = false;
+        inputs.PickingPassEnabled = false;
+        inputs.PostProcessPassEnabled = false;
+        inputs.SelectionOutlinePassEnabled = false;
+        inputs.ImGuiPassEnabled = false;
+        inputs.DebugViewPassEnabled = true;
+        inputs.DebugViewEnabled = true;
+        inputs.DebugResource = GetRenderResourceName(RenderResource::SceneNormal);
+
+        const FrameRecipe recipe = BuildDefaultPipelineRecipe(inputs);
+        EXPECT_TRUE(recipe.Normals);
+    }
+
+    // Debug view requesting Albedo → MaterialChannels flag
+    {
+        DefaultPipelineRecipeInputs inputs{};
+        inputs.SurfacePassEnabled = false;
+        inputs.PickingPassEnabled = false;
+        inputs.PostProcessPassEnabled = false;
+        inputs.SelectionOutlinePassEnabled = false;
+        inputs.ImGuiPassEnabled = false;
+        inputs.DebugViewPassEnabled = true;
+        inputs.DebugViewEnabled = true;
+        inputs.DebugResource = GetRenderResourceName(RenderResource::Albedo);
+
+        const FrameRecipe recipe = BuildDefaultPipelineRecipe(inputs);
+        EXPECT_TRUE(recipe.MaterialChannels);
+        EXPECT_TRUE(recipe.Requires(RenderResource::Albedo));
+        EXPECT_TRUE(recipe.Requires(RenderResource::Material0));
+    }
+
+    // Debug view requesting SceneColorHDR → forces Forward path
+    {
+        DefaultPipelineRecipeInputs inputs{};
+        inputs.SurfacePassEnabled = false;
+        inputs.PickingPassEnabled = false;
+        inputs.PostProcessPassEnabled = false;
+        inputs.SelectionOutlinePassEnabled = false;
+        inputs.ImGuiPassEnabled = false;
+        inputs.DebugViewPassEnabled = true;
+        inputs.DebugViewEnabled = true;
+        inputs.DebugResource = GetRenderResourceName(RenderResource::SceneColorHDR);
+
+        const FrameRecipe recipe = BuildDefaultPipelineRecipe(inputs);
+        EXPECT_EQ(recipe.LightingPath, FrameLightingPath::Forward);
+        EXPECT_TRUE(recipe.Requires(RenderResource::SceneColorHDR));
+    }
+
+    // Debug view requesting SelectionMask → Selection flag
+    {
+        DefaultPipelineRecipeInputs inputs{};
+        inputs.SurfacePassEnabled = false;
+        inputs.PickingPassEnabled = false;
+        inputs.PostProcessPassEnabled = false;
+        inputs.SelectionOutlinePassEnabled = false;
+        inputs.ImGuiPassEnabled = false;
+        inputs.DebugViewPassEnabled = true;
+        inputs.DebugViewEnabled = true;
+        inputs.DebugResource = GetRenderResourceName(RenderResource::SelectionMask);
+
+        const FrameRecipe recipe = BuildDefaultPipelineRecipe(inputs);
+        EXPECT_TRUE(recipe.Selection);
+    }
+}
+
+TEST(RenderResources, DebugViewDisabled_DoesNotSetDebugVisualization)
+{
+    using namespace Graphics;
+
+    DefaultPipelineRecipeInputs inputs{};
+    inputs.SurfacePassEnabled = false;
+    inputs.PickingPassEnabled = false;
+    inputs.PostProcessPassEnabled = false;
+    inputs.SelectionOutlinePassEnabled = false;
+    inputs.ImGuiPassEnabled = false;
+    inputs.DebugViewPassEnabled = true;
+    inputs.DebugViewEnabled = false; // Pass exists but debug mode not active
+
+    const FrameRecipe recipe = BuildDefaultPipelineRecipe(inputs);
+    EXPECT_FALSE(recipe.DebugVisualization);
+}
+
+TEST(RenderResources, LineAndPointPassesAlsoImplyGeometry)
+{
+    using namespace Graphics;
+
+    // LinePass alone implies geometry
+    {
+        DefaultPipelineRecipeInputs inputs{};
+        inputs.SurfacePassEnabled = false;
+        inputs.LinePassEnabled = true;
+        inputs.PointPassEnabled = false;
+        inputs.PickingPassEnabled = false;
+        inputs.PostProcessPassEnabled = false;
+        inputs.SelectionOutlinePassEnabled = false;
+        inputs.DebugViewPassEnabled = false;
+        inputs.ImGuiPassEnabled = false;
+
+        const FrameRecipe recipe = BuildDefaultPipelineRecipe(inputs);
+        EXPECT_TRUE(recipe.Depth);
+        EXPECT_EQ(recipe.LightingPath, FrameLightingPath::Forward);
+    }
+
+    // PointPass alone implies geometry
+    {
+        DefaultPipelineRecipeInputs inputs{};
+        inputs.SurfacePassEnabled = false;
+        inputs.LinePassEnabled = false;
+        inputs.PointPassEnabled = true;
+        inputs.PickingPassEnabled = false;
+        inputs.PostProcessPassEnabled = false;
+        inputs.SelectionOutlinePassEnabled = false;
+        inputs.DebugViewPassEnabled = false;
+        inputs.ImGuiPassEnabled = false;
+
+        const FrameRecipe recipe = BuildDefaultPipelineRecipe(inputs);
+        EXPECT_TRUE(recipe.Depth);
+        EXPECT_EQ(recipe.LightingPath, FrameLightingPath::Forward);
+    }
+}
+
+TEST(RenderResources, AllCanonicalResourceDefinitionsHaveUniqueNames)
+{
+    using namespace Graphics;
+
+    std::array<RenderResource, 10> allResources = {
+        RenderResource::SceneDepth,
+        RenderResource::EntityId,
+        RenderResource::PrimitiveId,
+        RenderResource::SceneNormal,
+        RenderResource::Albedo,
+        RenderResource::Material0,
+        RenderResource::SceneColorHDR,
+        RenderResource::SceneColorLDR,
+        RenderResource::SelectionMask,
+        RenderResource::SelectionOutline,
+    };
+
+    // All names must be unique (no collisions in the StringID space).
+    for (size_t i = 0; i < allResources.size(); ++i)
+    {
+        for (size_t j = i + 1; j < allResources.size(); ++j)
+        {
+            EXPECT_NE(GetRenderResourceName(allResources[i]),
+                       GetRenderResourceName(allResources[j]))
+                << "Canonical resources " << static_cast<int>(allResources[i])
+                << " and " << static_cast<int>(allResources[j])
+                << " have the same StringID name";
+        }
+    }
+
+    // Reverse lookup must succeed for all resources.
+    for (auto r : allResources)
+    {
+        const auto name = GetRenderResourceName(r);
+        const auto found = TryGetRenderResourceByName(name);
+        ASSERT_TRUE(found.has_value()) << "Reverse lookup failed for resource " << static_cast<int>(r);
+        EXPECT_EQ(*found, r);
+    }
+}
+
+TEST(RenderResources, CanonicalResourceFormats)
+{
+    using namespace Graphics;
+
+    // Verify fixed-format resources have non-UNDEFINED formats.
+    auto sceneHdr = GetRenderResourceDefinition(RenderResource::SceneColorHDR);
+    EXPECT_EQ(sceneHdr.FormatSource, RenderResourceFormatSource::Fixed);
+    EXPECT_NE(sceneHdr.FixedFormat, VK_FORMAT_UNDEFINED);
+
+    auto entityId = GetRenderResourceDefinition(RenderResource::EntityId);
+    EXPECT_EQ(entityId.FormatSource, RenderResourceFormatSource::Fixed);
+    EXPECT_EQ(entityId.FixedFormat, VK_FORMAT_R32_UINT);
+
+    // Verify swapchain-derived resources have Swapchain format source.
+    auto sceneLdr = GetRenderResourceDefinition(RenderResource::SceneColorLDR);
+    EXPECT_EQ(sceneLdr.FormatSource, RenderResourceFormatSource::Swapchain);
+    EXPECT_EQ(sceneLdr.FixedFormat, VK_FORMAT_UNDEFINED);
+
+    // Verify depth resource has Depth format source.
+    auto sceneDepth = GetRenderResourceDefinition(RenderResource::SceneDepth);
+    EXPECT_EQ(sceneDepth.FormatSource, RenderResourceFormatSource::Depth);
+
+    // ResolveRenderResourceFormat should use the correct source.
+    constexpr VkFormat kTestSwapchain = VK_FORMAT_B8G8R8A8_SRGB;
+    constexpr VkFormat kTestDepth = VK_FORMAT_D32_SFLOAT;
+
+    EXPECT_EQ(ResolveRenderResourceFormat(RenderResource::SceneColorLDR, kTestSwapchain, kTestDepth),
+              kTestSwapchain);
+    EXPECT_EQ(ResolveRenderResourceFormat(RenderResource::SceneDepth, kTestSwapchain, kTestDepth),
+              kTestDepth);
+    EXPECT_EQ(ResolveRenderResourceFormat(RenderResource::SceneColorHDR, kTestSwapchain, kTestDepth),
+              VK_FORMAT_R16G16B16A16_SFLOAT);
+}
+
+TEST(RenderResources, CanonicalResourceLifetimes)
+{
+    using namespace Graphics;
+
+    // Imported resources
+    EXPECT_EQ(GetRenderResourceDefinition(RenderResource::SceneDepth).Lifetime,
+              RenderResourceLifetime::Imported);
+
+    // Frame-transient resources
+    for (auto r : {RenderResource::EntityId, RenderResource::PrimitiveId,
+                   RenderResource::SceneNormal, RenderResource::Albedo,
+                   RenderResource::Material0, RenderResource::SceneColorHDR,
+                   RenderResource::SceneColorLDR, RenderResource::SelectionMask,
+                   RenderResource::SelectionOutline})
+    {
+        EXPECT_EQ(GetRenderResourceDefinition(r).Lifetime,
+                  RenderResourceLifetime::FrameTransient)
+            << "Resource " << static_cast<int>(r) << " should be FrameTransient";
+    }
+}
+
+TEST(RenderResources, NonOptionalResourcesAreIdentified)
+{
+    using namespace Graphics;
+
+    // SceneDepth and SceneColorHDR are non-optional.
+    EXPECT_FALSE(GetRenderResourceDefinition(RenderResource::SceneDepth).Optional);
+    EXPECT_FALSE(GetRenderResourceDefinition(RenderResource::SceneColorHDR).Optional);
+
+    // EntityId, PrimitiveId, etc. are optional.
+    EXPECT_TRUE(GetRenderResourceDefinition(RenderResource::EntityId).Optional);
+    EXPECT_TRUE(GetRenderResourceDefinition(RenderResource::PrimitiveId).Optional);
+    EXPECT_TRUE(GetRenderResourceDefinition(RenderResource::SceneNormal).Optional);
+}
