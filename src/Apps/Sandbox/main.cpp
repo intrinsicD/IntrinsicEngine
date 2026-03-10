@@ -42,7 +42,10 @@ using namespace Runtime;
 
 namespace
 {
-    struct HiddenEditorEntityTag {};
+    struct HiddenEditorEntityTag
+    {
+    };
+
     struct RetainedLineOverlaySlot
     {
         entt::entity Entity = entt::null;
@@ -75,14 +78,14 @@ namespace
                                            const Graphics::OctreeDebugDrawSettings& b)
     {
         return a.Enabled == b.Enabled &&
-               a.Overlay == b.Overlay &&
-               a.ColorByDepth == b.ColorByDepth &&
-               a.MaxDepth == b.MaxDepth &&
-               a.LeafOnly == b.LeafOnly &&
-               a.DrawInternal == b.DrawInternal &&
-               a.OccupiedOnly == b.OccupiedOnly &&
-               std::abs(a.Alpha - b.Alpha) <= 1e-4f &&
-               Vec3NearlyEqual(a.BaseColor, b.BaseColor);
+            a.Overlay == b.Overlay &&
+            a.ColorByDepth == b.ColorByDepth &&
+            a.MaxDepth == b.MaxDepth &&
+            a.LeafOnly == b.LeafOnly &&
+            a.DrawInternal == b.DrawInternal &&
+            a.OccupiedOnly == b.OccupiedOnly &&
+            std::abs(a.Alpha - b.Alpha) <= 1e-4f &&
+            Vec3NearlyEqual(a.BaseColor, b.BaseColor);
     }
 
     [[nodiscard]] glm::vec3 DepthRamp(float t)
@@ -109,7 +112,7 @@ namespace
     }
 
     void TransformAABB(const glm::vec3& lo, const glm::vec3& hi, const glm::mat4& m,
-                      glm::vec3& outLo, glm::vec3& outHi)
+                       glm::vec3& outLo, glm::vec3& outHi)
     {
         glm::vec3 corners[8] = {
             {lo.x, lo.y, lo.z}, {hi.x, lo.y, lo.z},
@@ -198,7 +201,8 @@ namespace
                 ReleaseCachedOctreeOverlay(engine);
 
             if (DrawBounds)
-                EnsureRetainedBoundsOverlay(engine, selected, collider->CollisionRef->LocalAABB, collider->WorldOBB, *xf);
+                EnsureRetainedBoundsOverlay(engine, selected, collider->CollisionRef->LocalAABB, collider->WorldOBB,
+                                            *xf);
             else
                 ReleaseRetainedLineOverlay(engine, m_BoundsOverlay);
 
@@ -262,7 +266,9 @@ namespace
             if (ImGui::ColorEdit3("OBB Color", obbColor))
                 BoundsSettings.OBBColor = glm::vec3(obbColor[0], obbColor[1], obbColor[2]);
 
-            float sphereColor[3] = {BoundsSettings.SphereColor.r, BoundsSettings.SphereColor.g, BoundsSettings.SphereColor.b};
+            float sphereColor[3] = {
+                BoundsSettings.SphereColor.r, BoundsSettings.SphereColor.g, BoundsSettings.SphereColor.b
+            };
             if (ImGui::ColorEdit3("Sphere Color", sphereColor))
                 BoundsSettings.SphereColor = glm::vec3(sphereColor[0], sphereColor[1], sphereColor[2]);
 
@@ -279,11 +285,15 @@ namespace
             if (ImGui::ColorEdit3("KD Leaf Color", kdLeafColor))
                 KDTreeSettings.LeafColor = glm::vec3(kdLeafColor[0], kdLeafColor[1], kdLeafColor[2]);
 
-            float kdInternalColor[3] = {KDTreeSettings.InternalColor.r, KDTreeSettings.InternalColor.g, KDTreeSettings.InternalColor.b};
+            float kdInternalColor[3] = {
+                KDTreeSettings.InternalColor.r, KDTreeSettings.InternalColor.g, KDTreeSettings.InternalColor.b
+            };
             if (ImGui::ColorEdit3("KD Internal Color", kdInternalColor))
                 KDTreeSettings.InternalColor = glm::vec3(kdInternalColor[0], kdInternalColor[1], kdInternalColor[2]);
 
-            float kdSplitColor[3] = {KDTreeSettings.SplitPlaneColor.r, KDTreeSettings.SplitPlaneColor.g, KDTreeSettings.SplitPlaneColor.b};
+            float kdSplitColor[3] = {
+                KDTreeSettings.SplitPlaneColor.r, KDTreeSettings.SplitPlaneColor.g, KDTreeSettings.SplitPlaneColor.b
+            };
             if (ImGui::ColorEdit3("KD Split Color", kdSplitColor))
                 KDTreeSettings.SplitPlaneColor = glm::vec3(kdSplitColor[0], kdSplitColor[1], kdSplitColor[2]);
 
@@ -306,7 +316,9 @@ namespace
             if (ImGui::ColorEdit3("BVH Leaf Color", bvhLeafColor))
                 BVHSettings.LeafColor = glm::vec3(bvhLeafColor[0], bvhLeafColor[1], bvhLeafColor[2]);
 
-            float bvhInternalColor[3] = {BVHSettings.InternalColor.r, BVHSettings.InternalColor.g, BVHSettings.InternalColor.b};
+            float bvhInternalColor[3] = {
+                BVHSettings.InternalColor.r, BVHSettings.InternalColor.g, BVHSettings.InternalColor.b
+            };
             if (ImGui::ColorEdit3("BVH Internal Color", bvhInternalColor))
                 BVHSettings.InternalColor = glm::vec3(bvhInternalColor[0], bvhInternalColor[1], bvhInternalColor[2]);
 
@@ -476,7 +488,8 @@ namespace
             upload.UploadMode = Graphics::GeometryUploadMode::Direct;
 
             auto [gpuData, token] = Graphics::GeometryGpuData::CreateAsync(
-                engine.GetDeviceShared(), engine.GetGraphicsBackend().GetTransferManager(), upload, &engine.GetGeometryStorage());
+                engine.GetDeviceShared(), engine.GetGraphicsBackend().GetTransferManager(), upload,
+                &engine.GetGeometryStorage());
             (void)token;
             if (!gpuData)
             {
@@ -517,7 +530,7 @@ namespace
         // -----------------------------------------------------------------
 
         bool EnsureSelectedColliderKDTree(entt::entity selected,
-                                         const Graphics::GeometryCollisionData& collision)
+                                          const Graphics::GeometryCollisionData& collision)
         {
             const bool cacheValid =
                 (m_SelectedKDTreeEntity == selected) &&
@@ -545,7 +558,7 @@ namespace
         }
 
         bool EnsureSelectedColliderConvexHull(entt::entity selected,
-                                             const Graphics::GeometryCollisionData& collision)
+                                              const Graphics::GeometryCollisionData& collision)
         {
             const bool cacheValid =
                 (m_SelectedHullEntity == selected) &&
@@ -604,7 +617,7 @@ namespace
             Graphics::OctreeDebugDrawSettings settings = OctreeSettings;
             settings.Enabled = true;
 
-            const glm::mat4 worldMatrix = engine.GetMatrix(xf);
+            const glm::mat4 worldMatrix = ECS::Components::Transform::GetMatrix(xf);
             const bool cacheValid =
                 (m_OctreeOverlayEntity != entt::null) &&
                 engine.GetScene().GetRegistry().valid(m_OctreeOverlayEntity) &&
@@ -653,7 +666,11 @@ namespace
                 edgeColors.insert(edgeColors.end(), kBoxEdges.size() / 2u, color);
             };
 
-            struct StackItem { Geometry::Octree::NodeIndex Node; std::uint32_t Depth; };
+            struct StackItem
+            {
+                Geometry::Octree::NodeIndex Node;
+                std::uint32_t Depth;
+            };
             std::array<StackItem, kMaxOctreeTraversalStack> stack{};
             std::size_t sp = 0;
             stack[sp++] = {0u, 0u};
@@ -677,8 +694,8 @@ namespace
                 if (drawThis)
                 {
                     const float t = (settings.MaxDepth > 0u)
-                        ? (static_cast<float>(item.Depth) / static_cast<float>(settings.MaxDepth))
-                        : 0.0f;
+                                        ? (static_cast<float>(item.Depth) / static_cast<float>(settings.MaxDepth))
+                                        : 0.0f;
                     const glm::vec3 rgb = settings.ColorByDepth ? DepthRamp(t) : settings.BaseColor;
                     const uint32_t color = PackWithAlpha(rgb, settings.Alpha);
 
@@ -716,7 +733,8 @@ namespace
             upload.UploadMode = Graphics::GeometryUploadMode::Direct;
 
             auto [gpuData, token] = Graphics::GeometryGpuData::CreateAsync(
-                engine.GetDeviceShared(), engine.GetGraphicsBackend().GetTransferManager(), upload, &engine.GetGeometryStorage());
+                engine.GetDeviceShared(), engine.GetGraphicsBackend().GetTransferManager(), upload,
+                &engine.GetGeometryStorage());
             (void)token;
             if (!gpuData)
             {
@@ -767,13 +785,21 @@ namespace
                                          const Geometry::OBB& worldObb,
                                          const ECS::Components::Transform::Component& xf)
         {
-            const glm::mat4 worldMatrix = engine.GetMatrix(xf);
+            const glm::mat4 worldMatrix = ECS::Components::Transform::GetMatrix(xf);
             const bool cacheValid =
                 (m_BoundsOverlaySourceEntity == selected) &&
                 m_BoundsOverlay.Geometry.IsValid() &&
                 OctreeSettingsEqual(
-                    { .Enabled = true, .Overlay = m_CachedBoundsSettings.Overlay, .ColorByDepth = false, .MaxDepth = 0u, .LeafOnly = false, .DrawInternal = false, .OccupiedOnly = false, .Alpha = m_CachedBoundsSettings.Alpha, .BaseColor = m_CachedBoundsSettings.AABBColor },
-                    { .Enabled = true, .Overlay = BoundsSettings.Overlay, .ColorByDepth = false, .MaxDepth = 0u, .LeafOnly = false, .DrawInternal = false, .OccupiedOnly = false, .Alpha = BoundsSettings.Alpha, .BaseColor = BoundsSettings.AABBColor }) &&
+                    {
+                        .Enabled = true, .Overlay = m_CachedBoundsSettings.Overlay, .ColorByDepth = false,
+                        .MaxDepth = 0u, .LeafOnly = false, .DrawInternal = false, .OccupiedOnly = false,
+                        .Alpha = m_CachedBoundsSettings.Alpha, .BaseColor = m_CachedBoundsSettings.AABBColor
+                    },
+                    {
+                        .Enabled = true, .Overlay = BoundsSettings.Overlay, .ColorByDepth = false, .MaxDepth = 0u,
+                        .LeafOnly = false, .DrawInternal = false, .OccupiedOnly = false, .Alpha = BoundsSettings.Alpha,
+                        .BaseColor = BoundsSettings.AABBColor
+                    }) &&
                 m_CachedBoundsSettings.DrawAABB == BoundsSettings.DrawAABB &&
                 m_CachedBoundsSettings.DrawOBB == BoundsSettings.DrawOBB &&
                 m_CachedBoundsSettings.DrawBoundingSphere == BoundsSettings.DrawBoundingSphere &&
@@ -821,7 +847,7 @@ namespace
                 return false;
             }
 
-            const glm::mat4 worldMatrix = engine.GetMatrix(xf);
+            const glm::mat4 worldMatrix = ECS::Components::Transform::GetMatrix(xf);
             const bool cacheValid =
                 (m_KDTreeOverlaySourceEntity == selected) &&
                 m_KDTreeOverlay.Geometry.IsValid() &&
@@ -844,7 +870,7 @@ namespace
             settings.Enabled = true;
             const bool ok = UpdateRetainedLineOverlay(engine, m_KDTreeOverlay, [&](Graphics::DebugDraw& dd)
             {
-                DrawKDTree(dd, m_SelectedColliderKDTree, settings, worldMatrix);
+                Graphics::DrawKDTree(dd, m_SelectedColliderKDTree, settings, worldMatrix);
             });
 
             if (!ok)
@@ -864,7 +890,7 @@ namespace
                                       const Graphics::GeometryCollisionData& collision,
                                       const ECS::Components::Transform::Component& xf)
         {
-            const glm::mat4 worldMatrix = engine.GetMatrix(xf);
+            const glm::mat4 worldMatrix = ECS::Components::Transform::GetMatrix(xf);
             const bool cacheValid =
                 (m_BVHOverlaySourceEntity == selected) &&
                 m_BVHOverlay.Geometry.IsValid() &&
@@ -887,7 +913,7 @@ namespace
             settings.Enabled = true;
             const bool ok = UpdateRetainedLineOverlay(engine, m_BVHOverlay, [&](Graphics::DebugDraw& dd)
             {
-                DrawBVH(dd, collision.Positions, collision.Indices, settings, worldMatrix);
+                Graphics::DrawBVH(dd, collision.Positions, collision.Indices, settings, worldMatrix);
             });
 
             if (!ok)
@@ -916,7 +942,7 @@ namespace
                 return false;
             }
 
-            const glm::mat4 worldMatrix = engine.GetMatrix(xf);
+            const glm::mat4 worldMatrix = ECS::Components::Transform::GetMatrix(xf);
             const bool cacheValid =
                 (m_ConvexHullOverlaySourceEntity == selected) &&
                 m_ConvexHullOverlay.Geometry.IsValid() &&
@@ -932,7 +958,7 @@ namespace
             settings.Enabled = true;
             const bool ok = UpdateRetainedLineOverlay(engine, m_ConvexHullOverlay, [&](Graphics::DebugDraw& dd)
             {
-                DrawConvexHull(dd, m_SelectedColliderHullMesh, settings, worldMatrix);
+                Graphics::DrawConvexHull(dd, m_SelectedColliderHullMesh, settings, worldMatrix);
             });
 
             if (!ok)
@@ -1075,7 +1101,7 @@ namespace
         }
 
         [[nodiscard]] static bool DrawOperatorPanelHeader(const SelectionContext& context,
-                                                           const char* description)
+                                                          const char* description)
         {
             if (description != nullptr && description[0] != '\0')
             {
@@ -1098,7 +1124,8 @@ namespace
                 return false;
             }
 
-            ImGui::TextDisabled("Operators apply in sequence to the selected surface mesh, so panels can be mixed into one workflow.");
+            ImGui::TextDisabled(
+                "Operators apply in sequence to the selected surface mesh, so panels can be mixed into one workflow.");
             ImGui::Separator();
             return true;
         }
@@ -1161,9 +1188,9 @@ namespace
             }
             for (size_t i = 0; i + 2 < collider->CollisionRef->Indices.size(); i += 3)
             {
-               (void)mesh.AddTriangle(vhs[collider->CollisionRef->Indices[i]],
-                                  vhs[collider->CollisionRef->Indices[i + 1]],
-                                  vhs[collider->CollisionRef->Indices[i + 2]]);
+                (void)mesh.AddTriangle(vhs[collider->CollisionRef->Indices[i]],
+                                       vhs[collider->CollisionRef->Indices[i + 1]],
+                                       vhs[collider->CollisionRef->Indices[i + 2]]);
             }
 
             // 2. Apply operator
@@ -1207,7 +1234,8 @@ namespace
             collider->CollisionRef->Indices = std::move(newIdx);
 
             std::vector<glm::vec3> newNormals(collider->CollisionRef->Positions.size(), glm::vec3(0, 1, 0));
-            Geometry::MeshUtils::CalculateNormals(collider->CollisionRef->Positions, collider->CollisionRef->Indices, newNormals);
+            Geometry::MeshUtils::CalculateNormals(collider->CollisionRef->Positions, collider->CollisionRef->Indices,
+                                                  newNormals);
 
             std::vector<glm::vec4> newAux(collider->CollisionRef->Positions.size(), glm::vec4(0.0f));
             Geometry::MeshUtils::GenerateUVs(collider->CollisionRef->Positions, newAux);
@@ -1222,12 +1250,15 @@ namespace
                 const uint32_t i0 = collider->CollisionRef->Indices[i];
                 const uint32_t i1 = collider->CollisionRef->Indices[i + 1];
                 const uint32_t i2 = collider->CollisionRef->Indices[i + 2];
-                auto aabb = Geometry::AABB{collider->CollisionRef->Positions[i0], collider->CollisionRef->Positions[i0]};
+                auto aabb = Geometry::AABB{
+                    collider->CollisionRef->Positions[i0], collider->CollisionRef->Positions[i0]
+                };
                 aabb = Geometry::Union(aabb, collider->CollisionRef->Positions[i1]);
                 aabb = Geometry::Union(aabb, collider->CollisionRef->Positions[i2]);
                 primitiveBounds.push_back(aabb);
             }
-            static_cast<void>(collider->CollisionRef->LocalOctree.Build(primitiveBounds, Geometry::Octree::SplitPolicy{}, 16, 8));
+            static_cast<void>(collider->CollisionRef->LocalOctree.Build(
+                primitiveBounds, Geometry::Octree::SplitPolicy{}, 16, 8));
 
             Graphics::GeometryUploadRequest uploadReq;
             uploadReq.Positions = collider->CollisionRef->Positions;
@@ -1238,7 +1269,8 @@ namespace
             uploadReq.UploadMode = Graphics::GeometryUploadMode::Staged;
 
             auto [gpuData, token] = Graphics::GeometryGpuData::CreateAsync(
-                m_Engine->GetDeviceShared(), m_Engine->GetGraphicsBackend().GetTransferManager(), uploadReq, &m_Engine->GetGeometryStorage());
+                m_Engine->GetDeviceShared(), m_Engine->GetGraphicsBackend().GetTransferManager(), uploadReq,
+                &m_Engine->GetGeometryStorage());
 
             auto oldHandle = sc->Geometry;
             sc->Geometry = m_Engine->GetGeometryStorage().Add(std::move(gpuData));
@@ -1334,15 +1366,16 @@ namespace
         {
             const auto context = GetSelectionContext();
 
-            ImGui::TextWrapped("Geometry tools are organized by workflow and algorithm family. Open only the panels you need, or open the full stack when chaining remeshing, smoothing, simplification, subdivision, and repair together.");
+            ImGui::TextWrapped(
+                "Geometry tools are organized by workflow and algorithm family. Open only the panels you need, or open the full stack when chaining remeshing, smoothing, simplification, subdivision, and repair together.");
             ImGui::SeparatorText("Selection");
             if (context.HasSelection)
             {
                 ImGui::Text("Selected Entity: %u",
                             static_cast<uint32_t>(static_cast<entt::id_type>(context.Selected)));
                 ImGui::TextDisabled(context.HasSurface
-                    ? "Surface mesh detected. Geometry operators are available."
-                    : "Selected entity does not have a Surface component.");
+                                        ? "Surface mesh detected. Geometry operators are available."
+                                        : "Selected entity does not have a Surface component.");
             }
             else
             {
@@ -1368,16 +1401,18 @@ namespace
 
             ImGui::SeparatorText("Approach Map");
             ImGui::BulletText("Remeshing: Isotropic and Adaptive remeshing share the same workflow surface.");
-            ImGui::BulletText("Smoothing: Uniform, Cotan, Taubin, and Implicit smoothing stay grouped together for side-by-side comparison.");
+            ImGui::BulletText(
+                "Smoothing: Uniform, Cotan, Taubin, and Implicit smoothing stay grouped together for side-by-side comparison.");
             ImGui::BulletText("Simplification, Subdivision, and Repair remain focused single-purpose panels.");
-            ImGui::BulletText("Panels compose naturally because each operator rewrites the selected surface mesh in place.");
+            ImGui::BulletText(
+                "Panels compose naturally because each operator rewrites the selected surface mesh in place.");
         }
 
         void DrawRemeshingPanel()
         {
             const auto context = GetSelectionContext();
             if (DrawOperatorPanelHeader(context,
-                    "Use remeshing to regularize edge lengths. Isotropic remeshing targets a uniform metric; adaptive remeshing keeps room for size-field-driven workflows while still sharing the same mesh pipeline."))
+                                        "Use remeshing to regularize edge lengths. Isotropic remeshing targets a uniform metric; adaptive remeshing keeps room for size-field-driven workflows while still sharing the same mesh pipeline."))
             {
                 ImGui::DragFloat("Target Length", &m_RemeshingUi.TargetLength, 0.01f, 0.001f, 10.0f);
                 ImGui::DragInt("Iterations", &m_RemeshingUi.Iterations, 1.0f, 1, 20);
@@ -1388,7 +1423,8 @@ namespace
                 if (ImGui::Button("Run Isotropic Remeshing"))
                 {
                     const auto ui = m_RemeshingUi;
-                    ApplyOperator(context.Selected, [ui](Geometry::Halfedge::Mesh& mesh) {
+                    ApplyOperator(context.Selected, [ui](Geometry::Halfedge::Mesh& mesh)
+                    {
                         Geometry::Remeshing::RemeshingParams params;
                         params.TargetLength = ui.TargetLength;
                         params.Iterations = ui.Iterations;
@@ -1402,7 +1438,8 @@ namespace
                 if (ImGui::Button("Run Adaptive Remeshing"))
                 {
                     const auto ui = m_RemeshingUi;
-                    ApplyOperator(context.Selected, [ui](Geometry::Halfedge::Mesh& mesh) {
+                    ApplyOperator(context.Selected, [ui](Geometry::Halfedge::Mesh& mesh)
+                    {
                         Geometry::AdaptiveRemeshing::AdaptiveRemeshingParams params;
                         params.MinEdgeLength = ui.TargetLength * 0.5f;
                         params.MaxEdgeLength = ui.TargetLength * 2.0f;
@@ -1418,14 +1455,15 @@ namespace
         {
             const auto context = GetSelectionContext();
             if (DrawOperatorPanelHeader(context,
-                    "Simplification reduces triangle count while preserving overall shape. Keep this panel separate from remeshing and smoothing so decimation can be inserted wherever a workflow needs it."))
+                                        "Simplification reduces triangle count while preserving overall shape. Keep this panel separate from remeshing and smoothing so decimation can be inserted wherever a workflow needs it."))
             {
                 ImGui::DragInt("Target Faces", &m_SimplificationUi.TargetFaces, 10.0f, 10, 1000000);
                 ImGui::Checkbox("Preserve Boundary", &m_SimplificationUi.PreserveBoundary);
                 if (ImGui::Button("Run QEM Simplification"))
                 {
                     const auto ui = m_SimplificationUi;
-                    ApplyOperator(context.Selected, [ui](Geometry::Halfedge::Mesh& mesh) {
+                    ApplyOperator(context.Selected, [ui](Geometry::Halfedge::Mesh& mesh)
+                    {
                         Geometry::Simplification::SimplificationParams params;
                         params.TargetFaces = ui.TargetFaces;
                         params.PreserveBoundary = ui.PreserveBoundary;
@@ -1439,7 +1477,7 @@ namespace
         {
             const auto context = GetSelectionContext();
             if (DrawOperatorPanelHeader(context,
-                    "Smoothing approaches stay together so you can compare differential operators without hunting through unrelated UI. They remain independently accessible from the Geometry menu and can still be chained after remeshing or before subdivision."))
+                                        "Smoothing approaches stay together so you can compare differential operators without hunting through unrelated UI. They remain independently accessible from the Geometry menu and can still be chained after remeshing or before subdivision."))
             {
                 ImGui::DragInt("Iterations", &m_SmoothingUi.Iterations, 1.0f, 1, 100);
                 ImGui::DragFloat("Lambda", &m_SmoothingUi.Lambda, 0.01f, 0.0f, 1.0f);
@@ -1449,7 +1487,8 @@ namespace
                 if (ImGui::Button("Run Uniform Laplacian"))
                 {
                     const auto ui = m_SmoothingUi;
-                    ApplyOperator(context.Selected, [ui](Geometry::Halfedge::Mesh& mesh) {
+                    ApplyOperator(context.Selected, [ui](Geometry::Halfedge::Mesh& mesh)
+                    {
                         Geometry::Smoothing::SmoothingParams params;
                         params.Iterations = ui.Iterations;
                         params.Lambda = ui.Lambda;
@@ -1460,7 +1499,8 @@ namespace
                 if (ImGui::Button("Run Cotan Laplacian"))
                 {
                     const auto ui = m_SmoothingUi;
-                    ApplyOperator(context.Selected, [ui](Geometry::Halfedge::Mesh& mesh) {
+                    ApplyOperator(context.Selected, [ui](Geometry::Halfedge::Mesh& mesh)
+                    {
                         Geometry::Smoothing::SmoothingParams params;
                         params.Iterations = ui.Iterations;
                         params.Lambda = ui.Lambda;
@@ -1471,7 +1511,8 @@ namespace
                 if (ImGui::Button("Run Taubin Smoothing"))
                 {
                     const auto ui = m_SmoothingUi;
-                    ApplyOperator(context.Selected, [ui](Geometry::Halfedge::Mesh& mesh) {
+                    ApplyOperator(context.Selected, [ui](Geometry::Halfedge::Mesh& mesh)
+                    {
                         Geometry::Smoothing::TaubinParams params;
                         params.Iterations = ui.Iterations;
                         params.Lambda = ui.Lambda;
@@ -1482,7 +1523,8 @@ namespace
                 if (ImGui::Button("Run Implicit Smoothing"))
                 {
                     const auto ui = m_SmoothingUi;
-                    ApplyOperator(context.Selected, [ui](Geometry::Halfedge::Mesh& mesh) {
+                    ApplyOperator(context.Selected, [ui](Geometry::Halfedge::Mesh& mesh)
+                    {
                         Geometry::Smoothing::ImplicitSmoothingParams params;
                         params.Iterations = ui.Iterations;
                         params.Lambda = ui.Lambda;
@@ -1497,13 +1539,14 @@ namespace
         {
             const auto context = GetSelectionContext();
             if (DrawOperatorPanelHeader(context,
-                    "Subdivision is kept distinct from smoothing and remeshing because it changes topology with a refinement-first workflow. Open it alongside repair or smoothing when building higher-resolution assets."))
+                                        "Subdivision is kept distinct from smoothing and remeshing because it changes topology with a refinement-first workflow. Open it alongside repair or smoothing when building higher-resolution assets."))
             {
                 ImGui::DragInt("Iterations", &m_SubdivisionUi.Iterations, 1.0f, 1, 5);
                 if (ImGui::Button("Run Loop Subdivision"))
                 {
                     const auto ui = m_SubdivisionUi;
-                    ApplyOperator(context.Selected, [ui](Geometry::Halfedge::Mesh& mesh) {
+                    ApplyOperator(context.Selected, [ui](Geometry::Halfedge::Mesh& mesh)
+                    {
                         Geometry::Halfedge::Mesh out;
                         Geometry::Subdivision::SubdivisionParams params;
                         params.Iterations = ui.Iterations;
@@ -1514,7 +1557,8 @@ namespace
                 if (ImGui::Button("Run Catmull-Clark Subdivision"))
                 {
                     const auto ui = m_SubdivisionUi;
-                    ApplyOperator(context.Selected, [ui](Geometry::Halfedge::Mesh& mesh) {
+                    ApplyOperator(context.Selected, [ui](Geometry::Halfedge::Mesh& mesh)
+                    {
                         Geometry::Halfedge::Mesh out;
                         Geometry::CatmullClark::SubdivisionParams params;
                         params.Iterations = ui.Iterations;
@@ -1529,11 +1573,12 @@ namespace
         {
             const auto context = GetSelectionContext();
             if (DrawOperatorPanelHeader(context,
-                    "Repair stays as a standalone cleanup pass so it can be inserted before or after heavier operators without dragging the rest of the geometry UI along."))
+                                        "Repair stays as a standalone cleanup pass so it can be inserted before or after heavier operators without dragging the rest of the geometry UI along."))
             {
                 if (ImGui::Button("Run Mesh Repair"))
                 {
-                    ApplyOperator(context.Selected, [](Geometry::Halfedge::Mesh& mesh) {
+                    ApplyOperator(context.Selected, [](Geometry::Halfedge::Mesh& mesh)
+                    {
                         static_cast<void>(Geometry::MeshRepair::Repair(mesh));
                     });
                 }
@@ -1660,19 +1705,25 @@ namespace
                         ImGui::Checkbox("Visible##Graph", &gd.Visible);
 
                         ImGui::SeparatorText("Node Settings");
-                        const char* modeNames[] = { "Flat Disc", "Surfel", "EWA Splatting", "Sphere" };
+                        const char* modeNames[] = {"Flat Disc", "Surfel", "EWA Splatting", "Sphere"};
                         int modeIdx = static_cast<int>(gd.NodeRenderMode);
                         if (modeIdx < 0 || modeIdx > 3) modeIdx = 0;
                         if (ImGui::Combo("Node Render Mode", &modeIdx, modeNames, 4))
                             gd.NodeRenderMode = static_cast<Geometry::PointCloud::RenderMode>(modeIdx);
-                        ImGui::SliderFloat("Node Size", &gd.DefaultNodeRadius, 0.0005f, 0.05f, "%.5f", ImGuiSliderFlags_Logarithmic);
-                        ImGui::SliderFloat("Node Size Multiplier", &gd.NodeSizeMultiplier, 0.1f, 10.0f, "%.2f", ImGuiSliderFlags_Logarithmic);
-                        float nc[4] = {gd.DefaultNodeColor.r, gd.DefaultNodeColor.g, gd.DefaultNodeColor.b, gd.DefaultNodeColor.a};
+                        ImGui::SliderFloat("Node Size", &gd.DefaultNodeRadius, 0.0005f, 0.05f, "%.5f",
+                                           ImGuiSliderFlags_Logarithmic);
+                        ImGui::SliderFloat("Node Size Multiplier", &gd.NodeSizeMultiplier, 0.1f, 10.0f, "%.2f",
+                                           ImGuiSliderFlags_Logarithmic);
+                        float nc[4] = {
+                            gd.DefaultNodeColor.r, gd.DefaultNodeColor.g, gd.DefaultNodeColor.b, gd.DefaultNodeColor.a
+                        };
                         if (ImGui::ColorEdit4("Node Color", nc))
                             gd.DefaultNodeColor = glm::vec4(nc[0], nc[1], nc[2], nc[3]);
 
                         ImGui::SeparatorText("Edge Settings");
-                        float ec[4] = {gd.DefaultEdgeColor.r, gd.DefaultEdgeColor.g, gd.DefaultEdgeColor.b, gd.DefaultEdgeColor.a};
+                        float ec[4] = {
+                            gd.DefaultEdgeColor.r, gd.DefaultEdgeColor.g, gd.DefaultEdgeColor.b, gd.DefaultEdgeColor.a
+                        };
                         if (ImGui::ColorEdit4("Edge Color", ec))
                             gd.DefaultEdgeColor = glm::vec4(ec[0], ec[1], ec[2], ec[3]);
                         ImGui::SliderFloat("Edge Width", &gd.EdgeWidth, 0.5f, 5.0f);
@@ -1691,9 +1742,11 @@ namespace
                             const auto* vtxPs = &gd.GraphRef->VertexProperties();
                             const auto* edgePs = &gd.GraphRef->EdgeProperties();
 
-                            if (ColorSourceWidget("Node Color Source", gd.Visualization.VertexColors, vtxPs, "GraphVtx"))
+                            if (ColorSourceWidget("Node Color Source", gd.Visualization.VertexColors, vtxPs,
+                                                  "GraphVtx"))
                                 reg.emplace_or_replace<ECS::DirtyTag::VertexAttributes>(selected);
-                            if (ColorSourceWidget("Edge Color Source", gd.Visualization.EdgeColors, edgePs, "GraphEdge"))
+                            if (ColorSourceWidget("Edge Color Source", gd.Visualization.EdgeColors, edgePs,
+                                                  "GraphEdge"))
                                 reg.emplace_or_replace<ECS::DirtyTag::EdgeAttributes>(selected);
 
                             VectorFieldWidget(gd.Visualization, vtxPs, "GraphVF");
@@ -1715,14 +1768,16 @@ namespace
                         ImGui::SeparatorText("Rendering");
                         ImGui::Checkbox("Visible##PCD", &pcd.Visible);
 
-                        const char* modeNames[] = { "Flat Disc", "Surfel", "EWA Splatting", "Sphere" };
+                        const char* modeNames[] = {"Flat Disc", "Surfel", "EWA Splatting", "Sphere"};
                         int modeIdx = static_cast<int>(pcd.RenderMode);
                         if (modeIdx < 0 || modeIdx > 3) modeIdx = 0;
                         if (ImGui::Combo("Render Mode##PCD", &modeIdx, modeNames, 4))
                             pcd.RenderMode = static_cast<Geometry::PointCloud::RenderMode>(modeIdx);
 
-                        ImGui::SliderFloat("Default Radius##PCD", &pcd.DefaultRadius, 0.0005f, 0.1f, "%.5f", ImGuiSliderFlags_Logarithmic);
-                        ImGui::SliderFloat("Size Multiplier##PCD", &pcd.SizeMultiplier, 0.1f, 10.0f, "%.2f", ImGuiSliderFlags_Logarithmic);
+                        ImGui::SliderFloat("Default Radius##PCD", &pcd.DefaultRadius, 0.0005f, 0.1f, "%.5f",
+                                           ImGuiSliderFlags_Logarithmic);
+                        ImGui::SliderFloat("Size Multiplier##PCD", &pcd.SizeMultiplier, 0.1f, 10.0f, "%.2f",
+                                           ImGuiSliderFlags_Logarithmic);
 
                         float dc[4] = {pcd.DefaultColor.r, pcd.DefaultColor.g, pcd.DefaultColor.b, pcd.DefaultColor.a};
                         if (ImGui::ColorEdit4("Default Color##PCD", dc))
@@ -1808,12 +1863,13 @@ namespace
                         if (auto* pt = reg.try_get<ECS::Point::Component>(selected))
                         {
                             ImGui::SeparatorText("Vertex Settings");
-                            const char* modeNames[] = { "Flat Disc", "Surfel", "EWA Splatting" };
+                            const char* modeNames[] = {"Flat Disc", "Surfel", "EWA Splatting"};
                             int modeIdx = static_cast<int>(pt->Mode);
                             if (modeIdx < 0 || modeIdx > 2) modeIdx = 0;
                             if (ImGui::Combo("Render Mode", &modeIdx, modeNames, 3))
                                 pt->Mode = static_cast<Geometry::PointCloud::RenderMode>(modeIdx);
-                            ImGui::SliderFloat("Vertex Size", &pt->Size, 0.0005f, 0.05f, "%.5f", ImGuiSliderFlags_Logarithmic);
+                            ImGui::SliderFloat("Vertex Size", &pt->Size, 0.0005f, 0.05f, "%.5f",
+                                               ImGuiSliderFlags_Logarithmic);
                             float vc[4] = {pt->Color.r, pt->Color.g, pt->Color.b, pt->Color.a};
                             if (ImGui::ColorEdit4("Vertex Color", vc))
                                 pt->Color = glm::vec4(vc[0], vc[1], vc[2], vc[3]);
@@ -1828,17 +1884,20 @@ namespace
                                 const auto* edgePs = &md->MeshRef->EdgeProperties();
                                 const auto* facePs = &md->MeshRef->FaceProperties();
 
-                                if (ColorSourceWidget("Vertex Color Source", md->Visualization.VertexColors, vtxPs, "MeshVtx"))
+                                if (ColorSourceWidget("Vertex Color Source", md->Visualization.VertexColors, vtxPs,
+                                                      "MeshVtx"))
                                 {
                                     md->AttributesDirty = true;
                                     reg.emplace_or_replace<ECS::DirtyTag::VertexAttributes>(selected);
                                 }
-                                if (ColorSourceWidget("Edge Color Source", md->Visualization.EdgeColors, edgePs, "MeshEdge"))
+                                if (ColorSourceWidget("Edge Color Source", md->Visualization.EdgeColors, edgePs,
+                                                      "MeshEdge"))
                                 {
                                     md->AttributesDirty = true;
                                     reg.emplace_or_replace<ECS::DirtyTag::EdgeAttributes>(selected);
                                 }
-                                if (ColorSourceWidget("Face Color Source", md->Visualization.FaceColors, facePs, "MeshFace"))
+                                if (ColorSourceWidget("Face Color Source", md->Visualization.FaceColors, facePs,
+                                                      "MeshFace"))
                                 {
                                     md->AttributesDirty = true;
                                     reg.emplace_or_replace<ECS::DirtyTag::FaceAttributes>(selected);
@@ -1894,9 +1953,12 @@ namespace
                         const char* typeLabel = "";
                         switch (p.Type)
                         {
-                        case Graphics::PropertyDataType::Scalar: typeLabel = " [float]"; break;
-                        case Graphics::PropertyDataType::Vec3:   typeLabel = " [vec3]"; break;
-                        case Graphics::PropertyDataType::Vec4:   typeLabel = " [vec4]"; break;
+                        case Graphics::PropertyDataType::Scalar: typeLabel = " [float]";
+                            break;
+                        case Graphics::PropertyDataType::Vec3: typeLabel = " [vec3]";
+                            break;
+                        case Graphics::PropertyDataType::Vec4: typeLabel = " [vec4]";
+                            break;
                         }
                         char itemLabel[256];
                         snprintf(itemLabel, sizeof(itemLabel), "%s%s", p.Name.c_str(), typeLabel);
@@ -1917,7 +1979,7 @@ namespace
             // Colormap selector.
             snprintf(idBuf, sizeof(idBuf), "Colormap##%s", suffix);
             int mapIdx = static_cast<int>(src.Map);
-            const char* mapNames[] = { "Viridis", "Inferno", "Plasma", "Jet", "Coolwarm", "Heat" };
+            const char* mapNames[] = {"Viridis", "Inferno", "Plasma", "Jet", "Coolwarm", "Heat"};
             if (ImGui::Combo(idBuf, &mapIdx, mapNames, 6))
             {
                 src.Map = static_cast<Graphics::Colormap::Type>(mapIdx);
@@ -1990,7 +2052,7 @@ namespace
             }
 
             // List existing vector fields.
-            for (size_t i = 0; i < config.VectorFields.size(); )
+            for (size_t i = 0; i < config.VectorFields.size();)
             {
                 auto& vf = config.VectorFields[i];
                 ImGui::PushID(static_cast<int>(i));
@@ -2016,7 +2078,9 @@ namespace
                 if (ps)
                 {
                     auto colorableProps = Graphics::EnumerateColorableProperties(*ps);
-                    const char* colorPreview = vf.ColorPropertyName.empty() ? "(Uniform)" : vf.ColorPropertyName.c_str();
+                    const char* colorPreview = vf.ColorPropertyName.empty()
+                                                   ? "(Uniform)"
+                                                   : vf.ColorPropertyName.c_str();
                     if (ImGui::BeginCombo("Arrow Color", colorPreview))
                     {
                         if (ImGui::Selectable("(Uniform)", vf.ColorPropertyName.empty()))
@@ -2037,7 +2101,9 @@ namespace
 
                     // Per-vector length property selector.
                     auto scalarProps = Graphics::EnumerateScalarProperties(*ps);
-                    const char* lenPreview = vf.LengthPropertyName.empty() ? "(Uniform)" : vf.LengthPropertyName.c_str();
+                    const char* lenPreview = vf.LengthPropertyName.empty()
+                                                 ? "(Uniform)"
+                                                 : vf.LengthPropertyName.c_str();
                     if (ImGui::BeginCombo("Arrow Length", lenPreview))
                     {
                         if (ImGui::Selectable("(Uniform)", vf.LengthPropertyName.empty()))
@@ -2115,7 +2181,8 @@ public:
 
         // Cache selected entity via dispatcher sink instead of polling every frame.
         GetScene().GetDispatcher().sink<ECS::Events::SelectionChanged>().connect<
-            [](entt::entity& cached, const ECS::Events::SelectionChanged& evt) {
+            [](entt::entity& cached, const ECS::Events::SelectionChanged& evt)
+            {
                 cached = evt.Entity;
             }>(m_CachedSelectedEntity);
 
@@ -2127,7 +2194,7 @@ public:
             -> std::shared_ptr<RHI::Texture>
         {
             auto result = Graphics::TextureLoader::LoadAsync(path, GetDevice(),
-                gfx.GetTransferManager(), gfx.GetTextureSystem());
+                                                             gfx.GetTransferManager(), gfx.GetTextureSystem());
 
             if (result)
             {
@@ -2152,7 +2219,7 @@ public:
             return {};
         };
         m_DuckTexture = GetAssetManager().Load<RHI::Texture>(Filesystem::GetAssetPath("textures/DuckCM.png"),
-                                                              textureLoader);
+                                                             textureLoader);
 
         auto modelLoader = [&](const std::string& path, Assets::AssetHandle handle)
             -> std::unique_ptr<Graphics::Model>
@@ -2215,18 +2282,23 @@ public:
             info.Category = Cat::System;
             info.Description = "Continuous rotation animation for tagged entities";
             info.Enabled = true;
-            features.Register(std::move(info), []() -> void* { return nullptr; }, [](void*) {});
+            features.Register(std::move(info), []() -> void* { return nullptr; }, [](void*)
+            {
+            });
         }
 
         // UI panels
-        auto registerPanelFeature = [&features](const std::string& name, const std::string& desc) {
+        auto registerPanelFeature = [&features](const std::string& name, const std::string& desc)
+        {
             Core::FeatureInfo info{};
             info.Name = name;
             info.Id = Core::Hash::StringID(Core::Hash::HashString(info.Name));
             info.Category = Cat::Panel;
             info.Description = desc;
             info.Enabled = true;
-            features.Register(std::move(info), []() -> void* { return nullptr; }, [](void*) {});
+            features.Register(std::move(info), []() -> void* { return nullptr; }, [](void*)
+            {
+            });
         };
         registerPanelFeature("Hierarchy", "Scene entity hierarchy browser");
         registerPanelFeature("Inspector", "Component property editor");
@@ -2240,7 +2312,8 @@ public:
         registerPanelFeature("Geometry - Smoothing", "Surface smoothing operators grouped by approach");
         registerPanelFeature("Geometry - Subdivision", "Subdivision operators for surface refinement");
         registerPanelFeature("Geometry - Repair", "Mesh cleanup and repair operators");
-        registerPanelFeature("Status Bar", "Bottom-of-viewport frame summary (frame time, entity count, active renderer)");
+        registerPanelFeature("Status Bar",
+                             "Bottom-of-viewport frame summary (frame time, entity count, active renderer)");
 
         Log::Info("FeatureRegistry: {} total features after client registration", features.Count());
 
@@ -2305,7 +2378,8 @@ public:
                     selfPickId = pid->Value;
 
                 uint32_t outlineIds[Graphics::Passes::SelectionOutlinePass::kMaxSelectedIds] = {};
-                const uint32_t outlineCount = Graphics::Passes::AppendOutlineRenderablePickIds(reg, selected, outlineIds);
+                const uint32_t outlineCount = Graphics::Passes::AppendOutlineRenderablePickIds(
+                    reg, selected, outlineIds);
                 ImGui::Text("PickIDs: Self=%u OutlineResolved=%u", selfPickId, outlineCount);
                 for (uint32_t i = 0; i < outlineCount; ++i)
                     ImGui::BulletText("Outline PickID[%u] = %u", i, outlineIds[i]);
@@ -2324,14 +2398,15 @@ public:
             const ImGuiViewport* viewport = ImGui::GetMainViewport();
             const float statusBarHeight = ImGui::GetFrameHeight() + 10.0f;
 
-            ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x, viewport->WorkPos.y + viewport->WorkSize.y - statusBarHeight));
+            ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x,
+                                           viewport->WorkPos.y + viewport->WorkSize.y - statusBarHeight));
             ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x, statusBarHeight));
 
             ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration |
-                                     ImGuiWindowFlags_NoMove |
-                                     ImGuiWindowFlags_NoSavedSettings |
-                                     ImGuiWindowFlags_NoBringToFrontOnFocus |
-                                     ImGuiWindowFlags_NoNavFocus;
+                ImGuiWindowFlags_NoMove |
+                ImGuiWindowFlags_NoSavedSettings |
+                ImGuiWindowFlags_NoBringToFrontOnFocus |
+                ImGuiWindowFlags_NoNavFocus;
 
             const float fps = ImGui::GetIO().Framerate;
             const float frameMs = fps > 0.0f ? (1000.0f / fps) : 0.0f;
@@ -2342,7 +2417,7 @@ public:
             {
                 ImGui::SameLine();
                 const ImVec2 pos = ImGui::GetCursorScreenPos();
-                const float h    = ImGui::GetFrameHeight();
+                const float h = ImGui::GetFrameHeight();
                 ImGui::GetWindowDrawList()->AddLine(
                     ImVec2(pos.x, pos.y),
                     ImVec2(pos.x, pos.y + h),
@@ -2412,7 +2487,7 @@ public:
 
             // --- Status ---
             ImGui::Separator();
-            const char* stateNames[] = { "Idle", "Hovered", "Active" };
+            const char* stateNames[] = {"Idle", "Hovered", "Active"};
             ImGui::Text("State: %s", stateNames[static_cast<int>(m_Gizmo.GetState())]);
         });
 
@@ -2431,7 +2506,7 @@ public:
                 ImGui::SeparatorText("Post Processing");
 
                 // Tone mapping
-                const char* toneMapOps[] = { "ACES", "Reinhard", "Uncharted 2" };
+                const char* toneMapOps[] = {"ACES", "Reinhard", "Uncharted 2"};
                 int toneOp = static_cast<int>(postSettings->ToneOperator);
                 if (ImGui::Combo("Tone Mapping", &toneOp, toneMapOps, 3))
                     postSettings->ToneOperator = static_cast<Graphics::Passes::ToneMapOperator>(toneOp);
@@ -2451,7 +2526,7 @@ public:
                 // Anti-Aliasing
                 ImGui::Spacing();
                 {
-                    const char* aaModeNames[] = { "None", "FXAA", "SMAA" };
+                    const char* aaModeNames[] = {"None", "FXAA", "SMAA"};
                     int aaIdx = static_cast<int>(postSettings->AntiAliasingMode);
                     if (ImGui::Combo("Anti-Aliasing", &aaIdx, aaModeNames, 3))
                         postSettings->AntiAliasingMode = static_cast<Graphics::Passes::AAMode>(aaIdx);
@@ -2496,8 +2571,8 @@ public:
 
                         // Show average luminance and EV.
                         float avgEV = (histo->AverageLuminance > 1e-6f)
-                                        ? std::log2(histo->AverageLuminance)
-                                        : postSettings->HistogramMinEV;
+                                          ? std::log2(histo->AverageLuminance)
+                                          : postSettings->HistogramMinEV;
                         ImGui::Text("Avg Luminance: %.4f  (%.1f EV)", histo->AverageLuminance, avgEV);
                     }
                     else
@@ -3014,7 +3089,7 @@ public:
         {
             // Uniform distribution on the sphere via Fibonacci lattice
             const float t = static_cast<float>(i) / static_cast<float>(N - 1);
-            const float phi = std::acos(1.0f - 2.0f * t);   // polar angle [0, π]
+            const float phi = std::acos(1.0f - 2.0f * t); // polar angle [0, π]
             const float theta = goldenAngle * static_cast<float>(i);
 
             // Only keep upper hemisphere (y > 0)
@@ -3025,19 +3100,19 @@ public:
             const float x = sinPhi * std::cos(theta);
             const float z = sinPhi * std::sin(theta);
 
-            const glm::vec3 pos    = glm::vec3(x, y, z) * radius;
+            const glm::vec3 pos = glm::vec3(x, y, z) * radius;
             const glm::vec3 normal = glm::normalize(pos);
 
             // Color: height-based gradient (blue at base → orange at top)
             const float h = (y + 0.05f) / 1.05f; // normalize to [0,1]
             const glm::vec4 color = glm::mix(
-                glm::vec4(0.2f, 0.4f, 0.9f, 1.0f),  // blue
-                glm::vec4(1.0f, 0.6f, 0.1f, 1.0f),  // orange
+                glm::vec4(0.2f, 0.4f, 0.9f, 1.0f), // blue
+                glm::vec4(1.0f, 0.6f, 0.1f, 1.0f), // orange
                 h);
 
             auto ph = cloud.AddPoint(pos);
             cloud.Normal(ph) = normal;
-            cloud.Color(ph)  = color;
+            cloud.Color(ph) = color;
         }
 
         if (cloud.Empty())

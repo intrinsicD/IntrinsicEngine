@@ -8,16 +8,17 @@ export module Core.Input;
 export namespace Core::Input {
     // Common Key Codes (Subset)
     namespace Key {
-        constexpr int W = 87;
         constexpr int A = 65;
-        constexpr int S = 83;
+        constexpr int C = 67;
         constexpr int D = 68;
         constexpr int E = 69;
         constexpr int F = 70;
         constexpr int G = 71;
         constexpr int Q = 81;
         constexpr int R = 82;
+        constexpr int S = 83;
         constexpr int T = 84;
+        constexpr int W = 87;
         constexpr int X = 88;
         constexpr int Space = 32;
         constexpr int Escape = 256;
