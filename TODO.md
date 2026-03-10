@@ -184,5 +184,5 @@ Identified via full codebase sweep (March 2026). Grouped by priority.
 
 ### D9. Sandbox Architecture (Opportunistic)
 
-- [ ] Replace boolean debug-visualization flags with ECS presence/absence pattern per CLAUDE.md convention.
+- [ ] Replace boolean debug-visualization flags with ECS presence/absence pattern per CLAUDE.md convention. **Review note (2026-03):** The six flags in `SpatialDebugController` are editor-level global settings, not per-entity state. Converting them to ECS tags would conflate entity data with transient editor preferences. The controller is already extracted from the main app class — the boolean pattern is acceptable here. Revisit only if debug viz becomes per-entity.
 - [ ] Extract remaining subsystems (geometry workflow UI state, inspector component panels) into dedicated classes to complete the god-object decomposition.

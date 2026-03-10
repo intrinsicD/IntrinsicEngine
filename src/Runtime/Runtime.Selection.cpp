@@ -2,6 +2,7 @@ module;
 
 #include <limits>
 #include <algorithm>
+#include <optional>
 #include <glm/glm.hpp>
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtc/quaternion.hpp>
@@ -38,6 +39,63 @@ namespace Runtime::Selection
         [[nodiscard]] inline glm::vec3 TransformPoint(const glm::mat4& m, const glm::vec3& p)
         {
             return glm::vec3(m * glm::vec4(p, 1.0f));
+        }
+
+        // Ray vs AABB slab test returning entry distance (or nullopt on miss).
+        [[nodiscard]] inline std::optional<float> RayAABBDistance(const Geometry::Ray& r, const Geometry::AABB& b)
+        {
+            const glm::vec3 invDir = 1.0f / r.Direction;
+            const glm::vec3 t0s = (b.Min - r.Origin) * invDir;
+            const glm::vec3 t1s = (b.Max - r.Origin) * invDir;
+
+            const glm::vec3 tsmaller = glm::min(t0s, t1s);
+            const glm::vec3 tbigger = glm::max(t0s, t1s);
+
+            const float tmin = glm::max(tsmaller.x, glm::max(tsmaller.y, tsmaller.z));
+            const float tmax = glm::min(tbigger.x, glm::min(tbigger.y, tbigger.z));
+
+            if (tmax < tmin || tmax < 0.0f) return std::nullopt;
+            return tmin > 0.0f ? tmin : tmax;
+        }
+
+        // Compute world-space AABB for a point cloud entity.
+        [[nodiscard]] inline Geometry::AABB PointCloudWorldAABB(
+            const ECS::PointCloud::Data& pcd,
+            const ECS::Components::Transform::Component& transform,
+            const entt::registry& reg, entt::entity entity)
+        {
+            if (!pcd.CloudRef || pcd.CloudRef->Size() == 0)
+                return {};
+
+            const auto positions = pcd.CloudRef->Positions();
+            Geometry::AABB local;
+            for (const auto& p : positions)
+            {
+                local.Min = glm::min(local.Min, p);
+                local.Max = glm::max(local.Max, p);
+            }
+
+            glm::mat4 world;
+            if (auto* w = reg.try_get<ECS::Components::Transform::WorldMatrix>(entity))
+                world = w->Matrix;
+            else
+                world = ECS::Components::Transform::GetMatrix(transform);
+
+            // Transform AABB corners to world space.
+            const glm::vec3 corners[8] = {
+                {local.Min.x, local.Min.y, local.Min.z}, {local.Max.x, local.Min.y, local.Min.z},
+                {local.Min.x, local.Max.y, local.Min.z}, {local.Max.x, local.Max.y, local.Min.z},
+                {local.Min.x, local.Min.y, local.Max.z}, {local.Max.x, local.Min.y, local.Max.z},
+                {local.Min.x, local.Max.y, local.Max.z}, {local.Max.x, local.Max.y, local.Max.z},
+            };
+            Geometry::AABB result;
+            for (const auto& c : corners)
+            {
+                const glm::vec3 wc = TransformPoint(world, c);
+                result.Min = glm::min(result.Min, wc);
+                result.Max = glm::max(result.Max, wc);
+            }
+            return result;
         }
     }
 
@@ -125,6 +183,31 @@ namespace Runtime::Selection
                 {
                     best.Entity = entity;
                     best.T = hit->T;
+                }
+            }
+        }
+
+        // Point cloud entities: ray vs world AABB for entity-level selection.
+        // Point clouds have no triangle mesh, so AABB intersection is the narrowphase.
+        {
+            auto pcView = reg.view<ECS::Components::Transform::Component,
+                                   ECS::PointCloud::Data,
+                                   ECS::Components::Selection::SelectableTag>();
+
+            for (auto [entity, transform, pcd] : pcView.each())
+            {
+                if (!pcd.CloudRef || pcd.CloudRef->Size() == 0) continue;
+
+                const Geometry::AABB worldAabb = PointCloudWorldAABB(pcd, transform, reg, entity);
+                if (!worldAabb.IsValid()) continue;
+
+                const auto hitT = RayAABBDistance(request.WorldRay, worldAabb);
+                if (!hitT) continue;
+
+                if (*hitT < best.T && *hitT <= request.MaxDistance)
+                {
+                    best.Entity = entity;
+                    best.T = *hitT;
                 }
             }
         }
