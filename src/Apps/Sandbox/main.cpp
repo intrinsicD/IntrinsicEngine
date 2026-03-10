@@ -2197,8 +2197,6 @@ public:
                   pcd.PointCount(), pcd.HasNormals() ? "yes" : "no", pcd.HasRadii() ? "yes" : "no");
     }
 
-t    // Removed obsolete DrawGeometryProcessingPanel (no longer needed).
-
     void DrawGeometryRemeshingPanel()
     {
         const auto context = GetGeometrySelectionContext();
