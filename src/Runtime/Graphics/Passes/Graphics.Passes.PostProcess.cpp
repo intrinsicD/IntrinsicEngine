@@ -677,7 +677,7 @@ namespace Graphics::Passes
 
                     data.Src = builder.Read(src,
                                             VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-                                            VK_ACCESS_2_SHADER_SAMPLED_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT);
+                                            VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
 
                     RGAttachmentInfo colorInfo{};
                     colorInfo.LoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -685,6 +685,7 @@ namespace Graphics::Passes
                     data.Dst = builder.WriteColor(bloomMips[capMip], colorInfo);
 
                     m_LastBloomDownHandles[capMip] = data.Src;
+                    m_LastBloomMipWriteHandles[capMip] = data.Dst;
                 },
                 [this, fi, srcW, srcH, dstW, dstH, threshold, isFirst, capMip]
                 (const BloomDownData&, const RGRegistry&, VkCommandBuffer cmd)
@@ -698,11 +699,13 @@ namespace Graphics::Passes
                                             m_BloomDownPipeline->GetLayout(),
                                             0, 1, &m_BloomDownSets[fi][capMip], 0, nullptr);
 
-                    struct {
+                    struct BloomDownPC {
                         float InvSrcResX, InvSrcResY;
                         float Threshold;
                         int   IsFirstMip;
-                    } pc{
+                    };
+                    static_assert(sizeof(BloomDownPC) == 16, "BloomDownPC must be 16 bytes");
+                    BloomDownPC pc{
                         1.0f / static_cast<float>(srcW),
                         1.0f / static_cast<float>(srcH),
                         threshold,
@@ -751,10 +754,10 @@ namespace Graphics::Passes
 
                     data.CoarserSrc = builder.Read(coarserSrc,
                                                     VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-                                                    VK_ACCESS_2_SHADER_SAMPLED_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT);
+                                                    VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
                     data.CurrentSrc = builder.Read(currentDown,
                                                     VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-                                                    VK_ACCESS_2_SHADER_SAMPLED_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT);
+                                                    VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
 
                     RGAttachmentInfo colorInfo{};
                     colorInfo.LoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -777,11 +780,13 @@ namespace Graphics::Passes
                                             m_BloomUpPipeline->GetLayout(),
                                             0, 1, &m_BloomUpSets[fi][capMip], 0, nullptr);
 
-                    struct {
+                    struct BloomUpPC {
                         float InvCoarserResX, InvCoarserResY;
                         float FilterRadius;
                         float _pad0;
-                    } pc{
+                    };
+                    static_assert(sizeof(BloomUpPC) == 16, "BloomUpPC must be 16 bytes");
+                    BloomUpPC pc{
                         1.0f / static_cast<float>(coarserW),
                         1.0f / static_cast<float>(coarserH),
                         filterRadius,
@@ -939,14 +944,16 @@ namespace Graphics::Passes
                                         m_HistogramPipeline->GetLayout(),
                                         0, 1, &m_HistogramSets[fi], 0, nullptr);
 
-                struct {
-                    float InvWidth;
-                    float InvHeight;
-                    float MinLogLum;
-                    float RangeLogLum;
-                } pc{
-                    1.0f / static_cast<float>(resolution.width),
-                    1.0f / static_cast<float>(resolution.height),
+                struct HistogramPC {
+                    uint32_t Width;
+                    uint32_t Height;
+                    float    MinLogLum;
+                    float    RangeLogLum;
+                };
+                static_assert(sizeof(HistogramPC) == 16, "HistogramPC must be 16 bytes");
+                HistogramPC pc{
+                    resolution.width,
+                    resolution.height,
                     minEV,
                     invRange
                 };
@@ -1002,15 +1009,13 @@ namespace Graphics::Passes
 
                 data.Src = builder.Read(postLdr,
                                         VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-                                        VK_ACCESS_2_SHADER_SAMPLED_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT);
+                                        VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
 
                 RGAttachmentInfo colorInfo{};
                 colorInfo.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
                 colorInfo.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
                 colorInfo.ClearValue.color = {{0.0f, 0.0f, 0.0f, 0.0f}};
                 data.Dst = builder.WriteColor(smaaEdges, colorInfo);
-
-                m_LastSMAAEdgesHandle = data.Src;
             },
             [this, fi, resolution, edgeThreshold]
             (const SMAAEdgeData&, const RGRegistry&, VkCommandBuffer cmd)
@@ -1023,11 +1028,13 @@ namespace Graphics::Passes
                                         m_SMAAEdgePipeline->GetLayout(),
                                         0, 1, &m_SMAAEdgeSets[fi], 0, nullptr);
 
-                struct {
+                struct SMAAEdgePC {
                     float InvResX, InvResY;
                     float EdgeThreshold;
                     float _pad0;
-                } pc{
+                };
+                static_assert(sizeof(SMAAEdgePC) == 16, "SMAAEdgePC must be 16 bytes");
+                SMAAEdgePC pc{
                     1.0f / static_cast<float>(resolution.width),
                     1.0f / static_cast<float>(resolution.height),
                     edgeThreshold, 0.0f
@@ -1056,7 +1063,7 @@ namespace Graphics::Passes
 
                 data.Edges = builder.Read(smaaEdges,
                                           VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-                                          VK_ACCESS_2_SHADER_SAMPLED_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT);
+                                          VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
 
                 RGAttachmentInfo colorInfo{};
                 colorInfo.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
@@ -1077,11 +1084,13 @@ namespace Graphics::Passes
                                         m_SMAABlendPipeline->GetLayout(),
                                         0, 1, &m_SMAABlendSets[fi], 0, nullptr);
 
-                struct {
+                struct SMAABlendPC {
                     float InvResX, InvResY;
                     int   MaxSearchSteps;
                     int   MaxSearchStepsDiag;
-                } pc{
+                };
+                static_assert(sizeof(SMAABlendPC) == 16, "SMAABlendPC must be 16 bytes");
+                SMAABlendPC pc{
                     1.0f / static_cast<float>(resolution.width),
                     1.0f / static_cast<float>(resolution.height),
                     maxSearch, maxSearchDiag
@@ -1100,10 +1109,10 @@ namespace Graphics::Passes
             {
                 data.Src = builder.Read(postLdr,
                                         VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-                                        VK_ACCESS_2_SHADER_SAMPLED_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT);
+                                        VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
                 data.Weights = builder.Read(smaaWeights,
                                             VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-                                            VK_ACCESS_2_SHADER_SAMPLED_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT);
+                                            VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
 
                 RGAttachmentInfo colorInfo{};
                 colorInfo.LoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -1123,10 +1132,12 @@ namespace Graphics::Passes
                                         m_SMAAResolvePipeline->GetLayout(),
                                         0, 1, &m_SMAAResolveSets[fi], 0, nullptr);
 
-                struct {
+                struct SMAAResolvePC {
                     float InvResX, InvResY;
                     float _pad0, _pad1;
-                } pc{
+                };
+                static_assert(sizeof(SMAAResolvePC) == 16, "SMAAResolvePC must be 16 bytes");
+                SMAAResolvePC pc{
                     1.0f / static_cast<float>(resolution.width),
                     1.0f / static_cast<float>(resolution.height),
                     0.0f, 0.0f
@@ -1273,13 +1284,13 @@ namespace Graphics::Passes
 
                     data.Src = builder.Read(sceneColor,
                                             VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-                                            VK_ACCESS_2_SHADER_SAMPLED_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT);
+                                            VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
 
                     if (bloomResult.IsValid())
                     {
                         data.Bloom = builder.Read(bloomResult,
                                                    VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-                                                   VK_ACCESS_2_SHADER_SAMPLED_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT);
+                                                   VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
                     }
 
                     RGAttachmentInfo colorInfo{};
@@ -1326,7 +1337,7 @@ namespace Graphics::Passes
                     {
                         data.Src = builder.Read(postLdr,
                                                 VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-                                                VK_ACCESS_2_SHADER_SAMPLED_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT);
+                                                VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
 
                         RGAttachmentInfo colorInfo{};
                         colorInfo.LoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -1344,12 +1355,14 @@ namespace Graphics::Passes
                                                 m_FXAAPipeline->GetLayout(),
                                                 0, 1, &m_FXAASets[fi], 0, nullptr);
 
-                        struct {
+                        struct FXAAPC {
                             float InvResX, InvResY;
                             float ContrastThreshold;
                             float RelativeThreshold;
                             float SubpixelBlending;
-                        } pc{
+                        };
+                        static_assert(sizeof(FXAAPC) == 20, "FXAAPC must be 20 bytes");
+                        FXAAPC pc{
                             1.0f / static_cast<float>(resolution.width),
                             1.0f / static_cast<float>(resolution.height),
                             fxaaContrast, fxaaRelative, fxaaSubpixel
@@ -1371,13 +1384,13 @@ namespace Graphics::Passes
                 {
                     data.Src = builder.Read(sceneColor,
                                             VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-                                            VK_ACCESS_2_SHADER_SAMPLED_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT);
+                                            VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
 
                     if (bloomResult.IsValid())
                     {
                         data.Bloom = builder.Read(bloomResult,
                                                    VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-                                                   VK_ACCESS_2_SHADER_SAMPLED_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT);
+                                                   VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
                     }
 
                     RGAttachmentInfo colorInfo{};
@@ -1474,30 +1487,17 @@ namespace Graphics::Passes
             if (VkImageView ldrView = findView(m_LastPostLdrHandle))
                 UpdateImageDescriptor(dev, m_SMAAEdgeSets[frameIndex], 0, m_LinearSampler, ldrView, readLayout);
 
-            // SMAA Blend: binding 0 = edges texture.
-            // Search for "SMAAEdges" resource in debug images.
-            for (const auto& img : debugImages)
-            {
-                if (img.Name == "SMAAEdges"_id && img.View != VK_NULL_HANDLE)
-                {
-                    UpdateImageDescriptor(dev, m_SMAABlendSets[frameIndex], 0, m_LinearSampler, img.View, readLayout);
-                    break;
-                }
-            }
+            // SMAA Blend: binding 0 = edges texture (cached handle from blend pass setup).
+            if (VkImageView edgesView = findView(m_LastSMAAEdgesHandle))
+                UpdateImageDescriptor(dev, m_SMAABlendSets[frameIndex], 0, m_LinearSampler, edgesView, readLayout);
             // Bindings 1 and 2 (area/search textures) are set once in Initialize.
 
-            // SMAA Resolve: binding 0 = PostLdr, binding 1 = weights.
+            // SMAA Resolve: binding 0 = PostLdr, binding 1 = weights (cached handle from resolve pass setup).
             if (VkImageView ldrView = findView(m_LastPostLdrHandle))
                 UpdateImageDescriptor(dev, m_SMAAResolveSets[frameIndex], 0, m_LinearSampler, ldrView, readLayout);
 
-            for (const auto& img : debugImages)
-            {
-                if (img.Name == "SMAAWeights"_id && img.View != VK_NULL_HANDLE)
-                {
-                    UpdateImageDescriptor(dev, m_SMAAResolveSets[frameIndex], 1, m_LinearSampler, img.View, readLayout);
-                    break;
-                }
-            }
+            if (VkImageView weightsView = findView(m_LastSMAAWeightsHandle))
+                UpdateImageDescriptor(dev, m_SMAAResolveSets[frameIndex], 1, m_LinearSampler, weightsView, readLayout);
         }
 
         // Update bloom downsample descriptors.
@@ -1522,25 +1522,9 @@ namespace Graphics::Passes
             if (VkImageView coarserView = findView(m_LastBloomUpSrcHandles[mip]))
                 UpdateImageDescriptor(dev, m_BloomUpSets[frameIndex][mip], 0, m_LinearSampler, coarserView, readLayout);
 
-            // Binding 1: the downsample mip at this level.
-            // The downsample handle at 'mip' was the SRC read of the next downsample pass.
-            // We need the actual bloom mip resource. Search for it in debug images by matching
-            // the resource created for BloomMip{mip}.
-            // For simplicity, we search for any image whose resource ID matches the downsample
-            // output at this mip level. The output of downsample[mip] = m_LastBloomDownHandles[mip]
-            // but that's the *input* read handle. We need the written texture.
-            // Since we can't easily track the written texture handle here, we look for any
-            // resource named "BloomMip{mip}" in the debug images.
-            std::string mipName = std::format("BloomMip{}", mip);
-            Core::Hash::StringID mipId{mipName.c_str()};
-            for (const auto& img : debugImages)
-            {
-                if (img.Name == mipId && img.View != VK_NULL_HANDLE)
-                {
-                    UpdateImageDescriptor(dev, m_BloomUpSets[frameIndex][mip], 1, m_LinearSampler, img.View, readLayout);
-                    break;
-                }
-            }
+            // Binding 1: the downsample mip at this level (cached write handle from downsample pass).
+            if (VkImageView mipView = findView(m_LastBloomMipWriteHandles[mip]))
+                UpdateImageDescriptor(dev, m_BloomUpSets[frameIndex][mip], 1, m_LinearSampler, mipView, readLayout);
         }
     }
 

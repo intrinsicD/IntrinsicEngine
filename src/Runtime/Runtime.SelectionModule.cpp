@@ -2,6 +2,7 @@ module;
 
 #include <glm/glm.hpp>
 #include <entt/entity/registry.hpp>
+#include <entt/signal/dispatcher.hpp>
 
 module Runtime.SelectionModule;
 
@@ -21,6 +22,17 @@ namespace Runtime
     SelectionModule::SelectionModule(const Config& cfg)
         : m_Config(cfg)
     {
+    }
+
+    void SelectionModule::ConnectToScene(ECS::Scene& scene)
+    {
+        // Register a dispatcher sink for GpuPickCompleted.
+        // When RenderSystem fires the event (after GPU readback), this caches
+        // the result for consumption in the next Update() call.
+        scene.GetDispatcher().sink<ECS::Events::GpuPickCompleted>().connect<
+            [](SelectionModule& self, const ECS::Events::GpuPickCompleted& evt) {
+                self.m_CachedGpuPick = CachedGpuPick{evt.PickID, evt.HasHit};
+            }>(*this);
     }
 
     glm::uvec2 SelectionModule::WindowToFramebufferPixel(const Core::Windowing::Window& window,
@@ -51,12 +63,12 @@ namespace Runtime
     }
 
     void SelectionModule::ApplyFromGpuPick(ECS::Scene& scene,
-                                          const Graphics::RenderSystem::PickResultGpu& pick,
+                                          uint32_t pickID, bool hasHit,
                                           Selection::PickMode mode)
     {
         auto& reg = scene.GetRegistry();
 
-        if (pick.HasHit && pick.EntityID != 0u)
+        if (hasHit && pickID != 0u)
         {
             // Resolve pick ID -> entity via component lookup.
             // Keep this restricted to selectable entities to avoid picking internal/non-editor entities.
@@ -64,7 +76,7 @@ namespace Runtime
             for (auto e : view)
             {
                 const auto& pid = view.get<ECS::Components::Selection::PickID>(e);
-                if (pid.Value == pick.EntityID)
+                if (pid.Value == pickID)
                 {
                     if (reg.valid(e))
                     {
@@ -157,6 +169,9 @@ namespace Runtime
                 {
                     const glm::uvec2 px = WindowToFramebufferPixel(window, window.GetInput().GetMousePosition());
                     renderSystem.RequestPick(px.x, px.y);
+                    // Capture click mode at request time so the correct mode is applied
+                    // when the async GPU readback result arrives (potentially frames later).
+                    m_PendingGpuClickMode = clickMode;
                 }
                 else
                 {
@@ -183,24 +198,13 @@ namespace Runtime
             }
         }
 
-        // 2) For GPU: consume resolved results whenever they become ready.
-        if (m_Config.Backend == Selection::PickBackend::GPU)
+        // 2) For GPU: consume cached result from GpuPickCompleted event.
+        if (m_Config.Backend == Selection::PickBackend::GPU && m_CachedGpuPick.has_value())
         {
-            if (auto pickOpt = renderSystem.TryConsumePickResult(); pickOpt.has_value())
-            {
-                // Background behavior requested:
-                //  - shift held: background does NOT deselect (skip deselection)
-                //  - no shift: background deselects all
-                if (!pickOpt->HasHit || pickOpt->EntityID == 0u)
-                {
-                    if (!shiftDown)
-                        Selection::ApplySelection(scene, entt::null, Selection::PickMode::Replace);
-                }
-                else
-                {
-                    ApplyFromGpuPick(scene, *pickOpt, clickMode);
-                }
-            }
+            const auto pick = *m_CachedGpuPick;
+            m_CachedGpuPick.reset();
+
+            ApplyFromGpuPick(scene, pick.PickID, pick.HasHit, m_PendingGpuClickMode);
         }
     }
 }

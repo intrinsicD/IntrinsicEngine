@@ -76,7 +76,6 @@ export namespace Graphics
         using PickResultGpu = InteractionSystem::PickResultGpu;
         void RequestPick(uint32_t x, uint32_t y);
         [[nodiscard]] PickResultGpu GetLastPickResult() const;
-        [[nodiscard]] std::optional<PickResultGpu> TryConsumePickResult();
 
         // Access selection outline settings (returns nullptr if not available)
         [[nodiscard]] Passes::SelectionOutlineSettings* GetSelectionOutlineSettings();

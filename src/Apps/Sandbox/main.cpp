@@ -12,6 +12,7 @@
 #include <limits>
 #include <imgui.h>
 #include <entt/entity/registry.hpp>
+#include <entt/signal/dispatcher.hpp>
 #include <tiny_gltf.h>
 #include <unordered_set>
 
@@ -181,6 +182,7 @@ public:
     Graphics::CameraComponent m_Camera;
 
     // Editor / Selection Settings
+    entt::entity m_CachedSelectedEntity = entt::null; // Updated by SelectionChanged sink — avoids per-frame polling.
     int m_SelectMouseButton = 1; // 0=LMB, 1=RMB, 2=MMB. Default: RMB to avoid conflict with LMB-drag orbit.
     GeometryRemeshingUiState m_GeometryRemeshingUi{};
     GeometrySimplificationUiState m_GeometrySimplificationUi{};
@@ -253,7 +255,7 @@ public:
     [[nodiscard]] GeometrySelectionContext GetGeometrySelectionContext()
     {
         GeometrySelectionContext context{};
-        context.Selected = GetSelection().GetSelectedEntity(GetScene());
+        context.Selected = m_CachedSelectedEntity;
 
         auto& reg = GetScene().GetRegistry();
         context.HasSelection = context.Selected != entt::null && reg.valid(context.Selected);
@@ -986,6 +988,16 @@ public:
         m_Camera = GetScene().GetRegistry().emplace<Graphics::CameraComponent>(m_CameraEntity);
         GetScene().GetRegistry().emplace<Graphics::OrbitControlComponent>(m_CameraEntity);
 
+        // Cache selected entity via dispatcher sink instead of polling every frame.
+        GetScene().GetDispatcher().sink<ECS::Events::SelectionChanged>().connect<
+            [](entt::entity& cached, const ECS::Events::SelectionChanged& evt) {
+                cached = evt.Entity;
+            }>(m_CachedSelectedEntity);
+
+        // Connect SelectionModule to the scene dispatcher so GPU pick results
+        // arrive via GpuPickCompleted event instead of per-frame polling.
+        GetSelection().ConnectToScene(GetScene());
+
         auto textureLoader = [this, &gfx](const std::filesystem::path& path, Core::Assets::AssetHandle handle)
             -> std::shared_ptr<RHI::Texture>
         {
@@ -1137,7 +1149,7 @@ public:
             ImGui::Separator();
             ImGui::Text("Select Mouse Button: %d", m_SelectMouseButton);
 
-            const entt::entity selected = GetSelection().GetSelectedEntity(GetScene());
+            const entt::entity selected = m_CachedSelectedEntity;
             const bool selectedValid = (selected != entt::null) && GetScene().GetRegistry().valid(selected);
 
             ImGui::Text("Selected: %u (%s)",
@@ -1567,7 +1579,7 @@ public:
             // Show status feedback
             if (m_DrawSelectedColliderOctree || m_DrawSelectedColliderBounds || m_DrawSelectedColliderKDTree || m_DrawSelectedColliderBVH || m_DrawSelectedColliderConvexHull)
             {
-                const entt::entity selected = GetSelection().GetSelectedEntity(GetScene());
+                const entt::entity selected = m_CachedSelectedEntity;
                 if (selected == entt::null || !GetScene().GetRegistry().valid(selected))
                 {
                     ImGui::TextDisabled("No valid selected entity.");
@@ -1623,7 +1635,7 @@ public:
             {
                 if (auto* orbit = GetScene().GetRegistry().try_get<Graphics::OrbitControlComponent>(m_CameraEntity))
                 {
-                    const entt::entity selected = GetSelection().GetSelectedEntity(GetScene());
+                    const entt::entity selected = m_CachedSelectedEntity;
                     if (selected != entt::null && GetScene().GetRegistry().valid(selected))
                     {
                         auto* collider = GetScene().GetRegistry().try_get<ECS::MeshCollider::Component>(selected);
@@ -1761,7 +1773,7 @@ public:
         // ---------------------------------------------------------------------
         if (m_DrawSelectedColliderOctree || m_DrawSelectedColliderBounds || m_DrawSelectedColliderKDTree || m_DrawSelectedColliderBVH || m_DrawSelectedColliderConvexHull || m_DrawSelectedColliderContacts)
         {
-            const entt::entity selected = GetSelection().GetSelectedEntity(GetScene());
+            const entt::entity selected = m_CachedSelectedEntity;
             if (selected != entt::null && GetScene().GetRegistry().valid(selected))
             {
                 auto& reg = GetScene().GetRegistry();
@@ -1795,48 +1807,46 @@ public:
                     else
                         ReleaseRetainedLineOverlay(m_ConvexHullOverlay);
 
+                    // Contact manifolds use the transient DebugDraw path (not retained
+                    // overlay) because they are derived from pairwise collider state each
+                    // frame and include short-lived point/normal instrumentation.
+                    ReleaseRetainedLineOverlay(m_ContactOverlay);
                     if (m_DrawSelectedColliderContacts)
                     {
-                        UpdateRetainedLineOverlay(m_ContactOverlay, [&](Graphics::DebugDraw& dd)
+                        auto& dd = GetRenderOrchestrator().GetDebugDraw();
+                        auto colliders = reg.view<ECS::MeshCollider::Component>();
+
+                        const uint32_t pointAColor = Graphics::DebugDraw::PackColorF(1.0f, 0.85f, 0.2f, 1.0f);
+                        const uint32_t pointBColor = Graphics::DebugDraw::PackColorF(1.0f, 0.2f, 0.2f, 1.0f);
+                        const uint32_t normalColor = Graphics::DebugDraw::PackColorF(0.2f, 0.85f, 1.0f, 1.0f);
+
+                        for (auto [otherEntity, otherCollider] : colliders.each())
                         {
-                            auto colliders = reg.view<ECS::MeshCollider::Component>();
+                            if (otherEntity == selected || !otherCollider.CollisionRef)
+                                continue;
 
-                            const uint32_t pointAColor = Graphics::DebugDraw::PackColorF(1.0f, 0.85f, 0.2f, 1.0f);
-                            const uint32_t pointBColor = Graphics::DebugDraw::PackColorF(1.0f, 0.2f, 0.2f, 1.0f);
-                            const uint32_t normalColor = Graphics::DebugDraw::PackColorF(0.2f, 0.85f, 1.0f, 1.0f);
+                            auto manifold = Geometry::ComputeContact(collider->WorldOBB, otherCollider.WorldOBB);
+                            if (!manifold)
+                                continue;
 
-                            for (auto [otherEntity, otherCollider] : colliders.each())
+                            const glm::vec3 mid = (manifold->ContactPointA + manifold->ContactPointB) * 0.5f;
+                            const glm::vec3 normalEnd = mid + manifold->Normal * (m_ContactNormalScale + manifold->PenetrationDepth);
+
+                            if (m_ContactDebugOverlay)
                             {
-                                if (otherEntity == selected || !otherCollider.CollisionRef)
-                                    continue;
-
-                                auto manifold = Geometry::ComputeContact(collider->WorldOBB, otherCollider.WorldOBB);
-                                if (!manifold)
-                                    continue;
-
-                                const glm::vec3 mid = (manifold->ContactPointA + manifold->ContactPointB) * 0.5f;
-                                const glm::vec3 normalEnd = mid + manifold->Normal * (m_ContactNormalScale + manifold->PenetrationDepth);
-
-                                if (m_ContactDebugOverlay)
-                                {
-                                    dd.OverlaySphere(manifold->ContactPointA, m_ContactPointRadius, pointAColor, 12);
-                                    dd.OverlaySphere(manifold->ContactPointB, m_ContactPointRadius, pointBColor, 12);
-                                    dd.OverlayLine(manifold->ContactPointA, manifold->ContactPointB, pointAColor, pointBColor);
-                                    dd.OverlayLine(mid, normalEnd, normalColor);
-                                }
-                                else
-                                {
-                                    dd.Sphere(manifold->ContactPointA, m_ContactPointRadius, pointAColor, 12);
-                                    dd.Sphere(manifold->ContactPointB, m_ContactPointRadius, pointBColor, 12);
-                                    dd.Line(manifold->ContactPointA, manifold->ContactPointB, pointAColor, pointBColor);
-                                    dd.Arrow(mid, normalEnd, glm::max(0.02f, m_ContactPointRadius), normalColor);
-                                }
+                                dd.OverlaySphere(manifold->ContactPointA, m_ContactPointRadius, pointAColor, 12);
+                                dd.OverlaySphere(manifold->ContactPointB, m_ContactPointRadius, pointBColor, 12);
+                                dd.OverlayLine(manifold->ContactPointA, manifold->ContactPointB, pointAColor, pointBColor);
+                                dd.OverlayLine(mid, normalEnd, normalColor);
                             }
-                        });
-                    }
-                    else
-                    {
-                        ReleaseRetainedLineOverlay(m_ContactOverlay);
+                            else
+                            {
+                                dd.Sphere(manifold->ContactPointA, m_ContactPointRadius, pointAColor, 12);
+                                dd.Sphere(manifold->ContactPointB, m_ContactPointRadius, pointBColor, 12);
+                                dd.Line(manifold->ContactPointA, manifold->ContactPointB, pointAColor, pointBColor);
+                                dd.Arrow(mid, normalEnd, glm::max(0.02f, m_ContactPointRadius), normalColor);
+                            }
+                        }
                     }
                 }
                 else
@@ -1918,7 +1928,7 @@ public:
             ImGui::RadioButton("MMB", &m_SelectMouseButton, 2);
         }
 
-        const entt::entity selected = GetSelection().GetSelectedEntity(GetScene());
+        const entt::entity selected = m_CachedSelectedEntity;
 
         GetScene().GetRegistry().view<entt::entity>().each([&](auto entityID)
         {
@@ -1971,7 +1981,7 @@ public:
             }
             if (ImGui::MenuItem("Remove Entity"))
             {
-                const entt::entity cur = GetSelection().GetSelectedEntity(GetScene());
+                const entt::entity cur = m_CachedSelectedEntity;
                 if (cur != entt::null && GetScene().GetRegistry().valid(cur))
                 {
                     GetScene().GetRegistry().destroy(cur);
@@ -2101,6 +2111,8 @@ public:
         auto& md = reg.emplace_or_replace<ECS::Mesh::Data>(entity);
         md.MeshRef = std::make_shared<Geometry::Halfedge::Mesh>(std::move(mesh));
         md.AttributesDirty = true;
+
+        GetScene().GetDispatcher().enqueue<ECS::Events::GeometryModified>({entity});
     }
 
     // =========================================================================
@@ -2560,7 +2572,7 @@ t    // Removed obsolete DrawGeometryProcessingPanel (no longer needed).
     {
         ImGui::Begin("Inspector");
 
-        const entt::entity selected = GetSelection().GetSelectedEntity(GetScene());
+        const entt::entity selected = m_CachedSelectedEntity;
 
         if (selected != entt::null && GetScene().GetRegistry().valid(selected))
         {
