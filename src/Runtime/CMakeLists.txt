@@ -23,6 +23,10 @@ target_sources(${target_name}
         Runtime.SelectionModule.cpp
         Runtime.SceneSerializer.cpp
         EditorUI/Runtime.EditorUI.cpp
+        EditorUI/Runtime.EditorUI.Widgets.cpp
+        EditorUI/Runtime.EditorUI.InspectorController.cpp
+        EditorUI/Runtime.EditorUI.GeometryWorkflowController.cpp
+        EditorUI/Runtime.EditorUI.SpatialDebugController.cpp
 )
 
 target_include_directories(${target_name} PUBLIC .)

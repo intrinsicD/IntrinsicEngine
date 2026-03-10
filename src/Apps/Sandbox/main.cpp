@@ -1,9 +1,8 @@
 // Sandbox Application — main entry point and SandboxApp orchestration class.
 //
 // The three controller subsystems (SpatialDebugController, GeometryWorkflowController,
-// InspectorController) have been extracted into dedicated headers under src/Apps/Sandbox/.
-// main.cpp now contains only bootstrap (main), asset setup (OnStart), and per-frame
-// orchestration (OnUpdate).
+// InspectorController) live in the Runtime.EditorUI module. main.cpp contains only
+// bootstrap (main), asset setup (OnStart), and per-frame orchestration (OnUpdate).
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -44,11 +43,6 @@ import ECS;
 import RHI;
 import Interface;
 
-// Extracted controller headers (Sandbox-local, not engine modules).
-#include "SandboxCommon.h"
-#include "SpatialDebugController.h"
-#include "GeometryWorkflowController.h"
-#include "InspectorController.h"
 
 using namespace Core;
 using namespace Runtime;
@@ -264,9 +258,9 @@ private:
     int m_SelectMouseButton = 0;
 
     // --- Extracted subsystem controllers ---
-    Sandbox::SpatialDebugController m_SpatialDebug;
-    Sandbox::GeometryWorkflowController m_GeometryWorkflow;
-    Sandbox::InspectorController m_Inspector;
+    Runtime::EditorUI::SpatialDebugController m_SpatialDebug;
+    Runtime::EditorUI::GeometryWorkflowController m_GeometryWorkflow;
+    Runtime::EditorUI::InspectorController m_Inspector;
 
     // --- Transform Gizmo ---
     Graphics::TransformGizmo m_Gizmo;
@@ -773,7 +767,7 @@ private:
 
         GetScene().GetRegistry().view<entt::entity>().each([&](auto entityID)
         {
-            if (GetScene().GetRegistry().all_of<Sandbox::HiddenEditorEntityTag>(entityID))
+            if (GetScene().GetRegistry().all_of<Runtime::EditorUI::HiddenEditorEntityTag>(entityID))
                 return;
 
             std::string name = "Entity";
@@ -881,7 +875,7 @@ private:
                                 {
                                     glm::mat4 world = GetMatrix(*xf);
                                     glm::vec3 wLo, wHi;
-                                    Sandbox::TransformAABB(aabb.Min, aabb.Max, world, wLo, wHi);
+                                    Runtime::EditorUI::TransformAABB(aabb.Min, aabb.Max, world, wLo, wHi);
                                     center = (wLo + wHi) * 0.5f;
                                     radius = glm::length((wHi - wLo) * 0.5f);
                                 }
@@ -917,7 +911,7 @@ private:
                                 {
                                     glm::mat4 world = GetMatrix(*xf);
                                     glm::vec3 wLo, wHi;
-                                    Sandbox::TransformAABB(aabb.Min, aabb.Max, world, wLo, wHi);
+                                    Runtime::EditorUI::TransformAABB(aabb.Min, aabb.Max, world, wLo, wHi);
                                     center = (wLo + wHi) * 0.5f;
                                     radius = glm::length((wHi - wLo) * 0.5f);
                                 }
