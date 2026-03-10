@@ -32,12 +32,8 @@ This document tracks the **active rendering-architecture backlog** for Intrinsic
 
 ## P0 — Critical Refactor
 
-Stage 1 (file extraction) is complete — see git history. Remaining work:
+Stage 1 (file extraction) and Stage 2 (module migration) are complete — see git history. Remaining work:
 
-- [ ] Move reusable editor/runtime panels from Sandbox headers to `Runtime.EditorUI` module:
-  - [ ] `InspectorController` → `Runtime.EditorUI` (general property inspector, ColorSourceWidget, VectorFieldWidget).
-  - [ ] `GeometryWorkflowController` → `Runtime.EditorUI` or adjacent `Runtime.GeometryUI` module.
-  - [ ] `SpatialDebugController` → `Runtime.EditorUI` or `Graphics` debug visualization module.
 - [ ] Preserve stability with tests:
   - [ ] panel registration coverage
   - [ ] headless app smoke test
