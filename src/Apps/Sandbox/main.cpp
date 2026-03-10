@@ -1792,30 +1792,123 @@ public:
                 Graphics::OnResize(*cameraComponent, m_Window->GetWindowWidth(), m_Window->GetWindowHeight());
             }
 
-            // --- F Key: Focus camera on selected model ---
-            if (!uiCapturesKeyboard && m_Window->GetInput().IsKeyJustPressed(Core::Input::Key::F))
+            // --- F / C Key: Focus camera on selected entity ---
+            // Works for meshes (via MeshCollider OBB), point clouds (via Cloud positions),
+            // and graphs (via Graph node positions). F = focus (fit in view), C = center (orbit target only).
             {
-                if (auto* orbit = GetScene().GetRegistry().try_get<Graphics::OrbitControlComponent>(m_CameraEntity))
+                const bool fPressed = !uiCapturesKeyboard && m_Window->GetInput().IsKeyJustPressed(Core::Input::Key::F);
+                const bool cPressed = !uiCapturesKeyboard && m_Window->GetInput().IsKeyJustPressed(Core::Input::Key::C);
+                if (fPressed || cPressed)
                 {
-                    const entt::entity selected = m_CachedSelectedEntity;
-                    if (selected != entt::null && GetScene().GetRegistry().valid(selected))
+                    if (auto* orbit = GetScene().GetRegistry().try_get<Graphics::OrbitControlComponent>(m_CameraEntity))
                     {
-                        auto* collider = GetScene().GetRegistry().try_get<ECS::MeshCollider::Component>(selected);
-                        if (collider && collider->CollisionRef)
+                        const entt::entity selected = m_CachedSelectedEntity;
+                        if (selected != entt::null && GetScene().GetRegistry().valid(selected))
                         {
-                            // Use the world-space OBB center as the new orbit target.
-                            orbit->Target = collider->WorldOBB.Center;
+                            // Compute world-space AABB center and radius for any entity type.
+                            glm::vec3 center{0.0f};
+                            float radius = 0.0f;
+                            bool found = false;
 
-                            // Compute an orbit distance that fits the object in view.
-                            float radius = glm::length(collider->WorldOBB.Extents);
-                            if (radius < 0.001f) radius = 1.0f;
-                            float halfFov = glm::radians(cameraComponent->Fov) * 0.5f;
-                            float fitDistance = radius / glm::tan(halfFov);
-                            orbit->Distance = fitDistance * 1.5f; // Add margin.
+                            auto& reg = GetScene().GetRegistry();
 
-                            // Reposition camera while preserving current viewing direction.
-                            glm::vec3 viewDir = glm::normalize(cameraComponent->Position - orbit->Target);
-                            cameraComponent->Position = orbit->Target + viewDir * orbit->Distance;
+                            // 1) Mesh entity: use world OBB.
+                            if (auto* collider = reg.try_get<ECS::MeshCollider::Component>(selected))
+                            {
+                                if (collider->CollisionRef)
+                                {
+                                    center = collider->WorldOBB.Center;
+                                    radius = glm::length(collider->WorldOBB.Extents);
+                                    found = true;
+                                }
+                            }
+
+                            // 2) Point cloud entity: compute AABB from cloud positions.
+                            if (!found)
+                            {
+                                if (auto* pcd = reg.try_get<ECS::PointCloud::Data>(selected))
+                                {
+                                    if (pcd->CloudRef && pcd->CloudRef->Size() > 0)
+                                    {
+                                        auto positions = pcd->CloudRef->Positions();
+                                        Geometry::AABB aabb;
+                                        for (const auto& p : positions)
+                                        {
+                                            aabb.Min = glm::min(aabb.Min, p);
+                                            aabb.Max = glm::max(aabb.Max, p);
+                                        }
+                                        // Transform to world space using entity transform.
+                                        if (auto* xf = reg.try_get<ECS::Components::Transform::Component>(selected))
+                                        {
+                                            glm::mat4 world = GetMatrix(*xf);
+                                            glm::vec3 wLo, wHi;
+                                            TransformAABB(aabb.Min, aabb.Max, world, wLo, wHi);
+                                            center = (wLo + wHi) * 0.5f;
+                                            radius = glm::length((wHi - wLo) * 0.5f);
+                                        }
+                                        else
+                                        {
+                                            center = aabb.GetCenter();
+                                            radius = glm::length(aabb.GetExtents());
+                                        }
+                                        found = true;
+                                    }
+                                }
+                            }
+
+                            // 3) Graph entity: compute AABB from node positions.
+                            if (!found)
+                            {
+                                if (auto* gd = reg.try_get<ECS::Graph::Data>(selected))
+                                {
+                                    if (gd->GraphRef && gd->GraphRef->VertexCount() > 0)
+                                    {
+                                        Geometry::AABB aabb;
+                                        for (std::size_t i = 0; i < gd->GraphRef->VerticesSize(); ++i)
+                                        {
+                                            Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(i)};
+                                            if (gd->GraphRef->IsValid(v))
+                                            {
+                                                glm::vec3 p = gd->GraphRef->VertexPosition(v);
+                                                aabb.Min = glm::min(aabb.Min, p);
+                                                aabb.Max = glm::max(aabb.Max, p);
+                                            }
+                                        }
+                                        if (auto* xf = reg.try_get<ECS::Components::Transform::Component>(selected))
+                                        {
+                                            glm::mat4 world = GetMatrix(*xf);
+                                            glm::vec3 wLo, wHi;
+                                            TransformAABB(aabb.Min, aabb.Max, world, wLo, wHi);
+                                            center = (wLo + wHi) * 0.5f;
+                                            radius = glm::length((wHi - wLo) * 0.5f);
+                                        }
+                                        else
+                                        {
+                                            center = aabb.GetCenter();
+                                            radius = glm::length(aabb.GetExtents());
+                                        }
+                                        found = true;
+                                    }
+                                }
+                            }
+
+                            if (found)
+                            {
+                                if (radius < 0.001f) radius = 1.0f;
+                                orbit->Target = center;
+
+                                if (fPressed)
+                                {
+                                    // F key: fit the object in view (adjust distance).
+                                    float halfFov = glm::radians(cameraComponent->Fov) * 0.5f;
+                                    float fitDistance = radius / glm::tan(halfFov);
+                                    orbit->Distance = fitDistance * 1.5f;
+                                }
+
+                                // Reposition camera while preserving current viewing direction.
+                                glm::vec3 viewDir = glm::normalize(cameraComponent->Position - orbit->Target);
+                                cameraComponent->Position = orbit->Target + viewDir * orbit->Distance;
+                            }
                         }
                     }
                 }

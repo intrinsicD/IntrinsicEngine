@@ -159,7 +159,7 @@ Key design decisions:
 - **Mouse consumption:** `Update()` returns `true` when the gizmo consumed the click, which blocks entity selection.
 - **Multi-entity support:** All selected entities with `Transform::Component` + `SelectedTag` are transformed together, preserving relative offsets during rotation/translation.
 
-Keyboard shortcuts (set in Sandbox app): `W`=Translate, `E`=Rotate, `R`=Scale, `X`=Toggle World/Local.
+Keyboard shortcuts (set in Sandbox app): `W`=Translate, `E`=Rotate, `R`=Scale, `X`=Toggle World/Local, `F`=Focus camera on selected (fit in view), `C`=Center camera on selected (orbit target only), `Q`=Reset camera.
 
 ## Three-Pass Rendering Architecture
 
