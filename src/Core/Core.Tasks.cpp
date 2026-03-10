@@ -61,7 +61,7 @@ namespace Core::Tasks
         {
             // Hybrid strategy:
             // 1) Try to acquire.
-            // 2)) If contended, do a short polite spin with CPU relax.
+            // 2) If contended, do a short polite spin with CPU relax.
             // 3) If still contended, use atomic::wait (futex) to sleep.
             while (true)
             {
@@ -733,8 +733,11 @@ namespace Core::Tasks
 
         slot.inUse = false;
         uint32_t node = slot.parkedHead;
+        const uint32_t safetyLimit = slot.parkedCount + 1;
+        uint32_t iterations = 0;
         while (node != SchedulerContext::InvalidParkedNode)
         {
+            if (++iterations > safetyLimit) break;
             auto& parkedNode = s_Ctx->parkedNodes[node];
             const uint32_t next = parkedNode.next;
             parkedNode.next = SchedulerContext::InvalidParkedNode;
@@ -848,8 +851,11 @@ namespace Core::Tasks
 
             continuations.reserve(slot.parkedCount);
             uint32_t node = slot.parkedHead;
+            const uint32_t safetyLimit = slot.parkedCount + 1;
+            uint32_t iterations = 0;
             while (node != SchedulerContext::InvalidParkedNode)
             {
+                if (++iterations > safetyLimit) break;
                 auto& parkedNode = s_Ctx->parkedNodes[node];
                 const uint32_t next = parkedNode.next;
                 parkedNode.next = SchedulerContext::InvalidParkedNode;

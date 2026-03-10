@@ -2,7 +2,7 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <functional>
-#include  <string_view>
+#include <string_view>
 
 export module Core.Hash;
 
