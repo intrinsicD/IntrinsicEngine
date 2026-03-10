@@ -25,6 +25,20 @@ namespace Runtime::EditorUI
     // File-local scene dirty tracker (one per process).
     static SceneDirtyTracker s_DirtyTracker;
 
+    // Persistent UI state for editor panels.  Avoids function-local
+    // static variables that retain stale content across panel hide/show.
+    struct EditorPanelState
+    {
+        // Scene file dialogs
+        char SavePath[512]   = "";
+        char SaveAsPath[512] = "scene.json";
+        char LoadPath[512]   = "scene.json";
+
+        // Feature browser
+        int FeatureCategory = 0;
+    };
+    static EditorPanelState s_PanelState;
+
     SceneDirtyTracker& GetSceneDirtyTracker()
     {
         return s_DirtyTracker;
@@ -36,7 +50,7 @@ namespace Runtime::EditorUI
         {
             auto& reg = engine.GetFeatureRegistry();
 
-            static int cat = 0;
+            int& cat = s_PanelState.FeatureCategory;
             const char* cats[] = {"RenderFeature", "System", "Panel", "GeometryOperator"};
 
             ImGui::TextDisabled("Feature Registry");
@@ -200,7 +214,7 @@ namespace Runtime::EditorUI
             if (ImGui::BeginPopupModal("SaveScenePopup", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
             {
                 auto& tracker = GetSceneDirtyTracker();
-                static char savePath[512] = "";
+                auto& savePath = s_PanelState.SavePath;
 
                 // Pre-fill with current path if empty
                 if (savePath[0] == '\0' && !tracker.GetCurrentPath().empty())
@@ -238,7 +252,7 @@ namespace Runtime::EditorUI
             // ---- Save As popup ----
             if (ImGui::BeginPopupModal("SaveSceneAsPopup", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
             {
-                static char saveAsPath[512] = "scene.json";
+                auto& saveAsPath = s_PanelState.SaveAsPath;
 
                 ImGui::Text("Save scene to:");
                 ImGui::InputText("##saveaspath", saveAsPath, sizeof(saveAsPath));
@@ -266,7 +280,7 @@ namespace Runtime::EditorUI
             // ---- Load Scene popup ----
             if (ImGui::BeginPopupModal("LoadScenePopup", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
             {
-                static char loadPath[512] = "scene.json";
+                auto& loadPath = s_PanelState.LoadPath;
 
                 // Dirty-state warning
                 auto& tracker = GetSceneDirtyTracker();
