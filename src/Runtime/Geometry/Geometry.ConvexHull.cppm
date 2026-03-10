@@ -13,8 +13,8 @@ export namespace Geometry
 {
     struct ConvexHull
     {
-        std::vector<glm::vec3> Vertices;
-        std::vector<Plane> Planes;
+        std::vector<glm::vec3> Vertices{};
+        std::vector<Plane> Planes{};
 
         [[nodiscard]] bool IsEmpty() const
         {

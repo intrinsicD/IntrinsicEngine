@@ -149,6 +149,7 @@ intrinsic_test_object_lib(RuntimeTestObjs
         Test_PropertySetDirtySync.cpp
         Test_SceneSerializer.cpp
         Test_TransformGizmo.cpp
+        Test_CameraSpaceTransforms.cpp
         Test_CompositionAndValidation.cpp
         Test_Colormap.cpp
         Test_ColorMapper.cpp

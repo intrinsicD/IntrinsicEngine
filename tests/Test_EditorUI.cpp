@@ -30,34 +30,22 @@ TEST(EditorUI, GetSceneDirtyTracker_IsLinkable)
 // SceneDirtyTracker state machine
 // =========================================================================
 
-TEST(SceneDirtyTracker, InitiallyClean)
+TEST(EditorUISceneDirtyTracker, InitiallyClean)
 {
     SceneDirtyTracker tracker;
     EXPECT_FALSE(tracker.IsDirty());
 }
 
-TEST(SceneDirtyTracker, MarkDirty_SetsDirtyState)
+TEST(EditorUISceneDirtyTracker, MarkDirty_SetsDirtyState)
 {
     SceneDirtyTracker tracker;
     tracker.MarkDirty();
     EXPECT_TRUE(tracker.IsDirty());
 }
 
-TEST(SceneDirtyTracker, ClearDirty_ResetsState)
+TEST(EditorUISceneDirtyTracker, ClearDirty_ResetsState)
 {
     SceneDirtyTracker tracker;
-    tracker.MarkDirty();
-    EXPECT_TRUE(tracker.IsDirty());
-
-    tracker.ClearDirty();
-    EXPECT_FALSE(tracker.IsDirty());
-}
-
-TEST(SceneDirtyTracker, MarkDirty_IsIdempotent)
-{
-    SceneDirtyTracker tracker;
-    tracker.MarkDirty();
-    tracker.MarkDirty();
     tracker.MarkDirty();
     EXPECT_TRUE(tracker.IsDirty());
 
@@ -65,20 +53,32 @@ TEST(SceneDirtyTracker, MarkDirty_IsIdempotent)
     EXPECT_FALSE(tracker.IsDirty());
 }
 
-TEST(SceneDirtyTracker, InitialPathIsEmpty)
+TEST(EditorUISceneDirtyTracker, MarkDirty_IsIdempotent)
+{
+    SceneDirtyTracker tracker;
+    tracker.MarkDirty();
+    tracker.MarkDirty();
+    tracker.MarkDirty();
+    EXPECT_TRUE(tracker.IsDirty());
+
+    tracker.ClearDirty();
+    EXPECT_FALSE(tracker.IsDirty());
+}
+
+TEST(EditorUISceneDirtyTracker, InitialPathIsEmpty)
 {
     SceneDirtyTracker tracker;
     EXPECT_TRUE(tracker.GetCurrentPath().empty());
 }
 
-TEST(SceneDirtyTracker, SetCurrentPath_StoresPath)
+TEST(EditorUISceneDirtyTracker, SetCurrentPath_StoresPath)
 {
     SceneDirtyTracker tracker;
     tracker.SetCurrentPath("scenes/test.json");
     EXPECT_EQ(tracker.GetCurrentPath(), "scenes/test.json");
 }
 
-TEST(SceneDirtyTracker, SetCurrentPath_Overwrites)
+TEST(EditorUISceneDirtyTracker, SetCurrentPath_Overwrites)
 {
     SceneDirtyTracker tracker;
     tracker.SetCurrentPath("first.json");
@@ -86,7 +86,7 @@ TEST(SceneDirtyTracker, SetCurrentPath_Overwrites)
     EXPECT_EQ(tracker.GetCurrentPath(), "second.json");
 }
 
-TEST(SceneDirtyTracker, PathAndDirtyAreIndependent)
+TEST(EditorUISceneDirtyTracker, PathAndDirtyAreIndependent)
 {
     SceneDirtyTracker tracker;
 
@@ -101,7 +101,7 @@ TEST(SceneDirtyTracker, PathAndDirtyAreIndependent)
     EXPECT_FALSE(tracker.IsDirty());
 }
 
-TEST(SceneDirtyTracker, ClearDirty_DoesNotClearPath)
+TEST(EditorUISceneDirtyTracker, ClearDirty_DoesNotClearPath)
 {
     SceneDirtyTracker tracker;
     tracker.SetCurrentPath("my_scene.json");

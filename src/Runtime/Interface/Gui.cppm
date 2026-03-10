@@ -13,6 +13,7 @@ export namespace Interface::GUI
 {
     using UIPanelCallback = std::function<void()>;
     using UIMenuCallback = std::function<void()>;
+    using UIOverlayCallback = std::function<void()>;
 
     // Initializes ImGui, GLFW backend, and Vulkan backend (Dynamic Rendering)
     void Init(Core::Windowing::Window& window, 
@@ -38,6 +39,13 @@ export namespace Interface::GUI
     void RemovePanel(const std::string& name);
 
     void RegisterMainMenuBar(std::string name, UIMenuCallback callback);
+
+    // Registers a draw callback executed every ImGui frame after all panel windows.
+    // The callback is responsible for issuing any immediate-mode ImGui/ImGuizmo draws it needs.
+    void RegisterOverlay(std::string name, UIOverlayCallback callback);
+
+    // Unregisters a previously added overlay callback.
+    void RemoveOverlay(const std::string& name);
 
     // Returns true if ImGui is using the mouse (hovering a window, dragging a slider)
     [[nodiscard]] bool WantCaptureMouse();

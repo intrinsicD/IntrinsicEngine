@@ -10,26 +10,11 @@ module;
 
 export module Graphics:TransformGizmo;
 
-import :DebugDraw;
 import :Camera;
 import Core.Input;
 
 export namespace Graphics
 {
-    // =========================================================================
-    // TransformGizmo — 3D manipulation gizmo system
-    // =========================================================================
-    //
-    // Renders translate/rotate/scale gizmos via the DebugDraw overlay path
-    // (LinePass transient, no depth test). Handles mouse interaction with
-    // deterministic picking priority.
-    //
-    // Contract:
-    //  - Call Update() once per frame before DebugDraw is consumed.
-    //  - Reads selected world pose from ECS Transform::WorldMatrix when available.
-    //  - Writes parent-local ECS Transform components after solving the world-space gizmo target.
-    //  - Main-thread only.
-
     enum class GizmoMode : uint8_t
     {
         Translate = 0,
@@ -52,7 +37,7 @@ export namespace Graphics
         XY   = 4,
         XZ   = 5,
         YZ   = 6,
-        All  = 7  // Uniform scale only
+        All  = 7
     };
 
     enum class GizmoPivot : uint8_t
@@ -75,43 +60,33 @@ export namespace Graphics
         GizmoPivot Pivot         = GizmoPivot::Centroid;
 
         bool  SnapEnabled        = false;
-        float TranslateSnap      = 0.25f;  // World units
-        float RotateSnap         = 15.0f;  // Degrees
-        float ScaleSnap          = 0.1f;   // Scale factor
+        float TranslateSnap      = 0.25f;
+        float RotateSnap         = 15.0f;
+        float ScaleSnap          = 0.1f;
 
-        float HandleLength       = 1.0f;   // Base length (scaled by distance)
-        float HandleThickness    = 3.0f;   // Line width in pixels
-        float PickRadius         = 0.08f;  // NDC pick tolerance
+        float HandleLength       = 1.0f;
+        float HandleThickness    = 3.0f;
 
-        // Mouse button used for gizmo interaction (0=LMB).
+        // ImGuizmo uses LMB internally; keep this as an engine/editor contract.
         int   MouseButton        = 0;
     };
 
     class TransformGizmo
     {
     public:
-        TransformGizmo()
-            : m_Config{},
-              m_State{GizmoState::Idle},
-              m_HoveredAxis{GizmoAxis::None},
-              m_ActiveAxis{GizmoAxis::None},
-              m_DragStart{0.0f},
-              m_DragStartMouseNDC{0.0f},
-              m_PivotPosition{0.0f},
-              m_PivotRotation{1.0f, 0.0f, 0.0f, 0.0f},
-              m_InitialRotateAngle{0.0f},
-              m_CachedTransforms{}
-        {}
+        TransformGizmo() = default;
 
-        // Per-frame update: handles input, updates state, emits debug geometry.
-        // Returns true if the gizmo consumed the mouse input (blocks selection).
+        // Captures selection/camera/viewport state before rendering.
+        // Returns true when the gizmo should block scene interaction for this frame.
         bool Update(entt::registry& registry,
-                    DebugDraw& debugDraw,
                     const CameraComponent& camera,
                     const Core::Input::Context& input,
                     uint32_t viewportWidth,
                     uint32_t viewportHeight,
                     bool uiCapturesMouse);
+
+        // Executes the actual ImGuizmo draw/manipulate path during the active ImGui frame.
+        void DrawImGui();
 
         void SetMode(GizmoMode mode);
         void ResetInteraction();
@@ -122,82 +97,35 @@ export namespace Graphics
         [[nodiscard]] GizmoState GetState() const { return m_State; }
         [[nodiscard]] GizmoAxis  GetHoveredAxis() const { return m_HoveredAxis; }
         [[nodiscard]] GizmoAxis  GetActiveAxis() const { return m_ActiveAxis; }
-
-        // Returns true if the gizmo is currently being dragged.
         [[nodiscard]] bool IsActive() const { return m_State == GizmoState::Active; }
 
     private:
-        GizmoConfig m_Config;
+        struct EntityTransformCache
+        {
+            entt::entity Entity = entt::null;
+            glm::mat4    InitialWorldMatrix{1.0f};
+            glm::mat4    InitialParentWorldMatrix{1.0f};
+            bool         HasInitialParentWorldMatrix = false;
+        };
+
+        GizmoConfig m_Config{};
         GizmoState  m_State       = GizmoState::Idle;
         GizmoAxis   m_HoveredAxis = GizmoAxis::None;
         GizmoAxis   m_ActiveAxis  = GizmoAxis::None;
 
-        // Interaction state
-        glm::vec3   m_DragStart{0.0f};    // World-space drag start point
-        glm::vec2   m_DragStartMouseNDC{0.0f};
-        glm::vec3   m_PivotPosition{0.0f};
-        glm::quat   m_PivotRotation{1.0f, 0.0f, 0.0f, 0.0f};
-        float       m_InitialRotateAngle = 0.0f;
+        entt::registry* m_Registry = nullptr;
+        CameraComponent m_Camera{};
+        uint32_t        m_ViewportWidth = 0;
+        uint32_t        m_ViewportHeight = 0;
+        bool            m_UICapturesMouse = false;
+        bool            m_HasSelection = false;
 
-        // Frozen drag-start anchor used during active manipulation.
-        glm::vec3   m_DragPivotPosition{0.0f};
-        glm::quat   m_DragPivotRotation{1.0f, 0.0f, 0.0f, 0.0f};
-        float       m_DragHandleScale = 1.0f;
-
-        // Cache for multi-selection initial transforms
-        struct EntityTransformCache
-        {
-            entt::entity Entity = entt::null;
-            glm::vec3    InitialPosition{0.0f};
-            glm::quat    InitialRotation{1.0f, 0.0f, 0.0f, 0.0f};
-            glm::vec3    InitialScale{1.0f};
-            glm::vec3    InitialWorldPosition{0.0f};
-            glm::quat    InitialWorldRotation{1.0f, 0.0f, 0.0f, 0.0f};
-            glm::vec3    InitialWorldScale{1.0f};
-            glm::mat4    InitialParentWorldMatrix{1.0f};
-            bool         HasInitialParentWorldMatrix = false;
-        };
+        glm::mat4       m_PivotMatrix{1.0f};
+        glm::mat4       m_ManipulationStartPivotMatrix{1.0f};
+        glm::mat4       m_CurrentManipulatedPivotMatrix{1.0f};
         std::vector<EntityTransformCache> m_CachedTransforms{};
 
-        // Compute the pivot point from selected entities.
-        [[nodiscard]] bool ComputePivot(entt::registry& registry, bool refreshCachedTransforms = true);
-
-        // Hit-test the mouse against gizmo axes.
-        [[nodiscard]] GizmoAxis HitTest(const glm::vec2& mouseNDC,
-                                        const CameraComponent& camera,
-                                        float handleScale) const;
-
-        // Compute world-space handle scale (constant screen size).
-        [[nodiscard]] float ComputeHandleScale(const CameraComponent& camera) const;
-
-        // Get the axis direction in gizmo space (world or local).
-        [[nodiscard]] glm::vec3 GetAxisDirection(GizmoAxis axis) const;
-
-        // Project mouse to a line/plane for dragging.
-        [[nodiscard]] glm::vec3 ProjectMouseToAxis(const glm::vec2& mouseNDC,
-                                                    const CameraComponent& camera,
-                                                    GizmoAxis axis,
-                                                    float handleScale) const;
-
-        [[nodiscard]] float ProjectMouseToRotation(const glm::vec2& mouseNDC,
-                                                    const CameraComponent& camera,
-                                                    GizmoAxis axis,
-                                                    float handleScale) const;
-
-        [[nodiscard]] float ProjectMouseToScale(const glm::vec2& mouseNDC,
-                                                const CameraComponent& camera,
-                                                GizmoAxis axis,
-                                                float handleScale) const;
-
-        // Apply snap to a value.
-        [[nodiscard]] float ApplySnap(float value, float snapIncrement) const;
-
-        // Emit gizmo geometry to DebugDraw.
-        void DrawTranslateGizmo(DebugDraw& dd, float handleScale) const;
-        void DrawRotateGizmo(DebugDraw& dd, float handleScale) const;
-        void DrawScaleGizmo(DebugDraw& dd, float handleScale) const;
-
-        // Get color for axis (highlighted when hovered/active).
-        [[nodiscard]] uint32_t GetAxisColor(GizmoAxis axis) const;
+        [[nodiscard]] bool ComputeSelectionSnapshot(entt::registry& registry, bool refreshCache);
+        void ApplyManipulatedPivotMatrix(const glm::mat4& manipulatedPivotMatrix);
     };
 }

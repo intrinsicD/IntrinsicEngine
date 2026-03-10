@@ -33,7 +33,7 @@ export namespace Runtime
         {
             // Which mouse button triggers selection.
             // 0=LMB, 1=RMB, 2=MMB.
-            int MouseButton = 1;
+            int MouseButton = 0;
 
             // If true, we do GPU ID-buffer picking.
             // If false, we'll fall back to CPU raycast picking.

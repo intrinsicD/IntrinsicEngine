@@ -5,6 +5,7 @@
 #include <cmath>
 
 import Runtime.Selection;
+import Runtime.SelectionModule;
 import Graphics;
 
 namespace
@@ -28,4 +29,10 @@ TEST(RuntimeSelection, RayFromNDC_IsSane)
 
     const float len = glm::length(ray.Direction);
     EXPECT_NEAR(len, 1.0f, 1e-3f);
+}
+
+TEST(RuntimeSelectionModule, DefaultMouseButton_IsLmb)
+{
+    Runtime::SelectionModule module;
+    EXPECT_EQ(module.GetConfig().MouseButton, 0);
 }

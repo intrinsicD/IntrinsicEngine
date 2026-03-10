@@ -45,8 +45,15 @@ namespace Interface::GUI
         UIMenuCallback Callback;
     };
 
+    struct RegisteredOverlay
+    {
+        std::string Name;
+        UIOverlayCallback Callback;
+    };
+
     static std::vector<RegisteredPanel> s_Panels;
     static std::vector<RegisteredMenu> s_Menus;
+    static std::vector<RegisteredOverlay> s_Overlays;
     static VkDescriptorPool s_DescriptorPool = VK_NULL_HANDLE;
     static RHI::VulkanDevice* s_Device = nullptr;
     static bool s_ShowTelemetryPanel = false;
@@ -729,6 +736,13 @@ namespace Interface::GUI
 
             ++it;
         }
+
+        // 4. FRAME OVERLAYS (no window wrapper)
+        for (const auto& overlay : s_Overlays)
+        {
+            if (overlay.Callback)
+                overlay.Callback();
+        }
     }
 
     void Render(VkCommandBuffer cmd)
@@ -765,6 +779,25 @@ namespace Interface::GUI
     {
         // Simple append - ImGui menus merge automatically if they have the same name (e.g. "File")
         s_Menus.push_back({std::move(name), std::move(callback)});
+    }
+
+    void RegisterOverlay(std::string name, UIOverlayCallback callback)
+    {
+        for (auto& overlay : s_Overlays)
+        {
+            if (overlay.Name == name)
+            {
+                overlay.Callback = std::move(callback);
+                return;
+            }
+        }
+
+        s_Overlays.push_back({std::move(name), std::move(callback)});
+    }
+
+    void RemoveOverlay(const std::string& name)
+    {
+        std::erase_if(s_Overlays, [&](const RegisteredOverlay& o) { return o.Name == name; });
     }
 
     bool WantCaptureMouse()

@@ -93,8 +93,8 @@ namespace Graphics
 
         glm::vec3 offset = camera.Position - orbitControlComponent.Target;
 
-        // --- 1. Handle Rotation (LMB drag) ---
-        if (inputContext.IsMouseButtonPressed(0)) // Left Click
+        // --- 1. Handle Rotation (RMB drag) ---
+        if (inputContext.IsMouseButtonPressed(1)) // Right Click
         {
             glm::vec2 pos = inputContext.GetMousePosition();
 

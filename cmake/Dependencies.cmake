@@ -180,8 +180,17 @@ if(NOT imgui_POPULATED)
     FetchContent_Populate(imgui)
 endif()
 
+FetchContent_Declare(
+        imguizmo
+        GIT_REPOSITORY https://github.com/CedricGuillemet/ImGuizmo.git
+)
+
+intrinsic_make_available(imguizmo)
+
 # Prefer the path returned by FetchContent_Populate; fall back to our offline cache layout.
 set(IMGUI_SOURCE_DIR "${imgui_SOURCE_DIR}")
+set(IMGUIZMO_SOURCE_DIR "${imguizmo_SOURCE_DIR}")
+
 if("${IMGUI_SOURCE_DIR}" STREQUAL "")
     set(IMGUI_SOURCE_DIR "${FETCHCONTENT_BASE_DIR}/imgui-src")
 endif()
@@ -191,6 +200,19 @@ if(NOT IS_DIRECTORY "${IMGUI_SOURCE_DIR}" OR NOT EXISTS "${IMGUI_SOURCE_DIR}/img
         "ImGui sources not found. Expected at: ${IMGUI_SOURCE_DIR}\n"
         "Missing file: ${IMGUI_SOURCE_DIR}/imgui.cpp\n"
         "If configuring offline, ensure external/cache/imgui-src is populated and non-empty."
+    )
+endif()
+
+if("${IMGUIZMO_SOURCE_DIR}" STREQUAL "")
+    set(IMGUIZMO_SOURCE_DIR "${FETCHCONTENT_BASE_DIR}/imguizmo-src")
+endif()
+
+
+if(NOT IS_DIRECTORY "${IMGUIZMO_SOURCE_DIR}" OR NOT EXISTS "${IMGUIZMO_SOURCE_DIR}/ImGuizmo.cpp")
+    message(FATAL_ERROR
+        "ImGuizmo sources not found. Expected at: ${IMGUIZMO_SOURCE_DIR}\n"
+        "Missing file: ${IMGUIZMO_SOURCE_DIR}/ImGuizmo.cpp\n"
+        "Set -DINTRINSIC_IMGUIZMO_SOURCE_DIR=/path/to/ImGuizmo or ensure FetchContent/offline cache is populated."
     )
 endif()
 
@@ -208,3 +230,10 @@ add_library(imgui_lib STATIC
 target_include_directories(imgui_lib PUBLIC ${IMGUI_SOURCE_DIR} ${IMGUI_SOURCE_DIR}/backends)
 target_compile_definitions(imgui_lib PUBLIC IMGUI_IMPL_VULKAN_NO_PROTOTYPES GLFW_INCLUDE_NONE)
 target_link_libraries(imgui_lib PUBLIC glfw volk)
+
+add_library(imguizmo_lib STATIC
+        ${IMGUIZMO_SOURCE_DIR}/ImGuizmo.cpp
+)
+target_include_directories(imguizmo_lib PUBLIC ${IMGUI_SOURCE_DIR} ${IMGUI_SOURCE_DIR}/backends ${IMGUIZMO_SOURCE_DIR})
+target_compile_definitions(imguizmo_lib PUBLIC IMGUI_IMPL_VULKAN_NO_PROTOTYPES GLFW_INCLUDE_NONE)
+target_link_libraries(imguizmo_lib PUBLIC imgui_lib)

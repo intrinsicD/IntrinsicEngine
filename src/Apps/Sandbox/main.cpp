@@ -183,7 +183,7 @@ public:
 
     // Editor / Selection Settings
     entt::entity m_CachedSelectedEntity = entt::null; // Updated by SelectionChanged sink — avoids per-frame polling.
-    int m_SelectMouseButton = 1; // 0=LMB, 1=RMB, 2=MMB. Default: RMB to avoid conflict with LMB-drag orbit.
+    int m_SelectMouseButton = 0; // 0=LMB, 1=RMB, 2=MMB. Default: LMB for scene interaction; camera orbit is RMB-only.
     GeometryRemeshingUiState m_GeometryRemeshingUi{};
     GeometrySimplificationUiState m_GeometrySimplificationUi{};
     GeometrySmoothingUiState m_GeometrySmoothingUi{};
@@ -1255,12 +1255,17 @@ public:
             // --- Visual settings ---
             ImGui::SeparatorText("Appearance");
             ImGui::SliderFloat("Handle Size", &cfg.HandleLength, 0.3f, 3.0f, "%.1f");
-            ImGui::SliderFloat("Pick Radius", &cfg.PickRadius, 0.02f, 0.2f, "%.3f");
+            ImGui::SliderFloat("Handle Thickness", &cfg.HandleThickness, 1.0f, 8.0f, "%.1f px");
 
             // --- Status ---
             ImGui::Separator();
             const char* stateNames[] = { "Idle", "Hovered", "Active" };
             ImGui::Text("State: %s", stateNames[static_cast<int>(m_Gizmo.GetState())]);
+        });
+
+        Interface::GUI::RegisterOverlay("Transform Gizmo", [this]()
+        {
+            m_Gizmo.DrawImGui();
         });
 
         // View Settings panel for configuring selection outline, post-process, etc.
@@ -1715,33 +1720,20 @@ public:
         }
 
         // ---------------------------------------------------------------------
-        // Transform Gizmo: update BEFORE debug draw and selection.
-        // The gizmo returns true if it consumed the mouse click (blocks selection).
+        // Transform Gizmo: update BEFORE selection so active/hovered gizmo frames
+        // can block scene interaction. Actual drawing/manipulation happens later
+        // during the ImGui frame via the registered overlay callback.
         // ---------------------------------------------------------------------
         bool gizmoConsumedMouse = false;
         if (cameraComponent != nullptr)
         {
-            Graphics::DebugDraw gizmoCapture;
             gizmoConsumedMouse = m_Gizmo.Update(
                 GetScene().GetRegistry(),
-                gizmoCapture,
                 *cameraComponent,
                 m_Window->GetInput(),
                 static_cast<uint32_t>(m_Window->GetWindowWidth()),
                 static_cast<uint32_t>(m_Window->GetWindowHeight()),
                 uiCapturesMouse);
-
-            if (gizmoCapture.HasContent())
-            {
-                // Keep gizmo rendering on the transient DebugDraw path.
-                // Rebuilding retained ECS::Line geometry every frame causes buffer churn,
-                // deferred-destruction pressure, and visible stalls when switching modes.
-                auto& frameDebugDraw = GetRenderOrchestrator().GetDebugDraw();
-                for (const auto& seg : gizmoCapture.GetOverlayLines())
-                    frameDebugDraw.OverlayLine(seg.Start, seg.End, seg.ColorStart, seg.ColorEnd);
-                for (const auto& seg : gizmoCapture.GetLines())
-                    frameDebugDraw.Line(seg.Start, seg.End, seg.ColorStart, seg.ColorEnd);
-            }
         }
 
         // ---------------------------------------------------------------------
