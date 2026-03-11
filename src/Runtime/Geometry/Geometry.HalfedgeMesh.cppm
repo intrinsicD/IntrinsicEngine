@@ -166,6 +166,10 @@ export namespace Geometry::Halfedge
         //   - Neither endpoint is isolated or deleted.
         [[nodiscard]] std::optional<VertexHandle> Collapse(EdgeHandle e, glm::vec3 newPosition);
 
+        // Directed edge collapse: collapsing halfedge h removes FromVertex(h)
+        // and keeps ToVertex(h) at the given position.
+        [[nodiscard]] std::optional<VertexHandle> Collapse(HalfedgeHandle h, glm::vec3 newPosition);
+
         // Edge flip: rotate the edge shared by two adjacent triangles.
         // Given edge (a,b) with adjacent faces (a,b,c) and (b,a,d),
         // the flip produces edge (c,d) with faces (c,d,a) and (d,c,b).
@@ -186,6 +190,9 @@ export namespace Geometry::Halfedge
 
         // Check whether collapsing edge e would violate the link condition.
         [[nodiscard]] bool IsCollapseOk(EdgeHandle e) const;
+
+        // Check whether collapsing the directed halfedge h is topologically valid.
+        [[nodiscard]] bool IsCollapseOk(HalfedgeHandle h) const;
 
         // Check whether flipping edge e is topologically valid.
         [[nodiscard]] bool IsFlipOk(EdgeHandle e) const;
@@ -224,7 +231,7 @@ export namespace Geometry::Halfedge
         // Writes non-deleted edge pairs into a pre-allocated output span.
         // Returns the number of pairs actually written (≤ out.size()).
         // Useful when the caller owns the buffer (e.g., staging belt region).
-        std::size_t ExtractEdgeVertexPairs(std::span<EdgeVertexPair> out) const;
+        [[nodiscard]] std::size_t ExtractEdgeVertexPairs(std::span<EdgeVertexPair> out) const;
 
         // -----------------------------------------------------------------
         // Attribute propagation policies for topology edits

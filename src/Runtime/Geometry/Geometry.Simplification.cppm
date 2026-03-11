@@ -14,30 +14,10 @@ export namespace Geometry::Simplification
     // Quadric Error Metric (QEM) Mesh Simplification
     // =========================================================================
     //
-    // Implementation of Garland & Heckbert (1997) "Surface Simplification
-    // Using Quadric Error Metrics". This is the gold-standard algorithm for
-    // triangle mesh decimation, widely used in LOD generation, scan cleanup,
-    // and mesh optimization.
-    //
-    // Algorithm overview:
-    //   1. For each vertex, compute a quadric Q_v = Σ K_f for all incident
-    //      faces f, where K_f is the fundamental error quadric of plane f:
-    //      K_f = n_f * n_f^T (outer product of face normal, extended to 4D
-    //      with the plane equation ax+by+cz+d=0).
-    //
-    //   2. For each edge (v_i, v_j), the cost of collapsing is:
-    //      Q = Q_i + Q_j
-    //      The optimal placement v̄ minimizes v̄^T Q v̄.
-    //      If Q is invertible, v̄ = Q^{-1} * [0,0,0,1]^T.
-    //      Otherwise, v̄ is chosen from {v_i, v_j, midpoint}.
-    //
-    //   3. All edges are placed in a min-heap ordered by collapse cost.
-    //
-    //   4. Iteratively pop the minimum-cost edge, collapse it, and update
-    //      the quadrics and costs of affected edges.
-    //
-    //   5. Stop when the target face count is reached or the minimum cost
-    //      exceeds the error threshold.
+    // The engine uses triangle quadrics derived from Trettner & Kobbelt (2020),
+    // "Fast and Robust QEF Minimization using Probabilistic Quadrics", with the
+    // probabilistic formulation enabled by default and a deterministic triangle-
+    // quadric fallback available for exact/legacy behavior.
 
     // Configuration for mesh simplification
     struct SimplificationParams
@@ -56,6 +36,32 @@ export namespace Geometry::Simplification
         // Weight for boundary edge quadrics. Higher values penalize boundary
         // collapse more strongly. Only used when PreserveBoundary is false.
         double BoundaryWeight{100.0};
+
+        // If true, use probabilistic triangle quadrics (Trettner & Kobbelt 2020).
+        // If false, use deterministic triangle quadrics from the same framework.
+        bool UseProbabilisticQuadrics{true};
+
+        // Relative positional standard deviation used by the probabilistic model.
+        // The absolute sigma is computed as:
+        //   sigma = ProbabilisticPositionStdDevFactor * mean_input_edge_length.
+        // Setting this to 0 makes the probabilistic model collapse to the
+        // deterministic triangle-quadric formulation.
+        double ProbabilisticPositionStdDevFactor{0.01};
+
+        // If true, forbid collapsing a boundary vertex into an interior vertex.
+        // This preserves open-boundary classification even when boundary edges
+        // are otherwise allowed to collapse.
+        bool ForbidBoundaryInteriorCollapse{true};
+
+        // Minimum number of incident faces required on the removed vertex.
+        // Values < 2 are treated as disabled.
+        std::size_t MinRemovedVertexIncidentFaces{2};
+
+        // Optional local quality constraints. Zero disables the check.
+        std::size_t MaxValence{0};
+        double MaxEdgeLength{0.0};
+        double MaxAspectRatio{0.0};
+        double MaxNormalDeviationDegrees{0.0};
     };
 
     // Result of simplification

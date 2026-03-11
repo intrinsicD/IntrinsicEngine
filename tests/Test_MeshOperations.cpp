@@ -1,7 +1,6 @@
 #include <gtest/gtest.h>
 #include <cmath>
 #include <numbers>
-#include <numeric>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -11,6 +10,98 @@ import Geometry;
 
 #include "TestMeshBuilders.h"
 
+namespace
+{
+    Geometry::Halfedge::Mesh MakeDenseClosedTriangleMesh(std::size_t iterations = 3)
+    {
+        auto coarse = MakeIcosahedron();
+        Geometry::Halfedge::Mesh refined;
+
+        Geometry::Subdivision::SubdivisionParams params;
+        params.Iterations = iterations;
+
+        auto result = Geometry::Subdivision::Subdivide(coarse, refined, params);
+        EXPECT_TRUE(result.has_value());
+        return refined;
+    }
+
+    void ExtractTriangleSoup(
+        Geometry::Halfedge::Mesh& mesh,
+        std::vector<glm::vec3>& positions,
+        std::vector<uint32_t>& indices)
+    {
+        mesh.GarbageCollection();
+
+        positions.clear();
+        indices.clear();
+        positions.reserve(mesh.VertexCount());
+        indices.reserve(mesh.FaceCount() * 3);
+
+        std::vector<uint32_t> vMap(mesh.VerticesSize(), 0u);
+        uint32_t currentIdx = 0;
+        for (std::size_t i = 0; i < mesh.VerticesSize(); ++i)
+        {
+            Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(i)};
+            ASSERT_FALSE(mesh.IsDeleted(v));
+            vMap[i] = currentIdx++;
+            positions.push_back(mesh.Position(v));
+        }
+
+        for (std::size_t i = 0; i < mesh.FacesSize(); ++i)
+        {
+            Geometry::FaceHandle f{static_cast<Geometry::PropertyIndex>(i)};
+            ASSERT_FALSE(mesh.IsDeleted(f));
+
+            const auto h0 = mesh.Halfedge(f);
+            const auto h1 = mesh.NextHalfedge(h0);
+            const auto h2 = mesh.NextHalfedge(h1);
+            const auto v0 = mesh.ToVertex(h0);
+            const auto v1 = mesh.ToVertex(h1);
+            const auto v2 = mesh.ToVertex(h2);
+
+            ASSERT_TRUE(mesh.IsValid(v0));
+            ASSERT_TRUE(mesh.IsValid(v1));
+            ASSERT_TRUE(mesh.IsValid(v2));
+            ASSERT_LT(v0.Index, vMap.size());
+            ASSERT_LT(v1.Index, vMap.size());
+            ASSERT_LT(v2.Index, vMap.size());
+
+            indices.push_back(vMap[v0.Index]);
+            indices.push_back(vMap[v1.Index]);
+            indices.push_back(vMap[v2.Index]);
+        }
+    }
+
+    Geometry::Halfedge::Mesh RebuildMeshFromTriangleSoup(
+        const std::vector<glm::vec3>& positions,
+        const std::vector<uint32_t>& indices)
+    {
+        Geometry::Halfedge::Mesh mesh;
+        std::vector<Geometry::VertexHandle> verts;
+        verts.reserve(positions.size());
+        for (const auto& p : positions)
+        {
+            verts.push_back(mesh.AddVertex(p));
+        }
+
+        bool buildOk = true;
+        for (std::size_t i = 0; i + 2 < indices.size(); i += 3)
+        {
+            const auto maybeFace = mesh.AddTriangle(verts[indices[i]], verts[indices[i + 1]], verts[indices[i + 2]]);
+            if (!maybeFace.has_value())
+            {
+                ADD_FAILURE() << "Failed to rebuild triangle " << (i / 3)
+                              << " from indices (" << indices[i] << ", "
+                              << indices[i + 1] << ", "
+                              << indices[i + 2] << ")";
+                buildOk = false;
+                break;
+            }
+        }
+        EXPECT_TRUE(buildOk);
+        return mesh;
+    }
+}
 
 
 // =============================================================================
@@ -249,6 +340,45 @@ TEST(MeshTopology_Collapse, SurvivingVertexAtCorrectPosition)
     EXPECT_NEAR(actual.x, target.x, 1e-5f);
     EXPECT_NEAR(actual.y, target.y, 1e-5f);
     EXPECT_NEAR(actual.z, target.z, 1e-5f);
+}
+
+TEST(MeshTopology_Collapse, DirectedHalfedgeCollapsePreservesToVertexWhileLegacyEdgeCollapseKeepsHistoricalSurvivor)
+{
+    auto meshDirected = MakeIcosahedron();
+    auto meshLegacy = meshDirected;
+
+    Geometry::EdgeHandle collapseEdge;
+    for (std::size_t i = 0; i < meshDirected.EdgesSize(); ++i)
+    {
+        Geometry::EdgeHandle e{static_cast<Geometry::PropertyIndex>(i)};
+        if (meshDirected.IsCollapseOk(e))
+        {
+            collapseEdge = e;
+            break;
+        }
+    }
+    ASSERT_TRUE(collapseEdge.IsValid());
+
+    const auto h0 = meshDirected.Halfedge(collapseEdge, 0);
+    const auto expectedDirectedSurvivor = meshDirected.ToVertex(h0);
+    const auto expectedLegacySurvivor = meshDirected.FromVertex(h0);
+
+    const glm::vec3 directedTarget(0.25f, -0.5f, 0.75f);
+    const auto directed = meshDirected.Collapse(h0, directedTarget);
+    ASSERT_TRUE(directed.has_value());
+    EXPECT_EQ(*directed, expectedDirectedSurvivor);
+    EXPECT_NE(*directed, expectedLegacySurvivor);
+    EXPECT_NEAR(meshDirected.Position(*directed).x, directedTarget.x, 1e-5f);
+    EXPECT_NEAR(meshDirected.Position(*directed).y, directedTarget.y, 1e-5f);
+    EXPECT_NEAR(meshDirected.Position(*directed).z, directedTarget.z, 1e-5f);
+
+    const glm::vec3 legacyTarget(-0.125f, 0.375f, 0.625f);
+    const auto legacy = meshLegacy.Collapse(collapseEdge, legacyTarget);
+    ASSERT_TRUE(legacy.has_value());
+    EXPECT_EQ(*legacy, expectedLegacySurvivor);
+    EXPECT_NEAR(meshLegacy.Position(*legacy).x, legacyTarget.x, 1e-5f);
+    EXPECT_NEAR(meshLegacy.Position(*legacy).y, legacyTarget.y, 1e-5f);
+    EXPECT_NEAR(meshLegacy.Position(*legacy).z, legacyTarget.z, 1e-5f);
 }
 
 // =============================================================================
@@ -967,3 +1097,247 @@ TEST(Simplification_QEM, PreservedMeshIsValid)
     EXPECT_EQ(static_cast<int>(V) - static_cast<int>(E) + static_cast<int>(F), 2)
         << "Euler characteristic should be 2 for closed mesh: V=" << V << " E=" << E << " F=" << F;
 }
+
+TEST(Simplification_QEM, GarbageCollectionKeepsFaceHalfedgesValidAfterDenseSimplification)
+{
+    auto mesh = MakeDenseClosedTriangleMesh();
+
+    Geometry::Simplification::SimplificationParams params;
+    params.TargetFaces = 400;
+    params.PreserveBoundary = false;
+
+    auto result = Geometry::Simplification::Simplify(mesh, params);
+    ASSERT_TRUE(result.has_value());
+    ASSERT_GT(result->CollapseCount, 0u);
+
+    for (std::size_t fi = 0; fi < mesh.FacesSize(); ++fi)
+    {
+        Geometry::FaceHandle f{static_cast<Geometry::PropertyIndex>(fi)};
+        if (mesh.IsDeleted(f))
+        {
+            continue;
+        }
+
+        const auto h0 = mesh.Halfedge(f);
+        ASSERT_TRUE(mesh.IsValid(h0)) << "Pre-GC face " << fi << " has invalid representative halfedge " << h0.Index;
+
+        const auto h1 = mesh.NextHalfedge(h0);
+        ASSERT_TRUE(mesh.IsValid(h1)) << "Pre-GC face " << fi << " has invalid second halfedge " << h1.Index;
+
+        const auto h2 = mesh.NextHalfedge(h1);
+        ASSERT_TRUE(mesh.IsValid(h2)) << "Pre-GC face " << fi << " has invalid third halfedge " << h2.Index;
+
+        EXPECT_EQ(mesh.NextHalfedge(h2), h0) << "Pre-GC face " << fi << " no longer forms a 3-cycle";
+
+        EXPECT_FALSE(mesh.IsDeleted(mesh.ToVertex(h0)));
+        EXPECT_FALSE(mesh.IsDeleted(mesh.ToVertex(h1)));
+        EXPECT_FALSE(mesh.IsDeleted(mesh.ToVertex(h2)));
+    }
+
+    mesh.GarbageCollection();
+
+    std::vector<uint32_t> extracted;
+    extracted.reserve(mesh.FaceCount() * 3);
+
+    for (std::size_t fi = 0; fi < mesh.FacesSize(); ++fi)
+    {
+        Geometry::FaceHandle f{static_cast<Geometry::PropertyIndex>(fi)};
+        if (mesh.IsDeleted(f))
+        {
+            continue;
+        }
+
+        const auto h0 = mesh.Halfedge(f);
+        ASSERT_TRUE(mesh.IsValid(h0)) << "Face " << fi << " has invalid representative halfedge " << h0.Index;
+
+        const auto h1 = mesh.NextHalfedge(h0);
+        ASSERT_TRUE(mesh.IsValid(h1)) << "Face " << fi << " has invalid second halfedge " << h1.Index;
+
+        const auto h2 = mesh.NextHalfedge(h1);
+        ASSERT_TRUE(mesh.IsValid(h2)) << "Face " << fi << " has invalid third halfedge " << h2.Index;
+
+        EXPECT_EQ(mesh.NextHalfedge(h2), h0) << "Face " << fi << " no longer forms a 3-cycle after GC";
+
+        const auto v0 = mesh.ToVertex(h0);
+        const auto v1 = mesh.ToVertex(h1);
+        const auto v2 = mesh.ToVertex(h2);
+        ASSERT_TRUE(mesh.IsValid(v0)) << "Face " << fi << " has invalid v0 " << v0.Index << " from h0 " << h0.Index;
+        ASSERT_TRUE(mesh.IsValid(v1)) << "Face " << fi << " has invalid v1 " << v1.Index << " from h1 " << h1.Index;
+        ASSERT_TRUE(mesh.IsValid(v2)) << "Face " << fi << " has invalid v2 " << v2.Index << " from h2 " << h2.Index;
+        EXPECT_FALSE(mesh.IsDeleted(v0));
+        EXPECT_FALSE(mesh.IsDeleted(v1));
+        EXPECT_FALSE(mesh.IsDeleted(v2));
+
+        extracted.push_back(v0.Index);
+        extracted.push_back(v1.Index);
+        extracted.push_back(v2.Index);
+    }
+
+    EXPECT_EQ(extracted.size(), mesh.FaceCount() * 3);
+}
+
+TEST(Simplification_QEM, DenseClosedMeshStaysClosed)
+{
+    auto mesh = MakeDenseClosedTriangleMesh();
+
+    Geometry::Simplification::SimplificationParams params;
+    params.TargetFaces = 400;
+    params.PreserveBoundary = false;
+
+    auto result = Geometry::Simplification::Simplify(mesh, params);
+    ASSERT_TRUE(result.has_value());
+    ASSERT_GT(result->CollapseCount, 0u);
+
+    auto countBoundaryEdges = [&](const Geometry::Halfedge::Mesh& m)
+    {
+        std::size_t boundaryEdges = 0;
+        for (std::size_t ei = 0; ei < m.EdgesSize(); ++ei)
+        {
+            Geometry::EdgeHandle e{static_cast<Geometry::PropertyIndex>(ei)};
+            if (m.IsDeleted(e))
+            {
+                continue;
+            }
+            if (m.IsBoundary(e))
+            {
+                ++boundaryEdges;
+            }
+        }
+        return boundaryEdges;
+    };
+
+    auto expectClosedSphereTopology = [&](const Geometry::Halfedge::Mesh& m, const char* phase, bool checkVertexManifold)
+    {
+        EXPECT_EQ(countBoundaryEdges(m), 0u) << phase << " introduced boundary edges";
+
+        const auto V = m.VertexCount();
+        const auto E = m.EdgeCount();
+        const auto F = m.FaceCount();
+        EXPECT_EQ(static_cast<int>(V) - static_cast<int>(E) + static_cast<int>(F), 2)
+            << phase << " changed Euler characteristic: V=" << V << " E=" << E << " F=" << F;
+
+        if (!checkVertexManifold)
+        {
+            return;
+        }
+
+        for (std::size_t vi = 0; vi < m.VerticesSize(); ++vi)
+        {
+            Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(vi)};
+            if (m.IsDeleted(v) || m.IsIsolated(v))
+            {
+                continue;
+            }
+            EXPECT_TRUE(m.IsManifold(v)) << phase << " made vertex " << vi << " non-manifold";
+        }
+    };
+
+    expectClosedSphereTopology(mesh, "pre-GC simplification", false);
+
+    mesh.GarbageCollection();
+
+    expectClosedSphereTopology(mesh, "post-GC simplification", true);
+}
+
+TEST(Simplification_QEM, ZeroProbabilisticSigmaMatchesDeterministicTriangleQuadrics)
+{
+    auto meshProb = MakeIcosahedron();
+    auto meshDet = MakeIcosahedron();
+
+    Geometry::Simplification::SimplificationParams probParams;
+    probParams.TargetFaces = 8;
+    probParams.PreserveBoundary = false;
+    probParams.UseProbabilisticQuadrics = true;
+    probParams.ProbabilisticPositionStdDevFactor = 0.0;
+
+    Geometry::Simplification::SimplificationParams detParams = probParams;
+    detParams.UseProbabilisticQuadrics = false;
+
+    auto prob = Geometry::Simplification::Simplify(meshProb, probParams);
+    auto det = Geometry::Simplification::Simplify(meshDet, detParams);
+    ASSERT_TRUE(prob.has_value());
+    ASSERT_TRUE(det.has_value());
+
+    meshProb.GarbageCollection();
+    meshDet.GarbageCollection();
+
+    EXPECT_EQ(prob->CollapseCount, det->CollapseCount);
+    EXPECT_EQ(prob->FinalFaceCount, det->FinalFaceCount);
+    EXPECT_NEAR(prob->MaxCollapseError, det->MaxCollapseError, 1e-9);
+
+    EXPECT_EQ(meshProb.VertexCount(), meshDet.VertexCount());
+    EXPECT_EQ(meshProb.EdgeCount(), meshDet.EdgeCount());
+    EXPECT_EQ(meshProb.FaceCount(), meshDet.FaceCount());
+}
+
+TEST(Simplification_QEM, RepeatedWorkflowStyleSimplificationStaysValid)
+{
+    auto mesh = MakeDenseClosedTriangleMesh(4); // 5,120 triangles: fast, but still dense enough for repeated decimation.
+
+    Geometry::Simplification::SimplificationParams first;
+    first.TargetFaces = 4000;
+    first.PreserveBoundary = false;
+
+    auto firstResult = Geometry::Simplification::Simplify(mesh, first);
+    ASSERT_TRUE(firstResult.has_value());
+    ASSERT_LE(mesh.FaceCount(), 4000u);
+
+    std::vector<glm::vec3> positions;
+    std::vector<uint32_t> indices;
+    ExtractTriangleSoup(mesh, positions, indices);
+    ASSERT_EQ(indices.size(), mesh.FaceCount() * 3);
+
+    auto rebuilt = RebuildMeshFromTriangleSoup(positions, indices);
+    ASSERT_EQ(rebuilt.FaceCount(), indices.size() / 3);
+
+    Geometry::Simplification::SimplificationParams second;
+    second.TargetFaces = 3000;
+    second.PreserveBoundary = false;
+
+    auto secondResult = Geometry::Simplification::Simplify(rebuilt, second);
+    ASSERT_TRUE(secondResult.has_value());
+    ASSERT_LE(rebuilt.FaceCount(), 3000u);
+
+    ExtractTriangleSoup(rebuilt, positions, indices);
+
+    EXPECT_EQ(indices.size(), rebuilt.FaceCount() * 3);
+    for (std::size_t ei = 0; ei < rebuilt.EdgesSize(); ++ei)
+    {
+        Geometry::EdgeHandle e{static_cast<Geometry::PropertyIndex>(ei)};
+        EXPECT_FALSE(rebuilt.IsDeleted(e));
+        EXPECT_FALSE(rebuilt.IsBoundary(e)) << "Repeated workflow simplification introduced a hole at edge " << ei;
+    }
+}
+
+TEST(Simplification_QEM, OpenBoundaryPatchKeepsDiskTopology)
+{
+    auto mesh = MakeSubdividedTriangle();
+
+    Geometry::Simplification::SimplificationParams params;
+    params.TargetFaces = 2;
+    params.PreserveBoundary = false;
+    params.ForbidBoundaryInteriorCollapse = true;
+
+    auto result = Geometry::Simplification::Simplify(mesh, params);
+    ASSERT_TRUE(result.has_value());
+    ASSERT_GT(result->CollapseCount, 0u);
+
+    mesh.GarbageCollection();
+
+    auto quality = Geometry::MeshQuality::ComputeQuality(mesh);
+    ASSERT_TRUE(quality.has_value());
+    EXPECT_EQ(quality->EulerCharacteristic, 1) << "Open patch should remain topologically equivalent to a disk";
+    EXPECT_EQ(quality->BoundaryLoopCount, 1u) << "Open patch simplification should keep a single boundary loop";
+    EXPECT_EQ(mesh.FaceCount(), 2u);
+
+    for (std::size_t vi = 0; vi < mesh.VerticesSize(); ++vi)
+    {
+        Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(vi)};
+        if (mesh.IsDeleted(v) || mesh.IsIsolated(v))
+        {
+            continue;
+        }
+        EXPECT_TRUE(mesh.IsManifold(v)) << "Open patch simplification made vertex " << vi << " non-manifold";
+    }
+}
+

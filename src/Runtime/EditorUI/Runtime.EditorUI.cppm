@@ -107,6 +107,8 @@ export namespace Runtime::EditorUI
         {
             int TargetFaces = 1000;
             bool PreserveBoundary = true;
+            bool UseProbabilisticQuadrics = true;
+            float ProbabilisticPositionStdDevFactor = 0.01f;
         };
 
         struct SmoothingUiState

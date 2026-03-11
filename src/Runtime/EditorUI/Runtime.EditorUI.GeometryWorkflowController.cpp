@@ -129,20 +129,41 @@ void GeometryWorkflowController::ApplyOperator(entt::entity entity,
     auto& reg = m_Engine->GetScene().GetRegistry();
     auto* collider = reg.try_get<ECS::MeshCollider::Component>(entity);
     auto* sc = reg.try_get<ECS::Surface::Component>(entity);
+    auto* meshData = reg.try_get<ECS::Mesh::Data>(entity);
     if (!collider || !collider->CollisionRef || !sc) return;
 
-    // 1. Build Halfedge::Mesh from CPU data
+    // 1. Acquire the authoritative halfedge mesh when available. Falling back to
+    // the collider triangle soup is lossy for repeated topology edits because a
+    // failed AddTriangle silently drops faces and manifests as "holes" on the
+    // next operator application.
     Geometry::Halfedge::Mesh mesh;
-    std::vector<Geometry::VertexHandle> vhs(collider->CollisionRef->Positions.size());
-    for (size_t i = 0; i < collider->CollisionRef->Positions.size(); ++i)
+    if (meshData && meshData->MeshRef)
     {
-        vhs[i] = mesh.AddVertex(collider->CollisionRef->Positions[i]);
+        mesh = *meshData->MeshRef;
     }
-    for (size_t i = 0; i + 2 < collider->CollisionRef->Indices.size(); i += 3)
+    else
     {
-        (void)mesh.AddTriangle(vhs[collider->CollisionRef->Indices[i]],
-                               vhs[collider->CollisionRef->Indices[i + 1]],
-                               vhs[collider->CollisionRef->Indices[i + 2]]);
+        std::vector<Geometry::VertexHandle> vhs(collider->CollisionRef->Positions.size());
+        for (size_t i = 0; i < collider->CollisionRef->Positions.size(); ++i)
+        {
+            vhs[i] = mesh.AddVertex(collider->CollisionRef->Positions[i]);
+        }
+        for (size_t i = 0; i + 2 < collider->CollisionRef->Indices.size(); i += 3)
+        {
+            const auto i0 = collider->CollisionRef->Indices[i];
+            const auto i1 = collider->CollisionRef->Indices[i + 1];
+            const auto i2 = collider->CollisionRef->Indices[i + 2];
+
+            auto face = mesh.AddTriangle(vhs[i0], vhs[i1], vhs[i2]);
+            if (!face)
+            {
+                face = mesh.AddTriangle(vhs[i0], vhs[i2], vhs[i1]);
+            }
+            if (!face)
+            {
+                return;
+            }
+        }
     }
 
     // 2. Apply operator
@@ -170,16 +191,38 @@ void GeometryWorkflowController::ApplyOperator(entt::entity entity,
     for (size_t i = 0; i < mesh.FacesSize(); ++i)
     {
         Geometry::FaceHandle f{static_cast<Geometry::PropertyIndex>(i)};
-        if (!mesh.IsDeleted(f))
+        if (mesh.IsDeleted(f))
         {
-            auto h0 = mesh.Halfedge(f);
-            auto h1 = mesh.NextHalfedge(h0);
-            auto h2 = mesh.NextHalfedge(h1);
-
-            newIdx.push_back(vMap[mesh.ToVertex(h0).Index]);
-            newIdx.push_back(vMap[mesh.ToVertex(h1).Index]);
-            newIdx.push_back(vMap[mesh.ToVertex(h2).Index]);
+            continue;
         }
+
+        const auto h0 = mesh.Halfedge(f);
+        if (!mesh.IsValid(h0))
+        {
+            continue;
+        }
+        const auto h1 = mesh.NextHalfedge(h0);
+        const auto h2 = mesh.NextHalfedge(h1);
+        if (!mesh.IsValid(h1) || !mesh.IsValid(h2) || mesh.NextHalfedge(h2) != h0)
+        {
+            continue;
+        }
+
+        const auto v0 = mesh.ToVertex(h0);
+        const auto v1 = mesh.ToVertex(h1);
+        const auto v2 = mesh.ToVertex(h2);
+        if (!mesh.IsValid(v0) || !mesh.IsValid(v1) || !mesh.IsValid(v2))
+        {
+            continue;
+        }
+        if (v0.Index >= vMap.size() || v1.Index >= vMap.size() || v2.Index >= vMap.size())
+        {
+            continue;
+        }
+
+        newIdx.push_back(vMap[v0.Index]);
+        newIdx.push_back(vMap[v1.Index]);
+        newIdx.push_back(vMap[v2.Index]);
     }
 
     collider->CollisionRef->Positions = std::move(newPos);
@@ -410,6 +453,11 @@ void GeometryWorkflowController::DrawSimplificationPanel()
     {
         ImGui::DragInt("Target Faces", &m_SimplificationUi.TargetFaces, 10.0f, 10, 1000000);
         ImGui::Checkbox("Preserve Boundary", &m_SimplificationUi.PreserveBoundary);
+        ImGui::Checkbox("Use Probabilistic Quadrics", &m_SimplificationUi.UseProbabilisticQuadrics);
+        ImGui::BeginDisabled(!m_SimplificationUi.UseProbabilisticQuadrics);
+        ImGui::DragFloat("Position StdDev Factor", &m_SimplificationUi.ProbabilisticPositionStdDevFactor,
+                         0.0005f, 0.0f, 0.25f, "%.4f");
+        ImGui::EndDisabled();
         if (ImGui::Button("Run QEM Simplification"))
         {
             const auto ui = m_SimplificationUi;
@@ -418,6 +466,8 @@ void GeometryWorkflowController::DrawSimplificationPanel()
                 Geometry::Simplification::SimplificationParams params;
                 params.TargetFaces = ui.TargetFaces;
                 params.PreserveBoundary = ui.PreserveBoundary;
+                params.UseProbabilisticQuadrics = ui.UseProbabilisticQuadrics;
+                params.ProbabilisticPositionStdDevFactor = ui.ProbabilisticPositionStdDevFactor;
                 static_cast<void>(Geometry::Simplification::Simplify(mesh, params));
             });
         }

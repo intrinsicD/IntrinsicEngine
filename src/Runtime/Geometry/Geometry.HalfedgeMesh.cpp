@@ -30,7 +30,7 @@ namespace Geometry::Halfedge
     namespace
     {
         template <class T>
-        static void TransferRule_T(
+        void TransferRule_T(
             Vertices& verts,
             const Mesh::VertexAttributeTransfer& rule,
             VertexHandle va,
@@ -57,7 +57,7 @@ namespace Geometry::Halfedge
             }
         }
 
-        static void TransferRule_Dynamic(
+        void TransferRule_Dynamic(
             Vertices& verts,
             const Mesh::VertexAttributeTransfer& rule,
             VertexHandle va,
@@ -706,13 +706,13 @@ namespace Geometry::Halfedge
         for (std::size_t i = 0; i < nh; ++i) hmap[HalfedgeHandle{static_cast<PropertyIndex>(i)}] = HalfedgeHandle{static_cast<PropertyIndex>(i)};
         for (std::size_t i = 0; i < nf; ++i) fmap[FaceHandle{static_cast<PropertyIndex>(i)}] = FaceHandle{static_cast<PropertyIndex>(i)};
 
-        // During compaction we swap entire property sets. This includes our transient map properties.
-        // To keep maps meaningful (oldHandle -> newHandle), we must also swap the map entries back.
+        // During compaction the transient map properties are swapped together with
+        // the topology payload. Starting from identity maps, that permutation is
+        // exactly the old-handle -> new-handle remap we need, so do not swap the
+        // map entries a second time here.
         auto swap_vertex_slots = [&](std::size_t a, std::size_t b)
         {
             m_Vertices.Swap(a, b);
-            using std::swap;
-            swap(vmap[VertexHandle{static_cast<PropertyIndex>(a)}], vmap[VertexHandle{static_cast<PropertyIndex>(b)}]);
         };
         auto swap_edge_slots = [&](std::size_t a, std::size_t b)
         {
@@ -725,16 +725,10 @@ namespace Geometry::Halfedge
 
             m_Halfedges.Swap(ha0, hb0);
             m_Halfedges.Swap(ha1, hb1);
-
-            using std::swap;
-            swap(hmap[HalfedgeHandle{static_cast<PropertyIndex>(ha0)}], hmap[HalfedgeHandle{static_cast<PropertyIndex>(hb0)}]);
-            swap(hmap[HalfedgeHandle{static_cast<PropertyIndex>(ha1)}], hmap[HalfedgeHandle{static_cast<PropertyIndex>(hb1)}]);
         };
         auto swap_face_slots = [&](std::size_t a, std::size_t b)
         {
             m_Faces.Swap(a, b);
-            using std::swap;
-            swap(fmap[FaceHandle{static_cast<PropertyIndex>(a)}], fmap[FaceHandle{static_cast<PropertyIndex>(b)}]);
         };
 
         if (nv > 0)
@@ -781,15 +775,6 @@ namespace Geometry::Halfedge
             nf = m_FDeleted[FaceHandle{static_cast<PropertyIndex>(i0)}] ? i0 : i0 + 1;
         }
 
-        for (std::size_t i = 0; i < nv; ++i)
-        {
-            auto v = VertexHandle{static_cast<PropertyIndex>(i)};
-            if (!IsIsolated(v))
-            {
-                SetHalfedge(v, hmap[Halfedge(v)]);
-            }
-        }
-
         for (std::size_t i = 0; i < nh; ++i)
         {
             auto h = HalfedgeHandle{static_cast<PropertyIndex>(i)};
@@ -801,10 +786,54 @@ namespace Geometry::Halfedge
             }
         }
 
+        // Face representatives can go stale the same way vertex representatives do
+        // when topology edits delete the particular halfedge a face used as its
+        // handle. Rebuild them from the surviving halfedge set instead of blindly
+        // remapping a possibly deleted representative.
         for (std::size_t i = 0; i < nf; ++i)
         {
-            auto f = FaceHandle{static_cast<PropertyIndex>(i)};
-            SetHalfedge(f, hmap[Halfedge(f)]);
+            SetHalfedge(FaceHandle{static_cast<PropertyIndex>(i)}, HalfedgeHandle{});
+        }
+
+        for (std::size_t i = 0; i < nh; ++i)
+        {
+            auto h = HalfedgeHandle{static_cast<PropertyIndex>(i)};
+            if (!IsBoundary(h))
+            {
+                auto f = Face(h);
+                if (!Halfedge(f).IsValid())
+                {
+                    SetHalfedge(f, h);
+                }
+            }
+        }
+
+        // Vertex representatives are less trustworthy than face cycles after
+        // topology edits: a live vertex may still point at a deleted-edge
+        // halfedge before compaction. Rebuild outgoing halfedges from the
+        // surviving halfedge set instead of blindly remapping stale handles.
+        for (std::size_t i = 0; i < nv; ++i)
+        {
+            SetHalfedge(VertexHandle{static_cast<PropertyIndex>(i)}, HalfedgeHandle{});
+        }
+
+        for (std::size_t i = 0; i < nh; ++i)
+        {
+            auto h = HalfedgeHandle{static_cast<PropertyIndex>(i)};
+            auto from = FromVertex(h);
+            if (!Halfedge(from).IsValid())
+            {
+                SetHalfedge(from, h);
+            }
+        }
+
+        for (std::size_t i = 0; i < nv; ++i)
+        {
+            auto v = VertexHandle{static_cast<PropertyIndex>(i)};
+            if (Halfedge(v).IsValid())
+            {
+                AdjustOutgoingHalfedge(v);
+            }
         }
 
         m_Vertices.Remove(vmap);
@@ -832,6 +861,11 @@ namespace Geometry::Halfedge
     // preserves the topological type of the mesh. For interior edge (v0, v1):
     //   |link(v0) ∩ link(v1)| must equal exactly 2 (the two opposite vertices).
     // For boundary edge: intersection must equal 1.
+
+    bool Mesh::IsCollapseOk(HalfedgeHandle h) const
+    {
+        return h.IsValid() && !IsDeleted(h) && IsCollapseOk(Edge(h));
+    }
 
     bool Mesh::IsCollapseOk(EdgeHandle e) const
     {
@@ -942,16 +976,22 @@ namespace Geometry::Halfedge
     // Collapse — Edge collapse
     // =========================================================================
     //
-    // Collapses edge e by merging v1 into v0. v0 survives at newPosition.
-    // All halfedges pointing to v1 are redirected to v0. The edge and its
-    // adjacent faces are deleted. v1 is marked deleted.
+    // The directed overload collapses halfedge h by removing FromVertex(h) and
+    // keeping ToVertex(h) at newPosition. The legacy EdgeHandle overload keeps
+    // the historic behavior by delegating to Halfedge(e, 1).
 
     std::optional<VertexHandle> Mesh::Collapse(EdgeHandle e, glm::vec3 newPosition)
     {
-        if (!IsCollapseOk(e)) return std::nullopt;
+        return Collapse(Halfedge(e, 1), newPosition);
+    }
 
-        HalfedgeHandle h0 = Halfedge(e, 0);
-        HalfedgeHandle h1 = Halfedge(e, 1);
+    std::optional<VertexHandle> Mesh::Collapse(HalfedgeHandle hCollapse, glm::vec3 newPosition)
+    {
+        if (!IsCollapseOk(hCollapse)) return std::nullopt;
+
+        const EdgeHandle e = Edge(hCollapse);
+        HalfedgeHandle h0 = OppositeHalfedge(hCollapse);
+        HalfedgeHandle h1 = hCollapse;
 
         VertexHandle v0 = FromVertex(h0);  // surviving vertex
         VertexHandle v1 = ToVertex(h0);    // removed vertex
@@ -1153,7 +1193,7 @@ namespace Geometry::Halfedge
         SetNextHalfedge(h0, h1n);   // c→d is followed by a→(old d→b becomes)... wait
         // Let me be more precise:
         // After flip: h0 = c → d,  we want f0 = (c,d,a)
-        //   h0 (c→d), then h1n (was a→d, but we need d→a... no)
+        //   h0 (c→d), then h1n (a→d, but we need d→a... no)
         //
         // Actually let me reconsider the rewiring carefully.
         // h0 goes from c to d (was a to b)
@@ -1178,37 +1218,8 @@ namespace Geometry::Halfedge
         //   h1: d → c
         //
         //   f0 should be triangle (c, d, a):
-        //     h0 (c→d) → h1n (d... wait, h1n was a→d, not d→something)
-        //
-        // Hmm. Let me use the standard PMP flip algorithm.
-        // The key insight: we reuse the existing 6 halfedges.
-        // h0 and h1 get new endpoints. The other 4 halfedges get reassigned to faces.
-
-        // Standard approach: h0 becomes c→d, h1 becomes d→c
-        // Face f0: h0p (previously c→a, still c→a... no, h0 now starts from c)
-        //
-        // Let me follow the standard halfedge flip from PMP:
-
-        // Face f0: (c, d, a) = h1 won't work...
-        //
-        // OK let me use the well-known recipe:
-        // After flip, f0 = {h0, h1p, h0p} and f1 = {h1, h0n, h1n}...
-        // Wait, that's the Botsch et al. recipe? Let me just use the known-correct version.
-
-        // The standard halfedge flip from "Polygon Mesh Processing" (Botsch et al.):
-        // f0 gets: h0 → h1p → h0p  (c→d, d→b... no that's wrong for triangle (c,d,a))
-        //
-        // Actually the standard recipe is:
-        //   f0: h1p, h0, h0n... no.
-        //
-        // Let me just go step by step.
-        // We have 6 halfedges: h0, h0n, h0p, h1, h1n, h1p.
-        // Before:
-        //   f0: h0→h0n→h0p→h0
-        //   f1: h1→h1n→h1p→h1
-        // After flip: h0 = c→d, h1 = d→c
-        //   f0 = (a, c, d): h0(c→d)→h1n(a→d)→h0(... wait, h0 is c→d, not d→c)
-        //   No. f0 = (c, d, a): h0(c→d)→?(d→a)→h0p(... h0p was c→a, but we need a→c)
+        //     h0 (c→d) → h1n(a→d)→h0(... wait, h0 is c→d, not d→c)
+        //     No. f0 = (c, d, a): h0(c→d)→?(d→a)→h0p(... h0p was c→a, but we need a→c)
         //
         // I think the cleaner approach is:
         //   f0 = {h0, h1p, h0n} with next chain: h0→h1p→h0n→h0
@@ -1216,71 +1227,10 @@ namespace Geometry::Halfedge
         //   This gives:
         //     f0: c→d (h0), d→(h1p.to)=b → wrong, we want d→a
         //
-        // I'm overcomplicating this. Let me just use the well-known recipe from
-        // Surface_mesh/PMP library:
-
-        // After flip:
-        //   f0: h0 → h0n → h1n → h0     (Wait, that's 3 edges for a triangle)
-        //   f1: h1 → h1n → h0n → h1     (No...)
-        //
-        // Actually the correct recipe from PMP (Botsch et al.) is:
-        //   New face f0 = (h1p, h0, h0n) — wait, let me just look at the topology.
-        //
-        // h0 is now c → d
-        // h0n was b → c and remains b → c (not changed)
-        // h0p was c → a and remains c → a
-        // h1 is now d → c
-        // h1n was a → d and remains a → d
-        // h1p was d → b and remains d → b
-        //
-        // Triangle 1: (a, c, d) using halfedges: h0p (c→a... that's backwards)
-        //   Actually h0p goes from c to a. So reading endpoints:
-        //   h0p: c→a, h1n: a→d, h0: c→d (but h0 goes c→d, not d→c)
-        //   For triangle (a, c, d), we need: a→c, c→d, d→a
-        //   a→c = opposite of h0p... no, that's wrong.
-        //
-        // OK I think the confusion is because h0 and h1 have swapped *which vertex they point to*
-        // but the halfedge *pair* still represents the same edge slot. h0 is the even halfedge
-        // and h1 is the odd. After SetVertex, h0 now points TO vd and h1 points TO vc.
-        // But FromVertex(h0) = ToVertex(h1) = vc. FromVertex(h1) = ToVertex(h0) = vd.
-        //
-        // So: h0 goes from vc to vd, h1 goes from vd to vc. Good.
-        //
-        // Now I need two triangles:
-        //   Triangle A = (vc, vd, va):
-        //     vc→vd (h0), vd→va (???), va→vc (???)
-        //     h1n goes a→d, we need d→a. That's opposite(h1n).
-        //     Hmm, but we can't use opposite(h1n) because that's in a different edge pair.
-        //
-        // Wait. We don't change the other 4 halfedges' TO vertices. We only change next/prev
-        // pointers and face assignments. Let me reconsider.
-        //
-        // The 6 halfedges in play are h0, h0n, h0p, h1, h1n, h1p.
-        // We set h0.to = vd, h1.to = vc. Everything else stays.
-        // h0n.to = vc (still), h0p.to = va (still)
-        // h1n.to = vd (still), h1p.to = vb (still)
-        //
-        // h0: vc → vd
-        // h0n: vb → vc
-        // h0p: vc → va  (wait, h0p.to = va, h0p.from = ToVertex(opposite(h0p))
-        //   Actually: from = FromVertex(h0p) = ToVertex(OppositeHalfedge(h0p))
-        //   Before the flip, h0p was c→a, so FromVertex = c, ToVertex = a.
-        //   We haven't changed h0p's ToVertex, so h0p is still "?→a".
-        //   h0p.from was vc originally. We haven't changed that. So h0p: vc→va.
-        // h1: vd → vc
-        // h1n: va → vd
-        // h1p: vd → vb  (h1p.to = vb, h1p.from = vd? Let's verify:
-        //   h1p was d→b before. h1p.to = vb. h1p.from = ToVertex(opposite(h1p)).
-        //   We haven't changed that, so h1p: vd→vb.
-        //
-        // Good. Now I want:
-        //   Face 0: triangle (vc, vd, va) using h0(vc→vd), h1n(va→vd... NO: h1n: va→vd)
-        //     Hmm, h1n goes va→vd, but I need vd→va.
-        //
-        // Actually wait. For triangle (vc, vd, va):
-        //   Edge vc→vd: h0
-        //   Edge vd→va: I need a halfedge from vd to va. That's not any of my 6.
-        //   Edge va→vc: I need a halfedge from va to vc. h0n goes vb→vc, not va→vc.
+        //   Face 0: triangle (c, d, a):
+        //     Edge c→d: h0
+        //     Edge d→a: I need a halfedge from d to a. That's not any of my 6.
+        //     Edge a→c: I need a halfedge from a to c. h0n goes b→c, not a→c.
         //
         // This means I need to reassign h1p and h0p:
         //   Face 0 = (vc, vd, va): h0 (vc→vd), then I reuse h1p but change its TO?
@@ -1291,7 +1241,7 @@ namespace Geometry::Halfedge
         //
         //   New Face 0: h0, h1p, h0n   (Wait, is this right?)
         //     h0: vc→vd, h1p: vd→vb, h0n: vb→vc → Triangle (vc, vd, vb)
-        //   New Face 1: h1, h0p, h1n
+        //   New Face 1: h1, h0p, h1n   (No...)
         //     h1: vd→vc, h0p: vc→va, h1n: va→vd → Triangle (vd, vc, va)
         //
         //   This gives triangles (vc, vd, vb) and (vd, vc, va) = (va, vd, vc).

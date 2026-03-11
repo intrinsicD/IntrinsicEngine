@@ -10,10 +10,12 @@
 #include <variant>
 #include <cstring>
 #include <vector>
+#include <glm/glm.hpp>
 
 import Core;
 import Core.IOBackend;
 import Graphics;
+import Geometry;
 
 using namespace Core::IO;
 using namespace Graphics;
@@ -918,4 +920,124 @@ TEST(IORegistryImport, FullPipelineWithGLB)
     auto* meshImport = std::get_if<MeshImportData>(&*result);
     ASSERT_NE(meshImport, nullptr);
     EXPECT_GT(meshImport->Meshes.size(), 0u);
+}
+
+namespace
+{
+    Geometry::Halfedge::Mesh BuildHalfedgeMesh(const Graphics::GeometryCpuData& cpu)
+    {
+        Geometry::Halfedge::Mesh mesh;
+        std::vector<Geometry::VertexHandle> verts;
+        verts.reserve(cpu.Positions.size());
+        for (const auto& p : cpu.Positions)
+        {
+            verts.push_back(mesh.AddVertex(p));
+        }
+
+        bool buildOk = true;
+        for (std::size_t i = 0; i + 2 < cpu.Indices.size(); i += 3)
+        {
+            const auto maybeFace = mesh.AddTriangle(verts[cpu.Indices[i]], verts[cpu.Indices[i + 1]], verts[cpu.Indices[i + 2]]);
+            if (!maybeFace.has_value())
+            {
+                ADD_FAILURE() << "Failed to build duck triangle " << (i / 3);
+                buildOk = false;
+                break;
+            }
+        }
+        EXPECT_TRUE(buildOk);
+        return mesh;
+    }
+
+    void ExtractTriangleSoup(Geometry::Halfedge::Mesh& mesh,
+                             std::vector<glm::vec3>& positions,
+                             std::vector<uint32_t>& indices)
+    {
+        mesh.GarbageCollection();
+        positions.clear();
+        indices.clear();
+        positions.reserve(mesh.VertexCount());
+        indices.reserve(mesh.FaceCount() * 3);
+
+        std::vector<uint32_t> vMap(mesh.VerticesSize(), 0u);
+        uint32_t next = 0;
+        for (std::size_t vi = 0; vi < mesh.VerticesSize(); ++vi)
+        {
+            Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(vi)};
+            ASSERT_FALSE(mesh.IsDeleted(v));
+            vMap[vi] = next++;
+            positions.push_back(mesh.Position(v));
+        }
+
+        for (std::size_t fi = 0; fi < mesh.FacesSize(); ++fi)
+        {
+            Geometry::FaceHandle f{static_cast<Geometry::PropertyIndex>(fi)};
+            ASSERT_FALSE(mesh.IsDeleted(f));
+            const auto h0 = mesh.Halfedge(f);
+            const auto h1 = mesh.NextHalfedge(h0);
+            const auto h2 = mesh.NextHalfedge(h1);
+            const auto v0 = mesh.ToVertex(h0);
+            const auto v1 = mesh.ToVertex(h1);
+            const auto v2 = mesh.ToVertex(h2);
+            ASSERT_TRUE(mesh.IsValid(v0));
+            ASSERT_TRUE(mesh.IsValid(v1));
+            ASSERT_TRUE(mesh.IsValid(v2));
+            indices.push_back(vMap[v0.Index]);
+            indices.push_back(vMap[v1.Index]);
+            indices.push_back(vMap[v2.Index]);
+        }
+    }
+}
+
+TEST(IORegistryImport, DuckRepeatedSimplificationWorkflow)
+{
+    FileIOBackend backend;
+    IORegistry registry;
+    RegisterBuiltinLoaders(registry);
+
+    std::string path = std::string(ENGINE_ROOT_DIR) + "/assets/models/Duck.glb";
+
+    IORequest checkReq;
+    checkReq.Path = path;
+    checkReq.Size = 1;
+    auto checkResult = backend.Read(checkReq);
+    if (!checkResult.has_value())
+    {
+        GTEST_SKIP() << "Duck.glb not found, skipping";
+        return;
+    }
+
+    auto result = registry.Import(path, backend);
+    ASSERT_TRUE(result.has_value()) << "Import failed";
+
+    auto* meshImport = std::get_if<MeshImportData>(&*result);
+    ASSERT_NE(meshImport, nullptr);
+    ASSERT_FALSE(meshImport->Meshes.empty());
+
+    auto mesh = BuildHalfedgeMesh(meshImport->Meshes.front());
+    ASSERT_GT(mesh.FaceCount(), 4000u);
+
+    Geometry::Simplification::SimplificationParams first;
+    first.TargetFaces = 4000;
+    first.PreserveBoundary = false;
+    auto firstResult = Geometry::Simplification::Simplify(mesh, first);
+    ASSERT_TRUE(firstResult.has_value());
+
+    std::vector<glm::vec3> positions;
+    std::vector<uint32_t> indices;
+    ExtractTriangleSoup(mesh, positions, indices);
+
+    Graphics::GeometryCpuData rebuiltCpu;
+    rebuiltCpu.Positions = positions;
+    rebuiltCpu.Indices = indices;
+    auto rebuilt = BuildHalfedgeMesh(rebuiltCpu);
+
+    Geometry::Simplification::SimplificationParams second;
+    second.TargetFaces = 3000;
+    second.PreserveBoundary = false;
+    auto secondResult = Geometry::Simplification::Simplify(rebuilt, second);
+    ASSERT_TRUE(secondResult.has_value());
+
+    ExtractTriangleSoup(rebuilt, positions, indices);
+    EXPECT_EQ(indices.size(), rebuilt.FaceCount() * 3);
 }
