@@ -23,9 +23,12 @@ namespace Geometry::MeshRepair
     // Boundary Loop Detection
     // =========================================================================
 
-    std::vector<BoundaryLoop> FindBoundaryLoops(const Halfedge::Mesh& mesh)
+    std::optional<BoundaryLoopResult> FindBoundaryLoops(const Halfedge::Mesh& mesh)
     {
-        std::vector<BoundaryLoop> loops;
+        if (mesh.IsEmpty())
+            return std::nullopt;
+
+        BoundaryLoopResult result;
 
         const std::size_t nH = mesh.HalfedgesSize();
         std::vector<bool> visited(nH, false);
@@ -53,10 +56,10 @@ namespace Geometry::MeshRepair
             } while (hCurr != h);
 
             if (!loop.Vertices.empty())
-                loops.push_back(std::move(loop));
+                result.Loops.push_back(std::move(loop));
         }
 
-        return loops;
+        return result;
     }
 
     // =========================================================================
@@ -159,7 +162,11 @@ namespace Geometry::MeshRepair
 
         HoleFillingResult result;
 
-        auto loops = FindBoundaryLoops(mesh);
+        auto loopsResult = FindBoundaryLoops(mesh);
+        if (!loopsResult)
+            return result; // empty mesh already checked above, but defensive
+
+        auto& loops = loopsResult->Loops;
         result.HolesDetected = loops.size();
 
         if (loops.empty())

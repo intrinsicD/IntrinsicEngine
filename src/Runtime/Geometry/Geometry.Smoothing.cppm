@@ -33,6 +33,16 @@ export namespace Geometry::Smoothing
         bool PreserveBoundary{true};
     };
 
+    // Result of explicit smoothing operations (Uniform, Cotan, Taubin)
+    struct SmoothingResult
+    {
+        // Number of smoothing iterations performed
+        std::size_t IterationsPerformed{0};
+
+        // Final vertex count (unchanged — topology is preserved)
+        std::size_t VertexCount{0};
+    };
+
     // -------------------------------------------------------------------------
     // Uniform Laplacian smoothing
     // -------------------------------------------------------------------------
@@ -44,7 +54,10 @@ export namespace Geometry::Smoothing
     //
     // Simple and fast but not area-aware. Causes shrinkage — use Taubin
     // smoothing to compensate.
-    void UniformLaplacian(Halfedge::Mesh& mesh, const SmoothingParams& params);
+    //
+    // Returns nullopt for empty meshes or zero iterations.
+    [[nodiscard]] std::optional<SmoothingResult> UniformLaplacian(
+        Halfedge::Mesh& mesh, const SmoothingParams& params);
 
     // -------------------------------------------------------------------------
     // Cotangent Laplacian smoothing
@@ -60,7 +73,10 @@ export namespace Geometry::Smoothing
     // More geometrically faithful than uniform Laplacian — respects
     // mesh geometry and produces better results on irregular meshes.
     // Still causes shrinkage; combine with Taubin for volume preservation.
-    void CotanLaplacian(Halfedge::Mesh& mesh, const SmoothingParams& params);
+    //
+    // Returns nullopt for empty meshes or zero iterations.
+    [[nodiscard]] std::optional<SmoothingResult> CotanLaplacian(
+        Halfedge::Mesh& mesh, const SmoothingParams& params);
 
     // -------------------------------------------------------------------------
     // Taubin smoothing (shrinkage-free)
@@ -97,7 +113,9 @@ export namespace Geometry::Smoothing
         bool PreserveBoundary{true};
     };
 
-    void Taubin(Halfedge::Mesh& mesh, const TaubinParams& params);
+    // Returns nullopt for empty meshes or zero iterations.
+    [[nodiscard]] std::optional<SmoothingResult> Taubin(
+        Halfedge::Mesh& mesh, const TaubinParams& params);
 
     // -------------------------------------------------------------------------
     // Implicit (backward Euler) Laplacian smoothing
