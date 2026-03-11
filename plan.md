@@ -384,3 +384,116 @@ A mesh uploads positions/normals once; wireframe, vertex visualization, and kNN 
 | 11 | **Lifecycle System** | `Graphics.Systems.MeshViewLifecycle.cppm`, `Graphics.Systems.GraphGeometrySync.cppm` | New geometry type → GPU pipeline |
 | 12 | **Vtable Anchor** | `Graphics.IORegistry.cpp`, `Graphics.Pipelines.cppm` | Virtual interfaces in modules |
 | 13 | **BDA Shared-Buffer** | Surface/Line/Point passes, `ReuseVertexBuffersFrom()` | Shared vertex data with multiple topology views |
+
+---
+
+## Worth Adopting — Patterns Not Yet In the Codebase
+
+These patterns address gaps in IntrinsicEngine or would improve existing code. Sourced from external C++23 engine review (Engine23, Engine24).
+
+### 14. Command Pattern for Undo/Redo (P1)
+
+**Gap:** ROADMAP.md Phase 2 lists "Undo/redo stack" but no implementation exists. The engine has `Core::Tasks` for async work but no Command abstraction for reversible operations.
+
+**Recommendation:** New module `Core.Command.cppm`:
+- `Core::Command` base with `Execute()` and `Undo()`.
+- `Core::CompositeCommand` for transaction grouping (e.g., multi-entity transform).
+- `Core::CommandHistory` with fixed-size ring buffer.
+- Commands are non-copyable, movable, stored as `std::unique_ptr<Command>`.
+- Use `std::expected` for execution results (not exceptions).
+
+**Use when:**
+- **Transform gizmo edits:** Each drag produces a `TransformCommand` capturing before/after state for all selected entities.
+- **Property panel mutations:** Material color, point size, line width — each discrete change is a command.
+- **Entity lifecycle:** Create/delete entity wrapped as commands. `CompositeCommand` groups entity + all its components.
+- **Geometry operator application:** Simplification, subdivision, smoothing — capture mesh state before operator, undo reverts to snapshot.
+- **Scene hierarchy changes:** Reparenting entities via drag-and-drop in the hierarchy panel.
+
+**Priority:** P1 — directly enables the ROADMAP Phase 2 undo/redo item.
+
+---
+
+### 15. Enumerate/Zip Iteration Utilities (P3)
+
+**Gap:** No equivalent exists. The codebase uses manual index tracking (`for (size_t i = 0; ...)`) throughout geometry processing, ECS iteration, and property sync code.
+
+**Recommendation:** Small utility module `Core.Iterators.cppm`:
+- `Enumerate(container)` — returns `(index, value&)` pairs. Zero-cost via iterator adapter.
+- `Zip(a, b)` — returns `(a_elem&, b_elem&)` pairs.
+- Skip `Range()` — C++23 `std::views::iota` covers this.
+
+**Use when:**
+- **PropertySet sync loops:** Iterating positions and normals in lockstep during GPU upload (`Zip(positions, normals)`).
+- **Edge pair construction:** Building edge index buffers where you need both element and index (`Enumerate(edges)`).
+- **Color/attribute extraction:** Zipping PropertySet values with cached GPU-side vectors during `PropertySetDirtySyncSystem` updates.
+
+**Priority:** P3 — quality-of-life improvement. Adopt opportunistically when touching files that benefit.
+
+---
+
+### 16. ComponentGui Template Dispatch (P3)
+
+**Gap:** `Runtime.EditorUI.InspectorController.cpp` uses a sequential `if (reg.all_of<T>)` chain per component type. This works but becomes a maintenance bottleneck as more component types are added.
+
+**Recommendation:** Per-component-type UI rendering via template specialization:
+```cpp
+template <typename T>
+struct ComponentEditor {
+    static void Render(entt::entity entity, entt::registry& reg);
+};
+```
+
+Specialize per component type. The inspector iterates known components and calls the appropriate specialization. Domain logic (ECS components) stays decoupled from UI code (ImGui rendering).
+
+**Use when:**
+- **Entity inspector panel:** Each component type gets its own `ComponentEditor<T>` specialization.
+- **Adding new ECS component types:** New component = new specialization. No changes to inspector dispatch.
+- **Debug views per component:** `ComponentEditor<Transform::Component>` shows position/rotation/scale; `ComponentEditor<Graph::Data>` shows node/edge counts, layout state.
+- **Conditional UI for optional components:** `reg.all_of<T>(entity)` check drives whether `ComponentEditor<T>` renders — presence = UI, absence = nothing.
+
+**Priority:** P3 — evaluate current inspector scale first; may already be manageable.
+
+---
+
+### 17. Policy-Based Template Composition for Geometry Operators (P3)
+
+**Gap:** Current operators use enum-based policy selection (e.g., `LaplacianVariant::Combinatorial` vs `NormalizedSymmetric`). This works for single-axis variation but doesn't scale to operators with multiple orthogonal variation points.
+
+**Recommendation:** Use template policies only when: (a) 2+ orthogonal axes, (b) each axis has 2+ variants, and (c) the inner loop is hot enough that virtual dispatch matters.
+
+**Use when:**
+- **ICP registration:** Correspondence policy (closest-point, normal-shooting, symmetric) x rejection policy (trimmed, Welsch, TEASER). Each combination is a compile-time instantiation with zero virtual dispatch in the inner loop.
+- **Iterative solvers with configurable preconditioners:** CG with diagonal vs. incomplete Cholesky — solver template takes a `Preconditioner` policy.
+- **Field design algorithms:** Cross-field vs. N-RoSy field computation shares the same optimization loop but differs in symmetry constraint policy.
+
+**Priority:** P3 — adopt when implementing new geometry operators, not as a retrofit to existing code.
+
+---
+
+### Note: Lock-Free MPSC Queue — Already Covered
+
+The existing `Utils::LockFreeQueue<T>` (`Utils.LockFreeQueue.cppm`) is **already MPMC** — it uses `compare_exchange_weak` on both `m_Tail` (producers) and `m_Head` (consumers) via Vyukov's bounded turn-based protocol. It is consumed by multiple worker threads via `Core.Tasks.cpp` (global inject queue, capacity 65536). A separate `Core.MPSCQueue.cppm` module is **not needed**. If contention increases under future Potree streaming or CUDA interop workloads, profile the existing queue first before introducing alternatives.
+
+---
+
+## Full Summary Table
+
+| # | Pattern | Status | Priority | Primary Use Case |
+|---|---------|--------|----------|------------------|
+| 1 | Subsystem Injection | Implemented | — | New engine-level subsystems |
+| 2 | `std::expected` Error Handling | Implemented | — | All fallible operations |
+| 3 | Geometry Operator | Implemented | — | New algorithms |
+| 4 | Module Organization | Implemented | — | Every new source file |
+| 5 | ECS Components | Implemented | — | New entity data types |
+| 6 | Render Pass / IRenderFeature | Implemented | — | New rendering methods |
+| 7 | Frame Graph / DAG Scheduling | Implemented | — | New per-frame systems |
+| 8 | SafeDestroy / Deferred Destruction | Implemented | — | GPU resource cleanup |
+| 9 | Event Communication | Implemented | — | Inter-system notifications |
+| 10 | Asset Loader/Exporter | Implemented | — | New file format support |
+| 11 | Lifecycle System | Implemented | — | Geometry → GPU pipeline |
+| 12 | Vtable Anchor | Implemented | — | Virtual interfaces in modules |
+| 13 | BDA Shared-Buffer | Implemented | — | Shared vertex data topology views |
+| 14 | Command Pattern (Undo/Redo) | **Not yet** | P1 | Reversible editor operations |
+| 15 | Enumerate/Zip Utilities | **Not yet** | P3 | Cleaner iteration in geometry/sync code |
+| 16 | ComponentGui Dispatch | **Not yet** | P3 | Per-type inspector UI |
+| 17 | Policy-Based Operator Composition | **Not yet** | P3 | Multi-axis geometry operator variants |
