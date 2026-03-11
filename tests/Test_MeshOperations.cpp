@@ -315,6 +315,40 @@ TEST(MeshTopology_Collapse, CollapseReducesCounts)
     EXPECT_EQ(mesh.FaceCount(), 18u);
 }
 
+TEST(MeshTopology_Collapse, SingleCollapsePreservesNextCycles)
+{
+    auto mesh = MakeIcosahedron();
+
+    Geometry::EdgeHandle collapseEdge;
+    for (std::size_t i = 0; i < mesh.EdgesSize(); ++i)
+    {
+        Geometry::EdgeHandle e{static_cast<Geometry::PropertyIndex>(i)};
+        if (mesh.IsCollapseOk(e))
+        {
+            collapseEdge = e;
+            break;
+        }
+    }
+    ASSERT_TRUE(collapseEdge.IsValid());
+
+    auto h0 = mesh.Halfedge(collapseEdge, 0);
+    glm::vec3 midpoint = (mesh.Position(mesh.FromVertex(h0)) +
+                          mesh.Position(mesh.ToVertex(h0))) * 0.5f;
+
+    auto result = mesh.Collapse(h0, midpoint);
+    ASSERT_TRUE(result.has_value());
+
+    // Every non-deleted face must still form a proper 3-cycle.
+    for (std::size_t fi = 0; fi < mesh.FacesSize(); ++fi)
+    {
+        Geometry::FaceHandle f{static_cast<Geometry::PropertyIndex>(fi)};
+        if (mesh.IsDeleted(f)) continue;
+
+        EXPECT_EQ(mesh.Valence(f), 3u)
+            << "Face " << fi << " has broken Next cycle after single collapse";
+    }
+}
+
 TEST(MeshTopology_Collapse, SurvivingVertexAtCorrectPosition)
 {
     auto mesh = MakeIcosahedron();
@@ -1303,10 +1337,9 @@ TEST(Simplification_QEM, RepeatedWorkflowStyleSimplificationStaysValid)
     }
 }
 
-TEST(Simplification_QEM, OpenBoundaryPatchReducesFaceCount)
+TEST(Simplification_QEM, OpenBoundaryPatchKeepsDiskTopology)
 {
     auto mesh = MakeSubdividedTriangle();
-    const auto initialFaces = mesh.FaceCount();
 
     Geometry::Simplification::SimplificationParams params;
     params.TargetFaces = 2;
@@ -1316,23 +1349,23 @@ TEST(Simplification_QEM, OpenBoundaryPatchReducesFaceCount)
     auto result = Geometry::Simplification::Simplify(mesh, params);
     ASSERT_TRUE(result.has_value());
     ASSERT_GT(result->CollapseCount, 0u);
-    EXPECT_LT(mesh.FaceCount(), initialFaces) << "Simplification should reduce face count on open boundary patch";
 
-    // Verify pre-GC mesh topology: remaining faces have valid halfedge cycles
-    for (std::size_t fi = 0; fi < mesh.FacesSize(); ++fi)
+    mesh.GarbageCollection();
+
+    auto quality = Geometry::MeshQuality::ComputeQuality(mesh);
+    ASSERT_TRUE(quality.has_value());
+    EXPECT_EQ(quality->EulerCharacteristic, 1) << "Open patch should remain topologically equivalent to a disk";
+    EXPECT_EQ(quality->BoundaryLoopCount, 1u) << "Open patch simplification should keep a single boundary loop";
+    EXPECT_EQ(mesh.FaceCount(), 2u);
+
+    for (std::size_t vi = 0; vi < mesh.VerticesSize(); ++vi)
     {
-        Geometry::FaceHandle f{static_cast<Geometry::PropertyIndex>(fi)};
-        if (mesh.IsDeleted(f))
+        Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(vi)};
+        if (mesh.IsDeleted(v) || mesh.IsIsolated(v))
         {
             continue;
         }
-        const auto h0 = mesh.Halfedge(f);
-        ASSERT_TRUE(mesh.IsValid(h0)) << "Face " << fi << " has invalid representative halfedge";
-        const auto h1 = mesh.NextHalfedge(h0);
-        ASSERT_TRUE(mesh.IsValid(h1)) << "Face " << fi << " has invalid second halfedge";
-        const auto h2 = mesh.NextHalfedge(h1);
-        ASSERT_TRUE(mesh.IsValid(h2)) << "Face " << fi << " has invalid third halfedge";
-        EXPECT_EQ(mesh.NextHalfedge(h2), h0) << "Face " << fi << " does not form a 3-cycle";
+        EXPECT_TRUE(mesh.IsManifold(v)) << "Open patch simplification made vertex " << vi << " non-manifold";
     }
 }
 

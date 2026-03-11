@@ -308,6 +308,7 @@ export namespace Geometry::Halfedge
         std::vector<VertexAttributeTransfer> m_VertexAttrTransfer;
 
         // Helpers used by Split/Collapse.
+        void RemoveLoopHelper(HalfedgeHandle h);
         void TransferVertexAttributes_OnSplit(VertexHandle va, VertexHandle vb, VertexHandle vm);
         void TransferVertexAttributes_OnCollapse(VertexHandle va, VertexHandle vb, VertexHandle vSurvivor);
     };
