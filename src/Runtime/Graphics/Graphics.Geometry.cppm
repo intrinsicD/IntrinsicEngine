@@ -68,9 +68,10 @@ export namespace Graphics
         Geometry::AABB LocalAABB;
         Geometry::Octree LocalOctree; // Static octree of mesh vertices
 
-        // Optional: Keep positions for precise ray intersection tests after Octree broadphase
+        // Optional: Keep CPU-side collision geometry and an authoritative editable mesh.
         std::vector<glm::vec3> Positions;
         std::vector<uint32_t> Indices;
+        std::shared_ptr<Geometry::Halfedge::Mesh> SourceMesh{};
     };
 
     struct GeometryBufferLayout

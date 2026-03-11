@@ -202,6 +202,18 @@ namespace Graphics
         collision->Positions = cpu.Positions;
         collision->Indices = cpu.Indices;
 
+        if (cpu.Topology == PrimitiveTopology::Triangles && !cpu.Positions.empty() && !cpu.Indices.empty())
+        {
+            Geometry::MeshUtils::TriangleSoupBuildParams buildParams;
+            buildParams.WeldVertices = true;
+            buildParams.WeldEpsilon = 1e-6f;
+
+            if (auto mesh = Geometry::MeshUtils::BuildHalfedgeMeshFromIndexedTriangles(cpu.Positions, cpu.Indices, cpu.Aux, buildParams))
+            {
+                collision->SourceMesh = std::make_shared<Geometry::Halfedge::Mesh>(std::move(*mesh));
+            }
+        }
+
         if (!collision->Positions.empty())
         {
             collision->LocalAABB = Geometry::Union(Geometry::Convert(collision->Positions));

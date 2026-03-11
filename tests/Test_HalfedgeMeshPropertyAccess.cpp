@@ -351,3 +351,53 @@ TEST(HalfedgeMesh_PropertyAccess, AllPropertySets_SizesConsistent)
     EXPECT_EQ(mesh.FaceProperties().Size(), mesh.FacesSize());
     EXPECT_EQ(mesh.HalfedgeProperties().Size(), mesh.HalfedgesSize());
 }
+
+TEST(HalfedgeMesh_PropertyAccess, PropertySet_RemoveThenReuseSameNameWorks)
+{
+    Geometry::PropertySet props;
+    props.Resize(3);
+
+    auto weights = props.Add<float>("p:weight", 1.0f);
+    ASSERT_TRUE(weights.IsValid());
+    weights[0] = 2.5f;
+
+    props.Remove(weights);
+    EXPECT_FALSE(weights.IsValid());
+    EXPECT_FALSE(props.Exists("p:weight"));
+
+    auto weights2 = props.GetOrAdd<float>("p:weight", 7.0f);
+    ASSERT_TRUE(weights2.IsValid());
+    EXPECT_TRUE(props.Exists("p:weight"));
+    EXPECT_EQ(weights2.Vector().size(), 3u);
+    EXPECT_FLOAT_EQ(weights2[0], 7.0f);
+    EXPECT_FLOAT_EQ(weights2[1], 7.0f);
+    EXPECT_FLOAT_EQ(weights2[2], 7.0f);
+}
+
+TEST(HalfedgeMesh_PropertyAccess, VertexProperties_RemainUsableAfterGarbageCollection)
+{
+    using namespace Geometry;
+
+    auto mesh = MakeQuadPair();
+    mesh.DeleteFace(FaceHandle{0});
+    ASSERT_TRUE(mesh.HasGarbage());
+
+    mesh.GarbageCollection();
+    EXPECT_FALSE(mesh.HasGarbage());
+
+    auto heat = VertexProperty<float>(mesh.VertexProperties().GetOrAdd<float>("v:heat", 3.0f));
+    ASSERT_TRUE(heat.IsValid());
+    EXPECT_EQ(heat.Vector().size(), mesh.VerticesSize());
+
+    for (std::size_t i = 0; i < mesh.VerticesSize(); ++i)
+    {
+        VertexHandle v{static_cast<PropertyIndex>(i)};
+        heat[v] = static_cast<float>(i);
+        EXPECT_FLOAT_EQ(heat[v], static_cast<float>(i));
+    }
+
+    auto heatRead = VertexProperty<float>(mesh.VertexProperties().Get<float>("v:heat"));
+    ASSERT_TRUE(heatRead.IsValid());
+    EXPECT_EQ(heatRead.Vector().size(), mesh.VerticesSize());
+}
+

@@ -17,6 +17,11 @@ import :HalfedgeMesh;
 
 namespace Geometry::CatmullClark
 {
+    namespace
+    {
+        constexpr const char* kVertexTexcoordPropertyName = "v:texcoord";
+    }
+
     // Perform a single level of Catmull-Clark subdivision.
     static bool SubdivideOnce(const Halfedge::Mesh& input, Halfedge::Mesh& output)
     {
@@ -27,6 +32,9 @@ namespace Geometry::CatmullClark
         if (nV == 0 || nF == 0)
             return false;
 
+        const auto inputTexcoord = input.VertexProperties().Get<glm::vec2>(kVertexTexcoordPropertyName);
+        const bool hasTexcoord = static_cast<bool>(inputTexcoord);
+
         output.Clear();
 
         // =====================================================================
@@ -34,6 +42,11 @@ namespace Geometry::CatmullClark
         // =====================================================================
         // F_i = centroid of face i's vertices
         std::vector<glm::vec3> facePoints(nF, glm::vec3(0.0f));
+        std::vector<glm::vec2> faceTexcoords;
+        if (hasTexcoord)
+        {
+            faceTexcoords.assign(nF, glm::vec2(0.0f));
+        }
         for (std::size_t fi = 0; fi < nF; ++fi)
         {
             FaceHandle fh{static_cast<PropertyIndex>(fi)};
@@ -41,28 +54,43 @@ namespace Geometry::CatmullClark
                 continue;
 
             glm::vec3 sum(0.0f);
+            glm::vec2 uvSum(0.0f);
             std::size_t count = 0;
             HalfedgeHandle hStart = input.Halfedge(fh);
             HalfedgeHandle h = hStart;
             std::size_t safety = 0;
             do
             {
-                sum += input.Position(input.ToVertex(h));
+                const VertexHandle v = input.ToVertex(h);
+                sum += input.Position(v);
+                if (hasTexcoord)
+                {
+                    uvSum += inputTexcoord[v.Index];
+                }
                 ++count;
                 h = input.NextHalfedge(h);
                 if (++safety > std::max<std::size_t>(input.HalfedgesSize(), 1000u)) break;
             } while (h != hStart);
 
             if (count > 0)
+            {
                 facePoints[fi] = sum / static_cast<float>(count);
+                if (hasTexcoord)
+                {
+                    faceTexcoords[fi] = uvSum / static_cast<float>(count);
+                }
+            }
         }
 
         // =====================================================================
         // Phase 2: Compute edge points (one per edge)
         // =====================================================================
-        // Interior: E = (v0 + v1 + F_left + F_right) / 4
-        // Boundary: E = (v0 + v1) / 2
         std::vector<glm::vec3> edgePoints(nE, glm::vec3(0.0f));
+        std::vector<glm::vec2> edgeTexcoords;
+        if (hasTexcoord)
+        {
+            edgeTexcoords.assign(nE, glm::vec2(0.0f));
+        }
         for (std::size_t ei = 0; ei < nE; ++ei)
         {
             EdgeHandle eh{static_cast<PropertyIndex>(ei)};
@@ -76,30 +104,38 @@ namespace Geometry::CatmullClark
             VertexHandle v1 = input.ToVertex(h0);
             glm::vec3 p0 = input.Position(v0);
             glm::vec3 p1 = input.Position(v1);
+            const glm::vec2 uv0 = hasTexcoord ? inputTexcoord[v0.Index] : glm::vec2(0.0f);
+            const glm::vec2 uv1 = hasTexcoord ? inputTexcoord[v1.Index] : glm::vec2(0.0f);
 
             if (input.IsBoundary(eh))
             {
-                // Boundary edge: simple midpoint
                 edgePoints[ei] = 0.5f * (p0 + p1);
+                if (hasTexcoord)
+                {
+                    edgeTexcoords[ei] = 0.5f * (uv0 + uv1);
+                }
             }
             else
             {
-                // Interior edge: average of endpoints and adjacent face points
                 FaceHandle f0 = input.Face(h0);
                 FaceHandle f1 = input.Face(h1);
                 edgePoints[ei] = (p0 + p1 + facePoints[f0.Index] + facePoints[f1.Index]) / 4.0f;
+                if (hasTexcoord)
+                {
+                    edgeTexcoords[ei] = (uv0 + uv1 + faceTexcoords[f0.Index] + faceTexcoords[f1.Index]) / 4.0f;
+                }
             }
         }
 
         // =====================================================================
         // Phase 3: Compute new vertex points (one per original vertex)
         // =====================================================================
-        // Interior: V' = Q/n + 2R/n + S(n-3)/n
-        //   Q = average of adjacent face points
-        //   R = average of adjacent edge midpoints
-        //   S = original position, n = valence
-        // Boundary: V' = (1/8)*prev + (3/4)*V + (1/8)*next
         std::vector<glm::vec3> vertexPoints(nV, glm::vec3(0.0f));
+        std::vector<glm::vec2> vertexTexcoords;
+        if (hasTexcoord)
+        {
+            vertexTexcoords.assign(nV, glm::vec2(0.0f));
+        }
         for (std::size_t vi = 0; vi < nV; ++vi)
         {
             VertexHandle vh{static_cast<PropertyIndex>(vi)};
@@ -107,11 +143,12 @@ namespace Geometry::CatmullClark
                 continue;
 
             glm::vec3 S = input.Position(vh);
+            const glm::vec2 Suv = hasTexcoord ? inputTexcoord[vi] : glm::vec2(0.0f);
 
             if (input.IsBoundary(vh))
             {
-                // Boundary vertex: (1/8)*prev + (3/4)*v + (1/8)*next
                 glm::vec3 boundarySum(0.0f);
+                glm::vec2 boundaryUvSum(0.0f);
                 std::size_t boundaryCount = 0;
 
                 HalfedgeHandle hStart = input.Halfedge(vh);
@@ -121,7 +158,12 @@ namespace Geometry::CatmullClark
                 {
                     if (input.IsBoundary(input.Edge(h)))
                     {
-                        boundarySum += input.Position(input.ToVertex(h));
+                        const VertexHandle neighbor = input.ToVertex(h);
+                        boundarySum += input.Position(neighbor);
+                        if (hasTexcoord)
+                        {
+                            boundaryUvSum += inputTexcoord[neighbor.Index];
+                        }
                         ++boundaryCount;
                     }
                     h = input.CWRotatedHalfedge(h);
@@ -129,20 +171,31 @@ namespace Geometry::CatmullClark
                 } while (h != hStart);
 
                 if (boundaryCount == 2)
+                {
                     vertexPoints[vi] = 0.75f * S + 0.125f * boundarySum;
+                    if (hasTexcoord)
+                    {
+                        vertexTexcoords[vi] = 0.75f * Suv + 0.125f * boundaryUvSum;
+                    }
+                }
                 else
-                    vertexPoints[vi] = S; // fallback
+                {
+                    vertexPoints[vi] = S;
+                    if (hasTexcoord)
+                    {
+                        vertexTexcoords[vi] = Suv;
+                    }
+                }
             }
             else
             {
-                // Interior vertex
                 std::size_t n = input.Valence(vh);
                 float fn = static_cast<float>(n);
 
-                // Q = average of adjacent face points
                 glm::vec3 Q(0.0f);
-                // R = average of adjacent edge midpoints
                 glm::vec3 R(0.0f);
+                glm::vec2 Quv(0.0f);
+                glm::vec2 Ruv(0.0f);
 
                 HalfedgeHandle hStart = input.Halfedge(vh);
                 HalfedgeHandle h = hStart;
@@ -150,15 +203,25 @@ namespace Geometry::CatmullClark
                 std::size_t safety = 0;
                 do
                 {
-                    // Face point of the face incident to this halfedge
                     FaceHandle f = input.Face(h);
                     if (f.IsValid())
+                    {
                         Q += facePoints[f.Index];
+                        if (hasTexcoord)
+                        {
+                            Quv += faceTexcoords[f.Index];
+                        }
+                    }
 
-                    // Edge midpoint (average of the two endpoints)
-                    glm::vec3 edgeMid = 0.5f * (input.Position(input.FromVertex(h)) +
-                                                  input.Position(input.ToVertex(h)));
+                    const VertexHandle from = input.FromVertex(h);
+                    const VertexHandle to = input.ToVertex(h);
+                    glm::vec3 edgeMid = 0.5f * (input.Position(from) + input.Position(to));
                     R += edgeMid;
+                    if (hasTexcoord)
+                    {
+                        const glm::vec2 edgeUvMid = 0.5f * (inputTexcoord[from.Index] + inputTexcoord[to.Index]);
+                        Ruv += edgeUvMid;
+                    }
 
                     ++count;
                     h = input.CWRotatedHalfedge(h);
@@ -170,10 +233,20 @@ namespace Geometry::CatmullClark
                     Q /= fn;
                     R /= fn;
                     vertexPoints[vi] = Q / fn + 2.0f * R / fn + S * (fn - 3.0f) / fn;
+                    if (hasTexcoord)
+                    {
+                        Quv /= fn;
+                        Ruv /= fn;
+                        vertexTexcoords[vi] = Quv / fn + 2.0f * Ruv / fn + Suv * (fn - 3.0f) / fn;
+                    }
                 }
                 else
                 {
-                    vertexPoints[vi] = S; // fallback
+                    vertexPoints[vi] = S;
+                    if (hasTexcoord)
+                    {
+                        vertexTexcoords[vi] = Suv;
+                    }
                 }
             }
         }
@@ -181,8 +254,12 @@ namespace Geometry::CatmullClark
         // =====================================================================
         // Phase 4: Build the subdivided mesh
         // =====================================================================
-        // New vertices: nV vertex points + nE edge points + nF face points
-        // New faces: for each original face with k edges, k quads
+        VertexProperty<glm::vec2> outputTexcoord;
+        if (hasTexcoord)
+        {
+            outputTexcoord = VertexProperty<glm::vec2>(
+                output.VertexProperties().GetOrAdd<glm::vec2>(kVertexTexcoordPropertyName, glm::vec2(0.0f)));
+        }
 
         // Add vertex points
         std::vector<VertexHandle> vVertices(nV);
@@ -192,6 +269,10 @@ namespace Geometry::CatmullClark
             if (input.IsDeleted(vh) || input.IsIsolated(vh))
                 continue;
             vVertices[vi] = output.AddVertex(vertexPoints[vi]);
+            if (hasTexcoord)
+            {
+                outputTexcoord[vVertices[vi]] = vertexTexcoords[vi];
+            }
         }
 
         // Add edge points
@@ -202,6 +283,10 @@ namespace Geometry::CatmullClark
             if (input.IsDeleted(eh))
                 continue;
             eVertices[ei] = output.AddVertex(edgePoints[ei]);
+            if (hasTexcoord)
+            {
+                outputTexcoord[eVertices[ei]] = edgeTexcoords[ei];
+            }
         }
 
         // Add face points
@@ -212,6 +297,10 @@ namespace Geometry::CatmullClark
             if (input.IsDeleted(fh))
                 continue;
             fVertices[fi] = output.AddVertex(facePoints[fi]);
+            if (hasTexcoord)
+            {
+                outputTexcoord[fVertices[fi]] = faceTexcoords[fi];
+            }
         }
 
         // =====================================================================

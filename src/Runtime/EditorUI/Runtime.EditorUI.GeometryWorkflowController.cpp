@@ -141,29 +141,37 @@ void GeometryWorkflowController::ApplyOperator(entt::entity entity,
     {
         mesh = *meshData->MeshRef;
     }
+    else if (collider->CollisionRef->SourceMesh)
+    {
+        mesh = *collider->CollisionRef->SourceMesh;
+    }
     else
     {
-        std::vector<Geometry::VertexHandle> vhs(collider->CollisionRef->Positions.size());
-        for (size_t i = 0; i < collider->CollisionRef->Positions.size(); ++i)
-        {
-            vhs[i] = mesh.AddVertex(collider->CollisionRef->Positions[i]);
-        }
-        for (size_t i = 0; i + 2 < collider->CollisionRef->Indices.size(); i += 3)
-        {
-            const auto i0 = collider->CollisionRef->Indices[i];
-            const auto i1 = collider->CollisionRef->Indices[i + 1];
-            const auto i2 = collider->CollisionRef->Indices[i + 2];
+        Geometry::MeshUtils::TriangleSoupBuildParams buildParams;
+        buildParams.WeldVertices = true;
+        buildParams.WeldEpsilon = 1e-6f;
 
-            auto face = mesh.AddTriangle(vhs[i0], vhs[i1], vhs[i2]);
-            if (!face)
-            {
-                face = mesh.AddTriangle(vhs[i0], vhs[i2], vhs[i1]);
-            }
-            if (!face)
-            {
-                return;
-            }
+        auto built = Geometry::MeshUtils::BuildHalfedgeMeshFromIndexedTriangles(
+            collider->CollisionRef->Positions,
+            collider->CollisionRef->Indices,
+            buildParams);
+        if (!built)
+        {
+            return;
         }
+        mesh = std::move(*built);
+    }
+
+    if (mesh.VertexProperties().Get<glm::vec2>("v:texcoord"))
+    {
+        Geometry::Halfedge::Mesh::VertexAttributeTransfer uvTransfer;
+        uvTransfer.Name = "v:texcoord";
+        uvTransfer.Rule = Geometry::Halfedge::Mesh::VertexAttributeTransfer::Policy::Average;
+        mesh.SetVertexAttributeTransferRules(std::span<const Geometry::Halfedge::Mesh::VertexAttributeTransfer>(&uvTransfer, 1));
+    }
+    else
+    {
+        mesh.ClearVertexAttributeTransferRules();
     }
 
     // 2. Apply operator
@@ -173,67 +181,16 @@ void GeometryWorkflowController::ApplyOperator(entt::entity entity,
     // 3. Extract back
     std::vector<glm::vec3> newPos;
     std::vector<uint32_t> newIdx;
-
-    newPos.reserve(mesh.VertexCount());
-    std::vector<uint32_t> vMap(mesh.VerticesSize(), 0);
-    uint32_t currentIdx = 0;
-    for (size_t i = 0; i < mesh.VerticesSize(); ++i)
-    {
-        Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(i)};
-        if (!mesh.IsDeleted(v))
-        {
-            vMap[i] = currentIdx++;
-            newPos.push_back(mesh.Position(v));
-        }
-    }
-
-    newIdx.reserve(mesh.FaceCount() * 3);
-    for (size_t i = 0; i < mesh.FacesSize(); ++i)
-    {
-        Geometry::FaceHandle f{static_cast<Geometry::PropertyIndex>(i)};
-        if (mesh.IsDeleted(f))
-        {
-            continue;
-        }
-
-        const auto h0 = mesh.Halfedge(f);
-        if (!mesh.IsValid(h0))
-        {
-            continue;
-        }
-        const auto h1 = mesh.NextHalfedge(h0);
-        const auto h2 = mesh.NextHalfedge(h1);
-        if (!mesh.IsValid(h1) || !mesh.IsValid(h2) || mesh.NextHalfedge(h2) != h0)
-        {
-            continue;
-        }
-
-        const auto v0 = mesh.ToVertex(h0);
-        const auto v1 = mesh.ToVertex(h1);
-        const auto v2 = mesh.ToVertex(h2);
-        if (!mesh.IsValid(v0) || !mesh.IsValid(v1) || !mesh.IsValid(v2))
-        {
-            continue;
-        }
-        if (v0.Index >= vMap.size() || v1.Index >= vMap.size() || v2.Index >= vMap.size())
-        {
-            continue;
-        }
-
-        newIdx.push_back(vMap[v0.Index]);
-        newIdx.push_back(vMap[v1.Index]);
-        newIdx.push_back(vMap[v2.Index]);
-    }
+    std::vector<glm::vec4> newAux;
+    Geometry::MeshUtils::ExtractIndexedTriangles(mesh, newPos, newIdx, &newAux);
 
     collider->CollisionRef->Positions = std::move(newPos);
     collider->CollisionRef->Indices = std::move(newIdx);
+    collider->CollisionRef->SourceMesh = std::make_shared<Geometry::Halfedge::Mesh>(mesh);
 
     std::vector<glm::vec3> newNormals(collider->CollisionRef->Positions.size(), glm::vec3(0, 1, 0));
     Geometry::MeshUtils::CalculateNormals(collider->CollisionRef->Positions, collider->CollisionRef->Indices,
                                           newNormals);
-
-    std::vector<glm::vec4> newAux(collider->CollisionRef->Positions.size(), glm::vec4(0.0f));
-    Geometry::MeshUtils::GenerateUVs(collider->CollisionRef->Positions, newAux);
 
     auto aabbs = Geometry::Convert(collider->CollisionRef->Positions);
     collider->CollisionRef->LocalAABB = Geometry::Union(aabbs);
@@ -284,7 +241,7 @@ void GeometryWorkflowController::ApplyOperator(entt::entity entity,
         pv->Dirty = true;
 
     auto& md = reg.emplace_or_replace<ECS::Mesh::Data>(entity);
-    md.MeshRef = std::make_shared<Geometry::Halfedge::Mesh>(std::move(mesh));
+    md.MeshRef = collider->CollisionRef->SourceMesh;
     md.AttributesDirty = true;
 
     m_Engine->GetScene().GetDispatcher().enqueue<ECS::Events::GeometryModified>({entity});

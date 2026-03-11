@@ -24,6 +24,7 @@ Built on **C++23 Modules**, **Vulkan 1.3** bindless rendering, coroutine-based t
   - Parallel systems use `BeginReadPhase()` / `EndReadPhase()` brackets.
   - `AcquireLease()` for long-lived access across hot-reloads.
 - **Registry-Driven Drag & Drop Import:** The runtime drop path delegates to `Graphics::IORegistry`, so any registered loader extension is accepted consistently by both file import and window drag-and-drop.
+- **Editor Geometry Workflow Hygiene:** When the editor reconstructs a `Halfedge::Mesh` from render/collider triangle soup, it now routes through UV-aware conversion helpers (`Geometry::MeshUtils::BuildHalfedgeMeshFromIndexedTriangles` / `ExtractIndexedTriangles`). Coincident vertices are welded only when their UVs also agree, so texture seams survive rebuilds instead of being averaged away, and edited meshes round-trip their `v:texcoord` property back into `Aux.xy` for GPU upload.
 
 ### 2. Geometry Processing Kernel
 
@@ -47,9 +48,11 @@ A **"Distinguished Scientist" grade** geometry kernel in `src/Runtime/Geometry/`
     `Halfedge::Mesh::SetVertexAttributeTransferRules()`.
   - For each property name (e.g. `"v:texcoord"`, `"v:color"`) you can choose a policy:
     `Average` (interpolate), `KeepA`, `KeepB`, or `None`.
-  - This is the engine-side equivalent of PMP's “property lifecycle” and is required if you want
-    dependent attributes (texcoords/colors/weights, etc.) to remain valid after remeshing or
-    simplification.
+  - The editor geometry workflow now enables this contract automatically for `"v:texcoord"`, so
+    remeshing and simplification keep UVs coherent instead of regenerating planar coordinates.
+  - Triangle-soup bridge helpers preserve UVs across CPU mesh ↔ halfedge conversion, and Loop /
+    Catmull-Clark subdivision propagate `"v:texcoord"` with the same refinement stencils used for
+    positions.
 
 
 **Graph Processing Operators:**

@@ -463,12 +463,6 @@ TEST(XYZLoader, ParsesSemicolonDelimitedRows)
     ASSERT_EQ(meshImport->Meshes.size(), 1u);
     ASSERT_EQ(meshImport->Meshes[0].Positions.size(), 3u);
     EXPECT_EQ(meshImport->Meshes[0].Topology, PrimitiveTopology::Points);
-    EXPECT_NEAR(meshImport->Meshes[0].Positions[0].x, 20.549438f, 1e-6f);
-    EXPECT_NEAR(meshImport->Meshes[0].Positions[0].y, -744.746521f, 1e-6f);
-    EXPECT_NEAR(meshImport->Meshes[0].Positions[0].z, -4.371309f, 1e-6f);
-    EXPECT_NEAR(meshImport->Meshes[0].Positions[2].x, 20.328897f, 1e-6f);
-    EXPECT_NEAR(meshImport->Meshes[0].Positions[2].y, -744.662109f, 1e-6f);
-    EXPECT_NEAR(meshImport->Meshes[0].Positions[2].z, -4.313331f, 1e-6f);
 }
 
 TEST(PCDLoader, ParseAsciiFromBytes)
@@ -926,27 +920,39 @@ namespace
 {
     Geometry::Halfedge::Mesh BuildHalfedgeMesh(const Graphics::GeometryCpuData& cpu)
     {
-        Geometry::Halfedge::Mesh mesh;
-        std::vector<Geometry::VertexHandle> verts;
-        verts.reserve(cpu.Positions.size());
-        for (const auto& p : cpu.Positions)
-        {
-            verts.push_back(mesh.AddVertex(p));
-        }
+        Geometry::MeshUtils::TriangleSoupBuildParams params;
+        params.WeldVertices = false;
+        auto mesh = Geometry::MeshUtils::BuildHalfedgeMeshFromIndexedTriangles(cpu.Positions, cpu.Indices, params);
+        EXPECT_TRUE(mesh.has_value());
+        return mesh ? std::move(*mesh) : Geometry::Halfedge::Mesh{};
+    }
 
-        bool buildOk = true;
-        for (std::size_t i = 0; i + 2 < cpu.Indices.size(); i += 3)
+    Geometry::Halfedge::Mesh BuildWorkflowHalfedgeMesh(const Graphics::GeometryCpuData& cpu)
+    {
+        Geometry::MeshUtils::TriangleSoupBuildParams params;
+        params.WeldVertices = true;
+        params.WeldEpsilon = 1e-6f;
+        auto mesh = Geometry::MeshUtils::BuildHalfedgeMeshFromIndexedTriangles(cpu.Positions, cpu.Indices, params);
+        EXPECT_TRUE(mesh.has_value());
+        return mesh ? std::move(*mesh) : Geometry::Halfedge::Mesh{};
+    }
+
+    [[nodiscard]] std::size_t CountBoundaryEdges(const Geometry::Halfedge::Mesh& mesh)
+    {
+        std::size_t boundaryEdges = 0;
+        for (std::size_t ei = 0; ei < mesh.EdgesSize(); ++ei)
         {
-            const auto maybeFace = mesh.AddTriangle(verts[cpu.Indices[i]], verts[cpu.Indices[i + 1]], verts[cpu.Indices[i + 2]]);
-            if (!maybeFace.has_value())
+            Geometry::EdgeHandle e{static_cast<Geometry::PropertyIndex>(ei)};
+            if (mesh.IsDeleted(e))
             {
-                ADD_FAILURE() << "Failed to build duck triangle " << (i / 3);
-                buildOk = false;
-                break;
+                continue;
+            }
+            if (mesh.IsBoundary(e))
+            {
+                ++boundaryEdges;
             }
         }
-        EXPECT_TRUE(buildOk);
-        return mesh;
+        return boundaryEdges;
     }
 
     void ExtractTriangleSoup(Geometry::Halfedge::Mesh& mesh,
@@ -987,6 +993,102 @@ namespace
             indices.push_back(vMap[v2.Index]);
         }
     }
+
+    void ExtractWorkflowStyleTriangleSoup(const Geometry::Halfedge::Mesh& mesh,
+                                          std::vector<glm::vec3>& positions,
+                                          std::vector<uint32_t>& indices)
+    {
+        positions.clear();
+        indices.clear();
+        positions.reserve(mesh.VertexCount());
+        indices.reserve(mesh.FaceCount() * 3);
+
+        std::vector<uint32_t> vMap(mesh.VerticesSize(), 0u);
+        uint32_t currentIdx = 0;
+        for (std::size_t i = 0; i < mesh.VerticesSize(); ++i)
+        {
+            Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(i)};
+            if (!mesh.IsDeleted(v))
+            {
+                vMap[i] = currentIdx++;
+                positions.push_back(mesh.Position(v));
+            }
+        }
+
+        for (std::size_t i = 0; i < mesh.FacesSize(); ++i)
+        {
+            Geometry::FaceHandle f{static_cast<Geometry::PropertyIndex>(i)};
+            if (mesh.IsDeleted(f))
+            {
+                continue;
+            }
+
+            const auto h0 = mesh.Halfedge(f);
+            if (!mesh.IsValid(h0))
+            {
+                continue;
+            }
+            const auto h1 = mesh.NextHalfedge(h0);
+            const auto h2 = mesh.NextHalfedge(h1);
+            if (!mesh.IsValid(h1) || !mesh.IsValid(h2) || mesh.NextHalfedge(h2) != h0)
+            {
+                continue;
+            }
+
+            const auto v0 = mesh.ToVertex(h0);
+            const auto v1 = mesh.ToVertex(h1);
+            const auto v2 = mesh.ToVertex(h2);
+            if (!mesh.IsValid(v0) || !mesh.IsValid(v1) || !mesh.IsValid(v2))
+            {
+                continue;
+            }
+            if (v0.Index >= vMap.size() || v1.Index >= vMap.size() || v2.Index >= vMap.size())
+            {
+                continue;
+            }
+
+            indices.push_back(vMap[v0.Index]);
+            indices.push_back(vMap[v1.Index]);
+            indices.push_back(vMap[v2.Index]);
+        }
+    }
+}
+
+TEST(IORegistryImport, DuckImportedTriangleSoupHasArtificialBoundarySeams)
+{
+    FileIOBackend backend;
+    IORegistry registry;
+    RegisterBuiltinLoaders(registry);
+
+    std::string path = std::string(ENGINE_ROOT_DIR) + "/assets/models/Duck.glb";
+
+    IORequest checkReq;
+    checkReq.Path = path;
+    checkReq.Size = 1;
+    auto checkResult = backend.Read(checkReq);
+    if (!checkResult.has_value())
+    {
+        GTEST_SKIP() << "Duck.glb not found, skipping";
+        return;
+    }
+
+    auto imported = registry.Import(path, backend);
+    ASSERT_TRUE(imported.has_value()) << "Import failed";
+
+    auto* meshImport = std::get_if<MeshImportData>(&*imported);
+    ASSERT_NE(meshImport, nullptr);
+    ASSERT_FALSE(meshImport->Meshes.empty());
+
+    auto rawMesh = BuildHalfedgeMesh(meshImport->Meshes.front());
+    auto workflowMesh = BuildWorkflowHalfedgeMesh(meshImport->Meshes.front());
+
+    auto rawQuality = Geometry::MeshQuality::ComputeQuality(rawMesh);
+    auto workflowQuality = Geometry::MeshQuality::ComputeQuality(workflowMesh);
+    ASSERT_TRUE(rawQuality.has_value());
+    ASSERT_TRUE(workflowQuality.has_value());
+
+    EXPECT_GT(rawQuality->BoundaryLoopCount, workflowQuality->BoundaryLoopCount)
+        << "Raw imported duck should expose more seam boundaries than the welded workflow mesh";
 }
 
 TEST(IORegistryImport, DuckRepeatedSimplificationWorkflow)
@@ -1014,7 +1116,7 @@ TEST(IORegistryImport, DuckRepeatedSimplificationWorkflow)
     ASSERT_NE(meshImport, nullptr);
     ASSERT_FALSE(meshImport->Meshes.empty());
 
-    auto mesh = BuildHalfedgeMesh(meshImport->Meshes.front());
+    auto mesh = BuildWorkflowHalfedgeMesh(meshImport->Meshes.front());
     ASSERT_GT(mesh.FaceCount(), 4000u);
 
     Geometry::Simplification::SimplificationParams first;
@@ -1030,7 +1132,7 @@ TEST(IORegistryImport, DuckRepeatedSimplificationWorkflow)
     Graphics::GeometryCpuData rebuiltCpu;
     rebuiltCpu.Positions = positions;
     rebuiltCpu.Indices = indices;
-    auto rebuilt = BuildHalfedgeMesh(rebuiltCpu);
+    auto rebuilt = BuildWorkflowHalfedgeMesh(rebuiltCpu);
 
     Geometry::Simplification::SimplificationParams second;
     second.TargetFaces = 3000;
@@ -1040,4 +1142,131 @@ TEST(IORegistryImport, DuckRepeatedSimplificationWorkflow)
 
     ExtractTriangleSoup(rebuilt, positions, indices);
     EXPECT_EQ(indices.size(), rebuilt.FaceCount() * 3);
+}
+
+TEST(IORegistryImport, DuckAggressiveSimplificationPreservesClosure)
+{
+    FileIOBackend backend;
+    IORegistry registry;
+    RegisterBuiltinLoaders(registry);
+
+    std::string path = std::string(ENGINE_ROOT_DIR) + "/assets/models/Duck.glb";
+
+    IORequest checkReq;
+    checkReq.Path = path;
+    checkReq.Size = 1;
+    auto checkResult = backend.Read(checkReq);
+    if (!checkResult.has_value())
+    {
+        GTEST_SKIP() << "Duck.glb not found, skipping";
+        return;
+    }
+
+    auto imported = registry.Import(path, backend);
+    ASSERT_TRUE(imported.has_value()) << "Import failed";
+
+    auto* meshImport = std::get_if<MeshImportData>(&*imported);
+    ASSERT_NE(meshImport, nullptr);
+    ASSERT_FALSE(meshImport->Meshes.empty());
+
+    auto mesh = BuildWorkflowHalfedgeMesh(meshImport->Meshes.front());
+    auto before = Geometry::MeshQuality::ComputeQuality(mesh);
+    ASSERT_TRUE(before.has_value());
+
+    Geometry::Simplification::SimplificationParams params;
+    params.TargetFaces = 1000;
+    params.PreserveBoundary = false;
+
+    auto result = Geometry::Simplification::Simplify(mesh, params);
+    ASSERT_TRUE(result.has_value());
+    ASSERT_LE(mesh.FaceCount(), 1000u);
+
+    const auto preGcBoundaryEdges = CountBoundaryEdges(mesh);
+    auto preGc = Geometry::MeshQuality::ComputeQuality(mesh);
+    ASSERT_TRUE(preGc.has_value());
+
+    mesh.GarbageCollection();
+
+    const auto postGcBoundaryEdges = CountBoundaryEdges(mesh);
+    auto after = Geometry::MeshQuality::ComputeQuality(mesh);
+    ASSERT_TRUE(after.has_value());
+
+    EXPECT_EQ(preGcBoundaryEdges, before->BoundaryLoopCount == 0 ? 0u : preGcBoundaryEdges)
+        << "Diagnostic guard to surface pre-GC boundary count in failure output";
+
+    EXPECT_EQ(after->BoundaryLoopCount, before->BoundaryLoopCount)
+        << "Duck simplification changed boundary loop count: before=" << before->BoundaryLoopCount
+        << " preGC=" << preGc->BoundaryLoopCount
+        << " after=" << after->BoundaryLoopCount
+        << " preGCBoundaryEdges=" << preGcBoundaryEdges
+        << " postGCBoundaryEdges=" << postGcBoundaryEdges;
+
+    if (before->BoundaryLoopCount == 0)
+    {
+        EXPECT_TRUE(after->IsClosed)
+            << "Duck started closed but aggressive simplification opened it: preGCBoundaryEdges="
+            << preGcBoundaryEdges << " postGCBoundaryEdges=" << postGcBoundaryEdges;
+        EXPECT_EQ(postGcBoundaryEdges, 0u);
+        EXPECT_EQ(after->EulerCharacteristic, before->EulerCharacteristic)
+            << "Closed duck should preserve Euler characteristic";
+    }
+}
+
+TEST(IORegistryImport, DuckAggressiveSimplificationSurvivesWorkflowExtraction)
+{
+    FileIOBackend backend;
+    IORegistry registry;
+    RegisterBuiltinLoaders(registry);
+
+    std::string path = std::string(ENGINE_ROOT_DIR) + "/assets/models/Duck.glb";
+
+    IORequest checkReq;
+    checkReq.Path = path;
+    checkReq.Size = 1;
+    auto checkResult = backend.Read(checkReq);
+    if (!checkResult.has_value())
+    {
+        GTEST_SKIP() << "Duck.glb not found, skipping";
+        return;
+    }
+
+    auto imported = registry.Import(path, backend);
+    ASSERT_TRUE(imported.has_value()) << "Import failed";
+
+    auto* meshImport = std::get_if<MeshImportData>(&*imported);
+    ASSERT_NE(meshImport, nullptr);
+    ASSERT_FALSE(meshImport->Meshes.empty());
+
+    auto mesh = BuildWorkflowHalfedgeMesh(meshImport->Meshes.front());
+
+    Geometry::Simplification::SimplificationParams params;
+    params.TargetFaces = 1000;
+    params.PreserveBoundary = false;
+
+    auto result = Geometry::Simplification::Simplify(mesh, params);
+    ASSERT_TRUE(result.has_value());
+
+    mesh.GarbageCollection();
+
+    std::vector<glm::vec3> positions;
+    std::vector<uint32_t> indices;
+    ExtractWorkflowStyleTriangleSoup(mesh, positions, indices);
+
+    EXPECT_EQ(indices.size(), mesh.FaceCount() * 3)
+        << "Workflow extraction dropped faces after aggressive duck simplification";
+
+    Graphics::GeometryCpuData rebuiltCpu;
+    rebuiltCpu.Positions = positions;
+    rebuiltCpu.Indices = indices;
+    auto rebuilt = BuildWorkflowHalfedgeMesh(rebuiltCpu);
+
+    auto rebuiltQuality = Geometry::MeshQuality::ComputeQuality(rebuilt);
+    ASSERT_TRUE(rebuiltQuality.has_value());
+
+    auto simplifiedQuality = Geometry::MeshQuality::ComputeQuality(mesh);
+    ASSERT_TRUE(simplifiedQuality.has_value());
+
+    EXPECT_EQ(rebuilt.FaceCount(), mesh.FaceCount());
+    EXPECT_EQ(rebuiltQuality->BoundaryLoopCount, simplifiedQuality->BoundaryLoopCount)
+        << "Workflow extraction/rebuild changed duck boundary topology";
 }

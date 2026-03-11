@@ -1,6 +1,9 @@
 module;
 #include <cstddef>
+#include <cstdint>
+#include <optional>
 #include <span>
+#include <vector>
 #include <glm/fwd.hpp>
 
 export module Geometry:MeshUtils;
@@ -71,4 +74,31 @@ export namespace Geometry::MeshUtils
 
     /// Shared tangential Laplacian smoothing pass used by remeshing operators.
     void TangentialSmooth(Halfedge::Mesh& mesh, double lambda, bool preserveBoundary);
+
+    struct TriangleSoupBuildParams
+    {
+        // Merge coincident vertices before building topology. When UVs are supplied,
+        // only UV-compatible duplicates are welded so texture seams remain representable.
+        bool WeldVertices{false};
+
+        // World-space weld tolerance. Values <= 0 fall back to exact-position matching.
+        float WeldEpsilon{0.0f};
+    };
+
+    [[nodiscard]] std::optional<Halfedge::Mesh> BuildHalfedgeMeshFromIndexedTriangles(
+        std::span<const glm::vec3> positions,
+        std::span<const uint32_t> indices,
+        const TriangleSoupBuildParams& params = {});
+
+    [[nodiscard]] std::optional<Halfedge::Mesh> BuildHalfedgeMeshFromIndexedTriangles(
+        std::span<const glm::vec3> positions,
+        std::span<const uint32_t> indices,
+        std::span<const glm::vec4> aux,
+        const TriangleSoupBuildParams& params = {});
+
+    void ExtractIndexedTriangles(
+        const Halfedge::Mesh& mesh,
+        std::vector<glm::vec3>& positions,
+        std::vector<uint32_t>& indices,
+        std::vector<glm::vec4>* aux = nullptr);
 }

@@ -190,7 +190,7 @@ export namespace Geometry
         {
             for (size_t i = 0; i < m_Storages.size(); ++i)
             {
-                if (m_Storages[i]->Name() == name) return i;
+                if (m_Storages[i] && m_Storages[i]->Name() == name) return i;
             }
             return std::nullopt;
         }

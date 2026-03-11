@@ -19,6 +19,11 @@ import :HalfedgeMesh;
 
 namespace Geometry::Subdivision
 {
+    namespace
+    {
+        constexpr const char* kVertexTexcoordPropertyName = "v:texcoord";
+    }
+
     // Warren's beta formula for Loop subdivision even-vertex weights.
     // For valence n:
     //   β = 1/n * (5/8 - (3/8 + 1/4 * cos(2π/n))²)
@@ -41,6 +46,9 @@ namespace Geometry::Subdivision
         if (nV == 0 || nF == 0)
             return false;
 
+        const auto inputTexcoord = input.VertexProperties().Get<glm::vec2>(kVertexTexcoordPropertyName);
+        const bool hasTexcoord = static_cast<bool>(inputTexcoord);
+
         // Verify all faces are triangles
         for (std::size_t fi = 0; fi < nF; ++fi)
         {
@@ -54,6 +62,11 @@ namespace Geometry::Subdivision
 
         // Phase 1: Compute new positions for even vertices (existing vertices)
         std::vector<glm::vec3> evenPositions(nV, glm::vec3(0.0f));
+        std::vector<glm::vec2> evenTexcoords;
+        if (hasTexcoord)
+        {
+            evenTexcoords.assign(nV, glm::vec2(0.0f));
+        }
         for (std::size_t vi = 0; vi < nV; ++vi)
         {
             VertexHandle vh{static_cast<PropertyIndex>(vi)};
@@ -61,6 +74,7 @@ namespace Geometry::Subdivision
                 continue;
 
             glm::vec3 p = input.Position(vh);
+            const glm::vec2 uv = hasTexcoord ? inputTexcoord[vi] : glm::vec2(0.0f);
             std::size_t valence = input.Valence(vh);
 
             if (input.IsBoundary(vh))
@@ -68,6 +82,7 @@ namespace Geometry::Subdivision
                 // Boundary vertex rule: 1/8 * prev + 3/4 * v + 1/8 * next
                 // Find the two boundary neighbors
                 glm::vec3 boundarySum(0.0f);
+                glm::vec2 boundaryUvSum(0.0f);
                 std::size_t boundaryCount = 0;
 
                 HalfedgeHandle hStart = input.Halfedge(vh);
@@ -78,7 +93,12 @@ namespace Geometry::Subdivision
                 {
                     if (input.IsBoundary(input.Edge(h)))
                     {
-                        boundarySum += input.Position(input.ToVertex(h));
+                        const VertexHandle neighbor = input.ToVertex(h);
+                        boundarySum += input.Position(neighbor);
+                        if (hasTexcoord)
+                        {
+                            boundaryUvSum += inputTexcoord[neighbor.Index];
+                        }
                         ++boundaryCount;
                     }
                     h = input.CWRotatedHalfedge(h);
@@ -88,10 +108,18 @@ namespace Geometry::Subdivision
                 if (boundaryCount == 2)
                 {
                     evenPositions[vi] = 0.75f * p + 0.125f * boundarySum;
+                    if (hasTexcoord)
+                    {
+                        evenTexcoords[vi] = 0.75f * uv + 0.125f * boundaryUvSum;
+                    }
                 }
                 else
                 {
                     evenPositions[vi] = p; // Fallback: keep position
+                    if (hasTexcoord)
+                    {
+                        evenTexcoords[vi] = uv;
+                    }
                 }
             }
             else
@@ -102,23 +130,38 @@ namespace Geometry::Subdivision
                 float fw = 1.0f - static_cast<float>(valence) * fb;
 
                 glm::vec3 neighborSum(0.0f);
+                glm::vec2 neighborUvSum(0.0f);
                 HalfedgeHandle hStart = input.Halfedge(vh);
                 HalfedgeHandle h = hStart;
                 std::size_t safety = 0;
                 const std::size_t maxIter = input.HalfedgesSize();
                 do
                 {
-                    neighborSum += input.Position(input.ToVertex(h));
+                    const VertexHandle neighbor = input.ToVertex(h);
+                    neighborSum += input.Position(neighbor);
+                    if (hasTexcoord)
+                    {
+                        neighborUvSum += inputTexcoord[neighbor.Index];
+                    }
                     h = input.CWRotatedHalfedge(h);
                     if (++safety > maxIter) break;
                 } while (h != hStart);
 
                 evenPositions[vi] = fw * p + fb * neighborSum;
+                if (hasTexcoord)
+                {
+                    evenTexcoords[vi] = fw * uv + fb * neighborUvSum;
+                }
             }
         }
 
         // Phase 2: Compute positions for odd vertices (new edge midpoints)
         std::vector<glm::vec3> oddPositions(nE, glm::vec3(0.0f));
+        std::vector<glm::vec2> oddTexcoords;
+        if (hasTexcoord)
+        {
+            oddTexcoords.assign(nE, glm::vec2(0.0f));
+        }
         for (std::size_t ei = 0; ei < nE; ++ei)
         {
             EdgeHandle eh{static_cast<PropertyIndex>(ei)};
@@ -132,26 +175,44 @@ namespace Geometry::Subdivision
             VertexHandle v1 = input.ToVertex(h0);
             glm::vec3 p0 = input.Position(v0);
             glm::vec3 p1 = input.Position(v1);
+            const glm::vec2 uv0 = hasTexcoord ? inputTexcoord[v0.Index] : glm::vec2(0.0f);
+            const glm::vec2 uv1 = hasTexcoord ? inputTexcoord[v1.Index] : glm::vec2(0.0f);
 
             if (input.IsBoundary(eh))
             {
                 // Boundary edge: simple midpoint
                 oddPositions[ei] = 0.5f * (p0 + p1);
+                if (hasTexcoord)
+                {
+                    oddTexcoords[ei] = 0.5f * (uv0 + uv1);
+                }
             }
             else
             {
                 // Interior edge: 3/8*(v0+v1) + 1/8*(v2+v3)
-                // v2 is opposite vertex in face of h0, v3 in face of h1
                 VertexHandle v2 = input.ToVertex(input.NextHalfedge(h0));
                 VertexHandle v3 = input.ToVertex(input.NextHalfedge(h1));
                 glm::vec3 p2 = input.Position(v2);
                 glm::vec3 p3 = input.Position(v3);
 
                 oddPositions[ei] = 0.375f * (p0 + p1) + 0.125f * (p2 + p3);
+                if (hasTexcoord)
+                {
+                    const glm::vec2 uv2 = inputTexcoord[v2.Index];
+                    const glm::vec2 uv3 = inputTexcoord[v3.Index];
+                    oddTexcoords[ei] = 0.375f * (uv0 + uv1) + 0.125f * (uv2 + uv3);
+                }
             }
         }
 
         // Phase 3: Build the subdivided mesh
+        VertexProperty<glm::vec2> outputTexcoord;
+        if (hasTexcoord)
+        {
+            outputTexcoord = VertexProperty<glm::vec2>(
+                output.VertexProperties().GetOrAdd<glm::vec2>(kVertexTexcoordPropertyName, glm::vec2(0.0f)));
+        }
+
         // Add even vertices (one per original vertex)
         std::vector<VertexHandle> evenVerts(nV);
         for (std::size_t vi = 0; vi < nV; ++vi)
@@ -160,6 +221,10 @@ namespace Geometry::Subdivision
             if (input.IsDeleted(vh) || input.IsIsolated(vh))
                 continue;
             evenVerts[vi] = output.AddVertex(evenPositions[vi]);
+            if (hasTexcoord)
+            {
+                outputTexcoord[evenVerts[vi]] = evenTexcoords[vi];
+            }
         }
 
         // Add odd vertices (one per original edge)
@@ -170,6 +235,10 @@ namespace Geometry::Subdivision
             if (input.IsDeleted(eh))
                 continue;
             oddVerts[ei] = output.AddVertex(oddPositions[ei]);
+            if (hasTexcoord)
+            {
+                outputTexcoord[oddVerts[ei]] = oddTexcoords[ei];
+            }
         }
 
         // Phase 4: Create 4 sub-triangles per original face

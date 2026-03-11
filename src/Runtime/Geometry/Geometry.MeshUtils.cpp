@@ -1,9 +1,12 @@
 module;
 #include <algorithm>
+#include <bit>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <limits>
 #include <span>
+#include <unordered_map>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -19,6 +22,74 @@ import Core.Logging;
 
 namespace Geometry::MeshUtils
 {
+    namespace
+    {
+        constexpr const char* kVertexTexcoordPropertyName = "v:texcoord";
+        constexpr float kTexcoordEpsilon = 1.0e-6f;
+
+        struct QuantizedPositionKey
+        {
+            std::int64_t X{0};
+            std::int64_t Y{0};
+            std::int64_t Z{0};
+
+            [[nodiscard]] friend bool operator==(const QuantizedPositionKey&, const QuantizedPositionKey&) = default;
+        };
+
+        struct QuantizedPositionKeyHash
+        {
+            [[nodiscard]] std::size_t operator()(const QuantizedPositionKey& key) const noexcept
+            {
+                std::size_t h = 1469598103934665603ull;
+                auto mix = [&h](std::uint64_t v)
+                {
+                    h ^= static_cast<std::size_t>(v);
+                    h *= 1099511628211ull;
+                };
+                mix(static_cast<std::uint64_t>(key.X));
+                mix(static_cast<std::uint64_t>(key.Y));
+                mix(static_cast<std::uint64_t>(key.Z));
+                return h;
+            }
+        };
+
+        [[nodiscard]] QuantizedPositionKey MakeQuantizedPositionKey(const glm::vec3& p, float epsilon) noexcept
+        {
+            if (epsilon > 0.0f)
+            {
+                const double inv = 1.0 / static_cast<double>(epsilon);
+                return {
+                    static_cast<std::int64_t>(std::llround(static_cast<double>(p.x) * inv)),
+                    static_cast<std::int64_t>(std::llround(static_cast<double>(p.y) * inv)),
+                    static_cast<std::int64_t>(std::llround(static_cast<double>(p.z) * inv))};
+            }
+
+            return {
+                static_cast<std::int64_t>(std::bit_cast<std::uint32_t>(p.x)),
+                static_cast<std::int64_t>(std::bit_cast<std::uint32_t>(p.y)),
+                static_cast<std::int64_t>(std::bit_cast<std::uint32_t>(p.z))};
+        }
+
+        [[nodiscard]] bool PositionsCoincide(const glm::vec3& a, const glm::vec3& b, float epsilon) noexcept
+        {
+            if (epsilon > 0.0f)
+            {
+                return glm::distance2(a, b) <= static_cast<double>(epsilon) * static_cast<double>(epsilon);
+            }
+            return a.x == b.x && a.y == b.y && a.z == b.z;
+        }
+
+        [[nodiscard]] bool TexcoordsCoincide(const glm::vec2& a, const glm::vec2& b, float epsilon = kTexcoordEpsilon) noexcept
+        {
+            return glm::distance2(a, b) <= static_cast<double>(epsilon) * static_cast<double>(epsilon);
+        }
+
+        [[nodiscard]] glm::vec2 AuxToTexcoord(const glm::vec4& aux) noexcept
+        {
+            return {aux.x, aux.y};
+        }
+    }
+
     bool TryGetTriangleFaceView(const Halfedge::Mesh& mesh, FaceHandle f, TriangleFaceView& out)
     {
         if (!f.IsValid() || mesh.IsDeleted(f))
@@ -139,21 +210,20 @@ namespace Geometry::MeshUtils
             const auto& pos = positions[i];
             glm::vec2 uv(0.0f);
 
-            switch (flatAxis)
+            if (flatAxis == 0)
             {
-            case 0: // YZ Plane (Side view)
                 uv.x = (pos.z - minBounds.z) / size.z;
-                uv.y = (pos.y - minBounds.y) / size.y; // Typically Y is V
-                break;
-            case 1: // XZ Plane (Top-down / Floor)
+                uv.y = (pos.y - minBounds.y) / size.y;
+            }
+            else if (flatAxis == 1)
+            {
                 uv.x = (pos.x - minBounds.x) / size.x;
                 uv.y = (pos.z - minBounds.z) / size.z;
-                break;
-            case 2: // XY Plane (Front view)
+            }
+            else
+            {
                 uv.x = (pos.x - minBounds.x) / size.x;
-                uv.y = (pos.y - minBounds.y) / size.y; // Y is V (might need 1.0 - y for Vulkan)
-                break;
-            default: break;
+                uv.y = (pos.y - minBounds.y) / size.y;
             }
 
             // Note: Vulkan UVs top-left is 0,0. GLTF/OpenGL bottom-left is 0,0.
@@ -363,6 +433,212 @@ namespace Geometry::MeshUtils
             if (mesh.IsDeleted(vh) || mesh.IsIsolated(vh))
                 continue;
             mesh.Position(vh) = newPositions[vi];
+        }
+    }
+
+    std::optional<Halfedge::Mesh> BuildHalfedgeMeshFromIndexedTriangles(
+        std::span<const glm::vec3> positions,
+        std::span<const uint32_t> indices,
+        const TriangleSoupBuildParams& params)
+    {
+        return BuildHalfedgeMeshFromIndexedTriangles(positions, indices, std::span<const glm::vec4>{}, params);
+    }
+
+    std::optional<Halfedge::Mesh> BuildHalfedgeMeshFromIndexedTriangles(
+        std::span<const glm::vec3> positions,
+        std::span<const uint32_t> indices,
+        std::span<const glm::vec4> aux,
+        const TriangleSoupBuildParams& params)
+    {
+        if (positions.empty() || indices.empty() || (indices.size() % 3u) != 0u)
+        {
+            return std::nullopt;
+        }
+
+        const bool hasAux = aux.empty() ? false : (aux.size() == positions.size());
+        if (!aux.empty() && !hasAux)
+        {
+            Core::Log::Warn("BuildHalfedgeMeshFromIndexedTriangles: aux vertex count ({}) does not match positions ({})",
+                            aux.size(), positions.size());
+            return std::nullopt;
+        }
+
+        Halfedge::Mesh mesh;
+        std::vector<VertexHandle> remap(positions.size(), VertexHandle{});
+        VertexProperty<glm::vec2> texcoord;
+        if (hasAux)
+        {
+            texcoord = VertexProperty<glm::vec2>(
+                mesh.VertexProperties().GetOrAdd<glm::vec2>(kVertexTexcoordPropertyName, glm::vec2(0.0f)));
+        }
+
+        const bool weldVertices = params.WeldVertices;
+        const float weldEpsilon = params.WeldEpsilon;
+
+        if (!weldVertices)
+        {
+            for (std::size_t i = 0; i < positions.size(); ++i)
+            {
+                remap[i] = mesh.AddVertex(positions[i]);
+                if (hasAux)
+                {
+                    texcoord[remap[i]] = AuxToTexcoord(aux[i]);
+                }
+            }
+        }
+        else
+        {
+            std::unordered_map<QuantizedPositionKey, std::vector<std::size_t>, QuantizedPositionKeyHash> buckets;
+            buckets.reserve(positions.size());
+
+            for (std::size_t i = 0; i < positions.size(); ++i)
+            {
+                const auto key = MakeQuantizedPositionKey(positions[i], weldEpsilon);
+                auto& candidates = buckets[key];
+
+                VertexHandle welded;
+                for (const std::size_t candidate : candidates)
+                {
+                    if (!PositionsCoincide(positions[i], positions[candidate], weldEpsilon))
+                    {
+                        continue;
+                    }
+                    if (hasAux && !TexcoordsCoincide(AuxToTexcoord(aux[i]), AuxToTexcoord(aux[candidate])))
+                    {
+                        continue;
+                    }
+
+                    welded = remap[candidate];
+                    break;
+                }
+
+                if (!welded.IsValid())
+                {
+                    welded = mesh.AddVertex(positions[i]);
+                    if (hasAux)
+                    {
+                        texcoord[welded] = AuxToTexcoord(aux[i]);
+                    }
+                    candidates.push_back(i);
+                }
+
+                remap[i] = welded;
+            }
+        }
+
+        for (std::size_t i = 0; i + 2 < indices.size(); i += 3)
+        {
+            const uint32_t i0 = indices[i];
+            const uint32_t i1 = indices[i + 1];
+            const uint32_t i2 = indices[i + 2];
+            if (i0 >= remap.size() || i1 >= remap.size() || i2 >= remap.size())
+            {
+                Core::Log::Warn("BuildHalfedgeMeshFromIndexedTriangles: triangle {} has out-of-range indices ({}, {}, {})",
+                                i / 3u, i0, i1, i2);
+                return std::nullopt;
+            }
+
+            const VertexHandle v0 = remap[i0];
+            const VertexHandle v1 = remap[i1];
+            const VertexHandle v2 = remap[i2];
+            if (!v0.IsValid() || !v1.IsValid() || !v2.IsValid())
+            {
+                return std::nullopt;
+            }
+            if (v0 == v1 || v1 == v2 || v2 == v0)
+            {
+                continue;
+            }
+
+            auto face = mesh.AddTriangle(v0, v1, v2);
+            if (!face)
+            {
+                face = mesh.AddTriangle(v0, v2, v1);
+            }
+            if (!face)
+            {
+                Core::Log::Warn("BuildHalfedgeMeshFromIndexedTriangles: failed to insert triangle {} after welding", i / 3u);
+                return std::nullopt;
+            }
+        }
+
+        return mesh;
+    }
+
+    void ExtractIndexedTriangles(
+        const Halfedge::Mesh& mesh,
+        std::vector<glm::vec3>& positions,
+        std::vector<uint32_t>& indices,
+        std::vector<glm::vec4>* aux)
+    {
+        positions.clear();
+        indices.clear();
+        if (aux != nullptr)
+        {
+            aux->clear();
+        }
+
+        positions.reserve(mesh.VertexCount());
+        indices.reserve(mesh.FaceCount() * 3u);
+
+        std::vector<uint32_t> vertexMap(mesh.VerticesSize(), 0u);
+        uint32_t currentIndex = 0u;
+
+        const auto texcoord = mesh.VertexProperties().Get<glm::vec2>(kVertexTexcoordPropertyName);
+        for (std::size_t i = 0; i < mesh.VerticesSize(); ++i)
+        {
+            const VertexHandle v{static_cast<PropertyIndex>(i)};
+            if (!mesh.IsValid(v) || mesh.IsDeleted(v))
+            {
+                continue;
+            }
+
+            vertexMap[i] = currentIndex++;
+            positions.push_back(mesh.Position(v));
+            if (aux != nullptr)
+            {
+                glm::vec4 packed(0.0f);
+                if (texcoord)
+                {
+                    const glm::vec2 uv = texcoord[i];
+                    packed.x = uv.x;
+                    packed.y = uv.y;
+                }
+                aux->push_back(packed);
+            }
+        }
+
+        for (std::size_t i = 0; i < mesh.FacesSize(); ++i)
+        {
+            const FaceHandle f{static_cast<PropertyIndex>(i)};
+            if (!mesh.IsValid(f) || mesh.IsDeleted(f))
+            {
+                continue;
+            }
+
+            const HalfedgeHandle h0 = mesh.Halfedge(f);
+            if (!mesh.IsValid(h0))
+            {
+                continue;
+            }
+            const HalfedgeHandle h1 = mesh.NextHalfedge(h0);
+            const HalfedgeHandle h2 = mesh.NextHalfedge(h1);
+            if (!mesh.IsValid(h1) || !mesh.IsValid(h2) || mesh.NextHalfedge(h2) != h0)
+            {
+                continue;
+            }
+
+            const VertexHandle v0 = mesh.ToVertex(h0);
+            const VertexHandle v1 = mesh.ToVertex(h1);
+            const VertexHandle v2 = mesh.ToVertex(h2);
+            if (!mesh.IsValid(v0) || !mesh.IsValid(v1) || !mesh.IsValid(v2))
+            {
+                continue;
+            }
+
+            indices.push_back(vertexMap[v0.Index]);
+            indices.push_back(vertexMap[v1.Index]);
+            indices.push_back(vertexMap[v2.Index]);
         }
     }
 }
