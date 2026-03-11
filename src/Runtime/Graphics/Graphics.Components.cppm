@@ -495,7 +495,7 @@ export namespace ECS::Line
 //
 // Presence of this component enables point rendering for the entity.
 // Removal disables it. The render mode selects the pipeline variant
-// (FlatDisc, Surfel, EWA).
+// (FlatDisc, Surfel, EWA, Sphere).
 
 export namespace ECS::Point
 {

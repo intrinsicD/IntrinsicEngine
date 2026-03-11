@@ -258,9 +258,9 @@ private:
     int m_SelectMouseButton = 0;
 
     // --- Extracted subsystem controllers ---
-    Runtime::EditorUI::SpatialDebugController m_SpatialDebug;
-    Runtime::EditorUI::GeometryWorkflowController m_GeometryWorkflow;
-    Runtime::EditorUI::InspectorController m_Inspector;
+    EditorUI::SpatialDebugController m_SpatialDebug;
+    EditorUI::GeometryWorkflowController m_GeometryWorkflow;
+    EditorUI::InspectorController m_Inspector;
 
     // --- Transform Gizmo ---
     Graphics::TransformGizmo m_Gizmo;
@@ -268,7 +268,7 @@ private:
     // =========================================================================
     // Asset loading helpers
     // =========================================================================
-    void LoadDuckAssets(Graphics::GraphicsBackend& gfx)
+    void LoadDuckAssets(GraphicsBackend& gfx)
     {
         auto textureLoader = [this, &gfx](const std::filesystem::path& path, Core::Assets::AssetHandle handle)
             -> std::shared_ptr<RHI::Texture>

@@ -51,6 +51,13 @@ TEST(PerPassComponents_Point, DefaultConstruction)
     EXPECT_FALSE(c.HasPerPointNormals);
 }
 
+TEST(PerPassComponents_Point, SphereModeAssignable)
+{
+    Point::Component c{};
+    c.Mode = Geometry::PointCloud::RenderMode::Sphere;
+    EXPECT_EQ(c.Mode, Geometry::PointCloud::RenderMode::Sphere);
+}
+
 // =============================================================================
 // kInvalidSlot Consistency — all components with GPU slots use the same sentinel
 // =============================================================================

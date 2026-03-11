@@ -61,3 +61,10 @@ TEST(PointCloudData_Component, EWAModeAssignable)
     comp.RenderMode = Geometry::PointCloud::RenderMode::EWA;
     EXPECT_EQ(comp.RenderMode, Geometry::PointCloud::RenderMode::EWA);
 }
+
+TEST(PointCloudData_Component, SphereModeAssignable)
+{
+    ECS::PointCloud::Data comp;
+    comp.RenderMode = Geometry::PointCloud::RenderMode::Sphere;
+    EXPECT_EQ(comp.RenderMode, Geometry::PointCloud::RenderMode::Sphere);
+}

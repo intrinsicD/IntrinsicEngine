@@ -9,6 +9,7 @@ module;
 #include <cmath>
 #include <cstdio>
 #include <limits>
+#include <string>
 #include <vector>
 #include <glm/glm.hpp>
 #include <imgui.h>

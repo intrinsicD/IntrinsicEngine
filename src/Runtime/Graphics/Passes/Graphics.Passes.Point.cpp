@@ -146,7 +146,7 @@ namespace Graphics::Passes
     // EnsureTransientBuffers
     // =========================================================================
 
-    bool PointPass::EnsureTransientBuffers(uint32_t pointCount, uint32_t frameIndex)
+    bool PointPass::EnsureTransientBuffers(uint32_t pointCount, [[maybe_unused]] uint32_t frameIndex)
     {
         if (pointCount == 0)
             return true;

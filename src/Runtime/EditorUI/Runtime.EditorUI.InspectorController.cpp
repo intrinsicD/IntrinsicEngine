@@ -277,10 +277,10 @@ void InspectorController::Draw()
                 if (auto* pt = reg.try_get<ECS::Point::Component>(selected))
                 {
                     ImGui::SeparatorText("Vertex Settings");
-                    const char* modeNames[] = {"Flat Disc", "Surfel", "EWA Splatting"};
+                    const char* modeNames[] = {"Flat Disc", "Surfel", "EWA Splatting", "Sphere"};
                     int modeIdx = static_cast<int>(pt->Mode);
-                    if (modeIdx < 0 || modeIdx > 2) modeIdx = 0;
-                    if (ImGui::Combo("Render Mode", &modeIdx, modeNames, 3))
+                    if (modeIdx < 0 || modeIdx > 3) modeIdx = 0;
+                    if (ImGui::Combo("Render Mode", &modeIdx, modeNames, 4))
                         pt->Mode = static_cast<Geometry::PointCloud::RenderMode>(modeIdx);
                     ImGui::SliderFloat("Vertex Size", &pt->Size, 0.0005f, 0.05f, "%.5f",
                                        ImGuiSliderFlags_Logarithmic);
