@@ -227,3 +227,12 @@ Top targets (by loop count):
 - [ ] `Graphics.Importers.PLY.cpp` (5 loops) — vertex/face element parsing.
 - [ ] `Graphics.Passes.Surface.cpp` (4 loops) — frustum culling.
 - [ ] `Graphics.Passes.Point.cpp` (4 loops) — point attribute buffers.
+
+### E5. Algorithm Variant Dispatch Adoption (P3)
+
+Several enum-based dispatches have unused fields per variant or sequential type-checking — candidates for the `std::variant` + `std::visit` pattern documented in `docs/architecture/algorithm-variant-dispatch.md`. Adopt when touching these files or when adding new variants.
+
+- [ ] `Graphics.Passes.PostProcess.cpp`: `AAMode` (None/FXAA/SMAA) — `PostProcessSettings` has FXAA-specific and SMAA-specific fields unused per mode. Three distinct pass topologies (0/1/3 passes). Strongest candidate.
+- [ ] `Graphics.Passes.Point.cpp`: `PointCloud::RenderMode` (FlatDisc/Surfel/EWA/Sphere) — `BuildPipeline(mode)` uses numeric if/else dispatch to select shader pairs. Each mode has distinct config potential.
+- [ ] `Graphics.ColorMapper.cpp`: `MapProperty()` uses try-each-type sequential dispatch (Scalar→colormap, Vec3→RGB, Vec4→RGBA). `ColorSource` config has fields only meaningful for Scalar type. Explicit variant at call site would eliminate sequential probing.
+- [ ] `Graphics.Passes.SelectionOutline.cpp`: `OutlineMode` (Solid/Pulse/Glow) — `SelectionOutlineSettings` has PulseSpeed/GlowFalloff fields unused per mode.
