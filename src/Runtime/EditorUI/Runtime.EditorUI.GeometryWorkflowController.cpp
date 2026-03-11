@@ -453,11 +453,10 @@ void GeometryWorkflowController::DrawSimplificationPanel()
     {
         ImGui::DragInt("Target Faces", &m_SimplificationUi.TargetFaces, 10.0f, 10, 1000000);
         ImGui::Checkbox("Preserve Boundary", &m_SimplificationUi.PreserveBoundary);
-        ImGui::Checkbox("Use Probabilistic Quadrics", &m_SimplificationUi.UseProbabilisticQuadrics);
-        ImGui::BeginDisabled(!m_SimplificationUi.UseProbabilisticQuadrics);
-        ImGui::DragFloat("Position StdDev Factor", &m_SimplificationUi.ProbabilisticPositionStdDevFactor,
-                         0.0005f, 0.0f, 0.25f, "%.4f");
-        ImGui::EndDisabled();
+        ImGui::DragFloat("Hausdorff Error", &m_SimplificationUi.HausdorffError,
+                         0.001f, 0.0f, 10.0f, "%.4f");
+        ImGui::DragFloat("Max Normal Deviation (deg)", &m_SimplificationUi.MaxNormalDeviationDeg,
+                         1.0f, 0.0f, 180.0f, "%.1f");
         if (ImGui::Button("Run QEM Simplification"))
         {
             const auto ui = m_SimplificationUi;
@@ -466,8 +465,8 @@ void GeometryWorkflowController::DrawSimplificationPanel()
                 Geometry::Simplification::SimplificationParams params;
                 params.TargetFaces = ui.TargetFaces;
                 params.PreserveBoundary = ui.PreserveBoundary;
-                params.UseProbabilisticQuadrics = ui.UseProbabilisticQuadrics;
-                params.ProbabilisticPositionStdDevFactor = ui.ProbabilisticPositionStdDevFactor;
+                params.HausdorffError = ui.HausdorffError;
+                params.MaxNormalDeviationDegrees = ui.MaxNormalDeviationDeg;
                 static_cast<void>(Geometry::Simplification::Simplify(mesh, params));
             });
         }

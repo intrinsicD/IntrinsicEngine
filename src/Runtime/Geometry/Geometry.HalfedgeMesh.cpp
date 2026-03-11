@@ -120,9 +120,41 @@ namespace Geometry::Halfedge
         EnsureProperties();
     }
 
-    Mesh::Mesh(const Mesh& rhs) = default;
+    Mesh::Mesh(const Mesh& rhs)
+        : m_Vertices(rhs.m_Vertices)
+        , m_Halfedges(rhs.m_Halfedges)
+        , m_Edges(rhs.m_Edges)
+        , m_Faces(rhs.m_Faces)
+        , m_DeletedVertices(rhs.m_DeletedVertices)
+        , m_DeletedEdges(rhs.m_DeletedEdges)
+        , m_DeletedFaces(rhs.m_DeletedFaces)
+        , m_HasGarbage(rhs.m_HasGarbage)
+        , m_VertexAttrTransfer(rhs.m_VertexAttrTransfer)
+    {
+        // PropertyBuffer<T> holds raw pointers into PropertyRegistry storage.
+        // After copying the registries, rebind the wrappers to this instance's storage.
+        EnsureProperties();
+    }
+
     Mesh::~Mesh() = default;
-    Mesh& Mesh::operator=(const Mesh& rhs) = default;
+
+    Mesh& Mesh::operator=(const Mesh& rhs)
+    {
+        if (this != &rhs)
+        {
+            m_Vertices = rhs.m_Vertices;
+            m_Halfedges = rhs.m_Halfedges;
+            m_Edges = rhs.m_Edges;
+            m_Faces = rhs.m_Faces;
+            m_DeletedVertices = rhs.m_DeletedVertices;
+            m_DeletedEdges = rhs.m_DeletedEdges;
+            m_DeletedFaces = rhs.m_DeletedFaces;
+            m_HasGarbage = rhs.m_HasGarbage;
+            m_VertexAttrTransfer = rhs.m_VertexAttrTransfer;
+            EnsureProperties();
+        }
+        return *this;
+    }
 
     void Mesh::EnsureProperties()
     {
@@ -319,10 +351,13 @@ namespace Geometry::Halfedge
 
         if (h.IsValid())
         {
+            const std::size_t maxIter = HalfedgesSize();
+            std::size_t iter = 0;
             do
             {
                 if (ToVertex(h) == end) return h;
                 h = CWRotatedHalfedge(h);
+                if (++iter > maxIter) break;
             } while (h != hh);
         }
 
@@ -775,15 +810,27 @@ namespace Geometry::Halfedge
             nf = m_FDeleted[FaceHandle{static_cast<PropertyIndex>(i0)}] ? i0 : i0 + 1;
         }
 
+        // Remap Vertex, Next, and Face through the compaction maps.
+        // Prev is rebuilt from Next afterward because Collapse may leave
+        // stale Prev pointers (the BCG reference implementation avoids this
+        // by not storing Prev at all).
         for (std::size_t i = 0; i < nh; ++i)
         {
             auto h = HalfedgeHandle{static_cast<PropertyIndex>(i)};
-            SetVertex(h, vmap[ToVertex(h)]);
-            SetNextHalfedge(h, hmap[NextHalfedge(h)]);
-            if (!IsBoundary(h))
+            m_HConn[h].Vertex = vmap[VertexHandle{m_HConn[h].Vertex}];
+            m_HConn[h].Next = hmap[HalfedgeHandle{m_HConn[h].Next}];
+            if (m_HConn[h].Face.IsValid())
             {
-                SetFace(h, fmap[Face(h)]);
+                m_HConn[h].Face = fmap[FaceHandle{m_HConn[h].Face}];
             }
+        }
+
+        // Rebuild all Prev pointers from the (now-remapped) Next chain.
+        for (std::size_t i = 0; i < nh; ++i)
+        {
+            auto h = HalfedgeHandle{static_cast<PropertyIndex>(i)};
+            auto n = m_HConn[h].Next;
+            m_HConn[n].Prev = h;
         }
 
         // Face representatives can go stale the same way vertex representatives do
@@ -973,178 +1020,150 @@ namespace Geometry::Halfedge
     }
 
     // =========================================================================
-    // Collapse — Edge collapse
+    // Collapse — Edge collapse (PMP/BCG pattern)
     // =========================================================================
     //
-    // The directed overload collapses halfedge h by removing FromVertex(h) and
-    // keeping ToVertex(h) at newPosition. The legacy EdgeHandle overload keeps
-    // the historic behavior by delegating to Halfedge(e, 1).
+    // The directed overload collapses halfedge h0 by removing FromVertex(h0)
+    // and keeping ToVertex(h0) at newPosition. Uses the standard
+    // remove_edge_helper + remove_loop_helper decomposition (Botsch, Kobbelt,
+    // Pauly, Alliez — "Polygon Mesh Processing") which correctly splices
+    // deleted halfedges out of all Next/Prev chains.
 
     std::optional<VertexHandle> Mesh::Collapse(EdgeHandle e, glm::vec3 newPosition)
     {
         return Collapse(Halfedge(e, 1), newPosition);
     }
 
-    std::optional<VertexHandle> Mesh::Collapse(HalfedgeHandle hCollapse, glm::vec3 newPosition)
+    std::optional<VertexHandle> Mesh::Collapse(HalfedgeHandle h0, glm::vec3 newPosition)
     {
-        if (!IsCollapseOk(hCollapse)) return std::nullopt;
+        if (!IsCollapseOk(h0)) return std::nullopt;
 
-        const EdgeHandle e = Edge(hCollapse);
-        HalfedgeHandle h0 = OppositeHalfedge(hCollapse);
-        HalfedgeHandle h1 = hCollapse;
+        // h0 goes from vRemove to vSurvive.
+        VertexHandle vSurvive = ToVertex(h0);
+        VertexHandle vRemove  = FromVertex(h0);
 
-        VertexHandle v0 = FromVertex(h0);  // surviving vertex
-        VertexHandle v1 = ToVertex(h0);    // removed vertex
+        // Transfer vertex attributes BEFORE deletion.
+        TransferVertexAttributes_OnCollapse(vSurvive, vRemove, vSurvive);
 
-        // Transfer vertex attributes BEFORE we mark v1 deleted.
-        // (PMP convention: the survivor receives merged/interpolated attributes.)
-        TransferVertexAttributes_OnCollapse(v0, v1, v0);
+        // Save these BEFORE remove_edge_helper modifies the mesh.
+        HalfedgeHandle h1 = PrevHalfedge(h0);
+        HalfedgeHandle o0 = OppositeHalfedge(h0);
+        HalfedgeHandle o1 = NextHalfedge(o0);
 
-        bool hasF0 = !IsBoundary(h0);
-        bool hasF1 = !IsBoundary(h1);
-
-        // Collect topology BEFORE modification
-        HalfedgeHandle h0n, h0p, h0n_opp, h0p_opp;
-        VertexHandle vc;
-        FaceHandle f0;
-        if (hasF0)
+        // ---- remove_edge_helper(h0) ----
         {
-            h0n = NextHalfedge(h0);
-            h0p = PrevHalfedge(h0);
-            h0n_opp = OppositeHalfedge(h0n);
-            h0p_opp = OppositeHalfedge(h0p);
-            vc = ToVertex(h0n);
-            f0 = Face(h0);
-        }
+            HalfedgeHandle hn = NextHalfedge(h0);
+            HalfedgeHandle hp = PrevHalfedge(h0); // == h1
+            HalfedgeHandle on = NextHalfedge(o0);  // == o1
+            HalfedgeHandle op = PrevHalfedge(o0);
 
-        HalfedgeHandle h1n, h1p, h1n_opp, h1p_opp;
-        VertexHandle vd;
-        FaceHandle f1;
-        if (hasF1)
-        {
-            h1n = NextHalfedge(h1);
-            h1p = PrevHalfedge(h1);
-            h1n_opp = OppositeHalfedge(h1n);
-            h1p_opp = OppositeHalfedge(h1p);
-            vd = ToVertex(h1n);
-            f1 = Face(h1);
-        }
+            FaceHandle fh = Face(h0);
+            FaceHandle fo = Face(o0);
 
-        // Collect v1's outgoing halfedges before redirect
-        std::vector<HalfedgeHandle> v1out;
-        v1out.reserve(8);
-        {
-            HalfedgeHandle h = Halfedge(v1);
-            HalfedgeHandle start = h;
-            const std::size_t maxIter = HalfedgesSize();
-            std::size_t iter = 0;
-            do
+            // Redirect all halfedges whose to-vertex is vRemove → vSurvive.
+            // Walk outgoing halfedges of vRemove; for each, change the
+            // to-vertex of its opposite from vRemove to vSurvive.
             {
-                v1out.push_back(h);
-                h = CWRotatedHalfedge(h);
-                if (++iter > maxIter) break; // safety: broken connectivity
-            } while (h != start);
-        }
-
-        // Phase 1: Redirect all v1 references to v0
-        for (auto h : v1out)
-        {
-            SetVertex(OppositeHalfedge(h), v0);
-        }
-
-        // Phase 2: Handle degenerate face on h0 side
-        if (hasF0)
-        {
-            // After redirect, h0n now goes v0→vc (was v1→vc).
-            // h0p_opp also goes v0→vc. These are duplicate edges.
-            // We keep edge(h0p) and delete edge(h0n).
-            // h0n_opp (vc→v0) must be spliced into h0p's chain.
-
-            // Splice h0p into the chain where h0n_opp was
-            SetNextHalfedge(PrevHalfedge(h0n_opp), h0p);
-            SetNextHalfedge(h0p, NextHalfedge(h0n_opp));
-            SetFace(h0p, Face(h0n_opp));
-
-            // Splice h0p_opp into the chain where h0n was
-            // (h0n was inside the deleted face, so h0p_opp takes its role
-            // in external faces — but actually h0p_opp is already in its own chain)
-            // No: h0n is being deleted along with its face.
-            // h0p_opp is in the chain of whatever face was using it.
-            // We just need to make sure face references are updated.
-
-            if (Face(h0n_opp).IsValid())
-                SetHalfedge(Face(h0n_opp), h0p);
-            if (Halfedge(vc) == h0n_opp)
-                SetHalfedge(vc, h0p);
-
-            m_FDeleted[f0] = true;
-            ++m_DeletedFaces;
-
-            EdgeHandle eDup = Edge(h0n);
-            if (!m_EDeleted[eDup])
-            {
-                m_EDeleted[eDup] = true;
-                ++m_DeletedEdges;
+                HalfedgeHandle cur = Halfedge(vRemove);
+                if (cur.IsValid())
+                {
+                    HalfedgeHandle start = cur;
+                    std::size_t safety = 0;
+                    const std::size_t maxIter = HalfedgesSize();
+                    do
+                    {
+                        SetVertex(OppositeHalfedge(cur), vSurvive);
+                        cur = CWRotatedHalfedge(cur);
+                        if (++safety > maxIter) break;
+                    } while (cur != start);
+                }
             }
+
+            // Splice h0 and o0 out of their Next chains.
+            SetNextHalfedge(hp, hn);
+            SetNextHalfedge(op, on);
+
+            // Update face halfedge representatives.
+            if (fh.IsValid()) SetHalfedge(fh, hn);
+            if (fo.IsValid()) SetHalfedge(fo, on);
+
+            // Update vertex halfedge representative for the survivor.
+            if (Halfedge(vSurvive) == o0)
+                SetHalfedge(vSurvive, hn);
+            AdjustOutgoingHalfedge(vSurvive);
+
+            // Delete the collapsed edge and the removed vertex.
+            m_EDeleted[Edge(h0)] = true;
+            ++m_DeletedEdges;
+            m_VDeleted[vRemove] = true;
+            ++m_DeletedVertices;
         }
 
-        // Phase 3: Handle degenerate face on h1 side
-        if (hasF1)
-        {
-            // After redirect, h1p now goes vd→v0 (was vd→v1).
-            // h1n_opp also goes vd→v0. Duplicate edges.
-            // We keep edge(h1n) and delete edge(h1p).
-            // h1p_opp (v0→vd) must be spliced into h1n's chain.
+        // ---- Check for degenerate 2-gon loops ----
+        // If an adjacent face was a triangle, removing h0/o0 leaves a 2-gon.
+        if (NextHalfedge(NextHalfedge(h1)) == h1)
+            RemoveLoopHelper(h1);
 
-            SetNextHalfedge(PrevHalfedge(h1p_opp), h1n);
-            SetNextHalfedge(h1n, NextHalfedge(h1p_opp));
-            SetFace(h1n, Face(h1p_opp));
+        if (NextHalfedge(NextHalfedge(o1)) == o1)
+            RemoveLoopHelper(o1);
 
-            if (Face(h1p_opp).IsValid())
-                SetHalfedge(Face(h1p_opp), h1n);
-            if (Halfedge(vd) == h1p_opp)
-                SetHalfedge(vd, h1n);
-
-            m_FDeleted[f1] = true;
-            ++m_DeletedFaces;
-
-            EdgeHandle eDup = Edge(h1p);
-            if (!m_EDeleted[eDup])
-            {
-                m_EDeleted[eDup] = true;
-                ++m_DeletedEdges;
-            }
-        }
-
-        // Phase 4: Delete collapsed edge and vertex v1
-        m_EDeleted[e] = true;
-        ++m_DeletedEdges;
-        m_VDeleted[v1] = true;
-        ++m_DeletedVertices;
-
-        // Phase 5: Set v0's position and fix outgoing halfedge
-        Position(v0) = newPosition;
-
-        // Find a valid outgoing halfedge for v0
-        HalfedgeHandle validOut;
-        for (auto h : v1out)
-        {
-            EdgeHandle eH = Edge(h);
-            if (!m_EDeleted[eH])
-            {
-                validOut = h;
-                break;
-            }
-        }
-        if (validOut.IsValid())
-            SetHalfedge(v0, validOut);
-
-        AdjustOutgoingHalfedge(v0);
-        if (vc.IsValid() && !m_VDeleted[vc]) AdjustOutgoingHalfedge(vc);
-        if (vd.IsValid() && !m_VDeleted[vd]) AdjustOutgoingHalfedge(vd);
+        // Set survivor position.
+        Position(vSurvive) = newPosition;
 
         m_HasGarbage = true;
-        return v0;
+        return vSurvive;
+    }
+
+    // =========================================================================
+    // RemoveLoopHelper — remove a degenerate 2-gon face
+    // =========================================================================
+    //
+    // Called when a face has degenerated into a 2-gon (two halfedges forming a
+    // loop: next(next(h)) == h). Merges the duplicate edges and deletes the
+    // degenerate face. Follows the PMP/BCG reference implementation.
+
+    void Mesh::RemoveLoopHelper(HalfedgeHandle h)
+    {
+        HalfedgeHandle h0 = h;
+        HalfedgeHandle h1 = NextHalfedge(h0);
+
+        HalfedgeHandle o0 = OppositeHalfedge(h0);
+        HalfedgeHandle o1 = OppositeHalfedge(h1);
+
+        VertexHandle v0 = ToVertex(h0);
+        VertexHandle v1 = ToVertex(h1);
+
+        FaceHandle fh = Face(h0);
+        FaceHandle fo = Face(o0);
+
+        // h1 replaces o0 in o0's face chain.
+        // h1 goes in the SAME direction as o0 (both connect the same
+        // pair of vertices in the same orientation), so the chain stays
+        // consistent. Edge(h0) is deleted; edge(h1) survives with h1
+        // in the external face (fo) and o1 in its own face.
+        SetNextHalfedge(PrevHalfedge(o0), h1);
+        SetNextHalfedge(h1, NextHalfedge(o0));
+        SetFace(h1, fo);
+
+        // Fix vertex representatives.
+        SetHalfedge(v0, h1);
+        AdjustOutgoingHalfedge(v0);
+        SetHalfedge(v1, o1);
+        AdjustOutgoingHalfedge(v1);
+
+        // Fix face representative.
+        if (fo.IsValid() && Halfedge(fo) == o0)
+            SetHalfedge(fo, h1);
+
+        // Delete the degenerate face and the duplicate edge.
+        if (fh.IsValid())
+        {
+            m_FDeleted[fh] = true;
+            ++m_DeletedFaces;
+        }
+
+        m_EDeleted[Edge(h0)] = true;
+        ++m_DeletedEdges;
     }
 
     // =========================================================================

@@ -60,7 +60,7 @@ A **"Distinguished Scientist" grade** geometry kernel in `src/Runtime/Geometry/`
 **Mesh Processing Operators:**
 | Operator | Algorithm | Reference |
 |---|---|---|
-| **Simplification** | Probabilistic triangle quadrics by default, deterministic triangle quadrics optional | Trettner & Kobbelt 2020; Garland & Heckbert 1997 |
+| **Simplification** | Plane-quadric QEM with normal-cone deviation tracking and Hausdorff error bounds | Garland & Heckbert 1997 |
 | **Smoothing** | Uniform / Cotangent / Taubin Laplacian | Botsch et al. 2010 |
 | **Curvature** | Mean, Gaussian, Principal (angle defect + mixed Voronoi) | Meyer et al. 2003 |
 | **Loop Subdivision** | Warren's simplified weights, boundary rules | Loop 1987, Warren 1995 |
@@ -85,17 +85,10 @@ A **"Distinguished Scientist" grade** geometry kernel in `src/Runtime/Geometry/`
 
 All operators follow a consistent contract: `Params` struct with defaults, `Result` struct with diagnostics, `std::optional<Result>` return for degenerate input.
 
-QEM simplification now defaults to **probabilistic triangle quadrics** (`UseProbabilisticQuadrics = true`).
-The uncertainty term is parameterized as a relative positional standard deviation,
-`ProbabilisticPositionStdDevFactor * mean_input_edge_length`, and setting the factor to `0`
-or disabling the probabilistic mode falls back to deterministic triangle quadrics for A/B comparisons.
-
-Simplification candidate evaluation is now **directed per halfedge** rather than assuming a fixed survivor per edge.
-For each undirected edge we score both collapse directions, choose the cheapest legal candidate, and execute the directed collapse that removes `FromVertex(h)` while preserving `ToVertex(h)`.
-Open-boundary robustness now defaults to rejecting **boundary → interior** collapses (`ForbidBoundaryInteriorCollapse = true`) and requiring at least two incident faces on the removed vertex (`MinRemovedVertexIncidentFaces = 2`).
-Additional local safety gates are available through `SimplificationParams`:
-`MaxValence`, `MaxEdgeLength`, `MaxAspectRatio`, and `MaxNormalDeviationDegrees`.
-These checks are evaluated on the affected one-ring before each collapse, so the operator can trade aggressiveness for stronger silhouette and topology preservation on pathological meshes.
+QEM simplification uses **per-vertex plane quadrics** (averaged from incident face centers and normals) with a per-vertex priority queue.
+Each vertex maintains its best legal collapse halfedge; the greedy loop pops the minimum-cost vertex and collapses to the surviving endpoint position.
+Optional quality guards include **normal-cone deviation tracking** (`MaxNormalDeviationDegrees`), **Hausdorff error bounds** (`HausdorffError`) via per-face point lists, **aspect ratio**, **edge length**, and **max valence** limits.
+Open-boundary robustness defaults to rejecting **boundary → interior** collapses (`ForbidBoundaryInteriorCollapse = true`) and requiring at least two incident faces on the removed vertex (`MinRemovedVertexIncidentFaces = 2`).
 
 Adaptive remeshing now exposes runtime safety controls in `AdaptiveRemeshingParams` for robustness on pathological inputs:
 `MaxOpsPerIteration` bounds split/collapse work per pass, and `MaxTopologyGrowthFactor` caps vertex/edge growth relative to the input mesh.
