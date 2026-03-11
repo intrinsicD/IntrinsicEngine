@@ -90,20 +90,31 @@ namespace Geometry::Smoothing
     // UniformLaplacian
     // =========================================================================
 
-    void UniformLaplacian(Halfedge::Mesh& mesh, const SmoothingParams& params)
+    std::optional<SmoothingResult> UniformLaplacian(Halfedge::Mesh& mesh, const SmoothingParams& params)
     {
+        if (mesh.IsEmpty() || params.Iterations == 0)
+            return std::nullopt;
+
         for (std::size_t iter = 0; iter < params.Iterations; ++iter)
         {
             UniformLaplacianPass(mesh, params.Lambda, params.PreserveBoundary);
         }
+
+        SmoothingResult result;
+        result.IterationsPerformed = params.Iterations;
+        result.VertexCount = mesh.VertexCount();
+        return result;
     }
 
     // =========================================================================
     // CotanLaplacian
     // =========================================================================
 
-    void CotanLaplacian(Halfedge::Mesh& mesh, const SmoothingParams& params)
+    std::optional<SmoothingResult> CotanLaplacian(Halfedge::Mesh& mesh, const SmoothingParams& params)
     {
+        if (mesh.IsEmpty() || params.Iterations == 0)
+            return std::nullopt;
+
         const std::size_t nV = mesh.VerticesSize();
         const std::size_t nE = mesh.EdgesSize();
         const std::size_t nF = mesh.FacesSize();
@@ -230,6 +241,11 @@ namespace Geometry::Smoothing
                 mesh.Position(vh) = glm::vec3(glm::dvec3(mesh.Position(vh)) + displacement);
             }
         }
+
+        SmoothingResult result;
+        result.IterationsPerformed = params.Iterations;
+        result.VertexCount = mesh.VertexCount();
+        return result;
     }
 
     // =========================================================================
@@ -241,8 +257,11 @@ namespace Geometry::Smoothing
     //
     // The result preserves volume much better than pure Laplacian smoothing.
 
-    void Taubin(Halfedge::Mesh& mesh, const TaubinParams& params)
+    std::optional<SmoothingResult> Taubin(Halfedge::Mesh& mesh, const TaubinParams& params)
     {
+        if (mesh.IsEmpty() || params.Iterations == 0)
+            return std::nullopt;
+
         assert(params.Lambda > 0.0);
         assert(params.PassbandFrequency > 0.0 && params.PassbandFrequency < 1.0);
 
@@ -258,6 +277,11 @@ namespace Geometry::Smoothing
             // Pass 2: Un-shrinking with μ
             UniformLaplacianPass(mesh, mu, params.PreserveBoundary);
         }
+
+        SmoothingResult result;
+        result.IterationsPerformed = params.Iterations;
+        result.VertexCount = mesh.VertexCount();
+        return result;
     }
 
     // =========================================================================

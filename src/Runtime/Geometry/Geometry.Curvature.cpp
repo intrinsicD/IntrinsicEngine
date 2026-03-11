@@ -5,6 +5,7 @@ module;
 #include <cmath>
 #include <cstddef>
 #include <numbers>
+#include <optional>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -116,8 +117,11 @@ namespace Geometry::Curvature
     // Applied to position: ΔS x = (1/A_i) Σ_j w_ij (x_j - x_i) = -2H n
     // So H = ||ΔS x|| / 2, but the sign needs the normal.
 
-    std::vector<double> ComputeMeanCurvature(const Halfedge::Mesh& mesh)
+    std::optional<MeanCurvatureResult> ComputeMeanCurvature(const Halfedge::Mesh& mesh)
     {
+        if (mesh.IsEmpty() || mesh.FaceCount() == 0)
+            return std::nullopt;
+
         const std::size_t nV = mesh.VerticesSize();
         const std::size_t nE = mesh.EdgesSize();
 
@@ -205,7 +209,15 @@ namespace Geometry::Curvature
             }
         }
 
-        return meanCurvature;
+        MeanCurvatureResult result;
+        result.Values = std::move(meanCurvature);
+        for (std::size_t i = 0; i < nV; ++i)
+        {
+            VertexHandle vh{static_cast<PropertyIndex>(i)};
+            if (!mesh.IsDeleted(vh) && !mesh.IsIsolated(vh))
+                ++result.ValidCount;
+        }
+        return result;
     }
 
     // =========================================================================
@@ -218,8 +230,11 @@ namespace Geometry::Curvature
     //
     // where θ_j is the angle at v_i in each incident triangle.
 
-    std::vector<double> ComputeGaussianCurvature(const Halfedge::Mesh& mesh)
+    std::optional<GaussianCurvatureResult> ComputeGaussianCurvature(const Halfedge::Mesh& mesh)
     {
+        if (mesh.IsEmpty() || mesh.FaceCount() == 0)
+            return std::nullopt;
+
         const std::size_t nV = mesh.VerticesSize();
         const std::size_t nF = mesh.FacesSize();
 
@@ -267,7 +282,15 @@ namespace Geometry::Curvature
             }
         }
 
-        return gaussianCurvature;
+        GaussianCurvatureResult result;
+        result.Values = std::move(gaussianCurvature);
+        for (std::size_t i = 0; i < nV; ++i)
+        {
+            VertexHandle vh{static_cast<PropertyIndex>(i)};
+            if (!mesh.IsDeleted(vh) && !mesh.IsIsolated(vh))
+                ++result.ValidCount;
+        }
+        return result;
     }
 
     // =========================================================================

@@ -201,15 +201,7 @@ ROADMAP Phase 2 lists "Undo/redo stack" but no implementation exists. Add `Core.
 - [ ] Integrate with entity create/delete (wrapped as commands).
 - [ ] Integrate with geometry operator application (mesh snapshot before operator, undo reverts).
 
-### E2. Geometry Operator Contract Compliance (P2)
-
-Six operators deviate from the standard Params/Result/`std::optional<Result>` contract.
-
-- [ ] `Geometry.Smoothing.cppm`: `UniformLaplacian()`, `CotanLaplacian()`, `Taubin()` return `void`. Add `SmoothingResult` struct with iteration count and convergence diagnostics; return `std::optional<SmoothingResult>`.
-- [ ] `Geometry.Curvature.cppm`: `ComputeMeanCurvature()`, `ComputeGaussianCurvature()` return raw `std::vector<double>`. Add `CurvatureParams` and wrap in `std::optional<Result>` with vertex count diagnostics.
-- [ ] `Geometry.MeshRepair.cppm`: `FindBoundaryLoops()` returns raw `std::vector<BoundaryLoop>`. Wrap in `std::optional` for degenerate-input consistency.
-
-### E3. `std::expected` Monadic Chaining Adoption (P3)
+### E2. `std::expected` Monadic Chaining Adoption (P3)
 
 Three files have 3+ sequential fallible stages that are strong candidates for `.and_then()` / `.transform()` chaining (per CLAUDE.md C++23 adoption policy):
 
@@ -217,7 +209,7 @@ Three files have 3+ sequential fallible stages that are strong candidates for `.
 - [ ] `Graphics.IORegistry.cpp`: `Export()` — 3 stages (find exporter → export bytes → write to backend) with error mapping at module boundary.
 - [ ] `Graphics.Importers.PLY.cpp`: Nested scalar/face parsing sub-pipelines with repetitive `if (!result) return std::unexpected(AssetError::DecodeFailed)`.
 
-### E4. C++23 `std::views::enumerate` Adoption (P3)
+### E3. C++23 `std::views::enumerate` Adoption (P3)
 
 109+ manual `for (size_t i = 0; i < N; ++i)` index loops across 46 files could use `std::views::enumerate`. Adopt opportunistically when touching these files — no dedicated churn PR.
 
@@ -228,7 +220,7 @@ Top targets (by loop count):
 - [ ] `Graphics.Passes.Surface.cpp` (4 loops) — frustum culling.
 - [ ] `Graphics.Passes.Point.cpp` (4 loops) — point attribute buffers.
 
-### E5. Algorithm Variant Dispatch Adoption (P3)
+### E4. Algorithm Variant Dispatch Adoption (P3)
 
 Several enum-based dispatches have unused fields per variant or sequential type-checking — candidates for the `std::variant` + `std::visit` pattern documented in `docs/architecture/algorithm-variant-dispatch.md`. Adopt when touching these files or when adding new variants.
 

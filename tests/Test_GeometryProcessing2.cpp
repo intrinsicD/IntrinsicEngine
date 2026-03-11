@@ -431,25 +431,28 @@ TEST(NormalEstimation, MinimumThreePoints)
 TEST(MeshRepair_BoundaryDetection, ClosedMeshHasNoBoundary)
 {
     auto mesh = MakeTetrahedron();
-    auto loops = Geometry::MeshRepair::FindBoundaryLoops(mesh);
-    EXPECT_TRUE(loops.empty());
+    auto result = Geometry::MeshRepair::FindBoundaryLoops(mesh);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_TRUE(result->Loops.empty());
 }
 
 TEST(MeshRepair_BoundaryDetection, OpenMeshHasBoundary)
 {
     auto mesh = MakeSingleTriangle();
-    auto loops = Geometry::MeshRepair::FindBoundaryLoops(mesh);
-    EXPECT_EQ(loops.size(), 1u);
-    EXPECT_EQ(loops[0].Vertices.size(), 3u);
+    auto result = Geometry::MeshRepair::FindBoundaryLoops(mesh);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->Loops.size(), 1u);
+    EXPECT_EQ(result->Loops[0].Vertices.size(), 3u);
 }
 
 TEST(MeshRepair_BoundaryDetection, TwoTriangleSquareHasBoundary)
 {
     auto mesh = MakeTwoTriangleSquare();
-    auto loops = Geometry::MeshRepair::FindBoundaryLoops(mesh);
+    auto result = Geometry::MeshRepair::FindBoundaryLoops(mesh);
+    ASSERT_TRUE(result.has_value());
     // The two-triangle square has one boundary loop with 4 vertices
-    EXPECT_EQ(loops.size(), 1u);
-    EXPECT_EQ(loops[0].Vertices.size(), 4u);
+    EXPECT_EQ(result->Loops.size(), 1u);
+    EXPECT_EQ(result->Loops[0].Vertices.size(), 4u);
 }
 
 TEST(MeshRepair_HoleFilling, FillsTriangularHole)
@@ -458,8 +461,9 @@ TEST(MeshRepair_HoleFilling, FillsTriangularHole)
     auto mesh = MakeTetrahedron();
 
     // Verify it starts closed
-    auto loopsBefore = Geometry::MeshRepair::FindBoundaryLoops(mesh);
-    EXPECT_TRUE(loopsBefore.empty());
+    auto beforeResult = Geometry::MeshRepair::FindBoundaryLoops(mesh);
+    ASSERT_TRUE(beforeResult.has_value());
+    EXPECT_TRUE(beforeResult->Loops.empty());
 
     // Delete one face to create a hole
     Geometry::FaceHandle f0{0};
@@ -467,8 +471,9 @@ TEST(MeshRepair_HoleFilling, FillsTriangularHole)
     mesh.GarbageCollection();
 
     // Verify the hole exists
-    auto loopsAfter = Geometry::MeshRepair::FindBoundaryLoops(mesh);
-    EXPECT_EQ(loopsAfter.size(), 1u);
+    auto afterResult = Geometry::MeshRepair::FindBoundaryLoops(mesh);
+    ASSERT_TRUE(afterResult.has_value());
+    EXPECT_EQ(afterResult->Loops.size(), 1u);
 
     // Fill the hole
     auto result = Geometry::MeshRepair::FillHoles(mesh);
@@ -478,8 +483,9 @@ TEST(MeshRepair_HoleFilling, FillsTriangularHole)
     EXPECT_GE(result->TrianglesAdded, 1u);
 
     // Verify no more holes
-    auto loopsFinal = Geometry::MeshRepair::FindBoundaryLoops(mesh);
-    EXPECT_TRUE(loopsFinal.empty());
+    auto finalResult = Geometry::MeshRepair::FindBoundaryLoops(mesh);
+    ASSERT_TRUE(finalResult.has_value());
+    EXPECT_TRUE(finalResult->Loops.empty());
 }
 
 TEST(MeshRepair_HoleFilling, EmptyMeshReturnsNullopt)

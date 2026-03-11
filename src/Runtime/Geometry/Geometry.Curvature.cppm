@@ -1,6 +1,7 @@
 module;
 
 #include <cstddef>
+#include <optional>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -49,6 +50,27 @@ export namespace Geometry::Curvature
         std::size_t ValidCount{0};
     };
 
+    // Result of per-vertex scalar curvature computation
+    struct MeanCurvatureResult
+    {
+        // Per-vertex mean curvature values (indexed by vertex index, including deleted slots).
+        // Deleted vertices get value 0.
+        std::vector<double> Values;
+
+        // Number of valid (non-deleted, non-isolated) vertices computed
+        std::size_t ValidCount{0};
+    };
+
+    struct GaussianCurvatureResult
+    {
+        // Per-vertex Gaussian curvature values (indexed by vertex index, including deleted slots).
+        // Deleted vertices get value 0.
+        std::vector<double> Values;
+
+        // Number of valid (non-deleted, non-isolated) vertices computed
+        std::size_t ValidCount{0};
+    };
+
     // -------------------------------------------------------------------------
     // Compute mean curvature via Laplace-Beltrami operator
     // -------------------------------------------------------------------------
@@ -62,9 +84,9 @@ export namespace Geometry::Curvature
     // normal with the estimated vertex normal. Positive H means the surface
     // curves toward the normal (convex locally).
     //
-    // Returns per-vertex mean curvature values. Size = mesh.VerticesSize().
-    // Deleted vertices get value 0.
-    [[nodiscard]] std::vector<double> ComputeMeanCurvature(const Halfedge::Mesh& mesh);
+    // Returns nullopt for empty meshes or meshes with no faces.
+    [[nodiscard]] std::optional<MeanCurvatureResult> ComputeMeanCurvature(
+        const Halfedge::Mesh& mesh);
 
     // -------------------------------------------------------------------------
     // Compute Gaussian curvature via angle defect
@@ -79,8 +101,9 @@ export namespace Geometry::Curvature
     // This is the Gauss-Bonnet discrete Gaussian curvature.
     // For closed surfaces: Σ K_i * A_i = 2π * χ(M) (Euler characteristic).
     //
-    // Returns per-vertex Gaussian curvature values. Size = mesh.VerticesSize().
-    [[nodiscard]] std::vector<double> ComputeGaussianCurvature(const Halfedge::Mesh& mesh);
+    // Returns nullopt for empty meshes or meshes with no faces.
+    [[nodiscard]] std::optional<GaussianCurvatureResult> ComputeGaussianCurvature(
+        const Halfedge::Mesh& mesh);
 
     // -------------------------------------------------------------------------
     // Compute all curvature quantities at once

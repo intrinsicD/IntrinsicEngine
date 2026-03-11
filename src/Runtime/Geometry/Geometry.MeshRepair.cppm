@@ -38,9 +38,16 @@ export namespace Geometry::MeshRepair
         std::vector<HalfedgeHandle> Halfedges;
     };
 
+    struct BoundaryLoopResult
+    {
+        // All boundary loops found in the mesh (may be empty for closed meshes)
+        std::vector<BoundaryLoop> Loops;
+    };
+
     // Find all boundary loops in the mesh.
     // Each loop is a cycle of boundary halfedges forming a hole.
-    [[nodiscard]] std::vector<BoundaryLoop> FindBoundaryLoops(const Halfedge::Mesh& mesh);
+    // Returns nullopt for empty meshes.
+    [[nodiscard]] std::optional<BoundaryLoopResult> FindBoundaryLoops(const Halfedge::Mesh& mesh);
 
     // =====================================================================
     // 2. Hole Filling

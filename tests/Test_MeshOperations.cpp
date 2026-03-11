@@ -260,7 +260,9 @@ TEST(Curvature_Mean, SphereHasConstantMeanCurvature)
     // The icosahedron is a crude approximation of a sphere.
     // All vertices should have approximately equal mean curvature.
     auto mesh = MakeIcosahedron();
-    auto H = Geometry::Curvature::ComputeMeanCurvature(mesh);
+    auto meanResult = Geometry::Curvature::ComputeMeanCurvature(mesh);
+    ASSERT_TRUE(meanResult.has_value());
+    auto& H = meanResult->Values;
 
     EXPECT_EQ(H.size(), mesh.VerticesSize());
 
@@ -280,7 +282,9 @@ TEST(Curvature_Mean, FlatMeshHasZeroMeanCurvature)
     // A flat mesh (all vertices in a plane) should have zero mean curvature
     // at interior vertices.
     auto mesh = MakeSubdividedTriangle();
-    auto H = Geometry::Curvature::ComputeMeanCurvature(mesh);
+    auto meanResult = Geometry::Curvature::ComputeMeanCurvature(mesh);
+    ASSERT_TRUE(meanResult.has_value());
+    auto& H = meanResult->Values;
 
     // Vertex 3 (index 3) is the interior vertex with valence 4
     // in the subdivided triangle (midpoint of v0-v1).
@@ -302,7 +306,9 @@ TEST(Curvature_Gaussian, FlatMeshHasZeroGaussianCurvature)
 {
     // Flat meshes have zero Gaussian curvature at interior vertices.
     auto mesh = MakeSubdividedTriangle();
-    auto K = Geometry::Curvature::ComputeGaussianCurvature(mesh);
+    auto gaussResult = Geometry::Curvature::ComputeGaussianCurvature(mesh);
+    ASSERT_TRUE(gaussResult.has_value());
+    auto& K = gaussResult->Values;
 
     for (std::size_t i = 0; i < mesh.VerticesSize(); ++i)
     {
@@ -320,7 +326,9 @@ TEST(Curvature_Gaussian, GaussBonnetOnClosedMesh)
     // Gauss-Bonnet theorem: Σ K_i * A_i = 2π * χ(M)
     // For a closed surface homeomorphic to a sphere: χ = 2, so integral = 4π.
     auto mesh = MakeTetrahedron();
-    auto K = Geometry::Curvature::ComputeGaussianCurvature(mesh);
+    auto gaussResult = Geometry::Curvature::ComputeGaussianCurvature(mesh);
+    ASSERT_TRUE(gaussResult.has_value());
+    auto& K = gaussResult->Values;
 
     // Build mixed areas
     auto ops = Geometry::DEC::BuildOperators(mesh);
@@ -342,7 +350,9 @@ TEST(Curvature_Gaussian, GaussBonnetOnClosedMesh)
 TEST(Curvature_Gaussian, IcosahedronGaussBonnet)
 {
     auto mesh = MakeIcosahedron();
-    auto K = Geometry::Curvature::ComputeGaussianCurvature(mesh);
+    auto gaussResult = Geometry::Curvature::ComputeGaussianCurvature(mesh);
+    ASSERT_TRUE(gaussResult.has_value());
+    auto& K = gaussResult->Values;
     auto ops = Geometry::DEC::BuildOperators(mesh);
 
     double integral = 0.0;
@@ -362,7 +372,9 @@ TEST(Curvature_Gaussian, PositiveOnConvexMesh)
 {
     // On a convex mesh (icosahedron), all Gaussian curvatures should be positive.
     auto mesh = MakeIcosahedron();
-    auto K = Geometry::Curvature::ComputeGaussianCurvature(mesh);
+    auto gaussResult = Geometry::Curvature::ComputeGaussianCurvature(mesh);
+    ASSERT_TRUE(gaussResult.has_value());
+    auto& K = gaussResult->Values;
 
     for (std::size_t i = 0; i < mesh.VerticesSize(); ++i)
     {
@@ -468,7 +480,9 @@ TEST(Smoothing_Uniform, ReducesVariance)
     params.Lambda = 0.3;
     params.PreserveBoundary = false; // closed mesh has no boundary
 
-    Geometry::Smoothing::UniformLaplacian(mesh, params);
+    auto smoothResult = Geometry::Smoothing::UniformLaplacian(mesh, params);
+    ASSERT_TRUE(smoothResult.has_value());
+    EXPECT_EQ(smoothResult->IterationsPerformed, 5u);
 
     double varianceAfter = edgeLengthVariance(mesh);
 
@@ -496,7 +510,8 @@ TEST(Smoothing_Uniform, PreservesBoundary)
     params.Lambda = 0.5;
     params.PreserveBoundary = true;
 
-    Geometry::Smoothing::UniformLaplacian(mesh, params);
+    auto smoothResult = Geometry::Smoothing::UniformLaplacian(mesh, params);
+    ASSERT_TRUE(smoothResult.has_value());
 
     // Boundary vertices should be unchanged
     for (const auto& [vh, pos] : boundaryPositions)
@@ -553,7 +568,8 @@ TEST(Smoothing_Cotan, ReducesEdgeLengthVariance)
     params.Lambda = 0.05;
     params.PreserveBoundary = false;
 
-    Geometry::Smoothing::CotanLaplacian(mesh, params);
+    auto smoothResult = Geometry::Smoothing::CotanLaplacian(mesh, params);
+    ASSERT_TRUE(smoothResult.has_value());
 
     double varAfter = edgeLengthVariance(mesh);
 
@@ -587,7 +603,8 @@ TEST(Smoothing_Taubin, PreservesVolumeBetterThanLaplacian)
     lapParams.Iterations = 10;
     lapParams.Lambda = 0.5;
     lapParams.PreserveBoundary = false;
-    Geometry::Smoothing::UniformLaplacian(mesh1, lapParams);
+    auto lapResult = Geometry::Smoothing::UniformLaplacian(mesh1, lapParams);
+    ASSERT_TRUE(lapResult.has_value());
 
     // Apply Taubin smoothing
     Geometry::Smoothing::TaubinParams taubinParams;
@@ -595,7 +612,8 @@ TEST(Smoothing_Taubin, PreservesVolumeBetterThanLaplacian)
     taubinParams.Lambda = 0.5;
     taubinParams.PassbandFrequency = 0.1;
     taubinParams.PreserveBoundary = false;
-    Geometry::Smoothing::Taubin(mesh2, taubinParams);
+    auto taubinResult = Geometry::Smoothing::Taubin(mesh2, taubinParams);
+    ASSERT_TRUE(taubinResult.has_value());
 
     double radiusAfterLaplacian = avgRadius(mesh1);
     double radiusAfterTaubin = avgRadius(mesh2);
@@ -618,7 +636,8 @@ TEST(Smoothing_Taubin, FlatMeshStaysFlat)
     params.PassbandFrequency = 0.1;
     params.PreserveBoundary = true;
 
-    Geometry::Smoothing::Taubin(mesh, params);
+    auto taubinResult = Geometry::Smoothing::Taubin(mesh, params);
+    ASSERT_TRUE(taubinResult.has_value());
 
     // Check all vertices remain in the z=0 plane
     for (std::size_t i = 0; i < mesh.VerticesSize(); ++i)
