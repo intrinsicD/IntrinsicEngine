@@ -389,8 +389,6 @@ A mesh uploads positions/normals once; wireframe, vertex visualization, and kNN 
 
 ## Worth Adopting — Patterns Not Yet In the Codebase
 
-These patterns address gaps in IntrinsicEngine or would improve existing code. Sourced from external C++23 engine review (Engine23, Engine24).
-
 ### 14. Command Pattern for Undo/Redo (P1)
 
 **Gap:** ROADMAP.md Phase 2 lists "Undo/redo stack" but no implementation exists. The engine has `Core::Tasks` for async work but no Command abstraction for reversible operations.
@@ -409,66 +407,23 @@ These patterns address gaps in IntrinsicEngine or would improve existing code. S
 - **Geometry operator application:** Simplification, subdivision, smoothing — capture mesh state before operator, undo reverts to snapshot.
 - **Scene hierarchy changes:** Reparenting entities via drag-and-drop in the hierarchy panel.
 
-**Priority:** P1 — directly enables the ROADMAP Phase 2 undo/redo item.
+**Priority:** P1 — directly enables the ROADMAP Phase 2 undo/redo item. Implementation TODOs tracked in `TODO.md` §E1.
 
 ---
 
-### 15. Enumerate/Zip Iteration Utilities (P3)
+### Rejected Patterns (with rationale)
 
-**Gap:** No equivalent exists. The codebase uses manual index tracking (`for (size_t i = 0; ...)`) throughout geometry processing, ECS iteration, and property sync code.
+#### ~~15. Enumerate/Zip Iteration Utilities~~ — DROPPED
 
-**Recommendation:** Small utility module `Core.Iterators.cppm`:
-- `Enumerate(container)` — returns `(index, value&)` pairs. Zero-cost via iterator adapter.
-- `Zip(a, b)` — returns `(a_elem&, b_elem&)` pairs.
-- Skip `Range()` — C++23 `std::views::iota` covers this.
+C++23 provides `std::views::enumerate` and `std::views::zip` natively. The engine uses Clang 20+ which supports both. A custom `Core.Iterators.cppm` module is unnecessary — use the standard library directly. Opportunistic adoption of `std::views::enumerate` across 109+ manual index loops is tracked in `TODO.md` §E4.
 
-**Use when:**
-- **PropertySet sync loops:** Iterating positions and normals in lockstep during GPU upload (`Zip(positions, normals)`).
-- **Edge pair construction:** Building edge index buffers where you need both element and index (`Enumerate(edges)`).
-- **Color/attribute extraction:** Zipping PropertySet values with cached GPU-side vectors during `PropertySetDirtySyncSystem` updates.
+#### ~~16. ComponentGui Template Dispatch~~ — DROPPED
 
-**Priority:** P3 — quality-of-life improvement. Adopt opportunistically when touching files that benefit.
+Codebase audit found only 6 sequential `reg.all_of<T>` checks in `InspectorController.cpp`. At this scale the explicit if-chain is clear and maintainable. The abstraction overhead (dispatch table, type-erased panel registration) is not justified until 10+ component types are inspectable. Re-evaluate if 5+ new component panels are added.
 
----
+#### ~~17. Policy-Based Template Composition~~ — DROPPED
 
-### 16. ComponentGui Template Dispatch (P3)
-
-**Gap:** `Runtime.EditorUI.InspectorController.cpp` uses a sequential `if (reg.all_of<T>)` chain per component type. This works but becomes a maintenance bottleneck as more component types are added.
-
-**Recommendation:** Per-component-type UI rendering via template specialization:
-```cpp
-template <typename T>
-struct ComponentEditor {
-    static void Render(entt::entity entity, entt::registry& reg);
-};
-```
-
-Specialize per component type. The inspector iterates known components and calls the appropriate specialization. Domain logic (ECS components) stays decoupled from UI code (ImGui rendering).
-
-**Use when:**
-- **Entity inspector panel:** Each component type gets its own `ComponentEditor<T>` specialization.
-- **Adding new ECS component types:** New component = new specialization. No changes to inspector dispatch.
-- **Debug views per component:** `ComponentEditor<Transform::Component>` shows position/rotation/scale; `ComponentEditor<Graph::Data>` shows node/edge counts, layout state.
-- **Conditional UI for optional components:** `reg.all_of<T>(entity)` check drives whether `ComponentEditor<T>` renders — presence = UI, absence = nothing.
-
-**Priority:** P3 — evaluate current inspector scale first; may already be manageable.
-
----
-
-### 17. Policy-Based Template Composition for Geometry Operators (P3)
-
-**Gap:** Current operators use enum-based policy selection (e.g., `LaplacianVariant::Combinatorial` vs `NormalizedSymmetric`). This works for single-axis variation but doesn't scale to operators with multiple orthogonal variation points.
-
-**Recommendation:** Use template policies only when: (a) 2+ orthogonal axes, (b) each axis has 2+ variants, and (c) the inner loop is hot enough that virtual dispatch matters.
-
-**Use when:**
-- **ICP registration:** Correspondence policy (closest-point, normal-shooting, symmetric) x rejection policy (trimmed, Welsch, TEASER). Each combination is a compile-time instantiation with zero virtual dispatch in the inner loop.
-- **Iterative solvers with configurable preconditioners:** CG with diagonal vs. incomplete Cholesky — solver template takes a `Preconditioner` policy.
-- **Field design algorithms:** Cross-field vs. N-RoSy field computation shares the same optimization loop but differs in symmetry constraint policy.
-
-**Priority:** P3 — adopt when implementing new geometry operators, not as a retrofit to existing code.
-
----
+The `docs/architecture/algorithm-variant-dispatch.md` already provides a `std::variant` + `std::visit` pattern that covers runtime algorithm selection with compile-time exhaustiveness. Template policies would only add value for operators with 2+ orthogonal hot-loop variation axes — no existing operator qualifies. If a future operator (ICP, field design) genuinely needs multi-axis compile-time specialization, adopt the pattern locally at that time rather than pre-building infrastructure.
 
 ### Note: Lock-Free MPSC Queue — Already Covered
 
@@ -494,6 +449,6 @@ The existing `Utils::LockFreeQueue<T>` (`Utils.LockFreeQueue.cppm`) is **already
 | 12 | Vtable Anchor | Implemented | — | Virtual interfaces in modules |
 | 13 | BDA Shared-Buffer | Implemented | — | Shared vertex data topology views |
 | 14 | Command Pattern (Undo/Redo) | **Not yet** | P1 | Reversible editor operations |
-| 15 | Enumerate/Zip Utilities | **Not yet** | P3 | Cleaner iteration in geometry/sync code |
-| 16 | ComponentGui Dispatch | **Not yet** | P3 | Per-type inspector UI |
-| 17 | Policy-Based Operator Composition | **Not yet** | P3 | Multi-axis geometry operator variants |
+| ~~15~~ | ~~Enumerate/Zip Utilities~~ | Dropped | — | C++23 `std::views::enumerate`/`zip` covers this natively |
+| ~~16~~ | ~~ComponentGui Dispatch~~ | Dropped | — | Only 6 component checks; not justified at current scale |
+| ~~17~~ | ~~Policy-Based Composition~~ | Dropped | — | `std::variant` dispatch (Pattern doc) already covers the need |
