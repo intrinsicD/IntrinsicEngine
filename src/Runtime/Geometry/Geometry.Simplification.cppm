@@ -11,13 +11,13 @@ import :HalfedgeMesh;
 export namespace Geometry::Simplification
 {
     // =========================================================================
-    // Quadric Error Metric (QEM) Mesh Simplification
+    // QEM Mesh Simplification with Normal Cones & Hausdorff Tracking
     // =========================================================================
     //
-    // The engine uses triangle quadrics derived from Trettner & Kobbelt (2020),
-    // "Fast and Robust QEF Minimization using Probabilistic Quadrics", with the
-    // probabilistic formulation enabled by default and a deterministic triangle-
-    // quadric fallback available for exact/legacy behavior.
+    // Greedy edge-collapse simplification using per-vertex plane quadrics
+    // (Garland & Heckbert 1997). Collapse legality is enforced by a battery of
+    // optional quality guards: normal-cone deviation, Hausdorff distance,
+    // aspect ratio, edge length, and valence limits.
 
     // Configuration for mesh simplification
     struct SimplificationParams
@@ -33,21 +33,6 @@ export namespace Geometry::Simplification
         // If true, boundary edges are not collapsed (preserves mesh outline).
         bool PreserveBoundary{true};
 
-        // Weight for boundary edge quadrics. Higher values penalize boundary
-        // collapse more strongly. Only used when PreserveBoundary is false.
-        double BoundaryWeight{100.0};
-
-        // If true, use probabilistic triangle quadrics (Trettner & Kobbelt 2020).
-        // If false, use deterministic triangle quadrics from the same framework.
-        bool UseProbabilisticQuadrics{true};
-
-        // Relative positional standard deviation used by the probabilistic model.
-        // The absolute sigma is computed as:
-        //   sigma = ProbabilisticPositionStdDevFactor * mean_input_edge_length.
-        // Setting this to 0 makes the probabilistic model collapse to the
-        // deterministic triangle-quadric formulation.
-        double ProbabilisticPositionStdDevFactor{0.01};
-
         // If true, forbid collapsing a boundary vertex into an interior vertex.
         // This preserves open-boundary classification even when boundary edges
         // are otherwise allowed to collapse.
@@ -61,7 +46,16 @@ export namespace Geometry::Simplification
         std::size_t MaxValence{0};
         double MaxEdgeLength{0.0};
         double MaxAspectRatio{0.0};
+
+        // Maximum allowed normal deviation in degrees. When > 0, normal cones
+        // track accumulated deviation per face. Collapses that would exceed
+        // half this angle are rejected.
         double MaxNormalDeviationDegrees{0.0};
+
+        // Maximum allowed Hausdorff distance from the simplified surface to
+        // the original. When > 0, per-face point lists track the original
+        // surface and collapses that violate the bound are rejected.
+        double HausdorffError{0.0};
     };
 
     // Result of simplification
