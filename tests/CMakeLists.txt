@@ -156,6 +156,10 @@ intrinsic_test_object_lib(RuntimeTestObjs
         Test_PropertyEnumerator.cpp
         Test_IsolineExtractor.cpp
         Test_EventBus.cpp
+        Test_PanelRegistration.cpp
+        Test_HeadlessAppSmoke.cpp
+        Test_SelectionGizmoRegression.cpp
+        Test_RenderUpdateIntegration.cpp
 
     DEPS IntrinsicCore IntrinsicRuntime nlohmann_json::nlohmann_json
 )

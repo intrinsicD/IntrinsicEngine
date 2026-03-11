@@ -32,13 +32,7 @@ This document tracks the **active rendering-architecture backlog** for Intrinsic
 
 ## P0 — Critical Refactor
 
-Stage 1 (file extraction) and Stage 2 (module migration) are complete — see git history. Remaining work:
-
-- [ ] Preserve stability with tests:
-  - [ ] panel registration coverage
-  - [ ] headless app smoke test
-  - [ ] selection/gizmo interaction regression coverage
-  - [ ] render/update integration smoke test
+Stage 1 (file extraction), Stage 2 (module migration), and Stage 3 (stability tests) are complete — see git history.
 
 ## 2. Next (P1) — Near-Term Follow-Up After the Refactor Lands
 
