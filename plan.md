@@ -37,6 +37,7 @@ These patterns conflict with IntrinsicEngine's design philosophy or are unnecess
 | Domain-Specific Exception Hierarchy | IntrinsicEngine uses `std::expected` for error handling — no exceptions. This is an explicit, codebase-wide design decision documented in CLAUDE.md. |
 | Plugin Architecture (friend lifecycle) | IntrinsicEngine uses `FeatureRegistry` for render feature registration and `FrameGraph` for system registration. Plugins as a concept don't exist — extensibility is through modules and feature flags. |
 | Compile-Time Traits System (VecTraits) | Only one math library (GLM). The traits layer adds indirection without benefit when there's no polymorphism over math types. |
+| Double-Buffered Command Queue | The `FrameGraph` (DAG scheduler) handles all system-level execution ordering. The only cross-thread queue is `RunOnMainThread()` for infrequent async completions (asset loads, file watcher callbacks) — contention is negligible. If it ever mattered, a lock-free MPSC queue would be the modern choice over double-buffering. |
 
 ---
 
@@ -62,21 +63,7 @@ These patterns address gaps in IntrinsicEngine or would improve existing code.
 
 **Priority:** P1 — directly enables the ROADMAP Phase 2 undo/redo item.
 
-### 2. Double-Buffered Command Queue for Deferred Main-Thread Work
-
-**Source:** Engine23/Engine24 CommandDoubleBuffer
-
-**Gap:** IntrinsicEngine has `RunOnMainThread()` for cross-thread callbacks, but no formal double-buffered queue. The current approach likely uses a mutex-protected vector with clear-after-drain. A double-buffer swap would reduce contention during high-frequency enqueue (e.g., multiple asset loads completing simultaneously).
-
-**Recommendation:** Evaluate whether the current `RunOnMainThread()` queue is a contention bottleneck under heavy async load. If so, adopt the two-buffer swap pattern:
-
-- Buffer A drains on main thread while Buffer B collects new work.
-- Single atomic swap at frame boundary.
-- Separate mutexes for producer and consumer sides.
-
-**Priority:** P2 — only if profiling shows contention. Not urgent.
-
-### 3. Python-Like Iteration Utilities (Enumerate, Zip)
+### 2. Python-Like Iteration Utilities (Enumerate, Zip)
 
 **Source:** Engine24 `Range()`, `Enumerate()`, `Zip()`, `SortByFirst()`
 
@@ -91,7 +78,7 @@ These patterns address gaps in IntrinsicEngine or would improve existing code.
 
 **Priority:** P3 — quality-of-life improvement, not blocking any feature. Adopt opportunistically when touching files that would benefit.
 
-### 4. ComponentGui — Template-Specialized Per-Type UI Rendering
+### 3. ComponentGui — Template-Specialized Per-Type UI Rendering
 
 **Source:** Engine23 `ComponentGui<T>::Show()`
 
@@ -110,7 +97,7 @@ Specialize per component type. The entity inspector iterates components and call
 
 **Priority:** P3 — architectural hygiene. Evaluate current `EditorUI` structure first; may already be clean enough.
 
-### 5. Policy-Based Template Composition for Geometry Operators
+### 4. Policy-Based Template Composition for Geometry Operators
 
 **Source:** Engine23 OptimizerBase with orthogonal policy axes
 
@@ -133,7 +120,6 @@ Use template policies only when: (a) there are 2+ orthogonal axes, (b) each axis
 | Action | Pattern | Priority | Blocks |
 |---|---|---|---|
 | **Implement** | Command Pattern (Undo/Redo) | P1 | ROADMAP Phase 2 |
-| **Evaluate** | Double-Buffered Command Queue | P2 | Nothing (perf optimization) |
 | **Add** | Enumerate/Zip iteration utilities | P3 | Nothing (QoL) |
 | **Evaluate** | ComponentGui template dispatch | P3 | Nothing (maintainability) |
 | **Adopt selectively** | Policy-based operator composition | P3 | New geometry operators |
