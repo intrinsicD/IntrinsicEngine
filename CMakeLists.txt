@@ -101,6 +101,7 @@ else()
     message(STATUS "Sanitizers DISABLED (libclang_rt.asan not found or manually turned off)")
 endif()
 option(INTRINSIC_ENABLE_NATIVE_ARCH "Enable -march=native for local profiling builds" OFF)
+option(INTRINSIC_ENABLE_CUDA "Enable CUDA compute backend for GPU-accelerated geometry processing" OFF)
 option(INTRINSIC_BUILD_SANDBOX "Build Sandbox application target" ON)
 option(INTRINSIC_BUILD_TESTS "Build test targets" ON)
 option(INTRINSIC_OFFLINE_DEPS
@@ -139,6 +140,20 @@ target_compile_definitions(IntrinsicConfig INTERFACE
 
 include(cmake/Dependencies.cmake)
 include(cmake/IntrinsicModule.cmake)
+
+# ------------------------------------------------------------------------------
+# CUDA Compute Backend (optional)
+# ------------------------------------------------------------------------------
+if(INTRINSIC_ENABLE_CUDA)
+    # Enable CUDA language support and find the CUDA driver API.
+    enable_language(CUDA)
+    find_package(CUDAToolkit REQUIRED)
+    message(STATUS "CUDA compute backend ENABLED (CUDAToolkit ${CUDAToolkit_VERSION})")
+    # Propagate to all targets that need conditional CUDA compilation.
+    target_compile_definitions(IntrinsicConfig INTERFACE INTRINSIC_HAS_CUDA=1)
+else()
+    message(STATUS "CUDA compute backend DISABLED")
+endif()
 
 if(INTRINSIC_BUILD_TESTS)
     include(CTest)

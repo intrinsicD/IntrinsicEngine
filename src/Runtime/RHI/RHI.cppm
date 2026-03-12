@@ -6,6 +6,7 @@ export import :CommandUtils;
 export import :CommandContext;
 export import :ComputePipeline;
 export import :Context;
+export import :CudaError;
 export import :Descriptors;
 export import :Device;
 export import :Image;
@@ -22,3 +23,7 @@ export import :TransientAllocator;
 export import :Types;
 export import :SceneInstances;
 export import :PersistentDescriptors;
+
+#ifdef INTRINSIC_HAS_CUDA
+export import :CudaDevice;
+#endif

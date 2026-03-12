@@ -176,8 +176,10 @@ Current selection is entity-level only. `HalfedgeMesh` provides the topological 
 
 Infrastructure required to move heavyweight geometry operators from CPU to GPU.
 
-- **CUDA support:** Add a CUDA compute backend for geometry-processing operators (staged rollout, starting with point cloud and spectral kernels).
-- **CUDA-Vulkan interop (mandatory):** Use zero-copy shared GPU buffers and explicit cross-API synchronization to avoid unnecessary CPU-GPU traffic.
+- **CUDA support (Phase 1 — done):** `RHI::CudaDevice` wrapper with driver API lifecycle (init, context, streams, memory alloc/free), `RHI::CudaError` domain error type, conditional CMake build via `INTRINSIC_ENABLE_CUDA`. Runtime tests skip gracefully when no CUDA driver is present.
+- **CUDA-Vulkan interop (Phase 2 — next):** Export Vulkan buffers/timeline semaphores for zero-copy import into CUDA. `RHI::CudaInterop` class with explicit cross-API synchronization.
+- **Compute dispatch abstraction (Phase 3):** `Runtime::ComputeBackend` subsystem owned by `Engine`, selecting between Vulkan Compute, CUDA, and CPU based on availability.
+- **First GPU workload (Phase 4):** GPU-accelerated K-means clustering for point clouds, validating the compute pipeline end-to-end.
 
 ### Geometry Processing — Remaining
 
