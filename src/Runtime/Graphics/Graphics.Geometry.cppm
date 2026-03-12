@@ -70,6 +70,7 @@ export namespace Graphics
 
         // Optional: Keep CPU-side collision geometry and an authoritative editable mesh.
         std::vector<glm::vec3> Positions;
+        std::vector<glm::vec4> Aux;
         std::vector<uint32_t> Indices;
         std::shared_ptr<Geometry::Halfedge::Mesh> SourceMesh{};
     };

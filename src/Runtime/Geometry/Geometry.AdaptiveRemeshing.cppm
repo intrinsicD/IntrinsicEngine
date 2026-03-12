@@ -89,7 +89,7 @@ export namespace Geometry::AdaptiveRemeshing
 
     // AdaptiveRemeshingResult is structurally identical to Remeshing::RemeshingResult.
     // Both alias Geometry::RemeshingOperationResult to avoid a duplicated definition.
-    using AdaptiveRemeshingResult = Geometry::RemeshingOperationResult;
+    using AdaptiveRemeshingResult = RemeshingOperationResult;
 
     // -------------------------------------------------------------------------
     // Curvature-driven adaptive remeshing.

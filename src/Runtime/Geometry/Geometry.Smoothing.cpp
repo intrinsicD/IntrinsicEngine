@@ -54,17 +54,11 @@ namespace Geometry::Smoothing
             glm::dvec3 centroid(0.0);
             std::size_t count = 0;
 
-            HalfedgeHandle h = mesh.Halfedge(vh);
-            HalfedgeHandle start = h;
-            std::size_t safety = 0;
-            const std::size_t maxIter = mesh.HalfedgesSize();
-            do
+            for (const HalfedgeHandle h : mesh.HalfedgesAroundVertex(vh))
             {
                 centroid += glm::dvec3(mesh.Position(mesh.ToVertex(h)));
                 ++count;
-                h = mesh.CWRotatedHalfedge(h);
-                if (++safety > maxIter) break;
-            } while (h != start);
+            }
 
             if (count == 0) continue;
 

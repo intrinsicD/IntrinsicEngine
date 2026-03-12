@@ -105,6 +105,98 @@ namespace
 
 
 // =============================================================================
+// Quadric tests
+// =============================================================================
+
+TEST(Quadric_Probabilistic, PlaneZeroVarianceMatchesDeterministicPlane)
+{
+    const glm::dvec3 point{1.0, 4.0, -2.0};
+    const glm::dvec3 normal{2.0, -1.0, 3.0};
+
+    const auto deterministic = Geometry::Quadric::PlaneQuadric(glm::vec3(point), glm::vec3(normal));
+    const auto probabilistic = Geometry::Quadric::ProbabilisticPlaneQuadric(point, normal, 0.0, 0.0);
+
+    EXPECT_DOUBLE_EQ(probabilistic.A00, deterministic.A00);
+    EXPECT_DOUBLE_EQ(probabilistic.A01, deterministic.A01);
+    EXPECT_DOUBLE_EQ(probabilistic.A02, deterministic.A02);
+    EXPECT_DOUBLE_EQ(probabilistic.A11, deterministic.A11);
+    EXPECT_DOUBLE_EQ(probabilistic.A12, deterministic.A12);
+    EXPECT_DOUBLE_EQ(probabilistic.A22, deterministic.A22);
+    EXPECT_DOUBLE_EQ(probabilistic.b0, deterministic.b0);
+    EXPECT_DOUBLE_EQ(probabilistic.b1, deterministic.b1);
+    EXPECT_DOUBLE_EQ(probabilistic.b2, deterministic.b2);
+    EXPECT_DOUBLE_EQ(probabilistic.c, deterministic.c);
+}
+
+TEST(Quadric_Probabilistic, PlaneIsotropicAndGeneralCovarianceVariantsAgree)
+{
+    const glm::dvec3 point{0.5, -1.25, 2.0};
+    const glm::dvec3 normal{1.5, 0.25, -0.75};
+    constexpr double positionStdDev = 0.15;
+    constexpr double normalStdDev = 0.2;
+
+    const glm::dmat3 sigmaP{positionStdDev * positionStdDev};
+    const glm::dmat3 sigmaN{normalStdDev * normalStdDev};
+
+    const auto isotropic = Geometry::Quadric::ProbabilisticPlaneQuadric(point, normal, positionStdDev, normalStdDev);
+    const auto general = Geometry::Quadric::ProbabilisticPlaneQuadric(point, normal, sigmaP, sigmaN);
+
+    EXPECT_NEAR(isotropic.A00, general.A00, 1e-12);
+    EXPECT_NEAR(isotropic.A01, general.A01, 1e-12);
+    EXPECT_NEAR(isotropic.A02, general.A02, 1e-12);
+    EXPECT_NEAR(isotropic.A11, general.A11, 1e-12);
+    EXPECT_NEAR(isotropic.A12, general.A12, 1e-12);
+    EXPECT_NEAR(isotropic.A22, general.A22, 1e-12);
+    EXPECT_NEAR(isotropic.b0, general.b0, 1e-12);
+    EXPECT_NEAR(isotropic.b1, general.b1, 1e-12);
+    EXPECT_NEAR(isotropic.b2, general.b2, 1e-12);
+    EXPECT_NEAR(isotropic.c, general.c, 1e-12);
+}
+
+TEST(Quadric_Probabilistic, TriangleIsotropicAndGeneralCovarianceVariantsAgree)
+{
+    const glm::dvec3 p{0.0, 0.0, 0.0};
+    const glm::dvec3 q{1.0, 0.0, 0.0};
+    const glm::dvec3 r{0.25, 1.0, 0.5};
+    constexpr double positionStdDev = 0.125;
+
+    const glm::dmat3 sigma{positionStdDev * positionStdDev};
+
+    const auto isotropic = Geometry::Quadric::ProbabilisticTriangleQuadric(p, q, r, positionStdDev);
+    const auto general = Geometry::Quadric::ProbabilisticTriangleQuadric(p, q, r, sigma, sigma, sigma);
+
+    EXPECT_NEAR(isotropic.A00, general.A00, 1e-12);
+    EXPECT_NEAR(isotropic.A01, general.A01, 1e-12);
+    EXPECT_NEAR(isotropic.A02, general.A02, 1e-12);
+    EXPECT_NEAR(isotropic.A11, general.A11, 1e-12);
+    EXPECT_NEAR(isotropic.A12, general.A12, 1e-12);
+    EXPECT_NEAR(isotropic.A22, general.A22, 1e-12);
+    EXPECT_NEAR(isotropic.b0, general.b0, 1e-12);
+    EXPECT_NEAR(isotropic.b1, general.b1, 1e-12);
+    EXPECT_NEAR(isotropic.b2, general.b2, 1e-12);
+    EXPECT_NEAR(isotropic.c, general.c, 1e-12);
+}
+
+TEST(Quadric_Probabilistic, DegenerateTriangleProducesFiniteEnergy)
+{
+    const glm::dvec3 p{2.0, -1.0, 0.5};
+    const auto quadric = Geometry::Quadric::ProbabilisticTriangleQuadric(p, p, p, 0.25);
+
+    EXPECT_TRUE(std::isfinite(quadric.A00));
+    EXPECT_TRUE(std::isfinite(quadric.A01));
+    EXPECT_TRUE(std::isfinite(quadric.A02));
+    EXPECT_TRUE(std::isfinite(quadric.A11));
+    EXPECT_TRUE(std::isfinite(quadric.A12));
+    EXPECT_TRUE(std::isfinite(quadric.A22));
+    EXPECT_TRUE(std::isfinite(quadric.b0));
+    EXPECT_TRUE(std::isfinite(quadric.b1));
+    EXPECT_TRUE(std::isfinite(quadric.b2));
+    EXPECT_TRUE(std::isfinite(quadric.c));
+    EXPECT_TRUE(std::isfinite(quadric.Evaluate(p)));
+}
+
+
+// =============================================================================
 // Edge Flip tests
 // =============================================================================
 
@@ -1337,6 +1429,142 @@ TEST(Simplification_QEM, RepeatedWorkflowStyleSimplificationStaysValid)
     }
 }
 
+TEST(Simplification_QEM, ConfigurableQuadricsSupportAllTypesResidencesAndPlacements)
+{
+    struct Config
+    {
+        Geometry::Simplification::QuadricType Type;
+        Geometry::Simplification::QuadricResidence Residence;
+        Geometry::Simplification::CollapsePlacementPolicy Placement;
+    };
+
+    const std::vector<Config> configs = {
+        {Geometry::Simplification::QuadricType::Plane, Geometry::Simplification::QuadricResidence::Vertices, Geometry::Simplification::CollapsePlacementPolicy::KeepSurvivor},
+        {Geometry::Simplification::QuadricType::Plane, Geometry::Simplification::QuadricResidence::Faces, Geometry::Simplification::CollapsePlacementPolicy::QuadricMinimizer},
+        {Geometry::Simplification::QuadricType::Plane, Geometry::Simplification::QuadricResidence::VerticesAndFaces, Geometry::Simplification::CollapsePlacementPolicy::BestOfEndpointsAndMinimizer},
+        {Geometry::Simplification::QuadricType::Triangle, Geometry::Simplification::QuadricResidence::Vertices, Geometry::Simplification::CollapsePlacementPolicy::KeepSurvivor},
+        {Geometry::Simplification::QuadricType::Triangle, Geometry::Simplification::QuadricResidence::Faces, Geometry::Simplification::CollapsePlacementPolicy::QuadricMinimizer},
+        {Geometry::Simplification::QuadricType::Triangle, Geometry::Simplification::QuadricResidence::VerticesAndFaces, Geometry::Simplification::CollapsePlacementPolicy::BestOfEndpointsAndMinimizer},
+        {Geometry::Simplification::QuadricType::Point, Geometry::Simplification::QuadricResidence::Vertices, Geometry::Simplification::CollapsePlacementPolicy::KeepSurvivor},
+        {Geometry::Simplification::QuadricType::Point, Geometry::Simplification::QuadricResidence::Faces, Geometry::Simplification::CollapsePlacementPolicy::QuadricMinimizer},
+        {Geometry::Simplification::QuadricType::Point, Geometry::Simplification::QuadricResidence::VerticesAndFaces, Geometry::Simplification::CollapsePlacementPolicy::BestOfEndpointsAndMinimizer},
+    };
+
+    for (const Config& config : configs)
+    {
+        SCOPED_TRACE(static_cast<int>(config.Type));
+        SCOPED_TRACE(static_cast<int>(config.Residence));
+        SCOPED_TRACE(static_cast<int>(config.Placement));
+
+        auto mesh = MakeDenseClosedTriangleMesh(2);
+        const std::size_t initialFaces = mesh.FaceCount();
+
+        Geometry::Simplification::SimplificationParams params;
+        params.TargetFaces = initialFaces / 2u;
+        params.PreserveBoundary = false;
+        params.Quadric.Type = config.Type;
+        params.Quadric.Residence = config.Residence;
+        params.Quadric.PlacementPolicy = config.Placement;
+
+        auto result = Geometry::Simplification::Simplify(mesh, params);
+        ASSERT_TRUE(result.has_value());
+        EXPECT_GT(result->CollapseCount, 0u);
+        EXPECT_LT(mesh.FaceCount(), initialFaces);
+    }
+}
+
+TEST(Simplification_QEM, ProbabilisticQuadricsSupportIsotropicAndCovarianceModes)
+{
+    struct Config
+    {
+        Geometry::Simplification::QuadricType Type;
+        Geometry::Simplification::QuadricProbabilisticMode Mode;
+    };
+
+    const std::vector<Config> configs = {
+        {Geometry::Simplification::QuadricType::Plane, Geometry::Simplification::QuadricProbabilisticMode::Isotropic},
+        {Geometry::Simplification::QuadricType::Plane, Geometry::Simplification::QuadricProbabilisticMode::Covariance},
+        {Geometry::Simplification::QuadricType::Triangle, Geometry::Simplification::QuadricProbabilisticMode::Isotropic},
+        {Geometry::Simplification::QuadricType::Triangle, Geometry::Simplification::QuadricProbabilisticMode::Covariance},
+    };
+
+    for (const Config& config : configs)
+    {
+        SCOPED_TRACE(static_cast<int>(config.Type));
+        SCOPED_TRACE(static_cast<int>(config.Mode));
+
+        auto mesh = MakeDenseClosedTriangleMesh(2);
+        const std::size_t initialFaces = mesh.FaceCount();
+
+        auto vertexSigma = Geometry::VertexProperty<glm::dmat3>(
+            mesh.VertexProperties().GetOrAdd<glm::dmat3>("v:quadric_sigma_p", glm::dmat3(0.0)));
+        for (std::size_t vi = 0; vi < mesh.VerticesSize(); ++vi)
+        {
+            Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(vi)};
+            if (!mesh.IsDeleted(v))
+            {
+                vertexSigma[v] = glm::dmat3(1e-4);
+            }
+        }
+
+        auto faceSigmaP = Geometry::FaceProperty<glm::dmat3>(
+            mesh.FaceProperties().GetOrAdd<glm::dmat3>("f:quadric_sigma_p", glm::dmat3(0.0)));
+        auto faceSigmaN = Geometry::FaceProperty<glm::dmat3>(
+            mesh.FaceProperties().GetOrAdd<glm::dmat3>("f:quadric_sigma_n", glm::dmat3(0.0)));
+        for (std::size_t fi = 0; fi < mesh.FacesSize(); ++fi)
+        {
+            Geometry::FaceHandle f{static_cast<Geometry::PropertyIndex>(fi)};
+            if (!mesh.IsDeleted(f))
+            {
+                faceSigmaP[f] = glm::dmat3(5e-5);
+                faceSigmaN[f] = glm::dmat3(2.5e-5);
+            }
+        }
+
+        Geometry::Simplification::SimplificationParams params;
+        params.TargetFaces = initialFaces / 2u;
+        params.PreserveBoundary = false;
+        params.Quadric.Type = config.Type;
+        params.Quadric.Residence = Geometry::Simplification::QuadricResidence::VerticesAndFaces;
+        params.Quadric.PlacementPolicy = Geometry::Simplification::CollapsePlacementPolicy::BestOfEndpointsAndMinimizer;
+        params.Quadric.ProbabilisticMode = config.Mode;
+        params.Quadric.PositionStdDev = 0.01;
+        params.Quadric.NormalStdDev = 0.02;
+
+        auto result = Geometry::Simplification::Simplify(mesh, params);
+        ASSERT_TRUE(result.has_value());
+        EXPECT_GT(result->CollapseCount, 0u);
+        EXPECT_LT(mesh.FaceCount(), initialFaces);
+    }
+}
+
+TEST(Simplification_QEM, MissingCovariancePropertiesFallBackToZeroCovariance)
+{
+    auto baselineMesh = MakeDenseClosedTriangleMesh(2);
+    auto covarianceMesh = baselineMesh;
+
+    Geometry::Simplification::SimplificationParams baseline;
+    baseline.TargetFaces = baselineMesh.FaceCount() / 2u;
+    baseline.PreserveBoundary = false;
+    baseline.Quadric.Type = Geometry::Simplification::QuadricType::Plane;
+    baseline.Quadric.Residence = Geometry::Simplification::QuadricResidence::VerticesAndFaces;
+    baseline.Quadric.PlacementPolicy = Geometry::Simplification::CollapsePlacementPolicy::BestOfEndpointsAndMinimizer;
+
+    Geometry::Simplification::SimplificationParams covariance = baseline;
+    covariance.Quadric.ProbabilisticMode = Geometry::Simplification::QuadricProbabilisticMode::Covariance;
+    covariance.Quadric.VertexPositionCovarianceProperty = "v:missing_sigma_p";
+    covariance.Quadric.FacePositionCovarianceProperty = "f:missing_sigma_p";
+    covariance.Quadric.FaceNormalCovarianceProperty = "f:missing_sigma_n";
+
+    auto baselineResult = Geometry::Simplification::Simplify(baselineMesh, baseline);
+    auto covarianceResult = Geometry::Simplification::Simplify(covarianceMesh, covariance);
+    ASSERT_TRUE(baselineResult.has_value());
+    ASSERT_TRUE(covarianceResult.has_value());
+
+    EXPECT_EQ(covarianceMesh.FaceCount(), baselineMesh.FaceCount());
+    EXPECT_EQ(covarianceResult->CollapseCount, baselineResult->CollapseCount);
+}
+
 TEST(Simplification_QEM, OpenBoundaryPatchKeepsDiskTopology)
 {
     auto mesh = MakeSubdividedTriangle();
@@ -1367,5 +1595,49 @@ TEST(Simplification_QEM, OpenBoundaryPatchKeepsDiskTopology)
         }
         EXPECT_TRUE(mesh.IsManifold(v)) << "Open patch simplification made vertex " << vi << " non-manifold";
     }
+}
+
+TEST(Simplification_QEM, PreserveBoundaryPreventsCollapsesOnOpenPatch)
+{
+    auto mesh = MakeSubdividedTriangle();
+
+    const auto before = Geometry::MeshQuality::ComputeQuality(mesh);
+    ASSERT_TRUE(before.has_value());
+    ASSERT_EQ(before->BoundaryLoopCount, 1u);
+
+    std::size_t boundaryVertexCountBefore = 0;
+    for (std::size_t vi = 0; vi < mesh.VerticesSize(); ++vi)
+    {
+        Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(vi)};
+        if (!mesh.IsDeleted(v) && !mesh.IsIsolated(v) && mesh.IsBoundary(v))
+        {
+            ++boundaryVertexCountBefore;
+        }
+    }
+
+    Geometry::Simplification::SimplificationParams params;
+    params.TargetFaces = 2;
+    params.PreserveBoundary = true;
+    params.ForbidBoundaryInteriorCollapse = true;
+
+    auto result = Geometry::Simplification::Simplify(mesh, params);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->CollapseCount, 0u);
+    EXPECT_EQ(mesh.FaceCount(), 4u);
+
+    const auto after = Geometry::MeshQuality::ComputeQuality(mesh);
+    ASSERT_TRUE(after.has_value());
+    EXPECT_EQ(after->BoundaryLoopCount, before->BoundaryLoopCount);
+
+    std::size_t boundaryVertexCountAfter = 0;
+    for (std::size_t vi = 0; vi < mesh.VerticesSize(); ++vi)
+    {
+        Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(vi)};
+        if (!mesh.IsDeleted(v) && !mesh.IsIsolated(v) && mesh.IsBoundary(v))
+        {
+            ++boundaryVertexCountAfter;
+        }
+    }
+    EXPECT_EQ(boundaryVertexCountAfter, boundaryVertexCountBefore);
 }
 

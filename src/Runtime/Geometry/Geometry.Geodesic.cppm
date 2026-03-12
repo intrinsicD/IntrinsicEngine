@@ -58,16 +58,17 @@ export namespace Geometry::Geodesic
 
     struct GeodesicResult
     {
-        // Per-vertex geodesic distances from the source set.
-        // Size = mesh.VerticesSize(). Deleted/isolated vertices have distance 0.
-        std::vector<double> Distances;
-
         // Number of CG iterations used in each solve step
         std::size_t HeatSolveIterations{0};
         std::size_t PoissonSolveIterations{0};
 
         // Whether both solves converged
         bool Converged{false};
+
+        // Per-vertex geodesic distances from the source set.
+        // Deleted/isolated vertices have distance 0.
+        VertexProperty<double> DistanceProperty{};
+        VertexProperty<bool> IsSourceProperty{};
     };
 
     // -------------------------------------------------------------------------
@@ -79,7 +80,7 @@ export namespace Geometry::Geodesic
     // Returns nullopt if the mesh is empty, has no faces, or the source set
     // is empty.
     [[nodiscard]] std::optional<GeodesicResult> ComputeDistance(
-        const Halfedge::Mesh& mesh,
+        Halfedge::Mesh& mesh,
         std::span<const std::size_t> sourceVertices,
         const GeodesicParams& params = {});
 

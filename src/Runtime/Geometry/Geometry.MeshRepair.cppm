@@ -32,16 +32,16 @@ export namespace Geometry::MeshRepair
     struct BoundaryLoop
     {
         // Ordered list of vertex handles forming the boundary loop
-        std::vector<VertexHandle> Vertices;
+        std::vector<VertexHandle> Vertices{};
 
         // Ordered list of boundary halfedge handles (one per edge in the loop)
-        std::vector<HalfedgeHandle> Halfedges;
+        std::vector<HalfedgeHandle> Halfedges{};
     };
 
     struct BoundaryLoopResult
     {
         // All boundary loops found in the mesh (may be empty for closed meshes)
-        std::vector<BoundaryLoop> Loops;
+        std::vector<BoundaryLoop> Loops{};
     };
 
     // Find all boundary loops in the mesh.

@@ -139,15 +139,15 @@ namespace Geometry::Parameterization
 
                 // Found an unvisited boundary halfedge — walk the loop
                 std::vector<std::size_t> loopVerts;
-                HalfedgeHandle cur = h;
-                std::size_t safety = 0;
-                do
+                for (const HalfedgeHandle cur : mesh.BoundaryHalfedges(h))
                 {
                     visited[cur.Index] = true;
-                    loopVerts.push_back(mesh.FromVertex(cur).Index);
-                    cur = mesh.NextHalfedge(cur);
-                    if (++safety > mesh.HalfedgesSize()) break;
-                } while (cur != h);
+                }
+
+                for (const VertexHandle v : mesh.BoundaryVertices(h))
+                {
+                    loopVerts.push_back(v.Index);
+                }
 
                 if (info.LoopCount == 0)
                     info.LoopVertices = std::move(loopVerts);
@@ -411,6 +411,8 @@ namespace Geometry::Parameterization
         // ------------------------------------------------------------------
         ParameterizationResult result;
         result.UVs.resize(nV, glm::vec2(0.0f, 0.0f));
+        result.PinVertex0 = pin0;
+        result.PinVertex1 = pin1;
         result.CGIterations = cgResult.Iterations;
         result.Converged = cgResult.Converged;
 
@@ -522,6 +524,38 @@ namespace Geometry::Parameterization
         result.FlippedTriangleCount = flipped;
         result.MeanConformalDistortion = (validTriangles > 0) ? sumDistortion / static_cast<double>(validTriangles) : 0.0;
         result.MaxConformalDistortion = maxDistortion;
+
+        return result;
+    }
+
+    std::optional<ParameterizationResult> ComputeLSCM(
+        Halfedge::Mesh& mesh,
+        const ParameterizationParams& params)
+    {
+        auto result = ComputeLSCM(static_cast<const Halfedge::Mesh&>(mesh), params);
+        if (!result)
+        {
+            return std::nullopt;
+        }
+
+        result->UVProperty = VertexProperty<glm::vec2>(mesh.VertexProperties().GetOrAdd<glm::vec2>("v:texcoord", glm::vec2(0.0f)));
+        result->IsPinnedProperty = VertexProperty<bool>(mesh.VertexProperties().GetOrAdd<bool>("v:lscm_pinned", false));
+
+        for (std::size_t i = 0; i < result->UVs.size(); ++i)
+        {
+            const VertexHandle vh{static_cast<PropertyIndex>(i)};
+            result->UVProperty[vh] = result->UVs[i];
+            result->IsPinnedProperty[vh] = false;
+        }
+
+        if (result->PinVertex0 < mesh.VerticesSize())
+        {
+            result->IsPinnedProperty[VertexHandle{static_cast<PropertyIndex>(result->PinVertex0)}] = true;
+        }
+        if (result->PinVertex1 < mesh.VerticesSize())
+        {
+            result->IsPinnedProperty[VertexHandle{static_cast<PropertyIndex>(result->PinVertex1)}] = true;
+        }
 
         return result;
     }

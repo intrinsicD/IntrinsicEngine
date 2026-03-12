@@ -42,17 +42,27 @@ A **"Distinguished Scientist" grade** geometry kernel in `src/Runtime/Geometry/`
 - Full halfedge data structure with `VertexHandle`, `EdgeHandle`, `FaceHandle`, `HalfedgeHandle`.
 - Euler operations: `EdgeCollapse` (Dey-Edelsbrunner link condition), `EdgeFlip`, `EdgeSplit`.
 - Arbitrary polygon support: `AddTriangle`, `AddQuad`, `AddFace(span<VertexHandle>)`.
+- Zero-allocation traversal helpers for common adjacency walks: `HalfedgesAroundFace`, `VerticesAroundFace`, `HalfedgesAroundVertex`, `FacesAroundVertex`, `BoundaryHalfedges`, and `BoundaryVertices`.
 - Property system with typed per-element storage and garbage collection.
 - **Attribute propagation contract (PMP-style):**
   - Topology edits (`Split` / `Collapse`) preserve *typed* per-vertex properties when you opt-in via
     `Halfedge::Mesh::SetVertexAttributeTransferRules()`.
   - For each property name (e.g. `"v:texcoord"`, `"v:color"`) you can choose a policy:
     `Average` (interpolate), `KeepA`, `KeepB`, or `None`.
+  - `Average` is evaluated from the requested split/collapse position projected onto the source edge,
+    i.e. $u' = (1-t)u_a + t u_b$ with $t = \mathrm{clamp}\left(\frac{(x' - x_a)\cdot(x_b-x_a)}{\|x_b-x_a\|^2}, 0, 1\right)$.
+    This keeps UV transfer coherent for QEM simplification, isotropic remeshing, and adaptive remeshing,
+    where the new vertex is not always the exact midpoint.
   - The editor geometry workflow now enables this contract automatically for `"v:texcoord"`, so
     remeshing and simplification keep UVs coherent instead of regenerating planar coordinates.
   - Triangle-soup bridge helpers preserve UVs across CPU mesh ↔ halfedge conversion, and Loop /
     Catmull-Clark subdivision propagate `"v:texcoord"` with the same refinement stencils used for
-    positions.
+    positions. Polygonal subdivision output is fan-triangulated on extraction so quad faces round-trip
+    back into the render/upload path with `Aux.xy` intact.
+- **Mesh-backed analysis results:** mutable overloads of `Curvature`, `Geodesic`, and `Parameterization`
+  publish their outputs as persistent mesh properties in addition to returning vectors/diagnostics.
+  Examples: `v:mean_curvature`, `v:gaussian_curvature`, `v:mean_curvature_normal`,
+  `v:geodesic_distance`, `v:is_geodesic_source`, `v:texcoord`, and `v:lscm_pinned`.
 
 
 **Graph Processing Operators:**
@@ -63,7 +73,7 @@ A **"Distinguished Scientist" grade** geometry kernel in `src/Runtime/Geometry/`
 **Mesh Processing Operators:**
 | Operator | Algorithm | Reference |
 |---|---|---|
-| **Simplification** | Plane-quadric QEM with normal-cone deviation tracking and Hausdorff error bounds | Garland & Heckbert 1997 |
+| **Simplification** | Configurable QEM with plane / triangle / point quadrics, selectable quadric residence (vertices, faces, or both), minimizer-aware placement policies, plus normal-cone deviation tracking and Hausdorff error bounds; `Geometry::Quadric` also exposes probabilistic plane/triangle factories for uncertainty-aware QEFs | Garland & Heckbert 1997; Trettner & Kobbelt 2020 |
 | **Smoothing** | Uniform / Cotangent / Taubin Laplacian | Botsch et al. 2010 |
 | **Curvature** | Mean, Gaussian, Principal (angle defect + mixed Voronoi) | Meyer et al. 2003 |
 | **Loop Subdivision** | Warren's simplified weights, boundary rules | Loop 1987, Warren 1995 |
@@ -88,10 +98,16 @@ A **"Distinguished Scientist" grade** geometry kernel in `src/Runtime/Geometry/`
 
 All operators follow a consistent contract: `Params` struct with defaults, `Result` struct with diagnostics, `std::optional<Result>` return for degenerate input.
 
-QEM simplification uses **per-vertex plane quadrics** (averaged from incident face centers and normals) with a per-vertex priority queue.
-Each vertex maintains its best legal collapse halfedge; the greedy loop pops the minimum-cost vertex and collapses to the surviving endpoint position.
+QEM simplification now exposes a configurable `SimplificationParams::Quadric` block:
+- **Primitive energy:** `Plane`, `Triangle`, or `Point` quadrics.
+- **Residence domain:** accumulate error on `Vertices`, `Faces`, or `VerticesAndFaces`.
+- **Probabilistic mode:** deterministic, isotropic uncertainty, or covariance-driven plane/triangle quadrics.
+- **Collapse placement:** keep the survivor, use the quadric minimizer when the system is well-conditioned, or evaluate the best candidate among both endpoints plus the minimizer.
+
+The default remains the previous Garland-Heckbert style behavior: **vertex-resident plane quadrics** averaged over incident faces and evaluated at the surviving endpoint, so existing callers preserve their old simplification profile unless they opt into richer quadric models.
 Optional quality guards include **normal-cone deviation tracking** (`MaxNormalDeviationDegrees`), **Hausdorff error bounds** (`HausdorffError`) via per-face point lists, **aspect ratio**, **edge length**, and **max valence** limits.
-Open-boundary robustness defaults to rejecting **boundary → interior** collapses (`ForbidBoundaryInteriorCollapse = true`) and requiring at least two incident faces on the removed vertex (`MinRemovedVertexIncidentFaces = 2`).
+Open-boundary robustness defaults to treating the live boundary as immutable when `PreserveBoundary = true` (no collapse may touch a boundary vertex), additionally rejecting **boundary → interior** collapses (`ForbidBoundaryInteriorCollapse = true`) and requiring at least two incident faces on the removed vertex (`MinRemovedVertexIncidentFaces = 2`).
+The exported `Geometry::Quadric` API now includes `ProbabilisticPlaneQuadric(...)` and `ProbabilisticTriangleQuadric(...)` in both isotropic and full-covariance forms for uncertainty-aware fitting experiments.
 
 Adaptive remeshing now exposes runtime safety controls in `AdaptiveRemeshingParams` for robustness on pathological inputs:
 `MaxOpsPerIteration` bounds split/collapse work per pass, and `MaxTopologyGrowthFactor` caps vertex/edge growth relative to the input mesh.

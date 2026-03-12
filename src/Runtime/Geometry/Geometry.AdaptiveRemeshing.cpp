@@ -187,7 +187,7 @@ namespace Geometry::AdaptiveRemeshing
     }
 
     static void ComputeSizingField(
-        const Halfedge::Mesh& mesh,
+        Halfedge::Mesh& mesh,
         double baseLength,
         double alpha,
         double minLen,
@@ -218,7 +218,7 @@ namespace Geometry::AdaptiveRemeshing
                 continue;
             }
 
-            const double absH = std::abs(curvField.Vertices[vi].MeanCurvature);
+            const double absH = std::abs(curvField.MeanCurvatureProperty[vh]);
             const double target = baseLength / (1.0 + alpha * absH);
             sizing[vi] = std::clamp(target, minLen, maxLen);
         }
@@ -335,10 +335,7 @@ namespace Geometry::AdaptiveRemeshing
 
             const auto checkNeighbors = [&](VertexHandle v)
             {
-                HalfedgeHandle hStart = mesh.Halfedge(v);
-                HalfedgeHandle hc = hStart;
-                std::size_t safety = 0;
-                do
+                for (const HalfedgeHandle hc : mesh.HalfedgesAroundVertex(v))
                 {
                     VertexHandle vn = mesh.ToVertex(hc);
                     if (vn != v0 && vn != v1)
@@ -353,9 +350,7 @@ namespace Geometry::AdaptiveRemeshing
                             return;
                         }
                     }
-                    hc = mesh.CWRotatedHalfedge(hc);
-                    if (++safety > 100) break;
-                } while (hc != hStart);
+                }
             };
 
             checkNeighbors(v0);

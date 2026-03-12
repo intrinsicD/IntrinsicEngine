@@ -56,21 +56,15 @@ namespace Geometry::CatmullClark
             glm::vec3 sum(0.0f);
             glm::vec2 uvSum(0.0f);
             std::size_t count = 0;
-            HalfedgeHandle hStart = input.Halfedge(fh);
-            HalfedgeHandle h = hStart;
-            std::size_t safety = 0;
-            do
+            for (const VertexHandle v : input.VerticesAroundFace(fh))
             {
-                const VertexHandle v = input.ToVertex(h);
                 sum += input.Position(v);
                 if (hasTexcoord)
                 {
                     uvSum += inputTexcoord[v.Index];
                 }
                 ++count;
-                h = input.NextHalfedge(h);
-                if (++safety > std::max<std::size_t>(input.HalfedgesSize(), 1000u)) break;
-            } while (h != hStart);
+            }
 
             if (count > 0)
             {
@@ -151,10 +145,7 @@ namespace Geometry::CatmullClark
                 glm::vec2 boundaryUvSum(0.0f);
                 std::size_t boundaryCount = 0;
 
-                HalfedgeHandle hStart = input.Halfedge(vh);
-                HalfedgeHandle h = hStart;
-                std::size_t safety = 0;
-                do
+                for (const HalfedgeHandle h : input.HalfedgesAroundVertex(vh))
                 {
                     if (input.IsBoundary(input.Edge(h)))
                     {
@@ -166,9 +157,7 @@ namespace Geometry::CatmullClark
                         }
                         ++boundaryCount;
                     }
-                    h = input.CWRotatedHalfedge(h);
-                    if (++safety > std::max<std::size_t>(input.HalfedgesSize(), 1000u)) break;
-                } while (h != hStart);
+                }
 
                 if (boundaryCount == 2)
                 {
@@ -197,11 +186,8 @@ namespace Geometry::CatmullClark
                 glm::vec2 Quv(0.0f);
                 glm::vec2 Ruv(0.0f);
 
-                HalfedgeHandle hStart = input.Halfedge(vh);
-                HalfedgeHandle h = hStart;
                 std::size_t count = 0;
-                std::size_t safety = 0;
-                do
+                for (const HalfedgeHandle h : input.HalfedgesAroundVertex(vh))
                 {
                     FaceHandle f = input.Face(h);
                     if (f.IsValid())
@@ -224,9 +210,7 @@ namespace Geometry::CatmullClark
                     }
 
                     ++count;
-                    h = input.CWRotatedHalfedge(h);
-                    if (++safety > std::max<std::size_t>(input.HalfedgesSize(), 1000u)) break;
-                } while (h != hStart);
+                }
 
                 if (count > 0 && count == n)
                 {
@@ -322,10 +306,7 @@ namespace Geometry::CatmullClark
 
             VertexHandle faceVert = fVertices[fi];
 
-            HalfedgeHandle hStart = input.Halfedge(fh);
-            HalfedgeHandle h = hStart;
-            std::size_t safety = 0;
-            do
+            for (const HalfedgeHandle h : input.HalfedgesAroundFace(fh))
             {
                 HalfedgeHandle hPrev = input.PrevHalfedge(h);
 
@@ -341,10 +322,7 @@ namespace Geometry::CatmullClark
                 // Quad: (vertex_point, edge_point_curr, face_point, edge_point_prev)
                 // Winding order: CCW
                 (void)output.AddQuad(vp, ep_curr, faceVert, ep_prev);
-
-                h = input.NextHalfedge(h);
-                if (++safety > std::max<std::size_t>(input.HalfedgesSize(), 1000u)) break;
-            } while (h != hStart);
+            }
         }
 
         return true;

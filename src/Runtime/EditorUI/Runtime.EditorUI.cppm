@@ -109,6 +109,17 @@ export namespace Runtime::EditorUI
             bool PreserveBoundary = true;
             float HausdorffError = 0.0f;
             float MaxNormalDeviationDeg = 0.0f;
+            int QuadricType = static_cast<int>(Geometry::Simplification::QuadricType::Plane);
+            int ProbabilisticMode = static_cast<int>(Geometry::Simplification::QuadricProbabilisticMode::Deterministic);
+            int Residence = static_cast<int>(Geometry::Simplification::QuadricResidence::Vertices);
+            int PlacementPolicy = static_cast<int>(Geometry::Simplification::CollapsePlacementPolicy::KeepSurvivor);
+            bool AverageVertexQuadrics = true;
+            bool AverageFaceQuadrics = false;
+            float PositionStdDev = 0.0f;
+            float NormalStdDev = 0.0f;
+            char VertexPositionCovarianceProperty[64] = "v:quadric_sigma_p";
+            char FacePositionCovarianceProperty[64] = "f:quadric_sigma_p";
+            char FaceNormalCovarianceProperty[64] = "f:quadric_sigma_n";
         };
 
         struct SmoothingUiState

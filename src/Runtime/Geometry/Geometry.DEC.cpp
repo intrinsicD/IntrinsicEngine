@@ -200,20 +200,14 @@ namespace Geometry::DEC
             std::vector<Entry> entries;
             entries.reserve(4);  // triangles have 3, quads have 4
 
-            HalfedgeHandle hStart = mesh.Halfedge(fh);
-            HalfedgeHandle h = hStart;
-            std::size_t safety = 0;
-            const std::size_t maxIter = mesh.HalfedgesSize();
-            do
+            for (const HalfedgeHandle h : mesh.HalfedgesAroundFace(fh))
             {
                 std::size_t eIdx = h.Index >> 1u;
                 bool isCanonical = (h.Index & 1u) == 0;
                 double sign = isCanonical ? +1.0 : -1.0;
 
                 entries.push_back({eIdx, sign});
-                h = mesh.NextHalfedge(h);
-                if (++safety > maxIter) break;
-            } while (h != hStart);
+            }
 
             // Sort by column index for CSR consistency
             std::sort(entries.begin(), entries.end(),
@@ -480,16 +474,11 @@ namespace Geometry::DEC
             }
             // 1 for diagonal + count neighbors
             rowNnz[vi] = 1;  // diagonal
-            HalfedgeHandle hStart = mesh.Halfedge(vh);
-            HalfedgeHandle h = hStart;
-            std::size_t safety = 0;
-            const std::size_t maxIter = mesh.HalfedgesSize();
-            do
+            for (const HalfedgeHandle h : mesh.HalfedgesAroundVertex(vh))
             {
+                (void)h;
                 rowNnz[vi] += 1;
-                h = mesh.CWRotatedHalfedge(h);
-                if (++safety > maxIter) break;
-            } while (h != hStart);
+            }
         }
 
         // Build row offsets
@@ -529,10 +518,7 @@ namespace Geometry::DEC
 
             double diagSum = 0.0;
 
-            HalfedgeHandle hStart = mesh.Halfedge(vh);
-            HalfedgeHandle h = hStart;
-            std::size_t safety2 = 0;
-            do
+            for (const HalfedgeHandle h : mesh.HalfedgesAroundVertex(vh))
             {
                 EdgeHandle e = mesh.Edge(h);
                 double w = hodge1.Diagonal[e.Index];
@@ -541,10 +527,7 @@ namespace Geometry::DEC
                 VertexHandle vOther = mesh.ToVertex(h);
                 entries.push_back({vOther.Index, -w});
                 diagSum += w;
-
-                h = mesh.CWRotatedHalfedge(h);
-                if (++safety2 > mesh.HalfedgesSize()) break;
-            } while (h != hStart);
+            }
 
             // Add diagonal
             entries.push_back({vi, diagSum});

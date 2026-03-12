@@ -117,7 +117,7 @@ namespace Geometry::Curvature
     // Applied to position: ΔS x = (1/A_i) Σ_j w_ij (x_j - x_i) = -2H n
     // So H = ||ΔS x|| / 2, but the sign needs the normal.
 
-    std::optional<MeanCurvatureResult> ComputeMeanCurvature(const Halfedge::Mesh& mesh)
+    std::optional<MeanCurvatureResult> ComputeMeanCurvature(Halfedge::Mesh& mesh)
     {
         if (mesh.IsEmpty() || mesh.FaceCount() == 0)
             return std::nullopt;
@@ -125,7 +125,9 @@ namespace Geometry::Curvature
         const std::size_t nV = mesh.VerticesSize();
         const std::size_t nE = mesh.EdgesSize();
 
-        std::vector<double> meanCurvature(nV, 0.0);
+        MeanCurvatureResult result;
+        result.Property = VertexProperty<double>(mesh.VertexProperties().GetOrAdd<double>("v:mean_curvature", 0.0));
+
         auto areas = ComputeMixedAreas(mesh);
 
         // Compute cotan weights per edge and accumulate Laplace-Beltrami
@@ -181,42 +183,30 @@ namespace Geometry::Curvature
                 // ΔS x = laplacian / area = -2H n
                 // H = ||ΔS x|| / 2
                 glm::dvec3 laplaceB = laplacian[i] / areas[i];
-                meanCurvature[i] = glm::length(laplaceB) / 2.0;
+                result.Property[vh] = glm::length(laplaceB) / 2.0;
 
                 // Sign convention: estimate vertex normal and check orientation
                 // Positive H = surface curves toward normal (locally convex)
                 glm::dvec3 normal(0.0);
-                HalfedgeHandle h = mesh.Halfedge(vh);
-                HalfedgeHandle start = h;
-                std::size_t safety = 0;
-                const std::size_t safetyLimit = std::max<std::size_t>(mesh.HalfedgesSize(), 1u);
-                do
+                for (const HalfedgeHandle h : mesh.HalfedgesAroundVertex(vh))
                 {
-                    if (!mesh.IsBoundary(h))
+                    if (mesh.IsBoundary(h))
                     {
-                        VertexHandle v1 = mesh.ToVertex(h);
-                        VertexHandle v2 = mesh.ToVertex(mesh.NextHalfedge(h));
-                        glm::dvec3 e1 = glm::dvec3(mesh.Position(v1)) - glm::dvec3(mesh.Position(vh));
-                        glm::dvec3 e2 = glm::dvec3(mesh.Position(v2)) - glm::dvec3(mesh.Position(vh));
-                        normal += glm::cross(e1, e2);
+                        continue;
                     }
-                    h = mesh.CWRotatedHalfedge(h);
-                    if (++safety > safetyLimit) break;
-                } while (h != start);
+
+                    const VertexHandle v1 = mesh.ToVertex(h);
+                    const VertexHandle v2 = mesh.ToVertex(mesh.NextHalfedge(h));
+                    const glm::dvec3 e1 = glm::dvec3(mesh.Position(v1)) - glm::dvec3(mesh.Position(vh));
+                    const glm::dvec3 e2 = glm::dvec3(mesh.Position(v2)) - glm::dvec3(mesh.Position(vh));
+                    normal += glm::cross(e1, e2);
+                }
 
                 if (glm::dot(normal, laplaceB) < 0.0)
-                    meanCurvature[i] = -meanCurvature[i];
+                    result.Property[vh] = -result.Property[vh];
             }
         }
 
-        MeanCurvatureResult result;
-        result.Values = std::move(meanCurvature);
-        for (std::size_t i = 0; i < nV; ++i)
-        {
-            VertexHandle vh{static_cast<PropertyIndex>(i)};
-            if (!mesh.IsDeleted(vh) && !mesh.IsIsolated(vh))
-                ++result.ValidCount;
-        }
         return result;
     }
 
@@ -230,7 +220,7 @@ namespace Geometry::Curvature
     //
     // where θ_j is the angle at v_i in each incident triangle.
 
-    std::optional<GaussianCurvatureResult> ComputeGaussianCurvature(const Halfedge::Mesh& mesh)
+    std::optional<GaussianCurvatureResult> ComputeGaussianCurvature(Halfedge::Mesh& mesh)
     {
         if (mesh.IsEmpty() || mesh.FaceCount() == 0)
             return std::nullopt;
@@ -238,7 +228,9 @@ namespace Geometry::Curvature
         const std::size_t nV = mesh.VerticesSize();
         const std::size_t nF = mesh.FacesSize();
 
-        std::vector<double> gaussianCurvature(nV, 0.0);
+        GaussianCurvatureResult result;
+        result.Property = VertexProperty<double>(mesh.VertexProperties().GetOrAdd<double>("v:gaussian_curvature", 0.0));
+
         auto areas = ComputeMixedAreas(mesh);
 
         // Accumulate angle sum per vertex
@@ -275,21 +267,13 @@ namespace Geometry::Curvature
             if (areas[i] > 1e-12)
             {
                 double defect = mesh.IsBoundary(vh)
-                    ? std::numbers::pi - angleSum[i]
-                    : 2.0 * std::numbers::pi - angleSum[i];
+                                    ? std::numbers::pi - angleSum[i]
+                                    : 2.0 * std::numbers::pi - angleSum[i];
 
-                gaussianCurvature[i] = defect / areas[i];
+                result.Property[vh] = defect / areas[i];
             }
         }
 
-        GaussianCurvatureResult result;
-        result.Values = std::move(gaussianCurvature);
-        for (std::size_t i = 0; i < nV; ++i)
-        {
-            VertexHandle vh{static_cast<PropertyIndex>(i)};
-            if (!mesh.IsDeleted(vh) && !mesh.IsIsolated(vh))
-                ++result.ValidCount;
-        }
         return result;
     }
 
@@ -297,16 +281,18 @@ namespace Geometry::Curvature
     // ComputeCurvature — Full curvature field
     // =========================================================================
 
-    CurvatureField ComputeCurvature(const Halfedge::Mesh& mesh)
+    CurvatureField ComputeCurvature(Halfedge::Mesh& mesh)
     {
         const std::size_t nV = mesh.VerticesSize();
         const std::size_t nE = mesh.EdgesSize();
         const std::size_t nF = mesh.FacesSize();
 
         CurvatureField result;
-        result.Vertices.resize(nV);
-        result.MeanCurvatureNormals.resize(nV, glm::vec3(0.0f));
-        result.ValidCount = 0;
+        result.MeanCurvatureProperty = VertexProperty<double>(mesh.VertexProperties().GetOrAdd<double>("v:mean_curvature", 0.0));
+        result.GaussianCurvatureProperty = VertexProperty<double>(mesh.VertexProperties().GetOrAdd<double>("v:gaussian_curvature", 0.0));
+        result.MinPrincipalCurvatureProperty = VertexProperty<double>(mesh.VertexProperties().GetOrAdd<double>("v:min_principal_curvature", 0.0));
+        result.MaxPrincipalCurvatureProperty = VertexProperty<double>(mesh.VertexProperties().GetOrAdd<double>("v:max_principal_curvature", 0.0));
+        result.MeanCurvatureNormalProperty = VertexProperty<glm::vec3>(mesh.VertexProperties().GetOrAdd<glm::vec3>("v:mean_curvature_normal", glm::vec3(0.0f)));
 
         // Shared computation: mixed Voronoi areas
         auto areas = ComputeMixedAreas(mesh);
@@ -381,8 +367,6 @@ namespace Geometry::Curvature
             VertexHandle vh{static_cast<PropertyIndex>(i)};
             if (mesh.IsDeleted(vh) || mesh.IsIsolated(vh)) continue;
 
-            ++result.ValidCount;
-
             if (areas[i] < 1e-12) continue;
 
             // Mean curvature
@@ -391,49 +375,44 @@ namespace Geometry::Curvature
 
             // Sign of mean curvature
             glm::dvec3 normal(0.0);
-            HalfedgeHandle h = mesh.Halfedge(vh);
-            HalfedgeHandle start = h;
-            std::size_t safety = 0;
-            const std::size_t safetyLimit = std::max<std::size_t>(mesh.HalfedgesSize(), 1u);
-            do
+            for (const HalfedgeHandle h : mesh.HalfedgesAroundVertex(vh))
             {
-                if (!mesh.IsBoundary(h))
+                if (mesh.IsBoundary(h))
                 {
-                    VertexHandle v1 = mesh.ToVertex(h);
-                    VertexHandle v2 = mesh.ToVertex(mesh.NextHalfedge(h));
-                    glm::dvec3 e1 = glm::dvec3(mesh.Position(v1)) - glm::dvec3(mesh.Position(vh));
-                    glm::dvec3 e2 = glm::dvec3(mesh.Position(v2)) - glm::dvec3(mesh.Position(vh));
-                    normal += glm::cross(e1, e2);
+                    continue;
                 }
-                h = mesh.CWRotatedHalfedge(h);
-                if (++safety > safetyLimit) break;
-            } while (h != start);
+
+                const VertexHandle v1 = mesh.ToVertex(h);
+                const VertexHandle v2 = mesh.ToVertex(mesh.NextHalfedge(h));
+                const glm::dvec3 e1 = glm::dvec3(mesh.Position(v1)) - glm::dvec3(mesh.Position(vh));
+                const glm::dvec3 e2 = glm::dvec3(mesh.Position(v2)) - glm::dvec3(mesh.Position(vh));
+                normal += glm::cross(e1, e2);
+            }
 
             if (glm::dot(normal, laplaceB) < 0.0)
                 H = -H;
 
             // Gaussian curvature
             double defect = mesh.IsBoundary(vh)
-                ? std::numbers::pi - angleSum[i]
-                : 2.0 * std::numbers::pi - angleSum[i];
+                                ? std::numbers::pi - angleSum[i]
+                                : 2.0 * std::numbers::pi - angleSum[i];
             double K = defect / areas[i];
 
             // Principal curvatures
             double discriminant = std::max(0.0, H * H - K);
             double sqrtDisc = std::sqrt(discriminant);
-            double kappa1 = H + sqrtDisc;  // max principal curvature
-            double kappa2 = H - sqrtDisc;  // min principal curvature
+            double kappa1 = H + sqrtDisc; // max principal curvature
+            double kappa2 = H - sqrtDisc; // min principal curvature
 
-            result.Vertices[i].MeanCurvature = H;
-            result.Vertices[i].GaussianCurvature = K;
-            result.Vertices[i].MaxPrincipalCurvature = kappa1;
-            result.Vertices[i].MinPrincipalCurvature = kappa2;
+            result.MeanCurvatureProperty[vh] = H;
+            result.GaussianCurvatureProperty[vh] = K;
+            result.MaxPrincipalCurvatureProperty[vh] = kappa1;
+            result.MinPrincipalCurvatureProperty[vh] = kappa2;
 
             // Mean curvature normal (half the Laplace-Beltrami of position)
-            result.MeanCurvatureNormals[i] = glm::vec3(laplaceB / 2.0);
+            result.MeanCurvatureNormalProperty[vh] = glm::vec3(laplaceB / 2.0);
         }
 
         return result;
     }
-
 } // namespace Geometry::Curvature

@@ -29,13 +29,39 @@ namespace Geometry::Halfedge
 
     namespace
     {
+        [[nodiscard]] float ComputeTransferParameter(
+            Vertices& verts,
+            VertexHandle va,
+            VertexHandle vb,
+            const glm::vec3& outPosition) noexcept
+        {
+            const auto points = verts.Get<glm::vec3>("v:point");
+            if (!points)
+            {
+                return 0.5f;
+            }
+
+            const glm::vec3 a = points[va.Index];
+            const glm::vec3 b = points[vb.Index];
+            const glm::vec3 ab = b - a;
+            const float lenSq = glm::dot(ab, ab);
+            if (lenSq <= 1.0e-20f)
+            {
+                return 0.5f;
+            }
+
+            const float t = glm::dot(outPosition - a, ab) / lenSq;
+            return std::clamp(t, 0.0f, 1.0f);
+        }
+
         template <class T>
         void TransferRule_T(
             Vertices& verts,
             const Mesh::VertexAttributeTransfer& rule,
             VertexHandle va,
             VertexHandle vb,
-            VertexHandle vOut)
+            VertexHandle vOut,
+            float t)
         {
             auto prop = verts.Get<T>(rule.Name);
             if (!prop) return;
@@ -43,7 +69,8 @@ namespace Geometry::Halfedge
             switch (rule.Rule)
             {
             case Mesh::VertexAttributeTransfer::Policy::Average:
-                prop[vOut.Index] = static_cast<T>(0.5f) * (prop[va.Index] + prop[vb.Index]);
+                prop[vOut.Index] = (static_cast<T>(1.0f - t) * prop[va.Index])
+                                 + (static_cast<T>(t) * prop[vb.Index]);
                 break;
             case Mesh::VertexAttributeTransfer::Policy::KeepA:
                 prop[vOut.Index] = prop[va.Index];
@@ -62,15 +89,18 @@ namespace Geometry::Halfedge
             const Mesh::VertexAttributeTransfer& rule,
             VertexHandle va,
             VertexHandle vb,
-            VertexHandle vOut)
+            VertexHandle vOut,
+            const glm::vec3& outPosition)
         {
+            const float t = ComputeTransferParameter(verts, va, vb, outPosition);
+
             // For now we only support the common math POD types used in geometry.
             // This avoids RTTI/casting from PropertyRegistry while still working
             // for texcoords/normals/colors and scalar weights.
-            TransferRule_T<float>(verts, rule, va, vb, vOut);
-            TransferRule_T<glm::vec2>(verts, rule, va, vb, vOut);
-            TransferRule_T<glm::vec3>(verts, rule, va, vb, vOut);
-            TransferRule_T<glm::vec4>(verts, rule, va, vb, vOut);
+            TransferRule_T<float>(verts, rule, va, vb, vOut, t);
+            TransferRule_T<glm::vec2>(verts, rule, va, vb, vOut, t);
+            TransferRule_T<glm::vec3>(verts, rule, va, vb, vOut, t);
+            TransferRule_T<glm::vec4>(verts, rule, va, vb, vOut, t);
 
             // Discrete attributes: average isn't meaningful; treat as KeepA by default.
             {
@@ -95,23 +125,23 @@ namespace Geometry::Halfedge
         }
     }
 
-    void Mesh::TransferVertexAttributes_OnSplit(VertexHandle va, VertexHandle vb, VertexHandle vm)
+    void Mesh::TransferVertexAttributes_OnSplit(VertexHandle va, VertexHandle vb, VertexHandle vm, glm::vec3 newPosition)
     {
         if (m_VertexAttrTransfer.empty()) return;
         for (const auto& rule : m_VertexAttrTransfer)
         {
             if (rule.Name.empty()) continue;
-            TransferRule_Dynamic(m_Vertices, rule, va, vb, vm);
+            TransferRule_Dynamic(m_Vertices, rule, va, vb, vm, newPosition);
         }
     }
 
-    void Mesh::TransferVertexAttributes_OnCollapse(VertexHandle va, VertexHandle vb, VertexHandle vSurvivor)
+    void Mesh::TransferVertexAttributes_OnCollapse(VertexHandle va, VertexHandle vb, VertexHandle vSurvivor, glm::vec3 newPosition)
     {
         if (m_VertexAttrTransfer.empty()) return;
         for (const auto& rule : m_VertexAttrTransfer)
         {
             if (rule.Name.empty()) continue;
-            TransferRule_Dynamic(m_Vertices, rule, va, vb, vSurvivor);
+            TransferRule_Dynamic(m_Vertices, rule, va, vb, vSurvivor, newPosition);
         }
     }
 
@@ -1043,7 +1073,7 @@ namespace Geometry::Halfedge
         VertexHandle vRemove  = FromVertex(h0);
 
         // Transfer vertex attributes BEFORE deletion.
-        TransferVertexAttributes_OnCollapse(vSurvive, vRemove, vSurvive);
+        TransferVertexAttributes_OnCollapse(vSurvive, vRemove, vSurvive, newPosition);
 
         // Save these BEFORE remove_edge_helper modifies the mesh.
         HalfedgeHandle h1 = PrevHalfedge(h0);
@@ -1361,7 +1391,7 @@ namespace Geometry::Halfedge
 
         // Transfer/interpolate any configured vertex attributes.
         // (PMP convention: the inserted vertex receives attributes based on the edge endpoints.)
-        TransferVertexAttributes_OnSplit(va, vb, vm);
+        TransferVertexAttributes_OnSplit(va, vb, vm, position);
 
         // Modify existing edge e: now goes va → vm (reuse h0/h1)
         SetVertex(h0, vm);  // h0 now: va → vm

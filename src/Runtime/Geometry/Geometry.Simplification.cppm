@@ -2,6 +2,7 @@ module;
 
 #include <cstddef>
 #include <optional>
+#include <string>
 
 export module Geometry:Simplification;
 
@@ -10,18 +11,75 @@ import :HalfedgeMesh;
 
 export namespace Geometry::Simplification
 {
+    enum class QuadricType
+    {
+        Plane,
+        Triangle,
+        Point
+    };
+
+    enum class QuadricProbabilisticMode
+    {
+        Deterministic,
+        Isotropic,
+        Covariance
+    };
+
+    enum class QuadricResidence
+    {
+        Vertices,
+        Faces,
+        VerticesAndFaces
+    };
+
+    enum class CollapsePlacementPolicy
+    {
+        KeepSurvivor,
+        QuadricMinimizer,
+        BestOfEndpointsAndMinimizer
+    };
+
+    struct QuadricOptions
+    {
+        QuadricType Type{QuadricType::Plane};
+        QuadricProbabilisticMode ProbabilisticMode{QuadricProbabilisticMode::Deterministic};
+        QuadricResidence Residence{QuadricResidence::Vertices};
+        CollapsePlacementPolicy PlacementPolicy{CollapsePlacementPolicy::KeepSurvivor};
+
+        // When vertex-resident quadrics are assembled from incident faces, divide
+        // by incident-count to keep scale comparable across irregular valence.
+        bool AverageVertexQuadrics{true};
+
+        // When face-resident quadrics are assembled for a collapse, divide by the
+        // number of contributing faces to keep the domain scale predictable.
+        bool AverageFaceQuadrics{false};
+
+        // Isotropic uncertainty parameters used by the probabilistic factories.
+        double PositionStdDev{0.0};
+        double NormalStdDev{0.0};
+
+        // Optional covariance property names for QuadricProbabilisticMode::Covariance.
+        // Missing properties are treated as zero covariance.
+        std::string VertexPositionCovarianceProperty{"v:quadric_sigma_p"};
+        std::string FacePositionCovarianceProperty{"f:quadric_sigma_p"};
+        std::string FaceNormalCovarianceProperty{"f:quadric_sigma_n"};
+    };
+
     // =========================================================================
     // QEM Mesh Simplification with Normal Cones & Hausdorff Tracking
     // =========================================================================
     //
-    // Greedy edge-collapse simplification using per-vertex plane quadrics
-    // (Garland & Heckbert 1997). Collapse legality is enforced by a battery of
-    // optional quality guards: normal-cone deviation, Hausdorff distance,
-    // aspect ratio, edge length, and valence limits.
+    // Greedy edge-collapse simplification using configurable quadric error
+    // metrics (plane / triangle / point) that can live on vertices, faces,
+    // or both. Collapse legality is enforced by a battery of optional quality
+    // guards: normal-cone deviation, Hausdorff distance, aspect ratio, edge
+    // length, and valence limits.
 
     // Configuration for mesh simplification
     struct SimplificationParams
     {
+        QuadricOptions Quadric{};
+
         // Target number of faces. The algorithm stops when FaceCount() <= TargetFaces.
         // Set to 0 to use only the error threshold.
         std::size_t TargetFaces{0};
@@ -30,7 +88,8 @@ export namespace Geometry::Simplification
         // use only the face count target.
         double MaxError{1e30};
 
-        // If true, boundary edges are not collapsed (preserves mesh outline).
+        // If true, the current open boundary is treated as immutable: boundary
+        // edges are not collapsed and no collapse may touch a boundary vertex.
         bool PreserveBoundary{true};
 
         // If true, forbid collapsing a boundary vertex into an interior vertex.

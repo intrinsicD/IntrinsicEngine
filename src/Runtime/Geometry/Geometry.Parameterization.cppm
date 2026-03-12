@@ -59,6 +59,10 @@ export namespace Geometry::Parameterization
         // Deleted/isolated vertices have UV = (0, 0).
         std::vector<glm::vec2> UVs;
 
+        // Actual pinned vertices used by the solve (manual or auto-selected).
+        std::size_t PinVertex0{std::numeric_limits<std::size_t>::max()};
+        std::size_t PinVertex1{std::numeric_limits<std::size_t>::max()};
+
         // Quality metrics
         double MeanConformalDistortion{0.0};   // σ_max / σ_min averaged over faces
         double MaxConformalDistortion{0.0};     // Worst-case triangle distortion
@@ -67,6 +71,10 @@ export namespace Geometry::Parameterization
         // Solver diagnostics
         std::size_t CGIterations{0};
         bool Converged{false};
+
+        // Optional mesh-backed properties populated by the mutable overload.
+        VertexProperty<glm::vec2> UVProperty{};
+        VertexProperty<bool> IsPinnedProperty{};
     };
 
     // -------------------------------------------------------------------------
@@ -81,6 +89,9 @@ export namespace Geometry::Parameterization
     // -------------------------------------------------------------------------
     [[nodiscard]] std::optional<ParameterizationResult> ComputeLSCM(
         const Halfedge::Mesh& mesh,
+        const ParameterizationParams& params = {});
+    [[nodiscard]] std::optional<ParameterizationResult> ComputeLSCM(
+        Halfedge::Mesh& mesh,
         const ParameterizationParams& params = {});
 
 } // namespace Geometry::Parameterization

@@ -6,7 +6,9 @@ module;
 
 #include <functional>
 #include <memory>
+#include <string>
 #include <vector>
+#include <span>
 #include <glm/glm.hpp>
 #include <imgui.h>
 #include <entt/entity/registry.hpp>
@@ -154,6 +156,7 @@ void GeometryWorkflowController::ApplyOperator(entt::entity entity,
         auto built = Geometry::MeshUtils::BuildHalfedgeMeshFromIndexedTriangles(
             collider->CollisionRef->Positions,
             collider->CollisionRef->Indices,
+            collider->CollisionRef->Aux,
             buildParams);
         if (!built)
         {
@@ -185,6 +188,7 @@ void GeometryWorkflowController::ApplyOperator(entt::entity entity,
     Geometry::MeshUtils::ExtractIndexedTriangles(mesh, newPos, newIdx, &newAux);
 
     collider->CollisionRef->Positions = std::move(newPos);
+    collider->CollisionRef->Aux = std::move(newAux);
     collider->CollisionRef->Indices = std::move(newIdx);
     collider->CollisionRef->SourceMesh = std::make_shared<Geometry::Halfedge::Mesh>(mesh);
 
@@ -216,7 +220,7 @@ void GeometryWorkflowController::ApplyOperator(entt::entity entity,
     uploadReq.Positions = collider->CollisionRef->Positions;
     uploadReq.Indices = collider->CollisionRef->Indices;
     uploadReq.Normals = newNormals;
-    uploadReq.Aux = newAux;
+    uploadReq.Aux = collider->CollisionRef->Aux;
     uploadReq.Topology = Graphics::PrimitiveTopology::Triangles;
     uploadReq.UploadMode = Graphics::GeometryUploadMode::Staged;
 
@@ -408,22 +412,94 @@ void GeometryWorkflowController::DrawSimplificationPanel()
     if (DrawOperatorPanelHeader(context,
                                 "Simplification reduces triangle count while preserving overall shape. Keep this panel separate from remeshing and smoothing so decimation can be inserted wherever a workflow needs it."))
     {
+        static constexpr const char* kQuadricTypes[] = {"Plane", "Triangle", "Point"};
+        static constexpr const char* kProbabilisticModes[] = {"Deterministic", "Isotropic", "Covariance"};
+        static constexpr const char* kResidences[] = {"Vertices", "Faces", "Vertices + Faces"};
+        static constexpr const char* kPlacementPolicies[] = {
+            "Keep Survivor",
+            "Quadric Minimizer",
+            "Best of Endpoints + Minimizer"
+        };
+
         ImGui::DragInt("Target Faces", &m_SimplificationUi.TargetFaces, 10.0f, 10, 1000000);
         ImGui::Checkbox("Preserve Boundary", &m_SimplificationUi.PreserveBoundary);
         ImGui::DragFloat("Hausdorff Error", &m_SimplificationUi.HausdorffError,
                          0.001f, 0.0f, 10.0f, "%.4f");
         ImGui::DragFloat("Max Normal Deviation (deg)", &m_SimplificationUi.MaxNormalDeviationDeg,
                          1.0f, 0.0f, 180.0f, "%.1f");
+
+        ImGui::SeparatorText("Quadrics");
+        ImGui::Combo("Quadric Type", &m_SimplificationUi.QuadricType, kQuadricTypes, IM_ARRAYSIZE(kQuadricTypes));
+        ImGui::Combo("Probabilistic Mode", &m_SimplificationUi.ProbabilisticMode, kProbabilisticModes, IM_ARRAYSIZE(kProbabilisticModes));
+        ImGui::Combo("Quadric Residence", &m_SimplificationUi.Residence, kResidences, IM_ARRAYSIZE(kResidences));
+        ImGui::Combo("Placement Policy", &m_SimplificationUi.PlacementPolicy, kPlacementPolicies, IM_ARRAYSIZE(kPlacementPolicies));
+        ImGui::Checkbox("Average Vertex Quadrics", &m_SimplificationUi.AverageVertexQuadrics);
+        ImGui::Checkbox("Average Face Quadrics", &m_SimplificationUi.AverageFaceQuadrics);
+
+        const auto quadricType = static_cast<Geometry::Simplification::QuadricType>(m_SimplificationUi.QuadricType);
+        const auto probabilisticMode = static_cast<Geometry::Simplification::QuadricProbabilisticMode>(m_SimplificationUi.ProbabilisticMode);
+
+        if (quadricType == Geometry::Simplification::QuadricType::Point
+            && probabilisticMode != Geometry::Simplification::QuadricProbabilisticMode::Deterministic)
+        {
+            ImGui::TextDisabled("Point quadrics currently use deterministic point-fit energy only.");
+        }
+
+        if (quadricType != Geometry::Simplification::QuadricType::Point
+            && probabilisticMode == Geometry::Simplification::QuadricProbabilisticMode::Isotropic)
+        {
+            ImGui::DragFloat("Position StdDev", &m_SimplificationUi.PositionStdDev, 0.001f, 0.0f, 10.0f, "%.5f");
+            if (quadricType == Geometry::Simplification::QuadricType::Plane)
+            {
+                ImGui::DragFloat("Normal StdDev", &m_SimplificationUi.NormalStdDev, 0.001f, 0.0f, 10.0f, "%.5f");
+            }
+        }
+        else if (quadricType != Geometry::Simplification::QuadricType::Point
+                 && probabilisticMode == Geometry::Simplification::QuadricProbabilisticMode::Covariance)
+        {
+            if (quadricType == Geometry::Simplification::QuadricType::Plane)
+            {
+                ImGui::InputText("Face Position Covariance", m_SimplificationUi.FacePositionCovarianceProperty,
+                                 IM_ARRAYSIZE(m_SimplificationUi.FacePositionCovarianceProperty));
+                ImGui::InputText("Face Normal Covariance", m_SimplificationUi.FaceNormalCovarianceProperty,
+                                 IM_ARRAYSIZE(m_SimplificationUi.FaceNormalCovarianceProperty));
+            }
+            else if (quadricType == Geometry::Simplification::QuadricType::Triangle)
+            {
+                ImGui::InputText("Vertex Position Covariance", m_SimplificationUi.VertexPositionCovarianceProperty,
+                                 IM_ARRAYSIZE(m_SimplificationUi.VertexPositionCovarianceProperty));
+            }
+            else
+            {
+                ImGui::TextDisabled("Point quadrics are deterministic; covariance inputs are ignored.");
+            }
+        }
+
         if (ImGui::Button("Run QEM Simplification"))
         {
             const auto ui = m_SimplificationUi;
             ApplyOperator(context.Selected, [ui](Geometry::Halfedge::Mesh& mesh)
             {
                 Geometry::Simplification::SimplificationParams params;
-                params.TargetFaces = ui.TargetFaces;
+                params.TargetFaces = static_cast<std::size_t>(std::max(ui.TargetFaces, 0));
                 params.PreserveBoundary = ui.PreserveBoundary;
                 params.HausdorffError = ui.HausdorffError;
                 params.MaxNormalDeviationDegrees = ui.MaxNormalDeviationDeg;
+                params.Quadric.Type = static_cast<Geometry::Simplification::QuadricType>(ui.QuadricType);
+                params.Quadric.ProbabilisticMode = static_cast<Geometry::Simplification::QuadricProbabilisticMode>(ui.ProbabilisticMode);
+                params.Quadric.Residence = static_cast<Geometry::Simplification::QuadricResidence>(ui.Residence);
+                params.Quadric.PlacementPolicy = static_cast<Geometry::Simplification::CollapsePlacementPolicy>(ui.PlacementPolicy);
+                params.Quadric.AverageVertexQuadrics = ui.AverageVertexQuadrics;
+                params.Quadric.AverageFaceQuadrics = ui.AverageFaceQuadrics;
+                params.Quadric.PositionStdDev = ui.PositionStdDev;
+                params.Quadric.NormalStdDev = ui.NormalStdDev;
+                params.Quadric.VertexPositionCovarianceProperty = ui.VertexPositionCovarianceProperty;
+                params.Quadric.FacePositionCovarianceProperty = ui.FacePositionCovarianceProperty;
+                params.Quadric.FaceNormalCovarianceProperty = ui.FaceNormalCovarianceProperty;
+                if (params.Quadric.Type == Geometry::Simplification::QuadricType::Point)
+                {
+                    params.Quadric.ProbabilisticMode = Geometry::Simplification::QuadricProbabilisticMode::Deterministic;
+                }
                 static_cast<void>(Geometry::Simplification::Simplify(mesh, params));
             });
         }

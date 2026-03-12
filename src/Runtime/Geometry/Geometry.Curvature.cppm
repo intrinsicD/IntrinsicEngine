@@ -38,37 +38,26 @@ export namespace Geometry::Curvature
     // Result of curvature computation for the entire mesh.
     struct CurvatureField
     {
-        // Per-vertex curvature values (indexed by vertex index, including deleted slots)
-        std::vector<VertexCurvature> Vertices;
+        VertexProperty<double> MeanCurvatureProperty{};             // H — signed mean curvature
+        VertexProperty<double> GaussianCurvatureProperty{};         // K — Gaussian curvature
+        VertexProperty<double> MinPrincipalCurvatureProperty{};     // κ₂ = H - √(H² - K)
+        VertexProperty<double> MaxPrincipalCurvatureProperty{};     // κ₁ = H + √(H² - K)
 
         // Per-vertex mean curvature normal: Hn = (1/2A_i) Σ_j (cot α_ij + cot β_ij)(x_j - x_i)
         // This is the Laplace-Beltrami of the position function, divided by 2.
         // Its magnitude is |H|, its direction is the surface normal (for smooth surfaces).
-        std::vector<glm::vec3> MeanCurvatureNormals;
-
-        // Convenience: total number of valid (non-deleted) vertices in the field
-        std::size_t ValidCount{0};
+        VertexProperty<glm::vec3> MeanCurvatureNormalProperty{};
     };
 
     // Result of per-vertex scalar curvature computation
     struct MeanCurvatureResult
     {
-        // Per-vertex mean curvature values (indexed by vertex index, including deleted slots).
-        // Deleted vertices get value 0.
-        std::vector<double> Values;
-
-        // Number of valid (non-deleted, non-isolated) vertices computed
-        std::size_t ValidCount{0};
+        VertexProperty<double> Property{};
     };
 
     struct GaussianCurvatureResult
     {
-        // Per-vertex Gaussian curvature values (indexed by vertex index, including deleted slots).
-        // Deleted vertices get value 0.
-        std::vector<double> Values;
-
-        // Number of valid (non-deleted, non-isolated) vertices computed
-        std::size_t ValidCount{0};
+        VertexProperty<double> Property{};
     };
 
     // -------------------------------------------------------------------------
@@ -86,7 +75,7 @@ export namespace Geometry::Curvature
     //
     // Returns nullopt for empty meshes or meshes with no faces.
     [[nodiscard]] std::optional<MeanCurvatureResult> ComputeMeanCurvature(
-        const Halfedge::Mesh& mesh);
+        Halfedge::Mesh& mesh);
 
     // -------------------------------------------------------------------------
     // Compute Gaussian curvature via angle defect
@@ -103,7 +92,7 @@ export namespace Geometry::Curvature
     //
     // Returns nullopt for empty meshes or meshes with no faces.
     [[nodiscard]] std::optional<GaussianCurvatureResult> ComputeGaussianCurvature(
-        const Halfedge::Mesh& mesh);
+        Halfedge::Mesh& mesh);
 
     // -------------------------------------------------------------------------
     // Compute all curvature quantities at once
@@ -119,6 +108,6 @@ export namespace Geometry::Curvature
     //
     // Note: H² - K < 0 can occur due to numerical error on coarse meshes.
     // We clamp to zero in that case.
-    [[nodiscard]] CurvatureField ComputeCurvature(const Halfedge::Mesh& mesh);
+    [[nodiscard]] CurvatureField ComputeCurvature(Halfedge::Mesh& mesh);
 
 } // namespace Geometry::Curvature

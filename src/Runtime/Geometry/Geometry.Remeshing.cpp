@@ -99,10 +99,7 @@ namespace Geometry::Remeshing
 
             auto checkNeighbors = [&](VertexHandle v)
             {
-                HalfedgeHandle hStart = mesh.Halfedge(v);
-                HalfedgeHandle hc = hStart;
-                std::size_t safety = 0;
-                do
+                for (const HalfedgeHandle hc : mesh.HalfedgesAroundVertex(v))
                 {
                     VertexHandle vn = mesh.ToVertex(hc);
                     if (vn != v0 && vn != v1)
@@ -114,9 +111,7 @@ namespace Geometry::Remeshing
                             return;
                         }
                     }
-                    hc = mesh.CWRotatedHalfedge(hc);
-                    if (++safety > 100) break;
-                } while (hc != hStart);
+                }
             };
 
             checkNeighbors(v0);

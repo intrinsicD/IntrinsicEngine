@@ -37,7 +37,7 @@ namespace Geometry::Geodesic
     struct FaceGradient
     {
         glm::vec3 Direction; // Normalized negative gradient
-        bool Valid;
+        bool Valid{false};
     };
 
     static std::vector<FaceGradient> ComputeNormalizedGradient(
@@ -156,18 +156,18 @@ namespace Geometry::Geodesic
             // Divergence contribution to vertex a:
             //   (1/2) [cot(B) * dot(pa - pb, Xf) + cot(C) * dot(pa - pc, Xf)]
             // Note: edges from neighboring vertices TO vertex a
-            double dotBA = static_cast<double>(glm::dot(pa - pb, Xf));
-            double dotCA = static_cast<double>(glm::dot(pa - pc, Xf));
+            auto dotBA = static_cast<double>(glm::dot(pa - pb, Xf));
+            auto dotCA = static_cast<double>(glm::dot(pa - pc, Xf));
             div[va.Index] += 0.5 * (cotB * dotBA + cotC * dotCA);
 
             // Divergence contribution to vertex b
-            double dotAB = static_cast<double>(glm::dot(pb - pa, Xf));
-            double dotCB = static_cast<double>(glm::dot(pb - pc, Xf));
+            auto dotAB = static_cast<double>(glm::dot(pb - pa, Xf));
+            auto dotCB = static_cast<double>(glm::dot(pb - pc, Xf));
             div[vb.Index] += 0.5 * (cotA * dotAB + cotC * dotCB);
 
             // Divergence contribution to vertex c
-            double dotAC = static_cast<double>(glm::dot(pc - pa, Xf));
-            double dotBC = static_cast<double>(glm::dot(pc - pb, Xf));
+            auto dotAC = static_cast<double>(glm::dot(pc - pa, Xf));
+            auto dotBC = static_cast<double>(glm::dot(pc - pb, Xf));
             div[vc.Index] += 0.5 * (cotA * dotAC + cotB * dotBC);
         }
 
@@ -179,7 +179,7 @@ namespace Geometry::Geodesic
     // =========================================================================
 
     std::optional<GeodesicResult> ComputeDistance(
-        const Halfedge::Mesh& mesh,
+        Halfedge::Mesh& mesh,
         std::span<const std::size_t> sourceVertices,
         const GeodesicParams& params)
     {
@@ -283,15 +283,13 @@ namespace Geometry::Geodesic
             if (phi[vi] < minDist) minDist = phi[vi];
         }
 
-        result.Distances.resize(nV, 0.0);
         for (std::size_t vi = 0; vi < nV; ++vi)
         {
             VertexHandle vh{static_cast<PropertyIndex>(vi)};
             if (mesh.IsDeleted(vh) || mesh.IsIsolated(vh)) continue;
-            result.Distances[vi] = phi[vi] - minDist;
+            result.DistanceProperty[vh] = phi[vi] - minDist;
         }
 
         return result;
     }
-
 } // namespace Geometry::Geodesic

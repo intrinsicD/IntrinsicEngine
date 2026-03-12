@@ -78,14 +78,10 @@ namespace Geometry::MeshQuality
                     if (!visited[bh.Index])
                     {
                         ++boundaryLoops;
-                        HalfedgeHandle cur = bh;
-                        std::size_t safety = 0;
-                        do
+                        for (const HalfedgeHandle cur : mesh.BoundaryHalfedges(bh))
                         {
                             visited[cur.Index] = true;
-                            cur = mesh.NextHalfedge(cur);
-                            if (++safety > mesh.HalfedgesSize()) break;
-                        } while (cur != bh);
+                        }
                     }
                 }
             }

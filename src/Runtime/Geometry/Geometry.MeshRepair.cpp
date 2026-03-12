@@ -282,15 +282,10 @@ namespace Geometry::MeshRepair
         std::vector<HalfedgeHandle> faceHE;
         faceHE.reserve(4);
 
-        HalfedgeHandle hStart = mesh.Halfedge(f);
-        HalfedgeHandle h = hStart;
-        std::size_t safety = 0;
-        do
+        for (const HalfedgeHandle h : mesh.HalfedgesAroundFace(f))
         {
             faceHE.push_back(h);
-            h = mesh.NextHalfedge(h);
-            if (++safety > 1000) break;
-        } while (h != hStart);
+        }
 
         const std::size_t n = faceHE.size();
         if (n < 3) return;
@@ -357,10 +352,7 @@ namespace Geometry::MeshRepair
                 bfsQueue.pop();
 
                 // Visit all neighbors through shared edges
-                HalfedgeHandle hStart = mesh.Halfedge(curr);
-                HalfedgeHandle h = hStart;
-                std::size_t safety = 0;
-                do
+                for (const HalfedgeHandle h : mesh.HalfedgesAroundFace(curr))
                 {
                     HalfedgeHandle hOpp = mesh.OppositeHalfedge(h);
                     FaceHandle fAdj = mesh.Face(hOpp);
@@ -399,10 +391,7 @@ namespace Geometry::MeshRepair
 
                         bfsQueue.push(fAdj);
                     }
-
-                    h = mesh.NextHalfedge(h);
-                    if (++safety > 1000) break;
-                } while (h != hStart);
+                }
             }
         }
 

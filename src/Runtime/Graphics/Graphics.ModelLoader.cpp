@@ -200,6 +200,7 @@ namespace Graphics
     {
         auto collision = std::make_shared<GeometryCollisionData>();
         collision->Positions = cpu.Positions;
+        collision->Aux = cpu.Aux;
         collision->Indices = cpu.Indices;
 
         if (cpu.Topology == PrimitiveTopology::Triangles && !cpu.Positions.empty() && !cpu.Indices.empty())

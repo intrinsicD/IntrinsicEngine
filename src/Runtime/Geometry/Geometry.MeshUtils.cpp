@@ -313,19 +313,10 @@ namespace Geometry::MeshUtils
     glm::vec3 VertexNormal(const Halfedge::Mesh& mesh, VertexHandle v)
     {
         glm::vec3 n(0.0f);
-        HalfedgeHandle hStart = mesh.Halfedge(v);
-        HalfedgeHandle h = hStart;
-        std::size_t safety = 0;
-        do
+        for (const FaceHandle f : mesh.FacesAroundVertex(v))
         {
-            FaceHandle f = mesh.Face(h);
-            if (f.IsValid() && !mesh.IsDeleted(f))
-            {
-                n += FaceNormal(mesh, f);
-            }
-            h = mesh.CWRotatedHalfedge(h);
-            if (++safety > 100) break;
-        } while (h != hStart);
+            n += FaceNormal(mesh, f);
+        }
 
         float len = glm::length(n);
         return (len > 1e-8f) ? (n / len) : glm::vec3(0.0f, 1.0f, 0.0f);
@@ -403,16 +394,11 @@ namespace Geometry::MeshUtils
             glm::vec3 centroid(0.0f);
             std::size_t count = 0;
 
-            HalfedgeHandle hStart = mesh.Halfedge(vh);
-            HalfedgeHandle h = hStart;
-            std::size_t safety = 0;
-            do
+            for (const HalfedgeHandle h : mesh.HalfedgesAroundVertex(vh))
             {
                 centroid += mesh.Position(mesh.ToVertex(h));
                 ++count;
-                h = mesh.CWRotatedHalfedge(h);
-                if (++safety > 100) break;
-            } while (h != hStart);
+            }
 
             if (count == 0)
             {
@@ -579,7 +565,7 @@ namespace Geometry::MeshUtils
         }
 
         positions.reserve(mesh.VertexCount());
-        indices.reserve(mesh.FaceCount() * 3u);
+        indices.reserve(mesh.FaceCount() * 6u);
 
         std::vector<uint32_t> vertexMap(mesh.VerticesSize(), 0u);
         uint32_t currentIndex = 0u;
@@ -621,24 +607,43 @@ namespace Geometry::MeshUtils
             {
                 continue;
             }
-            const HalfedgeHandle h1 = mesh.NextHalfedge(h0);
-            const HalfedgeHandle h2 = mesh.NextHalfedge(h1);
-            if (!mesh.IsValid(h1) || !mesh.IsValid(h2) || mesh.NextHalfedge(h2) != h0)
+
+            std::vector<VertexHandle> faceVerts;
+            faceVerts.reserve(mesh.Valence(f));
+            HalfedgeHandle h = h0;
+            std::size_t safety = 0;
+            const std::size_t maxIter = mesh.HalfedgesSize();
+            do
+            {
+                const VertexHandle v = mesh.ToVertex(h);
+                if (!mesh.IsValid(v) || mesh.IsDeleted(v))
+                {
+                    faceVerts.clear();
+                    break;
+                }
+                faceVerts.push_back(v);
+                h = mesh.NextHalfedge(h);
+                if (++safety > maxIter)
+                {
+                    faceVerts.clear();
+                    break;
+                }
+            } while (h != h0);
+
+            if (faceVerts.size() < 3)
             {
                 continue;
             }
 
-            const VertexHandle v0 = mesh.ToVertex(h0);
-            const VertexHandle v1 = mesh.ToVertex(h1);
-            const VertexHandle v2 = mesh.ToVertex(h2);
-            if (!mesh.IsValid(v0) || !mesh.IsValid(v1) || !mesh.IsValid(v2))
+            const VertexHandle v0 = faceVerts.front();
+            for (std::size_t corner = 1; corner + 1 < faceVerts.size(); ++corner)
             {
-                continue;
+                const VertexHandle v1 = faceVerts[corner];
+                const VertexHandle v2 = faceVerts[corner + 1];
+                indices.push_back(vertexMap[v0.Index]);
+                indices.push_back(vertexMap[v1.Index]);
+                indices.push_back(vertexMap[v2.Index]);
             }
-
-            indices.push_back(vertexMap[v0.Index]);
-            indices.push_back(vertexMap[v1.Index]);
-            indices.push_back(vertexMap[v2.Index]);
         }
     }
 }

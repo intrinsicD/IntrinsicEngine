@@ -85,11 +85,7 @@ namespace Geometry::Subdivision
                 glm::vec2 boundaryUvSum(0.0f);
                 std::size_t boundaryCount = 0;
 
-                HalfedgeHandle hStart = input.Halfedge(vh);
-                HalfedgeHandle h = hStart;
-                std::size_t safety = 0;
-                const std::size_t maxIter = input.HalfedgesSize();
-                do
+                for (const HalfedgeHandle h : input.HalfedgesAroundVertex(vh))
                 {
                     if (input.IsBoundary(input.Edge(h)))
                     {
@@ -101,9 +97,7 @@ namespace Geometry::Subdivision
                         }
                         ++boundaryCount;
                     }
-                    h = input.CWRotatedHalfedge(h);
-                    if (++safety > maxIter) break;
-                } while (h != hStart);
+                }
 
                 if (boundaryCount == 2)
                 {
@@ -131,11 +125,7 @@ namespace Geometry::Subdivision
 
                 glm::vec3 neighborSum(0.0f);
                 glm::vec2 neighborUvSum(0.0f);
-                HalfedgeHandle hStart = input.Halfedge(vh);
-                HalfedgeHandle h = hStart;
-                std::size_t safety = 0;
-                const std::size_t maxIter = input.HalfedgesSize();
-                do
+                for (const HalfedgeHandle h : input.HalfedgesAroundVertex(vh))
                 {
                     const VertexHandle neighbor = input.ToVertex(h);
                     neighborSum += input.Position(neighbor);
@@ -143,9 +133,7 @@ namespace Geometry::Subdivision
                     {
                         neighborUvSum += inputTexcoord[neighbor.Index];
                     }
-                    h = input.CWRotatedHalfedge(h);
-                    if (++safety > maxIter) break;
-                } while (h != hStart);
+                }
 
                 evenPositions[vi] = fw * p + fb * neighborSum;
                 if (hasTexcoord)

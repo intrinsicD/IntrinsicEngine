@@ -103,18 +103,13 @@ namespace Geometry::Boolean
                     continue;
 
                 std::vector<uint32_t> face;
-                HalfedgeHandle h = mesh.Halfedge(fh);
-                const HalfedgeHandle start = h;
-                uint32_t guard = 0;
-                do
+                for (const VertexHandle v : mesh.VerticesAroundFace(fh))
                 {
-                    const uint32_t vi = mesh.ToVertex(h).Index;
+                    const uint32_t vi = v.Index;
                     const int32_t mapped = (vi < remap.size()) ? remap[vi] : -1;
                     if (mapped >= 0)
                         face.push_back(static_cast<uint32_t>(mapped));
-                    h = mesh.NextHalfedge(h);
-                    ++guard;
-                } while (h.IsValid() && h != start && guard < 4096);
+                }
 
                 if (face.size() < 3)
                     continue;
@@ -144,17 +139,12 @@ namespace Geometry::Boolean
                     continue;
 
                 std::vector<VertexHandle> face;
-                HalfedgeHandle h = src.Halfedge(fh);
-                const HalfedgeHandle start = h;
-                uint32_t guard = 0;
-                do
+                for (const VertexHandle v : src.VerticesAroundFace(fh))
                 {
-                    const uint32_t vid = src.ToVertex(h).Index;
+                    const uint32_t vid = v.Index;
                     if (vid < remap.size())
                         face.push_back(remap[vid]);
-                    h = src.NextHalfedge(h);
-                    ++guard;
-                } while (h.IsValid() && h != start && guard < 4096);
+                }
 
                 if (face.size() >= 3)
                     (void)dst.AddFace(face);

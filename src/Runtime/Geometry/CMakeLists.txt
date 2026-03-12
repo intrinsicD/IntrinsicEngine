@@ -47,6 +47,7 @@ target_sources(${target_name}
         Geometry.NormalEstimation.cppm
         Geometry.MeshRepair.cppm
         Geometry.MarchingCubes.cppm
+        Geometry.MeshBoundary.cppm
         Geometry.SurfaceReconstruction.cppm
         Geometry.Parameterization.cppm
         Geometry.MeshQuality.cppm
@@ -54,6 +55,7 @@ target_sources(${target_name}
         Geometry.ConvexHullBuilder.cppm
         Geometry.PointCloud.cppm
         Geometry.Boolean.cppm
+        Geometry.Quadric.cppm
         PRIVATE
         FILE_SET geometry_impl TYPE CXX_MODULES FILES
         Geometry.MeshUtils.cpp
@@ -75,6 +77,7 @@ target_sources(${target_name}
         Geometry.NormalEstimation.cpp
         Geometry.MeshRepair.cpp
         Geometry.MarchingCubes.cpp
+        Geometry.MeshBoundary.cpp
         Geometry.SurfaceReconstruction.cpp
         Geometry.Parameterization.cpp
         Geometry.MeshQuality.cpp

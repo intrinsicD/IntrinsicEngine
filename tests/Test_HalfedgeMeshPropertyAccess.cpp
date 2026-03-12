@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <span>
 #include <unordered_set>
@@ -37,6 +38,19 @@ static Geometry::Halfedge::Mesh MakeQuadPair()
     auto v3 = mesh.AddVertex(glm::vec3(1, 1, 0));
     (void)mesh.AddTriangle(v0, v1, v2);
     (void)mesh.AddTriangle(v2, v1, v3);
+    return mesh;
+}
+
+// Helper: build a single quad face.
+static Geometry::Halfedge::Mesh MakeSingleQuad()
+{
+    using namespace Geometry;
+    Halfedge::Mesh mesh;
+    auto v0 = mesh.AddVertex(glm::vec3(0, 0, 0));
+    auto v1 = mesh.AddVertex(glm::vec3(1, 0, 0));
+    auto v2 = mesh.AddVertex(glm::vec3(1, 1, 0));
+    auto v3 = mesh.AddVertex(glm::vec3(0, 1, 0));
+    (void)mesh.AddQuad(v0, v1, v2, v3);
     return mesh;
 }
 
@@ -198,6 +212,194 @@ TEST(HalfedgeMesh_PropertyAccess, HalfedgeProperties_CanAddUserProperty)
     HalfedgeHandle h0{0};
     param[h0] = 3.14f;
     EXPECT_FLOAT_EQ(param[h0], 3.14f);
+}
+
+// =============================================================================
+// Traversal layer tests
+// =============================================================================
+
+TEST(HalfedgeMesh_Traversal, HalfedgesAroundFace_QuadMatchesNextCycle)
+{
+    using namespace Geometry;
+
+    const auto mesh = MakeSingleQuad();
+    const FaceHandle f{0};
+    ASSERT_FALSE(mesh.IsDeleted(f));
+
+    std::vector<HalfedgeHandle> visited;
+    for (const HalfedgeHandle h : mesh.HalfedgesAroundFace(f))
+    {
+        visited.push_back(h);
+    }
+
+    ASSERT_EQ(visited.size(), 4u);
+
+    HalfedgeHandle h = mesh.Halfedge(f);
+    for (std::size_t i = 0; i < visited.size(); ++i)
+    {
+        EXPECT_EQ(visited[i], h);
+        h = mesh.NextHalfedge(h);
+    }
+    EXPECT_EQ(h, mesh.Halfedge(f));
+}
+
+TEST(HalfedgeMesh_Traversal, VerticesAroundFace_QuadMatchesHalfedgeToVertices)
+{
+    using namespace Geometry;
+
+    const auto mesh = MakeSingleQuad();
+    const FaceHandle f{0};
+
+    std::vector<VertexHandle> visited;
+    for (const VertexHandle v : mesh.VerticesAroundFace(f))
+    {
+        visited.push_back(v);
+    }
+
+    ASSERT_EQ(visited.size(), 4u);
+
+    std::vector<VertexHandle> expected;
+    for (const HalfedgeHandle h : mesh.HalfedgesAroundFace(f))
+    {
+        expected.push_back(mesh.ToVertex(h));
+    }
+
+    EXPECT_EQ(visited, expected);
+}
+
+TEST(HalfedgeMesh_Traversal, HalfedgesAroundVertex_CountMatchesValence)
+{
+    using namespace Geometry;
+
+    const auto mesh = MakeTriangle();
+    const VertexHandle v{0};
+
+    std::vector<HalfedgeHandle> visited;
+    for (const HalfedgeHandle h : mesh.HalfedgesAroundVertex(v))
+    {
+        visited.push_back(h);
+    }
+
+    EXPECT_EQ(visited.size(), mesh.Valence(v));
+
+    std::unordered_set<uint32_t> uniqueHalfedges;
+    for (const HalfedgeHandle h : visited)
+    {
+        EXPECT_TRUE(uniqueHalfedges.insert(h.Index).second);
+    }
+}
+
+TEST(HalfedgeMesh_Traversal, FacesAroundVertex_BoundaryVertexSkipsBoundaryGap)
+{
+    using namespace Geometry;
+
+    const auto mesh = MakeTriangle();
+    const VertexHandle v{0};
+
+    std::vector<FaceHandle> visited;
+    for (const FaceHandle f : mesh.FacesAroundVertex(v))
+    {
+        visited.push_back(f);
+    }
+
+    ASSERT_EQ(visited.size(), 1u);
+    EXPECT_EQ(visited.front(), FaceHandle{0});
+}
+
+TEST(HalfedgeMesh_Traversal, FacesAroundVertex_InteriorVertexVisitsIncidentFacesOnce)
+{
+    using namespace Geometry;
+
+    const auto mesh = MakeQuadPair();
+    const VertexHandle v{1};
+
+    std::vector<FaceHandle> visited;
+    for (const FaceHandle f : mesh.FacesAroundVertex(v))
+    {
+        visited.push_back(f);
+    }
+
+    ASSERT_EQ(visited.size(), 2u);
+
+    std::unordered_set<uint32_t> uniqueFaces;
+    for (const FaceHandle f : visited)
+    {
+        EXPECT_TRUE(uniqueFaces.insert(f.Index).second);
+    }
+}
+
+TEST(HalfedgeMesh_Traversal, VertexOneRingRangesAreEmptyForIsolatedVertex)
+{
+    using namespace Geometry;
+
+    Halfedge::Mesh mesh;
+    const VertexHandle isolated = mesh.AddVertex(glm::vec3(2.0f, 3.0f, 4.0f));
+
+    std::size_t halfedgeCount = 0;
+    for (const HalfedgeHandle h : mesh.HalfedgesAroundVertex(isolated))
+    {
+        (void)h;
+        ++halfedgeCount;
+    }
+
+    std::size_t faceCount = 0;
+    for (const FaceHandle f : mesh.FacesAroundVertex(isolated))
+    {
+        (void)f;
+        ++faceCount;
+    }
+
+    EXPECT_EQ(halfedgeCount, 0u);
+    EXPECT_EQ(faceCount, 0u);
+}
+
+TEST(HalfedgeMesh_Traversal, BoundaryHalfedges_VisitsEachBoundaryEdgeOnce)
+{
+    using namespace Geometry;
+
+    const auto mesh = MakeTriangle();
+    const HalfedgeHandle h0 = mesh.Halfedge(FaceHandle{0});
+    const HalfedgeHandle boundaryStart = mesh.OppositeHalfedge(h0);
+    ASSERT_TRUE(mesh.IsBoundary(boundaryStart));
+
+    std::vector<HalfedgeHandle> visited;
+    for (const HalfedgeHandle h : mesh.BoundaryHalfedges(boundaryStart))
+    {
+        visited.push_back(h);
+        EXPECT_TRUE(mesh.IsBoundary(h));
+    }
+
+    ASSERT_EQ(visited.size(), 3u);
+    std::unordered_set<uint32_t> unique;
+    for (const HalfedgeHandle h : visited)
+    {
+        EXPECT_TRUE(unique.insert(h.Index).second);
+    }
+}
+
+TEST(HalfedgeMesh_Traversal, BoundaryVertices_MatchesBoundaryLoopConnectivity)
+{
+    using namespace Geometry;
+
+    const auto mesh = MakeTriangle();
+    const HalfedgeHandle h0 = mesh.Halfedge(FaceHandle{0});
+    const HalfedgeHandle boundaryStart = mesh.OppositeHalfedge(h0);
+
+    std::vector<VertexHandle> visited;
+    for (const VertexHandle v : mesh.BoundaryVertices(boundaryStart))
+    {
+        visited.push_back(v);
+    }
+
+    ASSERT_EQ(visited.size(), 3u);
+
+    std::vector<VertexHandle> expected;
+    for (const HalfedgeHandle h : mesh.BoundaryHalfedges(boundaryStart))
+    {
+        expected.push_back(mesh.FromVertex(h));
+    }
+
+    EXPECT_EQ(visited, expected);
 }
 
 // =============================================================================
@@ -399,5 +601,101 @@ TEST(HalfedgeMesh_PropertyAccess, VertexProperties_RemainUsableAfterGarbageColle
     auto heatRead = VertexProperty<float>(mesh.VertexProperties().Get<float>("v:heat"));
     ASSERT_TRUE(heatRead.IsValid());
     EXPECT_EQ(heatRead.Vector().size(), mesh.VerticesSize());
+}
+
+TEST(HalfedgeMesh_PropertyAccess, CurvatureMutableOverloadsPublishVertexProperties)
+{
+    using namespace Geometry;
+
+    auto mesh = MakeQuadPair();
+
+    auto meanResult = Curvature::ComputeMeanCurvature(mesh);
+    ASSERT_TRUE(meanResult.has_value());
+    ASSERT_TRUE(meanResult->Property.IsValid());
+    EXPECT_TRUE(mesh.VertexProperties().Exists("v:mean_curvature"));
+
+    for (std::size_t i = 0; i < mesh.VerticesSize(); ++i)
+    {
+        const VertexHandle vh{static_cast<PropertyIndex>(i)};
+        EXPECT_DOUBLE_EQ(meanResult->Property[vh], meanResult->Values[i]);
+    }
+
+    auto gaussResult = Curvature::ComputeGaussianCurvature(mesh);
+    ASSERT_TRUE(gaussResult.has_value());
+    ASSERT_TRUE(gaussResult->Property.IsValid());
+    EXPECT_TRUE(mesh.VertexProperties().Exists("v:gaussian_curvature"));
+
+    for (std::size_t i = 0; i < mesh.VerticesSize(); ++i)
+    {
+        const VertexHandle vh{static_cast<PropertyIndex>(i)};
+        EXPECT_DOUBLE_EQ(gaussResult->Property[vh], gaussResult->Values[i]);
+    }
+
+    auto field = Curvature::ComputeCurvature(mesh);
+    ASSERT_TRUE(field.MeanCurvatureProperty.IsValid());
+    ASSERT_TRUE(field.GaussianCurvatureProperty.IsValid());
+    ASSERT_TRUE(field.MinPrincipalCurvatureProperty.IsValid());
+    ASSERT_TRUE(field.MaxPrincipalCurvatureProperty.IsValid());
+    ASSERT_TRUE(field.MeanCurvatureNormalProperty.IsValid());
+
+    for (std::size_t i = 0; i < mesh.VerticesSize(); ++i)
+    {
+        const VertexHandle vh{static_cast<PropertyIndex>(i)};
+        EXPECT_DOUBLE_EQ(field.MeanCurvatureProperty[vh], field.Vertices[i].MeanCurvature);
+        EXPECT_DOUBLE_EQ(field.GaussianCurvatureProperty[vh], field.Vertices[i].GaussianCurvature);
+        EXPECT_DOUBLE_EQ(field.MinPrincipalCurvatureProperty[vh], field.Vertices[i].MinPrincipalCurvature);
+        EXPECT_DOUBLE_EQ(field.MaxPrincipalCurvatureProperty[vh], field.Vertices[i].MaxPrincipalCurvature);
+        EXPECT_EQ(field.MeanCurvatureNormalProperty[vh], field.MeanCurvatureNormals[i]);
+    }
+}
+
+TEST(HalfedgeMesh_PropertyAccess, GeodesicMutableOverloadPublishesDistanceAndSourceProperties)
+{
+    using namespace Geometry;
+
+    auto mesh = MakeQuadPair();
+    const std::array<std::size_t, 1> sources{0};
+
+    auto result = Geodesic::ComputeDistance(mesh, std::span<const std::size_t>(sources));
+    ASSERT_TRUE(result.has_value());
+    ASSERT_TRUE(result->DistanceProperty.IsValid());
+    ASSERT_TRUE(result->IsSourceProperty.IsValid());
+    EXPECT_TRUE(mesh.VertexProperties().Exists("v:geodesic_distance"));
+    EXPECT_TRUE(mesh.VertexProperties().Exists("v:is_geodesic_source"));
+
+    for (std::size_t i = 0; i < mesh.VerticesSize(); ++i)
+    {
+        const VertexHandle vh{static_cast<PropertyIndex>(i)};
+        EXPECT_DOUBLE_EQ(result->DistanceProperty[vh], result->Distances[i]);
+        EXPECT_EQ(result->IsSourceProperty[vh], i == 0u);
+    }
+}
+
+TEST(HalfedgeMesh_PropertyAccess, ParameterizationMutableOverloadPublishesUvAndPinProperties)
+{
+    using namespace Geometry;
+
+    auto mesh = MakeTriangle();
+    Parameterization::ParameterizationParams params;
+    params.PinVertex0 = 0;
+    params.PinVertex1 = 1;
+    params.PinUV0 = glm::vec2(0.0f, 0.0f);
+    params.PinUV1 = glm::vec2(1.0f, 0.0f);
+
+    auto result = Parameterization::ComputeLSCM(mesh, params);
+    ASSERT_TRUE(result.has_value());
+    ASSERT_TRUE(result->UVProperty.IsValid());
+    ASSERT_TRUE(result->IsPinnedProperty.IsValid());
+    EXPECT_TRUE(mesh.VertexProperties().Exists("v:texcoord"));
+    EXPECT_TRUE(mesh.VertexProperties().Exists("v:lscm_pinned"));
+
+    for (std::size_t i = 0; i < mesh.VerticesSize(); ++i)
+    {
+        const VertexHandle vh{static_cast<PropertyIndex>(i)};
+        EXPECT_EQ(result->UVProperty[vh], result->UVs[i]);
+    }
+
+    EXPECT_TRUE(result->IsPinnedProperty[VertexHandle{static_cast<PropertyIndex>(result->PinVertex0)}]);
+    EXPECT_TRUE(result->IsPinnedProperty[VertexHandle{static_cast<PropertyIndex>(result->PinVertex1)}]);
 }
 

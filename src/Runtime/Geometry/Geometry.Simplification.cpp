@@ -1,6 +1,7 @@
 module;
 
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <cmath>
 #include <cstddef>
@@ -14,6 +15,7 @@ module;
 
 module Geometry:Simplification.Impl;
 
+import :Quadric;
 import :Simplification;
 import :Properties;
 import :HalfedgeMesh;
@@ -31,80 +33,6 @@ namespace Geometry::Simplification
         {
             return std::isfinite(v);
         }
-
-        // =====================================================================
-        // Quadric — symmetric 3x3 + linear + constant: Q(x) = x^T A x - 2 b^T x + c
-        // =====================================================================
-
-        struct Quadric
-        {
-            double A00{0.0};
-            double A01{0.0};
-            double A02{0.0};
-            double A11{0.0};
-            double A12{0.0};
-            double A22{0.0};
-            double b0{0.0};
-            double b1{0.0};
-            double b2{0.0};
-            double c{0.0};
-
-            [[nodiscard]] static Quadric PlaneQuadric(glm::dvec3 const& point, glm::dvec3 const& normal) noexcept
-            {
-                const double d = glm::dot(point, normal);
-                Quadric q;
-                q.A00 = normal.x * normal.x;
-                q.A01 = normal.x * normal.y;
-                q.A02 = normal.x * normal.z;
-                q.A11 = normal.y * normal.y;
-                q.A12 = normal.y * normal.z;
-                q.A22 = normal.z * normal.z;
-                q.b0 = normal.x * d;
-                q.b1 = normal.y * d;
-                q.b2 = normal.z * d;
-                q.c = d * d;
-                return q;
-            }
-
-            Quadric& operator+=(Quadric const& rhs) noexcept
-            {
-                A00 += rhs.A00; A01 += rhs.A01; A02 += rhs.A02;
-                A11 += rhs.A11; A12 += rhs.A12; A22 += rhs.A22;
-                b0 += rhs.b0; b1 += rhs.b1; b2 += rhs.b2;
-                c += rhs.c;
-                return *this;
-            }
-
-            Quadric& operator*=(double s) noexcept
-            {
-                A00 *= s; A01 *= s; A02 *= s;
-                A11 *= s; A12 *= s; A22 *= s;
-                b0 *= s; b1 *= s; b2 *= s;
-                c *= s;
-                return *this;
-            }
-
-            [[nodiscard]] double Evaluate(glm::dvec3 const& p) const noexcept
-            {
-                const glm::dvec3 Ap{
-                    A00 * p.x + A01 * p.y + A02 * p.z,
-                    A01 * p.x + A11 * p.y + A12 * p.z,
-                    A02 * p.x + A12 * p.y + A22 * p.z
-                };
-                return glm::dot(p, Ap) - 2.0 * (p.x * b0 + p.y * b1 + p.z * b2) + c;
-            }
-
-            [[nodiscard]] double Evaluate(glm::vec3 const& p) const noexcept
-            {
-                return Evaluate(glm::dvec3(static_cast<double>(p.x), static_cast<double>(p.y), static_cast<double>(p.z)));
-            }
-
-            [[nodiscard]] friend Quadric operator+(Quadric lhs, Quadric const& rhs) noexcept
-            {
-                lhs += rhs;
-                return lhs;
-            }
-        };
 
         // =====================================================================
         // Normal Cone — tracks accumulated normal deviation per face
@@ -164,6 +92,7 @@ namespace Geometry::Simplification
         {
             HalfedgeHandle Halfedge;
             EdgeHandle Edge;
+            glm::vec3 Position{0.0f};
             double Cost{std::numeric_limits<double>::infinity()};
             std::size_t Version{0};
 
@@ -370,30 +299,274 @@ namespace Geometry::Simplification
                 return 0;
             }
 
-            const std::size_t heSize = mesh.HalfedgesSize();
             std::size_t count = 0;
-            HalfedgeHandle h = mesh.Halfedge(v);
-            if (h.Index >= heSize)
+            for (const FaceHandle f : mesh.FacesAroundVertex(v))
             {
-                return 0;
+                (void)f;
+                ++count;
             }
-            const HalfedgeHandle start = h;
-            const std::size_t maxIter = heSize;
-            std::size_t iter = 0;
-            do
+            return count;
+        }
+
+        template <typename Fn>
+        void ForEachFace(Halfedge::Mesh const& mesh, VertexHandle v, Fn&& fn) noexcept;
+
+        [[nodiscard]] bool UsesVertexResidence(QuadricResidence residence) noexcept
+        {
+            return residence != QuadricResidence::Faces;
+        }
+
+        [[nodiscard]] bool UsesFaceResidence(QuadricResidence residence) noexcept
+        {
+            return residence != QuadricResidence::Vertices;
+        }
+
+        [[nodiscard]] bool UsesFacePrimitive(QuadricType type) noexcept
+        {
+            return type != QuadricType::Point;
+        }
+
+        [[nodiscard]] glm::dmat3 ReadVertexCovariance(
+            Property<glm::dmat3> const& property,
+            VertexHandle v) noexcept
+        {
+            if (property && v.IsValid())
             {
-                const FaceHandle f = mesh.Face(h);
+                return property[v.Index];
+            }
+            return glm::dmat3(0.0);
+        }
+
+        [[nodiscard]] glm::dmat3 ReadFaceCovariance(
+            Property<glm::dmat3> const& property,
+            FaceHandle f) noexcept
+        {
+            if (property && f.IsValid())
+            {
+                return property[f.Index];
+            }
+            return glm::dmat3(0.0);
+        }
+
+        [[nodiscard]] Quadric ComputePointQuadric(Halfedge::Mesh const& mesh, VertexHandle v) noexcept
+        {
+            if (!v.IsValid() || mesh.IsDeleted(v) || mesh.IsIsolated(v))
+            {
+                return {};
+            }
+            return Quadric::PointQuadric(glm::dvec3(mesh.Position(v)));
+        }
+
+        [[nodiscard]] Quadric ComputeFaceQuadric(
+            Halfedge::Mesh const& mesh,
+            FaceHandle f,
+            glm::dvec3 const& faceNormal,
+            QuadricOptions const& options,
+            std::vector<Quadric> const& vertexPointQuadrics,
+            Property<glm::dmat3> const& vertexSigmaP,
+            Property<glm::dmat3> const& faceSigmaP,
+            Property<glm::dmat3> const& faceSigmaN) noexcept
+        {
+            if (!f.IsValid() || mesh.IsDeleted(f))
+            {
+                return {};
+            }
+
+            const HalfedgeHandle h0 = mesh.Halfedge(f);
+            const HalfedgeHandle h1 = mesh.NextHalfedge(h0);
+            const HalfedgeHandle h2 = mesh.NextHalfedge(h1);
+            const VertexHandle v0 = mesh.ToVertex(h0);
+            const VertexHandle v1 = mesh.ToVertex(h1);
+            const VertexHandle v2 = mesh.ToVertex(h2);
+
+            if (options.Type == QuadricType::Point)
+            {
+                Quadric faceQ = vertexPointQuadrics[v0.Index] + vertexPointQuadrics[v1.Index] + vertexPointQuadrics[v2.Index];
+                faceQ *= (1.0 / 3.0);
+                return faceQ;
+            }
+
+            const glm::dvec3 p0(mesh.Position(v0));
+            const glm::dvec3 p1(mesh.Position(v1));
+            const glm::dvec3 p2(mesh.Position(v2));
+
+            if (options.Type == QuadricType::Plane)
+            {
+                const glm::dvec3 center = (p0 + p1 + p2) / 3.0;
+                switch (options.ProbabilisticMode)
+                {
+                case QuadricProbabilisticMode::Deterministic:
+                    return Quadric::PlaneQuadric(glm::vec3(center), glm::vec3(faceNormal));
+                case QuadricProbabilisticMode::Isotropic:
+                    return Quadric::ProbabilisticPlaneQuadric(center, faceNormal, options.PositionStdDev, options.NormalStdDev);
+                case QuadricProbabilisticMode::Covariance:
+                    return Quadric::ProbabilisticPlaneQuadric(
+                        center,
+                        faceNormal,
+                        ReadFaceCovariance(faceSigmaP, f),
+                        ReadFaceCovariance(faceSigmaN, f));
+                }
+            }
+
+            switch (options.ProbabilisticMode)
+            {
+            case QuadricProbabilisticMode::Deterministic:
+                return Quadric::TriangleQuadric(glm::vec3(p0), glm::vec3(p1), glm::vec3(p2));
+            case QuadricProbabilisticMode::Isotropic:
+                return Quadric::ProbabilisticTriangleQuadric(p0, p1, p2, options.PositionStdDev);
+            case QuadricProbabilisticMode::Covariance:
+                return Quadric::ProbabilisticTriangleQuadric(
+                    p0,
+                    p1,
+                    p2,
+                    ReadVertexCovariance(vertexSigmaP, v0),
+                    ReadVertexCovariance(vertexSigmaP, v1),
+                    ReadVertexCovariance(vertexSigmaP, v2));
+            }
+
+            return {};
+        }
+
+        [[nodiscard]] Quadric ComputeVertexResidentQuadric(
+            Halfedge::Mesh const& mesh,
+            VertexHandle v,
+            QuadricOptions const& options,
+            std::vector<Quadric> const& faceQuadrics,
+            std::vector<Quadric> const& vertexPointQuadrics) noexcept
+        {
+            if (!v.IsValid() || mesh.IsDeleted(v) || mesh.IsIsolated(v))
+            {
+                return {};
+            }
+
+            if (options.Type == QuadricType::Point)
+            {
+                return vertexPointQuadrics[v.Index];
+            }
+
+            Quadric q;
+            double count = 0.0;
+            ForEachFace(mesh, v, [&](FaceHandle f)
+            {
                 if (f.IsValid() && !mesh.IsDeleted(f))
                 {
-                    ++count;
+                    q += faceQuadrics[f.Index];
+                    count += 1.0;
                 }
-                h = mesh.CWRotatedHalfedge(h);
-                if (h.Index >= heSize || ++iter > maxIter)
+            });
+
+            if (options.AverageVertexQuadrics && count > 0.0)
+            {
+                q *= (1.0 / count);
+            }
+            return q;
+        }
+
+        void AppendUniqueFace(std::vector<FaceHandle>& faces, FaceHandle f)
+        {
+            if (!f.IsValid())
+            {
+                return;
+            }
+
+            for (FaceHandle existing : faces)
+            {
+                if (existing == f)
                 {
-                    return 0;
+                    return;
                 }
-            } while (h != start);
-            return count;
+            }
+            faces.push_back(f);
+        }
+
+        [[nodiscard]] Quadric ComputeFaceResidentCollapseQuadric(
+            Halfedge::Mesh const& mesh,
+            HalfedgeHandle hCollapse,
+            QuadricOptions const& options,
+            std::vector<Quadric> const& faceQuadrics) noexcept
+        {
+            const VertexHandle vRemoved = mesh.FromVertex(hCollapse);
+            const VertexHandle vSurvivor = mesh.ToVertex(hCollapse);
+            const HalfedgeHandle hOpp = mesh.OppositeHalfedge(hCollapse);
+            const FaceHandle removedLeft = mesh.IsBoundary(hCollapse) ? FaceHandle{} : mesh.Face(hCollapse);
+            const FaceHandle removedRight = mesh.IsBoundary(hOpp) ? FaceHandle{} : mesh.Face(hOpp);
+
+            std::vector<FaceHandle> contributingFaces;
+            contributingFaces.reserve(16);
+            ForEachFace(mesh, vRemoved, [&](FaceHandle f)
+            {
+                if (f != removedLeft && f != removedRight && !mesh.IsDeleted(f))
+                {
+                    AppendUniqueFace(contributingFaces, f);
+                }
+            });
+            ForEachFace(mesh, vSurvivor, [&](FaceHandle f)
+            {
+                if (f != removedLeft && f != removedRight && !mesh.IsDeleted(f))
+                {
+                    AppendUniqueFace(contributingFaces, f);
+                }
+            });
+
+            Quadric q;
+            for (FaceHandle f : contributingFaces)
+            {
+                q += faceQuadrics[f.Index];
+            }
+
+            if (options.AverageFaceQuadrics && !contributingFaces.empty())
+            {
+                q *= (1.0 / static_cast<double>(contributingFaces.size()));
+            }
+            return q;
+        }
+
+        [[nodiscard]] Quadric ComputeCollapseQuadric(
+            Halfedge::Mesh const& mesh,
+            HalfedgeHandle hCollapse,
+            QuadricOptions const& options,
+            std::vector<Quadric> const& faceQuadrics,
+            std::vector<Quadric> const& vertexPointQuadrics) noexcept
+        {
+            const VertexHandle vRemoved = mesh.FromVertex(hCollapse);
+            const VertexHandle vSurvivor = mesh.ToVertex(hCollapse);
+
+            Quadric q;
+            if (UsesVertexResidence(options.Residence))
+            {
+                q += ComputeVertexResidentQuadric(mesh, vRemoved, options, faceQuadrics, vertexPointQuadrics);
+                q += ComputeVertexResidentQuadric(mesh, vSurvivor, options, faceQuadrics, vertexPointQuadrics);
+            }
+
+            if (UsesFaceResidence(options.Residence))
+            {
+                q += ComputeFaceResidentCollapseQuadric(mesh, hCollapse, options, faceQuadrics);
+            }
+
+            return q;
+        }
+
+        [[nodiscard]] bool TryAppendUniquePosition(
+            std::vector<glm::vec3>& positions,
+            glm::vec3 const& candidate,
+            float epsilon = 1e-6f) noexcept
+        {
+            if (!std::isfinite(candidate.x) || !std::isfinite(candidate.y) || !std::isfinite(candidate.z))
+            {
+                return false;
+            }
+
+            const float epsilon2 = epsilon * epsilon;
+            for (glm::vec3 const& existing : positions)
+            {
+                if (glm::dot(existing - candidate, existing - candidate) <= epsilon2)
+                {
+                    return false;
+                }
+            }
+
+            positions.push_back(candidate);
+            return true;
         }
 
         // =====================================================================
@@ -407,28 +580,11 @@ namespace Geometry::Simplification
             {
                 return;
             }
-            const std::size_t heSize = mesh.HalfedgesSize();
-            HalfedgeHandle h = mesh.Halfedge(v);
-            if (h.Index >= heSize)
+
+            for (const FaceHandle f : mesh.FacesAroundVertex(v))
             {
-                return;
+                fn(f);
             }
-            const HalfedgeHandle start = h;
-            const std::size_t maxIter = heSize;
-            std::size_t iter = 0;
-            do
-            {
-                const FaceHandle f = mesh.Face(h);
-                if (f.IsValid() && !mesh.IsDeleted(f))
-                {
-                    fn(f);
-                }
-                h = mesh.CWRotatedHalfedge(h);
-                if (h.Index >= heSize || ++iter > maxIter)
-                {
-                    break;
-                }
-            } while (h != start);
         }
 
     } // anonymous namespace
@@ -457,8 +613,21 @@ namespace Geometry::Simplification
             : 0.0;
 
 
+        const Property<glm::dmat3> vertexSigmaP = params.Quadric.ProbabilisticMode == QuadricProbabilisticMode::Covariance
+            && !params.Quadric.VertexPositionCovarianceProperty.empty()
+            ? mesh.VertexProperties().Get<glm::dmat3>(params.Quadric.VertexPositionCovarianceProperty)
+            : Property<glm::dmat3>{};
+        const Property<glm::dmat3> faceSigmaP = params.Quadric.ProbabilisticMode == QuadricProbabilisticMode::Covariance
+            && !params.Quadric.FacePositionCovarianceProperty.empty()
+            ? mesh.FaceProperties().Get<glm::dmat3>(params.Quadric.FacePositionCovarianceProperty)
+            : Property<glm::dmat3>{};
+        const Property<glm::dmat3> faceSigmaN = params.Quadric.ProbabilisticMode == QuadricProbabilisticMode::Covariance
+            && !params.Quadric.FaceNormalCovarianceProperty.empty()
+            ? mesh.FaceProperties().Get<glm::dmat3>(params.Quadric.FaceNormalCovarianceProperty)
+            : Property<glm::dmat3>{};
+
         // -----------------------------------------------------------------
-        // Phase 1: Compute face normals and initialize per-vertex quadrics
+        // Phase 1: Compute face normals and initialize configurable quadrics
         // -----------------------------------------------------------------
 
         std::vector<glm::dvec3> faceNormals(nF, glm::dvec3(0.0));
@@ -472,31 +641,35 @@ namespace Geometry::Simplification
             faceNormals[fi] = ComputeFaceNormalD(mesh, fh);
         }
 
-        // Per-vertex plane quadrics averaged over incident faces
-        std::vector<Quadric> vertexQuadrics(nV);
-        for (std::size_t vi = 0; vi < nV; ++vi)
+        std::vector<Quadric> vertexPointQuadrics(nV);
+        if (params.Quadric.Type == QuadricType::Point)
         {
-            const VertexHandle vh{static_cast<PropertyIndex>(vi)};
-            if (mesh.IsDeleted(vh) || mesh.IsIsolated(vh))
+            for (std::size_t vi = 0; vi < nV; ++vi)
             {
-                continue;
+                const VertexHandle vh{static_cast<PropertyIndex>(vi)};
+                vertexPointQuadrics[vi] = ComputePointQuadric(mesh, vh);
             }
+        }
 
-            double count = 0.0;
-            ForEachFace(mesh, vh, [&](FaceHandle f)
+        const bool needFaceQuadrics = UsesFacePrimitive(params.Quadric.Type) || UsesFaceResidence(params.Quadric.Residence);
+        std::vector<Quadric> faceQuadrics(nF);
+        if (needFaceQuadrics)
+        {
+            for (std::size_t fi = 0; fi < nF; ++fi)
             {
-                const glm::dvec3 center = ComputeFaceCenterD(mesh, f);
-                const glm::dvec3& n = faceNormals[f.Index];
-                if (glm::dot(n, n) > 0.5)
+                const FaceHandle fh{static_cast<PropertyIndex>(fi)};
+                if (!mesh.IsDeleted(fh))
                 {
-                    vertexQuadrics[vi] += Quadric::PlaneQuadric(center, n);
-                    count += 1.0;
+                    faceQuadrics[fi] = ComputeFaceQuadric(
+                        mesh,
+                        fh,
+                        faceNormals[fi],
+                        params.Quadric,
+                        vertexPointQuadrics,
+                        vertexSigmaP,
+                        faceSigmaP,
+                        faceSigmaN);
                 }
-            });
-
-            if (count > 0.0)
-            {
-                vertexQuadrics[vi] *= (1.0 / count);
             }
         }
 
@@ -535,7 +708,7 @@ namespace Geometry::Simplification
 
         std::vector<std::size_t> edgeVersion(nE, 0);
 
-        auto isCollapseLegal = [&](HalfedgeHandle hCollapse) -> bool
+        auto isCollapseLegal = [&](HalfedgeHandle hCollapse, glm::vec3 const& targetPosition) -> bool
         {
             if (!mesh.IsCollapseOk(hCollapse))
             {
@@ -555,6 +728,15 @@ namespace Geometry::Simplification
             const FaceHandle removedRight = mesh.IsBoundary(hOpp) ? FaceHandle{} : mesh.Face(hOpp);
             const VertexHandle vl = removedLeft.IsValid() ? mesh.ToVertex(mesh.NextHalfedge(hCollapse)) : VertexHandle{};
             const VertexHandle vr = removedRight.IsValid() ? mesh.ToVertex(mesh.NextHalfedge(hOpp)) : VertexHandle{};
+
+            // Preserve the open boundary as an immutable feature set: when enabled,
+            // no collapse may consume or move a boundary vertex, even through an
+            // interior edge adjacent to the boundary.
+            if (params.PreserveBoundary
+                && (mesh.IsBoundary(vRemoved) || mesh.IsBoundary(vSurvivor)))
+            {
+                return false;
+            }
 
             // Boundary → interior check
             if (params.ForbidBoundaryInteriorCollapse
@@ -591,18 +773,12 @@ namespace Geometry::Simplification
             }
 
             const glm::vec3 p0 = mesh.Position(vRemoved);
-            const glm::vec3 p1 = mesh.Position(vSurvivor);
+            const glm::vec3 p1 = targetPosition;
 
             // Max edge length check
             if (params.MaxEdgeLength > 0.0)
             {
-                const std::size_t heSize = mesh.HalfedgesSize();
-                HalfedgeHandle h = mesh.Halfedge(vRemoved);
-                if (h.Index >= heSize) return false;
-                const HalfedgeHandle start = h;
-                const std::size_t maxIter = heSize;
-                std::size_t iter = 0;
-                do
+                for (const HalfedgeHandle h : mesh.HalfedgesAroundVertex(vRemoved))
                 {
                     const VertexHandle neighbor = mesh.ToVertex(h);
                     if (neighbor != vSurvivor && neighbor != vl && neighbor != vr)
@@ -613,9 +789,7 @@ namespace Geometry::Simplification
                             return false;
                         }
                     }
-                    h = mesh.CWRotatedHalfedge(h);
-                    if (h.Index >= heSize || ++iter > maxIter) return false;
-                } while (h != start);
+                }
             }
 
             // Normal-flip / normal-cone check
@@ -770,6 +944,28 @@ namespace Geometry::Simplification
             return true;
         };
 
+        auto recomputeFaceData = [&](FaceHandle f)
+        {
+            if (!f.IsValid() || mesh.IsDeleted(f) || f.Index >= faceNormals.size())
+            {
+                return;
+            }
+
+            faceNormals[f.Index] = ComputeFaceNormalD(mesh, f);
+            if (needFaceQuadrics && f.Index < faceQuadrics.size())
+            {
+                faceQuadrics[f.Index] = ComputeFaceQuadric(
+                    mesh,
+                    f,
+                    faceNormals[f.Index],
+                    params.Quadric,
+                    vertexPointQuadrics,
+                    vertexSigmaP,
+                    faceSigmaP,
+                    faceSigmaN);
+            }
+        };
+
         // Compute directed collapse: evaluate cost of collapsing FromVertex(h) into ToVertex(h)
         auto computeDirectedCollapse = [&](HalfedgeHandle hCollapse) -> CollapseCandidate
         {
@@ -777,6 +973,7 @@ namespace Geometry::Simplification
             best.Halfedge = hCollapse;
             best.Edge = mesh.Edge(hCollapse);
             best.Version = edgeVersion[best.Edge.Index];
+            best.Position = mesh.Position(mesh.ToVertex(hCollapse));
 
             if (!mesh.IsCollapseOk(hCollapse))
             {
@@ -786,17 +983,48 @@ namespace Geometry::Simplification
             const VertexHandle vRemoved = mesh.FromVertex(hCollapse);
             const VertexHandle vSurvivor = mesh.ToVertex(hCollapse);
 
-            if (!isCollapseLegal(hCollapse))
+            const Quadric Q = ComputeCollapseQuadric(mesh, hCollapse, params.Quadric, faceQuadrics, vertexPointQuadrics);
+
+            std::vector<glm::vec3> candidatePositions;
+            candidatePositions.reserve(3);
+            const glm::vec3 removedPos = mesh.Position(vRemoved);
+            const glm::vec3 survivorPos = mesh.Position(vSurvivor);
+
+            switch (params.Quadric.PlacementPolicy)
             {
-                return best;
+            case CollapsePlacementPolicy::KeepSurvivor:
+                static_cast<void>(TryAppendUniquePosition(candidatePositions, survivorPos));
+                break;
+            case CollapsePlacementPolicy::QuadricMinimizer:
+                if (auto minimizer = Q.TryMinimizer())
+                {
+                    static_cast<void>(TryAppendUniquePosition(candidatePositions, *minimizer));
+                }
+                static_cast<void>(TryAppendUniquePosition(candidatePositions, survivorPos));
+                break;
+            case CollapsePlacementPolicy::BestOfEndpointsAndMinimizer:
+                static_cast<void>(TryAppendUniquePosition(candidatePositions, survivorPos));
+                static_cast<void>(TryAppendUniquePosition(candidatePositions, removedPos));
+                if (auto minimizer = Q.TryMinimizer())
+                {
+                    static_cast<void>(TryAppendUniquePosition(candidatePositions, *minimizer));
+                }
+                break;
             }
 
-            // Cost = quadric error at survivor position (BCG priority function)
-            const Quadric Q = vertexQuadrics[vRemoved.Index] + vertexQuadrics[vSurvivor.Index];
-            const double cost = Q.Evaluate(mesh.Position(vSurvivor));
-            if (IsFinite(cost))
+            for (glm::vec3 const& candidatePosition : candidatePositions)
             {
-                best.Cost = std::max(0.0, cost);
+                if (!isCollapseLegal(hCollapse, candidatePosition))
+                {
+                    continue;
+                }
+
+                const double cost = Q.Evaluate(candidatePosition);
+                if (IsFinite(cost) && cost < best.Cost)
+                {
+                    best.Cost = std::max(0.0, cost);
+                    best.Position = candidatePosition;
+                }
             }
 
             return best;
@@ -860,7 +1088,7 @@ namespace Geometry::Simplification
             {
                 continue;
             }
-            if (!isCollapseLegal(top.Halfedge))
+            if (!isCollapseLegal(top.Halfedge, top.Position))
             {
                 continue;
             }
@@ -877,7 +1105,7 @@ namespace Geometry::Simplification
 
             // Save pre-collapse data for post-processing
             const glm::vec3 removedPos = mesh.Position(vRemoved);
-            const Quadric mergedQ = vertexQuadrics[vRemoved.Index] + vertexQuadrics[vSurvivor.Index];
+            const Quadric mergedVertexPointQ = vertexPointQuadrics[vRemoved.Index] + vertexPointQuadrics[vSurvivor.Index];
 
             NormalCone flCone, frCone;
             if (normalDeviationRad > 0.0)
@@ -921,8 +1149,7 @@ namespace Geometry::Simplification
             }
 
             // Perform collapse (vRemoved removed, vSurvivor stays at its position)
-            const glm::vec3 survivorPos = mesh.Position(vSurvivor);
-            auto surviving = mesh.Collapse(top.Halfedge, survivorPos);
+            auto surviving = mesh.Collapse(top.Halfedge, top.Position);
             if (!surviving)
             {
                 continue;
@@ -932,16 +1159,15 @@ namespace Geometry::Simplification
             result.FinalFaceCount = mesh.FaceCount();
             result.MaxCollapseError = std::max(result.MaxCollapseError, top.Cost);
 
-            // Update quadrics
-            vertexQuadrics[surviving->Index] = mergedQ;
+            if (params.Quadric.Type == QuadricType::Point)
+            {
+                vertexPointQuadrics[surviving->Index] = mergedVertexPointQ;
+            }
 
             // Update face normals for the surviving one-ring
             ForEachFace(mesh, *surviving, [&](FaceHandle f)
             {
-                if (f.Index < faceNormals.size())
-                {
-                    faceNormals[f.Index] = ComputeFaceNormalD(mesh, f);
-                }
+                recomputeFaceData(f);
             });
 
             // Update normal cones
@@ -1008,31 +1234,18 @@ namespace Geometry::Simplification
             // on degenerate post-collapse topology that won't be used.
             if (result.FinalFaceCount > targetFaces && !mesh.IsIsolated(*surviving))
             {
-                const std::size_t heSize = mesh.HalfedgesSize();
-                const HalfedgeHandle hStart = mesh.Halfedge(*surviving);
-                if (hStart.Index < heSize)
+                for (const HalfedgeHandle h : mesh.HalfedgesAroundVertex(*surviving))
                 {
-                    HalfedgeHandle h = hStart;
-                    const std::size_t maxRingIter = heSize;
-                    std::size_t ringIter = 0;
-                    do
+                    const EdgeHandle eAdj = mesh.Edge(h);
+                    if (!mesh.IsDeleted(eAdj) && (!params.PreserveBoundary || !mesh.IsBoundary(eAdj)))
                     {
-                        const EdgeHandle eAdj = mesh.Edge(h);
-                        if (!mesh.IsDeleted(eAdj) && (!params.PreserveBoundary || !mesh.IsBoundary(eAdj)))
+                        ++edgeVersion[eAdj.Index];
+                        CollapseCandidate candidate = computeCollapse(eAdj);
+                        if (candidate.IsValid())
                         {
-                            ++edgeVersion[eAdj.Index];
-                            CollapseCandidate candidate = computeCollapse(eAdj);
-                            if (candidate.IsValid())
-                            {
-                                heap.Push(candidate);
-                            }
+                            heap.Push(candidate);
                         }
-                        h = mesh.CWRotatedHalfedge(h);
-                        if (h.Index >= heSize || ++ringIter > maxRingIter)
-                        {
-                            break;
-                        }
-                    } while (h != hStart);
+                    }
                 }
             }
         }
