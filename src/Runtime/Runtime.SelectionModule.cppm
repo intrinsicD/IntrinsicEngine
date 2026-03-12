@@ -42,6 +42,10 @@ export namespace Runtime
             // Selection mode on click.
             Selection::PickMode Mode = Selection::PickMode::Replace;
 
+            // Screen-space radius used to resolve mesh/graph/point-cloud
+            // sub-elements after the entity pick resolves.
+            float PickRadiusPixels = 12.0f;
+
             Activation Active = Activation::Enabled;
         };
 
@@ -64,6 +68,7 @@ export namespace Runtime
                     bool uiCapturesMouse);
 
         [[nodiscard]] entt::entity GetSelectedEntity(const ECS::Scene& scene) const;
+        [[nodiscard]] const Selection::Picked& GetPicked() const { return m_Picked; }
         void SetSelectedEntity(ECS::Scene& scene, entt::entity e);
         void ClearSelection(ECS::Scene& scene);
 
@@ -77,6 +82,11 @@ export namespace Runtime
         // so the correct mode is applied when the async result arrives.
         Selection::PickMode m_PendingGpuClickMode = Selection::PickMode::Replace;
 
+        ECS::Scene* m_ConnectedScene = nullptr;
+        Selection::PickRequest m_PendingPickRequest{};
+        bool m_HasPendingPickRequest = false;
+        Selection::Picked m_Picked{};
+
         // Cached GPU pick result received via GpuPickCompleted dispatcher event.
         struct CachedGpuPick
         {
@@ -85,9 +95,15 @@ export namespace Runtime
         };
         std::optional<CachedGpuPick> m_CachedGpuPick;
 
+        void OnGpuPickCompleted(const ECS::Events::GpuPickCompleted& evt);
+        void OnSelectionChanged(const ECS::Events::SelectionChanged& evt);
+        void SyncPickedToSelection(ECS::Scene& scene, const Selection::PickResult* clickResult = nullptr);
+
         static void ApplyFromGpuPick(ECS::Scene& scene,
                                     uint32_t pickID, bool hasHit,
-                                    Runtime::Selection::PickMode mode);
+                                    Runtime::Selection::PickMode mode,
+                                    const Selection::PickRequest* request,
+                                    Selection::Picked& picked);
 
         [[nodiscard]] static glm::uvec2 WindowToFramebufferPixel(const Core::Windowing::Window& window,
                                                                 const glm::vec2& mouseWindowCoords);

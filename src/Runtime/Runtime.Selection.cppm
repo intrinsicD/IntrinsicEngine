@@ -1,8 +1,6 @@
 module;
 #include <cstdint>
 #include <limits>
-#include <optional>
-#include <vector>
 #include <glm/glm.hpp>
 #include <entt/entity/entity.hpp>
 
@@ -14,6 +12,37 @@ import Graphics;
 
 export namespace Runtime::Selection
 {
+    struct Points
+    {
+        glm::vec3 World{0.0f};
+        glm::vec3 Local{0.0f};
+        glm::vec3 WorldNormal{0.0f};
+        glm::vec3 Barycentric{0.0f};
+    };
+
+    struct Picked
+    {
+        struct Entity
+        {
+            static constexpr uint32_t InvalidIndex = std::numeric_limits<uint32_t>::max();
+
+            entt::entity id = entt::null;
+            bool is_background = true;
+
+            constexpr explicit operator bool() const
+            {
+                return !is_background && id != entt::null;
+            }
+
+            uint32_t vertex_idx = InvalidIndex;
+            uint32_t edge_idx = InvalidIndex;
+            uint32_t face_idx = InvalidIndex;
+            float pick_radius = 0.0f;
+        } entity{};
+
+        Points spaces{};
+    };
+
     enum class PickBackend : uint8_t
     {
         CPU = 0,
@@ -29,7 +58,7 @@ export namespace Runtime::Selection
 
     struct PickRequest
     {
-        Geometry::Ray WorldRay;
+        Geometry::Ray WorldRay{};
         PickBackend Backend = PickBackend::CPU;
         PickMode Mode = PickMode::Replace;
 
@@ -38,16 +67,26 @@ export namespace Runtime::Selection
 
         // Optional: max distance.
         float MaxDistance = std::numeric_limits<float>::infinity();
+
+        // Screen-space radius used to resolve sub-element picks (vertex/edge/face)
+        // into a world-space tolerance at the hit depth.
+        float PickRadiusPixels = 12.0f;
+
+        // Camera snapshot captured when the pick request is issued.
+        float CameraFovYRadians = glm::radians(45.0f);
+        float ViewportHeightPixels = 900.0f;
     };
 
     struct PickResult
     {
         entt::entity Entity = entt::null;
         float T = std::numeric_limits<float>::infinity();
+        Picked PickedData{};
     };
 
     // CPU picking: uses MeshCollider broadphase (WorldOBB) and watertight ray/triangle on mesh data.
     [[nodiscard]] PickResult PickCPU(const ECS::Scene& scene, const PickRequest& request);
+    [[nodiscard]] PickResult PickEntityCPU(const ECS::Scene& scene, entt::entity entity, const PickRequest& request);
 
     // Apply selection state changes on the registry (SelectedTag/HoveredTag).
     void ApplySelection(ECS::Scene& scene, entt::entity hitEntity, PickMode mode);

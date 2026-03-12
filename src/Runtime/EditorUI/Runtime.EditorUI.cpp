@@ -149,6 +149,7 @@ namespace Runtime::EditorUI
 
             ImGui::SeparatorText("Config");
             ImGui::SliderInt("Mouse Button", &cfg.MouseButton, 0, 2);
+            ImGui::SliderFloat("Pick Radius (px)", &cfg.PickRadiusPixels, 1.0f, 32.0f, "%.1f");
 
             const char* backends[] = {"CPU", "GPU"};
             int backend = (cfg.Backend == Runtime::Selection::PickBackend::GPU) ? 1 : 0;
@@ -177,6 +178,20 @@ namespace Runtime::EditorUI
             ImGui::SeparatorText("State");
             const entt::entity selected = sel.GetSelectedEntity(engine.GetScene());
             ImGui::Text("Selected entity: %u", (uint32_t)selected);
+
+            const auto& picked = sel.GetPicked();
+            ImGui::Text("Picked entity: %u (%s)",
+                        static_cast<uint32_t>(picked.entity.id),
+                        picked.entity ? "hit" : "background");
+            ImGui::Text("vertex=%u edge=%u face=%u radius=%.5f",
+                        picked.entity.vertex_idx,
+                        picked.entity.edge_idx,
+                        picked.entity.face_idx,
+                        picked.entity.pick_radius);
+            ImGui::Text("world=(%.3f, %.3f, %.3f)",
+                        picked.spaces.World.x,
+                        picked.spaces.World.y,
+                        picked.spaces.World.z);
 
             if (ImGui::Button("Clear Selection"))
                 sel.ClearSelection(engine.GetScene());

@@ -92,55 +92,43 @@ namespace Graphics::Passes
                                                 0, 1, &ctx.GlobalDescriptorSet,
                                                 1, &dynamicOffset);
 
-                                            auto view = ctx.Scene.GetRegistry().view<
-                                                ECS::Components::Transform::Component,
-                                                ECS::Surface::Component>();
-
-                                            for (auto [entity, transform, renderable] : view.each())
+                                            auto& registry = ctx.Scene.GetRegistry();
+                                            auto drawPickGeometry =
+                                                [&](entt::entity entity,
+                                                    const glm::mat4& worldMatrix,
+                                                    const GeometryGpuData* vertexGeo,
+                                                    const GeometryGpuData* indexGeo,
+                                                    PrimitiveTopology topology)
                                             {
-                                                if (!renderable.Geometry.IsValid())
-                                                    continue;
+                                                if (vertexGeo == nullptr || vertexGeo->GetVertexBuffer() == nullptr)
+                                                    return;
 
-                                                auto* geo = ctx.GeometryStorage.GetUnchecked(renderable.Geometry);
-                                                if (!geo)
-                                                    continue;
-
-                                                glm::mat4 worldMatrix;
-                                                if (auto* world = ctx.Scene.GetRegistry().try_get<
-                                                    ECS::Components::Transform::WorldMatrix>(entity))
-                                                    worldMatrix = world->Matrix;
-                                                else
-                                                    worldMatrix = GetMatrix(transform);
-
-                                                if (geo->GetIndexCount() > 0)
-                                                    vkCmdBindIndexBuffer(
-                                                        cmd, geo->GetIndexBuffer()->GetHandle(), 0,
-                                                        VK_INDEX_TYPE_UINT32);
+                                                const GeometryGpuData* drawGeo = indexGeo != nullptr ? indexGeo : vertexGeo;
+                                                if (drawGeo->GetIndexCount() > 0 && drawGeo->GetIndexBuffer() != nullptr)
+                                                {
+                                                    vkCmdBindIndexBuffer(cmd,
+                                                                        drawGeo->GetIndexBuffer()->GetHandle(),
+                                                                        0,
+                                                                        VK_INDEX_TYPE_UINT32);
+                                                }
 
                                                 VkPrimitiveTopology vkTopo = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-                                                switch (geo->GetTopology())
+                                                switch (topology)
                                                 {
-                                                case PrimitiveTopology::Points: vkTopo =
-                                                        VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
-                                                    break;
-                                                case PrimitiveTopology::Lines: vkTopo = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
-                                                    break;
+                                                case PrimitiveTopology::Points: vkTopo = VK_PRIMITIVE_TOPOLOGY_POINT_LIST; break;
+                                                case PrimitiveTopology::Lines: vkTopo = VK_PRIMITIVE_TOPOLOGY_LINE_LIST; break;
                                                 case PrimitiveTopology::Triangles:
-                                                default: vkTopo = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-                                                    break;
+                                                default: vkTopo = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST; break;
                                                 }
                                                 vkCmdSetPrimitiveTopology(cmd, vkTopo);
 
-                                                // Use a stable, explicit GPU pick ID.
-                                                // entt::entity values can be recycled and are not safe as persistent pick identifiers.
                                                 uint32_t pickId = 0u;
-                                                if (auto* pid = ctx.Scene.GetRegistry().try_get<ECS::Components::Selection::PickID>(entity))
+                                                if (auto* pid = registry.try_get<ECS::Components::Selection::PickID>(entity))
                                                     pickId = pid->Value;
 
-                                                uint64_t baseAddr = geo->GetVertexBuffer()->GetDeviceAddress();
-                                                const auto& layout = geo->GetLayout();
+                                                const uint64_t baseAddr = vertexGeo->GetVertexBuffer()->GetDeviceAddress();
+                                                const auto& layout = vertexGeo->GetLayout();
 
-                                                // Match the push constant layout expected by pick_id.vert/frag (PickPushConsts).
                                                 struct PickPushConsts
                                                 {
                                                     glm::mat4 Model;
@@ -151,7 +139,7 @@ namespace Graphics::Passes
                                                     uint32_t _pad[3];
                                                 };
 
-                                                PickPushConsts push{
+                                                const PickPushConsts push{
                                                     .Model = worldMatrix,
                                                     .PtrPositions = baseAddr + layout.PositionsOffset,
                                                     .PtrNormals = 0,
@@ -160,19 +148,72 @@ namespace Graphics::Passes
                                                     ._pad = {}
                                                 };
 
-                                                vkCmdPushConstants(cmd, pipeline->GetLayout(),
-                                                                   VK_SHADER_STAGE_VERTEX_BIT |
-                                                                   VK_SHADER_STAGE_FRAGMENT_BIT,
-                                                                   0, sizeof(PickPushConsts), &push);
+                                                vkCmdPushConstants(cmd,
+                                                                   pipeline->GetLayout(),
+                                                                   VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                                                                   0,
+                                                                   sizeof(PickPushConsts),
+                                                                   &push);
 
-                                                if (geo->GetIndexCount() > 0)
-                                                    vkCmdDrawIndexed(cmd, geo->GetIndexCount(), 1, 0, 0, 0);
+                                                if (drawGeo->GetIndexCount() > 0)
+                                                {
+                                                    vkCmdDrawIndexed(cmd, drawGeo->GetIndexCount(), 1, 0, 0, 0);
+                                                }
                                                 else
                                                 {
-                                                    const uint32_t vertCount = static_cast<uint32_t>(geo->GetLayout().
-                                                        PositionsSize / sizeof(glm::vec3));
+                                                    const uint32_t vertCount = static_cast<uint32_t>(layout.PositionsSize / sizeof(glm::vec3));
                                                     vkCmdDraw(cmd, vertCount, 1, 0, 0);
                                                 }
+                                            };
+
+                                            auto surfaceView = registry.view<ECS::Components::Transform::Component,
+                                                                             ECS::Surface::Component>();
+                                            for (auto [entity, transform, surface] : surfaceView.each())
+                                            {
+                                                if (!surface.Geometry.IsValid())
+                                                    continue;
+                                                auto* geo = ctx.GeometryStorage.GetUnchecked(surface.Geometry);
+                                                if (!geo)
+                                                    continue;
+
+                                                const glm::mat4 worldMatrix = registry.all_of<ECS::Components::Transform::WorldMatrix>(entity)
+                                                    ? registry.get<ECS::Components::Transform::WorldMatrix>(entity).Matrix
+                                                    : GetMatrix(transform);
+                                                drawPickGeometry(entity, worldMatrix, geo, nullptr, PrimitiveTopology::Triangles);
+                                            }
+
+                                            auto lineView = registry.view<ECS::Components::Transform::Component,
+                                                                          ECS::Line::Component>();
+                                            for (auto [entity, transform, line] : lineView.each())
+                                            {
+                                                if (!line.Geometry.IsValid() || !line.EdgeView.IsValid())
+                                                    continue;
+
+                                                auto* vertexGeo = ctx.GeometryStorage.GetUnchecked(line.Geometry);
+                                                auto* edgeGeo = ctx.GeometryStorage.GetUnchecked(line.EdgeView);
+                                                if (!vertexGeo || !edgeGeo)
+                                                    continue;
+
+                                                const glm::mat4 worldMatrix = registry.all_of<ECS::Components::Transform::WorldMatrix>(entity)
+                                                    ? registry.get<ECS::Components::Transform::WorldMatrix>(entity).Matrix
+                                                    : GetMatrix(transform);
+                                                drawPickGeometry(entity, worldMatrix, vertexGeo, edgeGeo, PrimitiveTopology::Lines);
+                                            }
+
+                                            auto pointView = registry.view<ECS::Components::Transform::Component,
+                                                                           ECS::Point::Component>();
+                                            for (auto [entity, transform, point] : pointView.each())
+                                            {
+                                                if (!point.Geometry.IsValid())
+                                                    continue;
+                                                auto* geo = ctx.GeometryStorage.GetUnchecked(point.Geometry);
+                                                if (!geo)
+                                                    continue;
+
+                                                const glm::mat4 worldMatrix = registry.all_of<ECS::Components::Transform::WorldMatrix>(entity)
+                                                    ? registry.get<ECS::Components::Transform::WorldMatrix>(entity).Matrix
+                                                    : GetMatrix(transform);
+                                                drawPickGeometry(entity, worldMatrix, geo, nullptr, PrimitiveTopology::Points);
                                             }
                                         });
 
