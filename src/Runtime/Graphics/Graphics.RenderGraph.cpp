@@ -258,6 +258,8 @@ namespace Graphics
 
         m_ImagePool.clear();
         m_BufferPool.clear();
+        m_CachedPlan.reset();
+        m_LastShapeKey = 0;
         Core::Log::Info("RenderGraph: Pools trimmed.");
     }
 
@@ -480,6 +482,17 @@ namespace Graphics
 
     namespace
     {
+        // 64-bit hash combine (boost-style, adapted for 64-bit).
+        constexpr uint64_t HashCombine64(uint64_t seed, uint64_t value) noexcept
+        {
+            value *= 0x9e3779b97f4a7c15ull;
+            value = (value ^ (value >> 30u)) * 0xbf58476d1ce4e5b9ull;
+            value = (value ^ (value >> 27u)) * 0x94d049bb133111ebull;
+            value ^= (value >> 31u);
+            seed ^= value + 0x9e3779b97f4a7c15ull + (seed << 6u) + (seed >> 2u);
+            return seed;
+        }
+
         // Single source of truth for write-access detection across all barrier paths.
         // Used by image barriers, buffer barriers, and the adjacency-list builder.
         constexpr VkAccessFlags2 kWriteAccessMask =
@@ -502,7 +515,22 @@ namespace Graphics
         m_CompiledFrameIndex = frameIndex;
         ResolveTransientResources(frameIndex);
         CalculateBarriers();
-        BuildSchedulerGraph();
+        BuildSchedulerGraph(); // Always rebuild (cheap, reuses pools); keeps GetExecutionLayers() valid.
+
+        const uint64_t shapeKey = ComputeShapeKey();
+
+        if (m_CachedPlan && m_CachedPlan->ShapeKey == shapeKey)
+        {
+            // Cache hit: reuse packet assignments from previous frame.
+            m_LastShapeKey = shapeKey;
+            m_LastCacheHit = true;
+            return;
+        }
+
+        // Cache miss: rebuild packets.
+        m_LastShapeKey = shapeKey;
+        m_LastCacheHit = false;
+        Packetize();
     }
 
     void RenderGraph::ResolveTransientResources(uint32_t frameIndex)
@@ -757,76 +785,45 @@ namespace Graphics
 
     void RenderGraph::Execute(VkCommandBuffer cmd)
     {
-        // If Compile() wasn't called (or for safety), build layers lazily.
-        if (m_Scheduler.GetExecutionLayers().empty() && m_ActivePassCount > 0)
+        if (!m_CachedPlan || m_CachedPlan->PacketLayers.empty())
         {
-            BuildSchedulerGraph();
+            // Fallback: if no cached plan, build one now.
+            if (m_Scheduler.GetExecutionLayers().empty() && m_ActivePassCount > 0)
+                BuildSchedulerGraph();
+            Packetize();
         }
 
         m_LastPassTimings.clear();
         m_LastPassTimings.reserve(m_ActivePassCount);
 
-        for (const auto& layer : m_Scheduler.GetExecutionLayers())
+        for (const auto& packetLayer : m_CachedPlan->PacketLayers)
         {
-            if (!layer.empty())
-                ExecuteLayer(cmd, layer);
+            if (!packetLayer.empty())
+                ExecutePacketLayer(cmd, packetLayer);
         }
 
         // Note: CommandContext::Reset() is intentionally not called by RenderGraph.
         // The engine should reset thread-local pools at a known safe point (end-of-frame) once.
     }
 
-    void RenderGraph::ExecuteLayer(VkCommandBuffer cmd, const std::vector<uint32_t>& layer)
+    void RenderGraph::ExecutePacketLayer(VkCommandBuffer cmd, std::span<const ExecutionPacket> packets)
     {
-        // 1. Precompute inheritance info per pass (stable pointers for the worker tasks).
-        struct RasterInfo
-        {
-            bool IsRaster = false;
-            std::vector<VkFormat> ColorFormats;
-            VkFormat Depth = VK_FORMAT_UNDEFINED;
-            VkFormat Stencil = VK_FORMAT_UNDEFINED;
-        };
+        // 1. Record one secondary command buffer per packet in parallel.
+        std::vector<VkCommandBuffer> secondaryCmds(packets.size(), VK_NULL_HANDLE);
 
-        std::vector<RasterInfo> rasterInfos(layer.size());
-
-        for (size_t i = 0; i < layer.size(); ++i)
+        for (size_t pi = 0; pi < packets.size(); ++pi)
         {
-            const auto& pass = m_PassPool[layer[i]];
-            RasterInfo ri{};
-            ri.IsRaster = (pass.AttachmentHead != nullptr);
-            if (ri.IsRaster)
+            Core::Tasks::Scheduler::Dispatch([this, &packets, pi, &secondaryCmds]
             {
-                for (AttachmentNode* att = pass.AttachmentHead; att != nullptr; att = att->Next)
-                {
-                    const auto& res = m_ResourcePool[att->ID];
-                    if (att->IsDepth)
-                        ri.Depth = res.Format;
-                    else
-                        ri.ColorFormats.push_back(res.Format);
-                }
-            }
-            rasterInfos[i] = std::move(ri);
-        }
-
-        // 2. Record secondary command buffers in parallel.
-        std::vector<VkCommandBuffer> secondaryCmds(layer.size(), VK_NULL_HANDLE);
-
-        for (size_t i = 0; i < layer.size(); ++i)
-        {
-            const uint32_t passIdx = layer[i];
-
-            Core::Tasks::Scheduler::Dispatch([this, passIdx, &secondaryCmds, i, &rasterInfos]
-            {
-                auto& pass = m_PassPool[passIdx];
-                const bool isRaster = (pass.AttachmentHead != nullptr);
+                const auto& pkt = packets[pi];
 
                 RHI::SecondaryInheritanceInfo inherit{};
-                if (isRaster)
+                if (pkt.IsRaster)
                 {
-                    inherit.ColorAttachmentFormats = std::span<const VkFormat>(rasterInfos[i].ColorFormats.data(),
-                                                                               rasterInfos[i].ColorFormats.size());
-                    inherit.DepthAttachmentFormat = rasterInfos[i].Depth;
-                    inherit.StencilAttachmentFormat = rasterInfos[i].Stencil;
+                    inherit.ColorAttachmentFormats = std::span<const VkFormat>(
+                        pkt.ColorFormats.data(), pkt.ColorFormats.size());
+                    inherit.DepthAttachmentFormat = pkt.DepthFormat;
+                    inherit.StencilAttachmentFormat = pkt.StencilFormat;
                     inherit.RasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
                     inherit.ViewMask = 0;
                 }
@@ -834,58 +831,78 @@ namespace Graphics
                 const uint64_t frameEpoch = m_Device ? m_Device->GetGlobalFrameNumber() : 0ull;
                 VkCommandBuffer sec = RHI::CommandContext::BeginSecondary(*m_Device, frameEpoch, inherit);
 
-                if (pass.ExecuteFn)
-                    pass.ExecuteFn(pass.ExecuteUserData, m_Registry, sec);
+                // Record all passes in the packet into this single secondary.
+                for (uint32_t p = 0; p < pkt.PassCount; ++p)
+                {
+                    const uint32_t passIdx = pkt.FirstPass + p;
+                    auto& pass = m_PassPool[passIdx];
+
+                    // For multi-pass packets: intra-secondary barriers for non-first passes.
+                    if (p > 0 && (!pass.ImageBarriers.empty() || !pass.BufferBarriers.empty()))
+                    {
+                        VkDependencyInfo depInfo{};
+                        depInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+                        depInfo.imageMemoryBarrierCount = static_cast<uint32_t>(pass.ImageBarriers.size());
+                        depInfo.pImageMemoryBarriers = pass.ImageBarriers.data();
+                        depInfo.bufferMemoryBarrierCount = static_cast<uint32_t>(pass.BufferBarriers.size());
+                        depInfo.pBufferMemoryBarriers = pass.BufferBarriers.data();
+                        vkCmdPipelineBarrier2(sec, &depInfo);
+                    }
+
+                    if (pass.ExecuteFn)
+                        pass.ExecuteFn(pass.ExecuteUserData, m_Registry, sec);
+                }
 
                 RHI::CommandContext::End(sec);
-                secondaryCmds[i] = sec;
+                secondaryCmds[pi] = sec;
             });
         }
 
         Core::Tasks::Scheduler::WaitForAll();
 
-        // 3. Record barriers, begin rendering, and execute secondaries on the primary buffer.
-        //    GPU timestamp scopes are written on the primary cmd buffer around each pass.
-        //    CPU timing is measured around the barrier+render+execute block per pass.
-        for (size_t i = 0; i < layer.size(); ++i)
+        // 2. Primary: barriers (first pass of each packet), rendering scope, execute secondaries.
+        //    GPU timestamp scopes are written on the primary cmd buffer around each packet.
+        //    CPU timing is measured around the barrier+render+execute block per packet.
+        for (size_t pi = 0; pi < packets.size(); ++pi)
         {
-            const uint32_t passIdx = layer[i];
-            const auto& pass = m_PassPool[passIdx];
+            const auto& pkt = packets[pi];
+            const uint32_t firstPassIdx = pkt.FirstPass;
+            const auto& firstPass = m_PassPool[firstPassIdx];
 
             const auto cpuStart = std::chrono::high_resolution_clock::now();
 
-            // GPU scope begin (on primary, before any barriers/rendering for this pass).
+            // GPU scope begin (on primary, before any barriers/rendering for this packet).
             uint32_t gpuScopeIdx = ~0u;
             if (m_GpuProfiler)
             {
-                gpuScopeIdx = m_GpuProfiler->BeginScope(pass.Name);
+                gpuScopeIdx = m_GpuProfiler->BeginScope(firstPass.Name);
                 m_GpuProfiler->WriteScopeBegin(cmd, gpuScopeIdx, VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT);
             }
 
-            // Barriers (computed in Compile, hoisted to primary).
-            if (!pass.ImageBarriers.empty() || !pass.BufferBarriers.empty())
+            // Barriers for the first pass in the packet (hoisted to primary).
+            if (!firstPass.ImageBarriers.empty() || !firstPass.BufferBarriers.empty())
             {
                 VkDependencyInfo depInfo{};
                 depInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-                depInfo.imageMemoryBarrierCount = (uint32_t)pass.ImageBarriers.size();
-                depInfo.pImageMemoryBarriers = pass.ImageBarriers.data();
-                depInfo.bufferMemoryBarrierCount = (uint32_t)pass.BufferBarriers.size();
-                depInfo.pBufferMemoryBarriers = pass.BufferBarriers.data();
+                depInfo.imageMemoryBarrierCount = static_cast<uint32_t>(firstPass.ImageBarriers.size());
+                depInfo.pImageMemoryBarriers = firstPass.ImageBarriers.data();
+                depInfo.bufferMemoryBarrierCount = static_cast<uint32_t>(firstPass.BufferBarriers.size());
+                depInfo.pBufferMemoryBarriers = firstPass.BufferBarriers.data();
                 vkCmdPipelineBarrier2(cmd, &depInfo);
             }
 
-            const bool isRaster = (pass.AttachmentHead != nullptr);
+            // Begin rendering scope (for raster packets).
             VkRenderingInfo renderInfo{};
             std::vector<VkRenderingAttachmentInfo> colorAtts;
             VkRenderingAttachmentInfo depthAtt{};
             bool hasDepth = false;
 
-            if (isRaster)
+            if (pkt.IsRaster)
             {
                 colorAtts.reserve(8);
                 VkExtent2D renderArea{0, 0};
 
-                for (AttachmentNode* att = pass.AttachmentHead; att != nullptr; att = att->Next)
+                for (AttachmentNode* att = firstPass.AttachmentHead; att != nullptr; att = att->Next)
                 {
                     auto& res = m_ResourcePool[att->ID];
                     if (renderArea.width == 0 && renderArea.height == 0) renderArea = res.Extent;
@@ -917,21 +934,21 @@ namespace Graphics
                 renderInfo.flags = VK_RENDERING_CONTENTS_SECONDARY_COMMAND_BUFFERS_BIT;
                 renderInfo.renderArea = {{0, 0}, renderArea};
                 renderInfo.layerCount = 1;
-                renderInfo.colorAttachmentCount = (uint32_t)colorAtts.size();
+                renderInfo.colorAttachmentCount = static_cast<uint32_t>(colorAtts.size());
                 renderInfo.pColorAttachments = colorAtts.data();
                 renderInfo.pDepthAttachment = hasDepth ? &depthAtt : nullptr;
 
                 vkCmdBeginRendering(cmd, &renderInfo);
             }
 
-            VkCommandBuffer sec = secondaryCmds[i];
+            VkCommandBuffer sec = secondaryCmds[pi];
             if (sec != VK_NULL_HANDLE)
                 vkCmdExecuteCommands(cmd, 1, &sec);
 
-            if (isRaster)
+            if (pkt.IsRaster)
                 vkCmdEndRendering(cmd);
 
-            // GPU scope end (on primary, after rendering for this pass).
+            // GPU scope end (on primary, after rendering for this packet).
             if (m_GpuProfiler && gpuScopeIdx != ~0u)
             {
                 m_GpuProfiler->WriteScopeEnd(cmd, gpuScopeIdx, VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT);
@@ -941,8 +958,118 @@ namespace Graphics
             const uint64_t cpuNs = static_cast<uint64_t>(
                 std::chrono::duration_cast<std::chrono::nanoseconds>(cpuEnd - cpuStart).count());
 
-            m_LastPassTimings.push_back(PassTiming{pass.Name, cpuNs});
+            // Record per-pass timing (attribute wall time to first pass in packet).
+            for (uint32_t p = 0; p < pkt.PassCount; ++p)
+            {
+                m_LastPassTimings.push_back(PassTiming{
+                    m_PassPool[pkt.FirstPass + p].Name,
+                    (p == 0) ? cpuNs : 0
+                });
+            }
         }
+    }
+
+    // --- Shape Hashing ---
+    uint64_t RenderGraph::ComputeShapeKey() const
+    {
+        uint64_t h = 0xcbf29ce484222325ull;
+        h = HashCombine64(h, static_cast<uint64_t>(m_ActivePassCount));
+        for (uint32_t i = 0; i < m_ActivePassCount; ++i)
+        {
+            const auto& pass = m_PassPool[i];
+            h = HashCombine64(h, std::hash<std::string>{}(pass.Name));
+            for (AccessNode* node = pass.AccessHead; node != nullptr; node = node->Next)
+            {
+                h = HashCombine64(h, static_cast<uint64_t>(node->ID));
+                h = HashCombine64(h, static_cast<uint64_t>(node->Stage));
+                h = HashCombine64(h, static_cast<uint64_t>(node->Access));
+            }
+            for (AttachmentNode* att = pass.AttachmentHead; att != nullptr; att = att->Next)
+            {
+                h = HashCombine64(h, static_cast<uint64_t>(att->ID));
+                h = HashCombine64(h, att->IsDepth ? 1ull : 0ull);
+            }
+        }
+        return h;
+    }
+
+    // --- Packetization ---
+    bool RenderGraph::HasLinearEdge(uint32_t src, uint32_t dst) const
+    {
+        // src must have exactly 1 dependent, and it must be dst.
+        auto dependents = m_Scheduler.GetDependents(src);
+        if (dependents.size() != 1 || dependents[0] != dst) return false;
+        // dst must have indegree 1 (single predecessor).
+        return m_Scheduler.GetIndegree(dst) == 1;
+    }
+
+    void RenderGraph::Packetize()
+    {
+        const auto& layers = m_Scheduler.GetExecutionLayers();
+        m_CachedPlan = CompiledRenderPlan{};
+        m_CachedPlan->ShapeKey = m_LastShapeKey;
+        m_CachedPlan->PacketLayers.resize(layers.size());
+
+        uint32_t totalPackets = 0;
+
+        for (size_t li = 0; li < layers.size(); ++li)
+        {
+            const auto& layer = layers[li];
+            auto& packets = m_CachedPlan->PacketLayers[li];
+
+            for (size_t i = 0; i < layer.size(); ++i)
+            {
+                const uint32_t passIdx = layer[i];
+                const auto& pass = m_PassPool[passIdx];
+                const bool isRaster = (pass.AttachmentHead != nullptr);
+
+                // Try to extend the last packet in this layer.
+                bool merged = false;
+                if (!packets.empty())
+                {
+                    auto& last = packets.back();
+                    const uint32_t lastEnd = last.FirstPass + last.PassCount - 1;
+                    // Merge conditions (conservative: non-raster only):
+                    // - Adjacent pass indices (consecutive in registration order)
+                    // - Both non-raster
+                    // - No barriers on the candidate pass (no layout transitions needed)
+                    // - Linear DAG chain: last pass has outdegree 1 → this pass, this pass has indegree 1
+                    if (!isRaster && !last.IsRaster
+                        && passIdx == lastEnd + 1
+                        && pass.ImageBarriers.empty()
+                        && pass.BufferBarriers.empty()
+                        && HasLinearEdge(lastEnd, passIdx))
+                    {
+                        last.PassCount++;
+                        merged = true;
+                    }
+                }
+
+                if (!merged)
+                {
+                    ExecutionPacket pkt;
+                    pkt.FirstPass = passIdx;
+                    pkt.PassCount = 1;
+                    pkt.IsRaster = isRaster;
+                    // Cache raster info for secondary inheritance.
+                    if (isRaster)
+                    {
+                        for (AttachmentNode* att = pass.AttachmentHead; att != nullptr; att = att->Next)
+                        {
+                            const auto& res = m_ResourcePool[att->ID];
+                            if (att->IsDepth)
+                                pkt.DepthFormat = res.Format;
+                            else
+                                pkt.ColorFormats.push_back(res.Format);
+                        }
+                    }
+                    packets.push_back(std::move(pkt));
+                }
+            }
+            totalPackets += static_cast<uint32_t>(packets.size());
+        }
+
+        m_LastPacketCount = totalPackets;
     }
 
     std::vector<RenderGraphDebugPass> RenderGraph::BuildDebugPassList() const
