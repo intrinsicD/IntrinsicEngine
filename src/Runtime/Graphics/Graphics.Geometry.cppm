@@ -66,7 +66,16 @@ export namespace Graphics
     struct GeometryCollisionData
     {
         Geometry::AABB LocalAABB;
-        Geometry::Octree LocalOctree; // Static octree of mesh vertices
+        Geometry::Octree LocalOctree; // Static octree of triangle primitive bounds
+
+        // Local-space nearest-vertex lookup for picker refinement.
+        // Element i in LocalVertexLookupPoints maps to authoritative vertex index
+        // LocalVertexLookupIndices[i]. When SourceMesh is available these are
+        // Halfedge::VertexHandle::Index values; otherwise they fall back to raw
+        // Positions[] indices.
+        Geometry::KDTree LocalVertexKdTree;
+        std::vector<glm::vec3> LocalVertexLookupPoints;
+        std::vector<uint32_t> LocalVertexLookupIndices;
 
         // Optional: Keep CPU-side collision geometry and an authoritative editable mesh.
         std::vector<glm::vec3> Positions;

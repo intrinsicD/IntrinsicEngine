@@ -38,6 +38,10 @@ Stage 1 (file extraction), Stage 2 (module migration), and Stage 3 (stability te
 
 These are not required to finish the first wave, but they should begin soon after P0 is stable.
 
+### B0. RenderGraph Raster Packet Merging
+
+Extend `RenderGraph::Packetize()` to merge consecutive raster passes that target the exact same color+depth attachments into a single execution packet (shared `vkCmdBeginRendering` scope). Currently only non-raster (compute/copy) passes are eligible for merging. Requires attachment equality checking and shared `VkRenderingInfo` construction for multi-pass raster packets.
+
 ### B1. Deferred Lighting Path
 
 - [ ] Add a proper deferred lighting composition path.
@@ -53,10 +57,36 @@ These are not required to finish the first wave, but they should begin soon afte
 - [ ] Keep transparent/special/debug rendering in the forward path.
 - [ ] Define composition rules between paths.
 
-### B3. Selection and Editor Tooling Improvements
+### B3. Two-Stage GPU Selection Pipeline
 
-- [ ] Improve primitive/submesh selection.
-- [ ] Add mask visualization in the editor.
+Replace entity-only GPU pick with a dual-channel MRT pipeline producing both `EntityId` and `PrimitiveId` in one frame, enabling sub-entity (face/edge/point) selection.
+
+#### Infrastructure (readback & events)
+- [ ] Add `TRANSFER_SRC_BIT` to `PrimitiveId` resource definition (`Graphics.RenderPipeline.cppm`).
+- [ ] Expand readback buffer from 4 → 8 bytes; add `PrimitiveID` to `PickResultGpu` (`Graphics.Interaction.cppm/cpp`).
+- [ ] Add `PrimitiveID` to `GpuPickCompleted` event (`ECS.Components.Events.cppm`).
+- [ ] Thread `PrimitiveID` through `RenderSystem` event enqueue and `SelectionModule` cached pick.
+- [ ] Set `recipe.PrimitiveId = true` alongside `recipe.EntityId` in `BuildDefaultPipelineRecipe()`.
+
+#### MRT picking pass (mesh)
+- [ ] Create `pick_mesh.vert/frag` shaders with two MRT outputs (`outEntityID`, `outPrimitiveID = gl_PrimitiveID`).
+- [ ] Define unified 104-byte `PickPushConsts` struct (Model, PtrPositions, PtrAux, EntityID, PrimitiveBase, PickWidth, Viewport, pad).
+- [ ] Update PipelineLibrary mesh pick pipeline to `SetColorFormats({R32_UINT, R32_UINT})`.
+- [ ] Update `PickingPass` to write both EntityId and PrimitiveId attachments; PickCopy reads both into readback buffer.
+
+#### Graph edge picking (line pick pipeline)
+- [ ] Create `pick_line.vert/frag` shaders adapted from `line.vert` with vertex-amplified quads, `PickPushConsts`, and segment index output.
+- [ ] Add line pick pipeline to `PickingPass` (2× R32_UINT, cull none, depth bias -1/-1).
+- [ ] Add draw loop for `Graph::Data + Line::Component` entities and standalone `Line::Component` entities.
+
+#### Point cloud picking (point pick pipeline)
+- [ ] Create `pick_point.vert/frag` shaders adapted from `point_flatdisc.vert` with billboard quads, disc discard test, and point index output.
+- [ ] Add point pick pipeline to `PickingPass` (2× R32_UINT, cull none, depth bias -2/-2).
+- [ ] Add draw loop for `PointCloud::Data + Point::Component` entities and standalone `Point::Component` entities.
+
+#### Selection module integration
+- [ ] Update `ApplyFromGpuPick()` to decode primitive meaning by entity kind (mesh → triangle, graph → edge, point cloud → point).
+- [ ] Add local-space nearest-feature refinement using primitive ID (nearest edge/vertex for meshes).
 
 ---
 

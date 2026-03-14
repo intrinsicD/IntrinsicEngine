@@ -161,6 +161,8 @@ intrinsic_test_object_lib(RuntimeTestObjs
         Test_SelectionGizmoRegression.cpp
         Test_RenderUpdateIntegration.cpp
         Test_CudaDevice.cpp
+        Test_RenderGraphPackets.cpp
+
 
     DEPS IntrinsicCore IntrinsicRuntime nlohmann_json::nlohmann_json
 )

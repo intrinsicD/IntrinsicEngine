@@ -43,6 +43,37 @@ namespace Graphics
 {
     // --- Helpers ---
 
+    inline void RebuildVertexLookupCache(GeometryCollisionData& collision)
+    {
+        collision.LocalVertexLookupPoints.clear();
+        collision.LocalVertexLookupIndices.clear();
+
+        if (collision.SourceMesh)
+        {
+            collision.LocalVertexLookupPoints.reserve(collision.SourceMesh->VertexCount());
+            collision.LocalVertexLookupIndices.reserve(collision.SourceMesh->VertexCount());
+            for (std::size_t i = 0; i < collision.SourceMesh->VerticesSize(); ++i)
+            {
+                const Geometry::VertexHandle vh{static_cast<Geometry::PropertyIndex>(i)};
+                if (!collision.SourceMesh->IsValid(vh) || collision.SourceMesh->IsDeleted(vh))
+                    continue;
+
+                collision.LocalVertexLookupPoints.push_back(collision.SourceMesh->Position(vh));
+                collision.LocalVertexLookupIndices.push_back(static_cast<uint32_t>(vh.Index));
+            }
+        }
+        else
+        {
+            collision.LocalVertexLookupPoints = collision.Positions;
+            collision.LocalVertexLookupIndices.reserve(collision.Positions.size());
+            for (uint32_t i = 0; i < collision.Positions.size(); ++i)
+                collision.LocalVertexLookupIndices.push_back(i);
+        }
+
+        if (!collision.LocalVertexLookupPoints.empty())
+            static_cast<void>(collision.LocalVertexKdTree.BuildFromPoints(collision.LocalVertexLookupPoints));
+    }
+
     struct VertexKey
     {
         int p = -1, n = -1, t = -1;
@@ -248,6 +279,8 @@ namespace Graphics
                     primitiveBounds, Geometry::Octree::SplitPolicy{}, 16, 8));
             }
         }
+
+        RebuildVertexLookupCache(*collision);
 
         return collision;
     }

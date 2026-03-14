@@ -1,6 +1,7 @@
 module;
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -181,6 +182,16 @@ export namespace Graphics
     };
 
     // -------------------------------------------------------------------------
+    // Packet Execution Stats (public, for observability and testing)
+    // -------------------------------------------------------------------------
+    struct PacketStats
+    {
+        uint32_t PacketCount{};
+        uint32_t PassCount{};
+        bool CacheHit{};
+    };
+
+    // -------------------------------------------------------------------------
     // The Render Graph
     // -------------------------------------------------------------------------
     class RenderGraph
@@ -272,6 +283,9 @@ export namespace Graphics
             uint64_t CpuTimeNs = 0;
         };
         [[nodiscard]] const std::vector<PassTiming>& GetLastPassTimings() const { return m_LastPassTimings; }
+
+        // Packet execution stats from the most recent Compile()/Execute() cycle.
+        [[nodiscard]] PacketStats GetLastPacketStats() const { return {m_LastPacketCount, m_ActivePassCount, m_LastCacheHit}; }
 
         // Debug/introspection for tests/tools: valid after Compile() until Reset().
         [[nodiscard]] const std::vector<std::vector<uint32_t>>& GetExecutionLayers() const { return m_Scheduler.GetExecutionLayers(); }
@@ -470,9 +484,6 @@ export namespace Graphics
         void ResolveTransientResources(uint32_t frameIndex);
         void CalculateBarriers();
 
-        // Execute() sub-function — processes one execution layer.
-        void ExecuteLayer(VkCommandBuffer cmd, const std::vector<uint32_t>& layer);
-
         // Frame index associated with the most recent Compile().
         // Used for per-thread secondary command buffer reuse.
         uint32_t m_CompiledFrameIndex = ~0u;
@@ -482,5 +493,40 @@ export namespace Graphics
 
         // Per-pass CPU timing from the most recent Execute().
         std::vector<PassTiming> m_LastPassTimings;
+
+        // --- GPU Packet Execution ---
+        // A GPU packet: one or more consecutive passes recorded into a single secondary.
+        struct ExecutionPacket
+        {
+            uint32_t FirstPass{};       // Index into m_PassPool
+            uint32_t PassCount{1};      // Number of consecutive passes in this packet
+            bool IsRaster{false};       // True if any pass has attachments
+            // Cached raster info for BeginSecondary inheritance
+            std::vector<VkFormat> ColorFormats;
+            VkFormat DepthFormat{VK_FORMAT_UNDEFINED};
+            VkFormat StencilFormat{VK_FORMAT_UNDEFINED};
+        };
+
+        // Cached compiled plan: packets + shape key for cache lookup.
+        struct CompiledRenderPlan
+        {
+            uint64_t ShapeKey{};
+            std::vector<std::vector<ExecutionPacket>> PacketLayers; // packets grouped by execution layer
+        };
+
+        std::optional<CompiledRenderPlan> m_CachedPlan;
+        uint64_t m_LastShapeKey{0};
+
+        // Packetization: merge linear chains of non-raster passes into execution packets.
+        void Packetize();
+        [[nodiscard]] bool HasLinearEdge(uint32_t src, uint32_t dst) const;
+        [[nodiscard]] uint64_t ComputeShapeKey() const;
+
+        // Packet-based execution (replaces per-pass ExecuteLayer).
+        void ExecutePacketLayer(VkCommandBuffer cmd, std::span<const ExecutionPacket> packets);
+
+        // Packet stats from the most recent Compile()/Execute() cycle.
+        uint32_t m_LastPacketCount{0};
+        bool m_LastCacheHit{false};
     };
 }

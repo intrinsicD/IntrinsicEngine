@@ -1,5 +1,6 @@
 module;
 
+#include <algorithm>
 #include <glm/glm.hpp>
 #include <entt/entity/registry.hpp>
 #include <entt/signal/dispatcher.hpp>
@@ -14,6 +15,31 @@ import Runtime.Selection;
 
 namespace Runtime
 {
+    namespace
+    {
+        [[nodiscard]] Selection::PickRequest BuildPickRequest(const Graphics::CameraComponent& camera,
+                                                              const Core::Windowing::Window& window,
+                                                              Selection::PickMode mode,
+                                                              float pickRadiusPixels)
+        {
+            const auto winW = static_cast<uint32_t>(window.GetWindowWidth());
+            const auto winH = static_cast<uint32_t>(window.GetWindowHeight());
+
+            const glm::vec2 m = window.GetInput().GetMousePosition();
+            const float nx = (2.0f * (m.x / static_cast<float>(winW))) - 1.0f;
+            const float ny = (2.0f * (m.y / static_cast<float>(winH))) - 1.0f;
+
+            Selection::PickRequest req{};
+            req.WorldRay = Selection::RayFromNDC(camera, {nx, ny});
+            req.Backend = Selection::PickBackend::CPU;
+            req.Mode = mode;
+            req.PickRadiusPixels = pickRadiusPixels;
+            req.CameraFovYRadians = glm::radians(camera.Fov);
+            req.ViewportHeightPixels = static_cast<float>(std::max(winH, 1u));
+            return req;
+        }
+    }
+
     SelectionModule::SelectionModule()
         : m_Config{}
     {
@@ -26,13 +52,20 @@ namespace Runtime
 
     void SelectionModule::ConnectToScene(ECS::Scene& scene)
     {
-        // Register a dispatcher sink for GpuPickCompleted.
-        // When RenderSystem fires the event (after GPU readback), this caches
-        // the result for consumption in the next Update() call.
-        scene.GetDispatcher().sink<ECS::Events::GpuPickCompleted>().connect<
-            [](SelectionModule& self, const ECS::Events::GpuPickCompleted& evt) {
-                self.m_CachedGpuPick = CachedGpuPick{evt.PickID, evt.HasHit};
-            }>(*this);
+        m_ConnectedScene = &scene;
+        scene.GetDispatcher().sink<ECS::Events::GpuPickCompleted>().connect<&SelectionModule::OnGpuPickCompleted>(*this);
+        scene.GetDispatcher().sink<ECS::Events::SelectionChanged>().connect<&SelectionModule::OnSelectionChanged>(*this);
+    }
+
+    void SelectionModule::OnGpuPickCompleted(const ECS::Events::GpuPickCompleted& evt)
+    {
+        m_CachedGpuPick = CachedGpuPick{evt.PickID, evt.HasHit};
+    }
+
+    void SelectionModule::OnSelectionChanged(const ECS::Events::SelectionChanged&)
+    {
+        if (m_ConnectedScene != nullptr)
+            SyncPickedToSelection(*m_ConnectedScene, nullptr);
     }
 
     glm::uvec2 SelectionModule::WindowToFramebufferPixel(const Core::Windowing::Window& window,
@@ -64,7 +97,9 @@ namespace Runtime
 
     void SelectionModule::ApplyFromGpuPick(ECS::Scene& scene,
                                           uint32_t pickID, bool hasHit,
-                                          Selection::PickMode mode)
+                                          Selection::PickMode mode,
+                                          const Selection::PickRequest* request,
+                                          Selection::Picked& picked)
     {
         auto& reg = scene.GetRegistry();
 
@@ -80,6 +115,19 @@ namespace Runtime
                 {
                     if (reg.valid(e))
                     {
+                        if (request != nullptr)
+                        {
+                            const auto entityPick = Selection::PickEntityCPU(scene, e, *request);
+                            if (entityPick.Entity == e)
+                                picked = entityPick.PickedData;
+                        }
+
+                        if (picked.entity.id == entt::null)
+                        {
+                            picked.entity.id = e;
+                            picked.entity.is_background = false;
+                        }
+
                         Selection::ApplySelection(scene, e, mode);
                         return;
                     }
@@ -87,8 +135,31 @@ namespace Runtime
             }
         }
 
-        // No hit or invalid -> treat as background.
+        picked = {};
         Selection::ApplySelection(scene, entt::null, mode);
+    }
+
+    void SelectionModule::SyncPickedToSelection(ECS::Scene& scene, const Selection::PickResult* clickResult)
+    {
+        const entt::entity selected = GetSelectedEntity(scene);
+        if (selected == entt::null || !scene.GetRegistry().valid(selected))
+        {
+            m_Picked = {};
+            return;
+        }
+
+        if (clickResult != nullptr && clickResult->Entity == selected && clickResult->PickedData.entity)
+        {
+            m_Picked = clickResult->PickedData;
+            return;
+        }
+
+        if (m_Picked.entity.id == selected && m_Picked.entity)
+            return;
+
+        m_Picked = {};
+        m_Picked.entity.id = selected;
+        m_Picked.entity.is_background = false;
     }
 
     entt::entity SelectionModule::GetSelectedEntity(const ECS::Scene& scene) const
@@ -103,11 +174,13 @@ namespace Runtime
     void SelectionModule::SetSelectedEntity(ECS::Scene& scene, entt::entity e)
     {
         Selection::ApplySelection(scene, e, Selection::PickMode::Replace);
+        SyncPickedToSelection(scene, nullptr);
     }
 
     void SelectionModule::ClearSelection(ECS::Scene& scene)
     {
         Selection::ApplySelection(scene, entt::null, Selection::PickMode::Replace);
+        m_Picked = {};
     }
 
     void SelectionModule::Update(ECS::Scene& scene,
@@ -118,6 +191,24 @@ namespace Runtime
     {
         if (m_Config.Active != Activation::Enabled)
             return;
+
+        // Keep renderable scene entities selectable/pickable even when they were
+        // authored procedurally and did not come through SceneManager.
+        {
+            auto& reg = scene.GetRegistry();
+            static uint32_t s_NextAutoPickId = 2'000'000u;
+            const auto ensurePickability = [&](entt::entity entity)
+            {
+                if (!reg.all_of<ECS::Components::Selection::SelectableTag>(entity))
+                    reg.emplace<ECS::Components::Selection::SelectableTag>(entity);
+                if (!reg.all_of<ECS::Components::Selection::PickID>(entity))
+                    reg.emplace<ECS::Components::Selection::PickID>(entity, s_NextAutoPickId++);
+            };
+
+            for (auto entity : reg.view<ECS::Surface::Component>()) ensurePickability(entity);
+            for (auto entity : reg.view<ECS::PointCloud::Data>()) ensurePickability(entity);
+            for (auto entity : reg.view<ECS::Graph::Data>()) ensurePickability(entity);
+        }
 
         // Shift modifies selection semantics:
         //  - no shift: replace selection with the clicked entity (standard click-to-select)
@@ -149,6 +240,9 @@ namespace Runtime
                 Selection::PickRequest req{};
                 req.WorldRay = Selection::RayFromNDC(*camera, {nx, ny});
                 req.Backend = Selection::PickBackend::CPU;
+                req.PickRadiusPixels = m_Config.PickRadiusPixels;
+                req.CameraFovYRadians = glm::radians(camera->Fov);
+                req.ViewportHeightPixels = static_cast<float>(winH);
 
                 const auto hit = Selection::PickCPU(scene, req);
                 Selection::ApplyHover(scene, hit.Entity);
@@ -167,6 +261,8 @@ namespace Runtime
             {
                 if (m_Config.Backend == Selection::PickBackend::GPU)
                 {
+                    m_PendingPickRequest = BuildPickRequest(*camera, window, clickMode, m_Config.PickRadiusPixels);
+                    m_HasPendingPickRequest = true;
                     const glm::uvec2 px = WindowToFramebufferPixel(window, window.GetInput().GetMousePosition());
                     renderSystem.RequestPick(px.x, px.y);
                     // Capture click mode at request time so the correct mode is applied
@@ -175,24 +271,17 @@ namespace Runtime
                 }
                 else
                 {
-                    // CPU: build a ray from NDC.
                     const uint32_t winW = static_cast<uint32_t>(window.GetWindowWidth());
                     const uint32_t winH = static_cast<uint32_t>(window.GetWindowHeight());
                     if (winW > 0 && winH > 0)
                     {
-                        const glm::vec2 m = window.GetInput().GetMousePosition();
+                        m_PendingPickRequest = BuildPickRequest(*camera, window, clickMode, m_Config.PickRadiusPixels);
+                        m_HasPendingPickRequest = true;
 
-                        // NDC: x in [-1,1], y in [-1,1] with +y down (Vulkan).
-                        const float nx = (2.0f * (m.x / static_cast<float>(winW))) - 1.0f;
-                        const float ny = (2.0f * (m.y / static_cast<float>(winH))) - 1.0f;
-
-                        Selection::PickRequest req{};
-                        req.WorldRay = Selection::RayFromNDC(*camera, {nx, ny});
-                        req.Backend = Selection::PickBackend::CPU;
-                        req.Mode = clickMode;
-
-                        const auto hit = Selection::PickCPU(scene, req);
-                        Selection::ApplySelection(scene, hit.Entity, req.Mode);
+                        const auto hit = Selection::PickCPU(scene, m_PendingPickRequest);
+                        Selection::ApplySelection(scene, hit.Entity, m_PendingPickRequest.Mode);
+                        SyncPickedToSelection(scene, hit.Entity != entt::null ? &hit : nullptr);
+                        m_HasPendingPickRequest = false;
                     }
                 }
             }
@@ -204,7 +293,19 @@ namespace Runtime
             const auto pick = *m_CachedGpuPick;
             m_CachedGpuPick.reset();
 
-            ApplyFromGpuPick(scene, pick.PickID, pick.HasHit, m_PendingGpuClickMode);
+            Selection::Picked picked{};
+            ApplyFromGpuPick(scene,
+                             pick.PickID,
+                             pick.HasHit,
+                             m_PendingGpuClickMode,
+                             m_HasPendingPickRequest ? &m_PendingPickRequest : nullptr,
+                             picked);
+
+            Selection::PickResult resolved{};
+            resolved.Entity = picked.entity.id;
+            resolved.PickedData = picked;
+            SyncPickedToSelection(scene, resolved.Entity != entt::null ? &resolved : nullptr);
+            m_HasPendingPickRequest = false;
         }
     }
 }
