@@ -38,6 +38,20 @@ This document tracks the **active rendering-architecture backlog** for Intrinsic
 - [ ] Make the selection mode work with radio buttons (vertex, edge, face, entity).
 - [ ] Wire Geodesic computation in the ui. When active, mark the selected vertex or vertices (with shift for multiple selection) with a different colored shpere.
 
+### Core & RHI Code Quality (Audit Findings)
+
+- [ ] Extract RHI SafeDestroy helper — 9 files repeat identical move-capture + lambda pattern for deferred Vulkan resource destruction (`RHI.Buffer.cpp`, `RHI.Shader.cpp`, `RHI.Image.cpp`, `RHI.Texture.cpp`, `RHI.Pipeline.cpp`, etc.). Create a template or macro in `RHI.DestructionUtils`.
+- [ ] Standardize frame counter naming — `GlobalFrameNumber` (Device), `CurrentFrame` (Telemetry), `frameEpoch` (CommandContext), `currentFrameNumber` (ResourcePool) all refer to the same monotonic counter. Pick one name and unify.
+- [ ] Add algorithm comments to underdocumented complex sections:
+  - `ArenaLifetimeToken` atomic generation tracking (`Core.Memory.cpp:75-96`)
+  - `TypeToken<T>()` compile-time type signature hashing (`Core.FrameGraph.cppm:56-93`)
+  - Timeline semaphore two-atomic signaling pattern (`RHI.Device.cpp:155-160`)
+  - `ScopeStack::NewArray()` three-level indirection for destructor tracking (`Core.Memory.cppm:265-316`)
+  - Deferred deletion queue partitioning in `CollectGarbage()` (`RHI.Device.cppm:93-117`)
+- [ ] Rename `ResourcePool::GetUnchecked()` to `GetIfValid()` — the method still validates bounds and generation despite the "unchecked" name, creating a name/behavior mismatch.
+- [ ] Document device reference lifetime contract — RHI classes inconsistently use `VulkanDevice&` (non-owning) vs `shared_ptr<VulkanDevice>` (shared ownership). Add a comment convention explaining when each is appropriate.
+- [ ] Document Core.Memory `fprintf` vs `Core::Log` error reporting trade-off — Core uses `fprintf(stderr, ...)` to avoid circular dependency with Logging; Runtime modules use `Core::Log`. Add a rationale comment in `Core.Memory.cpp`.
+
 ## 2. Next (P1) — Near-Term Follow-Up After the Refactor Lands
 
 These are not required to finish the first wave, but they should begin soon after P0 is stable.
