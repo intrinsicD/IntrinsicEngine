@@ -309,3 +309,16 @@ PLY and PCD importers use `Detail::NormalizeColorChannelToUnitRange()` for color
 `RHI.Bindless.cpp` uses `std::cout << std::flush` instead of the structured `Core::Log` system used everywhere else.
 
 - [ ] Replace `std::cout` usage in `RHI.Bindless.cpp` with `Core::Log`.
+
+### D15. Render Pass: Generic EnsureAttrBuffer Template (P3)
+
+Five nearly-identical `Ensure*Buffer()` functions exist across passes (LinePass, PointPass, SurfacePass), each following the same map-lookup → SafeDestroy → allocate → write → return BDA pattern. Consolidating into a single generic template in `PassUtils.hpp` would eliminate ~150 lines of duplicated buffer management logic.
+
+- [ ] Extract a generic `EnsurePerEntityBuffer<T>()` template into `PassUtils.hpp`.
+- [ ] Migrate `EnsureEdgeAuxBuffer`, `EnsurePointAuxBuffer`, `EnsurePointRadiiBuffer`, `EnsureFaceAttrBuffer`, `EnsureVertexAttrBuffer` to use the shared template.
+
+### D16. Render Pass: Naming Inconsistency — Aux vs Attr (P4)
+
+Per-entity attribute buffer entry structs use inconsistent naming across passes: `FaceAttrEntry` / `VertexAttrEntry` (SurfacePass) vs `RetainedEdgeAuxEntry` / `RetainedPointAuxEntry` (LinePass / PointPass). Standardize to one convention.
+
+- [ ] Pick one naming convention (`*AuxEntry` or `*AttrEntry`) and unify across all passes.
