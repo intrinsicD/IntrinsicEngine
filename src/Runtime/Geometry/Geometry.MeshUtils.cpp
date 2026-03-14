@@ -24,7 +24,6 @@ namespace Geometry::MeshUtils
 {
     namespace
     {
-        constexpr const char* kVertexTexcoordPropertyName = "v:texcoord";
         constexpr float kTexcoordEpsilon = 1.0e-6f;
 
         struct QuantizedPositionKey

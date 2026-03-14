@@ -16,6 +16,7 @@ module;
 #include <vector>
 #include <glm/glm.hpp>
 #include "Graphics.FileFormatUtils.hpp"
+#include "Graphics.Importers.TextParse.hpp"
 
 module Graphics:Importers.PLY.Impl;
 import :Importers.PLY;
@@ -267,26 +268,13 @@ namespace Graphics
             }
         }
 
+        // Wrapper around TextParse::ParseNumber<float> that returns 0.0f on
+        // failure, matching the silent-default behavior expected by PLY vertex
+        // attribute parsing (positions, normals, colors default to zero/identity
+        // when a token is malformed).
         static float ParseFloat(std::string_view sv)
         {
-            float val = 0.0f;
-            std::from_chars(sv.data(), sv.data() + sv.size(), val);
-            return val;
-        }
-
-        static std::vector<std::string_view> Split(std::string_view str, const char delimiter)
-        {
-            std::vector<std::string_view> result;
-            size_t first = 0;
-            while (first < str.size())
-            {
-                const auto second = str.find(delimiter, first);
-                if (first != second)
-                    result.emplace_back(str.substr(first, second - first));
-                if (second == std::string_view::npos) break;
-                first = second + 1;
-            }
-            return result;
+            return Importers::TextParse::ParseNumber<float>(sv).value_or(0.0f);
         }
     }
 
@@ -494,11 +482,11 @@ namespace Graphics
             std::string line;
 
             // Vertex lines
+            std::vector<std::string_view> tokens;
             for (size_t i = 0; i < vertexElement.Count; ++i)
             {
                 std::getline(bodyStream, line);
-                std::vector<std::string_view> tokens = Split(line, ' ');
-                std::erase_if(tokens, [](std::string_view s) { return s.empty(); });
+                Importers::TextParse::SplitWhitespace(line, tokens);
 
                 if (idxX >= 0 && (size_t)idxX < tokens.size()) outData.Positions[i].x = ParseFloat(tokens[(size_t)idxX]);
                 if (idxY >= 0 && (size_t)idxY < tokens.size()) outData.Positions[i].y = ParseFloat(tokens[(size_t)idxY]);

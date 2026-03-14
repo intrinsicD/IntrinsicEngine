@@ -24,6 +24,8 @@ import :Geometry;
 import :AssetErrors;
 import Geometry;
 
+#include "Graphics.Importers.PostProcess.hpp"
+
 namespace Graphics
 {
     namespace
@@ -205,8 +207,16 @@ namespace Graphics
                 Geometry::MeshUtils::CalculateNormals(outData.Positions, outData.Indices, outData.Normals);
             }
 
-            // Generate UVs
-            Geometry::MeshUtils::GenerateUVs(outData.Positions, outData.Aux);
+            // Generate UVs via shared post-process path
+            if (!Importers::ApplyGeometryImportPostProcess(
+                    outData,
+                    true, // hasNormals — already computed above
+                    false, // hasUVs
+                    Geometry::MeshUtils::CalculateNormals,
+                    Geometry::MeshUtils::GenerateUVs))
+            {
+                return std::unexpected(AssetError::InvalidData);
+            }
 
             return outData;
         }
@@ -258,12 +268,17 @@ namespace Graphics
             if (outData.Positions.empty())
                 return std::unexpected(AssetError::InvalidData);
 
-            // Compute normals from geometry
             outData.Normals.resize(outData.Positions.size(), glm::vec3(0, 0, 0));
-            Geometry::MeshUtils::CalculateNormals(outData.Positions, outData.Indices, outData.Normals);
 
-            // Generate UVs
-            Geometry::MeshUtils::GenerateUVs(outData.Positions, outData.Aux);
+            if (!Importers::ApplyGeometryImportPostProcess(
+                    outData,
+                    false, // hasNormals — ASCII STL doesn't store per-vertex normals
+                    false, // hasUVs
+                    Geometry::MeshUtils::CalculateNormals,
+                    Geometry::MeshUtils::GenerateUVs))
+            {
+                return std::unexpected(AssetError::InvalidData);
+            }
 
             return outData;
         }
