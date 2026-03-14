@@ -165,7 +165,7 @@ namespace Geometry::Remeshing
             result.FlipCount += EqualizeValenceByEdgeFlip(mesh, params.PreserveBoundary);
 
             // Step 4: Tangential smoothing
-            MeshUtils::TangentialSmooth(mesh, params.SmoothingLambda, params.PreserveBoundary);
+            MeshUtils::TangentialSmooth(mesh, params.Lambda, params.PreserveBoundary);
 
             result.IterationsPerformed = iter + 1;
         }

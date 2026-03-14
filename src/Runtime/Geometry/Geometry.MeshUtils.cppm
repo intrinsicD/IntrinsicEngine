@@ -79,6 +79,11 @@ export namespace Geometry::MeshUtils
     /// Shared tangential Laplacian smoothing pass used by remeshing operators.
     void TangentialSmooth(Halfedge::Mesh& mesh, double lambda, bool preserveBoundary);
 
+    /// Mixed Voronoi area per vertex (Meyer et al., 2003).
+    /// Returns a vector indexed by vertex storage index.
+    /// Used by Curvature, Smoothing (cotan), and DEC (Hodge star 0).
+    std::vector<double> ComputeMixedVoronoiAreas(const Halfedge::Mesh& mesh);
+
     struct TriangleSoupBuildParams
     {
         // Merge coincident vertices before building topology. When UVs are supplied,

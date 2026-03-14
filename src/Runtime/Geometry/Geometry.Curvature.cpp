@@ -23,84 +23,7 @@ namespace Geometry::Curvature
     using MeshUtils::Cotan;
     using MeshUtils::TriangleArea;
     using MeshUtils::AngleAtVertex;
-
-    // =========================================================================
-    // Mixed Voronoi area per vertex (Meyer et al., 2003)
-    // =========================================================================
-    // Identical logic to DEC::BuildHodgeStar0 but returns a simple vector<double>
-    // for direct use in curvature computation.
-
-    static std::vector<double> ComputeMixedAreas(const Halfedge::Mesh& mesh)
-    {
-        const std::size_t nV = mesh.VerticesSize();
-        const std::size_t nF = mesh.FacesSize();
-
-        std::vector<double> areas(nV, 0.0);
-
-        for (std::size_t fi = 0; fi < nF; ++fi)
-        {
-            FaceHandle fh{static_cast<PropertyIndex>(fi)};
-            if (mesh.IsDeleted(fh)) continue;
-
-            HalfedgeHandle h0 = mesh.Halfedge(fh);
-            HalfedgeHandle h1 = mesh.NextHalfedge(h0);
-            HalfedgeHandle h2 = mesh.NextHalfedge(h1);
-
-            VertexHandle va = mesh.ToVertex(h0);
-            VertexHandle vb = mesh.ToVertex(h1);
-            VertexHandle vc = mesh.ToVertex(h2);
-
-            glm::vec3 pa = mesh.Position(va);
-            glm::vec3 pb = mesh.Position(vb);
-            glm::vec3 pc = mesh.Position(vc);
-
-            glm::vec3 eAB = pb - pa;
-            glm::vec3 eAC = pc - pa;
-            glm::vec3 eBC = pc - pb;
-
-            double area = TriangleArea(pa, pb, pc);
-            if (area < 1e-12) continue;
-
-            double dotA = static_cast<double>(glm::dot(eAB, eAC));
-            double dotB = static_cast<double>(glm::dot(-eAB, eBC));
-            double dotC = static_cast<double>(glm::dot(-eAC, -eBC));
-
-            if (dotA < 0.0)
-            {
-                areas[va.Index] += area / 2.0;
-                areas[vb.Index] += area / 4.0;
-                areas[vc.Index] += area / 4.0;
-            }
-            else if (dotB < 0.0)
-            {
-                areas[va.Index] += area / 4.0;
-                areas[vb.Index] += area / 2.0;
-                areas[vc.Index] += area / 4.0;
-            }
-            else if (dotC < 0.0)
-            {
-                areas[va.Index] += area / 4.0;
-                areas[vb.Index] += area / 4.0;
-                areas[vc.Index] += area / 2.0;
-            }
-            else
-            {
-                double cotA = Cotan(eAB, eAC);
-                double cotB = Cotan(-eAB, eBC);
-                double cotC = Cotan(-eAC, -eBC);
-
-                double lenSqAB = static_cast<double>(glm::dot(eAB, eAB));
-                double lenSqAC = static_cast<double>(glm::dot(eAC, eAC));
-                double lenSqBC = static_cast<double>(glm::dot(eBC, eBC));
-
-                areas[va.Index] += (lenSqAB * cotC + lenSqAC * cotB) / 8.0;
-                areas[vb.Index] += (lenSqAB * cotC + lenSqBC * cotA) / 8.0;
-                areas[vc.Index] += (lenSqAC * cotB + lenSqBC * cotA) / 8.0;
-            }
-        }
-
-        return areas;
-    }
+    using MeshUtils::ComputeMixedVoronoiAreas;
 
     // =========================================================================
     // ComputeMeanCurvature
@@ -128,7 +51,7 @@ namespace Geometry::Curvature
         MeanCurvatureResult result;
         result.Property = VertexProperty<double>(mesh.VertexProperties().GetOrAdd<double>("v:mean_curvature", 0.0));
 
-        auto areas = ComputeMixedAreas(mesh);
+        auto areas = ComputeMixedVoronoiAreas(mesh);
 
         // Compute cotan weights per edge and accumulate Laplace-Beltrami
         std::vector<glm::dvec3> laplacian(nV, glm::dvec3(0.0));
@@ -231,7 +154,7 @@ namespace Geometry::Curvature
         GaussianCurvatureResult result;
         result.Property = VertexProperty<double>(mesh.VertexProperties().GetOrAdd<double>("v:gaussian_curvature", 0.0));
 
-        auto areas = ComputeMixedAreas(mesh);
+        auto areas = ComputeMixedVoronoiAreas(mesh);
 
         // Accumulate angle sum per vertex
         std::vector<double> angleSum(nV, 0.0);
@@ -295,7 +218,7 @@ namespace Geometry::Curvature
         result.MeanCurvatureNormalProperty = VertexProperty<glm::vec3>(mesh.VertexProperties().GetOrAdd<glm::vec3>("v:mean_curvature_normal", glm::vec3(0.0f)));
 
         // Shared computation: mixed Voronoi areas
-        auto areas = ComputeMixedAreas(mesh);
+        auto areas = ComputeMixedVoronoiAreas(mesh);
 
         // 1. Accumulate cotan-weighted Laplacian for mean curvature
         std::vector<glm::dvec3> laplacian(nV, glm::dvec3(0.0));

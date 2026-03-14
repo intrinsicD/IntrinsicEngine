@@ -22,6 +22,7 @@ namespace Geometry::DEC
 {
     using MeshUtils::Cotan;
     using MeshUtils::TriangleArea;
+    using MeshUtils::ComputeMixedVoronoiAreas;
 
     // -------------------------------------------------------------------------
     // SparseMatrix operations
@@ -240,94 +241,13 @@ namespace Geometry::DEC
 
     DiagonalMatrix BuildHodgeStar0(const Halfedge::Mesh& mesh)
     {
-        const std::size_t nV = mesh.VerticesSize();
-        const std::size_t nF = mesh.FacesSize();
+        // Delegates to MeshUtils::ComputeMixedVoronoiAreas (Meyer et al., 2003),
+        // which is shared with Curvature and Smoothing modules.
+        auto areas = ComputeMixedVoronoiAreas(mesh);
 
         DiagonalMatrix hodge0;
-        hodge0.Size = nV;
-        hodge0.Diagonal.assign(nV, 0.0);
-
-        for (std::size_t fi = 0; fi < nF; ++fi)
-        {
-            FaceHandle fh{static_cast<PropertyIndex>(fi)};
-            if (mesh.IsDeleted(fh))
-            {
-                continue;
-            }
-
-            // Get the three vertices of this triangle
-            HalfedgeHandle h0 = mesh.Halfedge(fh);
-            HalfedgeHandle h1 = mesh.NextHalfedge(h0);
-            HalfedgeHandle h2 = mesh.NextHalfedge(h1);
-
-            VertexHandle va = mesh.ToVertex(h0);
-            VertexHandle vb = mesh.ToVertex(h1);
-            VertexHandle vc = mesh.ToVertex(h2);
-
-            glm::vec3 pa = mesh.Position(va);
-            glm::vec3 pb = mesh.Position(vb);
-            glm::vec3 pc = mesh.Position(vc);
-
-            // Edge vectors from each vertex
-            glm::vec3 eAB = pb - pa;
-            glm::vec3 eAC = pc - pa;
-            glm::vec3 eBC = pc - pb;
-
-            double area = TriangleArea(pa, pb, pc);
-            if (area < 1e-12)
-            {
-                continue;  // Degenerate triangle
-            }
-
-            // Check for obtuse angles
-            double dotA = static_cast<double>(glm::dot(eAB, eAC));  // angle at A
-            double dotB = static_cast<double>(glm::dot(-eAB, eBC));  // angle at B
-            double dotC = static_cast<double>(glm::dot(-eAC, -eBC)); // angle at C
-
-            if (dotA < 0.0)
-            {
-                // Obtuse at A
-                hodge0.Diagonal[va.Index] += area / 2.0;
-                hodge0.Diagonal[vb.Index] += area / 4.0;
-                hodge0.Diagonal[vc.Index] += area / 4.0;
-            }
-            else if (dotB < 0.0)
-            {
-                // Obtuse at B
-                hodge0.Diagonal[va.Index] += area / 4.0;
-                hodge0.Diagonal[vb.Index] += area / 2.0;
-                hodge0.Diagonal[vc.Index] += area / 4.0;
-            }
-            else if (dotC < 0.0)
-            {
-                // Obtuse at C
-                hodge0.Diagonal[va.Index] += area / 4.0;
-                hodge0.Diagonal[vb.Index] += area / 4.0;
-                hodge0.Diagonal[vc.Index] += area / 2.0;
-            }
-            else
-            {
-                // Non-obtuse: Voronoi area per vertex
-                // Voronoi area at vertex X = (1/8) Σ (|e|² cot(opposite_angle))
-                // for the two edges adjacent to X in this triangle.
-
-                double cotA = Cotan(eAB, eAC);
-                double cotB = Cotan(-eAB, eBC);
-                double cotC = Cotan(-eAC, -eBC);
-
-                double lenSqAB = static_cast<double>(glm::dot(eAB, eAB));
-                double lenSqAC = static_cast<double>(glm::dot(eAC, eAC));
-                double lenSqBC = static_cast<double>(glm::dot(eBC, eBC));
-
-                // At vertex A: edges AB and AC; opposite angles are C and B
-                hodge0.Diagonal[va.Index] += (lenSqAB * cotC + lenSqAC * cotB) / 8.0;
-                // At vertex B: edges AB and BC; opposite angles are C and A
-                hodge0.Diagonal[vb.Index] += (lenSqAB * cotC + lenSqBC * cotA) / 8.0;
-                // At vertex C: edges AC and BC; opposite angles are B and A
-                hodge0.Diagonal[vc.Index] += (lenSqAC * cotB + lenSqBC * cotA) / 8.0;
-            }
-        }
-
+        hodge0.Size = areas.size();
+        hodge0.Diagonal = std::move(areas);
         return hodge0;
     }
 

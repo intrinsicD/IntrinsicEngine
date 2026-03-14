@@ -136,18 +136,13 @@ namespace Graphics
                     glm::vec3 pos(vx, vy, vz);
 
                     VertexKey key{pos};
-                    auto it = uniqueVerts.find(key);
-                    if (it == uniqueVerts.end())
+                    auto [it, inserted] = uniqueVerts.try_emplace(
+                        key, static_cast<uint32_t>(outData.Positions.size()));
+                    if (inserted)
                     {
-                        auto idx = static_cast<uint32_t>(outData.Positions.size());
-                        uniqueVerts[key] = idx;
                         outData.Positions.push_back(pos);
-                        outData.Indices.push_back(idx);
                     }
-                    else
-                    {
-                        outData.Indices.push_back(it->second);
-                    }
+                    outData.Indices.push_back(it->second);
                 }
 
                 ptr += 50; // 12 (normal) + 36 (3 vertices) + 2 (attribute byte count)
@@ -250,18 +245,13 @@ namespace Graphics
                     glm::vec3 pos(x, y, z);
 
                     VertexKey key{pos};
-                    auto it = uniqueVerts.find(key);
-                    if (it == uniqueVerts.end())
+                    auto [it, inserted] = uniqueVerts.try_emplace(
+                        key, static_cast<uint32_t>(outData.Positions.size()));
+                    if (inserted)
                     {
-                        auto idx = static_cast<uint32_t>(outData.Positions.size());
-                        uniqueVerts[key] = idx;
                         outData.Positions.push_back(pos);
-                        outData.Indices.push_back(idx);
                     }
-                    else
-                    {
-                        outData.Indices.push_back(it->second);
-                    }
+                    outData.Indices.push_back(it->second);
                 }
             }
 
