@@ -828,8 +828,8 @@ namespace Graphics
                     inherit.ViewMask = 0;
                 }
 
-                const uint64_t frameEpoch = m_Device ? m_Device->GetGlobalFrameNumber() : 0ull;
-                VkCommandBuffer sec = RHI::CommandContext::BeginSecondary(*m_Device, frameEpoch, inherit);
+                const uint64_t globalFrame = m_Device ? m_Device->GetGlobalFrameNumber() : 0ull;
+                VkCommandBuffer sec = RHI::CommandContext::BeginSecondary(*m_Device, globalFrame, inherit);
 
                 // Record all passes in the packet into this single secondary.
                 for (uint32_t p = 0; p < pkt.PassCount; ++p)

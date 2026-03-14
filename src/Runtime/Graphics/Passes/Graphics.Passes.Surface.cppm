@@ -255,16 +255,16 @@ export namespace Graphics::Passes
                              Geometry::GeometryHandle singleGeometry);
 
         // -----------------------------------------------------------------
-        // Per-face attribute buffers — persistent BDA-addressable GPU buffers
-        // keyed by GeometryHandle::Index. Created lazily when an entity with
-        // CachedFaceColors is encountered during draw stream build.
+        // Per-entity retained attribute buffers — persistent BDA-addressable
+        // GPU buffers keyed by GeometryHandle::Index. Created lazily when an
+        // entity with cached colors is encountered during draw stream build.
         // -----------------------------------------------------------------
-        struct FaceAttrEntry
+        struct RetainedBufferEntry
         {
             std::unique_ptr<RHI::VulkanBuffer> Buffer;
-            uint32_t FaceCount = 0;
+            uint32_t Count = 0;
         };
-        std::unordered_map<uint32_t, FaceAttrEntry> m_FaceAttrBuffers;
+        std::unordered_map<uint32_t, RetainedBufferEntry> m_FaceAttrBuffers;
 
         // Sparse table: GeometryHandle::Index → point size in pixels.
         // Grown on demand by SetPointSize(); default 0.0f means "not set" (falls back to 4.0f).
@@ -277,16 +277,8 @@ export namespace Graphics::Passes
                                       const uint32_t* colorData,
                                       uint32_t faceCount);
 
-        // -----------------------------------------------------------------
-        // Per-vertex attribute buffers — persistent BDA-addressable GPU buffers
-        // keyed by GeometryHandle::Index. Same pattern as FaceAttrEntry.
-        // -----------------------------------------------------------------
-        struct VertexAttrEntry
-        {
-            std::unique_ptr<RHI::VulkanBuffer> Buffer;
-            uint32_t VertexCount = 0;
-        };
-        std::unordered_map<uint32_t, VertexAttrEntry> m_VertexAttrBuffers;
+        // Per-vertex attribute buffers — same pattern as face attr, same entry type.
+        std::unordered_map<uint32_t, RetainedBufferEntry> m_VertexAttrBuffers;
 
         // Create or update a persistent per-vertex attribute buffer for a geometry.
         // Data is an array of packed ABGR uint32_t, one per vertex.

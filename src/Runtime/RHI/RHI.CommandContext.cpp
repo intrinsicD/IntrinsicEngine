@@ -85,18 +85,18 @@ namespace RHI
     }
 
     VkCommandBuffer CommandContext::BeginSecondary(VulkanDevice& device,
-                                                  uint64_t frameEpoch,
+                                                  uint64_t globalFrameNumber,
                                                   const SecondaryInheritanceInfo& inherit)
     {
         VkCommandPool pool = GetOrCreatePool(device);
 
         const uint32_t frames = (s_Thread.FramesInFlight > 0) ? s_Thread.FramesInFlight : 1u;
-        const uint32_t slot = static_cast<uint32_t>(frameEpoch % static_cast<uint64_t>(frames));
+        const uint32_t slot = static_cast<uint32_t>(globalFrameNumber % static_cast<uint64_t>(frames));
 
         // Reset per-slot cursor once per new epoch.
-        if (s_Thread.LastEpochPerFrame[slot] != frameEpoch)
+        if (s_Thread.LastEpochPerFrame[slot] != globalFrameNumber)
         {
-            s_Thread.LastEpochPerFrame[slot] = frameEpoch;
+            s_Thread.LastEpochPerFrame[slot] = globalFrameNumber;
             s_Thread.UsedCountPerFrame[slot] = 0;
         }
 

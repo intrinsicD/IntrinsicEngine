@@ -69,7 +69,7 @@ export namespace Core
             return Add(std::make_unique<T>(std::forward<Args>(args)...));
         }
 
-        void Remove(Handle handle, uint64_t currentFrameNumber)
+        void Remove(Handle handle, uint64_t globalFrameNumber)
         {
             std::unique_lock lock(m_Mutex);
 
@@ -85,12 +85,12 @@ export namespace Core
                 m_PendingKillList.push_back({
                     .SlotIndex = handle.Index,
                     .Generation = handle.Generation,
-                    .KillFrameNumber = currentFrameNumber
+                    .KillFrameNumber = globalFrameNumber
                 });
             }
         }
 
-        void ProcessDeletions(uint64_t currentFrameNumber)
+        void ProcessDeletions(uint64_t globalFrameNumber)
         {
             // Quick check without lock first
             if (m_PendingKillList.empty()) return;
@@ -101,7 +101,7 @@ export namespace Core
             {
                 // Wait for RetirementFrames to pass before reclaiming the slot.
                 // For RetirementFrames == 0 (CPU-only pools) this condition is always false → immediate reclaim.
-                if (currentFrameNumber <= item.KillFrameNumber + RetirementFrames)
+                if (globalFrameNumber <= item.KillFrameNumber + RetirementFrames)
                     return false;
 
                 // Validate slot is still in the expected state

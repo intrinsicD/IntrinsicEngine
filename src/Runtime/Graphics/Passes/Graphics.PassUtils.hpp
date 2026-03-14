@@ -333,3 +333,60 @@ inline std::pair<std::string, std::string> ResolveShaderPaths(
         Core::Filesystem::ResolveShaderPathOrExit(resolver, fragId)
     };
 }
+
+// =============================================================================
+// EnsurePerEntityBuffer<T> — create or update a persistent BDA-addressable
+// per-entity attribute buffer.
+// =============================================================================
+// Deduplicates the identical pattern used by LinePass (edge aux), PointPass
+// (point aux, point radii), and SurfacePass (face attr, vertex attr).
+//
+// EntryT must have:
+//   std::unique_ptr<RHI::VulkanBuffer> Buffer;
+//   uint32_t Count;
+//
+// Returns the buffer device address, or 0 on allocation failure.
+
+template<typename T, typename EntryT>
+uint64_t EnsurePerEntityBuffer(
+    RHI::VulkanDevice& device,
+    std::unordered_map<uint32_t, EntryT>& bufferMap,
+    uint32_t entityKey,
+    const T* data,
+    uint32_t elementCount,
+    std::string_view passName)
+{
+    auto it = bufferMap.find(entityKey);
+
+    // Buffer exists and count matches — update data in-place.
+    if (it != bufferMap.end() && it->second.Count == elementCount && it->second.Buffer)
+    {
+        it->second.Buffer->Write(data, static_cast<size_t>(elementCount) * sizeof(T));
+        return it->second.Buffer->GetDeviceAddress();
+    }
+
+    // Need to create or recreate (count changed).
+    if (it != bufferMap.end() && it->second.Buffer)
+    {
+        device.SafeDestroy([old = std::move(it->second.Buffer)]() {});
+        it->second.Count = 0;
+    }
+
+    const VkDeviceSize size = static_cast<VkDeviceSize>(elementCount) * sizeof(T);
+    auto buf = std::make_unique<RHI::VulkanBuffer>(
+        device, size,
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+        VMA_MEMORY_USAGE_CPU_TO_GPU);
+
+    if (!buf->GetMappedData())
+    {
+        Core::Log::Error("{}: Failed to allocate per-entity buffer ({} bytes)", passName, size);
+        return 0;
+    }
+
+    buf->Write(data, static_cast<size_t>(size));
+    const uint64_t addr = buf->GetDeviceAddress();
+
+    bufferMap[entityKey] = { std::move(buf), elementCount };
+    return addr;
+}

@@ -65,39 +65,8 @@ namespace Graphics::Passes
         const uint32_t* colorData,
         uint32_t edgeCount)
     {
-        auto it = m_EdgeAuxBuffers.find(entityKey);
-
-        // Buffer exists and edge count matches — update data in-place.
-        if (it != m_EdgeAuxBuffers.end() && it->second.EdgeCount == edgeCount && it->second.Buffer)
-        {
-            it->second.Buffer->Write(colorData, static_cast<size_t>(edgeCount) * sizeof(uint32_t));
-            return it->second.Buffer->GetDeviceAddress();
-        }
-
-        // Need to create or recreate (count changed).
-        if (it != m_EdgeAuxBuffers.end() && it->second.Buffer)
-        {
-            m_Device->SafeDestroy([old = std::move(it->second.Buffer)]() {});
-            it->second.EdgeCount = 0;
-        }
-
-        const VkDeviceSize size = static_cast<VkDeviceSize>(edgeCount) * sizeof(uint32_t);
-        auto buf = std::make_unique<RHI::VulkanBuffer>(
-            *m_Device, size,
-            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-            VMA_MEMORY_USAGE_CPU_TO_GPU);
-
-        if (!buf->GetMappedData())
-        {
-            Core::Log::Error("LinePass: Failed to allocate edge aux buffer ({} bytes)", size);
-            return 0;
-        }
-
-        buf->Write(colorData, static_cast<size_t>(size));
-        const uint64_t addr = buf->GetDeviceAddress();
-
-        m_EdgeAuxBuffers[entityKey] = { std::move(buf), edgeCount };
-        return addr;
+        return EnsurePerEntityBuffer<uint32_t>(
+            *m_Device, m_EdgeAuxBuffers, entityKey, colorData, edgeCount, "LinePass");
     }
 
     // =========================================================================
