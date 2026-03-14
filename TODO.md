@@ -261,9 +261,8 @@ PLY importer migrated to use `NormalizeColorChannelToUnitRange` (was using inlin
 
 ### D6. Importer Line I/O Inconsistency (P3)
 
-OBJ, PCD, TGF, and XYZ importers use the shared `TextParse::NextLine()` / `SplitWhitespace()` utilities. PLY and OFF importers use `std::istringstream` + `std::getline()` instead. STL also uses `std::istringstream` for ASCII parsing.
+OBJ, PCD, TGF, XYZ, and OFF importers now use the shared `TextParse::NextLine()` / `SplitWhitespace()` utilities. PLY importer still uses `std::istringstream` + `std::getline()` for header parsing (acceptable — PLY header is inherently line-oriented with mixed element/property declarations). STL also uses `std::istringstream` for ASCII parsing.
 
-- [ ] Migrate OFF importer to use `TextParse` utilities when next touched.
 - [ ] Evaluate migrating STL ASCII parser to `TextParse` (lower priority, format is simple).
 
 ### D7. Selection.cpp Picking Helper Extraction (P3)
@@ -273,12 +272,6 @@ OBJ, PCD, TGF, and XYZ importers use the shared `TextParse::NextLine()` / `Split
 - [ ] Extract closest-point-on-segment and ray-sphere helpers into `Geometry::Queries` or a `Selection` utility header.
 - [ ] Reduce duplication between vertex/edge/face picking code paths.
 
-### D8. PLY Importer Byte-Swap vs `std::byteswap` (P4)
-
-PLY importer uses a manual `ByteSwap()` via `std::reverse`, while PCD importer uses `std::byteswap()` (C++23). Unify to `std::byteswap()` when the PLY byte-swap code is next touched.
-
-- [ ] Replace PLY's manual `ByteSwap()` with `std::byteswap()` + `std::bit_cast`.
-
 ### D10. Geometry Kernel: Neighborhood Centroid — Point Cloud Path (P4)
 
 `NormalEstimation.cpp` computes centroids over KNN point-cloud neighborhoods (raw `std::vector<glm::vec3>`, no halfedge connectivity). This is a different pattern from the mesh 1-ring centroid now in `MeshUtils::ComputeOneRingCentroid()` and cannot share the same helper.
@@ -287,10 +280,9 @@ PLY importer uses a manual `ByteSwap()` via `std::reverse`, while PCD importer u
 
 ### D12. Importer Color Parsing: Consolidate Remaining Paths (P3)
 
-PLY and PCD importers use `Detail::NormalizeColorChannelToUnitRange()` for color normalization. OFF importer has an independent inline `if (r > 1.0f) r /= 255.0f;` pattern. XYZ importer has standalone `ParseColorTriplet()` / `ParsePointColor()` functions.
+PLY, PCD, and OFF importers now use `Detail::NormalizeColorChannelToUnitRange()` for color normalization. XYZ importer has standalone `ParseColorTriplet()` / `ParsePointColor()` functions that also use the shared helper.
 
-- [ ] Extract shared `Importers::ParseColor()` helper unifying [0,255]→[0,1] and [0,1]→[0,1] range handling.
-- [ ] Migrate OFF and XYZ importers to the shared helper.
+- [ ] Extract shared `Importers::ParseColor()` helper unifying [0,255]→[0,1] and [0,1]→[0,1] range handling across remaining importers (XYZ, PCD).
 
 ### D13. RHI Swapchain: Consistent Deferred Destruction (P3)
 
