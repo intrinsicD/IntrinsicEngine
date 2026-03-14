@@ -11,6 +11,7 @@ module;
 #include <unordered_map>
 #include <variant>
 #include <vector>
+#include "Graphics.FileFormatUtils.hpp"
 
 module Graphics:IORegistry.Impl;
 import :IORegistry;
@@ -35,13 +36,8 @@ namespace Graphics
 {
     namespace
     {
-        std::string ToLowerStr(std::string_view sv)
-        {
-            std::string s(sv);
-            std::transform(s.begin(), s.end(), s.begin(),
-                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-            return s;
-        }
+        using Detail::LowercaseExtension;
+        using Detail::ToLowerAscii;
 
         AssetError MapCoreError(Core::ErrorCode code)
         {
@@ -69,7 +65,7 @@ namespace Graphics
 
         for (auto ext : extensions)
         {
-            std::string key = ToLowerStr(ext);
+            std::string key = ToLowerAscii(ext);
             if (m_LoadersByExt.contains(key))
             {
                 Core::Log::Warn("IORegistry: Extension '{}' already registered, skipping", key);
@@ -95,7 +91,7 @@ namespace Graphics
 
         for (auto ext : extensions)
         {
-            std::string key = ToLowerStr(ext);
+            std::string key = ToLowerAscii(ext);
             if (m_ExportersByExt.contains(key))
             {
                 Core::Log::Warn("IORegistry: Exporter extension '{}' already registered, skipping", key);
@@ -114,7 +110,7 @@ namespace Graphics
 
     IAssetLoader* IORegistry::FindLoader(std::string_view extension) const
     {
-        std::string key = ToLowerStr(extension);
+        std::string key = ToLowerAscii(extension);
         auto it = m_LoadersByExt.find(key);
         if (it != m_LoadersByExt.end())
             return it->second;
@@ -123,7 +119,7 @@ namespace Graphics
 
     IAssetExporter* IORegistry::FindExporter(std::string_view extension) const
     {
-        std::string key = ToLowerStr(extension);
+        std::string key = ToLowerAscii(extension);
         auto it = m_ExportersByExt.find(key);
         if (it != m_ExportersByExt.end())
             return it->second;
@@ -152,9 +148,7 @@ namespace Graphics
         namespace fs = std::filesystem;
 
         fs::path fsPath(filepath);
-        std::string ext = fsPath.extension().string();
-        std::transform(ext.begin(), ext.end(), ext.begin(),
-                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        std::string ext = LowercaseExtension(fsPath);
 
         auto* loader = FindLoader(ext);
         if (!loader)
@@ -188,9 +182,7 @@ namespace Graphics
         namespace fs = std::filesystem;
 
         fs::path fsPath(filepath);
-        std::string ext = fsPath.extension().string();
-        std::transform(ext.begin(), ext.end(), ext.begin(),
-                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        std::string ext = LowercaseExtension(fsPath);
 
         auto* exporter = FindExporter(ext);
         if (!exporter)

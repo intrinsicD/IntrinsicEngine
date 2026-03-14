@@ -217,18 +217,15 @@ namespace Graphics::Passes
                 return;
             }
 
-            const std::string vertPath = Core::Filesystem::ResolveShaderPathOrExit(
-                [&](Core::Hash::StringID id) { return m_ShaderRegistry->Get(id); },
-                "Outline.Vert"_id);
-            const std::string fragPath = Core::Filesystem::ResolveShaderPathOrExit(
-                [&](Core::Hash::StringID id) { return m_ShaderRegistry->Get(id); },
+            const auto [vertPath, fragPath] = ResolveShaderPaths(
+                *m_ShaderRegistry,
+                "Outline.Vert"_id,
                 "Outline.Frag"_id);
 
             RHI::ShaderModule vert(*m_Device, vertPath, RHI::ShaderStage::Vertex);
             RHI::ShaderModule frag(*m_Device, fragPath, RHI::ShaderStage::Fragment);
 
-            std::shared_ptr<RHI::VulkanDevice> deviceAlias(m_Device, [](RHI::VulkanDevice*) {});
-            RHI::PipelineBuilder pb(deviceAlias);
+            RHI::PipelineBuilder pb(MakeDeviceAlias(m_Device));
             pb.SetShaders(&vert, &frag);
             pb.SetTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
             pb.DisableDepthTest();

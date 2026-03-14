@@ -4,6 +4,10 @@
 #include <memory>
 #include <string_view>
 #include <type_traits>
+#ifdef INTRINSIC_HAS_CUDA
+#include <thread>
+#include <cuda.h>
+#endif
 
 import RHI;
 
@@ -173,6 +177,77 @@ TEST(CudaDevice, GetFreeMemory)
     ASSERT_TRUE(freeMem.has_value());
     EXPECT_GT(*freeMem, 0u);
     EXPECT_LE(*freeMem, device->GetTotalMemory());
+}
+
+TEST(CudaDevice, PublicOperationsWorkFromDifferentThread)
+{
+    auto result = RHI::CudaDevice::Create();
+    if (!result)
+        GTEST_SKIP() << "CUDA not available";
+
+    auto& device = *result;
+
+    RHI::CudaExpected<RHI::CudaBufferHandle> bufferResult{
+        std::unexpected(RHI::CudaError::Unknown)};
+    RHI::CudaExpected<CUstream> streamResult{
+        std::unexpected(RHI::CudaError::Unknown)};
+    RHI::CudaExpected<size_t> freeMemResult{
+        std::unexpected(RHI::CudaError::Unknown)};
+    RHI::CudaError syncResult = RHI::CudaError::Unknown;
+    RHI::CudaBufferHandle handle{};
+    CUstream stream = nullptr;
+
+    std::thread worker([&]
+    {
+        bufferResult = device->AllocateBuffer(256);
+        if (bufferResult)
+            handle = *bufferResult;
+
+        streamResult = device->CreateStream();
+        if (streamResult)
+            stream = *streamResult;
+
+        freeMemResult = device->GetFreeMemory();
+        syncResult = device->SynchronizeDefaultStream();
+
+        if (stream)
+            device->DestroyStream(stream);
+        if (handle)
+            device->FreeBuffer(handle);
+    });
+    worker.join();
+
+    ASSERT_TRUE(bufferResult.has_value()) << RHI::CudaErrorToString(bufferResult.error());
+    ASSERT_TRUE(streamResult.has_value()) << RHI::CudaErrorToString(streamResult.error());
+    ASSERT_TRUE(freeMemResult.has_value()) << RHI::CudaErrorToString(freeMemResult.error());
+    EXPECT_EQ(syncResult, RHI::CudaError::Success);
+    EXPECT_FALSE(static_cast<bool>(handle));
+}
+
+TEST(CudaDevice, DriverCallsRestoreForeignCurrentContext)
+{
+    auto result = RHI::CudaDevice::Create();
+    if (!result)
+        GTEST_SKIP() << "CUDA not available";
+
+    auto& device = *result;
+
+    CUcontext foreignContext = nullptr;
+    ASSERT_EQ(cuCtxCreate(&foreignContext, 0, device->GetDevice()), CUDA_SUCCESS);
+
+    CUcontext beforeCall = nullptr;
+    ASSERT_EQ(cuCtxGetCurrent(&beforeCall), CUDA_SUCCESS);
+    ASSERT_EQ(beforeCall, foreignContext);
+
+    auto freeMemResult = device->GetFreeMemory();
+    ASSERT_TRUE(freeMemResult.has_value()) << RHI::CudaErrorToString(freeMemResult.error());
+
+    CUcontext afterCall = nullptr;
+    ASSERT_EQ(cuCtxGetCurrent(&afterCall), CUDA_SUCCESS);
+    EXPECT_EQ(afterCall, foreignContext);
+
+    ASSERT_EQ(cuCtxSetCurrent(nullptr), CUDA_SUCCESS);
+    ASSERT_EQ(cuCtxDestroy(foreignContext), CUDA_SUCCESS);
 }
 
 #endif // INTRINSIC_HAS_CUDA

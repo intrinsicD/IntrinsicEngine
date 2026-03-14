@@ -19,6 +19,7 @@ Built on **C++23 Modules**, **Vulkan 1.3** bindless rendering, coroutine-based t
 - **Lock-Free Telemetry:** Ring-buffered telemetry system for real-time CPU frame times, draw calls, triangle counts, and per-pass GPU/CPU timing entries.
 - **Benchmark Runner:** Deterministic `Core::Benchmark::BenchmarkRunner` captures per-frame snapshots (CPU/GPU/frame time, draw calls, triangles) with configurable warmup, computes percentile stats (avg/min/max/p95/p99), and writes structured JSON. Headless mode via `--benchmark <frames> --out file.json`. Threshold-based regression gate: `tools/check_perf_regression.sh`.
 - **FrameGraph + DAG Scheduler:** ECS systems declare explicit data dependencies; `DAGScheduler` resolves topological execution order. Shared scheduling algorithm between FrameGraph and RenderGraph. The CPU ready-queue executor now dispatches dependents through a stable value-captured execution context, avoiding recursive lambda lifetime hazards under high worker counts.
+- **CUDA driver context safety:** `RHI::CudaDevice` now wraps each public CUDA driver call in a scoped `cuCtxPushCurrent` / `cuCtxPopCurrent`, so buffer allocation/free, stream creation/destruction, stream synchronization, and memory queries remain valid from any engine thread and restore any previously-current foreign CUDA context on that thread.
 - **AssetManager Read Phases:**
   - `AssetManager::Update()` is the single-writer phase on the main thread.
   - Parallel systems use `BeginReadPhase()` / `EndReadPhase()` brackets.

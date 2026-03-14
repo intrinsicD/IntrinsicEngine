@@ -233,6 +233,27 @@ namespace Geometry::Geodesic
         GeodesicResult result;
         result.HeatSolveIterations = heatResult.Iterations;
 
+        result.DistanceProperty = VertexProperty<double>(
+            mesh.VertexProperties().GetOrAdd<double>("v:geodesic_distance", 0.0));
+        result.IsSourceProperty = VertexProperty<bool>(
+            mesh.VertexProperties().GetOrAdd<bool>("v:is_geodesic_source", false));
+
+        for (std::size_t vi = 0; vi < nV; ++vi)
+        {
+            VertexHandle vh{static_cast<PropertyIndex>(vi)};
+            result.IsSourceProperty[vh] = false;
+        }
+
+        for (std::size_t s : sourceVertices)
+        {
+            if (s < nV)
+            {
+                VertexHandle vh{static_cast<PropertyIndex>(s)};
+                if (!mesh.IsDeleted(vh) && !mesh.IsIsolated(vh))
+                    result.IsSourceProperty[vh] = true;
+            }
+        }
+
         // =====================================================================
         // Step 2: Compute normalized negative gradient field
         // =====================================================================

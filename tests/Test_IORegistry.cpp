@@ -4,6 +4,7 @@
 #include <expected>
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -88,6 +89,39 @@ TEST(FileIOBackend, ReadEmptyPath)
     EXPECT_EQ(result.error(), Core::ErrorCode::InvalidPath);
 }
 
+TEST(FileIOBackend, ReadOffsetPastEndReturnsOutOfRange)
+{
+    FileIOBackend backend;
+    IORequest req;
+    req.Path = std::string(ENGINE_ROOT_DIR) + "/CMakeLists.txt";
+    req.Offset = std::numeric_limits<size_t>::max();
+
+    auto result = backend.Read(req);
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Core::ErrorCode::OutOfRange);
+}
+
+TEST(FileIOBackend, ReadRangePastEndReturnsOutOfRange)
+{
+    FileIOBackend backend;
+    const std::string path = std::string(ENGINE_ROOT_DIR) + "/CMakeLists.txt";
+
+    IORequest fullReq;
+    fullReq.Path = path;
+    auto full = backend.Read(fullReq);
+    ASSERT_TRUE(full.has_value());
+    ASSERT_GT(full->Data.size(), 0u);
+
+    IORequest req;
+    req.Path = path;
+    req.Offset = full->Data.size() - 1;
+    req.Size = 2;
+
+    auto result = backend.Read(req);
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Core::ErrorCode::OutOfRange);
+}
+
 // =============================================================================
 // AssetId Tests
 // =============================================================================
@@ -147,6 +181,51 @@ public:
 private:
     std::string m_Name;
     std::vector<std::string_view> m_Extensions;
+};
+
+class MockExporter final : public IAssetExporter
+{
+public:
+    explicit MockExporter(std::string_view name, std::vector<std::string_view> exts)
+        : m_Name(name), m_Extensions(std::move(exts)) {}
+
+    [[nodiscard]] std::string_view FormatName() const override { return m_Name; }
+    [[nodiscard]] std::span<const std::string_view> Extensions() const override { return m_Extensions; }
+
+    [[nodiscard]] std::expected<std::vector<std::byte>, AssetError> Export(
+        const GeometryCpuData& /*data*/,
+        const ExportOptions& /*options*/) override
+    {
+        return std::vector<std::byte>{std::byte{0x42}, std::byte{0x24}};
+    }
+
+private:
+    std::string m_Name;
+    std::vector<std::string_view> m_Extensions;
+};
+
+class ErrorIOBackend final : public IIOBackend
+{
+public:
+    std::optional<Core::ErrorCode> ReadError;
+    std::optional<Core::ErrorCode> WriteError;
+    std::vector<std::byte> ReadData{std::byte{0x01}, std::byte{0x02}};
+
+    [[nodiscard]] std::expected<IOReadResult, Core::ErrorCode> Read(const IORequest& /*request*/) override
+    {
+        if (ReadError)
+            return std::unexpected(*ReadError);
+        return IOReadResult{ReadData};
+    }
+
+    [[nodiscard]] std::expected<void, Core::ErrorCode> Write(
+        const IORequest& /*request*/,
+        std::span<const std::byte> /*data*/) override
+    {
+        if (WriteError)
+            return std::unexpected(*WriteError);
+        return {};
+    }
 };
 
 TEST(IORegistry, RegisterLoaderSucceeds)
@@ -1270,3 +1349,46 @@ TEST(IORegistryImport, DuckAggressiveSimplificationSurvivesWorkflowExtraction)
     EXPECT_EQ(rebuiltQuality->BoundaryLoopCount, simplifiedQuality->BoundaryLoopCount)
         << "Workflow extraction/rebuild changed duck boundary topology";
 }
+
+TEST(IORegistry, ImportMapsBackendReadErrorsToAssetErrors)
+{
+    IORegistry registry;
+    registry.RegisterLoader(std::make_unique<MockLoader>("Test", std::vector<std::string_view>{".mock"}));
+
+    ErrorIOBackend backend;
+    backend.ReadError = Core::ErrorCode::FileReadError;
+
+    auto result = registry.Import("/virtual/data.mock", backend);
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), AssetError::DecodeFailed);
+}
+
+TEST(IORegistry, ExportMapsBackendWriteErrorsToAssetErrors)
+{
+    IORegistry registry;
+    registry.RegisterExporter(std::make_unique<MockExporter>("Test", std::vector<std::string_view>{".mock"}));
+
+    ErrorIOBackend backend;
+    backend.WriteError = Core::ErrorCode::InvalidPath;
+
+    GeometryCpuData data;
+    data.Topology = PrimitiveTopology::Points;
+
+    auto result = registry.Export("/virtual/data.mock", backend, data);
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), AssetError::InvalidData);
+}
+
+TEST(IORegistry, ExportReturnsUnsupportedFormatForUnknownExt)
+{
+    IORegistry registry;
+    ErrorIOBackend backend;
+
+    GeometryCpuData data;
+    data.Topology = PrimitiveTopology::Points;
+
+    auto result = registry.Export("/virtual/data.unknown", backend, data);
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), AssetError::UnsupportedFormat);
+}
+

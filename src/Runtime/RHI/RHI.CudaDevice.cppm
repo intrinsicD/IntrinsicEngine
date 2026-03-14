@@ -28,10 +28,10 @@ export namespace RHI
     // Owns a CUDA context and default stream. Follows the VulkanDevice pattern:
     // non-copyable, non-movable, created via factory method.
     //
-    // Thread safety: CUDA contexts are thread-local by default. This class
-    // pushes/pops the context as needed. All public methods are safe to call
-    // from any thread, but concurrent kernel launches should use separate
-    // streams (via CreateStream).
+    // Thread safety: CUDA driver state is thread-local. Every public method that
+    // issues driver calls scopes m_Context current on the caller thread and
+    // restores the previous current context before returning. Concurrent work
+    // submission should still use separate streams (via CreateStream).
     class CudaDevice
     {
     public:

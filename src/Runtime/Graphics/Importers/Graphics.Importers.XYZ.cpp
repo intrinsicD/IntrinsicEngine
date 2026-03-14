@@ -7,6 +7,7 @@ module;
 #include <string_view>
 #include <vector>
 #include <glm/glm.hpp>
+#include "Graphics.FileFormatUtils.hpp"
 #include "Graphics.Importers.TextParse.hpp"
 
 module Graphics:Importers.XYZ.Impl;
@@ -24,11 +25,6 @@ namespace Graphics
     {
         constexpr std::string_view s_Extensions[] = { ".xyz", ".pts", ".xyzrgb", ".txt" };
 
-        [[nodiscard]] float NormalizeColorChannel(float value)
-        {
-            return value > 1.0f ? (value / 255.0f) : value;
-        }
-
         [[nodiscard]] std::optional<glm::vec4> ParseColorTriplet(
             std::span<const std::string_view> tokens,
             std::size_t offset)
@@ -43,9 +39,9 @@ namespace Graphics
                 return std::nullopt;
 
             return glm::vec4(
-                NormalizeColorChannel(*r),
-                NormalizeColorChannel(*g),
-                NormalizeColorChannel(*b),
+                Detail::NormalizeColorChannelToUnitRange(*r),
+                Detail::NormalizeColorChannelToUnitRange(*g),
+                Detail::NormalizeColorChannelToUnitRange(*b),
                 1.0f);
         }
 
@@ -67,7 +63,7 @@ namespace Graphics
             {
                 if (const auto intensity = Importers::TextParse::ParseNumber<float>(tokens[3]))
                 {
-                    const float value = NormalizeColorChannel(*intensity);
+                    const float value = Detail::NormalizeColorChannelToUnitRange(*intensity);
                     return glm::vec4(value, value, value, 1.0f);
                 }
             }

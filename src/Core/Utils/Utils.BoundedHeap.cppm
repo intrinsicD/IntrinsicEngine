@@ -7,8 +7,11 @@ export module Utils.BoundedHeap;
 
 export namespace Utils
 {
-    // Keeps the k *smallest* T by operator<. top() = current worst (largest) in the heap.
-    // Works great with T = std::pair<float,size_t> (lexicographic compare).
+    // Keeps the k smallest values under the strict weak ordering induced by operator<.
+    // top() is the current worst retained element (the maximal element under that ordering).
+    // Works well with T = std::pair<float, size_t>: comparison is lexicographic, so pairs are
+    // ordered by distance first, then by index. Smaller distance is better; for equal distance,
+    // smaller index is better. This assumes the key values participate in a strict weak ordering.
     template <typename T>
     class BoundedHeap
     {
@@ -18,7 +21,8 @@ export namespace Utils
             m_Data.reserve(m_MaxSize);
         }
 
-        // Add an item; ignores it if the heap is full and item is not better than the current worst.
+        // Adds an item. If the heap is full, only strictly better (smaller) items replace the
+        // current worst retained item; comparator-equivalent items are rejected.
         void Push(const T& item)
         {
             if (m_MaxSize == 0) return; // handle k == 0 quietly
@@ -30,17 +34,16 @@ export namespace Utils
             }
             else if (item < m_Data.front())
             {
-                // Replace current worst (largest) with better (smaller) item.
+                // Replace the current worst retained item with a strictly better one.
                 std::pop_heap(m_Data.begin(), m_Data.end());
                 m_Data.back() = item;
                 std::push_heap(m_Data.begin(), m_Data.end());
             }
-            // NOTE: If you want "keep first-seen on ties", change condition to:
-            //   if (item < data_.front() && !(data_.front() < item)) { ... }
-            // or equivalently keep strict < but normalize T's tie-break policy.
+            // This container is not insertion-stable for comparator-equivalent values. If ties
+            // need deterministic behavior, encode the tie-break policy in T's ordering.
         }
 
-        // Largest element (i.e., current worst). Precondition: not empty.
+        // Returns the current worst retained item. Precondition: not empty.
         const T& top() const
         {
             return m_Data.front();
@@ -52,9 +55,9 @@ export namespace Utils
 
         void Clear() { m_Data.clear(); }
 
-        // Convenience: Returns current worst (threshold for pruning).
-        // IMPORTANT: Only call when Size() == Capacity(), otherwise threshold is undefined.
-        // Caller should manage tau externally when heap is not yet full.
+        // Returns the current worst retained item. Precondition: not empty.
+        // When Size() < Capacity(), this is only the worst item seen so far; treat it as a
+        // pruning threshold only once Size() == Capacity().
         const T& Threshold() const
         {
             return top();
@@ -72,6 +75,6 @@ export namespace Utils
 
     private:
         std::size_t m_MaxSize;
-        std::vector<T> m_Data; // max-heap by operator< (largest at front)
+        std::vector<T> m_Data; // max-heap under operator< (worst retained item at front)
     };
 }

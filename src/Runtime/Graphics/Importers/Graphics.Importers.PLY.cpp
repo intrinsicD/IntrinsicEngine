@@ -15,6 +15,7 @@ module;
 #include <string_view>
 #include <vector>
 #include <glm/glm.hpp>
+#include "Graphics.FileFormatUtils.hpp"
 
 module Graphics:Importers.PLY.Impl;
 import :Importers.PLY;
@@ -54,8 +55,7 @@ namespace Graphics
 
         [[nodiscard]] static std::optional<PlyScalarType> PlyScalarTypeFromToken(std::string_view token)
         {
-            auto lower = std::string(token);
-            std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+            auto lower = Detail::ToLowerAscii(token);
 
             if (lower == "char" || lower == "int8") return PlyScalarType::Int8;
             if (lower == "uchar" || lower == "uint8" || lower == "uchar8") return PlyScalarType::UInt8;
@@ -189,12 +189,6 @@ namespace Graphics
             return s;
         }
 
-        [[nodiscard]] std::string ToLower(std::string s)
-        {
-            std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return (char)std::tolower(c); });
-            return s;
-        }
-
         [[nodiscard]] bool PlyScalarIsIntegerLike(PlyScalarType t)
         {
             switch (t)
@@ -231,7 +225,7 @@ namespace Graphics
             for (const auto& p : faceElement.Properties)
             {
                 if (!p.IsList) continue;
-                const std::string nameLower = ToLower(p.Name);
+                const std::string nameLower = Detail::ToLowerAscii(p.Name);
                 int score = 0;
                 if (nameLower == "vertex_indices" || nameLower == "vertex_index") score += 100;
                 if (nameLower.find("vertex") != std::string::npos) score += 20;
@@ -350,7 +344,7 @@ namespace Graphics
                 {
                     std::string fmt;
                     ss >> fmt;
-                    fmt = ToLower(fmt);
+                    fmt = Detail::ToLowerAscii(fmt);
                     if (fmt == "ascii") format = PlyFormat::Ascii;
                     else if (fmt == "binary_little_endian") format = PlyFormat::BinaryLittleEndian;
                     else if (fmt == "binary_big_endian") format = PlyFormat::BinaryBigEndian;
@@ -361,7 +355,7 @@ namespace Graphics
                     std::string type;
                     size_t count = 0;
                     ss >> type >> count;
-                    type = ToLower(type);
+                    type = Detail::ToLowerAscii(type);
 
                     elementsInOrder.emplace_back();
                     elementsInOrder.back().Name = type;
@@ -392,7 +386,7 @@ namespace Graphics
 
                     std::string typeOrList;
                     ss >> typeOrList;
-                    typeOrList = ToLower(typeOrList);
+                    typeOrList = Detail::ToLowerAscii(typeOrList);
 
                     PlyProperty prop{};
 
@@ -403,7 +397,7 @@ namespace Graphics
                         const auto countTy = PlyScalarTypeFromToken(countTypeTok);
                         const auto elemTy = PlyScalarTypeFromToken(elemTypeTok);
                         if (!countTy || !elemTy) return std::unexpected(AssetError::DecodeFailed);
-                        prop.Name = ToLower(name);
+                        prop.Name = Detail::ToLowerAscii(name);
                         prop.IsList = true;
                         prop.ListCountType = *countTy;
                         prop.ListElementType = *elemTy;
@@ -414,7 +408,7 @@ namespace Graphics
                         ss >> name;
                         const auto scalarTy = PlyScalarTypeFromToken(typeOrList);
                         if (!scalarTy) return std::unexpected(AssetError::DecodeFailed);
-                        prop.Name = ToLower(name);
+                        prop.Name = Detail::ToLowerAscii(name);
                         prop.IsList = false;
                         prop.ScalarType = *scalarTy;
                     }

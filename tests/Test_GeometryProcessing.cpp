@@ -474,10 +474,10 @@ TEST(Geodesic_Heat, SourceHasZeroDistance)
     auto result = Geometry::Geodesic::ComputeDistance(mesh, sources);
     ASSERT_TRUE(result.has_value());
 
-    EXPECT_EQ(result->Distances.size(), mesh.VerticesSize());
+    EXPECT_EQ(result->DistanceProperty.Array().size(), mesh.VerticesSize());
 
     // Source vertex should have zero distance
-    EXPECT_NEAR(result->Distances[0], 0.0, 1e-4);
+    EXPECT_NEAR(result->DistanceProperty[{0}], 0.0, 1e-4);
 }
 
 TEST(Geodesic_Heat, NonSourceVerticesHavePositiveDistance)
@@ -493,7 +493,7 @@ TEST(Geodesic_Heat, NonSourceVerticesHavePositiveDistance)
     {
         Geometry::VertexHandle vh{static_cast<Geometry::PropertyIndex>(vi)};
         if (mesh.IsDeleted(vh) || mesh.IsIsolated(vh)) continue;
-        EXPECT_GT(result->Distances[vi], 0.0)
+        EXPECT_GT(result->DistanceProperty[vh], 0.0)
             << "Vertex " << vi << " should have positive distance from source";
     }
 }
@@ -519,7 +519,7 @@ TEST(Geodesic_Heat, SymmetricMeshGivesEqualDistances)
     do
     {
         auto vn = mesh.ToVertex(h);
-        neighborDists.push_back(result->Distances[vn.Index]);
+        neighborDists.push_back(result->DistanceProperty[vn]);
         h = mesh.CWRotatedHalfedge(h);
     } while (h != hStart);
 
@@ -544,8 +544,8 @@ TEST(Geodesic_Heat, MultipleSourcesWork)
     ASSERT_TRUE(result.has_value());
 
     // Both sources should have minimum distance (0 or near-0)
-    EXPECT_NEAR(result->Distances[0], 0.0, 0.1);
-    EXPECT_NEAR(result->Distances[3], 0.0, 0.1);
+    EXPECT_NEAR(result->DistanceProperty[{0}], 0.0, 0.1);
+    EXPECT_NEAR(result->DistanceProperty[{3}], 0.0, 0.1);
 }
 
 TEST(Geodesic_Heat, DistancesRespectTriangleInequality)
@@ -566,8 +566,8 @@ TEST(Geodesic_Heat, DistancesRespectTriangleInequality)
         auto va = mesh.FromVertex(h0);
         auto vb = mesh.ToVertex(h0);
 
-        double da = result->Distances[va.Index];
-        double db = result->Distances[vb.Index];
+        double da = result->DistanceProperty[va];
+        double db = result->DistanceProperty[vb];
         double edgeLen = static_cast<double>(glm::distance(
             mesh.Position(va), mesh.Position(vb)));
 

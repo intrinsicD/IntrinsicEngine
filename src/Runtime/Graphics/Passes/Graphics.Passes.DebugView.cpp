@@ -107,22 +107,15 @@ namespace Graphics::Passes
                 std::exit(-1);
             }
 
-            const std::string vertPath = Core::Filesystem::ResolveShaderPathOrExit(
-                [&](Core::Hash::StringID id) { return m_ShaderRegistry->Get(id); },
-                "Debug.Vert"_id);
-            const std::string fragPath = Core::Filesystem::ResolveShaderPathOrExit(
-                [&](Core::Hash::StringID id) { return m_ShaderRegistry->Get(id); },
+            const auto [vertPath, fragPath] = ResolveShaderPaths(
+                *m_ShaderRegistry,
+                "Debug.Vert"_id,
                 "Debug.Frag"_id);
 
             RHI::ShaderModule vert(*m_Device, vertPath, RHI::ShaderStage::Vertex);
             RHI::ShaderModule frag(*m_Device, fragPath, RHI::ShaderStage::Fragment);
 
-            // PipelineBuilder API takes std::shared_ptr<VulkanDevice>. We don't own the device here.
-            // Use an aliasing shared_ptr with a no-op deleter to satisfy the API without changing ownership.
-            std::shared_ptr<RHI::VulkanDevice> deviceAlias(m_Device, [](RHI::VulkanDevice*)
-            {
-            });
-            RHI::PipelineBuilder pb(deviceAlias);
+            RHI::PipelineBuilder pb(MakeDeviceAlias(m_Device));
             pb.SetShaders(&vert, &frag);
             pb.SetTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
             pb.DisableDepthTest();

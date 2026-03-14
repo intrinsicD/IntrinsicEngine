@@ -32,7 +32,11 @@ This document tracks the **active rendering-architecture backlog** for Intrinsic
 
 ## P0 — Critical Refactor
 
-Stage 1 (file extraction), Stage 2 (module migration), and Stage 3 (stability tests) are complete — see git history.
+- [ ] Vertex Selection mode, Edge selection mode, and Face selection mode should all be independent of the lighting path. They should write to the same selection buffer format and be composited as a post-process outline regardless of forward/deferred/hybrid lighting decisions.
+- [ ] Vertex Selection mode uses Sphere rendering with a red color to mark the selected vertices.
+- [ ] Multi selection with shift key.
+- [ ] Make the selection mode work with radio buttons (vertex, edge, face, entity).
+- [ ] Wire Geodesic computation in the ui. When active, mark the selected vertex or vertices (with shift for multiple selection) with a different colored shpere.
 
 ## 2. Next (P1) — Near-Term Follow-Up After the Refactor Lands
 
@@ -211,50 +215,18 @@ These are the explicit constraints agents must preserve during the refactor even
 
 Identified via full codebase sweep (March 2026). Grouped by priority.
 
-No active items. Previous findings (D3 Core.Memory token pattern, D9 SpatialDebugController boolean flags, D9 god-object decomposition) have been resolved — see git history for details.
+### D1. Consolidate Graph Property Extraction Paths (P2)
 
----
+`Graphics.Systems.GraphGeometrySync.cpp` and `Graphics.Systems.PropertySetDirtySync.cpp` still duplicate graph-domain color/radius extraction rules, including deleted-element skipping and default property fallback (`"v:color"`, `"e:color"`, `"v:radius"`). Extract a shared internal helper so full uploads and incremental dirty-sync cannot drift.
 
-## 7. Pattern Adoption & Contract Compliance (Audit March 2026)
+- [ ] Move graph vertex/edge property extraction into one internal helper module/header.
+- [ ] Reuse the helper from both lifecycle sync and dirty-domain sync paths.
+- [ ] Add one regression test covering deleted-vertex skipping + fallback property names across both call sites.
 
-Sourced from `plan.md` pattern review and full codebase sweep.
+### D2. Finish Shared Pass Helper Adoption (P3)
 
-### E1. Command Pattern for Undo/Redo (P1)
+`Graphics.PassUtils.hpp` now covers shader-path resolution and non-owning `VulkanDevice` aliases, but `Graphics.PipelineLibrary.cpp` and parts of `Graphics.Passes.PostProcess.cpp` still open-code the same setup pattern.
 
-ROADMAP Phase 2 lists "Undo/redo stack" but no implementation exists. Add `Core.Command.cppm`:
-
-- [ ] `Core::Command` base with `Execute()` / `Undo()`, returning `std::expected`.
-- [ ] `Core::CompositeCommand` for transaction grouping (multi-entity transform).
-- [ ] `Core::CommandHistory` with fixed-size ring buffer.
-- [ ] Integrate with `TransformGizmo`: each drag produces a `TransformCommand` capturing before/after state.
-- [ ] Integrate with property panel mutations (material, point size, line width).
-- [ ] Integrate with entity create/delete (wrapped as commands).
-- [ ] Integrate with geometry operator application (mesh snapshot before operator, undo reverts).
-
-### E2. `std::expected` Monadic Chaining Adoption (P3)
-
-Three files have 3+ sequential fallible stages that are strong candidates for `.and_then()` / `.transform()` chaining (per CLAUDE.md C++23 adoption policy):
-
-- [ ] `Core.IOBackend.cpp`: `FileIOBackend::Read()` — 6 sequential `if (!...) return std::unexpected(ErrorCode::...)` checks. Classic monadic chain, single error type.
-- [ ] `Graphics.IORegistry.cpp`: `Export()` — 3 stages (find exporter → export bytes → write to backend) with error mapping at module boundary.
-- [ ] `Graphics.Importers.PLY.cpp`: Nested scalar/face parsing sub-pipelines with repetitive `if (!result) return std::unexpected(AssetError::DecodeFailed)`.
-
-### E3. C++23 `std::views::enumerate` Adoption (P3)
-
-109+ manual `for (size_t i = 0; i < N; ++i)` index loops across 46 files could use `std::views::enumerate`. Adopt opportunistically when touching these files — no dedicated churn PR.
-
-Top targets (by loop count):
-- [ ] `Geometry.Octree.cpp` (13 loops) — spatial query hot paths.
-- [ ] `Graphics.RenderGraph.cpp` (8 loops) — frame graph compilation.
-- [ ] `Graphics.Importers.PLY.cpp` (5 loops) — vertex/face element parsing.
-- [ ] `Graphics.Passes.Surface.cpp` (4 loops) — frustum culling.
-- [ ] `Graphics.Passes.Point.cpp` (4 loops) — point attribute buffers.
-
-### E4. Algorithm Variant Dispatch Adoption (P3)
-
-Several enum-based dispatches have unused fields per variant or sequential type-checking — candidates for the `std::variant` + `std::visit` pattern documented in `docs/architecture/algorithm-variant-dispatch.md`. Adopt when touching these files or when adding new variants.
-
-- [ ] `Graphics.Passes.PostProcess.cpp`: `AAMode` (None/FXAA/SMAA) — `PostProcessSettings` has FXAA-specific and SMAA-specific fields unused per mode. Three distinct pass topologies (0/1/3 passes). Strongest candidate.
-- [ ] `Graphics.Passes.Point.cpp`: `PointCloud::RenderMode` (FlatDisc/Surfel/EWA/Sphere) — `BuildPipeline(mode)` uses numeric if/else dispatch to select shader pairs. Each mode has distinct config potential.
-- [ ] `Graphics.ColorMapper.cpp`: `MapProperty()` uses try-each-type sequential dispatch (Scalar→colormap, Vec3→RGB, Vec4→RGBA). `ColorSource` config has fields only meaningful for Scalar type. Explicit variant at call site would eliminate sequential probing.
-- [ ] `Graphics.Passes.SelectionOutline.cpp`: `OutlineMode` (Solid/Pulse/Glow) — `SelectionOutlineSettings` has PulseSpeed/GlowFalloff fields unused per mode.
+- [ ] Replace remaining repeated `ResolveShaderPathOrExit(...)` pairs with shared helper calls.
+- [ ] Replace remaining ad hoc `shared_ptr<VulkanDevice>` alias lambdas with `MakeDeviceAlias(...)`.
+- [ ] Keep the refactor behavior-preserving and opportunistic when those files are next touched.

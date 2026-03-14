@@ -518,18 +518,18 @@ TEST(Curvature_Mean, SphereHasConstantMeanCurvature)
     auto mesh = MakeIcosahedron();
     auto meanResult = Geometry::Curvature::ComputeMeanCurvature(mesh);
     ASSERT_TRUE(meanResult.has_value());
-    auto& H = meanResult->Values;
+    auto& H = meanResult->Property;
 
-    EXPECT_EQ(H.size(), mesh.VerticesSize());
+    EXPECT_EQ(H.Array().size(), mesh.VerticesSize());
 
     // All icosahedron vertices are symmetric — mean curvature should be equal
-    double H0 = H[0];
+    double H0 = H[{0}];
     for (std::size_t i = 1; i < mesh.VerticesSize(); ++i)
     {
         Geometry::VertexHandle vh{static_cast<Geometry::PropertyIndex>(i)};
         if (mesh.IsDeleted(vh)) continue;
-        EXPECT_NEAR(std::abs(H[i]), std::abs(H0), 1e-4)
-            << "Vertex " << i << ": H=" << H[i] << " vs H0=" << H0;
+        EXPECT_NEAR(std::abs(H[vh]), std::abs(H0), 1e-4)
+            << "Vertex " << i << ": H=" << H[vh] << " vs H0=" << H0;
     }
 }
 
@@ -540,7 +540,7 @@ TEST(Curvature_Mean, FlatMeshHasZeroMeanCurvature)
     auto mesh = MakeSubdividedTriangle();
     auto meanResult = Geometry::Curvature::ComputeMeanCurvature(mesh);
     ASSERT_TRUE(meanResult.has_value());
-    auto& H = meanResult->Values;
+    auto& H = meanResult->Property;
 
     // Vertex 3 (index 3) is the interior vertex with valence 4
     // in the subdivided triangle (midpoint of v0-v1).
@@ -553,7 +553,7 @@ TEST(Curvature_Mean, FlatMeshHasZeroMeanCurvature)
         if (mesh.IsDeleted(vh) || mesh.IsIsolated(vh)) continue;
         if (mesh.IsBoundary(vh)) continue;
 
-        EXPECT_NEAR(H[i], 0.0, 1e-6)
+        EXPECT_NEAR(H[vh], 0.0, 1e-6)
             << "Interior vertex " << i << " should have H=0 on flat mesh";
     }
 }
@@ -564,7 +564,7 @@ TEST(Curvature_Gaussian, FlatMeshHasZeroGaussianCurvature)
     auto mesh = MakeSubdividedTriangle();
     auto gaussResult = Geometry::Curvature::ComputeGaussianCurvature(mesh);
     ASSERT_TRUE(gaussResult.has_value());
-    auto& K = gaussResult->Values;
+    auto& K = gaussResult->Property;
 
     for (std::size_t i = 0; i < mesh.VerticesSize(); ++i)
     {
@@ -572,7 +572,7 @@ TEST(Curvature_Gaussian, FlatMeshHasZeroGaussianCurvature)
         if (mesh.IsDeleted(vh) || mesh.IsIsolated(vh)) continue;
         if (mesh.IsBoundary(vh)) continue;
 
-        EXPECT_NEAR(K[i], 0.0, 1e-6)
+        EXPECT_NEAR(K[vh], 0.0, 1e-6)
             << "Interior vertex " << i << " should have K=0 on flat mesh";
     }
 }
@@ -584,7 +584,7 @@ TEST(Curvature_Gaussian, GaussBonnetOnClosedMesh)
     auto mesh = MakeTetrahedron();
     auto gaussResult = Geometry::Curvature::ComputeGaussianCurvature(mesh);
     ASSERT_TRUE(gaussResult.has_value());
-    auto& K = gaussResult->Values;
+    auto& K = gaussResult->Property;
 
     // Build mixed areas
     auto ops = Geometry::DEC::BuildOperators(mesh);
@@ -594,7 +594,7 @@ TEST(Curvature_Gaussian, GaussBonnetOnClosedMesh)
     {
         Geometry::VertexHandle vh{static_cast<Geometry::PropertyIndex>(i)};
         if (mesh.IsDeleted(vh) || mesh.IsIsolated(vh)) continue;
-        integral += K[i] * ops.Hodge0.Diagonal[i];
+        integral += K[vh] * ops.Hodge0.Diagonal[i];
     }
 
     // χ(tetrahedron) = V - E + F = 4 - 6 + 4 = 2
@@ -608,7 +608,7 @@ TEST(Curvature_Gaussian, IcosahedronGaussBonnet)
     auto mesh = MakeIcosahedron();
     auto gaussResult = Geometry::Curvature::ComputeGaussianCurvature(mesh);
     ASSERT_TRUE(gaussResult.has_value());
-    auto& K = gaussResult->Values;
+    auto& K = gaussResult->Property;
     auto ops = Geometry::DEC::BuildOperators(mesh);
 
     double integral = 0.0;
@@ -616,7 +616,7 @@ TEST(Curvature_Gaussian, IcosahedronGaussBonnet)
     {
         Geometry::VertexHandle vh{static_cast<Geometry::PropertyIndex>(i)};
         if (mesh.IsDeleted(vh) || mesh.IsIsolated(vh)) continue;
-        integral += K[i] * ops.Hodge0.Diagonal[i];
+        integral += K[vh] * ops.Hodge0.Diagonal[i];
     }
 
     // Icosahedron: V=12, E=30, F=20, χ=2, integral = 4π
@@ -630,14 +630,14 @@ TEST(Curvature_Gaussian, PositiveOnConvexMesh)
     auto mesh = MakeIcosahedron();
     auto gaussResult = Geometry::Curvature::ComputeGaussianCurvature(mesh);
     ASSERT_TRUE(gaussResult.has_value());
-    auto& K = gaussResult->Values;
+    auto& K = gaussResult->Property;
 
     for (std::size_t i = 0; i < mesh.VerticesSize(); ++i)
     {
         Geometry::VertexHandle vh{static_cast<Geometry::PropertyIndex>(i)};
         if (mesh.IsDeleted(vh) || mesh.IsIsolated(vh)) continue;
 
-        EXPECT_GT(K[i], 0.0) << "Vertex " << i << " should have K > 0 on convex mesh";
+        EXPECT_GT(K[vh], 0.0) << "Vertex " << i << " should have K > 0 on convex mesh";
     }
 }
 
@@ -652,19 +652,19 @@ TEST(Curvature_Full, PrincipalCurvatureRelation)
         Geometry::VertexHandle vh{static_cast<Geometry::PropertyIndex>(i)};
         if (mesh.IsDeleted(vh) || mesh.IsIsolated(vh)) continue;
 
-        const auto& vc = field.Vertices[i];
+        const auto& vc = field;
 
         // H should be average of principal curvatures
-        double expectedH = (vc.MaxPrincipalCurvature + vc.MinPrincipalCurvature) / 2.0;
-        EXPECT_NEAR(vc.MeanCurvature, expectedH, 1e-6)
+        double expectedH = (vc.MaxPrincipalCurvatureProperty[vh] + vc.MinPrincipalCurvatureProperty[vh]) / 2.0;
+        EXPECT_NEAR(vc.MeanCurvatureProperty[vh], expectedH, 1e-6)
             << "Vertex " << i << ": H should equal (κ₁ + κ₂)/2";
 
         // K should be product of principal curvatures (within discretization error).
         // On coarse meshes like the icosahedron, mean and Gaussian curvature
         // are computed by independent methods (Laplace-Beltrami vs angle defect),
         // so the relation K = κ₁*κ₂ only holds approximately.
-        double expectedK = vc.MaxPrincipalCurvature * vc.MinPrincipalCurvature;
-        EXPECT_NEAR(vc.GaussianCurvature, expectedK, 0.5)
+        double expectedK = vc.MaxPrincipalCurvatureProperty[vh] * vc.MinPrincipalCurvatureProperty[vh];
+        EXPECT_NEAR(vc.GaussianCurvatureProperty[vh], expectedK, 0.5)
             << "Vertex " << i << ": K should approximately equal κ₁ * κ₂";
     }
 }
@@ -674,14 +674,14 @@ TEST(Curvature_Full, MeanCurvatureNormalsNonZero)
     auto mesh = MakeIcosahedron();
     auto field = Geometry::Curvature::ComputeCurvature(mesh);
 
-    EXPECT_EQ(field.MeanCurvatureNormals.size(), mesh.VerticesSize());
+    EXPECT_EQ(field.MeanCurvatureNormalProperty.Array().size(), mesh.VerticesSize());
 
     for (std::size_t i = 0; i < mesh.VerticesSize(); ++i)
     {
         Geometry::VertexHandle vh{static_cast<Geometry::PropertyIndex>(i)};
         if (mesh.IsDeleted(vh) || mesh.IsIsolated(vh)) continue;
 
-        float len = glm::length(field.MeanCurvatureNormals[i]);
+        float len = glm::length(field.MeanCurvatureNormalProperty[vh]);
         EXPECT_GT(len, 0.0f) << "Vertex " << i << " mean curvature normal should be non-zero";
     }
 }

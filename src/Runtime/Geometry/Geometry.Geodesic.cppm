@@ -64,7 +64,6 @@ export namespace Geometry::Geodesic
 
         // Whether both solves converged
         bool Converged{false};
-
         // Per-vertex geodesic distances from the source set.
         // Deleted/isolated vertices have distance 0.
         VertexProperty<double> DistanceProperty{};

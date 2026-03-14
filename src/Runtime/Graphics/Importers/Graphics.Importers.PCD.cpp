@@ -14,6 +14,7 @@ module;
 
 #include <glm/glm.hpp>
 
+#include "Graphics.FileFormatUtils.hpp"
 #include "Graphics.Importers.TextParse.hpp"
 
 module Graphics:Importers.PCD.Impl;
@@ -56,19 +57,6 @@ namespace Graphics
         [[nodiscard]] bool IsCommentOrEmpty(std::string_view line)
         {
             return line.empty() || line.front() == '#';
-        }
-
-        [[nodiscard]] std::string ToLower(std::string_view value)
-        {
-            std::string lowered(value);
-            std::transform(lowered.begin(), lowered.end(), lowered.begin(),
-                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-            return lowered;
-        }
-
-        [[nodiscard]] float NormalizeColorChannel(float value)
-        {
-            return value > 1.0f ? (value / 255.0f) : value;
         }
 
         [[nodiscard]] const PCDField* FindField(std::span<const PCDField> fields, std::string_view name)
@@ -187,6 +175,15 @@ namespace Graphics
             return std::nullopt;
         }
 
+        [[nodiscard]] glm::vec4 UnpackPackedRgb(std::uint32_t packed)
+        {
+            return glm::vec4(
+                static_cast<float>((packed >> 16) & 0xFFu) / 255.0f,
+                static_cast<float>((packed >> 8) & 0xFFu) / 255.0f,
+                static_cast<float>(packed & 0xFFu) / 255.0f,
+                1.0f);
+        }
+
         [[nodiscard]] std::optional<glm::vec4> ParseAsciiColor(
             std::span<const std::string_view> tokens,
             std::span<const PCDField> fields)
@@ -202,9 +199,9 @@ namespace Graphics
                 if (r && g && b)
                 {
                     return glm::vec4(
-                        NormalizeColorChannel(*r),
-                        NormalizeColorChannel(*g),
-                        NormalizeColorChannel(*b),
+                        Detail::NormalizeColorChannelToUnitRange(*r),
+                        Detail::NormalizeColorChannelToUnitRange(*g),
+                        Detail::NormalizeColorChannelToUnitRange(*b),
                         1.0f);
                 }
             }
@@ -215,11 +212,7 @@ namespace Graphics
                 {
                     if (const auto packed = ParsePackedColorToken(tokens[rgbField->ScalarOffset]))
                     {
-                        return glm::vec4(
-                            static_cast<float>((*packed >> 16) & 0xFFu) / 255.0f,
-                            static_cast<float>((*packed >> 8) & 0xFFu) / 255.0f,
-                            static_cast<float>(*packed & 0xFFu) / 255.0f,
-                            1.0f);
+                        return UnpackPackedRgb(*packed);
                     }
                 }
             }
@@ -230,11 +223,7 @@ namespace Graphics
                 {
                     if (const auto packed = ParsePackedColorToken(tokens[rgbaField->ScalarOffset]))
                     {
-                        return glm::vec4(
-                            static_cast<float>((*packed >> 16) & 0xFFu) / 255.0f,
-                            static_cast<float>((*packed >> 8) & 0xFFu) / 255.0f,
-                            static_cast<float>(*packed & 0xFFu) / 255.0f,
-                            1.0f);
+                        return UnpackPackedRgb(*packed);
                     }
                 }
             }
@@ -257,9 +246,9 @@ namespace Graphics
                 if (r && g && b)
                 {
                     return glm::vec4(
-                        NormalizeColorChannel(*r),
-                        NormalizeColorChannel(*g),
-                        NormalizeColorChannel(*b),
+                        Detail::NormalizeColorChannelToUnitRange(*r),
+                        Detail::NormalizeColorChannelToUnitRange(*g),
+                        Detail::NormalizeColorChannelToUnitRange(*b),
                         1.0f);
                 }
             }
@@ -268,11 +257,7 @@ namespace Graphics
             {
                 if (const auto packed = ReadBinaryPackedColor(pointBytes, *rgbField))
                 {
-                    return glm::vec4(
-                        static_cast<float>((*packed >> 16) & 0xFFu) / 255.0f,
-                        static_cast<float>((*packed >> 8) & 0xFFu) / 255.0f,
-                        static_cast<float>(*packed & 0xFFu) / 255.0f,
-                        1.0f);
+                    return UnpackPackedRgb(*packed);
                 }
             }
 
@@ -280,11 +265,7 @@ namespace Graphics
             {
                 if (const auto packed = ReadBinaryPackedColor(pointBytes, *rgbaField))
                 {
-                    return glm::vec4(
-                        static_cast<float>((*packed >> 16) & 0xFFu) / 255.0f,
-                        static_cast<float>((*packed >> 8) & 0xFFu) / 255.0f,
-                        static_cast<float>(*packed & 0xFFu) / 255.0f,
-                        1.0f);
+                    return UnpackPackedRgb(*packed);
                 }
             }
 
@@ -312,13 +293,13 @@ namespace Graphics
                 if (tokens.empty())
                     continue;
 
-                const std::string key = ToLower(tokens.front());
+                const std::string key = Detail::ToLowerAscii(tokens.front());
                 if (key == "fields")
                 {
                     fieldNames.clear();
                     fieldNames.reserve(tokens.size() - 1);
                     for (std::size_t i = 1; i < tokens.size(); ++i)
-                        fieldNames.push_back(ToLower(tokens[i]));
+                        fieldNames.push_back(Detail::ToLowerAscii(tokens[i]));
                 }
                 else if (key == "size")
                 {
@@ -378,7 +359,7 @@ namespace Graphics
                 }
                 else if (key == "data" && tokens.size() >= 2)
                 {
-                    header.DataEncoding = ToLower(tokens[1]);
+                    header.DataEncoding = Detail::ToLowerAscii(tokens[1]);
                     break;
                 }
             }
