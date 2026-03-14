@@ -1,6 +1,14 @@
 intrinsic_add_module_library(IntrinsicRHI)
 set(target_name IntrinsicRHI)
 
+# --- Collect CUDA sources conditionally ---
+set(RHI_CUDA_MODULE_IFACES "")
+set(RHI_CUDA_MODULE_IMPLS "")
+if(INTRINSIC_ENABLE_CUDA)
+    list(APPEND RHI_CUDA_MODULE_IFACES RHI.CudaDevice.cppm)
+    list(APPEND RHI_CUDA_MODULE_IMPLS  RHI.CudaDevice.cpp)
+endif()
+
 target_sources(${target_name}
         PUBLIC
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
@@ -27,6 +35,8 @@ target_sources(${target_name}
         RHI.SceneInstances.cppm
         RHI.PersistentDescriptors.cppm
         RHI.ComputePipeline.cppm
+        RHI.CudaError.cppm
+        ${RHI_CUDA_MODULE_IFACES}
         PRIVATE
         RHI.Vma.cpp
         RHI.Transfer.cpp
@@ -51,6 +61,7 @@ target_sources(${target_name}
         RHI.PersistentDescriptors.cpp
         RHI.ComputePipeline.cpp
         RHI.CommandContext.cpp
+        ${RHI_CUDA_MODULE_IMPLS}
 )
 
 target_include_directories(${target_name} PUBLIC .)
@@ -64,3 +75,9 @@ target_link_libraries(${target_name}
         PRIVATE
         glfw
 )
+
+# --- CUDA dependencies (conditional) ---
+if(INTRINSIC_ENABLE_CUDA)
+    target_link_libraries(${target_name} PUBLIC CUDA::cuda_driver)
+    target_include_directories(${target_name} PUBLIC ${CUDAToolkit_INCLUDE_DIRS})
+endif()
