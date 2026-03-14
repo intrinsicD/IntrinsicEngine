@@ -231,11 +231,10 @@ Identified via full codebase sweep (March 2026). Grouped by priority.
 
 ### D2. Finish Shared Pass Helper Adoption (P3)
 
-`Graphics.PassUtils.hpp` now covers shader-path resolution and non-owning `VulkanDevice` aliases, but `Graphics.PipelineLibrary.cpp` and parts of `Graphics.Passes.PostProcess.cpp` still open-code the same setup pattern.
+`Graphics.PassUtils.hpp` covers shader-path resolution (`ResolveShaderPaths`) and non-owning `VulkanDevice` aliases (`MakeDeviceAlias`). `PostProcessPass` and all other passes now use these helpers. `PipelineLibrary.cpp` still uses raw `ResolveShaderPathOrExit` pairs because it resolves shaders without a `ShaderRegistry` — this is acceptable.
 
-- [ ] Replace remaining repeated `ResolveShaderPathOrExit(...)` pairs with shared helper calls.
-- [ ] Replace remaining ad hoc `shared_ptr<VulkanDevice>` alias lambdas with `MakeDeviceAlias(...)`.
-- [ ] Keep the refactor behavior-preserving and opportunistic when those files are next touched.
+- [ ] Evaluate whether `PipelineLibrary` can adopt `ResolveShaderPaths` with an alternate resolver overload.
+- [ ] Keep the refactor behavior-preserving and opportunistic when the file is next touched.
 
 ### D3. Vertex Deduplication Consolidation (P3)
 
@@ -251,13 +250,6 @@ PLY importer migrated to use `NormalizeColorChannelToUnitRange` (was using inlin
 - [ ] Unify color triplet/intensity parsing into a shared `Importers::ParseColor` helper.
 - [ ] Ensure consistent [0,255]→[0,1] and [0,1]→[0,1] range handling across remaining importers (XYZ, PCD).
 
-
-### D5. RHI Sampler Creation Consolidation (P3)
-
-`RHI.TextureSystem.cpp` and `RHI.Texture.cpp` both contain nearly identical `VkSamplerCreateInfo` setup and `vkCreateSampler` calls for linear-filtered, anisotropic samplers. Extract a shared `RHI::CreateDefaultSampler()` helper.
-
-- [ ] Extract sampler creation into a shared helper in `RHI.Device` or a new `RHI.SamplerUtils` header.
-- [ ] Migrate `TextureSystem.cpp` and `Texture.cpp` to use the shared helper.
 
 ### D6. Importer Line I/O Inconsistency (P3)
 
@@ -284,13 +276,6 @@ PLY, PCD, and OFF importers now use `Detail::NormalizeColorChannelToUnitRange()`
 
 - [ ] Extract shared `Importers::ParseColor()` helper unifying [0,255]→[0,1] and [0,1]→[0,1] range handling across remaining importers (XYZ, PCD).
 
-### D13. RHI Swapchain: Consistent Deferred Destruction (P3)
-
-`RHI.Swapchain.cpp` destroys `VkImageView` and `VkSwapchainKHR` directly instead of using `SafeDestroy()`. Other RHI components (Buffer, Image, Texture, Pipeline, Shader) consistently use deferred destruction. Synchronize the Swapchain with the established pattern.
-
-- [ ] Convert Swapchain `vkDestroyImageView` and `vkDestroySwapchainKHR` calls to `SafeDestroy()`.
-
-
 ### D15. Render Pass: Generic EnsureAttrBuffer Template (P3)
 
 Five nearly-identical `Ensure*Buffer()` functions exist across passes (LinePass, PointPass, SurfacePass), each following the same map-lookup → SafeDestroy → allocate → write → return BDA pattern. Consolidating into a single generic template in `PassUtils.hpp` would eliminate ~150 lines of duplicated buffer management logic.
@@ -300,6 +285,14 @@ Five nearly-identical `Ensure*Buffer()` functions exist across passes (LinePass,
 
 ### D16. Render Pass: Naming Inconsistency — Aux vs Attr (P4)
 
-Per-entity attribute buffer entry structs use inconsistent naming across passes: `FaceAttrEntry` / `VertexAttrEntry` (SurfacePass) vs `RetainedEdgeAuxEntry` / `RetainedPointAuxEntry` (LinePass / PointPass). Standardize to one convention.
+Per-entity attribute buffer entry structs use inconsistent naming across passes: `FaceAttrEntry` / `VertexAttrEntry` (SurfacePass) vs `RetainedEdgeAuxEntry` / `RetainedPointAuxEntry` (LinePass / PointPass). Standardize to one convention. Note: `PtrAux` and `PtrEdgeAux` are also used in push constants and shaders, so renaming requires coordinated shader updates.
 
 - [ ] Pick one naming convention (`*AuxEntry` or `*AttrEntry`) and unify across all passes.
+- [ ] Update corresponding push constant field names and shader `PtrAux`/`PtrEdgeAux` references.
+
+### D17. Frame Counter Naming Inconsistency (P3)
+
+Three naming conventions for the same monotonic frame counter across the codebase: `GetGlobalFrameNumber()` (Device), `frameEpoch` (CommandContext locals), `currentFrameNumber` (ResourcePool parameters), `globalFrame` / `currentGlobalFrame` (RenderSystem/RenderGraph locals). Within `RenderGraph.cpp` both `globalFrame` and `frameEpoch` are used.
+
+- [ ] Pick a canonical local variable name (suggest `globalFrame`) and standardize across RHI, RenderGraph, and lifecycle system locals.
+- [ ] Keep method name `GetGlobalFrameNumber()` and parameter name `globalFrameNumber` for public API consistency.

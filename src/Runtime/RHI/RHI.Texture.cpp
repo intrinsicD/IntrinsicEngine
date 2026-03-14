@@ -12,7 +12,7 @@ import Core.Logging;
 
 namespace RHI
 {
-    static void CreateSampler(VulkanDevice& device, uint32_t mipLevels, VkSampler& outSampler)
+    void CreateDefaultSampler(VulkanDevice& device, uint32_t mipLevels, VkSampler& outSampler)
     {
         VkSamplerCreateInfo samplerInfo{};
         samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -65,7 +65,7 @@ namespace RHI
             VK_IMAGE_ASPECT_COLOR_BIT,
             sharingMode);
 
-        CreateSampler(device, gpu->Image->GetMipLevels(), gpu->Sampler);
+        CreateDefaultSampler(device, gpu->Image->GetMipLevels(), gpu->Sampler);
 
         m_Handle = m_System->CreateFromData(std::move(gpu));
     }
