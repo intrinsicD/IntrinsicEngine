@@ -1,13 +1,13 @@
 module;
-#include <charconv>
 #include <cstddef>
 #include <expected>
 #include <span>
-#include <sstream>
 #include <string>
 #include <string_view>
 #include <vector>
 #include <glm/glm.hpp>
+#include "Graphics.FileFormatUtils.hpp"
+#include "Graphics.Importers.TextParse.hpp"
 
 module Graphics:Importers.OFF.Impl;
 import :Importers.OFF;
@@ -46,112 +46,137 @@ namespace Graphics
             return std::unexpected(AssetError::InvalidData);
 
         std::string_view text(reinterpret_cast<const char*>(data.data()), data.size());
-        std::istringstream stream{std::string{text}};
+        size_t cursor = 0;
+        std::string_view line;
+        std::vector<std::string_view> tokens;
+        tokens.reserve(16);
 
         // Parse header: OFF, COFF, NOFF, or CNOFF
-        std::string header;
-        stream >> header;
-        if (header.empty())
+        if (!Importers::TextParse::NextLine(text, cursor, line))
+            return std::unexpected(AssetError::InvalidData);
+
+        line = Importers::TextParse::Trim(line);
+        if (line.empty())
             return std::unexpected(AssetError::InvalidData);
 
         OFFVariant variant = OFFVariant::Standard;
-        if (header == "OFF")
+        if (line == "OFF")
             variant = OFFVariant::Standard;
-        else if (header == "COFF")
+        else if (line == "COFF")
             variant = OFFVariant::COFF;
-        else if (header == "NOFF")
+        else if (line == "NOFF")
             variant = OFFVariant::NOFF;
-        else if (header == "CNOFF")
+        else if (line == "CNOFF")
             variant = OFFVariant::CNOFF;
         else
             return std::unexpected(AssetError::InvalidData);
 
         // Parse counts: nVertices nFaces nEdges
-        std::size_t nVertices = 0, nFaces = 0, nEdges = 0;
-        stream >> nVertices >> nFaces >> nEdges;
-        (void)nEdges; // Ignored per format spec
+        if (!Importers::TextParse::NextLine(text, cursor, line))
+            return std::unexpected(AssetError::InvalidData);
 
-        if (nVertices == 0 || nFaces == 0)
+        Importers::TextParse::SplitWhitespace(line, tokens);
+        if (tokens.size() < 2)
+            return std::unexpected(AssetError::InvalidData);
+
+        const auto nVertices = Importers::TextParse::ParseNumber<std::size_t>(tokens[0]);
+        const auto nFaces = Importers::TextParse::ParseNumber<std::size_t>(tokens[1]);
+        if (!nVertices || !nFaces || *nVertices == 0 || *nFaces == 0)
             return std::unexpected(AssetError::InvalidData);
 
         GeometryCpuData outData;
         outData.Topology = PrimitiveTopology::Triangles;
-        outData.Positions.resize(nVertices);
-        outData.Normals.resize(nVertices, glm::vec3(0, 1, 0));
-        outData.Aux.resize(nVertices, glm::vec4(0, 0, 0, 0));
+        outData.Positions.resize(*nVertices);
+        outData.Normals.resize(*nVertices, glm::vec3(0, 1, 0));
+        outData.Aux.resize(*nVertices, glm::vec4(0, 0, 0, 0));
 
         bool hasNormals = (variant == OFFVariant::NOFF || variant == OFFVariant::CNOFF);
         bool hasColors = (variant == OFFVariant::COFF || variant == OFFVariant::CNOFF);
 
         // Parse vertices
-        for (std::size_t i = 0; i < nVertices; ++i)
+        for (std::size_t i = 0; i < *nVertices; ++i)
         {
-            float x = 0, y = 0, z = 0;
-            stream >> x >> y >> z;
-            outData.Positions[i] = glm::vec3(x, y, z);
+            if (!Importers::TextParse::NextLine(text, cursor, line))
+                return std::unexpected(AssetError::InvalidData);
 
-            if (hasNormals)
+            Importers::TextParse::SplitWhitespace(line, tokens);
+            if (tokens.size() < 3)
+                return std::unexpected(AssetError::InvalidData);
+
+            const auto x = Importers::TextParse::ParseNumber<float>(tokens[0]);
+            const auto y = Importers::TextParse::ParseNumber<float>(tokens[1]);
+            const auto z = Importers::TextParse::ParseNumber<float>(tokens[2]);
+            if (!x || !y || !z)
+                return std::unexpected(AssetError::InvalidData);
+
+            outData.Positions[i] = glm::vec3(*x, *y, *z);
+
+            std::size_t tokenIdx = 3;
+
+            if (hasNormals && tokenIdx + 2 < tokens.size())
             {
-                float nx = 0, ny = 0, nz = 0;
-                stream >> nx >> ny >> nz;
-                outData.Normals[i] = glm::vec3(nx, ny, nz);
+                const auto nx = Importers::TextParse::ParseNumber<float>(tokens[tokenIdx]);
+                const auto ny = Importers::TextParse::ParseNumber<float>(tokens[tokenIdx + 1]);
+                const auto nz = Importers::TextParse::ParseNumber<float>(tokens[tokenIdx + 2]);
+                if (nx && ny && nz)
+                    outData.Normals[i] = glm::vec3(*nx, *ny, *nz);
+                tokenIdx += 3;
             }
 
-            if (hasColors)
+            if (hasColors && tokenIdx + 2 < tokens.size())
             {
-                float r = 0, g = 0, b = 0, a = 1;
-                stream >> r >> g >> b;
+                const auto r = Importers::TextParse::ParseNumber<float>(tokens[tokenIdx]);
+                const auto g = Importers::TextParse::ParseNumber<float>(tokens[tokenIdx + 1]);
+                const auto b = Importers::TextParse::ParseNumber<float>(tokens[tokenIdx + 2]);
+                if (r && g && b)
+                {
+                    float rf = Detail::NormalizeColorChannelToUnitRange(*r);
+                    float gf = Detail::NormalizeColorChannelToUnitRange(*g);
+                    float bf = Detail::NormalizeColorChannelToUnitRange(*b);
+
+                    // Store colors in Aux.zw (UV in xy, color in zw per codebase convention)
+                    outData.Aux[i] = glm::vec4(0, 0, rf, gf); // simplified: store R and G in zw
+                }
+                tokenIdx += 3;
 
                 // Peek for alpha (optional)
-                // Check if next token is a number (alpha) or face data
-                auto pos = stream.tellg();
-                float maybeAlpha = 0;
-                if (stream >> maybeAlpha)
+                if (tokenIdx < tokens.size())
                 {
-                    a = maybeAlpha;
+                    if (const auto a = Importers::TextParse::ParseNumber<float>(tokens[tokenIdx]))
+                        (void)Detail::NormalizeColorChannelToUnitRange(*a); // alpha available but not stored in current format
                 }
-                else
-                {
-                    stream.clear();
-                    stream.seekg(pos);
-                }
-
-                // Detect 0-255 range and normalize to 0-1
-                if (r > 1.0f || g > 1.0f || b > 1.0f || a > 1.0f)
-                {
-                    r /= 255.0f;
-                    g /= 255.0f;
-                    b /= 255.0f;
-                    if (a > 1.0f) a /= 255.0f;
-                }
-
-                // Store colors in Aux.zw (UV in xy, color in zw per codebase convention)
-                outData.Aux[i] = glm::vec4(0, 0, r, g); // simplified: store R and G in zw
             }
         }
 
         // Parse faces
-        outData.Indices.reserve(nFaces * 3);
-        for (std::size_t i = 0; i < nFaces; ++i)
+        outData.Indices.reserve(*nFaces * 3);
+        for (std::size_t i = 0; i < *nFaces; ++i)
         {
-            std::size_t faceVerts = 0;
-            stream >> faceVerts;
+            if (!Importers::TextParse::NextLine(text, cursor, line))
+                return std::unexpected(AssetError::InvalidData);
 
-            if (faceVerts < 3)
+            Importers::TextParse::SplitWhitespace(line, tokens);
+            if (tokens.empty())
+                continue;
+
+            const auto faceVerts = Importers::TextParse::ParseNumber<std::size_t>(tokens[0]);
+            if (!faceVerts || *faceVerts < 3)
                 continue; // Skip degenerate faces
 
-            std::vector<uint32_t> faceIndices(faceVerts);
-            for (std::size_t j = 0; j < faceVerts; ++j)
+            if (tokens.size() < 1 + *faceVerts)
+                return std::unexpected(AssetError::InvalidData);
+
+            std::vector<uint32_t> faceIndices(*faceVerts);
+            for (std::size_t j = 0; j < *faceVerts; ++j)
             {
-                std::size_t idx = 0;
-                stream >> idx;
-                if (idx >= nVertices)
+                const auto idx = Importers::TextParse::ParseNumber<std::size_t>(tokens[1 + j]);
+                if (!idx || *idx >= *nVertices)
                     return std::unexpected(AssetError::InvalidData);
-                faceIndices[j] = static_cast<uint32_t>(idx);
+                faceIndices[j] = static_cast<uint32_t>(*idx);
             }
 
             // Fan triangulation for polygons
-            for (std::size_t j = 1; j + 1 < faceVerts; ++j)
+            for (std::size_t j = 1; j + 1 < *faceVerts; ++j)
             {
                 outData.Indices.push_back(faceIndices[0]);
                 outData.Indices.push_back(faceIndices[j]);

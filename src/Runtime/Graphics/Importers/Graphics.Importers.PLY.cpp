@@ -1,5 +1,4 @@
 module;
-#include <algorithm>
 #include <array>
 #include <bit>
 #include <cctype>
@@ -92,15 +91,26 @@ namespace Graphics
             return std::endian::native == std::endian::little;
         }
 
+        // C++23 byte swap: uses std::byteswap for integral types, and
+        // bit_cast round-trip for floating-point types (float/double).
         template <typename T>
         [[nodiscard]] static T ByteSwap(T v)
         {
             static_assert(std::is_trivially_copyable_v<T>);
-            std::array<std::byte, sizeof(T)> bytes{};
-            std::memcpy(bytes.data(), &v, sizeof(T));
-            std::reverse(bytes.begin(), bytes.end());
-            std::memcpy(&v, bytes.data(), sizeof(T));
-            return v;
+            if constexpr (std::is_integral_v<T>)
+            {
+                return std::byteswap(v);
+            }
+            else if constexpr (std::is_same_v<T, float>)
+            {
+                auto bits = std::bit_cast<uint32_t>(v);
+                return std::bit_cast<float>(std::byteswap(bits));
+            }
+            else if constexpr (std::is_same_v<T, double>)
+            {
+                auto bits = std::bit_cast<uint64_t>(v);
+                return std::bit_cast<double>(std::byteswap(bits));
+            }
         }
 
         // Byte-buffer reader (replaces ifstream-based ReadRaw)
