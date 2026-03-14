@@ -4,21 +4,13 @@ module;
 
 export module Core.Profiling;
 
+import Core.Hash;
 import Core.Telemetry;
 
 export namespace Core::Profiling
 {
-    // Compile-time FNV-1a hash for scope names
-    constexpr uint32_t HashString(const char* str)
-    {
-        uint32_t hash = 2166136261u;
-        while (*str)
-        {
-            hash ^= static_cast<uint8_t>(*str++);
-            hash *= 16777619u;
-        }
-        return hash;
-    }
+    // FNV-1a hash — delegates to Core::Hash::HashString.
+    using Core::Hash::HashString;
 
     struct ScopedTimer
     {

@@ -23,7 +23,7 @@ namespace Graphics
 {
     namespace
     {
-        constexpr std::string_view s_Extensions[] = { ".xyz", ".pts", ".xyzrgb", ".txt" };
+        static constexpr std::string_view s_Extensions[] = { ".xyz", ".pts", ".xyzrgb", ".txt" };
 
         [[nodiscard]] std::optional<glm::vec4> ParseColorTriplet(
             std::span<const std::string_view> tokens,

@@ -20,9 +20,31 @@ export namespace Geometry::Validation
     constexpr float EPSILON = 1e-6f;
     constexpr float EPSILON_SQ = EPSILON * EPSILON;
  
+    // --- Scalar Validation ---
+
+    inline bool IsFinite(float v) noexcept
+    {
+        return std::isfinite(v);
+    }
+
+    inline bool IsFinite(double v) noexcept
+    {
+        return std::isfinite(v);
+    }
+
     // --- Vector Validation ---
- 
+
+    inline bool IsFinite(const glm::vec2& v) noexcept
+    {
+        return std::isfinite(v.x) && std::isfinite(v.y);
+    }
+
     inline bool IsFinite(const glm::vec3& v)
+    {
+        return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z);
+    }
+
+    inline bool IsFinite(const glm::dvec3& v) noexcept
     {
         return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z);
     }

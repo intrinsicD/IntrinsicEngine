@@ -6,17 +6,11 @@ module;
 
 export module Geometry:Quadric;
 
+import :Validation;
+
 namespace Geometry::QuadricDetail
 {
-    [[nodiscard]] inline bool IsFinite(double value) noexcept
-    {
-        return std::isfinite(value);
-    }
-
-    [[nodiscard]] inline bool IsFinite(glm::dvec3 const& v) noexcept
-    {
-        return IsFinite(v.x) && IsFinite(v.y) && IsFinite(v.z);
-    }
+    using Validation::IsFinite;
 
     [[nodiscard]] inline glm::dmat3 SelfOuterProduct(glm::dvec3 const& v) noexcept
     {

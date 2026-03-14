@@ -18,82 +18,23 @@ namespace
     // Safe because there is exactly one SceneManager instance per process.
     Graphics::GPUScene* g_GpuSceneForDestroyHook = nullptr;
 
-    void OnSurfaceDestroyed(entt::registry& registry, entt::entity entity)
+    // Shared GPU slot cleanup for all component types that own a GPUScene slot.
+    // Each component type must expose GpuSlot and kInvalidSlot with compatible semantics.
+    template <typename T>
+    void OnGpuComponentDestroyed(entt::registry& registry, entt::entity entity)
     {
-        // NOTE: This hook is invoked for every Surface component destroyed.
-        // Each one owns its own GPUScene slot and must be freed here.
         if (!g_GpuSceneForDestroyHook)
             return;
 
-        auto& sc = registry.get<ECS::Surface::Component>(entity);
-        if (sc.GpuSlot == ECS::Surface::Component::kInvalidSlot)
+        auto& comp = registry.get<T>(entity);
+        if (comp.GpuSlot == T::kInvalidSlot)
             return;
 
         // Deactivate slot (radius = 0 => culler skips it) and free.
         Graphics::GpuInstanceData inst{};
-        g_GpuSceneForDestroyHook->QueueUpdate(sc.GpuSlot, inst, /*sphere*/ {0.0f, 0.0f, 0.0f, 0.0f});
-        g_GpuSceneForDestroyHook->FreeSlot(sc.GpuSlot);
-        sc.GpuSlot = ECS::Surface::Component::kInvalidSlot;
-    }
-
-    void OnMeshEdgeViewDestroyed(entt::registry& registry, entt::entity entity)
-    {
-        if (!g_GpuSceneForDestroyHook)
-            return;
-
-        auto& ev = registry.get<ECS::MeshEdgeView::Component>(entity);
-        if (ev.GpuSlot == ECS::MeshEdgeView::Component::kInvalidSlot)
-            return;
-
-        Graphics::GpuInstanceData inst{};
-        g_GpuSceneForDestroyHook->QueueUpdate(ev.GpuSlot, inst, /*sphere*/ {0.0f, 0.0f, 0.0f, 0.0f});
-        g_GpuSceneForDestroyHook->FreeSlot(ev.GpuSlot);
-        ev.GpuSlot = ECS::MeshEdgeView::Component::kInvalidSlot;
-    }
-
-    void OnMeshVertexViewDestroyed(entt::registry& registry, entt::entity entity)
-    {
-        if (!g_GpuSceneForDestroyHook)
-            return;
-
-        auto& pv = registry.get<ECS::MeshVertexView::Component>(entity);
-        if (pv.GpuSlot == ECS::MeshVertexView::Component::kInvalidSlot)
-            return;
-
-        Graphics::GpuInstanceData inst{};
-        g_GpuSceneForDestroyHook->QueueUpdate(pv.GpuSlot, inst, /*sphere*/ {0.0f, 0.0f, 0.0f, 0.0f});
-        g_GpuSceneForDestroyHook->FreeSlot(pv.GpuSlot);
-        pv.GpuSlot = ECS::MeshVertexView::Component::kInvalidSlot;
-    }
-
-    void OnGraphDataDestroyed(entt::registry& registry, entt::entity entity)
-    {
-        if (!g_GpuSceneForDestroyHook)
-            return;
-
-        auto& graphData = registry.get<ECS::Graph::Data>(entity);
-        if (graphData.GpuSlot == ECS::Graph::Data::kInvalidSlot)
-            return;
-
-        Graphics::GpuInstanceData inst{};
-        g_GpuSceneForDestroyHook->QueueUpdate(graphData.GpuSlot, inst, /*sphere*/ {0.0f, 0.0f, 0.0f, 0.0f});
-        g_GpuSceneForDestroyHook->FreeSlot(graphData.GpuSlot);
-        graphData.GpuSlot = ECS::Graph::Data::kInvalidSlot;
-    }
-
-    void OnPointCloudDataDestroyed(entt::registry& registry, entt::entity entity)
-    {
-        if (!g_GpuSceneForDestroyHook)
-            return;
-
-        auto& pcData = registry.get<ECS::PointCloud::Data>(entity);
-        if (pcData.GpuSlot == ECS::PointCloud::Data::kInvalidSlot)
-            return;
-
-        Graphics::GpuInstanceData inst{};
-        g_GpuSceneForDestroyHook->QueueUpdate(pcData.GpuSlot, inst, /*sphere*/ {0.0f, 0.0f, 0.0f, 0.0f});
-        g_GpuSceneForDestroyHook->FreeSlot(pcData.GpuSlot);
-        pcData.GpuSlot = ECS::PointCloud::Data::kInvalidSlot;
+        g_GpuSceneForDestroyHook->QueueUpdate(comp.GpuSlot, inst, /*sphere*/ {0.0f, 0.0f, 0.0f, 0.0f});
+        g_GpuSceneForDestroyHook->FreeSlot(comp.GpuSlot);
+        comp.GpuSlot = T::kInvalidSlot;
     }
 }
 
@@ -113,39 +54,22 @@ namespace Runtime
     void SceneManager::ConnectGpuHooks(Graphics::GPUScene& gpuScene)
     {
         g_GpuSceneForDestroyHook = &gpuScene;
-        m_Scene.GetRegistry().on_destroy<ECS::Surface::Component>()
-            .connect<&OnSurfaceDestroyed>();
-
-        m_Scene.GetRegistry().on_destroy<ECS::MeshEdgeView::Component>()
-            .connect<&OnMeshEdgeViewDestroyed>();
-
-        m_Scene.GetRegistry().on_destroy<ECS::MeshVertexView::Component>()
-            .connect<&OnMeshVertexViewDestroyed>();
-
-        m_Scene.GetRegistry().on_destroy<ECS::Graph::Data>()
-            .connect<&OnGraphDataDestroyed>();
-
-        m_Scene.GetRegistry().on_destroy<ECS::PointCloud::Data>()
-            .connect<&OnPointCloudDataDestroyed>();
+        auto& reg = m_Scene.GetRegistry();
+        reg.on_destroy<ECS::Surface::Component>().connect<&OnGpuComponentDestroyed<ECS::Surface::Component>>();
+        reg.on_destroy<ECS::MeshEdgeView::Component>().connect<&OnGpuComponentDestroyed<ECS::MeshEdgeView::Component>>();
+        reg.on_destroy<ECS::MeshVertexView::Component>().connect<&OnGpuComponentDestroyed<ECS::MeshVertexView::Component>>();
+        reg.on_destroy<ECS::Graph::Data>().connect<&OnGpuComponentDestroyed<ECS::Graph::Data>>();
+        reg.on_destroy<ECS::PointCloud::Data>().connect<&OnGpuComponentDestroyed<ECS::PointCloud::Data>>();
     }
 
     void SceneManager::DisconnectGpuHooks()
     {
-        m_Scene.GetRegistry().on_destroy<ECS::Surface::Component>()
-            .disconnect<&OnSurfaceDestroyed>();
-
-        m_Scene.GetRegistry().on_destroy<ECS::MeshEdgeView::Component>()
-            .disconnect<&OnMeshEdgeViewDestroyed>();
-
-        m_Scene.GetRegistry().on_destroy<ECS::MeshVertexView::Component>()
-            .disconnect<&OnMeshVertexViewDestroyed>();
-
-        m_Scene.GetRegistry().on_destroy<ECS::Graph::Data>()
-            .disconnect<&OnGraphDataDestroyed>();
-
-        m_Scene.GetRegistry().on_destroy<ECS::PointCloud::Data>()
-            .disconnect<&OnPointCloudDataDestroyed>();
-
+        auto& reg = m_Scene.GetRegistry();
+        reg.on_destroy<ECS::Surface::Component>().disconnect<&OnGpuComponentDestroyed<ECS::Surface::Component>>();
+        reg.on_destroy<ECS::MeshEdgeView::Component>().disconnect<&OnGpuComponentDestroyed<ECS::MeshEdgeView::Component>>();
+        reg.on_destroy<ECS::MeshVertexView::Component>().disconnect<&OnGpuComponentDestroyed<ECS::MeshVertexView::Component>>();
+        reg.on_destroy<ECS::Graph::Data>().disconnect<&OnGpuComponentDestroyed<ECS::Graph::Data>>();
+        reg.on_destroy<ECS::PointCloud::Data>().disconnect<&OnGpuComponentDestroyed<ECS::PointCloud::Data>>();
         g_GpuSceneForDestroyHook = nullptr;
     }
 

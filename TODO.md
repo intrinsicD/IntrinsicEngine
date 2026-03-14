@@ -230,3 +230,40 @@ Identified via full codebase sweep (March 2026). Grouped by priority.
 - [ ] Replace remaining repeated `ResolveShaderPathOrExit(...)` pairs with shared helper calls.
 - [ ] Replace remaining ad hoc `shared_ptr<VulkanDevice>` alias lambdas with `MakeDeviceAlias(...)`.
 - [ ] Keep the refactor behavior-preserving and opportunistic when those files are next touched.
+
+### D3. Vertex Deduplication Consolidation (P3)
+
+STL, OBJ, and PLY importers each implement near-identical spatial-hash vertex deduplication (quantize-based `VertexKey` + `VertexKeyHash`). Extract a shared `Importers::VertexDeduplicator` utility.
+
+- [ ] Extract `VertexKey` / `VertexKeyHash` / dedup-map pattern into `Graphics.Importers.VertexDedup.hpp`.
+- [ ] Migrate STL, OBJ, and PLY importers to use the shared utility.
+- [ ] Add a unit test for the deduplicator (coincident vertices, near-threshold vertices, distinct vertices).
+
+### D4. Color Parsing Unification (P3)
+
+XYZ and PCD importers independently parse RGB/intensity color fields with slightly different range normalization. `NormalizeColorChannelToUnitRange` in `FileFormatUtils.hpp` is the canonical normalizer, but each importer has its own parsing flow.
+
+- [ ] Unify color triplet/intensity parsing into a shared `Importers::ParseColor` helper.
+- [ ] Ensure consistent [0,255]→[0,1] and [0,1]→[0,1] range handling across all importers.
+
+### D5. Refactor Exporters to Use AppendFormatted (P3)
+
+`Graphics.ExportUtils.hpp` now provides `AppendFormatted()` but existing exporters (OBJ, PLY, STL) still use manual `snprintf` + `AppendString` patterns.
+
+- [ ] Migrate OBJ exporter `snprintf` sequences to `AppendFormatted`.
+- [ ] Migrate PLY exporter `snprintf` sequences to `AppendFormatted`.
+- [ ] Migrate STL ASCII exporter `snprintf` sequences to `AppendFormatted`.
+
+### D6. Update Test Files to Use Shared Mesh Builders (P3)
+
+`TestMeshBuilders.h` now provides `MakeCube()` and `MakeQuadPair()` but several test files still define local mesh builder functions that duplicate this shared geometry.
+
+- [ ] Audit test files for local mesh builder duplicates and replace with `TestMeshBuilders.h` calls.
+- [ ] Remove `MakeTriangle()` / `MakeQuadPair()` locals in `Test_HalfedgeMeshPropertyAccess.cpp` (use shared builders).
+
+### D7. Selection.cpp Picking Helper Extraction (P3)
+
+`Runtime.SelectionModule.cpp` contains several large picking functions with repeated hit-test patterns (closest-point-on-segment, sphere-ray intersection). These could be factored into geometry query helpers.
+
+- [ ] Extract closest-point-on-segment and ray-sphere helpers into `Geometry::Queries` or a `Selection` utility header.
+- [ ] Reduce duplication between vertex/edge/face picking code paths.

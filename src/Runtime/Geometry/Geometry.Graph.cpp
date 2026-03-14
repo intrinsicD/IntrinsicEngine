@@ -21,16 +21,19 @@ import :Graph;
 import :AABB;
 import :Octree;
 import :Properties;
+import :Validation;
 
 namespace Geometry::Graph
 {
+    using Validation::IsFinite;
+
     namespace
     {
-        [[nodiscard]] bool IsFiniteVec2(const glm::vec2& value)
-        {
-            return std::isfinite(value.x) && std::isfinite(value.y);
-        }
 
+        // Deterministic pseudo-random unit direction for an edge (i,j).
+        // Uses LCG-style hash constants to map the pair to a phase angle in [0, 2π),
+        // producing consistent initial displacement for force-directed layout.
+        // The mask 0xFFFF and scale 0.0000958738 ≈ 2π/65536 map to a uniform angle.
         [[nodiscard]] glm::vec2 UnitDirectionFromPair(std::uint32_t i, std::uint32_t j)
         {
             const float phase = static_cast<float>((((i + 1U) * 1664525U) ^ ((j + 1U) * 1013904223U)) & 0xFFFFU);
@@ -72,6 +75,10 @@ namespace Geometry::Graph
             return proj;
         }
 
+        // Combinatorial graph Laplacian: L = D - A, where D is the degree
+        // matrix and A is the adjacency matrix. Computes y = L * x in O(|E|).
+        // For each edge (i,j): y[i] += x[i] - x[j], y[j] += x[j] - x[i].
+        // Used by spectral embedding (Fiedler vector / graph partitioning).
         void MultiplyCombinatorialLaplacian(std::span<const std::pair<std::uint32_t, std::uint32_t>> edges,
             std::span<const float> x, std::span<float> y)
         {
@@ -84,11 +91,15 @@ namespace Geometry::Graph
             }
         }
 
+        // Symmetric normalized Laplacian: L_sym = D^{-1/2} L D^{-1/2} = I - D^{-1/2} A D^{-1/2}.
+        // Eigenvalues in [0, 2]; avoids hub-dominated embeddings on irregular-degree
+        // topologies. invSqrtDegree[i] = 1 / sqrt(deg(i)) is precomputed per vertex.
         void MultiplyNormalizedSymmetricLaplacian(std::span<const std::pair<std::uint32_t, std::uint32_t>> edges,
             std::span<const float> invSqrtDegree,
             std::span<const float> x,
             std::span<float> y)
         {
+            // Identity term: y = x (equivalent to D^{-1/2} D D^{-1/2} x = x).
             std::fill(y.begin(), y.end(), 0.0F);
             for (std::size_t i = 0; i < x.size(); ++i)
             {
@@ -96,6 +107,7 @@ namespace Geometry::Graph
                 y[i] += degreeTerm;
             }
 
+            // Adjacency term: y -= D^{-1/2} A D^{-1/2} x.
             for (const auto& [i, j] : edges)
             {
                 const std::size_t is = static_cast<std::size_t>(i);
@@ -107,6 +119,9 @@ namespace Geometry::Graph
             }
         }
 
+        // 2D orientation test (cross product of AB and AC).
+        // Returns > 0 for CCW, < 0 for CW, 0 for collinear.
+        // Used by edge-crossing detection for graph layout quality diagnostics.
         [[nodiscard]] float Orientation2D(const glm::vec2& a, const glm::vec2& b, const glm::vec2& c)
         {
             const glm::vec2 ab = b - a;
@@ -114,6 +129,7 @@ namespace Geometry::Graph
             return ab.x * ac.y - ab.y * ac.x;
         }
 
+        // Check whether two 1D intervals [a0,a1] and [b0,b1] overlap within epsilon.
         [[nodiscard]] bool RangesOverlap(float a0, float a1, float b0, float b1, float epsilon)
         {
             if (a0 > a1) std::swap(a0, a1);
@@ -121,6 +137,7 @@ namespace Geometry::Graph
             return (a0 <= b1 + epsilon) && (b0 <= a1 + epsilon);
         }
 
+        // Check whether point p lies on segment [a, b] within epsilon tolerance.
         [[nodiscard]] bool OnSegment(const glm::vec2& a, const glm::vec2& b, const glm::vec2& p, float epsilon)
         {
             return RangesOverlap(a.x, b.x, p.x, p.x, epsilon)
@@ -702,7 +719,7 @@ namespace Geometry::Graph
                 }
 
                 ioPositions[vi] += move;
-                if (!IsFiniteVec2(ioPositions[vi])) return std::nullopt;
+                if (!IsFinite(ioPositions[vi])) return std::nullopt;
                 maxDisplacement = std::max(maxDisplacement, moveLength);
             }
 
@@ -1147,7 +1164,7 @@ namespace Geometry::Graph
                     ioPositions[globalVertex] = glm::vec2(
                         componentXOffset + localX[localVertex],
                         -static_cast<float>(li) * params.LayerSpacing);
-                    if (!IsFiniteVec2(ioPositions[globalVertex])) return std::nullopt;
+                    if (!IsFinite(ioPositions[globalVertex])) return std::nullopt;
                 }
             }
 
@@ -1270,7 +1287,7 @@ namespace Geometry::Graph
 
             const glm::vec2 p0 = positions[v0];
             const glm::vec2 p1 = positions[v1];
-            if (!IsFiniteVec2(p0) || !IsFiniteVec2(p1)) return std::nullopt;
+            if (!IsFinite(p0) || !IsFinite(p1)) return std::nullopt;
             edges.emplace_back(v0, v1);
         }
 

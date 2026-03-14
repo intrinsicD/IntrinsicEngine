@@ -8,6 +8,7 @@ module;
 #include <vector>
 
 export module Core.Telemetry;
+import Core.Hash;
 import Core.Tasks;
 
 export namespace Core::Telemetry
@@ -191,19 +192,10 @@ export namespace Core::Telemetry
         std::chrono::high_resolution_clock::time_point m_Start;
     };
 
-    // -------------------------------------------------------------------------
-    // Compile-time FNV-1a hash for scope names
-    // -------------------------------------------------------------------------
-    constexpr uint32_t HashString(const char* str)
-    {
-        uint32_t hash = 2166136261u;
-        while (*str)
-        {
-            hash ^= static_cast<uint8_t>(*str++);
-            hash *= 16777619u;
-        }
-        return hash;
-    }
+    // FNV-1a hash — delegates to Core::Hash::HashString.
+    // Kept as a forwarding alias for backward compatibility with
+    // INTRINSIC_PROFILE_SCOPE and other macro-based instrumentation.
+    using Core::Hash::HashString;
 }
 
 // -------------------------------------------------------------------------

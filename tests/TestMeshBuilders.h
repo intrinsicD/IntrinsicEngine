@@ -122,6 +122,57 @@ inline Geometry::Halfedge::Mesh MakeIcosahedron()
     return mesh;
 }
 
+// Two quads sharing an edge (butterfly configuration): 5 vertices, 2 faces (quads).
+//   v0=(0,0,0)  v1=(1,0,0)  v2=(1,1,0)  v3=(0,1,0)  v4=(2,0,0)  v5=(2,1,0)
+//   Quad 0: v0-v1-v2-v3,  Quad 1: v1-v4-v5-v2
+inline Geometry::Halfedge::Mesh MakeQuadPair()
+{
+    Geometry::Halfedge::Mesh mesh;
+    auto v0 = mesh.AddVertex({0.0f, 0.0f, 0.0f});
+    auto v1 = mesh.AddVertex({1.0f, 0.0f, 0.0f});
+    auto v2 = mesh.AddVertex({1.0f, 1.0f, 0.0f});
+    auto v3 = mesh.AddVertex({0.0f, 1.0f, 0.0f});
+    auto v4 = mesh.AddVertex({2.0f, 0.0f, 0.0f});
+    auto v5 = mesh.AddVertex({2.0f, 1.0f, 0.0f});
+    (void)mesh.AddFace({v0, v1, v2, v3});
+    (void)mesh.AddFace({v1, v4, v5, v2});
+    return mesh;
+}
+
+// Axis-aligned cube centered at `center` with half-extent `h`.
+// 8 vertices, 12 triangles (2 per face). Closed manifold mesh.
+inline Geometry::Halfedge::Mesh MakeCube(float h = 1.0f, glm::vec3 center = glm::vec3(0.0f))
+{
+    Geometry::Halfedge::Mesh mesh;
+    auto v0 = mesh.AddVertex(center + glm::vec3(-h, -h, -h));
+    auto v1 = mesh.AddVertex(center + glm::vec3( h, -h, -h));
+    auto v2 = mesh.AddVertex(center + glm::vec3( h,  h, -h));
+    auto v3 = mesh.AddVertex(center + glm::vec3(-h,  h, -h));
+    auto v4 = mesh.AddVertex(center + glm::vec3(-h, -h,  h));
+    auto v5 = mesh.AddVertex(center + glm::vec3( h, -h,  h));
+    auto v6 = mesh.AddVertex(center + glm::vec3( h,  h,  h));
+    auto v7 = mesh.AddVertex(center + glm::vec3(-h,  h,  h));
+    // -Z
+    (void)mesh.AddTriangle(v0, v2, v1);
+    (void)mesh.AddTriangle(v0, v3, v2);
+    // +Z
+    (void)mesh.AddTriangle(v4, v5, v6);
+    (void)mesh.AddTriangle(v4, v6, v7);
+    // -X
+    (void)mesh.AddTriangle(v0, v4, v7);
+    (void)mesh.AddTriangle(v0, v7, v3);
+    // +X
+    (void)mesh.AddTriangle(v1, v2, v6);
+    (void)mesh.AddTriangle(v1, v6, v5);
+    // -Y
+    (void)mesh.AddTriangle(v0, v1, v5);
+    (void)mesh.AddTriangle(v0, v5, v4);
+    // +Y
+    (void)mesh.AddTriangle(v2, v3, v7);
+    (void)mesh.AddTriangle(v2, v7, v6);
+    return mesh;
+}
+
 // ---- Name aliases used in some test files ----
 
 // Same geometry as MakeSingleTriangle (used in Test_MeshQuality).

@@ -31,7 +31,7 @@ namespace Graphics
 {
     namespace
     {
-        constexpr std::string_view s_Extensions[] = { ".pcd" };
+        static constexpr std::string_view s_Extensions[] = { ".pcd" };
 
         struct PCDField
         {
