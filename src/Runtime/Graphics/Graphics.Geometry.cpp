@@ -85,7 +85,7 @@ namespace Graphics
                 return { std::unique_ptr<GeometryGpuData>{}, RHI::TransferToken{} };
             }
 
-            const GeometryGpuData* source = existingPool->GetUnchecked(data.ReuseVertexBuffersFrom);
+            const GeometryGpuData* source = existingPool->GetIfValid(data.ReuseVertexBuffersFrom);
             if (!source || !source->m_VertexBuffer)
             {
                 Core::Log::Error("GeometryGpuData::CreateAsync: ReuseVertexBuffersFrom handle invalid or source has no vertex buffer.");

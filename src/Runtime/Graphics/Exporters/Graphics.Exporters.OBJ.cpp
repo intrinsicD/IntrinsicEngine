@@ -19,6 +19,7 @@ import :AssetErrors;
 namespace Graphics
 {
     using ExportUtils::AppendString;
+    using ExportUtils::AppendFormatted;
 
     namespace
     {
@@ -43,13 +44,10 @@ namespace Graphics
         // Write vertices
         for (const auto& p : data.Positions)
         {
-            char buf[128];
-            int n = std::snprintf(buf, sizeof(buf), "v %.6f %.6f %.6f\n",
-                                  static_cast<double>(p.x),
-                                  static_cast<double>(p.y),
-                                  static_cast<double>(p.z));
-            if (n > 0)
-                AppendString(out, std::string(buf, static_cast<std::size_t>(n)));
+            AppendFormatted(out, "v %.6f %.6f %.6f\n",
+                            static_cast<double>(p.x),
+                            static_cast<double>(p.y),
+                            static_cast<double>(p.z));
         }
 
         // Write normals
@@ -58,13 +56,10 @@ namespace Graphics
         {
             for (const auto& n : data.Normals)
             {
-                char buf[128];
-                int len = std::snprintf(buf, sizeof(buf), "vn %.6f %.6f %.6f\n",
-                                        static_cast<double>(n.x),
-                                        static_cast<double>(n.y),
-                                        static_cast<double>(n.z));
-                if (len > 0)
-                    AppendString(out, std::string(buf, static_cast<std::size_t>(len)));
+                AppendFormatted(out, "vn %.6f %.6f %.6f\n",
+                                static_cast<double>(n.x),
+                                static_cast<double>(n.y),
+                                static_cast<double>(n.z));
             }
         }
 
@@ -74,12 +69,9 @@ namespace Graphics
         {
             for (const auto& a : data.Aux)
             {
-                char buf[128];
-                int len = std::snprintf(buf, sizeof(buf), "vt %.6f %.6f\n",
-                                        static_cast<double>(a.x),
-                                        static_cast<double>(a.y));
-                if (len > 0)
-                    AppendString(out, std::string(buf, static_cast<std::size_t>(len)));
+                AppendFormatted(out, "vt %.6f %.6f\n",
+                                static_cast<double>(a.x),
+                                static_cast<double>(a.y));
             }
         }
 
@@ -96,25 +88,12 @@ namespace Graphics
                 uint32_t b = data.Indices[i + 1] + 1;
                 uint32_t c = data.Indices[i + 2] + 1;
 
-                char buf[256];
-                int len = 0;
                 if (hasNormals && hasUVs)
-                {
-                    len = std::snprintf(buf, sizeof(buf), "f %u/%u/%u %u/%u/%u %u/%u/%u\n",
-                                        a, a, a, b, b, b, c, c, c);
-                }
+                    AppendFormatted(out, "f %u/%u/%u %u/%u/%u %u/%u/%u\n", a, a, a, b, b, b, c, c, c);
                 else if (hasNormals)
-                {
-                    len = std::snprintf(buf, sizeof(buf), "f %u//%u %u//%u %u//%u\n",
-                                        a, a, b, b, c, c);
-                }
+                    AppendFormatted(out, "f %u//%u %u//%u %u//%u\n", a, a, b, b, c, c);
                 else
-                {
-                    len = std::snprintf(buf, sizeof(buf), "f %u %u %u\n", a, b, c);
-                }
-
-                if (len > 0)
-                    AppendString(out, std::string(buf, static_cast<std::size_t>(len)));
+                    AppendFormatted(out, "f %u %u %u\n", a, b, c);
             }
         }
         else if (data.Topology == PrimitiveTopology::Lines && !data.Indices.empty())
@@ -126,10 +105,7 @@ namespace Graphics
             {
                 uint32_t a = data.Indices[i] + 1;
                 uint32_t b = data.Indices[i + 1] + 1;
-                char buf[64];
-                int len = std::snprintf(buf, sizeof(buf), "l %u %u\n", a, b);
-                if (len > 0)
-                    AppendString(out, std::string(buf, static_cast<std::size_t>(len)));
+                AppendFormatted(out, "l %u %u\n", a, b);
             }
         }
 

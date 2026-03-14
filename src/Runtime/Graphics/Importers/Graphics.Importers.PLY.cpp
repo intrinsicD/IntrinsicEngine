@@ -513,12 +513,10 @@ namespace Graphics
 
                 if (hasColors)
                 {
-                    float r = ParseFloat(tokens[(size_t)idxR]);
-                    float g = ParseFloat(tokens[(size_t)idxG]);
-                    float b = ParseFloat(tokens[(size_t)idxB]);
-                    float a = hasAlpha ? ParseFloat(tokens[(size_t)idxA]) : 255.0f;
-                    if (r > 1.0f || g > 1.0f || b > 1.0f || a > 1.0f)
-                    { r /= 255.0f; g /= 255.0f; b /= 255.0f; a /= 255.0f; }
+                    float r = Detail::NormalizeColorChannelToUnitRange(ParseFloat(tokens[(size_t)idxR]));
+                    float g = Detail::NormalizeColorChannelToUnitRange(ParseFloat(tokens[(size_t)idxG]));
+                    float b = Detail::NormalizeColorChannelToUnitRange(ParseFloat(tokens[(size_t)idxB]));
+                    float a = hasAlpha ? Detail::NormalizeColorChannelToUnitRange(ParseFloat(tokens[(size_t)idxA])) : 1.0f;
                     outData.Aux[i] = glm::vec4(r, g, b, a);
                 }
 
@@ -638,12 +636,19 @@ namespace Graphics
                                 const double rd = readFromBlobAsDouble(v, *pr);
                                 const double gd = readFromBlobAsDouble(v, *pg);
                                 const double bd = readFromBlobAsDouble(v, *pb);
-                                const double ad = pa ? readFromBlobAsDouble(v, *pa) : 255.0;
+                                const double ad = pa ? readFromBlobAsDouble(v, *pa) : 1.0;
                                 const bool byteBased = IsColorByteBased(pr->ScalarType) && IsColorByteBased(pg->ScalarType) && IsColorByteBased(pb->ScalarType)
                                                        && (!pa || IsColorByteBased(pa->ScalarType));
                                 float rf = (float)rd, gf = (float)gd, bf = (float)bd, af = (float)ad;
-                                if (byteBased || rf > 1.0f || gf > 1.0f || bf > 1.0f || af > 1.0f)
+                                if (byteBased)
                                 { rf /= 255.0f; gf /= 255.0f; bf /= 255.0f; af /= 255.0f; }
+                                else
+                                {
+                                    rf = Detail::NormalizeColorChannelToUnitRange(rf);
+                                    gf = Detail::NormalizeColorChannelToUnitRange(gf);
+                                    bf = Detail::NormalizeColorChannelToUnitRange(bf);
+                                    af = Detail::NormalizeColorChannelToUnitRange(af);
+                                }
                                 outData.Aux[i] = glm::vec4(rf, gf, bf, af);
                             }
 
@@ -715,10 +720,10 @@ namespace Graphics
                             if (hasNormals) outData.Normals[i] = nrm;
                             if (hasColors && gotColor)
                             {
-                                float rf = rgba.r, gf = rgba.g, bf = rgba.b;
-                                float af = hasAlpha ? rgba.a : 255.0f;
-                                if (rf > 1.0f || gf > 1.0f || bf > 1.0f || af > 1.0f)
-                                { rf /= 255.0f; gf /= 255.0f; bf /= 255.0f; af /= 255.0f; }
+                                float rf = Detail::NormalizeColorChannelToUnitRange(rgba.r);
+                                float gf = Detail::NormalizeColorChannelToUnitRange(rgba.g);
+                                float bf = Detail::NormalizeColorChannelToUnitRange(rgba.b);
+                                float af = hasAlpha ? Detail::NormalizeColorChannelToUnitRange(rgba.a) : 1.0f;
                                 outData.Aux[i] = glm::vec4(rf, gf, bf, af);
                             }
                             if (hasUVs) { outData.Aux[i].x = uv.x; outData.Aux[i].y = uv.y; }

@@ -559,7 +559,7 @@ namespace Runtime
                         // but for scene reload we attach directly.
                         const auto& seg = model->Meshes[0];
                         const auto handle = seg->Handle;
-                        const auto* geo = engine.GetGeometryStorage().GetUnchecked(handle);
+                        const auto* geo = engine.GetGeometryStorage().GetIfValid(handle);
 
                         if (geo && geo->GetTopology() == Graphics::PrimitiveTopology::Points)
                         {

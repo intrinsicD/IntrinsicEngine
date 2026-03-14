@@ -57,7 +57,7 @@ namespace Graphics::Systems::MeshRendererLifecycle
                 if (!mr.Geometry.IsValid())
                     continue;
 
-                GeometryGpuData* geo = geometryStorage.GetUnchecked(mr.Geometry);
+                GeometryGpuData* geo = geometryStorage.GetIfValid(mr.Geometry);
                 if (!geo || geo->GetIndexCount() == 0 || !geo->GetIndexBuffer() || !geo->GetVertexBuffer())
                     continue;
 

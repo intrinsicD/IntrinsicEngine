@@ -152,6 +152,17 @@ namespace RHI
         if (m_Device) vkDestroyDevice(m_Device, nullptr);
     }
 
+    // Two-atomic timeline signaling pattern:
+    //
+    //   m_GraphicsTimelineNextValue (relaxed fetch_add) — monotonic counter that
+    //     reserves the next unique timeline value. Relaxed is sufficient because
+    //     only uniqueness matters, not ordering between concurrent signalers.
+    //
+    //   m_GraphicsTimelineValue (release store) — publishes the last signaled
+    //     value. Asset-loader threads read this with acquire semantics via
+    //     GetGraphicsTimelineValue() to stamp their SafeDestroy deferrals.
+    //     The release/acquire pair ensures the GPU submission that uses this
+    //     timeline value is visible before any deferred deletion references it.
     uint64_t VulkanDevice::SignalGraphicsTimeline()
     {
         const uint64_t value = m_GraphicsTimelineNextValue.fetch_add(1, std::memory_order_relaxed);
@@ -167,6 +178,16 @@ namespace RHI
         return completed;
     }
 
+    // Partition-and-execute deferred deletion:
+    //
+    // Queries the GPU-completed timeline value via vkGetSemaphoreCounterValue,
+    // then single-pass partitions the deletion queue into "ready" (timeline value
+    // <= completed, safe to destroy) and "pending" (GPU still using the resource).
+    //
+    // Critical design: deletion callbacks execute OUTSIDE the lock. This prevents
+    // deadlocks when a callback itself calls SafeDestroy (re-entrant enqueueing).
+    // The pending vector replaces the queue under the lock; ready items are
+    // processed after lock release.
     void VulkanDevice::CollectGarbage()
     {
         const uint64_t completed = GetGraphicsTimelineCompletedValue();

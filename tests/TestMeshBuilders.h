@@ -173,6 +173,48 @@ inline Geometry::Halfedge::Mesh MakeCube(float h = 1.0f, glm::vec3 center = glm:
     return mesh;
 }
 
+// Right triangle in XY plane: v0=(0,0,0), v1=(1,0,0), v2=(0,1,0).
+// 1 face, 3 vertices, 3 boundary edges.
+// Used by property access and per-face attribute tests.
+inline Geometry::Halfedge::Mesh MakeRightTriangle()
+{
+    Geometry::Halfedge::Mesh mesh;
+    auto v0 = mesh.AddVertex({0.0f, 0.0f, 0.0f});
+    auto v1 = mesh.AddVertex({1.0f, 0.0f, 0.0f});
+    auto v2 = mesh.AddVertex({0.0f, 1.0f, 0.0f});
+    (void)mesh.AddTriangle(v0, v1, v2);
+    return mesh;
+}
+
+// Two-triangle mesh sharing edge v1-v2:
+//   v0=(0,0,0) v1=(1,0,0) v2=(0,1,0) v3=(1,1,0)
+//   Face 0: v0-v1-v2, Face 1: v2-v1-v3
+// 4 vertices, 2 faces, 1 shared interior edge, 4 boundary edges.
+inline Geometry::Halfedge::Mesh MakeTwoTriangleDiamond()
+{
+    Geometry::Halfedge::Mesh mesh;
+    auto v0 = mesh.AddVertex({0.0f, 0.0f, 0.0f});
+    auto v1 = mesh.AddVertex({1.0f, 0.0f, 0.0f});
+    auto v2 = mesh.AddVertex({0.0f, 1.0f, 0.0f});
+    auto v3 = mesh.AddVertex({1.0f, 1.0f, 0.0f});
+    (void)mesh.AddTriangle(v0, v1, v2);
+    (void)mesh.AddTriangle(v2, v1, v3);
+    return mesh;
+}
+
+// Single quad face: v0=(0,0,0), v1=(1,0,0), v2=(1,1,0), v3=(0,1,0).
+// Tests polygon (non-triangle) face support.
+inline Geometry::Halfedge::Mesh MakeSingleQuad()
+{
+    Geometry::Halfedge::Mesh mesh;
+    auto v0 = mesh.AddVertex({0.0f, 0.0f, 0.0f});
+    auto v1 = mesh.AddVertex({1.0f, 0.0f, 0.0f});
+    auto v2 = mesh.AddVertex({1.0f, 1.0f, 0.0f});
+    auto v3 = mesh.AddVertex({0.0f, 1.0f, 0.0f});
+    (void)mesh.AddQuad(v0, v1, v2, v3);
+    return mesh;
+}
+
 // ---- Name aliases used in some test files ----
 
 // Same geometry as MakeSingleTriangle (used in Test_MeshQuality).

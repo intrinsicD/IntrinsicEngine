@@ -85,7 +85,7 @@ void InspectorController::Draw()
             if (ImGui::CollapsingHeader("Surface", ImGuiTreeNodeFlags_DefaultOpen))
             {
                 auto& sc = reg.get<ECS::Surface::Component>(selected);
-                Graphics::GeometryGpuData* geo = m_Engine->GetGeometryStorage().GetUnchecked(sc.Geometry);
+                Graphics::GeometryGpuData* geo = m_Engine->GetGeometryStorage().GetIfValid(sc.Geometry);
 
                 if (geo)
                 {
@@ -218,7 +218,7 @@ void InspectorController::Draw()
         {
             auto& sc = reg.get<ECS::Surface::Component>(selected);
             Graphics::PrimitiveTopology topology = Graphics::PrimitiveTopology::Triangles;
-            if (auto* geo = m_Engine->GetGeometryStorage().GetUnchecked(sc.Geometry))
+            if (auto* geo = m_Engine->GetGeometryStorage().GetIfValid(sc.Geometry))
                 topology = geo->GetTopology();
 
             const bool isTriangleMesh = (topology == Graphics::PrimitiveTopology::Triangles);

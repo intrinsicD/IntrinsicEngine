@@ -12,6 +12,8 @@ import Graphics;
 import Geometry;
 import RHI;
 
+#include "TestMeshBuilders.h"
+
 namespace
 {
     namespace TestGpuColor
@@ -106,20 +108,14 @@ namespace
 // Helpers
 // =============================================================================
 
-// Build a single-triangle mesh.
-static Geometry::Halfedge::Mesh MakeTriangle()
-{
-    using namespace Geometry;
-    Halfedge::Mesh mesh;
-    auto v0 = mesh.AddVertex(glm::vec3(0, 0, 0));
-    auto v1 = mesh.AddVertex(glm::vec3(1, 0, 0));
-    auto v2 = mesh.AddVertex(glm::vec3(0, 1, 0));
-    (void)mesh.AddTriangle(v0, v1, v2);
-    return mesh;
-}
+// Use shared builders from TestMeshBuilders.h where possible.
+// MakeTriangle and MakeQuadPair forward to shared equivalents.
+// MakeTetrahedron uses different vertex coordinates than the shared version
+// (approximate regular tetrahedron vs exact), so it remains local.
+static Geometry::Halfedge::Mesh MakeTriangle() { return MakeRightTriangle(); }
+static Geometry::Halfedge::Mesh MakeQuadPair() { return MakeTwoTriangleDiamond(); }
 
-// Build a 4-face tetrahedron mesh.
-static Geometry::Halfedge::Mesh MakeTetrahedron()
+static Geometry::Halfedge::Mesh MakeLocalTetrahedron()
 {
     using namespace Geometry;
     Halfedge::Mesh mesh;
@@ -131,20 +127,6 @@ static Geometry::Halfedge::Mesh MakeTetrahedron()
     (void)mesh.AddTriangle(v0, v2, v3);
     (void)mesh.AddTriangle(v0, v3, v1);
     (void)mesh.AddTriangle(v1, v3, v2);
-    return mesh;
-}
-
-// Build a two-triangle quad mesh (v0-v1-v2 and v2-v1-v3).
-static Geometry::Halfedge::Mesh MakeQuadPair()
-{
-    using namespace Geometry;
-    Halfedge::Mesh mesh;
-    auto v0 = mesh.AddVertex(glm::vec3(0, 0, 0));
-    auto v1 = mesh.AddVertex(glm::vec3(1, 0, 0));
-    auto v2 = mesh.AddVertex(glm::vec3(0, 1, 0));
-    auto v3 = mesh.AddVertex(glm::vec3(1, 1, 0));
-    (void)mesh.AddTriangle(v0, v1, v2);
-    (void)mesh.AddTriangle(v2, v1, v3);
     return mesh;
 }
 
@@ -205,7 +187,7 @@ TEST(PerFaceAttr_FlatShading, ExtractFromPropertySet_SingleTriangle)
 TEST(PerFaceAttr_FlatShading, ExtractFromPropertySet_MultipleFaces)
 {
     using namespace Geometry;
-    auto mesh = MakeTetrahedron();
+    auto mesh = MakeLocalTetrahedron();
 
     auto color = FaceProperty<glm::vec4>(
         mesh.FaceProperties().GetOrAdd<glm::vec4>("f:color", glm::vec4(1.0f)));
@@ -378,7 +360,7 @@ TEST(PerFaceAttr_Curvature, CurvatureVisualization_PerFaceScalar)
 {
     // Simulate curvature visualization: per-face scalar values mapped to
     // heat colormap and stored as CachedFaceColors.
-    auto mesh = MakeTetrahedron();
+    auto mesh = MakeLocalTetrahedron();
 
     // Simulate per-face curvature values.
     std::vector<float> curvature = {0.0f, 0.33f, 0.66f, 1.0f};
@@ -494,7 +476,7 @@ TEST(PerFaceAttr_Segmentation, LabelToColor_AllOpaque)
 TEST(PerFaceAttr_Segmentation, SegmentationVisualization_PerFaceLabels)
 {
     using namespace Geometry;
-    auto mesh = MakeTetrahedron();
+    auto mesh = MakeLocalTetrahedron();
 
     // Add per-face label property.
     auto labelProp = FaceProperty<int>(
@@ -573,7 +555,7 @@ TEST(PerFaceAttr_Integration, PushConstantsPtrFaceAttrCanHoldBDA)
 TEST(PerFaceAttr_Integration, FaceColorCountMatchesFaceCount)
 {
     using namespace Geometry;
-    auto mesh = MakeTetrahedron();
+    auto mesh = MakeLocalTetrahedron();
 
     auto color = FaceProperty<glm::vec4>(
         mesh.FaceProperties().GetOrAdd<glm::vec4>("f:color", glm::vec4(1.0f)));

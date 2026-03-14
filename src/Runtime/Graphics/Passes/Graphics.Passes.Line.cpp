@@ -366,11 +366,11 @@ namespace Graphics::Passes
                 if (!line.EdgeView.IsValid())
                     continue;
 
-                GeometryGpuData* geo = m_GeometryStorage->GetUnchecked(line.Geometry);
+                GeometryGpuData* geo = m_GeometryStorage->GetIfValid(line.Geometry);
                 if (!geo || !geo->GetVertexBuffer())
                     continue;
 
-                GeometryGpuData* edgeGeo = m_GeometryStorage->GetUnchecked(line.EdgeView);
+                GeometryGpuData* edgeGeo = m_GeometryStorage->GetIfValid(line.EdgeView);
                 if (!edgeGeo || !edgeGeo->GetIndexBuffer() || !edgeGeo->GetVertexBuffer())
                     continue;
 

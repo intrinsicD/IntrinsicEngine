@@ -11,48 +11,15 @@
 
 import Geometry;
 
+#include "TestMeshBuilders.h"
+
 // =============================================================================
 // PropertySet Public Accessor Tests
 // =============================================================================
 
-// Helper: build a single-triangle mesh.
-static Geometry::Halfedge::Mesh MakeTriangle()
-{
-    using namespace Geometry;
-    Halfedge::Mesh mesh;
-    auto v0 = mesh.AddVertex(glm::vec3(0, 0, 0));
-    auto v1 = mesh.AddVertex(glm::vec3(1, 0, 0));
-    auto v2 = mesh.AddVertex(glm::vec3(0, 1, 0));
-    (void)mesh.AddTriangle(v0, v1, v2);
-    return mesh;
-}
-
-// Helper: build a two-triangle quad mesh (v0-v1-v2 and v2-v1-v3).
-static Geometry::Halfedge::Mesh MakeQuadPair()
-{
-    using namespace Geometry;
-    Halfedge::Mesh mesh;
-    auto v0 = mesh.AddVertex(glm::vec3(0, 0, 0));
-    auto v1 = mesh.AddVertex(glm::vec3(1, 0, 0));
-    auto v2 = mesh.AddVertex(glm::vec3(0, 1, 0));
-    auto v3 = mesh.AddVertex(glm::vec3(1, 1, 0));
-    (void)mesh.AddTriangle(v0, v1, v2);
-    (void)mesh.AddTriangle(v2, v1, v3);
-    return mesh;
-}
-
-// Helper: build a single quad face.
-static Geometry::Halfedge::Mesh MakeSingleQuad()
-{
-    using namespace Geometry;
-    Halfedge::Mesh mesh;
-    auto v0 = mesh.AddVertex(glm::vec3(0, 0, 0));
-    auto v1 = mesh.AddVertex(glm::vec3(1, 0, 0));
-    auto v2 = mesh.AddVertex(glm::vec3(1, 1, 0));
-    auto v3 = mesh.AddVertex(glm::vec3(0, 1, 0));
-    (void)mesh.AddQuad(v0, v1, v2, v3);
-    return mesh;
-}
+// Use shared builders: MakeRightTriangle(), MakeTwoTriangleDiamond(), MakeSingleQuad()
+static Geometry::Halfedge::Mesh MakeTriangle() { return MakeRightTriangle(); }
+static Geometry::Halfedge::Mesh MakeQuadPair() { return MakeTwoTriangleDiamond(); }
 
 // =============================================================================
 // EdgeProperties() Tests

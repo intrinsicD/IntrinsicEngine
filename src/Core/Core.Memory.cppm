@@ -72,8 +72,22 @@ export namespace Core::Memory
 
     namespace Detail
     {
+        // Global monotonic counter for unique arena generations.
+        // Each new arena (or moved-to arena) atomically claims the next value.
         inline std::atomic<ArenaGeneration> g_NextArenaGeneration{1};
 
+        // Shared lifetime witness for ArenaAllocator → LinearArena back-references.
+        //
+        // Problem: ArenaAllocator holds a raw pointer to a LinearArena. If the arena
+        // is moved or destroyed, that pointer dangles. We need a way for the allocator
+        // to detect this without preventing arena moves.
+        //
+        // Solution: Each arena heap-allocates a token and shares it with its allocators.
+        // The token uses two atomics — Alive (liveness flag) and Generation (unique ID) —
+        // so allocators can detect both destruction (Alive→false) and move-reassignment
+        // (Generation mismatch). On arena move, the old token is marked dead (release
+        // semantics) and a fresh token with a new generation is created for the new owner.
+        // Allocators check with acquire semantics before every allocation.
         struct ArenaLifetimeToken
         {
             std::atomic<ArenaGeneration> Generation{0};
@@ -244,6 +258,21 @@ export namespace Core::Memory
             return ptr;
         }
 
+        // Three-level arena allocation for non-trivially-destructible arrays:
+        //
+        //   Level 1: T[count]         — the array elements themselves.
+        //   Level 2: ArrayMetadata    — small {T* Ptr, size_t Count} record so the
+        //                                type-erased destructor knows how many elements
+        //                                to destroy.
+        //   Level 3: DestructorNode   — linked-list node pointing to ArrayMetadata,
+        //                                with a type-erased DestroyFn that reverse-
+        //                                iterates the array calling std::destroy_at.
+        //
+        // All three allocations come from the same LinearArena (bump pointer),
+        // so there is zero heap fragmentation. On ScopeStack::Reset(), the
+        // destructor chain walks m_Head → node.Next in LIFO order, calling each
+        // DestroyFn. For trivially-destructible T, levels 2 and 3 are skipped
+        // entirely (the array memory is reclaimed when the arena resets).
         template <typename T>
         [[nodiscard]] std::expected<std::span<T>, AllocatorError> NewArray(size_t count)
         {

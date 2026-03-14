@@ -112,7 +112,7 @@ namespace Runtime
                 // Route point topologies to PointCloud::Data for PointPass
                 // rendering. Meshes/lines use the standard Surface path.
                 const auto handle = model->Meshes[i]->Handle;
-                const auto* geo = m_GeometryStorage ? m_GeometryStorage->GetUnchecked(handle) : nullptr;
+                const auto* geo = m_GeometryStorage ? m_GeometryStorage->GetIfValid(handle) : nullptr;
 
                 if (geo && geo->GetTopology() == Graphics::PrimitiveTopology::Points)
                 {

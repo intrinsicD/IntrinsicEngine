@@ -145,7 +145,7 @@ namespace Graphics::Systems::MeshViewLifecycle
             if (!sc.Geometry.IsValid())
                 continue;
 
-            GeometryGpuData* srcGeo = geometryStorage.GetUnchecked(sc.Geometry);
+            GeometryGpuData* srcGeo = geometryStorage.GetIfValid(sc.Geometry);
             if (!srcGeo || !srcGeo->GetVertexBuffer())
                 continue;
 
@@ -206,7 +206,7 @@ namespace Graphics::Systems::MeshViewLifecycle
                     inst.Model = wm->Matrix;
                 inst.GeometryID = ev.Geometry.Index;
 
-                GeometryGpuData* edgeGeo = geometryStorage.GetUnchecked(ev.Geometry);
+                GeometryGpuData* edgeGeo = geometryStorage.GetIfValid(ev.Geometry);
                 glm::vec4 sphere = edgeGeo
                     ? ComputeLocalBoundingSphere(*edgeGeo)
                     : glm::vec4(0.0f, 0.0f, 0.0f, GPUSceneConstants::kMinBoundingSphereRadius);
@@ -255,7 +255,7 @@ namespace Graphics::Systems::MeshViewLifecycle
             if (!sc.Geometry.IsValid())
                 continue;
 
-            GeometryGpuData* srcGeo = geometryStorage.GetUnchecked(sc.Geometry);
+            GeometryGpuData* srcGeo = geometryStorage.GetIfValid(sc.Geometry);
             if (!srcGeo || !srcGeo->GetVertexBuffer())
                 continue;
 
@@ -302,7 +302,7 @@ namespace Graphics::Systems::MeshViewLifecycle
                     inst.Model = wm->Matrix;
                 inst.GeometryID = pv.Geometry.Index;
 
-                GeometryGpuData* vtxGeo = geometryStorage.GetUnchecked(pv.Geometry);
+                GeometryGpuData* vtxGeo = geometryStorage.GetIfValid(pv.Geometry);
                 glm::vec4 sphere = vtxGeo
                     ? ComputeLocalBoundingSphere(*vtxGeo)
                     : glm::vec4(0.0f, 0.0f, 0.0f, GPUSceneConstants::kMinBoundingSphereRadius);
@@ -329,7 +329,7 @@ namespace Graphics::Systems::MeshViewLifecycle
                 pointComp->Geometry = pv.Geometry;  // Vertex view (Points topology)
 
                 // Propagate normals availability from source mesh.
-                GeometryGpuData* geo = geometryStorage.GetUnchecked(pv.Geometry);
+                GeometryGpuData* geo = geometryStorage.GetIfValid(pv.Geometry);
                 if (geo)
                     pointComp->HasPerPointNormals = (geo->GetLayout().NormalsSize > 0);
             }
