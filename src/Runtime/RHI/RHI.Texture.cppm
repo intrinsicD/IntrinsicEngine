@@ -65,4 +65,8 @@ export namespace RHI
         VulkanDevice* m_Device = nullptr;
         TextureHandle m_Handle{};
     };
+
+    // Shared sampler creation helper used by Texture and TextureSystem.
+    // Creates a linear-filtered, anisotropic, repeat-addressing sampler.
+    void CreateDefaultSampler(VulkanDevice& device, uint32_t mipLevels, VkSampler& outSampler);
 }

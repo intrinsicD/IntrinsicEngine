@@ -37,20 +37,28 @@ namespace RHI {
 
         vkDeviceWaitIdle(m_Device->GetLogicalDevice());
 
-        // 1. Cleanup OLD views, but KEEP the swapchain handle for a moment
-        for (auto imageView : m_ImageViews) {
-            vkDestroyImageView(m_Device->GetLogicalDevice(), imageView, nullptr);
+        // 1. Cleanup OLD views via SafeDestroy for consistency with other RHI resources.
+        // vkDeviceWaitIdle above guarantees GPU is idle, but SafeDestroy keeps the pattern uniform.
+        VkDevice logicalDevice = m_Device->GetLogicalDevice();
+        if (!m_ImageViews.empty())
+        {
+            std::vector<VkImageView> oldViews = std::move(m_ImageViews);
+            m_Device->SafeDestroy([logicalDevice, oldViews = std::move(oldViews)]() {
+                for (auto view : oldViews)
+                    vkDestroyImageView(logicalDevice, view, nullptr);
+            });
         }
         m_ImageViews.clear();
-        // Do NOT destroy m_Swapchain yet. We pass it to the new one.
 
         // 2. Create NEW swapchain using the OLD one as reference
         VkSwapchainKHR oldSwapchain = m_Swapchain;
         CreateSwapchain(); // This overwrites m_Swapchain with the new handle
 
-        // 3. Destroy the OLD swapchain now that the new one is ready
+        // 3. Destroy the OLD swapchain via SafeDestroy
         if (oldSwapchain != VK_NULL_HANDLE) {
-            vkDestroySwapchainKHR(m_Device->GetLogicalDevice(), oldSwapchain, nullptr);
+            m_Device->SafeDestroy([logicalDevice, oldSwapchain]() {
+                vkDestroySwapchainKHR(logicalDevice, oldSwapchain, nullptr);
+            });
         }
 
         // 4. Create Views for the new swapchain
@@ -58,15 +66,25 @@ namespace RHI {
     }
 
     void VulkanSwapchain::Cleanup() {
-        for (auto imageView : m_ImageViews) {
-            vkDestroyImageView(m_Device->GetLogicalDevice(), imageView, nullptr);
+        // Defer image view destruction through SafeDestroy to ensure any
+        // in-flight frames referencing these views have completed.
+        VkDevice logicalDevice = m_Device->GetLogicalDevice();
+        if (!m_ImageViews.empty())
+        {
+            std::vector<VkImageView> views = std::move(m_ImageViews);
+            m_Device->SafeDestroy([logicalDevice, views = std::move(views)]() {
+                for (auto view : views)
+                    vkDestroyImageView(logicalDevice, view, nullptr);
+            });
         }
         m_ImageViews.clear();
-
         m_Images.clear();
 
         if (m_Swapchain != VK_NULL_HANDLE) {
-            vkDestroySwapchainKHR(m_Device->GetLogicalDevice(), m_Swapchain, nullptr);
+            VkSwapchainKHR swapchain = m_Swapchain;
+            m_Device->SafeDestroy([logicalDevice, swapchain]() {
+                vkDestroySwapchainKHR(logicalDevice, swapchain, nullptr);
+            });
             m_Swapchain = VK_NULL_HANDLE;
         }
     }
