@@ -279,13 +279,11 @@ PLY importer uses a manual `ByteSwap()` via `std::reverse`, while PCD importer u
 
 - [ ] Replace PLY's manual `ByteSwap()` with `std::byteswap()` + `std::bit_cast`.
 
-### D9. Geometry Kernel: Mixed Area / Cotan Laplacian Consolidation (P3)
+### D9. Geometry Kernel: Cotan Laplacian Consolidation (P3)
 
-Identical mixed Voronoi area computation appears in `Geometry.Curvature.cpp` (`ComputeMixedAreas`), `Geometry.Smoothing.cpp` (inline in `CotanLaplacian`), and `Geometry.DEC.cpp` (`BuildHodgeStar0`). The cotan-weighted Laplacian accumulation loop is also duplicated between Smoothing and Curvature.
+Mixed Voronoi area computation is now consolidated in `MeshUtils::ComputeMixedVoronoiAreas()` — used by Curvature, Smoothing, and DEC. The cotan-weighted Laplacian accumulation loop is still duplicated between Smoothing and Curvature.
 
-- [ ] Extract `ComputeMixedAreas()` to `MeshUtils` as a shared utility function.
 - [ ] Extract cotan-weighted Laplacian accumulation to `MeshUtils::ComputeCotanLaplacian()`.
-- [ ] Update Curvature, Smoothing, and DEC modules to use the shared implementations.
 
 ### D10. Geometry Kernel: Neighborhood Centroid Helper (P4)
 
@@ -293,8 +291,21 @@ Multiple modules independently compute 1-ring vertex centroids with identical ac
 
 - [ ] Extract `ComputeNeighborhoodCentroid()` helper to `MeshUtils`.
 
-### D11. Geometry Kernel: Parameter Naming Consistency (P4)
+### D12. Importer Color Parsing: Consolidate Remaining Paths (P3)
 
-Smoothing modules use `Lambda` for the smoothing weight parameter, while Remeshing and AdaptiveRemeshing use `SmoothingLambda` for the same concept.
+PLY and PCD importers use `Detail::NormalizeColorChannelToUnitRange()` for color normalization. OFF importer has an independent inline `if (r > 1.0f) r /= 255.0f;` pattern. XYZ importer has standalone `ParseColorTriplet()` / `ParsePointColor()` functions.
 
-- [ ] Standardize on one name (`Lambda` or `SmoothingLambda`) across all operator Params structs.
+- [ ] Extract shared `Importers::ParseColor()` helper unifying [0,255]→[0,1] and [0,1]→[0,1] range handling.
+- [ ] Migrate OFF and XYZ importers to the shared helper.
+
+### D13. RHI Swapchain: Consistent Deferred Destruction (P3)
+
+`RHI.Swapchain.cpp` destroys `VkImageView` and `VkSwapchainKHR` directly instead of using `SafeDestroy()`. Other RHI components (Buffer, Image, Texture, Pipeline, Shader) consistently use deferred destruction. Synchronize the Swapchain with the established pattern.
+
+- [ ] Convert Swapchain `vkDestroyImageView` and `vkDestroySwapchainKHR` calls to `SafeDestroy()`.
+
+### D14. RHI Bindless: Replace `std::cout` with `Core::Log` (P4)
+
+`RHI.Bindless.cpp` uses `std::cout << std::flush` instead of the structured `Core::Log` system used everywhere else.
+
+- [ ] Replace `std::cout` usage in `RHI.Bindless.cpp` with `Core::Log`.

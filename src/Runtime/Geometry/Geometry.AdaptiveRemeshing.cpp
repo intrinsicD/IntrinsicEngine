@@ -433,7 +433,7 @@ namespace Geometry::AdaptiveRemeshing
             }
             result.FlipCount += flipThisIter;
 
-            MeshUtils::TangentialSmooth(mesh, params.SmoothingLambda, params.PreserveBoundary);
+            MeshUtils::TangentialSmooth(mesh, params.Lambda, params.PreserveBoundary);
             ProjectVerticesToReference(mesh, projector, params.PreserveBoundary);
 
             if (mesh.HasGarbage()) mesh.GarbageCollection();

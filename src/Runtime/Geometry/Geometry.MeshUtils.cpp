@@ -421,6 +421,78 @@ namespace Geometry::MeshUtils
         }
     }
 
+    std::vector<double> ComputeMixedVoronoiAreas(const Halfedge::Mesh& mesh)
+    {
+        const std::size_t nV = mesh.VerticesSize();
+        const std::size_t nF = mesh.FacesSize();
+
+        std::vector<double> areas(nV, 0.0);
+
+        for (std::size_t fi = 0; fi < nF; ++fi)
+        {
+            FaceHandle fh{static_cast<PropertyIndex>(fi)};
+            if (mesh.IsDeleted(fh)) continue;
+
+            HalfedgeHandle h0 = mesh.Halfedge(fh);
+            HalfedgeHandle h1 = mesh.NextHalfedge(h0);
+            HalfedgeHandle h2 = mesh.NextHalfedge(h1);
+
+            VertexHandle va = mesh.ToVertex(h0);
+            VertexHandle vb = mesh.ToVertex(h1);
+            VertexHandle vc = mesh.ToVertex(h2);
+
+            glm::vec3 pa = mesh.Position(va);
+            glm::vec3 pb = mesh.Position(vb);
+            glm::vec3 pc = mesh.Position(vc);
+
+            glm::vec3 eAB = pb - pa;
+            glm::vec3 eAC = pc - pa;
+            glm::vec3 eBC = pc - pb;
+
+            double area = TriangleArea(pa, pb, pc);
+            if (area < 1e-12) continue;
+
+            double dotA = static_cast<double>(glm::dot(eAB, eAC));
+            double dotB = static_cast<double>(glm::dot(-eAB, eBC));
+            double dotC = static_cast<double>(glm::dot(-eAC, -eBC));
+
+            if (dotA < 0.0)
+            {
+                areas[va.Index] += area / 2.0;
+                areas[vb.Index] += area / 4.0;
+                areas[vc.Index] += area / 4.0;
+            }
+            else if (dotB < 0.0)
+            {
+                areas[va.Index] += area / 4.0;
+                areas[vb.Index] += area / 2.0;
+                areas[vc.Index] += area / 4.0;
+            }
+            else if (dotC < 0.0)
+            {
+                areas[va.Index] += area / 4.0;
+                areas[vb.Index] += area / 4.0;
+                areas[vc.Index] += area / 2.0;
+            }
+            else
+            {
+                double cotA = Cotan(eAB, eAC);
+                double cotB = Cotan(-eAB, eBC);
+                double cotC = Cotan(-eAC, -eBC);
+
+                double lenSqAB = static_cast<double>(glm::dot(eAB, eAB));
+                double lenSqAC = static_cast<double>(glm::dot(eAC, eAC));
+                double lenSqBC = static_cast<double>(glm::dot(eBC, eBC));
+
+                areas[va.Index] += (lenSqAB * cotC + lenSqAC * cotB) / 8.0;
+                areas[vb.Index] += (lenSqAB * cotC + lenSqBC * cotA) / 8.0;
+                areas[vc.Index] += (lenSqAC * cotB + lenSqBC * cotA) / 8.0;
+            }
+        }
+
+        return areas;
+    }
+
     std::optional<Halfedge::Mesh> BuildHalfedgeMeshFromIndexedTriangles(
         std::span<const glm::vec3> positions,
         std::span<const uint32_t> indices,

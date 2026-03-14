@@ -149,11 +149,10 @@ namespace Graphics
                     if (key.p < 0 || static_cast<size_t>(key.p) >= tempPos.size())
                         continue;
 
-                    if (uniqueVertices.find(key) == uniqueVertices.end())
+                    auto [it, inserted] = uniqueVertices.try_emplace(
+                        key, static_cast<uint32_t>(outData.Positions.size()));
+                    if (inserted)
                     {
-                        auto idx = static_cast<uint32_t>(outData.Positions.size());
-                        uniqueVertices[key] = idx;
-
                         outData.Positions.push_back(tempPos[key.p]);
                         outData.Normals.push_back((key.n >= 0 && static_cast<size_t>(key.n) < tempNorm.size())
                                                       ? tempNorm[key.n]
@@ -161,7 +160,7 @@ namespace Graphics
                         glm::vec2 uv = (key.t >= 0 && static_cast<size_t>(key.t) < tempUV.size()) ? tempUV[key.t] : glm::vec2(0, 0);
                         outData.Aux.emplace_back(uv.x, uv.y, 0, 0);
                     }
-                    faceIndices.push_back(uniqueVertices[key]);
+                    faceIndices.push_back(it->second);
                 }
 
                 for (size_t i = 1; i < faceIndices.size() - 1; ++i)

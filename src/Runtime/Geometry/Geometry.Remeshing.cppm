@@ -43,7 +43,7 @@ export namespace Geometry::Remeshing
         std::size_t Iterations{5};
 
         // Tangential smoothing factor per iteration (0 < λ < 1).
-        double SmoothingLambda{0.5};
+        double Lambda{0.5};
 
         // If true, boundary vertices are not moved and boundary edges
         // are not collapsed or flipped.

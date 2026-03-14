@@ -24,6 +24,7 @@ namespace Geometry::Smoothing
     using MeshUtils::Cotan;
     using MeshUtils::TriangleArea;
     using MeshUtils::MeanEdgeLength;
+    using MeshUtils::ComputeMixedVoronoiAreas;
 
     // -------------------------------------------------------------------------
     // Helper: single pass of uniform Laplacian smoothing
@@ -111,73 +112,11 @@ namespace Geometry::Smoothing
 
         const std::size_t nV = mesh.VerticesSize();
         const std::size_t nE = mesh.EdgesSize();
-        const std::size_t nF = mesh.FacesSize();
 
         for (std::size_t iter = 0; iter < params.Iterations; ++iter)
         {
-            // Compute mixed Voronoi areas
-            std::vector<double> areas(nV, 0.0);
-            for (std::size_t fi = 0; fi < nF; ++fi)
-            {
-                FaceHandle fh{static_cast<PropertyIndex>(fi)};
-                if (mesh.IsDeleted(fh)) continue;
-
-                HalfedgeHandle h0 = mesh.Halfedge(fh);
-                HalfedgeHandle h1 = mesh.NextHalfedge(h0);
-                HalfedgeHandle h2 = mesh.NextHalfedge(h1);
-
-                VertexHandle va = mesh.ToVertex(h0);
-                VertexHandle vb = mesh.ToVertex(h1);
-                VertexHandle vc = mesh.ToVertex(h2);
-
-                glm::vec3 pa = mesh.Position(va);
-                glm::vec3 pb = mesh.Position(vb);
-                glm::vec3 pc = mesh.Position(vc);
-
-                glm::vec3 eAB = pb - pa;
-                glm::vec3 eAC = pc - pa;
-                glm::vec3 eBC = pc - pb;
-
-                double area = TriangleArea(pa, pb, pc);
-                if (area < 1e-12) continue;
-
-                double dotA = static_cast<double>(glm::dot(eAB, eAC));
-                double dotB = static_cast<double>(glm::dot(-eAB, eBC));
-                double dotC = static_cast<double>(glm::dot(-eAC, -eBC));
-
-                if (dotA < 0.0)
-                {
-                    areas[va.Index] += area / 2.0;
-                    areas[vb.Index] += area / 4.0;
-                    areas[vc.Index] += area / 4.0;
-                }
-                else if (dotB < 0.0)
-                {
-                    areas[va.Index] += area / 4.0;
-                    areas[vb.Index] += area / 2.0;
-                    areas[vc.Index] += area / 4.0;
-                }
-                else if (dotC < 0.0)
-                {
-                    areas[va.Index] += area / 4.0;
-                    areas[vb.Index] += area / 4.0;
-                    areas[vc.Index] += area / 2.0;
-                }
-                else
-                {
-                    double cotA = Cotan(eAB, eAC);
-                    double cotB = Cotan(-eAB, eBC);
-                    double cotC = Cotan(-eAC, -eBC);
-
-                    double lenSqAB = static_cast<double>(glm::dot(eAB, eAB));
-                    double lenSqAC = static_cast<double>(glm::dot(eAC, eAC));
-                    double lenSqBC = static_cast<double>(glm::dot(eBC, eBC));
-
-                    areas[va.Index] += (lenSqAB * cotC + lenSqAC * cotB) / 8.0;
-                    areas[vb.Index] += (lenSqAB * cotC + lenSqBC * cotA) / 8.0;
-                    areas[vc.Index] += (lenSqAC * cotB + lenSqBC * cotA) / 8.0;
-                }
-            }
+            // Mixed Voronoi areas (Meyer et al., 2003) — shared with Curvature and DEC
+            auto areas = ComputeMixedVoronoiAreas(mesh);
 
             // Accumulate weighted Laplacian displacement per vertex
             std::vector<glm::dvec3> laplacian(nV, glm::dvec3(0.0));
