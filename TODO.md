@@ -27,6 +27,7 @@ This document tracks the **active rendering-architecture backlog** for Intrinsic
 - `ROADMAP.md` — medium/long-horizon feature roadmap and phase ordering.
 - `README.md` — user-facing architecture summary, build/test entry points, and SLOs.
 - `CLAUDE.md` — contributor conventions, C++23 policy, and markdown sync contract.
+- `PATTERNS.md` — reusable patterns catalog with canonical examples and usage guidance.
 
 ---
 
@@ -238,11 +239,10 @@ Identified via full codebase sweep (March 2026). Grouped by priority.
 
 ### D3. Vertex Deduplication Consolidation (P3)
 
-STL, OBJ, and PLY importers each implement near-identical spatial-hash vertex deduplication (quantize-based `VertexKey` + `VertexKeyHash`). Extract a shared `Importers::VertexDeduplicator` utility.
+STL uses spatial-hash vertex deduplication (quantize-based `VertexKey` + `VertexKeyHash`). OBJ uses index-based dedup (position/normal/texcoord index tuples). The two strategies are fundamentally different, but the spatial-hash pattern could be shared with future importers that also produce unindexed triangle soups.
 
-- [ ] Extract `VertexKey` / `VertexKeyHash` / dedup-map pattern into `Graphics.Importers.VertexDedup.hpp`.
-- [ ] Migrate STL, OBJ, and PLY importers to use the shared utility.
-- [ ] Add a unit test for the deduplicator (coincident vertices, near-threshold vertices, distinct vertices).
+- [ ] Extract STL's `VertexKey` / `VertexKeyHash` / dedup-map pattern into `Graphics.Importers.VertexDedup.hpp`.
+- [ ] Add a unit test for the spatial deduplicator (coincident vertices, near-threshold vertices, distinct vertices).
 
 ### D4. Color Parsing Unification (P3)
 
@@ -252,9 +252,29 @@ PLY importer migrated to use `NormalizeColorChannelToUnitRange` (was using inlin
 - [ ] Ensure consistent [0,255]→[0,1] and [0,1]→[0,1] range handling across remaining importers (XYZ, PCD).
 
 
+### D5. RHI Sampler Creation Consolidation (P3)
+
+`RHI.TextureSystem.cpp` and `RHI.Texture.cpp` both contain nearly identical `VkSamplerCreateInfo` setup and `vkCreateSampler` calls for linear-filtered, anisotropic samplers. Extract a shared `RHI::CreateDefaultSampler()` helper.
+
+- [ ] Extract sampler creation into a shared helper in `RHI.Device` or a new `RHI.SamplerUtils` header.
+- [ ] Migrate `TextureSystem.cpp` and `Texture.cpp` to use the shared helper.
+
+### D6. Importer Line I/O Inconsistency (P3)
+
+OBJ, PCD, TGF, and XYZ importers use the shared `TextParse::NextLine()` / `SplitWhitespace()` utilities. PLY and OFF importers use `std::istringstream` + `std::getline()` instead. STL also uses `std::istringstream` for ASCII parsing.
+
+- [ ] Migrate OFF importer to use `TextParse` utilities when next touched.
+- [ ] Evaluate migrating STL ASCII parser to `TextParse` (lower priority, format is simple).
+
 ### D7. Selection.cpp Picking Helper Extraction (P3)
 
 `Runtime.SelectionModule.cpp` contains several large picking functions with repeated hit-test patterns (closest-point-on-segment, sphere-ray intersection). These could be factored into geometry query helpers.
 
 - [ ] Extract closest-point-on-segment and ray-sphere helpers into `Geometry::Queries` or a `Selection` utility header.
 - [ ] Reduce duplication between vertex/edge/face picking code paths.
+
+### D8. PLY Importer Byte-Swap vs `std::byteswap` (P4)
+
+PLY importer uses a manual `ByteSwap()` via `std::reverse`, while PCD importer uses `std::byteswap()` (C++23). Unify to `std::byteswap()` when the PLY byte-swap code is next touched.
+
+- [ ] Replace PLY's manual `ByteSwap()` with `std::byteswap()` + `std::bit_cast`.

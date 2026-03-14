@@ -647,12 +647,6 @@ namespace Interface::GUI
         // Upload Fonts
         // This is necessary because we are using dynamic rendering and managing our own headers.
         // It creates the font texture and uploads it to the GPU.
-        // Note: As of ImGui 1.91+, ImGui_ImplVulkan_CreateFontsTexture is removed.
-        // The backend handles font upload lazily in ImGui_ImplVulkan_RenderDrawData -> ImGui_ImplVulkan_UpdateTexture.
-        // However, we must ensure the command pool is ready if we wanted to do it early, but we don't need to anymore.
-
-        // ImGui_ImplVulkan_CreateFontsTexture(); // REMOVED
-
         Core::Log::Info("ImGui Initialized.");
     }
 
