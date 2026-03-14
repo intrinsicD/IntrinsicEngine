@@ -14,13 +14,10 @@ module Geometry:CatmullClark.Impl;
 import :CatmullClark;
 import :Properties;
 import :HalfedgeMesh;
+import :MeshUtils;
 
 namespace Geometry::CatmullClark
 {
-    namespace
-    {
-        constexpr const char* kVertexTexcoordPropertyName = "v:texcoord";
-    }
 
     // Perform a single level of Catmull-Clark subdivision.
     static bool SubdivideOnce(const Halfedge::Mesh& input, Halfedge::Mesh& output)
@@ -32,7 +29,7 @@ namespace Geometry::CatmullClark
         if (nV == 0 || nF == 0)
             return false;
 
-        const auto inputTexcoord = input.VertexProperties().Get<glm::vec2>(kVertexTexcoordPropertyName);
+        const auto inputTexcoord = input.VertexProperties().Get<glm::vec2>(MeshUtils::kVertexTexcoordPropertyName);
         const bool hasTexcoord = static_cast<bool>(inputTexcoord);
 
         output.Clear();
@@ -242,7 +239,7 @@ namespace Geometry::CatmullClark
         if (hasTexcoord)
         {
             outputTexcoord = VertexProperty<glm::vec2>(
-                output.VertexProperties().GetOrAdd<glm::vec2>(kVertexTexcoordPropertyName, glm::vec2(0.0f)));
+                output.VertexProperties().GetOrAdd<glm::vec2>(MeshUtils::kVertexTexcoordPropertyName, glm::vec2(0.0f)));
         }
 
         // Add vertex points

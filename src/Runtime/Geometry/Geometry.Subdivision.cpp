@@ -16,13 +16,10 @@ module Geometry:Subdivision.Impl;
 import :Subdivision;
 import :Properties;
 import :HalfedgeMesh;
+import :MeshUtils;
 
 namespace Geometry::Subdivision
 {
-    namespace
-    {
-        constexpr const char* kVertexTexcoordPropertyName = "v:texcoord";
-    }
 
     // Warren's beta formula for Loop subdivision even-vertex weights.
     // For valence n:
@@ -46,7 +43,7 @@ namespace Geometry::Subdivision
         if (nV == 0 || nF == 0)
             return false;
 
-        const auto inputTexcoord = input.VertexProperties().Get<glm::vec2>(kVertexTexcoordPropertyName);
+        const auto inputTexcoord = input.VertexProperties().Get<glm::vec2>(MeshUtils::kVertexTexcoordPropertyName);
         const bool hasTexcoord = static_cast<bool>(inputTexcoord);
 
         // Verify all faces are triangles
@@ -198,7 +195,7 @@ namespace Geometry::Subdivision
         if (hasTexcoord)
         {
             outputTexcoord = VertexProperty<glm::vec2>(
-                output.VertexProperties().GetOrAdd<glm::vec2>(kVertexTexcoordPropertyName, glm::vec2(0.0f)));
+                output.VertexProperties().GetOrAdd<glm::vec2>(MeshUtils::kVertexTexcoordPropertyName, glm::vec2(0.0f)));
         }
 
         // Add even vertices (one per original vertex)

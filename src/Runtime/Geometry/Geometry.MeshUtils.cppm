@@ -13,6 +13,10 @@ import :HalfedgeMesh;
 
 export namespace Geometry::MeshUtils
 {
+    // Canonical property name for per-vertex texture coordinates across all
+    // geometry modules (subdivision, remeshing, mesh conversion, etc.).
+    inline constexpr const char* kVertexTexcoordPropertyName = "v:texcoord";
+
     struct TriangleFaceView
     {
         FaceHandle Face{};

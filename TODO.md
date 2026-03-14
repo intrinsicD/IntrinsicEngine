@@ -278,3 +278,23 @@ OBJ, PCD, TGF, and XYZ importers use the shared `TextParse::NextLine()` / `Split
 PLY importer uses a manual `ByteSwap()` via `std::reverse`, while PCD importer uses `std::byteswap()` (C++23). Unify to `std::byteswap()` when the PLY byte-swap code is next touched.
 
 - [ ] Replace PLY's manual `ByteSwap()` with `std::byteswap()` + `std::bit_cast`.
+
+### D9. Geometry Kernel: Mixed Area / Cotan Laplacian Consolidation (P3)
+
+Identical mixed Voronoi area computation appears in `Geometry.Curvature.cpp` (`ComputeMixedAreas`), `Geometry.Smoothing.cpp` (inline in `CotanLaplacian`), and `Geometry.DEC.cpp` (`BuildHodgeStar0`). The cotan-weighted Laplacian accumulation loop is also duplicated between Smoothing and Curvature.
+
+- [ ] Extract `ComputeMixedAreas()` to `MeshUtils` as a shared utility function.
+- [ ] Extract cotan-weighted Laplacian accumulation to `MeshUtils::ComputeCotanLaplacian()`.
+- [ ] Update Curvature, Smoothing, and DEC modules to use the shared implementations.
+
+### D10. Geometry Kernel: Neighborhood Centroid Helper (P4)
+
+Multiple modules independently compute 1-ring vertex centroids with identical accumulate-and-divide logic: `MeshUtils.cpp` (neighbor centroid for tangential smoothing), `Smoothing.cpp` (uniform Laplacian), `NormalEstimation.cpp` (local centroid for PCA).
+
+- [ ] Extract `ComputeNeighborhoodCentroid()` helper to `MeshUtils`.
+
+### D11. Geometry Kernel: Parameter Naming Consistency (P4)
+
+Smoothing modules use `Lambda` for the smoothing weight parameter, while Remeshing and AdaptiveRemeshing use `SmoothingLambda` for the same concept.
+
+- [ ] Standardize on one name (`Lambda` or `SmoothingLambda`) across all operator Params structs.
