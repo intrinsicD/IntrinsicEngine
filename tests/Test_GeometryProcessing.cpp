@@ -606,3 +606,134 @@ TEST(Geodesic_Heat, SolverConverges)
     EXPECT_GT(result->HeatSolveIterations, 0u);
     EXPECT_GT(result->PoissonSolveIterations, 0u);
 }
+
+// =============================================================================
+// MeshUtils::ComputeCotanLaplacian
+// =============================================================================
+
+TEST(MeshUtils_CotanLaplacian, EmptyMeshReturnsEmptyVector)
+{
+    Geometry::Halfedge::Mesh mesh;
+    auto laplacian = Geometry::MeshUtils::ComputeCotanLaplacian(mesh);
+    EXPECT_TRUE(laplacian.empty());
+}
+
+TEST(MeshUtils_CotanLaplacian, SingleTriangleNonZero)
+{
+    auto mesh = MakeSingleTriangle();
+    auto laplacian = Geometry::MeshUtils::ComputeCotanLaplacian(mesh);
+
+    ASSERT_EQ(laplacian.size(), mesh.VerticesSize());
+
+    // On a single triangle, each vertex should have a non-trivial Laplacian
+    // (boundary edges have only one adjacent face, so cotSum has one term).
+    double totalMag = 0.0;
+    for (const auto& L : laplacian)
+        totalMag += glm::length(L);
+    EXPECT_GT(totalMag, 0.0);
+}
+
+TEST(MeshUtils_CotanLaplacian, EquilateralTriangleSymmetry)
+{
+    // Equilateral triangle: all vertices should have equal Laplacian magnitude.
+    auto mesh = MakeSingleTriangle();
+    auto laplacian = Geometry::MeshUtils::ComputeCotanLaplacian(mesh);
+
+    ASSERT_EQ(laplacian.size(), 3u);
+    double m0 = glm::length(laplacian[0]);
+    double m1 = glm::length(laplacian[1]);
+    double m2 = glm::length(laplacian[2]);
+    EXPECT_NEAR(m0, m1, 1e-10);
+    EXPECT_NEAR(m1, m2, 1e-10);
+}
+
+TEST(MeshUtils_CotanLaplacian, ClampedWeightsNonNegative)
+{
+    // With clamped weights, the result should differ from unclamped only when
+    // negative cotan weights are present (obtuse triangles). For a regular
+    // icosahedron (all equilateral faces), both should be identical.
+    auto mesh = MakeIcosahedron();
+    auto unclamped = Geometry::MeshUtils::ComputeCotanLaplacian(mesh, false);
+    auto clamped = Geometry::MeshUtils::ComputeCotanLaplacian(mesh, true);
+
+    ASSERT_EQ(unclamped.size(), clamped.size());
+    for (std::size_t i = 0; i < unclamped.size(); ++i)
+    {
+        EXPECT_NEAR(unclamped[i].x, clamped[i].x, 1e-10) << "Index " << i;
+        EXPECT_NEAR(unclamped[i].y, clamped[i].y, 1e-10) << "Index " << i;
+        EXPECT_NEAR(unclamped[i].z, clamped[i].z, 1e-10) << "Index " << i;
+    }
+}
+
+TEST(MeshUtils_CotanLaplacian, ClosedMeshLaplacianSumsToZero)
+{
+    // On a closed manifold, the sum of all Laplacian vectors should be zero
+    // (conservation: total displacement is zero).
+    auto mesh = MakeTetrahedron();
+    auto laplacian = Geometry::MeshUtils::ComputeCotanLaplacian(mesh);
+
+    glm::dvec3 sum(0.0);
+    for (const auto& L : laplacian)
+        sum += L;
+    EXPECT_NEAR(sum.x, 0.0, 1e-10);
+    EXPECT_NEAR(sum.y, 0.0, 1e-10);
+    EXPECT_NEAR(sum.z, 0.0, 1e-10);
+}
+
+// =============================================================================
+// MeshUtils::ComputeOneRingCentroid
+// =============================================================================
+
+TEST(MeshUtils_OneRingCentroid, IsolatedVertexReturnsSelf)
+{
+    Geometry::Halfedge::Mesh mesh;
+    auto v = mesh.AddVertex(glm::vec3(1.0f, 2.0f, 3.0f));
+
+    auto centroid = Geometry::MeshUtils::ComputeOneRingCentroid(mesh, v);
+    EXPECT_NEAR(centroid.x, 1.0, 1e-10);
+    EXPECT_NEAR(centroid.y, 2.0, 1e-10);
+    EXPECT_NEAR(centroid.z, 3.0, 1e-10);
+}
+
+TEST(MeshUtils_OneRingCentroid, EquilateralTriangleCentroids)
+{
+    // For an equilateral triangle, centroid of neighbors of vertex 0 is the
+    // midpoint of the opposite edge.
+    auto mesh = MakeSingleTriangle();
+
+    // Vertex 0's neighbors are vertices 1 and 2
+    Geometry::VertexHandle v0{0};
+    auto centroid = Geometry::MeshUtils::ComputeOneRingCentroid(mesh, v0);
+
+    glm::vec3 p1 = mesh.Position(Geometry::VertexHandle{1});
+    glm::vec3 p2 = mesh.Position(Geometry::VertexHandle{2});
+    glm::dvec3 expected = (glm::dvec3(p1) + glm::dvec3(p2)) / 2.0;
+
+    EXPECT_NEAR(centroid.x, expected.x, 1e-10);
+    EXPECT_NEAR(centroid.y, expected.y, 1e-10);
+    EXPECT_NEAR(centroid.z, expected.z, 1e-10);
+}
+
+TEST(MeshUtils_OneRingCentroid, RegularTetrahedronSymmetry)
+{
+    // All vertices in a regular tetrahedron have the same centroid distance
+    // from their position (by symmetry).
+    auto mesh = MakeTetrahedron();
+
+    double dist0 = glm::length(
+        Geometry::MeshUtils::ComputeOneRingCentroid(mesh, Geometry::VertexHandle{0})
+        - glm::dvec3(mesh.Position(Geometry::VertexHandle{0})));
+    double dist1 = glm::length(
+        Geometry::MeshUtils::ComputeOneRingCentroid(mesh, Geometry::VertexHandle{1})
+        - glm::dvec3(mesh.Position(Geometry::VertexHandle{1})));
+    double dist2 = glm::length(
+        Geometry::MeshUtils::ComputeOneRingCentroid(mesh, Geometry::VertexHandle{2})
+        - glm::dvec3(mesh.Position(Geometry::VertexHandle{2})));
+    double dist3 = glm::length(
+        Geometry::MeshUtils::ComputeOneRingCentroid(mesh, Geometry::VertexHandle{3})
+        - glm::dvec3(mesh.Position(Geometry::VertexHandle{3})));
+
+    EXPECT_NEAR(dist0, dist1, 1e-6);
+    EXPECT_NEAR(dist1, dist2, 1e-6);
+    EXPECT_NEAR(dist2, dist3, 1e-6);
+}

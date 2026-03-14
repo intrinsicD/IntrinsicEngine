@@ -4,7 +4,6 @@ module;
 #include <algorithm>
 #include <mutex>
 #include <vector>
-#include <iostream>
 
 module RHI:Bindless.Impl;
 import :Bindless;
@@ -57,7 +56,6 @@ namespace RHI
 
         Core::Log::Info("Bindless System: Allocating {} slots (HW Limit: {}).",
                         m_MaxDescriptors, hwLimit);
-        std::cout << std::flush;
 
         // Binding 0: Bindless Texture Array
         VkDescriptorSetLayoutBinding textureBinding{};

@@ -390,22 +390,7 @@ namespace Geometry::MeshUtils
             }
 
             const glm::vec3 p = mesh.Position(vh);
-            glm::vec3 centroid(0.0f);
-            std::size_t count = 0;
-
-            for (const HalfedgeHandle h : mesh.HalfedgesAroundVertex(vh))
-            {
-                centroid += mesh.Position(mesh.ToVertex(h));
-                ++count;
-            }
-
-            if (count == 0)
-            {
-                newPositions[vi] = p;
-                continue;
-            }
-
-            centroid /= static_cast<float>(count);
+            glm::vec3 centroid = glm::vec3(ComputeOneRingCentroid(mesh, vh));
             glm::vec3 displacement = centroid - p;
             glm::vec3 n = VertexNormal(mesh, vh);
             glm::vec3 tangential = displacement - glm::dot(displacement, n) * n;
@@ -491,6 +476,71 @@ namespace Geometry::MeshUtils
         }
 
         return areas;
+    }
+
+    std::vector<glm::dvec3> ComputeCotanLaplacian(
+        const Halfedge::Mesh& mesh,
+        bool clampNonNegative)
+    {
+        const std::size_t nV = mesh.VerticesSize();
+        const std::size_t nE = mesh.EdgesSize();
+
+        std::vector<glm::dvec3> laplacian(nV, glm::dvec3(0.0));
+
+        for (std::size_t ei = 0; ei < nE; ++ei)
+        {
+            EdgeHandle eh{static_cast<PropertyIndex>(ei)};
+            if (mesh.IsDeleted(eh)) continue;
+
+            HalfedgeHandle h0{static_cast<PropertyIndex>(2u * ei)};
+            HalfedgeHandle h1 = mesh.OppositeHalfedge(h0);
+
+            VertexHandle vi = mesh.FromVertex(h0);
+            VertexHandle vj = mesh.ToVertex(h0);
+
+            double cotSum = 0.0;
+
+            if (!mesh.IsBoundary(h0))
+            {
+                VertexHandle vOpp = mesh.ToVertex(mesh.NextHalfedge(h0));
+                glm::vec3 u = mesh.Position(vi) - mesh.Position(vOpp);
+                glm::vec3 v = mesh.Position(vj) - mesh.Position(vOpp);
+                cotSum += Cotan(u, v);
+            }
+
+            if (!mesh.IsBoundary(h1))
+            {
+                VertexHandle vOpp = mesh.ToVertex(mesh.NextHalfedge(h1));
+                glm::vec3 u = mesh.Position(vj) - mesh.Position(vOpp);
+                glm::vec3 v = mesh.Position(vi) - mesh.Position(vOpp);
+                cotSum += Cotan(u, v);
+            }
+
+            double w = clampNonNegative ? std::max(0.0, cotSum) / 2.0 : cotSum / 2.0;
+            glm::dvec3 diff = glm::dvec3(mesh.Position(vj)) - glm::dvec3(mesh.Position(vi));
+
+            laplacian[vi.Index] += w * diff;
+            laplacian[vj.Index] -= w * diff;
+        }
+
+        return laplacian;
+    }
+
+    glm::dvec3 ComputeOneRingCentroid(const Halfedge::Mesh& mesh, VertexHandle v)
+    {
+        glm::dvec3 centroid(0.0);
+        std::size_t count = 0;
+
+        for (const HalfedgeHandle h : mesh.HalfedgesAroundVertex(v))
+        {
+            centroid += glm::dvec3(mesh.Position(mesh.ToVertex(h)));
+            ++count;
+        }
+
+        if (count == 0)
+            return glm::dvec3(mesh.Position(v));
+
+        return centroid / static_cast<double>(count);
     }
 
     std::optional<Halfedge::Mesh> BuildHalfedgeMeshFromIndexedTriangles(

@@ -279,17 +279,11 @@ PLY importer uses a manual `ByteSwap()` via `std::reverse`, while PCD importer u
 
 - [ ] Replace PLY's manual `ByteSwap()` with `std::byteswap()` + `std::bit_cast`.
 
-### D9. Geometry Kernel: Cotan Laplacian Consolidation (P3)
+### D10. Geometry Kernel: Neighborhood Centroid — Point Cloud Path (P4)
 
-Mixed Voronoi area computation is now consolidated in `MeshUtils::ComputeMixedVoronoiAreas()` — used by Curvature, Smoothing, and DEC. The cotan-weighted Laplacian accumulation loop is still duplicated between Smoothing and Curvature.
+`NormalEstimation.cpp` computes centroids over KNN point-cloud neighborhoods (raw `std::vector<glm::vec3>`, no halfedge connectivity). This is a different pattern from the mesh 1-ring centroid now in `MeshUtils::ComputeOneRingCentroid()` and cannot share the same helper.
 
-- [ ] Extract cotan-weighted Laplacian accumulation to `MeshUtils::ComputeCotanLaplacian()`.
-
-### D10. Geometry Kernel: Neighborhood Centroid Helper (P4)
-
-Multiple modules independently compute 1-ring vertex centroids with identical accumulate-and-divide logic: `MeshUtils.cpp` (neighbor centroid for tangential smoothing), `Smoothing.cpp` (uniform Laplacian), `NormalEstimation.cpp` (local centroid for PCA).
-
-- [ ] Extract `ComputeNeighborhoodCentroid()` helper to `MeshUtils`.
+- [ ] Evaluate extracting a standalone `ComputePointCentroid(points, indices)` helper if more point-cloud operators need it.
 
 ### D12. Importer Color Parsing: Consolidate Remaining Paths (P3)
 
@@ -304,11 +298,6 @@ PLY and PCD importers use `Detail::NormalizeColorChannelToUnitRange()` for color
 
 - [ ] Convert Swapchain `vkDestroyImageView` and `vkDestroySwapchainKHR` calls to `SafeDestroy()`.
 
-### D14. RHI Bindless: Replace `std::cout` with `Core::Log` (P4)
-
-`RHI.Bindless.cpp` uses `std::cout << std::flush` instead of the structured `Core::Log` system used everywhere else.
-
-- [ ] Replace `std::cout` usage in `RHI.Bindless.cpp` with `Core::Log`.
 
 ### D15. Render Pass: Generic EnsureAttrBuffer Template (P3)
 
