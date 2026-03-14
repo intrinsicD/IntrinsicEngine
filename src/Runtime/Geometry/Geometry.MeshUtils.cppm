@@ -84,6 +84,21 @@ export namespace Geometry::MeshUtils
     /// Used by Curvature, Smoothing (cotan), and DEC (Hodge star 0).
     std::vector<double> ComputeMixedVoronoiAreas(const Halfedge::Mesh& mesh);
 
+    /// Cotan-weighted Laplacian displacement per vertex:
+    ///   L[i] = Σ_j (cot α_ij + cot β_ij) / 2 · (x_j - x_i)
+    /// Used by Curvature (mean curvature normal) and Smoothing (cotan Laplacian).
+    /// When clampNonNegative is true, individual edge weights are clamped to
+    /// max(0, cotSum) — standard practice for explicit smoothing to avoid
+    /// instability from obtuse-triangle negative weights (Botsch et al., §4.2).
+    std::vector<glm::dvec3> ComputeCotanLaplacian(
+        const Halfedge::Mesh& mesh,
+        bool clampNonNegative = false);
+
+    /// Uniform 1-ring centroid for a mesh vertex (double precision).
+    /// Returns the average position of all halfedge neighbors, or the vertex
+    /// position itself if it has no neighbors.
+    glm::dvec3 ComputeOneRingCentroid(const Halfedge::Mesh& mesh, VertexHandle v);
+
     struct TriangleSoupBuildParams
     {
         // Merge coincident vertices before building topology. When UVs are supplied,

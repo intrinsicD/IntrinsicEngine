@@ -21,10 +21,9 @@ import :MeshUtils;
 
 namespace Geometry::Smoothing
 {
-    using MeshUtils::Cotan;
-    using MeshUtils::TriangleArea;
     using MeshUtils::MeanEdgeLength;
-    using MeshUtils::ComputeMixedVoronoiAreas;
+    using MeshUtils::ComputeCotanLaplacian;
+    using MeshUtils::ComputeOneRingCentroid;
 
     // -------------------------------------------------------------------------
     // Helper: single pass of uniform Laplacian smoothing
@@ -51,19 +50,7 @@ namespace Geometry::Smoothing
             if (mesh.IsDeleted(vh) || mesh.IsIsolated(vh)) continue;
             if (preserveBoundary && mesh.IsBoundary(vh)) continue;
 
-            // Compute centroid of 1-ring neighbors
-            glm::dvec3 centroid(0.0);
-            std::size_t count = 0;
-
-            for (const HalfedgeHandle h : mesh.HalfedgesAroundVertex(vh))
-            {
-                centroid += glm::dvec3(mesh.Position(mesh.ToVertex(h)));
-                ++count;
-            }
-
-            if (count == 0) continue;
-
-            centroid /= static_cast<double>(count);
+            glm::dvec3 centroid = ComputeOneRingCentroid(mesh, vh);
             glm::dvec3 displacement = centroid - glm::dvec3(mesh.Position(vh));
 
             newPositions[i] = glm::dvec3(mesh.Position(vh)) + factor * displacement;
@@ -111,51 +98,12 @@ namespace Geometry::Smoothing
             return std::nullopt;
 
         const std::size_t nV = mesh.VerticesSize();
-        const std::size_t nE = mesh.EdgesSize();
 
         for (std::size_t iter = 0; iter < params.Iterations; ++iter)
         {
-            // Mixed Voronoi areas (Meyer et al., 2003) — shared with Curvature and DEC
-            auto areas = ComputeMixedVoronoiAreas(mesh);
-
-            // Accumulate weighted Laplacian displacement per vertex
-            std::vector<glm::dvec3> laplacian(nV, glm::dvec3(0.0));
-
-            for (std::size_t ei = 0; ei < nE; ++ei)
-            {
-                EdgeHandle eh{static_cast<PropertyIndex>(ei)};
-                if (mesh.IsDeleted(eh)) continue;
-
-                HalfedgeHandle h0{static_cast<PropertyIndex>(2u * ei)};
-                HalfedgeHandle h1 = mesh.OppositeHalfedge(h0);
-
-                VertexHandle vi = mesh.FromVertex(h0);
-                VertexHandle vj = mesh.ToVertex(h0);
-
-                double cotSum = 0.0;
-
-                if (!mesh.IsBoundary(h0))
-                {
-                    VertexHandle vOpp = mesh.ToVertex(mesh.NextHalfedge(h0));
-                    glm::vec3 u = mesh.Position(vi) - mesh.Position(vOpp);
-                    glm::vec3 v = mesh.Position(vj) - mesh.Position(vOpp);
-                    cotSum += Cotan(u, v);
-                }
-
-                if (!mesh.IsBoundary(h1))
-                {
-                    VertexHandle vOpp = mesh.ToVertex(mesh.NextHalfedge(h1));
-                    glm::vec3 u = mesh.Position(vj) - mesh.Position(vOpp);
-                    glm::vec3 v = mesh.Position(vi) - mesh.Position(vOpp);
-                    cotSum += Cotan(u, v);
-                }
-
-                double w = std::max(0.0, cotSum) / 2.0;
-                glm::dvec3 diff = glm::dvec3(mesh.Position(vj)) - glm::dvec3(mesh.Position(vi));
-
-                laplacian[vi.Index] += w * diff;
-                laplacian[vj.Index] -= w * diff;
-            }
+            // Cotan-weighted Laplacian with non-negative clamping for explicit
+            // smoothing stability (Botsch et al., "Polygon Mesh Processing", §4.2).
+            auto laplacian = ComputeCotanLaplacian(mesh, /*clampNonNegative=*/true);
 
             // Apply displacement: x_i ← x_i + λ * Σ w_ij (x_j - x_i)
             // Note: we deliberately omit the 1/A_i area normalization used in

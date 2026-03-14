@@ -20,10 +20,9 @@ import :MeshUtils;
 
 namespace Geometry::Curvature
 {
-    using MeshUtils::Cotan;
-    using MeshUtils::TriangleArea;
     using MeshUtils::AngleAtVertex;
     using MeshUtils::ComputeMixedVoronoiAreas;
+    using MeshUtils::ComputeCotanLaplacian;
 
     // =========================================================================
     // ComputeMeanCurvature
@@ -46,54 +45,12 @@ namespace Geometry::Curvature
             return std::nullopt;
 
         const std::size_t nV = mesh.VerticesSize();
-        const std::size_t nE = mesh.EdgesSize();
 
         MeanCurvatureResult result;
         result.Property = VertexProperty<double>(mesh.VertexProperties().GetOrAdd<double>("v:mean_curvature", 0.0));
 
         auto areas = ComputeMixedVoronoiAreas(mesh);
-
-        // Compute cotan weights per edge and accumulate Laplace-Beltrami
-        std::vector<glm::dvec3> laplacian(nV, glm::dvec3(0.0));
-
-        for (std::size_t ei = 0; ei < nE; ++ei)
-        {
-            EdgeHandle eh{static_cast<PropertyIndex>(ei)};
-            if (mesh.IsDeleted(eh)) continue;
-
-            HalfedgeHandle h0{static_cast<PropertyIndex>(2u * ei)};
-            HalfedgeHandle h1 = mesh.OppositeHalfedge(h0);
-
-            VertexHandle vi = mesh.FromVertex(h0);
-            VertexHandle vj = mesh.ToVertex(h0);
-
-            double cotSum = 0.0;
-
-            // Cotan of angle opposite edge in face of h0
-            if (!mesh.IsBoundary(h0))
-            {
-                VertexHandle vOpp = mesh.ToVertex(mesh.NextHalfedge(h0));
-                glm::vec3 u = mesh.Position(vi) - mesh.Position(vOpp);
-                glm::vec3 v = mesh.Position(vj) - mesh.Position(vOpp);
-                cotSum += Cotan(u, v);
-            }
-
-            // Cotan of angle opposite edge in face of h1
-            if (!mesh.IsBoundary(h1))
-            {
-                VertexHandle vOpp = mesh.ToVertex(mesh.NextHalfedge(h1));
-                glm::vec3 u = mesh.Position(vj) - mesh.Position(vOpp);
-                glm::vec3 v = mesh.Position(vi) - mesh.Position(vOpp);
-                cotSum += Cotan(u, v);
-            }
-
-            double w = cotSum / 2.0;
-
-            glm::dvec3 diff = glm::dvec3(mesh.Position(vj)) - glm::dvec3(mesh.Position(vi));
-
-            laplacian[vi.Index] += w * diff;
-            laplacian[vj.Index] -= w * diff;
-        }
+        auto laplacian = ComputeCotanLaplacian(mesh);
 
         // Normalize by area and compute magnitude
         for (std::size_t i = 0; i < nV; ++i)
@@ -207,7 +164,6 @@ namespace Geometry::Curvature
     CurvatureField ComputeCurvature(Halfedge::Mesh& mesh)
     {
         const std::size_t nV = mesh.VerticesSize();
-        const std::size_t nE = mesh.EdgesSize();
         const std::size_t nF = mesh.FacesSize();
 
         CurvatureField result;
@@ -220,44 +176,8 @@ namespace Geometry::Curvature
         // Shared computation: mixed Voronoi areas
         auto areas = ComputeMixedVoronoiAreas(mesh);
 
-        // 1. Accumulate cotan-weighted Laplacian for mean curvature
-        std::vector<glm::dvec3> laplacian(nV, glm::dvec3(0.0));
-
-        for (std::size_t ei = 0; ei < nE; ++ei)
-        {
-            EdgeHandle eh{static_cast<PropertyIndex>(ei)};
-            if (mesh.IsDeleted(eh)) continue;
-
-            HalfedgeHandle h0{static_cast<PropertyIndex>(2u * ei)};
-            HalfedgeHandle h1 = mesh.OppositeHalfedge(h0);
-
-            VertexHandle vi = mesh.FromVertex(h0);
-            VertexHandle vj = mesh.ToVertex(h0);
-
-            double cotSum = 0.0;
-
-            if (!mesh.IsBoundary(h0))
-            {
-                VertexHandle vOpp = mesh.ToVertex(mesh.NextHalfedge(h0));
-                glm::vec3 u = mesh.Position(vi) - mesh.Position(vOpp);
-                glm::vec3 v = mesh.Position(vj) - mesh.Position(vOpp);
-                cotSum += Cotan(u, v);
-            }
-
-            if (!mesh.IsBoundary(h1))
-            {
-                VertexHandle vOpp = mesh.ToVertex(mesh.NextHalfedge(h1));
-                glm::vec3 u = mesh.Position(vj) - mesh.Position(vOpp);
-                glm::vec3 v = mesh.Position(vi) - mesh.Position(vOpp);
-                cotSum += Cotan(u, v);
-            }
-
-            double w = cotSum / 2.0;
-            glm::dvec3 diff = glm::dvec3(mesh.Position(vj)) - glm::dvec3(mesh.Position(vi));
-
-            laplacian[vi.Index] += w * diff;
-            laplacian[vj.Index] -= w * diff;
-        }
+        // 1. Cotan-weighted Laplacian for mean curvature
+        auto laplacian = ComputeCotanLaplacian(mesh);
 
         // 2. Accumulate angle sums for Gaussian curvature
         std::vector<double> angleSum(nV, 0.0);
