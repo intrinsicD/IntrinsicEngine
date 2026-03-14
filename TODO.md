@@ -42,13 +42,6 @@ This document tracks the **active rendering-architecture backlog** for Intrinsic
 
 - [ ] Extract RHI SafeDestroy helper — 9 files repeat identical move-capture + lambda pattern for deferred Vulkan resource destruction (`RHI.Buffer.cpp`, `RHI.Shader.cpp`, `RHI.Image.cpp`, `RHI.Texture.cpp`, `RHI.Pipeline.cpp`, etc.). Create a template or macro in `RHI.DestructionUtils`.
 - [ ] Standardize frame counter naming — `GlobalFrameNumber` (Device), `CurrentFrame` (Telemetry), `frameEpoch` (CommandContext), `currentFrameNumber` (ResourcePool) all refer to the same monotonic counter. Pick one name and unify.
-- [ ] Add algorithm comments to underdocumented complex sections:
-  - `ArenaLifetimeToken` atomic generation tracking (`Core.Memory.cpp:75-96`)
-  - `TypeToken<T>()` compile-time type signature hashing (`Core.FrameGraph.cppm:56-93`)
-  - Timeline semaphore two-atomic signaling pattern (`RHI.Device.cpp:155-160`)
-  - `ScopeStack::NewArray()` three-level indirection for destructor tracking (`Core.Memory.cppm:265-316`)
-  - Deferred deletion queue partitioning in `CollectGarbage()` (`RHI.Device.cppm:93-117`)
-- [ ] Rename `ResourcePool::GetUnchecked()` to `GetIfValid()` — the method still validates bounds and generation despite the "unchecked" name, creating a name/behavior mismatch.
 - [ ] Document device reference lifetime contract — RHI classes inconsistently use `VulkanDevice&` (non-owning) vs `shared_ptr<VulkanDevice>` (shared ownership). Add a comment convention explaining when each is appropriate.
 - [ ] Document Core.Memory `fprintf` vs `Core::Log` error reporting trade-off — Core uses `fprintf(stderr, ...)` to avoid circular dependency with Logging; Runtime modules use `Core::Log`. Add a rationale comment in `Core.Memory.cpp`.
 
@@ -229,12 +222,10 @@ These are the explicit constraints agents must preserve during the refactor even
 
 Identified via full codebase sweep (March 2026). Grouped by priority.
 
-### D1. Consolidate Graph Property Extraction Paths (P2)
+### D1. Graph Property Extraction Regression Test (P2)
 
-`Graphics.Systems.GraphGeometrySync.cpp` and `Graphics.Systems.PropertySetDirtySync.cpp` still duplicate graph-domain color/radius extraction rules, including deleted-element skipping and default property fallback (`"v:color"`, `"e:color"`, `"v:radius"`). Extract a shared internal helper so full uploads and incremental dirty-sync cannot drift.
+`Graphics.GraphPropertyHelpers.hpp` consolidates graph color/radius extraction. Both `GraphGeometrySync` and `PropertySetDirtySync` use the shared helpers. Remaining:
 
-- [ ] Move graph vertex/edge property extraction into one internal helper module/header.
-- [ ] Reuse the helper from both lifecycle sync and dirty-domain sync paths.
 - [ ] Add one regression test covering deleted-vertex skipping + fallback property names across both call sites.
 
 ### D2. Finish Shared Pass Helper Adoption (P3)
@@ -255,25 +246,11 @@ STL, OBJ, and PLY importers each implement near-identical spatial-hash vertex de
 
 ### D4. Color Parsing Unification (P3)
 
-XYZ and PCD importers independently parse RGB/intensity color fields with slightly different range normalization. `NormalizeColorChannelToUnitRange` in `FileFormatUtils.hpp` is the canonical normalizer, but each importer has its own parsing flow.
+PLY importer migrated to use `NormalizeColorChannelToUnitRange` (was using inline normalization). XYZ and PCD importers still have independent parsing flows.
 
 - [ ] Unify color triplet/intensity parsing into a shared `Importers::ParseColor` helper.
-- [ ] Ensure consistent [0,255]→[0,1] and [0,1]→[0,1] range handling across all importers.
+- [ ] Ensure consistent [0,255]→[0,1] and [0,1]→[0,1] range handling across remaining importers (XYZ, PCD).
 
-### D5. Refactor Exporters to Use AppendFormatted (P3)
-
-`Graphics.ExportUtils.hpp` now provides `AppendFormatted()` but existing exporters (OBJ, PLY, STL) still use manual `snprintf` + `AppendString` patterns.
-
-- [ ] Migrate OBJ exporter `snprintf` sequences to `AppendFormatted`.
-- [ ] Migrate PLY exporter `snprintf` sequences to `AppendFormatted`.
-- [ ] Migrate STL ASCII exporter `snprintf` sequences to `AppendFormatted`.
-
-### D6. Update Test Files to Use Shared Mesh Builders (P3)
-
-`TestMeshBuilders.h` now provides `MakeCube()` and `MakeQuadPair()` but several test files still define local mesh builder functions that duplicate this shared geometry.
-
-- [ ] Audit test files for local mesh builder duplicates and replace with `TestMeshBuilders.h` calls.
-- [ ] Remove `MakeTriangle()` / `MakeQuadPair()` locals in `Test_HalfedgeMeshPropertyAccess.cpp` (use shared builders).
 
 ### D7. Selection.cpp Picking Helper Extraction (P3)
 

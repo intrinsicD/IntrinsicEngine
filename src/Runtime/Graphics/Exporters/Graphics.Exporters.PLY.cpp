@@ -22,6 +22,7 @@ namespace Graphics
     using ExportUtils::AppendString;
     using ExportUtils::AppendBytes;
     using ExportUtils::AppendValue;
+    using ExportUtils::AppendFormatted;
 
     namespace
     {
@@ -113,27 +114,23 @@ namespace Graphics
             // ASCII vertex data
             for (std::size_t i = 0; i < data.Positions.size(); ++i)
             {
-                char buf[256];
-                int len = 0;
                 if (hasNormals)
                 {
-                    len = std::snprintf(buf, sizeof(buf), "%.6f %.6f %.6f %.6f %.6f %.6f\n",
-                                        static_cast<double>(data.Positions[i].x),
-                                        static_cast<double>(data.Positions[i].y),
-                                        static_cast<double>(data.Positions[i].z),
-                                        static_cast<double>(data.Normals[i].x),
-                                        static_cast<double>(data.Normals[i].y),
-                                        static_cast<double>(data.Normals[i].z));
+                    AppendFormatted(out, "%.6f %.6f %.6f %.6f %.6f %.6f\n",
+                                    static_cast<double>(data.Positions[i].x),
+                                    static_cast<double>(data.Positions[i].y),
+                                    static_cast<double>(data.Positions[i].z),
+                                    static_cast<double>(data.Normals[i].x),
+                                    static_cast<double>(data.Normals[i].y),
+                                    static_cast<double>(data.Normals[i].z));
                 }
                 else
                 {
-                    len = std::snprintf(buf, sizeof(buf), "%.6f %.6f %.6f\n",
-                                        static_cast<double>(data.Positions[i].x),
-                                        static_cast<double>(data.Positions[i].y),
-                                        static_cast<double>(data.Positions[i].z));
+                    AppendFormatted(out, "%.6f %.6f %.6f\n",
+                                    static_cast<double>(data.Positions[i].x),
+                                    static_cast<double>(data.Positions[i].y),
+                                    static_cast<double>(data.Positions[i].z));
                 }
-                if (len > 0)
-                    AppendString(out, std::string(buf, static_cast<std::size_t>(len)));
             }
 
             // ASCII face data
@@ -141,11 +138,8 @@ namespace Graphics
             {
                 for (std::size_t i = 0; i < data.Indices.size(); i += 3)
                 {
-                    char buf[64];
-                    int len = std::snprintf(buf, sizeof(buf), "3 %u %u %u\n",
-                                            data.Indices[i], data.Indices[i + 1], data.Indices[i + 2]);
-                    if (len > 0)
-                        AppendString(out, std::string(buf, static_cast<std::size_t>(len)));
+                    AppendFormatted(out, "3 %u %u %u\n",
+                                    data.Indices[i], data.Indices[i + 1], data.Indices[i + 2]);
                 }
             }
         }

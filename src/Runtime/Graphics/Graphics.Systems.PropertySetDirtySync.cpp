@@ -21,6 +21,8 @@ import Core.Logging;
 import Core.FrameGraph;
 import Geometry;
 
+#include "Graphics.GraphPropertyHelpers.hpp"
+
 using namespace Core::Hash;
 
 namespace Graphics::Systems::PropertySetDirtySync
@@ -55,43 +57,10 @@ namespace Graphics::Systems::PropertySetDirtySync
                 continue;
             }
 
-            // --- Re-extract per-node colors via ColorMapper ---
-            graphData.CachedNodeColors.clear();
-            {
-                auto& vtxConfig = graphData.Visualization.VertexColors;
-                if (vtxConfig.PropertyName.empty() && graph.VertexProperties().Exists("v:color"))
-                    vtxConfig.PropertyName = "v:color";
-
-                auto skipDeleted = [&graph](size_t i) -> bool {
-                    return graph.IsDeleted(
-                        Geometry::VertexHandle{static_cast<Geometry::PropertyIndex>(i)});
-                };
-                if (auto mapped = ColorMapper::MapProperty(
-                        graph.VertexProperties(), vtxConfig, skipDeleted))
-                {
-                    graphData.CachedNodeColors = std::move(mapped->Colors);
-                }
-            }
-
-            // --- Re-extract per-node radii ---
-            graphData.CachedNodeRadii.clear();
-            if (graph.VertexProperties().Exists("v:radius"))
-            {
-                auto radiusProp = Geometry::VertexProperty<float>(
-                    graph.VertexProperties().Get<float>("v:radius"));
-
-                graphData.CachedNodeRadii.reserve(graphData.GpuVertexCount);
-
-                const std::size_t vSize = graph.VerticesSize();
-                for (std::size_t i = 0; i < vSize; ++i)
-                {
-                    const Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(i)};
-                    if (graph.IsDeleted(v))
-                        continue;
-
-                    graphData.CachedNodeRadii.push_back(radiusProp[v]);
-                }
-            }
+            // --- Re-extract per-node colors and radii via shared helpers ---
+            graphData.CachedNodeColors = GraphPropertyHelpers::ExtractNodeColors(
+                graph, graphData.Visualization.VertexColors);
+            graphData.CachedNodeRadii = GraphPropertyHelpers::ExtractNodeRadii(graph);
 
             // --- Update Point::Component flags ---
             if (auto* pt = registry.try_get<ECS::Point::Component>(entity))
@@ -126,23 +95,9 @@ namespace Graphics::Systems::PropertySetDirtySync
                 continue;
             }
 
-            // --- Re-extract per-edge colors via ColorMapper ---
-            graphData.CachedEdgeColors.clear();
-            {
-                auto& edgeConfig = graphData.Visualization.EdgeColors;
-                if (edgeConfig.PropertyName.empty() && graph.EdgeProperties().Exists("e:color"))
-                    edgeConfig.PropertyName = "e:color";
-
-                auto skipDeleted = [&graph](size_t i) -> bool {
-                    return graph.IsDeleted(
-                        Geometry::EdgeHandle{static_cast<Geometry::PropertyIndex>(i)});
-                };
-                if (auto mapped = ColorMapper::MapProperty(
-                        graph.EdgeProperties(), edgeConfig, skipDeleted))
-                {
-                    graphData.CachedEdgeColors = std::move(mapped->Colors);
-                }
-            }
+            // --- Re-extract per-edge colors via shared helper ---
+            graphData.CachedEdgeColors = GraphPropertyHelpers::ExtractEdgeColors(
+                graph, graphData.Visualization.EdgeColors);
 
             // --- Update Line::Component flags ---
             if (auto* line = registry.try_get<ECS::Line::Component>(entity))

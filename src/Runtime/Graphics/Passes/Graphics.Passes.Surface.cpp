@@ -117,7 +117,7 @@ namespace Graphics::Passes
                 if (seen)
                     continue;
 
-                GeometryGpuData* geo = ctx.GeometryStorage.GetUnchecked(sc.Geometry);
+                GeometryGpuData* geo = ctx.GeometryStorage.GetIfValid(sc.Geometry);
                 if (!geo || geo->GetIndexCount() == 0 || !geo->GetIndexBuffer() || !geo->GetVertexBuffer())
                     continue;
 
@@ -773,7 +773,7 @@ namespace Graphics::Passes
             {
                 stage3.InstanceCount = ctx.GpuScene->GetActiveCountApprox();
 
-                GeometryGpuData* geo = ctx.GeometryStorage.GetUnchecked(stage3.GeoHandle);
+                GeometryGpuData* geo = ctx.GeometryStorage.GetIfValid(stage3.GeoHandle);
                 if (!geo || geo->GetIndexCount() == 0)
                 {
                     stage3.GeoHandle = {};

@@ -172,7 +172,7 @@ namespace Graphics::Passes
                                             {
                                                 if (!surface.Geometry.IsValid())
                                                     continue;
-                                                auto* geo = ctx.GeometryStorage.GetUnchecked(surface.Geometry);
+                                                auto* geo = ctx.GeometryStorage.GetIfValid(surface.Geometry);
                                                 if (!geo)
                                                     continue;
 
@@ -189,8 +189,8 @@ namespace Graphics::Passes
                                                 if (!line.Geometry.IsValid() || !line.EdgeView.IsValid())
                                                     continue;
 
-                                                auto* vertexGeo = ctx.GeometryStorage.GetUnchecked(line.Geometry);
-                                                auto* edgeGeo = ctx.GeometryStorage.GetUnchecked(line.EdgeView);
+                                                auto* vertexGeo = ctx.GeometryStorage.GetIfValid(line.Geometry);
+                                                auto* edgeGeo = ctx.GeometryStorage.GetIfValid(line.EdgeView);
                                                 if (!vertexGeo || !edgeGeo)
                                                     continue;
 
@@ -206,7 +206,7 @@ namespace Graphics::Passes
                                             {
                                                 if (!point.Geometry.IsValid())
                                                     continue;
-                                                auto* geo = ctx.GeometryStorage.GetUnchecked(point.Geometry);
+                                                auto* geo = ctx.GeometryStorage.GetIfValid(point.Geometry);
                                                 if (!geo)
                                                     continue;
 

@@ -26,6 +26,8 @@ import ECS;
 import Geometry;
 import RHI;
 
+#include "Graphics.GraphPropertyHelpers.hpp"
+
 using namespace Core::Hash;
 
 namespace Graphics::Systems::GraphGeometrySync
@@ -102,17 +104,6 @@ namespace Graphics::Systems::GraphGeometrySync
                 std::vector<uint32_t> remap(vSize, UINT32_MAX);
                 uint32_t compactIdx = 0;
 
-                // Check for per-node radius property ("v:radius" as float).
-                const bool hasNodeRadii = graph.VertexProperties().Exists("v:radius");
-                std::optional<Geometry::VertexProperty<float>> nodeRadiusProp;
-                if (hasNodeRadii)
-                    nodeRadiusProp = Geometry::VertexProperty<float>(
-                        graph.VertexProperties().Get<float>("v:radius"));
-
-                std::vector<float> nodeRadii;
-                if (hasNodeRadii)
-                    nodeRadii.reserve(vSize);
-
                 for (std::size_t i = 0; i < vSize; ++i)
                 {
                     const Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(i)};
@@ -123,32 +114,12 @@ namespace Graphics::Systems::GraphGeometrySync
                     // Graph nodes have no meaningful surface normal — use world-up default.
                     normals.emplace_back(0.0f, 1.0f, 0.0f);
                     remap[i] = compactIdx++;
-
-                    // Extract per-node radius.
-                    if (hasNodeRadii && nodeRadiusProp)
-                    {
-                        nodeRadii.push_back((*nodeRadiusProp)[v]);
-                    }
                 }
 
-                // --- Extract per-node colors via ColorMapper ---
-                // Use the configured vertex color property if set; fall back to "v:color".
-                std::vector<uint32_t> nodeColors;
-                {
-                    auto& vtxConfig = graphData.Visualization.VertexColors;
-                    // Default fallback: use "v:color" when no property is explicitly selected.
-                    if (vtxConfig.PropertyName.empty() && graph.VertexProperties().Exists("v:color"))
-                        vtxConfig.PropertyName = "v:color";
-
-                    auto skipDeleted = [&graph](size_t i) -> bool {
-                        return graph.IsDeleted(Geometry::VertexHandle{static_cast<Geometry::PropertyIndex>(i)});
-                    };
-                    if (auto mapped = ColorMapper::MapProperty(
-                            graph.VertexProperties(), vtxConfig, skipDeleted))
-                    {
-                        nodeColors = std::move(mapped->Colors);
-                    }
-                }
+                // --- Extract per-node colors and radii via shared helpers ---
+                std::vector<uint32_t> nodeColors = GraphPropertyHelpers::ExtractNodeColors(
+                    graph, graphData.Visualization.VertexColors);
+                std::vector<float> nodeRadii = GraphPropertyHelpers::ExtractNodeRadii(graph);
 
                 if (positions.empty())
                 {
@@ -208,23 +179,9 @@ namespace Graphics::Systems::GraphGeometrySync
                     edgePairs.push_back({ci0, ci1});
                 }
 
-                // --- Extract per-edge colors via ColorMapper ---
-                std::vector<uint32_t> edgeColors;
-                {
-                    auto& edgeConfig = graphData.Visualization.EdgeColors;
-                    // Default fallback: use "e:color" when no property is explicitly selected.
-                    if (edgeConfig.PropertyName.empty() && graph.EdgeProperties().Exists("e:color"))
-                        edgeConfig.PropertyName = "e:color";
-
-                    auto skipDeleted = [&graph](size_t i) -> bool {
-                        return graph.IsDeleted(Geometry::EdgeHandle{static_cast<Geometry::PropertyIndex>(i)});
-                    };
-                    if (auto mapped = ColorMapper::MapProperty(
-                            graph.EdgeProperties(), edgeConfig, skipDeleted))
-                    {
-                        edgeColors = std::move(mapped->Colors);
-                    }
-                }
+                // --- Extract per-edge colors via shared helper ---
+                std::vector<uint32_t> edgeColors = GraphPropertyHelpers::ExtractEdgeColors(
+                    graph, graphData.Visualization.EdgeColors);
 
                 // Release previous geometry before allocating new.
                 if (graphData.GpuGeometry.IsValid())
@@ -325,7 +282,7 @@ namespace Graphics::Systems::GraphGeometrySync
             // -----------------------------------------------------------------
             if (graphData.GpuSlot == ECS::Graph::Data::kInvalidSlot && graphData.GpuGeometry.IsValid())
             {
-                GeometryGpuData* geo = geometryStorage.GetUnchecked(graphData.GpuGeometry);
+                GeometryGpuData* geo = geometryStorage.GetIfValid(graphData.GpuGeometry);
                 if (geo && geo->GetVertexBuffer())
                 {
                     const uint32_t slot = gpuScene.AllocateSlot();

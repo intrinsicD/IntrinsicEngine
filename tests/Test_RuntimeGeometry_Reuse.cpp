@@ -133,7 +133,7 @@ TEST_F(GeometryReuseTest, ReuseSharesVertexBufferAndCreatesUniqueIndexBuffer)
     EXPECT_NE(ib1, ib2);
 
     // Layout is inherited (except topology, which is view-specific).
-    const auto* source = m_Pool.GetUnchecked(h1);
+    const auto* source = m_Pool.GetIfValid(h1);
     ASSERT_NE(source, nullptr);
     EXPECT_EQ(gpu2->GetLayout().PositionsOffset, source->GetLayout().PositionsOffset);
     EXPECT_EQ(gpu2->GetLayout().PositionsSize, source->GetLayout().PositionsSize);

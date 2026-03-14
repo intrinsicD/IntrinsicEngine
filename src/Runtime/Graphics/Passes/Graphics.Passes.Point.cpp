@@ -403,7 +403,7 @@ namespace Graphics::Passes
                 if (!pt.Geometry.IsValid())
                     continue;
 
-                GeometryGpuData* geo = m_GeometryStorage->GetUnchecked(pt.Geometry);
+                GeometryGpuData* geo = m_GeometryStorage->GetIfValid(pt.Geometry);
                 if (!geo || !geo->GetVertexBuffer())
                     continue;
 

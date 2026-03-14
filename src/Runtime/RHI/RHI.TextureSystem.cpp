@@ -83,7 +83,7 @@ namespace RHI
 
         if (handle.IsValid())
         {
-            const TextureGpuData* data = m_Pool.GetUnchecked(handle);
+            const TextureGpuData* data = m_Pool.GetIfValid(handle);
             // Queue descriptor update at the stable slot.
             m_Bindless.EnqueueUpdate(data->BindlessSlot, data->Image->GetView(), data->Sampler);
         }
@@ -152,7 +152,7 @@ namespace RHI
         // Immediately bind to default so sampling is safe until publish.
         if (handle.IsValid())
         {
-            const TextureGpuData* data = m_Pool.GetUnchecked(handle);
+            const TextureGpuData* data = m_Pool.GetIfValid(handle);
             if (m_DefaultView != VK_NULL_HANDLE && m_DefaultSampler != VK_NULL_HANDLE)
             {
                 m_Bindless.EnqueueUpdate(data->BindlessSlot, m_DefaultView, m_DefaultSampler);
@@ -231,9 +231,9 @@ namespace RHI
         return nullptr;
     }
 
-    const TextureGpuData* TextureSystem::GetUnchecked(TextureHandle handle) const
+    const TextureGpuData* TextureSystem::GetIfValid(TextureHandle handle) const
     {
-        return m_Pool.GetUnchecked(handle);
+        return m_Pool.GetIfValid(handle);
     }
 
     void TextureSystem::Clear()

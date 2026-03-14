@@ -28,7 +28,7 @@ export namespace RHI
         void Clear();
 
         [[nodiscard]] const TextureGpuData* Get(TextureHandle handle) const;
-        [[nodiscard]] const TextureGpuData* GetUnchecked(TextureHandle handle) const;
+        [[nodiscard]] const TextureGpuData* GetIfValid(TextureHandle handle) const;
 
         // Default/fallback texture descriptor (bindless slot 0 contract).
         // Must be called once during engine init after bindless is created.

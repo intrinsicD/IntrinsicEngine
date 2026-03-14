@@ -133,13 +133,11 @@ export namespace Core
             return slot.Data.get();
         }
 
-        // Hot-path access.
-        // WARNING: Only use if you are sure the handle is valid and the resource is alive.
-        [[nodiscard]] T* GetUnchecked(Handle handle) const
+        // Hot-path access with lightweight validation.
+        // Returns nullptr if the handle is invalid, stale, or the slot is inactive.
+        [[nodiscard]] T* GetIfValid(Handle handle) const
         {
             std::shared_lock lock(m_Mutex);
-            // We still do bounds/generation check because the cost is negligible compared to a cache miss,
-            // and safety is preferred. If you need ABSOLUTE speed, remove the 'if'.
             if (handle.Index < m_Slots.size())
             {
                 const Slot& slot = m_Slots[handle.Index];

@@ -60,7 +60,7 @@ namespace Graphics::Systems::PointCloudGeometrySync
                 // normals from uploaded layout when CloudRef is absent.
                 if (pcData.GpuGeometry.IsValid() && !pcData.CloudRef)
                 {
-                    if (GeometryGpuData* geo = geometryStorage.GetUnchecked(pcData.GpuGeometry))
+                    if (GeometryGpuData* geo = geometryStorage.GetIfValid(pcData.GpuGeometry))
                         pcData.HasGpuNormals = (geo->GetLayout().NormalsSize > 0);
                     pcData.GpuDirty = false;
                 }
@@ -162,7 +162,7 @@ namespace Graphics::Systems::PointCloudGeometrySync
             // -----------------------------------------------------------------
             if (pcData.GpuSlot == ECS::PointCloud::Data::kInvalidSlot && pcData.GpuGeometry.IsValid())
             {
-                GeometryGpuData* geo = geometryStorage.GetUnchecked(pcData.GpuGeometry);
+                GeometryGpuData* geo = geometryStorage.GetIfValid(pcData.GpuGeometry);
                 if (geo && geo->GetVertexBuffer())
                 {
                     const uint32_t slot = gpuScene.AllocateSlot();

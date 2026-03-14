@@ -21,6 +21,7 @@ import :AssetErrors;
 namespace Graphics
 {
     using ExportUtils::AppendString;
+    using ExportUtils::AppendFormatted;
 
     namespace
     {
@@ -124,8 +125,7 @@ namespace Graphics
                 if (!std::isfinite(normal.x))
                     normal = glm::vec3(0.0f, 0.0f, 0.0f);
 
-                char buf[512];
-                int len = std::snprintf(buf, sizeof(buf),
+                AppendFormatted(out,
                     "  facet normal %.6e %.6e %.6e\n"
                     "    outer loop\n"
                     "      vertex %.6e %.6e %.6e\n"
@@ -137,9 +137,6 @@ namespace Graphics
                     static_cast<double>(v0.x), static_cast<double>(v0.y), static_cast<double>(v0.z),
                     static_cast<double>(v1.x), static_cast<double>(v1.y), static_cast<double>(v1.z),
                     static_cast<double>(v2.x), static_cast<double>(v2.y), static_cast<double>(v2.z));
-
-                if (len > 0)
-                    AppendString(out, std::string(buf, static_cast<std::size_t>(len)));
             }
 
             AppendString(out, "endsolid IntrinsicEngine\n");

@@ -69,14 +69,14 @@ TEST(ResourcePool, CreateInPlace)
     EXPECT_EQ(result.value()->Name, "test");
 }
 
-TEST(ResourcePool, GetUnchecked)
+TEST(ResourcePool, GetIfValid)
 {
     ImmediatePool pool;
 
     auto h = pool.Create(99);
     ASSERT_TRUE(h.IsValid());
 
-    DummyResource* ptr = pool.GetUnchecked(h);
+    DummyResource* ptr = pool.GetIfValid(h);
     ASSERT_NE(ptr, nullptr);
     EXPECT_EQ(ptr->Value, 99);
 }
@@ -118,7 +118,7 @@ TEST(ResourcePool_Immediate, RemoveInvalidatesGet)
     auto result = pool.Get(h);
     EXPECT_FALSE(result.has_value());
 
-    auto* ptr = pool.GetUnchecked(h);
+    auto* ptr = pool.GetIfValid(h);
     EXPECT_EQ(ptr, nullptr);
 }
 
@@ -168,7 +168,7 @@ TEST(ResourcePool, StaleHandleRejected)
 
     // The old handle (stale generation) must be rejected.
     EXPECT_FALSE(pool.Get(h1).has_value());
-    EXPECT_EQ(pool.GetUnchecked(h1), nullptr);
+    EXPECT_EQ(pool.GetIfValid(h1), nullptr);
 
     // The new handle works.
     EXPECT_TRUE(pool.Get(h2).has_value());
@@ -297,7 +297,7 @@ TEST(ResourcePool, GetWithInvalidHandle)
     auto result = pool.Get(invalid);
     EXPECT_FALSE(result.has_value());
 
-    auto* ptr = pool.GetUnchecked(invalid);
+    auto* ptr = pool.GetIfValid(invalid);
     EXPECT_EQ(ptr, nullptr);
 }
 
@@ -317,7 +317,7 @@ TEST(ResourcePool, PointerStableAcrossAdds)
     ImmediatePool pool;
 
     auto h0 = pool.Create(0);
-    DummyResource* ptr0 = pool.GetUnchecked(h0);
+    DummyResource* ptr0 = pool.GetIfValid(h0);
     ASSERT_NE(ptr0, nullptr);
 
     // Add many more resources to potentially trigger vector reallocation.
@@ -325,7 +325,7 @@ TEST(ResourcePool, PointerStableAcrossAdds)
         pool.Create(i);
 
     // The original pointer should still be valid (unique_ptr heap allocation).
-    DummyResource* ptr0After = pool.GetUnchecked(h0);
+    DummyResource* ptr0After = pool.GetIfValid(h0);
     EXPECT_EQ(ptr0, ptr0After);
     EXPECT_EQ(ptr0After->Value, 0);
 }
