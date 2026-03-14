@@ -67,9 +67,14 @@ export namespace Geometry::PointCloud
         ~Cloud()                       = default;
 
         // ---- Capacity / sizing ----
+        // Canonical names match Mesh (VerticesSize/IsEmpty) and Graph conventions.
 
-        [[nodiscard]] std::size_t Size()  const noexcept { return m_Points.Size(); }
-        [[nodiscard]] bool        Empty() const noexcept { return m_Points.Size() == 0; }
+        [[nodiscard]] std::size_t PointCount() const noexcept { return m_Points.Size(); }
+        [[nodiscard]] bool        IsEmpty()    const noexcept { return m_Points.Size() == 0; }
+
+        // Legacy aliases — prefer PointCount() / IsEmpty() in new code.
+        [[nodiscard]] std::size_t Size()  const noexcept { return PointCount(); }
+        [[nodiscard]] bool        Empty() const noexcept { return IsEmpty(); }
 
         void Reserve(std::size_t n) { m_Points.Reserve(n); }
         void Clear();

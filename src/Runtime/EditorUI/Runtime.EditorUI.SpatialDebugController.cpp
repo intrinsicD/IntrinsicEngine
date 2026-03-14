@@ -23,6 +23,21 @@ import Graphics;
 import Geometry;
 import ECS;
 
+namespace
+{
+    // Shared helper to reduce glm::vec3 <-> float[3] boilerplate for ImGui color edits.
+    bool ColorEdit3(const char* label, glm::vec3& color)
+    {
+        float rgb[3] = {color.r, color.g, color.b};
+        if (ImGui::ColorEdit3(label, rgb))
+        {
+            color = glm::vec3(rgb[0], rgb[1], rgb[2]);
+            return true;
+        }
+        return false;
+    }
+} // anonymous namespace
+
 namespace Runtime::EditorUI
 {
 
@@ -117,19 +132,9 @@ void SpatialDebugController::DrawUI(Runtime::Engine& engine)
     ImGui::Checkbox("Draw Bounding Sphere", &BoundsSettings.DrawBoundingSphere);
     ImGui::SliderFloat("Bounds Alpha", &BoundsSettings.Alpha, 0.05f, 1.0f, "%.2f");
 
-    float aabbColor[3] = {BoundsSettings.AABBColor.r, BoundsSettings.AABBColor.g, BoundsSettings.AABBColor.b};
-    if (ImGui::ColorEdit3("AABB Color", aabbColor))
-        BoundsSettings.AABBColor = glm::vec3(aabbColor[0], aabbColor[1], aabbColor[2]);
-
-    float obbColor[3] = {BoundsSettings.OBBColor.r, BoundsSettings.OBBColor.g, BoundsSettings.OBBColor.b};
-    if (ImGui::ColorEdit3("OBB Color", obbColor))
-        BoundsSettings.OBBColor = glm::vec3(obbColor[0], obbColor[1], obbColor[2]);
-
-    float sphereColor[3] = {
-        BoundsSettings.SphereColor.r, BoundsSettings.SphereColor.g, BoundsSettings.SphereColor.b
-    };
-    if (ImGui::ColorEdit3("Sphere Color", sphereColor))
-        BoundsSettings.SphereColor = glm::vec3(sphereColor[0], sphereColor[1], sphereColor[2]);
+    ColorEdit3("AABB Color", BoundsSettings.AABBColor);
+    ColorEdit3("OBB Color", BoundsSettings.OBBColor);
+    ColorEdit3("Sphere Color", BoundsSettings.SphereColor);
 
     ImGui::SeparatorText("KD-Tree");
     ImGui::Checkbox("KD Overlay (no depth test)", &KDTreeSettings.Overlay);
@@ -140,28 +145,14 @@ void SpatialDebugController::DrawUI(Runtime::Engine& engine)
     ImGui::SliderInt("KD Max Depth", reinterpret_cast<int*>(&KDTreeSettings.MaxDepth), 0, 32);
     ImGui::SliderFloat("KD Alpha", &KDTreeSettings.Alpha, 0.05f, 1.0f, "%.2f");
 
-    float kdLeafColor[3] = {KDTreeSettings.LeafColor.r, KDTreeSettings.LeafColor.g, KDTreeSettings.LeafColor.b};
-    if (ImGui::ColorEdit3("KD Leaf Color", kdLeafColor))
-        KDTreeSettings.LeafColor = glm::vec3(kdLeafColor[0], kdLeafColor[1], kdLeafColor[2]);
-
-    float kdInternalColor[3] = {
-        KDTreeSettings.InternalColor.r, KDTreeSettings.InternalColor.g, KDTreeSettings.InternalColor.b
-    };
-    if (ImGui::ColorEdit3("KD Internal Color", kdInternalColor))
-        KDTreeSettings.InternalColor = glm::vec3(kdInternalColor[0], kdInternalColor[1], kdInternalColor[2]);
-
-    float kdSplitColor[3] = {
-        KDTreeSettings.SplitPlaneColor.r, KDTreeSettings.SplitPlaneColor.g, KDTreeSettings.SplitPlaneColor.b
-    };
-    if (ImGui::ColorEdit3("KD Split Color", kdSplitColor))
-        KDTreeSettings.SplitPlaneColor = glm::vec3(kdSplitColor[0], kdSplitColor[1], kdSplitColor[2]);
+    ColorEdit3("KD Leaf Color", KDTreeSettings.LeafColor);
+    ColorEdit3("KD Internal Color", KDTreeSettings.InternalColor);
+    ColorEdit3("KD Split Color", KDTreeSettings.SplitPlaneColor);
 
     ImGui::SeparatorText("Convex Hull");
     ImGui::Checkbox("Hull Overlay (no depth test)", &ConvexHullSettings.Overlay);
     ImGui::SliderFloat("Hull Alpha", &ConvexHullSettings.Alpha, 0.05f, 1.0f, "%.2f");
-    float hullColor[3] = {ConvexHullSettings.Color.r, ConvexHullSettings.Color.g, ConvexHullSettings.Color.b};
-    if (ImGui::ColorEdit3("Hull Color", hullColor))
-        ConvexHullSettings.Color = glm::vec3(hullColor[0], hullColor[1], hullColor[2]);
+    ColorEdit3("Hull Color", ConvexHullSettings.Color);
 
     ImGui::SeparatorText("BVH");
     ImGui::Checkbox("BVH Overlay (no depth test)", &BVHSettings.Overlay);
@@ -171,15 +162,8 @@ void SpatialDebugController::DrawUI(Runtime::Engine& engine)
     ImGui::SliderInt("BVH Leaf Triangles", reinterpret_cast<int*>(&BVHSettings.LeafTriangleCount), 1, 64);
     ImGui::SliderFloat("BVH Alpha", &BVHSettings.Alpha, 0.05f, 1.0f, "%.2f");
 
-    float bvhLeafColor[3] = {BVHSettings.LeafColor.r, BVHSettings.LeafColor.g, BVHSettings.LeafColor.b};
-    if (ImGui::ColorEdit3("BVH Leaf Color", bvhLeafColor))
-        BVHSettings.LeafColor = glm::vec3(bvhLeafColor[0], bvhLeafColor[1], bvhLeafColor[2]);
-
-    float bvhInternalColor[3] = {
-        BVHSettings.InternalColor.r, BVHSettings.InternalColor.g, BVHSettings.InternalColor.b
-    };
-    if (ImGui::ColorEdit3("BVH Internal Color", bvhInternalColor))
-        BVHSettings.InternalColor = glm::vec3(bvhInternalColor[0], bvhInternalColor[1], bvhInternalColor[2]);
+    ColorEdit3("BVH Leaf Color", BVHSettings.LeafColor);
+    ColorEdit3("BVH Internal Color", BVHSettings.InternalColor);
 
     ImGui::SeparatorText("Octree");
     ImGui::Checkbox("Overlay (no depth test)", &OctreeSettings.Overlay);
@@ -190,11 +174,7 @@ void SpatialDebugController::DrawUI(Runtime::Engine& engine)
     ImGui::SliderFloat("Alpha", &OctreeSettings.Alpha, 0.05f, 1.0f, "%.2f");
 
     if (!OctreeSettings.ColorByDepth)
-    {
-        float base[3] = {OctreeSettings.BaseColor.r, OctreeSettings.BaseColor.g, OctreeSettings.BaseColor.b};
-        if (ImGui::ColorEdit3("Base Color", base))
-            OctreeSettings.BaseColor = glm::vec3(base[0], base[1], base[2]);
-    }
+        ColorEdit3("Base Color", OctreeSettings.BaseColor);
 
     ImGui::SeparatorText("Contact Manifold");
     ImGui::Checkbox("Contact Overlay (no depth test)", &ContactOverlay);

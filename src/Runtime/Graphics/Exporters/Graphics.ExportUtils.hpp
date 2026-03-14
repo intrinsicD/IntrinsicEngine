@@ -29,4 +29,15 @@ namespace Graphics::ExportUtils
     {
         AppendBytes(out, &value, sizeof(T));
     }
+
+    // Convenience helper: snprintf into a stack buffer and append to output.
+    // Eliminates repeated char buf[N] + snprintf + AppendString boilerplate.
+    template <typename... Args>
+    void AppendFormatted(std::vector<std::byte>& out, const char* fmt, Args&&... args)
+    {
+        char buf[512];
+        const int len = std::snprintf(buf, sizeof(buf), fmt, std::forward<Args>(args)...);
+        if (len > 0)
+            AppendString(out, std::string(buf, static_cast<std::size_t>(len)));
+    }
 }

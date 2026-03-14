@@ -38,6 +38,20 @@ This document tracks the **active rendering-architecture backlog** for Intrinsic
 - [ ] Make the selection mode work with radio buttons (vertex, edge, face, entity).
 - [ ] Wire Geodesic computation in the ui. When active, mark the selected vertex or vertices (with shift for multiple selection) with a different colored shpere.
 
+### Core & RHI Code Quality (Audit Findings)
+
+- [ ] Extract RHI SafeDestroy helper — 9 files repeat identical move-capture + lambda pattern for deferred Vulkan resource destruction (`RHI.Buffer.cpp`, `RHI.Shader.cpp`, `RHI.Image.cpp`, `RHI.Texture.cpp`, `RHI.Pipeline.cpp`, etc.). Create a template or macro in `RHI.DestructionUtils`.
+- [ ] Standardize frame counter naming — `GlobalFrameNumber` (Device), `CurrentFrame` (Telemetry), `frameEpoch` (CommandContext), `currentFrameNumber` (ResourcePool) all refer to the same monotonic counter. Pick one name and unify.
+- [ ] Add algorithm comments to underdocumented complex sections:
+  - `ArenaLifetimeToken` atomic generation tracking (`Core.Memory.cpp:75-96`)
+  - `TypeToken<T>()` compile-time type signature hashing (`Core.FrameGraph.cppm:56-93`)
+  - Timeline semaphore two-atomic signaling pattern (`RHI.Device.cpp:155-160`)
+  - `ScopeStack::NewArray()` three-level indirection for destructor tracking (`Core.Memory.cppm:265-316`)
+  - Deferred deletion queue partitioning in `CollectGarbage()` (`RHI.Device.cppm:93-117`)
+- [ ] Rename `ResourcePool::GetUnchecked()` to `GetIfValid()` — the method still validates bounds and generation despite the "unchecked" name, creating a name/behavior mismatch.
+- [ ] Document device reference lifetime contract — RHI classes inconsistently use `VulkanDevice&` (non-owning) vs `shared_ptr<VulkanDevice>` (shared ownership). Add a comment convention explaining when each is appropriate.
+- [ ] Document Core.Memory `fprintf` vs `Core::Log` error reporting trade-off — Core uses `fprintf(stderr, ...)` to avoid circular dependency with Logging; Runtime modules use `Core::Log`. Add a rationale comment in `Core.Memory.cpp`.
+
 ## 2. Next (P1) — Near-Term Follow-Up After the Refactor Lands
 
 These are not required to finish the first wave, but they should begin soon after P0 is stable.
@@ -230,3 +244,40 @@ Identified via full codebase sweep (March 2026). Grouped by priority.
 - [ ] Replace remaining repeated `ResolveShaderPathOrExit(...)` pairs with shared helper calls.
 - [ ] Replace remaining ad hoc `shared_ptr<VulkanDevice>` alias lambdas with `MakeDeviceAlias(...)`.
 - [ ] Keep the refactor behavior-preserving and opportunistic when those files are next touched.
+
+### D3. Vertex Deduplication Consolidation (P3)
+
+STL, OBJ, and PLY importers each implement near-identical spatial-hash vertex deduplication (quantize-based `VertexKey` + `VertexKeyHash`). Extract a shared `Importers::VertexDeduplicator` utility.
+
+- [ ] Extract `VertexKey` / `VertexKeyHash` / dedup-map pattern into `Graphics.Importers.VertexDedup.hpp`.
+- [ ] Migrate STL, OBJ, and PLY importers to use the shared utility.
+- [ ] Add a unit test for the deduplicator (coincident vertices, near-threshold vertices, distinct vertices).
+
+### D4. Color Parsing Unification (P3)
+
+XYZ and PCD importers independently parse RGB/intensity color fields with slightly different range normalization. `NormalizeColorChannelToUnitRange` in `FileFormatUtils.hpp` is the canonical normalizer, but each importer has its own parsing flow.
+
+- [ ] Unify color triplet/intensity parsing into a shared `Importers::ParseColor` helper.
+- [ ] Ensure consistent [0,255]→[0,1] and [0,1]→[0,1] range handling across all importers.
+
+### D5. Refactor Exporters to Use AppendFormatted (P3)
+
+`Graphics.ExportUtils.hpp` now provides `AppendFormatted()` but existing exporters (OBJ, PLY, STL) still use manual `snprintf` + `AppendString` patterns.
+
+- [ ] Migrate OBJ exporter `snprintf` sequences to `AppendFormatted`.
+- [ ] Migrate PLY exporter `snprintf` sequences to `AppendFormatted`.
+- [ ] Migrate STL ASCII exporter `snprintf` sequences to `AppendFormatted`.
+
+### D6. Update Test Files to Use Shared Mesh Builders (P3)
+
+`TestMeshBuilders.h` now provides `MakeCube()` and `MakeQuadPair()` but several test files still define local mesh builder functions that duplicate this shared geometry.
+
+- [ ] Audit test files for local mesh builder duplicates and replace with `TestMeshBuilders.h` calls.
+- [ ] Remove `MakeTriangle()` / `MakeQuadPair()` locals in `Test_HalfedgeMeshPropertyAccess.cpp` (use shared builders).
+
+### D7. Selection.cpp Picking Helper Extraction (P3)
+
+`Runtime.SelectionModule.cpp` contains several large picking functions with repeated hit-test patterns (closest-point-on-segment, sphere-ray intersection). These could be factored into geometry query helpers.
+
+- [ ] Extract closest-point-on-segment and ray-sphere helpers into `Geometry::Queries` or a `Selection` utility header.
+- [ ] Reduce duplication between vertex/edge/face picking code paths.

@@ -28,7 +28,7 @@ namespace Graphics
 {
     namespace
     {
-        constexpr std::string_view s_Extensions[] = { ".stl" };
+        static constexpr std::string_view s_Extensions[] = { ".stl" };
 
         // Spatial hash for vertex deduplication
         struct VertexKey

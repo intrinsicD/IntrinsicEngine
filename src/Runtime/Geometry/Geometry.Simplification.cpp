@@ -20,28 +20,35 @@ import :Simplification;
 import :Properties;
 import :HalfedgeMesh;
 import :MeshUtils;
+import :Validation;
 
 namespace Geometry::Simplification
 {
+    using Validation::IsFinite;
+
     namespace
     {
         // =====================================================================
-        // Utility helpers
-        // =====================================================================
-
-        [[nodiscard]] bool IsFinite(double v) noexcept
-        {
-            return std::isfinite(v);
-        }
-
-        // =====================================================================
         // Normal Cone — tracks accumulated normal deviation per face
+        //
+        // A bounding cone on the unit sphere that encloses a set of normals.
+        // Represented as a center direction and a half-angle (in radians).
+        // Used to reject edge collapses whose resulting surface normals would
+        // deviate beyond a user-specified threshold (MaxNormalDeviationDegrees).
+        //
+        // Merge algorithm (spherical bounding cone union):
+        //   Given two cones (C1, a1) and (C2, a2), the merged cone's half-angle
+        //   covers the angular extent of both. When the center directions nearly
+        //   coincide (dp ≈ 1), we simply take the wider angle. When they are
+        //   nearly opposite (dp ≈ -1), the cone degenerates to a full sphere.
+        //   Otherwise, compute the arc angle between centers, find the min/max
+        //   extents on that arc, and re-center via spherical interpolation.
         // =====================================================================
 
         struct NormalCone
         {
             glm::dvec3 CenterNormal{0.0, 0.0, 1.0};
-            double Angle{0.0};
+            double Angle{0.0};  // half-angle in radians
 
             NormalCone() = default;
 
@@ -58,19 +65,25 @@ namespace Geometry::Simplification
 
                 if (dp > 0.99999)
                 {
+                    // Nearly parallel — just widen to the larger cone.
                     Angle = std::max(Angle, nc.Angle);
                 }
                 else if (dp < -0.99999)
                 {
+                    // Opposite directions — cone covers the full sphere.
                     Angle = 2.0 * std::numbers::pi;
                 }
                 else
                 {
+                    // General case: compute bounding cone of two spherical caps.
+                    // centerAngle = arc between the two cone center directions.
                     const double centerAngle = std::acos(std::clamp(dp, -1.0, 1.0));
+                    // Extent of the combined region along the great arc:
                     const double minAngle = std::min(-Angle, centerAngle - nc.Angle);
                     const double maxAngle = std::max(Angle, centerAngle + nc.Angle);
                     Angle = 0.5 * (maxAngle - minAngle);
 
+                    // Re-center via spherical SLERP to the midpoint of the extent.
                     const double axisAngle = 0.5 * (minAngle + maxAngle);
                     const double sinCA = std::sin(centerAngle);
                     if (std::abs(sinCA) > 1e-12)
