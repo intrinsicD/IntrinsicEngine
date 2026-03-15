@@ -407,7 +407,7 @@ A mesh uploads positions/normals once; wireframe, vertex visualization, and kNN 
 - **Geometry operator application:** Simplification, subdivision, smoothing — capture mesh state before operator, undo reverts to snapshot.
 - **Scene hierarchy changes:** Reparenting entities via drag-and-drop in the hierarchy panel.
 
-**Priority:** P1 — directly enables the ROADMAP Phase 2 undo/redo item. Implementation TODOs tracked in `TODO.md` §E1.
+**Priority:** P1 — directly enables the ROADMAP Phase 2 undo/redo item.
 
 ---
 
@@ -415,7 +415,7 @@ A mesh uploads positions/normals once; wireframe, vertex visualization, and kNN 
 
 #### ~~15. Enumerate/Zip Iteration Utilities~~ — DROPPED
 
-C++23 provides `std::views::enumerate` and `std::views::zip` natively. The engine uses Clang 20+ which supports both. A custom `Core.Iterators.cppm` module is unnecessary — use the standard library directly. Opportunistic adoption of `std::views::enumerate` across 109+ manual index loops is tracked in `TODO.md` §E4.
+C++23 provides `std::views::enumerate` and `std::views::zip` natively. The engine uses Clang 20+ which supports both. A custom `Core.Iterators.cppm` module is unnecessary — use the standard library directly. Opportunistic adoption of `std::views::enumerate` across manual index loops should be done when files are touched.
 
 #### ~~16. ComponentGui Template Dispatch~~ — DROPPED
 
