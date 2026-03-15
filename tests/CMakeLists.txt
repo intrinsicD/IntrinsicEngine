@@ -162,6 +162,8 @@ intrinsic_test_object_lib(RuntimeTestObjs
         Test_BDASharedBufferContract.cpp
         Test_PointCloudGeometrySync.cpp
         Test_MeshViewLifecycle.cpp
+        Test_GraphGeometrySync.cpp
+        Test_MeshRendererLifecycle.cpp
         Test_PerPassComponents.cpp
         Test_PerFaceAttributes.cpp
         Test_PropertySetDirtySync.cpp

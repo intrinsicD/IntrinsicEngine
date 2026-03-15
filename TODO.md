@@ -93,6 +93,14 @@ Replace entity-only GPU pick with a dual-channel MRT pipeline producing both `En
 - [ ] Update `ApplyFromGpuPick()` to decode primitive meaning by entity kind (mesh → triangle, graph → edge, point cloud → point).
 - [ ] Add local-space nearest-feature refinement using primitive ID (nearest edge/vertex for meshes).
 
+### B4. Lifecycle System Boilerplate Extraction
+
+The three geometry lifecycle systems (`MeshViewLifecycle`, `GraphGeometrySync`, `PointCloudGeometrySync`) implement the same three-phase pattern (detect dirty → upload & allocate GPUScene slot → populate per-pass components) with ~500 lines of structural duplication. Extract the shared Phase 1-2-3 skeleton into a reusable template or base class in `Graphics.LifecycleUtils.hpp`, reducing each system to its type-specific logic (edge extraction, attribute caching, upload mode selection).
+
+### B5. Geometry Upload Failure Event Dispatch
+
+Geometry upload failures in lifecycle systems are currently logged but not communicated to other systems via `entt::dispatcher`. Add a `GeometryUploadFailed` event to `ECS::Events` and fire it from the error paths in all three lifecycle systems, enabling UI notification and selection-state invalidation.
+
 ---
 
 ## 3. Later (P2) — Planned Downstream Work

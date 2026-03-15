@@ -77,90 +77,40 @@ namespace Graphics::Passes
         if (segmentCount == 0)
             return true;
 
+        constexpr uint32_t kMinCap = 256u;
+        constexpr VkBufferUsageFlags kBDA = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
+                                          | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+
         const uint32_t vertexCount = segmentCount * 2; // 2 vec3 per segment
 
         // --- Position buffer (per-frame) ---
-        if (vertexCount > m_TransientPosCapacity)
-        {
-            // Power-of-2 growth.
-            uint32_t newCap = std::max(256u, m_TransientPosCapacity);
-            while (newCap < vertexCount) newCap *= 2;
-
-            const VkDeviceSize size = static_cast<VkDeviceSize>(newCap) * sizeof(glm::vec3);
-            for (uint32_t i = 0; i < FRAMES; ++i)
-            {
-                if (m_TransientPosBuffer[i])
-                    m_Device->SafeDestroy([old = std::move(m_TransientPosBuffer[i])]() {});
-
-                m_TransientPosBuffer[i] = std::make_unique<RHI::VulkanBuffer>(
-                    *m_Device, size,
-                    VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-                    VMA_MEMORY_USAGE_CPU_TO_GPU);
-
-                if (!m_TransientPosBuffer[i]->GetMappedData())
-                {
-                    Core::Log::Error("LinePass: Failed to allocate transient position buffer ({} bytes)", size);
-                    return false;
-                }
-            }
-            m_TransientPosCapacity = newCap;
-        }
+        if (!EnsurePerFrameBuffer<glm::vec3, FRAMES>(
+                *m_Device, m_TransientPosBuffer, m_TransientPosCapacity,
+                vertexCount, kMinCap, "LinePass", kBDA))
+            return false;
 
         // --- Identity edge pair buffer (shared across frames — data is constant) ---
-        if (segmentCount > m_TransientEdgeCapacity)
+        const uint32_t prevEdgeCap = m_TransientEdgeCapacity;
+        if (!EnsureSingleBuffer<EdgePair>(
+                *m_Device, m_TransientEdgeBuffer, m_TransientEdgeCapacity,
+                segmentCount, kMinCap, "LinePass", kBDA))
+            return false;
+
+        // Fill with identity edge pairs when capacity grew: {0,1}, {2,3}, {4,5}, ...
+        if (m_TransientEdgeCapacity != prevEdgeCap)
         {
-            uint32_t newCap = std::max(256u, m_TransientEdgeCapacity);
-            while (newCap < segmentCount) newCap *= 2;
-
-            if (m_TransientEdgeBuffer)
-                m_Device->SafeDestroy([old = std::move(m_TransientEdgeBuffer)]() {});
-
-            const VkDeviceSize size = static_cast<VkDeviceSize>(newCap) * sizeof(EdgePair);
-            m_TransientEdgeBuffer = std::make_unique<RHI::VulkanBuffer>(
-                *m_Device, size,
-                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-                VMA_MEMORY_USAGE_CPU_TO_GPU);
-
-            if (!m_TransientEdgeBuffer->GetMappedData())
-            {
-                Core::Log::Error("LinePass: Failed to allocate transient edge buffer ({} bytes)", size);
-                return false;
-            }
-
-            // Fill with identity edge pairs: {0,1}, {2,3}, {4,5}, ...
-            std::vector<EdgePair> identityEdges(newCap);
-            for (uint32_t i = 0; i < newCap; ++i)
+            std::vector<EdgePair> identityEdges(m_TransientEdgeCapacity);
+            for (uint32_t i = 0; i < m_TransientEdgeCapacity; ++i)
                 identityEdges[i] = { i * 2, i * 2 + 1 };
-            m_TransientEdgeBuffer->Write(identityEdges.data(), newCap * sizeof(EdgePair));
-
-            m_TransientEdgeCapacity = newCap;
+            m_TransientEdgeBuffer->Write(identityEdges.data(),
+                                         m_TransientEdgeCapacity * sizeof(EdgePair));
         }
 
         // --- Per-edge color buffer (per-frame) ---
-        if (segmentCount > m_TransientColorCapacity)
-        {
-            uint32_t newCap = std::max(256u, m_TransientColorCapacity);
-            while (newCap < segmentCount) newCap *= 2;
-
-            const VkDeviceSize size = static_cast<VkDeviceSize>(newCap) * sizeof(uint32_t);
-            for (uint32_t i = 0; i < FRAMES; ++i)
-            {
-                if (m_TransientColorBuffer[i])
-                    m_Device->SafeDestroy([old = std::move(m_TransientColorBuffer[i])]() {});
-
-                m_TransientColorBuffer[i] = std::make_unique<RHI::VulkanBuffer>(
-                    *m_Device, size,
-                    VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-                    VMA_MEMORY_USAGE_CPU_TO_GPU);
-
-                if (!m_TransientColorBuffer[i]->GetMappedData())
-                {
-                    Core::Log::Error("LinePass: Failed to allocate transient color buffer ({} bytes)", size);
-                    return false;
-                }
-            }
-            m_TransientColorCapacity = newCap;
-        }
+        if (!EnsurePerFrameBuffer<uint32_t, FRAMES>(
+                *m_Device, m_TransientColorBuffer, m_TransientColorCapacity,
+                segmentCount, kMinCap, "LinePass", kBDA))
+            return false;
 
         return true;
     }
@@ -397,7 +347,7 @@ namespace Graphics::Passes
                 di.EdgeCount = edgeCount;
                 di.Color = wireColor;
                 // Clamp line width to safe pixel range [0.5, 32.0].
-                di.LineWidth = std::clamp(line.Width, 0.5f, 32.0f);
+                di.LineWidth = ClampLineWidth(line.Width);
                 di.PtrEdgeAttr = edgeAttrAddr;
 
                 if (line.Overlay)
@@ -483,7 +433,7 @@ namespace Graphics::Passes
                             di.PtrEdges = edgeAddr;
                             di.EdgeCount = depthLineCount;
                             di.Color = 0xFFFFFFFFu; // white fallback (unused when PtrEdgeAttr != 0)
-                            di.LineWidth = std::clamp(LineWidth, 0.5f, 32.0f);
+                            di.LineWidth = ClampLineWidth(LineWidth);
                             di.PtrEdgeAttr = colorAddr;
                             depthDraws.push_back(di);
                         }
@@ -507,7 +457,7 @@ namespace Graphics::Passes
                             di.PtrEdges = overlayEdgeAddr;
                             di.EdgeCount = overlayLineCount;
                             di.Color = 0xFFFFFFFFu;
-                            di.LineWidth = std::clamp(LineWidth, 0.5f, 32.0f);
+                            di.LineWidth = ClampLineWidth(LineWidth);
                             di.PtrEdgeAttr = overlayColorAddr;
                             overlayDraws.push_back(di);
                         }

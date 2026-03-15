@@ -323,6 +323,8 @@ class IAssetLoader {
 
 **Upload mode selection:** `StaticGeometry = false` (default) → Direct (host-visible) for dynamic graphs; `true` → Staged (device-local) for static content.
 
+**Naming convention:** Systems that create derived geometry views (edge/vertex views from existing mesh buffers) use the `*Lifecycle` suffix. Systems that upload geometry from an authoritative data source (graph, point cloud) use the `*Sync` suffix. Both implement the same three-phase pattern; the distinction is in their data flow direction. `PropertySetDirtySync` and `GPUSceneSync` are infrastructure systems (not per-geometry-type lifecycle) and correctly use the `Sync` suffix.
+
 **Canonical examples:**
 - `Graphics.Systems.MeshViewLifecycle.cppm` — Creates edge index buffers from collision data, populates `Line::Component` and `Point::Component` via `ReuseVertexBuffersFrom`.
 - `Graphics.Systems.GraphGeometrySync.cppm` — Uploads graph positions/normals/edge pairs, supports Direct/Staged upload mode per-entity.
