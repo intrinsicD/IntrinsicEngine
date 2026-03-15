@@ -19,10 +19,7 @@ export namespace Geometry
     // =========================================================================
     // Computes the pair of closest points between a ray (semi-infinite) and a
     // line segment, returning the squared distance and the parameter/point on
-    // each primitive.
-    //
-    // This function consolidates the picking helper previously duplicated in
-    // Runtime.Selection.cpp (TODO D19).
+    // each primitive.  Used by Runtime.Selection.cpp for graph-edge picking.
 
     struct RaySegmentResult
     {

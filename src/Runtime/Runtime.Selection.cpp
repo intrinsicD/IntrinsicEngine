@@ -109,79 +109,6 @@ namespace Runtime::Selection
             return SquaredLength(point - closest);
         }
 
-        struct RaySegmentClosest
-        {
-            float DistanceSq = std::numeric_limits<float>::infinity();
-            float RayT = 0.0f;
-            float SegmentT = 0.0f;
-            glm::vec3 PointOnRay{0.0f};
-            glm::vec3 PointOnSegment{0.0f};
-        };
-
-        [[nodiscard]] inline RaySegmentClosest ClosestRaySegment(const Geometry::Ray& ray,
-                                                                 const glm::vec3& a,
-                                                                 const glm::vec3& b)
-        {
-            const glm::vec3 d1 = ray.Direction;
-            const glm::vec3 d2 = b - a;
-            const glm::vec3 r = ray.Origin - a;
-
-            const float a11 = glm::dot(d1, d1);
-            const float a12 = glm::dot(d1, d2);
-            const float a22 = glm::dot(d2, d2);
-            const float b1 = glm::dot(d1, r);
-            const float b2 = glm::dot(d2, r);
-            const float det = a11 * a22 - a12 * a12;
-
-            RaySegmentClosest out{};
-
-            if (a22 <= 1.0e-20f)
-            {
-                out.DistanceSq = DistancePointToRaySq(ray, a, &out.RayT, &out.PointOnRay);
-                out.PointOnSegment = a;
-                return out;
-            }
-
-            float s = 0.0f;
-            float t = 0.0f;
-            if (det > 1.0e-20f)
-            {
-                s = glm::clamp((a12 * b2 - a22 * b1) / det, 0.0f, std::numeric_limits<float>::infinity());
-                t = glm::clamp((a11 * b2 - a12 * b1) / det, 0.0f, 1.0f);
-            }
-
-            auto evaluate = [&](float sCandidate, float tCandidate)
-            {
-                const glm::vec3 pRay = ray.Origin + sCandidate * d1;
-                const glm::vec3 pSeg = a + tCandidate * d2;
-                const float distSq = SquaredLength(pRay - pSeg);
-                if (distSq < out.DistanceSq)
-                {
-                    out.DistanceSq = distSq;
-                    out.RayT = sCandidate;
-                    out.SegmentT = tCandidate;
-                    out.PointOnRay = pRay;
-                    out.PointOnSegment = pSeg;
-                }
-            };
-
-            evaluate(s, t);
-
-            float rayPointT = 0.0f;
-            glm::vec3 rayPointClosest{0.0f};
-            evaluate(rayPointT, 0.0f);
-
-            static_cast<void>(DistancePointToRaySq(ray, b, &rayPointT, &rayPointClosest));
-            evaluate(rayPointT, 1.0f);
-
-            float segT = 0.0f;
-            glm::vec3 segClosest{0.0f};
-            static_cast<void>(PointSegmentDistanceSq(ray.Origin, a, b, &segT, &segClosest));
-            evaluate(0.0f, segT);
-
-            return out;
-        }
-
         [[nodiscard]] inline Geometry::AABB PointCloudWorldAABB(
             const ECS::PointCloud::Data& pcd,
             const ECS::Components::Transform::Component& transform,
@@ -706,7 +633,7 @@ namespace Runtime::Selection
                 const glm::vec3 localB = graphData.GraphRef->VertexPosition(v1h);
                 const glm::vec3 worldA = TransformPoint(world, localA);
                 const glm::vec3 worldB = TransformPoint(world, localB);
-                const RaySegmentClosest closest = ClosestRaySegment(request.WorldRay, worldA, worldB);
+                const auto closest = Geometry::ClosestRaySegment(request.WorldRay, worldA, worldB);
                 if (!(closest.RayT >= 0.0f && closest.RayT <= request.MaxDistance))
                     continue;
 

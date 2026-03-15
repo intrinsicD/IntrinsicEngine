@@ -6,8 +6,6 @@ module;
 #include <cstring>
 #include <expected>
 #include <span>
-#include <sstream>
-#include <string>
 #include <string_view>
 #include <unordered_map>
 #include <vector>
@@ -17,6 +15,7 @@ module;
 #include <glm/gtx/norm.hpp>
 #include <glm/gtx/compatibility.hpp>
 #include "Graphics.Importers.VertexDedup.hpp"
+#include "Graphics.Importers.TextParse.hpp"
 
 module Graphics:Importers.STL.Impl;
 import :Importers.STL;
@@ -195,41 +194,42 @@ namespace Graphics
 
         std::expected<GeometryCpuData, AssetError> ParseAscii(std::span<const std::byte> data)
         {
-            std::string_view text(reinterpret_cast<const char*>(data.data()), data.size());
-            std::istringstream stream{std::string{text}};
+            namespace TP = Importers::TextParse;
+
+            const std::string_view text(reinterpret_cast<const char*>(data.data()), data.size());
 
             GeometryCpuData outData;
             outData.Topology = PrimitiveTopology::Triangles;
 
             std::unordered_map<VertexKey, uint32_t, VertexKeyHash> uniqueVerts;
-            std::string line;
-            std::string token;
+            std::vector<std::string_view> tokens;
+            size_t cursor = 0;
+            std::string_view line;
 
-            while (std::getline(stream, line))
+            while (TP::NextLine(text, cursor, line))
             {
-                // Trim leading whitespace
-                auto start = line.find_first_not_of(" \t");
-                if (start == std::string::npos) continue;
-                std::string_view trimmed(line.data() + start, line.size() - start);
+                line = TP::Trim(line);
+                if (!line.starts_with("vertex"))
+                    continue;
 
-                if (trimmed.starts_with("vertex"))
-                {
-                    std::string lineStr{trimmed};
-                    std::stringstream ss{lineStr};
-                    ss >> token; // "vertex"
-                    float x = 0, y = 0, z = 0;
-                    ss >> x >> y >> z;
-                    glm::vec3 pos(x, y, z);
+                TP::SplitWhitespace(line, tokens);
+                // Expected: "vertex" x y z  (4 tokens minimum)
+                if (tokens.size() < 4)
+                    continue;
 
-                    VertexKey key{pos};
-                    auto [it, inserted] = uniqueVerts.try_emplace(
-                        key, static_cast<uint32_t>(outData.Positions.size()));
-                    if (inserted)
-                    {
-                        outData.Positions.push_back(pos);
-                    }
-                    outData.Indices.push_back(it->second);
-                }
+                const auto x = TP::ParseNumber<float>(tokens[1]);
+                const auto y = TP::ParseNumber<float>(tokens[2]);
+                const auto z = TP::ParseNumber<float>(tokens[3]);
+                if (!x || !y || !z)
+                    continue;
+
+                const glm::vec3 pos(*x, *y, *z);
+                VertexKey key{pos};
+                auto [it, inserted] = uniqueVerts.try_emplace(
+                    key, static_cast<uint32_t>(outData.Positions.size()));
+                if (inserted)
+                    outData.Positions.push_back(pos);
+                outData.Indices.push_back(it->second);
             }
 
             if (outData.Positions.empty())
