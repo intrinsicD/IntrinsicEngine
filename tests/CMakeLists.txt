@@ -118,6 +118,11 @@ intrinsic_test_object_lib(GeometryTestObjs
         Test_Raycast.cpp
         Test_Overlap.cpp
         Test_MarchingCubes.cpp
+        Test_GJK.cpp
+        Test_SDF.cpp
+        Test_Containment.cpp
+        Test_Support.cpp
+        Test_ContactManifold.cpp
     DEPS IntrinsicCore IntrinsicGeometry
 )
 

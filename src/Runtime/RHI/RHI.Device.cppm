@@ -11,6 +11,28 @@ export module RHI:Device;
 import :Context;
 import Core.InplaceFunction;
 
+// =============================================================================
+// Device Reference Lifetime Contract
+// =============================================================================
+// RHI classes use two patterns for referencing VulkanDevice:
+//
+//   1. Non-owning reference (VulkanDevice&):
+//      Use when the object's lifetime is strictly shorter than the device's.
+//      This is the common case for per-frame or per-pass objects that are
+//      created after device initialization and destroyed before device teardown.
+//      Examples: TransientAllocator, DescriptorLayout, DescriptorAllocator,
+//      render passes, RHI resource wrappers (Buffer, Image, Shader, etc.).
+//
+//   2. Shared ownership (std::shared_ptr<VulkanDevice>):
+//      Use when the object may outlive the scope that created it, or when
+//      ownership is shared across subsystems with independent lifecycles.
+//      Examples: SimpleRenderer, GraphicsPipeline — these are created by one
+//      subsystem but may be referenced by others across frame boundaries.
+//
+// When adding a new RHI class, prefer VulkanDevice& unless the class genuinely
+// needs to extend the device's lifetime or is owned by multiple subsystems.
+// =============================================================================
+
 namespace RHI
 {
     export class TransientAllocator;
