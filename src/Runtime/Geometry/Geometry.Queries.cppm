@@ -97,4 +97,53 @@ export namespace Geometry
 
         return best;
     }
+
+    // =========================================================================
+    // Point-Segment Closest Point
+    // =========================================================================
+    // Computes the closest point on a finite segment to a query point, returning
+    // the squared distance, segment parameter, and closest point together.
+    // Avoids the multiple-call pattern needed when using ClosestPointParameter +
+    // ClosestPoint + SquaredDistance separately.  Used by Runtime.Selection.cpp
+    // for edge proximity tests during mesh and graph picking.
+
+    struct PointSegmentResult
+    {
+        float DistanceSq = std::numeric_limits<float>::infinity();
+        float SegmentT = 0.0f;       // Parameter on segment [0, 1]
+        glm::vec3 ClosestPoint{0.0f};
+    };
+
+    [[nodiscard]] inline PointSegmentResult ClosestPointSegment(
+        const glm::vec3& point, const glm::vec3& segA, const glm::vec3& segB)
+    {
+        const float t = ClosestPointParameter(Segment{segA, segB}, point);
+        const glm::vec3 closest = segA + t * (segB - segA);
+        const glm::vec3 delta = point - closest;
+        return {glm::dot(delta, delta), t, closest};
+    }
+
+    // =========================================================================
+    // Point-Ray Closest Point
+    // =========================================================================
+    // Computes the closest point on a ray (semi-infinite) to a query point,
+    // returning the squared distance, ray parameter, and closest point together.
+    // Mirrors the interface of ClosestPointSegment for consistency and replaces
+    // ad-hoc local helpers in Runtime.Selection.cpp (point-cloud picking path).
+
+    struct PointRayResult
+    {
+        float DistanceSq = std::numeric_limits<float>::infinity();
+        float RayT = 0.0f;           // Parameter on ray (>= 0)
+        glm::vec3 ClosestPoint{0.0f};
+    };
+
+    [[nodiscard]] inline PointRayResult ClosestPointRay(
+        const glm::vec3& point, const Ray& ray)
+    {
+        const float t = ClosestPointParameter(ray, point);
+        const glm::vec3 closest = ray.GetPoint(t);
+        const glm::vec3 delta = point - closest;
+        return {glm::dot(delta, delta), t, closest};
+    }
 }

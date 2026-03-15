@@ -228,11 +228,9 @@ Identified via full codebase sweep (March 2026). Grouped by priority.
 - [ ] Keep the refactor behavior-preserving and opportunistic when the file is next touched.
 
 
-### D7. Picking Code Path Duplication (P3)
+### D7. Picking Code Path Duplication (P3) — Resolved
 
-`Runtime.SelectionModule.cpp` duplicated the NDC→world-ray construction — the hover path now calls `BuildPickRequest()` directly (details in git history). `Runtime.Selection.cpp` graph-edge picking now uses canonical `Geometry::ClosestRaySegment` instead of a local duplicate (D19, details in git history). Remaining:
-
-- [ ] Reduce duplication between vertex/edge/face picking code paths in `Runtime.Selection.cpp`.
+`Runtime.SelectionModule.cpp` duplicated the NDC→world-ray construction — the hover path now calls `BuildPickRequest()` directly (details in git history). `Runtime.Selection.cpp` graph-edge picking now uses canonical `Geometry::ClosestRaySegment` instead of a local duplicate (D19, details in git history). The duplicated world-space triangle normal computation that appeared in both `PickMeshEntityAuthoritative` and the flat-array fallback path has been extracted into a local `ComputeTriangleNormal` helper, and the local `PointSegmentDistanceSq` and `DistancePointToRaySq` helpers have been removed in favour of `Geometry::ClosestPointSegment` and `Geometry::ClosestPointRay` (details in git history).
 
 ### D10. Geometry Kernel: Neighborhood Centroid — Point Cloud Path (P4)
 
@@ -240,8 +238,6 @@ Identified via full codebase sweep (March 2026). Grouped by priority.
 
 - [ ] Evaluate extracting a standalone `ComputePointCentroid(points, indices)` helper if more point-cloud operators need it.
 
-### D19. Selection.cpp Picking Helpers Overlap with Geometry Module (P4) — Partially Resolved
+### D19. Selection.cpp Picking Helpers Overlap with Geometry Module (P4) — Resolved
 
-`Geometry::Queries` partition provides `ClosestRaySegment()` (canonical ray-segment closest-point computation). `Runtime.Selection.cpp` now uses it directly (local `RaySegmentClosest`/`ClosestRaySegment` duplicate removed). Remaining:
-
-- [ ] Consider adding output-parameter overloads to Geometry module for `SquaredDistance` (returning both the distance and the parameter/closest point).
+`Geometry::Queries` partition now provides `ClosestRaySegment()`, `ClosestPointSegment()`, and `ClosestPointRay()` — all returning rich result structs (`RaySegmentResult`, `PointSegmentResult`, `PointRayResult`) with distance, parameter, and closest-point in a single call. `Runtime.Selection.cpp` no longer contains any local geometry-query helpers; all three picking paths (mesh, point cloud, graph) use the canonical Geometry module functions. `Test_GeometryQueries.cpp` covers all three functions (details in git history).
