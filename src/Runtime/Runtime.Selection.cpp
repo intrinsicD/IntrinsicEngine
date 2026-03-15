@@ -48,6 +48,16 @@ namespace Runtime::Selection
             return glm::dot(v, v);
         }
 
+        // Compute the unit normal of a triangle given three world-space vertices.
+        // Returns zero for degenerate (collinear/coincident) triangles.
+        [[nodiscard]] inline glm::vec3 ComputeTriangleNormal(
+            const glm::vec3& v0, const glm::vec3& v1, const glm::vec3& v2)
+        {
+            glm::vec3 n = glm::cross(v1 - v0, v2 - v0);
+            const float lenSq = SquaredLength(n);
+            return lenSq > 1.0e-20f ? n / std::sqrt(lenSq) : glm::vec3(0.0f);
+        }
+
         // Conservative ray vs OBB broadphase: we approximate by AABB of the OBB in world space.
         [[nodiscard]] inline Geometry::AABB OBBToAABB(const Geometry::OBB& obb)
         {
@@ -78,35 +88,6 @@ namespace Runtime::Selection
             const float worldUnitsPerPixel =
                 (2.0f * clampedDepth * std::tan(0.5f * request.CameraFovYRadians)) / viewportHeight;
             return std::max(request.PickRadiusPixels * worldUnitsPerPixel, 1.0e-5f);
-        }
-
-        [[nodiscard]] inline float PointSegmentDistanceSq(const glm::vec3& p,
-                                                          const glm::vec3& a,
-                                                          const glm::vec3& b,
-                                                          float* outSegmentT = nullptr,
-                                                          glm::vec3* outClosestPoint = nullptr)
-        {
-            const glm::vec3 ab = b - a;
-            const float denom = glm::dot(ab, ab);
-            float t = 0.0f;
-            if (denom > 1.0e-20f)
-                t = glm::clamp(glm::dot(p - a, ab) / denom, 0.0f, 1.0f);
-            const glm::vec3 closest = a + t * ab;
-            if (outSegmentT) *outSegmentT = t;
-            if (outClosestPoint) *outClosestPoint = closest;
-            return SquaredLength(p - closest);
-        }
-
-        [[nodiscard]] inline float DistancePointToRaySq(const Geometry::Ray& ray,
-                                                        const glm::vec3& point,
-                                                        float* outRayT = nullptr,
-                                                        glm::vec3* outClosestPoint = nullptr)
-        {
-            const float t = std::max(glm::dot(point - ray.Origin, ray.Direction), 0.0f);
-            const glm::vec3 closest = ray.Origin + t * ray.Direction;
-            if (outRayT) *outRayT = t;
-            if (outClosestPoint) *outClosestPoint = closest;
-            return SquaredLength(point - closest);
         }
 
         [[nodiscard]] inline Geometry::AABB PointCloudWorldAABB(
@@ -346,19 +327,13 @@ namespace Runtime::Selection
                     const glm::vec3 world0 = TransformPoint(world, mesh.Position(v0));
                     const glm::vec3 world1 = TransformPoint(world, mesh.Position(v1));
                     const glm::vec3 world2 = TransformPoint(world, mesh.Position(v2));
-                    glm::vec3 normal = glm::cross(world1 - world0, world2 - world0);
-                    const float normalLenSq = SquaredLength(normal);
-                    if (normalLenSq > 1.0e-20f)
-                        normal /= std::sqrt(normalLenSq);
-                    else
-                        normal = glm::vec3(0.0f);
 
                     const float pickRadius = ComputeWorldPickRadius(worldT, request);
                     Picked picked = MakeEntityPicked(entity, pickRadius);
                     picked.entity.face_idx = static_cast<uint32_t>(face.Index);
                     picked.spaces.World = worldPoint;
                     picked.spaces.Local = localPoint;
-                    picked.spaces.WorldNormal = normal;
+                    picked.spaces.WorldNormal = ComputeTriangleNormal(world0, world1, world2);
                     picked.spaces.Barycentric = glm::vec3(hit->U, hit->V, 1.0f - hit->U - hit->V);
 
                     float bestEdgeDistSq = std::numeric_limits<float>::infinity();
@@ -368,7 +343,7 @@ namespace Runtime::Selection
                         const auto to = mesh.ToVertex(halfedge);
                         const glm::vec3 edgeA = TransformPoint(world, mesh.Position(from));
                         const glm::vec3 edgeB = TransformPoint(world, mesh.Position(to));
-                        const float distSq = PointSegmentDistanceSq(worldPoint, edgeA, edgeB);
+                        const float distSq = Geometry::ClosestPointSegment(worldPoint, edgeA, edgeB).DistanceSq;
                         if (distSq < bestEdgeDistSq && distSq <= pickRadius * pickRadius)
                         {
                             bestEdgeDistSq = distSq;
@@ -458,19 +433,13 @@ namespace Runtime::Selection
                 const glm::vec3 w0 = TransformPoint(world, positions[i0]);
                 const glm::vec3 w1 = TransformPoint(world, positions[i1]);
                 const glm::vec3 w2 = TransformPoint(world, positions[i2]);
-                glm::vec3 normal = glm::cross(w1 - w0, w2 - w0);
-                const float normalLenSq = SquaredLength(normal);
-                if (normalLenSq > 1.0e-20f)
-                    normal /= std::sqrt(normalLenSq);
-                else
-                    normal = glm::vec3(0.0f);
 
                 const float pickRadius = ComputeWorldPickRadius(worldT, request);
                 Picked picked = MakeEntityPicked(entity, pickRadius);
                 picked.entity.face_idx = static_cast<uint32_t>(i / 3u);
                 picked.spaces.World = worldPoint;
                 picked.spaces.Local = localPoint;
-                picked.spaces.WorldNormal = normal;
+                picked.spaces.WorldNormal = ComputeTriangleNormal(w0, w1, w2);
                 picked.spaces.Barycentric = glm::vec3(hit->U, hit->V, 1.0f - hit->U - hit->V);
 
                 const glm::vec3 triWorld[3] = {w0, w1, w2};
@@ -492,7 +461,7 @@ namespace Runtime::Selection
                 {
                     const glm::vec3 a = triWorld[edgePairs[edgeLocal][0]];
                     const glm::vec3 b = triWorld[edgePairs[edgeLocal][1]];
-                    const float distSq = PointSegmentDistanceSq(worldPoint, a, b);
+                    const float distSq = Geometry::ClosestPointSegment(worldPoint, a, b).DistanceSq;
                     if (distSq < bestEdgeDistSq && distSq <= pickRadius * pickRadius)
                     {
                         bestEdgeDistSq = distSq;
@@ -543,8 +512,9 @@ namespace Runtime::Selection
             {
                 const glm::vec3 localPoint = positions[i];
                 const glm::vec3 worldPoint = TransformPoint(world, localPoint);
-                float rayT = 0.0f;
-                const float distSq = DistancePointToRaySq(request.WorldRay, worldPoint, &rayT);
+                const auto closest = Geometry::ClosestPointRay(worldPoint, request.WorldRay);
+                const float rayT = closest.RayT;
+                const float distSq = closest.DistanceSq;
                 if (!(rayT >= 0.0f && rayT <= request.MaxDistance))
                     continue;
 
@@ -599,8 +569,9 @@ namespace Runtime::Selection
 
                 const glm::vec3 localPoint = graphData.GraphRef->VertexPosition(vh);
                 const glm::vec3 worldPoint = TransformPoint(world, localPoint);
-                float rayT = 0.0f;
-                const float distSq = DistancePointToRaySq(request.WorldRay, worldPoint, &rayT);
+                const auto nodeQuery = Geometry::ClosestPointRay(worldPoint, request.WorldRay);
+                const float rayT = nodeQuery.RayT;
+                const float distSq = nodeQuery.DistanceSq;
                 if (!(rayT >= 0.0f && rayT <= request.MaxDistance))
                     continue;
 
