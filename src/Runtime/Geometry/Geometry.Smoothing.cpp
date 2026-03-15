@@ -252,14 +252,9 @@ namespace Geometry::Smoothing
                 return xNew;
             };
 
-            auto xResult = solveAxis(xOld);
-            std::vector<double> xSolved = xResult;
-
-            auto yResult = solveAxis(yOld);
-            std::vector<double> ySolved = yResult;
-
-            auto zResult = solveAxis(zOld);
-            std::vector<double> zSolved = zResult;
+            std::vector<double> xSolved = solveAxis(xOld);
+            std::vector<double> ySolved = solveAxis(yOld);
+            std::vector<double> zSolved = solveAxis(zOld);
 
             // Write back positions
             for (std::size_t i = 0; i < nV; ++i)
