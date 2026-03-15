@@ -232,14 +232,68 @@ namespace Graphics::Passes
     }
 
     // =====================================================================
+    // UploadTextureViaStaging — one-shot CPU→GPU upload with layout
+    // transitions (UNDEFINED → TRANSFER_DST → SHADER_READ_ONLY).
+    // =====================================================================
+    static void UploadTextureViaStaging(
+        RHI::VulkanDevice& device,
+        RHI::VulkanImage& dstImage,
+        const void* srcData,
+        size_t dataSize,
+        uint32_t width,
+        uint32_t height)
+    {
+        RHI::VulkanBuffer staging(device, dataSize,
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
+
+        std::memcpy(staging.GetMappedData(), srcData, dataSize);
+
+        VkCommandBuffer cmd = RHI::CommandUtils::BeginSingleTimeCommands(device);
+
+        VkImageMemoryBarrier2 barrier{};
+        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+        barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.image = dstImage.GetHandle();
+        barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+        barrier.srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
+        barrier.srcAccessMask = 0;
+        barrier.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+        barrier.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+
+        VkDependencyInfo dep{};
+        dep.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+        dep.imageMemoryBarrierCount = 1;
+        dep.pImageMemoryBarriers = &barrier;
+        vkCmdPipelineBarrier2(cmd, &dep);
+
+        VkBufferImageCopy region{};
+        region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+        region.imageExtent = {width, height, 1};
+        vkCmdCopyBufferToImage(cmd, staging.GetHandle(), dstImage.GetHandle(),
+                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+
+        barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        barrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+        barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+        barrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+        barrier.dstAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
+        vkCmdPipelineBarrier2(cmd, &dep);
+
+        RHI::CommandUtils::EndSingleTimeCommands(device, cmd);
+    }
+
+    // =====================================================================
     // InitializeSMAALookupTextures
     // =====================================================================
     void PostProcessPass::InitializeSMAALookupTextures()
     {
         using namespace Graphics::SMAA;
 
-
-        // Generate area texture data (160x560, RG8).
+        // Area texture (160x560, RG8).
         auto areaData = GenerateAreaTexture();
         m_SMAAAreaTex = std::make_unique<RHI::VulkanImage>(
             *m_Device,
@@ -248,56 +302,12 @@ namespace Graphics::Passes
             VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
             VK_IMAGE_ASPECT_COLOR_BIT);
 
-        // Upload area texture data via staging buffer.
-        {
-            const size_t dataSize = areaData.size();
-            RHI::VulkanBuffer staging(*m_Device, dataSize,
-                VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
+        UploadTextureViaStaging(*m_Device, *m_SMAAAreaTex,
+            areaData.data(), areaData.size(),
+            static_cast<uint32_t>(kAreaTexWidth),
+            static_cast<uint32_t>(kAreaTexHeight));
 
-            std::memcpy(staging.GetMappedData(), areaData.data(), dataSize);
-
-            VkCommandBuffer cmd = RHI::CommandUtils::BeginSingleTimeCommands(*m_Device);
-
-            // Transition to TRANSFER_DST.
-            VkImageMemoryBarrier2 barrier{};
-            barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-            barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-            barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-            barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-            barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-            barrier.image = m_SMAAAreaTex->GetHandle();
-            barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-            barrier.srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
-            barrier.srcAccessMask = 0;
-            barrier.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
-            barrier.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
-
-            VkDependencyInfo dep{};
-            dep.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-            dep.imageMemoryBarrierCount = 1;
-            dep.pImageMemoryBarriers = &barrier;
-            vkCmdPipelineBarrier2(cmd, &dep);
-
-            VkBufferImageCopy region{};
-            region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-            region.imageExtent = {static_cast<uint32_t>(kAreaTexWidth),
-                                  static_cast<uint32_t>(kAreaTexHeight), 1};
-            vkCmdCopyBufferToImage(cmd, staging.GetHandle(), m_SMAAAreaTex->GetHandle(),
-                                   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
-
-            // Transition to SHADER_READ_ONLY.
-            barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-            barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            barrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
-            barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
-            barrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
-            barrier.dstAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
-            vkCmdPipelineBarrier2(cmd, &dep);
-
-            RHI::CommandUtils::EndSingleTimeCommands(*m_Device, cmd);
-        }
-
-        // Generate search texture data (66x33, R8).
+        // Search texture (66x33, R8).
         auto searchData = GenerateSearchTexture();
         m_SMAASearchTex = std::make_unique<RHI::VulkanImage>(
             *m_Device,
@@ -306,52 +316,10 @@ namespace Graphics::Passes
             VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
             VK_IMAGE_ASPECT_COLOR_BIT);
 
-        // Upload search texture data via staging buffer.
-        {
-            const size_t dataSize = searchData.size();
-            RHI::VulkanBuffer staging(*m_Device, dataSize,
-                VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
-
-            std::memcpy(staging.GetMappedData(), searchData.data(), dataSize);
-
-            VkCommandBuffer cmd = RHI::CommandUtils::BeginSingleTimeCommands(*m_Device);
-
-            VkImageMemoryBarrier2 barrier{};
-            barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-            barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-            barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-            barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-            barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-            barrier.image = m_SMAASearchTex->GetHandle();
-            barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-            barrier.srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
-            barrier.srcAccessMask = 0;
-            barrier.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
-            barrier.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
-
-            VkDependencyInfo dep{};
-            dep.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-            dep.imageMemoryBarrierCount = 1;
-            dep.pImageMemoryBarriers = &barrier;
-            vkCmdPipelineBarrier2(cmd, &dep);
-
-            VkBufferImageCopy region{};
-            region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-            region.imageExtent = {static_cast<uint32_t>(kSearchTexWidth),
-                                  static_cast<uint32_t>(kSearchTexHeight), 1};
-            vkCmdCopyBufferToImage(cmd, staging.GetHandle(), m_SMAASearchTex->GetHandle(),
-                                   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
-
-            barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-            barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            barrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
-            barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
-            barrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
-            barrier.dstAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
-            vkCmdPipelineBarrier2(cmd, &dep);
-
-            RHI::CommandUtils::EndSingleTimeCommands(*m_Device, cmd);
-        }
+        UploadTextureViaStaging(*m_Device, *m_SMAASearchTex,
+            searchData.data(), searchData.size(),
+            static_cast<uint32_t>(kSearchTexWidth),
+            static_cast<uint32_t>(kSearchTexHeight));
 
         Core::Log::Info("PostProcess: SMAA lookup textures initialized (Area {}x{}, Search {}x{})",
                         kAreaTexWidth, kAreaTexHeight, kSearchTexWidth, kSearchTexHeight);
@@ -359,6 +327,8 @@ namespace Graphics::Passes
 
     // =====================================================================
     // BuildToneMapPipeline
+    // Descriptor sets: set 0 = m_ToneMapSetLayout (HDR input sampler).
+    // Push constants (fragment, 80B): ToneMapParams (16B) + ColorGrading (64B).
     // =====================================================================
     std::unique_ptr<RHI::GraphicsPipeline> PostProcessPass::BuildToneMapPipeline(VkFormat outputFormat)
     {
@@ -396,6 +366,9 @@ namespace Graphics::Passes
 
     // =====================================================================
     // BuildFXAAPipeline
+    // Descriptor sets: set 0 = m_FXAASetLayout (LDR input sampler).
+    // Push constants (fragment, 20B): InvResolution (vec2) + QualitySubpix,
+    //   QualityEdgeThreshold, QualityEdgeThresholdMin (3× float).
     // =====================================================================
     std::unique_ptr<RHI::GraphicsPipeline> PostProcessPass::BuildFXAAPipeline(VkFormat outputFormat)
     {
@@ -432,6 +405,9 @@ namespace Graphics::Passes
 
     // =====================================================================
     // BuildSMAAEdgePipeline
+    // Descriptor sets: set 0 = m_SMAAEdgeSetLayout (LDR input sampler).
+    // Push constants (fragment, 16B): InvResolution (vec2) + EdgeThreshold
+    //   (float) + pad (float).
     // =====================================================================
     std::unique_ptr<RHI::GraphicsPipeline> PostProcessPass::BuildSMAAEdgePipeline(VkFormat edgeFormat)
     {
@@ -469,6 +445,10 @@ namespace Graphics::Passes
 
     // =====================================================================
     // BuildSMAABlendPipeline
+    // Descriptor sets: set 0 = m_SMAABlendSetLayout (edge tex + area tex +
+    //   search tex samplers).
+    // Push constants (fragment, 16B): InvResolution (vec2) + MaxSearchSteps
+    //   (int) + MaxSearchStepsDiag (int).
     // =====================================================================
     std::unique_ptr<RHI::GraphicsPipeline> PostProcessPass::BuildSMAABlendPipeline(VkFormat weightFormat)
     {
@@ -506,6 +486,9 @@ namespace Graphics::Passes
 
     // =====================================================================
     // BuildSMAAResolvePipeline
+    // Descriptor sets: set 0 = m_SMAAResolveSetLayout (blend weight tex +
+    //   original LDR input samplers).
+    // Push constants (fragment, 16B): InvResolution (vec2) + 2× pad (float).
     // =====================================================================
     std::unique_ptr<RHI::GraphicsPipeline> PostProcessPass::BuildSMAAResolvePipeline(VkFormat outputFormat)
     {
@@ -543,6 +526,10 @@ namespace Graphics::Passes
 
     // =====================================================================
     // BuildBloomDownsamplePipeline
+    // Descriptor sets: set 0 = m_BloomDownSetLayout (source mip sampler).
+    // Push constants (fragment, 16B): InvSrcResolution (vec2) + Threshold
+    //   (float) + IsFirstMip (int).
+    // Output: R16G16B16A16_SFLOAT.
     // =====================================================================
     std::unique_ptr<RHI::GraphicsPipeline> PostProcessPass::BuildBloomDownsamplePipeline()
     {
@@ -580,6 +567,11 @@ namespace Graphics::Passes
 
     // =====================================================================
     // BuildBloomUpsamplePipeline
+    // Descriptor sets: set 0 = m_BloomUpSetLayout (coarser mip + current mip
+    //   samplers).
+    // Push constants (fragment, 16B): InvCoarserResolution (vec2) +
+    //   FilterRadius (float) + pad (float).
+    // Output: R16G16B16A16_SFLOAT.
     // =====================================================================
     std::unique_ptr<RHI::GraphicsPipeline> PostProcessPass::BuildBloomUpsamplePipeline()
     {
@@ -807,6 +799,10 @@ namespace Graphics::Passes
 
     // =====================================================================
     // BuildHistogramPipeline
+    // Descriptor sets: set 0 = m_HistogramSetLayout (HDR input image +
+    //   histogram SSBO).
+    // Push constants (compute, 16B): InvWidth (float), InvHeight (float),
+    //   MinLogLum (float), RangeLogLum (float).
     // =====================================================================
     std::unique_ptr<RHI::ComputePipeline> PostProcessPass::BuildHistogramPipeline()
     {
@@ -817,9 +813,7 @@ namespace Graphics::Passes
             return nullptr;
         }
 
-        std::string compPath = Core::Filesystem::ResolveShaderPathOrExit(
-            [&](Core::Hash::StringID id) { return m_ShaderRegistry->Get(id); },
-            "Post.Histogram.Comp"_id);
+        std::string compPath = *compPathOpt;
 
         RHI::ShaderModule comp(*m_Device, compPath, RHI::ShaderStage::Compute);
 
