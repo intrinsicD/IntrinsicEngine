@@ -39,10 +39,6 @@ This document tracks the **active rendering-architecture backlog** for Intrinsic
 
 These are not required to finish the first wave, but they should begin soon after P0 is stable.
 
-### B0. RenderGraph Raster Packet Merging
-
-Extend `RenderGraph::Packetize()` to merge consecutive raster passes that target the exact same color+depth attachments into a single execution packet (shared `vkCmdBeginRendering` scope). Currently only non-raster (compute/copy) passes are eligible for merging. Requires attachment equality checking and shared `VkRenderingInfo` construction for multi-pass raster packets.
-
 ### B1. Deferred Lighting Path
 
 - [ ] Add a proper deferred lighting composition path.
