@@ -63,39 +63,8 @@ namespace Graphics::Passes
         const uint32_t* colorData,
         uint32_t pointCount)
     {
-        auto it = m_PointAuxBuffers.find(entityKey);
-
-        // Buffer exists and count matches — update data in-place.
-        if (it != m_PointAuxBuffers.end() && it->second.PointCount == pointCount && it->second.Buffer)
-        {
-            it->second.Buffer->Write(colorData, static_cast<size_t>(pointCount) * sizeof(uint32_t));
-            return it->second.Buffer->GetDeviceAddress();
-        }
-
-        // Need to create or recreate (count changed).
-        if (it != m_PointAuxBuffers.end() && it->second.Buffer)
-        {
-            m_Device->SafeDestroy([old = std::move(it->second.Buffer)]() {});
-            it->second.PointCount = 0;
-        }
-
-        const VkDeviceSize size = static_cast<VkDeviceSize>(pointCount) * sizeof(uint32_t);
-        auto buf = std::make_unique<RHI::VulkanBuffer>(
-            *m_Device, size,
-            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-            VMA_MEMORY_USAGE_CPU_TO_GPU);
-
-        if (!buf->GetMappedData())
-        {
-            Core::Log::Error("PointPass: Failed to allocate point aux buffer ({} bytes)", size);
-            return 0;
-        }
-
-        buf->Write(colorData, static_cast<size_t>(size));
-        const uint64_t addr = buf->GetDeviceAddress();
-
-        m_PointAuxBuffers[entityKey] = { std::move(buf), pointCount };
-        return addr;
+        return EnsurePerEntityBuffer<uint32_t>(
+            *m_Device, m_PointAuxBuffers, entityKey, colorData, pointCount, "PointPass");
     }
 
     // =========================================================================
@@ -107,39 +76,8 @@ namespace Graphics::Passes
         const float* radiiData,
         uint32_t pointCount)
     {
-        auto it = m_PointRadiiBuffers.find(entityKey);
-
-        // Buffer exists and count matches — update data in-place.
-        if (it != m_PointRadiiBuffers.end() && it->second.PointCount == pointCount && it->second.Buffer)
-        {
-            it->second.Buffer->Write(radiiData, static_cast<size_t>(pointCount) * sizeof(float));
-            return it->second.Buffer->GetDeviceAddress();
-        }
-
-        // Need to create or recreate (count changed).
-        if (it != m_PointRadiiBuffers.end() && it->second.Buffer)
-        {
-            m_Device->SafeDestroy([old = std::move(it->second.Buffer)]() {});
-            it->second.PointCount = 0;
-        }
-
-        const VkDeviceSize size = static_cast<VkDeviceSize>(pointCount) * sizeof(float);
-        auto buf = std::make_unique<RHI::VulkanBuffer>(
-            *m_Device, size,
-            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-            VMA_MEMORY_USAGE_CPU_TO_GPU);
-
-        if (!buf->GetMappedData())
-        {
-            Core::Log::Error("PointPass: Failed to allocate point radii buffer ({} bytes)", size);
-            return 0;
-        }
-
-        buf->Write(radiiData, static_cast<size_t>(size));
-        const uint64_t addr = buf->GetDeviceAddress();
-
-        m_PointRadiiBuffers[entityKey] = { std::move(buf), pointCount };
-        return addr;
+        return EnsurePerEntityBuffer<float>(
+            *m_Device, m_PointRadiiBuffers, entityKey, radiiData, pointCount, "PointPass");
     }
 
     // =========================================================================

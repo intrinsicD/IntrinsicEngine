@@ -42,7 +42,6 @@ This document tracks the **active rendering-architecture backlog** for Intrinsic
 ### Core & RHI Code Quality (Audit Findings)
 
 - [ ] Extract RHI SafeDestroy helper — 9 files repeat identical move-capture + lambda pattern for deferred Vulkan resource destruction (`RHI.Buffer.cpp`, `RHI.Shader.cpp`, `RHI.Image.cpp`, `RHI.Texture.cpp`, `RHI.Pipeline.cpp`, etc.). Create a template or macro in `RHI.DestructionUtils`.
-- [ ] Standardize frame counter naming — `GlobalFrameNumber` (Device), `CurrentFrame` (Telemetry), `frameEpoch` (CommandContext), `currentFrameNumber` (ResourcePool) all refer to the same monotonic counter. Pick one name and unify.
 - [ ] Document device reference lifetime contract — RHI classes inconsistently use `VulkanDevice&` (non-owning) vs `shared_ptr<VulkanDevice>` (shared ownership). Add a comment convention explaining when each is appropriate.
 - [ ] Document Core.Memory `fprintf` vs `Core::Log` error reporting trade-off — Core uses `fprintf(stderr, ...)` to avoid circular dependency with Logging; Runtime modules use `Core::Log`. Add a rationale comment in `Core.Memory.cpp`.
 
@@ -276,13 +275,6 @@ PLY, PCD, and OFF importers now use `Detail::NormalizeColorChannelToUnitRange()`
 
 - [ ] Extract shared `Importers::ParseColor()` helper unifying [0,255]→[0,1] and [0,1]→[0,1] range handling across remaining importers (XYZ, PCD).
 
-### D15. Render Pass: Generic EnsureAttrBuffer Template (P3)
-
-Five nearly-identical `Ensure*Buffer()` functions exist across passes (LinePass, PointPass, SurfacePass), each following the same map-lookup → SafeDestroy → allocate → write → return BDA pattern. Consolidating into a single generic template in `PassUtils.hpp` would eliminate ~150 lines of duplicated buffer management logic.
-
-- [ ] Extract a generic `EnsurePerEntityBuffer<T>()` template into `PassUtils.hpp`.
-- [ ] Migrate `EnsureEdgeAuxBuffer`, `EnsurePointAuxBuffer`, `EnsurePointRadiiBuffer`, `EnsureFaceAttrBuffer`, `EnsureVertexAttrBuffer` to use the shared template.
-
 ### D16. Render Pass: Naming Inconsistency — Aux vs Attr (P4)
 
 Per-entity attribute buffer entry structs use inconsistent naming across passes: `FaceAttrEntry` / `VertexAttrEntry` (SurfacePass) vs `RetainedEdgeAuxEntry` / `RetainedPointAuxEntry` (LinePass / PointPass). Standardize to one convention. Note: `PtrAux` and `PtrEdgeAux` are also used in push constants and shaders, so renaming requires coordinated shader updates.
@@ -290,9 +282,20 @@ Per-entity attribute buffer entry structs use inconsistent naming across passes:
 - [ ] Pick one naming convention (`*AuxEntry` or `*AttrEntry`) and unify across all passes.
 - [ ] Update corresponding push constant field names and shader `PtrAux`/`PtrEdgeAux` references.
 
-### D17. Frame Counter Naming Inconsistency (P3)
+### D18. Missing Geometry Test Coverage (P3)
 
-Three naming conventions for the same monotonic frame counter across the codebase: `GetGlobalFrameNumber()` (Device), `frameEpoch` (CommandContext locals), `currentFrameNumber` (ResourcePool parameters), `globalFrame` / `currentGlobalFrame` (RenderSystem/RenderGraph locals). Within `RenderGraph.cpp` both `globalFrame` and `frameEpoch` are used.
+Several geometry modules lack dedicated test files. Remaining gaps:
 
-- [ ] Pick a canonical local variable name (suggest `globalFrame`) and standardize across RHI, RenderGraph, and lifecycle system locals.
-- [ ] Keep method name `GetGlobalFrameNumber()` and parameter name `globalFrameNumber` for public API consistency.
+- [ ] `Geometry.GJK` — no dedicated tests (tested indirectly via Overlap fallback).
+- [ ] `Geometry.SDF` / `Geometry.SDFContact` — no dedicated tests.
+- [ ] `Geometry.Containment` — no dedicated tests.
+- [ ] `Geometry.Support` — no dedicated tests.
+- [ ] `Geometry.ContactManifold` — no dedicated tests.
+
+### D19. Selection.cpp Picking Helpers Overlap with Geometry Module (P4)
+
+`Runtime.Selection.cpp` contains `PointSegmentDistanceSq`, `DistancePointToRaySq`, and `ClosestRaySegment` in an anonymous namespace. The first two are near-duplicates of `Geometry::SquaredDistance(Segment, point)` and `Geometry::SquaredDistance(Ray, point)` from `Geometry.Segment.cppm` / `Geometry.Ray.cppm`, but the Selection versions use `float` output parameters for `t` and closest-point that the Geometry versions don't expose.
+
+- [ ] Add a `ClosestRaySegment()` function to `Geometry.Ray.cppm` (returns struct with DistanceSq, RayT, SegmentT, closest points).
+- [ ] Refactor Selection.cpp to use existing `Geometry::ClosestPointParameter` + `Geometry::ClosestPoint` where possible.
+- [ ] Consider adding output-parameter overloads to Geometry module for `SquaredDistance` (returning both the distance and the parameter/closest point).

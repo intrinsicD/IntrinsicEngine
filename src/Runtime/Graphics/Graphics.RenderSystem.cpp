@@ -857,7 +857,7 @@ namespace Graphics
         if (!m_Device)
             return;
 
-        const uint64_t currentGlobalFrame = m_Device->GetGlobalFrameNumber();
+        const uint64_t globalFrame = m_Device->GetGlobalFrameNumber();
         const uint32_t framesInFlight = m_Renderer.GetFramesInFlight();
 
         if (m_RetiredPipelines.empty())
@@ -868,7 +868,7 @@ namespace Graphics
                                  {
                                      if (!p.Pipeline)
                                          return true;
-                                     if (currentGlobalFrame < p.RetireFrame + framesInFlight)
+                                     if (globalFrame < p.RetireFrame + framesInFlight)
                                          return false;
                                      p.Pipeline->Shutdown();
                                      return true;

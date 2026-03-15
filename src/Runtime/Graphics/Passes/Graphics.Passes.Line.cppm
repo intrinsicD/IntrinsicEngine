@@ -91,14 +91,14 @@ export namespace Graphics::Passes
         std::unique_ptr<RHI::GraphicsPipeline> m_OverlayPipeline; // depth test disabled
 
         // Per-entity persistent edge attribute buffer (packed ABGR per edge).
-        struct RetainedEdgeAuxEntry
+        struct RetainedBufferEntry
         {
             std::unique_ptr<RHI::VulkanBuffer> Buffer;
-            uint32_t EdgeCount = 0;
+            uint32_t Count = 0;
         };
 
-        // Entity ID → persistent edge attribute buffer.
-        std::unordered_map<uint32_t, RetainedEdgeAuxEntry> m_EdgeAuxBuffers;
+        // Entity ID -> persistent edge attribute buffer.
+        std::unordered_map<uint32_t, RetainedBufferEntry> m_EdgeAuxBuffers;
 
         // --- Transient DebugDraw buffers (per-frame, host-visible, BDA) ---
         static constexpr uint32_t FRAMES = RHI::VulkanDevice::GetFramesInFlight();

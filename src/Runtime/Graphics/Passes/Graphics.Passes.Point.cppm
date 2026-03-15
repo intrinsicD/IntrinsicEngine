@@ -84,21 +84,18 @@ export namespace Graphics::Passes
         static constexpr uint32_t kModeCount = 4;
         std::unique_ptr<RHI::GraphicsPipeline> m_Pipelines[kModeCount];
 
-        // Per-entity persistent per-point color attribute buffer (packed ABGR).
-        struct RetainedPointAuxEntry
+        // Per-entity persistent per-point attribute buffer.
+        struct RetainedBufferEntry
         {
             std::unique_ptr<RHI::VulkanBuffer> Buffer;
-            uint32_t PointCount = 0;
+            uint32_t Count = 0;
         };
-        std::unordered_map<uint32_t, RetainedPointAuxEntry> m_PointAuxBuffers;
+
+        // Per-entity persistent per-point color attribute buffer (packed ABGR).
+        std::unordered_map<uint32_t, RetainedBufferEntry> m_PointAuxBuffers;
 
         // Per-entity persistent per-point radii buffer (float per point).
-        struct RetainedPointRadiiEntry
-        {
-            std::unique_ptr<RHI::VulkanBuffer> Buffer;
-            uint32_t PointCount = 0;
-        };
-        std::unordered_map<uint32_t, RetainedPointRadiiEntry> m_PointRadiiBuffers;
+        std::unordered_map<uint32_t, RetainedBufferEntry> m_PointRadiiBuffers;
 
         // --- Transient DebugDraw buffers (per-frame, host-visible, BDA) ---
         static constexpr uint32_t FRAMES = RHI::VulkanDevice::GetFramesInFlight();

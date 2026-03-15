@@ -2,6 +2,10 @@ module;
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 #include <array>
@@ -9,6 +13,7 @@ module;
 #include <glm/glm.hpp>
 
 #include "RHI.Vulkan.hpp"
+#include "Graphics.PassUtils.hpp"
 
 // Optional: enable extremely verbose per-entity material/texture tracing.
 // #define INTRINSIC_SURFACEPASS_TRACE_TEXTURES
@@ -962,39 +967,8 @@ namespace Graphics::Passes
         const uint32_t* colorData,
         uint32_t faceCount)
     {
-        auto it = m_FaceAttrBuffers.find(geoIndex);
-
-        // Buffer exists and face count matches — update data in-place.
-        if (it != m_FaceAttrBuffers.end() && it->second.FaceCount == faceCount && it->second.Buffer)
-        {
-            it->second.Buffer->Write(colorData, static_cast<size_t>(faceCount) * sizeof(uint32_t));
-            return it->second.Buffer->GetDeviceAddress();
-        }
-
-        // Need to create or recreate (count changed).
-        if (it != m_FaceAttrBuffers.end() && it->second.Buffer)
-        {
-            m_Device->SafeDestroy([old = std::move(it->second.Buffer)]() {});
-            it->second.FaceCount = 0;
-        }
-
-        const VkDeviceSize size = static_cast<VkDeviceSize>(faceCount) * sizeof(uint32_t);
-        auto buf = std::make_unique<RHI::VulkanBuffer>(
-            *m_Device, size,
-            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-            VMA_MEMORY_USAGE_CPU_TO_GPU);
-
-        if (!buf->GetMappedData())
-        {
-            Core::Log::Error("SurfacePass: Failed to allocate face attribute buffer ({} bytes)", size);
-            return 0;
-        }
-
-        buf->Write(colorData, static_cast<size_t>(size));
-        const uint64_t addr = buf->GetDeviceAddress();
-
-        m_FaceAttrBuffers[geoIndex] = { std::move(buf), faceCount };
-        return addr;
+        return EnsurePerEntityBuffer<uint32_t>(
+            *m_Device, m_FaceAttrBuffers, geoIndex, colorData, faceCount, "SurfacePass");
     }
 
     // =========================================================================
@@ -1008,39 +982,8 @@ namespace Graphics::Passes
         const uint32_t* colorData,
         uint32_t vertexCount)
     {
-        auto it = m_VertexAttrBuffers.find(geoIndex);
-
-        // Buffer exists and vertex count matches — update data in-place.
-        if (it != m_VertexAttrBuffers.end() && it->second.VertexCount == vertexCount && it->second.Buffer)
-        {
-            it->second.Buffer->Write(colorData, static_cast<size_t>(vertexCount) * sizeof(uint32_t));
-            return it->second.Buffer->GetDeviceAddress();
-        }
-
-        // Need to create or recreate (count changed).
-        if (it != m_VertexAttrBuffers.end() && it->second.Buffer)
-        {
-            m_Device->SafeDestroy([old = std::move(it->second.Buffer)]() {});
-            it->second.VertexCount = 0;
-        }
-
-        const VkDeviceSize size = static_cast<VkDeviceSize>(vertexCount) * sizeof(uint32_t);
-        auto buf = std::make_unique<RHI::VulkanBuffer>(
-            *m_Device, size,
-            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-            VMA_MEMORY_USAGE_CPU_TO_GPU);
-
-        if (!buf->GetMappedData())
-        {
-            Core::Log::Error("SurfacePass: Failed to allocate vertex attribute buffer ({} bytes)", size);
-            return 0;
-        }
-
-        buf->Write(colorData, static_cast<size_t>(size));
-        const uint64_t addr = buf->GetDeviceAddress();
-
-        m_VertexAttrBuffers[geoIndex] = { std::move(buf), vertexCount };
-        return addr;
+        return EnsurePerEntityBuffer<uint32_t>(
+            *m_Device, m_VertexAttrBuffers, geoIndex, colorData, vertexCount, "SurfacePass");
     }
 
     // -----------------------------------------------------------------
