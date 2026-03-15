@@ -156,17 +156,9 @@ namespace Graphics::Systems::PointCloudGeometrySync
             // Phase 2: Allocate GPUScene slot for entities with valid GPU geometry.
             // Allocate once, then GPUSceneSync handles subsequent transform-only updates.
             // -----------------------------------------------------------------
-            if (pcData.GpuSlot == ECS::kInvalidGpuSlot && pcData.GpuGeometry.IsValid())
-            {
-                GeometryGpuData* geo = geometryStorage.GetIfValid(pcData.GpuGeometry);
-                if (geo && geo->GetVertexBuffer())
-                {
-                    const uint32_t slot = AllocateGpuSlot(
-                        registry, entity, gpuScene, *geo, pcData.GpuGeometry);
-                    if (slot != ECS::kInvalidGpuSlot)
-                        pcData.GpuSlot = slot;
-                }
-            }
+            pcData.GpuSlot = TryAllocateGpuSlot(
+                registry, entity, gpuScene, geometryStorage,
+                pcData.GpuSlot, pcData.GpuGeometry);
 
             // -----------------------------------------------------------------
             // Phase 3: Populate Point::Component from PointCloud::Data.
@@ -188,8 +180,7 @@ namespace Graphics::Systems::PointCloudGeometrySync
             else if (!pcData.Visible)
             {
                 // Remove per-pass component so hidden clouds stop rendering.
-                if (registry.all_of<ECS::Point::Component>(entity))
-                    registry.remove<ECS::Point::Component>(entity);
+                RemovePassComponentIfPresent<ECS::Point::Component>(registry, entity);
             }
         }
     }

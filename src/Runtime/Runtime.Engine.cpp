@@ -24,7 +24,6 @@ import Core.Telemetry;
 import Core.Benchmark;
 import Core.FrameGraph;
 import Core.Hash;
-import Core.Profiling;
 import Core.FeatureRegistry;
 import Core.IOBackend;
 import RHI;

@@ -1,40 +1,14 @@
-module;
-#include <source_location>
-#include <chrono>
+// Core.Profiling — Re-exports Core.Telemetry profiling primitives.
+//
+// The canonical profiling types (ScopedTimer, TelemetrySystem, PROFILE_SCOPE
+// macros) live in Core.Telemetry. This module exists as a convenience alias
+// so consumers can `import Core.Profiling;` without depending on the full
+// Telemetry interface.
+//
+// Historical note: this module previously defined its own ScopedTimer that
+// duplicated Core.Telemetry::ScopedTimer. Consolidated to a single
+// implementation to avoid redundancy.
 
 export module Core.Profiling;
 
-import Core.Hash;
-import Core.Telemetry;
-
-export namespace Core::Profiling
-{
-    // FNV-1a hash — delegates to Core::Hash::HashString.
-    using Core::Hash::HashString;
-
-    struct ScopedTimer
-    {
-        const char* Name;
-        uint32_t NameHash;
-        std::source_location Loc;
-        std::chrono::high_resolution_clock::time_point Start;
-
-        ScopedTimer(const char* name, std::source_location loc = std::source_location::current())
-            : Name(name),
-              NameHash(HashString(name)),
-              Loc(loc),
-              Start(std::chrono::high_resolution_clock::now())
-        {
-        }
-
-        ~ScopedTimer()
-        {
-            auto end = std::chrono::high_resolution_clock::now();
-            auto durationNs = std::chrono::duration_cast<std::chrono::nanoseconds>(end - Start).count();
-            // Submit to Telemetry System (no console output)
-            Telemetry::TelemetrySystem::Get().RecordSample(NameHash, Name, durationNs);
-        }
-    };
-}
-
-
+export import Core.Telemetry;

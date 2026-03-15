@@ -95,15 +95,19 @@ Replace entity-only GPU pick with a dual-channel MRT pipeline producing both `En
 
 ### B4. Lifecycle System Boilerplate Extraction
 
-The three geometry lifecycle systems (`MeshViewLifecycle`, `GraphGeometrySync`, `PointCloudGeometrySync`) implement the same three-phase pattern (detect dirty → upload & allocate GPUScene slot → populate per-pass components) with structural duplication. Extract the shared Phase 1-2-3 skeleton into a reusable template or base class in `Graphics.LifecycleUtils.hpp`, reducing each system to its type-specific logic (edge extraction, attribute caching, upload mode selection). The `AllocateGpuSlot()` and `ComputeLocalBoundingSphere()` helpers are already shared; remaining duplications include the dirty-check → upload → component-populate sequencing and frustum cull integration.
+The three geometry lifecycle systems (`MeshViewLifecycle`, `GraphGeometrySync`, `PointCloudGeometrySync`) implement the same three-phase pattern (detect dirty → upload & allocate GPUScene slot → populate per-pass components) with structural duplication. `LifecycleUtils.hpp` now provides `AllocateGpuSlot()`, `ComputeLocalBoundingSphere()`, `TryAllocateGpuSlot()` (Phase 2), and `RemovePassComponentIfPresent()` (Phase 3 visibility toggle). Remaining: extract the full Phase 1-2-3 skeleton into a reusable template or base class, reducing each system to its type-specific logic (edge extraction, attribute caching, upload mode selection).
 
 ### B5. Geometry Upload Failure Event Dispatch
 
 Geometry upload failures in lifecycle systems are currently logged but not communicated to other systems via `entt::dispatcher`. Add a `GeometryUploadFailed` event to `ECS::Events` and fire it from the error paths in all three lifecycle systems, enabling UI notification and selection-state invalidation.
 
-### B6. Core.Profiling Test Coverage
+### B6. Per-Format Importer Test Coverage
 
-`Core.Profiling.cppm` (`ScopedTimer`, telemetry sample recording) has no dedicated test file. Add contract tests in `IntrinsicCoreTests` for scope entry/exit, nested timers, and telemetry integration.
+Individual importers (OBJ, PLY, STL, OFF, XYZ, PCD, TGF, GLTF) lack dedicated per-format unit tests. `Test_Importers.cpp` covers OBJ, OFF, XYZ, TGF, and STL with synthetic byte data; extend to PLY, PCD, and GLTF for complete coverage.
+
+### B7. Render Pass Contract Tests
+
+`SurfacePass`, `LinePass`, and `PointPass` have no isolated unit tests. Integration coverage exists via `Test_CompositionAndValidation.cpp` and `Test_PerPassComponents.cpp`, but per-pass contract tests (pipeline creation, frustum culling, BDA push constant layout) would catch regressions earlier.
 
 ---
 
