@@ -28,6 +28,9 @@ module;
 // #define INTRINSIC_MODELLOADER_VERBOSE 1
 
 module Graphics:ModelLoader.Impl;
+
+#include "Importers/Graphics.Importers.AttributeVertexKey.hpp"
+
 import :ModelLoader;
 import :AssetErrors;
 import :Model;
@@ -74,19 +77,8 @@ namespace Graphics
             static_cast<void>(collision.LocalVertexKdTree.BuildFromPoints(collision.LocalVertexLookupPoints));
     }
 
-    struct VertexKey
-    {
-        int p = -1, n = -1, t = -1;
-        bool operator==(const VertexKey& other) const { return p == other.p && n == other.n && t == other.t; }
-    };
-
-    struct VertexKeyHash
-    {
-        size_t operator()(const VertexKey& k) const
-        {
-            return std::hash<int>()(k.p) ^ (std::hash<int>()(k.n) << 1) ^ (std::hash<int>()(k.t) << 2);
-        }
-    };
+    using VertexKey = Importers::AttributeVertexKey;
+    using VertexKeyHash = Importers::AttributeVertexKeyHash;
 
     // NOTE: Legacy OBJ helpers (ParseFloat/Split) were removed.
     // The engine now routes parsing through IORegistry importer modules.
