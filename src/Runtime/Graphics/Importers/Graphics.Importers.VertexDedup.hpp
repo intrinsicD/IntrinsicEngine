@@ -14,6 +14,19 @@
 
 namespace Graphics::Importers
 {
+    namespace Detail
+    {
+        // Quantization factor: ~10 micron grid cells for unit-scale models.
+        // Shared by SpatialVertexKey equality and SpatialVertexKeyHash so the
+        // tolerance is defined in exactly one place.
+        inline constexpr float kVertexQuantizationFactor = 1e5f;
+
+        [[nodiscard]] inline int32_t QuantizeCoordinate(float v) noexcept
+        {
+            return static_cast<int32_t>(v * kVertexQuantizationFactor);
+        }
+    } // namespace Detail
+
     // Spatial vertex key: positions are quantized to a fixed grid for
     // fuzzy-equality comparison. Two vertices are "equal" if they fall into
     // the same quantized cell.
@@ -23,10 +36,9 @@ namespace Graphics::Importers
 
         bool operator==(const SpatialVertexKey& other) const
         {
-            auto qi = [](float v) { return static_cast<int32_t>(v * 1e5f); };
-            return qi(Position.x) == qi(other.Position.x)
-                && qi(Position.y) == qi(other.Position.y)
-                && qi(Position.z) == qi(other.Position.z);
+            return Detail::QuantizeCoordinate(Position.x) == Detail::QuantizeCoordinate(other.Position.x)
+                && Detail::QuantizeCoordinate(Position.y) == Detail::QuantizeCoordinate(other.Position.y)
+                && Detail::QuantizeCoordinate(Position.z) == Detail::QuantizeCoordinate(other.Position.z);
         }
     };
 
@@ -34,10 +46,9 @@ namespace Graphics::Importers
     {
         std::size_t operator()(const SpatialVertexKey& k) const
         {
-            auto qi = [](float v) { return static_cast<int32_t>(v * 1e5f); };
-            std::size_t h = std::hash<int32_t>()(qi(k.Position.x));
-            h ^= std::hash<int32_t>()(qi(k.Position.y)) * 2654435761u;
-            h ^= std::hash<int32_t>()(qi(k.Position.z)) * 40503u;
+            std::size_t h = std::hash<int32_t>()(Detail::QuantizeCoordinate(k.Position.x));
+            h ^= std::hash<int32_t>()(Detail::QuantizeCoordinate(k.Position.y)) * 2654435761u;
+            h ^= std::hash<int32_t>()(Detail::QuantizeCoordinate(k.Position.z)) * 40503u;
             return h;
         }
     };

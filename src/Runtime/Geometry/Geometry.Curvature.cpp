@@ -23,6 +23,7 @@ namespace Geometry::Curvature
     using MeshUtils::AngleAtVertex;
     using MeshUtils::ComputeMixedVoronoiAreas;
     using MeshUtils::ComputeCotanLaplacian;
+    using MeshUtils::VertexNormal;
 
     // =========================================================================
     // ComputeMeanCurvature
@@ -65,22 +66,9 @@ namespace Geometry::Curvature
                 glm::dvec3 laplaceB = laplacian[i] / areas[i];
                 result.Property[vh] = glm::length(laplaceB) / 2.0;
 
-                // Sign convention: estimate vertex normal and check orientation
-                // Positive H = surface curves toward normal (locally convex)
-                glm::dvec3 normal(0.0);
-                for (const HalfedgeHandle h : mesh.HalfedgesAroundVertex(vh))
-                {
-                    if (mesh.IsBoundary(h))
-                    {
-                        continue;
-                    }
-
-                    const VertexHandle v1 = mesh.ToVertex(h);
-                    const VertexHandle v2 = mesh.ToVertex(mesh.NextHalfedge(h));
-                    const glm::dvec3 e1 = glm::dvec3(mesh.Position(v1)) - glm::dvec3(mesh.Position(vh));
-                    const glm::dvec3 e2 = glm::dvec3(mesh.Position(v2)) - glm::dvec3(mesh.Position(vh));
-                    normal += glm::cross(e1, e2);
-                }
+                // Sign convention: check orientation against the area-weighted vertex
+                // normal. Positive H = surface curves toward normal (locally convex).
+                const glm::dvec3 normal = glm::dvec3(VertexNormal(mesh, vh));
 
                 if (glm::dot(normal, laplaceB) < 0.0)
                     result.Property[vh] = -result.Property[vh];
@@ -216,21 +204,9 @@ namespace Geometry::Curvature
             glm::dvec3 laplaceB = laplacian[i] / areas[i];
             double H = glm::length(laplaceB) / 2.0;
 
-            // Sign of mean curvature
-            glm::dvec3 normal(0.0);
-            for (const HalfedgeHandle h : mesh.HalfedgesAroundVertex(vh))
-            {
-                if (mesh.IsBoundary(h))
-                {
-                    continue;
-                }
-
-                const VertexHandle v1 = mesh.ToVertex(h);
-                const VertexHandle v2 = mesh.ToVertex(mesh.NextHalfedge(h));
-                const glm::dvec3 e1 = glm::dvec3(mesh.Position(v1)) - glm::dvec3(mesh.Position(vh));
-                const glm::dvec3 e2 = glm::dvec3(mesh.Position(v2)) - glm::dvec3(mesh.Position(vh));
-                normal += glm::cross(e1, e2);
-            }
+            // Sign of mean curvature: check orientation against the area-weighted
+            // vertex normal. Positive H = surface curves toward normal (locally convex).
+            const glm::dvec3 normal = glm::dvec3(VertexNormal(mesh, vh));
 
             if (glm::dot(normal, laplaceB) < 0.0)
                 H = -H;

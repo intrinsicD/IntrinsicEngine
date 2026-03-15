@@ -215,3 +215,55 @@ TEST(Curvature_GaussianCurvature, FlatMesh_NearZeroCurvatureAtInteriorVertices)
         }
     }
 }
+
+// =============================================================================
+// MeshUtils::VertexNormal — used by curvature sign detection
+// =============================================================================
+//
+// These tests verify the area-weighted vertex normal utility that ComputeMeanCurvature
+// and ComputeCurvature rely on for curvature sign orientation.
+
+TEST(MeshUtils_VertexNormal, ClosedConvexMesh_NormalsPointOutward)
+{
+    // For a convex closed mesh centred at the origin, every vertex normal must
+    // point generally outward (positive dot product with the outward radial direction).
+    auto mesh = MakeIcosahedron();
+    const std::size_t nV = mesh.VerticesSize();
+
+    for (std::size_t i = 0; i < nV; ++i)
+    {
+        Geometry::VertexHandle vh{static_cast<Geometry::PropertyIndex>(i)};
+        glm::vec3 n = Geometry::MeshUtils::VertexNormal(mesh, vh);
+        glm::vec3 pos = mesh.Position(vh);
+
+        // Normal should be unit length (or the fallback (0,1,0) for degenerate)
+        EXPECT_NEAR(glm::length(n), 1.0f, 1e-5f)
+            << "VertexNormal should return a unit vector (vertex " << i << ")";
+
+        // On an icosahedron centred at origin, the outward radial direction equals
+        // the normalised position. The vertex normal should agree in orientation.
+        glm::vec3 radial = glm::normalize(pos);
+        EXPECT_GT(glm::dot(n, radial), 0.0f)
+            << "VertexNormal on convex mesh should point outward (vertex " << i << ")";
+    }
+}
+
+TEST(MeshUtils_VertexNormal, FlatMesh_NormalsPointAlongFaceNormal)
+{
+    // A flat quad mesh in the XY plane. All vertex normals should align with +Z.
+    auto mesh = MakeTwoTriangleSquare();
+    const std::size_t nV = mesh.VerticesSize();
+
+    for (std::size_t i = 0; i < nV; ++i)
+    {
+        Geometry::VertexHandle vh{static_cast<Geometry::PropertyIndex>(i)};
+        glm::vec3 n = Geometry::MeshUtils::VertexNormal(mesh, vh);
+
+        // Non-isolated vertices (those with incident faces) should point along +Z.
+        if (!mesh.IsIsolated(vh))
+        {
+            EXPECT_NEAR(n.z, 1.0f, 1e-5f)
+                << "VertexNormal on flat XY mesh should be (0,0,1) (vertex " << i << ")";
+        }
+    }
+}
