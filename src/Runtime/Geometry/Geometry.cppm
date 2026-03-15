@@ -40,6 +40,7 @@ export import :Geodesic;
 export import :CatmullClark;
 export import :MarchingCubes;
 export import :MeshRepair;
+export import :MeshBoundary;
 export import :MeshQuality;
 export import :NormalEstimation;
 export import :SurfaceReconstruction;

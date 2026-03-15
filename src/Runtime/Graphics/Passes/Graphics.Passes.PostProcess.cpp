@@ -9,6 +9,7 @@ module;
 #include <format>
 #include <cmath>
 #include <vector>
+#include <unordered_map>
 #include <glm/glm.hpp>
 
 #include "RHI.Vulkan.hpp"

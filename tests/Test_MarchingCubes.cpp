@@ -131,8 +131,8 @@ TEST(MarchingCubes, ToMeshProducesValidHalfedgeMesh)
 
     auto mesh = ToMesh(*result);
     ASSERT_TRUE(mesh.has_value());
-    EXPECT_GT(mesh->NumVertices(), 0u);
-    EXPECT_GT(mesh->NumFaces(), 0u);
+    EXPECT_GT(mesh->VertexCount(), 0u);
+    EXPECT_GT(mesh->FaceCount(), 0u);
 }
 
 TEST(MarchingCubes, ToMeshEmptyResultReturnsNullopt)

@@ -5,6 +5,7 @@ module;
 #include <string>
 #include <string_view>
 #include <utility>
+#include <unordered_map>
 #include <glm/glm.hpp>
 
 #include "RHI.Vulkan.hpp"

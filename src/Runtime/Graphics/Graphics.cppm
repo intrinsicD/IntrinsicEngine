@@ -17,6 +17,7 @@ export import :ShaderRegistry;
 export import :PipelineLibrary;
 export import :Pipelines;
 export import :GPUScene;
+export import :GpuColor;
 export import :Systems.GPUSceneSync;
 export import :Systems.MeshRendererLifecycle;
 export import :Systems.GraphGeometrySync;

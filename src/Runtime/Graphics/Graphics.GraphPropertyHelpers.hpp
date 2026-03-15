@@ -16,8 +16,8 @@ namespace Graphics::GraphPropertyHelpers
     template <typename HandleT>
     [[nodiscard]] inline std::vector<uint32_t> ExtractColors(
         const Geometry::PropertySet& properties,
-        VisualizationConfig::PropertyColorConfig& config,
-        const Geometry::Graph& graph,
+        Graphics::ColorSource& config,
+        const Geometry::Graph::Graph& graph,
         std::string_view defaultPropName)
     {
         if (config.PropertyName.empty() && properties.Exists(defaultPropName))
@@ -35,8 +35,8 @@ namespace Graphics::GraphPropertyHelpers
 
     // Extract per-node colors (convenience wrapper).
     [[nodiscard]] inline std::vector<uint32_t> ExtractNodeColors(
-        const Geometry::Graph& graph,
-        VisualizationConfig::PropertyColorConfig& config)
+        const Geometry::Graph::Graph& graph,
+        Graphics::ColorSource& config)
     {
         return ExtractColors<Geometry::VertexHandle>(
             graph.VertexProperties(), config, graph, "v:color");
@@ -44,8 +44,8 @@ namespace Graphics::GraphPropertyHelpers
 
     // Extract per-edge colors (convenience wrapper).
     [[nodiscard]] inline std::vector<uint32_t> ExtractEdgeColors(
-        const Geometry::Graph& graph,
-        VisualizationConfig::PropertyColorConfig& config)
+        const Geometry::Graph::Graph& graph,
+        Graphics::ColorSource& config)
     {
         return ExtractColors<Geometry::EdgeHandle>(
             graph.EdgeProperties(), config, graph, "e:color");
@@ -53,7 +53,7 @@ namespace Graphics::GraphPropertyHelpers
 
     // Extract per-node radii from "v:radius" property, skipping deleted vertices.
     [[nodiscard]] inline std::vector<float> ExtractNodeRadii(
-        const Geometry::Graph& graph)
+        const Geometry::Graph::Graph& graph)
     {
         std::vector<float> radii;
         if (!graph.VertexProperties().Exists("v:radius"))

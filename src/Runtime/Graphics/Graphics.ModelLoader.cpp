@@ -29,8 +29,6 @@ module;
 
 module Graphics:ModelLoader.Impl;
 
-#include "Importers/Graphics.Importers.AttributeVertexKey.hpp"
-
 import :ModelLoader;
 import :AssetErrors;
 import :Model;
@@ -41,6 +39,8 @@ import Core.Logging;
 import RHI;
 import :Geometry;
 import Geometry;
+
+#include "Importers/Graphics.Importers.AttributeVertexKey.hpp"
 
 namespace Graphics
 {

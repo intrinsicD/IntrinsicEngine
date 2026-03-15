@@ -8,8 +8,6 @@
 // =============================================================================
 
 #include <cmath>
-#include <vector>
-
 #include <glm/glm.hpp>
 
 // Single equilateral triangle in the XY plane:
@@ -134,8 +132,8 @@ inline Geometry::Halfedge::Mesh MakeQuadPair()
     auto v3 = mesh.AddVertex({0.0f, 1.0f, 0.0f});
     auto v4 = mesh.AddVertex({2.0f, 0.0f, 0.0f});
     auto v5 = mesh.AddVertex({2.0f, 1.0f, 0.0f});
-    (void)mesh.AddFace({v0, v1, v2, v3});
-    (void)mesh.AddFace({v1, v4, v5, v2});
+    (void)mesh.AddQuad(v0, v1, v2, v3);
+    (void)mesh.AddQuad(v1, v4, v5, v2);
     return mesh;
 }
 

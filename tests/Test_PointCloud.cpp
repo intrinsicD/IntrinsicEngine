@@ -380,7 +380,7 @@ TEST(PointCloud_Subsample, SubsampleReducesCount)
     auto result = Geometry::PointCloud::RandomSubsample(cloud, params);
     ASSERT_TRUE(result.has_value());
 
-    EXPECT_EQ(result->Subsampled.Size(), 100u);
+    EXPECT_EQ(result->Subsampled.PointCount(), 100u);
     EXPECT_EQ(result->SelectedIndices.size(), 100u);
     EXPECT_TRUE(result->Subsampled.HasNormals());
     EXPECT_TRUE(result->Subsampled.HasColors());
@@ -394,7 +394,7 @@ TEST(PointCloud_Subsample, TargetLargerThanCloudReturnsAll)
     params.TargetCount = 200;
     auto result = Geometry::PointCloud::RandomSubsample(cloud, params);
     ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result->Subsampled.Size(), 50u);
+    EXPECT_EQ(result->Subsampled.PointCount(), 50u);
 }
 
 TEST(PointCloud_Subsample, DeterministicWithSameSeed)
@@ -473,14 +473,14 @@ TEST(PointCloud_Integration, DownsampleThenEstimateRadii)
     dParams.VoxelSize = 0.2f;
     auto dResult = Geometry::PointCloud::VoxelDownsample(cloud, dParams);
     ASSERT_TRUE(dResult.has_value());
-    EXPECT_GT(dResult->Downsampled.Size(), 10u);
+    EXPECT_GT(dResult->Downsampled.PointCount(), 10u);
 
     Geometry::PointCloud::RadiusEstimationParams rParams;
     rParams.KNeighbors = 6;
     rParams.ScaleFactor = 1.2f;
     auto rResult = Geometry::PointCloud::EstimateRadii(dResult->Downsampled, rParams);
     ASSERT_TRUE(rResult.has_value());
-    EXPECT_EQ(rResult->Radii.size(), dResult->Downsampled.Size());
+    EXPECT_EQ(rResult->Radii.size(), dResult->Downsampled.PointCount());
     EXPECT_GT(rResult->AverageRadius, 0.05f);
 }
 

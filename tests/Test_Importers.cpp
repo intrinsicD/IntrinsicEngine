@@ -43,20 +43,32 @@ static LoadContext MakeCtx(std::string_view path = "test.obj")
     return ctx;
 }
 
+static IAssetLoader* FindBuiltinLoader(std::string_view extension)
+{
+    static auto registry = [] {
+        auto value = std::make_unique<IORegistry>();
+        RegisterBuiltinLoaders(*value);
+        return value;
+    }();
+
+    return registry->FindLoader(extension);
+}
+
 // =============================================================================
 // OBJ Importer
 // =============================================================================
 
 TEST(Importer_OBJ, LoadsTriangle)
 {
-    OBJLoader loader;
+    auto* loader = FindBuiltinLoader(".obj");
+    ASSERT_NE(loader, nullptr);
     const std::string obj =
         "v 0 0 0\n"
         "v 1 0 0\n"
         "v 0 1 0\n"
         "f 1 2 3\n";
 
-    auto result = loader.Load(ToBytes(obj), MakeCtx("test.obj"));
+    auto result = loader->Load(ToBytes(obj), MakeCtx("test.obj"));
     ASSERT_TRUE(result.has_value()) << "OBJ load failed";
 
     const auto& meshes = AsMesh(*result).Meshes;
@@ -67,7 +79,8 @@ TEST(Importer_OBJ, LoadsTriangle)
 
 TEST(Importer_OBJ, LoadsQuadFanTriangulated)
 {
-    OBJLoader loader;
+    auto* loader = FindBuiltinLoader(".obj");
+    ASSERT_NE(loader, nullptr);
     const std::string obj =
         "v 0 0 0\n"
         "v 1 0 0\n"
@@ -75,7 +88,7 @@ TEST(Importer_OBJ, LoadsQuadFanTriangulated)
         "v 0 1 0\n"
         "f 1 2 3 4\n";
 
-    auto result = loader.Load(ToBytes(obj), MakeCtx("test.obj"));
+    auto result = loader->Load(ToBytes(obj), MakeCtx("test.obj"));
     ASSERT_TRUE(result.has_value());
 
     const auto& meshes = AsMesh(*result).Meshes;
@@ -86,9 +99,10 @@ TEST(Importer_OBJ, LoadsQuadFanTriangulated)
 
 TEST(Importer_OBJ, EmptyInputReturnsError)
 {
-    OBJLoader loader;
+    auto* loader = FindBuiltinLoader(".obj");
+    ASSERT_NE(loader, nullptr);
     const std::string empty;
-    auto result = loader.Load(ToBytes(empty), MakeCtx("test.obj"));
+    auto result = loader->Load(ToBytes(empty), MakeCtx("test.obj"));
     // Empty OBJ should either error or produce empty meshes.
     if (result.has_value())
     {
@@ -101,8 +115,9 @@ TEST(Importer_OBJ, EmptyInputReturnsError)
 
 TEST(Importer_OBJ, ExtensionsRegistered)
 {
-    OBJLoader loader;
-    auto exts = loader.Extensions();
+    auto* loader = FindBuiltinLoader(".obj");
+    ASSERT_NE(loader, nullptr);
+    auto exts = loader->Extensions();
     ASSERT_FALSE(exts.empty());
     bool found = false;
     for (auto ext : exts)
@@ -112,7 +127,8 @@ TEST(Importer_OBJ, ExtensionsRegistered)
 
 TEST(Importer_OBJ, VertexNormals)
 {
-    OBJLoader loader;
+    auto* loader = FindBuiltinLoader(".obj");
+    ASSERT_NE(loader, nullptr);
     const std::string obj =
         "v 0 0 0\n"
         "v 1 0 0\n"
@@ -120,7 +136,7 @@ TEST(Importer_OBJ, VertexNormals)
         "vn 0 0 1\n"
         "f 1//1 2//1 3//1\n";
 
-    auto result = loader.Load(ToBytes(obj), MakeCtx("test.obj"));
+    auto result = loader->Load(ToBytes(obj), MakeCtx("test.obj"));
     ASSERT_TRUE(result.has_value());
 
     const auto& meshes = AsMesh(*result).Meshes;
@@ -134,7 +150,8 @@ TEST(Importer_OBJ, VertexNormals)
 
 TEST(Importer_OFF, LoadsTriangle)
 {
-    OFFLoader loader;
+    auto* loader = FindBuiltinLoader(".off");
+    ASSERT_NE(loader, nullptr);
     const std::string off =
         "OFF\n"
         "3 1 0\n"
@@ -143,7 +160,7 @@ TEST(Importer_OFF, LoadsTriangle)
         "0 1 0\n"
         "3 0 1 2\n";
 
-    auto result = loader.Load(ToBytes(off), MakeCtx("test.off"));
+    auto result = loader->Load(ToBytes(off), MakeCtx("test.off"));
     ASSERT_TRUE(result.has_value()) << "OFF load failed";
 
     const auto& meshes = AsMesh(*result).Meshes;
@@ -154,16 +171,18 @@ TEST(Importer_OFF, LoadsTriangle)
 
 TEST(Importer_OFF, InvalidHeaderReturnsError)
 {
-    OFFLoader loader;
+    auto* loader = FindBuiltinLoader(".off");
+    ASSERT_NE(loader, nullptr);
     const std::string bad = "NOT_OFF\n3 1 0\n";
-    auto result = loader.Load(ToBytes(bad), MakeCtx("test.off"));
+    auto result = loader->Load(ToBytes(bad), MakeCtx("test.off"));
     EXPECT_FALSE(result.has_value());
 }
 
 TEST(Importer_OFF, ExtensionsRegistered)
 {
-    OFFLoader loader;
-    auto exts = loader.Extensions();
+    auto* loader = FindBuiltinLoader(".off");
+    ASSERT_NE(loader, nullptr);
+    auto exts = loader->Extensions();
     ASSERT_FALSE(exts.empty());
     bool found = false;
     for (auto ext : exts)
@@ -177,13 +196,14 @@ TEST(Importer_OFF, ExtensionsRegistered)
 
 TEST(Importer_XYZ, LoadsPoints)
 {
-    XYZLoader loader;
+    auto* loader = FindBuiltinLoader(".xyz");
+    ASSERT_NE(loader, nullptr);
     const std::string xyz =
         "1.0 2.0 3.0\n"
         "4.0 5.0 6.0\n"
         "7.0 8.0 9.0\n";
 
-    auto result = loader.Load(ToBytes(xyz), MakeCtx("test.xyz"));
+    auto result = loader->Load(ToBytes(xyz), MakeCtx("test.xyz"));
     ASSERT_TRUE(result.has_value()) << "XYZ load failed";
 
     const auto& meshes = AsMesh(*result).Meshes;
@@ -193,9 +213,10 @@ TEST(Importer_XYZ, LoadsPoints)
 
 TEST(Importer_XYZ, EmptyInputProducesNoGeometry)
 {
-    XYZLoader loader;
+    auto* loader = FindBuiltinLoader(".xyz");
+    ASSERT_NE(loader, nullptr);
     const std::string empty;
-    auto result = loader.Load(ToBytes(empty), MakeCtx("test.xyz"));
+    auto result = loader->Load(ToBytes(empty), MakeCtx("test.xyz"));
     if (result.has_value())
     {
         const auto& meshes = AsMesh(*result).Meshes;
@@ -206,8 +227,9 @@ TEST(Importer_XYZ, EmptyInputProducesNoGeometry)
 
 TEST(Importer_XYZ, ExtensionsRegistered)
 {
-    XYZLoader loader;
-    auto exts = loader.Extensions();
+    auto* loader = FindBuiltinLoader(".xyz");
+    ASSERT_NE(loader, nullptr);
+    auto exts = loader->Extensions();
     ASSERT_FALSE(exts.empty());
     bool found = false;
     for (auto ext : exts)
@@ -221,7 +243,8 @@ TEST(Importer_XYZ, ExtensionsRegistered)
 
 TEST(Importer_TGF, LoadsSimpleGraph)
 {
-    TGFLoader loader;
+    auto* loader = FindBuiltinLoader(".tgf");
+    ASSERT_NE(loader, nullptr);
     const std::string tgf =
         "1 NodeA\n"
         "2 NodeB\n"
@@ -230,14 +253,15 @@ TEST(Importer_TGF, LoadsSimpleGraph)
         "1 2 edge1\n"
         "2 3 edge2\n";
 
-    auto result = loader.Load(ToBytes(tgf), MakeCtx("test.tgf"));
+    auto result = loader->Load(ToBytes(tgf), MakeCtx("test.tgf"));
     ASSERT_TRUE(result.has_value()) << "TGF load failed";
 }
 
 TEST(Importer_TGF, ExtensionsRegistered)
 {
-    TGFLoader loader;
-    auto exts = loader.Extensions();
+    auto* loader = FindBuiltinLoader(".tgf");
+    ASSERT_NE(loader, nullptr);
+    auto exts = loader->Extensions();
     ASSERT_FALSE(exts.empty());
     bool found = false;
     for (auto ext : exts)
@@ -251,7 +275,8 @@ TEST(Importer_TGF, ExtensionsRegistered)
 
 TEST(Importer_STL, LoadsASCIITriangle)
 {
-    STLLoader loader;
+    auto* loader = FindBuiltinLoader(".stl");
+    ASSERT_NE(loader, nullptr);
     const std::string stl =
         "solid test\n"
         "facet normal 0 0 1\n"
@@ -263,7 +288,7 @@ TEST(Importer_STL, LoadsASCIITriangle)
         "endfacet\n"
         "endsolid test\n";
 
-    auto result = loader.Load(ToBytes(stl), MakeCtx("test.stl"));
+    auto result = loader->Load(ToBytes(stl), MakeCtx("test.stl"));
     ASSERT_TRUE(result.has_value()) << "STL load failed";
 
     const auto& meshes = AsMesh(*result).Meshes;
@@ -273,8 +298,9 @@ TEST(Importer_STL, LoadsASCIITriangle)
 
 TEST(Importer_STL, ExtensionsRegistered)
 {
-    STLLoader loader;
-    auto exts = loader.Extensions();
+    auto* loader = FindBuiltinLoader(".stl");
+    ASSERT_NE(loader, nullptr);
+    auto exts = loader->Extensions();
     ASSERT_FALSE(exts.empty());
     bool found = false;
     for (auto ext : exts)
@@ -288,7 +314,8 @@ TEST(Importer_STL, ExtensionsRegistered)
 
 TEST(Importer_PLY, LoadsASCIITriangle)
 {
-    PLYLoader loader;
+    auto* loader = FindBuiltinLoader(".ply");
+    ASSERT_NE(loader, nullptr);
     const std::string ply =
         "ply\n"
         "format ascii 1.0\n"
@@ -304,7 +331,7 @@ TEST(Importer_PLY, LoadsASCIITriangle)
         "0 1 0\n"
         "3 0 1 2\n";
 
-    auto result = loader.Load(ToBytes(ply), MakeCtx("test.ply"));
+    auto result = loader->Load(ToBytes(ply), MakeCtx("test.ply"));
     ASSERT_TRUE(result.has_value()) << "PLY ASCII load failed";
 
     const auto& meshes = AsMesh(*result).Meshes;
@@ -316,7 +343,8 @@ TEST(Importer_PLY, LoadsASCIITriangle)
 
 TEST(Importer_PLY, LoadsASCIIPointCloud)
 {
-    PLYLoader loader;
+    auto* loader = FindBuiltinLoader(".ply");
+    ASSERT_NE(loader, nullptr);
     const std::string ply =
         "ply\n"
         "format ascii 1.0\n"
@@ -330,7 +358,7 @@ TEST(Importer_PLY, LoadsASCIIPointCloud)
         "7.0 8.0 9.0\n"
         "10.0 11.0 12.0\n";
 
-    auto result = loader.Load(ToBytes(ply), MakeCtx("test.ply"));
+    auto result = loader->Load(ToBytes(ply), MakeCtx("test.ply"));
     ASSERT_TRUE(result.has_value()) << "PLY point cloud load failed";
 
     const auto& meshes = AsMesh(*result).Meshes;
@@ -342,7 +370,8 @@ TEST(Importer_PLY, LoadsASCIIPointCloud)
 
 TEST(Importer_PLY, LoadsASCIIWithNormalsAndColors)
 {
-    PLYLoader loader;
+    auto* loader = FindBuiltinLoader(".ply");
+    ASSERT_NE(loader, nullptr);
     const std::string ply =
         "ply\n"
         "format ascii 1.0\n"
@@ -361,7 +390,7 @@ TEST(Importer_PLY, LoadsASCIIWithNormalsAndColors)
         "1 0 0 0 0 1 0 255 0\n"
         "0 1 0 0 0 1 0 0 255\n";
 
-    auto result = loader.Load(ToBytes(ply), MakeCtx("test.ply"));
+    auto result = loader->Load(ToBytes(ply), MakeCtx("test.ply"));
     ASSERT_TRUE(result.has_value()) << "PLY normals+colors load failed";
 
     const auto& meshes = AsMesh(*result).Meshes;
@@ -373,7 +402,8 @@ TEST(Importer_PLY, LoadsASCIIWithNormalsAndColors)
 
 TEST(Importer_PLY, LoadsASCIIQuadTriangulated)
 {
-    PLYLoader loader;
+    auto* loader = FindBuiltinLoader(".ply");
+    ASSERT_NE(loader, nullptr);
     const std::string ply =
         "ply\n"
         "format ascii 1.0\n"
@@ -390,7 +420,7 @@ TEST(Importer_PLY, LoadsASCIIQuadTriangulated)
         "0 1 0\n"
         "4 0 1 2 3\n";
 
-    auto result = loader.Load(ToBytes(ply), MakeCtx("test.ply"));
+    auto result = loader->Load(ToBytes(ply), MakeCtx("test.ply"));
     ASSERT_TRUE(result.has_value());
 
     const auto& meshes = AsMesh(*result).Meshes;
@@ -435,8 +465,9 @@ TEST(Importer_PLY, LoadsBinaryLittleEndianTriangle)
     AppendLE<uint8_t>(data, 3);
     AppendLE<uint32_t>(data, 0); AppendLE<uint32_t>(data, 1); AppendLE<uint32_t>(data, 2);
 
-    PLYLoader loader;
-    auto result = loader.Load(std::span<const std::byte>(data), MakeCtx("test.ply"));
+    auto* loader = FindBuiltinLoader(".ply");
+    ASSERT_NE(loader, nullptr);
+    auto result = loader->Load(std::span<const std::byte>(data), MakeCtx("test.ply"));
     ASSERT_TRUE(result.has_value()) << "PLY binary LE load failed";
 
     const auto& meshes = AsMesh(*result).Meshes;
@@ -448,20 +479,22 @@ TEST(Importer_PLY, LoadsBinaryLittleEndianTriangle)
 
 TEST(Importer_PLY, MissingEndHeaderReturnsError)
 {
-    PLYLoader loader;
+    auto* loader = FindBuiltinLoader(".ply");
+    ASSERT_NE(loader, nullptr);
     const std::string bad =
         "ply\n"
         "format ascii 1.0\n"
         "element vertex 3\n"
         "property float x\n";
     // No end_header
-    auto result = loader.Load(ToBytes(bad), MakeCtx("test.ply"));
+    auto result = loader->Load(ToBytes(bad), MakeCtx("test.ply"));
     EXPECT_FALSE(result.has_value());
 }
 
 TEST(Importer_PLY, InvalidFormatReturnsError)
 {
-    PLYLoader loader;
+    auto* loader = FindBuiltinLoader(".ply");
+    ASSERT_NE(loader, nullptr);
     const std::string bad =
         "ply\n"
         "format unknown_format 1.0\n"
@@ -471,14 +504,15 @@ TEST(Importer_PLY, InvalidFormatReturnsError)
         "property float z\n"
         "end_header\n"
         "0 0 0\n";
-    auto result = loader.Load(ToBytes(bad), MakeCtx("test.ply"));
+    auto result = loader->Load(ToBytes(bad), MakeCtx("test.ply"));
     EXPECT_FALSE(result.has_value());
 }
 
 TEST(Importer_PLY, ExtensionsRegistered)
 {
-    PLYLoader loader;
-    auto exts = loader.Extensions();
+    auto* loader = FindBuiltinLoader(".ply");
+    ASSERT_NE(loader, nullptr);
+    auto exts = loader->Extensions();
     ASSERT_FALSE(exts.empty());
     bool found = false;
     for (auto ext : exts)
@@ -492,7 +526,8 @@ TEST(Importer_PLY, ExtensionsRegistered)
 
 TEST(Importer_PCD, LoadsASCIIPoints)
 {
-    PCDLoader loader;
+    auto* loader = FindBuiltinLoader(".pcd");
+    ASSERT_NE(loader, nullptr);
     const std::string pcd =
         "# .PCD v0.7 - Point Cloud Data\n"
         "FIELDS x y z\n"
@@ -507,7 +542,7 @@ TEST(Importer_PCD, LoadsASCIIPoints)
         "4.0 5.0 6.0\n"
         "7.0 8.0 9.0\n";
 
-    auto result = loader.Load(ToBytes(pcd), MakeCtx("test.pcd"));
+    auto result = loader->Load(ToBytes(pcd), MakeCtx("test.pcd"));
     ASSERT_TRUE(result.has_value()) << "PCD ASCII load failed";
 
     const auto& meshes = AsMesh(*result).Meshes;
@@ -518,7 +553,8 @@ TEST(Importer_PCD, LoadsASCIIPoints)
 
 TEST(Importer_PCD, LoadsASCIIWithSeparateRGBChannels)
 {
-    PCDLoader loader;
+    auto* loader = FindBuiltinLoader(".pcd");
+    ASSERT_NE(loader, nullptr);
     const std::string pcd =
         "FIELDS x y z r g b\n"
         "SIZE 4 4 4 1 1 1\n"
@@ -531,7 +567,7 @@ TEST(Importer_PCD, LoadsASCIIWithSeparateRGBChannels)
         "1.0 2.0 3.0 255 0 0\n"
         "4.0 5.0 6.0 0 255 0\n";
 
-    auto result = loader.Load(ToBytes(pcd), MakeCtx("test.pcd"));
+    auto result = loader->Load(ToBytes(pcd), MakeCtx("test.pcd"));
     ASSERT_TRUE(result.has_value()) << "PCD ASCII with colors load failed";
 
     const auto& meshes = AsMesh(*result).Meshes;
@@ -561,8 +597,9 @@ TEST(Importer_PCD, LoadsBinaryPoints)
     // Point 2: (4.0, 5.0, 6.0)
     AppendLE<float>(data, 4.0f); AppendLE<float>(data, 5.0f); AppendLE<float>(data, 6.0f);
 
-    PCDLoader loader;
-    auto result = loader.Load(std::span<const std::byte>(data), MakeCtx("test.pcd"));
+    auto* loader = FindBuiltinLoader(".pcd");
+    ASSERT_NE(loader, nullptr);
+    auto result = loader->Load(std::span<const std::byte>(data), MakeCtx("test.pcd"));
     ASSERT_TRUE(result.has_value()) << "PCD binary load failed";
 
     const auto& meshes = AsMesh(*result).Meshes;
@@ -572,7 +609,8 @@ TEST(Importer_PCD, LoadsBinaryPoints)
 
 TEST(Importer_PCD, MissingFieldsReturnsError)
 {
-    PCDLoader loader;
+    auto* loader = FindBuiltinLoader(".pcd");
+    ASSERT_NE(loader, nullptr);
     // Missing FIELDS header line
     const std::string bad =
         "SIZE 4 4 4\n"
@@ -581,13 +619,14 @@ TEST(Importer_PCD, MissingFieldsReturnsError)
         "POINTS 1\n"
         "DATA ascii\n"
         "1.0 2.0 3.0\n";
-    auto result = loader.Load(ToBytes(bad), MakeCtx("test.pcd"));
+    auto result = loader->Load(ToBytes(bad), MakeCtx("test.pcd"));
     EXPECT_FALSE(result.has_value());
 }
 
 TEST(Importer_PCD, MissingXYZFieldsReturnsError)
 {
-    PCDLoader loader;
+    auto* loader = FindBuiltinLoader(".pcd");
+    ASSERT_NE(loader, nullptr);
     // Has fields but not x/y/z
     const std::string bad =
         "FIELDS a b c\n"
@@ -597,13 +636,14 @@ TEST(Importer_PCD, MissingXYZFieldsReturnsError)
         "POINTS 1\n"
         "DATA ascii\n"
         "1.0 2.0 3.0\n";
-    auto result = loader.Load(ToBytes(bad), MakeCtx("test.pcd"));
+    auto result = loader->Load(ToBytes(bad), MakeCtx("test.pcd"));
     EXPECT_FALSE(result.has_value());
 }
 
 TEST(Importer_PCD, UnsupportedEncodingReturnsError)
 {
-    PCDLoader loader;
+    auto* loader = FindBuiltinLoader(".pcd");
+    ASSERT_NE(loader, nullptr);
     const std::string bad =
         "FIELDS x y z\n"
         "SIZE 4 4 4\n"
@@ -612,14 +652,15 @@ TEST(Importer_PCD, UnsupportedEncodingReturnsError)
         "POINTS 1\n"
         "DATA binary_compressed\n"
         "dummy\n";
-    auto result = loader.Load(ToBytes(bad), MakeCtx("test.pcd"));
+    auto result = loader->Load(ToBytes(bad), MakeCtx("test.pcd"));
     EXPECT_FALSE(result.has_value());
 }
 
 TEST(Importer_PCD, ExtensionsRegistered)
 {
-    PCDLoader loader;
-    auto exts = loader.Extensions();
+    auto* loader = FindBuiltinLoader(".pcd");
+    ASSERT_NE(loader, nullptr);
+    auto exts = loader->Extensions();
     ASSERT_FALSE(exts.empty());
     bool found = false;
     for (auto ext : exts)
@@ -705,10 +746,11 @@ static std::vector<std::byte> BuildMinimalGLB()
 
 TEST(Importer_GLTF, LoadsGLBTriangle)
 {
-    GLTFLoader loader;
+    auto* loader = FindBuiltinLoader(".glb");
+    ASSERT_NE(loader, nullptr);
     const auto glb = BuildMinimalGLB();
 
-    auto result = loader.Load(std::span<const std::byte>(glb), MakeCtx("test.glb"));
+    auto result = loader->Load(std::span<const std::byte>(glb), MakeCtx("test.glb"));
     ASSERT_TRUE(result.has_value()) << "GLB load failed";
 
     const auto& meshes = AsMesh(*result).Meshes;
@@ -720,24 +762,27 @@ TEST(Importer_GLTF, LoadsGLBTriangle)
 
 TEST(Importer_GLTF, EmptyInputReturnsError)
 {
-    GLTFLoader loader;
+    auto* loader = FindBuiltinLoader(".glb");
+    ASSERT_NE(loader, nullptr);
     const std::string empty;
-    auto result = loader.Load(ToBytes(empty), MakeCtx("test.glb"));
+    auto result = loader->Load(ToBytes(empty), MakeCtx("test.glb"));
     EXPECT_FALSE(result.has_value());
 }
 
 TEST(Importer_GLTF, InvalidBytesReturnsError)
 {
-    GLTFLoader loader;
+    auto* loader = FindBuiltinLoader(".gltf");
+    ASSERT_NE(loader, nullptr);
     const std::string garbage = "this is not valid gltf or glb data at all";
-    auto result = loader.Load(ToBytes(garbage), MakeCtx("test.gltf"));
+    auto result = loader->Load(ToBytes(garbage), MakeCtx("test.gltf"));
     EXPECT_FALSE(result.has_value());
 }
 
 TEST(Importer_GLTF, ExtensionsRegistered)
 {
-    GLTFLoader loader;
-    auto exts = loader.Extensions();
+    auto* loader = FindBuiltinLoader(".gltf");
+    ASSERT_NE(loader, nullptr);
+    auto exts = loader->Extensions();
     ASSERT_GE(exts.size(), 2u);
     bool foundGltf = false, foundGlb = false;
     for (auto ext : exts)
@@ -755,23 +800,16 @@ TEST(Importer_GLTF, ExtensionsRegistered)
 
 TEST(Importer_Contract, FormatNamesAreNonEmpty)
 {
-    OBJLoader obj;
-    OFFLoader off;
-    XYZLoader xyz;
-    TGFLoader tgf;
-    STLLoader stl;
-    PLYLoader ply;
-    PCDLoader pcd;
-    GLTFLoader gltf;
+    constexpr std::string_view kExtensions[] = {
+        ".obj", ".off", ".xyz", ".tgf", ".stl", ".ply", ".pcd", ".gltf", ".glb"
+    };
 
-    EXPECT_FALSE(obj.FormatName().empty());
-    EXPECT_FALSE(off.FormatName().empty());
-    EXPECT_FALSE(xyz.FormatName().empty());
-    EXPECT_FALSE(tgf.FormatName().empty());
-    EXPECT_FALSE(stl.FormatName().empty());
-    EXPECT_FALSE(ply.FormatName().empty());
-    EXPECT_FALSE(pcd.FormatName().empty());
-    EXPECT_FALSE(gltf.FormatName().empty());
+    for (std::string_view ext : kExtensions)
+    {
+        auto* loader = FindBuiltinLoader(ext);
+        ASSERT_NE(loader, nullptr) << "Missing built-in loader for " << ext;
+        EXPECT_FALSE(loader->FormatName().empty()) << ext;
+    }
 }
 
 TEST(Importer_Contract, ExtensionsStartWithDot)
@@ -781,12 +819,14 @@ TEST(Importer_Contract, ExtensionsStartWithDot)
             EXPECT_EQ(ext[0], '.') << "Extension must start with '.' in " << loader.FormatName();
     };
 
-    OBJLoader obj; checkDot(obj);
-    OFFLoader off; checkDot(off);
-    XYZLoader xyz; checkDot(xyz);
-    TGFLoader tgf; checkDot(tgf);
-    STLLoader stl; checkDot(stl);
-    PLYLoader ply; checkDot(ply);
-    PCDLoader pcd; checkDot(pcd);
-    GLTFLoader gltf; checkDot(gltf);
+    constexpr std::string_view kExtensions[] = {
+        ".obj", ".off", ".xyz", ".tgf", ".stl", ".ply", ".pcd", ".gltf"
+    };
+
+    for (std::string_view ext : kExtensions)
+    {
+        auto* loader = FindBuiltinLoader(ext);
+        ASSERT_NE(loader, nullptr) << "Missing built-in loader for " << ext;
+        checkDot(*loader);
+    }
 }

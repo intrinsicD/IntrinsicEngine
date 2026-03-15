@@ -140,7 +140,7 @@ TEST(SDF_Functor, AabbSDF)
 
 TEST(SDF_Functor, ObbSDF_AxisAligned)
 {
-    OBB obb{glm::vec3(0, 0, 0), glm::quat(1, 0, 0, 0), glm::vec3(1, 1, 1)};
+    OBB obb{glm::vec3(0, 0, 0), glm::vec3(1, 1, 1), glm::quat(1, 0, 0, 0)};
     auto sdf = SDF::CreateSDF(obb);
     EXPECT_LT(sdf(glm::vec3(0, 0, 0)), 0.0f);
     EXPECT_GT(sdf(glm::vec3(2, 0, 0)), 0.0f);

@@ -13,7 +13,6 @@ module;
 #include <glm/glm.hpp>
 
 #include "RHI.Vulkan.hpp"
-#include "Graphics.PassUtils.hpp"
 
 // Optional: enable extremely verbose per-entity material/texture tracing.
 // #define INTRINSIC_SURFACEPASS_TRACE_TEXTURES
@@ -29,10 +28,13 @@ import :Material;
 import :Components;
 import :GPUScene;
 import Geometry;
+import Core.Filesystem;
 import Core.Hash;
 import Core.Logging;
 import ECS;
 import RHI;
+
+#include "Graphics.PassUtils.hpp"
 
 using namespace Core::Hash;
 

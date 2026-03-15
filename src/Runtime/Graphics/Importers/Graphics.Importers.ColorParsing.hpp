@@ -33,9 +33,9 @@ namespace Graphics::Importers
             return std::nullopt;
 
         return glm::vec4(
-            Detail::NormalizeColorChannelToUnitRange(*r),
-            Detail::NormalizeColorChannelToUnitRange(*g),
-            Detail::NormalizeColorChannelToUnitRange(*b),
+            Graphics::Detail::NormalizeColorChannelToUnitRange(*r),
+            Graphics::Detail::NormalizeColorChannelToUnitRange(*g),
+            Graphics::Detail::NormalizeColorChannelToUnitRange(*b),
             1.0f);
     }
 
@@ -43,7 +43,7 @@ namespace Graphics::Importers
     // Auto-detects [0,255] vs [0,1] range.
     [[nodiscard]] inline glm::vec4 IntensityToColor(float intensity)
     {
-        const float v = Detail::NormalizeColorChannelToUnitRange(intensity);
+        const float v = Graphics::Detail::NormalizeColorChannelToUnitRange(intensity);
         return glm::vec4(v, v, v, 1.0f);
     }
 

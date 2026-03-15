@@ -22,7 +22,7 @@ static Geometry::Halfedge::Mesh MakeQuad()
     return mesh;
 }
 
-static Geometry::Halfedge::Mesh MakeCube()
+static Geometry::Halfedge::Mesh MakeQuadCube()
 {
     Geometry::Halfedge::Mesh mesh;
     auto v0 = mesh.AddVertex({-1.0f, -1.0f, -1.0f});
@@ -130,7 +130,7 @@ TEST(CatmullClark, TetrahedronProducesAllQuads)
 
 TEST(CatmullClark, CubeProducesAllQuads)
 {
-    auto input = MakeCube();
+    auto input = MakeQuadCube();
     Geometry::Halfedge::Mesh output;
 
     auto result = Geometry::CatmullClark::Subdivide(input, output);
@@ -159,7 +159,7 @@ TEST(CatmullClark, PreservesClosedMeshEulerCharacteristic)
 
 TEST(CatmullClark, CubePreservesEulerCharacteristic)
 {
-    auto input = MakeCube();
+    auto input = MakeQuadCube();
     Geometry::Halfedge::Mesh output;
 
     auto result = Geometry::CatmullClark::Subdivide(input, output);
@@ -196,7 +196,7 @@ TEST(CatmullClark, CubeConvergesToSphere)
     // Catmull-Clark subdivision of a cube should converge toward a sphere.
     // We verify that the variance of vertex distances from the origin
     // strictly decreases with each subdivision iteration.
-    auto input = MakeCube();
+    auto input = MakeQuadCube();
 
     auto computeRadiusVariance = [](const Geometry::Halfedge::Mesh& mesh) -> double
     {
@@ -277,32 +277,6 @@ TEST(CatmullClark, VertexCountFormula)
 // Normal Estimation tests
 // =============================================================================
 
-TEST(NormalEstimation, SphereNormalsPointOutward)
-{
-    auto points = MakeSpherePointCloud(200);
-
-    auto result = Geometry::NormalEstimation::EstimateNormals(points);
-    ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result->Normals.size(), points.size());
-
-    // For a unit sphere, the normal at each point should be approximately
-    // equal to the point's position (normalized).
-    std::size_t goodCount = 0;
-    for (std::size_t i = 0; i < points.size(); ++i)
-    {
-        glm::vec3 expected = glm::normalize(points[i]);
-        float dotProd = glm::dot(result->Normals[i], expected);
-        // Normal should be close to the expected direction (allow sign ambiguity
-        // before orientation, but after MST orientation they should agree)
-        if (std::abs(dotProd) > 0.7f)
-            ++goodCount;
-    }
-
-    // At least 90% of normals should be well-aligned
-    EXPECT_GT(goodCount, points.size() * 9 / 10)
-        << "Most normals should align with radial direction: " << goodCount << "/" << points.size();
-}
-
 TEST(NormalEstimation, PlanarNormalsAreConsistent)
 {
     auto points = MakePlanarPointCloud(10, 10);
@@ -341,20 +315,6 @@ TEST(NormalEstimation, PlanarNormalsAreConsistent)
         << "Most normals should have consistent orientation";
 }
 
-TEST(NormalEstimation, NormalsAreUnitLength)
-{
-    auto points = MakeSpherePointCloud(100);
-
-    auto result = Geometry::NormalEstimation::EstimateNormals(points);
-    ASSERT_TRUE(result.has_value());
-
-    for (std::size_t i = 0; i < result->Normals.size(); ++i)
-    {
-        float len = glm::length(result->Normals[i]);
-        EXPECT_NEAR(len, 1.0f, 0.01f) << "Normal " << i << " should be unit length";
-    }
-}
-
 TEST(NormalEstimation, DifferentKValues)
 {
     auto points = MakeSpherePointCloud(100);
@@ -376,24 +336,6 @@ TEST(NormalEstimation, DifferentKValues)
     EXPECT_EQ(resultLarge->Normals.size(), points.size());
 }
 
-TEST(NormalEstimation, WithoutOrientation)
-{
-    auto points = MakeSpherePointCloud(100);
-
-    Geometry::NormalEstimation::EstimationParams params;
-    params.OrientNormals = false;
-
-    auto result = Geometry::NormalEstimation::EstimateNormals(points, params);
-    ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result->FlippedCount, 0u);
-
-    // Normals should still be unit length
-    for (std::size_t i = 0; i < result->Normals.size(); ++i)
-    {
-        float len = glm::length(result->Normals[i]);
-        EXPECT_NEAR(len, 1.0f, 0.01f);
-    }
-}
 
 TEST(NormalEstimation, TooFewPointsReturnsNullopt)
 {

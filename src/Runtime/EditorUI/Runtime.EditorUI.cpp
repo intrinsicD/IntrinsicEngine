@@ -1,8 +1,10 @@
 module;
 
+#include <cstdio>
 #include <cstddef>
 #include <cstdint>
 #include <set>
+#include <glm/glm.hpp>
 #include <imgui.h>
 #include <string>
 #include <vector>
@@ -172,10 +174,11 @@ namespace Runtime::EditorUI
                 }
             }
 
+            const auto& sub = sel.GetSubElementSelection();
+
             if (cfg.ElementMode != Runtime::Selection::ElementMode::Entity)
             {
                 ImGui::TextDisabled("Hold Shift to add/toggle sub-elements.");
-                const auto& sub = sel.GetSubElementSelection();
                 if (!sub.SelectedVertices.empty())
                     ImGui::Text("Selected vertices: %zu", sub.SelectedVertices.size());
                 if (!sub.SelectedEdges.empty())

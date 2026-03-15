@@ -128,7 +128,7 @@ TEST(Overlap, FrustumSphereInside)
     // Create a simple frustum from a standard perspective-view matrix.
     const auto proj = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 100.0f);
     const auto view = glm::lookAt(glm::vec3(0, 0, 5), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
-    const auto frustum = Frustum::FromViewProjection(proj * view);
+    const auto frustum = Frustum::CreateFromMatrix(proj * view);
 
     Sphere s{glm::vec3(0, 0, 0), 1.0f};
     EXPECT_TRUE(TestOverlap(frustum, s));
@@ -138,7 +138,7 @@ TEST(Overlap, FrustumSphereOutside)
 {
     const auto proj = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 100.0f);
     const auto view = glm::lookAt(glm::vec3(0, 0, 5), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
-    const auto frustum = Frustum::FromViewProjection(proj * view);
+    const auto frustum = Frustum::CreateFromMatrix(proj * view);
 
     // Sphere far behind the camera.
     Sphere s{glm::vec3(0, 0, 200), 1.0f};
@@ -169,14 +169,14 @@ TEST(Overlap, SphereCapsuleSeparated)
 
 TEST(Overlap, OBBSphereOverlapping)
 {
-    OBB obb{glm::vec3(0, 0, 0), glm::quat(1, 0, 0, 0), glm::vec3(1, 1, 1)};
+    OBB obb{glm::vec3(0, 0, 0), glm::vec3(1, 1, 1), glm::quat(1, 0, 0, 0)};
     Sphere s{glm::vec3(1.5f, 0, 0), 1.0f};
     EXPECT_TRUE(TestOverlap(obb, s));
 }
 
 TEST(Overlap, OBBSphereSeparated)
 {
-    OBB obb{glm::vec3(0, 0, 0), glm::quat(1, 0, 0, 0), glm::vec3(1, 1, 1)};
+    OBB obb{glm::vec3(0, 0, 0), glm::vec3(1, 1, 1), glm::quat(1, 0, 0, 0)};
     Sphere s{glm::vec3(5, 5, 5), 0.5f};
     EXPECT_FALSE(TestOverlap(obb, s));
 }

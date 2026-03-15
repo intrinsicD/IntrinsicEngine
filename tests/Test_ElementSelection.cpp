@@ -10,6 +10,14 @@ import ECS;
 import Runtime.Selection;
 import Runtime.SelectionModule;
 
+namespace
+{
+    [[nodiscard]] bool IsNullEntity(entt::entity entity)
+    {
+        return entity == entt::null;
+    }
+}
+
 // =========================================================================
 // SubElementSelection unit tests
 // =========================================================================
@@ -18,7 +26,7 @@ TEST(ElementSelection, SubElementSelection_DefaultIsEmpty)
 {
     Runtime::Selection::SubElementSelection sub;
     EXPECT_TRUE(sub.Empty());
-    EXPECT_EQ(sub.Entity, entt::null);
+    EXPECT_TRUE(IsNullEntity(sub.Entity));
 }
 
 TEST(ElementSelection, SubElementSelection_ClearResetsAll)
@@ -33,7 +41,7 @@ TEST(ElementSelection, SubElementSelection_ClearResetsAll)
 
     sub.Clear();
     EXPECT_TRUE(sub.Empty());
-    EXPECT_EQ(sub.Entity, entt::null);
+    EXPECT_TRUE(IsNullEntity(sub.Entity));
 }
 
 TEST(ElementSelection, SubElementSelection_EmptyChecksAllSets)
@@ -90,7 +98,7 @@ TEST(ElementSelection, SelectionModule_ClearSubElementSelection)
 
     module.ClearSubElementSelection();
     EXPECT_TRUE(sub.Empty());
-    EXPECT_EQ(sub.Entity, entt::null);
+    EXPECT_TRUE(IsNullEntity(sub.Entity));
 }
 
 TEST(ElementSelection, SelectionModule_ClearSelectionAlsoClearsSubElements)

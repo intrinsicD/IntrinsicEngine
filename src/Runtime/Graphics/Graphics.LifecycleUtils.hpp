@@ -26,7 +26,7 @@
 // Callers should clamp sphere.w to kMinBoundingSphereRadius after this call to
 // guard against degenerate geometry slipping through.
 
-inline glm::vec4 ComputeLocalBoundingSphere(const GeometryGpuData& geo)
+inline glm::vec4 ComputeLocalBoundingSphere(const Graphics::GeometryGpuData& geo)
 {
     const glm::vec4 bounds = geo.GetLocalBoundingSphere();
     if (bounds.w > 0.0f)
@@ -35,7 +35,7 @@ inline glm::vec4 ComputeLocalBoundingSphere(const GeometryGpuData& geo)
     // Geometry exists but bounds are not yet computed (e.g., reused buffers
     // uploaded without positions). Use a large conservative radius so the
     // entity stays visible until a proper upload populates real bounds.
-    return {0.0f, 0.0f, 0.0f, GPUSceneConstants::kDefaultBoundingSphereRadius};
+    return {0.0f, 0.0f, 0.0f, Graphics::GPUSceneConstants::kDefaultBoundingSphereRadius};
 }
 
 // =============================================================================
@@ -51,15 +51,15 @@ inline glm::vec4 ComputeLocalBoundingSphere(const GeometryGpuData& geo)
 inline uint32_t AllocateGpuSlot(
     entt::registry& registry,
     entt::entity entity,
-    GPUScene& gpuScene,
-    const GeometryGpuData& geo,
+    Graphics::GPUScene& gpuScene,
+    const Graphics::GeometryGpuData& geo,
     Geometry::GeometryHandle geometryHandle)
 {
     const uint32_t slot = gpuScene.AllocateSlot();
     if (slot == ECS::kInvalidGpuSlot)
         return ECS::kInvalidGpuSlot;
 
-    GpuInstanceData inst{};
+    Graphics::GpuInstanceData inst{};
 
     auto* wm = registry.try_get<ECS::Components::Transform::WorldMatrix>(entity);
     if (wm)
@@ -72,7 +72,7 @@ inline uint32_t AllocateGpuSlot(
 
     glm::vec4 sphere = ComputeLocalBoundingSphere(geo);
     if (sphere.w <= 0.0f)
-        sphere.w = GPUSceneConstants::kMinBoundingSphereRadius;
+        sphere.w = Graphics::GPUSceneConstants::kMinBoundingSphereRadius;
 
     gpuScene.QueueUpdate(slot, inst, sphere);
 
@@ -94,8 +94,8 @@ inline uint32_t AllocateGpuSlot(
 inline uint32_t TryAllocateGpuSlot(
     entt::registry& registry,
     entt::entity entity,
-    GPUScene& gpuScene,
-    const GeometryPool& geometryStorage,
+    Graphics::GPUScene& gpuScene,
+    const Graphics::GeometryPool& geometryStorage,
     uint32_t currentSlot,
     Geometry::GeometryHandle geometryHandle)
 {
@@ -105,7 +105,7 @@ inline uint32_t TryAllocateGpuSlot(
     if (!geometryHandle.IsValid())
         return ECS::kInvalidGpuSlot;
 
-    GeometryGpuData* geo = geometryStorage.GetIfValid(geometryHandle);
+    Graphics::GeometryGpuData* geo = geometryStorage.GetIfValid(geometryHandle);
     if (!geo || !geo->GetVertexBuffer())
         return ECS::kInvalidGpuSlot;
 

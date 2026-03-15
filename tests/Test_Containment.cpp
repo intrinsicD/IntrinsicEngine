@@ -133,7 +133,7 @@ TEST(Containment, FrustumAABB_Inside)
 {
     auto proj = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 100.0f);
     auto view = glm::lookAt(glm::vec3(0, 0, 5), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
-    auto frustum = Frustum::FromViewProjection(proj * view);
+    auto frustum = Frustum::CreateFromMatrix(proj * view);
 
     // Small box near the camera's look-at target
     AABB box{glm::vec3(-0.1f, -0.1f, -0.1f), glm::vec3(0.1f, 0.1f, 0.1f)};
@@ -144,7 +144,7 @@ TEST(Containment, FrustumAABB_Outside)
 {
     auto proj = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 100.0f);
     auto view = glm::lookAt(glm::vec3(0, 0, 5), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
-    auto frustum = Frustum::FromViewProjection(proj * view);
+    auto frustum = Frustum::CreateFromMatrix(proj * view);
 
     // Box behind camera
     AABB box{glm::vec3(-1, -1, 50), glm::vec3(1, 1, 55)};
@@ -159,7 +159,7 @@ TEST(Containment, FrustumSphere_Inside)
 {
     auto proj = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 100.0f);
     auto view = glm::lookAt(glm::vec3(0, 0, 5), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
-    auto frustum = Frustum::FromViewProjection(proj * view);
+    auto frustum = Frustum::CreateFromMatrix(proj * view);
 
     Sphere s{glm::vec3(0, 0, 0), 0.5f};
     EXPECT_TRUE(Contains(frustum, s));
@@ -169,7 +169,7 @@ TEST(Containment, FrustumSphere_StraddlingPlane)
 {
     auto proj = glm::perspective(glm::radians(45.0f), 1.0f, 1.0f, 10.0f);
     auto view = glm::lookAt(glm::vec3(0, 0, 5), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
-    auto frustum = Frustum::FromViewProjection(proj * view);
+    auto frustum = Frustum::CreateFromMatrix(proj * view);
 
     // Very large sphere centered at origin — will straddle planes
     Sphere s{glm::vec3(0, 0, 0), 100.0f};

@@ -88,7 +88,7 @@ TEST(GJK, AABBAABB_Separated)
 
 TEST(GJK, OBBSphere_Overlapping)
 {
-    OBB obb{glm::vec3(0, 0, 0), glm::quat(1, 0, 0, 0), glm::vec3(1, 1, 1)};
+    OBB obb{glm::vec3(0, 0, 0), glm::vec3(1, 1, 1), glm::quat(1, 0, 0, 0)};
     Sphere s{glm::vec3(1.5f, 0, 0), 1.0f};
     Core::Memory::LinearArena scratch(8 * 1024);
     EXPECT_TRUE(Internal::GJK_Boolean(obb, s, scratch));

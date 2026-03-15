@@ -6,17 +6,19 @@ module;
 
 module Graphics:Passes.Picking.Impl;
 
-#include "Graphics.PassUtils.hpp"
-
 import :Passes.Picking;
 
 import :RenderPipeline;
 import :RenderGraph;
 import :Components;
 import :Geometry;
+import Core.Filesystem;
 import Core.Hash;
+import Core.Logging;
 import ECS;
 import RHI;
+
+#include "Graphics.PassUtils.hpp"
 
 using namespace Core::Hash;
 

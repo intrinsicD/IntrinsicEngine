@@ -17,9 +17,8 @@ import Geometry;
 // PropertySet Public Accessor Tests
 // =============================================================================
 
-// Use shared builders: MakeRightTriangle(), MakeTwoTriangleDiamond(), MakeSingleQuad()
+// Use shared builders: MakeRightTriangle(), MakeQuadPair(), MakeSingleQuad()
 static Geometry::Halfedge::Mesh MakeTriangle() { return MakeRightTriangle(); }
-static Geometry::Halfedge::Mesh MakeQuadPair() { return MakeTwoTriangleDiamond(); }
 
 // =============================================================================
 // EdgeProperties() Tests

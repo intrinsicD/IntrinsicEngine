@@ -640,7 +640,7 @@ TEST(GraphPropertyHelpers_D1, SkipDeletedVerticesInColorExtraction)
     ASSERT_EQ(graph->VerticesSize(), 3u);  // storage slots (including deleted)
     ASSERT_EQ(graph->VertexCount(),  2u);  // live vertices only
 
-    VisualizationConfig::PropertyColorConfig config;
+    Graphics::ColorSource config;
     config.PropertyName = "v:color";
 
     // Replicate the skipDeleted predicate from GraphPropertyHelpers::ExtractColors.
@@ -648,7 +648,7 @@ TEST(GraphPropertyHelpers_D1, SkipDeletedVerticesInColorExtraction)
         return graph->IsDeleted(Geometry::VertexHandle{static_cast<Geometry::PropertyIndex>(i)});
     };
 
-    const auto result = ColorMapper::MapProperty(
+    const auto result = Graphics::ColorMapper::MapProperty(
         graph->VertexProperties(), config, skipDeleted);
 
     ASSERT_TRUE(result.has_value());
@@ -662,7 +662,7 @@ TEST(GraphPropertyHelpers_D1, FallbackPropertyNameSetWhenEmpty)
     // default name when PropertyName is empty and the property exists.
     auto graph = MakeGraphWithDeletedMiddleVertex();
 
-    VisualizationConfig::PropertyColorConfig config;
+    Graphics::ColorSource config;
     ASSERT_TRUE(config.PropertyName.empty());  // start empty
 
     // Replicate the fallback-name logic from GraphPropertyHelpers::ExtractColors.
@@ -676,7 +676,7 @@ TEST(GraphPropertyHelpers_D1, FallbackPropertyNameSetWhenEmpty)
     auto skipDeleted = [&graph](size_t i) -> bool {
         return graph->IsDeleted(Geometry::VertexHandle{static_cast<Geometry::PropertyIndex>(i)});
     };
-    const auto result = ColorMapper::MapProperty(
+    const auto result = Graphics::ColorMapper::MapProperty(
         graph->VertexProperties(), config, skipDeleted);
 
     ASSERT_TRUE(result.has_value());
@@ -691,7 +691,7 @@ TEST(GraphPropertyHelpers_D1, FallbackDoesNotOverrideExplicitPropertyName)
     // Add a second named property that the test will request explicitly.
     graph->GetOrAddVertexProperty<glm::vec4>("v:highlight", glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
 
-    VisualizationConfig::PropertyColorConfig config;
+    Graphics::ColorSource config;
     config.PropertyName = "v:highlight";  // explicitly set — must not be changed
 
     // Fallback logic: should NOT change PropertyName because it is non-empty.

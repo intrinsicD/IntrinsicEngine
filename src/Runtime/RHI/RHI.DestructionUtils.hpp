@@ -17,6 +17,7 @@
 //   SafeDestroyVma(device, buffer, allocation, vmaDestroyBuffer);
 
 #include "RHI.Vulkan.hpp"
+#include <vector>
 
 namespace RHI::DestructionUtils
 {

@@ -109,11 +109,10 @@ namespace
 // =============================================================================
 
 // Use shared builders from TestMeshBuilders.h where possible.
-// MakeTriangle and MakeQuadPair forward to shared equivalents.
+// MakeTriangle forwards to the shared equivalent.
 // MakeTetrahedron uses different vertex coordinates than the shared version
 // (approximate regular tetrahedron vs exact), so it remains local.
 static Geometry::Halfedge::Mesh MakeTriangle() { return MakeRightTriangle(); }
-static Geometry::Halfedge::Mesh MakeQuadPair() { return MakeTwoTriangleDiamond(); }
 
 static Geometry::Halfedge::Mesh MakeLocalTetrahedron()
 {

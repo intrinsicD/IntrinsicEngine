@@ -158,7 +158,7 @@ TEST(ContactManifold, ConvexHullSphere_Fallback)
 
 TEST(ContactManifold, OBBCapsule_Fallback)
 {
-    OBB obb{glm::vec3(0, 0, 0), glm::quat(1, 0, 0, 0), glm::vec3(2, 2, 2)};
+    OBB obb{glm::vec3(0, 0, 0), glm::vec3(2, 2, 2), glm::quat(1, 0, 0, 0)};
     Capsule cap{glm::vec3(0, 0, 0), glm::vec3(0, 1, 0), 0.5f};
 
     Core::Memory::LinearArena scratch(64 * 1024);

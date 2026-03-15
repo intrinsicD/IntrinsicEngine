@@ -39,7 +39,7 @@ TEST(Geodesic, SourceVertexHasZeroDistance)
 
     // Source vertex distance should be 0
     Geometry::VertexHandle v0{0};
-    double d = result->DistanceProperty.Get(v0);
+    double d = result->DistanceProperty[v0];
     EXPECT_NEAR(d, 0.0, 1e-6);
 }
 
@@ -55,7 +55,7 @@ TEST(Geodesic, AllDistancesNonNegative)
     {
         Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(i)};
         if (!mesh.IsDeleted(v))
-            EXPECT_GE(result->DistanceProperty.Get(v), 0.0);
+            EXPECT_GE(result->DistanceProperty[v], 0.0);
     }
 }
 
@@ -71,14 +71,14 @@ TEST(Geodesic, DistanceIncreasesWithTopologicalDistance)
     // Source has distance 0, all other vertices are 1-ring neighbors
     // and should have positive distance
     Geometry::VertexHandle v0{0};
-    double d0 = result->DistanceProperty.Get(v0);
+    double d0 = result->DistanceProperty[v0];
     EXPECT_NEAR(d0, 0.0, 1e-6);
 
     for (std::size_t i = 1; i < mesh.VerticesSize(); ++i)
     {
         Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(i)};
         if (!mesh.IsDeleted(v))
-            EXPECT_GT(result->DistanceProperty.Get(v), d0);
+            EXPECT_GT(result->DistanceProperty[v], d0);
     }
 }
 
@@ -95,7 +95,7 @@ TEST(Geodesic, MultipleSourceVertices)
     for (auto src : sources)
     {
         Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(src)};
-        EXPECT_NEAR(result->DistanceProperty.Get(v), 0.0, 1e-6);
+        EXPECT_NEAR(result->DistanceProperty[v], 0.0, 1e-6);
     }
 }
 

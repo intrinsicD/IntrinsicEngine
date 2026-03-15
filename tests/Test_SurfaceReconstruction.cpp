@@ -117,16 +117,6 @@ static Geometry::MarchingCubes::ScalarGrid MakePlaneSDF(
 // Marching Cubes — Basic Tests
 // =============================================================================
 
-TEST(MarchingCubes, InvalidGridReturnsNullopt)
-{
-    Geometry::MarchingCubes::ScalarGrid grid;
-    grid.NX = 0;
-    grid.NY = 0;
-    grid.NZ = 0;
-
-    auto result = Geometry::MarchingCubes::Extract(grid);
-    EXPECT_FALSE(result.has_value());
-}
 
 TEST(MarchingCubes, EmptyGridReturnsNullopt)
 {

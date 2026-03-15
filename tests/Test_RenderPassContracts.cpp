@@ -1,10 +1,14 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <vector>
 
+#include <entt/entity/registry.hpp>
+
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 import Graphics;
 import Geometry;
@@ -354,8 +358,7 @@ TEST(RenderPassContract_Point, PointComponentDefaultsContract)
     // No per-point data by default.
     EXPECT_FALSE(pt.HasPerPointColors);
     EXPECT_FALSE(pt.HasPerPointRadii);
-    EXPECT_TRUE(pt.CachedColors.empty());
-    EXPECT_TRUE(pt.CachedRadii.empty());
+    EXPECT_FALSE(pt.HasPerPointNormals);
 }
 
 TEST(RenderPassContract_Point, PointPushConstantsFlagBits)
@@ -383,20 +386,21 @@ TEST(RenderPassContract_Point, PointPushConstantsFlagBits)
 TEST(RenderPassContract_Point, PerPointAttributeToggle)
 {
     ECS::Point::Component pt;
+    ECS::PointCloud::Data cloud;
 
-    // Simulate lifecycle system populating per-point colors.
-    pt.CachedColors = {0xFFFF0000, 0xFF00FF00, 0xFF0000FF};
-    pt.HasPerPointColors = true;
+    // Attribute caches live on the data authority; Point::Component carries flags only.
+    cloud.CachedColors = {0xFFFF0000, 0xFF00FF00, 0xFF0000FF};
+    pt.HasPerPointColors = !cloud.CachedColors.empty();
 
     EXPECT_TRUE(pt.HasPerPointColors);
-    EXPECT_EQ(pt.CachedColors.size(), 3u);
+    EXPECT_EQ(cloud.CachedColors.size(), 3u);
 
     // Simulate lifecycle system populating per-point radii.
-    pt.CachedRadii = {0.01f, 0.02f, 0.03f};
-    pt.HasPerPointRadii = true;
+    cloud.CachedRadii = {0.01f, 0.02f, 0.03f};
+    pt.HasPerPointRadii = !cloud.CachedRadii.empty();
 
     EXPECT_TRUE(pt.HasPerPointRadii);
-    EXPECT_EQ(pt.CachedRadii.size(), 3u);
+    EXPECT_EQ(cloud.CachedRadii.size(), 3u);
 }
 
 TEST(RenderPassContract_Point, DebugDrawPointsSeparation)
@@ -408,7 +412,8 @@ TEST(RenderPassContract_Point, DebugDrawPointsSeparation)
     dd.OverlaySphere({4, 5, 6}, 0.1f, Graphics::DebugDraw::Green());
 
     EXPECT_TRUE(dd.HasContent());
-    EXPECT_GE(dd.GetPointCount() + dd.GetOverlayPointCount(), 1u);
+    EXPECT_EQ(dd.GetPointCount(), 1u);
+    EXPECT_GT(dd.GetOverlayLineCount(), 0u);
 }
 
 // =============================================================================

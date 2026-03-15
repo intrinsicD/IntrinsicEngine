@@ -128,7 +128,7 @@ TEST(Support, Capsule_Perpendicular)
 
 TEST(Support, OBB_AxisAligned)
 {
-    OBB box{glm::vec3(0, 0, 0), glm::quat(1, 0, 0, 0), glm::vec3(1, 2, 3)};
+    OBB box{glm::vec3(0, 0, 0), glm::vec3(1, 2, 3), glm::quat(1, 0, 0, 0)};
     auto p = Support(box, glm::vec3(1, 0, 0));
     EXPECT_NEAR(p.x, 1.0f, kEps);
 }
@@ -137,7 +137,7 @@ TEST(Support, OBB_Rotated90)
 {
     // Rotate 90 degrees around Z: X-axis becomes Y-axis
     glm::quat rot = glm::angleAxis(glm::half_pi<float>(), glm::vec3(0, 0, 1));
-    OBB box{glm::vec3(0, 0, 0), rot, glm::vec3(3, 1, 1)};
+    OBB box{glm::vec3(0, 0, 0), glm::vec3(3, 1, 1), rot};
     // In world space, querying +Y should pick the extent along the original +X axis
     auto p = Support(box, glm::vec3(0, 1, 0));
     EXPECT_NEAR(p.y, 3.0f, kEps);
@@ -254,7 +254,7 @@ TEST(Support, Frustum_ReturnsCorner)
 {
     auto proj = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 100.0f);
     auto view = glm::lookAt(glm::vec3(0, 0, 5), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
-    auto frustum = Frustum::FromViewProjection(proj * view);
+    auto frustum = Frustum::CreateFromMatrix(proj * view);
 
     auto p = Support(frustum, glm::vec3(0, 0, 1));
     // Should be one of the far-plane corners
