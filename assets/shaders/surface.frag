@@ -12,19 +12,19 @@ layout(location = 3) in vec4 fragVertexColor;
 
 layout(location = 0) out vec4 outColor;
 
-// Per-face color buffer (optional BDA — when ptrFaceAttr != 0).
+// Per-face color buffer (optional BDA — when PtrFaceAttr != 0).
 layout(buffer_reference, scalar) readonly buffer FaceAttrBuf { uint color[]; };
 
 // Push constant layout must match surface.vert exactly.
 layout(push_constant) uniform PushConsts {
-    mat4 _unusedModel;
-    uint64_t ptrPos;
-    uint64_t ptrNorm;
-    uint64_t ptrAux;
-    uint VisibilityBase;
-    float PointSizePx;
-    uint64_t ptrFaceAttr;
-    uint64_t ptrVertexAttr;
+    mat4     Model;
+    uint64_t PtrPositions;
+    uint64_t PtrNormals;
+    uint64_t PtrAux;
+    uint     VisibilityBase;
+    float    PointSizePx;
+    uint64_t PtrFaceAttr;
+    uint64_t PtrVertexAttr;
 } push;
 
 // Binding 0 = Camera (UBO), Binding 1 = Bindless Array
@@ -51,13 +51,13 @@ void main() {
     // providing smooth scalar field / RGB visualization on mesh surfaces.
     // Per-face colors are flat (one color per triangle via gl_PrimitiveID).
     vec4 baseColor;
-    if (push.ptrVertexAttr != 0ul)
+    if (push.PtrVertexAttr != 0ul)
     {
         baseColor = fragVertexColor;
     }
-    else if (push.ptrFaceAttr != 0ul)
+    else if (push.PtrFaceAttr != 0ul)
     {
-        FaceAttrBuf fBuf = FaceAttrBuf(push.ptrFaceAttr);
+        FaceAttrBuf fBuf = FaceAttrBuf(push.PtrFaceAttr);
         baseColor = unpackUnorm4x8(fBuf.color[gl_PrimitiveID]);
     }
     else

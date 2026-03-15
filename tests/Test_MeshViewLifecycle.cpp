@@ -415,7 +415,7 @@ TEST(MeshViewLifecycle_Contract, EdgeViewIndexBufferBDACompatible)
     EXPECT_EQ(gpuVertices, 252u);
 }
 
-TEST(MeshViewLifecycle_Contract, EdgeAuxBuffersIndependentOfEdgeView)
+TEST(MeshViewLifecycle_Contract, EdgeAttrBuffersIndependentOfEdgeView)
 {
     // Per-edge color attribute buffers (CachedEdgeColors) live on
     // Line::Component and are managed by LinePass. MeshEdgeView only carries
@@ -431,5 +431,5 @@ TEST(MeshViewLifecycle_Contract, EdgeAuxBuffersIndependentOfEdgeView)
     // Edge view has geometry, but does not carry per-edge colors.
     EXPECT_TRUE(ev.HasGpuGeometry());
     EXPECT_EQ(ev.EdgeCount, line.CachedEdgeColors.size());
-    // LinePass reads CachedEdgeColors from Line::Component for aux buffer.
+    // LinePass reads CachedEdgeColors from Line::Component for attr buffer.
 }

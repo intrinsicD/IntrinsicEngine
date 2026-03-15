@@ -11,18 +11,18 @@ layout(location = 2) flat in uint fragTexID;
 
 layout(location = 0) out vec4 outColor;
 
-// Per-face color buffer (optional BDA — when ptrFaceAttr != 0).
+// Per-face color buffer (optional BDA — when PtrFaceAttr != 0).
 layout(buffer_reference, scalar) readonly buffer FaceAttrBuf { uint color[]; };
 
 // Push constant layout must match triangle.vert exactly.
 layout(push_constant) uniform PushConsts {
-    mat4 _unusedModel;
-    uint64_t ptrPos;
-    uint64_t ptrNorm;
-    uint64_t ptrAux;
-    uint VisibilityBase;
-    float PointSizePx;
-    uint64_t ptrFaceAttr;
+    mat4     Model;
+    uint64_t PtrPositions;
+    uint64_t PtrNormals;
+    uint64_t PtrAux;
+    uint     VisibilityBase;
+    float    PointSizePx;
+    uint64_t PtrFaceAttr;
 } push;
 
 // Binding 0 = Camera (UBO), Binding 1 = Bindless Array
@@ -40,13 +40,13 @@ void main() {
     float diff = max(dot(norm, lightDir), 0.0);
     vec3 diffuse = diff * lightColor;
 
-    // Per-face color: when ptrFaceAttr is valid, read per-face packed ABGR color
+    // Per-face color: when PtrFaceAttr is valid, read per-face packed ABGR color
     // indexed by gl_PrimitiveID. The face color replaces the texture color,
     // but lighting is still applied on top.
     vec4 baseColor;
-    if (push.ptrFaceAttr != 0ul)
+    if (push.PtrFaceAttr != 0ul)
     {
-        FaceAttrBuf fBuf = FaceAttrBuf(push.ptrFaceAttr);
+        FaceAttrBuf fBuf = FaceAttrBuf(push.PtrFaceAttr);
         baseColor = unpackUnorm4x8(fBuf.color[gl_PrimitiveID]);
     }
     else

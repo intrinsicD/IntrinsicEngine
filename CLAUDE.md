@@ -197,8 +197,8 @@ One device-local vertex buffer on the GPU, multiple index buffers with different
 
 Push constants per pass:
 - **SurfacePass**: `uint64_t PtrPositions`, `PtrNormals`, `PtrAux` + `PtrFaceAttr` for per-face colors via `gl_PrimitiveID`.
-- **LinePass**: `uint64_t PtrPositions` + `PtrEdges` + `PtrEdgeAux` for per-edge colors.
-- **PointPass** (120 bytes): Model + `PtrPositions`/`PtrNormals`/`PtrAux` + PointSize/SizeMultiplier/Viewport + Color/Flags.
+- **LinePass**: `uint64_t PtrPositions` + `PtrEdges` + `PtrEdgeAttr` for per-edge colors.
+- **PointPass** (120 bytes): Model + `PtrPositions`/`PtrNormals`/`PtrAttr` + PointSize/SizeMultiplier/Viewport + Color/Flags.
 
 ### Lifecycle Systems
 

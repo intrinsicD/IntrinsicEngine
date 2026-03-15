@@ -36,7 +36,7 @@ export namespace Graphics::Passes
     // - Pulls from DebugDraw for transient point markers.
     // - Reads positions/normals via BDA from shared device-local vertex buffers.
     // - Per-mode pipelines: FlatDisc (camera-facing), Surfel (normal-oriented + EWA).
-    // - Per-point attributes (colors, radii) via PtrAux BDA channel.
+    // - Per-point attributes (colors, radii) via PtrAttr BDA channel.
     // - Set 0: Camera UBO (shared across all passes).
     // - Push constants: Model + BDA pointers + point config (120 bytes).
     //
@@ -91,8 +91,8 @@ export namespace Graphics::Passes
             uint32_t Count = 0;
         };
 
-        // Per-entity persistent per-point color attribute buffer (packed ABGR).
-        std::unordered_map<uint32_t, RetainedBufferEntry> m_PointAuxBuffers;
+        // Per-entity persistent per-point color attribute buffer (packed ABGR per point).
+        std::unordered_map<uint32_t, RetainedBufferEntry> m_PointAttrBuffers;
 
         // Per-entity persistent per-point radii buffer (float per point).
         std::unordered_map<uint32_t, RetainedBufferEntry> m_PointRadiiBuffers;
@@ -112,10 +112,10 @@ export namespace Graphics::Passes
         std::unique_ptr<RHI::GraphicsPipeline> BuildPipeline(
             VkFormat colorFormat, VkFormat depthFormat, uint32_t mode);
 
-        // Create or update a persistent per-point attribute buffer.
-        uint64_t EnsurePointAuxBuffer(uint32_t entityKey,
-                                      const uint32_t* colorData,
-                                      uint32_t pointCount);
+        // Create or update a persistent per-point color attribute buffer.
+        uint64_t EnsurePointAttrBuffer(uint32_t entityKey,
+                                       const uint32_t* colorData,
+                                       uint32_t pointCount);
 
         // Create or update a persistent per-point radii buffer.
         uint64_t EnsurePointRadiiBuffer(uint32_t entityKey,

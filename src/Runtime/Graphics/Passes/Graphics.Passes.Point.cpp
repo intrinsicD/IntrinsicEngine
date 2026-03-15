@@ -43,7 +43,7 @@ namespace Graphics::Passes
         glm::mat4 Model;           // 64 bytes, offset  0
         uint64_t  PtrPositions;    //  8 bytes, offset 64
         uint64_t  PtrNormals;      //  8 bytes, offset 72
-        uint64_t  PtrAux;          //  8 bytes, offset 80 — per-point packed ABGR colors (0 = uniform Color)
+        uint64_t  PtrAttr;          //  8 bytes, offset 80 — per-point packed ABGR colors (0 = uniform Color)
         float     PointSize;       //  4 bytes, offset 88
         float     SizeMultiplier;  //  4 bytes, offset 92
         float     ViewportWidth;   //  4 bytes, offset 96
@@ -55,16 +55,16 @@ namespace Graphics::Passes
     static_assert(sizeof(PointPushConstants) == 120);
 
     // =========================================================================
-    // EnsurePointAuxBuffer
+    // EnsurePointAttrBuffer — per-point color attribute buffer (packed ABGR).
     // =========================================================================
 
-    uint64_t PointPass::EnsurePointAuxBuffer(
+    uint64_t PointPass::EnsurePointAttrBuffer(
         uint32_t entityKey,
         const uint32_t* colorData,
         uint32_t pointCount)
     {
         return EnsurePerEntityBuffer<uint32_t>(
-            *m_Device, m_PointAuxBuffers, entityKey, colorData, pointCount, "PointPass");
+            *m_Device, m_PointAttrBuffers, entityKey, colorData, pointCount, "PointPass");
     }
 
     // =========================================================================
@@ -165,13 +165,13 @@ namespace Graphics::Passes
     {
         if (!m_Device) return;
 
-        // Deferred-destroy persistent point aux buffers.
-        for (auto& [key, entry] : m_PointAuxBuffers)
+        // Deferred-destroy persistent point attribute buffers.
+        for (auto& [key, entry] : m_PointAttrBuffers)
         {
             if (entry.Buffer)
                 m_Device->SafeDestroy([old = std::move(entry.Buffer)]() {});
         }
-        m_PointAuxBuffers.clear();
+        m_PointAttrBuffers.clear();
 
         // Deferred-destroy persistent point radii buffers.
         for (auto& [key, entry] : m_PointRadiiBuffers)
@@ -302,7 +302,7 @@ namespace Graphics::Passes
             glm::mat4 Model;
             uint64_t PtrPositions;
             uint64_t PtrNormals;
-            uint64_t PtrAux;        // 0 = use uniform Color; non-zero = per-point BDA colors
+            uint64_t PtrAttr;        // 0 = use uniform Color; non-zero = per-point BDA colors
             uint32_t VertexCount;
             float    PointSize;
             float    SizeMultiplier;
@@ -315,17 +315,14 @@ namespace Graphics::Passes
         std::vector<DrawInfo> draws;
 
         // Track which entity keys have active aux buffers this frame.
-        std::vector<uint32_t> activeAuxKeys;
+        std::vector<uint32_t> activeAttrKeys;
 
         auto& registry = ctx.Scene.GetRegistry();
 
-        // -----------------------------------------------------------------
         // Frustum extraction — CPU-side culling for retained-mode draws.
-        // -----------------------------------------------------------------
         const bool cullingEnabled = !ctx.Debug.DisableCulling;
-        const Geometry::Frustum frustum = cullingEnabled
-            ? Geometry::Frustum::CreateFromMatrix(ctx.CameraProj * ctx.CameraView)
-            : Geometry::Frustum{};
+        const Geometry::Frustum frustum = CreateCullingFrustum(
+            ctx.CameraProj, ctx.CameraView, cullingEnabled);
 
         // =================================================================
         // Retained-mode draws via ECS::Point::Component
@@ -381,7 +378,7 @@ namespace Graphics::Passes
                 const bool isEWA = (effectiveModeIdx == 2u);
 
                 // Per-point color aux buffer (sourced from legacy components).
-                uint64_t auxAddr = 0;
+                uint64_t attrAddr = 0;
                 if (pt.HasPerPointColors)
                 {
                     const uint32_t entityKey = static_cast<uint32_t>(entity);
@@ -415,8 +412,8 @@ namespace Graphics::Passes
 
                     if (colorData)
                     {
-                        activeAuxKeys.push_back(entityKey);
-                        auxAddr = EnsurePointAuxBuffer(entityKey, colorData, colorCount);
+                        activeAttrKeys.push_back(entityKey);
+                        attrAddr = EnsurePointAttrBuffer(entityKey, colorData, colorCount);
                     }
                 }
 
@@ -459,7 +456,7 @@ namespace Graphics::Passes
                 }
 
                 uint32_t flags = 0;
-                if (auxAddr != 0)   flags |= 1u; // has per-point colors
+                if (attrAddr != 0)   flags |= 1u; // has per-point colors
                 if (isEWA)          flags |= 2u; // EWA mode
                 if (radiiAddr != 0) flags |= 4u; // has per-point radii
 
@@ -467,7 +464,7 @@ namespace Graphics::Passes
                 di.Model = worldMatrix;
                 di.PtrPositions = posAddr;
                 di.PtrNormals = normAddr;
-                di.PtrAux = auxAddr;
+                di.PtrAttr = attrAddr;
                 di.VertexCount = vertexCount;
                 // Clamp point radius to safe world-space range [0.0001, 1.0].
                 di.PointSize = std::clamp(pt.Size, 0.0001f, 1.0f);
@@ -482,25 +479,8 @@ namespace Graphics::Passes
             }
         }
 
-        // Cleanup orphaned aux buffers.
-        if (!m_PointAuxBuffers.empty())
-        {
-            std::sort(activeAuxKeys.begin(), activeAuxKeys.end());
-
-            for (auto it = m_PointAuxBuffers.begin(); it != m_PointAuxBuffers.end(); )
-            {
-                if (!std::binary_search(activeAuxKeys.begin(), activeAuxKeys.end(), it->first))
-                {
-                    if (it->second.Buffer)
-                        m_Device->SafeDestroy([old = std::move(it->second.Buffer)]() {});
-                    it = m_PointAuxBuffers.erase(it);
-                }
-                else
-                {
-                    ++it;
-                }
-            }
-        }
+        // Cleanup orphaned point attribute buffers.
+        CleanupOrphanedBuffers(*m_Device, m_PointAttrBuffers, activeAttrKeys);
 
         // =================================================================
         // Transient DebugDraw points (uploaded per-frame via BDA)
@@ -545,7 +525,7 @@ namespace Graphics::Passes
                     di.Model = glm::mat4(1.0f);
                     di.PtrPositions = posAddr;
                     di.PtrNormals = normAddr;
-                    di.PtrAux = 0;
+                    di.PtrAttr = 0;
                     di.VertexCount = transientCount;
                     di.PointSize = firstPt.Size;
                     di.SizeMultiplier = 1.0f;
@@ -619,7 +599,7 @@ namespace Graphics::Passes
                     push.Model = di.Model;
                     push.PtrPositions = di.PtrPositions;
                     push.PtrNormals = di.PtrNormals;
-                    push.PtrAux = di.PtrAux;
+                    push.PtrAttr = di.PtrAttr;
                     push.PointSize = di.PointSize;
                     push.SizeMultiplier = di.SizeMultiplier;
                     push.ViewportWidth = static_cast<float>(resolution.width);

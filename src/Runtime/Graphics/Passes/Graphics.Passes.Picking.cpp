@@ -6,6 +6,8 @@ module;
 
 module Graphics:Passes.Picking.Impl;
 
+#include "Graphics.PassUtils.hpp"
+
 import :Passes.Picking;
 
 import :RenderPipeline;
@@ -74,16 +76,7 @@ namespace Graphics::Passes
                                             vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                                               pipeline->GetHandle());
 
-                                            VkViewport viewport{};
-                                            viewport.x = 0.0f;
-                                            viewport.y = 0.0f;
-                                            viewport.width = static_cast<float>(ctx.Resolution.width);
-                                            viewport.height = static_cast<float>(ctx.Resolution.height);
-                                            viewport.minDepth = 0.0f;
-                                            viewport.maxDepth = 1.0f;
-                                            VkRect2D scissor{{0, 0}, ctx.Resolution};
-                                            vkCmdSetViewport(cmd, 0, 1, &viewport);
-                                            vkCmdSetScissor(cmd, 0, 1, &scissor);
+                                            SetViewportScissor(cmd, ctx.Resolution);
 
                                             const uint32_t dynamicOffset = static_cast<uint32_t>(ctx.GlobalCameraDynamicOffset);
                                             vkCmdBindDescriptorSets(

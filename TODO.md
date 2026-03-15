@@ -222,7 +222,7 @@ Identified via full codebase sweep (March 2026). Grouped by priority.
 
 ### D2. Finish Shared Pass Helper Adoption (P3)
 
-`Graphics.PassUtils.hpp` covers shader-path resolution (`ResolveShaderPaths`) and non-owning `VulkanDevice` aliases (`MakeDeviceAlias`). `PostProcessPass` and all other passes now use these helpers. `PipelineLibrary.cpp` still uses raw `ResolveShaderPathOrExit` pairs because it resolves shaders without a `ShaderRegistry` — this is acceptable.
+`Graphics.PassUtils.hpp` covers shader-path resolution (`ResolveShaderPaths`), non-owning `VulkanDevice` aliases (`MakeDeviceAlias`), `CreateCullingFrustum`, `CleanupOrphanedBuffers`, and `EnsurePerEntityBuffer`. `LinePass` and `PointPass` now use `CreateCullingFrustum` and `CleanupOrphanedBuffers` (previously duplicated inline). `PipelineLibrary.cpp` still uses raw `ResolveShaderPathOrExit` pairs because it resolves shaders without a `ShaderRegistry` — this is acceptable.
 
 - [ ] Evaluate whether `PipelineLibrary` can adopt `ResolveShaderPaths` with an alternate resolver overload.
 - [ ] Keep the refactor behavior-preserving and opportunistic when the file is next touched.
@@ -239,13 +239,6 @@ Identified via full codebase sweep (March 2026). Grouped by priority.
 `NormalEstimation.cpp` computes centroids over KNN point-cloud neighborhoods (raw `std::vector<glm::vec3>`, no halfedge connectivity). This is a different pattern from the mesh 1-ring centroid now in `MeshUtils::ComputeOneRingCentroid()` and cannot share the same helper.
 
 - [ ] Evaluate extracting a standalone `ComputePointCentroid(points, indices)` helper if more point-cloud operators need it.
-
-### D16. Render Pass: Naming Inconsistency — Aux vs Attr (P4)
-
-Per-entity attribute buffer entry structs use inconsistent naming across passes: `FaceAttrEntry` / `VertexAttrEntry` (SurfacePass) vs `RetainedEdgeAuxEntry` / `RetainedPointAuxEntry` (LinePass / PointPass). Standardize to one convention. Note: `PtrAux` and `PtrEdgeAux` are also used in push constants and shaders, so renaming requires coordinated shader updates.
-
-- [ ] Pick one naming convention (`*AuxEntry` or `*AttrEntry`) and unify across all passes.
-- [ ] Update corresponding push constant field names and shader `PtrAux`/`PtrEdgeAux` references.
 
 ### D19. Selection.cpp Picking Helpers Overlap with Geometry Module (P4) — Partially Resolved
 

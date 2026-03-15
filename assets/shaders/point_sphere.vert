@@ -17,14 +17,14 @@ layout(set = 0, binding = 0) uniform CameraBuffer {
 } camera;
 
 layout(buffer_reference, scalar) readonly buffer PosBuf   { vec3  v[]; };
-layout(buffer_reference, scalar) readonly buffer AuxBuf   { uint  v[]; };
+layout(buffer_reference, scalar) readonly buffer AttrBuf   { uint  v[]; };
 layout(buffer_reference, scalar) readonly buffer RadiiBuf { float v[]; };
 
 layout(push_constant) uniform PushConsts {
     mat4     Model;
     uint64_t PtrPositions;
     uint64_t PtrNormals;
-    uint64_t PtrAux;            // per-point packed ABGR colors (0 = uniform Color)
+    uint64_t PtrAttr;            // per-point packed ABGR colors (0 = uniform Color)
     float    PointSize;         // world-space radius
     float    SizeMultiplier;
     float    ViewportWidth;
@@ -49,11 +49,11 @@ void main()
     vec3 localPos = posBuf.v[pointIndex];
     vec3 worldPos = vec3(push.Model * vec4(localPos, 1.0));
 
-    // Resolve color: per-point aux or uniform.
-    if (push.PtrAux != 0ul && (push.Flags & 1u) != 0u)
+    // Resolve color: per-point attr or uniform.
+    if (push.PtrAttr != 0ul && (push.Flags & 1u) != 0u)
     {
-        AuxBuf auxBuf = AuxBuf(push.PtrAux);
-        fragColor = unpackUnorm4x8(auxBuf.v[pointIndex]);
+        AttrBuf attrBuf = AttrBuf(push.PtrAttr);
+        fragColor = unpackUnorm4x8(attrBuf.v[pointIndex]);
     }
     else
     {

@@ -15,16 +15,16 @@ layout(set = 0, binding = 0) uniform CameraBuffer {
 } camera;
 
 layout(push_constant) uniform PickPushConsts {
-    mat4 model;
-    uint64_t ptrPos;
-    uint64_t ptrNorm;
-    uint64_t ptrAux;
-    uint entityID;
+    mat4     Model;
+    uint64_t PtrPositions;
+    uint64_t PtrNormals;
+    uint64_t PtrAux;
+    uint     EntityID;
 } push;
 
 void main() {
-    PositionBuffer positions = PositionBuffer(push.ptrPos);
+    PositionBuffer positions = PositionBuffer(push.PtrPositions);
     vec3 inPos = positions.values[gl_VertexIndex];
-    gl_Position = camera.proj * camera.view * push.model * vec4(inPos, 1.0);
+    gl_Position = camera.proj * camera.view * push.Model * vec4(inPos, 1.0);
 }
 

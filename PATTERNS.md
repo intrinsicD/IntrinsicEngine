@@ -358,8 +358,8 @@ A mesh uploads positions/normals once; wireframe, vertex visualization, and kNN 
 
 **Push constants per pass:**
 - **SurfacePass:** `uint64_t PtrPositions`, `PtrNormals`, `PtrAux` + `PtrFaceAttr`.
-- **LinePass:** `uint64_t PtrPositions` + `PtrEdges` + `PtrEdgeAux`.
-- **PointPass (120 bytes):** Model + `PtrPositions`/`PtrNormals`/`PtrAux` + PointSize/SizeMultiplier/Viewport + Color/Flags.
+- **LinePass:** `uint64_t PtrPositions` + `PtrEdges` + `PtrEdgeAttr`.
+- **PointPass (120 bytes):** Model + `PtrPositions`/`PtrNormals`/`PtrAttr` + PointSize/SizeMultiplier/Viewport + Color/Flags.
 
 **Use when:**
 - Adding a new visualization that shares vertex data with an existing geometry type.

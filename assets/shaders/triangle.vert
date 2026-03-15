@@ -32,13 +32,13 @@ layout(std430, set = 2, binding = 1) readonly buffer Visibility {
 } visibility;
 
 layout(push_constant) uniform PushConsts {
-    mat4 _unusedModel;
-    uint64_t ptrPos;
-    uint64_t ptrNorm;
-    uint64_t ptrAux;
-    uint VisibilityBase; // Base offset into VisibleRemap[] for this geometry batch
-    float PointSizePx;  // Used when drawing VK_PRIMITIVE_TOPOLOGY_POINT_LIST via the Forward pass.
-    uint64_t ptrFaceAttr; // BDA to per-face packed ABGR colors (0 = standard shading)
+    mat4     Model;
+    uint64_t PtrPositions;
+    uint64_t PtrNormals;
+    uint64_t PtrAux;
+    uint     VisibilityBase; // Base offset into VisibleRemap[] for this geometry batch
+    float    PointSizePx;    // Used when drawing VK_PRIMITIVE_TOPOLOGY_POINT_LIST via the Forward pass.
+    uint64_t PtrFaceAttr;    // BDA to per-face packed ABGR colors (0 = standard shading)
 } push;
 
 layout(location = 0) out vec3 fragNormal;
@@ -46,9 +46,9 @@ layout(location = 1) out vec2 fragTexCoord;
 layout(location = 2) flat out uint fragTexID;
 
 void main() {
-    PosBuf  pBuf = PosBuf(push.ptrPos);
-    NormBuf nBuf = NormBuf(push.ptrNorm);
-    AuxBuf  aBuf = AuxBuf(push.ptrAux);
+    PosBuf  pBuf = PosBuf(push.PtrPositions);
+    NormBuf nBuf = NormBuf(push.PtrNormals);
+    AuxBuf  aBuf = AuxBuf(push.PtrAux);
 
     // Read SoA
     vec3 inPos = pBuf.v[gl_VertexIndex];
