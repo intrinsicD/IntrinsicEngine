@@ -517,9 +517,12 @@ export namespace Graphics
         std::optional<CompiledRenderPlan> m_CachedPlan;
         uint64_t m_LastShapeKey{0};
 
-        // Packetization: merge linear chains of non-raster passes into execution packets.
+        // Packetization: merge linear chains of passes into execution packets.
+        // Non-raster passes merge when they form a linear DAG chain with no barriers.
+        // Raster passes merge when they additionally target the exact same attachments.
         void Packetize();
         [[nodiscard]] bool HasLinearEdge(uint32_t src, uint32_t dst) const;
+        [[nodiscard]] bool HasMatchingAttachments(uint32_t passA, uint32_t passB) const;
         [[nodiscard]] uint64_t ComputeShapeKey() const;
 
         // Packet-based execution (replaces per-pass ExecuteLayer).

@@ -108,6 +108,23 @@ protected:
             });
     }
 
+    // Helper: register a raster pass writing color + depth attachments.
+    void AddRasterPassColorDepth(const std::string& name,
+                                 RGResourceHandle colorTarget,
+                                 RGResourceHandle depthTarget,
+                                 RGAttachmentInfo colorInfo = {},
+                                 RGAttachmentInfo depthInfo = {})
+    {
+        struct PassData {};
+        m_Graph->AddPass<PassData>(name,
+            [colorTarget, depthTarget, colorInfo, depthInfo](PassData&, RGBuilder& builder)
+            {
+                builder.WriteColor(colorTarget, colorInfo);
+                builder.WriteDepth(depthTarget, depthInfo);
+            },
+            [](const PassData&, const RGRegistry&, VkCommandBuffer) {});
+    }
+
     std::unique_ptr<RHI::VulkanContext> m_Context;
     std::shared_ptr<RHI::VulkanDevice> m_Device;
     std::unique_ptr<Core::Memory::LinearArena> m_Arena;
@@ -140,9 +157,9 @@ TEST_F(RenderGraphPacketTest, SinglePass_OnePacket)
 }
 
 // ---------------------------------------------------------------------------
-// Two independent raster passes: no merging (raster passes don't merge)
+// Two raster passes targeting DIFFERENT attachments: no merging
 // ---------------------------------------------------------------------------
-TEST_F(RenderGraphPacketTest, TwoRasterPasses_NoMerge)
+TEST_F(RenderGraphPacketTest, TwoRasterPasses_DifferentAttachments_NoMerge)
 {
     struct PassData {};
 
@@ -170,7 +187,7 @@ TEST_F(RenderGraphPacketTest, TwoRasterPasses_NoMerge)
 
     auto stats = m_Graph->GetLastPacketStats();
     EXPECT_EQ(stats.PassCount, 2u);
-    EXPECT_EQ(stats.PacketCount, 2u);  // No merging for raster passes
+    EXPECT_EQ(stats.PacketCount, 2u);  // Different attachments → no merging
 }
 
 // ---------------------------------------------------------------------------
@@ -317,4 +334,217 @@ TEST_F(RenderGraphPacketTest, ExecutionLayersStillValid)
     for (const auto& layer : layers)
         totalNodes += static_cast<uint32_t>(layer.size());
     EXPECT_EQ(totalNodes, 1u);
+}
+
+// ===========================================================================
+// Raster packet merging tests
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// Two consecutive raster passes targeting the SAME color+depth attachments
+// should merge into a single packet (shared vkCmdBeginRendering scope).
+// ---------------------------------------------------------------------------
+TEST_F(RenderGraphPacketTest, TwoRasterPasses_SameAttachments_Merge)
+{
+    struct PassData {};
+
+    RGResourceHandle color, depth;
+
+    // Pass A creates the targets and writes them.
+    m_Graph->AddPass<PassData>("RasterA",
+        [&color, &depth](PassData&, RGBuilder& builder)
+        {
+            color = builder.CreateTexture("color"_id,
+                RGTextureDesc{.Width = 64, .Height = 64, .Format = VK_FORMAT_R8G8B8A8_UNORM});
+            depth = builder.CreateTexture("depth"_id,
+                RGTextureDesc{.Width = 64, .Height = 64,
+                              .Format = VK_FORMAT_D32_SFLOAT,
+                              .Usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+                              .Aspect = VK_IMAGE_ASPECT_DEPTH_BIT});
+            builder.WriteColor(color, RGAttachmentInfo{
+                .LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+                .StoreOp = VK_ATTACHMENT_STORE_OP_STORE});
+            builder.WriteDepth(depth, RGAttachmentInfo{
+                .LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+                .StoreOp = VK_ATTACHMENT_STORE_OP_STORE});
+        },
+        [](const PassData&, const RGRegistry&, VkCommandBuffer) {});
+
+    // Pass B writes the same targets (load existing content, store result).
+    m_Graph->AddPass<PassData>("RasterB",
+        [&color, &depth](PassData&, RGBuilder& builder)
+        {
+            builder.WriteColor(color, RGAttachmentInfo{
+                .LoadOp = VK_ATTACHMENT_LOAD_OP_LOAD,
+                .StoreOp = VK_ATTACHMENT_STORE_OP_STORE});
+            builder.WriteDepth(depth, RGAttachmentInfo{
+                .LoadOp = VK_ATTACHMENT_LOAD_OP_LOAD,
+                .StoreOp = VK_ATTACHMENT_STORE_OP_STORE});
+        },
+        [](const PassData&, const RGRegistry&, VkCommandBuffer) {});
+
+    m_Graph->Compile(0);
+
+    auto stats = m_Graph->GetLastPacketStats();
+    EXPECT_EQ(stats.PassCount, 2u);
+    EXPECT_EQ(stats.PacketCount, 1u);  // Same attachments → merged into 1 packet
+}
+
+// ---------------------------------------------------------------------------
+// Three consecutive raster passes on the same attachments: all merge.
+// ---------------------------------------------------------------------------
+TEST_F(RenderGraphPacketTest, ThreeRasterPasses_SameAttachments_MergeAll)
+{
+    struct PassData {};
+
+    RGResourceHandle color, depth;
+
+    m_Graph->AddPass<PassData>("RasterA",
+        [&color, &depth](PassData&, RGBuilder& builder)
+        {
+            color = builder.CreateTexture("color"_id,
+                RGTextureDesc{.Width = 64, .Height = 64, .Format = VK_FORMAT_R8G8B8A8_UNORM});
+            depth = builder.CreateTexture("depth"_id,
+                RGTextureDesc{.Width = 64, .Height = 64,
+                              .Format = VK_FORMAT_D32_SFLOAT,
+                              .Usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+                              .Aspect = VK_IMAGE_ASPECT_DEPTH_BIT});
+            builder.WriteColor(color, RGAttachmentInfo{});
+            builder.WriteDepth(depth, RGAttachmentInfo{});
+        },
+        [](const PassData&, const RGRegistry&, VkCommandBuffer) {});
+
+    m_Graph->AddPass<PassData>("RasterB",
+        [&color, &depth](PassData&, RGBuilder& builder)
+        {
+            builder.WriteColor(color, RGAttachmentInfo{.LoadOp = VK_ATTACHMENT_LOAD_OP_LOAD});
+            builder.WriteDepth(depth, RGAttachmentInfo{.LoadOp = VK_ATTACHMENT_LOAD_OP_LOAD});
+        },
+        [](const PassData&, const RGRegistry&, VkCommandBuffer) {});
+
+    m_Graph->AddPass<PassData>("RasterC",
+        [&color, &depth](PassData&, RGBuilder& builder)
+        {
+            builder.WriteColor(color, RGAttachmentInfo{.LoadOp = VK_ATTACHMENT_LOAD_OP_LOAD});
+            builder.WriteDepth(depth, RGAttachmentInfo{.LoadOp = VK_ATTACHMENT_LOAD_OP_LOAD});
+        },
+        [](const PassData&, const RGRegistry&, VkCommandBuffer) {});
+
+    m_Graph->Compile(0);
+
+    auto stats = m_Graph->GetLastPacketStats();
+    EXPECT_EQ(stats.PassCount, 3u);
+    EXPECT_EQ(stats.PacketCount, 1u);  // All three merge
+}
+
+// ---------------------------------------------------------------------------
+// Raster passes with same color but different depth: no merging.
+// ---------------------------------------------------------------------------
+TEST_F(RenderGraphPacketTest, RasterPasses_SameColorDifferentDepth_NoMerge)
+{
+    struct PassData {};
+
+    RGResourceHandle color, depthA, depthB;
+
+    m_Graph->AddPass<PassData>("RasterA",
+        [&color, &depthA](PassData&, RGBuilder& builder)
+        {
+            color = builder.CreateTexture("color"_id,
+                RGTextureDesc{.Width = 64, .Height = 64, .Format = VK_FORMAT_R8G8B8A8_UNORM});
+            depthA = builder.CreateTexture("depthA"_id,
+                RGTextureDesc{.Width = 64, .Height = 64,
+                              .Format = VK_FORMAT_D32_SFLOAT,
+                              .Usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+                              .Aspect = VK_IMAGE_ASPECT_DEPTH_BIT});
+            builder.WriteColor(color, RGAttachmentInfo{});
+            builder.WriteDepth(depthA, RGAttachmentInfo{});
+        },
+        [](const PassData&, const RGRegistry&, VkCommandBuffer) {});
+
+    m_Graph->AddPass<PassData>("RasterB",
+        [&color, &depthB](PassData&, RGBuilder& builder)
+        {
+            depthB = builder.CreateTexture("depthB"_id,
+                RGTextureDesc{.Width = 64, .Height = 64,
+                              .Format = VK_FORMAT_D32_SFLOAT,
+                              .Usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+                              .Aspect = VK_IMAGE_ASPECT_DEPTH_BIT});
+            builder.WriteColor(color, RGAttachmentInfo{.LoadOp = VK_ATTACHMENT_LOAD_OP_LOAD});
+            builder.WriteDepth(depthB, RGAttachmentInfo{});
+        },
+        [](const PassData&, const RGRegistry&, VkCommandBuffer) {});
+
+    m_Graph->Compile(0);
+
+    auto stats = m_Graph->GetLastPacketStats();
+    EXPECT_EQ(stats.PassCount, 2u);
+    EXPECT_EQ(stats.PacketCount, 2u);  // Different depth → no merging
+}
+
+// ---------------------------------------------------------------------------
+// Raster pass followed by a compute pass: no merging across types.
+// ---------------------------------------------------------------------------
+TEST_F(RenderGraphPacketTest, RasterThenCompute_NoMerge)
+{
+    struct PassData {};
+
+    RGResourceHandle color, buf;
+
+    m_Graph->AddPass<PassData>("Raster",
+        [&color](PassData&, RGBuilder& builder)
+        {
+            color = builder.CreateTexture("color"_id,
+                RGTextureDesc{.Width = 64, .Height = 64, .Format = VK_FORMAT_R8G8B8A8_UNORM});
+            builder.WriteColor(color, RGAttachmentInfo{});
+        },
+        [](const PassData&, const RGRegistry&, VkCommandBuffer) {});
+
+    m_Graph->AddPass<PassData>("Compute",
+        [&color, &buf](PassData&, RGBuilder& builder)
+        {
+            buf = builder.CreateBuffer("buf"_id, RGBufferDesc{.Size = 256});
+            builder.Read(color,
+                         VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                         VK_ACCESS_2_SHADER_READ_BIT);
+            builder.Write(buf);
+        },
+        [](const PassData&, const RGRegistry&, VkCommandBuffer) {});
+
+    m_Graph->Compile(0);
+
+    auto stats = m_Graph->GetLastPacketStats();
+    EXPECT_EQ(stats.PassCount, 2u);
+    EXPECT_EQ(stats.PacketCount, 2u);  // Raster + compute → never merge
+}
+
+// ---------------------------------------------------------------------------
+// Color-only raster passes on the same target merge.
+// ---------------------------------------------------------------------------
+TEST_F(RenderGraphPacketTest, TwoRasterPasses_ColorOnly_SameTarget_Merge)
+{
+    struct PassData {};
+
+    RGResourceHandle color;
+
+    m_Graph->AddPass<PassData>("RasterA",
+        [&color](PassData&, RGBuilder& builder)
+        {
+            color = builder.CreateTexture("color"_id,
+                RGTextureDesc{.Width = 64, .Height = 64, .Format = VK_FORMAT_R8G8B8A8_UNORM});
+            builder.WriteColor(color, RGAttachmentInfo{});
+        },
+        [](const PassData&, const RGRegistry&, VkCommandBuffer) {});
+
+    m_Graph->AddPass<PassData>("RasterB",
+        [&color](PassData&, RGBuilder& builder)
+        {
+            builder.WriteColor(color, RGAttachmentInfo{.LoadOp = VK_ATTACHMENT_LOAD_OP_LOAD});
+        },
+        [](const PassData&, const RGRegistry&, VkCommandBuffer) {});
+
+    m_Graph->Compile(0);
+
+    auto stats = m_Graph->GetLastPacketStats();
+    EXPECT_EQ(stats.PassCount, 2u);
+    EXPECT_EQ(stats.PacketCount, 1u);  // Same color target → merged
 }

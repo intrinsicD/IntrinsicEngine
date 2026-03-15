@@ -902,6 +902,15 @@ namespace Graphics
                 colorAtts.reserve(8);
                 VkExtent2D renderArea{0, 0};
 
+                // For merged raster packets, load ops + clear values come from
+                // the first pass; store ops come from the last pass.
+                const auto& lastPass = m_PassPool[pkt.FirstPass + pkt.PassCount - 1];
+
+                // Build a quick lookup of store ops from the last pass's attachments.
+                // Walk both lists in lockstep (they have matching structure — same
+                // resource IDs in the same order, guaranteed by HasMatchingAttachments).
+                const AttachmentNode* lastAtt = lastPass.AttachmentHead;
+
                 for (AttachmentNode* att = firstPass.AttachmentHead; att != nullptr; att = att->Next)
                 {
                     auto& res = m_ResourcePool[att->ID];
@@ -916,7 +925,7 @@ namespace Graphics
                                            ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
                                            : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
                     info.loadOp = att->Info.LoadOp;
-                    info.storeOp = att->Info.StoreOp;
+                    info.storeOp = lastAtt ? lastAtt->Info.StoreOp : att->Info.StoreOp;
                     info.clearValue = att->Info.ClearValue;
 
                     if (att->IsDepth)
@@ -928,6 +937,8 @@ namespace Graphics
                     {
                         colorAtts.push_back(info);
                     }
+
+                    if (lastAtt) lastAtt = lastAtt->Next;
                 }
 
                 renderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
@@ -1003,6 +1014,29 @@ namespace Graphics
         return m_Scheduler.GetIndegree(dst) == 1;
     }
 
+    bool RenderGraph::HasMatchingAttachments(uint32_t passA, uint32_t passB) const
+    {
+        const auto& a = m_PassPool[passA];
+        const auto& b = m_PassPool[passB];
+
+        // Both must be raster (have attachments).
+        if (a.AttachmentHead == nullptr || b.AttachmentHead == nullptr)
+            return false;
+
+        // Walk both linked lists and compare resource IDs and depth classification.
+        const AttachmentNode* na = a.AttachmentHead;
+        const AttachmentNode* nb = b.AttachmentHead;
+        while (na != nullptr && nb != nullptr)
+        {
+            if (na->ID != nb->ID || na->IsDepth != nb->IsDepth)
+                return false;
+            na = na->Next;
+            nb = nb->Next;
+        }
+        // Both lists must be the same length.
+        return na == nullptr && nb == nullptr;
+    }
+
     void RenderGraph::Packetize()
     {
         const auto& layers = m_Scheduler.GetExecutionLayers();
@@ -1029,19 +1063,34 @@ namespace Graphics
                 {
                     auto& last = packets.back();
                     const uint32_t lastEnd = last.FirstPass + last.PassCount - 1;
-                    // Merge conditions (conservative: non-raster only):
+
+                    // Common merge prerequisites:
                     // - Adjacent pass indices (consecutive in registration order)
-                    // - Both non-raster
                     // - No barriers on the candidate pass (no layout transitions needed)
-                    // - Linear DAG chain: last pass has outdegree 1 → this pass, this pass has indegree 1
-                    if (!isRaster && !last.IsRaster
-                        && passIdx == lastEnd + 1
+                    // - Linear DAG chain: predecessor has outdegree 1 → this pass, indegree 1
+                    const bool canMerge = passIdx == lastEnd + 1
                         && pass.ImageBarriers.empty()
                         && pass.BufferBarriers.empty()
-                        && HasLinearEdge(lastEnd, passIdx))
+                        && HasLinearEdge(lastEnd, passIdx);
+
+                    if (canMerge)
                     {
-                        last.PassCount++;
-                        merged = true;
+                        if (!isRaster && !last.IsRaster)
+                        {
+                            // Non-raster merging (existing behavior).
+                            last.PassCount++;
+                            merged = true;
+                        }
+                        else if (isRaster && last.IsRaster
+                                 && HasMatchingAttachments(last.FirstPass, passIdx))
+                        {
+                            // Raster merging: consecutive raster passes targeting the
+                            // exact same color+depth attachments share a single
+                            // vkCmdBeginRendering scope. Load ops come from the first
+                            // pass; store ops come from the last pass in the packet.
+                            last.PassCount++;
+                            merged = true;
+                        }
                     }
                 }
 
