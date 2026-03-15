@@ -34,7 +34,7 @@ namespace Graphics::Systems::GPUSceneSync
 
         for (auto [entity, world, sc] : view.each())
         {
-            if (sc.GpuSlot == ECS::Surface::Component::kInvalidSlot)
+            if (sc.GpuSlot == ECS::kInvalidGpuSlot)
                 continue;
 
             const bool transformDirty = registry.all_of<ECS::Components::Transform::WorldUpdatedTag>(entity);
@@ -136,7 +136,7 @@ namespace Graphics::Systems::GPUSceneSync
 
         for (auto [entity, world, graphData] : graphView.each())
         {
-            if (graphData.GpuSlot == ECS::Graph::Data::kInvalidSlot)
+            if (graphData.GpuSlot == ECS::kInvalidGpuSlot)
                 continue;
 
             const bool transformDirty = registry.all_of<ECS::Components::Transform::WorldUpdatedTag>(entity);
@@ -164,7 +164,7 @@ namespace Graphics::Systems::GPUSceneSync
 
         for (auto [entity, world, pcData] : cloudView.each())
         {
-            if (pcData.GpuSlot == ECS::PointCloud::Data::kInvalidSlot)
+            if (pcData.GpuSlot == ECS::kInvalidGpuSlot)
                 continue;
 
             const bool transformDirty = registry.all_of<ECS::Components::Transform::WorldUpdatedTag>(entity);

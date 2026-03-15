@@ -129,6 +129,12 @@ namespace Graphics::Systems::PointCloudGeometrySync
                 {
                     Core::Log::Error("PointCloudGeometrySync: Failed to create GPU geometry for entity {}",
                                      static_cast<uint32_t>(entity));
+                    // Clear stale cached attributes — the previous geometry was
+                    // already released and counts may no longer match.
+                    pcData.CachedColors.clear();
+                    pcData.CachedRadii.clear();
+                    pcData.GpuPointCount = 0;
+                    pcData.HasGpuNormals = false;
                     pcData.GpuDirty = false;
                     // Fall through to Phase 3 (GpuGeometry invalid → skip).
                 }
@@ -150,14 +156,14 @@ namespace Graphics::Systems::PointCloudGeometrySync
             // Phase 2: Allocate GPUScene slot for entities with valid GPU geometry.
             // Allocate once, then GPUSceneSync handles subsequent transform-only updates.
             // -----------------------------------------------------------------
-            if (pcData.GpuSlot == ECS::PointCloud::Data::kInvalidSlot && pcData.GpuGeometry.IsValid())
+            if (pcData.GpuSlot == ECS::kInvalidGpuSlot && pcData.GpuGeometry.IsValid())
             {
                 GeometryGpuData* geo = geometryStorage.GetIfValid(pcData.GpuGeometry);
                 if (geo && geo->GetVertexBuffer())
                 {
                     const uint32_t slot = AllocateGpuSlot(
                         registry, entity, gpuScene, *geo, pcData.GpuGeometry);
-                    if (slot != ECS::PointCloud::Data::kInvalidSlot)
+                    if (slot != ECS::kInvalidGpuSlot)
                         pcData.GpuSlot = slot;
                 }
             }
@@ -178,6 +184,12 @@ namespace Graphics::Systems::PointCloudGeometrySync
                 pt.HasPerPointColors  = !pcData.CachedColors.empty();
                 pt.HasPerPointRadii   = pcData.HasRadii();
                 pt.HasPerPointNormals = pcData.HasRenderableNormals();
+            }
+            else if (!pcData.Visible)
+            {
+                // Remove per-pass component so hidden clouds stop rendering.
+                if (registry.all_of<ECS::Point::Component>(entity))
+                    registry.remove<ECS::Point::Component>(entity);
             }
         }
     }

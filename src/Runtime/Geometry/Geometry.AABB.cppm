@@ -66,6 +66,21 @@ export namespace Geometry
         }
     };
 
+    // Transform an AABB by a 4x4 matrix, returning the axis-aligned bounding
+    // box of the transformed corners. Useful for world-space AABB computation
+    // from local-space geometry + model matrix.
+    [[nodiscard]] AABB TransformAABB(const AABB& box, const glm::mat4& m)
+    {
+        AABB result;
+        for (const auto& corner : box.GetCorners())
+        {
+            const glm::vec3 tp = glm::vec3(m * glm::vec4(corner, 1.0f));
+            result.Min = glm::min(result.Min, tp);
+            result.Max = glm::max(result.Max, tp);
+        }
+        return result;
+    }
+
     [[nodiscard]] glm::vec3 ClosestPoint(const AABB& aabb, const glm::vec3& point)
     {
         return glm::clamp(point, aabb.Min, aabb.Max);

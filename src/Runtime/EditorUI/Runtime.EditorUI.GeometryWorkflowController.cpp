@@ -271,7 +271,7 @@ void GeometryWorkflowController::ApplyOperator(entt::entity entity,
         m_Engine->GetGeometryStorage().Remove(oldHandle, m_Engine->GetDevice().GetGlobalFrameNumber());
     }
 
-    sc->GpuSlot = ECS::Surface::Component::kInvalidSlot;
+    sc->GpuSlot = ECS::kInvalidGpuSlot;
     reg.emplace_or_replace<ECS::Components::Transform::WorldUpdatedTag>(entity);
 
     if (auto* ev = reg.try_get<ECS::MeshEdgeView::Component>(entity))

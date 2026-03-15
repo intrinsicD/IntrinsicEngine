@@ -192,6 +192,13 @@ namespace Graphics::Systems::GraphGeometrySync
                 {
                     Core::Log::Error("GraphGeometrySync: Failed to create GPU geometry for entity {}",
                                      static_cast<uint32_t>(entity));
+                    // Clear stale cached attributes — the previous geometry was
+                    // already released and counts may no longer match.
+                    graphData.CachedEdgePairs.clear();
+                    graphData.CachedEdgeColors.clear();
+                    graphData.CachedNodeColors.clear();
+                    graphData.CachedNodeRadii.clear();
+                    graphData.GpuVertexCount = 0;
                     graphData.GpuDirty = false;
                     // Fall through to Phase 3 (GpuGeometry invalid → skip).
                 }
@@ -259,14 +266,14 @@ namespace Graphics::Systems::GraphGeometrySync
             // Phase 2: Allocate GPUScene slot for entities with valid GPU geometry.
             // Allocate once, then GPUSceneSync handles subsequent transform-only updates.
             // -----------------------------------------------------------------
-            if (graphData.GpuSlot == ECS::Graph::Data::kInvalidSlot && graphData.GpuGeometry.IsValid())
+            if (graphData.GpuSlot == ECS::kInvalidGpuSlot && graphData.GpuGeometry.IsValid())
             {
                 GeometryGpuData* geo = geometryStorage.GetIfValid(graphData.GpuGeometry);
                 if (geo && geo->GetVertexBuffer())
                 {
                     const uint32_t slot = AllocateGpuSlot(
                         registry, entity, gpuScene, *geo, graphData.GpuGeometry);
-                    if (slot != ECS::Graph::Data::kInvalidSlot)
+                    if (slot != ECS::kInvalidGpuSlot)
                         graphData.GpuSlot = slot;
                 }
             }
@@ -298,6 +305,15 @@ namespace Graphics::Systems::GraphGeometrySync
                 pt.Mode              = graphData.NodeRenderMode;
                 pt.HasPerPointColors = !graphData.CachedNodeColors.empty();
                 pt.HasPerPointRadii  = !graphData.CachedNodeRadii.empty();
+            }
+            else if (!graphData.Visible)
+            {
+                // Remove per-pass components so hidden graphs stop rendering.
+                // Only remove if we own them (entity has Graph::Data).
+                if (registry.all_of<ECS::Line::Component>(entity))
+                    registry.remove<ECS::Line::Component>(entity);
+                if (registry.all_of<ECS::Point::Component>(entity))
+                    registry.remove<ECS::Point::Component>(entity);
             }
         }
     }

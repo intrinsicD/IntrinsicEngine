@@ -125,27 +125,15 @@ void InspectorController::Draw()
                 ImGui::Checkbox("Visible##Graph", &gd.Visible);
 
                 ImGui::SeparatorText("Node Settings");
-                const char* modeNames[] = {"Flat Disc", "Surfel", "EWA Splatting", "Sphere"};
-                int modeIdx = static_cast<int>(gd.NodeRenderMode);
-                if (modeIdx < 0 || modeIdx > 3) modeIdx = 0;
-                if (ImGui::Combo("Node Render Mode", &modeIdx, modeNames, 4))
-                    gd.NodeRenderMode = static_cast<Geometry::PointCloud::RenderMode>(modeIdx);
+                PointRenderModeCombo("Node Render Mode", gd.NodeRenderMode);
                 ImGui::SliderFloat("Node Size", &gd.DefaultNodeRadius, 0.0005f, 0.05f, "%.5f",
                                    ImGuiSliderFlags_Logarithmic);
                 ImGui::SliderFloat("Node Size Multiplier", &gd.NodeSizeMultiplier, 0.1f, 10.0f, "%.2f",
                                    ImGuiSliderFlags_Logarithmic);
-                float nc[4] = {
-                    gd.DefaultNodeColor.r, gd.DefaultNodeColor.g, gd.DefaultNodeColor.b, gd.DefaultNodeColor.a
-                };
-                if (ImGui::ColorEdit4("Node Color", nc))
-                    gd.DefaultNodeColor = glm::vec4(nc[0], nc[1], nc[2], nc[3]);
+                ColorEdit4("Node Color", gd.DefaultNodeColor);
 
                 ImGui::SeparatorText("Edge Settings");
-                float ec[4] = {
-                    gd.DefaultEdgeColor.r, gd.DefaultEdgeColor.g, gd.DefaultEdgeColor.b, gd.DefaultEdgeColor.a
-                };
-                if (ImGui::ColorEdit4("Edge Color", ec))
-                    gd.DefaultEdgeColor = glm::vec4(ec[0], ec[1], ec[2], ec[3]);
+                ColorEdit4("Edge Color", gd.DefaultEdgeColor);
                 ImGui::SliderFloat("Edge Width", &gd.EdgeWidth, 0.5f, 5.0f);
                 ImGui::Checkbox("Edge Overlay", &gd.EdgesOverlay);
 
@@ -186,20 +174,14 @@ void InspectorController::Draw()
                 ImGui::SeparatorText("Rendering");
                 ImGui::Checkbox("Visible##PCD", &pcd.Visible);
 
-                const char* modeNames[] = {"Flat Disc", "Surfel", "EWA Splatting", "Sphere"};
-                int modeIdx = static_cast<int>(pcd.RenderMode);
-                if (modeIdx < 0 || modeIdx > 3) modeIdx = 0;
-                if (ImGui::Combo("Render Mode##PCD", &modeIdx, modeNames, 4))
-                    pcd.RenderMode = static_cast<Geometry::PointCloud::RenderMode>(modeIdx);
+                PointRenderModeCombo("Render Mode##PCD", pcd.RenderMode);
 
                 ImGui::SliderFloat("Default Radius##PCD", &pcd.DefaultRadius, 0.0005f, 0.1f, "%.5f",
                                    ImGuiSliderFlags_Logarithmic);
                 ImGui::SliderFloat("Size Multiplier##PCD", &pcd.SizeMultiplier, 0.1f, 10.0f, "%.2f",
                                    ImGuiSliderFlags_Logarithmic);
 
-                float dc[4] = {pcd.DefaultColor.r, pcd.DefaultColor.g, pcd.DefaultColor.b, pcd.DefaultColor.a};
-                if (ImGui::ColorEdit4("Default Color##PCD", dc))
-                    pcd.DefaultColor = glm::vec4(dc[0], dc[1], dc[2], dc[3]);
+                ColorEdit4("Default Color##PCD", pcd.DefaultColor);
 
                 if (pcd.CloudRef)
                 {
@@ -264,9 +246,7 @@ void InspectorController::Draw()
                 if (auto* line = reg.try_get<ECS::Line::Component>(selected))
                 {
                     ImGui::SeparatorText("Wireframe Settings");
-                    float wc[4] = {line->Color.r, line->Color.g, line->Color.b, line->Color.a};
-                    if (ImGui::ColorEdit4("Wire Color", wc))
-                        line->Color = glm::vec4(wc[0], wc[1], wc[2], wc[3]);
+                    ColorEdit4("Wire Color", line->Color);
                     ImGui::SliderFloat("Wire Width", &line->Width, 0.5f, 5.0f);
                     ImGui::Checkbox("Overlay##Wire", &line->Overlay);
 
@@ -277,16 +257,10 @@ void InspectorController::Draw()
                 if (auto* pt = reg.try_get<ECS::Point::Component>(selected))
                 {
                     ImGui::SeparatorText("Vertex Settings");
-                    const char* modeNames[] = {"Flat Disc", "Surfel", "EWA Splatting", "Sphere"};
-                    int modeIdx = static_cast<int>(pt->Mode);
-                    if (modeIdx < 0 || modeIdx > 3) modeIdx = 0;
-                    if (ImGui::Combo("Render Mode", &modeIdx, modeNames, 4))
-                        pt->Mode = static_cast<Geometry::PointCloud::RenderMode>(modeIdx);
+                    PointRenderModeCombo("Render Mode", pt->Mode);
                     ImGui::SliderFloat("Vertex Size", &pt->Size, 0.0005f, 0.05f, "%.5f",
                                        ImGuiSliderFlags_Logarithmic);
-                    float vc[4] = {pt->Color.r, pt->Color.g, pt->Color.b, pt->Color.a};
-                    if (ImGui::ColorEdit4("Vertex Color", vc))
-                        pt->Color = glm::vec4(vc[0], vc[1], vc[2], vc[3]);
+                    ColorEdit4("Vertex Color", pt->Color);
                 }
 
                 // PropertySet-driven color visualization for meshes.

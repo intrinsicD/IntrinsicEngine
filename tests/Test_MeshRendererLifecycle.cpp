@@ -27,7 +27,7 @@ TEST(MeshRendererLifecycle_Contract, SurfaceComponentDefaultState)
     ECS::Surface::Component comp;
 
     EXPECT_FALSE(comp.Geometry.IsValid());
-    EXPECT_EQ(comp.GpuSlot, ECS::Surface::Component::kInvalidSlot);
+    EXPECT_EQ(comp.GpuSlot, ECS::kInvalidGpuSlot);
     EXPECT_TRUE(comp.Visible);
     EXPECT_TRUE(comp.CachedVisible);
     EXPECT_TRUE(comp.VertexColorsDirty);
@@ -40,16 +40,8 @@ TEST(MeshRendererLifecycle_Contract, SurfaceComponentDefaultState)
 
 TEST(MeshRendererLifecycle_Contract, InvalidSlotSentinelConsistent)
 {
-    // All renderer components must use the same kInvalidSlot sentinel (~0u).
-    EXPECT_EQ(ECS::Surface::Component::kInvalidSlot, ~0u);
-    EXPECT_EQ(ECS::Surface::Component::kInvalidSlot,
-              ECS::Graph::Data::kInvalidSlot);
-    EXPECT_EQ(ECS::Surface::Component::kInvalidSlot,
-              ECS::PointCloud::Data::kInvalidSlot);
-    EXPECT_EQ(ECS::Surface::Component::kInvalidSlot,
-              ECS::MeshEdgeView::Component::kInvalidSlot);
-    EXPECT_EQ(ECS::Surface::Component::kInvalidSlot,
-              ECS::MeshVertexView::Component::kInvalidSlot);
+    // All components now use the shared ECS::kInvalidGpuSlot constant.
+    EXPECT_EQ(ECS::kInvalidGpuSlot, ~0u);
 }
 
 // =============================================================================
@@ -106,13 +98,13 @@ TEST(MeshRendererLifecycle_Contract, MaterialCacheDefaultState)
 TEST(MeshRendererLifecycle_Contract, GpuSlotCanBeAssignedAndCleared)
 {
     ECS::Surface::Component comp;
-    EXPECT_EQ(comp.GpuSlot, ECS::Surface::Component::kInvalidSlot);
+    EXPECT_EQ(comp.GpuSlot, ECS::kInvalidGpuSlot);
 
     comp.GpuSlot = 7u;
     EXPECT_EQ(comp.GpuSlot, 7u);
 
-    comp.GpuSlot = ECS::Surface::Component::kInvalidSlot;
-    EXPECT_EQ(comp.GpuSlot, ECS::Surface::Component::kInvalidSlot);
+    comp.GpuSlot = ECS::kInvalidGpuSlot;
+    EXPECT_EQ(comp.GpuSlot, ECS::kInvalidGpuSlot);
 }
 
 // =============================================================================

@@ -222,7 +222,7 @@ TEST(BDA_Components, SurfaceDefaults)
     ECS::Surface::Component comp;
 
     EXPECT_FALSE(comp.Geometry.IsValid());
-    EXPECT_EQ(comp.GpuSlot, ECS::Surface::Component::kInvalidSlot);
+    EXPECT_EQ(comp.GpuSlot, ECS::kInvalidGpuSlot);
     EXPECT_EQ(comp.GpuSlot, ~0u);
 }
 
@@ -234,7 +234,7 @@ TEST(BDA_Components, GraphDataDefaults)
     EXPECT_FALSE(data.GpuGeometry.IsValid());
     EXPECT_FALSE(data.GpuEdgeGeometry.IsValid());
     EXPECT_EQ(data.GpuEdgeCount, 0u);
-    EXPECT_EQ(data.GpuSlot, ECS::Graph::Data::kInvalidSlot);
+    EXPECT_EQ(data.GpuSlot, ECS::kInvalidGpuSlot);
     EXPECT_TRUE(data.GpuDirty);
     EXPECT_EQ(data.GpuVertexCount, 0u);
     EXPECT_TRUE(data.CachedEdgePairs.empty());

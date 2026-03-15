@@ -8,6 +8,7 @@ module;
 #include <unordered_map>
 #include <vector>
 #include <glm/glm.hpp>
+#include "Graphics.Importers.AttributeVertexKey.hpp"
 #include "Graphics.Importers.TextParse.hpp"
 #include "Graphics.Importers.TriangulationUtils.hpp"
 
@@ -24,19 +25,8 @@ namespace Graphics
 {
     namespace
     {
-        struct VertexKey
-        {
-            int p = -1, n = -1, t = -1;
-            bool operator==(const VertexKey& other) const { return p == other.p && n == other.n && t == other.t; }
-        };
-
-        struct VertexKeyHash
-        {
-            size_t operator()(const VertexKey& k) const
-            {
-                return std::hash<int>()(k.p) ^ (std::hash<int>()(k.n) << 1) ^ (std::hash<int>()(k.t) << 2);
-            }
-        };
+        using VertexKey = Importers::AttributeVertexKey;
+        using VertexKeyHash = Importers::AttributeVertexKeyHash;
 
         static constexpr std::string_view s_Extensions[] = { ".obj" };
     }

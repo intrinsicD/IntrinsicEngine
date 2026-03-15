@@ -19,7 +19,7 @@ namespace
     Graphics::GPUScene* g_GpuSceneForDestroyHook = nullptr;
 
     // Shared GPU slot cleanup for all component types that own a GPUScene slot.
-    // Each component type must expose GpuSlot and kInvalidSlot with compatible semantics.
+    // All such components initialize GpuSlot to ECS::kInvalidGpuSlot.
     template <typename T>
     void OnGpuComponentDestroyed(entt::registry& registry, entt::entity entity)
     {
@@ -27,14 +27,14 @@ namespace
             return;
 
         auto& comp = registry.get<T>(entity);
-        if (comp.GpuSlot == T::kInvalidSlot)
+        if (comp.GpuSlot == ECS::kInvalidGpuSlot)
             return;
 
         // Deactivate slot (radius = 0 => culler skips it) and free.
         Graphics::GpuInstanceData inst{};
         g_GpuSceneForDestroyHook->QueueUpdate(comp.GpuSlot, inst, /*sphere*/ {0.0f, 0.0f, 0.0f, 0.0f});
         g_GpuSceneForDestroyHook->FreeSlot(comp.GpuSlot);
-        comp.GpuSlot = T::kInvalidSlot;
+        comp.GpuSlot = ECS::kInvalidGpuSlot;
     }
 }
 
