@@ -89,57 +89,21 @@ namespace Graphics::Passes
         if (pointCount == 0)
             return true;
 
+        constexpr uint32_t kMinCap = 256u;
+        constexpr VkBufferUsageFlags kBDA = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
+                                          | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+
         // --- Position buffer (per-frame) ---
-        if (pointCount > m_TransientPosCapacity)
-        {
-            uint32_t newCap = std::max(256u, m_TransientPosCapacity);
-            while (newCap < pointCount) newCap *= 2;
-
-            const VkDeviceSize size = static_cast<VkDeviceSize>(newCap) * sizeof(glm::vec3);
-            for (uint32_t i = 0; i < FRAMES; ++i)
-            {
-                if (m_TransientPosBuffer[i])
-                    m_Device->SafeDestroy([old = std::move(m_TransientPosBuffer[i])]() {});
-
-                m_TransientPosBuffer[i] = std::make_unique<RHI::VulkanBuffer>(
-                    *m_Device, size,
-                    VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-                    VMA_MEMORY_USAGE_CPU_TO_GPU);
-
-                if (!m_TransientPosBuffer[i]->GetMappedData())
-                {
-                    Core::Log::Error("PointPass: Failed to allocate transient position buffer ({} bytes)", size);
-                    return false;
-                }
-            }
-            m_TransientPosCapacity = newCap;
-        }
+        if (!EnsurePerFrameBuffer<glm::vec3, FRAMES>(
+                *m_Device, m_TransientPosBuffer, m_TransientPosCapacity,
+                pointCount, kMinCap, "PointPass", kBDA))
+            return false;
 
         // --- Normal buffer (per-frame) ---
-        if (pointCount > m_TransientNormCapacity)
-        {
-            uint32_t newCap = std::max(256u, m_TransientNormCapacity);
-            while (newCap < pointCount) newCap *= 2;
-
-            const VkDeviceSize size = static_cast<VkDeviceSize>(newCap) * sizeof(glm::vec3);
-            for (uint32_t i = 0; i < FRAMES; ++i)
-            {
-                if (m_TransientNormBuffer[i])
-                    m_Device->SafeDestroy([old = std::move(m_TransientNormBuffer[i])]() {});
-
-                m_TransientNormBuffer[i] = std::make_unique<RHI::VulkanBuffer>(
-                    *m_Device, size,
-                    VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-                    VMA_MEMORY_USAGE_CPU_TO_GPU);
-
-                if (!m_TransientNormBuffer[i]->GetMappedData())
-                {
-                    Core::Log::Error("PointPass: Failed to allocate transient normal buffer ({} bytes)", size);
-                    return false;
-                }
-            }
-            m_TransientNormCapacity = newCap;
-        }
+        if (!EnsurePerFrameBuffer<glm::vec3, FRAMES>(
+                *m_Device, m_TransientNormBuffer, m_TransientNormCapacity,
+                pointCount, kMinCap, "PointPass", kBDA))
+            return false;
 
         return true;
     }
@@ -467,7 +431,7 @@ namespace Graphics::Passes
                 di.PtrAttr = attrAddr;
                 di.VertexCount = vertexCount;
                 // Clamp point radius to safe world-space range [0.0001, 1.0].
-                di.PointSize = std::clamp(pt.Size, 0.0001f, 1.0f);
+                di.PointSize = ClampPointSize(pt.Size);
                 di.SizeMultiplier = pt.SizeMultiplier;
                 di.Color = ptColor;
                 di.Flags = flags;

@@ -14,6 +14,29 @@ import :VisualizationConfig;
 import Geometry;
 import Core.Assets;
 
+// =============================================================================
+// Component Naming Contract
+// =============================================================================
+//
+// This file defines three categories of ECS components with distinct naming
+// conventions (see PATTERNS.md §5 for the full pattern):
+//
+//   *::Data  — Geometry data authority components (Graph::Data, PointCloud::Data,
+//              Mesh::Data). Hold shared_ptr to authoritative geometry, cached
+//              per-element attributes (colors, radii), GPU state (GpuGeometry,
+//              GpuSlot, GpuDirty). Updated by lifecycle systems on dirty check.
+//
+//   *::Component — Per-pass render components (Surface::Component, Line::Component,
+//                  Point::Component) and geometry view components (MeshEdgeView,
+//                  MeshVertexView). Presence/absence is the rendering toggle — no
+//                  boolean flags. Populated every frame by lifecycle systems.
+//
+//   DirtyTag::* — Zero-size tag components for per-domain dirty tracking.
+//                 Presence signals that data has changed and needs re-sync.
+//
+// When adding a new geometry type, create a *::Data component.
+// When adding a new render pass, create a *::Component.
+
 // =========================================================================
 // DirtyTag — Per-domain dirty tracking for PropertySet CPU→GPU sync.
 // =========================================================================

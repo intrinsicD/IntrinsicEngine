@@ -246,13 +246,18 @@ inline void TransitionImageToShaderRead(
 //   passName      — used in error log messages.
 //
 // Growth strategy: next power of 2 >= required, floored at minCapacity.
+//
+// bufferUsage — Vulkan buffer usage flags. Default is STORAGE_BUFFER_BIT.
+//               Pass STORAGE_BUFFER_BIT | SHADER_DEVICE_ADDRESS_BIT for
+//               transient BDA-addressable buffers (Line/Point passes).
 template<typename T, uint32_t FRAMES>
 bool EnsurePerFrameBuffer(RHI::VulkanDevice& device,
                           std::unique_ptr<RHI::VulkanBuffer> (&buffers)[FRAMES],
                           uint32_t& capacity,
                           uint32_t  required,
                           uint32_t  minCapacity,
-                          std::string_view passName)
+                          std::string_view passName,
+                          VkBufferUsageFlags bufferUsage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
 {
     if (required <= capacity && buffers[0] != nullptr)
         return true;
@@ -275,7 +280,7 @@ bool EnsurePerFrameBuffer(RHI::VulkanDevice& device,
         buffers[i] = std::make_unique<RHI::VulkanBuffer>(
             device,
             byteSize,
-            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+            bufferUsage,
             VMA_MEMORY_USAGE_CPU_TO_GPU);
 
         if (!buffers[i]->GetMappedData())
@@ -478,3 +483,55 @@ uint64_t EnsurePerEntityBuffer(
     bufferMap[entityKey] = { std::move(buf), elementCount };
     return addr;
 }
+
+// =============================================================================
+// EnsureSingleBuffer<T> — grow a single (non-per-frame) host-visible BDA buffer.
+// =============================================================================
+// Same growth strategy as EnsurePerFrameBuffer but for a single buffer instance.
+// Used for shared-across-frames transient data (e.g., LinePass identity edge buffer).
+//
+// Returns true on success, false on allocation failure.
+
+template<typename T>
+bool EnsureSingleBuffer(RHI::VulkanDevice& device,
+                        std::unique_ptr<RHI::VulkanBuffer>& buffer,
+                        uint32_t& capacity,
+                        uint32_t  required,
+                        uint32_t  minCapacity,
+                        std::string_view passName,
+                        VkBufferUsageFlags bufferUsage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
+                                                        | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT)
+{
+    if (required <= capacity && buffer != nullptr)
+        return true;
+
+    uint32_t newCapacity = minCapacity;
+    while (newCapacity < required)
+        newCapacity *= 2;
+
+    if (buffer)
+        device.SafeDestroy([old = std::move(buffer)]() {});
+
+    const size_t byteSize = static_cast<size_t>(newCapacity) * sizeof(T);
+    buffer = std::make_unique<RHI::VulkanBuffer>(
+        device, byteSize, bufferUsage, VMA_MEMORY_USAGE_CPU_TO_GPU);
+
+    if (!buffer->GetMappedData())
+    {
+        Core::Log::Error("{}: Failed to allocate buffer ({} bytes)", passName, byteSize);
+        return false;
+    }
+
+    capacity = newCapacity;
+    return true;
+}
+
+// =============================================================================
+// ClampLineWidth / ClampPointSize — numerical safeguard helpers.
+// =============================================================================
+// Centralize the clamping constants documented in CLAUDE.md (Numerical Safeguards):
+//   Line widths: [0.5, 32.0] pixels (C++ and shader).
+//   Point radii:  [0.0001, 1.0] world-space.
+
+inline float ClampLineWidth(float width)  { return std::clamp(width, 0.5f, 32.0f); }
+inline float ClampPointSize(float size)   { return std::clamp(size, 0.0001f, 1.0f); }
