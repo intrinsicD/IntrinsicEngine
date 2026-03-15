@@ -755,15 +755,7 @@ namespace Graphics
                             }
                         }
 
-                        if (faceIndices.size() >= 3)
-                        {
-                            for (size_t k = 1; k + 1 < faceIndices.size(); ++k)
-                            {
-                                outData.Indices.push_back(faceIndices[0]);
-                                outData.Indices.push_back(faceIndices[k]);
-                                outData.Indices.push_back(faceIndices[k + 1]);
-                            }
-                        }
+                        Importers::TriangulateFan(faceIndices, outData.Indices);
                     }
                 }
                 else if (elem.Name == "tristrips")
