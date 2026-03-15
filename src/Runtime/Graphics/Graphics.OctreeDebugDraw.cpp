@@ -16,11 +16,6 @@ namespace Graphics
 {
     namespace
     {
-        [[nodiscard]] std::uint32_t PackWithAlpha(const glm::vec3& rgb, float alpha)
-        {
-            return GpuColor::PackVec3WithAlpha(rgb, alpha);
-        }
-
         // Delegates to Geometry::TransformAABB, wrapping the out-param interface.
         void TransformAABB(const glm::vec3& lo, const glm::vec3& hi, const glm::mat4& m,
                           glm::vec3& outLo, glm::vec3& outHi)
@@ -78,7 +73,7 @@ namespace Graphics
 
                 const float t = (maxDepth > 0) ? (static_cast<float>(it.Depth) / static_cast<float>(maxDepth)) : 0.0f;
                 const glm::vec3 rgb = settings.ColorByDepth ? GpuColor::DepthRamp(t) : settings.BaseColor;
-                const std::uint32_t color = PackWithAlpha(rgb, settings.Alpha);
+                const std::uint32_t color = GpuColor::PackVec3WithAlpha(rgb, settings.Alpha);
 
                 const auto& aabb = n.Aabb;
                 glm::vec3 lo, hi;

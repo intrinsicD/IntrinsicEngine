@@ -13,16 +13,6 @@ namespace Graphics
 {
     namespace
     {
-        [[nodiscard]] std::uint32_t PackWithAlpha(const glm::vec3& rgb, const float alpha)
-        {
-            return GpuColor::PackVec3WithAlpha(rgb, alpha);
-        }
-
-        [[nodiscard]] glm::vec3 TransformPoint(const glm::vec3& p, const glm::mat4& m)
-        {
-            return glm::vec3(m * glm::vec4(p, 1.0f));
-        }
-
         void EmitEdge(DebugDraw& dd,
                       const glm::vec3& a,
                       const glm::vec3& b,
@@ -30,8 +20,8 @@ namespace Graphics
                       const std::uint32_t color,
                       const glm::mat4& worldTransform)
         {
-            const glm::vec3 wa = TransformPoint(a, worldTransform);
-            const glm::vec3 wb = TransformPoint(b, worldTransform);
+            const glm::vec3 wa = GpuColor::TransformPoint(a, worldTransform);
+            const glm::vec3 wb = GpuColor::TransformPoint(b, worldTransform);
             if (overlay) dd.OverlayLine(wa, wb, color);
             else dd.Line(wa, wb, color);
         }
@@ -52,7 +42,7 @@ namespace Graphics
         if (!settings.Enabled) return;
         if (hullMesh.IsEmpty()) return;
 
-        const std::uint32_t lineColor = PackWithAlpha(settings.Color, settings.Alpha);
+        const std::uint32_t lineColor = GpuColor::PackVec3WithAlpha(settings.Color, settings.Alpha);
 
         for (std::uint32_t fi = 0; fi < hullMesh.FacesSize(); ++fi)
         {

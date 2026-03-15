@@ -12,11 +12,6 @@ namespace Graphics
 {
     namespace
     {
-        [[nodiscard]] std::uint32_t PackWithAlpha(const glm::vec3& rgb, const float alpha)
-        {
-            return GpuColor::PackVec3WithAlpha(rgb, alpha);
-        }
-
         [[nodiscard]] Geometry::AABB AabbFromObb(const Geometry::OBB& obb)
         {
             const auto corners = obb.GetCorners();
@@ -65,9 +60,9 @@ namespace Graphics
         if (!localAabb.IsValid()) return;
         if (!worldObb.IsValid()) return;
 
-        const std::uint32_t aabbColor = PackWithAlpha(settings.AABBColor, settings.Alpha);
-        const std::uint32_t obbColor = PackWithAlpha(settings.OBBColor, settings.Alpha);
-        const std::uint32_t sphereColor = PackWithAlpha(settings.SphereColor, settings.Alpha);
+        const std::uint32_t aabbColor = GpuColor::PackVec3WithAlpha(settings.AABBColor, settings.Alpha);
+        const std::uint32_t obbColor = GpuColor::PackVec3WithAlpha(settings.OBBColor, settings.Alpha);
+        const std::uint32_t sphereColor = GpuColor::PackVec3WithAlpha(settings.SphereColor, settings.Alpha);
 
         const auto drawBox = [&dd, &settings](const glm::vec3& lo, const glm::vec3& hi, const std::uint32_t color)
         {

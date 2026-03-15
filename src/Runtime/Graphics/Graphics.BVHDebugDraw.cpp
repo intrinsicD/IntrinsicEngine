@@ -35,16 +35,6 @@ namespace Graphics
             [[nodiscard]] bool IsLeaf() const { return Left < 0 || Right < 0; }
         };
 
-        [[nodiscard]] std::uint32_t PackWithAlpha(const glm::vec3& rgb, const float alpha)
-        {
-            return GpuColor::PackVec3WithAlpha(rgb, alpha);
-        }
-
-        [[nodiscard]] glm::vec3 TransformPoint(const glm::vec3& p, const glm::mat4& m)
-        {
-            return glm::vec3(m * glm::vec4(p, 1.0f));
-        }
-
         void EmitBox(DebugDraw& dd,
                      const Geometry::AABB& box,
                      const bool overlay,
@@ -66,7 +56,7 @@ namespace Graphics
             glm::vec3 maxP{std::numeric_limits<float>::lowest()};
             for (const glm::vec3 p : corners)
             {
-                const glm::vec3 wp = TransformPoint(p, worldTransform);
+                const glm::vec3 wp = GpuColor::TransformPoint(p, worldTransform);
                 minP = glm::min(minP, wp);
                 maxP = glm::max(maxP, wp);
             }
@@ -209,8 +199,8 @@ namespace Graphics
         BuildNodesRecursive(nodes, triangles, order, 0u, glm::max(1u, settings.LeafTriangleCount), 0u,
                             glm::max(settings.MaxDepth, 1u));
 
-        const std::uint32_t leafColor = PackWithAlpha(settings.LeafColor, settings.Alpha);
-        const std::uint32_t internalColor = PackWithAlpha(settings.InternalColor, settings.Alpha);
+        const std::uint32_t leafColor = GpuColor::PackVec3WithAlpha(settings.LeafColor, settings.Alpha);
+        const std::uint32_t internalColor = GpuColor::PackVec3WithAlpha(settings.InternalColor, settings.Alpha);
 
         struct NodeWithDepth { std::uint32_t Index; std::uint32_t Depth; };
         std::vector<NodeWithDepth> stack{};

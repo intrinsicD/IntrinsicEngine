@@ -105,6 +105,13 @@ export namespace Graphics::GpuColor
         return k[i0] * (1.0f - a) + k[i1] * a;
     }
 
+    // Transform a point by a 4x4 matrix (homogeneous w=1 projection).
+    // Shared helper previously duplicated in KDTree, BVH, and ConvexHull debug draw files.
+    [[nodiscard]] inline glm::vec3 TransformPoint(const glm::vec3& p, const glm::mat4& m) noexcept
+    {
+        return glm::vec3(m * glm::vec4(p, 1.0f));
+    }
+
     // Map an integer label to a deterministic color from a 12-entry palette.
     // Negative labels map to transparent black.
     [[nodiscard]] constexpr uint32_t LabelToColor(int label) noexcept

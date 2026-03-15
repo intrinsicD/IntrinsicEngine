@@ -105,10 +105,6 @@ Geometry upload failures in lifecycle systems are currently logged but not commu
 
 `Core.Profiling.cppm` (`ScopedTimer`, telemetry sample recording) has no dedicated test file. Add contract tests in `IntrinsicCoreTests` for scope entry/exit, nested timers, and telemetry integration.
 
-### B7. Debug Draw Helper Consolidation (remaining)
-
-The `PackWithAlpha()` local lambdas in the 5 debug draw `.cpp` files now delegate to `GpuColor::PackVec3WithAlpha()`, but they still exist as thin wrappers. Consider inlining the shared call at each use site and removing the wrapper functions entirely in a cleanup pass. Similarly, `TransformPoint()` is still duplicated in `KDTreeDebugDraw`, `BVHDebugDraw`, and `ConvexHullDebugDraw` — consider moving to a shared helper in `DebugDraw` or `GpuColor`.
-
 ---
 
 ## 3. Later (P2) — Planned Downstream Work

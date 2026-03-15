@@ -15,16 +15,6 @@ namespace Graphics
 {
     namespace
     {
-        [[nodiscard]] std::uint32_t PackWithAlpha(const glm::vec3& rgb, const float alpha)
-        {
-            return GpuColor::PackVec3WithAlpha(rgb, alpha);
-        }
-
-        [[nodiscard]] glm::vec3 TransformPoint(const glm::vec3& p, const glm::mat4& m)
-        {
-            return glm::vec3(m * glm::vec4(p, 1.0f));
-        }
-
         void EmitBox(DebugDraw& dd,
                      const Geometry::AABB& box,
                      const bool overlay,
@@ -46,7 +36,7 @@ namespace Graphics
             glm::vec3 maxP{std::numeric_limits<float>::lowest()};
             for (const glm::vec3 p : corners)
             {
-                const glm::vec3 wp = TransformPoint(p, worldTransform);
+                const glm::vec3 wp = GpuColor::TransformPoint(p, worldTransform);
                 minP = glm::min(minP, wp);
                 maxP = glm::max(maxP, wp);
             }
@@ -62,8 +52,8 @@ namespace Graphics
                       const std::uint32_t color,
                       const glm::mat4& worldTransform)
         {
-            const glm::vec3 wa = TransformPoint(a, worldTransform);
-            const glm::vec3 wb = TransformPoint(b, worldTransform);
+            const glm::vec3 wa = GpuColor::TransformPoint(a, worldTransform);
+            const glm::vec3 wb = GpuColor::TransformPoint(b, worldTransform);
             if (overlay) dd.OverlayLine(wa, wb, color);
             else dd.Line(wa, wb, color);
         }
@@ -141,9 +131,9 @@ namespace Graphics
         stack.reserve(64);
         stack.push_back({0u, 0u});
 
-        const auto leafColor = PackWithAlpha(settings.LeafColor, settings.Alpha);
-        const auto internalColor = PackWithAlpha(settings.InternalColor, settings.Alpha);
-        const auto splitColor = PackWithAlpha(settings.SplitPlaneColor, settings.Alpha);
+        const auto leafColor = GpuColor::PackVec3WithAlpha(settings.LeafColor, settings.Alpha);
+        const auto internalColor = GpuColor::PackVec3WithAlpha(settings.InternalColor, settings.Alpha);
+        const auto splitColor = GpuColor::PackVec3WithAlpha(settings.SplitPlaneColor, settings.Alpha);
 
         while (!stack.empty())
         {
