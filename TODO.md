@@ -89,10 +89,6 @@ Sub-element selection (vertex/edge/face) is functional via CPU-side KD-tree refi
 
 The three geometry lifecycle systems (`MeshViewLifecycle`, `GraphGeometrySync`, `PointCloudGeometrySync`) implement the same three-phase pattern (detect dirty → upload & allocate GPUScene slot → populate per-pass components) with structural duplication. `LifecycleUtils.hpp` now provides `AllocateGpuSlot()`, `ComputeLocalBoundingSphere()`, `TryAllocateGpuSlot()` (Phase 2), and `RemovePassComponentIfPresent()` (Phase 3 visibility toggle). Remaining: extract the full Phase 1-2-3 skeleton into a reusable template or base class, reducing each system to its type-specific logic (edge extraction, attribute caching, upload mode selection).
 
-### B6. Render Pass Contract Tests
-
-`SurfacePass`, `LinePass`, and `PointPass` have no isolated unit tests. Integration coverage exists via `Test_CompositionAndValidation.cpp` and `Test_PerPassComponents.cpp`, but per-pass contract tests (pipeline creation, frustum culling, BDA push constant layout) would catch regressions earlier.
-
 ---
 
 ## 3. Later (P2) — Planned Downstream Work

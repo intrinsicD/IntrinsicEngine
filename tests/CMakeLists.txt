@@ -187,6 +187,7 @@ intrinsic_test_object_lib(RuntimeTestObjs
         Test_RenderGraphPackets.cpp
         Test_ImporterUtils.cpp
         Test_Importers.cpp
+        Test_RenderPassContracts.cpp
 
     DEPS IntrinsicCore IntrinsicRuntime nlohmann_json::nlohmann_json
 )
