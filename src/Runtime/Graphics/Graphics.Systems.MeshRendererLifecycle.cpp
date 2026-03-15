@@ -17,28 +17,12 @@ import Core.Assets;
 import Core.FrameGraph;
 import ECS;
 
+#include "Graphics.LifecycleUtils.hpp"
+
 using namespace Core::Hash;
 
 namespace Graphics::Systems::MeshRendererLifecycle
 {
-    namespace
-    {
-        [[nodiscard]] auto ComputeLocalBoundingSphere(const GeometryGpuData& geo) -> glm::vec4
-        {
-            if (geo.GetIndexCount() == 0)
-                return {0.0f, 0.0f, 0.0f, 0.0f};
-
-            // Use precomputed bounds from GeometryGpuData (computed from CPU vertex data at upload time).
-            const glm::vec4 bounds = geo.GetLocalBoundingSphere();
-            if (bounds.w > 0.0f)
-                return bounds;
-
-            // Fallback for geometry without precomputed bounds (e.g. reused buffers
-            // where the source had no positions at upload time).
-            return {0.0f, 0.0f, 0.0f, GPUSceneConstants::kDefaultBoundingSphereRadius};
-        }
-    }
-
     void OnUpdate(entt::registry& registry,
                   GPUScene& gpuScene,
                   const Core::Assets::AssetManager& assetManager,

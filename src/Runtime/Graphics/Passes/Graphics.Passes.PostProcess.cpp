@@ -32,33 +32,6 @@ using namespace Core::Hash;
 namespace Graphics::Passes
 {
     // =====================================================================
-    // Helper: create a descriptor set layout with N combined image samplers.
-    // =====================================================================
-    static VkDescriptorSetLayout CreateMultiSamplerSetLayout(
-        VkDevice device, uint32_t bindingCount, VkShaderStageFlags stages, std::string_view passName)
-    {
-        std::vector<VkDescriptorSetLayoutBinding> bindings(bindingCount);
-        for (uint32_t i = 0; i < bindingCount; ++i)
-        {
-            bindings[i] = {};
-            bindings[i].binding = i;
-            bindings[i].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            bindings[i].descriptorCount = 1;
-            bindings[i].stageFlags = stages;
-        }
-
-        VkDescriptorSetLayoutCreateInfo layoutInfo{};
-        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-        layoutInfo.bindingCount = bindingCount;
-        layoutInfo.pBindings = bindings.data();
-
-        VkDescriptorSetLayout layout = VK_NULL_HANDLE;
-        CheckVkResult(vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &layout),
-                      passName, "vkCreateDescriptorSetLayout");
-        return layout;
-    }
-
-    // =====================================================================
     // Initialize
     // =====================================================================
     void PostProcessPass::Initialize(RHI::VulkanDevice& device,

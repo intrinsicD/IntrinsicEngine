@@ -222,10 +222,14 @@ Identified via full codebase sweep (March 2026). Grouped by priority.
 
 ### D2. Finish Shared Pass Helper Adoption (P3)
 
-`Graphics.PassUtils.hpp` covers shader-path resolution (`ResolveShaderPaths`), non-owning `VulkanDevice` aliases (`MakeDeviceAlias`), `CreateCullingFrustum`, `CleanupOrphanedBuffers`, and `EnsurePerEntityBuffer`. `LinePass` and `PointPass` now use `CreateCullingFrustum` and `CleanupOrphanedBuffers` (previously duplicated inline). `PipelineLibrary.cpp` still uses raw `ResolveShaderPathOrExit` pairs because it resolves shaders without a `ShaderRegistry` — this is acceptable.
+`Graphics.PassUtils.hpp` covers shader-path resolution (`ResolveShaderPaths`), non-owning `VulkanDevice` aliases (`MakeDeviceAlias`), `CreateCullingFrustum`, `CleanupOrphanedBuffers`, `EnsurePerEntityBuffer`, and `CreateMultiSamplerSetLayout`. `LinePass` and `PointPass` now use `CreateCullingFrustum` and `CleanupOrphanedBuffers` (previously duplicated inline). `PostProcessPass` now uses `CreateMultiSamplerSetLayout` from `PassUtils` (previously a private `static` helper). `PipelineLibrary.cpp` still uses raw `ResolveShaderPathOrExit` pairs because it resolves shaders without a `ShaderRegistry` — this is acceptable.
 
 - [ ] Evaluate whether `PipelineLibrary` can adopt `ResolveShaderPaths` with an alternate resolver overload.
 - [ ] Keep the refactor behavior-preserving and opportunistic when the file is next touched.
+
+### D20. Lifecycle System Bounding Sphere Consolidation — Resolved
+
+`ComputeLocalBoundingSphere` was defined identically in three lifecycle system files (`MeshViewLifecycle`, `GraphGeometrySync`, `PointCloudGeometrySync`) and with a superficially different but behaviourally equivalent variant in `MeshRendererLifecycle` (the extra `GetIndexCount() == 0` guard was dead code: the caller already checked that precondition). All four local definitions have been removed; the shared canonical implementation lives in `Graphics.LifecycleUtils.hpp` (details in git history).
 
 
 ### D7. Picking Code Path Duplication (P3) — Resolved
