@@ -19,7 +19,7 @@ namespace Graphics
         : m_Device(std::move(device))
     {
         // Allocate readback buffers (one per frame in flight).
-        // Each buffer holds 4 bytes (RGBA8 or UINT32) for the picked entity ID.
+        // Each buffer holds 8 bytes: EntityID (uint32) + PrimitiveID (uint32).
         m_PickReadbackBuffers.resize(config.MaxFramesInFlight);
         m_PickReadbackRequestFrame.resize(config.MaxFramesInFlight, 0);
 
@@ -27,7 +27,7 @@ namespace Graphics
         {
             m_PickReadbackBuffers[i] = std::make_unique<RHI::VulkanBuffer>(
                 *m_Device,
-                sizeof(uint32_t), // One pixel, 4 bytes
+                2 * sizeof(uint32_t), // Two pixels: EntityID + PrimitiveID
                 VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                 VMA_MEMORY_USAGE_GPU_TO_CPU // Mapped for CPU readback
             );
@@ -72,12 +72,13 @@ namespace Graphics
                 RHI::VulkanBuffer* buf = m_PickReadbackBuffers[i].get();
                 if (buf)
                 {
-                    uint32_t pixelValue = 0;
-                    buf->Read<uint32_t>(&pixelValue, 1);
+                    uint32_t readback[2] = {0, 0};
+                    buf->Read<uint32_t>(readback, 2);
 
                     // Entity ID 0 is usually "background/nothing".
-                    m_LastPickResult.HasHit = (pixelValue != 0);
-                    m_LastPickResult.EntityID = pixelValue;
+                    m_LastPickResult.HasHit = (readback[0] != 0);
+                    m_LastPickResult.EntityID = readback[0];
+                    m_LastPickResult.PrimitiveID = readback[1];
 
                     // Queue for consumption
                     m_HasPendingConsumedResult = true;

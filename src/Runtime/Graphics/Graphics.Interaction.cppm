@@ -37,6 +37,7 @@ export namespace Graphics
         {
             bool HasHit = false;
             uint32_t EntityID = 0;
+            uint32_t PrimitiveID = 0;
         };
 
         // Call this at the start of the frame to check for completed readbacks.

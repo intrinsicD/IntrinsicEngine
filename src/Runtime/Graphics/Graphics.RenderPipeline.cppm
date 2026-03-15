@@ -99,7 +99,7 @@ export namespace Graphics
                     VK_IMAGE_ASPECT_COLOR_BIT, RenderResourceLifetime::FrameTransient, true};
         case PrimitiveId:
             return {resource, "PrimitiveId"_id, VK_FORMAT_R32_UINT, RenderResourceFormatSource::Fixed,
-                    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                     VK_IMAGE_ASPECT_COLOR_BIT, RenderResourceLifetime::FrameTransient, true};
         case SceneNormal:
             return {resource, "SceneNormal"_id, VK_FORMAT_R16G16B16A16_SFLOAT, RenderResourceFormatSource::Fixed,

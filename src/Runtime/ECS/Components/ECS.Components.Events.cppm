@@ -26,6 +26,7 @@ export namespace ECS::Events
     struct GpuPickCompleted
     {
         uint32_t PickID = 0;
+        uint32_t PrimitiveID = 0;
         bool HasHit = false;
     };
 

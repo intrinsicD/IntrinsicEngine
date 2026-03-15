@@ -278,6 +278,110 @@ namespace Graphics
         }
 
         // ---------------------------------------------------------------------
+        // MRT Mesh Pick pipeline (EntityID + PrimitiveID, 2× R32_UINT)
+        // ---------------------------------------------------------------------
+        {
+            auto [vertPath, fragPath] = resolveVF("PickMesh.Vert"_id, "PickMesh.Frag"_id);
+
+            RHI::ShaderModule vert(*m_Device, vertPath, RHI::ShaderStage::Vertex);
+            RHI::ShaderModule frag(*m_Device, fragPath, RHI::ShaderStage::Fragment);
+
+            RHI::VertexInputDescription inputLayout = {};
+            RHI::PipelineBuilder builder(m_DeviceOwner);
+            builder.SetShaders(&vert, &frag);
+            builder.SetInputLayout(inputLayout);
+            builder.SetColorFormats({VK_FORMAT_R32_UINT, VK_FORMAT_R32_UINT});
+            builder.SetDepthFormat(depthFormat);
+            builder.SetCullMode(VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE);
+            builder.AddDescriptorSetLayout(m_GlobalSetLayout.GetHandle());
+
+            VkPushConstantRange pushConstant{};
+            pushConstant.offset = 0;
+            pushConstant.size = 104; // PickMRTPushConsts
+            pushConstant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+            builder.AddPushConstantRange(pushConstant);
+
+            auto pipelineResult = builder.Build();
+            if (!pipelineResult)
+            {
+                Core::Log::Error("Failed to build PickMesh pipeline: {}", (int)pipelineResult.error());
+                std::exit(1);
+            }
+
+            m_Pipelines[kPipeline_PickMesh] = std::move(*pipelineResult);
+        }
+
+        // ---------------------------------------------------------------------
+        // MRT Line Pick pipeline (vertex-amplified quads, 2× R32_UINT)
+        // ---------------------------------------------------------------------
+        {
+            auto [vertPath, fragPath] = resolveVF("PickLine.Vert"_id, "PickLine.Frag"_id);
+
+            RHI::ShaderModule vert(*m_Device, vertPath, RHI::ShaderStage::Vertex);
+            RHI::ShaderModule frag(*m_Device, fragPath, RHI::ShaderStage::Fragment);
+
+            RHI::VertexInputDescription inputLayout = {};
+            RHI::PipelineBuilder builder(m_DeviceOwner);
+            builder.SetShaders(&vert, &frag);
+            builder.SetInputLayout(inputLayout);
+            builder.SetColorFormats({VK_FORMAT_R32_UINT, VK_FORMAT_R32_UINT});
+            builder.SetDepthFormat(depthFormat);
+            builder.SetCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE);
+            builder.EnableDepthBias(-1.0f, -1.0f);
+            builder.AddDescriptorSetLayout(m_GlobalSetLayout.GetHandle());
+
+            VkPushConstantRange pushConstant{};
+            pushConstant.offset = 0;
+            pushConstant.size = 104; // PickMRTPushConsts
+            pushConstant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+            builder.AddPushConstantRange(pushConstant);
+
+            auto pipelineResult = builder.Build();
+            if (!pipelineResult)
+            {
+                Core::Log::Error("Failed to build PickLine pipeline: {}", (int)pipelineResult.error());
+                std::exit(1);
+            }
+
+            m_Pipelines[kPipeline_PickLine] = std::move(*pipelineResult);
+        }
+
+        // ---------------------------------------------------------------------
+        // MRT Point Pick pipeline (billboard quads, 2× R32_UINT)
+        // ---------------------------------------------------------------------
+        {
+            auto [vertPath, fragPath] = resolveVF("PickPoint.Vert"_id, "PickPoint.Frag"_id);
+
+            RHI::ShaderModule vert(*m_Device, vertPath, RHI::ShaderStage::Vertex);
+            RHI::ShaderModule frag(*m_Device, fragPath, RHI::ShaderStage::Fragment);
+
+            RHI::VertexInputDescription inputLayout = {};
+            RHI::PipelineBuilder builder(m_DeviceOwner);
+            builder.SetShaders(&vert, &frag);
+            builder.SetInputLayout(inputLayout);
+            builder.SetColorFormats({VK_FORMAT_R32_UINT, VK_FORMAT_R32_UINT});
+            builder.SetDepthFormat(depthFormat);
+            builder.SetCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE);
+            builder.EnableDepthBias(-2.0f, -2.0f);
+            builder.AddDescriptorSetLayout(m_GlobalSetLayout.GetHandle());
+
+            VkPushConstantRange pushConstant{};
+            pushConstant.offset = 0;
+            pushConstant.size = 104; // PickMRTPushConsts
+            pushConstant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+            builder.AddPushConstantRange(pushConstant);
+
+            auto pipelineResult = builder.Build();
+            if (!pipelineResult)
+            {
+                Core::Log::Error("Failed to build PickPoint pipeline: {}", (int)pipelineResult.error());
+                std::exit(1);
+            }
+
+            m_Pipelines[kPipeline_PickPoint] = std::move(*pipelineResult);
+        }
+
+        // ---------------------------------------------------------------------
         // GPUScene: Scatter update pipeline
         // ---------------------------------------------------------------------
         {

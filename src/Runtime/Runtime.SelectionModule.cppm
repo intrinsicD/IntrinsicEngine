@@ -100,6 +100,7 @@ export namespace Runtime
         struct CachedGpuPick
         {
             uint32_t PickID = 0;
+            uint32_t PrimitiveID = 0;
             bool HasHit = false;
         };
         std::optional<CachedGpuPick> m_CachedGpuPick;
@@ -110,9 +111,11 @@ export namespace Runtime
         void ApplySubElementPick(const Selection::Picked& picked, Selection::PickMode mode);
 
         static void ApplyFromGpuPick(ECS::Scene& scene,
-                                    uint32_t pickID, bool hasHit,
+                                    uint32_t pickID, uint32_t primitiveID,
+                                    bool hasHit,
                                     Runtime::Selection::PickMode mode,
                                     const Selection::PickRequest* request,
+                                    Selection::ElementMode elementMode,
                                     Selection::Picked& picked);
 
         [[nodiscard]] static glm::uvec2 WindowToFramebufferPixel(const Core::Windowing::Window& window,

@@ -54,40 +54,13 @@ These are not required to finish the first wave, but they should begin soon afte
 - [ ] Keep transparent/special/debug rendering in the forward path.
 - [ ] Define composition rules between paths.
 
-### B3. GPU-Native Primitive ID Pipeline (Optimization)
+### B3. GPU-Native Primitive ID Pipeline (**Complete**)
 
-Sub-element selection (vertex/edge/face) is functional via CPU-side KD-tree refinement after GPU entity pick. This task upgrades to a dual-channel MRT pipeline producing both `EntityId` and `PrimitiveId` in one GPU frame for higher precision and lower CPU overhead — eliminating the CPU refinement step.
+Dual-channel MRT pipeline producing both `EntityId` and `PrimitiveId` in one GPU frame. Three dedicated pick pipelines (mesh, line, point) with 104-byte `PickMRTPushConsts`. `SelectionModule` uses GPU `PrimitiveID` directly for sub-element selection when available, retaining CPU refinement as fallback for vertex-from-triangle resolution.
 
-#### Infrastructure (readback & events)
-- [ ] Add `TRANSFER_SRC_BIT` to `PrimitiveId` resource definition (`Graphics.RenderPipeline.cppm`).
-- [ ] Expand readback buffer from 4 → 8 bytes; add `PrimitiveID` to `PickResultGpu` (`Graphics.Interaction.cppm/cpp`).
-- [ ] Add `PrimitiveID` to `GpuPickCompleted` event (`ECS.Components.Events.cppm`).
-- [ ] Thread `PrimitiveID` through `RenderSystem` event enqueue and `SelectionModule` cached pick.
-- [ ] Set `recipe.PrimitiveId = true` alongside `recipe.EntityId` in `BuildDefaultPipelineRecipe()`.
+### B4. Lifecycle System Boilerplate Extraction (**Complete**)
 
-#### MRT picking pass (mesh)
-- [ ] Create `pick_mesh.vert/frag` shaders with two MRT outputs (`outEntityID`, `outPrimitiveID = gl_PrimitiveID`).
-- [ ] Define unified 104-byte `PickPushConsts` struct (Model, PtrPositions, PtrAux, EntityID, PrimitiveBase, PickWidth, Viewport, pad).
-- [ ] Update PipelineLibrary mesh pick pipeline to `SetColorFormats({R32_UINT, R32_UINT})`.
-- [ ] Update `PickingPass` to write both EntityId and PrimitiveId attachments; PickCopy reads both into readback buffer.
-
-#### Graph edge picking (line pick pipeline)
-- [ ] Create `pick_line.vert/frag` shaders adapted from `line.vert` with vertex-amplified quads, `PickPushConsts`, and segment index output.
-- [ ] Add line pick pipeline to `PickingPass` (2× R32_UINT, cull none, depth bias -1/-1).
-- [ ] Add draw loop for `Graph::Data + Line::Component` entities and standalone `Line::Component` entities.
-
-#### Point cloud picking (point pick pipeline)
-- [ ] Create `pick_point.vert/frag` shaders adapted from `point_flatdisc.vert` with billboard quads, disc discard test, and point index output.
-- [ ] Add point pick pipeline to `PickingPass` (2× R32_UINT, cull none, depth bias -2/-2).
-- [ ] Add draw loop for `PointCloud::Data + Point::Component` entities and standalone `Point::Component` entities.
-
-#### Selection module integration
-- [ ] Update `ApplyFromGpuPick()` to use GPU `PrimitiveID` directly instead of CPU refinement when available.
-- [ ] Retain CPU refinement as fallback path for entities without MRT pick pipelines.
-
-### B4. Lifecycle System Boilerplate Extraction
-
-The three geometry lifecycle systems (`MeshViewLifecycle`, `GraphGeometrySync`, `PointCloudGeometrySync`) implement the same three-phase pattern (detect dirty → upload & allocate GPUScene slot → populate per-pass components) with structural duplication. `LifecycleUtils.hpp` now provides `AllocateGpuSlot()`, `ComputeLocalBoundingSphere()`, `TryAllocateGpuSlot()` (Phase 2), and `RemovePassComponentIfPresent()` (Phase 3 visibility toggle). Remaining: extract the full Phase 1-2-3 skeleton into a reusable template or base class, reducing each system to its type-specific logic (edge extraction, attribute caching, upload mode selection).
+`LifecycleUtils.hpp` provides six shared helpers: `AllocateGpuSlot()`, `ComputeLocalBoundingSphere()`, `TryAllocateGpuSlot()` (Phase 2), `RemovePassComponentIfPresent()`, `PopulateOrRemovePassComponent()` (Phase 3 visibility-aware sync), and `HandleUploadFailure()` (Phase 1 error handling). All three lifecycle systems migrated to use the shared templates. Remaining Phase 1 loop skeleton extraction deferred — type-specific logic (edge extraction, attribute caching, upload mode selection) makes a full template over-engineered for the current three systems.
 
 ---
 

@@ -129,17 +129,12 @@ namespace Graphics::Systems::PointCloudGeometrySync
 
                 if (!newGpuData || !newGpuData->GetVertexBuffer())
                 {
-                    Core::Log::Error("PointCloudGeometrySync: Failed to create GPU geometry for entity {}",
-                                     static_cast<uint32_t>(entity));
-                    dispatcher.enqueue<ECS::Events::GeometryUploadFailed>({entity});
-                    // Clear stale cached attributes — the previous geometry was
-                    // already released and counts may no longer match.
+                    HandleUploadFailure(dispatcher, entity, "PointCloudGeometrySync");
                     pcData.CachedColors.clear();
                     pcData.CachedRadii.clear();
                     pcData.GpuPointCount = 0;
                     pcData.HasGpuNormals = false;
                     pcData.GpuDirty = false;
-                    // Fall through to Phase 3 (GpuGeometry invalid → skip).
                 }
                 else
                 {
@@ -166,25 +161,18 @@ namespace Graphics::Systems::PointCloudGeometrySync
             // -----------------------------------------------------------------
             // Phase 3: Populate Point::Component from PointCloud::Data.
             // -----------------------------------------------------------------
-            // Idempotent: runs every frame for visible cloud entities with
-            // valid GPU geometry.
-            if (pcData.Visible && pcData.GpuGeometry.IsValid())
-            {
-                auto& pt = registry.get_or_emplace<ECS::Point::Component>(entity);
-                pt.Geometry           = pcData.GpuGeometry;
-                pt.Color              = pcData.DefaultColor;
-                pt.Size               = pcData.DefaultRadius;
-                pt.SizeMultiplier     = pcData.SizeMultiplier;
-                pt.Mode               = pcData.RenderMode;
-                pt.HasPerPointColors  = !pcData.CachedColors.empty();
-                pt.HasPerPointRadii   = pcData.HasRadii();
-                pt.HasPerPointNormals = pcData.HasRenderableNormals();
-            }
-            else if (!pcData.Visible)
-            {
-                // Remove per-pass component so hidden clouds stop rendering.
-                RemovePassComponentIfPresent<ECS::Point::Component>(registry, entity);
-            }
+            PopulateOrRemovePassComponent<ECS::Point::Component>(
+                registry, entity, pcData.Visible, pcData.GpuGeometry.IsValid(),
+                [&](ECS::Point::Component& pt) {
+                    pt.Geometry           = pcData.GpuGeometry;
+                    pt.Color              = pcData.DefaultColor;
+                    pt.Size               = pcData.DefaultRadius;
+                    pt.SizeMultiplier     = pcData.SizeMultiplier;
+                    pt.Mode               = pcData.RenderMode;
+                    pt.HasPerPointColors  = !pcData.CachedColors.empty();
+                    pt.HasPerPointRadii   = pcData.HasRadii();
+                    pt.HasPerPointNormals = pcData.HasRenderableNormals();
+                });
         }
     }
 

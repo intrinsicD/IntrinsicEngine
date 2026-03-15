@@ -176,9 +176,7 @@ namespace Graphics::Systems::MeshViewLifecycle
 
             if (!gpuData || !gpuData->GetIndexBuffer())
             {
-                Core::Log::Error("MeshViewLifecycle: Failed to create edge view for entity {}",
-                                 static_cast<uint32_t>(entity));
-                dispatcher.enqueue<ECS::Events::GeometryUploadFailed>({entity});
+                HandleUploadFailure(dispatcher, entity, "MeshViewLifecycle");
                 ev.Dirty = false;
                 continue;
             }
@@ -253,9 +251,7 @@ namespace Graphics::Systems::MeshViewLifecycle
 
             if (!gpuData || !gpuData->GetVertexBuffer())
             {
-                Core::Log::Error("MeshViewLifecycle: Failed to create vertex view for entity {}",
-                                 static_cast<uint32_t>(entity));
-                dispatcher.enqueue<ECS::Events::GeometryUploadFailed>({entity});
+                HandleUploadFailure(dispatcher, entity, "MeshViewLifecycle");
                 pv.Dirty = false;
                 continue;
             }
