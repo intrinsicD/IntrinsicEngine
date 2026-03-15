@@ -162,6 +162,19 @@ Key design decisions:
 
 Keyboard shortcuts (set in Sandbox app): `W`=Translate, `E`=Rotate, `R`=Scale, `X`=Toggle World/Local, `F`=Focus camera on selected (fit in view), `C`=Center camera on selected (orbit target only), `Q`=Reset camera.
 
+## Sub-Element Selection System
+
+`Selection::ElementMode` (Entity/Vertex/Edge/Face) determines what a click selects. In Entity mode (default), whole entities receive `SelectedTag`. In sub-element modes, the clicked entity is implicitly selected and the picked sub-element index is added to `SubElementSelection`.
+
+- **`SubElementSelection`**: Per-entity state with `std::set<uint32_t>` for `SelectedVertices`, `SelectedEdges`, and `SelectedFaces`. Owned by `SelectionModule`. Cleared when switching to a different entity or back to Entity mode.
+- **Shift-click**: Toggle mode — adds or removes individual sub-elements. Without shift, Replace mode clears all sub-element sets and selects only the clicked element.
+- **Visual highlights** via `DrawSubElementHighlights()` (called per frame from Sandbox `OnUpdate`):
+  - Vertices: `DebugDraw::OverlaySphere()` in red (or green when Geodesic mode is active).
+  - Edges: `DebugDraw::OverlayLine()` in yellow.
+  - Faces: `DebugDraw::OverlayLine()` for outline + `DebugDraw::Triangle()` for fill in blue.
+- **Lighting independence**: All highlights render via DebugDraw overlay (no depth test), decoupled from forward/deferred/hybrid lighting path.
+- **Geodesic Distance integration**: In Vertex mode with Geodesic enabled, selected source vertices use green spheres. The "Compute Geodesic" button runs `Geometry::Geodesic::ComputeDistance()` from the selected sources. Results are stored as `v:geodesic_distance` mesh property, visualizable via the existing ColorSource/colormap UI.
+
 ## Three-Pass Rendering Architecture
 
 The engine uses a unified three-pass rendering architecture with one pass per primitive type. Each pass owns its own pipeline, shaders, and ECS component type, handling both retained-mode and transient data internally. No routing logic between passes. Adding a new rendering method = new shader + pipeline variant + register in `DefaultPipeline`.

@@ -1,6 +1,7 @@
 module;
 #include <cstdint>
 #include <limits>
+#include <set>
 #include <glm/glm.hpp>
 #include <entt/entity/entity.hpp>
 
@@ -54,6 +55,40 @@ export namespace Runtime::Selection
         Replace = 0,
         Add = 1,
         Toggle = 2
+    };
+
+    // Element-level selection mode: determines what clicking on geometry selects.
+    // In Entity mode, whole entities are selected (existing behavior).
+    // In Vertex/Edge/Face mode, sub-elements are selected on the picked entity.
+    enum class ElementMode : uint8_t
+    {
+        Entity = 0,
+        Vertex = 1,
+        Edge = 2,
+        Face = 3
+    };
+
+    // Per-entity sub-element selection state.
+    // Tracks which vertices, edges, or faces are selected on a given entity.
+    struct SubElementSelection
+    {
+        entt::entity Entity = entt::null;
+        std::set<uint32_t> SelectedVertices;
+        std::set<uint32_t> SelectedEdges;
+        std::set<uint32_t> SelectedFaces;
+
+        void Clear()
+        {
+            Entity = entt::null;
+            SelectedVertices.clear();
+            SelectedEdges.clear();
+            SelectedFaces.clear();
+        }
+
+        [[nodiscard]] bool Empty() const
+        {
+            return SelectedVertices.empty() && SelectedEdges.empty() && SelectedFaces.empty();
+        }
     };
 
     struct PickRequest

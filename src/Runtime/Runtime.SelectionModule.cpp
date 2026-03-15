@@ -1,6 +1,7 @@
 module;
 
 #include <algorithm>
+#include <set>
 #include <glm/glm.hpp>
 #include <entt/entity/registry.hpp>
 #include <entt/signal/dispatcher.hpp>
@@ -37,6 +38,17 @@ namespace Runtime
             req.CameraFovYRadians = glm::radians(camera.Fov);
             req.ViewportHeightPixels = static_cast<float>(std::max(winH, 1u));
             return req;
+        }
+    }
+
+    namespace
+    {
+        void ToggleElement(std::set<uint32_t>& elements, uint32_t idx)
+        {
+            if (auto it = elements.find(idx); it != elements.end())
+                elements.erase(it);
+            else
+                elements.insert(idx);
         }
     }
 
@@ -181,6 +193,7 @@ namespace Runtime
     {
         Selection::ApplySelection(scene, entt::null, Selection::PickMode::Replace);
         m_Picked = {};
+        m_SubElements.Clear();
     }
 
     void SelectionModule::Update(ECS::Scene& scene,
@@ -269,7 +282,32 @@ namespace Runtime
                         m_HasPendingPickRequest = true;
 
                         const auto hit = Selection::PickCPU(scene, m_PendingPickRequest);
-                        Selection::ApplySelection(scene, hit.Entity, m_PendingPickRequest.Mode);
+
+                        if (m_Config.ElementMode != Selection::ElementMode::Entity && hit.Entity != entt::null)
+                        {
+                            // Sub-element selection mode: select the entity first, then
+                            // add/toggle the picked sub-element.
+                            if (m_SubElements.Entity != hit.Entity)
+                            {
+                                // Switched to a different entity — reset sub-element state.
+                                m_SubElements.Clear();
+                                m_SubElements.Entity = hit.Entity;
+                                Selection::ApplySelection(scene, hit.Entity, Selection::PickMode::Replace);
+                            }
+                            else if (!scene.GetRegistry().all_of<ECS::Components::Selection::SelectedTag>(hit.Entity))
+                            {
+                                Selection::ApplySelection(scene, hit.Entity, Selection::PickMode::Replace);
+                            }
+
+                            ApplySubElementPick(hit.PickedData, clickMode);
+                        }
+                        else
+                        {
+                            Selection::ApplySelection(scene, hit.Entity, m_PendingPickRequest.Mode);
+                            if (m_Config.ElementMode == Selection::ElementMode::Entity)
+                                m_SubElements.Clear();
+                        }
+
                         SyncPickedToSelection(scene, hit.Entity != entt::null ? &hit : nullptr);
                         m_HasPendingPickRequest = false;
                     }
@@ -291,11 +329,71 @@ namespace Runtime
                              m_HasPendingPickRequest ? &m_PendingPickRequest : nullptr,
                              picked);
 
+            // GPU path sub-element selection (same logic as CPU path).
+            if (m_Config.ElementMode != Selection::ElementMode::Entity && picked.entity)
+            {
+                if (m_SubElements.Entity != picked.entity.id)
+                {
+                    m_SubElements.Clear();
+                    m_SubElements.Entity = picked.entity.id;
+                }
+                ApplySubElementPick(picked, m_PendingGpuClickMode);
+            }
+            else if (m_Config.ElementMode == Selection::ElementMode::Entity)
+            {
+                m_SubElements.Clear();
+            }
+
             Selection::PickResult resolved{};
             resolved.Entity = picked.entity.id;
             resolved.PickedData = picked;
             SyncPickedToSelection(scene, resolved.Entity != entt::null ? &resolved : nullptr);
             m_HasPendingPickRequest = false;
+        }
+    }
+
+    void SelectionModule::ApplySubElementPick(const Selection::Picked& picked, Selection::PickMode mode)
+    {
+        constexpr uint32_t Invalid = Selection::Picked::Entity::InvalidIndex;
+
+        uint32_t idx = Invalid;
+        std::set<uint32_t>* target = nullptr;
+
+        switch (m_Config.ElementMode)
+        {
+        case Selection::ElementMode::Vertex:
+            idx = picked.entity.vertex_idx;
+            target = &m_SubElements.SelectedVertices;
+            break;
+        case Selection::ElementMode::Edge:
+            idx = picked.entity.edge_idx;
+            target = &m_SubElements.SelectedEdges;
+            break;
+        case Selection::ElementMode::Face:
+            idx = picked.entity.face_idx;
+            target = &m_SubElements.SelectedFaces;
+            break;
+        default:
+            return;
+        }
+
+        if (idx == Invalid || target == nullptr)
+            return;
+
+        switch (mode)
+        {
+        case Selection::PickMode::Replace:
+            m_SubElements.SelectedVertices.clear();
+            m_SubElements.SelectedEdges.clear();
+            m_SubElements.SelectedFaces.clear();
+            target->insert(idx);
+            break;
+        case Selection::PickMode::Add:
+            target->insert(idx);
+            break;
+        case Selection::PickMode::Toggle:
+            ToggleElement(*target, idx);
+            break;
         }
     }
 }

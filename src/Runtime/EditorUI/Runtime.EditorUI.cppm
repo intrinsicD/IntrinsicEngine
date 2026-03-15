@@ -25,6 +25,11 @@ export namespace Runtime::EditorUI
     //  - Safe to call multiple times; panels are de-duplicated by name.
     void RegisterDefaultPanels(Engine& engine);
 
+    // Draw DebugDraw overlays for sub-element selection (selected vertices as
+    // spheres, selected edges as highlighted lines, selected faces as tinted triangles).
+    // Call once per frame from OnUpdate, after selection and before rendering.
+    void DrawSubElementHighlights(Engine& engine);
+
     // Access the shared dirty tracker for scene save/load state.
     // The tracker records whether unsaved changes exist and the path
     // of the current scene file (if any).

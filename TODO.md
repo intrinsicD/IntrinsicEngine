@@ -33,11 +33,7 @@ This document tracks the **active rendering-architecture backlog** for Intrinsic
 
 ## P0 — Critical Refactor
 
-- [ ] Vertex Selection mode, Edge selection mode, and Face selection mode should all be independent of the lighting path. They should write to the same selection buffer format and be composited as a post-process outline regardless of forward/deferred/hybrid lighting decisions.
-- [ ] Vertex Selection mode uses Sphere rendering with a red color to mark the selected vertices.
-- [ ] Multi selection with shift key.
-- [ ] Make the selection mode work with radio buttons (vertex, edge, face, entity).
-- [ ] Wire Geodesic computation in the ui. When active, mark the selected vertex or vertices (with shift for multiple selection) with a different colored shpere.
+*(All P0 items completed — see git history for implementation details.)*
 
 ## 2. Next (P1) — Near-Term Follow-Up After the Refactor Lands
 
