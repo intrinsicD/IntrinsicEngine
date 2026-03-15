@@ -6,7 +6,7 @@ module;
 #include <string_view>
 #include <vector>
 #include <glm/glm.hpp>
-#include "Graphics.FileFormatUtils.hpp"
+#include "Graphics.Importers.ColorParsing.hpp"
 #include "Graphics.Importers.TextParse.hpp"
 #include "Graphics.Importers.TriangulationUtils.hpp"
 

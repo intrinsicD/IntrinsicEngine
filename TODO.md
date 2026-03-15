@@ -241,13 +241,9 @@ STL's spatial-hash vertex deduplication extracted to `Graphics.Importers.VertexD
 
 Fan triangulation extracted to `Graphics.Importers.TriangulationUtils.hpp`. OBJ, PLY, and OFF importers migrated. Unit tests in `Test_ImporterUtils.cpp`. Details in git history.
 
-### D4. Color Parsing Unification (P3)
+### D4. Color Parsing Unification (P3) — **Resolved**
 
-PLY importer migrated to use `NormalizeColorChannelToUnitRange` (was using inline normalization). XYZ and PCD importers still have independent parsing flows.
-
-- [ ] Unify color triplet/intensity parsing into a shared `Importers::ParseColor` helper.
-- [ ] Ensure consistent [0,255]→[0,1] and [0,1]→[0,1] range handling across remaining importers (XYZ, PCD).
-
+Shared color parsing helpers extracted to `Graphics.Importers.ColorParsing.hpp` (`ParseRgbTriplet`, `IntensityToColor`, `UnpackPackedRgb`). XYZ, PCD, and OFF importers migrated. Unit tests in `Test_ImporterUtils.cpp`. Details in git history.
 
 ### D6. Importer Line I/O Inconsistency (P3)
 
@@ -268,11 +264,9 @@ OBJ, PCD, TGF, XYZ, and OFF importers now use the shared `TextParse::NextLine()`
 
 - [ ] Evaluate extracting a standalone `ComputePointCentroid(points, indices)` helper if more point-cloud operators need it.
 
-### D12. Importer Color Parsing: Consolidate Remaining Paths (P3)
+### D12. Importer Color Parsing: Consolidate Remaining Paths (P3) — **Resolved**
 
-PLY, PCD, and OFF importers now use `Detail::NormalizeColorChannelToUnitRange()` for color normalization. XYZ importer has standalone `ParseColorTriplet()` / `ParsePointColor()` functions that also use the shared helper.
-
-- [ ] Extract shared `Importers::ParseColor()` helper unifying [0,255]→[0,1] and [0,1]→[0,1] range handling across remaining importers (XYZ, PCD).
+Consolidated into shared `Graphics.Importers.ColorParsing.hpp` alongside D4. All importers now use the shared helpers. Details in git history.
 
 ### D16. Render Pass: Naming Inconsistency — Aux vs Attr (P4)
 

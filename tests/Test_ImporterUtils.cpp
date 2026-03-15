@@ -1,10 +1,11 @@
 // tests/Test_ImporterUtils.cpp — Tests for shared importer utilities:
-// SpatialVertexKey deduplication and polygon fan triangulation.
+// SpatialVertexKey deduplication, polygon fan triangulation, and color parsing.
 
 #include <gtest/gtest.h>
 #include <cstddef>
 #include <cstdint>
 #include <span>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 #include <glm/glm.hpp>
@@ -12,6 +13,7 @@
 // Include the headers under test directly (they are non-module headers).
 #include "../src/Runtime/Graphics/Importers/Graphics.Importers.VertexDedup.hpp"
 #include "../src/Runtime/Graphics/Importers/Graphics.Importers.TriangulationUtils.hpp"
+#include "../src/Runtime/Graphics/Importers/Graphics.Importers.ColorParsing.hpp"
 
 using namespace Graphics::Importers;
 
@@ -170,4 +172,97 @@ TEST(TriangulateFan, AppendsToExistingIndices)
     ASSERT_EQ(indices.size(), 6u);
     EXPECT_EQ(indices[0], 100u);  // Pre-existing
     EXPECT_EQ(indices[3], 0u);    // Newly appended
+}
+
+// =============================================================================
+// Color Parsing Tests
+// =============================================================================
+
+TEST(ColorParsing, ParseRgbTripletUnitRange)
+{
+    std::vector<std::string_view> tokens = {"0.5", "0.25", "0.75"};
+    auto result = ParseRgbTriplet(tokens, 0);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_NEAR(result->r, 0.5f, 1e-5f);
+    EXPECT_NEAR(result->g, 0.25f, 1e-5f);
+    EXPECT_NEAR(result->b, 0.75f, 1e-5f);
+    EXPECT_NEAR(result->a, 1.0f, 1e-5f);
+}
+
+TEST(ColorParsing, ParseRgbTripletByteRange)
+{
+    std::vector<std::string_view> tokens = {"255", "128", "0"};
+    auto result = ParseRgbTriplet(tokens, 0);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_NEAR(result->r, 1.0f, 1e-5f);
+    EXPECT_NEAR(result->g, 128.0f / 255.0f, 1e-3f);
+    EXPECT_NEAR(result->b, 0.0f, 1e-5f);
+}
+
+TEST(ColorParsing, ParseRgbTripletWithOffset)
+{
+    std::vector<std::string_view> tokens = {"1.0", "2.0", "3.0", "0.1", "0.2", "0.3"};
+    auto result = ParseRgbTriplet(tokens, 3);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_NEAR(result->r, 0.1f, 1e-5f);
+    EXPECT_NEAR(result->g, 0.2f, 1e-5f);
+    EXPECT_NEAR(result->b, 0.3f, 1e-5f);
+}
+
+TEST(ColorParsing, ParseRgbTripletInsufficientTokens)
+{
+    std::vector<std::string_view> tokens = {"0.5", "0.25"};
+    auto result = ParseRgbTriplet(tokens, 0);
+    EXPECT_FALSE(result.has_value());
+}
+
+TEST(ColorParsing, ParseRgbTripletInvalidTokens)
+{
+    std::vector<std::string_view> tokens = {"0.5", "abc", "0.75"};
+    auto result = ParseRgbTriplet(tokens, 0);
+    EXPECT_FALSE(result.has_value());
+}
+
+TEST(ColorParsing, IntensityToColorUnit)
+{
+    auto result = IntensityToColor(0.5f);
+    EXPECT_NEAR(result.r, 0.5f, 1e-5f);
+    EXPECT_NEAR(result.g, 0.5f, 1e-5f);
+    EXPECT_NEAR(result.b, 0.5f, 1e-5f);
+    EXPECT_NEAR(result.a, 1.0f, 1e-5f);
+}
+
+TEST(ColorParsing, IntensityToColorByte)
+{
+    auto result = IntensityToColor(200.0f);
+    EXPECT_NEAR(result.r, 200.0f / 255.0f, 1e-3f);
+    EXPECT_NEAR(result.g, 200.0f / 255.0f, 1e-3f);
+    EXPECT_NEAR(result.b, 200.0f / 255.0f, 1e-3f);
+}
+
+TEST(ColorParsing, UnpackPackedRgb)
+{
+    // 0x00FF8040 → R=255, G=128, B=64
+    uint32_t packed = 0x00FF8040u;
+    auto result = Graphics::Importers::UnpackPackedRgb(packed);
+    EXPECT_NEAR(result.r, 1.0f, 1e-5f);
+    EXPECT_NEAR(result.g, 128.0f / 255.0f, 1e-3f);
+    EXPECT_NEAR(result.b, 64.0f / 255.0f, 1e-3f);
+    EXPECT_NEAR(result.a, 1.0f, 1e-5f);
+}
+
+TEST(ColorParsing, UnpackPackedRgbBlack)
+{
+    auto result = Graphics::Importers::UnpackPackedRgb(0x00000000u);
+    EXPECT_NEAR(result.r, 0.0f, 1e-5f);
+    EXPECT_NEAR(result.g, 0.0f, 1e-5f);
+    EXPECT_NEAR(result.b, 0.0f, 1e-5f);
+}
+
+TEST(ColorParsing, UnpackPackedRgbWhite)
+{
+    auto result = Graphics::Importers::UnpackPackedRgb(0x00FFFFFFu);
+    EXPECT_NEAR(result.r, 1.0f, 1e-5f);
+    EXPECT_NEAR(result.g, 1.0f, 1e-5f);
+    EXPECT_NEAR(result.b, 1.0f, 1e-5f);
 }

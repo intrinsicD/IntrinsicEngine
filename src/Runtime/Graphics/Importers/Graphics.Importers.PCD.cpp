@@ -14,7 +14,7 @@ module;
 
 #include <glm/glm.hpp>
 
-#include "Graphics.FileFormatUtils.hpp"
+#include "Graphics.Importers.ColorParsing.hpp"
 #include "Graphics.Importers.TextParse.hpp"
 
 module Graphics:Importers.PCD.Impl;
@@ -175,15 +175,6 @@ namespace Graphics
             return std::nullopt;
         }
 
-        [[nodiscard]] glm::vec4 UnpackPackedRgb(std::uint32_t packed)
-        {
-            return glm::vec4(
-                static_cast<float>((packed >> 16) & 0xFFu) / 255.0f,
-                static_cast<float>((packed >> 8) & 0xFFu) / 255.0f,
-                static_cast<float>(packed & 0xFFu) / 255.0f,
-                1.0f);
-        }
-
         [[nodiscard]] std::optional<glm::vec4> ParseAsciiColor(
             std::span<const std::string_view> tokens,
             std::span<const PCDField> fields)
@@ -211,9 +202,7 @@ namespace Graphics
                 if (rgbField->ScalarOffset < tokens.size())
                 {
                     if (const auto packed = ParsePackedColorToken(tokens[rgbField->ScalarOffset]))
-                    {
-                        return UnpackPackedRgb(*packed);
-                    }
+                        return Importers::UnpackPackedRgb(*packed);
                 }
             }
 
@@ -222,9 +211,7 @@ namespace Graphics
                 if (rgbaField->ScalarOffset < tokens.size())
                 {
                     if (const auto packed = ParsePackedColorToken(tokens[rgbaField->ScalarOffset]))
-                    {
-                        return UnpackPackedRgb(*packed);
-                    }
+                        return Importers::UnpackPackedRgb(*packed);
                 }
             }
 
@@ -256,17 +243,13 @@ namespace Graphics
             if (const auto* rgbField = FindField(fields, "rgb"))
             {
                 if (const auto packed = ReadBinaryPackedColor(pointBytes, *rgbField))
-                {
-                    return UnpackPackedRgb(*packed);
-                }
+                    return Importers::UnpackPackedRgb(*packed);
             }
 
             if (const auto* rgbaField = FindField(fields, "rgba"))
             {
                 if (const auto packed = ReadBinaryPackedColor(pointBytes, *rgbaField))
-                {
-                    return UnpackPackedRgb(*packed);
-                }
+                    return Importers::UnpackPackedRgb(*packed);
             }
 
             return std::nullopt;
