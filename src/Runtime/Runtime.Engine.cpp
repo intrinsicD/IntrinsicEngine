@@ -537,7 +537,8 @@ namespace Runtime
                             frameGraph, registry, *gpuScene,
                             m_RenderOrchestrator->GetGeometryStorage(),
                             GetDeviceShared(),
-                            m_GraphicsBackend->GetTransferManager());
+                            m_GraphicsBackend->GetTransferManager(),
+                            m_SceneManager->GetScene().GetDispatcher());
                     }
 
                     if (m_FeatureRegistry.IsEnabled("MeshRendererLifecycle"_id))
@@ -558,7 +559,8 @@ namespace Runtime
                             frameGraph, registry, *gpuScene,
                             m_RenderOrchestrator->GetGeometryStorage(),
                             GetDeviceShared(),
-                            m_GraphicsBackend->GetTransferManager());
+                            m_GraphicsBackend->GetTransferManager(),
+                            m_SceneManager->GetScene().GetDispatcher());
                     }
 
                     // Mesh view lifecycle: creates GPU geometry views (edge index
@@ -570,7 +572,8 @@ namespace Runtime
                             frameGraph, registry, *gpuScene,
                             m_RenderOrchestrator->GetGeometryStorage(),
                             GetDeviceShared(),
-                            m_GraphicsBackend->GetTransferManager());
+                            m_GraphicsBackend->GetTransferManager(),
+                            m_SceneManager->GetScene().GetDispatcher());
                     }
 
 

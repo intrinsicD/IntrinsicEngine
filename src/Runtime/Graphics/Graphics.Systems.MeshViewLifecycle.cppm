@@ -2,6 +2,7 @@ module;
 
 #include <memory>
 #include <entt/fwd.hpp>
+#include <entt/signal/dispatcher.hpp>
 
 export module Graphics:Systems.MeshViewLifecycle;
 
@@ -50,7 +51,8 @@ export namespace Graphics::Systems::MeshViewLifecycle
                   GPUScene& gpuScene,
                   GeometryPool& geometryStorage,
                   std::shared_ptr<RHI::VulkanDevice> device,
-                  RHI::TransferManager& transferManager);
+                  RHI::TransferManager& transferManager,
+                  entt::dispatcher& dispatcher);
 
     // Register this system into a FrameGraph with its dependency declarations.
     // Declares: Read<Transform::WorldMatrix>, Write<MeshEdgeView::Component>,
@@ -61,5 +63,6 @@ export namespace Graphics::Systems::MeshViewLifecycle
                         GPUScene& gpuScene,
                         GeometryPool& geometryStorage,
                         std::shared_ptr<RHI::VulkanDevice> device,
-                        RHI::TransferManager& transferManager);
+                        RHI::TransferManager& transferManager,
+                        entt::dispatcher& dispatcher);
 }

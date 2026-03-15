@@ -8,6 +8,7 @@ module;
 
 #include <glm/glm.hpp>
 #include <entt/entity/registry.hpp>
+#include <entt/signal/dispatcher.hpp>
 
 module Graphics:Systems.GraphGeometrySync.Impl;
 
@@ -38,7 +39,8 @@ namespace Graphics::Systems::GraphGeometrySync
                   GPUScene& gpuScene,
                   GeometryPool& geometryStorage,
                   std::shared_ptr<RHI::VulkanDevice> device,
-                  RHI::TransferManager& transferManager)
+                  RHI::TransferManager& transferManager,
+                  entt::dispatcher& dispatcher)
     {
         auto view = registry.view<ECS::Graph::Data>();
 
@@ -192,6 +194,7 @@ namespace Graphics::Systems::GraphGeometrySync
                 {
                     Core::Log::Error("GraphGeometrySync: Failed to create GPU geometry for entity {}",
                                      static_cast<uint32_t>(entity));
+                    dispatcher.enqueue<ECS::Events::GeometryUploadFailed>({entity});
                     // Clear stale cached attributes — the previous geometry was
                     // already released and counts may no longer match.
                     graphData.CachedEdgePairs.clear();
@@ -312,7 +315,8 @@ namespace Graphics::Systems::GraphGeometrySync
                         GPUScene& gpuScene,
                         GeometryPool& geometryStorage,
                         std::shared_ptr<RHI::VulkanDevice> device,
-                        RHI::TransferManager& transferManager)
+                        RHI::TransferManager& transferManager,
+                        entt::dispatcher& dispatcher)
     {
         graph.AddPass("GraphGeometrySync",
             [](Core::FrameGraphBuilder& builder)
@@ -323,9 +327,9 @@ namespace Graphics::Systems::GraphGeometrySync
                 builder.WaitFor("TransformUpdate"_id);
                 builder.WaitFor("PropertySetDirtySync"_id);
             },
-            [&registry, &gpuScene, &geometryStorage, device, &transferManager]()
+            [&registry, &gpuScene, &geometryStorage, device, &transferManager, &dispatcher]()
             {
-                OnUpdate(registry, gpuScene, geometryStorage, device, transferManager);
+                OnUpdate(registry, gpuScene, geometryStorage, device, transferManager, dispatcher);
             });
     }
 }

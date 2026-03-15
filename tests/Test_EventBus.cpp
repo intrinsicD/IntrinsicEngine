@@ -294,3 +294,47 @@ TEST(EventBus, GpuPickCompleted_BackgroundHitHasZeroPickID)
     EXPECT_EQ(received[0].PickID, 0u);
     EXPECT_FALSE(received[0].HasHit);
 }
+
+// -----------------------------------------------------------------------------
+// GeometryUploadFailed — Dispatcher Contract Tests
+// -----------------------------------------------------------------------------
+
+TEST(EventBus, GeometryUploadFailed_SinkReceivesEnqueuedEvent)
+{
+    Scene scene;
+    entt::entity e = scene.CreateEntity("FailedUpload");
+
+    std::vector<GeometryUploadFailed> received;
+    scene.GetDispatcher().sink<GeometryUploadFailed>().connect<
+        [](std::vector<GeometryUploadFailed>& out, const GeometryUploadFailed& evt) {
+            out.push_back(evt);
+        }>(received);
+
+    scene.GetDispatcher().enqueue<GeometryUploadFailed>({e});
+    EXPECT_TRUE(received.empty()); // Deferred until update().
+
+    scene.GetDispatcher().update();
+    ASSERT_EQ(received.size(), 1u);
+    EXPECT_EQ(received[0].Entity, e);
+}
+
+TEST(EventBus, GeometryUploadFailed_MultipleEntitiesPerFrame)
+{
+    Scene scene;
+    entt::entity e1 = scene.CreateEntity("Mesh");
+    entt::entity e2 = scene.CreateEntity("Cloud");
+
+    std::vector<GeometryUploadFailed> received;
+    scene.GetDispatcher().sink<GeometryUploadFailed>().connect<
+        [](std::vector<GeometryUploadFailed>& out, const GeometryUploadFailed& evt) {
+            out.push_back(evt);
+        }>(received);
+
+    scene.GetDispatcher().enqueue<GeometryUploadFailed>({e1});
+    scene.GetDispatcher().enqueue<GeometryUploadFailed>({e2});
+    scene.GetDispatcher().update();
+
+    ASSERT_EQ(received.size(), 2u);
+    EXPECT_EQ(received[0].Entity, e1);
+    EXPECT_EQ(received[1].Entity, e2);
+}
