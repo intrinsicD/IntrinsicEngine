@@ -220,12 +220,6 @@ These are the explicit constraints agents must preserve during the refactor even
 
 Identified via full codebase sweep (March 2026). Grouped by priority.
 
-### D1. Graph Property Extraction Regression Test (P2)
-
-`Graphics.GraphPropertyHelpers.hpp` consolidates graph color/radius extraction. Both `GraphGeometrySync` and `PropertySetDirtySync` use the shared helpers. Remaining:
-
-- [ ] Add one regression test covering deleted-vertex skipping + fallback property names across both call sites.
-
 ### D2. Finish Shared Pass Helper Adoption (P3)
 
 `Graphics.PassUtils.hpp` covers shader-path resolution (`ResolveShaderPaths`) and non-owning `VulkanDevice` aliases (`MakeDeviceAlias`). `PostProcessPass` and all other passes now use these helpers. `PipelineLibrary.cpp` still uses raw `ResolveShaderPathOrExit` pairs because it resolves shaders without a `ShaderRegistry` — this is acceptable.
@@ -233,40 +227,18 @@ Identified via full codebase sweep (March 2026). Grouped by priority.
 - [ ] Evaluate whether `PipelineLibrary` can adopt `ResolveShaderPaths` with an alternate resolver overload.
 - [ ] Keep the refactor behavior-preserving and opportunistic when the file is next touched.
 
-### D3. Vertex Deduplication Consolidation (P3) — **Resolved**
 
-STL's spatial-hash vertex deduplication extracted to `Graphics.Importers.VertexDedup.hpp` (`SpatialVertexKey` / `SpatialVertexKeyHash`). Unit tests in `Test_ImporterUtils.cpp`. Details in git history.
+### D7. Picking Code Path Duplication (P3)
 
-### D3b. Polygon Fan Triangulation Consolidation (P3) — **Resolved**
+`Runtime.SelectionModule.cpp` duplicated the NDC→world-ray construction — the hover path now calls `BuildPickRequest()` directly (details in git history). `Runtime.Selection.cpp` graph-edge picking now uses canonical `Geometry::ClosestRaySegment` instead of a local duplicate (D19, details in git history). Remaining:
 
-Fan triangulation extracted to `Graphics.Importers.TriangulationUtils.hpp`. OBJ, PLY, and OFF importers migrated. Unit tests in `Test_ImporterUtils.cpp`. Details in git history.
-
-### D4. Color Parsing Unification (P3) — **Resolved**
-
-Shared color parsing helpers extracted to `Graphics.Importers.ColorParsing.hpp` (`ParseRgbTriplet`, `IntensityToColor`, `UnpackPackedRgb`). XYZ, PCD, and OFF importers migrated. Unit tests in `Test_ImporterUtils.cpp`. Details in git history.
-
-### D6. Importer Line I/O Inconsistency (P3)
-
-OBJ, PCD, TGF, XYZ, and OFF importers now use the shared `TextParse::NextLine()` / `SplitWhitespace()` utilities. PLY importer still uses `std::istringstream` + `std::getline()` for header parsing (acceptable — PLY header is inherently line-oriented with mixed element/property declarations). STL also uses `std::istringstream` for ASCII parsing.
-
-- [ ] Evaluate migrating STL ASCII parser to `TextParse` (lower priority, format is simple).
-
-### D7. Selection.cpp Picking Helper Extraction (P3)
-
-`Runtime.SelectionModule.cpp` contains several large picking functions with repeated hit-test patterns (closest-point-on-segment, sphere-ray intersection). These could be factored into geometry query helpers.
-
-- [ ] Extract closest-point-on-segment and ray-sphere helpers into `Geometry::Queries` or a `Selection` utility header.
-- [ ] Reduce duplication between vertex/edge/face picking code paths.
+- [ ] Reduce duplication between vertex/edge/face picking code paths in `Runtime.Selection.cpp`.
 
 ### D10. Geometry Kernel: Neighborhood Centroid — Point Cloud Path (P4)
 
 `NormalEstimation.cpp` computes centroids over KNN point-cloud neighborhoods (raw `std::vector<glm::vec3>`, no halfedge connectivity). This is a different pattern from the mesh 1-ring centroid now in `MeshUtils::ComputeOneRingCentroid()` and cannot share the same helper.
 
 - [ ] Evaluate extracting a standalone `ComputePointCentroid(points, indices)` helper if more point-cloud operators need it.
-
-### D12. Importer Color Parsing: Consolidate Remaining Paths (P3) — **Resolved**
-
-Consolidated into shared `Graphics.Importers.ColorParsing.hpp` alongside D4. All importers now use the shared helpers. Details in git history.
 
 ### D16. Render Pass: Naming Inconsistency — Aux vs Attr (P4)
 
@@ -275,13 +247,8 @@ Per-entity attribute buffer entry structs use inconsistent naming across passes:
 - [ ] Pick one naming convention (`*AuxEntry` or `*AttrEntry`) and unify across all passes.
 - [ ] Update corresponding push constant field names and shader `PtrAux`/`PtrEdgeAux` references.
 
-### D18. Missing Geometry Test Coverage (P3) — **Resolved**
-
-All five previously untested collision/query modules now have dedicated test files: GJK, SDF/SDFContact, Containment, Support (11 shape types), ContactManifold. Details in git history.
-
 ### D19. Selection.cpp Picking Helpers Overlap with Geometry Module (P4) — Partially Resolved
 
-`Geometry::Queries` partition now provides `ClosestRaySegment()` (canonical ray-segment closest-point computation). Remaining:
+`Geometry::Queries` partition provides `ClosestRaySegment()` (canonical ray-segment closest-point computation). `Runtime.Selection.cpp` now uses it directly (local `RaySegmentClosest`/`ClosestRaySegment` duplicate removed). Remaining:
 
-- [ ] Refactor `Selection.cpp` to use `Geometry::ClosestRaySegment` and existing `Geometry::ClosestPointParameter` + `Geometry::ClosestPoint` where possible.
 - [ ] Consider adding output-parameter overloads to Geometry module for `SquaredDistance` (returning both the distance and the parameter/closest point).

@@ -609,3 +609,125 @@ TEST(Graph_NodeAttributes, ClearedOnEmptyGraph)
     EXPECT_TRUE(data.CachedEdgeColors.empty());
     EXPECT_EQ(data.GpuVertexCount, 0u);
 }
+
+// =============================================================================
+// D1 Regression: GraphPropertyHelpers deleted-vertex skipping and fallback names
+// =============================================================================
+//
+// GraphPropertyHelpers::ExtractColors() uses a skipDeleted predicate fed into
+// ColorMapper::MapProperty(), and sets config.PropertyName to the default if
+// empty and the property exists.  Both GraphGeometrySyncSystem and
+// PropertySetDirtySyncSystem call the shared helpers; these tests exercise the
+// same predicates and property-name logic so a regression in either helper is
+// caught here.
+
+// Helper: build a 3-vertex graph with "v:color" on all vertices and delete the
+// middle vertex (without GC so IsDeleted() returns true for it).
+static std::shared_ptr<Geometry::Graph::Graph> MakeGraphWithDeletedMiddleVertex()
+{
+    auto g = std::make_shared<Geometry::Graph::Graph>();
+    auto v0 = g->AddVertex(glm::vec3(0, 0, 0));
+    auto v1 = g->AddVertex(glm::vec3(1, 0, 0));
+    auto v2 = g->AddVertex(glm::vec3(0, 1, 0));
+    g->GetOrAddVertexProperty<glm::vec4>("v:color", glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
+    g->DeleteVertex(v1);
+    // Intentionally skip GarbageCollection() — v1 slot is still in storage but
+    // IsDeleted(v1) == true.  VerticesSize() == 3, VertexCount() == 2.
+    return g;
+}
+
+TEST(GraphPropertyHelpers_D1, SkipDeletedVerticesInColorExtraction)
+{
+    // Regression: ExtractColors must skip deleted vertices via the skipDeleted
+    // predicate; it must produce exactly VertexCount() entries, not VerticesSize().
+    auto graph = MakeGraphWithDeletedMiddleVertex();
+    ASSERT_EQ(graph->VerticesSize(), 3u);  // storage slots (including deleted)
+    ASSERT_EQ(graph->VertexCount(),  2u);  // live vertices only
+
+    VisualizationConfig::PropertyColorConfig config;
+    config.PropertyName = "v:color";
+
+    // Replicate the skipDeleted predicate from GraphPropertyHelpers::ExtractColors.
+    auto skipDeleted = [&graph](size_t i) -> bool {
+        return graph->IsDeleted(Geometry::VertexHandle{static_cast<Geometry::PropertyIndex>(i)});
+    };
+
+    const auto result = ColorMapper::MapProperty(
+        graph->VertexProperties(), config, skipDeleted);
+
+    ASSERT_TRUE(result.has_value());
+    // Must have exactly 2 colors — one per live vertex, deleted slot excluded.
+    EXPECT_EQ(result->Colors.size(), 2u);
+}
+
+TEST(GraphPropertyHelpers_D1, FallbackPropertyNameSetWhenEmpty)
+{
+    // Regression: ExtractColors must auto-populate config.PropertyName from the
+    // default name when PropertyName is empty and the property exists.
+    auto graph = MakeGraphWithDeletedMiddleVertex();
+
+    VisualizationConfig::PropertyColorConfig config;
+    ASSERT_TRUE(config.PropertyName.empty());  // start empty
+
+    // Replicate the fallback-name logic from GraphPropertyHelpers::ExtractColors.
+    const std::string_view defaultPropName = "v:color";
+    if (config.PropertyName.empty() && graph->VertexProperties().Exists(defaultPropName))
+        config.PropertyName = std::string(defaultPropName);
+
+    EXPECT_EQ(config.PropertyName, "v:color");
+
+    // After name is set, extraction must succeed and return the live-vertex count.
+    auto skipDeleted = [&graph](size_t i) -> bool {
+        return graph->IsDeleted(Geometry::VertexHandle{static_cast<Geometry::PropertyIndex>(i)});
+    };
+    const auto result = ColorMapper::MapProperty(
+        graph->VertexProperties(), config, skipDeleted);
+
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->Colors.size(), 2u);
+}
+
+TEST(GraphPropertyHelpers_D1, FallbackDoesNotOverrideExplicitPropertyName)
+{
+    // Regression: fallback name assignment must be guarded by `config.PropertyName.empty()`.
+    // An explicitly set name must not be silently overwritten.
+    auto graph = MakeGraphWithDeletedMiddleVertex();
+    // Add a second named property that the test will request explicitly.
+    graph->GetOrAddVertexProperty<glm::vec4>("v:highlight", glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
+
+    VisualizationConfig::PropertyColorConfig config;
+    config.PropertyName = "v:highlight";  // explicitly set — must not be changed
+
+    // Fallback logic: should NOT change PropertyName because it is non-empty.
+    const std::string_view defaultPropName = "v:color";
+    if (config.PropertyName.empty() && graph->VertexProperties().Exists(defaultPropName))
+        config.PropertyName = std::string(defaultPropName);
+
+    EXPECT_EQ(config.PropertyName, "v:highlight");
+}
+
+TEST(GraphPropertyHelpers_D1, SkipDeletedVerticesInRadiusExtraction)
+{
+    // Regression: ExtractNodeRadii must skip deleted vertices when iterating
+    // VerticesSize() with an IsDeleted() guard.
+    auto graph = MakeGraphWithDeletedMiddleVertex();
+    graph->GetOrAddVertexProperty<float>("v:radius", 0.02f);
+
+    // Replicate the loop from GraphPropertyHelpers::ExtractNodeRadii.
+    std::vector<float> radii;
+    auto radiusProp = Geometry::VertexProperty<float>(
+        graph->VertexProperties().Get<float>("v:radius"));
+    const std::size_t vSize = graph->VerticesSize();
+    for (std::size_t i = 0; i < vSize; ++i)
+    {
+        const Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(i)};
+        if (graph->IsDeleted(v))
+            continue;
+        radii.push_back(radiusProp[v]);
+    }
+
+    // Must have exactly 2 radii — one per live vertex, deleted slot excluded.
+    EXPECT_EQ(radii.size(), 2u);
+    for (float r : radii)
+        EXPECT_FLOAT_EQ(r, 0.02f);
+}

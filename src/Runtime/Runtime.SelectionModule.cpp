@@ -231,19 +231,9 @@ namespace Runtime
             const uint32_t winH = static_cast<uint32_t>(window.GetWindowHeight());
             if (winW > 0 && winH > 0)
             {
-                const glm::vec2 m = window.GetInput().GetMousePosition();
-
-                // NDC: x in [-1,1], y in [-1,1] with +y down (Vulkan).
-                const float nx = (2.0f * (m.x / static_cast<float>(winW))) - 1.0f;
-                const float ny = (2.0f * (m.y / static_cast<float>(winH))) - 1.0f;
-
-                Selection::PickRequest req{};
-                req.WorldRay = Selection::RayFromNDC(*camera, {nx, ny});
-                req.Backend = Selection::PickBackend::CPU;
-                req.PickRadiusPixels = m_Config.PickRadiusPixels;
-                req.CameraFovYRadians = glm::radians(camera->Fov);
-                req.ViewportHeightPixels = static_cast<float>(winH);
-
+                const auto req = BuildPickRequest(*camera, window,
+                                                  Selection::PickMode::Replace,
+                                                  m_Config.PickRadiusPixels);
                 const auto hit = Selection::PickCPU(scene, req);
                 Selection::ApplyHover(scene, hit.Entity);
             }
