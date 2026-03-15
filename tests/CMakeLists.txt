@@ -142,6 +142,7 @@ intrinsic_test_object_lib(RuntimeTestObjs
         Test_RuntimeRHI.cpp
         Test_RuntimeSelection.cpp
         Test_RuntimeSelection_Multi.cpp
+        Test_ElementSelection.cpp
         Test_TextureMaterialHotReload.cpp
         Test_RuntimeCulling.cpp
         Test_GraphicsBackend.cpp

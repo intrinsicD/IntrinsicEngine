@@ -47,6 +47,9 @@ export namespace Runtime
             float PickRadiusPixels = 12.0f;
 
             Activation Active = Activation::Enabled;
+
+            // Element-level selection mode (Entity/Vertex/Edge/Face).
+            Selection::ElementMode ElementMode = Selection::ElementMode::Entity;
         };
 
         SelectionModule();
@@ -75,6 +78,11 @@ export namespace Runtime
         [[nodiscard]] Config& GetConfig() { return m_Config; }
         [[nodiscard]] const Config& GetConfig() const { return m_Config; }
 
+        // Sub-element selection state (per-entity vertex/edge/face sets).
+        [[nodiscard]] const Selection::SubElementSelection& GetSubElementSelection() const { return m_SubElements; }
+        [[nodiscard]] Selection::SubElementSelection& GetSubElementSelection() { return m_SubElements; }
+        void ClearSubElementSelection() { m_SubElements.Clear(); }
+
     private:
         Config m_Config;
 
@@ -86,6 +94,7 @@ export namespace Runtime
         Selection::PickRequest m_PendingPickRequest{};
         bool m_HasPendingPickRequest = false;
         Selection::Picked m_Picked{};
+        Selection::SubElementSelection m_SubElements{};
 
         // Cached GPU pick result received via GpuPickCompleted dispatcher event.
         struct CachedGpuPick
@@ -98,6 +107,7 @@ export namespace Runtime
         void OnGpuPickCompleted(const ECS::Events::GpuPickCompleted& evt);
         void OnSelectionChanged(const ECS::Events::SelectionChanged& evt);
         void SyncPickedToSelection(ECS::Scene& scene, const Selection::PickResult* clickResult = nullptr);
+        void ApplySubElementPick(const Selection::Picked& picked, Selection::PickMode mode);
 
         static void ApplyFromGpuPick(ECS::Scene& scene,
                                     uint32_t pickID, bool hasHit,

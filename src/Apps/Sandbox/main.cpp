@@ -210,6 +210,9 @@ public:
         // 8. Spatial debug visualization (before render system)
         m_SpatialDebug.Update(*this, m_CachedSelectedEntity);
 
+        // 8b. Sub-element selection highlights (vertex spheres, edge lines, face tint)
+        EditorUI::DrawSubElementHighlights(*this);
+
         // 9. Selection + render
         if (cameraComponent != nullptr)
         {
