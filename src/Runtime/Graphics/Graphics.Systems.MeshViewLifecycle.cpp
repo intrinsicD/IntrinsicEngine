@@ -8,6 +8,7 @@ module;
 
 #include <glm/glm.hpp>
 #include <entt/entity/registry.hpp>
+#include <entt/signal/dispatcher.hpp>
 
 module Graphics:Systems.MeshViewLifecycle.Impl;
 
@@ -82,7 +83,8 @@ namespace Graphics::Systems::MeshViewLifecycle
                   GPUScene& gpuScene,
                   GeometryPool& geometryStorage,
                   std::shared_ptr<RHI::VulkanDevice> device,
-                  RHI::TransferManager& transferManager)
+                  RHI::TransferManager& transferManager,
+                  entt::dispatcher& dispatcher)
     {
         // -----------------------------------------------------------------
         // Phase 0: Auto-attach/detach internal view components based on
@@ -176,6 +178,7 @@ namespace Graphics::Systems::MeshViewLifecycle
             {
                 Core::Log::Error("MeshViewLifecycle: Failed to create edge view for entity {}",
                                  static_cast<uint32_t>(entity));
+                dispatcher.enqueue<ECS::Events::GeometryUploadFailed>({entity});
                 ev.Dirty = false;
                 continue;
             }
@@ -252,6 +255,7 @@ namespace Graphics::Systems::MeshViewLifecycle
             {
                 Core::Log::Error("MeshViewLifecycle: Failed to create vertex view for entity {}",
                                  static_cast<uint32_t>(entity));
+                dispatcher.enqueue<ECS::Events::GeometryUploadFailed>({entity});
                 pv.Dirty = false;
                 continue;
             }
@@ -294,7 +298,8 @@ namespace Graphics::Systems::MeshViewLifecycle
                         GPUScene& gpuScene,
                         GeometryPool& geometryStorage,
                         std::shared_ptr<RHI::VulkanDevice> device,
-                        RHI::TransferManager& transferManager)
+                        RHI::TransferManager& transferManager,
+                        entt::dispatcher& dispatcher)
     {
         graph.AddPass("MeshViewLifecycle",
             [](Core::FrameGraphBuilder& builder)
@@ -306,9 +311,9 @@ namespace Graphics::Systems::MeshViewLifecycle
                 builder.Write<ECS::Point::Component>();
                 builder.WaitFor("MeshRendererLifecycle"_id);
             },
-            [&registry, &gpuScene, &geometryStorage, device, &transferManager]()
+            [&registry, &gpuScene, &geometryStorage, device, &transferManager, &dispatcher]()
             {
-                OnUpdate(registry, gpuScene, geometryStorage, device, transferManager);
+                OnUpdate(registry, gpuScene, geometryStorage, device, transferManager, dispatcher);
             });
     }
 }

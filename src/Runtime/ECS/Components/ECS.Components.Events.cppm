@@ -42,4 +42,11 @@ export namespace ECS::Events
     {
         entt::entity Entity = entt::null;
     };
+
+    // Fired when a lifecycle system fails to upload geometry to the GPU.
+    // Consumers: UI notification, selection-state invalidation.
+    struct GeometryUploadFailed
+    {
+        entt::entity Entity = entt::null;
+    };
 }

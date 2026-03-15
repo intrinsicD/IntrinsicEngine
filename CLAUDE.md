@@ -118,6 +118,7 @@ Use for **cross-system notifications** where the producer does not know or care 
 - Entity spawned/destroyed (hierarchy, dirty tracker, undo).
 - Geometry modified (edge/vertex views re-sync, scene dirty state).
 - Async operation completed on main thread (`GpuPickCompleted` from GPU pick readback).
+- Geometry upload failed (`GeometryUploadFailed` from lifecycle systems — UI notification, selection-state invalidation).
 
 **Do NOT use when:**
 - Per-component incremental dirty tracking → use `DirtyTag::*` components.

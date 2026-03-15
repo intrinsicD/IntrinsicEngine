@@ -2,6 +2,7 @@ module;
 
 #include <memory>
 #include <entt/fwd.hpp>
+#include <entt/signal/dispatcher.hpp>
 
 export module Graphics:Systems.GraphGeometrySync;
 
@@ -43,7 +44,8 @@ export namespace Graphics::Systems::GraphGeometrySync
                   GPUScene& gpuScene,
                   GeometryPool& geometryStorage,
                   std::shared_ptr<RHI::VulkanDevice> device,
-                  RHI::TransferManager& transferManager);
+                  RHI::TransferManager& transferManager,
+                  entt::dispatcher& dispatcher);
 
     // Register this system into a FrameGraph with its dependency declarations.
     // Declares: Write<ECS::Graph::Data>, Write<ECS::Line::Component>,
@@ -53,5 +55,6 @@ export namespace Graphics::Systems::GraphGeometrySync
                         GPUScene& gpuScene,
                         GeometryPool& geometryStorage,
                         std::shared_ptr<RHI::VulkanDevice> device,
-                        RHI::TransferManager& transferManager);
+                        RHI::TransferManager& transferManager,
+                        entt::dispatcher& dispatcher);
 }
