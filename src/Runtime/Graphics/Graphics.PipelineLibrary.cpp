@@ -70,17 +70,26 @@ namespace Graphics
     {
         (void)swapchainFormat;
 
+        // Local resolver helpers — avoid repeating the ShaderRegistry lambda at every call site.
+        auto resolver    = [&](Core::Hash::StringID id) { return shaderRegistry.Get(id); };
+        auto resolveVF   = [&](Core::Hash::StringID vertId, Core::Hash::StringID fragId)
+        {
+            return std::pair<std::string, std::string>{
+                Core::Filesystem::ResolveShaderPathOrExit(resolver, vertId),
+                Core::Filesystem::ResolveShaderPathOrExit(resolver, fragId)
+            };
+        };
+        auto resolveComp = [&](Core::Hash::StringID id)
+        {
+            return Core::Filesystem::ResolveShaderPathOrExit(resolver, id);
+        };
+
         // ---------------------------------------------------------------------
         // Surface pipeline (Textured + BDA)
         // Renders to HDR SceneColor target (sceneColorFormat), NOT the swapchain.
         // ---------------------------------------------------------------------
         {
-            const std::string vertPath = Core::Filesystem::ResolveShaderPathOrExit(
-                [&](Core::Hash::StringID id) { return shaderRegistry.Get(id); },
-                "Surface.Vert"_id);
-            const std::string fragPath = Core::Filesystem::ResolveShaderPathOrExit(
-                [&](Core::Hash::StringID id) { return shaderRegistry.Get(id); },
-                "Surface.Frag"_id);
+            auto [vertPath, fragPath] = resolveVF("Surface.Vert"_id, "Surface.Frag"_id);
 
             RHI::ShaderModule vert(*m_Device, vertPath, RHI::ShaderStage::Vertex);
             RHI::ShaderModule frag(*m_Device, fragPath, RHI::ShaderStage::Fragment);
@@ -160,12 +169,7 @@ namespace Graphics
         {
             // Lines
             {
-                const std::string vertPath = Core::Filesystem::ResolveShaderPathOrExit(
-                    [&](Core::Hash::StringID id) { return shaderRegistry.Get(id); },
-                    "Surface.Vert"_id);
-                const std::string fragPath = Core::Filesystem::ResolveShaderPathOrExit(
-                    [&](Core::Hash::StringID id) { return shaderRegistry.Get(id); },
-                    "Surface.Frag"_id);
+                auto [vertPath, fragPath] = resolveVF("Surface.Vert"_id, "Surface.Frag"_id);
 
                 RHI::ShaderModule vert(*m_Device, vertPath, RHI::ShaderStage::Vertex);
                 RHI::ShaderModule frag(*m_Device, fragPath, RHI::ShaderStage::Fragment);
@@ -201,12 +205,7 @@ namespace Graphics
 
             // Points
             {
-                const std::string vertPath = Core::Filesystem::ResolveShaderPathOrExit(
-                    [&](Core::Hash::StringID id) { return shaderRegistry.Get(id); },
-                    "Surface.Vert"_id);
-                const std::string fragPath = Core::Filesystem::ResolveShaderPathOrExit(
-                    [&](Core::Hash::StringID id) { return shaderRegistry.Get(id); },
-                    "Surface.Frag"_id);
+                auto [vertPath, fragPath] = resolveVF("Surface.Vert"_id, "Surface.Frag"_id);
 
                 RHI::ShaderModule vert(*m_Device, vertPath, RHI::ShaderStage::Vertex);
                 RHI::ShaderModule frag(*m_Device, fragPath, RHI::ShaderStage::Fragment);
@@ -245,12 +244,7 @@ namespace Graphics
         // Picking pipeline (ID buffer + BDA)
         // ---------------------------------------------------------------------
         {
-            const std::string vertPath = Core::Filesystem::ResolveShaderPathOrExit(
-                [&](Core::Hash::StringID id) { return shaderRegistry.Get(id); },
-                "Picking.Vert"_id);
-            const std::string fragPath = Core::Filesystem::ResolveShaderPathOrExit(
-                [&](Core::Hash::StringID id) { return shaderRegistry.Get(id); },
-                "Picking.Frag"_id);
+            auto [vertPath, fragPath] = resolveVF("Picking.Vert"_id, "Picking.Frag"_id);
 
             RHI::ShaderModule vert(*m_Device, vertPath, RHI::ShaderStage::Vertex);
             RHI::ShaderModule frag(*m_Device, fragPath, RHI::ShaderStage::Fragment);
@@ -319,9 +313,7 @@ namespace Graphics
 
             if (!m_SceneUpdatePipeline)
             {
-                const std::string compPath = Core::Filesystem::ResolveShaderPathOrExit(
-                    [&](Core::Hash::StringID id) { return shaderRegistry.Get(id); },
-                    "SceneUpdate.Comp"_id);
+                const std::string compPath = resolveComp("SceneUpdate.Comp"_id);
 
                 RHI::ShaderModule comp(*m_Device, compPath, RHI::ShaderStage::Compute);
 
@@ -404,9 +396,7 @@ namespace Graphics
 
             if (!m_CullPipeline)
             {
-                const std::string compPath = Core::Filesystem::ResolveShaderPathOrExit(
-                    [&](Core::Hash::StringID id) { return shaderRegistry.Get(id); },
-                    "Cull.Comp"_id);
+                const std::string compPath = resolveComp("Cull.Comp"_id);
 
                 RHI::ShaderModule comp(*m_Device, compPath, RHI::ShaderStage::Compute);
 
