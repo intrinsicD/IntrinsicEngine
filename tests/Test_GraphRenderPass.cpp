@@ -213,7 +213,7 @@ TEST(Graph_RetainedMode, DefaultGpuStateValues)
     EXPECT_FALSE(data.GpuGeometry.IsValid());
 
     // GPUScene slot should be invalid by default.
-    EXPECT_EQ(data.GpuSlot, ECS::Graph::Data::kInvalidSlot);
+    EXPECT_EQ(data.GpuSlot, ECS::kInvalidGpuSlot);
 
     // Edge pairs should be empty.
     EXPECT_TRUE(data.CachedEdgePairs.empty());
@@ -335,18 +335,14 @@ TEST(Graph_RetainedMode, GpuVertexCountTracksCompactedCount)
 
 TEST(Graph_GPUSceneSlot, InvalidSlotConstantMatchesOtherComponents)
 {
-    // All renderer components must use the same kInvalidSlot sentinel (0xFFFFFFFF).
-    EXPECT_EQ(ECS::Graph::Data::kInvalidSlot,
-              ECS::Surface::Component::kInvalidSlot);
-    EXPECT_EQ(ECS::Graph::Data::kInvalidSlot,
-              ECS::PointCloud::Data::kInvalidSlot);
-    EXPECT_EQ(ECS::Graph::Data::kInvalidSlot, ~0u);
+    // All components now use the shared ECS::kInvalidGpuSlot constant.
+    EXPECT_EQ(ECS::kInvalidGpuSlot, ~0u);
 }
 
 TEST(Graph_GPUSceneSlot, SlotDefaultsToInvalid)
 {
     ECS::Graph::Data data;
-    EXPECT_EQ(data.GpuSlot, ECS::Graph::Data::kInvalidSlot);
+    EXPECT_EQ(data.GpuSlot, ECS::kInvalidGpuSlot);
 }
 
 TEST(Graph_GPUSceneSlot, SlotCanBeAssignedAndCleared)
@@ -355,8 +351,8 @@ TEST(Graph_GPUSceneSlot, SlotCanBeAssignedAndCleared)
     data.GpuSlot = 42u;
     EXPECT_EQ(data.GpuSlot, 42u);
 
-    data.GpuSlot = ECS::Graph::Data::kInvalidSlot;
-    EXPECT_EQ(data.GpuSlot, ECS::Graph::Data::kInvalidSlot);
+    data.GpuSlot = ECS::kInvalidGpuSlot;
+    EXPECT_EQ(data.GpuSlot, ECS::kInvalidGpuSlot);
 }
 
 // =============================================================================

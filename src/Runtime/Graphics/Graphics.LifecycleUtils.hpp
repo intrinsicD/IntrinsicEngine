@@ -55,11 +55,9 @@ inline uint32_t AllocateGpuSlot(
     const GeometryGpuData& geo,
     Geometry::GeometryHandle geometryHandle)
 {
-    static constexpr uint32_t kInvalidSlot = ~0u;
-
     const uint32_t slot = gpuScene.AllocateSlot();
-    if (slot == kInvalidSlot)
-        return kInvalidSlot;
+    if (slot == ECS::kInvalidGpuSlot)
+        return ECS::kInvalidGpuSlot;
 
     GpuInstanceData inst{};
 

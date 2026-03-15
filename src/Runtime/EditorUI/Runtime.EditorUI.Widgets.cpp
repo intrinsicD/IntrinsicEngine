@@ -168,9 +168,7 @@ bool VectorFieldWidget(Graphics::VisualizationConfig& config,
 
         ImGui::DragFloat("Scale", &vf.Scale, 0.01f, 0.001f, 100.0f);
         ImGui::SliderFloat("Width", &vf.EdgeWidth, 0.5f, 5.0f);
-        float vc[4] = {vf.Color.r, vf.Color.g, vf.Color.b, vf.Color.a};
-        if (ImGui::ColorEdit4("Color", vc))
-            vf.Color = glm::vec4(vc[0], vc[1], vc[2], vc[3]);
+        ColorEdit4("Color", vf.Color);
         ImGui::Checkbox("Overlay", &vf.Overlay);
 
         // Per-vector color property selector.
@@ -230,6 +228,35 @@ bool VectorFieldWidget(Graphics::VisualizationConfig& config,
 }
 
 // =========================================================================
+// Reusable micro-widgets
+// =========================================================================
+
+bool PointRenderModeCombo(const char* label,
+                          Geometry::PointCloud::RenderMode& mode)
+{
+    static constexpr const char* kModeNames[] = {"Flat Disc", "Surfel", "EWA Splatting", "Sphere"};
+    int idx = static_cast<int>(mode);
+    if (idx < 0 || idx > 3) idx = 0;
+    if (ImGui::Combo(label, &idx, kModeNames, 4))
+    {
+        mode = static_cast<Geometry::PointCloud::RenderMode>(idx);
+        return true;
+    }
+    return false;
+}
+
+bool ColorEdit4(const char* label, glm::vec4& color)
+{
+    float c[4] = {color.r, color.g, color.b, color.a};
+    if (ImGui::ColorEdit4(label, c))
+    {
+        color = glm::vec4(c[0], c[1], c[2], c[3]);
+        return true;
+    }
+    return false;
+}
+
+// =========================================================================
 // Utility functions
 // =========================================================================
 
@@ -267,46 +294,21 @@ bool OctreeSettingsEqual(const Graphics::OctreeDebugDrawSettings& a,
 
 glm::vec3 DepthRamp(float t)
 {
-    t = std::clamp(t, 0.0f, 1.0f);
-    constexpr std::array<glm::vec3, 5> k = {
-        glm::vec3{0.267f, 0.005f, 0.329f},
-        glm::vec3{0.230f, 0.322f, 0.546f},
-        glm::vec3{0.128f, 0.566f, 0.550f},
-        glm::vec3{0.369f, 0.788f, 0.382f},
-        glm::vec3{0.993f, 0.906f, 0.144f},
-    };
-
-    const float x = t * 4.0f;
-    const int i0 = std::clamp(static_cast<int>(x), 0, 3);
-    const int i1 = i0 + 1;
-    const float alpha = x - static_cast<float>(i0);
-    return k[i0] * (1.0f - alpha) + k[i1] * alpha;
+    return Graphics::GpuColor::DepthRamp(t);
 }
 
 uint32_t PackWithAlpha(const glm::vec3& rgb, float alpha)
 {
-    return Graphics::DebugDraw::PackColorF(rgb.r, rgb.g, rgb.b, alpha);
+    return Graphics::GpuColor::PackVec3WithAlpha(rgb, alpha);
 }
 
 void TransformAABB(const glm::vec3& lo, const glm::vec3& hi, const glm::mat4& m,
                    glm::vec3& outLo, glm::vec3& outHi)
 {
-    glm::vec3 corners[8] = {
-        {lo.x, lo.y, lo.z}, {hi.x, lo.y, lo.z},
-        {lo.x, hi.y, lo.z}, {hi.x, hi.y, lo.z},
-        {lo.x, lo.y, hi.z}, {hi.x, lo.y, hi.z},
-        {lo.x, hi.y, hi.z}, {hi.x, hi.y, hi.z},
-    };
-
-    outLo = glm::vec3(std::numeric_limits<float>::max());
-    outHi = glm::vec3(std::numeric_limits<float>::lowest());
-
-    for (const glm::vec3& corner : corners)
-    {
-        const glm::vec3 transformed = glm::vec3(m * glm::vec4(corner, 1.0f));
-        outLo = glm::min(outLo, transformed);
-        outHi = glm::max(outHi, transformed);
-    }
+    const Geometry::AABB src{lo, hi};
+    const Geometry::AABB result = Geometry::TransformAABB(src, m);
+    outLo = result.Min;
+    outHi = result.Max;
 }
 
 } // namespace Runtime::EditorUI

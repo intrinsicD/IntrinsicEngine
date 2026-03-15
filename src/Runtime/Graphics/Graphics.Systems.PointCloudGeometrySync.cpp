@@ -150,14 +150,14 @@ namespace Graphics::Systems::PointCloudGeometrySync
             // Phase 2: Allocate GPUScene slot for entities with valid GPU geometry.
             // Allocate once, then GPUSceneSync handles subsequent transform-only updates.
             // -----------------------------------------------------------------
-            if (pcData.GpuSlot == ECS::PointCloud::Data::kInvalidSlot && pcData.GpuGeometry.IsValid())
+            if (pcData.GpuSlot == ECS::kInvalidGpuSlot && pcData.GpuGeometry.IsValid())
             {
                 GeometryGpuData* geo = geometryStorage.GetIfValid(pcData.GpuGeometry);
                 if (geo && geo->GetVertexBuffer())
                 {
                     const uint32_t slot = AllocateGpuSlot(
                         registry, entity, gpuScene, *geo, pcData.GpuGeometry);
-                    if (slot != ECS::PointCloud::Data::kInvalidSlot)
+                    if (slot != ECS::kInvalidGpuSlot)
                         pcData.GpuSlot = slot;
                 }
             }

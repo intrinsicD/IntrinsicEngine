@@ -32,7 +32,7 @@ TEST(MeshViewLifecycle_Contract, EdgeViewDefaultState)
     ECS::MeshEdgeView::Component comp;
 
     EXPECT_FALSE(comp.Geometry.IsValid());
-    EXPECT_EQ(comp.GpuSlot, ECS::MeshEdgeView::Component::kInvalidSlot);
+    EXPECT_EQ(comp.GpuSlot, ECS::kInvalidGpuSlot);
     EXPECT_EQ(comp.EdgeCount, 0u);
     EXPECT_TRUE(comp.Dirty);
     EXPECT_FALSE(comp.HasGpuGeometry());
@@ -40,12 +40,8 @@ TEST(MeshViewLifecycle_Contract, EdgeViewDefaultState)
 
 TEST(MeshViewLifecycle_Contract, EdgeViewInvalidSlotSentinel)
 {
-    // kInvalidSlot must be ~0u, consistent with other component types.
-    EXPECT_EQ(ECS::MeshEdgeView::Component::kInvalidSlot, ~0u);
-    EXPECT_EQ(ECS::MeshEdgeView::Component::kInvalidSlot,
-              ECS::Surface::Component::kInvalidSlot);
-    EXPECT_EQ(ECS::MeshEdgeView::Component::kInvalidSlot,
-              ECS::PointCloud::Data::kInvalidSlot);
+    // All components now use the shared ECS::kInvalidGpuSlot constant.
+    EXPECT_EQ(ECS::kInvalidGpuSlot, ~0u);
 }
 
 TEST(MeshViewLifecycle_Contract, EdgeViewHasGpuGeometryFalseByDefault)
@@ -70,7 +66,7 @@ TEST(MeshViewLifecycle_Contract, VertexViewDefaultState)
     ECS::MeshVertexView::Component comp;
 
     EXPECT_FALSE(comp.Geometry.IsValid());
-    EXPECT_EQ(comp.GpuSlot, ECS::MeshVertexView::Component::kInvalidSlot);
+    EXPECT_EQ(comp.GpuSlot, ECS::kInvalidGpuSlot);
     EXPECT_EQ(comp.VertexCount, 0u);
     EXPECT_TRUE(comp.Dirty);
     EXPECT_FALSE(comp.HasGpuGeometry());
@@ -78,9 +74,8 @@ TEST(MeshViewLifecycle_Contract, VertexViewDefaultState)
 
 TEST(MeshViewLifecycle_Contract, VertexViewInvalidSlotSentinel)
 {
-    EXPECT_EQ(ECS::MeshVertexView::Component::kInvalidSlot, ~0u);
-    EXPECT_EQ(ECS::MeshVertexView::Component::kInvalidSlot,
-              ECS::Surface::Component::kInvalidSlot);
+    // All components now use the shared ECS::kInvalidGpuSlot constant.
+    EXPECT_EQ(ECS::kInvalidGpuSlot, ~0u);
 }
 
 TEST(MeshViewLifecycle_Contract, VertexViewHasGpuGeometryTrueWhenValid)
@@ -235,7 +230,7 @@ TEST(MeshViewLifecycle_Contract, EdgeViewSlotLifecycle)
     // Phase 1: Newly attached (Dirty, no geometry, no slot).
     EXPECT_TRUE(comp.Dirty);
     EXPECT_FALSE(comp.HasGpuGeometry());
-    EXPECT_EQ(comp.GpuSlot, ECS::MeshEdgeView::Component::kInvalidSlot);
+    EXPECT_EQ(comp.GpuSlot, ECS::kInvalidGpuSlot);
 
     // Phase 2: Lifecycle system creates geometry and allocates slot.
     comp.Geometry = Geometry::GeometryHandle(0, 1);
@@ -245,11 +240,11 @@ TEST(MeshViewLifecycle_Contract, EdgeViewSlotLifecycle)
 
     EXPECT_FALSE(comp.Dirty);
     EXPECT_TRUE(comp.HasGpuGeometry());
-    EXPECT_NE(comp.GpuSlot, ECS::MeshEdgeView::Component::kInvalidSlot);
+    EXPECT_NE(comp.GpuSlot, ECS::kInvalidGpuSlot);
 
     // Phase 3: On destroy hook frees slot.
-    comp.GpuSlot = ECS::MeshEdgeView::Component::kInvalidSlot;
-    EXPECT_EQ(comp.GpuSlot, ECS::MeshEdgeView::Component::kInvalidSlot);
+    comp.GpuSlot = ECS::kInvalidGpuSlot;
+    EXPECT_EQ(comp.GpuSlot, ECS::kInvalidGpuSlot);
 }
 
 TEST(MeshViewLifecycle_Contract, VertexViewSlotLifecycle)
@@ -258,7 +253,7 @@ TEST(MeshViewLifecycle_Contract, VertexViewSlotLifecycle)
 
     EXPECT_TRUE(comp.Dirty);
     EXPECT_FALSE(comp.HasGpuGeometry());
-    EXPECT_EQ(comp.GpuSlot, ECS::MeshVertexView::Component::kInvalidSlot);
+    EXPECT_EQ(comp.GpuSlot, ECS::kInvalidGpuSlot);
 
     comp.Geometry = Geometry::GeometryHandle(0, 1);
     comp.VertexCount = 1024;
@@ -267,10 +262,10 @@ TEST(MeshViewLifecycle_Contract, VertexViewSlotLifecycle)
 
     EXPECT_FALSE(comp.Dirty);
     EXPECT_TRUE(comp.HasGpuGeometry());
-    EXPECT_NE(comp.GpuSlot, ECS::MeshVertexView::Component::kInvalidSlot);
+    EXPECT_NE(comp.GpuSlot, ECS::kInvalidGpuSlot);
 
-    comp.GpuSlot = ECS::MeshVertexView::Component::kInvalidSlot;
-    EXPECT_EQ(comp.GpuSlot, ECS::MeshVertexView::Component::kInvalidSlot);
+    comp.GpuSlot = ECS::kInvalidGpuSlot;
+    EXPECT_EQ(comp.GpuSlot, ECS::kInvalidGpuSlot);
 }
 
 // =============================================================================

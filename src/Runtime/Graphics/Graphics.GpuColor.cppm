@@ -1,6 +1,9 @@
 module;
 
+#include <algorithm>
 #include <cstdint>
+
+#include <glm/glm.hpp>
 
 export module Graphics:GpuColor;
 
@@ -73,6 +76,33 @@ export namespace Graphics::GpuColor
         }
 
         return PackColorF(r, g, b, a);
+    }
+
+    // Pack a glm::vec3 RGB with a separate alpha into ABGR uint32.
+    // Shared helper previously duplicated as local lambdas in 5+ debug draw files.
+    [[nodiscard]] inline uint32_t PackVec3WithAlpha(const glm::vec3& rgb, float alpha) noexcept
+    {
+        return PackColorF(rgb.r, rgb.g, rgb.b, std::clamp(alpha, 0.0f, 1.0f));
+    }
+
+    // Viridis-like 5-point linear-interpolation depth ramp.
+    // Maps t ∈ [0,1] to a perceptually uniform color progression.
+    // Used by octree/BVH/KD-tree debug visualization for depth-based coloring.
+    [[nodiscard]] inline glm::vec3 DepthRamp(float t) noexcept
+    {
+        t = std::clamp(t, 0.0f, 1.0f);
+        constexpr glm::vec3 k[5] = {
+            {0.267f, 0.005f, 0.329f},
+            {0.230f, 0.322f, 0.546f},
+            {0.128f, 0.566f, 0.550f},
+            {0.369f, 0.788f, 0.382f},
+            {0.993f, 0.906f, 0.144f},
+        };
+        const float x = t * 4.0f;
+        const int i0 = std::clamp(static_cast<int>(x), 0, 3);
+        const int i1 = i0 + 1;
+        const float a = x - static_cast<float>(i0);
+        return k[i0] * (1.0f - a) + k[i1] * a;
     }
 
     // Map an integer label to a deterministic color from a 12-entry palette.

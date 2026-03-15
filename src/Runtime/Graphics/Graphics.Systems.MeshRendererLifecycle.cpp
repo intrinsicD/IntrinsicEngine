@@ -36,7 +36,7 @@ namespace Graphics::Systems::MeshRendererLifecycle
         for (auto [entity, mr, world] : view.each())
         {
             // Allocate slot for newly-added components.
-            if (mr.GpuSlot == ECS::Surface::Component::kInvalidSlot)
+            if (mr.GpuSlot == ECS::kInvalidGpuSlot)
             {
                 if (!mr.Geometry.IsValid())
                     continue;
@@ -46,7 +46,7 @@ namespace Graphics::Systems::MeshRendererLifecycle
                     continue;
 
                 const uint32_t slot = gpuScene.AllocateSlot();
-                if (slot == ECS::Surface::Component::kInvalidSlot)
+                if (slot == ECS::kInvalidGpuSlot)
                     continue;
 
                 mr.GpuSlot = slot;

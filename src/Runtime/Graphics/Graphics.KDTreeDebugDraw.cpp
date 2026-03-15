@@ -17,7 +17,7 @@ namespace Graphics
     {
         [[nodiscard]] std::uint32_t PackWithAlpha(const glm::vec3& rgb, const float alpha)
         {
-            return DebugDraw::PackColorF(rgb.r, rgb.g, rgb.b, alpha);
+            return GpuColor::PackVec3WithAlpha(rgb, alpha);
         }
 
         [[nodiscard]] glm::vec3 TransformPoint(const glm::vec3& p, const glm::mat4& m)

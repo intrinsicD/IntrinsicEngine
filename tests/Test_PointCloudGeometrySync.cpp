@@ -28,7 +28,7 @@ TEST(PointCloudGeometrySync_Contract, DefaultGpuStateFields)
     ECS::PointCloud::Data comp;
 
     EXPECT_FALSE(comp.GpuGeometry.IsValid());
-    EXPECT_EQ(comp.GpuSlot, ECS::PointCloud::Data::kInvalidSlot);
+    EXPECT_EQ(comp.GpuSlot, ECS::kInvalidGpuSlot);
     EXPECT_TRUE(comp.GpuDirty);
     EXPECT_FALSE(comp.HasGpuGeometry());
     EXPECT_EQ(comp.GpuPointCount, 0u);
@@ -36,12 +36,8 @@ TEST(PointCloudGeometrySync_Contract, DefaultGpuStateFields)
 
 TEST(PointCloudGeometrySync_Contract, InvalidSlotSentinel)
 {
-    // kInvalidSlot must be ~0u (same as other components).
-    EXPECT_EQ(ECS::PointCloud::Data::kInvalidSlot, ~0u);
-    EXPECT_EQ(ECS::PointCloud::Data::kInvalidSlot,
-              ECS::Surface::Component::kInvalidSlot);
-    EXPECT_EQ(ECS::PointCloud::Data::kInvalidSlot,
-              ECS::Graph::Data::kInvalidSlot);
+    // All components now use the shared ECS::kInvalidGpuSlot constant.
+    EXPECT_EQ(ECS::kInvalidGpuSlot, ~0u);
 }
 
 // ---- HasGpuGeometry Query ----

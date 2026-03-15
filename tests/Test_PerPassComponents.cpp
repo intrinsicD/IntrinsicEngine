@@ -21,7 +21,7 @@ TEST(PerPassComponents_Surface, DefaultConstruction)
     Surface::Component c{};
     EXPECT_FALSE(c.Geometry.IsValid());
     EXPECT_FALSE(c.Material.IsValid());
-    EXPECT_EQ(c.GpuSlot, Surface::Component::kInvalidSlot);
+    EXPECT_EQ(c.GpuSlot, ECS::kInvalidGpuSlot);
     EXPECT_EQ(c.CachedMaterialRevisionForInstance, 0u);
     EXPECT_FALSE(c.CachedIsSelectedForInstance);
 }
@@ -64,11 +64,8 @@ TEST(PerPassComponents_Point, SphereModeAssignable)
 
 TEST(PerPassComponents_SlotSentinel, AllComponentsShareSameKInvalidSlot)
 {
-    EXPECT_EQ(Surface::Component::kInvalidSlot, Graph::Data::kInvalidSlot);
-    EXPECT_EQ(Surface::Component::kInvalidSlot, PointCloud::Data::kInvalidSlot);
-    EXPECT_EQ(Surface::Component::kInvalidSlot, MeshEdgeView::Component::kInvalidSlot);
-    EXPECT_EQ(Surface::Component::kInvalidSlot, MeshVertexView::Component::kInvalidSlot);
-    EXPECT_EQ(Surface::Component::kInvalidSlot, ~0u);
+    // All components now use the shared ECS::kInvalidGpuSlot constant.
+    EXPECT_EQ(ECS::kInvalidGpuSlot, ~0u);
 }
 
 // =============================================================================
@@ -84,7 +81,7 @@ TEST(PerPassComponents_Registry, SurfaceAttachDetach)
     ASSERT_TRUE(reg.all_of<Surface::Component>(e));
 
     auto& surf = reg.get<Surface::Component>(e);
-    EXPECT_EQ(surf.GpuSlot, Surface::Component::kInvalidSlot);
+    EXPECT_EQ(surf.GpuSlot, ECS::kInvalidGpuSlot);
 
     reg.remove<Surface::Component>(e);
     EXPECT_FALSE(reg.all_of<Surface::Component>(e));

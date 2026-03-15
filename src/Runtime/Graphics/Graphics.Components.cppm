@@ -81,6 +81,10 @@ export namespace ECS
         uint32_t i1;
     };
     static_assert(sizeof(EdgePair) == 8);
+
+    // Sentinel value for unallocated GPUScene slots.
+    // Shared by all component types that hold a GpuSlot member.
+    inline constexpr uint32_t kInvalidGpuSlot = ~0u;
 }
 
 export namespace ECS::MeshCollider
@@ -188,8 +192,7 @@ export namespace ECS::PointCloud
         // GPUScene slot for frustum culling and GPU-driven batching.
         // Allocated by PointCloudGeometrySyncSystem after successful upload.
         // Freed by on_destroy hook in SceneManager.
-        static constexpr uint32_t kInvalidSlot = ~0u;
-        uint32_t GpuSlot = kInvalidSlot;
+        uint32_t GpuSlot = ECS::kInvalidGpuSlot;
 
         // Per-point colors (packed ABGR), one per point.
         // Extracted from Cloud's "p:color" by PointCloudGeometrySyncSystem.
@@ -279,8 +282,7 @@ export namespace ECS::Graph
 
         // ---- GPU State (managed by GraphGeometrySyncSystem) ----
         Geometry::GeometryHandle GpuGeometry{};
-        static constexpr uint32_t kInvalidSlot = ~0u;
-        uint32_t GpuSlot = kInvalidSlot;
+        uint32_t GpuSlot = ECS::kInvalidGpuSlot;
 
         Geometry::GeometryHandle GpuEdgeGeometry{};
         uint32_t GpuEdgeCount = 0;
@@ -340,8 +342,7 @@ export namespace ECS::MeshEdgeView
         Geometry::GeometryHandle Geometry{};
 
         // GPUScene slot for frustum culling of this edge view.
-        static constexpr uint32_t kInvalidSlot = ~0u;
-        uint32_t GpuSlot = kInvalidSlot;
+        uint32_t GpuSlot = ECS::kInvalidGpuSlot;
 
         // Number of edges in the uploaded buffer.
         uint32_t EdgeCount = 0;
@@ -374,8 +375,7 @@ export namespace ECS::MeshVertexView
         Geometry::GeometryHandle Geometry{};
 
         // GPUScene slot for frustum culling of this vertex view.
-        static constexpr uint32_t kInvalidSlot = ~0u;
-        uint32_t GpuSlot = kInvalidSlot;
+        uint32_t GpuSlot = ECS::kInvalidGpuSlot;
 
         // Number of vertices in the view (derived from source mesh layout).
         uint32_t VertexCount = 0;
@@ -414,8 +414,7 @@ export namespace ECS::Surface
         Core::Assets::AssetHandle Material{};
 
         // ---- Retained Mode Slot ----
-        static constexpr uint32_t kInvalidSlot = ~0u;
-        uint32_t GpuSlot = kInvalidSlot;
+        uint32_t GpuSlot = ECS::kInvalidGpuSlot;
 
         // ---- Render Cache ----
         Graphics::MaterialHandle CachedMaterialHandle{};

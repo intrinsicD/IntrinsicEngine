@@ -59,6 +59,13 @@ export namespace Runtime::EditorUI
     bool VectorFieldWidget(Graphics::VisualizationConfig& config,
                            const Geometry::PropertySet* ps, const char* suffix);
 
+    // Point render mode combo (FlatDisc/Surfel/EWA/Sphere). Returns true on change.
+    bool PointRenderModeCombo(const char* label,
+                              Geometry::PointCloud::RenderMode& mode);
+
+    // ImGui ColorEdit4 that reads/writes a glm::vec4 directly. Returns true on change.
+    bool ColorEdit4(const char* label, glm::vec4& color);
+
     // =========================================================================
     // InspectorController — component property inspector panel
     // =========================================================================
