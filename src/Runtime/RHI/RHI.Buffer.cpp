@@ -3,6 +3,7 @@ module;
 #include <memory>
 #include <utility> // std::exchange
 #include "RHI.Vulkan.hpp"
+#include "RHI.DestructionUtils.hpp"
 
 module RHI:Buffer.Impl;
 
@@ -88,16 +89,7 @@ namespace RHI
 
     VulkanBuffer::~VulkanBuffer()
     {
-        if (!m_Buffer) return;
-
-        VkBuffer buffer = m_Buffer;
-        VmaAllocation allocation = m_Allocation;
-        VmaAllocator allocator = m_Device.GetAllocator();
-
-        m_Device.SafeDestroy([allocator, buffer, allocation]()
-        {
-            vmaDestroyBuffer(allocator, buffer, allocation);
-        });
+        DestructionUtils::SafeDestroyVma(m_Device, m_Buffer, m_Allocation, vmaDestroyBuffer);
     }
 
     VulkanBuffer::VulkanBuffer(VulkanBuffer&& other) noexcept
@@ -115,16 +107,7 @@ namespace RHI
         if (this != &other)
         {
             // Destroy current resources if any
-            if (m_Buffer)
-            {
-                VkBuffer buffer = m_Buffer;
-                VmaAllocation allocation = m_Allocation;
-                VmaAllocator allocator = m_Device.GetAllocator();
-                m_Device.SafeDestroy([allocator, buffer, allocation]()
-                {
-                    vmaDestroyBuffer(allocator, buffer, allocation);
-                });
-            }
+            DestructionUtils::SafeDestroyVma(m_Device, m_Buffer, m_Allocation, vmaDestroyBuffer);
 
             // Move from other
             m_Buffer = std::exchange(other.m_Buffer, VK_NULL_HANDLE);

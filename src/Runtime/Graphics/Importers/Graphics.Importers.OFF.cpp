@@ -6,8 +6,9 @@ module;
 #include <string_view>
 #include <vector>
 #include <glm/glm.hpp>
-#include "Graphics.FileFormatUtils.hpp"
+#include "Graphics.Importers.ColorParsing.hpp"
 #include "Graphics.Importers.TextParse.hpp"
+#include "Graphics.Importers.TriangulationUtils.hpp"
 
 module Graphics:Importers.OFF.Impl;
 import :Importers.OFF;
@@ -176,12 +177,7 @@ namespace Graphics
             }
 
             // Fan triangulation for polygons
-            for (std::size_t j = 1; j + 1 < *faceVerts; ++j)
-            {
-                outData.Indices.push_back(faceIndices[0]);
-                outData.Indices.push_back(faceIndices[j]);
-                outData.Indices.push_back(faceIndices[j + 1]);
-            }
+            Importers::TriangulateFan(faceIndices, outData.Indices);
         }
 
         Importers::GeometryImportPostProcessPolicy policy;

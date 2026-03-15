@@ -16,6 +16,7 @@ module;
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/norm.hpp>
 #include <glm/gtx/compatibility.hpp>
+#include "Graphics.Importers.VertexDedup.hpp"
 
 module Graphics:Importers.STL.Impl;
 import :Importers.STL;
@@ -32,32 +33,8 @@ namespace Graphics
     {
         static constexpr std::string_view s_Extensions[] = { ".stl" };
 
-        // Spatial hash for vertex deduplication
-        struct VertexKey
-        {
-            glm::vec3 Position;
-
-            bool operator==(const VertexKey& other) const
-            {
-                // Quantize-based comparison (~10 micron tolerance for unit-scale models)
-                auto qi = [](float v) { return static_cast<int32_t>(v * 1e5f); };
-                return qi(Position.x) == qi(other.Position.x)
-                    && qi(Position.y) == qi(other.Position.y)
-                    && qi(Position.z) == qi(other.Position.z);
-            }
-        };
-
-        struct VertexKeyHash
-        {
-            std::size_t operator()(const VertexKey& k) const
-            {
-                auto qi = [](float v) { return static_cast<int32_t>(v * 1e5f); };
-                std::size_t h = std::hash<int32_t>()(qi(k.Position.x));
-                h ^= std::hash<int32_t>()(qi(k.Position.y)) * 2654435761u;
-                h ^= std::hash<int32_t>()(qi(k.Position.z)) * 40503u;
-                return h;
-            }
-        };
+        using VertexKey = Importers::SpatialVertexKey;
+        using VertexKeyHash = Importers::SpatialVertexKeyHash;
 
         bool IsBinarySTL(std::span<const std::byte> data)
         {

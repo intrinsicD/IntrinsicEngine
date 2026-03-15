@@ -7,7 +7,7 @@ module;
 #include <string_view>
 #include <vector>
 #include <glm/glm.hpp>
-#include "Graphics.FileFormatUtils.hpp"
+#include "Graphics.Importers.ColorParsing.hpp"
 #include "Graphics.Importers.TextParse.hpp"
 
 module Graphics:Importers.XYZ.Impl;
@@ -25,47 +25,24 @@ namespace Graphics
     {
         static constexpr std::string_view s_Extensions[] = { ".xyz", ".pts", ".xyzrgb", ".txt" };
 
-        [[nodiscard]] std::optional<glm::vec4> ParseColorTriplet(
-            std::span<const std::string_view> tokens,
-            std::size_t offset)
-        {
-            if (offset + 2 >= tokens.size())
-                return std::nullopt;
-
-            const auto r = Importers::TextParse::ParseNumber<float>(tokens[offset + 0]);
-            const auto g = Importers::TextParse::ParseNumber<float>(tokens[offset + 1]);
-            const auto b = Importers::TextParse::ParseNumber<float>(tokens[offset + 2]);
-            if (!r || !g || !b)
-                return std::nullopt;
-
-            return glm::vec4(
-                Detail::NormalizeColorChannelToUnitRange(*r),
-                Detail::NormalizeColorChannelToUnitRange(*g),
-                Detail::NormalizeColorChannelToUnitRange(*b),
-                1.0f);
-        }
-
         [[nodiscard]] std::optional<glm::vec4> ParsePointColor(std::span<const std::string_view> tokens)
         {
             if (tokens.size() >= 7)
             {
-                if (auto color = ParseColorTriplet(tokens, tokens.size() - 3))
+                if (auto color = Importers::ParseRgbTriplet(tokens, tokens.size() - 3))
                     return color;
             }
 
             if (tokens.size() >= 6)
             {
-                if (auto color = ParseColorTriplet(tokens, 3))
+                if (auto color = Importers::ParseRgbTriplet(tokens, 3))
                     return color;
             }
 
             if (tokens.size() == 4)
             {
                 if (const auto intensity = Importers::TextParse::ParseNumber<float>(tokens[3]))
-                {
-                    const float value = Detail::NormalizeColorChannelToUnitRange(*intensity);
-                    return glm::vec4(value, value, value, 1.0f);
-                }
+                    return Importers::IntensityToColor(*intensity);
             }
 
             return std::nullopt;

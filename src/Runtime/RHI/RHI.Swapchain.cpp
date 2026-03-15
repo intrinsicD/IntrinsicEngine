@@ -1,5 +1,6 @@
 module;
 #include "RHI.Vulkan.hpp"
+#include "RHI.DestructionUtils.hpp"
 #include <vector>
 #include <algorithm>
 #include <limits>
@@ -38,55 +39,23 @@ namespace RHI {
         vkDeviceWaitIdle(m_Device->GetLogicalDevice());
 
         // 1. Cleanup OLD views via SafeDestroy for consistency with other RHI resources.
-        // vkDeviceWaitIdle above guarantees GPU is idle, but SafeDestroy keeps the pattern uniform.
-        VkDevice logicalDevice = m_Device->GetLogicalDevice();
-        if (!m_ImageViews.empty())
-        {
-            std::vector<VkImageView> oldViews = std::move(m_ImageViews);
-            m_Device->SafeDestroy([logicalDevice, oldViews = std::move(oldViews)]() {
-                for (auto view : oldViews)
-                    vkDestroyImageView(logicalDevice, view, nullptr);
-            });
-        }
-        m_ImageViews.clear();
+        DestructionUtils::SafeDestroyBatch(*m_Device, m_ImageViews, vkDestroyImageView);
 
         // 2. Create NEW swapchain using the OLD one as reference
         VkSwapchainKHR oldSwapchain = m_Swapchain;
         CreateSwapchain(); // This overwrites m_Swapchain with the new handle
 
         // 3. Destroy the OLD swapchain via SafeDestroy
-        if (oldSwapchain != VK_NULL_HANDLE) {
-            m_Device->SafeDestroy([logicalDevice, oldSwapchain]() {
-                vkDestroySwapchainKHR(logicalDevice, oldSwapchain, nullptr);
-            });
-        }
+        DestructionUtils::SafeDestroyVk(*m_Device, oldSwapchain, vkDestroySwapchainKHR);
 
         // 4. Create Views for the new swapchain
         CreateImageViews();
     }
 
     void VulkanSwapchain::Cleanup() {
-        // Defer image view destruction through SafeDestroy to ensure any
-        // in-flight frames referencing these views have completed.
-        VkDevice logicalDevice = m_Device->GetLogicalDevice();
-        if (!m_ImageViews.empty())
-        {
-            std::vector<VkImageView> views = std::move(m_ImageViews);
-            m_Device->SafeDestroy([logicalDevice, views = std::move(views)]() {
-                for (auto view : views)
-                    vkDestroyImageView(logicalDevice, view, nullptr);
-            });
-        }
-        m_ImageViews.clear();
+        DestructionUtils::SafeDestroyBatch(*m_Device, m_ImageViews, vkDestroyImageView);
         m_Images.clear();
-
-        if (m_Swapchain != VK_NULL_HANDLE) {
-            VkSwapchainKHR swapchain = m_Swapchain;
-            m_Device->SafeDestroy([logicalDevice, swapchain]() {
-                vkDestroySwapchainKHR(logicalDevice, swapchain, nullptr);
-            });
-            m_Swapchain = VK_NULL_HANDLE;
-        }
+        DestructionUtils::SafeDestroyVk(*m_Device, m_Swapchain, vkDestroySwapchainKHR);
     }
 
     void VulkanSwapchain::CreateSwapchain() {

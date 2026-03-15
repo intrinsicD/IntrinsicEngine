@@ -4,6 +4,7 @@ module;
 #include <algorithm>
 
 #include "RHI.Vulkan.hpp"
+#include "RHI.DestructionUtils.hpp"
 
 module RHI:PersistentDescriptors.Impl;
 
@@ -107,17 +108,7 @@ namespace RHI
 
     PersistentDescriptorPool::~PersistentDescriptorPool()
     {
-        if (m_AllPools.empty())
-            return;
-
-        const VkDevice dev = m_Device.GetLogicalDevice();
-        std::vector<VkDescriptorPool> pools = std::move(m_AllPools);
-        m_Device.SafeDestroy([dev, pools = std::move(pools)]()
-        {
-            for (VkDescriptorPool pool : pools)
-                if (pool != VK_NULL_HANDLE)
-                    vkDestroyDescriptorPool(dev, pool, nullptr);
-        });
+        DestructionUtils::SafeDestroyBatch(m_Device, m_AllPools, vkDestroyDescriptorPool);
         m_CurrentPool = VK_NULL_HANDLE;
     }
 
