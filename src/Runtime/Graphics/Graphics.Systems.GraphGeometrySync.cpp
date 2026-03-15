@@ -266,17 +266,9 @@ namespace Graphics::Systems::GraphGeometrySync
             // Phase 2: Allocate GPUScene slot for entities with valid GPU geometry.
             // Allocate once, then GPUSceneSync handles subsequent transform-only updates.
             // -----------------------------------------------------------------
-            if (graphData.GpuSlot == ECS::kInvalidGpuSlot && graphData.GpuGeometry.IsValid())
-            {
-                GeometryGpuData* geo = geometryStorage.GetIfValid(graphData.GpuGeometry);
-                if (geo && geo->GetVertexBuffer())
-                {
-                    const uint32_t slot = AllocateGpuSlot(
-                        registry, entity, gpuScene, *geo, graphData.GpuGeometry);
-                    if (slot != ECS::kInvalidGpuSlot)
-                        graphData.GpuSlot = slot;
-                }
-            }
+            graphData.GpuSlot = TryAllocateGpuSlot(
+                registry, entity, gpuScene, geometryStorage,
+                graphData.GpuSlot, graphData.GpuGeometry);
 
             // -----------------------------------------------------------------
             // Phase 3: Populate per-pass typed ECS components.
@@ -309,11 +301,8 @@ namespace Graphics::Systems::GraphGeometrySync
             else if (!graphData.Visible)
             {
                 // Remove per-pass components so hidden graphs stop rendering.
-                // Only remove if we own them (entity has Graph::Data).
-                if (registry.all_of<ECS::Line::Component>(entity))
-                    registry.remove<ECS::Line::Component>(entity);
-                if (registry.all_of<ECS::Point::Component>(entity))
-                    registry.remove<ECS::Point::Component>(entity);
+                RemovePassComponentIfPresent<ECS::Line::Component>(registry, entity);
+                RemovePassComponentIfPresent<ECS::Point::Component>(registry, entity);
             }
         }
     }

@@ -185,17 +185,9 @@ namespace Graphics::Systems::MeshViewLifecycle
             ev.Dirty = false;
 
             // Allocate GPUScene slot for frustum culling.
-            if (ev.GpuSlot == ECS::kInvalidGpuSlot)
-            {
-                GeometryGpuData* edgeGeo = geometryStorage.GetIfValid(ev.Geometry);
-                if (edgeGeo)
-                {
-                    const uint32_t slot = AllocateGpuSlot(
-                        registry, entity, gpuScene, *edgeGeo, ev.Geometry);
-                    if (slot != ECS::kInvalidGpuSlot)
-                        ev.GpuSlot = slot;
-                }
-            }
+            ev.GpuSlot = TryAllocateGpuSlot(
+                registry, entity, gpuScene, geometryStorage,
+                ev.GpuSlot, ev.Geometry);
         }
 
         // -----------------------------------------------------------------
@@ -269,17 +261,9 @@ namespace Graphics::Systems::MeshViewLifecycle
             pv.Dirty = false;
 
             // Allocate GPUScene slot for frustum culling.
-            if (pv.GpuSlot == ECS::kInvalidGpuSlot)
-            {
-                GeometryGpuData* vtxGeo = geometryStorage.GetIfValid(pv.Geometry);
-                if (vtxGeo)
-                {
-                    const uint32_t slot = AllocateGpuSlot(
-                        registry, entity, gpuScene, *vtxGeo, pv.Geometry);
-                    if (slot != ECS::kInvalidGpuSlot)
-                        pv.GpuSlot = slot;
-                }
-            }
+            pv.GpuSlot = TryAllocateGpuSlot(
+                registry, entity, gpuScene, geometryStorage,
+                pv.GpuSlot, pv.Geometry);
         }
 
         // -----------------------------------------------------------------

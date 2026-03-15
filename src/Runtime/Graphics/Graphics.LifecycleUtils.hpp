@@ -82,3 +82,45 @@ inline uint32_t AllocateGpuSlot(
 
     return slot;
 }
+
+// =============================================================================
+// TryAllocateGpuSlot — conditional GPUScene slot allocation for lifecycle
+// systems. Allocates a slot only when `currentSlot` is invalid and `geometry`
+// is valid with a vertex buffer. Returns the allocated slot (or kInvalidGpuSlot).
+// =============================================================================
+// Deduplicates the identical Phase 2 pattern found in GraphGeometrySync,
+// PointCloudGeometrySync, and MeshViewLifecycle.
+
+inline uint32_t TryAllocateGpuSlot(
+    entt::registry& registry,
+    entt::entity entity,
+    GPUScene& gpuScene,
+    const GeometryPool& geometryStorage,
+    uint32_t currentSlot,
+    Geometry::GeometryHandle geometryHandle)
+{
+    if (currentSlot != ECS::kInvalidGpuSlot)
+        return currentSlot;
+
+    if (!geometryHandle.IsValid())
+        return ECS::kInvalidGpuSlot;
+
+    GeometryGpuData* geo = geometryStorage.GetIfValid(geometryHandle);
+    if (!geo || !geo->GetVertexBuffer())
+        return ECS::kInvalidGpuSlot;
+
+    return AllocateGpuSlot(registry, entity, gpuScene, *geo, geometryHandle);
+}
+
+// =============================================================================
+// RemovePassComponentIfPresent — conditional per-pass component removal.
+// =============================================================================
+// Removes a per-pass ECS component from an entity only when present.
+// Used by lifecycle systems to hide geometry when visibility is toggled off.
+
+template<typename T>
+inline void RemovePassComponentIfPresent(entt::registry& registry, entt::entity entity)
+{
+    if (registry.all_of<T>(entity))
+        registry.remove<T>(entity);
+}

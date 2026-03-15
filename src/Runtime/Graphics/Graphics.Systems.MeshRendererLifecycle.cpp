@@ -76,19 +76,16 @@ namespace Graphics::Systems::MeshRendererLifecycle
                 mr.CachedMaterialHandleForInstance = matHandle;
                 mr.CachedMaterialRevisionForInstance = matRev;
 
-                if (auto* pick = registry.try_get<ECS::Components::Selection::PickID>(entt::entity(entity)))
+                if (auto* pick = registry.try_get<ECS::Components::Selection::PickID>(entity))
                     inst.EntityID = pick->Value;
 
-                glm::vec4 sphere{0.0f, 0.0f, 0.0f, 0.0f};
-
-                sphere = ComputeLocalBoundingSphere(*geo);
+                glm::vec4 sphere = ComputeLocalBoundingSphere(*geo);
                 if (sphere.w <= 0.0f)
                     sphere.w = GPUSceneConstants::kMinBoundingSphereRadius;
 
-
                 gpuScene.QueueUpdate(mr.GpuSlot, inst, sphere);
 
-                registry.remove<ECS::Components::Transform::WorldUpdatedTag>(entt::entity(entity));
+                registry.remove<ECS::Components::Transform::WorldUpdatedTag>(entity);
             }
         }
 
