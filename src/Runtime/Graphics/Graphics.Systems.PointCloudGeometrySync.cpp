@@ -25,22 +25,12 @@ import ECS;
 import Geometry;
 import RHI;
 
+#include "Graphics.LifecycleUtils.hpp"
+
 using namespace Core::Hash;
 
 namespace Graphics::Systems::PointCloudGeometrySync
 {
-    namespace
-    {
-        [[nodiscard]] auto ComputeLocalBoundingSphere(const GeometryGpuData& geo) -> glm::vec4
-        {
-            const glm::vec4 bounds = geo.GetLocalBoundingSphere();
-            if (bounds.w > 0.0f)
-                return bounds;
-
-            return {0.0f, 0.0f, 0.0f, GPUSceneConstants::kDefaultBoundingSphereRadius};
-        }
-    }
-
     void OnUpdate(entt::registry& registry,
                   GPUScene& gpuScene,
                   GeometryPool& geometryStorage,

@@ -23,21 +23,14 @@ import ECS;
 import Geometry;
 import RHI;
 
+#include "Graphics.LifecycleUtils.hpp"
+
 using namespace Core::Hash;
 
 namespace Graphics::Systems::MeshViewLifecycle
 {
     namespace
     {
-        [[nodiscard]] auto ComputeLocalBoundingSphere(const GeometryGpuData& geo) -> glm::vec4
-        {
-            const glm::vec4 bounds = geo.GetLocalBoundingSphere();
-            if (bounds.w > 0.0f)
-                return bounds;
-
-            return {0.0f, 0.0f, 0.0f, GPUSceneConstants::kDefaultBoundingSphereRadius};
-        }
-
         // Extract unique edges from triangle indices.
         // Returns flattened uint32_t indices: [i0_0, i1_0, i0_1, i1_1, ...]
         [[nodiscard]] auto ExtractUniqueEdgesFromTriangles(
