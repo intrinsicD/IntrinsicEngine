@@ -78,11 +78,11 @@ namespace Geometry::PointCloud
     bool Cloud::IsValid() const noexcept
     {
         // Empty cloud is valid.
-        if (Empty()) return true;
+        if (IsEmpty()) return true;
         // Optional properties must exactly cover all points when present.
-        if (HasNormals() && m_PNormal.Span().size() != Size()) return false;
-        if (HasColors()  && m_PColor.Span().size()  != Size()) return false;
-        if (HasRadii()   && m_PRadius.Span().size() != Size()) return false;
+        if (HasNormals() && m_PNormal.Span().size() != PointCount()) return false;
+        if (HasColors()  && m_PColor.Span().size()  != PointCount()) return false;
+        if (HasRadii()   && m_PRadius.Span().size() != PointCount()) return false;
         return true;
     }
 
@@ -92,7 +92,7 @@ namespace Geometry::PointCloud
 
     AABB ComputeBoundingBox(const Cloud& cloud)
     {
-        if (cloud.Empty())
+        if (cloud.IsEmpty())
             return AABB{glm::vec3(0.0f), glm::vec3(0.0f)};
 
         auto positions = cloud.Positions();
@@ -116,11 +116,11 @@ namespace Geometry::PointCloud
         const Cloud& cloud,
         const StatisticsParams& params)
     {
-        if (cloud.Empty())
+        if (cloud.IsEmpty())
             return std::nullopt;
 
         CloudStatistics stats{};
-        stats.PointCount = cloud.Size();
+        stats.PointCount = cloud.PointCount();
         stats.BoundingBox = ComputeBoundingBox(cloud);
         stats.BoundingBoxDiagonal = glm::length(stats.BoundingBox.Max - stats.BoundingBox.Min);
 
@@ -210,7 +210,7 @@ namespace Geometry::PointCloud
         const Cloud& cloud,
         const DownsampleParams& params)
     {
-        if (cloud.Empty())
+        if (cloud.IsEmpty())
             return std::nullopt;
 
         if (params.VoxelSize <= 0.0f)
@@ -247,7 +247,7 @@ namespace Geometry::PointCloud
         };
 
         std::unordered_map<glm::ivec3, CellAccum, CellHash, CellEqual> cells;
-        cells.reserve(cloud.Size() / 4);
+        cells.reserve(cloud.PointCount() / 4);
 
         const bool doNormals = cloud.HasNormals() && params.PreserveNormals;
         const bool doColors  = cloud.HasColors()  && params.PreserveColors;
@@ -258,7 +258,7 @@ namespace Geometry::PointCloud
         auto colors    = doColors  ? cloud.Colors()  : std::span<const glm::vec4>{};
         auto radii     = doRadii   ? cloud.Radii()   : std::span<const float>{};
 
-        for (std::size_t i = 0; i < cloud.Size(); ++i)
+        for (std::size_t i = 0; i < cloud.PointCount(); ++i)
         {
             const glm::vec3& p = positions[i];
             const glm::ivec3 cell(
@@ -275,7 +275,7 @@ namespace Geometry::PointCloud
         }
 
         DownsampleResult result;
-        result.OriginalCount = cloud.Size();
+        result.OriginalCount = cloud.PointCount();
         result.ReducedCount  = cells.size();
         result.ReductionRatio = static_cast<float>(result.ReducedCount) /
                                 static_cast<float>(result.OriginalCount);
@@ -312,7 +312,7 @@ namespace Geometry::PointCloud
         const Cloud& cloud,
         const RadiusEstimationParams& params)
     {
-        if (cloud.Size() < 2)
+        if (cloud.PointCount() < 2)
             return std::nullopt;
 
         auto positions = cloud.Positions();
@@ -334,13 +334,13 @@ namespace Geometry::PointCloud
         const std::size_t kQuery = k + 1;
 
         RadiusEstimationResult result;
-        result.Radii.resize(cloud.Size());
+        result.Radii.resize(cloud.PointCount());
         float radiusSum = 0.0f;
         float minRadius = std::numeric_limits<float>::max();
         float maxRadius = 0.0f;
 
         std::vector<std::size_t> knnIndices;
-        for (std::size_t i = 0; i < cloud.Size(); ++i)
+        for (std::size_t i = 0; i < cloud.PointCount(); ++i)
         {
             knnIndices.clear();
             octree.QueryKnn(positions[i], kQuery, knnIndices);
@@ -365,7 +365,7 @@ namespace Geometry::PointCloud
             maxRadius = std::max(maxRadius, r);
         }
 
-        result.AverageRadius = radiusSum / static_cast<float>(cloud.Size());
+        result.AverageRadius = radiusSum / static_cast<float>(cloud.PointCount());
         result.MinRadius = minRadius;
         result.MaxRadius = maxRadius;
 
@@ -380,10 +380,10 @@ namespace Geometry::PointCloud
         const Cloud& cloud,
         const SubsampleParams& params)
     {
-        if (cloud.Empty())
+        if (cloud.IsEmpty())
             return std::nullopt;
 
-        const std::size_t n      = cloud.Size();
+        const std::size_t n      = cloud.PointCount();
         const std::size_t target = std::min(params.TargetCount, n);
 
         std::vector<std::size_t> indices(n);

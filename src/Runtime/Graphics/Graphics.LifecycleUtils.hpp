@@ -8,9 +8,12 @@
 // Not part of any exported module interface.
 //
 // Requires the including TU to have imported:
-//   import :Geometry;   (for GeometryGpuData)
-//   import :GPUScene;   (for GPUSceneConstants)
-//   #include <glm/glm.hpp>  (in the global module fragment)
+//   import :Geometry;   (for GeometryGpuData, GeometryPool)
+//   import :GPUScene;   (for GPUScene, GPUSceneConstants, GpuInstanceData)
+//   import :Components; (for ECS component types)
+//   import ECS;         (for Transform, Selection components)
+//   #include <glm/glm.hpp>
+//   #include <entt/entity/registry.hpp>
 // =============================================================================
 
 // =============================================================================
@@ -33,4 +36,51 @@ inline glm::vec4 ComputeLocalBoundingSphere(const GeometryGpuData& geo)
     // uploaded without positions). Use a large conservative radius so the
     // entity stays visible until a proper upload populates real bounds.
     return {0.0f, 0.0f, 0.0f, GPUSceneConstants::kDefaultBoundingSphereRadius};
+}
+
+// =============================================================================
+// AllocateGpuSlot — shared GPUScene slot allocation for lifecycle systems.
+// =============================================================================
+// Allocates a GPUScene slot, populates GpuInstanceData with transform, geometry
+// ID, and entity pick ID, computes bounding sphere, queues the update, and
+// clears WorldUpdatedTag to prevent double-update by GPUSceneSync.
+//
+// Returns the allocated slot index, or kInvalidSlot on failure.
+// Used by GraphGeometrySync, PointCloudGeometrySync, and MeshViewLifecycle.
+
+inline uint32_t AllocateGpuSlot(
+    entt::registry& registry,
+    entt::entity entity,
+    GPUScene& gpuScene,
+    const GeometryGpuData& geo,
+    Geometry::GeometryHandle geometryHandle)
+{
+    static constexpr uint32_t kInvalidSlot = ~0u;
+
+    const uint32_t slot = gpuScene.AllocateSlot();
+    if (slot == kInvalidSlot)
+        return kInvalidSlot;
+
+    GpuInstanceData inst{};
+
+    auto* wm = registry.try_get<ECS::Components::Transform::WorldMatrix>(entity);
+    if (wm)
+        inst.Model = wm->Matrix;
+
+    inst.GeometryID = geometryHandle.Index;
+
+    if (auto* pick = registry.try_get<ECS::Components::Selection::PickID>(entity))
+        inst.EntityID = pick->Value;
+
+    glm::vec4 sphere = ComputeLocalBoundingSphere(geo);
+    if (sphere.w <= 0.0f)
+        sphere.w = GPUSceneConstants::kMinBoundingSphereRadius;
+
+    gpuScene.QueueUpdate(slot, inst, sphere);
+
+    // Clear the WorldUpdatedTag so GPUSceneSync doesn't double-update
+    // on the same frame.
+    registry.remove<ECS::Components::Transform::WorldUpdatedTag>(entity);
+
+    return slot;
 }

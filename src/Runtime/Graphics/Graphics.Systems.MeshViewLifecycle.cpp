@@ -187,26 +187,14 @@ namespace Graphics::Systems::MeshViewLifecycle
             // Allocate GPUScene slot for frustum culling.
             if (ev.GpuSlot == ECS::MeshEdgeView::Component::kInvalidSlot)
             {
-                const uint32_t slot = gpuScene.AllocateSlot();
-                if (slot == ECS::MeshEdgeView::Component::kInvalidSlot)
-                    continue;
-
-                ev.GpuSlot = slot;
-
-                GpuInstanceData inst{};
-                auto* wm = registry.try_get<ECS::Components::Transform::WorldMatrix>(entity);
-                if (wm)
-                    inst.Model = wm->Matrix;
-                inst.GeometryID = ev.Geometry.Index;
-
                 GeometryGpuData* edgeGeo = geometryStorage.GetIfValid(ev.Geometry);
-                glm::vec4 sphere = edgeGeo
-                    ? ComputeLocalBoundingSphere(*edgeGeo)
-                    : glm::vec4(0.0f, 0.0f, 0.0f, GPUSceneConstants::kMinBoundingSphereRadius);
-                if (sphere.w <= 0.0f)
-                    sphere.w = GPUSceneConstants::kMinBoundingSphereRadius;
-
-                gpuScene.QueueUpdate(ev.GpuSlot, inst, sphere);
+                if (edgeGeo)
+                {
+                    const uint32_t slot = AllocateGpuSlot(
+                        registry, entity, gpuScene, *edgeGeo, ev.Geometry);
+                    if (slot != ECS::MeshEdgeView::Component::kInvalidSlot)
+                        ev.GpuSlot = slot;
+                }
             }
         }
 
@@ -283,26 +271,14 @@ namespace Graphics::Systems::MeshViewLifecycle
             // Allocate GPUScene slot for frustum culling.
             if (pv.GpuSlot == ECS::MeshVertexView::Component::kInvalidSlot)
             {
-                const uint32_t slot = gpuScene.AllocateSlot();
-                if (slot == ECS::MeshVertexView::Component::kInvalidSlot)
-                    continue;
-
-                pv.GpuSlot = slot;
-
-                GpuInstanceData inst{};
-                auto* wm = registry.try_get<ECS::Components::Transform::WorldMatrix>(entity);
-                if (wm)
-                    inst.Model = wm->Matrix;
-                inst.GeometryID = pv.Geometry.Index;
-
                 GeometryGpuData* vtxGeo = geometryStorage.GetIfValid(pv.Geometry);
-                glm::vec4 sphere = vtxGeo
-                    ? ComputeLocalBoundingSphere(*vtxGeo)
-                    : glm::vec4(0.0f, 0.0f, 0.0f, GPUSceneConstants::kMinBoundingSphereRadius);
-                if (sphere.w <= 0.0f)
-                    sphere.w = GPUSceneConstants::kMinBoundingSphereRadius;
-
-                gpuScene.QueueUpdate(pv.GpuSlot, inst, sphere);
+                if (vtxGeo)
+                {
+                    const uint32_t slot = AllocateGpuSlot(
+                        registry, entity, gpuScene, *vtxGeo, pv.Geometry);
+                    if (slot != ECS::MeshVertexView::Component::kInvalidSlot)
+                        pv.GpuSlot = slot;
+                }
             }
         }
 

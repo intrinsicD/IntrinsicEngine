@@ -95,7 +95,7 @@ namespace Runtime::Selection
             const ECS::Components::Transform::Component& transform,
             const entt::registry& reg, entt::entity entity)
         {
-            if (!pcd.CloudRef || pcd.CloudRef->Size() == 0)
+            if (!pcd.CloudRef || pcd.CloudRef->IsEmpty())
                 return {};
 
             const auto positions = pcd.CloudRef->Positions();
@@ -494,7 +494,7 @@ namespace Runtime::Selection
             const entt::registry& reg,
             const PickRequest& request)
         {
-            if (!pcd.CloudRef || pcd.CloudRef->Size() == 0)
+            if (!pcd.CloudRef || pcd.CloudRef->IsEmpty())
                 return std::nullopt;
 
             const Geometry::AABB worldAabb = PointCloudWorldAABB(pcd, transform, reg, entity);

@@ -148,9 +148,9 @@ export namespace Geometry
             return BuildFromOwned(policy, maxPerNode, maxDepth);
         }
 
-        void QueryRay(const Ray& queryShape, std::vector<size_t>& result) const
+        void QueryRay(const Ray& queryShape, std::vector<size_t>& out) const
         {
-            Query<Ray>(queryShape, result);
+            Query<Ray>(queryShape, out);
         }
 
         void QueryAABB(const AABB& queryShape, std::vector<size_t>& out) const
@@ -164,9 +164,9 @@ export namespace Geometry
         }
 
         template <VolumetricSpatialQueryShape Shape>
-        void Query(const Shape& queryShape, std::vector<size_t>& result) const
+        void Query(const Shape& queryShape, std::vector<size_t>& out) const
         {
-            result.clear();
+            out.clear();
             if (m_Nodes.empty())
             {
                 return;
@@ -203,7 +203,7 @@ export namespace Geometry
                     const size_t end = node.FirstElement + node.NumElements;
                     for (size_t i = node.FirstElement; i < end; ++i)
                     {
-                        result.push_back(m_ElementIndices[i]);
+                        out.push_back(m_ElementIndices[i]);
                     }
                     continue;
                 }
@@ -215,7 +215,7 @@ export namespace Geometry
                     size_t ei = m_ElementIndices[i];
                     if (TestOverlap(ElementAabbs[ei], queryShape))
                     {
-                        result.push_back(ei);
+                        out.push_back(ei);
                     }
                 }
 
@@ -245,10 +245,10 @@ export namespace Geometry
         }
 
         template <SpatialQueryShape Shape>
-        void Query(const Shape& queryShape, std::vector<size_t>& result) const
+        void Query(const Shape& queryShape, std::vector<size_t>& out) const
             requires (!VolumetricSpatialQueryShape<Shape>)
         {
-            result.clear();
+            out.clear();
             if (m_Nodes.empty()) return;
 
             const Node* nodePtr = m_Nodes.data();
@@ -272,7 +272,7 @@ export namespace Geometry
                         std::size_t ei = m_ElementIndices[node.FirstElement + i];
                         if (TestOverlap(ElementAabbs[ei], queryShape))
                         {
-                            result.push_back(ei);
+                            out.push_back(ei);
                         }
                     }
                 }
@@ -283,7 +283,7 @@ export namespace Geometry
                         std::size_t ei = m_ElementIndices[node.FirstElement + i];
                         if (TestOverlap(ElementAabbs[ei], queryShape))
                         {
-                            result.push_back(ei);
+                            out.push_back(ei);
                         }
                     }
 
@@ -313,9 +313,9 @@ export namespace Geometry
             }
         }
 
-        void QueryKnn(const glm::vec3& queryPoint, std::size_t k, std::vector<size_t>& results) const;
+        void QueryKnn(const glm::vec3& queryPoint, std::size_t k, std::vector<size_t>& out) const;
 
-        void QueryNearest(const glm::vec3& queryPoint, std::size_t& result) const;
+        void QueryNearest(const glm::vec3& queryPoint, std::size_t& out) const;
 
         [[nodiscard]] bool ValidateStructure() const
         {

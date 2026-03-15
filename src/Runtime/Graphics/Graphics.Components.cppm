@@ -193,7 +193,7 @@ export namespace ECS::PointCloud
         // ---- Queries (delegate to CloudRef) ----
         [[nodiscard]] std::size_t PointCount() const noexcept
         {
-            return CloudRef ? CloudRef->Size() : 0;
+            return CloudRef ? CloudRef->PointCount() : 0;
         }
         [[nodiscard]] bool HasNormals() const noexcept
         {

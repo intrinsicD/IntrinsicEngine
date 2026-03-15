@@ -54,7 +54,7 @@ namespace Graphics::Systems::PointCloudGeometrySync
                         pcData.HasGpuNormals = (geo->GetLayout().NormalsSize > 0);
                     pcData.GpuDirty = false;
                 }
-                else if (!pcData.CloudRef || pcData.CloudRef->Empty())
+                else if (!pcData.CloudRef || pcData.CloudRef->IsEmpty())
                 {
                     // Cloud is empty or null — release any existing GPU geometry.
                     if (pcData.GpuGeometry.IsValid())
@@ -155,32 +155,10 @@ namespace Graphics::Systems::PointCloudGeometrySync
                 GeometryGpuData* geo = geometryStorage.GetIfValid(pcData.GpuGeometry);
                 if (geo && geo->GetVertexBuffer())
                 {
-                    const uint32_t slot = gpuScene.AllocateSlot();
+                    const uint32_t slot = AllocateGpuSlot(
+                        registry, entity, gpuScene, *geo, pcData.GpuGeometry);
                     if (slot != ECS::PointCloud::Data::kInvalidSlot)
-                    {
                         pcData.GpuSlot = slot;
-
-                        GpuInstanceData inst{};
-
-                        auto* wm = registry.try_get<ECS::Components::Transform::WorldMatrix>(entity);
-                        if (wm)
-                            inst.Model = wm->Matrix;
-
-                        inst.GeometryID = pcData.GpuGeometry.Index;
-
-                        if (auto* pick = registry.try_get<ECS::Components::Selection::PickID>(entity))
-                            inst.EntityID = pick->Value;
-
-                        glm::vec4 sphere = ComputeLocalBoundingSphere(*geo);
-                        if (sphere.w <= 0.0f)
-                            sphere.w = GPUSceneConstants::kMinBoundingSphereRadius;
-
-                        gpuScene.QueueUpdate(pcData.GpuSlot, inst, sphere);
-
-                        // Clear the WorldUpdatedTag so GPUSceneSync doesn't double-update
-                        // on the same frame.
-                        registry.remove<ECS::Components::Transform::WorldUpdatedTag>(entity);
-                    }
                 }
             }
 

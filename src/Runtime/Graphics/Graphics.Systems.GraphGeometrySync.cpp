@@ -42,6 +42,27 @@ namespace Graphics::Systems::GraphGeometrySync
     {
         auto view = registry.view<ECS::Graph::Data>();
 
+        // Helper: release all GPU geometry and cached data for a graph entity.
+        auto releaseGraphGpu = [&](ECS::Graph::Data& gd) {
+            if (gd.GpuGeometry.IsValid())
+            {
+                geometryStorage.Remove(gd.GpuGeometry, device->GetGlobalFrameNumber());
+                gd.GpuGeometry = {};
+            }
+            if (gd.GpuEdgeGeometry.IsValid())
+            {
+                geometryStorage.Remove(gd.GpuEdgeGeometry, device->GetGlobalFrameNumber());
+                gd.GpuEdgeGeometry = {};
+                gd.GpuEdgeCount = 0;
+            }
+            gd.CachedEdgePairs.clear();
+            gd.CachedEdgeColors.clear();
+            gd.CachedNodeColors.clear();
+            gd.CachedNodeRadii.clear();
+            gd.GpuVertexCount = 0;
+            gd.GpuDirty = false;
+        };
+
         for (auto [entity, graphData] : view.each())
         {
             // -----------------------------------------------------------------
@@ -52,23 +73,7 @@ namespace Graphics::Systems::GraphGeometrySync
                 if (!graphData.GraphRef || graphData.GraphRef->VertexCount() == 0)
                 {
                     // Graph is empty or null — release any existing GPU geometry.
-                    if (graphData.GpuGeometry.IsValid())
-                    {
-                        geometryStorage.Remove(graphData.GpuGeometry, device->GetGlobalFrameNumber());
-                        graphData.GpuGeometry = {};
-                    }
-                    if (graphData.GpuEdgeGeometry.IsValid())
-                    {
-                        geometryStorage.Remove(graphData.GpuEdgeGeometry, device->GetGlobalFrameNumber());
-                        graphData.GpuEdgeGeometry = {};
-                        graphData.GpuEdgeCount = 0;
-                    }
-                    graphData.CachedEdgePairs.clear();
-                    graphData.CachedEdgeColors.clear();
-                    graphData.CachedNodeColors.clear();
-                    graphData.CachedNodeRadii.clear();
-                    graphData.GpuVertexCount = 0;
-                    graphData.GpuDirty = false;
+                    releaseGraphGpu(graphData);
                     // Fall through to Phase 3 (GpuGeometry invalid → skip).
                 }
                 else
@@ -113,23 +118,7 @@ namespace Graphics::Systems::GraphGeometrySync
 
                 if (positions.empty())
                 {
-                    if (graphData.GpuGeometry.IsValid())
-                    {
-                        geometryStorage.Remove(graphData.GpuGeometry, device->GetGlobalFrameNumber());
-                        graphData.GpuGeometry = {};
-                    }
-                    if (graphData.GpuEdgeGeometry.IsValid())
-                    {
-                        geometryStorage.Remove(graphData.GpuEdgeGeometry, device->GetGlobalFrameNumber());
-                        graphData.GpuEdgeGeometry = {};
-                        graphData.GpuEdgeCount = 0;
-                    }
-                    graphData.CachedEdgePairs.clear();
-                    graphData.CachedEdgeColors.clear();
-                    graphData.CachedNodeColors.clear();
-                    graphData.CachedNodeRadii.clear();
-                    graphData.GpuVertexCount = 0;
-                    graphData.GpuDirty = false;
+                    releaseGraphGpu(graphData);
                     // Fall through to Phase 3 (GpuGeometry invalid → skip).
                 }
                 else
@@ -275,32 +264,10 @@ namespace Graphics::Systems::GraphGeometrySync
                 GeometryGpuData* geo = geometryStorage.GetIfValid(graphData.GpuGeometry);
                 if (geo && geo->GetVertexBuffer())
                 {
-                    const uint32_t slot = gpuScene.AllocateSlot();
+                    const uint32_t slot = AllocateGpuSlot(
+                        registry, entity, gpuScene, *geo, graphData.GpuGeometry);
                     if (slot != ECS::Graph::Data::kInvalidSlot)
-                    {
                         graphData.GpuSlot = slot;
-
-                        GpuInstanceData inst{};
-
-                        auto* wm = registry.try_get<ECS::Components::Transform::WorldMatrix>(entity);
-                        if (wm)
-                            inst.Model = wm->Matrix;
-
-                        inst.GeometryID = graphData.GpuGeometry.Index;
-
-                        if (auto* pick = registry.try_get<ECS::Components::Selection::PickID>(entity))
-                            inst.EntityID = pick->Value;
-
-                        glm::vec4 sphere = ComputeLocalBoundingSphere(*geo);
-                        if (sphere.w <= 0.0f)
-                            sphere.w = GPUSceneConstants::kMinBoundingSphereRadius;
-
-                        gpuScene.QueueUpdate(graphData.GpuSlot, inst, sphere);
-
-                        // Clear the WorldUpdatedTag so GPUSceneSync doesn't double-update
-                        // on the same frame.
-                        registry.remove<ECS::Components::Transform::WorldUpdatedTag>(entity);
-                    }
                 }
             }
 
