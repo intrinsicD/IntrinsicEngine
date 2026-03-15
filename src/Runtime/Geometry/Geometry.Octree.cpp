@@ -12,9 +12,9 @@ import :Octree;
 
 namespace Geometry
 {
-    void Octree::QueryNearest(const glm::vec3& queryPoint, std::size_t& result) const
+    void Octree::QueryNearest(const glm::vec3& queryPoint, std::size_t& out) const
     {
-        result = std::numeric_limits<size_t>::max();
+        out = std::numeric_limits<size_t>::max();
         if (NodeProperties.Empty())
         {
             return;
@@ -56,7 +56,7 @@ namespace Geometry
                     if (elemDistSq < minDistSq)
                     {
                         minDistSq = elemDistSq;
-                        result = elemIdx;
+                        out = elemIdx;
                     }
                 }
             }
@@ -72,7 +72,7 @@ namespace Geometry
                     if (elemDistSq < minDistSq)
                     {
                         minDistSq = elemDistSq;
-                        result = elemIdx;
+                        out = elemIdx;
                     }
                 }
                 // This is an internal node, so traverse to its children.
@@ -102,9 +102,9 @@ namespace Geometry
         }
     }
 
-    void Octree::QueryKnn(const glm::vec3& queryPoint, std::size_t k, std::vector<size_t>& results) const
+    void Octree::QueryKnn(const glm::vec3& queryPoint, std::size_t k, std::vector<size_t>& out) const
         {
-            results.clear();
+            out.clear();
             if (m_Nodes.empty() || k == 0)
             {
                 return;
@@ -195,10 +195,10 @@ namespace Geometry
             }
 
             auto pairs = heap.GetSortedData(); // ascending
-            results.resize(pairs.size());
+            out.resize(pairs.size());
             for (size_t i = 0; i < pairs.size(); ++i)
             {
-                results[i] = pairs[i].second;
+                out[i] = pairs[i].second;
             }
         }
 

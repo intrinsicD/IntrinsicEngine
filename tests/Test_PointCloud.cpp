@@ -93,8 +93,8 @@ TEST(PointCloud_Cloud, EmptyCloudIsValid)
 {
     Geometry::PointCloud::Cloud cloud;
     EXPECT_TRUE(cloud.IsValid());
-    EXPECT_TRUE(cloud.Empty());
-    EXPECT_EQ(cloud.Size(), 0u);
+    EXPECT_TRUE(cloud.IsEmpty());
+    EXPECT_EQ(cloud.PointCount(), 0u);
     EXPECT_FALSE(cloud.HasNormals());
     EXPECT_FALSE(cloud.HasColors());
     EXPECT_FALSE(cloud.HasRadii());
@@ -107,8 +107,8 @@ TEST(PointCloud_Cloud, PositionsOnlyIsValid)
     cloud.AddPoint({1, 0, 0});
     cloud.AddPoint({0, 1, 0});
     EXPECT_TRUE(cloud.IsValid());
-    EXPECT_FALSE(cloud.Empty());
-    EXPECT_EQ(cloud.Size(), 3u);
+    EXPECT_FALSE(cloud.IsEmpty());
+    EXPECT_EQ(cloud.PointCount(), 3u);
     EXPECT_FALSE(cloud.HasNormals());
 }
 
@@ -500,7 +500,7 @@ TEST(PointCloud_Edge, CollinearPointsDownsample)
     params.VoxelSize = 0.1f;
     auto result = Geometry::PointCloud::VoxelDownsample(cloud, params);
     ASSERT_TRUE(result.has_value());
-    EXPECT_LT(result->ReducedCount, cloud.Size());
+    EXPECT_LT(result->ReducedCount, cloud.PointCount());
 }
 
 TEST(PointCloud_Edge, DuplicatePointsDownsample)

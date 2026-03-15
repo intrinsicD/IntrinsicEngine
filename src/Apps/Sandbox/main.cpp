@@ -862,7 +862,7 @@ private:
                     {
                         if (auto* pcd = reg.try_get<ECS::PointCloud::Data>(selected))
                         {
-                            if (pcd->CloudRef && pcd->CloudRef->Size() > 0)
+                            if (pcd->CloudRef && !pcd->CloudRef->IsEmpty())
                             {
                                 auto positions = pcd->CloudRef->Positions();
                                 Geometry::AABB aabb;
@@ -1000,7 +1000,7 @@ private:
             cloud.Color(ph) = color;
         }
 
-        if (cloud.Empty())
+        if (cloud.IsEmpty())
         {
             Log::Warn("SpawnDemoPointCloud: no points generated.");
             return;

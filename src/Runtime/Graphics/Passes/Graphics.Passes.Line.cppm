@@ -60,7 +60,7 @@ export namespace Graphics::Passes
                         RHI::DescriptorAllocator& descriptorPool,
                         RHI::DescriptorLayout& globalLayout) override;
 
-        void SetShaderRegistry(const ShaderRegistry& reg) { m_ShaderRegistry = &reg; }
+        void SetShaderRegistry(const ShaderRegistry& shaderRegistry) { m_ShaderRegistry = &shaderRegistry; }
 
         // Set the geometry storage for looking up GeometryGpuData.
         void SetGeometryStorage(GeometryPool* pool) { m_GeometryStorage = pool; }

@@ -39,10 +39,6 @@ This document tracks the **active rendering-architecture backlog** for Intrinsic
 - [ ] Make the selection mode work with radio buttons (vertex, edge, face, entity).
 - [ ] Wire Geodesic computation in the ui. When active, mark the selected vertex or vertices (with shift for multiple selection) with a different colored shpere.
 
-### Core & RHI Code Quality (Audit Findings)
-
-All Core & RHI audit items have been resolved (SafeDestroy extraction, device lifetime docs, Core.Memory fprintf rationale). Details in git history.
-
 ## 2. Next (P1) — Near-Term Follow-Up After the Refactor Lands
 
 These are not required to finish the first wave, but they should begin soon after P0 is stable.
@@ -227,14 +223,6 @@ Identified via full codebase sweep (March 2026). Grouped by priority.
 - [ ] Evaluate whether `PipelineLibrary` can adopt `ResolveShaderPaths` with an alternate resolver overload.
 - [ ] Keep the refactor behavior-preserving and opportunistic when the file is next touched.
 
-### D20. Lifecycle System Bounding Sphere Consolidation — Resolved
-
-`ComputeLocalBoundingSphere` was defined identically in three lifecycle system files (`MeshViewLifecycle`, `GraphGeometrySync`, `PointCloudGeometrySync`) and with a superficially different but behaviourally equivalent variant in `MeshRendererLifecycle` (the extra `GetIndexCount() == 0` guard was dead code: the caller already checked that precondition). All four local definitions have been removed; the shared canonical implementation lives in `Graphics.LifecycleUtils.hpp` (details in git history).
-
-
-### D7. Picking Code Path Duplication (P3) — Resolved
-
-`Runtime.SelectionModule.cpp` duplicated the NDC→world-ray construction — the hover path now calls `BuildPickRequest()` directly (details in git history). `Runtime.Selection.cpp` graph-edge picking now uses canonical `Geometry::ClosestRaySegment` instead of a local duplicate (D19, details in git history). The duplicated world-space triangle normal computation that appeared in both `PickMeshEntityAuthoritative` and the flat-array fallback path has been extracted into a local `ComputeTriangleNormal` helper, and the local `PointSegmentDistanceSq` and `DistancePointToRaySq` helpers have been removed in favour of `Geometry::ClosestPointSegment` and `Geometry::ClosestPointRay` (details in git history).
 
 ### D10. Geometry Kernel: Neighborhood Centroid — Point Cloud Path (P4)
 
@@ -242,6 +230,28 @@ Identified via full codebase sweep (March 2026). Grouped by priority.
 
 - [ ] Evaluate extracting a standalone `ComputePointCentroid(points, indices)` helper if more point-cloud operators need it.
 
-### D19. Selection.cpp Picking Helpers Overlap with Geometry Module (P4) — Resolved
+### D21. GPUScene Slot Allocation Duplication (P3)
 
-`Geometry::Queries` partition now provides `ClosestRaySegment()`, `ClosestPointSegment()`, and `ClosestPointRay()` — all returning rich result structs (`RaySegmentResult`, `PointSegmentResult`, `PointRayResult`) with distance, parameter, and closest-point in a single call. `Runtime.Selection.cpp` no longer contains any local geometry-query helpers; all three picking paths (mesh, point cloud, graph) use the canonical Geometry module functions. `Test_GeometryQueries.cpp` covers all three functions (details in git history).
+The ~20-line GPUScene slot allocation block (allocate slot → populate `GpuInstanceData` → resolve transform/pickID/bounding sphere → `QueueUpdate`) is duplicated identically across `GraphGeometrySync`, `PointCloudGeometrySync`, `MeshViewLifecycle` (×2 for edge/vertex views), and `MeshRendererLifecycle`. Extract a shared `AllocateAndPopulateGpuSlot()` helper into `LifecycleUtils.hpp`.
+
+- [x] Extract shared helper `AllocateAndPopulateGpuSlot()` into `LifecycleUtils.hpp`.
+- [x] Adopt in `GraphGeometrySync`, `PointCloudGeometrySync`, and `MeshViewLifecycle`.
+
+### D22. Octree Query Output Parameter Naming Inconsistency (P4)
+
+`Octree::QueryRay()` uses `result` while `QueryAABB()`/`QuerySphere()` use `out`. Standardize to `out` for consistency with `KDTree` and the rest of the codebase.
+
+- [x] Rename `result` → `out` in `QueryRay()` and the generic `Query()` template.
+
+### D23. PointCloud Legacy Aliases (P4)
+
+`PointCloud::Cloud` exposes `Size()` and `Empty()` as legacy aliases alongside the canonical `PointCount()` and `IsEmpty()`. Remove the aliases and update any call sites.
+
+- [x] Remove `Size()` / `Empty()` aliases.
+- [x] Update call sites to use `PointCount()` / `IsEmpty()`.
+
+### D24. ShaderRegistry Parameter Naming Inconsistency (P4)
+
+`SetShaderRegistry()` uses abbreviated `reg` in `LinePass`/`PointPass` but full `shaderRegistry` in `DebugView`/`PostProcess`/`SelectionOutline`. Standardize to `shaderRegistry`.
+
+- [x] Rename parameter in `LinePass` and `PointPass` interfaces and implementations.
