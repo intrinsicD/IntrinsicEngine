@@ -56,6 +56,7 @@ target_sources(${target_name}
         Geometry.PointCloud.cppm
         Geometry.Boolean.cppm
         Geometry.Quadric.cppm
+        Geometry.Queries.cppm
         PRIVATE
         FILE_SET geometry_impl TYPE CXX_MODULES FILES
         Geometry.MeshUtils.cpp

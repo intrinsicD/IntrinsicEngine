@@ -11,6 +11,21 @@ module; // <--- Start Global Fragment
 
 module Core.Memory;
 
+// =============================================================================
+// Error reporting: fprintf(stderr) vs Core::Log
+// =============================================================================
+// Core.Memory intentionally uses fprintf(stderr, ...) instead of Core::Log for
+// error reporting. Core.Memory is a foundational module imported by nearly every
+// other module in the engine, including Core.Logging itself. Using Core::Log
+// here would create a circular module dependency (Core.Memory -> Core.Logging
+// -> Core.Memory). fprintf(stderr) avoids this while still providing visible
+// error output for critical conditions like thread violations and OOM.
+//
+// Rule of thumb:
+//   - Core modules (Core.Memory, Core.Tasks): use fprintf(stderr, ...).
+//   - Runtime modules (Graphics, RHI, ECS): use Core::Log.
+// =============================================================================
+
 namespace Core::Memory
 {
     LinearArena::LinearArena(size_t sizeBytes)

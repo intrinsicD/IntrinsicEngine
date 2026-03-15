@@ -49,3 +49,4 @@ export import :AdaptiveRemeshing;
 export import :ConvexHullBuilder;
 export import :PointCloud;
 export import :Boolean;
+export import :Queries;
