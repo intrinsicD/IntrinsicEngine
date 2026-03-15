@@ -192,18 +192,13 @@ namespace Graphics::Systems::GraphGeometrySync
 
                 if (!newGpuData || !newGpuData->GetVertexBuffer())
                 {
-                    Core::Log::Error("GraphGeometrySync: Failed to create GPU geometry for entity {}",
-                                     static_cast<uint32_t>(entity));
-                    dispatcher.enqueue<ECS::Events::GeometryUploadFailed>({entity});
-                    // Clear stale cached attributes — the previous geometry was
-                    // already released and counts may no longer match.
+                    HandleUploadFailure(dispatcher, entity, "GraphGeometrySync");
                     graphData.CachedEdgePairs.clear();
                     graphData.CachedEdgeColors.clear();
                     graphData.CachedNodeColors.clear();
                     graphData.CachedNodeRadii.clear();
                     graphData.GpuVertexCount = 0;
                     graphData.GpuDirty = false;
-                    // Fall through to Phase 3 (GpuGeometry invalid → skip).
                 }
                 else
                 {
@@ -276,37 +271,31 @@ namespace Graphics::Systems::GraphGeometrySync
             // -----------------------------------------------------------------
             // Phase 3: Populate per-pass typed ECS components.
             // -----------------------------------------------------------------
-            // Directly populates Line::Component (edges) and Point::Component
-            // (nodes) from Graph::Data. Idempotent — runs every frame for
-            // visible graph entities with valid GPU geometry.
-            if (graphData.Visible && graphData.GpuGeometry.IsValid())
-            {
-                // Edges → Line
-                auto& line = registry.get_or_emplace<ECS::Line::Component>(entity);
-                line.Geometry         = graphData.GpuGeometry;
-                line.EdgeView         = graphData.GpuEdgeGeometry;
-                line.EdgeCount        = graphData.GpuEdgeCount;
-                line.Color            = graphData.DefaultEdgeColor;
-                line.Width            = graphData.EdgeWidth;
-                line.Overlay          = graphData.EdgesOverlay;
-                line.HasPerEdgeColors = !graphData.CachedEdgeColors.empty();
+            const bool gpuValid = graphData.GpuGeometry.IsValid();
 
-                // Nodes → Point
-                auto& pt = registry.get_or_emplace<ECS::Point::Component>(entity);
-                pt.Geometry          = graphData.GpuGeometry;
-                pt.Color             = graphData.DefaultNodeColor;
-                pt.Size              = graphData.DefaultNodeRadius;
-                pt.SizeMultiplier    = graphData.NodeSizeMultiplier;
-                pt.Mode              = graphData.NodeRenderMode;
-                pt.HasPerPointColors = !graphData.CachedNodeColors.empty();
-                pt.HasPerPointRadii  = !graphData.CachedNodeRadii.empty();
-            }
-            else if (!graphData.Visible)
-            {
-                // Remove per-pass components so hidden graphs stop rendering.
-                RemovePassComponentIfPresent<ECS::Line::Component>(registry, entity);
-                RemovePassComponentIfPresent<ECS::Point::Component>(registry, entity);
-            }
+            PopulateOrRemovePassComponent<ECS::Line::Component>(
+                registry, entity, graphData.Visible, gpuValid,
+                [&](ECS::Line::Component& line) {
+                    line.Geometry         = graphData.GpuGeometry;
+                    line.EdgeView         = graphData.GpuEdgeGeometry;
+                    line.EdgeCount        = graphData.GpuEdgeCount;
+                    line.Color            = graphData.DefaultEdgeColor;
+                    line.Width            = graphData.EdgeWidth;
+                    line.Overlay          = graphData.EdgesOverlay;
+                    line.HasPerEdgeColors = !graphData.CachedEdgeColors.empty();
+                });
+
+            PopulateOrRemovePassComponent<ECS::Point::Component>(
+                registry, entity, graphData.Visible, gpuValid,
+                [&](ECS::Point::Component& pt) {
+                    pt.Geometry          = graphData.GpuGeometry;
+                    pt.Color             = graphData.DefaultNodeColor;
+                    pt.Size              = graphData.DefaultNodeRadius;
+                    pt.SizeMultiplier    = graphData.NodeSizeMultiplier;
+                    pt.Mode              = graphData.NodeRenderMode;
+                    pt.HasPerPointColors = !graphData.CachedNodeColors.empty();
+                    pt.HasPerPointRadii  = !graphData.CachedNodeRadii.empty();
+                });
         }
     }
 

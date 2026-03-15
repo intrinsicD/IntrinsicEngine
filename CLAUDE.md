@@ -171,6 +171,7 @@ Keyboard shortcuts (set in Sandbox app): `W`=Translate, `E`=Rotate, `R`=Scale, `
   - Faces: `DebugDraw::OverlayLine()` for outline + `DebugDraw::Triangle()` for fill in blue.
 - **Lighting independence**: All highlights render via DebugDraw overlay (no depth test), decoupled from forward/deferred/hybrid lighting path.
 - **Geodesic Distance integration**: In Vertex mode with Geodesic enabled, selected source vertices use green spheres. The "Compute Geodesic" button runs `Geometry::Geodesic::ComputeDistance()` from the selected sources. Results are stored as `v:geodesic_distance` mesh property, visualizable via the existing ColorSource/colormap UI.
+- **GPU PrimitiveID pipeline**: Dual-channel MRT picking produces both `EntityId` and `PrimitiveId` (R32_UINT each) in one GPU frame. Three dedicated pick pipelines: `pick_mesh` (gl_PrimitiveID for triangle index), `pick_line` (vertex-amplified quads, segment index output), `pick_point` (billboard quads with disc discard, point index output). All share a unified 104-byte `PickMRTPushConsts` struct. `SelectionModule::ApplyFromGpuPick()` uses GPU PrimitiveID directly when available; CPU refinement via KD-tree/halfedge is retained as fallback for vertex-from-triangle resolution.
 
 ## Three-Pass Rendering Architecture
 
@@ -212,7 +213,7 @@ Push constants per pass:
 
 ### Lifecycle Systems
 
-Lifecycle systems create GPU geometry and populate per-pass ECS components. All follow a two-phase pattern: Phase 1 uploads geometry on `GpuDirty=true`, Phase 2 allocates `GPUScene` slot with bounding sphere.
+Lifecycle systems create GPU geometry and populate per-pass ECS components. All follow a three-phase pattern: Phase 1 uploads geometry on `GpuDirty=true`, Phase 2 allocates `GPUScene` slot with bounding sphere, Phase 3 populates per-pass components. Shared helpers in `LifecycleUtils.hpp`: `AllocateGpuSlot()`, `ComputeLocalBoundingSphere()`, `TryAllocateGpuSlot()` (Phase 2), `RemovePassComponentIfPresent()`, `PopulateOrRemovePassComponent()` (Phase 3 visibility-aware sync), `HandleUploadFailure()` (Phase 1 error handling).
 
 - **`MeshViewLifecycleSystem`** (`"MeshViewLifecycle"`): Creates edge index buffers from collision data and vertex views via `ReuseVertexBuffersFrom`. Populates `Line::Component` (Geometry, EdgeView, EdgeCount) and `Point::Component`. `on_destroy` hooks free GPUScene slots.
 - **`GraphGeometrySyncSystem`** (`"GraphGeometrySync"`): Uploads positions/normals/edge pairs from `Graph::Data`, creates edge index buffer via `ReuseVertexBuffersFrom`. Upload mode selected per-entity by `Graph::Data::StaticGeometry`: `false` (default) → Direct (host-visible) for dynamic graphs; `true` → Staged (device-local) for static graphs. Populates `Line::Component` and `Point::Component`. Per-edge colors sourced from `Graph::Data::CachedEdgeColors`.

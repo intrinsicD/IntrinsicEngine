@@ -1185,7 +1185,7 @@ namespace Graphics
             if (auto pick = m_Interaction.TryConsumePickResult())
             {
                 scene.GetDispatcher().enqueue<ECS::Events::GpuPickCompleted>(
-                    {pick->EntityID, pick->HasHit});
+                    {pick->EntityID, pick->PrimitiveID, pick->HasHit});
             }
         }
 

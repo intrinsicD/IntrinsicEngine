@@ -85,6 +85,9 @@ namespace Graphics
         m_ImGuiPass->Initialize(device, descriptorPool, globalLayout);
 
         m_PickingPass->SetPipeline(&pipelineLibrary.GetOrDie(kPipeline_Picking));
+        m_PickingPass->SetMeshPickPipeline(&pipelineLibrary.GetOrDie(kPipeline_PickMesh));
+        m_PickingPass->SetLinePickPipeline(&pipelineLibrary.GetOrDie(kPipeline_PickLine));
+        m_PickingPass->SetPointPickPipeline(&pipelineLibrary.GetOrDie(kPipeline_PickPoint));
 
         m_SurfacePass->SetPipeline(&pipelineLibrary.GetOrDie(kPipeline_Surface));
         m_SurfacePass->SetLinePipeline(&pipelineLibrary.GetOrDie(kPipeline_SurfaceLines));
@@ -333,6 +336,7 @@ namespace Graphics
         {
             recipe.Depth = true;
             recipe.EntityId = true;
+            recipe.PrimitiveId = true;
         }
 
         if (inputs.PostProcessPassEnabled)

@@ -161,9 +161,9 @@ No transparency support. Required for translucent surfaces, point cloud blending
 
 Sub-mesh selection and geometry operators for research workflows.
 
-### Primitive Selection (**Click selection complete**)
+### Primitive Selection (**Click selection + GPU PrimitiveID complete**)
 
-Click-based sub-element selection is implemented. `ElementMode` (Entity/Vertex/Edge/Face) enables sub-entity picking with highlighted overlays (red spheres for vertices, yellow lines for edges, blue tinted triangles for faces). Shift-click toggles multi-select. `SubElementSelection` tracks per-entity sets of selected vertex, edge, and face indices. GPU picking emits IDs for surfaces, lines, and points; CPU refinement resolves precise sub-element hits via KD-tree lookup and halfedge adjacency. Geodesic distance UI integration is functional (heat-method distances from selected source vertices).
+Click-based sub-element selection is implemented with GPU-native precision. A dual-channel MRT picking pipeline produces both `EntityId` and `PrimitiveId` in one frame via three dedicated pick pipelines (mesh, line, point). `ElementMode` (Entity/Vertex/Edge/Face) enables sub-entity picking with highlighted overlays (red spheres for vertices, yellow lines for edges, blue tinted triangles for faces). Shift-click toggles multi-select. `SubElementSelection` tracks per-entity sets of selected vertex, edge, and face indices. `SelectionModule` uses GPU PrimitiveID directly for face/edge/point selection; CPU refinement via KD-tree is retained as fallback for vertex-from-triangle resolution. Geodesic distance UI integration is functional (heat-method distances from selected source vertices).
 
 **Remaining area selection modes:**
 - Lasso, box, paint-brush area selection.

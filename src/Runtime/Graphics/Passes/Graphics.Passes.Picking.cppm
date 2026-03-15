@@ -25,6 +25,9 @@ export namespace Graphics::Passes
         }
 
         void SetPipeline(RHI::GraphicsPipeline* p) { m_Pipeline = p; }
+        void SetMeshPickPipeline(RHI::GraphicsPipeline* p) { m_MeshPickPipeline = p; }
+        void SetLinePickPipeline(RHI::GraphicsPipeline* p) { m_LinePickPipeline = p; }
+        void SetPointPickPipeline(RHI::GraphicsPipeline* p) { m_PointPickPipeline = p; }
 
         void AddPasses(RenderPassContext& ctx) override;
 
@@ -32,15 +35,20 @@ export namespace Graphics::Passes
         struct PickPassData
         {
             RGResourceHandle IdBuffer;
+            RGResourceHandle PrimIdBuffer;
             RGResourceHandle Depth;
         };
 
         struct PickCopyPassData
         {
             RGResourceHandle IdBuffer;
+            RGResourceHandle PrimIdBuffer;
         };
 
         RHI::VulkanDevice* m_Device = nullptr; // non-owning
-        RHI::GraphicsPipeline* m_Pipeline = nullptr; // owned by pipeline library / engine
+        RHI::GraphicsPipeline* m_Pipeline = nullptr; // legacy single-output (fallback)
+        RHI::GraphicsPipeline* m_MeshPickPipeline = nullptr;
+        RHI::GraphicsPipeline* m_LinePickPipeline = nullptr;
+        RHI::GraphicsPipeline* m_PointPickPipeline = nullptr;
     };
 }

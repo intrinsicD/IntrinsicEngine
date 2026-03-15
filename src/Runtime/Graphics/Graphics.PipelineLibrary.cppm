@@ -82,4 +82,7 @@ export namespace Graphics
     inline constexpr StringID kPipeline_SurfaceLines = "Pipeline.SurfaceLines"_id;
     inline constexpr StringID kPipeline_SurfacePoints = "Pipeline.SurfacePoints"_id;
     inline constexpr StringID kPipeline_Picking = "Pipeline.Picking"_id;
+    inline constexpr StringID kPipeline_PickMesh = "Pipeline.PickMesh"_id;
+    inline constexpr StringID kPipeline_PickLine = "Pipeline.PickLine"_id;
+    inline constexpr StringID kPipeline_PickPoint = "Pipeline.PickPoint"_id;
 }

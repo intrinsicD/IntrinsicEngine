@@ -71,7 +71,7 @@ namespace Runtime
 
     void SelectionModule::OnGpuPickCompleted(const ECS::Events::GpuPickCompleted& evt)
     {
-        m_CachedGpuPick = CachedGpuPick{evt.PickID, evt.HasHit};
+        m_CachedGpuPick = CachedGpuPick{evt.PickID, evt.PrimitiveID, evt.HasHit};
     }
 
     void SelectionModule::OnSelectionChanged(const ECS::Events::SelectionChanged&)
@@ -108,9 +108,11 @@ namespace Runtime
     }
 
     void SelectionModule::ApplyFromGpuPick(ECS::Scene& scene,
-                                          uint32_t pickID, bool hasHit,
+                                          uint32_t pickID, uint32_t primitiveID,
+                                          bool hasHit,
                                           Selection::PickMode mode,
                                           const Selection::PickRequest* request,
+                                          Selection::ElementMode elementMode,
                                           Selection::Picked& picked)
     {
         auto& reg = scene.GetRegistry();
@@ -118,7 +120,6 @@ namespace Runtime
         if (hasHit && pickID != 0u)
         {
             // Resolve pick ID -> entity via component lookup.
-            // Keep this restricted to selectable entities to avoid picking internal/non-editor entities.
             auto view = reg.view<ECS::Components::Selection::PickID, ECS::Components::Selection::SelectableTag>();
             for (auto e : view)
             {
@@ -127,11 +128,74 @@ namespace Runtime
                 {
                     if (reg.valid(e))
                     {
-                        if (request != nullptr)
+                        // When GPU PrimitiveID is available and we're in sub-element
+                        // mode, use it directly instead of CPU refinement.
+                        if (primitiveID != 0u && elementMode != Selection::ElementMode::Entity)
                         {
-                            const auto entityPick = Selection::PickEntityCPU(scene, e, *request);
-                            if (entityPick.Entity == e)
-                                picked = entityPick.PickedData;
+                            picked.entity.id = e;
+                            picked.entity.is_background = false;
+
+                            // Map PrimitiveID to the appropriate sub-element index
+                            // based on the active element mode and entity type.
+                            //
+                            // For mesh surfaces: PrimitiveID = gl_PrimitiveID = triangle index.
+                            //   Vertex mode: resolve via triangle adjacency (CPU fallback still used).
+                            //   Edge mode: edge index from line pick pipeline.
+                            //   Face mode: triangle index directly.
+                            //
+                            // For lines/graphs: PrimitiveID = segment index.
+                            // For points: PrimitiveID = point index.
+
+                            constexpr uint32_t Invalid = Selection::Picked::Entity::InvalidIndex;
+
+                            if (reg.all_of<ECS::Surface::Component>(e))
+                            {
+                                // Mesh entity: PrimitiveID = triangle index from gl_PrimitiveID.
+                                switch (elementMode)
+                                {
+                                case Selection::ElementMode::Face:
+                                    picked.entity.face_idx = primitiveID;
+                                    break;
+                                case Selection::ElementMode::Vertex:
+                                    // GPU gives triangle index; vertex needs CPU refinement
+                                    // from within that triangle. Fall through to CPU path.
+                                    picked.entity.face_idx = primitiveID;
+                                    if (request != nullptr)
+                                    {
+                                        const auto entityPick = Selection::PickEntityCPU(scene, e, *request);
+                                        if (entityPick.Entity == e)
+                                            picked.entity.vertex_idx = entityPick.PickedData.entity.vertex_idx;
+                                    }
+                                    break;
+                                case Selection::ElementMode::Edge:
+                                    // For mesh edges rendered via LinePass, PrimitiveID = edge segment index.
+                                    picked.entity.edge_idx = primitiveID;
+                                    break;
+                                default:
+                                    break;
+                                }
+                            }
+                            else if (reg.all_of<ECS::Point::Component>(e))
+                            {
+                                // Point cloud or graph node: PrimitiveID = point index.
+                                picked.entity.vertex_idx = primitiveID;
+                            }
+                            else if (reg.all_of<ECS::Line::Component>(e))
+                            {
+                                // Graph edge or wireframe: PrimitiveID = segment index.
+                                picked.entity.edge_idx = primitiveID;
+                            }
+                        }
+                        else
+                        {
+                            // Fallback: CPU refinement when PrimitiveID is not
+                            // available or we're in Entity selection mode.
+                            if (request != nullptr)
+                            {
+                                const auto entityPick = Selection::PickEntityCPU(scene, e, *request);
+                                if (entityPick.Entity == e)
+                                    picked = entityPick.PickedData;
+                            }
                         }
 
                         if (picked.entity.id == entt::null)
@@ -324,9 +388,11 @@ namespace Runtime
             Selection::Picked picked{};
             ApplyFromGpuPick(scene,
                              pick.PickID,
+                             pick.PrimitiveID,
                              pick.HasHit,
                              m_PendingGpuClickMode,
                              m_HasPendingPickRequest ? &m_PendingPickRequest : nullptr,
+                             m_Config.ElementMode,
                              picked);
 
             // GPU path sub-element selection (same logic as CPU path).
