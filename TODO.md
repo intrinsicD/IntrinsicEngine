@@ -41,9 +41,7 @@ This document tracks the **active rendering-architecture backlog** for Intrinsic
 
 ### Core & RHI Code Quality (Audit Findings)
 
-- [ ] Extract RHI SafeDestroy helper — 9 files repeat identical move-capture + lambda pattern for deferred Vulkan resource destruction (`RHI.Buffer.cpp`, `RHI.Shader.cpp`, `RHI.Image.cpp`, `RHI.Texture.cpp`, `RHI.Pipeline.cpp`, etc.). Create a template or macro in `RHI.DestructionUtils`.
-- [x] Document device reference lifetime contract — comment block added to `RHI.Device.cppm` explaining when to use `VulkanDevice&` (non-owning) vs `shared_ptr<VulkanDevice>` (shared ownership).
-- [x] Document Core.Memory `fprintf` vs `Core::Log` error reporting trade-off — rationale comment added to `Core.Memory.cpp` explaining the circular dependency avoidance.
+All Core & RHI audit items have been resolved (SafeDestroy extraction, device lifetime docs, Core.Memory fprintf rationale). Details in git history.
 
 ## 2. Next (P1) — Near-Term Follow-Up After the Refactor Lands
 
@@ -235,12 +233,13 @@ Identified via full codebase sweep (March 2026). Grouped by priority.
 - [ ] Evaluate whether `PipelineLibrary` can adopt `ResolveShaderPaths` with an alternate resolver overload.
 - [ ] Keep the refactor behavior-preserving and opportunistic when the file is next touched.
 
-### D3. Vertex Deduplication Consolidation (P3)
+### D3. Vertex Deduplication Consolidation (P3) — **Resolved**
 
-STL uses spatial-hash vertex deduplication (quantize-based `VertexKey` + `VertexKeyHash`). OBJ uses index-based dedup (position/normal/texcoord index tuples). The two strategies are fundamentally different, but the spatial-hash pattern could be shared with future importers that also produce unindexed triangle soups.
+STL's spatial-hash vertex deduplication extracted to `Graphics.Importers.VertexDedup.hpp` (`SpatialVertexKey` / `SpatialVertexKeyHash`). Unit tests in `Test_ImporterUtils.cpp`. Details in git history.
 
-- [ ] Extract STL's `VertexKey` / `VertexKeyHash` / dedup-map pattern into `Graphics.Importers.VertexDedup.hpp`.
-- [ ] Add a unit test for the spatial deduplicator (coincident vertices, near-threshold vertices, distinct vertices).
+### D3b. Polygon Fan Triangulation Consolidation (P3) — **Resolved**
+
+Fan triangulation extracted to `Graphics.Importers.TriangulationUtils.hpp`. OBJ, PLY, and OFF importers migrated. Unit tests in `Test_ImporterUtils.cpp`. Details in git history.
 
 ### D4. Color Parsing Unification (P3)
 
@@ -284,18 +283,11 @@ Per-entity attribute buffer entry structs use inconsistent naming across passes:
 
 ### D18. Missing Geometry Test Coverage (P3) — **Resolved**
 
-Dedicated test files added for all five previously untested collision/query modules:
-
-- [x] `Geometry.GJK` — `Test_GJK.cpp` (boolean overlap, intersection/simplex recovery, convergence).
-- [x] `Geometry.SDF` / `Geometry.SDFContact` — `Test_SDF.cpp` (math functions, functors, factories, gradient solver).
-- [x] `Geometry.Containment` — `Test_Containment.cpp` (Sphere, AABB, Frustum containment pairs).
-- [x] `Geometry.Support` — `Test_Support.cpp` (all 11 shape types: Sphere, AABB, Capsule, OBB, Cylinder, Ellipsoid, Segment, Triangle, ConvexHull, Frustum, Ray).
-- [x] `Geometry.ContactManifold` — `Test_ContactManifold.cpp` (analytic solvers, symmetric dispatch, GJK/EPA fallback, raycasting).
+All five previously untested collision/query modules now have dedicated test files: GJK, SDF/SDFContact, Containment, Support (11 shape types), ContactManifold. Details in git history.
 
 ### D19. Selection.cpp Picking Helpers Overlap with Geometry Module (P4) — Partially Resolved
 
-`Geometry::Queries` partition (`Geometry.Queries.cppm`) now provides `ClosestRaySegment()` returning `RaySegmentResult` (DistanceSq, RayT, SegmentT, closest points). This is the canonical implementation for ray-segment closest-point computation.
+`Geometry::Queries` partition now provides `ClosestRaySegment()` (canonical ray-segment closest-point computation). Remaining:
 
-- [x] Add `ClosestRaySegment()` to `Geometry::Queries` partition (returns struct with DistanceSq, RayT, SegmentT, closest points).
 - [ ] Refactor `Selection.cpp` to use `Geometry::ClosestRaySegment` and existing `Geometry::ClosestPointParameter` + `Geometry::ClosestPoint` where possible.
 - [ ] Consider adding output-parameter overloads to Geometry module for `SquaredDistance` (returning both the distance and the parameter/closest point).

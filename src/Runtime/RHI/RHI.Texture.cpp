@@ -1,6 +1,7 @@
 module;
 
 #include "RHI.Vulkan.hpp"
+#include "RHI.DestructionUtils.hpp"
 #include <memory>
 
 module RHI:Texture.Impl;
@@ -80,15 +81,8 @@ namespace RHI
         // We do that by scheduling sampler destruction now and then removing the pool entry.
         if (const TextureGpuData* data = m_System->Get(m_Handle))
         {
-            if (data->Sampler)
-            {
-                VkDevice logicalDevice = m_Device->GetLogicalDevice();
-                VkSampler sampler = data->Sampler;
-                m_Device->SafeDestroy([logicalDevice, sampler]()
-                {
-                    vkDestroySampler(logicalDevice, sampler, nullptr);
-                });
-            }
+            VkSampler sampler = data->Sampler;
+            DestructionUtils::SafeDestroyVk(*m_Device, sampler, vkDestroySampler);
         }
 
         m_System->Destroy(m_Handle);

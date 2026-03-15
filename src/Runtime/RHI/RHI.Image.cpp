@@ -1,5 +1,6 @@
 module;
 #include "RHI.Vulkan.hpp"
+#include "RHI.DestructionUtils.hpp"
 #include <vector>
 #include <optional>
 #include <utility>
@@ -109,47 +110,13 @@ namespace RHI
     {
         if (this != &other)
         {
-            // Release current resources (if any) WITHOUT destroying the object (calling the destructor
-            // directly is UB unless followed by placement-new).
-            VkDevice logicalDevice = m_Device.GetLogicalDevice();
-            VmaAllocator allocator = m_Device.GetAllocator();
-
-            if (m_ImageView)
-            {
-                VkImageView view = m_ImageView;
-                m_Device.SafeDestroy([logicalDevice, view]()
-                {
-                    vkDestroyImageView(logicalDevice, view, nullptr);
-                });
-                m_ImageView = VK_NULL_HANDLE;
-            }
-
-            if (m_Image)
-            {
-                VkImage image = m_Image;
-                if (m_OwnsMemory)
-                {
-                    VmaAllocation allocation = m_Allocation;
-                    if (allocation)
-                    {
-                        m_Device.SafeDestroy([allocator, image, allocation]()
-                        {
-                            vmaDestroyImage(allocator, image, allocation);
-                        });
-                    }
-                }
-                else
-                {
-                    m_Device.SafeDestroy([logicalDevice, image]()
-                    {
-                        vkDestroyImage(logicalDevice, image, nullptr);
-                    });
-                }
-
-                m_Image = VK_NULL_HANDLE;
-                m_Allocation = VK_NULL_HANDLE;
-                m_OwnsMemory = false;
-            }
+            // Release current resources (if any)
+            DestructionUtils::SafeDestroyVk(m_Device, m_ImageView, vkDestroyImageView);
+            if (m_OwnsMemory)
+                DestructionUtils::SafeDestroyVma(m_Device, m_Image, m_Allocation, vmaDestroyImage);
+            else
+                DestructionUtils::SafeDestroyVk(m_Device, m_Image, vkDestroyImage);
+            m_OwnsMemory = false;
 
             // Move data
             // Note: m_Device is a reference, cannot be reassigned.
@@ -172,50 +139,19 @@ namespace RHI
 
     VulkanImage::~VulkanImage()
     {
-        VkDevice logicalDevice = m_Device.GetLogicalDevice();
-        VmaAllocator allocator = m_Device.GetAllocator();
-
         // 1. Always destroy the Image View
-        if (m_ImageView)
-        {
-            VkImageView view = m_ImageView;
-            m_Device.SafeDestroy([logicalDevice, view]()
-            {
-                vkDestroyImageView(logicalDevice, view, nullptr);
-            });
-        }
+        DestructionUtils::SafeDestroyVk(m_Device, m_ImageView, vkDestroyImageView);
 
         // 2. Destroy the Image Handle (and Memory if owned)
-        if (m_Image)
+        if (m_OwnsMemory)
         {
-            VkImage image = m_Image;
-
-            if (m_OwnsMemory)
-            {
-                // CASE A: Standard VMA Allocation
-                // We own the memory. vmaDestroyImage frees both the VkImage and the allocation.
-                VmaAllocation allocation = m_Allocation;
-
-                if (allocation)
-                {
-                    m_Device.SafeDestroy([allocator, image, allocation]()
-                    {
-                        vmaDestroyImage(allocator, image, allocation);
-                    });
-                }
-            }
-            else
-            {
-                // CASE B: Aliased / Unbound (RenderGraph)
-                // We do NOT own the memory (it belongs to the RenderGraph pool).
-                // We MUST destroy the VkImage handle, but MUST NOT touch the memory.
-                // IMPORTANT: still defer the destruction until the GPU is done with any command buffers
-                // that reference this VkImage.
-                m_Device.SafeDestroy([logicalDevice, image]()
-                {
-                    vkDestroyImage(logicalDevice, image, nullptr);
-                });
-            }
+            // CASE A: Standard VMA Allocation — vmaDestroyImage frees both VkImage and allocation.
+            DestructionUtils::SafeDestroyVma(m_Device, m_Image, m_Allocation, vmaDestroyImage);
+        }
+        else
+        {
+            // CASE B: Aliased / Unbound (RenderGraph) — destroy VkImage only, memory is external.
+            DestructionUtils::SafeDestroyVk(m_Device, m_Image, vkDestroyImage);
         }
     }
 

@@ -9,6 +9,7 @@ module;
 #include <vector>
 #include <glm/glm.hpp>
 #include "Graphics.Importers.TextParse.hpp"
+#include "Graphics.Importers.TriangulationUtils.hpp"
 
 module Graphics:Importers.OBJ.Impl;
 import :Importers.OBJ;
@@ -163,12 +164,7 @@ namespace Graphics
                     faceIndices.push_back(it->second);
                 }
 
-                for (size_t i = 1; i < faceIndices.size() - 1; ++i)
-                {
-                    outData.Indices.push_back(faceIndices[0]);
-                    outData.Indices.push_back(faceIndices[i]);
-                    outData.Indices.push_back(faceIndices[i + 1]);
-                }
+                Importers::TriangulateFan(faceIndices, outData.Indices);
             }
             else if (type == "l")
             {

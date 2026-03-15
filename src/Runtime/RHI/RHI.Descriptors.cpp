@@ -1,5 +1,6 @@
 module;
 #include "RHI.Vulkan.hpp"
+#include "RHI.DestructionUtils.hpp"
 #include <vector>
 
 module RHI:Descriptors.Impl;
@@ -29,14 +30,7 @@ namespace RHI {
     }
 
     DescriptorLayout::~DescriptorLayout() {
-        if (m_Layout == VK_NULL_HANDLE) return;
-        VkDevice logicalDevice = m_Device.GetLogicalDevice();
-        VkDescriptorSetLayout layout = m_Layout;
-
-        m_Device.SafeDestroy([logicalDevice, layout]()
-        {
-            vkDestroyDescriptorSetLayout(logicalDevice, layout, nullptr);
-        });
+        DestructionUtils::SafeDestroyVk(m_Device, m_Layout, vkDestroyDescriptorSetLayout);
     }
 
     // --- Descriptor Allocator (growing pools) ---

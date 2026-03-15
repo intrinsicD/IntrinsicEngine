@@ -1,5 +1,6 @@
 module;
 #include "RHI.Vulkan.hpp"
+#include "RHI.DestructionUtils.hpp"
 #include <fstream>
 #include <vector>
 #include <filesystem>
@@ -28,13 +29,7 @@ namespace RHI {
     }
 
     ShaderModule::~ShaderModule() {
-        if (!m_Module) return;
-        VkDevice logicalDevice = m_Device.GetLogicalDevice();
-        VkShaderModule module = m_Module;
-        m_Device.SafeDestroy([logicalDevice, module]()
-        {
-            vkDestroyShaderModule(logicalDevice, module, nullptr);
-        });
+        DestructionUtils::SafeDestroyVk(m_Device, m_Module, vkDestroyShaderModule);
     }
 
     VkPipelineShaderStageCreateInfo ShaderModule::GetStageInfo() const {

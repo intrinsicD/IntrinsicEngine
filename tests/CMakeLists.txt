@@ -174,7 +174,7 @@ intrinsic_test_object_lib(RuntimeTestObjs
         Test_RenderUpdateIntegration.cpp
         Test_CudaDevice.cpp
         Test_RenderGraphPackets.cpp
-
+        Test_ImporterUtils.cpp
 
     DEPS IntrinsicCore IntrinsicRuntime nlohmann_json::nlohmann_json
 )

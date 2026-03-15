@@ -16,6 +16,7 @@ module;
 #include <glm/glm.hpp>
 #include "Graphics.FileFormatUtils.hpp"
 #include "Graphics.Importers.TextParse.hpp"
+#include "Graphics.Importers.TriangulationUtils.hpp"
 
 module Graphics:Importers.PLY.Impl;
 import :Importers.PLY;
@@ -538,12 +539,7 @@ namespace Graphics
                     std::vector<uint32_t> faceIndices((size_t)count);
                     for (int k = 0; k < count; ++k) ss >> faceIndices[(size_t)k];
 
-                    for (size_t k = 1; k + 1 < faceIndices.size(); ++k)
-                    {
-                        outData.Indices.push_back(faceIndices[0]);
-                        outData.Indices.push_back(faceIndices[k]);
-                        outData.Indices.push_back(faceIndices[k + 1]);
-                    }
+                    Importers::TriangulateFan(faceIndices, outData.Indices);
                 }
             }
             else
