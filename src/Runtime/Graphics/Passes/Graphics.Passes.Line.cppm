@@ -98,7 +98,7 @@ export namespace Graphics::Passes
         };
 
         // Entity ID -> persistent edge attribute buffer.
-        std::unordered_map<uint32_t, RetainedBufferEntry> m_EdgeAuxBuffers;
+        std::unordered_map<uint32_t, RetainedBufferEntry> m_EdgeAttrBuffers;
 
         // --- Transient DebugDraw buffers (per-frame, host-visible, BDA) ---
         static constexpr uint32_t FRAMES = RHI::VulkanDevice::GetFramesInFlight();
@@ -116,9 +116,9 @@ export namespace Graphics::Passes
         uint32_t m_TransientColorCapacity = 0; // in segments
 
         // Create or update a persistent per-edge attribute buffer for an entity.
-        uint64_t EnsureEdgeAuxBuffer(uint32_t entityKey,
-                                     const uint32_t* colorData,
-                                     uint32_t edgeCount);
+        uint64_t EnsureEdgeAttrBuffer(uint32_t entityKey,
+                                      const uint32_t* colorData,
+                                      uint32_t edgeCount);
 
         // Build a graphics pipeline (depth test on or off).
         std::unique_ptr<RHI::GraphicsPipeline> BuildPipeline(

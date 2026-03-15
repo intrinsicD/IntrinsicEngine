@@ -32,8 +32,8 @@ struct EdgePair {
 };
 layout(buffer_reference, scalar) readonly buffer EdgeBuf { EdgePair e[]; };
 
-// Per-edge color buffer (optional BDA — when PtrEdgeAux != 0).
-layout(buffer_reference, scalar) readonly buffer EdgeAuxBuf { uint color[]; };
+// Per-edge color attribute buffer (optional BDA — when PtrEdgeAttr != 0).
+layout(buffer_reference, scalar) readonly buffer EdgeAttrBuf { uint color[]; };
 
 // Push constants.
 layout(push_constant) uniform PushConsts {
@@ -44,7 +44,7 @@ layout(push_constant) uniform PushConsts {
     float    ViewportWidth;
     float    ViewportHeight;
     uint     Color;           // packed ABGR (uniform color for all edges)
-    uint64_t PtrEdgeAux;      // BDA to per-edge packed ABGR colors (0 = use uniform Color)
+    uint64_t PtrEdgeAttr;      // BDA to per-edge packed ABGR colors (0 = use uniform Color)
 } push;
 
 layout(location = 0) out vec4 fragColor;
@@ -85,11 +85,11 @@ void main()
     vec2 dir = screenB - screenA;
     float len = length(dir);
 
-    // Per-edge color: read from BDA buffer when PtrEdgeAux != 0, otherwise use uniform Color.
-    if (push.PtrEdgeAux != 0ul)
+    // Per-edge color: read from BDA buffer when PtrEdgeAttr != 0, otherwise use uniform Color.
+    if (push.PtrEdgeAttr != 0ul)
     {
-        EdgeAuxBuf auxBuf = EdgeAuxBuf(push.PtrEdgeAux);
-        fragColor = unpackUnorm4x8(auxBuf.color[segmentIndex]);
+        EdgeAttrBuf attrBuf = EdgeAttrBuf(push.PtrEdgeAttr);
+        fragColor = unpackUnorm4x8(attrBuf.color[segmentIndex]);
     }
     else
     {

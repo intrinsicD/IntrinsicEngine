@@ -7,14 +7,14 @@
 layout(location = 0) out uint outID;
 
 layout(push_constant) uniform PickPushConsts {
-    mat4 model;
-    uint64_t ptrPos;
-    uint64_t ptrNorm;
-    uint64_t ptrAux;
-    uint entityID;
+    mat4     Model;
+    uint64_t PtrPositions;
+    uint64_t PtrNormals;
+    uint64_t PtrAux;
+    uint     EntityID;
 } push;
 
 void main() {
-    outID = push.entityID;
+    outID = push.EntityID;
 }
 

@@ -335,6 +335,59 @@ inline std::pair<std::string, std::string> ResolveShaderPaths(
 }
 
 // =============================================================================
+// CreateCullingFrustum — extract camera frustum for CPU-side culling.
+// =============================================================================
+// Returns a frustum from the camera VP matrix, or an empty frustum when
+// culling is disabled. Deduplicates the identical pattern found in every
+// retained-mode render pass (Surface, Line, Point).
+
+inline Geometry::Frustum CreateCullingFrustum(
+    const glm::mat4& cameraProj,
+    const glm::mat4& cameraView,
+    bool cullingEnabled)
+{
+    return cullingEnabled
+        ? Geometry::Frustum::CreateFromMatrix(cameraProj * cameraView)
+        : Geometry::Frustum{};
+}
+
+// =============================================================================
+// CleanupOrphanedBuffers — remove stale entries from a per-entity buffer map.
+// =============================================================================
+// Removes entries from `bufferMap` whose keys are not present in the sorted
+// `activeKeys` vector. Deferred-destroys the GPU buffers via SafeDestroy.
+//
+// EntryT must have: std::unique_ptr<RHI::VulkanBuffer> Buffer;
+//
+// Callers must sort activeKeys before passing them in.
+
+template<typename EntryT>
+void CleanupOrphanedBuffers(
+    RHI::VulkanDevice& device,
+    std::unordered_map<uint32_t, EntryT>& bufferMap,
+    std::vector<uint32_t>& activeKeys)
+{
+    if (bufferMap.empty())
+        return;
+
+    std::sort(activeKeys.begin(), activeKeys.end());
+
+    for (auto it = bufferMap.begin(); it != bufferMap.end(); )
+    {
+        if (!std::binary_search(activeKeys.begin(), activeKeys.end(), it->first))
+        {
+            if (it->second.Buffer)
+                device.SafeDestroy([old = std::move(it->second.Buffer)]() {});
+            it = bufferMap.erase(it);
+        }
+        else
+        {
+            ++it;
+        }
+    }
+}
+
+// =============================================================================
 // EnsurePerEntityBuffer<T> — create or update a persistent BDA-addressable
 // per-entity attribute buffer.
 // =============================================================================

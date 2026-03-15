@@ -46,7 +46,7 @@ namespace Graphics::Passes
         float     ViewportWidth{0.0f};   //  4 bytes, offset 84
         float     ViewportHeight{0.0f};  //  4 bytes, offset 88
         uint32_t  Color{0};           //  4 bytes, offset 92
-        uint64_t  PtrEdgeAux{0};      //  8 bytes, offset 96 — BDA to per-edge packed ABGR colors (0 = uniform Color)
+        uint64_t  PtrEdgeAttr{0};      //  8 bytes, offset 96 — BDA to per-edge packed ABGR colors (0 = uniform Color)
     };
     static_assert(sizeof(LinePushConstants) == 104);
 
@@ -54,19 +54,16 @@ namespace Graphics::Passes
     using EdgePair = ECS::EdgePair;
 
     // =========================================================================
-    // EnsureEdgeAuxBuffer
+    // EnsureEdgeAttrBuffer — per-edge attribute buffer (packed ABGR per edge).
     // =========================================================================
-    // Creates or updates a persistent BDA-addressable per-edge attribute buffer.
-    // Data: array of packed ABGR uint32_t, one per edge.
-    // Returns the buffer device address, or 0 on failure.
 
-    uint64_t LinePass::EnsureEdgeAuxBuffer(
+    uint64_t LinePass::EnsureEdgeAttrBuffer(
         uint32_t entityKey,
         const uint32_t* colorData,
         uint32_t edgeCount)
     {
         return EnsurePerEntityBuffer<uint32_t>(
-            *m_Device, m_EdgeAuxBuffers, entityKey, colorData, edgeCount, "LinePass");
+            *m_Device, m_EdgeAttrBuffers, entityKey, colorData, edgeCount, "LinePass");
     }
 
     // =========================================================================
@@ -189,12 +186,12 @@ namespace Graphics::Passes
         if (!m_Device) return;
 
         // Deferred-destroy all persistent edge attribute buffers.
-        for (auto& [key, entry] : m_EdgeAuxBuffers)
+        for (auto& [key, entry] : m_EdgeAttrBuffers)
         {
             if (entry.Buffer)
                 m_Device->SafeDestroy([old = std::move(entry.Buffer)]() {});
         }
-        m_EdgeAuxBuffers.clear();
+        m_EdgeAttrBuffers.clear();
 
         // Destroy transient buffers.
         for (auto& buf : m_TransientPosBuffer) buf.reset();
@@ -297,14 +294,14 @@ namespace Graphics::Passes
             uint32_t EdgeCount;
             uint32_t Color;
             float    LineWidth;
-            uint64_t PtrEdgeAux;   // 0 = use uniform Color; non-zero = per-edge BDA colors
+            uint64_t PtrEdgeAttr;   // 0 = use uniform Color; non-zero = per-edge BDA colors
         };
 
         std::vector<DrawInfo> depthDraws;    // depth-tested draws (retained + transient)
         std::vector<DrawInfo> overlayDraws;  // no-depth-test draws (retained overlay + transient overlay)
 
         // Track which entity keys have active aux buffers this frame.
-        std::vector<uint32_t> activeAuxKeys;
+        std::vector<uint32_t> activeAttrKeys;
 
         // =================================================================
         // Retained-mode draws via ECS::Line::Component
@@ -318,9 +315,8 @@ namespace Graphics::Passes
 
             // Frustum extraction — CPU-side culling for retained-mode draws.
             const bool cullingEnabled = !ctx.Debug.DisableCulling;
-            const Geometry::Frustum frustum = cullingEnabled
-                ? Geometry::Frustum::CreateFromMatrix(ctx.CameraProj * ctx.CameraView)
-                : Geometry::Frustum{};
+            const Geometry::Frustum frustum = CreateCullingFrustum(
+                ctx.CameraProj, ctx.CameraView, cullingEnabled);
 
             auto lineView = registry.view<ECS::Line::Component>();
 
@@ -361,7 +357,7 @@ namespace Graphics::Passes
                     line.Color.r, line.Color.g, line.Color.b, line.Color.a);
 
                 // Per-edge color aux buffer (sourced from legacy components).
-                uint64_t edgeAuxAddr = 0;
+                uint64_t edgeAttrAddr = 0;
                 if (line.HasPerEdgeColors && line.ShowPerEdgeColors)
                 {
                     const uint32_t* colorData = nullptr;
@@ -389,8 +385,8 @@ namespace Graphics::Passes
 
                     if (colorData)
                     {
-                        activeAuxKeys.push_back(entityKey);
-                        edgeAuxAddr = EnsureEdgeAuxBuffer(entityKey, colorData, colorCount);
+                        activeAttrKeys.push_back(entityKey);
+                        edgeAttrAddr = EnsureEdgeAttrBuffer(entityKey, colorData, colorCount);
                     }
                 }
 
@@ -402,7 +398,7 @@ namespace Graphics::Passes
                 di.Color = wireColor;
                 // Clamp line width to safe pixel range [0.5, 32.0].
                 di.LineWidth = std::clamp(line.Width, 0.5f, 32.0f);
-                di.PtrEdgeAux = edgeAuxAddr;
+                di.PtrEdgeAttr = edgeAttrAddr;
 
                 if (line.Overlay)
                     overlayDraws.push_back(di);
@@ -411,25 +407,8 @@ namespace Graphics::Passes
 
             }
 
-            // Cleanup orphaned edge aux buffers.
-            if (!m_EdgeAuxBuffers.empty())
-            {
-                std::sort(activeAuxKeys.begin(), activeAuxKeys.end());
-
-                for (auto it = m_EdgeAuxBuffers.begin(); it != m_EdgeAuxBuffers.end(); )
-                {
-                    if (!std::binary_search(activeAuxKeys.begin(), activeAuxKeys.end(), it->first))
-                    {
-                        if (it->second.Buffer)
-                            m_Device->SafeDestroy([old = std::move(it->second.Buffer)]() {});
-                        it = m_EdgeAuxBuffers.erase(it);
-                    }
-                    else
-                    {
-                        ++it;
-                    }
-                }
-            }
+            // Cleanup orphaned edge attribute buffers.
+            CleanupOrphanedBuffers(*m_Device, m_EdgeAttrBuffers, activeAttrKeys);
         }
 
         // =================================================================
@@ -503,9 +482,9 @@ namespace Graphics::Passes
                             di.PtrPositions = posAddr;
                             di.PtrEdges = edgeAddr;
                             di.EdgeCount = depthLineCount;
-                            di.Color = 0xFFFFFFFFu; // white fallback (unused when PtrEdgeAux != 0)
+                            di.Color = 0xFFFFFFFFu; // white fallback (unused when PtrEdgeAttr != 0)
                             di.LineWidth = std::clamp(LineWidth, 0.5f, 32.0f);
-                            di.PtrEdgeAux = colorAddr;
+                            di.PtrEdgeAttr = colorAddr;
                             depthDraws.push_back(di);
                         }
 
@@ -529,7 +508,7 @@ namespace Graphics::Passes
                             di.EdgeCount = overlayLineCount;
                             di.Color = 0xFFFFFFFFu;
                             di.LineWidth = std::clamp(LineWidth, 0.5f, 32.0f);
-                            di.PtrEdgeAux = overlayColorAddr;
+                            di.PtrEdgeAttr = overlayColorAddr;
                             overlayDraws.push_back(di);
                         }
                     }
@@ -596,7 +575,7 @@ namespace Graphics::Passes
                         push.ViewportWidth = static_cast<float>(resolution.width);
                         push.ViewportHeight = static_cast<float>(resolution.height);
                         push.Color = di.Color;
-                        push.PtrEdgeAux = di.PtrEdgeAux;
+                        push.PtrEdgeAttr = di.PtrEdgeAttr;
 
                         vkCmdPushConstants(cmd, m_Pipeline->GetLayout(),
                                            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
@@ -645,7 +624,7 @@ namespace Graphics::Passes
                         push.ViewportWidth = static_cast<float>(resolution.width);
                         push.ViewportHeight = static_cast<float>(resolution.height);
                         push.Color = di.Color;
-                        push.PtrEdgeAux = di.PtrEdgeAux;
+                        push.PtrEdgeAttr = di.PtrEdgeAttr;
 
                         vkCmdPushConstants(cmd, m_OverlayPipeline->GetLayout(),
                                            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
