@@ -146,19 +146,15 @@ Use for **deterministic resource cleanup** that must happen synchronously and im
 
 ## Transform Gizmo System
 
-`Graphics::TransformGizmo` provides interactive translate/rotate/scale manipulation rendered via the `DebugDraw` overlay path (no depth test). The system follows a strict state machine:
-
-- **Idle:** No axis highlighted. Hit-testing disabled when ImGui captures mouse.
-- **Hovered:** Mouse is over a gizmo axis/plane. Axis color changes to highlight yellow.
-- **Active:** Mouse button is held after clicking a hovered axis. Transform deltas applied per frame.
+`Graphics::TransformGizmo` is an ImGuizmo-backed editor wrapper. The engine caches selection/camera state during `OnUpdate()`, then executes the gizmo during the active ImGui frame through a lightweight overlay callback so transform interaction stays in the same input/render path as the rest of the editor UI.
 
 Key design decisions:
-- **Rendering via DebugDraw overlay:** Gizmo lines are always-on-top (no depth test), transient per frame. No retained GPU state needed.
-- **Deterministic picking priority:** Plane handles (XY/XZ/YZ) take priority over axis lines. Closest axis wins ties.
+- **ImGuizmo integration:** Rendering and interaction handled by ImGuizmo within the ImGui frame.
 - **Pivot computation:** Supports `Centroid` (average of selected positions) and `FirstSelected` pivot strategies.
 - **Snap:** Applied as post-processing on the delta value. Translation snaps per-axis, rotation snaps in degrees, scale snaps on the scale factor.
-- **Mouse consumption:** `Update()` returns `true` when the gizmo consumed the click, which blocks entity selection.
-- **Multi-entity support:** All selected entities with `Transform::Component` + `SelectedTag` are transformed together, preserving relative offsets during rotation/translation.
+- **Mouse consumption:** The gizmo consumes input during drag, blocking entity selection.
+- **Multi-entity support:** All selected entities with `Transform::Component` + `SelectedTag` are transformed together via shared pivot + world-space delta matrix.
+- **Parented entities:** Manipulation happens in world space and is converted back to the child's parent-local `Transform::Component` via `Transform::TryComputeLocalTransform()`.
 
 Keyboard shortcuts (set in Sandbox app): `W`=Translate, `E`=Rotate, `R`=Scale, `X`=Toggle World/Local, `F`=Focus camera on selected (fit in view), `C`=Center camera on selected (orbit target only), `Q`=Reset camera.
 
@@ -181,7 +177,7 @@ The engine uses a unified three-pass rendering architecture with one pass per pr
 
 ### Passes and DefaultPipeline
 
-`DefaultPipeline` registers 9 stages in order: Picking, `SurfacePass`, `LinePass`, `PointPass`, (Composition placeholder for future deferred/hybrid paths), `PostProcessPass`, SelectionOutline, DebugView, ImGui, Present.
+`DefaultPipeline` registers 10 stages in order: Picking, `SurfacePass`, `LinePass`, `PointPass`, (Composition placeholder for future deferred/hybrid paths), `PostProcessPass`, SelectionOutline, DebugView, ImGui, Present.
 
 | Pass | Primitives | Retained Data | Transient Data | Shaders | Feature Gate |
 |------|-----------|---------------|----------------|---------|--------------|

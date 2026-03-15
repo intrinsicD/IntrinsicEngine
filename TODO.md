@@ -54,9 +54,9 @@ These are not required to finish the first wave, but they should begin soon afte
 - [ ] Keep transparent/special/debug rendering in the forward path.
 - [ ] Define composition rules between paths.
 
-### B3. Two-Stage GPU Selection Pipeline
+### B3. GPU-Native Primitive ID Pipeline (Optimization)
 
-Replace entity-only GPU pick with a dual-channel MRT pipeline producing both `EntityId` and `PrimitiveId` in one frame, enabling sub-entity (face/edge/point) selection.
+Sub-element selection (vertex/edge/face) is functional via CPU-side KD-tree refinement after GPU entity pick. This task upgrades to a dual-channel MRT pipeline producing both `EntityId` and `PrimitiveId` in one GPU frame for higher precision and lower CPU overhead — eliminating the CPU refinement step.
 
 #### Infrastructure (readback & events)
 - [ ] Add `TRANSFER_SRC_BIT` to `PrimitiveId` resource definition (`Graphics.RenderPipeline.cppm`).
@@ -82,8 +82,8 @@ Replace entity-only GPU pick with a dual-channel MRT pipeline producing both `En
 - [ ] Add draw loop for `PointCloud::Data + Point::Component` entities and standalone `Point::Component` entities.
 
 #### Selection module integration
-- [ ] Update `ApplyFromGpuPick()` to decode primitive meaning by entity kind (mesh → triangle, graph → edge, point cloud → point).
-- [ ] Add local-space nearest-feature refinement using primitive ID (nearest edge/vertex for meshes).
+- [ ] Update `ApplyFromGpuPick()` to use GPU `PrimitiveID` directly instead of CPU refinement when available.
+- [ ] Retain CPU refinement as fallback path for entities without MRT pick pipelines.
 
 ### B4. Lifecycle System Boilerplate Extraction
 
@@ -170,7 +170,7 @@ These items should be **planned now** so the current refactor leaves room for th
 
 - [ ] Factor `PostProcessPass` into sub-pass classes (bloom, SMAA, tone mapping, histogram) to reduce single-class complexity.
 
-### C9. Render Asset / Shader System Cleanup
+### C8. Render Asset / Shader System Cleanup
 
 - [ ] Plan shader registration refactor.
 - [ ] Plan shader hot-reload boundaries by pass/stage.
@@ -178,7 +178,7 @@ These items should be **planned now** so the current refactor leaves room for th
 - [ ] Plan shader feature-key derivation from material/frame recipe.
 - [ ] Plan pipeline-cache invalidation strategy.
 
-### C10. Scene Serialization Compatibility
+### C9. Scene Serialization Compatibility
 
 - [ ] Ensure render settings serialize cleanly.
 - [ ] Ensure frame-recipe-relevant settings are serializable where appropriate.

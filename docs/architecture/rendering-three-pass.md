@@ -120,6 +120,6 @@ Currently all geometry passes write directly to `SceneColorHDR` (forward path). 
 
 ## Where Active Work Lives
 
-- Near-term execution queue: `TODO.md` (`Now / Next / Later / Planned`).
+- Near-term execution queue: `TODO.md` (`P0 / P1 / P2 / Planned Constraints`).
 - Medium/long-horizon planning: `ROADMAP.md`.
 - Historical migration narrative: `PLAN.md` (archival index).

@@ -49,17 +49,17 @@ These features turn the engine from a viewer into an interactive tool.
 
 ### Transform Gizmos (**MVP complete**)
 
-Translate/rotate/scale gizmos are implemented via the `DebugDraw` overlay path (`LinePass` transient, no depth test). The `Graphics::TransformGizmo` module provides a deterministic interaction state machine (idle → hovered → active) with:
+`Graphics::TransformGizmo` is an ImGuizmo-backed editor wrapper. The engine caches selection/camera state during `OnUpdate()`, then executes the gizmo during the active ImGui frame through a lightweight overlay callback so transform interaction stays in the same input/render path as the rest of the editor UI.
 
 - **Three modes:** Translate (arrows + plane handles), Rotate (circles per axis), Scale (axis lines + uniform center cube).
-- **World/local space:** Gizmo orientation follows entity rotation in local mode.
+- **World/local space:** Gizmo orientation follows entity rotation in local mode. For parented entities, manipulation happens in world space and is converted back to parent-local `Transform::Component` via `Transform::TryComputeLocalTransform()`.
 - **Snap:** Configurable increments for translation, rotation (degrees), and scale.
-- **Multi-selection:** Centroid or first-selected pivot strategy. All selected entities transform together.
+- **Multi-selection:** Centroid or first-selected pivot strategy. All selected entities transform together via shared pivot + world-space delta.
 - **Viewport toolbar:** ImGui panel for mode switching, space toggle, pivot selection, and snap configuration.
 - **Keyboard shortcuts:** W=Translate, E=Rotate, R=Scale, X=Toggle World/Local.
 - **Mouse integration:** Gizmo consumes LMB input during drag, blocking entity selection.
 
-Future: undo/redo integration, visual refinement (arrowhead cones, rotation arc feedback).
+Future: undo/redo integration.
 
 ### UI Improvements
 
@@ -134,7 +134,7 @@ New geometry types and rendering techniques building on Phase 1–3 infrastructu
 
 ### Point Cloud Rendering — Advanced Modes
 
-Basic modes (FlatDisc, Surfel, EWA) are complete. Each new mode is a shader + pipeline variant registered in `PointPass`.
+Basic modes (FlatDisc, Surfel, EWA, Sphere impostor) are complete. Each new mode is a shader + pipeline variant registered in `PointPass`.
 
 - **Gaussian Splatting (3DGS):** Oriented anisotropic splats via a dedicated compute rasterizer or tile-based sort+blend pipeline. Dominant representation in neural radiance field research.
 - **Potree-style octree LOD:** Hierarchical out-of-core streaming for billion-point clouds. Octree nodes loaded on demand by camera distance and screen-space error budget.
@@ -161,16 +161,13 @@ No transparency support. Required for translucent surfaces, point cloud blending
 
 Sub-mesh selection and geometry operators for research workflows.
 
-### Primitive Selection
+### Primitive Selection (**Click selection complete**)
 
-Current selection is entity-level only. `HalfedgeMesh` provides the topological foundation.
+Click-based sub-element selection is implemented. `ElementMode` (Entity/Vertex/Edge/Face) enables sub-entity picking with highlighted overlays (red spheres for vertices, yellow lines for edges, blue tinted triangles for faces). Shift-click toggles multi-select. `SubElementSelection` tracks per-entity sets of selected vertex, edge, and face indices. GPU picking emits IDs for surfaces, lines, and points; CPU refinement resolves precise sub-element hits via KD-tree lookup and halfedge adjacency. Geodesic distance UI integration is functional (heat-method distances from selected source vertices).
 
-**Selection modes:**
-- Vertex, edge, face selection with highlighted overlays.
+**Remaining area selection modes:**
 - Lasso, box, paint-brush area selection.
 - Connected-component flood fill, angle-based region growing.
-
-**Architecture:** Dedicated GPU picking pass writing `(EntityID, PrimitiveID, BarycentricCoords)`. CPU-side adjacency traversal via `HalfedgeMesh`. Per-entity bitsets for selected sub-elements.
 
 ### GPU Geometry Processing Backend
 
@@ -183,7 +180,7 @@ Infrastructure required to move heavyweight geometry operators from CPU to GPU.
 
 ### Geometry Processing — Remaining
 
-18 operators are complete. Remaining:
+Core operators are complete (16 mesh operators + DEC + graph builders/layouts + collision/spatial queries). Remaining:
 - **Exact Boolean CSG:** Robust triangle clipping + stitched remeshing for partial-overlap union/intersection/difference. The baseline (disjoint/full-containment) is done.
 - **Ultra-fast GPU K-means clustering:** CUDA-accelerated k-means for point clouds and feature-space segmentation workflows.
 - **Mesh and point cloud denoising:** Edge-aware/spectral denoising operators for scanned and reconstructed data.
@@ -192,8 +189,8 @@ Infrastructure required to move heavyweight geometry operators from CPU to GPU.
 - **Shape and point cloud registration (ICP variants):** Point-to-point, point-to-plane, and robust weighted ICP pipelines.
 - **Additional state-of-the-art geometry processing methods:** Continue integrating current research-grade operators as first-class runtime tools.
 
-**Top 8 next (dependency-ordered):** Ordered from foundational geometry robustness and correspondence to advanced deformation/reconstruction so later operators can reuse earlier data products and solvers.
-- **Heat method + vector heat geodesics:** Fast distance/transport primitives for segmentation, correspondence, and brush tools.
+**Top next (dependency-ordered):** Ordered from foundational geometry robustness and correspondence to advanced deformation/reconstruction so later operators can reuse earlier data products and solvers. Heat-method geodesic distance is already implemented; vector heat geodesics (parallel transport) remains.
+- **Vector heat geodesics:** Parallel transport extension of the existing heat-method solver for direction/frame field applications.
 - **Robust global registration (TEASER++/FGR/Super4PCS):** Outlier-tolerant coarse alignment before local ICP refinement.
 - **Non-rigid registration (CPD/embedded deformation):** Deformable alignment for temporal scans and articulated shapes.
 - **Field-aligned quad remeshing (MIQ/Instant Meshes class):** Direction-field-driven quad dominant remeshing for downstream UV/edit workflows.
@@ -263,7 +260,7 @@ The goal is a unified architecture where mesh, graph, and point cloud rendering 
 |----------|-------|
 | **Mesh** | ShadedTriangles, Wireframe, VertexPoints, NormalsDebug |
 | **Graph** | LineList, TubeImpostor, NodeDiscs, EdgeHeatmap |
-| **Point** | FlatDisc, Surfel, EWA, PotreeAdaptive, GaussianSplat |
+| **Point** | FlatDisc, Surfel, EWA, Sphere, PotreeAdaptive, GaussianSplat |
 
 ### Data-Oriented Design
 
