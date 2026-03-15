@@ -123,6 +123,11 @@ intrinsic_test_object_lib(GeometryTestObjs
         Test_Containment.cpp
         Test_Support.cpp
         Test_ContactManifold.cpp
+        Test_Simplification.cpp
+        Test_Geodesic.cpp
+        Test_Subdivision.cpp
+        Test_Smoothing.cpp
+        Test_NormalEstimation.cpp
     DEPS IntrinsicCore IntrinsicGeometry
 )
 
