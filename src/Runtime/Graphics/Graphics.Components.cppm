@@ -487,8 +487,8 @@ export namespace ECS::Line
         uint32_t EdgeCount = 0;
 
         // ---- Appearance (defaults; overridden by per-edge attributes) ----
-        glm::vec4 Color = {0.85f, 0.85f, 0.85f, 1.0f};
-        float     Width = 1.5f;
+        glm::vec4 Color = {1.0f, 1.0f, 1.0f, 1.0f};
+        float     Width = 2.0f;
         bool      Overlay = false;  // true = no depth test (always visible)
 
         // ---- Per-Edge Attribute Flags ----

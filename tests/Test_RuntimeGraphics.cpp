@@ -97,8 +97,21 @@ TEST(RenderResources, DefaultPipelineRecipeAllocatesOnlyRequiredCanonicalTargets
     EXPECT_TRUE(recipe.Requires(RenderResource::SceneColorLDR));
     EXPECT_FALSE(recipe.Requires(RenderResource::SelectionMask));
     EXPECT_FALSE(recipe.Requires(RenderResource::SelectionOutline));
-    EXPECT_FALSE(recipe.Requires(RenderResource::PrimitiveId));
+    EXPECT_TRUE(recipe.Requires(RenderResource::PrimitiveId));
     EXPECT_FALSE(recipe.Requires(RenderResource::SceneNormal));
+}
+
+TEST(RenderResources, PrimitiveIdIsOptionalWhenPickingIsDisabled)
+{
+    using namespace Graphics;
+
+    DefaultPipelineRecipeInputs inputs{};
+    inputs.SurfacePassEnabled = true;
+    inputs.PickingPassEnabled = false;
+
+    const FrameRecipe recipe = BuildDefaultPipelineRecipe(inputs);
+    EXPECT_FALSE(recipe.Requires(RenderResource::PrimitiveId));
+    EXPECT_FALSE(recipe.PrimitiveId);
 }
 
 // Full GPU test requires Vulkan Context, handled in Integration tests.

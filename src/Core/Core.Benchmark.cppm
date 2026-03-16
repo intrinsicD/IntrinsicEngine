@@ -57,7 +57,13 @@ export namespace Core::Benchmark
     class BenchmarkRunner
     {
     public:
-        void Configure(const BenchmarkConfig& config) { m_Config = config; }
+        void Configure(const BenchmarkConfig& config)
+        {
+            m_Config = config;
+            m_Snapshots.clear();
+            m_PassAccum.clear();
+            m_FrameIndex = 0;
+        }
 
         // Call once per frame during the benchmark run.
         // Returns true when the benchmark is still running, false when complete.

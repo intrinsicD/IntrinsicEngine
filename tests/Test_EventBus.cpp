@@ -267,7 +267,7 @@ TEST(EventBus, GpuPickCompleted_SinkReceivesEnqueuedEvent)
             out.push_back(evt);
         }>(received);
 
-    scene.GetDispatcher().enqueue<GpuPickCompleted>({42u, true});
+    scene.GetDispatcher().enqueue<GpuPickCompleted>({42u, 0u, true});
     EXPECT_TRUE(received.empty()); // Deferred.
 
     scene.GetDispatcher().update();
@@ -287,7 +287,7 @@ TEST(EventBus, GpuPickCompleted_BackgroundHitHasZeroPickID)
         }>(received);
 
     // Background click: no hit, PickID == 0.
-    scene.GetDispatcher().enqueue<GpuPickCompleted>({0u, false});
+    scene.GetDispatcher().enqueue<GpuPickCompleted>({0u, 0u, false});
     scene.GetDispatcher().update();
 
     ASSERT_EQ(received.size(), 1u);

@@ -49,6 +49,19 @@ export namespace Geometry::Internal
         constexpr int EPA_MAX_ITERATIONS = 32; // Maximum EPA iterations
     }
 
+    namespace Detail
+    {
+        [[nodiscard]] inline glm::vec3 TripleProduct(const glm::vec3& a, const glm::vec3& b, const glm::vec3& c)
+        {
+            return glm::cross(glm::cross(a, b), c);
+        }
+
+        [[nodiscard]] inline bool NearlyZero(const glm::vec3& v) noexcept
+        {
+            return glm::length2(v) <= Config::GJK_EPSILON * Config::GJK_EPSILON;
+        }
+    }
+
     // --- GJK IMPLEMENTATION (Boolean Overlap) ---
 
 
@@ -65,18 +78,40 @@ export namespace Geometry::Internal
                 glm::vec3 ab = b - a;
                 glm::vec3 ao = -a;
 
-                if (glm::dot(ab, ao) > 0)
+                const float abLenSq = glm::length2(ab);
+                if (abLenSq <= Config::GJK_EPSILON)
                 {
-                    direction = glm::cross(glm::cross(ab, ao), ab);
-                    if (glm::length2(direction) < Config::GJK_EPSILON)
+                    direction = ao;
+                    points.Size = 1;
+                    return Detail::NearlyZero(direction);
+                }
+
+                const float projection = glm::dot(ao, ab);
+                const glm::vec3 perp = Detail::TripleProduct(ab, ao, ab);
+
+                if (projection > 0.0f)
+                {
+                    if (Detail::NearlyZero(perp))
                     {
-                        direction = ao; // Fallback to avoid zero direction on nearly collinear points
+                        const float t = projection / abLenSq;
+                        if (t >= -Config::GJK_EPSILON && t <= 1.0f + Config::GJK_EPSILON)
+                            return true; // Origin lies on the segment AB.
+
+                        direction = ao;
+                        if (Detail::NearlyZero(direction))
+                            return true;
+                    }
+                    else
+                    {
+                        direction = perp;
                     }
                 }
                 else
                 {
                     points.Size = 1;
                     direction = ao;
+                    if (Detail::NearlyZero(direction))
+                        return true;
                 }
                 return false;
             }
@@ -90,48 +125,59 @@ export namespace Geometry::Internal
                 glm::vec3 ao = -a;
                 glm::vec3 abc = glm::cross(ab, ac);
 
-                if (glm::length2(abc) < Config::GJK_EPSILON)
+                if (Detail::NearlyZero(abc))
                 {
-                    direction = ao;
                     points.Size = 2;
-                    points[1] = c;
-                    return false;
+                    points[0] = b;
+                    points[1] = a;
+                    return NextSimplex(points, direction);
                 }
 
-                if (glm::dot(glm::cross(abc, ac), ao) > 0)
+                const glm::vec3 acPerp = glm::cross(abc, ac);
+                if (glm::dot(acPerp, ao) > 0.0f)
                 {
-                    if (glm::dot(ac, ao) > 0)
+                    if (glm::dot(ac, ao) > 0.0f)
                     {
-                        points[1] = c;
+                        points[0] = c;
+                        points[1] = a;
                         points.Size = 2;
-                        direction = glm::cross(glm::cross(ac, ao), ac);
+                        direction = Detail::TripleProduct(ac, ao, ac);
+                        if (Detail::NearlyZero(direction))
+                            return true;
                     }
                     else
                     {
-                        // Star Case (recursion-ish)
-                        points[1] = b;
+                        points[0] = b;
+                        points[1] = a;
                         points.Size = 2;
                         return NextSimplex(points, direction);
                     }
                 }
                 else
                 {
-                    if (glm::dot(glm::cross(ab, abc), ao) > 0)
+                    const glm::vec3 abPerp = glm::cross(ab, abc);
+                    if (glm::dot(abPerp, ao) > 0.0f)
                     {
-                        // Star Case
-                        points.Size = 2; // [a, b]
+                        points[0] = b;
+                        points[1] = a;
+                        points.Size = 2;
                         return NextSimplex(points, direction);
                     }
                     else
                     {
-                        if (glm::dot(abc, ao) > 0)
+                        const float planeDot = glm::dot(abc, ao);
+                        if (std::abs(planeDot) <= Config::GJK_EPSILON)
+                            return true;
+
+                        if (planeDot > 0.0f)
                         {
                             direction = abc;
                         }
                         else
                         {
+                            points[0] = b;
                             points[1] = c;
-                            points[2] = b; // Flip winding
+                            points[2] = a;
                             direction = -abc;
                         }
                     }
@@ -150,31 +196,37 @@ export namespace Geometry::Internal
                 glm::vec3 ao = -a;
 
                 glm::vec3 abc = glm::cross(ab, ac);
+                if (glm::dot(abc, ad) > 0.0f)
+                    abc = -abc;
                 glm::vec3 acd = glm::cross(ac, ad);
+                if (glm::dot(acd, ab) > 0.0f)
+                    acd = -acd;
                 glm::vec3 adb = glm::cross(ad, ab);
+                if (glm::dot(adb, ac) > 0.0f)
+                    adb = -adb;
 
-                if (glm::dot(abc, ao) > 0)
+                if (glm::dot(abc, ao) > 0.0f)
                 {
-                    points.Size = 3;
                     points[0] = c;
                     points[1] = b;
-                    points[2] = a; // Remove d
+                    points[2] = a;
+                    points.Size = 3;
                     return NextSimplex(points, direction);
                 }
-                if (glm::dot(acd, ao) > 0)
+                if (glm::dot(acd, ao) > 0.0f)
                 {
-                    points.Size = 3;
                     points[0] = d;
                     points[1] = c;
-                    points[2] = a; // Remove b
+                    points[2] = a;
+                    points.Size = 3;
                     return NextSimplex(points, direction);
                 }
-                if (glm::dot(adb, ao) > 0)
+                if (glm::dot(adb, ao) > 0.0f)
                 {
-                    points.Size = 3;
                     points[0] = b;
                     points[1] = d;
-                    points[2] = a; // Remove c
+                    points[2] = a;
+                    points.Size = 3;
                     return NextSimplex(points, direction);
                 }
                 return true; // Origin is inside all faces!
@@ -189,6 +241,9 @@ export namespace Geometry::Internal
         // Currently allocation-free; scratch is plumbed for consistency with EPA.
         glm::vec3 support = MinkowskiDifference::Support(a, b, {1, 0, 0});
 
+        if (Detail::NearlyZero(support))
+            return true;
+
         Simplex points;
         points.Push(support);
 
@@ -197,9 +252,27 @@ export namespace Geometry::Internal
 
         while (true)
         {
+            if (Detail::NearlyZero(direction))
+                return true;
+
             support = MinkowskiDifference::Support(a, b, direction);
 
-            if (glm::dot(support, direction) < 0) return false; // No intersection possible
+            if (Detail::NearlyZero(support))
+                return true;
+
+            if (glm::dot(support, direction) < Config::GJK_EPSILON) return false; // No intersection possible
+
+            bool duplicate = false;
+            for (int i = 0; i < points.Size; ++i)
+            {
+                if (glm::length2(points[i] - support) <= Config::GJK_EPSILON * Config::GJK_EPSILON)
+                {
+                    duplicate = true;
+                    break;
+                }
+            }
+            if (duplicate)
+                return false;
 
             points.Push(support);
 
@@ -218,13 +291,34 @@ export namespace Geometry::Internal
         glm::vec3 support = MinkowskiDifference::Support(a, b, {1, 0, 0});
         Simplex points;
         points.Push(support);
+
+        if (Detail::NearlyZero(support))
+            return points;
+
         glm::vec3 direction = -support;
         int maxIterations = Config::GJK_MAX_ITERATIONS;
 
         while (maxIterations-- > 0)
         {
+            if (Detail::NearlyZero(direction))
+                return points;
+
             support = MinkowskiDifference::Support(a, b, direction);
-            if (glm::dot(support, direction) < 0) return std::nullopt;
+
+            if (Detail::NearlyZero(support))
+            {
+                points.Push(support);
+                return points;
+            }
+
+            if (glm::dot(support, direction) < Config::GJK_EPSILON) return std::nullopt;
+
+            for (int i = 0; i < points.Size; ++i)
+            {
+                if (glm::length2(points[i] - support) <= Config::GJK_EPSILON * Config::GJK_EPSILON)
+                    return std::nullopt;
+            }
+
             points.Push(support);
             if (NextSimplex(points, direction)) return points; // Return the simplex containing origin
         }

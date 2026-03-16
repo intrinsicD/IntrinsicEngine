@@ -235,9 +235,6 @@ namespace Core::Tasks
         std::vector<uint32_t> freeWaitSlots;
         std::vector<ParkedNode> parkedNodes;
         std::vector<uint32_t> freeParkedNodes;
-
-        std::mutex readyWaitQueueMutex;
-        std::deque<ParkedContinuation> readyWaitQueue;
     };
 
     static std::unique_ptr<SchedulerContext> s_Ctx = nullptr;
@@ -527,16 +524,8 @@ namespace Core::Tasks
 
         for (;;)
         {
-            // Always drain wait-queue first: parked continuations are logically runnable work.
-            (void)DrainReadyFromWaitQueues(64);
-
-            // If there's no in-flight work AND the ready-wait-queue is empty, we're done.
             if (s_Ctx->inFlightTasks.load(std::memory_order_acquire) == 0)
-            {
-                std::lock_guard readyLock(s_Ctx->readyWaitQueueMutex);
-                if (s_Ctx->readyWaitQueue.empty())
-                    break;
-            }
+                break;
 
             LocalTask task;
             if (TryPopTask(task, std::nullopt))
@@ -631,7 +620,6 @@ namespace Core::Tasks
     void Scheduler::WorkerEntry(unsigned threadIndex)
     {
         static constexpr uint32_t FairnessInterval = 32;
-        static constexpr uint32_t ReadyDrainBudget = 8;
         s_WorkerIndex = static_cast<int>(threadIndex);
         uint32_t lastSignal = s_Ctx->workSignal.load(std::memory_order_acquire);
         uint32_t localPopBudget = FairnessInterval;
@@ -643,12 +631,6 @@ namespace Core::Tasks
             const bool shouldForceFairness = localPopBudget == 0;
             const bool canUseLocal = !shouldForceFairness;
             bool hasTask = false;
-
-            // Poll continuation wake queues before attempting cross-worker steal/inject.
-            // This keeps park->unpark latency low for dependency-heavy workloads.
-            const uint32_t drainedReady = DrainReadyFromWaitQueues(ReadyDrainBudget);
-            if (drainedReady > 0)
-                lastSignal = s_Ctx->workSignal.load(std::memory_order_acquire);
 
             if (canUseLocal && TryPopLocal(threadIndex, task))
             {
@@ -663,12 +645,6 @@ namespace Core::Tasks
                     hasTask = true;
                     localPopBudget = FairnessInterval;
                 }
-            }
-
-            if (!hasTask && drainedReady > 0 && TryPopTask(task, threadIndex))
-            {
-                hasTask = true;
-                localPopBudget = FairnessInterval;
             }
 
             if (hasTask)
@@ -820,6 +796,7 @@ namespace Core::Tasks
             // when the coroutine slice was scheduled will be released when this slice returns
             // via OnTaskDequeuedAndRun().
             s_Ctx->parkCount.fetch_add(1, std::memory_order_relaxed);
+            s_Ctx->parkCount.notify_all();
         }
 
         const auto parkNs = std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -873,14 +850,18 @@ namespace Core::Tasks
         if (continuations.empty())
             return 0;
 
+        const auto now = std::chrono::steady_clock::now();
+        for (auto& continuation : continuations)
         {
-            std::lock_guard readyLock(s_Ctx->readyWaitQueueMutex);
-            for (auto& continuation : continuations)
-                s_Ctx->readyWaitQueue.push_back(std::move(continuation));
+            const auto unparkNs = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                now - continuation.ParkedAt).count();
+            s_Ctx->unparkLatencyTotalNs.fetch_add(static_cast<uint64_t>(unparkNs), std::memory_order_relaxed);
+            s_Ctx->unparkCount.fetch_add(1, std::memory_order_relaxed);
+            RecordLatencySample(s_Ctx->unparkLatencyHistogram, static_cast<uint64_t>(unparkNs));
+
+            Reschedule(continuation.Handle, std::move(continuation.Alive));
         }
 
-        s_Ctx->workSignal.fetch_add(1, std::memory_order_release);
-        s_Ctx->workSignal.notify_all();
         return static_cast<uint32_t>(continuations.size());
     }
 
@@ -900,46 +881,6 @@ namespace Core::Tasks
         slot.ready = false;
     }
 
-    uint32_t Scheduler::DrainReadyFromWaitQueues(uint32_t budget)
-    {
-        if (!s_Ctx || budget == 0)
-            return 0;
-
-        // Hot path for dependency-heavy coroutine workloads: avoid per-drain
-        // heap churn by reusing a per-thread scratch buffer.
-        thread_local std::vector<SchedulerContext::ParkedContinuation> ready;
-        ready.clear();
-        if (ready.capacity() < budget)
-            ready.reserve(budget);
-        {
-            std::lock_guard readyLock(s_Ctx->readyWaitQueueMutex);
-            const uint32_t available = static_cast<uint32_t>(s_Ctx->readyWaitQueue.size());
-            const uint32_t drainCount = std::min(budget, available);
-            for (uint32_t i = 0; i < drainCount; ++i)
-            {
-                ready.push_back(std::move(s_Ctx->readyWaitQueue.front()));
-                s_Ctx->readyWaitQueue.pop_front();
-            }
-        }
-
-        const auto now = std::chrono::steady_clock::now();
-        for (auto& continuation : ready)
-        {
-            const auto unparkNs = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                now - continuation.ParkedAt).count();
-            s_Ctx->unparkLatencyTotalNs.fetch_add(static_cast<uint64_t>(unparkNs), std::memory_order_relaxed);
-            s_Ctx->unparkCount.fetch_add(1, std::memory_order_relaxed);
-            RecordLatencySample(s_Ctx->unparkLatencyHistogram, static_cast<uint64_t>(unparkNs));
-
-            // Parking does NOT hold an in-flight token (removed in ParkCurrentFiberIfNotReady).
-            // Unparking re-injects the continuation as a brand-new scheduled task.
-            // DispatchInternal (called inside Reschedule) issues the +1, and
-            // OnTaskDequeuedAndRun issues the matching -1 when the slice completes.
-            Reschedule(continuation.Handle, std::move(continuation.Alive));
-        }
-
-        return static_cast<uint32_t>(ready.size());
-    }
 
     CounterEvent::CounterEvent(uint32_t initialCount)
         : m_Count(initialCount)

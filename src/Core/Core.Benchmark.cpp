@@ -18,9 +18,10 @@ namespace Core::Benchmark
         if (IsComplete())
             return false;
 
-        m_FrameIndex++;
+        const uint32_t frameIndex = m_FrameIndex;
+        m_FrameIndex = frameIndex + 1;
 
-        if (IsWarmingUp())
+        if (frameIndex < m_Config.WarmupFrames)
             return true;
 
         const auto& stats = telemetry.GetFrameStats(0);

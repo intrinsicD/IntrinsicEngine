@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 
+#include "TestImGuiFrameScope.hpp"
+
 import Interface;
 
 // ==========================================================================
@@ -19,37 +21,13 @@ import Interface;
 // do NOT require a Vulkan device or GLFW window.
 // ==========================================================================
 
-namespace
-{
-    struct ImGuiFrameScope
-    {
-        ImGuiFrameScope()
-        {
-            IMGUI_CHECKVERSION();
-            Context = ImGui::CreateContext();
-            ImGui::SetCurrentContext(Context);
-            ImGuiIO& io = ImGui::GetIO();
-            io.DisplaySize = ImVec2(800.0f, 600.0f);
-            ImGui::NewFrame();
-        }
-
-        ~ImGuiFrameScope()
-        {
-            ImGui::EndFrame();
-            ImGui::DestroyContext(Context);
-        }
-
-        ImGuiContext* Context = nullptr;
-    };
-}
-
 // --------------------------------------------------------------------------
 // RegisterPanel: basic registration + callback invocation via DrawGUI
 // --------------------------------------------------------------------------
 
 TEST(PanelRegistration, RegisterPanel_IsCallable)
 {
-    ImGuiFrameScope frame;
+    TestSupport::ImGuiFrameScope frame;
 
     bool called = false;
     Interface::GUI::RegisterPanel("TestPanel_A", [&called]() { called = true; });
@@ -67,7 +45,7 @@ TEST(PanelRegistration, RegisterPanel_IsCallable)
 
 TEST(PanelRegistration, RemovePanel_StopsCallback)
 {
-    ImGuiFrameScope frame;
+    TestSupport::ImGuiFrameScope frame;
 
     int callCount = 0;
     Interface::GUI::RegisterPanel("TestPanel_B", [&callCount]() { ++callCount; });
@@ -88,7 +66,7 @@ TEST(PanelRegistration, RemovePanel_StopsCallback)
 
 TEST(PanelRegistration, RemovePanel_NonExistent_NoCrash)
 {
-    ImGuiFrameScope frame;
+    TestSupport::ImGuiFrameScope frame;
     Interface::GUI::RemovePanel("NonExistentPanel_XYZ");
     SUCCEED();
 }
@@ -99,7 +77,7 @@ TEST(PanelRegistration, RemovePanel_NonExistent_NoCrash)
 
 TEST(PanelRegistration, DuplicateRegistration_UpdatesCallback)
 {
-    ImGuiFrameScope frame;
+    TestSupport::ImGuiFrameScope frame;
 
     int firstCount = 0;
     int secondCount = 0;
@@ -122,7 +100,7 @@ TEST(PanelRegistration, DuplicateRegistration_UpdatesCallback)
 
 TEST(PanelRegistration, MultiplePanels_AllDrawn)
 {
-    ImGuiFrameScope frame;
+    TestSupport::ImGuiFrameScope frame;
 
     int countA = 0, countB = 0, countC = 0;
     Interface::GUI::RegisterPanel("Multi_A", [&countA]() { ++countA; });
@@ -146,7 +124,7 @@ TEST(PanelRegistration, MultiplePanels_AllDrawn)
 
 TEST(PanelRegistration, RegisterOverlay_IsInvokedDuringDrawGUI)
 {
-    ImGuiFrameScope frame;
+    TestSupport::ImGuiFrameScope frame;
 
     bool overlayFired = false;
     Interface::GUI::RegisterOverlay("TestOverlay", [&overlayFired]() { overlayFired = true; });
@@ -163,7 +141,7 @@ TEST(PanelRegistration, RegisterOverlay_IsInvokedDuringDrawGUI)
 
 TEST(PanelRegistration, RemoveOverlay_NonExistent_NoCrash)
 {
-    ImGuiFrameScope frame;
+    TestSupport::ImGuiFrameScope frame;
     Interface::GUI::RemoveOverlay("GhostOverlay_999");
     SUCCEED();
 }
@@ -174,7 +152,7 @@ TEST(PanelRegistration, RemoveOverlay_NonExistent_NoCrash)
 
 TEST(PanelRegistration, DuplicateOverlay_UpdatesCallback)
 {
-    ImGuiFrameScope frame;
+    TestSupport::ImGuiFrameScope frame;
 
     int first = 0, second = 0;
     Interface::GUI::RegisterOverlay("OvDup", [&first]() { ++first; });
@@ -194,7 +172,7 @@ TEST(PanelRegistration, DuplicateOverlay_UpdatesCallback)
 
 TEST(PanelRegistration, RegisterMainMenuBar_IsInvoked)
 {
-    ImGuiFrameScope frame;
+    TestSupport::ImGuiFrameScope frame;
 
     bool menuFired = false;
     Interface::GUI::RegisterMainMenuBar("TestMenu", [&menuFired]()
@@ -226,7 +204,7 @@ TEST(PanelRegistration, RegisterMainMenuBar_IsInvoked)
 
 TEST(PanelRegistration, NonClosablePanel_AlwaysDrawn)
 {
-    ImGuiFrameScope frame;
+    TestSupport::ImGuiFrameScope frame;
 
     int callCount = 0;
     Interface::GUI::RegisterPanel("Sticky", [&callCount]() { ++callCount; }, /*isClosable=*/false);

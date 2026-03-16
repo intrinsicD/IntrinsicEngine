@@ -29,6 +29,7 @@ namespace
         constexpr uint32_t PackColorF(float r, float g, float b, float a = 1.0f) noexcept
         {
             auto clamp = [](float v) noexcept -> uint8_t {
+                if (!std::isfinite(v)) return 0;
                 if (v <= 0.0f) return 0;
                 if (v >= 1.0f) return 255;
                 return static_cast<uint8_t>(v * 255.0f + 0.5f);
@@ -513,11 +514,11 @@ TEST(PerFaceAttr_Segmentation, SegmentationVisualization_PerFaceLabels)
 // Section 4: SurfacePass Integration Contract
 // =============================================================================
 
-TEST(PerFaceAttr_Integration, PushConstantsSize104Bytes)
+TEST(PerFaceAttr_Integration, PushConstantsSizeMatchesCurrentLayout)
 {
-    // MeshPushConstants must remain exactly 104 bytes to match the
-    // push constant range declared in all three surface pipelines.
-    EXPECT_EQ(sizeof(RHI::MeshPushConstants), 104u);
+    // MeshPushConstants includes both per-face and per-vertex attribute BDAs.
+    EXPECT_EQ(sizeof(RHI::MeshPushConstants), 112u);
+    EXPECT_LE(sizeof(RHI::MeshPushConstants), 256u);
 }
 
 TEST(PerFaceAttr_Integration, PushConstantsPtrFaceAttrOffset)
@@ -531,8 +532,10 @@ TEST(PerFaceAttr_Integration, PushConstantsPtrFaceAttrOffset)
     //   uint32_t VisibilityBase (4 bytes, offset 88)
     //   float    PointSizePx    (4 bytes, offset 92)
     //   uint64_t PtrFaceAttr    (8 bytes, offset 96)
-    //   Total: 104 bytes
+    //   uint64_t PtrVertexAttr  (8 bytes, offset 104)
+    //   Total: 112 bytes
     EXPECT_EQ(offsetof(RHI::MeshPushConstants, PtrFaceAttr), 96u);
+    EXPECT_EQ(offsetof(RHI::MeshPushConstants, PtrVertexAttr), 104u);
 }
 
 TEST(PerFaceAttr_Integration, PushConstantsPtrFaceAttrDefaultZero)
@@ -586,12 +589,22 @@ TEST(PerFaceAttr_Robustness, PackColorF_NaNClampedToZero)
     uint8_t r = (c >> 0) & 0xFF;
     uint8_t g = (c >> 8) & 0xFF;
     uint8_t b = (c >> 16) & 0xFF;
-    // NaN comparisons with <= and >= are both false, so the clamp
-    // falls through to the conversion: NaN * 255 + 0.5 is NaN,
-    // cast to uint8_t is implementation-defined. We just verify
-    // no crash and alpha is correct.
+    EXPECT_EQ(r, 0u);
+    EXPECT_EQ(g, 0u);
+    EXPECT_EQ(b, 0u);
     uint8_t a = (c >> 24) & 0xFF;
     EXPECT_EQ(a, 255u);
+}
+
+TEST(PerFaceAttr_Robustness, PackColorF_InfClampedDeterministically)
+{
+    float inf = std::numeric_limits<float>::infinity();
+    uint32_t c = TestGpuColor::PackColorF(inf, -inf, 0.5f, 1.0f);
+
+    EXPECT_EQ((c >> 0) & 0xFF, 0u);
+    EXPECT_EQ((c >> 8) & 0xFF, 0u);
+    EXPECT_EQ((c >> 16) & 0xFF, 128u);
+    EXPECT_EQ((c >> 24) & 0xFF, 255u);
 }
 
 TEST(PerFaceAttr_Robustness, DeletedFacesSkipped)

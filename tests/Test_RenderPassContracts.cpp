@@ -216,14 +216,14 @@ TEST(RenderPassContract_Line, LineComponentDefaultsContract)
     EXPECT_FALSE(line.EdgeView.IsValid());
     EXPECT_FALSE(line.Geometry.IsValid());
 
-    // Default color is white opaque.
-    EXPECT_FLOAT_EQ(line.Color.r, 1.0f);
-    EXPECT_FLOAT_EQ(line.Color.g, 1.0f);
-    EXPECT_FLOAT_EQ(line.Color.b, 1.0f);
+    // Default color is the neutral wireframe gray used by lifecycle-created line views.
+    EXPECT_FLOAT_EQ(line.Color.r, 0.85f);
+    EXPECT_FLOAT_EQ(line.Color.g, 0.85f);
+    EXPECT_FLOAT_EQ(line.Color.b, 0.85f);
     EXPECT_FLOAT_EQ(line.Color.a, 1.0f);
 
-    // Default width.
-    EXPECT_GT(line.Width, 0.0f);
+    // Default component width.
+    EXPECT_FLOAT_EQ(line.Width, 1.5f);
 
     // Not overlay by default.
     EXPECT_FALSE(line.Overlay);

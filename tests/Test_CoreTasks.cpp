@@ -308,6 +308,12 @@ TEST(CoreTasks, StaleWaitTokenUnparkDoesNotResumeNewWaiters)
 {
     Scheduler::Initialize(2);
 
+    auto waitForAdditionalPark = [](uint64_t previousParkCount)
+    {
+        while (Scheduler::ParkCountAtomic().load(std::memory_order_acquire) == previousParkCount)
+            Scheduler::ParkCountAtomic().wait(previousParkCount, std::memory_order_acquire);
+    };
+
     Scheduler::WaitToken staleToken{};
     {
         CounterEvent firstEvent{1};
@@ -324,6 +330,8 @@ TEST(CoreTasks, StaleWaitTokenUnparkDoesNotResumeNewWaiters)
         Scheduler::Dispatch(firstWaiter());
         while (firstStage.load(std::memory_order_acquire) < 1)
             std::this_thread::yield();
+
+        waitForAdditionalPark(0);
 
         firstEvent.Signal();
         Scheduler::WaitForAll();
@@ -344,7 +352,9 @@ TEST(CoreTasks, StaleWaitTokenUnparkDoesNotResumeNewWaiters)
     while (secondStage.load(std::memory_order_acquire) < 1)
         std::this_thread::yield();
 
-    (void)Scheduler::UnparkReady(staleToken);
+    waitForAdditionalPark(1);
+
+    EXPECT_EQ(Scheduler::UnparkReady(staleToken), 0u);
     for (int i = 0; i < 512; ++i)
         std::this_thread::yield();
 

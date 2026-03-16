@@ -8,6 +8,8 @@
 #include <imgui.h>
 #include <entt/entity/entity.hpp>
 
+#include "TestImGuiFrameScope.hpp"
+
 import ECS;
 import Graphics;
 import Core.Input;
@@ -42,26 +44,6 @@ namespace
         return entity;
     }
 
-    struct ImGuiFrameScope
-    {
-        ImGuiFrameScope()
-        {
-            IMGUI_CHECKVERSION();
-            Context = ImGui::CreateContext();
-            ImGui::SetCurrentContext(Context);
-            ImGuiIO& io = ImGui::GetIO();
-            io.DisplaySize = ImVec2(800.0f, 600.0f);
-            ImGui::NewFrame();
-        }
-
-        ~ImGuiFrameScope()
-        {
-            ImGui::EndFrame();
-            ImGui::DestroyContext(Context);
-        }
-
-        ImGuiContext* Context = nullptr;
-    };
 }
 
 TEST(TransformGizmo, NoSelectedEntity_ReturnsNotConsumed)
@@ -156,7 +138,7 @@ TEST(TransformGizmo, UICapturesMouse_BlocksInteraction)
 TEST(TransformGizmo, DrawImGui_NoSelection_NoCrash)
 {
     Graphics::TransformGizmo gizmo;
-    ImGuiFrameScope frame;
+    TestSupport::ImGuiFrameScope frame;
     gizmo.DrawImGui();
     SUCCEED();
 }
@@ -169,7 +151,7 @@ TEST(TransformGizmo, DrawImGui_WithSelection_NoCrash)
     Core::Input::Context input;
     ASSERT_FALSE(gizmo.Update(scene.GetRegistry(), MakeTestCamera(), input, 800, 600, false));
 
-    ImGuiFrameScope frame;
+    TestSupport::ImGuiFrameScope frame;
     gizmo.DrawImGui();
     SUCCEED();
 }

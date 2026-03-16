@@ -25,6 +25,31 @@ namespace Geometry::Curvature
     using MeshUtils::ComputeCotanLaplacian;
     using MeshUtils::VertexNormal;
 
+    namespace
+    {
+        [[nodiscard]] double ComputeSignedMeanCurvatureFromLaplaceBeltrami(
+            const glm::dvec3& laplaceB,
+            const glm::dvec3& normal) noexcept
+        {
+            const double laplaceLen = glm::length(laplaceB);
+            if (laplaceLen <= 1e-18)
+                return 0.0;
+
+            const double normalLen = glm::length(normal);
+            if (normalLen <= 1e-18)
+                return laplaceLen / 2.0;
+
+            // This implementation uses the cotan Laplace-Beltrami operator
+            //   Δx = (1/A) Σ_j w_ij (x_j - x_i)
+            // which points approximately toward -n on outward-oriented convex
+            // surfaces. Therefore the signed scalar mean curvature satisfies
+            //   Δx = -2 H n.
+            const double orientation = glm::dot(laplaceB, normal) / (laplaceLen * normalLen);
+            const double magnitude = laplaceLen / 2.0;
+            return (orientation > 0.0) ? -magnitude : magnitude;
+        }
+    }
+
     // =========================================================================
     // ComputeMeanCurvature
     // =========================================================================
@@ -62,16 +87,9 @@ namespace Geometry::Curvature
             if (areas[i] > 1e-12)
             {
                 // ΔS x = laplacian / area = -2H n
-                // H = ||ΔS x|| / 2
                 glm::dvec3 laplaceB = laplacian[i] / areas[i];
-                result.Property[vh] = glm::length(laplaceB) / 2.0;
-
-                // Sign convention: check orientation against the area-weighted vertex
-                // normal. Positive H = surface curves toward normal (locally convex).
                 const glm::dvec3 normal = glm::dvec3(VertexNormal(mesh, vh));
-
-                if (glm::dot(normal, laplaceB) < 0.0)
-                    result.Property[vh] = -result.Property[vh];
+                result.Property[vh] = ComputeSignedMeanCurvatureFromLaplaceBeltrami(laplaceB, normal);
             }
         }
 
@@ -200,16 +218,9 @@ namespace Geometry::Curvature
 
             if (areas[i] < 1e-12) continue;
 
-            // Mean curvature
             glm::dvec3 laplaceB = laplacian[i] / areas[i];
-            double H = glm::length(laplaceB) / 2.0;
-
-            // Sign of mean curvature: check orientation against the area-weighted
-            // vertex normal. Positive H = surface curves toward normal (locally convex).
             const glm::dvec3 normal = glm::dvec3(VertexNormal(mesh, vh));
-
-            if (glm::dot(normal, laplaceB) < 0.0)
-                H = -H;
+            double H = ComputeSignedMeanCurvatureFromLaplaceBeltrami(laplaceB, normal);
 
             // Gaussian curvature
             double defect = mesh.IsBoundary(vh)

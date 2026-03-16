@@ -394,7 +394,7 @@ TEST(HalfedgeMesh_EdgeExtraction, EdgeVertices_AreValidIndices)
 
 TEST(HalfedgeMesh_EdgeExtraction, TwoTriangles_SharedEdgeAppearsOnce)
 {
-    auto mesh = MakeQuadPair();
+    auto mesh = MakeTwoTriangleDiamond();
     // Two triangles sharing one edge: 3 + 3 - 1 = 5 unique edges.
     auto edges = mesh.ExtractEdgeVertexPairs();
     EXPECT_EQ(edges.size(), 5u);
@@ -408,6 +408,14 @@ TEST(HalfedgeMesh_EdgeExtraction, TwoTriangles_SharedEdgeAppearsOnce)
         uint64_t key = (static_cast<uint64_t>(lo) << 32) | hi;
         EXPECT_TRUE(edgeSet.insert(key).second) << "Duplicate edge: " << lo << "-" << hi;
     }
+}
+
+TEST(HalfedgeMesh_EdgeExtraction, TwoQuads_SharedEdgeAppearsOnce)
+{
+    auto mesh = MakeQuadPair();
+    // Two quads sharing one edge: 4 + 4 - 1 = 7 unique edges.
+    auto edges = mesh.ExtractEdgeVertexPairs();
+    EXPECT_EQ(edges.size(), 7u);
 }
 
 TEST(HalfedgeMesh_EdgeExtraction, MatchesFromVertex_ToVertex)

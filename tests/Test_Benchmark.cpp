@@ -70,6 +70,54 @@ TEST(Benchmark_Runner, CompletesAfterConfiguredFrames)
     EXPECT_EQ(runner.FramesRecorded(), cfg.FrameCount);
 }
 
+TEST(Benchmark_Runner, SingleWarmupFrameIsNotRecorded)
+{
+    BenchmarkRunner runner;
+    BenchmarkConfig cfg{};
+    cfg.FrameCount = 1;
+    cfg.WarmupFrames = 1;
+    runner.Configure(cfg);
+
+    auto& telemetry = TelemetrySystem::Get();
+
+    telemetry.BeginFrame();
+    telemetry.EndFrame();
+    EXPECT_TRUE(runner.RecordFrame(telemetry));
+    EXPECT_EQ(runner.FramesRecorded(), 0u);
+    EXPECT_FALSE(runner.IsWarmingUp());
+    EXPECT_FALSE(runner.IsComplete());
+
+    telemetry.BeginFrame();
+    telemetry.EndFrame();
+    EXPECT_TRUE(runner.RecordFrame(telemetry));
+    EXPECT_EQ(runner.FramesRecorded(), 1u);
+    EXPECT_TRUE(runner.IsComplete());
+}
+
+TEST(Benchmark_Runner, ConfigureResetsCapturedState)
+{
+    BenchmarkRunner runner;
+    BenchmarkConfig cfg{};
+    cfg.FrameCount = 2;
+    cfg.WarmupFrames = 0;
+    runner.Configure(cfg);
+
+    auto& telemetry = TelemetrySystem::Get();
+
+    telemetry.BeginFrame();
+    telemetry.EndFrame();
+    ASSERT_TRUE(runner.RecordFrame(telemetry));
+    EXPECT_EQ(runner.FramesRecorded(), 1u);
+
+    cfg.FrameCount = 1;
+    cfg.WarmupFrames = 1;
+    runner.Configure(cfg);
+
+    EXPECT_EQ(runner.FramesRecorded(), 0u);
+    EXPECT_TRUE(runner.IsWarmingUp());
+    EXPECT_FALSE(runner.IsComplete());
+}
+
 TEST(Benchmark_Runner, ComputeStatsBasic)
 {
     BenchmarkRunner runner;

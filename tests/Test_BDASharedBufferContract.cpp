@@ -517,9 +517,10 @@ TEST(BDA_PerFaceAttr, SurfaceFaceColorPopulation)
 
 TEST(BDA_PerFaceAttr, MeshPushConstantsSizeUnchanged)
 {
-    // MeshPushConstants must remain 104 bytes (PtrFaceAttr replaces _pad[2]).
-    // This ensures push constant range compatibility with the pipeline.
-    EXPECT_EQ(sizeof(RHI::MeshPushConstants), 104u);
+    // MeshPushConstants currently includes both per-face and per-vertex
+    // attribute pointers while remaining within the 256-byte Vulkan budget.
+    EXPECT_EQ(sizeof(RHI::MeshPushConstants), 112u);
+    EXPECT_LE(sizeof(RHI::MeshPushConstants), 256u);
 }
 
 TEST(BDA_PerFaceAttr, MeshPushConstantsPtrFaceAttrDefaultZero)

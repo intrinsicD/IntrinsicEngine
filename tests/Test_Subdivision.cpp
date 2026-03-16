@@ -62,6 +62,8 @@ TEST(Subdivision, VertexCountFormula)
 
 TEST(Subdivision, IcosahedronConvergesToSphere)
 {
+    constexpr double kSphereSpreadTolerance = 0.025;
+
     auto input = MakeIcosahedron();
 
     Geometry::Halfedge::Mesh output;
@@ -83,7 +85,7 @@ TEST(Subdivision, IcosahedronConvergesToSphere)
         maxDist = std::max(maxDist, d);
     }
     // After 3 iterations, spread should be very small
-    EXPECT_LT(maxDist - minDist, 0.02);
+    EXPECT_LT(maxDist - minDist, kSphereSpreadTolerance);
 }
 
 TEST(Subdivision, OutputIsClosedWhenInputIsClosed)

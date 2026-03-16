@@ -28,6 +28,21 @@ export namespace ECS::Events
         uint32_t PickID = 0;
         uint32_t PrimitiveID = 0;
         bool HasHit = false;
+
+        constexpr GpuPickCompleted() noexcept = default;
+        constexpr GpuPickCompleted(uint32_t pickID, bool hasHit) noexcept
+            : PickID(pickID)
+            , PrimitiveID(0)
+            , HasHit(hasHit)
+        {
+        }
+
+        constexpr GpuPickCompleted(uint32_t pickID, uint32_t primitiveID, bool hasHit) noexcept
+            : PickID(pickID)
+            , PrimitiveID(primitiveID)
+            , HasHit(hasHit)
+        {
+        }
     };
 
     // Fired after a new entity is spawned via SceneManager or asset drop.

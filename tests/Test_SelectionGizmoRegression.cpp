@@ -8,6 +8,8 @@
 #include <imgui.h>
 #include <entt/entity/entity.hpp>
 
+#include "TestImGuiFrameScope.hpp"
+
 import ECS;
 import Graphics;
 import Core.Input;
@@ -61,26 +63,6 @@ namespace
         return entity;
     }
 
-    struct ImGuiFrameScope
-    {
-        ImGuiFrameScope()
-        {
-            IMGUI_CHECKVERSION();
-            Context = ImGui::CreateContext();
-            ImGui::SetCurrentContext(Context);
-            ImGuiIO& io = ImGui::GetIO();
-            io.DisplaySize = ImVec2(800.0f, 600.0f);
-            ImGui::NewFrame();
-        }
-
-        ~ImGuiFrameScope()
-        {
-            ImGui::EndFrame();
-            ImGui::DestroyContext(Context);
-        }
-
-        ImGuiContext* Context = nullptr;
-    };
 }
 
 // ---------------------------------------------------------------------------
@@ -206,7 +188,7 @@ TEST(SelectionGizmoRegression, DrawImGui_MultiSelection_NoCrash)
     Core::Input::Context input;
     gizmo.Update(scene.GetRegistry(), MakeTestCamera(), input, 800, 600, false);
 
-    ImGuiFrameScope frame;
+    TestSupport::ImGuiFrameScope frame;
     gizmo.DrawImGui();
     SUCCEED();
 }

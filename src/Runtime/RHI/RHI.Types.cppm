@@ -1,5 +1,6 @@
 module;
 #include "RHI.Vulkan.hpp"
+#include <cstddef>
 #include <glm/glm.hpp>
 #include <vector>
 
@@ -74,6 +75,17 @@ export namespace RHI
         uint64_t PtrFaceAttr = 0; // BDA to per-face packed ABGR colors (0 = standard shading)
         uint64_t PtrVertexAttr = 0; // BDA to per-vertex packed ABGR colors (0 = no per-vertex colors)
     };
+
+    static_assert(offsetof(MeshPushConstants, Model) == 0);
+    static_assert(offsetof(MeshPushConstants, PtrPositions) == 64);
+    static_assert(offsetof(MeshPushConstants, PtrNormals) == 72);
+    static_assert(offsetof(MeshPushConstants, PtrAux) == 80);
+    static_assert(offsetof(MeshPushConstants, VisibilityBase) == 88);
+    static_assert(offsetof(MeshPushConstants, PointSizePx) == 92);
+    static_assert(offsetof(MeshPushConstants, PtrFaceAttr) == 96);
+    static_assert(offsetof(MeshPushConstants, PtrVertexAttr) == 104);
+    static_assert(sizeof(MeshPushConstants) == 112);
+    static_assert(sizeof(MeshPushConstants) <= 256);
 
     struct VertexInputDescription
     {

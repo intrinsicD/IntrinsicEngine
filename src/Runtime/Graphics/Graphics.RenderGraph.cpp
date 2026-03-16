@@ -121,7 +121,17 @@ namespace Graphics
 
     RGResourceHandle RGBuilder::WriteColor(RGResourceHandle resource, RGAttachmentInfo info)
     {
-        Write(resource, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT);
+        if (!resource.IsValid() || resource.ID >= m_Graph.m_ActiveResourceCount)
+        {
+            Core::Log::Error("RG: Invalid resource handle");
+            return {kInvalidResource};
+        }
+
+        auto& resNode = m_Graph.m_ResourcePool[resource.ID];
+        if (resNode.StartPass == ~0u) resNode.StartPass = m_PassIndex;
+        resNode.EndPass = std::max(resNode.EndPass, m_PassIndex);
+        if (resNode.FirstWritePass == ~0u) resNode.FirstWritePass = m_PassIndex;
+        resNode.LastWritePass = m_PassIndex;
 
         AttachmentNode node{resource.ID, info, false, nullptr};
         AppendToList(m_Graph.m_Arena,
@@ -133,8 +143,17 @@ namespace Graphics
 
     RGResourceHandle RGBuilder::WriteDepth(RGResourceHandle resource, RGAttachmentInfo info)
     {
-        Write(resource, VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
-              VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
+        if (!resource.IsValid() || resource.ID >= m_Graph.m_ActiveResourceCount)
+        {
+            Core::Log::Error("RG: Invalid resource handle");
+            return {kInvalidResource};
+        }
+
+        auto& resNode = m_Graph.m_ResourcePool[resource.ID];
+        if (resNode.StartPass == ~0u) resNode.StartPass = m_PassIndex;
+        resNode.EndPass = std::max(resNode.EndPass, m_PassIndex);
+        if (resNode.FirstWritePass == ~0u) resNode.FirstWritePass = m_PassIndex;
+        resNode.LastWritePass = m_PassIndex;
 
         AttachmentNode node{resource.ID, info, true, nullptr};
         AppendToList(m_Graph.m_Arena,
@@ -508,6 +527,44 @@ namespace Graphics
         {
             return (a & kWriteAccessMask) != 0;
         }
+
+        [[nodiscard]] constexpr bool IsAttachmentContinuationBarrier(const VkImageMemoryBarrier2& barrier) noexcept
+        {
+            if (barrier.oldLayout != barrier.newLayout)
+                return false;
+
+            const bool colorContinuation =
+                barrier.oldLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL &&
+                barrier.srcStageMask == VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT &&
+                barrier.dstStageMask == VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT &&
+                barrier.srcAccessMask == VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT &&
+                barrier.dstAccessMask == VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
+
+            constexpr VkPipelineStageFlags2 kDepthStages =
+                VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
+            const bool depthContinuation =
+                barrier.oldLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL &&
+                barrier.srcStageMask == kDepthStages &&
+                barrier.dstStageMask == kDepthStages &&
+                barrier.srcAccessMask == VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT &&
+                barrier.dstAccessMask == VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+
+            return colorContinuation || depthContinuation;
+        }
+
+        [[nodiscard]] bool AreOnlyAttachmentContinuationBarriers(std::span<const VkImageMemoryBarrier2> barriers) noexcept
+        {
+            return std::all_of(barriers.begin(), barriers.end(), [](const VkImageMemoryBarrier2& barrier)
+            {
+                return IsAttachmentContinuationBarrier(barrier);
+            });
+        }
+
+        template <typename PassT>
+        [[nodiscard]] bool CanMergeRasterContinuation(const PassT& pass) noexcept
+        {
+            return pass.BufferBarriers.empty() && AreOnlyAttachmentContinuationBarriers(pass.ImageBarriers);
+        }
     }
 
     void RenderGraph::Compile(uint32_t frameIndex)
@@ -838,7 +895,10 @@ namespace Graphics
                     auto& pass = m_PassPool[passIdx];
 
                     // For multi-pass packets: intra-secondary barriers for non-first passes.
-                    if (p > 0 && (!pass.ImageBarriers.empty() || !pass.BufferBarriers.empty()))
+                    const bool skipAttachmentContinuationBarriers =
+                        p > 0 && pkt.IsRaster && CanMergeRasterContinuation(pass);
+                    if (p > 0 && !skipAttachmentContinuationBarriers
+                        && (!pass.ImageBarriers.empty() || !pass.BufferBarriers.empty()))
                     {
                         VkDependencyInfo depInfo{};
                         depInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
@@ -1037,88 +1097,146 @@ namespace Graphics
         return na == nullptr && nb == nullptr;
     }
 
+
     void RenderGraph::Packetize()
     {
-        const auto& layers = m_Scheduler.GetExecutionLayers();
         m_CachedPlan = CompiledRenderPlan{};
         m_CachedPlan->ShapeKey = m_LastShapeKey;
-        m_CachedPlan->PacketLayers.resize(layers.size());
-
-        uint32_t totalPackets = 0;
-
-        for (size_t li = 0; li < layers.size(); ++li)
+        if (m_ActivePassCount == 0)
         {
-            const auto& layer = layers[li];
-            auto& packets = m_CachedPlan->PacketLayers[li];
-
-            for (size_t i = 0; i < layer.size(); ++i)
-            {
-                const uint32_t passIdx = layer[i];
-                const auto& pass = m_PassPool[passIdx];
-                const bool isRaster = (pass.AttachmentHead != nullptr);
-
-                // Try to extend the last packet in this layer.
-                bool merged = false;
-                if (!packets.empty())
-                {
-                    auto& last = packets.back();
-                    const uint32_t lastEnd = last.FirstPass + last.PassCount - 1;
-
-                    // Common merge prerequisites:
-                    // - Adjacent pass indices (consecutive in registration order)
-                    // - No barriers on the candidate pass (no layout transitions needed)
-                    // - Linear DAG chain: predecessor has outdegree 1 → this pass, indegree 1
-                    const bool canMerge = passIdx == lastEnd + 1
-                        && pass.ImageBarriers.empty()
-                        && pass.BufferBarriers.empty()
-                        && HasLinearEdge(lastEnd, passIdx);
-
-                    if (canMerge)
-                    {
-                        if (!isRaster && !last.IsRaster)
-                        {
-                            // Non-raster merging (existing behavior).
-                            last.PassCount++;
-                            merged = true;
-                        }
-                        else if (isRaster && last.IsRaster
-                                 && HasMatchingAttachments(last.FirstPass, passIdx))
-                        {
-                            // Raster merging: consecutive raster passes targeting the
-                            // exact same color+depth attachments share a single
-                            // vkCmdBeginRendering scope. Load ops come from the first
-                            // pass; store ops come from the last pass in the packet.
-                            last.PassCount++;
-                            merged = true;
-                        }
-                    }
-                }
-
-                if (!merged)
-                {
-                    ExecutionPacket pkt;
-                    pkt.FirstPass = passIdx;
-                    pkt.PassCount = 1;
-                    pkt.IsRaster = isRaster;
-                    // Cache raster info for secondary inheritance.
-                    if (isRaster)
-                    {
-                        for (AttachmentNode* att = pass.AttachmentHead; att != nullptr; att = att->Next)
-                        {
-                            const auto& res = m_ResourcePool[att->ID];
-                            if (att->IsDepth)
-                                pkt.DepthFormat = res.Format;
-                            else
-                                pkt.ColorFormats.push_back(res.Format);
-                        }
-                    }
-                    packets.push_back(std::move(pkt));
-                }
-            }
-            totalPackets += static_cast<uint32_t>(packets.size());
+            m_LastPacketCount = 0;
+            return;
         }
 
-        m_LastPacketCount = totalPackets;
+        constexpr uint32_t kInvalidPacket = ~0u;
+
+        auto makePacket = [this](uint32_t passIdx)
+        {
+            ExecutionPacket pkt;
+            pkt.FirstPass = passIdx;
+            pkt.PassCount = 1;
+
+            const auto& pass = m_PassPool[passIdx];
+            pkt.IsRaster = (pass.AttachmentHead != nullptr);
+            if (pkt.IsRaster)
+            {
+                for (AttachmentNode* att = pass.AttachmentHead; att != nullptr; att = att->Next)
+                {
+                    const auto& res = m_ResourcePool[att->ID];
+                    if (att->IsDepth)
+                        pkt.DepthFormat = res.Format;
+                    else
+                        pkt.ColorFormats.push_back(res.Format);
+                }
+            }
+            return pkt;
+        };
+
+        auto canMergeIntoPacket = [this](const ExecutionPacket& packet, uint32_t passIdx)
+        {
+            const uint32_t packetEnd = packet.FirstPass + packet.PassCount - 1;
+            const auto& pass = m_PassPool[passIdx];
+            const bool isRaster = (pass.AttachmentHead != nullptr);
+
+            if (passIdx != packetEnd + 1)
+                return false;
+            if (!HasLinearEdge(packetEnd, passIdx))
+                return false;
+            if (!pass.BufferBarriers.empty())
+                return false;
+
+            const bool imageBarriersCompatible =
+                pass.ImageBarriers.empty() || (isRaster && packet.IsRaster && CanMergeRasterContinuation(pass));
+            if (!imageBarriersCompatible)
+                return false;
+
+            if (!isRaster && !packet.IsRaster)
+                return true;
+
+            return isRaster && packet.IsRaster && HasMatchingAttachments(packet.FirstPass, passIdx);
+        };
+
+        std::vector<ExecutionPacket> packets;
+        packets.reserve(m_ActivePassCount);
+
+        std::vector<uint32_t> passToPacket(m_ActivePassCount, kInvalidPacket);
+
+        for (uint32_t passIdx = 0; passIdx < m_ActivePassCount;)
+        {
+            const uint32_t packetIndex = static_cast<uint32_t>(packets.size());
+            ExecutionPacket pkt = makePacket(passIdx);
+            passToPacket[passIdx] = packetIndex;
+            ++passIdx;
+
+            while (passIdx < m_ActivePassCount && canMergeIntoPacket(pkt, passIdx))
+            {
+                passToPacket[passIdx] = packetIndex;
+                ++pkt.PassCount;
+                ++passIdx;
+            }
+
+            packets.push_back(std::move(pkt));
+        }
+
+        std::vector<std::vector<uint32_t>> packetDependents(packets.size());
+        std::vector<uint32_t> packetIndegree(packets.size(), 0);
+
+        for (uint32_t passIdx = 0; passIdx < m_ActivePassCount; ++passIdx)
+        {
+            const uint32_t srcPacket = passToPacket[passIdx];
+            if (srcPacket == kInvalidPacket)
+                continue;
+
+            for (uint32_t depPass : m_Scheduler.GetDependents(passIdx))
+            {
+                if (depPass >= m_ActivePassCount)
+                    continue;
+
+                const uint32_t dstPacket = passToPacket[depPass];
+                if (dstPacket == kInvalidPacket || dstPacket == srcPacket)
+                    continue;
+
+                auto& deps = packetDependents[srcPacket];
+                if (std::find(deps.begin(), deps.end(), dstPacket) != deps.end())
+                    continue;
+
+                deps.push_back(dstPacket);
+                ++packetIndegree[dstPacket];
+            }
+        }
+
+        std::vector<uint32_t> ready;
+        ready.reserve(packets.size());
+        for (uint32_t packetIdx = 0; packetIdx < packets.size(); ++packetIdx)
+        {
+            if (packetIndegree[packetIdx] == 0)
+                ready.push_back(packetIdx);
+        }
+
+        while (!ready.empty())
+        {
+            std::sort(ready.begin(), ready.end());
+
+            auto& packetLayer = m_CachedPlan->PacketLayers.emplace_back();
+            packetLayer.reserve(ready.size());
+
+            std::vector<uint32_t> nextReady;
+            nextReady.reserve(packets.size());
+
+            for (uint32_t packetIdx : ready)
+            {
+                packetLayer.push_back(packets[packetIdx]);
+                for (uint32_t depPacket : packetDependents[packetIdx])
+                {
+                    if (--packetIndegree[depPacket] == 0)
+                        nextReady.push_back(depPacket);
+                }
+            }
+
+            ready = std::move(nextReady);
+        }
+
+        m_LastPacketCount = static_cast<uint32_t>(packets.size());
     }
 
     std::vector<RenderGraphDebugPass> RenderGraph::BuildDebugPassList() const

@@ -122,8 +122,12 @@ namespace ECS::Components::Hierarchy
             Detail::DetachHelper(registry, childComp);
         }
 
-        if (registry.all_of<Transform::Component, Transform::WorldMatrix>(child) &&
-            registry.all_of<Transform::WorldMatrix>(newParent))
+        const bool childTransformReady = registry.all_of<Transform::Component, Transform::WorldMatrix>(child)
+            && !registry.all_of<Transform::IsDirtyTag>(child);
+        const bool parentTransformReady = registry.all_of<Transform::WorldMatrix>(newParent)
+            && !registry.all_of<Transform::IsDirtyTag>(newParent);
+
+        if (childTransformReady && parentTransformReady)
         {
             auto& childLocal = registry.get<Transform::Component>(child);
             const auto& childWorld = registry.get<Transform::WorldMatrix>(child);
@@ -139,6 +143,13 @@ namespace ECS::Components::Hierarchy
                 childLocal.Scale = glm::vec3(1.0f);
             }
 
+            registry.emplace_or_replace<Transform::IsDirtyTag>(child);
+        }
+        else if (registry.all_of<Transform::Component>(child))
+        {
+            // Parent/child world matrices may still be stale this tick. In that case,
+            // preserve the current local transform and let the Transform system rebuild
+            // world-space from the new hierarchy on the next update.
             registry.emplace_or_replace<Transform::IsDirtyTag>(child);
         }
 

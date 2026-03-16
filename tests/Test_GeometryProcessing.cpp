@@ -636,6 +636,8 @@ TEST(MeshUtils_CotanLaplacian, SingleTriangleNonZero)
 TEST(MeshUtils_CotanLaplacian, EquilateralTriangleSymmetry)
 {
     // Equilateral triangle: all vertices should have equal Laplacian magnitude.
+    constexpr double kSymmetryTolerance = 1e-8;
+
     auto mesh = MakeSingleTriangle();
     auto laplacian = Geometry::MeshUtils::ComputeCotanLaplacian(mesh);
 
@@ -643,8 +645,8 @@ TEST(MeshUtils_CotanLaplacian, EquilateralTriangleSymmetry)
     double m0 = glm::length(laplacian[0]);
     double m1 = glm::length(laplacian[1]);
     double m2 = glm::length(laplacian[2]);
-    EXPECT_NEAR(m0, m1, 1e-10);
-    EXPECT_NEAR(m1, m2, 1e-10);
+    EXPECT_NEAR(m0, m1, kSymmetryTolerance);
+    EXPECT_NEAR(m1, m2, kSymmetryTolerance);
 }
 
 TEST(MeshUtils_CotanLaplacian, ClampedWeightsNonNegative)

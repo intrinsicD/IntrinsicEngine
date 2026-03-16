@@ -9,6 +9,23 @@ import Geometry;
 
 #include "TestMeshBuilders.h"
 
+namespace
+{
+    Geometry::Halfedge::Mesh MakeInsideOutTetrahedron()
+    {
+        Geometry::Halfedge::Mesh mesh;
+        auto v0 = mesh.AddVertex({1.0f,  1.0f,  1.0f});
+        auto v1 = mesh.AddVertex({1.0f, -1.0f, -1.0f});
+        auto v2 = mesh.AddVertex({-1.0f, 1.0f, -1.0f});
+        auto v3 = mesh.AddVertex({-1.0f,-1.0f,  1.0f});
+        (void)mesh.AddTriangle(v0, v2, v1);
+        (void)mesh.AddTriangle(v0, v3, v2);
+        (void)mesh.AddTriangle(v0, v1, v3);
+        (void)mesh.AddTriangle(v1, v2, v3);
+        return mesh;
+    }
+}
+
 // =============================================================================
 // ComputeMeanCurvature — empty mesh
 // =============================================================================
@@ -189,6 +206,18 @@ TEST(Curvature_MeanCurvature, FlatMesh_NearZeroCurvatureAtInteriorVertices)
                 << "Interior vertex " << i << " on flat mesh should have ~zero mean curvature";
         }
     }
+}
+
+TEST(Curvature_MeanCurvature, FlippedClosedMesh_NegativeCurvature)
+{
+    auto mesh = MakeInsideOutTetrahedron();
+    auto result = Geometry::Curvature::ComputeMeanCurvature(mesh);
+    ASSERT_TRUE(result.has_value());
+
+    const auto& prop = result->Property;
+    Geometry::VertexHandle v0{static_cast<Geometry::PropertyIndex>(0)};
+    EXPECT_LT(prop[v0], 0.0)
+        << "Inside-out orientation should flip the sign of mean curvature";
 }
 
 // =============================================================================
