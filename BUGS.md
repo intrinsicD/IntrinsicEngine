@@ -9,7 +9,6 @@ No active issues currently tracked.
 
 ## Verified / Closed
 
-No active picker index bugs tracked.
-
 - Verified: mesh vertex indices are recovered from picked local-space points via KD-tree lookup.
 - Verified: mesh edge/face, graph node/edge, and point-cloud point indices are covered by the focused picker regression suite.
+- Closed: pick-domain policy now enforces mesh→surface face IDs, graph→edge IDs, and point-cloud→point IDs in `PickingPass`; GPU primitive IDs are authoritative while CPU is refinement-only in `ResolveGpuSubElementPick`.

@@ -309,6 +309,16 @@ namespace Graphics::Passes
                                                                               ECS::Line::Component>();
                                                 for (auto [entity, transform, line] : lineView.each())
                                                 {
+                                                    // Domain policy:
+                                                    // - Mesh entities: pick via surface-face IDs only.
+                                                    // - Graph entities: pick via edge IDs.
+                                                    // - Point-cloud entities: pick via point IDs.
+                                                    const bool isMeshEntity = registry.all_of<ECS::MeshCollider::Component>(entity)
+                                                                           || registry.all_of<ECS::Mesh::Data>(entity);
+                                                    const bool isGraphEntity = registry.all_of<ECS::Graph::Data>(entity);
+                                                    if (isMeshEntity || !isGraphEntity)
+                                                        continue;
+
                                                     if (!line.Geometry.IsValid() || !line.EdgeView.IsValid())
                                                         continue;
 
@@ -391,6 +401,18 @@ namespace Graphics::Passes
                                                                                ECS::Point::Component>();
                                                 for (auto [entity, transform, point] : pointView.each())
                                                 {
+                                                    // Domain policy:
+                                                    // - Graph entities resolve via edge IDs (line domain),
+                                                    //   so skip graph node point-domain writes.
+                                                    // - Mesh entities resolve via surface-face IDs.
+                                                    // - Point-cloud entities resolve via point IDs.
+                                                    const bool isMeshEntity = registry.all_of<ECS::MeshCollider::Component>(entity)
+                                                                           || registry.all_of<ECS::Mesh::Data>(entity);
+                                                    const bool isGraphEntity = registry.all_of<ECS::Graph::Data>(entity);
+                                                    const bool isPointCloudEntity = registry.all_of<ECS::PointCloud::Data>(entity);
+                                                    if (isMeshEntity || isGraphEntity || !isPointCloudEntity)
+                                                        continue;
+
                                                     if (!point.Geometry.IsValid())
                                                         continue;
                                                     auto* geo = ctx.GeometryStorage.GetIfValid(point.Geometry);
