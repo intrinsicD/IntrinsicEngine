@@ -76,8 +76,19 @@ export namespace Geometry::Internal
         }
     }
 
-    // Computes penetration depth using Expanding Polytope Algorithm
-    // simplex: The final simplex from GJK (must contain origin)
+    // =========================================================================
+    // Normalized-workspace EPA
+    //
+    // The incoming simplex from GJK_Intersection is already in normalized
+    // space (points * invScale). EPA continues in the same normalized space:
+    // all new support queries are scaled by the same invScale factor.
+    //
+    // On convergence, the penetration normal is scale-invariant (unit vector),
+    // and the depth is unscaled back to world space (depth / invScale).
+    // The contact point on A is computed from the original-space support
+    // function so it is already in world coordinates.
+    // =========================================================================
+
     template <typename ShapeA, typename ShapeB>
     [[nodiscard]] inline std::optional<EPAResult> EPA_Solver(
         const ShapeA& a,
@@ -97,12 +108,9 @@ export namespace Geometry::Internal
 
         if (gjkSimplex.Size != 4) return std::nullopt;
 
-        // Derive scale-aware tolerance from the polytope extent.
-        float maxExtent = 0.0f;
-        for (int i = 0; i < 4; ++i)
-            maxExtent = std::max(maxExtent, glm::length(gjkSimplex.Points[i]));
-        const float tolerance = Detail::ComputeScaledEpsilon(
-            maxExtent, Config::EPA_RELATIVE_EPSILON, Config::EPA_ABSOLUTE_EPSILON);
+        // Use the same normalization factor that GJK used.
+        const float invScale = gjkSimplex.InvScale;
+        const float scale = (invScale > 1e-30f) ? (1.0f / invScale) : 1.0f;
 
         Vec3Vec polytope(vec3Alloc);
         FaceVec faces(faceAlloc);
@@ -136,15 +144,17 @@ export namespace Geometry::Internal
             // Degenerate face picked (should not happen — distance is max).
             if (glm::dot(searchDir, searchDir) < 1e-20f) return std::nullopt;
 
-            const glm::vec3 support = Geometry::Support(a, searchDir) - Geometry::Support(b, -searchDir);
+            // Support query in original space, normalized into the workspace.
+            const glm::vec3 support =
+                (Geometry::Support(a, searchDir) - Geometry::Support(b, -searchDir)) * invScale;
             const float sDist = glm::dot(support, searchDir);
 
-            if (std::abs(sDist - minDist) < tolerance)
+            if (std::abs(sDist - minDist) < Config::EPA_EPSILON)
             {
                 EPAResult result{};
-                result.Normal = -searchDir; // Normal A->B
-                result.Depth = sDist;
-                result.ContactPoint = Geometry::Support(a, searchDir);
+                result.Normal = -searchDir; // Normal A->B (unit vector, scale-invariant)
+                result.Depth = sDist * scale; // Unscale penetration depth to world space
+                result.ContactPoint = Geometry::Support(a, searchDir); // Already in world space
                 return result;
             }
 
