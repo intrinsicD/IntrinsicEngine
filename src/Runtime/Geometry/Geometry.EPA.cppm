@@ -1,5 +1,6 @@
 module;
 #include <glm/glm.hpp>
+#include <cmath>
 #include <vector>
 #include <optional>
 #include <algorithm>
@@ -38,6 +39,8 @@ export namespace Geometry::Internal
             bool operator==(const Edge& other) const { return A == other.A && B == other.B; }
         };
 
+        // Returns a valid face, or a face with Normal=(0,0,0) and Distance=max
+        // when the three vertices are collinear (degenerate).
         [[nodiscard]] inline PolytopeFace MakeFace(std::span<const glm::vec3> polytope, int i0, int i1, int i2)
         {
             PolytopeFace f{};
@@ -46,8 +49,21 @@ export namespace Geometry::Internal
             const glm::vec3 b = polytope[i1];
             const glm::vec3 c = polytope[i2];
 
+            const glm::vec3 cross = glm::cross(b - a, c - a);
+            const float lenSq = glm::dot(cross, cross);
+
+            // Guard: collinear vertices produce a zero cross product.
+            // Mark as degenerate with infinite distance so it is never chosen
+            // as the closest face during EPA expansion.
+            if (lenSq < 1e-20f)
+            {
+                f.Normal = glm::vec3(0.0f);
+                f.Distance = std::numeric_limits<float>::max();
+                return f;
+            }
+
             // Winding order matters for EPA. We assume CCW relative to origin.
-            f.Normal = glm::normalize(glm::cross(b - a, c - a));
+            f.Normal = cross * (1.0f / std::sqrt(lenSq));
             f.Distance = glm::dot(f.Normal, a);
 
             // Ensure outward-facing normal.
@@ -69,8 +85,7 @@ export namespace Geometry::Internal
         const Simplex& gjkSimplex,
         Core::Memory::LinearArena& scratch)
     {
-        constexpr int MAX_ITER = 32;
-        constexpr float TOLERANCE = 0.001f;
+        constexpr int MAX_ITER = Config::EPA_MAX_ITERATIONS;
 
         using Vec3Vec = std::vector<glm::vec3, Core::Memory::ArenaAllocator<glm::vec3>>;
         using FaceVec = std::vector<Detail::PolytopeFace, Core::Memory::ArenaAllocator<Detail::PolytopeFace>>;
@@ -81,6 +96,13 @@ export namespace Geometry::Internal
         Core::Memory::ArenaAllocator<Detail::Edge> edgeAlloc(scratch);
 
         if (gjkSimplex.Size != 4) return std::nullopt;
+
+        // Derive scale-aware tolerance from the polytope extent.
+        float maxExtent = 0.0f;
+        for (int i = 0; i < 4; ++i)
+            maxExtent = std::max(maxExtent, glm::length(gjkSimplex.Points[i]));
+        const float tolerance = Detail::ComputeScaledEpsilon(
+            maxExtent, Config::EPA_RELATIVE_EPSILON, Config::EPA_ABSOLUTE_EPSILON);
 
         Vec3Vec polytope(vec3Alloc);
         FaceVec faces(faceAlloc);
@@ -110,10 +132,14 @@ export namespace Geometry::Internal
             }
 
             const glm::vec3 searchDir = faces[closestFaceIdx].Normal;
+
+            // Degenerate face picked (should not happen — distance is max).
+            if (glm::dot(searchDir, searchDir) < 1e-20f) return std::nullopt;
+
             const glm::vec3 support = Geometry::Support(a, searchDir) - Geometry::Support(b, -searchDir);
             const float sDist = glm::dot(support, searchDir);
 
-            if (std::abs(sDist - minDist) < TOLERANCE)
+            if (std::abs(sDist - minDist) < tolerance)
             {
                 EPAResult result{};
                 result.Normal = -searchDir; // Normal A->B
