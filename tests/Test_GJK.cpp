@@ -196,3 +196,104 @@ TEST(GJK, ConvergesWithinIterationLimit)
     auto result = Internal::GJK_Boolean(a, b, scratch);
     EXPECT_TRUE(result);
 }
+
+// ============================================================================
+// GJK — Scale Invariance
+// ============================================================================
+
+TEST(GJK, ScaleInvariance_VerySmallObjects)
+{
+    // Two tiny spheres at 1e-3 scale — overlap and separation must be correct.
+    constexpr float s = 1e-3f;
+    Sphere a{glm::vec3(0, 0, 0), s};
+    Sphere b{glm::vec3(1.5f * s, 0, 0), s};
+    Core::Memory::LinearArena scratch(8 * 1024);
+    EXPECT_TRUE(Internal::GJK_Boolean(a, b, scratch)) << "Small overlapping spheres must be detected";
+
+    Sphere c{glm::vec3(5.0f * s, 0, 0), s};
+    EXPECT_FALSE(Internal::GJK_Boolean(a, c, scratch)) << "Small separated spheres must not overlap";
+}
+
+TEST(GJK, ScaleInvariance_VeryLargeObjects)
+{
+    // Two large spheres at 1e3 scale.
+    constexpr float s = 1e3f;
+    Sphere a{glm::vec3(0, 0, 0), s};
+    Sphere b{glm::vec3(1.5f * s, 0, 0), s};
+    Core::Memory::LinearArena scratch(8 * 1024);
+    EXPECT_TRUE(Internal::GJK_Boolean(a, b, scratch)) << "Large overlapping spheres must be detected";
+
+    Sphere c{glm::vec3(5.0f * s, 0, 0), s};
+    EXPECT_FALSE(Internal::GJK_Boolean(a, c, scratch)) << "Large separated spheres must not overlap";
+}
+
+TEST(GJK, ScaleInvariance_TinyAABBs)
+{
+    constexpr float s = 1e-4f;
+    AABB a{glm::vec3(-s), glm::vec3(s)};
+    AABB b{glm::vec3(0.5f * s, -s, -s), glm::vec3(3 * s, s, s)};
+    Core::Memory::LinearArena scratch(8 * 1024);
+    EXPECT_TRUE(Internal::GJK_Boolean(a, b, scratch)) << "Tiny overlapping AABBs must be detected";
+
+    AABB c{glm::vec3(5 * s, 5 * s, 5 * s), glm::vec3(7 * s, 7 * s, 7 * s)};
+    EXPECT_FALSE(Internal::GJK_Boolean(a, c, scratch)) << "Tiny separated AABBs must not overlap";
+}
+
+TEST(GJK, ScaleInvariance_HugeAABBs)
+{
+    constexpr float s = 1e4f;
+    AABB a{glm::vec3(-s), glm::vec3(s)};
+    AABB b{glm::vec3(0.5f * s, -s, -s), glm::vec3(3 * s, s, s)};
+    Core::Memory::LinearArena scratch(8 * 1024);
+    EXPECT_TRUE(Internal::GJK_Boolean(a, b, scratch)) << "Huge overlapping AABBs must be detected";
+
+    AABB c{glm::vec3(5 * s, 5 * s, 5 * s), glm::vec3(7 * s, 7 * s, 7 * s)};
+    EXPECT_FALSE(Internal::GJK_Boolean(a, c, scratch)) << "Huge separated AABBs must not overlap";
+}
+
+TEST(GJK, ScaleInvariance_Intersection_TinyOverlap)
+{
+    // GJK_Intersection must also work at small scales.
+    constexpr float s = 1e-3f;
+    Sphere a{glm::vec3(0, 0, 0), 2.0f * s};
+    Sphere b{glm::vec3(s, 0, 0), 2.0f * s};
+    Core::Memory::LinearArena scratch(8 * 1024);
+    auto result = Internal::GJK_Intersection(a, b, scratch);
+    EXPECT_TRUE(result.has_value()) << "Intersection must succeed for small overlapping spheres";
+}
+
+// ============================================================================
+// EPA — Scale Invariance and Degenerate Face Guard
+// ============================================================================
+
+TEST(GJK, EPA_ScaleInvariance_TinyPenetration)
+{
+    // Two tiny overlapping OBBs — EPA must produce valid depth at small scales.
+    // OBBs are better conditioned than tetrahedra for GJK simplex construction.
+    constexpr float s = 1e-3f;
+    OBB a{glm::vec3(0, 0, 0), glm::vec3(s, s, s), glm::quat(1, 0, 0, 0)};
+    OBB b{glm::vec3(0.5f * s, 0, 0), glm::vec3(s, s, s), glm::quat(1, 0, 0, 0)};
+
+    Core::Memory::LinearArena scratch(256 * 1024);
+    auto contact = ComputeContact(a, b, scratch);
+    ASSERT_TRUE(contact.has_value()) << "EPA must produce contact for tiny overlapping OBBs";
+    EXPECT_GT(contact->PenetrationDepth, 0.0f);
+}
+
+TEST(GJK, EPA_ScaleInvariance_LargePenetration)
+{
+    // Two large overlapping tetrahedra.
+    constexpr float s = 1e3f;
+    ConvexHull a;
+    a.Vertices = {
+        {0, 0, 0}, {s, 0, 0}, {0, s, 0}, {0, 0, s}
+    };
+    ConvexHull b;
+    b.Vertices = a.Vertices;
+    for (auto& v : b.Vertices) v += glm::vec3(0.15f * s);
+
+    Core::Memory::LinearArena scratch(256 * 1024);
+    auto contact = ComputeContact(a, b, scratch);
+    ASSERT_TRUE(contact.has_value()) << "EPA must produce contact for large overlapping hulls";
+    EXPECT_GT(contact->PenetrationDepth, 0.0f);
+}
