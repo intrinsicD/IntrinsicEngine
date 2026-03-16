@@ -336,6 +336,62 @@ TEST_F(RenderGraphPacketTest, ExecutionLayersStillValid)
     EXPECT_EQ(totalNodes, 1u);
 }
 
+// ---------------------------------------------------------------------------
+// Layout-sensitive read chains may need explicit ordering even when both later
+// passes are logically reads. The render graph uses MEMORY_WRITE as a scheduler-
+// only ordering marker for this case; barrier generation must still sanitize it
+// back to a valid Vulkan read access mask.
+// ---------------------------------------------------------------------------
+TEST_F(RenderGraphPacketTest, LayoutSensitiveReadChain_SerializesAcrossLayers)
+{
+    struct PassData {};
+    RGResourceHandle color;
+
+    m_Graph->AddPass<PassData>("WriteColor",
+        [&color](PassData&, RGBuilder& builder)
+        {
+            color = builder.CreateTexture("layout_sensitive_color"_id,
+                RGTextureDesc{
+                    .Width = 64,
+                    .Height = 64,
+                    .Format = VK_FORMAT_R8G8B8A8_UNORM,
+                    .Usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+                             VK_IMAGE_USAGE_SAMPLED_BIT |
+                             VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+                    .Aspect = VK_IMAGE_ASPECT_COLOR_BIT});
+            builder.WriteColor(color, RGAttachmentInfo{
+                .LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+                .StoreOp = VK_ATTACHMENT_STORE_OP_STORE});
+        },
+        [](const PassData&, const RGRegistry&, VkCommandBuffer) {});
+
+    m_Graph->AddPass<PassData>("ReadForBlit",
+        [&color](PassData&, RGBuilder& builder)
+        {
+            builder.Read(color,
+                         VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+                         VK_ACCESS_2_TRANSFER_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT);
+        },
+        [](const PassData&, const RGRegistry&, VkCommandBuffer) {});
+
+    m_Graph->AddPass<PassData>("ReadForSample",
+        [&color](PassData&, RGBuilder& builder)
+        {
+            builder.Read(color,
+                         VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                         VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
+        },
+        [](const PassData&, const RGRegistry&, VkCommandBuffer) {});
+
+    m_Graph->Compile(0);
+
+    const auto& layers = m_Graph->GetExecutionLayers();
+    ASSERT_EQ(layers.size(), 3u);
+    EXPECT_EQ(layers[0].size(), 1u);
+    EXPECT_EQ(layers[1].size(), 1u);
+    EXPECT_EQ(layers[2].size(), 1u);
+}
+
 // ===========================================================================
 // Raster packet merging tests
 // ===========================================================================

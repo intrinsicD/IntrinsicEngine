@@ -69,5 +69,9 @@ export namespace Graphics::Passes
 
         // Cached handle from AddPasses used for PostCompile descriptor update.
         RGResourceHandle m_LastSrcHandle{};
+        VkFormat m_LastSrcFormat = VK_FORMAT_UNDEFINED;
+        VkImageAspectFlags m_LastSrcAspect = 0;
+
+        void ReleaseImGuiTextures() noexcept;
     };
 }

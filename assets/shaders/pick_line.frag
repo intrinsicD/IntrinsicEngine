@@ -1,7 +1,8 @@
 // pick_line.frag — MRT picking fragment shader for line segments.
 //
 // Dual MRT output: EntityID (location 0) and PrimitiveID (location 1).
-// PrimitiveID = segment index (passed from vertex shader as flat varying).
+// PrimitiveID packs a 2-bit primitive-domain tag in the high bits and the
+// zero-based segment index in the low 30 bits.
 
 #version 460
 #extension GL_EXT_scalar_block_layout : require
@@ -16,6 +17,7 @@ layout(push_constant) uniform PickPushConsts {
     mat4     Model;
     uint64_t PtrPositions;
     uint64_t PtrEdges;
+    uint64_t PtrPrimitiveFaceIds;
     uint     EntityID;
     uint     PrimitiveBase;
     float    PickWidth;
@@ -24,7 +26,12 @@ layout(push_constant) uniform PickPushConsts {
     uint     _pad;
 } push;
 
+const uint kPrimitiveDomainLineSegment = 1u;
+const uint kPrimitiveDomainShift = 30u;
+const uint kPrimitiveIndexMask = 0x3fffffffu;
+
 void main() {
     outEntityID = push.EntityID;
-    outPrimitiveID = vSegmentIndex;
+    outPrimitiveID = (kPrimitiveDomainLineSegment << kPrimitiveDomainShift) |
+                     (vSegmentIndex & kPrimitiveIndexMask);
 }

@@ -217,6 +217,32 @@ TEST(Attributes_TriangleSoupBridge, WeldSkipsUVSeams)
     EXPECT_EQ(mesh->VertexCount(), positions.size());
 }
 
+TEST(Attributes_TriangleSoupBridge, ExtractIndexedTrianglesReportsAuthoritativeFaceIdsForTriangulatedNgons)
+{
+    using namespace Geometry;
+
+    Halfedge::Mesh mesh;
+    const auto v0 = mesh.AddVertex({0.0f, 0.0f, 0.0f});
+    const auto v1 = mesh.AddVertex({1.0f, 0.0f, 0.0f});
+    const auto v2 = mesh.AddVertex({1.0f, 1.0f, 0.0f});
+    const auto v3 = mesh.AddVertex({0.0f, 1.0f, 0.0f});
+    const auto v4 = mesh.AddVertex({2.0f, 0.0f, 0.0f});
+    const auto v5 = mesh.AddVertex({2.0f, 1.0f, 0.0f});
+    ASSERT_TRUE(mesh.AddQuad(v0, v1, v2, v3).has_value());
+    ASSERT_TRUE(mesh.AddTriangle(v1, v4, v5).has_value());
+
+    std::vector<glm::vec3> extractedPositions;
+    std::vector<uint32_t> extractedIndices;
+    std::vector<uint32_t> triangleFaceIds;
+    MeshUtils::ExtractIndexedTriangles(mesh, extractedPositions, extractedIndices, nullptr, &triangleFaceIds);
+
+    ASSERT_EQ(extractedIndices.size(), 9u);
+    ASSERT_EQ(triangleFaceIds.size(), 3u);
+    EXPECT_EQ(triangleFaceIds[0], 0u);
+    EXPECT_EQ(triangleFaceIds[1], 0u);
+    EXPECT_EQ(triangleFaceIds[2], 1u);
+}
+
 TEST(Attributes_Subdivision, LoopSubdivisionPreservesTexcoords)
 {
     using namespace Geometry;

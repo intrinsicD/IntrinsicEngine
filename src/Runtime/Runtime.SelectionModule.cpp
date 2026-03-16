@@ -11,6 +11,7 @@ module Runtime.SelectionModule;
 import Core.Window;
 import Core.Input;
 import ECS;
+import Geometry;
 import Graphics;
 import Runtime.Selection;
 
@@ -27,11 +28,14 @@ namespace Runtime
             const auto winH = static_cast<uint32_t>(window.GetWindowHeight());
 
             const glm::vec2 m = window.GetInput().GetMousePosition();
-            const float nx = (2.0f * (m.x / static_cast<float>(winW))) - 1.0f;
-            const float ny = (2.0f * (m.y / static_cast<float>(winH))) - 1.0f;
+            const Graphics::CameraRay worldRay = Graphics::RayFromScreen(
+                camera,
+                m,
+                static_cast<float>(std::max(winW, 1u)),
+                static_cast<float>(std::max(winH, 1u)));
 
             Selection::PickRequest req{};
-            req.WorldRay = Selection::RayFromNDC(camera, {nx, ny});
+            req.WorldRay = Geometry::Ray{worldRay.Origin, worldRay.Direction};
             req.Backend = Selection::PickBackend::CPU;
             req.Mode = mode;
             req.PickRadiusPixels = pickRadiusPixels;
@@ -128,63 +132,13 @@ namespace Runtime
                 {
                     if (reg.valid(e))
                     {
-                        // When GPU PrimitiveID is available and we're in sub-element
-                        // mode, use it directly instead of CPU refinement.
-                        if (primitiveID != 0u && elementMode != Selection::ElementMode::Entity)
+                        if (elementMode != Selection::ElementMode::Entity)
                         {
-                            picked.entity.id = e;
-                            picked.entity.is_background = false;
-
-                            // Map PrimitiveID to the appropriate sub-element index
-                            // based on the active element mode and entity type.
-                            //
-                            // For mesh surfaces: PrimitiveID = gl_PrimitiveID = triangle index.
-                            //   Vertex mode: resolve via triangle adjacency (CPU fallback still used).
-                            //   Edge mode: edge index from line pick pipeline.
-                            //   Face mode: triangle index directly.
-                            //
-                            // For lines/graphs: PrimitiveID = segment index.
-                            // For points: PrimitiveID = point index.
-
-                            constexpr uint32_t Invalid = Selection::Picked::Entity::InvalidIndex;
-
-                            if (reg.all_of<ECS::Surface::Component>(e))
-                            {
-                                // Mesh entity: PrimitiveID = triangle index from gl_PrimitiveID.
-                                switch (elementMode)
-                                {
-                                case Selection::ElementMode::Face:
-                                    picked.entity.face_idx = primitiveID;
-                                    break;
-                                case Selection::ElementMode::Vertex:
-                                    // GPU gives triangle index; vertex needs CPU refinement
-                                    // from within that triangle. Fall through to CPU path.
-                                    picked.entity.face_idx = primitiveID;
-                                    if (request != nullptr)
-                                    {
-                                        const auto entityPick = Selection::PickEntityCPU(scene, e, *request);
-                                        if (entityPick.Entity == e)
-                                            picked.entity.vertex_idx = entityPick.PickedData.entity.vertex_idx;
-                                    }
-                                    break;
-                                case Selection::ElementMode::Edge:
-                                    // For mesh edges rendered via LinePass, PrimitiveID = edge segment index.
-                                    picked.entity.edge_idx = primitiveID;
-                                    break;
-                                default:
-                                    break;
-                                }
-                            }
-                            else if (reg.all_of<ECS::Point::Component>(e))
-                            {
-                                // Point cloud or graph node: PrimitiveID = point index.
-                                picked.entity.vertex_idx = primitiveID;
-                            }
-                            else if (reg.all_of<ECS::Line::Component>(e))
-                            {
-                                // Graph edge or wireframe: PrimitiveID = segment index.
-                                picked.entity.edge_idx = primitiveID;
-                            }
+                            picked = Selection::ResolveGpuSubElementPick(scene,
+                                                                         e,
+                                                                         primitiveID,
+                                                                         elementMode,
+                                                                         request);
                         }
                         else
                         {
@@ -328,13 +282,16 @@ namespace Runtime
             {
                 if (m_Config.Backend == Selection::PickBackend::GPU)
                 {
-                    m_PendingPickRequest = BuildPickRequest(*camera, window, clickMode, m_Config.PickRadiusPixels);
-                    m_HasPendingPickRequest = true;
-                    const glm::uvec2 px = WindowToFramebufferPixel(window, window.GetInput().GetMousePosition());
-                    renderSystem.RequestPick(px.x, px.y);
-                    // Capture click mode at request time so the correct mode is applied
-                    // when the async GPU readback result arrives (potentially frames later).
-                    m_PendingGpuClickMode = clickMode;
+                    if (!renderSystem.GetInteraction().GetPendingPick().Pending)
+                    {
+                        m_PendingPickRequest = BuildPickRequest(*camera, window, clickMode, m_Config.PickRadiusPixels);
+                        m_HasPendingPickRequest = true;
+                        const glm::uvec2 px = WindowToFramebufferPixel(window, window.GetInput().GetMousePosition());
+                        renderSystem.RequestPick(px.x, px.y);
+                        // Capture click mode at request time so the correct mode is applied
+                        // when the async GPU readback result arrives (potentially frames later).
+                        m_PendingGpuClickMode = clickMode;
+                    }
                 }
                 else
                 {
@@ -368,7 +325,7 @@ namespace Runtime
                         else
                         {
                             Selection::ApplySelection(scene, hit.Entity, m_PendingPickRequest.Mode);
-                            if (m_Config.ElementMode == Selection::ElementMode::Entity)
+                            if (m_Config.ElementMode == Selection::ElementMode::Entity || hit.Entity == entt::null)
                                 m_SubElements.Clear();
                         }
 
@@ -406,6 +363,10 @@ namespace Runtime
                 ApplySubElementPick(picked, m_PendingGpuClickMode);
             }
             else if (m_Config.ElementMode == Selection::ElementMode::Entity)
+            {
+                m_SubElements.Clear();
+            }
+            else if (!picked.entity)
             {
                 m_SubElements.Clear();
             }

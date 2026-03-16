@@ -1,5 +1,6 @@
 module;
 #include <cstdint>
+#include <limits>
 #include <entt/entity/entity.hpp>
 
 export module ECS:Components.Events;
@@ -26,13 +27,13 @@ export namespace ECS::Events
     struct GpuPickCompleted
     {
         uint32_t PickID = 0;
-        uint32_t PrimitiveID = 0;
+        uint32_t PrimitiveID = std::numeric_limits<uint32_t>::max();
         bool HasHit = false;
 
         constexpr GpuPickCompleted() noexcept = default;
         constexpr GpuPickCompleted(uint32_t pickID, bool hasHit) noexcept
             : PickID(pickID)
-            , PrimitiveID(0)
+            , PrimitiveID(std::numeric_limits<uint32_t>::max())
             , HasHit(hasHit)
         {
         }

@@ -26,6 +26,7 @@ layout(push_constant) uniform PickPushConsts {
     mat4     Model;
     uint64_t PtrPositions;
     uint64_t PtrEdges;        // BDA to edge pair buffer
+    uint64_t PtrPrimitiveFaceIds;
     uint     EntityID;
     uint     PrimitiveBase;
     float    PickWidth;       // line width in pixels

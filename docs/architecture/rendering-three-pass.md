@@ -29,7 +29,7 @@ The render graph blackboard exposes a fixed canonical resource vocabulary:
 |----------|--------|----------|----------------|
 | `SceneDepth` | Swapchain/device depth format | Imported | Depth-tested scene + picking |
 | `EntityId` | `R32_UINT` | Frame transient | `PickingPass`, selection/debug sampling |
-| `PrimitiveId` | `R32_UINT` | Frame transient | Reserved for future primitive picking/debug |
+| `PrimitiveId` | `R32_UINT` | Frame transient | `PickingPass` primitive-domain hint (`2` high bits = domain, `30` low bits = authoritative face ID for surfaces when available, otherwise primitive index) for sub-element selection/debug |
 | `SceneNormal` | `R16G16B16A16_SFLOAT` | Frame transient | Reserved for future lighting/debug |
 | `Albedo` | `R8G8B8A8_UNORM` | Frame transient | Reserved for future material/debug |
 | `Material0` | `R16G16B16A16_SFLOAT` | Frame transient | Reserved for future material/debug |

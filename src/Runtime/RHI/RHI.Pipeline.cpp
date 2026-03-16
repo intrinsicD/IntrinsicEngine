@@ -215,12 +215,19 @@ namespace RHI
         dynamicInfo.dynamicStateCount = (uint32_t)dynamicStates.size();
         dynamicInfo.pDynamicStates = dynamicStates.data();
 
-        // 4. Color Blending (Assumes 1 attachment for simplicity, expand if needed)
+        // 4. Color Blending
+        const uint32_t colorAttachmentCount = m_RenderingInfo.colorAttachmentCount;
+        std::vector<VkPipelineColorBlendAttachmentState> colorBlendAttachments;
+        if (colorAttachmentCount > 0)
+        {
+            colorBlendAttachments.assign(colorAttachmentCount, m_ColorBlendAttachment);
+        }
+
         VkPipelineColorBlendStateCreateInfo colorBlending{};
         colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
         colorBlending.logicOpEnable = VK_FALSE;
-        colorBlending.attachmentCount = 1;
-        colorBlending.pAttachments = &m_ColorBlendAttachment;
+        colorBlending.attachmentCount = colorAttachmentCount;
+        colorBlending.pAttachments = colorBlendAttachments.empty() ? nullptr : colorBlendAttachments.data();
 
         // 5. Create Info
         VkGraphicsPipelineCreateInfo pipelineInfo{};

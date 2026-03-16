@@ -466,6 +466,17 @@ private:
 
                 const auto gpuPick = GetRenderOrchestrator().GetRenderSystem().GetLastPickResult();
                 ImGui::Text("Last GPU Pick: Hit=%d EntityID=%u", (int)gpuPick.HasHit, gpuPick.EntityID);
+
+                const auto& picked = GetSelection().GetPicked();
+                constexpr uint32_t Invalid = Runtime::Selection::Picked::Entity::InvalidIndex;
+                ImGui::Text("Picked IDs: V=%s E=%s F=%s",
+                            picked.entity.vertex_idx != Invalid ? std::to_string(picked.entity.vertex_idx).c_str() : "-",
+                            picked.entity.edge_idx != Invalid ? std::to_string(picked.entity.edge_idx).c_str() : "-",
+                            picked.entity.face_idx != Invalid ? std::to_string(picked.entity.face_idx).c_str() : "-");
+                ImGui::Text("Picked Local: (%.3f, %.3f, %.3f)",
+                            picked.spaces.Local.x, picked.spaces.Local.y, picked.spaces.Local.z);
+                ImGui::Text("Picked World: (%.3f, %.3f, %.3f)",
+                            picked.spaces.World.x, picked.spaces.World.y, picked.spaces.World.z);
             }
         });
 

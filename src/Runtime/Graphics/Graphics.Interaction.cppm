@@ -1,4 +1,5 @@
 module;
+#include <limits>
 #include <vector>
 #include <memory>
 #include <optional>
@@ -37,7 +38,7 @@ export namespace Graphics
         {
             bool HasHit = false;
             uint32_t EntityID = 0;
-            uint32_t PrimitiveID = 0;
+            uint32_t PrimitiveID = std::numeric_limits<uint32_t>::max();
         };
 
         // Call this at the start of the frame to check for completed readbacks.

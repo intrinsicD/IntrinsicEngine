@@ -512,9 +512,10 @@ namespace Graphics
             return seed;
         }
 
-        // Single source of truth for write-access detection across all barrier paths.
-        // Used by image barriers, buffer barriers, and the adjacency-list builder.
-        constexpr VkAccessFlags2 kWriteAccessMask =
+        // Scheduler-only write detection includes MEMORY_WRITE because several passes use it
+        // as an ordering marker for layout-sensitive read->read chains (for example
+        // TRANSFER_SRC -> SHADER_READ_ONLY on the same image).
+        constexpr VkAccessFlags2 kSchedulerWriteAccessMask =
             VK_ACCESS_2_MEMORY_WRITE_BIT |
             VK_ACCESS_2_SHADER_WRITE_BIT |
             VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT |
@@ -523,9 +524,45 @@ namespace Graphics
             VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT |
             VK_ACCESS_2_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
 
+        // Actual Vulkan write accesses used for barrier generation/state tracking.
+        // MEMORY_WRITE is intentionally excluded here: it is too generic to pair with
+        // read-only layouts such as SHADER_READ_ONLY_OPTIMAL and is only used above as a
+        // graph-ordering hint.
+        constexpr VkAccessFlags2 kBarrierWriteAccessMask =
+            VK_ACCESS_2_SHADER_WRITE_BIT |
+            VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT |
+            VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
+            VK_ACCESS_2_TRANSFER_WRITE_BIT |
+            VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT |
+            VK_ACCESS_2_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
+
+        constexpr VkAccessFlags2 kKnownReadAccessMask =
+            VK_ACCESS_2_SHADER_SAMPLED_READ_BIT |
+            VK_ACCESS_2_SHADER_READ_BIT |
+            VK_ACCESS_2_UNIFORM_READ_BIT |
+            VK_ACCESS_2_INPUT_ATTACHMENT_READ_BIT |
+            VK_ACCESS_2_TRANSFER_READ_BIT |
+            VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT |
+            VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+            VK_ACCESS_2_MEMORY_READ_BIT;
+
         [[nodiscard]] constexpr bool IsWriteAccessCheck(VkAccessFlags2 a) noexcept
         {
-            return (a & kWriteAccessMask) != 0;
+            return (a & kSchedulerWriteAccessMask) != 0;
+        }
+
+        [[nodiscard]] constexpr bool IsBarrierWriteAccessCheck(VkAccessFlags2 a) noexcept
+        {
+            return (a & kBarrierWriteAccessMask) != 0;
+        }
+
+        [[nodiscard]] constexpr VkAccessFlags2 SanitizeAccessForBarrier(VkAccessFlags2 access) noexcept
+        {
+            const bool hasRealWrite = (access & kBarrierWriteAccessMask) != 0;
+            const bool hasRead = (access & kKnownReadAccessMask) != 0;
+            if (hasRead && !hasRealWrite)
+                access &= ~VK_ACCESS_2_MEMORY_WRITE_BIT;
+            return access;
         }
 
         [[nodiscard]] constexpr bool IsAttachmentContinuationBarrier(const VkImageMemoryBarrier2& barrier) noexcept
@@ -643,8 +680,8 @@ namespace Graphics
                 if (res.Type == ResourceType::Buffer) return;
                 if (res.Type == ResourceType::Import && res.PhysicalBuffer) return;
 
-                const bool prevWrite = IsWriteAccessCheck(res.LastUsageAccess);
-                const bool currWrite = IsWriteAccessCheck(dstAccess);
+                const bool prevWrite = IsBarrierWriteAccessCheck(res.LastUsageAccess);
+                const bool currWrite = IsBarrierWriteAccessCheck(dstAccess);
                 const bool layoutMismatch = (res.CurrentLayout != targetLayout);
                 const bool isInitial = (res.LastUsageStage == VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT && res.LastUsageAccess == 0);
 
@@ -731,24 +768,25 @@ namespace Graphics
             for (AccessNode* node = pass.AccessHead; node != nullptr; node = node->Next)
             {
                 auto& res = m_ResourcePool[node->ID];
+                const VkAccessFlags2 effectiveAccess = SanitizeAccessForBarrier(node->Access);
                 VkImageLayout targetLayout = res.CurrentLayout;
 
-                if ((node->Access & (VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT)) != 0)
+                if ((effectiveAccess & (VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT)) != 0)
                     targetLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-                else if ((node->Access & (VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT)) != 0)
+                else if ((effectiveAccess & (VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT)) != 0)
                     targetLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-                else if ((node->Access & VK_ACCESS_2_TRANSFER_WRITE_BIT) != 0)
+                else if ((effectiveAccess & VK_ACCESS_2_TRANSFER_WRITE_BIT) != 0)
                     targetLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-                else if ((node->Access & VK_ACCESS_2_TRANSFER_READ_BIT) != 0)
+                else if ((effectiveAccess & VK_ACCESS_2_TRANSFER_READ_BIT) != 0)
                     targetLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-                else if ((node->Access & VK_ACCESS_2_SHADER_SAMPLED_READ_BIT) != 0)
+                else if ((effectiveAccess & VK_ACCESS_2_SHADER_SAMPLED_READ_BIT) != 0)
                     targetLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-                else if ((node->Access & (VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_UNIFORM_READ_BIT | VK_ACCESS_2_INPUT_ATTACHMENT_READ_BIT)) != 0)
+                else if ((effectiveAccess & (VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_UNIFORM_READ_BIT | VK_ACCESS_2_INPUT_ATTACHMENT_READ_BIT)) != 0)
                     targetLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-                else if ((node->Access & (VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT | VK_ACCESS_2_SHADER_STORAGE_READ_BIT)) != 0)
+                else if ((effectiveAccess & (VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT | VK_ACCESS_2_SHADER_STORAGE_READ_BIT)) != 0)
                     targetLayout = VK_IMAGE_LAYOUT_GENERAL;
 
-                pushImageBarrier(res, node->Stage, node->Access, targetLayout);
+                pushImageBarrier(res, node->Stage, effectiveAccess, targetLayout);
             }
 
             if (imgCount > 0) pass.ImageBarriers = std::span<VkImageMemoryBarrier2>(imgStart, imgCount);
@@ -763,8 +801,9 @@ namespace Graphics
                 bool isBuffer = (res.Type == ResourceType::Buffer) || (res.Type == ResourceType::Import && res.PhysicalBuffer);
                 if (!isBuffer) continue;
 
-                bool prevWrite = IsWriteAccessCheck(res.LastUsageAccess);
-                bool currWrite = IsWriteAccessCheck(node->Access);
+                const VkAccessFlags2 effectiveAccess = SanitizeAccessForBarrier(node->Access);
+                bool prevWrite = IsBarrierWriteAccessCheck(res.LastUsageAccess);
+                bool currWrite = IsBarrierWriteAccessCheck(effectiveAccess);
 
                 if ((prevWrite || currWrite) && res.LastUsageStage != VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT)
                 {
@@ -776,7 +815,7 @@ namespace Graphics
                     barrier.srcStageMask = res.LastUsageStage;
                     barrier.srcAccessMask = res.LastUsageAccess;
                     barrier.dstStageMask = node->Stage;
-                    barrier.dstAccessMask = node->Access;
+                    barrier.dstAccessMask = effectiveAccess;
 
                     auto alloc = m_Arena.New<VkBufferMemoryBarrier2>(barrier);
                     if (alloc)
@@ -786,7 +825,7 @@ namespace Graphics
                     }
                 }
                 res.LastUsageStage = node->Stage;
-                res.LastUsageAccess = node->Access;
+                res.LastUsageAccess = effectiveAccess;
             }
             if (bufCount > 0) pass.BufferBarriers = std::span<VkBufferMemoryBarrier2>(bufStart, bufCount);
         }

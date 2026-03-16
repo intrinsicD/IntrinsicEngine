@@ -1,7 +1,9 @@
 module;
 
+#include <cstdint>
 #include <memory>
 #include <span>
+#include <unordered_map>
 
 #include "RHI.Vulkan.hpp"
 
@@ -32,6 +34,12 @@ export namespace Graphics::Passes
         void AddPasses(RenderPassContext& ctx) override;
 
     private:
+        struct FaceIdBufferEntry
+        {
+            std::unique_ptr<RHI::VulkanBuffer> Buffer;
+            uint32_t Count = 0;
+        };
+
         struct PickPassData
         {
             RGResourceHandle IdBuffer;
@@ -45,10 +53,15 @@ export namespace Graphics::Passes
             RGResourceHandle PrimIdBuffer;
         };
 
+        uint64_t EnsureFaceIdBuffer(uint32_t geoIndex,
+                                    const uint32_t* faceIds,
+                                    uint32_t triangleCount);
+
         RHI::VulkanDevice* m_Device = nullptr; // non-owning
         RHI::GraphicsPipeline* m_Pipeline = nullptr; // legacy single-output (fallback)
         RHI::GraphicsPipeline* m_MeshPickPipeline = nullptr;
         RHI::GraphicsPipeline* m_LinePickPipeline = nullptr;
         RHI::GraphicsPipeline* m_PointPickPipeline = nullptr;
+        std::unordered_map<uint32_t, FaceIdBufferEntry> m_FaceIdBuffers;
     };
 }

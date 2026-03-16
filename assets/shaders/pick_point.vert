@@ -20,6 +20,7 @@ layout(push_constant) uniform PickPushConsts {
     mat4     Model;
     uint64_t PtrPositions;
     uint64_t PtrAux;          // unused for points
+    uint64_t PtrPrimitiveFaceIds;
     uint     EntityID;
     uint     PrimitiveBase;
     float    PickWidth;       // world-space point radius

@@ -1,5 +1,6 @@
 module;
 #include <cstring>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <vector>
@@ -54,6 +55,17 @@ namespace Graphics
         m_PendingPick.RequestFrameIndex = frameIndex;
         m_PendingPick.RequestGlobalFrame = globalFrame;
 
+        // Reset the readback slot up front so "no PrimitiveID copied" cannot be
+        // misinterpreted as a valid zero-based primitive index.
+        if (frameIndex < m_PickReadbackBuffers.size())
+        {
+            if (RHI::VulkanBuffer* buf = m_PickReadbackBuffers[frameIndex].get())
+            {
+                const uint32_t clear[2] = {0u, std::numeric_limits<uint32_t>::max()};
+                buf->Write(clear, sizeof(clear), 0);
+            }
+        }
+
         // Mark this frame slot as "waiting for readback".
         m_PickReadbackRequestFrame[frameIndex] = globalFrame;
     }
@@ -75,7 +87,9 @@ namespace Graphics
                     uint32_t readback[2] = {0, 0};
                     buf->Read<uint32_t>(readback, 2);
 
-                    // Entity ID 0 is usually "background/nothing".
+                    // Entity ID 0 is background/nothing. PrimitiveID uses
+                    // UINT_MAX as the explicit invalid sentinel so primitive 0
+                    // remains selectable.
                     m_LastPickResult.HasHit = (readback[0] != 0);
                     m_LastPickResult.EntityID = readback[0];
                     m_LastPickResult.PrimitiveID = readback[1];

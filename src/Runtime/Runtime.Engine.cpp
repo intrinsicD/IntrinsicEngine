@@ -165,8 +165,6 @@ namespace Runtime
         auto& matSys = m_RenderOrchestrator->GetMaterialSystem();
         matSys.ProcessDeletions(m_GraphicsBackend->GetDevice().GetGlobalFrameNumber());
 
-        Interface::GUI::Shutdown();
-
         m_SceneManager->Clear();
         GetAssetManager().Clear();
 
@@ -175,6 +173,10 @@ namespace Runtime
         // RenderOrchestrator destructor handles: GPUScene, RenderSystem, PipelineLibrary,
         // MaterialSystem, GeometryStorage, frame state.
         m_RenderOrchestrator.reset();
+
+        // GUI-backed textures owned by render passes must be released before the ImGui backend
+        // and descriptor pool are destroyed, but after RenderOrchestrator/RenderSystem shutdown.
+        Interface::GUI::Shutdown();
 
         // AssetPipeline destructor handles cleanup of asset state.
         m_AssetPipeline.reset();

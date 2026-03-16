@@ -297,7 +297,7 @@ namespace Graphics
 
             VkPushConstantRange pushConstant{};
             pushConstant.offset = 0;
-            pushConstant.size = 104; // PickMRTPushConsts
+            pushConstant.size = 112; // PickMRTPushConsts
             pushConstant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
             builder.AddPushConstantRange(pushConstant);
 
@@ -332,7 +332,7 @@ namespace Graphics
 
             VkPushConstantRange pushConstant{};
             pushConstant.offset = 0;
-            pushConstant.size = 104; // PickMRTPushConsts
+            pushConstant.size = 112; // PickMRTPushConsts
             pushConstant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
             builder.AddPushConstantRange(pushConstant);
 
@@ -367,7 +367,7 @@ namespace Graphics
 
             VkPushConstantRange pushConstant{};
             pushConstant.offset = 0;
-            pushConstant.size = 104; // PickMRTPushConsts
+            pushConstant.size = 112; // PickMRTPushConsts
             pushConstant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
             builder.AddPushConstantRange(pushConstant);
 

@@ -124,5 +124,6 @@ export namespace Geometry::MeshUtils
         const Halfedge::Mesh& mesh,
         std::vector<glm::vec3>& positions,
         std::vector<uint32_t>& indices,
-        std::vector<glm::vec4>* aux = nullptr);
+        std::vector<glm::vec4>* aux = nullptr,
+        std::vector<uint32_t>* triangleFaceIds = nullptr);
 }

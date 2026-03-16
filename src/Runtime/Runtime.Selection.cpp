@@ -24,6 +24,40 @@ namespace Runtime::Selection
 {
     namespace
     {
+        enum class PrimitivePickDomain : uint32_t
+        {
+            SurfaceTriangle = 0u,
+            LineSegment = 1u,
+            Point = 2u,
+            Reserved = 3u,
+        };
+
+        inline constexpr uint32_t PrimitivePickDomainShift = 30u;
+        inline constexpr uint32_t PrimitivePickIndexMask = 0x3fffffffu;
+
+        struct DecodedPrimitiveHint
+        {
+            bool Valid = false;
+            PrimitivePickDomain Domain = PrimitivePickDomain::Reserved;
+            uint32_t Index = Picked::Entity::InvalidIndex;
+            bool HasExplicitNonSurfaceDomain = false;
+        };
+
+        [[nodiscard]] constexpr DecodedPrimitiveHint DecodePrimitiveHint(uint32_t primitiveID)
+        {
+            if (!IsValidPrimitiveID(primitiveID))
+                return {};
+
+            const auto domainBits = primitiveID >> PrimitivePickDomainShift;
+            const auto domain = static_cast<PrimitivePickDomain>(domainBits);
+            return {
+                .Valid = true,
+                .Domain = domain,
+                .Index = primitiveID & PrimitivePickIndexMask,
+                .HasExplicitNonSurfaceDomain = domainBits != 0u,
+            };
+        }
+
         [[nodiscard]] inline bool IsSelectable(const entt::registry& r, entt::entity e)
         {
             return r.valid(e) && r.all_of<ECS::Components::Selection::SelectableTag>(e);
@@ -184,19 +218,20 @@ namespace Runtime::Selection
         };
 
         [[nodiscard]] LocalVertexLookupView BuildLocalVertexLookupView(
-            const ECS::MeshCollider::Component& collider,
+            const ECS::MeshCollider::Component* collider,
             const Geometry::Halfedge::Mesh* mesh)
         {
             LocalVertexLookupView view{};
 
-            if (collider.CollisionRef &&
-                !collider.CollisionRef->LocalVertexLookupPoints.empty() &&
-                collider.CollisionRef->LocalVertexLookupPoints.size() == collider.CollisionRef->LocalVertexLookupIndices.size() &&
-                !collider.CollisionRef->LocalVertexKdTree.Nodes().empty())
+            if (collider != nullptr &&
+                collider->CollisionRef &&
+                !collider->CollisionRef->LocalVertexLookupPoints.empty() &&
+                collider->CollisionRef->LocalVertexLookupPoints.size() == collider->CollisionRef->LocalVertexLookupIndices.size() &&
+                !collider->CollisionRef->LocalVertexKdTree.Nodes().empty())
             {
-                view.Tree = &collider.CollisionRef->LocalVertexKdTree;
-                view.Points = collider.CollisionRef->LocalVertexLookupPoints;
-                view.Indices = collider.CollisionRef->LocalVertexLookupIndices;
+                view.Tree = &collider->CollisionRef->LocalVertexKdTree;
+                view.Points = collider->CollisionRef->LocalVertexLookupPoints;
+                view.Indices = collider->CollisionRef->LocalVertexLookupIndices;
                 return view;
             }
 
@@ -214,11 +249,11 @@ namespace Runtime::Selection
                     view.ScratchIndices.push_back(static_cast<uint32_t>(vh.Index));
                 }
             }
-            else if (collider.CollisionRef)
+            else if (collider != nullptr && collider->CollisionRef)
             {
-                view.ScratchPoints = collider.CollisionRef->Positions;
-                view.ScratchIndices.reserve(collider.CollisionRef->Positions.size());
-                for (uint32_t i = 0; i < collider.CollisionRef->Positions.size(); ++i)
+                view.ScratchPoints = collider->CollisionRef->Positions;
+                view.ScratchIndices.reserve(collider->CollisionRef->Positions.size());
+                for (uint32_t i = 0; i < collider->CollisionRef->Positions.size(); ++i)
                     view.ScratchIndices.push_back(i);
             }
 
@@ -234,7 +269,7 @@ namespace Runtime::Selection
         }
 
         [[nodiscard]] uint32_t ResolveNearestVertexIndex(
-            const ECS::MeshCollider::Component& collider,
+            const ECS::MeshCollider::Component* collider,
             const Geometry::Halfedge::Mesh* mesh,
             const glm::vec3& localPoint,
             float localPickRadius)
@@ -274,9 +309,147 @@ namespace Runtime::Selection
             return bestIndex;
         }
 
+        [[nodiscard]] uint32_t ResolveNearestGraphVertexIndex(
+            const Geometry::Graph::Graph& graph,
+            const glm::vec3& localPoint,
+            float localPickRadius)
+        {
+            uint32_t bestIndex = Picked::Entity::InvalidIndex;
+            float bestDistanceSq = std::numeric_limits<float>::infinity();
+            const float radiusSq = localPickRadius * localPickRadius;
+            bool foundWithinRadius = false;
+
+            for (uint32_t i = 0; i < graph.VerticesSize(); ++i)
+            {
+                const Geometry::VertexHandle vh{static_cast<Geometry::PropertyIndex>(i)};
+                if (!graph.IsValid(vh) || graph.IsDeleted(vh))
+                    continue;
+
+                const float distSq = SquaredLength(graph.VertexPosition(vh) - localPoint);
+                const bool withinRadius = distSq <= radiusSq;
+                if (!withinRadius && foundWithinRadius)
+                    continue;
+
+                if (withinRadius && !foundWithinRadius)
+                {
+                    foundWithinRadius = true;
+                    bestDistanceSq = std::numeric_limits<float>::infinity();
+                    bestIndex = Picked::Entity::InvalidIndex;
+                }
+
+                if (distSq < bestDistanceSq || (distSq == bestDistanceSq && i < bestIndex))
+                {
+                    bestDistanceSq = distSq;
+                    bestIndex = i;
+                }
+            }
+
+            return bestIndex;
+        }
+
+        [[nodiscard]] uint32_t ResolveNearestGraphEdgeIndex(
+            const Geometry::Graph::Graph& graph,
+            const glm::vec3& localPoint,
+            float localPickRadius)
+        {
+            uint32_t bestIndex = Picked::Entity::InvalidIndex;
+            float bestDistanceSq = std::numeric_limits<float>::infinity();
+            const float radiusSq = localPickRadius * localPickRadius;
+            bool foundWithinRadius = false;
+
+            for (uint32_t i = 0; i < graph.EdgesSize(); ++i)
+            {
+                const Geometry::EdgeHandle eh{static_cast<Geometry::PropertyIndex>(i)};
+                if (!graph.IsValid(eh) || graph.IsDeleted(eh))
+                    continue;
+
+                const auto [v0h, v1h] = graph.EdgeVertices(eh);
+                const auto closest = Geometry::ClosestPointSegment(
+                    localPoint,
+                    graph.VertexPosition(v0h),
+                    graph.VertexPosition(v1h));
+                const bool withinRadius = closest.DistanceSq <= radiusSq;
+                if (!withinRadius && foundWithinRadius)
+                    continue;
+
+                if (withinRadius && !foundWithinRadius)
+                {
+                    foundWithinRadius = true;
+                    bestDistanceSq = std::numeric_limits<float>::infinity();
+                    bestIndex = Picked::Entity::InvalidIndex;
+                }
+
+                if (closest.DistanceSq < bestDistanceSq || (closest.DistanceSq == bestDistanceSq && i < bestIndex))
+                {
+                    bestDistanceSq = closest.DistanceSq;
+                    bestIndex = i;
+                }
+            }
+
+            return bestIndex;
+        }
+
+        [[nodiscard]] inline Geometry::AABB MeshWorldAABB(
+            const Geometry::Halfedge::Mesh& mesh,
+            const ECS::Components::Transform::Component& transform,
+            const entt::registry& reg,
+            entt::entity entity)
+        {
+            Geometry::AABB local;
+            bool hasAnyVertex = false;
+            for (std::size_t i = 0; i < mesh.VerticesSize(); ++i)
+            {
+                const Geometry::VertexHandle vh{static_cast<Geometry::PropertyIndex>(i)};
+                if (!mesh.IsValid(vh) || mesh.IsDeleted(vh))
+                    continue;
+
+                const glm::vec3 p = mesh.Position(vh);
+                if (!hasAnyVertex)
+                {
+                    local = Geometry::AABB{p, p};
+                    hasAnyVertex = true;
+                }
+                else
+                {
+                    local.Min = glm::min(local.Min, p);
+                    local.Max = glm::max(local.Max, p);
+                }
+            }
+
+            if (!hasAnyVertex)
+                return {};
+
+            const glm::mat4 world = WorldMatrixFor(reg, entity, transform);
+            const glm::vec3 corners[8] = {
+                {local.Min.x, local.Min.y, local.Min.z}, {local.Max.x, local.Min.y, local.Min.z},
+                {local.Min.x, local.Max.y, local.Min.z}, {local.Max.x, local.Max.y, local.Min.z},
+                {local.Min.x, local.Min.y, local.Max.z}, {local.Max.x, local.Min.y, local.Max.z},
+                {local.Min.x, local.Max.y, local.Max.z}, {local.Max.x, local.Max.y, local.Max.z},
+            };
+
+            Geometry::AABB result;
+            bool initialized = false;
+            for (const auto& c : corners)
+            {
+                const glm::vec3 wc = TransformPoint(world, c);
+                if (!initialized)
+                {
+                    result = Geometry::AABB{wc, wc};
+                    initialized = true;
+                }
+                else
+                {
+                    result.Min = glm::min(result.Min, wc);
+                    result.Max = glm::max(result.Max, wc);
+                }
+            }
+
+            return result;
+        }
+
         [[nodiscard]] std::optional<PickResult> PickMeshEntityAuthoritative(
             entt::entity entity,
-            const ECS::MeshCollider::Component& collider,
+            const ECS::MeshCollider::Component* collider,
             const Geometry::Halfedge::Mesh& mesh,
             const glm::mat4& world,
             const glm::mat4& invWorld,
@@ -394,7 +567,7 @@ namespace Runtime::Selection
 
             if (const auto* mesh = ResolveAuthoritativeMesh(entity, collider, reg))
             {
-                if (const auto candidate = PickMeshEntityAuthoritative(entity, collider, *mesh, world, invWorld, rayLocal, request))
+                if (const auto candidate = PickMeshEntityAuthoritative(entity, &collider, *mesh, world, invWorld, rayLocal, request))
                     return candidate;
             }
 
@@ -478,7 +651,7 @@ namespace Runtime::Selection
             {
                 const float localPickRadius = ComputeLocalPickRadius(invWorld, best.PickedData.entity.pick_radius);
                 best.PickedData.entity.vertex_idx = ResolveNearestVertexIndex(
-                    collider,
+                    &collider,
                     nullptr,
                     best.PickedData.spaces.Local,
                     localPickRadius);
@@ -557,6 +730,7 @@ namespace Runtime::Selection
                 return std::nullopt;
 
             const glm::mat4 world = WorldMatrixFor(reg, entity, transform);
+            const glm::mat4 invWorld = glm::inverse(world);
             PickResult best{};
             best.PickedData = MakeBackgroundPicked();
             float bestDistanceSq = std::numeric_limits<float>::infinity();
@@ -632,7 +806,58 @@ namespace Runtime::Selection
                 }
             }
 
+            if (best.Entity != entt::null)
+            {
+                const float localPickRadius = ComputeLocalPickRadius(invWorld, best.PickedData.entity.pick_radius);
+                if (best.PickedData.entity.vertex_idx == Picked::Entity::InvalidIndex)
+                {
+                    best.PickedData.entity.vertex_idx = ResolveNearestGraphVertexIndex(
+                        *graphData.GraphRef,
+                        best.PickedData.spaces.Local,
+                        localPickRadius);
+                }
+
+                if (best.PickedData.entity.edge_idx == Picked::Entity::InvalidIndex)
+                {
+                    best.PickedData.entity.edge_idx = ResolveNearestGraphEdgeIndex(
+                        *graphData.GraphRef,
+                        best.PickedData.spaces.Local,
+                        localPickRadius);
+                }
+            }
+
             return best.Entity != entt::null ? std::optional<PickResult>(best) : std::nullopt;
+        }
+
+        [[nodiscard]] std::optional<PickResult> PickMeshEntityFromMeshData(
+            entt::entity entity,
+            const ECS::Components::Transform::Component& transform,
+            const ECS::Mesh::Data& meshData,
+            const entt::registry& reg,
+            const PickRequest& request)
+        {
+            if (!meshData.MeshRef || meshData.MeshRef->FaceCount() == 0)
+                return std::nullopt;
+
+            const Geometry::AABB worldAabb = MeshWorldAABB(*meshData.MeshRef, transform, reg, entity);
+            if (!worldAabb.IsValid() || !Geometry::TestOverlap(request.WorldRay, worldAabb))
+                return std::nullopt;
+
+            const glm::mat4 world = WorldMatrixFor(reg, entity, transform);
+            const glm::mat4 invWorld = glm::inverse(world);
+            Geometry::Ray rayLocal{
+                TransformPoint(invWorld, request.WorldRay.Origin),
+                glm::normalize(glm::mat3(invWorld) * request.WorldRay.Direction)
+            };
+            rayLocal = Geometry::Validation::Sanitize(rayLocal);
+
+            return PickMeshEntityAuthoritative(entity,
+                                               nullptr,
+                                               *meshData.MeshRef,
+                                               world,
+                                               invWorld,
+                                               rayLocal,
+                                               request);
         }
     }
 
@@ -665,6 +890,16 @@ namespace Runtime::Selection
         for (auto [entity, transform, collider] : meshView.each())
         {
             const auto candidate = PickMeshEntity(entity, transform, collider, reg, request);
+            if (candidate && candidate->T < best.T)
+                best = *candidate;
+        }
+
+        auto meshDataView = reg.view<ECS::Components::Transform::Component,
+                                     ECS::Mesh::Data,
+                                     ECS::Components::Selection::SelectableTag>(entt::exclude<ECS::MeshCollider::Component>);
+        for (auto [entity, transform, meshData] : meshDataView.each())
+        {
+            const auto candidate = PickMeshEntityFromMeshData(entity, transform, meshData, reg, request);
             if (candidate && candidate->T < best.T)
                 best = *candidate;
         }
@@ -711,6 +946,12 @@ namespace Runtime::Selection
                 return *candidate;
         }
 
+        if (const auto* meshData = reg.try_get<ECS::Mesh::Data>(entity))
+        {
+            if (const auto candidate = PickMeshEntityFromMeshData(entity, *transform, *meshData, reg, request))
+                return *candidate;
+        }
+
         if (const auto* pcd = reg.try_get<ECS::PointCloud::Data>(entity))
         {
             if (const auto candidate = PickPointCloudEntity(entity, *transform, *pcd, reg, request))
@@ -724,6 +965,188 @@ namespace Runtime::Selection
         }
 
         return result;
+    }
+
+    Picked ResolveGpuSubElementPick(const ECS::Scene& scene,
+                                    entt::entity entity,
+                                    uint32_t primitiveID,
+                                    ElementMode elementMode,
+                                    const PickRequest* request)
+    {
+        Picked picked = MakeEntityPicked(entity, 0.0f);
+        if (entity == entt::null)
+            return MakeBackgroundPicked();
+
+        const auto& reg = scene.GetRegistry();
+        if (!reg.valid(entity))
+            return MakeBackgroundPicked();
+
+        const auto primitiveHint = DecodePrimitiveHint(primitiveID);
+        const bool hasPrimitiveID = primitiveHint.Valid;
+        PickResult cpuResult{};
+        cpuResult.PickedData = MakeBackgroundPicked();
+        bool hasCpuResult = false;
+
+        auto getCpuResult = [&]() -> const PickResult&
+        {
+            if (!hasCpuResult && request != nullptr)
+            {
+                cpuResult = PickEntityCPU(scene, entity, *request);
+                hasCpuResult = true;
+            }
+            return cpuResult;
+        };
+
+        auto adoptCpuPick = [&]() -> bool
+        {
+            const auto& entityPick = getCpuResult();
+            if (entityPick.Entity != entity || !entityPick.PickedData.entity)
+                return false;
+            picked = entityPick.PickedData;
+            return true;
+        };
+
+        const bool isMesh = reg.all_of<ECS::MeshCollider::Component>(entity)
+                         || reg.all_of<ECS::Mesh::Data>(entity);
+        const bool isGraph = reg.all_of<ECS::Graph::Data>(entity);
+        const bool isPointCloud = reg.all_of<ECS::PointCloud::Data>(entity);
+        const bool hasSurface = reg.all_of<ECS::Surface::Component>(entity);
+        const bool hasLine = reg.all_of<ECS::Line::Component>(entity);
+        const bool hasPoint = reg.all_of<ECS::Point::Component>(entity);
+
+        const bool adoptedCpu = adoptCpuPick();
+
+        if (elementMode == ElementMode::Entity)
+            return picked;
+
+        // Meshes: the CPU ray hit is authoritative and should populate
+        // face -> closest edge -> closest vertex in one shot. PrimitiveID is only
+        // used as an unambiguous fallback when CPU completion is unavailable.
+        if (isMesh)
+        {
+            if (!adoptedCpu && hasPrimitiveID)
+            {
+                switch (primitiveHint.Domain)
+                {
+                case PrimitivePickDomain::SurfaceTriangle:
+                    if (picked.entity.face_idx == Picked::Entity::InvalidIndex && hasSurface)
+                        picked.entity.face_idx = primitiveHint.Index;
+                    break;
+                case PrimitivePickDomain::LineSegment:
+                    if (picked.entity.edge_idx == Picked::Entity::InvalidIndex && hasLine)
+                        picked.entity.edge_idx = primitiveHint.Index;
+                    break;
+                case PrimitivePickDomain::Point:
+                    if (picked.entity.vertex_idx == Picked::Entity::InvalidIndex && hasPoint)
+                        picked.entity.vertex_idx = primitiveHint.Index;
+                    break;
+                case PrimitivePickDomain::Reserved:
+                    break;
+                }
+
+                // Legacy fallback for older/raw untyped primitive IDs: only safe when
+                // the entity is rendered in exactly one non-surface primitive domain.
+                if (!primitiveHint.HasExplicitNonSurfaceDomain)
+                {
+                    switch (elementMode)
+                    {
+                    case ElementMode::Vertex:
+                        if (picked.entity.vertex_idx == Picked::Entity::InvalidIndex && hasPoint && !hasLine && !hasSurface)
+                            picked.entity.vertex_idx = primitiveHint.Index;
+                        break;
+                    case ElementMode::Edge:
+                        if (picked.entity.edge_idx == Picked::Entity::InvalidIndex && hasLine && !hasPoint && !hasSurface)
+                            picked.entity.edge_idx = primitiveHint.Index;
+                        break;
+                    case ElementMode::Face:
+                        if (picked.entity.face_idx == Picked::Entity::InvalidIndex && hasSurface && !hasLine && !hasPoint)
+                            picked.entity.face_idx = primitiveHint.Index;
+                        break;
+                    default:
+                        break;
+                    }
+                }
+            }
+
+            return picked;
+        }
+
+        // Graphs: use the projected graph hit to fill both nearest edge and
+        // nearest vertex. PrimitiveID is a fallback only when the graph is
+        // rendered in a single primitive domain and no CPU completion is available.
+        if (isGraph)
+        {
+            if (!adoptedCpu && hasPrimitiveID)
+            {
+                switch (primitiveHint.Domain)
+                {
+                case PrimitivePickDomain::LineSegment:
+                    if (picked.entity.edge_idx == Picked::Entity::InvalidIndex && hasLine)
+                        picked.entity.edge_idx = primitiveHint.Index;
+                    break;
+                case PrimitivePickDomain::Point:
+                    if (picked.entity.vertex_idx == Picked::Entity::InvalidIndex && hasPoint)
+                        picked.entity.vertex_idx = primitiveHint.Index;
+                    break;
+                case PrimitivePickDomain::SurfaceTriangle:
+                case PrimitivePickDomain::Reserved:
+                    break;
+                }
+
+                if (!primitiveHint.HasExplicitNonSurfaceDomain)
+                {
+                    switch (elementMode)
+                    {
+                    case ElementMode::Vertex:
+                        if (picked.entity.vertex_idx == Picked::Entity::InvalidIndex && hasPoint && !hasLine)
+                            picked.entity.vertex_idx = primitiveHint.Index;
+                        break;
+                    case ElementMode::Edge:
+                        if (picked.entity.edge_idx == Picked::Entity::InvalidIndex && hasLine && !hasPoint)
+                            picked.entity.edge_idx = primitiveHint.Index;
+                        break;
+                    default:
+                        break;
+                    }
+                }
+            }
+
+            return picked;
+        }
+
+        // Point clouds already render point PrimitiveID directly.
+        if (isPointCloud)
+        {
+            if (elementMode == ElementMode::Vertex && hasPrimitiveID)
+            {
+                if (primitiveHint.Domain == PrimitivePickDomain::Point ||
+                    !primitiveHint.HasExplicitNonSurfaceDomain)
+                {
+                    picked.entity.vertex_idx = primitiveHint.Index;
+                }
+            }
+
+            return picked;
+        }
+
+        if (hasPoint &&
+            elementMode == ElementMode::Vertex && hasPrimitiveID)
+        {
+            picked.entity.vertex_idx = primitiveHint.Index;
+            return picked;
+        }
+
+        if (hasLine &&
+            elementMode == ElementMode::Edge && hasPrimitiveID)
+        {
+            picked.entity.edge_idx = primitiveHint.Index;
+            return picked;
+        }
+
+        if (!adoptedCpu)
+            return picked;
+
+        return picked;
     }
 
     void ApplySelection(ECS::Scene& scene, entt::entity hitEntity, PickMode mode)

@@ -13,6 +13,7 @@ module;
 #include <GLFW/glfw3.h> // Required for glfwGetInstanceProcAddress
 #include <algorithm>
 #include <array>
+#include <unordered_set>
 #include <vector>
 #include <filesystem>
 
@@ -57,6 +58,8 @@ namespace Interface::GUI
     static VkDescriptorPool s_DescriptorPool = VK_NULL_HANDLE;
     static RHI::VulkanDevice* s_Device = nullptr;
     static bool s_ShowTelemetryPanel = false;
+    static bool s_BackendInitialized = false;
+    static std::unordered_set<void*> s_RegisteredTextures;
 
     static float ToMs(uint64_t ns) { return static_cast<float>(static_cast<double>(ns) / 1'000'000.0); }
 
@@ -528,6 +531,8 @@ namespace Interface::GUI
               VkQueue graphicsQueue)
     {
         s_Device = &device;
+        s_BackendInitialized = false;
+        s_RegisteredTextures.clear();
 
         // 1. Setup Dear ImGui context
         IMGUI_CHECKVERSION();
@@ -643,6 +648,7 @@ namespace Interface::GUI
 
         // Init
         ImGui_ImplVulkan_Init(&init_info);
+        s_BackendInitialized = true;
 
         // Upload Fonts
         // This is necessary because we are using dynamic rendering and managing our own headers.
@@ -652,13 +658,17 @@ namespace Interface::GUI
 
     void Shutdown()
     {
+        s_BackendInitialized = false;
+        s_RegisteredTextures.clear();
         ImGui_ImplVulkan_Shutdown();
         ImGui_ImplGlfw_Shutdown();
         ImGui::DestroyContext();
         if (s_DescriptorPool && s_Device)
         {
             vkDestroyDescriptorPool(s_Device->GetLogicalDevice(), s_DescriptorPool, nullptr);
+            s_DescriptorPool = VK_NULL_HANDLE;
         }
+        s_Device = nullptr;
     }
 
     void BeginFrame()
@@ -853,13 +863,28 @@ namespace Interface::GUI
 
     void* AddTexture(VkSampler sampler, VkImageView imageView, VkImageLayout imageLayout)
     {
+        if (!s_BackendInitialized || imageView == VK_NULL_HANDLE)
+            return nullptr;
+
         // ImGui's Vulkan backend returns an opaque ImTextureID.
-        return ImGui_ImplVulkan_AddTexture(sampler, imageView, imageLayout);
+        void* textureId = ImGui_ImplVulkan_AddTexture(sampler, imageView, imageLayout);
+        if (textureId)
+            s_RegisteredTextures.insert(textureId);
+        return textureId;
     }
 
     void RemoveTexture(void* textureId)
     {
         if (!textureId) return;
+        if (!s_BackendInitialized)
+        {
+            s_RegisteredTextures.erase(textureId);
+            return;
+        }
+
+        if (!s_RegisteredTextures.erase(textureId))
+            return;
+
         ImGui_ImplVulkan_RemoveTexture(reinterpret_cast<VkDescriptorSet>(textureId));
     }
 }

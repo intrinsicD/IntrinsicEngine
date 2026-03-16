@@ -676,13 +676,18 @@ namespace Geometry::MeshUtils
         const Halfedge::Mesh& mesh,
         std::vector<glm::vec3>& positions,
         std::vector<uint32_t>& indices,
-        std::vector<glm::vec4>* aux)
+        std::vector<glm::vec4>* aux,
+        std::vector<uint32_t>* triangleFaceIds)
     {
         positions.clear();
         indices.clear();
         if (aux != nullptr)
         {
             aux->clear();
+        }
+        if (triangleFaceIds != nullptr)
+        {
+            triangleFaceIds->clear();
         }
 
         positions.reserve(mesh.VertexCount());
@@ -764,6 +769,8 @@ namespace Geometry::MeshUtils
                 indices.push_back(vertexMap[v0.Index]);
                 indices.push_back(vertexMap[v1.Index]);
                 indices.push_back(vertexMap[v2.Index]);
+                if (triangleFaceIds != nullptr)
+                    triangleFaceIds->push_back(static_cast<uint32_t>(f.Index));
             }
         }
     }

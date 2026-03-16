@@ -56,7 +56,7 @@ These are not required to finish the first wave, but they should begin soon afte
 
 ### B3. GPU-Native Primitive ID Pipeline (**Complete**)
 
-Dual-channel MRT pipeline producing both `EntityId` and `PrimitiveId` in one GPU frame. Three dedicated pick pipelines (mesh, line, point) with 104-byte `PickMRTPushConsts`. `SelectionModule` uses GPU `PrimitiveID` directly for sub-element selection when available, retaining CPU refinement as fallback for vertex-from-triangle resolution.
+Dual-channel MRT pipeline producing both `EntityId` and `PrimitiveId` in one GPU frame. Three dedicated pick pipelines (mesh, line, point) with 104-byte `PickMRTPushConsts`. `SelectionModule` uses the GPU entity hit for fast classification, then completes the full primitive tuple from the projected object hit: meshes resolve point-on-face → closest edge → closest vertex, graphs resolve nearest edge/node pairs, and point clouds keep direct point `PrimitiveID` selection. Invalid primitive IDs use `UINT_MAX`, so primitive index `0` remains valid.
 
 ### B4. Lifecycle System Boilerplate Extraction (**Complete**)
 

@@ -1,8 +1,9 @@
 // pick_point.frag — MRT picking fragment shader for points.
 //
 // Dual MRT output: EntityID (location 0) and PrimitiveID (location 1).
-// Disc discard test: fragments outside the unit circle are discarded
-// to produce clean circular pick targets.
+// PrimitiveID packs a 2-bit primitive-domain tag in the high bits and the
+// zero-based point index in the low 30 bits. Disc discard rejects fragments
+// outside the unit circle to produce clean circular pick targets.
 
 #version 460
 #extension GL_EXT_scalar_block_layout : require
@@ -18,6 +19,7 @@ layout(push_constant) uniform PickPushConsts {
     mat4     Model;
     uint64_t PtrPositions;
     uint64_t PtrAux;
+    uint64_t PtrPrimitiveFaceIds;
     uint     EntityID;
     uint     PrimitiveBase;
     float    PickWidth;
@@ -26,11 +28,16 @@ layout(push_constant) uniform PickPushConsts {
     uint     _pad;
 } push;
 
+const uint kPrimitiveDomainPoint = 2u;
+const uint kPrimitiveDomainShift = 30u;
+const uint kPrimitiveIndexMask = 0x3fffffffu;
+
 void main() {
     // Disc discard: reject fragments outside the unit circle.
     if (dot(fragDiscUV, fragDiscUV) > 1.0)
         discard;
 
     outEntityID = push.EntityID;
-    outPrimitiveID = vPointIndex;
+    outPrimitiveID = (kPrimitiveDomainPoint << kPrimitiveDomainShift) |
+                     (vPointIndex & kPrimitiveIndexMask);
 }

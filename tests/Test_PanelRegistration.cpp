@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <imgui.h>
+#include "RHI.Vulkan.hpp"
 #include <string>
 #include <vector>
 
@@ -143,6 +144,25 @@ TEST(PanelRegistration, RemoveOverlay_NonExistent_NoCrash)
 {
     TestSupport::ImGuiFrameScope frame;
     Interface::GUI::RemoveOverlay("GhostOverlay_999");
+    SUCCEED();
+}
+
+TEST(PanelRegistration, AddTexture_WithoutBackend_ReturnsNull)
+{
+    TestSupport::ImGuiFrameScope frame;
+
+    void* textureId = Interface::GUI::AddTexture(VK_NULL_HANDLE, VK_NULL_HANDLE,
+                                                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    EXPECT_EQ(textureId, nullptr);
+}
+
+TEST(PanelRegistration, RemoveTexture_WithoutBackend_IsNoOp)
+{
+    TestSupport::ImGuiFrameScope frame;
+
+    Interface::GUI::RemoveTexture(reinterpret_cast<void*>(0x1));
+    Interface::GUI::RemoveTexture(reinterpret_cast<void*>(0x1));
+    Interface::GUI::RemoveTexture(nullptr);
     SUCCEED();
 }
 

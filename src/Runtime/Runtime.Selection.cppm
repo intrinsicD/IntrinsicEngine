@@ -73,9 +73,9 @@ export namespace Runtime::Selection
     struct SubElementSelection
     {
         entt::entity Entity = entt::null;
-        std::set<uint32_t> SelectedVertices;
-        std::set<uint32_t> SelectedEdges;
-        std::set<uint32_t> SelectedFaces;
+        std::set<uint32_t> SelectedVertices{};
+        std::set<uint32_t> SelectedEdges{};
+        std::set<uint32_t> SelectedFaces{};
 
         void Clear()
         {
@@ -119,9 +119,27 @@ export namespace Runtime::Selection
         Picked PickedData{};
     };
 
+    inline constexpr uint32_t InvalidPrimitiveID = Picked::Entity::InvalidIndex;
+
+    [[nodiscard]] constexpr bool IsValidPrimitiveID(uint32_t primitiveID)
+    {
+        return primitiveID != InvalidPrimitiveID;
+    }
+
     // CPU picking: uses MeshCollider broadphase (WorldOBB) and watertight ray/triangle on mesh data.
     [[nodiscard]] PickResult PickCPU(const ECS::Scene& scene, const PickRequest& request);
     [[nodiscard]] PickResult PickEntityCPU(const ECS::Scene& scene, entt::entity entity, const PickRequest& request);
+
+    // GPU picking resolves entity ID on the GPU, then completes the picked
+    // primitive tuple on the CPU: use the self-describing primitive hint from
+    // the winning rendered primitive (surface triangle / line segment / point),
+    // and compute the remaining IDs from the projected hit point / ray
+    // intersection on the picked object.
+    [[nodiscard]] Picked ResolveGpuSubElementPick(const ECS::Scene& scene,
+                                                  entt::entity entity,
+                                                  uint32_t primitiveID,
+                                                  ElementMode elementMode,
+                                                  const PickRequest* request);
 
     // Apply selection state changes on the registry (SelectedTag/HoveredTag).
     void ApplySelection(ECS::Scene& scene, entt::entity hitEntity, PickMode mode);

@@ -22,6 +22,7 @@ layout(push_constant) uniform PickPushConsts {
     mat4     Model;
     uint64_t PtrPositions;
     uint64_t PtrAux;
+    uint64_t PtrPrimitiveFaceIds;
     uint     EntityID;
     uint     PrimitiveBase;
     float    PickWidth;

@@ -533,6 +533,105 @@ namespace Graphics
                                               return FormatVkFormatName(fmt);
                                           };
 
+                                          const auto findDebugImageByName = [&](Core::Hash::StringID id) -> const RenderGraphDebugImage*
+                                          {
+                                              for (const auto& img : m_LastDebugImages)
+                                              {
+                                                  if (img.Name == id)
+                                                      return &img;
+                                              }
+                                              return nullptr;
+                                          };
+
+                                          const auto isViewportEligible = [](const RenderGraphDebugImage& img)
+                                          {
+                                              return (img.Usage & VK_IMAGE_USAGE_SAMPLED_BIT) != 0 && img.View != VK_NULL_HANDLE;
+                                          };
+
+                                          const auto formatResourceLabel = [&](Core::Hash::StringID id,
+                                                                               VkFormat fmt,
+                                                                               VkImageAspectFlags aspect,
+                                                                               bool viewportEligible,
+                                                                               char* out,
+                                                                               size_t outSize)
+                                          {
+                                              const char* name = resolveName(id);
+                                              const char* eligibility = viewportEligible ? "" : " [diag-only]";
+                                              if (name)
+                                              {
+                                                  snprintf(out, outSize, "%s [%s]%s%s",
+                                                           name,
+                                                           formatName(fmt),
+                                                           (aspect & VK_IMAGE_ASPECT_DEPTH_BIT) != 0 ? " (Depth)" : "",
+                                                           eligibility);
+                                              }
+                                              else
+                                              {
+                                                  snprintf(out, outSize, "0x%08X [%s]%s%s",
+                                                           id.Value,
+                                                           formatName(fmt),
+                                                           (aspect & VK_IMAGE_ASPECT_DEPTH_BIT) != 0 ? " (Depth)" : "",
+                                                           eligibility);
+                                              }
+                                          };
+
+                                          uint32_t viewportEligibleCount = 0;
+                                          for (const auto& img : m_LastDebugImages)
+                                          {
+                                              if (isViewportEligible(img))
+                                                  ++viewportEligibleCount;
+                                          }
+
+                                          const RenderGraphDebugImage* selectedDebugImage = findDebugImageByName(debugView.SelectedResource);
+                                          char selectedViewportLabel[192];
+                                          if (selectedDebugImage)
+                                          {
+                                              formatResourceLabel(selectedDebugImage->Name,
+                                                                  selectedDebugImage->Format,
+                                                                  selectedDebugImage->Aspect,
+                                                                  isViewportEligible(*selectedDebugImage),
+                                                                  selectedViewportLabel,
+                                                                  sizeof(selectedViewportLabel));
+                                          }
+                                          else
+                                          {
+                                              const char* selectedName = resolveName(debugView.SelectedResource);
+                                              snprintf(selectedViewportLabel,
+                                                       sizeof(selectedViewportLabel),
+                                                       "%s [unavailable this frame]",
+                                                       selectedName ? selectedName : "Unknown");
+                                          }
+
+                                          if (ImGui::BeginCombo("Viewport debug source", selectedViewportLabel))
+                                          {
+                                              bool anyViewportEligible = false;
+                                              for (const auto& img : m_LastDebugImages)
+                                              {
+                                                  if (!isViewportEligible(img))
+                                                      continue;
+
+                                                  anyViewportEligible = true;
+                                                  char label[192];
+                                                  formatResourceLabel(img.Name, img.Format, img.Aspect, true, label, sizeof(label));
+                                                  const bool isSelected = (img.Name == debugView.SelectedResource);
+                                                  if (ImGui::Selectable(label, isSelected))
+                                                      debugView.SelectedResource = img.Name;
+                                                  if (isSelected)
+                                                      ImGui::SetItemDefaultFocus();
+                                              }
+
+                                              if (!anyViewportEligible)
+                                                  ImGui::TextDisabled("No sampleable render targets were produced this frame.");
+
+                                              ImGui::EndCombo();
+                                          }
+
+                                          ImGui::TextDisabled("Viewport can preview %u / %zu compiled images (sampled only).",
+                                                              viewportEligibleCount,
+                                                              m_LastDebugImages.size());
+                                          if (selectedDebugImage && !isViewportEligible(*selectedDebugImage))
+                                              ImGui::TextDisabled("The current selection is diagnostics-only; the viewport pass falls back to a valid sampled target.");
+
                                           // --- Pass-organized resource browser ---
                                           if (ImGui::CollapsingHeader("Per-Pass Attachments", ImGuiTreeNodeFlags_DefaultOpen))
                                           {
@@ -543,26 +642,28 @@ namespace Graphics
 
                                                   for (const auto& att : pass.Attachments)
                                                   {
+                                                      const RenderGraphDebugImage* attachmentImage = findDebugImageByName(att.ResourceName);
+                                                      const bool viewportEligible = attachmentImage && isViewportEligible(*attachmentImage);
                                                       const bool isSelected = (att.ResourceName == debugView.SelectedResource);
-                                                      const char* name = resolveName(att.ResourceName);
                                                       char label[192];
-                                                      if (name)
-                                                          snprintf(label, sizeof(label), "%s [%s]%s",
-                                                                   name, formatName(att.Format),
-                                                                   att.IsDepth ? " (Depth)" : "");
-                                                      else
-                                                          snprintf(label, sizeof(label), "0x%08X [%s]%s",
-                                                                   att.ResourceName.Value, formatName(att.Format),
-                                                                   att.IsDepth ? " (Depth)" : "");
+                                                      formatResourceLabel(att.ResourceName,
+                                                                          att.Format,
+                                                                          att.IsDepth ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT,
+                                                                          viewportEligible,
+                                                                          label,
+                                                                          sizeof(label));
 
+                                                      ImGui::BeginDisabled(!viewportEligible);
                                                       if (ImGui::Selectable(label, isSelected))
                                                           debugView.SelectedResource = att.ResourceName;
+                                                      ImGui::EndDisabled();
 
                                                       // Tooltip with details
                                                       if (ImGui::IsItemHovered())
                                                       {
                                                           ImGui::BeginTooltip();
                                                           ImGui::Text("Format: %s", formatName(att.Format));
+                                                          ImGui::Text("Viewport Preview: %s", viewportEligible ? "Available" : "Unavailable (not sampled this frame)");
                                                           ImGui::Text("Load: %s",
                                                               att.LoadOp == VK_ATTACHMENT_LOAD_OP_LOAD ? "LOAD" :
                                                               att.LoadOp == VK_ATTACHMENT_LOAD_OP_CLEAR ? "CLEAR" : "DONT_CARE");
@@ -621,15 +722,18 @@ namespace Graphics
 
                                                       // Name
                                                       ImGui::TableSetColumnIndex(0);
-                                                      const char* readableName = resolveName(img.Name);
                                                       const bool isSelected = (img.Name == debugView.SelectedResource);
                                                       char nameLabel[128];
-                                                      if (readableName)
-                                                          snprintf(nameLabel, sizeof(nameLabel), "%s##%u", readableName, img.Name.Value);
-                                                      else
-                                                          snprintf(nameLabel, sizeof(nameLabel), "0x%08X", img.Name.Value);
+                                                      formatResourceLabel(img.Name,
+                                                                          img.Format,
+                                                                          img.Aspect,
+                                                                          isViewportEligible(img),
+                                                                          nameLabel,
+                                                                          sizeof(nameLabel));
+                                                      ImGui::BeginDisabled(!isViewportEligible(img));
                                                       if (ImGui::Selectable(nameLabel, isSelected, ImGuiSelectableFlags_SpanAllColumns))
                                                           debugView.SelectedResource = img.Name;
+                                                      ImGui::EndDisabled();
 
                                                       // Size
                                                       ImGui::TableSetColumnIndex(1);

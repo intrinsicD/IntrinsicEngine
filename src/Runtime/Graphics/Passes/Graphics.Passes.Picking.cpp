@@ -1,6 +1,10 @@
 module;
 
+#include <cstddef>
 #include <glm/glm.hpp>
+#include <limits>
+#include <unordered_map>
+#include <vector>
 #include <entt/entity/registry.hpp>
 #include "RHI.Vulkan.hpp"
 
@@ -27,31 +31,56 @@ namespace Graphics::Passes
     namespace
     {
         // Unified MRT push constants for all pick pipelines.
-        // 104 bytes — fits within Vulkan's guaranteed 128-byte minimum.
+        // 112 bytes — fits within Vulkan's guaranteed 128-byte minimum.
         struct PickMRTPushConsts
         {
-            glm::mat4 Model;         // 64
-            uint64_t PtrPositions;   // 8
-            uint64_t PtrAux;         // 8  (PtrEdges for lines, unused for points)
-            uint32_t EntityID;       // 4
-            uint32_t PrimitiveBase;  // 4
-            float    PickWidth;      // 4  (line width for line pick, point size for point pick)
-            float    ViewportWidth;  // 4
-            float    ViewportHeight; // 4
-            uint32_t _pad;           // 4
-        };                           // total: 104
-        static_assert(sizeof(PickMRTPushConsts) == 104);
+            glm::mat4 Model{};         // 64
+            uint64_t PtrPositions{};   // 8
+            uint64_t PtrAux{};         // 8  (PtrEdges for lines, unused for points)
+            uint64_t PtrPrimitiveFaceIds{}; // 8 (surface triangle -> authoritative mesh face)
+            uint32_t EntityID{};       // 4
+            uint32_t PrimitiveBase{};  // 4
+            float    PickWidth{};      // 4  (line width for line pick, point size for point pick)
+            float    ViewportWidth{};  // 4
+            float    ViewportHeight{}; // 4
+            uint32_t _pad{};           // 4
+        };                           // total: 112
+        static_assert(sizeof(PickMRTPushConsts) == 112);
 
         // Legacy single-output push constants (for fallback pipeline).
         struct PickLegacyPushConsts
         {
-            glm::mat4 Model;
-            uint64_t PtrPositions;
-            uint64_t PtrNormals;
-            uint64_t PtrAux;
-            uint32_t EntityID;
-            uint32_t _pad[3];
+            glm::mat4 Model{};
+            uint64_t PtrPositions{};
+            uint64_t PtrNormals{};
+            uint64_t PtrAux{};
+            uint32_t EntityID{};
+            uint32_t _pad[3]{};
         };
+
+        [[nodiscard]] const Geometry::Halfedge::Mesh* ResolvePickingMesh(const entt::registry& registry, entt::entity entity)
+        {
+            if (const auto* meshData = registry.try_get<ECS::Mesh::Data>(entity))
+            {
+                if (meshData->MeshRef)
+                    return meshData->MeshRef.get();
+            }
+
+            if (const auto* collider = registry.try_get<ECS::MeshCollider::Component>(entity))
+            {
+                if (collider->CollisionRef && collider->CollisionRef->SourceMesh)
+                    return collider->CollisionRef->SourceMesh.get();
+            }
+
+            return nullptr;
+        }
+
+        void BuildTriangleFaceIds(const Geometry::Halfedge::Mesh& mesh, std::vector<uint32_t>& triangleFaceIds)
+        {
+            std::vector<glm::vec3> positions;
+            std::vector<uint32_t> indices;
+            Geometry::MeshUtils::ExtractIndexedTriangles(mesh, positions, indices, nullptr, &triangleFaceIds);
+        }
     }
 
     void PickingPass::AddPasses(RenderPassContext& ctx)
@@ -72,13 +101,52 @@ namespace Graphics::Passes
         if (!depth.IsValid() || !entityId.IsValid())
             return;
 
-        // PrimitiveId is optional — when not present, MRT pipelines write to
-        // EntityId only and PrimitiveID readback returns 0 (no hit).
+        // PrimitiveId is optional. When present, UINT_MAX is the invalid
+        // sentinel so primitive index 0 remains selectable.
         const RGResourceHandle primitiveId = ctx.Blackboard.Get(RenderResource::PrimitiveId);
         const bool hasMRT = primitiveId.IsValid() && m_MeshPickPipeline != nullptr;
 
         RGResourceHandle pickEntityHandle = entityId;
         RGResourceHandle pickPrimHandle = primitiveId;
+
+        std::unordered_map<uint32_t, uint64_t> faceIdByGeoIndex;
+        {
+            auto& registry = ctx.Scene.GetRegistry();
+            auto surfaceView = registry.view<ECS::Surface::Component>();
+            std::vector<uint32_t> triangleFaceIds;
+
+            for (auto [entity, surface] : surfaceView.each())
+            {
+                if (!surface.Geometry.IsValid() || faceIdByGeoIndex.contains(surface.Geometry.Index))
+                    continue;
+
+                auto* geo = ctx.GeometryStorage.GetIfValid(surface.Geometry);
+                if (!geo || geo->GetTopology() != PrimitiveTopology::Triangles)
+                    continue;
+
+                const Geometry::Halfedge::Mesh* mesh = ResolvePickingMesh(registry, entity);
+                if (mesh == nullptr)
+                    continue;
+
+                BuildTriangleFaceIds(*mesh, triangleFaceIds);
+                if (triangleFaceIds.empty())
+                    continue;
+
+                const uint32_t gpuTriangleCount = (geo->GetIndexCount() > 0)
+                    ? (geo->GetIndexCount() / 3u)
+                    : static_cast<uint32_t>((geo->GetLayout().PositionsSize / sizeof(glm::vec3)) / 3u);
+                if (gpuTriangleCount != triangleFaceIds.size())
+                    continue;
+
+                if (const uint64_t addr = EnsureFaceIdBuffer(surface.Geometry.Index,
+                                                             triangleFaceIds.data(),
+                                                             static_cast<uint32_t>(triangleFaceIds.size()));
+                    addr != 0)
+                {
+                    faceIdByGeoIndex[surface.Geometry.Index] = addr;
+                }
+            }
+        }
 
         ctx.Graph.AddPass<PickPassData>("PickID",
                                         [&](PickPassData& data, RGBuilder& builder)
@@ -98,13 +166,14 @@ namespace Graphics::Passes
                                                 RGAttachmentInfo primInfo{};
                                                 primInfo.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
                                                 primInfo.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
-                                                primInfo.ClearValue.color.uint32[0] = 0u;
+                                                primInfo.ClearValue.color.uint32[0] = std::numeric_limits<uint32_t>::max();
                                                 data.PrimIdBuffer = builder.WriteColor(primitiveId, primInfo);
                                             }
 
                                             data.Depth = builder.WriteDepth(depth, depthInfo);
                                         },
                                         [&, hasMRT,
+                                         faceIdByGeoIndex = std::move(faceIdByGeoIndex),
                                          legacyPipeline = m_Pipeline,
                                          meshPipeline = m_MeshPickPipeline,
                                          linePipeline = m_LinePickPipeline,
@@ -157,6 +226,7 @@ namespace Graphics::Passes
                                                     goto skip_surfaces;
 
                                                 bindPipelineAndSets(surfPipeline);
+                                                 vkCmdSetPrimitiveTopology(cmd, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 
                                                 auto surfaceView = registry.view<ECS::Components::Transform::Component,
                                                                                  ECS::Surface::Component>();
@@ -174,10 +244,12 @@ namespace Graphics::Passes
 
                                                     if (hasMRT && meshPipeline)
                                                     {
+                                                        const auto faceIdIt = faceIdByGeoIndex.find(surface.Geometry.Index);
                                                         const PickMRTPushConsts push{
                                                             .Model = worldMatrix,
                                                             .PtrPositions = baseAddr + layout.PositionsOffset,
                                                             .PtrAux = 0,
+                                                            .PtrPrimitiveFaceIds = (faceIdIt != faceIdByGeoIndex.end()) ? faceIdIt->second : 0,
                                                             .EntityID = getPickId(entity),
                                                             .PrimitiveBase = 0,
                                                             .PickWidth = 0.0f,
@@ -228,6 +300,10 @@ namespace Graphics::Passes
                                                     goto skip_lines;
 
                                                 bindPipelineAndSets(linePickPl);
+                                                 vkCmdSetPrimitiveTopology(cmd,
+                                                                           (hasMRT && linePipeline)
+                                                                               ? VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST
+                                                                               : VK_PRIMITIVE_TOPOLOGY_LINE_LIST);
 
                                                 auto lineView = registry.view<ECS::Components::Transform::Component,
                                                                               ECS::Line::Component>();
@@ -255,6 +331,7 @@ namespace Graphics::Passes
                                                             .Model = worldMatrix,
                                                             .PtrPositions = baseAddr + layout.PositionsOffset,
                                                             .PtrAux = edgeAddr,
+                                                            .PtrPrimitiveFaceIds = 0,
                                                             .EntityID = getPickId(entity),
                                                             .PrimitiveBase = 0,
                                                             .PickWidth = line.Width,
@@ -276,7 +353,6 @@ namespace Graphics::Passes
                                                             vkCmdBindIndexBuffer(cmd, edgeGeo->GetIndexBuffer()->GetHandle(),
                                                                                  0, VK_INDEX_TYPE_UINT32);
                                                         }
-                                                        vkCmdSetPrimitiveTopology(cmd, VK_PRIMITIVE_TOPOLOGY_LINE_LIST);
 
                                                         const PickLegacyPushConsts push{
                                                             .Model = worldMatrix,
@@ -306,6 +382,10 @@ namespace Graphics::Passes
                                                     goto skip_points;
 
                                                 bindPipelineAndSets(pointPickPl);
+                                                 vkCmdSetPrimitiveTopology(cmd,
+                                                                           (hasMRT && pointPipeline)
+                                                                               ? VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST
+                                                                               : VK_PRIMITIVE_TOPOLOGY_POINT_LIST);
 
                                                 auto pointView = registry.view<ECS::Components::Transform::Component,
                                                                                ECS::Point::Component>();
@@ -328,6 +408,7 @@ namespace Graphics::Passes
                                                             .Model = worldMatrix,
                                                             .PtrPositions = baseAddr + layout.PositionsOffset,
                                                             .PtrAux = 0,
+                                                            .PtrPrimitiveFaceIds = 0,
                                                             .EntityID = getPickId(entity),
                                                             .PrimitiveBase = 0,
                                                             .PickWidth = point.Size,
@@ -343,7 +424,6 @@ namespace Graphics::Passes
                                                     }
                                                     else
                                                     {
-                                                        vkCmdSetPrimitiveTopology(cmd, VK_PRIMITIVE_TOPOLOGY_POINT_LIST);
 
                                                         const PickLegacyPushConsts push{
                                                             .Model = worldMatrix,
@@ -442,5 +522,13 @@ namespace Graphics::Passes
                                                                            dst, 1, &region);
                                                  }
                                              });
+    }
+
+    uint64_t PickingPass::EnsureFaceIdBuffer(uint32_t geoIndex,
+                                             const uint32_t* faceIds,
+                                             uint32_t triangleCount)
+    {
+        return EnsurePerEntityBuffer<uint32_t>(
+            *m_Device, m_FaceIdBuffers, geoIndex, faceIds, triangleCount, "PickingPass");
     }
 }

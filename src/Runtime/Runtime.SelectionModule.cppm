@@ -1,5 +1,6 @@
 module;
 #include <cstdint>
+#include <limits>
 #include <optional>
 
 #include <glm/glm.hpp>
@@ -100,7 +101,7 @@ export namespace Runtime
         struct CachedGpuPick
         {
             uint32_t PickID = 0;
-            uint32_t PrimitiveID = 0;
+            uint32_t PrimitiveID = std::numeric_limits<uint32_t>::max();
             bool HasHit = false;
         };
         std::optional<CachedGpuPick> m_CachedGpuPick;

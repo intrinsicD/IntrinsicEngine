@@ -6,6 +6,8 @@ module;
 #include <string_view>
 #include <utility>
 #include <unordered_map>
+#include <algorithm>
+#include <vector>
 #include <glm/glm.hpp>
 
 #include "RHI.Vulkan.hpp"
@@ -29,6 +31,18 @@ using namespace Core::Hash;
 
 namespace Graphics::Passes
 {
+    void DebugViewPass::ReleaseImGuiTextures() noexcept
+    {
+        for (void*& texId : m_ImGuiTextureIds)
+        {
+            if (!texId)
+                continue;
+
+            Interface::GUI::RemoveTexture(texId);
+            texId = nullptr;
+        }
+    }
+
     void DebugViewPass::Initialize(RHI::VulkanDevice& device,
                                    RHI::DescriptorAllocator& descriptorPool,
                                    RHI::DescriptorLayout&)
@@ -99,6 +113,10 @@ namespace Graphics::Passes
         if (!ctx.Debug.Enabled)
             return;
 
+        m_LastSrcHandle = {};
+        m_LastSrcFormat = VK_FORMAT_UNDEFINED;
+        m_LastSrcAspect = 0;
+
         // Lazy pipeline build once we know swapchain format.
         if (!m_Pipeline)
         {
@@ -141,25 +159,32 @@ namespace Graphics::Passes
         if (ctx.PrevFrameDebugImages.empty())
             return;
 
-        const RenderGraphDebugImage* srcInfo = nullptr;
-        for (const auto& img : ctx.PrevFrameDebugImages)
+        const auto isSampleable = [](const RenderGraphDebugImage& img)
         {
-            if (img.Name == ctx.Debug.SelectedResource && (img.Usage & VK_IMAGE_USAGE_SAMPLED_BIT) != 0)
+            return (img.Usage & VK_IMAGE_USAGE_SAMPLED_BIT) != 0 && img.View != VK_NULL_HANDLE;
+        };
+
+        const auto findSampleableByName = [&](Core::Hash::StringID name) -> const RenderGraphDebugImage*
+        {
+            for (const auto& img : ctx.PrevFrameDebugImages)
             {
-                srcInfo = &img;
-                break;
+                if (img.Name == name && isSampleable(img))
+                    return &img;
             }
-        }
+            return nullptr;
+        };
+
+        const RenderGraphDebugImage* srcInfo = findSampleableByName(ctx.Debug.SelectedResource);
+        if (!srcInfo)
+            srcInfo = findSampleableByName(GetRenderResourceName(RenderResource::EntityId));
 
         if (!srcInfo)
         {
             for (const auto& img : ctx.PrevFrameDebugImages)
             {
-                if (img.Name == GetRenderResourceName(RenderResource::EntityId) &&
-                    (img.Usage & VK_IMAGE_USAGE_SAMPLED_BIT) != 0)
+                if (isSampleable(img))
                 {
                     srcInfo = &img;
-                    ctx.Debug.SelectedResource = img.Name;
                     break;
                 }
             }
@@ -167,6 +192,10 @@ namespace Graphics::Passes
 
         if (!srcInfo)
             return;
+
+        ctx.Debug.SelectedResource = srcInfo->Name;
+        m_LastSrcFormat = srcInfo->Format;
+        m_LastSrcAspect = srcInfo->Aspect;
 
         // 1. Prepare Intermediate Image (Always needed for UI, and now source for Viewport)
         if (ctx.FrameIndex >= m_PreviewImages.size())
@@ -237,7 +266,7 @@ namespace Graphics::Passes
                                            // Metadata
                                            data.SrcFormat = srcInfo->Format;
                                            data.IsDepth = (srcInfo->Aspect & VK_IMAGE_ASPECT_DEPTH_BIT) != 0;
-                                           m_LastSrcHandle = data.Src;
+                                            m_LastSrcHandle = data.Src;
 
                                            // Expose to Blackboard
                                            ctx.Blackboard.Add("DebugViewRGBA"_id, data.Dst);
@@ -377,22 +406,36 @@ namespace Graphics::Passes
         }
 
         VkDescriptorSet currentSet = m_DescriptorSets[frameIndex];
-        if (currentSet && m_LastSrcHandle.IsValid())
+        if (currentSet)
         {
-            for (const auto& img : debugImages)
-            {
-                if (img.Resource == m_LastSrcHandle.ID && img.View != VK_NULL_HANDLE)
-                {
-                    uint32_t targetBinding = 0;
-                    if (img.Format == VK_FORMAT_R32_UINT)
-                        targetBinding = 1;
-                    else if ((img.Aspect & VK_IMAGE_ASPECT_DEPTH_BIT) != 0)
-                        targetBinding = 2;
+            const VkDevice device = m_Device->GetLogicalDevice();
+            UpdateImageDescriptor(device, currentSet, 0,
+                                  m_Sampler, m_DummyFloat->GetView(),
+                                  VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            UpdateImageDescriptor(device, currentSet, 1,
+                                  m_Sampler, m_DummyUint->GetView(),
+                                  VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            UpdateImageDescriptor(device, currentSet, 2,
+                                  m_Sampler, m_DummyDepth->GetView(),
+                                  VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL);
 
-                    UpdateImageDescriptor(m_Device->GetLogicalDevice(), currentSet, targetBinding,
-                                          m_Sampler, img.View,
-                                          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-                    break;
+            if (m_LastSrcHandle.IsValid())
+            {
+                const uint32_t targetBinding = (m_LastSrcFormat == VK_FORMAT_R32_UINT)
+                    ? 1u
+                    : (((m_LastSrcAspect & VK_IMAGE_ASPECT_DEPTH_BIT) != 0) ? 2u : 0u);
+
+                for (const auto& img : debugImages)
+                {
+                    if (img.Resource == m_LastSrcHandle.ID && img.View != VK_NULL_HANDLE)
+                    {
+                        UpdateImageDescriptor(device, currentSet, targetBinding,
+                                              m_Sampler, img.View,
+                                              targetBinding == 2
+                                                  ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
+                                                  : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                        break;
+                    }
                 }
             }
         }
@@ -420,11 +463,7 @@ namespace Graphics::Passes
         // Device is idle when this is called from RenderSystem::OnResize
 
         // 1. Clear ImGui Descriptors
-        for (void* texId : m_ImGuiTextureIds)
-        {
-            if (texId) Interface::GUI::RemoveTexture(texId);
-        }
-        std::fill(m_ImGuiTextureIds.begin(), m_ImGuiTextureIds.end(), nullptr);
+        ReleaseImGuiTextures();
 
         // 2. Clear Images
         m_PreviewImages.clear();
@@ -432,10 +471,7 @@ namespace Graphics::Passes
 
     void DebugViewPass::Shutdown()
     {
-        for (void* texId : m_ImGuiTextureIds)
-        {
-            if (texId) Interface::GUI::RemoveTexture(texId);
-        }
+        ReleaseImGuiTextures();
         m_ImGuiTextureIds.clear();
 
         if (!m_Device) return;
