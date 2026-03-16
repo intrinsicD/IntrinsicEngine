@@ -1019,96 +1019,75 @@ namespace Runtime::Selection
         if (elementMode == ElementMode::Entity)
             return picked;
 
-        // Meshes: the CPU ray hit is authoritative and should populate
-        // face -> closest edge -> closest vertex in one shot. PrimitiveID is only
-        // used as an unambiguous fallback when CPU completion is unavailable.
+        // Meshes: GPU surface-face ID is authoritative. CPU is refinement-only:
+        // compute local/world hit point and nearest edge/vertex from that point.
         if (isMesh)
         {
-            if (!adoptedCpu && hasPrimitiveID)
+            if (hasPrimitiveID && primitiveHint.Domain == PrimitivePickDomain::SurfaceTriangle)
             {
-                switch (primitiveHint.Domain)
-                {
-                case PrimitivePickDomain::SurfaceTriangle:
-                    if (picked.entity.face_idx == Picked::Entity::InvalidIndex && hasSurface)
-                        picked.entity.face_idx = primitiveHint.Index;
-                    break;
-                case PrimitivePickDomain::LineSegment:
-                    if (picked.entity.edge_idx == Picked::Entity::InvalidIndex && hasLine)
-                        picked.entity.edge_idx = primitiveHint.Index;
-                    break;
-                case PrimitivePickDomain::Point:
-                    if (picked.entity.vertex_idx == Picked::Entity::InvalidIndex && hasPoint)
-                        picked.entity.vertex_idx = primitiveHint.Index;
-                    break;
-                case PrimitivePickDomain::Reserved:
-                    break;
-                }
+                if (hasSurface)
+                    picked.entity.face_idx = primitiveHint.Index;
 
-                // Legacy fallback for older/raw untyped primitive IDs: only safe when
-                // the entity is rendered in exactly one non-surface primitive domain.
-                if (!primitiveHint.HasExplicitNonSurfaceDomain)
+                if (request != nullptr)
                 {
-                    switch (elementMode)
+                    const auto& entityPick = getCpuResult();
+                    if (entityPick.Entity == entity && entityPick.PickedData.entity)
                     {
-                    case ElementMode::Vertex:
-                        if (picked.entity.vertex_idx == Picked::Entity::InvalidIndex && hasPoint && !hasLine && !hasSurface)
-                            picked.entity.vertex_idx = primitiveHint.Index;
-                        break;
-                    case ElementMode::Edge:
-                        if (picked.entity.edge_idx == Picked::Entity::InvalidIndex && hasLine && !hasPoint && !hasSurface)
-                            picked.entity.edge_idx = primitiveHint.Index;
-                        break;
-                    case ElementMode::Face:
-                        if (picked.entity.face_idx == Picked::Entity::InvalidIndex && hasSurface && !hasLine && !hasPoint)
-                            picked.entity.face_idx = primitiveHint.Index;
-                        break;
-                    default:
-                        break;
+                        // Preserve authoritative GPU face ID while adopting CPU
+                        // spatial refinement (edge/vertex and hit-space payload).
+                        const uint32_t gpuFace = picked.entity.face_idx;
+                        picked = entityPick.PickedData;
+                        picked.entity.face_idx = gpuFace;
                     }
                 }
+                return picked;
+            }
+
+            // Compatibility fallback when no valid GPU face primitive is available.
+            if (adoptedCpu)
+                return picked;
+
+            if (hasPrimitiveID && !primitiveHint.HasExplicitNonSurfaceDomain)
+            {
+                if (elementMode == ElementMode::Face && hasSurface)
+                    picked.entity.face_idx = primitiveHint.Index;
             }
 
             return picked;
         }
 
-        // Graphs: use the projected graph hit to fill both nearest edge and
-        // nearest vertex. PrimitiveID is a fallback only when the graph is
-        // rendered in a single primitive domain and no CPU completion is available.
+        // Graphs: GPU edge ID is authoritative. CPU is refinement-only for
+        // nearest vertex and hit-space payload.
         if (isGraph)
         {
-            if (!adoptedCpu && hasPrimitiveID)
+            if (hasPrimitiveID && primitiveHint.Domain == PrimitivePickDomain::LineSegment)
             {
-                switch (primitiveHint.Domain)
-                {
-                case PrimitivePickDomain::LineSegment:
-                    if (picked.entity.edge_idx == Picked::Entity::InvalidIndex && hasLine)
-                        picked.entity.edge_idx = primitiveHint.Index;
-                    break;
-                case PrimitivePickDomain::Point:
-                    if (picked.entity.vertex_idx == Picked::Entity::InvalidIndex && hasPoint)
-                        picked.entity.vertex_idx = primitiveHint.Index;
-                    break;
-                case PrimitivePickDomain::SurfaceTriangle:
-                case PrimitivePickDomain::Reserved:
-                    break;
-                }
+                if (hasLine)
+                    picked.entity.edge_idx = primitiveHint.Index;
 
-                if (!primitiveHint.HasExplicitNonSurfaceDomain)
+                if (request != nullptr)
                 {
-                    switch (elementMode)
+                    const auto& entityPick = getCpuResult();
+                    if (entityPick.Entity == entity && entityPick.PickedData.entity)
                     {
-                    case ElementMode::Vertex:
-                        if (picked.entity.vertex_idx == Picked::Entity::InvalidIndex && hasPoint && !hasLine)
-                            picked.entity.vertex_idx = primitiveHint.Index;
-                        break;
-                    case ElementMode::Edge:
-                        if (picked.entity.edge_idx == Picked::Entity::InvalidIndex && hasLine && !hasPoint)
-                            picked.entity.edge_idx = primitiveHint.Index;
-                        break;
-                    default:
-                        break;
+                        // Preserve authoritative GPU edge ID while adopting CPU
+                        // nearest-vertex and hit-space data.
+                        const uint32_t gpuEdge = picked.entity.edge_idx;
+                        picked = entityPick.PickedData;
+                        picked.entity.edge_idx = gpuEdge;
                     }
                 }
+                return picked;
+            }
+
+            // Compatibility fallback when no valid GPU edge primitive is available.
+            if (adoptedCpu)
+                return picked;
+
+            if (hasPrimitiveID && !primitiveHint.HasExplicitNonSurfaceDomain)
+            {
+                if (elementMode == ElementMode::Edge && hasLine)
+                    picked.entity.edge_idx = primitiveHint.Index;
             }
 
             return picked;
@@ -1208,4 +1187,3 @@ namespace Runtime::Selection
         scene.GetDispatcher().enqueue<ECS::Events::HoverChanged>({hoveredEntity});
     }
 }
-
