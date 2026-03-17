@@ -375,6 +375,22 @@ namespace Runtime
             uint64_t frameGraphExecuteNsTotal = 0;
             uint64_t frameGraphCriticalPathNs = 0;
 
+            auto compileAndExecuteGraph = [&](Core::FrameGraph& graph)
+            {
+                const auto compileResult = graph.Compile();
+                frameGraphCompileNsTotal += graph.GetLastCompileTimeNs();
+                if (!compileResult)
+                {
+                    return;
+                }
+
+                GetAssetManager().BeginReadPhase();
+                graph.Execute();
+                GetAssetManager().EndReadPhase();
+                frameGraphExecuteNsTotal += graph.GetLastExecuteTimeNs();
+                frameGraphCriticalPathNs += graph.GetLastCriticalPathTimeNs();
+            };
+
             auto currentTime = Clock::now();
             double frameTime = std::chrono::duration<double>(currentTime - lastTime).count();
             lastTime = currentTime;
@@ -465,16 +481,7 @@ namespace Runtime
                         const float dtF = static_cast<float>(fixedDt);
                         OnRegisterFixedSystems(fixedGraph, dtF);
 
-                        auto compileResult = fixedGraph.Compile();
-                        frameGraphCompileNsTotal += fixedGraph.GetLastCompileTimeNs();
-                        if (compileResult)
-                        {
-                            GetAssetManager().BeginReadPhase();
-                            fixedGraph.Execute();
-                            GetAssetManager().EndReadPhase();
-                            frameGraphExecuteNsTotal += fixedGraph.GetLastExecuteTimeNs();
-                            frameGraphCriticalPathNs += fixedGraph.GetLastCriticalPathTimeNs();
-                        }
+                        compileAndExecuteGraph(fixedGraph);
                     }
 
                     accumulator -= fixedDt;
@@ -587,16 +594,7 @@ namespace Runtime
                     }
                 }
 
-                auto compileResult = frameGraph.Compile();
-                frameGraphCompileNsTotal += frameGraph.GetLastCompileTimeNs();
-                if (compileResult)
-                {
-                    GetAssetManager().BeginReadPhase();
-                    frameGraph.Execute();
-                    GetAssetManager().EndReadPhase();
-                    frameGraphExecuteNsTotal += frameGraph.GetLastExecuteTimeNs();
-                    frameGraphCriticalPathNs += frameGraph.GetLastCriticalPathTimeNs();
-                }
+                compileAndExecuteGraph(frameGraph);
             }
 
             // Drain deferred events enqueued during this frame's system updates.

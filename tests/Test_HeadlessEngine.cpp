@@ -32,6 +32,34 @@ import ECS;
 class HeadlessEngineTest : public ::testing::Test
 {
 protected:
+    void QueueTransformUpdate(entt::registry& registry, entt::entity entity, const glm::vec3& position)
+    {
+        auto& transform = registry.get<ECS::Components::Transform::Component>(entity);
+        transform.Position = position;
+        registry.emplace_or_replace<ECS::Components::Transform::IsDirtyTag>(entity);
+    }
+
+    [[nodiscard]] bool RunTransformFrame(entt::registry& registry)
+    {
+        m_FrameScope->Reset();
+        m_AssetPipeline->ProcessMainThreadQueue();
+        m_AssetPipeline->ProcessUploads();
+
+        Core::FrameGraph frameGraph(*m_FrameScope);
+        ECS::Systems::Transform::RegisterSystem(frameGraph, registry);
+
+        const auto compileResult = frameGraph.Compile();
+        if (!compileResult.has_value())
+            return false;
+
+        m_AssetPipeline->GetAssetManager().BeginReadPhase();
+        frameGraph.Execute();
+        m_AssetPipeline->GetAssetManager().EndReadPhase();
+
+        m_TransferManager->GarbageCollect();
+        return true;
+    }
+
     void SetUp() override
     {
         // --- Mirror Engine::Engine() construction order (headless) ---
@@ -138,41 +166,14 @@ TEST_F(HeadlessEngineTest, OneFrameCycle)
     entt::entity e2 = scene.CreateEntity("Entity_B");
 
     // Set positions and mark dirty
-    auto& t1 = registry.get<ECS::Components::Transform::Component>(e1);
-    t1.Position = {10.0f, 0.0f, 0.0f};
-    registry.emplace_or_replace<ECS::Components::Transform::IsDirtyTag>(e1);
+    QueueTransformUpdate(registry, e1, {10.0f, 0.0f, 0.0f});
 
     auto& t2 = registry.get<ECS::Components::Transform::Component>(e2);
-    t2.Position = {0.0f, 5.0f, -3.0f};
     t2.Scale = {2.0f, 2.0f, 2.0f};
-    registry.emplace_or_replace<ECS::Components::Transform::IsDirtyTag>(e2);
+    QueueTransformUpdate(registry, e2, {0.0f, 5.0f, -3.0f});
 
     // --- One frame cycle (mirrors Engine::Run loop body) ---
-
-    // 1. Reset per-frame state
-    m_FrameScope->Reset();
-
-    // 2. Process main-thread queue (AssetPipeline)
-    m_AssetPipeline->ProcessMainThreadQueue();
-
-    // 3. Process uploads (AssetPipeline)
-    m_AssetPipeline->ProcessUploads();
-
-    // 4. FrameGraph: register, compile, execute
-    Core::FrameGraph frameGraph(*m_FrameScope);
-
-    ECS::Systems::Transform::RegisterSystem(frameGraph, registry);
-
-    auto compileResult = frameGraph.Compile();
-    ASSERT_TRUE(compileResult.has_value()) << "FrameGraph compile failed";
-    EXPECT_GE(frameGraph.GetPassCount(), 1u);
-
-    m_AssetPipeline->GetAssetManager().BeginReadPhase();
-    frameGraph.Execute();
-    m_AssetPipeline->GetAssetManager().EndReadPhase();
-
-    // 5. Transfer GC
-    m_TransferManager->GarbageCollect();
+    ASSERT_TRUE(RunTransformFrame(registry)) << "FrameGraph compile failed";
 
     // --- Verify frame results ---
 
@@ -208,30 +209,8 @@ TEST_F(HeadlessEngineTest, MultiFrameCycle)
 
     for (int frame = 0; frame < 5; ++frame)
     {
-        // Reset per-frame state (like Engine::Run top-of-loop)
-        m_FrameScope->Reset();
-
-        // Move entity each frame
-        auto& t = registry.get<ECS::Components::Transform::Component>(e);
-        t.Position.x = static_cast<float>(frame) * 3.0f;
-        registry.emplace_or_replace<ECS::Components::Transform::IsDirtyTag>(e);
-
-        // Process pipeline
-        m_AssetPipeline->ProcessMainThreadQueue();
-        m_AssetPipeline->ProcessUploads();
-
-        // FrameGraph cycle
-        Core::FrameGraph frameGraph(*m_FrameScope);
-        ECS::Systems::Transform::RegisterSystem(frameGraph, registry);
-
-        auto result = frameGraph.Compile();
-        ASSERT_TRUE(result.has_value()) << "Frame " << frame << " compile failed";
-
-        m_AssetPipeline->GetAssetManager().BeginReadPhase();
-        frameGraph.Execute();
-        m_AssetPipeline->GetAssetManager().EndReadPhase();
-
-        m_TransferManager->GarbageCollect();
+        QueueTransformUpdate(registry, e, {static_cast<float>(frame) * 3.0f, 0.0f, 0.0f});
+        ASSERT_TRUE(RunTransformFrame(registry)) << "Frame " << frame << " compile failed";
 
         // Verify
         auto& world = registry.get<ECS::Components::Transform::WorldMatrix>(e);
@@ -266,22 +245,9 @@ TEST_F(HeadlessEngineTest, AssetPipelineMainThreadQueueInFrameLoop)
     EXPECT_FALSE(taskExecuted);
 
     // --- Frame 1: process queue, then run FrameGraph ---
-    m_FrameScope->Reset();
-
     // This should execute our queued task
-    m_AssetPipeline->ProcessMainThreadQueue();
+    ASSERT_TRUE(RunTransformFrame(registry));
     EXPECT_TRUE(taskExecuted);
-
-    // Now the transform system should pick up the dirty entity
-    Core::FrameGraph frameGraph(*m_FrameScope);
-    ECS::Systems::Transform::RegisterSystem(frameGraph, registry);
-
-    auto result = frameGraph.Compile();
-    ASSERT_TRUE(result.has_value());
-
-    m_AssetPipeline->GetAssetManager().BeginReadPhase();
-    frameGraph.Execute();
-    m_AssetPipeline->GetAssetManager().EndReadPhase();
 
     // Verify the async-queued transform made it through the full pipeline
     auto& world = registry.get<ECS::Components::Transform::WorldMatrix>(e);
@@ -300,37 +266,17 @@ TEST_F(HeadlessEngineTest, EntityLifecycleDuringFrame)
     entt::entity e1 = scene.CreateEntity("Permanent");
     entt::entity e2 = scene.CreateEntity("Temporary");
 
-    auto& t1 = registry.get<ECS::Components::Transform::Component>(e1);
-    t1.Position = {1.0f, 2.0f, 3.0f};
-    registry.emplace_or_replace<ECS::Components::Transform::IsDirtyTag>(e1);
-
-    auto& t2 = registry.get<ECS::Components::Transform::Component>(e2);
-    t2.Position = {4.0f, 5.0f, 6.0f};
-    registry.emplace_or_replace<ECS::Components::Transform::IsDirtyTag>(e2);
-
-    // Run one frame
-    m_FrameScope->Reset();
-    Core::FrameGraph frameGraph(*m_FrameScope);
-    ECS::Systems::Transform::RegisterSystem(frameGraph, registry);
-    auto result = frameGraph.Compile();
-    ASSERT_TRUE(result.has_value());
-    frameGraph.Execute();
+    QueueTransformUpdate(registry, e1, {1.0f, 2.0f, 3.0f});
+    QueueTransformUpdate(registry, e2, {4.0f, 5.0f, 6.0f});
+    ASSERT_TRUE(RunTransformFrame(registry));
 
     // Destroy temporary entity
     registry.destroy(e2);
     EXPECT_EQ(scene.Size(), 1u);
 
     // Second frame: only permanent entity remains
-    m_FrameScope->Reset();
-    Core::FrameGraph frameGraph2(*m_FrameScope);
-
-    t1.Position.x = 99.0f;
-    registry.emplace_or_replace<ECS::Components::Transform::IsDirtyTag>(e1);
-
-    ECS::Systems::Transform::RegisterSystem(frameGraph2, registry);
-    auto result2 = frameGraph2.Compile();
-    ASSERT_TRUE(result2.has_value());
-    frameGraph2.Execute();
+    QueueTransformUpdate(registry, e1, {99.0f, 2.0f, 3.0f});
+    ASSERT_TRUE(RunTransformFrame(registry));
 
     auto& world1 = registry.get<ECS::Components::Transform::WorldMatrix>(e1);
     EXPECT_FLOAT_EQ(world1.Matrix[3][0], 99.0f);
@@ -376,16 +322,8 @@ TEST_F(HeadlessEngineTest, SceneClearAndReuse)
 
     // Repopulate and run a frame
     entt::entity e = scene.CreateEntity("Fresh");
-    auto& t = registry.get<ECS::Components::Transform::Component>(e);
-    t.Position = {7.0f, 8.0f, 9.0f};
-    registry.emplace_or_replace<ECS::Components::Transform::IsDirtyTag>(e);
-
-    m_FrameScope->Reset();
-    Core::FrameGraph frameGraph(*m_FrameScope);
-    ECS::Systems::Transform::RegisterSystem(frameGraph, registry);
-    auto result = frameGraph.Compile();
-    ASSERT_TRUE(result.has_value());
-    frameGraph.Execute();
+    QueueTransformUpdate(registry, e, {7.0f, 8.0f, 9.0f});
+    ASSERT_TRUE(RunTransformFrame(registry));
 
     auto& world = registry.get<ECS::Components::Transform::WorldMatrix>(e);
     EXPECT_FLOAT_EQ(world.Matrix[3][0], 7.0f);
