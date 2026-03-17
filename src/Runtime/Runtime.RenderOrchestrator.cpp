@@ -98,6 +98,8 @@ namespace Runtime
         constexpr std::array kShaderRegistrations = {
             ShaderRegistration{"Surface.Vert"_id, "shaders/surface.vert.spv"},
             ShaderRegistration{"Surface.Frag"_id, "shaders/surface.frag.spv"},
+            ShaderRegistration{"Surface.GBuffer.Frag"_id, "shaders/surface_gbuffer.frag.spv"},
+            ShaderRegistration{"Deferred.Lighting.Frag"_id, "shaders/deferred_lighting.frag.spv"},
             ShaderRegistration{"Picking.Vert"_id, "shaders/pick_id.vert.spv"},
             ShaderRegistration{"Picking.Frag"_id, "shaders/pick_id.frag.spv"},
             ShaderRegistration{"PickMesh.Vert"_id, "shaders/pick_mesh.vert.spv"},

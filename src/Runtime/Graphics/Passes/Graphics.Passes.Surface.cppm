@@ -54,6 +54,7 @@ export namespace Graphics::Passes
         void SetLinePipeline(RHI::GraphicsPipeline* p) { m_LinePipeline = p; }
         void SetPointPipeline(RHI::GraphicsPipeline* p) { m_PointPipeline = p; }
         void SetCullPipeline(RHI::ComputePipeline* p) { m_CullPipeline = p; }
+        void SetGBufferPipeline(RHI::GraphicsPipeline* p) { m_GBufferPipeline = p; }
 
         void AddPasses(RenderPassContext& ctx) override;
 
@@ -113,6 +114,14 @@ export namespace Graphics::Passes
             RGResourceHandle Depth{};
         };
 
+        struct GBufferPassData
+        {
+            RGResourceHandle Normal{};
+            RGResourceHandle Albedo{};
+            RGResourceHandle Material{};
+            RGResourceHandle Depth{};
+        };
+
         struct RenderPacket
         {
             Geometry::GeometryHandle GeoHandle{};
@@ -134,6 +143,7 @@ export namespace Graphics::Passes
         RHI::GraphicsPipeline* m_LinePipeline = nullptr; // owned by PipelineLibrary
         RHI::GraphicsPipeline* m_PointPipeline = nullptr; // owned by PipelineLibrary
         RHI::ComputePipeline* m_CullPipeline = nullptr; // owned by PipelineLibrary
+        RHI::GraphicsPipeline* m_GBufferPipeline = nullptr; // owned by PipelineLibrary
 
         // Stage 1: SSBO pull-model.
         // CRITICAL: must match VulkanDevice::MAX_FRAMES_IN_FLIGHT (3) exactly.
@@ -248,6 +258,12 @@ export namespace Graphics::Passes
 
         // Record a single raster pass that consumes the draw stream exactly once.
         void AddRasterPass(RenderPassContext& ctx, RGResourceHandle sceneColor, RGResourceHandle depth, DrawStream&& stream);
+
+        // Record a G-buffer raster pass (deferred path) that writes to MRT targets.
+        void AddGBufferRasterPass(RenderPassContext& ctx,
+                                  RGResourceHandle normal, RGResourceHandle albedo,
+                                  RGResourceHandle material, RGResourceHandle depth,
+                                  DrawStream&& stream);
 
         // Legacy helpers (will be folded into BuildDrawStream/AddRasterPass).
         void AddStage1And2Passes(RenderPassContext& ctx, RGResourceHandle backbuffer, RGResourceHandle depth);

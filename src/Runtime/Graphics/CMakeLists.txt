@@ -56,6 +56,7 @@ target_sources(${target_name}
         Passes/Graphics.Passes.DebugView.cppm
         Passes/Graphics.Passes.PostProcessSettings.cppm
         Passes/Graphics.Passes.PostProcess.cppm
+        Passes/Graphics.Passes.Composition.cppm
         Passes/Graphics.Passes.ImGui.cppm
         Graphics.IORegistry.cppm
         Importers/Graphics.Importers.OBJ.cppm
@@ -115,6 +116,7 @@ target_sources(${target_name}
         Passes/Graphics.Passes.Point.cpp
         Passes/Graphics.Passes.DebugView.cpp
         Passes/Graphics.Passes.PostProcess.cpp
+        Passes/Graphics.Passes.Composition.cpp
         Graphics.IORegistry.cpp
         Importers/Graphics.Importers.OBJ.cpp
         Importers/Graphics.Importers.PLY.cpp

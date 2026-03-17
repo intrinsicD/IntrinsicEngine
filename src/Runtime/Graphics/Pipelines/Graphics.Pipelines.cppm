@@ -19,6 +19,7 @@ import :Passes.Point;
 import :Passes.SelectionOutline;
 import :Passes.SelectionOutlineSettings;
 import :Passes.PostProcess;
+import :Passes.Composition;
 import RHI;
 import Core.Hash;
 import Core.FeatureRegistry;
@@ -35,8 +36,10 @@ export namespace Graphics
         bool SelectionOutlinePassEnabled = true;
         bool DebugViewPassEnabled = true;
         bool ImGuiPassEnabled = true;
+        bool CompositionPassEnabled = true;
         bool HasSelectionWork = false;
         bool DebugViewEnabled = false;
+        FrameLightingPath RequestedLightingPath = FrameLightingPath::Forward;
         Core::Hash::StringID DebugResource = GetRenderResourceName(RenderResource::EntityId);
     };
 
@@ -103,6 +106,7 @@ export namespace Graphics
         std::unique_ptr<Passes::DebugViewPass> m_DebugViewPass;
         std::unique_ptr<Passes::ImGuiPass> m_ImGuiPass;
         std::unique_ptr<Passes::PostProcessPass> m_PostProcessPass;
+        std::unique_ptr<Passes::CompositionPass> m_CompositionPass;
 
         RenderPath m_Path;
         bool m_PathDirty = true;

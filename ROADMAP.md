@@ -41,6 +41,10 @@ The HDR post-processing foundation is in place. Scene passes render to an `R16G1
 
 Long-horizon additions (after MVP): SSAO, DOF.
 
+### Deferred Lighting Path (**MVP complete**)
+
+`CompositionPass` implements a fullscreen deferred lighting composition pass. When `FrameLightingPath::Deferred` is active (toggled via `FeatureRegistry` → "DeferredLighting"), `SurfacePass` writes to a 3-channel G-buffer MRT (SceneNormal RGBA16F, Albedo RGBA8, Material0 RGBA16F) instead of SceneColorHDR. `CompositionPass` reads the G-buffer + depth, reconstructs world positions from depth via push-constant `InvViewProj`, and applies Blinn-Phong lighting into SceneColorHDR. The forward path remains the default and is preserved as a fallback for unsupported cases. Selection outlines, debug views, and post-processing are completely independent of the lighting path. The `FrameRecipe` system automatically allocates G-buffer resources only when deferred is active.
+
 ---
 
 ## Phase 2 — Core UX

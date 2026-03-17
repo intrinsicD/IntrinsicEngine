@@ -241,6 +241,51 @@ namespace Graphics
         }
 
         // ---------------------------------------------------------------------
+        // G-Buffer surface pipeline (deferred path MRT output)
+        //
+        // Same vertex shader as forward. Fragment shader writes to 3 MRT targets:
+        //   location 0 = SceneNormal  (RGBA16F)
+        //   location 1 = Albedo       (RGBA8)
+        //   location 2 = Material0    (RGBA16F)
+        // ---------------------------------------------------------------------
+        {
+            auto [vertPath, fragPath] = resolveVF("Surface.Vert"_id, "Surface.GBuffer.Frag"_id);
+
+            RHI::ShaderModule vert(*m_Device, vertPath, RHI::ShaderStage::Vertex);
+            RHI::ShaderModule frag(*m_Device, fragPath, RHI::ShaderStage::Fragment);
+
+            RHI::VertexInputDescription inputLayout = {};
+            RHI::PipelineBuilder builder(m_DeviceOwner);
+            builder.SetShaders(&vert, &frag);
+            builder.SetInputLayout(inputLayout);
+            builder.SetColorFormats({
+                VK_FORMAT_R16G16B16A16_SFLOAT,  // SceneNormal
+                VK_FORMAT_R8G8B8A8_UNORM,       // Albedo
+                VK_FORMAT_R16G16B16A16_SFLOAT    // Material0
+            });
+            builder.SetDepthFormat(depthFormat);
+            builder.SetCullMode(VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE);
+            builder.AddDescriptorSetLayout(m_GlobalSetLayout.GetHandle());
+            builder.AddDescriptorSetLayout(m_Bindless.GetLayout());
+            builder.AddDescriptorSetLayout(m_Stage1InstanceSetLayout);
+
+            VkPushConstantRange pushConstant{};
+            pushConstant.offset = 0;
+            pushConstant.size = sizeof(RHI::MeshPushConstants);
+            pushConstant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+            builder.AddPushConstantRange(pushConstant);
+
+            auto pipelineResult = builder.Build();
+            if (!pipelineResult)
+            {
+                Core::Log::Error("Failed to build SurfaceGBuffer pipeline: {}", (int)pipelineResult.error());
+                std::exit(1);
+            }
+
+            m_Pipelines[kPipeline_SurfaceGBuffer] = std::move(*pipelineResult);
+        }
+
+        // ---------------------------------------------------------------------
         // Picking pipeline (ID buffer + BDA)
         // ---------------------------------------------------------------------
         {
