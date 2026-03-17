@@ -54,14 +54,6 @@ These are not required to finish the first wave, but they should begin soon afte
 - [ ] Keep transparent/special/debug rendering in the forward path.
 - [ ] Define composition rules between paths.
 
-### B3. GPU-Native Primitive ID Pipeline (**Complete**)
-
-Dual-channel MRT pipeline producing both `EntityId` and `PrimitiveId` in one GPU frame. Three dedicated pick pipelines (mesh, line, point) with 104-byte `PickMRTPushConsts`. `SelectionModule` uses the GPU entity hit for fast classification, then completes the full primitive tuple from the projected object hit: meshes resolve point-on-face → closest edge → closest vertex, graphs resolve nearest edge/node pairs, and point clouds keep direct point `PrimitiveID` selection. Invalid primitive IDs use `UINT_MAX`, so primitive index `0` remains valid.
-
-### B4. Lifecycle System Boilerplate Extraction (**Complete**)
-
-`LifecycleUtils.hpp` provides six shared helpers: `AllocateGpuSlot()`, `ComputeLocalBoundingSphere()`, `TryAllocateGpuSlot()` (Phase 2), `RemovePassComponentIfPresent()`, `PopulateOrRemovePassComponent()` (Phase 3 visibility-aware sync), and `HandleUploadFailure()` (Phase 1 error handling). All three lifecycle systems migrated to use the shared templates. Remaining Phase 1 loop skeleton extraction deferred — type-specific logic (edge extraction, attribute caching, upload mode selection) makes a full template over-engineered for the current three systems.
-
 ---
 
 ## 3. Later (P2) — Planned Downstream Work
