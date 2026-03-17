@@ -1179,12 +1179,12 @@ TEST(RenderResources, DeferredRecipe_RequestsGBufferResources)
     EXPECT_TRUE(recipe.Requires(RenderResource::SceneDepth));
 }
 
-TEST(RenderResources, DeferredRecipe_NoSurfacePass_NoGBufferResources)
+TEST(RenderResources, DeferredRequestWithoutSurfacePass_FallsBackToForward)
 {
     using namespace Graphics;
 
-    // When SurfacePass is disabled, no G-buffer resources are needed even
-    // if the lighting path is deferred (only surface geometry writes G-buffer).
+    // Deferred needs SurfacePass to populate the G-buffer. Without it,
+    // recipe selection must fall back to forward shading for consistency.
     DefaultPipelineRecipeInputs inputs{};
     inputs.SurfacePassEnabled = false;
     inputs.LinePassEnabled = true;
@@ -1199,14 +1199,39 @@ TEST(RenderResources, DeferredRecipe_NoSurfacePass_NoGBufferResources)
 
     const FrameRecipe recipe = BuildDefaultPipelineRecipe(inputs);
 
-    // Still deferred path (geometry exists via LinePass).
-    EXPECT_EQ(recipe.LightingPath, FrameLightingPath::Deferred);
+    // Falls back to forward path when deferred prerequisites are not satisfied.
+    EXPECT_EQ(recipe.LightingPath, FrameLightingPath::Forward);
 
-    // But no G-buffer resources since SurfacePass is off.
+    // And therefore does not request deferred-only G-buffer resources.
     EXPECT_FALSE(recipe.Normals);
     EXPECT_FALSE(recipe.MaterialChannels);
     EXPECT_FALSE(recipe.Requires(RenderResource::SceneNormal));
     EXPECT_FALSE(recipe.Requires(RenderResource::Albedo));
+}
+
+
+TEST(RenderResources, DeferredRequestWithoutCompositionPass_FallsBackToForward)
+{
+    using namespace Graphics;
+
+    DefaultPipelineRecipeInputs inputs{};
+    inputs.SurfacePassEnabled = true;
+    inputs.LinePassEnabled = true;
+    inputs.PointPassEnabled = false;
+    inputs.PickingPassEnabled = false;
+    inputs.PostProcessPassEnabled = false;
+    inputs.SelectionOutlinePassEnabled = false;
+    inputs.DebugViewPassEnabled = false;
+    inputs.ImGuiPassEnabled = false;
+    inputs.CompositionPassEnabled = false;
+    inputs.RequestedLightingPath = FrameLightingPath::Deferred;
+
+    const FrameRecipe recipe = BuildDefaultPipelineRecipe(inputs);
+
+    EXPECT_EQ(recipe.LightingPath, FrameLightingPath::Forward);
+    EXPECT_FALSE(recipe.Requires(RenderResource::SceneNormal));
+    EXPECT_FALSE(recipe.Requires(RenderResource::Albedo));
+    EXPECT_FALSE(recipe.Requires(RenderResource::Material0));
 }
 
 TEST(RenderResources, ForwardRecipe_DoesNotRequestGBufferByDefault)
