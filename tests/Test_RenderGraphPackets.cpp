@@ -428,6 +428,55 @@ TEST_F(RenderGraphPacketTest, InvalidResourceHandles_AreRejectedAndDoNotCreateRe
     EXPECT_TRUE(images.empty());
 }
 
+TEST_F(RenderGraphPacketTest, AttachmentWritesAndReadsTrackTransientTextureLifetime)
+{
+    struct PassData
+    {
+        RGResourceHandle Color{};
+    };
+
+    RGResourceHandle color;
+
+    m_Graph->AddPass<PassData>("ColorWrite",
+        [&color](PassData& data, RGBuilder& builder)
+        {
+            color = builder.CreateTexture("trackedColor"_id,
+                RGTextureDesc{.Width = 64, .Height = 64, .Format = VK_FORMAT_R8G8B8A8_UNORM});
+
+            RGAttachmentInfo info{};
+            info.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+            info.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+            data.Color = builder.WriteColor(color, info);
+        },
+        [](const PassData&, const RGRegistry&, VkCommandBuffer) {});
+
+    m_Graph->AddPass<PassData>("ColorRead",
+        [&color](PassData& data, RGBuilder& builder)
+        {
+            data.Color = builder.Read(color,
+                                      VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                                      VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
+        },
+        [](const PassData&, const RGRegistry&, VkCommandBuffer) {});
+
+    m_Graph->Compile(0);
+
+    const auto images = m_Graph->BuildDebugImageList();
+    const auto it = std::find_if(images.begin(), images.end(), [](const RenderGraphDebugImage& img)
+    {
+        return img.Name == "trackedColor"_id;
+    });
+
+    ASSERT_NE(it, images.end());
+    EXPECT_FALSE(it->IsImported);
+    EXPECT_EQ(it->StartPass, 0u);
+    EXPECT_EQ(it->EndPass, 1u);
+    EXPECT_EQ(it->FirstWritePass, 0u);
+    EXPECT_EQ(it->LastWritePass, 0u);
+    EXPECT_EQ(it->FirstReadPass, 1u);
+    EXPECT_EQ(it->LastReadPass, 1u);
+}
+
 // ===========================================================================
 // Raster packet merging tests
 // ===========================================================================

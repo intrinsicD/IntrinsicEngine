@@ -93,6 +93,15 @@ export namespace Graphics
         [[nodiscard]] VkExtent2D GetTextureExtent(RGResourceHandle handle) const;
 
     private:
+        RGResourceHandle AddAccess(RGResourceHandle resource,
+                                   VkPipelineStageFlags2 stage,
+                                   VkAccessFlags2 access,
+                                   bool isWrite);
+        RGResourceHandle AddAttachmentWrite(RGResourceHandle resource,
+                                            RGAttachmentInfo info,
+                                            bool isDepth);
+        void TouchResourceLifetime(RGResourceHandle resource, bool isWrite);
+
         RenderGraph& m_Graph;
         uint32_t m_PassIndex;
     };

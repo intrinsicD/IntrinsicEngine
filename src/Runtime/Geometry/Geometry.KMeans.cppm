@@ -10,6 +10,8 @@ module;
 
 export module Geometry:KMeans;
 
+import :Properties;
+
 export namespace Geometry::KMeans
 {
     enum class Backend : uint8_t

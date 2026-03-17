@@ -2,7 +2,7 @@ module;
 
 #include <cstddef>
 #include <optional>
-#include <vector>
+#include <span>
 
 #include <glm/glm.hpp>
 
@@ -119,8 +119,8 @@ export namespace Geometry::SurfaceReconstruction
     //   - Normal estimation fails
     //   - The isosurface is empty (no geometry extracted)
     [[nodiscard]] std::optional<ReconstructionResult> Reconstruct(
-        const std::vector<glm::vec3>& points,
-        const std::vector<glm::vec3>& normals = {},
+        std::span<const glm::vec3> points,
+        std::span<const glm::vec3> normals = {},
         const ReconstructionParams& params = {});
 
 } // namespace Geometry::SurfaceReconstruction

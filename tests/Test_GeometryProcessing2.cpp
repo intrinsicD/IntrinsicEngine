@@ -2,6 +2,7 @@
 #include <cmath>
 #include <numbers>
 #include <numeric>
+#include <utility>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -11,38 +12,13 @@ import Geometry;
 
 #include "TestMeshBuilders.h"
 
-static Geometry::Halfedge::Mesh MakeQuad()
-{
-    Geometry::Halfedge::Mesh mesh;
-    auto v0 = mesh.AddVertex({0.0f, 0.0f, 0.0f});
-    auto v1 = mesh.AddVertex({1.0f, 0.0f, 0.0f});
-    auto v2 = mesh.AddVertex({1.0f, 1.0f, 0.0f});
-    auto v3 = mesh.AddVertex({0.0f, 1.0f, 0.0f});
-    (void)mesh.AddQuad(v0, v1, v2, v3);
-    return mesh;
-}
-
 static Geometry::Halfedge::Mesh MakeQuadCube()
 {
-    Geometry::Halfedge::Mesh mesh;
-    auto v0 = mesh.AddVertex({-1.0f, -1.0f, -1.0f});
-    auto v1 = mesh.AddVertex({ 1.0f, -1.0f, -1.0f});
-    auto v2 = mesh.AddVertex({ 1.0f,  1.0f, -1.0f});
-    auto v3 = mesh.AddVertex({-1.0f,  1.0f, -1.0f});
-    auto v4 = mesh.AddVertex({-1.0f, -1.0f,  1.0f});
-    auto v5 = mesh.AddVertex({ 1.0f, -1.0f,  1.0f});
-    auto v6 = mesh.AddVertex({ 1.0f,  1.0f,  1.0f});
-    auto v7 = mesh.AddVertex({-1.0f,  1.0f,  1.0f});
-
-    // 6 quad faces
-    (void)mesh.AddQuad(v3, v2, v1, v0); // -Z
-    (void)mesh.AddQuad(v4, v5, v6, v7); // +Z
-    (void)mesh.AddQuad(v0, v1, v5, v4); // -Y
-    (void)mesh.AddQuad(v2, v3, v7, v6); // +Y
-    (void)mesh.AddQuad(v0, v4, v7, v3); // -X
-    (void)mesh.AddQuad(v1, v2, v6, v5); // +X
-
-    return mesh;
+    auto mesh = Geometry::Halfedge::MakeMesh(Geometry::AABB{
+        .Min = {-1.0f, -1.0f, -1.0f},
+        .Max = { 1.0f,  1.0f,  1.0f},
+    });
+    return mesh ? std::move(*mesh) : Geometry::Halfedge::Mesh{};
 }
 
 

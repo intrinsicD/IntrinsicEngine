@@ -3,8 +3,10 @@
 // input, and planar point cloud correctness.
 
 #include <gtest/gtest.h>
+#include <array>
 #include <cmath>
 #include <cstddef>
+#include <span>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -151,3 +153,18 @@ TEST(NormalEstimation, CustomKNeighbors)
     ASSERT_TRUE(result.has_value());
     ASSERT_EQ(result->Normals.size(), points.size());
 }
+
+TEST(NormalEstimation, AcceptsBorrowedSpanInput)
+{
+    const std::array<glm::vec3, 4> points = {
+        glm::vec3{0.0f, 0.0f, 0.0f},
+        glm::vec3{1.0f, 0.0f, 0.0f},
+        glm::vec3{0.0f, 1.0f, 0.0f},
+        glm::vec3{1.0f, 1.0f, 0.0f},
+    };
+
+    auto result = Geometry::NormalEstimation::EstimateNormals(std::span<const glm::vec3>{points});
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->Normals.size(), points.size());
+}
+

@@ -10,6 +10,7 @@ module;
 export module Runtime.EditorUI;
 
 import Runtime.Engine;
+import Runtime.PointCloudKMeans;
 import Runtime.SceneSerializer;
 import Graphics;
 import Geometry;
@@ -71,6 +72,12 @@ export namespace Runtime::EditorUI
         }
     };
 
+    struct GeometryProcessingEntry
+    {
+        GeometryProcessingAlgorithm Algorithm = GeometryProcessingAlgorithm::KMeans;
+        GeometryProcessingDomain Domains = GeometryProcessingDomain::None;
+    };
+
     [[nodiscard]] GeometryProcessingCapabilities GetGeometryProcessingCapabilities(
         const entt::registry& registry,
         entt::entity entity);
@@ -78,6 +85,14 @@ export namespace Runtime::EditorUI
     [[nodiscard]] GeometryProcessingDomain GetSupportedDomains(GeometryProcessingAlgorithm algorithm) noexcept;
     [[nodiscard]] bool SupportsDomain(GeometryProcessingAlgorithm algorithm,
                                       GeometryProcessingDomain domain) noexcept;
+    [[nodiscard]] std::vector<GeometryProcessingEntry> ResolveGeometryProcessingEntries(
+        const entt::registry& registry,
+        entt::entity entity);
+    [[nodiscard]] std::vector<Runtime::PointCloudKMeans::Domain> GetAvailableKMeansDomains(
+        const entt::registry& registry,
+        entt::entity entity);
+    [[nodiscard]] const char* GeometryDomainLabel(GeometryProcessingDomain domain) noexcept;
+    [[nodiscard]] const char* GeometryProcessingAlgorithmLabel(GeometryProcessingAlgorithm algorithm) noexcept;
 
     // Registers a small set of editor-facing panels and menus to improve
     // discoverability of core engine features (FeatureRegistry, FrameGraph,
@@ -134,6 +149,74 @@ export namespace Runtime::EditorUI
     // ImGui ColorEdit4 that reads/writes a glm::vec4 directly. Returns true on change.
     bool ColorEdit4(const char* label, glm::vec4& color);
 
+    void DrawDomainBadges(GeometryProcessingDomain domains);
+
+    struct KMeansWidgetState
+    {
+        int ClusterCount = 8;
+        int MaxIterations = 32;
+        int Backend = static_cast<int>(Geometry::KMeans::Backend::CPU);
+        int Initialization = static_cast<int>(Geometry::KMeans::Initialization::Hierarchical);
+        int Seed = 42;
+        Runtime::PointCloudKMeans::Domain SelectedDomain = Runtime::PointCloudKMeans::Domain::Auto;
+    };
+
+    struct RemeshingWidgetState
+    {
+        float TargetLength = 0.05f;
+        int Iterations = 5;
+        bool PreserveBoundary = true;
+    };
+
+    struct SimplificationWidgetState
+    {
+        int TargetFaces = 1000;
+        bool PreserveBoundary = true;
+        float HausdorffError = 0.0f;
+        float MaxNormalDeviationDeg = 0.0f;
+        int QuadricType = static_cast<int>(Geometry::Simplification::QuadricType::Plane);
+        int ProbabilisticMode = static_cast<int>(Geometry::Simplification::QuadricProbabilisticMode::Deterministic);
+        int Residence = static_cast<int>(Geometry::Simplification::QuadricResidence::Vertices);
+        int PlacementPolicy = static_cast<int>(Geometry::Simplification::CollapsePlacementPolicy::KeepSurvivor);
+        bool AverageVertexQuadrics = true;
+        bool AverageFaceQuadrics = false;
+        float PositionStdDev = 0.0f;
+        float NormalStdDev = 0.0f;
+        char VertexPositionCovarianceProperty[64] = "v:quadric_sigma_p";
+        char FacePositionCovarianceProperty[64] = "f:quadric_sigma_p";
+        char FaceNormalCovarianceProperty[64] = "f:quadric_sigma_n";
+    };
+
+    struct SmoothingWidgetState
+    {
+        int Iterations = 10;
+        float Lambda = 0.5f;
+        bool PreserveBoundary = true;
+    };
+
+    struct SubdivisionWidgetState
+    {
+        int Iterations = 1;
+    };
+
+    [[nodiscard]] bool DrawKMeansWidget(Runtime::Engine& engine,
+                                        entt::entity entity,
+                                        KMeansWidgetState& state);
+    [[nodiscard]] bool DrawRemeshingWidget(Runtime::Engine& engine,
+                                           entt::entity entity,
+                                           RemeshingWidgetState& state);
+    [[nodiscard]] bool DrawSimplificationWidget(Runtime::Engine& engine,
+                                                entt::entity entity,
+                                                SimplificationWidgetState& state);
+    [[nodiscard]] bool DrawSmoothingWidget(Runtime::Engine& engine,
+                                           entt::entity entity,
+                                           SmoothingWidgetState& state);
+    [[nodiscard]] bool DrawSubdivisionWidget(Runtime::Engine& engine,
+                                             entt::entity entity,
+                                             SubdivisionWidgetState& state);
+    [[nodiscard]] bool DrawRepairWidget(Runtime::Engine& engine,
+                                        entt::entity entity);
+
     // =========================================================================
     // InspectorController — component property inspector panel
     // =========================================================================
@@ -153,20 +236,14 @@ export namespace Runtime::EditorUI
         void Draw();
 
     private:
-        struct PointSetKMeansUiState
-        {
-            int ClusterCount = 8;
-            int MaxIterations = 32;
-            int Backend = static_cast<int>(Geometry::KMeans::Backend::CPU);
-            int Initialization = static_cast<int>(Geometry::KMeans::Initialization::Hierarchical);
-            int Seed = 42;
-            int PreferredDomain = 0;
-        };
-
         Runtime::Engine* m_Engine = nullptr;
         entt::entity* m_CachedSelected = nullptr;
         GeometryWorkflowController* m_GeometryWorkflow = nullptr;
-        PointSetKMeansUiState m_PointSetKMeansUi{};
+        KMeansWidgetState m_KMeansUi{};
+        RemeshingWidgetState m_RemeshingUi{};
+        SimplificationWidgetState m_SimplificationUi{};
+        SmoothingWidgetState m_SmoothingUi{};
+        SubdivisionWidgetState m_SubdivisionUi{};
     };
 
     // =========================================================================
@@ -187,49 +264,10 @@ export namespace Runtime::EditorUI
     private:
         Runtime::Engine* m_Engine = nullptr;
         entt::entity* m_CachedSelected = nullptr;
-
-        struct RemeshingUiState
-        {
-            float TargetLength = 0.05f;
-            int Iterations = 5;
-            bool PreserveBoundary = true;
-        };
-
-        struct SimplificationUiState
-        {
-            int TargetFaces = 1000;
-            bool PreserveBoundary = true;
-            float HausdorffError = 0.0f;
-            float MaxNormalDeviationDeg = 0.0f;
-            int QuadricType = static_cast<int>(Geometry::Simplification::QuadricType::Plane);
-            int ProbabilisticMode = static_cast<int>(Geometry::Simplification::QuadricProbabilisticMode::Deterministic);
-            int Residence = static_cast<int>(Geometry::Simplification::QuadricResidence::Vertices);
-            int PlacementPolicy = static_cast<int>(Geometry::Simplification::CollapsePlacementPolicy::KeepSurvivor);
-            bool AverageVertexQuadrics = true;
-            bool AverageFaceQuadrics = false;
-            float PositionStdDev = 0.0f;
-            float NormalStdDev = 0.0f;
-            char VertexPositionCovarianceProperty[64] = "v:quadric_sigma_p";
-            char FacePositionCovarianceProperty[64] = "f:quadric_sigma_p";
-            char FaceNormalCovarianceProperty[64] = "f:quadric_sigma_n";
-        };
-
-        struct SmoothingUiState
-        {
-            int Iterations = 10;
-            float Lambda = 0.5f;
-            bool PreserveBoundary = true;
-        };
-
-        struct SubdivisionUiState
-        {
-            int Iterations = 1;
-        };
-
-        RemeshingUiState m_RemeshingUi{};
-        SimplificationUiState m_SimplificationUi{};
-        SmoothingUiState m_SmoothingUi{};
-        SubdivisionUiState m_SubdivisionUi{};
+        RemeshingWidgetState m_RemeshingUi{};
+        SimplificationWidgetState m_SimplificationUi{};
+        SmoothingWidgetState m_SmoothingUi{};
+        SubdivisionWidgetState m_SubdivisionUi{};
 
         struct SelectionContext
         {
@@ -250,7 +288,6 @@ export namespace Runtime::EditorUI
         void OpenRepairPanel();
         void OpenWorkflowStack();
 
-        void ApplyOperator(entt::entity entity, const std::function<void(Geometry::Halfedge::Mesh&)>& op);
 
         void DrawMenu();
         void DrawWorkflowPanel();

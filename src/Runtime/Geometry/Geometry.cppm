@@ -26,6 +26,7 @@ export import :Overlap;
 export import :Primitives;
 export import :Properties;
 export import :HalfedgeMesh;
+export import :MeshBuilder;
 export import :Graph;
 export import :SDF;
 export import :SDFContact;

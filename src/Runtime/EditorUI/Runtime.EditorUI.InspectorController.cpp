@@ -5,11 +5,7 @@
 
 module;
 
-#include <array>
-#include <algorithm>
 #include <cstring>
-#include <limits>
-#include <optional>
 #include <string>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -19,7 +15,6 @@ module;
 module Runtime.EditorUI;
 
 import Runtime.Engine;
-import Runtime.PointCloudKMeans;
 import Graphics;
 import Geometry;
 import ECS;
@@ -27,121 +22,6 @@ import Interface;
 
 namespace Runtime::EditorUI
 {
-namespace
-{
-    [[nodiscard]] constexpr const char* GeometryDomainLabel(GeometryProcessingDomain domain) noexcept
-    {
-        switch (domain)
-        {
-        case GeometryProcessingDomain::SurfaceMesh: return "Surface Mesh";
-        case GeometryProcessingDomain::MeshVertices: return "Mesh Vertices";
-        case GeometryProcessingDomain::GraphVertices: return "Graph Nodes";
-        case GeometryProcessingDomain::PointCloudPoints: return "Point Cloud Points";
-        case GeometryProcessingDomain::None:
-        default: return "None";
-        }
-    }
-
-    [[nodiscard]] constexpr GeometryProcessingDomain ToUiDomain(Runtime::PointCloudKMeans::Domain domain) noexcept
-    {
-        switch (domain)
-        {
-        case Runtime::PointCloudKMeans::Domain::MeshVertices: return GeometryProcessingDomain::MeshVertices;
-        case Runtime::PointCloudKMeans::Domain::GraphVertices: return GeometryProcessingDomain::GraphVertices;
-        case Runtime::PointCloudKMeans::Domain::PointCloudPoints: return GeometryProcessingDomain::PointCloudPoints;
-        case Runtime::PointCloudKMeans::Domain::Auto:
-        default: return GeometryProcessingDomain::None;
-        }
-    }
-
-    [[nodiscard]] constexpr const char* KMeansResultProperty(Runtime::PointCloudKMeans::Domain domain) noexcept
-    {
-        return domain == Runtime::PointCloudKMeans::Domain::PointCloudPoints
-            ? "p:kmeans_color"
-            : "v:kmeans_color";
-    }
-
-    void DrawDomainBadges(GeometryProcessingDomain domains)
-    {
-        bool first = true;
-        const auto draw = [&](GeometryProcessingDomain domain)
-        {
-            if (!HasAnyDomain(domains, domain))
-                return;
-            if (!first)
-                ImGui::SameLine();
-            ImGui::TextDisabled("[%s]", GeometryDomainLabel(domain));
-            first = false;
-        };
-
-        draw(GeometryProcessingDomain::SurfaceMesh);
-        draw(GeometryProcessingDomain::MeshVertices);
-        draw(GeometryProcessingDomain::GraphVertices);
-        draw(GeometryProcessingDomain::PointCloudPoints);
-    }
-
-    struct KMeansStatus
-    {
-        bool JobPending = false;
-        Geometry::KMeans::Backend LastBackend = Geometry::KMeans::Backend::CPU;
-        uint32_t LastIterations = 0;
-        bool LastConverged = false;
-        float LastInertia = 0.0f;
-        uint32_t LastMaxDistanceIndex = 0;
-        double LastDurationMs = 0.0;
-    };
-
-    [[nodiscard]] std::optional<KMeansStatus> ReadKMeansStatus(const entt::registry& reg,
-                                                               entt::entity entity,
-                                                               Runtime::PointCloudKMeans::Domain domain)
-    {
-        switch (domain)
-        {
-        case Runtime::PointCloudKMeans::Domain::MeshVertices:
-            if (const auto* mesh = reg.try_get<ECS::Mesh::Data>(entity))
-            {
-                return KMeansStatus{mesh->KMeansJobPending,
-                                    mesh->KMeansLastBackend,
-                                    mesh->KMeansLastIterations,
-                                    mesh->KMeansLastConverged,
-                                    mesh->KMeansLastInertia,
-                                    mesh->KMeansLastMaxDistanceIndex,
-                                    mesh->KMeansLastDurationMs};
-            }
-            break;
-        case Runtime::PointCloudKMeans::Domain::GraphVertices:
-            if (const auto* graph = reg.try_get<ECS::Graph::Data>(entity))
-            {
-                return KMeansStatus{graph->KMeansJobPending,
-                                    graph->KMeansLastBackend,
-                                    graph->KMeansLastIterations,
-                                    graph->KMeansLastConverged,
-                                    graph->KMeansLastInertia,
-                                    graph->KMeansLastMaxDistanceIndex,
-                                    graph->KMeansLastDurationMs};
-            }
-            break;
-        case Runtime::PointCloudKMeans::Domain::PointCloudPoints:
-            if (const auto* pointCloud = reg.try_get<ECS::PointCloud::Data>(entity))
-            {
-                return KMeansStatus{pointCloud->KMeansJobPending,
-                                    pointCloud->KMeansLastBackend,
-                                    pointCloud->KMeansLastIterations,
-                                    pointCloud->KMeansLastConverged,
-                                    pointCloud->KMeansLastInertia,
-                                    pointCloud->KMeansLastMaxDistanceIndex,
-                                    pointCloud->KMeansLastDurationMs};
-            }
-            break;
-        case Runtime::PointCloudKMeans::Domain::Auto:
-        default:
-            break;
-        }
-
-        return std::nullopt;
-    }
-}
-
 void InspectorController::Init(Runtime::Engine& engine,
                                entt::entity& cachedSelected,
                                GeometryWorkflowController* geometryWorkflow)
@@ -318,153 +198,56 @@ void InspectorController::Draw()
         }
 
         const auto processing = GetGeometryProcessingCapabilities(reg, selected);
-        if (processing.HasAny())
+        const auto algorithms = ResolveGeometryProcessingEntries(reg, selected);
+        if (processing.HasAny() && !algorithms.empty())
         {
             if (ImGui::CollapsingHeader("Geometry Processing", ImGuiTreeNodeFlags_DefaultOpen))
             {
                 ImGui::TextWrapped("Algorithms are exposed by the mathematical domain available on the selected entity's authoritative data, not by the inspector section they were loaded from.");
                 DrawDomainBadges(processing.Domains);
 
-                const auto kMeansDomains = processing.Domains & GetSupportedDomains(GeometryProcessingAlgorithm::KMeans);
-                ImGui::SeparatorText("Point-Set Algorithms");
-                ImGui::TextUnformatted("K-Means");
-                DrawDomainBadges(kMeansDomains);
-
-                if (kMeansDomains == GeometryProcessingDomain::None)
+                for (const auto& entry : algorithms)
                 {
-                    ImGui::TextDisabled("No compatible point-set domain is available on the selected entity.");
-                }
-                else
-                {
-                    std::array<Runtime::PointCloudKMeans::Domain, 3> kMeansDomainValues{};
-                    std::array<const char*, 3> kMeansDomainLabels{};
-                    int kMeansDomainCount = 0;
+                    ImGui::SeparatorText(GeometryProcessingAlgorithmLabel(entry.Algorithm));
+                    DrawDomainBadges(entry.Domains);
 
-                    if (HasAnyDomain(kMeansDomains, GeometryProcessingDomain::MeshVertices))
+                    const bool open = ImGui::TreeNodeEx(GeometryProcessingAlgorithmLabel(entry.Algorithm),
+                                                        ImGuiTreeNodeFlags_DefaultOpen);
+                    if (!open)
+                        continue;
+
+                    switch (entry.Algorithm)
                     {
-                        kMeansDomainValues[kMeansDomainCount] = Runtime::PointCloudKMeans::Domain::MeshVertices;
-                        kMeansDomainLabels[kMeansDomainCount++] = GeometryDomainLabel(GeometryProcessingDomain::MeshVertices);
-                    }
-                    if (HasAnyDomain(kMeansDomains, GeometryProcessingDomain::GraphVertices))
-                    {
-                        kMeansDomainValues[kMeansDomainCount] = Runtime::PointCloudKMeans::Domain::GraphVertices;
-                        kMeansDomainLabels[kMeansDomainCount++] = GeometryDomainLabel(GeometryProcessingDomain::GraphVertices);
-                    }
-                    if (HasAnyDomain(kMeansDomains, GeometryProcessingDomain::PointCloudPoints))
-                    {
-                        kMeansDomainValues[kMeansDomainCount] = Runtime::PointCloudKMeans::Domain::PointCloudPoints;
-                        kMeansDomainLabels[kMeansDomainCount++] = GeometryDomainLabel(GeometryProcessingDomain::PointCloudPoints);
-                    }
-
-                    m_PointSetKMeansUi.PreferredDomain = std::clamp(m_PointSetKMeansUi.PreferredDomain, 0, kMeansDomainCount - 1);
-                    if (kMeansDomainCount > 1)
-                    {
-                        ImGui::Combo("Domain##KMeans", &m_PointSetKMeansUi.PreferredDomain,
-                                     kMeansDomainLabels.data(), kMeansDomainCount);
-                    }
-
-                    const auto selectedKMeansDomain = kMeansDomainValues[m_PointSetKMeansUi.PreferredDomain];
-                    const auto targetInfo = Runtime::PointCloudKMeans::DescribeTarget(*m_Engine, selected, selectedKMeansDomain);
-
-                    ImGui::Text("Points: %zu", targetInfo.PointCount);
-                    ImGui::TextDisabled("Published color property: %s", KMeansResultProperty(selectedKMeansDomain));
-
-                    ImGui::DragInt("Clusters##ProcKMeans", &m_PointSetKMeansUi.ClusterCount, 1.0f, 1, 4096);
-                    ImGui::DragInt("Max Iterations##ProcKMeans", &m_PointSetKMeansUi.MaxIterations, 1.0f, 1, 4096);
-                    ImGui::DragInt("Seed##ProcKMeans", &m_PointSetKMeansUi.Seed, 1.0f, 0, std::numeric_limits<int>::max());
-
-                    {
-                        const char* initItems[] = {"Random", "Hierarchical"};
-                        ImGui::Combo("Initialization##ProcKMeans", &m_PointSetKMeansUi.Initialization,
-                                     initItems, IM_ARRAYSIZE(initItems));
+                    case GeometryProcessingAlgorithm::KMeans:
+                        static_cast<void>(DrawKMeansWidget(*m_Engine, selected, m_KMeansUi));
+                        break;
+                    case GeometryProcessingAlgorithm::Remeshing:
+                        static_cast<void>(DrawRemeshingWidget(*m_Engine, selected, m_RemeshingUi));
+                        break;
+                    case GeometryProcessingAlgorithm::Simplification:
+                        static_cast<void>(DrawSimplificationWidget(*m_Engine, selected, m_SimplificationUi));
+                        break;
+                    case GeometryProcessingAlgorithm::Smoothing:
+                        static_cast<void>(DrawSmoothingWidget(*m_Engine, selected, m_SmoothingUi));
+                        break;
+                    case GeometryProcessingAlgorithm::Subdivision:
+                        static_cast<void>(DrawSubdivisionWidget(*m_Engine, selected, m_SubdivisionUi));
+                        break;
+                    case GeometryProcessingAlgorithm::Repair:
+                        static_cast<void>(DrawRepairWidget(*m_Engine, selected));
+                        break;
                     }
 
-                    if (targetInfo.SupportsCuda)
+                    if (m_GeometryWorkflow && entry.Algorithm != GeometryProcessingAlgorithm::KMeans)
                     {
-                        const char* backendItems[] = {
-                            "CPU",
-#ifdef INTRINSIC_HAS_CUDA
-                            "CUDA"
-#endif
-                        };
-                        m_PointSetKMeansUi.Backend = std::clamp(m_PointSetKMeansUi.Backend, 0,
-                                                                IM_ARRAYSIZE(backendItems) - 1);
-                        ImGui::Combo("Backend##ProcKMeans", &m_PointSetKMeansUi.Backend,
-                                     backendItems, IM_ARRAYSIZE(backendItems));
-                    }
-                    else
-                    {
-                        m_PointSetKMeansUi.Backend = static_cast<int>(Geometry::KMeans::Backend::CPU);
-                        ImGui::TextDisabled("Backend: CPU (CUDA path currently uses authoritative point-cloud buffers only)");
+                        if (ImGui::SmallButton((std::string("Open Dedicated Panel##")
+                                             + GeometryProcessingAlgorithmLabel(entry.Algorithm)).c_str()))
+                        {
+                            m_GeometryWorkflow->OpenAlgorithmPanel(entry.Algorithm);
+                        }
                     }
 
-                    const bool canRunKMeans = targetInfo.IsValid() && !targetInfo.JobPending;
-                    if (!canRunKMeans)
-                        ImGui::BeginDisabled();
-
-                    if (ImGui::Button("Run K-Means##GeometryProcessing"))
-                    {
-                        Geometry::KMeans::Params params{};
-                        params.ClusterCount = static_cast<uint32_t>(std::max(m_PointSetKMeansUi.ClusterCount, 1));
-                        params.MaxIterations = static_cast<uint32_t>(std::max(m_PointSetKMeansUi.MaxIterations, 1));
-                        params.Seed = static_cast<uint32_t>(std::max(m_PointSetKMeansUi.Seed, 0));
-                        params.Init = static_cast<Geometry::KMeans::Initialization>(m_PointSetKMeansUi.Initialization);
-                        params.Compute = static_cast<Geometry::KMeans::Backend>(m_PointSetKMeansUi.Backend);
-                        static_cast<void>(Runtime::PointCloudKMeans::Schedule(*m_Engine, selected, params,
-                                                                              selectedKMeansDomain));
-                    }
-
-                    if (!canRunKMeans)
-                        ImGui::EndDisabled();
-
-                    if (targetInfo.SupportsCuda)
-                    {
-                        ImGui::SameLine();
-                        if (ImGui::Button("Release Compute Buffers##GeometryProcessing"))
-                            Runtime::PointCloudKMeans::ReleaseEntityBuffers(*m_Engine, selected);
-                    }
-
-                    if (const auto stats = ReadKMeansStatus(reg, selected, selectedKMeansDomain))
-                    {
-                        ImGui::Text("Job Pending: %s", stats->JobPending ? "Yes" : "No");
-                        ImGui::Text("Last Backend: %s", stats->LastBackend == Geometry::KMeans::Backend::CUDA ? "CUDA" : "CPU");
-                        ImGui::Text("Last Iterations: %u", stats->LastIterations);
-                        ImGui::Text("Last Converged: %s", stats->LastConverged ? "Yes" : "No");
-                        ImGui::Text("Last Inertia: %.6f", stats->LastInertia);
-                        ImGui::Text("Last Max-Distance Index: %u", stats->LastMaxDistanceIndex);
-                        ImGui::Text("Last Duration: %.3f ms", stats->LastDurationMs);
-                    }
-                }
-
-                ImGui::SeparatorText("Surface Topology Algorithms");
-                const bool hasSurfaceTopology = HasAnyDomain(processing.Domains, GeometryProcessingDomain::SurfaceMesh);
-                DrawDomainBadges(hasSurfaceTopology ? GeometryProcessingDomain::SurfaceMesh
-                                                    : GeometryProcessingDomain::None);
-
-                if (!hasSurfaceTopology)
-                {
-                    ImGui::TextDisabled("Topology-changing surface operators require a selected surface mesh with collider-backed authority.");
-                }
-                else if (!m_GeometryWorkflow)
-                {
-                    ImGui::TextDisabled("Geometry workflow controller is unavailable.");
-                }
-                else
-                {
-                    if (ImGui::Button("Open Remeshing##GeometryProcessing"))
-                        m_GeometryWorkflow->OpenAlgorithmPanel(GeometryProcessingAlgorithm::Remeshing);
-                    ImGui::SameLine();
-                    if (ImGui::Button("Open Simplification##GeometryProcessing"))
-                        m_GeometryWorkflow->OpenAlgorithmPanel(GeometryProcessingAlgorithm::Simplification);
-                    ImGui::SameLine();
-                    if (ImGui::Button("Open Smoothing##GeometryProcessing"))
-                        m_GeometryWorkflow->OpenAlgorithmPanel(GeometryProcessingAlgorithm::Smoothing);
-
-                    if (ImGui::Button("Open Subdivision##GeometryProcessing"))
-                        m_GeometryWorkflow->OpenAlgorithmPanel(GeometryProcessingAlgorithm::Subdivision);
-                    ImGui::SameLine();
-                    if (ImGui::Button("Open Repair##GeometryProcessing"))
-                        m_GeometryWorkflow->OpenAlgorithmPanel(GeometryProcessingAlgorithm::Repair);
+                    ImGui::TreePop();
                 }
             }
         }

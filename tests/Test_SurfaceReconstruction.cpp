@@ -1,9 +1,11 @@
 #include <gtest/gtest.h>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <limits>
 #include <numbers>
 #include <numeric>
+#include <span>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -610,3 +612,34 @@ TEST(SurfaceReconstruction, SphereReconstructionApproximatesRadius)
     EXPECT_NEAR(avgRadius, static_cast<double>(radius), 0.5)
         << "Average vertex radius should approximate the sphere radius";
 }
+
+TEST(SurfaceReconstruction, AcceptsBorrowedSpanInput)
+{
+    const std::array<glm::vec3, 6> points = {
+        glm::vec3{1.0f, 0.0f, 0.0f},
+        glm::vec3{-1.0f, 0.0f, 0.0f},
+        glm::vec3{0.0f, 1.0f, 0.0f},
+        glm::vec3{0.0f, -1.0f, 0.0f},
+        glm::vec3{0.0f, 0.0f, 1.0f},
+        glm::vec3{0.0f, 0.0f, -1.0f},
+    };
+    const std::array<glm::vec3, 6> normals = {
+        glm::vec3{1.0f, 0.0f, 0.0f},
+        glm::vec3{-1.0f, 0.0f, 0.0f},
+        glm::vec3{0.0f, 1.0f, 0.0f},
+        glm::vec3{0.0f, -1.0f, 0.0f},
+        glm::vec3{0.0f, 0.0f, 1.0f},
+        glm::vec3{0.0f, 0.0f, -1.0f},
+    };
+
+    Geometry::SurfaceReconstruction::ReconstructionParams params;
+    params.Resolution = 8;
+    params.EstimateNormals = false;
+
+    auto result = Geometry::SurfaceReconstruction::Reconstruct(
+        std::span<const glm::vec3>{points}, std::span<const glm::vec3>{normals}, params);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_GT(result->OutputVertexCount, 0u);
+    EXPECT_GT(result->OutputFaceCount, 0u);
+}
+

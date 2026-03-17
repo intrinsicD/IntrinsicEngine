@@ -75,7 +75,11 @@ namespace Graphics
         }
     }
 
-    RGResourceHandle RGBuilder::Read(RGResourceHandle resource, VkPipelineStageFlags2 stage, VkAccessFlags2 access)
+    RGResourceHandle RGBuilder::AddAccess(
+        RGResourceHandle resource,
+        VkPipelineStageFlags2 stage,
+        VkAccessFlags2 access,
+        bool isWrite)
     {
         if (!resource.IsValid() || resource.ID >= m_Graph.m_ActiveResourceCount)
         {
@@ -89,90 +93,70 @@ namespace Graphics
                      m_Graph.m_PassPool[m_PassIndex].AccessTail,
                      std::move(node));
 
+        TouchResourceLifetime(resource, isWrite);
+        return resource;
+    }
+
+    RGResourceHandle RGBuilder::AddAttachmentWrite(
+        RGResourceHandle resource,
+        RGAttachmentInfo info,
+        bool isDepth)
+    {
+        if (!resource.IsValid() || resource.ID >= m_Graph.m_ActiveResourceCount)
+        {
+            Core::Log::Error("RG: Invalid resource handle");
+            return {kInvalidResource};
+        }
+
+        TouchResourceLifetime(resource, true);
+
+        AttachmentNode node{resource.ID, info, isDepth, nullptr};
+        AppendToList(m_Graph.m_Arena,
+                     m_Graph.m_PassPool[m_PassIndex].AttachmentHead,
+                     m_Graph.m_PassPool[m_PassIndex].AttachmentTail,
+                     std::move(node));
+        return resource;
+    }
+
+    void RGBuilder::TouchResourceLifetime(RGResourceHandle resource, bool isWrite)
+    {
         auto& resourceNode = m_Graph.m_ResourcePool[resource.ID];
         if (resourceNode.StartPass == ~0u)
             resourceNode.StartPass = m_PassIndex;
         resourceNode.EndPass = std::max(resourceNode.EndPass, m_PassIndex);
 
-        if (resourceNode.FirstReadPass == ~0u)
-            resourceNode.FirstReadPass = m_PassIndex;
-        resourceNode.LastReadPass = m_PassIndex;
-        return resource;
+        if (isWrite)
+        {
+            if (resourceNode.FirstWritePass == ~0u)
+                resourceNode.FirstWritePass = m_PassIndex;
+            resourceNode.LastWritePass = m_PassIndex;
+        }
+        else
+        {
+            if (resourceNode.FirstReadPass == ~0u)
+                resourceNode.FirstReadPass = m_PassIndex;
+            resourceNode.LastReadPass = m_PassIndex;
+        }
+    }
+
+    RGResourceHandle RGBuilder::Read(RGResourceHandle resource, VkPipelineStageFlags2 stage, VkAccessFlags2 access)
+    {
+        return AddAccess(resource, stage, access, false);
     }
 
     RGResourceHandle RGBuilder::Write(RGResourceHandle resource, VkPipelineStageFlags2 stage, VkAccessFlags2 access)
     {
-        if (!resource.IsValid() || resource.ID >= m_Graph.m_ActiveResourceCount)
-        {
-            Core::Log::Error("RG: Invalid resource handle");
-            return {kInvalidResource};
-        }
-
-        AccessNode node{resource.ID, stage, access, nullptr};
-        AppendToList(m_Graph.m_Arena,
-                     m_Graph.m_PassPool[m_PassIndex].AccessHead,
-                     m_Graph.m_PassPool[m_PassIndex].AccessTail,
-                     std::move(node));
-
-        auto& resourceNode = m_Graph.m_ResourcePool[resource.ID];
-        if (resourceNode.StartPass == ~0u)
-            resourceNode.StartPass = m_PassIndex;
-        resourceNode.EndPass = std::max(resourceNode.EndPass, m_PassIndex);
-
-        if (resourceNode.FirstWritePass == ~0u)
-            resourceNode.FirstWritePass = m_PassIndex;
-        resourceNode.LastWritePass = m_PassIndex;
-        return resource;
+        return AddAccess(resource, stage, access, true);
     }
 
     RGResourceHandle RGBuilder::WriteColor(RGResourceHandle resource, RGAttachmentInfo info)
     {
-        if (!resource.IsValid() || resource.ID >= m_Graph.m_ActiveResourceCount)
-        {
-            Core::Log::Error("RG: Invalid resource handle");
-            return {kInvalidResource};
-        }
-
-        auto& resourceNode = m_Graph.m_ResourcePool[resource.ID];
-        if (resourceNode.StartPass == ~0u)
-            resourceNode.StartPass = m_PassIndex;
-        resourceNode.EndPass = std::max(resourceNode.EndPass, m_PassIndex);
-
-        if (resourceNode.FirstWritePass == ~0u)
-            resourceNode.FirstWritePass = m_PassIndex;
-        resourceNode.LastWritePass = m_PassIndex;
-
-        AttachmentNode node{resource.ID, info, false, nullptr};
-        AppendToList(m_Graph.m_Arena,
-                     m_Graph.m_PassPool[m_PassIndex].AttachmentHead,
-                     m_Graph.m_PassPool[m_PassIndex].AttachmentTail,
-                     std::move(node));
-        return resource;
+        return AddAttachmentWrite(resource, info, false);
     }
 
     RGResourceHandle RGBuilder::WriteDepth(RGResourceHandle resource, RGAttachmentInfo info)
     {
-        if (!resource.IsValid() || resource.ID >= m_Graph.m_ActiveResourceCount)
-        {
-            Core::Log::Error("RG: Invalid resource handle");
-            return {kInvalidResource};
-        }
-
-        auto& resourceNode = m_Graph.m_ResourcePool[resource.ID];
-        if (resourceNode.StartPass == ~0u)
-            resourceNode.StartPass = m_PassIndex;
-        resourceNode.EndPass = std::max(resourceNode.EndPass, m_PassIndex);
-
-        if (resourceNode.FirstWritePass == ~0u)
-            resourceNode.FirstWritePass = m_PassIndex;
-        resourceNode.LastWritePass = m_PassIndex;
-
-        AttachmentNode node{resource.ID, info, true, nullptr};
-        AppendToList(m_Graph.m_Arena,
-                     m_Graph.m_PassPool[m_PassIndex].AttachmentHead,
-                     m_Graph.m_PassPool[m_PassIndex].AttachmentTail,
-                     std::move(node));
-        return resource;
+        return AddAttachmentWrite(resource, info, true);
     }
 
     RGResourceHandle RGBuilder::CreateTexture(Core::Hash::StringID name, const RGTextureDesc& desc)

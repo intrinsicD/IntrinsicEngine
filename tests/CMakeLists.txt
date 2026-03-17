@@ -100,9 +100,11 @@ intrinsic_test_object_lib(GeometryTestObjs
         Test_RuntimeGraph_ParallelLayers.cpp
         Test_RuntimeGraphKNN.cpp
         Test_KDTree.cpp
+        Test_Octree.cpp
         Test_BVH.cpp
         Test_DEC.cpp
         Test_MeshOperations.cpp
+        Test_MeshBuilder.cpp
         Test_GeometryProcessing.cpp
         Test_GeometryProcessing2.cpp
         Test_SurfaceReconstruction.cpp

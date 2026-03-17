@@ -8,6 +8,7 @@ module;
 #include <numbers>
 #include <optional>
 #include <queue>
+#include <span>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -175,7 +176,7 @@ namespace Geometry::NormalEstimation
     };
 
     static void OrientNormalsMST(
-        const std::vector<glm::vec3>& points,
+        std::span<const glm::vec3> points,
         std::vector<glm::vec3>& normals,
         const std::vector<std::vector<std::size_t>>& neighborhoods,
         std::size_t& flippedCount)
@@ -248,7 +249,7 @@ namespace Geometry::NormalEstimation
     // =========================================================================
 
     std::optional<EstimationResult> EstimateNormals(
-        const std::vector<glm::vec3>& points,
+        std::span<const glm::vec3> points,
         const EstimationParams& params)
     {
         if (points.size() < 3)
@@ -260,20 +261,12 @@ namespace Geometry::NormalEstimation
         EstimationResult result;
         result.Normals.resize(n, glm::vec3(0.0f, 0.0f, 1.0f));
 
-        // Build octree for spatial queries
-        // Each point is represented as a zero-volume AABB
-        std::vector<AABB> pointAABBs(n);
-        for (std::size_t i = 0; i < n; ++i)
-        {
-            pointAABBs[i] = {.Min = points[i], .Max = points[i]};
-        }
-
         Octree octree;
         Octree::SplitPolicy policy;
         policy.SplitPoint = Octree::SplitPoint::Mean;
         policy.TightChildren = true;
 
-        if (!octree.Build(std::move(pointAABBs), policy, params.OctreeMaxPerNode, params.OctreeMaxDepth))
+        if (!octree.BuildFromPoints(points, policy, params.OctreeMaxPerNode, params.OctreeMaxDepth))
             return std::nullopt;
 
         // Store neighborhoods for MST orientation later

@@ -538,12 +538,6 @@ namespace Geometry::Graph
 
         if (effectiveK == 0U) return result;
 
-        std::vector<AABB> pointAabbs(n);
-        for (std::size_t i = 0; i < n; ++i)
-        {
-            pointAabbs[i] = {.Min = points[i], .Max = points[i]};
-        }
-
         Octree octree;
         Octree::SplitPolicy splitPolicy{};
         splitPolicy.SplitPoint = Octree::SplitPoint::Mean;
@@ -551,7 +545,7 @@ namespace Geometry::Graph
 
         constexpr std::size_t kOctreeMaxPerNode = 32U;
         constexpr std::size_t kOctreeMaxDepth = 16U;
-        if (!octree.Build(std::move(pointAabbs), splitPolicy, kOctreeMaxPerNode, kOctreeMaxDepth))
+        if (!octree.BuildFromPoints(points, splitPolicy, kOctreeMaxPerNode, kOctreeMaxDepth))
         {
             return std::nullopt;
         }

@@ -10,6 +10,7 @@ import ECS;
 import Geometry;
 import Runtime.Engine;
 import Runtime.EditorUI;
+import Runtime.PointCloudKMeans;
 import Runtime.SceneSerializer;
 
 using namespace Runtime;
@@ -166,12 +167,12 @@ TEST(EditorUIProcessing, MeshEntityReportsSurfaceAndVertexDomains)
 {
     ECS::Scene scene;
     auto& reg = scene.GetRegistry();
-    const entt::entity entity = reg.create();
+    const auto entity = reg.create();
 
     auto mesh = std::make_shared<Geometry::Halfedge::Mesh>();
-    mesh->AddVertex({0.0f, 0.0f, 0.0f});
-    mesh->AddVertex({1.0f, 0.0f, 0.0f});
-    mesh->AddVertex({0.0f, 1.0f, 0.0f});
+    static_cast<void>(mesh->AddVertex({0.0f, 0.0f, 0.0f}));
+    static_cast<void>(mesh->AddVertex({1.0f, 0.0f, 0.0f}));
+    static_cast<void>(mesh->AddVertex({0.0f, 1.0f, 0.0f}));
 
     ECS::Mesh::Data meshData{};
     meshData.MeshRef = mesh;
@@ -194,11 +195,11 @@ TEST(EditorUIProcessing, GraphAndPointCloudEntitiesReportPointDomains)
     ECS::Scene scene;
     auto& reg = scene.GetRegistry();
 
-    const entt::entity graphEntity = reg.create();
+    const auto graphEntity = reg.create();
     auto graph = std::make_shared<Geometry::Graph::Graph>();
     const auto gv0 = graph->AddVertex({0.0f, 0.0f, 0.0f});
     const auto gv1 = graph->AddVertex({1.0f, 0.0f, 0.0f});
-    graph->AddEdge(gv0, gv1);
+    static_cast<void>(graph->AddEdge(gv0, gv1));
 
     ECS::Graph::Data graphData{};
     graphData.GraphRef = graph;
@@ -208,7 +209,7 @@ TEST(EditorUIProcessing, GraphAndPointCloudEntitiesReportPointDomains)
     EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(graphCaps.Domains, Runtime::EditorUI::GeometryProcessingDomain::GraphVertices));
     EXPECT_FALSE(Runtime::EditorUI::HasAnyDomain(graphCaps.Domains, Runtime::EditorUI::GeometryProcessingDomain::MeshVertices));
 
-    const entt::entity cloudEntity = reg.create();
+    const auto cloudEntity = reg.create();
     auto cloud = std::make_shared<Geometry::PointCloud::Cloud>();
     cloud->AddPoint({0.0f, 0.0f, 0.0f});
     cloud->AddPoint({1.0f, 0.0f, 0.0f});
@@ -220,5 +221,63 @@ TEST(EditorUIProcessing, GraphAndPointCloudEntitiesReportPointDomains)
     const auto cloudCaps = Runtime::EditorUI::GetGeometryProcessingCapabilities(reg, cloudEntity);
     EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(cloudCaps.Domains, Runtime::EditorUI::GeometryProcessingDomain::PointCloudPoints));
     EXPECT_FALSE(Runtime::EditorUI::HasAnyDomain(cloudCaps.Domains, Runtime::EditorUI::GeometryProcessingDomain::SurfaceMesh));
+}
+
+TEST(EditorUIProcessing, MixedGeometryEntityEnumeratesAllKMeansDomainsInStableOrder)
+{
+    ECS::Scene scene;
+    auto& reg = scene.GetRegistry();
+    const auto entity = reg.create();
+
+    auto mesh = std::make_shared<Geometry::Halfedge::Mesh>();
+    static_cast<void>(mesh->AddVertex({0.0f, 0.0f, 0.0f}));
+    static_cast<void>(mesh->AddVertex({1.0f, 0.0f, 0.0f}));
+    static_cast<void>(mesh->AddVertex({0.0f, 1.0f, 0.0f}));
+    ECS::Mesh::Data meshData{};
+    meshData.MeshRef = mesh;
+    reg.emplace<ECS::Mesh::Data>(entity, meshData);
+    reg.emplace<ECS::Surface::Component>(entity);
+
+    ECS::MeshCollider::Component collider{};
+    collider.CollisionRef = std::make_shared<Graphics::GeometryCollisionData>();
+    reg.emplace<ECS::MeshCollider::Component>(entity, std::move(collider));
+
+    auto graph = std::make_shared<Geometry::Graph::Graph>();
+    const auto g0 = graph->AddVertex({0.0f, 0.0f, 0.0f});
+    const auto g1 = graph->AddVertex({1.0f, 0.0f, 0.0f});
+    static_cast<void>(graph->AddEdge(g0, g1));
+    ECS::Graph::Data graphData{};
+    graphData.GraphRef = graph;
+    reg.emplace<ECS::Graph::Data>(entity, graphData);
+
+    auto cloud = std::make_shared<Geometry::PointCloud::Cloud>();
+    cloud->AddPoint({0.0f, 0.0f, 0.0f});
+    cloud->AddPoint({1.0f, 0.0f, 0.0f});
+    ECS::PointCloud::Data pointCloudData{};
+    pointCloudData.CloudRef = cloud;
+    reg.emplace<ECS::PointCloud::Data>(entity, pointCloudData);
+
+    const auto caps = Runtime::EditorUI::GetGeometryProcessingCapabilities(reg, entity);
+    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(caps.Domains, Runtime::EditorUI::GeometryProcessingDomain::MeshVertices));
+    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(caps.Domains, Runtime::EditorUI::GeometryProcessingDomain::GraphVertices));
+    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(caps.Domains, Runtime::EditorUI::GeometryProcessingDomain::PointCloudPoints));
+
+    const auto domains = Runtime::EditorUI::GetAvailableKMeansDomains(reg, entity);
+    ASSERT_EQ(domains.size(), 3u);
+    EXPECT_EQ(domains[0], Runtime::PointCloudKMeans::Domain::MeshVertices);
+    EXPECT_EQ(domains[1], Runtime::PointCloudKMeans::Domain::GraphVertices);
+    EXPECT_EQ(domains[2], Runtime::PointCloudKMeans::Domain::PointCloudPoints);
+
+    const auto entries = Runtime::EditorUI::ResolveGeometryProcessingEntries(reg, entity);
+    ASSERT_EQ(entries.size(), 6u);
+    EXPECT_EQ(entries[0].Algorithm, Runtime::EditorUI::GeometryProcessingAlgorithm::KMeans);
+    EXPECT_EQ(entries[1].Algorithm, Runtime::EditorUI::GeometryProcessingAlgorithm::Remeshing);
+    EXPECT_EQ(entries[2].Algorithm, Runtime::EditorUI::GeometryProcessingAlgorithm::Simplification);
+    EXPECT_EQ(entries[3].Algorithm, Runtime::EditorUI::GeometryProcessingAlgorithm::Smoothing);
+    EXPECT_EQ(entries[4].Algorithm, Runtime::EditorUI::GeometryProcessingAlgorithm::Subdivision);
+    EXPECT_EQ(entries[5].Algorithm, Runtime::EditorUI::GeometryProcessingAlgorithm::Repair);
+    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(entries[0].Domains, Runtime::EditorUI::GeometryProcessingDomain::MeshVertices));
+    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(entries[0].Domains, Runtime::EditorUI::GeometryProcessingDomain::GraphVertices));
+    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(entries[0].Domains, Runtime::EditorUI::GeometryProcessingDomain::PointCloudPoints));
 }
 

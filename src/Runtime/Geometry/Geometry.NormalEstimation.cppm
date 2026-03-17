@@ -2,6 +2,7 @@ module;
 
 #include <cstddef>
 #include <optional>
+#include <span>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -75,14 +76,14 @@ export namespace Geometry::NormalEstimation
     // Estimate normals for a point cloud
     // -------------------------------------------------------------------------
     //
-    // Input: vector of 3D point positions.
+    // Input: borrowed contiguous range of 3D point positions.
     // Returns normals aligned with the estimated local surface orientation.
     //
     // Returns nullopt if:
     //   - Points is empty
     //   - Fewer than 3 points (cannot define a plane)
     [[nodiscard]] std::optional<EstimationResult> EstimateNormals(
-        const std::vector<glm::vec3>& points,
+        std::span<const glm::vec3> points,
         const EstimationParams& params = {});
 
 } // namespace Geometry::NormalEstimation

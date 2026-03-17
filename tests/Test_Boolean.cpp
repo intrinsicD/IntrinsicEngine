@@ -1,34 +1,17 @@
 #include <gtest/gtest.h>
 
 #include <glm/glm.hpp>
+#include <utility>
 
 import Geometry;
 
-// -------------------------------------------------------------------------
-// Helper: build an axis-aligned quad-faced cube mesh.
-// -------------------------------------------------------------------------
 static Geometry::Halfedge::Mesh MakeCube(float halfExtent, glm::vec3 center)
 {
-    Geometry::Halfedge::Mesh mesh;
-    const glm::vec3 c = center;
-    const float h = halfExtent;
-
-    auto v0 = mesh.AddVertex(c + glm::vec3{-h, -h, -h});
-    auto v1 = mesh.AddVertex(c + glm::vec3{ h, -h, -h});
-    auto v2 = mesh.AddVertex(c + glm::vec3{ h,  h, -h});
-    auto v3 = mesh.AddVertex(c + glm::vec3{-h,  h, -h});
-    auto v4 = mesh.AddVertex(c + glm::vec3{-h, -h,  h});
-    auto v5 = mesh.AddVertex(c + glm::vec3{ h, -h,  h});
-    auto v6 = mesh.AddVertex(c + glm::vec3{ h,  h,  h});
-    auto v7 = mesh.AddVertex(c + glm::vec3{-h,  h,  h});
-
-    (void)mesh.AddQuad(v3, v2, v1, v0);
-    (void)mesh.AddQuad(v4, v5, v6, v7);
-    (void)mesh.AddQuad(v0, v1, v5, v4);
-    (void)mesh.AddQuad(v2, v3, v7, v6);
-    (void)mesh.AddQuad(v0, v4, v7, v3);
-    (void)mesh.AddQuad(v1, v2, v6, v5);
-    return mesh;
+    auto mesh = Geometry::Halfedge::MakeMesh(Geometry::AABB{
+        .Min = center - glm::vec3{halfExtent},
+        .Max = center + glm::vec3{halfExtent},
+    });
+    return mesh ? std::move(*mesh) : Geometry::Halfedge::Mesh{};
 }
 
 // =========================================================================

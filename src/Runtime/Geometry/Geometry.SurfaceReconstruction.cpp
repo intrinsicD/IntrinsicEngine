@@ -6,6 +6,7 @@ module;
 #include <cstddef>
 #include <limits>
 #include <optional>
+#include <span>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -47,8 +48,8 @@ namespace Geometry::SurfaceReconstruction
     static float SignedDistanceNearest(
         const glm::vec3& queryPoint,
         const Octree& octree,
-        const std::vector<glm::vec3>& points,
-        const std::vector<glm::vec3>& normals)
+        std::span<const glm::vec3> points,
+        std::span<const glm::vec3> normals)
     {
         std::size_t nearestIdx = 0;
         octree.QueryNearest(queryPoint, nearestIdx);
@@ -67,8 +68,8 @@ namespace Geometry::SurfaceReconstruction
     static float SignedDistanceWeighted(
         const glm::vec3& queryPoint,
         const Octree& octree,
-        const std::vector<glm::vec3>& points,
-        const std::vector<glm::vec3>& normals,
+        std::span<const glm::vec3> points,
+        std::span<const glm::vec3> normals,
         std::size_t k,
         const ReconstructionParams& params,
         std::vector<std::size_t>& neighborBuffer)
@@ -130,8 +131,8 @@ namespace Geometry::SurfaceReconstruction
     // =========================================================================
 
     std::optional<ReconstructionResult> Reconstruct(
-        const std::vector<glm::vec3>& points,
-        const std::vector<glm::vec3>& normals,
+        std::span<const glm::vec3> points,
+        std::span<const glm::vec3> normals,
         const ReconstructionParams& params)
     {
         // Validate input
@@ -250,19 +251,12 @@ namespace Geometry::SurfaceReconstruction
         // -----------------------------------------------------------------
         // Step 4: Build octree for spatial queries
         // -----------------------------------------------------------------
-        const std::size_t filteredCount = usedPoints.size();
-        std::vector<AABB> pointAABBs(filteredCount);
-        for (std::size_t i = 0; i < filteredCount; ++i)
-        {
-            pointAABBs[i] = {.Min = usedPoints[i], .Max = usedPoints[i]};
-        }
-
         Octree octree;
         Octree::SplitPolicy policy;
         policy.SplitPoint = Octree::SplitPoint::Mean;
         policy.TightChildren = true;
 
-        if (!octree.Build(std::move(pointAABBs), policy,
+        if (!octree.BuildFromPoints(usedPoints, policy,
                           params.OctreeMaxPerNode, params.OctreeMaxDepth))
             return std::nullopt;
 
@@ -278,7 +272,7 @@ namespace Geometry::SurfaceReconstruction
         grid.Values.resize((gridNX + 1) * (gridNY + 1) * (gridNZ + 1));
 
         const bool useWeighted = (params.KNeighbors > 1);
-        const std::size_t effectiveK = std::min(params.KNeighbors, filteredCount);
+        const std::size_t effectiveK = std::min(params.KNeighbors, usedPoints.size());
         std::vector<std::size_t> neighborBuffer;
 
         for (std::size_t z = 0; z <= gridNZ; ++z)

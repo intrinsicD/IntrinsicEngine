@@ -141,18 +141,12 @@ namespace Geometry::PointCloud
             return stats;
         }
 
-        // Build octree for KNN queries.
-        std::vector<AABB> pointAABBs;
-        pointAABBs.reserve(positions.size());
-        for (const auto& p : positions)
-            pointAABBs.emplace_back(AABB{p, p});
-
         Octree octree;
         Octree::SplitPolicy policy{};
         policy.SplitPoint = Octree::SplitPoint::Center;
         policy.TightChildren = true;
 
-        if (!octree.Build(std::move(pointAABBs), policy, params.OctreeMaxPerNode, params.OctreeMaxDepth))
+        if (!octree.BuildFromPoints(positions, policy, params.OctreeMaxPerNode, params.OctreeMaxDepth))
             return stats;
 
         std::size_t sampleCount = params.SpacingSampleCount;
@@ -317,17 +311,12 @@ namespace Geometry::PointCloud
 
         auto positions = cloud.Positions();
 
-        std::vector<AABB> pointAABBs;
-        pointAABBs.reserve(positions.size());
-        for (const auto& p : positions)
-            pointAABBs.emplace_back(AABB{p, p});
-
         Octree octree;
         Octree::SplitPolicy policy{};
         policy.SplitPoint = Octree::SplitPoint::Center;
         policy.TightChildren = true;
 
-        if (!octree.Build(std::move(pointAABBs), policy, params.OctreeMaxPerNode, params.OctreeMaxDepth))
+        if (!octree.BuildFromPoints(positions, policy, params.OctreeMaxPerNode, params.OctreeMaxDepth))
             return std::nullopt;
 
         const std::size_t k      = std::max(params.KNeighbors, std::size_t{1});

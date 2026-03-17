@@ -2,7 +2,6 @@ module;
 
 #include <cstdio>
 #include <cstddef>
-#include <cstdint>
 #include <set>
 #include <glm/glm.hpp>
 #include <imgui.h>
@@ -18,6 +17,7 @@ import Core.FrameGraph;
 import Core.Hash;
 import Core.Logging;
 import Core.IOBackend;
+import Runtime.PointCloudKMeans;
 import Runtime.Selection;
 import Runtime.SelectionModule;
 import Runtime.SceneSerializer;
@@ -25,6 +25,33 @@ import Runtime.SceneSerializer;
 namespace Runtime::EditorUI
 {
     using namespace Core::Hash;
+
+    const char* GeometryDomainLabel(GeometryProcessingDomain domain) noexcept
+    {
+        switch (domain)
+        {
+        case GeometryProcessingDomain::SurfaceMesh: return "Surface Mesh";
+        case GeometryProcessingDomain::MeshVertices: return "Mesh Vertices";
+        case GeometryProcessingDomain::GraphVertices: return "Graph Nodes";
+        case GeometryProcessingDomain::PointCloudPoints: return "Point Cloud Points";
+        case GeometryProcessingDomain::None:
+        default: return "None";
+        }
+    }
+
+    const char* GeometryProcessingAlgorithmLabel(GeometryProcessingAlgorithm algorithm) noexcept
+    {
+        switch (algorithm)
+        {
+        case GeometryProcessingAlgorithm::KMeans: return "K-Means";
+        case GeometryProcessingAlgorithm::Remeshing: return "Remeshing";
+        case GeometryProcessingAlgorithm::Simplification: return "Simplification";
+        case GeometryProcessingAlgorithm::Smoothing: return "Smoothing";
+        case GeometryProcessingAlgorithm::Subdivision: return "Subdivision";
+        case GeometryProcessingAlgorithm::Repair: return "Repair";
+        default: return "Unknown";
+        }
+    }
 
     GeometryProcessingCapabilities GetGeometryProcessingCapabilities(const entt::registry& registry,
                                                                     entt::entity entity)
@@ -80,6 +107,52 @@ namespace Runtime::EditorUI
                         GeometryProcessingDomain domain) noexcept
     {
         return HasAnyDomain(GetSupportedDomains(algorithm), domain);
+    }
+
+    std::vector<GeometryProcessingEntry> ResolveGeometryProcessingEntries(const entt::registry& registry,
+                                                                         entt::entity entity)
+    {
+        const GeometryProcessingDomain capabilities = GetGeometryProcessingCapabilities(registry, entity).Domains;
+
+        static constexpr std::array<GeometryProcessingAlgorithm, 6> kAlgorithmOrder = {
+            GeometryProcessingAlgorithm::KMeans,
+            GeometryProcessingAlgorithm::Remeshing,
+            GeometryProcessingAlgorithm::Simplification,
+            GeometryProcessingAlgorithm::Smoothing,
+            GeometryProcessingAlgorithm::Subdivision,
+            GeometryProcessingAlgorithm::Repair,
+        };
+
+        std::vector<GeometryProcessingEntry> entries;
+        entries.reserve(kAlgorithmOrder.size());
+        for (const auto algorithm : kAlgorithmOrder)
+        {
+            const GeometryProcessingDomain domains = capabilities & GetSupportedDomains(algorithm);
+            if (domains == GeometryProcessingDomain::None)
+                continue;
+            entries.push_back(GeometryProcessingEntry{algorithm, domains});
+        }
+        return entries;
+    }
+
+    std::vector<Runtime::PointCloudKMeans::Domain> GetAvailableKMeansDomains(const entt::registry& registry,
+                                                                             entt::entity entity)
+    {
+        const GeometryProcessingDomain available =
+            GetGeometryProcessingCapabilities(registry, entity).Domains
+          & GetSupportedDomains(GeometryProcessingAlgorithm::KMeans);
+
+        std::vector<Runtime::PointCloudKMeans::Domain> domains;
+        domains.reserve(3);
+
+        if (HasAnyDomain(available, GeometryProcessingDomain::MeshVertices))
+            domains.push_back(Runtime::PointCloudKMeans::Domain::MeshVertices);
+        if (HasAnyDomain(available, GeometryProcessingDomain::GraphVertices))
+            domains.push_back(Runtime::PointCloudKMeans::Domain::GraphVertices);
+        if (HasAnyDomain(available, GeometryProcessingDomain::PointCloudPoints))
+            domains.push_back(Runtime::PointCloudKMeans::Domain::PointCloudPoints);
+
+        return domains;
     }
 
     // File-local scene dirty tracker (one per process).

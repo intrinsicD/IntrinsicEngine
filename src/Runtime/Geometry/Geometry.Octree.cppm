@@ -148,6 +148,21 @@ export namespace Geometry
             return BuildFromOwned(policy, maxPerNode, maxDepth);
         }
 
+        /// @brief Build the octree from a point set by lifting each point to a
+        ///        zero-volume AABB.
+        /// @return true if build succeeded, false if input was empty or invalid.
+        [[nodiscard]] bool BuildFromPoints(std::span<const glm::vec3> points, const SplitPolicy& policy,
+                                           const std::size_t maxPerNode, const std::size_t maxDepth)
+        {
+            std::vector<AABB> pointAabbs;
+            pointAabbs.reserve(points.size());
+            for (const glm::vec3& p : points)
+            {
+                pointAabbs.push_back(AABB{.Min = p, .Max = p});
+            }
+            return Build(std::move(pointAabbs), policy, maxPerNode, maxDepth);
+        }
+
         void QueryRay(const Ray& queryShape, std::vector<size_t>& out) const
         {
             Query<Ray>(queryShape, out);
