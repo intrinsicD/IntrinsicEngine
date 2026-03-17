@@ -50,4 +50,20 @@ namespace Graphics
             m_System->SetAlbedoAsset(m_Handle, textureAsset);
         }
     }
+
+    void Material::SetNormalTexture(Core::Assets::AssetHandle textureAsset)
+    {
+        if (m_System && m_Handle.IsValid())
+        {
+            m_System->SetNormalAsset(m_Handle, textureAsset);
+        }
+    }
+
+    void Material::SetMetallicRoughnessTexture(Core::Assets::AssetHandle textureAsset)
+    {
+        if (m_System && m_Handle.IsValid())
+        {
+            m_System->SetMetallicRoughnessAsset(m_Handle, textureAsset);
+        }
+    }
 }
