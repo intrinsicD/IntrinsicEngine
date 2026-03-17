@@ -40,6 +40,23 @@ using namespace Core::Hash;
 
 namespace Graphics
 {
+    [[nodiscard]] static FrameLightingPath ResolveLightingPath(const DefaultPipelineRecipeInputs& inputs,
+                                                               bool hasGeometry)
+    {
+        if (!hasGeometry)
+            return FrameLightingPath::None;
+
+        if (inputs.RequestedLightingPath != FrameLightingPath::Deferred)
+            return inputs.RequestedLightingPath;
+
+        // Deferred composition is only valid when SurfacePass can populate the
+        // G-buffer and CompositionPass can consume it.
+        if (inputs.SurfacePassEnabled && inputs.CompositionPassEnabled)
+            return FrameLightingPath::Deferred;
+
+        return FrameLightingPath::Forward;
+    }
+
     void DefaultPipeline::Shutdown()
     {
         if (m_PickingPass)          m_PickingPass->Shutdown();
@@ -340,17 +357,16 @@ namespace Graphics
         FrameRecipe recipe{};
 
         const bool hasGeometry = inputs.SurfacePassEnabled || inputs.LinePassEnabled || inputs.PointPassEnabled;
-        if (hasGeometry)
-        {
-            recipe.Depth = true;
-            recipe.LightingPath = inputs.RequestedLightingPath;
+        recipe.LightingPath = ResolveLightingPath(inputs, hasGeometry);
 
-            // Deferred path requires G-buffer resources.
-            if (recipe.LightingPath == FrameLightingPath::Deferred && inputs.SurfacePassEnabled)
-            {
-                recipe.Normals = true;
-                recipe.MaterialChannels = true;
-            }
+        if (hasGeometry)
+            recipe.Depth = true;
+
+        // Deferred path requires G-buffer resources produced by SurfacePass.
+        if (recipe.LightingPath == FrameLightingPath::Deferred)
+        {
+            recipe.Normals = true;
+            recipe.MaterialChannels = true;
         }
 
         if (inputs.PickingPassEnabled)
