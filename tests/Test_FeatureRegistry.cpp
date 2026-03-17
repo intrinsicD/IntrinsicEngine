@@ -175,8 +175,22 @@ TEST(FeatureRegistry, EnableDisable)
     EXPECT_TRUE(changed);
     EXPECT_FALSE(registry.IsEnabled("SurfacePass"_id));
 
-    registry.SetEnabled("SurfacePass"_id, true);
+    EXPECT_TRUE(registry.SetEnabled("SurfacePass"_id, true));
     EXPECT_TRUE(registry.IsEnabled("SurfacePass"_id));
+}
+
+
+// =========================================================================
+// Test: SetEnabled reports no-op when state is unchanged
+// =========================================================================
+TEST(FeatureRegistry, SetEnabledSameStateReturnsFalse)
+{
+    FeatureRegistry registry;
+    registry.Register<MockRenderFeature>("SurfacePass", FeatureCategory::RenderFeature);
+
+    EXPECT_FALSE(registry.SetEnabled("SurfacePass"_id, true));
+    EXPECT_TRUE(registry.SetEnabled("SurfacePass"_id, false));
+    EXPECT_FALSE(registry.SetEnabled("SurfacePass"_id, false));
 }
 
 // =========================================================================

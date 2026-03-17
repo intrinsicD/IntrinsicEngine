@@ -65,6 +65,7 @@ namespace Core
     std::vector<const FeatureInfo*> FeatureRegistry::GetByCategory(FeatureCategory category) const
     {
         std::vector<const FeatureInfo*> result;
+        result.reserve(m_Entries.size());
         for (const auto& entry : m_Entries)
         {
             if (entry.Info.Category == category)
@@ -78,6 +79,7 @@ namespace Core
     std::vector<const FeatureInfo*> FeatureRegistry::GetEnabled(FeatureCategory category) const
     {
         std::vector<const FeatureInfo*> result;
+        result.reserve(m_Entries.size());
         for (const auto& entry : m_Entries)
         {
             if (entry.Info.Category == category && entry.Info.Enabled)
@@ -96,6 +98,8 @@ namespace Core
     {
         Entry* entry = FindEntry(id);
         if (!entry) return false;
+        if (entry->Info.Enabled == enabled)
+            return false;
         entry->Info.Enabled = enabled;
         return true;
     }
