@@ -392,6 +392,42 @@ TEST_F(RenderGraphPacketTest, LayoutSensitiveReadChain_SerializesAcrossLayers)
     EXPECT_EQ(layers[2].size(), 1u);
 }
 
+
+// ---------------------------------------------------------------------------
+// Invalid resource handles should be rejected across all RGBuilder accessors
+// without creating phantom resources.
+// ---------------------------------------------------------------------------
+TEST_F(RenderGraphPacketTest, InvalidResourceHandles_AreRejectedAndDoNotCreateResources)
+{
+    struct PassData {};
+
+    constexpr ResourceID kOutOfRangeId = 999999u;
+    const RGResourceHandle invalid{kOutOfRangeId};
+
+    m_Graph->AddPass<PassData>("InvalidHandles",
+        [invalid](PassData&, RGBuilder& builder)
+        {
+            builder.Read(invalid,
+                         VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                         VK_ACCESS_2_SHADER_READ_BIT);
+            builder.Write(invalid,
+                          VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                          VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT);
+            builder.WriteColor(invalid, RGAttachmentInfo{});
+            builder.WriteDepth(invalid, RGAttachmentInfo{});
+        },
+        [](const PassData&, const RGRegistry&, VkCommandBuffer) {});
+
+    m_Graph->Compile(0);
+
+    const auto stats = m_Graph->GetLastPacketStats();
+    EXPECT_EQ(stats.PassCount, 1u);
+    EXPECT_EQ(stats.PacketCount, 1u);
+
+    const auto images = m_Graph->BuildDebugImageList();
+    EXPECT_TRUE(images.empty());
+}
+
 // ===========================================================================
 // Raster packet merging tests
 // ===========================================================================
