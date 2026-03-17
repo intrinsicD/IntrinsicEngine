@@ -181,6 +181,7 @@ namespace Graphics::Systems::PropertySetDirtySync
             auto view = registry.view<ECS::DirtyTag::VertexPositions, ECS::PointCloud::Data>();
             for (auto [entity, pcData] : view.each())
             {
+                ++pcData.PositionRevision;
                 pcData.GpuDirty = true;
             }
         }

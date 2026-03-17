@@ -1,6 +1,7 @@
 module;
 #include <string>
 #include <cstdint>
+#include <type_traits>
 #include <entt/entity/registry.hpp>
 #include <entt/signal/dispatcher.hpp>
 #include <glm/glm.hpp>
@@ -11,12 +12,18 @@ import Core.Logging;
 import Core.Assets;
 import Graphics;
 import ECS;
+#ifdef INTRINSIC_HAS_CUDA
+import RHI;
+#endif
 
 namespace
 {
     // File-static pointer for the EnTT on_destroy hook.
     // Safe because there is exactly one SceneManager instance per process.
     Graphics::GPUScene* g_GpuSceneForDestroyHook = nullptr;
+#ifdef INTRINSIC_HAS_CUDA
+    RHI::CudaDevice* g_CudaDeviceForDestroyHook = nullptr;
+#endif
 
     // Shared GPU slot cleanup for all component types that own a GPUScene slot.
     // All such components initialize GpuSlot to ECS::kInvalidGpuSlot.
@@ -27,6 +34,15 @@ namespace
             return;
 
         auto& comp = registry.get<T>(entity);
+
+#ifdef INTRINSIC_HAS_CUDA
+        if constexpr (std::is_same_v<T, ECS::PointCloud::Data>)
+        {
+            if (g_CudaDeviceForDestroyHook)
+                comp.ReleaseCudaBuffers(*g_CudaDeviceForDestroyHook);
+        }
+#endif
+
         if (comp.GpuSlot == ECS::kInvalidGpuSlot)
             return;
 
@@ -51,9 +67,16 @@ namespace Runtime
         Core::Log::Info("SceneManager: Shutdown.");
     }
 
-    void SceneManager::ConnectGpuHooks(Graphics::GPUScene& gpuScene)
+    void SceneManager::ConnectGpuHooks(Graphics::GPUScene& gpuScene
+#ifdef INTRINSIC_HAS_CUDA
+                                       , RHI::CudaDevice* cudaDevice
+#endif
+    )
     {
         g_GpuSceneForDestroyHook = &gpuScene;
+#ifdef INTRINSIC_HAS_CUDA
+        g_CudaDeviceForDestroyHook = cudaDevice;
+#endif
         auto& reg = m_Scene.GetRegistry();
         reg.on_destroy<ECS::Surface::Component>().connect<&OnGpuComponentDestroyed<ECS::Surface::Component>>();
         reg.on_destroy<ECS::MeshEdgeView::Component>().connect<&OnGpuComponentDestroyed<ECS::MeshEdgeView::Component>>();
@@ -71,6 +94,9 @@ namespace Runtime
         reg.on_destroy<ECS::Graph::Data>().disconnect<&OnGpuComponentDestroyed<ECS::Graph::Data>>();
         reg.on_destroy<ECS::PointCloud::Data>().disconnect<&OnGpuComponentDestroyed<ECS::PointCloud::Data>>();
         g_GpuSceneForDestroyHook = nullptr;
+#ifdef INTRINSIC_HAS_CUDA
+        g_CudaDeviceForDestroyHook = nullptr;
+#endif
     }
 
     entt::entity SceneManager::SpawnModel(Core::Assets::AssetManager& assetManager,
@@ -135,6 +161,10 @@ namespace Runtime
                         auto& col = m_Scene.GetRegistry().emplace<ECS::MeshCollider::Component>(targetEntity);
                         col.CollisionRef = model->Meshes[i]->CollisionGeometry;
                         col.WorldOBB.Center = col.CollisionRef->LocalAABB.GetCenter();
+
+                        auto& primitiveBvh = m_Scene.GetRegistry().emplace_or_replace<ECS::PrimitiveBVH::Data>(targetEntity);
+                        primitiveBvh.Source = ECS::PrimitiveBVH::SourceKind::MeshTriangles;
+                        primitiveBvh.Dirty = true;
                     }
                 }
 

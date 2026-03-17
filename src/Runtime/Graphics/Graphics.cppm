@@ -20,6 +20,7 @@ export import :GPUScene;
 export import :GpuColor;
 export import :Systems.GPUSceneSync;
 export import :Systems.MeshRendererLifecycle;
+export import :Systems.PrimitiveBVHSync;
 export import :Systems.GraphGeometrySync;
 export import :Systems.PointCloudGeometrySync;
 export import :Systems.MeshViewLifecycle;

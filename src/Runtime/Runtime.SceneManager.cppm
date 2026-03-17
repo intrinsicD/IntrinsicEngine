@@ -7,6 +7,9 @@ export module Runtime.SceneManager;
 import Core.Assets;
 import Graphics;
 import ECS;
+#ifdef INTRINSIC_HAS_CUDA
+import RHI;
+#endif
 
 export namespace Runtime
 {
@@ -35,7 +38,11 @@ export namespace Runtime
 
         // Connect the EnTT on_destroy<MeshRenderer> hook so that GPU slots
         // are reclaimed immediately when entities are destroyed.
-        void ConnectGpuHooks(Graphics::GPUScene& gpuScene);
+        void ConnectGpuHooks(Graphics::GPUScene& gpuScene
+#ifdef INTRINSIC_HAS_CUDA
+                             , RHI::CudaDevice* cudaDevice = nullptr
+#endif
+        );
         void DisconnectGpuHooks();
 
         // Provide the geometry pool so SpawnModel can inspect topology.

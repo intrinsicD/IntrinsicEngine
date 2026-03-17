@@ -633,6 +633,19 @@ TEST(MeshUtils_CotanLaplacian, SingleTriangleNonZero)
     EXPECT_GT(totalMag, 0.0);
 }
 
+TEST(MeshUtils_EdgeCotanWeight, EquilateralTriangleBoundaryWeight)
+{
+    auto mesh = MakeSingleTriangle();
+
+    const double expected = 1.0 / (2.0 * std::sqrt(3.0));
+    for (std::size_t ei = 0; ei < mesh.EdgesSize(); ++ei)
+    {
+        const Geometry::EdgeHandle e{static_cast<Geometry::PropertyIndex>(ei)};
+        EXPECT_NEAR(Geometry::MeshUtils::EdgeCotanWeight(mesh, e), expected, 1e-6)
+            << "Edge " << ei;
+    }
+}
+
 TEST(MeshUtils_CotanLaplacian, EquilateralTriangleSymmetry)
 {
     // Equilateral triangle: all vertices should have equal Laplacian magnitude.

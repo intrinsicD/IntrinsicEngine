@@ -62,6 +62,11 @@ export namespace Geometry::MeshUtils
     /// Mean edge length over all non-deleted edges.
     double MeanEdgeLength(const Halfedge::Mesh& mesh);
 
+    /// Canonical cotan edge weight used by DEC and cotan Laplacian operators:
+    ///   w_ij = (cot α_ij + cot β_ij) / 2
+    /// Boundary edges contribute only their single incident angle.
+    double EdgeCotanWeight(const Halfedge::Mesh& mesh, EdgeHandle e);
+
     /// Unnormalized face normal (cross product of two edge vectors).
     /// Magnitude equals twice the face area.
     glm::vec3 FaceNormal(const Halfedge::Mesh& mesh, FaceHandle f);

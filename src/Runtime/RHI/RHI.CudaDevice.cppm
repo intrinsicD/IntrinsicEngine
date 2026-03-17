@@ -68,6 +68,29 @@ export namespace RHI
         // Destroy a stream created via CreateStream.
         void DestroyStream(CUstream stream);
 
+        // ----- Event Management -----
+
+        [[nodiscard]] CudaExpected<CUevent> CreateEvent();
+        void DestroyEvent(CUevent event);
+        [[nodiscard]] CudaError RecordEvent(CUevent event, CUstream stream);
+        [[nodiscard]] CudaExpected<bool> IsEventComplete(CUevent event) const;
+        [[nodiscard]] CudaExpected<float> GetElapsedMilliseconds(CUevent start, CUevent end) const;
+
+        // ----- Memory Transfer -----
+
+        [[nodiscard]] CudaExpected<void> CopyHostToBufferAsync(
+            CudaBufferHandle destination,
+            const void* source,
+            size_t bytes,
+            CUstream stream,
+            size_t destinationOffset = 0);
+
+        [[nodiscard]] CudaExpected<void> CopyBufferToHost(
+            void* destination,
+            CudaBufferHandle source,
+            size_t bytes,
+            size_t sourceOffset = 0) const;
+
         // Synchronize the default stream (blocks until all queued work completes).
         [[nodiscard]] CudaError SynchronizeDefaultStream();
 

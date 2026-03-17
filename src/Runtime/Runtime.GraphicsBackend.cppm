@@ -50,6 +50,9 @@ export namespace Runtime
         [[nodiscard]] RHI::BindlessDescriptorSystem& GetBindlessSystem() const { return *m_BindlessSystem; }
         [[nodiscard]] RHI::TextureSystem& GetTextureSystem() const { return *m_TextureSystem; }
         [[nodiscard]] uint32_t GetDefaultTextureIndex() const { return m_DefaultTextureIndex; }
+#ifdef INTRINSIC_HAS_CUDA
+        [[nodiscard]] RHI::CudaDevice* GetCudaDevice() const { return m_CudaDevice.get(); }
+#endif
 
         // --- Per-frame maintenance ---
         void OnResize();
@@ -93,6 +96,10 @@ export namespace Runtime
         // Engine-owned default 1x1 white texture (bindless slot 0).
         std::shared_ptr<RHI::Texture> m_DefaultTexture;
         uint32_t m_DefaultTextureIndex = 0;
+
+#ifdef INTRINSIC_HAS_CUDA
+        std::unique_ptr<RHI::CudaDevice> m_CudaDevice;
+#endif
 
         // Back-reference to the window (needed for surface destruction).
         Core::Windowing::Window* m_Window = nullptr;

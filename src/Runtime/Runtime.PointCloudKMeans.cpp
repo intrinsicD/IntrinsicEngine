@@ -1,0 +1,897 @@
+module;
+
+#include <algorithm>
+#include <array>
+#include <chrono>
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <limits>
+#include <numeric>
+#include <optional>
+#include <random>
+#include <span>
+#include <string_view>
+#include <vector>
+
+#include <glm/geometric.hpp>
+#include <glm/glm.hpp>
+#include <entt/entity/registry.hpp>
+#include <entt/signal/dispatcher.hpp>
+
+#include "Core.Profiling.Macros.hpp"
+#ifdef INTRINSIC_HAS_CUDA
+#include <cuda.h>
+#endif
+
+module Runtime.PointCloudKMeans;
+
+import Runtime.Engine;
+import Graphics;
+import Geometry;
+import ECS;
+import Core.Logging;
+import Core.Tasks;
+#ifdef INTRINSIC_HAS_CUDA
+import RHI;
+#endif
+
+namespace Runtime::PointCloudKMeans
+{
+ #ifdef INTRINSIC_HAS_CUDA
+    namespace CudaKernels
+    {
+        bool LaunchLloyd(
+            CUstream stream,
+            CUdeviceptr positions,
+            uint32_t pointCount,
+            CUdeviceptr centroids,
+            uint32_t clusterCount,
+            uint32_t iterations,
+            CUdeviceptr labels,
+            CUdeviceptr distances,
+            CUdeviceptr sums,
+            CUdeviceptr clusterSizes);
+    }
+ #endif
+
+    namespace
+    {
+        using TargetDomain = Runtime::PointCloudKMeans::Domain;
+
+        struct CpuCompletionPayload
+        {
+            Engine* Owner = nullptr;
+            entt::entity Entity = entt::null;
+            TargetDomain Domain = TargetDomain::Auto;
+            std::optional<Geometry::KMeans::Result> Result{};
+            double DurationMs = 0.0;
+        };
+
+        struct ResolvedTarget
+        {
+            TargetDomain Domain = TargetDomain::Auto;
+            ECS::Mesh::Data* MeshData = nullptr;
+            ECS::Graph::Data* GraphData = nullptr;
+            ECS::PointCloud::Data* PointCloudData = nullptr;
+
+            [[nodiscard]] bool IsValid() const noexcept
+            {
+                return Domain != TargetDomain::Auto;
+            }
+
+            [[nodiscard]] bool SupportsCuda() const noexcept
+            {
+                return PointCloudData != nullptr && PointCloudData->CloudRef != nullptr;
+            }
+        };
+
+        [[nodiscard]] float SquaredDistance(const glm::vec3& a, const glm::vec3& b)
+        {
+            const glm::vec3 d = a - b;
+            return glm::dot(d, d);
+        }
+
+        [[nodiscard]] std::vector<glm::vec3> InitializeRandom(
+            std::span<const glm::vec3> points,
+            uint32_t k,
+            uint32_t seed)
+        {
+            std::vector<uint32_t> indices(points.size());
+            std::iota(indices.begin(), indices.end(), 0u);
+            std::mt19937 rng(seed);
+            std::shuffle(indices.begin(), indices.end(), rng);
+
+            std::vector<glm::vec3> centroids;
+            centroids.reserve(k);
+            for (uint32_t i = 0; i < k; ++i)
+                centroids.push_back(points[indices[i]]);
+            return centroids;
+        }
+
+        [[nodiscard]] std::vector<glm::vec3> InitializeHierarchical(
+            std::span<const glm::vec3> points,
+            uint32_t k)
+        {
+            glm::vec3 mean(0.0f);
+            for (const glm::vec3& p : points)
+                mean += p;
+            mean /= static_cast<float>(points.size());
+
+            std::vector<glm::vec3> centroids;
+            centroids.reserve(k);
+            centroids.push_back(mean);
+
+            std::vector<float> minDistances(points.size(), std::numeric_limits<float>::max());
+            for (uint32_t c = 1; c < k; ++c)
+            {
+                uint32_t farthestIndex = 0;
+                float farthestDistance = -1.0f;
+                for (std::size_t i = 0; i < points.size(); ++i)
+                {
+                    const float d = SquaredDistance(points[i], centroids.back());
+                    minDistances[i] = std::min(minDistances[i], d);
+                    if (minDistances[i] > farthestDistance)
+                    {
+                        farthestDistance = minDistances[i];
+                        farthestIndex = static_cast<uint32_t>(i);
+                    }
+                }
+                centroids.push_back(points[farthestIndex]);
+            }
+
+            return centroids;
+        }
+
+        [[nodiscard]] std::vector<glm::vec3> InitializeCentroids(
+            std::span<const glm::vec3> points,
+            const Geometry::KMeans::Params& params,
+            uint32_t k)
+        {
+            return (params.Init == Geometry::KMeans::Initialization::Random)
+                ? InitializeRandom(points, k, params.Seed)
+                : InitializeHierarchical(points, k);
+        }
+
+        [[nodiscard]] glm::vec4 LabelColor(uint32_t label)
+        {
+            const float h = std::fmod(0.61803398875f * static_cast<float>(label), 1.0f);
+            const float s = 0.65f;
+            const float v = 0.95f;
+
+            const float hh = h * 6.0f;
+            const float c = v * s;
+            const float x = c * (1.0f - std::fabs(std::fmod(hh, 2.0f) - 1.0f));
+            const float m = v - c;
+
+            glm::vec3 rgb(0.0f);
+            if (hh < 1.0f) rgb = {c, x, 0.0f};
+            else if (hh < 2.0f) rgb = {x, c, 0.0f};
+            else if (hh < 3.0f) rgb = {0.0f, c, x};
+            else if (hh < 4.0f) rgb = {0.0f, x, c};
+            else if (hh < 5.0f) rgb = {x, 0.0f, c};
+            else rgb = {c, 0.0f, x};
+            return glm::vec4(rgb + glm::vec3(m), 1.0f);
+        }
+
+        [[nodiscard]] std::vector<glm::vec3> SnapshotMeshVertices(
+            const Geometry::Halfedge::Mesh& mesh,
+            std::vector<uint32_t>* handles = nullptr)
+        {
+            std::vector<glm::vec3> points;
+            points.reserve(mesh.VertexCount());
+            if (handles)
+                handles->clear();
+
+            for (std::size_t i = 0; i < mesh.VerticesSize(); ++i)
+            {
+                const auto vh = Geometry::VertexHandle{static_cast<Geometry::PropertyIndex>(i)};
+                if (!mesh.IsValid(vh) || mesh.IsDeleted(vh))
+                    continue;
+
+                points.push_back(mesh.Position(vh));
+                if (handles)
+                    handles->push_back(static_cast<uint32_t>(i));
+            }
+
+            return points;
+        }
+
+        [[nodiscard]] std::vector<glm::vec3> SnapshotGraphVertices(
+            const Geometry::Graph::Graph& graph,
+            std::vector<uint32_t>* handles = nullptr)
+        {
+            std::vector<glm::vec3> points;
+            points.reserve(graph.VertexCount());
+            if (handles)
+                handles->clear();
+
+            for (std::size_t i = 0; i < graph.VerticesSize(); ++i)
+            {
+                const auto vh = Geometry::VertexHandle{static_cast<Geometry::PropertyIndex>(i)};
+                if (!graph.IsValid(vh) || graph.IsDeleted(vh))
+                    continue;
+
+                points.push_back(graph.VertexPosition(vh));
+                if (handles)
+                    handles->push_back(static_cast<uint32_t>(i));
+            }
+
+            return points;
+        }
+
+        [[nodiscard]] ResolvedTarget ResolveTarget(
+            entt::registry& reg,
+            entt::entity entity,
+            TargetDomain requestedDomain)
+        {
+            ResolvedTarget target{};
+            if (!reg.valid(entity))
+                return target;
+
+            const auto tryMesh = [&]() -> bool
+            {
+                auto* mesh = reg.try_get<ECS::Mesh::Data>(entity);
+                if (!mesh || !mesh->MeshRef)
+                    return false;
+                target.Domain = TargetDomain::MeshVertices;
+                target.MeshData = mesh;
+                return true;
+            };
+
+            const auto tryGraph = [&]() -> bool
+            {
+                auto* graph = reg.try_get<ECS::Graph::Data>(entity);
+                if (!graph || !graph->GraphRef)
+                    return false;
+                target.Domain = TargetDomain::GraphVertices;
+                target.GraphData = graph;
+                return true;
+            };
+
+            const auto tryPointCloud = [&]() -> bool
+            {
+                auto* cloud = reg.try_get<ECS::PointCloud::Data>(entity);
+                if (!cloud || !cloud->CloudRef || cloud->CloudRef->IsEmpty())
+                    return false;
+                target.Domain = TargetDomain::PointCloudPoints;
+                target.PointCloudData = cloud;
+                return true;
+            };
+
+            switch (requestedDomain)
+            {
+            case TargetDomain::MeshVertices: static_cast<void>(tryMesh()); return target;
+            case TargetDomain::GraphVertices: static_cast<void>(tryGraph()); return target;
+            case TargetDomain::PointCloudPoints: static_cast<void>(tryPointCloud()); return target;
+            case TargetDomain::Auto:
+            default:
+                if (tryPointCloud()) return target;
+                if (tryMesh()) return target;
+                if (tryGraph()) return target;
+                return target;
+            }
+        }
+
+        void ClearPending(ResolvedTarget& target)
+        {
+            switch (target.Domain)
+            {
+            case TargetDomain::MeshVertices:
+                if (target.MeshData)
+                {
+                    target.MeshData->KMeansJobPending = false;
+                    target.MeshData->KMeansPendingClusterCount = 0;
+                }
+                break;
+            case TargetDomain::GraphVertices:
+                if (target.GraphData)
+                {
+                    target.GraphData->KMeansJobPending = false;
+                    target.GraphData->KMeansPendingClusterCount = 0;
+                }
+                break;
+            case TargetDomain::PointCloudPoints:
+                if (target.PointCloudData)
+                {
+                    target.PointCloudData->KMeansJobPending = false;
+                    target.PointCloudData->KMeansPendingClusterCount = 0;
+                }
+                break;
+            case TargetDomain::Auto:
+            default:
+                break;
+            }
+        }
+
+        void MarkPending(ResolvedTarget& target,
+                         Geometry::KMeans::Backend backend,
+                         uint32_t clusterCount,
+                         uint32_t maxIterations)
+        {
+            switch (target.Domain)
+            {
+            case TargetDomain::MeshVertices:
+                if (target.MeshData)
+                {
+                    target.MeshData->KMeansJobPending = true;
+                    target.MeshData->KMeansPendingClusterCount = clusterCount;
+                    target.MeshData->KMeansLastBackend = backend;
+                    target.MeshData->KMeansLastIterations = maxIterations;
+                    target.MeshData->KMeansLastConverged = false;
+                }
+                break;
+            case TargetDomain::GraphVertices:
+                if (target.GraphData)
+                {
+                    target.GraphData->KMeansJobPending = true;
+                    target.GraphData->KMeansPendingClusterCount = clusterCount;
+                    target.GraphData->KMeansLastBackend = backend;
+                    target.GraphData->KMeansLastIterations = maxIterations;
+                    target.GraphData->KMeansLastConverged = false;
+                }
+                break;
+            case TargetDomain::PointCloudPoints:
+                if (target.PointCloudData)
+                {
+                    target.PointCloudData->KMeansJobPending = true;
+                    target.PointCloudData->KMeansPendingClusterCount = clusterCount;
+                    target.PointCloudData->KMeansLastBackend = backend;
+                    target.PointCloudData->KMeansLastIterations = maxIterations;
+                    target.PointCloudData->KMeansLastConverged = false;
+                }
+                break;
+            case TargetDomain::Auto:
+            default:
+                break;
+            }
+        }
+
+        [[nodiscard]] std::vector<glm::vec3> SnapshotPoints(const ResolvedTarget& target)
+        {
+            switch (target.Domain)
+            {
+            case TargetDomain::MeshVertices:
+                return (target.MeshData && target.MeshData->MeshRef)
+                    ? SnapshotMeshVertices(*target.MeshData->MeshRef)
+                    : std::vector<glm::vec3>{};
+            case TargetDomain::GraphVertices:
+                return (target.GraphData && target.GraphData->GraphRef)
+                    ? SnapshotGraphVertices(*target.GraphData->GraphRef)
+                    : std::vector<glm::vec3>{};
+            case TargetDomain::PointCloudPoints:
+                if (target.PointCloudData && target.PointCloudData->CloudRef)
+                {
+                    const auto positions = target.PointCloudData->CloudRef->Positions();
+                    return std::vector<glm::vec3>(positions.begin(), positions.end());
+                }
+                return {};
+            case TargetDomain::Auto:
+            default:
+                return {};
+            }
+        }
+
+#ifdef INTRINSIC_HAS_CUDA
+        class ScopedCudaContext
+        {
+        public:
+            ScopedCudaContext(CUcontext context, std::string_view op)
+                : m_Context(context)
+                , m_Operation(op)
+            {
+                m_Result = cuCtxPushCurrent(m_Context);
+                m_Active = (m_Result == CUDA_SUCCESS);
+            }
+
+            ~ScopedCudaContext()
+            {
+                if (!m_Active)
+                    return;
+                CUcontext popped = nullptr;
+                if (const CUresult result = cuCtxPopCurrent(&popped); result != CUDA_SUCCESS)
+                {
+                    Core::Log::Warn("{}: cuCtxPopCurrent failed (CUresult={}).",
+                                    m_Operation,
+                                    static_cast<int>(result));
+                }
+            }
+
+            [[nodiscard]] bool Ok() const { return m_Active; }
+            [[nodiscard]] RHI::CudaError Error() const
+            {
+                if (m_Result == CUDA_ERROR_INVALID_CONTEXT || m_Result == CUDA_ERROR_NOT_INITIALIZED)
+                    return RHI::CudaError::NotInitialized;
+                return RHI::CudaError::Unknown;
+            }
+
+        private:
+            CUcontext m_Context = nullptr;
+            std::string_view m_Operation{};
+            CUresult m_Result = CUDA_SUCCESS;
+            bool m_Active = false;
+        };
+
+        [[nodiscard]] bool EnsureCudaResources(
+            ECS::PointCloud::Data& pcData,
+            RHI::CudaDevice& cudaDevice,
+            uint32_t pointCount,
+            uint32_t clusterCount)
+        {
+            if (!pcData.CudaStream)
+            {
+                auto stream = cudaDevice.CreateStream();
+                if (!stream)
+                    return false;
+                pcData.CudaStream = *stream;
+            }
+            if (!pcData.CudaStartEvent)
+            {
+                auto event = cudaDevice.CreateEvent();
+                if (!event)
+                    return false;
+                pcData.CudaStartEvent = *event;
+            }
+            if (!pcData.CudaCompletionEvent)
+            {
+                auto event = cudaDevice.CreateEvent();
+                if (!event)
+                    return false;
+                pcData.CudaCompletionEvent = *event;
+            }
+
+            const auto ensureBuffer = [&](RHI::CudaBufferHandle& handle, uint32_t& capacity, uint32_t requiredCount, size_t stride) -> bool
+            {
+                if (capacity >= requiredCount && handle)
+                    return true;
+                cudaDevice.FreeBuffer(handle);
+                auto buffer = cudaDevice.AllocateBuffer(static_cast<size_t>(requiredCount) * stride);
+                if (!buffer)
+                    return false;
+                handle = *buffer;
+                capacity = requiredCount;
+                return true;
+            };
+
+            return ensureBuffer(pcData.CudaPositions, pcData.CudaPointCapacity, pointCount, sizeof(glm::vec3)) &&
+                   ensureBuffer(pcData.CudaLabels, pcData.CudaPointCapacity, pointCount, sizeof(uint32_t)) &&
+                   ensureBuffer(pcData.CudaDistances, pcData.CudaPointCapacity, pointCount, sizeof(float)) &&
+                   ensureBuffer(pcData.CudaCentroids, pcData.CudaClusterCapacity, clusterCount, sizeof(glm::vec3)) &&
+                   ensureBuffer(pcData.CudaSums, pcData.CudaClusterCapacity, clusterCount, sizeof(glm::vec3)) &&
+                   ensureBuffer(pcData.CudaClusterSizes, pcData.CudaClusterCapacity, clusterCount, sizeof(uint32_t));
+        }
+
+        [[nodiscard]] bool ScheduleCuda(
+            Engine& engine,
+            [[maybe_unused]] entt::entity entity,
+            ECS::PointCloud::Data& pcData,
+            const Geometry::KMeans::Params& params)
+        {
+            PROFILE_SCOPE("PointCloudKMeans::ScheduleCUDA");
+
+            auto* cudaDevice = engine.GetCudaDevice();
+            if (!cudaDevice || !pcData.CloudRef)
+                return false;
+
+            const auto positions = pcData.CloudRef->Positions();
+            if (positions.empty())
+                return false;
+
+            const uint32_t pointCount = static_cast<uint32_t>(positions.size());
+            const uint32_t clusterCount = std::min<uint32_t>(params.ClusterCount, pointCount);
+            if (clusterCount == 0 || params.MaxIterations == 0)
+                return false;
+
+            if (!EnsureCudaResources(pcData, *cudaDevice, pointCount, clusterCount))
+                return false;
+
+            if (pcData.CudaPositionRevision != pcData.PositionRevision)
+            {
+                auto upload = cudaDevice->CopyHostToBufferAsync(
+                    pcData.CudaPositions,
+                    positions.data(),
+                    positions.size_bytes(),
+                    pcData.CudaStream);
+                if (!upload)
+                    return false;
+                pcData.CudaPositionRevision = pcData.PositionRevision;
+            }
+
+            const std::vector<glm::vec3> centroids = InitializeCentroids(positions, params, clusterCount);
+            auto uploadCentroids = cudaDevice->CopyHostToBufferAsync(
+                pcData.CudaCentroids,
+                centroids.data(),
+                centroids.size() * sizeof(glm::vec3),
+                pcData.CudaStream);
+            if (!uploadCentroids)
+                return false;
+
+            if (cudaDevice->RecordEvent(pcData.CudaStartEvent, pcData.CudaStream) != RHI::CudaError::Success)
+                return false;
+
+            ScopedCudaContext context(cudaDevice->GetContext(), "PointCloudKMeans::ScheduleCUDA");
+            if (!context.Ok())
+                return false;
+
+            const bool launchOk = CudaKernels::LaunchLloyd(
+                pcData.CudaStream,
+                pcData.CudaPositions.Ptr,
+                pointCount,
+                pcData.CudaCentroids.Ptr,
+                clusterCount,
+                params.MaxIterations,
+                pcData.CudaLabels.Ptr,
+                pcData.CudaDistances.Ptr,
+                pcData.CudaSums.Ptr,
+                pcData.CudaClusterSizes.Ptr);
+            if (!launchOk)
+                return false;
+
+            if (cudaDevice->RecordEvent(pcData.CudaCompletionEvent, pcData.CudaStream) != RHI::CudaError::Success)
+                return false;
+
+            pcData.KMeansJobPending = true;
+            pcData.KMeansPendingClusterCount = clusterCount;
+            pcData.KMeansLastIterations = params.MaxIterations;
+            pcData.KMeansLastConverged = false;
+            return true;
+        }
+#endif
+    }
+
+    TargetInfo DescribeTarget(Engine& engine, entt::entity entity, Domain requestedDomain)
+    {
+        auto& reg = engine.GetScene().GetRegistry();
+        const ResolvedTarget target = ResolveTarget(reg, entity, requestedDomain);
+
+        TargetInfo info{};
+        info.ResolvedDomain = target.Domain;
+        info.SupportsCuda = target.SupportsCuda();
+
+        switch (target.Domain)
+        {
+        case Domain::MeshVertices:
+            if (target.MeshData)
+            {
+                info.PointCount = target.MeshData->VertexCount();
+                info.JobPending = target.MeshData->KMeansJobPending;
+            }
+            break;
+        case Domain::GraphVertices:
+            if (target.GraphData)
+            {
+                info.PointCount = target.GraphData->NodeCount();
+                info.JobPending = target.GraphData->KMeansJobPending;
+            }
+            break;
+        case Domain::PointCloudPoints:
+            if (target.PointCloudData)
+            {
+                info.PointCount = target.PointCloudData->PointCount();
+                info.JobPending = target.PointCloudData->KMeansJobPending;
+            }
+            break;
+        case Domain::Auto:
+        default:
+            break;
+        }
+
+        return info;
+    }
+
+    bool PublishResult(Engine& engine,
+                       entt::entity entity,
+                       const Geometry::KMeans::Result& result,
+                       double durationMs,
+                       Domain requestedDomain)
+    {
+        PROFILE_SCOPE("PointCloudKMeans::ApplyResult");
+
+        auto& reg = engine.GetScene().GetRegistry();
+        ResolvedTarget target = ResolveTarget(reg, entity, requestedDomain);
+        if (!target.IsValid())
+            return false;
+
+        ClearPending(target);
+
+        switch (target.Domain)
+        {
+        case Domain::MeshVertices:
+            if (!target.MeshData || !target.MeshData->MeshRef)
+                return false;
+            {
+                auto& mesh = *target.MeshData->MeshRef;
+                std::vector<uint32_t> handles;
+                const auto active = SnapshotMeshVertices(mesh, &handles);
+                if (active.size() != result.Labels.size() || result.SquaredDistances.size() != result.Labels.size())
+                    return false;
+
+                auto labelProp = Geometry::VertexProperty<uint32_t>(
+                    mesh.VertexProperties().GetOrAdd<uint32_t>("v:kmeans_label", 0u));
+                auto distanceProp = Geometry::VertexProperty<float>(
+                    mesh.VertexProperties().GetOrAdd<float>("v:kmeans_distance", 0.0f));
+                auto colorProp = Geometry::VertexProperty<glm::vec4>(
+                    mesh.VertexProperties().GetOrAdd<glm::vec4>("v:kmeans_color", glm::vec4(1.0f)));
+
+                for (std::size_t i = 0; i < handles.size(); ++i)
+                {
+                    const auto vh = Geometry::VertexHandle{static_cast<Geometry::PropertyIndex>(handles[i])};
+                    labelProp[vh] = result.Labels[i];
+                    distanceProp[vh] = result.SquaredDistances[i];
+                    colorProp[vh] = LabelColor(result.Labels[i]);
+                }
+
+                target.MeshData->Visualization.VertexColors.PropertyName = "v:kmeans_color";
+                target.MeshData->AttributesDirty = true;
+                target.MeshData->KMeansLastBackend = result.ActualBackend;
+                target.MeshData->KMeansLastIterations = result.Iterations;
+                target.MeshData->KMeansLastConverged = result.Converged;
+                target.MeshData->KMeansLastInertia = result.Inertia;
+                target.MeshData->KMeansLastMaxDistanceIndex = result.MaxDistanceIndex;
+                target.MeshData->KMeansLastDurationMs = durationMs;
+            }
+            break;
+        case Domain::GraphVertices:
+            if (!target.GraphData || !target.GraphData->GraphRef)
+                return false;
+            {
+                auto& graph = *target.GraphData->GraphRef;
+                std::vector<uint32_t> handles;
+                const auto active = SnapshotGraphVertices(graph, &handles);
+                if (active.size() != result.Labels.size() || result.SquaredDistances.size() != result.Labels.size())
+                    return false;
+
+                auto labelProp = graph.GetOrAddVertexProperty<uint32_t>("v:kmeans_label", 0u);
+                auto distanceProp = graph.GetOrAddVertexProperty<float>("v:kmeans_distance", 0.0f);
+                auto colorProp = graph.GetOrAddVertexProperty<glm::vec4>("v:kmeans_color", glm::vec4(1.0f));
+
+                for (std::size_t i = 0; i < handles.size(); ++i)
+                {
+                    const auto vh = Geometry::VertexHandle{static_cast<Geometry::PropertyIndex>(handles[i])};
+                    labelProp[vh] = result.Labels[i];
+                    distanceProp[vh] = result.SquaredDistances[i];
+                    colorProp[vh] = LabelColor(result.Labels[i]);
+                }
+
+                target.GraphData->Visualization.VertexColors.PropertyName = "v:kmeans_color";
+                target.GraphData->KMeansLastBackend = result.ActualBackend;
+                target.GraphData->KMeansLastIterations = result.Iterations;
+                target.GraphData->KMeansLastConverged = result.Converged;
+                target.GraphData->KMeansLastInertia = result.Inertia;
+                target.GraphData->KMeansLastMaxDistanceIndex = result.MaxDistanceIndex;
+                target.GraphData->KMeansLastDurationMs = durationMs;
+            }
+            break;
+        case Domain::PointCloudPoints:
+            if (!target.PointCloudData || !target.PointCloudData->CloudRef)
+                return false;
+            {
+                auto& pcData = *target.PointCloudData;
+                if (pcData.CloudRef->PointCount() != result.Labels.size() || result.SquaredDistances.size() != result.Labels.size())
+                    return false;
+
+                auto& cloud = *pcData.CloudRef;
+                auto labelProp = cloud.GetOrAddVertexProperty<uint32_t>("p:kmeans_label", 0u);
+                auto distanceProp = cloud.GetOrAddVertexProperty<float>("p:kmeans_distance", 0.0f);
+                auto colorProp = cloud.GetOrAddVertexProperty<glm::vec4>("p:kmeans_color", glm::vec4(1.0f));
+
+                for (std::size_t i = 0; i < result.Labels.size(); ++i)
+                {
+                    const auto vh = Geometry::PointCloud::Cloud::Handle(i);
+                    labelProp[vh] = result.Labels[i];
+                    distanceProp[vh] = result.SquaredDistances[i];
+                    colorProp[vh] = LabelColor(result.Labels[i]);
+                }
+
+                pcData.Visualization.VertexColors.PropertyName = "p:kmeans_color";
+                pcData.KMeansLastBackend = result.ActualBackend;
+                pcData.KMeansLastIterations = result.Iterations;
+                pcData.KMeansLastConverged = result.Converged;
+                pcData.KMeansLastInertia = result.Inertia;
+                pcData.KMeansLastMaxDistanceIndex = result.MaxDistanceIndex;
+                pcData.KMeansLastDurationMs = durationMs;
+            }
+            break;
+        case Domain::Auto:
+        default:
+            return false;
+        }
+
+        reg.emplace_or_replace<ECS::DirtyTag::VertexAttributes>(entity);
+        engine.GetScene().GetDispatcher().enqueue<ECS::Events::GeometryModified>({entity});
+        return true;
+    }
+
+    bool Schedule(Engine& engine,
+                  entt::entity entity,
+                  const Geometry::KMeans::Params& params,
+                  Domain requestedDomain)
+    {
+        PROFILE_SCOPE("PointCloudKMeans::Schedule");
+
+        auto& reg = engine.GetScene().GetRegistry();
+        ResolvedTarget target = ResolveTarget(reg, entity, requestedDomain);
+        if (!target.IsValid())
+            return false;
+
+        const auto targetInfo = DescribeTarget(engine, entity, requestedDomain);
+        if (!targetInfo.IsValid() || targetInfo.JobPending)
+            return false;
+
+#ifdef INTRINSIC_HAS_CUDA
+        if (params.Compute == Geometry::KMeans::Backend::CUDA && target.Domain == Domain::PointCloudPoints)
+        {
+            if (ScheduleCuda(engine, entity, *target.PointCloudData, params))
+                return true;
+            Core::Log::Warn("PointCloudKMeans: CUDA scheduling failed for entity {}. Falling back to CPU.",
+                            static_cast<uint32_t>(static_cast<entt::id_type>(entity)));
+        }
+#endif
+
+        std::vector<glm::vec3> snapshot = SnapshotPoints(target);
+        const Geometry::KMeans::Params cpuParams = [&]
+        {
+            auto copy = params;
+            copy.Compute = Geometry::KMeans::Backend::CPU;
+            return copy;
+        }();
+
+        if (snapshot.empty())
+            return false;
+
+        const uint32_t clusterCount = std::min<uint32_t>(cpuParams.ClusterCount,
+                                                         static_cast<uint32_t>(snapshot.size()));
+        MarkPending(target, Geometry::KMeans::Backend::CPU, clusterCount, cpuParams.MaxIterations);
+
+        const Domain resolvedDomain = target.Domain;
+
+        Core::Tasks::Scheduler::Dispatch([&engine, entity, resolvedDomain, snapshot = std::move(snapshot), cpuParams]() mutable
+        {
+            PROFILE_SCOPE("PointCloudKMeans::CPUWorker");
+            const auto start = std::chrono::high_resolution_clock::now();
+            const auto result = Geometry::KMeans::Cluster(snapshot, cpuParams);
+            const auto end = std::chrono::high_resolution_clock::now();
+            const double durationMs = std::chrono::duration<double, std::milli>(end - start).count();
+
+            auto payload = std::make_unique<CpuCompletionPayload>();
+            payload->Owner = &engine;
+            payload->Entity = entity;
+            payload->Domain = resolvedDomain;
+            payload->Result = result;
+            payload->DurationMs = durationMs;
+
+            engine.RunOnMainThread([payload = std::move(payload)]() mutable
+            {
+                Engine& owner = *payload->Owner;
+                const entt::entity completedEntity = payload->Entity;
+
+                if (!payload->Result)
+                {
+                    auto& reg = owner.GetScene().GetRegistry();
+                    if (reg.valid(completedEntity))
+                    {
+                        ResolvedTarget target = ResolveTarget(reg, completedEntity, payload->Domain);
+                        ClearPending(target);
+                    }
+                    return;
+                }
+
+                static_cast<void>(PublishResult(owner,
+                                                completedEntity,
+                                                *payload->Result,
+                                                payload->DurationMs,
+                                                payload->Domain));
+            });
+        });
+
+        return true;
+    }
+
+    void PumpCompletions(Engine& engine)
+    {
+        PROFILE_SCOPE("PointCloudKMeans::PumpCompletions");
+
+#ifdef INTRINSIC_HAS_CUDA
+        auto* cudaDevice = engine.GetCudaDevice();
+        if (!cudaDevice)
+            return;
+
+        auto& reg = engine.GetScene().GetRegistry();
+        auto view = reg.view<ECS::PointCloud::Data>();
+        for (auto [entity, pcData] : view.each())
+        {
+            if (!pcData.KMeansJobPending || !pcData.CudaCompletionEvent || !pcData.CloudRef)
+                continue;
+
+            auto ready = cudaDevice->IsEventComplete(pcData.CudaCompletionEvent);
+            if (!ready)
+                continue;
+            if (!*ready)
+                continue;
+
+            const uint32_t pointCount = static_cast<uint32_t>(pcData.CloudRef->PointCount());
+            const uint32_t clusterCount = pcData.KMeansPendingClusterCount;
+            if (pointCount == 0 || clusterCount == 0)
+            {
+                pcData.KMeansJobPending = false;
+                pcData.KMeansPendingClusterCount = 0;
+                continue;
+            }
+
+            std::vector<uint32_t> labels(pointCount, 0u);
+            std::vector<float> distances(pointCount, 0.0f);
+            std::vector<glm::vec3> centroids(clusterCount, glm::vec3(0.0f));
+
+            auto copyLabels = cudaDevice->CopyBufferToHost(labels.data(), pcData.CudaLabels, labels.size() * sizeof(uint32_t));
+            auto copyDistances = cudaDevice->CopyBufferToHost(distances.data(), pcData.CudaDistances, distances.size() * sizeof(float));
+            auto copyCentroids = cudaDevice->CopyBufferToHost(centroids.data(), pcData.CudaCentroids, centroids.size() * sizeof(glm::vec3));
+            if (!copyLabels || !copyDistances || !copyCentroids)
+            {
+                Core::Log::Warn("PointCloudKMeans: failed to download CUDA results for entity {}.",
+                                static_cast<uint32_t>(static_cast<entt::id_type>(entity)));
+                pcData.KMeansJobPending = false;
+                pcData.KMeansPendingClusterCount = 0;
+                continue;
+            }
+
+            Geometry::KMeans::Result result{};
+            result.Labels = std::move(labels);
+            result.SquaredDistances = std::move(distances);
+            result.Centroids = std::move(centroids);
+            result.Iterations = pcData.KMeansLastIterations;
+            result.Converged = false;
+            result.ActualBackend = Geometry::KMeans::Backend::CUDA;
+
+            float inertia = 0.0f;
+            float maxDistance = -1.0f;
+            uint32_t maxDistanceIndex = 0;
+            for (std::size_t i = 0; i < result.SquaredDistances.size(); ++i)
+            {
+                inertia += result.SquaredDistances[i];
+                if (result.SquaredDistances[i] > maxDistance)
+                {
+                    maxDistance = result.SquaredDistances[i];
+                    maxDistanceIndex = static_cast<uint32_t>(i);
+                }
+            }
+            result.Inertia = inertia;
+            result.MaxDistanceIndex = maxDistanceIndex;
+            result.Iterations = pcData.KMeansLastIterations;
+
+            double durationMs = 0.0;
+            if (auto elapsed = cudaDevice->GetElapsedMilliseconds(pcData.CudaStartEvent, pcData.CudaCompletionEvent))
+                durationMs = *elapsed;
+
+            static_cast<void>(PublishResult(engine, entity, result, durationMs, Domain::PointCloudPoints));
+        }
+#else
+        (void)engine;
+#endif
+    }
+
+    void ReleaseEntityBuffers(Engine& engine, entt::entity entity)
+    {
+#ifdef INTRINSIC_HAS_CUDA
+        auto* cudaDevice = engine.GetCudaDevice();
+        if (!cudaDevice)
+            return;
+
+        auto& reg = engine.GetScene().GetRegistry();
+        if (!reg.valid(entity))
+            return;
+        if (auto* pcData = reg.try_get<ECS::PointCloud::Data>(entity))
+            pcData->ReleaseCudaBuffers(*cudaDevice);
+#else
+        auto& reg = engine.GetScene().GetRegistry();
+        if (!reg.valid(entity))
+            return;
+        if (auto* pcData = reg.try_get<ECS::PointCloud::Data>(entity))
+        {
+            pcData->KMeansJobPending = false;
+            pcData->KMeansPendingClusterCount = 0;
+        }
+#endif
+    }
+}
+
+

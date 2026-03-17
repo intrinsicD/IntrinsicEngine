@@ -1,6 +1,5 @@
 #pragma once
 
-
 // =============================================================================
 // PassUtils — shared implementation helpers for render passes.
 //
@@ -8,7 +7,8 @@
 // fragments only — it is not part of any exported module interface.
 // =============================================================================
 
-// no Standard-library includes allowed here — this header is included in multiple TU contexts
+// This header is included from global module fragments, so it must include the
+// standard-library facilities it uses explicitly instead of relying on transitive includes.
 
 // =============================================================================
 // CheckVkResult — unified Vulkan error logging for render passes.

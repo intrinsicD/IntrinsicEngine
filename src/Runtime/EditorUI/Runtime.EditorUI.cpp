@@ -26,6 +26,62 @@ namespace Runtime::EditorUI
 {
     using namespace Core::Hash;
 
+    GeometryProcessingCapabilities GetGeometryProcessingCapabilities(const entt::registry& registry,
+                                                                    entt::entity entity)
+    {
+        GeometryProcessingCapabilities capabilities{};
+        if (entity == entt::null || !registry.valid(entity))
+            return capabilities;
+
+        if (registry.all_of<ECS::Surface::Component, ECS::MeshCollider::Component>(entity))
+            capabilities.Domains |= GeometryProcessingDomain::SurfaceMesh;
+
+        if (const auto* meshData = registry.try_get<ECS::Mesh::Data>(entity);
+            meshData && meshData->MeshRef)
+        {
+            capabilities.Domains |= GeometryProcessingDomain::MeshVertices;
+        }
+
+        if (const auto* graphData = registry.try_get<ECS::Graph::Data>(entity);
+            graphData && graphData->GraphRef)
+        {
+            capabilities.Domains |= GeometryProcessingDomain::GraphVertices;
+        }
+
+        if (const auto* pointCloudData = registry.try_get<ECS::PointCloud::Data>(entity);
+            pointCloudData && pointCloudData->CloudRef && !pointCloudData->CloudRef->IsEmpty())
+        {
+            capabilities.Domains |= GeometryProcessingDomain::PointCloudPoints;
+        }
+
+        return capabilities;
+    }
+
+    GeometryProcessingDomain GetSupportedDomains(GeometryProcessingAlgorithm algorithm) noexcept
+    {
+        switch (algorithm)
+        {
+        case GeometryProcessingAlgorithm::KMeans:
+            return GeometryProcessingDomain::MeshVertices
+                 | GeometryProcessingDomain::GraphVertices
+                 | GeometryProcessingDomain::PointCloudPoints;
+        case GeometryProcessingAlgorithm::Remeshing:
+        case GeometryProcessingAlgorithm::Simplification:
+        case GeometryProcessingAlgorithm::Smoothing:
+        case GeometryProcessingAlgorithm::Subdivision:
+        case GeometryProcessingAlgorithm::Repair:
+            return GeometryProcessingDomain::SurfaceMesh;
+        default:
+            return GeometryProcessingDomain::None;
+        }
+    }
+
+    bool SupportsDomain(GeometryProcessingAlgorithm algorithm,
+                        GeometryProcessingDomain domain) noexcept
+    {
+        return HasAnyDomain(GetSupportedDomains(algorithm), domain);
+    }
+
     // File-local scene dirty tracker (one per process).
     static SceneDirtyTracker s_DirtyTracker;
 

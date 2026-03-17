@@ -12,6 +12,7 @@ target_sources(${target_name}
         Runtime.Selection.cppm
         Runtime.SelectionModule.cppm
         Runtime.SceneSerializer.cppm
+        Runtime.PointCloudKMeans.cppm
         EditorUI/Runtime.EditorUI.cppm
         PRIVATE
         Runtime.Engine.cpp
@@ -22,6 +23,7 @@ target_sources(${target_name}
         Runtime.Selection.cpp
         Runtime.SelectionModule.cpp
         Runtime.SceneSerializer.cpp
+        Runtime.PointCloudKMeans.cpp
         EditorUI/Runtime.EditorUI.cpp
         EditorUI/Runtime.EditorUI.Widgets.cpp
         EditorUI/Runtime.EditorUI.InspectorController.cpp
@@ -47,6 +49,18 @@ target_link_libraries(${target_name}
         glfw
         nlohmann_json::nlohmann_json
 )
+
+if(INTRINSIC_ENABLE_CUDA)
+    add_library(IntrinsicRuntimePointCloudKMeansCuda OBJECT Runtime.PointCloudKMeans.cu)
+    set_target_properties(IntrinsicRuntimePointCloudKMeansCuda PROPERTIES
+            POSITION_INDEPENDENT_CODE ON
+            CUDA_STANDARD 17
+            CUDA_STANDARD_REQUIRED ON)
+    target_link_libraries(IntrinsicRuntimePointCloudKMeansCuda PRIVATE IntrinsicConfig CUDA::cudart CUDA::cuda_driver)
+    target_include_directories(IntrinsicRuntimePointCloudKMeansCuda PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_sources(${target_name} PRIVATE $<TARGET_OBJECTS:IntrinsicRuntimePointCloudKMeansCuda>)
+    target_link_libraries(${target_name} PRIVATE CUDA::cudart)
+endif()
 
 add_subdirectory(Geometry)
 add_subdirectory(ECS)

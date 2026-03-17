@@ -1,8 +1,14 @@
 module;
 
+#include <algorithm>
 #include <cstdint>
 #include <memory>
 #include <span>
+#include <string>
+#include <string_view>
+#include <unordered_map>
+#include <utility>
+#include <vector>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_inverse.hpp>
 
@@ -58,13 +64,17 @@ namespace Graphics::Passes
 
         // Dummy image for safe initial bindings.
         m_DummySampled = std::make_unique<RHI::VulkanImage>(
-            device, 1, 1, 1, VK_FORMAT_R8G8B8A8_UNORM,
+            device,
+            1,
+            1,
+            1,
+            VK_FORMAT_R8G8B8A8_UNORM,
             VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-            VMA_MEMORY_USAGE_GPU_ONLY);
+            VK_IMAGE_ASPECT_COLOR_BIT);
 
-        TransitionImageToShaderRead(device, m_DummySampled->GetImage(), VK_IMAGE_ASPECT_COLOR_BIT);
+        TransitionImageToShaderRead(device, m_DummySampled->GetHandle(), VK_IMAGE_ASPECT_COLOR_BIT);
 
-        VkImageView dummyView = m_DummySampled->GetImageView();
+        VkImageView dummyView = m_DummySampled->GetView();
         for (uint32_t i = 0; i < FRAMES; ++i)
         {
             for (uint32_t b = 0; b < 4; ++b)
@@ -206,10 +216,10 @@ namespace Graphics::Passes
         {
             for (const auto& img : debugImages)
             {
-                if (img.Handle.IsValid() && img.Handle == handle && img.View != VK_NULL_HANDLE)
+                if (handle.IsValid() && img.Resource == handle.ID && img.View != VK_NULL_HANDLE)
                     return img.View;
             }
-            return m_DummySampled ? m_DummySampled->GetImageView() : VK_NULL_HANDLE;
+            return m_DummySampled ? m_DummySampled->GetView() : VK_NULL_HANDLE;
         };
 
         struct DescBinding { uint32_t binding; RGResourceHandle handle; VkSampler sampler; };

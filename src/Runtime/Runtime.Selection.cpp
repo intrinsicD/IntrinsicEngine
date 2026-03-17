@@ -206,6 +206,17 @@ namespace Runtime::Selection
             return std::max(worldPickRadius * std::max(sx, std::max(sy, sz)), 1.0e-6f);
         }
 
+        [[nodiscard]] inline const ECS::PrimitiveBVH::Data* GetPrimitiveBVH(
+            const entt::registry& reg,
+            entt::entity entity,
+            const ECS::PrimitiveBVH::SourceKind expectedSource)
+        {
+            const auto* data = reg.try_get<ECS::PrimitiveBVH::Data>(entity);
+            if (data == nullptr || !data->HasValidBVH() || data->Source != expectedSource)
+                return nullptr;
+            return data;
+        }
+
         struct LocalVertexLookupView
         {
             const Geometry::KDTree* Tree = nullptr;
@@ -447,9 +458,256 @@ namespace Runtime::Selection
             return result;
         }
 
+        [[nodiscard]] std::optional<Picked> RefineFacePickCPU(
+            const entt::registry& reg,
+            entt::entity entity,
+            const ECS::Components::Transform::Component& transform,
+            const ECS::MeshCollider::Component* collider,
+            const Geometry::Halfedge::Mesh& mesh,
+            uint32_t gpuFaceIndex,
+            const PickRequest& request)
+        {
+            const auto* primitiveBvh = GetPrimitiveBVH(reg, entity, ECS::PrimitiveBVH::SourceKind::MeshTriangles);
+
+            auto tryResolveFace = [&](uint32_t candidateFaceIndex) -> std::optional<Geometry::FaceHandle>
+            {
+                const Geometry::FaceHandle candidate{static_cast<Geometry::PropertyIndex>(candidateFaceIndex)};
+                if (!mesh.IsValid(candidate) || mesh.IsDeleted(candidate))
+                    return std::nullopt;
+                return candidate;
+            };
+
+            uint32_t resolvedFaceIndex = gpuFaceIndex;
+            std::optional<Geometry::FaceHandle> face = tryResolveFace(resolvedFaceIndex);
+            if (!face && primitiveBvh != nullptr && gpuFaceIndex < primitiveBvh->Triangles.size())
+            {
+                resolvedFaceIndex = primitiveBvh->Triangles[gpuFaceIndex].FaceIndex;
+                face = tryResolveFace(resolvedFaceIndex);
+            }
+            if (!face)
+                return std::nullopt;
+
+            std::vector<Geometry::VertexHandle> faceVertices;
+            faceVertices.reserve(mesh.Valence(*face));
+            glm::vec3 localCentroid{0.0f};
+            for (const auto vertex : mesh.VerticesAroundFace(*face))
+            {
+                faceVertices.push_back(vertex);
+                localCentroid += mesh.Position(vertex);
+            }
+
+            if (faceVertices.size() < 3)
+                return std::nullopt;
+
+            localCentroid /= static_cast<float>(faceVertices.size());
+
+            const glm::mat4 world = WorldMatrixFor(reg, entity, transform);
+            const glm::mat4 invWorld = glm::inverse(world);
+            Geometry::Ray rayLocal{
+                TransformPoint(invWorld, request.WorldRay.Origin),
+                glm::normalize(glm::mat3(invWorld) * request.WorldRay.Direction)
+            };
+            rayLocal = Geometry::Validation::Sanitize(rayLocal);
+
+            float bestWorldT = std::numeric_limits<float>::infinity();
+            glm::vec3 bestLocalPoint = localCentroid;
+            glm::vec3 bestWorldPoint = TransformPoint(world, localCentroid);
+            glm::vec3 bestWorldNormal{0.0f};
+            glm::vec3 bestBarycentric{1.0f / 3.0f};
+            bool hasExactHit = false;
+
+            const auto faceRoot = faceVertices.front();
+            for (std::size_t corner = 1; corner + 1 < faceVertices.size(); ++corner)
+            {
+                const auto v1 = faceVertices[corner];
+                const auto v2 = faceVertices[corner + 1];
+
+                const glm::vec3 local0 = mesh.Position(faceRoot);
+                const glm::vec3 local1 = mesh.Position(v1);
+                const glm::vec3 local2 = mesh.Position(v2);
+                const glm::vec3 world0 = TransformPoint(world, local0);
+                const glm::vec3 world1 = TransformPoint(world, local1);
+                const glm::vec3 world2 = TransformPoint(world, local2);
+                const glm::vec3 triWorldNormal = ComputeTriangleNormal(world0, world1, world2);
+                if (SquaredLength(bestWorldNormal) <= 1.0e-20f && SquaredLength(triWorldNormal) > 1.0e-20f)
+                    bestWorldNormal = triWorldNormal;
+
+                const auto hit = Geometry::RayTriangle_Watertight(
+                    rayLocal,
+                    local0,
+                    local1,
+                    local2,
+                    0.0f,
+                    request.MaxDistance);
+                if (!hit)
+                    continue;
+
+                const glm::vec3 localPoint = rayLocal.Origin + hit->T * rayLocal.Direction;
+                const glm::vec3 worldPoint = TransformPoint(world, localPoint);
+                const float worldT = glm::dot(worldPoint - request.WorldRay.Origin, request.WorldRay.Direction);
+                if (!(worldT >= 0.0f && worldT <= request.MaxDistance))
+                    continue;
+                if (worldT >= bestWorldT)
+                    continue;
+
+                hasExactHit = true;
+                bestWorldT = worldT;
+                bestLocalPoint = localPoint;
+                bestWorldPoint = worldPoint;
+                bestWorldNormal = triWorldNormal;
+                bestBarycentric = glm::vec3(hit->U, hit->V, 1.0f - hit->U - hit->V);
+            }
+
+            if (!hasExactHit)
+            {
+                bestWorldT = glm::dot(bestWorldPoint - request.WorldRay.Origin, request.WorldRay.Direction);
+                if (!(bestWorldT >= 0.0f && bestWorldT <= request.MaxDistance))
+                    return std::nullopt;
+            }
+
+            const float pickRadius = ComputeWorldPickRadius(bestWorldT, request);
+            const float radiusSq = pickRadius * pickRadius;
+
+            Picked picked = MakeEntityPicked(entity, pickRadius);
+            picked.entity.face_idx = resolvedFaceIndex;
+            picked.spaces.World = bestWorldPoint;
+            picked.spaces.Local = bestLocalPoint;
+            picked.spaces.WorldNormal = bestWorldNormal;
+            picked.spaces.Barycentric = bestBarycentric;
+
+            float bestEdgeDistSq = std::numeric_limits<float>::infinity();
+            bool foundEdgeWithinRadius = false;
+            for (const auto halfedge : mesh.HalfedgesAroundFace(*face))
+            {
+                const auto from = mesh.FromVertex(halfedge);
+                const auto to = mesh.ToVertex(halfedge);
+                const glm::vec3 edgeA = TransformPoint(world, mesh.Position(from));
+                const glm::vec3 edgeB = TransformPoint(world, mesh.Position(to));
+                const auto closest = Geometry::ClosestPointSegment(bestWorldPoint, edgeA, edgeB);
+                const bool withinRadius = closest.DistanceSq <= radiusSq;
+                if (!withinRadius && foundEdgeWithinRadius)
+                    continue;
+
+                const uint32_t edgeIndex = static_cast<uint32_t>(mesh.Edge(halfedge).Index);
+                if (withinRadius && !foundEdgeWithinRadius)
+                {
+                    foundEdgeWithinRadius = true;
+                    bestEdgeDistSq = std::numeric_limits<float>::infinity();
+                    picked.entity.edge_idx = Picked::Entity::InvalidIndex;
+                }
+
+                if (closest.DistanceSq < bestEdgeDistSq ||
+                    (closest.DistanceSq == bestEdgeDistSq && edgeIndex < picked.entity.edge_idx))
+                {
+                    bestEdgeDistSq = closest.DistanceSq;
+                    picked.entity.edge_idx = edgeIndex;
+                }
+            }
+
+            float bestVertexDistSq = std::numeric_limits<float>::infinity();
+            bool foundVertexWithinRadius = false;
+            for (const auto vertex : faceVertices)
+            {
+                const uint32_t vertexIndex = static_cast<uint32_t>(vertex.Index);
+                const glm::vec3 worldVertex = TransformPoint(world, mesh.Position(vertex));
+                const float distSq = SquaredLength(worldVertex - bestWorldPoint);
+                const bool withinRadius = distSq <= radiusSq;
+                if (!withinRadius && foundVertexWithinRadius)
+                    continue;
+
+                if (withinRadius && !foundVertexWithinRadius)
+                {
+                    foundVertexWithinRadius = true;
+                    bestVertexDistSq = std::numeric_limits<float>::infinity();
+                    picked.entity.vertex_idx = Picked::Entity::InvalidIndex;
+                }
+
+                if (distSq < bestVertexDistSq ||
+                    (distSq == bestVertexDistSq && vertexIndex < picked.entity.vertex_idx))
+                {
+                    bestVertexDistSq = distSq;
+                    picked.entity.vertex_idx = vertexIndex;
+                }
+            }
+
+            if (picked.entity.vertex_idx == Picked::Entity::InvalidIndex)
+            {
+                const float localPickRadius = ComputeLocalPickRadius(invWorld, pickRadius);
+                picked.entity.vertex_idx = ResolveNearestVertexIndex(
+                    collider,
+                    &mesh,
+                    picked.spaces.Local,
+                    localPickRadius);
+            }
+
+            return picked;
+        }
+
+        [[nodiscard]] std::optional<Picked> RefineEdgePickCPU(
+            const entt::registry& reg,
+            entt::entity entity,
+            const ECS::Components::Transform::Component& transform,
+            const Geometry::Halfedge::Mesh& mesh,
+            uint32_t gpuEdgeIndex,
+            const PickRequest& request)
+        {
+            const Geometry::EdgeHandle edge{static_cast<Geometry::PropertyIndex>(gpuEdgeIndex)};
+            if (!mesh.IsValid(edge) || mesh.IsDeleted(edge))
+                return std::nullopt;
+
+            const auto halfedge = mesh.Halfedge(edge, 0);
+            const auto v0 = mesh.FromVertex(halfedge);
+            const auto v1 = mesh.ToVertex(halfedge);
+            if (!mesh.IsValid(v0) || mesh.IsDeleted(v0) || !mesh.IsValid(v1) || mesh.IsDeleted(v1))
+                return std::nullopt;
+
+            const glm::mat4 world = WorldMatrixFor(reg, entity, transform);
+            const glm::vec3 localA = mesh.Position(v0);
+            const glm::vec3 localB = mesh.Position(v1);
+            const glm::vec3 worldA = TransformPoint(world, localA);
+            const glm::vec3 worldB = TransformPoint(world, localB);
+
+            const auto closest = Geometry::ClosestRaySegment(request.WorldRay, worldA, worldB);
+
+            float rayT = closest.RayT;
+            float segmentT = closest.SegmentT;
+            glm::vec3 worldPoint = closest.PointOnSegment;
+            glm::vec3 localPoint = glm::mix(localA, localB, segmentT);
+
+            if (!(rayT >= 0.0f && rayT <= request.MaxDistance))
+            {
+                segmentT = 0.5f;
+                localPoint = glm::mix(localA, localB, segmentT);
+                worldPoint = TransformPoint(world, localPoint);
+                rayT = glm::dot(worldPoint - request.WorldRay.Origin, request.WorldRay.Direction);
+                if (!(rayT >= 0.0f && rayT <= request.MaxDistance))
+                    return std::nullopt;
+            }
+
+            const float pickRadius = ComputeWorldPickRadius(rayT, request);
+            Picked picked = MakeEntityPicked(entity, pickRadius);
+            picked.entity.edge_idx = gpuEdgeIndex;
+            picked.spaces.World = worldPoint;
+            picked.spaces.Local = localPoint;
+
+            glm::vec3 tangent = worldB - worldA;
+            const float tangentLenSq = SquaredLength(tangent);
+            if (tangentLenSq > 1.0e-20f)
+                picked.spaces.WorldNormal = tangent / std::sqrt(tangentLenSq);
+
+            const auto vertex0 = static_cast<uint32_t>(v0.Index);
+            const auto vertex1 = static_cast<uint32_t>(v1.Index);
+            const float dist0Sq = SquaredLength(localPoint - localA);
+            const float dist1Sq = SquaredLength(localPoint - localB);
+            picked.entity.vertex_idx = (dist0Sq < dist1Sq || (dist0Sq == dist1Sq && vertex0 <= vertex1)) ? vertex0 : vertex1;
+
+            return picked;
+        }
+
         [[nodiscard]] std::optional<PickResult> PickMeshEntityAuthoritative(
             entt::entity entity,
             const ECS::MeshCollider::Component* collider,
+            const ECS::PrimitiveBVH::Data* primitiveBvh,
             const Geometry::Halfedge::Mesh& mesh,
             const glm::mat4& world,
             const glm::mat4& invWorld,
@@ -458,6 +716,83 @@ namespace Runtime::Selection
         {
             PickResult best{};
             best.PickedData = MakeBackgroundPicked();
+
+            if (primitiveBvh != nullptr && !primitiveBvh->Triangles.empty())
+            {
+                std::vector<Geometry::BVH::ElementIndex> candidates;
+                primitiveBvh->LocalBVH.QueryRay(rayLocal, candidates);
+
+                for (const auto candidateIndex : candidates)
+                {
+                    if (candidateIndex >= primitiveBvh->Triangles.size())
+                        continue;
+
+                    const auto& tri = primitiveBvh->Triangles[candidateIndex];
+                    const auto hit = Geometry::RayTriangle_Watertight(
+                        rayLocal,
+                        tri.A,
+                        tri.B,
+                        tri.C,
+                        0.0f,
+                        request.MaxDistance);
+                    if (!hit)
+                        continue;
+
+                    const glm::vec3 localPoint = rayLocal.Origin + hit->T * rayLocal.Direction;
+                    const glm::vec3 worldPoint = TransformPoint(world, localPoint);
+                    const float worldT = glm::dot(worldPoint - request.WorldRay.Origin, request.WorldRay.Direction);
+                    if (!(worldT >= 0.0f && worldT <= request.MaxDistance))
+                        continue;
+                    if (worldT >= best.T)
+                        continue;
+
+                    const glm::vec3 world0 = TransformPoint(world, tri.A);
+                    const glm::vec3 world1 = TransformPoint(world, tri.B);
+                    const glm::vec3 world2 = TransformPoint(world, tri.C);
+
+                    const float pickRadius = ComputeWorldPickRadius(worldT, request);
+                    Picked picked = MakeEntityPicked(entity, pickRadius);
+                    picked.entity.face_idx = tri.FaceIndex;
+                    picked.spaces.World = worldPoint;
+                    picked.spaces.Local = localPoint;
+                    picked.spaces.WorldNormal = ComputeTriangleNormal(world0, world1, world2);
+                    picked.spaces.Barycentric = glm::vec3(hit->U, hit->V, 1.0f - hit->U - hit->V);
+
+                    const Geometry::FaceHandle face{static_cast<Geometry::PropertyIndex>(tri.FaceIndex)};
+                    if (mesh.IsValid(face) && !mesh.IsDeleted(face))
+                    {
+                        float bestEdgeDistSq = std::numeric_limits<float>::infinity();
+                        for (const auto halfedge : mesh.HalfedgesAroundFace(face))
+                        {
+                            const auto from = mesh.FromVertex(halfedge);
+                            const auto to = mesh.ToVertex(halfedge);
+                            const glm::vec3 edgeA = TransformPoint(world, mesh.Position(from));
+                            const glm::vec3 edgeB = TransformPoint(world, mesh.Position(to));
+                            const float distSq = Geometry::ClosestPointSegment(worldPoint, edgeA, edgeB).DistanceSq;
+                            if (distSq < bestEdgeDistSq && distSq <= pickRadius * pickRadius)
+                            {
+                                bestEdgeDistSq = distSq;
+                                picked.entity.edge_idx = static_cast<uint32_t>(mesh.Edge(halfedge).Index);
+                            }
+                        }
+                    }
+
+                    best.Entity = entity;
+                    best.T = worldT;
+                    best.PickedData = picked;
+                }
+
+                if (best.Entity != entt::null)
+                {
+                    const float localPickRadius = ComputeLocalPickRadius(invWorld, best.PickedData.entity.pick_radius);
+                    best.PickedData.entity.vertex_idx = ResolveNearestVertexIndex(
+                        collider,
+                        &mesh,
+                        best.PickedData.spaces.Local,
+                        localPickRadius);
+                    return best;
+                }
+            }
 
             for (std::size_t faceIndex = 0; faceIndex < mesh.FacesSize(); ++faceIndex)
             {
@@ -559,6 +894,7 @@ namespace Runtime::Selection
 
             const glm::mat4 world = WorldMatrixFor(reg, entity, transform);
             const glm::mat4 invWorld = glm::inverse(world);
+            const auto* primitiveBvh = GetPrimitiveBVH(reg, entity, ECS::PrimitiveBVH::SourceKind::MeshTriangles);
             Geometry::Ray rayLocal{
                 TransformPoint(invWorld, request.WorldRay.Origin),
                 glm::normalize(glm::mat3(invWorld) * request.WorldRay.Direction)
@@ -567,7 +903,7 @@ namespace Runtime::Selection
 
             if (const auto* mesh = ResolveAuthoritativeMesh(entity, collider, reg))
             {
-                if (const auto candidate = PickMeshEntityAuthoritative(entity, &collider, *mesh, world, invWorld, rayLocal, request))
+                if (const auto candidate = PickMeshEntityAuthoritative(entity, &collider, primitiveBvh, *mesh, world, invWorld, rayLocal, request))
                     return candidate;
             }
 
@@ -578,6 +914,91 @@ namespace Runtime::Selection
 
             PickResult best{};
             best.PickedData = MakeBackgroundPicked();
+
+            if (primitiveBvh != nullptr && !primitiveBvh->Triangles.empty())
+            {
+                std::vector<Geometry::BVH::ElementIndex> candidates;
+                primitiveBvh->LocalBVH.QueryRay(rayLocal, candidates);
+
+                for (const auto candidateIndex : candidates)
+                {
+                    if (candidateIndex >= primitiveBvh->Triangles.size())
+                        continue;
+
+                    const auto& tri = primitiveBvh->Triangles[candidateIndex];
+                    const auto hit = Geometry::RayTriangle_Watertight(
+                        rayLocal,
+                        tri.A,
+                        tri.B,
+                        tri.C,
+                        0.0f,
+                        request.MaxDistance);
+                    if (!hit)
+                        continue;
+
+                    const glm::vec3 localPoint = rayLocal.Origin + hit->T * rayLocal.Direction;
+                    const glm::vec3 worldPoint = TransformPoint(world, localPoint);
+                    const float worldT = glm::dot(worldPoint - request.WorldRay.Origin, request.WorldRay.Direction);
+                    if (!(worldT >= 0.0f && worldT <= request.MaxDistance))
+                        continue;
+                    if (worldT >= best.T)
+                        continue;
+
+                    const glm::vec3 w0 = TransformPoint(world, tri.A);
+                    const glm::vec3 w1 = TransformPoint(world, tri.B);
+                    const glm::vec3 w2 = TransformPoint(world, tri.C);
+
+                    const float pickRadius = ComputeWorldPickRadius(worldT, request);
+                    Picked picked = MakeEntityPicked(entity, pickRadius);
+                    picked.entity.face_idx = tri.FaceIndex;
+                    picked.spaces.World = worldPoint;
+                    picked.spaces.Local = localPoint;
+                    picked.spaces.WorldNormal = ComputeTriangleNormal(w0, w1, w2);
+                    picked.spaces.Barycentric = glm::vec3(hit->U, hit->V, 1.0f - hit->U - hit->V);
+
+                    const glm::vec3 triWorld[3] = {w0, w1, w2};
+                    const uint32_t triIndices[3] = {tri.I0, tri.I1, tri.I2};
+                    float bestVertexDistSq = std::numeric_limits<float>::infinity();
+                    for (uint32_t corner = 0; corner < 3; ++corner)
+                    {
+                        const float distSq = SquaredLength(triWorld[corner] - worldPoint);
+                        if (distSq < bestVertexDistSq && distSq <= pickRadius * pickRadius)
+                        {
+                            bestVertexDistSq = distSq;
+                            picked.entity.vertex_idx = triIndices[corner];
+                        }
+                    }
+
+                    const uint32_t edgePairs[3][2] = {{0u, 1u}, {1u, 2u}, {2u, 0u}};
+                    float bestEdgeDistSq = std::numeric_limits<float>::infinity();
+                    for (uint32_t edgeLocal = 0; edgeLocal < 3; ++edgeLocal)
+                    {
+                        const glm::vec3 a = triWorld[edgePairs[edgeLocal][0]];
+                        const glm::vec3 b = triWorld[edgePairs[edgeLocal][1]];
+                        const float distSq = Geometry::ClosestPointSegment(worldPoint, a, b).DistanceSq;
+                        if (distSq < bestEdgeDistSq && distSq <= pickRadius * pickRadius)
+                        {
+                            bestEdgeDistSq = distSq;
+                            picked.entity.edge_idx = static_cast<uint32_t>(tri.FaceIndex * 3u + edgeLocal);
+                        }
+                    }
+
+                    best.Entity = entity;
+                    best.T = worldT;
+                    best.PickedData = picked;
+                }
+
+                if (best.Entity != entt::null)
+                {
+                    const float localPickRadius = ComputeLocalPickRadius(invWorld, best.PickedData.entity.pick_radius);
+                    best.PickedData.entity.vertex_idx = ResolveNearestVertexIndex(
+                        &collider,
+                        nullptr,
+                        best.PickedData.spaces.Local,
+                        localPickRadius);
+                    return best;
+                }
+            }
 
             for (size_t i = 0; i + 2 < indices.size(); i += 3)
             {
@@ -731,6 +1152,7 @@ namespace Runtime::Selection
 
             const glm::mat4 world = WorldMatrixFor(reg, entity, transform);
             const glm::mat4 invWorld = glm::inverse(world);
+            const auto* primitiveBvh = GetPrimitiveBVH(reg, entity, ECS::PrimitiveBVH::SourceKind::GraphSegments);
             PickResult best{};
             best.PickedData = MakeBackgroundPicked();
             float bestDistanceSq = std::numeric_limits<float>::infinity();
@@ -767,7 +1189,54 @@ namespace Runtime::Selection
                 }
             }
 
-            for (uint32_t i = 0; i < graphData.GraphRef->EdgesSize(); ++i)
+            if (primitiveBvh != nullptr && !primitiveBvh->Segments.empty())
+            {
+                Geometry::Ray rayLocal{
+                    TransformPoint(invWorld, request.WorldRay.Origin),
+                    glm::normalize(glm::mat3(invWorld) * request.WorldRay.Direction)
+                };
+                rayLocal = Geometry::Validation::Sanitize(rayLocal);
+
+                std::vector<Geometry::BVH::ElementIndex> candidates;
+                primitiveBvh->LocalBVH.QueryRay(rayLocal, candidates);
+
+                for (const auto candidateIndex : candidates)
+                {
+                    if (candidateIndex >= primitiveBvh->Segments.size())
+                        continue;
+
+                    const auto& segment = primitiveBvh->Segments[candidateIndex];
+                    const glm::vec3 worldA = TransformPoint(world, segment.A);
+                    const glm::vec3 worldB = TransformPoint(world, segment.B);
+                    const auto closest = Geometry::ClosestRaySegment(request.WorldRay, worldA, worldB);
+                    if (!(closest.RayT >= 0.0f && closest.RayT <= request.MaxDistance))
+                        continue;
+
+                    const float pickRadius = ComputeWorldPickRadius(closest.RayT, request);
+                    if (closest.DistanceSq > pickRadius * pickRadius)
+                        continue;
+
+                    if (closest.RayT < best.T || (closest.RayT == best.T && closest.DistanceSq < bestDistanceSq))
+                    {
+                        const float segmentT = closest.SegmentT;
+                        Picked picked = MakeEntityPicked(entity, pickRadius);
+                        picked.entity.edge_idx = segment.EdgeIndex;
+                        picked.spaces.World = closest.PointOnSegment;
+                        picked.spaces.Local = glm::mix(segment.A, segment.B, segmentT);
+
+                        glm::vec3 tangent = worldB - worldA;
+                        const float tangentLenSq = SquaredLength(tangent);
+                        if (tangentLenSq > 1.0e-20f)
+                            picked.spaces.WorldNormal = tangent / std::sqrt(tangentLenSq);
+
+                        best.Entity = entity;
+                        best.T = closest.RayT;
+                        best.PickedData = picked;
+                        bestDistanceSq = closest.DistanceSq;
+                    }
+                }
+            }
+            else for (uint32_t i = 0; i < graphData.GraphRef->EdgesSize(); ++i)
             {
                 const Geometry::EdgeHandle eh{static_cast<Geometry::PropertyIndex>(i)};
                 if (!graphData.GraphRef->IsValid(eh) || graphData.GraphRef->IsDeleted(eh))
@@ -845,6 +1314,7 @@ namespace Runtime::Selection
 
             const glm::mat4 world = WorldMatrixFor(reg, entity, transform);
             const glm::mat4 invWorld = glm::inverse(world);
+            const auto* primitiveBvh = GetPrimitiveBVH(reg, entity, ECS::PrimitiveBVH::SourceKind::MeshTriangles);
             Geometry::Ray rayLocal{
                 TransformPoint(invWorld, request.WorldRay.Origin),
                 glm::normalize(glm::mat3(invWorld) * request.WorldRay.Direction)
@@ -853,6 +1323,7 @@ namespace Runtime::Selection
 
             return PickMeshEntityAuthoritative(entity,
                                                nullptr,
+                                               primitiveBvh,
                                                *meshData.MeshRef,
                                                world,
                                                invWorld,
@@ -1014,37 +1485,108 @@ namespace Runtime::Selection
         const bool hasLine = reg.all_of<ECS::Line::Component>(entity);
         const bool hasPoint = reg.all_of<ECS::Point::Component>(entity);
 
-        const bool adoptedCpu = adoptCpuPick();
-
         if (elementMode == ElementMode::Entity)
+        {
+            if (request != nullptr)
+                static_cast<void>(adoptCpuPick());
             return picked;
+        }
 
         // Meshes: GPU surface-face ID is authoritative. CPU is refinement-only:
         // compute local/world hit point and nearest edge/vertex from that point.
         if (isMesh)
         {
-            if (hasPrimitiveID && primitiveHint.Domain == PrimitivePickDomain::SurfaceTriangle)
+            if (hasPrimitiveID && primitiveHint.Domain == PrimitivePickDomain::Point)
             {
-                if (hasSurface)
-                    picked.entity.face_idx = primitiveHint.Index;
+                if (elementMode == ElementMode::Vertex && hasPoint)
+                    picked.entity.vertex_idx = primitiveHint.Index;
+                return picked;
+            }
 
+            if (hasPrimitiveID && primitiveHint.Domain == PrimitivePickDomain::LineSegment)
+            {
                 if (request != nullptr)
                 {
-                    const auto& entityPick = getCpuResult();
-                    if (entityPick.Entity == entity && entityPick.PickedData.entity)
+                    if (const auto* transform = reg.try_get<ECS::Components::Transform::Component>(entity))
                     {
-                        // Preserve authoritative GPU face ID while adopting CPU
-                        // spatial refinement (edge/vertex and hit-space payload).
-                        const uint32_t gpuFace = picked.entity.face_idx;
-                        picked = entityPick.PickedData;
-                        picked.entity.face_idx = gpuFace;
+                        const Geometry::Halfedge::Mesh* mesh = nullptr;
+                        if (const auto* collider = reg.try_get<ECS::MeshCollider::Component>(entity);
+                            collider != nullptr)
+                        {
+                            mesh = ResolveAuthoritativeMesh(entity, *collider, reg);
+                        }
+                        else if (const auto* meshData = reg.try_get<ECS::Mesh::Data>(entity);
+                                 meshData != nullptr && meshData->MeshRef)
+                        {
+                            mesh = meshData->MeshRef.get();
+                        }
+
+                        if (mesh != nullptr)
+                        {
+                            if (const auto refined = RefineEdgePickCPU(
+                                    reg,
+                                    entity,
+                                    *transform,
+                                    *mesh,
+                                    primitiveHint.Index,
+                                    *request))
+                            {
+                                return *refined;
+                            }
+                        }
                     }
                 }
+
+                if (hasLine)
+                    picked.entity.edge_idx = primitiveHint.Index;
+                return picked;
+            }
+
+            if (hasPrimitiveID && primitiveHint.Domain == PrimitivePickDomain::SurfaceTriangle)
+            {
+                if (request != nullptr)
+                {
+                    if (const auto* transform = reg.try_get<ECS::Components::Transform::Component>(entity))
+                    {
+                        const auto* collider = reg.try_get<ECS::MeshCollider::Component>(entity);
+                        const Geometry::Halfedge::Mesh* mesh = nullptr;
+                        if (collider != nullptr)
+                        {
+                            mesh = ResolveAuthoritativeMesh(entity, *collider, reg);
+                        }
+                        else if (const auto* meshData = reg.try_get<ECS::Mesh::Data>(entity);
+                                 meshData != nullptr && meshData->MeshRef)
+                        {
+                            mesh = meshData->MeshRef.get();
+                        }
+
+                        if (mesh != nullptr)
+                        {
+                            if (const auto refined = RefineFacePickCPU(
+                                    reg,
+                                    entity,
+                                    *transform,
+                                    collider,
+                                    *mesh,
+                                    primitiveHint.Index,
+                                    *request))
+                            {
+                                return *refined;
+                            }
+                        }
+                    }
+
+                    if (adoptCpuPick())
+                        return picked;
+                }
+
+                if (hasSurface)
+                    picked.entity.face_idx = primitiveHint.Index;
                 return picked;
             }
 
             // Compatibility fallback when no valid GPU face primitive is available.
-            if (adoptedCpu)
+            if (adoptCpuPick())
                 return picked;
 
             if (hasPrimitiveID && !primitiveHint.HasExplicitNonSurfaceDomain)
@@ -1081,7 +1623,7 @@ namespace Runtime::Selection
             }
 
             // Compatibility fallback when no valid GPU edge primitive is available.
-            if (adoptedCpu)
+            if (adoptCpuPick())
                 return picked;
 
             if (hasPrimitiveID && !primitiveHint.HasExplicitNonSurfaceDomain)
@@ -1122,9 +1664,8 @@ namespace Runtime::Selection
             return picked;
         }
 
-        if (!adoptedCpu)
-            return picked;
-
+        if (request != nullptr)
+            static_cast<void>(adoptCpuPick());
         return picked;
     }
 

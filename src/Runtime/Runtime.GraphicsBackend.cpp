@@ -30,6 +30,18 @@ namespace Runtime
         // 3. Device
         m_Device = std::make_shared<RHI::VulkanDevice>(*m_Context, m_Surface);
 
+#ifdef INTRINSIC_HAS_CUDA
+        if (auto cudaDevice = RHI::CudaDevice::Create(); cudaDevice)
+        {
+            m_CudaDevice = std::move(*cudaDevice);
+        }
+        else
+        {
+            Core::Log::Warn("GraphicsBackend: CUDA backend unavailable ({})",
+                            RHI::CudaErrorToString(cudaDevice.error()));
+        }
+#endif
+
         // 4. Bindless + TextureSystem
         m_BindlessSystem = std::make_unique<RHI::BindlessDescriptorSystem>(*m_Device);
         m_TextureSystem = std::make_unique<RHI::TextureSystem>(*m_Device, *m_BindlessSystem);
@@ -88,6 +100,10 @@ namespace Runtime
         {
             m_Device->FlushAllDeletionQueues();
         }
+
+#ifdef INTRINSIC_HAS_CUDA
+        m_CudaDevice.reset();
+#endif
 
         m_Device.reset();
 

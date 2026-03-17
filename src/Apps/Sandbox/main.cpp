@@ -92,7 +92,7 @@ public:
 
         // --- Initialize extracted controller subsystems ---
         m_GeometryWorkflow.Init(*this, m_CachedSelectedEntity);
-        m_Inspector.Init(*this, m_CachedSelectedEntity);
+        m_Inspector.Init(*this, m_CachedSelectedEntity, &m_GeometryWorkflow);
 
         // --- Register panels ---
         RegisterPanels();

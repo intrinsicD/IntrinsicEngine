@@ -1,9 +1,13 @@
 #include <gtest/gtest.h>
+#include <memory>
 
 // This test avoids touching ImGui directly (requires Vulkan context).
 // It validates linkability of the EditorUI module and exercises the
 // SceneDirtyTracker state machine, which is pure CPU state.
 
+import Graphics;
+import ECS;
+import Geometry;
 import Runtime.Engine;
 import Runtime.EditorUI;
 import Runtime.SceneSerializer;
@@ -137,3 +141,84 @@ TEST(EditorUI, GlobalDirtyTracker_RoundTrip)
     if (wasDirty) tracker.MarkDirty();
     else tracker.ClearDirty();
 }
+
+// =========================================================================
+// Geometry Processing capability discovery
+// =========================================================================
+
+TEST(EditorUIProcessing, SupportedDomainsExposePointSetAndSurfaceCapabilities)
+{
+    using Runtime::EditorUI::GeometryProcessingAlgorithm;
+    using Runtime::EditorUI::GeometryProcessingDomain;
+
+    const auto kmeans = Runtime::EditorUI::GetSupportedDomains(GeometryProcessingAlgorithm::KMeans);
+    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(kmeans, GeometryProcessingDomain::MeshVertices));
+    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(kmeans, GeometryProcessingDomain::GraphVertices));
+    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(kmeans, GeometryProcessingDomain::PointCloudPoints));
+    EXPECT_FALSE(Runtime::EditorUI::HasAnyDomain(kmeans, GeometryProcessingDomain::SurfaceMesh));
+
+    const auto smoothing = Runtime::EditorUI::GetSupportedDomains(GeometryProcessingAlgorithm::Smoothing);
+    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(smoothing, GeometryProcessingDomain::SurfaceMesh));
+    EXPECT_FALSE(Runtime::EditorUI::HasAnyDomain(smoothing, GeometryProcessingDomain::GraphVertices));
+}
+
+TEST(EditorUIProcessing, MeshEntityReportsSurfaceAndVertexDomains)
+{
+    ECS::Scene scene;
+    auto& reg = scene.GetRegistry();
+    const entt::entity entity = reg.create();
+
+    auto mesh = std::make_shared<Geometry::Halfedge::Mesh>();
+    mesh->AddVertex({0.0f, 0.0f, 0.0f});
+    mesh->AddVertex({1.0f, 0.0f, 0.0f});
+    mesh->AddVertex({0.0f, 1.0f, 0.0f});
+
+    ECS::Mesh::Data meshData{};
+    meshData.MeshRef = mesh;
+    reg.emplace<ECS::Mesh::Data>(entity, meshData);
+    reg.emplace<ECS::Surface::Component>(entity);
+
+    ECS::MeshCollider::Component collider{};
+    collider.CollisionRef = std::make_shared<Graphics::GeometryCollisionData>();
+    reg.emplace<ECS::MeshCollider::Component>(entity, std::move(collider));
+
+    const auto caps = Runtime::EditorUI::GetGeometryProcessingCapabilities(reg, entity);
+    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(caps.Domains, Runtime::EditorUI::GeometryProcessingDomain::SurfaceMesh));
+    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(caps.Domains, Runtime::EditorUI::GeometryProcessingDomain::MeshVertices));
+    EXPECT_FALSE(Runtime::EditorUI::HasAnyDomain(caps.Domains, Runtime::EditorUI::GeometryProcessingDomain::GraphVertices));
+    EXPECT_FALSE(Runtime::EditorUI::HasAnyDomain(caps.Domains, Runtime::EditorUI::GeometryProcessingDomain::PointCloudPoints));
+}
+
+TEST(EditorUIProcessing, GraphAndPointCloudEntitiesReportPointDomains)
+{
+    ECS::Scene scene;
+    auto& reg = scene.GetRegistry();
+
+    const entt::entity graphEntity = reg.create();
+    auto graph = std::make_shared<Geometry::Graph::Graph>();
+    const auto gv0 = graph->AddVertex({0.0f, 0.0f, 0.0f});
+    const auto gv1 = graph->AddVertex({1.0f, 0.0f, 0.0f});
+    graph->AddEdge(gv0, gv1);
+
+    ECS::Graph::Data graphData{};
+    graphData.GraphRef = graph;
+    reg.emplace<ECS::Graph::Data>(graphEntity, graphData);
+
+    const auto graphCaps = Runtime::EditorUI::GetGeometryProcessingCapabilities(reg, graphEntity);
+    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(graphCaps.Domains, Runtime::EditorUI::GeometryProcessingDomain::GraphVertices));
+    EXPECT_FALSE(Runtime::EditorUI::HasAnyDomain(graphCaps.Domains, Runtime::EditorUI::GeometryProcessingDomain::MeshVertices));
+
+    const entt::entity cloudEntity = reg.create();
+    auto cloud = std::make_shared<Geometry::PointCloud::Cloud>();
+    cloud->AddPoint({0.0f, 0.0f, 0.0f});
+    cloud->AddPoint({1.0f, 0.0f, 0.0f});
+
+    ECS::PointCloud::Data pointCloudData{};
+    pointCloudData.CloudRef = cloud;
+    reg.emplace<ECS::PointCloud::Data>(cloudEntity, pointCloudData);
+
+    const auto cloudCaps = Runtime::EditorUI::GetGeometryProcessingCapabilities(reg, cloudEntity);
+    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(cloudCaps.Domains, Runtime::EditorUI::GeometryProcessingDomain::PointCloudPoints));
+    EXPECT_FALSE(Runtime::EditorUI::HasAnyDomain(cloudCaps.Domains, Runtime::EditorUI::GeometryProcessingDomain::SurfaceMesh));
+}
+

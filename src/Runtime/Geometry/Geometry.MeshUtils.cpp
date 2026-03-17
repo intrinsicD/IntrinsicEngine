@@ -297,6 +297,40 @@ namespace Geometry::MeshUtils
         return (count > 0) ? (sum / static_cast<double>(count)) : 0.0;
     }
 
+    double EdgeCotanWeight(const Halfedge::Mesh& mesh, EdgeHandle e)
+    {
+        if (!mesh.IsValid(e) || mesh.IsDeleted(e))
+        {
+            return 0.0;
+        }
+
+        const HalfedgeHandle h0{static_cast<PropertyIndex>(2u * e.Index)};
+        const HalfedgeHandle h1 = mesh.OppositeHalfedge(h0);
+
+        const VertexHandle v0 = mesh.FromVertex(h0);
+        const VertexHandle v1 = mesh.ToVertex(h0);
+
+        double cotSum = 0.0;
+
+        if (!mesh.IsBoundary(h0))
+        {
+            const VertexHandle vOpp = mesh.ToVertex(mesh.NextHalfedge(h0));
+            const glm::vec3 u = mesh.Position(v0) - mesh.Position(vOpp);
+            const glm::vec3 v = mesh.Position(v1) - mesh.Position(vOpp);
+            cotSum += Cotan(u, v);
+        }
+
+        if (!mesh.IsBoundary(h1))
+        {
+            const VertexHandle vOpp = mesh.ToVertex(mesh.NextHalfedge(h1));
+            const glm::vec3 u = mesh.Position(v1) - mesh.Position(vOpp);
+            const glm::vec3 v = mesh.Position(v0) - mesh.Position(vOpp);
+            cotSum += Cotan(u, v);
+        }
+
+        return cotSum / 2.0;
+    }
+
     glm::vec3 FaceNormal(const Halfedge::Mesh& mesh, FaceHandle f)
     {
         HalfedgeHandle h0 = mesh.Halfedge(f);
@@ -494,30 +528,12 @@ namespace Geometry::MeshUtils
             if (mesh.IsDeleted(eh)) continue;
 
             HalfedgeHandle h0{static_cast<PropertyIndex>(2u * ei)};
-            HalfedgeHandle h1 = mesh.OppositeHalfedge(h0);
 
             VertexHandle vi = mesh.FromVertex(h0);
             VertexHandle vj = mesh.ToVertex(h0);
 
-            double cotSum = 0.0;
-
-            if (!mesh.IsBoundary(h0))
-            {
-                VertexHandle vOpp = mesh.ToVertex(mesh.NextHalfedge(h0));
-                glm::vec3 u = mesh.Position(vi) - mesh.Position(vOpp);
-                glm::vec3 v = mesh.Position(vj) - mesh.Position(vOpp);
-                cotSum += Cotan(u, v);
-            }
-
-            if (!mesh.IsBoundary(h1))
-            {
-                VertexHandle vOpp = mesh.ToVertex(mesh.NextHalfedge(h1));
-                glm::vec3 u = mesh.Position(vj) - mesh.Position(vOpp);
-                glm::vec3 v = mesh.Position(vi) - mesh.Position(vOpp);
-                cotSum += Cotan(u, v);
-            }
-
-            double w = clampNonNegative ? std::max(0.0, cotSum) / 2.0 : cotSum / 2.0;
+            const double edgeWeight = EdgeCotanWeight(mesh, eh);
+            const double w = clampNonNegative ? std::max(0.0, edgeWeight) : edgeWeight;
             glm::dvec3 diff = glm::dvec3(mesh.Position(vj)) - glm::dvec3(mesh.Position(vi));
 
             laplacian[vi.Index] += w * diff;

@@ -203,6 +203,46 @@ TEST(RuntimeSelection, PickCPU_MeshResolvesFaceIndex)
     EXPECT_FALSE(hit.PickedData.entity.is_background);
 }
 
+TEST(RuntimeSelection, PickCPU_MeshUsesAttachedPrimitiveBVH)
+{
+    ECS::Scene scene;
+    auto& reg = scene.GetRegistry();
+
+    const entt::entity e = scene.CreateEntity("MeshWithBVH");
+    reg.emplace<ECS::Components::Selection::SelectableTag>(e);
+
+    auto collision = std::make_shared<Graphics::GeometryCollisionData>();
+    collision->Positions = {
+        {-1.0f, -1.0f, 0.0f},
+        { 1.0f, -1.0f, 0.0f},
+        { 0.0f,  1.0f, 0.0f},
+    };
+    collision->Indices = {0u, 1u, 2u};
+    collision->LocalAABB = Geometry::AABB{glm::vec3(-1.0f, -1.0f, 0.0f), glm::vec3(1.0f, 1.0f, 0.0f)};
+
+    auto& collider = reg.emplace<ECS::MeshCollider::Component>(e);
+    collider.CollisionRef = collision;
+    collider.WorldOBB.Center = glm::vec3(0.0f);
+    collider.WorldOBB.Extents = glm::vec3(1.0f, 1.0f, 0.01f);
+
+    auto& primitiveBvh = reg.emplace<ECS::PrimitiveBVH::Data>(e);
+    primitiveBvh.Source = ECS::PrimitiveBVH::SourceKind::MeshTriangles;
+    primitiveBvh.Dirty = true;
+    Graphics::Systems::PrimitiveBVHSync::OnUpdate(reg);
+    ASSERT_TRUE(primitiveBvh.HasValidBVH());
+
+    Runtime::Selection::PickRequest req{};
+    req.WorldRay = Geometry::Ray{{0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, -1.0f}};
+    req.PickRadiusPixels = 24.0f;
+    req.CameraFovYRadians = glm::radians(45.0f);
+    req.ViewportHeightPixels = 900.0f;
+
+    const auto hit = Runtime::Selection::PickCPU(scene, req);
+    EXPECT_EQ(hit.Entity, e);
+    EXPECT_EQ(hit.PickedData.entity.face_idx, 0u);
+    EXPECT_FALSE(hit.PickedData.entity.is_background);
+}
+
 TEST(RuntimeSelection, PickCPU_MeshUsesAuthoritativeVertexAndEdgeIndices)
 {
     ECS::Scene scene;
@@ -451,6 +491,60 @@ TEST(RuntimeSelection, ResolveGpuSubElementPick_MeshUsesAuthoritativeFaceAndVert
     EXPECT_NE(pickedVertex.entity.edge_idx, Runtime::Selection::Picked::Entity::InvalidIndex);
 }
 
+TEST(RuntimeSelection, ResolveGpuSubElementPick_MeshSurfacePrimitiveDoesNotFallbackToWholeMeshRaycast)
+{
+    ECS::Scene scene;
+    auto& reg = scene.GetRegistry();
+
+    const entt::entity e = scene.CreateEntity("MeshGpuFaceAuthoritative");
+    reg.emplace<ECS::Components::Selection::SelectableTag>(e);
+    reg.emplace<ECS::Surface::Component>(e);
+
+    auto collision = std::make_shared<Graphics::GeometryCollisionData>();
+    collision->Positions = {
+        {-1.0f, -1.0f, 0.0f}, { 1.0f, -1.0f, 0.0f}, { 0.0f,  1.0f, 0.0f},
+        { 4.0f, -1.0f, 0.0f}, { 6.0f, -1.0f, 0.0f}, { 5.0f,  1.0f, 0.0f},
+    };
+    collision->Indices = {0u, 1u, 2u, 3u, 4u, 5u};
+    collision->LocalAABB = Geometry::AABB{glm::vec3(-1.0f, -1.0f, 0.0f), glm::vec3(6.0f, 1.0f, 0.0f)};
+
+    auto sourceMesh = std::make_shared<Geometry::Halfedge::Mesh>();
+    const auto v0 = sourceMesh->AddVertex({-1.0f, -1.0f, 0.0f});
+    const auto v1 = sourceMesh->AddVertex({ 1.0f, -1.0f, 0.0f});
+    const auto v2 = sourceMesh->AddVertex({ 0.0f,  1.0f, 0.0f});
+    const auto v3 = sourceMesh->AddVertex({ 4.0f, -1.0f, 0.0f});
+    const auto v4 = sourceMesh->AddVertex({ 6.0f, -1.0f, 0.0f});
+    const auto v5 = sourceMesh->AddVertex({ 5.0f,  1.0f, 0.0f});
+    ASSERT_TRUE(sourceMesh->AddTriangle(v0, v1, v2).has_value());
+    ASSERT_TRUE(sourceMesh->AddTriangle(v3, v4, v5).has_value());
+    collision->SourceMesh = sourceMesh;
+
+    auto& collider = reg.emplace<ECS::MeshCollider::Component>(e);
+    collider.CollisionRef = collision;
+    collider.WorldOBB.Center = glm::vec3(2.5f, 0.0f, 0.0f);
+    collider.WorldOBB.Extents = glm::vec3(3.5f, 1.0f, 0.01f);
+
+    auto& meshData = reg.emplace<ECS::Mesh::Data>(e);
+    meshData.MeshRef = sourceMesh;
+
+    Runtime::Selection::PickRequest req{};
+    req.WorldRay = Geometry::Ray{{0.0f, 0.1f, 1.0f}, {0.0f, 0.0f, -1.0f}};
+    req.PickRadiusPixels = 128.0f;
+    req.CameraFovYRadians = glm::radians(45.0f);
+    req.ViewportHeightPixels = 900.0f;
+
+    const auto picked = Runtime::Selection::ResolveGpuSubElementPick(
+        scene,
+        e,
+        EncodePrimitiveHint(PrimitivePickDomain::SurfaceTriangle, 1u),
+        Runtime::Selection::ElementMode::Vertex,
+        &req);
+
+    EXPECT_EQ(picked.entity.face_idx, 1u);
+    EXPECT_GE(picked.entity.vertex_idx, 3u);
+    EXPECT_LE(picked.entity.vertex_idx, 5u);
+}
+
 TEST(RuntimeSelection, ResolveGpuSubElementPick_MeshEdgeUsesClosestEdgeOnFace)
 {
     ECS::Scene scene;
@@ -567,6 +661,232 @@ TEST(RuntimeSelection, ResolveGpuSubElementPick_MeshMixedSurfaceLineFallbackUses
 
     EXPECT_EQ(picked.entity.id, e);
     EXPECT_EQ(picked.entity.edge_idx, static_cast<uint32_t>(edge.Index));
+}
+
+TEST(RuntimeSelection, ResolveGpuSubElementPick_ContractGuaranteesRequestedModeIndex)
+{
+    ECS::Scene scene;
+    auto& reg = scene.GetRegistry();
+
+    const entt::entity e = scene.CreateEntity("MeshGpuContractGuarantees");
+    reg.emplace<ECS::Components::Selection::SelectableTag>(e);
+
+    auto collision = std::make_shared<Graphics::GeometryCollisionData>();
+    auto sourceMesh = std::make_shared<Geometry::Halfedge::Mesh>();
+    const auto v0 = sourceMesh->AddVertex({-1.0f, -1.0f, 0.0f});
+    const auto v1 = sourceMesh->AddVertex({ 1.0f, -1.0f, 0.0f});
+    const auto v2 = sourceMesh->AddVertex({ 0.0f,  1.0f, 0.0f});
+    ASSERT_TRUE(sourceMesh->AddTriangle(v0, v1, v2).has_value());
+    collision->SourceMesh = sourceMesh;
+
+    auto& collider = reg.emplace<ECS::MeshCollider::Component>(e);
+    collider.CollisionRef = collision;
+
+    reg.emplace<ECS::Surface::Component>(e);
+    reg.emplace<ECS::Line::Component>(e);
+    reg.emplace<ECS::Point::Component>(e);
+
+    const auto halfedge = sourceMesh->FindHalfedge(v1, v2);
+    ASSERT_TRUE(halfedge.has_value());
+    const auto edge = sourceMesh->Edge(*halfedge);
+    ASSERT_TRUE(sourceMesh->IsValid(edge));
+
+    const auto facePick = Runtime::Selection::ResolveGpuSubElementPick(
+        scene,
+        e,
+        EncodePrimitiveHint(PrimitivePickDomain::SurfaceTriangle, 0u),
+        Runtime::Selection::ElementMode::Face,
+        nullptr);
+    EXPECT_EQ(facePick.entity.id, e);
+    EXPECT_EQ(facePick.entity.face_idx, 0u);
+
+    const auto edgePick = Runtime::Selection::ResolveGpuSubElementPick(
+        scene,
+        e,
+        EncodePrimitiveHint(PrimitivePickDomain::LineSegment, static_cast<uint32_t>(edge.Index)),
+        Runtime::Selection::ElementMode::Edge,
+        nullptr);
+    EXPECT_EQ(edgePick.entity.id, e);
+    EXPECT_EQ(edgePick.entity.edge_idx, static_cast<uint32_t>(edge.Index));
+
+    const auto vertexPick = Runtime::Selection::ResolveGpuSubElementPick(
+        scene,
+        e,
+        EncodePrimitiveHint(PrimitivePickDomain::Point, static_cast<uint32_t>(v2.Index)),
+        Runtime::Selection::ElementMode::Vertex,
+        nullptr);
+    EXPECT_EQ(vertexPick.entity.id, e);
+    EXPECT_EQ(vertexPick.entity.vertex_idx, static_cast<uint32_t>(v2.Index));
+}
+
+TEST(RuntimeSelection, ResolveGpuSubElementPick_ContractUnsupportedModeStaysUnresolvedWithoutRefinement)
+{
+    ECS::Scene scene;
+    auto& reg = scene.GetRegistry();
+
+    const entt::entity e = scene.CreateEntity("MeshGpuContractUnsupported");
+    reg.emplace<ECS::Components::Selection::SelectableTag>(e);
+
+    auto collision = std::make_shared<Graphics::GeometryCollisionData>();
+    auto sourceMesh = std::make_shared<Geometry::Halfedge::Mesh>();
+    const auto v0 = sourceMesh->AddVertex({-1.0f, -1.0f, 0.0f});
+    const auto v1 = sourceMesh->AddVertex({ 1.0f, -1.0f, 0.0f});
+    const auto v2 = sourceMesh->AddVertex({ 0.0f,  1.0f, 0.0f});
+    ASSERT_TRUE(sourceMesh->AddTriangle(v0, v1, v2).has_value());
+    collision->SourceMesh = sourceMesh;
+
+    auto& collider = reg.emplace<ECS::MeshCollider::Component>(e);
+    collider.CollisionRef = collision;
+
+    reg.emplace<ECS::Surface::Component>(e);
+    reg.emplace<ECS::Line::Component>(e);
+    reg.emplace<ECS::Point::Component>(e);
+
+    const auto halfedge = sourceMesh->FindHalfedge(v1, v2);
+    ASSERT_TRUE(halfedge.has_value());
+    const auto edge = sourceMesh->Edge(*halfedge);
+    ASSERT_TRUE(sourceMesh->IsValid(edge));
+
+    const auto surfaceAsEdge = Runtime::Selection::ResolveGpuSubElementPick(
+        scene,
+        e,
+        EncodePrimitiveHint(PrimitivePickDomain::SurfaceTriangle, 0u),
+        Runtime::Selection::ElementMode::Edge,
+        nullptr);
+    EXPECT_EQ(surfaceAsEdge.entity.id, e);
+    EXPECT_EQ(surfaceAsEdge.entity.edge_idx, Runtime::Selection::Picked::Entity::InvalidIndex);
+
+    const auto surfaceAsVertex = Runtime::Selection::ResolveGpuSubElementPick(
+        scene,
+        e,
+        EncodePrimitiveHint(PrimitivePickDomain::SurfaceTriangle, 0u),
+        Runtime::Selection::ElementMode::Vertex,
+        nullptr);
+    EXPECT_EQ(surfaceAsVertex.entity.id, e);
+    EXPECT_EQ(surfaceAsVertex.entity.vertex_idx, Runtime::Selection::Picked::Entity::InvalidIndex);
+
+    const auto lineAsFace = Runtime::Selection::ResolveGpuSubElementPick(
+        scene,
+        e,
+        EncodePrimitiveHint(PrimitivePickDomain::LineSegment, static_cast<uint32_t>(edge.Index)),
+        Runtime::Selection::ElementMode::Face,
+        nullptr);
+    EXPECT_EQ(lineAsFace.entity.id, e);
+    EXPECT_EQ(lineAsFace.entity.face_idx, Runtime::Selection::Picked::Entity::InvalidIndex);
+
+    const auto pointAsEdge = Runtime::Selection::ResolveGpuSubElementPick(
+        scene,
+        e,
+        EncodePrimitiveHint(PrimitivePickDomain::Point, static_cast<uint32_t>(v2.Index)),
+        Runtime::Selection::ElementMode::Edge,
+        nullptr);
+    EXPECT_EQ(pointAsEdge.entity.id, e);
+    EXPECT_EQ(pointAsEdge.entity.edge_idx, Runtime::Selection::Picked::Entity::InvalidIndex);
+}
+
+TEST(RuntimeSelection, ResolveGpuSubElementPick_MeshLinePrimitiveRefinesNearestEndpointVertex)
+{
+    ECS::Scene scene;
+    auto& reg = scene.GetRegistry();
+
+    const entt::entity e = scene.CreateEntity("MeshGpuLineRefine");
+    reg.emplace<ECS::Components::Selection::SelectableTag>(e);
+
+    auto collision = std::make_shared<Graphics::GeometryCollisionData>();
+    auto sourceMesh = std::make_shared<Geometry::Halfedge::Mesh>();
+    const auto v0 = sourceMesh->AddVertex({-1.0f, -1.0f, 0.0f});
+    const auto v1 = sourceMesh->AddVertex({ 1.0f, -1.0f, 0.0f});
+    const auto v2 = sourceMesh->AddVertex({ 1.0f,  1.0f, 0.0f});
+    ASSERT_TRUE(sourceMesh->AddTriangle(v0, v1, v2).has_value());
+    collision->SourceMesh = sourceMesh;
+
+    auto& collider = reg.emplace<ECS::MeshCollider::Component>(e);
+    collider.CollisionRef = collision;
+    collider.WorldOBB.Center = glm::vec3(0.0f, 0.0f, 0.0f);
+    collider.WorldOBB.Extents = glm::vec3(1.0f, 1.0f, 0.01f);
+
+    auto& meshData = reg.emplace<ECS::Mesh::Data>(e);
+    meshData.MeshRef = sourceMesh;
+
+    reg.emplace<ECS::Line::Component>(e);
+
+    const auto halfedge = sourceMesh->FindHalfedge(v1, v2);
+    ASSERT_TRUE(halfedge.has_value());
+    const auto edge = sourceMesh->Edge(*halfedge);
+    ASSERT_TRUE(sourceMesh->IsValid(edge));
+
+    Runtime::Selection::PickRequest req{};
+    req.WorldRay = Geometry::Ray{{0.95f, 0.8f, 1.0f}, {0.0f, 0.0f, -1.0f}};
+    req.PickRadiusPixels = 128.0f;
+    req.CameraFovYRadians = glm::radians(45.0f);
+    req.ViewportHeightPixels = 900.0f;
+
+    const auto picked = Runtime::Selection::ResolveGpuSubElementPick(
+        scene,
+        e,
+        EncodePrimitiveHint(PrimitivePickDomain::LineSegment, static_cast<uint32_t>(edge.Index)),
+        Runtime::Selection::ElementMode::Vertex,
+        &req);
+
+    EXPECT_EQ(picked.entity.id, e);
+    EXPECT_EQ(picked.entity.edge_idx, static_cast<uint32_t>(edge.Index));
+    EXPECT_EQ(picked.entity.vertex_idx, static_cast<uint32_t>(v2.Index));
+    EXPECT_NEAR(picked.spaces.World.x, 1.0f, 1.0e-4f);
+    EXPECT_NEAR(picked.spaces.World.y, 0.8f, 1.0e-3f);
+}
+
+TEST(RuntimeSelection, ResolveGpuSubElementPick_MeshLinePrimitiveDoesNotFallbackToWholeMeshRaycast)
+{
+    ECS::Scene scene;
+    auto& reg = scene.GetRegistry();
+
+    const entt::entity e = scene.CreateEntity("MeshGpuLineAuthoritative");
+    reg.emplace<ECS::Components::Selection::SelectableTag>(e);
+
+    auto collision = std::make_shared<Graphics::GeometryCollisionData>();
+    auto sourceMesh = std::make_shared<Geometry::Halfedge::Mesh>();
+    const auto v0 = sourceMesh->AddVertex({-1.0f, -1.0f, 0.0f});
+    const auto v1 = sourceMesh->AddVertex({ 1.0f, -1.0f, 0.0f});
+    const auto v2 = sourceMesh->AddVertex({ 1.0f,  1.0f, 0.0f});
+    const auto v3 = sourceMesh->AddVertex({ 4.0f, -1.0f, 0.0f});
+    const auto v4 = sourceMesh->AddVertex({ 6.0f, -1.0f, 0.0f});
+    const auto v5 = sourceMesh->AddVertex({ 6.0f,  1.0f, 0.0f});
+    ASSERT_TRUE(sourceMesh->AddTriangle(v0, v1, v2).has_value());
+    ASSERT_TRUE(sourceMesh->AddTriangle(v3, v4, v5).has_value());
+    collision->SourceMesh = sourceMesh;
+
+    auto& collider = reg.emplace<ECS::MeshCollider::Component>(e);
+    collider.CollisionRef = collision;
+    collider.WorldOBB.Center = glm::vec3(2.5f, 0.0f, 0.0f);
+    collider.WorldOBB.Extents = glm::vec3(3.5f, 1.0f, 0.01f);
+
+    auto& meshData = reg.emplace<ECS::Mesh::Data>(e);
+    meshData.MeshRef = sourceMesh;
+
+    reg.emplace<ECS::Line::Component>(e);
+
+    const auto halfedge = sourceMesh->FindHalfedge(v4, v5);
+    ASSERT_TRUE(halfedge.has_value());
+    const auto edge = sourceMesh->Edge(*halfedge);
+    ASSERT_TRUE(sourceMesh->IsValid(edge));
+
+    Runtime::Selection::PickRequest req{};
+    req.WorldRay = Geometry::Ray{{0.0f, 0.9f, 1.0f}, {0.0f, 0.0f, -1.0f}};
+    req.PickRadiusPixels = 128.0f;
+    req.CameraFovYRadians = glm::radians(45.0f);
+    req.ViewportHeightPixels = 900.0f;
+
+    const auto picked = Runtime::Selection::ResolveGpuSubElementPick(
+        scene,
+        e,
+        EncodePrimitiveHint(PrimitivePickDomain::LineSegment, static_cast<uint32_t>(edge.Index)),
+        Runtime::Selection::ElementMode::Vertex,
+        &req);
+
+    EXPECT_EQ(picked.entity.edge_idx, static_cast<uint32_t>(edge.Index));
+    EXPECT_GE(picked.entity.vertex_idx, 4u);
+    EXPECT_LE(picked.entity.vertex_idx, 5u);
+    EXPECT_NEAR(picked.spaces.World.x, 6.0f, 1.0e-4f);
 }
 
 TEST(RuntimeSelection, ResolveGpuSubElementPick_GraphVertexUsesClosestNodeNotPrimitive)

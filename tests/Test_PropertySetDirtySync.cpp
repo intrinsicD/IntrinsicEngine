@@ -115,12 +115,14 @@ TEST(PropertySetDirtySync, VertexPositions_PointCloud_EscalatesToGpuDirty)
 
     auto& pcd = reg.emplace<PointCloud::Data>(e);
     pcd.GpuDirty = false;
+    pcd.PositionRevision = 7;
 
     reg.emplace<DirtyTag::VertexPositions>(e);
 
     Graphics::Systems::PropertySetDirtySync::OnUpdate(reg);
 
     EXPECT_TRUE(pcd.GpuDirty);
+    EXPECT_EQ(pcd.PositionRevision, 8u);
     EXPECT_FALSE(reg.all_of<DirtyTag::VertexPositions>(e));
 }
 

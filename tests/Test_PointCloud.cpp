@@ -515,3 +515,69 @@ TEST(PointCloud_Edge, DuplicatePointsDownsample)
     ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result->ReducedCount, 1u);
 }
+
+// =============================================================================
+// K-means tests
+// =============================================================================
+
+TEST(PointCloud_KMeans, EmptyInputReturnsNullopt)
+{
+    std::vector<glm::vec3> points;
+    auto result = Geometry::KMeans::Cluster(points);
+    EXPECT_FALSE(result.has_value());
+}
+
+TEST(PointCloud_KMeans, DegenerateClusterCountReturnsNullopt)
+{
+    const std::vector<glm::vec3> points{{0.0f, 0.0f, 0.0f}};
+
+    Geometry::KMeans::Params params{};
+    params.ClusterCount = 0;
+    auto result = Geometry::KMeans::Cluster(points, params);
+    EXPECT_FALSE(result.has_value());
+}
+
+TEST(PointCloud_KMeans, TwoSeparatedBlobsProduceTwoCentroids)
+{
+    std::vector<glm::vec3> points;
+    points.reserve(64);
+    for (int i = 0; i < 32; ++i)
+        points.emplace_back(-10.0f + 0.01f * static_cast<float>(i), 0.0f, 0.0f);
+    for (int i = 0; i < 32; ++i)
+        points.emplace_back(10.0f + 0.01f * static_cast<float>(i), 0.0f, 0.0f);
+
+    Geometry::KMeans::Params params{};
+    params.ClusterCount = 2;
+    params.MaxIterations = 32;
+    params.Init = Geometry::KMeans::Initialization::Hierarchical;
+
+    auto result = Geometry::KMeans::Cluster(points, params);
+    ASSERT_TRUE(result.has_value());
+    ASSERT_EQ(result->Centroids.size(), 2u);
+    EXPECT_EQ(result->Labels.size(), points.size());
+    EXPECT_EQ(result->SquaredDistances.size(), points.size());
+    EXPECT_EQ(result->ActualBackend, Geometry::KMeans::Backend::CPU);
+    EXPECT_GT(result->Iterations, 0u);
+
+    std::sort(result->Centroids.begin(), result->Centroids.end(),
+              [](const glm::vec3& a, const glm::vec3& b) { return a.x < b.x; });
+
+    EXPECT_NEAR(result->Centroids[0].x, -9.845f, 0.25f);
+    EXPECT_NEAR(result->Centroids[1].x, 10.155f, 0.25f);
+    EXPECT_LT(result->Inertia, 1.0f);
+}
+
+TEST(PointCloud_KMeans, ClusterCountIsClampedToPointCount)
+{
+    const std::vector<glm::vec3> points{{0.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}};
+
+    Geometry::KMeans::Params params{};
+    params.ClusterCount = 8;
+    params.MaxIterations = 8;
+
+    auto result = Geometry::KMeans::Cluster(points, params);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->Centroids.size(), points.size());
+    EXPECT_EQ(result->Labels.size(), points.size());
+}
+

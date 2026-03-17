@@ -1,5 +1,6 @@
 module;
 
+#include <cstdint>
 #include <functional>
 #include <vector>
 #include <glm/glm.hpp>
@@ -16,6 +17,68 @@ import ECS;
 
 export namespace Runtime::EditorUI
 {
+    enum class GeometryProcessingDomain : uint32_t
+    {
+        None = 0u,
+        SurfaceMesh = 1u << 0,
+        MeshVertices = 1u << 1,
+        GraphVertices = 1u << 2,
+        PointCloudPoints = 1u << 3,
+    };
+
+    [[nodiscard]] constexpr GeometryProcessingDomain operator|(GeometryProcessingDomain a,
+                                                               GeometryProcessingDomain b) noexcept
+    {
+        return static_cast<GeometryProcessingDomain>(static_cast<uint32_t>(a) | static_cast<uint32_t>(b));
+    }
+
+    [[nodiscard]] constexpr GeometryProcessingDomain operator&(GeometryProcessingDomain a,
+                                                               GeometryProcessingDomain b) noexcept
+    {
+        return static_cast<GeometryProcessingDomain>(static_cast<uint32_t>(a) & static_cast<uint32_t>(b));
+    }
+
+    constexpr GeometryProcessingDomain& operator|=(GeometryProcessingDomain& a,
+                                                   GeometryProcessingDomain b) noexcept
+    {
+        a = (a | b);
+        return a;
+    }
+
+    [[nodiscard]] constexpr bool HasAnyDomain(GeometryProcessingDomain domains,
+                                              GeometryProcessingDomain query) noexcept
+    {
+        return static_cast<uint32_t>(domains & query) != 0u;
+    }
+
+    enum class GeometryProcessingAlgorithm : uint8_t
+    {
+        KMeans = 0,
+        Remeshing,
+        Simplification,
+        Smoothing,
+        Subdivision,
+        Repair,
+    };
+
+    struct GeometryProcessingCapabilities
+    {
+        GeometryProcessingDomain Domains = GeometryProcessingDomain::None;
+
+        [[nodiscard]] bool HasAny() const noexcept
+        {
+            return Domains != GeometryProcessingDomain::None;
+        }
+    };
+
+    [[nodiscard]] GeometryProcessingCapabilities GetGeometryProcessingCapabilities(
+        const entt::registry& registry,
+        entt::entity entity);
+
+    [[nodiscard]] GeometryProcessingDomain GetSupportedDomains(GeometryProcessingAlgorithm algorithm) noexcept;
+    [[nodiscard]] bool SupportsDomain(GeometryProcessingAlgorithm algorithm,
+                                      GeometryProcessingDomain domain) noexcept;
+
     // Registers a small set of editor-facing panels and menus to improve
     // discoverability of core engine features (FeatureRegistry, FrameGraph,
     // Selection config).
@@ -75,6 +138,8 @@ export namespace Runtime::EditorUI
     // InspectorController — component property inspector panel
     // =========================================================================
 
+    class GeometryWorkflowController;
+
     class InspectorController
     {
     public:
@@ -82,12 +147,26 @@ export namespace Runtime::EditorUI
         InspectorController(const InspectorController&) = delete;
         InspectorController& operator=(const InspectorController&) = delete;
 
-        void Init(Runtime::Engine& engine, entt::entity& cachedSelected);
+        void Init(Runtime::Engine& engine,
+                  entt::entity& cachedSelected,
+                  GeometryWorkflowController* geometryWorkflow = nullptr);
         void Draw();
 
     private:
+        struct PointSetKMeansUiState
+        {
+            int ClusterCount = 8;
+            int MaxIterations = 32;
+            int Backend = static_cast<int>(Geometry::KMeans::Backend::CPU);
+            int Initialization = static_cast<int>(Geometry::KMeans::Initialization::Hierarchical);
+            int Seed = 42;
+            int PreferredDomain = 0;
+        };
+
         Runtime::Engine* m_Engine = nullptr;
         entt::entity* m_CachedSelected = nullptr;
+        GeometryWorkflowController* m_GeometryWorkflow = nullptr;
+        PointSetKMeansUiState m_PointSetKMeansUi{};
     };
 
     // =========================================================================
@@ -103,6 +182,7 @@ export namespace Runtime::EditorUI
 
         void Init(Runtime::Engine& engine, entt::entity& cachedSelected);
         void RegisterPanelsAndMenu();
+        void OpenAlgorithmPanel(GeometryProcessingAlgorithm algorithm);
 
     private:
         Runtime::Engine* m_Engine = nullptr;

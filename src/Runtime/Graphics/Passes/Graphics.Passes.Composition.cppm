@@ -1,6 +1,7 @@
 module;
 
 #include <memory>
+#include <span>
 #include "RHI.Vulkan.hpp"
 
 export module Graphics:Passes.Composition;

@@ -4,6 +4,10 @@ module;
 #include <vector>
 #include <utility>
 
+#ifdef INTRINSIC_HAS_CUDA
+#include <cuda.h>
+#endif
+
 #include <glm/glm.hpp>
 
 export module Graphics:Components;
@@ -13,6 +17,9 @@ import :Material;
 import :VisualizationConfig;
 import Geometry;
 import Core.Assets;
+#ifdef INTRINSIC_HAS_CUDA
+import RHI;
+#endif
 
 // =============================================================================
 // Component Naming Contract
@@ -97,6 +104,90 @@ export namespace ECS::MeshCollider
 }
 
 // -------------------------------------------------------------------------
+// PrimitiveBVH::Data — optional entity-attached local-space primitive BVH.
+// -------------------------------------------------------------------------
+//
+// Acceleration structure cache for CPU/GPU-adjacent spatial queries such as
+// picking and future broadphase/collision workloads. The BVH itself is built
+// over primitive AABBs in local space; exact primitive refinement stays in the
+// consumer. Presence/absence of this component is the opt-in toggle.
+
+export namespace ECS::PrimitiveBVH
+{
+    enum class SourceKind : uint8_t
+    {
+        None = 0,
+        MeshTriangles,
+        GraphSegments,
+        PointCloudPoints,
+    };
+
+    enum class Backend : uint8_t
+    {
+        CPU = 0,
+        CUDA = 1,
+    };
+
+    struct TrianglePrimitive
+    {
+        Geometry::AABB Bounds{};
+        glm::vec3 A{0.0f};
+        glm::vec3 B{0.0f};
+        glm::vec3 C{0.0f};
+        uint32_t I0 = 0;
+        uint32_t I1 = 0;
+        uint32_t I2 = 0;
+        uint32_t FaceIndex = 0;
+    };
+
+    struct SegmentPrimitive
+    {
+        Geometry::AABB Bounds{};
+        glm::vec3 A{0.0f};
+        glm::vec3 B{0.0f};
+        uint32_t EdgeIndex = 0;
+    };
+
+    struct PointPrimitive
+    {
+        Geometry::AABB Bounds{};
+        glm::vec3 Position{0.0f};
+        uint32_t PointIndex = 0;
+    };
+
+    struct Data
+    {
+        Geometry::BVH LocalBVH{};
+        Geometry::AABB LocalBounds{};
+        Geometry::BVHBuildParams BuildParams{};
+        SourceKind Source = SourceKind::None;
+        Backend ActualBackend = Backend::CPU;
+        bool Dirty = true;
+        uint32_t PrimitiveCount = 0;
+
+        std::vector<TrianglePrimitive> Triangles{};
+        std::vector<SegmentPrimitive> Segments{};
+        std::vector<PointPrimitive> Points{};
+
+        void Clear()
+        {
+            LocalBVH.Clear();
+            LocalBounds = {};
+            Source = SourceKind::None;
+            PrimitiveCount = 0;
+            Triangles.clear();
+            Segments.clear();
+            Points.clear();
+        }
+
+        [[nodiscard]] bool HasValidBVH() const noexcept
+        {
+            return PrimitiveCount > 0 && !LocalBVH.Nodes().empty() && LocalBounds.IsValid();
+        }
+    };
+}
+
+// -------------------------------------------------------------------------
 // Mesh::Data — ECS component for PropertySet-backed mesh visualization.
 // -------------------------------------------------------------------------
 //
@@ -124,6 +215,16 @@ export namespace ECS::Mesh
 
         // When true, re-extract colors from MeshRef's PropertySets.
         bool AttributesDirty = true;
+
+        // ---- K-means compute state ----
+        bool KMeansJobPending = false;
+        uint32_t KMeansPendingClusterCount = 0;
+        Geometry::KMeans::Backend KMeansLastBackend = Geometry::KMeans::Backend::CPU;
+        uint32_t KMeansLastIterations = 0;
+        bool KMeansLastConverged = false;
+        float KMeansLastInertia = 0.0f;
+        uint32_t KMeansLastMaxDistanceIndex = 0;
+        double KMeansLastDurationMs = 0.0;
 
         // ---- Queries (delegate to MeshRef) ----
         [[nodiscard]] std::size_t VertexCount() const noexcept
@@ -216,6 +317,69 @@ export namespace ECS::PointCloud
         // the uploaded GPU layout contains normals (Surfel/EWA eligibility).
         bool HasGpuNormals = false;
 
+        // ---- K-means compute state ----
+        // Monotonic position revision used by async clustering to avoid
+        // redundant host->CUDA uploads when point positions did not change.
+        uint64_t PositionRevision = 1;
+
+        bool KMeansJobPending = false;
+        uint32_t KMeansPendingClusterCount = 0;
+        Geometry::KMeans::Backend KMeansLastBackend = Geometry::KMeans::Backend::CPU;
+        uint32_t KMeansLastIterations = 0;
+        bool KMeansLastConverged = false;
+        float KMeansLastInertia = 0.0f;
+        uint32_t KMeansLastMaxDistanceIndex = 0;
+        double KMeansLastDurationMs = 0.0;
+
+#ifdef INTRINSIC_HAS_CUDA
+        // Persistent CUDA resources kept alive per entity until explicit release
+        // or PointCloud::Data destruction.
+        RHI::CudaBufferHandle CudaPositions{};
+        RHI::CudaBufferHandle CudaLabels{};
+        RHI::CudaBufferHandle CudaDistances{};
+        RHI::CudaBufferHandle CudaCentroids{};
+        RHI::CudaBufferHandle CudaSums{};
+        RHI::CudaBufferHandle CudaClusterSizes{};
+        CUstream CudaStream = nullptr;
+        CUevent CudaStartEvent = nullptr;
+        CUevent CudaCompletionEvent = nullptr;
+        uint32_t CudaPointCapacity = 0;
+        uint32_t CudaClusterCapacity = 0;
+        uint64_t CudaPositionRevision = 0;
+
+        void ReleaseCudaBuffers(RHI::CudaDevice& cudaDevice)
+        {
+            cudaDevice.FreeBuffer(CudaPositions);
+            cudaDevice.FreeBuffer(CudaLabels);
+            cudaDevice.FreeBuffer(CudaDistances);
+            cudaDevice.FreeBuffer(CudaCentroids);
+            cudaDevice.FreeBuffer(CudaSums);
+            cudaDevice.FreeBuffer(CudaClusterSizes);
+
+            if (CudaStartEvent)
+            {
+                cudaDevice.DestroyEvent(CudaStartEvent);
+                CudaStartEvent = nullptr;
+            }
+            if (CudaCompletionEvent)
+            {
+                cudaDevice.DestroyEvent(CudaCompletionEvent);
+                CudaCompletionEvent = nullptr;
+            }
+            if (CudaStream)
+            {
+                cudaDevice.DestroyStream(CudaStream);
+                CudaStream = nullptr;
+            }
+
+            CudaPointCapacity = 0;
+            CudaClusterCapacity = 0;
+            CudaPositionRevision = 0;
+            KMeansJobPending = false;
+            KMeansPendingClusterCount = 0;
+        }
+#endif
+
         // ---- Queries (delegate to CloudRef) ----
         [[nodiscard]] std::size_t PointCount() const noexcept
         {
@@ -294,6 +458,16 @@ export namespace ECS::Graph
 
         bool GpuDirty = true;
         uint32_t GpuVertexCount = 0;
+
+        // ---- K-means compute state ----
+        bool KMeansJobPending = false;
+        uint32_t KMeansPendingClusterCount = 0;
+        Geometry::KMeans::Backend KMeansLastBackend = Geometry::KMeans::Backend::CPU;
+        uint32_t KMeansLastIterations = 0;
+        bool KMeansLastConverged = false;
+        float KMeansLastInertia = 0.0f;
+        uint32_t KMeansLastMaxDistanceIndex = 0;
+        double KMeansLastDurationMs = 0.0;
 
         // ---- Queries (delegate to GraphRef) ----
         [[nodiscard]] std::size_t NodeCount() const noexcept

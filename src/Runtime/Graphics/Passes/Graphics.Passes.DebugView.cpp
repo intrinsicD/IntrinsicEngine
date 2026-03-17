@@ -25,9 +25,10 @@ import Core.Filesystem;
 import RHI;
 import Interface;
 
+#include "Graphics.PassUtils.hpp"
+
 using namespace Core::Hash;
 
-#include "Graphics.PassUtils.hpp"
 
 namespace Graphics::Passes
 {

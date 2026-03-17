@@ -32,6 +32,10 @@ TEST(PointCloudGeometrySync_Contract, DefaultGpuStateFields)
     EXPECT_TRUE(comp.GpuDirty);
     EXPECT_FALSE(comp.HasGpuGeometry());
     EXPECT_EQ(comp.GpuPointCount, 0u);
+    EXPECT_EQ(comp.PositionRevision, 1u);
+    EXPECT_FALSE(comp.KMeansJobPending);
+    EXPECT_EQ(comp.KMeansPendingClusterCount, 0u);
+    EXPECT_EQ(comp.KMeansLastBackend, Geometry::KMeans::Backend::CPU);
 }
 
 TEST(PointCloudGeometrySync_Contract, InvalidSlotSentinel)

@@ -22,6 +22,7 @@ target_sources(${target_name}
         Graphics.GPUScene.cppm
         Graphics.Systems.GPUSceneSync.cppm
         Graphics.Systems.MeshRendererLifecycle.cppm
+        Graphics.Systems.PrimitiveBVHSync.cppm
         Graphics.Systems.GraphGeometrySync.cppm
         Graphics.Systems.PointCloudGeometrySync.cppm
         Graphics.Systems.MeshViewLifecycle.cppm
@@ -87,6 +88,7 @@ target_sources(${target_name}
         Graphics.GPUScene.cpp
         Graphics.Systems.GPUSceneSync.cpp
         Graphics.Systems.MeshRendererLifecycle.cpp
+        Graphics.Systems.PrimitiveBVHSync.cpp
         Graphics.Systems.GraphGeometrySync.cpp
         Graphics.Systems.PointCloudGeometrySync.cpp
         Graphics.Systems.MeshViewLifecycle.cpp

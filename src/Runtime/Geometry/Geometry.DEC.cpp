@@ -20,7 +20,7 @@ import :MeshUtils;
 
 namespace Geometry::DEC
 {
-    using MeshUtils::Cotan;
+    using MeshUtils::EdgeCotanWeight;
     using MeshUtils::TriangleArea;
     using MeshUtils::ComputeMixedVoronoiAreas;
 
@@ -275,42 +275,7 @@ namespace Geometry::DEC
                 continue;
             }
 
-            // Two halfedges of this edge
-            HalfedgeHandle h0{static_cast<PropertyIndex>(2u * ei)};
-            HalfedgeHandle h1 = mesh.OppositeHalfedge(h0);
-
-            double cotSum = 0.0;
-
-            // Halfedge h0 side: if not boundary, compute cotan of opposite angle
-            if (!mesh.IsBoundary(h0))
-            {
-                // The opposite vertex is the one across from this edge in the face.
-                // For halfedge h0: from->to is the edge. The opposite vertex is
-                // NextHalfedge(h0)->ToVertex.
-                VertexHandle vOpp = mesh.ToVertex(mesh.NextHalfedge(h0));
-                VertexHandle vFrom = mesh.FromVertex(h0);
-                VertexHandle vTo = mesh.ToVertex(h0);
-
-                glm::vec3 u = mesh.Position(vFrom) - mesh.Position(vOpp);
-                glm::vec3 v = mesh.Position(vTo) - mesh.Position(vOpp);
-
-                cotSum += Cotan(u, v);
-            }
-
-            // Halfedge h1 side
-            if (!mesh.IsBoundary(h1))
-            {
-                VertexHandle vOpp = mesh.ToVertex(mesh.NextHalfedge(h1));
-                VertexHandle vFrom = mesh.FromVertex(h1);
-                VertexHandle vTo = mesh.ToVertex(h1);
-
-                glm::vec3 u = mesh.Position(vFrom) - mesh.Position(vOpp);
-                glm::vec3 v = mesh.Position(vTo) - mesh.Position(vOpp);
-
-                cotSum += Cotan(u, v);
-            }
-
-            hodge1.Diagonal[ei] = cotSum / 2.0;
+            hodge1.Diagonal[ei] = EdgeCotanWeight(mesh, eh);
         }
 
         return hodge1;

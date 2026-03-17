@@ -100,6 +100,7 @@ intrinsic_test_object_lib(GeometryTestObjs
         Test_RuntimeGraph_ParallelLayers.cpp
         Test_RuntimeGraphKNN.cpp
         Test_KDTree.cpp
+        Test_BVH.cpp
         Test_DEC.cpp
         Test_MeshOperations.cpp
         Test_GeometryProcessing.cpp
@@ -184,6 +185,7 @@ intrinsic_test_object_lib(RuntimeTestObjs
         Test_SelectionGizmoRegression.cpp
         Test_RenderUpdateIntegration.cpp
         Test_CudaDevice.cpp
+        Test_PrimitiveBVHSync.cpp
         Test_RenderGraphPackets.cpp
         Test_ImporterUtils.cpp
         Test_Importers.cpp

@@ -5,7 +5,6 @@ module;
 #include <entt/entity/entity.hpp>
 #include <glm/glm.hpp>
 
-#include "RHI.Vulkan.hpp"
 
 #include "tiny_gltf.h"
 
@@ -145,6 +144,10 @@ export namespace Runtime
         [[nodiscard]] RHI::DescriptorLayout& GetDescriptorLayout() const { return m_GraphicsBackend->GetDescriptorLayout(); }
         [[nodiscard]] RHI::VulkanSwapchain& GetSwapchain() const { return m_GraphicsBackend->GetSwapchain(); }
         [[nodiscard]] Graphics::GeometryPool& GetGeometryStorage() { return m_RenderOrchestrator->GetGeometryStorage(); }
+
+#ifdef INTRINSIC_HAS_CUDA
+        [[nodiscard]] RHI::CudaDevice* GetCudaDevice() const { return m_GraphicsBackend->GetCudaDevice(); }
+#endif
 
         // Access to the I/O subsystem.
         [[nodiscard]] Core::IO::IIOBackend& GetIOBackend() { return *m_IOBackend; }

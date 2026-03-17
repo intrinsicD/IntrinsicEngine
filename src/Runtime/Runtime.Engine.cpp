@@ -11,7 +11,6 @@ module;
 #include <entt/entity/registry.hpp>
 #include "RHI.Vulkan.hpp"
 #include "Core.Profiling.Macros.hpp"
-#include <cstring>
 
 module Runtime.Engine;
 
@@ -34,6 +33,7 @@ import Runtime.GraphicsBackend;
 import Runtime.AssetPipeline;
 import Runtime.SceneManager;
 import Runtime.RenderOrchestrator;
+import Runtime.PointCloudKMeans;
 
 using namespace Core::Hash;
 
@@ -137,7 +137,11 @@ namespace Runtime
         m_SceneManager->SetGeometryStorage(&m_RenderOrchestrator->GetGeometryStorage());
         if (m_RenderOrchestrator->GetGPUScenePtr())
         {
-            m_SceneManager->ConnectGpuHooks(m_RenderOrchestrator->GetGPUScene());
+            m_SceneManager->ConnectGpuHooks(m_RenderOrchestrator->GetGPUScene()
+#ifdef INTRINSIC_HAS_CUDA
+                                            , GetCudaDevice()
+#endif
+            );
         }
 
         // 8. Register core features in the central FeatureRegistry.
@@ -349,6 +353,7 @@ namespace Runtime
         // --- ECS Systems ---
         reg("TransformUpdate",                Cat::System, "Propagates local transforms to world matrices");
         reg("MeshRendererLifecycle",           Cat::System, "Allocates/deallocates GPU slots for mesh renderers");
+        reg("PrimitiveBVHSync",                Cat::System, "Builds entity-attached primitive BVHs for local-space picking and future broadphase");
         reg("GraphGeometrySync",              Cat::System, "Uploads graph geometry to GPU and allocates GPUScene slots");
         reg("PointCloudGeometrySync",         Cat::System, "Uploads point clouds to GPU and allocates GPUScene slots");
         reg("MeshViewLifecycle",              Cat::System, "Creates GPU edge/vertex views from mesh via ReuseVertexBuffersFrom");
@@ -544,6 +549,12 @@ namespace Runtime
                         frameGraph, registry);
                 }
 
+                if (m_FeatureRegistry.IsEnabled("PrimitiveBVHSync"_id))
+                {
+                    Graphics::Systems::PrimitiveBVHSync::RegisterSystem(
+                        frameGraph, registry);
+                }
+
                 auto* gpuScene = m_RenderOrchestrator->GetGPUScenePtr();
                 if (gpuScene)
                 {
@@ -608,6 +619,8 @@ namespace Runtime
 
                 compileAndExecuteGraph(frameGraph);
             }
+
+            Runtime::PointCloudKMeans::PumpCompletions(*this);
 
             // Drain deferred events enqueued during this frame's system updates.
             // All dispatcher sinks run synchronously on the main thread here,

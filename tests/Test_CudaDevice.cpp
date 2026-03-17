@@ -233,7 +233,7 @@ TEST(CudaDevice, DriverCallsRestoreForeignCurrentContext)
     auto& device = *result;
 
     CUcontext foreignContext = nullptr;
-    ASSERT_EQ(cuCtxCreate(&foreignContext, 0, device->GetDevice()), CUDA_SUCCESS);
+    ASSERT_EQ(cuCtxCreate(&foreignContext, nullptr, 0, device->GetDevice()), CUDA_SUCCESS);
 
     CUcontext beforeCall = nullptr;
     ASSERT_EQ(cuCtxGetCurrent(&beforeCall), CUDA_SUCCESS);

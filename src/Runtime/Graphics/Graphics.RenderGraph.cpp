@@ -20,36 +20,6 @@ import RHI;
 
 namespace Graphics
 {
-    namespace
-    {
-        [[nodiscard]] bool IsValidResourceHandle(const RenderGraph& graph, RGResourceHandle resource)
-        {
-            return resource.IsValid() && resource.ID < graph.m_ActiveResourceCount;
-        }
-
-        void TrackResourceRead(ResourceNode& resourceNode, uint32_t passIndex)
-        {
-            if (resourceNode.StartPass == ~0u)
-                resourceNode.StartPass = passIndex;
-            resourceNode.EndPass = std::max(resourceNode.EndPass, passIndex);
-
-            if (resourceNode.FirstReadPass == ~0u)
-                resourceNode.FirstReadPass = passIndex;
-            resourceNode.LastReadPass = passIndex;
-        }
-
-        void TrackResourceWrite(ResourceNode& resourceNode, uint32_t passIndex)
-        {
-            if (resourceNode.StartPass == ~0u)
-                resourceNode.StartPass = passIndex;
-            resourceNode.EndPass = std::max(resourceNode.EndPass, passIndex);
-
-            if (resourceNode.FirstWritePass == ~0u)
-                resourceNode.FirstWritePass = passIndex;
-            resourceNode.LastWritePass = passIndex;
-        }
-    }
-
     // Remove file-local transient allocator state; lifetime is managed by RenderSystem.
 
     // --- RGRegistry ---
@@ -107,7 +77,7 @@ namespace Graphics
 
     RGResourceHandle RGBuilder::Read(RGResourceHandle resource, VkPipelineStageFlags2 stage, VkAccessFlags2 access)
     {
-        if (!IsValidResourceHandle(m_Graph, resource))
+        if (!resource.IsValid() || resource.ID >= m_Graph.m_ActiveResourceCount)
         {
             Core::Log::Error("RG: Invalid resource handle");
             return {kInvalidResource};
@@ -120,13 +90,19 @@ namespace Graphics
                      std::move(node));
 
         auto& resourceNode = m_Graph.m_ResourcePool[resource.ID];
-        TrackResourceRead(resourceNode, m_PassIndex);
+        if (resourceNode.StartPass == ~0u)
+            resourceNode.StartPass = m_PassIndex;
+        resourceNode.EndPass = std::max(resourceNode.EndPass, m_PassIndex);
+
+        if (resourceNode.FirstReadPass == ~0u)
+            resourceNode.FirstReadPass = m_PassIndex;
+        resourceNode.LastReadPass = m_PassIndex;
         return resource;
     }
 
     RGResourceHandle RGBuilder::Write(RGResourceHandle resource, VkPipelineStageFlags2 stage, VkAccessFlags2 access)
     {
-        if (!IsValidResourceHandle(m_Graph, resource))
+        if (!resource.IsValid() || resource.ID >= m_Graph.m_ActiveResourceCount)
         {
             Core::Log::Error("RG: Invalid resource handle");
             return {kInvalidResource};
@@ -139,20 +115,32 @@ namespace Graphics
                      std::move(node));
 
         auto& resourceNode = m_Graph.m_ResourcePool[resource.ID];
-        TrackResourceWrite(resourceNode, m_PassIndex);
+        if (resourceNode.StartPass == ~0u)
+            resourceNode.StartPass = m_PassIndex;
+        resourceNode.EndPass = std::max(resourceNode.EndPass, m_PassIndex);
+
+        if (resourceNode.FirstWritePass == ~0u)
+            resourceNode.FirstWritePass = m_PassIndex;
+        resourceNode.LastWritePass = m_PassIndex;
         return resource;
     }
 
     RGResourceHandle RGBuilder::WriteColor(RGResourceHandle resource, RGAttachmentInfo info)
     {
-        if (!IsValidResourceHandle(m_Graph, resource))
+        if (!resource.IsValid() || resource.ID >= m_Graph.m_ActiveResourceCount)
         {
             Core::Log::Error("RG: Invalid resource handle");
             return {kInvalidResource};
         }
 
         auto& resourceNode = m_Graph.m_ResourcePool[resource.ID];
-        TrackResourceWrite(resourceNode, m_PassIndex);
+        if (resourceNode.StartPass == ~0u)
+            resourceNode.StartPass = m_PassIndex;
+        resourceNode.EndPass = std::max(resourceNode.EndPass, m_PassIndex);
+
+        if (resourceNode.FirstWritePass == ~0u)
+            resourceNode.FirstWritePass = m_PassIndex;
+        resourceNode.LastWritePass = m_PassIndex;
 
         AttachmentNode node{resource.ID, info, false, nullptr};
         AppendToList(m_Graph.m_Arena,
@@ -164,14 +152,20 @@ namespace Graphics
 
     RGResourceHandle RGBuilder::WriteDepth(RGResourceHandle resource, RGAttachmentInfo info)
     {
-        if (!IsValidResourceHandle(m_Graph, resource))
+        if (!resource.IsValid() || resource.ID >= m_Graph.m_ActiveResourceCount)
         {
             Core::Log::Error("RG: Invalid resource handle");
             return {kInvalidResource};
         }
 
         auto& resourceNode = m_Graph.m_ResourcePool[resource.ID];
-        TrackResourceWrite(resourceNode, m_PassIndex);
+        if (resourceNode.StartPass == ~0u)
+            resourceNode.StartPass = m_PassIndex;
+        resourceNode.EndPass = std::max(resourceNode.EndPass, m_PassIndex);
+
+        if (resourceNode.FirstWritePass == ~0u)
+            resourceNode.FirstWritePass = m_PassIndex;
+        resourceNode.LastWritePass = m_PassIndex;
 
         AttachmentNode node{resource.ID, info, true, nullptr};
         AppendToList(m_Graph.m_Arena,

@@ -27,9 +27,9 @@ import Core.Filesystem;
 import RHI;
 import ECS;
 
-using namespace Core::Hash;
-
 #include "Graphics.PassUtils.hpp"
+
+using namespace Core::Hash;
 
 namespace Graphics::Passes
 {

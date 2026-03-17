@@ -72,6 +72,32 @@ void GeometryWorkflowController::RegisterPanelsAndMenu()
     Interface::GUI::RegisterMainMenuBar("Geometry", [this]() { DrawMenu(); });
 }
 
+void GeometryWorkflowController::OpenAlgorithmPanel(GeometryProcessingAlgorithm algorithm)
+{
+    switch (algorithm)
+    {
+    case GeometryProcessingAlgorithm::Remeshing:
+        OpenRemeshingPanel();
+        break;
+    case GeometryProcessingAlgorithm::Simplification:
+        OpenSimplificationPanel();
+        break;
+    case GeometryProcessingAlgorithm::Smoothing:
+        OpenSmoothingPanel();
+        break;
+    case GeometryProcessingAlgorithm::Subdivision:
+        OpenSubdivisionPanel();
+        break;
+    case GeometryProcessingAlgorithm::Repair:
+        OpenRepairPanel();
+        break;
+    case GeometryProcessingAlgorithm::KMeans:
+    default:
+        OpenWorkflowPanel();
+        break;
+    }
+}
+
 // --- Selection context ---
 
 GeometryWorkflowController::SelectionContext GeometryWorkflowController::GetSelectionContext() const
@@ -278,6 +304,8 @@ void GeometryWorkflowController::ApplyOperator(entt::entity entity,
         ev->Dirty = true;
     if (auto* pv = reg.try_get<ECS::MeshVertexView::Component>(entity))
         pv->Dirty = true;
+    if (auto* bvh = reg.try_get<ECS::PrimitiveBVH::Data>(entity))
+        bvh->Dirty = true;
 
     auto& md = reg.emplace_or_replace<ECS::Mesh::Data>(entity);
     md.MeshRef = collider->CollisionRef->SourceMesh;

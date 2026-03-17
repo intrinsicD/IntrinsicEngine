@@ -181,7 +181,7 @@ namespace RHI
         device->m_TotalMemory = totalMem;
 
         // Step 4: Create CUDA context.
-        CUresult ctxResult = cuCtxCreate(&device->m_Context, 0, device->m_Device);
+        CUresult ctxResult = cuCtxCreate(&device->m_Context, nullptr, 0, device->m_Device);
         if (ctxResult != CUDA_SUCCESS)
         {
             Core::Log::Error("CudaDevice::Create(): cuCtxCreate failed (CUresult={}).",
@@ -357,6 +357,155 @@ namespace RHI
 
             (void)contextGuard->Finish();
         }
+    }
+
+    CudaExpected<CUevent> CudaDevice::CreateEvent()
+    {
+        auto contextGuard = ScopedCudaContext::Push(m_Context, "CudaDevice::CreateEvent()");
+        if (!contextGuard)
+            return std::unexpected(contextGuard.error());
+
+        CUevent event = nullptr;
+        const CUresult result = cuEventCreate(&event, CU_EVENT_DEFAULT);
+        if (result != CUDA_SUCCESS)
+        {
+            Core::Log::Error("CudaDevice::CreateEvent(): cuEventCreate failed (CUresult={}).",
+                             static_cast<int>(result));
+            return std::unexpected(MapDriverError(result));
+        }
+
+        if (auto popResult = contextGuard->Finish(); !popResult)
+            return std::unexpected(popResult.error());
+        return event;
+    }
+
+    void CudaDevice::DestroyEvent(CUevent event)
+    {
+        if (!event)
+            return;
+
+        auto contextGuard = ScopedCudaContext::Push(m_Context, "CudaDevice::DestroyEvent()");
+        if (!contextGuard)
+            return;
+
+        if (const CUresult result = cuEventDestroy(event); result != CUDA_SUCCESS)
+        {
+            Core::Log::Warn("CudaDevice::DestroyEvent(): cuEventDestroy failed (CUresult={}).",
+                            static_cast<int>(result));
+        }
+
+        (void)contextGuard->Finish();
+    }
+
+    CudaError CudaDevice::RecordEvent(CUevent event, CUstream stream)
+    {
+        if (!event)
+            return CudaError::InvalidPointer;
+
+        auto contextGuard = ScopedCudaContext::Push(m_Context, "CudaDevice::RecordEvent()");
+        if (!contextGuard)
+            return contextGuard.error();
+
+        const CUresult result = cuEventRecord(event, stream ? stream : m_DefaultStream);
+        if (result != CUDA_SUCCESS)
+            return MapDriverError(result);
+
+        if (auto popResult = contextGuard->Finish(); !popResult)
+            return popResult.error();
+        return CudaError::Success;
+    }
+
+    CudaExpected<bool> CudaDevice::IsEventComplete(CUevent event) const
+    {
+        if (!event)
+            return std::unexpected(CudaError::InvalidPointer);
+
+        auto contextGuard = ScopedCudaContext::Push(m_Context, "CudaDevice::IsEventComplete()");
+        if (!contextGuard)
+            return std::unexpected(contextGuard.error());
+
+        const CUresult result = cuEventQuery(event);
+        if (result == CUDA_SUCCESS)
+        {
+            if (auto popResult = contextGuard->Finish(); !popResult)
+                return std::unexpected(popResult.error());
+            return true;
+        }
+        if (result == CUDA_ERROR_NOT_READY)
+        {
+            if (auto popResult = contextGuard->Finish(); !popResult)
+                return std::unexpected(popResult.error());
+            return false;
+        }
+
+        return std::unexpected(MapDriverError(result));
+    }
+
+    CudaExpected<float> CudaDevice::GetElapsedMilliseconds(CUevent start, CUevent end) const
+    {
+        if (!start || !end)
+            return std::unexpected(CudaError::InvalidPointer);
+
+        auto contextGuard = ScopedCudaContext::Push(m_Context, "CudaDevice::GetElapsedMilliseconds()");
+        if (!contextGuard)
+            return std::unexpected(contextGuard.error());
+
+        float elapsedMs = 0.0f;
+        const CUresult result = cuEventElapsedTime(&elapsedMs, start, end);
+        if (result != CUDA_SUCCESS)
+            return std::unexpected(MapDriverError(result));
+
+        if (auto popResult = contextGuard->Finish(); !popResult)
+            return std::unexpected(popResult.error());
+        return elapsedMs;
+    }
+
+    CudaExpected<void> CudaDevice::CopyHostToBufferAsync(
+        CudaBufferHandle destination,
+        const void* source,
+        size_t bytes,
+        CUstream stream,
+        size_t destinationOffset)
+    {
+        if (!destination || !source || bytes == 0 || destinationOffset + bytes > destination.Size)
+            return std::unexpected(CudaError::InvalidPointer);
+
+        auto contextGuard = ScopedCudaContext::Push(m_Context, "CudaDevice::CopyHostToBufferAsync()");
+        if (!contextGuard)
+            return std::unexpected(contextGuard.error());
+
+        const CUresult result = cuMemcpyHtoDAsync(destination.Ptr + destinationOffset,
+                                                  source,
+                                                  bytes,
+                                                  stream ? stream : m_DefaultStream);
+        if (result != CUDA_SUCCESS)
+            return std::unexpected(MapDriverError(result));
+
+        if (auto popResult = contextGuard->Finish(); !popResult)
+            return std::unexpected(popResult.error());
+        return {};
+    }
+
+    CudaExpected<void> CudaDevice::CopyBufferToHost(
+        void* destination,
+        CudaBufferHandle source,
+        size_t bytes,
+        size_t sourceOffset) const
+    {
+        if (!destination || !source || bytes == 0 || sourceOffset + bytes > source.Size)
+            return std::unexpected(CudaError::InvalidPointer);
+
+        auto contextGuard = ScopedCudaContext::Push(m_Context, "CudaDevice::CopyBufferToHost()");
+        if (!contextGuard)
+            return std::unexpected(contextGuard.error());
+
+        const CUresult result = cuMemcpyDtoH(destination, source.Ptr + sourceOffset, bytes);
+        if (result != CUDA_SUCCESS)
+            return std::unexpected(MapDriverError(result));
+
+        if (auto popResult = contextGuard->Finish(); !popResult)
+            return std::unexpected(popResult.error());
+        return {};
     }
 
     CudaError CudaDevice::SynchronizeDefaultStream()

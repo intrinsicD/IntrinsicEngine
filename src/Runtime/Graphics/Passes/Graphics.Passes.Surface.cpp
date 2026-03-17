@@ -7,6 +7,7 @@ module;
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 #include <array>
 #include <entt/entity/registry.hpp>
@@ -813,7 +814,7 @@ namespace Graphics::Passes
                                             builder.Read(instances, VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT, VK_ACCESS_2_SHADER_STORAGE_READ_BIT);
                                         }
                                     },
-                                    [this, &ctx, gbufPipeline = m_GBufferPipeline, fwdPipeline = m_Pipeline, stream = std::move(stream), fi = ctx.FrameIndex % FRAMES]
+                                    [this, &ctx, gbufPipeline = m_GBufferPipeline, stream = std::move(stream), fi = ctx.FrameIndex % FRAMES]
                                     (const GBufferPassData&, const RGRegistry&, VkCommandBuffer cmd) mutable
                                     {
                                         if (stream.Batches.empty())
@@ -902,7 +903,7 @@ namespace Graphics::Passes
                                                 writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
                                                 writes[1].descriptorCount = 1;
                                                 writes[1].pBufferInfo = &visInfo;
-                                                vkUpdateDescriptorSets(ctx.Renderer.GetDevice(), 2, writes, 0, nullptr);
+                                                vkUpdateDescriptorSets(m_Device->GetLogicalDevice(), 2, writes, 0, nullptr);
 
                                                 vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                                                         desired->GetLayout(),

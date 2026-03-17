@@ -35,6 +35,10 @@ export namespace Runtime::Selection
                 return !is_background && id != entt::null;
             }
 
+            // Sub-element IDs resolved for the pick. The ID corresponding to the
+            // active ElementMode is the only selection-critical guarantee.
+            // Remaining IDs are best-effort context that may be filled by CPU
+            // refinement when enough information is available.
             uint32_t vertex_idx = InvalidIndex;
             uint32_t edge_idx = InvalidIndex;
             uint32_t face_idx = InvalidIndex;
@@ -131,10 +135,11 @@ export namespace Runtime::Selection
     [[nodiscard]] PickResult PickEntityCPU(const ECS::Scene& scene, entt::entity entity, const PickRequest& request);
 
     // GPU picking resolves entity ID on the GPU, then completes the picked
-    // primitive tuple on the CPU: use the self-describing primitive hint from
-    // the winning rendered primitive (surface triangle / line segment / point),
-    // and compute the remaining IDs from the projected hit point / ray
-    // intersection on the picked object.
+    // primitive tuple on the CPU using the self-describing primitive hint from
+    // the winning rendered primitive (surface triangle / line segment / point).
+    // Contract: the ID corresponding to `elementMode` is guaranteed when that
+    // domain can be resolved for the picked object. Additional IDs are
+    // best-effort context only and must not be treated as API guarantees.
     [[nodiscard]] Picked ResolveGpuSubElementPick(const ECS::Scene& scene,
                                                   entt::entity entity,
                                                   uint32_t primitiveID,

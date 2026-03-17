@@ -582,6 +582,10 @@ namespace Runtime
                                 auto& col = engine.GetScene().GetRegistry().emplace_or_replace<ECS::MeshCollider::Component>(entity);
                                 col.CollisionRef = seg->CollisionGeometry;
                                 col.WorldOBB.Center = col.CollisionRef->LocalAABB.GetCenter();
+
+                                auto& primitiveBvh = engine.GetScene().GetRegistry().emplace_or_replace<ECS::PrimitiveBVH::Data>(entity);
+                                primitiveBvh.Source = ECS::PrimitiveBVH::SourceKind::MeshTriangles;
+                                primitiveBvh.Dirty = true;
                             }
                         }
                     }
