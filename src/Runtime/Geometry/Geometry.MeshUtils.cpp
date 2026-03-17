@@ -5,6 +5,7 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <numbers>
 #include <span>
 #include <unordered_map>
 #include <vector>
@@ -524,6 +525,38 @@ namespace Geometry::MeshUtils
         }
 
         return laplacian;
+    }
+
+    std::vector<double> ComputeVertexAngleSums(const Halfedge::Mesh& mesh)
+    {
+        const std::size_t nV = mesh.VerticesSize();
+        const std::size_t nF = mesh.FacesSize();
+        std::vector<double> angleSums(nV, 0.0);
+
+        TriangleFaceView tri{};
+        for (std::size_t fi = 0; fi < nF; ++fi)
+        {
+            const FaceHandle f{static_cast<PropertyIndex>(fi)};
+            if (!TryGetTriangleFaceView(mesh, f, tri))
+            {
+                continue;
+            }
+
+            angleSums[tri.V0.Index] += AngleAtVertex(tri.P0, tri.P1, tri.P2);
+            angleSums[tri.V1.Index] += AngleAtVertex(tri.P1, tri.P2, tri.P0);
+            angleSums[tri.V2.Index] += AngleAtVertex(tri.P2, tri.P0, tri.P1);
+        }
+
+        return angleSums;
+    }
+
+    double ComputeVertexAngleDefect(const Halfedge::Mesh& mesh,
+                                    VertexHandle v,
+                                    double angleSumAtVertex)
+    {
+        return mesh.IsBoundary(v)
+            ? std::numbers::pi - angleSumAtVertex
+            : 2.0 * std::numbers::pi - angleSumAtVertex;
     }
 
     glm::dvec3 ComputeOneRingCentroid(const Halfedge::Mesh& mesh, VertexHandle v)

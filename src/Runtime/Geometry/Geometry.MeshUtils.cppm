@@ -94,6 +94,17 @@ export namespace Geometry::MeshUtils
         const Halfedge::Mesh& mesh,
         bool clampNonNegative = false);
 
+    /// Sum incident corner angles for each vertex using all non-deleted
+    /// triangular faces. Returned vector is indexed by vertex storage index.
+    /// Used by curvature operators for angle-defect based Gaussian curvature.
+    std::vector<double> ComputeVertexAngleSums(const Halfedge::Mesh& mesh);
+
+    /// Discrete Gaussian angle defect at a vertex from a precomputed angle sum.
+    /// Interior: 2π - angleSum, boundary: π - angleSum.
+    double ComputeVertexAngleDefect(const Halfedge::Mesh& mesh,
+                                    VertexHandle v,
+                                    double angleSumAtVertex);
+
     /// Uniform 1-ring centroid for a mesh vertex (double precision).
     /// Returns the average position of all halfedge neighbors, or the vertex
     /// position itself if it has no neighbors.

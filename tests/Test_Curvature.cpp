@@ -296,3 +296,36 @@ TEST(MeshUtils_VertexNormal, FlatMesh_NormalsPointAlongFaceNormal)
         }
     }
 }
+
+
+TEST(MeshUtils_AngleDefect, ClosedTetrahedron_TotalDefectEqualsFourPi)
+{
+    auto mesh = MakeTetrahedron();
+    const auto angleSums = Geometry::MeshUtils::ComputeVertexAngleSums(mesh);
+
+    ASSERT_EQ(angleSums.size(), mesh.VerticesSize());
+
+    double totalDefect = 0.0;
+    for (std::size_t i = 0; i < mesh.VerticesSize(); ++i)
+    {
+        Geometry::VertexHandle vh{static_cast<Geometry::PropertyIndex>(i)};
+        totalDefect += Geometry::MeshUtils::ComputeVertexAngleDefect(mesh, vh, angleSums[i]);
+    }
+
+    EXPECT_NEAR(totalDefect, 4.0 * std::numbers::pi, 1e-6)
+        << "Closed genus-0 mesh should satisfy Σ angle defect = 4π";
+}
+
+TEST(MeshUtils_AngleDefect, BoundaryVertex_UsesPiMinusAngleSum)
+{
+    auto mesh = MakeSubdividedTriangle();
+    const auto angleSums = Geometry::MeshUtils::ComputeVertexAngleSums(mesh);
+
+    // Vertex 0 is a boundary corner in the test mesh with angle π/3.
+    Geometry::VertexHandle boundaryV{static_cast<Geometry::PropertyIndex>(0)};
+    ASSERT_TRUE(mesh.IsBoundary(boundaryV));
+
+    const double defect = Geometry::MeshUtils::ComputeVertexAngleDefect(mesh, boundaryV, angleSums[boundaryV.Index]);
+    const double expected = std::numbers::pi - angleSums[boundaryV.Index];
+    EXPECT_NEAR(defect, expected, 1e-12);
+}
