@@ -45,8 +45,10 @@ export namespace Graphics
 
         [[nodiscard]] MaterialHandle GetHandle() const { return m_Handle; }
 
-        // Link a texture asset to a specific slot on this material
+        // Link texture assets to specific material slots.
         void SetAlbedoTexture(Core::Assets::AssetHandle textureAsset);
+        void SetNormalTexture(Core::Assets::AssetHandle textureAsset);
+        void SetMetallicRoughnessTexture(Core::Assets::AssetHandle textureAsset);
 
     private:
         MaterialSystem* m_System = nullptr;

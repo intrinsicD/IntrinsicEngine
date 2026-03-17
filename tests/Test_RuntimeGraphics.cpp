@@ -503,6 +503,25 @@ TEST(GraphicsMaterial, ConstructorSignature_NoSharedPtrTexture)
                                           Core::Assets::AssetManager&>);
 }
 
+TEST(GraphicsMaterial, TextureSlotApiExposed)
+{
+    using namespace Graphics;
+
+    static_assert(std::is_member_function_pointer_v<decltype(&Material::SetAlbedoTexture)>);
+    static_assert(std::is_member_function_pointer_v<decltype(&Material::SetNormalTexture)>);
+    static_assert(std::is_member_function_pointer_v<decltype(&Material::SetMetallicRoughnessTexture)>);
+
+    static_assert(std::is_member_function_pointer_v<decltype(&MaterialSystem::SetAlbedoAsset)>);
+    static_assert(std::is_member_function_pointer_v<decltype(&MaterialSystem::SetNormalAsset)>);
+    static_assert(std::is_member_function_pointer_v<decltype(&MaterialSystem::SetMetallicRoughnessAsset)>);
+
+    static_assert(static_cast<unsigned>(MaterialSystem::TextureSlot::Albedo) == 0u);
+    static_assert(static_cast<unsigned>(MaterialSystem::TextureSlot::Normal) == 1u);
+    static_assert(static_cast<unsigned>(MaterialSystem::TextureSlot::MetallicRoughness) == 2u);
+
+    SUCCEED();
+}
+
 TEST(GraphicsMaterial, ConstructorTakesDeviceByRef)
 {
     using namespace Graphics;

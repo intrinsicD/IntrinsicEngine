@@ -1,5 +1,6 @@
 // src/Runtime/Graphics/Graphics.MaterialSystem.cppm
 module;
+#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <unordered_map>
@@ -17,6 +18,13 @@ export namespace Graphics
     class MaterialSystem
     {
     public:
+        enum class TextureSlot : uint8_t
+        {
+            Albedo,
+            Normal,
+            MetallicRoughness,
+        };
+
         MaterialSystem(RHI::TextureSystem& textureSystem, Core::Assets::AssetManager& assetManager);
         ~MaterialSystem();
 
@@ -34,6 +42,8 @@ export namespace Graphics
 
         // Binding Logic
         void SetAlbedoAsset(MaterialHandle material, Core::Assets::AssetHandle textureAsset);
+        void SetNormalAsset(MaterialHandle material, Core::Assets::AssetHandle textureAsset);
+        void SetMetallicRoughnessAsset(MaterialHandle material, Core::Assets::AssetHandle textureAsset);
 
         // Signal that a material's GPU-facing data changed (e.g. bindless texture index) and instances should refresh.
         [[nodiscard]] uint32_t GetRevision(MaterialHandle handle) const;
@@ -57,6 +67,7 @@ export namespace Graphics
         // Index is MaterialHandle::Index.
         std::vector<uint32_t> m_Revisions;
 
-        void OnTextureLoad(MaterialHandle matHandle, Core::Assets::AssetHandle texHandle, int slotType);
+        void BindTextureAsset(MaterialHandle material, Core::Assets::AssetHandle textureAsset, TextureSlot slot);
+        void OnTextureLoad(MaterialHandle matHandle, Core::Assets::AssetHandle texHandle, TextureSlot slot);
     };
 }

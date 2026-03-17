@@ -1,6 +1,7 @@
 // src/Runtime/Graphics/Graphics.MaterialSystem.cpp
 module;
 #include <mutex>
+#include <string_view>
 
 module Graphics:MaterialSystem.Impl;
 import :MaterialSystem;
@@ -96,18 +97,32 @@ namespace Graphics
 
     void MaterialSystem::SetAlbedoAsset(MaterialHandle material, Core::Assets::AssetHandle textureAsset)
     {
+        BindTextureAsset(material, textureAsset, TextureSlot::Albedo);
+    }
+
+    void MaterialSystem::SetNormalAsset(MaterialHandle material, Core::Assets::AssetHandle textureAsset)
+    {
+        BindTextureAsset(material, textureAsset, TextureSlot::Normal);
+    }
+
+    void MaterialSystem::SetMetallicRoughnessAsset(MaterialHandle material, Core::Assets::AssetHandle textureAsset)
+    {
+        BindTextureAsset(material, textureAsset, TextureSlot::MetallicRoughness);
+    }
+
+    void MaterialSystem::BindTextureAsset(MaterialHandle material, Core::Assets::AssetHandle textureAsset, TextureSlot slot)
+    {
         std::lock_guard lock(m_ListenerMutex);
 
-        auto callback = [this, material](Core::Assets::AssetHandle texHandle) {
-            this->OnTextureLoad(material, texHandle, 0);
+        auto callback = [this, material, slot](Core::Assets::AssetHandle texHandle) {
+            this->OnTextureLoad(material, texHandle, slot);
         };
 
-        // Fire immediately if ready, otherwise register
-        auto listenerID = m_AssetManager.Listen(textureAsset, callback);
+        const auto listenerID = m_AssetManager.Listen(textureAsset, callback);
         m_Listeners[material].push_back({textureAsset, listenerID});
     }
 
-    void MaterialSystem::OnTextureLoad(MaterialHandle matHandle, Core::Assets::AssetHandle texHandle, int slotType)
+    void MaterialSystem::OnTextureLoad(MaterialHandle matHandle, Core::Assets::AssetHandle texHandle, TextureSlot slot)
     {
         // 1. Get the RHI Texture (Asset Payload)
         auto* tex = m_AssetManager.TryGet<RHI::Texture>(texHandle);
@@ -117,17 +132,30 @@ namespace Graphics
         uint32_t bindlessID = tex->GetBindlessIndex();
 
         // DEBUG: trace material->texture binding updates.
-        Core::Log::Info("[MaterialSystem] OnTextureLoad: mat(index={}, gen={}) texAsset(id={}) -> bindlessSlot={} slotType={} ",
+        constexpr auto slotToString = [](TextureSlot textureSlot) -> std::string_view {
+            switch (textureSlot)
+            {
+                case TextureSlot::Albedo: return "Albedo";
+                case TextureSlot::Normal: return "Normal";
+                case TextureSlot::MetallicRoughness: return "MetallicRoughness";
+            }
+            return "Unknown";
+        };
+
+        Core::Log::Info("[MaterialSystem] OnTextureLoad: mat(index={}, gen={}) texAsset(id={}) -> bindlessSlot={} slot={}",
                         matHandle.Index, matHandle.Generation,
                         static_cast<uint32_t>(texHandle.ID),
-                        bindlessID, slotType);
+                        bindlessID, slotToString(slot));
 
         // 3. Update Material Data in Pool
-        if (auto* data = const_cast<MaterialData*>(GetData(matHandle)))
+        if (auto* data = GetData(matHandle))
         {
-            if (slotType == 0) data->AlbedoID = bindlessID;
-            // Normal map binding (slotType == 1) deferred to Material System Rewrite (TODO C1).
-            // MaterialData::NormalID exists but no shader reads it yet.
+            switch (slot)
+            {
+                case TextureSlot::Albedo: data->AlbedoID = bindlessID; break;
+                case TextureSlot::Normal: data->NormalID = bindlessID; break;
+                case TextureSlot::MetallicRoughness: data->MetallicRoughnessID = bindlessID; break;
+            }
 
             if (matHandle.Index >= m_Revisions.size())
                 m_Revisions.resize(static_cast<size_t>(matHandle.Index) + 1u, 1u);
