@@ -45,10 +45,8 @@ namespace Graphics::Passes
         if (!m_Pipeline)
             return;
 
-        // Scene passes render to the canonical HDR scene color target.
-        const RGResourceHandle sceneColor = ctx.Blackboard.Get(RenderResource::SceneColorHDR);
         const RGResourceHandle depth = ctx.Blackboard.Get(RenderResource::SceneDepth);
-        if (!sceneColor.IsValid() || !depth.IsValid())
+        if (!depth.IsValid())
             return;
 
         // Lazily init descriptor pools (single growing pool per category).
@@ -79,6 +77,28 @@ namespace Graphics::Passes
         }
 
         DrawStream stream = BuildDrawStream(ctx);
+
+        // Deferred path: write G-buffer MRT targets instead of SceneColorHDR.
+        if (ctx.Recipe.LightingPath == FrameLightingPath::Deferred && m_GBufferPipeline)
+        {
+            const RGResourceHandle normal   = ctx.Blackboard.Get(RenderResource::SceneNormal);
+            const RGResourceHandle albedo   = ctx.Blackboard.Get(RenderResource::Albedo);
+            const RGResourceHandle material = ctx.Blackboard.Get(RenderResource::Material0);
+
+            if (normal.IsValid() && albedo.IsValid() && material.IsValid())
+            {
+                AddGBufferRasterPass(ctx, normal, albedo, material, depth, std::move(stream));
+                return;
+            }
+            // Fall through to forward path if G-buffer resources are missing.
+            Core::Log::Warn("SurfacePass: Deferred path requested but G-buffer resources missing — falling back to forward.");
+        }
+
+        // Forward path: write directly to SceneColorHDR.
+        const RGResourceHandle sceneColor = ctx.Blackboard.Get(RenderResource::SceneColorHDR);
+        if (!sceneColor.IsValid())
+            return;
+
         AddRasterPass(ctx, sceneColor, depth, std::move(stream));
     }
 
@@ -719,6 +739,206 @@ namespace Graphics::Passes
                                                                                  b.CountOffsetBytes,
                                                                                  safeMaxDraws,
                                                                                  sizeof(VkDrawIndexedIndirectCommand));
+                                            }
+                                            else
+                                            {
+                                                vkCmdDrawIndexedIndirect(cmd,
+                                                                         b.IndirectBuffer->GetHandle(),
+                                                                         b.IndirectOffsetBytes,
+                                                                         safeMaxDraws,
+                                                                         sizeof(VkDrawIndexedIndirectCommand));
+                                            }
+                                        }
+                                    });
+    }
+
+    // =========================================================================
+    // G-Buffer Raster Pass (deferred path)
+    // =========================================================================
+    void Graphics::Passes::SurfacePass::AddGBufferRasterPass(
+        RenderPassContext& ctx,
+        RGResourceHandle normal, RGResourceHandle albedo,
+        RGResourceHandle material, RGResourceHandle depth,
+        DrawStream&& stream)
+    {
+        // G-buffer pass: writes to 3 MRT color targets + depth.
+        // Even with no batches, we still clear/write so downstream composition
+        // has valid producers in empty-scene frames.
+        ctx.Graph.AddPass<GBufferPassData>("GBufferRaster",
+                                    [this, &ctx, normal, albedo, material, depth, fi = ctx.FrameIndex % FRAMES]
+                                    (GBufferPassData& data, RGBuilder& builder)
+                                    {
+                                        RGAttachmentInfo normalInfo{};
+                                        normalInfo.ClearValue = {{{0.0f, 0.0f, 0.0f, 0.0f}}};
+                                        normalInfo.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+                                        normalInfo.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+
+                                        RGAttachmentInfo albedoInfo{};
+                                        albedoInfo.ClearValue = {{{0.0f, 0.0f, 0.0f, 0.0f}}};
+                                        albedoInfo.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+                                        albedoInfo.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+
+                                        RGAttachmentInfo materialInfo{};
+                                        materialInfo.ClearValue = {{{0.0f, 0.0f, 0.0f, 0.0f}}};
+                                        materialInfo.LoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+                                        materialInfo.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+
+                                        RGAttachmentInfo depthInfo{};
+                                        depthInfo.ClearValue.depthStencil = {1.0f, 0};
+
+                                        data.Normal   = builder.WriteColor(normal, normalInfo);
+                                        data.Albedo   = builder.WriteColor(albedo, albedoInfo);
+                                        data.Material = builder.WriteColor(material, materialInfo);
+                                        data.Depth    = builder.WriteDepth(depth, depthInfo);
+
+                                        // Declare dependencies on GPU-culled buffers (same as forward).
+                                        if (m_Stage3IndirectPacked[fi])
+                                        {
+                                            auto indirect = builder.ImportBuffer("Stage3.IndirectPacked"_id, *m_Stage3IndirectPacked[fi]);
+                                            builder.Read(indirect, VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT, VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT);
+                                        }
+                                        if (m_Stage3VisibilityPacked[fi])
+                                        {
+                                            auto visibility = builder.ImportBuffer("Stage3.VisibilityPacked"_id, *m_Stage3VisibilityPacked[fi]);
+                                            builder.Read(visibility, VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT, VK_ACCESS_2_SHADER_STORAGE_READ_BIT);
+                                        }
+                                        if (m_Stage3DrawCountsPacked[fi])
+                                        {
+                                            auto counts = builder.ImportBuffer("Stage3.DrawCounts"_id, *m_Stage3DrawCountsPacked[fi]);
+                                            builder.Read(counts, VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT, VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT);
+                                        }
+                                        if (ctx.GpuScene)
+                                        {
+                                            auto instances = builder.ImportBuffer("GPUScene.Scene"_id, ctx.GpuScene->GetSceneBuffer());
+                                            builder.Read(instances, VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT, VK_ACCESS_2_SHADER_STORAGE_READ_BIT);
+                                        }
+                                    },
+                                    [this, &ctx, gbufPipeline = m_GBufferPipeline, fwdPipeline = m_Pipeline, stream = std::move(stream), fi = ctx.FrameIndex % FRAMES]
+                                    (const GBufferPassData&, const RGRegistry&, VkCommandBuffer cmd) mutable
+                                    {
+                                        if (stream.Batches.empty())
+                                            return;
+
+                                        VkViewport viewport{};
+                                        viewport.x = 0.0f;
+                                        viewport.y = 0.0f;
+                                        viewport.width = (float)ctx.Resolution.width;
+                                        viewport.height = (float)ctx.Resolution.height;
+                                        viewport.minDepth = 0.0f;
+                                        viewport.maxDepth = 1.0f;
+
+                                        VkRect2D scissor{};
+                                        scissor.offset = {0, 0};
+                                        scissor.extent = {ctx.Resolution.width, ctx.Resolution.height};
+
+                                        vkCmdSetViewport(cmd, 0, 1, &viewport);
+                                        vkCmdSetScissor(cmd, 0, 1, &scissor);
+
+                                        // Bind global sets using the G-buffer pipeline layout.
+                                        // G-buffer pipeline shares the same descriptor set layouts as forward.
+                                        const uint32_t dynamicOffset = static_cast<uint32_t>(ctx.GlobalCameraDynamicOffset);
+                                        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                                                gbufPipeline->GetLayout(),
+                                                                0, 1, &ctx.GlobalDescriptorSet,
+                                                                1, &dynamicOffset);
+
+                                        VkDescriptorSet globalTextures = ctx.Bindless.GetGlobalSet();
+                                        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                                                gbufPipeline->GetLayout(),
+                                                                1, 1, &globalTextures,
+                                                                0, nullptr);
+
+                                        VkDescriptorSet instanceSet = m_InstanceSet[fi];
+                                        if (instanceSet == VK_NULL_HANDLE)
+                                        {
+                                            instanceSet = m_InstanceSetPool->Allocate(m_InstanceSetLayout);
+                                            m_InstanceSet[fi] = instanceSet;
+                                            if (instanceSet == VK_NULL_HANDLE)
+                                                return;
+                                        }
+                                        VkBuffer currentInstBuffer = VK_NULL_HANDLE;
+                                        VkBuffer currentVisBuffer = VK_NULL_HANDLE;
+
+                                        const RHI::GraphicsPipeline* currentPipeline = nullptr;
+
+                                        for (const DrawBatch& b : stream.Batches)
+                                        {
+                                            if (!b.InstanceBuffer || !b.VisibilityBuffer || !b.IndirectBuffer)
+                                                continue;
+
+                                            // Only triangle batches go through the G-buffer pipeline.
+                                            // Lines and points fall back to the forward pipeline (they
+                                            // shouldn't appear here but guard defensively).
+                                            const RHI::GraphicsPipeline* desired = gbufPipeline;
+                                            if (b.Topology != VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
+                                                continue; // Skip non-triangle topology in G-buffer pass.
+
+                                            if (!desired)
+                                                continue;
+
+                                            if (desired != currentPipeline)
+                                            {
+                                                vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, desired->GetHandle());
+                                                currentPipeline = desired;
+                                            }
+
+                                            const VkBuffer instHandle = b.InstanceBuffer->GetHandle();
+                                            const VkBuffer visHandle = b.VisibilityBuffer->GetHandle();
+
+                                            if (instHandle != currentInstBuffer || visHandle != currentVisBuffer)
+                                            {
+                                                VkDescriptorBufferInfo instInfo{instHandle, 0, VK_WHOLE_SIZE};
+                                                VkDescriptorBufferInfo visInfo{visHandle, 0, VK_WHOLE_SIZE};
+                                                VkWriteDescriptorSet writes[2]{};
+                                                writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                                                writes[0].dstSet = instanceSet;
+                                                writes[0].dstBinding = 0;
+                                                writes[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                                                writes[0].descriptorCount = 1;
+                                                writes[0].pBufferInfo = &instInfo;
+                                                writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                                                writes[1].dstSet = instanceSet;
+                                                writes[1].dstBinding = 1;
+                                                writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                                                writes[1].descriptorCount = 1;
+                                                writes[1].pBufferInfo = &visInfo;
+                                                vkUpdateDescriptorSets(ctx.Renderer.GetDevice(), 2, writes, 0, nullptr);
+
+                                                vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                                                        desired->GetLayout(),
+                                                                        2, 1, &instanceSet, 0, nullptr);
+
+                                                currentInstBuffer = instHandle;
+                                                currentVisBuffer = visHandle;
+                                            }
+
+                                            RHI::MeshPushConstants pc{};
+                                            pc.Model = glm::mat4(1.0f);
+                                            pc.PtrPositions = b.PtrPositions;
+                                            pc.PtrNormals = b.PtrNormals;
+                                            pc.PtrAux = 0;
+                                            pc.VisibilityBase = b.VisibilityBase;
+                                            pc.PointSizePx = b.PointSizePx;
+                                            pc.PtrFaceAttr = b.PtrFaceAttr;
+                                            pc.PtrVertexAttr = b.PtrVertexAttr;
+
+                                            vkCmdPushConstants(cmd, desired->GetLayout(),
+                                                               VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                                                               0, sizeof(pc), &pc);
+
+                                            if (b.IndexBuffer != VK_NULL_HANDLE)
+                                                vkCmdBindIndexBuffer(cmd, b.IndexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
+                                            const uint32_t safeMaxDraws = std::max(b.MaxDraws, 1u);
+                                            if (b.CountBuffer)
+                                            {
+                                                vkCmdDrawIndexedIndirectCount(cmd,
+                                                                             b.IndirectBuffer->GetHandle(),
+                                                                             b.IndirectOffsetBytes,
+                                                                             b.CountBuffer->GetHandle(),
+                                                                             b.CountOffsetBytes,
+                                                                             safeMaxDraws,
+                                                                             sizeof(VkDrawIndexedIndirectCommand));
                                             }
                                             else
                                             {

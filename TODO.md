@@ -8,7 +8,7 @@ This document tracks the **active rendering-architecture backlog** for Intrinsic
 
 ## 0. Scope & Success Criteria
 
-**Current focus:** finish the resource-driven rendering refactor without painting the engine into a corner for deferred, hybrid, transparency, or material-system work.
+**Current focus:** finish the resource-driven rendering refactor and expand lighting paths without painting the engine into a corner for hybrid, transparency, or material-system work.
 
 **Success criteria:**
 
@@ -38,14 +38,6 @@ This document tracks the **active rendering-architecture backlog** for Intrinsic
 ## 2. Next (P1) — Near-Term Follow-Up After the Refactor Lands
 
 These are not required to finish the first wave, but they should begin soon after P0 is stable.
-
-### B1. Deferred Lighting Path
-
-- [ ] Add a proper deferred lighting composition path.
-- [ ] Define the minimum G-buffer layout.
-- [ ] Route opaque lighting through the deferred path.
-- [ ] Preserve the forward path for unsupported cases.
-- [ ] Keep selection/debug independent of the deferred path.
 
 ### B2. Hybrid Renderer Support
 
@@ -146,7 +138,7 @@ These are the explicit constraints agents must preserve during the refactor even
 
 - [ ] Leave room for a material-system rewrite.
 - [ ] Leave room for transparency-path separation.
-- [ ] Leave room for deferred and hybrid lighting.
+- [ ] Leave room for hybrid lighting.
 - [ ] Leave room for motion vectors/history buffers.
 - [ ] Leave room for clustered/tiled lighting.
 - [ ] Leave room for effect passes like SSAO, decals, and bloom.

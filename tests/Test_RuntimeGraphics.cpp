@@ -1139,3 +1139,120 @@ TEST(RenderResources, NonOptionalResourcesAreIdentified)
     EXPECT_TRUE(GetRenderResourceDefinition(RenderResource::PrimitiveId).Optional);
     EXPECT_TRUE(GetRenderResourceDefinition(RenderResource::SceneNormal).Optional);
 }
+
+// =========================================================================
+// B1 — Deferred Lighting Path Recipe Tests
+// =========================================================================
+
+TEST(RenderResources, DeferredRecipe_RequestsGBufferResources)
+{
+    using namespace Graphics;
+
+    DefaultPipelineRecipeInputs inputs{};
+    inputs.SurfacePassEnabled = true;
+    inputs.LinePassEnabled = true;
+    inputs.PointPassEnabled = true;
+    inputs.PickingPassEnabled = true;
+    inputs.PostProcessPassEnabled = true;
+    inputs.SelectionOutlinePassEnabled = false;
+    inputs.DebugViewPassEnabled = false;
+    inputs.ImGuiPassEnabled = false;
+    inputs.CompositionPassEnabled = true;
+    inputs.RequestedLightingPath = FrameLightingPath::Deferred;
+
+    const FrameRecipe recipe = BuildDefaultPipelineRecipe(inputs);
+
+    EXPECT_EQ(recipe.LightingPath, FrameLightingPath::Deferred);
+    EXPECT_TRUE(recipe.Depth);
+    EXPECT_TRUE(recipe.Normals);
+    EXPECT_TRUE(recipe.MaterialChannels);
+
+    // G-buffer resources must be required.
+    EXPECT_TRUE(recipe.Requires(RenderResource::SceneNormal));
+    EXPECT_TRUE(recipe.Requires(RenderResource::Albedo));
+    EXPECT_TRUE(recipe.Requires(RenderResource::Material0));
+
+    // SceneColorHDR is still needed (composition writes it).
+    EXPECT_TRUE(recipe.Requires(RenderResource::SceneColorHDR));
+
+    // SceneDepth is always needed with geometry passes.
+    EXPECT_TRUE(recipe.Requires(RenderResource::SceneDepth));
+}
+
+TEST(RenderResources, DeferredRecipe_NoSurfacePass_NoGBufferResources)
+{
+    using namespace Graphics;
+
+    // When SurfacePass is disabled, no G-buffer resources are needed even
+    // if the lighting path is deferred (only surface geometry writes G-buffer).
+    DefaultPipelineRecipeInputs inputs{};
+    inputs.SurfacePassEnabled = false;
+    inputs.LinePassEnabled = true;
+    inputs.PointPassEnabled = false;
+    inputs.PickingPassEnabled = false;
+    inputs.PostProcessPassEnabled = false;
+    inputs.SelectionOutlinePassEnabled = false;
+    inputs.DebugViewPassEnabled = false;
+    inputs.ImGuiPassEnabled = false;
+    inputs.CompositionPassEnabled = true;
+    inputs.RequestedLightingPath = FrameLightingPath::Deferred;
+
+    const FrameRecipe recipe = BuildDefaultPipelineRecipe(inputs);
+
+    // Still deferred path (geometry exists via LinePass).
+    EXPECT_EQ(recipe.LightingPath, FrameLightingPath::Deferred);
+
+    // But no G-buffer resources since SurfacePass is off.
+    EXPECT_FALSE(recipe.Normals);
+    EXPECT_FALSE(recipe.MaterialChannels);
+    EXPECT_FALSE(recipe.Requires(RenderResource::SceneNormal));
+    EXPECT_FALSE(recipe.Requires(RenderResource::Albedo));
+}
+
+TEST(RenderResources, ForwardRecipe_DoesNotRequestGBufferByDefault)
+{
+    using namespace Graphics;
+
+    DefaultPipelineRecipeInputs inputs{};
+    inputs.SurfacePassEnabled = true;
+    inputs.LinePassEnabled = true;
+    inputs.PointPassEnabled = true;
+    inputs.PickingPassEnabled = false;
+    inputs.PostProcessPassEnabled = false;
+    inputs.SelectionOutlinePassEnabled = false;
+    inputs.DebugViewPassEnabled = false;
+    inputs.ImGuiPassEnabled = false;
+    inputs.RequestedLightingPath = FrameLightingPath::Forward;
+
+    const FrameRecipe recipe = BuildDefaultPipelineRecipe(inputs);
+
+    EXPECT_EQ(recipe.LightingPath, FrameLightingPath::Forward);
+    EXPECT_FALSE(recipe.Normals);
+    EXPECT_FALSE(recipe.MaterialChannels);
+    EXPECT_FALSE(recipe.Requires(RenderResource::SceneNormal));
+    EXPECT_FALSE(recipe.Requires(RenderResource::Albedo));
+    EXPECT_FALSE(recipe.Requires(RenderResource::Material0));
+}
+
+TEST(RenderResources, GBufferResourceDefinitions)
+{
+    using namespace Graphics;
+
+    // SceneNormal: RGBA16F, transient, optional
+    auto normal = GetRenderResourceDefinition(RenderResource::SceneNormal);
+    EXPECT_EQ(normal.FixedFormat, VK_FORMAT_R16G16B16A16_SFLOAT);
+    EXPECT_EQ(normal.Lifetime, RenderResourceLifetime::FrameTransient);
+    EXPECT_TRUE(normal.Optional);
+
+    // Albedo: RGBA8, transient, optional
+    auto albedo = GetRenderResourceDefinition(RenderResource::Albedo);
+    EXPECT_EQ(albedo.FixedFormat, VK_FORMAT_R8G8B8A8_UNORM);
+    EXPECT_EQ(albedo.Lifetime, RenderResourceLifetime::FrameTransient);
+    EXPECT_TRUE(albedo.Optional);
+
+    // Material0: RGBA16F, transient, optional
+    auto material = GetRenderResourceDefinition(RenderResource::Material0);
+    EXPECT_EQ(material.FixedFormat, VK_FORMAT_R16G16B16A16_SFLOAT);
+    EXPECT_EQ(material.Lifetime, RenderResourceLifetime::FrameTransient);
+    EXPECT_TRUE(material.Optional);
+}

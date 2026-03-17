@@ -25,6 +25,7 @@ import :Passes.Point;
 import :Passes.DebugView;
 import :Passes.ImGui;
 import :Passes.PostProcess;
+import :Passes.Composition;
 import :PipelineLibrary;
 import :ShaderRegistry;
 import :Pipelines;
@@ -47,6 +48,7 @@ namespace Graphics
         if (m_LinePass)             m_LinePass->Shutdown();
         if (m_PointPass)            m_PointPass->Shutdown();
         if (m_PostProcessPass)      m_PostProcessPass->Shutdown();
+        if (m_CompositionPass)      m_CompositionPass->Shutdown();
         if (m_DebugViewPass)        m_DebugViewPass->Shutdown();
         if (m_ImGuiPass)            m_ImGuiPass->Shutdown();
 
@@ -56,6 +58,7 @@ namespace Graphics
         m_LinePass.reset();
         m_PointPass.reset();
         m_PostProcessPass.reset();
+        m_CompositionPass.reset();
         m_DebugViewPass.reset();
         m_ImGuiPass.reset();
     }
@@ -74,6 +77,7 @@ namespace Graphics
         m_DebugViewPass        = std::make_unique<Passes::DebugViewPass>();
         m_ImGuiPass            = std::make_unique<Passes::ImGuiPass>();
         m_PostProcessPass      = std::make_unique<Passes::PostProcessPass>();
+        m_CompositionPass      = std::make_unique<Passes::CompositionPass>();
 
         m_PickingPass->Initialize(device, descriptorPool, globalLayout);
         m_SurfacePass->Initialize(device, descriptorPool, globalLayout);
@@ -81,6 +85,7 @@ namespace Graphics
         m_LinePass->Initialize(device, descriptorPool, globalLayout);
         m_PointPass->Initialize(device, descriptorPool, globalLayout);
         m_PostProcessPass->Initialize(device, descriptorPool, globalLayout);
+        m_CompositionPass->Initialize(device, descriptorPool, globalLayout);
         m_DebugViewPass->Initialize(device, descriptorPool, globalLayout);
         m_ImGuiPass->Initialize(device, descriptorPool, globalLayout);
 
@@ -101,6 +106,11 @@ namespace Graphics
         m_PointPass->SetShaderRegistry(shaderRegistry);
         m_DebugViewPass->SetShaderRegistry(shaderRegistry);
         m_PostProcessPass->SetShaderRegistry(shaderRegistry);
+        m_CompositionPass->SetShaderRegistry(shaderRegistry);
+
+        // Wire G-buffer pipeline to SurfacePass for deferred path.
+        if (pipelineLibrary.Contains(kPipeline_SurfaceGBuffer))
+            m_SurfacePass->SetGBufferPipeline(&pipelineLibrary.GetOrDie(kPipeline_SurfaceGBuffer));
 
         m_PathDirty = true;
     }
@@ -168,13 +178,14 @@ namespace Graphics
         }
 
         // ==================================================================
-        // 5. Composition insertion point (future).
-        //    When a deferred or hybrid lighting path is implemented, a
-        //    composition stage would be added here — after geometry passes
-        //    and before post-processing — to produce SceneColorHDR from
-        //    G-buffer channels. For the current forward path, geometry
-        //    passes write directly to SceneColorHDR; no composition needed.
+        // 5. Composition — deferred lighting.
+        //    Reads G-buffer (SceneNormal, Albedo, Material0) + SceneDepth
+        //    and writes SceneColorHDR via a fullscreen deferred lighting pass.
+        //    No-op when the frame recipe selects the forward lighting path
+        //    (geometry passes write SceneColorHDR directly in that case).
         // ==================================================================
+        if (m_CompositionPass)
+            m_Path.AddFeature("Composition", m_CompositionPass.get());
 
         // ==================================================================
         // 6. Post-Processing — HDR tone mapping + optional FXAA.
@@ -305,6 +316,7 @@ namespace Graphics
         if (m_LinePass)             m_LinePass->OnResize(width, height);
         if (m_PointPass)            m_PointPass->OnResize(width, height);
         if (m_PostProcessPass)      m_PostProcessPass->OnResize(width, height);
+        if (m_CompositionPass)      m_CompositionPass->OnResize(width, height);
         if (m_DebugViewPass)        m_DebugViewPass->OnResize(width, height);
         if (m_ImGuiPass)            m_ImGuiPass->OnResize(width, height);
     }
@@ -315,6 +327,8 @@ namespace Graphics
     {
         if (m_PostProcessPass)
             m_PostProcessPass->PostCompile(frameIndex, debugImages);
+        if (m_CompositionPass)
+            m_CompositionPass->PostCompile(frameIndex, debugImages);
         if (m_SelectionOutlinePass)
             m_SelectionOutlinePass->PostCompile(frameIndex, debugImages);
         if (m_DebugViewPass)
@@ -329,7 +343,14 @@ namespace Graphics
         if (hasGeometry)
         {
             recipe.Depth = true;
-            recipe.LightingPath = FrameLightingPath::Forward;
+            recipe.LightingPath = inputs.RequestedLightingPath;
+
+            // Deferred path requires G-buffer resources.
+            if (recipe.LightingPath == FrameLightingPath::Deferred && inputs.SurfacePassEnabled)
+            {
+                recipe.Normals = true;
+                recipe.MaterialChannels = true;
+            }
         }
 
         if (inputs.PickingPassEnabled)
@@ -404,9 +425,16 @@ namespace Graphics
         inputs.SelectionOutlinePassEnabled = m_SelectionOutlinePass && IsFeatureEnabled("SelectionOutlinePass"_id);
         inputs.DebugViewPassEnabled = m_DebugViewPass && IsFeatureEnabled("DebugViewPass"_id);
         inputs.ImGuiPassEnabled = m_ImGuiPass && IsFeatureEnabled("ImGuiPass"_id);
+        inputs.CompositionPassEnabled = m_CompositionPass != nullptr;
         inputs.HasSelectionWork = hasSelectionWork;
         inputs.DebugViewEnabled = ctx.Debug.Enabled;
         inputs.DebugResource = ctx.Debug.SelectedResource;
+
+        // Select lighting path: Deferred when the feature toggle is enabled and
+        // the composition pass is available; otherwise Forward.
+        inputs.RequestedLightingPath = (inputs.CompositionPassEnabled && IsFeatureEnabled("DeferredLighting"_id))
+            ? FrameLightingPath::Deferred
+            : FrameLightingPath::Forward;
 
         FrameRecipe recipe = BuildDefaultPipelineRecipe(inputs);
 

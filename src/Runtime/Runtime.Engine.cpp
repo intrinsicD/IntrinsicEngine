@@ -334,6 +334,18 @@ namespace Runtime
         reg("DebugViewPass",         Cat::RenderFeature, "Render target debug visualization");
         reg("ImGuiPass",             Cat::RenderFeature, "ImGui UI overlay");
 
+        // --- Lighting Path ---
+        // DeferredLighting is disabled by default; enable via FeatureRegistry UI.
+        {
+            Core::FeatureInfo info{};
+            info.Name = "DeferredLighting";
+            info.Id = Core::Hash::StringID(Core::Hash::HashString(info.Name));
+            info.Category = Cat::RenderFeature;
+            info.Description = "Deferred lighting path (G-buffer + fullscreen composition)";
+            info.Enabled = false;
+            m_FeatureRegistry.Register(std::move(info), noopFactory, noopDestroy);
+        }
+
         // --- ECS Systems ---
         reg("TransformUpdate",                Cat::System, "Propagates local transforms to world matrices");
         reg("MeshRendererLifecycle",           Cat::System, "Allocates/deallocates GPU slots for mesh renderers");
