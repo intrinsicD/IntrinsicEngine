@@ -4,7 +4,6 @@ module;
 #include <cassert>
 #include <cmath>
 #include <cstddef>
-#include <numbers>
 #include <optional>
 #include <vector>
 
@@ -20,9 +19,10 @@ import :MeshUtils;
 
 namespace Geometry::Curvature
 {
-    using MeshUtils::AngleAtVertex;
     using MeshUtils::ComputeMixedVoronoiAreas;
     using MeshUtils::ComputeCotanLaplacian;
+    using MeshUtils::ComputeVertexAngleDefect;
+    using MeshUtils::ComputeVertexAngleSums;
     using MeshUtils::VertexNormal;
 
     namespace
@@ -112,37 +112,14 @@ namespace Geometry::Curvature
             return std::nullopt;
 
         const std::size_t nV = mesh.VerticesSize();
-        const std::size_t nF = mesh.FacesSize();
 
         GaussianCurvatureResult result;
         result.Property = VertexProperty<double>(mesh.VertexProperties().GetOrAdd<double>("v:gaussian_curvature", 0.0));
 
         auto areas = ComputeMixedVoronoiAreas(mesh);
 
-        // Accumulate angle sum per vertex
-        std::vector<double> angleSum(nV, 0.0);
-
-        for (std::size_t fi = 0; fi < nF; ++fi)
-        {
-            FaceHandle fh{static_cast<PropertyIndex>(fi)};
-            if (mesh.IsDeleted(fh)) continue;
-
-            HalfedgeHandle h0 = mesh.Halfedge(fh);
-            HalfedgeHandle h1 = mesh.NextHalfedge(h0);
-            HalfedgeHandle h2 = mesh.NextHalfedge(h1);
-
-            VertexHandle va = mesh.ToVertex(h0);
-            VertexHandle vb = mesh.ToVertex(h1);
-            VertexHandle vc = mesh.ToVertex(h2);
-
-            glm::vec3 pa = mesh.Position(va);
-            glm::vec3 pb = mesh.Position(vb);
-            glm::vec3 pc = mesh.Position(vc);
-
-            angleSum[va.Index] += AngleAtVertex(pa, pb, pc);
-            angleSum[vb.Index] += AngleAtVertex(pb, pc, pa);
-            angleSum[vc.Index] += AngleAtVertex(pc, pa, pb);
-        }
+        // Accumulate angle sum per vertex.
+        const std::vector<double> vertexAngleSums = ComputeVertexAngleSums(mesh);
 
         // Compute Gaussian curvature
         for (std::size_t i = 0; i < nV; ++i)
@@ -152,10 +129,7 @@ namespace Geometry::Curvature
 
             if (areas[i] > 1e-12)
             {
-                double defect = mesh.IsBoundary(vh)
-                                    ? std::numbers::pi - angleSum[i]
-                                    : 2.0 * std::numbers::pi - angleSum[i];
-
+                const double defect = ComputeVertexAngleDefect(mesh, vh, vertexAngleSums[i]);
                 result.Property[vh] = defect / areas[i];
             }
         }
@@ -170,7 +144,6 @@ namespace Geometry::Curvature
     CurvatureField ComputeCurvature(Halfedge::Mesh& mesh)
     {
         const std::size_t nV = mesh.VerticesSize();
-        const std::size_t nF = mesh.FacesSize();
 
         CurvatureField result;
         result.MeanCurvatureProperty = VertexProperty<double>(mesh.VertexProperties().GetOrAdd<double>("v:mean_curvature", 0.0));
@@ -185,30 +158,8 @@ namespace Geometry::Curvature
         // 1. Cotan-weighted Laplacian for mean curvature
         auto laplacian = ComputeCotanLaplacian(mesh);
 
-        // 2. Accumulate angle sums for Gaussian curvature
-        std::vector<double> angleSum(nV, 0.0);
-
-        for (std::size_t fi = 0; fi < nF; ++fi)
-        {
-            FaceHandle fh{static_cast<PropertyIndex>(fi)};
-            if (mesh.IsDeleted(fh)) continue;
-
-            HalfedgeHandle h0 = mesh.Halfedge(fh);
-            HalfedgeHandle h1 = mesh.NextHalfedge(h0);
-            HalfedgeHandle h2 = mesh.NextHalfedge(h1);
-
-            VertexHandle va = mesh.ToVertex(h0);
-            VertexHandle vb = mesh.ToVertex(h1);
-            VertexHandle vc = mesh.ToVertex(h2);
-
-            glm::vec3 pa = mesh.Position(va);
-            glm::vec3 pb = mesh.Position(vb);
-            glm::vec3 pc = mesh.Position(vc);
-
-            angleSum[va.Index] += AngleAtVertex(pa, pb, pc);
-            angleSum[vb.Index] += AngleAtVertex(pb, pc, pa);
-            angleSum[vc.Index] += AngleAtVertex(pc, pa, pb);
-        }
+        // 2. Accumulate angle sums for Gaussian curvature.
+        const std::vector<double> vertexAngleSums = ComputeVertexAngleSums(mesh);
 
         // 3. Assemble per-vertex curvature
         for (std::size_t i = 0; i < nV; ++i)
@@ -223,10 +174,8 @@ namespace Geometry::Curvature
             double H = ComputeSignedMeanCurvatureFromLaplaceBeltrami(laplaceB, normal);
 
             // Gaussian curvature
-            double defect = mesh.IsBoundary(vh)
-                                ? std::numbers::pi - angleSum[i]
-                                : 2.0 * std::numbers::pi - angleSum[i];
-            double K = defect / areas[i];
+            const double defect = ComputeVertexAngleDefect(mesh, vh, vertexAngleSums[i]);
+            const double K = defect / areas[i];
 
             // Principal curvatures
             double discriminant = std::max(0.0, H * H - K);
