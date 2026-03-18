@@ -11,6 +11,7 @@ This file is now an archival index for the completed three-pass rendering refact
 ## Canonical Documents
 
 - `docs/architecture/rendering-three-pass.md` — canonical technical architecture spec (pass contracts, data contracts, invariants).
+- `docs/architecture/runtime-subsystem-boundaries.md` — current runtime ownership map, dependency directions, and lifecycle order.
 - `TODO.md` — active near-term execution queue.
 - `ROADMAP.md` — medium/long-horizon sequencing.
 
