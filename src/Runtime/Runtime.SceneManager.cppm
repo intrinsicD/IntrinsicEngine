@@ -63,7 +63,19 @@ export namespace Runtime
         void Clear();
 
     private:
+        struct GpuHookContext
+        {
+            Graphics::GPUScene* GpuScene = nullptr;
+#ifdef INTRINSIC_HAS_CUDA
+            RHI::CudaDevice* CudaDevice = nullptr;
+#endif
+        };
+
+        template <typename T>
+        void OnGpuComponentDestroyed(entt::registry& registry, entt::entity entity);
+
         ECS::Scene m_Scene;
         Graphics::GeometryPool* m_GeometryStorage = nullptr;
+        GpuHookContext m_GpuHookContext{};
     };
 }
