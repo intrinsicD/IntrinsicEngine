@@ -164,10 +164,25 @@ namespace Graphics
             m_Path.AddFeature("MeshPass.Surface", m_SurfacePass.get());
 
         // ==================================================================
-        // 3. LinePass — unified BDA-based line rendering.
+        // 3. Composition — deferred lighting.
+        //    Reads G-buffer (SceneNormal, Albedo, Material0) + SceneDepth
+        //    and writes SceneColorHDR via a fullscreen deferred lighting pass.
+        //    No-op when the frame recipe selects the forward lighting path
+        //    (SurfacePass writes SceneColorHDR directly in that case).
+        //
+        //    IMPORTANT: this must execute before LinePass / PointPass. Those
+        //    passes are the forward-overlay lane for primitives/materials that
+        //    stay out of the deferred G-buffer (wireframe, debug, point-cloud,
+        //    future transparent/special materials). Running composition first
+        //    preserves their SceneColorHDR LOAD/accumulate contract.
+        // ==================================================================
+        if (m_CompositionPass)
+            m_Path.AddFeature("Composition", m_CompositionPass.get());
+
+        // ==================================================================
+        // 4. LinePass — unified BDA-based line rendering.
         //    Consolidates retained wireframe/graph edges and transient DebugDraw
-        //    lines into a single pass. Always present when the pass exists so
-        //    debug-line output is not silently dropped.
+        //    lines into a single forward-overlay lane on SceneColorHDR.
         // ==================================================================
         if (m_LinePass)
         {
@@ -180,9 +195,11 @@ namespace Graphics
         }
 
         // ==================================================================
-        // 4. PointPass — unified BDA-based point rendering.
+        // 5. PointPass — unified BDA-based point rendering.
         //    Iterates ECS::Point::Component for retained draws and
-        //    DebugDraw::GetPoints() for transient markers.
+        //    DebugDraw::GetPoints() for transient markers. Like LinePass, this
+        //    is part of the forward-overlay lane that composes after deferred
+        //    lighting when the frame recipe selects that path.
         // ==================================================================
         if (m_PointPass && IsFeatureEnabled("PointPass"_id))
         {
@@ -195,16 +212,6 @@ namespace Graphics
         }
 
         // ==================================================================
-        // 5. Composition — deferred lighting.
-        //    Reads G-buffer (SceneNormal, Albedo, Material0) + SceneDepth
-        //    and writes SceneColorHDR via a fullscreen deferred lighting pass.
-        //    No-op when the frame recipe selects the forward lighting path
-        //    (geometry passes write SceneColorHDR directly in that case).
-        // ==================================================================
-        if (m_CompositionPass)
-            m_Path.AddFeature("Composition", m_CompositionPass.get());
-
-        // ==================================================================
         // 6. Post-Processing — HDR tone mapping + optional FXAA.
         //    Reads canonical SceneColorHDR and writes canonical SceneColorLDR.
         //    Final presentation to the imported swapchain image happens in the
@@ -214,13 +221,13 @@ namespace Graphics
             m_Path.AddFeature("PostProcess", m_PostProcessPass.get());
 
         // ==================================================================
-        // 6. Selection Outline — post-process overlay for selected entities.
+        // 7. Selection Outline — post-process overlay for selected entities.
         // ==================================================================
         if (m_SelectionOutlinePass && IsFeatureEnabled("SelectionOutlinePass"_id))
             m_Path.AddFeature("SelectionOutline", m_SelectionOutlinePass.get());
 
         // ==================================================================
-        // 7. Debug View — conditional texture inspector overlay.
+        // 8. Debug View — conditional texture inspector overlay.
         // ==================================================================
         if (m_DebugViewPass && IsFeatureEnabled("DebugViewPass"_id))
         {
@@ -232,7 +239,7 @@ namespace Graphics
         }
 
         // ==================================================================
-        // 8. ImGui — editor UI overlay.
+        // 9. ImGui — editor UI overlay.
         // ==================================================================
         if (m_ImGuiPass && IsFeatureEnabled("ImGuiPass"_id))
             m_Path.AddFeature("ImGui", m_ImGuiPass.get());

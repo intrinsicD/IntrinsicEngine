@@ -30,9 +30,9 @@ The render graph blackboard exposes a fixed canonical resource vocabulary:
 | `SceneDepth` | Swapchain/device depth format | Imported | Depth-tested scene + picking |
 | `EntityId` | `R32_UINT` | Frame transient | `PickingPass`, selection/debug sampling |
 | `PrimitiveId` | `R32_UINT` | Frame transient | `PickingPass` primitive-domain hint (`2` high bits = domain, `30` low bits = authoritative face ID for surfaces when available, otherwise primitive index) for sub-element selection/debug |
-| `SceneNormal` | `R16G16B16A16_SFLOAT` | Frame transient | Reserved for future lighting/debug |
-| `Albedo` | `R8G8B8A8_UNORM` | Frame transient | Reserved for future material/debug |
-| `Material0` | `R16G16B16A16_SFLOAT` | Frame transient | Reserved for future material/debug |
+| `SceneNormal` | `R16G16B16A16_SFLOAT` | Frame transient | Deferred-capable surface normal target; also sampleable for debug |
+| `Albedo` | `R8G8B8A8_UNORM` | Frame transient | Deferred-capable surface albedo target |
+| `Material0` | `R16G16B16A16_SFLOAT` | Frame transient | Deferred-capable surface material/shading parameters |
 | `SceneColorHDR` | `R16G16B16A16_SFLOAT` | Frame transient | Geometry/lighting output |
 | `SceneColorLDR` | Swapchain format | Frame transient | Post-process + overlay composition target |
 | `SelectionMask` | `R8_UNORM` | Frame transient | Reserved for future outline mask split |
@@ -46,9 +46,10 @@ The render graph blackboard exposes a fixed canonical resource vocabulary:
 | Pass | Inputs | Outputs | Initialization / Ownership |
 |------|--------|---------|----------------------------|
 | `PickingPass` | `SceneDepth` | `EntityId` | Clears both; no swapchain ownership |
-| `SurfacePass` | `SceneDepth`, GPUScene buffers | `SceneColorHDR`, `SceneDepth` | First HDR writer; clears color+depth |
-| `LinePass` | `SceneColorHDR`, `SceneDepth` | `SceneColorHDR`, `SceneDepth` | Accumulates via `LOAD` onto scene targets |
-| `PointPass` | `SceneColorHDR`, `SceneDepth` | `SceneColorHDR`, `SceneDepth` | Accumulates via `LOAD` onto scene targets |
+| `SurfacePass` | `SceneDepth`, GPUScene buffers | forward: `SceneColorHDR`; deferred: `SceneNormal` + `Albedo` + `Material0`, `SceneDepth` | Opaque surface lane. Clears depth plus either HDR color or the G-buffer MRT set |
+| `CompositionPass` | deferred: `SceneNormal`, `Albedo`, `Material0`, `SceneDepth` | deferred: `SceneColorHDR` | Fullscreen deferred lighting. No-op in forward mode |
+| `LinePass` | `SceneColorHDR`, `SceneDepth` | `SceneColorHDR`, `SceneDepth` | Forward-overlay lane for wireframe/graph/debug lines; accumulates via `LOAD` |
+| `PointPass` | `SceneColorHDR`, `SceneDepth` | `SceneColorHDR`, `SceneDepth` | Forward-overlay lane for point clouds/debug points; accumulates via `LOAD` |
 | `PostProcessPass` | `SceneColorHDR` | `SceneColorLDR` | Initializes LDR target; internal temp when FXAA enabled |
 | `SelectionOutlinePass` | `EntityId`, presentation target | presentation target | Alpha-blends via `LOAD` |
 | `DebugViewPass` | selected sampled resource | `DebugViewRGBA`, optional presentation target | Writes preview image, optional viewport composite |
@@ -80,16 +81,21 @@ Position/topology changes may escalate to full re-upload; pure attribute changes
 
 1. `PickingPass`
 2. `SurfacePass`
-3. `LinePass`
-4. `PointPass`
-5. *(Composition insertion point — reserved for future deferred/hybrid lighting)*
+3. `CompositionPass`
+4. `LinePass`
+5. `PointPass`
 6. `PostProcessPass`
 7. `SelectionOutlinePass`
 8. `DebugViewPass`
 9. `ImGuiPass`
 10. `Present`
 
-Currently all geometry passes write directly to `SceneColorHDR` (forward path). When a deferred or hybrid lighting path is implemented, a composition stage will be added at position 5 to produce `SceneColorHDR` from G-buffer channels. No abstraction exists for this yet — it will be introduced when the second concrete implementation demands it.
+Lighting-path coexistence is now explicit:
+
+- **Forward mode:** `SurfacePass` writes directly to `SceneColorHDR`; `CompositionPass` is a no-op; `LinePass` and `PointPass` accumulate onto the same HDR target.
+- **Deferred mode:** `SurfacePass` writes only the G-buffer MRT set (`SceneNormal`, `Albedo`, `Material0`) plus depth; `CompositionPass` resolves those buffers into `SceneColorHDR`; `LinePass` and `PointPass` then execute as forward overlays on top of the lit HDR scene.
+
+This establishes the current composition rule: deferred-capable opaque surfaces live in `SurfacePass`, while line/point/debug content remains in the forward lane. The same ordering is the extension point for future transparent or special-material forward overlays.
 
 ## Validation / Audit Expectations
 

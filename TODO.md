@@ -39,13 +39,6 @@ This document tracks the **active rendering-architecture backlog** for Intrinsic
 
 These are not required to finish the first wave, but they should begin soon after P0 is stable.
 
-### B2. Hybrid Renderer Support
-
-- [ ] Support forward + deferred coexistence.
-- [ ] Define which primitives/materials are deferred-capable.
-- [ ] Keep transparent/special/debug rendering in the forward path.
-- [ ] Define composition rules between paths.
-
 ### B3. Engine Architecture Review Follow-Up (Boundary + Coupling + Migration)
 
 #### B3.1 Current Architecture Map (baseline and keep current)
