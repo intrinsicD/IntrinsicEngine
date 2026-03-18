@@ -270,4 +270,5 @@ This baseline also makes the current hot spots explicit:
 - Core ECS system registration is still handwritten in the main frame loop.
 - `Graphics -> Interface` is an active dependency today (for ImGui/render-system wiring), so future boundary cleanup should treat it as an existing coupling to reduce deliberately rather than as a dependency that is already absent.
 
+
 Those are intentional observations for the follow-up TODO items; they are not contradictions in this document.
