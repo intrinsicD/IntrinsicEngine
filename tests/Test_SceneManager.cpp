@@ -1,11 +1,15 @@
 #include <gtest/gtest.h>
 #include <type_traits>
+#include <memory>
 
 #include <entt/entity/registry.hpp>
+#include "RHI.Vulkan.hpp"
 
 import Runtime.SceneManager;
 import ECS;
 import Core;
+import RHI;
+import Graphics;
 
 // ---------------------------------------------------------------------------
 // Compile-time API contract tests
@@ -118,4 +122,90 @@ TEST_F(SceneManagerTest, DestructorDisconnectsHooks)
     mgr->GetScene().CreateEntity("X");
     mgr.reset(); // destructor calls DisconnectGpuHooks
     SUCCEED();
+}
+
+class SceneManagerGpuHooksHeadlessTest : public ::testing::Test
+{
+protected:
+    void SetUp() override
+    {
+        RHI::ContextConfig ctxConfig{
+            .AppName = "SceneManagerGpuHooksTest",
+            .EnableValidation = true,
+            .Headless = true,
+        };
+
+        m_Context = std::make_unique<RHI::VulkanContext>(ctxConfig);
+        m_Device = std::make_shared<RHI::VulkanDevice>(*m_Context, VK_NULL_HANDLE);
+        m_DummyCompute = std::make_unique<RHI::ComputePipeline>(m_Device, VK_NULL_HANDLE, VK_NULL_HANDLE);
+    }
+
+    void TearDown() override
+    {
+        m_DummyCompute.reset();
+        if (m_Device)
+            m_Device->FlushAllDeletionQueues();
+        m_Device.reset();
+        m_Context.reset();
+    }
+
+    [[nodiscard]] std::unique_ptr<Graphics::GPUScene> CreateGpuScene()
+    {
+        return std::make_unique<Graphics::GPUScene>(*m_Device, *m_DummyCompute, VK_NULL_HANDLE, 8u);
+    }
+
+    std::unique_ptr<RHI::VulkanContext> m_Context;
+    std::shared_ptr<RHI::VulkanDevice> m_Device;
+    std::unique_ptr<RHI::ComputePipeline> m_DummyCompute;
+};
+
+TEST_F(SceneManagerGpuHooksHeadlessTest, GpuDestroyHooksRemainInstanceScopedAcrossManagers)
+{
+    Runtime::SceneManager mgrA;
+    Runtime::SceneManager mgrB;
+    auto gpuSceneA = CreateGpuScene();
+    auto gpuSceneB = CreateGpuScene();
+
+    mgrA.ConnectGpuHooks(*gpuSceneA);
+    mgrB.ConnectGpuHooks(*gpuSceneB);
+
+    const uint32_t slotA = gpuSceneA->AllocateSlot();
+    const uint32_t slotB = gpuSceneB->AllocateSlot();
+    ASSERT_EQ(slotA, 0u);
+    ASSERT_EQ(slotB, 0u);
+
+    const entt::entity entityA = mgrA.GetScene().CreateEntity("A");
+    auto& surfaceA = mgrA.GetRegistry().emplace<ECS::Surface::Component>(entityA);
+    surfaceA.GpuSlot = slotA;
+
+    mgrA.GetRegistry().destroy(entityA);
+
+    EXPECT_EQ(gpuSceneA->AllocateSlot(), slotA)
+        << "Destroying an entity in manager A must reclaim manager A's GPUScene slot.";
+    EXPECT_EQ(gpuSceneB->AllocateSlot(), 1u)
+        << "Destroying an entity in manager A must not reclaim manager B's GPUScene slot.";
+}
+
+TEST_F(SceneManagerGpuHooksHeadlessTest, DisconnectingOneManagerDoesNotDisableAnotherManagersHooks)
+{
+    Runtime::SceneManager mgrA;
+    Runtime::SceneManager mgrB;
+    auto gpuSceneA = CreateGpuScene();
+    auto gpuSceneB = CreateGpuScene();
+
+    mgrA.ConnectGpuHooks(*gpuSceneA);
+    mgrB.ConnectGpuHooks(*gpuSceneB);
+    mgrA.DisconnectGpuHooks();
+
+    const uint32_t slotB = gpuSceneB->AllocateSlot();
+    ASSERT_EQ(slotB, 0u);
+
+    const entt::entity entityB = mgrB.GetScene().CreateEntity("B");
+    auto& surfaceB = mgrB.GetRegistry().emplace<ECS::Surface::Component>(entityB);
+    surfaceB.GpuSlot = slotB;
+
+    mgrB.GetRegistry().destroy(entityB);
+
+    EXPECT_EQ(gpuSceneB->AllocateSlot(), slotB)
+        << "Disconnecting manager A must not clear manager B's hook context.";
 }

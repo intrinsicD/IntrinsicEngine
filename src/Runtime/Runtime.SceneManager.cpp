@@ -16,44 +16,6 @@ import ECS;
 import RHI;
 #endif
 
-namespace
-{
-    // File-static pointer for the EnTT on_destroy hook.
-    // Safe because there is exactly one SceneManager instance per process.
-    Graphics::GPUScene* g_GpuSceneForDestroyHook = nullptr;
-#ifdef INTRINSIC_HAS_CUDA
-    RHI::CudaDevice* g_CudaDeviceForDestroyHook = nullptr;
-#endif
-
-    // Shared GPU slot cleanup for all component types that own a GPUScene slot.
-    // All such components initialize GpuSlot to ECS::kInvalidGpuSlot.
-    template <typename T>
-    void OnGpuComponentDestroyed(entt::registry& registry, entt::entity entity)
-    {
-        if (!g_GpuSceneForDestroyHook)
-            return;
-
-        auto& comp = registry.get<T>(entity);
-
-#ifdef INTRINSIC_HAS_CUDA
-        if constexpr (std::is_same_v<T, ECS::PointCloud::Data>)
-        {
-            if (g_CudaDeviceForDestroyHook)
-                comp.ReleaseCudaBuffers(*g_CudaDeviceForDestroyHook);
-        }
-#endif
-
-        if (comp.GpuSlot == ECS::kInvalidGpuSlot)
-            return;
-
-        // Deactivate slot (radius = 0 => culler skips it) and free.
-        Graphics::GpuInstanceData inst{};
-        g_GpuSceneForDestroyHook->QueueUpdate(comp.GpuSlot, inst, /*sphere*/ {0.0f, 0.0f, 0.0f, 0.0f});
-        g_GpuSceneForDestroyHook->FreeSlot(comp.GpuSlot);
-        comp.GpuSlot = ECS::kInvalidGpuSlot;
-    }
-}
-
 namespace Runtime
 {
     SceneManager::SceneManager()
@@ -67,35 +29,63 @@ namespace Runtime
         Core::Log::Info("SceneManager: Shutdown.");
     }
 
+    template <typename T>
+    void SceneManager::OnGpuComponentDestroyed(entt::registry& registry, entt::entity entity)
+    {
+        if (!m_GpuHookContext.GpuScene)
+            return;
+
+        auto& comp = registry.get<T>(entity);
+
+#ifdef INTRINSIC_HAS_CUDA
+        if constexpr (std::is_same_v<T, ECS::PointCloud::Data>)
+        {
+            if (m_GpuHookContext.CudaDevice)
+                comp.ReleaseCudaBuffers(*m_GpuHookContext.CudaDevice);
+        }
+#endif
+
+        if (comp.GpuSlot == ECS::kInvalidGpuSlot)
+            return;
+
+        // Deactivate slot (radius = 0 => culler skips it) and free.
+        Graphics::GpuInstanceData inst{};
+        m_GpuHookContext.GpuScene->QueueUpdate(comp.GpuSlot, inst, /*sphere*/ {0.0f, 0.0f, 0.0f, 0.0f});
+        m_GpuHookContext.GpuScene->FreeSlot(comp.GpuSlot);
+        comp.GpuSlot = ECS::kInvalidGpuSlot;
+    }
+
     void SceneManager::ConnectGpuHooks(Graphics::GPUScene& gpuScene
 #ifdef INTRINSIC_HAS_CUDA
                                        , RHI::CudaDevice* cudaDevice
 #endif
     )
     {
-        g_GpuSceneForDestroyHook = &gpuScene;
+        DisconnectGpuHooks();
+
+        m_GpuHookContext.GpuScene = &gpuScene;
 #ifdef INTRINSIC_HAS_CUDA
-        g_CudaDeviceForDestroyHook = cudaDevice;
+        m_GpuHookContext.CudaDevice = cudaDevice;
 #endif
         auto& reg = m_Scene.GetRegistry();
-        reg.on_destroy<ECS::Surface::Component>().connect<&OnGpuComponentDestroyed<ECS::Surface::Component>>();
-        reg.on_destroy<ECS::MeshEdgeView::Component>().connect<&OnGpuComponentDestroyed<ECS::MeshEdgeView::Component>>();
-        reg.on_destroy<ECS::MeshVertexView::Component>().connect<&OnGpuComponentDestroyed<ECS::MeshVertexView::Component>>();
-        reg.on_destroy<ECS::Graph::Data>().connect<&OnGpuComponentDestroyed<ECS::Graph::Data>>();
-        reg.on_destroy<ECS::PointCloud::Data>().connect<&OnGpuComponentDestroyed<ECS::PointCloud::Data>>();
+        reg.on_destroy<ECS::Surface::Component>().connect<&SceneManager::OnGpuComponentDestroyed<ECS::Surface::Component>>(*this);
+        reg.on_destroy<ECS::MeshEdgeView::Component>().connect<&SceneManager::OnGpuComponentDestroyed<ECS::MeshEdgeView::Component>>(*this);
+        reg.on_destroy<ECS::MeshVertexView::Component>().connect<&SceneManager::OnGpuComponentDestroyed<ECS::MeshVertexView::Component>>(*this);
+        reg.on_destroy<ECS::Graph::Data>().connect<&SceneManager::OnGpuComponentDestroyed<ECS::Graph::Data>>(*this);
+        reg.on_destroy<ECS::PointCloud::Data>().connect<&SceneManager::OnGpuComponentDestroyed<ECS::PointCloud::Data>>(*this);
     }
 
     void SceneManager::DisconnectGpuHooks()
     {
         auto& reg = m_Scene.GetRegistry();
-        reg.on_destroy<ECS::Surface::Component>().disconnect<&OnGpuComponentDestroyed<ECS::Surface::Component>>();
-        reg.on_destroy<ECS::MeshEdgeView::Component>().disconnect<&OnGpuComponentDestroyed<ECS::MeshEdgeView::Component>>();
-        reg.on_destroy<ECS::MeshVertexView::Component>().disconnect<&OnGpuComponentDestroyed<ECS::MeshVertexView::Component>>();
-        reg.on_destroy<ECS::Graph::Data>().disconnect<&OnGpuComponentDestroyed<ECS::Graph::Data>>();
-        reg.on_destroy<ECS::PointCloud::Data>().disconnect<&OnGpuComponentDestroyed<ECS::PointCloud::Data>>();
-        g_GpuSceneForDestroyHook = nullptr;
+        reg.on_destroy<ECS::Surface::Component>().disconnect<&SceneManager::OnGpuComponentDestroyed<ECS::Surface::Component>>(*this);
+        reg.on_destroy<ECS::MeshEdgeView::Component>().disconnect<&SceneManager::OnGpuComponentDestroyed<ECS::MeshEdgeView::Component>>(*this);
+        reg.on_destroy<ECS::MeshVertexView::Component>().disconnect<&SceneManager::OnGpuComponentDestroyed<ECS::MeshVertexView::Component>>(*this);
+        reg.on_destroy<ECS::Graph::Data>().disconnect<&SceneManager::OnGpuComponentDestroyed<ECS::Graph::Data>>(*this);
+        reg.on_destroy<ECS::PointCloud::Data>().disconnect<&SceneManager::OnGpuComponentDestroyed<ECS::PointCloud::Data>>(*this);
+        m_GpuHookContext.GpuScene = nullptr;
 #ifdef INTRINSIC_HAS_CUDA
-        g_CudaDeviceForDestroyHook = nullptr;
+        m_GpuHookContext.CudaDevice = nullptr;
 #endif
     }
 
