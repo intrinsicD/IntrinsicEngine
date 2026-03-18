@@ -6,6 +6,13 @@ Built on **C++23 Modules**, **Vulkan 1.3** bindless rendering, coroutine-based t
 
 ---
 
+## Canonical Architecture Docs
+
+- `docs/architecture/rendering-three-pass.md` — pass contracts, render-resource invariants, and render-graph expectations.
+- `docs/architecture/runtime-subsystem-boundaries.md` — runtime ownership map, module dependency directions, and startup/per-frame/shutdown lifecycle.
+
+---
+
 ## Architectural Pillars
 
 ### 1. Core Systems & Concurrency
