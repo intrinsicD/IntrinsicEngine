@@ -67,7 +67,9 @@ GeometryWorkflowController::SelectionContext GeometryWorkflowController::GetSele
 
     auto& reg = m_Engine->GetScene().GetRegistry();
     context.HasSelection = context.Selected != entt::null && reg.valid(context.Selected);
-    context.HasSurface = context.HasSelection && reg.all_of<ECS::Surface::Component>(context.Selected);
+    context.HasSurface = context.HasSelection
+        && GetGeometryProcessingCapabilities(reg, context.Selected).HasEditableSurfaceMesh;
+    context.HasGraph = context.HasSelection && reg.all_of<ECS::Graph::Data>(context.Selected);
     return context;
 }
 
@@ -91,7 +93,7 @@ bool GeometryWorkflowController::DrawOperatorPanelHeader(const SelectionContext&
 
     if (!context.HasSurface)
     {
-        ImGui::TextDisabled("Selected entity does not have a Surface component.");
+        ImGui::TextDisabled("Selected entity does not expose an editable collider-backed surface mesh.");
         return false;
     }
 
@@ -139,9 +141,23 @@ void GeometryWorkflowController::OpenRepairPanel()
     Interface::GUI::OpenPanel("Geometry - Repair");
 }
 
+void GeometryWorkflowController::OpenMeshSpectralPanel()
+{
+    Interface::GUI::RegisterPanel("Geometry - Mesh Spectral", [this]() { DrawMeshSpectralPanel(); });
+    Interface::GUI::OpenPanel("Geometry - Mesh Spectral");
+}
+
+void GeometryWorkflowController::OpenGraphSpectralPanel()
+{
+    Interface::GUI::RegisterPanel("Geometry - Graph Spectral", [this]() { DrawGraphSpectralPanel(); });
+    Interface::GUI::OpenPanel("Geometry - Graph Spectral");
+}
+
 void GeometryWorkflowController::OpenWorkflowStack()
 {
     OpenWorkflowPanel();
+    OpenMeshSpectralPanel();
+    OpenGraphSpectralPanel();
     OpenRemeshingPanel();
     OpenSimplificationPanel();
     OpenSmoothingPanel();
@@ -162,6 +178,15 @@ void GeometryWorkflowController::DrawMenu()
             OpenWorkflowPanel();
         if (ImGui::MenuItem("Open Workflow Stack"))
             OpenWorkflowStack();
+        ImGui::EndMenu();
+    }
+
+    if (ImGui::BeginMenu("Spectral"))
+    {
+        if (ImGui::MenuItem("Mesh Spectral"))
+            OpenMeshSpectralPanel();
+        if (ImGui::MenuItem("Graph Spectral"))
+            OpenGraphSpectralPanel();
         ImGui::EndMenu();
     }
 
@@ -227,8 +252,8 @@ void GeometryWorkflowController::DrawWorkflowPanel()
         ImGui::Text("Selected Entity: %u",
                     static_cast<uint32_t>(static_cast<entt::id_type>(context.Selected)));
         ImGui::TextDisabled(context.HasSurface
-                                ? "Surface mesh detected. Geometry operators are available."
-                                : "Selected entity does not have a Surface component.");
+                                ? "Editable halfedge surface mesh detected. Geometry operators are available."
+                                : "Selected entity does not expose an editable collider-backed surface mesh.");
     }
     else
     {
@@ -238,6 +263,11 @@ void GeometryWorkflowController::DrawWorkflowPanel()
     ImGui::SeparatorText("Open Panels");
     if (ImGui::Button("Open Workflow Stack"))
         OpenWorkflowStack();
+    if (ImGui::Button("Open Mesh Spectral"))
+        OpenMeshSpectralPanel();
+    ImGui::SameLine();
+    if (ImGui::Button("Open Graph Spectral"))
+        OpenGraphSpectralPanel();
     if (ImGui::Button("Open Remeshing"))
         OpenRemeshingPanel();
     ImGui::SameLine();
@@ -253,6 +283,7 @@ void GeometryWorkflowController::DrawWorkflowPanel()
         OpenRepairPanel();
 
     ImGui::SeparatorText("Approach Map");
+    ImGui::BulletText("Spectral: Mesh modes publish scalar vertex fields; graph spectral layout can publish properties or rewrite node positions.");
     ImGui::BulletText("Remeshing: Isotropic and Adaptive remeshing share the same workflow surface.");
     ImGui::BulletText(
         "Smoothing: Uniform, Cotan, Taubin, and Implicit smoothing stay grouped together for side-by-side comparison.");
@@ -309,6 +340,42 @@ void GeometryWorkflowController::DrawRepairPanel()
     {
         static_cast<void>(DrawRepairWidget(*m_Engine, context.Selected));
     }
+}
+
+void GeometryWorkflowController::DrawMeshSpectralPanel()
+{
+    const auto context = GetSelectionContext();
+    if (DrawOperatorPanelHeader(context,
+                                "Compute low-frequency scalar modes of the cotangent Laplacian on the selected surface mesh. The published properties can be visualized immediately through the mesh vertex color source selector."))
+    {
+        static_cast<void>(DrawMeshSpectralWidget(*m_Engine, context.Selected, m_MeshSpectralUi));
+    }
+}
+
+void GeometryWorkflowController::DrawGraphSpectralPanel()
+{
+    const auto context = GetSelectionContext();
+
+    ImGui::TextWrapped(
+        "Compute a 2D spectral embedding of the selected graph using the first non-constant Laplacian modes. Results can be published as per-vertex scalar properties or applied directly to graph node positions.");
+    ImGui::Spacing();
+
+    if (!context.HasSelection)
+    {
+        ImGui::TextDisabled("Select a graph entity to run spectral layout.");
+        return;
+    }
+
+    ImGui::Text("Selected Entity: %u",
+                static_cast<uint32_t>(static_cast<entt::id_type>(context.Selected)));
+    if (!context.HasGraph)
+    {
+        ImGui::TextDisabled("Selected entity does not have a Graph component.");
+        return;
+    }
+
+    ImGui::Separator();
+    static_cast<void>(DrawGraphSpectralWidget(*m_Engine, context.Selected, m_GraphSpectralUi));
 }
 
 } // namespace Runtime::EditorUI

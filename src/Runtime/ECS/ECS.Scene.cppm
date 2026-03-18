@@ -26,6 +26,18 @@ export namespace ECS
 
         [[nodiscard]] size_t Size() const;
 
+        template <typename T>
+        T& Require(entt::entity entity, T&& obj)
+        {
+            return m_Registry.get_or_emplace<T>(entity, std::forward<T>(obj));
+        }
+
+        template <typename T>
+        T& Require(entt::entity entity)
+        {
+            return m_Registry.get_or_emplace<T>(entity);
+        }
+
     private:
         entt::registry m_Registry;
         entt::dispatcher m_Dispatcher;

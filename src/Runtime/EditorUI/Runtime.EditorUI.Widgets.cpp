@@ -33,6 +33,17 @@ namespace Runtime::EditorUI
 
 namespace
 {
+    constexpr GeometryProcessingDomain kMeshTopologyDomains =
+        GeometryProcessingDomain::MeshVertices |
+        GeometryProcessingDomain::MeshEdges |
+        GeometryProcessingDomain::MeshHalfedges |
+        GeometryProcessingDomain::MeshFaces;
+
+    constexpr GeometryProcessingDomain kGraphTopologyDomains =
+        GeometryProcessingDomain::GraphVertices |
+        GeometryProcessingDomain::GraphEdges |
+        GeometryProcessingDomain::GraphHalfedges;
+
     [[nodiscard]] constexpr GeometryProcessingDomain ToUiDomain(Runtime::PointCloudKMeans::Domain domain) noexcept
     {
         switch (domain)
@@ -248,7 +259,7 @@ namespace
         Geometry::MeshUtils::CalculateNormals(collider->CollisionRef->Positions, collider->CollisionRef->Indices,
                                               newNormals);
 
-        auto aabbs = Geometry::Convert(collider->CollisionRef->Positions);
+        auto aabbs = Geometry::Fit(collider->CollisionRef->Positions);
         collider->CollisionRef->LocalAABB = Geometry::Union(aabbs);
 
         std::vector<Geometry::AABB> primitiveBounds;
@@ -308,7 +319,425 @@ namespace
     [[nodiscard]] bool HasSurfaceInput(Runtime::Engine& engine, entt::entity entity) noexcept
     {
         const auto& reg = engine.GetScene().GetRegistry();
-        return HasAnyDomain(GetGeometryProcessingCapabilities(reg, entity).Domains, GeometryProcessingDomain::SurfaceMesh);
+        return GetGeometryProcessingCapabilities(reg, entity).HasEditableSurfaceMesh;
+    }
+
+    [[nodiscard]] const char* PropertyTypeLabel(const Geometry::PropertySet& ps,
+                                                const std::string& name)
+    {
+        if (ps.Get<bool>(name)) return "bool";
+        if (ps.Get<int>(name)) return "int";
+        if (ps.Get<uint32_t>(name)) return "uint32";
+        if (ps.Get<float>(name)) return "float";
+        if (ps.Get<double>(name)) return "double";
+        if (ps.Get<glm::vec2>(name)) return "vec2";
+        if (ps.Get<glm::vec3>(name)) return "vec3";
+        if (ps.Get<glm::vec4>(name)) return "vec4";
+        return "unsupported";
+    }
+
+    [[nodiscard]] std::string FormatValue(bool value)
+    {
+        return value ? "true" : "false";
+    }
+
+    [[nodiscard]] std::string FormatValue(int value)
+    {
+        return std::to_string(value);
+    }
+
+    [[nodiscard]] std::string FormatValue(uint32_t value)
+    {
+        return std::to_string(value);
+    }
+
+    [[nodiscard]] std::string FormatValue(float value)
+    {
+        char buffer[64];
+        std::snprintf(buffer, sizeof(buffer), "%.6g", static_cast<double>(value));
+        return std::string(buffer);
+    }
+
+    [[nodiscard]] std::string FormatValue(double value)
+    {
+        char buffer[64];
+        std::snprintf(buffer, sizeof(buffer), "%.6g", value);
+        return std::string(buffer);
+    }
+
+    [[nodiscard]] std::string FormatValue(const glm::vec2& value)
+    {
+        char buffer[96];
+        std::snprintf(buffer, sizeof(buffer), "(%.6g, %.6g)",
+                      static_cast<double>(value.x),
+                      static_cast<double>(value.y));
+        return std::string(buffer);
+    }
+
+    [[nodiscard]] std::string FormatValue(const glm::vec3& value)
+    {
+        char buffer[128];
+        std::snprintf(buffer, sizeof(buffer), "(%.6g, %.6g, %.6g)",
+                      static_cast<double>(value.x),
+                      static_cast<double>(value.y),
+                      static_cast<double>(value.z));
+        return std::string(buffer);
+    }
+
+    [[nodiscard]] std::string FormatValue(const glm::vec4& value)
+    {
+        char buffer[160];
+        std::snprintf(buffer, sizeof(buffer), "(%.6g, %.6g, %.6g, %.6g)",
+                      static_cast<double>(value.x),
+                      static_cast<double>(value.y),
+                      static_cast<double>(value.z),
+                      static_cast<double>(value.w));
+        return std::string(buffer);
+    }
+
+    template <class T>
+    bool DrawTypedPropertyPreview(const Geometry::PropertySet& ps,
+                                  const std::string& name,
+                                  const PropertySetBrowserState& state)
+    {
+        const auto property = ps.Get<T>(name);
+        if (!property)
+            return false;
+
+        const int totalRows = static_cast<int>(property.Vector().size());
+        const int previewRows = state.ShowAllRows
+            ? totalRows
+            : std::min(totalRows, std::max(state.PreviewRows, 1));
+
+        const ImGuiTableFlags flags = ImGuiTableFlags_Borders
+                                    | ImGuiTableFlags_RowBg
+                                    | ImGuiTableFlags_SizingStretchProp
+                                    | ImGuiTableFlags_ScrollY;
+        if (ImGui::BeginTable("##property_preview", state.ShowIndices ? 2 : 1, flags, ImVec2(0.0f, 180.0f)))
+        {
+            if (state.ShowIndices)
+                ImGui::TableSetupColumn("Index", ImGuiTableColumnFlags_WidthFixed, 64.0f);
+            ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
+            ImGui::TableHeadersRow();
+
+            for (int row = 0; row < previewRows; ++row)
+            {
+                ImGui::TableNextRow();
+                if (state.ShowIndices)
+                {
+                    ImGui::TableSetColumnIndex(0);
+                    ImGui::Text("%d", row);
+                    ImGui::TableSetColumnIndex(1);
+                }
+                else
+                {
+                    ImGui::TableSetColumnIndex(0);
+                }
+
+                const std::string formatted = FormatValue(property[static_cast<std::size_t>(row)]);
+                ImGui::TextUnformatted(formatted.c_str());
+            }
+
+            ImGui::EndTable();
+        }
+
+        if (!state.ShowAllRows && previewRows < totalRows)
+            ImGui::TextDisabled("Showing %d / %d rows.", previewRows, totalRows);
+
+        return true;
+    }
+
+    [[nodiscard]] double WeightedDot(std::span<const double> a,
+                                     std::span<const double> b,
+                                     const Geometry::DEC::DiagonalMatrix& mass,
+                                     std::span<const uint32_t> active)
+    {
+        double result = 0.0;
+        for (const uint32_t idx : active)
+            result += mass.Diagonal[idx] * a[idx] * b[idx];
+        return result;
+    }
+
+    [[nodiscard]] double WeightedNorm(std::span<const double> x,
+                                      const Geometry::DEC::DiagonalMatrix& mass,
+                                      std::span<const uint32_t> active)
+    {
+        return std::sqrt(std::max(0.0, WeightedDot(x, x, mass, active)));
+    }
+
+    void RemoveWeightedMean(std::vector<double>& x,
+                            const Geometry::DEC::DiagonalMatrix& mass,
+                            std::span<const uint32_t> active)
+    {
+        double weightSum = 0.0;
+        double weightedSum = 0.0;
+        for (const uint32_t idx : active)
+        {
+            const double w = mass.Diagonal[idx];
+            weightSum += w;
+            weightedSum += w * x[idx];
+        }
+        if (weightSum <= 1.0e-20)
+            return;
+
+        const double mean = weightedSum / weightSum;
+        for (const uint32_t idx : active)
+            x[idx] -= mean;
+    }
+
+    void OrthogonalizeWeighted(std::vector<double>& x,
+                               std::span<const double> basis,
+                               const Geometry::DEC::DiagonalMatrix& mass,
+                               std::span<const uint32_t> active)
+    {
+        const double denom = WeightedDot(basis, basis, mass, active);
+        if (std::abs(denom) <= 1.0e-20)
+            return;
+
+        const double coeff = WeightedDot(x, basis, mass, active) / denom;
+        for (const uint32_t idx : active)
+            x[idx] -= coeff * basis[idx];
+    }
+
+    [[nodiscard]] double NormalizeWeighted(std::vector<double>& x,
+                                           const Geometry::DEC::DiagonalMatrix& mass,
+                                           std::span<const uint32_t> active)
+    {
+        const double norm = WeightedNorm(x, mass, active);
+        if (norm <= 1.0e-20)
+            return 0.0;
+
+        const double invNorm = 1.0 / norm;
+        for (const uint32_t idx : active)
+            x[idx] *= invNorm;
+        return norm;
+    }
+
+    [[nodiscard]] double MaxActiveDifference(std::span<const double> a,
+                                             std::span<const double> b,
+                                             std::span<const uint32_t> active)
+    {
+        double maxDiff = 0.0;
+        for (const uint32_t idx : active)
+            maxDiff = std::max(maxDiff, std::abs(a[idx] - b[idx]));
+        return maxDiff;
+    }
+
+    [[nodiscard]] double MaxActiveAbs(std::span<const double> x,
+                                      std::span<const uint32_t> active)
+    {
+        double maxAbs = 0.0;
+        for (const uint32_t idx : active)
+            maxAbs = std::max(maxAbs, std::abs(x[idx]));
+        return maxAbs;
+    }
+
+    struct MeshSpectralComputationResult
+    {
+        std::size_t ActiveVertices = 0;
+        std::uint32_t IterationsPerformed = 0;
+        bool Converged = false;
+        std::array<double, 2> Eigenvalues{0.0, 0.0};
+        std::array<double, 2> Residuals{0.0, 0.0};
+        std::array<std::vector<double>, 2> Modes{};
+    };
+
+    [[nodiscard]] std::optional<MeshSpectralComputationResult> ComputeMeshSpectralModes(
+        const Geometry::Halfedge::Mesh& mesh,
+        int requestedModeCount,
+        int maxIterations,
+        float shift,
+        float solverTolerance)
+    {
+        const std::size_t n = mesh.VerticesSize();
+        if (n == 0)
+            return std::nullopt;
+
+        std::vector<uint32_t> active;
+        active.reserve(mesh.VertexCount());
+        for (std::size_t i = 0; i < n; ++i)
+        {
+            const Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(i)};
+            if (!mesh.IsValid(v) || mesh.IsDeleted(v))
+                continue;
+            active.push_back(static_cast<uint32_t>(i));
+        }
+        if (active.size() < 2)
+            return std::nullopt;
+
+        const int modeCount = std::clamp(requestedModeCount, 1, 2);
+        const auto ops = Geometry::DEC::BuildOperators(mesh);
+        if (ops.Hodge0.Size != n || ops.Laplacian.Rows != n || ops.Laplacian.Cols != n)
+            return std::nullopt;
+
+        std::array<std::vector<double>, 2> basis{
+            std::vector<double>(n, 0.0),
+            std::vector<double>(n, 0.0)
+        };
+        std::array<std::vector<double>, 2> nextBasis{
+            std::vector<double>(n, 0.0),
+            std::vector<double>(n, 0.0)
+        };
+        std::array<std::vector<double>, 2> rhs{
+            std::vector<double>(n, 0.0),
+            std::vector<double>(n, 0.0)
+        };
+
+        for (std::size_t rank = 0; rank < active.size(); ++rank)
+        {
+            const auto t = static_cast<double>(rank + 1u);
+            const uint32_t idx = active[rank];
+            basis[0][idx] = std::sin(0.73 * t) + 0.17 * std::cos(1.11 * t);
+            basis[1][idx] = std::cos(0.61 * t) - 0.21 * std::sin(1.37 * t);
+        }
+
+        RemoveWeightedMean(basis[0], ops.Hodge0, active);
+        if (NormalizeWeighted(basis[0], ops.Hodge0, active) == 0.0)
+            return std::nullopt;
+
+        if (modeCount > 1)
+        {
+            RemoveWeightedMean(basis[1], ops.Hodge0, active);
+            OrthogonalizeWeighted(basis[1], basis[0], ops.Hodge0, active);
+            if (NormalizeWeighted(basis[1], ops.Hodge0, active) == 0.0)
+                return std::nullopt;
+        }
+
+        Geometry::DEC::CGParams cgParams;
+        cgParams.MaxIterations = static_cast<std::size_t>(std::max(maxIterations * 8, 32));
+        cgParams.Tolerance = std::max(static_cast<double>(solverTolerance), 1.0e-10);
+
+        MeshSpectralComputationResult result;
+        result.ActiveVertices = active.size();
+        result.Converged = false;
+
+        const double shiftValue = std::max(static_cast<double>(shift), 1.0e-6);
+        const double uiTolerance = std::max(static_cast<double>(solverTolerance), 1.0e-8);
+
+        for (int iteration = 0; iteration < std::max(maxIterations, 1); ++iteration)
+        {
+            double maxDelta = 0.0;
+            bool cgConverged = true;
+
+            for (int col = 0; col < modeCount; ++col)
+            {
+                ops.Hodge0.Multiply(basis[col], rhs[col]);
+                std::fill(nextBasis[col].begin(), nextBasis[col].end(), 0.0);
+
+                const auto cg = Geometry::DEC::SolveCGShifted(
+                    ops.Hodge0, 1.0,
+                    ops.Laplacian, shiftValue,
+                    rhs[col], nextBasis[col], cgParams);
+                result.IterationsPerformed = std::max(result.IterationsPerformed,
+                                                      static_cast<std::uint32_t>(cg.Iterations));
+                cgConverged = cgConverged && cg.Converged;
+
+                RemoveWeightedMean(nextBasis[col], ops.Hodge0, active);
+                for (int prev = 0; prev < col; ++prev)
+                    OrthogonalizeWeighted(nextBasis[col], nextBasis[prev], ops.Hodge0, active);
+
+                if (NormalizeWeighted(nextBasis[col], ops.Hodge0, active) == 0.0)
+                    return std::nullopt;
+
+                maxDelta = std::max(maxDelta, MaxActiveDifference(nextBasis[col], basis[col], active));
+            }
+
+            basis = nextBasis;
+            result.Converged = maxDelta <= uiTolerance;
+            if (result.Converged && cgConverged)
+                break;
+        }
+
+        for (int col = 0; col < modeCount; ++col)
+        {
+            std::vector<double> laplace(n, 0.0);
+            std::vector<double> massTimes(n, 0.0);
+            std::vector<double> residual(n, 0.0);
+            ops.Laplacian.Multiply(basis[col], laplace);
+            ops.Hodge0.Multiply(basis[col], massTimes);
+
+            const double denom = WeightedDot(basis[col], basis[col], ops.Hodge0, active);
+            const double lambda = denom > 1.0e-20
+                ? WeightedDot(basis[col], laplace, ops.Hodge0, active) / denom
+                : 0.0;
+            result.Eigenvalues[col] = lambda;
+
+            double residualNorm = 0.0;
+            double rhsNorm = 0.0;
+            for (const uint32_t idx : active)
+            {
+                residual[idx] = laplace[idx] - lambda * massTimes[idx];
+                residualNorm += residual[idx] * residual[idx];
+                rhsNorm += massTimes[idx] * massTimes[idx];
+            }
+            result.Residuals[col] = std::sqrt(residualNorm / std::max(rhsNorm, 1.0e-20));
+            result.Modes[col] = basis[col];
+        }
+
+        return result;
+    }
+
+    void PublishMeshModeProperty(Geometry::Halfedge::Mesh& mesh,
+                                 std::string_view propertyName,
+                                 std::span<const double> mode,
+                                 bool normalize)
+    {
+        auto property = mesh.VertexProperties().GetOrAdd<float>(std::string(propertyName), 0.0f);
+        std::fill(property.Vector().begin(), property.Vector().end(), 0.0f);
+
+        std::vector<uint32_t> active;
+        active.reserve(mesh.VertexCount());
+        for (std::size_t i = 0; i < mesh.VerticesSize(); ++i)
+        {
+            const Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(i)};
+            if (!mesh.IsValid(v) || mesh.IsDeleted(v))
+                continue;
+            active.push_back(static_cast<uint32_t>(i));
+        }
+
+        const double maxAbs = normalize ? MaxActiveAbs(mode, active) : 1.0;
+        const double scale = maxAbs > 1.0e-20 ? 1.0 / maxAbs : 1.0;
+        for (const uint32_t idx : active)
+            property[idx] = static_cast<float>(mode[idx] * scale);
+    }
+
+    [[nodiscard]] std::vector<glm::vec2> ExtractGraphEmbeddingXY(const Geometry::Graph::Graph& graph)
+    {
+        std::vector<glm::vec2> positions(graph.VerticesSize(), glm::vec2(0.0f));
+        for (std::size_t i = 0; i < graph.VerticesSize(); ++i)
+        {
+            const Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(i)};
+            if (!v.IsValid() || graph.IsDeleted(v))
+                continue;
+            const glm::vec3 p = graph.VertexPosition(v);
+            positions[i] = glm::vec2(p.x, p.y);
+        }
+        return positions;
+    }
+
+    void PublishGraphSpectralProperties(Geometry::Graph::Graph& graph,
+                                        std::span<const glm::vec2> positions,
+                                        std::string_view uProperty,
+                                        std::string_view vProperty,
+                                        std::string_view radiusProperty)
+    {
+        auto u = graph.GetOrAddVertexProperty<float>(std::string(uProperty), 0.0f);
+        auto v = graph.GetOrAddVertexProperty<float>(std::string(vProperty), 0.0f);
+        auto radius = graph.GetOrAddVertexProperty<float>(std::string(radiusProperty), 0.0f);
+
+        std::fill(u.Vector().begin(), u.Vector().end(), 0.0f);
+        std::fill(v.Vector().begin(), v.Vector().end(), 0.0f);
+        std::fill(radius.Vector().begin(), radius.Vector().end(), 0.0f);
+
+        for (std::size_t i = 0; i < graph.VerticesSize(); ++i)
+        {
+            const Geometry::VertexHandle vh{static_cast<Geometry::PropertyIndex>(i)};
+            if (!graph.IsValid(vh) || graph.IsDeleted(vh))
+                continue;
+            u[vh] = positions[i].x;
+            v[vh] = positions[i].y;
+            radius[vh] = glm::length(positions[i]);
+        }
     }
 }
 
@@ -546,6 +975,72 @@ bool ColorEdit4(const char* label, glm::vec4& color)
     return false;
 }
 
+bool DrawPropertySetBrowserWidget(const char* label,
+                                  const Geometry::PropertySet* ps,
+                                  PropertySetBrowserState& state,
+                                  const char* suffix)
+{
+    if (label && label[0] != '\0')
+        ImGui::SeparatorText(label);
+
+    if (!ps)
+    {
+        ImGui::TextDisabled("No property set available.");
+        return false;
+    }
+
+    const auto names = ps->Properties();
+    if (names.empty())
+    {
+        ImGui::TextDisabled("No properties.");
+        return false;
+    }
+
+    state.SelectedProperty = std::clamp(state.SelectedProperty, 0, static_cast<int>(names.size()) - 1);
+    const char* preview = names[static_cast<std::size_t>(state.SelectedProperty)].c_str();
+
+    char comboLabel[128];
+    std::snprintf(comboLabel, sizeof(comboLabel), "Property##%s", suffix ? suffix : "PropertySetBrowser");
+    bool changed = false;
+    if (ImGui::BeginCombo(comboLabel, preview))
+    {
+        for (int i = 0; i < static_cast<int>(names.size()); ++i)
+        {
+            const bool selected = (state.SelectedProperty == i);
+            if (ImGui::Selectable(names[static_cast<std::size_t>(i)].c_str(), selected))
+            {
+                state.SelectedProperty = i;
+                changed = true;
+            }
+            if (selected)
+                ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
+
+    ImGui::DragInt("Preview Rows", &state.PreviewRows, 1.0f, 1, 4096);
+    ImGui::Checkbox("Show Indices", &state.ShowIndices);
+    ImGui::SameLine();
+    ImGui::Checkbox("Show All Rows", &state.ShowAllRows);
+
+    const std::string& propertyName = names[static_cast<std::size_t>(state.SelectedProperty)];
+    ImGui::Text("Property Count: %zu", names.size());
+    ImGui::Text("Value Count: %zu", ps->Size());
+    ImGui::TextDisabled("Type: %s", PropertyTypeLabel(*ps, propertyName));
+
+    if (DrawTypedPropertyPreview<bool>(*ps, propertyName, state)) return changed;
+    if (DrawTypedPropertyPreview<int>(*ps, propertyName, state)) return changed;
+    if (DrawTypedPropertyPreview<uint32_t>(*ps, propertyName, state)) return changed;
+    if (DrawTypedPropertyPreview<float>(*ps, propertyName, state)) return changed;
+    if (DrawTypedPropertyPreview<double>(*ps, propertyName, state)) return changed;
+    if (DrawTypedPropertyPreview<glm::vec2>(*ps, propertyName, state)) return changed;
+    if (DrawTypedPropertyPreview<glm::vec3>(*ps, propertyName, state)) return changed;
+    if (DrawTypedPropertyPreview<glm::vec4>(*ps, propertyName, state)) return changed;
+
+    ImGui::TextDisabled("Unsupported preview type for '%s'.", propertyName.c_str());
+    return changed;
+}
+
 void DrawDomainBadges(GeometryProcessingDomain domains)
 {
     bool first = true;
@@ -559,9 +1054,13 @@ void DrawDomainBadges(GeometryProcessingDomain domains)
         first = false;
     };
 
-    draw(GeometryProcessingDomain::SurfaceMesh);
     draw(GeometryProcessingDomain::MeshVertices);
+    draw(GeometryProcessingDomain::MeshEdges);
+    draw(GeometryProcessingDomain::MeshHalfedges);
+    draw(GeometryProcessingDomain::MeshFaces);
     draw(GeometryProcessingDomain::GraphVertices);
+    draw(GeometryProcessingDomain::GraphEdges);
+    draw(GeometryProcessingDomain::GraphHalfedges);
     draw(GeometryProcessingDomain::PointCloudPoints);
 }
 
@@ -673,11 +1172,227 @@ bool DrawKMeansWidget(Runtime::Engine& engine,
     return dispatched;
 }
 
+bool DrawMeshSpectralWidget(Runtime::Engine& engine,
+                           entt::entity entity,
+                           MeshSpectralWidgetState& state)
+{
+    auto& reg = engine.GetScene().GetRegistry();
+    auto* meshData = reg.try_get<ECS::Mesh::Data>(entity);
+    auto* collider = reg.try_get<ECS::MeshCollider::Component>(entity);
+
+    std::shared_ptr<Geometry::Halfedge::Mesh> meshRef;
+    if (meshData && meshData->MeshRef)
+        meshRef = meshData->MeshRef;
+    else if (collider && collider->CollisionRef && collider->CollisionRef->SourceMesh)
+        meshRef = collider->CollisionRef->SourceMesh;
+
+    DrawDomainBadges(meshRef ? kMeshTopologyDomains : GeometryProcessingDomain::None);
+    if (!meshRef)
+    {
+        ImGui::TextDisabled("Mesh spectral analysis requires an authoritative halfedge surface mesh.");
+        return false;
+    }
+
+    ImGui::Text("Vertices: %zu", meshRef->VertexCount());
+    ImGui::Text("Edges: %zu", meshRef->EdgeCount());
+    ImGui::Text("Faces: %zu", meshRef->FaceCount());
+
+    ImGui::DragInt("Modes", &state.ModeCount, 1.0f, 1, 2);
+    ImGui::DragInt("Inverse Iterations", &state.MaxIterations, 1.0f, 1, 256);
+    ImGui::DragFloat("Shift t", &state.Shift, 0.01f, 1.0e-4f, 100.0f, "%.5f", ImGuiSliderFlags_Logarithmic);
+    ImGui::DragFloat("Solver Tolerance", &state.SolverTolerance, 1.0e-7f, 1.0e-8f, 1.0e-2f, "%.1e",
+                     ImGuiSliderFlags_Logarithmic);
+    ImGui::Checkbox("Normalize Published Modes", &state.NormalizePublishedModes);
+
+    ImGui::InputText("Mode 0 Property", state.Mode0Property, IM_ARRAYSIZE(state.Mode0Property));
+    if (std::clamp(state.ModeCount, 1, 2) > 1)
+        ImGui::InputText("Mode 1 Property", state.Mode1Property, IM_ARRAYSIZE(state.Mode1Property));
+
+    ImGui::TextDisabled("Solves the generalized eigenproblem Lx = λMx via projected inverse iteration on (M + tL)^{-1}M.");
+
+    bool changed = false;
+    if (ImGui::Button("Compute Mesh Spectral Modes"))
+    {
+        const auto computed = ComputeMeshSpectralModes(*meshRef,
+                                                       state.ModeCount,
+                                                       state.MaxIterations,
+                                                       state.Shift,
+                                                       state.SolverTolerance);
+        if (computed)
+        {
+            state.LastActiveVertices = computed->ActiveVertices;
+            state.LastIterations = computed->IterationsPerformed;
+            state.LastConverged = computed->Converged;
+            state.LastEigenvalue0 = computed->Eigenvalues[0];
+            state.LastEigenvalue1 = computed->Eigenvalues[1];
+            state.LastResidual0 = computed->Residuals[0];
+            state.LastResidual1 = computed->Residuals[1];
+
+            PublishMeshModeProperty(*meshRef, state.Mode0Property, computed->Modes[0], state.NormalizePublishedModes);
+            if (std::clamp(state.ModeCount, 1, 2) > 1)
+                PublishMeshModeProperty(*meshRef, state.Mode1Property, computed->Modes[1], state.NormalizePublishedModes);
+
+            auto& writableMeshData = reg.get_or_emplace<ECS::Mesh::Data>(entity);
+            writableMeshData.MeshRef = meshRef;
+            writableMeshData.AttributesDirty = true;
+            reg.emplace_or_replace<ECS::DirtyTag::VertexAttributes>(entity);
+            engine.GetScene().GetDispatcher().enqueue<ECS::Events::GeometryModified>({entity});
+            changed = true;
+        }
+        else
+        {
+            ImGui::TextColored(ImVec4(0.9f, 0.3f, 0.3f, 1.0f),
+                               "Failed: mesh is degenerate or the shifted solve did not produce a valid mode basis.");
+        }
+    }
+
+    if (state.LastActiveVertices > 0)
+    {
+        ImGui::SeparatorText("Diagnostics");
+        ImGui::Text("Active Vertices: %zu", state.LastActiveVertices);
+        ImGui::Text("Iterations: %u", state.LastIterations);
+        ImGui::Text("Converged: %s", state.LastConverged ? "Yes" : "No");
+        ImGui::Text("λ0: %.6g   residual: %.6g",
+                    state.LastEigenvalue0,
+                    state.LastResidual0);
+        if (std::clamp(state.ModeCount, 1, 2) > 1)
+        {
+            ImGui::Text("λ1: %.6g   residual: %.6g",
+                        state.LastEigenvalue1,
+                        state.LastResidual1);
+        }
+        ImGui::TextDisabled("Visualize the published scalar fields via the mesh Vertex Color Source selector.");
+    }
+
+    return changed;
+}
+
+bool DrawGraphSpectralWidget(Runtime::Engine& engine,
+                            entt::entity entity,
+                            GraphSpectralWidgetState& state)
+{
+    auto& reg = engine.GetScene().GetRegistry();
+    auto* graphData = reg.try_get<ECS::Graph::Data>(entity);
+    if (!graphData || !graphData->GraphRef)
+    {
+        DrawDomainBadges(GeometryProcessingDomain::None);
+        ImGui::TextDisabled("Graph spectral layout requires an authoritative graph entity.");
+        return false;
+    }
+
+    auto& graph = *graphData->GraphRef;
+    DrawDomainBadges(kGraphTopologyDomains);
+    ImGui::Text("Nodes: %zu", graph.VertexCount());
+    ImGui::Text("Edges: %zu", graph.EdgeCount());
+
+    static constexpr const char* kVariants[] = {"Combinatorial", "Normalized Symmetric"};
+    state.Variant = std::clamp(state.Variant, 0, 1);
+    ImGui::Combo("Laplacian Variant", &state.Variant, kVariants, IM_ARRAYSIZE(kVariants));
+    ImGui::DragInt("Iterations##GraphSpectral", &state.MaxIterations, 1.0f, 1, 4096);
+    ImGui::DragFloat("Step Scale##GraphSpectral", &state.StepScale, 0.01f, 0.01f, 4.0f, "%.3f");
+    ImGui::DragFloat("Convergence Tol##GraphSpectral", &state.ConvergenceTolerance, 1.0e-6f,
+                     1.0e-7f, 1.0e-2f, "%.1e", ImGuiSliderFlags_Logarithmic);
+    ImGui::DragFloat("Min Norm Epsilon##GraphSpectral", &state.MinNormEpsilon, 1.0e-8f,
+                     1.0e-9f, 1.0e-2f, "%.1e", ImGuiSliderFlags_Logarithmic);
+    ImGui::DragFloat("Area Extent##GraphSpectral", &state.AreaExtent, 0.05f, 0.1f, 128.0f, "%.2f",
+                     ImGuiSliderFlags_Logarithmic);
+
+    ImGui::SeparatorText("Published Properties");
+    ImGui::InputText("U Property", state.UProperty, IM_ARRAYSIZE(state.UProperty));
+    ImGui::InputText("V Property", state.VProperty, IM_ARRAYSIZE(state.VProperty));
+    ImGui::InputText("Radius Property", state.RadiusProperty, IM_ARRAYSIZE(state.RadiusProperty));
+
+    ImGui::SeparatorText("Apply Layout");
+    ImGui::Checkbox("Preserve Existing Z", &state.PreserveExistingZ);
+    if (!state.PreserveExistingZ)
+        ImGui::DragFloat("Output Z", &state.OutputZ, 0.01f, -100.0f, 100.0f, "%.3f");
+
+    auto runLayout = [&](bool applyPositions)
+    {
+        auto positions = ExtractGraphEmbeddingXY(graph);
+        Geometry::Graph::SpectralLayoutParams params;
+        params.MaxIterations = static_cast<std::uint32_t>(std::max(state.MaxIterations, 1));
+        params.StepScale = state.StepScale;
+        params.ConvergenceTolerance = state.ConvergenceTolerance;
+        params.MinNormEpsilon = state.MinNormEpsilon;
+        params.AreaExtent = state.AreaExtent;
+        params.Variant = static_cast<Geometry::Graph::SpectralLayoutParams::LaplacianVariant>(state.Variant);
+
+        const auto result = Geometry::Graph::ComputeSpectralLayout(graph, positions, params);
+        if (!result)
+            return false;
+
+        state.LastActiveVertices = result->ActiveVertexCount;
+        state.LastActiveEdges = result->ActiveEdgeCount;
+        state.LastIterations = result->IterationsPerformed;
+        state.LastSubspaceDelta = result->SubspaceDelta;
+        state.LastConverged = result->Converged;
+
+        PublishGraphSpectralProperties(graph, positions, state.UProperty, state.VProperty, state.RadiusProperty);
+        if (const auto crossings = Geometry::Graph::CountEdgeCrossings(graph, positions))
+        {
+            state.LastCrossingCountValid = true;
+            state.LastCrossingCount = *crossings;
+        }
+        else
+        {
+            state.LastCrossingCountValid = false;
+            state.LastCrossingCount = 0;
+        }
+
+        reg.emplace_or_replace<ECS::DirtyTag::VertexAttributes>(entity);
+
+        if (applyPositions)
+        {
+            for (std::size_t i = 0; i < graph.VerticesSize(); ++i)
+            {
+                const Geometry::VertexHandle vh{static_cast<Geometry::PropertyIndex>(i)};
+                if (!graph.IsValid(vh) || graph.IsDeleted(vh))
+                    continue;
+
+                const glm::vec3 current = graph.VertexPosition(vh);
+                graph.SetVertexPosition(vh, glm::vec3(positions[i].x,
+                                                      positions[i].y,
+                                                      state.PreserveExistingZ ? current.z : state.OutputZ));
+            }
+            reg.emplace_or_replace<ECS::DirtyTag::VertexPositions>(entity);
+        }
+
+        engine.GetScene().GetDispatcher().enqueue<ECS::Events::GeometryModified>({entity});
+        return true;
+    };
+
+    bool changed = false;
+    if (ImGui::Button("Compute Spectral Layout Properties"))
+        changed = runLayout(false);
+    ImGui::SameLine();
+    if (ImGui::Button("Apply Spectral Layout To Graph"))
+        changed = runLayout(true) || changed;
+
+    if (state.LastActiveVertices > 0)
+    {
+        ImGui::SeparatorText("Diagnostics");
+        ImGui::Text("Active Vertices: %zu", state.LastActiveVertices);
+        ImGui::Text("Active Edges: %zu", state.LastActiveEdges);
+        ImGui::Text("Iterations: %u", state.LastIterations);
+        ImGui::Text("Converged: %s", state.LastConverged ? "Yes" : "No");
+        ImGui::Text("Subspace Delta: %.6g", static_cast<double>(state.LastSubspaceDelta));
+        if (state.LastCrossingCountValid)
+            ImGui::Text("Edge Crossings: %zu", state.LastCrossingCount);
+        else
+            ImGui::TextDisabled("Edge crossings unavailable for the current embedding.");
+        ImGui::TextDisabled("Use '%s' / '%s' as graph color sources or apply the embedding to update node positions.",
+                            state.UProperty, state.VProperty);
+    }
+
+    return changed;
+}
+
 bool DrawRemeshingWidget(Runtime::Engine& engine,
                         entt::entity entity,
                         RemeshingWidgetState& state)
 {
-    DrawDomainBadges(HasSurfaceInput(engine, entity) ? GeometryProcessingDomain::SurfaceMesh
+    DrawDomainBadges(HasSurfaceInput(engine, entity) ? kMeshTopologyDomains
                                                      : GeometryProcessingDomain::None);
     if (!HasSurfaceInput(engine, entity))
     {
@@ -685,7 +1400,7 @@ bool DrawRemeshingWidget(Runtime::Engine& engine,
         return false;
     }
 
-    ImGui::TextDisabled("Input Domain: %s", GeometryDomainLabel(GeometryProcessingDomain::SurfaceMesh));
+    ImGui::TextDisabled("Input Domains: Mesh Vertices / Mesh Edges / Mesh Halfedges / Mesh Faces");
     ImGui::DragFloat("Target Length", &state.TargetLength, 0.01f, 0.001f, 10.0f);
     ImGui::DragInt("Iterations", &state.Iterations, 1.0f, 1, 20);
     ImGui::Checkbox("Preserve Boundary", &state.PreserveBoundary);
@@ -729,7 +1444,7 @@ bool DrawSimplificationWidget(Runtime::Engine& engine,
                              entt::entity entity,
                              SimplificationWidgetState& state)
 {
-    DrawDomainBadges(HasSurfaceInput(engine, entity) ? GeometryProcessingDomain::SurfaceMesh
+    DrawDomainBadges(HasSurfaceInput(engine, entity) ? kMeshTopologyDomains
                                                      : GeometryProcessingDomain::None);
     if (!HasSurfaceInput(engine, entity))
     {
@@ -746,7 +1461,7 @@ bool DrawSimplificationWidget(Runtime::Engine& engine,
         "Best of Endpoints + Minimizer"
     };
 
-    ImGui::TextDisabled("Input Domain: %s", GeometryDomainLabel(GeometryProcessingDomain::SurfaceMesh));
+    ImGui::TextDisabled("Input Domains: Mesh Vertices / Mesh Edges / Mesh Halfedges / Mesh Faces");
     ImGui::DragInt("Target Faces", &state.TargetFaces, 10.0f, 10, 1000000);
     ImGui::Checkbox("Preserve Boundary", &state.PreserveBoundary);
     ImGui::DragFloat("Hausdorff Error", &state.HausdorffError, 0.001f, 0.0f, 10.0f, "%.4f");
@@ -829,7 +1544,7 @@ bool DrawSmoothingWidget(Runtime::Engine& engine,
                         entt::entity entity,
                         SmoothingWidgetState& state)
 {
-    DrawDomainBadges(HasSurfaceInput(engine, entity) ? GeometryProcessingDomain::SurfaceMesh
+    DrawDomainBadges(HasSurfaceInput(engine, entity) ? kMeshTopologyDomains
                                                      : GeometryProcessingDomain::None);
     if (!HasSurfaceInput(engine, entity))
     {
@@ -837,7 +1552,7 @@ bool DrawSmoothingWidget(Runtime::Engine& engine,
         return false;
     }
 
-    ImGui::TextDisabled("Input Domain: %s", GeometryDomainLabel(GeometryProcessingDomain::SurfaceMesh));
+    ImGui::TextDisabled("Input Domains: Mesh Vertices / Mesh Edges / Mesh Halfedges / Mesh Faces");
     ImGui::DragInt("Iterations", &state.Iterations, 1.0f, 1, 100);
     ImGui::DragFloat("Lambda", &state.Lambda, 0.01f, 0.0f, 1.0f);
     ImGui::Checkbox("Preserve Boundary", &state.PreserveBoundary);
@@ -900,7 +1615,7 @@ bool DrawSubdivisionWidget(Runtime::Engine& engine,
                           entt::entity entity,
                           SubdivisionWidgetState& state)
 {
-    DrawDomainBadges(HasSurfaceInput(engine, entity) ? GeometryProcessingDomain::SurfaceMesh
+    DrawDomainBadges(HasSurfaceInput(engine, entity) ? kMeshTopologyDomains
                                                      : GeometryProcessingDomain::None);
     if (!HasSurfaceInput(engine, entity))
     {
@@ -908,7 +1623,7 @@ bool DrawSubdivisionWidget(Runtime::Engine& engine,
         return false;
     }
 
-    ImGui::TextDisabled("Input Domain: %s", GeometryDomainLabel(GeometryProcessingDomain::SurfaceMesh));
+    ImGui::TextDisabled("Input Domains: Mesh Vertices / Mesh Edges / Mesh Halfedges / Mesh Faces");
     ImGui::DragInt("Iterations", &state.Iterations, 1.0f, 1, 5);
 
     bool changed = false;
@@ -943,7 +1658,7 @@ bool DrawSubdivisionWidget(Runtime::Engine& engine,
 bool DrawRepairWidget(Runtime::Engine& engine,
                      entt::entity entity)
 {
-    DrawDomainBadges(HasSurfaceInput(engine, entity) ? GeometryProcessingDomain::SurfaceMesh
+    DrawDomainBadges(HasSurfaceInput(engine, entity) ? kMeshTopologyDomains
                                                      : GeometryProcessingDomain::None);
     if (!HasSurfaceInput(engine, entity))
     {
@@ -951,7 +1666,7 @@ bool DrawRepairWidget(Runtime::Engine& engine,
         return false;
     }
 
-    ImGui::TextDisabled("Input Domain: %s", GeometryDomainLabel(GeometryProcessingDomain::SurfaceMesh));
+    ImGui::TextDisabled("Input Domains: Mesh Vertices / Mesh Edges / Mesh Halfedges / Mesh Faces");
     if (!ImGui::Button("Run Mesh Repair"))
         return false;
 

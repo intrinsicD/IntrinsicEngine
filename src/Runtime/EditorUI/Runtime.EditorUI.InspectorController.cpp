@@ -149,6 +149,7 @@ void InspectorController::Draw()
                 {
                     const auto* vtxPs = &gd.GraphRef->VertexProperties();
                     const auto* edgePs = &gd.GraphRef->EdgeProperties();
+                    const auto* halfedgePs = &gd.GraphRef->HalfedgeProperties();
 
                     if (ColorSourceWidget("Node Color Source", gd.Visualization.VertexColors, vtxPs,
                                           "GraphVtx"))
@@ -158,6 +159,25 @@ void InspectorController::Draw()
                         reg.emplace_or_replace<ECS::DirtyTag::EdgeAttributes>(selected);
 
                     VectorFieldWidget(gd.Visualization, vtxPs, "GraphVF");
+
+                    if (ImGui::TreeNodeEx("Property Browser##Graph", ImGuiTreeNodeFlags_DefaultOpen))
+                    {
+                        DrawPropertySetBrowserWidget("Vertex Properties", vtxPs, m_GraphVertexPropertiesUi, "GraphVertexProps");
+                        DrawPropertySetBrowserWidget("Edge Properties", edgePs, m_GraphEdgePropertiesUi, "GraphEdgeProps");
+                        DrawPropertySetBrowserWidget("Halfedge Properties", halfedgePs, m_GraphHalfedgePropertiesUi, "GraphHalfedgeProps");
+                        ImGui::TreePop();
+                    }
+
+                    if (ImGui::TreeNodeEx("Spectral Layout##Graph", ImGuiTreeNodeFlags_DefaultOpen))
+                    {
+                        static_cast<void>(DrawGraphSpectralWidget(*m_Engine, selected, m_GraphSpectralUi));
+                        if (m_GeometryWorkflow)
+                        {
+                            if (ImGui::SmallButton("Open Dedicated Graph Spectral Panel"))
+                                m_GeometryWorkflow->OpenGraphSpectralPanel();
+                        }
+                        ImGui::TreePop();
+                    }
                 }
             }
         }
@@ -193,6 +213,12 @@ void InspectorController::Draw()
                         reg.emplace_or_replace<ECS::DirtyTag::VertexAttributes>(selected);
 
                     VectorFieldWidget(pcd.Visualization, ptPs, "PCDVF");
+
+                    if (ImGui::TreeNodeEx("Property Browser##PointCloud", ImGuiTreeNodeFlags_DefaultOpen))
+                    {
+                        DrawPropertySetBrowserWidget("Point Properties", ptPs, m_PointCloudPropertiesUi, "PointCloudProps");
+                        ImGui::TreePop();
+                    }
                 }
             }
         }
@@ -327,6 +353,7 @@ void InspectorController::Draw()
                     {
                         const auto* vtxPs = &md->MeshRef->VertexProperties();
                         const auto* edgePs = &md->MeshRef->EdgeProperties();
+                        const auto* halfedgePs = &md->MeshRef->HalfedgeProperties();
                         const auto* facePs = &md->MeshRef->FaceProperties();
 
                         if (ColorSourceWidget("Vertex Color Source", md->Visualization.VertexColors, vtxPs,
@@ -349,6 +376,26 @@ void InspectorController::Draw()
                         }
 
                         VectorFieldWidget(md->Visualization, vtxPs, "MeshVF");
+
+                        if (ImGui::TreeNodeEx("Property Browser##Mesh", ImGuiTreeNodeFlags_DefaultOpen))
+                        {
+                            DrawPropertySetBrowserWidget("Vertex Properties", vtxPs, m_MeshVertexPropertiesUi, "MeshVertexProps");
+                            DrawPropertySetBrowserWidget("Edge Properties", edgePs, m_MeshEdgePropertiesUi, "MeshEdgeProps");
+                            DrawPropertySetBrowserWidget("Halfedge Properties", halfedgePs, m_MeshHalfedgePropertiesUi, "MeshHalfedgeProps");
+                            DrawPropertySetBrowserWidget("Face Properties", facePs, m_MeshFacePropertiesUi, "MeshFaceProps");
+                            ImGui::TreePop();
+                        }
+
+                        if (ImGui::TreeNodeEx("Spectral Modes##Mesh", ImGuiTreeNodeFlags_DefaultOpen))
+                        {
+                            static_cast<void>(DrawMeshSpectralWidget(*m_Engine, selected, m_MeshSpectralUi));
+                            if (m_GeometryWorkflow)
+                            {
+                                if (ImGui::SmallButton("Open Dedicated Mesh Spectral Panel"))
+                                    m_GeometryWorkflow->OpenMeshSpectralPanel();
+                            }
+                            ImGui::TreePop();
+                        }
                     }
                 }
             }

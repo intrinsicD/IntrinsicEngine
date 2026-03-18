@@ -26,13 +26,47 @@ namespace Runtime::EditorUI
 {
     using namespace Core::Hash;
 
+    namespace
+    {
+        constexpr GeometryProcessingDomain kMeshTopologyDomains =
+            GeometryProcessingDomain::MeshVertices |
+            GeometryProcessingDomain::MeshEdges |
+            GeometryProcessingDomain::MeshHalfedges |
+            GeometryProcessingDomain::MeshFaces;
+
+        constexpr GeometryProcessingDomain kGraphTopologyDomains =
+            GeometryProcessingDomain::GraphVertices |
+            GeometryProcessingDomain::GraphEdges |
+            GeometryProcessingDomain::GraphHalfedges;
+
+        [[nodiscard]] constexpr bool IsSurfaceTopologyAlgorithm(GeometryProcessingAlgorithm algorithm) noexcept
+        {
+            switch (algorithm)
+            {
+            case GeometryProcessingAlgorithm::Remeshing:
+            case GeometryProcessingAlgorithm::Simplification:
+            case GeometryProcessingAlgorithm::Smoothing:
+            case GeometryProcessingAlgorithm::Subdivision:
+            case GeometryProcessingAlgorithm::Repair:
+                return true;
+            case GeometryProcessingAlgorithm::KMeans:
+            default:
+                return false;
+            }
+        }
+    }
+
     const char* GeometryDomainLabel(GeometryProcessingDomain domain) noexcept
     {
         switch (domain)
         {
-        case GeometryProcessingDomain::SurfaceMesh: return "Surface Mesh";
         case GeometryProcessingDomain::MeshVertices: return "Mesh Vertices";
+        case GeometryProcessingDomain::MeshEdges: return "Mesh Edges";
+        case GeometryProcessingDomain::MeshHalfedges: return "Mesh Halfedges";
+        case GeometryProcessingDomain::MeshFaces: return "Mesh Faces";
         case GeometryProcessingDomain::GraphVertices: return "Graph Nodes";
+        case GeometryProcessingDomain::GraphEdges: return "Graph Edges";
+        case GeometryProcessingDomain::GraphHalfedges: return "Graph Halfedges";
         case GeometryProcessingDomain::PointCloudPoints: return "Point Cloud Points";
         case GeometryProcessingDomain::None:
         default: return "None";
@@ -54,31 +88,40 @@ namespace Runtime::EditorUI
     }
 
     GeometryProcessingCapabilities GetGeometryProcessingCapabilities(const entt::registry& registry,
-                                                                    entt::entity entity)
+                                                                     entt::entity entity)
     {
         GeometryProcessingCapabilities capabilities{};
         if (entity == entt::null || !registry.valid(entity))
             return capabilities;
 
-        if (registry.all_of<ECS::Surface::Component, ECS::MeshCollider::Component>(entity))
-            capabilities.Domains |= GeometryProcessingDomain::SurfaceMesh;
-
         if (const auto* meshData = registry.try_get<ECS::Mesh::Data>(entity);
             meshData && meshData->MeshRef)
         {
-            capabilities.Domains |= GeometryProcessingDomain::MeshVertices;
+            capabilities.Domains |= kMeshTopologyDomains;
+        }
+        else if (const auto* collider = registry.try_get<ECS::MeshCollider::Component>(entity);
+                 collider && collider->CollisionRef && collider->CollisionRef->SourceMesh)
+        {
+            capabilities.Domains |= kMeshTopologyDomains;
         }
 
         if (const auto* graphData = registry.try_get<ECS::Graph::Data>(entity);
             graphData && graphData->GraphRef)
         {
-            capabilities.Domains |= GeometryProcessingDomain::GraphVertices;
+            capabilities.Domains |= kGraphTopologyDomains;
         }
 
         if (const auto* pointCloudData = registry.try_get<ECS::PointCloud::Data>(entity);
-            pointCloudData && pointCloudData->CloudRef && !pointCloudData->CloudRef->IsEmpty())
+            pointCloudData && ((pointCloudData->CloudRef && !pointCloudData->CloudRef->IsEmpty())
+                            || pointCloudData->GpuPointCount > 0u))
         {
             capabilities.Domains |= GeometryProcessingDomain::PointCloudPoints;
+        }
+
+        if (const auto* collider = registry.try_get<ECS::MeshCollider::Component>(entity);
+            registry.all_of<ECS::Surface::Component>(entity) && collider && collider->CollisionRef)
+        {
+            capabilities.HasEditableSurfaceMesh = true;
         }
 
         return capabilities;
@@ -90,14 +133,14 @@ namespace Runtime::EditorUI
         {
         case GeometryProcessingAlgorithm::KMeans:
             return GeometryProcessingDomain::MeshVertices
-                 | GeometryProcessingDomain::GraphVertices
-                 | GeometryProcessingDomain::PointCloudPoints;
+                | GeometryProcessingDomain::GraphVertices
+                | GeometryProcessingDomain::PointCloudPoints;
         case GeometryProcessingAlgorithm::Remeshing:
         case GeometryProcessingAlgorithm::Simplification:
         case GeometryProcessingAlgorithm::Smoothing:
         case GeometryProcessingAlgorithm::Subdivision:
         case GeometryProcessingAlgorithm::Repair:
-            return GeometryProcessingDomain::SurfaceMesh;
+            return kMeshTopologyDomains;
         default:
             return GeometryProcessingDomain::None;
         }
@@ -110,9 +153,9 @@ namespace Runtime::EditorUI
     }
 
     std::vector<GeometryProcessingEntry> ResolveGeometryProcessingEntries(const entt::registry& registry,
-                                                                         entt::entity entity)
+                                                                          entt::entity entity)
     {
-        const GeometryProcessingDomain capabilities = GetGeometryProcessingCapabilities(registry, entity).Domains;
+        const GeometryProcessingCapabilities capabilities = GetGeometryProcessingCapabilities(registry, entity);
 
         static constexpr std::array<GeometryProcessingAlgorithm, 6> kAlgorithmOrder = {
             GeometryProcessingAlgorithm::KMeans,
@@ -127,7 +170,10 @@ namespace Runtime::EditorUI
         entries.reserve(kAlgorithmOrder.size());
         for (const auto algorithm : kAlgorithmOrder)
         {
-            const GeometryProcessingDomain domains = capabilities & GetSupportedDomains(algorithm);
+            if (IsSurfaceTopologyAlgorithm(algorithm) && !capabilities.HasEditableSurfaceMesh)
+                continue;
+
+            const GeometryProcessingDomain domains = capabilities.Domains & GetSupportedDomains(algorithm);
             if (domains == GeometryProcessingDomain::None)
                 continue;
             entries.push_back(GeometryProcessingEntry{algorithm, domains});
@@ -140,7 +186,7 @@ namespace Runtime::EditorUI
     {
         const GeometryProcessingDomain available =
             GetGeometryProcessingCapabilities(registry, entity).Domains
-          & GetSupportedDomains(GeometryProcessingAlgorithm::KMeans);
+            & GetSupportedDomains(GeometryProcessingAlgorithm::KMeans);
 
         std::vector<Runtime::PointCloudKMeans::Domain> domains;
         domains.reserve(3);
@@ -163,9 +209,9 @@ namespace Runtime::EditorUI
     struct EditorPanelState
     {
         // Scene file dialogs
-        char SavePath[512]   = "";
+        char SavePath[512] = "";
         char SaveAsPath[512] = "scene.json";
-        char LoadPath[512]   = "scene.json";
+        char LoadPath[512] = "scene.json";
 
         // Feature browser
         int FeatureCategory = 0;
@@ -176,6 +222,7 @@ namespace Runtime::EditorUI
         std::set<uint32_t> GeodesicSourceVertices;
         bool GeodesicDirty = false;
     };
+
     static EditorPanelState s_PanelState;
 
     SceneDirtyTracker& GetSceneDirtyTracker()
@@ -199,16 +246,21 @@ namespace Runtime::EditorUI
             Core::FeatureCategory category = Core::FeatureCategory::RenderFeature;
             switch (cat)
             {
-            case 0: category = Core::FeatureCategory::RenderFeature; break;
-            case 1: category = Core::FeatureCategory::System; break;
-            case 2: category = Core::FeatureCategory::Panel; break;
-            case 3: category = Core::FeatureCategory::GeometryOperator; break;
+            case 0: category = Core::FeatureCategory::RenderFeature;
+                break;
+            case 1: category = Core::FeatureCategory::System;
+                break;
+            case 2: category = Core::FeatureCategory::Panel;
+                break;
+            case 3: category = Core::FeatureCategory::GeometryOperator;
+                break;
             default: break;
             }
 
             const auto list = reg.GetByCategory(category);
 
-            if (ImGui::BeginTable("##features", 3, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable))
+            if (ImGui::BeginTable("##features", 3,
+                                  ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable))
             {
                 ImGui::TableSetupColumn("Enabled", ImGuiTableColumnFlags_WidthFixed, 70.0f);
                 ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
@@ -266,7 +318,8 @@ namespace Runtime::EditorUI
             for (uint32_t li = 0; li < (uint32_t)layers.size(); ++li)
             {
                 const auto& layer = layers[li];
-                const std::string label = "Layer " + std::to_string(li) + " (" + std::to_string(layer.size()) + " passes)";
+                const std::string label = "Layer " + std::to_string(li) + " (" + std::to_string(layer.size()) +
+                    " passes)";
                 if (ImGui::TreeNode(label.c_str()))
                 {
                     for (uint32_t passIndex : layer)
@@ -290,10 +343,13 @@ namespace Runtime::EditorUI
             ImGui::SeparatorText("Selection Mode");
             {
                 int em = static_cast<int>(cfg.ElementMode);
-                ImGui::RadioButton("Entity", &em, 0); ImGui::SameLine();
-                ImGui::RadioButton("Vertex", &em, 1); ImGui::SameLine();
-                ImGui::RadioButton("Edge",   &em, 2); ImGui::SameLine();
-                ImGui::RadioButton("Face",   &em, 3);
+                ImGui::RadioButton("Entity", &em, 0);
+                ImGui::SameLine();
+                ImGui::RadioButton("Vertex", &em, 1);
+                ImGui::SameLine();
+                ImGui::RadioButton("Edge", &em, 2);
+                ImGui::SameLine();
+                ImGui::RadioButton("Face", &em, 3);
 
                 const auto newMode = static_cast<Runtime::Selection::ElementMode>(em);
                 if (newMode != cfg.ElementMode)
@@ -334,9 +390,9 @@ namespace Runtime::EditorUI
                     auto& reg = engine.GetScene().GetRegistry();
 
                     bool canCompute = selected != entt::null
-                                      && !sub.SelectedVertices.empty()
-                                      && reg.valid(selected)
-                                      && reg.all_of<ECS::Mesh::Data>(selected);
+                        && !sub.SelectedVertices.empty()
+                        && reg.valid(selected)
+                        && reg.all_of<ECS::Mesh::Data>(selected);
 
                     if (!canCompute)
                         ImGui::BeginDisabled();
@@ -384,26 +440,35 @@ namespace Runtime::EditorUI
             const char* backends[] = {"CPU", "GPU"};
             int backend = (cfg.Backend == Runtime::Selection::PickBackend::GPU) ? 1 : 0;
             if (ImGui::Combo("Pick Backend", &backend, backends, IM_ARRAYSIZE(backends)))
-                cfg.Backend = backend == 1 ? Runtime::Selection::PickBackend::GPU : Runtime::Selection::PickBackend::CPU;
+                cfg.Backend = backend == 1
+                                  ? Runtime::Selection::PickBackend::GPU
+                                  : Runtime::Selection::PickBackend::CPU;
 
             const char* modes[] = {"Replace", "Add", "Toggle"};
             int mode = 0;
             switch (cfg.Mode)
             {
-            case Runtime::Selection::PickMode::Replace: mode = 0; break;
-            case Runtime::Selection::PickMode::Add: mode = 1; break;
-            case Runtime::Selection::PickMode::Toggle: mode = 2; break;
+            case Runtime::Selection::PickMode::Replace: mode = 0;
+                break;
+            case Runtime::Selection::PickMode::Add: mode = 1;
+                break;
+            case Runtime::Selection::PickMode::Toggle: mode = 2;
+                break;
             }
             if (ImGui::Combo("Default Mode (unused on click)", &mode, modes, IM_ARRAYSIZE(modes)))
             {
-                cfg.Mode = (mode == 1) ? Runtime::Selection::PickMode::Add
-                    : (mode == 2)       ? Runtime::Selection::PickMode::Toggle
-                                        : Runtime::Selection::PickMode::Replace;
+                cfg.Mode = (mode == 1)
+                               ? Runtime::Selection::PickMode::Add
+                               : (mode == 2)
+                               ? Runtime::Selection::PickMode::Toggle
+                               : Runtime::Selection::PickMode::Replace;
             }
 
             bool active = (cfg.Active == Runtime::SelectionModule::Activation::Enabled);
             if (ImGui::Checkbox("Active", &active))
-                cfg.Active = active ? Runtime::SelectionModule::Activation::Enabled : Runtime::SelectionModule::Activation::Disabled;
+                cfg.Active = active
+                                 ? Runtime::SelectionModule::Activation::Enabled
+                                 : Runtime::SelectionModule::Activation::Disabled;
 
             ImGui::SeparatorText("State");
             const entt::entity selected = sel.GetSelectedEntity(engine.GetScene());
@@ -532,7 +597,7 @@ namespace Runtime::EditorUI
                 if (tracker.IsDirty())
                 {
                     ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.0f, 1.0f),
-                        "Warning: unsaved changes will be lost.");
+                                       "Warning: unsaved changes will be lost.");
                     ImGui::Separator();
                 }
 
@@ -596,7 +661,8 @@ namespace Runtime::EditorUI
         // Sphere radius for vertex markers (world-space).
         constexpr float kVertexSphereRadius = 0.005f;
         constexpr uint32_t kVertexColor = Graphics::DebugDraw::PackColor(255, 40, 40); // Red
-        constexpr uint32_t kGeodesicSourceColor = Graphics::DebugDraw::PackColor(40, 255, 120); // Green (geodesic source)
+        constexpr uint32_t kGeodesicSourceColor = Graphics::DebugDraw::PackColor(40, 255, 120);
+        // Green (geodesic source)
         constexpr uint32_t kEdgeColor = Graphics::DebugDraw::PackColor(255, 200, 40); // Yellow
         constexpr uint32_t kFaceColor = Graphics::DebugDraw::PackColor(40, 120, 255, 160); // Blue (semi-transparent)
         const bool geodesicActive = s_PanelState.GeodesicActive;
@@ -655,7 +721,7 @@ namespace Runtime::EditorUI
                 if (faceVerts.size() >= 3)
                 {
                     glm::vec3 n = glm::normalize(glm::cross(faceVerts[1] - faceVerts[0],
-                                                              faceVerts[2] - faceVerts[0]));
+                                                            faceVerts[2] - faceVerts[0]));
                     for (size_t i = 1; i + 1 < faceVerts.size(); ++i)
                         dd.Triangle(faceVerts[0], faceVerts[i], faceVerts[i + 1], n, kFaceColor);
                 }

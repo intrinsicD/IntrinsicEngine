@@ -152,6 +152,13 @@ namespace Runtime
                         col.CollisionRef = model->Meshes[i]->CollisionGeometry;
                         col.WorldOBB.Center = col.CollisionRef->LocalAABB.GetCenter();
 
+                        if (col.CollisionRef->SourceMesh)
+                        {
+                            auto& meshData = m_Scene.GetRegistry().emplace_or_replace<ECS::Mesh::Data>(targetEntity);
+                            meshData.MeshRef = col.CollisionRef->SourceMesh;
+                            meshData.AttributesDirty = true;
+                        }
+
                         auto& primitiveBvh = m_Scene.GetRegistry().emplace_or_replace<ECS::PrimitiveBVH::Data>(targetEntity);
                         primitiveBvh.Source = ECS::PrimitiveBVH::SourceKind::MeshTriangles;
                         primitiveBvh.Dirty = true;

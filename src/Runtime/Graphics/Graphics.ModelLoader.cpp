@@ -240,7 +240,7 @@ namespace Graphics
 
         if (!collision->Positions.empty())
         {
-            collision->LocalAABB = Geometry::Union(Geometry::Convert(collision->Positions));
+            collision->LocalAABB = Geometry::Union(Geometry::ToAABB(collision->Positions));
         }
 
         if (cpu.Topology == PrimitiveTopology::Triangles && collision->Indices.size() >= 3)

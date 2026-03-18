@@ -4,6 +4,7 @@ module;
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/quaternion.hpp>
 #include <numbers>
+#include <span>
 
 export module Geometry:Ellipsoid;
 
@@ -56,5 +57,7 @@ export namespace Geometry
     {
         return static_cast<double>(ellipsoid.GetVolume());
     }
+
+    [[nodiscard]] Ellipsoid ToEllipsoiod(std::span<const glm::vec3> points); //TODO: implement this
 }
 

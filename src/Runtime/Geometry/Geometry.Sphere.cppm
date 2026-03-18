@@ -1,6 +1,7 @@
 module;
 
 #include <algorithm>
+#include <span>
 #include <glm/glm.hpp>
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/norm.hpp>
@@ -67,4 +68,16 @@ export namespace Geometry
     {
         return static_cast<double>(sphere.GetVolume());
     }
+
+    struct FittingParams
+    {
+        enum class FittingMethod
+        {
+            None,
+            //TODO: different fitting methods, iterative, closed form solver etc...
+        };
+        //TODO: fitting parameters...
+    };
+
+    [[nodiscard]] Sphere ToSphere(std::span<const glm::vec3> points, const FittingParams &params); //TODO: implement this
 }

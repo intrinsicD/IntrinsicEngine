@@ -1,6 +1,7 @@
 module;
 
 #include <cmath>
+#include <span>
 #include <glm/glm.hpp>
 
 export module Geometry:Plane;
@@ -51,4 +52,6 @@ export namespace Geometry
     {
         return ClosestPoint(plane, point);
     }
+
+    [[nodiscard]] Plane ToPlane(std::span<const glm::vec3> points); //TODO: implement this
 }

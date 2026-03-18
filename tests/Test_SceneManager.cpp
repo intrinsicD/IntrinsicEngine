@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include <type_traits>
 #include <memory>
+#include <glm/glm.hpp>
 
 #include <entt/entity/registry.hpp>
 #include "RHI.Vulkan.hpp"
@@ -10,6 +11,7 @@ import ECS;
 import Core;
 import RHI;
 import Graphics;
+import Geometry;
 
 // ---------------------------------------------------------------------------
 // Compile-time API contract tests
@@ -106,6 +108,42 @@ TEST_F(SceneManagerTest, MultipleCreateAndDestroy)
     entt::entity e3 = m_Mgr->GetScene().CreateEntity("E3");
     EXPECT_TRUE(e3 != entt::null);
     EXPECT_EQ(m_Mgr->GetScene().Size(), 2u);
+}
+
+TEST_F(SceneManagerTest, SpawnModelAttachesMeshDataFromCollisionSourceMesh)
+{
+    Core::Assets::AssetManager assetManager;
+    Graphics::GeometryPool geometryPool;
+    m_Mgr->SetGeometryStorage(&geometryPool);
+
+    auto model = std::make_unique<Graphics::Model>(geometryPool, std::shared_ptr<RHI::VulkanDevice>{});
+    auto segment = std::make_shared<Graphics::MeshSegment>();
+    segment->Name = "Duck";
+
+    auto collision = std::make_shared<Graphics::GeometryCollisionData>();
+    auto mesh = std::make_shared<Geometry::Halfedge::Mesh>();
+    const auto v0 = mesh->AddVertex({0.0f, 0.0f, 0.0f});
+    const auto v1 = mesh->AddVertex({1.0f, 0.0f, 0.0f});
+    const auto v2 = mesh->AddVertex({0.0f, 1.0f, 0.0f});
+    ASSERT_TRUE(mesh->AddTriangle(v0, v1, v2).has_value());
+
+    collision->SourceMesh = mesh;
+    collision->LocalAABB = Geometry::AABB{{0.0f, 0.0f, 0.0f}, {1.0f, 1.0f, 0.0f}};
+    segment->CollisionGeometry = collision;
+    model->Meshes.push_back(segment);
+
+    const auto modelHandle = assetManager.Create("test::duck", std::move(model));
+    ASSERT_TRUE(modelHandle.IsValid());
+
+    const entt::entity root = m_Mgr->SpawnModel(assetManager, modelHandle, Core::Assets::AssetHandle{},
+                                                glm::vec3(0.0f), glm::vec3(1.0f));
+    ASSERT_TRUE(root != entt::null);
+
+    auto& reg = m_Mgr->GetRegistry();
+    ASSERT_TRUE(reg.all_of<ECS::Surface::Component>(root));
+    ASSERT_TRUE(reg.all_of<ECS::MeshCollider::Component>(root));
+    ASSERT_TRUE(reg.all_of<ECS::Mesh::Data>(root));
+    EXPECT_EQ(reg.get<ECS::Mesh::Data>(root).MeshRef, mesh);
 }
 
 TEST_F(SceneManagerTest, DisconnectGpuHooksNoOpWithoutConnect)

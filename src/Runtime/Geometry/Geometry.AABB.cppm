@@ -121,7 +121,7 @@ export namespace Geometry
         return result;
     }
 
-    std::vector<AABB> Convert(std::span<const glm::vec3> points)
+    std::vector<AABB> ToAABB(std::span<const glm::vec3> points)
     {
         std::vector<AABB> result;
         result.reserve(points.size());

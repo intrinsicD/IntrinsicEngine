@@ -1142,7 +1142,7 @@ TEST(GeometryPrimitives, OBB_CommonUtils)
     ExpectVec3Near(axes[0], {0.0f, 1.0f, 0.0f}, 1e-5f);
     ExpectVec3Near(axes[1], {-1.0f, 0.0f, 0.0f}, 1e-5f);
 
-    const AABB aabb = ComputeAABB(box);
+    const AABB aabb = ToAABB(box);
     ExpectVec3Near(aabb.Min, {0.0f, -1.0f, -0.5f}, 1e-4f);
     ExpectVec3Near(aabb.Max, {4.0f, 1.0f, 0.5f}, 1e-4f);
 }

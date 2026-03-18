@@ -2,6 +2,7 @@ module;
 
 #include <cstdint>
 #include <functional>
+#include <string>
 #include <vector>
 #include <glm/glm.hpp>
 #include <entt/entity/entity.hpp>
@@ -21,10 +22,14 @@ export namespace Runtime::EditorUI
     enum class GeometryProcessingDomain : uint32_t
     {
         None = 0u,
-        SurfaceMesh = 1u << 0,
-        MeshVertices = 1u << 1,
-        GraphVertices = 1u << 2,
-        PointCloudPoints = 1u << 3,
+        MeshVertices = 1u << 0,
+        MeshEdges = 1u << 1,
+        MeshHalfedges = 1u << 2,
+        MeshFaces = 1u << 3,
+        GraphVertices = 1u << 4,
+        GraphEdges = 1u << 5,
+        GraphHalfedges = 1u << 6,
+        PointCloudPoints = 1u << 7,
     };
 
     [[nodiscard]] constexpr GeometryProcessingDomain operator|(GeometryProcessingDomain a,
@@ -65,10 +70,11 @@ export namespace Runtime::EditorUI
     struct GeometryProcessingCapabilities
     {
         GeometryProcessingDomain Domains = GeometryProcessingDomain::None;
+        bool HasEditableSurfaceMesh = false;
 
         [[nodiscard]] bool HasAny() const noexcept
         {
-            return Domains != GeometryProcessingDomain::None;
+            return HasEditableSurfaceMesh || Domains != GeometryProcessingDomain::None;
         }
     };
 
@@ -149,7 +155,60 @@ export namespace Runtime::EditorUI
     // ImGui ColorEdit4 that reads/writes a glm::vec4 directly. Returns true on change.
     bool ColorEdit4(const char* label, glm::vec4& color);
 
+    struct PropertySetBrowserState
+    {
+        int SelectedProperty = 0;
+        int PreviewRows = 8;
+        bool ShowIndices = true;
+        bool ShowAllRows = false;
+    };
+
+    bool DrawPropertySetBrowserWidget(const char* label,
+                                      const Geometry::PropertySet* ps,
+                                      PropertySetBrowserState& state,
+                                      const char* suffix);
+
     void DrawDomainBadges(GeometryProcessingDomain domains);
+
+    struct MeshSpectralWidgetState
+    {
+        int ModeCount = 2;
+        int MaxIterations = 24;
+        float Shift = 1.0f;
+        float SolverTolerance = 1.0e-6f;
+        bool NormalizePublishedModes = true;
+        char Mode0Property[64] = "v:spectral_mode_0";
+        char Mode1Property[64] = "v:spectral_mode_1";
+        std::size_t LastActiveVertices = 0;
+        std::uint32_t LastIterations = 0;
+        bool LastConverged = false;
+        double LastEigenvalue0 = 0.0;
+        double LastEigenvalue1 = 0.0;
+        double LastResidual0 = 0.0;
+        double LastResidual1 = 0.0;
+    };
+
+    struct GraphSpectralWidgetState
+    {
+        int Variant = static_cast<int>(Geometry::Graph::SpectralLayoutParams::LaplacianVariant::NormalizedSymmetric);
+        int MaxIterations = 96;
+        float StepScale = 0.85f;
+        float ConvergenceTolerance = 1.0e-5f;
+        float MinNormEpsilon = 1.0e-8f;
+        float AreaExtent = 2.0f;
+        bool PreserveExistingZ = true;
+        float OutputZ = 0.0f;
+        char UProperty[64] = "v:spectral_u";
+        char VProperty[64] = "v:spectral_v";
+        char RadiusProperty[64] = "v:spectral_radius";
+        std::size_t LastActiveVertices = 0;
+        std::size_t LastActiveEdges = 0;
+        std::uint32_t LastIterations = 0;
+        float LastSubspaceDelta = 0.0f;
+        bool LastConverged = false;
+        bool LastCrossingCountValid = false;
+        std::size_t LastCrossingCount = 0;
+    };
 
     struct KMeansWidgetState
     {
@@ -202,6 +261,12 @@ export namespace Runtime::EditorUI
     [[nodiscard]] bool DrawKMeansWidget(Runtime::Engine& engine,
                                         entt::entity entity,
                                         KMeansWidgetState& state);
+    [[nodiscard]] bool DrawMeshSpectralWidget(Runtime::Engine& engine,
+                                              entt::entity entity,
+                                              MeshSpectralWidgetState& state);
+    [[nodiscard]] bool DrawGraphSpectralWidget(Runtime::Engine& engine,
+                                               entt::entity entity,
+                                               GraphSpectralWidgetState& state);
     [[nodiscard]] bool DrawRemeshingWidget(Runtime::Engine& engine,
                                            entt::entity entity,
                                            RemeshingWidgetState& state);
@@ -239,6 +304,16 @@ export namespace Runtime::EditorUI
         Runtime::Engine* m_Engine = nullptr;
         entt::entity* m_CachedSelected = nullptr;
         GeometryWorkflowController* m_GeometryWorkflow = nullptr;
+        PropertySetBrowserState m_MeshVertexPropertiesUi{};
+        PropertySetBrowserState m_MeshEdgePropertiesUi{};
+        PropertySetBrowserState m_MeshHalfedgePropertiesUi{};
+        PropertySetBrowserState m_MeshFacePropertiesUi{};
+        PropertySetBrowserState m_GraphVertexPropertiesUi{};
+        PropertySetBrowserState m_GraphEdgePropertiesUi{};
+        PropertySetBrowserState m_GraphHalfedgePropertiesUi{};
+        PropertySetBrowserState m_PointCloudPropertiesUi{};
+        MeshSpectralWidgetState m_MeshSpectralUi{};
+        GraphSpectralWidgetState m_GraphSpectralUi{};
         KMeansWidgetState m_KMeansUi{};
         RemeshingWidgetState m_RemeshingUi{};
         SimplificationWidgetState m_SimplificationUi{};
@@ -260,10 +335,14 @@ export namespace Runtime::EditorUI
         void Init(Runtime::Engine& engine, entt::entity& cachedSelected);
         void RegisterPanelsAndMenu();
         void OpenAlgorithmPanel(GeometryProcessingAlgorithm algorithm);
+        void OpenMeshSpectralPanel();
+        void OpenGraphSpectralPanel();
 
     private:
         Runtime::Engine* m_Engine = nullptr;
         entt::entity* m_CachedSelected = nullptr;
+        MeshSpectralWidgetState m_MeshSpectralUi{};
+        GraphSpectralWidgetState m_GraphSpectralUi{};
         RemeshingWidgetState m_RemeshingUi{};
         SimplificationWidgetState m_SimplificationUi{};
         SmoothingWidgetState m_SmoothingUi{};
@@ -274,6 +353,7 @@ export namespace Runtime::EditorUI
             entt::entity Selected = entt::null;
             bool HasSelection = false;
             bool HasSurface = false;
+            bool HasGraph = false;
         };
 
         [[nodiscard]] SelectionContext GetSelectionContext() const;
@@ -296,6 +376,8 @@ export namespace Runtime::EditorUI
         void DrawSmoothingPanel();
         void DrawSubdivisionPanel();
         void DrawRepairPanel();
+        void DrawMeshSpectralPanel();
+        void DrawGraphSpectralPanel();
     };
 
     // =========================================================================

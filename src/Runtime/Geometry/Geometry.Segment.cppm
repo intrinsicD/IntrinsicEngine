@@ -1,6 +1,7 @@
 module;
 
 #include <cmath>
+#include <span>
 #include <glm/glm.hpp>
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/norm.hpp>
@@ -66,4 +67,6 @@ export namespace Geometry
     {
         return std::sqrt(SquaredDistance(segment, point));
     }
+
+    [[nodiscard]] Segment ToSegment(std::span<const glm::vec3> points); //TODO: implement this
 }

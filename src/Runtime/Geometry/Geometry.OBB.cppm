@@ -192,7 +192,7 @@ export namespace Geometry
         return glm::dot(delta, delta);
     }
 
-    [[nodiscard]] AABB ComputeAABB(const OBB& obb)
+    [[nodiscard]] AABB ToAABB(const OBB& obb)
     {
         AABB bounds;
         for (const glm::vec3& corner : obb.GetCorners())
@@ -201,4 +201,6 @@ export namespace Geometry
         }
         return bounds;
     }
+
+    [[nodiscard]] OBB ToOOBB(std::span<const glm::vec3> points); //TODO: implement this
 }

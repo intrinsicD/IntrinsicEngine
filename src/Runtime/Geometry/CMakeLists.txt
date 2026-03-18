@@ -8,6 +8,7 @@ target_sources(${target_name}
         Geometry.AABB.cppm
         Geometry.OBB.cppm
         Geometry.Sphere.cppm
+        Geometry.SphereSampling.cppm
         Geometry.Capsule.cppm
         Geometry.Cylinder.cppm
         Geometry.Ellipsoid.cppm
@@ -75,6 +76,7 @@ target_sources(${target_name}
         Geometry.DEC.cpp
         Geometry.Curvature.cpp
         Geometry.Smoothing.cpp
+        Geometry.SphereSampling.cpp
         Geometry.Simplification.cpp
         Geometry.Subdivision.cpp
         Geometry.Remeshing.cpp

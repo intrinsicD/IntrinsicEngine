@@ -156,23 +156,27 @@ TEST(EditorUIProcessing, SupportedDomainsExposePointSetAndSurfaceCapabilities)
     EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(kmeans, GeometryProcessingDomain::MeshVertices));
     EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(kmeans, GeometryProcessingDomain::GraphVertices));
     EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(kmeans, GeometryProcessingDomain::PointCloudPoints));
-    EXPECT_FALSE(Runtime::EditorUI::HasAnyDomain(kmeans, GeometryProcessingDomain::SurfaceMesh));
+    EXPECT_FALSE(Runtime::EditorUI::HasAnyDomain(kmeans, GeometryProcessingDomain::MeshEdges));
 
     const auto smoothing = Runtime::EditorUI::GetSupportedDomains(GeometryProcessingAlgorithm::Smoothing);
-    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(smoothing, GeometryProcessingDomain::SurfaceMesh));
+    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(smoothing, GeometryProcessingDomain::MeshVertices));
+    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(smoothing, GeometryProcessingDomain::MeshEdges));
+    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(smoothing, GeometryProcessingDomain::MeshHalfedges));
+    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(smoothing, GeometryProcessingDomain::MeshFaces));
     EXPECT_FALSE(Runtime::EditorUI::HasAnyDomain(smoothing, GeometryProcessingDomain::GraphVertices));
 }
 
-TEST(EditorUIProcessing, MeshEntityReportsSurfaceAndVertexDomains)
+TEST(EditorUIProcessing, MeshEntityReportsExplicitTopologyDomains)
 {
     ECS::Scene scene;
     auto& reg = scene.GetRegistry();
     const auto entity = reg.create();
 
     auto mesh = std::make_shared<Geometry::Halfedge::Mesh>();
-    static_cast<void>(mesh->AddVertex({0.0f, 0.0f, 0.0f}));
-    static_cast<void>(mesh->AddVertex({1.0f, 0.0f, 0.0f}));
-    static_cast<void>(mesh->AddVertex({0.0f, 1.0f, 0.0f}));
+    const auto v0 = mesh->AddVertex({0.0f, 0.0f, 0.0f});
+    const auto v1 = mesh->AddVertex({1.0f, 0.0f, 0.0f});
+    const auto v2 = mesh->AddVertex({0.0f, 1.0f, 0.0f});
+    ASSERT_TRUE(mesh->AddTriangle(v0, v1, v2).has_value());
 
     ECS::Mesh::Data meshData{};
     meshData.MeshRef = mesh;
@@ -184,10 +188,43 @@ TEST(EditorUIProcessing, MeshEntityReportsSurfaceAndVertexDomains)
     reg.emplace<ECS::MeshCollider::Component>(entity, std::move(collider));
 
     const auto caps = Runtime::EditorUI::GetGeometryProcessingCapabilities(reg, entity);
-    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(caps.Domains, Runtime::EditorUI::GeometryProcessingDomain::SurfaceMesh));
     EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(caps.Domains, Runtime::EditorUI::GeometryProcessingDomain::MeshVertices));
+    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(caps.Domains, Runtime::EditorUI::GeometryProcessingDomain::MeshEdges));
+    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(caps.Domains, Runtime::EditorUI::GeometryProcessingDomain::MeshHalfedges));
+    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(caps.Domains, Runtime::EditorUI::GeometryProcessingDomain::MeshFaces));
+    EXPECT_TRUE(caps.HasEditableSurfaceMesh);
     EXPECT_FALSE(Runtime::EditorUI::HasAnyDomain(caps.Domains, Runtime::EditorUI::GeometryProcessingDomain::GraphVertices));
     EXPECT_FALSE(Runtime::EditorUI::HasAnyDomain(caps.Domains, Runtime::EditorUI::GeometryProcessingDomain::PointCloudPoints));
+}
+
+TEST(EditorUIProcessing, ColliderBackedMeshFallbackReportsTopologyDomainsWithoutMeshComponent)
+{
+    ECS::Scene scene;
+    auto& reg = scene.GetRegistry();
+    const auto entity = reg.create();
+
+    auto mesh = std::make_shared<Geometry::Halfedge::Mesh>();
+    const auto v0 = mesh->AddVertex({0.0f, 0.0f, 0.0f});
+    const auto v1 = mesh->AddVertex({1.0f, 0.0f, 0.0f});
+    const auto v2 = mesh->AddVertex({0.0f, 1.0f, 0.0f});
+    ASSERT_TRUE(mesh->AddTriangle(v0, v1, v2).has_value());
+
+    reg.emplace<ECS::Surface::Component>(entity);
+
+    auto collision = std::make_shared<Graphics::GeometryCollisionData>();
+    collision->SourceMesh = mesh;
+    collision->LocalAABB = Geometry::AABB{{0.0f, 0.0f, 0.0f}, {1.0f, 1.0f, 0.0f}};
+
+    ECS::MeshCollider::Component collider{};
+    collider.CollisionRef = std::move(collision);
+    reg.emplace<ECS::MeshCollider::Component>(entity, std::move(collider));
+
+    const auto caps = Runtime::EditorUI::GetGeometryProcessingCapabilities(reg, entity);
+    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(caps.Domains, Runtime::EditorUI::GeometryProcessingDomain::MeshVertices));
+    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(caps.Domains, Runtime::EditorUI::GeometryProcessingDomain::MeshEdges));
+    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(caps.Domains, Runtime::EditorUI::GeometryProcessingDomain::MeshHalfedges));
+    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(caps.Domains, Runtime::EditorUI::GeometryProcessingDomain::MeshFaces));
+    EXPECT_TRUE(caps.HasEditableSurfaceMesh);
 }
 
 TEST(EditorUIProcessing, GraphAndPointCloudEntitiesReportPointDomains)
@@ -207,6 +244,8 @@ TEST(EditorUIProcessing, GraphAndPointCloudEntitiesReportPointDomains)
 
     const auto graphCaps = Runtime::EditorUI::GetGeometryProcessingCapabilities(reg, graphEntity);
     EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(graphCaps.Domains, Runtime::EditorUI::GeometryProcessingDomain::GraphVertices));
+    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(graphCaps.Domains, Runtime::EditorUI::GeometryProcessingDomain::GraphEdges));
+    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(graphCaps.Domains, Runtime::EditorUI::GeometryProcessingDomain::GraphHalfedges));
     EXPECT_FALSE(Runtime::EditorUI::HasAnyDomain(graphCaps.Domains, Runtime::EditorUI::GeometryProcessingDomain::MeshVertices));
 
     const auto cloudEntity = reg.create();
@@ -220,7 +259,7 @@ TEST(EditorUIProcessing, GraphAndPointCloudEntitiesReportPointDomains)
 
     const auto cloudCaps = Runtime::EditorUI::GetGeometryProcessingCapabilities(reg, cloudEntity);
     EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(cloudCaps.Domains, Runtime::EditorUI::GeometryProcessingDomain::PointCloudPoints));
-    EXPECT_FALSE(Runtime::EditorUI::HasAnyDomain(cloudCaps.Domains, Runtime::EditorUI::GeometryProcessingDomain::SurfaceMesh));
+    EXPECT_FALSE(Runtime::EditorUI::HasAnyDomain(cloudCaps.Domains, Runtime::EditorUI::GeometryProcessingDomain::MeshVertices));
 }
 
 TEST(EditorUIProcessing, MixedGeometryEntityEnumeratesAllKMeansDomainsInStableOrder)
@@ -259,8 +298,14 @@ TEST(EditorUIProcessing, MixedGeometryEntityEnumeratesAllKMeansDomainsInStableOr
 
     const auto caps = Runtime::EditorUI::GetGeometryProcessingCapabilities(reg, entity);
     EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(caps.Domains, Runtime::EditorUI::GeometryProcessingDomain::MeshVertices));
+    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(caps.Domains, Runtime::EditorUI::GeometryProcessingDomain::MeshEdges));
+    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(caps.Domains, Runtime::EditorUI::GeometryProcessingDomain::MeshHalfedges));
+    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(caps.Domains, Runtime::EditorUI::GeometryProcessingDomain::MeshFaces));
     EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(caps.Domains, Runtime::EditorUI::GeometryProcessingDomain::GraphVertices));
+    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(caps.Domains, Runtime::EditorUI::GeometryProcessingDomain::GraphEdges));
+    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(caps.Domains, Runtime::EditorUI::GeometryProcessingDomain::GraphHalfedges));
     EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(caps.Domains, Runtime::EditorUI::GeometryProcessingDomain::PointCloudPoints));
+    EXPECT_TRUE(caps.HasEditableSurfaceMesh);
 
     const auto domains = Runtime::EditorUI::GetAvailableKMeansDomains(reg, entity);
     ASSERT_EQ(domains.size(), 3u);
@@ -279,5 +324,7 @@ TEST(EditorUIProcessing, MixedGeometryEntityEnumeratesAllKMeansDomainsInStableOr
     EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(entries[0].Domains, Runtime::EditorUI::GeometryProcessingDomain::MeshVertices));
     EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(entries[0].Domains, Runtime::EditorUI::GeometryProcessingDomain::GraphVertices));
     EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(entries[0].Domains, Runtime::EditorUI::GeometryProcessingDomain::PointCloudPoints));
+    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(entries[1].Domains, Runtime::EditorUI::GeometryProcessingDomain::MeshHalfedges));
+    EXPECT_TRUE(Runtime::EditorUI::HasAnyDomain(entries[1].Domains, Runtime::EditorUI::GeometryProcessingDomain::MeshFaces));
 }
 
