@@ -23,6 +23,7 @@ This document tracks the **active rendering-architecture backlog** for Intrinsic
 ## 1. Related Documents
 
 - `docs/architecture/rendering-three-pass.md` — canonical runtime rendering architecture spec (pass contracts, data contracts, invariants).
+- `docs/architecture/runtime-subsystem-boundaries.md` — current runtime ownership map, dependency directions, and startup/per-frame/shutdown lifecycle.
 - `PLAN.md` — archival index for the completed three-pass migration.
 - `ROADMAP.md` — medium/long-horizon feature roadmap and phase ordering.
 - `README.md` — user-facing architecture summary, build/test entry points, and SLOs.
@@ -42,10 +43,6 @@ These are not required to finish the first wave, but they should begin soon afte
 ### B3. Engine Architecture Review Follow-Up (Boundary + Coupling + Migration)
 
 #### B3.1 Current Architecture Map (baseline and keep current)
-
-- [ ] Document the current subsystem boundaries and ownership map (`Engine`, `GraphicsBackend`, `RenderOrchestrator`, `SceneManager`, `AssetPipeline`).
-- [ ] Document explicit dependency directions between `Core`, `Runtime`, `Graphics`, `RHI`, `Geometry`, `ECS`, and `Interface`.
-- [ ] Publish a one-page runtime lifecycle map (startup, per-frame, shutdown) with the current execution order.
 
 #### B3.2 Coupling Hotspots (reduce first)
 
