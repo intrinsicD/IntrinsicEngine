@@ -46,6 +46,93 @@ These are not required to finish the first wave, but they should begin soon afte
 - [ ] Keep transparent/special/debug rendering in the forward path.
 - [ ] Define composition rules between paths.
 
+### B3. Engine Architecture Review Follow-Up (Boundary + Coupling + Migration)
+
+#### B3.1 Current Architecture Map (baseline and keep current)
+
+- [ ] Document the current subsystem boundaries and ownership map (`Engine`, `GraphicsBackend`, `RenderOrchestrator`, `SceneManager`, `AssetPipeline`).
+- [ ] Document explicit dependency directions between `Core`, `Runtime`, `Graphics`, `RHI`, `Geometry`, `ECS`, and `Interface`.
+- [ ] Publish a one-page runtime lifecycle map (startup, per-frame, shutdown) with the current execution order.
+
+#### B3.2 Coupling Hotspots (reduce first)
+
+- [ ] Reduce `Engine` orchestration coupling by introducing lane-level coordinators (simulation/render/streaming) while preserving behavior.
+- [ ] Reduce repetitive system registration glue in `Engine::Run()` via typed registration bundles.
+- [ ] Remove global/file-static GPU hook state from `SceneManager` and replace with instance-scoped callback context.
+
+#### B3.3 Mixed Concerns + Unstable Interfaces
+
+- [ ] Separate drag-drop ingest orchestration from `Engine` into a dedicated asset ingest service.
+- [ ] Separate frame-loop policy from subsystem wiring (registration/configuration vs. per-frame execution).
+- [ ] Replace string-based feature toggle callsites in hot orchestration paths with typed feature descriptors where practical.
+
+#### B3.4 Barriers to Testing + Evolution
+
+- [ ] Add seam-friendly interfaces for `Engine` dependencies to allow isolated tests without full Vulkan/runtime boot.
+- [ ] Add tests that lock frame-order contracts (fixed-step + variable-step + dispatcher + render handoff).
+- [ ] Add tests that lock asset-streaming completion semantics (queued -> uploaded -> finalized).
+
+#### B3.5 Hidden Architectural Duplication
+
+- [ ] Consolidate repeated geometry sync registration patterns (graph/mesh-view/point-cloud/GPU-scene) behind shared helpers.
+- [ ] Consolidate repeated GPU-slot reclaim lifecycle logic into a single policy utility with shared tests.
+- [ ] Audit duplicate upload/lifecycle code paths between retained geometry systems and document consolidation plan.
+
+#### B3.6 Redesign Options (decision package)
+
+##### Option O1 — Minimal Change
+
+- [ ] Write an ADR for O1 that explicitly captures:
+  - [ ] Benefits
+  - [ ] Drawbacks
+  - [ ] Migration cost
+  - [ ] Regression risk
+  - [ ] Performance impact
+  - [ ] Testability impact
+  - [ ] Future extensibility impact
+
+##### Option O2 — Pragmatic Medium Refactor
+
+- [ ] Write an ADR for O2 that explicitly captures:
+  - [ ] Benefits
+  - [ ] Drawbacks
+  - [ ] Migration cost
+  - [ ] Regression risk
+  - [ ] Performance impact
+  - [ ] Testability impact
+  - [ ] Future extensibility impact
+
+##### Option O3 — Ideal Target Architecture
+
+- [ ] Write an ADR for O3 that explicitly captures:
+  - [ ] Benefits
+  - [ ] Drawbacks
+  - [ ] Migration cost
+  - [ ] Regression risk
+  - [ ] Performance impact
+  - [ ] Testability impact
+  - [ ] Future extensibility impact
+
+#### B3.7 Recommended Path (default = O2) + Migration Plan
+
+- [ ] Ratify O2 as the default path unless new benchmark/test evidence disproves it.
+- [ ] Execute phased migration with safe checkpoints:
+  - [ ] Phase 0: Baseline lock (telemetry/order/contract snapshots).
+    - [ ] Safe checkpoint: no behavioral diff vs baseline in frame order + render contracts.
+  - [ ] Phase 1: Extract simulation/render/streaming lanes (no behavior change).
+    - [ ] Safe checkpoint: same pass/system order and same frame outputs as baseline.
+  - [ ] Phase 2: Replace global hook state with instance-scoped callbacks + typed system bundles.
+    - [ ] Safe checkpoint: lifecycle/resource reclaim tests unchanged.
+  - [ ] Phase 3: Move drag-drop + async load orchestration into streaming service state machine.
+    - [ ] Safe checkpoint: asset ingest completion/integrity metrics unchanged.
+  - [ ] Phase 4: Harden typed contracts for hybrid/deferred and post-process factoring.
+    - [ ] Safe checkpoint: render-graph validation and pass-contract suites remain green.
+
+- [ ] Define rollback strategy before each phase starts:
+  - [ ] Maintain a feature flag to route back to legacy orchestration path.
+  - [ ] Keep adapter shims for one migration window (then delete).
+  - [ ] Require pass/fail gates (tests + telemetry budgets) to permit cutover.
+
 ---
 
 ## 3. Later (P2) — Planned Downstream Work
