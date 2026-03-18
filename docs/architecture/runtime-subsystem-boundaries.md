@@ -104,6 +104,7 @@ Core ───────► RHI ───────► Graphics
 
 Geometry ─► Graphics        (geometry data / algorithms consumed by rendering)
 ECS ─────► Graphics         (render components + systems operate on ECS state)
+Graphics ─► Interface       (current ImGui/render-system integration path)
 
 Runtime ─► Core
 Runtime ─► RHI
@@ -117,7 +118,7 @@ Runtime ─► Interface
 
 - **`Core`** is the bottom utility layer: memory, assets, frame graph, hashing, telemetry, tasks, feature registry, I/O abstractions, and windowing.
 - **`RHI`** depends on `Core`-level facilities and encapsulates Vulkan/CUDA-facing primitives.
-- **`Graphics`** depends on `RHI`, `Core`, `Geometry`, and `ECS` to implement render passes, render graph execution, geometry upload/sync systems, materials, and GPU scene infrastructure.
+- **`Graphics`** depends on `RHI`, `Core`, `Geometry`, `ECS`, and currently `Interface` for render passes, render graph execution, geometry upload/sync systems, materials, GPU scene infrastructure, and ImGui/render-system integration.
 - **`Geometry`** stays algorithm/data-structure focused and does not depend on `Runtime`.
 - **`ECS`** stays scene/component/system infrastructure focused and does not depend on `Runtime`.
 - **`Interface`** is a top-layer UI/editor integration surface that can consume runtime and graphics state but should not become a dependency of lower layers.
@@ -131,7 +132,7 @@ Runtime ─► Interface
 | `Geometry` | `Core` | `Runtime`, `Graphics`, `Interface` |
 | `ECS` | `Core`, narrow math/types as needed | `Runtime`, `Interface` |
 | `RHI` | `Core` | `Runtime`, `Graphics`, `Interface` |
-| `Graphics` | `Core`, `RHI`, `Geometry`, `ECS` | `Runtime` |
+| `Graphics` | `Core`, `RHI`, `Geometry`, `ECS`, currently `Interface` | `Runtime` |
 | `Interface` | `Core`, `Graphics`, `Runtime`, `ECS` as presentation glue | lower layers depending back on `Interface` |
 | `Runtime` | all lower/runtime-adjacent layers above | being depended on by lower layers |
 
@@ -220,7 +221,17 @@ The variable-dt `FrameGraph` is assembled in this order, subject to feature togg
 
 The actual execution order is still data-dependency-driven by `Core::FrameGraph`, but this is the current registration order in `Engine::Run()`.
 
-## Shutdown order
+## End-of-run flush before destructor teardown
+
+```text
+1. Task scheduler wait-for-all
+2. GraphicsBackend::WaitIdle()
+3. GraphicsBackend::FlushDeletionQueues()
+```
+
+`Engine::Run()` performs this drain/flush sequence before returning control to the caller. It is separate from destructor-time subsystem teardown and must stay ordered ahead of backend destruction.
+
+## Destructor teardown order
 
 ```text
 1. GraphicsBackend::WaitIdle()
@@ -237,7 +248,6 @@ The actual execution order is still data-dependency-driven by `Core::FrameGraph`
 12. SceneManager destruction
 13. GraphicsBackend destruction
 14. Window destruction
-15. Final task wait + graphics deletion flush after Run() exits
 ```
 
 ### Shutdown invariants
@@ -246,6 +256,7 @@ The actual execution order is still data-dependency-driven by `Core::FrameGraph`
 - Material deletions are processed before `RenderOrchestrator` tears down `MaterialSystem`.
 - `RenderOrchestrator` dies before the GUI backend that may still reference render-owned textures.
 - `GraphicsBackend` dies after all higher-level runtime subsystems that borrow its services.
+- The end-of-run wait/idle/flush sequence completes before destructor-driven subsystem teardown begins.
 
 ---
 
@@ -257,5 +268,7 @@ This baseline also makes the current hot spots explicit:
 - `SceneManager` still uses file-static GPU hook state for EnTT destruction callbacks.
 - Runtime-to-runtime borrowing is still manual rather than lane-coordinated (`AssetPipeline`, `SceneManager`, `RenderOrchestrator` all meet in `Engine`).
 - Core ECS system registration is still handwritten in the main frame loop.
+- `Graphics -> Interface` is an active dependency today (for ImGui/render-system wiring), so future boundary cleanup should treat it as an existing coupling to reduce deliberately rather than as a dependency that is already absent.
+
 
 Those are intentional observations for the follow-up TODO items; they are not contradictions in this document.
