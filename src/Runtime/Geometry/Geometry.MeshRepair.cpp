@@ -16,6 +16,7 @@ module Geometry:MeshRepair.Impl;
 import :MeshRepair;
 import :Properties;
 import :HalfedgeMesh;
+import :MeshUtils;
 
 namespace Geometry::MeshRepair
 {
@@ -30,33 +31,12 @@ namespace Geometry::MeshRepair
 
         BoundaryLoopResult result;
 
-        const std::size_t nH = mesh.HalfedgesSize();
-        std::vector<bool> visited(nH, false);
-
-        for (std::size_t hi = 0; hi < nH; ++hi)
+        for (auto& loopData : MeshUtils::CollectBoundaryLoops(mesh))
         {
-            HalfedgeHandle h{static_cast<PropertyIndex>(hi)};
-            if (visited[hi]) continue;
-            if (mesh.IsDeleted(mesh.Edge(h))) continue;
-            if (!mesh.IsBoundary(h)) continue;
-
-            // Found an unvisited boundary halfedge — trace the loop
             BoundaryLoop loop;
-            HalfedgeHandle hCurr = h;
-            std::size_t safety = 0;
-            do
-            {
-                visited[hCurr.Index] = true;
-                loop.Halfedges.push_back(hCurr);
-                loop.Vertices.push_back(mesh.FromVertex(hCurr));
-
-                // Walk to next boundary halfedge in the loop
-                hCurr = mesh.NextHalfedge(hCurr);
-                if (++safety > nH) break; // safety limit
-            } while (hCurr != h);
-
-            if (!loop.Vertices.empty())
-                result.Loops.push_back(std::move(loop));
+            loop.Halfedges = std::move(loopData.Halfedges);
+            loop.Vertices = std::move(loopData.Vertices);
+            result.Loops.push_back(std::move(loop));
         }
 
         return result;

@@ -59,34 +59,9 @@ namespace Geometry::MeshQuality
         // Closedness & boundary loops
         // ------------------------------------------------------------------
         {
-            bool isClosed = true;
-            std::vector<bool> visited(mesh.HalfedgesSize(), false);
-            std::size_t boundaryLoops = 0;
-
-            for (std::size_t ei = 0; ei < mesh.EdgesSize(); ++ei)
-            {
-                EdgeHandle eh{static_cast<PropertyIndex>(ei)};
-                if (mesh.IsDeleted(eh)) continue;
-                if (mesh.IsBoundary(eh))
-                {
-                    isClosed = false;
-                    // Walk boundary loop from this edge if not already visited
-                    HalfedgeHandle h0{static_cast<PropertyIndex>(2u * ei)};
-                    HalfedgeHandle h1 = mesh.OppositeHalfedge(h0);
-                    HalfedgeHandle bh = mesh.IsBoundary(h0) ? h0 : h1;
-
-                    if (!visited[bh.Index])
-                    {
-                        ++boundaryLoops;
-                        for (const HalfedgeHandle cur : mesh.BoundaryHalfedges(bh))
-                        {
-                            visited[cur.Index] = true;
-                        }
-                    }
-                }
-            }
-            result.IsClosed = isClosed;
-            result.BoundaryLoopCount = boundaryLoops;
+            const auto boundaryLoops = MeshUtils::CollectBoundaryLoops(mesh);
+            result.IsClosed = boundaryLoops.empty();
+            result.BoundaryLoopCount = boundaryLoops.size();
         }
 
         // ------------------------------------------------------------------

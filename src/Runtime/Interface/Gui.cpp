@@ -13,6 +13,7 @@ module;
 #include <GLFW/glfw3.h> // Required for glfwGetInstanceProcAddress
 #include <algorithm>
 #include <array>
+#include <string_view>
 #include <unordered_set>
 #include <vector>
 #include <filesystem>
@@ -60,6 +61,19 @@ namespace Interface::GUI
     static bool s_ShowTelemetryPanel = false;
     static bool s_BackendInitialized = false;
     static std::unordered_set<void*> s_RegisteredTextures;
+
+    template <typename T>
+    static T* FindNamedItem(std::vector<T>& items, std::string_view name)
+    {
+        const auto it = std::ranges::find(items, name, &T::Name);
+        return it != items.end() ? &*it : nullptr;
+    }
+
+    template <typename T>
+    static void RemoveNamedItem(std::vector<T>& items, std::string_view name)
+    {
+        std::erase_if(items, [&](const T& item) { return item.Name == name; });
+    }
 
     static float ToMs(uint64_t ns) { return static_cast<float>(static_cast<double>(ns) / 1'000'000.0); }
 
@@ -755,28 +769,30 @@ namespace Interface::GUI
         ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
     }
 
-    void RegisterPanel(std::string name, UIPanelCallback callback, bool isClosable, int flags)
+    void RegisterPanel(std::string name, UIPanelCallback callback, bool isClosable, int flags, bool defaultOpen)
     {
-        // Check if panel exists to update it (re-open it if it was closed)
-        for (auto& panel : s_Panels)
+        // Update existing registration but preserve the user's current open state.
+        if (auto* panel = FindNamedItem(s_Panels, name))
         {
-            if (panel.Name == name)
-            {
-                panel.Callback = std::move(callback);
-                panel.IsClosable = isClosable;
-                panel.Flags = flags;
-                panel.IsOpen = true; // Re-open
-                return;
-            }
+            panel->Callback = std::move(callback);
+            panel->IsClosable = isClosable;
+            panel->Flags = flags;
+            return;
         }
 
-        // Add new
-        s_Panels.push_back({std::move(name), std::move(callback), isClosable, true, flags});
+        // Add new. Non-closable panels always draw, so IsOpen only matters for closable ones.
+        s_Panels.push_back({std::move(name), std::move(callback), isClosable, !isClosable || defaultOpen, flags});
+    }
+
+    void OpenPanel(const std::string& name)
+    {
+        if (auto* panel = FindNamedItem(s_Panels, name))
+            panel->IsOpen = true;
     }
 
     void RemovePanel(const std::string& name)
     {
-        std::erase_if(s_Panels, [&](const RegisteredPanel& p) { return p.Name == name; });
+        RemoveNamedItem(s_Panels, name);
     }
 
     void RegisterMainMenuBar(std::string name, UIMenuCallback callback)
@@ -787,13 +803,10 @@ namespace Interface::GUI
 
     void RegisterOverlay(std::string name, UIOverlayCallback callback)
     {
-        for (auto& overlay : s_Overlays)
+        if (auto* overlay = FindNamedItem(s_Overlays, name))
         {
-            if (overlay.Name == name)
-            {
-                overlay.Callback = std::move(callback);
-                return;
-            }
+            overlay->Callback = std::move(callback);
+            return;
         }
 
         s_Overlays.push_back({std::move(name), std::move(callback)});
@@ -801,7 +814,7 @@ namespace Interface::GUI
 
     void RemoveOverlay(const std::string& name)
     {
-        std::erase_if(s_Overlays, [&](const RegisteredOverlay& o) { return o.Name == name; });
+        RemoveNamedItem(s_Overlays, name);
     }
 
     bool WantCaptureMouse()

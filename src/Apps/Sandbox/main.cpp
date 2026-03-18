@@ -399,9 +399,9 @@ private:
     // =========================================================================
     void RegisterPanels()
     {
-        Interface::GUI::RegisterPanel("Hierarchy", [this]() { DrawHierarchyPanel(); });
-        Interface::GUI::RegisterPanel("Inspector", [this]() { m_Inspector.Draw(); });
-        Interface::GUI::RegisterPanel("Assets", [this]() { GetAssetManager().AssetsUiPanel(); });
+        Interface::GUI::RegisterPanel("Hierarchy", [this]() { DrawHierarchyPanel(); }, true, 0, false);
+        Interface::GUI::RegisterPanel("Inspector", [this]() { m_Inspector.Draw(); }, true, 0, false);
+        Interface::GUI::RegisterPanel("Assets", [this]() { GetAssetManager().AssetsUiPanel(); }, true, 0, false);
 
         // Geometry workflow panels and menu bar (delegated to controller).
         m_GeometryWorkflow.RegisterPanelsAndMenu();
@@ -478,7 +478,7 @@ private:
                 ImGui::Text("Picked World: (%.3f, %.3f, %.3f)",
                             picked.spaces.World.x, picked.spaces.World.y, picked.spaces.World.z);
             }
-        });
+        }, true, 0, false);
 
         // Status bar
         Interface::GUI::RegisterPanel("Status Bar", [this]()
@@ -566,7 +566,7 @@ private:
             ImGui::Separator();
             const char* stateNames[] = {"Idle", "Hovered", "Active"};
             ImGui::Text("State: %s", stateNames[static_cast<int>(m_Gizmo.GetState())]);
-        });
+        }, true, 0, false);
 
         Interface::GUI::RegisterOverlay("Transform Gizmo", [this]()
         {
@@ -577,7 +577,7 @@ private:
         Interface::GUI::RegisterPanel("View Settings", [this]()
         {
             DrawViewSettingsPanel();
-        });
+        }, true, 0, false);
     }
 
     // =========================================================================

@@ -34,7 +34,16 @@ export namespace Interface::GUI
     // Must be called inside a RenderPass (or BeginRendering).
     void Render(VkCommandBuffer cmd);
 
-    void RegisterPanel(std::string name, UIPanelCallback callback, bool isClosable = true, int flags = 0);
+    // Registers or updates a panel. On first registration, closable panels honor
+    // defaultOpen; subsequent registrations preserve the user's current open state.
+    void RegisterPanel(std::string name,
+                       UIPanelCallback callback,
+                       bool isClosable = true,
+                       int flags = 0,
+                       bool defaultOpen = true);
+
+    // Explicitly re-opens a previously registered panel from menus/tools.
+    void OpenPanel(const std::string& name);
 
     void RemovePanel(const std::string& name);
 

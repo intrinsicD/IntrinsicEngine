@@ -52,28 +52,16 @@ namespace Geometry::Geodesic
             FaceHandle fh{static_cast<PropertyIndex>(fi)};
             gradients[fi].Valid = false;
 
-            if (mesh.IsDeleted(fh))
+            MeshUtils::TriangleFaceView tri{};
+            if (!MeshUtils::TryGetTriangleFaceView(mesh, fh, tri))
                 continue;
 
-            // Get triangle vertices and values
-            HalfedgeHandle h0 = mesh.Halfedge(fh);
-            HalfedgeHandle h1 = mesh.NextHalfedge(h0);
-            HalfedgeHandle h2 = mesh.NextHalfedge(h1);
-
-            VertexHandle va = mesh.ToVertex(h0);
-            VertexHandle vb = mesh.ToVertex(h1);
-            VertexHandle vc = mesh.ToVertex(h2);
-
-            glm::vec3 pa = mesh.Position(va);
-            glm::vec3 pb = mesh.Position(vb);
-            glm::vec3 pc = mesh.Position(vc);
-
-            double ua_val = u[va.Index];
-            double ub_val = u[vb.Index];
-            double uc_val = u[vc.Index];
+            double ua_val = u[tri.V0.Index];
+            double ub_val = u[tri.V1.Index];
+            double uc_val = u[tri.V2.Index];
 
             // Face normal (unnormalized, length = 2*area)
-            glm::vec3 N = glm::cross(pb - pa, pc - pa);
+            glm::vec3 N = glm::cross(tri.P1 - tri.P0, tri.P2 - tri.P0);
             float areaTimesTwo = glm::length(N);
             if (areaTimesTwo < 1e-10f)
                 continue;
@@ -81,9 +69,9 @@ namespace Geometry::Geodesic
             N /= areaTimesTwo; // Unit normal
 
             // Edges opposite to each vertex
-            glm::vec3 ea = pc - pb; // opposite to a
-            glm::vec3 eb = pa - pc; // opposite to b
-            glm::vec3 ec = pb - pa; // opposite to c
+            glm::vec3 ea = tri.P2 - tri.P1; // opposite to a
+            glm::vec3 eb = tri.P0 - tri.P2; // opposite to b
+            glm::vec3 ec = tri.P1 - tri.P0; // opposite to c
 
             // Gradient: (1/2A) * Σ u_i * (N × e_i)
             float invTwoA = 1.0f / areaTimesTwo;
@@ -130,23 +118,14 @@ namespace Geometry::Geodesic
 
             glm::vec3 Xf = X[fi].Direction;
 
-            // Get triangle vertices
-            HalfedgeHandle h0 = mesh.Halfedge(fh);
-            HalfedgeHandle h1 = mesh.NextHalfedge(h0);
-            HalfedgeHandle h2 = mesh.NextHalfedge(h1);
-
-            VertexHandle va = mesh.ToVertex(h0);
-            VertexHandle vb = mesh.ToVertex(h1);
-            VertexHandle vc = mesh.ToVertex(h2);
-
-            glm::vec3 pa = mesh.Position(va);
-            glm::vec3 pb = mesh.Position(vb);
-            glm::vec3 pc = mesh.Position(vc);
+            MeshUtils::TriangleFaceView tri{};
+            if (!MeshUtils::TryGetTriangleFaceView(mesh, fh, tri))
+                continue;
 
             // Edges
-            glm::vec3 eab = pb - pa;
-            glm::vec3 eac = pc - pa;
-            glm::vec3 ebc = pc - pb;
+            glm::vec3 eab = tri.P1 - tri.P0;
+            glm::vec3 eac = tri.P2 - tri.P0;
+            glm::vec3 ebc = tri.P2 - tri.P1;
 
             // Cotangents at each vertex
             double cotA = Cotan(eab, eac);
@@ -156,19 +135,19 @@ namespace Geometry::Geodesic
             // Divergence contribution to vertex a:
             //   (1/2) [cot(B) * dot(pa - pb, Xf) + cot(C) * dot(pa - pc, Xf)]
             // Note: edges from neighboring vertices TO vertex a
-            auto dotBA = static_cast<double>(glm::dot(pa - pb, Xf));
-            auto dotCA = static_cast<double>(glm::dot(pa - pc, Xf));
-            div[va.Index] += 0.5 * (cotB * dotBA + cotC * dotCA);
+            auto dotBA = static_cast<double>(glm::dot(tri.P0 - tri.P1, Xf));
+            auto dotCA = static_cast<double>(glm::dot(tri.P0 - tri.P2, Xf));
+            div[tri.V0.Index] += 0.5 * (cotB * dotBA + cotC * dotCA);
 
             // Divergence contribution to vertex b
-            auto dotAB = static_cast<double>(glm::dot(pb - pa, Xf));
-            auto dotCB = static_cast<double>(glm::dot(pb - pc, Xf));
-            div[vb.Index] += 0.5 * (cotA * dotAB + cotC * dotCB);
+            auto dotAB = static_cast<double>(glm::dot(tri.P1 - tri.P0, Xf));
+            auto dotCB = static_cast<double>(glm::dot(tri.P1 - tri.P2, Xf));
+            div[tri.V1.Index] += 0.5 * (cotA * dotAB + cotC * dotCB);
 
             // Divergence contribution to vertex c
-            auto dotAC = static_cast<double>(glm::dot(pc - pa, Xf));
-            auto dotBC = static_cast<double>(glm::dot(pc - pb, Xf));
-            div[vc.Index] += 0.5 * (cotA * dotAC + cotB * dotBC);
+            auto dotAC = static_cast<double>(glm::dot(tri.P2 - tri.P0, Xf));
+            auto dotBC = static_cast<double>(glm::dot(tri.P2 - tri.P1, Xf));
+            div[tri.V2.Index] += 0.5 * (cotA * dotAC + cotB * dotBC);
         }
 
         return div;

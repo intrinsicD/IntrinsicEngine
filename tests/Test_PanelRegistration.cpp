@@ -3,7 +3,6 @@
 #include <imgui.h>
 #include "RHI.Vulkan.hpp"
 #include <string>
-#include <vector>
 
 #include "TestImGuiFrameScope.hpp"
 
@@ -16,7 +15,8 @@ import Interface;
 //   - Panels can be registered, removed, and re-registered by name.
 //   - Overlays can be registered and removed by name.
 //   - Menu bars can be registered.
-//   - Duplicate panel registration re-opens and updates existing entries.
+//   - Duplicate panel registration updates existing entries without clobbering user visibility.
+//   - Panels can be registered closed-by-default and explicitly reopened.
 //
 // These tests require an ImGui context (created/destroyed per test) but
 // do NOT require a Vulkan device or GLFW window.
@@ -93,6 +93,72 @@ TEST(PanelRegistration, DuplicateRegistration_UpdatesCallback)
     EXPECT_EQ(secondCount, 1);
 
     Interface::GUI::RemovePanel("TestPanel_Dup");
+}
+
+TEST(PanelRegistration, RegisterPanel_DefaultClosed_SkipsDrawUntilOpened)
+{
+    TestSupport::ImGuiFrameScope frame;
+
+    int callCount = 0;
+    Interface::GUI::RegisterPanel("Closed_Default", [&callCount]() { ++callCount; }, /*isClosable=*/true, /*flags=*/0, /*defaultOpen=*/false);
+
+    Interface::GUI::DrawGUI();
+    EXPECT_EQ(callCount, 0);
+
+    Interface::GUI::OpenPanel("Closed_Default");
+    Interface::GUI::DrawGUI();
+    EXPECT_EQ(callCount, 1);
+
+    Interface::GUI::RemovePanel("Closed_Default");
+}
+
+TEST(PanelRegistration, DuplicateRegistration_PreservesClosedState)
+{
+    TestSupport::ImGuiFrameScope frame;
+
+    int firstCount = 0;
+    int secondCount = 0;
+    Interface::GUI::RegisterPanel("Closed_Dup", [&firstCount]() { ++firstCount; }, /*isClosable=*/true, /*flags=*/0, /*defaultOpen=*/false);
+    Interface::GUI::RegisterPanel("Closed_Dup", [&secondCount]() { ++secondCount; });
+
+    Interface::GUI::DrawGUI();
+    EXPECT_EQ(firstCount, 0);
+    EXPECT_EQ(secondCount, 0);
+
+    Interface::GUI::OpenPanel("Closed_Dup");
+    Interface::GUI::DrawGUI();
+    EXPECT_EQ(firstCount, 0);
+    EXPECT_EQ(secondCount, 1);
+
+    Interface::GUI::RemovePanel("Closed_Dup");
+}
+
+TEST(PanelRegistration, DuplicateRegistration_PreservesOpenedState)
+{
+    TestSupport::ImGuiFrameScope frame;
+
+    int firstCount = 0;
+    int secondCount = 0;
+    Interface::GUI::RegisterPanel("Opened_Dup", [&firstCount]() { ++firstCount; }, /*isClosable=*/true, /*flags=*/0, /*defaultOpen=*/false);
+
+    Interface::GUI::OpenPanel("Opened_Dup");
+    Interface::GUI::DrawGUI();
+    EXPECT_EQ(firstCount, 1);
+
+    Interface::GUI::RegisterPanel("Opened_Dup", [&secondCount]() { ++secondCount; });
+
+    Interface::GUI::DrawGUI();
+    EXPECT_EQ(firstCount, 1);
+    EXPECT_EQ(secondCount, 1);
+
+    Interface::GUI::RemovePanel("Opened_Dup");
+}
+
+TEST(PanelRegistration, OpenPanel_NonExistent_NoCrash)
+{
+    TestSupport::ImGuiFrameScope frame;
+    Interface::GUI::OpenPanel("MissingPanel_123");
+    SUCCEED();
 }
 
 // --------------------------------------------------------------------------

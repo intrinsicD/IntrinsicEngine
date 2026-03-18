@@ -297,20 +297,13 @@ namespace Geometry::DEC
         for (std::size_t fi = 0; fi < nF; ++fi)
         {
             FaceHandle fh{static_cast<PropertyIndex>(fi)};
-            if (mesh.IsDeleted(fh))
+            MeshUtils::TriangleFaceView tri{};
+            if (!MeshUtils::TryGetTriangleFaceView(mesh, fh, tri))
             {
                 continue;
             }
 
-            HalfedgeHandle h0 = mesh.Halfedge(fh);
-            HalfedgeHandle h1 = mesh.NextHalfedge(h0);
-            HalfedgeHandle h2 = mesh.NextHalfedge(h1);
-
-            glm::vec3 pa = mesh.Position(mesh.ToVertex(h0));
-            glm::vec3 pb = mesh.Position(mesh.ToVertex(h1));
-            glm::vec3 pc = mesh.Position(mesh.ToVertex(h2));
-
-            double area = TriangleArea(pa, pb, pc);
+            double area = TriangleArea(tri.P0, tri.P1, tri.P2);
 
             if (area > 1e-12)
             {

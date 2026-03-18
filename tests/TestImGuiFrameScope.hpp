@@ -12,6 +12,8 @@ namespace TestSupport
             Context = ImGui::CreateContext();
             ImGui::SetCurrentContext(Context);
             ImGuiIO& io = ImGui::GetIO();
+            io.IniFilename = nullptr;
+            io.LogFilename = nullptr;
             io.DisplaySize = ImVec2(800.0f, 600.0f);
 
             unsigned char* pixels = nullptr;

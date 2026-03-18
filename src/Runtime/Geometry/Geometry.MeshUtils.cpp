@@ -120,6 +120,41 @@ namespace Geometry::MeshUtils
         return true;
     }
 
+    std::vector<BoundaryLoopData> CollectBoundaryLoops(const Halfedge::Mesh& mesh)
+    {
+        std::vector<BoundaryLoopData> loops;
+        if (mesh.IsEmpty() || mesh.HalfedgesSize() == 0)
+            return loops;
+
+        const std::size_t nH = mesh.HalfedgesSize();
+        std::vector<bool> visited(nH, false);
+
+        for (std::size_t hi = 0; hi < nH; ++hi)
+        {
+            HalfedgeHandle h{static_cast<PropertyIndex>(hi)};
+            if (visited[hi]) continue;
+            if (mesh.IsDeleted(mesh.Edge(h))) continue;
+            if (!mesh.IsBoundary(h)) continue;
+
+            BoundaryLoopData loop;
+            for (const HalfedgeHandle cur : mesh.BoundaryHalfedges(h))
+            {
+                visited[cur.Index] = true;
+                loop.Halfedges.push_back(cur);
+            }
+
+            for (const VertexHandle v : mesh.BoundaryVertices(h))
+            {
+                loop.Vertices.push_back(v);
+            }
+
+            if (!loop.Vertices.empty())
+                loops.push_back(std::move(loop));
+        }
+
+        return loops;
+    }
+
     void CalculateNormals(std::span<const glm::vec3> positions, std::span<const uint32_t> indices,
                           std::span<glm::vec3> normals)
     {

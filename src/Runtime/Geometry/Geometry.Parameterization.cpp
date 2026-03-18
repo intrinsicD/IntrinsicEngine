@@ -18,6 +18,7 @@ import :Parameterization;
 import :Properties;
 import :HalfedgeMesh;
 import :DEC;
+import :MeshUtils;
 
 namespace Geometry::Parameterization
 {
@@ -128,31 +129,15 @@ namespace Geometry::Parameterization
         BoundaryInfo FindBoundaryLoops(const Halfedge::Mesh& mesh)
         {
             BoundaryInfo info;
-            std::vector<bool> visited(mesh.HalfedgesSize(), false);
-
-            for (std::size_t hi = 0; hi < mesh.HalfedgesSize(); ++hi)
+            const auto loops = MeshUtils::CollectBoundaryLoops(mesh);
+            info.LoopCount = loops.size();
+            if (!loops.empty())
             {
-                HalfedgeHandle h{static_cast<PropertyIndex>(hi)};
-                if (visited[hi]) continue;
-                if (mesh.IsDeleted(EdgeHandle{static_cast<PropertyIndex>(hi / 2)})) continue;
-                if (!mesh.IsBoundary(h)) continue;
-
-                // Found an unvisited boundary halfedge — walk the loop
-                std::vector<std::size_t> loopVerts;
-                for (const HalfedgeHandle cur : mesh.BoundaryHalfedges(h))
+                info.LoopVertices.reserve(loops.front().Vertices.size());
+                for (const VertexHandle v : loops.front().Vertices)
                 {
-                    visited[cur.Index] = true;
+                    info.LoopVertices.push_back(v.Index);
                 }
-
-                for (const VertexHandle v : mesh.BoundaryVertices(h))
-                {
-                    loopVerts.push_back(v.Index);
-                }
-
-                if (info.LoopCount == 0)
-                    info.LoopVertices = std::move(loopVerts);
-
-                ++info.LoopCount;
             }
 
             return info;

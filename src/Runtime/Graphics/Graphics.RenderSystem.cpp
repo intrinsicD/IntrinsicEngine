@@ -902,7 +902,9 @@ namespace Graphics
                                           ImGui::DragFloat("Depth Far", &debugView.DepthFar, 1.0f, 1.0f, 100000.0f,
                                                            "%.1f", ImGuiSliderFlags_AlwaysClamp);
                                       },
-                                      true);
+                                      true,
+                                      0,
+                                      false);
 
         m_RenderGraph.SetTransientAllocator(m_GlobalResources.GetTransientAllocator());
         m_GpuScene = nullptr;

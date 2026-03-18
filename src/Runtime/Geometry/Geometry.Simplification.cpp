@@ -247,45 +247,48 @@ namespace Geometry::Simplification
         // Face helpers
         // =====================================================================
 
-        [[nodiscard]] glm::dvec3 ComputeFaceNormalD(Halfedge::Mesh const& mesh, FaceHandle f) noexcept
+        struct FaceTrianglePointsD
         {
+            glm::dvec3 P0{0.0};
+            glm::dvec3 P1{0.0};
+            glm::dvec3 P2{0.0};
+        };
+
+        [[nodiscard]] FaceTrianglePointsD GetFaceTrianglePointsD(Halfedge::Mesh const& mesh, FaceHandle f) noexcept
+        {
+            MeshUtils::TriangleFaceView tri{};
+            if (MeshUtils::TryGetTriangleFaceView(mesh, f, tri))
+            {
+                return {
+                    glm::dvec3(tri.P0),
+                    glm::dvec3(tri.P1),
+                    glm::dvec3(tri.P2)};
+            }
+
+            // Preserve historical behavior for any non-triangular face that may
+            // still reach simplification internals: use the leading 3-vertex
+            // cycle rather than changing semantics to "skip face entirely".
             const HalfedgeHandle h0 = mesh.Halfedge(f);
             const HalfedgeHandle h1 = mesh.NextHalfedge(h0);
             const HalfedgeHandle h2 = mesh.NextHalfedge(h1);
+            return {
+                glm::dvec3(mesh.Position(mesh.ToVertex(h0))),
+                glm::dvec3(mesh.Position(mesh.ToVertex(h1))),
+                glm::dvec3(mesh.Position(mesh.ToVertex(h2)))};
+        }
 
-            const glm::dvec3 p0(mesh.Position(mesh.ToVertex(h0)));
-            const glm::dvec3 p1(mesh.Position(mesh.ToVertex(h1)));
-            const glm::dvec3 p2(mesh.Position(mesh.ToVertex(h2)));
-
-            glm::dvec3 n = glm::cross(p1 - p0, p2 - p0);
+        [[nodiscard]] glm::dvec3 ComputeFaceNormalD(Halfedge::Mesh const& mesh, FaceHandle f) noexcept
+        {
+            const FaceTrianglePointsD tri = GetFaceTrianglePointsD(mesh, f);
+            glm::dvec3 n = glm::cross(tri.P1 - tri.P0, tri.P2 - tri.P0);
             const double len = glm::length(n);
             return len > 1e-12 ? n / len : glm::dvec3(0.0);
         }
 
-        [[nodiscard]] glm::dvec3 ComputeFaceCenterD(Halfedge::Mesh const& mesh, FaceHandle f) noexcept
-        {
-            const HalfedgeHandle h0 = mesh.Halfedge(f);
-            const HalfedgeHandle h1 = mesh.NextHalfedge(h0);
-            const HalfedgeHandle h2 = mesh.NextHalfedge(h1);
-
-            const glm::dvec3 p0(mesh.Position(mesh.ToVertex(h0)));
-            const glm::dvec3 p1(mesh.Position(mesh.ToVertex(h1)));
-            const glm::dvec3 p2(mesh.Position(mesh.ToVertex(h2)));
-
-            return (p0 + p1 + p2) / 3.0;
-        }
-
         [[nodiscard]] double FacePointDistance(Halfedge::Mesh const& mesh, FaceHandle f, glm::vec3 const& p) noexcept
         {
-            const HalfedgeHandle h0 = mesh.Halfedge(f);
-            const HalfedgeHandle h1 = mesh.NextHalfedge(h0);
-            const HalfedgeHandle h2 = mesh.NextHalfedge(h1);
-
-            const glm::dvec3 p0(mesh.Position(mesh.ToVertex(h0)));
-            const glm::dvec3 p1(mesh.Position(mesh.ToVertex(h1)));
-            const glm::dvec3 p2(mesh.Position(mesh.ToVertex(h2)));
-
-            return PointTriangleDistance(glm::dvec3(p), p0, p1, p2);
+            const FaceTrianglePointsD tri = GetFaceTrianglePointsD(mesh, f);
+            return PointTriangleDistance(glm::dvec3(p), tri.P0, tri.P1, tri.P2);
         }
 
         [[nodiscard]] double TriangleAspectRatioMetric(glm::vec3 const& p0, glm::vec3 const& p1, glm::vec3 const& p2) noexcept

@@ -28,7 +28,7 @@ void GeometryWorkflowController::Init(Runtime::Engine& engine, entt::entity& cac
 
 void GeometryWorkflowController::RegisterPanelsAndMenu()
 {
-    Interface::GUI::RegisterPanel("Geometry Workflow", [this]() { DrawWorkflowPanel(); });
+    Interface::GUI::RegisterPanel("Geometry Workflow", [this]() { DrawWorkflowPanel(); }, true, 0, false);
     Interface::GUI::RegisterMainMenuBar("Geometry", [this]() { DrawMenu(); });
 }
 
@@ -106,31 +106,37 @@ bool GeometryWorkflowController::DrawOperatorPanelHeader(const SelectionContext&
 void GeometryWorkflowController::OpenWorkflowPanel()
 {
     Interface::GUI::RegisterPanel("Geometry Workflow", [this]() { DrawWorkflowPanel(); });
+    Interface::GUI::OpenPanel("Geometry Workflow");
 }
 
 void GeometryWorkflowController::OpenRemeshingPanel()
 {
     Interface::GUI::RegisterPanel("Geometry - Remeshing", [this]() { DrawRemeshingPanel(); });
+    Interface::GUI::OpenPanel("Geometry - Remeshing");
 }
 
 void GeometryWorkflowController::OpenSimplificationPanel()
 {
     Interface::GUI::RegisterPanel("Geometry - Simplification", [this]() { DrawSimplificationPanel(); });
+    Interface::GUI::OpenPanel("Geometry - Simplification");
 }
 
 void GeometryWorkflowController::OpenSmoothingPanel()
 {
     Interface::GUI::RegisterPanel("Geometry - Smoothing", [this]() { DrawSmoothingPanel(); });
+    Interface::GUI::OpenPanel("Geometry - Smoothing");
 }
 
 void GeometryWorkflowController::OpenSubdivisionPanel()
 {
     Interface::GUI::RegisterPanel("Geometry - Subdivision", [this]() { DrawSubdivisionPanel(); });
+    Interface::GUI::OpenPanel("Geometry - Subdivision");
 }
 
 void GeometryWorkflowController::OpenRepairPanel()
 {
     Interface::GUI::RegisterPanel("Geometry - Repair", [this]() { DrawRepairPanel(); });
+    Interface::GUI::OpenPanel("Geometry - Repair");
 }
 
 void GeometryWorkflowController::OpenWorkflowStack()

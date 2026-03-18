@@ -136,22 +136,13 @@ namespace Geometry::AdaptiveRemeshing
                 for (std::size_t fi = 0; fi < mesh.FacesSize(); ++fi)
                 {
                     FaceHandle f{static_cast<PropertyIndex>(fi)};
-                    if (!mesh.IsValid(f) || mesh.IsDeleted(f)) continue;
+                    MeshUtils::TriangleFaceView tri{};
+                    if (!MeshUtils::TryGetTriangleFaceView(mesh, f, tri)) continue;
 
-                    const HalfedgeHandle h0 = mesh.Halfedge(f);
-                    const HalfedgeHandle h1 = mesh.NextHalfedge(h0);
-                    const HalfedgeHandle h2 = mesh.NextHalfedge(h1);
-                    const HalfedgeHandle h3 = mesh.NextHalfedge(h2);
-                    if (h3 != h0) continue;
-
-                    const glm::vec3 p0 = mesh.Position(mesh.ToVertex(h0));
-                    const glm::vec3 p1 = mesh.Position(mesh.ToVertex(h1));
-                    const glm::vec3 p2 = mesh.Position(mesh.ToVertex(h2));
-
-                    Triangles.push_back({p0, p1, p2});
+                    Triangles.push_back({tri.P0, tri.P1, tri.P2});
                     triAabbs.push_back(AABB{
-                        .Min = glm::min(p0, glm::min(p1, p2)),
-                        .Max = glm::max(p0, glm::max(p1, p2))});
+                        .Min = glm::min(tri.P0, glm::min(tri.P1, tri.P2)),
+                        .Max = glm::max(tri.P0, glm::max(tri.P1, tri.P2))});
                 }
 
                 if (Triangles.empty()) return false;

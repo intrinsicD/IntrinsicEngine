@@ -236,7 +236,7 @@ namespace Runtime::EditorUI
 
                 ImGui::EndTable();
             }
-        });
+        }, true, 0, false);
 
         // Add a menu entry to open it.
         Interface::GUI::RegisterMainMenuBar("Tools", []
@@ -245,7 +245,7 @@ namespace Runtime::EditorUI
             {
                 if (ImGui::MenuItem("Features"))
                 {
-                    // Panel menu is global; toggling is handled there.
+                    Interface::GUI::OpenPanel("Features");
                 }
                 ImGui::EndMenu();
             }
@@ -276,7 +276,7 @@ namespace Runtime::EditorUI
                     ImGui::TreePop();
                 }
             }
-        });
+        }, true, 0, false);
     }
 
     static void RegisterSelectionPanel(Runtime::Engine& engine)
@@ -425,7 +425,7 @@ namespace Runtime::EditorUI
 
             if (ImGui::Button("Clear Selection"))
                 sel.ClearSelection(engine.GetScene());
-        });
+        }, true, 0, false);
     }
 
     static void RegisterSceneFileMenu(Runtime::Engine& engine)

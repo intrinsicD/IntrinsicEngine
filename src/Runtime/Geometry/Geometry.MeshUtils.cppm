@@ -31,9 +31,19 @@ export namespace Geometry::MeshUtils
         glm::vec3 P2{};
     };
 
+    struct BoundaryLoopData
+    {
+        std::vector<HalfedgeHandle> Halfedges{};
+        std::vector<VertexHandle> Vertices{};
+    };
+
     /// Gather canonical triangle traversal data for a face.
     /// Returns false for invalid/deleted faces and non-triangular face loops.
     bool TryGetTriangleFaceView(const Halfedge::Mesh& mesh, FaceHandle f, TriangleFaceView& out);
+
+    /// Enumerate all boundary loops in canonical halfedge order.
+    /// Deleted edges are skipped; empty/closed meshes return an empty vector.
+    [[nodiscard]] std::vector<BoundaryLoopData> CollectBoundaryLoops(const Halfedge::Mesh& mesh);
 
     // --- Index-buffer mesh utilities ---
 
