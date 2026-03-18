@@ -48,7 +48,7 @@ These are not required to finish the first wave, but they should begin soon afte
 
 - [ ] Reduce `Engine` orchestration coupling by introducing lane-level coordinators (simulation/render/streaming) while preserving behavior.
 - [ ] Reduce repetitive system registration glue in `Engine::Run()` via typed registration bundles.
-- [ ] Remove global/file-static GPU hook state from `SceneManager` and replace with instance-scoped callback context.
+- [x] Remove global/file-static GPU hook state from `SceneManager` and replace with instance-scoped callback context.
 
 #### B3.3 Mixed Concerns + Unstable Interfaces
 
@@ -112,6 +112,8 @@ These are not required to finish the first wave, but they should begin soon afte
   - [ ] Phase 1: Extract simulation/render/streaming lanes (no behavior change).
     - [ ] Safe checkpoint: same pass/system order and same frame outputs as baseline.
   - [ ] Phase 2: Replace global hook state with instance-scoped callbacks + typed system bundles.
+    - [x] Replace global/file-static `SceneManager` hook state with instance-scoped callbacks.
+    - [ ] Introduce typed system bundles for `Engine::Run()`.
     - [ ] Safe checkpoint: lifecycle/resource reclaim tests unchanged.
   - [ ] Phase 3: Move drag-drop + async load orchestration into streaming service state machine.
     - [ ] Safe checkpoint: asset ingest completion/integrity metrics unchanged.
