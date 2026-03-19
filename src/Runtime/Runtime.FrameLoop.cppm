@@ -66,11 +66,47 @@ export namespace Runtime
         void Execute(this const FrameGraphExecutor&, Core::FrameGraph& graph);
     };
 
+    class IStreamingLaneHost
+    {
+    public:
+        virtual ~IStreamingLaneHost();
+
+        virtual void ProcessMainThreadQueue() = 0;
+        virtual void ProcessUploads() = 0;
+        virtual void ProcessTextureDeletions() = 0;
+        virtual void ProcessMaterialDeletions() = 0;
+        virtual void GarbageCollectTransfers() = 0;
+    };
+
+    class RuntimeStreamingLaneHost final : public IStreamingLaneHost
+    {
+    public:
+        RuntimeStreamingLaneHost(AssetPipeline& assets,
+                                 GraphicsBackend& graphics,
+                                 Graphics::MaterialSystem& materials)
+            : m_Assets(assets)
+            , m_Graphics(graphics)
+            , m_Materials(materials)
+        {
+        }
+
+        ~RuntimeStreamingLaneHost() override;
+
+        void ProcessMainThreadQueue() override;
+        void ProcessUploads() override;
+        void ProcessTextureDeletions() override;
+        void ProcessMaterialDeletions() override;
+        void GarbageCollectTransfers() override;
+
+    private:
+        AssetPipeline& m_Assets;
+        GraphicsBackend& m_Graphics;
+        Graphics::MaterialSystem& m_Materials;
+    };
+
     struct StreamingLaneCoordinator
     {
-        AssetPipeline& Assets;
-        GraphicsBackend& Graphics;
-        Graphics::MaterialSystem& Materials;
+        IStreamingLaneHost& Host;
 
         void BeginFrame(this const StreamingLaneCoordinator&);
         void EndFrame(this const StreamingLaneCoordinator&);
@@ -83,13 +119,49 @@ export namespace Runtime
         RenderHookFn OnRender;
     };
 
+    class IRenderLaneHost
+    {
+    public:
+        virtual ~IRenderLaneHost();
+
+        [[nodiscard]] virtual Core::FrameGraph& GetFrameGraph() = 0;
+        virtual void RegisterEngineSystems(Core::FrameGraph& graph) = 0;
+        virtual void DispatchDeferredEvents() = 0;
+    };
+
+    class RuntimeRenderLaneHost final : public IRenderLaneHost
+    {
+    public:
+        RuntimeRenderLaneHost(SceneManager& scene,
+                              RenderOrchestrator& renderer,
+                              GraphicsBackend& graphics,
+                              Core::FeatureRegistry& features,
+                              Core::Assets::AssetManager& assets)
+            : m_Scene(scene)
+            , m_Renderer(renderer)
+            , m_Graphics(graphics)
+            , m_Features(features)
+            , m_Assets(assets)
+        {
+        }
+
+        ~RuntimeRenderLaneHost() override;
+
+        [[nodiscard]] Core::FrameGraph& GetFrameGraph() override;
+        void RegisterEngineSystems(Core::FrameGraph& graph) override;
+        void DispatchDeferredEvents() override;
+
+    private:
+        SceneManager& m_Scene;
+        RenderOrchestrator& m_Renderer;
+        GraphicsBackend& m_Graphics;
+        Core::FeatureRegistry& m_Features;
+        Core::Assets::AssetManager& m_Assets;
+    };
+
     struct RenderLaneCoordinator
     {
-        SceneManager& Scene;
-        RenderOrchestrator& Renderer;
-        GraphicsBackend& Graphics;
-        Core::FeatureRegistry& Features;
-        Core::Assets::AssetManager& Assets;
+        IRenderLaneHost& Host;
 
         void Run(this const RenderLaneCoordinator&,
                  double frameTime,
