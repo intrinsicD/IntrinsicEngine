@@ -40,92 +40,67 @@ namespace
         }
     }
 
-    void RegisterTransformSystem(const Runtime::CoreFrameGraphRegistrationContext& context)
+    template <auto RegisterSystemFn>
+    void RegisterCoreSystem(const Runtime::CoreFrameGraphRegistrationContext& context)
     {
-        ECS::Systems::Transform::RegisterSystem(context.Graph, context.Registry);
+        RegisterSystemFn(context.Graph, context.Registry);
     }
 
-    void RegisterPropertySetDirtySyncSystem(const Runtime::CoreFrameGraphRegistrationContext& context)
+    template <auto RegisterSystemFn>
+    void RegisterGeometrySyncSystem(const Runtime::GpuFrameGraphRegistrationContext& context)
     {
-        Graphics::Systems::PropertySetDirtySync::RegisterSystem(context.Graph, context.Registry);
+        RegisterSystemFn(context.Core.Graph,
+                         context.Core.Registry,
+                         context.GpuScene,
+                         context.GeometryStorage,
+                         context.Device,
+                         context.TransferManager,
+                         context.Dispatcher);
     }
 
-    void RegisterPrimitiveBVHSyncSystem(const Runtime::CoreFrameGraphRegistrationContext& context)
+    template <auto RegisterSystemFn>
+    void RegisterMeshSurfaceSystem(const Runtime::GpuFrameGraphRegistrationContext& context)
     {
-        Graphics::Systems::PrimitiveBVHSync::RegisterSystem(context.Graph, context.Registry);
+        RegisterSystemFn(context.Core.Graph,
+                         context.Core.Registry,
+                         context.GpuScene,
+                         context.AssetManager,
+                         context.MaterialSystem,
+                         context.GeometryStorage,
+                         context.DefaultTextureId);
+    }
+
+    template <auto RegisterSystemFn>
+    void RegisterGpuSceneSystem(const Runtime::GpuFrameGraphRegistrationContext& context)
+    {
+        RegisterSystemFn(context.Core.Graph,
+                         context.Core.Registry,
+                         context.GpuScene,
+                         context.AssetManager,
+                         context.MaterialSystem,
+                         context.DefaultTextureId);
     }
 
     constexpr std::array<CoreSystemRegistrationSpec, 3> kCoreSystemRegistrations{{
-        {Runtime::SystemFeatureCatalog::TransformUpdate, &RegisterTransformSystem},
-        {Runtime::SystemFeatureCatalog::PropertySetDirtySync, &RegisterPropertySetDirtySyncSystem},
-        {Runtime::SystemFeatureCatalog::PrimitiveBVHSync, &RegisterPrimitiveBVHSyncSystem},
+        {Runtime::SystemFeatureCatalog::TransformUpdate,
+         &RegisterCoreSystem<&ECS::Systems::Transform::RegisterSystem>},
+        {Runtime::SystemFeatureCatalog::PropertySetDirtySync,
+         &RegisterCoreSystem<&Graphics::Systems::PropertySetDirtySync::RegisterSystem>},
+        {Runtime::SystemFeatureCatalog::PrimitiveBVHSync,
+         &RegisterCoreSystem<&Graphics::Systems::PrimitiveBVHSync::RegisterSystem>},
     }};
 
-    void RegisterGraphGeometrySyncSystem(const Runtime::GpuFrameGraphRegistrationContext& context)
-    {
-        Graphics::Systems::GraphGeometrySync::RegisterSystem(
-            context.Core.Graph,
-            context.Core.Registry,
-            context.GpuScene,
-            context.GeometryStorage,
-            context.Device,
-            context.TransferManager,
-            context.Dispatcher);
-    }
-
-    void RegisterMeshRendererLifecycleSystem(const Runtime::GpuFrameGraphRegistrationContext& context)
-    {
-        Graphics::Systems::MeshRendererLifecycle::RegisterSystem(
-            context.Core.Graph,
-            context.Core.Registry,
-            context.GpuScene,
-            context.AssetManager,
-            context.MaterialSystem,
-            context.GeometryStorage,
-            context.DefaultTextureId);
-    }
-
-    void RegisterPointCloudGeometrySyncSystem(const Runtime::GpuFrameGraphRegistrationContext& context)
-    {
-        Graphics::Systems::PointCloudGeometrySync::RegisterSystem(
-            context.Core.Graph,
-            context.Core.Registry,
-            context.GpuScene,
-            context.GeometryStorage,
-            context.Device,
-            context.TransferManager,
-            context.Dispatcher);
-    }
-
-    void RegisterMeshViewLifecycleSystem(const Runtime::GpuFrameGraphRegistrationContext& context)
-    {
-        Graphics::Systems::MeshViewLifecycle::RegisterSystem(
-            context.Core.Graph,
-            context.Core.Registry,
-            context.GpuScene,
-            context.GeometryStorage,
-            context.Device,
-            context.TransferManager,
-            context.Dispatcher);
-    }
-
-    void RegisterGpuSceneSyncSystem(const Runtime::GpuFrameGraphRegistrationContext& context)
-    {
-        Graphics::Systems::GPUSceneSync::RegisterSystem(
-            context.Core.Graph,
-            context.Core.Registry,
-            context.GpuScene,
-            context.AssetManager,
-            context.MaterialSystem,
-            context.DefaultTextureId);
-    }
-
     constexpr std::array<GpuSystemRegistrationSpec, 5> kGpuSystemRegistrations{{
-        {Runtime::SystemFeatureCatalog::GraphGeometrySync, &RegisterGraphGeometrySyncSystem},
-        {Runtime::SystemFeatureCatalog::MeshRendererLifecycle, &RegisterMeshRendererLifecycleSystem},
-        {Runtime::SystemFeatureCatalog::PointCloudGeometrySync, &RegisterPointCloudGeometrySyncSystem},
-        {Runtime::SystemFeatureCatalog::MeshViewLifecycle, &RegisterMeshViewLifecycleSystem},
-        {Runtime::SystemFeatureCatalog::GPUSceneSync, &RegisterGpuSceneSyncSystem},
+        {Runtime::SystemFeatureCatalog::GraphGeometrySync,
+         &RegisterGeometrySyncSystem<&Graphics::Systems::GraphGeometrySync::RegisterSystem>},
+        {Runtime::SystemFeatureCatalog::MeshRendererLifecycle,
+         &RegisterMeshSurfaceSystem<&Graphics::Systems::MeshRendererLifecycle::RegisterSystem>},
+        {Runtime::SystemFeatureCatalog::PointCloudGeometrySync,
+         &RegisterGeometrySyncSystem<&Graphics::Systems::PointCloudGeometrySync::RegisterSystem>},
+        {Runtime::SystemFeatureCatalog::MeshViewLifecycle,
+         &RegisterGeometrySyncSystem<&Graphics::Systems::MeshViewLifecycle::RegisterSystem>},
+        {Runtime::SystemFeatureCatalog::GPUSceneSync,
+         &RegisterGpuSceneSystem<&Graphics::Systems::GPUSceneSync::RegisterSystem>},
     }};
 }
 
