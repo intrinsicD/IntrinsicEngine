@@ -363,11 +363,10 @@ namespace Runtime
                 {
                     .OnUpdate = [&](float dt) { OnUpdate(dt); },
                     .RegisterVariableSystems = [&](Core::FrameGraph& graph, float dt) { OnRegisterSystems(graph, dt); },
+                    .BeforeDispatch = [&]() { Runtime::PointCloudKMeans::PumpCompletions(*this); },
                     .OnRender = [&]() { OnRender(); },
                 },
                 [&](Core::FrameGraph& graph) { executeGraph.Execute(graph); });
-
-            Runtime::PointCloudKMeans::PumpCompletions(*this);
 
             streamingLane.EndFrame();
 
