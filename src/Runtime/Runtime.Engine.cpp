@@ -28,191 +28,10 @@ import Runtime.AssetPipeline;
 import Runtime.AssetIngestService;
 import Runtime.SceneManager;
 import Runtime.RenderOrchestrator;
+import Runtime.FrameLoop;
 import Runtime.PointCloudKMeans;
-import Runtime.SystemBundles;
 
 using namespace Core::Hash;
-
-namespace
-{
-    struct FrameGraphTimingTotals
-    {
-        uint64_t CompileNsTotal = 0;
-        uint64_t ExecuteNsTotal = 0;
-        uint64_t CriticalPathNsTotal = 0;
-    };
-
-    struct FrameGraphExecutor
-    {
-        Core::Assets::AssetManager& AssetManager;
-        FrameGraphTimingTotals& Timings;
-
-        void Execute(Core::FrameGraph& graph) const
-        {
-            const auto compileResult = graph.Compile();
-            Timings.CompileNsTotal += graph.GetLastCompileTimeNs();
-            if (!compileResult)
-            {
-                return;
-            }
-
-            AssetManager.BeginReadPhase();
-            graph.Execute();
-            AssetManager.EndReadPhase();
-
-            Timings.ExecuteNsTotal += graph.GetLastExecuteTimeNs();
-            Timings.CriticalPathNsTotal += graph.GetLastCriticalPathTimeNs();
-        }
-    };
-
-    struct StreamingLaneCoordinator
-    {
-        Runtime::AssetPipeline& AssetPipeline;
-        Runtime::GraphicsBackend& GraphicsBackend;
-        Graphics::MaterialSystem& MaterialSystem;
-
-        void BeginFrame() const
-        {
-            AssetPipeline.ProcessMainThreadQueue();
-
-            {
-                PROFILE_SCOPE("ProcessUploads");
-                AssetPipeline.ProcessUploads();
-            }
-
-            // Reclaim pool slots for textures that became unreachable this frame.
-            GraphicsBackend.ProcessTextureDeletions();
-            MaterialSystem.ProcessDeletions(GraphicsBackend.GetDevice().GetGlobalFrameNumber());
-        }
-
-        void EndFrame() const
-        {
-            GraphicsBackend.GarbageCollectTransfers();
-        }
-    };
-
-    struct SimulationLaneCoordinator
-    {
-        Runtime::Engine& Engine;
-        Runtime::RenderOrchestrator& RenderOrchestrator;
-
-        template <typename ExecuteGraphFn>
-        void Run(double& accumulator,
-                 const double fixedDt,
-                 const int maxSubstepsPerFrame,
-                 ExecuteGraphFn&& executeGraph) const
-        {
-            PROFILE_SCOPE("FixedStep");
-
-            int substeps = 0;
-            while (accumulator >= fixedDt && substeps < maxSubstepsPerFrame)
-            {
-                {
-                    PROFILE_SCOPE("OnFixedUpdate");
-                    Engine.OnFixedUpdate(static_cast<float>(fixedDt));
-                }
-
-                // Allow client/engine simulation systems to run at fixed dt.
-                // NOTE: This currently reuses the same FrameGraph instance.
-                // If you register passes here, ensure pass names are unique per tick.
-                {
-                    PROFILE_SCOPE("FixedStepFrameGraph");
-                    auto& fixedGraph = RenderOrchestrator.GetFrameGraph();
-                    fixedGraph.Reset();
-
-                    const float dtF = static_cast<float>(fixedDt);
-                    Engine.OnRegisterFixedSystems(fixedGraph, dtF);
-
-                    executeGraph(fixedGraph);
-                }
-
-                accumulator -= fixedDt;
-                ++substeps;
-            }
-
-            // If we hit the clamp, drop remaining accumulated time.
-            // This keeps the engine responsive under extreme stalls.
-            if (substeps == maxSubstepsPerFrame)
-            {
-                accumulator = 0.0;
-            }
-        }
-    };
-
-    struct RenderLaneCoordinator
-    {
-        Runtime::Engine& Engine;
-        Runtime::SceneManager& SceneManager;
-        Runtime::RenderOrchestrator& RenderOrchestrator;
-        Runtime::GraphicsBackend& GraphicsBackend;
-        Core::FeatureRegistry& FeatureRegistry;
-
-        template <typename ExecuteGraphFn>
-        void Run(const double frameTime, ExecuteGraphFn&& executeGraph) const
-        {
-            {
-                PROFILE_SCOPE("OnUpdate");
-                // Variable-dt update for responsive input/camera.
-                Engine.OnUpdate(static_cast<float>(frameTime));
-            }
-
-            // --- FrameGraph: register, compile, and execute all variable-dt systems ---
-            {
-                PROFILE_SCOPE("FrameGraph");
-                auto& frameGraph = RenderOrchestrator.GetFrameGraph();
-                frameGraph.Reset();
-
-                auto& registry = SceneManager.GetRegistry();
-                const float frameDt = static_cast<float>(frameTime);
-
-                // Client/gameplay systems first: they produce dirty state.
-                Engine.OnRegisterSystems(frameGraph, frameDt);
-
-                // Core engine systems consume dirty state in pipeline order.
-                // Registration is grouped into typed bundles so Engine::Run()
-                // only orchestrates bundle boundaries rather than individual
-                // systems while preserving the same feature-gated pass order.
-                Runtime::CoreFrameGraphRegistrationContext coreBundleContext{
-                    .Graph = frameGraph,
-                    .Registry = registry,
-                    .Features = FeatureRegistry,
-                };
-                Runtime::CoreFrameGraphSystemBundle{}.Register(coreBundleContext);
-
-                auto* gpuScene = RenderOrchestrator.GetGPUScenePtr();
-                if (gpuScene)
-                {
-                    Runtime::GpuFrameGraphRegistrationContext gpuBundleContext{
-                        .Core = coreBundleContext,
-                        .GpuScene = *gpuScene,
-                        .AssetManager = Engine.GetAssetManager(),
-                        .MaterialSystem = RenderOrchestrator.GetMaterialSystem(),
-                        .GeometryStorage = RenderOrchestrator.GetGeometryStorage(),
-                        .Device = Engine.GetDeviceShared(),
-                        .TransferManager = GraphicsBackend.GetTransferManager(),
-                        .Dispatcher = SceneManager.GetScene().GetDispatcher(),
-                        .DefaultTextureId = GraphicsBackend.GetDefaultTextureIndex(),
-                    };
-                    Runtime::GpuFrameGraphSystemBundle{}.Register(gpuBundleContext);
-                }
-
-                executeGraph(frameGraph);
-            }
-
-            Runtime::PointCloudKMeans::PumpCompletions(Engine);
-
-            // Drain deferred events enqueued during this frame's system updates.
-            // All dispatcher sinks run synchronously on the main thread here,
-            // after ECS systems and before rendering (see CLAUDE.md Event Communication Policy).
-            SceneManager.GetScene().GetDispatcher().update();
-
-            {
-                PROFILE_SCOPE("OnRender");
-                Engine.OnRender();
-            }
-        }
-    };
-}
 
 namespace Runtime
 {
@@ -470,8 +289,19 @@ namespace Runtime
         // Fixed-step simulation (physics) accumulator.
         // We keep render/input updates variable-dt for responsiveness.
         double accumulator = 0.0;
-        constexpr double fixedDt = 1.0 / 60.0; // 60 Hz fixed simulation
-        constexpr int maxSubstepsPerFrame = 8; // clamp to avoid spiral-of-death
+        const FrameLoopPolicy frameLoopPolicy{};
+        const StreamingLaneCoordinator streamingLane{
+            .Assets = *m_AssetPipeline,
+            .Graphics = *m_GraphicsBackend,
+            .Materials = m_RenderOrchestrator->GetMaterialSystem(),
+        };
+        const RenderLaneCoordinator renderLane{
+            .Scene = *m_SceneManager,
+            .Renderer = *m_RenderOrchestrator,
+            .Graphics = *m_GraphicsBackend,
+            .Features = m_FeatureRegistry,
+            .Assets = GetAssetManager(),
+        };
 
         while (m_Running && !m_Window->ShouldClose())
         {
@@ -482,29 +312,12 @@ namespace Runtime
                 .AssetManager = GetAssetManager(),
                 .Timings = frameGraphTimings,
             };
-            const StreamingLaneCoordinator streamingLane{
-                .AssetPipeline = *m_AssetPipeline,
-                .GraphicsBackend = *m_GraphicsBackend,
-                .MaterialSystem = m_RenderOrchestrator->GetMaterialSystem(),
-            };
-            const SimulationLaneCoordinator simulationLane{
-                .Engine = *this,
-                .RenderOrchestrator = *m_RenderOrchestrator,
-            };
-            const RenderLaneCoordinator renderLane{
-                .Engine = *this,
-                .SceneManager = *m_SceneManager,
-                .RenderOrchestrator = *m_RenderOrchestrator,
-                .GraphicsBackend = *m_GraphicsBackend,
-                .FeatureRegistry = m_FeatureRegistry,
-            };
 
             auto currentTime = Clock::now();
-            double frameTime = std::chrono::duration<double>(currentTime - lastTime).count();
+            const double rawFrameTime = std::chrono::duration<double>(currentTime - lastTime).count();
             lastTime = currentTime;
-
-            // Prevent spiral of death from huge pauses/breakpoints
-            if (frameTime > 0.25) frameTime = 0.25;
+            const FrameTimeStep frameStep = ComputeFrameTime(rawFrameTime, frameLoopPolicy);
+            const double frameTime = frameStep.FrameTime;
 
             accumulator += frameTime;
 
@@ -551,13 +364,26 @@ namespace Runtime
 
             streamingLane.BeginFrame();
 
-            simulationLane.Run(accumulator, fixedDt, maxSubstepsPerFrame,
-                               [&](Core::FrameGraph& graph) { executeGraph.Execute(graph); });
+            RunFixedSteps(
+                accumulator,
+                frameLoopPolicy,
+                [&](float fixedDeltaTime) { OnFixedUpdate(fixedDeltaTime); },
+                [&](Core::FrameGraph& graph, float fixedDeltaTime) { OnRegisterFixedSystems(graph, fixedDeltaTime); },
+                m_RenderOrchestrator->GetFrameGraph(),
+                [&](Core::FrameGraph& graph) { executeGraph.Execute(graph); });
 
             // Resize is synchronized immediately after Window::OnUpdate() so render/update
             // always see the current framebuffer extent on monitor moves and DPI changes.
-            renderLane.Run(frameTime,
-                           [&](Core::FrameGraph& graph) { executeGraph.Execute(graph); });
+            renderLane.Run(
+                frameTime,
+                {
+                    .OnUpdate = [&](float dt) { OnUpdate(dt); },
+                    .RegisterVariableSystems = [&](Core::FrameGraph& graph, float dt) { OnRegisterSystems(graph, dt); },
+                    .OnRender = [&]() { OnRender(); },
+                },
+                [&](Core::FrameGraph& graph) { executeGraph.Execute(graph); });
+
+            Runtime::PointCloudKMeans::PumpCompletions(*this);
 
             streamingLane.EndFrame();
 
