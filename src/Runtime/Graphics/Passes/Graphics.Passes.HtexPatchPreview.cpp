@@ -453,7 +453,7 @@ namespace Graphics::Passes
                                                     data.Target = builder.Read(
                                                         handle,
                                                         VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-                                                        VK_ACCESS_2_SHADER_SAMPLED_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT);
+                                                        VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
                                                 }
                                             },
                                             [](const FinalizePassData&, const RGRegistry&, VkCommandBuffer)
