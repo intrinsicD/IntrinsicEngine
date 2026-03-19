@@ -46,9 +46,7 @@ These are not required to finish the first wave, but they should begin soon afte
 
 #### B3.2 Coupling Hotspots (reduce first)
 
-- [ ] Reduce `Engine` orchestration coupling by introducing lane-level coordinators (simulation/render/streaming) while preserving behavior.
 - [ ] Reduce repetitive system registration glue in `Engine::Run()` via typed registration bundles.
-- [x] Remove global/file-static GPU hook state from `SceneManager` and replace with instance-scoped callback context.
 
 #### B3.3 Mixed Concerns + Unstable Interfaces
 
@@ -109,11 +107,10 @@ These are not required to finish the first wave, but they should begin soon afte
 - [ ] Execute phased migration with safe checkpoints:
   - [ ] Phase 0: Baseline lock (telemetry/order/contract snapshots).
     - [ ] Safe checkpoint: no behavioral diff vs baseline in frame order + render contracts.
-  - [ ] Phase 1: Extract simulation/render/streaming lanes (no behavior change).
+  - [ ] Phase 1: Validate extracted simulation/render/streaming lanes (no behavior change).
     - [ ] Safe checkpoint: same pass/system order and same frame outputs as baseline.
-  - [ ] Phase 2: Replace global hook state with instance-scoped callbacks + typed system bundles.
-    - [x] Replace global/file-static `SceneManager` hook state with instance-scoped callbacks.
-    - [ ] Introduce typed system bundles for `Engine::Run()`.
+  - [ ] Phase 2: Land typed system bundles in `Engine::Run()`.
+    - [ ] Replace handwritten core system registration with typed bundle registration.
     - [ ] Safe checkpoint: lifecycle/resource reclaim tests unchanged.
   - [ ] Phase 3: Move drag-drop + async load orchestration into streaming service state machine.
     - [ ] Safe checkpoint: asset ingest completion/integrity metrics unchanged.

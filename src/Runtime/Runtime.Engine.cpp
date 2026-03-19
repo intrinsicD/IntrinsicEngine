@@ -37,6 +37,242 @@ import Runtime.PointCloudKMeans;
 
 using namespace Core::Hash;
 
+namespace
+{
+    struct FrameGraphTimingTotals
+    {
+        uint64_t CompileNsTotal = 0;
+        uint64_t ExecuteNsTotal = 0;
+        uint64_t CriticalPathNsTotal = 0;
+    };
+
+    struct FrameGraphExecutor
+    {
+        Core::Assets::AssetManager& AssetManager;
+        FrameGraphTimingTotals& Timings;
+
+        void Execute(Core::FrameGraph& graph) const
+        {
+            const auto compileResult = graph.Compile();
+            Timings.CompileNsTotal += graph.GetLastCompileTimeNs();
+            if (!compileResult)
+            {
+                return;
+            }
+
+            AssetManager.BeginReadPhase();
+            graph.Execute();
+            AssetManager.EndReadPhase();
+
+            Timings.ExecuteNsTotal += graph.GetLastExecuteTimeNs();
+            Timings.CriticalPathNsTotal += graph.GetLastCriticalPathTimeNs();
+        }
+    };
+
+    struct StreamingLaneCoordinator
+    {
+        Runtime::AssetPipeline& AssetPipeline;
+        Runtime::GraphicsBackend& GraphicsBackend;
+        Graphics::MaterialSystem& MaterialSystem;
+
+        void BeginFrame() const
+        {
+            AssetPipeline.ProcessMainThreadQueue();
+
+            {
+                PROFILE_SCOPE("ProcessUploads");
+                AssetPipeline.ProcessUploads();
+            }
+
+            // Reclaim pool slots for textures that became unreachable this frame.
+            GraphicsBackend.ProcessTextureDeletions();
+            MaterialSystem.ProcessDeletions(GraphicsBackend.GetDevice().GetGlobalFrameNumber());
+        }
+
+        void EndFrame() const
+        {
+            GraphicsBackend.GarbageCollectTransfers();
+        }
+    };
+
+    struct SimulationLaneCoordinator
+    {
+        Runtime::Engine& Engine;
+        Runtime::RenderOrchestrator& RenderOrchestrator;
+
+        template <typename ExecuteGraphFn>
+        void Run(double& accumulator,
+                 const double fixedDt,
+                 const int maxSubstepsPerFrame,
+                 ExecuteGraphFn&& executeGraph) const
+        {
+            PROFILE_SCOPE("FixedStep");
+
+            int substeps = 0;
+            while (accumulator >= fixedDt && substeps < maxSubstepsPerFrame)
+            {
+                {
+                    PROFILE_SCOPE("OnFixedUpdate");
+                    Engine.OnFixedUpdate(static_cast<float>(fixedDt));
+                }
+
+                // Allow client/engine simulation systems to run at fixed dt.
+                // NOTE: This currently reuses the same FrameGraph instance.
+                // If you register passes here, ensure pass names are unique per tick.
+                {
+                    PROFILE_SCOPE("FixedStepFrameGraph");
+                    auto& fixedGraph = RenderOrchestrator.GetFrameGraph();
+                    fixedGraph.Reset();
+
+                    const float dtF = static_cast<float>(fixedDt);
+                    Engine.OnRegisterFixedSystems(fixedGraph, dtF);
+
+                    executeGraph(fixedGraph);
+                }
+
+                accumulator -= fixedDt;
+                ++substeps;
+            }
+
+            // If we hit the clamp, drop remaining accumulated time.
+            // This keeps the engine responsive under extreme stalls.
+            if (substeps == maxSubstepsPerFrame)
+            {
+                accumulator = 0.0;
+            }
+        }
+    };
+
+    struct RenderLaneCoordinator
+    {
+        Runtime::Engine& Engine;
+        Runtime::SceneManager& SceneManager;
+        Runtime::RenderOrchestrator& RenderOrchestrator;
+        Runtime::GraphicsBackend& GraphicsBackend;
+        Core::FeatureRegistry& FeatureRegistry;
+
+        template <typename ExecuteGraphFn>
+        void Run(const double frameTime, ExecuteGraphFn&& executeGraph) const
+        {
+            {
+                PROFILE_SCOPE("OnUpdate");
+                // Variable-dt update for responsive input/camera.
+                Engine.OnUpdate(static_cast<float>(frameTime));
+            }
+
+            // --- FrameGraph: register, compile, and execute all variable-dt systems ---
+            {
+                PROFILE_SCOPE("FrameGraph");
+                auto& frameGraph = RenderOrchestrator.GetFrameGraph();
+                frameGraph.Reset();
+
+                auto& registry = SceneManager.GetRegistry();
+                const float frameDt = static_cast<float>(frameTime);
+
+                // Client/gameplay systems first: they produce dirty state.
+                Engine.OnRegisterSystems(frameGraph, frameDt);
+
+                // Core engine systems consume dirty state in pipeline order.
+                // Each system is gated by the FeatureRegistry so it can be
+                // toggled at runtime (e.g. for debugging or profiling).
+                if (FeatureRegistry.IsEnabled("TransformUpdate"_id))
+                    ECS::Systems::Transform::RegisterSystem(frameGraph, registry);
+
+                // PropertySet dirty-domain sync: processes per-domain dirty
+                // tags (VertexPositions, VertexAttributes, EdgeTopology,
+                // EdgeAttributes, FaceTopology, FaceAttributes) and either
+                // escalates to GpuDirty or performs incremental attribute
+                // re-extraction. Runs before lifecycle systems so GpuDirty
+                // flags are consumed in the same frame.
+                if (FeatureRegistry.IsEnabled("PropertySetDirtySync"_id))
+                {
+                    Graphics::Systems::PropertySetDirtySync::RegisterSystem(
+                        frameGraph, registry);
+                }
+
+                if (FeatureRegistry.IsEnabled("PrimitiveBVHSync"_id))
+                {
+                    Graphics::Systems::PrimitiveBVHSync::RegisterSystem(
+                        frameGraph, registry);
+                }
+
+                auto* gpuScene = RenderOrchestrator.GetGPUScenePtr();
+                if (gpuScene)
+                {
+                    auto& matSys = RenderOrchestrator.GetMaterialSystem();
+                    auto& geometryStorage = RenderOrchestrator.GetGeometryStorage();
+                    auto& dispatcher = SceneManager.GetScene().GetDispatcher();
+
+                    // Graph geometry sync: uploads graph node positions to GPU,
+                    // builds edge index pairs, extracts per-node attributes,
+                    // and allocates GPUScene slots for retained-mode BDA rendering.
+                    if (FeatureRegistry.IsEnabled("GraphGeometrySync"_id))
+                    {
+                        Graphics::Systems::GraphGeometrySync::RegisterSystem(
+                            frameGraph, registry, *gpuScene, geometryStorage,
+                            Engine.GetDeviceShared(),
+                            GraphicsBackend.GetTransferManager(),
+                            dispatcher);
+                    }
+
+                    if (FeatureRegistry.IsEnabled("MeshRendererLifecycle"_id))
+                    {
+                        Graphics::Systems::MeshRendererLifecycle::RegisterSystem(
+                            frameGraph, registry, *gpuScene, Engine.GetAssetManager(),
+                            matSys, geometryStorage,
+                            GraphicsBackend.GetDefaultTextureIndex());
+                    }
+
+                    // Cloud-backed point cloud sync: uploads Cloud::Positions/Normals
+                    // spans to device-local GPU buffers for entities with
+                    // ECS::PointCloud::Data (PropertySet-backed point clouds).
+                    if (FeatureRegistry.IsEnabled("PointCloudGeometrySync"_id))
+                    {
+                        Graphics::Systems::PointCloudGeometrySync::RegisterSystem(
+                            frameGraph, registry, *gpuScene, geometryStorage,
+                            Engine.GetDeviceShared(),
+                            GraphicsBackend.GetTransferManager(),
+                            dispatcher);
+                    }
+
+                    // Mesh view lifecycle: creates GPU geometry views (edge index
+                    // buffers, vertex point views) for entities with MeshEdgeView
+                    // or MeshVertexView components via ReuseVertexBuffersFrom.
+                    if (FeatureRegistry.IsEnabled("MeshViewLifecycle"_id))
+                    {
+                        Graphics::Systems::MeshViewLifecycle::RegisterSystem(
+                            frameGraph, registry, *gpuScene, geometryStorage,
+                            Engine.GetDeviceShared(),
+                            GraphicsBackend.GetTransferManager(),
+                            dispatcher);
+                    }
+
+                    if (FeatureRegistry.IsEnabled("GPUSceneSync"_id))
+                    {
+                        Graphics::Systems::GPUSceneSync::RegisterSystem(
+                            frameGraph, registry, *gpuScene, Engine.GetAssetManager(),
+                            matSys, GraphicsBackend.GetDefaultTextureIndex());
+                    }
+                }
+
+                executeGraph(frameGraph);
+            }
+
+            Runtime::PointCloudKMeans::PumpCompletions(Engine);
+
+            // Drain deferred events enqueued during this frame's system updates.
+            // All dispatcher sinks run synchronously on the main thread here,
+            // after ECS systems and before rendering (see CLAUDE.md Event Communication Policy).
+            SceneManager.GetScene().GetDispatcher().update();
+
+            {
+                PROFILE_SCOPE("OnRender");
+                Engine.OnRender();
+            }
+        }
+    };
+}
+
 namespace Runtime
 {
     Engine::Engine(const EngineConfig& config)
@@ -388,24 +624,26 @@ namespace Runtime
         {
             // Begin frame telemetry
             Core::Telemetry::TelemetrySystem::Get().BeginFrame();
-            uint64_t frameGraphCompileNsTotal = 0;
-            uint64_t frameGraphExecuteNsTotal = 0;
-            uint64_t frameGraphCriticalPathNs = 0;
-
-            auto compileAndExecuteGraph = [&](Core::FrameGraph& graph)
-            {
-                const auto compileResult = graph.Compile();
-                frameGraphCompileNsTotal += graph.GetLastCompileTimeNs();
-                if (!compileResult)
-                {
-                    return;
-                }
-
-                GetAssetManager().BeginReadPhase();
-                graph.Execute();
-                GetAssetManager().EndReadPhase();
-                frameGraphExecuteNsTotal += graph.GetLastExecuteTimeNs();
-                frameGraphCriticalPathNs += graph.GetLastCriticalPathTimeNs();
+            FrameGraphTimingTotals frameGraphTimings{};
+            const FrameGraphExecutor executeGraph{
+                .AssetManager = GetAssetManager(),
+                .Timings = frameGraphTimings,
+            };
+            const StreamingLaneCoordinator streamingLane{
+                .AssetPipeline = *m_AssetPipeline,
+                .GraphicsBackend = *m_GraphicsBackend,
+                .MaterialSystem = m_RenderOrchestrator->GetMaterialSystem(),
+            };
+            const SimulationLaneCoordinator simulationLane{
+                .Engine = *this,
+                .RenderOrchestrator = *m_RenderOrchestrator,
+            };
+            const RenderLaneCoordinator renderLane{
+                .Engine = *this,
+                .SceneManager = *m_SceneManager,
+                .RenderOrchestrator = *m_RenderOrchestrator,
+                .GraphicsBackend = *m_GraphicsBackend,
+                .FeatureRegistry = m_FeatureRegistry,
             };
 
             auto currentTime = Clock::now();
@@ -458,188 +696,23 @@ namespace Runtime
                 }
             }
 
-            m_AssetPipeline->ProcessMainThreadQueue();
+            streamingLane.BeginFrame();
 
-            {
-                PROFILE_SCOPE("ProcessUploads");
-                m_AssetPipeline->ProcessUploads();
-            }
-
-            // Reclaim pool slots for textures that became unreachable this frame.
-            m_GraphicsBackend->ProcessTextureDeletions();
-
-            {
-                auto& matSys = m_RenderOrchestrator->GetMaterialSystem();
-                matSys.ProcessDeletions(m_GraphicsBackend->GetDevice().GetGlobalFrameNumber());
-            }
-
-            // -----------------------------------------------------------------
-            // Fixed-step lane (0..N substeps) for deterministic simulation
-            // -----------------------------------------------------------------
-            {
-                PROFILE_SCOPE("FixedStep");
-
-                int substeps = 0;
-                while (accumulator >= fixedDt && substeps < maxSubstepsPerFrame)
-                {
-                    {
-                        PROFILE_SCOPE("OnFixedUpdate");
-                        OnFixedUpdate(static_cast<float>(fixedDt));
-                    }
-
-                    // Allow client/engine simulation systems to run at fixed dt.
-                    // NOTE: This currently reuses the same FrameGraph instance.
-                    // If you register passes here, ensure pass names are unique per tick.
-                    {
-                        PROFILE_SCOPE("FixedStepFrameGraph");
-                        auto& fixedGraph = m_RenderOrchestrator->GetFrameGraph();
-                        fixedGraph.Reset();
-
-                        const float dtF = static_cast<float>(fixedDt);
-                        OnRegisterFixedSystems(fixedGraph, dtF);
-
-                        compileAndExecuteGraph(fixedGraph);
-                    }
-
-                    accumulator -= fixedDt;
-                    ++substeps;
-                }
-
-                // If we hit the clamp, drop remaining accumulated time.
-                // This keeps the engine responsive under extreme stalls.
-                if (substeps == maxSubstepsPerFrame)
-                {
-                    accumulator = 0.0;
-                }
-            }
-
-            {
-                PROFILE_SCOPE("OnUpdate");
-                // Variable-dt update for responsive input/camera
-                OnUpdate(static_cast<float>(frameTime));
-            }
-
-            // --- FrameGraph: register, compile, and execute all variable-dt systems ---
-            {
-                PROFILE_SCOPE("FrameGraph");
-                auto& frameGraph = m_RenderOrchestrator->GetFrameGraph();
-                frameGraph.Reset();
-
-                auto& registry = m_SceneManager->GetRegistry();
-                const float frameDt = static_cast<float>(frameTime);
-
-                // Client/gameplay systems first: they produce dirty state
-                OnRegisterSystems(frameGraph, frameDt);
-
-                // Core engine systems consume dirty state in pipeline order.
-                // Each system is gated by the FeatureRegistry so it can be
-                // toggled at runtime (e.g. for debugging or profiling).
-                if (m_FeatureRegistry.IsEnabled("TransformUpdate"_id))
-                    ECS::Systems::Transform::RegisterSystem(frameGraph, registry);
-
-                // PropertySet dirty-domain sync: processes per-domain dirty
-                // tags (VertexPositions, VertexAttributes, EdgeTopology,
-                // EdgeAttributes, FaceTopology, FaceAttributes) and either
-                // escalates to GpuDirty or performs incremental attribute
-                // re-extraction. Runs before lifecycle systems so GpuDirty
-                // flags are consumed in the same frame.
-                if (m_FeatureRegistry.IsEnabled("PropertySetDirtySync"_id))
-                {
-                    Graphics::Systems::PropertySetDirtySync::RegisterSystem(
-                        frameGraph, registry);
-                }
-
-                if (m_FeatureRegistry.IsEnabled("PrimitiveBVHSync"_id))
-                {
-                    Graphics::Systems::PrimitiveBVHSync::RegisterSystem(
-                        frameGraph, registry);
-                }
-
-                auto* gpuScene = m_RenderOrchestrator->GetGPUScenePtr();
-                if (gpuScene)
-                {
-                    auto& matSys = m_RenderOrchestrator->GetMaterialSystem();
-
-                    // Graph geometry sync: uploads graph node positions to GPU,
-                    // builds edge index pairs, extracts per-node attributes,
-                    // and allocates GPUScene slots for retained-mode BDA rendering.
-                    if (m_FeatureRegistry.IsEnabled("GraphGeometrySync"_id))
-                    {
-                        Graphics::Systems::GraphGeometrySync::RegisterSystem(
-                            frameGraph, registry, *gpuScene,
-                            m_RenderOrchestrator->GetGeometryStorage(),
-                            GetDeviceShared(),
-                            m_GraphicsBackend->GetTransferManager(),
-                            m_SceneManager->GetScene().GetDispatcher());
-                    }
-
-                    if (m_FeatureRegistry.IsEnabled("MeshRendererLifecycle"_id))
-                    {
-                        Graphics::Systems::MeshRendererLifecycle::RegisterSystem(
-                            frameGraph, registry, *gpuScene, GetAssetManager(),
-                            matSys, m_RenderOrchestrator->GetGeometryStorage(),
-                            m_GraphicsBackend->GetDefaultTextureIndex());
-                    }
-
-
-                    // Cloud-backed point cloud sync: uploads Cloud::Positions/Normals
-                    // spans to device-local GPU buffers for entities with
-                    // ECS::PointCloud::Data (PropertySet-backed point clouds).
-                    if (m_FeatureRegistry.IsEnabled("PointCloudGeometrySync"_id))
-                    {
-                        Graphics::Systems::PointCloudGeometrySync::RegisterSystem(
-                            frameGraph, registry, *gpuScene,
-                            m_RenderOrchestrator->GetGeometryStorage(),
-                            GetDeviceShared(),
-                            m_GraphicsBackend->GetTransferManager(),
-                            m_SceneManager->GetScene().GetDispatcher());
-                    }
-
-                    // Mesh view lifecycle: creates GPU geometry views (edge index
-                    // buffers, vertex point views) for entities with MeshEdgeView
-                    // or MeshVertexView components via ReuseVertexBuffersFrom.
-                    if (m_FeatureRegistry.IsEnabled("MeshViewLifecycle"_id))
-                    {
-                        Graphics::Systems::MeshViewLifecycle::RegisterSystem(
-                            frameGraph, registry, *gpuScene,
-                            m_RenderOrchestrator->GetGeometryStorage(),
-                            GetDeviceShared(),
-                            m_GraphicsBackend->GetTransferManager(),
-                            m_SceneManager->GetScene().GetDispatcher());
-                    }
-
-
-                    if (m_FeatureRegistry.IsEnabled("GPUSceneSync"_id))
-                    {
-                        Graphics::Systems::GPUSceneSync::RegisterSystem(
-                            frameGraph, registry, *gpuScene, GetAssetManager(),
-                            matSys, m_GraphicsBackend->GetDefaultTextureIndex());
-                    }
-                }
-
-                compileAndExecuteGraph(frameGraph);
-            }
-
-            Runtime::PointCloudKMeans::PumpCompletions(*this);
-
-            // Drain deferred events enqueued during this frame's system updates.
-            // All dispatcher sinks run synchronously on the main thread here,
-            // after ECS systems and before rendering (see CLAUDE.md Event Communication Policy).
-            m_SceneManager->GetScene().GetDispatcher().update();
+            simulationLane.Run(accumulator, fixedDt, maxSubstepsPerFrame,
+                               [&](Core::FrameGraph& graph) { executeGraph.Execute(graph); });
 
             // Resize is synchronized immediately after Window::OnUpdate() so render/update
             // always see the current framebuffer extent on monitor moves and DPI changes.
+            renderLane.Run(frameTime,
+                           [&](Core::FrameGraph& graph) { executeGraph.Execute(graph); });
 
-            m_GraphicsBackend->GarbageCollectTransfers();
-
-            {
-                PROFILE_SCOPE("OnRender");
-                OnRender();
-            }
+            streamingLane.EndFrame();
 
             Core::Telemetry::TelemetrySystem::Get().SetTaskSchedulerStats(Core::Tasks::Scheduler::GetStats());
             Core::Telemetry::TelemetrySystem::Get().SetFrameGraphTimings(
-                frameGraphCompileNsTotal, frameGraphExecuteNsTotal, frameGraphCriticalPathNs);
+                frameGraphTimings.CompileNsTotal,
+                frameGraphTimings.ExecuteNsTotal,
+                frameGraphTimings.CriticalPathNsTotal);
 
             // End frame telemetry
             Core::Telemetry::TelemetrySystem::Get().EndFrame();
