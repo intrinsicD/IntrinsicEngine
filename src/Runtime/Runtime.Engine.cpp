@@ -271,18 +271,20 @@ namespace Runtime
         // We keep render/input updates variable-dt for responsiveness.
         double accumulator = 0.0;
         const FrameLoopPolicy frameLoopPolicy{};
-        const StreamingLaneCoordinator streamingLane{
-            .Assets = *m_AssetPipeline,
-            .Graphics = *m_GraphicsBackend,
-            .Materials = m_RenderOrchestrator->GetMaterialSystem(),
+        RuntimeStreamingLaneHost streamingLaneHost{
+            *m_AssetPipeline,
+            *m_GraphicsBackend,
+            m_RenderOrchestrator->GetMaterialSystem(),
         };
-        const RenderLaneCoordinator renderLane{
-            .Scene = *m_SceneManager,
-            .Renderer = *m_RenderOrchestrator,
-            .Graphics = *m_GraphicsBackend,
-            .Features = m_FeatureRegistry,
-            .Assets = GetAssetManager(),
+        const StreamingLaneCoordinator streamingLane{.Host = streamingLaneHost};
+        RuntimeRenderLaneHost renderLaneHost{
+            *m_SceneManager,
+            *m_RenderOrchestrator,
+            *m_GraphicsBackend,
+            m_FeatureRegistry,
+            GetAssetManager(),
         };
+        const RenderLaneCoordinator renderLane{.Host = renderLaneHost};
 
         while (m_Running && !m_Window->ShouldClose())
         {

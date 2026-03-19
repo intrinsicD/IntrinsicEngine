@@ -10,6 +10,11 @@ import Runtime.SystemBundles;
 
 namespace Runtime
 {
+    IStreamingLaneHost::~IStreamingLaneHost() = default;
+    RuntimeStreamingLaneHost::~RuntimeStreamingLaneHost() = default;
+    IRenderLaneHost::~IRenderLaneHost() = default;
+    RuntimeRenderLaneHost::~RuntimeRenderLaneHost() = default;
+
     FrameTimeStep ComputeFrameTime(double rawFrameTime, const FrameLoopPolicy& policy)
     {
         const double sanitized = std::clamp(rawFrameTime, 0.0, policy.MaxFrameDelta);
@@ -73,22 +78,86 @@ namespace Runtime
         self.Timings.CriticalPathNsTotal += graph.GetLastCriticalPathTimeNs();
     }
 
+    void RuntimeStreamingLaneHost::ProcessMainThreadQueue()
+    {
+        m_Assets.ProcessMainThreadQueue();
+    }
+
+    void RuntimeStreamingLaneHost::ProcessUploads()
+    {
+        m_Assets.ProcessUploads();
+    }
+
+    void RuntimeStreamingLaneHost::ProcessTextureDeletions()
+    {
+        m_Graphics.ProcessTextureDeletions();
+    }
+
+    void RuntimeStreamingLaneHost::ProcessMaterialDeletions()
+    {
+        m_Materials.ProcessDeletions(m_Graphics.GetDevice().GetGlobalFrameNumber());
+    }
+
+    void RuntimeStreamingLaneHost::GarbageCollectTransfers()
+    {
+        m_Graphics.GarbageCollectTransfers();
+    }
+
     void StreamingLaneCoordinator::BeginFrame(this const StreamingLaneCoordinator& self)
     {
-        self.Assets.ProcessMainThreadQueue();
+        self.Host.ProcessMainThreadQueue();
 
         {
             PROFILE_SCOPE("ProcessUploads");
-            self.Assets.ProcessUploads();
+            self.Host.ProcessUploads();
         }
 
-        self.Graphics.ProcessTextureDeletions();
-        self.Materials.ProcessDeletions(self.Graphics.GetDevice().GetGlobalFrameNumber());
+        self.Host.ProcessTextureDeletions();
+        self.Host.ProcessMaterialDeletions();
     }
 
     void StreamingLaneCoordinator::EndFrame(this const StreamingLaneCoordinator& self)
     {
-        self.Graphics.GarbageCollectTransfers();
+        self.Host.GarbageCollectTransfers();
+    }
+
+    Core::FrameGraph& RuntimeRenderLaneHost::GetFrameGraph()
+    {
+        return m_Renderer.GetFrameGraph();
+    }
+
+    void RuntimeRenderLaneHost::RegisterEngineSystems(Core::FrameGraph& graph)
+    {
+        auto& registry = m_Scene.GetRegistry();
+
+        CoreFrameGraphRegistrationContext coreBundleContext{
+            .Graph = graph,
+            .Registry = registry,
+            .Features = m_Features,
+        };
+        CoreFrameGraphSystemBundle{}.Register(coreBundleContext);
+
+        auto* gpuScene = m_Renderer.GetGPUScenePtr();
+        if (gpuScene)
+        {
+            GpuFrameGraphRegistrationContext gpuBundleContext{
+                .Core = coreBundleContext,
+                .GpuScene = *gpuScene,
+                .AssetManager = m_Assets,
+                .MaterialSystem = m_Renderer.GetMaterialSystem(),
+                .GeometryStorage = m_Renderer.GetGeometryStorage(),
+                .Device = m_Graphics.GetDeviceShared(),
+                .TransferManager = m_Graphics.GetTransferManager(),
+                .Dispatcher = m_Scene.GetScene().GetDispatcher(),
+                .DefaultTextureId = m_Graphics.GetDefaultTextureIndex(),
+            };
+            GpuFrameGraphSystemBundle{}.Register(gpuBundleContext);
+        }
+    }
+
+    void RuntimeRenderLaneHost::DispatchDeferredEvents()
+    {
+        m_Scene.GetScene().GetDispatcher().update();
     }
 
     void RenderLaneCoordinator::Run(this const RenderLaneCoordinator& self,
@@ -103,42 +172,18 @@ namespace Runtime
 
         {
             PROFILE_SCOPE("FrameGraph");
-            auto& frameGraph = self.Renderer.GetFrameGraph();
+            auto& frameGraph = self.Host.GetFrameGraph();
             frameGraph.Reset();
 
-            auto& registry = self.Scene.GetRegistry();
             const float frameDt = static_cast<float>(frameTime);
 
             callbacks.RegisterVariableSystems(frameGraph, frameDt);
-
-            CoreFrameGraphRegistrationContext coreBundleContext{
-                .Graph = frameGraph,
-                .Registry = registry,
-                .Features = self.Features,
-            };
-            CoreFrameGraphSystemBundle{}.Register(coreBundleContext);
-
-            auto* gpuScene = self.Renderer.GetGPUScenePtr();
-            if (gpuScene)
-            {
-                GpuFrameGraphRegistrationContext gpuBundleContext{
-                    .Core = coreBundleContext,
-                    .GpuScene = *gpuScene,
-                    .AssetManager = self.Assets,
-                    .MaterialSystem = self.Renderer.GetMaterialSystem(),
-                    .GeometryStorage = self.Renderer.GetGeometryStorage(),
-                    .Device = self.Graphics.GetDeviceShared(),
-                    .TransferManager = self.Graphics.GetTransferManager(),
-                    .Dispatcher = self.Scene.GetScene().GetDispatcher(),
-                    .DefaultTextureId = self.Graphics.GetDefaultTextureIndex(),
-                };
-                GpuFrameGraphSystemBundle{}.Register(gpuBundleContext);
-            }
+            self.Host.RegisterEngineSystems(frameGraph);
 
             executeGraph(frameGraph);
         }
 
-        self.Scene.GetScene().GetDispatcher().update();
+        self.Host.DispatchDeferredEvents();
 
         {
             PROFILE_SCOPE("OnRender");

@@ -51,8 +51,6 @@ These are not required to finish the first wave, but they should begin soon afte
 
 #### B3.4 Barriers to Testing + Evolution
 
-- [ ] Add seam-friendly interfaces for `Engine` dependencies to allow isolated tests without full Vulkan/runtime boot.
-- [ ] Add tests that lock frame-order contracts (fixed-step + variable-step + dispatcher + render handoff).
 - [ ] Add tests that lock asset-streaming completion semantics (queued -> uploaded -> finalized).
 
 #### B3.5 Hidden Architectural Duplication

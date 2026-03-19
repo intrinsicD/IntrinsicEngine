@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <string>
 #include <vector>
 
 import Core;
@@ -8,6 +9,47 @@ import Runtime.FrameLoop;
 namespace
 {
     constexpr double kEpsilon = 1e-9;
+
+    class FakeStreamingLaneHost final : public Runtime::IStreamingLaneHost
+    {
+    public:
+        void ProcessMainThreadQueue() override { Calls.emplace_back("queue"); }
+        void ProcessUploads() override { Calls.emplace_back("uploads"); }
+        void ProcessTextureDeletions() override { Calls.emplace_back("textures"); }
+        void ProcessMaterialDeletions() override { Calls.emplace_back("materials"); }
+        void GarbageCollectTransfers() override { Calls.emplace_back("gc"); }
+
+        std::vector<std::string> Calls;
+    };
+
+    class FakeRenderLaneHost final : public Runtime::IRenderLaneHost
+    {
+    public:
+        explicit FakeRenderLaneHost(Core::FrameGraph& graph)
+            : Graph(graph)
+        {
+        }
+
+        [[nodiscard]] Core::FrameGraph& GetFrameGraph() override
+        {
+            Calls.emplace_back("get_graph");
+            return Graph;
+        }
+
+        void RegisterEngineSystems(Core::FrameGraph& graph) override
+        {
+            EXPECT_EQ(&graph, &Graph);
+            Calls.emplace_back("register_engine");
+        }
+
+        void DispatchDeferredEvents() override
+        {
+            Calls.emplace_back("dispatch");
+        }
+
+        Core::FrameGraph& Graph;
+        std::vector<std::string> Calls;
+    };
 }
 
 TEST(RuntimeFrameLoop, ComputeFrameTime_ClampsLargeSpikes)
@@ -92,4 +134,68 @@ TEST(RuntimeFrameLoop, RunFixedSteps_ClampsAccumulatorAfterMaxSubsteps)
     EXPECT_EQ(result.ExecutedSubsteps, 2);
     EXPECT_TRUE(result.AccumulatorClamped);
     EXPECT_NEAR(accumulator, 0.0, kEpsilon);
+}
+
+TEST(RuntimeFrameLoop, StreamingLaneCoordinator_OrdersMainThreadUploadAndCleanupWork)
+{
+    FakeStreamingLaneHost host;
+    const Runtime::StreamingLaneCoordinator coordinator{.Host = host};
+
+    coordinator.BeginFrame();
+    coordinator.EndFrame();
+
+    const std::vector<std::string> expected{
+        "queue",
+        "uploads",
+        "textures",
+        "materials",
+        "gc",
+    };
+    EXPECT_EQ(host.Calls, expected);
+}
+
+TEST(RuntimeFrameLoop, RenderLaneCoordinator_OrdersUpdateRegistrationExecutionDispatchAndRender)
+{
+    Core::Memory::ScopeStack scope(64 * 1024);
+    Core::FrameGraph graph(scope);
+    FakeRenderLaneHost host(graph);
+    const Runtime::RenderLaneCoordinator coordinator{.Host = host};
+
+    std::vector<std::string> calls;
+    coordinator.Run(
+        1.0 / 60.0,
+        {
+            .OnUpdate = [&](float dt)
+            {
+                EXPECT_NEAR(dt, 1.0f / 60.0f, 1e-6f);
+                calls.emplace_back("update");
+            },
+            .RegisterVariableSystems = [&](Core::FrameGraph& registeredGraph, float dt)
+            {
+                EXPECT_EQ(&registeredGraph, &graph);
+                EXPECT_NEAR(dt, 1.0f / 60.0f, 1e-6f);
+                calls.emplace_back("register_client");
+            },
+            .OnRender = [&]() { calls.emplace_back("render"); },
+        },
+        [&](Core::FrameGraph& executedGraph)
+        {
+            EXPECT_EQ(&executedGraph, &graph);
+            calls.emplace_back("execute");
+        });
+
+    const std::vector<std::string> expectedCalls{
+        "update",
+        "register_client",
+        "execute",
+        "render",
+    };
+    EXPECT_EQ(calls, expectedCalls);
+
+    const std::vector<std::string> expectedHostCalls{
+        "get_graph",
+        "register_engine",
+        "dispatch",
+    };
+    EXPECT_EQ(host.Calls, expectedHostCalls);
 }
