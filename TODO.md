@@ -46,6 +46,7 @@ These are not required to finish the first wave, but they should begin soon afte
 
 #### B3.2 Coupling Hotspots (reduce first)
 
+*(No active items — see git history for completed coupling reductions.)*
 
 #### B3.3 Mixed Concerns + Unstable Interfaces
 
@@ -108,7 +109,35 @@ These are not required to finish the first wave, but they should begin soon afte
   - [ ] Keep adapter shims for one migration window (then delete).
   - [ ] Require pass/fail gates (tests + telemetry budgets) to permit cutover.
 
-#### B3.8 Htex-Inspired Halfedge-Pair Patch Storage (investigate feasibility)
+#### B3.8 Code Review Findings (2026-03-19 commit review)
+
+##### Critical / Correctness
+
+- [ ] Verify `PointCloudKMeans::PumpCompletions` ordering in `Engine::Run()` — moved from inside `RenderLaneCoordinator::Run()` (before `dispatcher.update()`) to after `renderLane.Run()`, delaying completion visibility by one frame. Confirm intentional or revert (`49a936a`).
+- [ ] Fix `VK_ACCESS_2_MEMORY_WRITE_BIT` on the read-only HTex finalize pass barrier — should be read-only access flags if the pass only reads (`1165e65`).
+
+##### Performance
+
+- [ ] Add dirty-checking / caching to HTex atlas rebuild — currently rebuilds per frame unconditionally.
+- [ ] Hoist per-texel string property lookups (`mesh.GetFaceProperty<T>(name, ...)`) outside the inner loop in HTex atlas building — move to a single lookup before iteration (`82a96bf`).
+- [ ] Add early termination to Dijkstra when all target vertices are settled — currently continues full graph exploration (`b09ecfa`).
+- [ ] Eliminate per-face `std::vector` allocation in `PolygonArea` — currently allocates 2E vectors for E edges; use fixed-size local buffer or direct accumulation (`1165e65`).
+
+##### Architecture / Pattern Compliance
+
+- [ ] Add `DijkstraParams` struct with sensible defaults and convergence diagnostics to `ShortestPathResult`, per the Geometry Operator Pattern in `CLAUDE.md`.
+- [ ] Change `BuildPatchMetadata` to return `std::optional<Result>` instead of raw vector, per the Geometry Operator Pattern.
+- [ ] Investigate templating the Circulators module — ~500 lines of near-identical boilerplate across circulator types could be reduced significantly.
+
+##### Process / Hygiene
+
+- [ ] Investigate and clean up duplicate identical commits on two branches (`596e411` / `eb7df2c`).
+- [ ] Audit vague "update" commit message for multi-file fix (`211fb73`) — ensure commit messages describe the "why".
+- [ ] Remove empty B3.2 section header in `TODO.md` (left after last item was removed) or add placeholder text.
+- [ ] Update `ROADMAP.md` to reflect B4 planning section additions in `TODO.md`.
+- [ ] Review whether `BuildDefaultPipelineRecipe` rewrite should have been a separate commit from the HTex feature work — behavioral change to all pipeline configs was bundled with a feature commit.
+
+#### B3.9 Htex-Inspired Halfedge-Pair Patch Storage (investigate feasibility)
 
 - [ ] Investigate a float-render-target-first `Htex`-style edge-patch system backed by `Halfedge::Mesh` edge IDs and intrinsic triangle lookup.
 - [ ] Keep the first implementation scoped to float render targets / float patch payloads; verify the patch path can coexist with existing property-driven visualization.
