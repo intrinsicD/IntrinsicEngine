@@ -3,11 +3,9 @@ module;
 
 module Runtime.SystemBundles;
 
-import Core.Hash;
 import ECS;
 import Graphics;
-
-using namespace Core::Hash;
+import Runtime.SystemFeatureCatalog;
 
 namespace
 {
@@ -16,13 +14,13 @@ namespace
 
     struct CoreSystemRegistrationSpec
     {
-        Core::Hash::StringID FeatureId;
+        Core::FeatureDescriptor Feature;
         CoreBundleRegisterFn Register;
     };
 
     struct GpuSystemRegistrationSpec
     {
-        Core::Hash::StringID FeatureId;
+        Core::FeatureDescriptor Feature;
         GpuBundleRegisterFn Register;
     };
 
@@ -33,7 +31,7 @@ namespace
     {
         for (const RegistrationSpec& registration : registrations)
         {
-            if (!features.IsEnabled(registration.FeatureId))
+            if (!features.IsEnabled(registration.Feature))
             {
                 continue;
             }
@@ -58,9 +56,9 @@ namespace
     }
 
     constexpr std::array<CoreSystemRegistrationSpec, 3> kCoreSystemRegistrations{{
-        {"TransformUpdate"_id, &RegisterTransformSystem},
-        {"PropertySetDirtySync"_id, &RegisterPropertySetDirtySyncSystem},
-        {"PrimitiveBVHSync"_id, &RegisterPrimitiveBVHSyncSystem},
+        {Runtime::SystemFeatureCatalog::TransformUpdate, &RegisterTransformSystem},
+        {Runtime::SystemFeatureCatalog::PropertySetDirtySync, &RegisterPropertySetDirtySyncSystem},
+        {Runtime::SystemFeatureCatalog::PrimitiveBVHSync, &RegisterPrimitiveBVHSyncSystem},
     }};
 
     void RegisterGraphGeometrySyncSystem(const Runtime::GpuFrameGraphRegistrationContext& context)
@@ -123,11 +121,11 @@ namespace
     }
 
     constexpr std::array<GpuSystemRegistrationSpec, 5> kGpuSystemRegistrations{{
-        {"GraphGeometrySync"_id, &RegisterGraphGeometrySyncSystem},
-        {"MeshRendererLifecycle"_id, &RegisterMeshRendererLifecycleSystem},
-        {"PointCloudGeometrySync"_id, &RegisterPointCloudGeometrySyncSystem},
-        {"MeshViewLifecycle"_id, &RegisterMeshViewLifecycleSystem},
-        {"GPUSceneSync"_id, &RegisterGpuSceneSyncSystem},
+        {Runtime::SystemFeatureCatalog::GraphGeometrySync, &RegisterGraphGeometrySyncSystem},
+        {Runtime::SystemFeatureCatalog::MeshRendererLifecycle, &RegisterMeshRendererLifecycleSystem},
+        {Runtime::SystemFeatureCatalog::PointCloudGeometrySync, &RegisterPointCloudGeometrySyncSystem},
+        {Runtime::SystemFeatureCatalog::MeshViewLifecycle, &RegisterMeshViewLifecycleSystem},
+        {Runtime::SystemFeatureCatalog::GPUSceneSync, &RegisterGpuSceneSyncSystem},
     }};
 }
 

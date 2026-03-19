@@ -20,6 +20,7 @@ target_sources(${target_name}
         Graphics.PipelineLibrary.cppm
         Graphics.RenderPipeline.cppm
         Graphics.GPUScene.cppm
+        Graphics.FeatureCatalog.cppm
         Graphics.Systems.GPUSceneSync.cppm
         Graphics.Systems.MeshRendererLifecycle.cppm
         Graphics.Systems.PrimitiveBVHSync.cppm
