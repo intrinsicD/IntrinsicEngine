@@ -15,6 +15,7 @@ export import :AssetErrors;
 export import :IORegistry;
 export import :ShaderRegistry;
 export import :PipelineLibrary;
+export import :FeatureCatalog;
 export import :Pipelines;
 export import :GPUScene;
 export import :GpuColor;

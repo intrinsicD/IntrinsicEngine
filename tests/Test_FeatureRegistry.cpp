@@ -82,6 +82,30 @@ TEST(FeatureRegistry, FindByStringID)
     EXPECT_TRUE(info->Enabled);
 }
 
+TEST(FeatureRegistry, DescriptorRegistrationAndToggleWorks)
+{
+    FeatureRegistry registry;
+    constexpr FeatureDescriptor descriptor = MakeFeatureDescriptor(
+        "DeferredLighting",
+        FeatureCategory::RenderFeature,
+        "Deferred lighting path",
+        false);
+
+    const bool ok = registry.Register(descriptor,
+                                      []() -> void* { return new MockRenderFeature{}; },
+                                      [](void* p) { delete static_cast<MockRenderFeature*>(p); });
+    ASSERT_TRUE(ok);
+
+    const FeatureInfo* info = registry.Find(descriptor);
+    ASSERT_NE(info, nullptr);
+    EXPECT_EQ(info->Name, "DeferredLighting");
+    EXPECT_FALSE(info->Enabled);
+    EXPECT_FALSE(registry.IsEnabled(descriptor));
+
+    EXPECT_TRUE(registry.SetEnabled(descriptor, true));
+    EXPECT_TRUE(registry.IsEnabled(descriptor));
+}
+
 // =========================================================================
 // Test: Find returns nullptr for unknown ID
 // =========================================================================
