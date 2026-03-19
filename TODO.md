@@ -78,7 +78,6 @@ These are not required to finish the first wave, but they should begin soon afte
 
 ##### Critical / Correctness
 
-- [ ] Verify `PointCloudKMeans::PumpCompletions` ordering in `Engine::Run()` — moved from inside `RenderLaneCoordinator::Run()` (before `dispatcher.update()`) to after `renderLane.Run()`, delaying completion visibility by one frame. Confirm intentional or revert (`49a936a`).
 - [ ] Fix `VK_ACCESS_2_MEMORY_WRITE_BIT` on the read-only HTex finalize pass barrier — should be read-only access flags if the pass only reads (`1165e65`).
 
 ##### Performance
