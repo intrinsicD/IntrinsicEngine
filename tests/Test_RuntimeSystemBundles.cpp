@@ -1,33 +1,33 @@
 #include <gtest/gtest.h>
 
-#include <string>
 #include <vector>
 
 #include <entt/entity/registry.hpp>
 
 import Core;
 import ECS;
+import Runtime.SystemFeatureCatalog;
 import Runtime.SystemBundles;
-
-using Core::Hash::operator""_id;
 
 namespace
 {
     struct MockSystemFeature final {};
 
-    void RegisterSystemFeature(Core::FeatureRegistry& registry, const std::string& name)
+    void RegisterSystemFeature(Core::FeatureRegistry& registry, const Core::FeatureDescriptor& feature)
     {
-        const bool ok = registry.Register<MockSystemFeature>(name, Core::FeatureCategory::System);
-        ASSERT_TRUE(ok) << "Failed to register feature '" << name << "'";
+        const bool ok = registry.Register(feature,
+                                          []() -> void* { return new MockSystemFeature{}; },
+                                          [](void* p) { delete static_cast<MockSystemFeature*>(p); });
+        ASSERT_TRUE(ok) << "Failed to register feature '" << feature.Name << "'";
     }
 }
 
 TEST(RuntimeSystemBundles, CoreBundle_PreservesCanonicalPassOrder)
 {
     Core::FeatureRegistry featureRegistry;
-    RegisterSystemFeature(featureRegistry, "TransformUpdate");
-    RegisterSystemFeature(featureRegistry, "PropertySetDirtySync");
-    RegisterSystemFeature(featureRegistry, "PrimitiveBVHSync");
+    RegisterSystemFeature(featureRegistry, Runtime::SystemFeatureCatalog::TransformUpdate);
+    RegisterSystemFeature(featureRegistry, Runtime::SystemFeatureCatalog::PropertySetDirtySync);
+    RegisterSystemFeature(featureRegistry, Runtime::SystemFeatureCatalog::PrimitiveBVHSync);
 
     Core::Memory::ScopeStack scope(1024 * 64);
     Core::FrameGraph graph(scope);
@@ -55,11 +55,11 @@ TEST(RuntimeSystemBundles, CoreBundle_PreservesCanonicalPassOrder)
 TEST(RuntimeSystemBundles, CoreBundle_RespectsFeatureToggles)
 {
     Core::FeatureRegistry featureRegistry;
-    RegisterSystemFeature(featureRegistry, "TransformUpdate");
-    RegisterSystemFeature(featureRegistry, "PropertySetDirtySync");
-    RegisterSystemFeature(featureRegistry, "PrimitiveBVHSync");
-    ASSERT_TRUE(featureRegistry.SetEnabled("PropertySetDirtySync"_id, false));
-    ASSERT_TRUE(featureRegistry.SetEnabled("PrimitiveBVHSync"_id, false));
+    RegisterSystemFeature(featureRegistry, Runtime::SystemFeatureCatalog::TransformUpdate);
+    RegisterSystemFeature(featureRegistry, Runtime::SystemFeatureCatalog::PropertySetDirtySync);
+    RegisterSystemFeature(featureRegistry, Runtime::SystemFeatureCatalog::PrimitiveBVHSync);
+    ASSERT_TRUE(featureRegistry.SetEnabled(Runtime::SystemFeatureCatalog::PropertySetDirtySync, false));
+    ASSERT_TRUE(featureRegistry.SetEnabled(Runtime::SystemFeatureCatalog::PrimitiveBVHSync, false));
 
     Core::Memory::ScopeStack scope(1024 * 64);
     Core::FrameGraph graph(scope);

@@ -132,14 +132,14 @@ namespace Graphics
         m_PathDirty = true;
     }
 
-    bool DefaultPipeline::IsFeatureEnabled(Core::Hash::StringID id) const
+    bool DefaultPipeline::IsFeatureEnabled(const Core::FeatureDescriptor& descriptor) const
     {
         if (!m_Registry) return true; // No registry → all features enabled
 
         // Render-path resilience: when a new pass is added but not yet registered
         // in the FeatureRegistry catalog, keep the pass enabled by default rather
         // than silently dropping it from the pipeline.
-        const Core::FeatureInfo* info = m_Registry->Find(id);
+        const Core::FeatureInfo* info = m_Registry->Find(descriptor);
         if (!info)
             return true;
 
@@ -153,14 +153,14 @@ namespace Graphics
         // ==================================================================
         // 1. Picking (Readback) — entity/primitive ID for click queries.
         // ==================================================================
-        if (m_PickingPass && IsFeatureEnabled("PickingPass"_id))
+        if (m_PickingPass && IsFeatureEnabled(FeatureCatalog::PickingPass))
             m_Path.AddFeature("Picking", m_PickingPass.get());
 
         // ==================================================================
         // 2. Surface Pass — face rendering via SurfacePass (triangles / lines /
         //    point geometry).
         // ==================================================================
-        if (m_SurfacePass && IsFeatureEnabled("SurfacePass"_id))
+        if (m_SurfacePass && IsFeatureEnabled(FeatureCatalog::SurfacePass))
             m_Path.AddFeature("MeshPass.Surface", m_SurfacePass.get());
 
         // ==================================================================
@@ -184,7 +184,7 @@ namespace Graphics
         //    Consolidates retained wireframe/graph edges and transient DebugDraw
         //    lines into a single forward-overlay lane on SceneColorHDR.
         // ==================================================================
-        if (m_LinePass)
+        if (m_LinePass && IsFeatureEnabled(FeatureCatalog::LinePass))
         {
             m_Path.AddStage("LinePass", [this](RenderPassContext& ctx)
             {
@@ -201,7 +201,7 @@ namespace Graphics
         //    is part of the forward-overlay lane that composes after deferred
         //    lighting when the frame recipe selects that path.
         // ==================================================================
-        if (m_PointPass && IsFeatureEnabled("PointPass"_id))
+        if (m_PointPass && IsFeatureEnabled(FeatureCatalog::PointPass))
         {
             m_Path.AddStage("Points", [this](RenderPassContext& ctx)
             {
@@ -217,19 +217,19 @@ namespace Graphics
         //    Final presentation to the imported swapchain image happens in the
         //    dedicated Present stage below.
         // ==================================================================
-        if (m_PostProcessPass && IsFeatureEnabled("PostProcessPass"_id))
+        if (m_PostProcessPass && IsFeatureEnabled(FeatureCatalog::PostProcessPass))
             m_Path.AddFeature("PostProcess", m_PostProcessPass.get());
 
         // ==================================================================
         // 7. Selection Outline — post-process overlay for selected entities.
         // ==================================================================
-        if (m_SelectionOutlinePass && IsFeatureEnabled("SelectionOutlinePass"_id))
+        if (m_SelectionOutlinePass && IsFeatureEnabled(FeatureCatalog::SelectionOutlinePass))
             m_Path.AddFeature("SelectionOutline", m_SelectionOutlinePass.get());
 
         // ==================================================================
         // 8. Debug View — conditional texture inspector overlay.
         // ==================================================================
-        if (m_DebugViewPass && IsFeatureEnabled("DebugViewPass"_id))
+        if (m_DebugViewPass && IsFeatureEnabled(FeatureCatalog::DebugViewPass))
         {
             m_Path.AddStage("DebugView", [this](RenderPassContext& ctx)
             {
@@ -241,7 +241,7 @@ namespace Graphics
         // ==================================================================
         // 9. ImGui — editor UI overlay.
         // ==================================================================
-        if (m_ImGuiPass && IsFeatureEnabled("ImGuiPass"_id))
+        if (m_ImGuiPass && IsFeatureEnabled(FeatureCatalog::ImGuiPass))
             m_Path.AddFeature("ImGui", m_ImGuiPass.get());
 
         m_Path.AddStage("Present", [](RenderPassContext& ctx)
@@ -432,7 +432,7 @@ namespace Graphics
     FrameRecipe DefaultPipeline::BuildFrameRecipe(const RenderPassContext& ctx) const
     {
         bool hasSelectionWork = false;
-        if (m_SelectionOutlinePass && IsFeatureEnabled("SelectionOutlinePass"_id))
+        if (m_SelectionOutlinePass && IsFeatureEnabled(FeatureCatalog::SelectionOutlinePass))
         {
             auto& registry = ctx.Scene.GetRegistry();
             hasSelectionWork = !registry.view<ECS::Components::Selection::SelectedTag>().empty() ||
@@ -440,14 +440,14 @@ namespace Graphics
         }
 
         DefaultPipelineRecipeInputs inputs{};
-        inputs.PickingPassEnabled = m_PickingPass && IsFeatureEnabled("PickingPass"_id);
-        inputs.SurfacePassEnabled = m_SurfacePass && IsFeatureEnabled("SurfacePass"_id);
-        inputs.LinePassEnabled = m_LinePass != nullptr;
-        inputs.PointPassEnabled = m_PointPass && IsFeatureEnabled("PointPass"_id);
-        inputs.PostProcessPassEnabled = m_PostProcessPass && IsFeatureEnabled("PostProcessPass"_id);
-        inputs.SelectionOutlinePassEnabled = m_SelectionOutlinePass && IsFeatureEnabled("SelectionOutlinePass"_id);
-        inputs.DebugViewPassEnabled = m_DebugViewPass && IsFeatureEnabled("DebugViewPass"_id);
-        inputs.ImGuiPassEnabled = m_ImGuiPass && IsFeatureEnabled("ImGuiPass"_id);
+        inputs.PickingPassEnabled = m_PickingPass && IsFeatureEnabled(FeatureCatalog::PickingPass);
+        inputs.SurfacePassEnabled = m_SurfacePass && IsFeatureEnabled(FeatureCatalog::SurfacePass);
+        inputs.LinePassEnabled = m_LinePass && IsFeatureEnabled(FeatureCatalog::LinePass);
+        inputs.PointPassEnabled = m_PointPass && IsFeatureEnabled(FeatureCatalog::PointPass);
+        inputs.PostProcessPassEnabled = m_PostProcessPass && IsFeatureEnabled(FeatureCatalog::PostProcessPass);
+        inputs.SelectionOutlinePassEnabled = m_SelectionOutlinePass && IsFeatureEnabled(FeatureCatalog::SelectionOutlinePass);
+        inputs.DebugViewPassEnabled = m_DebugViewPass && IsFeatureEnabled(FeatureCatalog::DebugViewPass);
+        inputs.ImGuiPassEnabled = m_ImGuiPass && IsFeatureEnabled(FeatureCatalog::ImGuiPass);
         inputs.CompositionPassEnabled = m_CompositionPass != nullptr;
         inputs.HasSelectionWork = hasSelectionWork;
         inputs.DebugViewEnabled = ctx.Debug.Enabled;
@@ -455,7 +455,7 @@ namespace Graphics
 
         // Select lighting path: Deferred when the feature toggle is enabled and
         // the composition pass is available; otherwise Forward.
-        inputs.RequestedLightingPath = (inputs.CompositionPassEnabled && IsFeatureEnabled("DeferredLighting"_id))
+        inputs.RequestedLightingPath = (inputs.CompositionPassEnabled && IsFeatureEnabled(FeatureCatalog::DeferredLighting))
             ? FrameLightingPath::Deferred
             : FrameLightingPath::Forward;
 
@@ -475,14 +475,14 @@ namespace Graphics
         state.HasFeatureRegistry = (m_Registry != nullptr);
         state.PathDirty = m_PathDirty;
 
-        state.PickingPass = {m_PickingPass != nullptr, m_PickingPass && IsFeatureEnabled("PickingPass"_id)};
-        state.SurfacePass = {m_SurfacePass != nullptr, m_SurfacePass && IsFeatureEnabled("SurfacePass"_id)};
-        state.SelectionOutlinePass = {m_SelectionOutlinePass != nullptr, m_SelectionOutlinePass && IsFeatureEnabled("SelectionOutlinePass"_id)};
-        state.LinePass = {m_LinePass != nullptr, m_LinePass != nullptr};
-        state.PointPass = {m_PointPass != nullptr, m_PointPass && IsFeatureEnabled("PointPass"_id)};
-        state.PostProcessPass = {m_PostProcessPass != nullptr, m_PostProcessPass && IsFeatureEnabled("PostProcessPass"_id)};
-        state.DebugViewPass = {m_DebugViewPass != nullptr, m_DebugViewPass && IsFeatureEnabled("DebugViewPass"_id)};
-        state.ImGuiPass = {m_ImGuiPass != nullptr, m_ImGuiPass && IsFeatureEnabled("ImGuiPass"_id)};
+        state.PickingPass = {m_PickingPass != nullptr, m_PickingPass && IsFeatureEnabled(FeatureCatalog::PickingPass)};
+        state.SurfacePass = {m_SurfacePass != nullptr, m_SurfacePass && IsFeatureEnabled(FeatureCatalog::SurfacePass)};
+        state.SelectionOutlinePass = {m_SelectionOutlinePass != nullptr, m_SelectionOutlinePass && IsFeatureEnabled(FeatureCatalog::SelectionOutlinePass)};
+        state.LinePass = {m_LinePass != nullptr, m_LinePass && IsFeatureEnabled(FeatureCatalog::LinePass)};
+        state.PointPass = {m_PointPass != nullptr, m_PointPass && IsFeatureEnabled(FeatureCatalog::PointPass)};
+        state.PostProcessPass = {m_PostProcessPass != nullptr, m_PostProcessPass && IsFeatureEnabled(FeatureCatalog::PostProcessPass)};
+        state.DebugViewPass = {m_DebugViewPass != nullptr, m_DebugViewPass && IsFeatureEnabled(FeatureCatalog::DebugViewPass)};
+        state.ImGuiPass = {m_ImGuiPass != nullptr, m_ImGuiPass && IsFeatureEnabled(FeatureCatalog::ImGuiPass)};
         return state;
     }
 }
