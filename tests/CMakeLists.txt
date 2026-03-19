@@ -150,6 +150,7 @@ intrinsic_test_object_lib(RuntimeTestObjs
         Test_RuntimeCulling.cpp
         Test_GraphicsBackend.cpp
         Test_AssetPipeline.cpp
+        Test_AssetIngestService.cpp
         Test_SceneManager.cpp
         Test_RenderOrchestrator.cpp
         Test_HeadlessEngine.cpp

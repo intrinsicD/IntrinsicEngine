@@ -38,6 +38,10 @@ Engine
 │   ├── pending transfer completion state
 │   ├── main-thread task queue
 │   └── runtime-created material keep-alive list
+├── AssetIngestService
+│   ├── drag-drop ingest orchestration
+│   ├── synchronous asset re-import orchestration
+│   └── default material/model registration helpers
 └── RenderOrchestrator
     ├── frame allocators (LinearArena / ScopeStack)
     ├── FrameGraph
@@ -71,7 +75,14 @@ Engine
 - **Role:** asset-state bridge between async GPU transfer completion and main-thread finalization.
 - **Owns:** `Core::Assets::AssetManager`, pending transfer records, main-thread deferred task queue, and tracked material handles.
 - **Borrows:** `RHI::TransferManager&` from `GraphicsBackend`.
-- **Does not own:** I/O decoding policy, window/rendering state, ECS scene, or GPU resource factories.
+- **Does not own:** I/O decoding policy, drag-drop/re-import orchestration, window/rendering state, ECS scene, or GPU resource factories.
+
+#### `AssetIngestService`
+
+- **Role:** owns drag-drop ingest and synchronous re-import orchestration so `Engine` no longer hand-assembles those workflows.
+- **Borrows:** device/transfer/geometry/material services plus `AssetPipeline`, `SceneManager`, `IORegistry`, and the active `IIOBackend`.
+- **Coordinates:** path validation, `Graphics::ModelLoader` invocation, asset registration, default material creation, and root `AssetSourceRef` attachment for imported scene entities.
+- **Does not own:** the asset database, GPU platform lifetime, ECS scene lifetime, or render-graph policy.
 
 #### `SceneManager`
 
@@ -143,13 +154,18 @@ Within the runtime composition root, today’s direct borrowing edges are:
 - `Engine -> GraphicsBackend`: owns subsystem, borrows accessors for device/swapchain/transfer/descriptor/texture services.
 - `Engine -> AssetPipeline`: owns subsystem, delegates asset-manager access, transfer completion polling, and main-thread queue execution.
 - `Engine -> SceneManager`: owns subsystem, delegates scene access, spawn, clear, and GPU-hook connect/disconnect.
+- `Engine -> AssetIngestService`: owns subsystem, delegates drag-drop ingest and synchronous asset re-import orchestration.
 - `Engine -> RenderOrchestrator`: owns subsystem, delegates frame allocators, frame graph, geometry storage, material system, GPU scene, and render system access.
 - `AssetPipeline -> GraphicsBackend`: **borrowed edge only** through `RHI::TransferManager&`.
+- `AssetIngestService -> GraphicsBackend`: **borrowed edges only** through device/transfer/default-texture services.
+- `AssetIngestService -> AssetPipeline`: **borrowed edge only** for asset registration, pending-transfer tracking, and main-thread callbacks.
+- `AssetIngestService -> SceneManager`: **borrowed edge only** for imported-entity spawning and `AssetSourceRef` attachment.
+- `AssetIngestService -> RenderOrchestrator`: **borrowed edge only** through geometry storage and material system.
 - `RenderOrchestrator -> GraphicsBackend`: **borrowed edges only** through device/swapchain/renderer/bindless/descriptors/texture system.
 - `RenderOrchestrator -> AssetPipeline`: **borrowed edge only** through `Core::Assets::AssetManager&`.
 - `SceneManager -> RenderOrchestrator`: optional GPU-scene hook connection plus geometry-pool pointer for spawn-time topology inspection.
 
-This is the current “diamond” structure: `Engine` owns all four subsystems, while carefully selected borrowed references cross between them.
+This is the current “star with borrowed cross-links” structure: `Engine` owns the runtime subsystems, while carefully selected borrowed references cross between them.
 
 ---
 
@@ -169,6 +185,7 @@ This is the current “diamond” structure: `Engine` owns all four subsystems, 
 9. SceneManager GPU hook connection + geometry storage wiring
 10. FeatureRegistry population
 11. IO backend + builtin loader registration
+12. AssetIngestService
 ```
 
 ### Why this order is valid
@@ -178,6 +195,7 @@ This is the current “diamond” structure: `Engine` owns all four subsystems, 
 - `AssetPipeline` requires `GraphicsBackend`’s transfer manager.
 - `RenderOrchestrator` requires GPU infrastructure plus the asset manager.
 - `SceneManager` GPU hooks are connected only after `RenderOrchestrator` has a `GPUScene`.
+- `AssetIngestService` requires the I/O backend/registry plus render + asset + scene services that already exist.
 
 ## Per-frame order
 
@@ -242,12 +260,13 @@ The actual execution order is still data-dependency-driven by `Core::FrameGraph`
 6. SceneManager::Clear()
 7. AssetManager::Clear()
 8. AssetPipeline tracked-material clear
-9. RenderOrchestrator destruction
-10. Interface::GUI shutdown
-11. AssetPipeline destruction
-12. SceneManager destruction
-13. GraphicsBackend destruction
-14. Window destruction
+9. AssetIngestService destruction
+10. RenderOrchestrator destruction
+11. Interface::GUI shutdown
+12. AssetPipeline destruction
+13. SceneManager destruction
+14. GraphicsBackend destruction
+15. Window destruction
 ```
 
 ### Shutdown invariants

@@ -1,0 +1,69 @@
+module;
+#include <memory>
+#include <optional>
+#include <string>
+#include <string_view>
+
+export module Runtime.AssetIngestService;
+
+import Core.Assets;
+import Core.IOBackend;
+import RHI;
+import Graphics;
+import Runtime.AssetPipeline;
+import Runtime.SceneManager;
+
+export namespace Runtime
+{
+    struct ImportedAssetHandles
+    {
+        Core::Assets::AssetHandle ModelHandle{};
+        Core::Assets::AssetHandle MaterialHandle{};
+    };
+
+    // Coordinates external asset ingest workflows (drag-drop and synchronous
+    // re-import) without leaking import orchestration into Engine.
+    class AssetIngestService
+    {
+    public:
+        AssetIngestService(std::shared_ptr<RHI::VulkanDevice> device,
+                           RHI::TransferManager& transferManager,
+                           Graphics::GeometryPool& geometryStorage,
+                           Graphics::MaterialSystem& materialSystem,
+                           AssetPipeline& assetPipeline,
+                           SceneManager& sceneManager,
+                           Graphics::IORegistry& ioRegistry,
+                           Core::IO::IIOBackend& ioBackend,
+                           uint32_t defaultTextureId);
+        ~AssetIngestService();
+
+        AssetIngestService(const AssetIngestService&) = delete;
+        AssetIngestService& operator=(const AssetIngestService&) = delete;
+        AssetIngestService(AssetIngestService&&) = delete;
+        AssetIngestService& operator=(AssetIngestService&&) = delete;
+
+        void EnqueueDropImport(const std::string& path);
+
+        [[nodiscard]] std::optional<ImportedAssetHandles> ImportModelSync(
+            const std::string& path,
+            std::string_view assetNamespace = "scene");
+
+    private:
+        [[nodiscard]] std::optional<ImportedAssetHandles> MaterializeImportedModel(
+            const std::string& sourcePath,
+            std::unique_ptr<Graphics::Model> model,
+            std::string_view assetNamespace);
+
+        std::shared_ptr<RHI::VulkanDevice> m_Device;
+        RHI::TransferManager& m_TransferManager;
+        Graphics::GeometryPool& m_GeometryStorage;
+        Graphics::MaterialSystem& m_MaterialSystem;
+        AssetPipeline& m_AssetPipeline;
+        SceneManager& m_SceneManager;
+        Graphics::IORegistry& m_IORegistry;
+        Core::IO::IIOBackend& m_IOBackend;
+        uint32_t m_DefaultTextureId = 0;
+        uint64_t m_DropAssetCounter = 0;
+        uint64_t m_ReimportAssetCounter = 0;
+    };
+}
