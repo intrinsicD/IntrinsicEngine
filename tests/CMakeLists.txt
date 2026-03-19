@@ -97,6 +97,7 @@ intrinsic_test_object_lib(GeometryTestObjs
         Test_RuntimeGeometry.cpp
         Test_RuntimeGeometry_NoHeapEPA.cpp
         Test_RuntimeGraph.cpp
+        Test_GraphCirculators.cpp
         Test_RuntimeGraph_ParallelLayers.cpp
         Test_RuntimeGraphKNN.cpp
         Test_KDTree.cpp
@@ -131,6 +132,7 @@ intrinsic_test_object_lib(GeometryTestObjs
         Test_ContactManifold.cpp
         Test_Simplification.cpp
         Test_Geodesic.cpp
+        Test_ShortestPath.cpp
         Test_Subdivision.cpp
         Test_Smoothing.cpp
         Test_NormalEstimation.cpp

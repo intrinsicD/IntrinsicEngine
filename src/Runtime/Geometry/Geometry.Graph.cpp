@@ -36,9 +36,9 @@ namespace Geometry::Graph
         // The mask 0xFFFF and scale 0.0000958738 ≈ 2π/65536 map to a uniform angle.
         [[nodiscard]] glm::vec2 UnitDirectionFromPair(std::uint32_t i, std::uint32_t j)
         {
-            const float phase = static_cast<float>((((i + 1U) * 1664525U) ^ ((j + 1U) * 1013904223U)) & 0xFFFFU);
-            const float angle = phase * 0.0000958738F;
-            return glm::vec2(std::cos(angle), std::sin(angle));
+            const auto phase = static_cast<float>((((i + 1U) * 1664525U) ^ ((j + 1U) * 1013904223U)) & 0xFFFFU);
+            const auto angle = phase * 0.0000958738F;
+            return {std::cos(angle), std::sin(angle)};
         }
 
         void RemoveMean(std::vector<float>& values)
@@ -369,19 +369,12 @@ namespace Geometry::Graph
     {
         assert(IsValid(start) && IsValid(end));
 
-        HalfedgeHandle h = Halfedge(start);
-        const HalfedgeHandle startH = h;
-
-        if (h.IsValid())
+        for (const HalfedgeHandle h : HalfedgesAroundVertex(start))
         {
-            std::size_t safety = 0;
-            const std::size_t maxIter = HalfedgesSize();
-            do
+            if (ToVertex(h) == end)
             {
-                if (ToVertex(h) == end) return h;
-                h = NextHalfedge(OppositeHalfedge(h));
-                if (++safety > maxIter) break;
-            } while (h != startH);
+                return h;
+            }
         }
 
         return std::nullopt;
@@ -774,10 +767,10 @@ namespace Geometry::Graph
         const float alpha = params.StepScale / std::max(1.0F, maxDegree);
         const float minNorm = std::max(params.MinNormEpsilon, 1.0e-12F);
 
-        std::vector<float> invSqrtDegree(n, 0.0F);
+            std::vector<float> invSqrtDegree(n, 0.0F);
         for (std::size_t i = 0; i < n; ++i)
         {
-            const float d = static_cast<float>(degree[i]);
+                const auto d = static_cast<float>(degree[i]);
             invSqrtDegree[i] = d > 0.0F ? 1.0F / std::sqrt(d) : 1.0F;
         }
 
@@ -787,7 +780,7 @@ namespace Geometry::Graph
         };
         for (std::size_t i = 0; i < n; ++i)
         {
-            const float t = static_cast<float>(i + 1U);
+                const auto t = static_cast<float>(i + 1U);
             q[0][i] = std::sin(0.73F * t) + 0.17F * std::cos(1.11F * t);
             q[1][i] = std::cos(0.61F * t) - 0.21F * std::sin(1.37F * t);
         }
@@ -986,12 +979,12 @@ namespace Geometry::Graph
 
             auto bfs_farthest = [&](std::uint32_t start,
                                     std::vector<std::int32_t>& outDistance,
-                                    std::vector<std::uint32_t>* outParent) -> std::uint32_t
+                                    std::optional<std::reference_wrapper<std::vector<std::uint32_t>>> outParent) -> std::uint32_t
             {
                 outDistance.assign(activeVertices.size(), -1);
-                if (outParent != nullptr)
+                if (outParent.has_value())
                 {
-                    outParent->assign(activeVertices.size(), std::numeric_limits<std::uint32_t>::max());
+                    outParent->get().assign(activeVertices.size(), std::numeric_limits<std::uint32_t>::max());
                 }
 
                 std::queue<std::uint32_t> queue;
@@ -1011,7 +1004,7 @@ namespace Geometry::Graph
                     {
                         if (!inComponent[v] || outDistance[v] >= 0) continue;
                         outDistance[v] = du + 1;
-                        if (outParent != nullptr) (*outParent)[v] = u;
+                        if (outParent.has_value()) outParent->get()[v] = u;
                         queue.push(v);
                     }
                 }
@@ -1035,8 +1028,8 @@ namespace Geometry::Graph
                 std::vector<std::int32_t> distances;
                 std::vector<std::uint32_t> parent;
                 const std::uint32_t start = componentVertices.front();
-                const std::uint32_t endpointA = bfs_farthest(start, distances, nullptr);
-                const std::uint32_t endpointB = bfs_farthest(endpointA, distances, &parent);
+                const std::uint32_t endpointA = bfs_farthest(start, distances, std::nullopt);
+                const std::uint32_t endpointB = bfs_farthest(endpointA, distances, std::ref(parent));
 
                 std::vector<std::uint32_t> diameterPath;
                 for (std::uint32_t current = endpointB; current != std::numeric_limits<std::uint32_t>::max();)

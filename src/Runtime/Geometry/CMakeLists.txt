@@ -30,6 +30,7 @@ target_sources(${target_name}
         Geometry.SDFContact.cppm
         Geometry.Validation.cppm
         Geometry.Properties.cppm
+        Geometry.Circulators.cppm
         Geometry.MeshUtils.cppm
         Geometry.Octree.cppm
         Geometry.KDTree.cppm
@@ -61,6 +62,7 @@ target_sources(${target_name}
         Geometry.Boolean.cppm
         Geometry.Quadric.cppm
         Geometry.Queries.cppm
+        Geometry.ShortestPath.cppm
         PRIVATE
         FILE_SET geometry_impl TYPE CXX_MODULES FILES
         Geometry.MeshUtils.cpp
@@ -94,6 +96,7 @@ target_sources(${target_name}
         Geometry.KMeans.cpp
         Geometry.PointCloud.cpp
         Geometry.Boolean.cpp
+        Geometry.ShortestPath.cpp
 )
 
 target_include_directories(${target_name} PUBLIC .)

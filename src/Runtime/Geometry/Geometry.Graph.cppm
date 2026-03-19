@@ -4,6 +4,7 @@ module;
 #include <cstdint>
 #include <utility>
 #include <string>
+#include <string_view>
 #include <optional>
 #include <span>
 #include <vector>
@@ -12,6 +13,7 @@ module;
 export module Geometry:Graph;
 
 import :Properties;
+import :Circulators;
 
 export namespace Geometry::Graph
 {
@@ -164,6 +166,7 @@ export namespace Geometry::Graph
         void SetHalfedge(VertexHandle v, HalfedgeHandle h);
 
         [[nodiscard]] VertexHandle ToVertex(HalfedgeHandle h) const;
+        [[nodiscard]] VertexHandle FromVertex(HalfedgeHandle h) const { return ToVertex(OppositeHalfedge(h)); }
         void SetVertex(HalfedgeHandle h, VertexHandle v);
 
         [[nodiscard]] HalfedgeHandle NextHalfedge(HalfedgeHandle h) const;
@@ -172,12 +175,25 @@ export namespace Geometry::Graph
         void SetPrevHalfedge(HalfedgeHandle h, HalfedgeHandle prev);
 
         [[nodiscard]] HalfedgeHandle OppositeHalfedge(HalfedgeHandle h) const;
+        [[nodiscard]] HalfedgeHandle CCWRotatedHalfedge(HalfedgeHandle h) const { return OppositeHalfedge(PrevHalfedge(h)); }
+        [[nodiscard]] HalfedgeHandle CWRotatedHalfedge(HalfedgeHandle h) const { return NextHalfedge(OppositeHalfedge(h)); }
 
         [[nodiscard]] EdgeHandle Edge(HalfedgeHandle h) const;
         [[nodiscard]] HalfedgeHandle Halfedge(EdgeHandle e, unsigned int i) const;
 
-        [[nodiscard]] bool IsIsolated(VertexHandle v) const;
+        [[nodiscard]] bool IsBoundary(HalfedgeHandle h) const { return IsValid(h) && NextHalfedge(h) == OppositeHalfedge(h); }
         [[nodiscard]] bool IsBoundary(VertexHandle v) const;
+
+        [[nodiscard]] bool IsIsolated(VertexHandle v) const;
+
+        using TraversalSentinel = Circulators::TraversalSentinel;
+        using HalfedgesAroundVertexRange = Circulators::HalfedgesAroundVertexRange<Graph>;
+        using BoundaryHalfedgesRange = Circulators::BoundaryHalfedgesRange<Graph>;
+        using BoundaryVerticesRange = Circulators::BoundaryVerticesRange<Graph>;
+
+        [[nodiscard]] HalfedgesAroundVertexRange HalfedgesAroundVertex(VertexHandle v) const { return HalfedgesAroundVertexRange{this, v}; }
+        [[nodiscard]] BoundaryHalfedgesRange BoundaryHalfedges(HalfedgeHandle h) const { return BoundaryHalfedgesRange{this, h}; }
+        [[nodiscard]] BoundaryVerticesRange BoundaryVertices(HalfedgeHandle h) const { return BoundaryVerticesRange{this, h}; }
 
         [[nodiscard]] std::optional<HalfedgeHandle> FindHalfedge(VertexHandle start, VertexHandle end) const;
         [[nodiscard]] std::optional<EdgeHandle> FindEdge(VertexHandle a, VertexHandle b) const;
@@ -188,21 +204,21 @@ export namespace Geometry::Graph
 
         // Properties
         template <class T>
-        [[nodiscard]] VertexProperty<T> GetOrAddVertexProperty(std::string name, T defaultValue = T())
+        [[nodiscard]] VertexProperty<T> GetOrAddVertexProperty(std::string_view name, T defaultValue = T())
         {
-            return Geometry::VertexProperty<T>(m_Vertices.GetOrAdd<T>(std::move(name), std::move(defaultValue)));
+            return Geometry::VertexProperty<T>(m_Vertices.GetOrAdd<T>(std::string{name}, std::move(defaultValue)));
         }
 
         template <class T>
-        [[nodiscard]] HalfedgeProperty<T> GetOrAddHalfedgeProperty(std::string name, T defaultValue = T())
+        [[nodiscard]] HalfedgeProperty<T> GetOrAddHalfedgeProperty(std::string_view name, T defaultValue = T())
         {
-            return Geometry::HalfedgeProperty<T>(m_Halfedges.GetOrAdd<T>(std::move(name), std::move(defaultValue)));
+            return Geometry::HalfedgeProperty<T>(m_Halfedges.GetOrAdd<T>(std::string{name}, std::move(defaultValue)));
         }
 
         template <class T>
-        [[nodiscard]] EdgeProperty<T> GetOrAddEdgeProperty(std::string name, T defaultValue = T())
+        [[nodiscard]] EdgeProperty<T> GetOrAddEdgeProperty(std::string_view name, T defaultValue = T())
         {
-            return Geometry::EdgeProperty<T>(m_Edges.GetOrAdd<T>(std::move(name), std::move(defaultValue)));
+            return Geometry::EdgeProperty<T>(m_Edges.GetOrAdd<T>(std::string{name}, std::move(defaultValue)));
         }
 
         // Public PropertySet accessors (mirrors Halfedge::Mesh pattern).
