@@ -10,6 +10,7 @@ import :RenderPath;
 import :RenderGraph;
 import :ShaderRegistry;
 import :PipelineLibrary;
+import :FeatureCatalog;
 import :Passes.DebugView;
 import :Passes.Surface;
 import :Passes.ImGui;
@@ -111,7 +112,7 @@ export namespace Graphics
         RenderPath m_Path;
         bool m_PathDirty = true;
 
-        [[nodiscard]] bool IsFeatureEnabled(Core::Hash::StringID id) const;
+        [[nodiscard]] bool IsFeatureEnabled(const Core::FeatureDescriptor& descriptor) const;
 
         void RebuildPath();
     };

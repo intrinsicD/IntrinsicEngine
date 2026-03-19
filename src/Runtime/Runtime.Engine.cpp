@@ -30,6 +30,7 @@ import Runtime.SceneManager;
 import Runtime.RenderOrchestrator;
 import Runtime.FrameLoop;
 import Runtime.PointCloudKMeans;
+import Runtime.SystemFeatureCatalog;
 
 using namespace Core::Hash;
 
@@ -217,8 +218,6 @@ namespace Runtime
 
     void Engine::RegisterCoreFeatures()
     {
-        using Cat = Core::FeatureCategory;
-
         // All features are registered as catalog entries for discovery and
         // runtime enable/disable.  Factories are no-ops: render passes are
         // owned by DefaultPipeline, and ECS systems are stateless free
@@ -226,47 +225,29 @@ namespace Runtime
         auto noopFactory = []() -> void* { return nullptr; };
         auto noopDestroy = [](void*) {};
 
-        auto reg = [&](const char* name, Cat cat, const char* desc) {
-            Core::FeatureInfo info{};
-            info.Name = name;
-            info.Id = Core::Hash::StringID(Core::Hash::HashString(info.Name));
-            info.Category = cat;
-            info.Description = desc;
-            info.Enabled = true;
-            m_FeatureRegistry.Register(std::move(info), noopFactory, noopDestroy);
+        const auto registerDescriptor = [&](const Core::FeatureDescriptor& descriptor)
+        {
+            m_FeatureRegistry.Register(descriptor, noopFactory, noopDestroy);
         };
 
-        // --- Render Features ---
-        reg("SurfacePass",           Cat::RenderFeature, "Main surface PBR rendering pass");
-        reg("PickingPass",           Cat::RenderFeature, "Entity ID picking for mouse selection");
-        reg("SelectionOutlinePass",  Cat::RenderFeature, "Selection outline overlay for selected/hovered entities");
-        reg("LinePass",              Cat::RenderFeature, "Unified BDA line rendering (retained wireframe/graph edges + transient DebugDraw)");
-        reg("PointPass",             Cat::RenderFeature, "Unified BDA point rendering (retained points/nodes/vertices + transient DebugDraw)");
-        reg("PostProcessPass",       Cat::RenderFeature, "Bloom + HDR tone mapping (ACES/Reinhard/Uncharted2) + optional FXAA");
-        reg("DebugViewPass",         Cat::RenderFeature, "Render target debug visualization");
-        reg("ImGuiPass",             Cat::RenderFeature, "ImGui UI overlay");
+        registerDescriptor(Graphics::FeatureCatalog::SurfacePass);
+        registerDescriptor(Graphics::FeatureCatalog::PickingPass);
+        registerDescriptor(Graphics::FeatureCatalog::SelectionOutlinePass);
+        registerDescriptor(Graphics::FeatureCatalog::LinePass);
+        registerDescriptor(Graphics::FeatureCatalog::PointPass);
+        registerDescriptor(Graphics::FeatureCatalog::PostProcessPass);
+        registerDescriptor(Graphics::FeatureCatalog::DebugViewPass);
+        registerDescriptor(Graphics::FeatureCatalog::ImGuiPass);
+        registerDescriptor(Graphics::FeatureCatalog::DeferredLighting);
 
-        // --- Lighting Path ---
-        // DeferredLighting is disabled by default; enable via FeatureRegistry UI.
-        {
-            Core::FeatureInfo info{};
-            info.Name = "DeferredLighting";
-            info.Id = Core::Hash::StringID(Core::Hash::HashString(info.Name));
-            info.Category = Cat::RenderFeature;
-            info.Description = "Deferred lighting path (G-buffer + fullscreen composition)";
-            info.Enabled = false;
-            m_FeatureRegistry.Register(std::move(info), noopFactory, noopDestroy);
-        }
-
-        // --- ECS Systems ---
-        reg("TransformUpdate",                Cat::System, "Propagates local transforms to world matrices");
-        reg("MeshRendererLifecycle",           Cat::System, "Allocates/deallocates GPU slots for mesh renderers");
-        reg("PrimitiveBVHSync",                Cat::System, "Builds entity-attached primitive BVHs for local-space picking and future broadphase");
-        reg("GraphGeometrySync",              Cat::System, "Uploads graph geometry to GPU and allocates GPUScene slots");
-        reg("PointCloudGeometrySync",         Cat::System, "Uploads point clouds to GPU and allocates GPUScene slots");
-        reg("MeshViewLifecycle",              Cat::System, "Creates GPU edge/vertex views from mesh via ReuseVertexBuffersFrom");
-        reg("GPUSceneSync",                   Cat::System, "Synchronizes CPU entity data to GPU scene buffers");
-        reg("PropertySetDirtySync",           Cat::System, "Syncs PropertySet dirty domains to GPU buffers (per-domain incremental)");
+        registerDescriptor(Runtime::SystemFeatureCatalog::TransformUpdate);
+        registerDescriptor(Runtime::SystemFeatureCatalog::MeshRendererLifecycle);
+        registerDescriptor(Runtime::SystemFeatureCatalog::PrimitiveBVHSync);
+        registerDescriptor(Runtime::SystemFeatureCatalog::GraphGeometrySync);
+        registerDescriptor(Runtime::SystemFeatureCatalog::PointCloudGeometrySync);
+        registerDescriptor(Runtime::SystemFeatureCatalog::MeshViewLifecycle);
+        registerDescriptor(Runtime::SystemFeatureCatalog::GPUSceneSync);
+        registerDescriptor(Runtime::SystemFeatureCatalog::PropertySetDirtySync);
 
         Core::Log::Info("FeatureRegistry: Registered {} core features", m_FeatureRegistry.Count());
     }
