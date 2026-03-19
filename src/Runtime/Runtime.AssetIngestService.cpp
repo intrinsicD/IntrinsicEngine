@@ -7,7 +7,7 @@ module;
 #include <string_view>
 #include <system_error>
 #include <utility>
-#include <entt/entity/fwd.hpp>
+#include <entt/entity/entity.hpp>
 #include <glm/glm.hpp>
 
 module Runtime.AssetIngestService;

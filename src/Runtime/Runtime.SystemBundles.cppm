@@ -12,6 +12,7 @@ import Core.Assets;
 import Core.FeatureRegistry;
 import Core.FrameGraph;
 import Graphics;
+import RHI;
 
 export namespace Runtime
 {

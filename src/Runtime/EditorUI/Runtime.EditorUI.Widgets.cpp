@@ -259,7 +259,7 @@ namespace
         Geometry::MeshUtils::CalculateNormals(collider->CollisionRef->Positions, collider->CollisionRef->Indices,
                                               newNormals);
 
-        auto aabbs = Geometry::Fit(collider->CollisionRef->Positions);
+        auto aabbs = Geometry::ToAABB(collider->CollisionRef->Positions);
         collider->CollisionRef->LocalAABB = Geometry::Union(aabbs);
 
         std::vector<Geometry::AABB> primitiveBounds;

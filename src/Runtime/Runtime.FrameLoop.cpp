@@ -1,5 +1,6 @@
 module;
 #include <algorithm>
+#include <cstdint>
 
 #include "Core.Profiling.Macros.hpp"
 
