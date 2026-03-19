@@ -75,6 +75,7 @@ A **"Distinguished Scientist" grade** geometry kernel in `src/Runtime/Geometry/`
   publish their outputs as persistent mesh properties in addition to returning vectors/diagnostics.
   Examples: `v:mean_curvature`, `v:gaussian_curvature`, `v:mean_curvature_normal`,
   `v:geodesic_distance`, `v:is_geodesic_source`, `v:texcoord`, and `v:lscm_pinned`.
+- **Active Investigation — Htex-inspired edge patches:** the engine is evaluating a float-render-target-first, halfedge-pair square patch system keyed by `Halfedge::Mesh` edge IDs. The proposed design keeps float payloads and preview/debug rendering in phase 1, with integer/categorical patch payloads deferred behind an explicit feasibility check.
 - **Shortest Path:** `Geometry::ShortestPath::Dijkstra()` now supports both `Halfedge::Mesh` and `Graph::Graph`
   with the same multi-source / multi-target contract. It writes persistent vertex properties
   (`v:shortest_path_distance`, `v:shortest_path_predecessor`) so path trees can be visualized or reused after

@@ -54,4 +54,5 @@ export import :Passes.Surface;
 export import :Passes.Line;
 export import :Passes.Point;
 export import :Passes.DebugView;
+export import :Passes.HtexPatchPreview;
 export import :Passes.ImGui;

@@ -119,6 +119,7 @@ intrinsic_test_object_lib(GeometryTestObjs
         Test_GeometryAttributePropagation.cpp
         Test_HalfedgeMeshPropertyAccess.cpp
         Test_HalfedgeMeshTopology.cpp
+        Test_HtexPatch.cpp
         Test_Validation.cpp
         Test_Curvature.cpp
         Test_Raycast.cpp

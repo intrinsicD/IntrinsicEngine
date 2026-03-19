@@ -237,6 +237,7 @@ namespace Runtime
         registerDescriptor(Graphics::FeatureCatalog::PointPass);
         registerDescriptor(Graphics::FeatureCatalog::PostProcessPass);
         registerDescriptor(Graphics::FeatureCatalog::DebugViewPass);
+        registerDescriptor(Graphics::FeatureCatalog::HtexPatchPreviewPass);
         registerDescriptor(Graphics::FeatureCatalog::ImGuiPass);
         registerDescriptor(Graphics::FeatureCatalog::DeferredLighting);
 

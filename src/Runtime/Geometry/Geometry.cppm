@@ -27,6 +27,7 @@ export import :Primitives;
 export import :Properties;
 export import :Circulators;
 export import :HalfedgeMesh;
+export import :HtexPatch;
 export import :MeshBuilder;
 export import :Graph;
 export import :SDF;

@@ -53,6 +53,7 @@ target_sources(${target_name}
         Passes/Graphics.Passes.Surface.cppm
         Passes/Graphics.Passes.SelectionOutlineSettings.cppm
         Passes/Graphics.Passes.SelectionOutline.cppm
+        Passes/Graphics.Passes.HtexPatchPreview.cppm
         Passes/Graphics.Passes.Line.cppm
         Passes/Graphics.Passes.Point.cppm
         Passes/Graphics.Passes.DebugView.cppm
@@ -115,6 +116,7 @@ target_sources(${target_name}
         Passes/Graphics.Passes.Picking.cpp
         Passes/Graphics.Passes.Surface.cpp
         Passes/Graphics.Passes.SelectionOutline.cpp
+        Passes/Graphics.Passes.HtexPatchPreview.cpp
         Passes/Graphics.Passes.Line.cpp
         Passes/Graphics.Passes.Point.cpp
         Passes/Graphics.Passes.DebugView.cpp

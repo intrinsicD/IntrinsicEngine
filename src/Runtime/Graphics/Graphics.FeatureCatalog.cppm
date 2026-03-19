@@ -43,6 +43,12 @@ export namespace Graphics::FeatureCatalog
         Core::FeatureCategory::RenderFeature,
         "Render target debug visualization");
 
+    inline constexpr Core::FeatureDescriptor HtexPatchPreviewPass = MakeFeatureDescriptor(
+        "HtexPatchPreviewPass",
+        Core::FeatureCategory::RenderFeature,
+        "Float-only Htex-style halfedge patch preview atlas",
+        false);
+
     inline constexpr Core::FeatureDescriptor ImGuiPass = MakeFeatureDescriptor(
         "ImGuiPass",
         Core::FeatureCategory::RenderFeature,

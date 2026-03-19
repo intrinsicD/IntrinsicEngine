@@ -3,7 +3,13 @@
 This file tracks **currently reproducible correctness bugs, flaky tests, and test-harness defects**.
 Each entry includes the observed repro, the likely affected symbols, and a fix plan aimed at a robust engine-level correction rather than a one-off patch.
 
-No active issues currently tracked.
+## Active Issues
+
+- `IntrinsicTests` currently fails to link in `tests/Test_RuntimeGraphics.cpp` with an undefined reference to `Graphics::BuildDefaultPipelineRecipe(Graphics::DefaultPipelineRecipeInputs const&)` after `IntrinsicGraphics` builds successfully.
+  - Observed when rebuilding the Htex patch preview lane.
+  - Likely affected symbols: `Graphics::BuildDefaultPipelineRecipe(...)`, `Test_RuntimeGraphics.cpp`.
+  - Status: not introduced by the Htex patch preview work; this path was unchanged here.
+  - Fix plan: inspect the `Graphics` module export/definition wiring for the default pipeline recipe and restore the missing link target or export.
 
 ---
 

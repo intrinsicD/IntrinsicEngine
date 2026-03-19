@@ -17,6 +17,7 @@ import :Passes.ImGui;
 import :Passes.Line;
 import :Passes.Picking;
 import :Passes.Point;
+import :Passes.HtexPatchPreview;
 import :Passes.SelectionOutline;
 import :Passes.SelectionOutlineSettings;
 import :Passes.PostProcess;
@@ -104,6 +105,7 @@ export namespace Graphics
         std::unique_ptr<Passes::SelectionOutlinePass> m_SelectionOutlinePass;
         std::unique_ptr<Passes::LinePass> m_LinePass;
         std::unique_ptr<Passes::PointPass> m_PointPass;
+        std::unique_ptr<Passes::HtexPatchPreviewPass> m_HtexPatchPreviewPass;
         std::unique_ptr<Passes::DebugViewPass> m_DebugViewPass;
         std::unique_ptr<Passes::ImGuiPass> m_ImGuiPass;
         std::unique_ptr<Passes::PostProcessPass> m_PostProcessPass;

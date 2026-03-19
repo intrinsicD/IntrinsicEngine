@@ -37,6 +37,7 @@ target_sources(${target_name}
         Geometry.BVH.cppm
         Geometry.Raycast.cppm
         Geometry.HalfedgeMesh.cppm
+        Geometry.HtexPatch.cppm
         Geometry.MeshBuilder.cppm
         Geometry.MeshOperator.cppm
         Geometry.Graph.cppm
@@ -69,6 +70,7 @@ target_sources(${target_name}
         Geometry.Raycast.cpp
         Geometry.EPA.cpp
         Geometry.HalfedgeMesh.cpp
+        Geometry.HtexPatch.cpp
         Geometry.MeshBuilder.cpp
         Geometry.Properties.cpp
         Geometry.Graph.cpp

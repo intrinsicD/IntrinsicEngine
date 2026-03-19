@@ -22,6 +22,7 @@ import :Passes.Surface;
 import :Passes.SelectionOutline;
 import :Passes.Line;
 import :Passes.Point;
+import :Passes.HtexPatchPreview;
 import :Passes.DebugView;
 import :Passes.ImGui;
 import :Passes.PostProcess;
@@ -40,22 +41,52 @@ using namespace Core::Hash;
 
 namespace Graphics
 {
-    [[nodiscard]] static FrameLightingPath ResolveLightingPath(const DefaultPipelineRecipeInputs& inputs,
-                                                               bool hasGeometry)
+    [[nodiscard]] FrameRecipe BuildDefaultPipelineRecipe(const DefaultPipelineRecipeInputs& inputs)
     {
-        if (!hasGeometry)
-            return FrameLightingPath::None;
+        const bool hasGeometry = inputs.SurfacePassEnabled || inputs.LinePassEnabled || inputs.PointPassEnabled;
+        const bool debugActive = inputs.DebugViewPassEnabled && inputs.DebugViewEnabled;
+        const Core::Hash::StringID debugResource = inputs.DebugResource;
 
-        if (inputs.RequestedLightingPath != FrameLightingPath::Deferred)
-            return inputs.RequestedLightingPath;
+        const bool debugRequestsDepth = debugActive && debugResource == GetRenderResourceName(RenderResource::SceneDepth);
+        const bool debugRequestsEntityId = debugActive &&
+                                           (debugResource == GetRenderResourceName(RenderResource::EntityId) ||
+                                            debugResource == GetRenderResourceName(RenderResource::SelectionMask) ||
+                                            debugResource == GetRenderResourceName(RenderResource::SelectionOutline));
+        const bool debugRequestsPrimitiveId = debugActive && debugResource == GetRenderResourceName(RenderResource::PrimitiveId);
+        const bool debugRequestsNormals = debugActive && debugResource == GetRenderResourceName(RenderResource::SceneNormal);
+        const bool debugRequestsMaterial = debugActive &&
+                                           (debugResource == GetRenderResourceName(RenderResource::Albedo) ||
+                                            debugResource == GetRenderResourceName(RenderResource::Material0));
+        const bool debugRequestsSceneColor = debugActive && debugResource == GetRenderResourceName(RenderResource::SceneColorHDR);
+        const bool debugRequestsSelection = debugActive &&
+                                            (debugResource == GetRenderResourceName(RenderResource::SelectionMask) ||
+                                             debugResource == GetRenderResourceName(RenderResource::SelectionOutline));
 
-        // Deferred composition is only valid when SurfacePass can populate the
-        // G-buffer and CompositionPass can consume it.
-        if (inputs.SurfacePassEnabled && inputs.CompositionPassEnabled)
-            return FrameLightingPath::Deferred;
+        const bool selectionActive = (inputs.SelectionOutlinePassEnabled && inputs.HasSelectionWork) || debugRequestsSelection;
+        const bool needsPickingSideband = inputs.PickingPassEnabled || debugRequestsEntityId || debugRequestsPrimitiveId;
 
-        return FrameLightingPath::Forward;
+        FrameRecipe recipe{};
+        recipe.Selection = selectionActive;
+        recipe.DebugVisualization = debugActive;
+        recipe.Post = inputs.PostProcessPassEnabled;
+
+        recipe.Depth = hasGeometry || needsPickingSideband || debugRequestsDepth || selectionActive;
+        recipe.EntityId = needsPickingSideband || selectionActive;
+        recipe.PrimitiveId = inputs.PickingPassEnabled || debugRequestsPrimitiveId;
+
+        const bool deferredRequested = inputs.RequestedLightingPath == FrameLightingPath::Deferred || debugRequestsMaterial;
+        const bool deferredUsable = deferredRequested && inputs.SurfacePassEnabled && inputs.CompositionPassEnabled && hasGeometry;
+        recipe.LightingPath = hasGeometry
+            ? (deferredUsable ? FrameLightingPath::Deferred : FrameLightingPath::Forward)
+            : (debugRequestsSceneColor ? FrameLightingPath::Forward : FrameLightingPath::None);
+
+        recipe.Normals = recipe.LightingPath == FrameLightingPath::Deferred || debugRequestsNormals;
+        recipe.MaterialChannels = recipe.LightingPath == FrameLightingPath::Deferred;
+        recipe.SceneColorLDR = recipe.Post || selectionActive || debugActive || inputs.ImGuiPassEnabled;
+
+        return recipe;
     }
+
 
     void DefaultPipeline::Shutdown()
     {
@@ -64,6 +95,7 @@ namespace Graphics
         if (m_SelectionOutlinePass) m_SelectionOutlinePass->Shutdown();
         if (m_LinePass)             m_LinePass->Shutdown();
         if (m_PointPass)            m_PointPass->Shutdown();
+        if (m_HtexPatchPreviewPass) m_HtexPatchPreviewPass->Shutdown();
         if (m_PostProcessPass)      m_PostProcessPass->Shutdown();
         if (m_CompositionPass)      m_CompositionPass->Shutdown();
         if (m_DebugViewPass)        m_DebugViewPass->Shutdown();
@@ -74,6 +106,7 @@ namespace Graphics
         m_SelectionOutlinePass.reset();
         m_LinePass.reset();
         m_PointPass.reset();
+        m_HtexPatchPreviewPass.reset();
         m_PostProcessPass.reset();
         m_CompositionPass.reset();
         m_DebugViewPass.reset();
@@ -91,6 +124,7 @@ namespace Graphics
         m_SelectionOutlinePass = std::make_unique<Passes::SelectionOutlinePass>();
         m_LinePass             = std::make_unique<Passes::LinePass>();
         m_PointPass            = std::make_unique<Passes::PointPass>();
+        m_HtexPatchPreviewPass = std::make_unique<Passes::HtexPatchPreviewPass>();
         m_DebugViewPass        = std::make_unique<Passes::DebugViewPass>();
         m_ImGuiPass            = std::make_unique<Passes::ImGuiPass>();
         m_PostProcessPass      = std::make_unique<Passes::PostProcessPass>();
@@ -101,6 +135,7 @@ namespace Graphics
         m_SelectionOutlinePass->Initialize(device, descriptorPool, globalLayout);
         m_LinePass->Initialize(device, descriptorPool, globalLayout);
         m_PointPass->Initialize(device, descriptorPool, globalLayout);
+        m_HtexPatchPreviewPass->Initialize(device, descriptorPool, globalLayout);
         m_PostProcessPass->Initialize(device, descriptorPool, globalLayout);
         m_CompositionPass->Initialize(device, descriptorPool, globalLayout);
         m_DebugViewPass->Initialize(device, descriptorPool, globalLayout);
@@ -212,7 +247,20 @@ namespace Graphics
         }
 
         // ==================================================================
-        // 6. Post-Processing — HDR tone mapping + optional FXAA.
+        // 6. HtexPatchPreview — hierarchical texture patch preview.
+        //    Renders a low-res proxy of the selected texture region for debugging
+        //    texture streaming and LOD transitions.
+        // ==================================================================
+        if (m_HtexPatchPreviewPass && IsFeatureEnabled(FeatureCatalog::HtexPatchPreviewPass))
+        {
+            m_Path.AddStage("HtexPatchPreview", [this](RenderPassContext& ctx)
+            {
+                m_HtexPatchPreviewPass->AddPasses(ctx);
+            });
+        }
+
+        // ==================================================================
+        // 7. Post-Processing — HDR tone mapping + optional FXAA.
         //    Reads canonical SceneColorHDR and writes canonical SceneColorLDR.
         //    Final presentation to the imported swapchain image happens in the
         //    dedicated Present stage below.
@@ -221,13 +269,13 @@ namespace Graphics
             m_Path.AddFeature("PostProcess", m_PostProcessPass.get());
 
         // ==================================================================
-        // 7. Selection Outline — post-process overlay for selected entities.
+        // 8. Selection Outline — post-process overlay for selected entities.
         // ==================================================================
         if (m_SelectionOutlinePass && IsFeatureEnabled(FeatureCatalog::SelectionOutlinePass))
             m_Path.AddFeature("SelectionOutline", m_SelectionOutlinePass.get());
 
         // ==================================================================
-        // 8. Debug View — conditional texture inspector overlay.
+        // 9. Debug View — conditional texture inspector overlay.
         // ==================================================================
         if (m_DebugViewPass && IsFeatureEnabled(FeatureCatalog::DebugViewPass))
         {
@@ -239,7 +287,7 @@ namespace Graphics
         }
 
         // ==================================================================
-        // 9. ImGui — editor UI overlay.
+        // 10. ImGui — editor UI overlay.
         // ==================================================================
         if (m_ImGuiPass && IsFeatureEnabled(FeatureCatalog::ImGuiPass))
             m_Path.AddFeature("ImGui", m_ImGuiPass.get());
@@ -339,6 +387,7 @@ namespace Graphics
         if (m_SelectionOutlinePass) m_SelectionOutlinePass->OnResize(width, height);
         if (m_LinePass)             m_LinePass->OnResize(width, height);
         if (m_PointPass)            m_PointPass->OnResize(width, height);
+        if (m_HtexPatchPreviewPass) m_HtexPatchPreviewPass->OnResize(width, height);
         if (m_PostProcessPass)      m_PostProcessPass->OnResize(width, height);
         if (m_CompositionPass)      m_CompositionPass->OnResize(width, height);
         if (m_DebugViewPass)        m_DebugViewPass->OnResize(width, height);
@@ -357,76 +406,6 @@ namespace Graphics
             m_SelectionOutlinePass->PostCompile(frameIndex, debugImages);
         if (m_DebugViewPass)
             m_DebugViewPass->PostCompile(frameIndex, debugImages);
-    }
-
-    [[nodiscard]] FrameRecipe BuildDefaultPipelineRecipe(const DefaultPipelineRecipeInputs& inputs)
-    {
-        FrameRecipe recipe{};
-
-        const bool hasGeometry = inputs.SurfacePassEnabled || inputs.LinePassEnabled || inputs.PointPassEnabled;
-        recipe.LightingPath = ResolveLightingPath(inputs, hasGeometry);
-
-        if (hasGeometry)
-            recipe.Depth = true;
-
-        // Deferred path requires G-buffer resources produced by SurfacePass.
-        if (recipe.LightingPath == FrameLightingPath::Deferred)
-        {
-            recipe.Normals = true;
-            recipe.MaterialChannels = true;
-        }
-
-        if (inputs.PickingPassEnabled)
-        {
-            recipe.Depth = true;
-            recipe.EntityId = true;
-            recipe.PrimitiveId = true;
-        }
-
-        if (inputs.PostProcessPassEnabled)
-        {
-            recipe.Post = true;
-            recipe.SceneColorLDR = true;
-        }
-
-        if (inputs.SelectionOutlinePassEnabled && inputs.HasSelectionWork)
-        {
-            recipe.Selection = true;
-            recipe.EntityId = true;
-            recipe.SceneColorLDR = true;
-        }
-
-        if (inputs.DebugViewPassEnabled && inputs.DebugViewEnabled)
-        {
-            recipe.DebugVisualization = true;
-            recipe.SceneColorLDR = true;
-            if (const auto selected = TryGetRenderResourceByName(inputs.DebugResource))
-            {
-                switch (*selected)
-                {
-                case RenderResource::SceneDepth: recipe.Depth = true; break;
-                case RenderResource::EntityId: recipe.EntityId = true; break;
-                case RenderResource::PrimitiveId: recipe.PrimitiveId = true; break;
-                case RenderResource::SceneNormal: recipe.Normals = true; break;
-                case RenderResource::Albedo:
-                case RenderResource::Material0: recipe.MaterialChannels = true; break;
-                case RenderResource::SceneColorHDR:
-                    if (recipe.LightingPath == FrameLightingPath::None)
-                        recipe.LightingPath = FrameLightingPath::Forward;
-                    break;
-                case RenderResource::SceneColorLDR: recipe.SceneColorLDR = true; break;
-                case RenderResource::SelectionMask:
-                case RenderResource::SelectionOutline:
-                    recipe.Selection = true;
-                    break;
-                }
-            }
-        }
-
-        if (inputs.ImGuiPassEnabled)
-            recipe.SceneColorLDR = recipe.SceneColorLDR || inputs.PostProcessPassEnabled;
-
-        return recipe;
     }
 
     FrameRecipe DefaultPipeline::BuildFrameRecipe(const RenderPassContext& ctx) const
@@ -453,8 +432,6 @@ namespace Graphics
         inputs.DebugViewEnabled = ctx.Debug.Enabled;
         inputs.DebugResource = ctx.Debug.SelectedResource;
 
-        // Select lighting path: Deferred when the feature toggle is enabled and
-        // the composition pass is available; otherwise Forward.
         inputs.RequestedLightingPath = (inputs.CompositionPassEnabled && IsFeatureEnabled(FeatureCatalog::DeferredLighting))
             ? FrameLightingPath::Deferred
             : FrameLightingPath::Forward;

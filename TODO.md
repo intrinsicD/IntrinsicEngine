@@ -111,6 +111,13 @@ These are not required to finish the first wave, but they should begin soon afte
   - [ ] Keep adapter shims for one migration window (then delete).
   - [ ] Require pass/fail gates (tests + telemetry budgets) to permit cutover.
 
+#### B3.8 Htex-Inspired Halfedge-Pair Patch Storage (investigate feasibility)
+
+- [ ] Investigate a float-render-target-first `Htex`-style edge-patch system backed by `Halfedge::Mesh` edge IDs and intrinsic triangle lookup.
+- [ ] Keep the first implementation scoped to float render targets / float patch payloads; verify the patch path can coexist with existing property-driven visualization.
+- [ ] Investigate the feasibility of native integer / categorical patch storage (`kmeans` labels, IDs, bitmasks, other non-float data) before committing to a shader/data-layout design.
+- [ ] Verify `v:kmeans_label` / `p:kmeans_label` continue to round-trip through the existing label publication and color-mapping paths while the patch work is prototyped.
+
 ### B4. Next-Gen Frame Pipeline Refactor (Fixed-Step + Extraction + Explicit Frame Contexts)
 
 Goal: refactor the runtime from a monolithic update/render loop into a staged frame pipeline with explicit ownership boundaries, immutable render extraction, bounded frames in flight, and explicit CPU/GPU completion tracking. The target shape is: platform -> fixed simulation -> extraction -> render preparation -> GPU submission -> maintenance.
