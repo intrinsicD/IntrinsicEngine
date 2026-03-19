@@ -233,7 +233,7 @@ TEST_F(HeadlessEngineTest, AssetPipelineMainThreadQueueInFrameLoop)
     bool taskExecuted = false;
 
     // Simulate what a worker thread would do: queue a main-thread task
-    // that modifies an entity's transform (like LoadDroppedAsset does).
+    // that modifies an entity's transform (like AssetIngestService does during import finalization).
     m_AssetPipeline->RunOnMainThread([&]()
     {
         auto& t = registry.get<ECS::Components::Transform::Component>(e);

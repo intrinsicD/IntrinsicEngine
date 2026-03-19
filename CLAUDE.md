@@ -201,7 +201,7 @@ Each pass iterates a dedicated ECS component type. The **toggle is presence/abse
 - **`ECS::MeshEdgeView::Component`** / **`ECS::MeshVertexView::Component`** — edge/vertex views derived from mesh geometry via `ReuseVertexBuffersFrom`. Auto-attached/detached by `MeshViewLifecycleSystem` when `Line::Component`/`Point::Component` is present/absent.
 - **`ECS::EdgePair`** — standalone component for edge pair data, decoupled from any specific pass.
 - **`ECS::DirtyTag::*`** — six zero-size tag components for per-domain dirty tracking: `VertexPositions`, `VertexAttributes`, `EdgeTopology`, `EdgeAttributes`, `FaceTopology`, `FaceAttributes`. Consumed by `PropertySetDirtySyncSystem`; cleared after sync. Multiple tags can coexist independently on the same entity.
-- **`ECS::Components::AssetSourceRef::Component`** — records the filesystem path (`std::string SourcePath`) from which an entity's geometry was loaded. Attached by `Engine::LoadDroppedAsset()` on the root entity. Used by `Runtime::SceneSerializer` to re-import assets on scene load. Not present on runtime-created entities (procedural geometry, demo point clouds).
+- **`ECS::Components::AssetSourceRef::Component`** — records the filesystem path (`std::string SourcePath`) from which an entity's geometry was loaded. Attached by `Runtime::AssetIngestService` on the root entity. Used by `Runtime::SceneSerializer` to re-import assets on scene load. Not present on runtime-created entities (procedural geometry, demo point clouds).
 
 ### BDA Shared-Buffer Design
 

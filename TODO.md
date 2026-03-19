@@ -49,7 +49,6 @@ These are not required to finish the first wave, but they should begin soon afte
 
 #### B3.3 Mixed Concerns + Unstable Interfaces
 
-- [ ] Separate drag-drop ingest orchestration from `Engine` into a dedicated asset ingest service.
 - [ ] Separate frame-loop policy from subsystem wiring (registration/configuration vs. per-frame execution).
 - [ ] Replace string-based feature toggle callsites in hot orchestration paths with typed feature descriptors where practical.
 

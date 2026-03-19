@@ -1,11 +1,5 @@
 module;
 #include <chrono>
-#include <queue>
-#include <mutex>
-#include <filesystem>
-#include <system_error> // for std::error_code
-#include <algorithm> // for std::transform
-#include <cctype>    // for std::tolower
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <entt/entity/registry.hpp>
@@ -31,6 +25,7 @@ import ECS;
 import Interface;
 import Runtime.GraphicsBackend;
 import Runtime.AssetPipeline;
+import Runtime.AssetIngestService;
 import Runtime.SceneManager;
 import Runtime.RenderOrchestrator;
 import Runtime.PointCloudKMeans;
@@ -276,7 +271,8 @@ namespace Runtime
                 {
                     for (const auto& path : event.Paths)
                     {
-                        LoadDroppedAsset(path);
+                        if (m_AssetIngestService)
+                            m_AssetIngestService->EnqueueDropImport(path);
                     }
                 }
             }, e);
@@ -333,6 +329,18 @@ namespace Runtime
         m_IOBackend = std::make_unique<Core::IO::FileIOBackend>();
         Graphics::RegisterBuiltinLoaders(m_IORegistry);
 
+        // 10. Asset ingest orchestration (drag-drop + sync re-import).
+        m_AssetIngestService = std::make_unique<AssetIngestService>(
+            GetDeviceShared(),
+            m_GraphicsBackend->GetTransferManager(),
+            m_RenderOrchestrator->GetGeometryStorage(),
+            m_RenderOrchestrator->GetMaterialSystem(),
+            *m_AssetPipeline,
+            *m_SceneManager,
+            m_IORegistry,
+            *m_IOBackend,
+            m_GraphicsBackend->GetDefaultTextureIndex());
+
         Core::Log::Info("Engine: Constructor complete.");
     }
 
@@ -356,6 +364,9 @@ namespace Runtime
 
         m_AssetPipeline->ClearLoadedMaterials();
 
+        // AssetIngestService borrows runtime subsystems; release it before tearing them down.
+        m_AssetIngestService.reset();
+
         // RenderOrchestrator destructor handles: GPUScene, RenderSystem, PipelineLibrary,
         // MaterialSystem, GeometryStorage, frame state.
         m_RenderOrchestrator.reset();
@@ -375,110 +386,6 @@ namespace Runtime
         m_GraphicsBackend.reset();
 
         m_Window.reset();
-    }
-
-    void Engine::LoadDroppedAsset(const std::string& path)
-    {
-        std::error_code ec;
-        std::filesystem::path fsPath(path);
-
-        // Check if file exists before canonicalizing
-        if (!std::filesystem::exists(fsPath, ec) || ec)
-        {
-            Core::Log::Error("Dropped file does not exist: {}", path);
-            return;
-        }
-
-        std::filesystem::path canonical = std::filesystem::canonical(fsPath, ec);
-        if (ec)
-        {
-            Core::Log::Error("Failed to resolve canonical path for: {}", path);
-            return;
-        }
-
-        std::filesystem::path assetDir = std::filesystem::canonical("assets/", ec);
-        if (ec)
-        {
-            Core::Log::Warn("Assets directory not found or inaccessible");
-        }
-
-        auto relativePath = canonical.lexically_relative(assetDir);
-        if (relativePath.empty() || relativePath.native().starts_with(".."))
-        {
-            Core::Log::Warn("Dropped file is outside of assets directory: {}", path);
-        }
-
-        std::string ext = fsPath.extension().string();
-
-        // Convert to lower case for comparison
-        std::transform(ext.begin(), ext.end(), ext.begin(),
-                       [](unsigned char c) { return std::tolower(c); });
-
-        bool isModel = m_IORegistry.CanImport(ext);
-
-        if (isModel)
-        {
-            Core::Log::Info("Scheduling Async Load: {}", path);
-
-            // 1. Offload heavy parsing to Worker Thread
-            Core::Tasks::Scheduler::Dispatch([this, path]()
-            {
-                // [Worker Thread] I/O-agnostic parsing via IORegistry
-                auto loadResult = Graphics::ModelLoader::LoadAsync(
-                    GetDeviceShared(), m_GraphicsBackend->GetTransferManager(),
-                    m_RenderOrchestrator->GetGeometryStorage(), path,
-                    m_IORegistry, *m_IOBackend);
-
-                if (!loadResult)
-                {
-                    Core::Log::Error("Failed to load model: {} ({})", path,
-                                     Graphics::AssetErrorToString(loadResult.error()));
-                    return;
-                }
-
-                // 2. Register Token immediately (Thread-safe)
-                m_AssetPipeline->RegisterAssetLoad(Core::Assets::AssetHandle{}, loadResult->Token);
-
-                // 3. Schedule Entity Spawning on Main Thread
-                m_AssetPipeline->RunOnMainThread([this, model = std::move(loadResult->ModelData), path]() mutable
-                {
-                    // [Main Thread] Safe to touch Scene/Assets
-                    std::filesystem::path fsPath(path);
-                    std::string baseName = fsPath.filename().string();
-
-                    static uint64_t s_AssetLoadCounter = 0;
-                    std::string assetName = baseName + "::" + std::to_string(++s_AssetLoadCounter);
-
-                    auto modelHandle = GetAssetManager().Create(assetName, std::move(model));
-
-                    Graphics::MaterialData matData;
-                    matData.AlbedoID = m_GraphicsBackend->GetDefaultTextureIndex();
-                    matData.RoughnessFactor = 0.5f;
-
-                    auto defaultMat = std::make_unique<Graphics::Material>(
-                        m_RenderOrchestrator->GetMaterialSystem(), matData);
-
-                    const std::string materialName = assetName + "::DefaultMaterial";
-                    auto defaultMaterialHandle = GetAssetManager().Create(materialName, std::move(defaultMat));
-                    m_AssetPipeline->TrackMaterial(defaultMaterialHandle);
-
-                    entt::entity root = SpawnModel(modelHandle, defaultMaterialHandle, glm::vec3(0.0f), glm::vec3(0.01f));
-
-                    // Record the asset source path on the root entity for scene serialization.
-                    if (root != entt::null)
-                    {
-                        GetScene().GetRegistry().emplace_or_replace<ECS::Components::AssetSourceRef::Component>(
-                            root, path);
-                    }
-
-                    Core::Log::Info("Successfully spawned: {}", assetName);
-                });
-            });
-        }
-        else
-        {
-            Core::Log::Warn("Unsupported file extension: {}", ext);
-        }
     }
 
     entt::entity Engine::SpawnModel(Core::Assets::AssetHandle modelHandle,
