@@ -51,11 +51,8 @@ These are not required to finish the first wave, but they should begin soon afte
 
 #### B3.4 Barriers to Testing + Evolution
 
-- [x] Add tests that lock asset-streaming completion semantics (queued -> uploaded -> finalized).
-
 #### B3.5 Hidden Architectural Duplication
 
-- [ ] Consolidate repeated geometry sync registration patterns (graph/mesh-view/point-cloud/GPU-scene) behind shared helpers.
 - [ ] Consolidate repeated GPU-slot reclaim lifecycle logic into a single policy utility with shared tests.
 - [ ] Audit duplicate upload/lifecycle code paths between retained geometry systems and document consolidation plan.
 
