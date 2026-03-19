@@ -183,6 +183,9 @@ namespace Runtime
             executeGraph(frameGraph);
         }
 
+        if (callbacks.BeforeDispatch)
+            callbacks.BeforeDispatch();
+
         self.Host.DispatchDeferredEvents();
 
         {

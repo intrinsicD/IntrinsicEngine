@@ -42,6 +42,7 @@ export namespace Runtime
     using RegisterFixedSystemsFn = Core::InplaceFunction<void(Core::FrameGraph&, float), 96>;
     using VariableUpdateFn = Core::InplaceFunction<void(float), 64>;
     using RegisterVariableSystemsFn = Core::InplaceFunction<void(Core::FrameGraph&, float), 96>;
+    using PreDispatchFn = Core::InplaceFunction<void(), 64>;
     using RenderHookFn = Core::InplaceFunction<void(), 64>;
 
     [[nodiscard]] FixedStepAdvanceResult RunFixedSteps(double& accumulator,
@@ -116,6 +117,7 @@ export namespace Runtime
     {
         VariableUpdateFn OnUpdate;
         RegisterVariableSystemsFn RegisterVariableSystems;
+        PreDispatchFn BeforeDispatch;
         RenderHookFn OnRender;
     };
 

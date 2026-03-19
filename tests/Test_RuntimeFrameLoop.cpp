@@ -25,14 +25,17 @@ namespace
     class FakeRenderLaneHost final : public Runtime::IRenderLaneHost
     {
     public:
-        explicit FakeRenderLaneHost(Core::FrameGraph& graph)
+        explicit FakeRenderLaneHost(Core::FrameGraph& graph, std::vector<std::string>* trace = nullptr)
             : Graph(graph)
+            , Trace(trace)
         {
         }
 
         [[nodiscard]] Core::FrameGraph& GetFrameGraph() override
         {
             Calls.emplace_back("get_graph");
+            if (Trace)
+                Trace->emplace_back("host:get_graph");
             return Graph;
         }
 
@@ -40,14 +43,19 @@ namespace
         {
             EXPECT_EQ(&graph, &Graph);
             Calls.emplace_back("register_engine");
+            if (Trace)
+                Trace->emplace_back("host:register_engine");
         }
 
         void DispatchDeferredEvents() override
         {
             Calls.emplace_back("dispatch");
+            if (Trace)
+                Trace->emplace_back("host:dispatch");
         }
 
         Core::FrameGraph& Graph;
+        std::vector<std::string>* Trace = nullptr;
         std::vector<std::string> Calls;
     };
 }
@@ -158,7 +166,8 @@ TEST(RuntimeFrameLoop, RenderLaneCoordinator_OrdersUpdateRegistrationExecutionDi
 {
     Core::Memory::ScopeStack scope(64 * 1024);
     Core::FrameGraph graph(scope);
-    FakeRenderLaneHost host(graph);
+    std::vector<std::string> trace;
+    FakeRenderLaneHost host(graph, &trace);
     const Runtime::RenderLaneCoordinator coordinator{.Host = host};
 
     std::vector<std::string> calls;
@@ -169,25 +178,38 @@ TEST(RuntimeFrameLoop, RenderLaneCoordinator_OrdersUpdateRegistrationExecutionDi
             {
                 EXPECT_NEAR(dt, 1.0f / 60.0f, 1e-6f);
                 calls.emplace_back("update");
+                trace.emplace_back("callback:update");
             },
             .RegisterVariableSystems = [&](Core::FrameGraph& registeredGraph, float dt)
             {
                 EXPECT_EQ(&registeredGraph, &graph);
                 EXPECT_NEAR(dt, 1.0f / 60.0f, 1e-6f);
                 calls.emplace_back("register_client");
+                trace.emplace_back("callback:register_client");
             },
-            .OnRender = [&]() { calls.emplace_back("render"); },
+            .BeforeDispatch = [&]()
+            {
+                calls.emplace_back("before_dispatch");
+                trace.emplace_back("callback:before_dispatch");
+            },
+            .OnRender = [&]()
+            {
+                calls.emplace_back("render");
+                trace.emplace_back("callback:render");
+            },
         },
         [&](Core::FrameGraph& executedGraph)
         {
             EXPECT_EQ(&executedGraph, &graph);
             calls.emplace_back("execute");
+            trace.emplace_back("callback:execute");
         });
 
     const std::vector<std::string> expectedCalls{
         "update",
         "register_client",
         "execute",
+        "before_dispatch",
         "render",
     };
     EXPECT_EQ(calls, expectedCalls);
@@ -198,4 +220,16 @@ TEST(RuntimeFrameLoop, RenderLaneCoordinator_OrdersUpdateRegistrationExecutionDi
         "dispatch",
     };
     EXPECT_EQ(host.Calls, expectedHostCalls);
+
+    const std::vector<std::string> expectedTrace{
+        "callback:update",
+        "host:get_graph",
+        "callback:register_client",
+        "host:register_engine",
+        "callback:execute",
+        "callback:before_dispatch",
+        "host:dispatch",
+        "callback:render",
+    };
+    EXPECT_EQ(trace, expectedTrace);
 }
