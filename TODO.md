@@ -125,6 +125,215 @@ These are not required to finish the first wave, but they should begin soon afte
   - [ ] Keep adapter shims for one migration window (then delete).
   - [ ] Require pass/fail gates (tests + telemetry budgets) to permit cutover.
 
+### B4. Next-Gen Frame Pipeline Refactor (Fixed-Step + Extraction + Explicit Frame Contexts)
+
+Goal: refactor the runtime from a monolithic update/render loop into a staged frame pipeline with explicit ownership boundaries, immutable render extraction, bounded frames in flight, and explicit CPU/GPU completion tracking. The target shape is: platform -> fixed simulation -> extraction -> render preparation -> GPU submission -> maintenance.
+
+#### B4.0 Target properties (the contract we are designing toward)
+
+- [ ] Keep OS/window/input pumping first on the main thread every frame.
+- [ ] Run simulation on a fixed timestep and keep rendering variable-rate.
+- [ ] Introduce explicit `FrameContext` ownership rather than ad-hoc per-frame global state.
+- [ ] Compile/execute the render graph per frame inside renderer-owned lifecycle code.
+- [ ] Decouple authoritative game/world state from render-facing state via an extraction boundary.
+- [ ] Keep frames in flight bounded (default 2, optional 3 when telemetry justifies it).
+- [ ] Treat job-system-driven parallelism as the default for simulation/extraction/render prep work.
+- [ ] Make GPU synchronization, frame pacing, and deferred resource retirement explicit architecture concepts.
+- [ ] Preserve headless/testable paths by isolating platform + swapchain work from simulation/extraction/maintenance logic.
+
+#### B4.1 Core principle: authoritative world state -> immutable render state
+
+- [ ] Codify the rule that simulation and rendering must not mutate the same live state during a frame.
+- [ ] Define the authoritative handoff as:
+  - [ ] simulation writes `WorldState N+1`
+  - [ ] extraction reads stable `WorldState N+1`
+  - [ ] extraction writes immutable `RenderWorld N+1`
+  - [ ] rendering consumes only `RenderWorld N+1`
+- [ ] Reject designs that let pass recording or render-graph setup walk arbitrary live ECS state after extraction has completed.
+- [ ] Add tests that lock the extraction boundary so render work cannot depend on mutation order inside the simulation lane.
+
+#### B4.2 Reference main loop (use this shape as the migration target)
+
+Use the following loop shape as the canonical reference for the refactor. Adaptation to current Intrinsic ownership should happen *under* this shape, not by changing the shape itself:
+
+```cpp
+while (!app.should_quit())
+{
+    platform.pump_events();          // window, input, quit, resize
+    clock.begin_frame();
+
+    if (app.is_minimized())
+    {
+        platform.wait_for_events_or_timeout();
+        continue;
+    }
+
+    // 1) Advance fixed-step simulation
+    accumulator += clock.frame_delta_clamped();
+
+    while (accumulator >= fixed_dt)
+    {
+        input_system.begin_sim_tick();
+        simulation.run_fixed_tick(fixed_dt);
+        gameplay.run_fixed_tick(fixed_dt);
+        physics.run_fixed_tick(fixed_dt);
+        animation.run_fixed_tick(fixed_dt);
+        world.commit_tick();         // authoritative state becomes consistent
+        accumulator -= fixed_dt;
+    }
+
+    const double alpha = accumulator / fixed_dt;
+
+    // 2) Build render snapshot from stable world state
+    RenderFrameInput render_input{};
+    render_input.alpha = alpha;
+    render_input.camera = camera_system.interpolate(alpha);
+    render_input.viewport = platform.viewport();
+    render_input.world_snapshot = world.create_readonly_snapshot();
+    render_input.input_snapshot = input_system.render_snapshot();
+
+    // 3) Start frame context
+    FrameContext& frame = renderer.begin_frame();
+
+    // 4) Extract immutable render data
+    RenderWorld render_world = renderer.extract_render_world(render_input);
+
+    // 5) Prepare render graph/jobs
+    renderer.prepare_frame(frame, render_world);
+
+    // 6) Execute GPU frame
+    renderer.execute_frame(frame);
+
+    // 7) End frame / retire finished work
+    renderer.end_frame(frame);
+    resource_system.collect_garbage(renderer.completed_gpu_value());
+
+    clock.end_frame();
+}
+```
+
+Mapping guidance for current Intrinsic code while preserving that reference shape:
+
+- [ ] `platform` maps to the current window/event/minimize/resize orchestration on the main thread.
+- [ ] `world` maps to `SceneManager` + authoritative ECS scene ownership, with a new explicit `commit_tick()` / readonly snapshot boundary.
+- [ ] `renderer` maps to `RenderOrchestrator` plus `RenderSystem`, but should evolve toward `begin_frame -> extract_render_world -> prepare_frame -> execute_frame -> end_frame`.
+- [ ] `resource_system` maps to the currently split upload-retirement / deferred-destruction responsibilities across `AssetPipeline`, render-side lifetime queues, and future explicit GPU-retirement services.
+- [ ] `RenderFrameInput`, `RenderWorld`, and `FrameContext` should become first-class types in the refactor rather than staying implicit in `Engine::Run()` / `RenderSystem::OnUpdate(...)`.
+
+#### B4.3 Platform stage (A)
+
+- [ ] Move all window/input/event pumping to the start of the frame on the main thread.
+- [ ] Centralize quit, resize, minimize, drag-drop ingest, and timer updates under one platform-stage API.
+- [ ] Ensure minimized/background behavior uses wait-for-events or throttled policy instead of busy-rendering.
+- [ ] Ensure SDL/GLFW event pumping semantics stay main-thread-only and are documented as such.
+
+#### B4.4 Simulation stage (B)
+
+- [ ] Introduce a clamped accumulator policy with explicit constants such as `fixed_dt` and `max_frame_dt`.
+- [ ] Default to `1/60` fixed-step simulation; allow `1/120` as a configurable high-frequency mode when justified.
+- [ ] Move deterministic gameplay / ECS / physics / AI / animation work onto the fixed-step lane.
+- [ ] Define `CommitFixedTick()` semantics so each completed fixed tick produces a consistent authoritative world state.
+- [ ] Add telemetry for tick count per frame, clamp hits, and simulation CPU time.
+
+#### B4.5 Extraction stage (C)
+
+- [ ] Introduce an explicit `RenderFrameInput` / `WorldSnapshot` / `RenderWorld` extraction boundary.
+- [ ] Ensure extraction is the only place that resolves live ECS state into render packets for the frame.
+- [ ] Define immutable packet families for Intrinsic's renderer:
+  - [ ] camera/view packets
+  - [ ] surface draw packets
+  - [ ] line / point / debug draw packets
+  - [ ] selection / picking packets
+  - [ ] light / environment packets
+  - [ ] UI / editor overlay packets
+  - [ ] geometry-processing visualization packets
+- [ ] Resolve retained `GPUScene` handles, bindless references, and debug-view state during extraction rather than during late pass recording.
+- [ ] Add tests that guarantee render prep and command recording consume extraction output only.
+
+#### B4.6 Render preparation stage (D)
+
+- [ ] Treat render preparation as CPU work that may schedule jobs for visibility, culling, LOD selection, sort keys, draw packet compaction, upload staging, and command recording.
+- [ ] Keep the main loop aware only of broad phases; do not hardcode detailed pass order outside renderer-owned preparation code.
+- [ ] Build the frame's render graph during preparation from `RenderWorld` and current view configuration.
+- [ ] Keep the current three-pass pipeline, deferred path, post-process path, selection/debug overlays, and future hybrid paths expressed as render-graph composition rather than top-level loop branching.
+- [ ] Prepare for GPU-driven / indirect execution by making CPU preparation emit packets and scheduling metadata rather than immediate live-state callbacks.
+
+#### B4.7 GPU submission stage (E)
+
+- [ ] Make the renderer follow the explicit-API rhythm: wait frame-context availability -> acquire -> reset per-frame allocators -> record -> submit -> present.
+- [ ] Keep swapchain acquire/present and final submit on the main thread; push all other practical work to jobs.
+- [ ] Move `RenderGraph` compile/record/execute under renderer-owned execution code.
+- [ ] Handle resize / out-of-date / minimized states without corrupting in-flight frame contexts.
+- [ ] Evolve toward queue-domain-aware scheduling (graphics / compute / transfer) without exposing queue details directly to the top-level engine loop.
+
+#### B4.8 Maintenance stage (F)
+
+- [ ] Retire completed uploads after GPU completion is known.
+- [ ] Process deferred destruction only when the relevant GPU completion value has passed.
+- [ ] Centralize readback completion, garbage collection, profiler rollup, telemetry capture, and hot-reload bookkeeping here.
+- [ ] Ensure maintenance can run in headless/test configurations even when no swapchain is active.
+
+#### B4.9 Explicit frame-context ring + bounded frames in flight
+
+- [ ] Introduce a dedicated `FrameContext` ring distinct from swapchain image count.
+- [ ] Start with 2 frames in flight by default; make 3 configurable for throughput-heavy modes only.
+- [ ] Move per-frame transient ownership under `FrameContext`:
+  - [ ] command allocator pools
+  - [ ] upload arenas / staging allocators
+  - [ ] descriptor arenas
+  - [ ] transient buffers / scratch allocators
+  - [ ] deferred deletion queues
+  - [ ] per-frame render graph or graph-execution cache
+  - [ ] per-frame profiling/stat samples
+- [ ] Audit existing systems and migrate any frame-temporary resource keyed by swapchain image count to frame-in-flight ownership unless image affinity is truly required.
+- [ ] Add explicit wait/reclaim/reset behavior before a `FrameContext` is reused.
+
+#### B4.10 Job system + multi-threaded command recording
+
+- [ ] Treat the CPU task graph as the execution substrate for simulation, extraction, and render-prep jobs.
+- [ ] Define per-phase barriers so extraction observes a stable world state and render prep observes a stable `RenderWorld`.
+- [ ] Parallelize suitable workloads:
+  - [ ] animation / transform propagation
+  - [ ] broadphase / AI / script jobs
+  - [ ] visibility / culling / LOD lists
+  - [ ] draw-packet building / sorting
+  - [ ] upload staging
+  - [ ] secondary command buffer or pass-local command recording
+- [ ] Add a TODO track for multi-threaded command recording of heavy passes (shadow views, debug/editor overlays, multi-view paths).
+- [ ] Keep the main thread as a conductor, not a worker.
+
+#### B4.11 Queue model, synchronization, frame pacing, and resource lifetime
+
+- [ ] Track queue domains conceptually as graphics / compute / transfer, even if the first implementation remains mostly single-queue.
+- [ ] Promote GPU completion tracking to a first-class timeline/fence abstraction shared by upload retirement, deferred deletion, and readback readiness.
+- [ ] Add timeline-based resource retirement instead of immediate GPU resource destruction from gameplay/editor code.
+- [ ] Add frame-pacing policies for vsync, low-latency/mailbox, uncapped, editor-throttled, and background-throttled modes.
+- [ ] Add telemetry for CPU frame time, GPU frame time, present blocking time, frames in flight, and estimated input-to-present latency.
+- [ ] Acquire late when practical, keep frames in flight bounded, and avoid the CPU running many frames ahead of the GPU.
+
+#### B4.12 Migration plan + anti-goals
+
+- [ ] Phase A: lock the current frame-order, resize, upload-retirement, pick/debug, and render-graph validation baselines.
+- [ ] Phase B: split the top-level loop into platform / simulation / extraction / render prep / submission / maintenance stages without changing behavior.
+- [ ] Phase C: introduce fixed-step simulation + authoritative world commit semantics.
+- [ ] Phase D: introduce immutable render extraction types and move renderer-facing ECS walks behind them.
+- [ ] Phase E: add the `FrameContext` ring and migrate frame-temporary ownership off swapchain image count.
+- [ ] Phase F: split the renderer into `BeginFrame / Extract / Prepare / Execute / EndFrame` lifecycle entry points.
+- [ ] Phase G: parallelize extraction/render-prep work and add explicit maintenance-stage retirement.
+- [ ] Phase H: evolve toward queue-domain-aware graph scheduling, GPU-driven preparation, and richer async compute / transfer overlap.
+- [ ] Preserve safe checkpoints after every phase:
+  - [ ] render-graph validation remains green
+  - [ ] headless/runtime smoke tests remain green
+  - [ ] resize / pick / debug-view behavior remains stable
+  - [ ] telemetry budgets stay within agreed thresholds
+- [ ] Explicit anti-goals for the refactor:
+  - [ ] no single giant task graph that mixes simulation mutation and render submission
+  - [ ] no renderer walking arbitrary live ECS state during command recording
+  - [ ] no tying per-frame transient ownership to swapchain image count
+  - [ ] no unlimited frames in flight
+  - [ ] no immediate GPU resource destruction
+  - [ ] no hardcoded detailed pass order in the top-level engine loop
+
 ---
 
 ## 3. Later (P2) — Planned Downstream Work
