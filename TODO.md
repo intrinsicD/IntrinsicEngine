@@ -56,28 +56,6 @@ These are not required to finish the first wave, but they should begin soon afte
 
 #### B3.6 Redesign Options (decision package)
 
-##### Option O1 — Minimal Change
-
-- [ ] Write an ADR for O1 that explicitly captures:
-  - [ ] Benefits
-  - [ ] Drawbacks
-  - [ ] Migration cost
-  - [ ] Regression risk
-  - [ ] Performance impact
-  - [ ] Testability impact
-  - [ ] Future extensibility impact
-
-##### Option O2 — Pragmatic Medium Refactor
-
-- [ ] Write an ADR for O2 that explicitly captures:
-  - [ ] Benefits
-  - [ ] Drawbacks
-  - [ ] Migration cost
-  - [ ] Regression risk
-  - [ ] Performance impact
-  - [ ] Testability impact
-  - [ ] Future extensibility impact
-
 ##### Option O3 — Ideal Target Architecture
 
 - [ ] Write an ADR for O3 that explicitly captures:
