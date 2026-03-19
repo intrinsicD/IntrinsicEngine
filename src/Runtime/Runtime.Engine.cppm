@@ -23,6 +23,7 @@ import ECS;
 import Runtime.SelectionModule;
 import Runtime.GraphicsBackend;
 import Runtime.AssetPipeline;
+import Runtime.AssetIngestService;
 import Runtime.SceneManager;
 import Runtime.RenderOrchestrator;
 
@@ -90,6 +91,9 @@ export namespace Runtime
         // ECS scene, entity lifecycle, and EnTT GPU-reclaim hooks.
         std::unique_ptr<SceneManager> m_SceneManager;
 
+        // External asset ingest orchestration (drag-drop + re-import).
+        std::unique_ptr<AssetIngestService> m_AssetIngestService;
+
         // Render subsystem: ShaderRegistry, PipelineLibrary, GPUScene, RenderSystem,
         // MaterialSystem, per-frame arena/scope/FrameGraph, GeometryPool.
         std::unique_ptr<RenderOrchestrator> m_RenderOrchestrator;
@@ -121,6 +125,10 @@ export namespace Runtime
         // Access to the SceneManager subsystem.
         [[nodiscard]] SceneManager& GetSceneManager() { return *m_SceneManager; }
         [[nodiscard]] const SceneManager& GetSceneManager() const { return *m_SceneManager; }
+
+        // Access to the AssetIngestService subsystem.
+        [[nodiscard]] AssetIngestService& GetAssetIngestService() { return *m_AssetIngestService; }
+        [[nodiscard]] const AssetIngestService& GetAssetIngestService() const { return *m_AssetIngestService; }
 
         // Access to the RenderOrchestrator subsystem.
         [[nodiscard]] RenderOrchestrator& GetRenderOrchestrator() { return *m_RenderOrchestrator; }
@@ -178,8 +186,6 @@ export namespace Runtime
 
         // Benchmark runner (active when EngineConfig::BenchmarkMode is true).
         Core::Benchmark::BenchmarkRunner m_BenchmarkRunner;
-
-        void LoadDroppedAsset(const std::string& path);
 
     private:
         EngineConfig m_EngineConfig;

@@ -204,53 +204,15 @@ namespace
     {
         ReimportedAsset result;
 
-        // Check file exists
-        std::error_code ec;
-        if (!std::filesystem::exists(sourcePath, ec) || ec)
+        auto imported = engine.GetAssetIngestService().ImportModelSync(sourcePath, "scene");
+        if (!imported)
         {
-            Core::Log::Error("Scene load: asset file not found: {}", sourcePath);
+            Core::Log::Error("Scene load: failed to import asset: {}", sourcePath);
             return result;
         }
 
-        // Use IORegistry to import synchronously via the I/O backend
-        auto loadResult = Graphics::ModelLoader::LoadAsync(
-            engine.GetDeviceShared(),
-            engine.GetGraphicsBackend().GetTransferManager(),
-            engine.GetRenderOrchestrator().GetGeometryStorage(),
-            sourcePath,
-            engine.GetIORegistry(),
-            engine.GetIOBackend());
-
-        if (!loadResult)
-        {
-            Core::Log::Error("Scene load: failed to import asset: {} ({})",
-                             sourcePath, Graphics::AssetErrorToString(loadResult.error()));
-            return result;
-        }
-
-        // Register the GPU transfer
-        engine.GetAssetPipeline().RegisterAssetLoad(Core::Assets::AssetHandle{}, loadResult->Token);
-
-        // Create the model asset
-        std::filesystem::path fsPath(sourcePath);
-        std::string baseName = fsPath.filename().string();
-        static uint64_t s_SceneLoadCounter = 0;
-        std::string assetName = "scene::" + baseName + "::" + std::to_string(++s_SceneLoadCounter);
-
-        result.ModelHandle = engine.GetAssetManager().Create(assetName, std::move(loadResult->ModelData));
-
-        // Create a default material
-        Graphics::MaterialData matData;
-        matData.AlbedoID = engine.GetGraphicsBackend().GetDefaultTextureIndex();
-        matData.RoughnessFactor = 0.5f;
-
-        auto defaultMat = std::make_unique<Graphics::Material>(
-            engine.GetRenderOrchestrator().GetMaterialSystem(), matData);
-
-        const std::string materialName = assetName + "::DefaultMaterial";
-        result.MaterialHandle = engine.GetAssetManager().Create(materialName, std::move(defaultMat));
-        engine.GetAssetPipeline().TrackMaterial(result.MaterialHandle);
-
+        result.ModelHandle = imported->ModelHandle;
+        result.MaterialHandle = imported->MaterialHandle;
         result.Success = true;
         return result;
     }
