@@ -175,7 +175,8 @@ namespace Geometry::ShortestPath
         [[nodiscard]] std::optional<ShortestPathResult> DijkstraCommon(
             Domain& graph,
             std::span<const VertexHandle> seedVertices,
-            std::span<const VertexHandle> goalVertices)
+            std::span<const VertexHandle> goalVertices,
+            const DijkstraParams& params)
         {
             if (graph.VerticesSize() == 0) return std::nullopt;
             if (seedVertices.empty() && goalVertices.empty()) return std::nullopt;
@@ -208,6 +209,7 @@ namespace Geometry::ShortestPath
                 if (result.Distances[source] > 0.0) result.Distances[source] = 0.0;
                 result.Predecessors[source] = VertexHandle{};
                 queue.push(FrontNode{source, 0.0});
+                ++result.QueuePushCount;
                 ++validStartCount;
             }
 
@@ -215,9 +217,11 @@ namespace Geometry::ShortestPath
             if (!goalVertices.empty() && validGoalCount == 0) return std::nullopt;
 
             std::vector<std::uint8_t> settled(vertexCount, 0);
+            const std::size_t settleBudget = params.MaxSettledVertices > 0 ? params.MaxSettledVertices : vertexCount;
+            const bool trackGoals = !goalVertices.empty();
             bool reachedGoal = goalVertices.empty();
 
-            while (!queue.empty())
+            while (!queue.empty() && result.SettledVertexCount < settleBudget)
             {
                 const FrontNode node = queue.top();
                 queue.pop();
@@ -225,10 +229,18 @@ namespace Geometry::ShortestPath
                 if (node.Distance > result.Distances[node.Vertex]) continue;
                 if (settled[node.Vertex.Index] != 0) continue;
                 settled[node.Vertex.Index] = 1;
+                ++result.SettledVertexCount;
 
                 if (goalMask[node.Vertex.Index] != 0)
                 {
+                    ++result.ReachedGoalCount;
                     reachedGoal = true;
+                    if (params.StopWhenAllTargetsSettled && result.ReachedGoalCount >= validGoalCount)
+                    {
+                        result.Converged = true;
+                        result.EarlyTerminated = true;
+                        break;
+                    }
                 }
 
                 std::size_t safety = 0;
@@ -244,13 +256,28 @@ namespace Geometry::ShortestPath
                     if (!std::isfinite(stepLength)) continue;
 
                     const double newDistance = node.Distance + stepLength;
+                    ++result.RelaxedEdgeCount;
                     if (newDistance < result.Distances[next])
                     {
                         result.Distances[next] = newDistance;
                         result.Predecessors[next] = node.Vertex;
                         queue.push(FrontNode{next, newDistance});
+                        ++result.QueuePushCount;
                     }
                 }
+            }
+
+            if (result.SettledVertexCount >= settleBudget && !queue.empty())
+            {
+                result.Converged = false;
+            }
+            else if (!trackGoals)
+            {
+                result.Converged = true;
+            }
+            else if (result.ReachedGoalCount >= validGoalCount)
+            {
+                result.Converged = true;
             }
 
             if (!reachedGoal) return std::nullopt;
@@ -261,25 +288,27 @@ namespace Geometry::ShortestPath
     std::optional<ShortestPathResult> Dijkstra(
         Halfedge::Mesh& mesh,
         std::span<const VertexHandle> startVertices,
-        std::span<const VertexHandle> endVertices)
+        std::span<const VertexHandle> endVertices,
+        const DijkstraParams& params)
     {
         if (startVertices.empty() && endVertices.empty()) return std::nullopt;
 
         const auto seedVertices = startVertices.empty() ? endVertices : startVertices;
         const auto goalVertices = startVertices.empty() ? std::span<const VertexHandle>{} : endVertices;
-        return DijkstraCommon(mesh, seedVertices, goalVertices);
+        return DijkstraCommon(mesh, seedVertices, goalVertices, params);
     }
 
     std::optional<ShortestPathResult> Dijkstra(
         Graph::Graph& graph,
         std::span<const VertexHandle> startVertices,
-        std::span<const VertexHandle> endVertices)
+        std::span<const VertexHandle> endVertices,
+        const DijkstraParams& params)
     {
         if (startVertices.empty() && endVertices.empty()) return std::nullopt;
 
         const auto seedVertices = startVertices.empty() ? endVertices : startVertices;
         const auto goalVertices = startVertices.empty() ? std::span<const VertexHandle>{} : endVertices;
-        return DijkstraCommon(graph, seedVertices, goalVertices);
+        return DijkstraCommon(graph, seedVertices, goalVertices, params);
     }
 
     std::optional<Graph::Graph> ExtractPathGraph(

@@ -3,6 +3,7 @@
 
 #include <gtest/gtest.h>
 
+#include <cmath>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -139,3 +140,50 @@ TEST(ShortestPath, ReturnsNulloptForEmptyMesh)
     EXPECT_FALSE(result.has_value());
 }
 
+
+TEST(ShortestPath, EarlyTerminatesAfterAllTargetsSettled)
+{
+    Geometry::Graph::Graph graph;
+    auto v0 = graph.AddVertex(glm::vec3{0.0f, 0.0f, 0.0f});
+    auto v1 = graph.AddVertex(glm::vec3{1.0f, 0.0f, 0.0f});
+    auto v2 = graph.AddVertex(glm::vec3{2.0f, 0.0f, 0.0f});
+    auto v3 = graph.AddVertex(glm::vec3{3.0f, 0.0f, 0.0f});
+    auto v4 = graph.AddVertex(glm::vec3{4.0f, 0.0f, 0.0f});
+
+    ASSERT_TRUE(graph.AddEdge(v0, v1).has_value());
+    ASSERT_TRUE(graph.AddEdge(v1, v2).has_value());
+    ASSERT_TRUE(graph.AddEdge(v2, v3).has_value());
+    ASSERT_TRUE(graph.AddEdge(v3, v4).has_value());
+
+    std::vector<Geometry::VertexHandle> sources{v0};
+    std::vector<Geometry::VertexHandle> targets{v2};
+
+    auto result = Geometry::ShortestPath::Dijkstra(graph, sources, targets);
+    ASSERT_TRUE(result.has_value());
+
+    EXPECT_TRUE(result->Converged);
+    EXPECT_TRUE(result->EarlyTerminated);
+    EXPECT_EQ(result->ReachedGoalCount, 1u);
+    EXPECT_EQ(result->SettledVertexCount, 3u);
+    EXPECT_TRUE(std::isinf(result->Distances[v3]));
+    EXPECT_TRUE(std::isinf(result->Distances[v4]));
+}
+
+TEST(ShortestPath, SettleBudgetPreventsConvergenceWhenTooSmall)
+{
+    Geometry::Graph::Graph graph;
+    auto v0 = graph.AddVertex(glm::vec3{0.0f, 0.0f, 0.0f});
+    auto v1 = graph.AddVertex(glm::vec3{1.0f, 0.0f, 0.0f});
+    auto v2 = graph.AddVertex(glm::vec3{2.0f, 0.0f, 0.0f});
+
+    ASSERT_TRUE(graph.AddEdge(v0, v1).has_value());
+    ASSERT_TRUE(graph.AddEdge(v1, v2).has_value());
+
+    std::vector<Geometry::VertexHandle> sources{v0};
+    std::vector<Geometry::VertexHandle> targets{v2};
+
+    Geometry::ShortestPath::DijkstraParams params{};
+    params.MaxSettledVertices = 2;
+    auto result = Geometry::ShortestPath::Dijkstra(graph, sources, targets, params);
+    EXPECT_FALSE(result.has_value());
+}
