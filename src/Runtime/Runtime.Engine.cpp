@@ -34,6 +34,7 @@ import Runtime.AssetPipeline;
 import Runtime.SceneManager;
 import Runtime.RenderOrchestrator;
 import Runtime.PointCloudKMeans;
+import Runtime.SystemBundles;
 
 using namespace Core::Hash;
 
@@ -173,86 +174,31 @@ namespace
                 Engine.OnRegisterSystems(frameGraph, frameDt);
 
                 // Core engine systems consume dirty state in pipeline order.
-                // Each system is gated by the FeatureRegistry so it can be
-                // toggled at runtime (e.g. for debugging or profiling).
-                if (FeatureRegistry.IsEnabled("TransformUpdate"_id))
-                    ECS::Systems::Transform::RegisterSystem(frameGraph, registry);
-
-                // PropertySet dirty-domain sync: processes per-domain dirty
-                // tags (VertexPositions, VertexAttributes, EdgeTopology,
-                // EdgeAttributes, FaceTopology, FaceAttributes) and either
-                // escalates to GpuDirty or performs incremental attribute
-                // re-extraction. Runs before lifecycle systems so GpuDirty
-                // flags are consumed in the same frame.
-                if (FeatureRegistry.IsEnabled("PropertySetDirtySync"_id))
-                {
-                    Graphics::Systems::PropertySetDirtySync::RegisterSystem(
-                        frameGraph, registry);
-                }
-
-                if (FeatureRegistry.IsEnabled("PrimitiveBVHSync"_id))
-                {
-                    Graphics::Systems::PrimitiveBVHSync::RegisterSystem(
-                        frameGraph, registry);
-                }
+                // Registration is grouped into typed bundles so Engine::Run()
+                // only orchestrates bundle boundaries rather than individual
+                // systems while preserving the same feature-gated pass order.
+                Runtime::CoreFrameGraphRegistrationContext coreBundleContext{
+                    .Graph = frameGraph,
+                    .Registry = registry,
+                    .Features = FeatureRegistry,
+                };
+                Runtime::CoreFrameGraphSystemBundle{}.Register(coreBundleContext);
 
                 auto* gpuScene = RenderOrchestrator.GetGPUScenePtr();
                 if (gpuScene)
                 {
-                    auto& matSys = RenderOrchestrator.GetMaterialSystem();
-                    auto& geometryStorage = RenderOrchestrator.GetGeometryStorage();
-                    auto& dispatcher = SceneManager.GetScene().GetDispatcher();
-
-                    // Graph geometry sync: uploads graph node positions to GPU,
-                    // builds edge index pairs, extracts per-node attributes,
-                    // and allocates GPUScene slots for retained-mode BDA rendering.
-                    if (FeatureRegistry.IsEnabled("GraphGeometrySync"_id))
-                    {
-                        Graphics::Systems::GraphGeometrySync::RegisterSystem(
-                            frameGraph, registry, *gpuScene, geometryStorage,
-                            Engine.GetDeviceShared(),
-                            GraphicsBackend.GetTransferManager(),
-                            dispatcher);
-                    }
-
-                    if (FeatureRegistry.IsEnabled("MeshRendererLifecycle"_id))
-                    {
-                        Graphics::Systems::MeshRendererLifecycle::RegisterSystem(
-                            frameGraph, registry, *gpuScene, Engine.GetAssetManager(),
-                            matSys, geometryStorage,
-                            GraphicsBackend.GetDefaultTextureIndex());
-                    }
-
-                    // Cloud-backed point cloud sync: uploads Cloud::Positions/Normals
-                    // spans to device-local GPU buffers for entities with
-                    // ECS::PointCloud::Data (PropertySet-backed point clouds).
-                    if (FeatureRegistry.IsEnabled("PointCloudGeometrySync"_id))
-                    {
-                        Graphics::Systems::PointCloudGeometrySync::RegisterSystem(
-                            frameGraph, registry, *gpuScene, geometryStorage,
-                            Engine.GetDeviceShared(),
-                            GraphicsBackend.GetTransferManager(),
-                            dispatcher);
-                    }
-
-                    // Mesh view lifecycle: creates GPU geometry views (edge index
-                    // buffers, vertex point views) for entities with MeshEdgeView
-                    // or MeshVertexView components via ReuseVertexBuffersFrom.
-                    if (FeatureRegistry.IsEnabled("MeshViewLifecycle"_id))
-                    {
-                        Graphics::Systems::MeshViewLifecycle::RegisterSystem(
-                            frameGraph, registry, *gpuScene, geometryStorage,
-                            Engine.GetDeviceShared(),
-                            GraphicsBackend.GetTransferManager(),
-                            dispatcher);
-                    }
-
-                    if (FeatureRegistry.IsEnabled("GPUSceneSync"_id))
-                    {
-                        Graphics::Systems::GPUSceneSync::RegisterSystem(
-                            frameGraph, registry, *gpuScene, Engine.GetAssetManager(),
-                            matSys, GraphicsBackend.GetDefaultTextureIndex());
-                    }
+                    Runtime::GpuFrameGraphRegistrationContext gpuBundleContext{
+                        .Core = coreBundleContext,
+                        .GpuScene = *gpuScene,
+                        .AssetManager = Engine.GetAssetManager(),
+                        .MaterialSystem = RenderOrchestrator.GetMaterialSystem(),
+                        .GeometryStorage = RenderOrchestrator.GetGeometryStorage(),
+                        .Device = Engine.GetDeviceShared(),
+                        .TransferManager = GraphicsBackend.GetTransferManager(),
+                        .Dispatcher = SceneManager.GetScene().GetDispatcher(),
+                        .DefaultTextureId = GraphicsBackend.GetDefaultTextureIndex(),
+                    };
+                    Runtime::GpuFrameGraphSystemBundle{}.Register(gpuBundleContext);
                 }
 
                 executeGraph(frameGraph);
