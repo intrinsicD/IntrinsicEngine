@@ -16,6 +16,8 @@ import ECS;
 import RHI;
 #endif
 
+#include "Graphics.LifecycleUtils.hpp"
+
 namespace Runtime
 {
     SceneManager::SceneManager()
@@ -48,11 +50,7 @@ namespace Runtime
         if (comp.GpuSlot == ECS::kInvalidGpuSlot)
             return;
 
-        // Deactivate slot (radius = 0 => culler skips it) and free.
-        Graphics::GpuInstanceData inst{};
-        m_GpuHookContext.GpuScene->QueueUpdate(comp.GpuSlot, inst, /*sphere*/ {0.0f, 0.0f, 0.0f, 0.0f});
-        m_GpuHookContext.GpuScene->FreeSlot(comp.GpuSlot);
-        comp.GpuSlot = ECS::kInvalidGpuSlot;
+        ReleaseGpuSlot(*m_GpuHookContext.GpuScene, comp);
     }
 
     void SceneManager::ConnectGpuHooks(Graphics::GPUScene& gpuScene
