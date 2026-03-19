@@ -13,6 +13,8 @@ import RHI;
 import Graphics;
 import Geometry;
 
+#include "../src/Runtime/Graphics/Graphics.LifecycleUtils.hpp"
+
 // ---------------------------------------------------------------------------
 // Compile-time API contract tests
 // ---------------------------------------------------------------------------
@@ -246,4 +248,33 @@ TEST_F(SceneManagerGpuHooksHeadlessTest, DisconnectingOneManagerDoesNotDisableAn
 
     EXPECT_EQ(gpuSceneB->AllocateSlot(), slotB)
         << "Disconnecting manager A must not clear manager B's hook context.";
+}
+
+TEST_F(SceneManagerGpuHooksHeadlessTest, ReleaseGpuSlotReclaimsRawSlotAndInvalidatesSentinel)
+{
+    auto gpuScene = CreateGpuScene();
+
+    uint32_t slot = gpuScene->AllocateSlot();
+    ASSERT_EQ(slot, 0u);
+
+    ReleaseGpuSlot(*gpuScene, slot);
+
+    EXPECT_EQ(slot, ECS::kInvalidGpuSlot);
+    EXPECT_EQ(gpuScene->AllocateSlot(), 0u)
+        << "Released slots must return to the GPUScene free list immediately.";
+}
+
+TEST_F(SceneManagerGpuHooksHeadlessTest, ReleaseGpuSlotReclaimsComponentOwnedSlot)
+{
+    auto gpuScene = CreateGpuScene();
+
+    ECS::Surface::Component surface{};
+    surface.GpuSlot = gpuScene->AllocateSlot();
+    ASSERT_EQ(surface.GpuSlot, 0u);
+
+    ReleaseGpuSlot(*gpuScene, surface);
+
+    EXPECT_EQ(surface.GpuSlot, ECS::kInvalidGpuSlot);
+    EXPECT_EQ(gpuScene->AllocateSlot(), 0u)
+        << "The shared reclaim helper must work for ECS components that own GpuSlot.";
 }

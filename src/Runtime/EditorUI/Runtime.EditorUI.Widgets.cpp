@@ -28,6 +28,8 @@ import ECS;
 import Graphics;
 import Geometry;
 
+#include "Graphics.LifecycleUtils.hpp"
+
 namespace Runtime::EditorUI
 {
 
@@ -298,7 +300,7 @@ namespace
         if (oldHandle.IsValid())
             engine.GetGeometryStorage().Remove(oldHandle, engine.GetDevice().GetGlobalFrameNumber());
 
-        sc->GpuSlot = ECS::kInvalidGpuSlot;
+        ReleaseGpuSlot(engine.GetRenderOrchestrator().GetGPUScene(), *sc);
         reg.emplace_or_replace<ECS::Components::Transform::WorldUpdatedTag>(entity);
 
         if (auto* ev = reg.try_get<ECS::MeshEdgeView::Component>(entity))

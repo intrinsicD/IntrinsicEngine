@@ -113,6 +113,31 @@ inline uint32_t TryAllocateGpuSlot(
 }
 
 // =============================================================================
+// ReleaseGpuSlot — shared GPUScene slot deactivation + reclamation policy.
+// =============================================================================
+// Deactivates the instance (zero-radius sphere), frees the GPUScene slot, and
+// resets the caller-owned slot sentinel. This is the canonical reclaim path for
+// component destruction and explicit geometry rewrites that invalidate an
+// existing GPUScene binding.
+
+inline void ReleaseGpuSlot(Graphics::GPUScene& gpuScene, uint32_t& slot)
+{
+    if (slot == ECS::kInvalidGpuSlot)
+        return;
+
+    Graphics::GpuInstanceData inst{};
+    gpuScene.QueueUpdate(slot, inst, /*sphere*/ {0.0f, 0.0f, 0.0f, 0.0f});
+    gpuScene.FreeSlot(slot);
+    slot = ECS::kInvalidGpuSlot;
+}
+
+template<typename T>
+inline void ReleaseGpuSlot(Graphics::GPUScene& gpuScene, T& comp)
+{
+    ReleaseGpuSlot(gpuScene, comp.GpuSlot);
+}
+
+// =============================================================================
 // RemovePassComponentIfPresent — conditional per-pass component removal.
 // =============================================================================
 // Removes a per-pass ECS component from an entity only when present.
