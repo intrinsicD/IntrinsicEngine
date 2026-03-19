@@ -26,6 +26,7 @@ import ECS;
 import Geometry;
 import RHI;
 
+#include "Graphics.PointCloudPropertyHelpers.hpp"
 #include "Graphics.LifecycleUtils.hpp"
 
 using namespace Core::Hash;
@@ -83,28 +84,9 @@ namespace Graphics::Systems::PointCloudGeometrySync
                 // Surfel/EWA require real normals; no synthetic default-up normals.
                 const bool hasNormals = cloud.HasNormals();
 
-                // --- Extract per-point colors via ColorMapper ---
-                std::vector<uint32_t> pointColors;
-                {
-                    auto& vtxConfig = pcData.Visualization.VertexColors;
-                    // Default fallback: use "p:color" when no property is explicitly selected.
-                    if (vtxConfig.PropertyName.empty() && cloud.HasColors())
-                        vtxConfig.PropertyName = "p:color";
-
-                    if (auto mapped = ColorMapper::MapProperty(
-                            cloud.PointProperties(), vtxConfig))
-                    {
-                        pointColors = std::move(mapped->Colors);
-                    }
-                }
-
-                // --- Extract per-point radii from PropertySet ---
-                std::vector<float> pointRadii;
-                if (cloud.HasRadii())
-                {
-                    const auto radii = cloud.Radii();
-                    pointRadii.assign(radii.begin(), radii.end());
-                }
+                auto pointColors = PointCloudPropertyHelpers::ExtractPointColors(
+                    cloud, pcData.Visualization.VertexColors);
+                auto pointRadii = PointCloudPropertyHelpers::ExtractPointRadii(cloud);
 
                 // Release previous geometry before allocating new.
                 if (pcData.GpuGeometry.IsValid())

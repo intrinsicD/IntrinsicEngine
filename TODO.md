@@ -53,8 +53,6 @@ These are not required to finish the first wave, but they should begin soon afte
 
 #### B3.5 Hidden Architectural Duplication
 
-- [ ] Audit duplicate upload/lifecycle code paths between retained geometry systems and document consolidation plan.
-
 #### B3.6 Redesign Options (decision package)
 
 ##### Option O1 — Minimal Change
