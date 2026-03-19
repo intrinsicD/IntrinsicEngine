@@ -54,19 +54,6 @@ These are not required to finish the first wave, but they should begin soon afte
 
 #### B3.5 Hidden Architectural Duplication
 
-#### B3.6 Redesign Options (decision package)
-
-##### Option O3 — Ideal Target Architecture
-
-- [ ] Write an ADR for O3 that explicitly captures:
-  - [ ] Benefits
-  - [ ] Drawbacks
-  - [ ] Migration cost
-  - [ ] Regression risk
-  - [ ] Performance impact
-  - [ ] Testability impact
-  - [ ] Future extensibility impact
-
 #### B3.7 Recommended Path (default = O2) + Migration Plan
 
 - [ ] Ratify O2 as the default path unless new benchmark/test evidence disproves it.
