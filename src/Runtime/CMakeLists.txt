@@ -11,6 +11,7 @@ target_sources(${target_name}
         Runtime.RenderOrchestrator.cppm
         Runtime.Selection.cppm
         Runtime.SelectionModule.cppm
+        Runtime.SystemBundles.cppm
         Runtime.SceneSerializer.cppm
         Runtime.PointCloudKMeans.cppm
         EditorUI/Runtime.EditorUI.cppm
@@ -22,6 +23,7 @@ target_sources(${target_name}
         Runtime.RenderOrchestrator.cpp
         Runtime.Selection.cpp
         Runtime.SelectionModule.cpp
+        Runtime.SystemBundles.cpp
         Runtime.SceneSerializer.cpp
         Runtime.PointCloudKMeans.cpp
         EditorUI/Runtime.EditorUI.cpp

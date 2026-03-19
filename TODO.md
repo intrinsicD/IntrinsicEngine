@@ -46,7 +46,6 @@ These are not required to finish the first wave, but they should begin soon afte
 
 #### B3.2 Coupling Hotspots (reduce first)
 
-- [ ] Reduce repetitive system registration glue in `Engine::Run()` via typed registration bundles.
 
 #### B3.3 Mixed Concerns + Unstable Interfaces
 
@@ -109,8 +108,7 @@ These are not required to finish the first wave, but they should begin soon afte
     - [ ] Safe checkpoint: no behavioral diff vs baseline in frame order + render contracts.
   - [ ] Phase 1: Validate extracted simulation/render/streaming lanes (no behavior change).
     - [ ] Safe checkpoint: same pass/system order and same frame outputs as baseline.
-  - [ ] Phase 2: Land typed system bundles in `Engine::Run()`.
-    - [ ] Replace handwritten core system registration with typed bundle registration.
+  - [ ] Phase 2 follow-through: validate the landed typed system bundles in `Engine::Run()` against the existing lifecycle/resource reclaim baseline.
     - [ ] Safe checkpoint: lifecycle/resource reclaim tests unchanged.
   - [ ] Phase 3: Move drag-drop + async load orchestration into streaming service state machine.
     - [ ] Safe checkpoint: asset ingest completion/integrity metrics unchanged.

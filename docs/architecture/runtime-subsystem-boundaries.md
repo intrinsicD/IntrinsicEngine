@@ -267,7 +267,7 @@ This baseline also makes the current hot spots explicit:
 - `Engine::Run()` still owns platform-stage sequencing directly, but fixed-step simulation, variable render/update, and streaming maintenance are now grouped into lane-level coordinators inside the runtime loop.
 - `SceneManager` now uses instance-scoped GPU hook callbacks for EnTT destruction handling rather than file-static state.
 - Runtime-to-runtime borrowing is still explicit and manual even after the lane split (`AssetPipeline`, `SceneManager`, `RenderOrchestrator` still meet in `Engine`).
-- Core ECS system registration is still handwritten in the main frame loop.
+- Core ECS system registration now flows through typed frame-graph bundles, keeping `Engine::Run()` at the orchestration level while preserving explicit bundle ordering.
 - `Graphics -> Interface` is an active dependency today (for ImGui/render-system wiring), so future boundary cleanup should treat it as an existing coupling to reduce deliberately rather than as a dependency that is already absent.
 
 
