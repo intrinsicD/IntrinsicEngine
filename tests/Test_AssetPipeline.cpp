@@ -79,6 +79,23 @@ protected:
     std::unique_ptr<Runtime::AssetPipeline> m_Pipeline;
 };
 
+namespace
+{
+    void WaitForTransferCompletion(RHI::TransferManager& transferManager, RHI::TransferToken token)
+    {
+        ASSERT_TRUE(token.IsValid());
+
+        int iterations = 0;
+        while (!transferManager.IsCompleted(token) && iterations < 10000)
+        {
+            transferManager.GarbageCollect();
+            ++iterations;
+        }
+
+        ASSERT_TRUE(transferManager.IsCompleted(token));
+    }
+}
+
 TEST_F(AssetPipelineHeadlessTest, AssetManagerAccessible)
 {
     // AssetPipeline exposes a functional AssetManager.
@@ -171,20 +188,15 @@ TEST_F(AssetPipelineHeadlessTest, RegisterAssetLoadAndProcessUploads)
 
     // Register the pending load.
     auto handle = m_Pipeline->GetAssetManager().Create("buf-asset", std::make_unique<int>(7));
+    m_Pipeline->GetAssetManager().MoveToProcessing(handle);
     m_Pipeline->RegisterAssetLoad(handle, token);
 
-    // Poll until the transfer completes.
-    int iterations = 0;
-    while (!m_TransferManager->IsCompleted(token) && iterations < 10000)
-    {
-        m_Pipeline->ProcessUploads();
-        ++iterations;
-    }
+    // Upload completion alone must not finalize the asset until ProcessUploads runs.
+    WaitForTransferCompletion(*m_TransferManager, token);
+    EXPECT_EQ(m_Pipeline->GetAssetManager().GetState(handle), Core::Assets::LoadState::Processing);
 
-    // One more call to process the completion.
+    // Process the completion and finalize the asset.
     m_Pipeline->ProcessUploads();
-
-    // The asset should have been finalized.
     EXPECT_EQ(m_Pipeline->GetAssetManager().GetState(handle), Core::Assets::LoadState::Ready);
 }
 
@@ -203,18 +215,76 @@ TEST_F(AssetPipelineHeadlessTest, RegisterAssetLoadWithCompletionCallback)
 
     bool callbackFired = false;
     auto handle = m_Pipeline->GetAssetManager().Create("cb-asset", std::make_unique<int>(99));
+    m_Pipeline->GetAssetManager().MoveToProcessing(handle);
     m_Pipeline->RegisterAssetLoad(handle, token, [&callbackFired]() { callbackFired = true; });
 
-    // Poll until completion.
-    int iterations = 0;
-    while (!callbackFired && iterations < 10000)
-    {
-        m_Pipeline->ProcessUploads();
-        ++iterations;
-    }
+    WaitForTransferCompletion(*m_TransferManager, token);
+    EXPECT_FALSE(callbackFired);
+    EXPECT_EQ(m_Pipeline->GetAssetManager().GetState(handle), Core::Assets::LoadState::Processing);
 
+    m_Pipeline->ProcessUploads();
     EXPECT_TRUE(callbackFired);
     EXPECT_EQ(m_Pipeline->GetAssetManager().GetState(handle), Core::Assets::LoadState::Ready);
+}
+
+TEST_F(AssetPipelineHeadlessTest, AssetStreamingCompletionSeparatesQueuedUploadedAndFinalizedStages)
+{
+    constexpr size_t bufSize = 192;
+    auto dst = std::make_unique<RHI::VulkanBuffer>(
+        *m_Device, bufSize,
+        VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        VMA_MEMORY_USAGE_GPU_ONLY);
+
+    std::vector<std::byte> payload(bufSize, std::byte{0x5A});
+    RHI::TransferToken token = m_TransferManager->UploadBuffer(dst->GetHandle(), payload);
+    ASSERT_TRUE(token.IsValid());
+
+    auto handle = m_Pipeline->GetAssetManager().Create("streaming-semantics", std::make_unique<int>(123));
+    auto& assetManager = m_Pipeline->GetAssetManager();
+    assetManager.MoveToProcessing(handle);
+
+    int completionCallbacks = 0;
+    int readyNotifications = 0;
+
+    assetManager.RequestNotify(handle, [&](Core::Assets::AssetHandle readyHandle)
+    {
+        EXPECT_EQ(readyHandle.ID, handle.ID);
+        ++readyNotifications;
+    });
+
+    m_Pipeline->RegisterAssetLoad(handle, token, [&]()
+    {
+        ++completionCallbacks;
+    });
+
+    // Stage 1: queued for GPU completion, but not yet uploaded/finalized.
+    EXPECT_EQ(assetManager.GetState(handle), Core::Assets::LoadState::Processing);
+    EXPECT_EQ(completionCallbacks, 0);
+    EXPECT_EQ(readyNotifications, 0);
+
+    // Stage 2: transfer is uploaded on the GPU timeline, but asset finalization
+    // remains deferred until the streaming lane polls ProcessUploads().
+    WaitForTransferCompletion(*m_TransferManager, token);
+    EXPECT_EQ(assetManager.GetState(handle), Core::Assets::LoadState::Processing);
+    EXPECT_EQ(completionCallbacks, 0);
+    EXPECT_EQ(readyNotifications, 0);
+
+    // Stage 3: ProcessUploads finalizes the asset exactly once.
+    m_Pipeline->ProcessUploads();
+    EXPECT_EQ(completionCallbacks, 1);
+    EXPECT_EQ(assetManager.GetState(handle), Core::Assets::LoadState::Ready);
+    EXPECT_EQ(readyNotifications, 0);
+
+    // Ready notifications are still main-thread AssetManager work and therefore
+    // do not fire until Update() drains the queue.
+    assetManager.Update();
+    EXPECT_EQ(completionCallbacks, 1);
+    EXPECT_EQ(readyNotifications, 1);
+
+    m_Pipeline->ProcessUploads();
+    assetManager.Update();
+    EXPECT_EQ(completionCallbacks, 1);
+    EXPECT_EQ(readyNotifications, 1);
 }
 
 TEST_F(AssetPipelineHeadlessTest, ProcessUploadsNoOpWhenEmpty)
