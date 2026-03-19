@@ -22,6 +22,7 @@ import Core.FrameGraph;
 import Geometry;
 
 #include "Graphics.GraphPropertyHelpers.hpp"
+#include "Graphics.PointCloudPropertyHelpers.hpp"
 
 using namespace Core::Hash;
 
@@ -131,27 +132,9 @@ namespace Graphics::Systems::PropertySetDirtySync
                 continue;
             }
 
-            // --- Re-extract per-point colors ---
-            pcData.CachedColors.clear();
-            {
-                auto& vtxConfig = pcData.Visualization.VertexColors;
-                if (vtxConfig.PropertyName.empty() && cloud.HasColors())
-                    vtxConfig.PropertyName = "p:color";
-
-                if (auto mapped = ColorMapper::MapProperty(
-                        cloud.PointProperties(), vtxConfig))
-                {
-                    pcData.CachedColors = std::move(mapped->Colors);
-                }
-            }
-
-            // --- Re-extract per-point radii ---
-            pcData.CachedRadii.clear();
-            if (cloud.HasRadii())
-            {
-                const auto radii = cloud.Radii();
-                pcData.CachedRadii.assign(radii.begin(), radii.end());
-            }
+            pcData.CachedColors = PointCloudPropertyHelpers::ExtractPointColors(
+                cloud, pcData.Visualization.VertexColors);
+            pcData.CachedRadii = PointCloudPropertyHelpers::ExtractPointRadii(cloud);
 
             // --- Update Point::Component flags ---
             if (auto* pt = registry.try_get<ECS::Point::Component>(entity))
