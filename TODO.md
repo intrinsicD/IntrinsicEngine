@@ -98,12 +98,10 @@ These are not required to finish the first wave, but they should begin soon afte
 
 - [ ] Add dirty-checking / caching to HTex atlas rebuild — currently rebuilds per frame unconditionally.
 - [ ] Hoist per-texel string property lookups (`mesh.GetFaceProperty<T>(name, ...)`) outside the inner loop in HTex atlas building — move to a single lookup before iteration (`82a96bf`).
-- [ ] Add early termination to Dijkstra when all target vertices are settled — currently continues full graph exploration (`b09ecfa`).
 - [ ] Eliminate per-face `std::vector` allocation in `PolygonArea` — currently allocates 2E vectors for E edges; use fixed-size local buffer or direct accumulation (`1165e65`).
 
 ##### Architecture / Pattern Compliance
 
-- [ ] Add `DijkstraParams` struct with sensible defaults and convergence diagnostics to `ShortestPathResult`, per the Geometry Operator Pattern in `CLAUDE.md`.
 - [ ] Change `BuildPatchMetadata` to return `std::optional<Result>` instead of raw vector, per the Geometry Operator Pattern.
 - [ ] Investigate templating the Circulators module — ~500 lines of near-identical boilerplate across circulator types could be reduced significantly.
 
