@@ -55,3 +55,23 @@ TEST(HtexPatch, TriangleToPatchUVReflectsOrientation)
     EXPECT_FLOAT_EQ(reflected.y, 0.25f);
 }
 
+TEST(HtexPatch, PatchToTriangleUVInvertsPatchOrientation)
+{
+    const glm::vec2 patchUV{0.2f, 0.35f};
+
+    const glm::vec2 canonical = Geometry::HtexPatch::PatchToTriangleUV(12u, patchUV, 5u);
+    EXPECT_FLOAT_EQ(canonical.x, patchUV.x);
+    EXPECT_FLOAT_EQ(canonical.y, patchUV.y);
+
+    const glm::vec2 reflected = Geometry::HtexPatch::PatchToTriangleUV(5u, patchUV, 12u);
+    EXPECT_FLOAT_EQ(reflected.x, 0.8f);
+    EXPECT_FLOAT_EQ(reflected.y, 0.65f);
+}
+
+TEST(HtexPatch, IsTriangleLocalUVRejectsTexelsOutsideHalfedgeTriangle)
+{
+    EXPECT_TRUE(Geometry::HtexPatch::IsTriangleLocalUV(glm::vec2{0.1f, 0.2f}));
+    EXPECT_TRUE(Geometry::HtexPatch::IsTriangleLocalUV(glm::vec2{0.0f, 1.0f}));
+    EXPECT_FALSE(Geometry::HtexPatch::IsTriangleLocalUV(glm::vec2{-0.01f, 0.2f}));
+    EXPECT_FALSE(Geometry::HtexPatch::IsTriangleLocalUV(glm::vec2{0.75f, 0.5f}));
+}

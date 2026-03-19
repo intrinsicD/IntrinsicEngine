@@ -138,5 +138,14 @@ namespace Geometry::HtexPatch
 
         return glm::vec2{1.0f - localUV.x, 1.0f - localUV.y};
     }
-}
 
+    glm::vec2 PatchToTriangleUV(std::uint32_t halfedgeIndex, glm::vec2 patchUV, std::uint32_t twinIndex) noexcept
+    {
+        return TriangleToPatchUV(halfedgeIndex, patchUV, twinIndex);
+    }
+
+    bool IsTriangleLocalUV(glm::vec2 localUV, float epsilon) noexcept
+    {
+        return localUV.x >= -epsilon && localUV.y >= -epsilon && (localUV.x + localUV.y) <= (1.0f + epsilon);
+    }
+}

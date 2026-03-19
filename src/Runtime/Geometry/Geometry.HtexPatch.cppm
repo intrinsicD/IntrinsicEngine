@@ -47,5 +47,11 @@ export namespace Geometry::HtexPatch
         std::uint32_t halfedgeIndex,
         glm::vec2 localUV,
         std::uint32_t twinIndex) noexcept;
-}
 
+    [[nodiscard]] glm::vec2 PatchToTriangleUV(
+        std::uint32_t halfedgeIndex,
+        glm::vec2 patchUV,
+        std::uint32_t twinIndex) noexcept;
+
+    [[nodiscard]] bool IsTriangleLocalUV(glm::vec2 localUV, float epsilon = 1.0e-6f) noexcept;
+}
