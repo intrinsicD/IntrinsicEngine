@@ -2,6 +2,7 @@ module;
 
 #include <cstdint>
 #include <limits>
+#include <optional>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -39,7 +40,15 @@ export namespace Geometry::HtexPatch
         std::uint16_t Flags = 0u;
     };
 
-    [[nodiscard]] std::vector<HalfedgePatchMeta> BuildPatchMetadata(
+    struct PatchBuildResult
+    {
+        std::vector<HalfedgePatchMeta> Patches{};
+        std::uint32_t BoundaryPatchCount = 0u;
+        std::uint32_t InteriorPatchCount = 0u;
+        std::uint16_t MaxAssignedResolution = 0u;
+    };
+
+    [[nodiscard]] std::optional<PatchBuildResult> BuildPatchMetadata(
         const Halfedge::Mesh& mesh,
         const PatchBuildParams& params = {});
 
