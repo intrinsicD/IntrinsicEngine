@@ -135,7 +135,6 @@ namespace Runtime
             .Registry = registry,
             .Features = m_Features,
         };
-        CoreFrameGraphSystemBundle{}.Register(coreBundleContext);
 
         auto* gpuScene = m_Renderer.GetGPUScenePtr();
         if (gpuScene)
@@ -151,8 +150,11 @@ namespace Runtime
                 .Dispatcher = m_Scene.GetScene().GetDispatcher(),
                 .DefaultTextureId = m_Graphics.GetDefaultTextureIndex(),
             };
-            GpuFrameGraphSystemBundle{}.Register(gpuBundleContext);
+            VariableFrameGraphSystemBundle{}.Register(coreBundleContext, &gpuBundleContext);
+            return;
         }
+
+        VariableFrameGraphSystemBundle{}.Register(coreBundleContext);
     }
 
     void RuntimeRenderLaneHost::DispatchDeferredEvents()
