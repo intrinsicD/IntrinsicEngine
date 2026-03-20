@@ -109,6 +109,11 @@ namespace Graphics::Passes
             };
         }
 
+        [[nodiscard]] bool HasPreviewKMeansData(const Geometry::Halfedge::Mesh& mesh) noexcept
+        {
+            return GetPreviewKMeansData(mesh).HasAny();
+        }
+
         [[nodiscard]] HalfedgeTriangle BuildHalfedgeTriangle(const Geometry::Halfedge::Mesh& mesh,
                                                              Geometry::HalfedgeHandle h) noexcept
         {
@@ -281,6 +286,26 @@ namespace Graphics::Passes
             for (auto entity : selected)
             {
                 if (IsInterestingMeshEntity(reg, entity))
+                {
+                    const auto& data = reg.get<ECS::Mesh::Data>(entity);
+                    if (data.MeshRef && HasPreviewKMeansData(*data.MeshRef))
+                        return entity;
+                }
+            }
+
+            for (auto entity : selected)
+            {
+                if (IsInterestingMeshEntity(reg, entity))
+                    return entity;
+            }
+        }
+
+        for (auto entity : reg.view<ECS::Mesh::Data>())
+        {
+            if (IsInterestingMeshEntity(reg, entity))
+            {
+                const auto& data = reg.get<ECS::Mesh::Data>(entity);
+                if (data.MeshRef && HasPreviewKMeansData(*data.MeshRef))
                     return entity;
             }
         }

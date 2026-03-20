@@ -46,8 +46,7 @@ export namespace Graphics::FeatureCatalog
     inline constexpr Core::FeatureDescriptor HtexPatchPreviewPass = MakeFeatureDescriptor(
         "HtexPatchPreviewPass",
         Core::FeatureCategory::RenderFeature,
-        "Float-only Htex-style halfedge patch preview atlas",
-        false);
+        "Float-only Htex-style halfedge patch preview atlas");
 
     inline constexpr Core::FeatureDescriptor ImGuiPass = MakeFeatureDescriptor(
         "ImGuiPass",

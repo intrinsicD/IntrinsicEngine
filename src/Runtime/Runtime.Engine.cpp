@@ -348,7 +348,7 @@ namespace Runtime
                 }
             }
 
-            RunFramePhases(
+            (void )RunFramePhases(
                 frameTime,
                 accumulator,
                 frameLoopPolicy,

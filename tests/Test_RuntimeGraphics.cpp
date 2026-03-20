@@ -603,6 +603,11 @@ TEST(HtexPatchPreview, DebugStateDefaultsToSafeValues)
     EXPECT_EQ(debug.LastAtlasHeight, 0u);
 }
 
+TEST(HtexPatchPreview, FeatureDescriptorIsEnabledByDefault)
+{
+    EXPECT_TRUE(Graphics::FeatureCatalog::HtexPatchPreviewPass.DefaultEnabled);
+}
+
 TEST(DefaultPipeline, DebugStateReportsFeatureAvailability)
 {
     Graphics::DefaultPipeline pipeline;
