@@ -1,4 +1,5 @@
 #include <cstdint>
+#include "Runtime.PointCloudKMeans.CudaKernels.hpp"
 #include <cuda.h>
 #include <cuda_runtime.h>
 

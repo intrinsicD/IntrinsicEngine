@@ -11,6 +11,7 @@ module;
 #include <random>
 #include <span>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 #include <glm/geometric.hpp>
@@ -20,6 +21,7 @@ module;
 
 #include "Core.Profiling.Macros.hpp"
 #ifdef INTRINSIC_HAS_CUDA
+#include "Runtime.PointCloudKMeans.CudaKernels.hpp"
 #include <cuda.h>
 #endif
 
@@ -47,23 +49,6 @@ import RHI.CudaError;
 
 namespace Runtime::PointCloudKMeans
 {
- #ifdef INTRINSIC_HAS_CUDA
-    namespace CudaKernels
-    {
-        bool LaunchLloyd(
-            CUstream stream,
-            CUdeviceptr positions,
-            uint32_t pointCount,
-            CUdeviceptr centroids,
-            uint32_t clusterCount,
-            uint32_t iterations,
-            CUdeviceptr labels,
-            CUdeviceptr distances,
-            CUdeviceptr sums,
-            CUdeviceptr clusterSizes);
-    }
- #endif
-
     namespace
     {
         using TargetDomain = Runtime::PointCloudKMeans::Domain;
@@ -80,6 +65,7 @@ namespace Runtime::PointCloudKMeans
         struct ResolvedTarget
         {
             TargetDomain Domain = TargetDomain::Auto;
+            std::size_t PointCount = 0;
             ECS::Mesh::Data* MeshData = nullptr;
             ECS::Graph::Data* GraphData = nullptr;
             ECS::PointCloud::Data* PointCloudData = nullptr;
@@ -91,7 +77,7 @@ namespace Runtime::PointCloudKMeans
 
             [[nodiscard]] bool SupportsCuda() const noexcept
             {
-                return PointCloudData != nullptr && PointCloudData->CloudRef != nullptr;
+                return IsValid() && PointCount > 0;
             }
         };
 
@@ -244,6 +230,7 @@ namespace Runtime::PointCloudKMeans
                 if (!mesh || !mesh->MeshRef)
                     return false;
                 target.Domain = TargetDomain::MeshVertices;
+                target.PointCount = mesh->VertexCount();
                 target.MeshData = mesh;
                 return true;
             };
@@ -254,6 +241,7 @@ namespace Runtime::PointCloudKMeans
                 if (!graph || !graph->GraphRef)
                     return false;
                 target.Domain = TargetDomain::GraphVertices;
+                target.PointCount = graph->NodeCount();
                 target.GraphData = graph;
                 return true;
             };
@@ -264,6 +252,7 @@ namespace Runtime::PointCloudKMeans
                 if (!cloud || !cloud->CloudRef || cloud->CloudRef->IsEmpty())
                     return false;
                 target.Domain = TargetDomain::PointCloudPoints;
+                target.PointCount = cloud->PointCount();
                 target.PointCloudData = cloud;
                 return true;
             };
@@ -386,6 +375,172 @@ namespace Runtime::PointCloudKMeans
                 return {};
             }
         }
+
+#ifdef INTRINSIC_HAS_CUDA
+        struct PendingCudaJob
+        {
+            entt::entity Entity = entt::null;
+            Domain TargetDomain = Domain::Auto;
+            RHI::CudaBufferHandle Positions{};
+            RHI::CudaBufferHandle Labels{};
+            RHI::CudaBufferHandle Distances{};
+            RHI::CudaBufferHandle Centroids{};
+            RHI::CudaBufferHandle Sums{};
+            RHI::CudaBufferHandle ClusterSizes{};
+            CUstream Stream = nullptr;
+            CUevent StartEvent = nullptr;
+            CUevent CompletionEvent = nullptr;
+            uint32_t PointCount = 0;
+            uint32_t ClusterCount = 0;
+            uint32_t Iterations = 0;
+        };
+
+        std::unordered_map<uint64_t, PendingCudaJob> g_PendingCudaJobs;
+
+        [[nodiscard]] uint64_t MakeEntityKey(entt::entity entity)
+        {
+            return static_cast<uint64_t>(static_cast<entt::id_type>(entity));
+        }
+
+        void DestroyPendingCudaJob(RHI::CudaDevice& cudaDevice, PendingCudaJob& job)
+        {
+            cudaDevice.FreeBuffer(job.Positions);
+            cudaDevice.FreeBuffer(job.Labels);
+            cudaDevice.FreeBuffer(job.Distances);
+            cudaDevice.FreeBuffer(job.Centroids);
+            cudaDevice.FreeBuffer(job.Sums);
+            cudaDevice.FreeBuffer(job.ClusterSizes);
+            if (job.StartEvent)
+                cudaDevice.DestroyEvent(job.StartEvent);
+            if (job.CompletionEvent)
+                cudaDevice.DestroyEvent(job.CompletionEvent);
+            if (job.Stream)
+                cudaDevice.DestroyStream(job.Stream);
+        }
+
+        [[nodiscard]] bool ScheduleCudaJob(
+            Engine& engine,
+            entt::entity entity,
+            ResolvedTarget target,
+            const Geometry::KMeans::Params& params)
+        {
+            auto* cudaDevice = engine.GetCudaDevice();
+            if (!cudaDevice)
+                return false;
+
+            const std::vector<glm::vec3> points = SnapshotPoints(target);
+            if (points.empty())
+                return false;
+
+            PendingCudaJob job{};
+            job.Entity = entity;
+            job.TargetDomain = target.Domain;
+            job.PointCount = static_cast<uint32_t>(points.size());
+            job.ClusterCount = std::min<uint32_t>(params.ClusterCount, job.PointCount);
+            job.Iterations = params.MaxIterations;
+
+            if (job.ClusterCount == 0 || job.Iterations == 0)
+                return false;
+
+            auto cleanup = [&]()
+            {
+                DestroyPendingCudaJob(*cudaDevice, job);
+            };
+
+            auto stream = cudaDevice->CreateStream();
+            if (!stream)
+                return false;
+            job.Stream = *stream;
+
+            auto startEvent = cudaDevice->CreateEvent();
+            if (!startEvent)
+            {
+                cleanup();
+                return false;
+            }
+            job.StartEvent = *startEvent;
+
+            auto completionEvent = cudaDevice->CreateEvent();
+            if (!completionEvent)
+            {
+                cleanup();
+                return false;
+            }
+            job.CompletionEvent = *completionEvent;
+
+            const auto allocateBuffer = [&](RHI::CudaBufferHandle& handle, size_t bytes) -> bool
+            {
+                auto buffer = cudaDevice->AllocateBuffer(bytes);
+                if (!buffer)
+                    return false;
+                handle = *buffer;
+                return true;
+            };
+
+            const size_t pointBytes = points.size() * sizeof(glm::vec3);
+
+            if (!allocateBuffer(job.Positions, pointBytes) ||
+                !allocateBuffer(job.Labels, sizeof(uint32_t) * job.PointCount) ||
+                !allocateBuffer(job.Distances, sizeof(float) * job.PointCount) ||
+                !allocateBuffer(job.Centroids, sizeof(glm::vec3) * job.ClusterCount) ||
+                !allocateBuffer(job.Sums, sizeof(glm::vec3) * job.ClusterCount) ||
+                !allocateBuffer(job.ClusterSizes, sizeof(uint32_t) * job.ClusterCount))
+            {
+                cleanup();
+                return false;
+            }
+
+            const std::vector<uint32_t> zeroLabels(job.PointCount, 0u);
+            const std::vector<float> zeroDistances(job.PointCount, 0.0f);
+            if (!cudaDevice->CopyHostToBufferAsync(job.Positions, points.data(), pointBytes, job.Stream) ||
+                !cudaDevice->CopyHostToBufferAsync(job.Labels, zeroLabels.data(), zeroLabels.size() * sizeof(uint32_t), job.Stream) ||
+                !cudaDevice->CopyHostToBufferAsync(job.Distances, zeroDistances.data(), zeroDistances.size() * sizeof(float), job.Stream))
+            {
+                cleanup();
+                return false;
+            }
+
+            const std::vector<glm::vec3> centroids = InitializeCentroids(points, params, job.ClusterCount);
+            if (!cudaDevice->CopyHostToBufferAsync(job.Centroids, centroids.data(), centroids.size() * sizeof(glm::vec3), job.Stream))
+            {
+                cleanup();
+                return false;
+            }
+
+            if (cudaDevice->RecordEvent(job.StartEvent, job.Stream) != RHI::CudaError::Success)
+            {
+                cleanup();
+                return false;
+            }
+
+            const bool launchOk = CudaKernels::LaunchLloyd(
+                job.Stream,
+                job.Positions.Ptr,
+                job.PointCount,
+                job.Centroids.Ptr,
+                job.ClusterCount,
+                job.Iterations,
+                job.Labels.Ptr,
+                job.Distances.Ptr,
+                job.Sums.Ptr,
+                job.ClusterSizes.Ptr);
+            if (!launchOk)
+            {
+                cleanup();
+                return false;
+            }
+
+            if (cudaDevice->RecordEvent(job.CompletionEvent, job.Stream) != RHI::CudaError::Success)
+            {
+                cleanup();
+                return false;
+            }
+
+            MarkPending(target, Geometry::KMeans::Backend::CUDA, job.ClusterCount, job.Iterations);
+            g_PendingCudaJobs.emplace(MakeEntityKey(entity), std::move(job));
+            return true;
+        }
+#endif
 
 #ifdef INTRINSIC_HAS_CUDA
         class ScopedCudaContext
@@ -734,10 +889,16 @@ namespace Runtime::PointCloudKMeans
             return false;
 
 #ifdef INTRINSIC_HAS_CUDA
-        if (params.Compute == Geometry::KMeans::Backend::CUDA && target.Domain == Domain::PointCloudPoints)
+        if (params.Compute == Geometry::KMeans::Backend::CUDA)
         {
-            if (ScheduleCuda(engine, entity, *target.PointCloudData, params))
+            if (target.Domain == Domain::PointCloudPoints)
+            {
+                if (ScheduleCuda(engine, entity, *target.PointCloudData, params))
+                    return true;
+            }
+            else if (ScheduleCudaJob(engine, entity, target, params))
                 return true;
+
             Core::Log::Warn("PointCloudKMeans: CUDA scheduling failed for entity {}. Falling back to CPU.",
                             static_cast<uint32_t>(static_cast<entt::id_type>(entity)));
         }
@@ -812,6 +973,83 @@ namespace Runtime::PointCloudKMeans
             return;
 
         auto& reg = engine.GetScene().GetRegistry();
+
+        for (auto it = g_PendingCudaJobs.begin(); it != g_PendingCudaJobs.end(); )
+        {
+            auto& job = it->second;
+            if (!reg.valid(job.Entity))
+            {
+                DestroyPendingCudaJob(*cudaDevice, job);
+                it = g_PendingCudaJobs.erase(it);
+                continue;
+            }
+
+            auto ready = cudaDevice->IsEventComplete(job.CompletionEvent);
+            if (!ready)
+            {
+                ++it;
+                continue;
+            }
+            if (!*ready)
+            {
+                ++it;
+                continue;
+            }
+
+            std::vector<uint32_t> labels(job.PointCount, 0u);
+            std::vector<float> distances(job.PointCount, 0.0f);
+            std::vector<glm::vec3> centroids(job.ClusterCount, glm::vec3(0.0f));
+
+            auto copyLabels = cudaDevice->CopyBufferToHost(labels.data(), job.Labels, labels.size() * sizeof(uint32_t));
+            auto copyDistances = cudaDevice->CopyBufferToHost(distances.data(), job.Distances, distances.size() * sizeof(float));
+            auto copyCentroids = cudaDevice->CopyBufferToHost(centroids.data(), job.Centroids, centroids.size() * sizeof(glm::vec3));
+            if (!copyLabels || !copyDistances || !copyCentroids)
+            {
+                Core::Log::Warn("PointCloudKMeans: failed to download CUDA results for entity {}.",
+                                static_cast<uint32_t>(static_cast<entt::id_type>(job.Entity)));
+                if (reg.valid(job.Entity))
+                {
+                    ResolvedTarget target = ResolveTarget(reg, job.Entity, job.TargetDomain);
+                    ClearPending(target);
+                }
+                DestroyPendingCudaJob(*cudaDevice, job);
+                it = g_PendingCudaJobs.erase(it);
+                continue;
+            }
+
+            Geometry::KMeans::Result result{};
+            result.Labels = std::move(labels);
+            result.SquaredDistances = std::move(distances);
+            result.Centroids = std::move(centroids);
+            result.Iterations = job.Iterations;
+            result.Converged = false;
+            result.ActualBackend = Geometry::KMeans::Backend::CUDA;
+
+            float inertia = 0.0f;
+            float maxDistance = -1.0f;
+            uint32_t maxDistanceIndex = 0;
+            for (std::size_t i = 0; i < result.SquaredDistances.size(); ++i)
+            {
+                inertia += result.SquaredDistances[i];
+                if (result.SquaredDistances[i] > maxDistance)
+                {
+                    maxDistance = result.SquaredDistances[i];
+                    maxDistanceIndex = static_cast<uint32_t>(i);
+                }
+            }
+            result.Inertia = inertia;
+            result.MaxDistanceIndex = maxDistanceIndex;
+
+            double durationMs = 0.0;
+            if (auto elapsed = cudaDevice->GetElapsedMilliseconds(job.StartEvent, job.CompletionEvent))
+                durationMs = *elapsed;
+
+            static_cast<void>(PublishResult(engine, job.Entity, result, durationMs, job.TargetDomain));
+
+            DestroyPendingCudaJob(*cudaDevice, job);
+            it = g_PendingCudaJobs.erase(it);
+        }
+
         auto view = reg.view<ECS::PointCloud::Data>();
         for (auto [entity, pcData] : view.each())
         {

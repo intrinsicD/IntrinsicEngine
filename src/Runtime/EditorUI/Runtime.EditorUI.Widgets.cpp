@@ -1139,7 +1139,7 @@ bool DrawKMeansWidget(Runtime::Engine& engine,
     else
     {
         state.Backend = static_cast<int>(Geometry::KMeans::Backend::CPU);
-        ImGui::TextDisabled("Backend: CPU (CUDA path currently uses authoritative point-cloud buffers only)");
+        ImGui::TextDisabled("Backend: CPU (CUDA backend unavailable for this target or build)");
     }
 
     bool dispatched = false;
@@ -1161,7 +1161,7 @@ bool DrawKMeansWidget(Runtime::Engine& engine,
     if (!canRun)
         ImGui::EndDisabled();
 
-    if (targetInfo.SupportsCuda)
+    if (targetInfo.SupportsCuda && selectedDomain == Runtime::PointCloudKMeans::Domain::PointCloudPoints)
     {
         ImGui::SameLine();
         if (ImGui::Button("Release Compute Buffers##GeometryProcessing"))

@@ -163,24 +163,56 @@ namespace RHI
         // Step 3: Get device handle and query properties.
         auto device = std::unique_ptr<CudaDevice>(new CudaDevice());
 
+        auto destroyCreatedContext = [&device]()
+        {
+            if (!device->m_Context)
+                return;
+
+            if (const CUresult destroyResult = cuCtxDestroy(device->m_Context);
+                destroyResult != CUDA_SUCCESS)
+            {
+                Core::Log::Warn("CudaDevice::Create(): cuCtxDestroy failed during cleanup "
+                                "(CUresult={}).",
+                                static_cast<int>(destroyResult));
+            }
+
+            device->m_Context = nullptr;
+        };
+
         if (auto r = Check(cuDeviceGet(&device->m_Device, deviceOrdinal)); !r)
             return std::unexpected(r.error());
 
-        cuDeviceGetName(device->m_DeviceName, sizeof(device->m_DeviceName), device->m_Device);
+        if (auto r = Check(cuDeviceGetName(device->m_DeviceName,
+                                           sizeof(device->m_DeviceName),
+                                           device->m_Device));
+            !r)
+        {
+            return std::unexpected(r.error());
+        }
 
-        cuDeviceGetAttribute(&device->m_ComputeCapabilityMajor,
-                             CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR,
-                             device->m_Device);
-        cuDeviceGetAttribute(&device->m_ComputeCapabilityMinor,
-                             CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR,
-                             device->m_Device);
+        if (auto r = Check(cuDeviceGetAttribute(&device->m_ComputeCapabilityMajor,
+                                                CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR,
+                                                device->m_Device));
+            !r)
+        {
+            return std::unexpected(r.error());
+        }
+
+        if (auto r = Check(cuDeviceGetAttribute(&device->m_ComputeCapabilityMinor,
+                                                CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR,
+                                                device->m_Device));
+            !r)
+        {
+            return std::unexpected(r.error());
+        }
 
         size_t totalMem = 0;
-        cuDeviceTotalMem(&totalMem, device->m_Device);
+        if (auto r = Check(cuDeviceTotalMem(&totalMem, device->m_Device)); !r)
+            return std::unexpected(r.error());
         device->m_TotalMemory = totalMem;
 
         // Step 4: Create CUDA context.
-        CUresult ctxResult = cuCtxCreate(&device->m_Context, nullptr, 0, device->m_Device);
+        CUresult ctxResult = cuCtxCreate(&device->m_Context, 0, device->m_Device);
         if (ctxResult != CUDA_SUCCESS)
         {
             Core::Log::Error("CudaDevice::Create(): cuCtxCreate failed (CUresult={}).",
@@ -192,7 +224,7 @@ namespace RHI
         CUresult streamResult = cuStreamCreate(&device->m_DefaultStream, CU_STREAM_NON_BLOCKING);
         if (streamResult != CUDA_SUCCESS)
         {
-            cuCtxDestroy(device->m_Context);
+            destroyCreatedContext();
             Core::Log::Error("CudaDevice::Create(): cuStreamCreate failed (CUresult={}).",
                              static_cast<int>(streamResult));
             return std::unexpected(CudaError::StreamCreateFailed);

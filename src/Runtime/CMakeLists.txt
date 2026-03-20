@@ -63,6 +63,9 @@ if(INTRINSIC_ENABLE_CUDA)
             POSITION_INDEPENDENT_CODE ON
             CUDA_STANDARD 17
             CUDA_STANDARD_REQUIRED ON)
+    set_target_properties(${target_name} PROPERTIES
+            CUDA_STANDARD 17
+            CUDA_STANDARD_REQUIRED ON)
     target_link_libraries(IntrinsicRuntimePointCloudKMeansCuda PRIVATE IntrinsicConfig CUDA::cudart CUDA::cuda_driver)
     target_include_directories(IntrinsicRuntimePointCloudKMeansCuda PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     target_sources(${target_name} PRIVATE $<TARGET_OBJECTS:IntrinsicRuntimePointCloudKMeansCuda>)

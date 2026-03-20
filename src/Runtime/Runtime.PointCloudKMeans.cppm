@@ -42,9 +42,9 @@ export namespace Runtime::PointCloudKMeans
     //
     // Backend selection:
     //   - CPU: worker-thread compute over a point-position snapshot.
-    //   - CUDA: available for point-cloud authoritative data via persistent
-    //           per-entity CUDA buffers + async stream execution, polled from
-    //           the main thread each frame.
+    //   - CUDA: available for any authoritative point-set source (mesh vertices,
+    //           graph nodes, point-cloud points) via stream-backed device
+    //           snapshots polled from the main thread each frame.
     //
     // Returns false when the entity is invalid, has no compatible point domain,
     // or already has an in-flight k-means job on the selected domain.
@@ -70,7 +70,7 @@ export namespace Runtime::PointCloudKMeans
     void PumpCompletions(Engine& engine);
 
     // Explicitly releases persistent CUDA buffers/events/stream for one entity.
-    // This only affects the point-cloud CUDA path. CPU jobs are not cancelled.
+    // This only affects the point-cloud CUDA cache. CPU jobs are not cancelled.
     void ReleaseEntityBuffers(Engine& engine, entt::entity entity);
 }
 
