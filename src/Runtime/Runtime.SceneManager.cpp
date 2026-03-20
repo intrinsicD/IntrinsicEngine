@@ -11,6 +11,7 @@ module Runtime.SceneManager;
 import Core.Logging;
 import Core.Assets;
 import Graphics;
+import Geometry;
 import ECS;
 #ifdef INTRINSIC_HAS_CUDA
 import RHI;

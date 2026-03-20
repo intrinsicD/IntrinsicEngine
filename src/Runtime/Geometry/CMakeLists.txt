@@ -46,6 +46,7 @@ target_sources(${target_name}
         Geometry.Smoothing.cppm
         Geometry.Simplification.cppm
         Geometry.Subdivision.cppm
+        Geometry.LinearSolver.cppm
         Geometry.Remeshing.cppm
         Geometry.Geodesic.cppm
         Geometry.CatmullClark.cppm
@@ -97,6 +98,7 @@ target_sources(${target_name}
         Geometry.ConvexHullBuilder.cpp
         Geometry.KMeans.cpp
         Geometry.PointCloud.cpp
+        Geometry.Sphere.cpp
         Geometry.Boolean.cpp
         Geometry.ShortestPath.cpp
 )

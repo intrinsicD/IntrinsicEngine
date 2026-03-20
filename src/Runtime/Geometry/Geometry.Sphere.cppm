@@ -1,6 +1,10 @@
 module;
 
 #include <algorithm>
+#include <array>
+#include <cmath>
+#include <cstdint>
+#include <optional>
 #include <span>
 #include <glm/glm.hpp>
 #define GLM_ENABLE_EXPERIMENTAL
@@ -71,13 +75,20 @@ export namespace Geometry
 
     struct FittingParams
     {
-        enum class FittingMethod
+        enum class FittingMethod : uint8_t
         {
             None,
-            //TODO: different fitting methods, iterative, closed form solver etc...
+            LeastSquares,
+            Bounding,
+            Hybrid,
         };
-        //TODO: fitting parameters...
+
+        FittingMethod Method{FittingMethod::Hybrid};
+        float MinimumRadius{0.0f};
+        float ContainmentSlack{1.0e-5f};
+        float SingularThreshold{1.0e-10f};
+        bool EnforceContainment{false};
     };
 
-    [[nodiscard]] Sphere ToSphere(std::span<const glm::vec3> points, const FittingParams &params); //TODO: implement this
+    [[nodiscard]] std::optional<Sphere> ToSphere(std::span<const glm::vec3> points, const FittingParams& params = {});
 }

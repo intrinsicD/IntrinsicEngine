@@ -18,6 +18,7 @@ module;
 #include <glm/glm.hpp>
 #include <imgui.h>
 #include <entt/entity/fwd.hpp>
+#include <entt/signal/fwd.hpp>
 
 module Runtime.EditorUI;
 
@@ -27,6 +28,7 @@ import Runtime.PointCloudKMeans;
 import ECS;
 import Graphics;
 import Geometry;
+import Core.Logging;
 
 #include "Graphics.LifecycleUtils.hpp"
 

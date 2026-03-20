@@ -42,6 +42,7 @@ A **"Distinguished Scientist" grade** geometry kernel in `src/Runtime/Geometry/`
 
 **Collision & Spatial Queries:**
 - **Primitives:** Spheres, AABBs, OBBs, Capsules, Cylinders, Convex Hulls.
+- **Sphere fitting:** `Geometry::ToSphere(points, params)` now supports robust best-fit and conservative bounding policies on borrowed point spans. The default hybrid policy filters non-finite samples, uses an algebraic least-squares fit when the system is well-conditioned, and falls back to an AABB-derived bounding sphere on singular input. `EnforceContainment` can inflate the fitted result to cover every retained sample with an absolute slack.
 - **GJK/EPA:** Gilbert-Johnson-Keerthi collision detection with Expanding Polytope Algorithm for contact points.
 - **SDF:** Signed distance field evaluation with gradient-based contact manifold generation.
 - **SAT:** Separating Axis Theorem for analytic primitive pair tests.
