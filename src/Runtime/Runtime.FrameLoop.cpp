@@ -193,4 +193,31 @@ namespace Runtime
             callbacks.OnRender();
         }
     }
+
+    FramePhaseRunResult RunFramePhases(double frameTime,
+                                       double& accumulator,
+                                       const FrameLoopPolicy& policy,
+                                       const StreamingLaneCoordinator& streamingLane,
+                                       const RenderLaneCoordinator& renderLane,
+                                       Core::FrameGraph& fixedGraph,
+                                       FramePhaseCallbacks&& callbacks)
+    {
+        streamingLane.BeginFrame();
+
+        FramePhaseRunResult result{
+            .FixedStep = RunFixedSteps(accumulator,
+                                       policy,
+                                       std::move(callbacks.OnFixedUpdate),
+                                       std::move(callbacks.RegisterFixedSystems),
+                                       fixedGraph,
+                                       std::move(callbacks.ExecuteFixedGraph)),
+        };
+
+        renderLane.Run(frameTime,
+                       std::move(callbacks.Render),
+                       std::move(callbacks.ExecuteVariableGraph));
+
+        streamingLane.EndFrame();
+        return result;
+    }
 }
