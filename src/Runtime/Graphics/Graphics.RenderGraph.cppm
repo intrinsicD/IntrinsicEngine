@@ -171,7 +171,29 @@ export namespace Graphics
             bool IsImported = false;
         };
 
+        struct ImageBarrier
+        {
+            ResourceID Resource{};
+            VkPipelineStageFlags2 SrcStageMask{0};
+            VkAccessFlags2 SrcAccessMask{0};
+            VkPipelineStageFlags2 DstStageMask{0};
+            VkAccessFlags2 DstAccessMask{0};
+            VkImageLayout OldLayout{VK_IMAGE_LAYOUT_UNDEFINED};
+            VkImageLayout NewLayout{VK_IMAGE_LAYOUT_UNDEFINED};
+        };
+
+        struct BufferBarrier
+        {
+            ResourceID Resource{};
+            VkPipelineStageFlags2 SrcStageMask{0};
+            VkAccessFlags2 SrcAccessMask{0};
+            VkPipelineStageFlags2 DstStageMask{0};
+            VkAccessFlags2 DstAccessMask{0};
+        };
+
         std::vector<Attachment> Attachments{};
+        std::vector<ImageBarrier> ImageBarriers{};
+        std::vector<BufferBarrier> BufferBarriers{};
     };
 
     struct AccessNode

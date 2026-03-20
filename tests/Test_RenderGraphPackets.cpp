@@ -428,6 +428,61 @@ TEST_F(RenderGraphPacketTest, InvalidResourceHandles_AreRejectedAndDoNotCreateRe
     EXPECT_TRUE(images.empty());
 }
 
+TEST_F(RenderGraphPacketTest, TransferWriteThenSampleRead_SanitizesFinalizeBarrierAccess)
+{
+    struct PassData
+    {
+        RGResourceHandle Texture{};
+    };
+
+    RHI::VulkanImage importTexture(*m_Device,
+                                  8,
+                                  8,
+                                  1,
+                                  VK_FORMAT_R8G8B8A8_UNORM,
+                                  VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                                  VK_IMAGE_ASPECT_COLOR_BIT);
+
+    RGResourceHandle imported;
+
+    m_Graph->AddPass<PassData>("Upload",
+        [&](PassData& data, RGBuilder& builder)
+        {
+            imported = builder.ImportTexture("preview"_id,
+                                             importTexture.GetHandle(),
+                                             importTexture.GetView(),
+                                             importTexture.GetFormat(),
+                                             {8u, 8u},
+                                             VK_IMAGE_LAYOUT_UNDEFINED);
+            data.Texture = builder.Write(imported,
+                                         VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+                                         VK_ACCESS_2_TRANSFER_WRITE_BIT);
+        },
+        [](const PassData&, const RGRegistry&, VkCommandBuffer) {});
+
+    m_Graph->AddPass<PassData>("Finalize",
+        [&](PassData& data, RGBuilder& builder)
+        {
+            data.Texture = builder.Read(imported,
+                                        VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                                        VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
+        },
+        [](const PassData&, const RGRegistry&, VkCommandBuffer) {});
+
+    m_Graph->Compile(0);
+
+    const auto passes = m_Graph->BuildDebugPassList();
+    ASSERT_EQ(passes.size(), 2u);
+    ASSERT_EQ(passes[1].ImageBarriers.size(), 1u);
+
+    const auto& barrier = passes[1].ImageBarriers[0];
+    EXPECT_EQ(barrier.OldLayout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    EXPECT_EQ(barrier.NewLayout, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    EXPECT_EQ(barrier.SrcAccessMask, VK_ACCESS_2_TRANSFER_WRITE_BIT);
+    EXPECT_EQ(barrier.DstAccessMask, VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
+    EXPECT_EQ(barrier.DstAccessMask & VK_ACCESS_2_MEMORY_WRITE_BIT, 0u);
+}
+
 TEST_F(RenderGraphPacketTest, AttachmentWritesAndReadsTrackTransientTextureLifetime)
 {
     struct PassData
