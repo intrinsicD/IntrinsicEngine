@@ -80,7 +80,8 @@ These are not required to finish the first wave, but they should begin soon afte
 
 ##### Critical / Correctness
 
-- [ ] Fix `VK_ACCESS_2_MEMORY_WRITE_BIT` on the read-only HTex finalize pass barrier — should be read-only access flags if the pass only reads (`1165e65`).
+- [x] Fix `VK_ACCESS_2_MEMORY_WRITE_BIT` on the read-only HTex finalize pass barrier — should be read-only access flags if the pass only reads (`1165e65`).
+  - Added a render-graph regression test that inspects the finalize image barrier and locks it to `VK_ACCESS_2_SHADER_SAMPLED_READ_BIT` without `VK_ACCESS_2_MEMORY_WRITE_BIT`.
 
 ##### Performance
 

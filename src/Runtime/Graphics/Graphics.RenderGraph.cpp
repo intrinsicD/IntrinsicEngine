@@ -1279,6 +1279,34 @@ namespace Graphics
         std::vector<RenderGraphDebugPass> out;
         out.reserve(m_ActivePassCount);
 
+        const auto findResourceByImage = [this](VkImage image) -> ResourceID
+        {
+            if (image == VK_NULL_HANDLE)
+                return ~0u;
+
+            for (uint32_t resourceIndex = 0; resourceIndex < m_ActiveResourceCount; ++resourceIndex)
+            {
+                if (m_ResourcePool[resourceIndex].PhysicalImage == image)
+                    return resourceIndex;
+            }
+
+            return ~0u;
+        };
+
+        const auto findResourceByBuffer = [this](VkBuffer buffer) -> ResourceID
+        {
+            if (buffer == VK_NULL_HANDLE)
+                return ~0u;
+
+            for (uint32_t resourceIndex = 0; resourceIndex < m_ActiveResourceCount; ++resourceIndex)
+            {
+                if (m_ResourcePool[resourceIndex].PhysicalBuffer == buffer)
+                    return resourceIndex;
+            }
+
+            return ~0u;
+        };
+
         for (uint32_t i = 0; i < m_ActivePassCount; ++i)
         {
             const auto& p = m_PassPool[i];
@@ -1298,6 +1326,29 @@ namespace Graphics
                                           att->IsDepth,
                                           res.Type == ResourceType::Import});
             }
+
+            for (const VkImageMemoryBarrier2& barrier : p.ImageBarriers)
+            {
+                const ResourceID resource = findResourceByImage(barrier.image);
+                dp.ImageBarriers.push_back({resource,
+                                            barrier.srcStageMask,
+                                            barrier.srcAccessMask,
+                                            barrier.dstStageMask,
+                                            barrier.dstAccessMask,
+                                            barrier.oldLayout,
+                                            barrier.newLayout});
+            }
+
+            for (const VkBufferMemoryBarrier2& barrier : p.BufferBarriers)
+            {
+                const ResourceID resource = findResourceByBuffer(barrier.buffer);
+                dp.BufferBarriers.push_back({resource,
+                                             barrier.srcStageMask,
+                                             barrier.srcAccessMask,
+                                             barrier.dstStageMask,
+                                             barrier.dstAccessMask});
+            }
+
             out.push_back(std::move(dp));
         }
         return out;
