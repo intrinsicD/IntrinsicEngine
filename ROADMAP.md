@@ -21,6 +21,29 @@ Sub-entity select → Geometry processing (interactive operator input)
 
 ---
 
+## Runtime Architecture Track
+
+This roadmap now explicitly tracks the staged runtime/frame-pipeline work captured in `TODO.md` → `B4. Next-Gen Frame Pipeline Refactor`. The default migration path is **O2** from `docs/architecture/adr-o2-pragmatic-medium-runtime-refactor.md`: preserve the current subsystem split, but introduce explicit platform, simulation, extraction, render-preparation, submission, and maintenance stages before considering any O3-scale redesign.
+
+### Near-term architecture sequencing
+
+1. **Baseline + checkpoints**
+   - Lock current telemetry, pass ordering, and render-contract snapshots before each migration phase.
+   - Keep rollback shims and feature-flagged cutovers until each phase clears its pass/fail gates.
+2. **Frame-stage extraction**
+   - Introduce typed `RenderFrameInput`, `WorldSnapshot`, `RenderWorld`, and `FrameContext` seams.
+   - Ensure render preparation consumes immutable extracted state instead of late live ECS traversal.
+3. **Fixed-step runtime evolution**
+   - Move toward a fixed-step simulation lane with variable-rate rendering and bounded frames in flight.
+   - Make GPU completion, deferred retirement, and per-frame ownership explicit runtime concepts.
+4. **Renderer-owned preparation**
+   - Keep three-pass/deferred/post/overlay behavior expressed as renderer-owned render-graph composition rather than top-level loop branching.
+   - Preserve headless/testable paths by isolating platform and swapchain specifics from simulation, extraction, and maintenance logic.
+
+This architecture track is intentionally cross-cutting: it enables later rendering, streaming, and interaction work without reordering the feature roadmap below.
+
+---
+
 ## Phase 1 — Foundation
 
 ### Post-Processing Pipeline (**MVP complete**)
