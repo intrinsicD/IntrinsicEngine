@@ -10,10 +10,9 @@ module;
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/glm.hpp>
 
-module Geometry:HalfedgeMesh.Impl;
+module Geometry.HalfedgeMesh;
 
-import :HalfedgeMesh;
-import :Properties;
+import Geometry.Properties;
 
 namespace Geometry::Halfedge
 {

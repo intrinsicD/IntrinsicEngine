@@ -15,10 +15,9 @@ module;
 #include <glm/gtx/norm.hpp>
 #include <glm/geometric.hpp>
 
-module Geometry:MeshUtils.Impl;
-import :MeshUtils;
-import :Properties;
-import :HalfedgeMesh;
+module Geometry.MeshUtils;
+import Geometry.Properties;
+import Geometry.HalfedgeMesh;
 import Core.Logging;
 
 namespace Geometry::MeshUtils

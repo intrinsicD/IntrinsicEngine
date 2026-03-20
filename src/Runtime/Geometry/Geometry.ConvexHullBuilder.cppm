@@ -7,10 +7,10 @@ module;
 
 #include <glm/glm.hpp>
 
-export module Geometry:ConvexHullBuilder;
+export module Geometry.ConvexHullBuilder;
 
-import :Primitives;
-import :HalfedgeMesh;
+import Geometry.Primitives;
+import Geometry.HalfedgeMesh;
 
 export namespace Geometry::ConvexHullBuilder
 {

@@ -4,10 +4,10 @@ module;
 #include <span>
 #include <vector>
 
-export module Geometry:ConvexHull;
+export module Geometry.ConvexHull;
 
-import :AABB;
-import :Plane;
+import Geometry.AABB;
+import Geometry.Plane;
 
 export namespace Geometry
 {

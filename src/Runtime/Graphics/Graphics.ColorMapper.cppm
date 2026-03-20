@@ -9,7 +9,7 @@ module;
 export module Graphics.ColorMapper;
 
 import Graphics.VisualizationConfig;
-import Geometry;
+import Geometry.Properties;
 
 // =============================================================================
 // Generic PropertySet → packed ABGR color mapping.

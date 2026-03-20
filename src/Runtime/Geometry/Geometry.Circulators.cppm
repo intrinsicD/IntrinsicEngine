@@ -3,9 +3,9 @@ module;
 #include <cstddef>
 #include <iterator>
 
-export module Geometry:Circulators;
+export module Geometry.Circulators;
 
-import :Properties;
+import Geometry.Properties;
 
 export namespace Geometry::Circulators
 {

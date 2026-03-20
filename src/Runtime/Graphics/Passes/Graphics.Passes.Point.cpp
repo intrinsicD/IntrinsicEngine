@@ -22,7 +22,7 @@ import Graphics.Components;
 import Graphics.DebugDraw;
 import Graphics.ShaderRegistry;
 import Graphics.GpuColor;
-import Geometry;
+import Geometry.Frustum;
 import Core.Hash;
 import Core.Logging;
 import Core.Filesystem;

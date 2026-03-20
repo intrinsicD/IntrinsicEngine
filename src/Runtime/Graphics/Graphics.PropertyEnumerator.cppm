@@ -6,7 +6,7 @@ module;
 
 export module Graphics.PropertyEnumerator;
 
-import Geometry;
+import Geometry.Properties;
 
 // =============================================================================
 // PropertySet property enumeration for color visualization UI.

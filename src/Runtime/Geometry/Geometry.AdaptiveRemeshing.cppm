@@ -3,11 +3,11 @@ module;
 #include <cstddef>
 #include <optional>
 
-export module Geometry:AdaptiveRemeshing;
+export module Geometry.AdaptiveRemeshing;
 
-import :MeshOperator;
-import :Properties;
-import :HalfedgeMesh;
+import Geometry.MeshOperator;
+import Geometry.Properties;
+import Geometry.HalfedgeMesh;
 
 export namespace Geometry::AdaptiveRemeshing
 {

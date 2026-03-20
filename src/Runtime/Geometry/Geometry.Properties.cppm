@@ -13,7 +13,7 @@ module;
 #include <vector>
 #include <limits>
 
-export module Geometry:Properties;
+export module Geometry.Properties;
 
 export namespace Geometry
 {

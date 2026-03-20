@@ -14,11 +14,10 @@ module;
 
 #include <glm/glm.hpp>
 
-module Geometry:PointCloud.Impl;
+module Geometry.PointCloud;
 
-import :PointCloud;
-import :AABB;
-import :Octree;
+import Geometry.AABB;
+import Geometry.Octree;
 
 namespace Geometry::PointCloud
 {

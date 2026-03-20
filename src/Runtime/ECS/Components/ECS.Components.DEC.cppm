@@ -4,7 +4,7 @@ module;
 
 export module ECS:Components.DEC;
 
-import Geometry;
+import Geometry.DEC;
 
 export namespace ECS::Components::DEC
 {

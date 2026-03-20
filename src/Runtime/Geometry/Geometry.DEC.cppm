@@ -6,10 +6,10 @@ module;
 #include <span>
 #include <vector>
 
-export module Geometry:DEC;
+export module Geometry.DEC;
 
-import :Properties;
-import :HalfedgeMesh;
+import Geometry.Properties;
+import Geometry.HalfedgeMesh;
 
 export namespace Geometry::DEC
 {

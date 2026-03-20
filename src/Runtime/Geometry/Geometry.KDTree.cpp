@@ -13,8 +13,7 @@ module;
 #include <vector>
 #include <glm/glm.hpp>
 
-module Geometry:KDTree.Impl;
-import :KDTree;
+module Geometry.KDTree;
 
 namespace Geometry
 {

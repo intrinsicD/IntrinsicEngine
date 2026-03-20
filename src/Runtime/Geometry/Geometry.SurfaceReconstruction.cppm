@@ -6,9 +6,9 @@ module;
 
 #include <glm/glm.hpp>
 
-export module Geometry:SurfaceReconstruction;
+export module Geometry.SurfaceReconstruction;
 
-import :HalfedgeMesh;
+import Geometry.HalfedgeMesh;
 
 export namespace Geometry::SurfaceReconstruction
 {

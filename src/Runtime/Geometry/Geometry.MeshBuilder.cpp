@@ -15,11 +15,10 @@ module;
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 
-module Geometry:MeshBuilder.Impl;
+module Geometry.MeshBuilder;
 
-import :MeshBuilder;
-import :HalfedgeMesh;
-import :Subdivision;
+import Geometry.HalfedgeMesh;
+import Geometry.Subdivision;
 
 namespace Geometry::Halfedge
 {

@@ -6,10 +6,10 @@ module;
 
 #include <glm/glm.hpp>
 
-export module Geometry:Curvature;
+export module Geometry.Curvature;
 
-import :Properties;
-import :HalfedgeMesh;
+import Geometry.Properties;
+import Geometry.HalfedgeMesh;
 
 export namespace Geometry::Curvature
 {

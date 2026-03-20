@@ -16,7 +16,6 @@ import Core.Assets;
 import Core.FrameGraph;
 import Core.Logging;
 import ECS;
-import Geometry;
 
 #include "Graphics.LifecycleUtils.hpp"
 

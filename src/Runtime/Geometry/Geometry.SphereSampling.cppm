@@ -3,9 +3,9 @@ module;
 #include <vector>
 #include <glm/glm.hpp>
 
-export module Geometry:SphereSampling;
+export module Geometry.SphereSampling;
 
-import :Sphere;
+import Geometry.Sphere;
 
 export namespace Geometry::Sampling
 {

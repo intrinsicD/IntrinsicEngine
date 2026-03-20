@@ -10,12 +10,11 @@ module;
 #include <glm/glm.hpp>
 #include <glm/geometric.hpp>
 
-module Geometry:Remeshing.Impl;
+module Geometry.Remeshing;
 
-import :Remeshing;
-import :Properties;
-import :HalfedgeMesh;
-import :MeshUtils;
+import Geometry.Properties;
+import Geometry.HalfedgeMesh;
+import Geometry.MeshUtils;
 
 namespace Geometry::Remeshing
 {

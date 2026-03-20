@@ -6,9 +6,8 @@ module;
 #include <utility>
 #include <vector>
 
-module Geometry:Properties.Impl;
+module Geometry.Properties;
 
-import :Properties;
 
 namespace Geometry
 {

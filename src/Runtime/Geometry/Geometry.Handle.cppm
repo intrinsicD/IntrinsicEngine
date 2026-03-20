@@ -1,6 +1,6 @@
 module;
 
-export module Geometry:Handle;
+export module Geometry.Handle;
 import Core.Handle;
 import Core.ResourcePool;
 import Core.Error;

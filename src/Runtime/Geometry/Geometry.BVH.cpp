@@ -10,8 +10,7 @@ module;
 
 #include <glm/glm.hpp>
 
-module Geometry:BVH.Impl;
-import :BVH;
+module Geometry.BVH;
 
 namespace Geometry
 {

@@ -11,7 +11,7 @@ module;
 
 module Graphics.IsolineExtractor;
 
-import Geometry;
+import Geometry.HalfedgeMesh;
 
 using namespace Graphics;
 using namespace Geometry;

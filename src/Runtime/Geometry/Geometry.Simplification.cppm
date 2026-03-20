@@ -4,10 +4,10 @@ module;
 #include <optional>
 #include <string>
 
-export module Geometry:Simplification;
+export module Geometry.Simplification;
 
-import :Properties;
-import :HalfedgeMesh;
+import Geometry.Properties;
+import Geometry.HalfedgeMesh;
 
 export namespace Geometry::Simplification
 {

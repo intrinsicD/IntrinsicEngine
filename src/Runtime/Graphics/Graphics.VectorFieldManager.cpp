@@ -18,7 +18,8 @@ import Graphics.VisualizationConfig;
 import Graphics.ColorMapper;
 import Graphics.GpuColor;
 
-import Geometry;
+import Geometry.Graph;
+import Geometry.Properties;
 import ECS;
 
 using namespace Graphics;

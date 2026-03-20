@@ -14,12 +14,11 @@ module;
 #include <glm/glm.hpp>
 #include <glm/geometric.hpp>
 
-module Geometry:NormalEstimation.Impl;
+module Geometry.NormalEstimation;
 
-import :NormalEstimation;
-import :AABB;
-import :Octree;
-import :Primitives;
+import Geometry.AABB;
+import Geometry.Octree;
+import Geometry.Primitives;
 
 namespace Geometry::NormalEstimation
 {

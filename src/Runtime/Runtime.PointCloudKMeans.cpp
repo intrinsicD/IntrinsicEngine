@@ -28,7 +28,10 @@ module Runtime.PointCloudKMeans;
 
 import Runtime.Engine;
 import Graphics.Components;
-import Geometry;
+import Geometry.Graph;
+import Geometry.HalfedgeMesh;
+import Geometry.KMeans;
+import Geometry.PointCloud;
 import ECS;
 import Core.Logging;
 import Core.Tasks;

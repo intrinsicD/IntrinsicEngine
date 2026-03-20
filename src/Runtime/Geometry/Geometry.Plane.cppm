@@ -4,9 +4,9 @@ module;
 #include <span>
 #include <glm/glm.hpp>
 
-export module Geometry:Plane;
+export module Geometry.Plane;
 
-import :Pca;
+import Geometry.Pca;
 
 export namespace Geometry
 {

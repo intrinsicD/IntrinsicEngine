@@ -12,15 +12,15 @@ module;
 #include <string>
 #include <glm/glm.hpp>
 
-export module Geometry:Octree;
+export module Geometry.Octree;
 
 import Utils.BoundedHeap;
-import :Properties;
-import :AABB;
-import :Primitives;
-import :Containment;
-import :Overlap;
-import :Support;
+import Geometry.Properties;
+import Geometry.AABB;
+import Geometry.Primitives;
+import Geometry.Containment;
+import Geometry.Overlap;
+import Geometry.Support;
 
 export namespace Geometry
 {

@@ -4,9 +4,9 @@ module;
 #include <glm/gtx/norm.hpp>
 #include <concepts>
 
-export module Geometry:Support;
+export module Geometry.Support;
 
-import :Primitives;
+import Geometry.Primitives;
 
 export namespace Geometry
 {

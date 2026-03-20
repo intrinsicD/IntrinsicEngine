@@ -11,12 +11,11 @@ module;
 #include <glm/glm.hpp>
 #include <glm/geometric.hpp>
 
-module Geometry:Subdivision.Impl;
+module Geometry.Subdivision;
 
-import :Subdivision;
-import :Properties;
-import :HalfedgeMesh;
-import :MeshUtils;
+import Geometry.Properties;
+import Geometry.HalfedgeMesh;
+import Geometry.MeshUtils;
 
 namespace Geometry::Subdivision
 {

@@ -6,10 +6,9 @@ module;
 #include <glm/glm.hpp>
 #include <random>
 
-module Geometry:SphereSampling.Impl;
+module Geometry.SphereSampling;
 
-import :SphereSampling;
-import :Sphere;
+import Geometry.Sphere;
 
 namespace Geometry::Sampling
 {

@@ -2,7 +2,7 @@ module;
 
 #include <cstddef>
 
-export module Geometry:MeshOperator;
+export module Geometry.MeshOperator;
 
 export namespace Geometry
 {

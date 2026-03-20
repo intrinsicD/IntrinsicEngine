@@ -37,7 +37,10 @@ import Core.Filesystem;
 import Core.Logging;
 import RHI;
 import Graphics.Geometry;
-import Geometry;
+import Geometry.AABB;
+import Geometry.HalfedgeMesh;
+import Geometry.MeshUtils;
+import Geometry.Octree;
 
 #include "Importers/Graphics.Importers.AttributeVertexKey.hpp"
 

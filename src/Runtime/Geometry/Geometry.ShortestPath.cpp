@@ -13,11 +13,10 @@ module;
 #include <glm/glm.hpp>
 #include <glm/geometric.hpp>
 
-module Geometry:ShortestPath.Impl;
+module Geometry.ShortestPath;
 
-import :ShortestPath;
-import :HalfedgeMesh;
-import :Graph;
+import Geometry.HalfedgeMesh;
+import Geometry.Graph;
 
 namespace Geometry::ShortestPath
 {

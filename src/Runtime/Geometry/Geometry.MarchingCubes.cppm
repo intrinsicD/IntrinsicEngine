@@ -7,9 +7,9 @@ module;
 
 #include <glm/glm.hpp>
 
-export module Geometry:MarchingCubes;
+export module Geometry.MarchingCubes;
 
-import :HalfedgeMesh;
+import Geometry.HalfedgeMesh;
 
 export namespace Geometry::MarchingCubes
 {

@@ -3,10 +3,10 @@ module;
 #include <cstddef>
 #include <optional>
 
-export module Geometry:MeshQuality;
+export module Geometry.MeshQuality;
 
-import :Properties;
-import :HalfedgeMesh;
+import Geometry.Properties;
+import Geometry.HalfedgeMesh;
 
 export namespace Geometry::MeshQuality
 {

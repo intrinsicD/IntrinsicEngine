@@ -6,7 +6,8 @@ module;
 
 export module Graphics.BoundingDebugDraw;
 
-import Geometry;
+import Geometry.AABB;
+import Geometry.OBB;
 import Graphics.DebugDraw;
 
 export namespace Graphics

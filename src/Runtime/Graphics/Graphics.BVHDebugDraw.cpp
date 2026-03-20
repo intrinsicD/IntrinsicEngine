@@ -12,7 +12,7 @@ module;
 module Graphics.BVHDebugDraw;
 
 import Graphics.GpuColor;
-import Geometry;
+import Geometry.AABB;
 
 namespace Graphics
 {
