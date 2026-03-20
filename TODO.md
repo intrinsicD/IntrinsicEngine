@@ -61,8 +61,9 @@ O2 remains the default migration path per `docs/architecture/adr-o2-pragmatic-me
   - [x] Phase 2 follow-through: validate the landed typed system bundles in `Engine::Run()` against the existing lifecycle/resource reclaim baseline.
     - Added `VariableFrameGraphSystemBundle` as the canonical runtime registration path so `RuntimeRenderLaneHost` no longer reassembles core/GPU bundle sequencing inline.
     - Safe checkpoint: lifecycle/resource reclaim tests unchanged.
-  - [ ] Phase 3: Move drag-drop + async load orchestration into streaming service state machine.
-    - [ ] Safe checkpoint: asset ingest completion/integrity metrics unchanged.
+  - [x] Phase 3: Move drag-drop + async load orchestration into streaming service state machine.
+    - `RuntimeStreamingLaneHost` now pumps `AssetIngestService` before main-thread queue/upload maintenance so drag-drop ingest progresses through an explicit streaming-lane state machine instead of ad hoc worker->main-thread callbacks.
+    - Safe checkpoint: frame-loop streaming-order tests updated and asset ingest materialization/spawn finalization remain on the main thread.
   - [ ] Phase 4: Harden typed contracts for hybrid/deferred and post-process factoring.
     - [ ] Safe checkpoint: render-graph validation and pass-contract suites remain green.
 

@@ -78,6 +78,12 @@ namespace Runtime
         self.Timings.CriticalPathNsTotal += graph.GetLastCriticalPathTimeNs();
     }
 
+    void RuntimeStreamingLaneHost::ProcessAssetIngest()
+    {
+        if (m_Ingest)
+            m_Ingest->PumpStreamingStateMachine();
+    }
+
     void RuntimeStreamingLaneHost::ProcessMainThreadQueue()
     {
         m_Assets.ProcessMainThreadQueue();
@@ -105,6 +111,7 @@ namespace Runtime
 
     void StreamingLaneCoordinator::BeginFrame(this const StreamingLaneCoordinator& self)
     {
+        self.Host.ProcessAssetIngest();
         self.Host.ProcessMainThreadQueue();
 
         {

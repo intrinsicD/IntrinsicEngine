@@ -79,7 +79,7 @@ Engine
 
 #### `AssetIngestService`
 
-- **Role:** owns drag-drop ingest and synchronous re-import orchestration so `Engine` no longer hand-assembles those workflows.
+- **Role:** owns drag-drop ingest and synchronous re-import orchestration so `Engine` no longer hand-assembles those workflows. Drag-drop requests are queued immediately, then advanced by the streaming lane as an explicit ingest state machine on the main thread.
 - **Borrows:** device/transfer/geometry/material services plus `AssetPipeline`, `SceneManager`, `IORegistry`, and the active `IIOBackend`.
 - **Coordinates:** path validation, `Graphics::ModelLoader` invocation, asset registration, default material creation, and root `AssetSourceRef` attachment for imported scene entities.
 - **Does not own:** the asset database, GPU platform lifetime, ECS scene lifetime, or render-graph policy.
