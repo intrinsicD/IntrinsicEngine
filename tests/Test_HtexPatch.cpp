@@ -11,12 +11,18 @@ TEST(HtexPatch, BuildPatchMetadataProducesOneEntryPerEdge)
     auto mesh = MakeTetrahedron();
 
     const auto patches = Geometry::HtexPatch::BuildPatchMetadata(mesh);
-    ASSERT_EQ(patches.size(), mesh.EdgeCount());
+    ASSERT_TRUE(patches.has_value());
+    const auto& result = *patches;
+    const auto& metadata = result.Patches;
+    ASSERT_EQ(metadata.size(), mesh.EdgeCount());
+    EXPECT_EQ(result.BoundaryPatchCount, 0u);
+    EXPECT_EQ(result.InteriorPatchCount, mesh.EdgeCount());
+    EXPECT_GE(result.MaxAssignedResolution, 8u);
 
-    for (const auto& patch : patches)
+    for (const auto& patch : metadata)
     {
         EXPECT_LT(patch.EdgeIndex, mesh.EdgesSize());
-        EXPECT_LT(patch.LayerIndex, patches.size());
+        EXPECT_LT(patch.LayerIndex, metadata.size());
         EXPECT_GE(patch.Resolution, 8u);
         EXPECT_LE(patch.Resolution, 128u);
         EXPECT_EQ(patch.Flags & Geometry::HtexPatch::Boundary, 0u);
@@ -30,9 +36,14 @@ TEST(HtexPatch, BoundaryEdgesAreFlaggedAndHaveOneIncidentFace)
     auto mesh = MakeSingleTriangle();
 
     const auto patches = Geometry::HtexPatch::BuildPatchMetadata(mesh);
-    ASSERT_EQ(patches.size(), mesh.EdgeCount());
+    ASSERT_TRUE(patches.has_value());
+    const auto& result = *patches;
+    const auto& metadata = result.Patches;
+    ASSERT_EQ(metadata.size(), mesh.EdgeCount());
+    EXPECT_EQ(result.BoundaryPatchCount, mesh.EdgeCount());
+    EXPECT_EQ(result.InteriorPatchCount, 0u);
 
-    for (const auto& patch : patches)
+    for (const auto& patch : metadata)
     {
         EXPECT_NE(patch.Flags & Geometry::HtexPatch::Boundary, 0u);
 
@@ -40,6 +51,12 @@ TEST(HtexPatch, BoundaryEdgesAreFlaggedAndHaveOneIncidentFace)
         const bool face1Valid = patch.Face1Index != Geometry::HtexPatch::kInvalidIndex;
         EXPECT_NE(face0Valid, face1Valid);
     }
+}
+
+TEST(HtexPatch, BuildPatchMetadataRejectsEmptyMesh)
+{
+    Geometry::Halfedge::Mesh mesh;
+    EXPECT_FALSE(Geometry::HtexPatch::BuildPatchMetadata(mesh).has_value());
 }
 
 TEST(HtexPatch, TriangleToPatchUVReflectsOrientation)

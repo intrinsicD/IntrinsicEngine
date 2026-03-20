@@ -249,14 +249,15 @@ namespace Graphics::Passes
                                                                uint32_t& outWidth,
                                                                uint32_t& outHeight) const
     {
-        const auto patches = Geometry::HtexPatch::BuildPatchMetadata(mesh);
-        if (patches.empty())
+        const auto patchBuild = Geometry::HtexPatch::BuildPatchMetadata(mesh);
+        if (!patchBuild)
         {
             outWidth = 1;
             outHeight = 1;
             outPixels.assign(1, glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
             return false;
         }
+        const auto& patches = patchBuild->Patches;
 
         constexpr uint32_t kTileSize = 16u;
         constexpr uint32_t kMaxColumns = 32u;

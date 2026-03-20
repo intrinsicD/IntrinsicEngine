@@ -5,6 +5,7 @@ module;
 #include <cmath>
 #include <cstdint>
 #include <limits>
+#include <optional>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -43,52 +44,60 @@ namespace Geometry::HtexPatch
             if (!mesh.IsValid(h0))
                 return 0.0;
 
-            std::vector<VertexHandle> verts;
-            verts.reserve(mesh.Valence(f));
-
             HalfedgeHandle h = h0;
             std::size_t safety = 0;
             const std::size_t maxIter = mesh.HalfedgesSize();
+            std::size_t vertexCount = 0;
+            glm::dvec3 p0{0.0};
+            glm::dvec3 prev{0.0};
+            double area = 0.0;
             do
             {
                 const VertexHandle v = mesh.ToVertex(h);
                 if (!mesh.IsValid(v) || mesh.IsDeleted(v))
                 {
-                    verts.clear();
-                    break;
+                    return 0.0;
                 }
 
-                verts.push_back(v);
+                const glm::dvec3 position = glm::dvec3(mesh.Position(v));
+                ++vertexCount;
+                if (vertexCount == 1u)
+                {
+                    p0 = position;
+                }
+                else if (vertexCount == 2u)
+                {
+                    prev = position;
+                }
+                else
+                {
+                    area += 0.5 * glm::length(glm::cross(prev - p0, position - p0));
+                    prev = position;
+                }
+
                 h = mesh.NextHalfedge(h);
                 if (++safety > maxIter)
                 {
-                    verts.clear();
-                    break;
+                    return 0.0;
                 }
             } while (h != h0);
 
-            if (verts.size() < 3u)
+            if (vertexCount < 3u)
                 return 0.0;
-
-            const glm::dvec3 p0 = glm::dvec3(mesh.Position(verts.front()));
-            double area = 0.0;
-            for (std::size_t i = 1; i + 1 < verts.size(); ++i)
-            {
-                const glm::dvec3 p1 = glm::dvec3(mesh.Position(verts[i]));
-                const glm::dvec3 p2 = glm::dvec3(mesh.Position(verts[i + 1]));
-                area += 0.5 * glm::length(glm::cross(p1 - p0, p2 - p0));
-            }
 
             return area;
         }
     }
 
-    std::vector<HalfedgePatchMeta> BuildPatchMetadata(
+    std::optional<PatchBuildResult> BuildPatchMetadata(
         const Halfedge::Mesh& mesh,
         const PatchBuildParams& params)
     {
-        std::vector<HalfedgePatchMeta> patches;
-        patches.reserve(mesh.EdgeCount());
+        if (mesh.EdgeCount() == 0u)
+            return std::nullopt;
+
+        PatchBuildResult result{};
+        result.Patches.reserve(mesh.EdgeCount());
 
         for (std::size_t ei = 0; ei < mesh.EdgesSize(); ++ei)
         {
@@ -105,12 +114,17 @@ namespace Geometry::HtexPatch
             meta.Halfedge1Index = h1.IsValid() ? static_cast<std::uint32_t>(h1.Index) : kInvalidIndex;
             meta.Face0Index = (h0.IsValid() && !mesh.IsBoundary(h0)) ? static_cast<std::uint32_t>(mesh.Face(h0).Index) : kInvalidIndex;
             meta.Face1Index = (h1.IsValid() && !mesh.IsBoundary(h1)) ? static_cast<std::uint32_t>(mesh.Face(h1).Index) : kInvalidIndex;
-            meta.LayerIndex = static_cast<std::uint32_t>(patches.size());
+            meta.LayerIndex = static_cast<std::uint32_t>(result.Patches.size());
             meta.Flags = 0u;
 
             if (!h0.IsValid() || !h1.IsValid() || mesh.IsBoundary(e))
             {
                 meta.Flags |= Boundary;
+                ++result.BoundaryPatchCount;
+            }
+            else
+            {
+                ++result.InteriorPatchCount;
             }
 
             const double area0 = meta.Face0Index != kInvalidIndex ? PolygonArea(mesh, mesh.Face(h0)) : 0.0;
@@ -121,11 +135,15 @@ namespace Geometry::HtexPatch
             {
                 meta.Resolution = std::max<std::uint16_t>(params.MinResolution, 8u);
             }
+            result.MaxAssignedResolution = std::max(result.MaxAssignedResolution, meta.Resolution);
 
-            patches.push_back(meta);
+            result.Patches.push_back(meta);
         }
 
-        return patches;
+        if (result.Patches.empty())
+            return std::nullopt;
+
+        return result;
     }
 
     glm::vec2 TriangleToPatchUV(std::uint32_t halfedgeIndex, glm::vec2 localUV, std::uint32_t twinIndex) noexcept
