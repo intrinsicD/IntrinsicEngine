@@ -8,6 +8,7 @@ export module Graphics.TextureLoader;
 import Graphics.AssetErrors;
 import RHI.Device;
 import RHI.Texture;
+import RHI.TextureFwd;
 import RHI.TextureSystem;
 import RHI.Transfer;
 

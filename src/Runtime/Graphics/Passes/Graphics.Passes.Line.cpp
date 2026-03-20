@@ -32,6 +32,8 @@ import Core.Filesystem;
 
 import ECS;
 
+import RHI.Buffer;
+import RHI.CommandUtils;
 import RHI.Descriptors;
 import RHI.Device;
 import RHI.Pipeline;

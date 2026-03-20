@@ -4,7 +4,6 @@ module;
 #include <array>
 #include <bit>
 #include <cmath>
-#include <cstdint>
 #include <memory>
 #include <optional>
 #include <span>
@@ -32,6 +31,8 @@ import Geometry.Overlap;
 import Geometry.Sphere;
 import Geometry.Properties;
 
+import RHI.Buffer;
+import RHI.CommandUtils;
 import RHI.Descriptors;
 import RHI.Device;
 import RHI.Image;
@@ -83,6 +84,14 @@ namespace Graphics::Passes
             bool Valid = false;
         };
 
+        [[nodiscard]] float TriangleAreaSquared(const HalfedgeTriangle& tri) noexcept
+        {
+            const glm::vec3 e0 = tri.Positions[1] - tri.Positions[0];
+            const glm::vec3 e1 = tri.Positions[2] - tri.Positions[0];
+            const glm::vec3 n = glm::cross(e0, e1);
+            return glm::dot(n, n);
+        }
+
         struct PreviewKMeansData
         {
             Geometry::Property<uint32_t> Labels{};
@@ -94,21 +103,14 @@ namespace Graphics::Passes
             }
         };
 
-        [[nodiscard]] constexpr glm::vec4 UnpackABGR(uint32_t packed) noexcept
+        [[nodiscard]] float VertexLabelScalar(
+            const Geometry::Halfedge::Mesh& mesh,
+            const Geometry::Property<uint32_t>& labels,
+            Geometry::VertexHandle v) noexcept
         {
-            const float r = static_cast<float>(packed & 0xFFu) / 255.0f;
-            const float g = static_cast<float>((packed >> 8) & 0xFFu) / 255.0f;
-            const float b = static_cast<float>((packed >> 16) & 0xFFu) / 255.0f;
-            const float a = static_cast<float>((packed >> 24) & 0xFFu) / 255.0f;
-            return {r, g, b, a};
-        }
-
-        [[nodiscard]] glm::vec4 DarkenBorder(glm::vec4 color) noexcept
-        {
-            color.r *= 0.72f;
-            color.g *= 0.72f;
-            color.b *= 0.72f;
-            return color;
+            if (!v.IsValid() || !mesh.IsValid(v) || mesh.IsDeleted(v) || !labels)
+                return -1.0f;
+            return static_cast<float>(labels[v.Index]);
         }
 
         [[nodiscard]] PreviewKMeansData GetPreviewKMeansData(const Geometry::Halfedge::Mesh& mesh) noexcept
@@ -147,6 +149,19 @@ namespace Graphics::Passes
                 tri.Positions[i] = mesh.Position(tri.Vertices[i]);
             }
 
+            if (tri.Vertices[0] == tri.Vertices[1] || tri.Vertices[1] == tri.Vertices[2] || tri.Vertices[2] == tri.Vertices[0])
+                return {};
+
+            if (!std::isfinite(tri.Positions[0].x) || !std::isfinite(tri.Positions[0].y) || !std::isfinite(tri.Positions[0].z) ||
+                !std::isfinite(tri.Positions[1].x) || !std::isfinite(tri.Positions[1].y) || !std::isfinite(tri.Positions[1].z) ||
+                !std::isfinite(tri.Positions[2].x) || !std::isfinite(tri.Positions[2].y) || !std::isfinite(tri.Positions[2].z))
+            {
+                return {};
+            }
+
+            if (TriangleAreaSquared(tri) <= 1.0e-20f)
+                return {};
+
             tri.Valid = true;
             return tri;
         }
@@ -173,79 +188,72 @@ namespace Graphics::Passes
             return best;
         }
 
-        [[nodiscard]] glm::vec4 KMeansVertexColor(const Geometry::Halfedge::Mesh&,
-                                                  const HalfedgeTriangle& tri,
-                                                  glm::vec2 patchUV,
-                                                  std::uint32_t halfedgeIndex,
-                                                  std::uint32_t twinIndex,
-                                                  const Geometry::Property<uint32_t>& kmeansLabels,
-                                                  const Geometry::Property<glm::vec4>& kmeansColors) noexcept
+        [[nodiscard]] float KMeansVertexScalar(const Geometry::Halfedge::Mesh& mesh,
+                                               const HalfedgeTriangle& tri,
+                                               glm::vec2 patchUV,
+                                               std::uint32_t halfedgeIndex,
+                                               std::uint32_t twinIndex,
+                                               const Geometry::Property<uint32_t>& kmeansLabels) noexcept
         {
             if (!tri.Valid)
-                return glm::vec4(0.0f);
+                return 0.0f;
 
             const glm::vec2 localUV = Geometry::HtexPatch::PatchToTriangleUV(halfedgeIndex, patchUV, twinIndex);
             if (!Geometry::HtexPatch::IsTriangleLocalUV(localUV))
-                return glm::vec4(0.0f);
+                return 0.0f;
 
             const glm::vec3 p = EvaluateTrianglePoint(tri, localUV);
             const std::size_t winner = ClosestTriangleVertex(tri, p);
-            if (kmeansLabels)
-            {
-                return UnpackABGR(Graphics::GpuColor::LabelToColor(
-                    static_cast<int>(kmeansLabels[tri.Vertices[winner].Index])));
-            }
-
-            if (kmeansColors)
-                return kmeansColors[tri.Vertices[winner].Index];
-
-            return glm::vec4(0.0f);
+            return VertexLabelScalar(mesh, kmeansLabels, tri.Vertices[winner]);
         }
 
-        [[nodiscard]] glm::vec4 ComputeTileColorFromPatch(const Geometry::Halfedge::Mesh& mesh,
-                                                          const Geometry::HtexPatch::HalfedgePatchMeta& patch,
-                                                          const PreviewKMeansData& kmeansData) noexcept
+        [[nodiscard]] float ComputeTileScalarFromPatch(const Geometry::Halfedge::Mesh& mesh,
+                                                       const Geometry::HtexPatch::HalfedgePatchMeta& patch,
+                                                       const PreviewKMeansData& kmeansData) noexcept
         {
-            glm::vec4 color = UnpackABGR(Graphics::GpuColor::LabelToColor(static_cast<int>(patch.EdgeIndex)));
-
             const Geometry::HalfedgeHandle h0{static_cast<Geometry::PropertyIndex>(patch.Halfedge0Index)};
             const Geometry::HalfedgeHandle h1{static_cast<Geometry::PropertyIndex>(patch.Halfedge1Index)};
             const bool hasH0 = h0.IsValid() && mesh.IsValid(h0);
             const bool hasH1 = h1.IsValid() && mesh.IsValid(h1);
 
-            if (kmeansData.Colors && hasH0 && hasH1)
+            if (kmeansData.Labels && hasH0)
             {
-                const auto v0 = mesh.ToVertex(h0);
-                const auto v1 = mesh.ToVertex(h1);
-                color = 0.5f * (kmeansData.Colors[v0.Index] + kmeansData.Colors[v1.Index]);
-            }
-            else if (kmeansData.Labels && hasH0)
-            {
-                const auto v0 = mesh.ToVertex(h0);
-                color = UnpackABGR(Graphics::GpuColor::LabelToColor(static_cast<int>(kmeansData.Labels[v0.Index])));
+                const HalfedgeTriangle tri = BuildHalfedgeTriangle(mesh, h0);
+                if (tri.Valid)
+                {
+                    const glm::vec2 centerUV{0.5f, 0.5f};
+                    const float tri0Scalar = KMeansVertexScalar(
+                        mesh,
+                        tri,
+                        centerUV,
+                        patch.Halfedge0Index,
+                        patch.Halfedge1Index,
+                        kmeansData.Labels);
+                    if (tri0Scalar >= 0.0f)
+                    {
+                        return tri0Scalar;
+                    }
+
+                    if (hasH1)
+                    {
+                        const HalfedgeTriangle triTwin = BuildHalfedgeTriangle(mesh, h1);
+                        if (triTwin.Valid)
+                        {
+                            const float tri1Scalar = KMeansVertexScalar(
+                                mesh,
+                                triTwin,
+                                centerUV,
+                                patch.Halfedge1Index,
+                                patch.Halfedge0Index,
+                                kmeansData.Labels);
+                            if (tri1Scalar >= 0.0f)
+                                return tri1Scalar;
+                        }
+                    }
+                }
             }
 
-            if (patch.Flags & Geometry::HtexPatch::Boundary)
-            {
-                color.a = 0.85f;
-                color.r *= 0.88f;
-                color.g *= 0.88f;
-                color.b *= 0.88f;
-            }
-            else
-            {
-                color.a = 1.0f;
-            }
-
-            color = glm::clamp(color, glm::vec4(0.0f), glm::vec4(1.0f));
-            if (!kmeansData.HasAny())
-            {
-                color.r *= 0.92f;
-                color.g *= 0.96f;
-                color.b *= 1.0f;
-            }
-
-            return color;
+            return static_cast<float>(patch.EdgeIndex);
         }
     }
 
@@ -410,7 +418,7 @@ namespace Graphics::Passes
         outHeight = rows * kTileSize;
         outPixels.assign(static_cast<size_t>(outWidth) * static_cast<size_t>(outHeight), glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
         const PreviewKMeansData kmeansData = GetPreviewKMeansData(mesh);
-        const bool hasPerTexelKMeans = kmeansData.HasAny();
+        const bool hasPerTexelKMeans = static_cast<bool>(kmeansData.Labels);
 
         for (std::size_t i = 0; i < patches.size(); ++i)
         {
@@ -418,13 +426,7 @@ namespace Graphics::Passes
             const uint32_t px = static_cast<uint32_t>(i % columns) * kTileSize;
             const uint32_t py = static_cast<uint32_t>(i / columns) * kTileSize;
 
-            glm::vec4 color = ComputeTileColorFromPatch(mesh, patch, kmeansData);
-            const float resFactor = std::clamp(static_cast<float>(patch.Resolution) / 128.0f, 0.0f, 1.0f);
-            const float scale = 0.70f + 0.30f * resFactor;
-            color.r *= scale;
-            color.g *= scale;
-            color.b *= scale;
-            color = glm::clamp(color, glm::vec4(0.0f), glm::vec4(1.0f));
+            const float scalar = ComputeTileScalarFromPatch(mesh, patch, kmeansData);
 
             const Geometry::HalfedgeHandle h0{static_cast<Geometry::PropertyIndex>(patch.Halfedge0Index)};
             const Geometry::HalfedgeHandle h1{static_cast<Geometry::PropertyIndex>(patch.Halfedge1Index)};
@@ -435,40 +437,34 @@ namespace Graphics::Passes
             {
                 for (uint32_t x = 0; x < kTileSize; ++x)
                 {
-                    glm::vec4 texel = color;
+                    float texelScalar = scalar;
                     if (hasPerTexelKMeans)
                     {
                         const glm::vec2 patchUV{(static_cast<float>(x) + 0.5f) / static_cast<float>(kTileSize),
                                                 (static_cast<float>(y) + 0.5f) / static_cast<float>(kTileSize)};
 
-                        const glm::vec4 tri0Color = KMeansVertexColor(
+                        const float tri0Scalar = KMeansVertexScalar(
                             mesh,
                             tri0,
                             patchUV,
                             patch.Halfedge0Index,
                             patch.Halfedge1Index,
-                            kmeansData.Labels,
-                            kmeansData.Colors);
-                        const glm::vec4 tri1Color = KMeansVertexColor(
+                            kmeansData.Labels);
+                        const float tri1Scalar = KMeansVertexScalar(
                             mesh,
                             tri1,
                             patchUV,
                             patch.Halfedge1Index,
                             patch.Halfedge0Index,
-                            kmeansData.Labels,
-                            kmeansData.Colors);
+                            kmeansData.Labels);
 
-                        if (tri0Color.a > 0.0f)
-                            texel = tri0Color;
-                        else if (tri1Color.a > 0.0f)
-                            texel = tri1Color;
+                        if (tri0Scalar >= 0.0f)
+                            texelScalar = tri0Scalar;
+                        else if (tri1Scalar >= 0.0f)
+                            texelScalar = tri1Scalar;
                     }
 
-                    if (x == 0u || y == 0u || x + 1u == kTileSize || y + 1u == kTileSize)
-                        texel = DarkenBorder(texel);
-                    else if (std::abs((static_cast<float>(x) + static_cast<float>(y) + 1.0f) -
-                                      static_cast<float>(kTileSize)) <= 0.75f)
-                        texel = DarkenBorder(texel);
+                    const glm::vec4 texel{texelScalar, 0.0f, 0.0f, 1.0f};
 
                     const size_t dst = static_cast<size_t>(py + y) * static_cast<size_t>(outWidth) + static_cast<size_t>(px + x);
                     outPixels[dst] = texel;

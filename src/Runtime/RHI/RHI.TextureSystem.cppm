@@ -7,7 +7,7 @@ module;
 export module RHI.TextureSystem;
 
 import RHI.Device;
-import RHI.Texture;
+import RHI.TextureFwd;
 import RHI.Bindless;
 import Core.Handle;       // For Core::StrongHandle (via TextureHandle)
 import Core.ResourcePool; // For Core::ResourcePool

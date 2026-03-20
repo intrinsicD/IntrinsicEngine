@@ -34,7 +34,6 @@ import Graphics.Geometry;
 import Graphics.OctreeDebugDraw;
 import Graphics.PropertyEnumerator;
 import Graphics.VisualizationConfig;
-import Geometry;
 import Core.Logging;
 
 #include "Graphics.LifecycleUtils.hpp"

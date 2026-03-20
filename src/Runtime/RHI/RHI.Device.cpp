@@ -73,9 +73,6 @@ namespace RHI
             }
         }
 
-        // Create transient allocator AFTER device creation (it owns VkDeviceMemory pages).
-        m_TransientAllocator = std::make_unique<TransientAllocator>(*this);
-
         CreateCommandPool();
     }
 
@@ -126,9 +123,6 @@ namespace RHI
             vkDestroySemaphore(m_Device, m_GraphicsTimelineSemaphore, nullptr);
             m_GraphicsTimelineSemaphore = VK_NULL_HANDLE;
         }
-
-        // 3) Destroy transient allocator pages (raw VkDeviceMemory pages).
-        m_TransientAllocator.reset();
 
         // 4) One more flush in case any destructors enqueued work during step (3).
         FlushAllDeletionQueues();

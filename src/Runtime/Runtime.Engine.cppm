@@ -18,7 +18,9 @@ import Core.FeatureRegistry;
 import Core.IOBackend;
 import Core.Benchmark;
 import RHI.Buffer;
+#ifdef INTRINSIC_HAS_CUDA
 import RHI.CudaDevice;
+#endif
 import RHI.Descriptors;
 import RHI.Device;
 import RHI.Swapchain;

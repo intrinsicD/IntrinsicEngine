@@ -29,6 +29,7 @@ target_sources(${target_name}
         RHI.Image.cppm
         RHI.Texture.cppm
         RHI.TextureSystem.cppm
+        RHI.TextureFwd.cppm
         RHI.Transfer.cppm
         RHI.StagingBelt.cppm
         RHI.TransientAllocator.cppm

@@ -7,38 +7,42 @@ module;
 module RHI.Texture;
 import RHI.Device;
 import RHI.TextureSystem;
+import RHI.TextureFwd;
 import RHI.Image;
 import Core.Logging;
 
 namespace RHI
 {
-    void CreateDefaultSampler(VulkanDevice& device, uint32_t mipLevels, VkSampler& outSampler)
+    namespace
     {
-        VkSamplerCreateInfo samplerInfo{};
-        samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-        samplerInfo.magFilter = VK_FILTER_LINEAR;
-        samplerInfo.minFilter = VK_FILTER_LINEAR;
-        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-        samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        samplerInfo.anisotropyEnable = VK_TRUE;
-
-        VkPhysicalDeviceProperties properties{};
-        vkGetPhysicalDeviceProperties(device.GetPhysicalDevice(), &properties);
-        samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
-
-        samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-        samplerInfo.unnormalizedCoordinates = VK_FALSE;
-        samplerInfo.compareEnable = VK_FALSE;
-        samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-        samplerInfo.minLod = 0.0f;
-        samplerInfo.maxLod = static_cast<float>(mipLevels);
-
-        if (vkCreateSampler(device.GetLogicalDevice(), &samplerInfo, nullptr, &outSampler) != VK_SUCCESS)
+        void CreateDefaultSampler(VulkanDevice& device, uint32_t mipLevels, VkSampler& outSampler)
         {
-            Core::Log::Error("Failed to create texture sampler!");
-            outSampler = VK_NULL_HANDLE;
+            VkSamplerCreateInfo samplerInfo{};
+            samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+            samplerInfo.magFilter = VK_FILTER_LINEAR;
+            samplerInfo.minFilter = VK_FILTER_LINEAR;
+            samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+            samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+            samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+            samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+            samplerInfo.anisotropyEnable = VK_TRUE;
+
+            VkPhysicalDeviceProperties properties{};
+            vkGetPhysicalDeviceProperties(device.GetPhysicalDevice(), &properties);
+            samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
+
+            samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+            samplerInfo.unnormalizedCoordinates = VK_FALSE;
+            samplerInfo.compareEnable = VK_FALSE;
+            samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+            samplerInfo.minLod = 0.0f;
+            samplerInfo.maxLod = static_cast<float>(mipLevels);
+
+            if (vkCreateSampler(device.GetLogicalDevice(), &samplerInfo, nullptr, &outSampler) != VK_SUCCESS)
+            {
+                Core::Log::Error("Failed to create texture sampler!");
+                outSampler = VK_NULL_HANDLE;
+            }
         }
     }
 

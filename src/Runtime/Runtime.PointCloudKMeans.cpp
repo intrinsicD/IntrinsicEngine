@@ -5,7 +5,6 @@ module;
 #include <chrono>
 #include <cmath>
 #include <cstddef>
-#include <cstdint>
 #include <limits>
 #include <numeric>
 #include <optional>
@@ -153,7 +152,7 @@ namespace Runtime::PointCloudKMeans
             return centroids;
         }
 
-        [[nodiscard]] std::vector<glm::vec3> InitializeCentroids(
+        [[nodiscard]] [[maybe_unused]] std::vector<glm::vec3> InitializeCentroids(
             std::span<const glm::vec3> points,
             const Geometry::KMeans::Params& params,
             uint32_t k)
@@ -312,6 +311,12 @@ namespace Runtime::PointCloudKMeans
             default:
                 break;
             }
+        }
+
+        void MarkVertexAttributesDirty(entt::registry& reg, entt::entity entity)
+        {
+            if (reg.valid(entity))
+                reg.emplace_or_replace<ECS::DirtyTag::VertexAttributes>(entity);
         }
 
         void MarkPending(ResolvedTarget& target,
@@ -707,7 +712,7 @@ namespace Runtime::PointCloudKMeans
             return false;
         }
 
-        reg.emplace_or_replace<ECS::DirtyTag::VertexAttributes>(entity);
+        MarkVertexAttributesDirty(reg, entity);
         engine.GetScene().GetDispatcher().enqueue<ECS::Events::GeometryModified>({entity});
         return true;
     }

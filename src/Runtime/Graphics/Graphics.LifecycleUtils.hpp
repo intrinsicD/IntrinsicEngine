@@ -9,7 +9,7 @@
 //
 // Requires the including TU to have imported:
 //   import Graphics.Geometry;  (for GeometryGpuData, GeometryPool)
-//   import Geometry;    (for Geometry::GeometryHandle)
+//   import Geometry.Handle;    (for Geometry::GeometryHandle)
 //   import Graphics.GPUScene;  (for GPUScene, GPUSceneConstants, GpuInstanceData)
 //   import Graphics.Components; (for ECS component types)
 //   import ECS;                (for Transform, Selection components)

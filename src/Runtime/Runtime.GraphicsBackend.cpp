@@ -9,13 +9,16 @@ import Core.Logging;
 import Core.Window;
 import RHI.Bindless;
 import RHI.Context;
+#ifdef INTRINSIC_HAS_CUDA
 import RHI.CudaDevice;
 import RHI.CudaError;
+#endif
 import RHI.Descriptors;
 import RHI.Device;
 import RHI.Renderer;
 import RHI.Swapchain;
 import RHI.Texture;
+import RHI.TextureFwd;
 import RHI.TextureSystem;
 import RHI.Transfer;
 
@@ -203,7 +206,9 @@ namespace Runtime
 
         // Bindless slot 0 is reserved for the default/error texture.
         m_DefaultTextureIndex = 0;
-        m_BindlessSystem->SetTexture(m_DefaultTextureIndex, *m_DefaultTexture);
+        m_BindlessSystem->SetTexture(m_DefaultTextureIndex,
+                                     m_DefaultTexture->GetView(),
+                                     m_DefaultTexture->GetSampler());
 
         // Plumb default descriptor into the TextureSystem so freed slots become safe to sample.
         m_TextureSystem->SetDefaultDescriptor(m_DefaultTexture->GetView(), m_DefaultTexture->GetSampler());

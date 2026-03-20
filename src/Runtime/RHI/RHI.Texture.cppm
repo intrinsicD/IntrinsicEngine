@@ -1,34 +1,17 @@
 module;
 #include "RHI.Vulkan.hpp"
-#include <string>
-#include <vector>
 #include <memory>
 
 export module RHI.Texture;
 
 import RHI.Device;
+import RHI.TextureSystem;
+import RHI.TextureFwd;
 import RHI.Image;
 import Core.Handle; // For Core::StrongHandle
 
 export namespace RHI
 {
-    // Forward declare the System
-    class TextureSystem;
-
-    struct TextureTag {};
-    using TextureHandle = Core::StrongHandle<TextureTag>;
-
-    // Heavy GPU data (lives in TextureSystem pool)
-    struct TextureGpuData
-    {
-        std::unique_ptr<VulkanImage> Image;
-        VkSampler Sampler = VK_NULL_HANDLE;
-
-        // Shader-visible stable index into the global bindless texture array.
-        // NOTE: This is intentionally NOT TextureHandle::Index because pool indices can be reused.
-        uint32_t BindlessSlot = 0;
-    };
-
     // Public RAII handle held by AssetManager (via shared_ptr<T> slot).
     // Move-only: asset lifetime/sharing is managed by AssetManager, not by copying Texture objects.
     class Texture
@@ -65,8 +48,4 @@ export namespace RHI
         VulkanDevice* m_Device = nullptr;
         TextureHandle m_Handle{};
     };
-
-    // Shared sampler creation helper used by Texture and TextureSystem.
-    // Creates a linear-filtered, anisotropic, repeat-addressing sampler.
-    void CreateDefaultSampler(VulkanDevice& device, uint32_t mipLevels, VkSampler& outSampler);
 }

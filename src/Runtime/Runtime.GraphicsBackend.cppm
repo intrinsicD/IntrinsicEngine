@@ -11,7 +11,9 @@ import Core.Window;
 import Core.Logging;
 import RHI.Bindless;
 import RHI.Context;
+#ifdef INTRINSIC_HAS_CUDA
 import RHI.CudaDevice;
+#endif
 import RHI.Descriptors;
 import RHI.Device;
 import RHI.Renderer;

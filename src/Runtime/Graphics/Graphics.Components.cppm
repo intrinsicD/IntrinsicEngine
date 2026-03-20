@@ -15,7 +15,16 @@ export module Graphics.Components;
 import Graphics.Geometry;
 import Graphics.Material;
 import Graphics.VisualizationConfig;
-import Geometry;
+
+import Geometry.BVH;
+import Geometry.HalfedgeMesh;
+import Geometry.Graph;
+import Geometry.PointCloud;
+import Geometry.Handle;
+import Geometry.KMeans;
+import Geometry.OBB;
+import Geometry.AABB;
+
 import Core.Assets;
 #ifdef INTRINSIC_HAS_CUDA
 import RHI.CudaDevice;

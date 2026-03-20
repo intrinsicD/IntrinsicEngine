@@ -12,10 +12,15 @@ module;
 module Graphics.Systems.PrimitiveBVHSync;
 
 import Graphics.Components;
+import Geometry.AABB;
+import Geometry.HalfedgeMesh;
+import Geometry.Graph;
+import Geometry.PointCloud;
+import Geometry.Properties;
 
 import Core.Hash;
 import Core.FrameGraph;
-import Geometry;
+
 import ECS;
 
 using namespace Core::Hash;

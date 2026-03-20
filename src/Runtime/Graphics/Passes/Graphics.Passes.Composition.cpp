@@ -24,6 +24,8 @@ import Core.Filesystem;
 import Core.Hash;
 import Core.Logging;
 
+import RHI.Buffer;
+import RHI.CommandUtils;
 import RHI.Descriptors;
 import RHI.Device;
 import RHI.Image;

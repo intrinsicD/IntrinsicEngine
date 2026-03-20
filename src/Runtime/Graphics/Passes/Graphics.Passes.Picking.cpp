@@ -34,6 +34,8 @@ import Core.Logging;
 
 import ECS;
 
+import RHI.Buffer;
+import RHI.CommandUtils;
 import RHI.Pipeline;
 
 #include "Graphics.PassUtils.hpp"

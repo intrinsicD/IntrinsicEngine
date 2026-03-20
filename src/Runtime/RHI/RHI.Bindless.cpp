@@ -7,7 +7,6 @@ module;
 
 module RHI.Bindless;
 import RHI.Device;
-import RHI.Texture;
 import Core.Logging;
 
 namespace RHI
@@ -108,9 +107,9 @@ namespace RHI
         VK_CHECK(vkAllocateDescriptorSets(m_Device.GetLogicalDevice(), &allocInfo, &m_GlobalSet));
     }
 
-    void BindlessDescriptorSystem::SetTexture(uint32_t index, const Texture& texture)
+    void BindlessDescriptorSystem::SetTexture(uint32_t index, VkImageView view, VkSampler sampler, VkImageLayout layout)
     {
-        EnqueueUpdate(index, texture.GetView(), texture.GetSampler(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        EnqueueUpdate(index, view, sampler, layout);
     }
 
     void BindlessDescriptorSystem::EnqueueUpdate(uint32_t index, VkImageView view, VkSampler sampler, VkImageLayout layout)

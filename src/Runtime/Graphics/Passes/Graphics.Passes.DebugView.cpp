@@ -24,6 +24,8 @@ import Core.Logging;
 import Core.Filesystem;
 
 import RHI.Descriptors;
+import RHI.Buffer;
+import RHI.CommandUtils;
 import RHI.Device;
 import RHI.Image;
 import RHI.Pipeline;

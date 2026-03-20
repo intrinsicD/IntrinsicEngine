@@ -20,7 +20,7 @@ import Core.InplaceFunction;
 //      Use when the object's lifetime is strictly shorter than the device's.
 //      This is the common case for per-frame or per-pass objects that are
 //      created after device initialization and destroyed before device teardown.
-//      Examples: TransientAllocator, DescriptorLayout, DescriptorAllocator,
+//      Examples: DescriptorLayout, DescriptorAllocator,
 //      render passes, RHI resource wrappers (Buffer, Image, Shader, etc.).
 //
 //   2. Shared ownership (std::shared_ptr<VulkanDevice>):
@@ -35,8 +35,6 @@ import Core.InplaceFunction;
 
 namespace RHI
 {
-    export class TransientAllocator;
-
     export struct QueueFamilyIndices
     {
         std::optional<uint32_t> GraphicsFamily;
@@ -180,9 +178,6 @@ namespace RHI
         bool IsDeviceSuitable(VkPhysicalDevice device);
         QueueFamilyIndices FindQueueFamilies(VkPhysicalDevice device);
         bool CheckDeviceExtensionSupport(VkPhysicalDevice device);
-
-        // Device-owned transient allocator (lifetime managed by unique_ptr).
-        std::unique_ptr<TransientAllocator> m_TransientAllocator;
 
         // Timeline semaphore to track completion on the graphics queue.
         VkSemaphore m_GraphicsTimelineSemaphore = VK_NULL_HANDLE;

@@ -29,6 +29,8 @@ import Geometry.Frustum;
 import Geometry.Overlap;
 import Geometry.Sphere;
 
+import RHI.Buffer;
+import RHI.CommandUtils;
 import RHI.Descriptors;
 import RHI.Device;
 import RHI.Image;

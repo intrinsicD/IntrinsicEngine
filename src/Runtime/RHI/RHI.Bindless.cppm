@@ -6,7 +6,6 @@ module;
 export module RHI.Bindless;
 
 import RHI.Device;
-import RHI.Texture;
 
 export namespace RHI
 {
@@ -17,8 +16,9 @@ export namespace RHI
 
         ~BindlessDescriptorSystem();
 
-        // Legacy convenience: queues an update.
-        void SetTexture(uint32_t index, const Texture& texture);
+        // Legacy convenience: queues an update from raw Vulkan image state.
+        void SetTexture(uint32_t index, VkImageView view, VkSampler sampler,
+                        VkImageLayout layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
         // Queue a descriptor update. Thread-safe.
         // The update is applied on the next call to FlushPending().
