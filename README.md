@@ -77,7 +77,7 @@ A **"Distinguished Scientist" grade** geometry kernel in `src/Runtime/Geometry/`
   publish their outputs as persistent mesh properties in addition to returning vectors/diagnostics.
   Examples: `v:mean_curvature`, `v:gaussian_curvature`, `v:mean_curvature_normal`,
   `v:geodesic_distance`, `v:is_geodesic_source`, `v:texcoord`, and `v:lscm_pinned`.
-- **KMeans Htex Scalar Atlas:** the Htex preview path consumes mesh `v:kmeans_*` properties and bakes a float scalar atlas, where each texel samples its enclosing triangle and resolves to the closest triangle vertex label. The atlas is intentionally scalar-field data so the existing UI colormap/debug-view path can colorize it downstream; degenerate / non-finite triangles are rejected.
+- **KMeans Htex Scalar Atlas:** the Htex preview path consumes mesh `v:kmeans_*` properties and bakes a float scalar atlas, where each texel samples its enclosing triangle in object space and classifies that sample against reconstructed cluster centroids. This preserves the expected centroidal Voronoi-style structure instead of reusing per-triangle nearest-vertex partitions. The atlas is intentionally scalar-field data so the existing UI colormap/debug-view path can colorize it downstream; degenerate / non-finite triangles are rejected.
 - **Shortest Path:** `Geometry::ShortestPath::Dijkstra()` now supports both `Halfedge::Mesh` and `Graph::Graph`
   with the same multi-source / multi-target contract. It writes persistent vertex properties
   (`v:shortest_path_distance`, `v:shortest_path_predecessor`) so path trees can be visualized or reused after
