@@ -4,7 +4,7 @@ module;
 #include <vector>
 #include <cstdint>
 
-export module Graphics:PropertyEnumerator;
+export module Graphics.PropertyEnumerator;
 
 import Geometry;
 

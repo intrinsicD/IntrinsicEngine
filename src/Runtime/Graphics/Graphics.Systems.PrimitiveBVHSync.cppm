@@ -2,7 +2,7 @@ module;
 
 #include <entt/fwd.hpp>
 
-export module Graphics:Systems.PrimitiveBVHSync;
+export module Graphics.Systems.PrimitiveBVHSync;
 
 import Core.FrameGraph;
 

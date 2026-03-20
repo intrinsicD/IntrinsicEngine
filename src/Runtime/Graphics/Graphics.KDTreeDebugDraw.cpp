@@ -7,9 +7,10 @@ module;
 
 #include <glm/glm.hpp>
 
-module Graphics:KDTreeDebugDraw.Impl;
+module Graphics.KDTreeDebugDraw;
 
-import :KDTreeDebugDraw;
+import Graphics.GpuColor;
+
 
 namespace Graphics
 {

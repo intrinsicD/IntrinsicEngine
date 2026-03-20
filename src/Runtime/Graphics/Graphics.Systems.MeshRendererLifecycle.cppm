@@ -2,13 +2,13 @@ module;
 
 #include <entt/fwd.hpp>
 
-export module Graphics:Systems.MeshRendererLifecycle;
+export module Graphics.Systems.MeshRendererLifecycle;
 
 import Core.Assets;
 import Core.FrameGraph;
-import :Geometry;
-import :GPUScene;
-import :MaterialSystem;
+import Graphics.Geometry;
+import Graphics.GPUScene;
+import Graphics.MaterialSystem;
 
 export namespace Graphics::Systems::MeshRendererLifecycle
 {

@@ -6,9 +6,8 @@ module;
 #include <vector>
 #include "RHI.Vulkan.hpp"
 
-module Graphics:Interaction.Impl;
+module Graphics.Interaction;
 
-import :Interaction;
 import RHI;
 import Core.Hash;
 

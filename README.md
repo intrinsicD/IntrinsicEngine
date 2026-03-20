@@ -18,6 +18,7 @@ Built on **C++23 Modules**, **Vulkan 1.3** bindless rendering, coroutine-based t
 ### 1. Core Systems & Concurrency
 
 - **C++23 Modular Design:** Strict interface boundaries using `.cppm` partitions. `std::expected` for monadic error handling. No exceptions (`-fno-exceptions`).
+  - Prefer narrow named-module imports in implementation units; avoid umbrella imports when a file only needs a small surface (for example, use `Geometry:Handle` for handle-only code paths instead of importing the full `Geometry` module).
 - **Zero-Overhead Memory:**
   - `LinearArena` — O(1) monotonic frame allocator with O(1) bulk deallocation.
   - `ScopeStack` — LIFO allocator with destructor support for complex per-frame objects.

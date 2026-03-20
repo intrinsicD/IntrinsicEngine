@@ -14,13 +14,13 @@ module;
 #include <entt/entity/registry.hpp>
 #include "RHI.Vulkan.hpp"
 
-module Graphics:Passes.SelectionOutline.Impl;
+module Graphics.Passes.SelectionOutline;
 
-import :Passes.SelectionOutline;
-import :Components;
-import :RenderPipeline;
-import :RenderGraph;
-import :ShaderRegistry;
+import Graphics.Components;
+import Graphics.RenderPipeline;
+import Graphics.RenderGraph;
+import Graphics.ShaderRegistry;
+import Geometry;
 import Core.Hash;
 import Core.Logging;
 import Core.Filesystem;

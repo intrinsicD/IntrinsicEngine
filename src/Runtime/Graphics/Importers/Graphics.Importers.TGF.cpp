@@ -9,11 +9,10 @@ module;
 #include <glm/glm.hpp>
 #include "Graphics.Importers.TextParse.hpp"
 
-module Graphics:Importers.TGF.Impl;
-import :Importers.TGF;
-import :IORegistry;
-import :Geometry;
-import :AssetErrors;
+module Graphics.Importers.TGF;
+import Graphics.IORegistry;
+import Graphics.Geometry;
+import Graphics.AssetErrors;
 
 namespace Graphics
 {

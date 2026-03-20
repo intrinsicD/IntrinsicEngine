@@ -6,9 +6,8 @@ module;
 
 #include <glm/glm.hpp>
 
-module Graphics:PropertyEnumerator.Impl;
+module Graphics.PropertyEnumerator;
 
-import :PropertyEnumerator;
 import Geometry;
 
 using namespace Graphics;

@@ -4,17 +4,17 @@ module;
 #include <span>
 #include <string_view>
 
-export module Graphics:Importers.OBJ;
+export module Graphics.Importers.OBJ;
 
-import :IORegistry;
-import :AssetErrors;
+import Graphics.IORegistry;
+import Graphics.AssetErrors;
 
 export namespace Graphics
 {
     class OBJLoader final : public IAssetLoader
     {
     public:
-        ~OBJLoader() override;
+        ~OBJLoader() override = default;
 
         [[nodiscard]] std::string_view FormatName() const override { return "Wavefront OBJ"; }
         [[nodiscard]] std::span<const std::string_view> Extensions() const override;

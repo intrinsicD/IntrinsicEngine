@@ -6,9 +6,8 @@ module;
 #include <cstring>
 #include "RHI.Vulkan.hpp"
 
-module Graphics:TextureLoader.Impl;
-import :TextureLoader;
-import :AssetErrors;
+module Graphics.TextureLoader;
+import Graphics.AssetErrors;
 
 import RHI;
 

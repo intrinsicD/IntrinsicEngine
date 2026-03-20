@@ -9,7 +9,8 @@ export module Runtime.Selection;
 
 import ECS;
 import Geometry;
-import Graphics;
+import Graphics.Components;
+import Graphics.Camera;
 
 export namespace Runtime::Selection
 {

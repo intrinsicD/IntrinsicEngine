@@ -5,10 +5,9 @@ module;
 #include <cmath>
 #include <algorithm>
 
-module Graphics:Colormap.Impl;
+module Graphics.Colormap;
 
-import :Colormap;
-import :GpuColor;
+import Graphics.GpuColor;
 
 using namespace Graphics;
 

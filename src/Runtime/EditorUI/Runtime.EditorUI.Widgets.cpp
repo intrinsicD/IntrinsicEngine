@@ -25,8 +25,15 @@ module Runtime.EditorUI;
 import Runtime.Engine;
 import Runtime.GraphicsBackend;
 import Runtime.PointCloudKMeans;
+import Graphics.Components;
+import Graphics.GPUScene;
 import ECS;
-import Graphics;
+import Graphics.Colormap;
+import Graphics.GpuColor;
+import Graphics.Geometry;
+import Graphics.OctreeDebugDraw;
+import Graphics.PropertyEnumerator;
+import Graphics.VisualizationConfig;
 import Geometry;
 import Core.Logging;
 

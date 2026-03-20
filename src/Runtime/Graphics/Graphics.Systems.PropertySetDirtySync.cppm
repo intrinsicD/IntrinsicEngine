@@ -2,7 +2,7 @@ module;
 
 #include <entt/fwd.hpp>
 
-export module Graphics:Systems.PropertySetDirtySync;
+export module Graphics.Systems.PropertySetDirtySync;
 
 import Core.FrameGraph;
 

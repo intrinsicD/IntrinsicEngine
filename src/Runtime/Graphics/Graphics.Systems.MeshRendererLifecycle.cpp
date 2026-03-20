@@ -3,20 +3,20 @@ module;
 #include <glm/glm.hpp>
 #include <entt/entity/registry.hpp>
 
-module Graphics:Systems.MeshRendererLifecycle.Impl;
+module Graphics.Systems.MeshRendererLifecycle;
 
-import :Systems.MeshRendererLifecycle;
-import :GPUScene;
+import Graphics.GPUScene;
 
-import :Components;
-import :Material;
-import :Geometry;
+import Graphics.Components;
+import Graphics.Material;
+import Graphics.Geometry;
 
 import Core.Hash;
 import Core.Assets;
 import Core.FrameGraph;
 import Core.Logging;
 import ECS;
+import Geometry;
 
 #include "Graphics.LifecycleUtils.hpp"
 

@@ -12,11 +12,10 @@ module;
 #include "Graphics.Importers.TextParse.hpp"
 #include "Graphics.Importers.TriangulationUtils.hpp"
 
-module Graphics:Importers.OBJ.Impl;
-import :Importers.OBJ;
-import :IORegistry;
-import :Geometry;
-import :AssetErrors;
+module Graphics.Importers.OBJ;
+import Graphics.IORegistry;
+import Graphics.Geometry;
+import Graphics.AssetErrors;
 import Geometry;
 
 #include "Graphics.Importers.PostProcess.hpp"

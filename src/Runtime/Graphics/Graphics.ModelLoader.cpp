@@ -27,17 +27,16 @@ module;
 // Optional: enable verbose import-time logging.
 // #define INTRINSIC_MODELLOADER_VERBOSE 1
 
-module Graphics:ModelLoader.Impl;
+module Graphics.ModelLoader;
 
-import :ModelLoader;
-import :AssetErrors;
-import :Model;
-import :IORegistry;
+import Graphics.AssetErrors;
+import Graphics.Model;
+import Graphics.IORegistry;
 import Core.IOBackend;
 import Core.Filesystem;
 import Core.Logging;
 import RHI;
-import :Geometry;
+import Graphics.Geometry;
 import Geometry;
 
 #include "Importers/Graphics.Importers.AttributeVertexKey.hpp"

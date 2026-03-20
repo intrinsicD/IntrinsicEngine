@@ -8,10 +8,11 @@
 // Not part of any exported module interface.
 //
 // Requires the including TU to have imported:
-//   import :Geometry;   (for GeometryGpuData, GeometryPool)
-//   import :GPUScene;   (for GPUScene, GPUSceneConstants, GpuInstanceData)
-//   import :Components; (for ECS component types)
-//   import ECS;         (for Transform, Selection components)
+//   import Graphics.Geometry;  (for GeometryGpuData, GeometryPool)
+//   import Geometry;    (for Geometry::GeometryHandle)
+//   import Graphics.GPUScene;  (for GPUScene, GPUSceneConstants, GpuInstanceData)
+//   import Graphics.Components; (for ECS component types)
+//   import ECS;                (for Transform, Selection components)
 //   #include <glm/glm.hpp>
 //   #include <entt/entity/registry.hpp>
 // =============================================================================

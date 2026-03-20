@@ -4,7 +4,7 @@ module;
 #include <unordered_map>
 #include <optional>
 
-export module Graphics:ShaderRegistry;
+export module Graphics.ShaderRegistry;
 
 import Core.Hash;
 

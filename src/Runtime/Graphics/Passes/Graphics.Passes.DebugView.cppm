@@ -6,11 +6,11 @@ module;
 
 #include "RHI.Vulkan.hpp"
 
-export module Graphics:Passes.DebugView;
+export module Graphics.Passes.DebugView;
 
-import :RenderPipeline;
-import :RenderGraph;
-import :ShaderRegistry;
+import Graphics.RenderPipeline;
+import Graphics.RenderGraph;
+import Graphics.ShaderRegistry;
 import Core.Hash;
 import Interface;
 import RHI;

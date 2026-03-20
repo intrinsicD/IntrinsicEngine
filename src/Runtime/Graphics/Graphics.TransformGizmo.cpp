@@ -13,10 +13,9 @@ module;
 #include <glm/gtx/quaternion.hpp>
 #include <entt/entity/registry.hpp>
 
-module Graphics:TransformGizmo.Impl;
+module Graphics.TransformGizmo;
 
-import :TransformGizmo;
-import :Camera;
+import Graphics.Camera;
 import ECS;
 import Core.Input;
 

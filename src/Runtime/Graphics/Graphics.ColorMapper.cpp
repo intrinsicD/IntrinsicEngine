@@ -10,12 +10,11 @@ module;
 
 #include <glm/glm.hpp>
 
-module Graphics:ColorMapper.Impl;
+module Graphics.ColorMapper;
 
-import :ColorMapper;
-import :Colormap;
-import :GpuColor;
-import :VisualizationConfig;
+import Graphics.Colormap;
+import Graphics.GpuColor;
+import Graphics.VisualizationConfig;
 import Geometry;
 
 using namespace Graphics;

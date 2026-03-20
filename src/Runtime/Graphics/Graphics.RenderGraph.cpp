@@ -9,9 +9,8 @@ module;
 #include <algorithm>
 #include <utility>
 
-module Graphics:RenderGraph.Impl;
+module Graphics.RenderGraph;
 
-import :RenderGraph;
 import Core.Hash;
 import Core.Memory;
 import Core.Logging;

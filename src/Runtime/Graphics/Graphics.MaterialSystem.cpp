@@ -3,9 +3,8 @@ module;
 #include <mutex>
 #include <string_view>
 
-module Graphics:MaterialSystem.Impl;
-import :MaterialSystem;
-import :Material;
+module Graphics.Material;
+
 import Core.Assets;
 import Core.Logging;
 import RHI;

@@ -9,9 +9,9 @@ module;
 #include <glm/glm.hpp>
 #include <entt/entity/registry.hpp>
 
-export module Graphics:VectorFieldManager;
+export module Graphics.VectorFieldManager;
 
-import :VisualizationConfig;
+import Graphics.VisualizationConfig;
 import Geometry;
 
 // =============================================================================

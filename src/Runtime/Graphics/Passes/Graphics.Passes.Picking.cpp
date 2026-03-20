@@ -13,14 +13,15 @@ module;
 #include <entt/entity/registry.hpp>
 #include "RHI.Vulkan.hpp"
 
-module Graphics:Passes.Picking.Impl;
+module Graphics.Passes.Picking;
 
-import :Passes.Picking;
 
-import :RenderPipeline;
-import :RenderGraph;
-import :Components;
-import :Geometry;
+import Graphics.RenderPipeline;
+import Graphics.RenderGraph;
+import Graphics.Components;
+import Graphics.Geometry;
+import Graphics.ShaderRegistry;
+import Geometry;
 import Core.Filesystem;
 import Core.Hash;
 import Core.Logging;

@@ -9,7 +9,7 @@ module;
 
 #include "RHI.Vulkan.hpp"
 
-export module Graphics:GPUScene;
+export module Graphics.GPUScene;
 
 import RHI;
 

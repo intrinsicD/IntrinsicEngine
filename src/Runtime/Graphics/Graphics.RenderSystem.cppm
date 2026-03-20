@@ -6,22 +6,23 @@ module;
 
 #include "RHI.Vulkan.hpp"
 
-export module Graphics:RenderSystem;
+export module Graphics.RenderSystem;
 
 import RHI;
-import :Camera;
-import :Geometry;
-import :RenderGraph;
-import :RenderPipeline;
-import :ShaderRegistry;
-import :PipelineLibrary;
-import :GPUScene;
-import :MaterialSystem;
-import :DebugDraw;
-import :Interaction; // New: Interaction Logic
-import :Presentation; // New: Presentation Logic
-import :GlobalResources; // New: Global State
-import :Passes.SelectionOutlineSettings;
+import Graphics.Camera;
+import Graphics.Geometry;
+import Graphics.RenderGraph;
+import Graphics.RenderPipeline;
+import Graphics.ShaderRegistry;
+import Graphics.PipelineLibrary;
+import Graphics.GPUScene;
+import Graphics.MaterialSystem;
+import Graphics.DebugDraw;
+import Graphics.Interaction; // New: Interaction Logic
+import Graphics.Presentation; // New: Presentation Logic
+import Graphics.GlobalResources; // New: Global State
+import Graphics.Passes.SelectionOutlineSettings;
+import Graphics.Passes.PostProcessSettings;
 import Core.Memory;
 import Core.Assets;
 import ECS;

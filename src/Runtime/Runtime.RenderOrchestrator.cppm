@@ -13,7 +13,13 @@ import Core.Assets;
 import Core.Hash;
 import Core.FeatureRegistry;
 import RHI;
-import Graphics;
+import Graphics.DebugDraw;
+import Graphics.Geometry;
+import Graphics.GPUScene;
+import Graphics.MaterialSystem;
+import Graphics.PipelineLibrary;
+import Graphics.RenderSystem;
+import Graphics.ShaderRegistry;
 import Geometry;
 import ECS;
 

@@ -4,9 +4,10 @@ module;
 #include <cstdint>
 #include <glm/glm.hpp>
 
-module Graphics:BoundingDebugDraw.Impl;
+module Graphics.BoundingDebugDraw;
 
-import :BoundingDebugDraw;
+import Graphics.GpuColor;
+
 
 namespace Graphics
 {

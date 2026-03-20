@@ -18,16 +18,16 @@ module;
 // Optional: enable extremely verbose per-entity material/texture tracing.
 // #define INTRINSIC_SURFACEPASS_TRACE_TEXTURES
 
-module Graphics:Passes.Surface.Impl;
+module Graphics.Passes.Surface;
 
-import :Passes.Surface;
 
-import :RenderPipeline;
-import :RenderGraph;
-import :Geometry;
-import :Material;
-import :Components;
-import :GPUScene;
+import Graphics.RenderPipeline;
+import Graphics.RenderGraph;
+import Graphics.Geometry;
+import Graphics.Material;
+import Graphics.Components;
+import Graphics.GPUScene;
+import Graphics.ShaderRegistry;
 import Geometry;
 import Core.Filesystem;
 import Core.Hash;

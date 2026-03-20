@@ -6,9 +6,9 @@ module;
 
 #include <glm/glm.hpp>
 
-export module Graphics:BVHDebugDraw;
+export module Graphics.BVHDebugDraw;
 
-import :DebugDraw;
+import Graphics.DebugDraw;
 
 export namespace Graphics
 {

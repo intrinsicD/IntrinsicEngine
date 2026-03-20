@@ -2,10 +2,10 @@ module;
 
 #include "RHI.Vulkan.hpp"
 
-export module Graphics:Passes.ImGui;
+export module Graphics.Passes.ImGui;
 
-import :RenderPipeline;
-import :RenderGraph;
+import Graphics.RenderPipeline;
+import Graphics.RenderGraph;
 import Core.Hash;
 import RHI;
 import Interface;

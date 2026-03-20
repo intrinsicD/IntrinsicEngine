@@ -12,7 +12,9 @@ export module Runtime.SystemBundles;
 import Core.Assets;
 import Core.FeatureRegistry;
 import Core.FrameGraph;
-import Graphics;
+import Graphics.Geometry;
+import Graphics.GPUScene;
+import Graphics.MaterialSystem;
 import RHI;
 
 export namespace Runtime

@@ -1,9 +1,11 @@
 module;
 
+#include <array>
 #include <cstdint>
 #include <glm/glm.hpp>
+#include "RHI.Vulkan.hpp"
 
-export module Graphics:Passes.PostProcessSettings;
+export module Graphics.Passes.PostProcessSettings;
 
 export namespace Graphics::Passes
 {
@@ -82,5 +84,46 @@ export namespace Graphics::Passes
         uint32_t Bins[kHistogramBinCount] = {};
         float    AverageLuminance = 0.0f;
         bool     Valid            = false;
+    };
+
+    inline constexpr uint32_t kPostProcessDebugBloomMipCount = 5;
+    inline constexpr uint32_t kBloomMipCount = kPostProcessDebugBloomMipCount;
+
+    struct PostProcessDebugState
+    {
+        bool Initialized = false;
+        bool ShaderRegistryConfigured = false;
+        bool ToneMapPipelineBuilt = false;
+        bool FXAAPipelineBuilt = false;
+        bool SMAAEdgePipelineBuilt = false;
+        bool SMAABlendPipelineBuilt = false;
+        bool SMAAResolvePipelineBuilt = false;
+        bool BloomDownPipelineBuilt = false;
+        bool BloomUpPipelineBuilt = false;
+        bool HistogramPipelineBuilt = false;
+        bool DummySampledAllocated = false;
+        bool BloomEnabled = false;
+        bool HistogramEnabled = false;
+        bool FXAAEnabled = false;
+        bool SMAAEnabled = false;
+        bool LastSceneColorHandleValid = false;
+        bool LastPostLdrHandleValid = false;
+        bool LastBloomMip0HandleValid = false;
+        bool LastSMAAEdgesHandleValid = false;
+        bool LastSMAAWeightsHandleValid = false;
+        uint32_t ResizeCount = 0;
+        uint32_t LastResizeWidth = 0;
+        uint32_t LastResizeHeight = 0;
+        uint32_t LastFrameIndex = ~0u;
+        uint32_t LastResolutionWidth = 0;
+        uint32_t LastResolutionHeight = 0;
+        uint32_t LastSceneColorHandle = 0;
+        uint32_t LastPostLdrHandle = 0;
+        uint32_t LastBloomMip0Handle = 0;
+        uint32_t LastSMAAEdgesHandle = 0;
+        uint32_t LastSMAAWeightsHandle = 0;
+        VkFormat LastOutputFormat = VK_FORMAT_UNDEFINED;
+        std::array<uint32_t, kPostProcessDebugBloomMipCount> LastBloomDownHandles{};
+        std::array<uint32_t, kPostProcessDebugBloomMipCount> LastBloomUpSourceHandles{};
     };
 }

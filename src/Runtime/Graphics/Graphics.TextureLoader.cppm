@@ -3,9 +3,9 @@ module;
 #include <memory>
 #include <expected>
 
-export module Graphics:TextureLoader;
+export module Graphics.TextureLoader;
 
-import :AssetErrors;
+import Graphics.AssetErrors;
 import RHI;
 
 export namespace Graphics

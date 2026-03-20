@@ -7,11 +7,11 @@ module;
 
 #include "RHI.Vulkan.hpp"
 
-export module Graphics:Passes.Picking;
+export module Graphics.Passes.Picking;
 
-import :RenderPipeline;
-import :RenderGraph;
-import :Components;
+import Graphics.RenderPipeline;
+import Graphics.RenderGraph;
+import Graphics.Components;
 import ECS;
 import RHI;
 

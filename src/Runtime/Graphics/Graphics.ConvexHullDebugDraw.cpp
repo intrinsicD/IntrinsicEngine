@@ -5,9 +5,9 @@ module;
 
 #include <glm/glm.hpp>
 
-module Graphics:ConvexHullDebugDraw.Impl;
+module Graphics.ConvexHullDebugDraw;
 
-import :ConvexHullDebugDraw;
+import Graphics.GpuColor;
 
 namespace Graphics
 {

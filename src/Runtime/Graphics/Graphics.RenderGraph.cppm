@@ -8,7 +8,7 @@ module;
 #include <span>
 #include "RHI.Vulkan.hpp"
 
-export module Graphics:RenderGraph;
+export module Graphics.RenderGraph;
 
 import RHI;
 

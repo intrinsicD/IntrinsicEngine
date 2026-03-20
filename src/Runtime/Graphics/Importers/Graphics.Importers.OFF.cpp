@@ -10,11 +10,10 @@ module;
 #include "Graphics.Importers.TextParse.hpp"
 #include "Graphics.Importers.TriangulationUtils.hpp"
 
-module Graphics:Importers.OFF.Impl;
-import :Importers.OFF;
-import :IORegistry;
-import :Geometry;
-import :AssetErrors;
+module Graphics.Importers.OFF;
+import Graphics.IORegistry;
+import Graphics.Geometry;
+import Graphics.AssetErrors;
 import Geometry;
 
 #include "Graphics.Importers.PostProcess.hpp"

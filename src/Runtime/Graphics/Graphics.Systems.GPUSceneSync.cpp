@@ -3,18 +3,17 @@ module;
 #include <entt/entity/registry.hpp>
 #include <glm/glm.hpp>
 
-module Graphics:Systems.GPUSceneSync.Impl;
+module Graphics.Systems.GPUSceneSync;
 
-import :Systems.GPUSceneSync;
-import :GPUScene;
+import Graphics.GPUScene;
 
 import ECS;
-import :Components;
+import Graphics.Components;
 import Core.Hash;
 import Core.Assets;
 import Core.FrameGraph;
-import :MaterialSystem;
-import :Material;
+import Graphics.MaterialSystem;
+import Graphics.Material;
 
 using namespace Core::Hash;
 

@@ -6,7 +6,7 @@ module;
 
 #include <glm/glm.hpp>
 
-export module Graphics:IsolineExtractor;
+export module Graphics.IsolineExtractor;
 
 import Geometry;
 

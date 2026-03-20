@@ -4,10 +4,10 @@ module;
 #include <entt/fwd.hpp>
 #include <entt/signal/dispatcher.hpp>
 
-export module Graphics:Systems.GraphGeometrySync;
+export module Graphics.Systems.GraphGeometrySync;
 
-import :Geometry;
-import :GPUScene;
+import Graphics.Geometry;
+import Graphics.GPUScene;
 import Core.FrameGraph;
 import RHI;
 

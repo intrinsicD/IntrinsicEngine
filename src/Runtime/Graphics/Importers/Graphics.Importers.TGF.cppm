@@ -4,17 +4,17 @@ module;
 #include <span>
 #include <string_view>
 
-export module Graphics:Importers.TGF;
+export module Graphics.Importers.TGF;
 
-import :IORegistry;
-import :AssetErrors;
+import Graphics.IORegistry;
+import Graphics.AssetErrors;
 
 export namespace Graphics
 {
     class TGFLoader final : public IAssetLoader
     {
     public:
-        ~TGFLoader() override;
+        ~TGFLoader() override = default;
 
         [[nodiscard]] std::string_view FormatName() const override { return "Trivial Graph Format"; }
         [[nodiscard]] std::span<const std::string_view> Extensions() const override;

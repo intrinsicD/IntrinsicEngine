@@ -2,12 +2,12 @@ module;
 
 #include <entt/fwd.hpp>
 
-export module Graphics:Systems.GPUSceneSync;
+export module Graphics.Systems.GPUSceneSync;
 
 import Core.Assets;
 import Core.FrameGraph;
-import :GPUScene;
-import :MaterialSystem;
+import Graphics.GPUScene;
+import Graphics.MaterialSystem;
 
 export namespace Graphics::Systems::GPUSceneSync
 {

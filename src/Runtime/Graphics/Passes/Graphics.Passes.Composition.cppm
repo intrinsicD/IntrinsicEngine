@@ -4,11 +4,11 @@ module;
 #include <span>
 #include "RHI.Vulkan.hpp"
 
-export module Graphics:Passes.Composition;
+export module Graphics.Passes.Composition;
 
-import :RenderPipeline;
-import :RenderGraph;
-import :ShaderRegistry;
+import Graphics.RenderPipeline;
+import Graphics.RenderGraph;
+import Graphics.ShaderRegistry;
 import RHI;
 import Core.Hash;
 

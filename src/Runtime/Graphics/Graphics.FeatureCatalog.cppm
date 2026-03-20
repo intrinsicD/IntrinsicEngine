@@ -1,6 +1,6 @@
 module;
 
-export module Graphics:FeatureCatalog;
+export module Graphics.FeatureCatalog;
 
 import Core.FeatureRegistry;
 

@@ -27,7 +27,7 @@ module;
 module Runtime.PointCloudKMeans;
 
 import Runtime.Engine;
-import Graphics;
+import Graphics.Components;
 import Geometry;
 import ECS;
 import Core.Logging;

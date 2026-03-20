@@ -1,17 +1,21 @@
 // src/Runtime/Graphics/Graphics.Material.cppm
 module;
+#include <mutex>
+#include <unordered_map>
+#include <vector>
+
+#include <cstdint>
 #include <glm/glm.hpp>
 
-export module Graphics:Material;
+export module Graphics.Material;
 
-import Core.Handle;
 import Core.Assets;
+import Core.Handle;
+import Core.ResourcePool;
+import RHI;
 
 export namespace Graphics
 {
-    // Forward declare System to break dependency cycle
-    class MaterialSystem;
-
     // 1. Strong Handle (The "Key")
     struct MaterialTag {};
     using MaterialHandle = Core::StrongHandle<MaterialTag>;
@@ -27,6 +31,51 @@ export namespace Graphics
         uint32_t AlbedoID = 0;
         uint32_t NormalID = 0;
         uint32_t MetallicRoughnessID = 0;
+    };
+
+    class MaterialSystem
+    {
+    public:
+        enum class TextureSlot : uint8_t
+        {
+            Albedo,
+            Normal,
+            MetallicRoughness,
+        };
+
+        MaterialSystem(RHI::TextureSystem& textureSystem, Core::Assets::AssetManager& assetManager);
+        ~MaterialSystem();
+
+        [[nodiscard]] MaterialHandle Create(const MaterialData& data);
+        void Destroy(MaterialHandle handle);
+        void ProcessDeletions(uint64_t currentFrame);
+
+        [[nodiscard]] const MaterialData* GetData(MaterialHandle handle) const;
+        [[nodiscard]] MaterialData* GetData(MaterialHandle handle);
+
+        void SetAlbedoAsset(MaterialHandle material, Core::Assets::AssetHandle textureAsset);
+        void SetNormalAsset(MaterialHandle material, Core::Assets::AssetHandle textureAsset);
+        void SetMetallicRoughnessAsset(MaterialHandle material, Core::Assets::AssetHandle textureAsset);
+
+        [[nodiscard]] uint32_t GetRevision(MaterialHandle handle) const;
+
+    private:
+        RHI::TextureSystem& m_TextureSystem;
+        Core::Assets::AssetManager& m_AssetManager;
+        Core::ResourcePool<MaterialData, MaterialHandle, 3> m_Pool;
+
+        struct ListenerEntry
+        {
+            Core::Assets::AssetHandle Asset;
+            Core::Assets::ListenerHandle CallbackID;
+        };
+
+        std::mutex m_ListenerMutex;
+        std::unordered_map<MaterialHandle, std::vector<ListenerEntry>> m_Listeners;
+        std::vector<uint32_t> m_Revisions;
+
+        void BindTextureAsset(MaterialHandle material, Core::Assets::AssetHandle textureAsset, TextureSlot slot);
+        void OnTextureLoad(MaterialHandle matHandle, Core::Assets::AssetHandle texHandle, TextureSlot slot);
     };
 
     // 3. The Public Resource (RAII Wrapper)

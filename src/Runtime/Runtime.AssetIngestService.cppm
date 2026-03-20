@@ -11,7 +11,10 @@ export module Runtime.AssetIngestService;
 import Core.Assets;
 import Core.IOBackend;
 import RHI;
-import Graphics;
+import Graphics.Geometry;
+import Graphics.IORegistry;
+import Graphics.MaterialSystem;
+import Graphics.Model;
 import Runtime.AssetPipeline;
 import Runtime.SceneManager;
 

@@ -4,10 +4,10 @@ module;
 
 #include <glm/glm.hpp>
 
-export module Graphics:OctreeDebugDraw;
+export module Graphics.OctreeDebugDraw;
 
 import Geometry;
-import :DebugDraw;
+import Graphics.DebugDraw;
 
 export namespace Graphics
 {

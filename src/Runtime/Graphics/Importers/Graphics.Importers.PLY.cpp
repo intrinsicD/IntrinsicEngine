@@ -18,11 +18,10 @@ module;
 #include "Graphics.Importers.TextParse.hpp"
 #include "Graphics.Importers.TriangulationUtils.hpp"
 
-module Graphics:Importers.PLY.Impl;
-import :Importers.PLY;
-import :IORegistry;
-import :Geometry;
-import :AssetErrors;
+module Graphics.Importers.PLY;
+import Graphics.IORegistry;
+import Graphics.Geometry;
+import Graphics.AssetErrors;
 import Core.Logging;
 import Geometry;
 

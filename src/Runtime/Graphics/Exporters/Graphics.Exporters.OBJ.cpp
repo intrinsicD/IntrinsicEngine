@@ -8,11 +8,10 @@ module;
 #include <vector>
 #include <glm/glm.hpp>
 
-module Graphics:Exporters.OBJ.Impl;
-import :Exporters.OBJ;
-import :IORegistry;
-import :Geometry;
-import :AssetErrors;
+module Graphics.Exporters.OBJ;
+import Graphics.IORegistry;
+import Graphics.Geometry;
+import Graphics.AssetErrors;
 
 #include "Graphics.ExportUtils.hpp"
 

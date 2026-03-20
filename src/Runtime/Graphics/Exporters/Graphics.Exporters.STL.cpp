@@ -10,11 +10,10 @@ module;
 #include <glm/glm.hpp>
 #include <glm/geometric.hpp>
 
-module Graphics:Exporters.STL.Impl;
-import :Exporters.STL;
-import :IORegistry;
-import :Geometry;
-import :AssetErrors;
+module Graphics.Exporters.STL;
+import Graphics.IORegistry;
+import Graphics.Geometry;
+import Graphics.AssetErrors;
 
 #include "Graphics.ExportUtils.hpp"
 

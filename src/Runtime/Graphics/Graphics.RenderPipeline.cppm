@@ -11,16 +11,17 @@ module;
 
 #include "RHI.Vulkan.hpp"
 
-export module Graphics:RenderPipeline;
+export module Graphics.RenderPipeline;
 
-import :RenderGraph;
-import :MaterialSystem;
-import :Geometry;
-import :ShaderRegistry;
-import :PipelineLibrary;
-import :DebugDraw;
-import :Passes.SelectionOutlineSettings;
-import :Passes.PostProcessSettings;
+import Graphics.RenderGraph;
+import Graphics.GPUScene;
+import Graphics.MaterialSystem;
+import Graphics.Geometry;
+import Graphics.ShaderRegistry;
+import Graphics.PipelineLibrary;
+import Graphics.DebugDraw;
+import Graphics.Passes.SelectionOutlineSettings;
+import Graphics.Passes.PostProcessSettings;
 import Core.Hash;
 import Core.Assets;
 import ECS;
@@ -28,13 +29,8 @@ import RHI;
 
 export namespace Graphics
 {
-    // Forward declaration (keeps include graph minimal).
-    class GPUScene;
-
     namespace Passes
     {
-        struct SelectionOutlineDebugState;
-        struct PostProcessDebugState;
     }
 
     enum class RenderResource : uint8_t
@@ -472,11 +468,4 @@ export namespace Graphics
         };
     }
 
-    // Validate a compiled render graph against the frame recipe and write
-    // policies. Returns structured diagnostics instead of logging directly.
-    [[nodiscard]] RenderGraphValidationResult ValidateCompiledGraph(
-        const FrameRecipe& recipe,
-        std::span<const RenderGraphDebugPass> passes,
-        std::span<const RenderGraphDebugImage> images,
-        std::span<const ImportedResourceWritePolicy> writePolicies = {});
 }

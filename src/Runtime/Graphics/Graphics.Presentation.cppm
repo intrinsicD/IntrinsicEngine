@@ -3,7 +3,7 @@ module;
 #include <memory>
 #include "RHI.Vulkan.hpp"
 
-export module Graphics:Presentation;
+export module Graphics.Presentation;
 
 import RHI;
 

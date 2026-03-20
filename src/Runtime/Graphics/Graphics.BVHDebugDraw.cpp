@@ -9,10 +9,10 @@ module;
 
 #include <glm/glm.hpp>
 
-module Graphics:BVHDebugDraw.Impl;
+module Graphics.BVHDebugDraw;
 
+import Graphics.GpuColor;
 import Geometry;
-import :BVHDebugDraw;
 
 namespace Graphics
 {

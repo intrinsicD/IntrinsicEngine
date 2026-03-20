@@ -5,7 +5,7 @@ module;
 
 #include <glm/glm.hpp>
 
-export module Graphics:GpuColor;
+export module Graphics.GpuColor;
 
 // =============================================================================
 // GPU color packing utilities — shared by DebugDraw and render passes.

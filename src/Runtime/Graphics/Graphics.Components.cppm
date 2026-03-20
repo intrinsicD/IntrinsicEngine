@@ -10,11 +10,11 @@ module;
 
 #include <glm/glm.hpp>
 
-export module Graphics:Components;
+export module Graphics.Components;
 
-import :Geometry;
-import :Material;
-import :VisualizationConfig;
+import Graphics.Geometry;
+import Graphics.Material;
+import Graphics.VisualizationConfig;
 import Geometry;
 import Core.Assets;
 #ifdef INTRINSIC_HAS_CUDA

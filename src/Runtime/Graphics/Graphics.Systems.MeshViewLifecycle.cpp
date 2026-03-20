@@ -10,12 +10,11 @@ module;
 #include <entt/entity/registry.hpp>
 #include <entt/signal/dispatcher.hpp>
 
-module Graphics:Systems.MeshViewLifecycle.Impl;
+module Graphics.Systems.MeshViewLifecycle;
 
-import :Systems.MeshViewLifecycle;
-import :GPUScene;
-import :Components;
-import :Geometry;
+import Graphics.GPUScene;
+import Graphics.Components;
+import Graphics.Geometry;
 
 import Core.Hash;
 import Core.Logging;

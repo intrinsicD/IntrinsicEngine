@@ -15,11 +15,10 @@ module;
 #include <string_view>
 #include <vector>
 
-module Graphics:Importers.GLTF.Impl;
-import :Importers.GLTF;
-import :IORegistry;
-import :Geometry;
-import :AssetErrors;
+module Graphics.Importers.GLTF;
+import Graphics.IORegistry;
+import Graphics.Geometry;
+import Graphics.AssetErrors;
 import Core.IOBackend;
 import Core.Logging;
 import Geometry;

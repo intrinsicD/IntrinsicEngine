@@ -10,11 +10,11 @@ module;
 #include <glm/glm.hpp>
 #include "RHI.Vulkan.hpp"
 
-export module Graphics:Passes.Surface;
+export module Graphics.Passes.Surface;
 
-import :RenderPipeline;
-import :RenderGraph;
-import :Components;
+import Graphics.RenderPipeline;
+import Graphics.RenderGraph;
+import Graphics.Components;
 import Geometry;
 import ECS;
 import RHI;

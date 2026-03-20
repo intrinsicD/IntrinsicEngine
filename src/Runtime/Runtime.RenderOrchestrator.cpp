@@ -14,7 +14,14 @@ import Core.FrameGraph;
 import Core.Assets;
 import Core.FeatureRegistry;
 import RHI;
-import Graphics;
+import Graphics.DebugDraw;
+import Graphics.Geometry;
+import Graphics.GPUScene;
+import Graphics.MaterialSystem;
+import Graphics.PipelineLibrary;
+import Graphics.Pipelines;
+import Graphics.RenderSystem;
+import Graphics.ShaderRegistry;
 
 using namespace Core::Hash;
 

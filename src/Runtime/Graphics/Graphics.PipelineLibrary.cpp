@@ -7,10 +7,9 @@ module;
 #include <glm/glm.hpp>
 #include "RHI.Vulkan.hpp"
 
-module Graphics:PipelineLibrary.Impl;
+module Graphics.PipelineLibrary;
 
-import :PipelineLibrary;
-import :ShaderRegistry;
+import Graphics.ShaderRegistry;
 
 import Core.Hash;
 import Core.Filesystem;

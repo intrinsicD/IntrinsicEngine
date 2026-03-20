@@ -7,13 +7,13 @@ module;
 
 #include "RHI.Vulkan.hpp"
 
-export module Graphics:Passes.Line;
+export module Graphics.Passes.Line;
 
-import :RenderPipeline;
-import :RenderGraph;
-import :Geometry;
-import :DebugDraw;
-import :ShaderRegistry;
+import Graphics.RenderPipeline;
+import Graphics.RenderGraph;
+import Graphics.Geometry;
+import Graphics.DebugDraw;
+import Graphics.ShaderRegistry;
 import Core.Hash;
 import RHI;
 

@@ -17,6 +17,7 @@ import Core.FrameGraph;
 import Core.Hash;
 import Core.Logging;
 import Core.IOBackend;
+import Graphics.Components;
 import Runtime.PointCloudKMeans;
 import Runtime.Selection;
 import Runtime.SelectionModule;

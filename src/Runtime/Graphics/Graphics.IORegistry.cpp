@@ -13,21 +13,20 @@ module;
 #include <vector>
 #include "Graphics.FileFormatUtils.hpp"
 
-module Graphics:IORegistry.Impl;
-import :IORegistry;
-import :AssetErrors;
-import :Geometry;
-import :Importers.OBJ;
-import :Importers.PLY;
-import :Importers.XYZ;
-import :Importers.PCD;
-import :Importers.TGF;
-import :Importers.GLTF;
-import :Importers.STL;
-import :Importers.OFF;
-import :Exporters.OBJ;
-import :Exporters.PLY;
-import :Exporters.STL;
+module Graphics.IORegistry;
+import Graphics.AssetErrors;
+import Graphics.Geometry;
+import Graphics.Importers.OBJ;
+import Graphics.Importers.PLY;
+import Graphics.Importers.XYZ;
+import Graphics.Importers.PCD;
+import Graphics.Importers.TGF;
+import Graphics.Importers.GLTF;
+import Graphics.Importers.STL;
+import Graphics.Importers.OFF;
+import Graphics.Exporters.OBJ;
+import Graphics.Exporters.PLY;
+import Graphics.Exporters.STL;
 import Core.IOBackend;
 import Core.Error;
 import Core.Logging;
@@ -214,24 +213,6 @@ namespace Graphics
             result.emplace_back(ext);
         return result;
     }
-
-    // -------------------------------------------------------------------------
-    // Vtable anchors: defining the destructor (the Itanium ABI key function)
-    // HERE — in the TU that imports ALL loader/exporter partitions — ensures
-    // each vtable is emitted in this object file. Retained as defensive practice
-    // for robust vtable emission across module partition boundaries.
-    // -------------------------------------------------------------------------
-    OBJLoader::~OBJLoader() = default;
-    PLYLoader::~PLYLoader() = default;
-    XYZLoader::~XYZLoader() = default;
-    PCDLoader::~PCDLoader() = default;
-    TGFLoader::~TGFLoader() = default;
-    GLTFLoader::~GLTFLoader() = default;
-    STLLoader::~STLLoader() = default;
-    OFFLoader::~OFFLoader() = default;
-    OBJExporter::~OBJExporter() = default;
-    PLYExporter::~PLYExporter() = default;
-    STLExporter::~STLExporter() = default;
 
     void RegisterBuiltinLoaders(IORegistry& registry)
     {

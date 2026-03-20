@@ -5,18 +5,18 @@ module;
 #include <string_view>
 #include <vector>
 
-export module Graphics:Exporters.STL;
+export module Graphics.Exporters.STL;
 
-import :IORegistry;
-import :AssetErrors;
-import :Geometry;
+import Graphics.IORegistry;
+import Graphics.AssetErrors;
+import Graphics.Geometry;
 
 export namespace Graphics
 {
     class STLExporter final : public IAssetExporter
     {
     public:
-        ~STLExporter() override;
+        ~STLExporter() override = default;
 
         [[nodiscard]] std::string_view FormatName() const override { return "STL (Stereolithography)"; }
         [[nodiscard]] std::span<const std::string_view> Extensions() const override;

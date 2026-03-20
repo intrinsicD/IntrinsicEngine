@@ -4,12 +4,12 @@ module;
 #include <glm/glm.hpp>
 #include "RHI.Vulkan.hpp"
 
-export module Graphics:GlobalResources;
+export module Graphics.GlobalResources;
 
 import RHI;
-import :Camera;
-import :ShaderRegistry;
-import :PipelineLibrary;
+import Graphics.Camera;
+import Graphics.ShaderRegistry;
+import Graphics.PipelineLibrary;
 
 export namespace Graphics
 {

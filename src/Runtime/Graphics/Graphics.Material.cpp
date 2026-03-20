@@ -1,11 +1,7 @@
 // src/Runtime/Graphics/Graphics.Material.cpp
 module;
-#include <utility>
 
-module Graphics:Material.Impl;
-import :Material;
-import :MaterialSystem;
-import Core.Assets;
+module Graphics.Material;
 
 namespace Graphics
 {

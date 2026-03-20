@@ -8,9 +8,10 @@ module;
 
 #include <glm/glm.hpp>
 
-module Graphics:OctreeDebugDraw.Impl;
+module Graphics.OctreeDebugDraw;
 
-import :OctreeDebugDraw;
+import Graphics.GpuColor;
+
 
 namespace Graphics
 {

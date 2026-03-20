@@ -17,11 +17,10 @@ module;
 #include "Graphics.Importers.VertexDedup.hpp"
 #include "Graphics.Importers.TextParse.hpp"
 
-module Graphics:Importers.STL.Impl;
-import :Importers.STL;
-import :IORegistry;
-import :Geometry;
-import :AssetErrors;
+module Graphics.Importers.STL;
+import Graphics.IORegistry;
+import Graphics.Geometry;
+import Graphics.AssetErrors;
 import Geometry;
 
 #include "Graphics.Importers.PostProcess.hpp"

@@ -10,11 +10,10 @@ module;
 #include "Graphics.Importers.ColorParsing.hpp"
 #include "Graphics.Importers.TextParse.hpp"
 
-module Graphics:Importers.XYZ.Impl;
-import :Importers.XYZ;
-import :IORegistry;
-import :Geometry;
-import :AssetErrors;
+module Graphics.Importers.XYZ;
+import Graphics.IORegistry;
+import Graphics.Geometry;
+import Graphics.AssetErrors;
 import Geometry;
 
 #include "Graphics.Importers.PostProcess.hpp"

@@ -4,17 +4,17 @@ module;
 #include <span>
 #include <string_view>
 
-export module Graphics:Importers.STL;
+export module Graphics.Importers.STL;
 
-import :IORegistry;
-import :AssetErrors;
+import Graphics.IORegistry;
+import Graphics.AssetErrors;
 
 export namespace Graphics
 {
     class STLLoader final : public IAssetLoader
     {
     public:
-        ~STLLoader() override;
+        ~STLLoader() override = default;
 
         [[nodiscard]] std::string_view FormatName() const override { return "STL (Stereolithography)"; }
         [[nodiscard]] std::span<const std::string_view> Extensions() const override;

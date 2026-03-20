@@ -13,16 +13,15 @@ module;
 #include <glm/glm.hpp>
 #include "RHI.Vulkan.hpp"
 
-module Graphics:Passes.Point.Impl;
+module Graphics.Passes.Point;
 
-import :Passes.Point;
-import :RenderPipeline;
-import :RenderGraph;
-import :Geometry;
-import :Components;
-import :DebugDraw;
-import :ShaderRegistry;
-import :GpuColor;
+import Graphics.RenderPipeline;
+import Graphics.RenderGraph;
+import Graphics.Geometry;
+import Graphics.Components;
+import Graphics.DebugDraw;
+import Graphics.ShaderRegistry;
+import Graphics.GpuColor;
 import Geometry;
 import Core.Hash;
 import Core.Logging;

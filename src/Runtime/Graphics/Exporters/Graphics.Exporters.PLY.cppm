@@ -5,18 +5,18 @@ module;
 #include <string_view>
 #include <vector>
 
-export module Graphics:Exporters.PLY;
+export module Graphics.Exporters.PLY;
 
-import :IORegistry;
-import :AssetErrors;
-import :Geometry;
+import Graphics.IORegistry;
+import Graphics.AssetErrors;
+import Graphics.Geometry;
 
 export namespace Graphics
 {
     class PLYExporter final : public IAssetExporter
     {
     public:
-        ~PLYExporter() override;
+        ~PLYExporter() override = default;
 
         [[nodiscard]] std::string_view FormatName() const override { return "Stanford PLY"; }
         [[nodiscard]] std::span<const std::string_view> Extensions() const override;

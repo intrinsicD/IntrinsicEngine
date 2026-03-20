@@ -3,12 +3,12 @@ module;
 #include <memory>
 #include <expected>
 
-export module Graphics:ModelLoader;
+export module Graphics.ModelLoader;
 
-import :AssetErrors;
-import :Model;
-import :Geometry;
-import :IORegistry;
+import Graphics.AssetErrors;
+import Graphics.Model;
+import Graphics.Geometry;
+import Graphics.IORegistry;
 import Core.IOBackend;
 import RHI;
 

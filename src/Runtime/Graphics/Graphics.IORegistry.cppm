@@ -10,10 +10,10 @@ module;
 #include <variant>
 #include <vector>
 
-export module Graphics:IORegistry;
+export module Graphics.IORegistry;
 
-import :Geometry;
-import :AssetErrors;
+import Graphics.Geometry;
+import Graphics.AssetErrors;
 import Core.IOBackend;
 
 export namespace Graphics

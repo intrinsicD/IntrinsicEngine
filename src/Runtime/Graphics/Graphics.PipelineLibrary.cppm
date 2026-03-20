@@ -6,11 +6,11 @@ module;
 
 #include "RHI.Vulkan.hpp"
 
-export module Graphics:PipelineLibrary;
+export module Graphics.PipelineLibrary;
 
 import Core.Hash;
 import RHI;
-import :ShaderRegistry;
+import Graphics.ShaderRegistry;
 
 export namespace Graphics
 {

@@ -9,11 +9,10 @@ module;
 #include <vector>
 #include <glm/glm.hpp>
 
-module Graphics:Exporters.PLY.Impl;
-import :Exporters.PLY;
-import :IORegistry;
-import :Geometry;
-import :AssetErrors;
+module Graphics.Exporters.PLY;
+import Graphics.IORegistry;
+import Graphics.Geometry;
+import Graphics.AssetErrors;
 
 #include "Graphics.ExportUtils.hpp"
 

@@ -4,10 +4,10 @@ module;
 
 #include <glm/glm.hpp>
 
-export module Graphics:KDTreeDebugDraw;
+export module Graphics.KDTreeDebugDraw;
 
 import Geometry;
-import :DebugDraw;
+import Graphics.DebugDraw;
 
 export namespace Graphics
 {

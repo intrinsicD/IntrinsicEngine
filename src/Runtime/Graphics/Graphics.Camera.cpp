@@ -3,8 +3,7 @@ module;
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/quaternion.hpp>
 
-module Graphics:Camera.Impl;
-import :Camera;
+module Graphics.Camera;
 import Core.Input;
 
 namespace Graphics

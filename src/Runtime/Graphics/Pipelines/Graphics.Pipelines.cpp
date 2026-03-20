@@ -10,26 +10,25 @@ module;
 
 #include <RHI.Vulkan.hpp>
 
-module Graphics:Pipelines.Impl;
+module Graphics.Pipelines;
 
-import :RenderPipeline;
-import :RenderGraph;
-import :Components;
-import :Geometry;
-import :DebugDraw;
-import :Passes.Picking;
-import :Passes.Surface;
-import :Passes.SelectionOutline;
-import :Passes.Line;
-import :Passes.Point;
-import :Passes.HtexPatchPreview;
-import :Passes.DebugView;
-import :Passes.ImGui;
-import :Passes.PostProcess;
-import :Passes.Composition;
-import :PipelineLibrary;
-import :ShaderRegistry;
-import :Pipelines;
+import Graphics.RenderPipeline;
+import Graphics.RenderGraph;
+import Graphics.Components;
+import Graphics.Geometry;
+import Graphics.DebugDraw;
+import Graphics.Passes.Picking;
+import Graphics.Passes.Surface;
+import Graphics.Passes.SelectionOutline;
+import Graphics.Passes.Line;
+import Graphics.Passes.Point;
+import Graphics.Passes.HtexPatchPreview;
+import Graphics.Passes.DebugView;
+import Graphics.Passes.ImGui;
+import Graphics.Passes.PostProcess;
+import Graphics.Passes.Composition;
+import Graphics.PipelineLibrary;
+import Graphics.ShaderRegistry;
 import RHI;
 import ECS;
 import Core.Hash;

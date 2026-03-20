@@ -9,45 +9,18 @@ module;
 #include <glm/glm.hpp>
 #include "RHI.Vulkan.hpp"
 
-export module Graphics:Passes.SelectionOutline;
+export module Graphics.Passes.SelectionOutline;
 
-import :Passes.SelectionOutlineSettings;
-import :RenderPipeline;
-import :RenderGraph;
-import :ShaderRegistry;
+import Graphics.Passes.SelectionOutlineSettings;
+import Graphics.RenderPipeline;
+import Graphics.RenderGraph;
+import Graphics.ShaderRegistry;
 import Core.Hash;
 import ECS;
 import RHI;
 
 export namespace Graphics::Passes
 {
-    inline constexpr uint32_t kSelectionOutlineDebugMaxSelectedIds = 16;
-
-    struct SelectionOutlineDebugState
-    {
-        bool Initialized = false;
-        bool ShaderRegistryConfigured = false;
-        bool PipelineBuilt = false;
-        bool DummyPickIdAllocated = false;
-        bool LastPassRequested = false;
-        bool LastPassAdded = false;
-        bool LastDescriptorPatched = false;
-        bool LastEntityIdHandleValid = false;
-        bool LastTargetHandleValid = false;
-        uint32_t DescriptorSetCount = 0;
-        uint32_t ResizeCount = 0;
-        uint32_t LastResizeWidth = 0;
-        uint32_t LastResizeHeight = 0;
-        uint32_t LastFrameIndex = ~0u;
-        uint32_t LastResolutionWidth = 0;
-        uint32_t LastResolutionHeight = 0;
-        uint32_t LastSelectedCount = 0;
-        uint32_t LastHoveredId = 0;
-        uint32_t LastEntityIdHandle = 0;
-        uint32_t LastTargetHandle = 0;
-        VkFormat LastColorFormat = VK_FORMAT_UNDEFINED;
-        std::array<uint32_t, kSelectionOutlineDebugMaxSelectedIds> LastSelectedIds{};
-    };
 
     [[nodiscard]] uint32_t AppendOutlineRenderablePickIds(const entt::registry& registry,
                                                           entt::entity root,

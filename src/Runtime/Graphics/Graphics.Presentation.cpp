@@ -3,9 +3,8 @@ module;
 #include <memory>
 #include "RHI.Vulkan.hpp"
 
-module Graphics:Presentation.Impl;
+module Graphics.Presentation;
 
-import :Presentation;
 import RHI;
 
 namespace Graphics

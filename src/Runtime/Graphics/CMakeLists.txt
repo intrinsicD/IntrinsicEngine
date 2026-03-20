@@ -76,8 +76,6 @@ target_sources(${target_name}
         PRIVATE
         Graphics.TinyGltf.cpp
         Graphics.ShaderCompiler.cpp
-        PRIVATE
-        FILE_SET graphics_impl TYPE CXX_MODULES FILES
         Graphics.Camera.cpp
         Graphics.Geometry.cpp
         Graphics.Material.cpp
@@ -88,14 +86,6 @@ target_sources(${target_name}
         Graphics.TextureLoader.cpp
         Graphics.PipelineLibrary.cpp
         Graphics.GPUScene.cpp
-        Graphics.Systems.GPUSceneSync.cpp
-        Graphics.Systems.MeshRendererLifecycle.cpp
-        Graphics.Systems.PrimitiveBVHSync.cpp
-        Graphics.Systems.GraphGeometrySync.cpp
-        Graphics.Systems.PointCloudGeometrySync.cpp
-        Graphics.Systems.MeshViewLifecycle.cpp
-        Graphics.Systems.PropertySetDirtySync.cpp
-        # New Implementations
         Graphics.DebugDraw.cpp
         Graphics.OctreeDebugDraw.cpp
         Graphics.BoundingDebugDraw.cpp
@@ -111,8 +101,15 @@ target_sources(${target_name}
         Graphics.ColorMapper.cpp
         Graphics.VectorFieldManager.cpp
         Graphics.IsolineExtractor.cpp
-
         Pipelines/Graphics.Pipelines.cpp
+        Graphics.IORegistry.cpp
+        Graphics.Systems.GPUSceneSync.cpp
+        Graphics.Systems.MeshRendererLifecycle.cpp
+        Graphics.Systems.PrimitiveBVHSync.cpp
+        Graphics.Systems.GraphGeometrySync.cpp
+        Graphics.Systems.PointCloudGeometrySync.cpp
+        Graphics.Systems.MeshViewLifecycle.cpp
+        Graphics.Systems.PropertySetDirtySync.cpp
         Passes/Graphics.Passes.Picking.cpp
         Passes/Graphics.Passes.Surface.cpp
         Passes/Graphics.Passes.SelectionOutline.cpp
@@ -122,7 +119,6 @@ target_sources(${target_name}
         Passes/Graphics.Passes.DebugView.cpp
         Passes/Graphics.Passes.PostProcess.cpp
         Passes/Graphics.Passes.Composition.cpp
-        Graphics.IORegistry.cpp
         Importers/Graphics.Importers.OBJ.cpp
         Importers/Graphics.Importers.PLY.cpp
         Importers/Graphics.Importers.XYZ.cpp

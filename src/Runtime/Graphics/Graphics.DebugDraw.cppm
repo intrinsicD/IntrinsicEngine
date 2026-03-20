@@ -7,9 +7,9 @@ module;
 
 #include <glm/glm.hpp>
 
-export module Graphics:DebugDraw;
+export module Graphics.DebugDraw;
 
-import :GpuColor;
+import Graphics.GpuColor;
 
 export namespace Graphics
 {

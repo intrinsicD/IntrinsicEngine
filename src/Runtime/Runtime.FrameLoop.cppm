@@ -7,7 +7,7 @@ import Core.Assets;
 import Core.FeatureRegistry;
 import Core.FrameGraph;
 import Core.InplaceFunction;
-import Graphics;
+import Graphics.MaterialSystem;
 import Runtime.AssetIngestService;
 import Runtime.AssetPipeline;
 import Runtime.GraphicsBackend;

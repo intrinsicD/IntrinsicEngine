@@ -3,25 +3,26 @@ module;
 #include <memory>
 #include <span>
 
-export module Graphics:Pipelines;
+export module Graphics.Pipelines;
 
-import :RenderPipeline;
-import :RenderPath;
-import :RenderGraph;
-import :ShaderRegistry;
-import :PipelineLibrary;
-import :FeatureCatalog;
-import :Passes.DebugView;
-import :Passes.Surface;
-import :Passes.ImGui;
-import :Passes.Line;
-import :Passes.Picking;
-import :Passes.Point;
-import :Passes.HtexPatchPreview;
-import :Passes.SelectionOutline;
-import :Passes.SelectionOutlineSettings;
-import :Passes.PostProcess;
-import :Passes.Composition;
+import Graphics.RenderPipeline;
+import Graphics.RenderPath;
+import Graphics.RenderGraph;
+import Graphics.ShaderRegistry;
+import Graphics.PipelineLibrary;
+import Graphics.FeatureCatalog;
+import Graphics.Passes.DebugView;
+import Graphics.Passes.Surface;
+import Graphics.Passes.ImGui;
+import Graphics.Passes.Line;
+import Graphics.Passes.Picking;
+import Graphics.Passes.Point;
+import Graphics.Passes.HtexPatchPreview;
+import Graphics.Passes.SelectionOutline;
+import Graphics.Passes.SelectionOutlineSettings;
+import Graphics.Passes.PostProcessSettings;
+import Graphics.Passes.PostProcess;
+import Graphics.Passes.Composition;
 import RHI;
 import Core.Hash;
 import Core.FeatureRegistry;

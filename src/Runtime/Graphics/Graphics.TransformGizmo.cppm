@@ -8,9 +8,9 @@ module;
 #include <entt/entity/entity.hpp>
 #include <entt/entity/registry.hpp>
 
-export module Graphics:TransformGizmo;
+export module Graphics.TransformGizmo;
 
-import :Camera;
+import Graphics.Camera;
 import Core.Input;
 
 export namespace Graphics

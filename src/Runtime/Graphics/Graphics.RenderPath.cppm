@@ -5,9 +5,9 @@ module;
 #include <string_view>
 #include <memory>
 
-export module Graphics:RenderPath;
+export module Graphics.RenderPath;
 
-import :RenderPipeline;
+import Graphics.RenderPipeline;
 import Core.InplaceFunction;
 
 export namespace Graphics

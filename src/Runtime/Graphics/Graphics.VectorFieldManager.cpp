@@ -11,13 +11,12 @@ module;
 #include <glm/glm.hpp>
 #include <entt/entity/registry.hpp>
 
-module Graphics:VectorFieldManager.Impl;
+module Graphics.VectorFieldManager;
 
-import :VectorFieldManager;
-import :Components;
-import :VisualizationConfig;
-import :ColorMapper;
-import :GpuColor;
+import Graphics.Components;
+import Graphics.VisualizationConfig;
+import Graphics.ColorMapper;
+import Graphics.GpuColor;
 
 import Geometry;
 import ECS;

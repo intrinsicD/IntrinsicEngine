@@ -17,12 +17,11 @@ module;
 #include "Graphics.Importers.ColorParsing.hpp"
 #include "Graphics.Importers.TextParse.hpp"
 
-module Graphics:Importers.PCD.Impl;
+module Graphics.Importers.PCD;
 
-import :Importers.PCD;
-import :IORegistry;
-import :Geometry;
-import :AssetErrors;
+import Graphics.IORegistry;
+import Graphics.Geometry;
+import Graphics.AssetErrors;
 import Geometry;
 
 #include "Graphics.Importers.PostProcess.hpp"

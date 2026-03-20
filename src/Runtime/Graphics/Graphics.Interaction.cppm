@@ -6,7 +6,7 @@ module;
 #include <glm/glm.hpp>
 #include "RHI.Vulkan.hpp"
 
-export module Graphics:Interaction;
+export module Graphics.Interaction;
 
 import RHI;
 import Core.Hash;

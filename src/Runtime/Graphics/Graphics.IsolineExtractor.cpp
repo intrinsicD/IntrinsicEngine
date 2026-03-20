@@ -9,9 +9,8 @@ module;
 
 #include <glm/glm.hpp>
 
-module Graphics:IsolineExtractor.Impl;
+module Graphics.IsolineExtractor;
 
-import :IsolineExtractor;
 import Geometry;
 
 using namespace Graphics;

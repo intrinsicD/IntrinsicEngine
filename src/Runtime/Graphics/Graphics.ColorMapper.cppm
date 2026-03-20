@@ -6,9 +6,9 @@ module;
 #include <string>
 #include <vector>
 
-export module Graphics:ColorMapper;
+export module Graphics.ColorMapper;
 
-import :VisualizationConfig;
+import Graphics.VisualizationConfig;
 import Geometry;
 
 // =============================================================================

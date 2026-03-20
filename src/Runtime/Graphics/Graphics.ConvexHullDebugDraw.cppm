@@ -4,10 +4,10 @@ module;
 
 #include <glm/glm.hpp>
 
-export module Graphics:ConvexHullDebugDraw;
+export module Graphics.ConvexHullDebugDraw;
 
 import Geometry;
-import :DebugDraw;
+import Graphics.DebugDraw;
 
 export namespace Graphics
 {

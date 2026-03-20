@@ -7,9 +7,8 @@ module;
 #include <glm/glm.hpp>
 #include <glm/gtc/constants.hpp>
 
-module Graphics:DebugDraw.Impl;
+module Graphics.DebugDraw;
 
-import :DebugDraw;
 import Geometry;
 
 namespace Graphics

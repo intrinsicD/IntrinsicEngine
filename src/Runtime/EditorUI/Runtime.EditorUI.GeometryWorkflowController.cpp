@@ -13,7 +13,7 @@ module Runtime.EditorUI;
 
 import Runtime.Engine;
 import Runtime.GraphicsBackend;
-import Graphics;
+import Graphics.Components;
 import Geometry;
 import ECS;
 import Interface;

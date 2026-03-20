@@ -13,7 +13,16 @@ export module Runtime.EditorUI;
 import Runtime.Engine;
 import Runtime.PointCloudKMeans;
 import Runtime.SceneSerializer;
-import Graphics;
+import Graphics.Components;
+import Graphics.BVHDebugDraw;
+import Graphics.BoundingDebugDraw;
+import Graphics.Colormap;
+import Graphics.ConvexHullDebugDraw;
+import Graphics.DebugDraw;
+import Graphics.Geometry;
+import Graphics.KDTreeDebugDraw;
+import Graphics.OctreeDebugDraw;
+import Graphics.VisualizationConfig;
 import Geometry;
 import ECS;
 

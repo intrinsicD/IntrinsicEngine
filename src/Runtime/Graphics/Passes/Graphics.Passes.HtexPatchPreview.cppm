@@ -9,15 +9,17 @@ module;
 #include <entt/entity/fwd.hpp>
 #include <glm/glm.hpp>
 
-export module Graphics:Passes.HtexPatchPreview;
+export module Graphics.Passes.HtexPatchPreview;
 
-import :RenderPipeline;
-import :RenderGraph;
-import :Components;
+import Graphics.RenderPipeline;
+import Graphics.RenderGraph;
+import Graphics.Components;
 import Core.Hash;
 import Geometry;
 import RHI;
 import ECS;
+
+using namespace Core::Hash;
 
 export namespace Graphics::Passes
 {

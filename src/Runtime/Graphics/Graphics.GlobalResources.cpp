@@ -4,12 +4,11 @@ module;
 #include <vector>
 #include "RHI.Vulkan.hpp"
 
-module Graphics:GlobalResources.Impl;
+module Graphics.GlobalResources;
 
-import :GlobalResources;
-import :ShaderRegistry;
-import :PipelineLibrary;
-import :Camera;
+import Graphics.ShaderRegistry;
+import Graphics.PipelineLibrary;
+import Graphics.Camera;
 import Core.Logging;
 import RHI;
 

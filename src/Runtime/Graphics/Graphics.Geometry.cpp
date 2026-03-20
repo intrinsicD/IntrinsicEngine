@@ -9,8 +9,7 @@ module;
 #include <glm/glm.hpp>
 #include "RHI.Vulkan.hpp"
 
-module Graphics:Geometry.Impl;
-import :Geometry;
+module Graphics.Geometry;
 import Geometry;
 import RHI;
 import Core.Logging;

@@ -14,13 +14,14 @@ module;
 #include <glm/glm.hpp>
 #include "RHI.Vulkan.hpp"
 
-module Graphics:Passes.HtexPatchPreview.Impl;
+module Graphics.Passes.HtexPatchPreview;
 
-import :Passes.HtexPatchPreview;
-import :GpuColor;
+import Graphics.ShaderRegistry;
+import Graphics.GpuColor;
 import Core.Hash;
 import Core.Filesystem;
 import Core.Logging;
+
 import ECS;
 import Geometry;
 import RHI;

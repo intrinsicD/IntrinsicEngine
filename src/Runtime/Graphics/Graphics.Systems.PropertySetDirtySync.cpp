@@ -8,13 +8,12 @@ module;
 #include <glm/glm.hpp>
 #include <entt/entity/registry.hpp>
 
-module Graphics:Systems.PropertySetDirtySync.Impl;
+module Graphics.Systems.PropertySetDirtySync;
 
-import :Systems.PropertySetDirtySync;
-import :Components;
-import :GpuColor;
-import :ColorMapper;
-import :VisualizationConfig;
+import Graphics.Components;
+import Graphics.GpuColor;
+import Graphics.ColorMapper;
+import Graphics.VisualizationConfig;
 
 import Core.Hash;
 import Core.Logging;

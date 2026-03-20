@@ -8,9 +8,8 @@ module;
 
 #include "RHI.Vulkan.hpp"
 
-module Graphics:GPUScene.Impl;
+module Graphics.GPUScene;
 
-import :GPUScene;
 
 import Core.Logging;
 import RHI;

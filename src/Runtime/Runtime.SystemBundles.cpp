@@ -5,7 +5,13 @@ module;
 module Runtime.SystemBundles;
 
 import ECS;
-import Graphics;
+import Graphics.Systems.GPUSceneSync;
+import Graphics.Systems.GraphGeometrySync;
+import Graphics.Systems.MeshRendererLifecycle;
+import Graphics.Systems.MeshViewLifecycle;
+import Graphics.Systems.PointCloudGeometrySync;
+import Graphics.Systems.PrimitiveBVHSync;
+import Graphics.Systems.PropertySetDirtySync;
 import Runtime.SystemFeatureCatalog;
 
 namespace

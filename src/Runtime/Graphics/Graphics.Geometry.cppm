@@ -3,15 +3,11 @@ module;
 #include <vector>
 #include <span>
 #include <memory>
-#include <mutex>
-#include <shared_mutex>
 #include <utility>
-#include <queue>
-#include <expected>
 #include <glm/glm.hpp>
 #include "RHI.Vulkan.hpp"
 
-export module Graphics:Geometry;
+export module Graphics.Geometry;
 
 import RHI;
 import Geometry;

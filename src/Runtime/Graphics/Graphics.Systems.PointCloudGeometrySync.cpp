@@ -9,15 +9,14 @@ module;
 #include <entt/entity/registry.hpp>
 #include <entt/signal/dispatcher.hpp>
 
-module Graphics:Systems.PointCloudGeometrySync.Impl;
+module Graphics.Systems.PointCloudGeometrySync;
 
-import :Systems.PointCloudGeometrySync;
-import :Components;
-import :Geometry;
-import :GPUScene;
-import :GpuColor;
-import :ColorMapper;
-import :VisualizationConfig;
+import Graphics.Components;
+import Graphics.Geometry;
+import Graphics.GPUScene;
+import Graphics.GpuColor;
+import Graphics.ColorMapper;
+import Graphics.VisualizationConfig;
 
 import Core.Hash;
 import Core.Logging;

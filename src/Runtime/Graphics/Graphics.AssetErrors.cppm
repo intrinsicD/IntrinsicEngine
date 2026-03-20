@@ -3,7 +3,7 @@ module;
 #include <cstdint>
 #include <string_view>
 
-export module Graphics:AssetErrors;
+export module Graphics.AssetErrors;
 
 export namespace Graphics
 {

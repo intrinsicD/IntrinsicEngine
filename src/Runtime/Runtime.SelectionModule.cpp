@@ -11,8 +11,10 @@ module Runtime.SelectionModule;
 import Core.Window;
 import Core.Input;
 import ECS;
+import Graphics.Components;
 import Geometry;
-import Graphics;
+import Graphics.Camera;
+import Graphics.RenderSystem;
 import Runtime.Selection;
 
 namespace Runtime

@@ -4,10 +4,10 @@ module;
 
 #include <glm/glm.hpp>
 
-export module Graphics:BoundingDebugDraw;
+export module Graphics.BoundingDebugDraw;
 
 import Geometry;
-import :DebugDraw;
+import Graphics.DebugDraw;
 
 export namespace Graphics
 {

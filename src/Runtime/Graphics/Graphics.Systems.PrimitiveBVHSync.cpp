@@ -9,10 +9,9 @@ module;
 #include <glm/glm.hpp>
 #include <entt/entity/registry.hpp>
 
-module Graphics:Systems.PrimitiveBVHSync.Impl;
+module Graphics.Systems.PrimitiveBVHSync;
 
-import :Systems.PrimitiveBVHSync;
-import :Components;
+import Graphics.Components;
 
 import Core.Hash;
 import Core.FrameGraph;

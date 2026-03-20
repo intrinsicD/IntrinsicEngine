@@ -14,12 +14,12 @@ module;
 
 #include "RHI.Vulkan.hpp"
 
-module Graphics:Passes.Composition.Impl;
+module Graphics.Passes.Composition;
 
-import :Passes.Composition;
-import :RenderPipeline;
-import :RenderGraph;
-import :ShaderRegistry;
+import Graphics.RenderPipeline;
+import Graphics.RenderGraph;
+import Graphics.ShaderRegistry;
+import Geometry;
 import Core.Filesystem;
 import Core.Hash;
 import Core.Logging;

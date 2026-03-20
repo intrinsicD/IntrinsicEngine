@@ -7,9 +7,9 @@ module;
 #include <glm/glm.hpp>
 #include <entt/entity/entity.hpp>
 
-export module Graphics:VisualizationConfig;
+export module Graphics.VisualizationConfig;
 
-import :Colormap;
+import Graphics.Colormap;
 
 // =============================================================================
 // Per-entity visualization configuration for PropertySet-driven color rendering.

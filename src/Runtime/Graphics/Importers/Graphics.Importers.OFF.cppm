@@ -4,17 +4,17 @@ module;
 #include <span>
 #include <string_view>
 
-export module Graphics:Importers.OFF;
+export module Graphics.Importers.OFF;
 
-import :IORegistry;
-import :AssetErrors;
+import Graphics.IORegistry;
+import Graphics.AssetErrors;
 
 export namespace Graphics
 {
     class OFFLoader final : public IAssetLoader
     {
     public:
-        ~OFFLoader() override;
+        ~OFFLoader() override = default;
 
         [[nodiscard]] std::string_view FormatName() const override { return "Object File Format (OFF)"; }
         [[nodiscard]] std::span<const std::string_view> Extensions() const override;

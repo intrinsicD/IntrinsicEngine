@@ -4,9 +4,9 @@ module;
 #include <cstdint>
 #include <cmath>
 
-export module Graphics:Colormap;
+export module Graphics.Colormap;
 
-import :GpuColor;
+import Graphics.GpuColor;
 
 // =============================================================================
 // Scientific colormaps for scalar field visualization.

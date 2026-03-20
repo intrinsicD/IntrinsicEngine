@@ -16,23 +16,22 @@ module;
 
 #include "RHI.Vulkan.hpp"
 
-module Graphics:RenderSystem.Impl;
+module Graphics.RenderSystem;
 
-import :RenderSystem;
-import :Camera;
-import :Components;
-import :RenderPipeline;
-import :RenderGraph;
-import :Geometry;
-import :MaterialSystem;
-import :ShaderRegistry;
-import :PipelineLibrary;
-import :GPUScene;
-import :Interaction;
-import :Presentation;
-import :GlobalResources;
-import :Passes.SelectionOutlineSettings;
-import :Pipelines;
+import Graphics.Camera;
+import Graphics.Components;
+import Graphics.RenderPipeline;
+import Graphics.RenderGraph;
+import Graphics.Geometry;
+import Graphics.MaterialSystem;
+import Graphics.ShaderRegistry;
+import Graphics.PipelineLibrary;
+import Graphics.GPUScene;
+import Graphics.Interaction;
+import Graphics.Presentation;
+import Graphics.GlobalResources;
+import Graphics.Passes.SelectionOutlineSettings;
+import Graphics.Pipelines;
 
 import Core.Hash;
 import Core.Memory;
@@ -163,7 +162,7 @@ namespace Graphics
         const FrameRecipe& recipe,
         std::span<const RenderGraphDebugPass> passes,
         std::span<const RenderGraphDebugImage> images,
-        std::span<const ImportedResourceWritePolicy> writePolicies)
+        std::span<const ImportedResourceWritePolicy> writePolicies = {})
     {
         RenderGraphValidationResult result{};
 
