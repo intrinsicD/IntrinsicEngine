@@ -117,6 +117,18 @@ namespace
         {kGpuSystemOrder[4],
          &RegisterGpuSceneSystem<&Graphics::Systems::GPUSceneSync::RegisterSystem>},
     }};
+
+    constexpr std::array<Core::FeatureDescriptor,
+                         kCoreSystemOrder.size() + kGpuSystemOrder.size()> kVariableSystemOrder{{
+        kCoreSystemOrder[0],
+        kCoreSystemOrder[1],
+        kCoreSystemOrder[2],
+        kGpuSystemOrder[0],
+        kGpuSystemOrder[1],
+        kGpuSystemOrder[2],
+        kGpuSystemOrder[3],
+        kGpuSystemOrder[4],
+    }};
 }
 
 namespace Runtime
@@ -137,6 +149,17 @@ namespace Runtime
                                                           context);
     }
 
+    void VariableFrameGraphSystemBundle::Register(this const VariableFrameGraphSystemBundle&,
+                                                  const CoreFrameGraphRegistrationContext& coreContext,
+                                                  const GpuFrameGraphRegistrationContext* gpuContext)
+    {
+        CoreFrameGraphSystemBundle{}.Register(coreContext);
+        if (gpuContext)
+        {
+            GpuFrameGraphSystemBundle{}.Register(*gpuContext);
+        }
+    }
+
     std::span<const Core::FeatureDescriptor> GetCoreFrameGraphFeatureOrder()
     {
         return kCoreSystemOrder;
@@ -145,5 +168,10 @@ namespace Runtime
     std::span<const Core::FeatureDescriptor> GetGpuFrameGraphFeatureOrder()
     {
         return kGpuSystemOrder;
+    }
+
+    std::span<const Core::FeatureDescriptor> GetVariableFrameGraphFeatureOrder()
+    {
+        return kVariableSystemOrder;
     }
 }

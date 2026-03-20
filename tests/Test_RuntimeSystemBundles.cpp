@@ -78,21 +78,12 @@ TEST(RuntimeSystemBundles, ExportedFullVariableFeatureOrderMatchesCanonicalBasel
         "GPUSceneSync",
     };
 
-    const auto coreOrder = Runtime::GetCoreFrameGraphFeatureOrder();
-    const auto gpuOrder = Runtime::GetGpuFrameGraphFeatureOrder();
-    ASSERT_EQ(coreOrder.size() + gpuOrder.size(), kExpectedOrder.size());
+    const auto order = Runtime::GetVariableFrameGraphFeatureOrder();
+    ASSERT_EQ(order.size(), kExpectedOrder.size());
 
-    size_t index = 0;
-    for (const auto& feature : coreOrder)
+    for (size_t i = 0; i < order.size(); ++i)
     {
-        EXPECT_EQ(feature.Name, kExpectedOrder[index]) << "Unexpected combined bundle entry at index " << index;
-        ++index;
-    }
-
-    for (const auto& feature : gpuOrder)
-    {
-        EXPECT_EQ(feature.Name, kExpectedOrder[index]) << "Unexpected combined bundle entry at index " << index;
-        ++index;
+        EXPECT_EQ(order[i].Name, kExpectedOrder[i]) << "Unexpected combined bundle entry at index " << i;
     }
 }
 
@@ -151,4 +142,64 @@ TEST(RuntimeSystemBundles, CoreBundle_RespectsFeatureToggles)
 
     ASSERT_EQ(graph.GetPassCount(), 1u);
     EXPECT_EQ(graph.GetPassName(0), "TransformUpdate");
+}
+
+TEST(RuntimeSystemBundles, VariableBundle_CoreOnlyMatchesCanonicalBaseline)
+{
+    Core::FeatureRegistry featureRegistry;
+    RegisterSystemFeature(featureRegistry, Runtime::SystemFeatureCatalog::TransformUpdate);
+    RegisterSystemFeature(featureRegistry, Runtime::SystemFeatureCatalog::PropertySetDirtySync);
+    RegisterSystemFeature(featureRegistry, Runtime::SystemFeatureCatalog::PrimitiveBVHSync);
+
+    Core::Memory::ScopeStack scope(1024 * 64);
+    Core::FrameGraph graph(scope);
+
+    ECS::Scene scene;
+    auto& registry = scene.GetRegistry();
+
+    Runtime::CoreFrameGraphRegistrationContext context{
+        .Graph = graph,
+        .Registry = registry,
+        .Features = featureRegistry,
+    };
+
+    Runtime::VariableFrameGraphSystemBundle{}.Register(context);
+
+    ASSERT_EQ(graph.GetPassCount(), 3u);
+    EXPECT_EQ(graph.GetPassName(0), "TransformUpdate");
+    EXPECT_EQ(graph.GetPassName(1), "PropertySetDirtySync");
+    EXPECT_EQ(graph.GetPassName(2), "PrimitiveBVHSync");
+
+    const auto compileResult = graph.Compile();
+    ASSERT_TRUE(compileResult.has_value()) << "Compile failed";
+}
+
+TEST(RuntimeSystemBundles, VariableBundle_CoreOnlyRespectsFeatureToggles)
+{
+    Core::FeatureRegistry featureRegistry;
+    RegisterSystemFeature(featureRegistry, Runtime::SystemFeatureCatalog::TransformUpdate);
+    RegisterSystemFeature(featureRegistry, Runtime::SystemFeatureCatalog::PropertySetDirtySync);
+    RegisterSystemFeature(featureRegistry, Runtime::SystemFeatureCatalog::PrimitiveBVHSync);
+    ASSERT_TRUE(featureRegistry.SetEnabled(Runtime::SystemFeatureCatalog::TransformUpdate, false));
+    ASSERT_TRUE(featureRegistry.SetEnabled(Runtime::SystemFeatureCatalog::PrimitiveBVHSync, false));
+
+    Core::Memory::ScopeStack scope(1024 * 64);
+    Core::FrameGraph graph(scope);
+
+    ECS::Scene scene;
+    auto& registry = scene.GetRegistry();
+
+    Runtime::CoreFrameGraphRegistrationContext context{
+        .Graph = graph,
+        .Registry = registry,
+        .Features = featureRegistry,
+    };
+
+    Runtime::VariableFrameGraphSystemBundle{}.Register(context);
+
+    ASSERT_EQ(graph.GetPassCount(), 1u);
+    EXPECT_EQ(graph.GetPassName(0), "PropertySetDirtySync");
+
+    const auto compileResult = graph.Compile();
+    ASSERT_TRUE(compileResult.has_value()) << "Compile failed";
 }

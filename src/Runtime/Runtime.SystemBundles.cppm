@@ -49,6 +49,14 @@ export namespace Runtime
                       const GpuFrameGraphRegistrationContext& context);
     };
 
+    struct VariableFrameGraphSystemBundle
+    {
+        void Register(this const VariableFrameGraphSystemBundle&,
+                      const CoreFrameGraphRegistrationContext& coreContext,
+                      const GpuFrameGraphRegistrationContext* gpuContext = nullptr);
+    };
+
     [[nodiscard]] std::span<const Core::FeatureDescriptor> GetCoreFrameGraphFeatureOrder();
     [[nodiscard]] std::span<const Core::FeatureDescriptor> GetGpuFrameGraphFeatureOrder();
+    [[nodiscard]] std::span<const Core::FeatureDescriptor> GetVariableFrameGraphFeatureOrder();
 }

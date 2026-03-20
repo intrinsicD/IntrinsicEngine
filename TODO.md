@@ -58,8 +58,9 @@ These are not required to finish the first wave, but they should begin soon afte
 
 O2 remains the default migration path per `docs/architecture/adr-o2-pragmatic-medium-runtime-refactor.md` unless future benchmark/test evidence overturns it.
 - [ ] Execute phased migration with safe checkpoints:
-  - [ ] Phase 2 follow-through: validate the landed typed system bundles in `Engine::Run()` against the existing lifecycle/resource reclaim baseline.
-    - [ ] Safe checkpoint: lifecycle/resource reclaim tests unchanged.
+  - [x] Phase 2 follow-through: validate the landed typed system bundles in `Engine::Run()` against the existing lifecycle/resource reclaim baseline.
+    - Added `VariableFrameGraphSystemBundle` as the canonical runtime registration path so `RuntimeRenderLaneHost` no longer reassembles core/GPU bundle sequencing inline.
+    - Safe checkpoint: lifecycle/resource reclaim tests unchanged.
   - [ ] Phase 3: Move drag-drop + async load orchestration into streaming service state machine.
     - [ ] Safe checkpoint: asset ingest completion/integrity metrics unchanged.
   - [ ] Phase 4: Harden typed contracts for hybrid/deferred and post-process factoring.
