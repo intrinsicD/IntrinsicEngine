@@ -516,9 +516,9 @@ TEST(PerFaceAttr_Segmentation, SegmentationVisualization_PerFaceLabels)
 
 TEST(PerFaceAttr_Integration, PushConstantsSizeMatchesCurrentLayout)
 {
-    // MeshPushConstants includes both per-face and per-vertex attribute BDAs.
-    EXPECT_EQ(sizeof(RHI::MeshPushConstants), 112u);
-    EXPECT_LE(sizeof(RHI::MeshPushConstants), 256u);
+    // MeshPushConstants includes per-face, per-vertex, and index buffer BDA pointers.
+    EXPECT_EQ(sizeof(RHI::MeshPushConstants), 120u);
+    EXPECT_LE(sizeof(RHI::MeshPushConstants), 128u);
 }
 
 TEST(PerFaceAttr_Integration, PushConstantsPtrFaceAttrOffset)
@@ -533,9 +533,11 @@ TEST(PerFaceAttr_Integration, PushConstantsPtrFaceAttrOffset)
     //   float    PointSizePx    (4 bytes, offset 92)
     //   uint64_t PtrFaceAttr    (8 bytes, offset 96)
     //   uint64_t PtrVertexAttr  (8 bytes, offset 104)
-    //   Total: 112 bytes
+    //   uint64_t PtrIndices     (8 bytes, offset 112)
+    //   Total: 120 bytes
     EXPECT_EQ(offsetof(RHI::MeshPushConstants, PtrFaceAttr), 96u);
     EXPECT_EQ(offsetof(RHI::MeshPushConstants, PtrVertexAttr), 104u);
+    EXPECT_EQ(offsetof(RHI::MeshPushConstants, PtrIndices), 112u);
 }
 
 TEST(PerFaceAttr_Integration, PushConstantsPtrFaceAttrDefaultZero)

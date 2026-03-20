@@ -473,8 +473,10 @@ namespace Graphics::Passes
         // Resolve per-vertex attribute buffers from Surface components.
         // Maps geometry handle index → vertex attribute BDA address.
         // First entity with CachedVertexColors for a geometry wins.
+        // Also tracks which geometries want nearest-vertex (Voronoi) rendering.
         // -----------------------------------------------------------------
         std::unordered_map<uint32_t, uint64_t> vertexAttrByGeoIndex;
+        std::unordered_map<uint32_t, bool> nearestVertexByGeoIndex;
         {
             auto visView = ctx.Scene.GetRegistry().view<ECS::Surface::Component>();
             for (auto [entity, sc] : visView.each())
@@ -489,7 +491,10 @@ namespace Graphics::Passes
                 const uint64_t addr = EnsureVertexAttrBuffer(
                     sc.Geometry.Index, sc.CachedVertexColors.data(), vertexCount);
                 if (addr != 0)
+                {
                     vertexAttrByGeoIndex[sc.Geometry.Index] = addr;
+                    nearestVertexByGeoIndex[sc.Geometry.Index] = sc.UseNearestVertexColors;
+                }
             }
         }
 
@@ -536,6 +541,17 @@ namespace Graphics::Passes
             // Per-vertex attribute buffer (0 = no per-vertex colors).
             auto vertexIt = vertexAttrByGeoIndex.find(g.Handle.Index);
             b.PtrVertexAttr = (vertexIt != vertexAttrByGeoIndex.end()) ? vertexIt->second : 0;
+
+            // Index buffer BDA for nearest-vertex Voronoi rendering.
+            // Only set when vertex attrs exist AND nearest-vertex mode is active.
+            {
+                auto nearestIt = nearestVertexByGeoIndex.find(g.Handle.Index);
+                if (nearestIt != nearestVertexByGeoIndex.end() && nearestIt->second
+                    && b.PtrVertexAttr != 0 && g.Geo->GetIndexBuffer())
+                {
+                    b.PtrIndices = g.Geo->GetIndexBuffer()->GetDeviceAddress();
+                }
+            }
 
             // Packed buffers.
             b.InstanceBuffer = &ctx.GpuScene->GetSceneBuffer();
@@ -719,7 +735,8 @@ namespace Graphics::Passes
                                                 .VisibilityBase = b.VisibilityBase,
                                                 .PointSizePx = (b.Topology == VK_PRIMITIVE_TOPOLOGY_POINT_LIST) ? b.PointSizePx : 1.0f,
                                                 .PtrFaceAttr = b.PtrFaceAttr,
-                                                .PtrVertexAttr = b.PtrVertexAttr
+                                                .PtrVertexAttr = b.PtrVertexAttr,
+                                                .PtrIndices = b.PtrIndices
                                             };
                                             vkCmdPushConstants(cmd, desired->GetLayout(),
                                                                VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
@@ -934,6 +951,7 @@ namespace Graphics::Passes
                                             pc.PointSizePx = b.PointSizePx;
                                             pc.PtrFaceAttr = b.PtrFaceAttr;
                                             pc.PtrVertexAttr = b.PtrVertexAttr;
+                                            pc.PtrIndices = b.PtrIndices;
 
                                             vkCmdPushConstants(cmd, desired->GetLayout(),
                                                                VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,

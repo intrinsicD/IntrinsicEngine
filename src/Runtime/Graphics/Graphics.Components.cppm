@@ -638,6 +638,10 @@ export namespace ECS::Surface
         // per-face colors. When false, standard texture/material shading
         // is used even if face color data exists. Toggled via Inspector UI.
         bool ShowPerFaceColors = true;
+
+        // When true, per-vertex colors are rendered as nearest-vertex (Voronoi)
+        // instead of smooth interpolation. Requires PtrIndices in the draw batch.
+        bool UseNearestVertexColors = false;
     };
 }
 

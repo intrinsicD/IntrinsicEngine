@@ -137,6 +137,7 @@ TEST(RenderPassContract_Surface, MeshPushConstantsBDADefaultsToZero)
     EXPECT_EQ(pc.PtrAux, 0u);
     EXPECT_EQ(pc.PtrFaceAttr, 0u);
     EXPECT_EQ(pc.PtrVertexAttr, 0u);
+    EXPECT_EQ(pc.PtrIndices, 0u);
 }
 
 TEST(RenderPassContract_Surface, CullWorkgroupSizeIs64)

@@ -71,6 +71,12 @@ export namespace Graphics
 
         IsolineConfig Isolines;
 
+        /// When true, per-vertex colors are not interpolated across triangles.
+        /// Instead, each fragment picks the color of the closest triangle vertex
+        /// (by Euclidean distance in object space), producing Voronoi-like regions.
+        /// Used for cluster label visualization (e.g. K-Means).
+        bool UseNearestVertexColors = false;
+
         /// Multiple vector fields can be active simultaneously.
         /// Each spawns a separate child Graph entity.
         std::vector<VectorFieldEntry> VectorFields;

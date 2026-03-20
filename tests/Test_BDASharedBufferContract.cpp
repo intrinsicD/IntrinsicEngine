@@ -517,10 +517,10 @@ TEST(BDA_PerFaceAttr, SurfaceFaceColorPopulation)
 
 TEST(BDA_PerFaceAttr, MeshPushConstantsSizeUnchanged)
 {
-    // MeshPushConstants currently includes both per-face and per-vertex
-    // attribute pointers while remaining within the 256-byte Vulkan budget.
-    EXPECT_EQ(sizeof(RHI::MeshPushConstants), 112u);
-    EXPECT_LE(sizeof(RHI::MeshPushConstants), 256u);
+    // MeshPushConstants includes per-face, per-vertex, and index buffer BDA
+    // pointers while remaining within the 128-byte Vulkan minimum budget.
+    EXPECT_EQ(sizeof(RHI::MeshPushConstants), 120u);
+    EXPECT_LE(sizeof(RHI::MeshPushConstants), 128u);
 }
 
 TEST(BDA_PerFaceAttr, MeshPushConstantsPtrFaceAttrDefaultZero)

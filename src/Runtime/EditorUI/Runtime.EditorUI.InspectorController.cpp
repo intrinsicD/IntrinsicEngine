@@ -359,6 +359,9 @@ void InspectorController::Draw()
                         if (ColorSourceWidget("Vertex Color Source", md->Visualization.VertexColors, vtxPs,
                                               "MeshVtx"))
                         {
+                            // Clear nearest-vertex mode when user switches away from kmeans labels.
+                            if (md->Visualization.VertexColors.PropertyName != "v:kmeans_label_f")
+                                md->Visualization.UseNearestVertexColors = false;
                             md->AttributesDirty = true;
                             reg.emplace_or_replace<ECS::DirtyTag::VertexAttributes>(selected);
                         }
