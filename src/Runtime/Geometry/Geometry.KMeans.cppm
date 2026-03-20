@@ -71,5 +71,38 @@ export namespace Geometry::KMeans
     [[nodiscard]] std::optional<Result> Cluster(
         std::span<const glm::vec3> points,
         const Params& params = {});
-}
 
+    // Recompute cluster centroids directly from an existing label assignment.
+    //
+    // This is useful for downstream visualization paths that only persist labels
+    // but still need a centroidal Voronoi evaluation of arbitrary samples.
+    //
+    // Robustness:
+    //   - returns zero vectors for empty / invalid clusters,
+    //   - ignores labels outside [0, clusterCount),
+    //   - ignores non-finite sample positions.
+    //
+    // Complexity:
+    //   - Time: O(n)
+    //   - Space: O(k)
+    [[nodiscard]] std::vector<glm::vec3> RecomputeCentroids(
+        std::span<const glm::vec3> points,
+        std::span<const uint32_t> labels,
+        uint32_t clusterCount);
+
+    // Classify an arbitrary sample against a centroid set.
+    //
+    // Returns the nearest centroid index under the squared Euclidean metric:
+    //   $$ \ell(x) = \arg\min_j \|x - c_j\|_2^2 $$
+    //
+    // Robustness:
+    //   - returns nullopt for empty centroid sets or non-finite query points,
+    //   - skips non-finite centroids.
+    //
+    // Complexity:
+    //   - Time: O(k)
+    //   - Space: O(1)
+    [[nodiscard]] std::optional<uint32_t> ClassifyPointToCentroid(
+        const glm::vec3& point,
+        std::span<const glm::vec3> centroids) noexcept;
+}

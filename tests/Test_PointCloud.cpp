@@ -581,3 +581,38 @@ TEST(PointCloud_KMeans, ClusterCountIsClampedToPointCount)
     EXPECT_EQ(result->Labels.size(), points.size());
 }
 
+TEST(PointCloud_KMeans, RecomputeCentroidsMatchesPerLabelMeans)
+{
+    const std::vector<glm::vec3> points{
+        {-2.0f, 0.0f, 0.0f},
+        {-4.0f, 0.0f, 0.0f},
+        {10.0f, 0.0f, 0.0f},
+        {14.0f, 0.0f, 0.0f},
+    };
+    const std::vector<uint32_t> labels{0u, 0u, 1u, 1u};
+
+    const auto centroids = Geometry::KMeans::RecomputeCentroids(points, labels, 2u);
+    ASSERT_EQ(centroids.size(), 2u);
+    EXPECT_FLOAT_EQ(centroids[0].x, -3.0f);
+    EXPECT_FLOAT_EQ(centroids[0].y, 0.0f);
+    EXPECT_FLOAT_EQ(centroids[0].z, 0.0f);
+    EXPECT_FLOAT_EQ(centroids[1].x, 12.0f);
+    EXPECT_FLOAT_EQ(centroids[1].y, 0.0f);
+    EXPECT_FLOAT_EQ(centroids[1].z, 0.0f);
+}
+
+TEST(PointCloud_KMeans, ClassifyPointToCentroidUsesCentroidVoronoiCells)
+{
+    const std::vector<glm::vec3> centroids{
+        {-3.0f, 0.0f, 0.0f},
+        {12.0f, 0.0f, 0.0f},
+    };
+
+    const auto left = Geometry::KMeans::ClassifyPointToCentroid(glm::vec3{-1.0f, 0.0f, 0.0f}, centroids);
+    ASSERT_TRUE(left.has_value());
+    EXPECT_EQ(*left, 0u);
+
+    const auto right = Geometry::KMeans::ClassifyPointToCentroid(glm::vec3{9.0f, 0.0f, 0.0f}, centroids);
+    ASSERT_TRUE(right.has_value());
+    EXPECT_EQ(*right, 1u);
+}

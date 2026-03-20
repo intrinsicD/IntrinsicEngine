@@ -26,6 +26,7 @@ import ECS;
 
 import Geometry.HalfedgeMesh;
 import Geometry.HtexPatch;
+import Geometry.KMeans;
 import Geometry.Frustum;
 import Geometry.Overlap;
 import Geometry.Sphere;
@@ -96,10 +97,16 @@ namespace Graphics::Passes
         {
             Geometry::Property<uint32_t> Labels{};
             Geometry::Property<glm::vec4> Colors{};
+            std::vector<glm::vec3> Centroids{};
 
             [[nodiscard]] bool HasAny() const noexcept
             {
                 return static_cast<bool>(Labels) || static_cast<bool>(Colors);
+            }
+
+            [[nodiscard]] bool HasCentroidField() const noexcept
+            {
+                return static_cast<bool>(Labels) && !Centroids.empty();
             }
         };
 
@@ -113,11 +120,55 @@ namespace Graphics::Passes
             return static_cast<float>(labels[v.Index]);
         }
 
+        [[nodiscard]] std::vector<glm::vec3> ReconstructPreviewCentroids(
+            const Geometry::Halfedge::Mesh& mesh,
+            const Geometry::Property<uint32_t>& labels)
+        {
+            if (!labels)
+                return {};
+
+            uint32_t clusterCount = 0u;
+            for (std::size_t i = 0; i < mesh.VertexCount(); ++i)
+            {
+                const Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(i)};
+                if (!mesh.IsValid(v) || mesh.IsDeleted(v))
+                    continue;
+                clusterCount = std::max(clusterCount, labels[v.Index] + 1u);
+            }
+
+            if (clusterCount == 0u)
+                return {};
+
+            std::vector<glm::vec3> points;
+            std::vector<uint32_t> pointLabels;
+            points.reserve(mesh.VertexCount());
+            pointLabels.reserve(mesh.VertexCount());
+
+            for (std::size_t i = 0; i < mesh.VertexCount(); ++i)
+            {
+                const Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(i)};
+                if (!mesh.IsValid(v) || mesh.IsDeleted(v))
+                    continue;
+
+                const glm::vec3 p = mesh.Position(v);
+                if (!std::isfinite(p.x) || !std::isfinite(p.y) || !std::isfinite(p.z))
+                    continue;
+
+                points.push_back(p);
+                pointLabels.push_back(labels[v.Index]);
+            }
+
+            return Geometry::KMeans::RecomputeCentroids(points, pointLabels, clusterCount);
+        }
+
         [[nodiscard]] PreviewKMeansData GetPreviewKMeansData(const Geometry::Halfedge::Mesh& mesh) noexcept
         {
             return {
                 .Labels = mesh.VertexProperties().Get<uint32_t>("v:kmeans_label"),
                 .Colors = mesh.VertexProperties().Get<glm::vec4>("v:kmeans_color"),
+                .Centroids = ReconstructPreviewCentroids(
+                    mesh,
+                    mesh.VertexProperties().Get<uint32_t>("v:kmeans_label")),
             };
         }
 
@@ -172,27 +223,12 @@ namespace Graphics::Passes
             return w0 * tri.Positions[0] + localUV.x * tri.Positions[1] + localUV.y * tri.Positions[2];
         }
 
-        [[nodiscard]] std::size_t ClosestTriangleVertex(const HalfedgeTriangle& tri, glm::vec3 p) noexcept
-        {
-            std::size_t best = 0;
-            float bestDistance2 = glm::dot(p - tri.Positions[0], p - tri.Positions[0]);
-            for (std::size_t i = 1; i < tri.Positions.size(); ++i)
-            {
-                const float distance2 = glm::dot(p - tri.Positions[i], p - tri.Positions[i]);
-                if (distance2 < bestDistance2)
-                {
-                    bestDistance2 = distance2;
-                    best = i;
-                }
-            }
-            return best;
-        }
-
         [[nodiscard]] float KMeansVertexScalar(const Geometry::Halfedge::Mesh& mesh,
                                                const HalfedgeTriangle& tri,
                                                glm::vec2 patchUV,
                                                std::uint32_t halfedgeIndex,
                                                std::uint32_t twinIndex,
+                                               std::span<const glm::vec3> kmeansCentroids,
                                                const Geometry::Property<uint32_t>& kmeansLabels) noexcept
         {
             if (!tri.Valid)
@@ -203,8 +239,17 @@ namespace Graphics::Passes
                 return 0.0f;
 
             const glm::vec3 p = EvaluateTrianglePoint(tri, localUV);
-            const std::size_t winner = ClosestTriangleVertex(tri, p);
-            return VertexLabelScalar(mesh, kmeansLabels, tri.Vertices[winner]);
+            if (const auto winner = Geometry::KMeans::ClassifyPointToCentroid(p, kmeansCentroids))
+                return static_cast<float>(*winner);
+
+            for (Geometry::VertexHandle v : tri.Vertices)
+            {
+                const float label = VertexLabelScalar(mesh, kmeansLabels, v);
+                if (label >= 0.0f)
+                    return label;
+            }
+
+            return -1.0f;
         }
 
         [[nodiscard]] float ComputeTileScalarFromPatch(const Geometry::Halfedge::Mesh& mesh,
@@ -216,7 +261,7 @@ namespace Graphics::Passes
             const bool hasH0 = h0.IsValid() && mesh.IsValid(h0);
             const bool hasH1 = h1.IsValid() && mesh.IsValid(h1);
 
-            if (kmeansData.Labels && hasH0)
+            if (kmeansData.HasCentroidField() && hasH0)
             {
                 const HalfedgeTriangle tri = BuildHalfedgeTriangle(mesh, h0);
                 if (tri.Valid)
@@ -228,6 +273,7 @@ namespace Graphics::Passes
                         centerUV,
                         patch.Halfedge0Index,
                         patch.Halfedge1Index,
+                        kmeansData.Centroids,
                         kmeansData.Labels);
                     if (tri0Scalar >= 0.0f)
                     {
@@ -245,6 +291,7 @@ namespace Graphics::Passes
                                 centerUV,
                                 patch.Halfedge1Index,
                                 patch.Halfedge0Index,
+                                kmeansData.Centroids,
                                 kmeansData.Labels);
                             if (tri1Scalar >= 0.0f)
                                 return tri1Scalar;
@@ -418,7 +465,7 @@ namespace Graphics::Passes
         outHeight = rows * kTileSize;
         outPixels.assign(static_cast<size_t>(outWidth) * static_cast<size_t>(outHeight), glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
         const PreviewKMeansData kmeansData = GetPreviewKMeansData(mesh);
-        const bool hasPerTexelKMeans = static_cast<bool>(kmeansData.Labels);
+        const bool hasPerTexelKMeans = kmeansData.HasCentroidField();
 
         for (std::size_t i = 0; i < patches.size(); ++i)
         {
@@ -449,6 +496,7 @@ namespace Graphics::Passes
                             patchUV,
                             patch.Halfedge0Index,
                             patch.Halfedge1Index,
+                            kmeansData.Centroids,
                             kmeansData.Labels);
                         const float tri1Scalar = KMeansVertexScalar(
                             mesh,
@@ -456,6 +504,7 @@ namespace Graphics::Passes
                             patchUV,
                             patch.Halfedge1Index,
                             patch.Halfedge0Index,
+                            kmeansData.Centroids,
                             kmeansData.Labels);
 
                         if (tri0Scalar >= 0.0f)

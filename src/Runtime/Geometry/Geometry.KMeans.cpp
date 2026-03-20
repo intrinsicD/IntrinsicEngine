@@ -21,6 +21,11 @@ namespace Geometry::KMeans
 {
     namespace
     {
+        [[nodiscard]] bool IsFiniteVec3(const glm::vec3& v) noexcept
+        {
+            return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z);
+        }
+
         [[nodiscard]] float SquaredDistance(const glm::vec3& a, const glm::vec3& b)
         {
             const glm::vec3 d = a - b;
@@ -177,5 +182,60 @@ namespace Geometry::KMeans
 
         return result;
     }
-}
 
+    std::vector<glm::vec3> RecomputeCentroids(
+        std::span<const glm::vec3> points,
+        std::span<const uint32_t> labels,
+        uint32_t clusterCount)
+    {
+        if (clusterCount == 0 || points.empty() || labels.size() != points.size())
+            return {};
+
+        std::vector<glm::vec3> centroids(clusterCount, glm::vec3(0.0f));
+        std::vector<uint32_t> counts(clusterCount, 0u);
+
+        for (std::size_t i = 0; i < points.size(); ++i)
+        {
+            const uint32_t label = labels[i];
+            if (label >= clusterCount || !IsFiniteVec3(points[i]))
+                continue;
+
+            centroids[label] += points[i];
+            ++counts[label];
+        }
+
+        for (uint32_t c = 0; c < clusterCount; ++c)
+        {
+            if (counts[c] > 0)
+                centroids[c] /= static_cast<float>(counts[c]);
+        }
+
+        return centroids;
+    }
+
+    std::optional<uint32_t> ClassifyPointToCentroid(
+        const glm::vec3& point,
+        std::span<const glm::vec3> centroids) noexcept
+    {
+        if (centroids.empty() || !IsFiniteVec3(point))
+            return std::nullopt;
+
+        std::optional<uint32_t> bestCluster;
+        float bestDistance = 0.0f;
+
+        for (uint32_t c = 0; c < static_cast<uint32_t>(centroids.size()); ++c)
+        {
+            if (!IsFiniteVec3(centroids[c]))
+                continue;
+
+            const float d = SquaredDistance(point, centroids[c]);
+            if (!bestCluster || d < bestDistance)
+            {
+                bestCluster = c;
+                bestDistance = d;
+            }
+        }
+
+        return bestCluster;
+    }
+}
