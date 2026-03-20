@@ -1,5 +1,6 @@
 module;
 
+#include <cmath>
 #include <glm/glm.hpp>
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/quaternion.hpp>
@@ -7,6 +8,8 @@ module;
 #include <span>
 
 export module Geometry:Ellipsoid;
+
+import :OBB;
 
 export namespace Geometry
 {
@@ -58,6 +61,29 @@ export namespace Geometry
         return static_cast<double>(ellipsoid.GetVolume());
     }
 
-    [[nodiscard]] Ellipsoid ToEllipsoiod(std::span<const glm::vec3> points); //TODO: implement this
-}
+    [[nodiscard]] inline Ellipsoid ToEllipsoiod(std::span<const glm::vec3> points)
+    {
+        const OBB obb = ToOOBB(points);
 
+        Ellipsoid ellipsoid;
+        ellipsoid.Center = obb.Center;
+        ellipsoid.Rotation = obb.Rotation;
+        ellipsoid.Radii = glm::max(obb.Extents, glm::vec3{1.0e-6f});
+
+        float maxNormalizedLengthSq = 1.0f;
+        for (const glm::vec3& point : points)
+        {
+            if (!std::isfinite(point.x) || !std::isfinite(point.y) || !std::isfinite(point.z))
+            {
+                continue;
+            }
+
+            const glm::vec3 local = ellipsoid.ToLocal(point);
+            const glm::vec3 scaled = local / ellipsoid.Radii;
+            maxNormalizedLengthSq = std::max(maxNormalizedLengthSq, glm::dot(scaled, scaled));
+        }
+
+        ellipsoid.Radii *= std::sqrt(maxNormalizedLengthSq);
+        return ellipsoid;
+    }
+}

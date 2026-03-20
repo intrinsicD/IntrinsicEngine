@@ -6,6 +6,8 @@ module;
 
 export module Geometry:Plane;
 
+import :Pca;
+
 export namespace Geometry
 {
     struct Plane
@@ -53,5 +55,28 @@ export namespace Geometry
         return ClosestPoint(plane, point);
     }
 
-    [[nodiscard]] Plane ToPlane(std::span<const glm::vec3> points); //TODO: implement this
+    [[nodiscard]] inline Plane ToPlane(std::span<const glm::vec3> points)
+    {
+        const PcaResult pca = ToPca(points);
+
+        Plane plane;
+        plane.Distance = 0.0f;
+
+        if (!pca.Valid)
+        {
+            return plane;
+        }
+
+        glm::vec3 normal = glm::normalize(glm::vec3{pca.Eigenvectors[2]});
+        if (!std::isfinite(normal.x) || !std::isfinite(normal.y) || !std::isfinite(normal.z)
+            || glm::dot(normal, normal) <= 1.0e-12f)
+        {
+            normal = glm::vec3{0.0f, 1.0f, 0.0f};
+        }
+
+        plane.Normal = normal;
+        plane.Distance = -glm::dot(plane.Normal, pca.Mean);
+        plane.Normalize();
+        return plane;
+    }
 }

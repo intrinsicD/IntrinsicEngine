@@ -1,15 +1,18 @@
 module;
 
+#include <cmath>
 #include <glm/glm.hpp>
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/component_wise.hpp>
 #include <glm/gtx/quaternion.hpp>
+#include <limits>
 #include <span>
 #include <array>
 
 export module Geometry:OBB;
 
 import :AABB;
+import :Pca;
 
 export namespace Geometry
 {
@@ -202,5 +205,54 @@ export namespace Geometry
         return bounds;
     }
 
-    [[nodiscard]] OBB ToOOBB(std::span<const glm::vec3> points); //TODO: implement this
+    [[nodiscard]] inline OBB ToOOBB(std::span<const glm::vec3> points)
+    {
+        const auto isFinite = [](const glm::vec3& point)
+        {
+            return std::isfinite(point.x) && std::isfinite(point.y) && std::isfinite(point.z);
+        };
+
+        const PcaResult pca = ToPca(points);
+        if (!pca.Valid)
+        {
+            return OBB{};
+        }
+
+        glm::mat3 basis = pca.Eigenvectors;
+        glm::vec3 axis0 = glm::normalize(basis[0]);
+        glm::vec3 axis1 = glm::normalize(basis[1]);
+        glm::vec3 axis2 = glm::normalize(glm::cross(axis0, axis1));
+        if (glm::dot(axis2, axis2) <= 1.0e-12f)
+        {
+            axis2 = glm::vec3{0.0f, 0.0f, 1.0f};
+        }
+        axis1 = glm::normalize(glm::cross(axis2, axis0));
+        basis = glm::mat3{axis0, axis1, axis2};
+
+        glm::vec3 minLocal(std::numeric_limits<float>::max());
+        glm::vec3 maxLocal(-std::numeric_limits<float>::max());
+        for (const glm::vec3& point : points)
+        {
+            if (!isFinite(point))
+            {
+                continue;
+            }
+
+            const glm::vec3 local{
+                glm::dot(point - pca.Mean, basis[0]),
+                glm::dot(point - pca.Mean, basis[1]),
+                glm::dot(point - pca.Mean, basis[2]),
+            };
+            minLocal = glm::min(minLocal, local);
+            maxLocal = glm::max(maxLocal, local);
+        }
+
+        const glm::vec3 localCenter = 0.5f * (minLocal + maxLocal);
+
+        OBB obb;
+        obb.Extents = glm::max(0.5f * (maxLocal - minLocal), glm::vec3{0.0f});
+        obb.Center = pca.Mean + basis * localCenter;
+        obb.Rotation = glm::normalize(glm::quat_cast(basis));
+        return obb;
+    }
 }

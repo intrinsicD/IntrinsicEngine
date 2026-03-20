@@ -6,6 +6,7 @@ export import :Sphere;
 export import :Capsule;
 export import :Cylinder;
 export import :Ellipsoid;
+export import :Pca;
 export import :Segment;
 export import :Triangle;
 export import :Plane;
