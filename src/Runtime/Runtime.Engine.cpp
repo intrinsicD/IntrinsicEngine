@@ -346,29 +346,30 @@ namespace Runtime
                 }
             }
 
-            streamingLane.BeginFrame();
-
-            RunFixedSteps(
+            RunFramePhases(
+                frameTime,
                 accumulator,
                 frameLoopPolicy,
-                [&](float fixedDeltaTime) { OnFixedUpdate(fixedDeltaTime); },
-                [&](Core::FrameGraph& graph, float fixedDeltaTime) { OnRegisterFixedSystems(graph, fixedDeltaTime); },
+                streamingLane,
+                renderLane,
                 m_RenderOrchestrator->GetFrameGraph(),
-                [&](Core::FrameGraph& graph) { executeGraph.Execute(graph); });
-
-            // Resize is synchronized immediately after Window::OnUpdate() so render/update
-            // always see the current framebuffer extent on monitor moves and DPI changes.
-            renderLane.Run(
-                frameTime,
                 {
-                    .OnUpdate = [&](float dt) { OnUpdate(dt); },
-                    .RegisterVariableSystems = [&](Core::FrameGraph& graph, float dt) { OnRegisterSystems(graph, dt); },
-                    .BeforeDispatch = [&]() { Runtime::PointCloudKMeans::PumpCompletions(*this); },
-                    .OnRender = [&]() { OnRender(); },
-                },
-                [&](Core::FrameGraph& graph) { executeGraph.Execute(graph); });
-
-            streamingLane.EndFrame();
+                    .OnFixedUpdate = [&](float fixedDeltaTime) { OnFixedUpdate(fixedDeltaTime); },
+                    .RegisterFixedSystems = [&](Core::FrameGraph& graph, float fixedDeltaTime)
+                    { OnRegisterFixedSystems(graph, fixedDeltaTime); },
+                    .ExecuteFixedGraph = [&](Core::FrameGraph& graph) { executeGraph.Execute(graph); },
+                    .Render =
+                        {
+                            // Resize is synchronized immediately after Window::OnUpdate() so render/update
+                            // always see the current framebuffer extent on monitor moves and DPI changes.
+                            .OnUpdate = [&](float dt) { OnUpdate(dt); },
+                            .RegisterVariableSystems = [&](Core::FrameGraph& graph, float dt)
+                            { OnRegisterSystems(graph, dt); },
+                            .BeforeDispatch = [&]() { Runtime::PointCloudKMeans::PumpCompletions(*this); },
+                            .OnRender = [&]() { OnRender(); },
+                        },
+                    .ExecuteVariableGraph = [&](Core::FrameGraph& graph) { executeGraph.Execute(graph); },
+                });
 
             Core::Telemetry::TelemetrySystem::Get().SetTaskSchedulerStats(Core::Tasks::Scheduler::GetStats());
             Core::Telemetry::TelemetrySystem::Get().SetFrameGraphTimings(

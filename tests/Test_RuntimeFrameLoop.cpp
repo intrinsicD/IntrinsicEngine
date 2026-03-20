@@ -233,3 +233,106 @@ TEST(RuntimeFrameLoop, RenderLaneCoordinator_OrdersUpdateRegistrationExecutionDi
     };
     EXPECT_EQ(trace, expectedTrace);
 }
+
+TEST(RuntimeFrameLoop, RunFramePhases_PreservesStreamingFixedAndRenderLaneBaselineOrder)
+{
+    Runtime::FrameLoopPolicy policy{
+        .FixedDt = 0.1,
+        .MaxFrameDelta = 0.25,
+        .MaxSubstepsPerFrame = 8,
+    };
+
+    double accumulator = 0.25;
+
+    Core::Memory::ScopeStack scope(64 * 1024);
+    Core::FrameGraph graph(scope);
+    std::vector<std::string> trace;
+
+    FakeStreamingLaneHost streamingHost;
+    FakeRenderLaneHost renderHost(graph);
+
+    const Runtime::StreamingLaneCoordinator streamingLane{.Host = streamingHost};
+    const Runtime::RenderLaneCoordinator renderLane{.Host = renderHost};
+
+    const Runtime::FramePhaseRunResult result = Runtime::RunFramePhases(
+        1.0 / 60.0,
+        accumulator,
+        policy,
+        streamingLane,
+        renderLane,
+        graph,
+        {
+            .OnFixedUpdate = [&](float dt)
+            {
+                EXPECT_NEAR(dt, 0.1f, 1e-6f);
+                trace.emplace_back("fixed:update");
+            },
+            .RegisterFixedSystems = [&](Core::FrameGraph& fixedGraph, float dt)
+            {
+                EXPECT_EQ(&fixedGraph, &graph);
+                EXPECT_NEAR(dt, 0.1f, 1e-6f);
+                trace.emplace_back("fixed:register");
+            },
+            .ExecuteFixedGraph = [&](Core::FrameGraph& fixedGraph)
+            {
+                EXPECT_EQ(&fixedGraph, &graph);
+                trace.emplace_back("fixed:execute");
+            },
+            .Render =
+                {
+                    .OnUpdate = [&](float dt)
+                    {
+                        EXPECT_NEAR(dt, 1.0f / 60.0f, 1e-6f);
+                        trace.emplace_back("render:update");
+                    },
+                    .RegisterVariableSystems = [&](Core::FrameGraph& renderGraph, float dt)
+                    {
+                        EXPECT_EQ(&renderGraph, &graph);
+                        EXPECT_NEAR(dt, 1.0f / 60.0f, 1e-6f);
+                        trace.emplace_back("render:register_client");
+                    },
+                    .BeforeDispatch = [&]() { trace.emplace_back("render:before_dispatch"); },
+                    .OnRender = [&]() { trace.emplace_back("render"); },
+                },
+            .ExecuteVariableGraph = [&](Core::FrameGraph& renderGraph)
+            {
+                EXPECT_EQ(&renderGraph, &graph);
+                trace.emplace_back("render:execute");
+            },
+        });
+
+    EXPECT_EQ(result.FixedStep.ExecutedSubsteps, 2);
+    EXPECT_FALSE(result.FixedStep.AccumulatorClamped);
+    EXPECT_NEAR(accumulator, 0.05, kEpsilon);
+
+    const std::vector<std::string> expectedStreamingCalls{
+        "queue",
+        "uploads",
+        "textures",
+        "materials",
+        "gc",
+    };
+    EXPECT_EQ(streamingHost.Calls, expectedStreamingCalls);
+
+    const std::vector<std::string> expectedRenderHostCalls{
+        "get_graph",
+        "register_engine",
+        "dispatch",
+    };
+    EXPECT_EQ(renderHost.Calls, expectedRenderHostCalls);
+
+    const std::vector<std::string> expectedTrace{
+        "fixed:update",
+        "fixed:register",
+        "fixed:execute",
+        "fixed:update",
+        "fixed:register",
+        "fixed:execute",
+        "render:update",
+        "render:register_client",
+        "render:execute",
+        "render:before_dispatch",
+        "render",
+    };
+    EXPECT_EQ(trace, expectedTrace);
+}
