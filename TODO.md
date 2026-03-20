@@ -78,8 +78,6 @@ O2 remains the default migration path per `docs/architecture/adr-o2-pragmatic-me
 
 ##### Performance
 
-- [ ] Hoist per-texel string property lookups (`mesh.GetFaceProperty<T>(name, ...)`) outside the inner loop in HTex atlas building — move to a single lookup before iteration (`82a96bf`).
-
 ##### Architecture / Pattern Compliance
 
 - [ ] Investigate templating the Circulators module — ~500 lines of near-identical boilerplate across circulator types could be reduced significantly.
