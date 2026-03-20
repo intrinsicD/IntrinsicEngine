@@ -125,6 +125,7 @@ intrinsic_test_object_lib(GeometryTestObjs
         Test_Curvature.cpp
         Test_Raycast.cpp
         Test_GeometryQueries.cpp
+        Test_PcaPrimitives.cpp
         Test_Overlap.cpp
         Test_MarchingCubes.cpp
         Test_GJK.cpp

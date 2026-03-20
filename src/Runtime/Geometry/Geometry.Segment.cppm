@@ -1,12 +1,15 @@
 module;
 
 #include <cmath>
+#include <limits>
 #include <span>
 #include <glm/glm.hpp>
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/norm.hpp>
 
 export module Geometry:Segment;
+
+import :Pca;
 
 export namespace Geometry
 {
@@ -68,5 +71,76 @@ export namespace Geometry
         return std::sqrt(SquaredDistance(segment, point));
     }
 
-    [[nodiscard]] Segment ToSegment(std::span<const glm::vec3> points); //TODO: implement this
+    [[nodiscard]] inline Segment ToSegment(std::span<const glm::vec3> points)
+    {
+        const auto isFinite = [](const glm::vec3& point)
+        {
+            return std::isfinite(point.x) && std::isfinite(point.y) && std::isfinite(point.z);
+        };
+
+        Segment segment{};
+
+        glm::vec3 firstFinite{0.0f};
+        bool hasFirstFinite = false;
+        std::size_t finiteCount = 0;
+        for (const glm::vec3& point : points)
+        {
+            if (!isFinite(point))
+            {
+                continue;
+            }
+
+            if (!hasFirstFinite)
+            {
+                firstFinite = point;
+                hasFirstFinite = true;
+            }
+            ++finiteCount;
+        }
+
+        if (!hasFirstFinite)
+        {
+            return segment;
+        }
+
+        if (finiteCount == 1)
+        {
+            segment.A = firstFinite;
+            segment.B = firstFinite;
+            return segment;
+        }
+
+        const PcaResult pca = ToPca(points);
+        glm::vec3 axis = glm::normalize(glm::vec3{pca.Eigenvectors[0]});
+        if (!std::isfinite(axis.x) || !std::isfinite(axis.y) || !std::isfinite(axis.z)
+            || glm::dot(axis, axis) <= 1.0e-12f)
+        {
+            axis = glm::vec3{1.0f, 0.0f, 0.0f};
+        }
+
+        float minProjection = std::numeric_limits<float>::max();
+        float maxProjection = -std::numeric_limits<float>::max();
+        for (const glm::vec3& point : points)
+        {
+            if (!isFinite(point))
+            {
+                continue;
+            }
+
+            const float projection = glm::dot(point - pca.Mean, axis);
+            minProjection = std::min(minProjection, projection);
+            maxProjection = std::max(maxProjection, projection);
+        }
+
+        if (!(minProjection <= maxProjection))
+        {
+            segment.A = pca.Mean;
+            segment.B = pca.Mean;
+            return segment;
+        }
+
+        segment.A = pca.Mean + axis * minProjection;
+        segment.B = pca.Mean + axis * maxProjection;
+        return segment;
+    }
 }
