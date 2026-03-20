@@ -1,29 +1,29 @@
 export module RHI;
 
-export import :Bindless;
-export import :Buffer;
-export import :CommandUtils;
-export import :CommandContext;
-export import :ComputePipeline;
-export import :Context;
-export import :CudaError;
-export import :Descriptors;
-export import :Device;
-export import :Image;
-export import :Pipeline;
-export import :Profiler;
-export import :Renderer;
-export import :Shader;
-export import :Swapchain;
-export import :StagingBelt;
-export import :Texture;
-export import :TextureSystem;
-export import :Transfer;
-export import :TransientAllocator;
-export import :Types;
-export import :SceneInstances;
-export import :PersistentDescriptors;
+export import RHI.Bindless;
+export import RHI.Buffer;
+export import RHI.CommandUtils;
+export import RHI.CommandContext;
+export import RHI.ComputePipeline;
+export import RHI.Context;
+export import RHI.CudaError;
+export import RHI.Descriptors;
+export import RHI.Device;
+export import RHI.Image;
+export import RHI.Pipeline;
+export import RHI.Profiler;
+export import RHI.Renderer;
+export import RHI.Shader;
+export import RHI.Swapchain;
+export import RHI.StagingBelt;
+export import RHI.Texture;
+export import RHI.TextureSystem;
+export import RHI.Transfer;
+export import RHI.TransientAllocator;
+export import RHI.Types;
+export import RHI.SceneInstances;
+export import RHI.PersistentDescriptors;
 
 #ifdef INTRINSIC_HAS_CUDA
-export import :CudaDevice;
+export import RHI.CudaDevice;
 #endif

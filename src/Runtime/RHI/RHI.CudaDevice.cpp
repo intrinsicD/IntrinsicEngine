@@ -8,10 +8,9 @@ module;
 #include <string_view>
 #include <cuda.h>
 
-module RHI:CudaDevice.Impl;
+module RHI.CudaDevice;
 
-import :CudaDevice;
-import :CudaError;
+import RHI.CudaError;
 import Core.Logging;
 
 namespace RHI

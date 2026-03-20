@@ -6,10 +6,9 @@ module;
 #include "RHI.Vulkan.hpp"
 #include "RHI.DestructionUtils.hpp"
 
-module RHI:PersistentDescriptors.Impl;
+module RHI.PersistentDescriptors;
 
-import :PersistentDescriptors;
-import :Device;
+import RHI.Device;
 import Core.Logging;
 
 namespace RHI

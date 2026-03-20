@@ -1,9 +1,9 @@
 module;
 #include "RHI.Vulkan.hpp"
 
-export module RHI:Image;
+export module RHI.Image;
 
-import :Device;
+import RHI.Device;
 
 export namespace RHI
 {

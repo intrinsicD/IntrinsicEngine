@@ -2,9 +2,9 @@ module;
 #include "RHI.Vulkan.hpp"
 #include <vector>
 
-export module RHI:Descriptors;
+export module RHI.Descriptors;
 
-import :Device;
+import RHI.Device;
 
 export namespace RHI
 {

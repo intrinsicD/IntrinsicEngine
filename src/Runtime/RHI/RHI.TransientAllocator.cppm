@@ -4,9 +4,9 @@ module;
 #include <cstdint>
 #include "RHI.Vulkan.hpp"
 
-export module RHI:TransientAllocator;
+export module RHI.TransientAllocator;
 
-import :Device;
+import RHI.Device;
 
 export namespace RHI
 {

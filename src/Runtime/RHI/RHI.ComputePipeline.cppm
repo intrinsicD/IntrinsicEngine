@@ -4,10 +4,10 @@ module;
 #include <vector>
 #include <expected>
 
-export module RHI:ComputePipeline;
+export module RHI.ComputePipeline;
 
-import :Device;
-import :Shader;
+import RHI.Device;
+import RHI.Shader;
 
 export namespace RHI
 {

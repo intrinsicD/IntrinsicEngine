@@ -6,9 +6,9 @@ module;
 #include <atomic>
 #include "RHI.Vulkan.hpp"
 
-export module RHI:Device;
+export module RHI.Device;
 
-import :Context;
+import RHI.Context;
 import Core.InplaceFunction;
 
 // =============================================================================

@@ -4,10 +4,9 @@ module;
 #include <utility>
 #include "RHI.Vulkan.hpp"
 
-module RHI:TransientAllocator.Impl;
+module RHI.TransientAllocator;
 
-import :TransientAllocator;
-import :Device;
+import RHI.Device;
 import Core.Logging;
 
 namespace RHI

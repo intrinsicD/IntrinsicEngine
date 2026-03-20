@@ -5,9 +5,8 @@ module;
 #include <vector>
 #include <filesystem>
 
-module RHI:Shader.Impl;
-import :Shader;
-import :Device;
+module RHI.Shader;
+import RHI.Device;
 import Core.Logging;
 
 namespace RHI {

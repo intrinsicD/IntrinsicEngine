@@ -7,9 +7,9 @@ module;
 #include <string_view>
 #include <cuda.h>
 
-export module RHI:CudaDevice;
+export module RHI.CudaDevice;
 
-import :CudaError;
+import RHI.CudaError;
 
 export namespace RHI
 {

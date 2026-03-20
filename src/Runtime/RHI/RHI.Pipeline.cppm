@@ -4,11 +4,11 @@ module;
 #include <vector>
 #include <expected>
 
-export module RHI:Pipeline;
+export module RHI.Pipeline;
 
-import :Device;
-import :Shader;
-import :Types; // For VertexInputDescription
+import RHI.Device;
+import RHI.Shader;
+import RHI.Types; // For VertexInputDescription
 
 export namespace RHI
 {

@@ -4,7 +4,7 @@ module;
 #include <glm/glm.hpp>
 #include <vector>
 
-export module RHI:Types;
+export module RHI.Types;
 
 export namespace RHI
 {

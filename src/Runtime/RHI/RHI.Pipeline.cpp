@@ -5,11 +5,10 @@ module;
 #include <memory>
 #include <expected>
 
-module RHI:Pipeline.Impl;
-import :Pipeline;
-import :Device;
-import :Shader;
-import :Types;
+module RHI.Pipeline;
+import RHI.Device;
+import RHI.Shader;
+import RHI.Types;
 import Core.Logging;
 
 namespace RHI

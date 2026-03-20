@@ -7,8 +7,7 @@ module;
 
 #include "RHI.Vulkan.hpp"
 
-module RHI:Context.Impl;
-import :Context;
+module RHI.Context;
 import Core.Logging;
 
 namespace RHI

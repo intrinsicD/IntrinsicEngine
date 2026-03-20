@@ -2,10 +2,9 @@ module;
 #include "RHI.Vulkan.hpp"
 #include <vector>
 
-module RHI:CommandContext.Impl;
+module RHI.CommandContext;
 
-import :CommandContext;
-import :Device;
+import RHI.Device;
 import Core.Logging;
 
 namespace RHI

@@ -4,11 +4,11 @@ module;
 #include <vector>
 #include "RHI.Vulkan.hpp"
 
-export module RHI:TextureSystem;
+export module RHI.TextureSystem;
 
-import :Device;
-import :Texture;
-import :Bindless;
+import RHI.Device;
+import RHI.Texture;
+import RHI.Bindless;
 import Core.Handle;       // For Core::StrongHandle (via TextureHandle)
 import Core.ResourcePool; // For Core::ResourcePool
 

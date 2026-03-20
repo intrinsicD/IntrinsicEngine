@@ -3,10 +3,10 @@ module;
 #include <vector>
 #include <mutex>
 
-export module RHI:Bindless;
+export module RHI.Bindless;
 
-import :Device;
-import :Texture;
+import RHI.Device;
+import RHI.Texture;
 
 export namespace RHI
 {

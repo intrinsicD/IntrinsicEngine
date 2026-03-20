@@ -2,9 +2,9 @@ module;
 #include "RHI.Vulkan.hpp"
 #include <span>
 
-export module RHI:CommandContext;
+export module RHI.CommandContext;
 
-import :Device;
+import RHI.Device;
 
 export namespace RHI
 {

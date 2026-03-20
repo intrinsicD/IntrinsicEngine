@@ -3,9 +3,9 @@ module;
 #include <string>
 #include <vector>
 
-export module RHI:Shader;
+export module RHI.Shader;
 
-import :Device;
+import RHI.Device;
 
 export namespace RHI {
     

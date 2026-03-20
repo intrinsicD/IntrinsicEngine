@@ -5,13 +5,13 @@ module;
 
 #include "RHI.Vulkan.hpp"
 
-export module RHI:Renderer;
+export module RHI.Renderer;
 
-import :Device;
-import :Swapchain;
-import :Pipeline;
-import :Image;
-import :Profiler;
+import RHI.Device;
+import RHI.Swapchain;
+import RHI.Pipeline;
+import RHI.Image;
+import RHI.Profiler;
 
 namespace RHI
 {
