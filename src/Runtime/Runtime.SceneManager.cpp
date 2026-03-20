@@ -10,11 +10,15 @@ module Runtime.SceneManager;
 
 import Core.Logging;
 import Core.Assets;
+
 import Graphics.Components;
 import Graphics.Geometry;
 import Graphics.GPUScene;
 import Graphics.Model;
+
 import ECS;
+
+import Geometry.Handle;
 #ifdef INTRINSIC_HAS_CUDA
 import RHI;
 #endif

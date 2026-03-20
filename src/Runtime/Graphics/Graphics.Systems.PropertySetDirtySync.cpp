@@ -15,6 +15,10 @@ import Graphics.GpuColor;
 import Graphics.ColorMapper;
 import Graphics.VisualizationConfig;
 
+import Geometry.Properties;
+import Geometry.Graph;
+import Geometry.PointCloud;
+
 import Core.Hash;
 import Core.Logging;
 import Core.FrameGraph;

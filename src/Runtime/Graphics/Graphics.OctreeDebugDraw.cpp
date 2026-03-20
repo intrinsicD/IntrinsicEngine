@@ -11,6 +11,7 @@ module;
 module Graphics.OctreeDebugDraw;
 
 import Graphics.GpuColor;
+import Geometry.AABB;
 
 
 namespace Graphics

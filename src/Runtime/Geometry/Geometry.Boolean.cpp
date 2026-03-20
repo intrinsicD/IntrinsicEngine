@@ -14,6 +14,7 @@ module Geometry.Boolean;
 import Geometry.AABB;
 import Geometry.HalfedgeMesh;
 import Geometry.MeshUtils;
+import Geometry.Properties;
 
 namespace Geometry::Boolean
 {

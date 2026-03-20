@@ -16,6 +16,7 @@ module;
 module Runtime.Selection;
 
 import ECS;
+
 import Geometry.AABB;
 import Geometry.BVH;
 import Geometry.Graph;
@@ -27,7 +28,10 @@ import Geometry.Queries;
 import Geometry.Raycast;
 import Geometry.Ray;
 import Geometry.Validation;
+import Geometry.Properties;
+
 import Core.Logging;
+
 import Graphics.Components;
 import Graphics.Camera;
 

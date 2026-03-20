@@ -19,10 +19,16 @@ module Graphics.Passes.Composition;
 import Graphics.RenderPipeline;
 import Graphics.RenderGraph;
 import Graphics.ShaderRegistry;
+
 import Core.Filesystem;
 import Core.Hash;
 import Core.Logging;
+
 import RHI;
+
+import Geometry.Frustum;
+import Geometry.Overlap;
+import Geometry.Sphere;
 
 #include "Graphics.PassUtils.hpp"
 

@@ -10,7 +10,7 @@ module;
 module Graphics.KDTreeDebugDraw;
 
 import Graphics.GpuColor;
-
+import Geometry.AABB;
 
 namespace Graphics
 {

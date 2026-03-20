@@ -28,13 +28,19 @@ import Graphics.Material;
 import Graphics.Components;
 import Graphics.GPUScene;
 import Graphics.ShaderRegistry;
+
 import Geometry.Frustum;
 import Geometry.Handle;
 import Geometry.Validation;
+import Geometry.Overlap;
+import Geometry.Sphere;
+
 import Core.Filesystem;
 import Core.Hash;
 import Core.Logging;
+
 import ECS;
+
 import RHI;
 
 #include "Graphics.PassUtils.hpp"

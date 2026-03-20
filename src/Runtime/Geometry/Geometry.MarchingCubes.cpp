@@ -17,6 +17,7 @@ module Geometry.MarchingCubes;
 
 import Geometry.HalfedgeMesh;
 import Geometry.Handle;
+import Geometry.Properties;
 
 namespace Geometry::MarchingCubes
 {

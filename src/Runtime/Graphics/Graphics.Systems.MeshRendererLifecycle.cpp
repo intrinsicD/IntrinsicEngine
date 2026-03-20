@@ -6,7 +6,6 @@ module;
 module Graphics.Systems.MeshRendererLifecycle;
 
 import Graphics.GPUScene;
-
 import Graphics.Components;
 import Graphics.Material;
 import Graphics.Geometry;
@@ -15,7 +14,10 @@ import Core.Hash;
 import Core.Assets;
 import Core.FrameGraph;
 import Core.Logging;
+
 import ECS;
+
+import Geometry.Handle;
 
 #include "Graphics.LifecycleUtils.hpp"
 

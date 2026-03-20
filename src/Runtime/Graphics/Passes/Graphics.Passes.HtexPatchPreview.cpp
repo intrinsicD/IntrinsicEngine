@@ -18,13 +18,20 @@ module Graphics.Passes.HtexPatchPreview;
 
 import Graphics.ShaderRegistry;
 import Graphics.GpuColor;
+
 import Core.Hash;
 import Core.Filesystem;
 import Core.Logging;
 
 import ECS;
+
 import Geometry.HalfedgeMesh;
 import Geometry.HtexPatch;
+import Geometry.Frustum;
+import Geometry.Overlap;
+import Geometry.Sphere;
+import Geometry.Properties;
+
 import RHI;
 
 #include "Graphics.PassUtils.hpp"

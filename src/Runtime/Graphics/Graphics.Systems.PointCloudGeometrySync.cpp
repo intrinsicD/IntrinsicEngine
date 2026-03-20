@@ -21,8 +21,13 @@ import Graphics.VisualizationConfig;
 import Core.Hash;
 import Core.Logging;
 import Core.FrameGraph;
+
 import ECS;
+
 import RHI;
+
+import Geometry.PointCloud;
+import Geometry.Handle;
 
 #include "Graphics.PointCloudPropertyHelpers.hpp"
 #include "Graphics.LifecycleUtils.hpp"

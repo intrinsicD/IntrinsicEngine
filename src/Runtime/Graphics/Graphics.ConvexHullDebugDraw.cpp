@@ -8,6 +8,7 @@ module;
 module Graphics.ConvexHullDebugDraw;
 
 import Graphics.GpuColor;
+import Geometry.Properties;
 
 namespace Graphics
 {

@@ -19,6 +19,7 @@ module Geometry.MeshBuilder;
 
 import Geometry.HalfedgeMesh;
 import Geometry.Subdivision;
+import Geometry.Properties;
 
 namespace Geometry::Halfedge
 {

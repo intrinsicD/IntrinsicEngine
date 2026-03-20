@@ -41,6 +41,7 @@ import Geometry.AABB;
 import Geometry.HalfedgeMesh;
 import Geometry.MeshUtils;
 import Geometry.Octree;
+import Geometry.Properties;
 
 #include "Importers/Graphics.Importers.AttributeVertexKey.hpp"
 

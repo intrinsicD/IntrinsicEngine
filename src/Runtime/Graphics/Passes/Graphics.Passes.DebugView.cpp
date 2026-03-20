@@ -18,11 +18,17 @@ module Graphics.Passes.DebugView;
 import Graphics.RenderPipeline;
 import Graphics.RenderGraph;
 import Graphics.ShaderRegistry;
+
 import Core.Hash;
 import Core.Logging;
 import Core.Filesystem;
+
 import RHI;
 import Interface;
+
+import Geometry.Frustum;
+import Geometry.Overlap;
+import Geometry.Sphere;
 
 #include "Graphics.PassUtils.hpp"
 

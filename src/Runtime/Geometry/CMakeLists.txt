@@ -67,7 +67,6 @@ target_sources(${target_name}
         Geometry.Queries.cppm
         Geometry.ShortestPath.cppm
         PRIVATE
-        FILE_SET geometry_impl TYPE CXX_MODULES FILES
         Geometry.MeshUtils.cpp
         Geometry.Raycast.cpp
         Geometry.EPA.cpp

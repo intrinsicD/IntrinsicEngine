@@ -19,8 +19,12 @@ import Graphics.Geometry;
 import Core.Hash;
 import Core.Logging;
 import Core.FrameGraph;
+
 import ECS;
+
 import RHI;
+
+import Geometry.Handle;
 
 #include "Graphics.LifecycleUtils.hpp"
 

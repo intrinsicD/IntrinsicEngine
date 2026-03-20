@@ -22,8 +22,13 @@ import Graphics.VisualizationConfig;
 import Core.Hash;
 import Core.Logging;
 import Core.FrameGraph;
+
 import ECS;
+
 import Geometry.Graph;
+import Geometry.Properties;
+import Geometry.Handle;
+
 import RHI;
 
 #include "Graphics.GraphPropertyHelpers.hpp"

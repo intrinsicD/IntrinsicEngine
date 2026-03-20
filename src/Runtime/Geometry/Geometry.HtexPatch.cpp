@@ -12,6 +12,7 @@ module;
 
 module Geometry.HtexPatch;
 
+import Geometry.Properties;
 
 namespace Geometry::HtexPatch
 {

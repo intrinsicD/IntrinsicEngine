@@ -20,10 +20,17 @@ import Graphics.Components;
 import Graphics.RenderPipeline;
 import Graphics.RenderGraph;
 import Graphics.ShaderRegistry;
+
 import Core.Hash;
 import Core.Logging;
 import Core.Filesystem;
+
+import Geometry.Frustum;
+import Geometry.Overlap;
+import Geometry.Sphere;
+
 import RHI;
+
 import ECS;
 
 #include "Graphics.PassUtils.hpp"

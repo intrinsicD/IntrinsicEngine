@@ -22,10 +22,16 @@ module Graphics.Passes.PostProcess;
 import Graphics.RenderPipeline;
 import Graphics.RenderGraph;
 import Graphics.ShaderRegistry;
+
 import Core.Hash;
 import Core.Logging;
 import Core.Filesystem;
+
 import RHI;
+
+import Geometry.Frustum;
+import Geometry.Overlap;
+import Geometry.Sphere;
 
 #include "Graphics.PassUtils.hpp"
 

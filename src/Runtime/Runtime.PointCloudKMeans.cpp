@@ -27,14 +27,20 @@ module;
 module Runtime.PointCloudKMeans;
 
 import Runtime.Engine;
+
 import Graphics.Components;
+
 import Geometry.Graph;
 import Geometry.HalfedgeMesh;
 import Geometry.KMeans;
 import Geometry.PointCloud;
+import Geometry.Properties;
+
 import ECS;
+
 import Core.Logging;
 import Core.Tasks;
+
 #ifdef INTRINSIC_HAS_CUDA
 import RHI;
 #endif
