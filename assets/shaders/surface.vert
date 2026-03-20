@@ -43,12 +43,14 @@ layout(push_constant) uniform PushConsts {
     float    PointSizePx;    // Used when drawing VK_PRIMITIVE_TOPOLOGY_POINT_LIST via the Forward pass.
     uint64_t PtrFaceAttr;    // BDA to per-face packed ABGR colors (0 = standard shading)
     uint64_t PtrVertexAttr;  // BDA to per-vertex packed ABGR colors (0 = no per-vertex colors)
+    uint64_t PtrIndices;     // BDA to index buffer (uint32[]) — enables nearest-vertex label rendering
 } push;
 
 layout(location = 0) out vec3 fragNormal;
 layout(location = 1) out vec2 fragTexCoord;
 layout(location = 2) flat out uint fragTexID;
 layout(location = 3) out vec4 fragVertexColor;
+layout(location = 4) out vec3 fragObjectPos;
 
 void main() {
     PosBuf  pBuf = PosBuf(push.PtrPositions);
@@ -95,6 +97,9 @@ void main() {
     {
         fragVertexColor = vec4(0.0);
     }
+
+    // Object-space position for nearest-vertex Voronoi rendering.
+    fragObjectPos = inPos;
 
     fragTexCoord = inUV;
     fragTexID = inst.TextureID;

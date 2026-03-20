@@ -233,6 +233,9 @@ export namespace Graphics::Passes
             // Per-vertex attribute buffer device address (0 = no per-vertex colors).
             uint64_t PtrVertexAttr = 0;
 
+            // Index buffer device address (non-zero enables nearest-vertex Voronoi rendering).
+            uint64_t PtrIndices = 0;
+
             // Packed-slice offsets (bytes) into Indirect buffers.
             VkDeviceSize IndirectOffsetBytes = 0;
             VkDeviceSize CountOffsetBytes = 0;

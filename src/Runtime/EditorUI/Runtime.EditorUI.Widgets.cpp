@@ -68,9 +68,11 @@ namespace
 
     [[nodiscard]] constexpr const char* KMeansResultProperty(Runtime::PointCloudKMeans::Domain domain) noexcept
     {
-        return domain == Runtime::PointCloudKMeans::Domain::PointCloudPoints
-            ? "p:kmeans_color"
-            : "v:kmeans_color";
+        if (domain == Runtime::PointCloudKMeans::Domain::PointCloudPoints)
+            return "p:kmeans_color";
+        if (domain == Runtime::PointCloudKMeans::Domain::MeshVertices)
+            return "v:kmeans_label_f";  // Scalar label → colormap → Voronoi texel rendering
+        return "v:kmeans_color";
     }
 
     struct KMeansStatus
@@ -1177,6 +1179,34 @@ bool DrawKMeansWidget(Runtime::Engine& engine,
         ImGui::Text("Last Inertia: %.6f", stats->LastInertia);
         ImGui::Text("Last Max-Distance Index: %u", stats->LastMaxDistanceIndex);
         ImGui::Text("Last Duration: %.3f ms", stats->LastDurationMs);
+    }
+
+    // Colormap selector for mesh vertex labels (Voronoi texel rendering).
+    if (selectedDomain == Runtime::PointCloudKMeans::Domain::MeshVertices)
+    {
+        if (auto* md = reg.try_get<ECS::Mesh::Data>(entity))
+        {
+            if (md->Visualization.VertexColors.PropertyName == "v:kmeans_label_f")
+            {
+                ImGui::SeparatorText("Label Colormap");
+                const char* mapNames[] = {"Viridis", "Inferno", "Plasma", "Jet", "Coolwarm", "Heat"};
+                int mapIdx = static_cast<int>(md->Visualization.VertexColors.Map);
+                if (ImGui::Combo("Colormap##KMeansVoronoi", &mapIdx, mapNames, 6))
+                {
+                    md->Visualization.VertexColors.Map = static_cast<Graphics::Colormap::Type>(mapIdx);
+                    md->AttributesDirty = true;
+                    reg.emplace_or_replace<ECS::DirtyTag::VertexAttributes>(entity);
+                }
+                int bins = static_cast<int>(md->Visualization.VertexColors.Bins);
+                if (ImGui::DragInt("Bins##KMeansVoronoi", &bins, 1.0f, 0, 256))
+                {
+                    md->Visualization.VertexColors.Bins = static_cast<uint32_t>(std::max(bins, 0));
+                    md->AttributesDirty = true;
+                    reg.emplace_or_replace<ECS::DirtyTag::VertexAttributes>(entity);
+                }
+                ImGui::TextDisabled("Bins=0: continuous colormap. >0: quantized steps.");
+            }
+        }
     }
 
     return dispatched;

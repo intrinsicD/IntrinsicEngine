@@ -623,6 +623,8 @@ namespace Runtime::PointCloudKMeans
 
                 auto labelProp = Geometry::VertexProperty<uint32_t>(
                     mesh.VertexProperties().GetOrAdd<uint32_t>("v:kmeans_label", 0u));
+                auto labelFloatProp = Geometry::VertexProperty<float>(
+                    mesh.VertexProperties().GetOrAdd<float>("v:kmeans_label_f", 0.0f));
                 auto distanceProp = Geometry::VertexProperty<float>(
                     mesh.VertexProperties().GetOrAdd<float>("v:kmeans_distance", 0.0f));
                 auto colorProp = Geometry::VertexProperty<glm::vec4>(
@@ -632,11 +634,17 @@ namespace Runtime::PointCloudKMeans
                 {
                     const auto vh = Geometry::VertexHandle{static_cast<Geometry::PropertyIndex>(handles[i])};
                     labelProp[vh] = result.Labels[i];
+                    labelFloatProp[vh] = static_cast<float>(result.Labels[i]);
                     distanceProp[vh] = result.SquaredDistances[i];
                     colorProp[vh] = LabelColor(result.Labels[i]);
                 }
 
-                target.MeshData->Visualization.VertexColors.PropertyName = "v:kmeans_color";
+                // Use the float label property with colormap for Voronoi texel rendering.
+                // The shader uses nearest-vertex selection (not interpolation) to produce
+                // sharp Voronoi-like cluster boundaries on each triangle face.
+                target.MeshData->Visualization.VertexColors.PropertyName = "v:kmeans_label_f";
+                target.MeshData->Visualization.VertexColors.AutoRange = true;
+                target.MeshData->Visualization.UseNearestVertexColors = true;
                 target.MeshData->AttributesDirty = true;
                 target.MeshData->KMeansLastBackend = result.ActualBackend;
                 target.MeshData->KMeansLastIterations = result.Iterations;

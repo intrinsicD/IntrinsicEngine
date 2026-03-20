@@ -219,6 +219,7 @@ namespace Graphics::Systems::PropertySetDirtySync
                     surfComp.CachedVertexColors = std::move(result->Colors);
             }
 
+            surfComp.UseNearestVertexColors = meshData.Visualization.UseNearestVertexColors;
             surfComp.VertexColorsDirty = true;
         }
     }
