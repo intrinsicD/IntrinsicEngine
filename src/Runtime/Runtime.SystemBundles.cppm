@@ -2,6 +2,7 @@ module;
 #include <array>
 #include <cstdint>
 #include <memory>
+#include <span>
 #include <entt/entity/fwd.hpp>
 #include <entt/signal/fwd.hpp>
 #include "RHI.Vulkan.hpp"
@@ -47,4 +48,7 @@ export namespace Runtime
         void Register(this const GpuFrameGraphSystemBundle&,
                       const GpuFrameGraphRegistrationContext& context);
     };
+
+    [[nodiscard]] std::span<const Core::FeatureDescriptor> GetCoreFrameGraphFeatureOrder();
+    [[nodiscard]] std::span<const Core::FeatureDescriptor> GetGpuFrameGraphFeatureOrder();
 }
