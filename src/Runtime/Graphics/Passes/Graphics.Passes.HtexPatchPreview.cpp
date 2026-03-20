@@ -72,6 +72,17 @@ namespace Graphics::Passes
             bool Valid = false;
         };
 
+        struct PreviewKMeansData
+        {
+            Geometry::Property<uint32_t> Labels{};
+            Geometry::Property<glm::vec4> Colors{};
+
+            [[nodiscard]] bool HasAny() const noexcept
+            {
+                return static_cast<bool>(Labels) || static_cast<bool>(Colors);
+            }
+        };
+
         [[nodiscard]] constexpr glm::vec4 UnpackABGR(uint32_t packed) noexcept
         {
             const float r = static_cast<float>(packed & 0xFFu) / 255.0f;
@@ -87,6 +98,14 @@ namespace Graphics::Passes
             color.g *= 0.72f;
             color.b *= 0.72f;
             return color;
+        }
+
+        [[nodiscard]] PreviewKMeansData GetPreviewKMeansData(const Geometry::Halfedge::Mesh& mesh) noexcept
+        {
+            return {
+                .Labels = mesh.VertexProperties().Get<uint32_t>("v:kmeans_label"),
+                .Colors = mesh.VertexProperties().Get<glm::vec4>("v:kmeans_color"),
+            };
         }
 
         [[nodiscard]] HalfedgeTriangle BuildHalfedgeTriangle(const Geometry::Halfedge::Mesh& mesh,
@@ -166,6 +185,52 @@ namespace Graphics::Passes
 
             return glm::vec4(0.0f);
         }
+
+        [[nodiscard]] glm::vec4 ComputeTileColorFromPatch(const Geometry::Halfedge::Mesh& mesh,
+                                                          const Geometry::HtexPatch::HalfedgePatchMeta& patch,
+                                                          const PreviewKMeansData& kmeansData) noexcept
+        {
+            glm::vec4 color = UnpackABGR(Graphics::GpuColor::LabelToColor(static_cast<int>(patch.EdgeIndex)));
+
+            const Geometry::HalfedgeHandle h0{static_cast<Geometry::PropertyIndex>(patch.Halfedge0Index)};
+            const Geometry::HalfedgeHandle h1{static_cast<Geometry::PropertyIndex>(patch.Halfedge1Index)};
+            const bool hasH0 = h0.IsValid() && mesh.IsValid(h0);
+            const bool hasH1 = h1.IsValid() && mesh.IsValid(h1);
+
+            if (kmeansData.Colors && hasH0 && hasH1)
+            {
+                const auto v0 = mesh.ToVertex(h0);
+                const auto v1 = mesh.ToVertex(h1);
+                color = 0.5f * (kmeansData.Colors[v0.Index] + kmeansData.Colors[v1.Index]);
+            }
+            else if (kmeansData.Labels && hasH0)
+            {
+                const auto v0 = mesh.ToVertex(h0);
+                color = UnpackABGR(Graphics::GpuColor::LabelToColor(static_cast<int>(kmeansData.Labels[v0.Index])));
+            }
+
+            if (patch.Flags & Geometry::HtexPatch::Boundary)
+            {
+                color.a = 0.85f;
+                color.r *= 0.88f;
+                color.g *= 0.88f;
+                color.b *= 0.88f;
+            }
+            else
+            {
+                color.a = 1.0f;
+            }
+
+            color = glm::clamp(color, glm::vec4(0.0f), glm::vec4(1.0f));
+            if (!kmeansData.HasAny())
+            {
+                color.r *= 0.92f;
+                color.g *= 0.96f;
+                color.b *= 1.0f;
+            }
+
+            return color;
+        }
     }
 
     void HtexPatchPreviewPass::Initialize(RHI::VulkanDevice& device,
@@ -198,58 +263,6 @@ namespace Graphics::Passes
         for (auto& img : m_PreviewImages)
             img.reset();
         m_UploadedAtlasRevision.fill(0);
-    }
-
-    [[nodiscard]] glm::vec4 HtexPatchPreviewPass::DecodePackedColor(uint32_t packed) noexcept
-    {
-        return UnpackABGR(packed);
-    }
-
-    [[nodiscard]] glm::vec4 HtexPatchPreviewPass::TileColorFromPatch(const Geometry::Halfedge::Mesh& mesh,
-                                                                     const Geometry::HtexPatch::HalfedgePatchMeta& patch) noexcept
-    {
-        glm::vec4 color = UnpackABGR(Graphics::GpuColor::LabelToColor(static_cast<int>(patch.EdgeIndex)));
-        const auto kmeansColors = mesh.VertexProperties().Get<glm::vec4>("v:kmeans_color");
-        const auto kmeansLabels = mesh.VertexProperties().Get<uint32_t>("v:kmeans_label");
-
-        const Geometry::HalfedgeHandle h0{static_cast<Geometry::PropertyIndex>(patch.Halfedge0Index)};
-        const Geometry::HalfedgeHandle h1{static_cast<Geometry::PropertyIndex>(patch.Halfedge1Index)};
-        const bool hasH0 = h0.IsValid() && mesh.IsValid(h0);
-        const bool hasH1 = h1.IsValid() && mesh.IsValid(h1);
-
-        if (kmeansColors && hasH0 && hasH1)
-        {
-            const auto v0 = mesh.ToVertex(h0);
-            const auto v1 = mesh.ToVertex(h1);
-            color = 0.5f * (kmeansColors[v0.Index] + kmeansColors[v1.Index]);
-        }
-        else if (kmeansLabels && hasH0)
-        {
-            const auto v0 = mesh.ToVertex(h0);
-            color = DecodePackedColor(Graphics::GpuColor::LabelToColor(static_cast<int>(kmeansLabels[v0.Index])));
-        }
-
-        if (patch.Flags & Geometry::HtexPatch::Boundary)
-        {
-            color.a = 0.85f;
-            color.r *= 0.88f;
-            color.g *= 0.88f;
-            color.b *= 0.88f;
-        }
-        else
-        {
-            color.a = 1.0f;
-        }
-
-        color = glm::clamp(color, glm::vec4(0.0f), glm::vec4(1.0f));
-        if (!(kmeansColors || kmeansLabels))
-        {
-            color.r *= 0.92f;
-            color.g *= 0.96f;
-            color.b *= 1.0f;
-        }
-
-        return color;
     }
 
     [[nodiscard]] bool HtexPatchPreviewPass::IsInterestingMeshEntity(const entt::registry& reg, entt::entity entity)
@@ -310,29 +323,28 @@ namespace Graphics::Passes
             hash = HashCombine64(hash, patch.Flags);
         }
 
-        const auto kmeansLabels = mesh.VertexProperties().Get<uint32_t>("v:kmeans_label");
-        hash = HashCombine64(hash, kmeansLabels ? 1ull : 0ull);
-        if (kmeansLabels)
+        const PreviewKMeansData kmeansData = GetPreviewKMeansData(mesh);
+        hash = HashCombine64(hash, kmeansData.Labels ? 1ull : 0ull);
+        if (kmeansData.Labels)
         {
             for (std::size_t i = 0; i < mesh.VertexCount(); ++i)
             {
                 const Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(i)};
                 if (!mesh.IsValid(v) || mesh.IsDeleted(v))
                     continue;
-                hash = HashCombine64(hash, static_cast<uint64_t>(kmeansLabels[v.Index]));
+                hash = HashCombine64(hash, static_cast<uint64_t>(kmeansData.Labels[v.Index]));
             }
         }
 
-        const auto kmeansColors = mesh.VertexProperties().Get<glm::vec4>("v:kmeans_color");
-        hash = HashCombine64(hash, kmeansColors ? 1ull : 0ull);
-        if (kmeansColors)
+        hash = HashCombine64(hash, kmeansData.Colors ? 1ull : 0ull);
+        if (kmeansData.Colors)
         {
             for (std::size_t i = 0; i < mesh.VertexCount(); ++i)
             {
                 const Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(i)};
                 if (!mesh.IsValid(v) || mesh.IsDeleted(v))
                     continue;
-                hash = HashVec4(hash, kmeansColors[v.Index]);
+                hash = HashVec4(hash, kmeansData.Colors[v.Index]);
             }
         }
 
@@ -361,9 +373,8 @@ namespace Graphics::Passes
         outWidth = columns * kTileSize;
         outHeight = rows * kTileSize;
         outPixels.assign(static_cast<size_t>(outWidth) * static_cast<size_t>(outHeight), glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
-        const auto kmeansLabels = mesh.VertexProperties().Get<uint32_t>("v:kmeans_label");
-        const auto kmeansColors = mesh.VertexProperties().Get<glm::vec4>("v:kmeans_color");
-        const bool hasPerTexelKMeans = static_cast<bool>(kmeansLabels) || static_cast<bool>(kmeansColors);
+        const PreviewKMeansData kmeansData = GetPreviewKMeansData(mesh);
+        const bool hasPerTexelKMeans = kmeansData.HasAny();
 
         for (std::size_t i = 0; i < patches.size(); ++i)
         {
@@ -371,7 +382,7 @@ namespace Graphics::Passes
             const uint32_t px = static_cast<uint32_t>(i % columns) * kTileSize;
             const uint32_t py = static_cast<uint32_t>(i / columns) * kTileSize;
 
-            glm::vec4 color = TileColorFromPatch(mesh, patch);
+            glm::vec4 color = ComputeTileColorFromPatch(mesh, patch, kmeansData);
             const float resFactor = std::clamp(static_cast<float>(patch.Resolution) / 128.0f, 0.0f, 1.0f);
             const float scale = 0.70f + 0.30f * resFactor;
             color.r *= scale;
@@ -400,16 +411,16 @@ namespace Graphics::Passes
                             patchUV,
                             patch.Halfedge0Index,
                             patch.Halfedge1Index,
-                            kmeansLabels,
-                            kmeansColors);
+                            kmeansData.Labels,
+                            kmeansData.Colors);
                         const glm::vec4 tri1Color = KMeansVertexColor(
                             mesh,
                             tri1,
                             patchUV,
                             patch.Halfedge1Index,
                             patch.Halfedge0Index,
-                            kmeansLabels,
-                            kmeansColors);
+                            kmeansData.Labels,
+                            kmeansData.Colors);
 
                         if (tri0Color.a > 0.0f)
                             texel = tri0Color;
@@ -501,8 +512,7 @@ namespace Graphics::Passes
         m_DebugState.LastPatchCount = static_cast<uint32_t>(meshData.MeshRef->EdgeCount());
         m_DebugState.LastAtlasWidth = width;
         m_DebugState.LastAtlasHeight = height;
-        m_DebugState.UsedKMeansColors = static_cast<bool>(meshData.MeshRef->VertexProperties().Get<glm::vec4>("v:kmeans_color")) ||
-                                        static_cast<bool>(meshData.MeshRef->VertexProperties().Get<uint32_t>("v:kmeans_label"));
+        m_DebugState.UsedKMeansColors = GetPreviewKMeansData(*meshData.MeshRef).HasAny();
 
         if (ctx.FrameIndex >= FRAMES)
             return;

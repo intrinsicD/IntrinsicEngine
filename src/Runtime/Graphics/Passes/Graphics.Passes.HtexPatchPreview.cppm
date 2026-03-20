@@ -92,9 +92,6 @@ export namespace Graphics::Passes
                                                      uint32_t& outWidth,
                                                      uint32_t& outHeight);
 
-        [[nodiscard]] static glm::vec4 DecodePackedColor(uint32_t packed) noexcept;
-        [[nodiscard]] static glm::vec4 TileColorFromPatch(const Geometry::Halfedge::Mesh& mesh,
-                                                          const Geometry::HtexPatch::HalfedgePatchMeta& patch) noexcept;
         [[nodiscard]] static bool IsInterestingMeshEntity(const entt::registry& reg, entt::entity entity);
         [[nodiscard]] static std::optional<entt::entity> FindSourceMeshEntity(const entt::registry& reg);
         [[nodiscard]] static uint64_t ComputePreviewAtlasSignature(
