@@ -124,8 +124,8 @@ namespace Graphics::Passes
 
     void CompositionPass::AddPasses(RenderPassContext& ctx)
     {
-        // Only run for the deferred lighting path.
-        if (ctx.Recipe.LightingPath != FrameLightingPath::Deferred)
+        // Only run for deferred-backed lighting paths.
+        if (!UsesDeferredComposition(ctx.Recipe.LightingPath))
             return;
 
         if (!m_ShaderRegistry)

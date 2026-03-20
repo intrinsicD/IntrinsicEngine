@@ -72,6 +72,11 @@ export namespace Graphics
         Hybrid,
     };
 
+    [[nodiscard]] constexpr bool UsesDeferredComposition(FrameLightingPath lightingPath)
+    {
+        return lightingPath == FrameLightingPath::Deferred || lightingPath == FrameLightingPath::Hybrid;
+    }
+
     struct RenderResourceDefinition
     {
         RenderResource Id{};

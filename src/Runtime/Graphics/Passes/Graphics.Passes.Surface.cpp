@@ -91,8 +91,8 @@ namespace Graphics::Passes
 
         DrawStream stream = BuildDrawStream(ctx);
 
-        // Deferred path: write G-buffer MRT targets instead of SceneColorHDR.
-        if (ctx.Recipe.LightingPath == FrameLightingPath::Deferred && m_GBufferPipeline)
+        // Deferred-backed paths write the G-buffer MRT set instead of SceneColorHDR.
+        if (UsesDeferredComposition(ctx.Recipe.LightingPath) && m_GBufferPipeline)
         {
             const RGResourceHandle normal   = ctx.Blackboard.Get(RenderResource::SceneNormal);
             const RGResourceHandle albedo   = ctx.Blackboard.Get(RenderResource::Albedo);
@@ -104,7 +104,7 @@ namespace Graphics::Passes
                 return;
             }
             // Fall through to forward path if G-buffer resources are missing.
-            Core::Log::Warn("SurfacePass: Deferred path requested but G-buffer resources missing — falling back to forward.");
+            Core::Log::Warn("SurfacePass: Deferred-backed path requested but G-buffer resources missing — falling back to forward.");
         }
 
         // Forward path: write directly to SceneColorHDR.
