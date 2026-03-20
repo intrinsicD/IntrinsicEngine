@@ -10,7 +10,7 @@ module;
 #include "RHI.Vulkan.hpp"
 
 module Graphics.Geometry;
-import Geometry;
+import Geometry.Validation;
 import RHI;
 import Core.Logging;
 

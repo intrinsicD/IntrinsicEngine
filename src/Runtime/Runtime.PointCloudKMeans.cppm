@@ -5,7 +5,7 @@ module;
 export module Runtime.PointCloudKMeans;
 
 import Runtime.Engine;
-import Geometry;
+import Geometry.KMeans;
 
 export namespace Runtime::PointCloudKMeans
 {

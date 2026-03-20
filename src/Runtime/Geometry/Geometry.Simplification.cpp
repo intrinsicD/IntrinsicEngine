@@ -13,14 +13,13 @@ module;
 #include <glm/glm.hpp>
 #include <glm/geometric.hpp>
 
-module Geometry:Simplification.Impl;
+module Geometry.Simplification;
 
-import :Quadric;
-import :Simplification;
-import :Properties;
-import :HalfedgeMesh;
-import :MeshUtils;
-import :Validation;
+import Geometry.Quadric;
+import Geometry.Properties;
+import Geometry.HalfedgeMesh;
+import Geometry.MeshUtils;
+import Geometry.Validation;
 
 namespace Geometry::Simplification
 {

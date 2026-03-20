@@ -19,7 +19,6 @@ module Graphics.Passes.Composition;
 import Graphics.RenderPipeline;
 import Graphics.RenderGraph;
 import Graphics.ShaderRegistry;
-import Geometry;
 import Core.Filesystem;
 import Core.Hash;
 import Core.Logging;

@@ -3,10 +3,10 @@ module;
 #include <array>
 #include <glm/glm.hpp>
 
-export module Geometry:Frustum;
+export module Geometry.Frustum;
 
-import :AABB;
-import :Plane;
+import Geometry.AABB;
+import Geometry.Plane;
 
 export namespace Geometry
 {

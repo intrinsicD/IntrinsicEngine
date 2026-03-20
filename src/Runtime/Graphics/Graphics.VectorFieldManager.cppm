@@ -12,7 +12,7 @@ module;
 export module Graphics.VectorFieldManager;
 
 import Graphics.VisualizationConfig;
-import Geometry;
+import Geometry.Properties;
 
 // =============================================================================
 // VectorFieldManager — creates/updates/destroys child Graph entities for

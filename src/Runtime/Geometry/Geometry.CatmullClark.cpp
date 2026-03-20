@@ -9,12 +9,11 @@ module;
 #include <glm/glm.hpp>
 #include <glm/geometric.hpp>
 
-module Geometry:CatmullClark.Impl;
+module Geometry.CatmullClark;
 
-import :CatmullClark;
-import :Properties;
-import :HalfedgeMesh;
-import :MeshUtils;
+import Geometry.Properties;
+import Geometry.HalfedgeMesh;
+import Geometry.MeshUtils;
 
 namespace Geometry::CatmullClark
 {

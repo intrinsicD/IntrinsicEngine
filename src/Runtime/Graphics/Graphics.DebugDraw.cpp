@@ -9,7 +9,7 @@ module;
 
 module Graphics.DebugDraw;
 
-import Geometry;
+import Geometry.Validation;
 
 namespace Graphics
 {

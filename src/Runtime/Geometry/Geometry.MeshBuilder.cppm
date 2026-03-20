@@ -3,10 +3,10 @@ module;
 #include <cstdint>
 #include <optional>
 
-export module Geometry:MeshBuilder;
+export module Geometry.MeshBuilder;
 
-import :HalfedgeMesh;
-import :Primitives;
+import Geometry.HalfedgeMesh;
+import Geometry.Primitives;
 
 export namespace Geometry::Halfedge
 {

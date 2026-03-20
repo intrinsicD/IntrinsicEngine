@@ -12,7 +12,7 @@ import Core.Window;
 import Core.Input;
 import ECS;
 import Graphics.Components;
-import Geometry;
+import Geometry.Ray;
 import Graphics.Camera;
 import Graphics.RenderSystem;
 import Runtime.Selection;

@@ -17,12 +17,11 @@ module;
 #include <glm/glm.hpp>
 #include <glm/geometric.hpp>
 
-module Geometry:ConvexHullBuilder.Impl;
+module Geometry.ConvexHullBuilder;
 
-import :ConvexHullBuilder;
-import :Primitives;
-import :Properties;
-import :HalfedgeMesh;
+import Geometry.Primitives;
+import Geometry.Properties;
+import Geometry.HalfedgeMesh;
 
 namespace Geometry::ConvexHullBuilder
 {

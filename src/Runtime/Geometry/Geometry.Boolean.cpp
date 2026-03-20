@@ -9,12 +9,11 @@ module;
 
 #include <glm/glm.hpp>
 
-module Geometry:Boolean.Impl;
+module Geometry.Boolean;
 
-import :Boolean;
-import :AABB;
-import :HalfedgeMesh;
-import :MeshUtils;
+import Geometry.AABB;
+import Geometry.HalfedgeMesh;
+import Geometry.MeshUtils;
 
 namespace Geometry::Boolean
 {

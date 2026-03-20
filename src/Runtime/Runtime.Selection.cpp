@@ -16,7 +16,17 @@ module;
 module Runtime.Selection;
 
 import ECS;
-import Geometry;
+import Geometry.AABB;
+import Geometry.BVH;
+import Geometry.Graph;
+import Geometry.HalfedgeMesh;
+import Geometry.KDTree;
+import Geometry.OBB;
+import Geometry.Overlap;
+import Geometry.Queries;
+import Geometry.Raycast;
+import Geometry.Ray;
+import Geometry.Validation;
 import Core.Logging;
 import Graphics.Components;
 import Graphics.Camera;

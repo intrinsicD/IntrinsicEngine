@@ -5,7 +5,7 @@ module;
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/norm.hpp>
 
-export module Geometry:Ray;
+export module Geometry.Ray;
 
 export namespace Geometry
 {

@@ -7,9 +7,9 @@ module;
 
 #include <glm/glm.hpp>
 
-export module Geometry:HtexPatch;
+export module Geometry.HtexPatch;
 
-import :HalfedgeMesh;
+import Geometry.HalfedgeMesh;
 
 export namespace Geometry::HtexPatch
 {

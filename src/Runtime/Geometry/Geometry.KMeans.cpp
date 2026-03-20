@@ -14,9 +14,8 @@ module;
 #include <glm/geometric.hpp>
 #include <glm/glm.hpp>
 
-module Geometry:KMeans.Impl;
+module Geometry.KMeans;
 
-import :KMeans;
 
 namespace Geometry::KMeans
 {

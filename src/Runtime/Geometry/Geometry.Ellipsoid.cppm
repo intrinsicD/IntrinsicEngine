@@ -7,9 +7,9 @@ module;
 #include <numbers>
 #include <span>
 
-export module Geometry:Ellipsoid;
+export module Geometry.Ellipsoid;
 
-import :OBB;
+import Geometry.OBB;
 
 export namespace Geometry
 {

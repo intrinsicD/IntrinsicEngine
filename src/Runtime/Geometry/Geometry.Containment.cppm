@@ -6,10 +6,10 @@ module;
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/norm.hpp>
 
-export module Geometry:Containment;
+export module Geometry.Containment;
 
-import :Primitives;
-import :SDF;
+import Geometry.Primitives;
+import Geometry.SDF;
 
 export namespace Geometry
 {

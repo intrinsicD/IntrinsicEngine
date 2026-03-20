@@ -3,11 +3,11 @@ module;
 #include <cstddef>
 #include <optional>
 
-export module Geometry:Smoothing;
+export module Geometry.Smoothing;
 
-import :Properties;
-import :HalfedgeMesh;
-import :DEC;
+import Geometry.Properties;
+import Geometry.HalfedgeMesh;
+import Geometry.DEC;
 
 export namespace Geometry::Smoothing
 {

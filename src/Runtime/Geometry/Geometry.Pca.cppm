@@ -10,7 +10,7 @@ module;
 
 #include <glm/glm.hpp>
 
-export module Geometry:Pca;
+export module Geometry.Pca;
 
 namespace Geometry::PcaDetail
 {

@@ -10,10 +10,10 @@ module;
 #include <vector>
 #include <glm/glm.hpp>
 
-export module Geometry:Graph;
+export module Geometry.Graph;
 
-import :Properties;
-import :Circulators;
+import Geometry.Properties;
+import Geometry.Circulators;
 
 export namespace Geometry::Graph
 {

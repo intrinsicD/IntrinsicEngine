@@ -6,9 +6,9 @@ module;
 #include <glm/gtx/norm.hpp>
 #include <numbers>
 
-export module Geometry:Capsule;
+export module Geometry.Capsule;
 
-import :Segment;
+import Geometry.Segment;
 
 export namespace Geometry
 {

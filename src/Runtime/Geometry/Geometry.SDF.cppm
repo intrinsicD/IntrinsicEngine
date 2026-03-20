@@ -7,9 +7,9 @@ module;
 #include <span>
 #include <cmath>
 
-export module Geometry:SDF;
+export module Geometry.SDF;
 
-import :Primitives;
+import Geometry.Primitives;
 
 export namespace Geometry::SDF
 {

@@ -4,12 +4,12 @@ module;
 #include <glm/gtx/norm.hpp>
 #include <span>
 
-export module Geometry:Overlap;
+export module Geometry.Overlap;
 
-import :Primitives;
-import :SDF;
-import :GJK;
-import :Support;
+import Geometry.Primitives;
+import Geometry.SDF;
+import Geometry.GJK;
+import Geometry.Support;
 
 export namespace Geometry
 {

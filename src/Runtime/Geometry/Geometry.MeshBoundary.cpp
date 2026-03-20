@@ -4,9 +4,8 @@ module;
 #include <optional>
 #include <vector>
 
-export module Geometry:MeshBoundary.Impl;
+module Geometry.MeshBoundary;
 
-import :MeshBoundary;
 
 namespace Geometry::MeshBoundary
 {

@@ -7,9 +7,9 @@ module;
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/norm.hpp>
 
-export module Geometry:Segment;
+export module Geometry.Segment;
 
-import :Pca;
+import Geometry.Pca;
 
 export namespace Geometry
 {

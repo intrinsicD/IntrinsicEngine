@@ -6,8 +6,7 @@ module;
 #include <array>
 #include <span>
 
-module Geometry:EPA.Impl;
-import :EPA;
+module Geometry.EPA;
 import Core.Memory;
 import Core.Logging;
 

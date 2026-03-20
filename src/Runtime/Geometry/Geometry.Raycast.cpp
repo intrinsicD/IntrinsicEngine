@@ -4,11 +4,10 @@ module;
 #include <optional>
 #include <glm/glm.hpp>
 
-module Geometry:Raycast.Impl;
+module Geometry.Raycast;
 
-import :Raycast;
-import :Primitives;
-import :Validation;
+import Geometry.Primitives;
+import Geometry.Validation;
 
 namespace Geometry
 {

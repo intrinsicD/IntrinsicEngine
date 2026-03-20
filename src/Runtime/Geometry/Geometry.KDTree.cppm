@@ -9,12 +9,12 @@ module;
 #include <vector>
 #include <glm/glm.hpp>
 
-export module Geometry:KDTree;
+export module Geometry.KDTree;
 
-import :AABB;
-import :Primitives;
-import :Containment;
-import :Overlap;
+import Geometry.AABB;
+import Geometry.Primitives;
+import Geometry.Containment;
+import Geometry.Overlap;
 
 export namespace Geometry
 {

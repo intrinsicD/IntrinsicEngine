@@ -15,7 +15,7 @@ module Graphics.ColorMapper;
 import Graphics.Colormap;
 import Graphics.GpuColor;
 import Graphics.VisualizationConfig;
-import Geometry;
+import Geometry.Properties;
 
 using namespace Graphics;
 

@@ -8,12 +8,12 @@ module;
 #include <span>
 #include <vector>
 
-export module Geometry:BVH;
+export module Geometry.BVH;
 
-import :AABB;
-import :Primitives;
-import :Containment;
-import :Overlap;
+import Geometry.AABB;
+import Geometry.Primitives;
+import Geometry.Containment;
+import Geometry.Overlap;
 
 export namespace Geometry
 {

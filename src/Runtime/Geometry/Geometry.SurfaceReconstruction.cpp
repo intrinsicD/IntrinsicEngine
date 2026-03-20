@@ -12,16 +12,15 @@ module;
 #include <glm/glm.hpp>
 #include <glm/geometric.hpp>
 
-module Geometry:SurfaceReconstruction.Impl;
+module Geometry.SurfaceReconstruction;
 
-import :SurfaceReconstruction;
-import :MarchingCubes;
-import :NormalEstimation;
-import :HalfedgeMesh;
-import :AABB;
-import :Octree;
-import :Primitives;
-import :Validation;
+import Geometry.MarchingCubes;
+import Geometry.NormalEstimation;
+import Geometry.HalfedgeMesh;
+import Geometry.AABB;
+import Geometry.Octree;
+import Geometry.Primitives;
+import Geometry.Validation;
 
 namespace Geometry::SurfaceReconstruction
 {

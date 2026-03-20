@@ -7,9 +7,9 @@ module;
 #include <limits>
 
 
-export module Geometry:Validation;
+export module Geometry.Validation;
  
-import :Primitives;
+import Geometry.Primitives;
  
 export namespace Geometry::Validation
 {

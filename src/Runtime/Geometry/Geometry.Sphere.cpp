@@ -5,10 +5,9 @@ module;
 #include <vector>
 #include <span>
 
-module Geometry:Sphere.Impl;
+module Geometry.Sphere;
 
-import :LinearSolver;
-import :Sphere;
+import Geometry.LinearSolver;
 
 namespace Geometry
 {

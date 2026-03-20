@@ -4,12 +4,12 @@ module;
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/norm.hpp>
 
-export module Geometry:Contact;
+export module Geometry.ContactManifold;
 
-import :Primitives;
-import :GJK; // Should contain GJK_EPA logic in full version
-import :EPA;
-import :Support;
+import Geometry.Primitives;
+import Geometry.GJK; // Should contain GJK_EPA logic in full version
+import Geometry.EPA;
+import Geometry.Support;
 import Core.Memory;
 import Core.Logging;
 

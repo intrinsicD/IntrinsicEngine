@@ -15,13 +15,12 @@ module;
 
 #include <glm/glm.hpp>
 
-module Geometry:Graph.Impl;
+module Geometry.Graph;
 
-import :Graph;
-import :AABB;
-import :Octree;
-import :Properties;
-import :Validation;
+import Geometry.AABB;
+import Geometry.Octree;
+import Geometry.Properties;
+import Geometry.Validation;
 
 namespace Geometry::Graph
 {

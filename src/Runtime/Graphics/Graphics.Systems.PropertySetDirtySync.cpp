@@ -18,7 +18,6 @@ import Graphics.VisualizationConfig;
 import Core.Hash;
 import Core.Logging;
 import Core.FrameGraph;
-import Geometry;
 
 #include "Graphics.GraphPropertyHelpers.hpp"
 #include "Graphics.PointCloudPropertyHelpers.hpp"
