@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <array>
+#include <string_view>
 #include <vector>
 
 #include <entt/entity/registry.hpp>
@@ -19,6 +21,46 @@ namespace
                                           []() -> void* { return new MockSystemFeature{}; },
                                           [](void* p) { delete static_cast<MockSystemFeature*>(p); });
         ASSERT_TRUE(ok) << "Failed to register feature '" << feature.Name << "'";
+    }
+}
+
+TEST(RuntimeSystemBundles, ExportedCoreFeatureOrderMatchesCanonicalBaseline)
+{
+    constexpr std::array<std::string_view, 3> kExpectedOrder{
+        "TransformUpdate",
+        "PropertySetDirtySync",
+        "PrimitiveBVHSync",
+    };
+
+    const auto order = Runtime::GetCoreFrameGraphFeatureOrder();
+    ASSERT_EQ(order.size(), kExpectedOrder.size());
+
+    for (size_t i = 0; i < order.size(); ++i)
+    {
+        EXPECT_EQ(order[i].Name, kExpectedOrder[i]) << "Unexpected core bundle entry at index " << i;
+        EXPECT_EQ(order[i].Category, Core::FeatureCategory::System);
+        EXPECT_TRUE(order[i].DefaultEnabled);
+    }
+}
+
+TEST(RuntimeSystemBundles, ExportedGpuFeatureOrderMatchesCanonicalBaseline)
+{
+    constexpr std::array<std::string_view, 5> kExpectedOrder{
+        "GraphGeometrySync",
+        "MeshRendererLifecycle",
+        "PointCloudGeometrySync",
+        "MeshViewLifecycle",
+        "GPUSceneSync",
+    };
+
+    const auto order = Runtime::GetGpuFrameGraphFeatureOrder();
+    ASSERT_EQ(order.size(), kExpectedOrder.size());
+
+    for (size_t i = 0; i < order.size(); ++i)
+    {
+        EXPECT_EQ(order[i].Name, kExpectedOrder[i]) << "Unexpected GPU bundle entry at index " << i;
+        EXPECT_EQ(order[i].Category, Core::FeatureCategory::System);
+        EXPECT_TRUE(order[i].DefaultEnabled);
     }
 }
 

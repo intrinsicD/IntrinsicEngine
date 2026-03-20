@@ -1,5 +1,6 @@
 module;
 #include <array>
+#include <span>
 
 module Runtime.SystemBundles;
 
@@ -81,25 +82,39 @@ namespace
                          context.DefaultTextureId);
     }
 
+    constexpr std::array<Core::FeatureDescriptor, 3> kCoreSystemOrder{{
+        Runtime::SystemFeatureCatalog::TransformUpdate,
+        Runtime::SystemFeatureCatalog::PropertySetDirtySync,
+        Runtime::SystemFeatureCatalog::PrimitiveBVHSync,
+    }};
+
     constexpr std::array<CoreSystemRegistrationSpec, 3> kCoreSystemRegistrations{{
-        {Runtime::SystemFeatureCatalog::TransformUpdate,
+        {kCoreSystemOrder[0],
          &RegisterCoreSystem<&ECS::Systems::Transform::RegisterSystem>},
-        {Runtime::SystemFeatureCatalog::PropertySetDirtySync,
+        {kCoreSystemOrder[1],
          &RegisterCoreSystem<&Graphics::Systems::PropertySetDirtySync::RegisterSystem>},
-        {Runtime::SystemFeatureCatalog::PrimitiveBVHSync,
+        {kCoreSystemOrder[2],
          &RegisterCoreSystem<&Graphics::Systems::PrimitiveBVHSync::RegisterSystem>},
     }};
 
+    constexpr std::array<Core::FeatureDescriptor, 5> kGpuSystemOrder{{
+        Runtime::SystemFeatureCatalog::GraphGeometrySync,
+        Runtime::SystemFeatureCatalog::MeshRendererLifecycle,
+        Runtime::SystemFeatureCatalog::PointCloudGeometrySync,
+        Runtime::SystemFeatureCatalog::MeshViewLifecycle,
+        Runtime::SystemFeatureCatalog::GPUSceneSync,
+    }};
+
     constexpr std::array<GpuSystemRegistrationSpec, 5> kGpuSystemRegistrations{{
-        {Runtime::SystemFeatureCatalog::GraphGeometrySync,
+        {kGpuSystemOrder[0],
          &RegisterGeometrySyncSystem<&Graphics::Systems::GraphGeometrySync::RegisterSystem>},
-        {Runtime::SystemFeatureCatalog::MeshRendererLifecycle,
+        {kGpuSystemOrder[1],
          &RegisterMeshSurfaceSystem<&Graphics::Systems::MeshRendererLifecycle::RegisterSystem>},
-        {Runtime::SystemFeatureCatalog::PointCloudGeometrySync,
+        {kGpuSystemOrder[2],
          &RegisterGeometrySyncSystem<&Graphics::Systems::PointCloudGeometrySync::RegisterSystem>},
-        {Runtime::SystemFeatureCatalog::MeshViewLifecycle,
+        {kGpuSystemOrder[3],
          &RegisterGeometrySyncSystem<&Graphics::Systems::MeshViewLifecycle::RegisterSystem>},
-        {Runtime::SystemFeatureCatalog::GPUSceneSync,
+        {kGpuSystemOrder[4],
          &RegisterGpuSceneSystem<&Graphics::Systems::GPUSceneSync::RegisterSystem>},
     }};
 }
@@ -120,5 +135,15 @@ namespace Runtime
         RegisterEnabledSystems<GpuSystemRegistrationSpec>(context.Core.Features,
                                                           kGpuSystemRegistrations,
                                                           context);
+    }
+
+    std::span<const Core::FeatureDescriptor> GetCoreFrameGraphFeatureOrder()
+    {
+        return kCoreSystemOrder;
+    }
+
+    std::span<const Core::FeatureDescriptor> GetGpuFrameGraphFeatureOrder()
+    {
+        return kGpuSystemOrder;
     }
 }
