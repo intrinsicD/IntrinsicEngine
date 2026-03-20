@@ -33,7 +33,7 @@ Built on **C++23 Modules**, **Vulkan 1.3** bindless rendering, coroutine-based t
   - `AssetManager::Update()` is the single-writer phase on the main thread.
   - Parallel systems use `BeginReadPhase()` / `EndReadPhase()` brackets.
   - `AcquireLease()` for long-lived access across hot-reloads.
-- **Registry-Driven Drag & Drop Import:** `Runtime::AssetIngestService` owns drag-drop/re-import orchestration and delegates format selection to `Graphics::IORegistry`, so any registered loader extension is accepted consistently by both file import and window drag-and-drop.
+- **Registry-Driven Drag & Drop Import:** `Runtime::AssetIngestService` owns drag-drop/re-import orchestration and delegates format selection to `Graphics::IORegistry`, so any registered loader extension is accepted consistently by both file import and window drag-and-drop. Drag-drop requests now flow through the runtime streaming lane as an explicit ingest state machine before main-thread materialization/spawn.
 - **Editor Geometry Workflow Hygiene:** When the editor reconstructs a `Halfedge::Mesh` from render/collider triangle soup, it now routes through UV-aware conversion helpers (`Geometry::MeshUtils::BuildHalfedgeMeshFromIndexedTriangles` / `ExtractIndexedTriangles`). Coincident vertices are welded only when their UVs also agree, so texture seams survive rebuilds instead of being averaged away, and edited meshes round-trip their `v:texcoord` property back into `Aux.xy` for GPU upload.
 
 ### 2. Geometry Processing Kernel

@@ -13,6 +13,7 @@ namespace
     class FakeStreamingLaneHost final : public Runtime::IStreamingLaneHost
     {
     public:
+        void ProcessAssetIngest() override { Calls.emplace_back("ingest"); }
         void ProcessMainThreadQueue() override { Calls.emplace_back("queue"); }
         void ProcessUploads() override { Calls.emplace_back("uploads"); }
         void ProcessTextureDeletions() override { Calls.emplace_back("textures"); }
@@ -153,6 +154,7 @@ TEST(RuntimeFrameLoop, StreamingLaneCoordinator_OrdersMainThreadUploadAndCleanup
     coordinator.EndFrame();
 
     const std::vector<std::string> expected{
+        "ingest",
         "queue",
         "uploads",
         "textures",
@@ -306,6 +308,7 @@ TEST(RuntimeFrameLoop, RunFramePhases_PreservesStreamingFixedAndRenderLaneBaseli
     EXPECT_NEAR(accumulator, 0.05, kEpsilon);
 
     const std::vector<std::string> expectedStreamingCalls{
+        "ingest",
         "queue",
         "uploads",
         "textures",

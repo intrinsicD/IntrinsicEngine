@@ -273,6 +273,7 @@ namespace Runtime
         double accumulator = 0.0;
         const FrameLoopPolicy frameLoopPolicy{};
         RuntimeStreamingLaneHost streamingLaneHost{
+            m_AssetIngestService.get(),
             *m_AssetPipeline,
             *m_GraphicsBackend,
             m_RenderOrchestrator->GetMaterialSystem(),
