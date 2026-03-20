@@ -2,10 +2,12 @@ module;
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <cmath>
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <span>
 #include <vector>
 
 #include <entt/entity/registry.hpp>
@@ -31,6 +33,38 @@ namespace Graphics::Passes
 {
     namespace
     {
+        [[nodiscard]] constexpr uint64_t HashCombine64(uint64_t seed, uint64_t value) noexcept
+        {
+            value *= 0x9e3779b97f4a7c15ull;
+            value = (value ^ (value >> 30u)) * 0xbf58476d1ce4e5b9ull;
+            value = (value ^ (value >> 27u)) * 0x94d049bb133111ebull;
+            value ^= (value >> 31u);
+            seed ^= value + 0x9e3779b97f4a7c15ull + (seed << 6u) + (seed >> 2u);
+            return seed;
+        }
+
+        [[nodiscard]] constexpr uint64_t HashFloat(float value) noexcept
+        {
+            return std::bit_cast<uint32_t>(value);
+        }
+
+        [[nodiscard]] uint64_t HashVec3(uint64_t seed, const glm::vec3& value) noexcept
+        {
+            seed = HashCombine64(seed, HashFloat(value.x));
+            seed = HashCombine64(seed, HashFloat(value.y));
+            seed = HashCombine64(seed, HashFloat(value.z));
+            return seed;
+        }
+
+        [[nodiscard]] uint64_t HashVec4(uint64_t seed, const glm::vec4& value) noexcept
+        {
+            seed = HashCombine64(seed, HashFloat(value.r));
+            seed = HashCombine64(seed, HashFloat(value.g));
+            seed = HashCombine64(seed, HashFloat(value.b));
+            seed = HashCombine64(seed, HashFloat(value.a));
+            return seed;
+        }
+
         struct HalfedgeTriangle
         {
             std::array<Geometry::VertexHandle, 3> Vertices{};
@@ -104,11 +138,13 @@ namespace Graphics::Passes
             return best;
         }
 
-        [[nodiscard]] glm::vec4 KMeansVertexColor(const Geometry::Halfedge::Mesh& mesh,
+        [[nodiscard]] glm::vec4 KMeansVertexColor(const Geometry::Halfedge::Mesh&,
                                                   const HalfedgeTriangle& tri,
                                                   glm::vec2 patchUV,
                                                   std::uint32_t halfedgeIndex,
-                                                  std::uint32_t twinIndex) noexcept
+                                                  std::uint32_t twinIndex,
+                                                  const Geometry::Property<uint32_t>& kmeansLabels,
+                                                  const Geometry::Property<glm::vec4>& kmeansColors) noexcept
         {
             if (!tri.Valid)
                 return glm::vec4(0.0f);
@@ -119,14 +155,12 @@ namespace Graphics::Passes
 
             const glm::vec3 p = EvaluateTrianglePoint(tri, localUV);
             const std::size_t winner = ClosestTriangleVertex(tri, p);
-            const auto kmeansLabels = mesh.VertexProperties().Get<uint32_t>("v:kmeans_label");
             if (kmeansLabels)
             {
                 return UnpackABGR(Graphics::GpuColor::LabelToColor(
                     static_cast<int>(kmeansLabels[tri.Vertices[winner].Index])));
             }
 
-            const auto kmeansColors = mesh.VertexProperties().Get<glm::vec4>("v:kmeans_color");
             if (kmeansColors)
                 return kmeansColors[tri.Vertices[winner].Index];
 
@@ -153,8 +187,9 @@ namespace Graphics::Passes
         for (auto& buf : m_StagingBuffers)
             buf.reset();
 
+        m_UploadedAtlasRevision.fill(0);
+        m_CachedAtlas = {};
         m_StagingCapacity = 0;
-        m_LastPreviewHandle = {};
     }
 
     void HtexPatchPreviewPass::OnResize(uint32_t, uint32_t)
@@ -162,6 +197,7 @@ namespace Graphics::Passes
         // Device is idle on resize in the current render-system contract.
         for (auto& img : m_PreviewImages)
             img.reset();
+        m_UploadedAtlasRevision.fill(0);
     }
 
     [[nodiscard]] glm::vec4 HtexPatchPreviewPass::DecodePackedColor(uint32_t packed) noexcept
@@ -244,20 +280,78 @@ namespace Graphics::Passes
         return std::nullopt;
     }
 
+    [[nodiscard]] uint64_t HtexPatchPreviewPass::ComputePreviewAtlasSignature(
+        const Geometry::Halfedge::Mesh& mesh,
+        std::span<const Geometry::HtexPatch::HalfedgePatchMeta> patches) noexcept
+    {
+        uint64_t hash = 0xcbf29ce484222325ull;
+        hash = HashCombine64(hash, static_cast<uint64_t>(mesh.VertexCount()));
+        hash = HashCombine64(hash, static_cast<uint64_t>(mesh.EdgeCount()));
+        hash = HashCombine64(hash, static_cast<uint64_t>(mesh.FaceCount()));
+        hash = HashCombine64(hash, static_cast<uint64_t>(patches.size()));
+
+        for (std::size_t i = 0; i < mesh.VertexCount(); ++i)
+        {
+            const Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(i)};
+            if (!mesh.IsValid(v) || mesh.IsDeleted(v))
+                continue;
+            hash = HashVec3(hash, mesh.Position(v));
+        }
+
+        for (const auto& patch : patches)
+        {
+            hash = HashCombine64(hash, patch.EdgeIndex);
+            hash = HashCombine64(hash, patch.Halfedge0Index);
+            hash = HashCombine64(hash, patch.Halfedge1Index);
+            hash = HashCombine64(hash, patch.Face0Index);
+            hash = HashCombine64(hash, patch.Face1Index);
+            hash = HashCombine64(hash, patch.Resolution);
+            hash = HashCombine64(hash, patch.LayerIndex);
+            hash = HashCombine64(hash, patch.Flags);
+        }
+
+        const auto kmeansLabels = mesh.VertexProperties().Get<uint32_t>("v:kmeans_label");
+        hash = HashCombine64(hash, kmeansLabels ? 1ull : 0ull);
+        if (kmeansLabels)
+        {
+            for (std::size_t i = 0; i < mesh.VertexCount(); ++i)
+            {
+                const Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(i)};
+                if (!mesh.IsValid(v) || mesh.IsDeleted(v))
+                    continue;
+                hash = HashCombine64(hash, static_cast<uint64_t>(kmeansLabels[v.Index]));
+            }
+        }
+
+        const auto kmeansColors = mesh.VertexProperties().Get<glm::vec4>("v:kmeans_color");
+        hash = HashCombine64(hash, kmeansColors ? 1ull : 0ull);
+        if (kmeansColors)
+        {
+            for (std::size_t i = 0; i < mesh.VertexCount(); ++i)
+            {
+                const Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(i)};
+                if (!mesh.IsValid(v) || mesh.IsDeleted(v))
+                    continue;
+                hash = HashVec4(hash, kmeansColors[v.Index]);
+            }
+        }
+
+        return hash;
+    }
+
     [[nodiscard]] bool HtexPatchPreviewPass::BuildPreviewAtlas(const Geometry::Halfedge::Mesh& mesh,
+                                                               std::span<const Geometry::HtexPatch::HalfedgePatchMeta> patches,
                                                                std::vector<glm::vec4>& outPixels,
                                                                uint32_t& outWidth,
-                                                               uint32_t& outHeight) const
+                                                               uint32_t& outHeight)
     {
-        const auto patchBuild = Geometry::HtexPatch::BuildPatchMetadata(mesh);
-        if (!patchBuild)
+        if (patches.empty())
         {
-            outWidth = 1;
-            outHeight = 1;
-            outPixels.assign(1, glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
+            outWidth = 1u;
+            outHeight = 1u;
+            outPixels.assign(1u, glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
             return false;
         }
-        const auto& patches = patchBuild->Patches;
 
         constexpr uint32_t kTileSize = 16u;
         constexpr uint32_t kMaxColumns = 32u;
@@ -267,6 +361,9 @@ namespace Graphics::Passes
         outWidth = columns * kTileSize;
         outHeight = rows * kTileSize;
         outPixels.assign(static_cast<size_t>(outWidth) * static_cast<size_t>(outHeight), glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
+        const auto kmeansLabels = mesh.VertexProperties().Get<uint32_t>("v:kmeans_label");
+        const auto kmeansColors = mesh.VertexProperties().Get<glm::vec4>("v:kmeans_color");
+        const bool hasPerTexelKMeans = static_cast<bool>(kmeansLabels) || static_cast<bool>(kmeansColors);
 
         for (std::size_t i = 0; i < patches.size(); ++i)
         {
@@ -286,8 +383,6 @@ namespace Graphics::Passes
             const Geometry::HalfedgeHandle h1{static_cast<Geometry::PropertyIndex>(patch.Halfedge1Index)};
             const HalfedgeTriangle tri0 = BuildHalfedgeTriangle(mesh, h0);
             const HalfedgeTriangle tri1 = BuildHalfedgeTriangle(mesh, h1);
-            const bool hasPerTexelKMeans = static_cast<bool>(mesh.VertexProperties().Get<uint32_t>("v:kmeans_label")) ||
-                                           static_cast<bool>(mesh.VertexProperties().Get<glm::vec4>("v:kmeans_color"));
 
             for (uint32_t y = 0; y < kTileSize; ++y)
             {
@@ -304,13 +399,17 @@ namespace Graphics::Passes
                             tri0,
                             patchUV,
                             patch.Halfedge0Index,
-                            patch.Halfedge1Index);
+                            patch.Halfedge1Index,
+                            kmeansLabels,
+                            kmeansColors);
                         const glm::vec4 tri1Color = KMeansVertexColor(
                             mesh,
                             tri1,
                             patchUV,
                             patch.Halfedge1Index,
-                            patch.Halfedge0Index);
+                            patch.Halfedge0Index,
+                            kmeansLabels,
+                            kmeansColors);
 
                         if (tri0Color.a > 0.0f)
                             texel = tri0Color;
@@ -338,6 +437,9 @@ namespace Graphics::Passes
         if (!m_Device || ctx.Resolution.width == 0 || ctx.Resolution.height == 0)
             return;
 
+        m_DebugState.AtlasRebuiltThisFrame = false;
+        m_DebugState.AtlasUploadQueuedThisFrame = false;
+
         auto& reg = ctx.Scene.GetRegistry();
         const auto source = FindSourceMeshEntity(reg);
         if (!source)
@@ -350,12 +452,49 @@ namespace Graphics::Passes
         const auto entity = *source;
         const auto& meshData = reg.get<ECS::Mesh::Data>(entity);
         if (!meshData.MeshRef)
+        {
+            m_DebugState.HasMesh = false;
+            m_DebugState.PreviewImageReady = false;
             return;
+        }
 
-        std::vector<glm::vec4> pixels;
-        uint32_t width = 1;
-        uint32_t height = 1;
-        const bool built = BuildPreviewAtlas(*meshData.MeshRef, pixels, width, height);
+        uint32_t width = 1u;
+        uint32_t height = 1u;
+        bool built = false;
+
+        if (const auto patchBuild = Geometry::HtexPatch::BuildPatchMetadata(*meshData.MeshRef))
+        {
+            const uint64_t signature = ComputePreviewAtlasSignature(*meshData.MeshRef, patchBuild->Patches);
+            if (!m_CachedAtlas.Valid || m_CachedAtlas.Signature != signature)
+            {
+                m_CachedAtlas.Pixels.clear();
+                m_CachedAtlas.Built = BuildPreviewAtlas(
+                    *meshData.MeshRef,
+                    patchBuild->Patches,
+                    m_CachedAtlas.Pixels,
+                    m_CachedAtlas.Width,
+                    m_CachedAtlas.Height);
+                m_CachedAtlas.Signature = signature;
+                m_CachedAtlas.Valid = true;
+                ++m_CachedAtlas.Revision;
+                if (m_CachedAtlas.Revision == 0)
+                    m_CachedAtlas.Revision = 1;
+                m_DebugState.AtlasRebuiltThisFrame = true;
+            }
+
+            width = m_CachedAtlas.Width;
+            height = m_CachedAtlas.Height;
+            built = m_CachedAtlas.Built;
+        }
+        else
+        {
+            m_CachedAtlas = {};
+            m_CachedAtlas.Width = 1u;
+            m_CachedAtlas.Height = 1u;
+            m_CachedAtlas.Pixels.assign(1u, glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
+            width = m_CachedAtlas.Width;
+            height = m_CachedAtlas.Height;
+        }
 
         m_DebugState.HasMesh = true;
         m_DebugState.LastMeshEntity = static_cast<uint32_t>(entity);
@@ -380,21 +519,54 @@ namespace Graphics::Passes
                 VK_FORMAT_R32G32B32A32_SFLOAT,
                 VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
                 VK_IMAGE_ASPECT_COLOR_BIT);
+            m_UploadedAtlasRevision[ctx.FrameIndex] = 0;
         }
         m_DebugState.PreviewImageReady = true;
 
         if (!built)
             return;
 
+        const auto importName = kPreviewName;
+        const bool needsUpload = (m_CachedAtlas.Revision != 0u) &&
+                                 (m_UploadedAtlasRevision[ctx.FrameIndex] != m_CachedAtlas.Revision);
+
+        if (!needsUpload)
+        {
+            ctx.Graph.AddPass<FinalizePassData>("HtexPatchPreview.Bind",
+                                                [&, importName](FinalizePassData& data, RGBuilder& builder)
+                                                {
+                                                    data.Target = builder.ImportTexture(
+                                                        importName,
+                                                        m_PreviewImages[ctx.FrameIndex]->GetHandle(),
+                                                        m_PreviewImages[ctx.FrameIndex]->GetView(),
+                                                        m_PreviewImages[ctx.FrameIndex]->GetFormat(),
+                                                        {width, height},
+                                                        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                                                    if (data.Target.IsValid())
+                                                    {
+                                                        data.Target = builder.Read(
+                                                            data.Target,
+                                                            VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                                                            VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
+                                                        ctx.Blackboard.Add(importName, data.Target);
+                                                    }
+                                                },
+                                                [](const FinalizePassData&, const RGRegistry&, VkCommandBuffer)
+                                                {
+                                                });
+            return;
+        }
+
         if (!EnsurePerFrameBuffer<glm::vec4, FRAMES>(
                 *m_Device, m_StagingBuffers, m_StagingCapacity,
-                static_cast<uint32_t>(pixels.size()), 256u, "HtexPatchPreview",
+                static_cast<uint32_t>(m_CachedAtlas.Pixels.size()), 256u, "HtexPatchPreview",
                 VK_BUFFER_USAGE_TRANSFER_SRC_BIT))
             return;
 
-        m_StagingBuffers[ctx.FrameIndex]->Write(pixels.data(), pixels.size() * sizeof(glm::vec4));
-
-        const auto importName = kPreviewName;
+        m_StagingBuffers[ctx.FrameIndex]->Write(
+            m_CachedAtlas.Pixels.data(),
+            m_CachedAtlas.Pixels.size() * sizeof(glm::vec4));
+        m_DebugState.AtlasUploadQueuedThisFrame = true;
 
         ctx.Graph.AddPass<UploadPassData>("HtexPatchPreview.Upload",
                                           [&, width, height, importName](UploadPassData& data, RGBuilder& builder)
@@ -453,12 +625,14 @@ namespace Graphics::Passes
                                                 {
                                                     data.Target = builder.Read(
                                                         handle,
-                                                        VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-                                                        VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
+                                                    VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                                                    VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
                                                 }
                                             },
-                                            [](const FinalizePassData&, const RGRegistry&, VkCommandBuffer)
+                                            [this, frameIndex = ctx.FrameIndex](const FinalizePassData&, const RGRegistry&, VkCommandBuffer)
                                             {
+                                                if (frameIndex < FRAMES)
+                                                    m_UploadedAtlasRevision[frameIndex] = m_CachedAtlas.Revision;
                                             });
     }
 }
