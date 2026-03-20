@@ -1256,6 +1256,59 @@ TEST(RenderResources, DeferredRequestWithoutCompositionPass_FallsBackToForward)
     EXPECT_FALSE(recipe.Requires(RenderResource::Material0));
 }
 
+TEST(RenderResources, HybridRecipe_UsesDeferredBackedContracts)
+{
+    using namespace Graphics;
+
+    DefaultPipelineRecipeInputs inputs{};
+    inputs.SurfacePassEnabled = true;
+    inputs.LinePassEnabled = true;
+    inputs.PointPassEnabled = true;
+    inputs.PickingPassEnabled = false;
+    inputs.PostProcessPassEnabled = false;
+    inputs.SelectionOutlinePassEnabled = false;
+    inputs.DebugViewPassEnabled = false;
+    inputs.ImGuiPassEnabled = false;
+    inputs.CompositionPassEnabled = true;
+    inputs.RequestedLightingPath = FrameLightingPath::Hybrid;
+
+    const FrameRecipe recipe = BuildDefaultPipelineRecipe(inputs);
+
+    EXPECT_EQ(recipe.LightingPath, FrameLightingPath::Hybrid);
+    EXPECT_TRUE(recipe.Normals);
+    EXPECT_TRUE(recipe.MaterialChannels);
+    EXPECT_TRUE(recipe.Requires(RenderResource::SceneNormal));
+    EXPECT_TRUE(recipe.Requires(RenderResource::Albedo));
+    EXPECT_TRUE(recipe.Requires(RenderResource::Material0));
+    EXPECT_TRUE(recipe.Requires(RenderResource::SceneColorHDR));
+    EXPECT_TRUE(UsesDeferredComposition(recipe.LightingPath));
+}
+
+TEST(RenderResources, HybridRequestWithoutCompositionPass_FallsBackToForward)
+{
+    using namespace Graphics;
+
+    DefaultPipelineRecipeInputs inputs{};
+    inputs.SurfacePassEnabled = true;
+    inputs.LinePassEnabled = true;
+    inputs.PointPassEnabled = false;
+    inputs.PickingPassEnabled = false;
+    inputs.PostProcessPassEnabled = false;
+    inputs.SelectionOutlinePassEnabled = false;
+    inputs.DebugViewPassEnabled = false;
+    inputs.ImGuiPassEnabled = false;
+    inputs.CompositionPassEnabled = false;
+    inputs.RequestedLightingPath = FrameLightingPath::Hybrid;
+
+    const FrameRecipe recipe = BuildDefaultPipelineRecipe(inputs);
+
+    EXPECT_EQ(recipe.LightingPath, FrameLightingPath::Forward);
+    EXPECT_FALSE(UsesDeferredComposition(recipe.LightingPath));
+    EXPECT_FALSE(recipe.Requires(RenderResource::SceneNormal));
+    EXPECT_FALSE(recipe.Requires(RenderResource::Albedo));
+    EXPECT_FALSE(recipe.Requires(RenderResource::Material0));
+}
+
 TEST(RenderResources, ForwardRecipe_DoesNotRequestGBufferByDefault)
 {
     using namespace Graphics;

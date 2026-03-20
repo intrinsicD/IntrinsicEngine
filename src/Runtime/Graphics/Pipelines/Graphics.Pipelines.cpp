@@ -74,14 +74,18 @@ namespace Graphics
         recipe.EntityId = needsPickingSideband || selectionActive;
         recipe.PrimitiveId = inputs.PickingPassEnabled || debugRequestsPrimitiveId;
 
-        const bool deferredRequested = inputs.RequestedLightingPath == FrameLightingPath::Deferred || debugRequestsMaterial;
+        const bool hybridRequested = inputs.RequestedLightingPath == FrameLightingPath::Hybrid;
+        const bool deferredRequested = hybridRequested ||
+                                       inputs.RequestedLightingPath == FrameLightingPath::Deferred ||
+                                       debugRequestsMaterial;
         const bool deferredUsable = deferredRequested && inputs.SurfacePassEnabled && inputs.CompositionPassEnabled && hasGeometry;
         recipe.LightingPath = hasGeometry
-            ? (deferredUsable ? FrameLightingPath::Deferred : FrameLightingPath::Forward)
+            ? (deferredUsable ? (hybridRequested ? FrameLightingPath::Hybrid : FrameLightingPath::Deferred)
+                              : FrameLightingPath::Forward)
             : (debugRequestsSceneColor ? FrameLightingPath::Forward : FrameLightingPath::None);
 
-        recipe.Normals = recipe.LightingPath == FrameLightingPath::Deferred || debugRequestsNormals;
-        recipe.MaterialChannels = recipe.LightingPath == FrameLightingPath::Deferred;
+        recipe.Normals = UsesDeferredComposition(recipe.LightingPath) || debugRequestsNormals;
+        recipe.MaterialChannels = UsesDeferredComposition(recipe.LightingPath);
         recipe.SceneColorLDR = recipe.Post || selectionActive || debugActive || inputs.ImGuiPassEnabled;
 
         return recipe;

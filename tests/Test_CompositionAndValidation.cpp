@@ -338,6 +338,37 @@ TEST(RenderGraphValidation, DefaultDeferredRecipe_BaselineContractsValidateClean
     EXPECT_EQ(result.WarningCount(), 0u);
 }
 
+TEST(RenderGraphValidation, DefaultHybridRecipe_BaselineContractsValidateCleanly)
+{
+    DefaultPipelineRecipeInputs inputs{};
+    inputs.SurfacePassEnabled = true;
+    inputs.CompositionPassEnabled = true;
+    inputs.PostProcessPassEnabled = true;
+    inputs.RequestedLightingPath = FrameLightingPath::Hybrid;
+
+    const FrameRecipe recipe = BuildDefaultPipelineRecipe(inputs);
+    ASSERT_EQ(recipe.LightingPath, FrameLightingPath::Hybrid);
+    ASSERT_TRUE(UsesDeferredComposition(recipe.LightingPath));
+
+    std::vector<RenderGraphDebugImage> images = {
+        MakeDebugImage(RenderResource::SceneDepth, true, 0),
+        MakeDebugImage(RenderResource::SceneNormal, false, 0),
+        MakeDebugImage(RenderResource::Albedo, false, 0),
+        MakeDebugImage(RenderResource::Material0, false, 0),
+        MakeDebugImage(RenderResource::SceneColorHDR, false, 1),
+        MakeDebugImage(RenderResource::SceneColorLDR, false, 2),
+        MakeDebugImageRaw(StringID{"Backbuffer"}, 101, true, 3),
+    };
+
+    std::vector<RenderGraphDebugPass> passes = {
+        MakePassWithAttachment("Present.LDR", 3, StringID{"Backbuffer"}, 101, true),
+    };
+
+    const auto result = ValidateCompiledGraph(recipe, passes, images);
+    EXPECT_FALSE(result.HasErrors());
+    EXPECT_EQ(result.WarningCount(), 0u);
+}
+
 TEST(RenderGraphValidation, DefaultImportedWritePolicies_ContainsBackbuffer)
 {
     const auto policies = GetDefaultImportedWritePolicies();
