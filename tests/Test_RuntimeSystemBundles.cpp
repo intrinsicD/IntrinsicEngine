@@ -64,6 +64,38 @@ TEST(RuntimeSystemBundles, ExportedGpuFeatureOrderMatchesCanonicalBaseline)
     }
 }
 
+
+TEST(RuntimeSystemBundles, ExportedFullVariableFeatureOrderMatchesCanonicalBaseline)
+{
+    constexpr std::array<std::string_view, 8> kExpectedOrder{
+        "TransformUpdate",
+        "PropertySetDirtySync",
+        "PrimitiveBVHSync",
+        "GraphGeometrySync",
+        "MeshRendererLifecycle",
+        "PointCloudGeometrySync",
+        "MeshViewLifecycle",
+        "GPUSceneSync",
+    };
+
+    const auto coreOrder = Runtime::GetCoreFrameGraphFeatureOrder();
+    const auto gpuOrder = Runtime::GetGpuFrameGraphFeatureOrder();
+    ASSERT_EQ(coreOrder.size() + gpuOrder.size(), kExpectedOrder.size());
+
+    size_t index = 0;
+    for (const auto& feature : coreOrder)
+    {
+        EXPECT_EQ(feature.Name, kExpectedOrder[index]) << "Unexpected combined bundle entry at index " << index;
+        ++index;
+    }
+
+    for (const auto& feature : gpuOrder)
+    {
+        EXPECT_EQ(feature.Name, kExpectedOrder[index]) << "Unexpected combined bundle entry at index " << index;
+        ++index;
+    }
+}
+
 TEST(RuntimeSystemBundles, CoreBundle_PreservesCanonicalPassOrder)
 {
     Core::FeatureRegistry featureRegistry;

@@ -282,6 +282,62 @@ TEST(RenderGraphValidation, ValidForwardPipeline_NoDiagnostics)
     EXPECT_EQ(result.WarningCount(), 0u);
 }
 
+
+TEST(RenderGraphValidation, DefaultForwardRecipe_BaselineContractsValidateCleanly)
+{
+    DefaultPipelineRecipeInputs inputs{};
+    inputs.SurfacePassEnabled = true;
+    inputs.PostProcessPassEnabled = true;
+    inputs.ImGuiPassEnabled = true;
+
+    const FrameRecipe recipe = BuildDefaultPipelineRecipe(inputs);
+
+    std::vector<RenderGraphDebugImage> images = {
+        MakeDebugImage(RenderResource::SceneDepth, true, 0),
+        MakeDebugImage(RenderResource::SceneColorHDR, false, 0),
+        MakeDebugImage(RenderResource::SceneColorLDR, false, 1),
+        MakeDebugImageRaw(StringID{"Backbuffer"}, 99, true, 2),
+    };
+
+    std::vector<RenderGraphDebugPass> passes = {
+        MakePassWithAttachment("Present.LDR", 2, StringID{"Backbuffer"}, 99, true),
+    };
+
+    const auto result = ValidateCompiledGraph(recipe, passes, images);
+    EXPECT_FALSE(result.HasErrors());
+    EXPECT_EQ(result.WarningCount(), 0u);
+}
+
+TEST(RenderGraphValidation, DefaultDeferredRecipe_BaselineContractsValidateCleanly)
+{
+    DefaultPipelineRecipeInputs inputs{};
+    inputs.SurfacePassEnabled = true;
+    inputs.CompositionPassEnabled = true;
+    inputs.PostProcessPassEnabled = true;
+    inputs.RequestedLightingPath = FrameLightingPath::Deferred;
+
+    const FrameRecipe recipe = BuildDefaultPipelineRecipe(inputs);
+    ASSERT_EQ(recipe.LightingPath, FrameLightingPath::Deferred);
+
+    std::vector<RenderGraphDebugImage> images = {
+        MakeDebugImage(RenderResource::SceneDepth, true, 0),
+        MakeDebugImage(RenderResource::SceneNormal, false, 0),
+        MakeDebugImage(RenderResource::Albedo, false, 0),
+        MakeDebugImage(RenderResource::Material0, false, 0),
+        MakeDebugImage(RenderResource::SceneColorHDR, false, 1),
+        MakeDebugImage(RenderResource::SceneColorLDR, false, 2),
+        MakeDebugImageRaw(StringID{"Backbuffer"}, 100, true, 3),
+    };
+
+    std::vector<RenderGraphDebugPass> passes = {
+        MakePassWithAttachment("Present.LDR", 3, StringID{"Backbuffer"}, 100, true),
+    };
+
+    const auto result = ValidateCompiledGraph(recipe, passes, images);
+    EXPECT_FALSE(result.HasErrors());
+    EXPECT_EQ(result.WarningCount(), 0u);
+}
+
 TEST(RenderGraphValidation, DefaultImportedWritePolicies_ContainsBackbuffer)
 {
     const auto policies = GetDefaultImportedWritePolicies();
