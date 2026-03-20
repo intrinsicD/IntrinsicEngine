@@ -59,9 +59,9 @@ These are not required to finish the first wave, but they should begin soon afte
 - [x] Ratify O2 as the default path unless new benchmark/test evidence disproves it.
   - Ratified via `docs/architecture/adr-o2-pragmatic-medium-runtime-refactor.md`; O2 is now the default migration path unless future benchmark/test evidence overturns it.
 - [ ] Execute phased migration with safe checkpoints:
-  - [ ] Phase 0: Baseline lock (telemetry/order/contract snapshots).
+  - [x] Phase 0: Baseline lock (telemetry/order/contract snapshots).
     - [x] Lock the current core/GPU frame-graph system bundle order with snapshot tests so migration phases can detect accidental reordering.
-    - [ ] Safe checkpoint: no behavioral diff vs baseline in frame order + render contracts.
+    - [x] Safe checkpoint: no behavioral diff vs baseline in frame order + render contracts.
   - [ ] Phase 1: Validate extracted simulation/render/streaming lanes (no behavior change).
     - [ ] Safe checkpoint: same pass/system order and same frame outputs as baseline.
   - [ ] Phase 2 follow-through: validate the landed typed system bundles in `Engine::Run()` against the existing lifecycle/resource reclaim baseline.
