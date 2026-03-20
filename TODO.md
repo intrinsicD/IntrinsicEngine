@@ -58,8 +58,6 @@ These are not required to finish the first wave, but they should begin soon afte
 
 O2 remains the default migration path per `docs/architecture/adr-o2-pragmatic-medium-runtime-refactor.md` unless future benchmark/test evidence overturns it.
 - [ ] Execute phased migration with safe checkpoints:
-  - [ ] Phase 1: Validate extracted simulation/render/streaming lanes (no behavior change).
-    - [ ] Safe checkpoint: same pass/system order and same frame outputs as baseline.
   - [ ] Phase 2 follow-through: validate the landed typed system bundles in `Engine::Run()` against the existing lifecycle/resource reclaim baseline.
     - [ ] Safe checkpoint: lifecycle/resource reclaim tests unchanged.
   - [ ] Phase 3: Move drag-drop + async load orchestration into streaming service state machine.

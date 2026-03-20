@@ -170,4 +170,26 @@ export namespace Runtime
                  RenderLaneCallbacks&& callbacks,
                  ExecuteGraphFn&& executeGraph);
     };
+
+    struct FramePhaseCallbacks
+    {
+        FixedUpdateFn OnFixedUpdate;
+        RegisterFixedSystemsFn RegisterFixedSystems;
+        ExecuteGraphFn ExecuteFixedGraph;
+        RenderLaneCallbacks Render;
+        ExecuteGraphFn ExecuteVariableGraph;
+    };
+
+    struct FramePhaseRunResult
+    {
+        FixedStepAdvanceResult FixedStep;
+    };
+
+    [[nodiscard]] FramePhaseRunResult RunFramePhases(double frameTime,
+                                                     double& accumulator,
+                                                     const FrameLoopPolicy& policy,
+                                                     const StreamingLaneCoordinator& streamingLane,
+                                                     const RenderLaneCoordinator& renderLane,
+                                                     Core::FrameGraph& fixedGraph,
+                                                     FramePhaseCallbacks&& callbacks);
 }
