@@ -1,8 +1,10 @@
 module;
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 export module Runtime.AssetIngestService;
 
@@ -22,7 +24,10 @@ export namespace Runtime
     };
 
     // Coordinates external asset ingest workflows (drag-drop and synchronous
-    // re-import) without leaking import orchestration into Engine.
+    // re-import) without leaking import orchestration into Engine. Asynchronous
+    // drag-drop imports now advance through an explicit streaming-lane state
+    // machine so Engine only enqueues requests while the streaming lane owns
+    // worker dispatch and main-thread finalization.
     class AssetIngestService
     {
     public:
@@ -43,16 +48,33 @@ export namespace Runtime
         AssetIngestService& operator=(AssetIngestService&&) = delete;
 
         void EnqueueDropImport(const std::string& path);
+        void PumpStreamingStateMachine();
 
         [[nodiscard]] std::optional<ImportedAssetHandles> ImportModelSync(
             const std::string& path,
             std::string_view assetNamespace = "scene");
 
     private:
+        struct PendingAsyncImport
+        {
+            std::string CanonicalPath;
+            std::string AssetNamespace;
+        };
+
+        struct CompletedAsyncImport
+        {
+            std::string CanonicalPath;
+            std::string AssetNamespace;
+            std::unique_ptr<Graphics::Model> Model;
+        };
+
         [[nodiscard]] std::optional<ImportedAssetHandles> MaterializeImportedModel(
             const std::string& sourcePath,
             std::unique_ptr<Graphics::Model> model,
             std::string_view assetNamespace);
+
+        void ScheduleQueuedImports();
+        void FinalizeCompletedImports();
 
         std::shared_ptr<RHI::VulkanDevice> m_Device;
         RHI::TransferManager& m_TransferManager;
@@ -65,5 +87,9 @@ export namespace Runtime
         uint32_t m_DefaultTextureId = 0;
         uint64_t m_DropAssetCounter = 0;
         uint64_t m_ReimportAssetCounter = 0;
+
+        std::mutex m_AsyncImportMutex;
+        std::vector<PendingAsyncImport> m_QueuedAsyncImports;
+        std::vector<CompletedAsyncImport> m_CompletedAsyncImports;
     };
 }

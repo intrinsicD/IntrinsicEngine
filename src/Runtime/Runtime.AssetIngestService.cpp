@@ -6,7 +6,9 @@ module;
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <mutex>
 #include <utility>
+#include <vector>
 #include <entt/entity/entity.hpp>
 #include <glm/glm.hpp>
 
@@ -108,54 +110,106 @@ namespace Runtime
             return;
         }
 
-        Core::Log::Info("Scheduling async ingest: {}", importPath->CanonicalPath);
-
-        std::string canonicalPath = importPath->CanonicalPath;
-        Core::Tasks::Scheduler::Dispatch([this, canonicalPath]()
         {
-            auto loadResult = Graphics::ModelLoader::LoadAsync(
-                m_Device,
-                m_TransferManager,
-                m_GeometryStorage,
-                canonicalPath,
-                m_IORegistry,
-                m_IOBackend);
+            std::lock_guard lock(m_AsyncImportMutex);
+            m_QueuedAsyncImports.push_back(PendingAsyncImport{
+                .CanonicalPath = importPath->CanonicalPath,
+                .AssetNamespace = "drop",
+            });
+        }
 
-            if (!loadResult)
-            {
-                Core::Log::Error("Failed to load model: {} ({})",
-                                 canonicalPath,
-                                 Graphics::AssetErrorToString(loadResult.error()));
+        Core::Log::Info("Queued async ingest request: {}", importPath->CanonicalPath);
+    }
+
+    void AssetIngestService::PumpStreamingStateMachine()
+    {
+        ScheduleQueuedImports();
+        FinalizeCompletedImports();
+    }
+
+    void AssetIngestService::ScheduleQueuedImports()
+    {
+        std::vector<PendingAsyncImport> queued;
+        {
+            std::lock_guard lock(m_AsyncImportMutex);
+            if (m_QueuedAsyncImports.empty())
                 return;
-            }
+            queued.swap(m_QueuedAsyncImports);
+        }
 
-            m_AssetPipeline.RegisterAssetLoad(Core::Assets::AssetHandle{}, loadResult->Token);
-            m_AssetPipeline.RunOnMainThread([this, model = std::move(loadResult->ModelData), canonicalPath]() mutable
+        for (auto& request : queued)
+        {
+            Core::Log::Info("Scheduling async ingest: {}", request.CanonicalPath);
+
+            Core::Tasks::Scheduler::Dispatch([this,
+                                              canonicalPath = request.CanonicalPath,
+                                              assetNamespace = request.AssetNamespace]() mutable
             {
-                auto imported = MaterializeImportedModel(canonicalPath, std::move(model), "drop");
-                if (!imported)
+                auto loadResult = Graphics::ModelLoader::LoadAsync(
+                    m_Device,
+                    m_TransferManager,
+                    m_GeometryStorage,
+                    canonicalPath,
+                    m_IORegistry,
+                    m_IOBackend);
+
+                if (!loadResult)
                 {
-                    Core::Log::Error("Failed to register imported model on main thread: {}", canonicalPath);
+                    Core::Log::Error("Failed to load model: {} ({})",
+                                     canonicalPath,
+                                     Graphics::AssetErrorToString(loadResult.error()));
                     return;
                 }
 
-                entt::entity root = m_SceneManager.SpawnModel(
-                    m_AssetPipeline.GetAssetManager(),
-                    imported->ModelHandle,
-                    imported->MaterialHandle,
-                    glm::vec3(0.0f),
-                    glm::vec3(0.01f));
+                m_AssetPipeline.RegisterAssetLoad(Core::Assets::AssetHandle{}, loadResult->Token);
 
-                if (root != entt::null)
-                {
-                    m_SceneManager.GetRegistry().emplace_or_replace<ECS::Components::AssetSourceRef::Component>(
-                        root,
-                        canonicalPath);
-                }
-
-                Core::Log::Info("Successfully spawned imported asset: {}", canonicalPath);
+                std::lock_guard lock(m_AsyncImportMutex);
+                m_CompletedAsyncImports.push_back(CompletedAsyncImport{
+                    .CanonicalPath = std::move(canonicalPath),
+                    .AssetNamespace = std::move(assetNamespace),
+                    .Model = std::move(loadResult->ModelData),
+                });
             });
-        });
+        }
+    }
+
+    void AssetIngestService::FinalizeCompletedImports()
+    {
+        std::vector<CompletedAsyncImport> completed;
+        {
+            std::lock_guard lock(m_AsyncImportMutex);
+            if (m_CompletedAsyncImports.empty())
+                return;
+            completed.swap(m_CompletedAsyncImports);
+        }
+
+        for (auto& item : completed)
+        {
+            auto imported = MaterializeImportedModel(item.CanonicalPath,
+                                                    std::move(item.Model),
+                                                    item.AssetNamespace);
+            if (!imported)
+            {
+                Core::Log::Error("Failed to register imported model on main thread: {}", item.CanonicalPath);
+                continue;
+            }
+
+            entt::entity root = m_SceneManager.SpawnModel(
+                m_AssetPipeline.GetAssetManager(),
+                imported->ModelHandle,
+                imported->MaterialHandle,
+                glm::vec3(0.0f),
+                glm::vec3(0.01f));
+
+            if (root != entt::null)
+            {
+                m_SceneManager.GetRegistry().emplace_or_replace<ECS::Components::AssetSourceRef::Component>(
+                    root,
+                    item.CanonicalPath);
+            }
+
+            Core::Log::Info("Successfully spawned imported asset: {}", item.CanonicalPath);
+        }
     }
 
     std::optional<ImportedAssetHandles> AssetIngestService::ImportModelSync(const std::string& path,

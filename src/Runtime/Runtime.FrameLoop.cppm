@@ -8,6 +8,7 @@ import Core.FeatureRegistry;
 import Core.FrameGraph;
 import Core.InplaceFunction;
 import Graphics;
+import Runtime.AssetIngestService;
 import Runtime.AssetPipeline;
 import Runtime.GraphicsBackend;
 import Runtime.RenderOrchestrator;
@@ -72,6 +73,7 @@ export namespace Runtime
     public:
         virtual ~IStreamingLaneHost();
 
+        virtual void ProcessAssetIngest() = 0;
         virtual void ProcessMainThreadQueue() = 0;
         virtual void ProcessUploads() = 0;
         virtual void ProcessTextureDeletions() = 0;
@@ -82,10 +84,12 @@ export namespace Runtime
     class RuntimeStreamingLaneHost final : public IStreamingLaneHost
     {
     public:
-        RuntimeStreamingLaneHost(AssetPipeline& assets,
+        RuntimeStreamingLaneHost(AssetIngestService* ingest,
+                                 AssetPipeline& assets,
                                  GraphicsBackend& graphics,
                                  Graphics::MaterialSystem& materials)
-            : m_Assets(assets)
+            : m_Ingest(ingest)
+            , m_Assets(assets)
             , m_Graphics(graphics)
             , m_Materials(materials)
         {
@@ -93,6 +97,7 @@ export namespace Runtime
 
         ~RuntimeStreamingLaneHost() override;
 
+        void ProcessAssetIngest() override;
         void ProcessMainThreadQueue() override;
         void ProcessUploads() override;
         void ProcessTextureDeletions() override;
@@ -100,6 +105,7 @@ export namespace Runtime
         void GarbageCollectTransfers() override;
 
     private:
+        AssetIngestService* m_Ingest = nullptr;
         AssetPipeline& m_Assets;
         GraphicsBackend& m_Graphics;
         Graphics::MaterialSystem& m_Materials;
