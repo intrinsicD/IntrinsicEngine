@@ -8,7 +8,7 @@ module;
 #include <vector>
 #include <cfloat>
 
-export module Geometry:AABB;
+export module Geometry.AABB;
 
 export namespace Geometry
 {

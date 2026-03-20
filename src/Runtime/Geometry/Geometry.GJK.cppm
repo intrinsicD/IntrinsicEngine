@@ -7,10 +7,10 @@ module;
 #include <array>
 #include <optional>
 
-export module Geometry:GJK;
+export module Geometry.GJK;
 
-import :Primitives;
-import :Support;
+import Geometry.Primitives;
+import Geometry.Support;
 import Core.Memory;
 
 export namespace Geometry::Internal

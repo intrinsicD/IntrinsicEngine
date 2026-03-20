@@ -6,7 +6,7 @@ module;
 
 export module Graphics.KDTreeDebugDraw;
 
-import Geometry;
+import Geometry.KDTree;
 import Graphics.DebugDraw;
 
 export namespace Graphics

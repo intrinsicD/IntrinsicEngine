@@ -8,7 +8,7 @@ module;
 
 module Graphics.PropertyEnumerator;
 
-import Geometry;
+import Geometry.Properties;
 
 using namespace Graphics;
 

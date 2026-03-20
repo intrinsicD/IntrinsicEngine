@@ -7,8 +7,7 @@ module;
 #include <functional>
 #include <glm/glm.hpp>
 
-module Geometry:Octree.Impl;
-import :Octree;
+module Geometry.Octree;
 
 namespace Geometry
 {

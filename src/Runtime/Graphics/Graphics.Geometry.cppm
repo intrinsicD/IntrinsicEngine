@@ -10,7 +10,11 @@ module;
 export module Graphics.Geometry;
 
 import RHI;
-import Geometry;
+import Geometry.AABB;
+import Geometry.Handle;
+import Geometry.HalfedgeMesh;
+import Geometry.KDTree;
+import Geometry.Octree;
 import Core.ResourcePool;
 
 export namespace Graphics

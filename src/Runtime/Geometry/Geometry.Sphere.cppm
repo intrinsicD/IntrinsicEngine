@@ -11,7 +11,7 @@ module;
 #include <glm/gtx/norm.hpp>
 #include <numbers>
 
-export module Geometry:Sphere;
+export module Geometry.Sphere;
 
 export namespace Geometry
 {

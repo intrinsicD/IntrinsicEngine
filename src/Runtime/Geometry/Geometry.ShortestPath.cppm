@@ -4,11 +4,11 @@ module;
 #include <optional>
 #include <span>
 
-export module Geometry:ShortestPath;
+export module Geometry.ShortestPath;
 
-import :HalfedgeMesh;
-import :Graph;
-import :Properties;
+import Geometry.HalfedgeMesh;
+import Geometry.Graph;
+import Geometry.Properties;
 
 export namespace Geometry::ShortestPath
 {

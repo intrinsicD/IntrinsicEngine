@@ -15,7 +15,7 @@ export module Graphics.Passes.Surface;
 import Graphics.RenderPipeline;
 import Graphics.RenderGraph;
 import Graphics.Components;
-import Geometry;
+import Geometry.Handle;
 import ECS;
 import RHI;
 

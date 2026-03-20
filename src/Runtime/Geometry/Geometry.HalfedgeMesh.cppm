@@ -11,10 +11,10 @@ module;
 
 #include <glm/glm.hpp>
 
-export module Geometry:HalfedgeMesh;
+export module Geometry.HalfedgeMesh;
 
-import :Properties;
-import :Circulators;
+import Geometry.Properties;
+import Geometry.Circulators;
 
 export namespace Geometry::Halfedge
 {

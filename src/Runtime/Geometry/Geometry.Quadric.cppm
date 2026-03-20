@@ -4,9 +4,9 @@ module;
 #include <optional>
 #include <glm/glm.hpp>
 
-export module Geometry:Quadric;
+export module Geometry.Quadric;
 
-import :Validation;
+import Geometry.Validation;
 
 namespace Geometry::QuadricDetail
 {

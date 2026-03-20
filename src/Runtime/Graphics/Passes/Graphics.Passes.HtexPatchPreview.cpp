@@ -23,7 +23,8 @@ import Core.Filesystem;
 import Core.Logging;
 
 import ECS;
-import Geometry;
+import Geometry.HalfedgeMesh;
+import Geometry.HtexPatch;
 import RHI;
 
 #include "Graphics.PassUtils.hpp"

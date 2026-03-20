@@ -8,7 +8,7 @@ module;
 
 export module Graphics.IsolineExtractor;
 
-import Geometry;
+import Geometry.HalfedgeMesh;
 
 // =============================================================================
 // IsolineExtractor — extract contour lines from scalar fields on meshes.

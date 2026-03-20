@@ -6,7 +6,7 @@ module;
 
 export module Graphics.OctreeDebugDraw;
 
-import Geometry;
+import Geometry.Octree;
 import Graphics.DebugDraw;
 
 export namespace Graphics

@@ -9,10 +9,10 @@ module;
 #include <span>
 #include <array>
 
-export module Geometry:OBB;
+export module Geometry.OBB;
 
-import :AABB;
-import :Pca;
+import Geometry.AABB;
+import Geometry.Pca;
 
 export namespace Geometry
 {

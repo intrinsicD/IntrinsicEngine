@@ -7,10 +7,10 @@ module;
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/norm.hpp>
 
-export module Geometry:Queries;
+export module Geometry.Queries;
 
-import :Ray;
-import :Segment;
+import Geometry.Ray;
+import Geometry.Segment;
 
 export namespace Geometry
 {

@@ -20,7 +20,7 @@ import Graphics.MaterialSystem;
 import Graphics.PipelineLibrary;
 import Graphics.RenderSystem;
 import Graphics.ShaderRegistry;
-import Geometry;
+import Geometry.Handle;
 import ECS;
 
 export namespace Runtime

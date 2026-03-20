@@ -14,7 +14,6 @@ import Graphics.Components;
 import Graphics.Geometry;
 import Graphics.GPUScene;
 import Graphics.Model;
-import Geometry;
 import ECS;
 #ifdef INTRINSIC_HAS_CUDA
 import RHI;

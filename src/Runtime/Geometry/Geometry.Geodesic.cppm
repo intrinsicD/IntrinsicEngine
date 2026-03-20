@@ -5,10 +5,10 @@ module;
 #include <span>
 #include <vector>
 
-export module Geometry:Geodesic;
+export module Geometry.Geodesic;
 
-import :Properties;
-import :HalfedgeMesh;
+import Geometry.Properties;
+import Geometry.HalfedgeMesh;
 
 export namespace Geometry::Geodesic
 {

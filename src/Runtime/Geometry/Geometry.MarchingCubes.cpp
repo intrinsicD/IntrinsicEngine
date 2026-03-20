@@ -13,11 +13,10 @@ module;
 #include <glm/glm.hpp>
 #include <glm/geometric.hpp>
 
-module Geometry:MarchingCubes.Impl;
+module Geometry.MarchingCubes;
 
-import :MarchingCubes;
-import :HalfedgeMesh;
-import :Handle;
+import Geometry.HalfedgeMesh;
+import Geometry.Handle;
 
 namespace Geometry::MarchingCubes
 {

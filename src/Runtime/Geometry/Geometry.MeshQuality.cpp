@@ -10,12 +10,11 @@ module;
 #include <glm/glm.hpp>
 #include <glm/geometric.hpp>
 
-module Geometry:MeshQuality.Impl;
+module Geometry.MeshQuality;
 
-import :MeshQuality;
-import :Properties;
-import :HalfedgeMesh;
-import :MeshUtils;
+import Geometry.Properties;
+import Geometry.HalfedgeMesh;
+import Geometry.MeshUtils;
 
 namespace Geometry::MeshQuality
 {

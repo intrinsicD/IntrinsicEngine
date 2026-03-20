@@ -6,10 +6,10 @@ module;
 #include <vector>
 #include <glm/fwd.hpp>
 
-export module Geometry:MeshUtils;
+export module Geometry.MeshUtils;
 
-import :Properties;
-import :HalfedgeMesh;
+import Geometry.Properties;
+import Geometry.HalfedgeMesh;
 
 export namespace Geometry::MeshUtils
 {

@@ -5,9 +5,9 @@ module;
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/norm.hpp>
 
-export module Geometry:Triangle;
+export module Geometry.Triangle;
 
-import :Segment;
+import Geometry.Segment;
 
 export namespace Geometry
 {

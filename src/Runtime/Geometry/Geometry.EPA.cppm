@@ -8,11 +8,11 @@ module;
 #include <array>
 #include <span>
 
-export module Geometry:EPA;
+export module Geometry.EPA;
 
-import :GJK;
-import :Support;
-import :Primitives;
+import Geometry.GJK;
+import Geometry.Support;
+import Geometry.Primitives;
 import Core.Memory;
 
 export namespace Geometry::Internal

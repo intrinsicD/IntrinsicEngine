@@ -6,7 +6,7 @@ module;
 
 export module Graphics.ConvexHullDebugDraw;
 
-import Geometry;
+import Geometry.HalfedgeMesh;
 import Graphics.DebugDraw;
 
 export namespace Graphics

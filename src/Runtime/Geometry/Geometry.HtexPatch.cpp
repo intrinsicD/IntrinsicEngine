@@ -10,9 +10,8 @@ module;
 
 #include <glm/glm.hpp>
 
-module Geometry:HtexPatch.Impl;
+module Geometry.HtexPatch;
 
-import :HtexPatch;
 
 namespace Geometry::HtexPatch
 {

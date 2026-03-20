@@ -8,9 +8,9 @@ module;
 
 #include <glm/glm.hpp>
 
-export module Geometry:KMeans;
+export module Geometry.KMeans;
 
-import :Properties;
+import Geometry.Properties;
 
 export namespace Geometry::KMeans
 {

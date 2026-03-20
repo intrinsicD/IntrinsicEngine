@@ -3,10 +3,10 @@ module;
 #include <optional>
 #include <glm/glm.hpp>
 
-export module Geometry:Raycast;
+export module Geometry.Raycast;
 
-import :Primitives;
-import :Validation;
+import Geometry.Primitives;
+import Geometry.Validation;
 
 export namespace Geometry
 {

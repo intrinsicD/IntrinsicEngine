@@ -22,7 +22,6 @@ import Core.Hash;
 import Core.Logging;
 import Core.FrameGraph;
 import ECS;
-import Geometry;
 import RHI;
 
 #include "Graphics.PointCloudPropertyHelpers.hpp"

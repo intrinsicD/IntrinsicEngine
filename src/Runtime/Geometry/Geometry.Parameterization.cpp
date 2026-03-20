@@ -12,13 +12,12 @@ module;
 #include <glm/glm.hpp>
 #include <glm/geometric.hpp>
 
-module Geometry:Parameterization.Impl;
+module Geometry.Parameterization;
 
-import :Parameterization;
-import :Properties;
-import :HalfedgeMesh;
-import :DEC;
-import :MeshUtils;
+import Geometry.Properties;
+import Geometry.HalfedgeMesh;
+import Geometry.DEC;
+import Geometry.MeshUtils;
 
 namespace Geometry::Parameterization
 {

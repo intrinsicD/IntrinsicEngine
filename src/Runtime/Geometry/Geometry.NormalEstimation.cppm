@@ -7,7 +7,7 @@ module;
 
 #include <glm/glm.hpp>
 
-export module Geometry:NormalEstimation;
+export module Geometry.NormalEstimation;
 
 export namespace Geometry::NormalEstimation
 {

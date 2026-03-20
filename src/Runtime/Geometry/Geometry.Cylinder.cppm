@@ -7,9 +7,9 @@ module;
 #include <glm/gtx/norm.hpp>
 #include <numbers>
 
-export module Geometry:Cylinder;
+export module Geometry.Cylinder;
 
-import :Sphere;
+import Geometry.Sphere;
 
 export namespace Geometry
 {

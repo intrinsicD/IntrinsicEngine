@@ -3,7 +3,7 @@ module;
 #include <array>
 #include <cstdlib>
 
-export module Geometry:LinearSolver;
+export module Geometry.LinearSolver;
 
 export namespace Geometry::Solver
 {

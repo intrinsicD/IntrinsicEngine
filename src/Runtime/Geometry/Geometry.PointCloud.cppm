@@ -9,10 +9,10 @@ module;
 
 #include <glm/glm.hpp>
 
-export module Geometry:PointCloud;
+export module Geometry.PointCloud;
 
-import :AABB;
-import :Properties;
+import Geometry.AABB;
+import Geometry.Properties;
 
 export namespace Geometry::PointCloud
 {

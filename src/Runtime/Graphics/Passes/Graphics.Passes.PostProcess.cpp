@@ -22,7 +22,6 @@ module Graphics.Passes.PostProcess;
 import Graphics.RenderPipeline;
 import Graphics.RenderGraph;
 import Graphics.ShaderRegistry;
-import Geometry;
 import Core.Hash;
 import Core.Logging;
 import Core.Filesystem;

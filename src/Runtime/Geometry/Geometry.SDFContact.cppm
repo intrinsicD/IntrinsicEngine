@@ -4,9 +4,9 @@ module;
 #include <functional>
 #include <concepts>
 
-export module Geometry:SDFContact;
+export module Geometry.SDFContact;
 
-import :Contact;
+import Geometry.ContactManifold;
 
 export namespace Geometry::SDF
 {

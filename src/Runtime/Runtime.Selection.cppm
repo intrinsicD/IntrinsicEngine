@@ -8,7 +8,7 @@ module;
 export module Runtime.Selection;
 
 import ECS;
-import Geometry;
+import Geometry.Ray;
 import Graphics.Components;
 import Graphics.Camera;
 

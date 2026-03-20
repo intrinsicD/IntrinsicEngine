@@ -7,10 +7,10 @@ module;
 
 #include <glm/glm.hpp>
 
-export module Geometry:Parameterization;
+export module Geometry.Parameterization;
 
-import :Properties;
-import :HalfedgeMesh;
+import Geometry.Properties;
+import Geometry.HalfedgeMesh;
 
 export namespace Geometry::Parameterization
 {

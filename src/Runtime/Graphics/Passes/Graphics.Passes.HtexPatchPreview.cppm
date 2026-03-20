@@ -15,7 +15,8 @@ import Graphics.RenderPipeline;
 import Graphics.RenderGraph;
 import Graphics.Components;
 import Core.Hash;
-import Geometry;
+import Geometry.HalfedgeMesh;
+import Geometry.HtexPatch;
 import RHI;
 import ECS;
 

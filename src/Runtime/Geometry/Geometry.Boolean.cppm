@@ -2,9 +2,9 @@ module;
 
 #include <optional>
 
-export module Geometry:Boolean;
+export module Geometry.Boolean;
 
-import :HalfedgeMesh;
+import Geometry.HalfedgeMesh;
 
 export namespace Geometry::Boolean
 {
