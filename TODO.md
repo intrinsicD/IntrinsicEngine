@@ -56,7 +56,8 @@ These are not required to finish the first wave, but they should begin soon afte
 
 #### B3.7 Recommended Path (default = O2) + Migration Plan
 
-- [ ] Ratify O2 as the default path unless new benchmark/test evidence disproves it.
+- [x] Ratify O2 as the default path unless new benchmark/test evidence disproves it.
+  - Ratified via `docs/architecture/adr-o2-pragmatic-medium-runtime-refactor.md`; O2 is now the default migration path unless future benchmark/test evidence overturns it.
 - [ ] Execute phased migration with safe checkpoints:
   - [ ] Phase 0: Baseline lock (telemetry/order/contract snapshots).
     - [ ] Safe checkpoint: no behavioral diff vs baseline in frame order + render contracts.
@@ -93,8 +94,8 @@ These are not required to finish the first wave, but they should begin soon afte
 
 - [ ] Investigate and clean up duplicate identical commits on two branches (`596e411` / `eb7df2c`).
 - [ ] Audit vague "update" commit message for multi-file fix (`211fb73`) — ensure commit messages describe the "why".
-- [ ] Remove empty B3.2 section header in `TODO.md` (left after last item was removed) or add placeholder text.
-- [ ] Update `ROADMAP.md` to reflect B4 planning section additions in `TODO.md`.
+- [x] Remove empty B3.2 section header in `TODO.md` (left after last item was removed) or add placeholder text.
+- [x] Update `ROADMAP.md` to reflect B4 planning section additions in `TODO.md`.
 - [ ] Review whether `BuildDefaultPipelineRecipe` rewrite should have been a separate commit from the HTex feature work — behavioral change to all pipeline configs was bundled with a feature commit.
 
 #### B3.9 Htex-Inspired Halfedge-Pair Patch Storage (investigate feasibility)

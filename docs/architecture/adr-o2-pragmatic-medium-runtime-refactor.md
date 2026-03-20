@@ -1,6 +1,6 @@
 # ADR O2 — Pragmatic Medium Runtime Refactor Path
 
-- **Status:** Proposed recommended default
+- **Status:** Accepted default runtime migration path
 - **Date:** 2026-03-19
 - **Owners:** Runtime / Rendering Architecture
 - **Related backlog:** `TODO.md` → `B3. Engine Architecture Review Follow-Up`, `B3.7 Recommended Path (default = O2) + Migration Plan`
@@ -36,7 +36,7 @@ O2 does **not** require a wholesale rewrite of all subsystems. Instead it minimi
 
 ## Decision
 
-Document **O2** as the recommended path for the B3 architecture review package.
+Ratify **O2** as the default path for the B3 architecture review package.
 
 Under O2 we will prefer the following direction:
 
@@ -46,7 +46,7 @@ Under O2 we will prefer the following direction:
 4. evolve toward explicit `FrameContext` ownership and bounded frames in flight,
 5. keep migration incremental, reversible, and guarded by tests plus telemetry.
 
-This ADR intentionally stops short of claiming that O2 is already ratified in implementation. The separate B3.7 item remains the place where benchmark/test evidence can confirm or reject O2 as the active default.
+This ADR now serves as the ratified default direction for the B3 follow-up backlog. Future benchmark or test evidence may still overturn that choice, but review and implementation planning should assume O2 unless new data proves otherwise.
 
 ## Benefits
 
