@@ -4,10 +4,10 @@ module;
 #include <vector>
 #include <memory>
 
-export module RHI:Texture;
+export module RHI.Texture;
 
-import :Device;
-import :Image;
+import RHI.Device;
+import RHI.Image;
 import Core.Handle; // For Core::StrongHandle
 
 export namespace RHI

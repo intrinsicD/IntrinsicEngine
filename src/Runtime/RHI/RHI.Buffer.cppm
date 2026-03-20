@@ -3,9 +3,9 @@ module;
 #include <limits>
 #include "RHI.Vulkan.hpp"
 
-export module RHI:Buffer;
+export module RHI.Buffer;
 
-import :Device;
+import RHI.Device;
 import Core.Logging; // For Core::Log::Error in inline Write/Read methods
 
 export namespace RHI {

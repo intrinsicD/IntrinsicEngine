@@ -5,9 +5,8 @@ module;
 #include <optional>
 #include <utility>
 
-module RHI:Image.Impl;
-import :Image;
-import :Device;
+module RHI.Image;
+import RHI.Device;
 import Core.Logging;
 
 namespace RHI

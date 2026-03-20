@@ -6,7 +6,10 @@ module;
 export module Graphics.TextureLoader;
 
 import Graphics.AssetErrors;
-import RHI;
+import RHI.Device;
+import RHI.Texture;
+import RHI.TextureSystem;
+import RHI.Transfer;
 
 export namespace Graphics
 {

@@ -7,7 +7,8 @@ export module Graphics.Passes.ImGui;
 import Graphics.RenderPipeline;
 import Graphics.RenderGraph;
 import Core.Hash;
-import RHI;
+import RHI.Descriptors;
+import RHI.Device;
 import Interface;
 
 using namespace Core::Hash;

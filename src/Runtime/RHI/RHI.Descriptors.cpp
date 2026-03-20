@@ -3,9 +3,8 @@ module;
 #include "RHI.DestructionUtils.hpp"
 #include <vector>
 
-module RHI:Descriptors.Impl;
-import :Descriptors;
-import :Device;
+module RHI.Descriptors;
+import RHI.Device;
 import Core.Logging;
 
 namespace RHI {

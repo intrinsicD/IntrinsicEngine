@@ -25,7 +25,11 @@ import Graphics.Passes.PostProcessSettings;
 import Core.Hash;
 import Core.Assets;
 import ECS;
-import RHI;
+import RHI.Bindless;
+import RHI.Buffer;
+import RHI.Descriptors;
+import RHI.Device;
+import RHI.Renderer;
 
 export namespace Graphics
 {

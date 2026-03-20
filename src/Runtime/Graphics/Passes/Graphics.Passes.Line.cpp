@@ -32,7 +32,10 @@ import Core.Filesystem;
 
 import ECS;
 
-import RHI;
+import RHI.Descriptors;
+import RHI.Device;
+import RHI.Pipeline;
+import RHI.Shader;
 
 #include "Graphics.PassUtils.hpp"
 

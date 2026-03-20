@@ -12,7 +12,8 @@ export module Graphics.Material;
 import Core.Assets;
 import Core.Handle;
 import Core.ResourcePool;
-import RHI;
+import RHI.Texture;
+import RHI.TextureSystem;
 
 export namespace Graphics
 {

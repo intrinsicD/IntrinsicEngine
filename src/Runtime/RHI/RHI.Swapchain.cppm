@@ -6,9 +6,9 @@ module;
 
 #include "RHI.Vulkan.hpp"
 
-export module RHI:Swapchain;
+export module RHI.Swapchain;
 
-import :Device;
+import RHI.Device;
 import Core.Window; // For Core::Windowing::Window
 
 namespace RHI

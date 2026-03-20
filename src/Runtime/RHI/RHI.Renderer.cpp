@@ -5,14 +5,13 @@ module;
 
 #include "RHI.Vulkan.hpp"
 
-module RHI:Renderer.Impl;
-import :Renderer;
-import :Device;
-import :Swapchain;
-import :Pipeline;
-import :Image;
-import :CommandUtils;
-import :Profiler;
+module RHI.Renderer;
+import RHI.Device;
+import RHI.Swapchain;
+import RHI.Pipeline;
+import RHI.Image;
+import RHI.CommandUtils;
+import RHI.Profiler;
 import Core.Logging;
 import Core.Telemetry;
 

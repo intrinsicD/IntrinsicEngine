@@ -2,13 +2,12 @@ module;
 #include <memory>
 #include "RHI.Vulkan.hpp"
 
-module RHI:TextureSystem.Impl;
+module RHI.TextureSystem;
 
-import :TextureSystem;
-import :Device;
-import :Texture;
-import :Bindless;
-import :Image;
+import RHI.Device;
+import RHI.Texture;
+import RHI.Bindless;
+import RHI.Image;
 import Core.Logging;
 
 namespace RHI

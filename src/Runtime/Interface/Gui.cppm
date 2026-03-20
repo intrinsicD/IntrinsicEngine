@@ -5,7 +5,8 @@ module;
 
 export module Interface:GUI;
 
-import RHI;
+import RHI.Device;
+import RHI.Swapchain;
 import Core.Window;
 import Core.Telemetry;
 

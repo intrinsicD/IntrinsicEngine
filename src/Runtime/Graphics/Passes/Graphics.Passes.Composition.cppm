@@ -9,7 +9,10 @@ export module Graphics.Passes.Composition;
 import Graphics.RenderPipeline;
 import Graphics.RenderGraph;
 import Graphics.ShaderRegistry;
-import RHI;
+import RHI.Descriptors;
+import RHI.Device;
+import RHI.Image;
+import RHI.Pipeline;
 import Core.Hash;
 
 export namespace Graphics::Passes

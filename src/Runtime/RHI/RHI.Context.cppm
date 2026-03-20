@@ -3,7 +3,7 @@ module;
 #include <string_view>
 #include "RHI.Vulkan.hpp"
 
-export module RHI:Context;
+export module RHI.Context;
 
 
 namespace RHI {

@@ -13,7 +13,10 @@ import Graphics.RenderPipeline;
 import Graphics.RenderGraph;
 import Graphics.Components;
 import ECS;
-import RHI;
+import RHI.Buffer;
+import RHI.Descriptors;
+import RHI.Device;
+import RHI.Pipeline;
 
 export namespace Graphics::Passes
 {

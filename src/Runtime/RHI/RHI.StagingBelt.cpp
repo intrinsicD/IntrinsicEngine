@@ -6,11 +6,10 @@ module;
 #include <memory>
 #include "RHI.Vulkan.hpp"
 
-module RHI:StagingBelt.Impl;
+module RHI.StagingBelt;
 
-import :StagingBelt;
-import :Device;
-import :Buffer;
+import RHI.Device;
+import RHI.Buffer;
 import Core.Logging;
 
 namespace

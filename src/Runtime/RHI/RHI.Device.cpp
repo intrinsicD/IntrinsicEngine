@@ -11,10 +11,9 @@ module;
 #include "RHI.Vulkan.hpp"
 
 
-module RHI:Device.Impl;
-import :Device;
-import :Context;
-import :TransientAllocator;
+module RHI.Device;
+import RHI.Context;
+import RHI.TransientAllocator;
 import Core.Logging;
 import Core.InplaceFunction;
 

@@ -18,7 +18,7 @@ import Graphics.VisualizationConfig;
 import Geometry;
 import Core.Assets;
 #ifdef INTRINSIC_HAS_CUDA
-import RHI;
+import RHI.CudaDevice;
 #endif
 
 // =============================================================================

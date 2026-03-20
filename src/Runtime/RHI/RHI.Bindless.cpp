@@ -5,10 +5,9 @@ module;
 #include <mutex>
 #include <vector>
 
-module RHI:Bindless.Impl;
-import :Bindless;
-import :Device;
-import :Texture;
+module RHI.Bindless;
+import RHI.Device;
+import RHI.Texture;
 import Core.Logging;
 
 namespace RHI

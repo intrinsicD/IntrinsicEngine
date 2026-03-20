@@ -39,9 +39,6 @@ target_sources(${target_name}
         ${RHI_CUDA_MODULE_IFACES}
         PRIVATE
         RHI.Vma.cpp
-        RHI.Transfer.cpp
-        PRIVATE
-        FILE_SET rhi_impl TYPE CXX_MODULES FILES
         RHI.Bindless.cpp
         RHI.Context.cpp
         RHI.Device.cpp

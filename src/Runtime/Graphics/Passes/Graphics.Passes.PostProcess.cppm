@@ -12,7 +12,12 @@ import Graphics.RenderPipeline;
 import Graphics.RenderGraph;
 import Graphics.ShaderRegistry;
 import Graphics.Passes.PostProcessSettings;
-import RHI;
+import RHI.Buffer;
+import RHI.ComputePipeline;
+import RHI.Descriptors;
+import RHI.Device;
+import RHI.Image;
+import RHI.Pipeline;
 
 export namespace Graphics::Passes
 {

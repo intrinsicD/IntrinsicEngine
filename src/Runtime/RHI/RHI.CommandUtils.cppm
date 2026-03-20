@@ -1,9 +1,9 @@
 module;
 #include "RHI.Vulkan.hpp"
 
-export module RHI:CommandUtils;
+export module RHI.CommandUtils;
 
-import :Device;
+import RHI.Device;
 import Core.Logging; // For VK_CHECK macro (uses Core::Log::Error)
 
 export namespace RHI::CommandUtils

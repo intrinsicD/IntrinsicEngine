@@ -8,11 +8,11 @@ module;
 #include <cstddef>
 #include "RHI.Vulkan.hpp" // Implementation detail, kept in module fragment if possible, but needed for class members
 
-export module RHI:Transfer;
+export module RHI.Transfer;
 
-import :Device;
-import :Buffer;
-import :StagingBelt;
+import RHI.Device;
+import RHI.Buffer;
+import RHI.StagingBelt;
 
 export namespace RHI {
 

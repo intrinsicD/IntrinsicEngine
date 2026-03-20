@@ -9,7 +9,11 @@ module;
 export module Graphics.PipelineLibrary;
 
 import Core.Hash;
-import RHI;
+import RHI.Bindless;
+import RHI.ComputePipeline;
+import RHI.Descriptors;
+import RHI.Device;
+import RHI.Pipeline;
 import Graphics.ShaderRegistry;
 
 export namespace Graphics

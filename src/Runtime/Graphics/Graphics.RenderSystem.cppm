@@ -8,7 +8,12 @@ module;
 
 export module Graphics.RenderSystem;
 
-import RHI;
+import RHI.Bindless;
+import RHI.Buffer;
+import RHI.Descriptors;
+import RHI.Device;
+import RHI.Renderer;
+import RHI.Swapchain;
 import Graphics.Camera;
 import Graphics.Geometry;
 import Graphics.RenderGraph;

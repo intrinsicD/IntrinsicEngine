@@ -19,7 +19,6 @@ import Core.FrameGraph;
 import Core.Hash;
 import Core.FeatureRegistry;
 import Core.IOBackend;
-import RHI;
 import Graphics.FeatureCatalog;
 import Graphics.IORegistry;
 import ECS;

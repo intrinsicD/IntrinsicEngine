@@ -24,7 +24,8 @@ import Core.FrameGraph;
 
 import ECS;
 
-import RHI;
+import RHI.Device;
+import RHI.Transfer;
 
 import Geometry.PointCloud;
 import Geometry.Handle;

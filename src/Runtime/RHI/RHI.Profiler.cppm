@@ -9,9 +9,9 @@ module;
 #include <vector>
 #include <expected>
 
-export module RHI:Profiler;
+export module RHI.Profiler;
 
-import :Device;
+import RHI.Device;
 
 export namespace RHI
 {

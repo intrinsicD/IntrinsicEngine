@@ -4,11 +4,10 @@ module;
 #include "RHI.DestructionUtils.hpp"
 #include <memory>
 
-module RHI:Texture.Impl;
-import :Texture;
-import :Device;
-import :TextureSystem;
-import :Image;
+module RHI.Texture;
+import RHI.Device;
+import RHI.TextureSystem;
+import RHI.Image;
 import Core.Logging;
 
 namespace RHI

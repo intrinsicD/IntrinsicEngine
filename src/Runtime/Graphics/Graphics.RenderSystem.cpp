@@ -38,7 +38,11 @@ import Core.Memory;
 import Core.Assets;
 import Core.Logging;
 import Core.Telemetry;
-import RHI;
+import RHI.Bindless;
+import RHI.Descriptors;
+import RHI.Device;
+import RHI.Renderer;
+import RHI.Swapchain;
 import ECS;
 import Interface;
 

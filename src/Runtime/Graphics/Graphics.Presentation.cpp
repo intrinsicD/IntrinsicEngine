@@ -5,7 +5,10 @@ module;
 
 module Graphics.Presentation;
 
-import RHI;
+import RHI.Device;
+import RHI.Image;
+import RHI.Renderer;
+import RHI.Swapchain;
 
 namespace Graphics
 {

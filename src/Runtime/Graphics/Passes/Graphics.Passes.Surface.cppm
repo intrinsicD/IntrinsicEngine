@@ -17,7 +17,12 @@ import Graphics.RenderGraph;
 import Graphics.Components;
 import Geometry.Handle;
 import ECS;
-import RHI;
+import RHI.Buffer;
+import RHI.ComputePipeline;
+import RHI.Descriptors;
+import RHI.Device;
+import RHI.PersistentDescriptors;
+import RHI.Pipeline;
 
 export namespace Graphics::Passes
 {

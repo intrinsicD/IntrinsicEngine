@@ -11,7 +11,9 @@ module;
 
 module Graphics.Geometry;
 import Geometry.Validation;
-import RHI;
+import RHI.Buffer;
+import RHI.Device;
+import RHI.Transfer;
 import Core.Logging;
 
 namespace Graphics

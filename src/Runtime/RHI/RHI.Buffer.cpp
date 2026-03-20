@@ -5,10 +5,9 @@ module;
 #include "RHI.Vulkan.hpp"
 #include "RHI.DestructionUtils.hpp"
 
-module RHI:Buffer.Impl;
+module RHI.Buffer;
 
-import :Buffer;
-import :Device;
+import RHI.Device;
 import Core.Logging;
 
 namespace RHI

@@ -9,7 +9,16 @@ export module Runtime.GraphicsBackend;
 
 import Core.Window;
 import Core.Logging;
-import RHI;
+import RHI.Bindless;
+import RHI.Context;
+import RHI.CudaDevice;
+import RHI.Descriptors;
+import RHI.Device;
+import RHI.Renderer;
+import RHI.Swapchain;
+import RHI.Texture;
+import RHI.TextureSystem;
+import RHI.Transfer;
 
 export namespace Runtime
 {

@@ -20,7 +20,7 @@ import ECS;
 
 import Geometry.Handle;
 #ifdef INTRINSIC_HAS_CUDA
-import RHI;
+import RHI.CudaDevice;
 #endif
 
 #include "Graphics.LifecycleUtils.hpp"

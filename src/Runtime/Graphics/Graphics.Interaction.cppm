@@ -8,7 +8,8 @@ module;
 
 export module Graphics.Interaction;
 
-import RHI;
+import RHI.Buffer;
+import RHI.Device;
 import Core.Hash;
 
 export namespace Graphics

@@ -4,7 +4,7 @@ module;
 #include <expected>
 #include <string_view>
 
-export module RHI:CudaError;
+export module RHI.CudaError;
 
 export namespace RHI
 {

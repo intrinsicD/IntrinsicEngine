@@ -2,7 +2,7 @@ module;
 #include <cstdint>
 #include <glm/glm.hpp>
 
-export module RHI:SceneInstances;
+export module RHI.SceneInstances;
 
 export namespace RHI
 {

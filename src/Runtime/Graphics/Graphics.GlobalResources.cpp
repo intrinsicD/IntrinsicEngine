@@ -10,7 +10,12 @@ import Graphics.ShaderRegistry;
 import Graphics.PipelineLibrary;
 import Graphics.Camera;
 import Core.Logging;
-import RHI;
+import RHI.Bindless;
+import RHI.Buffer;
+import RHI.Descriptors;
+import RHI.Device;
+import RHI.TransientAllocator;
+import RHI.Types;
 
 namespace Graphics
 {

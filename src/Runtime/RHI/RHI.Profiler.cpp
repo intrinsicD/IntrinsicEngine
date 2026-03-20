@@ -9,9 +9,8 @@ module;
 #include <string>
 #include <vector>
 
-module RHI:Profiler.Impl;
-import :Profiler;
-import :Device;
+module RHI.Profiler;
+import RHI.Device;
 import Core.Logging;
 import Core.Telemetry;
 

@@ -4,11 +4,10 @@ module;
 #include "RHI.Vulkan.hpp"
 #include "RHI.DestructionUtils.hpp"
 
-module RHI:ComputePipeline.Impl;
+module RHI.ComputePipeline;
 
-import :ComputePipeline;
-import :Device;
-import :Shader;
+import RHI.Device;
+import RHI.Shader;
 import Core.Logging;
 
 namespace RHI

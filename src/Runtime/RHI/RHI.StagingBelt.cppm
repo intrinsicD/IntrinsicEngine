@@ -5,10 +5,10 @@ module;
 #include <memory>
 #include "RHI.Vulkan.hpp"
 
-export module RHI:StagingBelt;
+export module RHI.StagingBelt;
 
-import :Device;
-import :Buffer;
+import RHI.Device;
+import RHI.Buffer;
 
 export namespace RHI
 {

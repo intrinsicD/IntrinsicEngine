@@ -3,9 +3,9 @@ module;
 #include <vector>
 #include "RHI.Vulkan.hpp"
 
-export module RHI:PersistentDescriptors;
+export module RHI.PersistentDescriptors;
 
-import :Device;
+import RHI.Device;
 
 export namespace RHI
 {

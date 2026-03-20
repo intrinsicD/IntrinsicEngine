@@ -17,7 +17,10 @@ import Graphics.RenderGraph;
 import Graphics.ShaderRegistry;
 import Core.Hash;
 import ECS;
-import RHI;
+import RHI.Descriptors;
+import RHI.Device;
+import RHI.Image;
+import RHI.Pipeline;
 
 export namespace Graphics::Passes
 {

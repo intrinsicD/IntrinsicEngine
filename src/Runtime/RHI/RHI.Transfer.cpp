@@ -9,11 +9,10 @@ module;
 #include <cstddef>
 #include "RHI.Vulkan.hpp"
 
-module RHI:Transfer.Impl;
-import :Transfer;
-import :Device;
-import :Buffer;
-import :StagingBelt;
+module RHI.Transfer;
+import RHI.Device;
+import RHI.Buffer;
+import RHI.StagingBelt;
 import Core.Logging;
 
 namespace RHI

@@ -10,7 +10,7 @@ import Graphics.Geometry;
 import Graphics.GPUScene;
 import ECS;
 #ifdef INTRINSIC_HAS_CUDA
-import RHI;
+import RHI.CudaDevice;
 #endif
 
 export namespace Runtime

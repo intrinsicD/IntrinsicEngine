@@ -11,7 +11,10 @@ module;
 
 export module Graphics.GPUScene;
 
-import RHI;
+import RHI.Buffer;
+import RHI.ComputePipeline;
+import RHI.Device;
+import RHI.PersistentDescriptors;
 
 export namespace Graphics
 {

@@ -29,7 +29,11 @@ import Geometry.Frustum;
 import Geometry.Overlap;
 import Geometry.Sphere;
 
-import RHI;
+import RHI.Descriptors;
+import RHI.Device;
+import RHI.Image;
+import RHI.Pipeline;
+import RHI.Shader;
 
 import ECS;
 

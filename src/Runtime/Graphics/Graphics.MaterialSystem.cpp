@@ -7,7 +7,8 @@ module Graphics.Material;
 
 import Core.Assets;
 import Core.Logging;
-import RHI;
+import RHI.Texture;
+import RHI.TextureSystem;
 
 namespace Graphics
 {

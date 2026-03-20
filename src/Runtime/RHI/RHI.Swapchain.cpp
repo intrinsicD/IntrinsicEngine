@@ -8,9 +8,8 @@ module;
 
 #include "GLFW/glfw3.h"
 
-module RHI:Swapchain.Impl;
-import :Swapchain;
-import :Device;
+module RHI.Swapchain;
+import RHI.Device;
 import Core.Logging;
 import Core.Window;
 
