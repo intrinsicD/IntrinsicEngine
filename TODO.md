@@ -56,12 +56,8 @@ These are not required to finish the first wave, but they should begin soon afte
 
 #### B3.7 Recommended Path (default = O2) + Migration Plan
 
-- [x] Ratify O2 as the default path unless new benchmark/test evidence disproves it.
-  - Ratified via `docs/architecture/adr-o2-pragmatic-medium-runtime-refactor.md`; O2 is now the default migration path unless future benchmark/test evidence overturns it.
+O2 remains the default migration path per `docs/architecture/adr-o2-pragmatic-medium-runtime-refactor.md` unless future benchmark/test evidence overturns it.
 - [ ] Execute phased migration with safe checkpoints:
-  - [x] Phase 0: Baseline lock (telemetry/order/contract snapshots).
-    - [x] Lock the current core/GPU frame-graph system bundle order with snapshot tests so migration phases can detect accidental reordering.
-    - [x] Safe checkpoint: no behavioral diff vs baseline in frame order + render contracts.
   - [ ] Phase 1: Validate extracted simulation/render/streaming lanes (no behavior change).
     - [ ] Safe checkpoint: same pass/system order and same frame outputs as baseline.
   - [ ] Phase 2 follow-through: validate the landed typed system bundles in `Engine::Run()` against the existing lifecycle/resource reclaim baseline.
@@ -80,12 +76,8 @@ These are not required to finish the first wave, but they should begin soon afte
 
 ##### Critical / Correctness
 
-- [x] Fix `VK_ACCESS_2_MEMORY_WRITE_BIT` on the read-only HTex finalize pass barrier — should be read-only access flags if the pass only reads (`1165e65`).
-  - Added a render-graph regression test that inspects the finalize image barrier and locks it to `VK_ACCESS_2_SHADER_SAMPLED_READ_BIT` without `VK_ACCESS_2_MEMORY_WRITE_BIT`.
-
 ##### Performance
 
-- [ ] Add dirty-checking / caching to HTex atlas rebuild — currently rebuilds per frame unconditionally.
 - [ ] Hoist per-texel string property lookups (`mesh.GetFaceProperty<T>(name, ...)`) outside the inner loop in HTex atlas building — move to a single lookup before iteration (`82a96bf`).
 
 ##### Architecture / Pattern Compliance
@@ -96,8 +88,6 @@ These are not required to finish the first wave, but they should begin soon afte
 
 - [ ] Investigate and clean up duplicate identical commits on two branches (`596e411` / `eb7df2c`).
 - [ ] Audit vague "update" commit message for multi-file fix (`211fb73`) — ensure commit messages describe the "why".
-- [x] Remove empty B3.2 section header in `TODO.md` (left after last item was removed) or add placeholder text.
-- [x] Update `ROADMAP.md` to reflect B4 planning section additions in `TODO.md`.
 - [ ] Review whether `BuildDefaultPipelineRecipe` rewrite should have been a separate commit from the HTex feature work — behavioral change to all pipeline configs was bundled with a feature commit.
 
 #### B3.9 Htex-Inspired Halfedge-Pair Patch Storage (investigate feasibility)

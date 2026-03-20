@@ -586,6 +586,23 @@ TEST(PostProcess, DebugStateDefaultsToSafeValues)
     EXPECT_EQ(debug.LastFrameIndex, ~0u);
 }
 
+TEST(HtexPatchPreview, DebugStateDefaultsToSafeValues)
+{
+    Graphics::Passes::HtexPatchPreviewPass pass;
+    const auto& debug = pass.GetDebugState();
+
+    EXPECT_FALSE(debug.Initialized);
+    EXPECT_FALSE(debug.HasMesh);
+    EXPECT_FALSE(debug.PreviewImageReady);
+    EXPECT_FALSE(debug.UsedKMeansColors);
+    EXPECT_FALSE(debug.AtlasRebuiltThisFrame);
+    EXPECT_FALSE(debug.AtlasUploadQueuedThisFrame);
+    EXPECT_EQ(debug.LastMeshEntity, 0u);
+    EXPECT_EQ(debug.LastPatchCount, 0u);
+    EXPECT_EQ(debug.LastAtlasWidth, 0u);
+    EXPECT_EQ(debug.LastAtlasHeight, 0u);
+}
+
 TEST(DefaultPipeline, DebugStateReportsFeatureAvailability)
 {
     Graphics::DefaultPipeline pipeline;
