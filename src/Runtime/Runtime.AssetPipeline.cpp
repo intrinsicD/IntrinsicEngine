@@ -9,7 +9,7 @@ module Runtime.AssetPipeline;
 import Core.Logging;
 import Core.Tasks;
 import Core.Assets;
-import RHI;
+import RHI.Transfer;
 
 namespace Runtime
 {

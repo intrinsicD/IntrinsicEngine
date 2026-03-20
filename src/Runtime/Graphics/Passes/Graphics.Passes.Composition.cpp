@@ -24,7 +24,11 @@ import Core.Filesystem;
 import Core.Hash;
 import Core.Logging;
 
-import RHI;
+import RHI.Descriptors;
+import RHI.Device;
+import RHI.Image;
+import RHI.Pipeline;
+import RHI.Shader;
 
 import Geometry.Frustum;
 import Geometry.Overlap;

@@ -9,7 +9,8 @@ export module Graphics.Systems.GraphGeometrySync;
 import Graphics.Geometry;
 import Graphics.GPUScene;
 import Core.FrameGraph;
-import RHI;
+import RHI.Device;
+import RHI.Transfer;
 
 export namespace Graphics::Systems::GraphGeometrySync
 {

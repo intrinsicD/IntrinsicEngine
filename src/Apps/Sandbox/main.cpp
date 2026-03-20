@@ -52,7 +52,7 @@ import Graphics.TextureLoader;
 import Graphics.TransformGizmo;
 import Geometry;
 import ECS;
-import RHI;
+import RHI.Texture;
 import Interface;
 
 

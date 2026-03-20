@@ -28,7 +28,8 @@ import Core.Logging;
 import Core.Filesystem;
 import Core.Telemetry;
 import Core.Window;
-import RHI;
+import RHI.Device;
+import RHI.Swapchain;
 
 namespace Interface::GUI
 {

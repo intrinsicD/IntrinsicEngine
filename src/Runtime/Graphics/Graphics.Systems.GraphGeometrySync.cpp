@@ -29,7 +29,8 @@ import Geometry.Graph;
 import Geometry.Properties;
 import Geometry.Handle;
 
-import RHI;
+import RHI.Device;
+import RHI.Transfer;
 
 #include "Graphics.GraphPropertyHelpers.hpp"
 #include "Graphics.LifecycleUtils.hpp"

@@ -42,7 +42,8 @@ import Core.Logging;
 import Core.Tasks;
 
 #ifdef INTRINSIC_HAS_CUDA
-import RHI;
+import RHI.CudaDevice;
+import RHI.CudaError;
 #endif
 
 namespace Runtime::PointCloudKMeans

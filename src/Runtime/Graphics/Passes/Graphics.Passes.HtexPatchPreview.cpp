@@ -32,7 +32,9 @@ import Geometry.Overlap;
 import Geometry.Sphere;
 import Geometry.Properties;
 
-import RHI;
+import RHI.Descriptors;
+import RHI.Device;
+import RHI.Image;
 
 #include "Graphics.PassUtils.hpp"
 

@@ -12,7 +12,10 @@ module Graphics.GPUScene;
 
 
 import Core.Logging;
-import RHI;
+import RHI.Buffer;
+import RHI.ComputePipeline;
+import RHI.Device;
+import RHI.PersistentDescriptors;
 
 namespace Graphics
 {

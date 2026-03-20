@@ -17,7 +17,10 @@ import Graphics.Components;
 import Core.Hash;
 import Geometry.HalfedgeMesh;
 import Geometry.HtexPatch;
-import RHI;
+import RHI.Buffer;
+import RHI.Descriptors;
+import RHI.Device;
+import RHI.Image;
 import ECS;
 
 using namespace Core::Hash;

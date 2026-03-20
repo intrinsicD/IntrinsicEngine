@@ -10,7 +10,8 @@ export module Runtime.AssetIngestService;
 
 import Core.Assets;
 import Core.IOBackend;
-import RHI;
+import RHI.Device;
+import RHI.Transfer;
 import Graphics.Geometry;
 import Graphics.IORegistry;
 import Graphics.MaterialSystem;

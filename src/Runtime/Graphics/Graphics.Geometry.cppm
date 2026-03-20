@@ -9,7 +9,9 @@ module;
 
 export module Graphics.Geometry;
 
-import RHI;
+import RHI.Buffer;
+import RHI.Device;
+import RHI.Transfer;
 import Geometry.AABB;
 import Geometry.Handle;
 import Geometry.HalfedgeMesh;

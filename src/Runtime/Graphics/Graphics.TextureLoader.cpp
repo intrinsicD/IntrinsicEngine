@@ -9,7 +9,10 @@ module;
 module Graphics.TextureLoader;
 import Graphics.AssetErrors;
 
-import RHI;
+import RHI.Device;
+import RHI.Texture;
+import RHI.TextureSystem;
+import RHI.Transfer;
 
 namespace Graphics
 {

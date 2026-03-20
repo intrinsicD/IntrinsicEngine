@@ -8,7 +8,7 @@ export module Graphics.Model;
 import Graphics.Geometry;
 import Graphics.Material; // Optional, if we want to store materials here later
 import Geometry.Handle;
-import RHI;
+import RHI.Device;
 
 export namespace Graphics
 {

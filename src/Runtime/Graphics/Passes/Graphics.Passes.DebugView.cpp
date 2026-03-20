@@ -23,7 +23,11 @@ import Core.Hash;
 import Core.Logging;
 import Core.Filesystem;
 
-import RHI;
+import RHI.Descriptors;
+import RHI.Device;
+import RHI.Image;
+import RHI.Pipeline;
+import RHI.Shader;
 import Interface;
 
 import Geometry.Frustum;

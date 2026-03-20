@@ -15,7 +15,11 @@ import Core.Hash;
 import Core.Memory;
 import Core.Logging;
 import Core.Tasks;
-import RHI;
+import RHI.Buffer;
+import RHI.CommandContext;
+import RHI.Device;
+import RHI.Image;
+import RHI.TransientAllocator;
 
 namespace Graphics
 {

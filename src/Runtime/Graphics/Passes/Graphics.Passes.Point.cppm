@@ -15,7 +15,10 @@ import Graphics.Geometry;
 import Graphics.DebugDraw;
 import Graphics.ShaderRegistry;
 import Core.Hash;
-import RHI;
+import RHI.Buffer;
+import RHI.Descriptors;
+import RHI.Device;
+import RHI.Pipeline;
 
 export namespace Graphics::Passes
 {

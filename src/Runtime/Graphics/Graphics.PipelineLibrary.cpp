@@ -14,7 +14,13 @@ import Graphics.ShaderRegistry;
 import Core.Hash;
 import Core.Filesystem;
 import Core.Logging;
-import RHI;
+import RHI.Bindless;
+import RHI.ComputePipeline;
+import RHI.Descriptors;
+import RHI.Device;
+import RHI.Pipeline;
+import RHI.Shader;
+import RHI.Types;
 
 using namespace Core::Hash;
 

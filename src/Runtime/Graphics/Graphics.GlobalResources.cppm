@@ -6,7 +6,11 @@ module;
 
 export module Graphics.GlobalResources;
 
-import RHI;
+import RHI.Bindless;
+import RHI.Buffer;
+import RHI.Descriptors;
+import RHI.Device;
+import RHI.TransientAllocator;
 import Graphics.Camera;
 import Graphics.ShaderRegistry;
 import Graphics.PipelineLibrary;

@@ -10,7 +10,11 @@ module;
 
 export module Graphics.RenderGraph;
 
-import RHI;
+import RHI.Buffer;
+import RHI.Device;
+import RHI.Image;
+import RHI.Profiler;
+import RHI.TransientAllocator;
 
 import Core.Hash;
 import Core.Memory;

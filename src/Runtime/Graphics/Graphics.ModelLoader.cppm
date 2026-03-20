@@ -10,7 +10,8 @@ import Graphics.Model;
 import Graphics.Geometry;
 import Graphics.IORegistry;
 import Core.IOBackend;
-import RHI;
+import RHI.Device;
+import RHI.Transfer;
 
 export namespace Graphics
 {

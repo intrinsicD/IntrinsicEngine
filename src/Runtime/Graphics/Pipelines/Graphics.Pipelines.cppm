@@ -23,7 +23,8 @@ import Graphics.Passes.SelectionOutlineSettings;
 import Graphics.Passes.PostProcessSettings;
 import Graphics.Passes.PostProcess;
 import Graphics.Passes.Composition;
-import RHI;
+import RHI.Descriptors;
+import RHI.Device;
 import Core.Hash;
 import Core.FeatureRegistry;
 

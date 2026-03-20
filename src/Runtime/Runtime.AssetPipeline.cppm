@@ -10,7 +10,7 @@ export module Runtime.AssetPipeline;
 
 import Core.Assets;
 import Core.Tasks;
-import RHI;
+import RHI.Transfer;
 
 export namespace Runtime
 {

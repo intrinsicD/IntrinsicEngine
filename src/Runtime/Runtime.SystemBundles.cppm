@@ -15,7 +15,8 @@ import Core.FrameGraph;
 import Graphics.Geometry;
 import Graphics.GPUScene;
 import Graphics.MaterialSystem;
-import RHI;
+import RHI.Device;
+import RHI.Transfer;
 
 export namespace Runtime
 {
