@@ -1,5 +1,6 @@
 module;
 
+#include <array>
 #include <cstdint>
 #include <limits>
 #include <optional>
@@ -11,6 +12,7 @@ module;
 export module Geometry.HtexPatch;
 
 import Geometry.HalfedgeMesh;
+import Geometry.Properties;
 
 export namespace Geometry::HtexPatch
 {
@@ -58,6 +60,12 @@ export namespace Geometry::HtexPatch
         std::uint32_t Height = 1u;
     };
 
+    struct HalfedgePatchTriangle
+    {
+        std::array<VertexHandle, 3> Vertices{};
+        std::array<glm::vec3, 3> Positions{};
+    };
+
     [[nodiscard]] std::optional<PatchBuildResult> BuildPatchMetadata(
         const Halfedge::Mesh& mesh,
         const PatchBuildParams& params = {});
@@ -71,6 +79,24 @@ export namespace Geometry::HtexPatch
         const Halfedge::Mesh& mesh,
         const HalfedgePatchMeta& patch,
         glm::vec2 patchUV) noexcept;
+
+    [[nodiscard]] std::optional<HalfedgePatchTriangle> BuildHalfedgeTriangle(
+        const Halfedge::Mesh& mesh,
+        std::uint32_t halfedgeIndex) noexcept;
+
+    [[nodiscard]] std::optional<std::uint32_t> ClassifyPatchSurfacePointToCentroid(
+        const Halfedge::Mesh& mesh,
+        const HalfedgePatchMeta& patch,
+        glm::vec2 patchUV,
+        std::span<const glm::vec3> centroids) noexcept;
+
+    [[nodiscard]] bool BuildCategoricalPatchAtlas(
+        const Halfedge::Mesh& mesh,
+        std::span<const HalfedgePatchMeta> patches,
+        std::span<const glm::vec3> centroids,
+        std::vector<std::uint32_t>& outTexels,
+        PatchAtlasLayout& outLayout,
+        std::uint32_t invalidValue) noexcept;
 
     [[nodiscard]] glm::vec2 TriangleToPatchUV(
         std::uint32_t halfedgeIndex,

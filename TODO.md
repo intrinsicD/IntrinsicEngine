@@ -81,7 +81,7 @@ O2 remains the default migration path per `docs/architecture/adr-o2-pragmatic-me
 ###### Architecture / Pattern Compliance
 
 - [ ] **HtexPatch → KMeans coupling (d58ff17):** `Geometry.HtexPatch` now imports `Geometry.KMeans` for `ClassifyPointToCentroid`, creating a dependency from the patch system to the clustering system. Consider accepting a classification function/span as a parameter to keep the patch module independent.
-- [ ] **Duplicated triangle construction logic:** `BuildHalfedgeTriangle()` in `Geometry.HtexPatch.cpp` and similar triangle construction/validation in `Graphics.Passes.HtexPatchPreview.cpp` share near-identical logic. Centralize into a shared utility.
+- [x] **Duplicated triangle construction logic:** `Geometry.HtexPatch` now exports the validated halfedge-triangle builder and categorical patch-atlas helper, and `Graphics.Passes.HtexPatchPreview.cpp` consumes the shared utility instead of maintaining a parallel implementation.
 - [ ] **PATTERNS.md stage count drift:** Section 6 states "`DefaultPipeline` registers 9 stages" but the current code registers 10 stages per `rendering-three-pass.md`. Update PATTERNS.md.
 - [ ] **Shader code duplication (181d92b):** The Voronoi nearest-vertex BDA lookup logic is copy-pasted between `surface.frag` and `surface_gbuffer.frag` (~30 lines each). Extract to a shared GLSL include.
 
