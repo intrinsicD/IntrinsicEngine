@@ -78,7 +78,6 @@ O2 remains the default migration path per `docs/architecture/adr-o2-pragmatic-me
 
 ###### Critical / Correctness
 
-- [ ] **Push constant budget at 120/128 bytes (181d92b):** `MeshPushConstants` grew to 120 bytes with the `PtrIndices` field, leaving only 8 bytes before the Vulkan guaranteed minimum (128). Document this constraint in CLAUDE.md or the render architecture spec so future additions know to migrate to a UBO-backed approach.
 - [ ] **Global mutable state for CUDA jobs (8613af5):** `g_PendingCudaJobs` is a file-scope `std::unordered_map` in `Runtime.PointCloudKMeans.cpp`. If `PumpCompletions` and `ScheduleCudaJob` can be called from different threads, this is a data race. Verify main-thread-only access and document the constraint, or encapsulate in a class with explicit thread-safety annotation.
 
 ###### Architecture / Pattern Compliance
@@ -105,7 +104,6 @@ Goal: refactor the runtime from a monolithic update/render loop into a staged fr
 
 #### B4.0 Target properties (the contract we are designing toward)
 
-- [x] Keep OS/window/input pumping first on the main thread every frame.
 - [ ] Run simulation on a fixed timestep and keep rendering variable-rate.
 - [ ] Introduce explicit `FrameContext` ownership rather than ad-hoc per-frame global state.
 - [ ] Compile/execute the render graph per frame inside renderer-owned lifecycle code.
@@ -196,9 +194,7 @@ Mapping guidance for current Intrinsic code while preserving that reference shap
 
 #### B4.3 Platform stage (A)
 
-- [x] Move all window/input/event pumping to the start of the frame on the main thread.
 - [ ] Centralize quit, resize, minimize, drag-drop ingest, and timer updates under one platform-stage API.
-- [x] Ensure minimized/background behavior uses wait-for-events or throttled policy instead of busy-rendering.
 - [ ] Ensure SDL/GLFW event pumping semantics stay main-thread-only and are documented as such.
 
 #### B4.4 Simulation stage (B)

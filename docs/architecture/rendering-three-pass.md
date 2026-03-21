@@ -115,7 +115,7 @@ This establishes the current composition rule: deferred-capable opaque surfaces 
 - Skip degenerate triangles.
 - Clamp line widths and point radii to safe ranges.
 - Condition EWA covariance (when active) and fall back safely if ill-conditioned.
-- Keep push constants within device limits (compile/runtime checks).
+- Keep push constants within device limits (compile/runtime checks). `RHI::MeshPushConstants` is currently 120 bytes, leaving only 8 bytes before Vulkan's 128-byte guaranteed minimum. Treat mesh push constants as budget-constrained: additional mesh-draw data should move to a UBO/SSBO or other descriptor-backed payload rather than growing the push-constant block further.
 - Keep backbuffer ownership explicit: only `FrameSetup` imports it, only `Present` finalizes it when `SceneColorLDR` exists.
 
 ## Performance Intent

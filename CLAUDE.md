@@ -208,7 +208,7 @@ Each pass iterates a dedicated ECS component type. The **toggle is presence/abse
 One device-local vertex buffer on the GPU, multiple index buffers with different topologies referencing into it. Data sharing works via **buffer device addresses (BDA)**, not `vkCmdBindVertexBuffers` — zero vertex-input-binding calls in the codebase. Each topology view gets its own `VkPipeline` with its own vertex shader that reads from the shared buffer via BDA. A mesh uploads positions/normals once; wireframe, vertex visualization, and kNN graph edges all `ReuseVertexBuffersFrom` that mesh handle — zero vertex duplication.
 
 Push constants per pass:
-- **SurfacePass**: `uint64_t PtrPositions`, `PtrNormals`, `PtrAux` + `PtrFaceAttr` for per-face colors via `gl_PrimitiveID`.
+- **SurfacePass / mesh draws:** `RHI::MeshPushConstants` is **120 bytes** after adding `PtrIndices`. Vulkan only guarantees **128 bytes**, so there are **8 bytes of guaranteed headroom left**. Treat this block as effectively full: future mesh-draw payload growth must migrate infrequently changing or bulk fields to a UBO/SSBO/descriptor-backed struct instead of extending the push-constant block further. Keep the existing size/offset contract tests and `static_assert(sizeof(MeshPushConstants) <= 128)` green when touching this layout.
 - **LinePass**: `uint64_t PtrPositions` + `PtrEdges` + `PtrEdgeAttr` for per-edge colors.
 - **PointPass** (120 bytes): Model + `PtrPositions`/`PtrNormals`/`PtrAttr` + PointSize/SizeMultiplier/Viewport + Color/Flags.
 
