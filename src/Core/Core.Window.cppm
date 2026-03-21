@@ -86,6 +86,7 @@ export namespace Core::Windowing
         Window& operator=(const Window&) = delete;
 
         void OnUpdate(); // Call this every frame (Polls events)
+        void WaitForEventsTimeout(double timeoutSeconds);
 
         [[nodiscard]] bool ShouldClose() const;
         [[nodiscard]] void* GetNativeHandle() const { return m_Window; } // Returns GLFWwindow* void*
@@ -93,6 +94,7 @@ export namespace Core::Windowing
         [[nodiscard]] int GetWindowHeight() const;
         [[nodiscard]] int GetFramebufferWidth() const;
         [[nodiscard]] int GetFramebufferHeight() const;
+        [[nodiscard]] bool IsMinimized() const;
         [[nodiscard]] bool IsValid() const { return m_IsValid; }
         [[nodiscard]] const Input::Context &GetInput() const { return m_InputContext; }
 

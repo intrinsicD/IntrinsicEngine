@@ -23,6 +23,22 @@ namespace
         std::vector<std::string> Calls;
     };
 
+    class FakePlatformFrameHost final : public Runtime::IPlatformFrameHost
+    {
+    public:
+        void PumpEvents() override { Calls.emplace_back("pump"); }
+        [[nodiscard]] bool IsMinimized() const override { return Minimized; }
+        void WaitForEventsOrTimeout(double timeoutSeconds) override
+        {
+            WaitSeconds = timeoutSeconds;
+            Calls.emplace_back("wait");
+        }
+
+        bool Minimized = false;
+        double WaitSeconds = 0.0;
+        std::vector<std::string> Calls;
+    };
+
     class FakeRenderLaneHost final : public Runtime::IRenderLaneHost
     {
     public:
@@ -189,6 +205,40 @@ TEST(RuntimeFrameLoop, StreamingLaneCoordinator_OrdersMainThreadUploadAndCleanup
         "gc",
     };
     EXPECT_EQ(host.Calls, expected);
+}
+
+TEST(RuntimeFrameLoop, PlatformFrameCoordinator_PumpsEventsAndContinuesWhenWindowIsActive)
+{
+    FakePlatformFrameHost host;
+    const Runtime::PlatformFrameCoordinator coordinator{
+        .Host = host,
+        .MinimizedWaitSeconds = 0.125,
+    };
+
+    const Runtime::PlatformFrameResult result = coordinator.BeginFrame();
+
+    EXPECT_TRUE(result.ContinueFrame);
+    EXPECT_FALSE(result.Minimized);
+    EXPECT_EQ(host.Calls, std::vector<std::string>{"pump"});
+    EXPECT_DOUBLE_EQ(host.WaitSeconds, 0.0);
+}
+
+TEST(RuntimeFrameLoop, PlatformFrameCoordinator_WaitsAndSkipsWhenWindowIsMinimized)
+{
+    FakePlatformFrameHost host;
+    host.Minimized = true;
+
+    const Runtime::PlatformFrameCoordinator coordinator{
+        .Host = host,
+        .MinimizedWaitSeconds = 0.25,
+    };
+
+    const Runtime::PlatformFrameResult result = coordinator.BeginFrame();
+
+    EXPECT_FALSE(result.ContinueFrame);
+    EXPECT_TRUE(result.Minimized);
+    EXPECT_EQ(host.Calls, (std::vector<std::string>{"pump", "wait"}));
+    EXPECT_DOUBLE_EQ(host.WaitSeconds, 0.25);
 }
 
 TEST(RuntimeFrameLoop, RenderLaneCoordinator_OrdersUpdateRegistrationExecutionDispatchAndRender)

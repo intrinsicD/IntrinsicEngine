@@ -274,6 +274,8 @@ namespace Runtime
         // We keep render/input updates variable-dt for responsiveness.
         double accumulator = 0.0;
         const FrameLoopPolicy frameLoopPolicy{};
+        RuntimePlatformFrameHost platformFrameHost{*m_Window};
+        const PlatformFrameCoordinator platformFrame{.Host = platformFrameHost};
         RuntimeStreamingLaneHost streamingLaneHost{
             m_AssetIngestService.get(),
             *m_AssetPipeline,
@@ -302,6 +304,17 @@ namespace Runtime
                 .Timings = frameGraphTimings,
             };
 
+            {
+                PROFILE_SCOPE("PlatformStage");
+                const PlatformFrameResult platformResult = platformFrame.BeginFrame();
+                if (!platformResult.ContinueFrame)
+                {
+                    lastTime = Clock::now();
+                    Core::Telemetry::TelemetrySystem::Get().EndFrame();
+                    continue;
+                }
+            }
+
             auto currentTime = Clock::now();
             const double rawFrameTime = std::chrono::duration<double>(currentTime - lastTime).count();
             lastTime = currentTime;
@@ -313,11 +326,6 @@ namespace Runtime
             {
                 PROFILE_SCOPE("FrameArena::Reset");
                 m_RenderOrchestrator->ResetFrameState();
-            }
-
-            {
-                PROFILE_SCOPE("Window::OnUpdate");
-                m_Window->OnUpdate();
             }
 
             {
