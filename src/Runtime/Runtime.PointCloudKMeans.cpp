@@ -764,119 +764,149 @@ namespace Runtime::PointCloudKMeans
 
         ClearPending(target);
 
+        bool published = false;
         switch (target.Domain)
         {
         case Domain::MeshVertices:
-            if (!target.MeshData || !target.MeshData->MeshRef)
+            if (!target.MeshData)
                 return false;
-            {
-                auto& mesh = *target.MeshData->MeshRef;
-                std::vector<uint32_t> handles;
-                const auto active = SnapshotMeshVertices(mesh, &handles);
-                if (active.size() != result.Labels.size() || result.SquaredDistances.size() != result.Labels.size())
-                    return false;
-
-                auto labelProp = Geometry::VertexProperty<uint32_t>(
-                    mesh.VertexProperties().GetOrAdd<uint32_t>("v:kmeans_label", 0u));
-                auto labelFloatProp = Geometry::VertexProperty<float>(
-                    mesh.VertexProperties().GetOrAdd<float>("v:kmeans_label_f", 0.0f));
-                auto distanceProp = Geometry::VertexProperty<float>(
-                    mesh.VertexProperties().GetOrAdd<float>("v:kmeans_distance", 0.0f));
-                auto colorProp = Geometry::VertexProperty<glm::vec4>(
-                    mesh.VertexProperties().GetOrAdd<glm::vec4>("v:kmeans_color", glm::vec4(1.0f)));
-
-                for (std::size_t i = 0; i < handles.size(); ++i)
-                {
-                    const auto vh = Geometry::VertexHandle{static_cast<Geometry::PropertyIndex>(handles[i])};
-                    labelProp[vh] = result.Labels[i];
-                    labelFloatProp[vh] = static_cast<float>(result.Labels[i]);
-                    distanceProp[vh] = result.SquaredDistances[i];
-                    colorProp[vh] = LabelColor(result.Labels[i]);
-                }
-
-                // Use the float label property with colormap for Voronoi texel rendering.
-                // The shader uses nearest-vertex selection (not interpolation) to produce
-                // sharp Voronoi-like cluster boundaries on each triangle face.
-                target.MeshData->Visualization.VertexColors.PropertyName = "v:kmeans_label_f";
-                target.MeshData->Visualization.VertexColors.AutoRange = true;
-                target.MeshData->Visualization.UseNearestVertexColors = true;
-                target.MeshData->AttributesDirty = true;
-                target.MeshData->KMeansLastBackend = result.ActualBackend;
-                target.MeshData->KMeansLastIterations = result.Iterations;
-                target.MeshData->KMeansLastConverged = result.Converged;
-                target.MeshData->KMeansLastInertia = result.Inertia;
-                target.MeshData->KMeansLastMaxDistanceIndex = result.MaxDistanceIndex;
-                target.MeshData->KMeansLastDurationMs = durationMs;
-            }
+            published = PublishMeshVertexResult(*target.MeshData, result, durationMs);
             break;
         case Domain::GraphVertices:
-            if (!target.GraphData || !target.GraphData->GraphRef)
+            if (!target.GraphData)
                 return false;
-            {
-                auto& graph = *target.GraphData->GraphRef;
-                std::vector<uint32_t> handles;
-                const auto active = SnapshotGraphVertices(graph, &handles);
-                if (active.size() != result.Labels.size() || result.SquaredDistances.size() != result.Labels.size())
-                    return false;
-
-                auto labelProp = graph.GetOrAddVertexProperty<uint32_t>("v:kmeans_label", 0u);
-                auto distanceProp = graph.GetOrAddVertexProperty<float>("v:kmeans_distance", 0.0f);
-                auto colorProp = graph.GetOrAddVertexProperty<glm::vec4>("v:kmeans_color", glm::vec4(1.0f));
-
-                for (std::size_t i = 0; i < handles.size(); ++i)
-                {
-                    const auto vh = Geometry::VertexHandle{static_cast<Geometry::PropertyIndex>(handles[i])};
-                    labelProp[vh] = result.Labels[i];
-                    distanceProp[vh] = result.SquaredDistances[i];
-                    colorProp[vh] = LabelColor(result.Labels[i]);
-                }
-
-                target.GraphData->Visualization.VertexColors.PropertyName = "v:kmeans_color";
-                target.GraphData->KMeansLastBackend = result.ActualBackend;
-                target.GraphData->KMeansLastIterations = result.Iterations;
-                target.GraphData->KMeansLastConverged = result.Converged;
-                target.GraphData->KMeansLastInertia = result.Inertia;
-                target.GraphData->KMeansLastMaxDistanceIndex = result.MaxDistanceIndex;
-                target.GraphData->KMeansLastDurationMs = durationMs;
-            }
+            published = PublishGraphVertexResult(*target.GraphData, result, durationMs);
             break;
         case Domain::PointCloudPoints:
-            if (!target.PointCloudData || !target.PointCloudData->CloudRef)
+            if (!target.PointCloudData)
                 return false;
-            {
-                auto& pcData = *target.PointCloudData;
-                if (pcData.CloudRef->PointCount() != result.Labels.size() || result.SquaredDistances.size() != result.Labels.size())
-                    return false;
-
-                auto& cloud = *pcData.CloudRef;
-                auto labelProp = cloud.GetOrAddVertexProperty<uint32_t>("p:kmeans_label", 0u);
-                auto distanceProp = cloud.GetOrAddVertexProperty<float>("p:kmeans_distance", 0.0f);
-                auto colorProp = cloud.GetOrAddVertexProperty<glm::vec4>("p:kmeans_color", glm::vec4(1.0f));
-
-                for (std::size_t i = 0; i < result.Labels.size(); ++i)
-                {
-                    const auto vh = Geometry::PointCloud::Cloud::Handle(i);
-                    labelProp[vh] = result.Labels[i];
-                    distanceProp[vh] = result.SquaredDistances[i];
-                    colorProp[vh] = LabelColor(result.Labels[i]);
-                }
-
-                pcData.Visualization.VertexColors.PropertyName = "p:kmeans_color";
-                pcData.KMeansLastBackend = result.ActualBackend;
-                pcData.KMeansLastIterations = result.Iterations;
-                pcData.KMeansLastConverged = result.Converged;
-                pcData.KMeansLastInertia = result.Inertia;
-                pcData.KMeansLastMaxDistanceIndex = result.MaxDistanceIndex;
-                pcData.KMeansLastDurationMs = durationMs;
-            }
+            published = PublishPointCloudPointResult(*target.PointCloudData, result, durationMs);
             break;
         case Domain::Auto:
         default:
             return false;
         }
 
+        if (!published)
+            return false;
+
         MarkVertexAttributesDirty(reg, entity);
         engine.GetScene().GetDispatcher().enqueue<ECS::Events::GeometryModified>({entity});
+        return true;
+    }
+
+    bool PublishMeshVertexResult(ECS::Mesh::Data& meshData,
+                                 const Geometry::KMeans::Result& result,
+                                 double durationMs)
+    {
+        if (!meshData.MeshRef)
+            return false;
+
+        auto& mesh = *meshData.MeshRef;
+        std::vector<uint32_t> handles;
+        const auto active = SnapshotMeshVertices(mesh, &handles);
+        if (active.size() != result.Labels.size() || result.SquaredDistances.size() != result.Labels.size())
+            return false;
+
+        auto labelProp = Geometry::VertexProperty<uint32_t>(
+            mesh.VertexProperties().GetOrAdd<uint32_t>("v:kmeans_label", 0u));
+        auto labelFloatProp = Geometry::VertexProperty<float>(
+            mesh.VertexProperties().GetOrAdd<float>("v:kmeans_label_f", 0.0f));
+        auto distanceProp = Geometry::VertexProperty<float>(
+            mesh.VertexProperties().GetOrAdd<float>("v:kmeans_distance", 0.0f));
+        auto colorProp = Geometry::VertexProperty<glm::vec4>(
+            mesh.VertexProperties().GetOrAdd<glm::vec4>("v:kmeans_color", glm::vec4(1.0f)));
+
+        for (std::size_t i = 0; i < handles.size(); ++i)
+        {
+            const auto vh = Geometry::VertexHandle{static_cast<Geometry::PropertyIndex>(handles[i])};
+            labelProp[vh] = result.Labels[i];
+            labelFloatProp[vh] = static_cast<float>(result.Labels[i]);
+            distanceProp[vh] = result.SquaredDistances[i];
+            colorProp[vh] = LabelColor(result.Labels[i]);
+        }
+
+        // Use the float label property with colormap for Voronoi texel rendering.
+        // The shader uses nearest-vertex selection (not interpolation) to produce
+        // sharp Voronoi-like cluster boundaries on each triangle face.
+        meshData.Visualization.VertexColors.PropertyName = "v:kmeans_label_f";
+        meshData.Visualization.VertexColors.AutoRange = true;
+        meshData.Visualization.UseNearestVertexColors = true;
+        meshData.AttributesDirty = true;
+        meshData.KMeansLastBackend = result.ActualBackend;
+        meshData.KMeansLastIterations = result.Iterations;
+        meshData.KMeansLastConverged = result.Converged;
+        meshData.KMeansLastInertia = result.Inertia;
+        meshData.KMeansLastMaxDistanceIndex = result.MaxDistanceIndex;
+        meshData.KMeansLastDurationMs = durationMs;
+        return true;
+    }
+
+    bool PublishGraphVertexResult(ECS::Graph::Data& graphData,
+                                  const Geometry::KMeans::Result& result,
+                                  double durationMs)
+    {
+        if (!graphData.GraphRef)
+            return false;
+
+        auto& graph = *graphData.GraphRef;
+        std::vector<uint32_t> handles;
+        const auto active = SnapshotGraphVertices(graph, &handles);
+        if (active.size() != result.Labels.size() || result.SquaredDistances.size() != result.Labels.size())
+            return false;
+
+        auto labelProp = graph.GetOrAddVertexProperty<uint32_t>("v:kmeans_label", 0u);
+        auto distanceProp = graph.GetOrAddVertexProperty<float>("v:kmeans_distance", 0.0f);
+        auto colorProp = graph.GetOrAddVertexProperty<glm::vec4>("v:kmeans_color", glm::vec4(1.0f));
+
+        for (std::size_t i = 0; i < handles.size(); ++i)
+        {
+            const auto vh = Geometry::VertexHandle{static_cast<Geometry::PropertyIndex>(handles[i])};
+            labelProp[vh] = result.Labels[i];
+            distanceProp[vh] = result.SquaredDistances[i];
+            colorProp[vh] = LabelColor(result.Labels[i]);
+        }
+
+        graphData.Visualization.VertexColors.PropertyName = "v:kmeans_color";
+        graphData.KMeansLastBackend = result.ActualBackend;
+        graphData.KMeansLastIterations = result.Iterations;
+        graphData.KMeansLastConverged = result.Converged;
+        graphData.KMeansLastInertia = result.Inertia;
+        graphData.KMeansLastMaxDistanceIndex = result.MaxDistanceIndex;
+        graphData.KMeansLastDurationMs = durationMs;
+        return true;
+    }
+
+    bool PublishPointCloudPointResult(ECS::PointCloud::Data& pointCloudData,
+                                      const Geometry::KMeans::Result& result,
+                                      double durationMs)
+    {
+        if (!pointCloudData.CloudRef)
+            return false;
+
+        auto& cloud = *pointCloudData.CloudRef;
+        if (cloud.PointCount() != result.Labels.size() || result.SquaredDistances.size() != result.Labels.size())
+            return false;
+
+        auto labelProp = cloud.GetOrAddVertexProperty<uint32_t>("p:kmeans_label", 0u);
+        auto distanceProp = cloud.GetOrAddVertexProperty<float>("p:kmeans_distance", 0.0f);
+        auto colorProp = cloud.GetOrAddVertexProperty<glm::vec4>("p:kmeans_color", glm::vec4(1.0f));
+
+        for (std::size_t i = 0; i < result.Labels.size(); ++i)
+        {
+            const auto vh = Geometry::PointCloud::Cloud::Handle(i);
+            labelProp[vh] = result.Labels[i];
+            distanceProp[vh] = result.SquaredDistances[i];
+            colorProp[vh] = LabelColor(result.Labels[i]);
+        }
+
+        pointCloudData.Visualization.VertexColors.PropertyName = "p:kmeans_color";
+        pointCloudData.KMeansLastBackend = result.ActualBackend;
+        pointCloudData.KMeansLastIterations = result.Iterations;
+        pointCloudData.KMeansLastConverged = result.Converged;
+        pointCloudData.KMeansLastInertia = result.Inertia;
+        pointCloudData.KMeansLastMaxDistanceIndex = result.MaxDistanceIndex;
+        pointCloudData.KMeansLastDurationMs = durationMs;
         return true;
     }
 
@@ -1154,5 +1184,4 @@ namespace Runtime::PointCloudKMeans
 #endif
     }
 }
-
 

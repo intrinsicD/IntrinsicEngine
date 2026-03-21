@@ -6,6 +6,7 @@ export module Runtime.PointCloudKMeans;
 
 import Runtime.Engine;
 import Geometry.KMeans;
+import ECS;
 
 export namespace Runtime::PointCloudKMeans
 {
@@ -65,6 +66,24 @@ export namespace Runtime::PointCloudKMeans
         double durationMs,
         Domain requestedDomain = Domain::Auto);
 
+    // Pure publication helpers used by PublishResult() after the target entity
+    // has been resolved. These keep the PropertySet publication contract
+    // testable without requiring a fully constructed Engine instance.
+    [[nodiscard]] bool PublishMeshVertexResult(
+        ECS::Mesh::Data& meshData,
+        const Geometry::KMeans::Result& result,
+        double durationMs);
+
+    [[nodiscard]] bool PublishGraphVertexResult(
+        ECS::Graph::Data& graphData,
+        const Geometry::KMeans::Result& result,
+        double durationMs);
+
+    [[nodiscard]] bool PublishPointCloudPointResult(
+        ECS::PointCloud::Data& pointCloudData,
+        const Geometry::KMeans::Result& result,
+        double durationMs);
+
     // Poll in-flight CUDA jobs and publish completed label/color properties back
     // into authoritative PropertySets. Call once per frame on the main thread.
     void PumpCompletions(Engine& engine);
@@ -73,4 +92,3 @@ export namespace Runtime::PointCloudKMeans
     // This only affects the point-cloud CUDA cache. CPU jobs are not cancelled.
     void ReleaseEntityBuffers(Engine& engine, entt::entity entity);
 }
-
