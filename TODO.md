@@ -70,7 +70,7 @@ O2 remains the default migration path per `docs/architecture/adr-o2-pragmatic-me
 
 ##### Process / Hygiene
 
-- [ ] Investigate and clean up duplicate identical commits on two branches (`596e411` / `eb7df2c`).
+- [x] Investigated duplicate identical commits on two branches (`596e411` / `eb7df2c`): both commits share the same parent (`211fb73`) and the same stable patch ID, so the duplication came from parallel branches carrying the same fix and later both being merged (`bc011c0` / `c85f881`). Cleanup decision: treat this as closed historical duplication, do not rewrite shared history on `work`, and use `git patch-id --stable` / `git range-diff` before merging overlapping branches in the future.
 - [ ] Audit vague "update" commit message for multi-file fix (`211fb73`) — ensure commit messages describe the "why".
 - [ ] Review whether `BuildDefaultPipelineRecipe` rewrite should have been a separate commit from the HTex feature work — behavioral change to all pipeline configs was bundled with a feature commit.
 
