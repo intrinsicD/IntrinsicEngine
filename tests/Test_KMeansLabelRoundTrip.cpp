@@ -5,9 +5,13 @@
 
 #include <glm/glm.hpp>
 
-import Graphics;
-import Geometry;
-import ECS;
+import Graphics.ColorMapper;
+import Graphics.Colormap;
+import Graphics.Components;
+import Geometry.HalfedgeMesh;
+import Geometry.KMeans;
+import Geometry.PointCloud;
+import Geometry.Properties;
 import Runtime.PointCloudKMeans;
 
 namespace

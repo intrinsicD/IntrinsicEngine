@@ -86,7 +86,6 @@ O2 remains the default migration path per `docs/architecture/adr-o2-pragmatic-me
 
 - [ ] **Bundled unrelated changes in single commits:** `e711573` mixes RHI module refactoring with KMeans rendering fixes. `4e474f2` bundles CUDA-default removal with frame-loop scaffolding. `563aa1c` bundles Material/PostProcess code reorganization with import narrowing. Future commits should separate mechanical refactors from behavioral changes.
 - [ ] **CUDA ON/OFF toggling:** `set(INTRINSIC_ENABLE_CUDA ON)` was removed in `4e474f2` then restored in `8613af5`, suggesting overlapping branch development without cleanup.
-- [ ] **Narrow-import policy in tests (b746283):** `Test_KMeansLabelRoundTrip.cpp` uses `import Graphics;` (umbrella) rather than narrow per-module imports, contradicting the narrowing policy established in the same commit series.
 
 ### B4. Next-Gen Frame Pipeline Refactor (Fixed-Step + Extraction + Explicit Frame Contexts)
 
