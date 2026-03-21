@@ -186,8 +186,6 @@ Mapping guidance for current Intrinsic code while preserving that reference shap
 
 #### B4.3 Platform stage (A)
 
-- [ ] Ensure SDL/GLFW event pumping semantics stay main-thread-only and are documented as such.
-
 #### B4.4 Simulation stage (B)
 
 - [ ] Introduce a clamped accumulator policy with explicit constants such as `fixed_dt` and `max_frame_dt`.

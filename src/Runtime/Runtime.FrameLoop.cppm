@@ -1,5 +1,6 @@
 module;
 #include <cstdint>
+#include <thread>
 
 export module Runtime.FrameLoop;
 
@@ -147,6 +148,7 @@ export namespace Runtime
         bool ContinueFrame = true;
         bool Minimized = false;
         bool ShouldQuit = false;
+        bool ThreadViolation = false;
         bool ResizeRequested = false;
         int FramebufferWidth = 0;
         int FramebufferHeight = 0;
@@ -158,6 +160,7 @@ export namespace Runtime
         IPlatformFrameHost& Host;
         FrameClock& Clock;
         double MinimizedWaitSeconds = 0.05;
+        std::thread::id OwningThread = std::this_thread::get_id();
 
         [[nodiscard]] PlatformFrameResult BeginFrame(this PlatformFrameCoordinator&,
                                                     const FrameLoopPolicy& policy);

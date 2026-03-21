@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <atomic>
 #include <string>
+#include <thread>
 #include <vector>
 
 import Core;
@@ -288,6 +290,35 @@ TEST(RuntimeFrameLoop, PlatformFrameCoordinator_ReportsQuitAndResizeSignals)
     EXPECT_EQ(result.FramebufferHeight, 1080);
     EXPECT_EQ(host.Calls, (std::vector<std::string>{"pump", "consume_resize"}));
     EXPECT_FALSE(host.ResizeRequested);
+}
+
+TEST(RuntimeFrameLoop, PlatformFrameCoordinator_RefusesCrossThreadEventPumping)
+{
+    FakePlatformFrameHost host;
+    Runtime::FrameClock clock;
+
+    Runtime::PlatformFrameCoordinator coordinator{
+        .Host = host,
+        .Clock = clock,
+        .MinimizedWaitSeconds = 0.25,
+    };
+
+    std::atomic<bool> workerStarted = false;
+    Runtime::PlatformFrameResult result{};
+    std::thread worker([&]() {
+        workerStarted.store(true, std::memory_order_release);
+        result = coordinator.BeginFrame(Runtime::FrameLoopPolicy{});
+    });
+    worker.join();
+
+    EXPECT_TRUE(workerStarted.load(std::memory_order_acquire));
+    EXPECT_FALSE(result.ContinueFrame);
+    EXPECT_FALSE(result.Minimized);
+    EXPECT_FALSE(result.ShouldQuit);
+    EXPECT_TRUE(result.ThreadViolation);
+    EXPECT_EQ(result.FramebufferWidth, 0);
+    EXPECT_EQ(result.FramebufferHeight, 0);
+    EXPECT_TRUE(host.Calls.empty());
 }
 
 TEST(RuntimeFrameLoop, FrameClock_ResetYieldsZeroDeltaOnFirstAdvance)

@@ -199,6 +199,8 @@ This is the current “star with borrowed cross-links” structure: `Engine` own
 
 ## Per-frame order
 
+`Runtime::PlatformFrameCoordinator` is a **main-thread-only** boundary: window event pumping, minimize waits, resize consumption, and sanitized frame-time sampling must all execute on the owning window thread, and the runtime now rejects cross-thread platform-stage entry before touching the host.
+
 ```text
 Begin telemetry
   ├─ reset frame allocators / DebugDraw
