@@ -14,7 +14,7 @@ export namespace Graphics
     class PLYLoader final : public IAssetLoader
     {
     public:
-        ~PLYLoader() override;
+        ~PLYLoader() override = default;
 
         [[nodiscard]] std::string_view FormatName() const override { return "Stanford PLY"; }
         [[nodiscard]] std::span<const std::string_view> Extensions() const override;

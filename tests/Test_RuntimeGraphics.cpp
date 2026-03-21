@@ -913,6 +913,25 @@ TEST(RenderResources, DebugViewEachResourceType_SetsCorrectRecipeFlags)
         EXPECT_TRUE(recipe.SceneColorLDR);
     }
 
+    // Debug view requesting EntityId should also request PrimitiveId so the MRT picking path is used.
+    {
+        DefaultPipelineRecipeInputs inputs{};
+        inputs.SurfacePassEnabled = false;
+        inputs.PickingPassEnabled = false;
+        inputs.PostProcessPassEnabled = false;
+        inputs.SelectionOutlinePassEnabled = false;
+        inputs.ImGuiPassEnabled = false;
+        inputs.DebugViewPassEnabled = true;
+        inputs.DebugViewEnabled = true;
+        inputs.DebugResource = GetRenderResourceName(RenderResource::EntityId);
+
+        const FrameRecipe recipe = BuildDefaultPipelineRecipe(inputs);
+        EXPECT_TRUE(recipe.EntityId);
+        EXPECT_TRUE(recipe.PrimitiveId);
+        EXPECT_TRUE(recipe.Requires(RenderResource::EntityId));
+        EXPECT_TRUE(recipe.Requires(RenderResource::PrimitiveId));
+    }
+
     // Debug view requesting PrimitiveId → PrimitiveId flag
     {
         DefaultPipelineRecipeInputs inputs{};
@@ -994,6 +1013,8 @@ TEST(RenderResources, DebugViewEachResourceType_SetsCorrectRecipeFlags)
 
         const FrameRecipe recipe = BuildDefaultPipelineRecipe(inputs);
         EXPECT_TRUE(recipe.Selection);
+        EXPECT_TRUE(recipe.PrimitiveId);
+        EXPECT_TRUE(recipe.Requires(RenderResource::PrimitiveId));
     }
 }
 

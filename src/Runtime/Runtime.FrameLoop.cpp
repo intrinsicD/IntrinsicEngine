@@ -1,7 +1,6 @@
 module;
 #include <algorithm>
 #include <chrono>
-#include <cstdint>
 #include <thread>
 #include <utility>
 
@@ -236,6 +235,11 @@ namespace Runtime
         return m_Window.GetFramebufferHeight();
     }
 
+    bool RuntimePlatformFrameHost::HasResizeRequest() const
+    {
+        return m_ResizeRequested;
+    }
+
     bool RuntimePlatformFrameHost::ConsumeResizeRequest()
     {
         return std::exchange(m_ResizeRequested, false);
@@ -256,13 +260,14 @@ namespace Runtime
         }
 
         self.Host.PumpEvents();
+        const bool resizeRequested = self.Host.HasResizeRequest();
         if (self.Host.ShouldQuit())
         {
             self.Clock.Reset();
             return PlatformFrameResult{
                 .ContinueFrame = false,
                 .ShouldQuit = true,
-                .ResizeRequested = self.Host.ConsumeResizeRequest(),
+                .ResizeRequested = resizeRequested,
                 .FramebufferWidth = self.Host.GetFramebufferWidth(),
                 .FramebufferHeight = self.Host.GetFramebufferHeight(),
             };
@@ -270,10 +275,11 @@ namespace Runtime
 
         if (!self.Host.IsMinimized())
         {
+            self.Host.ConsumeResizeRequest();
             return PlatformFrameResult{
                 .ContinueFrame = true,
                 .Minimized = false,
-                .ResizeRequested = self.Host.ConsumeResizeRequest(),
+                .ResizeRequested = resizeRequested,
                 .FramebufferWidth = self.Host.GetFramebufferWidth(),
                 .FramebufferHeight = self.Host.GetFramebufferHeight(),
                 .FrameStep = self.Clock.Advance(policy),
@@ -285,7 +291,7 @@ namespace Runtime
         return PlatformFrameResult{
             .ContinueFrame = false,
             .Minimized = true,
-            .ResizeRequested = self.Host.ConsumeResizeRequest(),
+            .ResizeRequested = resizeRequested,
             .FramebufferWidth = self.Host.GetFramebufferWidth(),
             .FramebufferHeight = self.Host.GetFramebufferHeight(),
         };

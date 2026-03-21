@@ -5,8 +5,8 @@ module;
 #include <string>
 #include <string_view>
 #include <utility>
-#include <unordered_map>
 #include <algorithm>
+#include <unordered_map>
 #include <vector>
 #include <glm/glm.hpp>
 
@@ -167,47 +167,69 @@ namespace Graphics::Passes
                 Core::Log::Error("DebugView: failed to build pipeline (VkResult={})", (int)built.error());
         }
 
-        // Resolve selected resource by NAME from previous frame list.
-        if (ctx.PrevFrameDebugImages.empty())
-            return;
-
-        const auto isSampleable = [](const RenderGraphDebugImage& img)
+        const auto resolveCurrentHandle = [&](Core::Hash::StringID name) -> RGResourceHandle
         {
-            return (img.Usage & VK_IMAGE_USAGE_SAMPLED_BIT) != 0 && img.View != VK_NULL_HANDLE;
+            return ctx.Blackboard.Get(name);
         };
 
-        const auto findSampleableByName = [&](Core::Hash::StringID name) -> const RenderGraphDebugImage*
+        enum class SourceKind
         {
-            for (const auto& img : ctx.PrevFrameDebugImages)
-            {
-                if (img.Name == name && isSampleable(img))
-                    return &img;
-            }
-            return nullptr;
+            Float,
+            Uint,
+            Depth,
         };
 
-        const RenderGraphDebugImage* srcInfo = findSampleableByName(ctx.Debug.SelectedResource);
-        if (!srcInfo)
-            srcInfo = findSampleableByName(GetRenderResourceName(RenderResource::EntityId));
+        Core::Hash::StringID resolvedName = ctx.Debug.SelectedResource;
+        RGResourceHandle resolvedHandle = resolveCurrentHandle(resolvedName);
+        RGTextureDesc srcDesc{};
+        SourceKind sourceKind = SourceKind::Float;
 
-        if (!srcInfo)
+        if (resolvedName == GetRenderResourceName(RenderResource::SceneDepth))
+            sourceKind = SourceKind::Depth;
+        else if (resolvedName == GetRenderResourceName(RenderResource::EntityId) ||
+                 resolvedName == GetRenderResourceName(RenderResource::PrimitiveId) ||
+                 resolvedName == GetRenderResourceName(RenderResource::SelectionMask) ||
+                 resolvedName == GetRenderResourceName(RenderResource::SelectionOutline))
+            sourceKind = SourceKind::Uint;
+
+        if (const auto canonical = TryGetRenderResourceByName(resolvedName); canonical && resolvedHandle.IsValid())
         {
-            for (const auto& img : ctx.PrevFrameDebugImages)
-            {
-                if (isSampleable(img))
-                {
-                    srcInfo = &img;
-                    break;
-                }
-            }
+            const auto def = GetRenderResourceDefinition(*canonical);
+            srcDesc.Width = ctx.Resolution.width;
+            srcDesc.Height = ctx.Resolution.height;
+            srcDesc.Format = ResolveRenderResourceFormat(*canonical, ctx.SwapchainFormat, ctx.DepthFormat);
+            srcDesc.Usage = def.Usage;
+            srcDesc.Aspect = def.Aspect;
+            m_LastSrcFormat = srcDesc.Format;
+            m_LastSrcAspect = srcDesc.Aspect;
         }
-
-        if (!srcInfo)
-            return;
-
-        ctx.Debug.SelectedResource = srcInfo->Name;
-        m_LastSrcFormat = srcInfo->Format;
-        m_LastSrcAspect = srcInfo->Aspect;
+        else if (resolvedHandle.IsValid())
+        {
+            // Non-canonical resources should still resolve from the current frame only.
+            srcDesc.Width = ctx.Resolution.width;
+            srcDesc.Height = ctx.Resolution.height;
+            srcDesc.Format = (sourceKind == SourceKind::Depth) ? ctx.DepthFormat
+                            : (sourceKind == SourceKind::Uint) ? VK_FORMAT_R32_UINT
+                                                              : ctx.SwapchainFormat;
+            srcDesc.Usage = VK_IMAGE_USAGE_SAMPLED_BIT;
+            srcDesc.Aspect = (sourceKind == SourceKind::Depth) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
+            m_LastSrcFormat = srcDesc.Format;
+            m_LastSrcAspect = srcDesc.Aspect;
+        }
+        else
+        {
+            // Current frame does not yet expose the requested source; fall back to a dummy texture
+            // of the matching kind instead of sampling stale previous-frame metadata.
+            srcDesc.Width = 1;
+            srcDesc.Height = 1;
+            srcDesc.Format = (sourceKind == SourceKind::Depth) ? VK_FORMAT_D32_SFLOAT
+                            : (sourceKind == SourceKind::Uint) ? VK_FORMAT_R32_UINT
+                                                              : VK_FORMAT_R8G8B8A8_UNORM;
+            srcDesc.Usage = VK_IMAGE_USAGE_SAMPLED_BIT;
+            srcDesc.Aspect = (sourceKind == SourceKind::Depth) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
+            m_LastSrcFormat = srcDesc.Format;
+            m_LastSrcAspect = srcDesc.Aspect;
+        }
 
         // 1. Prepare Intermediate Image (Always needed for UI, and now source for Viewport)
         if (ctx.FrameIndex >= m_PreviewImages.size())
@@ -234,22 +256,40 @@ namespace Graphics::Passes
             }
         }
 
-        // Only transient resources are supported by the current resolve strategy.
-        RGTextureDesc srcDesc{};
-        srcDesc.Width = srcInfo->Extent.width;
-        srcDesc.Height = srcInfo->Extent.height;
-        srcDesc.Format = srcInfo->Format;
-        srcDesc.Usage = srcInfo->Usage;
-        srcDesc.Aspect = srcInfo->Aspect;
-
         ctx.Graph.AddPass<ResolveData>("DebugViewResolve",
                                        [&](ResolveData& data, RGBuilder& builder)
                                        {
-                                           // Blackboard lookup patch logic goes here
-                                           RGResourceHandle srcHandle = ctx.Blackboard.Get(srcInfo->Name);
+                                           RGResourceHandle srcHandle = resolvedHandle;
                                            if (!srcHandle.IsValid())
-                                               srcHandle = builder.CreateTexture(
-                                                   srcInfo->Name, srcDesc);
+                                           {
+                                               switch (sourceKind)
+                                               {
+                                               case SourceKind::Depth:
+                                                   srcHandle = builder.ImportTexture("DebugViewDummyDepth"_id,
+                                                                                     m_DummyDepth->GetHandle(),
+                                                                                     m_DummyDepth->GetView(),
+                                                                                     m_DummyDepth->GetFormat(),
+                                                                                     {1u, 1u},
+                                                                                     VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL);
+                                                   break;
+                                               case SourceKind::Uint:
+                                                   srcHandle = builder.ImportTexture("DebugViewDummyUint"_id,
+                                                                                     m_DummyUint->GetHandle(),
+                                                                                     m_DummyUint->GetView(),
+                                                                                     m_DummyUint->GetFormat(),
+                                                                                     {1u, 1u},
+                                                                                     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                                                   break;
+                                               case SourceKind::Float:
+                                                   srcHandle = builder.ImportTexture("DebugViewDummyFloat"_id,
+                                                                                     m_DummyFloat->GetHandle(),
+                                                                                     m_DummyFloat->GetView(),
+                                                                                     m_DummyFloat->GetFormat(),
+                                                                                     {1u, 1u},
+                                                                                     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                                                   break;
+                                               }
+                                           }
                                            if (!srcHandle.IsValid()) return;
 
                                            // Import intermediate
@@ -276,9 +316,9 @@ namespace Graphics::Passes
                                                                    VK_ACCESS_2_SHADER_SAMPLED_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT);
 
                                            // Metadata
-                                           data.SrcFormat = srcInfo->Format;
-                                           data.IsDepth = (srcInfo->Aspect & VK_IMAGE_ASPECT_DEPTH_BIT) != 0;
-                                            m_LastSrcHandle = data.Src;
+                                           data.SrcFormat = srcDesc.Format;
+                                           data.IsDepth = (srcDesc.Aspect & VK_IMAGE_ASPECT_DEPTH_BIT) != 0;
+                                           m_LastSrcHandle = data.Src;
 
                                            // Expose to Blackboard
                                            ctx.Blackboard.Add("DebugViewRGBA"_id, data.Dst);

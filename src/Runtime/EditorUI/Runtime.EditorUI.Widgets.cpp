@@ -25,15 +25,27 @@ module Runtime.EditorUI;
 import Runtime.Engine;
 import Runtime.GraphicsBackend;
 import Runtime.PointCloudKMeans;
+
+import ECS;
+
 import Graphics.Components;
 import Graphics.GPUScene;
-import ECS;
 import Graphics.Colormap;
 import Graphics.GpuColor;
 import Graphics.Geometry;
 import Graphics.OctreeDebugDraw;
 import Graphics.PropertyEnumerator;
 import Graphics.VisualizationConfig;
+
+import Geometry.MeshUtils;
+import Geometry.Octree;
+import Geometry.DEC;
+import Geometry.Remeshing;
+import Geometry.AdaptiveRemeshing;
+import Geometry.Smoothing;
+import Geometry.CatmullClark;
+import Geometry.MeshRepair;
+
 import Core.Logging;
 
 #include "Graphics.LifecycleUtils.hpp"

@@ -1,10 +1,7 @@
 module;
 
-#include <cstddef>
 #include <memory>
 #include <span>
-#include <algorithm>
-#include <unordered_set>
 #include <glm/glm.hpp>
 #include <entt/entt.hpp>
 
@@ -52,7 +49,11 @@ namespace Graphics
                                            (debugResource == GetRenderResourceName(RenderResource::EntityId) ||
                                             debugResource == GetRenderResourceName(RenderResource::SelectionMask) ||
                                             debugResource == GetRenderResourceName(RenderResource::SelectionOutline));
-        const bool debugRequestsPrimitiveId = debugActive && debugResource == GetRenderResourceName(RenderResource::PrimitiveId);
+        const bool debugRequestsPrimitiveId = debugActive &&
+                                             (debugResource == GetRenderResourceName(RenderResource::EntityId) ||
+                                              debugResource == GetRenderResourceName(RenderResource::PrimitiveId) ||
+                                              debugResource == GetRenderResourceName(RenderResource::SelectionMask) ||
+                                              debugResource == GetRenderResourceName(RenderResource::SelectionOutline));
         const bool debugRequestsNormals = debugActive && debugResource == GetRenderResourceName(RenderResource::SceneNormal);
         const bool debugRequestsMaterial = debugActive &&
                                            (debugResource == GetRenderResourceName(RenderResource::Albedo) ||

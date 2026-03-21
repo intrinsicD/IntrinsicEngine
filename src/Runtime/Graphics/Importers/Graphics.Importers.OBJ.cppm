@@ -14,7 +14,7 @@ export namespace Graphics
     class OBJLoader final : public IAssetLoader
     {
     public:
-        ~OBJLoader() override;
+        ~OBJLoader() override = default;
 
         [[nodiscard]] std::string_view FormatName() const override { return "Wavefront OBJ"; }
         [[nodiscard]] std::span<const std::string_view> Extensions() const override;

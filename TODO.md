@@ -203,6 +203,7 @@ Mapping guidance for current Intrinsic code while preserving that reference shap
   - [ ] light / environment packets
   - [ ] UI / editor overlay packets
   - [ ] geometry-processing visualization packets
+- [ ] Move `Graphics.Passes.Picking` entity/primitive resolution into extraction so pass recording consumes immutable pick packets instead of live ECS traversal.
 - [ ] Resolve retained `GPUScene` handles, bindless references, and debug-view state during extraction rather than during late pass recording.
 - [ ] Add tests that guarantee render prep and command recording consume extraction output only.
 
@@ -387,6 +388,7 @@ These are the explicit constraints agents must preserve during the refactor even
 - [ ] Leave room for clustered/tiled lighting.
 - [ ] Leave room for effect passes like SSAO, decals, and bloom.
 - [ ] Leave room for future GPU-driven visibility integration.
+- [ ] Keep any non-MRT compatibility mode behind an explicit build/runtime feature flag; do not reintroduce it as an implicit picker fallback.
 
 ---
 

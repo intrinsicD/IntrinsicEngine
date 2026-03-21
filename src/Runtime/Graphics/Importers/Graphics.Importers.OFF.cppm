@@ -14,7 +14,7 @@ export namespace Graphics
     class OFFLoader final : public IAssetLoader
     {
     public:
-        ~OFFLoader() override;
+        ~OFFLoader() override = default;
 
         [[nodiscard]] std::string_view FormatName() const override { return "Object File Format (OFF)"; }
         [[nodiscard]] std::span<const std::string_view> Extensions() const override;

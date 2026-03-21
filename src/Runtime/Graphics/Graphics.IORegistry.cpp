@@ -33,21 +33,6 @@ import Core.Logging;
 
 namespace Graphics
 {
-    IAssetLoader::~IAssetLoader() = default;
-    IAssetExporter::~IAssetExporter() = default;
-
-    OBJLoader::~OBJLoader() = default;
-    PLYLoader::~PLYLoader() = default;
-    XYZLoader::~XYZLoader() = default;
-    PCDLoader::~PCDLoader() = default;
-    TGFLoader::~TGFLoader() = default;
-    GLTFLoader::~GLTFLoader() = default;
-    STLLoader::~STLLoader() = default;
-    OFFLoader::~OFFLoader() = default;
-
-    OBJExporter::~OBJExporter() = default;
-    PLYExporter::~PLYExporter() = default;
-    STLExporter::~STLExporter() = default;
 
     namespace
     {

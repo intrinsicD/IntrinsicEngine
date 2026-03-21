@@ -19,6 +19,7 @@ module Runtime.EditorUI;
 
 import Runtime.Engine;
 import Runtime.GraphicsBackend;
+
 import Graphics.Components;
 import Graphics.BVHDebugDraw;
 import Graphics.BoundingDebugDraw;
@@ -27,6 +28,12 @@ import Graphics.DebugDraw;
 import Graphics.Geometry;
 import Graphics.KDTreeDebugDraw;
 import Graphics.OctreeDebugDraw;
+
+import Geometry.ConvexHullBuilder;
+import Geometry.OBB;
+import Geometry.AABB;
+import Geometry.Octree;
+import Geometry.ContactManifold;
 
 import ECS;
 

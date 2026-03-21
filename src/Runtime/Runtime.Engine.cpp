@@ -1,5 +1,4 @@
 module;
-#include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <entt/entity/registry.hpp>
 #include "RHI.Vulkan.hpp"
@@ -259,11 +258,19 @@ namespace Runtime
         Core::Log::Info("Engine::Run starting...");
         OnStart();
 
+        const int startupFbWidth = m_Window->GetFramebufferWidth();
+        const int startupFbHeight = m_Window->GetFramebufferHeight();
+        const bool startupResizePerformed = startupFbWidth > 0 && startupFbHeight > 0;
+        if (startupResizePerformed)
+        {
+            Core::Log::Info("Engine startup resize: framebuffer={}x{}", startupFbWidth, startupFbHeight);
+            m_GraphicsBackend->OnResize();
+            m_RenderOrchestrator->OnResize();
+        }
+
         // Bootstrap the renderer through the same path as a real framebuffer resize.
-        // In practice this is what makes the selection outline appear today: swapchain
-        // recreation, render-graph pool trim, presentation depth invalidation, and
-        // per-pipeline resize callbacks. Some WSI state only settles after the first
-        // event poll, so prime the flag here and let the first frame consume it once.
+        // The flag stays armed even if we already performed the startup resize so the
+        // first pumped frame still exercises the normal resize branch after WSI settles.
         m_FramebufferResized = true;
 
         double accumulator = 0.0;
@@ -422,5 +429,6 @@ namespace Runtime
 
         // Final flush: destroy any RHI resources that were deferred via VulkanDevice::SafeDestroy().
         m_GraphicsBackend->FlushDeletionQueues();
+
     }
 }

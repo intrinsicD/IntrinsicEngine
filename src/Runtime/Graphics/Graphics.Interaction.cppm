@@ -57,7 +57,7 @@ export namespace Graphics
         struct DebugViewState
         {
             bool Enabled = false;
-            Core::Hash::StringID SelectedResource = Core::Hash::StringID("PickID");
+            Core::Hash::StringID SelectedResource = Core::Hash::StringID("EntityId");
             bool ShowInViewport = false;
             bool DisableCulling = false;
             float DepthNear = 0.1f;

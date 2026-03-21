@@ -13,6 +13,7 @@ export module Runtime.EditorUI;
 import Runtime.Engine;
 import Runtime.PointCloudKMeans;
 import Runtime.SceneSerializer;
+
 import Graphics.Components;
 import Graphics.BVHDebugDraw;
 import Graphics.BoundingDebugDraw;
@@ -23,7 +24,19 @@ import Graphics.Geometry;
 import Graphics.KDTreeDebugDraw;
 import Graphics.OctreeDebugDraw;
 import Graphics.VisualizationConfig;
-import Geometry;
+
+import Geometry.Handle;
+import Geometry.KMeans;
+import Geometry.Properties;
+import Geometry.Simplification;
+import Geometry.Subdivision;
+import Geometry.PointCloud;
+import Geometry.Graph;
+import Geometry.HalfedgeMesh;
+import Geometry.KDTree;
+import Geometry.AABB;
+import Geometry.OBB;
+
 import ECS;
 
 export namespace Runtime::EditorUI

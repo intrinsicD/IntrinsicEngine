@@ -1,5 +1,4 @@
 module;
-#include <cstdint>
 #include <thread>
 
 export module Runtime.FrameLoop;
@@ -116,6 +115,7 @@ export namespace Runtime
         virtual void WaitForEventsOrTimeout(double timeoutSeconds) = 0;
         [[nodiscard]] virtual int GetFramebufferWidth() const = 0;
         [[nodiscard]] virtual int GetFramebufferHeight() const = 0;
+        virtual bool HasResizeRequest() const = 0;
         virtual bool ConsumeResizeRequest() = 0;
     };
 
@@ -136,6 +136,7 @@ export namespace Runtime
         void WaitForEventsOrTimeout(double timeoutSeconds) override;
         [[nodiscard]] int GetFramebufferWidth() const override;
         [[nodiscard]] int GetFramebufferHeight() const override;
+        bool HasResizeRequest() const override;
         bool ConsumeResizeRequest() override;
 
     private:

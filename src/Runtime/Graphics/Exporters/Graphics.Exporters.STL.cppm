@@ -16,7 +16,7 @@ export namespace Graphics
     class STLExporter final : public IAssetExporter
     {
     public:
-        ~STLExporter() override;
+        ~STLExporter() override = default;
 
         [[nodiscard]] std::string_view FormatName() const override { return "STL (Stereolithography)"; }
         [[nodiscard]] std::span<const std::string_view> Extensions() const override;
