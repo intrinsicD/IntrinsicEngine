@@ -109,15 +109,14 @@ TEST(HtexPatch, ComputeAtlasLayoutPacksPatchTilesIntoBoundedGrid)
     EXPECT_EQ(layout.Height, 32u);
 }
 
-TEST(HtexPatch, BuildCategoricalPatchAtlasEncodesVertexLabelsLosslessly)
+TEST(HtexPatch, BuildCategoricalPatchAtlasEncodesNearestClusterIdsLosslessly)
 {
     auto mesh = MakeSingleTriangle();
-    auto labels = Geometry::VertexProperty<uint32_t>(
-        mesh.VertexProperties().GetOrAdd<uint32_t>("v:kmeans_label", 0u));
-
-    labels[Geometry::VertexHandle{0u}] = 3u;
-    labels[Geometry::VertexHandle{1u}] = 7u;
-    labels[Geometry::VertexHandle{2u}] = 11u;
+    const std::vector<glm::vec3> centroids{
+        mesh.Position(Geometry::VertexHandle{0u}),
+        mesh.Position(Geometry::VertexHandle{1u}),
+        mesh.Position(Geometry::VertexHandle{2u}),
+    };
 
     const auto patches = Geometry::HtexPatch::BuildPatchMetadata(mesh);
     ASSERT_TRUE(patches.has_value());
@@ -127,30 +126,30 @@ TEST(HtexPatch, BuildCategoricalPatchAtlasEncodesVertexLabelsLosslessly)
     ASSERT_TRUE(Geometry::HtexPatch::BuildCategoricalPatchAtlas(
         mesh,
         patches->Patches,
-        labels,
+        centroids,
         atlasTexels,
         layout,
         Geometry::HtexPatch::kInvalidIndex));
 
     ASSERT_EQ(atlasTexels.size(), static_cast<size_t>(layout.Width) * static_cast<size_t>(layout.Height));
 
-    bool saw3 = false;
-    bool saw7 = false;
-    bool saw11 = false;
+    bool saw0 = false;
+    bool saw1 = false;
+    bool saw2 = false;
     for (uint32_t texel : atlasTexels)
     {
-        EXPECT_TRUE(texel == Geometry::HtexPatch::kInvalidIndex || texel == 3u || texel == 7u || texel == 11u);
-        saw3 |= (texel == 3u);
-        saw7 |= (texel == 7u);
-        saw11 |= (texel == 11u);
+        EXPECT_TRUE(texel == Geometry::HtexPatch::kInvalidIndex || texel == 0u || texel == 1u || texel == 2u);
+        saw0 |= (texel == 0u);
+        saw1 |= (texel == 1u);
+        saw2 |= (texel == 2u);
     }
 
-    EXPECT_TRUE(saw3);
-    EXPECT_TRUE(saw7);
-    EXPECT_TRUE(saw11);
+    EXPECT_TRUE(saw0);
+    EXPECT_TRUE(saw1);
+    EXPECT_TRUE(saw2);
 }
 
-TEST(HtexPatch, BuildCategoricalPatchAtlasRejectsMissingLabelField)
+TEST(HtexPatch, BuildCategoricalPatchAtlasRejectsMissingCentroids)
 {
     auto mesh = MakeSingleTriangle();
     const auto patches = Geometry::HtexPatch::BuildPatchMetadata(mesh);

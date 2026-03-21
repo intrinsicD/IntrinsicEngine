@@ -11,7 +11,7 @@ module;
 export module Geometry.HtexPatch;
 
 import Geometry.HalfedgeMesh;
-import Geometry.Properties;
+import Geometry.KMeans;
 
 export namespace Geometry::HtexPatch
 {
@@ -71,7 +71,7 @@ export namespace Geometry::HtexPatch
     [[nodiscard]] bool BuildCategoricalPatchAtlas(
         const Halfedge::Mesh& mesh,
         std::span<const HalfedgePatchMeta> patches,
-        const Property<std::uint32_t>& labels,
+        std::span<const glm::vec3> centroids,
         std::vector<std::uint32_t>& outTexels,
         PatchAtlasLayout& outLayout,
         std::uint32_t invalidValue = kInvalidIndex);

@@ -472,7 +472,7 @@ namespace Graphics::Passes
         const bool hasCategoricalAtlas = Geometry::HtexPatch::BuildCategoricalPatchAtlas(
             mesh,
             patches,
-            kmeansData.Labels,
+            kmeansData.Centroids,
             categoricalAtlasTexels,
             categoricalLayout,
             Geometry::HtexPatch::kInvalidIndex);

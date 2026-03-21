@@ -13,7 +13,7 @@ module;
 
 module Geometry.HtexPatch;
 
-import Geometry.Properties;
+import Geometry.KMeans;
 
 namespace Geometry::HtexPatch
 {
@@ -144,39 +144,26 @@ namespace Geometry::HtexPatch
             return w0 * tri.Positions[0] + localUV.x * tri.Positions[1] + localUV.y * tri.Positions[2];
         }
 
-        [[nodiscard]] std::uint32_t ClassifyNearestTriangleVertex(const HalfedgeTriangle& tri,
-                                                                  glm::vec2 localUV,
-                                                                  const Property<std::uint32_t>& labels,
-                                                                  std::uint32_t invalidValue) noexcept
+        [[nodiscard]] std::uint32_t ClassifyPointToCluster(const HalfedgeTriangle& tri,
+                                                           glm::vec2 localUV,
+                                                           std::span<const glm::vec3> centroids,
+                                                           std::uint32_t invalidValue) noexcept
         {
-            if (!tri.Valid || !labels)
+            if (!tri.Valid || centroids.empty())
                 return invalidValue;
 
             const glm::vec3 p = EvaluateTrianglePoint(tri, localUV);
-            float bestDistance = std::numeric_limits<float>::max();
-            std::uint32_t bestLabel = invalidValue;
-            for (std::size_t i = 0; i < tri.Vertices.size(); ++i)
-            {
-                const VertexHandle v = tri.Vertices[i];
-                if (!v.IsValid())
-                    continue;
+            if (const auto winner = Geometry::KMeans::ClassifyPointToCentroid(p, centroids))
+                return *winner;
 
-                const float dist2 = glm::dot(tri.Positions[i] - p, tri.Positions[i] - p);
-                if (dist2 < bestDistance)
-                {
-                    bestDistance = dist2;
-                    bestLabel = labels[v.Index];
-                }
-            }
-
-            return bestLabel;
+            return invalidValue;
         }
 
         [[nodiscard]] std::uint32_t ClassifyPatchTexel(const HalfedgeTriangle& tri,
                                                        glm::vec2 patchUV,
                                                        std::uint32_t halfedgeIndex,
                                                        std::uint32_t twinIndex,
-                                                       const Property<std::uint32_t>& labels,
+                                                       std::span<const glm::vec3> centroids,
                                                        std::uint32_t invalidValue) noexcept
         {
             if (!tri.Valid)
@@ -186,7 +173,7 @@ namespace Geometry::HtexPatch
             if (!IsTriangleLocalUV(localUV))
                 return invalidValue;
 
-            return ClassifyNearestTriangleVertex(tri, localUV, labels, invalidValue);
+            return ClassifyPointToCluster(tri, localUV, centroids, invalidValue);
         }
     }
 
@@ -267,7 +254,7 @@ namespace Geometry::HtexPatch
 
     bool BuildCategoricalPatchAtlas(const Halfedge::Mesh& mesh,
                                     std::span<const HalfedgePatchMeta> patches,
-                                    const Property<std::uint32_t>& labels,
+                                    std::span<const glm::vec3> centroids,
                                     std::vector<std::uint32_t>& outTexels,
                                     PatchAtlasLayout& outLayout,
                                     std::uint32_t invalidValue)
@@ -275,7 +262,7 @@ namespace Geometry::HtexPatch
         outLayout = ComputeAtlasLayout(patches.size());
         outTexels.assign(static_cast<std::size_t>(outLayout.Width) * static_cast<std::size_t>(outLayout.Height), invalidValue);
 
-        if (patches.empty() || !labels)
+        if (patches.empty() || centroids.empty())
             return false;
 
         bool wroteAny = false;
@@ -304,7 +291,7 @@ namespace Geometry::HtexPatch
                         patchUV,
                         patch.Halfedge0Index,
                         patch.Halfedge1Index,
-                        labels,
+                        centroids,
                         invalidValue);
                     if (texel == invalidValue)
                     {
@@ -313,7 +300,7 @@ namespace Geometry::HtexPatch
                             patchUV,
                             patch.Halfedge1Index,
                             patch.Halfedge0Index,
-                            labels,
+                            centroids,
                             invalidValue);
                     }
 
