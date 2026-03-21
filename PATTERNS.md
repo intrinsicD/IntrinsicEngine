@@ -207,7 +207,7 @@ class IRenderFeature {
 - `Graphics.Passes.Surface.cppm` — Filled triangles with BDA from `GeometryGpuData`.
 - `Graphics.Passes.Line.cppm` — Thick anti-aliased edges, retained + transient `DebugDraw::GetLines()`.
 - `Graphics.Passes.Point.cppm` — Billboard quads with per-mode pipelines (`FlatDisc`/`Surfel`).
-- `Graphics.Pipelines.cppm` — `DefaultPipeline` registers 9 stages in order.
+- `Graphics.Pipelines.cppm` — `DefaultPipeline` registers 10 stages in order.
 
 **Use when:**
 - Adding a new primitive type or rendering method.
