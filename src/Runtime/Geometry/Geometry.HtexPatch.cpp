@@ -6,6 +6,7 @@ module;
 #include <cstdint>
 #include <limits>
 #include <optional>
+#include <span>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -18,6 +19,13 @@ namespace Geometry::HtexPatch
 {
     namespace
     {
+        struct HalfedgeTriangle
+        {
+            std::array<VertexHandle, 3> Vertices{};
+            std::array<glm::vec3, 3> Positions{};
+            bool Valid = false;
+        };
+
         [[nodiscard]] std::uint16_t BucketResolution(float target, const PatchBuildParams& params) noexcept
         {
             constexpr std::array<std::uint16_t, 5> kBuckets{8u, 16u, 32u, 64u, 128u};
@@ -87,6 +95,99 @@ namespace Geometry::HtexPatch
 
             return area;
         }
+
+        [[nodiscard]] float TriangleAreaSquared(const HalfedgeTriangle& tri) noexcept
+        {
+            const glm::vec3 e0 = tri.Positions[1] - tri.Positions[0];
+            const glm::vec3 e1 = tri.Positions[2] - tri.Positions[0];
+            const glm::vec3 n = glm::cross(e0, e1);
+            return glm::dot(n, n);
+        }
+
+        [[nodiscard]] HalfedgeTriangle BuildHalfedgeTriangle(const Halfedge::Mesh& mesh, HalfedgeHandle h) noexcept
+        {
+            HalfedgeTriangle tri{};
+            if (!h.IsValid() || !mesh.IsValid(h) || mesh.IsDeleted(h) || mesh.IsBoundary(h))
+                return tri;
+
+            const HalfedgeHandle next = mesh.NextHalfedge(h);
+            if (!next.IsValid() || !mesh.IsValid(next) || mesh.IsDeleted(next))
+                return tri;
+
+            tri.Vertices[0] = mesh.FromVertex(h);
+            tri.Vertices[1] = mesh.ToVertex(h);
+            tri.Vertices[2] = mesh.ToVertex(next);
+
+            for (std::size_t i = 0; i < tri.Vertices.size(); ++i)
+            {
+                if (!tri.Vertices[i].IsValid() || !mesh.IsValid(tri.Vertices[i]) || mesh.IsDeleted(tri.Vertices[i]))
+                    return {};
+
+                tri.Positions[i] = mesh.Position(tri.Vertices[i]);
+                if (!std::isfinite(tri.Positions[i].x) || !std::isfinite(tri.Positions[i].y) || !std::isfinite(tri.Positions[i].z))
+                    return {};
+            }
+
+            if (tri.Vertices[0] == tri.Vertices[1] || tri.Vertices[1] == tri.Vertices[2] || tri.Vertices[2] == tri.Vertices[0])
+                return {};
+
+            if (TriangleAreaSquared(tri) <= 1.0e-20f)
+                return {};
+
+            tri.Valid = true;
+            return tri;
+        }
+
+        [[nodiscard]] glm::vec3 EvaluateTrianglePoint(const HalfedgeTriangle& tri, glm::vec2 localUV) noexcept
+        {
+            const float w0 = 1.0f - localUV.x - localUV.y;
+            return w0 * tri.Positions[0] + localUV.x * tri.Positions[1] + localUV.y * tri.Positions[2];
+        }
+
+        [[nodiscard]] std::uint32_t ClassifyNearestTriangleVertex(const HalfedgeTriangle& tri,
+                                                                  glm::vec2 localUV,
+                                                                  const Property<std::uint32_t>& labels,
+                                                                  std::uint32_t invalidValue) noexcept
+        {
+            if (!tri.Valid || !labels)
+                return invalidValue;
+
+            const glm::vec3 p = EvaluateTrianglePoint(tri, localUV);
+            float bestDistance = std::numeric_limits<float>::max();
+            std::uint32_t bestLabel = invalidValue;
+            for (std::size_t i = 0; i < tri.Vertices.size(); ++i)
+            {
+                const VertexHandle v = tri.Vertices[i];
+                if (!v.IsValid())
+                    continue;
+
+                const float dist2 = glm::dot(tri.Positions[i] - p, tri.Positions[i] - p);
+                if (dist2 < bestDistance)
+                {
+                    bestDistance = dist2;
+                    bestLabel = labels[v.Index];
+                }
+            }
+
+            return bestLabel;
+        }
+
+        [[nodiscard]] std::uint32_t ClassifyPatchTexel(const HalfedgeTriangle& tri,
+                                                       glm::vec2 patchUV,
+                                                       std::uint32_t halfedgeIndex,
+                                                       std::uint32_t twinIndex,
+                                                       const Property<std::uint32_t>& labels,
+                                                       std::uint32_t invalidValue) noexcept
+        {
+            if (!tri.Valid)
+                return invalidValue;
+
+            const glm::vec2 localUV = PatchToTriangleUV(halfedgeIndex, patchUV, twinIndex);
+            if (!IsTriangleLocalUV(localUV))
+                return invalidValue;
+
+            return ClassifyNearestTriangleVertex(tri, localUV, labels, invalidValue);
+        }
     }
 
     std::optional<PatchBuildResult> BuildPatchMetadata(
@@ -144,6 +245,87 @@ namespace Geometry::HtexPatch
             return std::nullopt;
 
         return result;
+    }
+
+    PatchAtlasLayout ComputeAtlasLayout(std::size_t patchCount, std::uint32_t tileSize, std::uint32_t maxColumns) noexcept
+    {
+        PatchAtlasLayout layout{};
+        layout.TileSize = std::max(1u, tileSize);
+
+        if (patchCount == 0u)
+            return layout;
+
+        const std::uint32_t columnsLimit = std::max(1u, maxColumns);
+        layout.Columns = std::max(1u,
+                                  std::min(columnsLimit,
+                                           static_cast<std::uint32_t>(std::ceil(std::sqrt(static_cast<float>(patchCount))))));
+        layout.Rows = static_cast<std::uint32_t>((patchCount + layout.Columns - 1u) / layout.Columns);
+        layout.Width = layout.Columns * layout.TileSize;
+        layout.Height = layout.Rows * layout.TileSize;
+        return layout;
+    }
+
+    bool BuildCategoricalPatchAtlas(const Halfedge::Mesh& mesh,
+                                    std::span<const HalfedgePatchMeta> patches,
+                                    const Property<std::uint32_t>& labels,
+                                    std::vector<std::uint32_t>& outTexels,
+                                    PatchAtlasLayout& outLayout,
+                                    std::uint32_t invalidValue)
+    {
+        outLayout = ComputeAtlasLayout(patches.size());
+        outTexels.assign(static_cast<std::size_t>(outLayout.Width) * static_cast<std::size_t>(outLayout.Height), invalidValue);
+
+        if (patches.empty() || !labels)
+            return false;
+
+        bool wroteAny = false;
+        const std::uint32_t tileSize = outLayout.TileSize;
+
+        for (std::size_t i = 0; i < patches.size(); ++i)
+        {
+            const auto& patch = patches[i];
+            const std::uint32_t px = static_cast<std::uint32_t>(i % outLayout.Columns) * tileSize;
+            const std::uint32_t py = static_cast<std::uint32_t>(i / outLayout.Columns) * tileSize;
+
+            const HalfedgeHandle h0{static_cast<PropertyIndex>(patch.Halfedge0Index)};
+            const HalfedgeHandle h1{static_cast<PropertyIndex>(patch.Halfedge1Index)};
+            const HalfedgeTriangle tri0 = BuildHalfedgeTriangle(mesh, h0);
+            const HalfedgeTriangle tri1 = BuildHalfedgeTriangle(mesh, h1);
+
+            for (std::uint32_t y = 0; y < tileSize; ++y)
+            {
+                for (std::uint32_t x = 0; x < tileSize; ++x)
+                {
+                    const glm::vec2 patchUV{(static_cast<float>(x) + 0.5f) / static_cast<float>(tileSize),
+                                            (static_cast<float>(y) + 0.5f) / static_cast<float>(tileSize)};
+
+                    std::uint32_t texel = ClassifyPatchTexel(
+                        tri0,
+                        patchUV,
+                        patch.Halfedge0Index,
+                        patch.Halfedge1Index,
+                        labels,
+                        invalidValue);
+                    if (texel == invalidValue)
+                    {
+                        texel = ClassifyPatchTexel(
+                            tri1,
+                            patchUV,
+                            patch.Halfedge1Index,
+                            patch.Halfedge0Index,
+                            labels,
+                            invalidValue);
+                    }
+
+                    const std::size_t dst = static_cast<std::size_t>(py + y) * static_cast<std::size_t>(outLayout.Width) +
+                                            static_cast<std::size_t>(px + x);
+                    outTexels[dst] = texel;
+                    wroteAny |= (texel != invalidValue);
+                }
+            }
+        }
+
+        return wroteAny;
     }
 
     glm::vec2 TriangleToPatchUV(std::uint32_t halfedgeIndex, glm::vec2 localUV, std::uint32_t twinIndex) noexcept

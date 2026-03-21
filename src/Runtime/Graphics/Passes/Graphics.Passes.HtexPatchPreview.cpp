@@ -4,6 +4,7 @@ module;
 #include <array>
 #include <bit>
 #include <cmath>
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <span>
@@ -466,6 +467,15 @@ namespace Graphics::Passes
         outPixels.assign(static_cast<size_t>(outWidth) * static_cast<size_t>(outHeight), glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
         const PreviewKMeansData kmeansData = GetPreviewKMeansData(mesh);
         const bool hasPerTexelKMeans = kmeansData.HasCentroidField();
+        Geometry::HtexPatch::PatchAtlasLayout categoricalLayout{};
+        std::vector<std::uint32_t> categoricalAtlasTexels;
+        const bool hasCategoricalAtlas = Geometry::HtexPatch::BuildCategoricalPatchAtlas(
+            mesh,
+            patches,
+            kmeansData.Labels,
+            categoricalAtlasTexels,
+            categoricalLayout,
+            Geometry::HtexPatch::kInvalidIndex);
 
         for (std::size_t i = 0; i < patches.size(); ++i)
         {
@@ -511,6 +521,16 @@ namespace Graphics::Passes
                             texelScalar = tri0Scalar;
                         else if (tri1Scalar >= 0.0f)
                             texelScalar = tri1Scalar;
+                    }
+                    else if (hasCategoricalAtlas && categoricalLayout.Width == outWidth && categoricalLayout.Height == outHeight)
+                    {
+                        const size_t src = static_cast<size_t>(py + y) * static_cast<size_t>(categoricalLayout.Width) +
+                                           static_cast<size_t>(px + x);
+                        if (src < categoricalAtlasTexels.size() &&
+                            categoricalAtlasTexels[src] != Geometry::HtexPatch::kInvalidIndex)
+                        {
+                            texelScalar = static_cast<float>(categoricalAtlasTexels[src]);
+                        }
                     }
 
                     const glm::vec4 texel{texelScalar, 0.0f, 0.0f, 1.0f};

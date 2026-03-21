@@ -3,6 +3,7 @@ module;
 #include <cstdint>
 #include <limits>
 #include <optional>
+#include <span>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -10,6 +11,7 @@ module;
 export module Geometry.HtexPatch;
 
 import Geometry.HalfedgeMesh;
+import Geometry.Properties;
 
 export namespace Geometry::HtexPatch
 {
@@ -48,9 +50,31 @@ export namespace Geometry::HtexPatch
         std::uint16_t MaxAssignedResolution = 0u;
     };
 
+    struct PatchAtlasLayout
+    {
+        std::uint32_t TileSize = 16u;
+        std::uint32_t Columns = 1u;
+        std::uint32_t Rows = 1u;
+        std::uint32_t Width = 1u;
+        std::uint32_t Height = 1u;
+    };
+
     [[nodiscard]] std::optional<PatchBuildResult> BuildPatchMetadata(
         const Halfedge::Mesh& mesh,
         const PatchBuildParams& params = {});
+
+    [[nodiscard]] PatchAtlasLayout ComputeAtlasLayout(
+        std::size_t patchCount,
+        std::uint32_t tileSize = 16u,
+        std::uint32_t maxColumns = 32u) noexcept;
+
+    [[nodiscard]] bool BuildCategoricalPatchAtlas(
+        const Halfedge::Mesh& mesh,
+        std::span<const HalfedgePatchMeta> patches,
+        const Property<std::uint32_t>& labels,
+        std::vector<std::uint32_t>& outTexels,
+        PatchAtlasLayout& outLayout,
+        std::uint32_t invalidValue = kInvalidIndex);
 
     [[nodiscard]] glm::vec2 TriangleToPatchUV(
         std::uint32_t halfedgeIndex,
