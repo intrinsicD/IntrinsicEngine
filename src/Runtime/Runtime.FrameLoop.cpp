@@ -15,6 +15,90 @@ namespace Runtime
     IRenderLaneHost::~IRenderLaneHost() = default;
     RuntimeRenderLaneHost::~RuntimeRenderLaneHost() = default;
 
+    namespace
+    {
+        [[nodiscard]] FramePhaseRunResult RunFramePhasesStaged(double frameTime,
+                                                               double& accumulator,
+                                                               const FrameLoopPolicy& policy,
+                                                               const StreamingLaneCoordinator& streamingLane,
+                                                               const RenderLaneCoordinator& renderLane,
+                                                               Core::FrameGraph& fixedGraph,
+                                                               FramePhaseCallbacks&& callbacks)
+        {
+            streamingLane.BeginFrame();
+
+            FramePhaseRunResult result{
+                .FixedStep = RunFixedSteps(accumulator,
+                                           policy,
+                                           std::move(callbacks.OnFixedUpdate),
+                                           std::move(callbacks.RegisterFixedSystems),
+                                           fixedGraph,
+                                           std::move(callbacks.ExecuteFixedGraph)),
+                .Mode = FrameLoopMode::StagedPhases,
+            };
+
+            renderLane.Run(frameTime,
+                           std::move(callbacks.Render),
+                           std::move(callbacks.ExecuteVariableGraph));
+
+            streamingLane.EndFrame();
+            return result;
+        }
+
+        [[nodiscard]] FramePhaseRunResult RunFramePhasesLegacyCompatibility(double frameTime,
+                                                                            double& accumulator,
+                                                                            const FrameLoopPolicy& policy,
+                                                                            const StreamingLaneCoordinator& streamingLane,
+                                                                            const RenderLaneCoordinator& renderLane,
+                                                                            Core::FrameGraph& fixedGraph,
+                                                                            FramePhaseCallbacks&& callbacks)
+        {
+            // Temporary rollback shim: preserve the pre-cutover frame order while the staged
+            // frame-pipeline migration lands incrementally. Delete after the migration window.
+            streamingLane.BeginFrame();
+
+            const FixedStepAdvanceResult fixedStep = RunFixedSteps(accumulator,
+                                                                   policy,
+                                                                   std::move(callbacks.OnFixedUpdate),
+                                                                   std::move(callbacks.RegisterFixedSystems),
+                                                                   fixedGraph,
+                                                                   std::move(callbacks.ExecuteFixedGraph));
+
+            renderLane.Run(frameTime,
+                           std::move(callbacks.Render),
+                           std::move(callbacks.ExecuteVariableGraph));
+
+            streamingLane.EndFrame();
+            return FramePhaseRunResult{
+                .FixedStep = fixedStep,
+                .Mode = FrameLoopMode::LegacyCompatibility,
+            };
+        }
+    }
+
+    FrameLoopMode ResolveFrameLoopMode(const Core::FeatureRegistry& features)
+    {
+        if (features.IsEnabled(FrameLoopFeatureCatalog::LegacyCompatibility))
+        {
+            return FrameLoopMode::LegacyCompatibility;
+        }
+
+        return FrameLoopMode::StagedPhases;
+    }
+
+    const char* ToString(FrameLoopMode mode)
+    {
+        switch (mode)
+        {
+        case FrameLoopMode::LegacyCompatibility:
+            return "LegacyCompatibility";
+        case FrameLoopMode::StagedPhases:
+            return "StagedPhases";
+        }
+
+        return "Unknown";
+    }
+
     FrameTimeStep ComputeFrameTime(double rawFrameTime, const FrameLoopPolicy& policy)
     {
         const double sanitized = std::clamp(rawFrameTime, 0.0, policy.MaxFrameDelta);
@@ -211,22 +295,51 @@ namespace Runtime
                                        Core::FrameGraph& fixedGraph,
                                        FramePhaseCallbacks&& callbacks)
     {
-        streamingLane.BeginFrame();
+        return RunFramePhasesForMode(FrameLoopMode::StagedPhases,
+                                     frameTime,
+                                     accumulator,
+                                     policy,
+                                     streamingLane,
+                                     renderLane,
+                                     fixedGraph,
+                                     std::move(callbacks));
+    }
 
-        FramePhaseRunResult result{
-            .FixedStep = RunFixedSteps(accumulator,
-                                       policy,
-                                       std::move(callbacks.OnFixedUpdate),
-                                       std::move(callbacks.RegisterFixedSystems),
-                                       fixedGraph,
-                                       std::move(callbacks.ExecuteFixedGraph)),
-        };
+    FramePhaseRunResult RunFramePhasesForMode(FrameLoopMode mode,
+                                              double frameTime,
+                                              double& accumulator,
+                                              const FrameLoopPolicy& policy,
+                                              const StreamingLaneCoordinator& streamingLane,
+                                              const RenderLaneCoordinator& renderLane,
+                                              Core::FrameGraph& fixedGraph,
+                                              FramePhaseCallbacks&& callbacks)
+    {
+        switch (mode)
+        {
+        case FrameLoopMode::LegacyCompatibility:
+            return RunFramePhasesLegacyCompatibility(frameTime,
+                                                     accumulator,
+                                                     policy,
+                                                     streamingLane,
+                                                     renderLane,
+                                                     fixedGraph,
+                                                     std::move(callbacks));
+        case FrameLoopMode::StagedPhases:
+            return RunFramePhasesStaged(frameTime,
+                                        accumulator,
+                                        policy,
+                                        streamingLane,
+                                        renderLane,
+                                        fixedGraph,
+                                        std::move(callbacks));
+        }
 
-        renderLane.Run(frameTime,
-                       std::move(callbacks.Render),
-                       std::move(callbacks.ExecuteVariableGraph));
-
-        streamingLane.EndFrame();
-        return result;
+        return RunFramePhasesStaged(frameTime,
+                                    accumulator,
+                                    policy,
+                                    streamingLane,
+                                    renderLane,
+                                    fixedGraph,
+                                    std::move(callbacks));
     }
 }

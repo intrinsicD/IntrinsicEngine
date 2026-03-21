@@ -23,6 +23,7 @@ This document tracks the **active rendering-architecture backlog** for Intrinsic
 ## 1. Related Documents
 
 - `docs/architecture/rendering-three-pass.md` — canonical runtime rendering architecture spec (pass contracts, data contracts, invariants).
+- `docs/architecture/frame-loop-rollback-strategy.md` — concrete rollback toggle, shim, and pass/fail gates for frame-loop migration phases.
 - `docs/architecture/runtime-subsystem-boundaries.md` — current runtime ownership map, dependency directions, and startup/per-frame/shutdown lifecycle.
 - `PLAN.md` — archival index for the completed three-pass migration.
 - `ROADMAP.md` — medium/long-horizon feature roadmap and phase ordering.
@@ -57,11 +58,6 @@ These are not required to finish the first wave, but they should begin soon afte
 #### B3.7 Recommended Path (default = O2) + Migration Plan
 
 O2 remains the default migration path per `docs/architecture/adr-o2-pragmatic-medium-runtime-refactor.md` unless future benchmark/test evidence overturns it.
-
-- [ ] Define rollback strategy before each phase starts:
-  - [ ] Maintain a feature flag to route back to legacy orchestration path.
-  - [ ] Keep adapter shims for one migration window (then delete).
-  - [ ] Require pass/fail gates (tests + telemetry budgets) to permit cutover.
 
 #### B3.8 Code Review Findings (2026-03-19 commit review)
 

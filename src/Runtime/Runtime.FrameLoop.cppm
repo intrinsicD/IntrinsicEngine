@@ -16,6 +16,29 @@ import Runtime.SceneManager;
 
 export namespace Runtime
 {
+    enum class FrameLoopMode : uint8_t
+    {
+        LegacyCompatibility = 0,
+        StagedPhases,
+    };
+
+    namespace FrameLoopFeatureCatalog
+    {
+        inline constexpr Core::FeatureDescriptor StagedPhases = Core::MakeFeatureDescriptor(
+            "FrameLoop.StagedPhases",
+            Core::FeatureCategory::System,
+            "Runs the staged frame loop coordinators for streaming, fixed-step, and render lanes.");
+
+        inline constexpr Core::FeatureDescriptor LegacyCompatibility = Core::MakeFeatureDescriptor(
+            "FrameLoop.LegacyCompatibility",
+            Core::FeatureCategory::System,
+            "Rollback shim that preserves the current frame-order contract through a legacy-compatible adapter.",
+            false);
+    }
+
+    [[nodiscard]] FrameLoopMode ResolveFrameLoopMode(const Core::FeatureRegistry& features);
+    [[nodiscard]] const char* ToString(FrameLoopMode mode);
+
     struct FrameLoopPolicy
     {
         double FixedDt = 1.0 / 60.0;
@@ -189,6 +212,7 @@ export namespace Runtime
     struct FramePhaseRunResult
     {
         FixedStepAdvanceResult FixedStep;
+        FrameLoopMode Mode = FrameLoopMode::StagedPhases;
     };
 
     [[nodiscard]] FramePhaseRunResult RunFramePhases(double frameTime,
@@ -198,4 +222,13 @@ export namespace Runtime
                                                      const RenderLaneCoordinator& renderLane,
                                                      Core::FrameGraph& fixedGraph,
                                                      FramePhaseCallbacks&& callbacks);
+
+    [[nodiscard]] FramePhaseRunResult RunFramePhasesForMode(FrameLoopMode mode,
+                                                            double frameTime,
+                                                            double& accumulator,
+                                                            const FrameLoopPolicy& policy,
+                                                            const StreamingLaneCoordinator& streamingLane,
+                                                            const RenderLaneCoordinator& renderLane,
+                                                            Core::FrameGraph& fixedGraph,
+                                                            FramePhaseCallbacks&& callbacks);
 }
