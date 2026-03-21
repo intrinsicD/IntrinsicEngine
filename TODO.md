@@ -80,11 +80,6 @@ O2 remains the default migration path per `docs/architecture/adr-o2-pragmatic-me
 
 ###### Architecture / Pattern Compliance
 
-- [x] **HtexPatch → KMeans coupling (d58ff17):** Resolved in the current tree. `Geometry.HtexPatch` now owns its centroid-classification helper and no longer imports `Geometry.KMeans`, keeping the patch system independent of the clustering module.
-- [x] **Duplicated triangle construction logic:** `Geometry.HtexPatch` now exports the validated halfedge-triangle builder and categorical patch-atlas helper, and `Graphics.Passes.HtexPatchPreview.cpp` consumes the shared utility instead of maintaining a parallel implementation.
-- [x] **PATTERNS.md stage count drift:** Resolved. `PATTERNS.md` now matches the current 10-stage `DefaultPipeline` ordering.
-- [x] **Shader code duplication (181d92b):** Resolved. The shared Voronoi nearest-vertex / base-color resolution path now lives in `assets/shaders/surface_color_resolve.glsl`, and `CompileShaders.cmake` passes the shader source root as an include path while tracking `.glsl` include dependencies so both build-time compilation and future runtime hot-reload flows can reuse the same source-level include.
-
 ###### Performance
 
 - [ ] **Per-frame centroid reconstruction (d6d4a1a):** `ReconstructPreviewCentroids()` iterates all mesh vertices twice per call. If called per-frame from the Htex preview path, consider caching centroids and invalidating on KMeans re-run.
@@ -94,7 +89,6 @@ O2 remains the default migration path per `docs/architecture/adr-o2-pragmatic-me
 - [ ] **Bundled unrelated changes in single commits:** `e711573` mixes RHI module refactoring with KMeans rendering fixes. `4e474f2` bundles CUDA-default removal with frame-loop scaffolding. `563aa1c` bundles Material/PostProcess code reorganization with import narrowing. Future commits should separate mechanical refactors from behavioral changes.
 - [ ] **CUDA ON/OFF toggling:** `set(INTRINSIC_ENABLE_CUDA ON)` was removed in `4e474f2` then restored in `8613af5`, suggesting overlapping branch development without cleanup.
 - [ ] **Narrow-import policy in tests (b746283):** `Test_KMeansLabelRoundTrip.cpp` uses `import Graphics;` (umbrella) rather than narrow per-module imports, contradicting the narrowing policy established in the same commit series.
-- [x] **BUGS.md stale entry:** Resolved. `BUGS.md` now treats the old `BuildDefaultPipelineRecipe` link-failure note as closed/stale rather than an active issue.
 
 ### B4. Next-Gen Frame Pipeline Refactor (Fixed-Step + Extraction + Explicit Frame Contexts)
 
@@ -192,7 +186,6 @@ Mapping guidance for current Intrinsic code while preserving that reference shap
 
 #### B4.3 Platform stage (A)
 
-- [ ] Centralize quit, resize, minimize, drag-drop ingest, and timer updates under one platform-stage API.
 - [ ] Ensure SDL/GLFW event pumping semantics stay main-thread-only and are documented as such.
 
 #### B4.4 Simulation stage (B)

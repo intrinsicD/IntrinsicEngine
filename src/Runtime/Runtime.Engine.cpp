@@ -1,5 +1,4 @@
 module;
-#include <chrono>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <entt/entity/registry.hpp>
@@ -267,15 +266,14 @@ namespace Runtime
         // event poll, so prime the flag here and let the first frame consume it once.
         m_FramebufferResized = true;
 
-        using Clock = std::chrono::high_resolution_clock;
-        auto lastTime = Clock::now();
-
-        // Fixed-step simulation (physics) accumulator.
-        // We keep render/input updates variable-dt for responsiveness.
         double accumulator = 0.0;
         const FrameLoopPolicy frameLoopPolicy{};
-        RuntimePlatformFrameHost platformFrameHost{*m_Window};
-        const PlatformFrameCoordinator platformFrame{.Host = platformFrameHost};
+        FrameClock frameClock{};
+        RuntimePlatformFrameHost platformFrameHost{*m_Window, m_FramebufferResized};
+        PlatformFrameCoordinator platformFrame{
+            .Host = platformFrameHost,
+            .Clock = frameClock,
+        };
         RuntimeStreamingLaneHost streamingLaneHost{
             m_AssetIngestService.get(),
             *m_AssetPipeline,
@@ -294,7 +292,7 @@ namespace Runtime
         FrameLoopMode activeFrameLoopMode = ResolveFrameLoopMode(m_FeatureRegistry);
         Core::Log::Info("Engine::Run frame-loop mode: {}", ToString(activeFrameLoopMode));
 
-        while (m_Running && !m_Window->ShouldClose())
+        while (m_Running)
         {
             // Begin frame telemetry
             Core::Telemetry::TelemetrySystem::Get().BeginFrame();
@@ -306,115 +304,115 @@ namespace Runtime
 
             {
                 PROFILE_SCOPE("PlatformStage");
-                const PlatformFrameResult platformResult = platformFrame.BeginFrame();
-                if (!platformResult.ContinueFrame)
+                const PlatformFrameResult platformResult = platformFrame.BeginFrame(frameLoopPolicy);
+                if (platformResult.ShouldQuit)
                 {
-                    lastTime = Clock::now();
+                    m_Running = false;
                     Core::Telemetry::TelemetrySystem::Get().EndFrame();
                     continue;
                 }
-            }
 
-            auto currentTime = Clock::now();
-            const double rawFrameTime = std::chrono::duration<double>(currentTime - lastTime).count();
-            lastTime = currentTime;
-            const FrameTimeStep frameStep = ComputeFrameTime(rawFrameTime, frameLoopPolicy);
-            const double frameTime = frameStep.FrameTime;
-
-            accumulator += frameTime;
-
-            {
-                PROFILE_SCOPE("FrameArena::Reset");
-                m_RenderOrchestrator->ResetFrameState();
-            }
-
-            {
-                const int fbWidth = m_Window->GetFramebufferWidth();
-                const int fbHeight = m_Window->GetFramebufferHeight();
-                const VkExtent2D swapExtent = m_GraphicsBackend->GetSwapchain().GetExtent();
-                const bool framebufferExtentMismatch =
-                    fbWidth > 0 && fbHeight > 0 &&
-                    (swapExtent.width != static_cast<uint32_t>(fbWidth) ||
-                     swapExtent.height != static_cast<uint32_t>(fbHeight));
-
-                if (framebufferExtentMismatch)
-                    m_FramebufferResized = true;
-
-                // Monitor moves can change framebuffer extent/content scale without a reliable
-                // resize callback on every platform. Apply resize before per-frame update/render
-                // so picking, EntityId, and post-process overlays all use the current extent.
-                if (m_FramebufferResized && fbWidth > 0 && fbHeight > 0)
+                if (!platformResult.ContinueFrame)
                 {
-                    Core::Log::Info(
-                        "Engine resize trigger: framebuffer={}x{} swapchainBefore={}x{} resizedFlag={} mismatch={}",
-                        fbWidth,
-                        fbHeight,
-                        swapExtent.width,
-                        swapExtent.height,
-                        m_FramebufferResized,
-                        framebufferExtentMismatch);
-                    m_GraphicsBackend->OnResize();
-                    m_RenderOrchestrator->OnResize();
-                    m_FramebufferResized = false;
+                    Core::Telemetry::TelemetrySystem::Get().EndFrame();
+                    continue;
                 }
-            }
 
-            const FrameLoopMode frameLoopMode = ResolveFrameLoopMode(m_FeatureRegistry);
-            if (frameLoopMode != activeFrameLoopMode)
-            {
-                Core::Log::Warn("Engine::Run frame-loop mode switch: {} -> {}",
-                                ToString(activeFrameLoopMode),
-                                ToString(frameLoopMode));
-                activeFrameLoopMode = frameLoopMode;
-            }
+                accumulator += platformResult.FrameStep.FrameTime;
 
-            const FramePhaseRunResult framePhaseResult = RunFramePhasesForMode(
-                frameLoopMode,
-                frameTime,
-                accumulator,
-                frameLoopPolicy,
-                streamingLane,
-                renderLane,
-                m_RenderOrchestrator->GetFrameGraph(),
                 {
-                    .OnFixedUpdate = [&](float fixedDeltaTime) { OnFixedUpdate(fixedDeltaTime); },
-                    .RegisterFixedSystems = [&](Core::FrameGraph& graph, float fixedDeltaTime)
-                    { OnRegisterFixedSystems(graph, fixedDeltaTime); },
-                    .ExecuteFixedGraph = [&](Core::FrameGraph& graph) { executeGraph.Execute(graph); },
-                    .Render =
-                        {
-                            // Resize is synchronized immediately after Window::OnUpdate() so render/update
-                            // always see the current framebuffer extent on monitor moves and DPI changes.
-                            .OnUpdate = [&](float dt) { OnUpdate(dt); },
-                            .RegisterVariableSystems = [&](Core::FrameGraph& graph, float dt)
-                            { OnRegisterSystems(graph, dt); },
-                            .BeforeDispatch = [&]() { Runtime::PointCloudKMeans::PumpCompletions(*this); },
-                            .OnRender = [&]() { OnRender(); },
-                        },
-                    .ExecuteVariableGraph = [&](Core::FrameGraph& graph) { executeGraph.Execute(graph); },
-                });
+                    PROFILE_SCOPE("FrameArena::Reset");
+                    m_RenderOrchestrator->ResetFrameState();
+                }
 
-            Core::Telemetry::TelemetrySystem::Get().SetSimulationStats(
-                static_cast<uint32_t>(framePhaseResult.FixedStep.ExecutedSubsteps),
-                framePhaseResult.FixedStep.AccumulatorClamped ? 1u : 0u,
-                framePhaseResult.FixedStep.CpuTimeNs);
-            Core::Telemetry::TelemetrySystem::Get().SetTaskSchedulerStats(Core::Tasks::Scheduler::GetStats());
-            Core::Telemetry::TelemetrySystem::Get().SetFrameGraphTimings(
-                frameGraphTimings.CompileNsTotal,
-                frameGraphTimings.ExecuteNsTotal,
-                frameGraphTimings.CriticalPathNsTotal);
-
-            // End frame telemetry
-            Core::Telemetry::TelemetrySystem::Get().EndFrame();
-
-            // Benchmark mode: record frame and exit when complete.
-            if (m_EngineConfig.BenchmarkMode)
-            {
-                m_BenchmarkRunner.RecordFrame(Core::Telemetry::TelemetrySystem::Get());
-                if (m_BenchmarkRunner.IsComplete())
                 {
-                    m_BenchmarkRunner.Finalize();
-                    m_Running = false;
+                    const int fbWidth = platformResult.FramebufferWidth;
+                    const int fbHeight = platformResult.FramebufferHeight;
+                    const VkExtent2D swapExtent = m_GraphicsBackend->GetSwapchain().GetExtent();
+                    const bool framebufferExtentMismatch =
+                        fbWidth > 0 && fbHeight > 0 &&
+                        (swapExtent.width != static_cast<uint32_t>(fbWidth) ||
+                         swapExtent.height != static_cast<uint32_t>(fbHeight));
+
+                    const bool resizeRequested =
+                        platformResult.ResizeRequested || framebufferExtentMismatch;
+
+                    // Monitor moves can change framebuffer extent/content scale without a reliable
+                    // resize callback on every platform. Apply resize before per-frame update/render
+                    // so picking, EntityId, and post-process overlays all use the current extent.
+                    if (resizeRequested && fbWidth > 0 && fbHeight > 0)
+                    {
+                        Core::Log::Info(
+                            "Engine resize trigger: framebuffer={}x{} swapchainBefore={}x{} resizeRequested={} mismatch={}",
+                            fbWidth,
+                            fbHeight,
+                            swapExtent.width,
+                            swapExtent.height,
+                            resizeRequested,
+                            framebufferExtentMismatch);
+                        m_GraphicsBackend->OnResize();
+                        m_RenderOrchestrator->OnResize();
+                    }
+                }
+
+                const FrameLoopMode frameLoopMode = ResolveFrameLoopMode(m_FeatureRegistry);
+                if (frameLoopMode != activeFrameLoopMode)
+                {
+                    Core::Log::Warn("Engine::Run frame-loop mode switch: {} -> {}",
+                                    ToString(activeFrameLoopMode),
+                                    ToString(frameLoopMode));
+                    activeFrameLoopMode = frameLoopMode;
+                }
+
+                const double frameTime = platformResult.FrameStep.FrameTime;
+                const FramePhaseRunResult framePhaseResult = RunFramePhasesForMode(
+                    frameLoopMode,
+                    frameTime,
+                    accumulator,
+                    frameLoopPolicy,
+                    streamingLane,
+                    renderLane,
+                    m_RenderOrchestrator->GetFrameGraph(),
+                    {
+                        .OnFixedUpdate = [&](float fixedDeltaTime) { OnFixedUpdate(fixedDeltaTime); },
+                        .RegisterFixedSystems = [&](Core::FrameGraph& graph, float fixedDeltaTime)
+                        { OnRegisterFixedSystems(graph, fixedDeltaTime); },
+                        .ExecuteFixedGraph = [&](Core::FrameGraph& graph) { executeGraph.Execute(graph); },
+                        .Render =
+                            {
+                                // Resize is synchronized immediately after Window::OnUpdate() so render/update
+                                // always see the current framebuffer extent on monitor moves and DPI changes.
+                                .OnUpdate = [&](float dt) { OnUpdate(dt); },
+                                .RegisterVariableSystems = [&](Core::FrameGraph& graph, float dt)
+                                { OnRegisterSystems(graph, dt); },
+                                .BeforeDispatch = [&]() { Runtime::PointCloudKMeans::PumpCompletions(*this); },
+                                .OnRender = [&]() { OnRender(); },
+                            },
+                        .ExecuteVariableGraph = [&](Core::FrameGraph& graph) { executeGraph.Execute(graph); },
+                    });
+
+                Core::Telemetry::TelemetrySystem::Get().SetSimulationStats(
+                    static_cast<uint32_t>(framePhaseResult.FixedStep.ExecutedSubsteps),
+                    framePhaseResult.FixedStep.AccumulatorClamped ? 1u : 0u,
+                    framePhaseResult.FixedStep.CpuTimeNs);
+                Core::Telemetry::TelemetrySystem::Get().SetTaskSchedulerStats(Core::Tasks::Scheduler::GetStats());
+                Core::Telemetry::TelemetrySystem::Get().SetFrameGraphTimings(
+                    frameGraphTimings.CompileNsTotal,
+                    frameGraphTimings.ExecuteNsTotal,
+                    frameGraphTimings.CriticalPathNsTotal);
+
+                // End frame telemetry
+                Core::Telemetry::TelemetrySystem::Get().EndFrame();
+
+                // Benchmark mode: record frame and exit when complete.
+                if (m_EngineConfig.BenchmarkMode)
+                {
+                    m_BenchmarkRunner.RecordFrame(Core::Telemetry::TelemetrySystem::Get());
+                    if (m_BenchmarkRunner.IsComplete())
+                    {
+                        m_BenchmarkRunner.Finalize();
+                        m_Running = false;
+                    }
                 }
             }
         }
