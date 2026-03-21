@@ -79,21 +79,6 @@ namespace Graphics::Passes
             return seed;
         }
 
-        struct HalfedgeTriangle
-        {
-            std::array<Geometry::VertexHandle, 3> Vertices{};
-            std::array<glm::vec3, 3> Positions{};
-            bool Valid = false;
-        };
-
-        [[nodiscard]] float TriangleAreaSquared(const HalfedgeTriangle& tri) noexcept
-        {
-            const glm::vec3 e0 = tri.Positions[1] - tri.Positions[0];
-            const glm::vec3 e1 = tri.Positions[2] - tri.Positions[0];
-            const glm::vec3 n = glm::cross(e0, e1);
-            return glm::dot(n, n);
-        }
-
         struct PreviewKMeansData
         {
             Geometry::Property<uint32_t> Labels{};
@@ -178,130 +163,131 @@ namespace Graphics::Passes
             return GetPreviewKMeansData(mesh).HasAny();
         }
 
-        [[nodiscard]] HalfedgeTriangle BuildHalfedgeTriangle(const Geometry::Halfedge::Mesh& mesh,
-                                                             Geometry::HalfedgeHandle h) noexcept
+        [[nodiscard]] float FirstPatchVertexLabel(const Geometry::Halfedge::Mesh& mesh,
+                                                  const Geometry::HtexPatch::HalfedgePatchMeta& patch,
+                                                  const Geometry::Property<uint32_t>& kmeansLabels) noexcept
         {
-            HalfedgeTriangle tri{};
-            if (!h.IsValid() || !mesh.IsValid(h) || mesh.IsDeleted(h) || mesh.IsBoundary(h))
-                return tri;
-
-            const Geometry::HalfedgeHandle next = mesh.NextHalfedge(h);
-            if (!next.IsValid() || !mesh.IsValid(next) || mesh.IsDeleted(next))
-                return tri;
-
-            tri.Vertices[0] = mesh.FromVertex(h);
-            tri.Vertices[1] = mesh.ToVertex(h);
-            tri.Vertices[2] = mesh.ToVertex(next);
-
-            for (std::size_t i = 0; i < tri.Vertices.size(); ++i)
+            const auto sampleHalfedgeLabel = [&](std::uint32_t halfedgeIndex) noexcept -> float
             {
-                if (!tri.Vertices[i].IsValid() || !mesh.IsValid(tri.Vertices[i]) || mesh.IsDeleted(tri.Vertices[i]))
-                    return {};
+                if (halfedgeIndex == Geometry::HtexPatch::kInvalidIndex)
+                    return -1.0f;
 
-                tri.Positions[i] = mesh.Position(tri.Vertices[i]);
-            }
+                const Geometry::HalfedgeHandle h{static_cast<Geometry::PropertyIndex>(halfedgeIndex)};
+                if (!h.IsValid() || !mesh.IsValid(h) || mesh.IsDeleted(h) || mesh.IsBoundary(h))
+                    return -1.0f;
 
-            if (tri.Vertices[0] == tri.Vertices[1] || tri.Vertices[1] == tri.Vertices[2] || tri.Vertices[2] == tri.Vertices[0])
-                return {};
+                const Geometry::HalfedgeHandle next = mesh.NextHalfedge(h);
+                if (!next.IsValid() || !mesh.IsValid(next) || mesh.IsDeleted(next))
+                    return -1.0f;
 
-            if (!std::isfinite(tri.Positions[0].x) || !std::isfinite(tri.Positions[0].y) || !std::isfinite(tri.Positions[0].z) ||
-                !std::isfinite(tri.Positions[1].x) || !std::isfinite(tri.Positions[1].y) || !std::isfinite(tri.Positions[1].z) ||
-                !std::isfinite(tri.Positions[2].x) || !std::isfinite(tri.Positions[2].y) || !std::isfinite(tri.Positions[2].z))
-            {
-                return {};
-            }
+                const std::array<Geometry::VertexHandle, 3> vertices{
+                    mesh.FromVertex(h),
+                    mesh.ToVertex(h),
+                    mesh.ToVertex(next),
+                };
 
-            if (TriangleAreaSquared(tri) <= 1.0e-20f)
-                return {};
+                for (Geometry::VertexHandle v : vertices)
+                {
+                    const float label = VertexLabelScalar(mesh, kmeansLabels, v);
+                    if (label >= 0.0f)
+                        return label;
+                }
 
-            tri.Valid = true;
-            return tri;
-        }
+                return -1.0f;
+            };
 
-        [[nodiscard]] glm::vec3 EvaluateTrianglePoint(const HalfedgeTriangle& tri, glm::vec2 localUV) noexcept
-        {
-            const float w0 = 1.0f - localUV.x - localUV.y;
-            return w0 * tri.Positions[0] + localUV.x * tri.Positions[1] + localUV.y * tri.Positions[2];
+            if (const float label0 = sampleHalfedgeLabel(patch.Halfedge0Index); label0 >= 0.0f)
+                return label0;
+            return sampleHalfedgeLabel(patch.Halfedge1Index);
         }
 
         [[nodiscard]] float KMeansVertexScalar(const Geometry::Halfedge::Mesh& mesh,
-                                               const HalfedgeTriangle& tri,
+                                               const Geometry::HtexPatch::HalfedgePatchMeta& patch,
                                                glm::vec2 patchUV,
-                                               std::uint32_t halfedgeIndex,
-                                               std::uint32_t twinIndex,
                                                std::span<const glm::vec3> kmeansCentroids,
                                                const Geometry::Property<uint32_t>& kmeansLabels) noexcept
         {
-            if (!tri.Valid)
-                return 0.0f;
-
-            const glm::vec2 localUV = Geometry::HtexPatch::PatchToTriangleUV(halfedgeIndex, patchUV, twinIndex);
-            if (!Geometry::HtexPatch::IsTriangleLocalUV(localUV))
-                return 0.0f;
-
-            const glm::vec3 p = EvaluateTrianglePoint(tri, localUV);
-            if (const auto winner = Geometry::KMeans::ClassifyPointToCentroid(p, kmeansCentroids))
-                return static_cast<float>(*winner);
-
-            for (Geometry::VertexHandle v : tri.Vertices)
+            const auto samplePoint = Geometry::HtexPatch::SamplePatchSurfacePoint(mesh, patch, patchUV);
+            if (samplePoint)
             {
-                const float label = VertexLabelScalar(mesh, kmeansLabels, v);
-                if (label >= 0.0f)
-                    return label;
+                const glm::vec3& p = *samplePoint;
+                if (const auto winner = Geometry::KMeans::ClassifyPointToCentroid(p, kmeansCentroids))
+                    return static_cast<float>(*winner);
             }
 
-            return -1.0f;
+            return FirstPatchVertexLabel(mesh, patch, kmeansLabels);
         }
 
         [[nodiscard]] float ComputeTileScalarFromPatch(const Geometry::Halfedge::Mesh& mesh,
                                                        const Geometry::HtexPatch::HalfedgePatchMeta& patch,
                                                        const PreviewKMeansData& kmeansData) noexcept
         {
-            const Geometry::HalfedgeHandle h0{static_cast<Geometry::PropertyIndex>(patch.Halfedge0Index)};
-            const Geometry::HalfedgeHandle h1{static_cast<Geometry::PropertyIndex>(patch.Halfedge1Index)};
-            const bool hasH0 = h0.IsValid() && mesh.IsValid(h0);
-            const bool hasH1 = h1.IsValid() && mesh.IsValid(h1);
-
-            if (kmeansData.HasCentroidField() && hasH0)
+            if (kmeansData.HasCentroidField())
             {
-                const HalfedgeTriangle tri = BuildHalfedgeTriangle(mesh, h0);
-                if (tri.Valid)
-                {
-                    const glm::vec2 centerUV{0.5f, 0.5f};
-                    const float tri0Scalar = KMeansVertexScalar(
+                if (const float centerScalar = KMeansVertexScalar(
                         mesh,
-                        tri,
-                        centerUV,
-                        patch.Halfedge0Index,
-                        patch.Halfedge1Index,
+                        patch,
+                        glm::vec2{0.5f, 0.5f},
                         kmeansData.Centroids,
                         kmeansData.Labels);
-                    if (tri0Scalar >= 0.0f)
-                    {
-                        return tri0Scalar;
-                    }
-
-                    if (hasH1)
-                    {
-                        const HalfedgeTriangle triTwin = BuildHalfedgeTriangle(mesh, h1);
-                        if (triTwin.Valid)
-                        {
-                            const float tri1Scalar = KMeansVertexScalar(
-                                mesh,
-                                triTwin,
-                                centerUV,
-                                patch.Halfedge1Index,
-                                patch.Halfedge0Index,
-                                kmeansData.Centroids,
-                                kmeansData.Labels);
-                            if (tri1Scalar >= 0.0f)
-                                return tri1Scalar;
-                        }
-                    }
+                    centerScalar >= 0.0f)
+                {
+                    return centerScalar;
                 }
             }
 
             return static_cast<float>(patch.EdgeIndex);
+        }
+
+        [[nodiscard]] bool BuildCategoricalPatchAtlas(const Geometry::Halfedge::Mesh& mesh,
+                                                      std::span<const Geometry::HtexPatch::HalfedgePatchMeta> patches,
+                                                      std::span<const glm::vec3> centroids,
+                                                      std::vector<std::uint32_t>& outTexels,
+                                                      Geometry::HtexPatch::PatchAtlasLayout& outLayout,
+                                                      std::uint32_t invalidValue) noexcept
+        {
+            outLayout = Geometry::HtexPatch::ComputeAtlasLayout(patches.size());
+            outTexels.assign(
+                static_cast<std::size_t>(outLayout.Width) * static_cast<std::size_t>(outLayout.Height),
+                invalidValue);
+
+            if (patches.empty() || centroids.empty())
+                return false;
+
+            bool wroteAny = false;
+            const std::uint32_t tileSize = outLayout.TileSize;
+
+            for (std::size_t i = 0; i < patches.size(); ++i)
+            {
+                const auto& patch = patches[i];
+                const std::uint32_t px = static_cast<std::uint32_t>(i % outLayout.Columns) * tileSize;
+                const std::uint32_t py = static_cast<std::uint32_t>(i / outLayout.Columns) * tileSize;
+
+                for (std::uint32_t y = 0; y < tileSize; ++y)
+                {
+                    for (std::uint32_t x = 0; x < tileSize; ++x)
+                    {
+                        const glm::vec2 patchUV{
+                            (static_cast<float>(x) + 0.5f) / static_cast<float>(tileSize),
+                            (static_cast<float>(y) + 0.5f) / static_cast<float>(tileSize),
+                        };
+
+                        std::uint32_t texel = invalidValue;
+                        if (const auto point = Geometry::HtexPatch::SamplePatchSurfacePoint(mesh, patch, patchUV))
+                        {
+                            if (const auto winner = Geometry::KMeans::ClassifyPointToCentroid(*point, centroids))
+                                texel = *winner;
+                        }
+
+                        const std::size_t dst = static_cast<std::size_t>(py + y) * static_cast<std::size_t>(outLayout.Width) +
+                                                static_cast<std::size_t>(px + x);
+                        outTexels[dst] = texel;
+                        wroteAny |= (texel != invalidValue);
+                    }
+                }
+            }
+
+            return wroteAny;
         }
     }
 
@@ -469,7 +455,7 @@ namespace Graphics::Passes
         const bool hasPerTexelKMeans = kmeansData.HasCentroidField();
         Geometry::HtexPatch::PatchAtlasLayout categoricalLayout{};
         std::vector<std::uint32_t> categoricalAtlasTexels;
-        const bool hasCategoricalAtlas = Geometry::HtexPatch::BuildCategoricalPatchAtlas(
+        const bool hasCategoricalAtlas = BuildCategoricalPatchAtlas(
             mesh,
             patches,
             kmeansData.Centroids,
@@ -484,12 +470,6 @@ namespace Graphics::Passes
             const uint32_t py = static_cast<uint32_t>(i / columns) * kTileSize;
 
             const float scalar = ComputeTileScalarFromPatch(mesh, patch, kmeansData);
-
-            const Geometry::HalfedgeHandle h0{static_cast<Geometry::PropertyIndex>(patch.Halfedge0Index)};
-            const Geometry::HalfedgeHandle h1{static_cast<Geometry::PropertyIndex>(patch.Halfedge1Index)};
-            const HalfedgeTriangle tri0 = BuildHalfedgeTriangle(mesh, h0);
-            const HalfedgeTriangle tri1 = BuildHalfedgeTriangle(mesh, h1);
-
             for (uint32_t y = 0; y < kTileSize; ++y)
             {
                 for (uint32_t x = 0; x < kTileSize; ++x)
@@ -500,27 +480,14 @@ namespace Graphics::Passes
                         const glm::vec2 patchUV{(static_cast<float>(x) + 0.5f) / static_cast<float>(kTileSize),
                                                 (static_cast<float>(y) + 0.5f) / static_cast<float>(kTileSize)};
 
-                        const float tri0Scalar = KMeansVertexScalar(
+                        const float sampledScalar = KMeansVertexScalar(
                             mesh,
-                            tri0,
+                            patch,
                             patchUV,
-                            patch.Halfedge0Index,
-                            patch.Halfedge1Index,
                             kmeansData.Centroids,
                             kmeansData.Labels);
-                        const float tri1Scalar = KMeansVertexScalar(
-                            mesh,
-                            tri1,
-                            patchUV,
-                            patch.Halfedge1Index,
-                            patch.Halfedge0Index,
-                            kmeansData.Centroids,
-                            kmeansData.Labels);
-
-                        if (tri0Scalar >= 0.0f)
-                            texelScalar = tri0Scalar;
-                        else if (tri1Scalar >= 0.0f)
-                            texelScalar = tri1Scalar;
+                        if (sampledScalar >= 0.0f)
+                            texelScalar = sampledScalar;
                     }
                     else if (hasCategoricalAtlas && categoricalLayout.Width == outWidth && categoricalLayout.Height == outHeight)
                     {

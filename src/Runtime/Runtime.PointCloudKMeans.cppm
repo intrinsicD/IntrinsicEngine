@@ -1,10 +1,13 @@
 module;
 
+#include <cstdint>
+
 #include <entt/entity/entity.hpp>
 
 export module Runtime.PointCloudKMeans;
 
 import Runtime.Engine;
+import Graphics.Components;
 import Geometry.KMeans;
 import ECS;
 

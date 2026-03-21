@@ -11,7 +11,6 @@ module;
 export module Geometry.HtexPatch;
 
 import Geometry.HalfedgeMesh;
-import Geometry.KMeans;
 
 export namespace Geometry::HtexPatch
 {
@@ -68,13 +67,10 @@ export namespace Geometry::HtexPatch
         std::uint32_t tileSize = 16u,
         std::uint32_t maxColumns = 32u) noexcept;
 
-    [[nodiscard]] bool BuildCategoricalPatchAtlas(
+    [[nodiscard]] std::optional<glm::vec3> SamplePatchSurfacePoint(
         const Halfedge::Mesh& mesh,
-        std::span<const HalfedgePatchMeta> patches,
-        std::span<const glm::vec3> centroids,
-        std::vector<std::uint32_t>& outTexels,
-        PatchAtlasLayout& outLayout,
-        std::uint32_t invalidValue = kInvalidIndex);
+        const HalfedgePatchMeta& patch,
+        glm::vec2 patchUV) noexcept;
 
     [[nodiscard]] glm::vec2 TriangleToPatchUV(
         std::uint32_t halfedgeIndex,

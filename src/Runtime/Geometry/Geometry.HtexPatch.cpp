@@ -14,7 +14,6 @@ module;
 module Geometry.HtexPatch;
 
 import Geometry.HalfedgeMesh;
-import Geometry.KMeans;
 import Geometry.Properties;
 
 namespace Geometry::HtexPatch
@@ -146,36 +145,19 @@ namespace Geometry::HtexPatch
             return w0 * tri.Positions[0] + localUV.x * tri.Positions[1] + localUV.y * tri.Positions[2];
         }
 
-        [[nodiscard]] std::uint32_t ClassifyPointToCluster(const HalfedgeTriangle& tri,
-                                                           glm::vec2 localUV,
-                                                           std::span<const glm::vec3> centroids,
-                                                           std::uint32_t invalidValue) noexcept
-        {
-            if (!tri.Valid || centroids.empty())
-                return invalidValue;
-
-            const glm::vec3 p = EvaluateTrianglePoint(tri, localUV);
-            if (const auto winner = Geometry::KMeans::ClassifyPointToCentroid(p, centroids))
-                return *winner;
-
-            return invalidValue;
-        }
-
-        [[nodiscard]] std::uint32_t ClassifyPatchTexel(const HalfedgeTriangle& tri,
-                                                       glm::vec2 patchUV,
-                                                       std::uint32_t halfedgeIndex,
-                                                       std::uint32_t twinIndex,
-                                                       std::span<const glm::vec3> centroids,
-                                                       std::uint32_t invalidValue) noexcept
+        [[nodiscard]] std::optional<glm::vec3> SampleTrianglePoint(const HalfedgeTriangle& tri,
+                                                                   glm::vec2 patchUV,
+                                                                   std::uint32_t halfedgeIndex,
+                                                                   std::uint32_t twinIndex) noexcept
         {
             if (!tri.Valid)
-                return invalidValue;
+                return std::nullopt;
 
             const glm::vec2 localUV = PatchToTriangleUV(halfedgeIndex, patchUV, twinIndex);
             if (!IsTriangleLocalUV(localUV))
-                return invalidValue;
+                return std::nullopt;
 
-            return ClassifyPointToCluster(tri, localUV, centroids, invalidValue);
+            return EvaluateTrianglePoint(tri, localUV);
         }
     }
 
@@ -254,67 +236,27 @@ namespace Geometry::HtexPatch
         return layout;
     }
 
-    bool BuildCategoricalPatchAtlas(const Halfedge::Mesh& mesh,
-                                    std::span<const HalfedgePatchMeta> patches,
-                                    std::span<const glm::vec3> centroids,
-                                    std::vector<std::uint32_t>& outTexels,
-                                    PatchAtlasLayout& outLayout,
-                                    std::uint32_t invalidValue)
+    std::optional<glm::vec3> SamplePatchSurfacePoint(const Halfedge::Mesh& mesh,
+                                                     const HalfedgePatchMeta& patch,
+                                                     glm::vec2 patchUV) noexcept
     {
-        outLayout = ComputeAtlasLayout(patches.size());
-        outTexels.assign(static_cast<std::size_t>(outLayout.Width) * static_cast<std::size_t>(outLayout.Height), invalidValue);
+        const HalfedgeHandle h0{static_cast<PropertyIndex>(patch.Halfedge0Index)};
+        const HalfedgeHandle h1{static_cast<PropertyIndex>(patch.Halfedge1Index)};
 
-        if (patches.empty() || centroids.empty())
-            return false;
-
-        bool wroteAny = false;
-        const std::uint32_t tileSize = outLayout.TileSize;
-
-        for (std::size_t i = 0; i < patches.size(); ++i)
+        if (const auto tri0Point = SampleTrianglePoint(
+                BuildHalfedgeTriangle(mesh, h0),
+                patchUV,
+                patch.Halfedge0Index,
+                patch.Halfedge1Index))
         {
-            const auto& patch = patches[i];
-            const std::uint32_t px = static_cast<std::uint32_t>(i % outLayout.Columns) * tileSize;
-            const std::uint32_t py = static_cast<std::uint32_t>(i / outLayout.Columns) * tileSize;
-
-            const HalfedgeHandle h0{static_cast<PropertyIndex>(patch.Halfedge0Index)};
-            const HalfedgeHandle h1{static_cast<PropertyIndex>(patch.Halfedge1Index)};
-            const HalfedgeTriangle tri0 = BuildHalfedgeTriangle(mesh, h0);
-            const HalfedgeTriangle tri1 = BuildHalfedgeTriangle(mesh, h1);
-
-            for (std::uint32_t y = 0; y < tileSize; ++y)
-            {
-                for (std::uint32_t x = 0; x < tileSize; ++x)
-                {
-                    const glm::vec2 patchUV{(static_cast<float>(x) + 0.5f) / static_cast<float>(tileSize),
-                                            (static_cast<float>(y) + 0.5f) / static_cast<float>(tileSize)};
-
-                    std::uint32_t texel = ClassifyPatchTexel(
-                        tri0,
-                        patchUV,
-                        patch.Halfedge0Index,
-                        patch.Halfedge1Index,
-                        centroids,
-                        invalidValue);
-                    if (texel == invalidValue)
-                    {
-                        texel = ClassifyPatchTexel(
-                            tri1,
-                            patchUV,
-                            patch.Halfedge1Index,
-                            patch.Halfedge0Index,
-                            centroids,
-                            invalidValue);
-                    }
-
-                    const std::size_t dst = static_cast<std::size_t>(py + y) * static_cast<std::size_t>(outLayout.Width) +
-                                            static_cast<std::size_t>(px + x);
-                    outTexels[dst] = texel;
-                    wroteAny |= (texel != invalidValue);
-                }
-            }
+            return tri0Point;
         }
 
-        return wroteAny;
+        return SampleTrianglePoint(
+            BuildHalfedgeTriangle(mesh, h1),
+            patchUV,
+            patch.Halfedge1Index,
+            patch.Halfedge0Index);
     }
 
     glm::vec2 TriangleToPatchUV(std::uint32_t halfedgeIndex, glm::vec2 localUV, std::uint32_t twinIndex) noexcept
