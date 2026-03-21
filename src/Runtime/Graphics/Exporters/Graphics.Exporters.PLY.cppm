@@ -16,7 +16,7 @@ export namespace Graphics
     class PLYExporter final : public IAssetExporter
     {
     public:
-        ~PLYExporter() override = default;
+        ~PLYExporter() override;
 
         [[nodiscard]] std::string_view FormatName() const override { return "Stanford PLY"; }
         [[nodiscard]] std::span<const std::string_view> Extensions() const override;

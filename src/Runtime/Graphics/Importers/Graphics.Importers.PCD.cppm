@@ -14,7 +14,7 @@ export namespace Graphics
     class PCDLoader final : public IAssetLoader
     {
     public:
-        ~PCDLoader() override = default;
+        ~PCDLoader() override;
 
         [[nodiscard]] std::string_view FormatName() const override { return "PCD Point Cloud"; }
         [[nodiscard]] std::span<const std::string_view> Extensions() const override;

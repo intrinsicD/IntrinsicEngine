@@ -14,7 +14,7 @@ export namespace Graphics
     class TGFLoader final : public IAssetLoader
     {
     public:
-        ~TGFLoader() override = default;
+        ~TGFLoader() override;
 
         [[nodiscard]] std::string_view FormatName() const override { return "Trivial Graph Format"; }
         [[nodiscard]] std::span<const std::string_view> Extensions() const override;

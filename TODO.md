@@ -78,7 +78,6 @@ O2 remains the default migration path per `docs/architecture/adr-o2-pragmatic-me
 
 ###### Critical / Correctness
 
-- [ ] **Vtable anchor policy deviation (563aa1c):** The module-partition-to-separate-module refactor removed all 11 explicit out-of-line destructor definitions for `IAssetLoader`/`IAssetExporter` subclasses from `Graphics.IORegistry.cpp`. CLAUDE.md explicitly requires vtable anchors for pure-virtual base classes in module partition interfaces. Either restore the anchors or update CLAUDE.md to reflect the relaxed policy under Clang 20.
 - [ ] **Push constant budget at 120/128 bytes (181d92b):** `MeshPushConstants` grew to 120 bytes with the `PtrIndices` field, leaving only 8 bytes before the Vulkan guaranteed minimum (128). Document this constraint in CLAUDE.md or the render architecture spec so future additions know to migrate to a UBO-backed approach.
 - [ ] **Global mutable state for CUDA jobs (8613af5):** `g_PendingCudaJobs` is a file-scope `std::unordered_map` in `Runtime.PointCloudKMeans.cpp`. If `PumpCompletions` and `ScheduleCudaJob` can be called from different threads, this is a data race. Verify main-thread-only access and document the constraint, or encapsulate in a class with explicit thread-safety annotation.
 
