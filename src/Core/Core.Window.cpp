@@ -252,6 +252,19 @@ namespace Core::Windowing
         glfwGetFramebufferSize(static_cast<GLFWwindow*>(m_Window), &m_Data.FramebufferWidth, &m_Data.FramebufferHeight);
     }
 
+    void Window::WaitForEventsTimeout(double timeoutSeconds)
+    {
+        if (!m_IsValid) return;
+
+        glfwWaitEventsTimeout(timeoutSeconds);
+        m_InputContext.Update();
+
+        // Keep cached window/framebuffer dimensions current after the wait, since the wake-up
+        // event may have been a restore or resize rather than a normal per-frame pump.
+        glfwGetWindowSize(static_cast<GLFWwindow*>(m_Window), &m_Data.WindowWidth, &m_Data.WindowHeight);
+        glfwGetFramebufferSize(static_cast<GLFWwindow*>(m_Window), &m_Data.FramebufferWidth, &m_Data.FramebufferHeight);
+    }
+
     int Window::GetWindowWidth() const
     {
         return m_Data.WindowWidth;
@@ -270,6 +283,18 @@ namespace Core::Windowing
     int Window::GetFramebufferHeight() const
     {
         return m_Data.FramebufferHeight;
+    }
+
+    bool Window::IsMinimized() const
+    {
+        if (!m_IsValid)
+            return true;
+
+        auto* glfwWindow = static_cast<GLFWwindow*>(m_Window);
+        if (glfwGetWindowAttrib(glfwWindow, GLFW_ICONIFIED) == GLFW_TRUE)
+            return true;
+
+        return m_Data.FramebufferWidth <= 0 || m_Data.FramebufferHeight <= 0;
     }
 
     bool Window::ShouldClose() const

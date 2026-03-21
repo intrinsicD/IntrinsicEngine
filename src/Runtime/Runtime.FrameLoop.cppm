@@ -7,6 +7,7 @@ import Core.Assets;
 import Core.FeatureRegistry;
 import Core.FrameGraph;
 import Core.InplaceFunction;
+import Core.Window;
 import Graphics.MaterialSystem;
 import Runtime.AssetIngestService;
 import Runtime.AssetPipeline;
@@ -89,6 +90,48 @@ export namespace Runtime
         FrameGraphTimingTotals& Timings;
 
         void Execute(this const FrameGraphExecutor&, Core::FrameGraph& graph);
+    };
+
+    class IPlatformFrameHost
+    {
+    public:
+        virtual ~IPlatformFrameHost();
+
+        virtual void PumpEvents() = 0;
+        [[nodiscard]] virtual bool IsMinimized() const = 0;
+        virtual void WaitForEventsOrTimeout(double timeoutSeconds) = 0;
+    };
+
+    class RuntimePlatformFrameHost final : public IPlatformFrameHost
+    {
+    public:
+        explicit RuntimePlatformFrameHost(Core::Windowing::Window& window)
+            : m_Window(window)
+        {
+        }
+
+        ~RuntimePlatformFrameHost() override;
+
+        void PumpEvents() override;
+        [[nodiscard]] bool IsMinimized() const override;
+        void WaitForEventsOrTimeout(double timeoutSeconds) override;
+
+    private:
+        Core::Windowing::Window& m_Window;
+    };
+
+    struct PlatformFrameResult
+    {
+        bool ContinueFrame = true;
+        bool Minimized = false;
+    };
+
+    struct PlatformFrameCoordinator
+    {
+        IPlatformFrameHost& Host;
+        double MinimizedWaitSeconds = 0.05;
+
+        [[nodiscard]] PlatformFrameResult BeginFrame(this const PlatformFrameCoordinator&);
     };
 
     class IStreamingLaneHost

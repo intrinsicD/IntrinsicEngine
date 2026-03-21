@@ -10,6 +10,8 @@ import Runtime.SystemBundles;
 
 namespace Runtime
 {
+    IPlatformFrameHost::~IPlatformFrameHost() = default;
+    RuntimePlatformFrameHost::~RuntimePlatformFrameHost() = default;
     IStreamingLaneHost::~IStreamingLaneHost() = default;
     RuntimeStreamingLaneHost::~RuntimeStreamingLaneHost() = default;
     IRenderLaneHost::~IRenderLaneHost() = default;
@@ -160,6 +162,39 @@ namespace Runtime
 
         self.Timings.ExecuteNsTotal += graph.GetLastExecuteTimeNs();
         self.Timings.CriticalPathNsTotal += graph.GetLastCriticalPathTimeNs();
+    }
+
+    void RuntimePlatformFrameHost::PumpEvents()
+    {
+        m_Window.OnUpdate();
+    }
+
+    bool RuntimePlatformFrameHost::IsMinimized() const
+    {
+        return m_Window.IsMinimized();
+    }
+
+    void RuntimePlatformFrameHost::WaitForEventsOrTimeout(double timeoutSeconds)
+    {
+        m_Window.WaitForEventsTimeout(timeoutSeconds);
+    }
+
+    PlatformFrameResult PlatformFrameCoordinator::BeginFrame(this const PlatformFrameCoordinator& self)
+    {
+        self.Host.PumpEvents();
+        if (!self.Host.IsMinimized())
+        {
+            return PlatformFrameResult{
+                .ContinueFrame = true,
+                .Minimized = false,
+            };
+        }
+
+        self.Host.WaitForEventsOrTimeout(self.MinimizedWaitSeconds);
+        return PlatformFrameResult{
+            .ContinueFrame = false,
+            .Minimized = true,
+        };
     }
 
     void RuntimeStreamingLaneHost::ProcessAssetIngest()

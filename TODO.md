@@ -78,7 +78,7 @@ Goal: refactor the runtime from a monolithic update/render loop into a staged fr
 
 #### B4.0 Target properties (the contract we are designing toward)
 
-- [ ] Keep OS/window/input pumping first on the main thread every frame.
+- [x] Keep OS/window/input pumping first on the main thread every frame.
 - [ ] Run simulation on a fixed timestep and keep rendering variable-rate.
 - [ ] Introduce explicit `FrameContext` ownership rather than ad-hoc per-frame global state.
 - [ ] Compile/execute the render graph per frame inside renderer-owned lifecycle code.
@@ -169,9 +169,9 @@ Mapping guidance for current Intrinsic code while preserving that reference shap
 
 #### B4.3 Platform stage (A)
 
-- [ ] Move all window/input/event pumping to the start of the frame on the main thread.
+- [x] Move all window/input/event pumping to the start of the frame on the main thread.
 - [ ] Centralize quit, resize, minimize, drag-drop ingest, and timer updates under one platform-stage API.
-- [ ] Ensure minimized/background behavior uses wait-for-events or throttled policy instead of busy-rendering.
+- [x] Ensure minimized/background behavior uses wait-for-events or throttled policy instead of busy-rendering.
 - [ ] Ensure SDL/GLFW event pumping semantics stay main-thread-only and are documented as such.
 
 #### B4.4 Simulation stage (B)
