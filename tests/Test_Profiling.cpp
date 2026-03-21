@@ -166,6 +166,24 @@ TEST(Profiling_TelemetrySystem, DrawCallTracking)
 }
 
 // ---------------------------------------------------------------------------
+// TelemetrySystem: fixed-step simulation telemetry is captured per frame.
+// ---------------------------------------------------------------------------
+TEST(Profiling_TelemetrySystem, SimulationStatsTracking)
+{
+    auto& telemetry = TelemetrySystem::Get();
+    telemetry.BeginFrame();
+
+    telemetry.SetSimulationStats(3, 1, 42'000);
+
+    telemetry.EndFrame();
+
+    const auto& stats = telemetry.GetFrameStats(0);
+    EXPECT_EQ(stats.SimulationTickCount, 3u);
+    EXPECT_EQ(stats.SimulationClampHitCount, 1u);
+    EXPECT_EQ(stats.SimulationCpuTimeNs, 42'000u);
+}
+
+// ---------------------------------------------------------------------------
 // TelemetrySystem: average frame time is non-negative.
 // ---------------------------------------------------------------------------
 TEST(Profiling_TelemetrySystem, AverageFrameTime)

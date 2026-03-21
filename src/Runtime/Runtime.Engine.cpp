@@ -368,7 +368,7 @@ namespace Runtime
                 activeFrameLoopMode = frameLoopMode;
             }
 
-            (void )RunFramePhasesForMode(
+            const FramePhaseRunResult framePhaseResult = RunFramePhasesForMode(
                 frameLoopMode,
                 frameTime,
                 accumulator,
@@ -394,6 +394,10 @@ namespace Runtime
                     .ExecuteVariableGraph = [&](Core::FrameGraph& graph) { executeGraph.Execute(graph); },
                 });
 
+            Core::Telemetry::TelemetrySystem::Get().SetSimulationStats(
+                static_cast<uint32_t>(framePhaseResult.FixedStep.ExecutedSubsteps),
+                framePhaseResult.FixedStep.AccumulatorClamped ? 1u : 0u,
+                framePhaseResult.FixedStep.CpuTimeNs);
             Core::Telemetry::TelemetrySystem::Get().SetTaskSchedulerStats(Core::Tasks::Scheduler::GetStats());
             Core::Telemetry::TelemetrySystem::Get().SetFrameGraphTimings(
                 frameGraphTimings.CompileNsTotal,

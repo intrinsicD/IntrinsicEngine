@@ -32,6 +32,9 @@ export namespace Core::Telemetry
         uint64_t FrameTimeNs = 0;
         uint64_t CpuTimeNs = 0;
         uint64_t GpuTimeNs = 0;
+        uint32_t SimulationTickCount = 0;
+        uint32_t SimulationClampHitCount = 0;
+        uint64_t SimulationCpuTimeNs = 0;
         uint32_t DrawCalls = 0;
         uint32_t TriangleCount = 0;
         uint32_t SampleCount = 0;
@@ -100,6 +103,7 @@ export namespace Core::Telemetry
         void RecordSample(uint32_t nameHash, const char* name, uint64_t durationNs, uint16_t depth = 0);
         void RecordDrawCall(uint32_t triangles = 0);
         void SetGpuFrameTimeNs(uint64_t gpuTimeNs);
+        void SetSimulationStats(uint32_t tickCount, uint32_t clampHitCount, uint64_t simulationCpuTimeNs);
         void SetTaskSchedulerStats(const Core::Tasks::Scheduler::Stats& stats);
         void SetFrameGraphTimings(uint64_t compileTimeNs, uint64_t executeTimeNs, uint64_t criticalPathTimeNs);
 
@@ -137,6 +141,9 @@ export namespace Core::Telemetry
         std::atomic<uint32_t> m_CurrentFrameSampleCount{0};
         std::atomic<uint32_t> m_DrawCallCount{0};
         std::atomic<uint32_t> m_TriangleCount{0};
+        std::atomic<uint32_t> m_SimulationTickCount{0};
+        std::atomic<uint32_t> m_SimulationClampHitCount{0};
+        std::atomic<uint64_t> m_SimulationCpuTimeNs{0};
         std::atomic<size_t> m_CategoryCount{0};
         std::atomic<uint64_t> m_TaskParkCount{0};
         std::atomic<uint64_t> m_TaskUnparkCount{0};

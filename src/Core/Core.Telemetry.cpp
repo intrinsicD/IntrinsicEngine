@@ -41,6 +41,9 @@ namespace Core::Telemetry
     {
         m_FrameStartTime = std::chrono::high_resolution_clock::now();
         m_CurrentFrameSampleCount.store(0, std::memory_order_relaxed);
+        m_SimulationTickCount.store(0, std::memory_order_relaxed);
+        m_SimulationClampHitCount.store(0, std::memory_order_relaxed);
+        m_SimulationCpuTimeNs.store(0, std::memory_order_relaxed);
 
         for (auto& cat : m_Categories)
         {
@@ -58,6 +61,9 @@ namespace Core::Telemetry
         m_FrameHistory[idx].FrameNumber = m_CurrentFrame;
         m_FrameHistory[idx].FrameTimeNs = duration;
         m_FrameHistory[idx].CpuTimeNs = duration;
+        m_FrameHistory[idx].SimulationTickCount = m_SimulationTickCount.load(std::memory_order_relaxed);
+        m_FrameHistory[idx].SimulationClampHitCount = m_SimulationClampHitCount.load(std::memory_order_relaxed);
+        m_FrameHistory[idx].SimulationCpuTimeNs = m_SimulationCpuTimeNs.load(std::memory_order_relaxed);
         m_FrameHistory[idx].SampleCount = m_CurrentFrameSampleCount.load(std::memory_order_relaxed);
         m_FrameHistory[idx].DrawCalls = m_DrawCallCount.load(std::memory_order_relaxed);
         m_FrameHistory[idx].TriangleCount = m_TriangleCount.load(std::memory_order_relaxed);
@@ -112,6 +118,15 @@ namespace Core::Telemetry
     {
         size_t idx = (m_CurrentFrame - 1) % MAX_FRAME_HISTORY;
         m_FrameHistory[idx].GpuTimeNs = gpuTimeNs;
+    }
+
+    void TelemetrySystem::SetSimulationStats(uint32_t tickCount,
+                                             uint32_t clampHitCount,
+                                             uint64_t simulationCpuTimeNs)
+    {
+        m_SimulationTickCount.store(tickCount, std::memory_order_relaxed);
+        m_SimulationClampHitCount.store(clampHitCount, std::memory_order_relaxed);
+        m_SimulationCpuTimeNs.store(simulationCpuTimeNs, std::memory_order_relaxed);
     }
 
     void TelemetrySystem::SetTaskSchedulerStats(const Core::Tasks::Scheduler::Stats& stats)
