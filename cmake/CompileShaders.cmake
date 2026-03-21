@@ -36,6 +36,11 @@ function(intrinsic_add_glsl_shaders target_name)
         "${ARG_SOURCE_DIR}/*.frag"
         "${ARG_SOURCE_DIR}/*.comp"
     )
+    file(GLOB_RECURSE _INTRINSIC_GLSL_INCLUDES
+        CONFIGURE_DEPENDS
+        "${ARG_SOURCE_DIR}/*.glsl"
+        "${ARG_SOURCE_DIR}/*.glslinc"
+    )
 
     if (NOT _INTRINSIC_GLSL)
         message(WARNING "No shaders found under '${ARG_SOURCE_DIR}'.")
@@ -52,8 +57,8 @@ function(intrinsic_add_glsl_shaders target_name)
 
         add_custom_command(
             OUTPUT "${_out}"
-            COMMAND "${GLSL_COMPILER}" "${_src}" -o "${_out}" --target-env=vulkan1.3
-            DEPENDS "${_src}"
+            COMMAND "${GLSL_COMPILER}" "${_src}" -I "${ARG_SOURCE_DIR}" -o "${_out}" --target-env=vulkan1.3
+            DEPENDS "${_src}" ${_INTRINSIC_GLSL_INCLUDES}
             COMMENT "Compiling GLSL -> SPV: ${_rel}"
             VERBATIM
         )

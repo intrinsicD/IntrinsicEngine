@@ -83,7 +83,7 @@ O2 remains the default migration path per `docs/architecture/adr-o2-pragmatic-me
 - [x] **HtexPatch → KMeans coupling (d58ff17):** Resolved in the current tree. `Geometry.HtexPatch` now owns its centroid-classification helper and no longer imports `Geometry.KMeans`, keeping the patch system independent of the clustering module.
 - [x] **Duplicated triangle construction logic:** `Geometry.HtexPatch` now exports the validated halfedge-triangle builder and categorical patch-atlas helper, and `Graphics.Passes.HtexPatchPreview.cpp` consumes the shared utility instead of maintaining a parallel implementation.
 - [x] **PATTERNS.md stage count drift:** Resolved. `PATTERNS.md` now matches the current 10-stage `DefaultPipeline` ordering.
-- [ ] **Shader code duplication (181d92b):** The Voronoi nearest-vertex BDA lookup logic is copy-pasted between `surface.frag` and `surface_gbuffer.frag` (~30 lines each). Extract to a shared GLSL include.
+- [x] **Shader code duplication (181d92b):** Resolved. The shared Voronoi nearest-vertex / base-color resolution path now lives in `assets/shaders/surface_color_resolve.glsl`, and `CompileShaders.cmake` passes the shader source root as an include path while tracking `.glsl` include dependencies so both build-time compilation and future runtime hot-reload flows can reuse the same source-level include.
 
 ###### Performance
 
