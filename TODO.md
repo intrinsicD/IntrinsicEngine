@@ -59,7 +59,7 @@ These are not required to finish the first wave, but they should begin soon afte
 
 O2 remains the default migration path per `docs/architecture/adr-o2-pragmatic-medium-runtime-refactor.md` unless future benchmark/test evidence overturns it.
 
-#### B3.8 Code Review Findings (2026-03-19 commit review)
+#### B3.8 Code Review Findings
 
 ##### Critical / Correctness
 
@@ -69,10 +69,37 @@ O2 remains the default migration path per `docs/architecture/adr-o2-pragmatic-me
 
 ##### Architecture / Pattern Compliance
 
-
 ##### Process / Hygiene
 
+##### 2026-03-19 commit review
+
 - [ ] Review whether `BuildDefaultPipelineRecipe` rewrite should have been a separate commit from the HTex feature work — behavioral change to all pipeline configs was bundled with a feature commit.
+
+##### 2026-03-20 / 2026-03-21 commit review
+
+###### Critical / Correctness
+
+- [ ] **Vtable anchor policy deviation (563aa1c):** The module-partition-to-separate-module refactor removed all 11 explicit out-of-line destructor definitions for `IAssetLoader`/`IAssetExporter` subclasses from `Graphics.IORegistry.cpp`. CLAUDE.md explicitly requires vtable anchors for pure-virtual base classes in module partition interfaces. Either restore the anchors or update CLAUDE.md to reflect the relaxed policy under Clang 20.
+- [ ] **Push constant budget at 120/128 bytes (181d92b):** `MeshPushConstants` grew to 120 bytes with the `PtrIndices` field, leaving only 8 bytes before the Vulkan guaranteed minimum (128). Document this constraint in CLAUDE.md or the render architecture spec so future additions know to migrate to a UBO-backed approach.
+- [ ] **Global mutable state for CUDA jobs (8613af5):** `g_PendingCudaJobs` is a file-scope `std::unordered_map` in `Runtime.PointCloudKMeans.cpp`. If `PumpCompletions` and `ScheduleCudaJob` can be called from different threads, this is a data race. Verify main-thread-only access and document the constraint, or encapsulate in a class with explicit thread-safety annotation.
+
+###### Architecture / Pattern Compliance
+
+- [ ] **HtexPatch → KMeans coupling (d58ff17):** `Geometry.HtexPatch` now imports `Geometry.KMeans` for `ClassifyPointToCentroid`, creating a dependency from the patch system to the clustering system. Consider accepting a classification function/span as a parameter to keep the patch module independent.
+- [ ] **Duplicated triangle construction logic:** `BuildHalfedgeTriangle()` in `Geometry.HtexPatch.cpp` and similar triangle construction/validation in `Graphics.Passes.HtexPatchPreview.cpp` share near-identical logic. Centralize into a shared utility.
+- [ ] **PATTERNS.md stage count drift:** Section 6 states "`DefaultPipeline` registers 9 stages" but the current code registers 10 stages per `rendering-three-pass.md`. Update PATTERNS.md.
+- [ ] **Shader code duplication (181d92b):** The Voronoi nearest-vertex BDA lookup logic is copy-pasted between `surface.frag` and `surface_gbuffer.frag` (~30 lines each). Extract to a shared GLSL include.
+
+###### Performance
+
+- [ ] **Per-frame centroid reconstruction (d6d4a1a):** `ReconstructPreviewCentroids()` iterates all mesh vertices twice per call. If called per-frame from the Htex preview path, consider caching centroids and invalidating on KMeans re-run.
+
+###### Process / Hygiene
+
+- [ ] **Bundled unrelated changes in single commits:** `e711573` mixes RHI module refactoring with KMeans rendering fixes. `4e474f2` bundles CUDA-default removal with frame-loop scaffolding. `563aa1c` bundles Material/PostProcess code reorganization with import narrowing. Future commits should separate mechanical refactors from behavioral changes.
+- [ ] **CUDA ON/OFF toggling:** `set(INTRINSIC_ENABLE_CUDA ON)` was removed in `4e474f2` then restored in `8613af5`, suggesting overlapping branch development without cleanup.
+- [ ] **Narrow-import policy in tests (b746283):** `Test_KMeansLabelRoundTrip.cpp` uses `import Graphics;` (umbrella) rather than narrow per-module imports, contradicting the narrowing policy established in the same commit series.
+- [ ] **BUGS.md stale entry:** The `IntrinsicTests` link failure for `BuildDefaultPipelineRecipe` is still listed as active. Verify whether the hybrid lighting commit (2900cf1) resolved this and update status.
 
 ### B4. Next-Gen Frame Pipeline Refactor (Fixed-Step + Extraction + Explicit Frame Contexts)
 
