@@ -2,12 +2,14 @@ module;
 #include <algorithm>
 #include <chrono>
 #include <cstdint>
+#include <thread>
 #include <utility>
 
 #include "Core.Profiling.Macros.hpp"
 
 module Runtime.FrameLoop;
 
+import Core.Logging;
 import Runtime.SystemBundles;
 
 namespace Runtime
@@ -242,6 +244,17 @@ namespace Runtime
     PlatformFrameResult PlatformFrameCoordinator::BeginFrame(this PlatformFrameCoordinator& self,
                                                              const FrameLoopPolicy& policy)
     {
+        if (self.OwningThread != std::this_thread::get_id())
+        {
+            Core::Log::Error(
+                "PlatformFrameCoordinator::BeginFrame must run on the owning main thread; refusing cross-thread event pumping.");
+            self.Clock.Reset();
+            return PlatformFrameResult{
+                .ContinueFrame = false,
+                .ThreadViolation = true,
+            };
+        }
+
         self.Host.PumpEvents();
         if (self.Host.ShouldQuit())
         {
