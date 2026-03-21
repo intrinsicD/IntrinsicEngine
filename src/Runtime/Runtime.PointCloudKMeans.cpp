@@ -11,6 +11,7 @@ module;
 #include <random>
 #include <span>
 #include <string_view>
+#include <thread>
 #include <unordered_map>
 #include <vector>
 
@@ -395,7 +396,37 @@ namespace Runtime::PointCloudKMeans
             uint32_t Iterations = 0;
         };
 
-        std::unordered_map<uint64_t, PendingCudaJob> g_PendingCudaJobs;
+        // Thread model: main-thread only.
+        //
+        // ScheduleCudaJob(), PumpCompletions(), and ReleaseEntityBuffers() are
+        // all invoked from the runtime's main-thread frame/update path. CPU
+        // worker jobs never mutate this registry directly; they marshal
+        // completions through Engine::RunOnMainThread() before touching
+        // authoritative ECS/runtime state.
+        class PendingCudaJobRegistry
+        {
+        public:
+            [[nodiscard]] std::unordered_map<uint64_t, PendingCudaJob>* TryAccess(std::string_view operation)
+            {
+                if (m_OwningThread == std::this_thread::get_id())
+                    return &m_Jobs;
+
+                Core::Log::Error(
+                    "{} must run on the owning main thread; refusing cross-thread CUDA job registry access.",
+                    operation);
+                return nullptr;
+            }
+
+        private:
+            std::thread::id m_OwningThread = std::this_thread::get_id();
+            std::unordered_map<uint64_t, PendingCudaJob> m_Jobs;
+        };
+
+        [[nodiscard]] PendingCudaJobRegistry& GetPendingCudaJobRegistry()
+        {
+            static PendingCudaJobRegistry registry{};
+            return registry;
+        }
 
         [[nodiscard]] uint64_t MakeEntityKey(entt::entity entity)
         {
@@ -537,7 +568,23 @@ namespace Runtime::PointCloudKMeans
             }
 
             MarkPending(target, Geometry::KMeans::Backend::CUDA, job.ClusterCount, job.Iterations);
-            g_PendingCudaJobs.emplace(MakeEntityKey(entity), std::move(job));
+            auto* pendingJobs = GetPendingCudaJobRegistry().TryAccess("PointCloudKMeans::ScheduleCudaJob");
+            if (!pendingJobs)
+            {
+                cleanup();
+                ClearPending(target);
+                return false;
+            }
+
+            const auto [_, inserted] = pendingJobs->emplace(MakeEntityKey(entity), std::move(job));
+            if (!inserted)
+            {
+                cleanup();
+                ClearPending(target);
+                Core::Log::Warn("PointCloudKMeans: duplicate CUDA job detected for entity {}.",
+                                static_cast<uint32_t>(static_cast<entt::id_type>(entity)));
+                return false;
+            }
             return true;
         }
 #endif
@@ -1010,15 +1057,19 @@ namespace Runtime::PointCloudKMeans
         if (!cudaDevice)
             return;
 
+        auto* pendingJobs = GetPendingCudaJobRegistry().TryAccess("PointCloudKMeans::PumpCompletions");
+        if (!pendingJobs)
+            return;
+
         auto& reg = engine.GetScene().GetRegistry();
 
-        for (auto it = g_PendingCudaJobs.begin(); it != g_PendingCudaJobs.end(); )
+        for (auto it = pendingJobs->begin(); it != pendingJobs->end(); )
         {
             auto& job = it->second;
             if (!reg.valid(job.Entity))
             {
                 DestroyPendingCudaJob(*cudaDevice, job);
-                it = g_PendingCudaJobs.erase(it);
+                it = pendingJobs->erase(it);
                 continue;
             }
 
@@ -1051,7 +1102,7 @@ namespace Runtime::PointCloudKMeans
                     ClearPending(target);
                 }
                 DestroyPendingCudaJob(*cudaDevice, job);
-                it = g_PendingCudaJobs.erase(it);
+                it = pendingJobs->erase(it);
                 continue;
             }
 
@@ -1085,7 +1136,7 @@ namespace Runtime::PointCloudKMeans
             static_cast<void>(PublishResult(engine, job.Entity, result, durationMs, job.TargetDomain));
 
             DestroyPendingCudaJob(*cudaDevice, job);
-            it = g_PendingCudaJobs.erase(it);
+            it = pendingJobs->erase(it);
         }
 
         auto view = reg.view<ECS::PointCloud::Data>();
@@ -1167,6 +1218,16 @@ namespace Runtime::PointCloudKMeans
         if (!cudaDevice)
             return;
 
+        if (auto* pendingJobs = GetPendingCudaJobRegistry().TryAccess("PointCloudKMeans::ReleaseEntityBuffers"))
+        {
+            const auto jobIt = pendingJobs->find(MakeEntityKey(entity));
+            if (jobIt != pendingJobs->end())
+            {
+                DestroyPendingCudaJob(*cudaDevice, jobIt->second);
+                pendingJobs->erase(jobIt);
+            }
+        }
+
         auto& reg = engine.GetScene().GetRegistry();
         if (!reg.valid(entity))
             return;
@@ -1184,4 +1245,3 @@ namespace Runtime::PointCloudKMeans
 #endif
     }
 }
-

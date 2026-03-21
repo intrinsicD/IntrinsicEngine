@@ -78,8 +78,6 @@ O2 remains the default migration path per `docs/architecture/adr-o2-pragmatic-me
 
 ###### Critical / Correctness
 
-- [ ] **Global mutable state for CUDA jobs (8613af5):** `g_PendingCudaJobs` is a file-scope `std::unordered_map` in `Runtime.PointCloudKMeans.cpp`. If `PumpCompletions` and `ScheduleCudaJob` can be called from different threads, this is a data race. Verify main-thread-only access and document the constraint, or encapsulate in a class with explicit thread-safety annotation.
-
 ###### Architecture / Pattern Compliance
 
 - [ ] **HtexPatch → KMeans coupling (d58ff17):** `Geometry.HtexPatch` now imports `Geometry.KMeans` for `ClassifyPointToCentroid`, creating a dependency from the patch system to the clustering system. Consider accepting a classification function/span as a parameter to keep the patch module independent.
