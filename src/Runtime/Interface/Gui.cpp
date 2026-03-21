@@ -320,6 +320,17 @@ namespace Interface::GUI
 
             ImGui::Separator();
 
+            if (ImGui::TreeNodeEx("Fixed-Step Simulation", ImGuiTreeNodeFlags_DefaultOpen))
+            {
+                const float simulationCpuMs = ToMs(stats.SimulationCpuTimeNs);
+                ImGui::Text("Ticks: %u", stats.SimulationTickCount);
+                ImGui::Text("Accumulator clamp hits: %u", stats.SimulationClampHitCount);
+                ImGui::Text("Simulation CPU: %.3f ms", simulationCpuMs);
+                ImGui::TreePop();
+            }
+
+            ImGui::Separator();
+
             // -----------------------------------------------------------------
             // Per-Pass GPU + CPU Timing Timeline
             // -----------------------------------------------------------------

@@ -1,5 +1,6 @@
 module;
 #include <algorithm>
+#include <chrono>
 #include <cstdint>
 
 #include "Core.Profiling.Macros.hpp"
@@ -119,6 +120,7 @@ namespace Runtime
     {
         PROFILE_SCOPE("FixedStep");
 
+        const auto startTime = std::chrono::high_resolution_clock::now();
         FixedStepAdvanceResult result{};
         while (accumulator >= policy.FixedDt && result.ExecutedSubsteps < policy.MaxSubstepsPerFrame)
         {
@@ -143,6 +145,11 @@ namespace Runtime
             accumulator = 0.0;
             result.AccumulatorClamped = true;
         }
+
+        result.CpuTimeNs = static_cast<uint64_t>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::high_resolution_clock::now() - startTime)
+                .count());
 
         return result;
     }

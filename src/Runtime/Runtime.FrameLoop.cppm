@@ -60,6 +60,7 @@ export namespace Runtime
     {
         int ExecutedSubsteps = 0;
         bool AccumulatorClamped = false;
+        uint64_t CpuTimeNs = 0;
     };
 
     using ExecuteGraphFn = Core::InplaceFunction<void(Core::FrameGraph&), 96>;
