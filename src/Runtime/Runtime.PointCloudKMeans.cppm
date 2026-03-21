@@ -48,7 +48,9 @@ export namespace Runtime::PointCloudKMeans
     //   - CPU: worker-thread compute over a point-position snapshot.
     //   - CUDA: available for any authoritative point-set source (mesh vertices,
     //           graph nodes, point-cloud points) via stream-backed device
-    //           snapshots polled from the main thread each frame.
+    //           snapshots polled from the main thread each frame. The transient
+    //           CUDA job registry for mesh/graph domains is thread-affine and
+    //           must only be touched from the owning main-thread frame loop.
     //
     // Returns false when the entity is invalid, has no compatible point domain,
     // or already has an in-flight k-means job on the selected domain.
@@ -88,7 +90,8 @@ export namespace Runtime::PointCloudKMeans
         double durationMs);
 
     // Poll in-flight CUDA jobs and publish completed label/color properties back
-    // into authoritative PropertySets. Call once per frame on the main thread.
+    // into authoritative PropertySets. Call once per frame on the owning main
+    // thread; the CUDA job registry is explicitly thread-affine.
     void PumpCompletions(Engine& engine);
 
     // Explicitly releases persistent CUDA buffers/events/stream for one entity.
