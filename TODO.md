@@ -67,7 +67,6 @@ O2 remains the default migration path per `docs/architecture/adr-o2-pragmatic-me
 
 ##### Architecture / Pattern Compliance
 
-- [ ] Investigate templating the Circulators module — ~500 lines of near-identical boilerplate across circulator types could be reduced significantly.
 
 ##### Process / Hygiene
 
