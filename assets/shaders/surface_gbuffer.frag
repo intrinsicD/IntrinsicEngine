@@ -52,59 +52,14 @@ layout(push_constant) uniform PushConsts {
 // Binding 0 = Camera (UBO), Binding 1 = Bindless Array
 layout(set = 1, binding = 0) uniform sampler2D globalTextures[];
 
+#include "surface_color_resolve.glsl"
+
 void main() {
     // Epsilon-guarded renormalization.
     float nLen = length(fragNormal);
     vec3 norm = (nLen > 1e-6) ? (fragNormal / nLen) : vec3(0.0, 0.0, 1.0);
 
-    // Color priority: per-vertex color > per-face color > texture.
-    // Nearest-vertex Voronoi mode when PtrIndices != 0 AND PtrVertexAttr != 0.
-    vec4 baseColor;
-    if (push.PtrVertexAttr != 0ul && push.PtrIndices != 0ul)
-    {
-        IndexBuf iBuf = IndexBuf(push.PtrIndices);
-        PosBuf pBuf = PosBuf(push.PtrPositions);
-        VertexAttrBuf vaBuf = VertexAttrBuf(push.PtrVertexAttr);
-
-        uint i0 = iBuf.idx[gl_PrimitiveID * 3 + 0];
-        uint i1 = iBuf.idx[gl_PrimitiveID * 3 + 1];
-        uint i2 = iBuf.idx[gl_PrimitiveID * 3 + 2];
-
-        vec3 p0 = pBuf.v[i0];
-        vec3 p1 = pBuf.v[i1];
-        vec3 p2 = pBuf.v[i2];
-
-        vec3 d0 = fragObjectPos - p0;
-        vec3 d1 = fragObjectPos - p1;
-        vec3 d2 = fragObjectPos - p2;
-
-        float dist0 = dot(d0, d0);
-        float dist1 = dot(d1, d1);
-        float dist2 = dot(d2, d2);
-
-        uint nearestIdx;
-        if (dist0 <= dist1 && dist0 <= dist2)
-            nearestIdx = i0;
-        else if (dist1 <= dist2)
-            nearestIdx = i1;
-        else
-            nearestIdx = i2;
-
-        baseColor = unpackUnorm4x8(vaBuf.color[nearestIdx]);
-    }
-    else if (push.PtrVertexAttr != 0ul)
-    {
-        baseColor = fragVertexColor;
-    }
-    else if (push.PtrFaceAttr != 0ul)
-    {
-        FaceAttrBuf fBuf = FaceAttrBuf(push.PtrFaceAttr);
-        baseColor = unpackUnorm4x8(fBuf.color[gl_PrimitiveID]);
-    }
-    else
-    {
-        baseColor = texture(globalTextures[nonuniformEXT(fragTexID)], fragTexCoord);
-    }
+    vec4 baseColor = ResolveSurfaceBaseColor();
 
     // Write G-buffer.
     outNormal   = vec4(norm, 0.0);
