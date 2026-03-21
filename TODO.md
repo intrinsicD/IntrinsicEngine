@@ -70,18 +70,7 @@ O2 remains the default migration path per `docs/architecture/adr-o2-pragmatic-me
 
 ##### Process / Hygiene
 
-- [x] Investigated duplicate identical commits on two branches (`596e411` / `eb7df2c`): both commits share the same parent (`211fb73`) and the same stable patch ID, so the duplication came from parallel branches carrying the same fix and later both being merged (`bc011c0` / `c85f881`). Cleanup decision: treat this as closed historical duplication, do not rewrite shared history on `work`, and use `git patch-id --stable` / `git range-diff` before merging overlapping branches in the future.
-- [ ] Audit vague "update" commit message for multi-file fix (`211fb73`) — ensure commit messages describe the "why".
 - [ ] Review whether `BuildDefaultPipelineRecipe` rewrite should have been a separate commit from the HTex feature work — behavioral change to all pipeline configs was bundled with a feature commit.
-
-#### B3.9 Htex-Inspired Halfedge-Pair Patch Storage (investigate feasibility)
-
-- [x] Investigate a float-render-target-first `Htex`-style edge-patch system backed by `Halfedge::Mesh` edge IDs and intrinsic triangle lookup.
-- [x] Keep the first implementation scoped to float render targets / float patch payloads; verify the patch path can coexist with existing property-driven visualization.
-- [x] Investigate the feasibility of native integer / categorical patch storage (`kmeans` labels, IDs, bitmasks, other non-float data) before committing to a shader/data-layout design.
-  - Added a CPU-side categorical patch-atlas builder that preserves integer labels losslessly, while the live preview path remains float-render-target-first until a dedicated integer shader/data path lands.
-- [x] Verify `v:kmeans_label` / `p:kmeans_label` continue to round-trip through the existing label publication and color-mapping paths while the patch work is prototyped.
-  - Added focused runtime coverage around the pure k-means publication helpers so mesh labels still publish `v:kmeans_label` + `v:kmeans_label_f` for HTex/colormap use, while point-cloud labels still publish `p:kmeans_label` with the existing direct color visualization path.
 
 ### B4. Next-Gen Frame Pipeline Refactor (Fixed-Step + Extraction + Explicit Frame Contexts)
 
