@@ -63,6 +63,8 @@ O2 remains the default migration path per `docs/architecture/adr-o2-pragmatic-me
 
 ##### Critical / Correctness
 
+- [ ] Unblock `Runtime.PointCloudKMeans.cppm` module compilation by importing the module that exports `ECS::Mesh::Data` before the helper publication declarations; current wide runtime/test builds fail when `PublishMeshVertexResult(...)` references `ECS::Mesh::Data` without the `Graphics.Components` import.
+
 ##### Performance
 
 ##### Architecture / Pattern Compliance

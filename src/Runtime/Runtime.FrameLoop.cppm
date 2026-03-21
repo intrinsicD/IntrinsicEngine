@@ -1,6 +1,5 @@
 module;
 #include <cstdint>
-#include <chrono>
 
 export module Runtime.FrameLoop;
 
