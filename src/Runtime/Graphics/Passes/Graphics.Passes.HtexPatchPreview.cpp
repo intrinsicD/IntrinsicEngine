@@ -169,24 +169,11 @@ namespace Graphics::Passes
         {
             const auto sampleHalfedgeLabel = [&](std::uint32_t halfedgeIndex) noexcept -> float
             {
-                if (halfedgeIndex == Geometry::HtexPatch::kInvalidIndex)
+                const auto tri = Geometry::HtexPatch::BuildHalfedgeTriangle(mesh, halfedgeIndex);
+                if (!tri)
                     return -1.0f;
 
-                const Geometry::HalfedgeHandle h{static_cast<Geometry::PropertyIndex>(halfedgeIndex)};
-                if (!h.IsValid() || !mesh.IsValid(h) || mesh.IsDeleted(h) || mesh.IsBoundary(h))
-                    return -1.0f;
-
-                const Geometry::HalfedgeHandle next = mesh.NextHalfedge(h);
-                if (!next.IsValid() || !mesh.IsValid(next) || mesh.IsDeleted(next))
-                    return -1.0f;
-
-                const std::array<Geometry::VertexHandle, 3> vertices{
-                    mesh.FromVertex(h),
-                    mesh.ToVertex(h),
-                    mesh.ToVertex(next),
-                };
-
-                for (Geometry::VertexHandle v : vertices)
+                for (Geometry::VertexHandle v : tri->Vertices)
                 {
                     const float label = VertexLabelScalar(mesh, kmeansLabels, v);
                     if (label >= 0.0f)
@@ -207,12 +194,10 @@ namespace Graphics::Passes
                                                std::span<const glm::vec3> kmeansCentroids,
                                                const Geometry::Property<uint32_t>& kmeansLabels) noexcept
         {
-            const auto samplePoint = Geometry::HtexPatch::SamplePatchSurfacePoint(mesh, patch, patchUV);
-            if (samplePoint)
+            if (const auto winner = Geometry::HtexPatch::ClassifyPatchSurfacePointToCentroid(
+                    mesh, patch, patchUV, kmeansCentroids))
             {
-                const glm::vec3& p = *samplePoint;
-                if (const auto winner = Geometry::KMeans::ClassifyPointToCentroid(p, kmeansCentroids))
-                    return static_cast<float>(*winner);
+                return static_cast<float>(*winner);
             }
 
             return FirstPatchVertexLabel(mesh, patch, kmeansLabels);
@@ -239,56 +224,6 @@ namespace Graphics::Passes
             return static_cast<float>(patch.EdgeIndex);
         }
 
-        [[nodiscard]] bool BuildCategoricalPatchAtlas(const Geometry::Halfedge::Mesh& mesh,
-                                                      std::span<const Geometry::HtexPatch::HalfedgePatchMeta> patches,
-                                                      std::span<const glm::vec3> centroids,
-                                                      std::vector<std::uint32_t>& outTexels,
-                                                      Geometry::HtexPatch::PatchAtlasLayout& outLayout,
-                                                      std::uint32_t invalidValue) noexcept
-        {
-            outLayout = Geometry::HtexPatch::ComputeAtlasLayout(patches.size());
-            outTexels.assign(
-                static_cast<std::size_t>(outLayout.Width) * static_cast<std::size_t>(outLayout.Height),
-                invalidValue);
-
-            if (patches.empty() || centroids.empty())
-                return false;
-
-            bool wroteAny = false;
-            const std::uint32_t tileSize = outLayout.TileSize;
-
-            for (std::size_t i = 0; i < patches.size(); ++i)
-            {
-                const auto& patch = patches[i];
-                const std::uint32_t px = static_cast<std::uint32_t>(i % outLayout.Columns) * tileSize;
-                const std::uint32_t py = static_cast<std::uint32_t>(i / outLayout.Columns) * tileSize;
-
-                for (std::uint32_t y = 0; y < tileSize; ++y)
-                {
-                    for (std::uint32_t x = 0; x < tileSize; ++x)
-                    {
-                        const glm::vec2 patchUV{
-                            (static_cast<float>(x) + 0.5f) / static_cast<float>(tileSize),
-                            (static_cast<float>(y) + 0.5f) / static_cast<float>(tileSize),
-                        };
-
-                        std::uint32_t texel = invalidValue;
-                        if (const auto point = Geometry::HtexPatch::SamplePatchSurfacePoint(mesh, patch, patchUV))
-                        {
-                            if (const auto winner = Geometry::KMeans::ClassifyPointToCentroid(*point, centroids))
-                                texel = *winner;
-                        }
-
-                        const std::size_t dst = static_cast<std::size_t>(py + y) * static_cast<std::size_t>(outLayout.Width) +
-                                                static_cast<std::size_t>(px + x);
-                        outTexels[dst] = texel;
-                        wroteAny |= (texel != invalidValue);
-                    }
-                }
-            }
-
-            return wroteAny;
-        }
     }
 
     void HtexPatchPreviewPass::Initialize(RHI::VulkanDevice& device,
@@ -455,7 +390,7 @@ namespace Graphics::Passes
         const bool hasPerTexelKMeans = kmeansData.HasCentroidField();
         Geometry::HtexPatch::PatchAtlasLayout categoricalLayout{};
         std::vector<std::uint32_t> categoricalAtlasTexels;
-        const bool hasCategoricalAtlas = BuildCategoricalPatchAtlas(
+        const bool hasCategoricalAtlas = Geometry::HtexPatch::BuildCategoricalPatchAtlas(
             mesh,
             patches,
             kmeansData.Centroids,

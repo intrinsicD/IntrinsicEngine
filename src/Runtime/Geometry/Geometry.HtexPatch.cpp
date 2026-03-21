@@ -20,13 +20,6 @@ namespace Geometry::HtexPatch
 {
     namespace
     {
-        struct HalfedgeTriangle
-        {
-            std::array<VertexHandle, 3> Vertices{};
-            std::array<glm::vec3, 3> Positions{};
-            bool Valid = false;
-        };
-
         [[nodiscard]] std::uint16_t BucketResolution(float target, const PatchBuildParams& params) noexcept
         {
             constexpr std::array<std::uint16_t, 5> kBuckets{8u, 16u, 32u, 64u, 128u};
@@ -97,7 +90,7 @@ namespace Geometry::HtexPatch
             return area;
         }
 
-        [[nodiscard]] float TriangleAreaSquared(const HalfedgeTriangle& tri) noexcept
+        [[nodiscard]] float TriangleAreaSquared(const HalfedgePatchTriangle& tri) noexcept
         {
             const glm::vec3 e0 = tri.Positions[1] - tri.Positions[0];
             const glm::vec3 e1 = tri.Positions[2] - tri.Positions[0];
@@ -105,15 +98,16 @@ namespace Geometry::HtexPatch
             return glm::dot(n, n);
         }
 
-        [[nodiscard]] HalfedgeTriangle BuildHalfedgeTriangle(const Halfedge::Mesh& mesh, HalfedgeHandle h) noexcept
+        [[nodiscard]] std::optional<HalfedgePatchTriangle> BuildHalfedgeTriangleImpl(const Halfedge::Mesh& mesh,
+                                                                                     HalfedgeHandle h) noexcept
         {
-            HalfedgeTriangle tri{};
+            HalfedgePatchTriangle tri{};
             if (!h.IsValid() || !mesh.IsValid(h) || mesh.IsDeleted(h) || mesh.IsBoundary(h))
-                return tri;
+                return std::nullopt;
 
             const HalfedgeHandle next = mesh.NextHalfedge(h);
             if (!next.IsValid() || !mesh.IsValid(next) || mesh.IsDeleted(next))
-                return tri;
+                return std::nullopt;
 
             tri.Vertices[0] = mesh.FromVertex(h);
             tri.Vertices[1] = mesh.ToVertex(h);
@@ -122,42 +116,72 @@ namespace Geometry::HtexPatch
             for (std::size_t i = 0; i < tri.Vertices.size(); ++i)
             {
                 if (!tri.Vertices[i].IsValid() || !mesh.IsValid(tri.Vertices[i]) || mesh.IsDeleted(tri.Vertices[i]))
-                    return {};
+                    return std::nullopt;
 
                 tri.Positions[i] = mesh.Position(tri.Vertices[i]);
                 if (!std::isfinite(tri.Positions[i].x) || !std::isfinite(tri.Positions[i].y) || !std::isfinite(tri.Positions[i].z))
-                    return {};
+                    return std::nullopt;
             }
 
             if (tri.Vertices[0] == tri.Vertices[1] || tri.Vertices[1] == tri.Vertices[2] || tri.Vertices[2] == tri.Vertices[0])
-                return {};
+                return std::nullopt;
 
             if (TriangleAreaSquared(tri) <= 1.0e-20f)
-                return {};
+                return std::nullopt;
 
-            tri.Valid = true;
             return tri;
         }
 
-        [[nodiscard]] glm::vec3 EvaluateTrianglePoint(const HalfedgeTriangle& tri, glm::vec2 localUV) noexcept
+        [[nodiscard]] glm::vec3 EvaluateTrianglePoint(const HalfedgePatchTriangle& tri, glm::vec2 localUV) noexcept
         {
             const float w0 = 1.0f - localUV.x - localUV.y;
             return w0 * tri.Positions[0] + localUV.x * tri.Positions[1] + localUV.y * tri.Positions[2];
         }
 
-        [[nodiscard]] std::optional<glm::vec3> SampleTrianglePoint(const HalfedgeTriangle& tri,
+        [[nodiscard]] std::optional<glm::vec3> SampleTrianglePoint(const std::optional<HalfedgePatchTriangle>& tri,
                                                                    glm::vec2 patchUV,
                                                                    std::uint32_t halfedgeIndex,
                                                                    std::uint32_t twinIndex) noexcept
         {
-            if (!tri.Valid)
+            if (!tri)
                 return std::nullopt;
 
             const glm::vec2 localUV = PatchToTriangleUV(halfedgeIndex, patchUV, twinIndex);
             if (!IsTriangleLocalUV(localUV))
                 return std::nullopt;
 
-            return EvaluateTrianglePoint(tri, localUV);
+            return EvaluateTrianglePoint(*tri, localUV);
+        }
+
+        [[nodiscard]] bool IsFiniteVec3(const glm::vec3& value) noexcept
+        {
+            return std::isfinite(value.x) && std::isfinite(value.y) && std::isfinite(value.z);
+        }
+
+        [[nodiscard]] std::optional<std::uint32_t> ClassifyPointToNearestCentroid(
+            const glm::vec3& point,
+            std::span<const glm::vec3> centroids) noexcept
+        {
+            if (!IsFiniteVec3(point) || centroids.empty())
+                return std::nullopt;
+
+            std::optional<std::uint32_t> bestCluster;
+            float bestDistance = 0.0f;
+            for (std::uint32_t c = 0; c < static_cast<std::uint32_t>(centroids.size()); ++c)
+            {
+                if (!IsFiniteVec3(centroids[c]))
+                    continue;
+
+                const glm::vec3 delta = point - centroids[c];
+                const float distanceSq = glm::dot(delta, delta);
+                if (!bestCluster || distanceSq < bestDistance)
+                {
+                    bestCluster = c;
+                    bestDistance = distanceSq;
+                }
+            }
+
+            return bestCluster;
         }
     }
 
@@ -240,11 +264,8 @@ namespace Geometry::HtexPatch
                                                      const HalfedgePatchMeta& patch,
                                                      glm::vec2 patchUV) noexcept
     {
-        const HalfedgeHandle h0{static_cast<PropertyIndex>(patch.Halfedge0Index)};
-        const HalfedgeHandle h1{static_cast<PropertyIndex>(patch.Halfedge1Index)};
-
         if (const auto tri0Point = SampleTrianglePoint(
-                BuildHalfedgeTriangle(mesh, h0),
+                BuildHalfedgeTriangle(mesh, patch.Halfedge0Index),
                 patchUV,
                 patch.Halfedge0Index,
                 patch.Halfedge1Index))
@@ -253,10 +274,80 @@ namespace Geometry::HtexPatch
         }
 
         return SampleTrianglePoint(
-            BuildHalfedgeTriangle(mesh, h1),
+            BuildHalfedgeTriangle(mesh, patch.Halfedge1Index),
             patchUV,
             patch.Halfedge1Index,
             patch.Halfedge0Index);
+    }
+
+    std::optional<HalfedgePatchTriangle> BuildHalfedgeTriangle(const Halfedge::Mesh& mesh,
+                                                               std::uint32_t halfedgeIndex) noexcept
+    {
+        if (halfedgeIndex == kInvalidIndex)
+            return std::nullopt;
+
+        return BuildHalfedgeTriangleImpl(mesh, HalfedgeHandle{static_cast<PropertyIndex>(halfedgeIndex)});
+    }
+
+    std::optional<std::uint32_t> ClassifyPatchSurfacePointToCentroid(
+        const Halfedge::Mesh& mesh,
+        const HalfedgePatchMeta& patch,
+        glm::vec2 patchUV,
+        std::span<const glm::vec3> centroids) noexcept
+    {
+        const auto point = SamplePatchSurfacePoint(mesh, patch, patchUV);
+        if (!point)
+            return std::nullopt;
+
+        return ClassifyPointToNearestCentroid(*point, centroids);
+    }
+
+    bool BuildCategoricalPatchAtlas(const Halfedge::Mesh& mesh,
+                                    std::span<const HalfedgePatchMeta> patches,
+                                    std::span<const glm::vec3> centroids,
+                                    std::vector<std::uint32_t>& outTexels,
+                                    PatchAtlasLayout& outLayout,
+                                    std::uint32_t invalidValue) noexcept
+    {
+        outLayout = ComputeAtlasLayout(patches.size());
+        outTexels.assign(
+            static_cast<std::size_t>(outLayout.Width) * static_cast<std::size_t>(outLayout.Height),
+            invalidValue);
+
+        if (patches.empty() || centroids.empty())
+            return false;
+
+        bool wroteAny = false;
+        const std::uint32_t tileSize = outLayout.TileSize;
+
+        for (std::size_t i = 0; i < patches.size(); ++i)
+        {
+            const auto& patch = patches[i];
+            const std::uint32_t px = static_cast<std::uint32_t>(i % outLayout.Columns) * tileSize;
+            const std::uint32_t py = static_cast<std::uint32_t>(i / outLayout.Columns) * tileSize;
+
+            for (std::uint32_t y = 0; y < tileSize; ++y)
+            {
+                for (std::uint32_t x = 0; x < tileSize; ++x)
+                {
+                    const glm::vec2 patchUV{
+                        (static_cast<float>(x) + 0.5f) / static_cast<float>(tileSize),
+                        (static_cast<float>(y) + 0.5f) / static_cast<float>(tileSize),
+                    };
+
+                    std::uint32_t texel = invalidValue;
+                    if (const auto winner = ClassifyPatchSurfacePointToCentroid(mesh, patch, patchUV, centroids))
+                        texel = *winner;
+
+                    const std::size_t dst = static_cast<std::size_t>(py + y) * static_cast<std::size_t>(outLayout.Width) +
+                                            static_cast<std::size_t>(px + x);
+                    outTexels[dst] = texel;
+                    wroteAny |= (texel != invalidValue);
+                }
+            }
+        }
+
+        return wroteAny;
     }
 
     glm::vec2 TriangleToPatchUV(std::uint32_t halfedgeIndex, glm::vec2 localUV, std::uint32_t twinIndex) noexcept
