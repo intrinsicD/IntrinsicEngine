@@ -14,7 +14,7 @@ export namespace Graphics
     class GLTFLoader final : public IAssetLoader
     {
     public:
-        ~GLTFLoader() override = default;
+        ~GLTFLoader() override;
 
         [[nodiscard]] std::string_view FormatName() const override { return "glTF/GLB"; }
         [[nodiscard]] std::span<const std::string_view> Extensions() const override;

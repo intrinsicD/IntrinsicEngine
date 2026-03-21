@@ -14,7 +14,7 @@ export namespace Graphics
     class XYZLoader final : public IAssetLoader
     {
     public:
-        ~XYZLoader() override = default;
+        ~XYZLoader() override;
 
         [[nodiscard]] std::string_view FormatName() const override { return "XYZ Point Cloud"; }
         [[nodiscard]] std::span<const std::string_view> Extensions() const override;

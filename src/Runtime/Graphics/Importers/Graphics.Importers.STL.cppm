@@ -14,7 +14,7 @@ export namespace Graphics
     class STLLoader final : public IAssetLoader
     {
     public:
-        ~STLLoader() override = default;
+        ~STLLoader() override;
 
         [[nodiscard]] std::string_view FormatName() const override { return "STL (Stereolithography)"; }
         [[nodiscard]] std::span<const std::string_view> Extensions() const override;
