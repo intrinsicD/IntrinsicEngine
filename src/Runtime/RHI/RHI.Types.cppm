@@ -64,6 +64,9 @@ export namespace RHI
         alignas(16) glm::mat4 Proj;
     };
 
+    // WARNING: This block is 120 bytes. Vulkan only guarantees 128 bytes of
+    // push constants, so future mesh-draw payload growth should migrate to
+    // descriptor-backed data instead of extending this struct further.
     struct MeshPushConstants
     {
         glm::mat4 Model;
