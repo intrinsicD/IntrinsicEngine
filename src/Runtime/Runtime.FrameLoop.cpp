@@ -2,6 +2,7 @@ module;
 #include <algorithm>
 #include <chrono>
 #include <cstdint>
+#include <utility>
 
 #include "Core.Profiling.Macros.hpp"
 
@@ -111,6 +112,38 @@ namespace Runtime
         };
     }
 
+    namespace
+    {
+        [[nodiscard]] double SampleFrameClockSeconds()
+        {
+            using Seconds = std::chrono::duration<double>;
+            return std::chrono::duration_cast<Seconds>(
+                       std::chrono::high_resolution_clock::now().time_since_epoch())
+                .count();
+        }
+    }
+
+    void FrameClock::Reset()
+    {
+        m_LastSampleSeconds = SampleFrameClockSeconds();
+        m_HasLastSample = false;
+    }
+
+    FrameTimeStep FrameClock::Advance(const FrameLoopPolicy& policy) &
+    {
+        const double nowSeconds = SampleFrameClockSeconds();
+        if (!m_HasLastSample)
+        {
+            m_LastSampleSeconds = nowSeconds;
+            m_HasLastSample = true;
+            return {};
+        }
+
+        const double rawFrameTime = nowSeconds - m_LastSampleSeconds;
+        m_LastSampleSeconds = nowSeconds;
+        return ComputeFrameTime(rawFrameTime, policy);
+    }
+
     FixedStepAdvanceResult RunFixedSteps(double& accumulator,
                                          const FrameLoopPolicy& policy,
                                          FixedUpdateFn&& onFixedUpdate,
@@ -176,6 +209,11 @@ namespace Runtime
         m_Window.OnUpdate();
     }
 
+    bool RuntimePlatformFrameHost::ShouldQuit() const
+    {
+        return m_Window.ShouldClose();
+    }
+
     bool RuntimePlatformFrameHost::IsMinimized() const
     {
         return m_Window.IsMinimized();
@@ -186,21 +224,57 @@ namespace Runtime
         m_Window.WaitForEventsTimeout(timeoutSeconds);
     }
 
-    PlatformFrameResult PlatformFrameCoordinator::BeginFrame(this const PlatformFrameCoordinator& self)
+    int RuntimePlatformFrameHost::GetFramebufferWidth() const
+    {
+        return m_Window.GetFramebufferWidth();
+    }
+
+    int RuntimePlatformFrameHost::GetFramebufferHeight() const
+    {
+        return m_Window.GetFramebufferHeight();
+    }
+
+    bool RuntimePlatformFrameHost::ConsumeResizeRequest()
+    {
+        return std::exchange(m_ResizeRequested, false);
+    }
+
+    PlatformFrameResult PlatformFrameCoordinator::BeginFrame(this PlatformFrameCoordinator& self,
+                                                             const FrameLoopPolicy& policy)
     {
         self.Host.PumpEvents();
+        if (self.Host.ShouldQuit())
+        {
+            self.Clock.Reset();
+            return PlatformFrameResult{
+                .ContinueFrame = false,
+                .ShouldQuit = true,
+                .ResizeRequested = self.Host.ConsumeResizeRequest(),
+                .FramebufferWidth = self.Host.GetFramebufferWidth(),
+                .FramebufferHeight = self.Host.GetFramebufferHeight(),
+            };
+        }
+
         if (!self.Host.IsMinimized())
         {
             return PlatformFrameResult{
                 .ContinueFrame = true,
                 .Minimized = false,
+                .ResizeRequested = self.Host.ConsumeResizeRequest(),
+                .FramebufferWidth = self.Host.GetFramebufferWidth(),
+                .FramebufferHeight = self.Host.GetFramebufferHeight(),
+                .FrameStep = self.Clock.Advance(policy),
             };
         }
 
         self.Host.WaitForEventsOrTimeout(self.MinimizedWaitSeconds);
+        self.Clock.Reset();
         return PlatformFrameResult{
             .ContinueFrame = false,
             .Minimized = true,
+            .ResizeRequested = self.Host.ConsumeResizeRequest(),
+            .FramebufferWidth = self.Host.GetFramebufferWidth(),
+            .FramebufferHeight = self.Host.GetFramebufferHeight(),
         };
     }
 

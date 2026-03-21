@@ -283,7 +283,7 @@ The actual execution order is still data-dependency-driven by `Core::FrameGraph`
 
 This baseline also makes the current hot spots explicit:
 
-- `Engine::Run()` still owns platform-stage sequencing directly, but fixed-step simulation policy, variable render/update orchestration, and streaming maintenance now flow through the dedicated `Runtime.FrameLoop` helpers instead of being inlined inside `Engine::Run()`.
+- `Engine::Run()` now consumes a single `Runtime::PlatformFrameCoordinator` result for event pumping, minimize/quit gating, framebuffer-resize signaling, and frame-time sampling, but resize *application* still bridges platform and render ownership inside `Engine`.
 - `SceneManager` now uses instance-scoped GPU hook callbacks for EnTT destruction handling rather than file-static state.
 - Runtime-to-runtime borrowing is still explicit and manual even after the lane split (`AssetPipeline`, `SceneManager`, `RenderOrchestrator` still meet in `Engine`).
 - Core ECS system registration now flows through typed frame-graph bundles, keeping `Engine::Run()` at the orchestration level while preserving explicit bundle ordering.

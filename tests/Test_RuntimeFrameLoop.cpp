@@ -27,14 +27,28 @@ namespace
     {
     public:
         void PumpEvents() override { Calls.emplace_back("pump"); }
+        [[nodiscard]] bool ShouldQuit() const override { return QuitRequested; }
         [[nodiscard]] bool IsMinimized() const override { return Minimized; }
         void WaitForEventsOrTimeout(double timeoutSeconds) override
         {
             WaitSeconds = timeoutSeconds;
             Calls.emplace_back("wait");
         }
+        [[nodiscard]] int GetFramebufferWidth() const override { return FramebufferWidth; }
+        [[nodiscard]] int GetFramebufferHeight() const override { return FramebufferHeight; }
+        bool ConsumeResizeRequest() override
+        {
+            const bool resize = ResizeRequested;
+            ResizeRequested = false;
+            Calls.emplace_back("consume_resize");
+            return resize;
+        }
 
         bool Minimized = false;
+        bool QuitRequested = false;
+        bool ResizeRequested = false;
+        int FramebufferWidth = 1600;
+        int FramebufferHeight = 900;
         double WaitSeconds = 0.0;
         std::vector<std::string> Calls;
     };
@@ -210,16 +224,22 @@ TEST(RuntimeFrameLoop, StreamingLaneCoordinator_OrdersMainThreadUploadAndCleanup
 TEST(RuntimeFrameLoop, PlatformFrameCoordinator_PumpsEventsAndContinuesWhenWindowIsActive)
 {
     FakePlatformFrameHost host;
-    const Runtime::PlatformFrameCoordinator coordinator{
+    Runtime::FrameClock clock;
+    Runtime::PlatformFrameCoordinator coordinator{
         .Host = host,
+        .Clock = clock,
         .MinimizedWaitSeconds = 0.125,
     };
 
-    const Runtime::PlatformFrameResult result = coordinator.BeginFrame();
+    const Runtime::PlatformFrameResult result = coordinator.BeginFrame(Runtime::FrameLoopPolicy{});
 
     EXPECT_TRUE(result.ContinueFrame);
     EXPECT_FALSE(result.Minimized);
-    EXPECT_EQ(host.Calls, std::vector<std::string>{"pump"});
+    EXPECT_FALSE(result.ShouldQuit);
+    EXPECT_FALSE(result.ResizeRequested);
+    EXPECT_EQ(result.FramebufferWidth, 1600);
+    EXPECT_EQ(result.FramebufferHeight, 900);
+    EXPECT_EQ(host.Calls, (std::vector<std::string>{"pump", "consume_resize"}));
     EXPECT_DOUBLE_EQ(host.WaitSeconds, 0.0);
 }
 
@@ -227,18 +247,58 @@ TEST(RuntimeFrameLoop, PlatformFrameCoordinator_WaitsAndSkipsWhenWindowIsMinimiz
 {
     FakePlatformFrameHost host;
     host.Minimized = true;
+    Runtime::FrameClock clock;
 
-    const Runtime::PlatformFrameCoordinator coordinator{
+    Runtime::PlatformFrameCoordinator coordinator{
         .Host = host,
+        .Clock = clock,
         .MinimizedWaitSeconds = 0.25,
     };
 
-    const Runtime::PlatformFrameResult result = coordinator.BeginFrame();
+    const Runtime::PlatformFrameResult result = coordinator.BeginFrame(Runtime::FrameLoopPolicy{});
 
     EXPECT_FALSE(result.ContinueFrame);
     EXPECT_TRUE(result.Minimized);
-    EXPECT_EQ(host.Calls, (std::vector<std::string>{"pump", "wait"}));
+    EXPECT_FALSE(result.ShouldQuit);
+    EXPECT_EQ(host.Calls, (std::vector<std::string>{"pump", "wait", "consume_resize"}));
     EXPECT_DOUBLE_EQ(host.WaitSeconds, 0.25);
+}
+
+TEST(RuntimeFrameLoop, PlatformFrameCoordinator_ReportsQuitAndResizeSignals)
+{
+    FakePlatformFrameHost host;
+    host.QuitRequested = true;
+    host.ResizeRequested = true;
+    host.FramebufferWidth = 1920;
+    host.FramebufferHeight = 1080;
+    Runtime::FrameClock clock;
+
+    Runtime::PlatformFrameCoordinator coordinator{
+        .Host = host,
+        .Clock = clock,
+        .MinimizedWaitSeconds = 0.25,
+    };
+
+    const Runtime::PlatformFrameResult result = coordinator.BeginFrame(Runtime::FrameLoopPolicy{});
+
+    EXPECT_FALSE(result.ContinueFrame);
+    EXPECT_TRUE(result.ShouldQuit);
+    EXPECT_TRUE(result.ResizeRequested);
+    EXPECT_EQ(result.FramebufferWidth, 1920);
+    EXPECT_EQ(result.FramebufferHeight, 1080);
+    EXPECT_EQ(host.Calls, (std::vector<std::string>{"pump", "consume_resize"}));
+    EXPECT_FALSE(host.ResizeRequested);
+}
+
+TEST(RuntimeFrameLoop, FrameClock_ResetYieldsZeroDeltaOnFirstAdvance)
+{
+    Runtime::FrameClock clock;
+    clock.Reset();
+
+    const Runtime::FrameTimeStep step = clock.Advance(Runtime::FrameLoopPolicy{});
+
+    EXPECT_FALSE(step.Clamped);
+    EXPECT_NEAR(step.FrameTime, 0.0, kEpsilon);
 }
 
 TEST(RuntimeFrameLoop, RenderLaneCoordinator_OrdersUpdateRegistrationExecutionDispatchAndRender)

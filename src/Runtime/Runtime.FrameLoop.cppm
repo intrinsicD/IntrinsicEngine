@@ -56,6 +56,17 @@ export namespace Runtime
     [[nodiscard]] FrameTimeStep ComputeFrameTime(double rawFrameTime,
                                                  const FrameLoopPolicy& policy = {});
 
+    class FrameClock
+    {
+    public:
+        void Reset();
+        [[nodiscard]] FrameTimeStep Advance(const FrameLoopPolicy& policy) &;
+
+    private:
+        double m_LastSampleSeconds = 0.0;
+        bool m_HasLastSample = false;
+    };
+
     struct FixedStepAdvanceResult
     {
         int ExecutedSubsteps = 0;
@@ -99,40 +110,57 @@ export namespace Runtime
         virtual ~IPlatformFrameHost();
 
         virtual void PumpEvents() = 0;
+        [[nodiscard]] virtual bool ShouldQuit() const = 0;
         [[nodiscard]] virtual bool IsMinimized() const = 0;
         virtual void WaitForEventsOrTimeout(double timeoutSeconds) = 0;
+        [[nodiscard]] virtual int GetFramebufferWidth() const = 0;
+        [[nodiscard]] virtual int GetFramebufferHeight() const = 0;
+        virtual bool ConsumeResizeRequest() = 0;
     };
 
     class RuntimePlatformFrameHost final : public IPlatformFrameHost
     {
     public:
-        explicit RuntimePlatformFrameHost(Core::Windowing::Window& window)
+        RuntimePlatformFrameHost(Core::Windowing::Window& window, bool& resizeRequested)
             : m_Window(window)
+            , m_ResizeRequested(resizeRequested)
         {
         }
 
         ~RuntimePlatformFrameHost() override;
 
         void PumpEvents() override;
+        [[nodiscard]] bool ShouldQuit() const override;
         [[nodiscard]] bool IsMinimized() const override;
         void WaitForEventsOrTimeout(double timeoutSeconds) override;
+        [[nodiscard]] int GetFramebufferWidth() const override;
+        [[nodiscard]] int GetFramebufferHeight() const override;
+        bool ConsumeResizeRequest() override;
 
     private:
         Core::Windowing::Window& m_Window;
+        bool& m_ResizeRequested;
     };
 
     struct PlatformFrameResult
     {
         bool ContinueFrame = true;
         bool Minimized = false;
+        bool ShouldQuit = false;
+        bool ResizeRequested = false;
+        int FramebufferWidth = 0;
+        int FramebufferHeight = 0;
+        FrameTimeStep FrameStep{};
     };
 
     struct PlatformFrameCoordinator
     {
         IPlatformFrameHost& Host;
+        FrameClock& Clock;
         double MinimizedWaitSeconds = 0.05;
 
-        [[nodiscard]] PlatformFrameResult BeginFrame(this const PlatformFrameCoordinator&);
+        [[nodiscard]] PlatformFrameResult BeginFrame(this PlatformFrameCoordinator&,
+                                                    const FrameLoopPolicy& policy);
     };
 
     class IStreamingLaneHost
