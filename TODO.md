@@ -82,8 +82,6 @@ O2 remains the default migration path per `docs/architecture/adr-o2-pragmatic-me
 
 ###### Performance
 
-- [ ] **Per-frame centroid reconstruction (d6d4a1a):** `ReconstructPreviewCentroids()` iterates all mesh vertices twice per call. If called per-frame from the Htex preview path, consider caching centroids and invalidating on KMeans re-run.
-
 ###### Process / Hygiene
 
 - [ ] **Bundled unrelated changes in single commits:** `e711573` mixes RHI module refactoring with KMeans rendering fixes. `4e474f2` bundles CUDA-default removal with frame-loop scaffolding. `563aa1c` bundles Material/PostProcess code reorganization with import narrowing. Future commits should separate mechanical refactors from behavioral changes.

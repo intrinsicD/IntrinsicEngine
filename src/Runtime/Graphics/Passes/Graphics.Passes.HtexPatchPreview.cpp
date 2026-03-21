@@ -79,23 +79,6 @@ namespace Graphics::Passes
             return seed;
         }
 
-        struct PreviewKMeansData
-        {
-            Geometry::Property<uint32_t> Labels{};
-            Geometry::Property<glm::vec4> Colors{};
-            std::vector<glm::vec3> Centroids{};
-
-            [[nodiscard]] bool HasAny() const noexcept
-            {
-                return static_cast<bool>(Labels) || static_cast<bool>(Colors);
-            }
-
-            [[nodiscard]] bool HasCentroidField() const noexcept
-            {
-                return static_cast<bool>(Labels) && !Centroids.empty();
-            }
-        };
-
         [[nodiscard]] float VertexLabelScalar(
             const Geometry::Halfedge::Mesh& mesh,
             const Geometry::Property<uint32_t>& labels,
@@ -147,20 +130,30 @@ namespace Graphics::Passes
             return Geometry::KMeans::RecomputeCentroids(points, pointLabels, clusterCount);
         }
 
-        [[nodiscard]] PreviewKMeansData GetPreviewKMeansData(const Geometry::Halfedge::Mesh& mesh) noexcept
+        [[nodiscard]] uint64_t ComputePreviewKMeansSignature(
+            const Geometry::Halfedge::Mesh& mesh,
+            const Geometry::Property<uint32_t>& labels,
+            const Geometry::Property<glm::vec4>& colors) noexcept
         {
-            return {
-                .Labels = mesh.VertexProperties().Get<uint32_t>("v:kmeans_label"),
-                .Colors = mesh.VertexProperties().Get<glm::vec4>("v:kmeans_color"),
-                .Centroids = ReconstructPreviewCentroids(
-                    mesh,
-                    mesh.VertexProperties().Get<uint32_t>("v:kmeans_label")),
-            };
-        }
+            uint64_t hash = 0xcbf29ce484222325ull;
+            hash = HashCombine64(hash, static_cast<uint64_t>(mesh.VertexCount()));
+            hash = HashCombine64(hash, labels ? 1ull : 0ull);
+            hash = HashCombine64(hash, colors ? 1ull : 0ull);
 
-        [[nodiscard]] bool HasPreviewKMeansData(const Geometry::Halfedge::Mesh& mesh) noexcept
-        {
-            return GetPreviewKMeansData(mesh).HasAny();
+            for (std::size_t i = 0; i < mesh.VertexCount(); ++i)
+            {
+                const Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(i)};
+                if (!mesh.IsValid(v) || mesh.IsDeleted(v))
+                    continue;
+
+                hash = HashVec3(hash, mesh.Position(v));
+                if (labels)
+                    hash = HashCombine64(hash, static_cast<uint64_t>(labels[v.Index]));
+                if (colors)
+                    hash = HashVec4(hash, colors[v.Index]);
+            }
+
+            return hash;
         }
 
         [[nodiscard]] float FirstPatchVertexLabel(const Geometry::Halfedge::Mesh& mesh,
@@ -247,6 +240,7 @@ namespace Graphics::Passes
 
         m_UploadedAtlasRevision.fill(0);
         m_CachedAtlas = {};
+        m_CachedKMeans = {};
         m_StagingCapacity = 0;
     }
 
@@ -256,6 +250,26 @@ namespace Graphics::Passes
         for (auto& img : m_PreviewImages)
             img.reset();
         m_UploadedAtlasRevision.fill(0);
+    }
+
+    [[nodiscard]] PreviewKMeansData HtexPatchPreviewPass::GetPreviewKMeansData(
+        const Geometry::Halfedge::Mesh& mesh) noexcept
+    {
+        PreviewKMeansData data{
+            .Labels = mesh.VertexProperties().Get<uint32_t>("v:kmeans_label"),
+            .Colors = mesh.VertexProperties().Get<glm::vec4>("v:kmeans_color"),
+        };
+
+        const uint64_t signature = ComputePreviewKMeansSignature(mesh, data.Labels, data.Colors);
+        if (!m_CachedKMeans.Valid || m_CachedKMeans.Signature != signature)
+        {
+            m_CachedKMeans.Centroids = ReconstructPreviewCentroids(mesh, data.Labels);
+            m_CachedKMeans.Signature = signature;
+            m_CachedKMeans.Valid = true;
+        }
+
+        data.Centroids = std::span<const glm::vec3>{m_CachedKMeans.Centroids};
+        return data;
     }
 
     [[nodiscard]] bool HtexPatchPreviewPass::IsInterestingMeshEntity(const entt::registry& reg, entt::entity entity)
@@ -275,8 +289,13 @@ namespace Graphics::Passes
                 if (IsInterestingMeshEntity(reg, entity))
                 {
                     const auto& data = reg.get<ECS::Mesh::Data>(entity);
-                    if (data.MeshRef && HasPreviewKMeansData(*data.MeshRef))
-                        return entity;
+                    if (data.MeshRef)
+                    {
+                        const auto labels = data.MeshRef->VertexProperties().Get<uint32_t>("v:kmeans_label");
+                        const auto colors = data.MeshRef->VertexProperties().Get<glm::vec4>("v:kmeans_color");
+                        if (labels || colors)
+                            return entity;
+                    }
                 }
             }
 
@@ -292,8 +311,13 @@ namespace Graphics::Passes
             if (IsInterestingMeshEntity(reg, entity))
             {
                 const auto& data = reg.get<ECS::Mesh::Data>(entity);
-                if (data.MeshRef && HasPreviewKMeansData(*data.MeshRef))
-                    return entity;
+                if (data.MeshRef)
+                {
+                    const auto labels = data.MeshRef->VertexProperties().Get<uint32_t>("v:kmeans_label");
+                    const auto colors = data.MeshRef->VertexProperties().Get<glm::vec4>("v:kmeans_color");
+                    if (labels || colors)
+                        return entity;
+                }
             }
         }
 
@@ -308,6 +332,7 @@ namespace Graphics::Passes
 
     [[nodiscard]] uint64_t HtexPatchPreviewPass::ComputePreviewAtlasSignature(
         const Geometry::Halfedge::Mesh& mesh,
+        const PreviewKMeansData& kmeansData,
         std::span<const Geometry::HtexPatch::HalfedgePatchMeta> patches) noexcept
     {
         uint64_t hash = 0xcbf29ce484222325ull;
@@ -336,7 +361,6 @@ namespace Graphics::Passes
             hash = HashCombine64(hash, patch.Flags);
         }
 
-        const PreviewKMeansData kmeansData = GetPreviewKMeansData(mesh);
         hash = HashCombine64(hash, kmeansData.Labels ? 1ull : 0ull);
         if (kmeansData.Labels)
         {
@@ -365,6 +389,7 @@ namespace Graphics::Passes
     }
 
     [[nodiscard]] bool HtexPatchPreviewPass::BuildPreviewAtlas(const Geometry::Halfedge::Mesh& mesh,
+                                                               const PreviewKMeansData& kmeansData,
                                                                std::span<const Geometry::HtexPatch::HalfedgePatchMeta> patches,
                                                                std::vector<glm::vec4>& outPixels,
                                                                uint32_t& outWidth,
@@ -386,7 +411,6 @@ namespace Graphics::Passes
         outWidth = columns * kTileSize;
         outHeight = rows * kTileSize;
         outPixels.assign(static_cast<size_t>(outWidth) * static_cast<size_t>(outHeight), glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
-        const PreviewKMeansData kmeansData = GetPreviewKMeansData(mesh);
         const bool hasPerTexelKMeans = kmeansData.HasCentroidField();
         Geometry::HtexPatch::PatchAtlasLayout categoricalLayout{};
         std::vector<std::uint32_t> categoricalAtlasTexels;
@@ -478,12 +502,14 @@ namespace Graphics::Passes
 
         if (const auto patchBuild = Geometry::HtexPatch::BuildPatchMetadata(*meshData.MeshRef))
         {
-            const uint64_t signature = ComputePreviewAtlasSignature(*meshData.MeshRef, patchBuild->Patches);
+            const PreviewKMeansData kmeansData = GetPreviewKMeansData(*meshData.MeshRef);
+            const uint64_t signature = ComputePreviewAtlasSignature(*meshData.MeshRef, kmeansData, patchBuild->Patches);
             if (!m_CachedAtlas.Valid || m_CachedAtlas.Signature != signature)
             {
                 m_CachedAtlas.Pixels.clear();
                 m_CachedAtlas.Built = BuildPreviewAtlas(
                     *meshData.MeshRef,
+                    kmeansData,
                     patchBuild->Patches,
                     m_CachedAtlas.Pixels,
                     m_CachedAtlas.Width,
@@ -515,7 +541,12 @@ namespace Graphics::Passes
         m_DebugState.LastPatchCount = static_cast<uint32_t>(meshData.MeshRef->EdgeCount());
         m_DebugState.LastAtlasWidth = width;
         m_DebugState.LastAtlasHeight = height;
-        m_DebugState.UsedKMeansColors = GetPreviewKMeansData(*meshData.MeshRef).HasAny();
+        m_DebugState.UsedKMeansColors = [&]() noexcept
+        {
+            const auto labels = meshData.MeshRef->VertexProperties().Get<uint32_t>("v:kmeans_label");
+            const auto colors = meshData.MeshRef->VertexProperties().Get<glm::vec4>("v:kmeans_color");
+            return static_cast<bool>(labels) || static_cast<bool>(colors);
+        }();
 
         if (ctx.FrameIndex >= FRAMES)
             return;

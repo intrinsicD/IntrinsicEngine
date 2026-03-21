@@ -1,6 +1,7 @@
 module;
 
 #include <array>
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <span>
@@ -39,6 +40,30 @@ export namespace Graphics::Passes
         uint32_t LastPatchCount = 0;
         uint32_t LastAtlasWidth = 0;
         uint32_t LastAtlasHeight = 0;
+    };
+
+    struct PreviewKMeansData
+    {
+        Geometry::Property<uint32_t> Labels{};
+        Geometry::Property<glm::vec4> Colors{};
+        std::span<const glm::vec3> Centroids{};
+
+        [[nodiscard]] bool HasAny() const noexcept
+        {
+            return static_cast<bool>(Labels) || static_cast<bool>(Colors);
+        }
+
+        [[nodiscard]] bool HasCentroidField() const noexcept
+        {
+            return static_cast<bool>(Labels) && !Centroids.empty();
+        }
+    };
+
+    struct CachedPreviewKMeans
+    {
+        std::vector<glm::vec3> Centroids{};
+        uint64_t Signature = 0;
+        bool Valid = false;
     };
 
     class HtexPatchPreviewPass final : public IRenderFeature
@@ -92,7 +117,10 @@ export namespace Graphics::Passes
 
         CachedPreviewAtlas m_CachedAtlas{};
 
+        CachedPreviewKMeans m_CachedKMeans{};
+
         [[nodiscard]] static bool BuildPreviewAtlas(const Geometry::Halfedge::Mesh& mesh,
+                                                    const PreviewKMeansData& kmeansData,
                                                     std::span<const Geometry::HtexPatch::HalfedgePatchMeta> patches,
                                                      std::vector<glm::vec4>& outPixels,
                                                      uint32_t& outWidth,
@@ -102,6 +130,8 @@ export namespace Graphics::Passes
         [[nodiscard]] static std::optional<entt::entity> FindSourceMeshEntity(const entt::registry& reg);
         [[nodiscard]] static uint64_t ComputePreviewAtlasSignature(
             const Geometry::Halfedge::Mesh& mesh,
+            const PreviewKMeansData& kmeansData,
             std::span<const Geometry::HtexPatch::HalfedgePatchMeta> patches) noexcept;
+        [[nodiscard]] PreviewKMeansData GetPreviewKMeansData(const Geometry::Halfedge::Mesh& mesh) noexcept;
     };
 }
