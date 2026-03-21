@@ -34,7 +34,7 @@ export namespace Geometry::Circulators
 
             RingIterator& operator++()
             {
-                AdvancePolicy::template Advance(*this);
+                AdvancePolicy::Advance(*this);
                 return *this;
             }
 

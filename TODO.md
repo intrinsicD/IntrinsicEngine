@@ -80,7 +80,8 @@ O2 remains the default migration path per `docs/architecture/adr-o2-pragmatic-me
 - [x] Keep the first implementation scoped to float render targets / float patch payloads; verify the patch path can coexist with existing property-driven visualization.
 - [x] Investigate the feasibility of native integer / categorical patch storage (`kmeans` labels, IDs, bitmasks, other non-float data) before committing to a shader/data-layout design.
   - Added a CPU-side categorical patch-atlas builder that preserves integer labels losslessly, while the live preview path remains float-render-target-first until a dedicated integer shader/data path lands.
-- [ ] Verify `v:kmeans_label` / `p:kmeans_label` continue to round-trip through the existing label publication and color-mapping paths while the patch work is prototyped.
+- [x] Verify `v:kmeans_label` / `p:kmeans_label` continue to round-trip through the existing label publication and color-mapping paths while the patch work is prototyped.
+  - Added focused runtime coverage around the pure k-means publication helpers so mesh labels still publish `v:kmeans_label` + `v:kmeans_label_f` for HTex/colormap use, while point-cloud labels still publish `p:kmeans_label` with the existing direct color visualization path.
 
 ### B4. Next-Gen Frame Pipeline Refactor (Fixed-Step + Extraction + Explicit Frame Contexts)
 

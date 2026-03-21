@@ -13,7 +13,9 @@ module;
 
 module Geometry.HtexPatch;
 
+import Geometry.HalfedgeMesh;
 import Geometry.KMeans;
+import Geometry.Properties;
 
 namespace Geometry::HtexPatch
 {
