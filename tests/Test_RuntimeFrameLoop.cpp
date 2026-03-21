@@ -81,6 +81,33 @@ TEST(RuntimeFrameLoop, ComputeFrameTime_RejectsNegativeDelta)
     EXPECT_NEAR(step.FrameTime, 0.0, kEpsilon);
 }
 
+TEST(RuntimeFrameLoop, ResolveFrameLoopMode_DefaultsToStagedPhases)
+{
+    Core::FeatureRegistry registry;
+    ASSERT_TRUE(registry.Register(Runtime::FrameLoopFeatureCatalog::StagedPhases,
+                                  []() -> void* { return nullptr; },
+                                  [](void*) {}));
+    ASSERT_TRUE(registry.Register(Runtime::FrameLoopFeatureCatalog::LegacyCompatibility,
+                                  []() -> void* { return nullptr; },
+                                  [](void*) {}));
+
+    EXPECT_EQ(Runtime::ResolveFrameLoopMode(registry), Runtime::FrameLoopMode::StagedPhases);
+}
+
+TEST(RuntimeFrameLoop, ResolveFrameLoopMode_LegacyRollbackTakesPrecedenceWhenEnabled)
+{
+    Core::FeatureRegistry registry;
+    ASSERT_TRUE(registry.Register(Runtime::FrameLoopFeatureCatalog::StagedPhases,
+                                  []() -> void* { return nullptr; },
+                                  [](void*) {}));
+    ASSERT_TRUE(registry.Register(Runtime::FrameLoopFeatureCatalog::LegacyCompatibility,
+                                  []() -> void* { return nullptr; },
+                                  [](void*) {}));
+    ASSERT_TRUE(registry.SetEnabled(Runtime::FrameLoopFeatureCatalog::LegacyCompatibility, true));
+
+    EXPECT_EQ(Runtime::ResolveFrameLoopMode(registry), Runtime::FrameLoopMode::LegacyCompatibility);
+}
+
 TEST(RuntimeFrameLoop, RunFixedSteps_AdvancesUntilAccumulatorIsBelowFixedDt)
 {
     Runtime::FrameLoopPolicy policy{
@@ -303,6 +330,88 @@ TEST(RuntimeFrameLoop, RunFramePhases_PreservesStreamingFixedAndRenderLaneBaseli
             },
         });
 
+    EXPECT_EQ(result.FixedStep.ExecutedSubsteps, 2);
+    EXPECT_FALSE(result.FixedStep.AccumulatorClamped);
+    EXPECT_EQ(result.Mode, Runtime::FrameLoopMode::StagedPhases);
+    EXPECT_NEAR(accumulator, 0.05, kEpsilon);
+
+    const std::vector<std::string> expectedStreamingCalls{
+        "ingest",
+        "queue",
+        "uploads",
+        "textures",
+        "materials",
+        "gc",
+    };
+    EXPECT_EQ(streamingHost.Calls, expectedStreamingCalls);
+
+    const std::vector<std::string> expectedRenderHostCalls{
+        "get_graph",
+        "register_engine",
+        "dispatch",
+    };
+    EXPECT_EQ(renderHost.Calls, expectedRenderHostCalls);
+
+    const std::vector<std::string> expectedTrace{
+        "fixed:update",
+        "fixed:register",
+        "fixed:execute",
+        "fixed:update",
+        "fixed:register",
+        "fixed:execute",
+        "render:update",
+        "render:register_client",
+        "render:execute",
+        "render:before_dispatch",
+        "render",
+    };
+    EXPECT_EQ(trace, expectedTrace);
+}
+
+TEST(RuntimeFrameLoop, RunFramePhasesForMode_LegacyCompatibilityPreservesBaselineOrder)
+{
+    Runtime::FrameLoopPolicy policy{
+        .FixedDt = 0.1,
+        .MaxFrameDelta = 0.25,
+        .MaxSubstepsPerFrame = 8,
+    };
+
+    double accumulator = 0.25;
+
+    Core::Memory::ScopeStack scope(64 * 1024);
+    Core::FrameGraph graph(scope);
+    std::vector<std::string> trace;
+
+    FakeStreamingLaneHost streamingHost;
+    FakeRenderLaneHost renderHost(graph);
+
+    const Runtime::StreamingLaneCoordinator streamingLane{.Host = streamingHost};
+    const Runtime::RenderLaneCoordinator renderLane{.Host = renderHost};
+
+    const Runtime::FramePhaseRunResult result = Runtime::RunFramePhasesForMode(
+        Runtime::FrameLoopMode::LegacyCompatibility,
+        1.0 / 60.0,
+        accumulator,
+        policy,
+        streamingLane,
+        renderLane,
+        graph,
+        {
+            .OnFixedUpdate = [&](float) { trace.emplace_back("fixed:update"); },
+            .RegisterFixedSystems = [&](Core::FrameGraph&, float) { trace.emplace_back("fixed:register"); },
+            .ExecuteFixedGraph = [&](Core::FrameGraph&) { trace.emplace_back("fixed:execute"); },
+            .Render =
+                {
+                    .OnUpdate = [&](float) { trace.emplace_back("render:update"); },
+                    .RegisterVariableSystems = [&](Core::FrameGraph&, float)
+                    { trace.emplace_back("render:register_client"); },
+                    .BeforeDispatch = [&]() { trace.emplace_back("render:before_dispatch"); },
+                    .OnRender = [&]() { trace.emplace_back("render"); },
+                },
+            .ExecuteVariableGraph = [&](Core::FrameGraph&) { trace.emplace_back("render:execute"); },
+        });
+
+    EXPECT_EQ(result.Mode, Runtime::FrameLoopMode::LegacyCompatibility);
     EXPECT_EQ(result.FixedStep.ExecutedSubsteps, 2);
     EXPECT_FALSE(result.FixedStep.AccumulatorClamped);
     EXPECT_NEAR(accumulator, 0.05, kEpsilon);

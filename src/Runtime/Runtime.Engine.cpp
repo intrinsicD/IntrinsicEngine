@@ -249,6 +249,8 @@ namespace Runtime
         registerDescriptor(Runtime::SystemFeatureCatalog::MeshViewLifecycle);
         registerDescriptor(Runtime::SystemFeatureCatalog::GPUSceneSync);
         registerDescriptor(Runtime::SystemFeatureCatalog::PropertySetDirtySync);
+        registerDescriptor(Runtime::FrameLoopFeatureCatalog::StagedPhases);
+        registerDescriptor(Runtime::FrameLoopFeatureCatalog::LegacyCompatibility);
 
         Core::Log::Info("FeatureRegistry: Registered {} core features", m_FeatureRegistry.Count());
     }
@@ -287,6 +289,8 @@ namespace Runtime
             GetAssetManager(),
         };
         const RenderLaneCoordinator renderLane{.Host = renderLaneHost};
+        FrameLoopMode activeFrameLoopMode = ResolveFrameLoopMode(m_FeatureRegistry);
+        Core::Log::Info("Engine::Run frame-loop mode: {}", ToString(activeFrameLoopMode));
 
         while (m_Running && !m_Window->ShouldClose())
         {
@@ -347,7 +351,17 @@ namespace Runtime
                 }
             }
 
-            (void )RunFramePhases(
+            const FrameLoopMode frameLoopMode = ResolveFrameLoopMode(m_FeatureRegistry);
+            if (frameLoopMode != activeFrameLoopMode)
+            {
+                Core::Log::Warn("Engine::Run frame-loop mode switch: {} -> {}",
+                                ToString(activeFrameLoopMode),
+                                ToString(frameLoopMode));
+                activeFrameLoopMode = frameLoopMode;
+            }
+
+            (void )RunFramePhasesForMode(
+                frameLoopMode,
                 frameTime,
                 accumulator,
                 frameLoopPolicy,

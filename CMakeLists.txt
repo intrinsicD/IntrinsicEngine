@@ -144,7 +144,6 @@ include(cmake/IntrinsicModule.cmake)
 # ------------------------------------------------------------------------------
 # CUDA Compute Backend (optional)
 # ------------------------------------------------------------------------------
-set(INTRINSIC_ENABLE_CUDA ON)
 if(INTRINSIC_ENABLE_CUDA)
     # Enable CUDA language support and find the CUDA driver API.
     enable_language(CUDA)

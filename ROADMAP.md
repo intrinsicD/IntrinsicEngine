@@ -30,6 +30,7 @@ This roadmap now explicitly tracks the staged runtime/frame-pipeline work captur
 1. **Baseline + checkpoints**
    - Lock current telemetry, pass ordering, and render-contract snapshots before each migration phase.
    - Keep rollback shims and feature-flagged cutovers until each phase clears its pass/fail gates.
+   - Use `FrameLoop.StagedPhases` / `FrameLoop.LegacyCompatibility` as the explicit cutover toggle pair documented in `docs/architecture/frame-loop-rollback-strategy.md`.
 2. **Frame-stage extraction**
    - Introduce typed `RenderFrameInput`, `WorldSnapshot`, `RenderWorld`, and `FrameContext` seams.
    - Ensure render preparation consumes immutable extracted state instead of late live ECS traversal.
