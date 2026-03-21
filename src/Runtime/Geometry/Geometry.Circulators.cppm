@@ -13,14 +13,14 @@ export namespace Geometry::Circulators
     {
     };
 
-    template <class Domain>
-    struct HalfedgesAroundFaceRange
+    namespace Detail
     {
-        struct Iterator
+        template <class Domain, class ValueType, class DereferencePolicy, class AdvancePolicy>
+        struct RingIterator
         {
             using iterator_concept = std::input_iterator_tag;
             using iterator_category = std::input_iterator_tag;
-            using value_type = HalfedgeHandle;
+            using value_type = ValueType;
             using difference_type = std::ptrdiff_t;
             using reference = value_type;
 
@@ -30,45 +30,161 @@ export namespace Geometry::Circulators
             std::size_t RemainingSteps{0};
             bool Ended{true};
 
-            [[nodiscard]] value_type operator*() const { return Current; }
+            [[nodiscard]] value_type operator*() const { return DereferencePolicy::Get(*Owner, Current); }
 
-            Iterator& operator++()
+            RingIterator& operator++()
             {
-                if (Ended || Owner == nullptr)
-                {
-                    return *this;
-                }
-
-                if (RemainingSteps == 0)
-                {
-                    Ended = true;
-                    Current = {};
-                    return *this;
-                }
-
-                const HalfedgeHandle next = Owner->NextHalfedge(Current);
-                --RemainingSteps;
-                if (!next.IsValid() || next == Start)
-                {
-                    Ended = true;
-                    Current = {};
-                    return *this;
-                }
-
-                Current = next;
+                AdvancePolicy::template Advance(*this);
                 return *this;
             }
 
-            Iterator operator++(int)
+            RingIterator operator++(int)
             {
-                Iterator copy = *this;
+                RingIterator copy = *this;
                 ++(*this);
                 return copy;
             }
 
-            friend bool operator==(const Iterator& it, TraversalSentinel) { return it.Ended; }
-            friend bool operator!=(const Iterator& it, TraversalSentinel) { return !it.Ended; }
+            friend bool operator==(const RingIterator& it, TraversalSentinel) { return it.Ended; }
+            friend bool operator!=(const RingIterator& it, TraversalSentinel) { return !it.Ended; }
         };
+
+        template <class Iterator>
+        void EndTraversal(Iterator& it)
+        {
+            it.Ended = true;
+            it.Current = {};
+        }
+
+        template <class Iterator, class StepFn>
+        void AdvanceSimple(Iterator& it, StepFn step)
+        {
+            if (it.Ended || it.Owner == nullptr)
+            {
+                return;
+            }
+
+            if (it.RemainingSteps == 0)
+            {
+                EndTraversal(it);
+                return;
+            }
+
+            const HalfedgeHandle next = step(*it.Owner, it.Current);
+            --it.RemainingSteps;
+            if (!next.IsValid() || next == it.Start)
+            {
+                EndTraversal(it);
+                return;
+            }
+
+            it.Current = next;
+        }
+
+        template <class Iterator, class Domain>
+        [[nodiscard]] Iterator MakeIterator(const Domain* owner, HalfedgeHandle start)
+        {
+            return Iterator{owner, start, start, owner->HalfedgesSize(), false};
+        }
+
+        template <class Domain>
+        struct ReturnHalfedge
+        {
+            [[nodiscard]] static HalfedgeHandle Get(const Domain&, HalfedgeHandle current) { return current; }
+        };
+
+        template <class Domain>
+        struct ReturnToVertex
+        {
+            [[nodiscard]] static VertexHandle Get(const Domain& owner, HalfedgeHandle current) { return owner.ToVertex(current); }
+        };
+
+        template <class Domain>
+        struct ReturnFromVertex
+        {
+            [[nodiscard]] static VertexHandle Get(const Domain& owner, HalfedgeHandle current) { return owner.FromVertex(current); }
+        };
+
+        template <class Domain>
+        struct ReturnFace
+        {
+            [[nodiscard]] static FaceHandle Get(const Domain& owner, HalfedgeHandle current) { return owner.Face(current); }
+        };
+
+        struct AdvanceViaNextHalfedge
+        {
+            template <class Iterator>
+            static void Advance(Iterator& it)
+            {
+                AdvanceSimple(it, [](const auto& owner, HalfedgeHandle current) {
+                    return owner.NextHalfedge(current);
+                });
+            }
+        };
+
+        struct AdvanceViaCWRotation
+        {
+            template <class Iterator>
+            static void Advance(Iterator& it)
+            {
+                AdvanceSimple(it, [](const auto& owner, HalfedgeHandle current) {
+                    return owner.CWRotatedHalfedge(current);
+                });
+            }
+        };
+
+        struct AdvanceViaCWRotationToValidFace
+        {
+            template <class Iterator>
+            static void Advance(Iterator& it)
+            {
+                if (it.Ended || it.Owner == nullptr)
+                {
+                    return;
+                }
+
+                while (it.RemainingSteps > 0)
+                {
+                    const HalfedgeHandle next = it.Owner->CWRotatedHalfedge(it.Current);
+                    --it.RemainingSteps;
+                    if (!next.IsValid() || next == it.Start)
+                    {
+                        EndTraversal(it);
+                        return;
+                    }
+
+                    it.Current = next;
+                    const FaceHandle face = it.Owner->Face(it.Current);
+                    if (face.IsValid() && !it.Owner->IsDeleted(face))
+                    {
+                        return;
+                    }
+                }
+
+                EndTraversal(it);
+            }
+        };
+
+        template <class Domain>
+        using SimpleHalfedgeIterator = RingIterator<Domain, HalfedgeHandle, ReturnHalfedge<Domain>, AdvanceViaNextHalfedge>;
+
+        template <class Domain>
+        using FaceVertexIterator = RingIterator<Domain, VertexHandle, ReturnToVertex<Domain>, AdvanceViaNextHalfedge>;
+
+        template <class Domain>
+        using VertexHalfedgeIterator = RingIterator<Domain, HalfedgeHandle, ReturnHalfedge<Domain>, AdvanceViaCWRotation>;
+
+        template <class Domain>
+        using FaceIterator = RingIterator<Domain, FaceHandle, ReturnFace<Domain>, AdvanceViaCWRotationToValidFace>;
+
+        template <class Domain>
+        using BoundaryVertexIterator = RingIterator<Domain, VertexHandle, ReturnFromVertex<Domain>, AdvanceViaNextHalfedge>;
+    }
+
+    template <class Domain>
+    struct HalfedgesAroundFaceRange
+    {
+        using Iterator = Detail::SimpleHalfedgeIterator<Domain>;
 
         const Domain* Owner{};
         FaceHandle FaceValue{};
@@ -86,7 +202,7 @@ export namespace Geometry::Circulators
                 return {};
             }
 
-            return Iterator{Owner, h, h, Owner->HalfedgesSize(), false};
+            return Detail::MakeIterator<Iterator>(Owner, h);
         }
 
         [[nodiscard]] static TraversalSentinel end() { return {}; }
@@ -95,59 +211,7 @@ export namespace Geometry::Circulators
     template <class Domain>
     struct VerticesAroundFaceRange
     {
-        struct Iterator
-        {
-            using iterator_concept = std::input_iterator_tag;
-            using iterator_category = std::input_iterator_tag;
-            using value_type = VertexHandle;
-            using difference_type = std::ptrdiff_t;
-            using reference = value_type;
-
-            const Domain* Owner{};
-            HalfedgeHandle Start{};
-            HalfedgeHandle Current{};
-            std::size_t RemainingSteps{0};
-            bool Ended{true};
-
-            [[nodiscard]] value_type operator*() const { return Owner->ToVertex(Current); }
-
-            Iterator& operator++()
-            {
-                if (Ended || Owner == nullptr)
-                {
-                    return *this;
-                }
-
-                if (RemainingSteps == 0)
-                {
-                    Ended = true;
-                    Current = {};
-                    return *this;
-                }
-
-                const HalfedgeHandle next = Owner->NextHalfedge(Current);
-                --RemainingSteps;
-                if (!next.IsValid() || next == Start)
-                {
-                    Ended = true;
-                    Current = {};
-                    return *this;
-                }
-
-                Current = next;
-                return *this;
-            }
-
-            Iterator operator++(int)
-            {
-                Iterator copy = *this;
-                ++(*this);
-                return copy;
-            }
-
-            friend bool operator==(const Iterator& it, TraversalSentinel) { return it.Ended; }
-            friend bool operator!=(const Iterator& it, TraversalSentinel) { return !it.Ended; }
-        };
+        using Iterator = Detail::FaceVertexIterator<Domain>;
 
         const Domain* Owner{};
         FaceHandle FaceValue{};
@@ -165,7 +229,7 @@ export namespace Geometry::Circulators
                 return {};
             }
 
-            return Iterator{Owner, h, h, Owner->HalfedgesSize(), false};
+            return Detail::MakeIterator<Iterator>(Owner, h);
         }
 
         [[nodiscard]] static TraversalSentinel end() { return {}; }
@@ -174,59 +238,7 @@ export namespace Geometry::Circulators
     template <class Domain>
     struct HalfedgesAroundVertexRange
     {
-        struct Iterator
-        {
-            using iterator_concept = std::input_iterator_tag;
-            using iterator_category = std::input_iterator_tag;
-            using value_type = HalfedgeHandle;
-            using difference_type = std::ptrdiff_t;
-            using reference = value_type;
-
-            const Domain* Owner{};
-            HalfedgeHandle Start{};
-            HalfedgeHandle Current{};
-            std::size_t RemainingSteps{0};
-            bool Ended{true};
-
-            [[nodiscard]] value_type operator*() const { return Current; }
-
-            Iterator& operator++()
-            {
-                if (Ended || Owner == nullptr)
-                {
-                    return *this;
-                }
-
-                if (RemainingSteps == 0)
-                {
-                    Ended = true;
-                    Current = {};
-                    return *this;
-                }
-
-                const HalfedgeHandle next = Owner->CWRotatedHalfedge(Current);
-                --RemainingSteps;
-                if (!next.IsValid() || next == Start)
-                {
-                    Ended = true;
-                    Current = {};
-                    return *this;
-                }
-
-                Current = next;
-                return *this;
-            }
-
-            Iterator operator++(int)
-            {
-                Iterator copy = *this;
-                ++(*this);
-                return copy;
-            }
-
-            friend bool operator==(const Iterator& it, TraversalSentinel) { return it.Ended; }
-            friend bool operator!=(const Iterator& it, TraversalSentinel) { return !it.Ended; }
-        };
+        using Iterator = Detail::VertexHalfedgeIterator<Domain>;
 
         const Domain* Owner{};
         VertexHandle VertexValue{};
@@ -244,7 +256,7 @@ export namespace Geometry::Circulators
                 return {};
             }
 
-            return Iterator{Owner, h, h, Owner->HalfedgesSize(), false};
+            return Detail::MakeIterator<Iterator>(Owner, h);
         }
 
         [[nodiscard]] static TraversalSentinel end() { return {}; }
@@ -253,63 +265,7 @@ export namespace Geometry::Circulators
     template <class Domain>
     struct FacesAroundVertexRange
     {
-        struct Iterator
-        {
-            using iterator_concept = std::input_iterator_tag;
-            using iterator_category = std::input_iterator_tag;
-            using value_type = FaceHandle;
-            using difference_type = std::ptrdiff_t;
-            using reference = value_type;
-
-            const Domain* Owner{};
-            HalfedgeHandle Start{};
-            HalfedgeHandle Current{};
-            std::size_t RemainingSteps{0};
-            bool Ended{true};
-
-            [[nodiscard]] value_type operator*() const { return Owner->Face(Current); }
-
-            Iterator& operator++()
-            {
-                if (Ended || Owner == nullptr)
-                {
-                    return *this;
-                }
-
-                while (RemainingSteps > 0)
-                {
-                    const HalfedgeHandle next = Owner->CWRotatedHalfedge(Current);
-                    --RemainingSteps;
-                    if (!next.IsValid() || next == Start)
-                    {
-                        Ended = true;
-                        Current = {};
-                        return *this;
-                    }
-
-                    Current = next;
-                    const FaceHandle f = Owner->Face(Current);
-                    if (f.IsValid() && !Owner->IsDeleted(f))
-                    {
-                        return *this;
-                    }
-                }
-
-                Ended = true;
-                Current = {};
-                return *this;
-            }
-
-            Iterator operator++(int)
-            {
-                Iterator copy = *this;
-                ++(*this);
-                return copy;
-            }
-
-            friend bool operator==(const Iterator& it, TraversalSentinel) { return it.Ended; }
-            friend bool operator!=(const Iterator& it, TraversalSentinel) { return !it.Ended; }
-        };
+        using Iterator = Detail::FaceIterator<Domain>;
 
         const Domain* Owner{};
         VertexHandle VertexValue{};
@@ -334,7 +290,7 @@ export namespace Geometry::Circulators
                 const FaceHandle f = Owner->Face(h);
                 if (f.IsValid() && !Owner->IsDeleted(f))
                 {
-                    return Iterator{Owner, h, h, Owner->HalfedgesSize(), false};
+                    return Detail::MakeIterator<Iterator>(Owner, h);
                 }
 
                 h = Owner->CWRotatedHalfedge(h);
@@ -354,59 +310,7 @@ export namespace Geometry::Circulators
     template <class Domain>
     struct BoundaryHalfedgesRange
     {
-        struct Iterator
-        {
-            using iterator_concept = std::input_iterator_tag;
-            using iterator_category = std::input_iterator_tag;
-            using value_type = HalfedgeHandle;
-            using difference_type = std::ptrdiff_t;
-            using reference = value_type;
-
-            const Domain* Owner{};
-            HalfedgeHandle Start{};
-            HalfedgeHandle Current{};
-            std::size_t RemainingSteps{0};
-            bool Ended{true};
-
-            [[nodiscard]] value_type operator*() const { return Current; }
-
-            Iterator& operator++()
-            {
-                if (Ended || Owner == nullptr)
-                {
-                    return *this;
-                }
-
-                if (RemainingSteps == 0)
-                {
-                    Ended = true;
-                    Current = {};
-                    return *this;
-                }
-
-                const HalfedgeHandle next = Owner->NextHalfedge(Current);
-                --RemainingSteps;
-                if (!next.IsValid() || next == Start)
-                {
-                    Ended = true;
-                    Current = {};
-                    return *this;
-                }
-
-                Current = next;
-                return *this;
-            }
-
-            Iterator operator++(int)
-            {
-                Iterator copy = *this;
-                ++(*this);
-                return copy;
-            }
-
-            friend bool operator==(const Iterator& it, TraversalSentinel) { return it.Ended; }
-            friend bool operator!=(const Iterator& it, TraversalSentinel) { return !it.Ended; }
-        };
+        using Iterator = Detail::SimpleHalfedgeIterator<Domain>;
 
         const Domain* Owner{};
         HalfedgeHandle StartBoundary{};
@@ -418,7 +322,7 @@ export namespace Geometry::Circulators
                 return {};
             }
 
-            return Iterator{Owner, StartBoundary, StartBoundary, Owner->HalfedgesSize(), false};
+            return Detail::MakeIterator<Iterator>(Owner, StartBoundary);
         }
 
         [[nodiscard]] static TraversalSentinel end() { return {}; }
@@ -427,59 +331,7 @@ export namespace Geometry::Circulators
     template <class Domain>
     struct BoundaryVerticesRange
     {
-        struct Iterator
-        {
-            using iterator_concept = std::input_iterator_tag;
-            using iterator_category = std::input_iterator_tag;
-            using value_type = VertexHandle;
-            using difference_type = std::ptrdiff_t;
-            using reference = value_type;
-
-            const Domain* Owner{};
-            HalfedgeHandle Start{};
-            HalfedgeHandle Current{};
-            std::size_t RemainingSteps{0};
-            bool Ended{true};
-
-            [[nodiscard]] value_type operator*() const { return Owner->FromVertex(Current); }
-
-            Iterator& operator++()
-            {
-                if (Ended || Owner == nullptr)
-                {
-                    return *this;
-                }
-
-                if (RemainingSteps == 0)
-                {
-                    Ended = true;
-                    Current = {};
-                    return *this;
-                }
-
-                const HalfedgeHandle next = Owner->NextHalfedge(Current);
-                --RemainingSteps;
-                if (!next.IsValid() || next == Start)
-                {
-                    Ended = true;
-                    Current = {};
-                    return *this;
-                }
-
-                Current = next;
-                return *this;
-            }
-
-            Iterator operator++(int)
-            {
-                Iterator copy = *this;
-                ++(*this);
-                return copy;
-            }
-
-            friend bool operator==(const Iterator& it, TraversalSentinel) { return it.Ended; }
-            friend bool operator!=(const Iterator& it, TraversalSentinel) { return !it.Ended; }
-        };
+        using Iterator = Detail::BoundaryVertexIterator<Domain>;
 
         const Domain* Owner{};
         HalfedgeHandle StartBoundary{};
@@ -491,10 +343,9 @@ export namespace Geometry::Circulators
                 return {};
             }
 
-            return Iterator{Owner, StartBoundary, StartBoundary, Owner->HalfedgesSize(), false};
+            return Detail::MakeIterator<Iterator>(Owner, StartBoundary);
         }
 
         [[nodiscard]] static TraversalSentinel end() { return {}; }
     };
 }
-
