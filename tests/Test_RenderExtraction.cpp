@@ -29,7 +29,8 @@ TEST(RenderExtraction, FrameContext_ResetPreparedStateClearsOwnedRenderWorld)
     Runtime::FrameContext frame{};
     frame.PreparedRenderWorld = Runtime::RenderWorld{
         .Alpha = 0.5,
-        .Viewport = Runtime::RenderViewport{.Width = 800, .Height = 600},
+        .View = Runtime::MakeRenderViewPacket(Graphics::CameraComponent{},
+                                              Runtime::RenderViewport{.Width = 800, .Height = 600}),
         .World = sceneManager.CreateReadonlySnapshot(),
     };
     frame.Prepared = true;
@@ -85,7 +86,8 @@ TEST(RenderExtraction, FrameContextRing_ReusesBoundedSlotsByFrameNumberModulo)
     frame0.Submitted = true;
     frame0.PreparedRenderWorld = Runtime::RenderWorld{
         .Alpha = 0.25,
-        .Viewport = Runtime::RenderViewport{.Width = 640, .Height = 480},
+        .View = Runtime::MakeRenderViewPacket(Graphics::CameraComponent{},
+                                              Runtime::RenderViewport{.Width = 640, .Height = 480}),
     };
 
     Runtime::FrameContext& frame3 =
@@ -122,7 +124,10 @@ TEST(RenderExtraction, MakeRenderFrameInput_SanitizesAlphaAndCapturesSnapshotGen
     EXPECT_TRUE(input.IsValid());
     EXPECT_DOUBLE_EQ(input.Alpha, 1.0);
     EXPECT_EQ(input.World.CommittedTick, 2u);
-    EXPECT_EQ(input.Camera.Position, glm::vec3(1.0f, 2.0f, 3.0f));
+    EXPECT_EQ(input.View.Camera.Position, glm::vec3(1.0f, 2.0f, 3.0f));
+    EXPECT_EQ(input.View.CameraPosition, glm::vec3(1.0f, 2.0f, 3.0f));
+    EXPECT_EQ(input.View.Viewport.Width, 1920u);
+    EXPECT_EQ(input.View.Viewport.Height, 1080u);
 }
 
 TEST(RenderExtraction, WorldSnapshot_DetectsAuthoritativeCommitDrift)
@@ -165,9 +170,12 @@ TEST(RenderExtraction, ExtractRenderWorld_CopiesImmutableFrameInputs)
     EXPECT_TRUE(renderWorld.IsValid());
     EXPECT_DOUBLE_EQ(renderWorld.Alpha, 0.25);
     EXPECT_EQ(renderWorld.World.CommittedTick, 1u);
-    EXPECT_EQ(renderWorld.Camera.Position, glm::vec3(4.0f, 5.0f, 6.0f));
-    EXPECT_EQ(renderWorld.Viewport.Width, 1280u);
-    EXPECT_EQ(renderWorld.Viewport.Height, 720u);
+    EXPECT_EQ(renderWorld.View.Camera.Position, glm::vec3(4.0f, 5.0f, 6.0f));
+    EXPECT_EQ(renderWorld.View.CameraForward, renderWorld.View.Camera.GetForward());
+    EXPECT_EQ(renderWorld.View.Viewport.Width, 1280u);
+    EXPECT_EQ(renderWorld.View.Viewport.Height, 720u);
+    EXPECT_EQ(renderWorld.View.ViewProjectionMatrix,
+              renderWorld.View.ProjectionMatrix * renderWorld.View.ViewMatrix);
 }
 
 TEST(RenderExtraction, ExtractedRenderWorld_TracksWhenAuthoritativeSceneAdvancesPastExtraction)
@@ -220,11 +228,42 @@ TEST(RenderExtraction, FrameContext_OwnsPreparedRenderWorldCopy)
     frame.Prepared = true;
 
     renderWorld.Alpha = 0.0;
-    renderWorld.Camera.Position = glm::vec3(0.0f);
+    renderWorld.View.Camera.Position = glm::vec3(0.0f);
+    renderWorld.View.CameraPosition = glm::vec3(0.0f);
 
     const Runtime::RenderWorld* owned = frame.GetPreparedRenderWorld();
     ASSERT_NE(owned, nullptr);
     EXPECT_DOUBLE_EQ(owned->Alpha, 0.75);
-    EXPECT_EQ(owned->Camera.Position, glm::vec3(7.0f, 8.0f, 9.0f));
+    EXPECT_EQ(owned->View.Camera.Position, glm::vec3(7.0f, 8.0f, 9.0f));
+    EXPECT_EQ(owned->View.CameraPosition, glm::vec3(7.0f, 8.0f, 9.0f));
     EXPECT_EQ(owned->World.CommittedTick, 1u);
+}
+
+TEST(RenderExtraction, MakeRenderViewPacket_CapturesDerivedCameraState)
+{
+    Graphics::CameraComponent camera{};
+    camera.Position = glm::vec3(-2.0f, 3.0f, 5.0f);
+    camera.Fov = 60.0f;
+    camera.AspectRatio = 21.0f / 9.0f;
+    camera.Near = 0.25f;
+    camera.Far = 250.0f;
+    camera.Orientation = glm::normalize(glm::quat(glm::vec3(0.2f, -0.35f, 0.1f)));
+    Graphics::UpdateMatrices(camera, camera.AspectRatio);
+
+    const Runtime::RenderViewPacket view =
+        Runtime::MakeRenderViewPacket(camera, Runtime::RenderViewport{.Width = 3440, .Height = 1440});
+
+    EXPECT_TRUE(view.IsValid());
+    EXPECT_EQ(view.Camera.Position, camera.Position);
+    EXPECT_EQ(view.CameraPosition, camera.Position);
+    EXPECT_EQ(view.CameraForward, camera.GetForward());
+    EXPECT_EQ(view.ViewMatrix, camera.ViewMatrix);
+    EXPECT_EQ(view.ProjectionMatrix, camera.ProjectionMatrix);
+    EXPECT_EQ(view.ViewProjectionMatrix, camera.ProjectionMatrix * camera.ViewMatrix);
+    EXPECT_EQ(view.NearPlane, camera.Near);
+    EXPECT_EQ(view.FarPlane, camera.Far);
+    EXPECT_EQ(view.AspectRatio, camera.AspectRatio);
+    EXPECT_EQ(view.VerticalFieldOfViewDegrees, camera.Fov);
+    EXPECT_EQ(view.Viewport.Width, 3440u);
+    EXPECT_EQ(view.Viewport.Height, 1440u);
 }
