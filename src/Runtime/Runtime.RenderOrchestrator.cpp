@@ -30,6 +30,7 @@ import Graphics.PipelineLibrary;
 import Graphics.Pipelines;
 import Graphics.RenderSystem;
 import Graphics.ShaderRegistry;
+import Runtime.RenderExtraction;
 
 using namespace Core::Hash;
 
@@ -53,6 +54,7 @@ namespace Runtime
         , m_Swapchain(swapchain)
         , m_Bindless(bindless)
         , m_DescriptorLayout(descriptorLayout)
+        , m_AssetManager(assetManager)
         , m_FeatureRegistry(featureRegistry)
     {
         Core::Log::Info("RenderOrchestrator: Initializing...");
@@ -209,6 +211,61 @@ namespace Runtime
         m_FrameScope.Reset();
         m_FrameArena.Reset();
         m_DebugDraw.Reset();
+        m_PreparedRenderWorld.reset();
+    }
+
+    FrameContext RenderOrchestrator::BeginFrame() const
+    {
+        const VkExtent2D extent = m_Swapchain.GetExtent();
+        return FrameContext{
+            .FrameNumber = m_Device ? m_Device->GetGlobalFrameNumber() : 0u,
+            .Viewport =
+                {
+                    .Width = extent.width,
+                    .Height = extent.height,
+                },
+        };
+    }
+
+    RenderWorld RenderOrchestrator::ExtractRenderWorld(const RenderFrameInput& input) const
+    {
+        return Runtime::ExtractRenderWorld(input);
+    }
+
+    void RenderOrchestrator::PrepareFrame(FrameContext& frame, const RenderWorld& renderWorld)
+    {
+        m_PreparedRenderWorld = renderWorld;
+        frame.Prepared = renderWorld.IsValid();
+        frame.Viewport = renderWorld.Viewport;
+    }
+
+    void RenderOrchestrator::ExecuteFrame(FrameContext& frame)
+    {
+        if (!m_PreparedRenderWorld || !m_PreparedRenderWorld->IsValid())
+        {
+            Core::Log::Warn("RenderOrchestrator::ExecuteFrame skipped: no prepared RenderWorld.");
+            return;
+        }
+
+        // Transitional bridge: RenderSystem::OnUpdate still expects mutable ECS::Scene&
+        // even though frame orchestration now flows through immutable RenderWorld packets.
+        // The snapshot itself is treated as readonly by construction; this cast only
+        // adapts the legacy RenderSystem entry point until extraction fully owns render prep.
+        auto* scene = const_cast<ECS::Scene*>(m_PreparedRenderWorld->World.Scene);
+        if (!scene)
+        {
+            Core::Log::Warn("RenderOrchestrator::ExecuteFrame skipped: prepared RenderWorld has no scene.");
+            return;
+        }
+
+        m_RenderSystem->OnUpdate(*scene, m_PreparedRenderWorld->Camera, m_AssetManager);
+        frame.Submitted = true;
+    }
+
+    void RenderOrchestrator::EndFrame(FrameContext& frame)
+    {
+        frame.Prepared = false;
+        m_PreparedRenderWorld.reset();
     }
 
     std::pair<Geometry::GeometryHandle, RHI::TransferToken>

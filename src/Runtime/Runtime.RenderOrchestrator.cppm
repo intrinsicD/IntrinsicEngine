@@ -1,6 +1,7 @@
 module;
 #include <memory>
 #include <cstddef>
+#include <optional>
 #include <span>
 
 #include "RHI.Vulkan.hpp"
@@ -29,6 +30,7 @@ import Graphics.RenderSystem;
 import Graphics.ShaderRegistry;
 import Geometry.Handle;
 import ECS;
+import Runtime.RenderExtraction;
 
 export namespace Runtime
 {
@@ -94,6 +96,13 @@ export namespace Runtime
         // Reset per-frame allocators (call at the start of each frame).
         void ResetFrameState();
 
+        // --- Staged frame-pipeline seam ---
+        [[nodiscard]] FrameContext BeginFrame() const;
+        [[nodiscard]] RenderWorld ExtractRenderWorld(const RenderFrameInput& input) const;
+        void PrepareFrame(FrameContext& frame, const RenderWorld& renderWorld);
+        void ExecuteFrame(FrameContext& frame);
+        void EndFrame(FrameContext& frame);
+
         // -----------------------------------------------------------------
         // Geometry Views (shared-vertex GPU data)
         // -----------------------------------------------------------------
@@ -140,9 +149,11 @@ export namespace Runtime
         RHI::VulkanSwapchain& m_Swapchain;
         RHI::BindlessDescriptorSystem& m_Bindless;
         RHI::DescriptorLayout& m_DescriptorLayout;
+        Core::Assets::AssetManager& m_AssetManager;
 
         // Borrowed reference to the engine-wide feature registry (nullable).
         Core::FeatureRegistry* m_FeatureRegistry = nullptr;
+        std::optional<RenderWorld> m_PreparedRenderWorld;
 
         void InitPipeline(RHI::VulkanSwapchain& swapchain,
                           RHI::SimpleRenderer& renderer,
