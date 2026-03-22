@@ -43,6 +43,7 @@ namespace Runtime
         return WorldSnapshot{
             .Scene = &m_Scene,
             .Registry = &m_Scene.GetRegistry(),
+            .CommitSource = &m_CommittedTick,
             .CommittedTick = m_CommittedTick,
         };
     }

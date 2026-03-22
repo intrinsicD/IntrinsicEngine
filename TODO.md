@@ -101,8 +101,6 @@ Goal: refactor the runtime from a monolithic update/render loop into a staged fr
   - [ ] extraction reads stable `WorldState N+1`
   - [ ] extraction writes immutable `RenderWorld N+1`
   - [ ] rendering consumes only `RenderWorld N+1`
-- [ ] Reject designs that let pass recording or render-graph setup walk arbitrary live ECS state after extraction has completed.
-- [ ] Add tests that lock the extraction boundary so render work cannot depend on mutation order inside the simulation lane.
 
 #### B4.2 Reference main loop (use this shape as the migration target)
 
