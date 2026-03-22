@@ -38,6 +38,7 @@ namespace Runtime
                                            policy,
                                            std::move(callbacks.OnFixedUpdate),
                                            std::move(callbacks.RegisterFixedSystems),
+                                           std::move(callbacks.CommitFixedTick),
                                            fixedGraph,
                                            std::move(callbacks.ExecuteFixedGraph)),
                 .Mode = FrameLoopMode::StagedPhases,
@@ -67,6 +68,7 @@ namespace Runtime
                                                                    policy,
                                                                    std::move(callbacks.OnFixedUpdate),
                                                                    std::move(callbacks.RegisterFixedSystems),
+                                                                   std::move(callbacks.CommitFixedTick),
                                                                    fixedGraph,
                                                                    std::move(callbacks.ExecuteFixedGraph));
 
@@ -170,6 +172,7 @@ namespace Runtime
                                          const FrameLoopPolicy& policy,
                                          FixedUpdateFn&& onFixedUpdate,
                                          RegisterFixedSystemsFn&& registerFixedSystems,
+                                         CommitFixedTickFn&& commitFixedTick,
                                          Core::FrameGraph& fixedGraph,
                                          ExecuteGraphFn&& executeGraph)
     {
@@ -189,6 +192,12 @@ namespace Runtime
                 fixedGraph.Reset();
                 registerFixedSystems(fixedGraph, static_cast<float>(policy.FixedDt));
                 executeGraph(fixedGraph);
+            }
+
+            if (commitFixedTick)
+            {
+                PROFILE_SCOPE("CommitFixedTick");
+                commitFixedTick();
             }
 
             accumulator -= policy.FixedDt;

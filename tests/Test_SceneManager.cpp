@@ -74,6 +74,28 @@ TEST_F(SceneManagerTest, RegistryAccessible)
     EXPECT_EQ(&reg, &sceneReg);
 }
 
+TEST_F(SceneManagerTest, CommitFixedTickAdvancesReadonlySnapshotGeneration)
+{
+    const Runtime::WorldSnapshot initialSnapshot = m_Mgr->CreateReadonlySnapshot();
+    ASSERT_TRUE(initialSnapshot.IsValid());
+    EXPECT_EQ(initialSnapshot.Scene, &m_Mgr->GetScene());
+    EXPECT_EQ(initialSnapshot.Registry, &m_Mgr->GetRegistry());
+    EXPECT_EQ(initialSnapshot.CommittedTick, 0u);
+    EXPECT_EQ(m_Mgr->GetCommittedTick(), 0u);
+
+    m_Mgr->CommitFixedTick();
+    m_Mgr->CommitFixedTick();
+
+    const Runtime::WorldSnapshot committedSnapshot = m_Mgr->CreateReadonlySnapshot();
+    ASSERT_TRUE(committedSnapshot.IsValid());
+    EXPECT_EQ(committedSnapshot.Scene, &m_Mgr->GetScene());
+    EXPECT_EQ(committedSnapshot.Registry, &m_Mgr->GetRegistry());
+    EXPECT_EQ(committedSnapshot.CommittedTick, 2u);
+    EXPECT_EQ(m_Mgr->GetCommittedTick(), 2u);
+    EXPECT_EQ(initialSnapshot.CommittedTick, 0u)
+        << "Snapshots capture the committed-tick generation present at extraction time.";
+}
+
 TEST_F(SceneManagerTest, CreateEntityViaScene)
 {
     entt::entity e = m_Mgr->GetScene().CreateEntity("TestEntity");
@@ -88,6 +110,7 @@ TEST_F(SceneManagerTest, CreateEntityViaScene)
 
 TEST_F(SceneManagerTest, ClearEmptiesRegistry)
 {
+    m_Mgr->CommitFixedTick();
     m_Mgr->GetScene().CreateEntity("A");
     m_Mgr->GetScene().CreateEntity("B");
     m_Mgr->GetScene().CreateEntity("C");
@@ -95,6 +118,7 @@ TEST_F(SceneManagerTest, ClearEmptiesRegistry)
 
     m_Mgr->Clear();
     EXPECT_EQ(m_Mgr->GetScene().Size(), 0u);
+    EXPECT_EQ(m_Mgr->GetCommittedTick(), 0u);
 }
 
 TEST_F(SceneManagerTest, MultipleCreateAndDestroy)

@@ -1,4 +1,5 @@
 module;
+#include <cstdint>
 #include <entt/fwd.hpp>
 #include <glm/glm.hpp>
 
@@ -15,6 +16,15 @@ import RHI.CudaDevice;
 
 export namespace Runtime
 {
+    struct WorldSnapshot
+    {
+        const ECS::Scene* Scene = nullptr;
+        const entt::registry* Registry = nullptr;
+        uint64_t CommittedTick = 0;
+
+        [[nodiscard]] bool IsValid() const { return Scene != nullptr && Registry != nullptr; }
+    };
+
     // Owns the ECS scene, entity lifecycle management, and EnTT hooks
     // for GPU resource reclamation.  Extracted from Engine following
     // the GraphicsBackend / AssetPipeline pattern.
@@ -35,6 +45,13 @@ export namespace Runtime
         [[nodiscard]] const ECS::Scene& GetScene() const { return m_Scene; }
         [[nodiscard]] entt::registry& GetRegistry() { return m_Scene.GetRegistry(); }
         [[nodiscard]] const entt::registry& GetRegistry() const { return m_Scene.GetRegistry(); }
+        [[nodiscard]] uint64_t GetCommittedTick() const { return m_CommittedTick; }
+        [[nodiscard]] WorldSnapshot CreateReadonlySnapshot() const;
+
+        // Marks the authoritative ECS world state as consistent after a completed
+        // fixed simulation tick. Rendering/extraction code can key snapshot reads
+        // against this monotonically increasing commit number.
+        void CommitFixedTick();
 
         // --- GPU hook management ---
 
@@ -79,5 +96,6 @@ export namespace Runtime
         ECS::Scene m_Scene;
         Graphics::GeometryPool* m_GeometryStorage = nullptr;
         GpuHookContext m_GpuHookContext{};
+        uint64_t m_CommittedTick = 0;
     };
 }

@@ -391,6 +391,7 @@ namespace Runtime
                         .OnFixedUpdate = [&](float fixedDeltaTime) { OnFixedUpdate(fixedDeltaTime); },
                         .RegisterFixedSystems = [&](Core::FrameGraph& graph, float fixedDeltaTime)
                         { OnRegisterFixedSystems(graph, fixedDeltaTime); },
+                        .CommitFixedTick = [&]() { m_SceneManager->CommitFixedTick(); },
                         .ExecuteFixedGraph = [&](Core::FrameGraph& graph) { executeGraph.Execute(graph); },
                         .Render =
                             {

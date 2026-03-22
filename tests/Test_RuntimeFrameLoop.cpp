@@ -181,6 +181,7 @@ TEST(RuntimeFrameLoop, RunFixedSteps_AdvancesUntilAccumulatorIsBelowFixedDt)
 
     double accumulator = 0.35;
     std::vector<float> fixedUpdates;
+    int committedTicks = 0;
     int graphExecutions = 0;
 
     Core::Memory::ScopeStack scope(64 * 1024);
@@ -196,6 +197,7 @@ TEST(RuntimeFrameLoop, RunFixedSteps_AdvancesUntilAccumulatorIsBelowFixedDt)
             EXPECT_NEAR(dt, 0.1f, 1e-6f);
             ++graphExecutions;
         },
+        [&]() { ++committedTicks; },
         graph,
         [&](Core::FrameGraph& executedGraph)
         {
@@ -204,6 +206,7 @@ TEST(RuntimeFrameLoop, RunFixedSteps_AdvancesUntilAccumulatorIsBelowFixedDt)
 
     EXPECT_EQ(result.ExecutedSubsteps, 3);
     EXPECT_FALSE(result.AccumulatorClamped);
+    EXPECT_EQ(committedTicks, 3);
     EXPECT_EQ(graphExecutions, 3);
     ASSERT_EQ(fixedUpdates.size(), 3u);
     EXPECT_NEAR(accumulator, 0.05, kEpsilon);
@@ -227,6 +230,7 @@ TEST(RuntimeFrameLoop, RunFixedSteps_ClampsAccumulatorAfterMaxSubsteps)
         policy,
         [](float) {},
         [](Core::FrameGraph&, float) {},
+        []() {},
         graph,
         [](Core::FrameGraph&) {});
 
@@ -474,6 +478,7 @@ TEST(RuntimeFrameLoop, RunFramePhases_PreservesStreamingFixedAndRenderLaneBaseli
                 EXPECT_NEAR(dt, 0.1f, 1e-6f);
                 trace.emplace_back("fixed:register");
             },
+            .CommitFixedTick = [&]() { trace.emplace_back("fixed:commit"); },
             .ExecuteFixedGraph = [&](Core::FrameGraph& fixedGraph)
             {
                 EXPECT_EQ(&fixedGraph, &graph);
@@ -528,9 +533,11 @@ TEST(RuntimeFrameLoop, RunFramePhases_PreservesStreamingFixedAndRenderLaneBaseli
         "fixed:update",
         "fixed:register",
         "fixed:execute",
+        "fixed:commit",
         "fixed:update",
         "fixed:register",
         "fixed:execute",
+        "fixed:commit",
         "render:update",
         "render:register_client",
         "render:execute",
@@ -571,6 +578,7 @@ TEST(RuntimeFrameLoop, RunFramePhasesForMode_LegacyCompatibilityPreservesBaselin
         {
             .OnFixedUpdate = [&](float) { trace.emplace_back("fixed:update"); },
             .RegisterFixedSystems = [&](Core::FrameGraph&, float) { trace.emplace_back("fixed:register"); },
+            .CommitFixedTick = [&]() { trace.emplace_back("fixed:commit"); },
             .ExecuteFixedGraph = [&](Core::FrameGraph&) { trace.emplace_back("fixed:execute"); },
             .Render =
                 {
@@ -609,9 +617,11 @@ TEST(RuntimeFrameLoop, RunFramePhasesForMode_LegacyCompatibilityPreservesBaselin
         "fixed:update",
         "fixed:register",
         "fixed:execute",
+        "fixed:commit",
         "fixed:update",
         "fixed:register",
         "fixed:execute",
+        "fixed:commit",
         "render:update",
         "render:register_client",
         "render:execute",

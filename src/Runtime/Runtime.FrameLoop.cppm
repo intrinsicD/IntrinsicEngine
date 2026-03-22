@@ -1,4 +1,5 @@
 module;
+#include <cstdint>
 #include <thread>
 
 export module Runtime.FrameLoop;
@@ -86,6 +87,7 @@ export namespace Runtime
     using ExecuteGraphFn = Core::InplaceFunction<void(Core::FrameGraph&), 96>;
     using FixedUpdateFn = Core::InplaceFunction<void(float), 64>;
     using RegisterFixedSystemsFn = Core::InplaceFunction<void(Core::FrameGraph&, float), 96>;
+    using CommitFixedTickFn = Core::InplaceFunction<void(), 64>;
     using VariableUpdateFn = Core::InplaceFunction<void(float), 64>;
     using RegisterVariableSystemsFn = Core::InplaceFunction<void(Core::FrameGraph&, float), 96>;
     using PreDispatchFn = Core::InplaceFunction<void(), 64>;
@@ -95,6 +97,7 @@ export namespace Runtime
                                                        const FrameLoopPolicy& policy,
                                                        FixedUpdateFn&& onFixedUpdate,
                                                        RegisterFixedSystemsFn&& registerFixedSystems,
+                                                       CommitFixedTickFn&& commitFixedTick,
                                                        Core::FrameGraph& fixedGraph,
                                                        ExecuteGraphFn&& executeGraph);
 
@@ -289,6 +292,7 @@ export namespace Runtime
     {
         FixedUpdateFn OnFixedUpdate;
         RegisterFixedSystemsFn RegisterFixedSystems;
+        CommitFixedTickFn CommitFixedTick;
         ExecuteGraphFn ExecuteFixedGraph;
         RenderLaneCallbacks Render;
         ExecuteGraphFn ExecuteVariableGraph;
