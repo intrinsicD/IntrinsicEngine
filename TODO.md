@@ -88,7 +88,7 @@ Goal: refactor the runtime from a monolithic update/render loop into a staged fr
 
 #### B4.0 Target properties (the contract we are designing toward)
 
-- [ ] Run simulation on a fixed timestep and keep rendering variable-rate.
+- [x] Run simulation on a fixed timestep and keep rendering variable-rate.
 - [ ] Introduce explicit `FrameContext` ownership rather than ad-hoc per-frame global state.
 - [ ] Compile/execute the render graph per frame inside renderer-owned lifecycle code.
 - [ ] Decouple authoritative game/world state from render-facing state via an extraction boundary.

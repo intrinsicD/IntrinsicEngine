@@ -78,7 +78,9 @@ export namespace Runtime
         // Intended for deterministic simulation / physics.
         virtual void OnFixedUpdate([[maybe_unused]] float fixedDeltaTime) {}
 
-        virtual void OnRender() = 0; // Optional custom rendering hook
+        // Variable-rate render hook. `alpha` is the fixed-step interpolation factor
+        // computed from the remaining simulation accumulator after fixed ticks.
+        virtual void OnRender(double alpha) = 0;
 
         // Override to register additional systems into the FrameGraph each frame.
         // Called after the engine's core systems are registered but before Compile/Execute.

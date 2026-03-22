@@ -44,7 +44,10 @@ namespace Runtime
                 .Mode = FrameLoopMode::StagedPhases,
             };
 
+            const double alpha = ComputeRenderInterpolationAlpha(accumulator, policy);
+
             renderLane.Run(frameTime,
+                           alpha,
                            std::move(callbacks.Render),
                            std::move(callbacks.ExecuteVariableGraph));
 
@@ -72,7 +75,10 @@ namespace Runtime
                                                                    fixedGraph,
                                                                    std::move(callbacks.ExecuteFixedGraph));
 
+            const double alpha = ComputeRenderInterpolationAlpha(accumulator, policy);
+
             renderLane.Run(frameTime,
+                           alpha,
                            std::move(callbacks.Render),
                            std::move(callbacks.ExecuteVariableGraph));
 
@@ -134,6 +140,14 @@ namespace Runtime
             .FrameTime = sanitized,
             .Clamped = sanitized != rawFrameTime,
         };
+    }
+
+    double ComputeRenderInterpolationAlpha(double accumulator, const FrameLoopPolicy& policy)
+    {
+        if (!std::isfinite(accumulator) || !std::isfinite(policy.FixedDt) || policy.FixedDt <= 0.0)
+            return 0.0;
+
+        return std::clamp(accumulator / policy.FixedDt, 0.0, 1.0);
     }
 
     namespace
@@ -420,6 +434,7 @@ namespace Runtime
 
     void RenderLaneCoordinator::Run(this const RenderLaneCoordinator& self,
                                     double frameTime,
+                                    double alpha,
                                     RenderLaneCallbacks&& callbacks,
                                     ExecuteGraphFn&& executeGraph)
     {
@@ -448,7 +463,7 @@ namespace Runtime
 
         {
             PROFILE_SCOPE("OnRender");
-            callbacks.OnRender();
+            callbacks.OnRender(alpha);
         }
     }
 
