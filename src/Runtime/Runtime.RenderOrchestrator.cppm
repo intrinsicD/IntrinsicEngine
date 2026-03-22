@@ -1,7 +1,6 @@
 module;
 #include <memory>
 #include <cstddef>
-#include <optional>
 #include <span>
 
 #include "RHI.Vulkan.hpp"
@@ -155,7 +154,6 @@ export namespace Runtime
 
         // Borrowed reference to the engine-wide feature registry (nullable).
         Core::FeatureRegistry* m_FeatureRegistry = nullptr;
-        std::optional<RenderWorld> m_PreparedRenderWorld;
         mutable FrameContextRing m_FrameContextRing;
 
         void InitPipeline(RHI::VulkanSwapchain& swapchain,
