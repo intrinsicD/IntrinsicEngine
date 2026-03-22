@@ -20,9 +20,28 @@ export namespace Runtime
     {
         const ECS::Scene* Scene = nullptr;
         const entt::registry* Registry = nullptr;
+        const uint64_t* CommitSource = nullptr;
         uint64_t CommittedTick = 0;
 
-        [[nodiscard]] bool IsValid() const { return Scene != nullptr && Registry != nullptr; }
+        [[nodiscard]] bool IsValid() const
+        {
+            return Scene != nullptr && Registry != nullptr && CommitSource != nullptr;
+        }
+
+        [[nodiscard]] uint64_t GetCurrentCommittedTick() const
+        {
+            return CommitSource ? *CommitSource : CommittedTick;
+        }
+
+        [[nodiscard]] bool IsCurrent() const
+        {
+            return IsValid() && GetCurrentCommittedTick() == CommittedTick;
+        }
+
+        [[nodiscard]] bool HasCommitDrift() const
+        {
+            return IsValid() && !IsCurrent();
+        }
     };
 
     // Owns the ECS scene, entity lifecycle management, and EnTT hooks

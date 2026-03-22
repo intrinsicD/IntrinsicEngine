@@ -247,6 +247,15 @@ namespace Runtime
             return;
         }
 
+        if (preparedRenderWorld->World.HasCommitDrift())
+        {
+            Core::Log::Warn(
+                "RenderOrchestrator::PrepareFrame skipped: extracted world snapshot drifted from authoritative state (snapshot tick {}, current tick {}).",
+                preparedRenderWorld->World.CommittedTick,
+                preparedRenderWorld->World.GetCurrentCommittedTick());
+            return;
+        }
+
         const ECS::Scene* scene = preparedRenderWorld->World.Scene;
         if (!scene)
         {

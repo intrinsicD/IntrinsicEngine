@@ -125,6 +125,24 @@ TEST(RenderExtraction, MakeRenderFrameInput_SanitizesAlphaAndCapturesSnapshotGen
     EXPECT_EQ(input.Camera.Position, glm::vec3(1.0f, 2.0f, 3.0f));
 }
 
+TEST(RenderExtraction, WorldSnapshot_DetectsAuthoritativeCommitDrift)
+{
+    Runtime::SceneManager sceneManager;
+
+    const Runtime::WorldSnapshot snapshot = sceneManager.CreateReadonlySnapshot();
+    EXPECT_TRUE(snapshot.IsValid());
+    EXPECT_TRUE(snapshot.IsCurrent());
+    EXPECT_FALSE(snapshot.HasCommitDrift());
+    EXPECT_EQ(snapshot.GetCurrentCommittedTick(), 0u);
+
+    sceneManager.CommitFixedTick();
+
+    EXPECT_FALSE(snapshot.IsCurrent());
+    EXPECT_TRUE(snapshot.HasCommitDrift());
+    EXPECT_EQ(snapshot.CommittedTick, 0u);
+    EXPECT_EQ(snapshot.GetCurrentCommittedTick(), 1u);
+}
+
 TEST(RenderExtraction, ExtractRenderWorld_CopiesImmutableFrameInputs)
 {
     Runtime::SceneManager sceneManager;
@@ -150,6 +168,30 @@ TEST(RenderExtraction, ExtractRenderWorld_CopiesImmutableFrameInputs)
     EXPECT_EQ(renderWorld.Camera.Position, glm::vec3(4.0f, 5.0f, 6.0f));
     EXPECT_EQ(renderWorld.Viewport.Width, 1280u);
     EXPECT_EQ(renderWorld.Viewport.Height, 720u);
+}
+
+TEST(RenderExtraction, ExtractedRenderWorld_TracksWhenAuthoritativeSceneAdvancesPastExtraction)
+{
+    Runtime::SceneManager sceneManager;
+    sceneManager.CommitFixedTick();
+
+    Graphics::CameraComponent camera{};
+    const Runtime::RenderWorld renderWorld = Runtime::ExtractRenderWorld(Runtime::MakeRenderFrameInput(
+        camera,
+        sceneManager.CreateReadonlySnapshot(),
+        Runtime::RenderViewport{.Width = 800, .Height = 600},
+        0.5));
+
+    ASSERT_TRUE(renderWorld.IsValid());
+    EXPECT_TRUE(renderWorld.World.IsCurrent());
+    EXPECT_FALSE(renderWorld.World.HasCommitDrift());
+
+    sceneManager.CommitFixedTick();
+
+    EXPECT_FALSE(renderWorld.World.IsCurrent());
+    EXPECT_TRUE(renderWorld.World.HasCommitDrift());
+    EXPECT_EQ(renderWorld.World.CommittedTick, 1u);
+    EXPECT_EQ(renderWorld.World.GetCurrentCommittedTick(), 2u);
 }
 
 TEST(RenderExtraction, RenderPassContext_ExposesReadonlySceneSnapshot)
