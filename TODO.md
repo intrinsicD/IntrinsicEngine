@@ -181,12 +181,10 @@ Mapping guidance for current Intrinsic code while preserving that reference shap
 #### B4.4 Simulation stage (B)
 
 - [ ] Move deterministic gameplay / ECS / physics / AI / animation work onto the fixed-step lane.
-- [x] Define `CommitFixedTick()` semantics so each completed fixed tick produces a consistent authoritative world state.
 - [ ] Add telemetry for tick count per frame, clamp hits, and simulation CPU time.
 
 #### B4.5 Extraction stage (C)
 
-- [ ] Introduce an explicit `RenderFrameInput` / `WorldSnapshot` / `RenderWorld` extraction boundary.
 - [ ] Ensure extraction is the only place that resolves live ECS state into render packets for the frame.
 - [ ] Define immutable packet families for Intrinsic's renderer:
   - [ ] camera/view packets

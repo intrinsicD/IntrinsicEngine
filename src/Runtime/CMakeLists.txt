@@ -9,6 +9,7 @@ target_sources(${target_name}
         Runtime.AssetPipeline.cppm
         Runtime.AssetIngestService.cppm
         Runtime.SceneManager.cppm
+        Runtime.RenderExtraction.cppm
         Runtime.RenderOrchestrator.cppm
         Runtime.Selection.cppm
         Runtime.SelectionModule.cppm
@@ -24,6 +25,7 @@ target_sources(${target_name}
         Runtime.AssetPipeline.cpp
         Runtime.AssetIngestService.cpp
         Runtime.SceneManager.cpp
+        Runtime.RenderExtraction.cpp
         Runtime.RenderOrchestrator.cpp
         Runtime.Selection.cpp
         Runtime.SelectionModule.cpp

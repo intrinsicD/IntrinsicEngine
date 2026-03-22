@@ -193,6 +193,7 @@ intrinsic_test_object_lib(RuntimeTestObjs
         Test_HeadlessAppSmoke.cpp
         Test_SelectionGizmoRegression.cpp
         Test_RenderUpdateIntegration.cpp
+        Test_RenderExtraction.cpp
         Test_CudaDevice.cpp
         Test_PrimitiveBVHSync.cpp
         Test_RenderGraphPackets.cpp

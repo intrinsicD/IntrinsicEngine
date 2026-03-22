@@ -1,4 +1,6 @@
 module;
+#include <type_traits>
+#include <variant>
 #include <glm/glm.hpp>
 #include <entt/entity/registry.hpp>
 #include "RHI.Vulkan.hpp"

@@ -27,6 +27,7 @@ import Runtime.GraphicsBackend;
 import Runtime.AssetPipeline;
 import Runtime.RenderOrchestrator;
 import Runtime.SelectionModule;
+import Runtime.RenderExtraction;
 import Runtime.Selection;
 import Runtime.EditorUI;
 
@@ -248,7 +249,18 @@ public:
                 *m_Window,
                 uiCapturesMouse || gizmoConsumedMouse);
 
-            renderSys.OnUpdate(GetScene(), *cameraComponent, GetAssetManager());
+            auto frame = GetRenderOrchestrator().BeginFrame();
+            const Runtime::RenderFrameInput renderInput = Runtime::MakeRenderFrameInput(
+                *cameraComponent,
+                GetSceneManager().CreateReadonlySnapshot(),
+                Runtime::RenderViewport{
+                    .Width = static_cast<uint32_t>(m_Window->GetFramebufferWidth()),
+                    .Height = static_cast<uint32_t>(m_Window->GetFramebufferHeight()),
+                });
+            const Runtime::RenderWorld renderWorld = GetRenderOrchestrator().ExtractRenderWorld(renderInput);
+            GetRenderOrchestrator().PrepareFrame(frame, renderWorld);
+            GetRenderOrchestrator().ExecuteFrame(frame);
+            GetRenderOrchestrator().EndFrame(frame);
         }
     }
 
