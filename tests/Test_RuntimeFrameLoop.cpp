@@ -22,6 +22,13 @@ namespace
         void ProcessUploads() override { Calls.emplace_back("uploads"); }
         void ProcessTextureDeletions() override { Calls.emplace_back("textures"); }
         void ProcessMaterialDeletions() override { Calls.emplace_back("materials"); }
+
+        std::vector<std::string> Calls;
+    };
+
+    class FakeMaintenanceLaneHost final : public Runtime::IMaintenanceLaneHost
+    {
+    public:
         void GarbageCollectTransfers() override { Calls.emplace_back("gc"); }
 
         std::vector<std::string> Calls;
@@ -291,7 +298,6 @@ TEST(RuntimeFrameLoop, StreamingLaneCoordinator_OrdersMainThreadUploadAndCleanup
     const Runtime::StreamingLaneCoordinator coordinator{.Host = host};
 
     coordinator.BeginFrame();
-    coordinator.EndFrame();
 
     const std::vector<std::string> expected{
         "ingest",
@@ -299,9 +305,18 @@ TEST(RuntimeFrameLoop, StreamingLaneCoordinator_OrdersMainThreadUploadAndCleanup
         "uploads",
         "textures",
         "materials",
-        "gc",
     };
     EXPECT_EQ(host.Calls, expected);
+}
+
+TEST(RuntimeFrameLoop, MaintenanceLaneCoordinator_RunsHeadlessCleanupWithoutRenderState)
+{
+    FakeMaintenanceLaneHost host;
+    const Runtime::MaintenanceLaneCoordinator coordinator{.Host = host};
+
+    coordinator.Run();
+
+    EXPECT_EQ(host.Calls, (std::vector<std::string>{"gc"}));
 }
 
 TEST(RuntimeFrameLoop, PlatformFrameCoordinator_PumpsEventsAndContinuesWhenWindowIsActive)
@@ -539,9 +554,11 @@ TEST(RuntimeFrameLoop, RunFramePhases_PreservesStreamingFixedAndRenderLaneBaseli
     std::vector<std::string> trace;
 
     FakeStreamingLaneHost streamingHost;
+    FakeMaintenanceLaneHost maintenanceHost;
     FakeRenderLaneHost renderHost(graph);
 
     const Runtime::StreamingLaneCoordinator streamingLane{.Host = streamingHost};
+    const Runtime::MaintenanceLaneCoordinator maintenanceLane{.Host = maintenanceHost};
     const Runtime::RenderLaneCoordinator renderLane{.Host = renderHost};
 
     const Runtime::FramePhaseRunResult result = Runtime::RunFramePhases(
@@ -549,6 +566,7 @@ TEST(RuntimeFrameLoop, RunFramePhases_PreservesStreamingFixedAndRenderLaneBaseli
         accumulator,
         policy,
         streamingLane,
+        maintenanceLane,
         renderLane,
         graph,
         {
@@ -607,9 +625,9 @@ TEST(RuntimeFrameLoop, RunFramePhases_PreservesStreamingFixedAndRenderLaneBaseli
         "uploads",
         "textures",
         "materials",
-        "gc",
     };
     EXPECT_EQ(streamingHost.Calls, expectedStreamingCalls);
+    EXPECT_EQ(maintenanceHost.Calls, (std::vector<std::string>{"gc"}));
 
     const std::vector<std::string> expectedRenderHostCalls{
         "get_graph",
@@ -655,9 +673,11 @@ TEST(RuntimeFrameLoop, RunFramePhasesForMode_LegacyCompatibilityPreservesBaselin
     std::vector<std::string> trace;
 
     FakeStreamingLaneHost streamingHost;
+    FakeMaintenanceLaneHost maintenanceHost;
     FakeRenderLaneHost renderHost(graph);
 
     const Runtime::StreamingLaneCoordinator streamingLane{.Host = streamingHost};
+    const Runtime::MaintenanceLaneCoordinator maintenanceLane{.Host = maintenanceHost};
     const Runtime::RenderLaneCoordinator renderLane{.Host = renderHost};
 
     const Runtime::FramePhaseRunResult result = Runtime::RunFramePhasesForMode(
@@ -666,6 +686,7 @@ TEST(RuntimeFrameLoop, RunFramePhasesForMode_LegacyCompatibilityPreservesBaselin
         accumulator,
         policy,
         streamingLane,
+        maintenanceLane,
         renderLane,
         graph,
         {
@@ -699,9 +720,9 @@ TEST(RuntimeFrameLoop, RunFramePhasesForMode_LegacyCompatibilityPreservesBaselin
         "uploads",
         "textures",
         "materials",
-        "gc",
     };
     EXPECT_EQ(streamingHost.Calls, expectedStreamingCalls);
+    EXPECT_EQ(maintenanceHost.Calls, (std::vector<std::string>{"gc"}));
 
     const std::vector<std::string> expectedRenderHostCalls{
         "get_graph",

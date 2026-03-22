@@ -21,6 +21,8 @@ namespace Runtime
     RuntimePlatformFrameHost::~RuntimePlatformFrameHost() = default;
     IStreamingLaneHost::~IStreamingLaneHost() = default;
     RuntimeStreamingLaneHost::~RuntimeStreamingLaneHost() = default;
+    IMaintenanceLaneHost::~IMaintenanceLaneHost() = default;
+    RuntimeMaintenanceLaneHost::~RuntimeMaintenanceLaneHost() = default;
     IRenderLaneHost::~IRenderLaneHost() = default;
     RuntimeRenderLaneHost::~RuntimeRenderLaneHost() = default;
 
@@ -30,6 +32,7 @@ namespace Runtime
                                                                double& accumulator,
                                                                const FrameLoopPolicy& policy,
                                                                const StreamingLaneCoordinator& streamingLane,
+                                                               const MaintenanceLaneCoordinator& maintenanceLane,
                                                                const RenderLaneCoordinator& renderLane,
                                                                Core::FrameGraph& fixedGraph,
                                                                FramePhaseCallbacks&& callbacks)
@@ -54,7 +57,7 @@ namespace Runtime
                            std::move(callbacks.Render),
                            std::move(callbacks.ExecuteVariableGraph));
 
-            streamingLane.EndFrame();
+            maintenanceLane.Run();
             return result;
         }
 
@@ -62,6 +65,7 @@ namespace Runtime
                                                                             double& accumulator,
                                                                             const FrameLoopPolicy& policy,
                                                                             const StreamingLaneCoordinator& streamingLane,
+                                                                            const MaintenanceLaneCoordinator& maintenanceLane,
                                                                             const RenderLaneCoordinator& renderLane,
                                                                             Core::FrameGraph& fixedGraph,
                                                                             FramePhaseCallbacks&& callbacks)
@@ -85,7 +89,7 @@ namespace Runtime
                            std::move(callbacks.Render),
                            std::move(callbacks.ExecuteVariableGraph));
 
-            streamingLane.EndFrame();
+            maintenanceLane.Run();
             return FramePhaseRunResult{
                 .FixedStep = fixedStep,
                 .Mode = FrameLoopMode::LegacyCompatibility,
@@ -370,11 +374,6 @@ namespace Runtime
         m_Materials.ProcessDeletions(m_Graphics.GetDevice().GetGlobalFrameNumber());
     }
 
-    void RuntimeStreamingLaneHost::GarbageCollectTransfers()
-    {
-        m_Graphics.GarbageCollectTransfers();
-    }
-
     void StreamingLaneCoordinator::BeginFrame(this const StreamingLaneCoordinator& self)
     {
         self.Host.ProcessAssetIngest();
@@ -389,7 +388,12 @@ namespace Runtime
         self.Host.ProcessMaterialDeletions();
     }
 
-    void StreamingLaneCoordinator::EndFrame(this const StreamingLaneCoordinator& self)
+    void RuntimeMaintenanceLaneHost::GarbageCollectTransfers()
+    {
+        m_Graphics.GarbageCollectTransfers();
+    }
+
+    void MaintenanceLaneCoordinator::Run(this const MaintenanceLaneCoordinator& self)
     {
         self.Host.GarbageCollectTransfers();
     }
@@ -509,6 +513,7 @@ namespace Runtime
                                        double& accumulator,
                                        const FrameLoopPolicy& policy,
                                        const StreamingLaneCoordinator& streamingLane,
+                                       const MaintenanceLaneCoordinator& maintenanceLane,
                                        const RenderLaneCoordinator& renderLane,
                                        Core::FrameGraph& fixedGraph,
                                        FramePhaseCallbacks&& callbacks)
@@ -518,6 +523,7 @@ namespace Runtime
                                      accumulator,
                                      policy,
                                      streamingLane,
+                                     maintenanceLane,
                                      renderLane,
                                      fixedGraph,
                                      std::move(callbacks));
@@ -528,6 +534,7 @@ namespace Runtime
                                               double& accumulator,
                                               const FrameLoopPolicy& policy,
                                               const StreamingLaneCoordinator& streamingLane,
+                                              const MaintenanceLaneCoordinator& maintenanceLane,
                                               const RenderLaneCoordinator& renderLane,
                                               Core::FrameGraph& fixedGraph,
                                               FramePhaseCallbacks&& callbacks)
@@ -539,6 +546,7 @@ namespace Runtime
                                                      accumulator,
                                                      policy,
                                                      streamingLane,
+                                                     maintenanceLane,
                                                      renderLane,
                                                      fixedGraph,
                                                      std::move(callbacks));
@@ -547,6 +555,7 @@ namespace Runtime
                                         accumulator,
                                         policy,
                                         streamingLane,
+                                        maintenanceLane,
                                         renderLane,
                                         fixedGraph,
                                         std::move(callbacks));
@@ -556,6 +565,7 @@ namespace Runtime
                                     accumulator,
                                     policy,
                                     streamingLane,
+                                    maintenanceLane,
                                     renderLane,
                                     fixedGraph,
                                     std::move(callbacks));

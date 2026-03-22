@@ -201,6 +201,8 @@ This is the current “star with borrowed cross-links” structure: `Engine` own
 
 `Runtime::PlatformFrameCoordinator` is a **main-thread-only** boundary: window event pumping, minimize waits, resize consumption, and sanitized frame-time sampling must all execute on the owning window thread, and the runtime now rejects cross-thread platform-stage entry before touching the host.
 
+`Runtime::MaintenanceLaneCoordinator` is now a separate post-render boundary: end-of-frame retirement work is routed through a dedicated host interface so tests/headless paths can execute maintenance without needing a swapchain-backed render lane.
+
 ```text
 Begin telemetry
   ├─ reset frame allocators / DebugDraw
@@ -219,8 +221,9 @@ Begin telemetry
   │    └─ compile + execute frame graph inside AssetManager read phase
   ├─ pump async point-cloud k-means completions
   ├─ drain dispatcher events
-  ├─ transfer-manager garbage collection
   ├─ client OnRender
+  ├─ maintenance lane
+  │    └─ transfer-manager garbage collection
   ├─ write telemetry / benchmark frame
 End telemetry
 ```
