@@ -59,7 +59,7 @@ TEST(RenderExtraction, FrameContextRing_DefaultsToDoubleBuffering)
     Runtime::FrameContextRing ring;
     EXPECT_EQ(ring.GetFramesInFlight(), Runtime::DefaultFrameContexts);
 
-    const Runtime::FrameContext frame0 =
+    const Runtime::FrameContext& frame0 =
         ring.BeginFrame(0u, Runtime::RenderViewport{.Width = 1600, .Height = 900});
 
     EXPECT_EQ(frame0.FrameNumber, 0u);
@@ -73,13 +73,22 @@ TEST(RenderExtraction, FrameContextRing_ReusesBoundedSlotsByFrameNumberModulo)
 {
     Runtime::FrameContextRing ring(3u);
 
-    const Runtime::FrameContext frame0 =
+    Runtime::FrameContext& frame0 =
         ring.BeginFrame(0u, Runtime::RenderViewport{.Width = 640, .Height = 480});
-    const Runtime::FrameContext frame1 =
+    const Runtime::FrameContext* frame0Address = &frame0;
+
+    Runtime::FrameContext& frame1 =
         ring.BeginFrame(1u, Runtime::RenderViewport{.Width = 640, .Height = 480});
-    const Runtime::FrameContext frame2 =
+    Runtime::FrameContext& frame2 =
         ring.BeginFrame(2u, Runtime::RenderViewport{.Width = 640, .Height = 480});
-    const Runtime::FrameContext frame3 =
+    frame0.Prepared = true;
+    frame0.Submitted = true;
+    frame0.PreparedRenderWorld = Runtime::RenderWorld{
+        .Alpha = 0.25,
+        .Viewport = Runtime::RenderViewport{.Width = 640, .Height = 480},
+    };
+
+    Runtime::FrameContext& frame3 =
         ring.BeginFrame(3u, Runtime::RenderViewport{.Width = 640, .Height = 480});
 
     EXPECT_EQ(frame0.SlotIndex, 0u);
@@ -88,6 +97,10 @@ TEST(RenderExtraction, FrameContextRing_ReusesBoundedSlotsByFrameNumberModulo)
     EXPECT_EQ(frame3.SlotIndex, 0u);
     EXPECT_EQ(frame3.PreviousFrameNumber, 0u);
     EXPECT_EQ(frame3.FramesInFlight, 3u);
+    EXPECT_EQ(&frame3, frame0Address);
+    EXPECT_FALSE(frame3.Prepared);
+    EXPECT_FALSE(frame3.Submitted);
+    EXPECT_EQ(frame3.GetPreparedRenderWorld(), nullptr);
 }
 
 TEST(RenderExtraction, MakeRenderFrameInput_SanitizesAlphaAndCapturesSnapshotGeneration)
