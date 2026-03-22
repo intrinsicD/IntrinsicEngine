@@ -12,6 +12,42 @@ Built on **C++23 Modules**, **Vulkan 1.3** bindless rendering, coroutine-based t
 - `docs/architecture/frame-loop-rollback-strategy.md` — staged-frame-loop rollback toggle, compatibility-shim policy, and pass/fail cutover gates.
 - `docs/architecture/runtime-subsystem-boundaries.md` — runtime ownership map, module dependency directions, and startup/per-frame/shutdown lifecycle.
 
+## Build & Test Entry Points
+
+- **Supported toolchain:** Ninja + Clang 20+ + CMake 3.28+.
+- **Preset policy:** the repository now codifies CUDA selection with explicit configure presets so the default developer path stays stable:
+  - `dev` — Debug + tests + Sandbox, **CUDA OFF**
+  - `dev-cuda` — Debug + tests + Sandbox, **CUDA ON**
+  - `ci` — Debug + tests, Sandbox OFF, **CUDA OFF**
+- **Why this matters:** `INTRINSIC_ENABLE_CUDA` is opt-in. Enabling/disabling the backend is now an explicit configure choice rather than an accidental local cache carry-over.
+
+### Configure
+
+```bash
+cmake --preset dev
+```
+
+Enable the optional CUDA backend only when you actually want the CUDA modules and have a working CUDA toolkit/driver install:
+
+```bash
+cmake --preset dev-cuda
+```
+
+### Targeted builds
+
+Keep builds narrow; do not rebuild the whole tree unless you need to.
+
+```bash
+cmake --build --preset dev --target IntrinsicRuntime
+cmake --build --preset dev --target IntrinsicTests
+```
+
+### Focused test run
+
+```bash
+./build/dev/bin/IntrinsicTests --gtest_filter="RuntimeFrameLoop.*"
+```
+
 ---
 
 ## Architectural Pillars

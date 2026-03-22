@@ -1,0 +1,64 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 28,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "INTRINSIC_BUILD_SANDBOX": "ON",
+        "INTRINSIC_BUILD_TESTS": "ON",
+        "INTRINSIC_ENABLE_SANITIZERS": "ON"
+      }
+    },
+    {
+      "name": "dev",
+      "displayName": "Debug + tests + sandbox (CUDA off)",
+      "inherits": "base",
+      "description": "Default developer configuration. Keeps the CUDA backend disabled unless explicitly requested.",
+      "cacheVariables": {
+        "INTRINSIC_ENABLE_CUDA": "OFF"
+      }
+    },
+    {
+      "name": "dev-cuda",
+      "displayName": "Debug + tests + sandbox (CUDA on)",
+      "inherits": "base",
+      "description": "Developer configuration with the optional CUDA backend enabled. Requires a working CUDA toolkit/driver install.",
+      "cacheVariables": {
+        "INTRINSIC_ENABLE_CUDA": "ON"
+      }
+    },
+    {
+      "name": "ci",
+      "displayName": "Debug tests-only (CUDA off)",
+      "inherits": "base",
+      "description": "Smaller headless-friendly configure preset for CI or focused test runs.",
+      "cacheVariables": {
+        "INTRINSIC_BUILD_SANDBOX": "OFF",
+        "INTRINSIC_ENABLE_CUDA": "OFF"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "dev",
+      "configurePreset": "dev"
+    },
+    {
+      "name": "dev-cuda",
+      "configurePreset": "dev-cuda"
+    },
+    {
+      "name": "ci",
+      "configurePreset": "ci"
+    }
+  ]
+}
