@@ -46,7 +46,8 @@ namespace Runtime
         RHI::TextureSystem& textureSystem,
         Core::Assets::AssetManager& assetManager,
         Core::FeatureRegistry* featureRegistry,
-        size_t frameArenaSize)
+        size_t frameArenaSize,
+        uint32_t frameContextCount)
         : m_FrameArena(frameArenaSize)
         , m_FrameScope(frameArenaSize)
         , m_FrameGraph(m_FrameScope)
@@ -56,8 +57,11 @@ namespace Runtime
         , m_DescriptorLayout(descriptorLayout)
         , m_AssetManager(assetManager)
         , m_FeatureRegistry(featureRegistry)
+        , m_FrameContextRing(frameContextCount)
     {
         Core::Log::Info("RenderOrchestrator: Initializing...");
+        Core::Log::Info("RenderOrchestrator: frame-context ring configured for {} slots.",
+                        m_FrameContextRing.GetFramesInFlight());
 
         // 1. MaterialSystem (depends on TextureSystem + AssetManager)
         m_MaterialSystem = std::make_unique<Graphics::MaterialSystem>(textureSystem, assetManager);
@@ -217,14 +221,12 @@ namespace Runtime
     FrameContext RenderOrchestrator::BeginFrame() const
     {
         const VkExtent2D extent = m_Swapchain.GetExtent();
-        return FrameContext{
-            .FrameNumber = m_Device ? m_Device->GetGlobalFrameNumber() : 0u,
-            .Viewport =
-                {
-                    .Width = extent.width,
-                    .Height = extent.height,
-                },
-        };
+        return m_FrameContextRing.BeginFrame(
+            m_Device ? m_Device->GetGlobalFrameNumber() : 0u,
+            RenderViewport{
+                .Width = extent.width,
+                .Height = extent.height,
+            });
     }
 
     RenderWorld RenderOrchestrator::ExtractRenderWorld(const RenderFrameInput& input) const

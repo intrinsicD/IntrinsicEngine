@@ -34,6 +34,7 @@ import Runtime.GraphicsBackend;
 import Runtime.AssetPipeline;
 import Runtime.AssetIngestService;
 import Runtime.SceneManager;
+import Runtime.RenderExtraction;
 import Runtime.RenderOrchestrator;
 
 export namespace Runtime
@@ -44,6 +45,7 @@ export namespace Runtime
         int Width = 1600;
         int Height = 900;
         size_t FrameArenaSize = 1024 * 1024; // Configurable frame arena (default: 1 MB)
+        uint32_t FrameContextCount = DefaultFrameContexts;
 
         // Fixed-step simulation policy. Defaults target 60 Hz with a 250 ms
         // frame-delta clamp, while allowing 120 Hz or tighter policies when

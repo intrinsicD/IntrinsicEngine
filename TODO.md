@@ -223,8 +223,6 @@ Mapping guidance for current Intrinsic code while preserving that reference shap
 
 #### B4.9 Explicit frame-context ring + bounded frames in flight
 
-- [ ] Introduce a dedicated `FrameContext` ring distinct from swapchain image count.
-- [ ] Start with 2 frames in flight by default; make 3 configurable for throughput-heavy modes only.
 - [ ] Move per-frame transient ownership under `FrameContext`:
   - [ ] command allocator pools
   - [ ] upload arenas / staging allocators
