@@ -10,6 +10,8 @@ module;
 module Runtime.FrameLoop;
 
 import Core.Logging;
+import Graphics.Camera;
+import Runtime.RenderExtraction;
 import Runtime.SystemBundles;
 
 namespace Runtime
@@ -432,6 +434,32 @@ namespace Runtime
         m_Scene.GetScene().GetDispatcher().update();
     }
 
+    void RuntimeRenderLaneHost::ExecutePreparedFrame(double alpha)
+    {
+        auto view = m_Scene.GetRegistry().view<Graphics::CameraComponent>();
+        if (view.empty())
+            return;
+        auto it = view.begin();
+
+        const Graphics::CameraComponent& camera = view.get<Graphics::CameraComponent>(*it);
+        const auto extent = m_Graphics.GetSwapchain().GetExtent();
+
+        FrameContext frame = m_Renderer.BeginFrame();
+        const RenderFrameInput renderInput = MakeRenderFrameInput(
+            camera,
+            m_Scene.CreateReadonlySnapshot(),
+            RenderViewport{
+                .Width = extent.width,
+                .Height = extent.height,
+            },
+            alpha);
+        const RenderWorld renderWorld = m_Renderer.ExtractRenderWorld(renderInput);
+
+        m_Renderer.PrepareFrame(frame, renderWorld);
+        m_Renderer.ExecuteFrame(frame);
+        m_Renderer.EndFrame(frame);
+    }
+
     void RenderLaneCoordinator::Run(this const RenderLaneCoordinator& self,
                                     double frameTime,
                                     double alpha,
@@ -464,6 +492,7 @@ namespace Runtime
         {
             PROFILE_SCOPE("OnRender");
             callbacks.OnRender(alpha);
+            self.Host.ExecutePreparedFrame(alpha);
         }
     }
 

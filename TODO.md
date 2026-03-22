@@ -88,7 +88,7 @@ Goal: refactor the runtime from a monolithic update/render loop into a staged fr
 
 #### B4.0 Target properties (the contract we are designing toward)
 
-- [x] Run simulation on a fixed timestep and keep rendering variable-rate.
+- Baseline now runs simulation on a fixed timestep while keeping rendering variable-rate.
 - [ ] Introduce explicit `FrameContext` ownership rather than ad-hoc per-frame global state.
 - [ ] Compile/execute the render graph per frame inside renderer-owned lifecycle code.
 - [ ] Decouple authoritative game/world state from render-facing state via an extraction boundary.
@@ -99,7 +99,7 @@ Goal: refactor the runtime from a monolithic update/render loop into a staged fr
 
 #### B4.1 Core principle: authoritative world state -> immutable render state
 
-- [x] Codify the rule that simulation and rendering must not mutate the same live state during a frame.
+- Baseline rule is now explicit: simulation and rendering must not mutate the same live state during a frame.
 - [ ] Define the authoritative handoff as:
   - [ ] simulation writes `WorldState N+1`
   - [ ] extraction reads stable `WorldState N+1`
@@ -171,10 +171,10 @@ while (!app.should_quit())
 Mapping guidance for current Intrinsic code while preserving that reference shape:
 
 - [ ] `platform` maps to the current window/event/minimize/resize orchestration on the main thread.
-- [ ] `world` maps to `SceneManager` + authoritative ECS scene ownership, with a new explicit `commit_tick()` / readonly snapshot boundary.
-- [ ] `renderer` maps to `RenderOrchestrator` plus `RenderSystem`, but should evolve toward `begin_frame -> extract_render_world -> prepare_frame -> execute_frame -> end_frame`.
+- Current baseline: `world` maps to `SceneManager` + authoritative ECS scene ownership, with an explicit `commit_tick()` / readonly snapshot boundary.
+- Current baseline: `renderer` maps to `RenderOrchestrator` plus `RenderSystem`, with the runtime render lane now following `begin_frame -> extract_render_world -> prepare_frame -> execute_frame -> end_frame`.
 - [ ] `resource_system` maps to the currently split upload-retirement / deferred-destruction responsibilities across `AssetPipeline`, render-side lifetime queues, and future explicit GPU-retirement services.
-- [x] `RenderFrameInput`, `RenderWorld`, and `FrameContext` should become first-class types in the refactor rather than staying implicit in `Engine::Run()` / `RenderSystem::OnUpdate(...)`.
+- Current baseline: `RenderFrameInput`, `RenderWorld`, and `FrameContext` are first-class types rather than remaining implicit in `Engine::Run()` / `RenderSystem::OnUpdate(...)`.
 
 #### B4.3 Platform stage (A)
 
@@ -210,7 +210,7 @@ Mapping guidance for current Intrinsic code while preserving that reference shap
 
 - [ ] Make the renderer follow the explicit-API rhythm: wait frame-context availability -> acquire -> reset per-frame allocators -> record -> submit -> present.
 - [ ] Keep swapchain acquire/present and final submit on the main thread; push all other practical work to jobs.
-- [x] Move `RenderGraph` compile/record/execute under renderer-owned execution code.
+- Baseline now keeps `RenderGraph` compile/record/execute under renderer-owned execution code.
 - [ ] Handle resize / out-of-date / minimized states without corrupting in-flight frame contexts.
 - [ ] Evolve toward queue-domain-aware scheduling (graphics / compute / transfer) without exposing queue details directly to the top-level engine loop.
 

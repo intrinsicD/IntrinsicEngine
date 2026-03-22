@@ -248,6 +248,7 @@ export namespace Runtime
         [[nodiscard]] virtual Core::FrameGraph& GetFrameGraph() = 0;
         virtual void RegisterEngineSystems(Core::FrameGraph& graph) = 0;
         virtual void DispatchDeferredEvents() = 0;
+        virtual void ExecutePreparedFrame(double alpha) = 0;
     };
 
     class RuntimeRenderLaneHost final : public IRenderLaneHost
@@ -271,6 +272,7 @@ export namespace Runtime
         [[nodiscard]] Core::FrameGraph& GetFrameGraph() override;
         void RegisterEngineSystems(Core::FrameGraph& graph) override;
         void DispatchDeferredEvents() override;
+        void ExecutePreparedFrame(double alpha) override;
 
     private:
         SceneManager& m_Scene;
