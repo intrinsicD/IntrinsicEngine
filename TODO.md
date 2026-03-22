@@ -70,10 +70,6 @@ O2 remains the default migration path per `docs/architecture/adr-o2-pragmatic-me
 
 ##### Process / Hygiene
 
-##### 2026-03-19 commit review
-
-- [ ] Review whether `BuildDefaultPipelineRecipe` rewrite should have been a separate commit from the HTex feature work — behavioral change to all pipeline configs was bundled with a feature commit.
-
 ##### 2026-03-20 / 2026-03-21 commit review
 
 ###### Critical / Correctness
