@@ -94,7 +94,7 @@ Engine
 #### `RenderOrchestrator`
 
 - **Role:** runtime render subsystem owner.
-- **Owns:** frame allocators, `Core::FrameGraph`, shader registry, geometry pool, debug draw accumulator, material system, pipeline library, GPU scene, and render system.
+- **Owns:** frame allocators, bounded logical `FrameContext` ring, `Core::FrameGraph`, shader registry, geometry pool, debug draw accumulator, material system, pipeline library, GPU scene, and render system.
 - **Borrows:** device, swapchain, renderer, bindless, descriptor pool/layout, texture system, and asset manager.
 - **Does not own:** the window, swapchain recreation policy outside its resize entrypoint, scene registry, or asset ingestion queues.
 
@@ -155,7 +155,7 @@ Within the runtime composition root, today’s direct borrowing edges are:
 - `Engine -> AssetPipeline`: owns subsystem, delegates asset-manager access, transfer completion polling, and main-thread queue execution.
 - `Engine -> SceneManager`: owns subsystem, delegates scene access, spawn, clear, and GPU-hook connect/disconnect.
 - `Engine -> AssetIngestService`: owns subsystem, delegates drag-drop ingest and synchronous asset re-import orchestration.
-- `Engine -> RenderOrchestrator`: owns subsystem, delegates frame allocators, frame graph, geometry storage, material system, GPU scene, and render system access.
+- `Engine -> RenderOrchestrator`: owns subsystem, delegates frame allocators, frame-context ring configuration, frame graph, geometry storage, material system, GPU scene, and render system access.
 - `AssetPipeline -> GraphicsBackend`: **borrowed edge only** through `RHI::TransferManager&`.
 - `AssetIngestService -> GraphicsBackend`: **borrowed edges only** through device/transfer/default-texture services.
 - `AssetIngestService -> AssetPipeline`: **borrowed edge only** for asset registration, pending-transfer tracking, and main-thread callbacks.

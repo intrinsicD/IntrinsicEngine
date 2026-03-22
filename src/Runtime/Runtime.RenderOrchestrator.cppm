@@ -52,7 +52,8 @@ export namespace Runtime
                            RHI::TextureSystem& textureSystem,
                            Core::Assets::AssetManager& assetManager,
                            Core::FeatureRegistry* featureRegistry = nullptr,
-                           size_t frameArenaSize = 1024 * 1024);
+                           size_t frameArenaSize = 1024 * 1024,
+                           uint32_t frameContextCount = DefaultFrameContexts);
         ~RenderOrchestrator();
 
         // Non-copyable, non-movable (owns GPU resources and frame state).
@@ -89,6 +90,7 @@ export namespace Runtime
 
         [[nodiscard]] Graphics::DebugDraw& GetDebugDraw() { return m_DebugDraw; }
         [[nodiscard]] const Graphics::DebugDraw& GetDebugDraw() const { return m_DebugDraw; }
+        [[nodiscard]] uint32_t GetFrameContextCount() const { return m_FrameContextRing.GetFramesInFlight(); }
 
         // --- Per-frame maintenance ---
         void OnResize();
@@ -154,6 +156,7 @@ export namespace Runtime
         // Borrowed reference to the engine-wide feature registry (nullable).
         Core::FeatureRegistry* m_FeatureRegistry = nullptr;
         std::optional<RenderWorld> m_PreparedRenderWorld;
+        mutable FrameContextRing m_FrameContextRing;
 
         void InitPipeline(RHI::VulkanSwapchain& swapchain,
                           RHI::SimpleRenderer& renderer,

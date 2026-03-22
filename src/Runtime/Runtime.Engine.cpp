@@ -128,7 +128,8 @@ namespace Runtime
             m_GraphicsBackend->GetTextureSystem(),
             GetAssetManager(),
             &m_FeatureRegistry,
-            config.FrameArenaSize);
+            config.FrameArenaSize,
+            config.FrameContextCount);
 
         // 7. Connect EnTT on_destroy hook for immediate GPU slot reclaim (via SceneManager).
         //    Also provide the geometry pool so SpawnModel can inspect topology.

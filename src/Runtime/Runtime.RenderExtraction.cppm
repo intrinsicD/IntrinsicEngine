@@ -1,7 +1,9 @@
 module;
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
+#include <limits>
 
 export module Runtime.RenderExtraction;
 
@@ -10,6 +12,11 @@ import Runtime.SceneManager;
 
 export namespace Runtime
 {
+    inline constexpr uint32_t MinFrameContexts = 2;
+    inline constexpr uint32_t DefaultFrameContexts = 2;
+    inline constexpr uint32_t MaxFrameContexts = 3;
+    inline constexpr uint64_t InvalidFrameNumber = std::numeric_limits<uint64_t>::max();
+
     struct RenderViewport
     {
         uint32_t Width = 0;
@@ -50,9 +57,34 @@ export namespace Runtime
     struct FrameContext
     {
         uint64_t FrameNumber = 0;
+        uint64_t PreviousFrameNumber = InvalidFrameNumber;
+        uint32_t SlotIndex = 0;
+        uint32_t FramesInFlight = DefaultFrameContexts;
         RenderViewport Viewport{};
         bool Prepared = false;
         bool Submitted = false;
+    };
+
+    [[nodiscard]] uint32_t SanitizeFrameContextCount(uint32_t requestedCount);
+
+    class FrameContextRing
+    {
+    public:
+        explicit FrameContextRing(uint32_t framesInFlight = DefaultFrameContexts);
+
+        void Configure(uint32_t framesInFlight);
+
+        [[nodiscard]] uint32_t GetFramesInFlight() const
+        {
+            return m_FramesInFlight;
+        }
+
+        [[nodiscard]] FrameContext BeginFrame(uint64_t frameNumber, RenderViewport viewport) &;
+
+    private:
+        uint32_t m_FramesInFlight = DefaultFrameContexts;
+        std::array<uint64_t, MaxFrameContexts> m_LastFramePerSlot{
+            InvalidFrameNumber, InvalidFrameNumber, InvalidFrameNumber};
     };
 
     [[nodiscard]] RenderFrameInput MakeRenderFrameInput(const Graphics::CameraComponent& camera,
