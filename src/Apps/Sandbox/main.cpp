@@ -251,7 +251,7 @@ public:
         }
     }
 
-    void OnRender() override
+    void OnRender(double alpha) override
     {
         auto view = GetScene().GetRegistry().view<Graphics::CameraComponent>();
         auto it = view.begin();
@@ -267,7 +267,8 @@ public:
             Runtime::RenderViewport{
                 .Width = static_cast<uint32_t>(m_Window->GetFramebufferWidth()),
                 .Height = static_cast<uint32_t>(m_Window->GetFramebufferHeight()),
-            });
+            },
+            alpha);
         const Runtime::RenderWorld renderWorld = GetRenderOrchestrator().ExtractRenderWorld(renderInput);
         GetRenderOrchestrator().PrepareFrame(frame, renderWorld);
         GetRenderOrchestrator().ExecuteFrame(frame);

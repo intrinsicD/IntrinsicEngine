@@ -404,7 +404,7 @@ namespace Runtime
                                 .RegisterVariableSystems = [&](Core::FrameGraph& graph, float dt)
                                 { OnRegisterSystems(graph, dt); },
                                 .BeforeDispatch = [&]() { Runtime::PointCloudKMeans::PumpCompletions(*this); },
-                                .OnRender = [&]() { OnRender(); },
+                                .OnRender = [&](double alpha) { OnRender(alpha); },
                             },
                         .ExecuteVariableGraph = [&](Core::FrameGraph& graph) { executeGraph.Execute(graph); },
                     });

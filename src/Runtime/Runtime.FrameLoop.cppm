@@ -65,6 +65,8 @@ export namespace Runtime
 
     [[nodiscard]] FrameTimeStep ComputeFrameTime(double rawFrameTime,
                                                  const FrameLoopPolicy& policy = {});
+    [[nodiscard]] double ComputeRenderInterpolationAlpha(double accumulator,
+                                                         const FrameLoopPolicy& policy = {});
 
     class FrameClock
     {
@@ -91,7 +93,7 @@ export namespace Runtime
     using VariableUpdateFn = Core::InplaceFunction<void(float), 64>;
     using RegisterVariableSystemsFn = Core::InplaceFunction<void(Core::FrameGraph&, float), 96>;
     using PreDispatchFn = Core::InplaceFunction<void(), 64>;
-    using RenderHookFn = Core::InplaceFunction<void(), 64>;
+    using RenderHookFn = Core::InplaceFunction<void(double), 64>;
 
     [[nodiscard]] FixedStepAdvanceResult RunFixedSteps(double& accumulator,
                                                        const FrameLoopPolicy& policy,
@@ -284,6 +286,7 @@ export namespace Runtime
 
         void Run(this const RenderLaneCoordinator&,
                  double frameTime,
+                 double alpha,
                  RenderLaneCallbacks&& callbacks,
                  ExecuteGraphFn&& executeGraph);
     };

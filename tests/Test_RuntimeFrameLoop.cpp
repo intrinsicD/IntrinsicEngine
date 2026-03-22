@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <atomic>
+#include <limits>
 #include <string>
 #include <thread>
 #include <vector>
@@ -142,6 +143,20 @@ TEST(RuntimeFrameLoop, ComputeFrameTime_RejectsNegativeDelta)
     const Runtime::FrameTimeStep step = Runtime::ComputeFrameTime(-0.5);
     EXPECT_TRUE(step.Clamped);
     EXPECT_NEAR(step.FrameTime, 0.0, kEpsilon);
+}
+
+TEST(RuntimeFrameLoop, ComputeRenderInterpolationAlpha_UsesAccumulatorOverFixedDt)
+{
+    const Runtime::FrameLoopPolicy policy{
+        .FixedDt = 1.0 / 60.0,
+        .MaxFrameDelta = 0.25,
+        .MaxSubstepsPerFrame = 8,
+    };
+
+    EXPECT_NEAR(Runtime::ComputeRenderInterpolationAlpha(0.0, policy), 0.0, kEpsilon);
+    EXPECT_NEAR(Runtime::ComputeRenderInterpolationAlpha(policy.FixedDt * 0.5, policy), 0.5, kEpsilon);
+    EXPECT_NEAR(Runtime::ComputeRenderInterpolationAlpha(policy.FixedDt * 2.0, policy), 1.0, kEpsilon);
+    EXPECT_NEAR(Runtime::ComputeRenderInterpolationAlpha(std::numeric_limits<double>::quiet_NaN(), policy), 0.0, kEpsilon);
 }
 
 TEST(RuntimeFrameLoop, ResolveFrameLoopMode_DefaultsToStagedPhases)
@@ -378,6 +393,7 @@ TEST(RuntimeFrameLoop, RenderLaneCoordinator_OrdersUpdateRegistrationExecutionDi
     std::vector<std::string> calls;
     coordinator.Run(
         1.0 / 60.0,
+        0.375,
         {
             .OnUpdate = [&](float dt)
             {
@@ -397,8 +413,9 @@ TEST(RuntimeFrameLoop, RenderLaneCoordinator_OrdersUpdateRegistrationExecutionDi
                 calls.emplace_back("before_dispatch");
                 trace.emplace_back("callback:before_dispatch");
             },
-            .OnRender = [&]()
+            .OnRender = [&](double alpha)
             {
+                EXPECT_NEAR(alpha, 0.375, 1e-6);
                 calls.emplace_back("render");
                 trace.emplace_back("callback:render");
             },
@@ -498,7 +515,11 @@ TEST(RuntimeFrameLoop, RunFramePhases_PreservesStreamingFixedAndRenderLaneBaseli
                         trace.emplace_back("render:register_client");
                     },
                     .BeforeDispatch = [&]() { trace.emplace_back("render:before_dispatch"); },
-                    .OnRender = [&]() { trace.emplace_back("render"); },
+                    .OnRender = [&](double alpha)
+                    {
+                        EXPECT_NEAR(alpha, 0.5, 1e-6);
+                        trace.emplace_back("render");
+                    },
                 },
             .ExecuteVariableGraph = [&](Core::FrameGraph& renderGraph)
             {
@@ -586,7 +607,11 @@ TEST(RuntimeFrameLoop, RunFramePhasesForMode_LegacyCompatibilityPreservesBaselin
                     .RegisterVariableSystems = [&](Core::FrameGraph&, float)
                     { trace.emplace_back("render:register_client"); },
                     .BeforeDispatch = [&]() { trace.emplace_back("render:before_dispatch"); },
-                    .OnRender = [&]() { trace.emplace_back("render"); },
+                    .OnRender = [&](double alpha)
+                    {
+                        EXPECT_NEAR(alpha, 0.5, 1e-6);
+                        trace.emplace_back("render");
+                    },
                 },
             .ExecuteVariableGraph = [&](Core::FrameGraph&) { trace.emplace_back("render:execute"); },
         });
