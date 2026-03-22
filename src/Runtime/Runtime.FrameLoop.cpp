@@ -1,6 +1,7 @@
 module;
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <thread>
 #include <utility>
 
@@ -102,6 +103,26 @@ namespace Runtime
         }
 
         return "Unknown";
+    }
+
+    FrameLoopPolicy MakeFrameLoopPolicy(double fixedStepHz,
+                                        double maxFrameDeltaSeconds,
+                                        int maxSubstepsPerFrame)
+    {
+        const double sanitizedFixedStepHz =
+            std::isfinite(fixedStepHz) && fixedStepHz > 0.0 ? fixedStepHz : DefaultFixedStepHz;
+        const double sanitizedMaxFrameDelta =
+            std::isfinite(maxFrameDeltaSeconds) && maxFrameDeltaSeconds > 0.0
+                ? maxFrameDeltaSeconds
+                : DefaultMaxFrameDeltaSeconds;
+        const int sanitizedMaxSubsteps =
+            maxSubstepsPerFrame > 0 ? maxSubstepsPerFrame : DefaultMaxSubstepsPerFrame;
+
+        return FrameLoopPolicy{
+            .FixedDt = 1.0 / sanitizedFixedStepHz,
+            .MaxFrameDelta = sanitizedMaxFrameDelta,
+            .MaxSubstepsPerFrame = sanitizedMaxSubsteps,
+        };
     }
 
     FrameTimeStep ComputeFrameTime(double rawFrameTime, const FrameLoopPolicy& policy)

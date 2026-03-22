@@ -66,7 +66,16 @@ using namespace Runtime;
 class SandboxApp : public Engine
 {
 public:
-    explicit SandboxApp(const Runtime::EngineConfig& config = {"Sandbox", 1600, 900})
+    static Runtime::EngineConfig MakeDefaultConfig()
+    {
+        Runtime::EngineConfig config{};
+        config.AppName = "Sandbox";
+        config.Width = 1600;
+        config.Height = 900;
+        return config;
+    }
+
+    explicit SandboxApp(const Runtime::EngineConfig& config = MakeDefaultConfig())
         : Engine(config)
     {
     }
@@ -1081,6 +1090,18 @@ int main(int argc, char* argv[])
         else if (arg == "--out" && i + 1 < argc)
         {
             config.BenchmarkOutputPath = argv[++i];
+        }
+        else if (arg == "--fixed-hz" && i + 1 < argc)
+        {
+            config.FixedStepHz = std::stod(argv[++i]);
+        }
+        else if (arg == "--max-frame-dt" && i + 1 < argc)
+        {
+            config.MaxFrameDeltaSeconds = std::stod(argv[++i]);
+        }
+        else if (arg == "--max-substeps" && i + 1 < argc)
+        {
+            config.MaxSubstepsPerFrame = std::stoi(argv[++i]);
         }
     }
 

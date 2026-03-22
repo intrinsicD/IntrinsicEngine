@@ -274,7 +274,14 @@ namespace Runtime
         m_FramebufferResized = true;
 
         double accumulator = 0.0;
-        const FrameLoopPolicy frameLoopPolicy{};
+        const FrameLoopPolicy frameLoopPolicy = MakeFrameLoopPolicy(
+            m_EngineConfig.FixedStepHz,
+            m_EngineConfig.MaxFrameDeltaSeconds,
+            m_EngineConfig.MaxSubstepsPerFrame);
+        Core::Log::Info("Engine fixed-step policy: {:.3f} Hz, maxFrameDelta={:.3f}s, maxSubsteps={}",
+                        frameLoopPolicy.FixedDt > 0.0 ? 1.0 / frameLoopPolicy.FixedDt : 0.0,
+                        frameLoopPolicy.MaxFrameDelta,
+                        frameLoopPolicy.MaxSubstepsPerFrame);
         FrameClock frameClock{};
         RuntimePlatformFrameHost platformFrameHost{*m_Window, m_FramebufferResized};
         PlatformFrameCoordinator platformFrame{
