@@ -235,7 +235,7 @@ public:
         // 8b. Sub-element selection highlights (vertex spheres, edge lines, face tint)
         EditorUI::DrawSubElementHighlights(*this);
 
-        // 9. Selection + render
+        // 9. Selection
         if (cameraComponent != nullptr)
         {
             auto& renderSys = GetRenderOrchestrator().GetRenderSystem();
@@ -248,24 +248,30 @@ public:
                 cameraComponent,
                 *m_Window,
                 uiCapturesMouse || gizmoConsumedMouse);
-
-            auto frame = GetRenderOrchestrator().BeginFrame();
-            const Runtime::RenderFrameInput renderInput = Runtime::MakeRenderFrameInput(
-                *cameraComponent,
-                GetSceneManager().CreateReadonlySnapshot(),
-                Runtime::RenderViewport{
-                    .Width = static_cast<uint32_t>(m_Window->GetFramebufferWidth()),
-                    .Height = static_cast<uint32_t>(m_Window->GetFramebufferHeight()),
-                });
-            const Runtime::RenderWorld renderWorld = GetRenderOrchestrator().ExtractRenderWorld(renderInput);
-            GetRenderOrchestrator().PrepareFrame(frame, renderWorld);
-            GetRenderOrchestrator().ExecuteFrame(frame);
-            GetRenderOrchestrator().EndFrame(frame);
         }
     }
 
     void OnRender() override
     {
+        auto view = GetScene().GetRegistry().view<Graphics::CameraComponent>();
+        auto it = view.begin();
+        if (it == view.end())
+            return;
+
+        auto& cameraComponent = view.get<Graphics::CameraComponent>(*it);
+
+        auto frame = GetRenderOrchestrator().BeginFrame();
+        const Runtime::RenderFrameInput renderInput = Runtime::MakeRenderFrameInput(
+            cameraComponent,
+            GetSceneManager().CreateReadonlySnapshot(),
+            Runtime::RenderViewport{
+                .Width = static_cast<uint32_t>(m_Window->GetFramebufferWidth()),
+                .Height = static_cast<uint32_t>(m_Window->GetFramebufferHeight()),
+            });
+        const Runtime::RenderWorld renderWorld = GetRenderOrchestrator().ExtractRenderWorld(renderInput);
+        GetRenderOrchestrator().PrepareFrame(frame, renderWorld);
+        GetRenderOrchestrator().ExecuteFrame(frame);
+        GetRenderOrchestrator().EndFrame(frame);
     }
 
     void OnRegisterSystems(Core::FrameGraph& graph, float deltaTime) override
