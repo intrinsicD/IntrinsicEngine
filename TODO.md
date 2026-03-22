@@ -97,10 +97,10 @@ Goal: refactor the runtime from a monolithic update/render loop into a staged fr
 
 - Baseline rule is now explicit: simulation and rendering must not mutate the same live state during a frame.
 - Baseline handoff is now explicit:
-  - [x] simulation writes `WorldState N+1`
-  - [x] extraction reads stable `WorldState N+1`
-  - [x] extraction writes immutable `RenderWorld N+1`
-  - [x] rendering consumes only `RenderWorld N+1`
+  - simulation writes `WorldState N+1`
+  - extraction reads stable `WorldState N+1`
+  - extraction writes immutable `RenderWorld N+1`
+  - rendering consumes only `RenderWorld N+1`
 
 #### B4.2 Reference main loop (use this shape as the migration target)
 
@@ -175,7 +175,6 @@ Mapping guidance for current Intrinsic code while preserving that reference shap
 #### B4.4 Simulation stage (B)
 
 - [ ] Move deterministic gameplay / ECS / physics / AI / animation work onto the fixed-step lane.
-- [ ] Add telemetry for tick count per frame, clamp hits, and simulation CPU time.
 
 #### B4.5 Extraction stage (C)
 
@@ -212,7 +211,7 @@ Mapping guidance for current Intrinsic code while preserving that reference shap
 - [ ] Retire completed uploads after GPU completion is known.
 - [ ] Process deferred destruction only when the relevant GPU completion value has passed.
 - [ ] Centralize readback completion, garbage collection, profiler rollup, telemetry capture, and hot-reload bookkeeping here.
-- [x] Ensure maintenance can run in headless/test configurations even when no swapchain is active.
+- Baseline now ensures maintenance can run in headless/test configurations even when no swapchain is active.
 
 #### B4.9 Explicit frame-context ring + bounded frames in flight
 
