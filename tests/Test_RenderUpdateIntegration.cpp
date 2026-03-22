@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <concepts>
 #include <glm/glm.hpp>
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_transform.hpp>
@@ -66,6 +67,25 @@ TEST(RenderUpdateIntegration, RenderOrchestrator_NotMovable)
 TEST(RenderUpdateIntegration, RenderOrchestrator_NotDefaultConstructible)
 {
     static_assert(!std::is_default_constructible_v<Runtime::RenderOrchestrator>);
+    SUCCEED();
+}
+
+TEST(RenderUpdateIntegration, RenderSystem_ExposesStagedFrameExecutionApi)
+{
+    static_assert(requires(Graphics::RenderSystem& renderSystem,
+                           ECS::Scene& scene,
+                           const Graphics::CameraComponent& camera,
+                           Core::Assets::AssetManager& assetManager,
+                           uint64_t currentFrame)
+    {
+        renderSystem.BeginFrame(currentFrame);
+        { renderSystem.AcquireFrame() } -> std::same_as<bool>;
+        renderSystem.ProcessCompletedGpuWork(scene, currentFrame);
+        renderSystem.UpdateGlobals(camera);
+        renderSystem.BuildGraph(scene, assetManager, camera);
+        renderSystem.ExecuteGraph();
+        renderSystem.EndFrame();
+    });
     SUCCEED();
 }
 

@@ -61,7 +61,13 @@ export namespace Graphics
         // Hot-swap: schedules activation at the start of the next successfully-begun frame.
         void RequestPipelineSwap(std::unique_ptr<RenderPipeline> pipeline);
 
-        void OnUpdate(ECS::Scene& scene, const CameraComponent& camera, Core::Assets::AssetManager& assetManager);
+        void BeginFrame(uint64_t currentFrame);
+        [[nodiscard]] bool AcquireFrame();
+        void ProcessCompletedGpuWork(ECS::Scene& scene, uint64_t currentFrame);
+        void UpdateGlobals(const CameraComponent& camera);
+        void BuildGraph(ECS::Scene& scene, Core::Assets::AssetManager& assetManager, const CameraComponent& camera);
+        void ExecuteGraph();
+        void EndFrame();
 
         void OnResize();
 
@@ -151,12 +157,5 @@ export namespace Graphics
         void ApplyPendingPipelineSwap(uint32_t width, uint32_t height);
         void GarbageCollectRetiredPipelines();
 
-        // OnUpdate sub-steps (called in order by OnUpdate)
-        void BeginFrame(uint64_t currentFrame);
-        bool AcquireFrame();  // returns false if frame could not be acquired (swapchain out-of-date)
-        void UpdateGlobals(const CameraComponent& camera);
-        void BuildGraph(ECS::Scene& scene, Core::Assets::AssetManager& assetManager, const CameraComponent& camera);
-        void ExecuteGraph();
-        void EndFrame();
     };
 }
