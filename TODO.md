@@ -174,7 +174,7 @@ Mapping guidance for current Intrinsic code while preserving that reference shap
 - [ ] `world` maps to `SceneManager` + authoritative ECS scene ownership, with a new explicit `commit_tick()` / readonly snapshot boundary.
 - [ ] `renderer` maps to `RenderOrchestrator` plus `RenderSystem`, but should evolve toward `begin_frame -> extract_render_world -> prepare_frame -> execute_frame -> end_frame`.
 - [ ] `resource_system` maps to the currently split upload-retirement / deferred-destruction responsibilities across `AssetPipeline`, render-side lifetime queues, and future explicit GPU-retirement services.
-- [ ] `RenderFrameInput`, `RenderWorld`, and `FrameContext` should become first-class types in the refactor rather than staying implicit in `Engine::Run()` / `RenderSystem::OnUpdate(...)`.
+- [x] `RenderFrameInput`, `RenderWorld`, and `FrameContext` should become first-class types in the refactor rather than staying implicit in `Engine::Run()` / `RenderSystem::OnUpdate(...)`.
 
 #### B4.3 Platform stage (A)
 
@@ -210,7 +210,7 @@ Mapping guidance for current Intrinsic code while preserving that reference shap
 
 - [ ] Make the renderer follow the explicit-API rhythm: wait frame-context availability -> acquire -> reset per-frame allocators -> record -> submit -> present.
 - [ ] Keep swapchain acquire/present and final submit on the main thread; push all other practical work to jobs.
-- [ ] Move `RenderGraph` compile/record/execute under renderer-owned execution code.
+- [x] Move `RenderGraph` compile/record/execute under renderer-owned execution code.
 - [ ] Handle resize / out-of-date / minimized states without corrupting in-flight frame contexts.
 - [ ] Evolve toward queue-domain-aware scheduling (graphics / compute / transfer) without exposing queue details directly to the top-level engine loop.
 

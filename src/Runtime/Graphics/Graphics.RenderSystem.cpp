@@ -1013,7 +1013,7 @@ namespace Graphics
     }
 
     // -------------------------------------------------------------------------
-    // OnUpdate sub-steps
+    // Staged frame execution
     // -------------------------------------------------------------------------
 
     void RenderSystem::BeginFrame(uint64_t currentFrame)
@@ -1039,6 +1039,27 @@ namespace Graphics
             return false;
         }
         return true;
+    }
+
+    void RenderSystem::ProcessCompletedGpuWork(ECS::Scene& scene, uint64_t currentFrame)
+    {
+        // Process GPU pick readbacks AFTER the fence wait in AcquireFrame.
+        // The fence guarantees that the GPU has completed writing to the readback buffer
+        // for the previous use of this frame index. Using (currentFrame - framesInFlight)
+        // as the completed frame ensures we only consume results that are definitely done.
+        const uint32_t framesInFlight = m_Renderer.GetFramesInFlight();
+        const uint64_t safeCompleted = (currentFrame > framesInFlight)
+            ? (currentFrame - framesInFlight)
+            : 0;
+        m_Interaction.ProcessReadbacks(safeCompleted);
+
+        // Fire GpuPickCompleted event when a readback result is available.
+        // Consumers (SelectionModule) receive this via dispatcher sink instead of polling.
+        if (auto pick = m_Interaction.TryConsumePickResult())
+        {
+            scene.GetDispatcher().enqueue<ECS::Events::GpuPickCompleted>(
+                {pick->EntityID, pick->PrimitiveID, pick->HasHit});
+        }
     }
 
     void RenderSystem::UpdateGlobals(const CameraComponent& camera)
@@ -1262,46 +1283,6 @@ namespace Graphics
     void RenderSystem::EndFrame()
     {
         m_Presentation.EndFrame();
-    }
-
-    // -------------------------------------------------------------------------
-    // OnUpdate — thin coordinator that calls sub-steps in order
-    // -------------------------------------------------------------------------
-
-    void RenderSystem::OnUpdate(ECS::Scene& scene, const CameraComponent& camera,
-                                Core::Assets::AssetManager& assetManager)
-    {
-        const uint64_t currentFrame = m_Device->GetGlobalFrameNumber();
-
-        BeginFrame(currentFrame);
-
-        if (!AcquireFrame())
-            return;
-
-        // Process GPU pick readbacks AFTER the fence wait in AcquireFrame.
-        // The fence guarantees that the GPU has completed writing to the readback buffer
-        // for the previous use of this frame index. Using (currentFrame - framesInFlight)
-        // as the completed frame ensures we only consume results that are definitely done.
-        {
-            const uint32_t framesInFlight = m_Renderer.GetFramesInFlight();
-            const uint64_t safeCompleted = (currentFrame > framesInFlight)
-                ? (currentFrame - framesInFlight)
-                : 0;
-            m_Interaction.ProcessReadbacks(safeCompleted);
-
-            // Fire GpuPickCompleted event when a readback result is available.
-            // Consumers (SelectionModule) receive this via dispatcher sink instead of polling.
-            if (auto pick = m_Interaction.TryConsumePickResult())
-            {
-                scene.GetDispatcher().enqueue<ECS::Events::GpuPickCompleted>(
-                    {pick->EntityID, pick->PrimitiveID, pick->HasHit});
-            }
-        }
-
-        UpdateGlobals(camera);
-        BuildGraph(scene, assetManager, camera);
-        ExecuteGraph();
-        EndFrame();
     }
 
     void RenderSystem::OnResize()

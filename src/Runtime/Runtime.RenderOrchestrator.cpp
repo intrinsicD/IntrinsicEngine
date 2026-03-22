@@ -247,10 +247,10 @@ namespace Runtime
             return;
         }
 
-        // Transitional bridge: RenderSystem::OnUpdate still expects mutable ECS::Scene&
+        // Transitional bridge: render graph construction still traverses the live ECS scene
         // even though frame orchestration now flows through immutable RenderWorld packets.
         // The snapshot itself is treated as readonly by construction; this cast only
-        // adapts the legacy RenderSystem entry point until extraction fully owns render prep.
+        // adapts the remaining scene-based render-graph builders until extraction fully owns render prep.
         auto* scene = const_cast<ECS::Scene*>(m_PreparedRenderWorld->World.Scene);
         if (!scene)
         {
@@ -258,7 +258,16 @@ namespace Runtime
             return;
         }
 
-        m_RenderSystem->OnUpdate(*scene, m_PreparedRenderWorld->Camera, m_AssetManager);
+        const uint64_t currentFrame = m_Device ? m_Device->GetGlobalFrameNumber() : frame.FrameNumber;
+        m_RenderSystem->BeginFrame(currentFrame);
+        if (!m_RenderSystem->AcquireFrame())
+            return;
+
+        m_RenderSystem->ProcessCompletedGpuWork(*scene, currentFrame);
+        m_RenderSystem->UpdateGlobals(m_PreparedRenderWorld->Camera);
+        m_RenderSystem->BuildGraph(*scene, m_AssetManager, m_PreparedRenderWorld->Camera);
+        m_RenderSystem->ExecuteGraph();
+        m_RenderSystem->EndFrame();
         frame.Submitted = true;
     }
 
