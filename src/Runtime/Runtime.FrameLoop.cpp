@@ -2,6 +2,7 @@ module;
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <optional>
 #include <thread>
 #include <utility>
 
@@ -434,17 +435,16 @@ namespace Runtime
         m_Scene.GetScene().GetDispatcher().update();
     }
 
-    void RuntimeRenderLaneHost::ExecutePreparedFrame(double alpha)
+    std::optional<RenderWorld> RuntimeRenderLaneHost::ExtractRenderWorld(double alpha)
     {
         auto view = m_Scene.GetRegistry().view<Graphics::CameraComponent>();
         if (view.empty())
-            return;
+            return std::nullopt;
         auto it = view.begin();
 
         const Graphics::CameraComponent& camera = view.get<Graphics::CameraComponent>(*it);
         const auto extent = m_Graphics.GetSwapchain().GetExtent();
 
-        FrameContext& frame = m_Renderer.BeginFrame();
         const RenderFrameInput renderInput = MakeRenderFrameInput(
             camera,
             m_Scene.CreateReadonlySnapshot(),
@@ -453,8 +453,15 @@ namespace Runtime
                 .Height = extent.height,
             },
             alpha);
-        const RenderWorld renderWorld = m_Renderer.ExtractRenderWorld(renderInput);
+        if (!renderInput.IsValid())
+            return std::nullopt;
 
+        return m_Renderer.ExtractRenderWorld(renderInput);
+    }
+
+    void RuntimeRenderLaneHost::ExecutePreparedFrame(const RenderWorld& renderWorld)
+    {
+        FrameContext& frame = m_Renderer.BeginFrame();
         m_Renderer.PrepareFrame(frame, renderWorld);
         m_Renderer.ExecuteFrame(frame);
         m_Renderer.EndFrame(frame);
@@ -488,11 +495,13 @@ namespace Runtime
             callbacks.BeforeDispatch();
 
         self.Host.DispatchDeferredEvents();
+        std::optional<RenderWorld> renderWorld = self.Host.ExtractRenderWorld(alpha);
 
         {
             PROFILE_SCOPE("OnRender");
             callbacks.OnRender(alpha);
-            self.Host.ExecutePreparedFrame(alpha);
+            if (renderWorld)
+                self.Host.ExecutePreparedFrame(*renderWorld);
         }
     }
 

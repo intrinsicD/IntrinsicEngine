@@ -1,5 +1,6 @@
 module;
 #include <cstdint>
+#include <optional>
 #include <thread>
 
 export module Runtime.FrameLoop;
@@ -10,6 +11,7 @@ import Core.FrameGraph;
 import Core.InplaceFunction;
 import Core.Window;
 import Graphics.MaterialSystem;
+import Runtime.RenderExtraction;
 import Runtime.AssetIngestService;
 import Runtime.AssetPipeline;
 import Runtime.GraphicsBackend;
@@ -248,7 +250,8 @@ export namespace Runtime
         [[nodiscard]] virtual Core::FrameGraph& GetFrameGraph() = 0;
         virtual void RegisterEngineSystems(Core::FrameGraph& graph) = 0;
         virtual void DispatchDeferredEvents() = 0;
-        virtual void ExecutePreparedFrame(double alpha) = 0;
+        [[nodiscard]] virtual std::optional<RenderWorld> ExtractRenderWorld(double alpha) = 0;
+        virtual void ExecutePreparedFrame(const RenderWorld& renderWorld) = 0;
     };
 
     class RuntimeRenderLaneHost final : public IRenderLaneHost
@@ -272,7 +275,8 @@ export namespace Runtime
         [[nodiscard]] Core::FrameGraph& GetFrameGraph() override;
         void RegisterEngineSystems(Core::FrameGraph& graph) override;
         void DispatchDeferredEvents() override;
-        void ExecutePreparedFrame(double alpha) override;
+        [[nodiscard]] std::optional<RenderWorld> ExtractRenderWorld(double alpha) override;
+        void ExecutePreparedFrame(const RenderWorld& renderWorld) override;
 
     private:
         SceneManager& m_Scene;
