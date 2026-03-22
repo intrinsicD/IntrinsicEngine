@@ -65,7 +65,9 @@ export namespace Graphics
         [[nodiscard]] bool AcquireFrame();
         void ProcessCompletedGpuWork(ECS::Scene& scene, uint64_t currentFrame);
         void UpdateGlobals(const CameraComponent& camera);
-        void BuildGraph(ECS::Scene& scene, Core::Assets::AssetManager& assetManager, const CameraComponent& camera);
+        void BuildGraph(const ECS::Scene& scene,
+                        Core::Assets::AssetManager& assetManager,
+                        const CameraComponent& camera);
         void ExecuteGraph();
         void EndFrame();
 

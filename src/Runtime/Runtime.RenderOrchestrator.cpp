@@ -249,11 +249,7 @@ namespace Runtime
             return;
         }
 
-        // Transitional bridge: render graph construction still traverses the live ECS scene
-        // even though frame orchestration now flows through immutable RenderWorld packets.
-        // The snapshot itself is treated as readonly by construction; this cast only
-        // adapts the remaining scene-based render-graph builders until extraction fully owns render prep.
-        auto* scene = const_cast<ECS::Scene*>(m_PreparedRenderWorld->World.Scene);
+        const ECS::Scene* scene = m_PreparedRenderWorld->World.Scene;
         if (!scene)
         {
             Core::Log::Warn("RenderOrchestrator::ExecuteFrame skipped: prepared RenderWorld has no scene.");
@@ -265,7 +261,10 @@ namespace Runtime
         if (!m_RenderSystem->AcquireFrame())
             return;
 
-        m_RenderSystem->ProcessCompletedGpuWork(*scene, currentFrame);
+        // GPU readback completion still bridges through the scene dispatcher so selection
+        // events can be enqueued on the main thread. Render-graph construction itself now
+        // consumes the extracted scene snapshot as a const input.
+        m_RenderSystem->ProcessCompletedGpuWork(*const_cast<ECS::Scene*>(scene), currentFrame);
         m_RenderSystem->UpdateGlobals(m_PreparedRenderWorld->Camera);
         m_RenderSystem->BuildGraph(*scene, m_AssetManager, m_PreparedRenderWorld->Camera);
         m_RenderSystem->ExecuteGraph();

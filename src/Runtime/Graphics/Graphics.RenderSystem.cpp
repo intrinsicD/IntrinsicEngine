@@ -52,9 +52,9 @@ namespace Graphics
 {
     namespace
     {
-        [[nodiscard]] bool HasSelectionWork(ECS::Scene& scene)
+        [[nodiscard]] bool HasSelectionWork(const ECS::Scene& scene)
         {
-            auto& registry = scene.GetRegistry();
+            const auto& registry = scene.GetRegistry();
             return !registry.view<ECS::Components::Selection::SelectedTag>().empty() ||
                    !registry.view<ECS::Components::Selection::HoveredTag>().empty();
         }
@@ -1073,7 +1073,7 @@ namespace Graphics
         ApplyPendingPipelineSwap(extent.width, extent.height);
     }
 
-    void RenderSystem::BuildGraph(ECS::Scene& scene, Core::Assets::AssetManager& assetManager,
+    void RenderSystem::BuildGraph(const ECS::Scene& scene, Core::Assets::AssetManager& assetManager,
                                   const CameraComponent& camera)
     {
         const uint32_t frameIndex = m_Presentation.GetFrameIndex();

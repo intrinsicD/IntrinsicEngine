@@ -1,10 +1,12 @@
 #include <gtest/gtest.h>
 
 #include <glm/glm.hpp>
+#include <type_traits>
 
 import Runtime.RenderExtraction;
 import Runtime.SceneManager;
 import Graphics.Camera;
+import Graphics.RenderPipeline;
 
 TEST(RenderExtraction, FrameContext_DefaultStateIsUnprepared)
 {
@@ -110,4 +112,11 @@ TEST(RenderExtraction, ExtractRenderWorld_CopiesImmutableFrameInputs)
     EXPECT_EQ(renderWorld.Camera.Position, glm::vec3(4.0f, 5.0f, 6.0f));
     EXPECT_EQ(renderWorld.Viewport.Width, 1280u);
     EXPECT_EQ(renderWorld.Viewport.Height, 720u);
+}
+
+TEST(RenderExtraction, RenderPassContext_ExposesReadonlySceneSnapshot)
+{
+    using SceneRef = decltype(std::declval<Graphics::RenderPassContext>().Scene);
+    static_assert(std::is_const_v<std::remove_reference_t<SceneRef>>);
+    SUCCEED();
 }

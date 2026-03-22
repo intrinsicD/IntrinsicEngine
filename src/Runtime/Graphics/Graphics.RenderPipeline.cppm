@@ -251,7 +251,7 @@ export namespace Graphics
         RenderBlackboard& Blackboard;
 
         // Scene
-        ECS::Scene& Scene;
+        const ECS::Scene& Scene;
         const Core::Assets::AssetManager& AssetManager;
         GeometryPool& GeometryStorage;
         MaterialSystem& MaterialSystem;
