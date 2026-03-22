@@ -64,9 +64,9 @@ export namespace RHI
         alignas(16) glm::mat4 Proj;
     };
 
-    // WARNING: This block is 120 bytes. Vulkan only guarantees 128 bytes of
-    // push constants, so future mesh-draw payload growth should migrate to
-    // descriptor-backed data instead of extending this struct further.
+    // WARNING: This block is 128 bytes — the Vulkan guaranteed minimum.
+    // No further fields can be added. Future mesh-draw payload growth must
+    // migrate to descriptor-backed data (UBO/SSBO).
     struct MeshPushConstants
     {
         glm::mat4 Model;
@@ -76,8 +76,9 @@ export namespace RHI
         uint32_t VisibilityBase; // Base offset into VisibleRemap[] for multi-geometry batching
         float    PointSizePx = 1.0f; // Used by Forward pass when drawing point-list topology.
         uint64_t PtrFaceAttr = 0; // BDA to per-face packed ABGR colors (0 = standard shading)
-        uint64_t PtrVertexAttr = 0; // BDA to per-vertex packed ABGR colors (0 = no per-vertex colors)
+        uint64_t PtrVertexAttr = 0; // BDA to per-vertex packed ABGR colors or labels (0 = none)
         uint64_t PtrIndices = 0; // BDA to index buffer (uint32[]) — enables nearest-vertex label rendering
+        uint64_t PtrCentroids = 0; // BDA to centroid buffer ({vec3 pos, uint color}[]) — enables centroid Voronoi
     };
 
     static_assert(offsetof(MeshPushConstants, Model) == 0);
@@ -89,7 +90,8 @@ export namespace RHI
     static_assert(offsetof(MeshPushConstants, PtrFaceAttr) == 96);
     static_assert(offsetof(MeshPushConstants, PtrVertexAttr) == 104);
     static_assert(offsetof(MeshPushConstants, PtrIndices) == 112);
-    static_assert(sizeof(MeshPushConstants) == 120);
+    static_assert(offsetof(MeshPushConstants, PtrCentroids) == 120);
+    static_assert(sizeof(MeshPushConstants) == 128);
     static_assert(sizeof(MeshPushConstants) <= 128);
 
     struct VertexInputDescription

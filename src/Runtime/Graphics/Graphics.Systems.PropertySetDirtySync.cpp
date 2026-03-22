@@ -220,6 +220,51 @@ namespace Graphics::Systems::PropertySetDirtySync
             }
 
             surfComp.UseNearestVertexColors = meshData.Visualization.UseNearestVertexColors;
+
+            // Centroid-based Voronoi: extract raw vertex labels + centroid data
+            // so the shader can compute distance to centroids (not vertices).
+            surfComp.CachedVertexLabels.clear();
+            surfComp.CachedCentroids.clear();
+
+            if (surfComp.UseNearestVertexColors && !meshData.KMeansCentroids.empty())
+            {
+                auto& mesh = *meshData.MeshRef;
+                auto labelProp = mesh.VertexProperties().Get<uint32_t>("v:kmeans_label");
+                if (labelProp.IsValid())
+                {
+                    const auto& labelData = labelProp.Vector();
+                    surfComp.CachedVertexLabels.reserve(labelData.size());
+                    for (std::size_t i = 0; i < labelData.size(); ++i)
+                        surfComp.CachedVertexLabels.push_back(labelData[i]);
+
+                    // Build centroid entries: position + color.
+                    // Derive each centroid's color from the first vertex bearing that label.
+                    const uint32_t k = static_cast<uint32_t>(meshData.KMeansCentroids.size());
+                    surfComp.CachedCentroids.resize(k);
+                    std::vector<bool> colorFound(k, false);
+
+                    const bool haveColors = surfComp.CachedVertexLabels.size() == surfComp.CachedVertexColors.size();
+                    for (std::size_t i = 0; i < surfComp.CachedVertexLabels.size() && haveColors; ++i)
+                    {
+                        const uint32_t label = surfComp.CachedVertexLabels[i];
+                        if (label < k && !colorFound[label])
+                        {
+                            surfComp.CachedCentroids[label] = {meshData.KMeansCentroids[label],
+                                                                surfComp.CachedVertexColors[i]};
+                            colorFound[label] = true;
+                        }
+                    }
+
+                    // Fallback for any centroid without a vertex representative.
+                    for (uint32_t i = 0; i < k; ++i)
+                    {
+                        if (!colorFound[i])
+                            surfComp.CachedCentroids[i] = {meshData.KMeansCentroids[i],
+                                                            GpuColor::PackColorF(1.0f, 1.0f, 1.0f)};
+                    }
+                }
+            }
+
             surfComp.VertexColorsDirty = true;
         }
     }

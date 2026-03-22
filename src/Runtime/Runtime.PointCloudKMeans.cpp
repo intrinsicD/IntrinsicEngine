@@ -886,6 +886,7 @@ namespace Runtime::PointCloudKMeans
         meshData.KMeansLastInertia = result.Inertia;
         meshData.KMeansLastMaxDistanceIndex = result.MaxDistanceIndex;
         meshData.KMeansLastDurationMs = durationMs;
+        meshData.KMeansCentroids = result.Centroids;
         return true;
     }
 

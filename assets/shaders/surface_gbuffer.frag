@@ -47,6 +47,7 @@ layout(push_constant) uniform PushConsts {
     uint64_t PtrFaceAttr;
     uint64_t PtrVertexAttr;
     uint64_t PtrIndices;
+    uint64_t PtrCentroids;
 } push;
 
 // Binding 0 = Camera (UBO), Binding 1 = Bindless Array

@@ -42,8 +42,9 @@ layout(push_constant) uniform PushConsts {
     uint     VisibilityBase; // Base offset into VisibleRemap[] for this geometry batch
     float    PointSizePx;    // Used when drawing VK_PRIMITIVE_TOPOLOGY_POINT_LIST via the Forward pass.
     uint64_t PtrFaceAttr;    // BDA to per-face packed ABGR colors (0 = standard shading)
-    uint64_t PtrVertexAttr;  // BDA to per-vertex packed ABGR colors (0 = no per-vertex colors)
+    uint64_t PtrVertexAttr;  // BDA to per-vertex packed ABGR colors or labels (0 = none)
     uint64_t PtrIndices;     // BDA to index buffer (uint32[]) — enables nearest-vertex label rendering
+    uint64_t PtrCentroids;   // BDA to centroid buffer ({vec3 pos, uint color}[]) — centroid Voronoi
 } push;
 
 layout(location = 0) out vec3 fragNormal;
@@ -88,7 +89,9 @@ void main() {
 
     // Per-vertex color: read from BDA buffer when PtrVertexAttr != 0.
     // Interpolated across the triangle to the fragment shader.
-    if (push.PtrVertexAttr != 0ul)
+    // When PtrCentroids != 0, PtrVertexAttr holds labels (not colors) —
+    // skip interpolation; the fragment shader reads labels via BDA directly.
+    if (push.PtrVertexAttr != 0ul && push.PtrCentroids == 0ul)
     {
         VertexAttrBuf vaBuf = VertexAttrBuf(push.PtrVertexAttr);
         fragVertexColor = unpackUnorm4x8(vaBuf.color[gl_VertexIndex]);
