@@ -89,10 +89,6 @@ Goal: refactor the runtime from a monolithic update/render loop into a staged fr
 #### B4.0 Target properties (the contract we are designing toward)
 
 - Baseline now runs simulation on a fixed timestep while keeping rendering variable-rate.
-- [ ] Introduce explicit `FrameContext` ownership rather than ad-hoc per-frame global state.
-- [ ] Compile/execute the render graph per frame inside renderer-owned lifecycle code.
-- [ ] Decouple authoritative game/world state from render-facing state via an extraction boundary.
-- [ ] Keep frames in flight bounded (default 2, optional 3 when telemetry justifies it).
 - [ ] Treat job-system-driven parallelism as the default for simulation/extraction/render prep work.
 - [ ] Make GPU synchronization, frame pacing, and deferred resource retirement explicit architecture concepts.
 - [ ] Preserve headless/testable paths by isolating platform + swapchain work from simulation/extraction/maintenance logic.
@@ -202,7 +198,6 @@ Mapping guidance for current Intrinsic code while preserving that reference shap
 
 - [ ] Treat render preparation as CPU work that may schedule jobs for visibility, culling, LOD selection, sort keys, draw packet compaction, upload staging, and command recording.
 - [ ] Keep the main loop aware only of broad phases; do not hardcode detailed pass order outside renderer-owned preparation code.
-- [ ] Build the frame's render graph during preparation from `RenderWorld` and current view configuration.
 - [ ] Keep the current three-pass pipeline, deferred path, post-process path, selection/debug overlays, and future hybrid paths expressed as render-graph composition rather than top-level loop branching.
 - [ ] Prepare for GPU-driven / indirect execution by making CPU preparation emit packets and scheduling metadata rather than immediate live-state callbacks.
 
