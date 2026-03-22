@@ -235,6 +235,10 @@ export namespace ECS::Mesh
         uint32_t KMeansLastMaxDistanceIndex = 0;
         double KMeansLastDurationMs = 0.0;
 
+        // Centroid positions from the last KMeans run.  Retained so the
+        // surface shader can compute true centroid-based Voronoi cells.
+        std::vector<glm::vec3> KMeansCentroids{};
+
         // ---- Queries (delegate to MeshRef) ----
         [[nodiscard]] std::size_t VertexCount() const noexcept
         {
@@ -642,6 +646,16 @@ export namespace ECS::Surface
         // When true, per-vertex colors are rendered as nearest-vertex (Voronoi)
         // instead of smooth interpolation. Requires PtrIndices in the draw batch.
         bool UseNearestVertexColors = false;
+
+        // ---- Centroid-Based Voronoi (optional) ----
+        // When non-empty, the shader uses vertex labels (not colors) to look
+        // up centroid positions and computes true centroid-based Voronoi cells.
+        // CachedVertexLabels: uint32 per vertex (cluster ID).
+        // CachedCentroids: {vec3 pos, uint32 packedColor} per centroid.
+        std::vector<uint32_t> CachedVertexLabels{};
+
+        struct CentroidEntry { glm::vec3 Position; uint32_t PackedColor; };
+        std::vector<CentroidEntry> CachedCentroids{};
     };
 }
 

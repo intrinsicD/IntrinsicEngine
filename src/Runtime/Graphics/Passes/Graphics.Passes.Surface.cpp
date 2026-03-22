@@ -473,10 +473,12 @@ namespace Graphics::Passes
         // Resolve per-vertex attribute buffers from Surface components.
         // Maps geometry handle index → vertex attribute BDA address.
         // First entity with CachedVertexColors for a geometry wins.
-        // Also tracks which geometries want nearest-vertex (Voronoi) rendering.
+        // Also tracks which geometries want nearest-vertex (Voronoi) rendering
+        // and centroid-based Voronoi (PtrCentroids).
         // -----------------------------------------------------------------
         std::unordered_map<uint32_t, uint64_t> vertexAttrByGeoIndex;
         std::unordered_map<uint32_t, bool> nearestVertexByGeoIndex;
+        std::unordered_map<uint32_t, uint64_t> centroidByGeoIndex;
         {
             auto visView = ctx.Scene.GetRegistry().view<ECS::Surface::Component>();
             for (auto [entity, sc] : visView.each())
@@ -487,13 +489,44 @@ namespace Graphics::Passes
                 if (vertexAttrByGeoIndex.contains(sc.Geometry.Index))
                     continue;
 
-                const uint32_t vertexCount = static_cast<uint32_t>(sc.CachedVertexColors.size());
-                const uint64_t addr = EnsureVertexAttrBuffer(
-                    sc.Geometry.Index, sc.CachedVertexColors.data(), vertexCount);
-                if (addr != 0)
+                // When centroid data is available, upload vertex labels (not colors)
+                // to PtrVertexAttr and centroid entries to PtrCentroids.  The shader
+                // uses labels to index into the centroid buffer for true Voronoi.
+                const bool hasCentroidVoronoi =
+                    sc.UseNearestVertexColors
+                    && !sc.CachedCentroids.empty()
+                    && !sc.CachedVertexLabels.empty()
+                    && sc.CachedVertexLabels.size() == sc.CachedVertexColors.size();
+
+                if (hasCentroidVoronoi)
                 {
-                    vertexAttrByGeoIndex[sc.Geometry.Index] = addr;
-                    nearestVertexByGeoIndex[sc.Geometry.Index] = sc.UseNearestVertexColors;
+                    // Upload vertex labels as the vertex attribute buffer.
+                    const uint32_t vertexCount = static_cast<uint32_t>(sc.CachedVertexLabels.size());
+                    const uint64_t labelAddr = EnsureVertexAttrBuffer(
+                        sc.Geometry.Index, sc.CachedVertexLabels.data(), vertexCount);
+                    if (labelAddr != 0)
+                    {
+                        vertexAttrByGeoIndex[sc.Geometry.Index] = labelAddr;
+                        nearestVertexByGeoIndex[sc.Geometry.Index] = true;
+
+                        const uint32_t k = static_cast<uint32_t>(sc.CachedCentroids.size());
+                        const uint64_t centAddr = EnsureCentroidBuffer(
+                            sc.Geometry.Index, sc.CachedCentroids.data(), k);
+                        if (centAddr != 0)
+                            centroidByGeoIndex[sc.Geometry.Index] = centAddr;
+                    }
+                }
+                else
+                {
+                    // Standard path: upload packed ABGR colors.
+                    const uint32_t vertexCount = static_cast<uint32_t>(sc.CachedVertexColors.size());
+                    const uint64_t addr = EnsureVertexAttrBuffer(
+                        sc.Geometry.Index, sc.CachedVertexColors.data(), vertexCount);
+                    if (addr != 0)
+                    {
+                        vertexAttrByGeoIndex[sc.Geometry.Index] = addr;
+                        nearestVertexByGeoIndex[sc.Geometry.Index] = sc.UseNearestVertexColors;
+                    }
                 }
             }
         }
@@ -551,6 +584,13 @@ namespace Graphics::Passes
                 {
                     b.PtrIndices = g.Geo->GetIndexBuffer()->GetDeviceAddress();
                 }
+            }
+
+            // Centroid buffer BDA for centroid-based Voronoi rendering.
+            {
+                auto centIt = centroidByGeoIndex.find(g.Handle.Index);
+                if (centIt != centroidByGeoIndex.end())
+                    b.PtrCentroids = centIt->second;
             }
 
             // Packed buffers.
@@ -736,7 +776,8 @@ namespace Graphics::Passes
                                                 .PointSizePx = (b.Topology == VK_PRIMITIVE_TOPOLOGY_POINT_LIST) ? b.PointSizePx : 1.0f,
                                                 .PtrFaceAttr = b.PtrFaceAttr,
                                                 .PtrVertexAttr = b.PtrVertexAttr,
-                                                .PtrIndices = b.PtrIndices
+                                                .PtrIndices = b.PtrIndices,
+                                                .PtrCentroids = b.PtrCentroids
                                             };
                                             vkCmdPushConstants(cmd, desired->GetLayout(),
                                                                VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
@@ -952,6 +993,7 @@ namespace Graphics::Passes
                                             pc.PtrFaceAttr = b.PtrFaceAttr;
                                             pc.PtrVertexAttr = b.PtrVertexAttr;
                                             pc.PtrIndices = b.PtrIndices;
+                                            pc.PtrCentroids = b.PtrCentroids;
 
                                             vkCmdPushConstants(cmd, desired->GetLayout(),
                                                                VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
@@ -1237,6 +1279,30 @@ namespace Graphics::Passes
     {
         return EnsurePerEntityBuffer<uint32_t>(
             *m_Device, m_VertexAttrBuffers, geoIndex, colorData, vertexCount, "SurfacePass");
+    }
+
+    // =========================================================================
+    // EnsureCentroidBuffer
+    // =========================================================================
+    // Creates or updates a persistent BDA-addressable centroid buffer for a
+    // geometry. Data is an array of {vec3 pos, uint32_t packedColor} entries.
+
+    uint64_t SurfacePass::EnsureCentroidBuffer(
+        uint32_t geoIndex,
+        const ECS::Surface::Component::CentroidEntry* entries,
+        uint32_t centroidCount)
+    {
+        // Convert from ECS struct to GPU-packed struct.
+        std::vector<GpuCentroidEntry> gpu(centroidCount);
+        for (uint32_t i = 0; i < centroidCount; ++i)
+        {
+            gpu[i].x = entries[i].Position.x;
+            gpu[i].y = entries[i].Position.y;
+            gpu[i].z = entries[i].Position.z;
+            gpu[i].packedColor = entries[i].PackedColor;
+        }
+        return EnsurePerEntityBuffer<GpuCentroidEntry>(
+            *m_Device, m_CentroidBuffers, geoIndex, gpu.data(), centroidCount, "SurfacePass");
     }
 
     // -----------------------------------------------------------------

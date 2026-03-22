@@ -236,6 +236,9 @@ export namespace Graphics::Passes
             // Index buffer device address (non-zero enables nearest-vertex Voronoi rendering).
             uint64_t PtrIndices = 0;
 
+            // Centroid buffer BDA ({vec3 pos, uint packedColor}[] — enables centroid Voronoi).
+            uint64_t PtrCentroids = 0;
+
             // Packed-slice offsets (bytes) into Indirect buffers.
             VkDeviceSize IndirectOffsetBytes = 0;
             VkDeviceSize CountOffsetBytes = 0;
@@ -310,5 +313,17 @@ export namespace Graphics::Passes
         uint64_t EnsureVertexAttrBuffer(uint32_t geoIndex,
                                         const uint32_t* colorData,
                                         uint32_t vertexCount);
+
+        // Per-centroid buffers — {vec3 pos, uint packedColor} per centroid.
+        // One buffer per geometry that uses centroid-based Voronoi.
+        std::unordered_map<uint32_t, RetainedBufferEntry> m_CentroidBuffers;
+
+        // GPU-side centroid entry layout: 16 bytes, matching the shader struct.
+        struct alignas(4) GpuCentroidEntry { float x, y, z; uint32_t packedColor; };
+        static_assert(sizeof(GpuCentroidEntry) == 16);
+
+        uint64_t EnsureCentroidBuffer(uint32_t geoIndex,
+                                      const ECS::Surface::Component::CentroidEntry* entries,
+                                      uint32_t centroidCount);
     };
 }
