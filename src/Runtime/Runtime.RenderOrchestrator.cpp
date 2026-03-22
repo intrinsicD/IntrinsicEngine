@@ -238,7 +238,7 @@ namespace Runtime
         frame.PreparedRenderWorld = renderWorld;
         frame.Prepared = false;
         frame.Submitted = false;
-        frame.Viewport = renderWorld.Viewport;
+        frame.Viewport = renderWorld.View.Viewport;
 
         const RenderWorld* preparedRenderWorld = frame.GetPreparedRenderWorld();
         if (!preparedRenderWorld || !preparedRenderWorld->IsValid())
@@ -272,8 +272,8 @@ namespace Runtime
         // events can be enqueued on the main thread. Render-graph construction itself now
         // happens during the preparation stage so GPU submission can consume a prepared graph.
         m_RenderSystem->ProcessCompletedGpuWork(*const_cast<ECS::Scene*>(scene), currentFrame);
-        m_RenderSystem->UpdateGlobals(preparedRenderWorld->Camera);
-        m_RenderSystem->BuildGraph(*scene, m_AssetManager, preparedRenderWorld->Camera);
+        m_RenderSystem->UpdateGlobals(preparedRenderWorld->View.Camera);
+        m_RenderSystem->BuildGraph(*scene, m_AssetManager, preparedRenderWorld->View.Camera);
         frame.Prepared = true;
     }
 

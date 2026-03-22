@@ -109,7 +109,8 @@ namespace
             }
             Runtime::RenderWorld renderWorld{
                 .Alpha = alpha,
-                .Viewport = Runtime::RenderViewport{.Width = 1280, .Height = 720},
+                .View = Runtime::MakeRenderViewPacket(Graphics::CameraComponent{},
+                                                      Runtime::RenderViewport{.Width = 1280, .Height = 720}),
             };
             if (Trace)
                 Trace->emplace_back("host:extract_world");

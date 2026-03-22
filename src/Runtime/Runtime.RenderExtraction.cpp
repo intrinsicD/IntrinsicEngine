@@ -2,6 +2,7 @@ module;
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <glm/gtc/matrix_inverse.hpp>
 
 module Runtime.RenderExtraction;
 
@@ -65,9 +66,29 @@ namespace Runtime
     {
         return RenderFrameInput{
             .Alpha = SanitizeAlpha(alpha),
-            .Camera = camera,
-            .Viewport = viewport,
+            .View = MakeRenderViewPacket(camera, viewport),
             .World = world,
+        };
+    }
+
+    RenderViewPacket MakeRenderViewPacket(const Graphics::CameraComponent& camera, RenderViewport viewport)
+    {
+        const glm::mat4 viewProjection = camera.ProjectionMatrix * camera.ViewMatrix;
+        return RenderViewPacket{
+            .Camera = camera,
+            .ViewMatrix = camera.ViewMatrix,
+            .ProjectionMatrix = camera.ProjectionMatrix,
+            .ViewProjectionMatrix = viewProjection,
+            .InverseViewMatrix = glm::inverse(camera.ViewMatrix),
+            .InverseProjectionMatrix = glm::inverse(camera.ProjectionMatrix),
+            .InverseViewProjectionMatrix = glm::inverse(viewProjection),
+            .CameraPosition = camera.Position,
+            .NearPlane = camera.Near,
+            .CameraForward = camera.GetForward(),
+            .FarPlane = camera.Far,
+            .Viewport = viewport,
+            .AspectRatio = camera.AspectRatio,
+            .VerticalFieldOfViewDegrees = camera.Fov,
         };
     }
 
@@ -75,8 +96,7 @@ namespace Runtime
     {
         return RenderWorld{
             .Alpha = SanitizeAlpha(input.Alpha),
-            .Camera = input.Camera,
-            .Viewport = input.Viewport,
+            .View = input.View,
             .World = input.World,
         };
     }

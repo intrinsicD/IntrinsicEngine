@@ -180,7 +180,6 @@ Mapping guidance for current Intrinsic code while preserving that reference shap
 
 - [ ] Ensure extraction is the only place that resolves live ECS state into render packets for the frame.
 - [ ] Define immutable packet families for Intrinsic's renderer:
-  - [ ] camera/view packets
   - [ ] surface draw packets
   - [ ] line / point / debug draw packets
   - [ ] selection / picking packets
