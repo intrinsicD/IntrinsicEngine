@@ -183,6 +183,23 @@ TEST(Profiling_TelemetrySystem, SimulationStatsTracking)
     EXPECT_EQ(stats.SimulationCpuTimeNs, 42'000u);
 }
 
+TEST(Profiling_TelemetrySystem, SimulationStatsResetAtBeginFrame)
+{
+    auto& telemetry = TelemetrySystem::Get();
+
+    telemetry.BeginFrame();
+    telemetry.SetSimulationStats(2, 1, 7'000);
+    telemetry.EndFrame();
+
+    telemetry.BeginFrame();
+    telemetry.EndFrame();
+
+    const auto& stats = telemetry.GetFrameStats(0);
+    EXPECT_EQ(stats.SimulationTickCount, 0u);
+    EXPECT_EQ(stats.SimulationClampHitCount, 0u);
+    EXPECT_EQ(stats.SimulationCpuTimeNs, 0u);
+}
+
 // ---------------------------------------------------------------------------
 // TelemetrySystem: average frame time is non-negative.
 // ---------------------------------------------------------------------------
