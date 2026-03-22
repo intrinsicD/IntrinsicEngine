@@ -1,6 +1,7 @@
 module;
 #include <glm/glm.hpp>
 #include <memory>
+#include <span>
 #include <vector>
 #include <optional>
 
@@ -67,7 +68,10 @@ export namespace Graphics
         void UpdateGlobals(const CameraComponent& camera);
         void BuildGraph(const ECS::Scene& scene,
                         Core::Assets::AssetManager& assetManager,
-                        const CameraComponent& camera);
+                        const CameraComponent& camera,
+                        std::span<const PickingSurfacePacket> pickingSurfacePackets = {},
+                        std::span<const PickingLinePacket> pickingLinePackets = {},
+                        std::span<const PickingPointPacket> pickingPointPackets = {});
         void ExecuteGraph();
         void EndFrame();
 

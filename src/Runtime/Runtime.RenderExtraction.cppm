@@ -1,15 +1,14 @@
 module;
-#include <algorithm>
-#include <array>
-#include <cmath>
 #include <cstdint>
 #include <limits>
 #include <optional>
+#include <vector>
 #include <glm/glm.hpp>
 
 export module Runtime.RenderExtraction;
 
 import Graphics.Camera;
+import Graphics.RenderPipeline;
 import Runtime.SceneManager;
 
 export namespace Runtime
@@ -70,6 +69,9 @@ export namespace Runtime
         double Alpha = 0.0;
         RenderViewPacket View{};
         WorldSnapshot World{};
+        std::vector<Graphics::PickingSurfacePacket> SurfacePicking{};
+        std::vector<Graphics::PickingLinePacket> LinePicking{};
+        std::vector<Graphics::PickingPointPacket> PointPicking{};
 
         [[nodiscard]] bool IsValid() const
         {

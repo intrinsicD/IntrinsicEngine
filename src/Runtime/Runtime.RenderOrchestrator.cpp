@@ -273,7 +273,12 @@ namespace Runtime
         // happens during the preparation stage so GPU submission can consume a prepared graph.
         m_RenderSystem->ProcessCompletedGpuWork(*const_cast<ECS::Scene*>(scene), currentFrame);
         m_RenderSystem->UpdateGlobals(preparedRenderWorld->View.Camera);
-        m_RenderSystem->BuildGraph(*scene, m_AssetManager, preparedRenderWorld->View.Camera);
+        m_RenderSystem->BuildGraph(*scene,
+                                   m_AssetManager,
+                                   preparedRenderWorld->View.Camera,
+                                   preparedRenderWorld->SurfacePicking,
+                                   preparedRenderWorld->LinePicking,
+                                   preparedRenderWorld->PointPicking);
         frame.Prepared = true;
     }
 
