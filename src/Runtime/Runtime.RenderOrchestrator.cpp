@@ -236,9 +236,36 @@ namespace Runtime
     void RenderOrchestrator::PrepareFrame(FrameContext& frame, const RenderWorld& renderWorld)
     {
         frame.PreparedRenderWorld = renderWorld;
-        frame.Prepared = renderWorld.IsValid();
+        frame.Prepared = false;
         frame.Submitted = false;
         frame.Viewport = renderWorld.Viewport;
+
+        const RenderWorld* preparedRenderWorld = frame.GetPreparedRenderWorld();
+        if (!preparedRenderWorld || !preparedRenderWorld->IsValid())
+        {
+            Core::Log::Warn("RenderOrchestrator::PrepareFrame skipped: invalid RenderWorld supplied for frame preparation.");
+            return;
+        }
+
+        const ECS::Scene* scene = preparedRenderWorld->World.Scene;
+        if (!scene)
+        {
+            Core::Log::Warn("RenderOrchestrator::PrepareFrame skipped: prepared RenderWorld has no scene.");
+            return;
+        }
+
+        const uint64_t currentFrame = m_Device ? m_Device->GetGlobalFrameNumber() : frame.FrameNumber;
+        m_RenderSystem->BeginFrame(currentFrame);
+        if (!m_RenderSystem->AcquireFrame())
+            return;
+
+        // GPU readback completion still bridges through the scene dispatcher so selection
+        // events can be enqueued on the main thread. Render-graph construction itself now
+        // happens during the preparation stage so GPU submission can consume a prepared graph.
+        m_RenderSystem->ProcessCompletedGpuWork(*const_cast<ECS::Scene*>(scene), currentFrame);
+        m_RenderSystem->UpdateGlobals(preparedRenderWorld->Camera);
+        m_RenderSystem->BuildGraph(*scene, m_AssetManager, preparedRenderWorld->Camera);
+        frame.Prepared = true;
     }
 
     void RenderOrchestrator::ExecuteFrame(FrameContext& frame)
@@ -250,24 +277,12 @@ namespace Runtime
             return;
         }
 
-        const ECS::Scene* scene = preparedRenderWorld->World.Scene;
-        if (!scene)
+        if (!frame.Prepared)
         {
-            Core::Log::Warn("RenderOrchestrator::ExecuteFrame skipped: prepared RenderWorld has no scene.");
+            Core::Log::Warn("RenderOrchestrator::ExecuteFrame skipped: frame preparation did not complete successfully.");
             return;
         }
 
-        const uint64_t currentFrame = m_Device ? m_Device->GetGlobalFrameNumber() : frame.FrameNumber;
-        m_RenderSystem->BeginFrame(currentFrame);
-        if (!m_RenderSystem->AcquireFrame())
-            return;
-
-        // GPU readback completion still bridges through the scene dispatcher so selection
-        // events can be enqueued on the main thread. Render-graph construction itself now
-        // consumes the extracted scene snapshot as a const input.
-        m_RenderSystem->ProcessCompletedGpuWork(*const_cast<ECS::Scene*>(scene), currentFrame);
-        m_RenderSystem->UpdateGlobals(preparedRenderWorld->Camera);
-        m_RenderSystem->BuildGraph(*scene, m_AssetManager, preparedRenderWorld->Camera);
         m_RenderSystem->ExecuteGraph();
         m_RenderSystem->EndFrame();
         frame.Submitted = true;
