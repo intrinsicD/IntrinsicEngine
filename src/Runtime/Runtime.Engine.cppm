@@ -80,7 +80,9 @@ export namespace Runtime
 
         // Variable-rate render hook. `alpha` is the fixed-step interpolation factor
         // computed from the remaining simulation accumulator after fixed ticks.
-        virtual void OnRender(double alpha) = 0;
+        // Runs immediately before the runtime extracts immutable render state and
+        // hands the frame to RenderOrchestrator.
+        virtual void OnRender([[maybe_unused]] double alpha) {}
 
         // Override to register additional systems into the FrameGraph each frame.
         // Called after the engine's core systems are registered but before Compile/Execute.

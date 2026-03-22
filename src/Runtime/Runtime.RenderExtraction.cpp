@@ -1,6 +1,7 @@
 module;
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 
 module Runtime.RenderExtraction;
 

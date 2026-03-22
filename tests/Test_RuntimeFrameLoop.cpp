@@ -89,9 +89,18 @@ namespace
                 Trace->emplace_back("host:dispatch");
         }
 
+        void ExecutePreparedFrame(double alpha) override
+        {
+            Calls.emplace_back("execute_frame");
+            LastAlpha = alpha;
+            if (Trace)
+                Trace->emplace_back("host:execute_frame");
+        }
+
         Core::FrameGraph& Graph;
         std::vector<std::string>* Trace = nullptr;
         std::vector<std::string> Calls;
+        double LastAlpha = -1.0;
     };
 }
 
@@ -382,7 +391,7 @@ TEST(RuntimeFrameLoop, FrameClock_ResetYieldsZeroDeltaOnFirstAdvance)
     EXPECT_NEAR(step.FrameTime, 0.0, kEpsilon);
 }
 
-TEST(RuntimeFrameLoop, RenderLaneCoordinator_OrdersUpdateRegistrationExecutionDispatchAndRender)
+TEST(RuntimeFrameLoop, RenderLaneCoordinator_OrdersUpdateRegistrationExecutionDispatchAndFrameSubmission)
 {
     Core::Memory::ScopeStack scope(64 * 1024);
     Core::FrameGraph graph(scope);
@@ -440,8 +449,10 @@ TEST(RuntimeFrameLoop, RenderLaneCoordinator_OrdersUpdateRegistrationExecutionDi
         "get_graph",
         "register_engine",
         "dispatch",
+        "execute_frame",
     };
     EXPECT_EQ(host.Calls, expectedHostCalls);
+    EXPECT_NEAR(host.LastAlpha, 0.375, kEpsilon);
 
     const std::vector<std::string> expectedTrace{
         "callback:update",
@@ -452,6 +463,7 @@ TEST(RuntimeFrameLoop, RenderLaneCoordinator_OrdersUpdateRegistrationExecutionDi
         "callback:before_dispatch",
         "host:dispatch",
         "callback:render",
+        "host:execute_frame",
     };
     EXPECT_EQ(trace, expectedTrace);
 }
@@ -547,8 +559,10 @@ TEST(RuntimeFrameLoop, RunFramePhases_PreservesStreamingFixedAndRenderLaneBaseli
         "get_graph",
         "register_engine",
         "dispatch",
+        "execute_frame",
     };
     EXPECT_EQ(renderHost.Calls, expectedRenderHostCalls);
+    EXPECT_NEAR(renderHost.LastAlpha, 0.5, kEpsilon);
 
     const std::vector<std::string> expectedTrace{
         "fixed:update",
@@ -635,8 +649,10 @@ TEST(RuntimeFrameLoop, RunFramePhasesForMode_LegacyCompatibilityPreservesBaselin
         "get_graph",
         "register_engine",
         "dispatch",
+        "execute_frame",
     };
     EXPECT_EQ(renderHost.Calls, expectedRenderHostCalls);
+    EXPECT_NEAR(renderHost.LastAlpha, 0.5, kEpsilon);
 
     const std::vector<std::string> expectedTrace{
         "fixed:update",
