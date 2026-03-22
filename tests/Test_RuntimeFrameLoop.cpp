@@ -38,6 +38,7 @@ namespace
         }
         [[nodiscard]] int GetFramebufferWidth() const override { return FramebufferWidth; }
         [[nodiscard]] int GetFramebufferHeight() const override { return FramebufferHeight; }
+        [[nodiscard]] bool HasResizeRequest() const override { return ResizeRequested; }
         bool ConsumeResizeRequest() override
         {
             const bool resize = ResizeRequested;
@@ -104,6 +105,36 @@ TEST(RuntimeFrameLoop, ComputeFrameTime_ClampsLargeSpikes)
     const Runtime::FrameTimeStep step = Runtime::ComputeFrameTime(1.5, policy);
     EXPECT_TRUE(step.Clamped);
     EXPECT_NEAR(step.FrameTime, 0.25, kEpsilon);
+}
+
+TEST(RuntimeFrameLoop, MakeFrameLoopPolicy_DefaultsToSixtyHertzAndCanonicalClamp)
+{
+    const Runtime::FrameLoopPolicy policy = Runtime::MakeFrameLoopPolicy();
+
+    EXPECT_NEAR(policy.FixedDt, 1.0 / Runtime::DefaultFixedStepHz, kEpsilon);
+    EXPECT_NEAR(policy.MaxFrameDelta, Runtime::DefaultMaxFrameDeltaSeconds, kEpsilon);
+    EXPECT_EQ(policy.MaxSubstepsPerFrame, Runtime::DefaultMaxSubstepsPerFrame);
+}
+
+TEST(RuntimeFrameLoop, MakeFrameLoopPolicy_AllowsHighFrequencyFixedStepConfiguration)
+{
+    const Runtime::FrameLoopPolicy policy = Runtime::MakeFrameLoopPolicy(
+        Runtime::HighFrequencyFixedStepHz,
+        0.1,
+        4);
+
+    EXPECT_NEAR(policy.FixedDt, 1.0 / Runtime::HighFrequencyFixedStepHz, kEpsilon);
+    EXPECT_NEAR(policy.MaxFrameDelta, 0.1, kEpsilon);
+    EXPECT_EQ(policy.MaxSubstepsPerFrame, 4);
+}
+
+TEST(RuntimeFrameLoop, MakeFrameLoopPolicy_SanitizesInvalidInputsToSafeDefaults)
+{
+    const Runtime::FrameLoopPolicy policy = Runtime::MakeFrameLoopPolicy(-120.0, -1.0, 0);
+
+    EXPECT_NEAR(policy.FixedDt, 1.0 / Runtime::DefaultFixedStepHz, kEpsilon);
+    EXPECT_NEAR(policy.MaxFrameDelta, Runtime::DefaultMaxFrameDeltaSeconds, kEpsilon);
+    EXPECT_EQ(policy.MaxSubstepsPerFrame, Runtime::DefaultMaxSubstepsPerFrame);
 }
 
 TEST(RuntimeFrameLoop, ComputeFrameTime_RejectsNegativeDelta)
@@ -262,7 +293,7 @@ TEST(RuntimeFrameLoop, PlatformFrameCoordinator_WaitsAndSkipsWhenWindowIsMinimiz
     EXPECT_FALSE(result.ContinueFrame);
     EXPECT_TRUE(result.Minimized);
     EXPECT_FALSE(result.ShouldQuit);
-    EXPECT_EQ(host.Calls, (std::vector<std::string>{"pump", "wait", "consume_resize"}));
+    EXPECT_EQ(host.Calls, (std::vector<std::string>{"pump", "wait"}));
     EXPECT_DOUBLE_EQ(host.WaitSeconds, 0.25);
 }
 
@@ -288,8 +319,8 @@ TEST(RuntimeFrameLoop, PlatformFrameCoordinator_ReportsQuitAndResizeSignals)
     EXPECT_TRUE(result.ResizeRequested);
     EXPECT_EQ(result.FramebufferWidth, 1920);
     EXPECT_EQ(result.FramebufferHeight, 1080);
-    EXPECT_EQ(host.Calls, (std::vector<std::string>{"pump", "consume_resize"}));
-    EXPECT_FALSE(host.ResizeRequested);
+    EXPECT_EQ(host.Calls, (std::vector<std::string>{"pump"}));
+    EXPECT_TRUE(host.ResizeRequested);
 }
 
 TEST(RuntimeFrameLoop, PlatformFrameCoordinator_RefusesCrossThreadEventPumping)

@@ -17,6 +17,11 @@ import Runtime.SceneManager;
 
 export namespace Runtime
 {
+    inline constexpr double DefaultFixedStepHz = 60.0;
+    inline constexpr double HighFrequencyFixedStepHz = 120.0;
+    inline constexpr double DefaultMaxFrameDeltaSeconds = 0.25;
+    inline constexpr int DefaultMaxSubstepsPerFrame = 8;
+
     enum class FrameLoopMode : uint8_t
     {
         LegacyCompatibility = 0,
@@ -42,10 +47,14 @@ export namespace Runtime
 
     struct FrameLoopPolicy
     {
-        double FixedDt = 1.0 / 60.0;
-        double MaxFrameDelta = 0.25;
-        int MaxSubstepsPerFrame = 8;
+        double FixedDt = 1.0 / DefaultFixedStepHz;
+        double MaxFrameDelta = DefaultMaxFrameDeltaSeconds;
+        int MaxSubstepsPerFrame = DefaultMaxSubstepsPerFrame;
     };
+
+    [[nodiscard]] FrameLoopPolicy MakeFrameLoopPolicy(double fixedStepHz = DefaultFixedStepHz,
+                                                      double maxFrameDeltaSeconds = DefaultMaxFrameDeltaSeconds,
+                                                      int maxSubstepsPerFrame = DefaultMaxSubstepsPerFrame);
 
     struct FrameTimeStep
     {

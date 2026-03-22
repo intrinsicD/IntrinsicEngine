@@ -181,8 +181,6 @@ Mapping guidance for current Intrinsic code while preserving that reference shap
 
 #### B4.4 Simulation stage (B)
 
-- [ ] Introduce a clamped accumulator policy with explicit constants such as `fixed_dt` and `max_frame_dt`.
-- [ ] Default to `1/60` fixed-step simulation; allow `1/120` as a configurable high-frequency mode when justified.
 - [ ] Move deterministic gameplay / ECS / physics / AI / animation work onto the fixed-step lane.
 - [ ] Define `CommitFixedTick()` semantics so each completed fixed tick produces a consistent authoritative world state.
 - [ ] Add telemetry for tick count per frame, clamp hits, and simulation CPU time.

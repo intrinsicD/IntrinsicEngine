@@ -29,6 +29,7 @@ import Graphics.Geometry;
 import Graphics.IORegistry;
 import ECS;
 import Runtime.SelectionModule;
+import Runtime.FrameLoop;
 import Runtime.GraphicsBackend;
 import Runtime.AssetPipeline;
 import Runtime.AssetIngestService;
@@ -43,6 +44,13 @@ export namespace Runtime
         int Width = 1600;
         int Height = 900;
         size_t FrameArenaSize = 1024 * 1024; // Configurable frame arena (default: 1 MB)
+
+        // Fixed-step simulation policy. Defaults target 60 Hz with a 250 ms
+        // frame-delta clamp, while allowing 120 Hz or tighter policies when
+        // the caller explicitly opts in.
+        double FixedStepHz = DefaultFixedStepHz;
+        double MaxFrameDeltaSeconds = DefaultMaxFrameDeltaSeconds;
+        int MaxSubstepsPerFrame = DefaultMaxSubstepsPerFrame;
 
         // Benchmark mode: when enabled, the engine runs for a fixed number of frames
         // and writes timing data to a JSON file, then exits.
