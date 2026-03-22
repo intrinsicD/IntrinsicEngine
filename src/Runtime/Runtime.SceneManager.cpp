@@ -38,6 +38,20 @@ namespace Runtime
         Core::Log::Info("SceneManager: Shutdown.");
     }
 
+    WorldSnapshot SceneManager::CreateReadonlySnapshot() const
+    {
+        return WorldSnapshot{
+            .Scene = &m_Scene,
+            .Registry = &m_Scene.GetRegistry(),
+            .CommittedTick = m_CommittedTick,
+        };
+    }
+
+    void SceneManager::CommitFixedTick()
+    {
+        ++m_CommittedTick;
+    }
+
     template <typename T>
     void SceneManager::OnGpuComponentDestroyed(entt::registry& registry, entt::entity entity)
     {
@@ -191,5 +205,6 @@ namespace Runtime
     void SceneManager::Clear()
     {
         m_Scene.GetRegistry().clear();
+        m_CommittedTick = 0;
     }
 }

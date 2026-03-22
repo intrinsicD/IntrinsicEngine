@@ -181,7 +181,7 @@ Mapping guidance for current Intrinsic code while preserving that reference shap
 #### B4.4 Simulation stage (B)
 
 - [ ] Move deterministic gameplay / ECS / physics / AI / animation work onto the fixed-step lane.
-- [ ] Define `CommitFixedTick()` semantics so each completed fixed tick produces a consistent authoritative world state.
+- [x] Define `CommitFixedTick()` semantics so each completed fixed tick produces a consistent authoritative world state.
 - [ ] Add telemetry for tick count per frame, clamp hits, and simulation CPU time.
 
 #### B4.5 Extraction stage (C)
