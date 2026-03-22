@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <limits>
+#include <optional>
 #include <string>
 #include <thread>
 #include <vector>
@@ -89,10 +90,29 @@ namespace
                 Trace->emplace_back("host:dispatch");
         }
 
-        void ExecutePreparedFrame(double alpha) override
+        [[nodiscard]] std::optional<Runtime::RenderWorld> ExtractRenderWorld(double alpha) override
+        {
+            Calls.emplace_back("extract_world");
+            LastAlpha = alpha;
+            if (!ShouldProduceRenderWorld)
+            {
+                if (Trace)
+                    Trace->emplace_back("host:extract_world");
+                return std::nullopt;
+            }
+            Runtime::RenderWorld renderWorld{
+                .Alpha = alpha,
+                .Viewport = Runtime::RenderViewport{.Width = 1280, .Height = 720},
+            };
+            if (Trace)
+                Trace->emplace_back("host:extract_world");
+            return renderWorld;
+        }
+
+        void ExecutePreparedFrame(const Runtime::RenderWorld& renderWorld) override
         {
             Calls.emplace_back("execute_frame");
-            LastAlpha = alpha;
+            LastExecutedAlpha = renderWorld.Alpha;
             if (Trace)
                 Trace->emplace_back("host:execute_frame");
         }
@@ -100,7 +120,9 @@ namespace
         Core::FrameGraph& Graph;
         std::vector<std::string>* Trace = nullptr;
         std::vector<std::string> Calls;
+        bool ShouldProduceRenderWorld = true;
         double LastAlpha = -1.0;
+        double LastExecutedAlpha = -1.0;
     };
 }
 
@@ -449,10 +471,12 @@ TEST(RuntimeFrameLoop, RenderLaneCoordinator_OrdersUpdateRegistrationExecutionDi
         "get_graph",
         "register_engine",
         "dispatch",
+        "extract_world",
         "execute_frame",
     };
     EXPECT_EQ(host.Calls, expectedHostCalls);
     EXPECT_NEAR(host.LastAlpha, 0.375, kEpsilon);
+    EXPECT_NEAR(host.LastExecutedAlpha, 0.375, kEpsilon);
 
     const std::vector<std::string> expectedTrace{
         "callback:update",
@@ -462,10 +486,42 @@ TEST(RuntimeFrameLoop, RenderLaneCoordinator_OrdersUpdateRegistrationExecutionDi
         "callback:execute",
         "callback:before_dispatch",
         "host:dispatch",
+        "host:extract_world",
         "callback:render",
         "host:execute_frame",
     };
     EXPECT_EQ(trace, expectedTrace);
+}
+
+TEST(RuntimeFrameLoop, RenderLaneCoordinator_SkipsFrameSubmissionWhenExtractionProducesNoRenderWorld)
+{
+    Core::Memory::ScopeStack scope(64 * 1024);
+    Core::FrameGraph graph(scope);
+    FakeRenderLaneHost host(graph);
+    host.ShouldProduceRenderWorld = false;
+
+    const Runtime::RenderLaneCoordinator coordinator{.Host = host};
+
+    coordinator.Run(
+        1.0 / 60.0,
+        0.25,
+        {
+            .OnUpdate = [](float) {},
+            .RegisterVariableSystems = [](Core::FrameGraph&, float) {},
+            .BeforeDispatch = []() {},
+            .OnRender = [](double) {},
+        },
+        [](Core::FrameGraph&) {});
+
+    const std::vector<std::string> expectedHostCalls{
+        "get_graph",
+        "register_engine",
+        "dispatch",
+        "extract_world",
+    };
+    EXPECT_EQ(host.Calls, expectedHostCalls);
+    EXPECT_NEAR(host.LastAlpha, 0.25, kEpsilon);
+    EXPECT_LT(host.LastExecutedAlpha, 0.0);
 }
 
 TEST(RuntimeFrameLoop, RunFramePhases_PreservesStreamingFixedAndRenderLaneBaselineOrder)
@@ -559,10 +615,12 @@ TEST(RuntimeFrameLoop, RunFramePhases_PreservesStreamingFixedAndRenderLaneBaseli
         "get_graph",
         "register_engine",
         "dispatch",
+        "extract_world",
         "execute_frame",
     };
     EXPECT_EQ(renderHost.Calls, expectedRenderHostCalls);
     EXPECT_NEAR(renderHost.LastAlpha, 0.5, kEpsilon);
+    EXPECT_NEAR(renderHost.LastExecutedAlpha, 0.5, kEpsilon);
 
     const std::vector<std::string> expectedTrace{
         "fixed:update",
@@ -649,10 +707,12 @@ TEST(RuntimeFrameLoop, RunFramePhasesForMode_LegacyCompatibilityPreservesBaselin
         "get_graph",
         "register_engine",
         "dispatch",
+        "extract_world",
         "execute_frame",
     };
     EXPECT_EQ(renderHost.Calls, expectedRenderHostCalls);
     EXPECT_NEAR(renderHost.LastAlpha, 0.5, kEpsilon);
+    EXPECT_NEAR(renderHost.LastExecutedAlpha, 0.5, kEpsilon);
 
     const std::vector<std::string> expectedTrace{
         "fixed:update",

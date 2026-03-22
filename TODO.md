@@ -96,11 +96,11 @@ Goal: refactor the runtime from a monolithic update/render loop into a staged fr
 #### B4.1 Core principle: authoritative world state -> immutable render state
 
 - Baseline rule is now explicit: simulation and rendering must not mutate the same live state during a frame.
-- [ ] Define the authoritative handoff as:
-  - [ ] simulation writes `WorldState N+1`
-  - [ ] extraction reads stable `WorldState N+1`
-  - [ ] extraction writes immutable `RenderWorld N+1`
-  - [ ] rendering consumes only `RenderWorld N+1`
+- Baseline handoff is now explicit:
+  - [x] simulation writes `WorldState N+1`
+  - [x] extraction reads stable `WorldState N+1`
+  - [x] extraction writes immutable `RenderWorld N+1`
+  - [x] rendering consumes only `RenderWorld N+1`
 
 #### B4.2 Reference main loop (use this shape as the migration target)
 
