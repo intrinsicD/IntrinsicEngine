@@ -298,6 +298,10 @@ namespace Runtime
             m_RenderOrchestrator->GetMaterialSystem(),
         };
         const StreamingLaneCoordinator streamingLane{.Host = streamingLaneHost};
+        RuntimeMaintenanceLaneHost maintenanceLaneHost{
+            *m_GraphicsBackend,
+        };
+        const MaintenanceLaneCoordinator maintenanceLane{.Host = maintenanceLaneHost};
         RuntimeRenderLaneHost renderLaneHost{
             *m_SceneManager,
             *m_RenderOrchestrator,
@@ -388,6 +392,7 @@ namespace Runtime
                     accumulator,
                     frameLoopPolicy,
                     streamingLane,
+                    maintenanceLane,
                     renderLane,
                     m_RenderOrchestrator->GetFrameGraph(),
                     {

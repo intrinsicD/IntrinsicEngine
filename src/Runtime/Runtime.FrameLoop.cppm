@@ -193,7 +193,6 @@ export namespace Runtime
         virtual void ProcessUploads() = 0;
         virtual void ProcessTextureDeletions() = 0;
         virtual void ProcessMaterialDeletions() = 0;
-        virtual void GarbageCollectTransfers() = 0;
     };
 
     class RuntimeStreamingLaneHost final : public IStreamingLaneHost
@@ -217,7 +216,6 @@ export namespace Runtime
         void ProcessUploads() override;
         void ProcessTextureDeletions() override;
         void ProcessMaterialDeletions() override;
-        void GarbageCollectTransfers() override;
 
     private:
         AssetIngestService* m_Ingest = nullptr;
@@ -231,7 +229,37 @@ export namespace Runtime
         IStreamingLaneHost& Host;
 
         void BeginFrame(this const StreamingLaneCoordinator&);
-        void EndFrame(this const StreamingLaneCoordinator&);
+    };
+
+    class IMaintenanceLaneHost
+    {
+    public:
+        virtual ~IMaintenanceLaneHost();
+
+        virtual void GarbageCollectTransfers() = 0;
+    };
+
+    class RuntimeMaintenanceLaneHost final : public IMaintenanceLaneHost
+    {
+    public:
+        explicit RuntimeMaintenanceLaneHost(GraphicsBackend& graphics)
+            : m_Graphics(graphics)
+        {
+        }
+
+        ~RuntimeMaintenanceLaneHost() override;
+
+        void GarbageCollectTransfers() override;
+
+    private:
+        GraphicsBackend& m_Graphics;
+    };
+
+    struct MaintenanceLaneCoordinator
+    {
+        IMaintenanceLaneHost& Host;
+
+        void Run(this const MaintenanceLaneCoordinator&);
     };
 
     struct RenderLaneCallbacks
@@ -317,6 +345,7 @@ export namespace Runtime
                                                      double& accumulator,
                                                      const FrameLoopPolicy& policy,
                                                      const StreamingLaneCoordinator& streamingLane,
+                                                     const MaintenanceLaneCoordinator& maintenanceLane,
                                                      const RenderLaneCoordinator& renderLane,
                                                      Core::FrameGraph& fixedGraph,
                                                      FramePhaseCallbacks&& callbacks);
@@ -326,6 +355,7 @@ export namespace Runtime
                                                             double& accumulator,
                                                             const FrameLoopPolicy& policy,
                                                             const StreamingLaneCoordinator& streamingLane,
+                                                            const MaintenanceLaneCoordinator& maintenanceLane,
                                                             const RenderLaneCoordinator& renderLane,
                                                             Core::FrameGraph& fixedGraph,
                                                             FramePhaseCallbacks&& callbacks);

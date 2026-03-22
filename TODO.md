@@ -212,7 +212,7 @@ Mapping guidance for current Intrinsic code while preserving that reference shap
 - [ ] Retire completed uploads after GPU completion is known.
 - [ ] Process deferred destruction only when the relevant GPU completion value has passed.
 - [ ] Centralize readback completion, garbage collection, profiler rollup, telemetry capture, and hot-reload bookkeeping here.
-- [ ] Ensure maintenance can run in headless/test configurations even when no swapchain is active.
+- [x] Ensure maintenance can run in headless/test configurations even when no swapchain is active.
 
 #### B4.9 Explicit frame-context ring + bounded frames in flight
 
