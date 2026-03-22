@@ -99,7 +99,7 @@ Goal: refactor the runtime from a monolithic update/render loop into a staged fr
 
 #### B4.1 Core principle: authoritative world state -> immutable render state
 
-- [ ] Codify the rule that simulation and rendering must not mutate the same live state during a frame.
+- [x] Codify the rule that simulation and rendering must not mutate the same live state during a frame.
 - [ ] Define the authoritative handoff as:
   - [ ] simulation writes `WorldState N+1`
   - [ ] extraction reads stable `WorldState N+1`
