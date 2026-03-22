@@ -1,12 +1,18 @@
 #include <gtest/gtest.h>
 
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <type_traits>
 
 import Runtime.RenderExtraction;
 import Runtime.SceneManager;
 import Graphics.Camera;
+import Graphics.Components;
 import Graphics.RenderPipeline;
+import Geometry.Graph;
+import Geometry.PointCloud;
+import Geometry.HalfedgeMesh;
+import ECS;
 
 TEST(RenderExtraction, FrameContext_DefaultStateIsUnprepared)
 {
@@ -176,6 +182,95 @@ TEST(RenderExtraction, ExtractRenderWorld_CopiesImmutableFrameInputs)
     EXPECT_EQ(renderWorld.View.Viewport.Height, 720u);
     EXPECT_EQ(renderWorld.View.ViewProjectionMatrix,
               renderWorld.View.ProjectionMatrix * renderWorld.View.ViewMatrix);
+}
+
+TEST(RenderExtraction, ExtractRenderWorld_BuildsImmutablePickingPacketsFromAuthoritativeScene)
+{
+    Runtime::SceneManager sceneManager;
+    auto& registry = sceneManager.GetRegistry();
+
+    auto mesh = std::make_shared<Geometry::Halfedge::Mesh>();
+    const auto v0 = mesh->AddVertex(glm::vec3(0.0f, 0.0f, 0.0f));
+    const auto v1 = mesh->AddVertex(glm::vec3(1.0f, 0.0f, 0.0f));
+    const auto v2 = mesh->AddVertex(glm::vec3(0.0f, 1.0f, 0.0f));
+    ASSERT_TRUE(mesh->AddTriangle(v0, v1, v2).has_value());
+
+    const entt::entity surfaceEntity = registry.create();
+    registry.emplace<ECS::Components::Transform::Component>(
+        surfaceEntity,
+        ECS::Components::Transform::Component{.Position = glm::vec3(1.0f, 2.0f, 3.0f)});
+    registry.emplace<ECS::Components::Selection::PickID>(surfaceEntity, ECS::Components::Selection::PickID{.Value = 11u});
+    registry.emplace<ECS::Surface::Component>(surfaceEntity, ECS::Surface::Component{
+        .Geometry = Geometry::GeometryHandle{10u, 1u},
+    });
+    registry.emplace<ECS::Mesh::Data>(surfaceEntity, ECS::Mesh::Data{
+        .MeshRef = mesh,
+    });
+
+    const entt::entity lineEntity = registry.create();
+    registry.emplace<ECS::Components::Transform::Component>(
+        lineEntity,
+        ECS::Components::Transform::Component{.Position = glm::vec3(-1.0f, 0.0f, 0.0f)});
+    registry.emplace<ECS::Components::Selection::PickID>(lineEntity, ECS::Components::Selection::PickID{.Value = 22u});
+    registry.emplace<ECS::Line::Component>(lineEntity, ECS::Line::Component{
+        .Geometry = Geometry::GeometryHandle{20u, 1u},
+        .EdgeView = Geometry::GeometryHandle{21u, 1u},
+        .EdgeCount = 4u,
+        .Width = 3.5f,
+    });
+    registry.emplace<ECS::Graph::Data>(lineEntity, ECS::Graph::Data{
+        .GraphRef = std::make_shared<Geometry::Graph::Graph>(),
+    });
+
+    const entt::entity pointEntity = registry.create();
+    registry.emplace<ECS::Components::Transform::WorldMatrix>(
+        pointEntity,
+        ECS::Components::Transform::WorldMatrix{
+            .Matrix = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 5.0f, 0.0f)),
+        });
+    registry.emplace<ECS::Components::Selection::PickID>(pointEntity, ECS::Components::Selection::PickID{.Value = 33u});
+    registry.emplace<ECS::Point::Component>(pointEntity, ECS::Point::Component{
+        .Geometry = Geometry::GeometryHandle{30u, 1u},
+        .Size = 0.125f,
+    });
+    registry.emplace<ECS::PointCloud::Data>(pointEntity, ECS::PointCloud::Data{
+        .CloudRef = std::make_shared<Geometry::PointCloud::Cloud>(),
+    });
+
+    sceneManager.CommitFixedTick();
+
+    Graphics::CameraComponent camera{};
+    const Runtime::RenderWorld renderWorld = Runtime::ExtractRenderWorld(Runtime::MakeRenderFrameInput(
+        camera,
+        sceneManager.CreateReadonlySnapshot(),
+        Runtime::RenderViewport{.Width = 800, .Height = 600},
+        0.5));
+
+    ASSERT_TRUE(renderWorld.IsValid());
+    ASSERT_EQ(renderWorld.SurfacePicking.size(), 1u);
+    ASSERT_EQ(renderWorld.LinePicking.size(), 1u);
+    ASSERT_EQ(renderWorld.PointPicking.size(), 1u);
+
+    const auto& surfacePacket = renderWorld.SurfacePicking.front();
+    EXPECT_EQ(surfacePacket.Geometry, Geometry::GeometryHandle(10u, 1u));
+    EXPECT_EQ(surfacePacket.EntityId, 11u);
+    EXPECT_EQ(surfacePacket.WorldMatrix[3], glm::vec4(1.0f, 2.0f, 3.0f, 1.0f));
+    EXPECT_EQ(surfacePacket.TriangleFaceIds.size(), 1u);
+    EXPECT_EQ(surfacePacket.TriangleFaceIds.front(), 0u);
+
+    const auto& linePacket = renderWorld.LinePicking.front();
+    EXPECT_EQ(linePacket.Geometry, Geometry::GeometryHandle(20u, 1u));
+    EXPECT_EQ(linePacket.EdgeView, Geometry::GeometryHandle(21u, 1u));
+    EXPECT_EQ(linePacket.EntityId, 22u);
+    EXPECT_FLOAT_EQ(linePacket.Width, 3.5f);
+    EXPECT_EQ(linePacket.EdgeCount, 4u);
+    EXPECT_EQ(linePacket.WorldMatrix[3], glm::vec4(-1.0f, 0.0f, 0.0f, 1.0f));
+
+    const auto& pointPacket = renderWorld.PointPicking.front();
+    EXPECT_EQ(pointPacket.Geometry, Geometry::GeometryHandle(30u, 1u));
+    EXPECT_EQ(pointPacket.EntityId, 33u);
+    EXPECT_FLOAT_EQ(pointPacket.Size, 0.125f);
+    EXPECT_EQ(pointPacket.WorldMatrix[3], glm::vec4(0.0f, 5.0f, 0.0f, 1.0f));
 }
 
 TEST(RenderExtraction, ExtractedRenderWorld_TracksWhenAuthoritativeSceneAdvancesPastExtraction)
