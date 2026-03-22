@@ -4,6 +4,7 @@ module;
 #include <cmath>
 #include <cstdint>
 #include <limits>
+#include <optional>
 
 export module Runtime.RenderExtraction;
 
@@ -61,8 +62,26 @@ export namespace Runtime
         uint32_t SlotIndex = 0;
         uint32_t FramesInFlight = DefaultFrameContexts;
         RenderViewport Viewport{};
+        std::optional<RenderWorld> PreparedRenderWorld{};
         bool Prepared = false;
         bool Submitted = false;
+
+        [[nodiscard]] const RenderWorld* GetPreparedRenderWorld() const
+        {
+            return PreparedRenderWorld ? &*PreparedRenderWorld : nullptr;
+        }
+
+        [[nodiscard]] RenderWorld* GetPreparedRenderWorld()
+        {
+            return PreparedRenderWorld ? &*PreparedRenderWorld : nullptr;
+        }
+
+        void ResetPreparedState()
+        {
+            PreparedRenderWorld.reset();
+            Prepared = false;
+            Submitted = false;
+        }
     };
 
     [[nodiscard]] uint32_t SanitizeFrameContextCount(uint32_t requestedCount);

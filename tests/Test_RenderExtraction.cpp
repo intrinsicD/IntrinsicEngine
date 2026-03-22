@@ -18,6 +18,31 @@ TEST(RenderExtraction, FrameContext_DefaultStateIsUnprepared)
     EXPECT_FALSE(frame.Prepared);
     EXPECT_FALSE(frame.Submitted);
     EXPECT_FALSE(frame.Viewport.IsValid());
+    EXPECT_EQ(frame.GetPreparedRenderWorld(), nullptr);
+}
+
+TEST(RenderExtraction, FrameContext_ResetPreparedStateClearsOwnedRenderWorld)
+{
+    Runtime::SceneManager sceneManager;
+    sceneManager.CommitFixedTick();
+
+    Runtime::FrameContext frame{};
+    frame.PreparedRenderWorld = Runtime::RenderWorld{
+        .Alpha = 0.5,
+        .Viewport = Runtime::RenderViewport{.Width = 800, .Height = 600},
+        .World = sceneManager.CreateReadonlySnapshot(),
+    };
+    frame.Prepared = true;
+    frame.Submitted = true;
+
+    ASSERT_NE(frame.GetPreparedRenderWorld(), nullptr);
+    EXPECT_EQ(frame.GetPreparedRenderWorld()->World.CommittedTick, 1u);
+
+    frame.ResetPreparedState();
+
+    EXPECT_EQ(frame.GetPreparedRenderWorld(), nullptr);
+    EXPECT_FALSE(frame.Prepared);
+    EXPECT_FALSE(frame.Submitted);
 }
 
 TEST(RenderExtraction, SanitizeFrameContextCount_ClampsToSupportedBounds)
@@ -119,4 +144,32 @@ TEST(RenderExtraction, RenderPassContext_ExposesReadonlySceneSnapshot)
     using SceneRef = decltype(std::declval<Graphics::RenderPassContext>().Scene);
     static_assert(std::is_const_v<std::remove_reference_t<SceneRef>>);
     SUCCEED();
+}
+
+TEST(RenderExtraction, FrameContext_OwnsPreparedRenderWorldCopy)
+{
+    Runtime::SceneManager sceneManager;
+    sceneManager.CommitFixedTick();
+
+    Graphics::CameraComponent camera{};
+    camera.Position = glm::vec3(7.0f, 8.0f, 9.0f);
+
+    Runtime::RenderWorld renderWorld = Runtime::ExtractRenderWorld(Runtime::MakeRenderFrameInput(
+        camera,
+        sceneManager.CreateReadonlySnapshot(),
+        Runtime::RenderViewport{.Width = 1024, .Height = 768},
+        0.75));
+
+    Runtime::FrameContext frame{};
+    frame.PreparedRenderWorld = renderWorld;
+    frame.Prepared = true;
+
+    renderWorld.Alpha = 0.0;
+    renderWorld.Camera.Position = glm::vec3(0.0f);
+
+    const Runtime::RenderWorld* owned = frame.GetPreparedRenderWorld();
+    ASSERT_NE(owned, nullptr);
+    EXPECT_DOUBLE_EQ(owned->Alpha, 0.75);
+    EXPECT_EQ(owned->Camera.Position, glm::vec3(7.0f, 8.0f, 9.0f));
+    EXPECT_EQ(owned->World.CommittedTick, 1u);
 }

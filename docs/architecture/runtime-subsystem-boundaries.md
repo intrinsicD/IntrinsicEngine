@@ -94,7 +94,7 @@ Engine
 #### `RenderOrchestrator`
 
 - **Role:** runtime render subsystem owner.
-- **Owns:** frame allocators, bounded logical `FrameContext` ring, `Core::FrameGraph`, shader registry, geometry pool, debug draw accumulator, material system, pipeline library, GPU scene, and render system.
+- **Owns:** frame allocators, bounded logical `FrameContext` ring, frame-owned prepared `RenderWorld` snapshots, `Core::FrameGraph`, shader registry, geometry pool, debug draw accumulator, material system, pipeline library, GPU scene, and render system.
 - **Borrows:** device, swapchain, renderer, bindless, descriptor pool/layout, texture system, and asset manager.
 - **Does not own:** the window, swapchain recreation policy outside its resize entrypoint, scene registry, or asset ingestion queues.
 

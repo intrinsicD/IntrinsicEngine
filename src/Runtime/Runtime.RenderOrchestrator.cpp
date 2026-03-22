@@ -215,7 +215,6 @@ namespace Runtime
         m_FrameScope.Reset();
         m_FrameArena.Reset();
         m_DebugDraw.Reset();
-        m_PreparedRenderWorld.reset();
     }
 
     FrameContext RenderOrchestrator::BeginFrame() const
@@ -236,20 +235,22 @@ namespace Runtime
 
     void RenderOrchestrator::PrepareFrame(FrameContext& frame, const RenderWorld& renderWorld)
     {
-        m_PreparedRenderWorld = renderWorld;
+        frame.PreparedRenderWorld = renderWorld;
         frame.Prepared = renderWorld.IsValid();
+        frame.Submitted = false;
         frame.Viewport = renderWorld.Viewport;
     }
 
     void RenderOrchestrator::ExecuteFrame(FrameContext& frame)
     {
-        if (!m_PreparedRenderWorld || !m_PreparedRenderWorld->IsValid())
+        const RenderWorld* preparedRenderWorld = frame.GetPreparedRenderWorld();
+        if (!preparedRenderWorld || !preparedRenderWorld->IsValid())
         {
-            Core::Log::Warn("RenderOrchestrator::ExecuteFrame skipped: no prepared RenderWorld.");
+            Core::Log::Warn("RenderOrchestrator::ExecuteFrame skipped: no prepared RenderWorld bound to the active FrameContext.");
             return;
         }
 
-        const ECS::Scene* scene = m_PreparedRenderWorld->World.Scene;
+        const ECS::Scene* scene = preparedRenderWorld->World.Scene;
         if (!scene)
         {
             Core::Log::Warn("RenderOrchestrator::ExecuteFrame skipped: prepared RenderWorld has no scene.");
@@ -265,8 +266,8 @@ namespace Runtime
         // events can be enqueued on the main thread. Render-graph construction itself now
         // consumes the extracted scene snapshot as a const input.
         m_RenderSystem->ProcessCompletedGpuWork(*const_cast<ECS::Scene*>(scene), currentFrame);
-        m_RenderSystem->UpdateGlobals(m_PreparedRenderWorld->Camera);
-        m_RenderSystem->BuildGraph(*scene, m_AssetManager, m_PreparedRenderWorld->Camera);
+        m_RenderSystem->UpdateGlobals(preparedRenderWorld->Camera);
+        m_RenderSystem->BuildGraph(*scene, m_AssetManager, preparedRenderWorld->Camera);
         m_RenderSystem->ExecuteGraph();
         m_RenderSystem->EndFrame();
         frame.Submitted = true;
@@ -274,8 +275,7 @@ namespace Runtime
 
     void RenderOrchestrator::EndFrame(FrameContext& frame)
     {
-        frame.Prepared = false;
-        m_PreparedRenderWorld.reset();
+        frame.ResetPreparedState();
     }
 
     std::pair<Geometry::GeometryHandle, RHI::TransferToken>
