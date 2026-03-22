@@ -264,7 +264,41 @@ m_Device.SafeDestroy([dev, pools = std::move(pools)]() {
 
 ---
 
-## 9. Event Communication Pattern
+## 9. Commit Hygiene for Cross-Cutting Render Contracts
+
+**What:** Separate **feature-local work** from **cross-cutting render-contract changes** whenever a change affects canonical frame construction, resource requirements, or default pipeline behavior.
+
+**Why:** Helpers such as `BuildDefaultPipelineRecipe(...)` sit on the critical path for every pipeline configuration. A change there is not just a local implementation detail — it changes the global frame recipe contract:
+
+- which canonical resources become required,
+- whether deferred / hybrid / forward fallback occurs,
+- whether picking sideband resources are allocated,
+- and whether debug or selection overlays become legal for a given frame.
+
+Bundling that kind of rewrite into an unrelated feature commit makes review noisy and obscures whether regressions come from the feature itself or from the renderer-wide contract change.
+
+**Use when:**
+- A feature also needs a behavioral rewrite of `BuildDefaultPipelineRecipe(...)`, render-graph validation policy, resource definitions, or pass-order rules.
+- A refactor changes default behavior for *all* pipelines rather than only the new feature’s code path.
+- The diff mixes “new pass / new feature” work with “existing renderer contract changed everywhere” work.
+
+**Preferred split:**
+1. **Commit A — contract/mechanical change**
+   - Adjust recipe/resource behavior.
+   - Add or update focused regression tests.
+   - Keep feature-facing code out of this commit when practical.
+2. **Commit B — feature integration**
+   - Add the new pass, shaders, UI, or geometry algorithm.
+   - Consume the already-reviewed contract behavior from Commit A.
+
+**Canonical examples:**
+- `src/Runtime/Graphics/Pipelines/Graphics.Pipelines.cpp` — `BuildDefaultPipelineRecipe(...)` is a renderer-wide contract seam, not a feature-local helper.
+- `tests/Test_RuntimeGraphics.cpp` — focused recipe regression coverage should land with contract changes.
+- `tests/Test_CompositionAndValidation.cpp` — render-graph validation expectations should be updated in the same contract-focused commit series.
+
+---
+
+## 10. Event Communication Pattern
 
 **What:** Three mechanisms for inter-system communication, each with distinct use cases:
 
@@ -287,7 +321,7 @@ Synchronous and immediate. Fires during `reg.remove<T>()` or `reg.destroy()`. Ne
 
 ---
 
-## 10. Asset Loader/Exporter Interface Pattern
+## 11. Asset Loader/Exporter Interface Pattern
 
 **What:** Stateless transform interface — loaders/exporters never open files; they receive bytes from `IIOBackend` via `LoadContext`:
 
@@ -313,7 +347,7 @@ class IAssetLoader {
 
 ---
 
-## 11. Lifecycle System Pattern
+## 12. Lifecycle System Pattern
 
 **What:** Two-phase GPU upload with PropertySet attribute extraction:
 
@@ -336,7 +370,7 @@ class IAssetLoader {
 
 ---
 
-## 12. Vtable Anchor Pattern
+## 13. Vtable Anchor Pattern
 
 **What:** When a class with virtual functions is declared in a module partition interface (`.cppm`), vtable emission can be fragile. As defensive practice:
 
@@ -352,7 +386,7 @@ class IAssetLoader {
 
 ---
 
-## 13. BDA Shared-Buffer Design
+## 14. BDA Shared-Buffer Design
 
 **What:** One device-local vertex buffer on the GPU, multiple index buffers with different topologies referencing into it via buffer device addresses (BDA). Zero `vkCmdBindVertexBuffers` calls in the codebase.
 
