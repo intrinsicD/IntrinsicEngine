@@ -98,12 +98,11 @@ export namespace Runtime
             return m_FramesInFlight;
         }
 
-        [[nodiscard]] FrameContext BeginFrame(uint64_t frameNumber, RenderViewport viewport) &;
+        [[nodiscard]] FrameContext& BeginFrame(uint64_t frameNumber, RenderViewport viewport) &;
 
     private:
         uint32_t m_FramesInFlight = DefaultFrameContexts;
-        std::array<uint64_t, MaxFrameContexts> m_LastFramePerSlot{
-            InvalidFrameNumber, InvalidFrameNumber, InvalidFrameNumber};
+        std::array<FrameContext, MaxFrameContexts> m_Contexts{};
     };
 
     [[nodiscard]] RenderFrameInput MakeRenderFrameInput(const Graphics::CameraComponent& camera,

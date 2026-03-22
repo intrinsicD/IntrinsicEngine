@@ -444,7 +444,7 @@ namespace Runtime
         const Graphics::CameraComponent& camera = view.get<Graphics::CameraComponent>(*it);
         const auto extent = m_Graphics.GetSwapchain().GetExtent();
 
-        FrameContext frame = m_Renderer.BeginFrame();
+        FrameContext& frame = m_Renderer.BeginFrame();
         const RenderFrameInput renderInput = MakeRenderFrameInput(
             camera,
             m_Scene.CreateReadonlySnapshot(),

@@ -98,7 +98,7 @@ export namespace Runtime
         void ResetFrameState();
 
         // --- Staged frame-pipeline seam ---
-        [[nodiscard]] FrameContext BeginFrame() const;
+        [[nodiscard]] FrameContext& BeginFrame() const;
         [[nodiscard]] RenderWorld ExtractRenderWorld(const RenderFrameInput& input) const;
         void PrepareFrame(FrameContext& frame, const RenderWorld& renderWorld);
         void ExecuteFrame(FrameContext& frame);

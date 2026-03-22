@@ -217,7 +217,7 @@ namespace Runtime
         m_DebugDraw.Reset();
     }
 
-    FrameContext RenderOrchestrator::BeginFrame() const
+    FrameContext& RenderOrchestrator::BeginFrame() const
     {
         const VkExtent2D extent = m_Swapchain.GetExtent();
         return m_FrameContextRing.BeginFrame(
