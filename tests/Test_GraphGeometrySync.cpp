@@ -34,9 +34,9 @@ static std::shared_ptr<Geometry::Graph::Graph> MakeLineGraph()
     auto v1 = g->AddVertex(glm::vec3(1, 0, 0));
     auto v2 = g->AddVertex(glm::vec3(2, 0, 0));
     auto v3 = g->AddVertex(glm::vec3(3, 0, 0));
-    g->AddEdge(v0, v1);
-    g->AddEdge(v1, v2);
-    g->AddEdge(v2, v3);
+    (void)g->AddEdge(v0, v1);
+    (void)g->AddEdge(v1, v2);
+    (void)g->AddEdge(v2, v3);
     return g;
 }
 
@@ -146,7 +146,7 @@ TEST(GraphGeometrySync_EdgePairs, AllVerticesDeletedProducesNoPairs)
     auto g = std::make_shared<Geometry::Graph::Graph>();
     auto v0 = g->AddVertex(glm::vec3(0, 0, 0));
     auto v1 = g->AddVertex(glm::vec3(1, 0, 0));
-    g->AddEdge(v0, v1);
+    (void)g->AddEdge(v0, v1);
     g->DeleteVertex(v0);
     g->DeleteVertex(v1);
 
@@ -163,7 +163,7 @@ TEST(GraphGeometrySync_EdgePairs, AllVerticesDeletedProducesNoPairs)
 TEST(GraphGeometrySync_EdgeColors, ExtractsEdgeColorsFromPropertySet)
 {
     auto g = MakeLineGraph();
-    auto colorProp = g->GetOrAddEdgeProperty<glm::vec4>("e:color",
+    [[maybe_unused]] auto colorProp = g->GetOrAddEdgeProperty<glm::vec4>("e:color",
         glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
 
     ECS::Graph::Data data;
@@ -199,7 +199,7 @@ TEST(GraphGeometrySync_EdgeColors, NoEdgeColorsWhenPropertyAbsent)
 TEST(GraphGeometrySync_EdgeColors, EdgeColorCountMatchesAfterDeletion)
 {
     auto g = MakeLineGraph();
-    g->GetOrAddEdgeProperty<glm::vec4>("e:color", glm::vec4(1, 0, 0, 1));
+    (void)g->GetOrAddEdgeProperty<glm::vec4>("e:color", glm::vec4(1, 0, 0, 1));
 
     // Delete the middle vertex — removes 2 adjacent edges.
     g->DeleteVertex(Geometry::VertexHandle{1});
@@ -322,8 +322,8 @@ TEST(GraphGeometrySync_Compaction, VertexCountMatchesLiveVertices)
     auto v1 = g->AddVertex(glm::vec3(1, 0, 0));
     auto v2 = g->AddVertex(glm::vec3(2, 0, 0));
     auto v3 = g->AddVertex(glm::vec3(3, 0, 0));
-    g->AddEdge(v0, v1);
-    g->AddEdge(v2, v3);
+    (void)g->AddEdge(v0, v1);
+    (void)g->AddEdge(v2, v3);
 
     g->DeleteVertex(v1); // v1 deleted, v0 now isolated.
 

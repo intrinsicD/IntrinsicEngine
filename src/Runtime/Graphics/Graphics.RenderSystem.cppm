@@ -1,6 +1,7 @@
 module;
 #include <glm/glm.hpp>
 #include <memory>
+#include <span>
 #include <vector>
 #include <optional>
 
@@ -160,4 +161,10 @@ export namespace Graphics
         void GarbageCollectRetiredPipelines();
 
     };
+
+    [[nodiscard]] RenderGraphValidationResult ValidateCompiledGraph(
+        const FrameRecipe& recipe,
+        std::span<const RenderGraphDebugPass> passes,
+        std::span<const RenderGraphDebugImage> images,
+        std::span<const ImportedResourceWritePolicy> writePolicies = {});
 }

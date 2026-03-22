@@ -86,8 +86,8 @@ static double ScaleAwareTolerance(const std::vector<glm::vec3>& points,
 
 // Compute the volume of a convex hull via the divergence theorem.
 // Assumes triangulated faces with outward normals.
-static double ConvexHullVolume(const Geometry::ConvexHull& hull,
-                               const std::vector<std::array<uint32_t, 3>>& faces)
+[[maybe_unused]] static double ConvexHullVolume(const Geometry::ConvexHull& hull,
+                                                const std::vector<std::array<uint32_t, 3>>& faces)
 {
     // V = (1/6) * sum_faces |det(v0, v1, v2)|
     // = (1/6) * sum_faces dot(v0, cross(v1, v2))

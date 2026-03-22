@@ -233,8 +233,8 @@ TEST(PropertySetDirtySync, VertexAttributes_Graph_UpdatesPointComponentFlags)
     auto e = reg.create();
 
     auto graph = std::make_shared<Geometry::Graph::Graph>();
-    graph->AddVertex({0, 0, 0});
-    graph->GetOrAddVertexProperty<glm::vec4>("v:color", {1, 1, 1, 1});
+    (void)graph->AddVertex({0, 0, 0});
+    (void)graph->GetOrAddVertexProperty<glm::vec4>("v:color", {1, 1, 1, 1});
 
     auto& gd = reg.emplace<Graph::Data>(e);
     gd.GraphRef = graph;
@@ -314,9 +314,9 @@ TEST(PropertySetDirtySync, EdgeAttributes_ReExtractsEdgeColors)
     auto graph = std::make_shared<Geometry::Graph::Graph>();
     auto v0 = graph->AddVertex({0, 0, 0});
     auto v1 = graph->AddVertex({1, 0, 0});
-    graph->AddEdge(v0, v1);
+    (void)graph->AddEdge(v0, v1);
 
-    auto edgeColors = graph->GetOrAddEdgeProperty<glm::vec4>(
+    [[maybe_unused]] auto edgeColors = graph->GetOrAddEdgeProperty<glm::vec4>(
         "e:color", {1, 1, 1, 1});
 
     auto& gd = reg.emplace<Graph::Data>(e);
@@ -347,8 +347,8 @@ TEST(PropertySetDirtySync, EdgeAttributes_CountDivergence_Escalates)
     auto v0 = graph->AddVertex({0, 0, 0});
     auto v1 = graph->AddVertex({1, 0, 0});
     auto v2 = graph->AddVertex({0, 1, 0});
-    graph->AddEdge(v0, v1);
-    graph->AddEdge(v1, v2); // 2 edges
+    (void)graph->AddEdge(v0, v1);
+    (void)graph->AddEdge(v1, v2); // 2 edges
 
     auto& gd = reg.emplace<Graph::Data>(e);
     gd.GraphRef = graph;
@@ -502,8 +502,8 @@ TEST(PropertySetDirtySync, VertexAttributeChange_DoesNotTriggerEdgeRebuild)
     auto e = reg.create();
 
     auto graph = std::make_shared<Geometry::Graph::Graph>();
-    graph->AddVertex({0, 0, 0});
-    graph->GetOrAddVertexProperty<glm::vec4>("v:color", {1, 1, 1, 1});
+    (void)graph->AddVertex({0, 0, 0});
+    (void)graph->GetOrAddVertexProperty<glm::vec4>("v:color", {1, 1, 1, 1});
 
     auto& gd = reg.emplace<Graph::Data>(e);
     gd.GraphRef = graph;

@@ -106,8 +106,8 @@ TEST(SphereFitting, LeastSquaresRecoversNoisySphere)
 	{
 		const float radialNoise = (static_cast<float>(i % 5) - 2.0f) * 0.0125f;
 		const glm::vec3 offset = glm::vec3{
-			0.01f * static_cast<float>((i % 3) - 1),
-			0.008f * static_cast<float>((i % 4) - 1.5f),
+			0.01f * (static_cast<float>(i % 3) - 1.0f),
+			0.008f * (static_cast<float>(i % 4) - 1.5f),
 			-0.006f * static_cast<float>((i % 2) ? 1.0f : -1.0f),
 		};
 		samples.push_back(center + directions[i] * (radius + radialNoise) + offset);

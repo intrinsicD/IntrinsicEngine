@@ -46,45 +46,37 @@ namespace Geometry::NormalEstimation
     {
         Eigen3 result{};
 
-        // Shift matrix by trace/3 for numerical stability (Smith's method)
-        const double c0 = a00 * a11 * a22 + 2.0 * a01 * a02 * a12
-                          - a00 * a12 * a12 - a11 * a02 * a02 - a22 * a01 * a01;
-        const double c1 = a00 * a11 - a01 * a01 + a00 * a22 - a02 * a02 + a11 * a22 - a12 * a12;
-        const double c2 = a00 + a11 + a22;
-
-        // Shift: solve t^3 - c2*t^2 + c1*t - c0 = 0
-        // Substitution: t = s + c2/3
-        const double c2over3 = c2 / 3.0;
-        const double aVal = c1 - c2 * c2over3;        // = a' coefficient
-        const double bVal = c0 - c1 * c2over3 + 2.0 * c2over3 * c2over3 * c2over3; // = b' coefficient
-
-        const double halfB = bVal / 2.0;
-        const double q = halfB * halfB + (aVal / 3.0) * (aVal / 3.0) * (aVal / 3.0);
-
-        double lambda0, lambda1, lambda2;
-
-        if (q <= 0.0)
+        const double mean = (a00 + a11 + a22) / 3.0;
+        const double b00 = a00 - mean;
+        const double b11 = a11 - mean;
+        const double b22 = a22 - mean;
+        const double p2 = (b00 * b00 + b11 * b11 + b22 * b22
+                          + 2.0 * (a01 * a01 + a02 * a02 + a12 * a12)) / 6.0;
+        const double scale = std::max({std::abs(a00), std::abs(a11), std::abs(a22), std::abs(a01), std::abs(a02), std::abs(a12), 1.0});
+        if (!(p2 > std::numeric_limits<double>::epsilon() * scale * scale))
         {
-            // Three real roots (typical for covariance matrices)
-            const double sqrtMinusA3 = std::sqrt(std::max(0.0, -aVal / 3.0));
-            const double r = sqrtMinusA3 * sqrtMinusA3 * sqrtMinusA3;
-            double theta = 0.0;
-            if (r > 1e-30)
-                theta = std::acos(std::clamp(-halfB / r, -1.0, 1.0)) / 3.0;
+            result.Eigenvalues = {mean, mean, mean};
+            result.Eigenvectors[0] = {1.0, 0.0, 0.0};
+            result.Eigenvectors[1] = {0.0, 1.0, 0.0};
+            result.Eigenvectors[2] = {0.0, 0.0, 1.0};
+            return result;
+        }
 
-            const double twoSqrt = 2.0 * sqrtMinusA3;
-            lambda0 = c2over3 + twoSqrt * std::cos(theta + 2.0 * std::numbers::pi / 3.0);
-            lambda1 = c2over3 + twoSqrt * std::cos(theta + 4.0 * std::numbers::pi / 3.0);
-            lambda2 = c2over3 + twoSqrt * std::cos(theta);
-        }
-        else
-        {
-            // Degenerate case: use direct formula
-            const double sqrtQ = std::sqrt(q);
-            const double u = std::cbrt(-halfB + sqrtQ);
-            const double v = std::cbrt(-halfB - sqrtQ);
-            lambda0 = lambda1 = lambda2 = c2over3 + u + v;
-        }
+        const double p = std::sqrt(p2);
+        const double invP = 1.0 / p;
+        const double c00 = b00 * invP;
+        const double c01 = a01 * invP;
+        const double c02 = a02 * invP;
+        const double c11 = b11 * invP;
+        const double c12 = a12 * invP;
+        const double c22 = b22 * invP;
+        const double detC = c00 * c11 * c22 + 2.0 * c01 * c02 * c12
+                          - c00 * c12 * c12 - c11 * c02 * c02 - c22 * c01 * c01;
+        const double phi = std::acos(std::clamp(detC * 0.5, -1.0, 1.0)) / 3.0;
+
+        double lambda0 = mean + 2.0 * p * std::cos(phi);
+        double lambda2 = mean + 2.0 * p * std::cos(phi + 2.0 * std::numbers::pi / 3.0);
+        double lambda1 = 3.0 * mean - lambda0 - lambda2;
 
         // Sort eigenvalues ascending
         if (lambda0 > lambda1) std::swap(lambda0, lambda1);

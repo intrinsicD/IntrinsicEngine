@@ -9,6 +9,8 @@
 
 import Core;
 import Runtime.FrameLoop;
+import Runtime.RenderExtraction;
+import Graphics.Camera;
 
 namespace
 {

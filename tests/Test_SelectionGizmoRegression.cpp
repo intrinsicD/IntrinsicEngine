@@ -93,7 +93,7 @@ TEST(SelectionGizmoRegression, SelectionReplace_GizmoReturnsToIdle)
     Graphics::TransformGizmo gizmo;
     Core::Input::Context input;
 
-    entt::entity a = CreateSelectedEntity(scene, glm::vec3(0.0f), "A");
+    [[maybe_unused]] entt::entity a = CreateSelectedEntity(scene, glm::vec3(0.0f), "A");
 
     gizmo.Update(scene.GetRegistry(), MakeTestCamera(), input, 800, 600, false);
     EXPECT_EQ(gizmo.GetState(), Graphics::GizmoState::Idle);
@@ -271,7 +271,7 @@ TEST(SelectionGizmoRegression, DeselectAll_GizmoSeesEmptySelection)
     ECS::Scene scene;
     auto& reg = scene.GetRegistry();
 
-    entt::entity e = CreateSelectedEntity(scene, glm::vec3(0.0f), "X");
+    [[maybe_unused]] entt::entity e = CreateSelectedEntity(scene, glm::vec3(0.0f), "X");
 
     Graphics::TransformGizmo gizmo;
     Core::Input::Context input;

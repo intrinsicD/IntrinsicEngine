@@ -5,12 +5,14 @@
 // device required.
 
 #include <gtest/gtest.h>
+#include <sstream>
 #include <string>
 #include <vector>
 
 #include "RHI.Vulkan.hpp"
 
 import Graphics;
+import Graphics.RenderSystem;
 import Core;
 
 using namespace Graphics;
@@ -71,6 +73,14 @@ static RenderGraphDebugPass MakePassWithAttachment(
     return pass;
 }
 
+static std::string DescribeValidationResult(const RenderGraphValidationResult& result)
+{
+    std::ostringstream oss;
+    for (const auto& diag : result.Diagnostics)
+        oss << (diag.Severity == RenderGraphValidationSeverity::Error ? "error" : "warning") << ": " << diag.Message << '\n';
+    return oss.str();
+}
+
 TEST(RenderGraphValidation, EmptyGraph_NoRecipe_NoDiagnostics)
 {
     FrameRecipe recipe{};
@@ -78,7 +88,7 @@ TEST(RenderGraphValidation, EmptyGraph_NoRecipe_NoDiagnostics)
     std::vector<RenderGraphDebugImage> images;
 
     auto result = ValidateCompiledGraph(recipe, passes, images);
-    EXPECT_FALSE(result.HasErrors());
+    EXPECT_FALSE(result.HasErrors()) << DescribeValidationResult(result);
     EXPECT_EQ(result.ErrorCount(), 0u);
     EXPECT_EQ(result.WarningCount(), 0u);
 }
@@ -182,7 +192,7 @@ TEST(RenderGraphValidation, BackbufferWrittenByPresent_NoError)
     };
 
     auto result = ValidateCompiledGraph(recipe, passes, images);
-    EXPECT_FALSE(result.HasErrors());
+    EXPECT_FALSE(result.HasErrors()) << DescribeValidationResult(result);
 }
 
 TEST(RenderGraphValidation, CustomWritePolicy_UnauthorizedWriter_IsError)
@@ -228,7 +238,7 @@ TEST(RenderGraphValidation, CustomWritePolicy_AuthorizedWriter_NoError)
     };
 
     auto result = ValidateCompiledGraph(recipe, passes, images, policies);
-    EXPECT_FALSE(result.HasErrors());
+    EXPECT_FALSE(result.HasErrors()) << DescribeValidationResult(result);
 }
 
 TEST(RenderGraphValidation, MultipleReInitialization_IsWarning)
@@ -294,6 +304,8 @@ TEST(RenderGraphValidation, DefaultForwardRecipe_BaselineContractsValidateCleanl
 
     std::vector<RenderGraphDebugImage> images = {
         MakeDebugImage(RenderResource::SceneDepth, true, 0),
+        MakeDebugImage(RenderResource::EntityId, false, 0),
+        MakeDebugImage(RenderResource::PrimitiveId, false, 0),
         MakeDebugImage(RenderResource::SceneColorHDR, false, 0),
         MakeDebugImage(RenderResource::SceneColorLDR, false, 1),
         MakeDebugImageRaw(StringID{"Backbuffer"}, 99, true, 2),
@@ -321,6 +333,8 @@ TEST(RenderGraphValidation, DefaultDeferredRecipe_BaselineContractsValidateClean
 
     std::vector<RenderGraphDebugImage> images = {
         MakeDebugImage(RenderResource::SceneDepth, true, 0),
+        MakeDebugImage(RenderResource::EntityId, false, 0),
+        MakeDebugImage(RenderResource::PrimitiveId, false, 0),
         MakeDebugImage(RenderResource::SceneNormal, false, 0),
         MakeDebugImage(RenderResource::Albedo, false, 0),
         MakeDebugImage(RenderResource::Material0, false, 0),
@@ -352,6 +366,8 @@ TEST(RenderGraphValidation, DefaultHybridRecipe_BaselineContractsValidateCleanly
 
     std::vector<RenderGraphDebugImage> images = {
         MakeDebugImage(RenderResource::SceneDepth, true, 0),
+        MakeDebugImage(RenderResource::EntityId, false, 0),
+        MakeDebugImage(RenderResource::PrimitiveId, false, 0),
         MakeDebugImage(RenderResource::SceneNormal, false, 0),
         MakeDebugImage(RenderResource::Albedo, false, 0),
         MakeDebugImage(RenderResource::Material0, false, 0),

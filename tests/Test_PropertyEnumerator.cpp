@@ -16,7 +16,7 @@ using namespace Graphics;
 TEST(PropertyEnumerator, EnumeratesFloatProperty)
 {
     Geometry::PropertySet ps;
-    ps.Add<float>("curvature", 0.0f);
+    (void)ps.Add<float>("curvature", 0.0f);
 
     auto props = EnumerateColorableProperties(ps);
     ASSERT_EQ(props.size(), 1u);
@@ -27,7 +27,7 @@ TEST(PropertyEnumerator, EnumeratesFloatProperty)
 TEST(PropertyEnumerator, EnumeratesVec3Property)
 {
     Geometry::PropertySet ps;
-    ps.Add<glm::vec3>("v:color", glm::vec3(0.0f));
+    (void)ps.Add<glm::vec3>("v:color", glm::vec3(0.0f));
 
     auto props = EnumerateColorableProperties(ps);
     ASSERT_EQ(props.size(), 1u);
@@ -38,7 +38,7 @@ TEST(PropertyEnumerator, EnumeratesVec3Property)
 TEST(PropertyEnumerator, EnumeratesVec4Property)
 {
     Geometry::PropertySet ps;
-    ps.Add<glm::vec4>("rgba", glm::vec4(0.0f));
+    (void)ps.Add<glm::vec4>("rgba", glm::vec4(0.0f));
 
     auto props = EnumerateColorableProperties(ps);
     ASSERT_EQ(props.size(), 1u);
@@ -49,11 +49,11 @@ TEST(PropertyEnumerator, EnumeratesVec4Property)
 TEST(PropertyEnumerator, FiltersInternalProperties)
 {
     Geometry::PropertySet ps;
-    ps.Add<glm::vec3>("v:position", glm::vec3(0.0f));
-    ps.Add<glm::vec3>("v:normal", glm::vec3(0.0f));
-    ps.Add<glm::vec3>("p:position", glm::vec3(0.0f));
-    ps.Add<glm::vec3>("p:normal", glm::vec3(0.0f));
-    ps.Add<float>("curvature", 0.0f);
+    (void)ps.Add<glm::vec3>("v:position", glm::vec3(0.0f));
+    (void)ps.Add<glm::vec3>("v:normal", glm::vec3(0.0f));
+    (void)ps.Add<glm::vec3>("p:position", glm::vec3(0.0f));
+    (void)ps.Add<glm::vec3>("p:normal", glm::vec3(0.0f));
+    (void)ps.Add<float>("curvature", 0.0f);
 
     auto props = EnumerateColorableProperties(ps);
     ASSERT_EQ(props.size(), 1u);
@@ -63,9 +63,9 @@ TEST(PropertyEnumerator, FiltersInternalProperties)
 TEST(PropertyEnumerator, EnumerateScalarOnlyReturnsFloat)
 {
     Geometry::PropertySet ps;
-    ps.Add<float>("curvature", 0.0f);
-    ps.Add<glm::vec3>("v:color", glm::vec3(0.0f));
-    ps.Add<glm::vec4>("rgba", glm::vec4(0.0f));
+    (void)ps.Add<float>("curvature", 0.0f);
+    (void)ps.Add<glm::vec3>("v:color", glm::vec3(0.0f));
+    (void)ps.Add<glm::vec4>("rgba", glm::vec4(0.0f));
 
     auto props = EnumerateScalarProperties(ps);
     ASSERT_EQ(props.size(), 1u);
@@ -76,9 +76,9 @@ TEST(PropertyEnumerator, EnumerateScalarOnlyReturnsFloat)
 TEST(PropertyEnumerator, EnumerateVectorOnlyReturnsVec3)
 {
     Geometry::PropertySet ps;
-    ps.Add<float>("curvature", 0.0f);
-    ps.Add<glm::vec3>("direction", glm::vec3(0.0f));
-    ps.Add<glm::vec4>("rgba", glm::vec4(0.0f));
+    (void)ps.Add<float>("curvature", 0.0f);
+    (void)ps.Add<glm::vec3>("direction", glm::vec3(0.0f));
+    (void)ps.Add<glm::vec4>("rgba", glm::vec4(0.0f));
 
     auto props = EnumerateVectorProperties(ps);
     ASSERT_EQ(props.size(), 1u);
@@ -97,9 +97,9 @@ TEST(PropertyEnumerator, EmptyPropertySet)
 TEST(PropertyEnumerator, MultipleProperties)
 {
     Geometry::PropertySet ps;
-    ps.Add<float>("curvature", 0.0f);
-    ps.Add<float>("area", 0.0f);
-    ps.Add<glm::vec3>("v:color", glm::vec3(0.0f));
+    (void)ps.Add<float>("curvature", 0.0f);
+    (void)ps.Add<float>("area", 0.0f);
+    (void)ps.Add<glm::vec3>("v:color", glm::vec3(0.0f));
 
     auto props = EnumerateColorableProperties(ps);
     EXPECT_EQ(props.size(), 3u);
@@ -108,8 +108,8 @@ TEST(PropertyEnumerator, MultipleProperties)
 TEST(PropertyEnumerator, UnsupportedTypeFiltered)
 {
     Geometry::PropertySet ps;
-    ps.Add<int>("label", 0);
-    ps.Add<float>("curvature", 0.0f);
+    (void)ps.Add<int>("label", 0);
+    (void)ps.Add<float>("curvature", 0.0f);
 
     auto props = EnumerateColorableProperties(ps);
     // int is not float/vec3/vec4, so only curvature shows up.

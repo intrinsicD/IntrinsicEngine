@@ -153,37 +153,42 @@ namespace SphereFitDetail
                 return MakeCircleSphere(points[0], points[1], points[2], params, points);
             }
 
-            std::array<std::array<double, 4>, 4> ata{};
-            std::array<double, 4> atb{};
+            const glm::dvec3 ref = points.front();
+            std::array<std::array<double, 3>, 3> ata{};
+            std::array<double, 3> atb{};
 
-            for (const glm::dvec3& p : points)
+            const double refNormSq = glm::dot(ref, ref);
+            for (std::size_t i = 1; i < points.size(); ++i)
             {
-                const double rhs = glm::dot(p, p);
-                const std::array<double, 4> row{2.0 * p.x, 2.0 * p.y, 2.0 * p.z, 1.0};
-                for (std::size_t i = 0; i < 4; ++i)
+                const glm::dvec3 rowVec = points[i] - ref;
+                const std::array<double, 3> row{2.0 * rowVec.x, 2.0 * rowVec.y, 2.0 * rowVec.z};
+                const double rhs = glm::dot(points[i], points[i]) - refNormSq;
+
+                for (std::size_t r = 0; r < 3; ++r)
                 {
-                    atb[i] += row[i] * rhs;
-                    for (std::size_t j = 0; j < 4; ++j)
+                    atb[r] += row[r] * rhs;
+                    for (std::size_t c = 0; c < 3; ++c)
                     {
-                        ata[i][j] += row[i] * row[j];
+                        ata[r][c] += row[r] * row[c];
                     }
                 }
             }
 
-            std::array<double, 4> solution{};
-            if (!Solver::SolveLinearSystem(ata, atb, solution, static_cast<double>(params.SingularThreshold)))
+            std::array<double, 3> center{};
+            if (!Solver::SolveLinearSystem(ata, atb, center, static_cast<double>(params.SingularThreshold)))
             {
                 return std::nullopt;
             }
 
-            const glm::dvec3 center{solution[0], solution[1], solution[2]};
-            const double radiusSq = glm::dot(center, center) + solution[3];
-            if (!(radiusSq >= 0.0) || !std::isfinite(radiusSq))
+            glm::dvec3 centerD{center[0], center[1], center[2]};
+            double radius = 0.0;
+            for (const glm::dvec3& p : points)
             {
-                return std::nullopt;
+                radius += glm::distance(p, centerD);
             }
+            radius /= static_cast<double>(points.size());
 
-            return FinalizeSphere(center, std::sqrt(radiusSq), points, params);
+            return FinalizeSphere(centerD, radius, points, params);
         }
     }
 

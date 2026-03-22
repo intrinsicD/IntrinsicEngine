@@ -347,9 +347,10 @@ namespace Graphics
 
             VkPushConstantRange pushConstant{};
             pushConstant.offset = 0;
-            // Point picking now shares the 120-byte point-style BDA contract.
-            // This keeps radius-aware point rendering and point picking aligned.
-            pushConstant.size = 120;
+            // PickMesh uses the canonical mesh push-constant contract.
+            // Keep this aligned with `RHI::MeshPushConstants` to satisfy the
+            // shader's declared push-constant block size.
+            pushConstant.size = sizeof(RHI::MeshPushConstants);
             pushConstant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
             builder.AddPushConstantRange(pushConstant);
 

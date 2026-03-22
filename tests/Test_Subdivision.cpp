@@ -145,7 +145,7 @@ TEST(Subdivision, InputMeshIsNotModified)
     const auto origFaces = input.FaceCount();
 
     Geometry::Halfedge::Mesh output;
-    Geometry::Subdivision::Subdivide(input, output);
+    (void)Geometry::Subdivision::Subdivide(input, output);
 
     EXPECT_EQ(input.VertexCount(), origVerts);
     EXPECT_EQ(input.FaceCount(), origFaces);

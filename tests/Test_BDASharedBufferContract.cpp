@@ -379,8 +379,8 @@ TEST(BDA_GraphData, PropertySetBackedColors)
     auto graph = std::make_shared<Geometry::Graph::Graph>();
 
     // Add some vertices
-    auto v0 = graph->AddVertex({0, 0, 0});
-    auto v1 = graph->AddVertex({1, 0, 0});
+    (void)graph->AddVertex({0, 0, 0});
+    (void)graph->AddVertex({1, 0, 0});
 
     ECS::Graph::Data data;
     data.GraphRef = graph;
@@ -389,7 +389,7 @@ TEST(BDA_GraphData, PropertySetBackedColors)
     EXPECT_FALSE(data.HasNodeColors());
 
     // Add color property
-    auto colors = graph->GetOrAddVertexProperty<glm::vec4>("v:color", {1, 1, 1, 1});
+    (void)graph->GetOrAddVertexProperty<glm::vec4>("v:color", {1, 1, 1, 1});
     EXPECT_TRUE(data.HasNodeColors());
 
     EXPECT_EQ(data.NodeCount(), 2u);
@@ -398,14 +398,14 @@ TEST(BDA_GraphData, PropertySetBackedColors)
 TEST(BDA_GraphData, PropertySetBackedRadii)
 {
     auto graph = std::make_shared<Geometry::Graph::Graph>();
-    graph->AddVertex({0, 0, 0});
+    (void)graph->AddVertex({0, 0, 0});
 
     ECS::Graph::Data data;
     data.GraphRef = graph;
 
     EXPECT_FALSE(data.HasNodeRadii());
 
-    auto radii = graph->GetOrAddVertexProperty<float>("v:radius", 0.01f);
+    (void)graph->GetOrAddVertexProperty<float>("v:radius", 0.01f);
     EXPECT_TRUE(data.HasNodeRadii());
 }
 
@@ -470,8 +470,8 @@ TEST(BDA_PerEdgeAttr, GraphDataEdgeColorFromPropertySet)
     auto v0 = graph->AddVertex({0, 0, 0});
     auto v1 = graph->AddVertex({1, 0, 0});
     auto v2 = graph->AddVertex({0, 1, 0});
-    graph->AddEdge(v0, v1);
-    graph->AddEdge(v1, v2);
+    (void)graph->AddEdge(v0, v1);
+    (void)graph->AddEdge(v1, v2);
 
     ECS::Graph::Data data;
     data.GraphRef = graph;
@@ -480,7 +480,7 @@ TEST(BDA_PerEdgeAttr, GraphDataEdgeColorFromPropertySet)
     EXPECT_FALSE(data.HasEdgeColors());
 
     // Add per-edge color property.
-    auto edgeColors = graph->GetOrAddEdgeProperty<glm::vec4>(
+    (void)graph->GetOrAddEdgeProperty<glm::vec4>(
         "e:color", glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
     EXPECT_TRUE(data.HasEdgeColors());
     EXPECT_EQ(data.EdgeCount(), 2u);
@@ -519,7 +519,7 @@ TEST(BDA_PerFaceAttr, MeshPushConstantsSizeUnchanged)
 {
     // MeshPushConstants includes per-face, per-vertex, and index buffer BDA
     // pointers while remaining within the 128-byte Vulkan minimum budget.
-    EXPECT_EQ(sizeof(RHI::MeshPushConstants), 120u);
+    EXPECT_EQ(sizeof(RHI::MeshPushConstants), 128u);
     EXPECT_LE(sizeof(RHI::MeshPushConstants), 128u);
 }
 

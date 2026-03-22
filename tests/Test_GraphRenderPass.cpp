@@ -26,9 +26,9 @@ static std::shared_ptr<Geometry::Graph::Graph> MakeTriangleGraph()
     auto v0 = g->AddVertex(glm::vec3(0, 0, 0));
     auto v1 = g->AddVertex(glm::vec3(1, 0, 0));
     auto v2 = g->AddVertex(glm::vec3(0, 1, 0));
-    g->AddEdge(v0, v1);
-    g->AddEdge(v1, v2);
-    g->AddEdge(v2, v0);
+    (void)g->AddEdge(v0, v1);
+    (void)g->AddEdge(v1, v2);
+    (void)g->AddEdge(v2, v0);
     return g;
 }
 
@@ -77,7 +77,7 @@ TEST(Graph_Data, PropertySetBackedColors)
     EXPECT_FALSE(data.HasNodeColors());
 
     // Add per-node colors via PropertySet.
-    auto colorProp = data.GraphRef->GetOrAddVertexProperty<glm::vec4>("v:color",
+    [[maybe_unused]] auto colorProp = data.GraphRef->GetOrAddVertexProperty<glm::vec4>("v:color",
         glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
     EXPECT_TRUE(data.HasNodeColors());
 }
@@ -89,7 +89,7 @@ TEST(Graph_Data, PropertySetBackedRadii)
     EXPECT_FALSE(data.HasNodeRadii());
 
     // Add per-node radii via PropertySet.
-    auto radiusProp = data.GraphRef->GetOrAddVertexProperty<float>("v:radius", 0.02f);
+    [[maybe_unused]] auto radiusProp = data.GraphRef->GetOrAddVertexProperty<float>("v:radius", 0.02f);
     EXPECT_TRUE(data.HasNodeRadii());
 }
 
@@ -128,8 +128,8 @@ TEST(Graph_Data, GraphWithDeletedVertices)
     auto v0 = g->AddVertex(glm::vec3(0, 0, 0));
     auto v1 = g->AddVertex(glm::vec3(1, 0, 0));
     auto v2 = g->AddVertex(glm::vec3(0, 1, 0));
-    g->AddEdge(v0, v1);
-    g->AddEdge(v1, v2);
+    (void)g->AddEdge(v0, v1);
+    (void)g->AddEdge(v1, v2);
 
     ECS::Graph::Data data;
     data.GraphRef = g;
@@ -193,7 +193,7 @@ TEST(Graph_PropertySetAccessors, PropertyExistsCheck)
     auto g = MakeTriangleGraph();
 
     EXPECT_FALSE(g->VertexProperties().Exists("v:color"));
-    g->GetOrAddVertexProperty<glm::vec4>("v:color");
+    (void)g->GetOrAddVertexProperty<glm::vec4>("v:color");
     EXPECT_TRUE(g->VertexProperties().Exists("v:color"));
 }
 
@@ -312,9 +312,9 @@ TEST(Graph_RetainedMode, GpuVertexCountTracksCompactedCount)
     auto v1 = g->AddVertex(glm::vec3(1, 0, 0));
     auto v2 = g->AddVertex(glm::vec3(0, 1, 0));
     auto v3 = g->AddVertex(glm::vec3(1, 1, 0));
-    g->AddEdge(v0, v1);
-    g->AddEdge(v1, v2);
-    g->AddEdge(v2, v3);
+    (void)g->AddEdge(v0, v1);
+    (void)g->AddEdge(v1, v2);
+    (void)g->AddEdge(v2, v3);
 
     ECS::Graph::Data data;
     data.GraphRef = g;
@@ -384,7 +384,7 @@ TEST(Graph_NodeAttributes, CachedNodeColorsMatchVertexCount)
     data.GraphRef = g;
 
     // Add per-node colors via PropertySet.
-    auto colorProp = g->GetOrAddVertexProperty<glm::vec4>("v:color",
+    [[maybe_unused]] auto colorProp = g->GetOrAddVertexProperty<glm::vec4>("v:color",
         glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
     EXPECT_TRUE(data.HasNodeColors());
 
@@ -410,7 +410,7 @@ TEST(Graph_NodeAttributes, CachedNodeRadiiMatchVertexCount)
     ECS::Graph::Data data;
     data.GraphRef = g;
 
-    auto radiusProp = g->GetOrAddVertexProperty<float>("v:radius", 0.02f);
+    [[maybe_unused]] auto radiusProp = g->GetOrAddVertexProperty<float>("v:radius", 0.02f);
     EXPECT_TRUE(data.HasNodeRadii());
 
     const std::size_t vSize = g->VerticesSize();
@@ -453,8 +453,8 @@ TEST(Graph_NodeAttributes, EmptyWhenPropertySetAbsent)
 
 TEST(Graph_StaticGeometry, DefaultIsFalse)
 {
-    // Default is false — backward-compatible with existing dynamic graph behavior.
-    ECS::Graph::Data data;
+    // Default is false - backward-compatible with existing dynamic graph behavior.
+    ECS::Graph::Data data{};
     EXPECT_FALSE(data.StaticGeometry);
 }
 
@@ -622,10 +622,10 @@ TEST(Graph_NodeAttributes, ClearedOnEmptyGraph)
 static std::shared_ptr<Geometry::Graph::Graph> MakeGraphWithDeletedMiddleVertex()
 {
     auto g = std::make_shared<Geometry::Graph::Graph>();
-    auto v0 = g->AddVertex(glm::vec3(0, 0, 0));
+    [[maybe_unused]] auto v0 = g->AddVertex(glm::vec3(0, 0, 0));
     auto v1 = g->AddVertex(glm::vec3(1, 0, 0));
-    auto v2 = g->AddVertex(glm::vec3(0, 1, 0));
-    g->GetOrAddVertexProperty<glm::vec4>("v:color", glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
+    [[maybe_unused]] auto v2 = g->AddVertex(glm::vec3(0, 1, 0));
+    (void)g->GetOrAddVertexProperty<glm::vec4>("v:color", glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
     g->DeleteVertex(v1);
     // Intentionally skip GarbageCollection() — v1 slot is still in storage but
     // IsDeleted(v1) == true.  VerticesSize() == 3, VertexCount() == 2.
@@ -689,7 +689,7 @@ TEST(GraphPropertyHelpers_D1, FallbackDoesNotOverrideExplicitPropertyName)
     // An explicitly set name must not be silently overwritten.
     auto graph = MakeGraphWithDeletedMiddleVertex();
     // Add a second named property that the test will request explicitly.
-    graph->GetOrAddVertexProperty<glm::vec4>("v:highlight", glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
+    (void)graph->GetOrAddVertexProperty<glm::vec4>("v:highlight", glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
 
     Graphics::ColorSource config;
     config.PropertyName = "v:highlight";  // explicitly set — must not be changed
@@ -707,7 +707,7 @@ TEST(GraphPropertyHelpers_D1, SkipDeletedVerticesInRadiusExtraction)
     // Regression: ExtractNodeRadii must skip deleted vertices when iterating
     // VerticesSize() with an IsDeleted() guard.
     auto graph = MakeGraphWithDeletedMiddleVertex();
-    graph->GetOrAddVertexProperty<float>("v:radius", 0.02f);
+    (void)graph->GetOrAddVertexProperty<float>("v:radius", 0.02f);
 
     // Replicate the loop from GraphPropertyHelpers::ExtractNodeRadii.
     std::vector<float> radii;

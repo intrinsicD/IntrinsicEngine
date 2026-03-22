@@ -77,8 +77,7 @@ namespace Graphics
 
         const bool hybridRequested = inputs.RequestedLightingPath == FrameLightingPath::Hybrid;
         const bool deferredRequested = hybridRequested ||
-                                       inputs.RequestedLightingPath == FrameLightingPath::Deferred ||
-                                       debugRequestsMaterial;
+                                       inputs.RequestedLightingPath == FrameLightingPath::Deferred;
         const bool deferredUsable = deferredRequested && inputs.SurfacePassEnabled && inputs.CompositionPassEnabled && hasGeometry;
         recipe.LightingPath = hasGeometry
             ? (deferredUsable ? (hybridRequested ? FrameLightingPath::Hybrid : FrameLightingPath::Deferred)
@@ -86,7 +85,7 @@ namespace Graphics
             : (debugRequestsSceneColor ? FrameLightingPath::Forward : FrameLightingPath::None);
 
         recipe.Normals = UsesDeferredComposition(recipe.LightingPath) || debugRequestsNormals;
-        recipe.MaterialChannels = UsesDeferredComposition(recipe.LightingPath);
+        recipe.MaterialChannels = UsesDeferredComposition(recipe.LightingPath) || debugRequestsMaterial;
         recipe.SceneColorLDR = recipe.Post || selectionActive || debugActive || inputs.ImGuiPassEnabled;
 
         return recipe;

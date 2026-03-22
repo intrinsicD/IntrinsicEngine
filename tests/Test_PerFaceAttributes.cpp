@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <cstddef>
+#include <limits>
 #include <numeric>
 #include <vector>
 
@@ -517,7 +519,7 @@ TEST(PerFaceAttr_Segmentation, SegmentationVisualization_PerFaceLabels)
 TEST(PerFaceAttr_Integration, PushConstantsSizeMatchesCurrentLayout)
 {
     // MeshPushConstants includes per-face, per-vertex, and index buffer BDA pointers.
-    EXPECT_EQ(sizeof(RHI::MeshPushConstants), 120u);
+    EXPECT_EQ(sizeof(RHI::MeshPushConstants), 128u);
     EXPECT_LE(sizeof(RHI::MeshPushConstants), 128u);
 }
 
@@ -534,10 +536,12 @@ TEST(PerFaceAttr_Integration, PushConstantsPtrFaceAttrOffset)
     //   uint64_t PtrFaceAttr    (8 bytes, offset 96)
     //   uint64_t PtrVertexAttr  (8 bytes, offset 104)
     //   uint64_t PtrIndices     (8 bytes, offset 112)
-    //   Total: 120 bytes
+    //   uint64_t PtrCentroids   (8 bytes, offset 120)
+    //   Total: 128 bytes
     EXPECT_EQ(offsetof(RHI::MeshPushConstants, PtrFaceAttr), 96u);
     EXPECT_EQ(offsetof(RHI::MeshPushConstants, PtrVertexAttr), 104u);
     EXPECT_EQ(offsetof(RHI::MeshPushConstants, PtrIndices), 112u);
+    EXPECT_EQ(offsetof(RHI::MeshPushConstants, PtrCentroids), 120u);
 }
 
 TEST(PerFaceAttr_Integration, PushConstantsPtrFaceAttrDefaultZero)

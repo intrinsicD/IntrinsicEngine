@@ -234,7 +234,7 @@ TEST(ResourcePool_Deferred, MultipleRemovalsWithDifferentRetirementTimes)
     DeferredPool pool;
 
     auto h0 = pool.Create(0); // index 0
-    auto h1 = pool.Create(1); // index 1
+    [[maybe_unused]] auto h1 = pool.Create(1); // index 1
     auto h2 = pool.Create(2); // index 2
 
     pool.Remove(h0, 10); // Removed at frame 10

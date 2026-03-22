@@ -21,7 +21,7 @@ namespace
         Geometry::Halfedge::Mesh refined;
         Geometry::Subdivision::SubdivisionParams sp;
         sp.Iterations = 2; // 20 * 16 = 320 faces
-        Geometry::Subdivision::Subdivide(ico, refined, sp);
+        (void)Geometry::Subdivision::Subdivide(ico, refined, sp);
         return refined;
     }
 }

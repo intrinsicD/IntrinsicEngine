@@ -30,7 +30,7 @@ import Runtime.RenderOrchestrator;
 
 namespace
 {
-    [[nodiscard]] Graphics::CameraComponent MakeTestCamera()
+    [[maybe_unused]] [[nodiscard]] Graphics::CameraComponent MakeTestCamera()
     {
         Graphics::CameraComponent cam;
         cam.Position = glm::vec3(0.0f, 0.0f, 10.0f);

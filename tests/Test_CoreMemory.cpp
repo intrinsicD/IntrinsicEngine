@@ -654,7 +654,7 @@ TEST(ArenaAllocatorDeathTest, DetectsUseAfterArenaDestroyed)
     // Simulate 'arena destroyed' for the allocator by explicitly invalidating the arena token.
     arena.DebugInvalidateLifetimeTokenForTests();
 
-    EXPECT_DEATH(leaked->allocate(1), "arena lifetime violation");
+    EXPECT_DEATH((void)leaked->allocate(1), "arena lifetime violation");
 }
 
 TEST(ArenaAllocatorDeathTest, DetectsUseAfterArenaMovedFrom)
@@ -667,6 +667,6 @@ TEST(ArenaAllocatorDeathTest, DetectsUseAfterArenaMovedFrom)
 
     // After move, the moved-from arena must be considered dead for existing allocators.
     // Triggering allocate() should trip the lifetime violation check.
-    EXPECT_DEATH(alloc.allocate(1), "arena lifetime violation");
+    EXPECT_DEATH((void)alloc.allocate(1), "arena lifetime violation");
 }
 #endif // NDEBUG

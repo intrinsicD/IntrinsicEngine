@@ -1,6 +1,9 @@
 #include <gtest/gtest.h>
+#include <algorithm>
+#include <cstddef>
 #include <memory>
 #include <type_traits>
+#include <string>
 #include <thread>
 #include <vector>
 #include <atomic>
@@ -178,7 +181,7 @@ TEST_F(TransferTest, TimelineValue_ConcurrentSafeDestroy)
 
     // Signal the timeline a few times to establish a non-zero baseline.
     for (int i = 0; i < 5; ++i)
-        m_Device->SignalGraphicsTimeline();
+        (void)m_Device->SignalGraphicsTimeline();
 
     const uint64_t baseline = m_Device->GetGraphicsTimelineValue();
     EXPECT_GE(baseline, 5u);
@@ -205,7 +208,7 @@ TEST_F(TransferTest, TimelineValue_ConcurrentSafeDestroy)
 
     // Main thread keeps signaling while background threads enqueue deletions.
     for (int i = 0; i < 50; ++i)
-        m_Device->SignalGraphicsTimeline();
+        (void)m_Device->SignalGraphicsTimeline();
 
     for (auto& th : threads)
         th.join();

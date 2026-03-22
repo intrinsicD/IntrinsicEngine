@@ -238,7 +238,7 @@ TEST(CoreHash, U64Hash_Basic)
 {
     U64Hash hasher;
 
-    size_t h1 = hasher(0ull);
+    (void)hasher(0ull);
     size_t h2 = hasher(1ull);
     size_t h3 = hasher(std::numeric_limits<uint64_t>::max());
 

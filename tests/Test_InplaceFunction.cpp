@@ -391,7 +391,6 @@ TEST(InplaceFunction, DestructorCalledOnMoveAssign)
     int dtorCountB = 0;
 
     InplaceFunction<void()> fnA{DestructorTracker{dtorCountA}};
-    int countA = dtorCountA;
 
     InplaceFunction<void()> fnB{DestructorTracker{dtorCountB}};
     int countB = dtorCountB;

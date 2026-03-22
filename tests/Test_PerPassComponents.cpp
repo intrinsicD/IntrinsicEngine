@@ -9,6 +9,7 @@
 
 import Graphics;
 import Geometry;
+import ECS;
 
 using namespace ECS;
 
@@ -28,7 +29,7 @@ TEST(PerPassComponents_Surface, DefaultConstruction)
 
 TEST(PerPassComponents_Line, DefaultConstruction)
 {
-    Line::Component c{};
+    ECS::Line::Component c{};
     EXPECT_FALSE(c.Geometry.IsValid());
     EXPECT_FALSE(c.EdgeView.IsValid());
     EXPECT_EQ(c.Color, glm::vec4(0.85f, 0.85f, 0.85f, 1.0f));
@@ -91,21 +92,21 @@ TEST(PerPassComponents_Registry, LineAttachDetach)
 {
     entt::registry reg;
     auto e = reg.create();
-    reg.emplace<Line::Component>(e);
+    reg.emplace<ECS::Line::Component>(e);
 
-    ASSERT_TRUE(reg.all_of<Line::Component>(e));
+    ASSERT_TRUE(reg.all_of<ECS::Line::Component>(e));
 
-    auto& line = reg.get<Line::Component>(e);
+    auto& line = reg.get<ECS::Line::Component>(e);
     line.Color = {1.0f, 0.0f, 0.0f, 1.0f};
     line.Width = 3.0f;
     line.Overlay = true;
 
-    EXPECT_EQ(reg.get<Line::Component>(e).Color, glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
-    EXPECT_FLOAT_EQ(reg.get<Line::Component>(e).Width, 3.0f);
-    EXPECT_TRUE(reg.get<Line::Component>(e).Overlay);
+    EXPECT_EQ(reg.get<ECS::Line::Component>(e).Color, glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
+    EXPECT_FLOAT_EQ(reg.get<ECS::Line::Component>(e).Width, 3.0f);
+    EXPECT_TRUE(reg.get<ECS::Line::Component>(e).Overlay);
 
-    reg.remove<Line::Component>(e);
-    EXPECT_FALSE(reg.all_of<Line::Component>(e));
+    reg.remove<ECS::Line::Component>(e);
+    EXPECT_FALSE(reg.all_of<ECS::Line::Component>(e));
 }
 
 TEST(PerPassComponents_Registry, PointAttachDetach)
@@ -138,11 +139,11 @@ TEST(PerPassComponents_Composition, MeshEntity_AllThreeComponents)
     auto e = reg.create();
 
     reg.emplace<Surface::Component>(e);
-    reg.emplace<Line::Component>(e);
+    reg.emplace<ECS::Line::Component>(e);
     reg.emplace<Point::Component>(e);
 
     EXPECT_TRUE(reg.all_of<Surface::Component>(e));
-    EXPECT_TRUE(reg.all_of<Line::Component>(e));
+    EXPECT_TRUE(reg.all_of<ECS::Line::Component>(e));
     EXPECT_TRUE(reg.all_of<Point::Component>(e));
 }
 
@@ -153,11 +154,11 @@ TEST(PerPassComponents_Composition, GraphEntity_LineAndPoint)
     auto e = reg.create();
 
     reg.emplace<Graph::Data>(e);
-    reg.emplace<Line::Component>(e);
+    reg.emplace<ECS::Line::Component>(e);
     reg.emplace<Point::Component>(e);
 
     EXPECT_TRUE(reg.all_of<Graph::Data>(e));
-    EXPECT_TRUE(reg.all_of<Line::Component>(e));
+    EXPECT_TRUE(reg.all_of<ECS::Line::Component>(e));
     EXPECT_TRUE(reg.all_of<Point::Component>(e));
     EXPECT_FALSE(reg.all_of<Surface::Component>(e));
 }
@@ -172,7 +173,7 @@ TEST(PerPassComponents_Composition, PointCloudEntity_PointOnly)
 
     EXPECT_TRUE(reg.all_of<Point::Component>(e));
     EXPECT_FALSE(reg.all_of<Surface::Component>(e));
-    EXPECT_FALSE(reg.all_of<Line::Component>(e));
+    EXPECT_FALSE(reg.all_of<ECS::Line::Component>(e));
 }
 
 TEST(PerPassComponents_Composition, AllThreeComponentsCoexist)
@@ -182,11 +183,11 @@ TEST(PerPassComponents_Composition, AllThreeComponentsCoexist)
     auto e = reg.create();
 
     reg.emplace<Surface::Component>(e);
-    reg.emplace<Line::Component>(e);
+    reg.emplace<ECS::Line::Component>(e);
     reg.emplace<Point::Component>(e);
 
     EXPECT_TRUE(reg.all_of<Surface::Component>(e));
-    EXPECT_TRUE(reg.all_of<Line::Component>(e));
+    EXPECT_TRUE(reg.all_of<ECS::Line::Component>(e));
     EXPECT_TRUE(reg.all_of<Point::Component>(e));
 }
 
@@ -200,15 +201,15 @@ TEST(PerPassComponents_Toggle, WireframeToggle_ByPresence)
     auto e = reg.create();
 
     // Wireframe OFF: no Line component.
-    EXPECT_FALSE(reg.all_of<Line::Component>(e));
+    EXPECT_FALSE(reg.all_of<ECS::Line::Component>(e));
 
     // Wireframe ON: attach Line component.
-    reg.emplace<Line::Component>(e);
-    EXPECT_TRUE(reg.all_of<Line::Component>(e));
+    reg.emplace<ECS::Line::Component>(e);
+    EXPECT_TRUE(reg.all_of<ECS::Line::Component>(e));
 
     // Wireframe OFF: detach.
-    reg.remove<Line::Component>(e);
-    EXPECT_FALSE(reg.all_of<Line::Component>(e));
+    reg.remove<ECS::Line::Component>(e);
+    EXPECT_FALSE(reg.all_of<ECS::Line::Component>(e));
 }
 
 TEST(PerPassComponents_Toggle, VertexVisToggle_ByPresence)
@@ -237,8 +238,8 @@ TEST(PerPassComponents_Iteration, SurfacePassView)
     auto e1 = reg.create();
     auto e2 = reg.create();
     auto e3 = reg.create();
-    auto e4 = reg.create();
-    auto e5 = reg.create();
+    [[maybe_unused]] auto e4 = reg.create();
+    [[maybe_unused]] auto e5 = reg.create();
 
     reg.emplace<Surface::Component>(e1);
     reg.emplace<Surface::Component>(e2);
@@ -260,7 +261,7 @@ TEST(PerPassComponents_Iteration, LinePassView)
     entt::registry reg;
 
     auto e1 = reg.create();
-    auto e2 = reg.create();
+    [[maybe_unused]] auto e2 = reg.create();
 
     reg.emplace<Line::Component>(e1);
     // e2 has no Line component.

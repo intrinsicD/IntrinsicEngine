@@ -246,6 +246,8 @@ namespace Geometry::HtexPatch
     {
         PatchAtlasLayout layout{};
         layout.TileSize = std::max(1u, tileSize);
+        layout.Width = layout.TileSize;
+        layout.Height = layout.TileSize;
 
         if (patchCount == 0u)
             return layout;
@@ -309,13 +311,20 @@ namespace Geometry::HtexPatch
                                     PatchAtlasLayout& outLayout,
                                     std::uint32_t invalidValue) noexcept
     {
-        outLayout = ComputeAtlasLayout(patches.size());
+        outLayout = PatchAtlasLayout{};
+        outLayout.Width = outLayout.TileSize;
+        outLayout.Height = outLayout.TileSize;
         outTexels.assign(
             static_cast<std::size_t>(outLayout.Width) * static_cast<std::size_t>(outLayout.Height),
             invalidValue);
 
         if (patches.empty() || centroids.empty())
             return false;
+
+        outLayout = ComputeAtlasLayout(patches.size());
+        outTexels.assign(
+            static_cast<std::size_t>(outLayout.Width) * static_cast<std::size_t>(outLayout.Height),
+            invalidValue);
 
         bool wroteAny = false;
         const std::uint32_t tileSize = outLayout.TileSize;

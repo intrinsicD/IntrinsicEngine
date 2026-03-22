@@ -410,12 +410,13 @@ TEST(AssetSystem, Clear_SafeWithMultipleAssets)
     // Load several assets
     auto loader = [](const std::string& path, AssetHandle) -> std::shared_ptr<int>
     {
+        (void)path;
         return std::make_shared<int>(42);
     };
 
-    auto h1 = manager.Load<int>("asset_a", loader);
-    auto h2 = manager.Load<int>("asset_b", loader);
-    auto h3 = manager.Load<int>("asset_c", loader);
+    [[maybe_unused]] auto h1 = manager.Load<int>("asset_a", loader);
+    [[maybe_unused]] auto h2 = manager.Load<int>("asset_b", loader);
+    [[maybe_unused]] auto h3 = manager.Load<int>("asset_c", loader);
 
     Core::Tasks::Scheduler::WaitForAll();
 

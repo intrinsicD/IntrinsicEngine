@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
 #include <type_traits>
 
 import Runtime.RenderExtraction;

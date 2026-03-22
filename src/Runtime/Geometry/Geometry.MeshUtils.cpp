@@ -295,17 +295,17 @@ namespace Geometry::MeshUtils
 
     double AngleAtVertex(glm::vec3 a, glm::vec3 b, glm::vec3 c)
     {
-        glm::vec3 ab = b - a;
-        glm::vec3 ac = c - a;
-        float lenAB = glm::length(ab);
-        float lenAC = glm::length(ac);
+        const glm::dvec3 ab = glm::dvec3(b) - glm::dvec3(a);
+        const glm::dvec3 ac = glm::dvec3(c) - glm::dvec3(a);
+        const double lenAB = glm::length(ab);
+        const double lenAC = glm::length(ac);
 
         if (lenAB < 1e-10f || lenAC < 1e-10f)
             return 0.0;
 
-        float cosAngle = glm::dot(ab, ac) / (lenAB * lenAC);
-        cosAngle = std::clamp(cosAngle, -1.0f, 1.0f);
-        return static_cast<double>(std::acos(cosAngle));
+        const double sinAngle = glm::length(glm::cross(ab, ac));
+        const double cosAngle = glm::dot(ab, ac);
+        return std::atan2(sinAngle, cosAngle);
     }
 
     double EdgeLengthSq(const Halfedge::Mesh& mesh, EdgeHandle e)

@@ -4,9 +4,7 @@ module;
 #include <array>
 #include <cmath>
 #include <limits>
-#include <numbers>
 #include <span>
-#include <utility>
 
 #include <glm/glm.hpp>
 
@@ -35,166 +33,101 @@ namespace Geometry::PcaDetail
     {
         Eigen3 result{};
 
-        const double c0 = a00 * a11 * a22 + 2.0 * a01 * a02 * a12
-                        - a00 * a12 * a12 - a11 * a02 * a02 - a22 * a01 * a01;
-        const double c1 = a00 * a11 - a01 * a01 + a00 * a22 - a02 * a02 + a11 * a22 - a12 * a12;
-        const double c2 = a00 + a11 + a22;
-
-        const double c2Over3 = c2 / 3.0;
-        const double aVal = c1 - c2 * c2Over3;
-        const double bVal = c0 - c1 * c2Over3 + 2.0 * c2Over3 * c2Over3 * c2Over3;
-        const double halfB = bVal / 2.0;
-        const double q = halfB * halfB + (aVal / 3.0) * (aVal / 3.0) * (aVal / 3.0);
-
-        double lambda0 = c2Over3;
-        double lambda1 = c2Over3;
-        double lambda2 = c2Over3;
-
-        if (q <= 0.0)
+        const double mean = (a00 + a11 + a22) / 3.0;
+        const double b00 = a00 - mean;
+        const double b11 = a11 - mean;
+        const double b22 = a22 - mean;
+        const double p2 = (b00 * b00 + b11 * b11 + b22 * b22
+                          + 2.0 * (a01 * a01 + a02 * a02 + a12 * a12)) / 6.0;
+        const double scale = std::max({std::abs(a00), std::abs(a11), std::abs(a22), std::abs(a01), std::abs(a02), std::abs(a12), 1.0});
+        if (!(p2 > std::numeric_limits<double>::epsilon() * scale * scale))
         {
-            const double sqrtMinusA3 = std::sqrt(std::max(0.0, -aVal / 3.0));
-            const double r = sqrtMinusA3 * sqrtMinusA3 * sqrtMinusA3;
-            double theta = 0.0;
-            if (r > 1e-30)
-            {
-                theta = std::acos(std::clamp(-halfB / r, -1.0, 1.0)) / 3.0;
-            }
-
-            const double twoSqrt = 2.0 * sqrtMinusA3;
-            lambda0 = c2Over3 + twoSqrt * std::cos(theta + 2.0 * std::numbers::pi / 3.0);
-            lambda1 = c2Over3 + twoSqrt * std::cos(theta + 4.0 * std::numbers::pi / 3.0);
-            lambda2 = c2Over3 + twoSqrt * std::cos(theta);
+            result.Eigenvalues = {mean, mean, mean};
+            result.Eigenvectors[0] = {1.0, 0.0, 0.0};
+            result.Eigenvectors[1] = {0.0, 1.0, 0.0};
+            result.Eigenvectors[2] = {0.0, 0.0, 1.0};
         }
         else
         {
-            const double sqrtQ = std::sqrt(q);
-            const double u = std::cbrt(-halfB + sqrtQ);
-            const double v = std::cbrt(-halfB - sqrtQ);
-            lambda0 = lambda1 = lambda2 = c2Over3 + u + v;
-        }
+            const double p = std::sqrt(p2);
+            const double invP = 1.0 / p;
+            const double c00 = b00 * invP;
+            const double c01 = a01 * invP;
+            const double c02 = a02 * invP;
+            const double c11 = b11 * invP;
+            const double c12 = a12 * invP;
+            const double c22 = b22 * invP;
+            const double detC = c00 * c11 * c22 + 2.0 * c01 * c02 * c12
+                              - c00 * c12 * c12 - c11 * c02 * c02 - c22 * c01 * c01;
+            const double phi = std::acos(std::clamp(detC * 0.5, -1.0, 1.0)) / 3.0;
 
-        std::array<std::pair<double, glm::dvec3>, 3> eig{
-            std::pair{lambda0, glm::dvec3{1.0, 0.0, 0.0}},
-            std::pair{lambda1, glm::dvec3{0.0, 1.0, 0.0}},
-            std::pair{lambda2, glm::dvec3{0.0, 0.0, 1.0}},
-        };
+            double lambda0 = mean + 2.0 * p * std::cos(phi);
+            double lambda2 = mean + 2.0 * p * std::cos(phi + 2.0 * std::acos(-1.0) / 3.0);
+            double lambda1 = 3.0 * mean - lambda0 - lambda2;
 
-        auto computeEigenvector = [&](double lambda) -> glm::dvec3
-        {
-            const glm::dvec3 row0{a00 - lambda, a01, a02};
-            const glm::dvec3 row1{a01, a11 - lambda, a12};
-            const glm::dvec3 row2{a02, a12, a22 - lambda};
+            if (lambda0 > lambda1) std::swap(lambda0, lambda1);
+            if (lambda1 > lambda2) std::swap(lambda1, lambda2);
+            if (lambda0 > lambda1) std::swap(lambda0, lambda1);
 
-            const glm::dvec3 c01 = glm::cross(row0, row1);
-            const glm::dvec3 c02 = glm::cross(row0, row2);
-            const glm::dvec3 c12 = glm::cross(row1, row2);
+            result.Eigenvalues = {lambda2, lambda1, lambda0};
 
-            const double d01 = glm::dot(c01, c01);
-            const double d02 = glm::dot(c02, c02);
-            const double d12 = glm::dot(c12, c12);
-
-            glm::dvec3 best{1.0, 0.0, 0.0};
-            double bestLengthSq = d01;
-            if (d01 >= d02 && d01 >= d12)
+            auto computeEigenvector = [&](double lambda) -> glm::dvec3
             {
-                best = c01;
-                bestLengthSq = d01;
-            }
-            else if (d02 >= d12)
-            {
-                best = c02;
-                bestLengthSq = d02;
-            }
-            else
-            {
-                best = c12;
-                bestLengthSq = d12;
-            }
+                const glm::dvec3 row0{a00 - lambda, a01, a02};
+                const glm::dvec3 row1{a01, a11 - lambda, a12};
+                const glm::dvec3 row2{a02, a12, a22 - lambda};
 
-            if (bestLengthSq > 1e-30)
-            {
-                return best / std::sqrt(bestLengthSq);
-            }
+                const glm::dvec3 cross01 = glm::cross(row0, row1);
+                const glm::dvec3 cross02 = glm::cross(row0, row2);
+                const glm::dvec3 cross12 = glm::cross(row1, row2);
 
-            const glm::dvec3 basis[3] = {
-                {1.0, 0.0, 0.0},
-                {0.0, 1.0, 0.0},
-                {0.0, 0.0, 1.0},
-            };
-            double bestResidual = std::numeric_limits<double>::max();
-            glm::dvec3 fallback = basis[0];
-            for (const glm::dvec3& axis : basis)
-            {
-                const glm::dvec3 residual{
-                    (a00 - lambda) * axis.x + a01 * axis.y + a02 * axis.z,
-                    a01 * axis.x + (a11 - lambda) * axis.y + a12 * axis.z,
-                    a02 * axis.x + a12 * axis.y + (a22 - lambda) * axis.z,
-                };
-                const double residualNorm = glm::dot(residual, residual);
-                if (residualNorm < bestResidual)
+                const double lenSq01 = glm::dot(cross01, cross01);
+                const double lenSq02 = glm::dot(cross02, cross02);
+                const double lenSq12 = glm::dot(cross12, cross12);
+
+                glm::dvec3 best{1.0, 0.0, 0.0};
+                double bestLenSq = lenSq01;
+                if (lenSq01 >= lenSq02 && lenSq01 >= lenSq12)
                 {
-                    bestResidual = residualNorm;
-                    fallback = axis;
+                    best = cross01;
+                    bestLenSq = lenSq01;
                 }
-            }
-            return fallback;
-        };
+                else if (lenSq02 >= lenSq12)
+                {
+                    best = cross02;
+                    bestLenSq = lenSq02;
+                }
+                else
+                {
+                    best = cross12;
+                    bestLenSq = lenSq12;
+                }
 
-        eig[0].second = computeEigenvector(eig[0].first);
-        eig[1].second = computeEigenvector(eig[1].first);
-        eig[2].second = computeEigenvector(eig[2].first);
+                if (bestLenSq > 1e-30)
+                    return best / std::sqrt(bestLenSq);
 
-        std::sort(eig.begin(), eig.end(), [](const auto& a, const auto& b)
-        {
-            return a.first > b.first;
-        });
+                return {1.0, 0.0, 0.0};
+            };
 
-        glm::dvec3 axis0 = eig[0].second;
-        if (const double len = glm::length(axis0); len > 1e-15)
-        {
-            axis0 /= len;
-        }
-        else
-        {
-            axis0 = glm::dvec3{1.0, 0.0, 0.0};
-        }
+            result.Eigenvectors[2] = computeEigenvector(lambda0);
+            result.Eigenvectors[1] = computeEigenvector(lambda1);
+            result.Eigenvectors[0] = computeEigenvector(lambda2);
 
-        glm::dvec3 axis1 = eig[1].second - glm::dot(eig[1].second, axis0) * axis0;
-        if (const double len = glm::length(axis1); len > 1e-15)
-        {
-            axis1 /= len;
-        }
-        else
-        {
-            const glm::dvec3 fallback = std::abs(axis0.x) < 0.9
-                ? glm::dvec3{1.0, 0.0, 0.0}
-                : glm::dvec3{0.0, 1.0, 0.0};
-            axis1 = glm::normalize(glm::cross(axis0, fallback));
+            const double dot01 = glm::dot(result.Eigenvectors[0], result.Eigenvectors[1]);
+            result.Eigenvectors[1] -= dot01 * result.Eigenvectors[0];
+            const double len1 = glm::length(result.Eigenvectors[1]);
+            if (len1 > 1e-15)
+                result.Eigenvectors[1] /= len1;
+
+            result.Eigenvectors[2] = glm::cross(result.Eigenvectors[0], result.Eigenvectors[1]);
+            const double len2 = glm::length(result.Eigenvectors[2]);
+            if (len2 > 1e-15)
+                result.Eigenvectors[2] /= len2;
         }
 
-        glm::dvec3 axis2 = glm::cross(axis0, axis1);
-        if (const double len = glm::length(axis2); len > 1e-15)
-        {
-            axis2 /= len;
-        }
-        else
-        {
-            axis2 = glm::dvec3{0.0, 0.0, 1.0};
-        }
-
-        if (glm::dot(glm::cross(axis0, axis1), axis2) < 0.0)
-        {
-            axis2 = -axis2;
-        }
-
-        result.Eigenvalues = glm::dvec3{
-            std::max(0.0, eig[0].first),
-            std::max(0.0, eig[1].first),
-            std::max(0.0, eig[2].first),
-        };
-        result.Eigenvectors[0] = axis0;
-        result.Eigenvectors[1] = axis1;
-        result.Eigenvectors[2] = axis2;
+        result.Eigenvalues.x = std::max(0.0, result.Eigenvalues.x);
+        result.Eigenvalues.y = std::max(0.0, result.Eigenvalues.y);
+        result.Eigenvalues.z = std::max(0.0, result.Eigenvalues.z);
         return result;
     }
 }
@@ -222,7 +155,7 @@ export namespace Geometry
             {
                 continue;
             }
-            mean += glm::dvec3{point};
+            mean += glm::dvec3{static_cast<double>(point.x), static_cast<double>(point.y), static_cast<double>(point.z)};
             ++count;
         }
 
@@ -233,7 +166,7 @@ export namespace Geometry
 
         mean /= static_cast<double>(count);
         result.Valid = true;
-        result.Mean = glm::vec3{mean};
+        result.Mean = glm::vec3{static_cast<float>(mean.x), static_cast<float>(mean.y), static_cast<float>(mean.z)};
 
         if (count == 1)
         {
@@ -256,7 +189,7 @@ export namespace Geometry
                 continue;
             }
 
-            const glm::dvec3 delta = glm::dvec3{point} - mean;
+            const glm::dvec3 delta = glm::dvec3{static_cast<double>(point.x), static_cast<double>(point.y), static_cast<double>(point.z)} - mean;
             c00 += delta.x * delta.x;
             c01 += delta.x * delta.y;
             c02 += delta.x * delta.z;
@@ -271,11 +204,15 @@ export namespace Geometry
             c11 * invCount, c12 * invCount, c22 * invCount);
 
         result.Eigenvectors = glm::mat3{
-            glm::vec3{eigen.Eigenvectors[0]},
-            glm::vec3{eigen.Eigenvectors[1]},
-            glm::vec3{eigen.Eigenvectors[2]},
+            glm::vec3{static_cast<float>(eigen.Eigenvectors[0].x), static_cast<float>(eigen.Eigenvectors[0].y), static_cast<float>(eigen.Eigenvectors[0].z)},
+            glm::vec3{static_cast<float>(eigen.Eigenvectors[1].x), static_cast<float>(eigen.Eigenvectors[1].y), static_cast<float>(eigen.Eigenvectors[1].z)},
+            glm::vec3{static_cast<float>(eigen.Eigenvectors[2].x), static_cast<float>(eigen.Eigenvectors[2].y), static_cast<float>(eigen.Eigenvectors[2].z)},
         };
-        result.Eigenvalues = glm::vec3{eigen.Eigenvalues};
+        result.Eigenvalues = glm::vec3{
+            static_cast<float>(eigen.Eigenvalues.x),
+            static_cast<float>(eigen.Eigenvalues.y),
+            static_cast<float>(eigen.Eigenvalues.z),
+        };
 
         const float largest = std::max(result.Eigenvalues.x, 1.0e-12f);
         result.Flat = result.Eigenvalues.z <= largest * 1.0e-5f;
