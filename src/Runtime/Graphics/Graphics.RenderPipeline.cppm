@@ -17,6 +17,7 @@ import Graphics.RenderGraph;
 import Graphics.GPUScene;
 import Graphics.MaterialSystem;
 import Graphics.Geometry;
+import Geometry.Handle;
 import Graphics.ShaderRegistry;
 import Graphics.PipelineLibrary;
 import Graphics.DebugDraw;
@@ -242,6 +243,32 @@ export namespace Graphics
         }
     };
 
+    struct PickingSurfacePacket
+    {
+        Geometry::GeometryHandle Geometry{};
+        glm::mat4 WorldMatrix{1.0f};
+        uint32_t EntityId = 0;
+        std::vector<uint32_t> TriangleFaceIds{};
+    };
+
+    struct PickingLinePacket
+    {
+        Geometry::GeometryHandle Geometry{};
+        Geometry::GeometryHandle EdgeView{};
+        glm::mat4 WorldMatrix{1.0f};
+        uint32_t EntityId = 0;
+        float Width = 1.0f;
+        uint32_t EdgeCount = 0;
+    };
+
+    struct PickingPointPacket
+    {
+        Geometry::GeometryHandle Geometry{};
+        glm::mat4 WorldMatrix{1.0f};
+        uint32_t EntityId = 0;
+        float Size = 1.0f;
+    };
+
     // ---------------------------------------------------------------------
     // Frame Context
     // ---------------------------------------------------------------------
@@ -309,6 +336,10 @@ export namespace Graphics
 
         RHI::VulkanBuffer* PickReadbackBuffer = nullptr;
         DebugDraw* DebugDrawPtr = nullptr;
+
+        std::span<const PickingSurfacePacket> PickingSurfacePackets{};
+        std::span<const PickingLinePacket> PickingLinePackets{};
+        std::span<const PickingPointPacket> PickingPointPackets{};
     };
 
     [[nodiscard]] inline RGTextureDesc BuildRenderResourceTextureDesc(RenderResource resource,

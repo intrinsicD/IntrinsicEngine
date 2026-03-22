@@ -1073,8 +1073,12 @@ namespace Graphics
         ApplyPendingPipelineSwap(extent.width, extent.height);
     }
 
-    void RenderSystem::BuildGraph(const ECS::Scene& scene, Core::Assets::AssetManager& assetManager,
-                                  const CameraComponent& camera)
+    void RenderSystem::BuildGraph(const ECS::Scene& scene,
+                                  Core::Assets::AssetManager& assetManager,
+                                  const CameraComponent& camera,
+                                  std::span<const PickingSurfacePacket> pickingSurfacePackets,
+                                  std::span<const PickingLinePacket> pickingLinePackets,
+                                  std::span<const PickingPointPacket> pickingPointPackets)
     {
         const uint32_t frameIndex = m_Presentation.GetFrameIndex();
         m_RenderGraph.Reset(frameIndex);
@@ -1124,7 +1128,10 @@ namespace Graphics
             camera.ViewMatrix,
             camera.ProjectionMatrix,
             m_Interaction.GetReadbackBuffer(frameIndex),
-            m_DebugDraw
+            m_DebugDraw,
+            pickingSurfacePackets,
+            pickingLinePackets,
+            pickingPointPackets
         };
 
         if (m_ActivePipeline)

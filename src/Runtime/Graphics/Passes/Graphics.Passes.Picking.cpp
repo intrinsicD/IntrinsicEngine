@@ -10,7 +10,6 @@ module;
 #include <unordered_map>
 #include <vector>
 #include <glm/glm.hpp>
-#include <entt/entity/registry.hpp>
 #include "RHI.Vulkan.hpp"
 
 module Graphics.Passes.Picking;
@@ -22,8 +21,6 @@ import Graphics.Components;
 import Graphics.Geometry;
 import Graphics.ShaderRegistry;
 
-import Geometry.HalfedgeMesh;
-import Geometry.MeshUtils;
 import Geometry.Frustum;
 import Geometry.Overlap;
 import Geometry.Sphere;
@@ -31,8 +28,6 @@ import Geometry.Sphere;
 import Core.Filesystem;
 import Core.Hash;
 import Core.Logging;
-
-import ECS;
 
 import RHI.Buffer;
 import RHI.CommandUtils;
@@ -68,30 +63,6 @@ namespace Graphics::Passes
         };                           // total: 112
         static_assert(sizeof(PickMRTPushConsts) == 112);
 
-        [[nodiscard]] const Geometry::Halfedge::Mesh* ResolvePickingMesh(const entt::registry& registry, entt::entity entity)
-        {
-            if (const auto* meshData = registry.try_get<ECS::Mesh::Data>(entity))
-            {
-                if (meshData->MeshRef)
-                    return meshData->MeshRef.get();
-            }
-
-            if (const auto* collider = registry.try_get<ECS::MeshCollider::Component>(entity))
-            {
-                if (collider->CollisionRef && collider->CollisionRef->SourceMesh)
-                    return collider->CollisionRef->SourceMesh.get();
-            }
-
-            return nullptr;
-        }
-
-        void BuildTriangleFaceIds(const Geometry::Halfedge::Mesh& mesh, std::vector<uint32_t>& triangleFaceIds)
-        {
-            std::vector<glm::vec3> positions;
-            std::vector<uint32_t> indices;
-            Geometry::MeshUtils::ExtractIndexedTriangles(mesh, positions, indices, nullptr, &triangleFaceIds);
-        }
-
 #ifdef __clang__
 #pragma clang diagnostic pop
 #endif
@@ -116,32 +87,25 @@ namespace Graphics::Passes
 
         std::unordered_map<uint32_t, uint64_t> faceIdByGeoIndex;
         {
-            auto& registry = ctx.Scene.GetRegistry();
-            auto surfaceView = registry.view<ECS::Surface::Component>();
-            std::vector<uint32_t> triangleFaceIds;
-            for (auto [entity, surface] : surfaceView.each())
+            for (const auto& packet : ctx.PickingSurfacePackets)
             {
-                if (!surface.Geometry.IsValid() || faceIdByGeoIndex.contains(surface.Geometry.Index))
+                if (!packet.Geometry.IsValid() || faceIdByGeoIndex.contains(packet.Geometry.Index))
                     continue;
-                auto* geo = ctx.GeometryStorage.GetIfValid(surface.Geometry);
+                auto* geo = ctx.GeometryStorage.GetIfValid(packet.Geometry);
                 if (!geo || geo->GetTopology() != PrimitiveTopology::Triangles)
                     continue;
-                const Geometry::Halfedge::Mesh* mesh = ResolvePickingMesh(registry, entity);
-                if (!mesh)
-                    continue;
-                BuildTriangleFaceIds(*mesh, triangleFaceIds);
-                if (triangleFaceIds.empty())
+                if (packet.TriangleFaceIds.empty())
                     continue;
                 const uint32_t gpuTriangleCount = (geo->GetIndexCount() > 0)
                     ? (geo->GetIndexCount() / 3u)
                     : static_cast<uint32_t>((geo->GetLayout().PositionsSize / sizeof(glm::vec3)) / 3u);
-                if (gpuTriangleCount != triangleFaceIds.size())
+                if (gpuTriangleCount != packet.TriangleFaceIds.size())
                     continue;
-                if (const uint64_t addr = EnsureFaceIdBuffer(surface.Geometry.Index,
-                                                             triangleFaceIds.data(),
-                                                             static_cast<uint32_t>(triangleFaceIds.size())); addr != 0)
+                if (const uint64_t addr = EnsureFaceIdBuffer(packet.Geometry.Index,
+                                                             packet.TriangleFaceIds.data(),
+                                                             static_cast<uint32_t>(packet.TriangleFaceIds.size())); addr != 0)
                 {
-                    faceIdByGeoIndex[surface.Geometry.Index] = addr;
+                    faceIdByGeoIndex[packet.Geometry.Index] = addr;
                 }
             }
         }
@@ -181,19 +145,6 @@ namespace Graphics::Passes
 
                                             SetViewportScissor(cmd, ctx.Resolution);
 
-                                            auto& registry = ctx.Scene.GetRegistry();
-                                            auto getPickId = [&](entt::entity entity) -> uint32_t
-                                            {
-                                                if (auto* pid = registry.try_get<ECS::Components::Selection::PickID>(entity))
-                                                    return pid->Value;
-                                                return 0u;
-                                            };
-                                            auto getWorldMatrix = [&](entt::entity entity, const ECS::Components::Transform::Component& transform) -> glm::mat4
-                                            {
-                                                if (registry.all_of<ECS::Components::Transform::WorldMatrix>(entity))
-                                                    return registry.get<ECS::Components::Transform::WorldMatrix>(entity).Matrix;
-                                                return GetMatrix(transform);
-                                            };
                                             auto bindPipelineAndSets = [&](RHI::GraphicsPipeline* pipeline)
                                             {
                                                 vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->GetHandle());
@@ -207,23 +158,22 @@ namespace Graphics::Passes
                                             // Surface
                                             bindPipelineAndSets(meshPipeline);
                                             vkCmdSetPrimitiveTopology(cmd, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-                                            for (auto [entity, transform, surface] : registry.view<ECS::Components::Transform::Component, ECS::Surface::Component>().each())
+                                            for (const auto& packet : ctx.PickingSurfacePackets)
                                             {
-                                                if (!surface.Geometry.IsValid())
+                                                if (!packet.Geometry.IsValid())
                                                     continue;
-                                                auto* geo = ctx.GeometryStorage.GetIfValid(surface.Geometry);
+                                                auto* geo = ctx.GeometryStorage.GetIfValid(packet.Geometry);
                                                 if (!geo || !geo->GetVertexBuffer())
                                                     continue;
-                                                const glm::mat4 worldMatrix = getWorldMatrix(entity, transform);
                                                 const uint64_t baseAddr = geo->GetVertexBuffer()->GetDeviceAddress();
                                                 const auto& layout = geo->GetLayout();
-                                                const auto faceIdIt = faceIdByGeoIndex.find(surface.Geometry.Index);
+                                                const auto faceIdIt = faceIdByGeoIndex.find(packet.Geometry.Index);
                                                 const PickMRTPushConsts push{
-                                                    .Model = worldMatrix,
+                                                    .Model = packet.WorldMatrix,
                                                     .PtrPositions = baseAddr + layout.PositionsOffset,
                                                     .PtrAux = 0,
                                                     .PtrPrimitiveFaceIds = (faceIdIt != faceIdByGeoIndex.end()) ? faceIdIt->second : 0,
-                                                    .EntityID = getPickId(entity),
+                                                    .EntityID = packet.EntityId,
                                                     .PrimitiveBase = 0,
                                                     .PickWidth = 0.0f,
                                                     .ViewportWidth = static_cast<float>(ctx.Resolution.width),
@@ -246,65 +196,54 @@ namespace Graphics::Passes
                                             // Lines
                                             bindPipelineAndSets(linePipeline);
                                             vkCmdSetPrimitiveTopology(cmd, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-                                            for (auto [entity, transform, line] : registry.view<ECS::Components::Transform::Component, ECS::Line::Component>().each())
+                                            for (const auto& packet : ctx.PickingLinePackets)
                                             {
-                                                const bool isMeshEntity = registry.all_of<ECS::MeshCollider::Component>(entity) || registry.all_of<ECS::Mesh::Data>(entity);
-                                                const bool isGraphEntity = registry.all_of<ECS::Graph::Data>(entity);
-                                                if (isMeshEntity || !isGraphEntity)
+                                                if (!packet.Geometry.IsValid() || !packet.EdgeView.IsValid() || packet.EdgeCount == 0u)
                                                     continue;
-                                                if (!line.Geometry.IsValid() || !line.EdgeView.IsValid())
-                                                    continue;
-                                                auto* vertexGeo = ctx.GeometryStorage.GetIfValid(line.Geometry);
-                                                auto* edgeGeo = ctx.GeometryStorage.GetIfValid(line.EdgeView);
+                                                auto* vertexGeo = ctx.GeometryStorage.GetIfValid(packet.Geometry);
+                                                auto* edgeGeo = ctx.GeometryStorage.GetIfValid(packet.EdgeView);
                                                 if (!vertexGeo || !edgeGeo)
                                                     continue;
-                                                const glm::mat4 worldMatrix = getWorldMatrix(entity, transform);
                                                 const uint64_t baseAddr = vertexGeo->GetVertexBuffer()->GetDeviceAddress();
                                                 const auto& layout = vertexGeo->GetLayout();
                                                 const uint64_t edgeAddr = edgeGeo->GetIndexBuffer() ? edgeGeo->GetIndexBuffer()->GetDeviceAddress() : 0;
                                                 const PickMRTPushConsts push{
-                                                    .Model = worldMatrix,
+                                                    .Model = packet.WorldMatrix,
                                                     .PtrPositions = baseAddr + layout.PositionsOffset,
                                                     .PtrAux = edgeAddr,
                                                     .PtrPrimitiveFaceIds = 0,
-                                                    .EntityID = getPickId(entity),
+                                                    .EntityID = packet.EntityId,
                                                     .PrimitiveBase = 0,
-                                                    .PickWidth = line.Width,
+                                                    .PickWidth = packet.Width,
                                                     .ViewportWidth = static_cast<float>(ctx.Resolution.width),
                                                     .ViewportHeight = static_cast<float>(ctx.Resolution.height),
                                                     ._pad = 0,
                                                 };
                                                 vkCmdPushConstants(cmd, linePipeline->GetLayout(), VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push), &push);
-                                                vkCmdDraw(cmd, line.EdgeCount * 6, 1, 0, 0);
+                                                vkCmdDraw(cmd, packet.EdgeCount * 6, 1, 0, 0);
                                             }
 
                                             // Points
                                             bindPipelineAndSets(pointPipeline);
                                             vkCmdSetPrimitiveTopology(cmd, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-                                            for (auto [entity, transform, point] : registry.view<ECS::Components::Transform::Component, ECS::Point::Component>().each())
+                                            for (const auto& packet : ctx.PickingPointPackets)
                                             {
-                                                const bool isMeshEntity = registry.all_of<ECS::MeshCollider::Component>(entity) || registry.all_of<ECS::Mesh::Data>(entity);
-                                                const bool isGraphEntity = registry.all_of<ECS::Graph::Data>(entity);
-                                                const bool isPointCloudEntity = registry.all_of<ECS::PointCloud::Data>(entity);
-                                                if (isMeshEntity || isGraphEntity || !isPointCloudEntity)
+                                                if (!packet.Geometry.IsValid())
                                                     continue;
-                                                if (!point.Geometry.IsValid())
-                                                    continue;
-                                                auto* geo = ctx.GeometryStorage.GetIfValid(point.Geometry);
+                                                auto* geo = ctx.GeometryStorage.GetIfValid(packet.Geometry);
                                                 if (!geo || !geo->GetVertexBuffer())
                                                     continue;
-                                                const glm::mat4 worldMatrix = getWorldMatrix(entity, transform);
                                                 const uint64_t baseAddr = geo->GetVertexBuffer()->GetDeviceAddress();
                                                 const auto& layout = geo->GetLayout();
                                                 const uint32_t vertCount = static_cast<uint32_t>(layout.PositionsSize / sizeof(glm::vec3));
                                                 const PickMRTPushConsts push{
-                                                    .Model = worldMatrix,
+                                                    .Model = packet.WorldMatrix,
                                                     .PtrPositions = baseAddr + layout.PositionsOffset,
                                                     .PtrAux = 0,
                                                     .PtrPrimitiveFaceIds = 0,
-                                                    .EntityID = getPickId(entity),
+                                                    .EntityID = packet.EntityId,
                                                     .PrimitiveBase = 0,
-                                                    .PickWidth = point.Size,
+                                                    .PickWidth = packet.Size,
                                                     .ViewportWidth = static_cast<float>(ctx.Resolution.width),
                                                     .ViewportHeight = static_cast<float>(ctx.Resolution.height),
                                                     ._pad = 0,
