@@ -28,13 +28,13 @@ namespace
                  | (static_cast<uint32_t>(a) << 24);
         }
 
-        constexpr uint32_t PackColorF(float r, float g, float b, float a = 1.0f) noexcept
+        uint32_t PackColorF(float r, float g, float b, float a = 1.0f) noexcept
         {
             auto clamp = [](float v) noexcept -> uint8_t {
                 if (!std::isfinite(v)) return 0;
                 if (v <= 0.0f) return 0;
                 if (v >= 1.0f) return 255;
-                return static_cast<uint8_t>(v * 255.0f + 0.5f);
+                return static_cast<uint8_t>(std::lround(static_cast<double>(v) * 255.0));
             };
             return PackColor(clamp(r), clamp(g), clamp(b), clamp(a));
         }
@@ -140,7 +140,7 @@ static std::vector<uint32_t> ExtractFaceColorsFromMesh(const Geometry::Halfedge:
     if (!mesh.FaceProperties().Exists("f:color"))
         return {};
 
-    auto colorProp = Geometry::FaceProperty<glm::vec4>(
+    auto colorProp = Geometry::ConstFaceProperty<glm::vec4>(
         mesh.FaceProperties().Get<glm::vec4>("f:color"));
     if (!colorProp.IsValid())
         return {};
@@ -325,7 +325,8 @@ TEST(PerFaceAttr_Curvature, ScalarToHeatColor_Monotonic)
         float t = static_cast<float>(i) / 100.0f;
         uint32_t c = TestGpuColor::ScalarToHeatColor(t);
         uint8_t r = (c >> 0) & 0xFF;
-        EXPECT_GE(r, prevR) << "Red channel decreased at t=" << t;
+        EXPECT_GE(static_cast<unsigned int>(r), static_cast<unsigned int>(prevR))
+            << "Red channel decreased at t=" << t;
         prevR = r;
     }
 }
@@ -702,7 +703,7 @@ TEST(PerFaceAttr_Robustness, LargeMeshScaling)
         }
     }
 
-    const std::size_t expectedFaces = static_cast<std::size_t>(N * N * 2);
+    const auto expectedFaces = static_cast<std::size_t>(N) * static_cast<std::size_t>(N) * 2u;
     ASSERT_EQ(mesh.FaceCount(), expectedFaces);
 
     // Populate face colors with curvature-like values.

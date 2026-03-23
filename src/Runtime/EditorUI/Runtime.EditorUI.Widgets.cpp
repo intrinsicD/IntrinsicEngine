@@ -346,7 +346,7 @@ namespace
         return GetGeometryProcessingCapabilities(reg, entity).HasEditableSurfaceMesh;
     }
 
-    [[nodiscard]] const char* PropertyTypeLabel(const Geometry::PropertySet& ps,
+    [[nodiscard]] const char* PropertyTypeLabel(const Geometry::ConstPropertySet& ps,
                                                 const std::string& name)
     {
         if (ps.Get<bool>(name)) return "bool";
@@ -420,7 +420,7 @@ namespace
     }
 
     template <class T>
-    bool DrawTypedPropertyPreview(const Geometry::PropertySet& ps,
+    bool DrawTypedPropertyPreview(const Geometry::ConstPropertySet& ps,
                                   const std::string& name,
                                   const PropertySetBrowserState& state)
     {
@@ -769,7 +769,7 @@ namespace
 // ColorSourceWidget
 // =========================================================================
 bool ColorSourceWidget(const char* label, Graphics::ColorSource& src,
-                       const Geometry::PropertySet* ps, const char* suffix)
+                       const Geometry::ConstPropertySet* ps, const char* suffix)
 {
     bool changed = false;
     char idBuf[128];
@@ -864,7 +864,7 @@ bool ColorSourceWidget(const char* label, Graphics::ColorSource& src,
 // VectorFieldWidget
 // =========================================================================
 bool VectorFieldWidget(Graphics::VisualizationConfig& config,
-                       const Geometry::PropertySet* ps, const char* suffix)
+                       const Geometry::ConstPropertySet* ps, const char* suffix)
 {
     bool changed = false;
     char idBuf[128];
@@ -1000,7 +1000,7 @@ bool ColorEdit4(const char* label, glm::vec4& color)
 }
 
 bool DrawPropertySetBrowserWidget(const char* label,
-                                  const Geometry::PropertySet* ps,
+                                  const Geometry::ConstPropertySet* ps,
                                   PropertySetBrowserState& state,
                                   const char* suffix)
 {

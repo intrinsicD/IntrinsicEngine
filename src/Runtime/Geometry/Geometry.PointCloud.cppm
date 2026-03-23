@@ -5,6 +5,7 @@ module;
 #include <optional>
 #include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -132,19 +133,19 @@ export namespace Geometry::PointCloud
         // ---- User-defined per-point properties ----
 
         template <class T>
-        [[nodiscard]] VertexProperty<T> GetOrAddVertexProperty(std::string name, T defaultValue = T())
+        [[nodiscard]] VertexProperty<T> GetOrAddVertexProperty(std::string_view name, T defaultValue = T())
         {
-            return VertexProperty<T>(m_Points.GetOrAdd<T>(std::move(name), std::move(defaultValue)));
+            return VertexProperty<T>(m_Points.GetOrAdd<T>(std::string{name}, std::move(defaultValue)));
         }
 
         template <class T>
-        [[nodiscard]] VertexProperty<T> GetVertexProperty(std::string_view name) const
+        [[nodiscard]] ConstProperty<T> GetVertexProperty(std::string_view name) const
         {
-            return VertexProperty<T>(m_Points.Get<T>(name));
+            return ConstPropertySet(m_Points).Get<T>(name);
         }
 
-        [[nodiscard]] Vertices&       PointProperties()       noexcept { return m_Points; }
-        [[nodiscard]] const Vertices& PointProperties() const noexcept { return m_Points; }
+        [[nodiscard]] Vertices& PointProperties() noexcept { return m_Points; }
+        [[nodiscard]] ConstPropertySet PointProperties() const noexcept { return ConstPropertySet(m_Points); } // NOLINT(readability-convert-member-functions-to-static)
 
         // Validate internal consistency (built-in optional arrays, if present, match Size()).
         [[nodiscard]] bool IsValid() const noexcept;
@@ -170,7 +171,7 @@ export namespace Geometry::PointCloud
     struct CloudStatistics
     {
         std::size_t PointCount{0};
-        AABB        BoundingBox;
+        AABB        BoundingBox{};
         glm::vec3   Centroid{0.0f};
         float       AverageSpacing{0.0f};    // Mean distance to nearest neighbor.
         float       MinSpacing{0.0f};
@@ -248,7 +249,7 @@ export namespace Geometry::PointCloud
 
     struct RadiusEstimationResult
     {
-        std::vector<float> Radii;
+        std::vector<float> Radii{};
         float AverageRadius{0.0f};
         float MinRadius{0.0f};
         float MaxRadius{0.0f};
@@ -273,8 +274,8 @@ export namespace Geometry::PointCloud
 
     struct SubsampleResult
     {
-        Cloud Subsampled;
-        std::vector<std::size_t> SelectedIndices;  // Original indices of kept points.
+        Cloud Subsampled{};
+        std::vector<std::size_t> SelectedIndices{};  // Original indices of kept points.
     };
 
     // Returns nullopt if cloud is empty.

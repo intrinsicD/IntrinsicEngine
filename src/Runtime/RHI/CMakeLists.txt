@@ -20,6 +20,7 @@ target_sources(${target_name}
         RHI.Renderer.cppm
         RHI.Profiler.cppm
         RHI.Buffer.cppm
+        RHI.BufferHandle.cppm
         RHI.CommandUtils.cppm
         RHI.CommandContext.cppm
         RHI.Types.cppm
@@ -30,6 +31,7 @@ target_sources(${target_name}
         RHI.Texture.cppm
         RHI.TextureSystem.cppm
         RHI.TextureFwd.cppm
+        RHI.TextureHandle.cppm
         RHI.Transfer.cppm
         RHI.StagingBelt.cppm
         RHI.TransientAllocator.cppm

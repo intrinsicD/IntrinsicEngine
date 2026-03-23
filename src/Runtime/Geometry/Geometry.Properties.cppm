@@ -268,25 +268,39 @@ export namespace Geometry
         [[nodiscard]] explicit operator bool() const noexcept { return m_Storage != nullptr; }
 
         /// Direct access to the backing vector; asserts if invalid.
-        [[nodiscard]] std::vector<T>& Vector() const noexcept
+        [[nodiscard]] std::vector<T>& Vector() noexcept
         {
             assert(m_Storage != nullptr);
             return m_Storage->Data();
         }
 
+        [[nodiscard]] const std::vector<T>& Vector() const noexcept
+        {
+            assert(m_Storage != nullptr);
+            return static_cast<const Internal::PropertyStorage<T>*>(m_Storage)->Data();
+        }
+
         /// Element access; asserts if invalid or index out of range.
-        [[nodiscard]] decltype(auto) operator[](size_t index) const
+        [[nodiscard]] decltype(auto) operator[](size_t index)
         {
             assert(m_Storage != nullptr);
             assert(index < m_Storage->Data().size());
             return m_Storage->Data()[index];
         }
 
+        /// Read-only element access; asserts if invalid or index out of range.
+        [[nodiscard]] decltype(auto) operator[](size_t index) const
+        {
+            assert(m_Storage != nullptr);
+            assert(index < m_Storage->Data().size());
+            return static_cast<const Internal::PropertyStorage<T>*>(m_Storage)->Data()[index];
+        }
+
         /// Returns a read-only span (unsupported for vector<bool>).
         [[nodiscard]] std::span<const T> Span() const noexcept requires (!std::is_same_v<T, bool>)
         {
             assert(m_Storage != nullptr);
-            return std::span<T>(m_Storage->Data());
+            return std::span<const T>(static_cast<const Internal::PropertyStorage<T>*>(m_Storage)->Data());
         }
 
         /// Returns a mutable span (unsupported for vector<bool>).
@@ -300,7 +314,7 @@ export namespace Geometry
         [[nodiscard]] const T* Data() const noexcept requires (!std::is_same_v<T, bool>)
         {
             assert(m_Storage != nullptr);
-            return m_Storage->Data().data();
+            return static_cast<const Internal::PropertyStorage<T>*>(m_Storage)->Data().data();
         }
 
         /// Clears the handle so it no longer refers to storage.
@@ -528,6 +542,34 @@ export namespace Geometry
         PropertyBuffer<T> m_Buffer;
     };
 
+    /// Read-only value-semantic wrapper around ConstPropertyBuffer.
+    template <class T>
+    class ConstProperty
+    {
+    public:
+        ConstProperty() = default;
+
+        explicit ConstProperty(ConstPropertyBuffer<T> buffer) : m_Buffer(buffer)
+        {
+        }
+
+        [[nodiscard]] bool IsValid() const noexcept { return static_cast<bool>(m_Buffer); }
+        explicit operator bool() const noexcept { return static_cast<bool>(m_Buffer); }
+
+        [[nodiscard]] const std::string& Name() const { return m_Buffer.Name(); }
+
+        [[nodiscard]] decltype(auto) operator[](size_t index) const { return m_Buffer[index]; }
+
+        [[nodiscard]] const std::vector<T>& Vector() const { return m_Buffer.Vector(); }
+        [[nodiscard]] const std::vector<T>& Array() const { return m_Buffer.Vector(); }
+        [[nodiscard]] std::span<const T> Span() const { return m_Buffer.Span(); }
+
+        [[nodiscard]] const ConstPropertyBuffer<T>& Handle() const noexcept { return m_Buffer; }
+
+    private:
+        ConstPropertyBuffer<T> m_Buffer;
+    };
+
     /// Property wrapper that indexes by a handle type (e.g., VertexHandle).
     template <class HandleT, class T>
     class HandleProperty : public Property<T>
@@ -546,6 +588,20 @@ export namespace Geometry
         {
             return Property<T>::operator[](handle.Index);
         }
+    };
+
+    /// Read-only property wrapper indexed by a handle type (e.g., VertexHandle).
+    template <class HandleT, class T>
+    class ConstHandleProperty : public ConstProperty<T>
+    {
+    public:
+        using ConstProperty<T>::ConstProperty;
+
+        explicit ConstHandleProperty(ConstProperty<T> base) : ConstProperty<T>(std::move(base))
+        {
+        }
+
+        [[nodiscard]] decltype(auto) operator[](HandleT handle) const { return ConstProperty<T>::operator[](handle.Index); }
     };
 
     /// Convenience wrapper for a PropertyRegistry.
@@ -592,6 +648,31 @@ export namespace Geometry
 
     private:
         PropertyRegistry m_Registry;
+    };
+
+    class ConstPropertySet
+    {
+    public:
+        ConstPropertySet() = default;
+        explicit ConstPropertySet(const PropertySet& set) : m_Set(&set) {}
+
+        [[nodiscard]] size_t Size() const noexcept { return m_Set->Size(); }
+        [[nodiscard]] bool Empty() const { return m_Set->Empty(); }
+        [[nodiscard]] bool Exists(std::string_view name) const { return m_Set->Exists(name); }
+        [[nodiscard]] std::vector<std::string> Properties() const { return m_Set->Properties(); }
+
+        template <class T>
+        [[nodiscard]] ConstProperty<T> Get(std::string_view name) const
+        {
+            if (auto handle = m_Set->Registry().Get<T>(name))
+            {
+                return ConstProperty<T>(*handle);
+            }
+            return ConstProperty<T>();
+        }
+
+    private:
+        const PropertySet* m_Set{nullptr};
     };
 
     template <class T>
@@ -690,21 +771,41 @@ export namespace Geometry
     template <class T>
     using VertexProperty = HandleProperty<VertexHandle, T>;
 
+    /// Read-only property indexed by VertexHandle.
+    template <class T>
+    using ConstVertexProperty = ConstHandleProperty<VertexHandle, T>;
+
     /// Property indexed by HalfedgeHandle.
     template <class T>
     using HalfedgeProperty = HandleProperty<HalfedgeHandle, T>;
+
+    /// Read-only property indexed by HalfedgeHandle.
+    template <class T>
+    using ConstHalfedgeProperty = ConstHandleProperty<HalfedgeHandle, T>;
 
     /// Property indexed by EdgeHandle.
     template <class T>
     using EdgeProperty = HandleProperty<EdgeHandle, T>;
 
+    /// Read-only property indexed by EdgeHandle.
+    template <class T>
+    using ConstEdgeProperty = ConstHandleProperty<EdgeHandle, T>;
+
     /// Property indexed by FaceHandle.
     template <class T>
     using FaceProperty = HandleProperty<FaceHandle, T>;
 
+    /// Read-only property indexed by FaceHandle.
+    template <class T>
+    using ConstFaceProperty = ConstHandleProperty<FaceHandle, T>;
+
     /// Property indexed by NodeHandle.
     template <class T>
     using NodeProperty = HandleProperty<NodeHandle, T>;
+
+    /// Read-only property indexed by NodeHandle.
+    template <class T>
+    using ConstNodeProperty = ConstHandleProperty<NodeHandle, T>;
 
     /// Standard property sets for topology elements.
     using Vertices = PropertySet;

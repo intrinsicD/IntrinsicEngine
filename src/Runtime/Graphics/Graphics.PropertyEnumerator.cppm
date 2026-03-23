@@ -37,12 +37,18 @@ export namespace Graphics
     /// Filters out internal properties (positions, normals, connectivity).
     [[nodiscard]] std::vector<PropertyInfo> EnumerateColorableProperties(
         const Geometry::PropertySet& ps);
+    [[nodiscard]] std::vector<PropertyInfo> EnumerateColorableProperties(
+        const Geometry::ConstPropertySet& ps);
 
     /// Returns only scalar (float) properties suitable for scalar field viz.
     [[nodiscard]] std::vector<PropertyInfo> EnumerateScalarProperties(
         const Geometry::PropertySet& ps);
+    [[nodiscard]] std::vector<PropertyInfo> EnumerateScalarProperties(
+        const Geometry::ConstPropertySet& ps);
 
     /// Returns only vec3 properties suitable for vector field viz.
     [[nodiscard]] std::vector<PropertyInfo> EnumerateVectorProperties(
         const Geometry::PropertySet& ps);
+    [[nodiscard]] std::vector<PropertyInfo> EnumerateVectorProperties(
+        const Geometry::ConstPropertySet& ps);
 }

@@ -145,23 +145,43 @@ namespace Geometry::Halfedge
     }
 
     Mesh::Mesh()
+        : m_Properties(std::make_shared<MeshProperties>())
+        , m_Vertices(m_Properties->Vertices)
+        , m_Halfedges(m_Properties->Halfedges)
+        , m_Edges(m_Properties->Edges)
+        , m_Faces(m_Properties->Faces)
+    {
+        EnsureProperties();
+    }
+
+    Mesh::Mesh(PropertySet& vertices, PropertySet& halfedges, PropertySet& edges, PropertySet& faces) noexcept
+        : m_Properties(nullptr)
+        , m_Vertices(vertices)
+        , m_Halfedges(halfedges)
+        , m_Edges(edges)
+        , m_Faces(faces)
     {
         EnsureProperties();
     }
 
     Mesh::Mesh(const Mesh& rhs)
-        : m_Vertices(rhs.m_Vertices)
-        , m_Halfedges(rhs.m_Halfedges)
-        , m_Edges(rhs.m_Edges)
-        , m_Faces(rhs.m_Faces)
-        , m_DeletedVertices(rhs.m_DeletedVertices)
-        , m_DeletedEdges(rhs.m_DeletedEdges)
-        , m_DeletedFaces(rhs.m_DeletedFaces)
-        , m_HasGarbage(rhs.m_HasGarbage)
-        , m_VertexAttrTransfer(rhs.m_VertexAttrTransfer)
+        : m_Properties(std::make_shared<MeshProperties>())
+        , m_Vertices(m_Properties->Vertices)
+        , m_Halfedges(m_Properties->Halfedges)
+        , m_Edges(m_Properties->Edges)
+        , m_Faces(m_Properties->Faces)
     {
-        // PropertyBuffer<T> holds raw pointers into PropertyRegistry storage.
-        // After copying the registries, rebind the wrappers to this instance's storage.
+        m_Vertices = rhs.m_Vertices;
+        m_Halfedges = rhs.m_Halfedges;
+        m_Edges = rhs.m_Edges;
+        m_Faces = rhs.m_Faces;
+
+        m_DeletedVertices = rhs.m_DeletedVertices;
+        m_DeletedEdges = rhs.m_DeletedEdges;
+        m_DeletedFaces = rhs.m_DeletedFaces;
+        m_HasGarbage = rhs.m_HasGarbage;
+        m_VertexAttrTransfer = rhs.m_VertexAttrTransfer;
+
         EnsureProperties();
     }
 
@@ -183,6 +203,159 @@ namespace Geometry::Halfedge
             EnsureProperties();
         }
         return *this;
+    }
+
+    Mesh& Mesh::operator=(Mesh&& rhs) noexcept
+    {
+        if (this != &rhs)
+        {
+            m_Vertices = std::move(rhs.m_Vertices);
+            m_Halfedges = std::move(rhs.m_Halfedges);
+            m_Edges = std::move(rhs.m_Edges);
+            m_Faces = std::move(rhs.m_Faces);
+            m_DeletedVertices = rhs.m_DeletedVertices;
+            m_DeletedEdges = rhs.m_DeletedEdges;
+            m_DeletedFaces = rhs.m_DeletedFaces;
+            m_HasGarbage = rhs.m_HasGarbage;
+            m_AddFaceVertices = std::move(rhs.m_AddFaceVertices);
+            m_AddFaceHalfedges = std::move(rhs.m_AddFaceHalfedges);
+            m_AddFaceIsNew = std::move(rhs.m_AddFaceIsNew);
+            m_AddFaceNeedsAdjust = std::move(rhs.m_AddFaceNeedsAdjust);
+            m_AddFaceNextCache = std::move(rhs.m_AddFaceNextCache);
+            m_VertexAttrTransfer = std::move(rhs.m_VertexAttrTransfer);
+        }
+        return *this;
+    }
+
+    bool ConstMeshView::IsManifold(VertexHandle v) const
+    {
+        int gaps = 0;
+        HalfedgeHandle h = Halfedge(v);
+        const HalfedgeHandle start = h;
+        if (h.IsValid())
+        {
+            std::size_t safety = 0;
+            const std::size_t maxIter = HalfedgesSize();
+            do
+            {
+                if (IsBoundary(h)) ++gaps;
+                h = CWRotatedHalfedge(h);
+                if (++safety > maxIter) break;
+            } while (h != start);
+        }
+        return gaps < 2;
+    }
+
+    std::optional<HalfedgeHandle> ConstMeshView::FindHalfedge(VertexHandle start, VertexHandle end) const
+    {
+        assert(IsValid(start) && IsValid(end));
+
+        HalfedgeHandle h = Halfedge(start);
+        const HalfedgeHandle hh = h;
+
+        if (h.IsValid())
+        {
+            const std::size_t maxIter = HalfedgesSize();
+            std::size_t iter = 0;
+            do
+            {
+                if (ToVertex(h) == end) return h;
+                h = CWRotatedHalfedge(h);
+                if (++iter > maxIter) break;
+            } while (h != hh);
+        }
+
+        return std::nullopt;
+    }
+
+    std::optional<EdgeHandle> ConstMeshView::FindEdge(VertexHandle a, VertexHandle b) const
+    {
+        if (auto h = FindHalfedge(a, b)) return Edge(*h);
+        return std::nullopt;
+    }
+
+    std::size_t ConstMeshView::Valence(VertexHandle v) const
+    {
+        std::size_t count = 0;
+        HalfedgeHandle h = Halfedge(v);
+        const HalfedgeHandle start = h;
+        if (h.IsValid())
+        {
+            const std::size_t maxIter = HalfedgesSize();
+            std::size_t iter = 0;
+            do
+            {
+                ++count;
+                h = CWRotatedHalfedge(h);
+                if (++iter > maxIter) return count;
+            } while (h != start);
+        }
+        return count;
+    }
+
+    std::size_t ConstMeshView::Valence(FaceHandle f) const
+    {
+        std::size_t count = 0;
+        HalfedgeHandle h = Halfedge(f);
+        const HalfedgeHandle start = h;
+        if (h.IsValid())
+        {
+            const std::size_t maxIter = HalfedgesSize();
+            do
+            {
+                ++count;
+                h = NextHalfedge(h);
+                if (count > maxIter) break;
+            } while (h != start);
+        }
+        return count;
+    }
+
+    std::vector<EdgeVertexPair> ConstMeshView::ExtractEdgeVertexPairs() const
+    {
+        const std::size_t nEdges = EdgesSize();
+        if (nEdges == 0)
+            return {};
+
+        const auto hConn = m_HConn.Span();
+
+        std::vector<EdgeVertexPair> result;
+        result.reserve(EdgeCount());
+
+        for (std::size_t i = 0; i < nEdges; ++i)
+        {
+            if (m_EDeleted.Handle()[i])
+                continue;
+
+            const auto v0 = static_cast<uint32_t>(hConn[2 * i + 1].Vertex.Index);
+            const auto v1 = static_cast<uint32_t>(hConn[2 * i].Vertex.Index);
+            result.push_back({v0, v1});
+        }
+
+        return result;
+    }
+
+    std::size_t ConstMeshView::ExtractEdgeVertexPairs(std::span<EdgeVertexPair> out) const
+    {
+        const std::size_t nEdges = EdgesSize();
+        if (nEdges == 0 || out.empty())
+            return 0;
+
+        const auto hConn = m_HConn.Span();
+
+        std::size_t written = 0;
+
+        for (std::size_t i = 0; i < nEdges && written < out.size(); ++i)
+        {
+            if (m_EDeleted.Handle()[i])
+                continue;
+
+            out[written++] = EdgeVertexPair{
+                static_cast<uint32_t>(hConn[2 * i + 1].Vertex.Index),
+                static_cast<uint32_t>(hConn[2 * i].Vertex.Index)};
+        }
+
+        return written;
     }
 
     void Mesh::EnsureProperties()
@@ -519,19 +692,20 @@ namespace Geometry::Halfedge
                 outer_prev = OppositeHalfedge(inner_next);
                 outer_next = OppositeHalfedge(inner_prev);
 
-                switch (id)
+                if (id == 1)
                 {
-                case 1:
                     boundary_prev = PrevHalfedge(inner_next);
                     next_cache.emplace_back(boundary_prev, outer_next);
                     SetHalfedge(v, outer_next);
-                    break;
-                case 2:
+                }
+                else if (id == 2)
+                {
                     boundary_next = NextHalfedge(inner_prev);
                     next_cache.emplace_back(outer_prev, boundary_next);
                     SetHalfedge(v, boundary_next);
-                    break;
-                case 3:
+                }
+                else if (id == 3)
+                {
                     if (!Halfedge(v).IsValid())
                     {
                         SetHalfedge(v, outer_next);
@@ -544,7 +718,6 @@ namespace Geometry::Halfedge
                         next_cache.emplace_back(boundary_prev, outer_next);
                         next_cache.emplace_back(outer_prev, boundary_next);
                     }
-                    break;
                 }
 
                 next_cache.emplace_back(inner_prev, inner_next);
@@ -1518,7 +1691,7 @@ namespace Geometry::Halfedge
 
         for (std::size_t i = 0; i < nEdges; ++i)
         {
-            if (m_EDeleted[EdgeHandle{static_cast<PropertyIndex>(i)}])
+            if (m_EDeleted.Handle()[i])
                 continue;
 
             // Edge i has halfedges at indices 2*i and 2*i+1.
@@ -1544,7 +1717,7 @@ namespace Geometry::Halfedge
 
         for (std::size_t i = 0; i < nEdges && written < out.size(); ++i)
         {
-            if (m_EDeleted[EdgeHandle{static_cast<PropertyIndex>(i)}])
+            if (m_EDeleted.Handle()[i])
                 continue;
 
             const auto v0 = static_cast<uint32_t>(hConn[2 * i + 1].Vertex.Index);

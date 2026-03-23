@@ -163,12 +163,12 @@ export namespace Runtime::EditorUI
     // Color source selector: property combo + colormap + range + binning.
     // Returns true if any value changed.
     bool ColorSourceWidget(const char* label, Graphics::ColorSource& src,
-                           const Geometry::PropertySet* ps, const char* suffix);
+                           const Geometry::ConstPropertySet* ps, const char* suffix);
 
     // Vector field overlay manager: add/remove/configure vector field entries.
     // Returns true if any value changed.
     bool VectorFieldWidget(Graphics::VisualizationConfig& config,
-                           const Geometry::PropertySet* ps, const char* suffix);
+                           const Geometry::ConstPropertySet* ps, const char* suffix);
 
     // Point render mode combo (FlatDisc/Surfel/EWA/Sphere). Returns true on change.
     bool PointRenderModeCombo(const char* label,
@@ -186,7 +186,7 @@ export namespace Runtime::EditorUI
     };
 
     bool DrawPropertySetBrowserWidget(const char* label,
-                                      const Geometry::PropertySet* ps,
+                                      const Geometry::ConstPropertySet* ps,
                                       PropertySetBrowserState& state,
                                       const char* suffix);
 

@@ -2,9 +2,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
-#include <limits>
 #include <numbers>
-#include <numeric>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -121,6 +119,19 @@ TEST(PointCloud_Cloud, FullAttributesAreValid)
     EXPECT_TRUE(cloud.HasNormals());
     EXPECT_TRUE(cloud.HasColors());
     EXPECT_TRUE(cloud.HasRadii());
+}
+
+TEST(PointCloud_Cloud, ConstPropertyAccessUsesReadOnlyViews)
+{
+    const auto cloud = MakeSphereCloud(8, 1.0f, true, false);
+
+    const auto props = cloud.PointProperties();
+    EXPECT_TRUE(props.Exists("p:position"));
+
+    const auto positions = cloud.GetVertexProperty<glm::vec3>("p:position");
+    ASSERT_TRUE(positions.IsValid());
+    EXPECT_EQ(positions.Vector().size(), cloud.PointCount());
+    EXPECT_EQ(positions[0], cloud.Position(Geometry::PointCloud::Cloud::Handle(0)));
 }
 
 TEST(PointCloud_Cloud, MismatchedNormalsInvalid)

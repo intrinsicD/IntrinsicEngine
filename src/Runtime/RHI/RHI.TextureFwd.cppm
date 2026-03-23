@@ -8,6 +8,7 @@ export module RHI.TextureFwd;
 import Core.Handle;
 import RHI.Image;
 import RHI.Device;
+export import RHI.TextureHandle;
 
 export namespace RHI
 {
@@ -22,8 +23,4 @@ export namespace RHI
         // NOTE: This is intentionally NOT TextureHandle::Index because pool indices can be reused.
         uint32_t BindlessSlot = 0;
     };
-
-    struct TextureTag {};
-    using TextureHandle = Core::StrongHandle<TextureTag>;
-
 }

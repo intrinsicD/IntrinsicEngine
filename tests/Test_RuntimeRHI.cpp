@@ -57,6 +57,8 @@ TEST(RHITexture, ConstructorTakesDeviceByRef)
 {
     // Handle-body idiom: Texture is a lightweight RAII handle that requires a TextureSystem.
     static_assert(std::is_constructible_v<RHI::Texture, RHI::TextureSystem&, RHI::VulkanDevice&, uint32_t, uint32_t, VkFormat>);
+    static_assert(std::is_nothrow_move_constructible_v<RHI::Texture>);
+    static_assert(std::is_nothrow_move_assignable_v<RHI::Texture>);
 
     // Must not accept shared_ptr device anymore.
     static_assert(!std::is_constructible_v<RHI::Texture, std::shared_ptr<RHI::VulkanDevice>, uint32_t, uint32_t, VkFormat>);
@@ -244,7 +246,7 @@ TEST_F(TransferTest, AsyncBufferUpload) {
     );
 
     // Fill staging data
-    uint32_t* data = static_cast<uint32_t*>(stagingBuffer->Map());
+    auto* data = static_cast<uint32_t*>(stagingBuffer->Map());
     for(size_t i = 0; i < bufferSize/4; ++i) data[i] = 0xDEADBEEF;
     stagingBuffer->Unmap();
 
@@ -306,14 +308,14 @@ TEST_F(TransferTest, StagingBeltManySmallUploads)
             VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
             VMA_MEMORY_USAGE_GPU_ONLY);
 
-        const uint32_t pattern = static_cast<uint32_t>(0xA5A50000u | static_cast<uint32_t>(i & 0xFFFF));
+        const auto pattern = static_cast<uint32_t>(0xA5A50000u | static_cast<uint32_t>(i & 0xFFFF));
 
         VkCommandBuffer cmd = m_TransferMgr->Begin();
 
         auto alloc = m_TransferMgr->AllocateStaging(uploadSize, copyAlign);
         ASSERT_NE(alloc.Buffer, VK_NULL_HANDLE) << "Staging belt ran out of space in test (may need larger default belt)";
 
-        uint32_t* dstWords = static_cast<uint32_t*>(alloc.MappedPtr);
+        auto* dstWords = static_cast<uint32_t*>(alloc.MappedPtr);
         for (size_t w = 0; w < uploadSize / sizeof(uint32_t); ++w)
             dstWords[w] = pattern;
 

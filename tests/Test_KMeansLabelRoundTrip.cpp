@@ -112,9 +112,9 @@ TEST(KMeansLabelRoundTrip, PointCloudPublicationPreservesLabelsAndDirectColorCon
     ASSERT_TRUE(labels.IsValid());
     ASSERT_TRUE(colors.IsValid());
 
-    EXPECT_EQ(labels[Geometry::PointCloud::Cloud::Handle(0)], 1u);
-    EXPECT_EQ(labels[Geometry::PointCloud::Cloud::Handle(1)], 0u);
-    EXPECT_EQ(labels[Geometry::PointCloud::Cloud::Handle(2)], 1u);
+    EXPECT_EQ(labels[0], 1u);
+    EXPECT_EQ(labels[1], 0u);
+    EXPECT_EQ(labels[2], 1u);
 
     auto colorConfig = pointCloudData.Visualization.VertexColors;
     const auto mapped = Graphics::ColorMapper::MapProperty(cloud->PointProperties(), colorConfig);

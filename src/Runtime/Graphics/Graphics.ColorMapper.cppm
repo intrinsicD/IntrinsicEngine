@@ -3,7 +3,6 @@ module;
 #include <cstdint>
 #include <functional>
 #include <optional>
-#include <string>
 #include <vector>
 
 export module Graphics.ColorMapper;
@@ -27,11 +26,11 @@ import Geometry.Properties;
 
 export namespace Graphics::ColorMapper
 {
-    struct MappingResult
+    struct MappingResult // NOLINT(clang-analyzer-optin.cplusplus.UninitializedObject)
     {
-        std::vector<uint32_t> Colors;          ///< Packed ABGR, one per element
-        float ComputedMin = 0.0f;              ///< Auto-range min (for UI feedback)
-        float ComputedMax = 1.0f;              ///< Auto-range max (for UI feedback)
+        std::vector<uint32_t> Colors{};        ///< Packed ABGR, one per element
+        float ComputedMin{0.0f};               ///< Auto-range min (for UI feedback)
+        float ComputedMax{1.0f};               ///< Auto-range max (for UI feedback)
     };
 
     /// Map a named property to packed ABGR colors.
@@ -44,6 +43,11 @@ export namespace Graphics::ColorMapper
     /// @returns           MappingResult on success, nullopt if property not found or type mismatch.
     [[nodiscard]] std::optional<MappingResult> MapProperty(
         const Geometry::PropertySet& ps,
+        ColorSource& config,
+        std::function<bool(size_t)> skipDeleted = {});
+
+    [[nodiscard]] std::optional<MappingResult> MapProperty(
+        const Geometry::ConstPropertySet& ps,
         ColorSource& config,
         std::function<bool(size_t)> skipDeleted = {});
 }

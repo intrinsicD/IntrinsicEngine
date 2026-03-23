@@ -223,13 +223,13 @@ export namespace Geometry::Graph
 
         // Public PropertySet accessors (mirrors Halfedge::Mesh pattern).
         [[nodiscard]] Vertices& VertexProperties() noexcept { return m_Vertices; }
-        [[nodiscard]] const Vertices& VertexProperties() const noexcept { return m_Vertices; }
+        [[nodiscard]] ConstPropertySet VertexProperties() const noexcept { return ConstPropertySet(m_Vertices); } // NOLINT(readability-convert-member-functions-to-static)
 
         [[nodiscard]] Edges& EdgeProperties() noexcept { return m_Edges; }
-        [[nodiscard]] const Edges& EdgeProperties() const noexcept { return m_Edges; }
+        [[nodiscard]] ConstPropertySet EdgeProperties() const noexcept { return ConstPropertySet(m_Edges); } // NOLINT(readability-convert-member-functions-to-static)
 
         [[nodiscard]] Halfedges& HalfedgeProperties() noexcept { return m_Halfedges; }
-        [[nodiscard]] const Halfedges& HalfedgeProperties() const noexcept { return m_Halfedges; }
+        [[nodiscard]] ConstPropertySet HalfedgeProperties() const noexcept { return ConstPropertySet(m_Halfedges); } // NOLINT(readability-convert-member-functions-to-static)
 
     private:
         struct VertexConnectivity

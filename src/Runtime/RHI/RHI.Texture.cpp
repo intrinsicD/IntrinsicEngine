@@ -15,6 +15,21 @@ namespace RHI
 {
     namespace
     {
+        void DestroyTexture(TextureSystem& system, VulkanDevice& device, TextureHandle handle) noexcept
+        {
+            if (!handle.IsValid())
+                return;
+
+            // Destroy the sampler before removing the backing pool entry.
+            if (const TextureGpuData* data = system.Get(handle))
+            {
+                VkSampler sampler = data->Sampler;
+                DestructionUtils::SafeDestroyVk(device, sampler, vkDestroySampler);
+            }
+
+            system.Destroy(handle);
+        }
+
         void CreateDefaultSampler(VulkanDevice& device, uint32_t mipLevels, VkSampler& outSampler)
         {
             VkSamplerCreateInfo samplerInfo{};
@@ -76,19 +91,8 @@ namespace RHI
 
     Texture::~Texture()
     {
-        if (!m_System || !m_Device || !m_Handle.IsValid())
-            return;
-
-        // Defer sampler destruction in the same way old Texture did.
-        // The pool stores TextureGpuData; we need to ensure VkSampler is destroyed safely.
-        // We do that by scheduling sampler destruction now and then removing the pool entry.
-        if (const TextureGpuData* data = m_System->Get(m_Handle))
-        {
-            VkSampler sampler = data->Sampler;
-            DestructionUtils::SafeDestroyVk(*m_Device, sampler, vkDestroySampler);
-        }
-
-        m_System->Destroy(m_Handle);
+        if (m_System && m_Device)
+            DestroyTexture(*m_System, *m_Device, m_Handle);
         m_Handle = {};
         m_System = nullptr;
         m_Device = nullptr;
@@ -108,8 +112,8 @@ namespace RHI
     {
         if (this == &other) return *this;
 
-        // Release current
-        this->~Texture();
+        if (m_System && m_Device)
+            DestroyTexture(*m_System, *m_Device, m_Handle);
 
         m_System = other.m_System;
         m_Device = other.m_Device;

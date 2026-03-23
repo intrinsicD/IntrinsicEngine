@@ -32,8 +32,8 @@ namespace
     }
 }
 
-std::vector<PropertyInfo> Graphics::EnumerateColorableProperties(
-    const Geometry::PropertySet& ps)
+template <class PropertySetT>
+static std::vector<PropertyInfo> EnumerateColorablePropertiesImpl(const PropertySetT& ps)
 {
     std::vector<PropertyInfo> result;
     const auto names = ps.Properties();
@@ -43,56 +43,86 @@ std::vector<PropertyInfo> Graphics::EnumerateColorableProperties(
         if (IsInternalProperty(name))
             continue;
 
-        // Try each supported type. First match wins.
-        if (ps.Get<float>(name).IsValid())
-        {
+        if (ps.template Get<float>(name).IsValid())
             result.push_back({name, PropertyDataType::Scalar});
-        }
-        else if (ps.Get<glm::vec3>(name).IsValid())
-        {
+        else if (ps.template Get<glm::vec3>(name).IsValid())
             result.push_back({name, PropertyDataType::Vec3});
-        }
-        else if (ps.Get<glm::vec4>(name).IsValid())
-        {
+        else if (ps.template Get<glm::vec4>(name).IsValid())
             result.push_back({name, PropertyDataType::Vec4});
-        }
     }
 
     return result;
+}
+
+template <class PropertySetT>
+static std::vector<PropertyInfo> EnumerateScalarPropertiesImpl(const PropertySetT& ps)
+{
+    std::vector<PropertyInfo> result;
+    const auto names = ps.Properties();
+
+    for (const auto& name : names)
+    {
+        if (IsInternalProperty(name))
+            continue;
+
+        if (ps.template Get<float>(name).IsValid())
+            result.push_back({name, PropertyDataType::Scalar});
+    }
+
+    return result;
+}
+
+template <class PropertySetT>
+static std::vector<PropertyInfo> EnumerateVectorPropertiesImpl(const PropertySetT& ps)
+{
+    std::vector<PropertyInfo> result;
+    const auto names = ps.Properties();
+
+    for (const auto& name : names)
+    {
+        if (IsInternalProperty(name))
+            continue;
+
+        if (ps.template Get<glm::vec3>(name).IsValid())
+            result.push_back({name, PropertyDataType::Vec3});
+    }
+
+    return result;
+}
+
+std::vector<PropertyInfo> Graphics::EnumerateColorableProperties(
+    const Geometry::PropertySet& ps)
+{
+    return EnumerateColorablePropertiesImpl(ps);
+}
+
+std::vector<PropertyInfo> Graphics::EnumerateColorableProperties(
+    const Geometry::ConstPropertySet& ps)
+{
+    return EnumerateColorablePropertiesImpl(ps);
 }
 
 std::vector<PropertyInfo> Graphics::EnumerateScalarProperties(
     const Geometry::PropertySet& ps)
 {
-    std::vector<PropertyInfo> result;
-    const auto names = ps.Properties();
+    return EnumerateScalarPropertiesImpl(ps);
+}
 
-    for (const auto& name : names)
-    {
-        if (IsInternalProperty(name))
-            continue;
-
-        if (ps.Get<float>(name).IsValid())
-            result.push_back({name, PropertyDataType::Scalar});
-    }
-
-    return result;
+std::vector<PropertyInfo> Graphics::EnumerateScalarProperties(
+    const Geometry::ConstPropertySet& ps)
+{
+    return EnumerateScalarPropertiesImpl(ps);
 }
 
 std::vector<PropertyInfo> Graphics::EnumerateVectorProperties(
     const Geometry::PropertySet& ps)
 {
-    std::vector<PropertyInfo> result;
-    const auto names = ps.Properties();
-
-    for (const auto& name : names)
-    {
-        if (IsInternalProperty(name))
-            continue;
-
-        if (ps.Get<glm::vec3>(name).IsValid())
-            result.push_back({name, PropertyDataType::Vec3});
-    }
-
-    return result;
+    return EnumerateVectorPropertiesImpl(ps);
 }
+
+std::vector<PropertyInfo> Graphics::EnumerateVectorProperties(
+    const Geometry::ConstPropertySet& ps)
+{
+    return EnumerateVectorPropertiesImpl(ps);
+}
+

@@ -147,24 +147,24 @@ void InspectorController::Draw()
 
                 if (gd.GraphRef)
                 {
-                    const auto* vtxPs = &gd.GraphRef->VertexProperties();
-                    const auto* edgePs = &gd.GraphRef->EdgeProperties();
-                    const auto* halfedgePs = &gd.GraphRef->HalfedgeProperties();
+                    const Geometry::ConstPropertySet vtxPs{gd.GraphRef->VertexProperties()};
+                    const Geometry::ConstPropertySet edgePs{gd.GraphRef->EdgeProperties()};
+                    const Geometry::ConstPropertySet halfedgePs{gd.GraphRef->HalfedgeProperties()};
 
-                    if (ColorSourceWidget("Node Color Source", gd.Visualization.VertexColors, vtxPs,
+                    if (ColorSourceWidget("Node Color Source", gd.Visualization.VertexColors, &vtxPs,
                                           "GraphVtx"))
                         reg.emplace_or_replace<ECS::DirtyTag::VertexAttributes>(selected);
-                    if (ColorSourceWidget("Edge Color Source", gd.Visualization.EdgeColors, edgePs,
+                    if (ColorSourceWidget("Edge Color Source", gd.Visualization.EdgeColors, &edgePs,
                                           "GraphEdge"))
                         reg.emplace_or_replace<ECS::DirtyTag::EdgeAttributes>(selected);
 
-                    VectorFieldWidget(gd.Visualization, vtxPs, "GraphVF");
+                    VectorFieldWidget(gd.Visualization, &vtxPs, "GraphVF");
 
                     if (ImGui::TreeNodeEx("Property Browser##Graph", ImGuiTreeNodeFlags_DefaultOpen))
                     {
-                        DrawPropertySetBrowserWidget("Vertex Properties", vtxPs, m_GraphVertexPropertiesUi, "GraphVertexProps");
-                        DrawPropertySetBrowserWidget("Edge Properties", edgePs, m_GraphEdgePropertiesUi, "GraphEdgeProps");
-                        DrawPropertySetBrowserWidget("Halfedge Properties", halfedgePs, m_GraphHalfedgePropertiesUi, "GraphHalfedgeProps");
+                        DrawPropertySetBrowserWidget("Vertex Properties", &vtxPs, m_GraphVertexPropertiesUi, "GraphVertexProps");
+                        DrawPropertySetBrowserWidget("Edge Properties", &edgePs, m_GraphEdgePropertiesUi, "GraphEdgeProps");
+                        DrawPropertySetBrowserWidget("Halfedge Properties", &halfedgePs, m_GraphHalfedgePropertiesUi, "GraphHalfedgeProps");
                         ImGui::TreePop();
                     }
 
@@ -207,16 +207,16 @@ void InspectorController::Draw()
 
                 if (pcd.CloudRef)
                 {
-                    const auto* ptPs = &pcd.CloudRef->PointProperties();
+                    const Geometry::ConstPropertySet ptPs{pcd.CloudRef->PointProperties()};
 
-                    if (ColorSourceWidget("Point Color Source", pcd.Visualization.VertexColors, ptPs, "PCDVtx"))
+                    if (ColorSourceWidget("Point Color Source", pcd.Visualization.VertexColors, &ptPs, "PCDVtx"))
                         reg.emplace_or_replace<ECS::DirtyTag::VertexAttributes>(selected);
 
-                    VectorFieldWidget(pcd.Visualization, ptPs, "PCDVF");
+                    VectorFieldWidget(pcd.Visualization, &ptPs, "PCDVF");
 
                     if (ImGui::TreeNodeEx("Property Browser##PointCloud", ImGuiTreeNodeFlags_DefaultOpen))
                     {
-                        DrawPropertySetBrowserWidget("Point Properties", ptPs, m_PointCloudPropertiesUi, "PointCloudProps");
+                        DrawPropertySetBrowserWidget("Point Properties", &ptPs, m_PointCloudPropertiesUi, "PointCloudProps");
                         ImGui::TreePop();
                     }
                 }
@@ -351,12 +351,12 @@ void InspectorController::Draw()
                 {
                     if (md->MeshRef)
                     {
-                        const auto* vtxPs = &md->MeshRef->VertexProperties();
-                        const auto* edgePs = &md->MeshRef->EdgeProperties();
-                        const auto* halfedgePs = &md->MeshRef->HalfedgeProperties();
-                        const auto* facePs = &md->MeshRef->FaceProperties();
+                        const Geometry::ConstPropertySet vtxPs{md->MeshRef->VertexProperties()};
+                        const Geometry::ConstPropertySet edgePs{md->MeshRef->EdgeProperties()};
+                        const Geometry::ConstPropertySet halfedgePs{md->MeshRef->HalfedgeProperties()};
+                        const Geometry::ConstPropertySet facePs{md->MeshRef->FaceProperties()};
 
-                        if (ColorSourceWidget("Vertex Color Source", md->Visualization.VertexColors, vtxPs,
+                        if (ColorSourceWidget("Vertex Color Source", md->Visualization.VertexColors, &vtxPs,
                                               "MeshVtx"))
                         {
                             // Clear nearest-vertex mode when user switches away from kmeans labels.
@@ -365,27 +365,27 @@ void InspectorController::Draw()
                             md->AttributesDirty = true;
                             reg.emplace_or_replace<ECS::DirtyTag::VertexAttributes>(selected);
                         }
-                        if (ColorSourceWidget("Edge Color Source", md->Visualization.EdgeColors, edgePs,
+                        if (ColorSourceWidget("Edge Color Source", md->Visualization.EdgeColors, &edgePs,
                                               "MeshEdge"))
                         {
                             md->AttributesDirty = true;
                             reg.emplace_or_replace<ECS::DirtyTag::EdgeAttributes>(selected);
                         }
-                        if (ColorSourceWidget("Face Color Source", md->Visualization.FaceColors, facePs,
+                        if (ColorSourceWidget("Face Color Source", md->Visualization.FaceColors, &facePs,
                                               "MeshFace"))
                         {
                             md->AttributesDirty = true;
                             reg.emplace_or_replace<ECS::DirtyTag::FaceAttributes>(selected);
                         }
 
-                        VectorFieldWidget(md->Visualization, vtxPs, "MeshVF");
+                        VectorFieldWidget(md->Visualization, &vtxPs, "MeshVF");
 
                         if (ImGui::TreeNodeEx("Property Browser##Mesh", ImGuiTreeNodeFlags_DefaultOpen))
                         {
-                            DrawPropertySetBrowserWidget("Vertex Properties", vtxPs, m_MeshVertexPropertiesUi, "MeshVertexProps");
-                            DrawPropertySetBrowserWidget("Edge Properties", edgePs, m_MeshEdgePropertiesUi, "MeshEdgeProps");
-                            DrawPropertySetBrowserWidget("Halfedge Properties", halfedgePs, m_MeshHalfedgePropertiesUi, "MeshHalfedgeProps");
-                            DrawPropertySetBrowserWidget("Face Properties", facePs, m_MeshFacePropertiesUi, "MeshFaceProps");
+                            DrawPropertySetBrowserWidget("Vertex Properties", &vtxPs, m_MeshVertexPropertiesUi, "MeshVertexProps");
+                            DrawPropertySetBrowserWidget("Edge Properties", &edgePs, m_MeshEdgePropertiesUi, "MeshEdgeProps");
+                            DrawPropertySetBrowserWidget("Halfedge Properties", &halfedgePs, m_MeshHalfedgePropertiesUi, "MeshHalfedgeProps");
+                            DrawPropertySetBrowserWidget("Face Properties", &facePs, m_MeshFacePropertiesUi, "MeshFaceProps");
                             ImGui::TreePop();
                         }
 

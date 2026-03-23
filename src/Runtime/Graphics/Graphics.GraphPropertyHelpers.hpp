@@ -13,9 +13,9 @@ namespace Graphics::GraphPropertyHelpers
     // Extract per-element colors via ColorMapper with default property fallback.
     // Sets config.PropertyName to defaultPropName if empty and the property exists.
     // Returns the extracted color vector (empty if no property found).
-    template <typename HandleT>
+    template <typename HandleT, class PropertySetT>
     [[nodiscard]] inline std::vector<uint32_t> ExtractColors(
-        const Geometry::PropertySet& properties,
+        const PropertySetT& properties,
         Graphics::ColorSource& config,
         const Geometry::Graph::Graph& graph,
         std::string_view defaultPropName)
@@ -56,11 +56,13 @@ namespace Graphics::GraphPropertyHelpers
         const Geometry::Graph::Graph& graph)
     {
         std::vector<float> radii;
-        if (!graph.VertexProperties().Exists("v:radius"))
+        const auto properties = graph.VertexProperties();
+        if (!properties.Exists("v:radius"))
             return radii;
 
-        auto radiusProp = Geometry::VertexProperty<float>(
-            graph.VertexProperties().Get<float>("v:radius"));
+        const auto radiusProp = properties.Get<float>("v:radius");
+        if (!radiusProp)
+            return radii;
 
         radii.reserve(graph.VertexCount());
 
@@ -71,7 +73,7 @@ namespace Graphics::GraphPropertyHelpers
             if (graph.IsDeleted(v))
                 continue;
 
-            radii.push_back(radiusProp[v]);
+            radii.push_back(radiusProp[static_cast<std::size_t>(i)]);
         }
 
         return radii;

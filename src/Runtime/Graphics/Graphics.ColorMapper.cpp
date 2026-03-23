@@ -2,10 +2,10 @@ module;
 
 #include <algorithm>
 #include <cmath>
-#include <cstdint>
 #include <functional>
 #include <limits>
 #include <optional>
+#include <utility>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -21,12 +21,13 @@ using namespace Graphics;
 
 namespace
 {
+    template <class PropertySetT>
     [[nodiscard]] std::optional<ColorMapper::MappingResult> MapScalar(
-        const Geometry::PropertySet& ps,
+        const PropertySetT& ps,
         ColorSource& config,
         const std::function<bool(size_t)>& skipDeleted)
     {
-        auto prop = ps.Get<float>(config.PropertyName);
+        auto prop = ps.template Get<float>(config.PropertyName);
         if (!prop.IsValid())
             return std::nullopt;
 
@@ -102,12 +103,13 @@ namespace
         return result;
     }
 
+    template <class PropertySetT>
     [[nodiscard]] std::optional<ColorMapper::MappingResult> MapVec3(
-        const Geometry::PropertySet& ps,
+        const PropertySetT& ps,
         const ColorSource& config,
         const std::function<bool(size_t)>& skipDeleted)
     {
-        auto prop = ps.Get<glm::vec3>(config.PropertyName);
+        auto prop = ps.template Get<glm::vec3>(config.PropertyName);
         if (!prop.IsValid())
             return std::nullopt;
 
@@ -129,12 +131,13 @@ namespace
         return result;
     }
 
+    template <class PropertySetT>
     [[nodiscard]] std::optional<ColorMapper::MappingResult> MapVec4(
-        const Geometry::PropertySet& ps,
+        const PropertySetT& ps,
         const ColorSource& config,
         const std::function<bool(size_t)>& skipDeleted)
     {
-        auto prop = ps.Get<glm::vec4>(config.PropertyName);
+        auto prop = ps.template Get<glm::vec4>(config.PropertyName);
         if (!prop.IsValid())
             return std::nullopt;
 
@@ -159,6 +162,14 @@ namespace
 
 std::optional<ColorMapper::MappingResult> ColorMapper::MapProperty(
     const Geometry::PropertySet& ps,
+    ColorSource& config,
+    std::function<bool(size_t)> skipDeleted)
+{
+    return MapProperty(Geometry::ConstPropertySet(ps), config, std::move(skipDeleted));
+}
+
+std::optional<ColorMapper::MappingResult> ColorMapper::MapProperty(
+    const Geometry::ConstPropertySet& ps,
     ColorSource& config,
     std::function<bool(size_t)> skipDeleted)
 {

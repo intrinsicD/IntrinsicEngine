@@ -93,6 +93,18 @@ TEST(Graph_Data, PropertySetBackedRadii)
     EXPECT_TRUE(data.HasNodeRadii());
 }
 
+TEST(Graph_Data, ConstPropertyAccessUsesReadOnlyViews)
+{
+    const Geometry::Graph::Graph graph = *MakeTriangleGraph();
+
+    const auto props = graph.VertexProperties();
+    EXPECT_TRUE(props.Exists("v:point"));
+
+    const auto points = props.Get<glm::vec3>("v:point");
+    ASSERT_TRUE(points.IsValid());
+    EXPECT_EQ(points.Vector().size(), graph.VerticesSize());
+}
+
 TEST(Graph_Data, SharedPtrSemantics)
 {
     auto graph = MakeTriangleGraph();
