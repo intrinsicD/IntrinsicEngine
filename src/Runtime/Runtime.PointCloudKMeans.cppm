@@ -64,6 +64,10 @@ export namespace Runtime::PointCloudKMeans
     // source using domain-native property names:
     //   - mesh / graph vertices: v:kmeans_*
     //   - point clouds:          p:kmeans_*
+    //
+    // Publication also refreshes/creates a retained centroid child entity with
+    // a point-cloud authority component so centroids render through the normal
+    // point pipeline and can carry persistent ECS-side acceleration structures.
     [[nodiscard]] bool PublishResult(
         Engine& engine,
         entt::entity entity,

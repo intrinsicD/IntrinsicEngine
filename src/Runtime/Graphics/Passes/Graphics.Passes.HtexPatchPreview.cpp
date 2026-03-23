@@ -249,6 +249,29 @@ namespace Graphics::Passes
 
     [[nodiscard]] std::optional<entt::entity> HtexPatchPreviewPass::FindSourceMeshEntity(const entt::registry& reg)
     {
+        std::optional<entt::entity> freshestKMeansMesh;
+        uint64_t freshestRevision = 0;
+        auto considerFreshest = [&](entt::entity entity)
+        {
+            if (!IsInterestingMeshEntity(reg, entity))
+                return;
+
+            const auto& data = reg.get<ECS::Mesh::Data>(entity);
+            if (!data.MeshRef)
+                return;
+
+            const auto labels = data.MeshRef->VertexProperties().Get<uint32_t>("v:kmeans_label");
+            const auto colors = data.MeshRef->VertexProperties().Get<glm::vec4>("v:kmeans_color");
+            if (!(labels || colors))
+                return;
+
+            if (!freshestKMeansMesh || data.KMeansResultRevision >= freshestRevision)
+            {
+                freshestKMeansMesh = entity;
+                freshestRevision = data.KMeansResultRevision;
+            }
+        };
+
         if (auto selected = reg.view<ECS::Components::Selection::SelectedTag>(); !selected.empty())
         {
             for (auto entity : selected)
@@ -272,6 +295,11 @@ namespace Graphics::Passes
                     return entity;
             }
         }
+
+        for (auto entity : reg.view<ECS::Mesh::Data>())
+            considerFreshest(entity);
+        if (freshestKMeansMesh)
+            return freshestKMeansMesh;
 
         for (auto entity : reg.view<ECS::Mesh::Data>())
         {

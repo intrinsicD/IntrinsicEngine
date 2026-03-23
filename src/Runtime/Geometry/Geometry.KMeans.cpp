@@ -16,6 +16,7 @@ module;
 
 module Geometry.KMeans;
 
+import Geometry.KDTree;
 
 namespace Geometry::KMeans
 {
@@ -85,9 +86,79 @@ namespace Geometry::KMeans
 
             return centroids;
         }
+
+        [[nodiscard]] std::vector<glm::vec3> SanitizeInitialCentroids(
+            std::span<const glm::vec3> initialCentroids,
+            uint32_t k)
+        {
+            std::vector<glm::vec3> seeds;
+            seeds.reserve(k);
+            for (const glm::vec3& centroid : initialCentroids)
+            {
+                if (!IsFiniteVec3(centroid))
+                    continue;
+                seeds.push_back(centroid);
+                if (seeds.size() == k)
+                    break;
+            }
+            return seeds;
+        }
+
+        [[nodiscard]] bool RebuildCentroidTree(
+            std::span<const glm::vec3> centroids,
+            CpuScratch* cpuScratch)
+        {
+            if (cpuScratch == nullptr)
+                return false;
+
+            return cpuScratch->CentroidTree.BuildFromPoints(
+                centroids, cpuScratch->CentroidTreeBuildParams).has_value();
+        }
+
+        [[nodiscard]] std::optional<std::pair<uint32_t, float>> FindNearestCentroid(
+            const glm::vec3& point,
+            std::span<const glm::vec3> centroids,
+            CpuScratch* cpuScratch)
+        {
+            if (centroids.empty() || !IsFiniteVec3(point))
+                return std::nullopt;
+
+            if (cpuScratch != nullptr && !cpuScratch->CentroidTree.Nodes().empty())
+            {
+                auto& nearest = cpuScratch->QueryBuffer;
+                if (cpuScratch->CentroidTree.QueryKnn(point, 1u, nearest) && !nearest.empty())
+                {
+                    const uint32_t bestCluster = nearest.front();
+                    if (bestCluster < centroids.size())
+                        return std::pair<uint32_t, float>{bestCluster, SquaredDistance(point, centroids[bestCluster])};
+                }
+            }
+
+            uint32_t bestCluster = 0;
+            float bestDistance = SquaredDistance(point, centroids[0]);
+            for (uint32_t c = 1; c < static_cast<uint32_t>(centroids.size()); ++c)
+            {
+                const float d = SquaredDistance(point, centroids[c]);
+                if (d < bestDistance)
+                {
+                    bestDistance = d;
+                    bestCluster = c;
+                }
+            }
+
+            return std::pair<uint32_t, float>{bestCluster, bestDistance};
+        }
     }
 
     std::optional<Result> Cluster(std::span<const glm::vec3> points, const Params& params)
+    {
+        return Cluster(points, {}, params, nullptr);
+    }
+
+    std::optional<Result> Cluster(std::span<const glm::vec3> points,
+                                  std::span<const glm::vec3> initialCentroids,
+                                  const Params& params,
+                                  CpuScratch* cpuScratch)
     {
         if (points.empty() || params.ClusterCount == 0 || params.MaxIterations == 0)
             return std::nullopt;
@@ -100,9 +171,9 @@ namespace Geometry::KMeans
         result.ActualBackend = Backend::CPU;
         result.Labels.assign(points.size(), 0u);
         result.SquaredDistances.assign(points.size(), 0.0f);
-        result.Centroids = (params.Init == Initialization::Random)
-            ? InitializeRandom(points, k, params.Seed)
-            : InitializeHierarchical(points, k);
+        result.Centroids = BuildInitialCentroids(points, initialCentroids, params, k);
+        if (result.Centroids.size() != k)
+            return std::nullopt;
 
         std::vector<glm::vec3> sums(k, glm::vec3(0.0f));
         std::vector<uint32_t> counts(k, 0u);
@@ -115,6 +186,7 @@ namespace Geometry::KMeans
         {
             std::fill(sums.begin(), sums.end(), glm::vec3(0.0f));
             std::fill(counts.begin(), counts.end(), 0u);
+            static_cast<void>(RebuildCentroidTree(result.Centroids, cpuScratch));
 
             float inertia = 0.0f;
             float maxDistance = -1.0f;
@@ -123,18 +195,11 @@ namespace Geometry::KMeans
 
             for (std::size_t i = 0; i < points.size(); ++i)
             {
-                uint32_t bestCluster = 0;
-                float bestDistance = SquaredDistance(points[i], result.Centroids[0]);
-                for (uint32_t c = 1; c < k; ++c)
-                {
-                    const float d = SquaredDistance(points[i], result.Centroids[c]);
-                    if (d < bestDistance)
-                    {
-                        bestDistance = d;
-                        bestCluster = c;
-                    }
-                }
+                const auto assignment = FindNearestCentroid(points[i], result.Centroids, cpuScratch);
+                if (!assignment)
+                    return std::nullopt;
 
+                const auto [bestCluster, bestDistance] = *assignment;
                 nextLabels[i] = bestCluster;
                 result.SquaredDistances[i] = bestDistance;
                 sums[bestCluster] += points[i];
@@ -181,6 +246,26 @@ namespace Geometry::KMeans
         }
 
         return result;
+    }
+
+    std::vector<glm::vec3> BuildInitialCentroids(
+        std::span<const glm::vec3> points,
+        std::span<const glm::vec3> initialCentroids,
+        const Params& params,
+        uint32_t clusterCount)
+    {
+        if (points.empty() || clusterCount == 0)
+            return {};
+
+        if (std::vector<glm::vec3> seeds = SanitizeInitialCentroids(initialCentroids, clusterCount);
+            seeds.size() == clusterCount)
+        {
+            return seeds;
+        }
+
+        return (params.Init == Initialization::Random)
+            ? InitializeRandom(points, clusterCount, params.Seed)
+            : InitializeHierarchical(points, clusterCount);
     }
 
     std::vector<glm::vec3> RecomputeCentroids(

@@ -6,6 +6,7 @@ module;
 #include <cmath>
 #include <cstddef>
 #include <limits>
+#include <memory>
 #include <numeric>
 #include <optional>
 #include <random>
@@ -13,6 +14,7 @@ module;
 #include <string_view>
 #include <thread>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include <glm/geometric.hpp>
@@ -34,6 +36,7 @@ import Graphics.Components;
 
 import Geometry.Graph;
 import Geometry.HalfedgeMesh;
+import Geometry.KDTree;
 import Geometry.KMeans;
 import Geometry.PointCloud;
 import Geometry.Properties;
@@ -81,73 +84,6 @@ namespace Runtime::PointCloudKMeans
                 return IsValid() && PointCount > 0;
             }
         };
-
-        [[nodiscard]] float SquaredDistance(const glm::vec3& a, const glm::vec3& b)
-        {
-            const glm::vec3 d = a - b;
-            return glm::dot(d, d);
-        }
-
-        [[nodiscard]] std::vector<glm::vec3> InitializeRandom(
-            std::span<const glm::vec3> points,
-            uint32_t k,
-            uint32_t seed)
-        {
-            std::vector<uint32_t> indices(points.size());
-            std::iota(indices.begin(), indices.end(), 0u);
-            std::mt19937 rng(seed);
-            std::shuffle(indices.begin(), indices.end(), rng);
-
-            std::vector<glm::vec3> centroids;
-            centroids.reserve(k);
-            for (uint32_t i = 0; i < k; ++i)
-                centroids.push_back(points[indices[i]]);
-            return centroids;
-        }
-
-        [[nodiscard]] std::vector<glm::vec3> InitializeHierarchical(
-            std::span<const glm::vec3> points,
-            uint32_t k)
-        {
-            glm::vec3 mean(0.0f);
-            for (const glm::vec3& p : points)
-                mean += p;
-            mean /= static_cast<float>(points.size());
-
-            std::vector<glm::vec3> centroids;
-            centroids.reserve(k);
-            centroids.push_back(mean);
-
-            std::vector<float> minDistances(points.size(), std::numeric_limits<float>::max());
-            for (uint32_t c = 1; c < k; ++c)
-            {
-                uint32_t farthestIndex = 0;
-                float farthestDistance = -1.0f;
-                for (std::size_t i = 0; i < points.size(); ++i)
-                {
-                    const float d = SquaredDistance(points[i], centroids.back());
-                    minDistances[i] = std::min(minDistances[i], d);
-                    if (minDistances[i] > farthestDistance)
-                    {
-                        farthestDistance = minDistances[i];
-                        farthestIndex = static_cast<uint32_t>(i);
-                    }
-                }
-                centroids.push_back(points[farthestIndex]);
-            }
-
-            return centroids;
-        }
-
-        [[nodiscard]] [[maybe_unused]] std::vector<glm::vec3> InitializeCentroids(
-            std::span<const glm::vec3> points,
-            const Geometry::KMeans::Params& params,
-            uint32_t k)
-        {
-            return (params.Init == Geometry::KMeans::Initialization::Random)
-                ? InitializeRandom(points, k, params.Seed)
-                : InitializeHierarchical(points, k);
-        }
 
         [[nodiscard]] glm::vec4 LabelColor(uint32_t label)
         {
@@ -377,6 +313,183 @@ namespace Runtime::PointCloudKMeans
             }
         }
 
+        [[nodiscard]] std::vector<glm::vec3> SnapshotExistingCentroids(entt::registry& reg, const ResolvedTarget& target)
+        {
+            auto snapshotFromEntity = [&](entt::entity centroidEntity) -> std::vector<glm::vec3>
+            {
+                if (centroidEntity == entt::null || !reg.valid(centroidEntity))
+                    return {};
+
+                const auto* centroidData = reg.try_get<ECS::PointCloud::Data>(centroidEntity);
+                if (!centroidData || !centroidData->CloudRef)
+                    return {};
+
+                const auto positions = centroidData->CloudRef->Positions();
+                return std::vector<glm::vec3>(positions.begin(), positions.end());
+            };
+
+            switch (target.Domain)
+            {
+            case TargetDomain::MeshVertices:
+                return target.MeshData ? snapshotFromEntity(target.MeshData->KMeansCentroidEntity) : std::vector<glm::vec3>{};
+            case TargetDomain::GraphVertices:
+                return target.GraphData ? snapshotFromEntity(target.GraphData->KMeansCentroidEntity) : std::vector<glm::vec3>{};
+            case TargetDomain::PointCloudPoints:
+                return target.PointCloudData ? snapshotFromEntity(target.PointCloudData->KMeansCentroidEntity)
+                                             : std::vector<glm::vec3>{};
+            case TargetDomain::Auto:
+            default:
+                return {};
+            }
+        }
+
+        [[nodiscard]] entt::entity GetCentroidEntity(const ResolvedTarget& target) noexcept
+        {
+            switch (target.Domain)
+            {
+            case TargetDomain::MeshVertices:
+                return target.MeshData ? target.MeshData->KMeansCentroidEntity : entt::null;
+            case TargetDomain::GraphVertices:
+                return target.GraphData ? target.GraphData->KMeansCentroidEntity : entt::null;
+            case TargetDomain::PointCloudPoints:
+                return target.PointCloudData ? target.PointCloudData->KMeansCentroidEntity : entt::null;
+            case TargetDomain::Auto:
+            default:
+                return entt::null;
+            }
+        }
+
+        void SetCentroidEntity(ResolvedTarget& target, entt::entity centroidEntity) noexcept
+        {
+            switch (target.Domain)
+            {
+            case TargetDomain::MeshVertices:
+                if (target.MeshData)
+                    target.MeshData->KMeansCentroidEntity = centroidEntity;
+                break;
+            case TargetDomain::GraphVertices:
+                if (target.GraphData)
+                    target.GraphData->KMeansCentroidEntity = centroidEntity;
+                break;
+            case TargetDomain::PointCloudPoints:
+                if (target.PointCloudData)
+                    target.PointCloudData->KMeansCentroidEntity = centroidEntity;
+                break;
+            case TargetDomain::Auto:
+            default:
+                break;
+            }
+        }
+
+        void BumpKMeansRevision(ResolvedTarget& target) noexcept
+        {
+            switch (target.Domain)
+            {
+            case TargetDomain::MeshVertices:
+                if (target.MeshData)
+                    ++target.MeshData->KMeansResultRevision;
+                break;
+            case TargetDomain::GraphVertices:
+                if (target.GraphData)
+                    ++target.GraphData->KMeansResultRevision;
+                break;
+            case TargetDomain::PointCloudPoints:
+                if (target.PointCloudData)
+                    ++target.PointCloudData->KMeansResultRevision;
+                break;
+            case TargetDomain::Auto:
+            default:
+                break;
+            }
+        }
+
+        [[nodiscard]] std::string MakeCentroidEntityName(const entt::registry& reg, entt::entity sourceEntity)
+        {
+            if (const auto* name = reg.try_get<ECS::Components::NameTag::Component>(sourceEntity))
+                return name->Name + " / KMeans Centroids";
+            return "KMeans Centroids";
+        }
+
+        [[nodiscard]] entt::entity EnsureCentroidEntity(entt::registry& reg,
+                                                        entt::entity sourceEntity,
+                                                        ResolvedTarget& target)
+        {
+            entt::entity centroidEntity = GetCentroidEntity(target);
+            if (centroidEntity != entt::null && reg.valid(centroidEntity))
+                return centroidEntity;
+
+            centroidEntity = reg.create();
+            reg.emplace_or_replace<ECS::Components::NameTag::Component>(
+                centroidEntity, ECS::Components::NameTag::Component{.Name = MakeCentroidEntityName(reg, sourceEntity)});
+            reg.emplace_or_replace<ECS::Components::Hierarchy::Component>(centroidEntity);
+            reg.emplace_or_replace<ECS::PointCloud::Data>(centroidEntity);
+            ECS::Components::Hierarchy::Attach(reg, centroidEntity, sourceEntity);
+            SetCentroidEntity(target, centroidEntity);
+            return centroidEntity;
+        }
+
+        void SyncCentroidPointCloud(ECS::PointCloud::Data& centroidData,
+                                    const Geometry::KMeans::Result& result)
+        {
+            if (!centroidData.CloudRef)
+                centroidData.CloudRef = std::make_shared<Geometry::PointCloud::Cloud>();
+
+            auto& cloud = *centroidData.CloudRef;
+            cloud.Clear();
+            cloud.EnableColors();
+            cloud.EnableRadii(0.025f);
+
+            auto colorProp = cloud.GetOrAddVertexProperty<glm::vec4>("p:color", glm::vec4(1.0f));
+            auto radiusProp = cloud.GetOrAddVertexProperty<float>("p:radius", 0.025f);
+
+            const float radius = 0.025f;
+            for (uint32_t i = 0; i < static_cast<uint32_t>(result.Centroids.size()); ++i)
+            {
+                const auto handle = cloud.AddPoint(result.Centroids[i]);
+                colorProp[handle] = LabelColor(i);
+                radiusProp[handle] = radius;
+            }
+
+            centroidData.Visualization.VertexColors.PropertyName = "p:color";
+            centroidData.DefaultRadius = radius;
+            centroidData.SizeMultiplier = 1.25f;
+            centroidData.Visible = true;
+            centroidData.GpuDirty = true;
+            ++centroidData.PositionRevision;
+        }
+
+        void BuildCentroidPointKDTree(entt::registry& reg, entt::entity centroidEntity)
+        {
+            auto* centroidData = reg.try_get<ECS::PointCloud::Data>(centroidEntity);
+            if (!centroidData || !centroidData->CloudRef)
+                return;
+
+            auto& kd = reg.get_or_emplace<ECS::PointKDTree::Data>(centroidEntity);
+            kd.Clear();
+            const auto positions = centroidData->CloudRef->Positions();
+            if (positions.empty())
+                return;
+
+            if (kd.Tree.BuildFromPoints(positions, kd.BuildParams))
+            {
+                kd.PointCount = static_cast<uint32_t>(positions.size());
+                kd.Dirty = false;
+            }
+        }
+
+        void UpdateCentroidEntity(Engine& engine,
+                                  entt::entity sourceEntity,
+                                  ResolvedTarget& target,
+                                  const Geometry::KMeans::Result& result)
+        {
+            auto& reg = engine.GetScene().GetRegistry();
+            const entt::entity centroidEntity = EnsureCentroidEntity(reg, sourceEntity, target);
+            auto& centroidData = reg.get_or_emplace<ECS::PointCloud::Data>(centroidEntity);
+            SyncCentroidPointCloud(centroidData, result);
+            BuildCentroidPointKDTree(reg, centroidEntity);
+            engine.GetScene().GetDispatcher().enqueue<ECS::Events::GeometryModified>({centroidEntity});
+        }
+
 #ifdef INTRINSIC_HAS_CUDA
         struct PendingCudaJob
         {
@@ -531,7 +644,10 @@ namespace Runtime::PointCloudKMeans
                 return false;
             }
 
-            const std::vector<glm::vec3> centroids = InitializeCentroids(points, params, job.ClusterCount);
+            const std::vector<glm::vec3> existingCentroids =
+                SnapshotExistingCentroids(engine.GetScene().GetRegistry(), target);
+            const std::vector<glm::vec3> centroids = Geometry::KMeans::BuildInitialCentroids(
+                points, existingCentroids, params, job.ClusterCount);
             if (!cudaDevice->CopyHostToBufferAsync(job.Centroids, centroids.data(), centroids.size() * sizeof(glm::vec3), job.Stream))
             {
                 cleanup();
@@ -680,7 +796,7 @@ namespace Runtime::PointCloudKMeans
 
         [[nodiscard]] bool ScheduleCuda(
             Engine& engine,
-            [[maybe_unused]] entt::entity entity,
+            entt::entity entity,
             ECS::PointCloud::Data& pcData,
             const Geometry::KMeans::Params& params)
         {
@@ -714,7 +830,11 @@ namespace Runtime::PointCloudKMeans
                 pcData.CudaPositionRevision = pcData.PositionRevision;
             }
 
-            const std::vector<glm::vec3> centroids = InitializeCentroids(positions, params, clusterCount);
+            auto& reg = engine.GetScene().GetRegistry();
+            ResolvedTarget target = ResolveTarget(reg, entity, Domain::PointCloudPoints);
+            const std::vector<glm::vec3> existingCentroids = SnapshotExistingCentroids(reg, target);
+            const std::vector<glm::vec3> centroids = Geometry::KMeans::BuildInitialCentroids(
+                positions, existingCentroids, params, clusterCount);
             auto uploadCentroids = cudaDevice->CopyHostToBufferAsync(
                 pcData.CudaCentroids,
                 centroids.data(),
@@ -837,6 +957,8 @@ namespace Runtime::PointCloudKMeans
         if (!published)
             return false;
 
+        BumpKMeansRevision(target);
+        UpdateCentroidEntity(engine, entity, target, result);
         MarkVertexAttributesDirty(reg, entity);
         engine.GetScene().GetDispatcher().enqueue<ECS::Events::GeometryModified>({entity});
         return true;
@@ -991,6 +1113,7 @@ namespace Runtime::PointCloudKMeans
 #endif
 
         std::vector<glm::vec3> snapshot = SnapshotPoints(target);
+        std::vector<glm::vec3> initialCentroids = SnapshotExistingCentroids(reg, target);
         const Geometry::KMeans::Params cpuParams = [&]
         {
             auto copy = params;
@@ -1007,11 +1130,17 @@ namespace Runtime::PointCloudKMeans
 
         const Domain resolvedDomain = target.Domain;
 
-        Core::Tasks::Scheduler::Dispatch([&engine, entity, resolvedDomain, snapshot = std::move(snapshot), cpuParams]() mutable
+        Core::Tasks::Scheduler::Dispatch([&engine,
+                                          entity,
+                                          resolvedDomain,
+                                          snapshot = std::move(snapshot),
+                                          initialCentroids = std::move(initialCentroids),
+                                          cpuParams]() mutable
         {
             PROFILE_SCOPE("PointCloudKMeans::CPUWorker");
             const auto start = std::chrono::high_resolution_clock::now();
-            const auto result = Geometry::KMeans::Cluster(snapshot, cpuParams);
+            Geometry::KMeans::CpuScratch scratch{};
+            const auto result = Geometry::KMeans::Cluster(snapshot, initialCentroids, cpuParams, &scratch);
             const auto end = std::chrono::high_resolution_clock::now();
             const double durationMs = std::chrono::duration<double, std::milli>(end - start).count();
 
@@ -1232,6 +1361,22 @@ namespace Runtime::PointCloudKMeans
         auto& reg = engine.GetScene().GetRegistry();
         if (!reg.valid(entity))
             return;
+
+        const auto releaseCentroidPointCloud = [&](entt::entity centroidEntity)
+        {
+            if (centroidEntity == entt::null || !reg.valid(centroidEntity))
+                return;
+            if (auto* centroidData = reg.try_get<ECS::PointCloud::Data>(centroidEntity))
+                centroidData->ReleaseCudaBuffers(*cudaDevice);
+        };
+
+        if (auto* meshData = reg.try_get<ECS::Mesh::Data>(entity))
+            releaseCentroidPointCloud(meshData->KMeansCentroidEntity);
+        if (auto* graphData = reg.try_get<ECS::Graph::Data>(entity))
+            releaseCentroidPointCloud(graphData->KMeansCentroidEntity);
+        if (auto* sourcePointCloud = reg.try_get<ECS::PointCloud::Data>(entity))
+            releaseCentroidPointCloud(sourcePointCloud->KMeansCentroidEntity);
+
         if (auto* pcData = reg.try_get<ECS::PointCloud::Data>(entity))
             pcData->ReleaseCudaBuffers(*cudaDevice);
 #else

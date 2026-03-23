@@ -8,6 +8,7 @@ module;
 #include <cuda.h>
 #endif
 
+#include <entt/entity/entity.hpp>
 #include <glm/glm.hpp>
 
 export module Graphics.Components;
@@ -19,6 +20,7 @@ import Graphics.VisualizationConfig;
 import Geometry.BVH;
 import Geometry.HalfedgeMesh;
 import Geometry.Graph;
+import Geometry.KDTree;
 import Geometry.PointCloud;
 import Geometry.Handle;
 import Geometry.KMeans;
@@ -196,6 +198,29 @@ export namespace ECS::PrimitiveBVH
     };
 }
 
+export namespace ECS::PointKDTree
+{
+    struct Data
+    {
+        Geometry::KDTree Tree{};
+        Geometry::KDTreeBuildParams BuildParams{};
+        bool Dirty = true;
+        uint32_t PointCount = 0;
+
+        void Clear()
+        {
+            Tree = {};
+            Dirty = true;
+            PointCount = 0;
+        }
+
+        [[nodiscard]] bool HasValidTree() const noexcept
+        {
+            return PointCount > 0 && !Tree.Nodes().empty();
+        }
+    };
+}
+
 // -------------------------------------------------------------------------
 // Mesh::Data — ECS component for PropertySet-backed mesh visualization.
 // -------------------------------------------------------------------------
@@ -234,6 +259,8 @@ export namespace ECS::Mesh
         float KMeansLastInertia = 0.0f;
         uint32_t KMeansLastMaxDistanceIndex = 0;
         double KMeansLastDurationMs = 0.0;
+        entt::entity KMeansCentroidEntity = entt::null;
+        uint64_t KMeansResultRevision = 0;
 
         // Centroid positions from the last KMeans run.  Retained so the
         // surface shader can compute true centroid-based Voronoi cells.
@@ -343,6 +370,8 @@ export namespace ECS::PointCloud
         float KMeansLastInertia = 0.0f;
         uint32_t KMeansLastMaxDistanceIndex = 0;
         double KMeansLastDurationMs = 0.0;
+        entt::entity KMeansCentroidEntity = entt::null;
+        uint64_t KMeansResultRevision = 0;
 
 #ifdef INTRINSIC_HAS_CUDA
         // Persistent CUDA resources kept alive per entity until explicit release
@@ -482,6 +511,8 @@ export namespace ECS::Graph
         float KMeansLastInertia = 0.0f;
         uint32_t KMeansLastMaxDistanceIndex = 0;
         double KMeansLastDurationMs = 0.0;
+        entt::entity KMeansCentroidEntity = entt::null;
+        uint64_t KMeansResultRevision = 0;
 
         // ---- Queries (delegate to GraphRef) ----
         [[nodiscard]] std::size_t NodeCount() const noexcept

@@ -581,6 +581,38 @@ TEST(PointCloud_KMeans, ClusterCountIsClampedToPointCount)
     EXPECT_EQ(result->Labels.size(), points.size());
 }
 
+TEST(PointCloud_KMeans, ReusesPersistentCentroidSeedsAndBuildsCpuScratchTree)
+{
+    const std::vector<glm::vec3> points{
+        {-10.0f, 0.0f, 0.0f},
+        {-9.5f, 0.0f, 0.0f},
+        {10.0f, 0.0f, 0.0f},
+        {10.5f, 0.0f, 0.0f},
+    };
+    const std::vector<glm::vec3> persistentCentroids{
+        {-9.75f, 0.0f, 0.0f},
+        {10.25f, 0.0f, 0.0f},
+    };
+
+    Geometry::KMeans::Params params{};
+    params.ClusterCount = 2;
+    params.MaxIterations = 8;
+    params.Init = Geometry::KMeans::Initialization::Random;
+    params.Seed = 1337u;
+
+    Geometry::KMeans::CpuScratch scratch{};
+    auto result = Geometry::KMeans::Cluster(points, persistentCentroids, params, &scratch);
+    ASSERT_TRUE(result.has_value());
+    ASSERT_EQ(result->Centroids.size(), 2u);
+    EXPECT_FALSE(scratch.CentroidTree.Nodes().empty());
+
+    std::sort(result->Centroids.begin(), result->Centroids.end(),
+              [](const glm::vec3& a, const glm::vec3& b) { return a.x < b.x; });
+
+    EXPECT_NEAR(result->Centroids[0].x, -9.75f, 1.0e-3f);
+    EXPECT_NEAR(result->Centroids[1].x, 10.25f, 1.0e-3f);
+}
+
 TEST(PointCloud_KMeans, RecomputeCentroidsMatchesPerLabelMeans)
 {
     const std::vector<glm::vec3> points{
