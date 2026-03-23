@@ -10,6 +10,7 @@ module;
 
 export module Geometry.KMeans;
 
+import Geometry.KDTree;
 import Geometry.Properties;
 
 export namespace Geometry::KMeans
@@ -48,6 +49,13 @@ export namespace Geometry::KMeans
         Backend ActualBackend = Backend::CPU;
     };
 
+    struct CpuScratch
+    {
+        Geometry::KDTree CentroidTree{};
+        Geometry::KDTreeBuildParams CentroidTreeBuildParams{};
+        std::vector<Geometry::KDTree::ElementIndex> QueryBuffer{};
+    };
+
     // Lloyd-style k-means on unstructured 3D point sets.
     //
     // Objective:
@@ -71,6 +79,30 @@ export namespace Geometry::KMeans
     [[nodiscard]] std::optional<Result> Cluster(
         std::span<const glm::vec3> points,
         const Params& params = {});
+
+    // Lloyd-style k-means with externally managed centroid seeds.
+    //
+    // The initial centroids may come from persistent ECS-owned state such as a
+    // retained centroid point-cloud entity. When the provided set contains at
+    // least k finite positions, those seeds are used directly; otherwise the
+    // operator falls back to the requested initialization policy.
+    //
+    // CPU scratch owns only temporary acceleration structures. In particular,
+    // the implementation rebuilds the centroid KD-tree each iteration because
+    // centroid positions are mutable within the solve.
+    [[nodiscard]] std::optional<Result> Cluster(
+        std::span<const glm::vec3> points,
+        std::span<const glm::vec3> initialCentroids,
+        const Params& params,
+        CpuScratch* cpuScratch);
+
+    // Build an initial centroid set from either persistent ECS-provided seeds
+    // or the algorithm's configured seeding policy.
+    [[nodiscard]] std::vector<glm::vec3> BuildInitialCentroids(
+        std::span<const glm::vec3> points,
+        std::span<const glm::vec3> initialCentroids,
+        const Params& params,
+        uint32_t clusterCount);
 
     // Recompute cluster centroids directly from an existing label assignment.
     //
