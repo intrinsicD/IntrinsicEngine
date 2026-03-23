@@ -23,6 +23,7 @@ namespace RHI
 
         void BeginFrame();
         void EndFrame();
+        void RequestShutdown();
 
         void BindPipeline(const GraphicsPipeline& pipeline);
         void Draw(uint32_t vertexCount);
@@ -66,6 +67,7 @@ namespace RHI
         uint32_t m_ImageIndex = 0;
         uint32_t m_FramesInFlight = 0;
         bool m_IsFrameStarted = false;
+        bool m_ShutdownRequested = false;
 
         void InitSyncStructures();
         std::unique_ptr<GpuProfiler> m_GpuProfiler;

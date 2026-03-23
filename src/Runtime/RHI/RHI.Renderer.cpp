@@ -63,6 +63,11 @@ namespace RHI
         vkDestroyCommandPool(m_Device->GetLogicalDevice(), m_CommandPool, nullptr);
     }
 
+    void SimpleRenderer::RequestShutdown()
+    {
+        m_ShutdownRequested = true;
+    }
+
     void SimpleRenderer::InitSyncStructures()
     {
         m_ImageAvailableSemaphores.resize(m_FramesInFlight);
@@ -86,8 +91,30 @@ namespace RHI
 
     void SimpleRenderer::BeginFrame()
     {
+        if (m_ShutdownRequested)
+        {
+            m_IsFrameStarted = false;
+            return;
+        }
+
+        if (!m_Device || m_Device->GetLogicalDevice() == VK_NULL_HANDLE)
+        {
+            m_IsFrameStarted = false;
+            return;
+        }
+
         // 1. Wait for fence (CPU wait)
-        VK_CHECK(vkWaitForFences(m_Device->GetLogicalDevice(), 1, &m_InFlightFences[m_CurrentFrame], VK_TRUE, UINT64_MAX));
+        const VkResult fenceWaitResult = vkWaitForFences(m_Device->GetLogicalDevice(), 1, &m_InFlightFences[m_CurrentFrame], VK_TRUE, UINT64_MAX);
+        if (fenceWaitResult != VK_SUCCESS)
+        {
+            if (m_ShutdownRequested && fenceWaitResult == VK_ERROR_DEVICE_LOST)
+            {
+                m_IsFrameStarted = false;
+                return;
+            }
+
+            VK_CHECK(fenceWaitResult);
+        }
 
         // Reclaim timeline-based deferred deletions whose submissions have completed.
         m_Device->CollectGarbage();

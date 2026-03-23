@@ -77,6 +77,8 @@ namespace Runtime
                 if constexpr (std::is_same_v<T, Core::Windowing::WindowCloseEvent>)
                 {
                     m_Running = false;
+                    if (m_GraphicsBackend)
+                        m_GraphicsBackend->GetRenderer().RequestShutdown();
                 }
                 else if constexpr (std::is_same_v<T, Core::Windowing::WindowResizeEvent>)
                 {
@@ -167,6 +169,9 @@ namespace Runtime
 
     Engine::~Engine()
     {
+        if (m_GraphicsBackend)
+            m_GraphicsBackend->GetRenderer().RequestShutdown();
+
         m_GraphicsBackend->WaitIdle();
 
         // Disconnect entity destruction hooks before tearing down GPU systems.

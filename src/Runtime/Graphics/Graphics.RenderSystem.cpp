@@ -166,7 +166,7 @@ namespace Graphics
         const FrameRecipe& recipe,
         std::span<const RenderGraphDebugPass> passes,
         std::span<const RenderGraphDebugImage> images,
-        std::span<const ImportedResourceWritePolicy> writePolicies = {})
+        std::span<const ImportedResourceWritePolicy> writePolicies)
     {
         RenderGraphValidationResult result{};
 

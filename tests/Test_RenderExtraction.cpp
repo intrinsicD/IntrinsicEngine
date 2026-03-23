@@ -2,6 +2,7 @@
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
 #include <type_traits>
 #include <entt/entity/fwd.hpp>
 
@@ -205,26 +206,26 @@ TEST(RenderExtraction, ExtractRenderWorld_BuildsImmutablePickingPacketsFromAutho
     registry.emplace<ECS::Surface::Component>(surfaceEntity, ECS::Surface::Component{
         .Geometry = Geometry::GeometryHandle{10u, 1u},
     });
-    registry.emplace<ECS::Mesh::Data>(surfaceEntity, ECS::Mesh::Data{
-        .MeshRef = mesh,
-    });
+    auto& meshData = registry.emplace<ECS::Mesh::Data>(surfaceEntity);
+    meshData.MeshRef = mesh;
 
     const entt::entity lineEntity = registry.create();
     registry.emplace<ECS::Components::Transform::Component>(
         lineEntity,
         ECS::Components::Transform::Component{.Position = glm::vec3(-1.0f, 0.0f, 0.0f)});
     registry.emplace<ECS::Components::Selection::PickID>(lineEntity, ECS::Components::Selection::PickID{.Value = 22u});
-    registry.emplace<ECS::Line::Component>(lineEntity, ECS::Line::Component{
-        .Geometry = Geometry::GeometryHandle{20u, 1u},
-        .EdgeView = Geometry::GeometryHandle{21u, 1u},
-        .EdgeCount = 4u,
-        .Width = 3.5f,
-    });
-    registry.emplace<ECS::Graph::Data>(lineEntity, ECS::Graph::Data{
-        .GraphRef = std::make_shared<Geometry::Graph::Graph>(),
-    });
+    auto& line = registry.emplace<ECS::Line::Component>(lineEntity);
+    line.Geometry = Geometry::GeometryHandle{20u, 1u};
+    line.EdgeView = Geometry::GeometryHandle{21u, 1u};
+    line.EdgeCount = 4u;
+    line.Width = 3.5f;
+    auto& graphData = registry.emplace<ECS::Graph::Data>(lineEntity);
+    graphData.GraphRef = std::make_shared<Geometry::Graph::Graph>();
 
     const entt::entity pointEntity = registry.create();
+    registry.emplace<ECS::Components::Transform::Component>(
+        pointEntity,
+        ECS::Components::Transform::Component{.Position = glm::vec3(0.0f, 5.0f, 0.0f)});
     registry.emplace<ECS::Components::Transform::WorldMatrix>(
         pointEntity,
         ECS::Components::Transform::WorldMatrix{
@@ -235,9 +236,8 @@ TEST(RenderExtraction, ExtractRenderWorld_BuildsImmutablePickingPacketsFromAutho
         .Geometry = Geometry::GeometryHandle{30u, 1u},
         .Size = 0.125f,
     });
-    registry.emplace<ECS::PointCloud::Data>(pointEntity, ECS::PointCloud::Data{
-        .CloudRef = std::make_shared<Geometry::PointCloud::Cloud>(),
-    });
+    auto& cloudData = registry.emplace<ECS::PointCloud::Data>(pointEntity);
+    cloudData.CloudRef = std::make_shared<Geometry::PointCloud::Cloud>();
 
     sceneManager.CommitFixedTick();
 
