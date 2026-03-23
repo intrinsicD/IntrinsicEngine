@@ -362,12 +362,11 @@ export namespace ECS::PointCloud
 
         void ReleaseCudaBuffers(RHI::CudaDevice& cudaDevice)
         {
-            cudaDevice.FreeBuffer(CudaPositions);
-            cudaDevice.FreeBuffer(CudaLabels);
-            cudaDevice.FreeBuffer(CudaDistances);
-            cudaDevice.FreeBuffer(CudaCentroids);
-            cudaDevice.FreeBuffer(CudaSums);
-            cudaDevice.FreeBuffer(CudaClusterSizes);
+            if (CudaStream)
+            {
+                cudaDevice.DestroyStream(CudaStream);
+                CudaStream = nullptr;
+            }
 
             if (CudaStartEvent)
             {
@@ -379,11 +378,13 @@ export namespace ECS::PointCloud
                 cudaDevice.DestroyEvent(CudaCompletionEvent);
                 CudaCompletionEvent = nullptr;
             }
-            if (CudaStream)
-            {
-                cudaDevice.DestroyStream(CudaStream);
-                CudaStream = nullptr;
-            }
+
+            cudaDevice.FreeBuffer(CudaPositions);
+            cudaDevice.FreeBuffer(CudaLabels);
+            cudaDevice.FreeBuffer(CudaDistances);
+            cudaDevice.FreeBuffer(CudaCentroids);
+            cudaDevice.FreeBuffer(CudaSums);
+            cudaDevice.FreeBuffer(CudaClusterSizes);
 
             CudaPointCapacity = 0;
             CudaClusterCapacity = 0;

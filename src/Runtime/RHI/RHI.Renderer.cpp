@@ -104,16 +104,29 @@ namespace RHI
         }
 
         // 1. Wait for fence (CPU wait)
-        const VkResult fenceWaitResult = vkWaitForFences(m_Device->GetLogicalDevice(), 1, &m_InFlightFences[m_CurrentFrame], VK_TRUE, UINT64_MAX);
+        constexpr uint64_t kFenceWaitTimeoutNs = 16'000'000ull; // ~16 ms: keep the frame loop responsive.
+        const VkResult fenceWaitResult = vkWaitForFences(
+            m_Device->GetLogicalDevice(), 1, &m_InFlightFences[m_CurrentFrame], VK_TRUE, kFenceWaitTimeoutNs);
         if (fenceWaitResult != VK_SUCCESS)
         {
-            if (m_ShutdownRequested && fenceWaitResult == VK_ERROR_DEVICE_LOST)
+            if (fenceWaitResult == VK_TIMEOUT)
             {
                 m_IsFrameStarted = false;
                 return;
             }
 
-            VK_CHECK(fenceWaitResult);
+            if (fenceWaitResult == VK_ERROR_DEVICE_LOST)
+            {
+                Core::Log::Error("SimpleRenderer::BeginFrame(): device lost while waiting for frame fence.");
+                RequestShutdown();
+                m_IsFrameStarted = false;
+                return;
+            }
+
+            Core::Log::Error("SimpleRenderer::BeginFrame(): vkWaitForFences failed (VkResult={}).",
+                             static_cast<int>(fenceWaitResult));
+            m_IsFrameStarted = false;
+            return;
         }
 
         // Reclaim timeline-based deferred deletions whose submissions have completed.

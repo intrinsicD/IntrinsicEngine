@@ -435,18 +435,18 @@ namespace Runtime::PointCloudKMeans
 
         void DestroyPendingCudaJob(RHI::CudaDevice& cudaDevice, PendingCudaJob& job)
         {
+            if (job.Stream)
+                cudaDevice.DestroyStream(job.Stream);
+            if (job.StartEvent)
+                cudaDevice.DestroyEvent(job.StartEvent);
+            if (job.CompletionEvent)
+                cudaDevice.DestroyEvent(job.CompletionEvent);
             cudaDevice.FreeBuffer(job.Positions);
             cudaDevice.FreeBuffer(job.Labels);
             cudaDevice.FreeBuffer(job.Distances);
             cudaDevice.FreeBuffer(job.Centroids);
             cudaDevice.FreeBuffer(job.Sums);
             cudaDevice.FreeBuffer(job.ClusterSizes);
-            if (job.StartEvent)
-                cudaDevice.DestroyEvent(job.StartEvent);
-            if (job.CompletionEvent)
-                cudaDevice.DestroyEvent(job.CompletionEvent);
-            if (job.Stream)
-                cudaDevice.DestroyStream(job.Stream);
         }
 
         [[nodiscard]] bool ScheduleCudaJob(

@@ -78,6 +78,9 @@ if (x && y && z) tempPos.emplace_back(*x, *y, *z);
 - **Result struct** with diagnostics (iteration counts, element counts, convergence status).
 - **Return type:** `std::optional<Result>` — `std::nullopt` for degenerate input (empty mesh, zero iterations, collinear points).
 - **In-place vs. new mesh:** Topology-modifying operations (simplification, remeshing) work in-place. Topology-restructuring operations (subdivision) take `const Mesh& input, Mesh& output`.
+- **Use Acceleration structures:** Use the right acceleration structure — `Geometry::KDTree, Geometry::Octree, Geometry::BVH` where possible.
+- **Add cuda variant:** implement a cuda-friendly version of the operator where possible.
+- **Reuse existing code** Always try to find a reusable implementation in the engine first. When an essential algorithm/structure is missing, implement it in the Geometry module and add a new operator entry point rather than copying code into a new feature.
 - **Safety limits:** All `CWRotatedHalfedge` loops have `if (++safety > N) break;` guards.
 
 **Canonical examples:**

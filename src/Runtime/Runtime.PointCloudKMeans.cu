@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstdint>
 #include "Runtime.PointCloudKMeans.CudaKernels.hpp"
 #include <cuda.h>
@@ -7,6 +8,8 @@ namespace Runtime::PointCloudKMeans::CudaKernels
 {
     namespace
     {
+        constexpr uint32_t kPointBatchSize = 8192u;
+
         struct Float3
         {
             float x;
@@ -102,7 +105,6 @@ namespace Runtime::PointCloudKMeans::CudaKernels
         cudaStream_t runtimeStream = reinterpret_cast<cudaStream_t>(stream);
 
         constexpr uint32_t threadsPerBlock = 256;
-        const uint32_t pointBlocks = (pointCount + threadsPerBlock - 1u) / threadsPerBlock;
         const uint32_t clusterBlocks = (clusterCount + threadsPerBlock - 1u) / threadsPerBlock;
 
         for (uint32_t iter = 0; iter < iterations; ++iter)
@@ -112,17 +114,23 @@ namespace Runtime::PointCloudKMeans::CudaKernels
             if (cudaMemsetAsync(dClusterSizes, 0, sizeof(uint32_t) * clusterCount, runtimeStream) != cudaSuccess)
                 return false;
 
-            AssignClusters<<<pointBlocks, threadsPerBlock, 0, runtimeStream>>>(
-                dPositions,
-                pointCount,
-                dCentroids,
-                clusterCount,
-                dLabels,
-                dDistances,
-                dSums,
-                dClusterSizes);
-            if (cudaPeekAtLastError() != cudaSuccess)
-                return false;
+            for (uint32_t base = 0; base < pointCount; base += kPointBatchSize)
+            {
+                const uint32_t batchCount = std::min(kPointBatchSize, pointCount - base);
+                const uint32_t batchBlocks = (batchCount + threadsPerBlock - 1u) / threadsPerBlock;
+
+                AssignClusters<<<batchBlocks, threadsPerBlock, 0, runtimeStream>>>(
+                    dPositions + base,
+                    batchCount,
+                    dCentroids,
+                    clusterCount,
+                    dLabels + base,
+                    dDistances + base,
+                    dSums,
+                    dClusterSizes);
+                if (cudaPeekAtLastError() != cudaSuccess)
+                    return false;
+            }
 
             UpdateCentroids<<<clusterBlocks, threadsPerBlock, 0, runtimeStream>>>(
                 dCentroids,

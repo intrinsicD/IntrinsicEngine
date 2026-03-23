@@ -1,7 +1,6 @@
 module;
 
 #include <array>
-#include <cstdint>
 #include <memory>
 #include <optional>
 #include <span>
@@ -64,13 +63,6 @@ export namespace Graphics::Passes
         }
     };
 
-    struct CachedPreviewKMeans
-    {
-        std::vector<glm::vec3> Centroids{};
-        uint64_t Signature = 0;
-        bool Valid = false;
-    };
-
     class HtexPatchPreviewPass final : public IRenderFeature
     {
     public:
@@ -90,16 +82,12 @@ export namespace Graphics::Passes
 
         struct UploadPassData
         {
-            UploadPassData() : Target(RGResourceHandle{}) {}
-
-            RGResourceHandle Target;
+            RGResourceHandle Target{};
         };
 
         struct FinalizePassData
         {
-            FinalizePassData() : Target(RGResourceHandle{}) {}
-
-            RGResourceHandle Target;
+            RGResourceHandle Target{};
         };
 
         RHI::VulkanDevice* m_Device = nullptr;
@@ -122,7 +110,8 @@ export namespace Graphics::Passes
 
         CachedPreviewAtlas m_CachedAtlas{};
 
-        CachedPreviewKMeans m_CachedKMeans{};
+        struct PendingPreviewBake;
+        std::shared_ptr<PendingPreviewBake> m_PendingBake{};
 
         [[nodiscard]] static bool BuildPreviewAtlas(const Geometry::Halfedge::Mesh& mesh,
                                                     const PreviewKMeansData& kmeansData,
@@ -137,6 +126,5 @@ export namespace Graphics::Passes
             const Geometry::Halfedge::Mesh& mesh,
             const PreviewKMeansData& kmeansData,
             std::span<const Geometry::HtexPatch::HalfedgePatchMeta> patches) noexcept;
-        [[nodiscard]] PreviewKMeansData GetPreviewKMeansData(const Geometry::Halfedge::Mesh& mesh) noexcept;
     };
 }
