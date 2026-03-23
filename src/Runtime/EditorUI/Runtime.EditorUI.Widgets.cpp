@@ -1163,7 +1163,7 @@ bool DrawKMeansWidget(Runtime::Engine& engine,
 
     if (ImGui::Button("Run K-Means##GeometryProcessing"))
     {
-        Geometry::KMeans::Params params{};
+        Geometry::KMeans::KMeansParams params{};
         params.ClusterCount = static_cast<uint32_t>(std::max(state.ClusterCount, 1));
         params.MaxIterations = static_cast<uint32_t>(std::max(state.MaxIterations, 1));
         params.Seed = static_cast<uint32_t>(std::max(state.Seed, 0));
@@ -1570,7 +1570,7 @@ bool DrawSimplificationWidget(Runtime::Engine& engine,
     const auto ui = state;
     return ApplySurfaceMeshOperator(engine, entity, [ui](Geometry::Halfedge::Mesh& mesh)
     {
-        Geometry::Simplification::SimplificationParams params;
+        Geometry::Simplification::Params params;
         params.TargetFaces = static_cast<std::size_t>(std::max(ui.TargetFaces, 0));
         params.PreserveBoundary = ui.PreserveBoundary;
         params.HausdorffError = ui.HausdorffError;

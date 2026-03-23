@@ -332,7 +332,7 @@ TEST(Attributes_TopologyOperators, SimplificationPreservesTexcoords)
 
     const std::size_t initialFaces = mesh.FaceCount();
 
-    Simplification::SimplificationParams params;
+    Simplification::Params params;
     params.TargetFaces = initialFaces / 2u;
     params.PreserveBoundary = false;
 
@@ -353,7 +353,7 @@ TEST(Attributes_TopologyOperators, SimplificationWithConfigurableQuadricsPreserv
 
     const std::size_t initialFaces = mesh.FaceCount();
 
-    Simplification::SimplificationParams params;
+    Simplification::Params params;
     params.TargetFaces = initialFaces / 2u;
     params.PreserveBoundary = false;
     params.Quadric.Type = Simplification::QuadricType::Triangle;

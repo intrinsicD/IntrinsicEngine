@@ -35,7 +35,7 @@ TEST(KMeansLabelRoundTrip, MeshVertexPublicationPreservesLabelsAndColormapContra
     meshData.MeshRef = mesh;
     meshData.AttributesDirty = false;
 
-    Geometry::KMeans::Result result{};
+    Geometry::KMeans::KMeansResult result{};
     result.Labels = {2u, 0u, 2u};
     result.SquaredDistances = {0.25f, 0.5f, 0.75f};
     result.Iterations = 7u;
@@ -89,7 +89,7 @@ TEST(KMeansLabelRoundTrip, PointCloudPublicationPreservesLabelsAndDirectColorCon
     ECS::PointCloud::Data pointCloudData{};
     pointCloudData.CloudRef = cloud;
 
-    Geometry::KMeans::Result result{};
+    Geometry::KMeans::KMeansResult result{};
     result.Labels = {1u, 0u, 1u};
     result.SquaredDistances = {0.1f, 0.2f, 0.3f};
     result.Iterations = 4u;

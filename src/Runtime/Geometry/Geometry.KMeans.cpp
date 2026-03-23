@@ -150,14 +150,14 @@ namespace Geometry::KMeans
         }
     }
 
-    std::optional<Result> Cluster(std::span<const glm::vec3> points, const Params& params)
+    std::optional<KMeansResult> Cluster(std::span<const glm::vec3> points, const KMeansParams& params)
     {
         return Cluster(points, {}, params, nullptr);
     }
 
-    std::optional<Result> Cluster(std::span<const glm::vec3> points,
+    std::optional<KMeansResult> Cluster(std::span<const glm::vec3> points,
                                   std::span<const glm::vec3> initialCentroids,
-                                  const Params& params,
+                                  const KMeansParams& params,
                                   CpuScratch* cpuScratch)
     {
         if (points.empty() || params.ClusterCount == 0 || params.MaxIterations == 0)
@@ -167,7 +167,7 @@ namespace Geometry::KMeans
         if (k == 0)
             return std::nullopt;
 
-        Result result{};
+        KMeansResult result{};
         result.ActualBackend = Backend::CPU;
         result.Labels.assign(points.size(), 0u);
         result.SquaredDistances.assign(points.size(), 0.0f);
@@ -251,7 +251,7 @@ namespace Geometry::KMeans
     std::vector<glm::vec3> BuildInitialCentroids(
         std::span<const glm::vec3> points,
         std::span<const glm::vec3> initialCentroids,
-        const Params& params,
+        const KMeansParams& params,
         uint32_t clusterCount)
     {
         if (points.empty() || clusterCount == 0)

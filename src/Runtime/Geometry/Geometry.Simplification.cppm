@@ -76,7 +76,7 @@ export namespace Geometry::Simplification
     // length, and valence limits.
 
     // Configuration for mesh simplification
-    struct SimplificationParams
+    struct Params
     {
         QuadricOptions Quadric{};
 
@@ -118,7 +118,7 @@ export namespace Geometry::Simplification
     };
 
     // Result of simplification
-    struct SimplificationResult
+    struct Result
     {
         // Number of collapses performed
         std::size_t CollapseCount{0};
@@ -139,8 +139,8 @@ export namespace Geometry::Simplification
     //
     // Returns nullopt if the mesh cannot be simplified (e.g., too few faces,
     // non-manifold input, or all collapses violate the link condition).
-    [[nodiscard]] std::optional<SimplificationResult> Simplify(
+    [[nodiscard]] std::optional<Result> Simplify(
         Halfedge::Mesh& mesh,
-        const SimplificationParams& params);
+        const Params& params);
 
 } // namespace Geometry::Simplification

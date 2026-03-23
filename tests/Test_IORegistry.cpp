@@ -1198,7 +1198,7 @@ TEST(IORegistryImport, DuckRepeatedSimplificationWorkflow)
     auto mesh = BuildWorkflowHalfedgeMesh(meshImport->Meshes.front());
     ASSERT_GT(mesh.FaceCount(), 4000u);
 
-    Geometry::Simplification::SimplificationParams first;
+    Geometry::Simplification::Params first;
     first.TargetFaces = 4000;
     first.PreserveBoundary = false;
     auto firstResult = Geometry::Simplification::Simplify(mesh, first);
@@ -1213,7 +1213,7 @@ TEST(IORegistryImport, DuckRepeatedSimplificationWorkflow)
     rebuiltCpu.Indices = indices;
     auto rebuilt = BuildWorkflowHalfedgeMesh(rebuiltCpu);
 
-    Geometry::Simplification::SimplificationParams second;
+    Geometry::Simplification::Params second;
     second.TargetFaces = 3000;
     second.PreserveBoundary = false;
     auto secondResult = Geometry::Simplification::Simplify(rebuilt, second);
@@ -1252,7 +1252,7 @@ TEST(IORegistryImport, DuckAggressiveSimplificationPreservesClosure)
     auto before = Geometry::MeshQuality::ComputeQuality(mesh);
     ASSERT_TRUE(before.has_value());
 
-    Geometry::Simplification::SimplificationParams params;
+    Geometry::Simplification::Params params;
     params.TargetFaces = 1000;
     params.PreserveBoundary = false;
 
@@ -1318,7 +1318,7 @@ TEST(IORegistryImport, DuckAggressiveSimplificationSurvivesWorkflowExtraction)
 
     auto mesh = BuildWorkflowHalfedgeMesh(meshImport->Meshes.front());
 
-    Geometry::Simplification::SimplificationParams params;
+    Geometry::Simplification::Params params;
     params.TargetFaces = 1000;
     params.PreserveBoundary = false;
 

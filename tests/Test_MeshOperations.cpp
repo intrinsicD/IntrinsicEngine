@@ -1125,7 +1125,7 @@ TEST(Simplification_QEM, ReducesFaceCount)
     auto mesh = MakeIcosahedron();
     EXPECT_EQ(mesh.FaceCount(), 20u);
 
-    Geometry::Simplification::SimplificationParams params;
+    Geometry::Simplification::Params params;
     params.TargetFaces = 10;
     params.PreserveBoundary = false; // closed mesh
 
@@ -1142,7 +1142,7 @@ TEST(Simplification_QEM, RespectsTargetFaceCount)
 {
     auto mesh = MakeIcosahedron();
 
-    Geometry::Simplification::SimplificationParams params;
+    Geometry::Simplification::Params params;
     params.TargetFaces = 12;
     params.PreserveBoundary = false;
 
@@ -1157,7 +1157,7 @@ TEST(Simplification_QEM, TooFewFacesReturnsNullopt)
 {
     auto mesh = MakeSingleTriangle();
 
-    Geometry::Simplification::SimplificationParams params;
+    Geometry::Simplification::Params params;
     params.TargetFaces = 1;
 
     auto result = Geometry::Simplification::Simplify(mesh, params);
@@ -1168,7 +1168,7 @@ TEST(Simplification_QEM, ErrorThresholdStopsEarly)
 {
     auto mesh = MakeIcosahedron();
 
-    Geometry::Simplification::SimplificationParams params;
+    Geometry::Simplification::Params params;
     params.TargetFaces = 4; // Very aggressive
     params.MaxError = 1e-10; // Very tight threshold — should stop early
     params.PreserveBoundary = false;
@@ -1187,7 +1187,7 @@ TEST(Simplification_QEM, PreservedMeshIsValid)
 {
     auto mesh = MakeIcosahedron();
 
-    Geometry::Simplification::SimplificationParams params;
+    Geometry::Simplification::Params params;
     params.TargetFaces = 8;
     params.PreserveBoundary = false;
 
@@ -1228,7 +1228,7 @@ TEST(Simplification_QEM, GarbageCollectionKeepsFaceHalfedgesValidAfterDenseSimpl
 {
     auto mesh = MakeDenseClosedTriangleMesh();
 
-    Geometry::Simplification::SimplificationParams params;
+    Geometry::Simplification::Params params;
     params.TargetFaces = 400;
     params.PreserveBoundary = false;
 
@@ -1306,7 +1306,7 @@ TEST(Simplification_QEM, DenseClosedMeshStaysClosed)
 {
     auto mesh = MakeDenseClosedTriangleMesh();
 
-    Geometry::Simplification::SimplificationParams params;
+    Geometry::Simplification::Params params;
     params.TargetFaces = 400;
     params.PreserveBoundary = false;
 
@@ -1380,7 +1380,7 @@ TEST(Simplification_QEM, HausdorffErrorConstraintIsRespected)
         }
     }
 
-    Geometry::Simplification::SimplificationParams params;
+    Geometry::Simplification::Params params;
     params.TargetFaces = 400;
     params.PreserveBoundary = false;
     params.HausdorffError = 0.5;
@@ -1394,7 +1394,7 @@ TEST(Simplification_QEM, RepeatedWorkflowStyleSimplificationStaysValid)
 {
     auto mesh = MakeDenseClosedTriangleMesh(4); // 5,120 triangles: fast, but still dense enough for repeated decimation.
 
-    Geometry::Simplification::SimplificationParams first;
+    Geometry::Simplification::Params first;
     first.TargetFaces = 4000;
     first.PreserveBoundary = false;
 
@@ -1410,7 +1410,7 @@ TEST(Simplification_QEM, RepeatedWorkflowStyleSimplificationStaysValid)
     auto rebuilt = RebuildMeshFromTriangleSoup(positions, indices);
     ASSERT_EQ(rebuilt.FaceCount(), indices.size() / 3);
 
-    Geometry::Simplification::SimplificationParams second;
+    Geometry::Simplification::Params second;
     second.TargetFaces = 3000;
     second.PreserveBoundary = false;
 
@@ -1459,7 +1459,7 @@ TEST(Simplification_QEM, ConfigurableQuadricsSupportAllTypesResidencesAndPlaceme
         auto mesh = MakeDenseClosedTriangleMesh(2);
         const std::size_t initialFaces = mesh.FaceCount();
 
-        Geometry::Simplification::SimplificationParams params;
+        Geometry::Simplification::Params params;
         params.TargetFaces = initialFaces / 2u;
         params.PreserveBoundary = false;
         params.Quadric.Type = config.Type;
@@ -1521,7 +1521,7 @@ TEST(Simplification_QEM, ProbabilisticQuadricsSupportIsotropicAndCovarianceModes
             }
         }
 
-        Geometry::Simplification::SimplificationParams params;
+        Geometry::Simplification::Params params;
         params.TargetFaces = initialFaces / 2u;
         params.PreserveBoundary = false;
         params.Quadric.Type = config.Type;
@@ -1543,14 +1543,14 @@ TEST(Simplification_QEM, MissingCovariancePropertiesFallBackToZeroCovariance)
     auto baselineMesh = MakeDenseClosedTriangleMesh(2);
     auto covarianceMesh = baselineMesh;
 
-    Geometry::Simplification::SimplificationParams baseline;
+    Geometry::Simplification::Params baseline;
     baseline.TargetFaces = baselineMesh.FaceCount() / 2u;
     baseline.PreserveBoundary = false;
     baseline.Quadric.Type = Geometry::Simplification::QuadricType::Plane;
     baseline.Quadric.Residence = Geometry::Simplification::QuadricResidence::VerticesAndFaces;
     baseline.Quadric.PlacementPolicy = Geometry::Simplification::CollapsePlacementPolicy::BestOfEndpointsAndMinimizer;
 
-    Geometry::Simplification::SimplificationParams covariance = baseline;
+    Geometry::Simplification::Params covariance = baseline;
     covariance.Quadric.ProbabilisticMode = Geometry::Simplification::QuadricProbabilisticMode::Covariance;
     covariance.Quadric.VertexPositionCovarianceProperty = "v:missing_sigma_p";
     covariance.Quadric.FacePositionCovarianceProperty = "f:missing_sigma_p";
@@ -1569,7 +1569,7 @@ TEST(Simplification_QEM, OpenBoundaryPatchKeepsDiskTopology)
 {
     auto mesh = MakeSubdividedTriangle();
 
-    Geometry::Simplification::SimplificationParams params;
+    Geometry::Simplification::Params params;
     params.TargetFaces = 2;
     params.PreserveBoundary = false;
     params.ForbidBoundaryInteriorCollapse = true;
@@ -1615,7 +1615,7 @@ TEST(Simplification_QEM, PreserveBoundaryPreventsCollapsesOnOpenPatch)
         }
     }
 
-    Geometry::Simplification::SimplificationParams params;
+    Geometry::Simplification::Params params;
     params.TargetFaces = 2;
     params.PreserveBoundary = true;
     params.ForbidBoundaryInteriorCollapse = true;

@@ -57,7 +57,7 @@ export namespace Runtime::PointCloudKMeans
     [[nodiscard]] bool Schedule(
         Engine& engine,
         entt::entity entity,
-        const Geometry::KMeans::Params& params,
+        const Geometry::KMeans::KMeansParams& params,
         Domain requestedDomain = Domain::Auto);
 
     // Publish a completed K-means result into the selected authoritative data
@@ -71,7 +71,7 @@ export namespace Runtime::PointCloudKMeans
     [[nodiscard]] bool PublishResult(
         Engine& engine,
         entt::entity entity,
-        const Geometry::KMeans::Result& result,
+        const Geometry::KMeans::KMeansResult& result,
         double durationMs,
         Domain requestedDomain = Domain::Auto);
 
@@ -80,17 +80,17 @@ export namespace Runtime::PointCloudKMeans
     // testable without requiring a fully constructed Engine instance.
     [[nodiscard]] bool PublishMeshVertexResult(
         ECS::Mesh::Data& meshData,
-        const Geometry::KMeans::Result& result,
+        const Geometry::KMeans::KMeansResult& result,
         double durationMs);
 
     [[nodiscard]] bool PublishGraphVertexResult(
         ECS::Graph::Data& graphData,
-        const Geometry::KMeans::Result& result,
+        const Geometry::KMeans::KMeansResult& result,
         double durationMs);
 
     [[nodiscard]] bool PublishPointCloudPointResult(
         ECS::PointCloud::Data& pointCloudData,
-        const Geometry::KMeans::Result& result,
+        const Geometry::KMeans::KMeansResult& result,
         double durationMs);
 
     // Poll in-flight CUDA jobs and publish completed label/color properties back

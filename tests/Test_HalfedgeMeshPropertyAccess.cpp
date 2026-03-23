@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <memory>
 #include <span>
 #include <unordered_set>
 #include <vector>
@@ -178,6 +179,72 @@ TEST(HalfedgeMesh_PropertyAccess, HalfedgeProperties_CanAddUserProperty)
     HalfedgeHandle h0{0};
     param[h0] = 3.14f;
     EXPECT_FLOAT_EQ(param[h0], 3.14f);
+}
+
+TEST(HalfedgeMesh_CopySemantics, CopyConstructor_DeepCopiesExternalPropertyStorage)
+{
+    using namespace Geometry;
+
+    auto properties = std::make_shared<Halfedge::MeshProperties>();
+    Halfedge::Mesh mesh(properties);
+
+    const auto v0 = mesh.AddVertex(glm::vec3{1.0f, 2.0f, 3.0f});
+    ASSERT_TRUE(v0.IsValid());
+
+    auto tag = VertexProperty<std::uint32_t>(mesh.VertexProperties().GetOrAdd<std::uint32_t>("v:tag", 7u));
+    ASSERT_TRUE(tag.IsValid());
+    tag[v0] = 17u;
+
+    Halfedge::Mesh copy(mesh);
+
+    ASSERT_TRUE(copy.VertexProperties().Exists("v:point"));
+    ASSERT_TRUE(copy.VertexProperties().Exists("v:tag"));
+
+    auto copyTag = VertexProperty<std::uint32_t>(copy.VertexProperties().Get<std::uint32_t>("v:tag"));
+    ASSERT_TRUE(copyTag.IsValid());
+
+    EXPECT_EQ(copy.Position(v0), glm::vec3(1.0f, 2.0f, 3.0f));
+    EXPECT_EQ(copyTag[v0], 17u);
+
+    copy.Position(v0) = glm::vec3(9.0f, 8.0f, 7.0f);
+    copyTag[v0] = 99u;
+
+    EXPECT_EQ(mesh.Position(v0), glm::vec3(1.0f, 2.0f, 3.0f));
+    EXPECT_EQ(tag[v0], 17u);
+    EXPECT_EQ(properties->Vertices.Size(), mesh.VertexProperties().Size());
+}
+
+TEST(HalfedgeMesh_CopySemantics, CopyAssignment_CopiesIntoOwnedPropertyStorage)
+{
+    using namespace Geometry;
+
+    auto source = MakeTriangle();
+    auto sourceTag = VertexProperty<std::uint32_t>(source.VertexProperties().GetOrAdd<std::uint32_t>("v:tag", 0u));
+    ASSERT_TRUE(sourceTag.IsValid());
+    sourceTag[VertexHandle{0}] = 11u;
+
+    auto targetProperties = std::make_shared<Halfedge::MeshProperties>();
+    Halfedge::Mesh target(targetProperties);
+    const auto t0 = target.AddVertex(glm::vec3{-1.0f, -1.0f, -1.0f});
+    ASSERT_TRUE(t0.IsValid());
+
+    target = source;
+
+    ASSERT_TRUE(target.VertexProperties().Exists("v:point"));
+    ASSERT_TRUE(target.VertexProperties().Exists("v:tag"));
+
+    auto targetTag = VertexProperty<std::uint32_t>(target.VertexProperties().Get<std::uint32_t>("v:tag"));
+    ASSERT_TRUE(targetTag.IsValid());
+
+    EXPECT_EQ(target.Position(VertexHandle{0}), source.Position(VertexHandle{0}));
+    EXPECT_EQ(targetTag[VertexHandle{0}], 11u);
+
+    target.Position(VertexHandle{0}) = glm::vec3(42.0f, 0.0f, 0.0f);
+    targetTag[VertexHandle{0}] = 77u;
+
+    EXPECT_NE(target.Position(VertexHandle{0}), source.Position(VertexHandle{0}));
+    EXPECT_EQ(sourceTag[VertexHandle{0}], 11u);
+    EXPECT_EQ(targetProperties->Vertices.Size(), target.VertexProperties().Size());
 }
 
 // =============================================================================

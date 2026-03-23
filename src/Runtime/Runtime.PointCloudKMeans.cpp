@@ -62,7 +62,7 @@ namespace Runtime::PointCloudKMeans
             Engine* Owner = nullptr;
             entt::entity Entity = entt::null;
             TargetDomain Domain = TargetDomain::Auto;
-            std::optional<Geometry::KMeans::Result> Result{};
+            std::optional<Geometry::KMeans::KMeansResult> Result{};
             double DurationMs = 0.0;
         };
 
@@ -429,7 +429,7 @@ namespace Runtime::PointCloudKMeans
         }
 
         void SyncCentroidPointCloud(ECS::PointCloud::Data& centroidData,
-                                    const Geometry::KMeans::Result& result)
+                                    const Geometry::KMeans::KMeansResult& result)
         {
             if (!centroidData.CloudRef)
                 centroidData.CloudRef = std::make_shared<Geometry::PointCloud::Cloud>();
@@ -480,7 +480,7 @@ namespace Runtime::PointCloudKMeans
         void UpdateCentroidEntity(Engine& engine,
                                   entt::entity sourceEntity,
                                   ResolvedTarget& target,
-                                  const Geometry::KMeans::Result& result)
+                                  const Geometry::KMeans::KMeansResult& result)
         {
             auto& reg = engine.GetScene().GetRegistry();
             const entt::entity centroidEntity = EnsureCentroidEntity(reg, sourceEntity, target);
@@ -566,7 +566,7 @@ namespace Runtime::PointCloudKMeans
             Engine& engine,
             entt::entity entity,
             ResolvedTarget target,
-            const Geometry::KMeans::Params& params)
+            const Geometry::KMeans::KMeansParams& params)
         {
             auto* cudaDevice = engine.GetCudaDevice();
             if (!cudaDevice)
@@ -798,7 +798,7 @@ namespace Runtime::PointCloudKMeans
             Engine& engine,
             entt::entity entity,
             ECS::PointCloud::Data& pcData,
-            const Geometry::KMeans::Params& params)
+            const Geometry::KMeans::KMeansParams& params)
         {
             PROFILE_SCOPE("PointCloudKMeans::ScheduleCUDA");
 
@@ -918,7 +918,7 @@ namespace Runtime::PointCloudKMeans
 
     bool PublishResult(Engine& engine,
                        entt::entity entity,
-                       const Geometry::KMeans::Result& result,
+                       const Geometry::KMeans::KMeansResult& result,
                        double durationMs,
                        Domain requestedDomain)
     {
@@ -965,7 +965,7 @@ namespace Runtime::PointCloudKMeans
     }
 
     bool PublishMeshVertexResult(ECS::Mesh::Data& meshData,
-                                 const Geometry::KMeans::Result& result,
+                                 const Geometry::KMeans::KMeansResult& result,
                                  double durationMs)
     {
         if (!meshData.MeshRef)
@@ -1013,7 +1013,7 @@ namespace Runtime::PointCloudKMeans
     }
 
     bool PublishGraphVertexResult(ECS::Graph::Data& graphData,
-                                  const Geometry::KMeans::Result& result,
+                                  const Geometry::KMeans::KMeansResult& result,
                                   double durationMs)
     {
         if (!graphData.GraphRef)
@@ -1048,7 +1048,7 @@ namespace Runtime::PointCloudKMeans
     }
 
     bool PublishPointCloudPointResult(ECS::PointCloud::Data& pointCloudData,
-                                      const Geometry::KMeans::Result& result,
+                                      const Geometry::KMeans::KMeansResult& result,
                                       double durationMs)
     {
         if (!pointCloudData.CloudRef)
@@ -1082,7 +1082,7 @@ namespace Runtime::PointCloudKMeans
 
     bool Schedule(Engine& engine,
                   entt::entity entity,
-                  const Geometry::KMeans::Params& params,
+                  const Geometry::KMeans::KMeansParams& params,
                   Domain requestedDomain)
     {
         PROFILE_SCOPE("PointCloudKMeans::Schedule");
@@ -1114,7 +1114,7 @@ namespace Runtime::PointCloudKMeans
 
         std::vector<glm::vec3> snapshot = SnapshotPoints(target);
         std::vector<glm::vec3> initialCentroids = SnapshotExistingCentroids(reg, target);
-        const Geometry::KMeans::Params cpuParams = [&]
+        const Geometry::KMeans::KMeansParams cpuParams = [&]
         {
             auto copy = params;
             copy.Compute = Geometry::KMeans::Backend::CPU;

@@ -608,9 +608,9 @@ namespace Geometry::Simplification
     // Main simplification entry point
     // =========================================================================
 
-    std::optional<SimplificationResult> Simplify(
+    std::optional<Result> Simplify(
         Halfedge::Mesh& mesh,
-        const SimplificationParams& params)
+        const Params& params)
     {
         using namespace Geometry;
 
@@ -1081,7 +1081,7 @@ namespace Geometry::Simplification
         // Phase 6: Greedy collapse loop
         // -----------------------------------------------------------------
 
-        SimplificationResult result;
+        Result result;
         result.FinalFaceCount = mesh.FaceCount();
 
         while (!heap.Empty() && result.FinalFaceCount > targetFaces)

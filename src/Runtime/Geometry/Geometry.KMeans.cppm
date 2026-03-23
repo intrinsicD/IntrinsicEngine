@@ -27,7 +27,7 @@ export namespace Geometry::KMeans
         Hierarchical = 1,
     };
 
-    struct Params
+    struct KMeansParams
     {
         uint32_t ClusterCount = 8;
         uint32_t MaxIterations = 32;
@@ -37,7 +37,7 @@ export namespace Geometry::KMeans
         Backend Compute = Backend::CPU;
     };
 
-    struct Result
+    struct KMeansResult
     {
         std::vector<uint32_t> Labels{};
         std::vector<float> SquaredDistances{};
@@ -76,9 +76,9 @@ export namespace Geometry::KMeans
     // Complexity:
     //   - Time: O(n * k * iters)
     //   - Space: O(n + k)
-    [[nodiscard]] std::optional<Result> Cluster(
+    [[nodiscard]] std::optional<KMeansResult> Cluster(
         std::span<const glm::vec3> points,
-        const Params& params = {});
+        const KMeansParams& params = {});
 
     // Lloyd-style k-means with externally managed centroid seeds.
     //
@@ -90,10 +90,10 @@ export namespace Geometry::KMeans
     // CPU scratch owns only temporary acceleration structures. In particular,
     // the implementation rebuilds the centroid KD-tree each iteration because
     // centroid positions are mutable within the solve.
-    [[nodiscard]] std::optional<Result> Cluster(
+    [[nodiscard]] std::optional<KMeansResult> Cluster(
         std::span<const glm::vec3> points,
         std::span<const glm::vec3> initialCentroids,
-        const Params& params,
+        const KMeansParams& params,
         CpuScratch* cpuScratch);
 
     // Build an initial centroid set from either persistent ECS-provided seeds
@@ -101,7 +101,7 @@ export namespace Geometry::KMeans
     [[nodiscard]] std::vector<glm::vec3> BuildInitialCentroids(
         std::span<const glm::vec3> points,
         std::span<const glm::vec3> initialCentroids,
-        const Params& params,
+        const KMeansParams& params,
         uint32_t clusterCount);
 
     // Recompute cluster centroids directly from an existing label assignment.

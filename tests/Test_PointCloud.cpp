@@ -531,7 +531,7 @@ TEST(PointCloud_KMeans, DegenerateClusterCountReturnsNullopt)
 {
     const std::vector<glm::vec3> points{{0.0f, 0.0f, 0.0f}};
 
-    Geometry::KMeans::Params params{};
+    Geometry::KMeans::KMeansParams params{};
     params.ClusterCount = 0;
     auto result = Geometry::KMeans::Cluster(points, params);
     EXPECT_FALSE(result.has_value());
@@ -546,7 +546,7 @@ TEST(PointCloud_KMeans, TwoSeparatedBlobsProduceTwoCentroids)
     for (int i = 0; i < 32; ++i)
         points.emplace_back(10.0f + 0.01f * static_cast<float>(i), 0.0f, 0.0f);
 
-    Geometry::KMeans::Params params{};
+    Geometry::KMeans::KMeansParams params{};
     params.ClusterCount = 2;
     params.MaxIterations = 32;
     params.Init = Geometry::KMeans::Initialization::Hierarchical;
@@ -571,7 +571,7 @@ TEST(PointCloud_KMeans, ClusterCountIsClampedToPointCount)
 {
     const std::vector<glm::vec3> points{{0.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}};
 
-    Geometry::KMeans::Params params{};
+    Geometry::KMeans::KMeansParams params{};
     params.ClusterCount = 8;
     params.MaxIterations = 8;
 
@@ -594,7 +594,7 @@ TEST(PointCloud_KMeans, ReusesPersistentCentroidSeedsAndBuildsCpuScratchTree)
         {10.25f, 0.0f, 0.0f},
     };
 
-    Geometry::KMeans::Params params{};
+    Geometry::KMeans::KMeansParams params{};
     params.ClusterCount = 2;
     params.MaxIterations = 8;
     params.Init = Geometry::KMeans::Initialization::Random;

@@ -34,7 +34,7 @@ TEST(Simplification, ReducesToTargetFaceCount)
     const auto originalFaces = mesh.FaceCount();
     ASSERT_GT(originalFaces, 100u);
 
-    Geometry::Simplification::SimplificationParams params;
+    Geometry::Simplification::Params params;
     params.TargetFaces = 40;
 
     auto result = Geometry::Simplification::Simplify(mesh, params);
@@ -50,7 +50,7 @@ TEST(Simplification, ErrorThresholdStopsEarly)
 {
     auto mesh = MakeDenseMesh();
 
-    Geometry::Simplification::SimplificationParams params;
+    Geometry::Simplification::Params params;
     params.TargetFaces = 4; // Aggressive target
     params.MaxError = 1e-10; // Very tight error — should stop early
 
@@ -68,7 +68,7 @@ TEST(Simplification, PreservesBoundary)
     auto mesh = MakeSingleTriangle();
     ASSERT_EQ(mesh.FaceCount(), 1u);
 
-    Geometry::Simplification::SimplificationParams params;
+    Geometry::Simplification::Params params;
     params.TargetFaces = 0;
     params.PreserveBoundary = true;
 
@@ -82,7 +82,7 @@ TEST(Simplification, ClosedMeshRemainsClosedAfterSimplification)
 {
     auto mesh = MakeDenseMesh();
 
-    Geometry::Simplification::SimplificationParams params;
+    Geometry::Simplification::Params params;
     params.TargetFaces = 80;
     params.PreserveBoundary = true;
 
@@ -106,7 +106,7 @@ TEST(Simplification, ReturnsNulloptForEmptyMesh)
 {
     Geometry::Halfedge::Mesh mesh;
 
-    Geometry::Simplification::SimplificationParams params;
+    Geometry::Simplification::Params params;
     params.TargetFaces = 0;
 
     auto result = Geometry::Simplification::Simplify(mesh, params);
@@ -117,7 +117,7 @@ TEST(Simplification, ReturnsNulloptForSingleFaceMesh)
 {
     auto mesh = MakeSingleTriangle();
 
-    Geometry::Simplification::SimplificationParams params;
+    Geometry::Simplification::Params params;
     params.TargetFaces = 0;
 
     auto result = Geometry::Simplification::Simplify(mesh, params);
@@ -130,7 +130,7 @@ TEST(Simplification, MaxCollapseErrorIsNonNegative)
 {
     auto mesh = MakeDenseMesh();
 
-    Geometry::Simplification::SimplificationParams params;
+    Geometry::Simplification::Params params;
     params.TargetFaces = 100;
 
     auto result = Geometry::Simplification::Simplify(mesh, params);
@@ -143,7 +143,7 @@ TEST(Simplification, TetrahedronMinimalSimplification)
     auto mesh = MakeTetrahedron();
     ASSERT_EQ(mesh.FaceCount(), 4u);
 
-    Geometry::Simplification::SimplificationParams params;
+    Geometry::Simplification::Params params;
     params.TargetFaces = 2;
 
     auto result = Geometry::Simplification::Simplify(mesh, params);
@@ -159,7 +159,7 @@ TEST(Simplification, QuadricMinimizerPlacement)
 {
     auto mesh = MakeDenseMesh();
 
-    Geometry::Simplification::SimplificationParams params;
+    Geometry::Simplification::Params params;
     params.TargetFaces = 80;
     params.Quadric.PlacementPolicy =
         Geometry::Simplification::CollapsePlacementPolicy::QuadricMinimizer;
