@@ -296,6 +296,11 @@ namespace Runtime
             .Host = platformFrameHost,
             .Clock = frameClock,
         };
+        RuntimeResizeSyncHost resizeSyncHost{
+            *m_GraphicsBackend,
+            *m_RenderOrchestrator,
+        };
+        const ResizeSyncCoordinator resizeSync{.Host = resizeSyncHost};
         RuntimeStreamingLaneHost streamingLaneHost{
             m_AssetIngestService.get(),
             *m_AssetPipeline,
@@ -354,30 +359,24 @@ namespace Runtime
                 {
                     const int fbWidth = platformResult.FramebufferWidth;
                     const int fbHeight = platformResult.FramebufferHeight;
-                    const VkExtent2D swapExtent = m_GraphicsBackend->GetSwapchain().GetExtent();
-                    const bool framebufferExtentMismatch =
-                        fbWidth > 0 && fbHeight > 0 &&
-                        (swapExtent.width != static_cast<uint32_t>(fbWidth) ||
-                         swapExtent.height != static_cast<uint32_t>(fbHeight));
-
-                    const bool resizeRequested =
-                        platformResult.ResizeRequested || framebufferExtentMismatch;
+                    const ResizeSyncResult resizeResult = resizeSync.Sync(platformResult);
+                    const FramebufferExtent swapExtent = resizeResult.SwapchainExtentBefore;
+                    const bool resizeRequested = resizeResult.ResizeRequested;
+                    const bool framebufferExtentMismatch = resizeResult.FramebufferExtentMismatch;
 
                     // Monitor moves can change framebuffer extent/content scale without a reliable
                     // resize callback on every platform. Apply resize before per-frame update/render
                     // so picking, EntityId, and post-process overlays all use the current extent.
-                    if (resizeRequested && fbWidth > 0 && fbHeight > 0)
+                    if (resizeResult.ResizeApplied)
                     {
                         Core::Log::Info(
                             "Engine resize trigger: framebuffer={}x{} swapchainBefore={}x{} resizeRequested={} mismatch={}",
                             fbWidth,
                             fbHeight,
-                            swapExtent.width,
-                            swapExtent.height,
+                            swapExtent.Width,
+                            swapExtent.Height,
                             resizeRequested,
                             framebufferExtentMismatch);
-                        m_GraphicsBackend->OnResize();
-                        m_RenderOrchestrator->OnResize();
                     }
                 }
 

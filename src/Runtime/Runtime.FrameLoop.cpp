@@ -19,6 +19,8 @@ namespace Runtime
 {
     IPlatformFrameHost::~IPlatformFrameHost() = default;
     RuntimePlatformFrameHost::~RuntimePlatformFrameHost() = default;
+    IResizeSyncHost::~IResizeSyncHost() = default;
+    RuntimeResizeSyncHost::~RuntimeResizeSyncHost() = default;
     IStreamingLaneHost::~IStreamingLaneHost() = default;
     RuntimeStreamingLaneHost::~RuntimeStreamingLaneHost() = default;
     IMaintenanceLaneHost::~IMaintenanceLaneHost() = default;
@@ -345,6 +347,48 @@ namespace Runtime
             .ResizeRequested = resizeRequested,
             .FramebufferWidth = self.Host.GetFramebufferWidth(),
             .FramebufferHeight = self.Host.GetFramebufferHeight(),
+        };
+    }
+
+    FramebufferExtent RuntimeResizeSyncHost::GetSwapchainExtent() const
+    {
+        const VkExtent2D extent = m_Graphics.GetSwapchain().GetExtent();
+        return FramebufferExtent{
+            .Width = extent.width,
+            .Height = extent.height,
+        };
+    }
+
+    void RuntimeResizeSyncHost::ApplyResize()
+    {
+        m_Graphics.OnResize();
+        m_Renderer.OnResize();
+    }
+
+    ResizeSyncResult ResizeSyncCoordinator::Sync(const PlatformFrameResult& platformFrame) const
+    {
+        if (!platformFrame.ContinueFrame || platformFrame.FramebufferWidth <= 0 ||
+            platformFrame.FramebufferHeight <= 0)
+        {
+            return ResizeSyncResult{};
+        }
+
+        const FramebufferExtent swapExtent = Host.GetSwapchainExtent();
+        const bool framebufferExtentMismatch =
+            swapExtent.Width != static_cast<uint32_t>(platformFrame.FramebufferWidth) ||
+            swapExtent.Height != static_cast<uint32_t>(platformFrame.FramebufferHeight);
+        const bool resizeRequested = platformFrame.ResizeRequested || framebufferExtentMismatch;
+
+        if (resizeRequested)
+        {
+            Host.ApplyResize();
+        }
+
+        return ResizeSyncResult{
+            .SwapchainExtentBefore = swapExtent,
+            .ResizeRequested = resizeRequested,
+            .FramebufferExtentMismatch = framebufferExtentMismatch,
+            .ResizeApplied = resizeRequested,
         };
     }
 
