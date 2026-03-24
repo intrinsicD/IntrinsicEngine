@@ -186,7 +186,7 @@ Mapping guidance for current Intrinsic code while preserving that reference shap
   - [ ] light / environment packets
   - [ ] UI / editor overlay packets
   - [ ] geometry-processing visualization packets
-- [ ] Move `Graphics.Passes.Picking` entity/primitive resolution into extraction so pass recording consumes immutable pick packets instead of live ECS traversal.
+- [x] Move `Graphics.Passes.Picking` entity/primitive resolution into extraction so pass recording consumes immutable pick packets instead of live ECS traversal. *(Runtime extraction now builds immutable `PickingSurfacePacket`/`PickingLinePacket`/`PickingPointPacket` bundles, and `PickingPass` records draws exclusively from `RenderPassContext` packet spans.)*
 - [ ] Resolve retained `GPUScene` handles, bindless references, and debug-view state during extraction rather than during late pass recording.
 - [ ] Add tests that guarantee render prep and command recording consume extraction output only.
 
