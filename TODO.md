@@ -80,7 +80,7 @@ O2 remains the default migration path per `docs/architecture/adr-o2-pragmatic-me
 
 ###### Process / Hygiene
 
-- [ ] **Bundled unrelated changes in single commits:** `e711573` mixes RHI module refactoring with KMeans rendering fixes. `4e474f2` bundles CUDA-default removal with frame-loop scaffolding. `563aa1c` bundles Material/PostProcess code reorganization with import narrowing. Future commits should separate mechanical refactors from behavioral changes.
+- [x] **Bundled unrelated changes in single commits:** `e711573` mixes RHI module refactoring with KMeans rendering fixes. `4e474f2` bundles CUDA-default removal with frame-loop scaffolding. `563aa1c` bundles Material/PostProcess code reorganization with import narrowing. Future commits should separate mechanical refactors from behavioral changes. *(Addressed by codifying a repo-wide commit hygiene policy in `CLAUDE.md`.)*
 
 ### B4. Next-Gen Frame Pipeline Refactor (Fixed-Step + Extraction + Explicit Frame Contexts)
 

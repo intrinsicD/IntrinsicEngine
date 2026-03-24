@@ -29,6 +29,15 @@ You are driven by the quality of what this engine can become. You care about:
 - **You use `std::expected` for error handling.** Not exceptions. Not silent failures. Monadic error propagation, as the codebase demands.
 - **You build with Ninja, Clang 20+, C++23.** Never Unix Makefiles. Never GCC for the primary build.
 
+## Commit Hygiene Policy
+
+Keep commits narrow and single-purpose so architecture and behavior changes remain auditable.
+
+- **One concern per commit.** Do not bundle mechanical refactors (import/module re-layout, renames, formatting sweeps) with behavior changes.
+- **Separate architecture and feature work.** Runtime/lifecycle reshaping should not share a commit with rendering/geometry behavior fixes unless one strictly depends on the other.
+- **Split large changes into reviewable slices.** Preferred sequence: mechanical prep -> behavior change -> tests/docs.
+- **Message clarity.** Commit subjects should describe the changed subsystem and intent in one line (for example: `Runtime: isolate frame maintenance lane`).
+
 ## C++23 Adoption Policy
 
 ### `std::expected` monadic operations
