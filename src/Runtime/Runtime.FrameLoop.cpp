@@ -380,6 +380,12 @@ namespace Runtime
         m_Graphics.CollectGpuDeferredDestructions();
     }
 
+    void RuntimeMaintenanceLaneHost::ProcessCompletedReadbacks()
+    {
+        m_Renderer.GetRenderSystem().ProcessCompletedGpuWork(m_Scene.GetScene(),
+                                                             m_Graphics.GetDevice().GetGlobalFrameNumber());
+    }
+
     void RuntimeMaintenanceLaneHost::GarbageCollectTransfers()
     {
         m_Graphics.GarbageCollectTransfers();
@@ -397,6 +403,7 @@ namespace Runtime
 
     void MaintenanceLaneCoordinator::Run(this const MaintenanceLaneCoordinator& self)
     {
+        self.Host.ProcessCompletedReadbacks();
         self.Host.CollectGpuDeferredDestructions();
         self.Host.GarbageCollectTransfers();
         self.Host.ProcessTextureDeletions();
