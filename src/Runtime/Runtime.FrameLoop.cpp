@@ -421,35 +421,32 @@ namespace Runtime
 
     void RuntimeMaintenanceLaneHost::CollectGpuDeferredDestructions()
     {
-        m_Graphics.CollectGpuDeferredDestructions();
+        m_Maintenance.CollectGpuDeferredDestructions();
     }
 
     void RuntimeMaintenanceLaneHost::CaptureGpuSyncState()
     {
-        auto& device = m_Graphics.GetDevice();
-        m_LastCompletedGraphicsTimelineValue = device.GetGraphicsTimelineCompletedValue();
-        m_LastObservedGlobalFrameNumber = device.GetGlobalFrameNumber();
+        m_Maintenance.CaptureGpuSyncState();
     }
 
     void RuntimeMaintenanceLaneHost::ProcessCompletedReadbacks()
     {
-        m_Renderer.GetRenderSystem().ProcessCompletedGpuWork(m_Scene.GetScene(),
-                                                             m_LastObservedGlobalFrameNumber);
+        m_Maintenance.ProcessCompletedReadbacks();
     }
 
     void RuntimeMaintenanceLaneHost::GarbageCollectTransfers()
     {
-        m_Graphics.GarbageCollectTransfers();
+        m_Maintenance.GarbageCollectTransfers();
     }
 
     void RuntimeMaintenanceLaneHost::ProcessTextureDeletions()
     {
-        m_Graphics.ProcessTextureDeletions();
+        m_Maintenance.ProcessTextureDeletions();
     }
 
     void RuntimeMaintenanceLaneHost::ProcessMaterialDeletions()
     {
-        m_Materials.ProcessDeletions(m_LastObservedGlobalFrameNumber);
+        m_Maintenance.ProcessMaterialDeletions();
     }
 
     void MaintenanceLaneCoordinator::Run(this const MaintenanceLaneCoordinator& self)

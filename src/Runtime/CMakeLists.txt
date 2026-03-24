@@ -11,6 +11,7 @@ target_sources(${target_name}
         Runtime.SceneManager.cppm
         Runtime.RenderExtraction.cppm
         Runtime.RenderOrchestrator.cppm
+        Runtime.ResourceMaintenance.cppm
         Runtime.Selection.cppm
         Runtime.SelectionModule.cppm
         Runtime.FrameLoop.cppm
@@ -27,6 +28,7 @@ target_sources(${target_name}
         Runtime.SceneManager.cpp
         Runtime.RenderExtraction.cpp
         Runtime.RenderOrchestrator.cpp
+        Runtime.ResourceMaintenance.cpp
         Runtime.Selection.cpp
         Runtime.SelectionModule.cpp
         Runtime.FrameLoop.cpp
