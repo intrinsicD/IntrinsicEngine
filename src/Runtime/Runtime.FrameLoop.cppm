@@ -191,21 +191,15 @@ export namespace Runtime
         virtual void ProcessAssetIngest() = 0;
         virtual void ProcessMainThreadQueue() = 0;
         virtual void ProcessUploads() = 0;
-        virtual void ProcessTextureDeletions() = 0;
-        virtual void ProcessMaterialDeletions() = 0;
     };
 
     class RuntimeStreamingLaneHost final : public IStreamingLaneHost
     {
     public:
         RuntimeStreamingLaneHost(AssetIngestService* ingest,
-                                 AssetPipeline& assets,
-                                 GraphicsBackend& graphics,
-                                 Graphics::MaterialSystem& materials)
+                                 AssetPipeline& assets)
             : m_Ingest(ingest)
             , m_Assets(assets)
-            , m_Graphics(graphics)
-            , m_Materials(materials)
         {
         }
 
@@ -214,14 +208,10 @@ export namespace Runtime
         void ProcessAssetIngest() override;
         void ProcessMainThreadQueue() override;
         void ProcessUploads() override;
-        void ProcessTextureDeletions() override;
-        void ProcessMaterialDeletions() override;
 
     private:
         AssetIngestService* m_Ingest = nullptr;
         AssetPipeline& m_Assets;
-        GraphicsBackend& m_Graphics;
-        Graphics::MaterialSystem& m_Materials;
     };
 
     struct StreamingLaneCoordinator
@@ -236,23 +226,31 @@ export namespace Runtime
     public:
         virtual ~IMaintenanceLaneHost();
 
+        virtual void CollectGpuDeferredDestructions() = 0;
         virtual void GarbageCollectTransfers() = 0;
+        virtual void ProcessTextureDeletions() = 0;
+        virtual void ProcessMaterialDeletions() = 0;
     };
 
     class RuntimeMaintenanceLaneHost final : public IMaintenanceLaneHost
     {
     public:
-        explicit RuntimeMaintenanceLaneHost(GraphicsBackend& graphics)
+        RuntimeMaintenanceLaneHost(GraphicsBackend& graphics, Graphics::MaterialSystem& materials)
             : m_Graphics(graphics)
+            , m_Materials(materials)
         {
         }
 
         ~RuntimeMaintenanceLaneHost() override;
 
+        void CollectGpuDeferredDestructions() override;
         void GarbageCollectTransfers() override;
+        void ProcessTextureDeletions() override;
+        void ProcessMaterialDeletions() override;
 
     private:
         GraphicsBackend& m_Graphics;
+        Graphics::MaterialSystem& m_Materials;
     };
 
     struct MaintenanceLaneCoordinator

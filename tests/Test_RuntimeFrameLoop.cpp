@@ -22,8 +22,6 @@ namespace
         void ProcessAssetIngest() override { Calls.emplace_back("ingest"); }
         void ProcessMainThreadQueue() override { Calls.emplace_back("queue"); }
         void ProcessUploads() override { Calls.emplace_back("uploads"); }
-        void ProcessTextureDeletions() override { Calls.emplace_back("textures"); }
-        void ProcessMaterialDeletions() override { Calls.emplace_back("materials"); }
 
         std::vector<std::string> Calls;
     };
@@ -31,7 +29,10 @@ namespace
     class FakeMaintenanceLaneHost final : public Runtime::IMaintenanceLaneHost
     {
     public:
+        void CollectGpuDeferredDestructions() override { Calls.emplace_back("deferred_gc"); }
         void GarbageCollectTransfers() override { Calls.emplace_back("gc"); }
+        void ProcessTextureDeletions() override { Calls.emplace_back("textures"); }
+        void ProcessMaterialDeletions() override { Calls.emplace_back("materials"); }
 
         std::vector<std::string> Calls;
     };
@@ -306,8 +307,6 @@ TEST(RuntimeFrameLoop, StreamingLaneCoordinator_OrdersMainThreadUploadAndCleanup
         "ingest",
         "queue",
         "uploads",
-        "textures",
-        "materials",
     };
     EXPECT_EQ(host.Calls, expected);
 }
@@ -319,7 +318,12 @@ TEST(RuntimeFrameLoop, MaintenanceLaneCoordinator_RunsHeadlessCleanupWithoutRend
 
     coordinator.Run();
 
-    EXPECT_EQ(host.Calls, (std::vector<std::string>{"gc"}));
+    EXPECT_EQ(host.Calls, (std::vector<std::string>{
+                              "deferred_gc",
+                              "gc",
+                              "textures",
+                              "materials",
+                          }));
 }
 
 TEST(RuntimeFrameLoop, PlatformFrameCoordinator_PumpsEventsAndContinuesWhenWindowIsActive)

@@ -299,12 +299,11 @@ namespace Runtime
         RuntimeStreamingLaneHost streamingLaneHost{
             m_AssetIngestService.get(),
             *m_AssetPipeline,
-            *m_GraphicsBackend,
-            m_RenderOrchestrator->GetMaterialSystem(),
         };
         const StreamingLaneCoordinator streamingLane{.Host = streamingLaneHost};
         RuntimeMaintenanceLaneHost maintenanceLaneHost{
             *m_GraphicsBackend,
+            m_RenderOrchestrator->GetMaterialSystem(),
         };
         const MaintenanceLaneCoordinator maintenanceLane{.Host = maintenanceLaneHost};
         RuntimeRenderLaneHost renderLaneHost{
