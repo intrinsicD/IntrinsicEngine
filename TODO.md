@@ -90,7 +90,7 @@ Goal: refactor the runtime from a monolithic update/render loop into a staged fr
 
 - Baseline now runs simulation on a fixed timestep while keeping rendering variable-rate.
 - [x] Treat job-system-driven parallelism as the default for simulation/extraction/render prep work. *(Picking-packet extraction now dispatches surface/line/point packet builds through `Core::Tasks::Scheduler` with a serial fallback when the scheduler is unavailable.)*
-- [ ] Make GPU synchronization, frame pacing, and deferred resource retirement explicit architecture concepts.
+- [x] Make GPU synchronization, frame pacing, and deferred resource retirement explicit architecture concepts. *(Maintenance lane now snapshots graphics timeline/global-frame sync state once per frame (`CaptureGpuSyncState`) before readback/material-retirement work, so GPU-completion-driven maintenance is an explicit staged concept instead of scattered ad-hoc queries.)*
 - [ ] Preserve headless/testable paths by isolating platform + swapchain work from simulation/extraction/maintenance logic.
 
 #### B4.1 Core principle: authoritative world state -> immutable render state

@@ -226,6 +226,7 @@ export namespace Runtime
     public:
         virtual ~IMaintenanceLaneHost();
 
+        virtual void CaptureGpuSyncState() = 0;
         virtual void ProcessCompletedReadbacks() = 0;
         virtual void CollectGpuDeferredDestructions() = 0;
         virtual void GarbageCollectTransfers() = 0;
@@ -246,6 +247,7 @@ export namespace Runtime
 
         ~RuntimeMaintenanceLaneHost() override;
 
+        void CaptureGpuSyncState() override;
         void ProcessCompletedReadbacks() override;
         void CollectGpuDeferredDestructions() override;
         void GarbageCollectTransfers() override;
@@ -257,6 +259,8 @@ export namespace Runtime
         RenderOrchestrator& m_Renderer;
         GraphicsBackend& m_Graphics;
         Graphics::MaterialSystem& m_Materials;
+        uint64_t m_LastCompletedGraphicsTimelineValue = 0;
+        uint64_t m_LastObservedGlobalFrameNumber = 0;
     };
 
     struct MaintenanceLaneCoordinator
