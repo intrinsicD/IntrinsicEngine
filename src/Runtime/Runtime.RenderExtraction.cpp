@@ -3,6 +3,7 @@ module;
 #include <cmath>
 #include <cstdint>
 #include <vector>
+#include <latch>
 #include <entt/entity/fwd.hpp>
 #include <glm/gtc/matrix_inverse.hpp>
 
@@ -12,6 +13,7 @@ import Graphics.Components;
 import Geometry.HalfedgeMesh;
 import Geometry.MeshUtils;
 import ECS;
+import Core.Tasks;
 
 namespace Runtime
 {
@@ -159,6 +161,47 @@ namespace Runtime
 
             return packets;
         }
+
+        struct PickingPacketBundle
+        {
+            std::vector<Graphics::PickingSurfacePacket> Surface{};
+            std::vector<Graphics::PickingLinePacket> Line{};
+            std::vector<Graphics::PickingPointPacket> Point{};
+        };
+
+        [[nodiscard]] PickingPacketBundle ExtractPickingPackets(const WorldSnapshot& world)
+        {
+            if (!Core::Tasks::Scheduler::IsInitialized())
+            {
+                return PickingPacketBundle{
+                    .Surface = ExtractSurfacePickingPackets(world),
+                    .Line = ExtractLinePickingPackets(world),
+                    .Point = ExtractPointPickingPackets(world),
+                };
+            }
+
+            PickingPacketBundle packets{};
+            std::latch done(3);
+
+            Core::Tasks::Scheduler::Dispatch([&]
+            {
+                packets.Surface = ExtractSurfacePickingPackets(world);
+                done.count_down();
+            });
+            Core::Tasks::Scheduler::Dispatch([&]
+            {
+                packets.Line = ExtractLinePickingPackets(world);
+                done.count_down();
+            });
+            Core::Tasks::Scheduler::Dispatch([&]
+            {
+                packets.Point = ExtractPointPickingPackets(world);
+                done.count_down();
+            });
+
+            done.wait();
+            return packets;
+        }
     }
 
     uint32_t SanitizeFrameContextCount(uint32_t requestedCount)
@@ -239,13 +282,14 @@ namespace Runtime
 
     RenderWorld ExtractRenderWorld(const RenderFrameInput& input)
     {
+        PickingPacketBundle packets = ExtractPickingPackets(input.World);
         return RenderWorld{
             .Alpha = SanitizeAlpha(input.Alpha),
             .View = input.View,
             .World = input.World,
-            .SurfacePicking = ExtractSurfacePickingPackets(input.World),
-            .LinePicking = ExtractLinePickingPackets(input.World),
-            .PointPicking = ExtractPointPickingPackets(input.World),
+            .SurfacePicking = std::move(packets.Surface),
+            .LinePicking = std::move(packets.Line),
+            .PointPicking = std::move(packets.Point),
         };
     }
 }

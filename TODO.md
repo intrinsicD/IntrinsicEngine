@@ -89,7 +89,7 @@ Goal: refactor the runtime from a monolithic update/render loop into a staged fr
 #### B4.0 Target properties (the contract we are designing toward)
 
 - Baseline now runs simulation on a fixed timestep while keeping rendering variable-rate.
-- [ ] Treat job-system-driven parallelism as the default for simulation/extraction/render prep work.
+- [x] Treat job-system-driven parallelism as the default for simulation/extraction/render prep work. *(Picking-packet extraction now dispatches surface/line/point packet builds through `Core::Tasks::Scheduler` with a serial fallback when the scheduler is unavailable.)*
 - [ ] Make GPU synchronization, frame pacing, and deferred resource retirement explicit architecture concepts.
 - [ ] Preserve headless/testable paths by isolating platform + swapchain work from simulation/extraction/maintenance logic.
 
