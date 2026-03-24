@@ -11,6 +11,7 @@ Built on **C++23 Modules**, **Vulkan 1.3** bindless rendering, coroutine-based t
 - `docs/architecture/rendering-three-pass.md` — pass contracts, render-resource invariants, and render-graph expectations.
 - `docs/architecture/frame-loop-rollback-strategy.md` — staged-frame-loop rollback toggle, compatibility-shim policy, and pass/fail cutover gates.
 - `docs/architecture/runtime-subsystem-boundaries.md` — runtime ownership map, module dependency directions, and startup/per-frame/shutdown lifecycle.
+- `docs/architecture/feature-module-playbook.md` — standard feature-module contract, layering rules, and refactor workflow for reusable development.
 
 ## Build & Test Entry Points
 
