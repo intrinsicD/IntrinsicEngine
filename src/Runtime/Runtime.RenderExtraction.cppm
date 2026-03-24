@@ -89,6 +89,7 @@ export namespace Runtime
         std::optional<RenderWorld> PreparedRenderWorld{};
         bool Prepared = false;
         bool Submitted = false;
+        bool ReusedSubmittedSlot = false;
 
         [[nodiscard]] const RenderWorld* GetPreparedRenderWorld() const
         {
@@ -104,7 +105,6 @@ export namespace Runtime
         {
             PreparedRenderWorld.reset();
             Prepared = false;
-            Submitted = false;
         }
     };
 

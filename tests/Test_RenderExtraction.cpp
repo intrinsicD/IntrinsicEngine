@@ -26,6 +26,7 @@ TEST(RenderExtraction, FrameContext_DefaultStateIsUnprepared)
     EXPECT_EQ(frame.FramesInFlight, Runtime::DefaultFrameContexts);
     EXPECT_FALSE(frame.Prepared);
     EXPECT_FALSE(frame.Submitted);
+    EXPECT_FALSE(frame.ReusedSubmittedSlot);
     EXPECT_FALSE(frame.Viewport.IsValid());
     EXPECT_EQ(frame.GetPreparedRenderWorld(), nullptr);
 }
@@ -52,7 +53,7 @@ TEST(RenderExtraction, FrameContext_ResetPreparedStateClearsOwnedRenderWorld)
 
     EXPECT_EQ(frame.GetPreparedRenderWorld(), nullptr);
     EXPECT_FALSE(frame.Prepared);
-    EXPECT_FALSE(frame.Submitted);
+    EXPECT_TRUE(frame.Submitted);
 }
 
 TEST(RenderExtraction, SanitizeFrameContextCount_ClampsToSupportedBounds)
@@ -111,7 +112,23 @@ TEST(RenderExtraction, FrameContextRing_ReusesBoundedSlotsByFrameNumberModulo)
     EXPECT_EQ(&frame3, frame0Address);
     EXPECT_FALSE(frame3.Prepared);
     EXPECT_FALSE(frame3.Submitted);
+    EXPECT_TRUE(frame3.ReusedSubmittedSlot);
     EXPECT_EQ(frame3.GetPreparedRenderWorld(), nullptr);
+}
+
+TEST(RenderExtraction, FrameContextRing_DoesNotFlagReuseWhenPriorSlotWasNotSubmitted)
+{
+    Runtime::FrameContextRing ring(2u);
+
+    Runtime::FrameContext& frame0 =
+        ring.BeginFrame(0u, Runtime::RenderViewport{.Width = 800, .Height = 600});
+    frame0.Prepared = true;
+    frame0.Submitted = false;
+
+    Runtime::FrameContext& frame2 =
+        ring.BeginFrame(2u, Runtime::RenderViewport{.Width = 800, .Height = 600});
+
+    EXPECT_FALSE(frame2.ReusedSubmittedSlot);
 }
 
 TEST(RenderExtraction, MakeRenderFrameInput_SanitizesAlphaAndCapturesSnapshotGeneration)

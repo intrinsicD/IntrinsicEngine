@@ -214,6 +214,7 @@ Mapping guidance for current Intrinsic code while preserving that reference shap
 
 #### B4.9 Explicit frame-context ring + bounded frames in flight
 
+- Baseline now tracks frame-context slot reuse over previously submitted work (`FrameContext::ReusedSubmittedSlot`) so renderer-owned wait policy can be asserted in tests before full GPU-completion wiring lands.
 - [ ] Move per-frame transient ownership under `FrameContext`:
   - [ ] command allocator pools
   - [ ] upload arenas / staging allocators
