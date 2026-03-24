@@ -164,7 +164,7 @@ while (!app.should_quit())
 
 Mapping guidance for current Intrinsic code while preserving that reference shape:
 
-- [ ] `platform` maps to the current window/event/minimize/resize orchestration on the main thread.
+- [x] `platform` maps to the current window/event/minimize/resize orchestration on the main thread. *(Implemented via `RuntimePlatformFrameHost` + `PlatformFrameCoordinator`, including main-thread ownership validation, pump/minimize handling, and framebuffer extent capture before staged frame execution.)*
 - Current baseline: `world` maps to `SceneManager` + authoritative ECS scene ownership, with an explicit `commit_tick()` / readonly snapshot boundary.
 - Current baseline: `renderer` maps to `RenderOrchestrator` plus `RenderSystem`, with the runtime render lane now following `begin_frame -> extract_render_world -> prepare_frame -> execute_frame -> end_frame`.
 - [ ] `resource_system` maps to the currently split upload-retirement / deferred-destruction responsibilities across `AssetPipeline`, render-side lifetime queues, and future explicit GPU-retirement services.
