@@ -30,6 +30,7 @@ import Runtime.SceneManager;
 import Runtime.RenderOrchestrator;
 import Runtime.FrameLoop;
 import Runtime.PointCloudKMeans;
+import Runtime.SystemBundles;
 import Runtime.SystemFeatureCatalog;
 
 using namespace Core::Hash;
@@ -402,7 +403,19 @@ namespace Runtime
                     {
                         .OnFixedUpdate = [&](float fixedDeltaTime) { OnFixedUpdate(fixedDeltaTime); },
                         .RegisterFixedSystems = [&](Core::FrameGraph& graph, float fixedDeltaTime)
-                        { OnRegisterFixedSystems(graph, fixedDeltaTime); },
+                        {
+                            // Fixed-step lane is the authoritative deterministic update path.
+                            // Register caller-owned simulation/gameplay systems first, then
+                            // run the engine's core ECS deterministic systems (transforms,
+                            // property dirty propagation, CPU-side primitive BVH sync).
+                            OnRegisterFixedSystems(graph, fixedDeltaTime);
+                            CoreFrameGraphRegistrationContext fixedContext{
+                                .Graph = graph,
+                                .Registry = m_SceneManager->GetRegistry(),
+                                .Features = m_FeatureRegistry,
+                            };
+                            CoreFrameGraphSystemBundle{}.Register(fixedContext);
+                        },
                         .CommitFixedTick = [&]() { m_SceneManager->CommitFixedTick(); },
                         .ExecuteFixedGraph = [&](Core::FrameGraph& graph) { executeGraph.Execute(graph); },
                         .Render =
