@@ -189,6 +189,7 @@ namespace Runtime
         const uint32_t slotIndex = static_cast<uint32_t>(frameNumber % static_cast<uint64_t>(m_FramesInFlight));
         FrameContext& frame = m_Contexts[slotIndex];
         const uint64_t previousFrameNumber = frame.FrameNumber;
+        const bool previouslySubmitted = frame.Submitted;
         const bool hasPreviousFrame = frame.Prepared || frame.Submitted || frame.Viewport.IsValid() ||
                                       frame.FrameNumber != 0u || frame.PreviousFrameNumber != InvalidFrameNumber;
 
@@ -198,6 +199,8 @@ namespace Runtime
         frame.SlotIndex = slotIndex;
         frame.FramesInFlight = m_FramesInFlight;
         frame.Viewport = viewport;
+        frame.Submitted = false;
+        frame.ReusedSubmittedSlot = hasPreviousFrame && previouslySubmitted;
         return frame;
     }
 
