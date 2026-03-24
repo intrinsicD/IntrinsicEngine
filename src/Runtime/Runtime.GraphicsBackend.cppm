@@ -67,6 +67,7 @@ export namespace Runtime
 
         // --- Per-frame maintenance ---
         void OnResize();
+        void CollectGpuDeferredDestructions();
         void GarbageCollectTransfers();
         void ProcessTextureDeletions();
 

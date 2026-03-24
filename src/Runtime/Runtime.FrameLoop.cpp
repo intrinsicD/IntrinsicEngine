@@ -364,16 +364,6 @@ namespace Runtime
         m_Assets.ProcessUploads();
     }
 
-    void RuntimeStreamingLaneHost::ProcessTextureDeletions()
-    {
-        m_Graphics.ProcessTextureDeletions();
-    }
-
-    void RuntimeStreamingLaneHost::ProcessMaterialDeletions()
-    {
-        m_Materials.ProcessDeletions(m_Graphics.GetDevice().GetGlobalFrameNumber());
-    }
-
     void StreamingLaneCoordinator::BeginFrame(this const StreamingLaneCoordinator& self)
     {
         self.Host.ProcessAssetIngest();
@@ -383,9 +373,11 @@ namespace Runtime
             PROFILE_SCOPE("ProcessUploads");
             self.Host.ProcessUploads();
         }
+    }
 
-        self.Host.ProcessTextureDeletions();
-        self.Host.ProcessMaterialDeletions();
+    void RuntimeMaintenanceLaneHost::CollectGpuDeferredDestructions()
+    {
+        m_Graphics.CollectGpuDeferredDestructions();
     }
 
     void RuntimeMaintenanceLaneHost::GarbageCollectTransfers()
@@ -393,9 +385,22 @@ namespace Runtime
         m_Graphics.GarbageCollectTransfers();
     }
 
+    void RuntimeMaintenanceLaneHost::ProcessTextureDeletions()
+    {
+        m_Graphics.ProcessTextureDeletions();
+    }
+
+    void RuntimeMaintenanceLaneHost::ProcessMaterialDeletions()
+    {
+        m_Materials.ProcessDeletions(m_Graphics.GetDevice().GetGlobalFrameNumber());
+    }
+
     void MaintenanceLaneCoordinator::Run(this const MaintenanceLaneCoordinator& self)
     {
+        self.Host.CollectGpuDeferredDestructions();
         self.Host.GarbageCollectTransfers();
+        self.Host.ProcessTextureDeletions();
+        self.Host.ProcessMaterialDeletions();
     }
 
     Core::FrameGraph& RuntimeRenderLaneHost::GetFrameGraph()

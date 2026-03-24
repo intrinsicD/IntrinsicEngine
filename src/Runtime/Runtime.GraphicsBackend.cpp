@@ -219,6 +219,14 @@ namespace Runtime
         m_Renderer->OnResize();
     }
 
+    void GraphicsBackend::CollectGpuDeferredDestructions()
+    {
+        if (m_Device)
+        {
+            m_Device->CollectGarbage();
+        }
+    }
+
     void GraphicsBackend::GarbageCollectTransfers()
     {
         m_TransferManager->GarbageCollect();

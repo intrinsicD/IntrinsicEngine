@@ -129,9 +129,6 @@ namespace RHI
             return;
         }
 
-        // Reclaim timeline-based deferred deletions whose submissions have completed.
-        m_Device->CollectGarbage();
-
         // 2. Reclaim resources that were scheduled on this frame-slot.
         // IMPORTANT: this must happen before advancing the global frame epoch used by SafeDestroy().
         m_Device->FlushDeletionQueue(m_CurrentFrame);

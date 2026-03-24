@@ -207,8 +207,8 @@ Mapping guidance for current Intrinsic code while preserving that reference shap
 
 #### B4.8 Maintenance stage (F)
 
-- [ ] Retire completed uploads after GPU completion is known.
-- [ ] Process deferred destruction only when the relevant GPU completion value has passed.
+- [x] Retire completed uploads after GPU completion is known. *(Maintenance lane now owns transfer garbage collection after render submission.)*
+- [x] Process deferred destruction only when the relevant GPU completion value has passed. *(Maintenance lane now explicitly runs timeline-based deferred-destruction collection.)*
 - [ ] Centralize readback completion, garbage collection, profiler rollup, telemetry capture, and hot-reload bookkeeping here.
 - Baseline now ensures maintenance can run in headless/test configurations even when no swapchain is active.
 
