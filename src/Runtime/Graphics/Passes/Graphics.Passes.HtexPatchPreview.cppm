@@ -6,6 +6,7 @@ module;
 #include <span>
 #include <vector>
 
+#include <entt/entity/entity.hpp>
 #include <entt/entity/fwd.hpp>
 #include <glm/glm.hpp>
 
@@ -109,6 +110,23 @@ export namespace Graphics::Passes
         };
 
         CachedPreviewAtlas m_CachedAtlas{};
+
+        struct CachedPreviewInputs
+        {
+            entt::entity SourceEntity = entt::null;
+            const Geometry::Halfedge::Mesh* Mesh = nullptr;
+            std::size_t VertexCount = 0;
+            std::size_t EdgeCount = 0;
+            std::size_t FaceCount = 0;
+            uint64_t KMeansResultRevision = 0;
+            bool HasLabels = false;
+            bool HasColors = false;
+            bool Valid = false;
+        };
+
+        CachedPreviewInputs m_CachedInputs{};
+        uint64_t m_CachedPreviewSignature = 0;
+        Geometry::HtexPatch::PatchBuildResult m_CachedPatchBuild{};
 
         struct PendingPreviewBake;
         std::shared_ptr<PendingPreviewBake> m_PendingBake{};

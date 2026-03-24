@@ -4,17 +4,18 @@ module;
 #include <array>
 #include <cmath>
 #include <cstdint>
-#include <limits>
 #include <optional>
 #include <span>
 #include <vector>
 
 #include <glm/glm.hpp>
+#include "Core.Profiling.Macros.hpp"
 
 module Geometry.HtexPatch;
 
 import Geometry.HalfedgeMesh;
 import Geometry.Properties;
+import Core.Logging;
 
 namespace Geometry::HtexPatch
 {
@@ -24,17 +25,18 @@ namespace Geometry::HtexPatch
         {
             constexpr std::array<std::uint16_t, 5> kBuckets{8u, 16u, 32u, 64u, 128u};
 
-            const float minRes = static_cast<float>(std::max<std::uint16_t>(1u, params.MinResolution));
-            const float maxRes = static_cast<float>(std::max(params.MinResolution, params.MaxResolution));
+            const auto [minBucket, maxBucket] = std::minmax(params.MinResolution, params.MaxResolution);
+            const auto minRes = static_cast<float>(std::max<std::uint16_t>(1u, minBucket));
+            const auto maxRes = static_cast<float>(std::max(minBucket, maxBucket));
             const float clampedTarget = std::clamp(target, minRes, maxRes);
 
             for (const std::uint16_t bucket : kBuckets)
             {
                 if (clampedTarget <= static_cast<float>(bucket))
-                    return std::clamp(bucket, params.MinResolution, params.MaxResolution);
+                    return std::clamp(bucket, minBucket, maxBucket);
             }
 
-            return std::clamp(kBuckets.back(), params.MinResolution, params.MaxResolution);
+            return std::clamp(kBuckets.back(), minBucket, maxBucket);
         }
 
         [[nodiscard]] double PolygonArea(const Halfedge::Mesh& mesh, FaceHandle f) noexcept
@@ -189,6 +191,8 @@ namespace Geometry::HtexPatch
         const Halfedge::Mesh& mesh,
         const PatchBuildParams& params)
     {
+        PROFILE_SCOPE("HtexPatch::BuildPatchMetadata");
+
         if (mesh.EdgeCount() == 0u)
             return std::nullopt;
 
@@ -311,6 +315,8 @@ namespace Geometry::HtexPatch
                                     PatchAtlasLayout& outLayout,
                                     std::uint32_t invalidValue) noexcept
     {
+        PROFILE_SCOPE("HtexPatch::BuildCategoricalPatchAtlas");
+
         outLayout = PatchAtlasLayout{};
         outLayout.Width = outLayout.TileSize;
         outLayout.Height = outLayout.TileSize;

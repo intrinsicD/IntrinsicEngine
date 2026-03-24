@@ -45,6 +45,7 @@ import Geometry.AdaptiveRemeshing;
 import Geometry.Smoothing;
 import Geometry.CatmullClark;
 import Geometry.MeshRepair;
+import Geometry.MeshAnalysis;
 
 import Core.Logging;
 

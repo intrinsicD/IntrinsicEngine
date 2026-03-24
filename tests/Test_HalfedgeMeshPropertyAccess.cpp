@@ -6,6 +6,7 @@
 #include <memory>
 #include <span>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -233,6 +234,29 @@ TEST(HalfedgeMesh_View, Mesh_BindsDirectPropertySets)
     EXPECT_FLOAT_EQ(weight[v0], 2.5f);
     EXPECT_EQ(mesh.Position(v0), glm::vec3(4.0f, 5.0f, 6.0f));
     EXPECT_EQ(view.Position(v0), glm::vec3(4.0f, 5.0f, 6.0f));
+}
+
+TEST(HalfedgeMesh_View, MoveAssignment_RebindsBuiltInPropertyHandles)
+{
+    using namespace Geometry;
+
+    auto source = MakeTriangle();
+    const VertexHandle v0{0};
+    const VertexHandle v1{1};
+
+    ASSERT_TRUE(source.IsValid(v0));
+    ASSERT_TRUE(source.IsValid(v1));
+    ASSERT_FALSE(source.IsDeleted(v0));
+
+    Geometry::Halfedge::Mesh movedTo;
+    movedTo = std::move(source);
+
+    EXPECT_TRUE(movedTo.IsValid(v0));
+    EXPECT_TRUE(movedTo.IsValid(v1));
+    EXPECT_FALSE(movedTo.IsDeleted(v0));
+    EXPECT_FALSE(movedTo.IsDeleted(v1));
+    EXPECT_EQ(movedTo.Position(v0), glm::vec3(0.0f, 0.0f, 0.0f));
+    EXPECT_EQ(movedTo.Position(v1).y, 0.0f);
 }
 
 // =============================================================================

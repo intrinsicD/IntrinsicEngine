@@ -2,7 +2,6 @@ module;
 
 #include <cstdint>
 #include <functional>
-#include <string>
 #include <vector>
 #include <glm/glm.hpp>
 #include <entt/entity/entity.hpp>
@@ -280,6 +279,22 @@ export namespace Runtime::EditorUI
         int Iterations = 1;
     };
 
+    struct MeshAnalysisWidgetState
+    {
+        bool HasResults = false;
+        std::size_t ProblemVertices = 0;
+        std::size_t ProblemEdges = 0;
+        std::size_t ProblemHalfedges = 0;
+        std::size_t ProblemFaces = 0;
+        std::size_t BoundaryVertices = 0;
+        std::size_t BoundaryEdges = 0;
+        std::size_t BoundaryFaces = 0;
+        std::size_t NonManifoldVertices = 0;
+        std::size_t DegenerateFaces = 0;
+        std::size_t NonTriangleFaces = 0;
+        std::size_t NonFiniteElements = 0;
+    };
+
     [[nodiscard]] bool DrawKMeansWidget(Runtime::Engine& engine,
                                         entt::entity entity,
                                         KMeansWidgetState& state);
@@ -341,6 +356,7 @@ export namespace Runtime::EditorUI
         SimplificationWidgetState m_SimplificationUi{};
         SmoothingWidgetState m_SmoothingUi{};
         SubdivisionWidgetState m_SubdivisionUi{};
+        MeshAnalysisWidgetState m_MeshAnalysisUi{};
     };
 
     // =========================================================================

@@ -110,6 +110,7 @@ intrinsic_test_object_lib(GeometryTestObjs
         Test_GeometryProcessing2.cpp
         Test_SurfaceReconstruction.cpp
         Test_MeshQuality.cpp
+        Test_MeshAnalysis.cpp
         Test_Parameterization.cpp
         Test_AdaptiveRemeshing.cpp
         Test_ConvexHull.cpp

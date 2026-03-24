@@ -48,6 +48,7 @@ export import Geometry.MarchingCubes;
 export import Geometry.MeshRepair;
 export import Geometry.MeshBoundary;
 export import Geometry.MeshQuality;
+export import Geometry.MeshAnalysis;
 export import Geometry.NormalEstimation;
 export import Geometry.SurfaceReconstruction;
 export import Geometry.Parameterization;

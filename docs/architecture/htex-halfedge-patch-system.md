@@ -299,6 +299,7 @@ The repo already has a stable k-means property pipeline:
 - `Runtime::PointCloudKMeans::PublishResult()` publishes `v:kmeans_label`, `p:kmeans_label`, `v:kmeans_color`, and `p:kmeans_color`
 - `Graphics::ColorMapper` converts `glm::vec4` / scalar properties into renderable packed colors
 - the editor already uses the color property for visualization
+- the Htex patch preview pass caches patch metadata and the last desired atlas signature between stable mesh / k-means revisions so it does not rebuild the edge sidecar every frame
 
 For this patch system, k-means is a good regression fixture because it checks two things:
 

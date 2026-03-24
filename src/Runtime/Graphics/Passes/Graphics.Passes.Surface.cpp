@@ -2,7 +2,6 @@ module;
 
 #include <algorithm>
 #include <cmath>
-#include <cstdint>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -1293,16 +1292,17 @@ namespace Graphics::Passes
         uint32_t centroidCount)
     {
         // Convert from ECS struct to GPU-packed struct.
-        std::vector<GpuCentroidEntry> gpu(centroidCount);
+        std::vector<GpuCentroidEntry> gpu(centroidCount + 1u);
+        gpu[0] = GpuCentroidEntry{0.0f, 0.0f, 0.0f, centroidCount};
         for (uint32_t i = 0; i < centroidCount; ++i)
         {
-            gpu[i].x = entries[i].Position.x;
-            gpu[i].y = entries[i].Position.y;
-            gpu[i].z = entries[i].Position.z;
-            gpu[i].packedColor = entries[i].PackedColor;
+            gpu[i + 1u].x = entries[i].Position.x;
+            gpu[i + 1u].y = entries[i].Position.y;
+            gpu[i + 1u].z = entries[i].Position.z;
+            gpu[i + 1u].packedColor = entries[i].PackedColor;
         }
         return EnsurePerEntityBuffer<GpuCentroidEntry>(
-            *m_Device, m_CentroidBuffers, geoIndex, gpu.data(), centroidCount, "SurfacePass");
+            *m_Device, m_CentroidBuffers, geoIndex, gpu.data(), static_cast<uint32_t>(gpu.size()), "SurfacePass");
     }
 
     // -----------------------------------------------------------------

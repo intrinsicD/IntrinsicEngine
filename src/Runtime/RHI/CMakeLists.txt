@@ -20,7 +20,6 @@ target_sources(${target_name}
         RHI.Renderer.cppm
         RHI.Profiler.cppm
         RHI.Buffer.cppm
-        RHI.BufferHandle.cppm
         RHI.CommandUtils.cppm
         RHI.CommandContext.cppm
         RHI.Types.cppm

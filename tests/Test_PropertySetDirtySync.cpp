@@ -2,7 +2,8 @@
 // Test_PropertySetDirtySync.cpp — Contract tests for the PropertySet
 // dirty-domain sync system (TODO §1). Validates:
 //
-//   - Dirty tag components are zero-size ECS tags.
+//   - Dirty tag components are empty ECS tags (1 byte in C++), used only as
+//     presence markers.
 //   - Tag attachment/detachment on entities.
 //   - Domain independence: attribute tags don't trigger full re-upload.
 //   - Position/topology tags escalate to GpuDirty.
@@ -29,7 +30,7 @@ using namespace ECS;
 
 TEST(DirtyTag, ZeroSizeTags)
 {
-    // All dirty tags must be zero-size (tag components for cache efficiency).
+    // All dirty tags must be empty tag components (presence-only markers).
     EXPECT_EQ(sizeof(DirtyTag::VertexPositions), 1u);  // Empty struct = 1 byte in C++
     EXPECT_EQ(sizeof(DirtyTag::VertexAttributes), 1u);
     EXPECT_EQ(sizeof(DirtyTag::EdgeTopology), 1u);
@@ -65,6 +66,29 @@ TEST(DirtyTag, MultipleTagsCoexist)
     EXPECT_TRUE(reg.all_of<DirtyTag::EdgeAttributes>(e));
     EXPECT_TRUE(reg.all_of<DirtyTag::FaceAttributes>(e));
     EXPECT_FALSE(reg.all_of<DirtyTag::VertexPositions>(e));
+}
+
+TEST(DirtyTag, FaceAttributes_ViewDoesNotAliasMeshOrSurfaceStorage)
+{
+    entt::registry reg;
+    auto e = reg.create();
+
+    reg.emplace<Mesh::Data>(e);
+    reg.emplace<Surface::Component>(e);
+    reg.emplace<DirtyTag::FaceAttributes>(e);
+
+    auto view = reg.view<DirtyTag::FaceAttributes, Mesh::Data, Surface::Component>();
+
+    std::size_t count = 0;
+    for (auto [entity, meshData, surf] : view.each())
+    {
+        (void)meshData;
+        (void)surf;
+        EXPECT_EQ(entity, e);
+        ++count;
+    }
+
+    EXPECT_EQ(count, 1u);
 }
 
 TEST(DirtyTag, BulkClear)

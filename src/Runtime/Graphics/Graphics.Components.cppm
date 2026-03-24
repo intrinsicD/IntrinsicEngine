@@ -9,6 +9,7 @@ module;
 #endif
 
 #include <entt/entity/entity.hpp>
+#include <entt/core/type_info.hpp>
 #include <glm/glm.hpp>
 
 export module Graphics.Components;
@@ -83,6 +84,7 @@ export namespace ECS::DirtyTag
     struct FaceTopology {};
     struct FaceAttributes {};
 }
+
 
 // =========================================================================
 // EdgePair — Standalone edge index pair type (formerly in RenderVisualization).

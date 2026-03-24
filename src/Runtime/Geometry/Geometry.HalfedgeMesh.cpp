@@ -223,6 +223,9 @@ namespace Geometry::Halfedge
             m_AddFaceNeedsAdjust = std::move(rhs.m_AddFaceNeedsAdjust);
             m_AddFaceNextCache = std::move(rhs.m_AddFaceNextCache);
             m_VertexAttrTransfer = std::move(rhs.m_VertexAttrTransfer);
+
+            // Rebind cached built-in property handles to the destination storages.
+            EnsureProperties();
         }
         return *this;
     }

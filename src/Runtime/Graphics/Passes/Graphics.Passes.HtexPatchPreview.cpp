@@ -14,6 +14,7 @@ module;
 #include <entt/entity/registry.hpp>
 #include <glm/glm.hpp>
 #include "RHI.Vulkan.hpp"
+#include "Core.Profiling.Macros.hpp"
 
 module Graphics.Passes.HtexPatchPreview;
 
@@ -105,11 +106,13 @@ namespace Graphics::Passes
             const Geometry::Halfedge::Mesh& mesh,
             const Geometry::Property<uint32_t>& labels)
         {
+            PROFILE_SCOPE("HtexPatchPreview::ReconstructPreviewCentroids");
+
             if (!labels)
                 return {};
 
             uint32_t clusterCount = 0u;
-            for (std::size_t i = 0; i < mesh.VertexCount(); ++i)
+            for (std::size_t i = 0; i < mesh.VerticesSize(); ++i)
             {
                 const Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(i)};
                 if (!mesh.IsValid(v) || mesh.IsDeleted(v))
@@ -125,7 +128,7 @@ namespace Graphics::Passes
             points.reserve(mesh.VertexCount());
             pointLabels.reserve(mesh.VertexCount());
 
-            for (std::size_t i = 0; i < mesh.VertexCount(); ++i)
+            for (std::size_t i = 0; i < mesh.VerticesSize(); ++i)
             {
                 const Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(i)};
                 if (!mesh.IsValid(v) || mesh.IsDeleted(v))
@@ -226,6 +229,9 @@ namespace Graphics::Passes
 
         m_UploadedAtlasRevision.fill(0);
         m_CachedAtlas = {};
+        m_CachedInputs = {};
+        m_CachedPreviewSignature = 0;
+        m_CachedPatchBuild = {};
         m_PendingBake.reset();
         m_StagingCapacity = 0;
     }
@@ -330,13 +336,15 @@ namespace Graphics::Passes
         const PreviewKMeansData& kmeansData,
         std::span<const Geometry::HtexPatch::HalfedgePatchMeta> patches) noexcept
     {
+        PROFILE_SCOPE("HtexPatchPreview::ComputePreviewAtlasSignature");
+
         uint64_t hash = 0xcbf29ce484222325ull;
         hash = HashCombine64(hash, static_cast<uint64_t>(mesh.VertexCount()));
         hash = HashCombine64(hash, static_cast<uint64_t>(mesh.EdgeCount()));
         hash = HashCombine64(hash, static_cast<uint64_t>(mesh.FaceCount()));
         hash = HashCombine64(hash, static_cast<uint64_t>(patches.size()));
 
-        for (std::size_t i = 0; i < mesh.VertexCount(); ++i)
+        for (std::size_t i = 0; i < mesh.VerticesSize(); ++i)
         {
             const Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(i)};
             if (!mesh.IsValid(v) || mesh.IsDeleted(v))
@@ -359,7 +367,7 @@ namespace Graphics::Passes
         hash = HashCombine64(hash, kmeansData.Labels ? 1ull : 0ull);
         if (kmeansData.Labels)
         {
-            for (std::size_t i = 0; i < mesh.VertexCount(); ++i)
+            for (std::size_t i = 0; i < mesh.VerticesSize(); ++i)
             {
                 const Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(i)};
                 if (!mesh.IsValid(v) || mesh.IsDeleted(v))
@@ -371,7 +379,7 @@ namespace Graphics::Passes
         hash = HashCombine64(hash, kmeansData.Colors ? 1ull : 0ull);
         if (kmeansData.Colors)
         {
-            for (std::size_t i = 0; i < mesh.VertexCount(); ++i)
+            for (std::size_t i = 0; i < mesh.VerticesSize(); ++i)
             {
                 const Geometry::VertexHandle v{static_cast<Geometry::PropertyIndex>(i)};
                 if (!mesh.IsValid(v) || mesh.IsDeleted(v))
@@ -390,6 +398,8 @@ namespace Graphics::Passes
                                                                uint32_t& outWidth,
                                                                uint32_t& outHeight)
     {
+        PROFILE_SCOPE("HtexPatchPreview::BuildPreviewAtlas");
+
         if (patches.empty())
         {
             outWidth = 1u;
@@ -400,22 +410,25 @@ namespace Graphics::Passes
 
         constexpr uint32_t kTileSize = 16u;
         constexpr uint32_t kMaxColumns = 32u;
-        const uint32_t columns = std::max(1u, std::min(kMaxColumns, static_cast<uint32_t>(std::ceil(std::sqrt(static_cast<float>(patches.size()))))));
+        const uint32_t columns = std::max(1u,
+                                          std::min(kMaxColumns,
+                                                   static_cast<uint32_t>(std::ceil(std::sqrt(static_cast<float>(patches.size()))))));
         const uint32_t rows = static_cast<uint32_t>((patches.size() + columns - 1u) / columns);
 
         outWidth = columns * kTileSize;
         outHeight = rows * kTileSize;
         outPixels.assign(static_cast<size_t>(outWidth) * static_cast<size_t>(outHeight), glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
+
         const bool hasPerTexelKMeans = kmeansData.HasCentroidField();
         Geometry::HtexPatch::PatchAtlasLayout categoricalLayout{};
         std::vector<std::uint32_t> categoricalAtlasTexels;
-        const bool hasCategoricalAtlas = Geometry::HtexPatch::BuildCategoricalPatchAtlas(
-            mesh,
-            patches,
-            kmeansData.Centroids,
-            categoricalAtlasTexels,
-            categoricalLayout,
-            Geometry::HtexPatch::kInvalidIndex);
+        const bool hasCategoricalAtlas = !hasPerTexelKMeans &&
+                                         Geometry::HtexPatch::BuildCategoricalPatchAtlas(mesh,
+                                                                                         patches,
+                                                                                         kmeansData.Centroids,
+                                                                                         categoricalAtlasTexels,
+                                                                                         categoricalLayout,
+                                                                                         Geometry::HtexPatch::kInvalidIndex);
 
         for (std::size_t i = 0; i < patches.size(); ++i)
         {
@@ -455,8 +468,8 @@ namespace Graphics::Passes
                     }
 
                     const glm::vec4 texel{texelScalar, 0.0f, 0.0f, 1.0f};
-
-                    const size_t dst = static_cast<size_t>(py + y) * static_cast<size_t>(outWidth) + static_cast<size_t>(px + x);
+                    const size_t dst = static_cast<size_t>(py + y) * static_cast<size_t>(outWidth) +
+                                       static_cast<size_t>(px + x);
                     outPixels[dst] = texel;
                 }
             }
@@ -467,6 +480,8 @@ namespace Graphics::Passes
 
     void HtexPatchPreviewPass::AddPasses(RenderPassContext& ctx)
     {
+        PROFILE_SCOPE("HtexPatchPreview::AddPasses");
+
         if (!m_Device || ctx.Resolution.width == 0 || ctx.Resolution.height == 0)
             return;
 
@@ -498,30 +513,86 @@ namespace Graphics::Passes
             m_DebugState.AtlasRebuiltThisFrame = true;
         }
 
+        const PreviewKMeansData kmeansData{
+            .Labels = meshData.MeshRef->VertexProperties().Get<uint32_t>("v:kmeans_label"),
+            .Colors = meshData.MeshRef->VertexProperties().Get<glm::vec4>("v:kmeans_color"),
+        };
+
+        const bool cachedInputsMatch = m_CachedInputs.Valid &&
+                                       m_CachedInputs.SourceEntity == entity &&
+                                       m_CachedInputs.Mesh == meshData.MeshRef.get() &&
+                                       m_CachedInputs.VertexCount == meshData.MeshRef->VertexCount() &&
+                                       m_CachedInputs.EdgeCount == meshData.MeshRef->EdgeCount() &&
+                                       m_CachedInputs.FaceCount == meshData.MeshRef->FaceCount() &&
+                                       m_CachedInputs.KMeansResultRevision == meshData.KMeansResultRevision &&
+                                       m_CachedInputs.HasLabels == static_cast<bool>(kmeansData.Labels) &&
+                                       m_CachedInputs.HasColors == static_cast<bool>(kmeansData.Colors);
+
+        uint64_t desiredSignature = m_CachedPreviewSignature;
+        if (!cachedInputsMatch)
+        {
+            PROFILE_SCOPE("HtexPatchPreview::RefreshPatchCache");
+
+            if (const auto patchBuild = Geometry::HtexPatch::BuildPatchMetadata(*meshData.MeshRef))
+            {
+                m_CachedPatchBuild = *patchBuild;
+                m_CachedInputs = CachedPreviewInputs{
+                    .SourceEntity = entity,
+                    .Mesh = meshData.MeshRef.get(),
+                    .VertexCount = meshData.MeshRef->VertexCount(),
+                    .EdgeCount = meshData.MeshRef->EdgeCount(),
+                    .FaceCount = meshData.MeshRef->FaceCount(),
+                    .KMeansResultRevision = meshData.KMeansResultRevision,
+                    .HasLabels = static_cast<bool>(kmeansData.Labels),
+                    .HasColors = static_cast<bool>(kmeansData.Colors),
+                    .Valid = true,
+                };
+
+                desiredSignature = ComputePreviewAtlasSignature(*meshData.MeshRef, kmeansData, m_CachedPatchBuild.Patches);
+                m_CachedPreviewSignature = desiredSignature;
+            }
+            else
+            {
+                m_CachedInputs = {};
+                m_CachedPatchBuild = {};
+                m_CachedPreviewSignature = 0;
+                m_CachedAtlas = {};
+            }
+        }
+        else if (desiredSignature == 0u)
+        {
+            desiredSignature = ComputePreviewAtlasSignature(*meshData.MeshRef, kmeansData, m_CachedPatchBuild.Patches);
+            m_CachedPreviewSignature = desiredSignature;
+        }
+
         uint32_t width = 1u;
         uint32_t height = 1u;
         bool built = false;
 
-        if (const auto patchBuild = Geometry::HtexPatch::BuildPatchMetadata(*meshData.MeshRef))
+        const bool atlasReady = desiredSignature != 0u &&
+                                m_CachedAtlas.Valid &&
+                                m_CachedAtlas.Built &&
+                                m_CachedAtlas.Signature == desiredSignature;
+
+        if (!atlasReady)
         {
-            const PreviewKMeansData kmeansData{
-                .Labels = meshData.MeshRef->VertexProperties().Get<uint32_t>("v:kmeans_label"),
-                .Colors = meshData.MeshRef->VertexProperties().Get<glm::vec4>("v:kmeans_color"),
-            };
-            const uint64_t signature = ComputePreviewAtlasSignature(*meshData.MeshRef, kmeansData, patchBuild->Patches);
-            if (!m_CachedAtlas.Valid || !m_CachedAtlas.Built || m_CachedAtlas.Signature != signature)
+            if (desiredSignature != 0u)
             {
-                if (!m_PendingBake || m_PendingBake->Signature != signature)
+                if (!m_PendingBake || m_PendingBake->Signature != desiredSignature)
                 {
+                    PROFILE_SCOPE("HtexPatchPreview::EnqueueBake");
+
                     auto pending = std::make_shared<PendingPreviewBake>();
-                    pending->Signature = signature;
+                    pending->Signature = desiredSignature;
                     pending->Revision = m_CachedAtlas.Revision != 0u ? (m_CachedAtlas.Revision + 1u) : 1u;
                     pending->MeshCopy = Geometry::Halfedge::Mesh{*meshData.MeshRef};
-                    pending->Patches = patchBuild->Patches;
+                    pending->Patches = m_CachedPatchBuild.Patches;
                     m_PendingBake = pending;
 
                     auto bakeJob = [pending]() mutable
                     {
+                        PROFILE_SCOPE("HtexPatchPreview::BakeJob");
+
                         auto& meshCopy = pending->MeshCopy;
                         auto& patchesCopy = pending->Patches;
 
@@ -555,7 +626,7 @@ namespace Graphics::Passes
 
                 m_DebugState.HasMesh = true;
                 m_DebugState.LastMeshEntity = static_cast<uint32_t>(entity);
-                m_DebugState.LastPatchCount = static_cast<uint32_t>(patchBuild->Patches.size());
+                m_DebugState.LastPatchCount = static_cast<uint32_t>(m_CachedPatchBuild.Patches.size());
                 m_DebugState.LastAtlasWidth = 0u;
                 m_DebugState.LastAtlasHeight = 0u;
                 m_DebugState.UsedKMeansColors = [&]() noexcept
@@ -567,7 +638,10 @@ namespace Graphics::Passes
                 m_DebugState.PreviewImageReady = false;
                 return;
             }
+        }
 
+        if (atlasReady)
+        {
             width = m_CachedAtlas.Width;
             height = m_CachedAtlas.Height;
             built = true;
@@ -575,7 +649,7 @@ namespace Graphics::Passes
 
         m_DebugState.HasMesh = true;
         m_DebugState.LastMeshEntity = static_cast<uint32_t>(entity);
-        m_DebugState.LastPatchCount = static_cast<uint32_t>(meshData.MeshRef->EdgeCount());
+        m_DebugState.LastPatchCount = static_cast<uint32_t>(m_CachedPatchBuild.Patches.size());
         m_DebugState.LastAtlasWidth = width;
         m_DebugState.LastAtlasHeight = height;
         m_DebugState.UsedKMeansColors = [&]() noexcept
@@ -706,8 +780,8 @@ namespace Graphics::Passes
                                                 {
                                                     data.Target = builder.Read(
                                                         handle,
-                                                    VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-                                                    VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
+                                                        VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                                                        VK_ACCESS_2_SHADER_SAMPLED_READ_BIT);
                                                 }
                                             },
                                             [this, frameIndex = ctx.FrameIndex](const FinalizePassData&, const RGRegistry&, VkCommandBuffer)

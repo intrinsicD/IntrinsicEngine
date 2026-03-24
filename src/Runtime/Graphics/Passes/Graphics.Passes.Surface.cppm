@@ -314,7 +314,8 @@ export namespace Graphics::Passes
                                         const uint32_t* colorData,
                                         uint32_t vertexCount);
 
-        // Per-centroid buffers — {vec3 pos, uint packedColor} per centroid.
+        // Per-centroid buffers — first entry stores the centroid count header,
+        // followed by {vec3 pos, uint packedColor} entries per centroid.
         // One buffer per geometry that uses centroid-based Voronoi.
         std::unordered_map<uint32_t, RetainedBufferEntry> m_CentroidBuffers;
 

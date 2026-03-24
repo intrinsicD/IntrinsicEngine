@@ -109,6 +109,25 @@ TEST(HtexPatch, ComputeAtlasLayoutPacksPatchTilesIntoBoundedGrid)
     EXPECT_EQ(layout.Height, 32u);
 }
 
+TEST(HtexPatch, BuildPatchMetadataHandlesReversedResolutionBounds)
+{
+    auto mesh = MakeSingleTriangle();
+
+    Geometry::HtexPatch::PatchBuildParams params{};
+    params.TexelsPerUnit = 32.0f;
+    params.MinResolution = 64u;
+    params.MaxResolution = 8u;
+
+    const auto patches = Geometry::HtexPatch::BuildPatchMetadata(mesh, params);
+    ASSERT_TRUE(patches.has_value());
+
+    for (const auto& patch : patches->Patches)
+    {
+        EXPECT_GE(patch.Resolution, 8u);
+        EXPECT_LE(patch.Resolution, 64u);
+    }
+}
+
 TEST(HtexPatch, BuildCategoricalPatchAtlasEncodesNearestClusterIdsLosslessly)
 {
     auto mesh = MakeSingleTriangle();

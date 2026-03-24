@@ -58,6 +58,7 @@ target_sources(${target_name}
         Geometry.SurfaceReconstruction.cppm
         Geometry.Parameterization.cppm
         Geometry.MeshQuality.cppm
+        Geometry.MeshAnalysis.cppm
         Geometry.AdaptiveRemeshing.cppm
         Geometry.ConvexHullBuilder.cppm
         Geometry.KMeans.cppm
@@ -94,6 +95,7 @@ target_sources(${target_name}
         Geometry.SurfaceReconstruction.cpp
         Geometry.Parameterization.cpp
         Geometry.MeshQuality.cpp
+        Geometry.MeshAnalysis.cpp
         Geometry.AdaptiveRemeshing.cpp
         Geometry.ConvexHullBuilder.cpp
         Geometry.KMeans.cpp

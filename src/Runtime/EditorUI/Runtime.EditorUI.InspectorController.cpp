@@ -17,6 +17,7 @@ module Runtime.EditorUI;
 import Runtime.Engine;
 import Graphics.Components;
 import Graphics.Geometry;
+import Geometry.MeshAnalysis;
 import ECS;
 import Interface;
 
@@ -349,12 +350,22 @@ void InspectorController::Draw()
                 // PropertySet-driven color visualization for meshes.
                 if (auto* md = reg.try_get<ECS::Mesh::Data>(selected))
                 {
-                    if (md->MeshRef)
+                    auto meshRef = md->MeshRef;
+                    if (!meshRef)
                     {
-                        const Geometry::ConstPropertySet vtxPs{md->MeshRef->VertexProperties()};
-                        const Geometry::ConstPropertySet edgePs{md->MeshRef->EdgeProperties()};
-                        const Geometry::ConstPropertySet halfedgePs{md->MeshRef->HalfedgeProperties()};
-                        const Geometry::ConstPropertySet facePs{md->MeshRef->FaceProperties()};
+                        if (auto* collider = reg.try_get<ECS::MeshCollider::Component>(selected))
+                        {
+                            if (collider->CollisionRef)
+                                meshRef = collider->CollisionRef->SourceMesh;
+                        }
+                    }
+
+                    if (meshRef)
+                    {
+                        const Geometry::ConstPropertySet vtxPs{meshRef->VertexProperties()};
+                        const Geometry::ConstPropertySet edgePs{meshRef->EdgeProperties()};
+                        const Geometry::ConstPropertySet halfedgePs{meshRef->HalfedgeProperties()};
+                        const Geometry::ConstPropertySet facePs{meshRef->FaceProperties()};
 
                         if (ColorSourceWidget("Vertex Color Source", md->Visualization.VertexColors, &vtxPs,
                                               "MeshVtx"))
@@ -397,6 +408,82 @@ void InspectorController::Draw()
                                 if (ImGui::SmallButton("Open Dedicated Mesh Spectral Panel"))
                                     m_GeometryWorkflow->OpenMeshSpectralPanel();
                             }
+                            ImGui::TreePop();
+                        }
+
+                        if (ImGui::TreeNodeEx("Mesh Analysis (Defect Markers)##Mesh", ImGuiTreeNodeFlags_DefaultOpen))
+                        {
+                            ImGui::TextDisabled("Run the analysis to publish selection-friendly defect markers and scalar mirrors.");
+                            ImGui::TextDisabled("Binary mirror fields: 1.0 = flagged/problem, 0.0 = clean.");
+                            ImGui::TextDisabled("Recommended color source: a discrete/binary colormap on `*_analysis_problem_f`.");
+
+                            if (ImGui::Button("Run Mesh Analysis"))
+                            {
+                                if (auto analysis = Geometry::MeshAnalysis::Analyze(*meshRef))
+                                {
+                                    m_MeshAnalysisUi.HasResults = true;
+                                    m_MeshAnalysisUi.ProblemVertices = analysis->ProblemVertices.size();
+                                    m_MeshAnalysisUi.ProblemEdges = analysis->ProblemEdges.size();
+                                    m_MeshAnalysisUi.ProblemHalfedges = analysis->ProblemHalfedges.size();
+                                    m_MeshAnalysisUi.ProblemFaces = analysis->ProblemFaces.size();
+                                    m_MeshAnalysisUi.BoundaryVertices = analysis->BoundaryVertexCount;
+                                    m_MeshAnalysisUi.BoundaryEdges = analysis->BoundaryEdgeCount;
+                                    m_MeshAnalysisUi.BoundaryFaces = analysis->BoundaryFaceCount;
+                                    m_MeshAnalysisUi.NonManifoldVertices = analysis->NonManifoldVertexCount;
+                                    m_MeshAnalysisUi.DegenerateFaces = analysis->DegenerateFaceCount;
+                                    m_MeshAnalysisUi.NonTriangleFaces = analysis->NonTriangleFaceCount;
+                                    m_MeshAnalysisUi.NonFiniteElements = analysis->NonFiniteVertexCount
+                                                                       + analysis->NonFiniteEdgeCount
+                                                                       + analysis->NonFiniteFaceCount;
+
+                                    auto vMirror = meshRef->VertexProperties().GetOrAdd<float>("v:analysis_problem_f", 0.0f);
+                                    auto eMirror = meshRef->EdgeProperties().GetOrAdd<float>("e:analysis_problem_f", 0.0f);
+                                    auto hMirror = meshRef->HalfedgeProperties().GetOrAdd<float>("h:analysis_problem_f", 0.0f);
+                                    auto fMirror = meshRef->FaceProperties().GetOrAdd<float>("f:analysis_problem_f", 0.0f);
+
+                                    for (std::size_t i = 0; i < meshRef->VerticesSize(); ++i)
+                                        vMirror[i] = analysis->ProblemVertex[Geometry::VertexHandle{static_cast<Geometry::PropertyIndex>(i)}] ? 1.0f : 0.0f;
+                                    for (std::size_t i = 0; i < meshRef->EdgesSize(); ++i)
+                                        eMirror[i] = analysis->ProblemEdge[Geometry::EdgeHandle{static_cast<Geometry::PropertyIndex>(i)}] ? 1.0f : 0.0f;
+                                    for (std::size_t i = 0; i < meshRef->HalfedgesSize(); ++i)
+                                        hMirror[i] = analysis->ProblemHalfedge[Geometry::HalfedgeHandle{static_cast<Geometry::PropertyIndex>(i)}] ? 1.0f : 0.0f;
+                                    for (std::size_t i = 0; i < meshRef->FacesSize(); ++i)
+                                        fMirror[i] = analysis->ProblemFace[Geometry::FaceHandle{static_cast<Geometry::PropertyIndex>(i)}] ? 1.0f : 0.0f;
+
+                                    md->Visualization.VertexColors.PropertyName = "v:analysis_problem_f";
+                                    md->Visualization.VertexColors.AutoRange = true;
+                                    md->Visualization.EdgeColors.PropertyName = "e:analysis_problem_f";
+                                    md->Visualization.EdgeColors.AutoRange = true;
+                                    md->Visualization.FaceColors.PropertyName = "f:analysis_problem_f";
+                                    md->Visualization.FaceColors.AutoRange = true;
+                                    md->AttributesDirty = true;
+                                    reg.emplace_or_replace<ECS::DirtyTag::VertexAttributes>(selected);
+                                    reg.emplace_or_replace<ECS::DirtyTag::EdgeAttributes>(selected);
+                                    reg.emplace_or_replace<ECS::DirtyTag::FaceAttributes>(selected);
+                                }
+                                else
+                                {
+                                    m_MeshAnalysisUi.HasResults = false;
+                                }
+                            }
+
+                            if (m_MeshAnalysisUi.HasResults)
+                            {
+                                ImGui::SeparatorText("Last Analysis");
+                                ImGui::Text("Problem Vertices: %zu", m_MeshAnalysisUi.ProblemVertices);
+                                ImGui::Text("Problem Edges: %zu", m_MeshAnalysisUi.ProblemEdges);
+                                ImGui::Text("Problem Halfedges: %zu", m_MeshAnalysisUi.ProblemHalfedges);
+                                ImGui::Text("Problem Faces: %zu", m_MeshAnalysisUi.ProblemFaces);
+                                ImGui::Text("Boundary Vertices: %zu", m_MeshAnalysisUi.BoundaryVertices);
+                                ImGui::Text("Boundary Edges: %zu", m_MeshAnalysisUi.BoundaryEdges);
+                                ImGui::Text("Boundary Faces: %zu", m_MeshAnalysisUi.BoundaryFaces);
+                                ImGui::Text("Non-Manifold Vertices: %zu", m_MeshAnalysisUi.NonManifoldVertices);
+                                ImGui::Text("Degenerate Faces: %zu", m_MeshAnalysisUi.DegenerateFaces);
+                                ImGui::Text("Non-Triangle Faces: %zu", m_MeshAnalysisUi.NonTriangleFaces);
+                                ImGui::Text("Non-Finite Elements: %zu", m_MeshAnalysisUi.NonFiniteElements);
+                            }
+
+                            ImGui::TextDisabled("Use the color-source selectors above to visualize `*_analysis_problem_f`.");
                             ImGui::TreePop();
                         }
                     }
