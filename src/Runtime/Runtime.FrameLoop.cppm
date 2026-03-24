@@ -10,12 +10,12 @@ import Core.FeatureRegistry;
 import Core.FrameGraph;
 import Core.InplaceFunction;
 import Core.Window;
-import Graphics.MaterialSystem;
 import Runtime.RenderExtraction;
 import Runtime.AssetIngestService;
 import Runtime.AssetPipeline;
 import Runtime.GraphicsBackend;
 import Runtime.RenderOrchestrator;
+import Runtime.ResourceMaintenance;
 import Runtime.SceneManager;
 
 export namespace Runtime
@@ -287,10 +287,7 @@ export namespace Runtime
     {
     public:
         RuntimeMaintenanceLaneHost(SceneManager& scene, RenderOrchestrator& renderer, GraphicsBackend& graphics)
-            : m_Scene(scene)
-            , m_Renderer(renderer)
-            , m_Graphics(graphics)
-            , m_Materials(renderer.GetMaterialSystem())
+            : m_Maintenance(scene, renderer, graphics)
         {
         }
 
@@ -304,12 +301,7 @@ export namespace Runtime
         void ProcessMaterialDeletions() override;
 
     private:
-        SceneManager& m_Scene;
-        RenderOrchestrator& m_Renderer;
-        GraphicsBackend& m_Graphics;
-        Graphics::MaterialSystem& m_Materials;
-        uint64_t m_LastCompletedGraphicsTimelineValue = 0;
-        uint64_t m_LastObservedGlobalFrameNumber = 0;
+        ResourceMaintenanceService m_Maintenance;
     };
 
     struct MaintenanceLaneCoordinator
