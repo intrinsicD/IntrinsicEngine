@@ -488,11 +488,9 @@ namespace Runtime
                 .Dispatcher = m_Scene.GetScene().GetDispatcher(),
                 .DefaultTextureId = m_Graphics.GetDefaultTextureIndex(),
             };
-            VariableFrameGraphSystemBundle{}.Register(coreBundleContext, &gpuBundleContext);
+            GpuFrameGraphSystemBundle{}.Register(gpuBundleContext);
             return;
         }
-
-        VariableFrameGraphSystemBundle{}.Register(coreBundleContext);
     }
 
     void RuntimeRenderLaneHost::DispatchDeferredEvents()
