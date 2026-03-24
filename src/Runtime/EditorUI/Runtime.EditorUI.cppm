@@ -30,7 +30,7 @@ import Geometry.Properties;
 import Geometry.Simplification;
 import Geometry.Subdivision;
 import Geometry.PointCloud;
-import Geometry.Graph;
+import Geometry.GraphUtils;
 import Geometry.HalfedgeMesh;
 import Geometry.KDTree;
 import Geometry.AABB;

@@ -38,12 +38,11 @@ target_sources(${target_name}
         Geometry.BVH.cppm
         Geometry.Raycast.cppm
         Geometry.HalfedgeMesh.cppm
-        Geometry.HalfedgeMeshView.cppm
         Geometry.HtexPatch.cppm
         Geometry.MeshBuilder.cppm
         Geometry.MeshOperator.cppm
+        Geometry.GraphUtils.cppm
         Geometry.Graph.cppm
-        Geometry.GraphView.cppm
         Geometry.DEC.cppm
         Geometry.Curvature.cppm
         Geometry.Smoothing.cppm
@@ -75,12 +74,11 @@ target_sources(${target_name}
         Geometry.Raycast.cpp
         Geometry.EPA.cpp
         Geometry.HalfedgeMesh.cpp
-        Geometry.HalfedgeMeshView.cpp
         Geometry.HtexPatch.cpp
         Geometry.MeshBuilder.cpp
         Geometry.Properties.cpp
+        Geometry.GraphUtils.cpp
         Geometry.Graph.cpp
-        Geometry.GraphView.cpp
         Geometry.Octree.cpp
         Geometry.KDTree.cpp
         Geometry.BVH.cpp
@@ -109,6 +107,12 @@ target_sources(${target_name}
         Geometry.Sphere.cpp
         Geometry.Boolean.cpp
         Geometry.ShortestPath.cpp
+
+        #Partitioned modules: how do we tell cmake about these? Do we need to list them all here, or can we just list the main module and have it import the others?
+        PUBLIC
+        FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
+        Geometry.HalfedgeMeshFwd.cppm
+        Geometry.GraphFwd.cppm
 )
 
 target_include_directories(${target_name} PUBLIC .)

@@ -1,6 +1,6 @@
 module;
 
-#include <algorithm>
+#include <glm/glm.hpp>
 
 module Geometry.PointCloudView;
 

@@ -12,6 +12,7 @@ module;
 
 module Geometry.HalfedgeMesh;
 
+import Geometry.HalfedgeMeshFwd;
 import Geometry.Properties;
 
 namespace Geometry::Halfedge
@@ -69,7 +70,7 @@ namespace Geometry::Halfedge
             {
             case Mesh::VertexAttributeTransfer::Policy::Average:
                 prop[vOut.Index] = (static_cast<T>(1.0f - t) * prop[va.Index])
-                                 + (static_cast<T>(t) * prop[vb.Index]);
+                    + (static_cast<T>(t) * prop[vb.Index]);
                 break;
             case Mesh::VertexAttributeTransfer::Policy::KeepA:
                 prop[vOut.Index] = prop[va.Index];
@@ -124,7 +125,8 @@ namespace Geometry::Halfedge
         }
     }
 
-    void Mesh::TransferVertexAttributes_OnSplit(VertexHandle va, VertexHandle vb, VertexHandle vm, glm::vec3 newPosition)
+    void Mesh::TransferVertexAttributes_OnSplit(VertexHandle va, VertexHandle vb, VertexHandle vm,
+                                                glm::vec3 newPosition)
     {
         if (m_VertexAttrTransfer.empty()) return;
         for (const auto& rule : m_VertexAttrTransfer)
@@ -134,7 +136,8 @@ namespace Geometry::Halfedge
         }
     }
 
-    void Mesh::TransferVertexAttributes_OnCollapse(VertexHandle va, VertexHandle vb, VertexHandle vSurvivor, glm::vec3 newPosition)
+    void Mesh::TransferVertexAttributes_OnCollapse(VertexHandle va, VertexHandle vb, VertexHandle vSurvivor,
+                                                   glm::vec3 newPosition)
     {
         if (m_VertexAttrTransfer.empty()) return;
         for (const auto& rule : m_VertexAttrTransfer)
@@ -146,85 +149,103 @@ namespace Geometry::Halfedge
 
     Mesh::Mesh()
         : m_Properties(std::make_shared<MeshProperties>())
-        , m_Vertices(m_Properties->Vertices)
-        , m_Halfedges(m_Properties->Halfedges)
-        , m_Edges(m_Properties->Edges)
-        , m_Faces(m_Properties->Faces)
+          , m_Vertices(m_Properties->Vertices)
+          , m_Halfedges(m_Properties->Halfedges)
+          , m_Edges(m_Properties->Edges)
+          , m_Faces(m_Properties->Faces)
+          , m_DeletedVertices(m_Properties->DeletedVertices)
+          , m_DeletedEdges(m_Properties->DeletedEdges)
+          , m_DeletedFaces(m_Properties->DeletedFaces)
     {
         EnsureProperties();
     }
 
-    Mesh::Mesh(PropertySet& vertices, PropertySet& halfedges, PropertySet& edges, PropertySet& faces) noexcept
+    Mesh::Mesh(PropertySet& vertices, PropertySet& halfedges, PropertySet& edges, PropertySet& faces,
+               size_t& deletedVertices, size_t& deletedEdges, size_t& deletedFaces) noexcept
         : m_Properties(nullptr)
-        , m_Vertices(vertices)
-        , m_Halfedges(halfedges)
-        , m_Edges(edges)
-        , m_Faces(faces)
+          , m_Vertices(vertices)
+          , m_Halfedges(halfedges)
+          , m_Edges(edges)
+          , m_Faces(faces)
+          , m_DeletedVertices(deletedVertices)
+          , m_DeletedEdges(deletedEdges)
+          , m_DeletedFaces(deletedFaces)
     {
         EnsureProperties();
     }
 
     Mesh::Mesh(const Mesh& rhs)
         : m_Properties(std::make_shared<MeshProperties>())
-        , m_Vertices(m_Properties->Vertices)
-        , m_Halfedges(m_Properties->Halfedges)
-        , m_Edges(m_Properties->Edges)
-        , m_Faces(m_Properties->Faces)
+          , m_Vertices(m_Properties->Vertices)
+          , m_Halfedges(m_Properties->Halfedges)
+          , m_Edges(m_Properties->Edges)
+          , m_Faces(m_Properties->Faces)
+          , m_DeletedVertices(m_Properties->DeletedVertices)
+          , m_DeletedEdges(m_Properties->DeletedEdges)
+          , m_DeletedFaces(m_Properties->DeletedFaces)
     {
         m_Vertices = rhs.m_Vertices;
         m_Halfedges = rhs.m_Halfedges;
         m_Edges = rhs.m_Edges;
         m_Faces = rhs.m_Faces;
-
         m_DeletedVertices = rhs.m_DeletedVertices;
         m_DeletedEdges = rhs.m_DeletedEdges;
         m_DeletedFaces = rhs.m_DeletedFaces;
-        m_HasGarbage = rhs.m_HasGarbage;
         m_VertexAttrTransfer = rhs.m_VertexAttrTransfer;
-
+        m_AddFaceVertices = rhs.m_AddFaceVertices;
+        m_AddFaceHalfedges = rhs.m_AddFaceHalfedges;
+        m_AddFaceIsNew = rhs.m_AddFaceIsNew;
+        m_AddFaceNeedsAdjust = rhs.m_AddFaceNeedsAdjust;
+        m_AddFaceNextCache = rhs.m_AddFaceNextCache;
         EnsureProperties();
     }
 
     Mesh::~Mesh() = default;
 
-    Mesh& Mesh::operator=(const Mesh& rhs)
+    Mesh& Mesh::operator=(const Mesh& other) noexcept
     {
-        if (this != &rhs)
+        if (this != &other)
         {
-            m_Vertices = rhs.m_Vertices;
-            m_Halfedges = rhs.m_Halfedges;
-            m_Edges = rhs.m_Edges;
-            m_Faces = rhs.m_Faces;
-            m_DeletedVertices = rhs.m_DeletedVertices;
-            m_DeletedEdges = rhs.m_DeletedEdges;
-            m_DeletedFaces = rhs.m_DeletedFaces;
-            m_HasGarbage = rhs.m_HasGarbage;
-            m_VertexAttrTransfer = rhs.m_VertexAttrTransfer;
+            // Reference members are fixed at construction time; copy into the
+            // currently-bound storage instead of rebinding `m_Properties`.
+            m_Vertices = other.m_Vertices;
+            m_Halfedges = other.m_Halfedges;
+            m_Edges = other.m_Edges;
+            m_Faces = other.m_Faces;
+            m_DeletedVertices = other.m_DeletedVertices;
+            m_DeletedEdges = other.m_DeletedEdges;
+            m_DeletedFaces = other.m_DeletedFaces;
+            m_VertexAttrTransfer = other.m_VertexAttrTransfer;
+            m_AddFaceVertices = other.m_AddFaceVertices;
+            m_AddFaceHalfedges = other.m_AddFaceHalfedges;
+            m_AddFaceIsNew = other.m_AddFaceIsNew;
+            m_AddFaceNeedsAdjust = other.m_AddFaceNeedsAdjust;
+            m_AddFaceNextCache = other.m_AddFaceNextCache;
             EnsureProperties();
         }
         return *this;
     }
 
-    Mesh& Mesh::operator=(Mesh&& rhs) noexcept
+    Mesh& Mesh::operator=(Mesh&& other) noexcept
     {
-        if (this != &rhs)
+        if (this != &other)
         {
-            m_Vertices = std::move(rhs.m_Vertices);
-            m_Halfedges = std::move(rhs.m_Halfedges);
-            m_Edges = std::move(rhs.m_Edges);
-            m_Faces = std::move(rhs.m_Faces);
-            m_DeletedVertices = rhs.m_DeletedVertices;
-            m_DeletedEdges = rhs.m_DeletedEdges;
-            m_DeletedFaces = rhs.m_DeletedFaces;
-            m_HasGarbage = rhs.m_HasGarbage;
-            m_AddFaceVertices = std::move(rhs.m_AddFaceVertices);
-            m_AddFaceHalfedges = std::move(rhs.m_AddFaceHalfedges);
-            m_AddFaceIsNew = std::move(rhs.m_AddFaceIsNew);
-            m_AddFaceNeedsAdjust = std::move(rhs.m_AddFaceNeedsAdjust);
-            m_AddFaceNextCache = std::move(rhs.m_AddFaceNextCache);
-            m_VertexAttrTransfer = std::move(rhs.m_VertexAttrTransfer);
+            // Move the contents of the currently-bound sets; do not swap the
+            // backing pointers because the mesh exposes reference members.
+            if (&m_Vertices != &other.m_Vertices) m_Vertices = std::move(other.m_Vertices);
+            if (&m_Halfedges != &other.m_Halfedges) m_Halfedges = std::move(other.m_Halfedges);
+            if (&m_Edges != &other.m_Edges) m_Edges = std::move(other.m_Edges);
+            if (&m_Faces != &other.m_Faces) m_Faces = std::move(other.m_Faces);
+            if (&m_DeletedVertices != &other.m_DeletedVertices) m_DeletedVertices = other.m_DeletedVertices;
+            if (&m_DeletedEdges != &other.m_DeletedEdges) m_DeletedEdges = other.m_DeletedEdges;
+            if (&m_DeletedFaces != &other.m_DeletedFaces) m_DeletedFaces = other.m_DeletedFaces;
 
-            // Rebind cached built-in property handles to the destination storages.
+            m_AddFaceVertices = std::move(other.m_AddFaceVertices);
+            m_AddFaceHalfedges = std::move(other.m_AddFaceHalfedges);
+            m_AddFaceIsNew = std::move(other.m_AddFaceIsNew);
+            m_AddFaceNeedsAdjust = std::move(other.m_AddFaceNeedsAdjust);
+            m_AddFaceNextCache = std::move(other.m_AddFaceNextCache);
+            m_VertexAttrTransfer = std::move(other.m_VertexAttrTransfer);
             EnsureProperties();
         }
         return *this;
@@ -259,7 +280,8 @@ namespace Geometry::Halfedge
                 }
                 h = CWRotatedHalfedge(h);
                 if (++iter > maxIter) return; // safety: broken connectivity
-            } while (h != start);
+            }
+            while (h != start);
         }
     }
 
@@ -279,7 +301,8 @@ namespace Geometry::Halfedge
                 if (ToVertex(h) == end) return h;
                 h = CWRotatedHalfedge(h);
                 if (++iter > maxIter) break;
-            } while (h != hh);
+            }
+            while (h != hh);
         }
 
         return std::nullopt;
@@ -311,7 +334,7 @@ namespace Geometry::Halfedge
         VertexHandle v;
         std::size_t i, ii, id;
         HalfedgeHandle inner_next, inner_prev, outer_next, outer_prev, boundary_next, boundary_prev, patch_start,
-            patch_end;
+                       patch_end;
 
         auto& halfedges = m_AddFaceHalfedges;
         auto& is_new = m_AddFaceIsNew;
@@ -364,7 +387,8 @@ namespace Geometry::Halfedge
                     do
                     {
                         boundary_prev = OppositeHalfedge(NextHalfedge(boundary_prev));
-                    } while (!IsBoundary(boundary_prev) || boundary_prev == inner_prev);
+                    }
+                    while (!IsBoundary(boundary_prev) || boundary_prev == inner_prev);
 
                     boundary_next = NextHalfedge(boundary_prev);
                     assert(IsBoundary(boundary_prev));
@@ -478,7 +502,8 @@ namespace Geometry::Halfedge
                 ++count;
                 h = CWRotatedHalfedge(h);
                 if (count > maxIter) return count; // safety: broken connectivity
-            } while (h != start);
+            }
+            while (h != start);
         }
         return count;
     }
@@ -496,7 +521,8 @@ namespace Geometry::Halfedge
                 ++count;
                 h = NextHalfedge(h);
                 if (count > maxIter) break;
-            } while (h != start);
+            }
+            while (h != start);
         }
         return count;
     }
@@ -521,7 +547,8 @@ namespace Geometry::Halfedge
                 if (f.IsValid()) incident.push_back(f);
                 h = CWRotatedHalfedge(h);
                 if (++safety > maxIter) break;
-            } while (h != start);
+            }
+            while (h != start);
         }
 
         for (auto f : incident) DeleteFace(f);
@@ -530,7 +557,6 @@ namespace Geometry::Halfedge
         {
             m_VDeleted[v] = true;
             ++m_DeletedVertices;
-            m_HasGarbage = true;
         }
     }
 
@@ -574,7 +600,8 @@ namespace Geometry::Halfedge
             verts.push_back(ToVertex(h));
             h = NextHalfedge(h);
             if (++safety > maxIter) break;
-        } while (h != start);
+        }
+        while (h != start);
 
         if (!deleted_edges.empty())
         {
@@ -634,13 +661,167 @@ namespace Geometry::Halfedge
         }
 
         for (auto vtx : verts) AdjustOutgoingHalfedge(vtx);
+    }
 
-        m_HasGarbage = true;
+
+    void Mesh::EnsureProperties()
+    {
+        // Built-in properties (match PMP naming to ease porting/debugging)
+        m_VPoint = VertexProperty<glm::vec3>(m_Vertices.GetOrAdd<glm::vec3>("v:point", glm::vec3(0.0f)));
+        m_VConn = VertexProperty<VertexConnectivity>(m_Vertices.GetOrAdd<VertexConnectivity>("v:connectivity", {}));
+        m_HConn = HalfedgeProperty<HalfedgeConnectivity>(
+            m_Halfedges.GetOrAdd<HalfedgeConnectivity>("h:connectivity", {}));
+        m_FConn = FaceProperty<FaceConnectivity>(m_Faces.GetOrAdd<FaceConnectivity>("f:connectivity", {}));
+
+        m_VDeleted = VertexProperty<bool>(m_Vertices.GetOrAdd<bool>("v:deleted", false));
+        m_EDeleted = EdgeProperty<bool>(m_Edges.GetOrAdd<bool>("e:deleted", false));
+        m_FDeleted = FaceProperty<bool>(m_Faces.GetOrAdd<bool>("f:deleted", false));
+    }
+
+    void Mesh::Clear()
+    {
+        m_Vertices.Clear();
+        m_Halfedges.Clear();
+        m_Edges.Clear();
+        m_Faces.Clear();
+
+        EnsureProperties();
+
+        m_DeletedVertices = 0;
+        m_DeletedEdges = 0;
+        m_DeletedFaces = 0;
+    }
+
+    void Mesh::FreeMemory()
+    {
+        m_Vertices.Shrink_to_fit();
+        m_Halfedges.Shrink_to_fit();
+        m_Edges.Shrink_to_fit();
+        m_Faces.Shrink_to_fit();
+    }
+
+    void Mesh::Reserve(std::size_t nVertices, std::size_t nEdges, std::size_t nFaces)
+    {
+        m_Vertices.Registry().Reserve(nVertices);
+        m_Halfedges.Registry().Reserve(2 * nEdges);
+        m_Edges.Registry().Reserve(nEdges);
+        m_Faces.Registry().Reserve(nFaces);
+    }
+
+    VertexHandle Mesh::NewVertex()
+    {
+        if (VerticesSize() >= kInvalidIndex) return {};
+        // PropertySet::PushBack doesn't currently bump registry size; grow explicitly.
+        m_Vertices.Resize(VerticesSize() + 1);
+        return VertexHandle{static_cast<PropertyIndex>(VerticesSize() - 1)};
+    }
+
+    HalfedgeHandle Mesh::NewEdge()
+    {
+        if (HalfedgesSize() >= kInvalidIndex) return {};
+
+        // One edge => 2 halfedges.
+        m_Edges.Resize(EdgesSize() + 1);
+        m_Halfedges.Resize(HalfedgesSize() + 2);
+
+        return HalfedgeHandle{static_cast<PropertyIndex>(HalfedgesSize() - 2)};
+    }
+
+    HalfedgeHandle Mesh::NewEdge(VertexHandle start, VertexHandle end)
+    {
+        assert(start != end);
+        if (HalfedgesSize() >= kInvalidIndex) return {};
+
+        m_Edges.Resize(EdgesSize() + 1);
+        m_Halfedges.Resize(HalfedgesSize() + 2);
+
+        const HalfedgeHandle h0{static_cast<PropertyIndex>(HalfedgesSize() - 2)};
+        const HalfedgeHandle h1{static_cast<PropertyIndex>(HalfedgesSize() - 1)};
+
+        SetVertex(h0, end);
+        SetVertex(h1, start);
+
+        return h0;
+    }
+
+    FaceHandle Mesh::NewFace()
+    {
+        if (FacesSize() >= kInvalidIndex) return {};
+        m_Faces.Resize(FacesSize() + 1);
+        return FaceHandle{static_cast<PropertyIndex>(FacesSize() - 1)};
+    }
+
+    VertexHandle Mesh::AddVertex()
+    {
+        return NewVertex();
+    }
+
+    VertexHandle Mesh::AddVertex(glm::vec3 position)
+    {
+        const VertexHandle v = NewVertex();
+        if (v.IsValid())
+        {
+            m_VPoint[v] = position;
+        }
+        return v;
+    }
+
+    bool Mesh::IsBoundary(VertexHandle v) const
+    {
+        const HalfedgeHandle h = Halfedge(v);
+        return !(h.IsValid() && Face(h).IsValid());
+    }
+
+    bool Mesh::IsManifold(VertexHandle v) const
+    {
+        int gaps = 0;
+        HalfedgeHandle h = Halfedge(v);
+        const HalfedgeHandle start = h;
+        if (h.IsValid())
+        {
+            std::size_t safety = 0;
+            const std::size_t maxIter = HalfedgesSize();
+            do
+            {
+                if (IsBoundary(h)) ++gaps;
+                h = CWRotatedHalfedge(h);
+                if (++safety > maxIter) break;
+            }
+            while (h != start);
+        }
+        return gaps < 2;
+    }
+
+    HalfedgeHandle Mesh::Halfedge(EdgeHandle e, unsigned int i) const
+    {
+        assert(i <= 1);
+        return HalfedgeHandle{static_cast<PropertyIndex>((e.Index << 1u) + i)};
+    }
+
+    bool Mesh::IsBoundary(EdgeHandle e) const
+    {
+        return IsBoundary(Halfedge(e, 0)) || IsBoundary(Halfedge(e, 1));
+    }
+
+    bool Mesh::IsBoundary(FaceHandle f) const
+    {
+        HalfedgeHandle h = Halfedge(f);
+        const HalfedgeHandle start = h;
+        std::size_t safety = 0;
+        const std::size_t maxIter = HalfedgesSize();
+        do
+        {
+            if (IsBoundary(OppositeHalfedge(h))) return true;
+            h = NextHalfedge(h);
+            if (++safety > maxIter) break;
+        }
+        while (h != start);
+        return false;
     }
 
     void Mesh::GarbageCollection()
     {
-        if (!m_HasGarbage) return;
+        if (!HasGarbage()) return;
 
         auto nv = VerticesSize();
         auto ne = EdgesSize();
@@ -658,9 +839,18 @@ namespace Geometry::Halfedge
         auto hmap = HalfedgeProperty<HalfedgeHandle>(m_Halfedges.Add<HalfedgeHandle>("h:garbage-collection", {}));
         auto fmap = FaceProperty<FaceHandle>(m_Faces.Add<FaceHandle>("f:garbage-collection", {}));
 
-        for (std::size_t i = 0; i < nv; ++i) vmap[VertexHandle{static_cast<PropertyIndex>(i)}] = VertexHandle{static_cast<PropertyIndex>(i)};
-        for (std::size_t i = 0; i < nh; ++i) hmap[HalfedgeHandle{static_cast<PropertyIndex>(i)}] = HalfedgeHandle{static_cast<PropertyIndex>(i)};
-        for (std::size_t i = 0; i < nf; ++i) fmap[FaceHandle{static_cast<PropertyIndex>(i)}] = FaceHandle{static_cast<PropertyIndex>(i)};
+        for (std::size_t i = 0; i < nv; ++i)
+            vmap[VertexHandle{static_cast<PropertyIndex>(i)}] = VertexHandle{
+                static_cast<PropertyIndex>(i)
+            };
+        for (std::size_t i = 0; i < nh; ++i)
+            hmap[HalfedgeHandle{static_cast<PropertyIndex>(i)}] = HalfedgeHandle{
+                static_cast<PropertyIndex>(i)
+            };
+        for (std::size_t i = 0; i < nf; ++i)
+            fmap[FaceHandle{static_cast<PropertyIndex>(i)}] = FaceHandle{
+                static_cast<PropertyIndex>(i)
+            };
 
         // During compaction the transient map properties are swapped together with
         // the topology payload. Starting from identity maps, that permutation is
@@ -818,7 +1008,6 @@ namespace Geometry::Halfedge
         m_Faces.Shrink_to_fit();
 
         m_DeletedVertices = m_DeletedEdges = m_DeletedFaces = 0;
-        m_HasGarbage = false;
     }
 
     // =========================================================================
@@ -861,8 +1050,9 @@ namespace Geometry::Halfedge
                 VertexHandle vn = ToVertex(h);
                 if (vn != v1) link0.push_back(vn);
                 h = CWRotatedHalfedge(h);
-                if (++iter > maxIter) return false;  // broken connectivity
-            } while (h != start);
+                if (++iter > maxIter) return false; // broken connectivity
+            }
+            while (h != start);
         }
 
         // Collect 1-ring neighbors of v1 (with safety limit)
@@ -877,8 +1067,9 @@ namespace Geometry::Halfedge
                 VertexHandle vn = ToVertex(h);
                 if (vn != v0) link1.push_back(vn);
                 h = CWRotatedHalfedge(h);
-                if (++iter > maxIter) return false;  // broken connectivity
-            } while (h != start);
+                if (++iter > maxIter) return false; // broken connectivity
+            }
+            while (h != start);
         }
 
         // Sort for intersection
@@ -893,7 +1084,12 @@ namespace Geometry::Halfedge
         {
             if (it0->Index < it1->Index) ++it0;
             else if (it0->Index > it1->Index) ++it1;
-            else { ++commonCount; ++it0; ++it1; }
+            else
+            {
+                ++commonCount;
+                ++it0;
+                ++it1;
+            }
         }
 
         // For interior edge: exactly 2 common neighbors (the two opposite vertices)
@@ -961,7 +1157,7 @@ namespace Geometry::Halfedge
 
         // h0 goes from vRemove to vSurvive.
         VertexHandle vSurvive = ToVertex(h0);
-        VertexHandle vRemove  = FromVertex(h0);
+        VertexHandle vRemove = FromVertex(h0);
 
         // Transfer vertex attributes BEFORE deletion.
         TransferVertexAttributes_OnCollapse(vSurvive, vRemove, vSurvive, newPosition);
@@ -975,7 +1171,7 @@ namespace Geometry::Halfedge
         {
             HalfedgeHandle hn = NextHalfedge(h0);
             HalfedgeHandle hp = PrevHalfedge(h0); // == h1
-            HalfedgeHandle on = NextHalfedge(o0);  // == o1
+            HalfedgeHandle on = NextHalfedge(o0); // == o1
             HalfedgeHandle op = PrevHalfedge(o0);
 
             FaceHandle fh = Face(h0);
@@ -996,7 +1192,8 @@ namespace Geometry::Halfedge
                         SetVertex(OppositeHalfedge(cur), vSurvive);
                         cur = CWRotatedHalfedge(cur);
                         if (++safety > maxIter) break;
-                    } while (cur != start);
+                    }
+                    while (cur != start);
                 }
             }
 
@@ -1031,7 +1228,6 @@ namespace Geometry::Halfedge
         // Set survivor position.
         Position(vSurvive) = newPosition;
 
-        m_HasGarbage = true;
         return vSurvive;
     }
 
@@ -1106,31 +1302,31 @@ namespace Geometry::Halfedge
     {
         if (!IsFlipOk(e)) return false;
 
-        HalfedgeHandle h0 = Halfedge(e, 0);  // a → b
-        HalfedgeHandle h1 = Halfedge(e, 1);  // b → a
+        HalfedgeHandle h0 = Halfedge(e, 0); // a → b
+        HalfedgeHandle h1 = Halfedge(e, 1); // b → a
 
         // Halfedges in face f0 (a → b → c → a)
-        HalfedgeHandle h0n = NextHalfedge(h0);  // b → c
-        HalfedgeHandle h0p = PrevHalfedge(h0);  // c → a
+        HalfedgeHandle h0n = NextHalfedge(h0); // b → c
+        HalfedgeHandle h0p = PrevHalfedge(h0); // c → a
 
         // Halfedges in face f1 (b → a → d → b)
-        HalfedgeHandle h1n = NextHalfedge(h1);  // a → d
-        HalfedgeHandle h1p = PrevHalfedge(h1);  // d → b
+        HalfedgeHandle h1n = NextHalfedge(h1); // a → d
+        HalfedgeHandle h1p = PrevHalfedge(h1); // d → b
 
         FaceHandle f0 = Face(h0);
         FaceHandle f1 = Face(h1);
 
-        VertexHandle va = FromVertex(h0);      // = ToVertex(h1)
+        VertexHandle va = FromVertex(h0); // = ToVertex(h1)
         VertexHandle vb = ToVertex(h0);
-        VertexHandle vc = ToVertex(h0n);       // opposite vertex in f0
-        VertexHandle vd = ToVertex(h1n);       // opposite vertex in f1
+        VertexHandle vc = ToVertex(h0n); // opposite vertex in f0
+        VertexHandle vd = ToVertex(h1n); // opposite vertex in f1
 
         // Update the flipped edge endpoints: h0 becomes c→d, h1 becomes d→c
-        SetVertex(h0, vd);   // h0 now points to d
-        SetVertex(h1, vc);   // h1 now points to c
+        SetVertex(h0, vd); // h0 now points to d
+        SetVertex(h1, vc); // h1 now points to c
 
         // Rewire face f0: c → d → a → c  (h0, h1n, h0p)
-        SetNextHalfedge(h0, h1n);   // c→d is followed by a→(old d→b becomes)... wait
+        SetNextHalfedge(h0, h1n); // c→d is followed by a→(old d→b becomes)... wait
         // Let me be more precise:
         // After flip: h0 = c → d,  we want f0 = (c,d,a)
         //   h0 (c→d), then h1n (a→d, but we need d→a... no)
@@ -1247,8 +1443,8 @@ namespace Geometry::Halfedge
     {
         if (IsDeleted(e)) return {};
 
-        HalfedgeHandle h0 = Halfedge(e, 0);  // va → vb
-        HalfedgeHandle h1 = Halfedge(e, 1);  // vb → va
+        HalfedgeHandle h0 = Halfedge(e, 0); // va → vb
+        HalfedgeHandle h1 = Halfedge(e, 1); // vb → va
 
         VertexHandle va = FromVertex(h0);
         VertexHandle vb = ToVertex(h0);
@@ -1285,7 +1481,7 @@ namespace Geometry::Halfedge
         TransferVertexAttributes_OnSplit(va, vb, vm, position);
 
         // Modify existing edge e: now goes va → vm (reuse h0/h1)
-        SetVertex(h0, vm);  // h0 now: va → vm
+        SetVertex(h0, vm); // h0 now: va → vm
         // h1 already: vb → va, but we need vm → va.
         // Actually we need: e = (va, vm) with h0: va→vm, h1: vm→va
         // But h1.to was va, and h1.from was vb. We need h1.from = vm.

@@ -3,9 +3,6 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <optional>
-#include <span>
-#include <string>
-#include <string_view>
 #include <vector>
 
 #include <glm/glm.hpp>

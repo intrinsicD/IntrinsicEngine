@@ -1,6 +1,5 @@
 module;
 
-
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -14,8 +13,7 @@ module;
 
 export module Geometry.HalfedgeMesh;
 
-export import Geometry.HalfedgeMeshView;
-
+import Geometry.HalfedgeMeshFwd;
 import Geometry.Properties;
 import Geometry.Circulators;
 
@@ -33,13 +31,12 @@ export namespace Geometry::Halfedge
         using BoundaryVerticesRange = Circulators::BoundaryVerticesRange<Mesh>;
 
         Mesh();
-        Mesh(PropertySet& vertices, PropertySet& halfedges, PropertySet& edges, PropertySet& faces) noexcept;
-        Mesh(const Mesh& rhs);
-        Mesh(Mesh&&) noexcept = default;
+        Mesh(PropertySet& vertices, PropertySet& halfedges, PropertySet& edges, PropertySet& faces, size_t &deletedVertices, size_t &deletedEdges, size_t &deletedFaces) noexcept;
+        Mesh(const Mesh &other);
         ~Mesh();
 
-        Mesh& operator=(const Mesh& rhs);
-        Mesh& operator=(Mesh&&) noexcept;
+        Mesh &operator=(const Mesh &other) noexcept;
+        Mesh &operator=(Mesh &&other) noexcept;
 
         // Construction
         [[nodiscard]] VertexHandle AddVertex();
@@ -188,7 +185,7 @@ export namespace Geometry::Halfedge
         // Check whether flipping edge e is topologically valid.
         [[nodiscard]] bool IsFlipOk(EdgeHandle e) const;
 
-        [[nodiscard]] bool HasGarbage() const noexcept { return m_HasGarbage; }
+        [[nodiscard]] bool HasGarbage() const noexcept { return m_DeletedVertices > 0u || m_DeletedEdges > 0u || m_DeletedFaces > 0u; }
 
         // -----------------------------------------------------------------
         // Property system access (PMP-style)
@@ -283,11 +280,9 @@ export namespace Geometry::Halfedge
         EdgeProperty<bool> m_EDeleted;
         FaceProperty<bool> m_FDeleted;
 
-        PropertyIndex m_DeletedVertices{0};
-        PropertyIndex m_DeletedEdges{0};
-        PropertyIndex m_DeletedFaces{0};
-
-        bool m_HasGarbage{false};
+        std::size_t &m_DeletedVertices;
+        std::size_t &m_DeletedEdges;
+        std::size_t &m_DeletedFaces;
 
         // Scratch buffers for AddFace (mirrors provided implementation)
         using NextCacheEntry = std::pair<HalfedgeHandle, HalfedgeHandle>;
@@ -310,7 +305,4 @@ export namespace Geometry::Halfedge
     };
 
     using MeshView = Mesh;
-}
-
-
 }
