@@ -302,8 +302,9 @@ namespace Runtime
         };
         const StreamingLaneCoordinator streamingLane{.Host = streamingLaneHost};
         RuntimeMaintenanceLaneHost maintenanceLaneHost{
+            *m_SceneManager,
+            *m_RenderOrchestrator,
             *m_GraphicsBackend,
-            m_RenderOrchestrator->GetMaterialSystem(),
         };
         const MaintenanceLaneCoordinator maintenanceLane{.Host = maintenanceLaneHost};
         RuntimeRenderLaneHost renderLaneHost{

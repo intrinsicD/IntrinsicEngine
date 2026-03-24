@@ -209,7 +209,12 @@ Mapping guidance for current Intrinsic code while preserving that reference shap
 
 - [x] Retire completed uploads after GPU completion is known. *(Maintenance lane now owns transfer garbage collection after render submission.)*
 - [x] Process deferred destruction only when the relevant GPU completion value has passed. *(Maintenance lane now explicitly runs timeline-based deferred-destruction collection.)*
-- [ ] Centralize readback completion, garbage collection, profiler rollup, telemetry capture, and hot-reload bookkeeping here.
+- [x] Centralize GPU readback completion in the maintenance lane. *(GPU pick readback completion now runs via `MaintenanceLaneCoordinator` instead of render preparation.)*
+- [ ] Keep centralizing remaining maintenance concerns here:
+  - [ ] garbage collection
+  - [ ] profiler rollup
+  - [ ] telemetry capture
+  - [ ] hot-reload bookkeeping
 - Baseline now ensures maintenance can run in headless/test configurations even when no swapchain is active.
 
 #### B4.9 Explicit frame-context ring + bounded frames in flight

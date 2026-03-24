@@ -29,6 +29,7 @@ namespace
     class FakeMaintenanceLaneHost final : public Runtime::IMaintenanceLaneHost
     {
     public:
+        void ProcessCompletedReadbacks() override { Calls.emplace_back("readbacks"); }
         void CollectGpuDeferredDestructions() override { Calls.emplace_back("deferred_gc"); }
         void GarbageCollectTransfers() override { Calls.emplace_back("gc"); }
         void ProcessTextureDeletions() override { Calls.emplace_back("textures"); }
@@ -319,6 +320,7 @@ TEST(RuntimeFrameLoop, MaintenanceLaneCoordinator_RunsHeadlessCleanupWithoutRend
     coordinator.Run();
 
     EXPECT_EQ(host.Calls, (std::vector<std::string>{
+                              "readbacks",
                               "deferred_gc",
                               "gc",
                               "textures",
@@ -634,7 +636,7 @@ TEST(RuntimeFrameLoop, RunFramePhases_PreservesStreamingFixedAndRenderLaneBaseli
         "materials",
     };
     EXPECT_EQ(streamingHost.Calls, expectedStreamingCalls);
-    EXPECT_EQ(maintenanceHost.Calls, (std::vector<std::string>{"gc"}));
+    EXPECT_EQ(maintenanceHost.Calls, (std::vector<std::string>{"readbacks", "gc"}));
 
     const std::vector<std::string> expectedRenderHostCalls{
         "get_graph",
@@ -729,7 +731,7 @@ TEST(RuntimeFrameLoop, RunFramePhasesForMode_LegacyCompatibilityPreservesBaselin
         "materials",
     };
     EXPECT_EQ(streamingHost.Calls, expectedStreamingCalls);
-    EXPECT_EQ(maintenanceHost.Calls, (std::vector<std::string>{"gc"}));
+    EXPECT_EQ(maintenanceHost.Calls, (std::vector<std::string>{"readbacks", "gc"}));
 
     const std::vector<std::string> expectedRenderHostCalls{
         "get_graph",

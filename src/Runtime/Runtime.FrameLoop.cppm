@@ -226,6 +226,7 @@ export namespace Runtime
     public:
         virtual ~IMaintenanceLaneHost();
 
+        virtual void ProcessCompletedReadbacks() = 0;
         virtual void CollectGpuDeferredDestructions() = 0;
         virtual void GarbageCollectTransfers() = 0;
         virtual void ProcessTextureDeletions() = 0;
@@ -235,20 +236,25 @@ export namespace Runtime
     class RuntimeMaintenanceLaneHost final : public IMaintenanceLaneHost
     {
     public:
-        RuntimeMaintenanceLaneHost(GraphicsBackend& graphics, Graphics::MaterialSystem& materials)
-            : m_Graphics(graphics)
-            , m_Materials(materials)
+        RuntimeMaintenanceLaneHost(SceneManager& scene, RenderOrchestrator& renderer, GraphicsBackend& graphics)
+            : m_Scene(scene)
+            , m_Renderer(renderer)
+            , m_Graphics(graphics)
+            , m_Materials(renderer.GetMaterialSystem())
         {
         }
 
         ~RuntimeMaintenanceLaneHost() override;
 
+        void ProcessCompletedReadbacks() override;
         void CollectGpuDeferredDestructions() override;
         void GarbageCollectTransfers() override;
         void ProcessTextureDeletions() override;
         void ProcessMaterialDeletions() override;
 
     private:
+        SceneManager& m_Scene;
+        RenderOrchestrator& m_Renderer;
         GraphicsBackend& m_Graphics;
         Graphics::MaterialSystem& m_Materials;
     };

@@ -307,10 +307,6 @@ namespace Runtime
         if (!m_RenderSystem->AcquireFrame())
             return;
 
-        // GPU readback completion still bridges through the scene dispatcher so selection
-        // events can be enqueued on the main thread. Render-graph construction itself now
-        // happens during the preparation stage so GPU submission can consume a prepared graph.
-        m_RenderSystem->ProcessCompletedGpuWork(*const_cast<ECS::Scene*>(scene), currentFrame);
         m_RenderSystem->UpdateGlobals(preparedRenderWorld->View.Camera);
         m_RenderSystem->BuildGraph(*scene,
                                    m_AssetManager,
