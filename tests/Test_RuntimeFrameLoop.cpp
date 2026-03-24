@@ -29,6 +29,7 @@ namespace
     class FakeMaintenanceLaneHost final : public Runtime::IMaintenanceLaneHost
     {
     public:
+        void CaptureGpuSyncState() override { Calls.emplace_back("capture_sync"); }
         void ProcessCompletedReadbacks() override { Calls.emplace_back("readbacks"); }
         void CollectGpuDeferredDestructions() override { Calls.emplace_back("deferred_gc"); }
         void GarbageCollectTransfers() override { Calls.emplace_back("gc"); }
@@ -320,6 +321,7 @@ TEST(RuntimeFrameLoop, MaintenanceLaneCoordinator_RunsHeadlessCleanupWithoutRend
     coordinator.Run();
 
     EXPECT_EQ(host.Calls, (std::vector<std::string>{
+                              "capture_sync",
                               "readbacks",
                               "deferred_gc",
                               "gc",
@@ -628,15 +630,16 @@ TEST(RuntimeFrameLoop, RunFramePhases_PreservesStreamingFixedAndRenderLaneBaseli
     EXPECT_EQ(result.Mode, Runtime::FrameLoopMode::StagedPhases);
     EXPECT_NEAR(accumulator, 0.05, kEpsilon);
 
-    const std::vector<std::string> expectedStreamingCalls{
-        "ingest",
-        "queue",
-        "uploads",
-        "textures",
-        "materials",
-    };
+    const std::vector<std::string> expectedStreamingCalls{"ingest", "queue", "uploads"};
     EXPECT_EQ(streamingHost.Calls, expectedStreamingCalls);
-    EXPECT_EQ(maintenanceHost.Calls, (std::vector<std::string>{"readbacks", "gc"}));
+    EXPECT_EQ(maintenanceHost.Calls, (std::vector<std::string>{
+                                         "capture_sync",
+                                         "readbacks",
+                                         "deferred_gc",
+                                         "gc",
+                                         "textures",
+                                         "materials",
+                                     }));
 
     const std::vector<std::string> expectedRenderHostCalls{
         "get_graph",
@@ -723,15 +726,16 @@ TEST(RuntimeFrameLoop, RunFramePhasesForMode_LegacyCompatibilityPreservesBaselin
     EXPECT_FALSE(result.FixedStep.AccumulatorClamped);
     EXPECT_NEAR(accumulator, 0.05, kEpsilon);
 
-    const std::vector<std::string> expectedStreamingCalls{
-        "ingest",
-        "queue",
-        "uploads",
-        "textures",
-        "materials",
-    };
+    const std::vector<std::string> expectedStreamingCalls{"ingest", "queue", "uploads"};
     EXPECT_EQ(streamingHost.Calls, expectedStreamingCalls);
-    EXPECT_EQ(maintenanceHost.Calls, (std::vector<std::string>{"readbacks", "gc"}));
+    EXPECT_EQ(maintenanceHost.Calls, (std::vector<std::string>{
+                                         "capture_sync",
+                                         "readbacks",
+                                         "deferred_gc",
+                                         "gc",
+                                         "textures",
+                                         "materials",
+                                     }));
 
     const std::vector<std::string> expectedRenderHostCalls{
         "get_graph",
