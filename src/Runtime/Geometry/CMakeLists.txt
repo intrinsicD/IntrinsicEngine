@@ -38,10 +38,12 @@ target_sources(${target_name}
         Geometry.BVH.cppm
         Geometry.Raycast.cppm
         Geometry.HalfedgeMesh.cppm
+        Geometry.HalfedgeMeshView.cppm
         Geometry.HtexPatch.cppm
         Geometry.MeshBuilder.cppm
         Geometry.MeshOperator.cppm
         Geometry.Graph.cppm
+        Geometry.GraphView.cppm
         Geometry.DEC.cppm
         Geometry.Curvature.cppm
         Geometry.Smoothing.cppm
@@ -63,6 +65,7 @@ target_sources(${target_name}
         Geometry.ConvexHullBuilder.cppm
         Geometry.KMeans.cppm
         Geometry.PointCloud.cppm
+        Geometry.PointCloudView.cppm
         Geometry.Boolean.cppm
         Geometry.Quadric.cppm
         Geometry.Queries.cppm
@@ -72,10 +75,12 @@ target_sources(${target_name}
         Geometry.Raycast.cpp
         Geometry.EPA.cpp
         Geometry.HalfedgeMesh.cpp
+        Geometry.HalfedgeMeshView.cpp
         Geometry.HtexPatch.cpp
         Geometry.MeshBuilder.cpp
         Geometry.Properties.cpp
         Geometry.Graph.cpp
+        Geometry.GraphView.cpp
         Geometry.Octree.cpp
         Geometry.KDTree.cpp
         Geometry.BVH.cpp
@@ -100,6 +105,7 @@ target_sources(${target_name}
         Geometry.ConvexHullBuilder.cpp
         Geometry.KMeans.cpp
         Geometry.PointCloud.cpp
+        Geometry.PointCloudView.cpp
         Geometry.Sphere.cpp
         Geometry.Boolean.cpp
         Geometry.ShortestPath.cpp
