@@ -183,6 +183,55 @@ export namespace Runtime
                                                     const FrameLoopPolicy& policy);
     };
 
+    struct FramebufferExtent
+    {
+        uint32_t Width = 0;
+        uint32_t Height = 0;
+    };
+
+    class IResizeSyncHost
+    {
+    public:
+        virtual ~IResizeSyncHost();
+
+        [[nodiscard]] virtual FramebufferExtent GetSwapchainExtent() const = 0;
+        virtual void ApplyResize() = 0;
+    };
+
+    class RuntimeResizeSyncHost final : public IResizeSyncHost
+    {
+    public:
+        RuntimeResizeSyncHost(GraphicsBackend& graphics, RenderOrchestrator& renderer)
+            : m_Graphics(graphics)
+            , m_Renderer(renderer)
+        {
+        }
+
+        ~RuntimeResizeSyncHost() override;
+
+        [[nodiscard]] FramebufferExtent GetSwapchainExtent() const override;
+        void ApplyResize() override;
+
+    private:
+        GraphicsBackend& m_Graphics;
+        RenderOrchestrator& m_Renderer;
+    };
+
+    struct ResizeSyncResult
+    {
+        FramebufferExtent SwapchainExtentBefore{};
+        bool ResizeRequested = false;
+        bool FramebufferExtentMismatch = false;
+        bool ResizeApplied = false;
+    };
+
+    struct ResizeSyncCoordinator
+    {
+        IResizeSyncHost& Host;
+
+        [[nodiscard]] ResizeSyncResult Sync(const PlatformFrameResult& platformFrame) const;
+    };
+
     class IStreamingLaneHost
     {
     public:

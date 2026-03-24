@@ -137,6 +137,26 @@ namespace
         double LastAlpha = -1.0;
         double LastExecutedAlpha = -1.0;
     };
+
+    class FakeResizeSyncHost final : public Runtime::IResizeSyncHost
+    {
+    public:
+        [[nodiscard]] Runtime::FramebufferExtent GetSwapchainExtent() const override
+        {
+            return SwapchainExtent;
+        }
+
+        void ApplyResize() override
+        {
+            ++ResizeApplyCount;
+        }
+
+        Runtime::FramebufferExtent SwapchainExtent{
+            .Width = 1600,
+            .Height = 900,
+        };
+        int ResizeApplyCount = 0;
+    };
 }
 
 TEST(RuntimeFrameLoop, ComputeFrameTime_ClampsLargeSpikes)
@@ -426,6 +446,59 @@ TEST(RuntimeFrameLoop, PlatformFrameCoordinator_RefusesCrossThreadEventPumping)
     EXPECT_EQ(result.FramebufferWidth, 0);
     EXPECT_EQ(result.FramebufferHeight, 0);
     EXPECT_TRUE(host.Calls.empty());
+}
+
+TEST(RuntimeFrameLoop, ResizeSyncCoordinator_AppliesResizeOnRequestOrExtentMismatch)
+{
+    FakeResizeSyncHost host;
+    const Runtime::ResizeSyncCoordinator coordinator{.Host = host};
+
+    const Runtime::PlatformFrameResult explicitRequest{
+        .ContinueFrame = true,
+        .ResizeRequested = true,
+        .FramebufferWidth = 1600,
+        .FramebufferHeight = 900,
+    };
+    const Runtime::ResizeSyncResult explicitRequestResult = coordinator.Sync(explicitRequest);
+    EXPECT_TRUE(explicitRequestResult.ResizeRequested);
+    EXPECT_FALSE(explicitRequestResult.FramebufferExtentMismatch);
+    EXPECT_TRUE(explicitRequestResult.ResizeApplied);
+    EXPECT_EQ(host.ResizeApplyCount, 1);
+
+    const Runtime::PlatformFrameResult mismatchRequest{
+        .ContinueFrame = true,
+        .ResizeRequested = false,
+        .FramebufferWidth = 1920,
+        .FramebufferHeight = 1080,
+    };
+    const Runtime::ResizeSyncResult mismatchResult = coordinator.Sync(mismatchRequest);
+    EXPECT_TRUE(mismatchResult.ResizeRequested);
+    EXPECT_TRUE(mismatchResult.FramebufferExtentMismatch);
+    EXPECT_TRUE(mismatchResult.ResizeApplied);
+    EXPECT_EQ(host.ResizeApplyCount, 2);
+}
+
+TEST(RuntimeFrameLoop, ResizeSyncCoordinator_SkipsResizeForNonRenderablePlatformFrames)
+{
+    FakeResizeSyncHost host;
+    const Runtime::ResizeSyncCoordinator coordinator{.Host = host};
+
+    const Runtime::ResizeSyncResult minimizedResult = coordinator.Sync(Runtime::PlatformFrameResult{
+        .ContinueFrame = false,
+        .FramebufferWidth = 1600,
+        .FramebufferHeight = 900,
+    });
+    EXPECT_FALSE(minimizedResult.ResizeRequested);
+    EXPECT_FALSE(minimizedResult.ResizeApplied);
+
+    const Runtime::ResizeSyncResult invalidExtentResult = coordinator.Sync(Runtime::PlatformFrameResult{
+        .ContinueFrame = true,
+        .FramebufferWidth = 0,
+        .FramebufferHeight = 900,
+    });
+    EXPECT_FALSE(invalidExtentResult.ResizeRequested);
+    EXPECT_FALSE(invalidExtentResult.ResizeApplied);
+    EXPECT_EQ(host.ResizeApplyCount, 0);
 }
 
 TEST(RuntimeFrameLoop, FrameClock_ResetYieldsZeroDeltaOnFirstAdvance)
