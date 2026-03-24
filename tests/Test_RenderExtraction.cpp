@@ -22,6 +22,7 @@ TEST(RenderExtraction, FrameContext_DefaultStateIsUnprepared)
     Runtime::FrameContext frame{};
     EXPECT_EQ(frame.FrameNumber, 0u);
     EXPECT_EQ(frame.PreviousFrameNumber, Runtime::InvalidFrameNumber);
+    EXPECT_EQ(frame.LastSubmittedTimelineValue, 0u);
     EXPECT_EQ(frame.SlotIndex, 0u);
     EXPECT_EQ(frame.FramesInFlight, Runtime::DefaultFrameContexts);
     EXPECT_FALSE(frame.Prepared);
@@ -94,6 +95,7 @@ TEST(RenderExtraction, FrameContextRing_ReusesBoundedSlotsByFrameNumberModulo)
         ring.BeginFrame(2u, Runtime::RenderViewport{.Width = 640, .Height = 480});
     frame0.Prepared = true;
     frame0.Submitted = true;
+    frame0.LastSubmittedTimelineValue = 42u;
     frame0.PreparedRenderWorld = Runtime::RenderWorld{
         .Alpha = 0.25,
         .View = Runtime::MakeRenderViewPacket(Graphics::CameraComponent{},
@@ -113,6 +115,7 @@ TEST(RenderExtraction, FrameContextRing_ReusesBoundedSlotsByFrameNumberModulo)
     EXPECT_FALSE(frame3.Prepared);
     EXPECT_FALSE(frame3.Submitted);
     EXPECT_TRUE(frame3.ReusedSubmittedSlot);
+    EXPECT_EQ(frame3.LastSubmittedTimelineValue, 42u);
     EXPECT_EQ(frame3.GetPreparedRenderWorld(), nullptr);
 }
 

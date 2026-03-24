@@ -83,6 +83,7 @@ export namespace Runtime
     {
         uint64_t FrameNumber = 0;
         uint64_t PreviousFrameNumber = InvalidFrameNumber;
+        uint64_t LastSubmittedTimelineValue = 0;
         uint32_t SlotIndex = 0;
         uint32_t FramesInFlight = DefaultFrameContexts;
         RenderViewport Viewport{};

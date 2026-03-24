@@ -36,6 +36,43 @@ using namespace Core::Hash;
 
 namespace Runtime
 {
+    namespace
+    {
+        void WaitForFrameContextReuseIfNeeded(const std::shared_ptr<RHI::VulkanDevice>& device, const FrameContext& frame)
+        {
+            if (!device || !frame.ReusedSubmittedSlot || frame.LastSubmittedTimelineValue == 0u)
+                return;
+
+            const uint64_t completed = device->GetGraphicsTimelineCompletedValue();
+            if (completed >= frame.LastSubmittedTimelineValue)
+                return;
+
+            VkSemaphoreWaitInfo waitInfo{};
+            waitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
+            waitInfo.semaphoreCount = 1;
+            const VkSemaphore timelineSemaphore = device->GetGraphicsTimelineSemaphore();
+            waitInfo.pSemaphores = &timelineSemaphore;
+            const uint64_t waitValue = frame.LastSubmittedTimelineValue;
+            waitInfo.pValues = &waitValue;
+
+            const VkResult result = vkWaitSemaphores(device->GetLogicalDevice(), &waitInfo, UINT64_MAX);
+            if (result != VK_SUCCESS)
+            {
+                Core::Log::Warn(
+                    "RenderOrchestrator::BeginFrame: failed waiting for frame-context slot {} timeline {} reuse (VkResult={}).",
+                    frame.SlotIndex,
+                    frame.LastSubmittedTimelineValue,
+                    static_cast<int32_t>(result));
+                return;
+            }
+
+            Core::Log::Debug(
+                "RenderOrchestrator::BeginFrame: waited for timeline {} before reusing submitted frame-context slot {}.",
+                frame.LastSubmittedTimelineValue,
+                frame.SlotIndex);
+        }
+    }
+
     RenderOrchestrator::RenderOrchestrator(
         std::shared_ptr<RHI::VulkanDevice> device,
         RHI::VulkanSwapchain& swapchain,
@@ -220,12 +257,14 @@ namespace Runtime
     FrameContext& RenderOrchestrator::BeginFrame() const
     {
         const VkExtent2D extent = m_Swapchain.GetExtent();
-        return m_FrameContextRing.BeginFrame(
+        FrameContext& frame = m_FrameContextRing.BeginFrame(
             m_Device ? m_Device->GetGlobalFrameNumber() : 0u,
             RenderViewport{
                 .Width = extent.width,
                 .Height = extent.height,
             });
+        WaitForFrameContextReuseIfNeeded(m_Device, frame);
+        return frame;
     }
 
     RenderWorld RenderOrchestrator::ExtractRenderWorld(const RenderFrameInput& input) const
@@ -304,6 +343,7 @@ namespace Runtime
 
     void RenderOrchestrator::EndFrame(FrameContext& frame)
     {
+        frame.LastSubmittedTimelineValue = (frame.Submitted && m_Device) ? m_Device->GetGraphicsTimelineValue() : 0u;
         frame.ResetPreparedState();
     }
 

@@ -224,7 +224,7 @@ Mapping guidance for current Intrinsic code while preserving that reference shap
   - [ ] per-frame render graph or graph-execution cache
   - [ ] per-frame profiling/stat samples
 - [ ] Audit existing systems and migrate any frame-temporary resource keyed by swapchain image count to frame-in-flight ownership unless image affinity is truly required.
-- [ ] Add explicit wait behavior before a `FrameContext` is reused once GPU-completion tracking is wired into the frame ring.
+- [x] Add explicit wait behavior before a `FrameContext` is reused once GPU-completion tracking is wired into the frame ring. *(Renderer now blocks on the graphics timeline semaphore when a recycled slot still references an in-flight submit, using the slot's last-submitted timeline value.)*
 
 #### B4.10 Job system + multi-threaded command recording
 
