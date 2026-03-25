@@ -69,6 +69,7 @@ export namespace Graphics
         void BuildGraph(const ECS::Scene& scene,
                         Core::Assets::AssetManager& assetManager,
                         const CameraComponent& camera,
+                        bool hasSelectionWork = false,
                         std::span<const PickingSurfacePacket> pickingSurfacePackets = {},
                         std::span<const PickingLinePacket> pickingLinePackets = {},
                         std::span<const PickingPointPacket> pickingPointPackets = {});

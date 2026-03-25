@@ -52,13 +52,6 @@ namespace Graphics
 {
     namespace
     {
-        [[nodiscard]] bool HasSelectionWork(const ECS::Scene& scene)
-        {
-            const auto& registry = scene.GetRegistry();
-            return !registry.view<ECS::Components::Selection::SelectedTag>().empty() ||
-                   !registry.view<ECS::Components::Selection::HoveredTag>().empty();
-        }
-
         void LogRenderAudit(const std::vector<RenderGraphDebugPass>& passes,
                             const std::vector<RenderGraphDebugImage>& images)
         {
@@ -1076,6 +1069,7 @@ namespace Graphics
     void RenderSystem::BuildGraph(const ECS::Scene& scene,
                                   Core::Assets::AssetManager& assetManager,
                                   const CameraComponent& camera,
+                                  bool hasSelectionWork,
                                   std::span<const PickingSurfacePacket> pickingSurfacePackets,
                                   std::span<const PickingLinePacket> pickingLinePackets,
                                   std::span<const PickingPointPacket> pickingPointPackets)
@@ -1129,6 +1123,7 @@ namespace Graphics
             camera.ProjectionMatrix,
             m_Interaction.GetReadbackBuffer(frameIndex),
             m_DebugDraw,
+            hasSelectionWork,
             pickingSurfacePackets,
             pickingLinePackets,
             pickingPointPackets
@@ -1139,9 +1134,9 @@ namespace Graphics
         else
         {
             ctx.Recipe.Depth = true;
-            ctx.Recipe.EntityId = pendingPick.Pending || HasSelectionWork(scene) || debugView.Enabled;
+            ctx.Recipe.EntityId = pendingPick.Pending || hasSelectionWork || debugView.Enabled;
             ctx.Recipe.DebugVisualization = debugView.Enabled;
-            ctx.Recipe.Selection = HasSelectionWork(scene);
+            ctx.Recipe.Selection = hasSelectionWork;
             ctx.Recipe.LightingPath = FrameLightingPath::Forward;
             ctx.Recipe.Post = true;
             ctx.Recipe.SceneColorLDR = true;
