@@ -70,6 +70,7 @@ export namespace Graphics
                         Core::Assets::AssetManager& assetManager,
                         const CameraComponent& camera,
                         bool hasSelectionWork = false,
+                        const SelectionOutlinePacket& selectionOutline = {},
                         std::span<const PickingSurfacePacket> pickingSurfacePackets = {},
                         std::span<const PickingLinePacket> pickingLinePackets = {},
                         std::span<const PickingPointPacket> pickingPointPackets = {});

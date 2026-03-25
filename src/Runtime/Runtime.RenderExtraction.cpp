@@ -169,6 +169,80 @@ namespace Runtime
             std::vector<Graphics::PickingPointPacket> Point{};
         };
 
+        [[nodiscard]] Graphics::SelectionOutlinePacket ExtractSelectionOutlinePacket(const WorldSnapshot& world)
+        {
+            Graphics::SelectionOutlinePacket packet{};
+            if (!world.Registry)
+                return packet;
+
+            const entt::registry& registry = *world.Registry;
+            auto canEmitPickId = [&](entt::entity entity)
+            {
+                return registry.valid(entity) &&
+                       registry.all_of<ECS::Surface::Component, ECS::Components::Selection::PickID>(entity);
+            };
+
+            auto visitSubtree = [&](entt::entity root, auto&& visitor)
+            {
+                if (!registry.valid(root))
+                    return;
+
+                std::vector<entt::entity> stack;
+                stack.push_back(root);
+                while (!stack.empty())
+                {
+                    const entt::entity current = stack.back();
+                    stack.pop_back();
+                    visitor(current);
+
+                    const auto* hierarchy = registry.try_get<ECS::Components::Hierarchy::Component>(current);
+                    if (!hierarchy)
+                        continue;
+
+                    for (entt::entity child = hierarchy->FirstChild; child != entt::null;)
+                    {
+                        entt::entity nextSibling = entt::null;
+                        if (const auto* childHierarchy = registry.try_get<ECS::Components::Hierarchy::Component>(child))
+                            nextSibling = childHierarchy->NextSibling;
+                        stack.push_back(child);
+                        child = nextSibling;
+                    }
+                }
+            };
+
+            auto selectedRoots = registry.view<ECS::Components::Selection::SelectedTag>();
+            for (const auto root : selectedRoots)
+            {
+                visitSubtree(root, [&](entt::entity candidate)
+                {
+                    if (!canEmitPickId(candidate))
+                        return;
+                    const uint32_t pickId = registry.get<ECS::Components::Selection::PickID>(candidate).Value;
+                    if (pickId == 0u)
+                        return;
+                    if (std::find(packet.SelectedPickIds.begin(), packet.SelectedPickIds.end(), pickId) !=
+                        packet.SelectedPickIds.end())
+                        return;
+                    packet.SelectedPickIds.push_back(pickId);
+                });
+            }
+
+            auto hoveredRoots = registry.view<ECS::Components::Selection::HoveredTag>();
+            for (const auto root : hoveredRoots)
+            {
+                visitSubtree(root, [&](entt::entity candidate)
+                {
+                    if (packet.HoveredPickId != 0u || !canEmitPickId(candidate))
+                        return;
+                    packet.HoveredPickId = registry.get<ECS::Components::Selection::PickID>(candidate).Value;
+                });
+                if (packet.HoveredPickId != 0u)
+                    break;
+            }
+
+            return packet;
+        }
+
         [[nodiscard]] bool ExtractSelectionWorkState(const WorldSnapshot& world)
         {
             if (!world.Registry)
@@ -298,6 +372,7 @@ namespace Runtime
             .View = input.View,
             .World = input.World,
             .HasSelectionWork = ExtractSelectionWorkState(input.World),
+            .SelectionOutline = ExtractSelectionOutlinePacket(input.World),
             .SurfacePicking = std::move(packets.Surface),
             .LinePicking = std::move(packets.Line),
             .PointPicking = std::move(packets.Point),

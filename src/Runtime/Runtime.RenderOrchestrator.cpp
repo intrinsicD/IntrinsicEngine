@@ -312,6 +312,7 @@ namespace Runtime
                                    m_AssetManager,
                                    preparedRenderWorld->View.Camera,
                                    preparedRenderWorld->HasSelectionWork,
+                                   preparedRenderWorld->SelectionOutline,
                                    preparedRenderWorld->SurfacePicking,
                                    preparedRenderWorld->LinePicking,
                                    preparedRenderWorld->PointPicking);

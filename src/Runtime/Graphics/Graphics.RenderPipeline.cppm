@@ -269,6 +269,12 @@ export namespace Graphics
         float Size = 1.0f;
     };
 
+    struct SelectionOutlinePacket
+    {
+        std::vector<uint32_t> SelectedPickIds{};
+        uint32_t HoveredPickId = 0;
+    };
+
     // ---------------------------------------------------------------------
     // Frame Context
     // ---------------------------------------------------------------------
@@ -337,6 +343,7 @@ export namespace Graphics
         RHI::VulkanBuffer* PickReadbackBuffer = nullptr;
         DebugDraw* DebugDrawPtr = nullptr;
         bool HasSelectionWork = false;
+        SelectionOutlinePacket SelectionOutline{};
 
         std::span<const PickingSurfacePacket> PickingSurfacePackets{};
         std::span<const PickingLinePacket> PickingLinePackets{};
