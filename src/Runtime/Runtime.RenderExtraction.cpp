@@ -4,7 +4,7 @@ module;
 #include <cstdint>
 #include <vector>
 #include <latch>
-#include <entt/entity/fwd.hpp>
+#include <entt/entity/entity.hpp>
 #include <glm/gtc/matrix_inverse.hpp>
 
 module Runtime.RenderExtraction;
@@ -210,24 +210,23 @@ namespace Runtime
                 }
             };
 
-            auto selectedRoots = registry.view<ECS::Components::Selection::SelectedTag>();
-            for (const auto root : selectedRoots)
+            registry.view<ECS::Components::Selection::SelectedTag>().each([&](entt::entity root)
             {
                 visitSubtree(root, [&](entt::entity candidate)
-                {
-                    if (!canEmitPickId(candidate))
-                        return;
-                    const uint32_t pickId = registry.get<ECS::Components::Selection::PickID>(candidate).Value;
-                    if (pickId == 0u)
-                        return;
-                    if (std::find(packet.SelectedPickIds.begin(), packet.SelectedPickIds.end(), pickId) !=
-                        packet.SelectedPickIds.end())
-                        return;
-                    packet.SelectedPickIds.push_back(pickId);
-                });
-            }
+               {
+                   if (!canEmitPickId(candidate))
+                       return;
+                   const uint32_t pickId = registry.get<ECS::Components::Selection::PickID>(candidate).Value;
+                   if (pickId == 0u)
+                       return;
+                   if (std::find(packet.SelectedPickIds.begin(), packet.SelectedPickIds.end(), pickId) !=
+                       packet.SelectedPickIds.end())
+                       return;
+                   packet.SelectedPickIds.push_back(pickId);
+               });
+            });
 
-            auto hoveredRoots = registry.view<ECS::Components::Selection::HoveredTag>();
+            auto hoveredRoots = registry.view<ECS::Components::Selection::HoveredTag, entt::entity>();
             for (const auto root : hoveredRoots)
             {
                 visitSubtree(root, [&](entt::entity candidate)

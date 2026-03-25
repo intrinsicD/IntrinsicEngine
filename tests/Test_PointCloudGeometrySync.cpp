@@ -288,7 +288,7 @@ TEST(PointCloudGeometrySync_Contract, CloudDataSurvivesAfterUpload)
 
     // Cloud data is still accessible for re-upload or CPU queries.
     EXPECT_EQ(comp.PointCount(), 2u);
-    EXPECT_EQ(comp.CloudRef->PointCount(), 2u);
+    EXPECT_EQ(comp.CloudRef->VerticesSize(), 2u);
     EXPECT_FLOAT_EQ(comp.CloudRef->Positions()[0].x, 1.f);
 }
 

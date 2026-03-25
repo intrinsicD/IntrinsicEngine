@@ -128,7 +128,7 @@ namespace Graphics::Systems::PropertySetDirtySync
             auto& cloud = *pcData.CloudRef;
 
             // Safety: if point count diverged, escalate.
-            if (pcData.GpuPointCount != static_cast<uint32_t>(cloud.PointCount()))
+            if (pcData.GpuPointCount != static_cast<uint32_t>(cloud.VerticesSize()))
             {
                 pcData.GpuDirty = true;
                 continue;

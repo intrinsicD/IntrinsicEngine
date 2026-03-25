@@ -21,16 +21,20 @@ import Core.Error;
 import Core.IOBackend;
 import Core.Assets;
 import Core.Tasks;
+
 import Graphics.Geometry;
 import Graphics.Model;
 import Graphics.Components;
+
 import ECS;
+
 import Runtime.Engine;
 import Runtime.SceneManager;
 import Runtime.AssetPipeline;
 import Runtime.RenderOrchestrator;
 import Runtime.GraphicsBackend;
-import Geometry.PointCloud;
+
+import Geometry.PointCloudUtils;
 
 using json = nlohmann::json;
 

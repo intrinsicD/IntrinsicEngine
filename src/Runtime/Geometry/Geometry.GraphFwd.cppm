@@ -8,6 +8,18 @@ import Geometry.Properties;
 
 export namespace Geometry::Graph
 {
+    struct VertexConnectivity
+    {
+        HalfedgeHandle Halfedge{};
+    };
+
+    struct HalfedgeConnectivity
+    {
+        VertexHandle Vertex{};
+        HalfedgeHandle Next{};
+        HalfedgeHandle Prev{};
+    };
+
     struct GraphProperties
     {
         PropertySet Vertices;

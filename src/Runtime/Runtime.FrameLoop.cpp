@@ -7,6 +7,7 @@ module;
 #include <utility>
 
 #include "Core.Profiling.Macros.hpp"
+#include "RHI.Vulkan.hpp"
 
 module Runtime.FrameLoop;
 

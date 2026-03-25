@@ -22,7 +22,7 @@ import Geometry.BVH;
 import Geometry.HalfedgeMesh;
 import Geometry.Graph;
 import Geometry.KDTree;
-import Geometry.PointCloud;
+import Geometry.PointCloudUtils;
 import Geometry.Handle;
 import Geometry.KMeans;
 import Geometry.OBB;
@@ -428,7 +428,7 @@ export namespace ECS::PointCloud
         // ---- Queries (delegate to CloudRef) ----
         [[nodiscard]] std::size_t PointCount() const noexcept
         {
-            return CloudRef ? CloudRef->PointCount() : 0;
+            return CloudRef ? CloudRef->VerticesSize() : 0;
         }
         [[nodiscard]] bool HasNormals() const noexcept
         {

@@ -182,26 +182,6 @@ TEST(HalfedgeMesh_PropertyAccess, HalfedgeProperties_CanAddUserProperty)
     EXPECT_FLOAT_EQ(param[h0], 3.14f);
 }
 
-TEST(HalfedgeMesh_View, ConstMeshView_ForwardsReadOnlyAccess)
-{
-    using namespace Geometry;
-
-    auto mesh = MakeTriangle();
-    Geometry::Halfedge::ConstMeshView view(mesh);
-
-    EXPECT_EQ(view.VerticesSize(), mesh.VerticesSize());
-    EXPECT_EQ(view.HalfedgesSize(), mesh.HalfedgesSize());
-    EXPECT_EQ(view.EdgesSize(), mesh.EdgesSize());
-    EXPECT_EQ(view.FacesSize(), mesh.FacesSize());
-
-    EXPECT_EQ(view.Position(VertexHandle{0}), mesh.Position(VertexHandle{0}));
-    EXPECT_EQ(view.Positions().size(), mesh.Positions().size());
-    EXPECT_EQ(view.VertexProperties().Size(), mesh.VertexProperties().Size());
-    EXPECT_EQ(view.HalfedgeProperties().Size(), mesh.HalfedgeProperties().Size());
-    EXPECT_EQ(view.EdgeProperties().Size(), mesh.EdgeProperties().Size());
-    EXPECT_EQ(view.FaceProperties().Size(), mesh.FaceProperties().Size());
-}
-
 TEST(HalfedgeMesh_View, Mesh_BindsDirectPropertySets)
 {
     using namespace Geometry;
@@ -211,18 +191,16 @@ TEST(HalfedgeMesh_View, Mesh_BindsDirectPropertySets)
     PropertySet edges{};
     PropertySet faces{};
 
-    Halfedge::Mesh mesh(vertices, halfedges, edges, faces);
-    Geometry::Halfedge::ConstMeshView view(vertices, halfedges, edges, faces);
+    size_t deletedVertices = 0;
+    size_t deletedEdges = 0;
+    size_t deletedFaces = 0;
+
+    Halfedge::Mesh mesh(vertices, halfedges, edges, faces, deletedVertices, deletedEdges, deletedFaces);
 
     EXPECT_TRUE(vertices.Exists("v:point"));
     EXPECT_TRUE(halfedges.Exists("h:connectivity"));
     EXPECT_TRUE(edges.Exists("e:deleted"));
     EXPECT_TRUE(faces.Exists("f:deleted"));
-
-    EXPECT_EQ(view.VerticesSize(), mesh.VerticesSize());
-    EXPECT_EQ(view.HalfedgesSize(), mesh.HalfedgesSize());
-    EXPECT_EQ(view.EdgesSize(), mesh.EdgesSize());
-    EXPECT_EQ(view.FacesSize(), mesh.FacesSize());
 
     auto weight = VertexProperty<float>(mesh.VertexProperties().GetOrAdd<float>("v:weight", 2.5f));
     ASSERT_TRUE(weight.IsValid());
@@ -233,7 +211,6 @@ TEST(HalfedgeMesh_View, Mesh_BindsDirectPropertySets)
     EXPECT_EQ(vertices.Size(), mesh.VertexProperties().Size());
     EXPECT_FLOAT_EQ(weight[v0], 2.5f);
     EXPECT_EQ(mesh.Position(v0), glm::vec3(4.0f, 5.0f, 6.0f));
-    EXPECT_EQ(view.Position(v0), glm::vec3(4.0f, 5.0f, 6.0f));
 }
 
 TEST(HalfedgeMesh_View, MoveAssignment_RebindsBuiltInPropertyHandles)

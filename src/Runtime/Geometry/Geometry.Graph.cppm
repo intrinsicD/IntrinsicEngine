@@ -12,7 +12,7 @@ module;
 
 export module Geometry.Graph;
 
-import Geometry.GraphFwd;
+export import Geometry.GraphFwd;
 import Geometry.Properties;
 import Geometry.Circulators;
 
@@ -153,17 +153,6 @@ export namespace Geometry::Graph
         [[nodiscard]] ConstPropertySet HalfedgeProperties() const noexcept { return ConstPropertySet(m_Halfedges); } // NOLINT(readability-convert-member-functions-to-static)
 
     private:
-        struct VertexConnectivity
-        {
-            HalfedgeHandle Halfedge{};
-        };
-
-        struct HalfedgeConnectivity
-        {
-            VertexHandle Vertex{};
-            HalfedgeHandle Next{};
-            HalfedgeHandle Prev{};
-        };
 
         void EnsureProperties();
 

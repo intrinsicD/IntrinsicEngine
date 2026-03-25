@@ -63,8 +63,8 @@ target_sources(${target_name}
         Geometry.AdaptiveRemeshing.cppm
         Geometry.ConvexHullBuilder.cppm
         Geometry.KMeans.cppm
+        Geometry.PointCloudUtils.cppm
         Geometry.PointCloud.cppm
-        Geometry.PointCloudView.cppm
         Geometry.Boolean.cppm
         Geometry.Quadric.cppm
         Geometry.Queries.cppm
@@ -102,8 +102,8 @@ target_sources(${target_name}
         Geometry.AdaptiveRemeshing.cpp
         Geometry.ConvexHullBuilder.cpp
         Geometry.KMeans.cpp
+        Geometry.PointCloudUtils.cpp
         Geometry.PointCloud.cpp
-        Geometry.PointCloudView.cpp
         Geometry.Sphere.cpp
         Geometry.Boolean.cpp
         Geometry.ShortestPath.cpp
@@ -113,6 +113,7 @@ target_sources(${target_name}
         FILE_SET CXX_MODULES TYPE CXX_MODULES FILES
         Geometry.HalfedgeMeshFwd.cppm
         Geometry.GraphFwd.cppm
+        Geometry.PointCloudFwd.cppm
 )
 
 target_include_directories(${target_name} PUBLIC .)

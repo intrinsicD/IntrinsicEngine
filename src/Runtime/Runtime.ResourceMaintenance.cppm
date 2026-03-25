@@ -3,6 +3,7 @@ module;
 
 export module Runtime.ResourceMaintenance;
 
+import Graphics.Material;
 import Runtime.GraphicsBackend;
 import Runtime.RenderOrchestrator;
 import Runtime.SceneManager;

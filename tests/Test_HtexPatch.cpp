@@ -128,6 +128,67 @@ TEST(HtexPatch, BuildPatchMetadataHandlesReversedResolutionBounds)
     }
 }
 
+TEST(HtexPatch, BuildHalfedgeTriangleKeepsValidSliverFaces)
+{
+    Geometry::Halfedge::Mesh mesh;
+    const auto v0 = mesh.AddVertex({0.0f, 0.0f, 0.0f});
+    const auto v1 = mesh.AddVertex({1.0e-5f, 0.0f, 0.0f});
+    const auto v2 = mesh.AddVertex({0.0f, 1.0e-5f, 0.0f});
+    ASSERT_TRUE(mesh.AddTriangle(v0, v1, v2).has_value());
+
+    const auto h0 = mesh.Halfedge(Geometry::FaceHandle{0});
+    const auto tri = Geometry::HtexPatch::BuildHalfedgeTriangle(mesh, static_cast<uint32_t>(h0.Index));
+    ASSERT_TRUE(tri.has_value());
+
+    EXPECT_EQ(std::count(tri->Vertices.begin(), tri->Vertices.end(), v0), 1);
+    EXPECT_EQ(std::count(tri->Vertices.begin(), tri->Vertices.end(), v1), 1);
+    EXPECT_EQ(std::count(tri->Vertices.begin(), tri->Vertices.end(), v2), 1);
+    EXPECT_NE(tri->Vertices[0], tri->Vertices[1]);
+    EXPECT_NE(tri->Vertices[1], tri->Vertices[2]);
+    EXPECT_NE(tri->Vertices[2], tri->Vertices[0]);
+
+    const glm::vec3 e0 = tri->Positions[1] - tri->Positions[0];
+    const glm::vec3 e1 = tri->Positions[2] - tri->Positions[0];
+    EXPECT_GT(glm::length(glm::cross(e0, e1)), 0.0f);
+}
+
+TEST(HtexPatch, BuildCategoricalPatchAtlasHandlesValidSliverTriangles)
+{
+    Geometry::Halfedge::Mesh mesh;
+    const auto v0 = mesh.AddVertex({0.0f, 0.0f, 0.0f});
+    const auto v1 = mesh.AddVertex({1.0e-5f, 0.0f, 0.0f});
+    const auto v2 = mesh.AddVertex({0.0f, 1.0e-5f, 0.0f});
+    ASSERT_TRUE(mesh.AddTriangle(v0, v1, v2).has_value());
+
+    const auto patches = Geometry::HtexPatch::BuildPatchMetadata(mesh);
+    ASSERT_TRUE(patches.has_value());
+
+    const std::vector<glm::vec3> centroids{
+        mesh.Position(v0),
+        mesh.Position(v1),
+        mesh.Position(v2),
+    };
+
+    Geometry::HtexPatch::PatchAtlasLayout layout{};
+    std::vector<uint32_t> atlasTexels;
+    ASSERT_TRUE(Geometry::HtexPatch::BuildCategoricalPatchAtlas(
+        mesh,
+        patches->Patches,
+        centroids,
+        atlasTexels,
+        layout,
+        Geometry::HtexPatch::kInvalidIndex));
+
+    ASSERT_EQ(atlasTexels.size(), static_cast<size_t>(layout.Width) * static_cast<size_t>(layout.Height));
+    EXPECT_TRUE(std::any_of(
+        atlasTexels.begin(),
+        atlasTexels.end(),
+        [](uint32_t texel)
+        {
+            return texel != Geometry::HtexPatch::kInvalidIndex;
+        }));
+}
+
 TEST(HtexPatch, BuildCategoricalPatchAtlasEncodesNearestClusterIdsLosslessly)
 {
     auto mesh = MakeSingleTriangle();

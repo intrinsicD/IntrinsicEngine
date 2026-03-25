@@ -128,7 +128,8 @@ namespace Geometry::HtexPatch
             if (tri.Vertices[0] == tri.Vertices[1] || tri.Vertices[1] == tri.Vertices[2] || tri.Vertices[2] == tri.Vertices[0])
                 return std::nullopt;
 
-            if (TriangleAreaSquared(tri) <= 1.0e-20f)
+            const float areaSquared = TriangleAreaSquared(tri);
+            if (!std::isfinite(areaSquared) || areaSquared <= 0.0f)
                 return std::nullopt;
 
             return tri;

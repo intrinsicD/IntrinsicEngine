@@ -203,7 +203,7 @@ namespace Graphics::Passes
                 }
             }
 
-            return static_cast<float>(patch.EdgeIndex);
+            return FirstPatchVertexLabel(mesh, patch, kmeansData.Labels);
         }
 
     }
@@ -441,7 +441,7 @@ namespace Graphics::Passes
             {
                 for (uint32_t x = 0; x < kTileSize; ++x)
                 {
-                    float texelScalar = scalar;
+                    float texelScalar = scalar >= 0.0f ? scalar : 0.0f;
                     if (hasPerTexelKMeans)
                     {
                         const glm::vec2 patchUV{(static_cast<float>(x) + 0.5f) / static_cast<float>(kTileSize),
@@ -589,7 +589,7 @@ namespace Graphics::Passes
                     pending->Patches = m_CachedPatchBuild.Patches;
                     m_PendingBake = pending;
 
-                    auto bakeJob = [pending]() mutable
+                    auto bakeJob = [pending, centroidSeed = meshData.KMeansCentroids]() mutable
                     {
                         PROFILE_SCOPE("HtexPatchPreview::BakeJob");
 
@@ -601,7 +601,9 @@ namespace Graphics::Passes
                             .Colors = meshCopy.VertexProperties().Get<glm::vec4>("v:kmeans_color"),
                         };
 
-                        std::vector<glm::vec3> centroids = ReconstructPreviewCentroids(meshCopy, workerKMeans.Labels);
+                        std::vector<glm::vec3> centroids = centroidSeed;
+                        if (centroids.empty())
+                            centroids = ReconstructPreviewCentroids(meshCopy, workerKMeans.Labels);
                         workerKMeans.Centroids = std::span<const glm::vec3>{centroids};
 
                         CachedPreviewAtlas atlas{};

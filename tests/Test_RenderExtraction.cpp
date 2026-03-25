@@ -371,7 +371,7 @@ TEST(RenderExtraction, ExtractedPickingPacketsRemainStableAfterSceneMutation)
         .Geometry = Geometry::GeometryHandle{99u, 1u},
     });
     registry.emplace<ECS::PointCloud::Data>(latePoint, ECS::PointCloud::Data{
-        .CloudRef = std::make_shared<Geometry::PointCloud::Cloud>(),
+        .CloudRef = std::make_shared<Geometry::PointCloud::Cloud>()
     });
 
     // Extracted packets remain immutable snapshots and do not track live ECS mutations.

@@ -29,7 +29,7 @@ import Geometry.KMeans;
 import Geometry.Properties;
 import Geometry.Simplification;
 import Geometry.Subdivision;
-import Geometry.PointCloud;
+import Geometry.PointCloudUtils;
 import Geometry.GraphUtils;
 import Geometry.HalfedgeMesh;
 import Geometry.KDTree;

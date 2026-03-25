@@ -5,6 +5,7 @@
 
 #include <glm/glm.hpp>
 
+import ECS;
 import Graphics.ColorMapper;
 import Graphics.Colormap;
 import Graphics.Components;
@@ -55,6 +56,13 @@ TEST(KMeansLabelRoundTrip, MeshVertexPublicationPreservesLabelsAndColormapContra
     EXPECT_FLOAT_EQ(meshData.KMeansLastInertia, 1.5f);
     EXPECT_EQ(meshData.KMeansLastMaxDistanceIndex, 1u);
     EXPECT_DOUBLE_EQ(meshData.KMeansLastDurationMs, 3.25);
+    ASSERT_EQ(meshData.KMeansCentroids.size(), result.Centroids.size());
+    for (std::size_t i = 0; i < result.Centroids.size(); ++i)
+    {
+        EXPECT_FLOAT_EQ(meshData.KMeansCentroids[i].x, result.Centroids[i].x);
+        EXPECT_FLOAT_EQ(meshData.KMeansCentroids[i].y, result.Centroids[i].y);
+        EXPECT_FLOAT_EQ(meshData.KMeansCentroids[i].z, result.Centroids[i].z);
+    }
 
     const auto labels = Geometry::VertexProperty<uint32_t>(mesh->VertexProperties().Get<uint32_t>("v:kmeans_label"));
     const auto labelFloats = Geometry::VertexProperty<float>(mesh->VertexProperties().Get<float>("v:kmeans_label_f"));
@@ -123,3 +131,23 @@ TEST(KMeansLabelRoundTrip, PointCloudPublicationPreservesLabelsAndDirectColorCon
     EXPECT_EQ(mapped->Colors[0], mapped->Colors[2]);
     EXPECT_NE(mapped->Colors[0], mapped->Colors[1]);
 }
+
+TEST(KMeansLabelRoundTrip, CentroidEntityUsesRenderableSceneContract)
+{
+    ECS::Scene scene;
+    const auto centroid = scene.CreateEntity("Source / KMeans Centroids");
+    auto& reg = scene.GetRegistry();
+
+    reg.emplace<ECS::PointCloud::Data>(centroid);
+
+    EXPECT_TRUE(reg.all_of<ECS::Components::NameTag::Component>(centroid));
+    EXPECT_TRUE(reg.all_of<ECS::Components::Transform::Component>(centroid));
+    EXPECT_TRUE(reg.all_of<ECS::Components::Transform::WorldMatrix>(centroid));
+    EXPECT_TRUE(reg.all_of<ECS::Components::Hierarchy::Component>(centroid));
+    EXPECT_TRUE(reg.all_of<ECS::PointCloud::Data>(centroid));
+
+    const auto& centroidData = reg.get<ECS::PointCloud::Data>(centroid);
+    EXPECT_TRUE(centroidData.Visible);
+    EXPECT_FALSE(centroidData.CloudRef);
+}
+

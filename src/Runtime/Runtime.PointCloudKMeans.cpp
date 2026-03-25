@@ -421,6 +421,9 @@ namespace Runtime::PointCloudKMeans
             centroidEntity = reg.create();
             reg.emplace_or_replace<ECS::Components::NameTag::Component>(
                 centroidEntity, ECS::Components::NameTag::Component{.Name = MakeCentroidEntityName(reg, sourceEntity)});
+            reg.emplace_or_replace<ECS::Components::Transform::Component>(centroidEntity);
+            reg.emplace_or_replace<ECS::Components::Transform::WorldMatrix>(centroidEntity);
+            reg.emplace_or_replace<ECS::Components::Transform::IsDirtyTag>(centroidEntity);
             reg.emplace_or_replace<ECS::Components::Hierarchy::Component>(centroidEntity);
             reg.emplace_or_replace<ECS::PointCloud::Data>(centroidEntity);
             ECS::Components::Hierarchy::Attach(reg, centroidEntity, sourceEntity);
@@ -1055,7 +1058,7 @@ namespace Runtime::PointCloudKMeans
             return false;
 
         auto& cloud = *pointCloudData.CloudRef;
-        if (cloud.PointCount() != result.Labels.size() || result.SquaredDistances.size() != result.Labels.size())
+        if (cloud.VerticesSize() != result.Labels.size() || result.SquaredDistances.size() != result.Labels.size())
             return false;
 
         auto labelProp = cloud.GetOrAddVertexProperty<uint32_t>("p:kmeans_label", 0u);

@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <numbers>
 #include <vector>
 
@@ -92,7 +93,7 @@ TEST(PointCloud_Cloud, EmptyCloudIsValid)
     Geometry::PointCloud::Cloud cloud;
     EXPECT_TRUE(cloud.IsValid());
     EXPECT_TRUE(cloud.IsEmpty());
-    EXPECT_EQ(cloud.PointCount(), 0u);
+    EXPECT_EQ(cloud.VerticesSize(), 0u);
     EXPECT_FALSE(cloud.HasNormals());
     EXPECT_FALSE(cloud.HasColors());
     EXPECT_FALSE(cloud.HasRadii());
@@ -106,7 +107,7 @@ TEST(PointCloud_Cloud, PositionsOnlyIsValid)
     cloud.AddPoint({0, 1, 0});
     EXPECT_TRUE(cloud.IsValid());
     EXPECT_FALSE(cloud.IsEmpty());
-    EXPECT_EQ(cloud.PointCount(), 3u);
+    EXPECT_EQ(cloud.VerticesSize(), 3u);
     EXPECT_FALSE(cloud.HasNormals());
 }
 
@@ -130,7 +131,7 @@ TEST(PointCloud_Cloud, ConstPropertyAccessUsesReadOnlyViews)
 
     const auto positions = cloud.GetVertexProperty<glm::vec3>("p:position");
     ASSERT_TRUE(positions.IsValid());
-    EXPECT_EQ(positions.Vector().size(), cloud.PointCount());
+    EXPECT_EQ(positions.Vector().size(), cloud.VerticesSize());
     EXPECT_EQ(positions[0], cloud.Position(Geometry::PointCloud::Cloud::Handle(0)));
 }
 
@@ -391,11 +392,28 @@ TEST(PointCloud_Subsample, SubsampleReducesCount)
     auto result = Geometry::PointCloud::RandomSubsample(cloud, params);
     ASSERT_TRUE(result.has_value());
 
-    EXPECT_EQ(result->Subsampled.PointCount(), 100u);
+    EXPECT_EQ(result->Subsampled.VerticesSize(), 100u);
     EXPECT_EQ(result->SelectedIndices.size(), 100u);
     EXPECT_TRUE(result->Subsampled.HasNormals());
     EXPECT_TRUE(result->Subsampled.HasColors());
     EXPECT_TRUE(result->Subsampled.IsValid());
+}
+
+TEST(PointCloud_Subsample, ReturnedCloudKeepsValidPositionSpan)
+{
+    auto cloud = MakeSphereCloud(64, 1.0f, true, false);
+    Geometry::PointCloud::SubsampleParams params;
+    params.TargetCount = 16;
+
+    auto result = Geometry::PointCloud::RandomSubsample(cloud, params);
+    ASSERT_TRUE(result.has_value());
+
+    const auto positions = result->Subsampled.Positions();
+    EXPECT_EQ(positions.size(), result->Subsampled.VerticesSize());
+    ASSERT_FALSE(positions.empty());
+    EXPECT_TRUE(std::isfinite(positions.front().x));
+    EXPECT_TRUE(std::isfinite(positions.front().y));
+    EXPECT_TRUE(std::isfinite(positions.front().z));
 }
 
 TEST(PointCloud_Subsample, TargetLargerThanCloudReturnsAll)
@@ -405,7 +423,7 @@ TEST(PointCloud_Subsample, TargetLargerThanCloudReturnsAll)
     params.TargetCount = 200;
     auto result = Geometry::PointCloud::RandomSubsample(cloud, params);
     ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result->Subsampled.PointCount(), 50u);
+    EXPECT_EQ(result->Subsampled.VerticesSize(), 50u);
 }
 
 TEST(PointCloud_Subsample, DeterministicWithSameSeed)
@@ -484,14 +502,14 @@ TEST(PointCloud_Integration, DownsampleThenEstimateRadii)
     dParams.VoxelSize = 0.2f;
     auto dResult = Geometry::PointCloud::VoxelDownsample(cloud, dParams);
     ASSERT_TRUE(dResult.has_value());
-    EXPECT_GT(dResult->Downsampled.PointCount(), 10u);
+    EXPECT_GT(dResult->Downsampled.VerticesSize(), 10u);
 
     Geometry::PointCloud::RadiusEstimationParams rParams;
     rParams.KNeighbors = 6;
     rParams.ScaleFactor = 1.2f;
     auto rResult = Geometry::PointCloud::EstimateRadii(dResult->Downsampled, rParams);
     ASSERT_TRUE(rResult.has_value());
-    EXPECT_EQ(rResult->Radii.size(), dResult->Downsampled.PointCount());
+    EXPECT_EQ(rResult->Radii.size(), dResult->Downsampled.VerticesSize());
     EXPECT_GT(rResult->AverageRadius, 0.05f);
 }
 
@@ -511,7 +529,7 @@ TEST(PointCloud_Edge, CollinearPointsDownsample)
     params.VoxelSize = 0.1f;
     auto result = Geometry::PointCloud::VoxelDownsample(cloud, params);
     ASSERT_TRUE(result.has_value());
-    EXPECT_LT(result->ReducedCount, cloud.PointCount());
+    EXPECT_LT(result->ReducedCount, cloud.VerticesSize());
 }
 
 TEST(PointCloud_Edge, DuplicatePointsDownsample)
@@ -642,6 +660,28 @@ TEST(PointCloud_KMeans, RecomputeCentroidsMatchesPerLabelMeans)
     EXPECT_FLOAT_EQ(centroids[1].x, 12.0f);
     EXPECT_FLOAT_EQ(centroids[1].y, 0.0f);
     EXPECT_FLOAT_EQ(centroids[1].z, 0.0f);
+}
+
+TEST(PointCloud_KMeans, RecomputeCentroidsLeavesEmptyClustersAtOrigin)
+{
+    const std::vector<glm::vec3> points{
+        {-2.0f, 0.0f, 0.0f},
+        {10.0f, 0.0f, 0.0f},
+        {14.0f, 0.0f, 0.0f},
+    };
+    const std::vector<uint32_t> labels{0u, 2u, 2u};
+
+    const auto centroids = Geometry::KMeans::RecomputeCentroids(points, labels, 3u);
+    ASSERT_EQ(centroids.size(), 3u);
+    EXPECT_FLOAT_EQ(centroids[0].x, -2.0f);
+    EXPECT_FLOAT_EQ(centroids[0].y, 0.0f);
+    EXPECT_FLOAT_EQ(centroids[0].z, 0.0f);
+    EXPECT_FLOAT_EQ(centroids[1].x, 0.0f);
+    EXPECT_FLOAT_EQ(centroids[1].y, 0.0f);
+    EXPECT_FLOAT_EQ(centroids[1].z, 0.0f);
+    EXPECT_FLOAT_EQ(centroids[2].x, 12.0f);
+    EXPECT_FLOAT_EQ(centroids[2].y, 0.0f);
+    EXPECT_FLOAT_EQ(centroids[2].z, 0.0f);
 }
 
 TEST(PointCloud_KMeans, ClassifyPointToCentroidUsesCentroidVoronoiCells)
