@@ -319,6 +319,70 @@ TEST(RenderExtraction, ExtractedRenderWorld_TracksWhenAuthoritativeSceneAdvances
     EXPECT_EQ(renderWorld.World.GetCurrentCommittedTick(), 2u);
 }
 
+TEST(RenderExtraction, ExtractedPickingPacketsRemainStableAfterSceneMutation)
+{
+    Runtime::SceneManager sceneManager;
+    auto& registry = sceneManager.GetRegistry();
+
+    const entt::entity surfaceEntity = registry.create();
+    registry.emplace<ECS::Components::Transform::Component>(
+        surfaceEntity,
+        ECS::Components::Transform::Component{.Position = glm::vec3(1.0f, 0.0f, 0.0f)});
+    registry.emplace<ECS::Components::Selection::PickID>(surfaceEntity, ECS::Components::Selection::PickID{.Value = 101u});
+    registry.emplace<ECS::Surface::Component>(surfaceEntity, ECS::Surface::Component{
+        .Geometry = Geometry::GeometryHandle{41u, 1u},
+    });
+
+    const entt::entity lineEntity = registry.create();
+    registry.emplace<ECS::Components::Transform::Component>(
+        lineEntity,
+        ECS::Components::Transform::Component{.Position = glm::vec3(0.0f, 2.0f, 0.0f)});
+    registry.emplace<ECS::Components::Selection::PickID>(lineEntity, ECS::Components::Selection::PickID{.Value = 202u});
+    auto& line = registry.emplace<ECS::Line::Component>(lineEntity);
+    line.Geometry = Geometry::GeometryHandle{51u, 1u};
+    line.EdgeView = Geometry::GeometryHandle{52u, 1u};
+    line.EdgeCount = 7u;
+    line.Width = 2.5f;
+    auto& graphData = registry.emplace<ECS::Graph::Data>(lineEntity);
+    graphData.GraphRef = std::make_shared<Geometry::Graph::Graph>();
+
+    sceneManager.CommitFixedTick();
+
+    Graphics::CameraComponent camera{};
+    const Runtime::RenderWorld extracted = Runtime::ExtractRenderWorld(Runtime::MakeRenderFrameInput(
+        camera,
+        sceneManager.CreateReadonlySnapshot(),
+        Runtime::RenderViewport{.Width = 1280, .Height = 720},
+        0.5));
+
+    ASSERT_EQ(extracted.SurfacePicking.size(), 1u);
+    ASSERT_EQ(extracted.LinePicking.size(), 1u);
+    EXPECT_TRUE(extracted.PointPicking.empty());
+    EXPECT_EQ(extracted.SurfacePicking.front().Geometry, Geometry::GeometryHandle(41u, 1u));
+    EXPECT_EQ(extracted.LinePicking.front().Geometry, Geometry::GeometryHandle(51u, 1u));
+    EXPECT_EQ(extracted.LinePicking.front().EdgeCount, 7u);
+
+    // Mutate authoritative ECS after extraction.
+    registry.get<ECS::Surface::Component>(surfaceEntity).Geometry = Geometry::GeometryHandle{};
+    registry.get<ECS::Line::Component>(lineEntity).EdgeCount = 0u;
+    const entt::entity latePoint = registry.create();
+    registry.emplace<ECS::Components::Transform::Component>(latePoint, ECS::Components::Transform::Component{});
+    registry.emplace<ECS::Point::Component>(latePoint, ECS::Point::Component{
+        .Geometry = Geometry::GeometryHandle{99u, 1u},
+    });
+    registry.emplace<ECS::PointCloud::Data>(latePoint, ECS::PointCloud::Data{
+        .CloudRef = std::make_shared<Geometry::PointCloud::Cloud>(),
+    });
+
+    // Extracted packets remain immutable snapshots and do not track live ECS mutations.
+    ASSERT_EQ(extracted.SurfacePicking.size(), 1u);
+    ASSERT_EQ(extracted.LinePicking.size(), 1u);
+    EXPECT_TRUE(extracted.PointPicking.empty());
+    EXPECT_EQ(extracted.SurfacePicking.front().Geometry, Geometry::GeometryHandle(41u, 1u));
+    EXPECT_EQ(extracted.LinePicking.front().Geometry, Geometry::GeometryHandle(51u, 1u));
+    EXPECT_EQ(extracted.LinePicking.front().EdgeCount, 7u);
+}
+
 TEST(RenderExtraction, RenderPassContext_ExposesReadonlySceneSnapshot)
 {
     using SceneRef = decltype(std::declval<Graphics::RenderPassContext>().Scene);
