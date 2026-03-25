@@ -167,31 +167,14 @@ namespace Graphics::Passes
 
     void SelectionOutlinePass::AddPasses(RenderPassContext& ctx)
     {
-        // Skip if no entities are selected or hovered
-        auto& registry = ctx.Scene.GetRegistry();
-
-        // Count selected entities and collect their PickIDs.
-        // Selection can target non-renderable hierarchy parents from the editor tree,
-        // while the PickID buffer is written by renderable descendants.
         uint32_t selectedCount = 0;
         uint32_t selectedIds[kMaxSelectedIds] = {};
-        uint32_t hoveredId = 0;
-        bool hasHovered = false;
+        for (uint32_t i = 0; i < std::min(static_cast<uint32_t>(ctx.SelectionOutline.SelectedPickIds.size()), kMaxSelectedIds); ++i)
+            selectedIds[i] = ctx.SelectionOutline.SelectedPickIds[i];
+        selectedCount = std::min(static_cast<uint32_t>(ctx.SelectionOutline.SelectedPickIds.size()), kMaxSelectedIds);
 
-        auto selectedView = registry.view<ECS::Components::Selection::SelectedTag>();
-
-        for (auto entity : selectedView)
-            selectedCount = AppendOutlineRenderablePickIds(registry, entity, selectedIds, selectedCount);
-
-        auto hoveredView = registry.view<ECS::Components::Selection::HoveredTag>();
-
-        for (auto entity : hoveredView)
-        {
-            hoveredId = ResolveOutlineRenderablePickId(registry, entity);
-            hasHovered = hoveredId != 0u;
-            if (hasHovered)
-                break; // Only one hovered entity at a time
-        }
+        const uint32_t hoveredId = ctx.SelectionOutline.HoveredPickId;
+        const bool hasHovered = hoveredId != 0u;
 
         m_DebugState.LastFrameIndex = ctx.FrameIndex;
         m_DebugState.LastResolutionWidth = ctx.Resolution.width;

@@ -70,6 +70,7 @@ export namespace Runtime
         RenderViewPacket View{};
         WorldSnapshot World{};
         bool HasSelectionWork = false;
+        Graphics::SelectionOutlinePacket SelectionOutline{};
         std::vector<Graphics::PickingSurfacePacket> SurfacePicking{};
         std::vector<Graphics::PickingLinePacket> LinePicking{};
         std::vector<Graphics::PickingPointPacket> PointPicking{};
