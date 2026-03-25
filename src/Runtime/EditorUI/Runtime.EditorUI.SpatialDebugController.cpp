@@ -72,13 +72,13 @@ void SpatialDebugController::Update(Runtime::Engine& engine, entt::entity select
         return;
     }
 
-    if (selected == entt::null || !engine.GetScene().GetRegistry().valid(selected))
+    if (selected == entt::null || !engine.GetSceneManager().GetScene().GetRegistry().valid(selected))
     {
         ReleaseAll(engine);
         return;
     }
 
-    auto& reg = engine.GetScene().GetRegistry();
+    auto& reg = engine.GetSceneManager().GetScene().GetRegistry();
     auto* collider = reg.try_get<ECS::MeshCollider::Component>(selected);
     auto* xf = reg.try_get<ECS::Components::Transform::Component>(selected);
 
@@ -197,14 +197,14 @@ void SpatialDebugController::DrawUI(Runtime::Engine& engine)
 
     if (AnyActive())
     {
-        const entt::entity selected = engine.GetSelection().GetSelectedEntity(engine.GetScene());
-        if (selected == entt::null || !engine.GetScene().GetRegistry().valid(selected))
+        const entt::entity selected = engine.GetSelection().GetSelectedEntity(engine.GetSceneManager().GetScene());
+        if (selected == entt::null || !engine.GetSceneManager().GetScene().GetRegistry().valid(selected))
         {
             ImGui::TextDisabled("No valid selected entity.");
         }
         else
         {
-            auto* collider = engine.GetScene().GetRegistry().try_get<ECS::MeshCollider::Component>(selected);
+            auto* collider = engine.GetSceneManager().GetScene().GetRegistry().try_get<ECS::MeshCollider::Component>(selected);
             if (!collider || !collider->CollisionRef)
             {
                 ImGui::TextDisabled("Selected entity has no MeshCollider.");
@@ -219,12 +219,12 @@ void SpatialDebugController::DrawUI(Runtime::Engine& engine)
 
 void SpatialDebugController::ReleaseRetainedLineOverlay(Runtime::Engine& engine, RetainedLineOverlaySlot& slot)
 {
-    auto& reg = engine.GetScene().GetRegistry();
+    auto& reg = engine.GetSceneManager().GetScene().GetRegistry();
     if (slot.Entity != entt::null && reg.valid(slot.Entity))
         reg.destroy(slot.Entity);
 
     if (slot.Geometry.IsValid())
-        engine.GetGeometryStorage().Remove(slot.Geometry, engine.GetDevice().GetGlobalFrameNumber());
+        engine.GetRenderOrchestrator().GetGeometryStorage().Remove(slot.Geometry, engine.GetGraphicsBackend().GetDevice().GetGlobalFrameNumber());
 
     slot = {};
 }
@@ -295,8 +295,8 @@ bool SpatialDebugController::UpdateRetainedLineOverlay(Runtime::Engine& engine, 
     upload.UploadMode = Graphics::GeometryUploadMode::Direct;
 
     auto [gpuData, token] = Graphics::GeometryGpuData::CreateAsync(
-        engine.GetDeviceShared(), engine.GetGraphicsBackend().GetTransferManager(), upload,
-        &engine.GetGeometryStorage());
+        engine.GetGraphicsBackend().GetDeviceShared(), engine.GetGraphicsBackend().GetTransferManager(), upload,
+        &engine.GetRenderOrchestrator().GetGeometryStorage());
     (void)token;
     if (!gpuData)
     {
@@ -305,9 +305,9 @@ bool SpatialDebugController::UpdateRetainedLineOverlay(Runtime::Engine& engine, 
     }
 
     const Geometry::GeometryHandle oldGeometry = slot.Geometry;
-    const Geometry::GeometryHandle newGeometry = engine.GetGeometryStorage().Add(std::move(gpuData));
+    const Geometry::GeometryHandle newGeometry = engine.GetRenderOrchestrator().GetGeometryStorage().Add(std::move(gpuData));
 
-    auto& reg = engine.GetScene().GetRegistry();
+    auto& reg = engine.GetSceneManager().GetScene().GetRegistry();
     if (slot.Entity == entt::null || !reg.valid(slot.Entity))
     {
         slot.Entity = reg.create();
@@ -327,7 +327,7 @@ bool SpatialDebugController::UpdateRetainedLineOverlay(Runtime::Engine& engine, 
 
     slot.Geometry = newGeometry;
     if (oldGeometry.IsValid() && oldGeometry != newGeometry)
-        engine.GetGeometryStorage().Remove(oldGeometry, engine.GetDevice().GetGlobalFrameNumber());
+        engine.GetRenderOrchestrator().GetGeometryStorage().Remove(oldGeometry, engine.GetGraphicsBackend().GetDevice().GetGlobalFrameNumber());
 
     return true;
 }
@@ -399,13 +399,13 @@ bool SpatialDebugController::EnsureSelectedColliderConvexHull(entt::entity selec
 
 void SpatialDebugController::ReleaseCachedOctreeOverlay(Runtime::Engine& engine)
 {
-    auto& reg = engine.GetScene().GetRegistry();
+    auto& reg = engine.GetSceneManager().GetScene().GetRegistry();
     if (m_OctreeOverlayEntity != entt::null && reg.valid(m_OctreeOverlayEntity))
         reg.destroy(m_OctreeOverlayEntity);
 
     if (m_OctreeOverlayGeometry.IsValid())
     {
-        engine.GetGeometryStorage().Remove(m_OctreeOverlayGeometry, engine.GetDevice().GetGlobalFrameNumber());
+        engine.GetRenderOrchestrator().GetGeometryStorage().Remove(m_OctreeOverlayGeometry, engine.GetGraphicsBackend().GetDevice().GetGlobalFrameNumber());
         m_OctreeOverlayGeometry = {};
     }
 
@@ -427,7 +427,7 @@ bool SpatialDebugController::EnsureRetainedOctreeOverlay(Runtime::Engine& engine
     const glm::mat4 worldMatrix = ECS::Components::Transform::GetMatrix(xf);
     const bool cacheValid =
         (m_OctreeOverlayEntity != entt::null) &&
-        engine.GetScene().GetRegistry().valid(m_OctreeOverlayEntity) &&
+        engine.GetSceneManager().GetScene().GetRegistry().valid(m_OctreeOverlayEntity) &&
         m_OctreeOverlayGeometry.IsValid() &&
         (m_OctreeOverlaySourceEntity == selected) &&
         OctreeSettingsEqual(m_CachedOctreeSettings, settings) &&
@@ -540,8 +540,8 @@ bool SpatialDebugController::EnsureRetainedOctreeOverlay(Runtime::Engine& engine
     upload.UploadMode = Graphics::GeometryUploadMode::Direct;
 
     auto [gpuData, token] = Graphics::GeometryGpuData::CreateAsync(
-        engine.GetDeviceShared(), engine.GetGraphicsBackend().GetTransferManager(), upload,
-        &engine.GetGeometryStorage());
+        engine.GetGraphicsBackend().GetDeviceShared(), engine.GetGraphicsBackend().GetTransferManager(), upload,
+        &engine.GetRenderOrchestrator().GetGeometryStorage());
     (void)token;
     if (!gpuData)
     {
@@ -550,9 +550,9 @@ bool SpatialDebugController::EnsureRetainedOctreeOverlay(Runtime::Engine& engine
     }
 
     const Geometry::GeometryHandle oldGeometry = m_OctreeOverlayGeometry;
-    const Geometry::GeometryHandle newGeometry = engine.GetGeometryStorage().Add(std::move(gpuData));
+    const Geometry::GeometryHandle newGeometry = engine.GetRenderOrchestrator().GetGeometryStorage().Add(std::move(gpuData));
 
-    auto& reg = engine.GetScene().GetRegistry();
+    auto& reg = engine.GetSceneManager().GetScene().GetRegistry();
     if (m_OctreeOverlayEntity == entt::null || !reg.valid(m_OctreeOverlayEntity))
     {
         m_OctreeOverlayEntity = reg.create();
@@ -578,7 +578,7 @@ bool SpatialDebugController::EnsureRetainedOctreeOverlay(Runtime::Engine& engine
     m_HasCachedOctreeAabb = true;
 
     if (oldGeometry.IsValid() && oldGeometry != newGeometry)
-        engine.GetGeometryStorage().Remove(oldGeometry, engine.GetDevice().GetGlobalFrameNumber());
+        engine.GetRenderOrchestrator().GetGeometryStorage().Remove(oldGeometry, engine.GetGraphicsBackend().GetDevice().GetGlobalFrameNumber());
 
     return true;
 }
@@ -785,7 +785,7 @@ void SpatialDebugController::EmitContactManifolds(Runtime::Engine& engine, entt:
                                                    const ECS::MeshCollider::Component& selectedCollider)
 {
     auto& dd = engine.GetRenderOrchestrator().GetDebugDraw();
-    auto& reg = engine.GetScene().GetRegistry();
+    auto& reg = engine.GetSceneManager().GetScene().GetRegistry();
     auto colliders = reg.view<ECS::MeshCollider::Component>();
 
     const uint32_t pointAColor = Graphics::DebugDraw::PackColorF(1.0f, 0.85f, 0.2f, 1.0f);

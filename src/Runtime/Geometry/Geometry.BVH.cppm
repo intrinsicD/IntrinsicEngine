@@ -13,6 +13,7 @@ export module Geometry.BVH;
 import Geometry.AABB;
 import Geometry.Primitives;
 import Geometry.Containment;
+import Geometry.Support;
 import Geometry.Overlap;
 
 export namespace Geometry

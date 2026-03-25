@@ -14,13 +14,9 @@
 #include <filesystem>
 #include <cmath>
 #include <string>
-#include <array>
-#include <limits>
 #include <imgui.h>
 #include <entt/entity/registry.hpp>
 #include <entt/signal/dispatcher.hpp>
-#include <tiny_gltf.h>
-#include <unordered_set>
 
 import Runtime.Engine;
 import Runtime.GraphicsBackend;
@@ -90,12 +86,15 @@ public:
         auto& gfx = GetGraphicsBackend();
 
         // Camera
-        m_CameraEntity = GetScene().CreateEntity("Main Camera");
-        m_Camera = GetScene().GetRegistry().emplace<Graphics::CameraComponent>(m_CameraEntity);
-        GetScene().GetRegistry().emplace<Graphics::OrbitControlComponent>(m_CameraEntity);
+        auto &sceneManager = GetSceneManager();
+        auto &scene = sceneManager.GetScene();
+        auto &registry = scene.GetRegistry();
+        m_CameraEntity = scene.CreateEntity("Main Camera");
+        m_Camera = registry.emplace<Graphics::CameraComponent>(m_CameraEntity);
+        registry.emplace<Graphics::OrbitControlComponent>(m_CameraEntity);
 
         // Cache selected entity via dispatcher sink instead of polling every frame.
-        GetScene().GetDispatcher().sink<ECS::Events::SelectionChanged>().connect<
+        scene.GetDispatcher().sink<ECS::Events::SelectionChanged>().connect<
             [](entt::entity& cached, const ECS::Events::SelectionChanged& evt)
             {
                 cached = evt.Entity;
@@ -103,7 +102,7 @@ public:
 
         // Connect SelectionModule to the scene dispatcher so GPU pick results
         // arrive via GpuPickCompleted event instead of per-frame polling.
-        GetSelection().ConnectToScene(GetScene());
+        GetSelection().ConnectToScene(scene);
 
         // --- Asset loading ---
         LoadDuckAssets(gfx);
@@ -124,7 +123,11 @@ public:
     // -------------------------------------------------------------------------
     void OnUpdate(float dt) override
     {
-        GetAssetManager().Update();
+        auto& sceneManager = GetSceneManager();
+        auto& scene = sceneManager.GetScene();
+        auto& registry = scene.GetRegistry();
+
+        GetAssetPipeline().GetAssetManager().Update();
 
         bool uiCapturesMouse = Interface::GUI::WantCaptureMouse();
         bool uiCapturesKeyboard = Interface::GUI::WantCaptureKeyboard();
@@ -138,14 +141,14 @@ public:
 
         // 1. Camera update
         Graphics::CameraComponent* cameraComponent = nullptr;
-        if (GetScene().GetRegistry().valid(m_CameraEntity))
+        if (registry.valid(m_CameraEntity))
         {
-            cameraComponent = GetScene().GetRegistry().try_get<Graphics::CameraComponent>(m_CameraEntity);
-            if (auto* orbit = GetScene().GetRegistry().try_get<Graphics::OrbitControlComponent>(m_CameraEntity))
+            cameraComponent = registry.try_get<Graphics::CameraComponent>(m_CameraEntity);
+            if (auto* orbit = registry.try_get<Graphics::OrbitControlComponent>(m_CameraEntity))
             {
                 Graphics::OnUpdate(*cameraComponent, *orbit, m_Window->GetInput(), dt, inputCaptured);
             }
-            else if (auto* fly = GetScene().GetRegistry().try_get<Graphics::FlyControlComponent>(m_CameraEntity))
+            else if (auto* fly = registry.try_get<Graphics::FlyControlComponent>(m_CameraEntity))
             {
                 Graphics::OnUpdate(*cameraComponent, *fly, m_Window->GetInput(), dt, inputCaptured);
             }
@@ -179,7 +182,7 @@ public:
 
         // 4. Update camera matrices
         {
-            auto view = GetScene().GetRegistry().view<Graphics::CameraComponent>();
+            auto view = registry.view<Graphics::CameraComponent>();
             for (auto [entity, cam] : view.each())
             {
                 Graphics::UpdateMatrices(cam, aspectRatio);
@@ -189,11 +192,11 @@ public:
         // 5. Spawn duck model once loaded
         if (!m_IsEntitySpawned)
         {
-            if (GetAssetManager().GetState(m_DuckModel) == Assets::LoadState::Ready)
+            if (GetAssetPipeline().GetAssetManager().GetState(m_DuckModel) == Assets::LoadState::Ready)
             {
                 m_DuckEntity = SpawnModel(m_DuckModel, m_DuckMaterialHandle, glm::vec3(0.0f), glm::vec3(0.01f));
                 if (m_DuckEntity != entt::null)
-                    GetSelection().SetSelectedEntity(GetScene(), m_DuckEntity);
+                    GetSelection().SetSelectedEntity(scene, m_DuckEntity);
 
                 m_IsEntitySpawned = true;
                 Log::Info("Duck Entity Spawned.");
@@ -202,7 +205,7 @@ public:
 
         // 6. Update world OBBs
         {
-            auto view = GetScene().GetRegistry().view<
+            auto view = registry.view<
                 ECS::Components::Transform::Component, ECS::MeshCollider::Component>();
             for (auto [entity, transform, collider] : view.each())
             {
@@ -220,7 +223,7 @@ public:
         if (cameraComponent != nullptr)
         {
             gizmoConsumedMouse = m_Gizmo.Update(
-                GetScene().GetRegistry(),
+                registry,
                 *cameraComponent,
                 m_Window->GetInput(),
                 static_cast<uint32_t>(m_Window->GetWindowWidth()),
@@ -242,7 +245,7 @@ public:
             GetSelection().GetConfig().MouseButton = m_SelectMouseButton;
 
             GetSelection().Update(
-                GetScene(),
+                scene,
                 renderSys,
                 cameraComponent,
                 *m_Window,
@@ -253,15 +256,19 @@ public:
     void OnRegisterSystems(Core::FrameGraph& graph, float deltaTime) override
     {
         using namespace Core::Hash;
+        auto& sceneManager = GetSceneManager();
+        auto& scene = sceneManager.GetScene();
+        auto& registry = scene.GetRegistry();
+
         if (GetFeatureRegistry().IsEnabled("AxisRotator"_id))
-            ECS::Systems::AxisRotator::RegisterSystem(graph, GetScene().GetRegistry(), deltaTime);
+            ECS::Systems::AxisRotator::RegisterSystem(graph, registry, deltaTime);
     }
 
 private:
     // --- Resources ---
     Assets::AssetHandle m_DuckModel{};
     Assets::AssetHandle m_DuckTexture{};
-    Assets::AssetHandle m_DuckMaterialHandle;
+    Assets::AssetHandle m_DuckMaterialHandle{};
 
     // --- State ---
     bool m_IsEntitySpawned = false;
@@ -269,19 +276,19 @@ private:
 
     // --- Camera ---
     entt::entity m_CameraEntity = entt::null;
-    Graphics::CameraComponent m_Camera;
+    Graphics::CameraComponent m_Camera{};
 
     // --- Editor / Selection ---
     entt::entity m_CachedSelectedEntity = entt::null;
     int m_SelectMouseButton = 0;
 
     // --- Extracted subsystem controllers ---
-    EditorUI::SpatialDebugController m_SpatialDebug;
-    EditorUI::GeometryWorkflowController m_GeometryWorkflow;
-    EditorUI::InspectorController m_Inspector;
+    EditorUI::SpatialDebugController m_SpatialDebug{};
+    EditorUI::GeometryWorkflowController m_GeometryWorkflow{};
+    EditorUI::InspectorController m_Inspector{};
 
     // --- Transform Gizmo ---
-    Graphics::TransformGizmo m_Gizmo;
+    Graphics::TransformGizmo m_Gizmo{};
 
     // =========================================================================
     // Asset loading helpers
@@ -291,12 +298,12 @@ private:
         auto textureLoader = [this, &gfx](const std::filesystem::path& path, Core::Assets::AssetHandle handle)
             -> std::shared_ptr<RHI::Texture>
         {
-            auto result = Graphics::TextureLoader::LoadAsync(path, GetDevice(),
+            auto result = Graphics::TextureLoader::LoadAsync(path, GetGraphicsBackend().GetDevice(),
                                                              gfx.GetTransferManager(), gfx.GetTextureSystem());
 
             if (result)
             {
-                RegisterAssetLoad(handle, result->Token, [this, texHandle = result->TextureHandle]()
+                GetAssetPipeline().RegisterAssetLoad(handle, result->Token, [this, texHandle = result->TextureHandle]()
                 {
                     auto& g = GetGraphicsBackend();
                     if (const auto* data = g.GetTextureSystem().Get(texHandle))
@@ -305,27 +312,27 @@ private:
                     }
                 });
 
-                GetAssetManager().MoveToProcessing(handle);
+                GetAssetPipeline().GetAssetManager().MoveToProcessing(handle);
                 return std::move(result->Texture);
             }
 
             Log::Warn("Texture load failed: {} ({})", path.string(), Graphics::AssetErrorToString(result.error()));
             return {};
         };
-        m_DuckTexture = GetAssetManager().Load<RHI::Texture>(Filesystem::GetAssetPath("textures/DuckCM.png"),
+        m_DuckTexture = GetAssetPipeline().GetAssetManager().Load<RHI::Texture>(Filesystem::GetAssetPath("textures/DuckCM.png"),
                                                              textureLoader);
 
         auto modelLoader = [&](const std::string& path, Assets::AssetHandle handle)
             -> std::unique_ptr<Graphics::Model>
         {
             auto result = Graphics::ModelLoader::LoadAsync(
-                GetDeviceShared(), gfx.GetTransferManager(), GetGeometryStorage(), path,
+                GetGraphicsBackend().GetDeviceShared(), gfx.GetTransferManager(), GetRenderOrchestrator().GetGeometryStorage(), path,
                 GetIORegistry(), GetIOBackend());
 
             if (result)
             {
-                RegisterAssetLoad(handle, result->Token);
-                GetAssetManager().MoveToProcessing(handle);
+                GetAssetPipeline().RegisterAssetLoad(handle, result->Token);
+                GetAssetPipeline().GetAssetManager().MoveToProcessing(handle);
                 return std::move(result->ModelData);
             }
 
@@ -333,7 +340,7 @@ private:
             return nullptr;
         };
 
-        m_DuckModel = GetAssetManager().Load<Graphics::Model>(
+        m_DuckModel = GetAssetPipeline().GetAssetManager().Load<Graphics::Model>(
             Filesystem::GetAssetPath("models/Duck.glb"),
             modelLoader
         );
@@ -350,7 +357,7 @@ private:
 
         DuckMaterial->SetAlbedoTexture(m_DuckTexture);
 
-        m_DuckMaterialHandle = GetAssetManager().Create("DuckMaterial", std::move(DuckMaterial));
+        m_DuckMaterialHandle = GetAssetPipeline().GetAssetManager().Create("DuckMaterial", std::move(DuckMaterial));
         GetAssetPipeline().TrackMaterial(m_DuckMaterialHandle);
 
         Log::Info("Asset Load Requested. Waiting for background thread...");
@@ -416,7 +423,7 @@ private:
     {
         Interface::GUI::RegisterPanel("Hierarchy", [this]() { DrawHierarchyPanel(); }, true, 0, false);
         Interface::GUI::RegisterPanel("Inspector", [this]() { m_Inspector.Draw(); }, true, 0, false);
-        Interface::GUI::RegisterPanel("Assets", [this]() { GetAssetManager().AssetsUiPanel(); }, true, 0, false);
+        Interface::GUI::RegisterPanel("Assets", [this]() { GetAssetPipeline().GetAssetManager().AssetsUiPanel(); }, true, 0, false);
 
         // Geometry workflow panels and menu bar (delegated to controller).
         m_GeometryWorkflow.RegisterPanelsAndMenu();
@@ -428,7 +435,7 @@ private:
         Interface::GUI::RegisterPanel("Stats", [this]()
         {
             ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
-            ImGui::Text("Entities: %d", (int)GetScene().Size());
+            ImGui::Text("Entities: %d", (int)GetSceneManager().GetScene().Size());
 
             ImGui::SeparatorText("Render Pipeline");
             {
@@ -444,7 +451,7 @@ private:
             ImGui::Text("Select Mouse Button: %d", m_SelectMouseButton);
 
             const entt::entity selected = m_CachedSelectedEntity;
-            const bool selectedValid = (selected != entt::null) && GetScene().GetRegistry().valid(selected);
+            const bool selectedValid = (selected != entt::null) && GetSceneManager().GetScene().GetRegistry().valid(selected);
 
             ImGui::Text("Selected: %u (%s)",
                         static_cast<uint32_t>(static_cast<entt::id_type>(selected)),
@@ -452,7 +459,7 @@ private:
 
             if (selectedValid)
             {
-                const auto& reg = GetScene().GetRegistry();
+                const auto& reg = GetSceneManager().GetScene().GetRegistry();
                 const bool hasSelectedTag = reg.all_of<ECS::Components::Selection::SelectedTag>(selected);
                 const bool hasSelectableTag = reg.all_of<ECS::Components::Selection::SelectableTag>(selected);
                 const bool hasSurface = reg.all_of<ECS::Surface::Component>(selected);
@@ -532,7 +539,7 @@ private:
             {
                 ImGui::Text("Frame: %.2f ms (%.1f FPS)", frameMs, fps);
                 VerticalSeparator();
-                ImGui::Text("Entities: %d", static_cast<int>(GetScene().Size()));
+                ImGui::Text("Entities: %d", static_cast<int>(GetSceneManager().GetScene().Size()));
                 VerticalSeparator();
                 ImGui::Text("Render Mode: DefaultPipeline");
             }
@@ -794,15 +801,15 @@ private:
 
         const entt::entity selected = m_CachedSelectedEntity;
 
-        GetScene().GetRegistry().view<entt::entity>().each([&](auto entityID)
+        GetSceneManager().GetScene().GetRegistry().view<entt::entity>().each([&](auto entityID)
         {
-            if (GetScene().GetRegistry().all_of<Runtime::EditorUI::HiddenEditorEntityTag>(entityID))
+            if (GetSceneManager().GetScene().GetRegistry().all_of<Runtime::EditorUI::HiddenEditorEntityTag>(entityID))
                 return;
 
             std::string name = "Entity";
-            if (GetScene().GetRegistry().all_of<ECS::Components::NameTag::Component>(entityID))
+            if (GetSceneManager().GetScene().GetRegistry().all_of<ECS::Components::NameTag::Component>(entityID))
             {
-                name = GetScene().GetRegistry().get<ECS::Components::NameTag::Component>(entityID).Name;
+                name = GetSceneManager().GetScene().GetRegistry().get<ECS::Components::NameTag::Component>(entityID).Name;
             }
 
             ImGuiTreeNodeFlags flags = ((selected == entityID) ? ImGuiTreeNodeFlags_Selected : 0) |
@@ -814,7 +821,7 @@ private:
 
             if (ImGui::IsItemClicked())
             {
-                GetSelection().SetSelectedEntity(GetScene(), entityID);
+                GetSelection().SetSelectedEntity(GetSceneManager().GetScene(), entityID);
             }
 
             if (opened)
@@ -825,14 +832,14 @@ private:
 
         if (ImGui::IsWindowHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ImGui::IsAnyItemHovered())
         {
-            GetSelection().ClearSelection(GetScene());
+            GetSelection().ClearSelection(GetSceneManager().GetScene());
         }
 
         if (ImGui::BeginPopupContextWindow(nullptr, 1))
         {
             if (ImGui::MenuItem("Create Empty Entity"))
             {
-                GetScene().CreateEntity("Empty Entity");
+                GetSceneManager().GetScene().CreateEntity("Empty Entity");
             }
             if (ImGui::MenuItem("Create Demo Point Cloud"))
             {
@@ -841,10 +848,10 @@ private:
             if (ImGui::MenuItem("Remove Entity"))
             {
                 const entt::entity cur = m_CachedSelectedEntity;
-                if (cur != entt::null && GetScene().GetRegistry().valid(cur))
+                if (cur != entt::null && GetSceneManager().GetScene().GetRegistry().valid(cur))
                 {
-                    GetScene().GetRegistry().destroy(cur);
-                    GetSelection().ClearSelection(GetScene());
+                    GetSceneManager().GetScene().GetRegistry().destroy(cur);
+                    GetSelection().ClearSelection(GetSceneManager().GetScene());
                 }
             }
             ImGui::EndPopup();
@@ -864,16 +871,16 @@ private:
         const bool cPressed = !uiCapturesKeyboard && m_Window->GetInput().IsKeyJustPressed(Core::Input::Key::C);
         if (fPressed || cPressed)
         {
-            if (auto* orbit = GetScene().GetRegistry().try_get<Graphics::OrbitControlComponent>(m_CameraEntity))
+            if (auto* orbit = GetSceneManager().GetScene().GetRegistry().try_get<Graphics::OrbitControlComponent>(m_CameraEntity))
             {
                 const entt::entity selected = m_CachedSelectedEntity;
-                if (selected != entt::null && GetScene().GetRegistry().valid(selected))
+                if (selected != entt::null && GetSceneManager().GetScene().GetRegistry().valid(selected))
                 {
                     glm::vec3 center{0.0f};
                     float radius = 0.0f;
                     bool found = false;
 
-                    auto& reg = GetScene().GetRegistry();
+                    auto& reg = GetSceneManager().GetScene().GetRegistry();
 
                     // 1) Mesh entity: use world OBB.
                     if (auto* collider = reg.try_get<ECS::MeshCollider::Component>(selected))
@@ -976,7 +983,7 @@ private:
         // Q Key: Reset camera to defaults
         if (!uiCapturesKeyboard && m_Window->GetInput().IsKeyJustPressed(Core::Input::Key::Q))
         {
-            if (auto* orbit = GetScene().GetRegistry().try_get<Graphics::OrbitControlComponent>(m_CameraEntity))
+            if (auto* orbit = GetSceneManager().GetScene().GetRegistry().try_get<Graphics::OrbitControlComponent>(m_CameraEntity))
             {
                 orbit->Target = glm::vec3(0.0f);
                 orbit->Distance = 5.0f;
@@ -1040,7 +1047,7 @@ private:
         radiiParams.ScaleFactor = 1.2f;
         auto radiiResult = Geometry::PointCloud::EstimateRadii(cloud, radiiParams);
 
-        auto& scene = GetScene();
+        auto& scene = GetSceneManager().GetScene();
         entt::entity entity = scene.CreateEntity("Demo Point Cloud");
 
         auto& pcd = scene.GetRegistry().emplace<ECS::PointCloud::Data>(entity);

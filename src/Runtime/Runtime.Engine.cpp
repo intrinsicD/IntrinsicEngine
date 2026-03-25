@@ -129,7 +129,7 @@ namespace Runtime
             m_GraphicsBackend->GetDescriptorPool(),
             m_GraphicsBackend->GetDescriptorLayout(),
             m_GraphicsBackend->GetTextureSystem(),
-            GetAssetManager(),
+            m_AssetPipeline->GetAssetManager(),
             &m_FeatureRegistry,
             config.FrameArenaSize,
             config.FrameContextCount);
@@ -141,7 +141,7 @@ namespace Runtime
         {
             m_SceneManager->ConnectGpuHooks(m_RenderOrchestrator->GetGPUScene()
 #ifdef INTRINSIC_HAS_CUDA
-                                            , GetCudaDevice()
+                                            , m_GraphicsBackend->GetCudaDevice()
 #endif
             );
         }
@@ -155,7 +155,7 @@ namespace Runtime
 
         // 10. Asset ingest orchestration (drag-drop + sync re-import).
         m_AssetIngestService = std::make_unique<AssetIngestService>(
-            GetDeviceShared(),
+            m_GraphicsBackend->GetDeviceShared(),
             m_GraphicsBackend->GetTransferManager(),
             m_RenderOrchestrator->GetGeometryStorage(),
             m_RenderOrchestrator->GetMaterialSystem(),
@@ -187,7 +187,7 @@ namespace Runtime
         matSys.ProcessDeletions(m_GraphicsBackend->GetDevice().GetGlobalFrameNumber());
 
         m_SceneManager->Clear();
-        GetAssetManager().Clear();
+        m_AssetPipeline->GetAssetManager().Clear();
 
         m_AssetPipeline->ClearLoadedMaterials();
 
@@ -220,7 +220,7 @@ namespace Runtime
                                     glm::vec3 position,
                                     glm::vec3 scale)
     {
-        return m_SceneManager->SpawnModel(GetAssetManager(), modelHandle, materialHandle, position, scale);
+        return m_SceneManager->SpawnModel(m_AssetPipeline->GetAssetManager(), modelHandle, materialHandle, position, scale);
     }
 
     void Engine::RegisterCoreFeatures()
@@ -318,7 +318,7 @@ namespace Runtime
             *m_RenderOrchestrator,
             *m_GraphicsBackend,
             m_FeatureRegistry,
-            GetAssetManager(),
+            m_AssetPipeline->GetAssetManager(),
         };
         const RenderLaneCoordinator renderLane{.Host = renderLaneHost};
         FrameLoopMode activeFrameLoopMode = ResolveFrameLoopMode(m_FeatureRegistry);
@@ -330,7 +330,7 @@ namespace Runtime
             Core::Telemetry::TelemetrySystem::Get().BeginFrame();
             FrameGraphTimingTotals frameGraphTimings{};
             const FrameGraphExecutor executeGraph{
-                .AssetManager = GetAssetManager(),
+                .AssetManager = m_AssetPipeline->GetAssetManager(),
                 .Timings = frameGraphTimings,
             };
 

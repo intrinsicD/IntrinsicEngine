@@ -13,6 +13,8 @@ Built on **C++23 Modules**, **Vulkan 1.3** bindless rendering, coroutine-based t
 - `docs/architecture/runtime-subsystem-boundaries.md` — runtime ownership map, module dependency directions, and startup/per-frame/shutdown lifecycle.
 - `docs/architecture/feature-module-playbook.md` — standard feature-module contract, layering rules, and refactor workflow for reusable development.
 
+Runtime code follows a subsystem-first access policy: `Engine` acts as the composition root and frame-loop orchestrator, while lower-level GPU, scene, asset, and render state is accessed through the owning subsystem getters (`GetGraphicsBackend()`, `GetAssetPipeline()`, `GetSceneManager()`, `GetRenderOrchestrator()`).
+
 ## Build & Test Entry Points
 
 - **Supported toolchain:** Ninja + Clang 20+ + CMake 3.28+.

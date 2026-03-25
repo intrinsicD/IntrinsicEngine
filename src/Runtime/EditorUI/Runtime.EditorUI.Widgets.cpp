@@ -223,7 +223,7 @@ namespace
                                                 entt::entity entity,
                                                 const std::function<void(Geometry::Halfedge::Mesh&)>& op)
     {
-        auto& reg = engine.GetScene().GetRegistry();
+        auto& reg = engine.GetSceneManager().GetScene().GetRegistry();
         auto* collider = reg.try_get<ECS::MeshCollider::Component>(entity);
         auto* sc = reg.try_get<ECS::Surface::Component>(entity);
         auto* meshData = reg.try_get<ECS::Mesh::Data>(entity);
@@ -314,14 +314,14 @@ namespace
         uploadReq.UploadMode = Graphics::GeometryUploadMode::Staged;
 
         auto [gpuData, token] = Graphics::GeometryGpuData::CreateAsync(
-            engine.GetDeviceShared(), engine.GetGraphicsBackend().GetTransferManager(), uploadReq,
-            &engine.GetGeometryStorage());
+            engine.GetGraphicsBackend().GetDeviceShared(), engine.GetGraphicsBackend().GetTransferManager(), uploadReq,
+            &engine.GetRenderOrchestrator().GetGeometryStorage());
 
         auto oldHandle = sc->Geometry;
-        sc->Geometry = engine.GetGeometryStorage().Add(std::move(gpuData));
+        sc->Geometry = engine.GetRenderOrchestrator().GetGeometryStorage().Add(std::move(gpuData));
 
         if (oldHandle.IsValid())
-            engine.GetGeometryStorage().Remove(oldHandle, engine.GetDevice().GetGlobalFrameNumber());
+            engine.GetRenderOrchestrator().GetGeometryStorage().Remove(oldHandle, engine.GetGraphicsBackend().GetDevice().GetGlobalFrameNumber());
 
         ReleaseGpuSlot(engine.GetRenderOrchestrator().GetGPUScene(), *sc);
         reg.emplace_or_replace<ECS::Components::Transform::WorldUpdatedTag>(entity);
@@ -337,13 +337,13 @@ namespace
         md.MeshRef = collider->CollisionRef->SourceMesh;
         md.AttributesDirty = true;
 
-        engine.GetScene().GetDispatcher().enqueue<ECS::Events::GeometryModified>({entity});
+        engine.GetSceneManager().GetScene().GetDispatcher().enqueue<ECS::Events::GeometryModified>({entity});
         return true;
     }
 
     [[nodiscard]] bool HasSurfaceInput(Runtime::Engine& engine, entt::entity entity) noexcept
     {
-        const auto& reg = engine.GetScene().GetRegistry();
+        const auto& reg = engine.GetSceneManager().GetScene().GetRegistry();
         return GetGeometryProcessingCapabilities(reg, entity).HasEditableSurfaceMesh;
     }
 
@@ -1093,7 +1093,7 @@ bool DrawKMeansWidget(Runtime::Engine& engine,
                      entt::entity entity,
                      KMeansWidgetState& state)
 {
-    auto& reg = engine.GetScene().GetRegistry();
+    auto& reg = engine.GetSceneManager().GetScene().GetRegistry();
     const auto domains = GetGeometryProcessingCapabilities(reg, entity).Domains
                        & GetSupportedDomains(GeometryProcessingAlgorithm::KMeans);
     DrawDomainBadges(domains);
@@ -1229,7 +1229,7 @@ bool DrawMeshSpectralWidget(Runtime::Engine& engine,
                            entt::entity entity,
                            MeshSpectralWidgetState& state)
 {
-    auto& reg = engine.GetScene().GetRegistry();
+    auto& reg = engine.GetSceneManager().GetScene().GetRegistry();
     auto* meshData = reg.try_get<ECS::Mesh::Data>(entity);
     auto* collider = reg.try_get<ECS::MeshCollider::Component>(entity);
 
@@ -1289,7 +1289,7 @@ bool DrawMeshSpectralWidget(Runtime::Engine& engine,
             writableMeshData.MeshRef = meshRef;
             writableMeshData.AttributesDirty = true;
             reg.emplace_or_replace<ECS::DirtyTag::VertexAttributes>(entity);
-            engine.GetScene().GetDispatcher().enqueue<ECS::Events::GeometryModified>({entity});
+            engine.GetSceneManager().GetScene().GetDispatcher().enqueue<ECS::Events::GeometryModified>({entity});
             changed = true;
         }
         else
@@ -1324,7 +1324,7 @@ bool DrawGraphSpectralWidget(Runtime::Engine& engine,
                             entt::entity entity,
                             GraphSpectralWidgetState& state)
 {
-    auto& reg = engine.GetScene().GetRegistry();
+    auto& reg = engine.GetSceneManager().GetScene().GetRegistry();
     auto* graphData = reg.try_get<ECS::Graph::Data>(entity);
     if (!graphData || !graphData->GraphRef)
     {
@@ -1411,7 +1411,7 @@ bool DrawGraphSpectralWidget(Runtime::Engine& engine,
             reg.emplace_or_replace<ECS::DirtyTag::VertexPositions>(entity);
         }
 
-        engine.GetScene().GetDispatcher().enqueue<ECS::Events::GeometryModified>({entity});
+        engine.GetSceneManager().GetScene().GetDispatcher().enqueue<ECS::Events::GeometryModified>({entity});
         return true;
     };
 

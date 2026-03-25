@@ -485,12 +485,12 @@ namespace Runtime::PointCloudKMeans
                                   ResolvedTarget& target,
                                   const Geometry::KMeans::KMeansResult& result)
         {
-            auto& reg = engine.GetScene().GetRegistry();
+            auto& reg = engine.GetSceneManager().GetScene().GetRegistry();
             const entt::entity centroidEntity = EnsureCentroidEntity(reg, sourceEntity, target);
             auto& centroidData = reg.get_or_emplace<ECS::PointCloud::Data>(centroidEntity);
             SyncCentroidPointCloud(centroidData, result);
             BuildCentroidPointKDTree(reg, centroidEntity);
-            engine.GetScene().GetDispatcher().enqueue<ECS::Events::GeometryModified>({centroidEntity});
+            engine.GetSceneManager().GetScene().GetDispatcher().enqueue<ECS::Events::GeometryModified>({centroidEntity});
         }
 
 #ifdef INTRINSIC_HAS_CUDA
@@ -517,7 +517,7 @@ namespace Runtime::PointCloudKMeans
         // ScheduleCudaJob(), PumpCompletions(), and ReleaseEntityBuffers() are
         // all invoked from the runtime's main-thread frame/update path. CPU
         // worker jobs never mutate this registry directly; they marshal
-        // completions through Engine::RunOnMainThread() before touching
+        // completions through AssetPipeline::RunOnMainThread() before touching
         // authoritative ECS/runtime state.
         class PendingCudaJobRegistry
         {
@@ -571,7 +571,7 @@ namespace Runtime::PointCloudKMeans
             ResolvedTarget target,
             const Geometry::KMeans::KMeansParams& params)
         {
-            auto* cudaDevice = engine.GetCudaDevice();
+            auto* cudaDevice = engine.GetGraphicsBackend().GetCudaDevice();
             if (!cudaDevice)
                 return false;
 
@@ -648,7 +648,7 @@ namespace Runtime::PointCloudKMeans
             }
 
             const std::vector<glm::vec3> existingCentroids =
-                SnapshotExistingCentroids(engine.GetScene().GetRegistry(), target);
+                SnapshotExistingCentroids(engine.GetSceneManager().GetScene().GetRegistry(), target);
             const std::vector<glm::vec3> centroids = Geometry::KMeans::BuildInitialCentroids(
                 points, existingCentroids, params, job.ClusterCount);
             if (!cudaDevice->CopyHostToBufferAsync(job.Centroids, centroids.data(), centroids.size() * sizeof(glm::vec3), job.Stream))
@@ -805,7 +805,7 @@ namespace Runtime::PointCloudKMeans
         {
             PROFILE_SCOPE("PointCloudKMeans::ScheduleCUDA");
 
-            auto* cudaDevice = engine.GetCudaDevice();
+            auto* cudaDevice = engine.GetGraphicsBackend().GetCudaDevice();
             if (!cudaDevice || !pcData.CloudRef)
                 return false;
 
@@ -833,7 +833,7 @@ namespace Runtime::PointCloudKMeans
                 pcData.CudaPositionRevision = pcData.PositionRevision;
             }
 
-            auto& reg = engine.GetScene().GetRegistry();
+            auto& reg = engine.GetSceneManager().GetScene().GetRegistry();
             ResolvedTarget target = ResolveTarget(reg, entity, Domain::PointCloudPoints);
             const std::vector<glm::vec3> existingCentroids = SnapshotExistingCentroids(reg, target);
             const std::vector<glm::vec3> centroids = Geometry::KMeans::BuildInitialCentroids(
@@ -881,7 +881,7 @@ namespace Runtime::PointCloudKMeans
 
     TargetInfo DescribeTarget(Engine& engine, entt::entity entity, Domain requestedDomain)
     {
-        auto& reg = engine.GetScene().GetRegistry();
+        auto& reg = engine.GetSceneManager().GetScene().GetRegistry();
         const ResolvedTarget target = ResolveTarget(reg, entity, requestedDomain);
 
         TargetInfo info{};
@@ -927,7 +927,7 @@ namespace Runtime::PointCloudKMeans
     {
         PROFILE_SCOPE("PointCloudKMeans::ApplyResult");
 
-        auto& reg = engine.GetScene().GetRegistry();
+        auto& reg = engine.GetSceneManager().GetScene().GetRegistry();
         ResolvedTarget target = ResolveTarget(reg, entity, requestedDomain);
         if (!target.IsValid())
             return false;
@@ -963,7 +963,7 @@ namespace Runtime::PointCloudKMeans
         BumpKMeansRevision(target);
         UpdateCentroidEntity(engine, entity, target, result);
         MarkVertexAttributesDirty(reg, entity);
-        engine.GetScene().GetDispatcher().enqueue<ECS::Events::GeometryModified>({entity});
+        engine.GetSceneManager().GetScene().GetDispatcher().enqueue<ECS::Events::GeometryModified>({entity});
         return true;
     }
 
@@ -1090,7 +1090,7 @@ namespace Runtime::PointCloudKMeans
     {
         PROFILE_SCOPE("PointCloudKMeans::Schedule");
 
-        auto& reg = engine.GetScene().GetRegistry();
+        auto& reg = engine.GetSceneManager().GetScene().GetRegistry();
         ResolvedTarget target = ResolveTarget(reg, entity, requestedDomain);
         if (!target.IsValid())
             return false;
@@ -1154,14 +1154,14 @@ namespace Runtime::PointCloudKMeans
             payload->Result = result;
             payload->DurationMs = durationMs;
 
-            engine.RunOnMainThread([payload = std::move(payload)]() mutable
+            engine.GetAssetPipeline().RunOnMainThread([payload = std::move(payload)]() mutable
             {
                 Engine& owner = *payload->Owner;
                 const entt::entity completedEntity = payload->Entity;
 
                 if (!payload->Result)
                 {
-                    auto& reg = owner.GetScene().GetRegistry();
+                    auto& reg = owner.GetSceneManager().GetScene().GetRegistry();
                     if (reg.valid(completedEntity))
                     {
                         ResolvedTarget target = ResolveTarget(reg, completedEntity, payload->Domain);
@@ -1186,7 +1186,7 @@ namespace Runtime::PointCloudKMeans
         PROFILE_SCOPE("PointCloudKMeans::PumpCompletions");
 
 #ifdef INTRINSIC_HAS_CUDA
-        auto* cudaDevice = engine.GetCudaDevice();
+        auto* cudaDevice = engine.GetGraphicsBackend().GetCudaDevice();
         if (!cudaDevice)
             return;
 
@@ -1194,7 +1194,7 @@ namespace Runtime::PointCloudKMeans
         if (!pendingJobs)
             return;
 
-        auto& reg = engine.GetScene().GetRegistry();
+        auto& reg = engine.GetSceneManager().GetScene().GetRegistry();
 
         for (auto it = pendingJobs->begin(); it != pendingJobs->end(); )
         {
@@ -1347,7 +1347,7 @@ namespace Runtime::PointCloudKMeans
     void ReleaseEntityBuffers(Engine& engine, entt::entity entity)
     {
 #ifdef INTRINSIC_HAS_CUDA
-        auto* cudaDevice = engine.GetCudaDevice();
+        auto* cudaDevice = engine.GetGraphicsBackend().GetCudaDevice();
         if (!cudaDevice)
             return;
 
@@ -1361,7 +1361,7 @@ namespace Runtime::PointCloudKMeans
             }
         }
 
-        auto& reg = engine.GetScene().GetRegistry();
+        auto& reg = engine.GetSceneManager().GetScene().GetRegistry();
         if (!reg.valid(entity))
             return;
 
@@ -1383,7 +1383,7 @@ namespace Runtime::PointCloudKMeans
         if (auto* pcData = reg.try_get<ECS::PointCloud::Data>(entity))
             pcData->ReleaseCudaBuffers(*cudaDevice);
 #else
-        auto& reg = engine.GetScene().GetRegistry();
+        auto& reg = engine.GetSceneManager().GetScene().GetRegistry();
         if (!reg.valid(entity))
             return;
         if (auto* pcData = reg.try_get<ECS::PointCloud::Data>(entity))

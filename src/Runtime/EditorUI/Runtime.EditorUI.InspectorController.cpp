@@ -38,9 +38,9 @@ void InspectorController::Draw()
 
     const entt::entity selected = *m_CachedSelected;
 
-    if (selected != entt::null && m_Engine->GetScene().GetRegistry().valid(selected))
+    if (selected != entt::null && m_Engine->GetSceneManager().GetScene().GetRegistry().valid(selected))
     {
-        auto& reg = m_Engine->GetScene().GetRegistry();
+        auto& reg = m_Engine->GetSceneManager().GetScene().GetRegistry();
 
         // 1. Tag Component
         if (reg.all_of<ECS::Components::NameTag::Component>(selected))
@@ -88,7 +88,7 @@ void InspectorController::Draw()
             if (ImGui::CollapsingHeader("Surface", ImGuiTreeNodeFlags_DefaultOpen))
             {
                 auto& sc = reg.get<ECS::Surface::Component>(selected);
-                Graphics::GeometryGpuData* geo = m_Engine->GetGeometryStorage().GetIfValid(sc.Geometry);
+                Graphics::GeometryGpuData* geo = m_Engine->GetRenderOrchestrator().GetGeometryStorage().GetIfValid(sc.Geometry);
 
                 if (geo)
                 {
@@ -284,7 +284,7 @@ void InspectorController::Draw()
         {
             auto& sc = reg.get<ECS::Surface::Component>(selected);
             Graphics::PrimitiveTopology topology = Graphics::PrimitiveTopology::Triangles;
-            if (auto* geo = m_Engine->GetGeometryStorage().GetIfValid(sc.Geometry))
+            if (auto* geo = m_Engine->GetRenderOrchestrator().GetGeometryStorage().GetIfValid(sc.Geometry))
                 topology = geo->GetTopology();
 
             const bool isTriangleMesh = (topology == Graphics::PrimitiveTopology::Triangles);

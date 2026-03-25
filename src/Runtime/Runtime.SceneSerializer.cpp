@@ -348,7 +348,7 @@ namespace Runtime
         const std::string& path,
         Core::IO::IIOBackend& backend)
     {
-        const auto& reg = engine.GetScene().GetRegistry();
+        const auto& reg = engine.GetSceneManager().GetScene().GetRegistry();
 
         // Build entity → index mapping for hierarchy references
         std::unordered_map<entt::entity, uint32_t> entityToIndex;
@@ -443,7 +443,7 @@ namespace Runtime
         }
 
         // 4. Clear the current scene
-        engine.GetSelection().ClearSelection(engine.GetScene());
+        engine.GetSelection().ClearSelection(engine.GetSceneManager().GetScene());
         engine.GetSceneManager().Clear();
 
         // 5. Import unique assets first (group entities by source path)
@@ -478,13 +478,13 @@ namespace Runtime
             uint32_t savedId = ej["id"].get<uint32_t>();
             std::string name = ej.value("name", "Unnamed Entity");
 
-            entt::entity entity = engine.GetScene().CreateEntity(name);
+            entt::entity entity = engine.GetSceneManager().GetScene().CreateEntity(name);
             indexToEntity[savedId] = entity;
 
             // Apply transform
             if (ej.contains("transform"))
             {
-                auto& t = engine.GetScene().GetRegistry().get<ECS::Components::Transform::Component>(entity);
+                auto& t = engine.GetSceneManager().GetScene().GetRegistry().get<ECS::Components::Transform::Component>(entity);
                 const auto& tj = ej["transform"];
                 if (tj.contains("position"))
                     t.Position = JsonToVec3(tj["position"]);
@@ -493,7 +493,7 @@ namespace Runtime
                 if (tj.contains("scale"))
                     t.Scale = JsonToVec3(tj["scale"]);
 
-                engine.GetScene().GetRegistry().emplace_or_replace<ECS::Components::Transform::IsDirtyTag>(entity);
+                engine.GetSceneManager().GetScene().GetRegistry().emplace_or_replace<ECS::Components::Transform::IsDirtyTag>(entity);
             }
 
             // Store asset source ref
@@ -502,14 +502,14 @@ namespace Runtime
                 std::string src = ej["assetSource"].get<std::string>();
                 if (!src.empty())
                 {
-                    engine.GetScene().GetRegistry().emplace<ECS::Components::AssetSourceRef::Component>(entity, src);
+                    engine.GetSceneManager().GetScene().GetRegistry().emplace<ECS::Components::AssetSourceRef::Component>(entity, src);
                 }
             }
 
             // Make selectable
-            engine.GetScene().GetRegistry().emplace<ECS::Components::Selection::SelectableTag>(entity);
+            engine.GetSceneManager().GetScene().GetRegistry().emplace<ECS::Components::Selection::SelectableTag>(entity);
             static uint32_t s_PickId = 1000000u; // Start high to avoid conflicts
-            engine.GetScene().GetRegistry().emplace<ECS::Components::Selection::PickID>(entity, s_PickId++);
+            engine.GetSceneManager().GetScene().GetRegistry().emplace<ECS::Components::Selection::PickID>(entity, s_PickId++);
 
             // If this entity has an asset source, spawn the model's geometry onto it
             if (ej.contains("assetSource"))
@@ -519,7 +519,7 @@ namespace Runtime
                 if (it != assetCache.end() && it->second.Success)
                 {
                     // Resolve the model to get mesh segment handles
-                    auto* model = engine.GetAssetManager().TryGet<Graphics::Model>(it->second.ModelHandle);
+                    auto* model = engine.GetAssetPipeline().GetAssetManager().TryGet<Graphics::Model>(it->second.ModelHandle);
                     if (model && !model->Meshes.empty())
                     {
                         // For simplicity, attach the first mesh segment's geometry.
@@ -527,11 +527,11 @@ namespace Runtime
                         // but for scene reload we attach directly.
                         const auto& seg = model->Meshes[0];
                         const auto handle = seg->Handle;
-                        const auto* geo = engine.GetGeometryStorage().GetIfValid(handle);
+                        const auto* geo = engine.GetRenderOrchestrator().GetGeometryStorage().GetIfValid(handle);
 
                         if (geo && geo->GetTopology() == Graphics::PrimitiveTopology::Points)
                         {
-                            auto& pcd = engine.GetScene().GetRegistry().emplace_or_replace<ECS::PointCloud::Data>(entity);
+                            auto& pcd = engine.GetSceneManager().GetScene().GetRegistry().emplace_or_replace<ECS::PointCloud::Data>(entity);
                             pcd.GpuGeometry = handle;
                             pcd.GpuDirty = false;
                             pcd.CloudRef.reset();
@@ -541,17 +541,17 @@ namespace Runtime
                         }
                         else
                         {
-                            auto& sc = engine.GetScene().GetRegistry().emplace_or_replace<ECS::Surface::Component>(entity);
+                            auto& sc = engine.GetSceneManager().GetScene().GetRegistry().emplace_or_replace<ECS::Surface::Component>(entity);
                             sc.Geometry = handle;
                             sc.Material = it->second.MaterialHandle;
 
                             if (seg->CollisionGeometry)
                             {
-                                auto& col = engine.GetScene().GetRegistry().emplace_or_replace<ECS::MeshCollider::Component>(entity);
+                                auto& col = engine.GetSceneManager().GetScene().GetRegistry().emplace_or_replace<ECS::MeshCollider::Component>(entity);
                                 col.CollisionRef = seg->CollisionGeometry;
                                 col.WorldOBB.Center = col.CollisionRef->LocalAABB.GetCenter();
 
-                                auto& primitiveBvh = engine.GetScene().GetRegistry().emplace_or_replace<ECS::PrimitiveBVH::Data>(entity);
+                                auto& primitiveBvh = engine.GetSceneManager().GetScene().GetRegistry().emplace_or_replace<ECS::PrimitiveBVH::Data>(entity);
                                 primitiveBvh.Source = ECS::PrimitiveBVH::SourceKind::MeshTriangles;
                                 primitiveBvh.Dirty = true;
                             }
@@ -576,7 +576,7 @@ namespace Runtime
                 if (childIt != indexToEntity.end() && parentIt != indexToEntity.end())
                 {
                     ECS::Components::Hierarchy::Attach(
-                        engine.GetScene().GetRegistry(),
+                        engine.GetSceneManager().GetScene().GetRegistry(),
                         childIt->second,
                         parentIt->second);
                 }
@@ -592,7 +592,7 @@ namespace Runtime
                 auto it = indexToEntity.find(savedId);
                 if (it != indexToEntity.end())
                 {
-                    ApplyComponentSettings(engine.GetScene().GetRegistry(), it->second, ej["components"]);
+                    ApplyComponentSettings(engine.GetSceneManager().GetScene().GetRegistry(), it->second, ej["components"]);
                 }
             }
         }

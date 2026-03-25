@@ -392,8 +392,8 @@ namespace Runtime::EditorUI
                     ImGui::TextDisabled("Select source vertices, then click Compute.");
                     ImGui::Text("Source vertices: %zu", sub.SelectedVertices.size());
 
-                    const entt::entity selected = sel.GetSelectedEntity(engine.GetScene());
-                    auto& reg = engine.GetScene().GetRegistry();
+                    const entt::entity selected = sel.GetSelectedEntity(engine.GetSceneManager().GetScene());
+                    auto& reg = engine.GetSceneManager().GetScene().GetRegistry();
 
                     bool canCompute = selected != entt::null
                         && !sub.SelectedVertices.empty()
@@ -477,7 +477,7 @@ namespace Runtime::EditorUI
                                  : Runtime::SelectionModule::Activation::Disabled;
 
             ImGui::SeparatorText("State");
-            const entt::entity selected = sel.GetSelectedEntity(engine.GetScene());
+            const entt::entity selected = sel.GetSelectedEntity(engine.GetSceneManager().GetScene());
             ImGui::Text("Selected entity: %u", (uint32_t)selected);
 
             const auto& picked = sel.GetPicked();
@@ -495,7 +495,7 @@ namespace Runtime::EditorUI
                         picked.spaces.World.z);
 
             if (ImGui::Button("Clear Selection"))
-                sel.ClearSelection(engine.GetScene());
+                sel.ClearSelection(engine.GetSceneManager().GetScene());
         }, true, 0, false);
     }
 
@@ -653,7 +653,7 @@ namespace Runtime::EditorUI
             return;
 
         const entt::entity entity = sub.Entity;
-        auto& reg = engine.GetScene().GetRegistry();
+        auto& reg = engine.GetSceneManager().GetScene().GetRegistry();
         if (entity == entt::null || !reg.valid(entity))
             return;
 

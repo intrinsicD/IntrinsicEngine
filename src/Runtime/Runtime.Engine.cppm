@@ -156,51 +156,11 @@ export namespace Runtime
         [[nodiscard]] RenderOrchestrator& GetRenderOrchestrator() { return *m_RenderOrchestrator; }
         [[nodiscard]] const RenderOrchestrator& GetRenderOrchestrator() const { return *m_RenderOrchestrator; }
 
-        // Convenience: direct access to the ECS scene (delegates to SceneManager).
-        [[nodiscard]] ECS::Scene& GetScene() { return m_SceneManager->GetScene(); }
-        [[nodiscard]] const ECS::Scene& GetScene() const { return m_SceneManager->GetScene(); }
-
-        // Convenience accessor: delegates to AssetPipeline.
-        [[nodiscard]] Core::Assets::AssetManager& GetAssetManager() { return m_AssetPipeline->GetAssetManager(); }
-        [[nodiscard]] const Core::Assets::AssetManager& GetAssetManager() const { return m_AssetPipeline->GetAssetManager(); }
-
-        // Helper to access the camera buffer (Temporary until we have a Camera Component)
-        [[nodiscard]] RHI::VulkanBuffer* GetGlobalUBO() const { return m_RenderOrchestrator->GetRenderSystem().GetGlobalUBO(); }
-
-        // Convenience accessors that delegate to GraphicsBackend.
-        [[nodiscard]] RHI::VulkanDevice& GetDevice() const { return m_GraphicsBackend->GetDevice(); }
-        [[nodiscard]] const std::shared_ptr<RHI::VulkanDevice>& GetDeviceShared() const { return m_GraphicsBackend->GetDeviceShared(); }
-        [[nodiscard]] RHI::DescriptorAllocator& GetDescriptorPool() const { return m_GraphicsBackend->GetDescriptorPool(); }
-        [[nodiscard]] RHI::DescriptorLayout& GetDescriptorLayout() const { return m_GraphicsBackend->GetDescriptorLayout(); }
-        [[nodiscard]] RHI::VulkanSwapchain& GetSwapchain() const { return m_GraphicsBackend->GetSwapchain(); }
-        [[nodiscard]] Graphics::GeometryPool& GetGeometryStorage() { return m_RenderOrchestrator->GetGeometryStorage(); }
-
-#ifdef INTRINSIC_HAS_CUDA
-        [[nodiscard]] RHI::CudaDevice* GetCudaDevice() const { return m_GraphicsBackend->GetCudaDevice(); }
-#endif
-
         // Access to the I/O subsystem.
         [[nodiscard]] Core::IO::IIOBackend& GetIOBackend() { return *m_IOBackend; }
         [[nodiscard]] const Graphics::IORegistry& GetIORegistry() const { return m_IORegistry; }
         [[nodiscard]] Graphics::IORegistry& GetIORegistry() { return m_IORegistry; }
 
-        // Convenience methods that delegate to AssetPipeline.
-        void RegisterAssetLoad(Core::Assets::AssetHandle handle, RHI::TransferToken token)
-        {
-            m_AssetPipeline->RegisterAssetLoad(handle, token);
-        }
-
-        template <typename F>
-        void RegisterAssetLoad(Core::Assets::AssetHandle handle, RHI::TransferToken token, F&& onComplete)
-        {
-            m_AssetPipeline->RegisterAssetLoad(handle, token, std::forward<F>(onComplete));
-        }
-
-        template <typename F>
-        void RunOnMainThread(F&& task)
-        {
-            m_AssetPipeline->RunOnMainThread(std::forward<F>(task));
-        }
 
     protected:
         bool m_Running = true;

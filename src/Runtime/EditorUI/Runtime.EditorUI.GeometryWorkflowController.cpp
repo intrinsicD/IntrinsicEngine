@@ -64,7 +64,7 @@ GeometryWorkflowController::SelectionContext GeometryWorkflowController::GetSele
     SelectionContext context{};
     context.Selected = *m_CachedSelected;
 
-    auto& reg = m_Engine->GetScene().GetRegistry();
+    auto& reg = m_Engine->GetSceneManager().GetScene().GetRegistry();
     context.HasSelection = context.Selected != entt::null && reg.valid(context.Selected);
     context.HasSurface = context.HasSelection
         && GetGeometryProcessingCapabilities(reg, context.Selected).HasEditableSurfaceMesh;

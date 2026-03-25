@@ -60,6 +60,7 @@ Engine
 
 - **Role:** top-level composition root and frame-loop owner.
 - **Owns directly:** window, feature registry, selection module, I/O backend, I/O registry, and the four extracted subsystems.
+- **Access policy:** callers go through the owning subsystem getter first (`GetGraphicsBackend()`, `GetAssetPipeline()`, `GetSceneManager()`, `GetRenderOrchestrator()`); `Engine` no longer exposes convenience shims for scene, asset, device, swapchain, CUDA, or geometry storage access.
 - **May orchestrate:** startup ordering, resize handling, fixed-step lane, variable-step lane, render handoff, asset upload polling, and final shutdown sequencing.
 - **Should not absorb again:** low-level Vulkan lifetime management, direct asset-transfer bookkeeping, ECS hook wiring details, or render-subsystem internal ownership.
 
