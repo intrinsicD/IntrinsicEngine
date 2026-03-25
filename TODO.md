@@ -187,6 +187,7 @@ Mapping guidance for current Intrinsic code while preserving that reference shap
   - [ ] UI / editor overlay packets
   - [ ] geometry-processing visualization packets
 - [x] Move `Graphics.Passes.Picking` entity/primitive resolution into extraction so pass recording consumes immutable pick packets instead of live ECS traversal. *(Runtime extraction now builds immutable `PickingSurfacePacket`/`PickingLinePacket`/`PickingPointPacket` bundles, and `PickingPass` records draws exclusively from `RenderPassContext` packet spans.)*
+- [x] Route selection-presence recipe inputs through extraction snapshots instead of querying live ECS during render-graph recipe construction. *(Extraction now captures immutable `RenderWorld::HasSelectionWork`, and both `RenderSystem` fallback recipe logic plus `DefaultPipeline::BuildFrameRecipe` consume that snapshot state rather than doing late `SelectedTag`/`HoveredTag` registry traversals.)*
 - [ ] Resolve retained `GPUScene` handles, bindless references, and debug-view state during extraction rather than during late pass recording.
 - [x] Add tests that guarantee render prep and command recording consume extraction output only. *(Added `RenderExtraction.ExtractedPickingPacketsRemainStableAfterSceneMutation` to lock immutable extraction-snapshot behavior for picking packets, preventing live ECS mutations from changing recorded packet inputs.)*
 

@@ -28,7 +28,6 @@ import Graphics.PipelineLibrary;
 import Graphics.ShaderRegistry;
 import RHI.Descriptors;
 import RHI.Device;
-import ECS;
 import Core.Hash;
 import Core.FeatureRegistry;
 import Core.Logging;
@@ -414,14 +413,6 @@ namespace Graphics
 
     FrameRecipe DefaultPipeline::BuildFrameRecipe(const RenderPassContext& ctx) const
     {
-        bool hasSelectionWork = false;
-        if (m_SelectionOutlinePass && IsFeatureEnabled(FeatureCatalog::SelectionOutlinePass))
-        {
-            auto& registry = ctx.Scene.GetRegistry();
-            hasSelectionWork = !registry.view<ECS::Components::Selection::SelectedTag>().empty() ||
-                               !registry.view<ECS::Components::Selection::HoveredTag>().empty();
-        }
-
         DefaultPipelineRecipeInputs inputs{};
         inputs.PickingPassEnabled = m_PickingPass && IsFeatureEnabled(FeatureCatalog::PickingPass);
         inputs.SurfacePassEnabled = m_SurfacePass && IsFeatureEnabled(FeatureCatalog::SurfacePass);
@@ -432,7 +423,7 @@ namespace Graphics
         inputs.DebugViewPassEnabled = m_DebugViewPass && IsFeatureEnabled(FeatureCatalog::DebugViewPass);
         inputs.ImGuiPassEnabled = m_ImGuiPass && IsFeatureEnabled(FeatureCatalog::ImGuiPass);
         inputs.CompositionPassEnabled = m_CompositionPass != nullptr;
-        inputs.HasSelectionWork = hasSelectionWork;
+        inputs.HasSelectionWork = ctx.HasSelectionWork;
         inputs.DebugViewEnabled = ctx.Debug.Enabled;
         inputs.DebugResource = ctx.Debug.SelectedResource;
 

@@ -311,6 +311,7 @@ namespace Runtime
         m_RenderSystem->BuildGraph(*scene,
                                    m_AssetManager,
                                    preparedRenderWorld->View.Camera,
+                                   preparedRenderWorld->HasSelectionWork,
                                    preparedRenderWorld->SurfacePicking,
                                    preparedRenderWorld->LinePicking,
                                    preparedRenderWorld->PointPicking);

@@ -69,6 +69,7 @@ export namespace Runtime
         double Alpha = 0.0;
         RenderViewPacket View{};
         WorldSnapshot World{};
+        bool HasSelectionWork = false;
         std::vector<Graphics::PickingSurfacePacket> SurfacePicking{};
         std::vector<Graphics::PickingLinePacket> LinePicking{};
         std::vector<Graphics::PickingPointPacket> PointPicking{};

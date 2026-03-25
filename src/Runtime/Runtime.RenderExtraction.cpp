@@ -169,6 +169,16 @@ namespace Runtime
             std::vector<Graphics::PickingPointPacket> Point{};
         };
 
+        [[nodiscard]] bool ExtractSelectionWorkState(const WorldSnapshot& world)
+        {
+            if (!world.Registry)
+                return false;
+
+            const entt::registry& registry = *world.Registry;
+            return !registry.view<ECS::Components::Selection::SelectedTag>().empty() ||
+                   !registry.view<ECS::Components::Selection::HoveredTag>().empty();
+        }
+
         [[nodiscard]] PickingPacketBundle ExtractPickingPackets(const WorldSnapshot& world)
         {
             if (!Core::Tasks::Scheduler::IsInitialized())
@@ -287,6 +297,7 @@ namespace Runtime
             .Alpha = SanitizeAlpha(input.Alpha),
             .View = input.View,
             .World = input.World,
+            .HasSelectionWork = ExtractSelectionWorkState(input.World),
             .SurfacePicking = std::move(packets.Surface),
             .LinePicking = std::move(packets.Line),
             .PointPicking = std::move(packets.Point),

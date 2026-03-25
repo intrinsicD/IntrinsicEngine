@@ -383,6 +383,31 @@ TEST(RenderExtraction, ExtractedPickingPacketsRemainStableAfterSceneMutation)
     EXPECT_EQ(extracted.LinePicking.front().EdgeCount, 7u);
 }
 
+TEST(RenderExtraction, ExtractedSelectionWorkStateRemainsStableAfterMutation)
+{
+    Runtime::SceneManager sceneManager;
+    auto& registry = sceneManager.GetRegistry();
+
+    const entt::entity selectedEntity = registry.create();
+    registry.emplace<ECS::Components::Selection::SelectedTag>(selectedEntity);
+
+    sceneManager.CommitFixedTick();
+
+    const Runtime::RenderWorld extracted = Runtime::ExtractRenderWorld(Runtime::MakeRenderFrameInput(
+        Graphics::CameraComponent{},
+        sceneManager.CreateReadonlySnapshot(),
+        Runtime::RenderViewport{.Width = 1024, .Height = 768},
+        0.0));
+
+    EXPECT_TRUE(extracted.HasSelectionWork);
+
+    registry.remove<ECS::Components::Selection::SelectedTag>(selectedEntity);
+    EXPECT_FALSE(registry.any_of<ECS::Components::Selection::SelectedTag>(selectedEntity));
+
+    // Extracted state is immutable and does not change with post-extraction ECS mutation.
+    EXPECT_TRUE(extracted.HasSelectionWork);
+}
+
 TEST(RenderExtraction, RenderPassContext_ExposesReadonlySceneSnapshot)
 {
     using SceneRef = decltype(std::declval<Graphics::RenderPassContext>().Scene);

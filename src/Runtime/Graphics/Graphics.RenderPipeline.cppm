@@ -336,6 +336,7 @@ export namespace Graphics
 
         RHI::VulkanBuffer* PickReadbackBuffer = nullptr;
         DebugDraw* DebugDrawPtr = nullptr;
+        bool HasSelectionWork = false;
 
         std::span<const PickingSurfacePacket> PickingSurfacePackets{};
         std::span<const PickingLinePacket> PickingLinePackets{};
