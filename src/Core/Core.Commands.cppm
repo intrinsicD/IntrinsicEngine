@@ -51,17 +51,18 @@ export namespace Core
     template <typename T>
         requires std::copy_constructible<T>
     [[nodiscard]] EditorCommand MakeComponentChangeCommand(std::string name,
-                                                           entt::registry& reg,
+                                                           entt::registry* reg,
                                                            entt::entity entity,
                                                            T oldState,
                                                            T newState)
     {
+        assert(reg && "MakeComponentChangeCommand: registry pointer must not be null");
         const CmdComponentChange<T> change{entity, std::move(oldState), std::move(newState)};
 
         return EditorCommand{
             .name = std::move(name),
-            .redo = [&reg, change]() { (void)change.redo(reg); },
-            .undo = [&reg, change]() { (void)change.undo(reg); },
+            .redo = [reg, change]() { if (reg) (void)change.redo(*reg); },
+            .undo = [reg, change]() { if (reg) (void)change.undo(*reg); },
         };
     }
 

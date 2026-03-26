@@ -4,6 +4,7 @@ module;
 #include <cstdint>
 #include <optional>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include <latch>
 #include <entt/entity/registry.hpp>
@@ -221,6 +222,7 @@ namespace Runtime
                 }
             };
 
+            std::unordered_set<uint32_t> seenPickIds;
             registry.view<ECS::Components::Selection::SelectedTag>().each([&](entt::entity root)
             {
                 visitSubtree(root, [&](entt::entity candidate)
@@ -230,8 +232,7 @@ namespace Runtime
                     const uint32_t pickId = registry.get<ECS::Components::Selection::PickID>(candidate).Value;
                     if (pickId == 0u)
                         return;
-                    if (std::find(packet.SelectedPickIds.begin(), packet.SelectedPickIds.end(), pickId) !=
-                        packet.SelectedPickIds.end())
+                    if (!seenPickIds.insert(pickId).second)
                         return;
                     packet.SelectedPickIds.push_back(pickId);
                 });
