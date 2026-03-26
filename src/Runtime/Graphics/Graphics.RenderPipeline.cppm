@@ -3,7 +3,6 @@ module;
 #include <unordered_map>
 #include <memory>
 #include <span>
-#include <array>
 #include <optional>
 #include <string>
 #include <vector>
@@ -18,6 +17,8 @@ import Graphics.GPUScene;
 import Graphics.MaterialSystem;
 import Graphics.Geometry;
 import Geometry.Handle;
+import Geometry.HalfedgeMesh;
+import Geometry.PointCloudUtils;
 import Graphics.ShaderRegistry;
 import Graphics.PipelineLibrary;
 import Graphics.DebugDraw;
@@ -25,7 +26,6 @@ import Graphics.Passes.SelectionOutlineSettings;
 import Graphics.Passes.PostProcessSettings;
 import Core.Hash;
 import Core.Assets;
-import ECS;
 import RHI.Bindless;
 import RHI.Buffer;
 import RHI.Descriptors;
@@ -275,6 +275,62 @@ export namespace Graphics
         uint32_t HoveredPickId = 0;
     };
 
+    struct SurfaceCentroidPacketEntry
+    {
+        glm::vec3 Position{0.0f};
+        uint32_t PackedColor = 0;
+    };
+
+    struct SurfaceDrawPacket
+    {
+        Geometry::GeometryHandle Geometry{};
+        std::vector<uint32_t> FaceColors{};
+        std::vector<uint32_t> VertexColors{};
+        std::vector<uint32_t> VertexLabels{};
+        std::vector<SurfaceCentroidPacketEntry> Centroids{};
+        bool UseNearestVertexColors = false;
+    };
+
+    struct LineDrawPacket
+    {
+        Geometry::GeometryHandle Geometry{};
+        Geometry::GeometryHandle EdgeView{};
+        glm::mat4 WorldMatrix{1.0f};
+        glm::vec4 Color{0.85f, 0.85f, 0.85f, 1.0f};
+        float Width = 1.5f;
+        bool Overlay = false;
+        uint32_t EdgeCount = 0;
+        uint32_t EntityKey = 0;
+        std::vector<uint32_t> EdgeColors{};
+    };
+
+    struct PointDrawPacket
+    {
+        Geometry::GeometryHandle Geometry{};
+        glm::mat4 WorldMatrix{1.0f};
+        glm::vec4 Color{1.0f, 0.6f, 0.0f, 1.0f};
+        float Size = 0.008f;
+        float SizeMultiplier = 1.0f;
+        Geometry::PointCloud::RenderMode Mode = Geometry::PointCloud::RenderMode::FlatDisc;
+        bool HasPerPointNormals = false;
+        uint32_t EntityKey = 0;
+        std::vector<uint32_t> Colors{};
+        std::vector<float> Radii{};
+    };
+
+    struct HtexPatchPreviewPacket
+    {
+        uint32_t SourceEntityId = 0;
+        std::optional<Geometry::Halfedge::Mesh> Mesh{};
+        uint64_t KMeansResultRevision = 0;
+        std::vector<glm::vec3> KMeansCentroids{};
+
+        [[nodiscard]] bool IsValid() const
+        {
+            return Mesh.has_value();
+        }
+    };
+
     // ---------------------------------------------------------------------
     // Frame Context
     // ---------------------------------------------------------------------
@@ -283,8 +339,6 @@ export namespace Graphics
         RenderGraph& Graph;
         RenderBlackboard& Blackboard;
 
-        // Scene
-        const ECS::Scene& Scene;
         const Core::Assets::AssetManager& AssetManager;
         GeometryPool& GeometryStorage;
         MaterialSystem& MaterialSystem;
@@ -348,6 +402,10 @@ export namespace Graphics
         std::span<const PickingSurfacePacket> PickingSurfacePackets{};
         std::span<const PickingLinePacket> PickingLinePackets{};
         std::span<const PickingPointPacket> PickingPointPackets{};
+        std::span<const SurfaceDrawPacket> SurfaceDrawPackets{};
+        std::span<const LineDrawPacket> LineDrawPackets{};
+        std::span<const PointDrawPacket> PointDrawPackets{};
+        const HtexPatchPreviewPacket* HtexPatchPreview = nullptr;
     };
 
     [[nodiscard]] inline RGTextureDesc BuildRenderResourceTextureDesc(RenderResource resource,
@@ -432,6 +490,7 @@ export namespace Graphics
         virtual Passes::SelectionOutlineSettings* GetSelectionOutlineSettings() { return nullptr; }
         virtual Passes::PostProcessSettings* GetPostProcessSettings() { return nullptr; }
         virtual const Passes::HistogramReadback* GetHistogramReadback() const { return nullptr; }
+        virtual void SetDebugDraw(DebugDraw* dd) { (void)dd; }
         [[nodiscard]] virtual RenderPipelineDebugState GetDebugState() const { return {}; }
         [[nodiscard]] virtual const Passes::SelectionOutlineDebugState* GetSelectionOutlineDebugState() const { return nullptr; }
         [[nodiscard]] virtual const Passes::PostProcessDebugState* GetPostProcessDebugState() const { return nullptr; }

@@ -158,98 +158,113 @@ namespace Graphics::Passes
                                             // Surface
                                             bindPipelineAndSets(meshPipeline);
                                             vkCmdSetPrimitiveTopology(cmd, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-                                            for (const auto& packet : ctx.PickingSurfacePackets)
+                                            if (const auto* surfacePackets = ctx.PickingSurfacePackets.data();
+                                                surfacePackets && !ctx.PickingSurfacePackets.empty())
                                             {
-                                                if (!packet.Geometry.IsValid())
-                                                    continue;
-                                                auto* geo = ctx.GeometryStorage.GetIfValid(packet.Geometry);
-                                                if (!geo || !geo->GetVertexBuffer())
-                                                    continue;
-                                                const uint64_t baseAddr = geo->GetVertexBuffer()->GetDeviceAddress();
-                                                const auto& layout = geo->GetLayout();
-                                                const auto faceIdIt = faceIdByGeoIndex.find(packet.Geometry.Index);
-                                                const PickMRTPushConsts push{
-                                                    .Model = packet.WorldMatrix,
-                                                    .PtrPositions = baseAddr + layout.PositionsOffset,
-                                                    .PtrAux = 0,
-                                                    .PtrPrimitiveFaceIds = (faceIdIt != faceIdByGeoIndex.end()) ? faceIdIt->second : 0,
-                                                    .EntityID = packet.EntityId,
-                                                    .PrimitiveBase = 0,
-                                                    .PickWidth = 0.0f,
-                                                    .ViewportWidth = static_cast<float>(ctx.Resolution.width),
-                                                    .ViewportHeight = static_cast<float>(ctx.Resolution.height),
-                                                    ._pad = 0,
-                                                };
-                                                vkCmdPushConstants(cmd, meshPipeline->GetLayout(), VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push), &push);
-                                                if (geo->GetIndexCount() > 0 && geo->GetIndexBuffer())
+                                                for (size_t i = 0; i < ctx.PickingSurfacePackets.size(); ++i)
                                                 {
-                                                    vkCmdBindIndexBuffer(cmd, geo->GetIndexBuffer()->GetHandle(), 0, VK_INDEX_TYPE_UINT32);
-                                                    vkCmdDrawIndexed(cmd, geo->GetIndexCount(), 1, 0, 0, 0);
-                                                }
-                                                else
-                                                {
-                                                    const uint32_t vertCount = static_cast<uint32_t>(layout.PositionsSize / sizeof(glm::vec3));
-                                                    vkCmdDraw(cmd, vertCount, 1, 0, 0);
-                                                }
+                                                    const auto& packet = surfacePackets[i];
+                                                    if (!packet.Geometry.IsValid())
+                                                        continue;
+                                                    auto* geo = ctx.GeometryStorage.GetIfValid(packet.Geometry);
+                                                    if (!geo || !geo->GetVertexBuffer())
+                                                        continue;
+                                                    const uint64_t baseAddr = geo->GetVertexBuffer()->GetDeviceAddress();
+                                                    const auto& layout = geo->GetLayout();
+                                                    const auto faceIdIt = faceIdByGeoIndex.find(packet.Geometry.Index);
+                                                     const PickMRTPushConsts push{
+                                                         .Model = packet.WorldMatrix,
+                                                         .PtrPositions = baseAddr + layout.PositionsOffset,
+                                                         .PtrAux = 0,
+                                                         .PtrPrimitiveFaceIds = (faceIdIt != faceIdByGeoIndex.end()) ? faceIdIt->second : 0,
+                                                         .EntityID = packet.EntityId,
+                                                         .PrimitiveBase = 0,
+                                                         .PickWidth = 0.0f,
+                                                         .ViewportWidth = static_cast<float>(ctx.Resolution.width),
+                                                         .ViewportHeight = static_cast<float>(ctx.Resolution.height),
+                                                         ._pad = 0,
+                                                     };
+                                                     vkCmdPushConstants(cmd, meshPipeline->GetLayout(), VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push), &push);
+                                                     if (geo->GetIndexCount() > 0 && geo->GetIndexBuffer())
+                                                     {
+                                                         vkCmdBindIndexBuffer(cmd, geo->GetIndexBuffer()->GetHandle(), 0, VK_INDEX_TYPE_UINT32);
+                                                         vkCmdDrawIndexed(cmd, geo->GetIndexCount(), 1, 0, 0, 0);
+                                                     }
+                                                     else
+                                                     {
+                                                         const uint32_t vertCount = static_cast<uint32_t>(layout.PositionsSize / sizeof(glm::vec3));
+                                                         vkCmdDraw(cmd, vertCount, 1, 0, 0);
+                                                     }
+                                                 }
                                             }
 
                                             // Lines
                                             bindPipelineAndSets(linePipeline);
                                             vkCmdSetPrimitiveTopology(cmd, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-                                            for (const auto& packet : ctx.PickingLinePackets)
+                                            if (const auto* linePackets = ctx.PickingLinePackets.data();
+                                                linePackets && !ctx.PickingLinePackets.empty())
                                             {
-                                                if (!packet.Geometry.IsValid() || !packet.EdgeView.IsValid() || packet.EdgeCount == 0u)
-                                                    continue;
-                                                auto* vertexGeo = ctx.GeometryStorage.GetIfValid(packet.Geometry);
-                                                auto* edgeGeo = ctx.GeometryStorage.GetIfValid(packet.EdgeView);
-                                                if (!vertexGeo || !edgeGeo)
-                                                    continue;
-                                                const uint64_t baseAddr = vertexGeo->GetVertexBuffer()->GetDeviceAddress();
-                                                const auto& layout = vertexGeo->GetLayout();
-                                                const uint64_t edgeAddr = edgeGeo->GetIndexBuffer() ? edgeGeo->GetIndexBuffer()->GetDeviceAddress() : 0;
-                                                const PickMRTPushConsts push{
-                                                    .Model = packet.WorldMatrix,
-                                                    .PtrPositions = baseAddr + layout.PositionsOffset,
-                                                    .PtrAux = edgeAddr,
-                                                    .PtrPrimitiveFaceIds = 0,
-                                                    .EntityID = packet.EntityId,
-                                                    .PrimitiveBase = 0,
-                                                    .PickWidth = packet.Width,
-                                                    .ViewportWidth = static_cast<float>(ctx.Resolution.width),
-                                                    .ViewportHeight = static_cast<float>(ctx.Resolution.height),
-                                                    ._pad = 0,
-                                                };
-                                                vkCmdPushConstants(cmd, linePipeline->GetLayout(), VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push), &push);
-                                                vkCmdDraw(cmd, packet.EdgeCount * 6, 1, 0, 0);
+                                                for (size_t i = 0; i < ctx.PickingLinePackets.size(); ++i)
+                                                {
+                                                    const auto& packet = linePackets[i];
+                                                    if (!packet.Geometry.IsValid() || !packet.EdgeView.IsValid() || packet.EdgeCount == 0u)
+                                                        continue;
+                                                    auto* vertexGeo = ctx.GeometryStorage.GetIfValid(packet.Geometry);
+                                                    auto* edgeGeo = ctx.GeometryStorage.GetIfValid(packet.EdgeView);
+                                                    if (!vertexGeo || !edgeGeo)
+                                                        continue;
+                                                    const uint64_t baseAddr = vertexGeo->GetVertexBuffer()->GetDeviceAddress();
+                                                    const auto& layout = vertexGeo->GetLayout();
+                                                    const uint64_t edgeAddr = edgeGeo->GetIndexBuffer() ? edgeGeo->GetIndexBuffer()->GetDeviceAddress() : 0;
+                                                    const PickMRTPushConsts push{
+                                                        .Model = packet.WorldMatrix,
+                                                        .PtrPositions = baseAddr + layout.PositionsOffset,
+                                                        .PtrAux = edgeAddr,
+                                                        .PtrPrimitiveFaceIds = 0,
+                                                        .EntityID = packet.EntityId,
+                                                        .PrimitiveBase = 0,
+                                                        .PickWidth = packet.Width,
+                                                        .ViewportWidth = static_cast<float>(ctx.Resolution.width),
+                                                        .ViewportHeight = static_cast<float>(ctx.Resolution.height),
+                                                        ._pad = 0,
+                                                    };
+                                                    vkCmdPushConstants(cmd, linePipeline->GetLayout(), VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push), &push);
+                                                    vkCmdDraw(cmd, packet.EdgeCount * 6, 1, 0, 0);
+                                                }
                                             }
 
                                             // Points
                                             bindPipelineAndSets(pointPipeline);
                                             vkCmdSetPrimitiveTopology(cmd, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-                                            for (const auto& packet : ctx.PickingPointPackets)
+                                            if (const auto* pointPackets = ctx.PickingPointPackets.data();
+                                                pointPackets && !ctx.PickingPointPackets.empty())
                                             {
-                                                if (!packet.Geometry.IsValid())
-                                                    continue;
-                                                auto* geo = ctx.GeometryStorage.GetIfValid(packet.Geometry);
-                                                if (!geo || !geo->GetVertexBuffer())
-                                                    continue;
-                                                const uint64_t baseAddr = geo->GetVertexBuffer()->GetDeviceAddress();
-                                                const auto& layout = geo->GetLayout();
-                                                const uint32_t vertCount = static_cast<uint32_t>(layout.PositionsSize / sizeof(glm::vec3));
-                                                const PickMRTPushConsts push{
-                                                    .Model = packet.WorldMatrix,
-                                                    .PtrPositions = baseAddr + layout.PositionsOffset,
-                                                    .PtrAux = 0,
-                                                    .PtrPrimitiveFaceIds = 0,
-                                                    .EntityID = packet.EntityId,
-                                                    .PrimitiveBase = 0,
-                                                    .PickWidth = packet.Size,
-                                                    .ViewportWidth = static_cast<float>(ctx.Resolution.width),
-                                                    .ViewportHeight = static_cast<float>(ctx.Resolution.height),
-                                                    ._pad = 0,
-                                                };
-                                                vkCmdPushConstants(cmd, pointPipeline->GetLayout(), VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push), &push);
-                                                vkCmdDraw(cmd, vertCount * 6, 1, 0, 0);
+                                                for (size_t i = 0; i < ctx.PickingPointPackets.size(); ++i)
+                                                {
+                                                    const auto& packet = pointPackets[i];
+                                                    if (!packet.Geometry.IsValid())
+                                                        continue;
+                                                    auto* geo = ctx.GeometryStorage.GetIfValid(packet.Geometry);
+                                                    if (!geo || !geo->GetVertexBuffer())
+                                                        continue;
+                                                    const uint64_t baseAddr = geo->GetVertexBuffer()->GetDeviceAddress();
+                                                    const auto& layout = geo->GetLayout();
+                                                    const uint32_t vertCount = static_cast<uint32_t>(layout.PositionsSize / sizeof(glm::vec3));
+                                                    const PickMRTPushConsts push{
+                                                        .Model = packet.WorldMatrix,
+                                                        .PtrPositions = baseAddr + layout.PositionsOffset,
+                                                        .PtrAux = 0,
+                                                        .PtrPrimitiveFaceIds = 0,
+                                                        .EntityID = packet.EntityId,
+                                                        .PrimitiveBase = 0,
+                                                        .PickWidth = packet.Size,
+                                                        .ViewportWidth = static_cast<float>(ctx.Resolution.width),
+                                                        .ViewportHeight = static_cast<float>(ctx.Resolution.height),
+                                                        ._pad = 0,
+                                                    };
+                                                    vkCmdPushConstants(cmd, pointPipeline->GetLayout(), VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push), &push);
+                                                    vkCmdDraw(cmd, vertCount * 6, 1, 0, 0);
+                                                }
                                             }
                                         });
 

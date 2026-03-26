@@ -28,6 +28,7 @@ target_sources(${target_name}
         Core.DAGScheduler.cppm
         Core.FeatureRegistry.cppm
         Core.InplaceFunction.cppm
+        Core.Commands.cppm
         Core.IOBackend.cppm
         Core.Benchmark.cppm
         PRIVATE

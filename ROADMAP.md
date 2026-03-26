@@ -87,14 +87,14 @@ These features turn the engine from a viewer into an interactive tool.
 - **Keyboard shortcuts:** W=Translate, E=Rotate, R=Scale, X=Toggle World/Local.
 - **Mouse integration:** Gizmo consumes LMB input during drag, blocking entity selection.
 
-Future: undo/redo integration.
+Undo/redo integration now lives in `Core::CommandHistory`; editor panels should record discrete edits at interaction boundaries (for example mouse release) instead of logging every transient drag frame.
 
 ### UI Improvements
 
 Each improvement is independent and can land incrementally:
 - **Dockable panel layout:** ImGui docking branch — free panel arrangement, save/restore layouts.
 - **Viewport toolbar:** Render mode switching, wireframe overlay, debug views directly in the 3D viewport.
-- **Undo/redo stack:** Command-pattern undo for all property changes.
+- **Undo/redo stack:** Command-pattern undo for all property changes via `Core::CommandHistory` and ECS before/after snapshots.
 - **Multi-object editing:** Edit shared properties across all selected entities.
 - **Asset browser:** Thumbnail previews, drag-and-drop import, directory navigation.
 - **Console / log panel:** Scrollable, filterable log output (currently stdout only).
@@ -106,7 +106,7 @@ Each improvement is independent and can land incrementally:
 
 JSON-based scene save/load is implemented (`Runtime::SaveScene()` / `Runtime::LoadScene()`). The serializer covers entity names, transforms, hierarchy, asset source paths, visibility, and rendering parameters. GPU state is reconstructed on load by re-importing assets from recorded source paths. Editor UI exposes File → Save/Load Scene with dirty-state prompts.
 
-Future extensions: project-level files (scene path + editor layout + camera preset), binary scene format for large scenes, undo/redo integration.
+Future extensions: project-level files (scene path + editor layout + camera preset), binary scene format for large scenes.
 
 ---
 

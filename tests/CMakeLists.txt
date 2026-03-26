@@ -68,6 +68,7 @@ intrinsic_test_object_lib(CoreTestObjs
         Test_CoreMemory.cpp
         Test_CoreTasks.cpp
         Test_CoreHandle.cpp
+        Test_CoreCommands.cpp
         Test_CoreHash.cpp
         Test_CoreFrameGraph.cpp
         Test_FrameGraphTypeTokenHelper.cpp
@@ -80,7 +81,7 @@ intrinsic_test_object_lib(CoreTestObjs
         Test_Benchmark.cpp
         Test_Profiling.cpp
         Test_CoreError.cpp
-    DEPS IntrinsicCore
+    DEPS IntrinsicCore EnTT::EnTT
 )
 
 # --- ECS tests (FrameGraph system integration) ---

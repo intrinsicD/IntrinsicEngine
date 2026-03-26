@@ -271,16 +271,12 @@ namespace Graphics::Passes
         // MeshViewLifecycleSystem or GraphGeometrySyncSystem).
         if (m_GeometryStorage)
         {
-            auto& registry = ctx.Scene.GetRegistry();
-
             // Frustum extraction — CPU-side culling for retained-mode draws.
             const bool cullingEnabled = !ctx.Debug.DisableCulling;
             const Geometry::Frustum frustum = CreateCullingFrustum(
                 ctx.CameraProj, ctx.CameraView, cullingEnabled);
 
-            auto lineView = registry.view<ECS::Line::Component>();
-
-            for (auto [entity, line] : lineView.each())
+            for (const auto& line : ctx.LineDrawPackets)
             {
                 // Skip entities without valid geometry or edges.
                 if (!line.Geometry.IsValid() || line.EdgeCount == 0)
@@ -299,14 +295,12 @@ namespace Graphics::Passes
                 if (!edgeGeo || !edgeGeo->GetIndexBuffer() || !edgeGeo->GetVertexBuffer())
                     continue;
 
-                glm::mat4 worldMatrix(1.0f);
-                if (auto* wm = registry.try_get<ECS::Components::Transform::WorldMatrix>(entity))
-                    worldMatrix = wm->Matrix;
+                const glm::mat4 worldMatrix = line.WorldMatrix;
 
                 if (cullingEnabled && !FrustumCullSphere(worldMatrix, geo->GetLocalBoundingSphere(), frustum))
                     continue;
 
-                const uint32_t entityKey = static_cast<uint32_t>(entity);
+                const uint32_t entityKey = line.EntityKey;
                 const uint32_t edgeCount = line.EdgeCount;
 
                 const uint64_t edgeAddr = edgeGeo->GetIndexBuffer()->GetDeviceAddress();
@@ -316,37 +310,14 @@ namespace Graphics::Passes
                 const uint32_t wireColor = GpuColor::PackColorF(
                     line.Color.r, line.Color.g, line.Color.b, line.Color.a);
 
-                // Per-edge color aux buffer (sourced from legacy components).
+                // Per-edge color aux buffer (resolved during extraction).
                 uint64_t edgeAttrAddr = 0;
-                if (line.HasPerEdgeColors && line.ShowPerEdgeColors)
+                if (!line.EdgeColors.empty())
                 {
-                    const uint32_t* colorData = nullptr;
-                    uint32_t colorCount = 0;
-
-                    if (const auto* gd = registry.try_get<ECS::Graph::Data>(entity))
-                    {
-                        if (!gd->CachedEdgeColors.empty() &&
-                            gd->CachedEdgeColors.size() == edgeCount)
-                        {
-                            colorData = gd->CachedEdgeColors.data();
-                            colorCount = edgeCount;
-                        }
-                    }
-
-                    if (!colorData)
-                    {
-                        if (!line.CachedEdgeColors.empty() &&
-                            line.CachedEdgeColors.size() == edgeCount)
-                        {
-                            colorData = line.CachedEdgeColors.data();
-                            colorCount = edgeCount;
-                        }
-                    }
-
-                    if (colorData)
+                    if (line.EdgeColors.size() == edgeCount)
                     {
                         activeAttrKeys.push_back(entityKey);
-                        edgeAttrAddr = EnsureEdgeAttrBuffer(entityKey, colorData, colorCount);
+                        edgeAttrAddr = EnsureEdgeAttrBuffer(entityKey, line.EdgeColors.data(), edgeCount);
                     }
                 }
 

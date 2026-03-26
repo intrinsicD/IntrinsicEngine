@@ -66,14 +66,17 @@ export namespace Graphics
         [[nodiscard]] bool AcquireFrame();
         void ProcessCompletedGpuWork(ECS::Scene& scene, uint64_t currentFrame);
         void UpdateGlobals(const CameraComponent& camera);
-        void BuildGraph(const ECS::Scene& scene,
-                        Core::Assets::AssetManager& assetManager,
+        void BuildGraph(Core::Assets::AssetManager& assetManager,
                         const CameraComponent& camera,
                         bool hasSelectionWork = false,
                         const SelectionOutlinePacket& selectionOutline = {},
                         std::span<const PickingSurfacePacket> pickingSurfacePackets = {},
                         std::span<const PickingLinePacket> pickingLinePackets = {},
-                        std::span<const PickingPointPacket> pickingPointPackets = {});
+                        std::span<const PickingPointPacket> pickingPointPackets = {},
+                        std::span<const SurfaceDrawPacket> surfaceDrawPackets = {},
+                        std::span<const LineDrawPacket> lineDrawPackets = {},
+                        std::span<const PointDrawPacket> pointDrawPackets = {},
+                        const HtexPatchPreviewPacket* htexPatchPreview = nullptr);
         void ExecuteGraph();
         void EndFrame();
 

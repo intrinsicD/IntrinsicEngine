@@ -227,7 +227,6 @@ namespace Graphics
             m_Path.AddStage("LinePass", [this](RenderPassContext& ctx)
             {
                 m_LinePass->SetGeometryStorage(&ctx.GeometryStorage);
-                m_LinePass->SetDebugDraw(ctx.DebugDrawPtr);
                 m_LinePass->AddPasses(ctx);
             });
         }
@@ -244,7 +243,6 @@ namespace Graphics
             m_Path.AddStage("Points", [this](RenderPassContext& ctx)
             {
                 m_PointPass->SetGeometryStorage(&ctx.GeometryStorage);
-                m_PointPass->SetDebugDraw(ctx.DebugDrawPtr);
                 m_PointPass->AddPasses(ctx);
             });
         }
@@ -381,6 +379,14 @@ namespace Graphics
         }
 
         m_Path.Execute(ctx);
+    }
+
+    void DefaultPipeline::SetDebugDraw(DebugDraw* dd)
+    {
+        if (m_LinePass)
+            m_LinePass->SetDebugDraw(dd);
+        if (m_PointPass)
+            m_PointPass->SetDebugDraw(dd);
     }
 
     void DefaultPipeline::OnResize(uint32_t width, uint32_t height)

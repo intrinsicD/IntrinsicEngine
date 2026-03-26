@@ -94,7 +94,7 @@ namespace Graphics::Passes
 
         [[nodiscard]] float VertexLabelScalar(
             const Geometry::Halfedge::Mesh& mesh,
-            const Geometry::Property<uint32_t>& labels,
+            const Geometry::ConstProperty<uint32_t>& labels,
             Geometry::VertexHandle v) noexcept
         {
             if (!v.IsValid() || !mesh.IsValid(v) || mesh.IsDeleted(v) || !labels)
@@ -104,7 +104,7 @@ namespace Graphics::Passes
 
         [[nodiscard]] std::vector<glm::vec3> ReconstructPreviewCentroids(
             const Geometry::Halfedge::Mesh& mesh,
-            const Geometry::Property<uint32_t>& labels)
+            const Geometry::ConstProperty<uint32_t>& labels)
         {
             PROFILE_SCOPE("HtexPatchPreview::ReconstructPreviewCentroids");
 
@@ -147,7 +147,7 @@ namespace Graphics::Passes
 
         [[nodiscard]] float FirstPatchVertexLabel(const Geometry::Halfedge::Mesh& mesh,
                                                   const Geometry::HtexPatch::HalfedgePatchMeta& patch,
-                                                  const Geometry::Property<uint32_t>& kmeansLabels) noexcept
+                                                  const Geometry::ConstProperty<uint32_t>& kmeansLabels) noexcept
         {
             const auto sampleHalfedgeLabel = [&](std::uint32_t halfedgeIndex) noexcept -> float
             {
@@ -174,7 +174,7 @@ namespace Graphics::Passes
                                                const Geometry::HtexPatch::HalfedgePatchMeta& patch,
                                                glm::vec2 patchUV,
                                                std::span<const glm::vec3> kmeansCentroids,
-                                               const Geometry::Property<uint32_t>& kmeansLabels) noexcept
+                                               const Geometry::ConstProperty<uint32_t>& kmeansLabels) noexcept
         {
             if (const auto winner = Geometry::HtexPatch::ClassifyPatchSurfacePointToCentroid(
                     mesh, patch, patchUV, kmeansCentroids))
@@ -244,92 +244,6 @@ namespace Graphics::Passes
         m_UploadedAtlasRevision.fill(0);
     }
 
-
-    [[nodiscard]] bool HtexPatchPreviewPass::IsInterestingMeshEntity(const entt::registry& reg, entt::entity entity)
-    {
-        if (!reg.valid(entity) || !reg.all_of<ECS::Mesh::Data>(entity))
-            return false;
-        const auto& data = reg.get<ECS::Mesh::Data>(entity);
-        return static_cast<bool>(data.MeshRef) && data.MeshRef->EdgeCount() > 0;
-    }
-
-    [[nodiscard]] std::optional<entt::entity> HtexPatchPreviewPass::FindSourceMeshEntity(const entt::registry& reg)
-    {
-        std::optional<entt::entity> freshestKMeansMesh;
-        uint64_t freshestRevision = 0;
-        auto considerFreshest = [&](entt::entity entity)
-        {
-            if (!IsInterestingMeshEntity(reg, entity))
-                return;
-
-            const auto& data = reg.get<ECS::Mesh::Data>(entity);
-            if (!data.MeshRef)
-                return;
-
-            const auto labels = data.MeshRef->VertexProperties().Get<uint32_t>("v:kmeans_label");
-            const auto colors = data.MeshRef->VertexProperties().Get<glm::vec4>("v:kmeans_color");
-            if (!(labels || colors))
-                return;
-
-            if (!freshestKMeansMesh || data.KMeansResultRevision >= freshestRevision)
-            {
-                freshestKMeansMesh = entity;
-                freshestRevision = data.KMeansResultRevision;
-            }
-        };
-
-        if (auto selected = reg.view<ECS::Components::Selection::SelectedTag>(); !selected.empty())
-        {
-            for (auto entity : selected)
-            {
-                if (IsInterestingMeshEntity(reg, entity))
-                {
-                    const auto& data = reg.get<ECS::Mesh::Data>(entity);
-                    if (data.MeshRef)
-                    {
-                        const auto labels = data.MeshRef->VertexProperties().Get<uint32_t>("v:kmeans_label");
-                        const auto colors = data.MeshRef->VertexProperties().Get<glm::vec4>("v:kmeans_color");
-                        if (labels || colors)
-                            return entity;
-                    }
-                }
-            }
-
-            for (auto entity : selected)
-            {
-                if (IsInterestingMeshEntity(reg, entity))
-                    return entity;
-            }
-        }
-
-        for (auto entity : reg.view<ECS::Mesh::Data>())
-            considerFreshest(entity);
-        if (freshestKMeansMesh)
-            return freshestKMeansMesh;
-
-        for (auto entity : reg.view<ECS::Mesh::Data>())
-        {
-            if (IsInterestingMeshEntity(reg, entity))
-            {
-                const auto& data = reg.get<ECS::Mesh::Data>(entity);
-                if (data.MeshRef)
-                {
-                    const auto labels = data.MeshRef->VertexProperties().Get<uint32_t>("v:kmeans_label");
-                    const auto colors = data.MeshRef->VertexProperties().Get<glm::vec4>("v:kmeans_color");
-                    if (labels || colors)
-                        return entity;
-                }
-            }
-        }
-
-        for (auto entity : reg.view<ECS::Mesh::Data>())
-        {
-            if (IsInterestingMeshEntity(reg, entity))
-                return entity;
-        }
-
-        return std::nullopt;
-    }
 
     [[nodiscard]] uint64_t HtexPatchPreviewPass::ComputePreviewAtlasSignature(
         const Geometry::Halfedge::Mesh& mesh,
@@ -488,23 +402,16 @@ namespace Graphics::Passes
         m_DebugState.AtlasRebuiltThisFrame = false;
         m_DebugState.AtlasUploadQueuedThisFrame = false;
 
-        auto& reg = ctx.Scene.GetRegistry();
-        const auto source = FindSourceMeshEntity(reg);
-        if (!source)
+        const Graphics::HtexPatchPreviewPacket* preview = ctx.HtexPatchPreview;
+        if (!preview || !preview->IsValid())
         {
             m_DebugState.HasMesh = false;
             m_DebugState.PreviewImageReady = false;
             return;
         }
 
-        const auto entity = *source;
-        const auto& meshData = reg.get<ECS::Mesh::Data>(entity);
-        if (!meshData.MeshRef)
-        {
-            m_DebugState.HasMesh = false;
-            m_DebugState.PreviewImageReady = false;
-            return;
-        }
+        const entt::entity entity = static_cast<entt::entity>(preview->SourceEntityId);
+        const Geometry::Halfedge::Mesh& mesh = *preview->Mesh;
 
         if (m_PendingBake && m_PendingBake->Ready.load(std::memory_order_acquire))
         {
@@ -514,17 +421,17 @@ namespace Graphics::Passes
         }
 
         const PreviewKMeansData kmeansData{
-            .Labels = meshData.MeshRef->VertexProperties().Get<uint32_t>("v:kmeans_label"),
-            .Colors = meshData.MeshRef->VertexProperties().Get<glm::vec4>("v:kmeans_color"),
+            .Labels = mesh.VertexProperties().Get<uint32_t>("v:kmeans_label"),
+            .Colors = mesh.VertexProperties().Get<glm::vec4>("v:kmeans_color"),
+            .Centroids = preview->KMeansCentroids,
         };
 
         const bool cachedInputsMatch = m_CachedInputs.Valid &&
                                        m_CachedInputs.SourceEntity == entity &&
-                                       m_CachedInputs.Mesh == meshData.MeshRef.get() &&
-                                       m_CachedInputs.VertexCount == meshData.MeshRef->VertexCount() &&
-                                       m_CachedInputs.EdgeCount == meshData.MeshRef->EdgeCount() &&
-                                       m_CachedInputs.FaceCount == meshData.MeshRef->FaceCount() &&
-                                       m_CachedInputs.KMeansResultRevision == meshData.KMeansResultRevision &&
+                                       m_CachedInputs.VertexCount == mesh.VertexCount() &&
+                                       m_CachedInputs.EdgeCount == mesh.EdgeCount() &&
+                                       m_CachedInputs.FaceCount == mesh.FaceCount() &&
+                                       m_CachedInputs.KMeansResultRevision == preview->KMeansResultRevision &&
                                        m_CachedInputs.HasLabels == static_cast<bool>(kmeansData.Labels) &&
                                        m_CachedInputs.HasColors == static_cast<bool>(kmeansData.Colors);
 
@@ -533,22 +440,21 @@ namespace Graphics::Passes
         {
             PROFILE_SCOPE("HtexPatchPreview::RefreshPatchCache");
 
-            if (const auto patchBuild = Geometry::HtexPatch::BuildPatchMetadata(*meshData.MeshRef))
+            if (const auto patchBuild = Geometry::HtexPatch::BuildPatchMetadata(mesh))
             {
                 m_CachedPatchBuild = *patchBuild;
                 m_CachedInputs = CachedPreviewInputs{
                     .SourceEntity = entity,
-                    .Mesh = meshData.MeshRef.get(),
-                    .VertexCount = meshData.MeshRef->VertexCount(),
-                    .EdgeCount = meshData.MeshRef->EdgeCount(),
-                    .FaceCount = meshData.MeshRef->FaceCount(),
-                    .KMeansResultRevision = meshData.KMeansResultRevision,
+                    .VertexCount = mesh.VertexCount(),
+                    .EdgeCount = mesh.EdgeCount(),
+                    .FaceCount = mesh.FaceCount(),
+                    .KMeansResultRevision = preview->KMeansResultRevision,
                     .HasLabels = static_cast<bool>(kmeansData.Labels),
                     .HasColors = static_cast<bool>(kmeansData.Colors),
                     .Valid = true,
                 };
 
-                desiredSignature = ComputePreviewAtlasSignature(*meshData.MeshRef, kmeansData, m_CachedPatchBuild.Patches);
+                desiredSignature = ComputePreviewAtlasSignature(mesh, kmeansData, m_CachedPatchBuild.Patches);
                 m_CachedPreviewSignature = desiredSignature;
             }
             else
@@ -561,7 +467,7 @@ namespace Graphics::Passes
         }
         else if (desiredSignature == 0u)
         {
-            desiredSignature = ComputePreviewAtlasSignature(*meshData.MeshRef, kmeansData, m_CachedPatchBuild.Patches);
+            desiredSignature = ComputePreviewAtlasSignature(mesh, kmeansData, m_CachedPatchBuild.Patches);
             m_CachedPreviewSignature = desiredSignature;
         }
 
@@ -585,15 +491,15 @@ namespace Graphics::Passes
                     auto pending = std::make_shared<PendingPreviewBake>();
                     pending->Signature = desiredSignature;
                     pending->Revision = m_CachedAtlas.Revision != 0u ? (m_CachedAtlas.Revision + 1u) : 1u;
-                    pending->MeshCopy = Geometry::Halfedge::Mesh{*meshData.MeshRef};
+                    pending->MeshCopy = Geometry::Halfedge::Mesh{mesh};
                     pending->Patches = m_CachedPatchBuild.Patches;
                     m_PendingBake = pending;
 
-                    auto bakeJob = [pending, centroidSeed = meshData.KMeansCentroids]() mutable
+                    auto bakeJob = [pending, centroidSeed = preview->KMeansCentroids]() mutable
                     {
                         PROFILE_SCOPE("HtexPatchPreview::BakeJob");
 
-                        auto& meshCopy = pending->MeshCopy;
+                        const auto& meshCopy = pending->MeshCopy;
                         auto& patchesCopy = pending->Patches;
 
                         PreviewKMeansData workerKMeans{
@@ -633,8 +539,8 @@ namespace Graphics::Passes
                 m_DebugState.LastAtlasHeight = 0u;
                 m_DebugState.UsedKMeansColors = [&]() noexcept
                 {
-                    const auto labels = meshData.MeshRef->VertexProperties().Get<uint32_t>("v:kmeans_label");
-                    const auto colors = meshData.MeshRef->VertexProperties().Get<glm::vec4>("v:kmeans_color");
+                    const auto labels = mesh.VertexProperties().Get<uint32_t>("v:kmeans_label");
+                    const auto colors = mesh.VertexProperties().Get<glm::vec4>("v:kmeans_color");
                     return static_cast<bool>(labels) || static_cast<bool>(colors);
                 }();
                 m_DebugState.PreviewImageReady = false;
@@ -656,8 +562,8 @@ namespace Graphics::Passes
         m_DebugState.LastAtlasHeight = height;
         m_DebugState.UsedKMeansColors = [&]() noexcept
         {
-            const auto labels = meshData.MeshRef->VertexProperties().Get<uint32_t>("v:kmeans_label");
-            const auto colors = meshData.MeshRef->VertexProperties().Get<glm::vec4>("v:kmeans_color");
+            const auto labels = mesh.VertexProperties().Get<uint32_t>("v:kmeans_label");
+            const auto colors = mesh.VertexProperties().Get<glm::vec4>("v:kmeans_color");
             return static_cast<bool>(labels) || static_cast<bool>(colors);
         }();
 

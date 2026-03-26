@@ -178,18 +178,18 @@ Mapping guidance for current Intrinsic code while preserving that reference shap
 
 #### B4.5 Extraction stage (C)
 
-- [ ] Ensure extraction is the only place that resolves live ECS state into render packets for the frame.
+- [x] Ensure extraction is the only place that resolves live ECS state into render packets for the frame. *(`Runtime::RenderExtraction` now resolves committed-world surface/line/point draw packets, HTEX preview inputs, and selection/picking packets before render prep; `Graphics::RenderSystem::BuildGraph(...)` no longer takes `ECS::Scene`, so pass recording consumes extracted packet spans instead of late live-ECS queries.)*
 - [ ] Define immutable packet families for Intrinsic's renderer:
-  - [ ] surface draw packets
-  - [ ] line / point / debug draw packets
-  - [ ] selection / picking packets
+  - [x] surface draw packets
+  - [ ] line / point / debug draw packets *(line and point packets are extracted; debug draw packetization is still pending)*
+  - [x] selection / picking packets
   - [ ] light / environment packets
   - [ ] UI / editor overlay packets
-  - [ ] geometry-processing visualization packets
+  - [ ] geometry-processing visualization packets *(HTEX patch preview now extracts immutable inputs; broader visualization packet families are still pending)*
 - [x] Move `Graphics.Passes.Picking` entity/primitive resolution into extraction so pass recording consumes immutable pick packets instead of live ECS traversal. *(Runtime extraction now builds immutable `PickingSurfacePacket`/`PickingLinePacket`/`PickingPointPacket` bundles, and `PickingPass` records draws exclusively from `RenderPassContext` packet spans.)*
 - [x] Route selection-presence recipe inputs through extraction snapshots instead of querying live ECS during render-graph recipe construction. *(Extraction now captures immutable `RenderWorld::HasSelectionWork`, and both `RenderSystem` fallback recipe logic plus `DefaultPipeline::BuildFrameRecipe` consume that snapshot state rather than doing late `SelectedTag`/`HoveredTag` registry traversals.)*
 - [ ] Resolve retained `GPUScene` handles, bindless references, and debug-view state during extraction rather than during late pass recording.
-- [x] Add tests that guarantee render prep and command recording consume extraction output only. *(Added `RenderExtraction.ExtractedPickingPacketsRemainStableAfterSceneMutation` to lock immutable extraction-snapshot behavior for picking packets, preventing live ECS mutations from changing recorded packet inputs.)*
+- [x] Add tests that guarantee render prep and command recording consume extraction output only. *(`RenderExtraction` coverage now locks immutable extraction-snapshot behavior for picking, surface draw, line draw, point draw, and HTEX preview packets, preventing live ECS mutations from changing recorded packet inputs.)*
 
 #### B4.6 Render preparation stage (D)
 

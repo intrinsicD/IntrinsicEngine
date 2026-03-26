@@ -82,7 +82,7 @@ TEST(RenderUpdateIntegration, RenderSystem_ExposesStagedFrameExecutionApi)
         { renderSystem.AcquireFrame() } -> std::same_as<bool>;
         renderSystem.ProcessCompletedGpuWork(scene, currentFrame);
         renderSystem.UpdateGlobals(camera);
-        renderSystem.BuildGraph(scene, assetManager, camera);
+        renderSystem.BuildGraph(assetManager, camera);
         renderSystem.ExecuteGraph();
         renderSystem.EndFrame();
     });

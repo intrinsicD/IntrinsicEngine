@@ -20,6 +20,7 @@ import Core.Hash;
 import Core.FeatureRegistry;
 import Core.IOBackend;
 import Graphics.FeatureCatalog;
+import Graphics.Components;
 import Graphics.IORegistry;
 import ECS;
 import Interface;
@@ -37,6 +38,15 @@ using namespace Core::Hash;
 
 namespace Runtime
 {
+    namespace
+    {
+        template <typename T>
+        void PrewarmStorage(entt::registry& registry)
+        {
+            (void)registry.storage<T>();
+        }
+    }
+
     Engine::Engine(const EngineConfig& config)
         : m_EngineConfig(config)
     {
@@ -58,6 +68,38 @@ namespace Runtime
 
         // 1. SceneManager (ECS scene, entity lifecycle, GPU-reclaim hooks)
         m_SceneManager = std::make_unique<SceneManager>();
+
+        // Prewarm component storages on the main thread before any frame-graph
+        // worker can touch the registry. EnTT creates storages lazily, and the
+        // first concurrent insert/view on a new component type can race on the
+        // internal dense-map reallocation path.
+        {
+            auto& registry = m_SceneManager->GetRegistry();
+            PrewarmStorage<ECS::Components::Transform::Component>(registry);
+            PrewarmStorage<ECS::Components::Transform::WorldMatrix>(registry);
+            PrewarmStorage<ECS::Components::Transform::IsDirtyTag>(registry);
+            PrewarmStorage<ECS::Components::Transform::WorldUpdatedTag>(registry);
+            PrewarmStorage<ECS::Components::Hierarchy::Component>(registry);
+            PrewarmStorage<ECS::Components::NameTag::Component>(registry);
+            PrewarmStorage<ECS::DirtyTag::VertexPositions>(registry);
+            PrewarmStorage<ECS::DirtyTag::VertexAttributes>(registry);
+            PrewarmStorage<ECS::DirtyTag::EdgeTopology>(registry);
+            PrewarmStorage<ECS::DirtyTag::EdgeAttributes>(registry);
+            PrewarmStorage<ECS::DirtyTag::FaceTopology>(registry);
+            PrewarmStorage<ECS::DirtyTag::FaceAttributes>(registry);
+            PrewarmStorage<ECS::MeshCollider::Component>(registry);
+            PrewarmStorage<ECS::PrimitiveBVH::Data>(registry);
+            PrewarmStorage<ECS::PointKDTree::Data>(registry);
+            PrewarmStorage<ECS::Graph::Data>(registry);
+            PrewarmStorage<ECS::PointCloud::Data>(registry);
+            PrewarmStorage<ECS::Mesh::Data>(registry);
+            PrewarmStorage<ECS::Surface::Component>(registry);
+            PrewarmStorage<ECS::Line::Component>(registry);
+            PrewarmStorage<ECS::Point::Component>(registry);
+            PrewarmStorage<ECS::MeshEdgeView::Component>(registry);
+            PrewarmStorage<ECS::MeshVertexView::Component>(registry);
+            PrewarmStorage<ECS::Components::Selection::PickID>(registry);
+        }
 
         // 2. Window
         Core::Windowing::WindowProps props{config.AppName, config.Width, config.Height};

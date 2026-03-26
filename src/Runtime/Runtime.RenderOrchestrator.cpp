@@ -272,12 +272,12 @@ namespace Runtime
         return Runtime::ExtractRenderWorld(input);
     }
 
-    void RenderOrchestrator::PrepareFrame(FrameContext& frame, const RenderWorld& renderWorld)
+    void RenderOrchestrator::PrepareFrame(FrameContext& frame, RenderWorld renderWorld)
     {
-        frame.PreparedRenderWorld = renderWorld;
+        frame.PreparedRenderWorld = std::move(renderWorld);
         frame.Prepared = false;
         frame.Submitted = false;
-        frame.Viewport = renderWorld.View.Viewport;
+        frame.Viewport = frame.PreparedRenderWorld ? frame.PreparedRenderWorld->View.Viewport : RenderViewport{};
 
         const RenderWorld* preparedRenderWorld = frame.GetPreparedRenderWorld();
         if (!preparedRenderWorld || !preparedRenderWorld->IsValid())
@@ -295,27 +295,23 @@ namespace Runtime
             return;
         }
 
-        const ECS::Scene* scene = preparedRenderWorld->World.Scene;
-        if (!scene)
-        {
-            Core::Log::Warn("RenderOrchestrator::PrepareFrame skipped: prepared RenderWorld has no scene.");
-            return;
-        }
-
         const uint64_t currentFrame = m_Device ? m_Device->GetGlobalFrameNumber() : frame.FrameNumber;
         m_RenderSystem->BeginFrame(currentFrame);
         if (!m_RenderSystem->AcquireFrame())
             return;
 
         m_RenderSystem->UpdateGlobals(preparedRenderWorld->View.Camera);
-        m_RenderSystem->BuildGraph(*scene,
-                                   m_AssetManager,
+        m_RenderSystem->BuildGraph(m_AssetManager,
                                    preparedRenderWorld->View.Camera,
                                    preparedRenderWorld->HasSelectionWork,
                                    preparedRenderWorld->SelectionOutline,
                                    preparedRenderWorld->SurfacePicking,
                                    preparedRenderWorld->LinePicking,
-                                   preparedRenderWorld->PointPicking);
+                                   preparedRenderWorld->PointPicking,
+                                   preparedRenderWorld->SurfaceDraws,
+                                   preparedRenderWorld->LineDraws,
+                                   preparedRenderWorld->PointDraws,
+                                   preparedRenderWorld->HtexPatchPreview ? &*preparedRenderWorld->HtexPatchPreview : nullptr);
         frame.Prepared = true;
     }
 

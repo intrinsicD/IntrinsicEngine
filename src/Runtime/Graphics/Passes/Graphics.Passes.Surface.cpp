@@ -137,34 +137,32 @@ namespace Graphics::Passes
 
         uint32_t maxHandleIndex = 0;
 
-        // Build unique geometry list from ECS (queries Surface::Component).
+        // Build unique geometry list from extracted surface packets.
         {
-            auto view = ctx.Scene.GetRegistry().view<ECS::Surface::Component>();
-            for (auto entity : view)
+            for (const auto& packet : ctx.SurfaceDrawPackets)
             {
-                const auto& sc = view.get<ECS::Surface::Component>(entity);
-                if (!sc.Geometry.IsValid())
+                if (!packet.Geometry.IsValid())
                     continue;
 
-                maxHandleIndex = std::max(maxHandleIndex, sc.Geometry.Index);
+                maxHandleIndex = std::max(maxHandleIndex, packet.Geometry.Index);
 
                 bool seen = false;
                 for (const DenseGeo& g : dense)
                 {
-                    if (g.Handle == sc.Geometry) { seen = true; break; }
+                    if (g.Handle == packet.Geometry) { seen = true; break; }
                 }
                 if (seen)
                     continue;
 
-                GeometryGpuData* geo = ctx.GeometryStorage.GetIfValid(sc.Geometry);
+                GeometryGpuData* geo = ctx.GeometryStorage.GetIfValid(packet.Geometry);
                 if (!geo || geo->GetIndexCount() == 0 || !geo->GetIndexBuffer() || !geo->GetVertexBuffer())
                     continue;
 
-                dense.push_back({.Handle = sc.Geometry, .Geo = geo});
+                dense.push_back({.Handle = packet.Geometry, .Geo = geo});
             }
         }
 
-         // IMPORTANT: ensure deterministic ordering.
+        // IMPORTANT: ensure deterministic ordering.
         // Dense IDs are used to slice packed indirect/visibility buffers.
         // If dense order changes frame-to-frame, geometry will read the wrong slice → flicker.
         std::sort(dense.begin(), dense.end(), [](const DenseGeo& a, const DenseGeo& b)
@@ -187,23 +185,21 @@ namespace Graphics::Passes
             uint32_t invalidGeometryHandle = 0;
             uint32_t invalidGeometryMapping = 0;
 
-            auto view = ctx.Scene.GetRegistry().view<ECS::Surface::Component>();
-            for (auto entity : view)
+            for (const auto& packet : ctx.SurfaceDrawPackets)
             {
-                const auto& sc = view.get<ECS::Surface::Component>(entity);
-                if (!sc.Geometry.IsValid())
+                if (!packet.Geometry.IsValid())
                 {
                     ++invalidGeometryHandle;
                     continue;
                 }
 
-                if (sc.Geometry.Index >= handleToDense.size())
+                if (packet.Geometry.Index >= handleToDense.size())
                 {
                     ++invalidGeometryMapping;
                     continue;
                 }
 
-                if (handleToDense[sc.Geometry.Index] == GPUSceneConstants::kPreserveGeometryId)
+                if (handleToDense[packet.Geometry.Index] == GPUSceneConstants::kPreserveGeometryId)
                     ++invalidGeometryMapping;
             }
 
@@ -444,34 +440,32 @@ namespace Graphics::Passes
         }
 
         // -----------------------------------------------------------------
-        // Resolve per-face attribute buffers from Surface components.
+        // Resolve per-face attribute buffers from extracted surface packets.
         // Maps geometry handle index → face attribute BDA address.
-        // First entity with CachedFaceColors for a geometry wins.
+        // First packet with face colors for a geometry wins.
         // -----------------------------------------------------------------
         std::unordered_map<uint32_t, uint64_t> faceAttrByGeoIndex;
         {
-            auto visView = ctx.Scene.GetRegistry().view<ECS::Surface::Component>();
-            for (auto [entity, sc] : visView.each())
+            for (const auto& packet : ctx.SurfaceDrawPackets)
             {
-                if (!sc.Geometry.IsValid() || sc.CachedFaceColors.empty() || !sc.ShowPerFaceColors)
+                if (!packet.Geometry.IsValid() || packet.FaceColors.empty())
                     continue;
 
-                // Only process the first entity per geometry (all instances share face colors).
-                if (faceAttrByGeoIndex.contains(sc.Geometry.Index))
+                if (faceAttrByGeoIndex.contains(packet.Geometry.Index))
                     continue;
 
-                const uint32_t faceCount = static_cast<uint32_t>(sc.CachedFaceColors.size());
+                const uint32_t faceCount = static_cast<uint32_t>(packet.FaceColors.size());
                 const uint64_t addr = EnsureFaceAttrBuffer(
-                    sc.Geometry.Index, sc.CachedFaceColors.data(), faceCount);
+                    packet.Geometry.Index, packet.FaceColors.data(), faceCount);
                 if (addr != 0)
-                    faceAttrByGeoIndex[sc.Geometry.Index] = addr;
+                    faceAttrByGeoIndex[packet.Geometry.Index] = addr;
             }
         }
 
         // -----------------------------------------------------------------
-        // Resolve per-vertex attribute buffers from Surface components.
+        // Resolve per-vertex attribute buffers from extracted surface packets.
         // Maps geometry handle index → vertex attribute BDA address.
-        // First entity with CachedVertexColors for a geometry wins.
+        // First packet with vertex colors for a geometry wins.
         // Also tracks which geometries want nearest-vertex (Voronoi) rendering
         // and centroid-based Voronoi (PtrCentroids).
         // -----------------------------------------------------------------
@@ -479,52 +473,51 @@ namespace Graphics::Passes
         std::unordered_map<uint32_t, bool> nearestVertexByGeoIndex;
         std::unordered_map<uint32_t, uint64_t> centroidByGeoIndex;
         {
-            auto visView = ctx.Scene.GetRegistry().view<ECS::Surface::Component>();
-            for (auto [entity, sc] : visView.each())
+            for (const auto& packet : ctx.SurfaceDrawPackets)
             {
-                if (!sc.Geometry.IsValid() || sc.CachedVertexColors.empty() || !sc.ShowPerVertexColors)
+                if (!packet.Geometry.IsValid() || packet.VertexColors.empty())
                     continue;
 
-                if (vertexAttrByGeoIndex.contains(sc.Geometry.Index))
+                if (vertexAttrByGeoIndex.contains(packet.Geometry.Index))
                     continue;
 
                 // When centroid data is available, upload vertex labels (not colors)
                 // to PtrVertexAttr and centroid entries to PtrCentroids.  The shader
                 // uses labels to index into the centroid buffer for true Voronoi.
                 const bool hasCentroidVoronoi =
-                    sc.UseNearestVertexColors
-                    && !sc.CachedCentroids.empty()
-                    && !sc.CachedVertexLabels.empty()
-                    && sc.CachedVertexLabels.size() == sc.CachedVertexColors.size();
+                    packet.UseNearestVertexColors
+                    && !packet.Centroids.empty()
+                    && !packet.VertexLabels.empty()
+                    && packet.VertexLabels.size() == packet.VertexColors.size();
 
                 if (hasCentroidVoronoi)
                 {
                     // Upload vertex labels as the vertex attribute buffer.
-                    const uint32_t vertexCount = static_cast<uint32_t>(sc.CachedVertexLabels.size());
+                    const uint32_t vertexCount = static_cast<uint32_t>(packet.VertexLabels.size());
                     const uint64_t labelAddr = EnsureVertexAttrBuffer(
-                        sc.Geometry.Index, sc.CachedVertexLabels.data(), vertexCount);
+                        packet.Geometry.Index, packet.VertexLabels.data(), vertexCount);
                     if (labelAddr != 0)
                     {
-                        vertexAttrByGeoIndex[sc.Geometry.Index] = labelAddr;
-                        nearestVertexByGeoIndex[sc.Geometry.Index] = true;
+                        vertexAttrByGeoIndex[packet.Geometry.Index] = labelAddr;
+                        nearestVertexByGeoIndex[packet.Geometry.Index] = true;
 
-                        const uint32_t k = static_cast<uint32_t>(sc.CachedCentroids.size());
+                        const uint32_t k = static_cast<uint32_t>(packet.Centroids.size());
                         const uint64_t centAddr = EnsureCentroidBuffer(
-                            sc.Geometry.Index, sc.CachedCentroids.data(), k);
+                            packet.Geometry.Index, packet.Centroids.data(), k);
                         if (centAddr != 0)
-                            centroidByGeoIndex[sc.Geometry.Index] = centAddr;
+                            centroidByGeoIndex[packet.Geometry.Index] = centAddr;
                     }
                 }
                 else
                 {
                     // Standard path: upload packed ABGR colors.
-                    const uint32_t vertexCount = static_cast<uint32_t>(sc.CachedVertexColors.size());
+                    const uint32_t vertexCount = static_cast<uint32_t>(packet.VertexColors.size());
                     const uint64_t addr = EnsureVertexAttrBuffer(
-                        sc.Geometry.Index, sc.CachedVertexColors.data(), vertexCount);
+                        packet.Geometry.Index, packet.VertexColors.data(), vertexCount);
                     if (addr != 0)
                     {
-                        vertexAttrByGeoIndex[sc.Geometry.Index] = addr;
-                        nearestVertexByGeoIndex[sc.Geometry.Index] = sc.UseNearestVertexColors;
+                        vertexAttrByGeoIndex[packet.Geometry.Index] = addr;
+                        nearestVertexByGeoIndex[packet.Geometry.Index] = packet.UseNearestVertexColors;
                     }
                 }
             }
@@ -1288,7 +1281,7 @@ namespace Graphics::Passes
 
     uint64_t SurfacePass::EnsureCentroidBuffer(
         uint32_t geoIndex,
-        const ECS::Surface::Component::CentroidEntry* entries,
+        const SurfaceCentroidPacketEntry* entries,
         uint32_t centroidCount)
     {
         // Convert from ECS struct to GPU-packed struct.

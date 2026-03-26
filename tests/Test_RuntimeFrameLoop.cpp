@@ -122,7 +122,7 @@ namespace
             return renderWorld;
         }
 
-        void ExecutePreparedFrame(const Runtime::RenderWorld& renderWorld) override
+        void ExecutePreparedFrame(Runtime::RenderWorld renderWorld) override
         {
             Calls.emplace_back("execute_frame");
             LastExecutedAlpha = renderWorld.Alpha;

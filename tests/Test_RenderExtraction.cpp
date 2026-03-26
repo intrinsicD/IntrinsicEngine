@@ -3,7 +3,9 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <span>
 #include <type_traits>
+#include <utility>
 #include <entt/entity/fwd.hpp>
 
 import Runtime.RenderExtraction;
@@ -223,9 +225,17 @@ TEST(RenderExtraction, ExtractRenderWorld_BuildsImmutablePickingPacketsFromAutho
         surfaceEntity,
         ECS::Components::Transform::Component{.Position = glm::vec3(1.0f, 2.0f, 3.0f)});
     registry.emplace<ECS::Components::Selection::PickID>(surfaceEntity, ECS::Components::Selection::PickID{.Value = 11u});
-    registry.emplace<ECS::Surface::Component>(surfaceEntity, ECS::Surface::Component{
+    auto& surface = registry.emplace<ECS::Surface::Component>(surfaceEntity, ECS::Surface::Component{
         .Geometry = Geometry::GeometryHandle{10u, 1u},
     });
+    surface.CachedFaceColors = {0xFF102030u};
+    surface.CachedVertexColors = {0xFF405060u, 0xFF708090u, 0xFFA0B0C0u};
+    surface.UseNearestVertexColors = true;
+    surface.CachedVertexLabels = {2u, 1u, 0u};
+    surface.CachedCentroids = {
+        ECS::Surface::Component::CentroidEntry{glm::vec3(1.0f, 0.0f, 0.0f), 0xFF112233u},
+        ECS::Surface::Component::CentroidEntry{glm::vec3(0.0f, 1.0f, 0.0f), 0xFF445566u},
+    };
     auto& meshData = registry.emplace<ECS::Mesh::Data>(surfaceEntity);
     meshData.MeshRef = mesh;
 
@@ -239,8 +249,11 @@ TEST(RenderExtraction, ExtractRenderWorld_BuildsImmutablePickingPacketsFromAutho
     line.EdgeView = Geometry::GeometryHandle{21u, 1u};
     line.EdgeCount = 4u;
     line.Width = 3.5f;
+    line.HasPerEdgeColors = true;
+    line.CachedEdgeColors = {0xFF010203u, 0xFF040506u, 0xFF070809u, 0xFF0A0B0Cu};
     auto& graphData = registry.emplace<ECS::Graph::Data>(lineEntity);
     graphData.GraphRef = std::make_shared<Geometry::Graph::Graph>();
+    graphData.CachedEdgeColors = {0xFF111213u, 0xFF141516u, 0xFF171819u, 0xFF1A1B1Cu};
 
     const entt::entity pointEntity = registry.create();
     registry.emplace<ECS::Components::Transform::Component>(
@@ -252,12 +265,17 @@ TEST(RenderExtraction, ExtractRenderWorld_BuildsImmutablePickingPacketsFromAutho
             .Matrix = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 5.0f, 0.0f)),
         });
     registry.emplace<ECS::Components::Selection::PickID>(pointEntity, ECS::Components::Selection::PickID{.Value = 33u});
-    registry.emplace<ECS::Point::Component>(pointEntity, ECS::Point::Component{
+    auto& point = registry.emplace<ECS::Point::Component>(pointEntity, ECS::Point::Component{
         .Geometry = Geometry::GeometryHandle{30u, 1u},
         .Size = 0.125f,
     });
+    point.HasPerPointColors = true;
+    point.HasPerPointRadii = true;
+    point.HasPerPointNormals = true;
     auto& cloudData = registry.emplace<ECS::PointCloud::Data>(pointEntity);
     cloudData.CloudRef = std::make_shared<Geometry::PointCloud::Cloud>();
+    cloudData.CachedColors = {0xFF212223u, 0xFF242526u};
+    cloudData.CachedRadii = {0.25f, 0.5f};
 
     sceneManager.CommitFixedTick();
 
@@ -272,6 +290,9 @@ TEST(RenderExtraction, ExtractRenderWorld_BuildsImmutablePickingPacketsFromAutho
     ASSERT_EQ(renderWorld.SurfacePicking.size(), 1u);
     ASSERT_EQ(renderWorld.LinePicking.size(), 1u);
     ASSERT_EQ(renderWorld.PointPicking.size(), 1u);
+    ASSERT_EQ(renderWorld.SurfaceDraws.size(), 1u);
+    ASSERT_EQ(renderWorld.LineDraws.size(), 1u);
+    ASSERT_EQ(renderWorld.PointDraws.size(), 1u);
 
     const auto& surfacePacket = renderWorld.SurfacePicking.front();
     EXPECT_EQ(surfacePacket.Geometry, Geometry::GeometryHandle(10u, 1u));
@@ -293,6 +314,32 @@ TEST(RenderExtraction, ExtractRenderWorld_BuildsImmutablePickingPacketsFromAutho
     EXPECT_EQ(pointPacket.EntityId, 33u);
     EXPECT_FLOAT_EQ(pointPacket.Size, 0.125f);
     EXPECT_EQ(pointPacket.WorldMatrix[3], glm::vec4(0.0f, 5.0f, 0.0f, 1.0f));
+
+    const auto& surfaceDraw = renderWorld.SurfaceDraws.front();
+    EXPECT_EQ(surfaceDraw.Geometry, Geometry::GeometryHandle(10u, 1u));
+    ASSERT_EQ(surfaceDraw.FaceColors.size(), 1u);
+    EXPECT_EQ(surfaceDraw.FaceColors.front(), 0xFF102030u);
+    ASSERT_EQ(surfaceDraw.VertexColors.size(), 3u);
+    EXPECT_TRUE(surfaceDraw.UseNearestVertexColors);
+    EXPECT_EQ(surfaceDraw.VertexLabels, std::vector<uint32_t>({2u, 1u, 0u}));
+    ASSERT_EQ(surfaceDraw.Centroids.size(), 2u);
+    EXPECT_EQ(surfaceDraw.Centroids.front().PackedColor, 0xFF112233u);
+
+    const auto& lineDraw = renderWorld.LineDraws.front();
+    EXPECT_EQ(lineDraw.Geometry, Geometry::GeometryHandle(20u, 1u));
+    EXPECT_EQ(lineDraw.EdgeView, Geometry::GeometryHandle(21u, 1u));
+    EXPECT_EQ(lineDraw.EntityKey, static_cast<uint32_t>(lineEntity));
+    EXPECT_EQ(lineDraw.EdgeCount, 4u);
+    EXPECT_EQ(lineDraw.EdgeColors, graphData.CachedEdgeColors);
+    EXPECT_EQ(lineDraw.WorldMatrix[3], glm::vec4(-1.0f, 0.0f, 0.0f, 1.0f));
+
+    const auto& pointDraw = renderWorld.PointDraws.front();
+    EXPECT_EQ(pointDraw.Geometry, Geometry::GeometryHandle(30u, 1u));
+    EXPECT_EQ(pointDraw.EntityKey, static_cast<uint32_t>(pointEntity));
+    EXPECT_TRUE(pointDraw.HasPerPointNormals);
+    EXPECT_EQ(pointDraw.Colors, cloudData.CachedColors);
+    EXPECT_EQ(pointDraw.Radii, cloudData.CachedRadii);
+    EXPECT_EQ(pointDraw.WorldMatrix[3], glm::vec4(0.0f, 5.0f, 0.0f, 1.0f));
 }
 
 TEST(RenderExtraction, ExtractedRenderWorld_TracksWhenAuthoritativeSceneAdvancesPastExtraction)
@@ -319,7 +366,7 @@ TEST(RenderExtraction, ExtractedRenderWorld_TracksWhenAuthoritativeSceneAdvances
     EXPECT_EQ(renderWorld.World.GetCurrentCommittedTick(), 2u);
 }
 
-TEST(RenderExtraction, ExtractedPickingPacketsRemainStableAfterSceneMutation)
+TEST(RenderExtraction, ExtractedRenderPacketsRemainStableAfterSceneMutation)
 {
     Runtime::SceneManager sceneManager;
     auto& registry = sceneManager.GetRegistry();
@@ -329,9 +376,10 @@ TEST(RenderExtraction, ExtractedPickingPacketsRemainStableAfterSceneMutation)
         surfaceEntity,
         ECS::Components::Transform::Component{.Position = glm::vec3(1.0f, 0.0f, 0.0f)});
     registry.emplace<ECS::Components::Selection::PickID>(surfaceEntity, ECS::Components::Selection::PickID{.Value = 101u});
-    registry.emplace<ECS::Surface::Component>(surfaceEntity, ECS::Surface::Component{
+    auto& surface = registry.emplace<ECS::Surface::Component>(surfaceEntity, ECS::Surface::Component{
         .Geometry = Geometry::GeometryHandle{41u, 1u},
     });
+    surface.CachedFaceColors = {0xFF010203u};
 
     const entt::entity lineEntity = registry.create();
     registry.emplace<ECS::Components::Transform::Component>(
@@ -343,8 +391,29 @@ TEST(RenderExtraction, ExtractedPickingPacketsRemainStableAfterSceneMutation)
     line.EdgeView = Geometry::GeometryHandle{52u, 1u};
     line.EdgeCount = 7u;
     line.Width = 2.5f;
+    line.HasPerEdgeColors = true;
+    line.CachedEdgeColors = {0xFF101112u, 0xFF131415u, 0xFF161718u, 0xFF191A1Bu,
+                             0xFF1C1D1Eu, 0xFF1F2021u, 0xFF222324u};
     auto& graphData = registry.emplace<ECS::Graph::Data>(lineEntity);
     graphData.GraphRef = std::make_shared<Geometry::Graph::Graph>();
+    graphData.CachedEdgeColors = line.CachedEdgeColors;
+    const std::vector<uint32_t> expectedLineColors = graphData.CachedEdgeColors;
+
+    const entt::entity pointEntity = registry.create();
+    registry.emplace<ECS::Components::Transform::Component>(
+        pointEntity,
+        ECS::Components::Transform::Component{.Position = glm::vec3(0.0f, 0.0f, 4.0f)});
+    registry.emplace<ECS::Components::Selection::PickID>(pointEntity, ECS::Components::Selection::PickID{.Value = 303u});
+    auto& point = registry.emplace<ECS::Point::Component>(pointEntity);
+    point.Geometry = Geometry::GeometryHandle{61u, 1u};
+    point.HasPerPointColors = true;
+    point.HasPerPointRadii = true;
+    auto& pointCloud = registry.emplace<ECS::PointCloud::Data>(pointEntity);
+    pointCloud.CloudRef = std::make_shared<Geometry::PointCloud::Cloud>();
+    pointCloud.CachedColors = {0xFF252627u, 0xFF28292Au};
+    pointCloud.CachedRadii = {0.2f, 0.4f};
+    const std::vector<uint32_t> expectedPointColors = pointCloud.CachedColors;
+    const std::vector<float> expectedPointRadii = pointCloud.CachedRadii;
 
     sceneManager.CommitFixedTick();
 
@@ -357,14 +426,25 @@ TEST(RenderExtraction, ExtractedPickingPacketsRemainStableAfterSceneMutation)
 
     ASSERT_EQ(extracted.SurfacePicking.size(), 1u);
     ASSERT_EQ(extracted.LinePicking.size(), 1u);
-    EXPECT_TRUE(extracted.PointPicking.empty());
+    ASSERT_EQ(extracted.PointPicking.size(), 1u);
+    ASSERT_EQ(extracted.SurfaceDraws.size(), 1u);
+    ASSERT_EQ(extracted.LineDraws.size(), 1u);
+    ASSERT_EQ(extracted.PointDraws.size(), 1u);
     EXPECT_EQ(extracted.SurfacePicking.front().Geometry, Geometry::GeometryHandle(41u, 1u));
     EXPECT_EQ(extracted.LinePicking.front().Geometry, Geometry::GeometryHandle(51u, 1u));
     EXPECT_EQ(extracted.LinePicking.front().EdgeCount, 7u);
+    EXPECT_EQ(extracted.SurfaceDraws.front().FaceColors, std::vector<uint32_t>({0xFF010203u}));
+    EXPECT_EQ(extracted.LineDraws.front().EdgeColors, expectedLineColors);
+    EXPECT_EQ(extracted.PointDraws.front().Colors, expectedPointColors);
+    EXPECT_EQ(extracted.PointDraws.front().Radii, expectedPointRadii);
 
     // Mutate authoritative ECS after extraction.
     registry.get<ECS::Surface::Component>(surfaceEntity).Geometry = Geometry::GeometryHandle{};
+    registry.get<ECS::Surface::Component>(surfaceEntity).CachedFaceColors = {0xFFFFFFFFu};
     registry.get<ECS::Line::Component>(lineEntity).EdgeCount = 0u;
+    registry.get<ECS::Graph::Data>(lineEntity).CachedEdgeColors.clear();
+    registry.get<ECS::PointCloud::Data>(pointEntity).CachedColors.clear();
+    registry.get<ECS::PointCloud::Data>(pointEntity).CachedRadii.clear();
     const entt::entity latePoint = registry.create();
     registry.emplace<ECS::Components::Transform::Component>(latePoint, ECS::Components::Transform::Component{});
     registry.emplace<ECS::Point::Component>(latePoint, ECS::Point::Component{
@@ -377,10 +457,17 @@ TEST(RenderExtraction, ExtractedPickingPacketsRemainStableAfterSceneMutation)
     // Extracted packets remain immutable snapshots and do not track live ECS mutations.
     ASSERT_EQ(extracted.SurfacePicking.size(), 1u);
     ASSERT_EQ(extracted.LinePicking.size(), 1u);
-    EXPECT_TRUE(extracted.PointPicking.empty());
+    ASSERT_EQ(extracted.PointPicking.size(), 1u);
+    ASSERT_EQ(extracted.SurfaceDraws.size(), 1u);
+    ASSERT_EQ(extracted.LineDraws.size(), 1u);
+    ASSERT_EQ(extracted.PointDraws.size(), 1u);
     EXPECT_EQ(extracted.SurfacePicking.front().Geometry, Geometry::GeometryHandle(41u, 1u));
     EXPECT_EQ(extracted.LinePicking.front().Geometry, Geometry::GeometryHandle(51u, 1u));
     EXPECT_EQ(extracted.LinePicking.front().EdgeCount, 7u);
+    EXPECT_EQ(extracted.SurfaceDraws.front().FaceColors, std::vector<uint32_t>({0xFF010203u}));
+    EXPECT_EQ(extracted.LineDraws.front().EdgeColors, expectedLineColors);
+    EXPECT_EQ(extracted.PointDraws.front().Colors, expectedPointColors);
+    EXPECT_EQ(extracted.PointDraws.front().Radii, expectedPointRadii);
 }
 
 TEST(RenderExtraction, ExtractedSelectionWorkStateRemainsStableAfterMutation)
@@ -408,14 +495,59 @@ TEST(RenderExtraction, ExtractedSelectionWorkStateRemainsStableAfterMutation)
     EXPECT_TRUE(extracted.HasSelectionWork);
 }
 
-TEST(RenderExtraction, RenderPassContext_ExposesReadonlySceneSnapshot)
+TEST(RenderExtraction, ExtractedHtexPreviewPacketRemainsStableAfterMeshMutation)
 {
-    using SceneRef = decltype(std::declval<Graphics::RenderPassContext>().Scene);
-    static_assert(std::is_const_v<std::remove_reference_t<SceneRef>>);
+    Runtime::SceneManager sceneManager;
+    auto& registry = sceneManager.GetRegistry();
+
+    auto mesh = std::make_shared<Geometry::Halfedge::Mesh>();
+    const auto v0 = mesh->AddVertex(glm::vec3(0.0f, 0.0f, 0.0f));
+    const auto v1 = mesh->AddVertex(glm::vec3(1.0f, 0.0f, 0.0f));
+    const auto v2 = mesh->AddVertex(glm::vec3(0.0f, 1.0f, 0.0f));
+    ASSERT_TRUE(mesh->AddTriangle(v0, v1, v2).has_value());
+
+    const entt::entity meshEntity = registry.create();
+    registry.emplace<ECS::Components::Selection::SelectedTag>(meshEntity);
+    auto& meshData = registry.emplace<ECS::Mesh::Data>(meshEntity);
+    meshData.MeshRef = mesh;
+    meshData.KMeansResultRevision = 5u;
+    meshData.KMeansCentroids = {glm::vec3(0.25f, 0.5f, 0.0f)};
+
+    sceneManager.CommitFixedTick();
+
+    const Runtime::RenderWorld extracted = Runtime::ExtractRenderWorld(Runtime::MakeRenderFrameInput(
+        Graphics::CameraComponent{},
+        sceneManager.CreateReadonlySnapshot(),
+        Runtime::RenderViewport{.Width = 1024, .Height = 768},
+        0.0));
+
+    ASSERT_TRUE(extracted.HtexPatchPreview.has_value());
+    ASSERT_TRUE(extracted.HtexPatchPreview->IsValid());
+    EXPECT_EQ(extracted.HtexPatchPreview->SourceEntityId, static_cast<uint32_t>(meshEntity));
+    EXPECT_EQ(extracted.HtexPatchPreview->KMeansResultRevision, 5u);
+    ASSERT_EQ(extracted.HtexPatchPreview->KMeansCentroids.size(), 1u);
+
+    const glm::vec3 extractedPosition = extracted.HtexPatchPreview->Mesh->Position(v0);
+    mesh->Position(v0) = glm::vec3(99.0f, 98.0f, 97.0f);
+
+    EXPECT_EQ(extracted.HtexPatchPreview->Mesh->Position(v0), extractedPosition);
+}
+
+TEST(RenderExtraction, RenderPassContext_ExposesReadonlyExtractedPackets)
+{
+    using SurfaceSpan = decltype(std::declval<Graphics::RenderPassContext>().SurfaceDrawPackets);
+    using LineSpan = decltype(std::declval<Graphics::RenderPassContext>().LineDrawPackets);
+    using PointSpan = decltype(std::declval<Graphics::RenderPassContext>().PointDrawPackets);
+    using HtexPtr = decltype(std::declval<Graphics::RenderPassContext>().HtexPatchPreview);
+
+    static_assert(std::is_same_v<SurfaceSpan, std::span<const Graphics::SurfaceDrawPacket>>);
+    static_assert(std::is_same_v<LineSpan, std::span<const Graphics::LineDrawPacket>>);
+    static_assert(std::is_same_v<PointSpan, std::span<const Graphics::PointDrawPacket>>);
+    static_assert(std::is_same_v<HtexPtr, const Graphics::HtexPatchPreviewPacket*>);
     SUCCEED();
 }
 
-TEST(RenderExtraction, FrameContext_OwnsPreparedRenderWorldCopy)
+TEST(RenderExtraction, FrameContext_OwnsPreparedRenderWorldAfterMove)
 {
     Runtime::SceneManager sceneManager;
     sceneManager.CommitFixedTick();
@@ -430,12 +562,8 @@ TEST(RenderExtraction, FrameContext_OwnsPreparedRenderWorldCopy)
         0.75));
 
     Runtime::FrameContext frame{};
-    frame.PreparedRenderWorld = renderWorld;
+    frame.PreparedRenderWorld = std::move(renderWorld);
     frame.Prepared = true;
-
-    renderWorld.Alpha = 0.0;
-    renderWorld.View.Camera.Position = glm::vec3(0.0f);
-    renderWorld.View.CameraPosition = glm::vec3(0.0f);
 
     const Runtime::RenderWorld* owned = frame.GetPreparedRenderWorld();
     ASSERT_NE(owned, nullptr);

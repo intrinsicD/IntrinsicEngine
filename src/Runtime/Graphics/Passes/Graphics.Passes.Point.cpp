@@ -290,8 +290,7 @@ namespace Graphics::Passes
 
         // Track which entity keys have active aux buffers this frame.
         std::vector<uint32_t> activeAttrKeys;
-
-        auto& registry = ctx.Scene.GetRegistry();
+        std::vector<uint32_t> activeRadiiKeys;
 
         // Frustum extraction — CPU-side culling for retained-mode draws.
         const bool cullingEnabled = !ctx.Debug.DisableCulling;
@@ -305,9 +304,7 @@ namespace Graphics::Passes
         // - MeshViewLifecycle (mesh vertex views)
         // - GraphGeometrySyncSystem (graph nodes)
         {
-            auto pointView = registry.view<ECS::Point::Component>();
-
-            for (auto [entity, pt] : pointView.each())
+            for (const auto& pt : ctx.PointDrawPackets)
             {
                 if (!pt.Geometry.IsValid())
                     continue;
@@ -324,9 +321,7 @@ namespace Graphics::Passes
                 if (vertexCount == 0)
                     continue;
 
-                glm::mat4 worldMatrix(1.0f);
-                if (auto* wm = registry.try_get<ECS::Components::Transform::WorldMatrix>(entity))
-                    worldMatrix = wm->Matrix;
+                const glm::mat4 worldMatrix = pt.WorldMatrix;
 
                 // Frustum cull.
                 if (cullingEnabled && !FrustumCullSphere(worldMatrix, geo->GetLocalBoundingSphere(), frustum))
@@ -351,81 +346,26 @@ namespace Graphics::Passes
                     (requestedNormalOrientedMode && !hasValidNormals) ? 0u : requestedModeIdx;
                 const bool isEWA = (effectiveModeIdx == 2u);
 
-                // Per-point color aux buffer (sourced from legacy components).
+                // Per-point color aux buffer (resolved during extraction).
                 uint64_t attrAddr = 0;
-                if (pt.HasPerPointColors)
+                if (!pt.Colors.empty())
                 {
-                    const uint32_t entityKey = static_cast<uint32_t>(entity);
-                    const uint32_t* colorData = nullptr;
-                    uint32_t colorCount = 0;
-
-                    // Try Graph::Data.CachedNodeColors
-                    if (const auto* gd = registry.try_get<ECS::Graph::Data>(entity))
+                    if (pt.Colors.size() == vertexCount)
                     {
-                        if (!gd->CachedNodeColors.empty() &&
-                            gd->CachedNodeColors.size() == vertexCount)
-                        {
-                            colorData = gd->CachedNodeColors.data();
-                            colorCount = vertexCount;
-                        }
-                    }
-
-                    // Try PointCloud::Data.CachedColors
-                    if (!colorData)
-                    {
-                        if (const auto* pcd = registry.try_get<ECS::PointCloud::Data>(entity))
-                        {
-                            if (!pcd->CachedColors.empty() &&
-                                pcd->CachedColors.size() == vertexCount)
-                            {
-                                colorData = pcd->CachedColors.data();
-                                colorCount = vertexCount;
-                            }
-                        }
-                    }
-
-                    if (colorData)
-                    {
-                        activeAttrKeys.push_back(entityKey);
-                        attrAddr = EnsurePointAttrBuffer(entityKey, colorData, colorCount);
+                        activeAttrKeys.push_back(pt.EntityKey);
+                        attrAddr = EnsurePointAttrBuffer(pt.EntityKey, pt.Colors.data(), vertexCount);
                     }
                 }
 
-                // Per-point radii buffer (sourced from Graph::Data or PointCloud::Data).
+                // Per-point radii buffer (resolved during extraction).
                 uint64_t radiiAddr = 0;
                 {
-                    const uint32_t entityKey = static_cast<uint32_t>(entity);
-                    const float* radiiData = nullptr;
-                    uint32_t radiiCount = 0;
-
-                    // Try Graph::Data.CachedNodeRadii
-                    if (const auto* gd = registry.try_get<ECS::Graph::Data>(entity))
+                    if (!pt.Radii.empty() && pt.Radii.size() == vertexCount)
                     {
-                        if (!gd->CachedNodeRadii.empty() &&
-                            gd->CachedNodeRadii.size() == vertexCount)
-                        {
-                            radiiData = gd->CachedNodeRadii.data();
-                            radiiCount = vertexCount;
-                        }
-                    }
-
-                    // Try PointCloud::Data.CachedRadii
-                    if (!radiiData)
-                    {
-                        if (const auto* pcd = registry.try_get<ECS::PointCloud::Data>(entity))
-                        {
-                            if (!pcd->CachedRadii.empty() &&
-                                pcd->CachedRadii.size() == vertexCount)
-                            {
-                                radiiData = pcd->CachedRadii.data();
-                                radiiCount = vertexCount;
-                            }
-                        }
-                    }
-
-                    if (radiiData)
-                    {
-                        radiiAddr = EnsurePointRadiiBuffer(entityKey + 0x80000000u, radiiData, radiiCount);
+                        activeRadiiKeys.push_back(pt.EntityKey + 0x80000000u);
+                        radiiAddr = EnsurePointRadiiBuffer(pt.EntityKey + 0x80000000u,
+                                                           pt.Radii.data(),
+                                                           vertexCount);
                     }
                 }
 
@@ -455,6 +395,7 @@ namespace Graphics::Passes
 
         // Cleanup orphaned point attribute buffers.
         CleanupOrphanedBuffers(*m_Device, m_PointAttrBuffers, activeAttrKeys);
+        CleanupOrphanedBuffers(*m_Device, m_PointRadiiBuffers, activeRadiiKeys);
 
         // =================================================================
         // Transient DebugDraw points (uploaded per-frame via BDA)

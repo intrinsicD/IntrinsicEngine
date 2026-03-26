@@ -1066,14 +1066,17 @@ namespace Graphics
         ApplyPendingPipelineSwap(extent.width, extent.height);
     }
 
-    void RenderSystem::BuildGraph(const ECS::Scene& scene,
-                                  Core::Assets::AssetManager& assetManager,
+    void RenderSystem::BuildGraph(Core::Assets::AssetManager& assetManager,
                                   const CameraComponent& camera,
                                   bool hasSelectionWork,
                                   const SelectionOutlinePacket& selectionOutline,
                                   std::span<const PickingSurfacePacket> pickingSurfacePackets,
                                   std::span<const PickingLinePacket> pickingLinePackets,
-                                  std::span<const PickingPointPacket> pickingPointPackets)
+                                  std::span<const PickingPointPacket> pickingPointPackets,
+                                  std::span<const SurfaceDrawPacket> surfaceDrawPackets,
+                                  std::span<const LineDrawPacket> lineDrawPackets,
+                                  std::span<const PointDrawPacket> pointDrawPackets,
+                                  const HtexPatchPreviewPacket* htexPatchPreview)
     {
         const uint32_t frameIndex = m_Presentation.GetFrameIndex();
         m_RenderGraph.Reset(frameIndex);
@@ -1089,14 +1092,15 @@ namespace Graphics
         m_LastBuiltImageIndex = imageIndex;
         m_LastBuiltGraphExtent = extent;
         RenderBlackboard blackboard;
+        auto stableBlackboard = m_FrameScope.New<RenderBlackboard>(blackboard);
+        RenderBlackboard* activeBlackboard = stableBlackboard ? *stableBlackboard : &blackboard;
 
         const auto& pendingPick = m_Interaction.GetPendingPick();
         const auto& debugView = m_Interaction.GetDebugViewState();
 
         RenderPassContext ctx{
             m_RenderGraph,
-            blackboard,
-            scene,
+            *activeBlackboard,
             assetManager,
             m_GeometryStorage,
             m_MaterialSystem,
@@ -1112,38 +1116,50 @@ namespace Graphics
             m_GlobalResources.GetCameraUBO(),
             m_GlobalResources.GetGlobalDescriptorSet(),
             m_GlobalResources.GetDynamicUBOOffset(frameIndex),
-            m_GlobalResources.GetBindlessSystem(),
-            {pendingPick.Pending, pendingPick.X, pendingPick.Y},
-            {
-                debugView.Enabled, debugView.ShowInViewport, debugView.DisableCulling, debugView.SelectedResource,
-                debugView.DepthNear, debugView.DepthFar
-            },
-            m_LastDebugImages,
-            m_LastDebugPasses,
-            camera.ViewMatrix,
-            camera.ProjectionMatrix,
-            m_Interaction.GetReadbackBuffer(frameIndex),
-            m_DebugDraw,
-            hasSelectionWork,
-            selectionOutline,
-            pickingSurfacePackets,
-            pickingLinePackets,
-            pickingPointPackets
+            m_GlobalResources.GetBindlessSystem()
         };
 
+        ctx.PickRequest.Pending = pendingPick.Pending;
+        ctx.PickRequest.X = pendingPick.X;
+        ctx.PickRequest.Y = pendingPick.Y;
+
+        ctx.Debug.Enabled = debugView.Enabled;
+        ctx.Debug.ShowInViewport = debugView.ShowInViewport;
+        ctx.Debug.DisableCulling = debugView.DisableCulling;
+        ctx.Debug.SelectedResource = debugView.SelectedResource;
+        ctx.Debug.DepthNear = debugView.DepthNear;
+        ctx.Debug.DepthFar = debugView.DepthFar;
+        ctx.PrevFrameDebugImages = m_LastDebugImages;
+        ctx.PrevFrameDebugPasses = m_LastDebugPasses;
+        ctx.CameraView = camera.ViewMatrix;
+        ctx.CameraProj = camera.ProjectionMatrix;
+        ctx.PickReadbackBuffer = m_Interaction.GetReadbackBuffer(frameIndex);
+        ctx.HasSelectionWork = hasSelectionWork;
+        ctx.SelectionOutline = selectionOutline;
+        ctx.PickingSurfacePackets = pickingSurfacePackets;
+        ctx.PickingLinePackets = pickingLinePackets;
+        ctx.PickingPointPackets = pickingPointPackets;
+        ctx.SurfaceDrawPackets = surfaceDrawPackets;
+        ctx.LineDrawPackets = lineDrawPackets;
+        ctx.PointDrawPackets = pointDrawPackets;
+        ctx.HtexPatchPreview = htexPatchPreview;
+
+        auto stable = m_FrameScope.New<RenderPassContext>(ctx);
+        RenderPassContext* stableCtx = stable ? *stable : &ctx;
+
         if (m_ActivePipeline)
-            ctx.Recipe = m_ActivePipeline->BuildFrameRecipe(ctx);
+            stableCtx->Recipe = m_ActivePipeline->BuildFrameRecipe(*stableCtx);
         else
         {
-            ctx.Recipe.Depth = true;
-            ctx.Recipe.EntityId = pendingPick.Pending || hasSelectionWork || debugView.Enabled;
-            ctx.Recipe.DebugVisualization = debugView.Enabled;
-            ctx.Recipe.Selection = hasSelectionWork;
-            ctx.Recipe.LightingPath = FrameLightingPath::Forward;
-            ctx.Recipe.Post = true;
-            ctx.Recipe.SceneColorLDR = true;
+            stableCtx->Recipe.Depth = true;
+            stableCtx->Recipe.EntityId = pendingPick.Pending || hasSelectionWork || debugView.Enabled;
+            stableCtx->Recipe.DebugVisualization = debugView.Enabled;
+            stableCtx->Recipe.Selection = hasSelectionWork;
+            stableCtx->Recipe.LightingPath = FrameLightingPath::Forward;
+            stableCtx->Recipe.Post = true;
+            stableCtx->Recipe.SceneColorLDR = true;
         }
-        m_LastFrameRecipe = ctx.Recipe;
+        m_LastFrameRecipe = stableCtx->Recipe;
 
         struct FrameSetupData
         {
@@ -1151,7 +1167,7 @@ namespace Graphics
             RGResourceHandle Backbuffer;
         };
         m_RenderGraph.AddPass<FrameSetupData>("FrameSetup",
-                                              [&](FrameSetupData& data, RGBuilder& builder)
+                                              [this, extent, stableCtx, activeBlackboard](FrameSetupData& data, RGBuilder& builder)
                                               {
                                                   data.Backbuffer = builder.ImportTexture(
                                                       "Backbuffer"_id,
@@ -1160,7 +1176,7 @@ namespace Graphics
                                                       m_Presentation.GetBackbufferFormat(),
                                                       extent,
                                                       VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-                                                  blackboard.Add("Backbuffer"_id, data.Backbuffer);
+                                                  activeBlackboard->Add("Backbuffer"_id, data.Backbuffer);
 
                                                   for (RenderResource resource : {
                                                            RenderResource::SceneDepth,
@@ -1175,7 +1191,7 @@ namespace Graphics
                                                            RenderResource::SelectionOutline,
                                                        })
                                                   {
-                                                      if (!ctx.Recipe.Requires(resource))
+                                                      if (!stableCtx->Recipe.Requires(resource))
                                                           continue;
 
                                                       const auto index = static_cast<size_t>(resource);
@@ -1195,9 +1211,9 @@ namespace Graphics
                                                       {
                                                           data.Resources[index] = builder.CreateTexture(
                                                               def.Name,
-                                                              BuildRenderResourceTextureDesc(resource, ctx));
+                                                               BuildRenderResourceTextureDesc(resource, *stableCtx));
                                                       }
-                                                      blackboard.Add(resource, data.Resources[index]);
+                                                      activeBlackboard->Add(resource, data.Resources[index]);
                                                   }
                                               },
                                               [](const FrameSetupData&, const RGRegistry&, VkCommandBuffer)
@@ -1229,18 +1245,11 @@ namespace Graphics
                                                    if (m_GpuScene) m_GpuScene->Sync(cmd, frameIndex);
                                                });
 
-        auto stable = m_FrameScope.New<RenderPassContext>(ctx);
-        if (stable)
+
+        if (m_ActivePipeline)
         {
-            RenderPassContext* stableCtx = *stable;
-            if (m_ActivePipeline)
-                m_ActivePipeline->SetupFrame(*stableCtx);
-        }
-        else
-        {
-            Core::Log::Error("RenderSystem::BuildGraph failed to allocate stable RenderPassContext from frame scope");
-            if (m_ActivePipeline)
-                m_ActivePipeline->SetupFrame(ctx);
+            m_ActivePipeline->SetDebugDraw(m_DebugDraw);
+            m_ActivePipeline->SetupFrame(*stableCtx);
         }
     }
 

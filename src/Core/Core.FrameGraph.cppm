@@ -55,7 +55,7 @@ export namespace Core
 
     namespace Detail
     {
-        [[nodiscard]] consteval uint64_t HashTypeTokenString(std::string_view str)
+        [[nodiscard]] constexpr uint64_t HashTypeTokenString(std::string_view str)
         {
             uint64_t hash = 14695981039346656037ull;
             for (unsigned char c : str)
@@ -67,7 +67,7 @@ export namespace Core
         }
 
         template <typename T>
-        [[nodiscard]] consteval std::string_view TypeTokenSignature()
+        [[nodiscard]] constexpr std::string_view TypeTokenSignature()
         {
 #if defined(__clang__) || defined(__GNUC__)
             return __PRETTY_FUNCTION__;

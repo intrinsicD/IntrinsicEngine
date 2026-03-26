@@ -324,7 +324,7 @@ export namespace Graphics::Passes
         static_assert(sizeof(GpuCentroidEntry) == 16);
 
         uint64_t EnsureCentroidBuffer(uint32_t geoIndex,
-                                      const ECS::Surface::Component::CentroidEntry* entries,
+                                      const SurfaceCentroidPacketEntry* entries,
                                       uint32_t centroidCount);
     };
 }

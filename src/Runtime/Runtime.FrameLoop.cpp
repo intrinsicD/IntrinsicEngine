@@ -523,10 +523,10 @@ namespace Runtime
         return m_Renderer.ExtractRenderWorld(renderInput);
     }
 
-    void RuntimeRenderLaneHost::ExecutePreparedFrame(const RenderWorld& renderWorld)
+    void RuntimeRenderLaneHost::ExecutePreparedFrame(RenderWorld renderWorld)
     {
         FrameContext& frame = m_Renderer.BeginFrame();
-        m_Renderer.PrepareFrame(frame, renderWorld);
+        m_Renderer.PrepareFrame(frame, std::move(renderWorld));
         m_Renderer.ExecuteFrame(frame);
         m_Renderer.EndFrame(frame);
     }
@@ -565,7 +565,7 @@ namespace Runtime
             PROFILE_SCOPE("OnRender");
             callbacks.OnRender(alpha);
             if (renderWorld)
-                self.Host.ExecutePreparedFrame(*renderWorld);
+                self.Host.ExecutePreparedFrame(std::move(*renderWorld));
         }
     }
 

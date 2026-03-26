@@ -74,6 +74,10 @@ export namespace Runtime
         std::vector<Graphics::PickingSurfacePacket> SurfacePicking{};
         std::vector<Graphics::PickingLinePacket> LinePicking{};
         std::vector<Graphics::PickingPointPacket> PointPicking{};
+        std::vector<Graphics::SurfaceDrawPacket> SurfaceDraws{};
+        std::vector<Graphics::LineDrawPacket> LineDraws{};
+        std::vector<Graphics::PointDrawPacket> PointDraws{};
+        std::optional<Graphics::HtexPatchPreviewPacket> HtexPatchPreview{};
 
         [[nodiscard]] bool IsValid() const
         {
@@ -129,7 +133,7 @@ export namespace Runtime
 
     private:
         uint32_t m_FramesInFlight = DefaultFrameContexts;
-        std::array<FrameContext, MaxFrameContexts> m_Contexts{};
+        std::vector<FrameContext> m_Contexts{};
     };
 
     [[nodiscard]] RenderFrameInput MakeRenderFrameInput(const Graphics::CameraComponent& camera,

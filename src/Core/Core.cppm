@@ -18,3 +18,4 @@ export import Core.FrameGraph;
 export import Core.DAGScheduler;
 export import Core.FeatureRegistry;
 export import Core.InplaceFunction;
+export import Core.Commands;

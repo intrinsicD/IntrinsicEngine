@@ -328,7 +328,7 @@ export namespace Runtime
         virtual void RegisterEngineSystems(Core::FrameGraph& graph) = 0;
         virtual void DispatchDeferredEvents() = 0;
         [[nodiscard]] virtual std::optional<RenderWorld> ExtractRenderWorld(double alpha) = 0;
-        virtual void ExecutePreparedFrame(const RenderWorld& renderWorld) = 0;
+        virtual void ExecutePreparedFrame(RenderWorld renderWorld) = 0;
     };
 
     class RuntimeRenderLaneHost final : public IRenderLaneHost
@@ -353,7 +353,7 @@ export namespace Runtime
         void RegisterEngineSystems(Core::FrameGraph& graph) override;
         void DispatchDeferredEvents() override;
         [[nodiscard]] std::optional<RenderWorld> ExtractRenderWorld(double alpha) override;
-        void ExecutePreparedFrame(const RenderWorld& renderWorld) override;
+        void ExecutePreparedFrame(RenderWorld renderWorld) override;
 
     private:
         SceneManager& m_Scene;

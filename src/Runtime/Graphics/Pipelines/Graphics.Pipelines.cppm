@@ -8,6 +8,7 @@ export module Graphics.Pipelines;
 import Graphics.RenderPipeline;
 import Graphics.RenderPath;
 import Graphics.RenderGraph;
+import Graphics.DebugDraw;
 import Graphics.ShaderRegistry;
 import Graphics.PipelineLibrary;
 import Graphics.FeatureCatalog;
@@ -66,6 +67,7 @@ export namespace Graphics
 
         [[nodiscard]] FrameRecipe BuildFrameRecipe(const RenderPassContext& ctx) const override;
         void SetupFrame(RenderPassContext& ctx) override;
+        void SetDebugDraw(DebugDraw* dd) override;
 
         void OnResize(uint32_t width, uint32_t height) override;
 

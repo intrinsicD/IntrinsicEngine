@@ -430,14 +430,13 @@ A mesh uploads positions/normals once; wireframe, vertex visualization, and kNN 
 
 ### 14. Command Pattern for Undo/Redo (P1)
 
-**Gap:** ROADMAP.md Phase 2 lists "Undo/redo stack" but no implementation exists. The engine has `Core::Tasks` for async work but no Command abstraction for reversible operations.
+**Status:** Implemented in `src/Core/Core.Commands.cppm` and covered by `tests/Test_CoreCommands.cpp`.
 
-**Recommendation:** New module `Core.Command.cppm`:
-- `Core::Command` base with `Execute()` and `Undo()`.
-- `Core::CompositeCommand` for transaction grouping (e.g., multi-entity transform).
-- `Core::CommandHistory` with fixed-size ring buffer.
-- Commands are non-copyable, movable, stored as `std::unique_ptr<Command>`.
-- Use `std::expected` for execution results (not exceptions).
+**Implementation:**
+- `Core::EditorCommand` stores `std::string` names plus move-only redo/undo callables via `std::move_only_function<void()>`.
+- `Core::CommandHistory` provides bounded undo/redo stacks with `Execute()`, `Undo()`, `Redo()`, `Clear()`, `CanUndo()`, and `CanRedo()`.
+- `Core::CmdComponentChange<T>` captures ECS before/after snapshots for `entt::registry` updates.
+- `Core::MakeComponentChangeCommand<T>()` converts a registry snapshot pair into a replayable editor command.
 
 **Use when:**
 - **Transform gizmo edits:** Each drag produces a `TransformCommand` capturing before/after state for all selected entities.
@@ -446,7 +445,7 @@ A mesh uploads positions/normals once; wireframe, vertex visualization, and kNN 
 - **Geometry operator application:** Simplification, subdivision, smoothing — capture mesh state before operator, undo reverts to snapshot.
 - **Scene hierarchy changes:** Reparenting entities via drag-and-drop in the hierarchy panel.
 
-**Priority:** P1 — directly enables the ROADMAP Phase 2 undo/redo item.
+**Priority:** P1 — directly supports reversible editor operations and property edits.
 
 ---
 
@@ -487,7 +486,7 @@ The existing `Utils::LockFreeQueue<T>` (`Utils.LockFreeQueue.cppm`) is **already
 | 11 | Lifecycle System | Implemented | — | Geometry → GPU pipeline |
 | 12 | Vtable Anchor | Implemented | — | Virtual interfaces in modules |
 | 13 | BDA Shared-Buffer | Implemented | — | Shared vertex data topology views |
-| 14 | Command Pattern (Undo/Redo) | **Not yet** | P1 | Reversible editor operations |
+| 14 | Command Pattern (Undo/Redo) | Implemented | P1 | Reversible editor operations |
 | ~~15~~ | ~~Enumerate/Zip Utilities~~ | Dropped | — | C++23 `std::views::enumerate`/`zip` covers this natively |
 | ~~16~~ | ~~ComponentGui Dispatch~~ | Dropped | — | Only 6 component checks; not justified at current scale |
 | ~~17~~ | ~~Policy-Based Composition~~ | Dropped | — | `std::variant` dispatch (Pattern doc) already covers the need |

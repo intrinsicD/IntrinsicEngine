@@ -49,8 +49,8 @@ export namespace Graphics::Passes
 
     struct PreviewKMeansData
     {
-        Geometry::Property<uint32_t> Labels{};
-        Geometry::Property<glm::vec4> Colors{};
+        Geometry::ConstProperty<uint32_t> Labels{};
+        Geometry::ConstProperty<glm::vec4> Colors{};
         std::span<const glm::vec3> Centroids{};
 
         [[nodiscard]] bool HasAny() const noexcept
@@ -114,7 +114,6 @@ export namespace Graphics::Passes
         struct CachedPreviewInputs
         {
             entt::entity SourceEntity = entt::null;
-            const Geometry::Halfedge::Mesh* Mesh = nullptr;
             std::size_t VertexCount = 0;
             std::size_t EdgeCount = 0;
             std::size_t FaceCount = 0;
@@ -138,8 +137,6 @@ export namespace Graphics::Passes
                                                      uint32_t& outWidth,
                                                      uint32_t& outHeight);
 
-        [[nodiscard]] static bool IsInterestingMeshEntity(const entt::registry& reg, entt::entity entity);
-        [[nodiscard]] static std::optional<entt::entity> FindSourceMeshEntity(const entt::registry& reg);
         [[nodiscard]] static uint64_t ComputePreviewAtlasSignature(
             const Geometry::Halfedge::Mesh& mesh,
             const PreviewKMeansData& kmeansData,
