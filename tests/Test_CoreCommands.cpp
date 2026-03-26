@@ -106,7 +106,7 @@ TEST(CoreCommands, ComponentChangeCommandRestoresRegistryState)
 
     auto command = Core::MakeComponentChangeCommand(
         "Change value",
-        registry,
+        &registry,
         entity,
         TestComponent{1},
         TestComponent{5});
