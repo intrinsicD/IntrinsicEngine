@@ -9,7 +9,7 @@ module;
 
 export module Geometry.Segment;
 
-import Geometry.Pca;
+import Geometry.PCA;
 
 export namespace Geometry
 {
@@ -110,7 +110,7 @@ export namespace Geometry
             return segment;
         }
 
-        const PcaResult pca = ToPca(points);
+        const PCAResult pca = ToPCA(points);
         glm::vec3 axis = glm::normalize(glm::vec3{pca.Eigenvectors[0]});
         if (!std::isfinite(axis.x) || !std::isfinite(axis.y) || !std::isfinite(axis.z)
             || glm::dot(axis, axis) <= 1.0e-12f)

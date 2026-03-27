@@ -6,7 +6,7 @@ module;
 
 export module Geometry.Plane;
 
-import Geometry.Pca;
+import Geometry.PCA;
 
 export namespace Geometry
 {
@@ -57,7 +57,7 @@ export namespace Geometry
 
     [[nodiscard]] inline Plane ToPlane(std::span<const glm::vec3> points)
     {
-        const PcaResult pca = ToPca(points);
+        const PCAResult pca = ToPCA(points);
 
         Plane plane;
         plane.Distance = 0.0f;

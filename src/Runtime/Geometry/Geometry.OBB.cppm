@@ -12,7 +12,7 @@ module;
 export module Geometry.OBB;
 
 import Geometry.AABB;
-import Geometry.Pca;
+import Geometry.PCA;
 
 export namespace Geometry
 {
@@ -212,7 +212,7 @@ export namespace Geometry
             return std::isfinite(point.x) && std::isfinite(point.y) && std::isfinite(point.z);
         };
 
-        const PcaResult pca = ToPca(points);
+        const PCAResult pca = ToPCA(points);
         if (!pca.Valid)
         {
             return OBB{};

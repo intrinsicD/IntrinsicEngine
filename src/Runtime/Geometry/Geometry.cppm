@@ -6,7 +6,7 @@ export import Geometry.Sphere;
 export import Geometry.Capsule;
 export import Geometry.Cylinder;
 export import Geometry.Ellipsoid;
-export import Geometry.Pca;
+export import Geometry.PCA;
 export import Geometry.Segment;
 export import Geometry.Triangle;
 export import Geometry.Plane;

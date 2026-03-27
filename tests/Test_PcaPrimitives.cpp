@@ -59,7 +59,7 @@ TEST(PcaPrimitives, PcaRecoversDominantAxisForLineSamples)
         {std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f},
     };
 
-    const Geometry::PcaResult pca = Geometry::ToPca(points);
+    const Geometry::PCAResult pca = Geometry::ToPCA(points);
     ASSERT_TRUE(pca.Valid);
     EXPECT_GT(pca.Eigenvalues.x, pca.Eigenvalues.y);
     EXPECT_GT(pca.Eigenvalues.y + 1.0e-6f, pca.Eigenvalues.z);
