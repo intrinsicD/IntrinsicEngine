@@ -5,7 +5,7 @@
 
 import Geometry;
 
-#include "TestMeshBuilders.h"
+#include "Test_MeshBuilders.h"
 
 // Larger disk mesh: subdivided square (4 triangles, 5 vertices)
 static Geometry::Halfedge::Mesh MakeSquareDisk()

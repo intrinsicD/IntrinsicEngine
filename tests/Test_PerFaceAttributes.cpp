@@ -14,7 +14,7 @@ import Graphics;
 import Geometry;
 import RHI;
 
-#include "TestMeshBuilders.h"
+#include "Test_MeshBuilders.h"
 
 namespace
 {
@@ -111,7 +111,7 @@ namespace
 // Helpers
 // =============================================================================
 
-// Use shared builders from TestMeshBuilders.h where possible.
+// Use shared builders from Test_MeshBuilders.h where possible.
 // MakeTriangle forwards to the shared equivalent.
 // MakeTetrahedron uses different vertex coordinates than the shared version
 // (approximate regular tetrahedron vs exact), so it remains local.

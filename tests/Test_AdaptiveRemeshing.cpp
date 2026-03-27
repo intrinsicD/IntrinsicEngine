@@ -9,7 +9,7 @@
 
 import Geometry;
 
-#include "TestMeshBuilders.h"
+#include "Test_MeshBuilders.h"
 
 // Create a flat NxN grid of triangles (all in the Z=0 plane)
 static Geometry::Halfedge::Mesh MakeFlatGrid(int n)
