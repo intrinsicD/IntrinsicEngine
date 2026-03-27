@@ -4,7 +4,7 @@ export module ECS:Components.GeometryDataSources;
 
 import Geometry.Properties;
 
-export namespace ECS::Components::GeometryDataSource
+export namespace ECS::Components::GeometryDataSources
 {
     struct VertexDataSource
     {
@@ -26,7 +26,7 @@ export namespace ECS::Components::GeometryDataSource
         Geometry::PropertySet Properties;
     };
 
-     struct NodeDataSource
+    struct NodeDataSource
     {
         Geometry::PropertySet Properties;
     };
