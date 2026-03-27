@@ -2,8 +2,8 @@
 
 This document records the current audit of duplicate retained-geometry upload and lifecycle code paths across:
 
-- `GraphGeometrySync`
-- `PointCloudGeometrySync`
+- `GraphLifecycle`
+- `PointCloudLifecycle`
 - `MeshViewLifecycle`
 - `PropertySetDirtySync`
 
@@ -17,8 +17,8 @@ The audit focuses on CPU-side retained geometry preparation and ECS lifecycle wi
 
 The concrete systems reviewed were:
 
-- `src/Runtime/Graphics/Graphics.Systems.GraphGeometrySync.cpp`
-- `src/Runtime/Graphics/Graphics.Systems.PointCloudGeometrySync.cpp`
+- `src/Runtime/Graphics/Graphics.Systems.GraphLifecycle.cpp`
+- `src/Runtime/Graphics/Graphics.Systems.PointCloudLifecycle.cpp`
 - `src/Runtime/Graphics/Graphics.Systems.MeshViewLifecycle.cpp`
 - `src/Runtime/Graphics/Graphics.Systems.PropertySetDirtySync.cpp`
 - `src/Runtime/Graphics/Graphics.LifecycleUtils.hpp`
@@ -35,7 +35,7 @@ The retained-geometry systems already share a useful common substrate:
 However, the audit found three remaining duplication clusters:
 
 1. **Attribute extraction duplication**
-   - Point-cloud per-point color/radius extraction existed in both `PointCloudGeometrySync` and `PropertySetDirtySync`.
+   - Point-cloud per-point color/radius extraction existed in both `PointCloudLifecycle` and `PropertySetDirtySync`.
    - Graph extraction is already centralized, so point clouds were the obvious missing peer.
 
 2. **Geometry rewrite / teardown duplication**
@@ -59,7 +59,7 @@ However, the audit found three remaining duplication clusters:
 
 Before this audit cleanup, these two blocks were effectively duplicated:
 
-- `PointCloudGeometrySync` phase-1 extraction
+- `PointCloudLifecycle` phase-1 extraction
 - `PropertySetDirtySync::SyncPointCloudAttributes`
 
 Shared behavior:
@@ -79,7 +79,7 @@ This was the lowest-risk consolidation target because it has:
 
 ### Graph
 
-`GraphGeometrySync` has a local `releaseGraphGpu(...)` lambda that:
+`GraphLifecycle` has a local `releaseGraphGpu(...)` lambda that:
 
 - removes vertex geometry
 - removes edge geometry
@@ -89,7 +89,7 @@ This was the lowest-risk consolidation target because it has:
 
 ### Point cloud
 
-`PointCloudGeometrySync` has an inline empty/null-cloud branch that:
+`PointCloudLifecycle` has an inline empty/null-cloud branch that:
 
 - removes point geometry
 - clears cached point attributes
@@ -100,7 +100,7 @@ These are conceptually parallel, but not yet factored. They are good future cons
 
 ## C. Upload orchestration skeleton
 
-`GraphGeometrySync`, `PointCloudGeometrySync`, and `MeshViewLifecycle` all implement a near-identical control flow:
+`GraphLifecycle`, `PointCloudLifecycle`, and `MeshViewLifecycle` all implement a near-identical control flow:
 
 $$
 \text{Dirty} \rightarrow \text{Validate/Extract} \rightarrow \text{Upload} \rightarrow

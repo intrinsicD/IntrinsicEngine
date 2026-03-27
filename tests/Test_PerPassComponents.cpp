@@ -304,7 +304,7 @@ TEST(PerPassComponents_Iteration, PointPassView)
 
 TEST(Phase6_GraphSync, GraphDataFields_MapToLineAndPoint)
 {
-    // Validates the field mapping contract: GraphGeometrySyncSystem
+    // Validates the field mapping contract: GraphLifecycleSystem
     // populates Line::Component and Point::Component from Graph::Data
     // with the same field mapping that ComponentMigration previously used.
     Graph::Data gd;
@@ -319,7 +319,7 @@ TEST(Phase6_GraphSync, GraphDataFields_MapToLineAndPoint)
     gd.CachedNodeRadii = {0.01f};
     gd.CachedEdgeColors = {0xFF00FF00};
 
-    // Simulate what GraphGeometrySyncSystem Phase 3 does.
+    // Simulate what GraphLifecycleSystem Phase 3 does.
     Line::Component line;
     line.Color            = gd.DefaultEdgeColor;
     line.Width            = gd.EdgeWidth;
@@ -349,7 +349,7 @@ TEST(Phase6_GraphSync, GraphDataFields_MapToLineAndPoint)
 
 TEST(Phase6_CloudSync, PointCloudDataFields_MapToPoint)
 {
-    // Validates the field mapping contract: PointCloudGeometrySyncSystem
+    // Validates the field mapping contract: PointCloudLifecycleSystem
     // populates Point::Component from PointCloud::Data.
     auto cloud = std::make_shared<Geometry::PointCloud::Cloud>();
     cloud->EnableNormals();
@@ -364,7 +364,7 @@ TEST(Phase6_CloudSync, PointCloudDataFields_MapToPoint)
     pcd.SizeMultiplier = 2.0f;
     pcd.RenderMode = Geometry::PointCloud::RenderMode::Surfel;
 
-    // Simulate what PointCloudGeometrySyncSystem Phase 3 does.
+    // Simulate what PointCloudLifecycleSystem Phase 3 does.
     Point::Component pt;
     pt.Color             = pcd.DefaultColor;
     pt.Size              = pcd.DefaultRadius;

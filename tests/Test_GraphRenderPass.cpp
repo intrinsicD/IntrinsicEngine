@@ -258,7 +258,7 @@ TEST(Graph_RetainedMode, DefaultGpuStateValues)
 TEST(Graph_RetainedMode, GpuDirtyStartsTrue)
 {
     // Every new Graph::Data instance starts dirty so that
-    // GraphGeometrySyncSystem uploads on the first frame.
+    // GraphLifecycleSystem uploads on the first frame.
     ECS::Graph::Data data;
     data.GraphRef = MakeTriangleGraph();
     EXPECT_TRUE(data.GpuDirty);
@@ -266,7 +266,7 @@ TEST(Graph_RetainedMode, GpuDirtyStartsTrue)
 
 TEST(Graph_RetainedMode, EdgePairStorageMatchesEdgeCount)
 {
-    // Simulate what GraphGeometrySyncSystem would do: extract edge pairs
+    // Simulate what GraphLifecycleSystem would do: extract edge pairs
     // from graph topology and store them on the component.
     auto g = MakeTriangleGraph(); // 3 vertices, 3 edges
 
@@ -371,7 +371,7 @@ TEST(Graph_GPUSceneSlot, SlotCanBeAssignedAndCleared)
 // Per-Node Attribute Cache — Contract tests
 // =============================================================================
 //
-// GraphGeometrySyncSystem extracts per-node colors and radii from PropertySets
+// GraphLifecycleSystem extracts per-node colors and radii from PropertySets
 // into CachedNodeColors / CachedNodeRadii vectors on the component.
 
 TEST(Graph_NodeAttributes, CachedNodeColorsDefaultEmpty)
@@ -388,7 +388,7 @@ TEST(Graph_NodeAttributes, CachedNodeRadiiDefaultEmpty)
 
 TEST(Graph_NodeAttributes, CachedNodeColorsMatchVertexCount)
 {
-    // Simulate what GraphGeometrySyncSystem does: extract per-node colors
+    // Simulate what GraphLifecycleSystem does: extract per-node colors
     // and pack them as ABGR uint32 values.
     auto g = MakeTriangleGraph();
 
@@ -505,7 +505,7 @@ TEST(Graph_StaticGeometry, StaticUploadModeIsStaged)
 
 TEST(Graph_StaticGeometry, UploadRequestDirect)
 {
-    // Simulate what GraphGeometrySyncSystem builds for a dynamic graph.
+    // Simulate what GraphLifecycleSystem builds for a dynamic graph.
     auto g = MakeTriangleGraph();
     ECS::Graph::Data data;
     data.GraphRef = g;
@@ -525,7 +525,7 @@ TEST(Graph_StaticGeometry, UploadRequestDirect)
 
 TEST(Graph_StaticGeometry, UploadRequestStaged)
 {
-    // Simulate what GraphGeometrySyncSystem builds for a static graph.
+    // Simulate what GraphLifecycleSystem builds for a static graph.
     auto g = MakeTriangleGraph();
     ECS::Graph::Data data;
     data.GraphRef = g;
@@ -584,7 +584,7 @@ TEST(Graph_StaticGeometry, StaticFlagDoesNotAffectGpuDirty)
 
 TEST(Graph_StaticGeometry, StagedMatchesPointCloudUploadMode)
 {
-    // Static graph upload mode should match PointCloudGeometrySyncSystem's mode.
+    // Static graph upload mode should match PointCloudLifecycleSystem's mode.
     // This ensures consistency across retained-mode renderers for static data.
     Graphics::GeometryUploadRequest graphUpload{};
     graphUpload.UploadMode = Graphics::GeometryUploadMode::Staged;
@@ -604,7 +604,7 @@ TEST(Graph_NodeAttributes, ClearedOnEmptyGraph)
     data.CachedEdgePairs.push_back({0, 1});
     data.CachedEdgeColors.push_back(0xFFFFFFFF);
 
-    // Simulate what GraphGeometrySyncSystem does for an empty graph.
+    // Simulate what GraphLifecycleSystem does for an empty graph.
     data.CachedEdgePairs.clear();
     data.CachedEdgeColors.clear();
     data.CachedNodeColors.clear();
@@ -624,7 +624,7 @@ TEST(Graph_NodeAttributes, ClearedOnEmptyGraph)
 //
 // GraphPropertyHelpers::ExtractColors() uses a skipDeleted predicate fed into
 // ColorMapper::MapProperty(), and sets config.PropertyName to the default if
-// empty and the property exists.  Both GraphGeometrySyncSystem and
+// empty and the property exists.  Both GraphLifecycleSystem and
 // PropertySetDirtySyncSystem call the shared helpers; these tests exercise the
 // same predicates and property-name logic so a regression in either helper is
 // caught here.

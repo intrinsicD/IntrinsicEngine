@@ -411,7 +411,7 @@ TEST(BDA_GraphData, PropertySetBackedRadii)
 
 TEST(BDA_GraphData, GpuDirtyDefaultTrue)
 {
-    // New Graph::Data must start dirty so GraphGeometrySyncSystem
+    // New Graph::Data must start dirty so GraphLifecycleSystem
     // uploads positions on first frame.
     ECS::Graph::Data data;
     EXPECT_TRUE(data.GpuDirty);

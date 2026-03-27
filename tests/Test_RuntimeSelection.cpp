@@ -228,7 +228,7 @@ TEST(RuntimeSelection, PickCPU_MeshUsesAttachedPrimitiveBVH)
     auto& primitiveBvh = reg.emplace<ECS::PrimitiveBVH::Data>(e);
     primitiveBvh.Source = ECS::PrimitiveBVH::SourceKind::MeshTriangles;
     primitiveBvh.Dirty = true;
-    Graphics::Systems::PrimitiveBVHSync::OnUpdate(reg);
+    Graphics::Systems::PrimitiveBVHBuild::OnUpdate(reg);
     ASSERT_TRUE(primitiveBvh.HasValidBVH());
 
     Runtime::Selection::PickRequest req{};

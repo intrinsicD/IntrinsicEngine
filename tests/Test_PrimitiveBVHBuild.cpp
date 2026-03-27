@@ -9,7 +9,7 @@ import ECS;
 import Graphics;
 import Geometry;
 
-TEST(PrimitiveBVHSync, BuildsTriangleBvhFromMeshCollider)
+TEST(PrimitiveBVHBuild, BuildsTriangleBvhFromMeshCollider)
 {
     ECS::Scene scene;
     auto& reg = scene.GetRegistry();
@@ -35,7 +35,7 @@ TEST(PrimitiveBVHSync, BuildsTriangleBvhFromMeshCollider)
     bvh.Source = ECS::PrimitiveBVH::SourceKind::MeshTriangles;
     bvh.Dirty = true;
 
-    Graphics::Systems::PrimitiveBVHSync::OnUpdate(reg);
+    Graphics::Systems::PrimitiveBVHBuild::OnUpdate(reg);
 
     ASSERT_TRUE(bvh.HasValidBVH());
     EXPECT_EQ(bvh.Source, ECS::PrimitiveBVH::SourceKind::MeshTriangles);
@@ -48,7 +48,7 @@ TEST(PrimitiveBVHSync, BuildsTriangleBvhFromMeshCollider)
     EXPECT_EQ(hits.size(), 2u);
 }
 
-TEST(PrimitiveBVHSync, BuildsSegmentBvhFromGraph)
+TEST(PrimitiveBVHBuild, BuildsSegmentBvhFromGraph)
 {
     ECS::Scene scene;
     auto& reg = scene.GetRegistry();
@@ -70,7 +70,7 @@ TEST(PrimitiveBVHSync, BuildsSegmentBvhFromGraph)
     bvh.Source = ECS::PrimitiveBVH::SourceKind::GraphSegments;
     bvh.Dirty = true;
 
-    Graphics::Systems::PrimitiveBVHSync::OnUpdate(reg);
+    Graphics::Systems::PrimitiveBVHBuild::OnUpdate(reg);
 
     ASSERT_TRUE(bvh.HasValidBVH());
     EXPECT_EQ(bvh.Source, ECS::PrimitiveBVH::SourceKind::GraphSegments);
