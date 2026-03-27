@@ -1,6 +1,6 @@
 module;
 
-export module ECS.Components.GeometryDataSources;
+export module ECS:Components.GeometryDataSources;
 
 import Geometry.Properties;
 
