@@ -11,7 +11,7 @@ This document catalogs the main reusable patterns in the IntrinsicEngine codebas
 **Canonical examples:**
 - `Runtime.GraphicsBackend.cppm` — Takes `Core::Windowing::Window&` and config, owns Vulkan context/device/swapchain via `unique_ptr`, provides `GetDevice()`, `GetSwapchain()` accessors returning non-owning references.
 - `Runtime.AssetPipeline.cppm` — Takes borrowed `RHI::TransferManager&`, owns `Core::Assets::AssetManager` and thread-safe queues.
-- `Runtime.RenderOrchestrator.cppm` — Takes 8 borrowed references (device, swapchain, renderer, bindless, etc.), owns `PipelineLibrary`, `MaterialSystem`, `GPUScene`, `RenderSystem`.
+- `Runtime.RenderOrchestrator.cppm` — Takes 8 borrowed references (device, swapchain, renderer, bindless, etc.), owns `PipelineLibrary`, `MaterialRegistry`, `GPUScene`, `RenderSystem`.
 - `Runtime.SceneManager.cppm` — Owns `ECS::Scene`, takes `Graphics::GPUScene&` in `ConnectGpuHooks()`.
 
 **Instantiation order** (in `Engine.cpp`):
@@ -235,7 +235,7 @@ All per-frame transient data (pass nodes, adjacency lists, closures) allocated i
 - `Graphics.Systems.PropertySetDirtySync.cppm` — `WaitFor("TransformUpdate")`, signals `"PropertySetDirtySync"`.
 - `Graphics.Systems.MeshViewLifecycle.cppm` — `WaitFor("PropertySetDirtySync")`.
 
-**Execution order:** PropertySetDirtySync → MeshViewLifecycle → GraphGeometrySync → PointCloudGeometrySync → GPUSceneSync.
+**Execution order:** PropertySetDirtySync → MeshViewLifecycle → GraphLifecycle → PointCloudLifecycle → GPUSceneSync.
 
 **Use when:**
 - Adding any new ECS system that runs per-frame.
@@ -360,12 +360,17 @@ class IAssetLoader {
 
 **Upload mode selection:** `StaticGeometry = false` (default) → Direct (host-visible) for dynamic graphs; `true` → Staged (device-local) for static content.
 
-**Naming convention:** Systems that create derived geometry views (edge/vertex views from existing mesh buffers) use the `*Lifecycle` suffix. Systems that upload geometry from an authoritative data source (graph, point cloud) use the `*Sync` suffix. Both implement the same three-phase pattern; the distinction is in their data flow direction. `PropertySetDirtySync` and `GPUSceneSync` are infrastructure systems (not per-geometry-type lifecycle) and correctly use the `Sync` suffix.
+**Naming convention:**
+- **"Lifecycle"** = manages creation/destruction/update of GPU resources in response to ECS component state (upload geometry, allocate GPU slot, populate render components). Examples: `MeshRendererLifecycle`, `MeshViewLifecycle`, `GraphLifecycle`, `PointCloudLifecycle`.
+- **"Sync"** = updates existing GPU data from changed CPU state without allocation/creation. Examples: `GPUSceneSync` (transform updates), `PropertySetDirtySync` (dirty flag propagation).
+- **"Build"** = CPU-only computation, no GPU interaction. Example: `PrimitiveBVHBuild`.
+
+**Infrastructure managers** use descriptive suffixes (`Manager`, `Registry`) instead of "System" to avoid confusion with ECS systems: `RHI::TextureManager`, `Graphics::MaterialRegistry`.
 
 **Canonical examples:**
 - `Graphics.Systems.MeshViewLifecycle.cppm` — Creates edge index buffers from collision data, populates `Line::Component` and `Point::Component` via `ReuseVertexBuffersFrom`.
-- `Graphics.Systems.GraphGeometrySync.cppm` — Uploads graph positions/normals/edge pairs, supports Direct/Staged upload mode per-entity.
-- `Graphics.Systems.PointCloudGeometrySync.cppm` — Reads `Cloud::Positions()`/`Normals()` spans (zero copy), supports preloaded-geometry entities.
+- `Graphics.Systems.GraphLifecycle.cppm` — Uploads graph positions/normals/edge pairs, supports Direct/Staged upload mode per-entity.
+- `Graphics.Systems.PointCloudLifecycle.cppm` — Reads `Cloud::Positions()`/`Normals()` spans (zero copy), supports preloaded-geometry entities.
 
 **Use when:**
 - Adding a new geometry type to the engine.
@@ -420,7 +425,7 @@ A mesh uploads positions/normals once; wireframe, vertex visualization, and kNN 
 | 8 | **SafeDestroy / Deferred Destruction** | `RHI.Device.cppm`, `Core.InplaceFunction.cppm` | GPU resource cleanup |
 | 9 | **Event Communication** | `ECS.Components.Events.cppm`, `Graphics.Components.cppm` (DirtyTag) | Inter-system notifications |
 | 10 | **Asset Loader/Exporter** | `Graphics.IORegistry.cppm`, `Graphics.Importers.*.cpp` | New file format support |
-| 11 | **Lifecycle System** | `Graphics.Systems.MeshViewLifecycle.cppm`, `Graphics.Systems.GraphGeometrySync.cppm` | New geometry type → GPU pipeline |
+| 11 | **Lifecycle System** | `Graphics.Systems.MeshViewLifecycle.cppm`, `Graphics.Systems.GraphLifecycle.cppm` | New geometry type → GPU pipeline |
 | 12 | **Vtable Anchor** | `Graphics.IORegistry.cpp`, `Graphics.Pipelines.cppm` | Virtual interfaces in modules |
 | 13 | **BDA Shared-Buffer** | Surface/Line/Point passes, `ReuseVertexBuffersFrom()` | Shared vertex data with multiple topology views |
 
