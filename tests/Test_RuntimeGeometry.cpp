@@ -840,7 +840,7 @@ TEST(Octree, QueryNearest_CorrectResult)
 // KNN Query Tests
 // -----------------------------------------------------------------------------
 
-TEST(Octree, QueryKnn_Basic)
+TEST(Octree, QueryKNN_Basic)
 {
     Octree octree;
     std::vector<AABB> aabbs = {
@@ -856,7 +856,7 @@ TEST(Octree, QueryKnn_Basic)
 
     glm::vec3 queryPoint{0.5f, 0.5f, 0.5f};
     std::vector<size_t> results;
-    octree.QueryKnn(queryPoint, 3, results);
+    octree.QueryKNN(queryPoint, 3, results);
 
     ASSERT_EQ(results.size(), 3u);
     // Results should be sorted by distance (closest first)
@@ -865,7 +865,7 @@ TEST(Octree, QueryKnn_Basic)
     EXPECT_EQ(results[2], 2u);  // Third
 }
 
-TEST(Octree, QueryKnn_KGreaterThanElements)
+TEST(Octree, QueryKNN_KGreaterThanElements)
 {
     Octree octree;
     std::vector<AABB> aabbs = {
@@ -877,12 +877,12 @@ TEST(Octree, QueryKnn_KGreaterThanElements)
     ASSERT_TRUE(octree.Build(aabbs, policy, 8, 10));
 
     std::vector<size_t> results;
-    octree.QueryKnn({0, 0, 0}, 10, results);  // Ask for 10, only 2 exist
+    octree.QueryKNN({0, 0, 0}, 10, results);  // Ask for 10, only 2 exist
 
     EXPECT_EQ(results.size(), 2u);
 }
 
-TEST(Octree, QueryKnn_CorrectResults)
+TEST(Octree, QueryKNN_CorrectResults)
 {
     Octree octree;
     auto aabbs = GenerateRandomAABBs(100, 50.0f, 2.0f, 321);
@@ -894,7 +894,7 @@ TEST(Octree, QueryKnn_CorrectResults)
     const size_t k = 5;
 
     std::vector<size_t> octreeResults;
-    octree.QueryKnn(queryPoint, k, octreeResults);
+    octree.QueryKNN(queryPoint, k, octreeResults);
 
     // Brute force KNN
     std::vector<std::pair<double, size_t>> allDistances;

@@ -39,7 +39,7 @@ export namespace Geometry
         std::uint32_t MaxDepthReached{0};
     };
 
-    struct KDTreeKnnResult
+    struct KDTreeKNNResult
     {
         std::size_t ReturnedCount{0};
         std::size_t VisitedNodes{0};
@@ -135,7 +135,7 @@ export namespace Geometry
             Query(queryShape, out);
         }
 
-        [[nodiscard]] std::optional<KDTreeKnnResult> QueryKnn(const glm::vec3& query, std::uint32_t k,
+        [[nodiscard]] std::optional<KDTreeKNNResult> QueryKNN(const glm::vec3& query, std::uint32_t k,
             std::vector<ElementIndex>& outElementIndices) const;
 
         [[nodiscard]] std::optional<KDTreeRadiusResult> QueryRadius(const glm::vec3& query, float radius,
