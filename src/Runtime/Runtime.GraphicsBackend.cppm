@@ -19,7 +19,7 @@ import RHI.Device;
 import RHI.Renderer;
 import RHI.Swapchain;
 import RHI.Texture;
-import RHI.TextureSystem;
+import RHI.TextureManager;
 import RHI.Transfer;
 
 export namespace Runtime
@@ -59,7 +59,7 @@ export namespace Runtime
         [[nodiscard]] RHI::DescriptorLayout& GetDescriptorLayout() const { return *m_DescriptorLayout; }
         [[nodiscard]] RHI::DescriptorAllocator& GetDescriptorPool() const { return *m_DescriptorPool; }
         [[nodiscard]] RHI::BindlessDescriptorSystem& GetBindlessSystem() const { return *m_BindlessSystem; }
-        [[nodiscard]] RHI::TextureSystem& GetTextureSystem() const { return *m_TextureSystem; }
+        [[nodiscard]] RHI::TextureManager& GetTextureManager() const { return *m_TextureManager; }
         [[nodiscard]] uint32_t GetDefaultTextureIndex() const { return m_DefaultTextureIndex; }
 #ifdef INTRINSIC_HAS_CUDA
         [[nodiscard]] RHI::CudaDevice* GetCudaDevice() const { return m_CudaDevice.get(); }
@@ -76,7 +76,7 @@ export namespace Runtime
         void FlushDeletionQueues();
 
         // Clear texture pool (call during teardown after all textures are released).
-        void ClearTextureSystem();
+        void ClearTextureManager();
 
     private:
         // Vulkan instance & debug layers.
@@ -103,7 +103,7 @@ export namespace Runtime
         std::unique_ptr<RHI::BindlessDescriptorSystem> m_BindlessSystem;
 
         // Texture pooling + bindless slot management.
-        std::unique_ptr<RHI::TextureSystem> m_TextureSystem;
+        std::unique_ptr<RHI::TextureManager> m_TextureManager;
 
         // Engine-owned default 1x1 white texture (bindless slot 0).
         std::shared_ptr<RHI::Texture> m_DefaultTexture;

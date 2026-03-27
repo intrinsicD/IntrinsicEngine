@@ -13,7 +13,7 @@ export import RHI.TextureHandle;
 export namespace RHI
 {
 
-    // Heavy GPU data (lives in TextureSystem pool)
+    // Heavy GPU data (lives in TextureManager pool)
     struct TextureGpuData
     {
         std::unique_ptr<VulkanImage> Image;

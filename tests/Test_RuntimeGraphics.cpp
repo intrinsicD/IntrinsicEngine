@@ -489,15 +489,15 @@ TEST(GraphicsMaterial, ConstructorSignature_NoSharedPtrTexture)
 {
     using namespace Graphics;
 
-    // Current engine contract: Material is an RAII wrapper over a MaterialSystem pool slot.
-    static_assert(std::is_constructible_v<Material, MaterialSystem&, const MaterialData&>);
+    // Current engine contract: Material is an RAII wrapper over a MaterialRegistry pool slot.
+    static_assert(std::is_constructible_v<Material, MaterialRegistry&, const MaterialData&>);
     static_assert(std::is_destructible_v<Material>);
 
     // Still enforce: no legacy constructor taking std::shared_ptr<Texture>.
     static_assert(!std::is_constructible_v<Material,
                                           RHI::VulkanDevice&,
                                           RHI::BindlessDescriptorSystem&,
-                                          RHI::TextureSystem&,
+                                          RHI::TextureManager&,
                                           Core::Assets::AssetHandle,
                                           std::shared_ptr<RHI::Texture>,
                                           Core::Assets::AssetManager&>);
@@ -511,13 +511,13 @@ TEST(GraphicsMaterial, TextureSlotApiExposed)
     static_assert(std::is_member_function_pointer_v<decltype(&Material::SetNormalTexture)>);
     static_assert(std::is_member_function_pointer_v<decltype(&Material::SetMetallicRoughnessTexture)>);
 
-    static_assert(std::is_member_function_pointer_v<decltype(&MaterialSystem::SetAlbedoAsset)>);
-    static_assert(std::is_member_function_pointer_v<decltype(&MaterialSystem::SetNormalAsset)>);
-    static_assert(std::is_member_function_pointer_v<decltype(&MaterialSystem::SetMetallicRoughnessAsset)>);
+    static_assert(std::is_member_function_pointer_v<decltype(&MaterialRegistry::SetAlbedoAsset)>);
+    static_assert(std::is_member_function_pointer_v<decltype(&MaterialRegistry::SetNormalAsset)>);
+    static_assert(std::is_member_function_pointer_v<decltype(&MaterialRegistry::SetMetallicRoughnessAsset)>);
 
-    static_assert(static_cast<unsigned>(MaterialSystem::TextureSlot::Albedo) == 0u);
-    static_assert(static_cast<unsigned>(MaterialSystem::TextureSlot::Normal) == 1u);
-    static_assert(static_cast<unsigned>(MaterialSystem::TextureSlot::MetallicRoughness) == 2u);
+    static_assert(static_cast<unsigned>(MaterialRegistry::TextureSlot::Albedo) == 0u);
+    static_assert(static_cast<unsigned>(MaterialRegistry::TextureSlot::Normal) == 1u);
+    static_assert(static_cast<unsigned>(MaterialRegistry::TextureSlot::MetallicRoughness) == 2u);
 
     SUCCEED();
 }
@@ -526,7 +526,7 @@ TEST(GraphicsMaterial, ConstructorTakesDeviceByRef)
 {
     using namespace Graphics;
 
-    // The Material wrapper no longer takes a VulkanDevice directly; it takes a MaterialSystem.
+    // The Material wrapper no longer takes a VulkanDevice directly; it takes a MaterialRegistry.
     static_assert(!std::is_constructible_v<Material,
                                           RHI::VulkanDevice&,
                                           Core::Assets::AssetHandle,

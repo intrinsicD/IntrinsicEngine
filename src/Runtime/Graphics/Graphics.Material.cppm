@@ -13,7 +13,7 @@ import Core.Assets;
 import Core.Handle;
 import Core.ResourcePool;
 import RHI.Texture;
-import RHI.TextureSystem;
+import RHI.TextureManager;
 
 export namespace Graphics
 {
@@ -34,7 +34,7 @@ export namespace Graphics
         uint32_t MetallicRoughnessID = 0;
     };
 
-    class MaterialSystem
+    class MaterialRegistry
     {
     public:
         enum class TextureSlot : uint8_t
@@ -44,8 +44,8 @@ export namespace Graphics
             MetallicRoughness,
         };
 
-        MaterialSystem(RHI::TextureSystem& textureSystem, Core::Assets::AssetManager& assetManager);
-        ~MaterialSystem();
+        MaterialRegistry(RHI::TextureManager& textureManager, Core::Assets::AssetManager& assetManager);
+        ~MaterialRegistry();
 
         [[nodiscard]] MaterialHandle Create(const MaterialData& data);
         void Destroy(MaterialHandle handle);
@@ -61,7 +61,7 @@ export namespace Graphics
         [[nodiscard]] uint32_t GetRevision(MaterialHandle handle) const;
 
     private:
-        RHI::TextureSystem& m_TextureSystem;
+        RHI::TextureManager& m_TextureManager;
         Core::Assets::AssetManager& m_AssetManager;
         Core::ResourcePool<MaterialData, MaterialHandle, 3> m_Pool;
 
@@ -85,7 +85,7 @@ export namespace Graphics
     class Material
     {
     public:
-        Material(MaterialSystem& system, const MaterialData& initialData);
+        Material(MaterialRegistry& system, const MaterialData& initialData);
         ~Material();
 
         Material(const Material&) = delete;
@@ -101,7 +101,7 @@ export namespace Graphics
         void SetMetallicRoughnessTexture(Core::Assets::AssetHandle textureAsset);
 
     private:
-        MaterialSystem* m_System = nullptr;
+        MaterialRegistry* m_System = nullptr;
         MaterialHandle m_Handle;
     };
 }

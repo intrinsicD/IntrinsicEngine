@@ -23,7 +23,7 @@ import Graphics.Components;
 import Graphics.RenderPipeline;
 import Graphics.RenderGraph;
 import Graphics.Geometry;
-import Graphics.MaterialSystem;
+import Graphics.MaterialRegistry;
 import Graphics.ShaderRegistry;
 import Graphics.PipelineLibrary;
 import Graphics.GPUScene;
@@ -300,7 +300,7 @@ namespace Graphics
                                Core::Memory::LinearArena& frameArena,
                                Core::Memory::ScopeStack& frameScope,
                                GeometryPool& geometryStorage,
-                               MaterialSystem& materialSystem)
+                               MaterialRegistry& materialRegistry)
         : m_Config(config)
           , m_DeviceOwner(std::move(device))
           , m_Device(m_DeviceOwner.get())
@@ -314,7 +314,7 @@ namespace Graphics
           , m_Interaction({.MaxFramesInFlight = renderer.GetFramesInFlight()}, m_DeviceOwner)
           , m_RenderGraph(m_DeviceOwner, frameArena, frameScope)
           , m_GeometryStorage(geometryStorage)
-          , m_MaterialSystem(materialSystem)
+          , m_MaterialRegistry(materialRegistry)
 
     {
         // Wire GPU profiler into RenderGraph for per-pass timestamp scoping.
@@ -1103,7 +1103,7 @@ namespace Graphics
             *activeBlackboard,
             assetManager,
             m_GeometryStorage,
-            m_MaterialSystem,
+            m_MaterialRegistry,
             m_GpuScene,
             frameIndex,
             extent,

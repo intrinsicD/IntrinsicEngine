@@ -72,7 +72,7 @@ namespace
                          context.Core.Registry,
                          context.GpuScene,
                          context.AssetManager,
-                         context.MaterialSystem,
+                         context.MaterialRegistry,
                          context.GeometryStorage,
                          context.DefaultTextureId);
     }
@@ -84,7 +84,7 @@ namespace
                          context.Core.Registry,
                          context.GpuScene,
                          context.AssetManager,
-                         context.MaterialSystem,
+                         context.MaterialRegistry,
                          context.DefaultTextureId);
     }
 

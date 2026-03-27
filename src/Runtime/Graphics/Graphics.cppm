@@ -3,7 +3,7 @@ export module Graphics;
 export import Graphics.Camera;
 export import Graphics.Geometry;
 export import Graphics.Material;
-export import Graphics.MaterialSystem;
+export import Graphics.MaterialRegistry;
 export import Graphics.Model;
 export import Graphics.ModelLoader;
 export import Graphics.RenderSystem;

@@ -75,7 +75,7 @@ TEST_F(GraphicsBackendHeadlessTest, DescriptorSubsystemsCreatable)
     // Verify that the descriptor subsystems that GraphicsBackend bundles
     // can be created and destroyed in the correct order headlessly.
     auto bindless = std::make_unique<RHI::BindlessDescriptorSystem>(*m_Device);
-    auto texSys = std::make_unique<RHI::TextureSystem>(*m_Device, *bindless);
+    auto texSys = std::make_unique<RHI::TextureManager>(*m_Device, *bindless);
     auto layout = std::make_unique<RHI::DescriptorLayout>(*m_Device);
     auto pool = std::make_unique<RHI::DescriptorAllocator>(*m_Device);
     auto transfer = std::make_unique<RHI::TransferManager>(*m_Device);
@@ -96,7 +96,7 @@ TEST_F(GraphicsBackendHeadlessTest, DestructionOrderSafe)
     // Create subsystems in GraphicsBackend's init order, then destroy
     // in its destructor order.  No crashes = correct ordering.
     auto bindless = std::make_unique<RHI::BindlessDescriptorSystem>(*m_Device);
-    auto texSys = std::make_unique<RHI::TextureSystem>(*m_Device, *bindless);
+    auto texSys = std::make_unique<RHI::TextureManager>(*m_Device, *bindless);
     auto transfer = std::make_unique<RHI::TransferManager>(*m_Device);
     auto layout = std::make_unique<RHI::DescriptorLayout>(*m_Device);
     auto pool = std::make_unique<RHI::DescriptorAllocator>(*m_Device);

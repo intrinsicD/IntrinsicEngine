@@ -54,7 +54,7 @@ protected:
         m_Device = std::make_shared<RHI::VulkanDevice>(*m_Context, VK_NULL_HANDLE);
 
         m_Bindless = std::make_unique<RHI::BindlessDescriptorSystem>(*m_Device);
-        m_TextureSystem = std::make_unique<RHI::TextureSystem>(*m_Device, *m_Bindless);
+        m_TextureManager = std::make_unique<RHI::TextureManager>(*m_Device, *m_Bindless);
         m_DescriptorLayout = std::make_unique<RHI::DescriptorLayout>(*m_Device);
         m_DescriptorPool = std::make_unique<RHI::DescriptorAllocator>(*m_Device);
     }
@@ -63,7 +63,7 @@ protected:
     {
         m_DescriptorPool.reset();
         m_DescriptorLayout.reset();
-        m_TextureSystem.reset();
+        m_TextureManager.reset();
         m_Bindless.reset();
         m_Device->FlushAllDeletionQueues();
     }
@@ -71,7 +71,7 @@ protected:
     std::unique_ptr<RHI::VulkanContext> m_Context;
     std::shared_ptr<RHI::VulkanDevice> m_Device;
     std::unique_ptr<RHI::BindlessDescriptorSystem> m_Bindless;
-    std::unique_ptr<RHI::TextureSystem> m_TextureSystem;
+    std::unique_ptr<RHI::TextureManager> m_TextureManager;
     std::unique_ptr<RHI::DescriptorLayout> m_DescriptorLayout;
     std::unique_ptr<RHI::DescriptorAllocator> m_DescriptorPool;
 };
@@ -97,12 +97,12 @@ TEST_F(RenderOrchestratorHeadlessTest, DescriptorSubsystemsReady)
     EXPECT_TRUE(m_DescriptorPool->IsValid());
 }
 
-TEST_F(RenderOrchestratorHeadlessTest, MaterialSystemCreatable)
+TEST_F(RenderOrchestratorHeadlessTest, MaterialRegistryCreatable)
 {
-    // MaterialSystem is one of the first things RenderOrchestrator creates.
+    // MaterialRegistry is one of the first things RenderOrchestrator creates.
     // Verify it can be constructed with headless Vulkan infrastructure.
     Core::Assets::AssetManager assetManager;
-    auto matSys = std::make_unique<Graphics::MaterialSystem>(*m_TextureSystem, assetManager);
+    auto matSys = std::make_unique<Graphics::MaterialRegistry>(*m_TextureManager, assetManager);
     EXPECT_NE(matSys, nullptr);
 
     // Create and destroy a material to exercise the pool.

@@ -6,7 +6,7 @@ module;
 
 module RHI.Texture;
 import RHI.Device;
-import RHI.TextureSystem;
+import RHI.TextureManager;
 import RHI.TextureFwd;
 import RHI.Image;
 import Core.Logging;
@@ -15,7 +15,7 @@ namespace RHI
 {
     namespace
     {
-        void DestroyTexture(TextureSystem& system, VulkanDevice& device, TextureHandle handle) noexcept
+        void DestroyTexture(TextureManager& system, VulkanDevice& device, TextureHandle handle) noexcept
         {
             if (!handle.IsValid())
                 return;
@@ -61,12 +61,12 @@ namespace RHI
         }
     }
 
-    Texture::Texture(TextureSystem& system, VulkanDevice& device, TextureHandle handle)
+    Texture::Texture(TextureManager& system, VulkanDevice& device, TextureHandle handle)
         : m_System(&system), m_Device(&device), m_Handle(handle)
     {
     }
 
-    Texture::Texture(TextureSystem& system, VulkanDevice& device, uint32_t width, uint32_t height, VkFormat format)
+    Texture::Texture(TextureManager& system, VulkanDevice& device, uint32_t width, uint32_t height, VkFormat format)
         : m_System(&system), m_Device(&device)
     {
         auto gpu = std::make_unique<TextureGpuData>();

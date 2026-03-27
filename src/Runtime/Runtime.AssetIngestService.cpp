@@ -21,7 +21,7 @@ import Graphics.AssetErrors;
 import Graphics.Geometry;
 import Graphics.IORegistry;
 import Graphics.Material;
-import Graphics.MaterialSystem;
+import Graphics.MaterialRegistry;
 import Graphics.Model;
 import Graphics.ModelLoader;
 import ECS;
@@ -74,7 +74,7 @@ namespace Runtime
     AssetIngestService::AssetIngestService(std::shared_ptr<RHI::VulkanDevice> device,
                                            RHI::TransferManager& transferManager,
                                            Graphics::GeometryPool& geometryStorage,
-                                           Graphics::MaterialSystem& materialSystem,
+                                           Graphics::MaterialRegistry& materialRegistry,
                                            AssetPipeline& assetPipeline,
                                            SceneManager& sceneManager,
                                            Graphics::IORegistry& ioRegistry,
@@ -83,7 +83,7 @@ namespace Runtime
         : m_Device(std::move(device))
         , m_TransferManager(transferManager)
         , m_GeometryStorage(geometryStorage)
-        , m_MaterialSystem(materialSystem)
+        , m_MaterialRegistry(materialRegistry)
         , m_AssetPipeline(assetPipeline)
         , m_SceneManager(sceneManager)
         , m_IORegistry(ioRegistry)
@@ -277,7 +277,7 @@ namespace Runtime
         matData.AlbedoID = m_DefaultTextureId;
         matData.RoughnessFactor = 0.5f;
 
-        auto defaultMat = std::make_unique<Graphics::Material>(m_MaterialSystem, matData);
+        auto defaultMat = std::make_unique<Graphics::Material>(m_MaterialRegistry, matData);
         const std::string materialName = assetName + "::DefaultMaterial";
         handles.MaterialHandle = assetManager.Create(materialName, std::move(defaultMat));
         m_AssetPipeline.TrackMaterial(handles.MaterialHandle);

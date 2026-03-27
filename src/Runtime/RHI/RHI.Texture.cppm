@@ -5,7 +5,7 @@ module;
 export module RHI.Texture;
 
 import RHI.Device;
-import RHI.TextureSystem;
+import RHI.TextureManager;
 import RHI.TextureFwd;
 import RHI.Image;
 import RHI.TextureHandle; // For Core::StrongHandle
@@ -18,13 +18,13 @@ export namespace RHI
     {
     public:
         // New: lightweight wrapper around an already-allocated texture handle.
-        // Contract: handle must come from TextureSystem.
-        Texture(TextureSystem& system, VulkanDevice& device, TextureHandle handle);
+        // Contract: handle must come from TextureManager.
+        Texture(TextureManager& system, VulkanDevice& device, TextureHandle handle);
 
-        // Streaming must go through TransferManager + TextureSystem.
+        // Streaming must go through TransferManager + TextureManager.
 
         // Kept: Create an empty GPU texture (used for default/error or render targets).
-        Texture(TextureSystem& system, VulkanDevice& device, uint32_t width, uint32_t height, VkFormat format);
+        Texture(TextureManager& system, VulkanDevice& device, uint32_t width, uint32_t height, VkFormat format);
 
         ~Texture();
 
@@ -44,7 +44,7 @@ export namespace RHI
         [[nodiscard]] VkSampler GetSampler() const;
 
     private:
-        TextureSystem* m_System = nullptr;
+        TextureManager* m_System = nullptr;
         VulkanDevice* m_Device = nullptr;
         TextureHandle m_Handle{};
     };

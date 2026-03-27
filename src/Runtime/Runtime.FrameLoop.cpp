@@ -482,7 +482,7 @@ namespace Runtime
                 .Core = coreBundleContext,
                 .GpuScene = *gpuScene,
                 .AssetManager = m_Assets,
-                .MaterialSystem = m_Renderer.GetMaterialSystem(),
+                .MaterialRegistry = m_Renderer.GetMaterialRegistry(),
                 .GeometryStorage = m_Renderer.GetGeometryStorage(),
                 .Device = m_Graphics.GetDeviceShared(),
                 .TransferManager = m_Graphics.GetTransferManager(),

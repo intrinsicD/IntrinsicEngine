@@ -9,7 +9,7 @@ import Graphics.AssetErrors;
 import RHI.Device;
 import RHI.Texture;
 import RHI.TextureFwd;
-import RHI.TextureSystem;
+import RHI.TextureManager;
 import RHI.Transfer;
 
 export namespace Graphics
@@ -30,7 +30,7 @@ export namespace Graphics
             const std::filesystem::path& filepath,
             RHI::VulkanDevice& device,
             RHI::TransferManager& transferManager,
-            RHI::TextureSystem& textureSystem,
+            RHI::TextureManager& textureManager,
             bool isSRGB = true);
     };
 }

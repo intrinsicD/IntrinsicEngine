@@ -17,7 +17,7 @@ export namespace Runtime
             : m_Scene(scene)
             , m_Renderer(renderer)
             , m_Graphics(graphics)
-            , m_Materials(renderer.GetMaterialSystem())
+            , m_Materials(renderer.GetMaterialRegistry())
         {
         }
 
@@ -35,7 +35,7 @@ export namespace Runtime
         SceneManager& m_Scene;
         RenderOrchestrator& m_Renderer;
         GraphicsBackend& m_Graphics;
-        Graphics::MaterialSystem& m_Materials;
+        Graphics::MaterialRegistry& m_Materials;
         uint64_t m_LastCompletedGraphicsTimelineValue = 0;
         uint64_t m_LastObservedGlobalFrameNumber = 0;
     };

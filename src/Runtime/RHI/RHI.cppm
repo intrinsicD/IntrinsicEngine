@@ -17,7 +17,7 @@ export import RHI.Shader;
 export import RHI.Swapchain;
 export import RHI.StagingBelt;
 export import RHI.Texture;
-export import RHI.TextureSystem;
+export import RHI.TextureManager;
 export import RHI.Transfer;
 export import RHI.TransientAllocator;
 export import RHI.Types;

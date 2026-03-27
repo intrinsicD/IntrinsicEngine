@@ -8,7 +8,7 @@ import Core.Assets;
 import Core.FrameGraph;
 import Graphics.Geometry;
 import Graphics.GPUScene;
-import Graphics.MaterialSystem;
+import Graphics.MaterialRegistry;
 
 export namespace Graphics::Systems::MeshRendererLifecycle
 {
@@ -22,7 +22,7 @@ export namespace Graphics::Systems::MeshRendererLifecycle
     void OnUpdate(entt::registry& registry,
                   GPUScene& gpuScene,
                   const Core::Assets::AssetManager& assetManager,
-                  const MaterialSystem& materialSystem,
+                  const MaterialRegistry& materialRegistry,
                   const GeometryPool& geometryStorage,
                   uint32_t defaultTextureId);
 
@@ -32,7 +32,7 @@ export namespace Graphics::Systems::MeshRendererLifecycle
                         entt::registry& registry,
                         GPUScene& gpuScene,
                         const Core::Assets::AssetManager& assetManager,
-                        const MaterialSystem& materialSystem,
+                        const MaterialRegistry& materialRegistry,
                         const GeometryPool& geometryStorage,
                         uint32_t defaultTextureId);
 }

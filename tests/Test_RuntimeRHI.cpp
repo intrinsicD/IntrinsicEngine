@@ -55,8 +55,8 @@ TEST(RHIShader, ConstructorTakesDeviceByRef)
 
 TEST(RHITexture, ConstructorTakesDeviceByRef)
 {
-    // Handle-body idiom: Texture is a lightweight RAII handle that requires a TextureSystem.
-    static_assert(std::is_constructible_v<RHI::Texture, RHI::TextureSystem&, RHI::VulkanDevice&, uint32_t, uint32_t, VkFormat>);
+    // Handle-body idiom: Texture is a lightweight RAII handle that requires a TextureManager.
+    static_assert(std::is_constructible_v<RHI::Texture, RHI::TextureManager&, RHI::VulkanDevice&, uint32_t, uint32_t, VkFormat>);
     static_assert(std::is_nothrow_move_constructible_v<RHI::Texture>);
     static_assert(std::is_nothrow_move_assignable_v<RHI::Texture>);
 

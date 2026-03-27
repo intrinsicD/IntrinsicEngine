@@ -19,7 +19,7 @@ import RHI.Renderer;
 import RHI.Swapchain;
 import RHI.Texture;
 import RHI.TextureFwd;
-import RHI.TextureSystem;
+import RHI.TextureManager;
 import RHI.Transfer;
 
 namespace Runtime
@@ -55,9 +55,9 @@ namespace Runtime
         }
 #endif
 
-        // 4. Bindless + TextureSystem
+        // 4. Bindless + TextureManager
         m_BindlessSystem = std::make_unique<RHI::BindlessDescriptorSystem>(*m_Device);
-        m_TextureSystem = std::make_unique<RHI::TextureSystem>(*m_Device, *m_BindlessSystem);
+        m_TextureManager = std::make_unique<RHI::TextureManager>(*m_Device, *m_BindlessSystem);
 
         // 5. Swapchain & Renderer
         m_Swapchain = std::make_unique<RHI::VulkanSwapchain>(m_Device, window);
@@ -87,10 +87,10 @@ namespace Runtime
         m_DefaultTexture.reset();
 
         // Texture pool: process any final deletions and clear.
-        if (m_TextureSystem)
+        if (m_TextureManager)
         {
-            m_TextureSystem->ProcessDeletions();
-            m_TextureSystem->Clear();
+            m_TextureManager->ProcessDeletions();
+            m_TextureManager->Clear();
         }
 
         // Descriptor systems.
@@ -106,7 +106,7 @@ namespace Runtime
         m_TransferManager.reset();
 
         // Texture system (after descriptors and transfer are gone).
-        m_TextureSystem.reset();
+        m_TextureManager.reset();
 
         // Flush deferred VkObject destruction.
         if (m_Device)
@@ -132,8 +132,8 @@ namespace Runtime
 
     void GraphicsBackend::CreateDefaultTexture()
     {
-        const RHI::TextureHandle handle = m_TextureSystem->CreatePending(1, 1, VK_FORMAT_R8G8B8A8_SRGB);
-        m_DefaultTexture = std::make_shared<RHI::Texture>(*m_TextureSystem, *m_Device, handle);
+        const RHI::TextureHandle handle = m_TextureManager->CreatePending(1, 1, VK_FORMAT_R8G8B8A8_SRGB);
+        m_DefaultTexture = std::make_shared<RHI::Texture>(*m_TextureManager, *m_Device, handle);
 
         // Upload a single white pixel (RGBA8) via the transfer queue.
         const uint32_t white = 0xFFFFFFFFu;
@@ -210,8 +210,8 @@ namespace Runtime
                                      m_DefaultTexture->GetView(),
                                      m_DefaultTexture->GetSampler());
 
-        // Plumb default descriptor into the TextureSystem so freed slots become safe to sample.
-        m_TextureSystem->SetDefaultDescriptor(m_DefaultTexture->GetView(), m_DefaultTexture->GetSampler());
+        // Plumb default descriptor into the TextureManager so freed slots become safe to sample.
+        m_TextureManager->SetDefaultDescriptor(m_DefaultTexture->GetView(), m_DefaultTexture->GetSampler());
     }
 
     void GraphicsBackend::OnResize()
@@ -234,9 +234,9 @@ namespace Runtime
 
     void GraphicsBackend::ProcessTextureDeletions()
     {
-        if (m_TextureSystem)
+        if (m_TextureManager)
         {
-            m_TextureSystem->ProcessDeletions();
+            m_TextureManager->ProcessDeletions();
         }
     }
 
@@ -256,12 +256,12 @@ namespace Runtime
         }
     }
 
-    void GraphicsBackend::ClearTextureSystem()
+    void GraphicsBackend::ClearTextureManager()
     {
-        if (m_TextureSystem)
+        if (m_TextureManager)
         {
-            m_TextureSystem->ProcessDeletions();
-            m_TextureSystem->Clear();
+            m_TextureManager->ProcessDeletions();
+            m_TextureManager->Clear();
         }
     }
 }

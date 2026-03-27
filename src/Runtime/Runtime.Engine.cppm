@@ -117,7 +117,7 @@ export namespace Runtime
         std::unique_ptr<AssetIngestService> m_AssetIngestService;
 
         // Render subsystem: ShaderRegistry, PipelineLibrary, GPUScene, RenderSystem,
-        // MaterialSystem, per-frame arena/scope/FrameGraph, GeometryPool.
+        // MaterialRegistry, per-frame arena/scope/FrameGraph, GeometryPool.
         std::unique_ptr<RenderOrchestrator> m_RenderOrchestrator;
 
         // I/O backend (Phase 0: loose files via std::ifstream)
