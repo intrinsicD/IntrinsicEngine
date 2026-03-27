@@ -22,6 +22,7 @@ import Core.Hash;
 import Core.FrameGraph;
 
 import ECS;
+import Runtime.SystemFeatureCatalog;
 
 using namespace Core::Hash;
 
@@ -313,7 +314,7 @@ namespace Graphics::Systems::PrimitiveBVHBuild
     void RegisterSystem(Core::FrameGraph& graph,
                         entt::registry& registry)
     {
-        graph.AddPass("PrimitiveBVHBuild",
+        graph.AddPass(Runtime::SystemFeatureCatalog::PassNames::PrimitiveBVHBuild,
             [](Core::FrameGraphBuilder& builder)
             {
                 builder.Read<ECS::Mesh::Data>();

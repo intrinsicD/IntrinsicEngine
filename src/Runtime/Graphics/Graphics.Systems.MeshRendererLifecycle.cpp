@@ -21,6 +21,8 @@ import Geometry.Handle;
 
 #include "Graphics.LifecycleUtils.hpp"
 
+import Runtime.SystemFeatureCatalog;
+
 using namespace Core::Hash;
 
 namespace Graphics::Systems::MeshRendererLifecycle
@@ -104,7 +106,7 @@ namespace Graphics::Systems::MeshRendererLifecycle
                         const GeometryPool& geometryStorage,
                         uint32_t defaultTextureId)
     {
-        graph.AddPass("MeshRendererLifecycle",
+        graph.AddPass(Runtime::SystemFeatureCatalog::PassNames::MeshRendererLifecycle,
             [](Core::FrameGraphBuilder& builder)
             {
                 builder.Read<ECS::Components::Transform::WorldMatrix>();

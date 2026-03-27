@@ -33,6 +33,8 @@ import Geometry.Handle;
 #include "Graphics.PointCloudPropertyHelpers.hpp"
 #include "Graphics.LifecycleUtils.hpp"
 
+import Runtime.SystemFeatureCatalog;
+
 using namespace Core::Hash;
 
 namespace Graphics::Systems::PointCloudLifecycle
@@ -170,7 +172,7 @@ namespace Graphics::Systems::PointCloudLifecycle
                         RHI::TransferManager& transferManager,
                         entt::dispatcher& dispatcher)
     {
-        graph.AddPass("PointCloudLifecycle",
+        graph.AddPass(Runtime::SystemFeatureCatalog::PassNames::PointCloudLifecycle,
             [](Core::FrameGraphBuilder& builder)
             {
                 builder.Write<ECS::PointCloud::Data>();

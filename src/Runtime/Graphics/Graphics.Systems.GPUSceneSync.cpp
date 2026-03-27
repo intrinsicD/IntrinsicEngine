@@ -14,6 +14,7 @@ import Core.Assets;
 import Core.FrameGraph;
 import Graphics.MaterialSystem;
 import Graphics.Material;
+import Runtime.SystemFeatureCatalog;
 
 using namespace Core::Hash;
 
@@ -192,7 +193,7 @@ namespace Graphics::Systems::GPUSceneSync
                         const MaterialSystem& materialSystem,
                         uint32_t defaultTextureId)
     {
-        graph.AddPass("GPUSceneSync",
+        graph.AddPass(Runtime::SystemFeatureCatalog::PassNames::GPUSceneSync,
             [](Core::FrameGraphBuilder& builder)
             {
                 builder.Read<ECS::Components::Transform::WorldMatrix>();

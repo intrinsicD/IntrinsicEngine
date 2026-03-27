@@ -35,6 +35,8 @@ import RHI.Transfer;
 #include "Graphics.GraphPropertyHelpers.hpp"
 #include "Graphics.LifecycleUtils.hpp"
 
+import Runtime.SystemFeatureCatalog;
+
 using namespace Core::Hash;
 
 namespace Graphics::Systems::GraphLifecycle
@@ -312,7 +314,7 @@ namespace Graphics::Systems::GraphLifecycle
                         RHI::TransferManager& transferManager,
                         entt::dispatcher& dispatcher)
     {
-        graph.AddPass("GraphLifecycle",
+        graph.AddPass(Runtime::SystemFeatureCatalog::PassNames::GraphLifecycle,
             [](Core::FrameGraphBuilder& builder)
             {
                 builder.Write<ECS::Graph::Data>();
