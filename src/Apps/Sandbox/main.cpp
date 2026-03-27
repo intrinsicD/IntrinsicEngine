@@ -299,14 +299,14 @@ private:
             -> std::shared_ptr<RHI::Texture>
         {
             auto result = Graphics::TextureLoader::LoadAsync(path, GetGraphicsBackend().GetDevice(),
-                                                             gfx.GetTransferManager(), gfx.GetTextureSystem());
+                                                             gfx.GetTransferManager(), gfx.GetTextureManager());
 
             if (result)
             {
                 GetAssetPipeline().RegisterAssetLoad(handle, result->Token, [this, texHandle = result->TextureHandle]()
                 {
                     auto& g = GetGraphicsBackend();
-                    if (const auto* data = g.GetTextureSystem().Get(texHandle))
+                    if (const auto* data = g.GetTextureManager().Get(texHandle))
                     {
                         g.GetBindlessSystem().EnqueueUpdate(data->BindlessSlot, data->Image->GetView(), data->Sampler);
                     }
@@ -351,7 +351,7 @@ private:
         matData.MetallicFactor = 0.0f;
 
         auto DuckMaterial = std::make_unique<Graphics::Material>(
-            GetRenderOrchestrator().GetMaterialSystem(),
+            GetRenderOrchestrator().GetMaterialRegistry(),
             matData
         );
 

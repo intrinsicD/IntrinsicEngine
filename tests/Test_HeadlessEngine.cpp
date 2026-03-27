@@ -82,7 +82,7 @@ protected:
         // 3. GPU infrastructure that GraphicsBackend normally owns
         m_TransferManager = std::make_unique<RHI::TransferManager>(*m_Device);
         m_Bindless = std::make_unique<RHI::BindlessDescriptorSystem>(*m_Device);
-        m_TextureSystem = std::make_unique<RHI::TextureSystem>(*m_Device, *m_Bindless);
+        m_TextureManager = std::make_unique<RHI::TextureManager>(*m_Device, *m_Bindless);
         m_DescriptorLayout = std::make_unique<RHI::DescriptorLayout>(*m_Device);
         m_DescriptorPool = std::make_unique<RHI::DescriptorAllocator>(*m_Device);
 
@@ -117,12 +117,12 @@ protected:
         m_DescriptorLayout.reset();
 
         // Texture + Bindless
-        if (m_TextureSystem)
+        if (m_TextureManager)
         {
-            m_TextureSystem->ProcessDeletions();
-            m_TextureSystem->Clear();
+            m_TextureManager->ProcessDeletions();
+            m_TextureManager->Clear();
         }
-        m_TextureSystem.reset();
+        m_TextureManager.reset();
         m_Bindless.reset();
 
         // Transfer
@@ -145,7 +145,7 @@ protected:
     std::shared_ptr<RHI::VulkanDevice> m_Device;
     std::unique_ptr<RHI::TransferManager> m_TransferManager;
     std::unique_ptr<RHI::BindlessDescriptorSystem> m_Bindless;
-    std::unique_ptr<RHI::TextureSystem> m_TextureSystem;
+    std::unique_ptr<RHI::TextureManager> m_TextureManager;
     std::unique_ptr<RHI::DescriptorLayout> m_DescriptorLayout;
     std::unique_ptr<RHI::DescriptorAllocator> m_DescriptorPool;
 

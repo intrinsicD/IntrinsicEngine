@@ -20,12 +20,12 @@ import RHI.Image;
 import RHI.Renderer;
 import RHI.Swapchain;
 import RHI.Texture;
-import RHI.TextureSystem;
+import RHI.TextureManager;
 import RHI.Transfer;
 import Graphics.DebugDraw;
 import Graphics.Geometry;
 import Graphics.GPUScene;
-import Graphics.MaterialSystem;
+import Graphics.MaterialRegistry;
 import Graphics.PipelineLibrary;
 import Graphics.Pipelines;
 import Graphics.RenderSystem;
@@ -80,7 +80,7 @@ namespace Runtime
         RHI::BindlessDescriptorSystem& bindless,
         RHI::DescriptorAllocator& descriptorPool,
         RHI::DescriptorLayout& descriptorLayout,
-        RHI::TextureSystem& textureSystem,
+        RHI::TextureManager& textureManager,
         Core::Assets::AssetManager& assetManager,
         Core::FeatureRegistry* featureRegistry,
         size_t frameArenaSize,
@@ -100,8 +100,8 @@ namespace Runtime
         Core::Log::Info("RenderOrchestrator: frame-context ring configured for {} slots.",
                         m_FrameContextRing.GetFramesInFlight());
 
-        // 1. MaterialSystem (depends on TextureSystem + AssetManager)
-        m_MaterialSystem = std::make_unique<Graphics::MaterialSystem>(textureSystem, assetManager);
+        // 1. MaterialRegistry (depends on TextureManager + AssetManager)
+        m_MaterialRegistry = std::make_unique<Graphics::MaterialRegistry>(textureManager, assetManager);
 
         // 2. Pipelines & RenderSystem
         InitPipeline(swapchain, renderer, bindless, descriptorPool, descriptorLayout);
@@ -129,7 +129,7 @@ namespace Runtime
         m_GpuScene.reset();
         m_RenderSystem.reset();
         m_PipelineLibrary.reset();
-        m_MaterialSystem.reset();
+        m_MaterialRegistry.reset();
 
         // Clear geometry storage before device destruction.
         m_GeometryStorage.Clear();
@@ -222,7 +222,7 @@ namespace Runtime
             m_FrameArena,
             m_FrameScope,
             m_GeometryStorage,
-            *m_MaterialSystem
+            *m_MaterialRegistry
         );
         Core::Log::Info("RenderOrchestrator: RenderSystem created successfully.");
 

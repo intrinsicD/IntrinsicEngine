@@ -28,9 +28,9 @@ export namespace Graphics::Passes
     //
     // Consolidates all point rendering in the three-pass architecture:
     // - Mesh vertex visualization (from ECS::Point::Component via MeshVertexView)
-    // - Graph node rendering (from ECS::Point::Component via GraphGeometrySyncSystem)
-    // - Standalone/preloaded point cloud rendering (from ECS::Point::Component via PointCloudGeometrySyncSystem)
-    // - Cloud-backed point clouds (from ECS::Point::Component via PointCloudGeometrySyncSystem)
+    // - Graph node rendering (from ECS::Point::Component via GraphLifecycleSystem)
+    // - Standalone/preloaded point cloud rendering (from ECS::Point::Component via PointCloudLifecycleSystem)
+    // - Cloud-backed point clouds (from ECS::Point::Component via PointCloudLifecycleSystem)
     // - Transient debug point markers (from DebugDraw::GetPoints())
     //
     // Architecture:

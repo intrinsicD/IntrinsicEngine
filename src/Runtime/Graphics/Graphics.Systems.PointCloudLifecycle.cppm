@@ -4,7 +4,7 @@ module;
 #include <entt/fwd.hpp>
 #include <entt/signal/dispatcher.hpp>
 
-export module Graphics.Systems.PointCloudGeometrySync;
+export module Graphics.Systems.PointCloudLifecycle;
 
 import Graphics.Geometry;
 import Graphics.GPUScene;
@@ -12,7 +12,7 @@ import Core.FrameGraph;
 import RHI.Device;
 import RHI.Transfer;
 
-export namespace Graphics::Systems::PointCloudGeometrySync
+export namespace Graphics::Systems::PointCloudLifecycle
 {
     // Uploads PointCloud::Cloud positions/normals to device-local vertex
     // buffers, extracts per-point attributes (colors, radii) from

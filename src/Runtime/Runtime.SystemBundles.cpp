@@ -6,11 +6,11 @@ module Runtime.SystemBundles;
 
 import ECS;
 import Graphics.Systems.GPUSceneSync;
-import Graphics.Systems.GraphGeometrySync;
+import Graphics.Systems.GraphLifecycle;
 import Graphics.Systems.MeshRendererLifecycle;
 import Graphics.Systems.MeshViewLifecycle;
-import Graphics.Systems.PointCloudGeometrySync;
-import Graphics.Systems.PrimitiveBVHSync;
+import Graphics.Systems.PointCloudLifecycle;
+import Graphics.Systems.PrimitiveBVHBuild;
 import Graphics.Systems.PropertySetDirtySync;
 import Runtime.SystemFeatureCatalog;
 
@@ -72,7 +72,7 @@ namespace
                          context.Core.Registry,
                          context.GpuScene,
                          context.AssetManager,
-                         context.MaterialSystem,
+                         context.MaterialRegistry,
                          context.GeometryStorage,
                          context.DefaultTextureId);
     }
@@ -84,14 +84,14 @@ namespace
                          context.Core.Registry,
                          context.GpuScene,
                          context.AssetManager,
-                         context.MaterialSystem,
+                         context.MaterialRegistry,
                          context.DefaultTextureId);
     }
 
     constexpr std::array<Core::FeatureDescriptor, 3> kCoreSystemOrder{{
         Runtime::SystemFeatureCatalog::TransformUpdate,
         Runtime::SystemFeatureCatalog::PropertySetDirtySync,
-        Runtime::SystemFeatureCatalog::PrimitiveBVHSync,
+        Runtime::SystemFeatureCatalog::PrimitiveBVHBuild,
     }};
 
     constexpr std::array<CoreSystemRegistrationSpec, 3> kCoreSystemRegistrations{{
@@ -100,24 +100,24 @@ namespace
         {kCoreSystemOrder[1],
          &RegisterCoreSystem<&Graphics::Systems::PropertySetDirtySync::RegisterSystem>},
         {kCoreSystemOrder[2],
-         &RegisterCoreSystem<&Graphics::Systems::PrimitiveBVHSync::RegisterSystem>},
+         &RegisterCoreSystem<&Graphics::Systems::PrimitiveBVHBuild::RegisterSystem>},
     }};
 
     constexpr std::array<Core::FeatureDescriptor, 5> kGpuSystemOrder{{
-        Runtime::SystemFeatureCatalog::GraphGeometrySync,
+        Runtime::SystemFeatureCatalog::GraphLifecycle,
         Runtime::SystemFeatureCatalog::MeshRendererLifecycle,
-        Runtime::SystemFeatureCatalog::PointCloudGeometrySync,
+        Runtime::SystemFeatureCatalog::PointCloudLifecycle,
         Runtime::SystemFeatureCatalog::MeshViewLifecycle,
         Runtime::SystemFeatureCatalog::GPUSceneSync,
     }};
 
     constexpr std::array<GpuSystemRegistrationSpec, 5> kGpuSystemRegistrations{{
         {kGpuSystemOrder[0],
-         &RegisterGeometrySyncSystem<&Graphics::Systems::GraphGeometrySync::RegisterSystem>},
+         &RegisterGeometrySyncSystem<&Graphics::Systems::GraphLifecycle::RegisterSystem>},
         {kGpuSystemOrder[1],
          &RegisterMeshSurfaceSystem<&Graphics::Systems::MeshRendererLifecycle::RegisterSystem>},
         {kGpuSystemOrder[2],
-         &RegisterGeometrySyncSystem<&Graphics::Systems::PointCloudGeometrySync::RegisterSystem>},
+         &RegisterGeometrySyncSystem<&Graphics::Systems::PointCloudLifecycle::RegisterSystem>},
         {kGpuSystemOrder[3],
          &RegisterGeometrySyncSystem<&Graphics::Systems::MeshViewLifecycle::RegisterSystem>},
         {kGpuSystemOrder[4],

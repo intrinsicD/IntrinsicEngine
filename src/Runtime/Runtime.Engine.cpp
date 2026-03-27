@@ -162,7 +162,7 @@ namespace Runtime
                              m_GraphicsBackend->GetContext().GetInstance(),
                              m_GraphicsBackend->GetDevice().GetGraphicsQueue());
 
-        // 6. RenderOrchestrator (MaterialSystem, GeometryStorage, Pipelines, RenderSystem, GPUScene, FrameGraph)
+        // 6. RenderOrchestrator (MaterialRegistry, GeometryStorage, Pipelines, RenderSystem, GPUScene, FrameGraph)
         m_RenderOrchestrator = std::make_unique<RenderOrchestrator>(
             m_GraphicsBackend->GetDeviceShared(),
             m_GraphicsBackend->GetSwapchain(),
@@ -170,7 +170,7 @@ namespace Runtime
             m_GraphicsBackend->GetBindlessSystem(),
             m_GraphicsBackend->GetDescriptorPool(),
             m_GraphicsBackend->GetDescriptorLayout(),
-            m_GraphicsBackend->GetTextureSystem(),
+            m_GraphicsBackend->GetTextureManager(),
             m_AssetPipeline->GetAssetManager(),
             &m_FeatureRegistry,
             config.FrameArenaSize,
@@ -200,7 +200,7 @@ namespace Runtime
             m_GraphicsBackend->GetDeviceShared(),
             m_GraphicsBackend->GetTransferManager(),
             m_RenderOrchestrator->GetGeometryStorage(),
-            m_RenderOrchestrator->GetMaterialSystem(),
+            m_RenderOrchestrator->GetMaterialRegistry(),
             *m_AssetPipeline,
             *m_SceneManager,
             m_IORegistry,
@@ -224,8 +224,8 @@ namespace Runtime
         Core::Tasks::Scheduler::Shutdown();
         Core::Filesystem::FileWatcher::Shutdown();
 
-        // Process material deletions before RenderOrchestrator destroys MaterialSystem.
-        auto& matSys = m_RenderOrchestrator->GetMaterialSystem();
+        // Process material deletions before RenderOrchestrator destroys MaterialRegistry.
+        auto& matSys = m_RenderOrchestrator->GetMaterialRegistry();
         matSys.ProcessDeletions(m_GraphicsBackend->GetDevice().GetGlobalFrameNumber());
 
         m_SceneManager->Clear();
@@ -237,7 +237,7 @@ namespace Runtime
         m_AssetIngestService.reset();
 
         // RenderOrchestrator destructor handles: GPUScene, RenderSystem, PipelineLibrary,
-        // MaterialSystem, GeometryStorage, frame state.
+        // MaterialRegistry, GeometryStorage, frame state.
         m_RenderOrchestrator.reset();
 
         // GUI-backed textures owned by render passes must be released before the ImGui backend
@@ -292,9 +292,9 @@ namespace Runtime
 
         registerDescriptor(Runtime::SystemFeatureCatalog::TransformUpdate);
         registerDescriptor(Runtime::SystemFeatureCatalog::MeshRendererLifecycle);
-        registerDescriptor(Runtime::SystemFeatureCatalog::PrimitiveBVHSync);
-        registerDescriptor(Runtime::SystemFeatureCatalog::GraphGeometrySync);
-        registerDescriptor(Runtime::SystemFeatureCatalog::PointCloudGeometrySync);
+        registerDescriptor(Runtime::SystemFeatureCatalog::PrimitiveBVHBuild);
+        registerDescriptor(Runtime::SystemFeatureCatalog::GraphLifecycle);
+        registerDescriptor(Runtime::SystemFeatureCatalog::PointCloudLifecycle);
         registerDescriptor(Runtime::SystemFeatureCatalog::MeshViewLifecycle);
         registerDescriptor(Runtime::SystemFeatureCatalog::GPUSceneSync);
         registerDescriptor(Runtime::SystemFeatureCatalog::PropertySetDirtySync);

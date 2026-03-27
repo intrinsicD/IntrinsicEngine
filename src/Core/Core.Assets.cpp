@@ -176,7 +176,7 @@ namespace Core::Assets
         }
 
         // 2. Destroy entities one-by-one WITHOUT holding the main mutex.
-        // Destructors (e.g. ~Material -> MaterialSystem::Destroy -> AssetManager::Unlisten)
+        // Destructors (e.g. ~Material -> MaterialRegistry::Destroy -> AssetManager::Unlisten)
         // can safely re-acquire m_Mutex because we released it above.
         for (auto entity : toDestroy)
         {

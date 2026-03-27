@@ -5,7 +5,7 @@ module Graphics.Material;
 
 namespace Graphics
 {
-    Material::Material(MaterialSystem& system, const MaterialData& initialData)
+    Material::Material(MaterialRegistry& system, const MaterialData& initialData)
         : m_System(&system)
     {
         m_Handle = m_System->Create(initialData);

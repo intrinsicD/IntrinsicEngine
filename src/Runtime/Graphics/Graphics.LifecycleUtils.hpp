@@ -4,7 +4,7 @@
 // LifecycleUtils — shared helpers for GPU lifecycle system implementations.
 //
 // Intended for inclusion in lifecycle system .cpp files (MeshViewLifecycle,
-// GraphGeometrySync, PointCloudGeometrySync, MeshRendererLifecycle).
+// GraphLifecycle, PointCloudLifecycle, MeshRendererLifecycle).
 // Not part of any exported module interface.
 //
 // Requires the including TU to have imported:
@@ -47,7 +47,7 @@ inline glm::vec4 ComputeLocalBoundingSphere(const Graphics::GeometryGpuData& geo
 // clears WorldUpdatedTag to prevent double-update by GPUSceneSync.
 //
 // Returns the allocated slot index, or kInvalidSlot on failure.
-// Used by GraphGeometrySync, PointCloudGeometrySync, and MeshViewLifecycle.
+// Used by GraphLifecycle, PointCloudLifecycle, and MeshViewLifecycle.
 
 inline uint32_t AllocateGpuSlot(
     entt::registry& registry,
@@ -89,8 +89,8 @@ inline uint32_t AllocateGpuSlot(
 // systems. Allocates a slot only when `currentSlot` is invalid and `geometry`
 // is valid with a vertex buffer. Returns the allocated slot (or kInvalidGpuSlot).
 // =============================================================================
-// Deduplicates the identical Phase 2 pattern found in GraphGeometrySync,
-// PointCloudGeometrySync, and MeshViewLifecycle.
+// Deduplicates the identical Phase 2 pattern found in GraphLifecycle,
+// PointCloudLifecycle, and MeshViewLifecycle.
 
 inline uint32_t TryAllocateGpuSlot(
     entt::registry& registry,
@@ -156,8 +156,8 @@ inline void RemovePassComponentIfPresent(entt::registry& registry, entt::entity 
 // =============================================================================
 // When visible and GPU geometry is valid, calls `get_or_emplace<T>` and invokes
 // the populator lambda to fill fields. When not visible, removes the component.
-// This deduplicates the identical Phase 3 pattern found in GraphGeometrySync,
-// PointCloudGeometrySync, and MeshViewLifecycle.
+// This deduplicates the identical Phase 3 pattern found in GraphLifecycle,
+// PointCloudLifecycle, and MeshViewLifecycle.
 //
 // Usage:
 //   PopulateOrRemovePassComponent<ECS::Point::Component>(

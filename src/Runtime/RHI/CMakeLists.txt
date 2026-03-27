@@ -28,7 +28,7 @@ target_sources(${target_name}
         RHI.Descriptors.cppm
         RHI.Image.cppm
         RHI.Texture.cppm
-        RHI.TextureSystem.cppm
+        RHI.TextureManager.cppm
         RHI.TextureFwd.cppm
         RHI.TextureHandle.cppm
         RHI.Transfer.cppm
@@ -53,7 +53,7 @@ target_sources(${target_name}
         RHI.Descriptors.cpp
         RHI.Image.cpp
         RHI.Texture.cpp
-        RHI.TextureSystem.cpp
+        RHI.TextureManager.cpp
         RHI.Transfer.cpp
         RHI.StagingBelt.cpp
         RHI.TransientAllocator.cpp

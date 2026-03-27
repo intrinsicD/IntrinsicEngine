@@ -11,7 +11,7 @@ import Graphics.AssetErrors;
 
 import RHI.Device;
 import RHI.Texture;
-import RHI.TextureSystem;
+import RHI.TextureManager;
 import RHI.Transfer;
 
 namespace Graphics
@@ -20,7 +20,7 @@ namespace Graphics
         const std::filesystem::path& filepath,
         RHI::VulkanDevice& device,
         RHI::TransferManager& transferManager,
-        RHI::TextureSystem& textureSystem,
+        RHI::TextureManager& textureManager,
         bool isSRGB)
     {
         // 1) IO & Decode
@@ -43,8 +43,8 @@ namespace Graphics
         const size_t sizeBytes = static_cast<size_t>(w) * static_cast<size_t>(h) * 4u;
 
         // 2) Reserve a bindless-visible texture handle immediately (still default-bound).
-        const RHI::TextureHandle handle = textureSystem.CreatePending(static_cast<uint32_t>(w), static_cast<uint32_t>(h), format);
-        auto texture = std::make_shared<RHI::Texture>(textureSystem, device, handle);
+        const RHI::TextureHandle handle = textureManager.CreatePending(static_cast<uint32_t>(w), static_cast<uint32_t>(h), format);
+        auto texture = std::make_shared<RHI::Texture>(textureManager, device, handle);
 
         // 3) Staging allocation
         VkPhysicalDeviceProperties props{};

@@ -7,7 +7,7 @@ export module Graphics.Systems.GPUSceneSync;
 import Core.Assets;
 import Core.FrameGraph;
 import Graphics.GPUScene;
-import Graphics.MaterialSystem;
+import Graphics.MaterialRegistry;
 
 export namespace Graphics::Systems::GPUSceneSync
 {
@@ -18,11 +18,11 @@ export namespace Graphics::Systems::GPUSceneSync
     //  - Updates only entities that have an allocated Surface::GpuSlot.
     //
     // Extended contract:
-    //  - Also refreshes instance TextureID when the referenced material changes (MaterialSystem revision bump).
+    //  - Also refreshes instance TextureID when the referenced material changes (MaterialRegistry revision bump).
     void OnUpdate(entt::registry& registry,
                   GPUScene& gpuScene,
                   const Core::Assets::AssetManager& assetManager,
-                  const MaterialSystem& materialSystem,
+                  const MaterialRegistry& materialRegistry,
                   uint32_t defaultTextureId);
 
     // Register this system into a FrameGraph with its dependency declarations.
@@ -32,6 +32,6 @@ export namespace Graphics::Systems::GPUSceneSync
                         entt::registry& registry,
                         GPUScene& gpuScene,
                         const Core::Assets::AssetManager& assetManager,
-                        const MaterialSystem& materialSystem,
+                        const MaterialRegistry& materialRegistry,
                         uint32_t defaultTextureId);
 }

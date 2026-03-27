@@ -22,6 +22,7 @@ import Geometry.PointCloud;
 import Core.Hash;
 import Core.Logging;
 import Core.FrameGraph;
+import Runtime.SystemFeatureCatalog;
 
 #include "Graphics.GraphPropertyHelpers.hpp"
 #include "Graphics.PointCloudPropertyHelpers.hpp"
@@ -344,7 +345,7 @@ namespace Graphics::Systems::PropertySetDirtySync
     void RegisterSystem(Core::FrameGraph& graph,
                         entt::registry& registry)
     {
-        graph.AddPass("PropertySetDirtySync",
+        graph.AddPass(Runtime::SystemFeatureCatalog::PassNames::PropertySetDirtySync,
             [](Core::FrameGraphBuilder& builder)
             {
                 // Writes to data components (GpuDirty, cached attributes).

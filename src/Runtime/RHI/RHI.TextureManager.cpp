@@ -2,7 +2,7 @@ module;
 #include <memory>
 #include "RHI.Vulkan.hpp"
 
-module RHI.TextureSystem;
+module RHI.TextureManager;
 
 import RHI.Device;
 import RHI.Bindless;
@@ -44,7 +44,7 @@ namespace RHI
         }
     }
 
-    TextureSystem::TextureSystem(VulkanDevice& device, BindlessDescriptorSystem& bindless)
+    TextureManager::TextureManager(VulkanDevice& device, BindlessDescriptorSystem& bindless)
         : m_Device(device)
         , m_Bindless(bindless)
     {
@@ -53,12 +53,12 @@ namespace RHI
         m_FreeBindlessSlots.reserve(1024);
     }
 
-    TextureSystem::~TextureSystem()
+    TextureManager::~TextureManager()
     {
         m_Pool.Clear();
     }
 
-    uint32_t TextureSystem::AllocateBindlessSlot()
+    uint32_t TextureManager::AllocateBindlessSlot()
     {
         // Prefer reuse to avoid exhausting the global bindless capacity.
         if (!m_FreeBindlessSlots.empty())
@@ -71,13 +71,13 @@ namespace RHI
         return m_NextBindlessSlot++;
     }
 
-    void TextureSystem::SetDefaultDescriptor(VkImageView view, VkSampler sampler)
+    void TextureManager::SetDefaultDescriptor(VkImageView view, VkSampler sampler)
     {
         m_DefaultView = view;
         m_DefaultSampler = sampler;
     }
 
-    void TextureSystem::FreeBindlessSlot(uint32_t slot)
+    void TextureManager::FreeBindlessSlot(uint32_t slot)
     {
         // Slot 0 is reserved for the engine default/error texture.
         if (slot == 0)
@@ -90,13 +90,13 @@ namespace RHI
         }
         else
         {
-            Core::Log::Warn("TextureSystem::FreeBindlessSlot({}) called before default descriptor was set. Slot will be recycled with stale descriptor content.", slot);
+            Core::Log::Warn("TextureManager::FreeBindlessSlot({}) called before default descriptor was set. Slot will be recycled with stale descriptor content.", slot);
         }
 
         m_FreeBindlessSlots.push_back(slot);
     }
 
-    TextureHandle TextureSystem::CreateFromData(std::unique_ptr<TextureGpuData> gpuData)
+    TextureHandle TextureManager::CreateFromData(std::unique_ptr<TextureGpuData> gpuData)
     {
         if (!gpuData || !gpuData->Image)
             return {};
@@ -122,7 +122,7 @@ namespace RHI
         return handle;
     }
 
-    TextureHandle TextureSystem::CreatePending(uint32_t width, uint32_t height, VkFormat format)
+    TextureHandle TextureManager::CreatePending(uint32_t width, uint32_t height, VkFormat format)
     {
         // Allocate a pool entry with a bindless slot, but keep it bound to default.
         auto gpu = std::make_unique<TextureGpuData>();
@@ -178,7 +178,7 @@ namespace RHI
         return handle;
     }
 
-    void TextureSystem::Publish(TextureHandle handle, std::unique_ptr<TextureGpuData> gpuData)
+    void TextureManager::Publish(TextureHandle handle, std::unique_ptr<TextureGpuData> gpuData)
     {
         if (!handle.IsValid() || !gpuData || !gpuData->Image)
             return;
@@ -214,7 +214,7 @@ namespace RHI
         m_Bindless.EnqueueUpdate(dst->BindlessSlot, dst->Image->GetView(), dst->Sampler);
     }
 
-    void TextureSystem::Destroy(TextureHandle handle)
+    void TextureManager::Destroy(TextureHandle handle)
     {
         if (!handle.IsValid())
             return;
@@ -229,24 +229,24 @@ namespace RHI
         m_Pool.Remove(handle, m_Device.GetGlobalFrameNumber());
     }
 
-    void TextureSystem::ProcessDeletions()
+    void TextureManager::ProcessDeletions()
     {
         m_Pool.ProcessDeletions(m_Device.GetGlobalFrameNumber());
     }
 
-    const TextureGpuData* TextureSystem::Get(TextureHandle handle) const
+    const TextureGpuData* TextureManager::Get(TextureHandle handle) const
     {
         auto res = m_Pool.Get(handle);
         if (res) return *res;
         return nullptr;
     }
 
-    const TextureGpuData* TextureSystem::GetIfValid(TextureHandle handle) const
+    const TextureGpuData* TextureManager::GetIfValid(TextureHandle handle) const
     {
         return m_Pool.GetIfValid(handle);
     }
 
-    void TextureSystem::Clear()
+    void TextureManager::Clear()
     {
         // NOTE: This must only be called when the GPU is idle (vkDeviceWaitIdle already executed).
         // Clears pending kills and immediately releases all TextureGpuData heap objects (which free Vulkan images).

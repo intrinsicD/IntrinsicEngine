@@ -12,8 +12,9 @@ import Graphics.Components;
 import Core.Hash;
 import Core.Assets;
 import Core.FrameGraph;
-import Graphics.MaterialSystem;
+import Graphics.MaterialRegistry;
 import Graphics.Material;
+import Runtime.SystemFeatureCatalog;
 
 using namespace Core::Hash;
 
@@ -22,7 +23,7 @@ namespace Graphics::Systems::GPUSceneSync
     void OnUpdate(entt::registry& registry,
                   GPUScene& gpuScene,
                   const Core::Assets::AssetManager& assetManager,
-                  const MaterialSystem& materialSystem,
+                  const MaterialRegistry& materialRegistry,
                   uint32_t defaultTextureId)
     {
         // Fast path: only entities that either changed transform OR need material refresh.
@@ -61,8 +62,8 @@ namespace Graphics::Systems::GPUSceneSync
             const MaterialData* matData = nullptr;
             if (sc.CachedMaterialHandle.IsValid())
             {
-                matRev = materialSystem.GetRevision(sc.CachedMaterialHandle);
-                matData = materialSystem.GetData(sc.CachedMaterialHandle);
+                matRev = materialRegistry.GetRevision(sc.CachedMaterialHandle);
+                matData = materialRegistry.GetData(sc.CachedMaterialHandle);
             }
 
             const bool materialDirty = (sc.CachedMaterialHandle != sc.CachedMaterialHandleForInstance) ||
@@ -189,10 +190,10 @@ namespace Graphics::Systems::GPUSceneSync
                         entt::registry& registry,
                         GPUScene& gpuScene,
                         const Core::Assets::AssetManager& assetManager,
-                        const MaterialSystem& materialSystem,
+                        const MaterialRegistry& materialRegistry,
                         uint32_t defaultTextureId)
     {
-        graph.AddPass("GPUSceneSync",
+        graph.AddPass(Runtime::SystemFeatureCatalog::PassNames::GPUSceneSync,
             [](Core::FrameGraphBuilder& builder)
             {
                 builder.Read<ECS::Components::Transform::WorldMatrix>();
@@ -201,9 +202,9 @@ namespace Graphics::Systems::GPUSceneSync
                 builder.WaitFor("TransformUpdate"_id);
                 builder.Signal("GPUSceneReady"_id);
             },
-            [&registry, &gpuScene, &assetManager, &materialSystem, defaultTextureId]()
+            [&registry, &gpuScene, &assetManager, &materialRegistry, defaultTextureId]()
             {
-                OnUpdate(registry, gpuScene, assetManager, materialSystem, defaultTextureId);
+                OnUpdate(registry, gpuScene, assetManager, materialRegistry, defaultTextureId);
             });
     }
 }

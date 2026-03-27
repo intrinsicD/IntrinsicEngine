@@ -22,7 +22,7 @@ import Graphics.RenderPipeline;
 import Graphics.ShaderRegistry;
 import Graphics.PipelineLibrary;
 import Graphics.GPUScene;
-import Graphics.MaterialSystem;
+import Graphics.MaterialRegistry;
 import Graphics.DebugDraw;
 import Graphics.Interaction; // New: Interaction Logic
 import Graphics.Presentation; // New: Presentation Logic
@@ -56,7 +56,7 @@ export namespace Graphics
                      Core::Memory::LinearArena& frameArena,
                      Core::Memory::ScopeStack& frameScope,
                      GeometryPool& geometryStorage,
-                     MaterialSystem& materialSystem);
+                     MaterialRegistry& materialRegistry);
         ~RenderSystem();
 
         // Hot-swap: schedules activation at the start of the next successfully-begun frame.
@@ -135,7 +135,7 @@ export namespace Graphics
 
         RenderGraph m_RenderGraph;
         GeometryPool& m_GeometryStorage;
-        MaterialSystem& m_MaterialSystem;
+        MaterialRegistry& m_MaterialRegistry;
 
         // Retained-mode GPU scene (persistent SSBOs + sparse updates). Non-owning.
         GPUScene* m_GpuScene = nullptr;

@@ -14,7 +14,7 @@ import RHI.Device;
 import RHI.Transfer;
 import Graphics.Geometry;
 import Graphics.IORegistry;
-import Graphics.MaterialSystem;
+import Graphics.MaterialRegistry;
 import Graphics.Model;
 import Runtime.AssetPipeline;
 import Runtime.SceneManager;
@@ -38,7 +38,7 @@ export namespace Runtime
         AssetIngestService(std::shared_ptr<RHI::VulkanDevice> device,
                            RHI::TransferManager& transferManager,
                            Graphics::GeometryPool& geometryStorage,
-                           Graphics::MaterialSystem& materialSystem,
+                           Graphics::MaterialRegistry& materialRegistry,
                            AssetPipeline& assetPipeline,
                            SceneManager& sceneManager,
                            Graphics::IORegistry& ioRegistry,
@@ -83,7 +83,7 @@ export namespace Runtime
         std::shared_ptr<RHI::VulkanDevice> m_Device;
         RHI::TransferManager& m_TransferManager;
         Graphics::GeometryPool& m_GeometryStorage;
-        Graphics::MaterialSystem& m_MaterialSystem;
+        Graphics::MaterialRegistry& m_MaterialRegistry;
         AssetPipeline& m_AssetPipeline;
         SceneManager& m_SceneManager;
         Graphics::IORegistry& m_IORegistry;

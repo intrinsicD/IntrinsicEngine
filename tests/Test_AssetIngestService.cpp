@@ -34,7 +34,7 @@ TEST(AssetIngestService, RequiresExplicitSubsystemDependencies)
                                           std::shared_ptr<RHI::VulkanDevice>,
                                           RHI::TransferManager&,
                                           Graphics::GeometryPool&,
-                                          Graphics::MaterialSystem&,
+                                          Graphics::MaterialRegistry&,
                                           Runtime::AssetPipeline&,
                                           Runtime::SceneManager&,
                                           Graphics::IORegistry&,

@@ -2,11 +2,11 @@ module;
 
 #include <entt/fwd.hpp>
 
-export module Graphics.Systems.PrimitiveBVHSync;
+export module Graphics.Systems.PrimitiveBVHBuild;
 
 import Core.FrameGraph;
 
-export namespace Graphics::Systems::PrimitiveBVHSync
+export namespace Graphics::Systems::PrimitiveBVHBuild
 {
     // Builds local-space primitive BVHs for entities that opt in via
     // ECS::PrimitiveBVH::Data. Phase 1 supports mesh triangles, graph edges,

@@ -10,7 +10,7 @@ module;
 #include <entt/entity/registry.hpp>
 #include <entt/signal/dispatcher.hpp>
 
-module Graphics.Systems.GraphGeometrySync;
+module Graphics.Systems.GraphLifecycle;
 
 import Graphics.Components;
 import Graphics.Geometry;
@@ -35,9 +35,11 @@ import RHI.Transfer;
 #include "Graphics.GraphPropertyHelpers.hpp"
 #include "Graphics.LifecycleUtils.hpp"
 
+import Runtime.SystemFeatureCatalog;
+
 using namespace Core::Hash;
 
-namespace Graphics::Systems::GraphGeometrySync
+namespace Graphics::Systems::GraphLifecycle
 {
 
     void OnUpdate(entt::registry& registry,
@@ -197,7 +199,7 @@ namespace Graphics::Systems::GraphGeometrySync
 
                 if (!newGpuData || !newGpuData->GetVertexBuffer())
                 {
-                    HandleUploadFailure(dispatcher, entity, "GraphGeometrySync");
+                    HandleUploadFailure(dispatcher, entity, "GraphLifecycle");
                     graphData.CachedEdgePairs.clear();
                     graphData.CachedEdgeColors.clear();
                     graphData.CachedNodeColors.clear();
@@ -248,7 +250,7 @@ namespace Graphics::Systems::GraphGeometrySync
                     }
                     else
                     {
-                        Core::Log::Warn("GraphGeometrySync: Failed to create edge index buffer for entity {}",
+                        Core::Log::Warn("GraphLifecycle: Failed to create edge index buffer for entity {}",
                                         static_cast<uint32_t>(entity));
                     }
                 }
@@ -312,7 +314,7 @@ namespace Graphics::Systems::GraphGeometrySync
                         RHI::TransferManager& transferManager,
                         entt::dispatcher& dispatcher)
     {
-        graph.AddPass("GraphGeometrySync",
+        graph.AddPass(Runtime::SystemFeatureCatalog::PassNames::GraphLifecycle,
             [](Core::FrameGraphBuilder& builder)
             {
                 builder.Write<ECS::Graph::Data>();

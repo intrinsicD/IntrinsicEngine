@@ -29,6 +29,8 @@ import Geometry.Handle;
 
 #include "Graphics.LifecycleUtils.hpp"
 
+import Runtime.SystemFeatureCatalog;
+
 using namespace Core::Hash;
 
 namespace Graphics::Systems::MeshViewLifecycle
@@ -300,7 +302,7 @@ namespace Graphics::Systems::MeshViewLifecycle
                         RHI::TransferManager& transferManager,
                         entt::dispatcher& dispatcher)
     {
-        graph.AddPass("MeshViewLifecycle",
+        graph.AddPass(Runtime::SystemFeatureCatalog::PassNames::MeshViewLifecycle,
             [](Core::FrameGraphBuilder& builder)
             {
                 builder.Read<ECS::Components::Transform::WorldMatrix>();

@@ -18,12 +18,12 @@ import RHI.Device;
 import RHI.Renderer;
 import RHI.Swapchain;
 import RHI.Texture;
-import RHI.TextureSystem;
+import RHI.TextureManager;
 import RHI.Transfer;
 import Graphics.DebugDraw;
 import Graphics.Geometry;
 import Graphics.GPUScene;
-import Graphics.MaterialSystem;
+import Graphics.MaterialRegistry;
 import Graphics.PipelineLibrary;
 import Graphics.RenderSystem;
 import Graphics.ShaderRegistry;
@@ -34,7 +34,7 @@ import Runtime.RenderExtraction;
 export namespace Runtime
 {
     // Owns the render subsystem: ShaderRegistry, PipelineLibrary, GPUScene,
-    // RenderSystem, MaterialSystem, per-frame arena/scope/FrameGraph, and
+    // RenderSystem, MaterialRegistry, per-frame arena/scope/FrameGraph, and
     // GeometryPool.  Extracted from Engine following the GraphicsBackend /
     // AssetPipeline / SceneManager pattern.
     class RenderOrchestrator
@@ -48,7 +48,7 @@ export namespace Runtime
                            RHI::BindlessDescriptorSystem& bindless,
                            RHI::DescriptorAllocator& descriptorPool,
                            RHI::DescriptorLayout& descriptorLayout,
-                           RHI::TextureSystem& textureSystem,
+                           RHI::TextureManager& textureManager,
                            Core::Assets::AssetManager& assetManager,
                            Core::FeatureRegistry* featureRegistry = nullptr,
                            size_t frameArenaSize = 1024 * 1024,
@@ -72,8 +72,8 @@ export namespace Runtime
         [[nodiscard]] Graphics::PipelineLibrary& GetPipelineLibrary() { return *m_PipelineLibrary; }
         [[nodiscard]] const Graphics::PipelineLibrary& GetPipelineLibrary() const { return *m_PipelineLibrary; }
 
-        [[nodiscard]] Graphics::MaterialSystem& GetMaterialSystem() { return *m_MaterialSystem; }
-        [[nodiscard]] const Graphics::MaterialSystem& GetMaterialSystem() const { return *m_MaterialSystem; }
+        [[nodiscard]] Graphics::MaterialRegistry& GetMaterialRegistry() { return *m_MaterialRegistry; }
+        [[nodiscard]] const Graphics::MaterialRegistry& GetMaterialRegistry() const { return *m_MaterialRegistry; }
 
         [[nodiscard]] Graphics::ShaderRegistry& GetShaderRegistry() { return m_ShaderRegistry; }
         [[nodiscard]] const Graphics::ShaderRegistry& GetShaderRegistry() const { return m_ShaderRegistry; }
@@ -137,7 +137,7 @@ export namespace Runtime
         std::unique_ptr<Graphics::PipelineLibrary> m_PipelineLibrary;
 
         // Material system (texture binding, hot-reload).
-        std::unique_ptr<Graphics::MaterialSystem> m_MaterialSystem;
+        std::unique_ptr<Graphics::MaterialRegistry> m_MaterialRegistry;
 
         // Retained-mode GPU scene (persistent SSBOs, slot allocator).
         std::unique_ptr<Graphics::GPUScene> m_GpuScene;

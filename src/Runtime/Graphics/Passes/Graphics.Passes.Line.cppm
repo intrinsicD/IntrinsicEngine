@@ -32,7 +32,7 @@ export namespace Graphics::Passes
     //
     // Retained sources (via ECS::Line::Component, populated by lifecycle systems):
     // - Mesh wireframe edges (MeshEdgeView BDA index buffer)
-    // - Graph edges (GpuEdgeGeometry BDA index buffer from GraphGeometrySyncSystem)
+    // - Graph edges (GpuEdgeGeometry BDA index buffer from GraphLifecycleSystem)
     // - Standalone line entities (future)
     //
     // All retained edge sources provide a valid EdgeView geometry handle with

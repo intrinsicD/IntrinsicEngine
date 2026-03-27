@@ -14,7 +14,7 @@ import Core.FeatureRegistry;
 import Core.FrameGraph;
 import Graphics.Geometry;
 import Graphics.GPUScene;
-import Graphics.MaterialSystem;
+import Graphics.MaterialRegistry;
 import RHI.Device;
 import RHI.Transfer;
 
@@ -32,7 +32,7 @@ export namespace Runtime
         CoreFrameGraphRegistrationContext& Core;
         Graphics::GPUScene& GpuScene;
         Core::Assets::AssetManager& AssetManager;
-        Graphics::MaterialSystem& MaterialSystem;
+        Graphics::MaterialRegistry& MaterialRegistry;
         Graphics::GeometryPool& GeometryStorage;
         std::shared_ptr<RHI::VulkanDevice> Device;
         RHI::TransferManager& TransferManager;

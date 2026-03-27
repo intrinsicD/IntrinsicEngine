@@ -268,7 +268,7 @@ namespace Graphics::Passes
         // =================================================================
         // All retained edge sources provide a valid EdgeView geometry
         // handle with a BDA-addressable index buffer (created by
-        // MeshViewLifecycleSystem or GraphGeometrySyncSystem).
+        // MeshViewLifecycleSystem or GraphLifecycleSystem).
         if (m_GeometryStorage)
         {
             // Frustum extraction — CPU-side culling for retained-mode draws.

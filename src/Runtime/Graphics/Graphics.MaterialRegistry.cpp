@@ -1,4 +1,4 @@
-// src/Runtime/Graphics/Graphics.MaterialSystem.cpp
+// src/Runtime/Graphics/Graphics.MaterialRegistry.cpp
 module;
 #include <mutex>
 #include <string_view>
@@ -8,17 +8,17 @@ module Graphics.Material;
 import Core.Assets;
 import Core.Logging;
 import RHI.Texture;
-import RHI.TextureSystem;
+import RHI.TextureManager;
 
 namespace Graphics
 {
-    MaterialSystem::MaterialSystem(RHI::TextureSystem& textureSystem, Core::Assets::AssetManager& assetManager)
-        : m_TextureSystem(textureSystem), m_AssetManager(assetManager)
+    MaterialRegistry::MaterialRegistry(RHI::TextureManager& textureManager, Core::Assets::AssetManager& assetManager)
+        : m_TextureManager(textureManager), m_AssetManager(assetManager)
     {
         m_Revisions.resize(1024u, 1u);
     }
 
-    MaterialSystem::~MaterialSystem()
+    MaterialRegistry::~MaterialRegistry()
     {
         std::lock_guard lock(m_ListenerMutex);
         for(auto& [mat, listeners] : m_Listeners) {
@@ -29,7 +29,7 @@ namespace Graphics
         m_Pool.Clear();
     }
 
-    uint32_t MaterialSystem::GetRevision(MaterialHandle handle) const
+    uint32_t MaterialRegistry::GetRevision(MaterialHandle handle) const
     {
         if (!handle.IsValid())
             return 0u;
@@ -38,7 +38,7 @@ namespace Graphics
         return m_Revisions[handle.Index];
     }
 
-    MaterialHandle MaterialSystem::Create(const MaterialData& data)
+    MaterialHandle MaterialRegistry::Create(const MaterialData& data)
     {
         MaterialHandle h = m_Pool.Create(data);
         if (h.IsValid())
@@ -50,7 +50,7 @@ namespace Graphics
         return h;
     }
 
-    void MaterialSystem::Destroy(MaterialHandle handle)
+    void MaterialRegistry::Destroy(MaterialHandle handle)
     {
         if(!handle.IsValid()) return;
 
@@ -78,39 +78,39 @@ namespace Graphics
         m_Pool.Remove(handle, 0);
     }
 
-    void MaterialSystem::ProcessDeletions(uint64_t currentFrame)
+    void MaterialRegistry::ProcessDeletions(uint64_t currentFrame)
     {
         m_Pool.ProcessDeletions(currentFrame);
     }
 
-    const MaterialData* MaterialSystem::GetData(MaterialHandle handle) const
+    const MaterialData* MaterialRegistry::GetData(MaterialHandle handle) const
     {
         auto res = m_Pool.Get(handle);
         return res ? *res : nullptr;
     }
 
-    MaterialData* MaterialSystem::GetData(MaterialHandle handle)
+    MaterialData* MaterialRegistry::GetData(MaterialHandle handle)
     {
         auto res = m_Pool.Get(handle);
         return res ? *res : nullptr;
     }
 
-    void MaterialSystem::SetAlbedoAsset(MaterialHandle material, Core::Assets::AssetHandle textureAsset)
+    void MaterialRegistry::SetAlbedoAsset(MaterialHandle material, Core::Assets::AssetHandle textureAsset)
     {
         BindTextureAsset(material, textureAsset, TextureSlot::Albedo);
     }
 
-    void MaterialSystem::SetNormalAsset(MaterialHandle material, Core::Assets::AssetHandle textureAsset)
+    void MaterialRegistry::SetNormalAsset(MaterialHandle material, Core::Assets::AssetHandle textureAsset)
     {
         BindTextureAsset(material, textureAsset, TextureSlot::Normal);
     }
 
-    void MaterialSystem::SetMetallicRoughnessAsset(MaterialHandle material, Core::Assets::AssetHandle textureAsset)
+    void MaterialRegistry::SetMetallicRoughnessAsset(MaterialHandle material, Core::Assets::AssetHandle textureAsset)
     {
         BindTextureAsset(material, textureAsset, TextureSlot::MetallicRoughness);
     }
 
-    void MaterialSystem::BindTextureAsset(MaterialHandle material, Core::Assets::AssetHandle textureAsset, TextureSlot slot)
+    void MaterialRegistry::BindTextureAsset(MaterialHandle material, Core::Assets::AssetHandle textureAsset, TextureSlot slot)
     {
         std::lock_guard lock(m_ListenerMutex);
 
@@ -122,7 +122,7 @@ namespace Graphics
         m_Listeners[material].push_back({textureAsset, listenerID});
     }
 
-    void MaterialSystem::OnTextureLoad(MaterialHandle matHandle, Core::Assets::AssetHandle texHandle, TextureSlot slot)
+    void MaterialRegistry::OnTextureLoad(MaterialHandle matHandle, Core::Assets::AssetHandle texHandle, TextureSlot slot)
     {
         // 1. Get the RHI Texture (Asset Payload)
         auto* tex = m_AssetManager.TryGet<RHI::Texture>(texHandle);
@@ -142,7 +142,7 @@ namespace Graphics
             return "Unknown";
         };
 
-        Core::Log::Info("[MaterialSystem] OnTextureLoad: mat(index={}, gen={}) texAsset(id={}) -> bindlessSlot={} slot={}",
+        Core::Log::Info("[MaterialRegistry] OnTextureLoad: mat(index={}, gen={}) texAsset(id={}) -> bindlessSlot={} slot={}",
                         matHandle.Index, matHandle.Generation,
                         static_cast<uint32_t>(texHandle.ID),
                         bindlessID, slotToString(slot));

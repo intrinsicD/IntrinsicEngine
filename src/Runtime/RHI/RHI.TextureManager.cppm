@@ -1,10 +1,10 @@
-// src/Runtime/RHI/RHI.TextureSystem.cppm
+// src/Runtime/RHI/RHI.TextureManager.cppm
 module;
 #include <memory>
 #include <vector>
 #include "RHI.Vulkan.hpp"
 
-export module RHI.TextureSystem;
+export module RHI.TextureManager;
 
 import RHI.Device;
 import RHI.TextureFwd;
@@ -14,11 +14,11 @@ import Core.ResourcePool; // For Core::ResourcePool
 
 export namespace RHI
 {
-    class TextureSystem
+    class TextureManager
     {
     public:
-        TextureSystem(VulkanDevice& device, BindlessDescriptorSystem& bindless);
-        ~TextureSystem();
+        TextureManager(VulkanDevice& device, BindlessDescriptorSystem& bindless);
+        ~TextureManager();
 
         TextureHandle CreateFromData(std::unique_ptr<TextureGpuData> gpuData);
         void Destroy(TextureHandle handle);

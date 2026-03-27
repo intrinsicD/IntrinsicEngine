@@ -302,7 +302,7 @@ namespace Graphics::Passes
         // =================================================================
         // Point::Component is populated by lifecycle systems:
         // - MeshViewLifecycle (mesh vertex views)
-        // - GraphGeometrySyncSystem (graph nodes)
+        // - GraphLifecycleSystem (graph nodes)
         {
             for (const auto& pt : ctx.PointDrawPackets)
             {

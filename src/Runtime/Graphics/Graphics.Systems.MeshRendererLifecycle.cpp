@@ -21,6 +21,8 @@ import Geometry.Handle;
 
 #include "Graphics.LifecycleUtils.hpp"
 
+import Runtime.SystemFeatureCatalog;
+
 using namespace Core::Hash;
 
 namespace Graphics::Systems::MeshRendererLifecycle
@@ -28,7 +30,7 @@ namespace Graphics::Systems::MeshRendererLifecycle
     void OnUpdate(entt::registry& registry,
                   GPUScene& gpuScene,
                   const Core::Assets::AssetManager& assetManager,
-                  const MaterialSystem& materialSystem,
+                  const MaterialRegistry& materialRegistry,
                   const GeometryPool& geometryStorage,
                   uint32_t defaultTextureId)
     {
@@ -69,8 +71,8 @@ namespace Graphics::Systems::MeshRendererLifecycle
                 uint32_t texId = defaultTextureId;
                 if (matHandle.IsValid())
                 {
-                    matRev = materialSystem.GetRevision(matHandle);
-                    if (const MaterialData* data = materialSystem.GetData(matHandle))
+                    matRev = materialRegistry.GetRevision(matHandle);
+                    if (const MaterialData* data = materialRegistry.GetData(matHandle))
                         texId = data->AlbedoID;
                 }
                 inst.TextureID = texId;
@@ -100,11 +102,11 @@ namespace Graphics::Systems::MeshRendererLifecycle
                         entt::registry& registry,
                         GPUScene& gpuScene,
                         const Core::Assets::AssetManager& assetManager,
-                        const MaterialSystem& materialSystem,
+                        const MaterialRegistry& materialRegistry,
                         const GeometryPool& geometryStorage,
                         uint32_t defaultTextureId)
     {
-        graph.AddPass("MeshRendererLifecycle",
+        graph.AddPass(Runtime::SystemFeatureCatalog::PassNames::MeshRendererLifecycle,
             [](Core::FrameGraphBuilder& builder)
             {
                 builder.Read<ECS::Components::Transform::WorldMatrix>();
@@ -112,9 +114,9 @@ namespace Graphics::Systems::MeshRendererLifecycle
                 builder.WaitFor("TransformUpdate"_id);
                 builder.Signal("MeshRendererLifecycle"_id);
             },
-            [&registry, &gpuScene, &assetManager, &materialSystem, &geometryStorage, defaultTextureId]()
+            [&registry, &gpuScene, &assetManager, &materialRegistry, &geometryStorage, defaultTextureId]()
             {
-                OnUpdate(registry, gpuScene, assetManager, materialSystem, geometryStorage, defaultTextureId);
+                OnUpdate(registry, gpuScene, assetManager, materialRegistry, geometryStorage, defaultTextureId);
             });
     }
 }

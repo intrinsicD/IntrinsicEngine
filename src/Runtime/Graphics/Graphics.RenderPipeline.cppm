@@ -14,7 +14,7 @@ export module Graphics.RenderPipeline;
 
 import Graphics.RenderGraph;
 import Graphics.GPUScene;
-import Graphics.MaterialSystem;
+import Graphics.MaterialRegistry;
 import Graphics.Geometry;
 import Geometry.Handle;
 import Geometry.HalfedgeMesh;
@@ -341,7 +341,7 @@ export namespace Graphics
 
         const Core::Assets::AssetManager& AssetManager;
         GeometryPool& GeometryStorage;
-        MaterialSystem& MaterialSystem;
+        MaterialRegistry& MaterialRegistry;
 
         // Retained-mode GPU scene (owned by RenderSystem).
         GPUScene* GpuScene = nullptr;

@@ -8,6 +8,7 @@ import :Components.Transform;
 import :Components.Hierarchy;
 import Core.Hash;
 import Core.FrameGraph;
+import Runtime.SystemFeatureCatalog;
 
 using Core::Hash::operator""_id;
 
@@ -78,7 +79,7 @@ namespace ECS::Systems::Transform
 
     void RegisterSystem(Core::FrameGraph& graph, entt::registry& registry)
     {
-        graph.AddPass("TransformUpdate",
+        graph.AddPass(Runtime::SystemFeatureCatalog::PassNames::TransformUpdate,
             [](Core::FrameGraphBuilder& builder)
             {
                 builder.Read<Components::Transform::Component>();
