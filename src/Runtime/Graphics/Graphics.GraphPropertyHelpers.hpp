@@ -4,7 +4,7 @@
 // GraphPropertyHelpers — shared graph property extraction utilities.
 //
 // Consolidates duplicated property extraction logic between
-// GraphGeometrySync (full upload) and PropertySetDirtySync (incremental sync).
+// GraphLifecycle (full upload) and PropertySetDirtySync (incremental sync).
 // This header is intended for inclusion in graph-related system .cpp files only.
 // =============================================================================
 

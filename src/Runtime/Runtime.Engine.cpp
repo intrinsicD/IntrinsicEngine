@@ -292,9 +292,9 @@ namespace Runtime
 
         registerDescriptor(Runtime::SystemFeatureCatalog::TransformUpdate);
         registerDescriptor(Runtime::SystemFeatureCatalog::MeshRendererLifecycle);
-        registerDescriptor(Runtime::SystemFeatureCatalog::PrimitiveBVHSync);
-        registerDescriptor(Runtime::SystemFeatureCatalog::GraphGeometrySync);
-        registerDescriptor(Runtime::SystemFeatureCatalog::PointCloudGeometrySync);
+        registerDescriptor(Runtime::SystemFeatureCatalog::PrimitiveBVHBuild);
+        registerDescriptor(Runtime::SystemFeatureCatalog::GraphLifecycle);
+        registerDescriptor(Runtime::SystemFeatureCatalog::PointCloudLifecycle);
         registerDescriptor(Runtime::SystemFeatureCatalog::MeshViewLifecycle);
         registerDescriptor(Runtime::SystemFeatureCatalog::GPUSceneSync);
         registerDescriptor(Runtime::SystemFeatureCatalog::PropertySetDirtySync);

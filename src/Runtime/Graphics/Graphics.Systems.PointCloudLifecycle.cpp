@@ -9,7 +9,7 @@ module;
 #include <entt/entity/registry.hpp>
 #include <entt/signal/dispatcher.hpp>
 
-module Graphics.Systems.PointCloudGeometrySync;
+module Graphics.Systems.PointCloudLifecycle;
 
 import Graphics.Components;
 import Graphics.Geometry;
@@ -35,7 +35,7 @@ import Geometry.Handle;
 
 using namespace Core::Hash;
 
-namespace Graphics::Systems::PointCloudGeometrySync
+namespace Graphics::Systems::PointCloudLifecycle
 {
     void OnUpdate(entt::registry& registry,
                   GPUScene& gpuScene,
@@ -115,7 +115,7 @@ namespace Graphics::Systems::PointCloudGeometrySync
 
                 if (!newGpuData || !newGpuData->GetVertexBuffer())
                 {
-                    HandleUploadFailure(dispatcher, entity, "PointCloudGeometrySync");
+                    HandleUploadFailure(dispatcher, entity, "PointCloudLifecycle");
                     pcData.CachedColors.clear();
                     pcData.CachedRadii.clear();
                     pcData.GpuPointCount = 0;
@@ -170,7 +170,7 @@ namespace Graphics::Systems::PointCloudGeometrySync
                         RHI::TransferManager& transferManager,
                         entt::dispatcher& dispatcher)
     {
-        graph.AddPass("PointCloudGeometrySync",
+        graph.AddPass("PointCloudLifecycle",
             [](Core::FrameGraphBuilder& builder)
             {
                 builder.Write<ECS::PointCloud::Data>();

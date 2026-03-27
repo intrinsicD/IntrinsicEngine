@@ -39,8 +39,8 @@ export namespace Graphics::Systems::PropertySetDirtySync
     // dirty domains are handled independently — a face color change does
     // NOT trigger a vertex buffer re-upload.
     //
-    // Scheduling: runs BEFORE existing lifecycle systems (GraphGeometrySync,
-    // PointCloudGeometrySync, MeshViewLifecycle) so that GpuDirty flags
+    // Scheduling: runs BEFORE existing lifecycle systems (GraphLifecycle,
+    // PointCloudLifecycle, MeshViewLifecycle) so that GpuDirty flags
     // set here are consumed in the same frame.
     //
     // Thread model: main thread only (reads/writes ECS components).

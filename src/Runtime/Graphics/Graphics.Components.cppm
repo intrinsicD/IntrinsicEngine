@@ -91,7 +91,7 @@ export namespace ECS::DirtyTag
 // =========================================================================
 // Two uint32 vertex indices referencing into a position array.
 // Used by Graph::Data::CachedEdgePairs, LinePass BDA uploads,
-// MeshViewLifecycleSystem, and GraphGeometrySyncSystem.
+// MeshViewLifecycleSystem, and GraphLifecycleSystem.
 
 export namespace ECS
 {
@@ -295,7 +295,7 @@ export namespace ECS::Mesh
 //
 // Rendering: retained-mode via BDA shared-buffer architecture.
 //   - Points rendered via PointPass (BDA position pull).
-//   - GPU state managed by PointCloudGeometrySyncSystem: positions/normals
+//   - GPU state managed by PointCloudLifecycleSystem: positions/normals
 //     are uploaded to a device-local vertex buffer (GpuGeometry), per-point
 //     attributes extracted from PropertySets.
 //   - Re-upload triggers on GpuDirty = true.
@@ -327,27 +327,27 @@ export namespace ECS::PointCloud
         // When VertexColors.PropertyName is empty, falls back to Cloud::Colors().
         Graphics::VisualizationConfig Visualization;
 
-        // ---- GPU State (managed by PointCloudGeometrySyncSystem) ----
+        // ---- GPU State (managed by PointCloudLifecycleSystem) ----
         // Device-local vertex buffer holding positions + normals.
         // PointPass reads from this buffer via BDA.
         Geometry::GeometryHandle GpuGeometry{};
 
         // GPUScene slot for frustum culling and GPU-driven batching.
-        // Allocated by PointCloudGeometrySyncSystem after successful upload.
+        // Allocated by PointCloudLifecycleSystem after successful upload.
         // Freed by on_destroy hook in SceneManager.
         uint32_t GpuSlot = ECS::kInvalidGpuSlot;
 
         // Per-point colors (packed ABGR), one per point.
-        // Extracted from Cloud's "p:color" by PointCloudGeometrySyncSystem.
+        // Extracted from Cloud's "p:color" by PointCloudLifecycleSystem.
         // When empty, PointPass uses uniform DefaultColor.
         std::vector<uint32_t> CachedColors;
 
         // Per-point radii (world-space), one per point.
-        // Extracted from Cloud's "p:radius" by PointCloudGeometrySyncSystem.
+        // Extracted from Cloud's "p:radius" by PointCloudLifecycleSystem.
         // When empty, PointPass uses uniform DefaultRadius.
         std::vector<float> CachedRadii;
 
-        // When true, PointCloudGeometrySyncSystem re-uploads positions/normals
+        // When true, PointCloudLifecycleSystem re-uploads positions/normals
         // and re-extracts per-point attributes. Set on first attach, or when
         // Cloud data changes.
         bool GpuDirty = true;
@@ -489,7 +489,7 @@ export namespace ECS::Graph
         // When EdgeColors.PropertyName is empty, falls back to "e:color".
         Graphics::VisualizationConfig Visualization;
 
-        // ---- GPU State (managed by GraphGeometrySyncSystem) ----
+        // ---- GPU State (managed by GraphLifecycleSystem) ----
         Geometry::GeometryHandle GpuGeometry{};
         uint32_t GpuSlot = ECS::kInvalidGpuSlot;
 
@@ -699,7 +699,7 @@ export namespace ECS::Surface
 //
 // Presence of this component enables wireframe/edge rendering for the entity.
 // Removal disables it. Edge data comes from MeshViewLifecycleSystem (for
-// meshes) or GraphGeometrySyncSystem (for graphs). Per-edge attributes
+// meshes) or GraphLifecycleSystem (for graphs). Per-edge attributes
 // (colors, widths) are uploaded to a separate BDA channel by LinePass.
 
 export namespace ECS::Line
@@ -727,7 +727,7 @@ export namespace ECS::Line
 
         // Edge index buffer (separate from vertex buffer). Contains
         // flattened uint32_t pairs. Created by MeshViewLifecycleSystem
-        // (from collision data) or GraphGeometrySyncSystem (from graph
+        // (from collision data) or GraphLifecycleSystem (from graph
         // topology via ReuseVertexBuffersFrom). Must be valid for
         // LinePass to render edges — no internal fallback.
         Geometry::GeometryHandle EdgeView{};

@@ -4,7 +4,7 @@ module;
 #include <entt/fwd.hpp>
 #include <entt/signal/dispatcher.hpp>
 
-export module Graphics.Systems.GraphGeometrySync;
+export module Graphics.Systems.GraphLifecycle;
 
 import Graphics.Geometry;
 import Graphics.GPUScene;
@@ -12,7 +12,7 @@ import Core.FrameGraph;
 import RHI.Device;
 import RHI.Transfer;
 
-export namespace Graphics::Systems::GraphGeometrySync
+export namespace Graphics::Systems::GraphLifecycle
 {
     // Uploads graph node positions to vertex buffers, extracts edge index pairs
     // from graph topology, extracts per-node attributes (colors, radii) from

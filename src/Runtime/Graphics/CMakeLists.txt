@@ -23,9 +23,9 @@ target_sources(${target_name}
         Graphics.FeatureCatalog.cppm
         Graphics.Systems.GPUSceneSync.cppm
         Graphics.Systems.MeshRendererLifecycle.cppm
-        Graphics.Systems.PrimitiveBVHSync.cppm
-        Graphics.Systems.GraphGeometrySync.cppm
-        Graphics.Systems.PointCloudGeometrySync.cppm
+        Graphics.Systems.PrimitiveBVHBuild.cppm
+        Graphics.Systems.GraphLifecycle.cppm
+        Graphics.Systems.PointCloudLifecycle.cppm
         Graphics.Systems.MeshViewLifecycle.cppm
         Graphics.Systems.PropertySetDirtySync.cppm
         # New Modules
@@ -105,9 +105,9 @@ target_sources(${target_name}
         Graphics.IORegistry.cpp
         Graphics.Systems.GPUSceneSync.cpp
         Graphics.Systems.MeshRendererLifecycle.cpp
-        Graphics.Systems.PrimitiveBVHSync.cpp
-        Graphics.Systems.GraphGeometrySync.cpp
-        Graphics.Systems.PointCloudGeometrySync.cpp
+        Graphics.Systems.PrimitiveBVHBuild.cpp
+        Graphics.Systems.GraphLifecycle.cpp
+        Graphics.Systems.PointCloudLifecycle.cpp
         Graphics.Systems.MeshViewLifecycle.cpp
         Graphics.Systems.PropertySetDirtySync.cpp
         Passes/Graphics.Passes.Picking.cpp

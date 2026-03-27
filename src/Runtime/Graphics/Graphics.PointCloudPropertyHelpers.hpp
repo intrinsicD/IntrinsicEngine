@@ -8,7 +8,7 @@
 // PointCloudPropertyHelpers — shared point-cloud property extraction utilities.
 //
 // Consolidates duplicated property extraction logic between
-// PointCloudGeometrySync (full upload) and PropertySetDirtySync (incremental
+// PointCloudLifecycle (full upload) and PropertySetDirtySync (incremental
 // sync). This header is intended for inclusion in point-cloud related system
 // .cpp files only.
 // =============================================================================

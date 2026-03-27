@@ -18,20 +18,20 @@ export namespace Runtime::SystemFeatureCatalog
         Core::FeatureCategory::System,
         "Allocates/deallocates GPU slots for mesh renderers");
 
-    inline constexpr Core::FeatureDescriptor PrimitiveBVHSync = MakeFeatureDescriptor(
-        "PrimitiveBVHSync",
+    inline constexpr Core::FeatureDescriptor PrimitiveBVHBuild = MakeFeatureDescriptor(
+        "PrimitiveBVHBuild",
         Core::FeatureCategory::System,
         "Builds entity-attached primitive BVHs for local-space picking and future broadphase");
 
-    inline constexpr Core::FeatureDescriptor GraphGeometrySync = MakeFeatureDescriptor(
-        "GraphGeometrySync",
+    inline constexpr Core::FeatureDescriptor GraphLifecycle = MakeFeatureDescriptor(
+        "GraphLifecycle",
         Core::FeatureCategory::System,
-        "Uploads graph geometry to GPU and allocates GPUScene slots");
+        "Manages graph GPU resource lifecycle: uploads geometry, allocates GPUScene slots, populates render components");
 
-    inline constexpr Core::FeatureDescriptor PointCloudGeometrySync = MakeFeatureDescriptor(
-        "PointCloudGeometrySync",
+    inline constexpr Core::FeatureDescriptor PointCloudLifecycle = MakeFeatureDescriptor(
+        "PointCloudLifecycle",
         Core::FeatureCategory::System,
-        "Uploads point clouds to GPU and allocates GPUScene slots");
+        "Manages point cloud GPU resource lifecycle: uploads geometry, allocates GPUScene slots, populates render components");
 
     inline constexpr Core::FeatureDescriptor MeshViewLifecycle = MakeFeatureDescriptor(
         "MeshViewLifecycle",

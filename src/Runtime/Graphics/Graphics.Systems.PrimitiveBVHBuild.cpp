@@ -9,7 +9,7 @@ module;
 #include <glm/glm.hpp>
 #include <entt/entity/registry.hpp>
 
-module Graphics.Systems.PrimitiveBVHSync;
+module Graphics.Systems.PrimitiveBVHBuild;
 
 import Graphics.Components;
 import Geometry.AABB;
@@ -25,7 +25,7 @@ import ECS;
 
 using namespace Core::Hash;
 
-namespace Graphics::Systems::PrimitiveBVHSync
+namespace Graphics::Systems::PrimitiveBVHBuild
 {
     namespace
     {
@@ -313,7 +313,7 @@ namespace Graphics::Systems::PrimitiveBVHSync
     void RegisterSystem(Core::FrameGraph& graph,
                         entt::registry& registry)
     {
-        graph.AddPass("PrimitiveBVHSync",
+        graph.AddPass("PrimitiveBVHBuild",
             [](Core::FrameGraphBuilder& builder)
             {
                 builder.Read<ECS::Mesh::Data>();
