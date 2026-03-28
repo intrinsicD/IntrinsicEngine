@@ -573,6 +573,41 @@ TEST(RenderExtraction, FrameContext_OwnsPreparedRenderWorldAfterMove)
     EXPECT_EQ(owned->World.CommittedTick, 1u);
 }
 
+TEST(RenderExtraction, LightEnvironmentPacket_DefaultsMatchPreviousHardcodedValues)
+{
+    // Verify that LightEnvironmentPacket defaults produce the same lighting
+    // as the previously hardcoded shader constants (direction (1,1,1) normalised,
+    // white light, 0.1 ambient).
+    Graphics::LightEnvironmentPacket pkt{};
+    const glm::vec3 expectedDir = glm::normalize(glm::vec3(1.0f, 1.0f, 1.0f));
+    EXPECT_NEAR(pkt.LightDirection.x, expectedDir.x, 1e-5f);
+    EXPECT_NEAR(pkt.LightDirection.y, expectedDir.y, 1e-5f);
+    EXPECT_NEAR(pkt.LightDirection.z, expectedDir.z, 1e-5f);
+    EXPECT_FLOAT_EQ(pkt.LightIntensity, 1.0f);
+    EXPECT_EQ(pkt.LightColor, glm::vec3(1.0f));
+    EXPECT_EQ(pkt.AmbientColor, glm::vec3(1.0f));
+    EXPECT_FLOAT_EQ(pkt.AmbientIntensity, 0.1f);
+}
+
+TEST(RenderExtraction, ExtractRenderWorld_PopulatesDefaultLightEnvironmentPacket)
+{
+    Runtime::SceneManager sceneManager;
+    sceneManager.CommitFixedTick();
+
+    const Runtime::RenderWorld renderWorld = Runtime::ExtractRenderWorld(Runtime::MakeRenderFrameInput(
+        Graphics::CameraComponent{},
+        sceneManager.CreateReadonlySnapshot(),
+        Runtime::RenderViewport{.Width = 800, .Height = 600},
+        0.0));
+
+    EXPECT_TRUE(renderWorld.IsValid());
+    const auto& light = renderWorld.Lighting;
+    EXPECT_FLOAT_EQ(light.LightIntensity, 1.0f);
+    EXPECT_FLOAT_EQ(light.AmbientIntensity, 0.1f);
+    EXPECT_EQ(light.LightColor, glm::vec3(1.0f));
+    EXPECT_EQ(light.AmbientColor, glm::vec3(1.0f));
+}
+
 TEST(RenderExtraction, MakeRenderViewPacket_CapturesDerivedCameraState)
 {
     Graphics::CameraComponent camera{};
