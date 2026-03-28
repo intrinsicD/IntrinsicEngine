@@ -49,7 +49,9 @@ import Geometry.MeshAnalysis;
 
 import Core.Logging;
 
-#include "Graphics.LifecycleUtils.hpp"
+import Graphics.LifecycleUtils;
+
+using namespace Graphics::LifecycleUtils;
 
 namespace Runtime::EditorUI
 {

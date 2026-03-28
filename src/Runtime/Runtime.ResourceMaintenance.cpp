@@ -11,7 +11,7 @@ namespace Runtime
 
     void ResourceMaintenanceService::ProcessCompletedReadbacks()
     {
-        m_Renderer.GetRenderSystem().ProcessCompletedGpuWork(m_Scene.GetScene(),
+        m_Renderer.GetRenderDriver().ProcessCompletedGpuWork(m_Scene.GetScene(),
                                                              m_LastObservedGlobalFrameNumber);
     }
 

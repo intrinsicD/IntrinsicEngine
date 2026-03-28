@@ -102,7 +102,7 @@ This establishes the current composition rule: deferred-capable opaque surfaces 
 
 - Render-graph introspection reports per-pass attachment metadata (resource name, format, load/store ops, imported flag).
 - Render-graph introspection reports per-resource first/last read and write pass indices.
-- Temporary audit logging may dump pass order, resource creation, transitions, and formats from `RenderSystem`.
+- Temporary audit logging may dump pass order, resource creation, transitions, and formats from `RenderDriver`.
 - Any pass using `LOAD` without a guaranteed earlier write in-frame or an imported resource should emit a warning.
 - `ValidateCompiledGraph()` returns `RenderGraphValidationResult` with structured diagnostics (error/warning severity).
 - Missing required resources and transient resources without producers are validation **errors** (not warnings).

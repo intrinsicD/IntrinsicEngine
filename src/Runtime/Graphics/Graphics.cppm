@@ -6,7 +6,7 @@ export import Graphics.Material;
 export import Graphics.MaterialRegistry;
 export import Graphics.Model;
 export import Graphics.ModelLoader;
-export import Graphics.RenderSystem;
+export import Graphics.RenderDriver;
 export import Graphics.RenderPipeline;
 export import Graphics.TextureLoader;
 export import Graphics.RenderGraph;

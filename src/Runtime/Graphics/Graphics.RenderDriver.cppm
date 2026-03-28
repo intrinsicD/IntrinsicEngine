@@ -7,7 +7,7 @@ module;
 
 #include "RHI.Vulkan.hpp"
 
-export module Graphics.RenderSystem;
+export module Graphics.RenderDriver;
 
 import RHI.Bindless;
 import RHI.Buffer;
@@ -35,16 +35,16 @@ import ECS;
 
 export namespace Graphics
 {
-    struct RenderSystemConfig
+    struct RenderDriverConfig
     {
         bool EnableRenderAuditLogging = false;
         // Future: MSAA settings, Shadow resolution, etc.
     };
 
-    class RenderSystem
+    class RenderDriver
     {
     public:
-        RenderSystem(const RenderSystemConfig& config,
+        RenderDriver(const RenderDriverConfig& config,
                      std::shared_ptr<RHI::VulkanDevice> device,
                      RHI::VulkanSwapchain& swapchain,
                      RHI::SimpleRenderer& renderer,
@@ -57,7 +57,7 @@ export namespace Graphics
                      Core::Memory::ScopeStack& frameScope,
                      GeometryPool& geometryStorage,
                      MaterialRegistry& materialRegistry);
-        ~RenderSystem();
+        ~RenderDriver();
 
         // Hot-swap: schedules activation at the start of the next successfully-begun frame.
         void RequestPipelineSwap(std::unique_ptr<RenderPipeline> pipeline);
@@ -87,7 +87,7 @@ export namespace Graphics
 
         [[nodiscard]] RHI::VulkanBuffer* GetGlobalUBO() const { return m_GlobalResources.GetCameraUBO(); }
 
-        // Retained-mode scene is owned by Runtime::Engine. RenderSystem consumes it during rendering.
+        // Retained-mode scene is owned by Runtime::Engine. RenderDriver consumes it during rendering.
         void SetGpuScene(GPUScene* scene) { m_GpuScene = scene; }
 
 
@@ -115,7 +115,7 @@ export namespace Graphics
         [[nodiscard]] std::string DumpRenderGraphToString() const;
 
     private:
-        RenderSystemConfig m_Config;
+        RenderDriverConfig m_Config;
 
         // Ownership stays with the caller, but we avoid ref-count ops in hot code.
         std::shared_ptr<RHI::VulkanDevice> m_DeviceOwner;

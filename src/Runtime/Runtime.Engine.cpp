@@ -162,7 +162,7 @@ namespace Runtime
                              m_GraphicsBackend->GetContext().GetInstance(),
                              m_GraphicsBackend->GetDevice().GetGraphicsQueue());
 
-        // 6. RenderOrchestrator (MaterialRegistry, GeometryStorage, Pipelines, RenderSystem, GPUScene, FrameGraph)
+        // 6. RenderOrchestrator (MaterialRegistry, GeometryStorage, Pipelines, RenderDriver, GPUScene, FrameGraph)
         m_RenderOrchestrator = std::make_unique<RenderOrchestrator>(
             m_GraphicsBackend->GetDeviceShared(),
             m_GraphicsBackend->GetSwapchain(),
@@ -236,12 +236,12 @@ namespace Runtime
         // AssetIngestService borrows runtime subsystems; release it before tearing them down.
         m_AssetIngestService.reset();
 
-        // RenderOrchestrator destructor handles: GPUScene, RenderSystem, PipelineLibrary,
+        // RenderOrchestrator destructor handles: GPUScene, RenderDriver, PipelineLibrary,
         // MaterialRegistry, GeometryStorage, frame state.
         m_RenderOrchestrator.reset();
 
         // GUI-backed textures owned by render passes must be released before the ImGui backend
-        // and descriptor pool are destroyed, but after RenderOrchestrator/RenderSystem shutdown.
+        // and descriptor pool are destroyed, but after RenderOrchestrator/RenderDriver shutdown.
         Interface::GUI::Shutdown();
 
         // AssetPipeline destructor handles cleanup of asset state.

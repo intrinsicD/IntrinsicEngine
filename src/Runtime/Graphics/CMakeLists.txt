@@ -10,7 +10,7 @@ target_sources(${target_name}
         Graphics.Material.cppm
         Graphics.MaterialRegistry.cppm
         Graphics.Model.cppm
-        Graphics.RenderSystem.cppm
+        Graphics.RenderDriver.cppm
         Graphics.RenderGraph.cppm
         Components/Graphics.Components.cppm
         Components/Graphics.Components.Core.cppm
@@ -59,6 +59,7 @@ target_sources(${target_name}
         Graphics.PropertyEnumerator.cppm
         Graphics.ColorMapper.cppm
         Graphics.VectorFieldManager.cppm
+        Graphics.LifecycleUtils.cppm
         Graphics.IsolineExtractor.cppm
 
         Pipelines/Graphics.Pipelines.cppm
@@ -93,7 +94,7 @@ target_sources(${target_name}
         Graphics.Geometry.cpp
         Graphics.Material.cpp
         Graphics.MaterialRegistry.cpp
-        Graphics.RenderSystem.cpp
+        Graphics.RenderDriver.cpp
         Graphics.RenderGraph.cpp
         Graphics.ModelLoader.cpp
         Graphics.TextureLoader.cpp

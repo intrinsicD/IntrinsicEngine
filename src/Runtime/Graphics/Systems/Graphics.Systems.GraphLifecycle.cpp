@@ -33,11 +33,12 @@ import RHI.Device;
 import RHI.Transfer;
 
 import Core.SystemFeatureCatalog;
+import Graphics.LifecycleUtils;
 
 #include "Graphics.GraphPropertyHelpers.hpp"
-#include "Graphics.LifecycleUtils.hpp"
 
 using namespace Core::Hash;
+using namespace Graphics::LifecycleUtils;
 
 namespace Graphics::Systems::GraphLifecycle
 {

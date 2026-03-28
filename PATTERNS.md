@@ -11,7 +11,7 @@ This document catalogs the main reusable patterns in the IntrinsicEngine codebas
 **Canonical examples:**
 - `Runtime.GraphicsBackend.cppm` — Takes `Core::Windowing::Window&` and config, owns Vulkan context/device/swapchain via `unique_ptr`, provides `GetDevice()`, `GetSwapchain()` accessors returning non-owning references.
 - `Runtime.AssetPipeline.cppm` — Takes borrowed `RHI::TransferManager&`, owns `Core::Assets::AssetManager` and thread-safe queues.
-- `Runtime.RenderOrchestrator.cppm` — Takes 8 borrowed references (device, swapchain, renderer, bindless, etc.), owns `PipelineLibrary`, `MaterialRegistry`, `GPUScene`, `RenderSystem`.
+- `Runtime.RenderOrchestrator.cppm` — Takes 8 borrowed references (device, swapchain, renderer, bindless, etc.), owns `PipelineLibrary`, `MaterialRegistry`, `GPUScene`, `RenderDriver`.
 - `Runtime.SceneManager.cppm` — Owns `ECS::Scene`, takes `Graphics::GPUScene&` in `ConnectGpuHooks()`.
 
 **Instantiation order** (in `Engine.cpp`):

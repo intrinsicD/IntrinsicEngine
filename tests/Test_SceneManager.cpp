@@ -13,7 +13,9 @@ import RHI;
 import Graphics;
 import Geometry;
 
-#include "../src/Runtime/Graphics/Graphics.LifecycleUtils.hpp"
+import Graphics.LifecycleUtils;
+
+using namespace Graphics::LifecycleUtils;
 
 // ---------------------------------------------------------------------------
 // Compile-time API contract tests

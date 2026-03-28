@@ -16,7 +16,7 @@ module;
 
 #include "RHI.Vulkan.hpp"
 
-module Graphics.RenderSystem;
+module Graphics.RenderDriver;
 
 import Graphics.Camera;
 import Graphics.Components;
@@ -288,7 +288,7 @@ namespace Graphics
         return result;
     }
 
-    RenderSystem::RenderSystem(const RenderSystemConfig& config,
+    RenderDriver::RenderDriver(const RenderDriverConfig& config,
                                std::shared_ptr<RHI::VulkanDevice> device,
                                RHI::VulkanSwapchain& swapchain,
                                RHI::SimpleRenderer& renderer,
@@ -906,7 +906,7 @@ namespace Graphics
         m_GpuScene = nullptr;
     }
 
-    RenderSystem::~RenderSystem()
+    RenderDriver::~RenderDriver()
     {
         if (m_Device) vkDeviceWaitIdle(m_Device->GetLogicalDevice());
 
@@ -922,14 +922,14 @@ namespace Graphics
         m_PendingPipeline.reset();
     }
 
-    void RenderSystem::RequestPipelineSwap(std::unique_ptr<RenderPipeline> pipeline)
+    void RenderDriver::RequestPipelineSwap(std::unique_ptr<RenderPipeline> pipeline)
     {
         if (m_PendingPipeline)
             m_PendingPipeline->Shutdown();
         m_PendingPipeline = std::move(pipeline);
     }
 
-    void RenderSystem::ApplyPendingPipelineSwap(uint32_t width, uint32_t height)
+    void RenderDriver::ApplyPendingPipelineSwap(uint32_t width, uint32_t height)
     {
         if (!m_PendingPipeline)
             return;
@@ -954,7 +954,7 @@ namespace Graphics
         }
     }
 
-    void RenderSystem::GarbageCollectRetiredPipelines()
+    void RenderDriver::GarbageCollectRetiredPipelines()
     {
         if (!m_Device)
             return;
@@ -979,28 +979,28 @@ namespace Graphics
         m_RetiredPipelines.erase(it, m_RetiredPipelines.end());
     }
 
-    void RenderSystem::RequestPick(uint32_t x, uint32_t y)
+    void RenderDriver::RequestPick(uint32_t x, uint32_t y)
     {
         m_Interaction.RequestPick(x, y, m_Presentation.GetFrameIndex(), m_Device->GetGlobalFrameNumber());
     }
 
-    RenderSystem::PickResultGpu RenderSystem::GetLastPickResult() const
+    RenderDriver::PickResultGpu RenderDriver::GetLastPickResult() const
     {
         auto res = m_Interaction.GetLastPickResult();
         return {res.HasHit, res.EntityID};
     }
 
-    Passes::SelectionOutlineSettings* RenderSystem::GetSelectionOutlineSettings()
+    Passes::SelectionOutlineSettings* RenderDriver::GetSelectionOutlineSettings()
     {
         return m_ActivePipeline ? m_ActivePipeline->GetSelectionOutlineSettings() : nullptr;
     }
 
-    Passes::PostProcessSettings* RenderSystem::GetPostProcessSettings()
+    Passes::PostProcessSettings* RenderDriver::GetPostProcessSettings()
     {
         return m_ActivePipeline ? m_ActivePipeline->GetPostProcessSettings() : nullptr;
     }
 
-    const Passes::HistogramReadback* RenderSystem::GetHistogramReadback() const
+    const Passes::HistogramReadback* RenderDriver::GetHistogramReadback() const
     {
         return m_ActivePipeline ? m_ActivePipeline->GetHistogramReadback() : nullptr;
     }
@@ -1009,7 +1009,7 @@ namespace Graphics
     // Staged frame execution
     // -------------------------------------------------------------------------
 
-    void RenderSystem::BeginFrame(uint64_t currentFrame)
+    void RenderDriver::BeginFrame(uint64_t currentFrame)
     {
         m_GeometryStorage.ProcessDeletions(currentFrame);
         GarbageCollectRetiredPipelines();
@@ -1024,7 +1024,7 @@ namespace Graphics
         Interface::GUI::DrawGUI();
     }
 
-    bool RenderSystem::AcquireFrame()
+    bool RenderDriver::AcquireFrame()
     {
         if (!m_Presentation.BeginFrame())
         {
@@ -1034,7 +1034,7 @@ namespace Graphics
         return true;
     }
 
-    void RenderSystem::ProcessCompletedGpuWork(ECS::Scene& scene, uint64_t currentFrame)
+    void RenderDriver::ProcessCompletedGpuWork(ECS::Scene& scene, uint64_t currentFrame)
     {
         // Process GPU pick readbacks AFTER the fence wait in AcquireFrame.
         // The fence guarantees that the GPU has completed writing to the readback buffer
@@ -1055,7 +1055,7 @@ namespace Graphics
         }
     }
 
-    void RenderSystem::UpdateGlobals(const CameraComponent& camera)
+    void RenderDriver::UpdateGlobals(const CameraComponent& camera)
     {
         const uint32_t frameIndex = m_Presentation.GetFrameIndex();
         const auto extent = m_Presentation.GetResolution();
@@ -1066,7 +1066,7 @@ namespace Graphics
         ApplyPendingPipelineSwap(extent.width, extent.height);
     }
 
-    void RenderSystem::BuildGraph(Core::Assets::AssetManager& assetManager,
+    void RenderDriver::BuildGraph(Core::Assets::AssetManager& assetManager,
                                   const CameraComponent& camera,
                                   bool hasSelectionWork,
                                   const SelectionOutlinePacket& selectionOutline,
@@ -1245,7 +1245,7 @@ namespace Graphics
         }
     }
 
-    void RenderSystem::ExecuteGraph()
+    void RenderDriver::ExecuteGraph()
     {
         const uint32_t frameIndex = m_Presentation.GetFrameIndex();
 
@@ -1285,12 +1285,12 @@ namespace Graphics
         }
     }
 
-    void RenderSystem::EndFrame()
+    void RenderDriver::EndFrame()
     {
         m_Presentation.EndFrame();
     }
 
-    void RenderSystem::OnResize()
+    void RenderDriver::OnResize()
     {
         ++m_ResizeCount;
         m_LastResizeExtent = m_Presentation.GetResolution();
@@ -1306,7 +1306,7 @@ namespace Graphics
     // DumpRenderGraphToString — human-readable render graph snapshot
     // -------------------------------------------------------------------------
 
-    std::string RenderSystem::DumpRenderGraphToString() const
+    std::string RenderDriver::DumpRenderGraphToString() const
     {
         std::string out;
         out.reserve(4096);

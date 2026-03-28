@@ -66,7 +66,7 @@ export namespace Graphics::Passes
         std::unique_ptr<RHI::VulkanImage> m_DummyUint;
         std::unique_ptr<RHI::VulkanImage> m_DummyDepth;
 
-        // Per-frame preview RGBA image (owned here rather than RenderSystem)
+        // Per-frame preview RGBA image (owned here rather than RenderDriver)
         std::vector<std::unique_ptr<RHI::VulkanImage>> m_PreviewImages;
         std::vector<void*> m_ImGuiTextureIds;
 

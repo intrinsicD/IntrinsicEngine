@@ -24,7 +24,7 @@ import ECS;
 // subsystem constellation — SceneManager, AssetPipeline, FrameGraph, and
 // ECS Transform system — works end-to-end for a single frame.
 //
-// The full GPU rendering pipeline (RenderOrchestrator, RenderSystem) is
+// The full GPU rendering pipeline (RenderOrchestrator, RenderDriver) is
 // intentionally excluded: it requires a swapchain/surface.  Individual
 // headless tests for GraphicsBackend and RenderOrchestrator cover those.
 // ===========================================================================

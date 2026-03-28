@@ -28,7 +28,7 @@ import Graphics.GPUScene;
 import Graphics.MaterialRegistry;
 import Graphics.PipelineLibrary;
 import Graphics.Pipelines;
-import Graphics.RenderSystem;
+import Graphics.RenderDriver;
 import Graphics.ShaderRegistry;
 import Runtime.RenderExtraction;
 
@@ -103,7 +103,7 @@ namespace Runtime
         // 1. MaterialRegistry (depends on TextureManager + AssetManager)
         m_MaterialRegistry = std::make_unique<Graphics::MaterialRegistry>(textureManager, assetManager);
 
-        // 2. Pipelines & RenderSystem
+        // 2. Pipelines & RenderDriver
         InitPipeline(swapchain, renderer, bindless, descriptorPool, descriptorLayout);
 
         // 3. Retained-mode GPUScene
@@ -115,8 +115,8 @@ namespace Runtime
                 m_GpuScene = std::make_unique<Graphics::GPUScene>(
                     *m_Device, *p, m_PipelineLibrary->GetSceneUpdateSetLayout());
 
-                if (m_RenderSystem)
-                    m_RenderSystem->SetGpuScene(m_GpuScene.get());
+                if (m_RenderDriver)
+                    m_RenderDriver->SetGpuScene(m_GpuScene.get());
             }
         }
 
@@ -127,7 +127,7 @@ namespace Runtime
     {
         // Destroy GPU systems in reverse dependency order.
         m_GpuScene.reset();
-        m_RenderSystem.reset();
+        m_RenderDriver.reset();
         m_PipelineLibrary.reset();
         m_MaterialRegistry.reset();
 
@@ -206,10 +206,10 @@ namespace Runtime
                                          swapchain.GetImageFormat(),
                                          RHI::VulkanImage::FindDepthFormat(*m_Device));
 
-        // RenderSystem (borrows PSOs via PipelineLibrary)
-        Core::Log::Info("RenderOrchestrator: Creating RenderSystem...");
-        Graphics::RenderSystemConfig rsConfig{};
-        m_RenderSystem = std::make_unique<Graphics::RenderSystem>(
+        // RenderDriver (borrows PSOs via PipelineLibrary)
+        Core::Log::Info("RenderOrchestrator: Creating RenderDriver...");
+        Graphics::RenderDriverConfig rsConfig{};
+        m_RenderDriver = std::make_unique<Graphics::RenderDriver>(
             rsConfig,
             m_Device,
             swapchain,
@@ -224,24 +224,24 @@ namespace Runtime
             m_GeometryStorage,
             *m_MaterialRegistry
         );
-        Core::Log::Info("RenderOrchestrator: RenderSystem created successfully.");
+        Core::Log::Info("RenderOrchestrator: RenderDriver created successfully.");
 
-        if (!m_RenderSystem)
+        if (!m_RenderDriver)
         {
-            Core::Log::Error("RenderOrchestrator: Failed to create RenderSystem!");
+            Core::Log::Error("RenderOrchestrator: Failed to create RenderDriver!");
             std::exit(1);
         }
 
         // Default Render Pipeline (hot-swappable)
         auto defaultPipeline = std::make_unique<Graphics::DefaultPipeline>();
         defaultPipeline->SetFeatureRegistry(m_FeatureRegistry);
-        m_RenderSystem->RequestPipelineSwap(std::move(defaultPipeline));
+        m_RenderDriver->RequestPipelineSwap(std::move(defaultPipeline));
     }
 
     void RenderOrchestrator::OnResize()
     {
-        if (m_RenderSystem)
-            m_RenderSystem->OnResize();
+        if (m_RenderDriver)
+            m_RenderDriver->OnResize();
     }
 
     void RenderOrchestrator::ResetFrameState()
@@ -307,12 +307,12 @@ namespace Runtime
         }
 
         const uint64_t currentFrame = m_Device ? m_Device->GetGlobalFrameNumber() : frame.FrameNumber;
-        m_RenderSystem->BeginFrame(currentFrame);
-        if (!m_RenderSystem->AcquireFrame())
+        m_RenderDriver->BeginFrame(currentFrame);
+        if (!m_RenderDriver->AcquireFrame())
             return;
 
-        m_RenderSystem->UpdateGlobals(preparedRenderWorld->View.Camera);
-        m_RenderSystem->BuildGraph(m_AssetManager,
+        m_RenderDriver->UpdateGlobals(preparedRenderWorld->View.Camera);
+        m_RenderDriver->BuildGraph(m_AssetManager,
                                    preparedRenderWorld->View.Camera,
                                    preparedRenderWorld->HasSelectionWork,
                                    preparedRenderWorld->SelectionOutline,
@@ -344,8 +344,8 @@ namespace Runtime
             return;
         }
 
-        m_RenderSystem->ExecuteGraph();
-        m_RenderSystem->EndFrame();
+        m_RenderDriver->ExecuteGraph();
+        m_RenderDriver->EndFrame();
         frame.Submitted = true;
     }
 

@@ -23,7 +23,9 @@ import Geometry.Handle;
 import RHI.CudaDevice;
 #endif
 
-#include "Graphics.LifecycleUtils.hpp"
+import Graphics.LifecycleUtils;
+
+using namespace Graphics::LifecycleUtils;
 
 namespace Runtime
 {

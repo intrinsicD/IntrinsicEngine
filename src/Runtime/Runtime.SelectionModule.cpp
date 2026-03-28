@@ -14,7 +14,7 @@ import ECS;
 import Graphics.Components;
 import Geometry.Ray;
 import Graphics.Camera;
-import Graphics.RenderSystem;
+import Graphics.RenderDriver;
 import Runtime.Selection;
 
 namespace Runtime
@@ -217,7 +217,7 @@ namespace Runtime
     }
 
     void SelectionModule::Update(ECS::Scene& scene,
-                                 Graphics::RenderSystem& renderSystem,
+                                 Graphics::RenderDriver& renderSystem,
                                  const Graphics::CameraComponent* camera,
                                  const Core::Windowing::Window& window,
                                  bool uiCapturesMouse)

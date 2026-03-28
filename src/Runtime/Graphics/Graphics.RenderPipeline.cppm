@@ -343,7 +343,7 @@ export namespace Graphics
         GeometryPool& GeometryStorage;
         MaterialRegistry& MaterialRegistry;
 
-        // Retained-mode GPU scene (owned by RenderSystem).
+        // Retained-mode GPU scene (owned by RenderDriver).
         GPUScene* GpuScene = nullptr;
 
         // Frame

@@ -12,7 +12,7 @@
 #include "RHI.Vulkan.hpp"
 
 import Graphics;
-import Graphics.RenderSystem;
+import Graphics.RenderDriver;
 import Core;
 
 using namespace Graphics;

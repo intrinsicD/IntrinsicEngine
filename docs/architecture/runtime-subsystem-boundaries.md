@@ -51,7 +51,7 @@ Engine
     ├── MaterialSystem
     ├── PipelineLibrary
     ├── GPUScene
-    └── RenderSystem
+    └── RenderDriver
 ```
 
 ### Boundary summary

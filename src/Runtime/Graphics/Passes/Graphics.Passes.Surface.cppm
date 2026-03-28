@@ -144,7 +144,7 @@ export namespace Graphics::Passes
 
         RHI::VulkanDevice* m_Device = nullptr; // non-owning
         RHI::DescriptorAllocator* m_DescriptorPool = nullptr; // non-owning
-        RHI::GraphicsPipeline* m_Pipeline = nullptr; // owned by RenderSystem for now
+        RHI::GraphicsPipeline* m_Pipeline = nullptr; // owned by RenderDriver for now
         RHI::GraphicsPipeline* m_LinePipeline = nullptr; // owned by PipelineLibrary
         RHI::GraphicsPipeline* m_PointPipeline = nullptr; // owned by PipelineLibrary
         RHI::ComputePipeline* m_CullPipeline = nullptr; // owned by PipelineLibrary

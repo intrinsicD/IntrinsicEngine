@@ -452,7 +452,7 @@ namespace Graphics::Passes
         // Lazily allocate descriptor sets if needed.
         if (frameIndex >= m_DescriptorSets.size())
         {
-            // Cannot allocate without a descriptor allocator reference; this should be sized from RenderSystem.
+            // Cannot allocate without a descriptor allocator reference; this should be sized from RenderDriver.
             // For now, keep “null implies disabled”.
             return;
         }
@@ -512,7 +512,7 @@ namespace Graphics::Passes
     {
         (void)width;
         (void)height;
-        // Device is idle when this is called from RenderSystem::OnResize
+        // Device is idle when this is called from RenderDriver::OnResize
 
         // 1. Clear ImGui Descriptors
         ReleaseImGuiTextures();
