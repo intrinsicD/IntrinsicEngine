@@ -110,6 +110,10 @@ namespace Core
             struct FrameGraphExecutionState
             {
                 std::unique_ptr<std::atomic<uint32_t>[]> RemainingDependencies;
+                // CAS-guarded dispatch flags: each node may only be dispatched once.
+                // Prevents double-execution under high contention regardless of
+                // indegree bookkeeping races in the task scheduler.
+                std::unique_ptr<std::atomic<uint32_t>[]> DispatchedFlags;
                 uint32_t NodeCount = 0;
             };
 
@@ -123,11 +127,17 @@ namespace Core
             FrameGraphExecutionState state{};
             state.NodeCount = nodeCount;
             state.RemainingDependencies = std::make_unique<std::atomic<uint32_t>[]>(nodeCount);
+            state.DispatchedFlags = std::make_unique<std::atomic<uint32_t>[]>(nodeCount);
 
             for (uint32_t nodeIdx = 0; nodeIdx < nodeCount; ++nodeIdx)
             {
                 state.RemainingDependencies[nodeIdx].store(m_Scheduler.GetIndegree(nodeIdx), std::memory_order_relaxed);
+                state.DispatchedFlags[nodeIdx].store(0, std::memory_order_relaxed);
             }
+
+            // Full fence: guarantee all stores above are globally visible
+            // before any root task is dispatched to worker threads.
+            std::atomic_thread_fence(std::memory_order_seq_cst);
 
             const auto executePassAndReleaseDependents = [](ExecutionContext ctx, uint32_t nodeIdx, auto dispatchSelf) -> void
             {
@@ -144,9 +154,14 @@ namespace Core
 
                     if (prior == 1)
                     {
-                        Tasks::Scheduler::Dispatch([ctx, dependent, dispatchSelf]() {
-                            dispatchSelf(ctx, dependent, dispatchSelf);
-                        });
+                        uint32_t expected = 0;
+                        if (ctx.State.DispatchedFlags[dependent].compare_exchange_strong(
+                                expected, 1, std::memory_order_acq_rel, std::memory_order_relaxed))
+                        {
+                            Tasks::Scheduler::Dispatch([ctx, dependent, dispatchSelf]() {
+                                dispatchSelf(ctx, dependent, dispatchSelf);
+                            });
+                        }
                     }
                 }
             };
@@ -155,12 +170,17 @@ namespace Core
             uint32_t readyCount = 0;
             for (uint32_t nodeIdx = 0; nodeIdx < nodeCount; ++nodeIdx)
             {
-                if (state.RemainingDependencies[nodeIdx].load(std::memory_order_relaxed) == 0)
+                if (state.RemainingDependencies[nodeIdx].load(std::memory_order_acquire) == 0)
                 {
                     ++readyCount;
-                    Tasks::Scheduler::Dispatch([execCtx, nodeIdx, executePassAndReleaseDependents]() {
-                        executePassAndReleaseDependents(execCtx, nodeIdx, executePassAndReleaseDependents);
-                    });
+                    uint32_t expected = 0;
+                    if (state.DispatchedFlags[nodeIdx].compare_exchange_strong(
+                            expected, 1, std::memory_order_acq_rel, std::memory_order_relaxed))
+                    {
+                        Tasks::Scheduler::Dispatch([execCtx, nodeIdx, executePassAndReleaseDependents]() {
+                            executePassAndReleaseDependents(execCtx, nodeIdx, executePassAndReleaseDependents);
+                        });
+                    }
                 }
             }
 
