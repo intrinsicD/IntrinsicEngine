@@ -181,7 +181,7 @@ Mapping guidance for current Intrinsic code while preserving that reference shap
 - [x] Ensure extraction is the only place that resolves live ECS state into render packets for the frame. *(`Runtime::RenderExtraction` now resolves committed-world surface/line/point draw packets, HTEX preview inputs, and selection/picking packets before render prep; `Graphics::RenderSystem::BuildGraph(...)` no longer takes `ECS::Scene`, so pass recording consumes extracted packet spans instead of late live-ECS queries.)*
 - [ ] Define immutable packet families for Intrinsic's renderer:
   - [x] surface draw packets
-  - [ ] line / point / debug draw packets *(line and point packets are extracted; debug draw packetization is still pending)*
+  - [x] line / point / debug draw packets *(line and point packets extracted via ECS; debug draw now snapshotted into `RenderWorld` vectors during `ExtractRenderWorld` and consumed as immutable spans through `RenderPassContext`)*
   - [x] selection / picking packets
   - [ ] light / environment packets
   - [ ] UI / editor overlay packets

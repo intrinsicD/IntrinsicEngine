@@ -12,7 +12,6 @@ export module Graphics.Passes.Line;
 import Graphics.RenderPipeline;
 import Graphics.RenderGraph;
 import Graphics.Geometry;
-import Graphics.DebugDraw;
 import Graphics.ShaderRegistry;
 import Core.Hash;
 import RHI.Buffer;
@@ -68,9 +67,6 @@ export namespace Graphics::Passes
         // Set the geometry storage for looking up GeometryGpuData.
         void SetGeometryStorage(GeometryPool* pool) { m_GeometryStorage = pool; }
 
-        // Set the DebugDraw accumulator for transient line data.
-        void SetDebugDraw(DebugDraw* dd) { m_DebugDraw = dd; }
-
         void AddPasses(RenderPassContext& ctx) override;
         void Shutdown() override;
 
@@ -84,7 +80,6 @@ export namespace Graphics::Passes
         RHI::VulkanDevice* m_Device = nullptr;
         const ShaderRegistry* m_ShaderRegistry = nullptr;
         GeometryPool* m_GeometryStorage = nullptr;
-        DebugDraw* m_DebugDraw = nullptr;
 
         // Global camera layout (set 0) — borrowed.
         VkDescriptorSetLayout m_GlobalSetLayout = VK_NULL_HANDLE;

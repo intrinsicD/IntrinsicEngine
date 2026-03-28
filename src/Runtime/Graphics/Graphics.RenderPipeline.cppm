@@ -395,7 +395,6 @@ export namespace Graphics
         glm::mat4 CameraProj{1.0f};
 
         RHI::VulkanBuffer* PickReadbackBuffer = nullptr;
-        DebugDraw* DebugDrawPtr = nullptr;
         bool HasSelectionWork = false;
         SelectionOutlinePacket SelectionOutline{};
 
@@ -406,6 +405,11 @@ export namespace Graphics
         std::span<const LineDrawPacket> LineDrawPackets{};
         std::span<const PointDrawPacket> PointDrawPackets{};
         const HtexPatchPreviewPacket* HtexPatchPreview = nullptr;
+
+        // Debug draw snapshot — immutable copies extracted from DebugDraw accumulator.
+        std::span<const DebugDraw::LineSegment> DebugDrawLines{};
+        std::span<const DebugDraw::LineSegment> DebugDrawOverlayLines{};
+        std::span<const DebugDraw::PointMarker> DebugDrawPoints{};
     };
 
     [[nodiscard]] inline RGTextureDesc BuildRenderResourceTextureDesc(RenderResource resource,
@@ -490,7 +494,6 @@ export namespace Graphics
         virtual Passes::SelectionOutlineSettings* GetSelectionOutlineSettings() { return nullptr; }
         virtual Passes::PostProcessSettings* GetPostProcessSettings() { return nullptr; }
         virtual const Passes::HistogramReadback* GetHistogramReadback() const { return nullptr; }
-        virtual void SetDebugDraw(DebugDraw* dd) { (void)dd; }
         [[nodiscard]] virtual RenderPipelineDebugState GetDebugState() const { return {}; }
         [[nodiscard]] virtual const Passes::SelectionOutlineDebugState* GetSelectionOutlineDebugState() const { return nullptr; }
         [[nodiscard]] virtual const Passes::PostProcessDebugState* GetPostProcessDebugState() const { return nullptr; }
