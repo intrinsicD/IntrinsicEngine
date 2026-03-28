@@ -57,6 +57,11 @@ export namespace Interface::GUI
     // Unregisters a previously added overlay callback.
     void RemoveOverlay(const std::string& name);
 
+    // Returns true when a GUI frame has been started (BeginFrame) but not yet
+    // completed (Render or EndFrame).  Used by the renderer to issue cleanup
+    // (EndFrame) when swapchain acquire fails after GUI generation ran.
+    [[nodiscard]] bool IsFrameActive();
+
     // Returns true if ImGui is using the mouse (hovering a window, dragging a slider)
     [[nodiscard]] bool WantCaptureMouse();
 

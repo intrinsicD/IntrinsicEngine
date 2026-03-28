@@ -1020,15 +1020,18 @@ namespace Graphics
         // NOTE: ProcessReadbacks was moved to after AcquireFrame (fence wait) to ensure
         // the GPU has actually completed writing to the readback buffer before we read it.
 
-        Interface::GUI::BeginFrame();
-        Interface::GUI::DrawGUI();
+        // GUI::BeginFrame() + GUI::DrawGUI() are now called by
+        // RenderOrchestrator::PrepareEditorOverlay() before extraction,
+        // so ImGui draw data is part of the immutable RenderWorld.
     }
 
     bool RenderDriver::AcquireFrame()
     {
         if (!m_Presentation.BeginFrame())
         {
-            Interface::GUI::EndFrame();
+            // GUI frame was started during extraction; discard without rendering.
+            if (Interface::GUI::IsFrameActive())
+                Interface::GUI::EndFrame();
             return false;
         }
         return true;
@@ -1080,7 +1083,8 @@ namespace Graphics
                                   const HtexPatchPreviewPacket* htexPatchPreview,
                                   std::span<const DebugDraw::LineSegment> debugDrawLines,
                                   std::span<const DebugDraw::LineSegment> debugDrawOverlayLines,
-                                  std::span<const DebugDraw::PointMarker> debugDrawPoints)
+                                  std::span<const DebugDraw::PointMarker> debugDrawPoints,
+                                  const EditorOverlayPacket& editorOverlay)
     {
         const uint32_t frameIndex = m_Presentation.GetFrameIndex();
         m_RenderGraph.Reset(frameIndex);
@@ -1138,6 +1142,7 @@ namespace Graphics
         ctx.DebugDrawLines = debugDrawLines;
         ctx.DebugDrawOverlayLines = debugDrawOverlayLines;
         ctx.DebugDrawPoints = debugDrawPoints;
+        ctx.EditorOverlay = editorOverlay;
 
         auto stable = m_FrameScope.New<RenderPassContext>(ctx);
         RenderPassContext* stableCtx = stable ? *stable : &ctx;

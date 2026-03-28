@@ -636,3 +636,62 @@ TEST(RenderExtraction, MakeRenderViewPacket_CapturesDerivedCameraState)
     EXPECT_EQ(view.Viewport.Width, 3440u);
     EXPECT_EQ(view.Viewport.Height, 1440u);
 }
+
+// =============================================================================
+// EditorOverlayPacket
+// =============================================================================
+
+TEST(RenderExtraction, EditorOverlayPacket_DefaultHasNoDrawData)
+{
+    const Graphics::EditorOverlayPacket packet{};
+    EXPECT_FALSE(packet.HasDrawData);
+}
+
+TEST(RenderExtraction, RenderWorld_DefaultEditorOverlayHasNoDrawData)
+{
+    Runtime::RenderWorld world{};
+    EXPECT_FALSE(world.EditorOverlay.HasDrawData);
+}
+
+TEST(RenderExtraction, EditorOverlayPacket_PresentInExtractedRenderWorld)
+{
+    // ExtractRenderWorld produces an EditorOverlayPacket with HasDrawData=false
+    // by default (the overlay is set by the orchestrator after extraction).
+    Runtime::SceneManager sceneManager;
+    sceneManager.CommitFixedTick();
+    Graphics::CameraComponent camera{};
+    camera.AspectRatio = 16.0f / 9.0f;
+    Graphics::UpdateMatrices(camera, camera.AspectRatio);
+
+    const Runtime::RenderFrameInput input{
+        .Alpha = 0.0,
+        .View = Runtime::MakeRenderViewPacket(camera, Runtime::RenderViewport{.Width = 800, .Height = 600}),
+        .World = sceneManager.CreateReadonlySnapshot(),
+    };
+    Runtime::RenderWorld world = Runtime::ExtractRenderWorld(input);
+    EXPECT_FALSE(world.EditorOverlay.HasDrawData);
+
+    // Simulating what PrepareEditorOverlay does — set HasDrawData after extraction.
+    world.EditorOverlay = Graphics::EditorOverlayPacket{.HasDrawData = true};
+    EXPECT_TRUE(world.EditorOverlay.HasDrawData);
+}
+
+TEST(RenderExtraction, FrameContext_PreparedRenderWorldCarriesEditorOverlay)
+{
+    Runtime::SceneManager sceneManager;
+    sceneManager.CommitFixedTick();
+
+    Runtime::FrameContext frame{};
+    frame.PreparedRenderWorld = Runtime::RenderWorld{
+        .Alpha = 0.5,
+        .View = Runtime::MakeRenderViewPacket(Graphics::CameraComponent{},
+                                              Runtime::RenderViewport{.Width = 800, .Height = 600}),
+        .World = sceneManager.CreateReadonlySnapshot(),
+        .EditorOverlay = Graphics::EditorOverlayPacket{.HasDrawData = true},
+    };
+    frame.Prepared = true;
+
+    const Runtime::RenderWorld* prepared = frame.GetPreparedRenderWorld();
+    ASSERT_NE(prepared, nullptr);
+    EXPECT_TRUE(prepared->EditorOverlay.HasDrawData);
+}

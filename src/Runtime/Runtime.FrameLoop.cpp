@@ -13,6 +13,7 @@ module Runtime.FrameLoop;
 
 import Core.Logging;
 import Graphics.Camera;
+import Graphics.RenderPipeline;
 import Runtime.RenderExtraction;
 import Runtime.SystemBundles;
 
@@ -501,6 +502,10 @@ namespace Runtime
 
     std::optional<RenderWorld> RuntimeRenderLaneHost::ExtractRenderWorld(double alpha)
     {
+        // Prepare the editor overlay (ImGui frame) before extraction so that
+        // ImGui draw data is finalized and part of the immutable RenderWorld.
+        const Graphics::EditorOverlayPacket overlay = m_Renderer.PrepareEditorOverlay();
+
         auto view = m_Scene.GetRegistry().view<Graphics::CameraComponent>();
         if (view.empty())
             return std::nullopt;
@@ -520,7 +525,9 @@ namespace Runtime
         if (!renderInput.IsValid())
             return std::nullopt;
 
-        return m_Renderer.ExtractRenderWorld(renderInput);
+        RenderWorld world = m_Renderer.ExtractRenderWorld(renderInput);
+        world.EditorOverlay = overlay;
+        return world;
     }
 
     void RuntimeRenderLaneHost::ExecutePreparedFrame(RenderWorld renderWorld)

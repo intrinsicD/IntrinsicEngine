@@ -61,6 +61,7 @@ namespace Interface::GUI
     static RHI::VulkanDevice* s_Device = nullptr;
     static bool s_ShowTelemetryPanel = false;
     static bool s_BackendInitialized = false;
+    static bool s_FrameActive = false;
     static std::unordered_set<void*> s_RegisteredTextures;
 
     template <typename T>
@@ -702,11 +703,13 @@ namespace Interface::GUI
         ImGui_ImplVulkan_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
+        s_FrameActive = true;
     }
 
     void EndFrame()
     {
         ImGui::EndFrame();
+        s_FrameActive = false;
     }
 
     void DrawGUI()
@@ -779,6 +782,7 @@ namespace Interface::GUI
     {
         ImGui::Render();
         ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
+        s_FrameActive = false;
     }
 
     void RegisterPanel(std::string name, UIPanelCallback callback, bool isClosable, int flags, bool defaultOpen)
@@ -827,6 +831,11 @@ namespace Interface::GUI
     void RemoveOverlay(const std::string& name)
     {
         RemoveNamedItem(s_Overlays, name);
+    }
+
+    bool IsFrameActive()
+    {
+        return s_FrameActive;
     }
 
     bool WantCaptureMouse()
