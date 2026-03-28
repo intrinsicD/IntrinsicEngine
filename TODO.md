@@ -282,7 +282,6 @@ Mapping guidance for current Intrinsic code while preserving that reference shap
 
 ### B5. Architectural Legibility — Deferred Cleanup
 
-- [ ] **Move Graphics systems to `Systems/` subdirectory.** ECS systems live in `ECS/Systems/`; Graphics systems are mixed into the `Graphics/` root with 80+ other files. Create `Graphics/Systems/` and move all `Graphics.Systems.*.cppm/.cpp` files there.
 - [ ] **Rename `Graphics.RenderSystem` to `Graphics.RenderDriver`.** Infrastructure class shares "System" suffix with ECS systems. ~40 references across Sandbox, RenderOrchestrator, SelectionModule. High blast radius — separate PR.
 - [ ] **Convert `Graphics.LifecycleUtils.hpp` to a C++23 module.** Currently a raw `.hpp` header included in system `.cpp` files but not part of any exported module interface.
 
