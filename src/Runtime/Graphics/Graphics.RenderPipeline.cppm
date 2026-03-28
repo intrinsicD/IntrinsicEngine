@@ -350,6 +350,18 @@ export namespace Graphics
         }
     };
 
+    // -----------------------------------------------------------------------
+    // Editor Overlay Packet — immutable per-frame UI/editor overlay state.
+    // -----------------------------------------------------------------------
+    // Extracted once per frame to decouple ImGui draw-data generation from
+    // render-graph recording.  The ImGuiPass checks HasDrawData before
+    // issuing ImGui_ImplVulkan_RenderDrawData.
+    struct EditorOverlayPacket
+    {
+        // True when GUI::DrawGUI() ran this frame and ImGui draw data is ready.
+        bool HasDrawData = false;
+    };
+
     // ---------------------------------------------------------------------
     // Frame Context
     // ---------------------------------------------------------------------
@@ -430,6 +442,9 @@ export namespace Graphics
         std::span<const DebugDraw::LineSegment> DebugDrawLines{};
         std::span<const DebugDraw::LineSegment> DebugDrawOverlayLines{};
         std::span<const DebugDraw::PointMarker> DebugDrawPoints{};
+
+        // Editor overlay state (ImGui draw-data readiness).
+        EditorOverlayPacket EditorOverlay{};
     };
 
     [[nodiscard]] inline RGTextureDesc BuildRenderResourceTextureDesc(RenderResource resource,

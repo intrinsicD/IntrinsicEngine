@@ -80,7 +80,8 @@ export namespace Graphics
                         const HtexPatchPreviewPacket* htexPatchPreview = nullptr,
                         std::span<const DebugDraw::LineSegment> debugDrawLines = {},
                         std::span<const DebugDraw::LineSegment> debugDrawOverlayLines = {},
-                        std::span<const DebugDraw::PointMarker> debugDrawPoints = {});
+                        std::span<const DebugDraw::PointMarker> debugDrawPoints = {},
+                        const EditorOverlayPacket& editorOverlay = {});
         void ExecuteGraph();
         void EndFrame();
 

@@ -30,6 +30,7 @@ import Graphics.PipelineLibrary;
 import Graphics.Pipelines;
 import Graphics.RenderDriver;
 import Graphics.ShaderRegistry;
+import Interface;
 import Runtime.RenderExtraction;
 
 using namespace Core::Hash;
@@ -251,6 +252,13 @@ namespace Runtime
         m_DebugDraw.Reset();
     }
 
+    Graphics::EditorOverlayPacket RenderOrchestrator::PrepareEditorOverlay() const
+    {
+        Interface::GUI::BeginFrame();
+        Interface::GUI::DrawGUI();
+        return Graphics::EditorOverlayPacket{.HasDrawData = true};
+    }
+
     FrameContext& RenderOrchestrator::BeginFrame() const
     {
         const VkExtent2D extent = m_Swapchain.GetExtent();
@@ -326,7 +334,8 @@ namespace Runtime
                                    preparedRenderWorld->HtexPatchPreview ? &*preparedRenderWorld->HtexPatchPreview : nullptr,
                                    preparedRenderWorld->DebugDrawLines,
                                    preparedRenderWorld->DebugDrawOverlayLines,
-                                   preparedRenderWorld->DebugDrawPoints);
+                                   preparedRenderWorld->DebugDrawPoints,
+                                   preparedRenderWorld->EditorOverlay);
         frame.Prepared = true;
     }
 

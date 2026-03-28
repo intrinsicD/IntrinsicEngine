@@ -81,6 +81,9 @@ export namespace Runtime
         std::vector<Graphics::PointDrawPacket> PointDraws{};
         std::optional<Graphics::HtexPatchPreviewPacket> HtexPatchPreview{};
 
+        // Editor UI overlay state (ImGui draw-data readiness).
+        Graphics::EditorOverlayPacket EditorOverlay{};
+
         // Debug draw snapshots — immutable copies extracted from the DebugDraw accumulator.
         std::vector<Graphics::DebugDraw::LineSegment> DebugDrawLines{};
         std::vector<Graphics::DebugDraw::LineSegment> DebugDrawOverlayLines{};

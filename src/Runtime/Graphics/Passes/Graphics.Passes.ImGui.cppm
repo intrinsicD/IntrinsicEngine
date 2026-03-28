@@ -26,6 +26,13 @@ export namespace Graphics::Passes
 
         void AddPasses(RenderPassContext& ctx) override
         {
+            // Only add the ImGui render pass when the extraction phase produced
+            // editor overlay draw data.  This decouples ImGui draw-list
+            // generation (which now runs before extraction) from render-graph
+            // recording.
+            if (!ctx.EditorOverlay.HasDrawData)
+                return;
+
             struct Data
             {
                 RGResourceHandle Target;

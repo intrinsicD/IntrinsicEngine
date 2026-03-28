@@ -26,6 +26,7 @@ import Graphics.GPUScene;
 import Graphics.MaterialRegistry;
 import Graphics.PipelineLibrary;
 import Graphics.RenderDriver;
+import Graphics.RenderPipeline;
 import Graphics.ShaderRegistry;
 import Geometry.Handle;
 import ECS;
@@ -98,6 +99,11 @@ export namespace Runtime
         void ResetFrameState();
 
         // --- Staged frame-pipeline seam ---
+
+        // Runs GUI::BeginFrame() + GUI::DrawGUI() so ImGui draw data is
+        // finalized before extraction.  Returns an immutable overlay packet.
+        [[nodiscard]] Graphics::EditorOverlayPacket PrepareEditorOverlay() const;
+
         [[nodiscard]] FrameContext& BeginFrame() const;
         [[nodiscard]] RenderWorld ExtractRenderWorld(const RenderFrameInput& input) const;
         void PrepareFrame(FrameContext& frame, RenderWorld renderWorld);
