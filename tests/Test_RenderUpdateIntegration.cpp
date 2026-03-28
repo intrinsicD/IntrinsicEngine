@@ -76,6 +76,9 @@ TEST(RenderUpdateIntegration, RenderDriver_ExposesStagedFrameExecutionApi)
                            ECS::Scene& scene,
                            const Graphics::CameraComponent& camera,
                            const Graphics::LightEnvironmentPacket& lighting,
+                           const Graphics::SelectionOutlinePacket& selectionOutline,
+                           const Graphics::PickRequestSnapshot& pickRequest,
+                           const Graphics::DebugViewSnapshot& debugView,
                            Core::Assets::AssetManager& assetManager,
                            uint64_t currentFrame)
     {
@@ -83,7 +86,7 @@ TEST(RenderUpdateIntegration, RenderDriver_ExposesStagedFrameExecutionApi)
         { renderSystem.AcquireFrame() } -> std::same_as<bool>;
         renderSystem.ProcessCompletedGpuWork(scene, currentFrame);
         renderSystem.UpdateGlobals(camera, lighting);
-        renderSystem.BuildGraph(assetManager, camera, lighting);
+        renderSystem.BuildGraph(assetManager, camera, lighting, false, selectionOutline, pickRequest, debugView);
         renderSystem.ExecuteGraph();
         renderSystem.EndFrame();
     });

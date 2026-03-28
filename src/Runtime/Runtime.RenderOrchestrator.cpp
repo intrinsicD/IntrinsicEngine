@@ -293,6 +293,34 @@ namespace Runtime
         if (!triangles.empty())
             world.DebugDrawTriangles.assign(triangles.begin(), triangles.end());
 
+        // Resolve interaction state during extraction so BuildGraph consumes
+        // immutable extracted state rather than querying live InteractionSystem.
+        const auto& interaction = m_RenderDriver->GetInteraction();
+
+        const auto& pendingPick = interaction.GetPendingPick();
+        world.PickRequest = Graphics::PickRequestSnapshot{
+            .Pending = pendingPick.Pending,
+            .X = pendingPick.X,
+            .Y = pendingPick.Y,
+        };
+
+        const auto& debugView = interaction.GetDebugViewState();
+        world.DebugView = Graphics::DebugViewSnapshot{
+            .Enabled = debugView.Enabled,
+            .ShowInViewport = debugView.ShowInViewport,
+            .DisableCulling = debugView.DisableCulling,
+            .SelectedResource = debugView.SelectedResource,
+            .DepthNear = debugView.DepthNear,
+            .DepthFar = debugView.DepthFar,
+        };
+
+        // Snapshot retained GPUScene state so frame-recipe decisions use
+        // extraction-time state rather than late live queries.
+        world.GpuScene = Graphics::GpuSceneSnapshot{
+            .Available = m_GpuScene != nullptr,
+            .ActiveCountApprox = m_GpuScene ? m_GpuScene->GetActiveCountApprox() : 0u,
+        };
+
         return world;
     }
 
@@ -330,6 +358,8 @@ namespace Runtime
                                    preparedRenderWorld->Lighting,
                                    preparedRenderWorld->HasSelectionWork,
                                    preparedRenderWorld->SelectionOutline,
+                                   preparedRenderWorld->PickRequest,
+                                   preparedRenderWorld->DebugView,
                                    preparedRenderWorld->SurfacePicking,
                                    preparedRenderWorld->LinePicking,
                                    preparedRenderWorld->PointPicking,
