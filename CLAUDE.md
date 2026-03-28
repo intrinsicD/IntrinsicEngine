@@ -265,6 +265,10 @@ All shaders handling normals use epsilon-guarded renormalization (`length > 1e-6
 
 Only `DebugDraw` content uses per-frame transient uploads. `LinePass` uploads transient lines as flat position arrays with identity edge pairs, reusing the same BDA shader path. `PointPass` uploads transient points via per-frame host-visible BDA buffers. All retained geometry uses persistent device-local buffers.
 
+### Editor Overlay Extraction
+
+ImGui draw-data generation (`GUI::BeginFrame()` + `GUI::DrawGUI()`) runs **before** render-world extraction, not during render-graph recording. `RenderOrchestrator::PrepareEditorOverlay()` starts the ImGui frame, executes all registered panels/menus/overlays (including the transform gizmo), and returns an immutable `EditorOverlayPacket` with `HasDrawData = true`. The packet travels through `RenderWorld` → `RenderPassContext` → `ImGuiPass`. The pass skips itself when `HasDrawData` is false. If swapchain acquire fails after GUI generation, `GUI::EndFrame()` discards the draw data via `IsFrameActive()` guard. `GUI::Render(cmd)` (which calls `ImGui::Render()` + `ImGui_ImplVulkan_RenderDrawData()`) still executes inside the `ImGuiPass` render-graph node.
+
 ## Build & Test Workflow
 
 The setup script (`.claude/setup.sh`) installs dependencies, configures CMake (Debug, Ninja, Clang 20+), and builds the **library targets only** — not test executables. This keeps session setup fast.
