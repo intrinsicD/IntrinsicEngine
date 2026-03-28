@@ -134,8 +134,7 @@ namespace Graphics
                     float gf = Detail::NormalizeColorChannelToUnitRange(*g);
                     float bf = Detail::NormalizeColorChannelToUnitRange(*b);
 
-                    // Store colors in Aux.zw (UV in xy, color in zw per codebase convention)
-                    outData.Aux[i] = glm::vec4(0, 0, rf, gf); // simplified: store R and G in zw
+                    outData.Aux[i] = glm::vec4(rf, gf, bf, 1.0f);
                 }
                 tokenIdx += 3;
 

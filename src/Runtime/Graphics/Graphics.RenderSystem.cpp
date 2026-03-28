@@ -1114,24 +1114,16 @@ namespace Graphics
             m_GlobalResources.GetCameraUBO(),
             m_GlobalResources.GetGlobalDescriptorSet(),
             m_GlobalResources.GetDynamicUBOOffset(frameIndex),
-            m_GlobalResources.GetBindlessSystem()
+            m_GlobalResources.GetBindlessSystem(),
+            {pendingPick.Pending, pendingPick.X, pendingPick.Y},
+            {debugView.Enabled, debugView.ShowInViewport, debugView.DisableCulling,
+             debugView.SelectedResource, debugView.DepthNear, debugView.DepthFar},
+            m_LastDebugImages,
+            m_LastDebugPasses,
+            camera.ViewMatrix,
+            camera.ProjectionMatrix,
+            m_Interaction.GetReadbackBuffer(frameIndex),
         };
-
-        ctx.PickRequest.Pending = pendingPick.Pending;
-        ctx.PickRequest.X = pendingPick.X;
-        ctx.PickRequest.Y = pendingPick.Y;
-
-        ctx.Debug.Enabled = debugView.Enabled;
-        ctx.Debug.ShowInViewport = debugView.ShowInViewport;
-        ctx.Debug.DisableCulling = debugView.DisableCulling;
-        ctx.Debug.SelectedResource = debugView.SelectedResource;
-        ctx.Debug.DepthNear = debugView.DepthNear;
-        ctx.Debug.DepthFar = debugView.DepthFar;
-        ctx.PrevFrameDebugImages = m_LastDebugImages;
-        ctx.PrevFrameDebugPasses = m_LastDebugPasses;
-        ctx.CameraView = camera.ViewMatrix;
-        ctx.CameraProj = camera.ProjectionMatrix;
-        ctx.PickReadbackBuffer = m_Interaction.GetReadbackBuffer(frameIndex);
         ctx.HasSelectionWork = hasSelectionWork;
         ctx.SelectionOutline = selectionOutline;
         ctx.PickingSurfacePackets = pickingSurfacePackets;

@@ -75,8 +75,7 @@ O2 remains the default migration path per `docs/architecture/adr-o2-pragmatic-me
 
 ##### Compiler Warnings (pre-existing)
 
-- [ ] **Unused variable `bf` in `Graphics.Importers.OFF.cpp:135`.** `float bf` is computed but never used — only `rf` and `gf` are stored in `Aux.zw`. The blue channel is silently dropped.
-- [ ] **Missing field `PickRequest` initializer in `Graphics.RenderSystem.cpp:1118`.** Designated-initializer aggregate construction of `RenderPassContext` omits `PickRequest`, triggering `-Wmissing-field-initializers`. Fields are assigned separately on lines 1120-1122, but the aggregate init should include them or use a separate construction pattern.
+*(No active items — see git history for completed fixes.)*
 
 ##### 2026-03-20 / 2026-03-21 commit review
 
