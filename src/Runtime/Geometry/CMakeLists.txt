@@ -12,7 +12,7 @@ target_sources(${target_name}
         Geometry.Capsule.cppm
         Geometry.Cylinder.cppm
         Geometry.Ellipsoid.cppm
-        Geometry.Pca.cppm
+        Geometry.PCA.cppm
         Geometry.Segment.cppm
         Geometry.Triangle.cppm
         Geometry.Plane.cppm

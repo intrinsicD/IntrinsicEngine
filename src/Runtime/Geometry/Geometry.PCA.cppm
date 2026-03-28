@@ -8,9 +8,9 @@ module;
 
 #include <glm/glm.hpp>
 
-export module Geometry.Pca;
+export module Geometry.PCA;
 
-namespace Geometry::PcaDetail
+namespace Geometry::PCADetail
 {
     [[nodiscard]] inline bool IsFinite(const glm::vec3& value)
     {
@@ -134,7 +134,7 @@ namespace Geometry::PcaDetail
 
 export namespace Geometry
 {
-    struct PcaResult
+    struct PCAResult
     {
         bool Valid{false}; // True if at least one finite sample contributed.
         bool Flat{false}; // True if the point set is numerically rank deficient.
@@ -143,15 +143,15 @@ export namespace Geometry
         glm::vec3 Eigenvalues{1.0f}; // Corresponding eigenvalues
     };
 
-    [[nodiscard]] inline PcaResult ToPca(std::span<const glm::vec3> points)
+    [[nodiscard]] inline PCAResult ToPCA(std::span<const glm::vec3> points)
     {
-        PcaResult result{};
+        PCAResult result{};
 
         glm::dvec3 mean{0.0};
         std::size_t count = 0;
         for (const glm::vec3& point : points)
         {
-            if (!PcaDetail::IsFinite(point))
+            if (!PCADetail::IsFinite(point))
             {
                 continue;
             }
@@ -184,7 +184,7 @@ export namespace Geometry
         double c22 = 0.0;
         for (const glm::vec3& point : points)
         {
-            if (!PcaDetail::IsFinite(point))
+            if (!PCADetail::IsFinite(point))
             {
                 continue;
             }
@@ -199,7 +199,7 @@ export namespace Geometry
         }
 
         const double invCount = 1.0 / static_cast<double>(count);
-        const auto eigen = PcaDetail::SymmetricEigen3(
+        const auto eigen = PCADetail::SymmetricEigen3(
             c00 * invCount, c01 * invCount, c02 * invCount,
             c11 * invCount, c12 * invCount, c22 * invCount);
 

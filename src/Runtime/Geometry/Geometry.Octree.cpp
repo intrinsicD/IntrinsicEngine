@@ -101,7 +101,7 @@ namespace Geometry
         }
     }
 
-    void Octree::QueryKnn(const glm::vec3& queryPoint, std::size_t k, std::vector<size_t>& out) const
+    void Octree::QueryKNN(const glm::vec3& queryPoint, std::size_t k, std::vector<size_t>& out) const
         {
             out.clear();
             if (m_Nodes.empty() || k == 0)

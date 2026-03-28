@@ -236,10 +236,10 @@ The variable-dt `FrameGraph` is assembled in this order, subject to feature togg
 1. Client/gameplay systems via `OnRegisterSystems(...)`
 2. `TransformUpdate`
 3. `PropertySetDirtySync`
-4. `PrimitiveBVHSync`
-5. `GraphGeometrySync`
+4. `PrimitiveBVHBuild`
+5. `GraphLifecycle`
 6. `MeshRendererLifecycle`
-7. `PointCloudGeometrySync`
+7. `PointCloudLifecycle`
 8. `MeshViewLifecycle`
 9. `GPUSceneSync`
 

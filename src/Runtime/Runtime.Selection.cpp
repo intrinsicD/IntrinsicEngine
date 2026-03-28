@@ -309,7 +309,7 @@ namespace Runtime::Selection
 
             if (candidates.empty())
             {
-                static_cast<void>(lookup.Tree->QueryKnn(localPoint, 1u, candidates));
+                static_cast<void>(lookup.Tree->QueryKNN(localPoint, 1u, candidates));
             }
 
             uint32_t bestIndex = Picked::Entity::InvalidIndex;

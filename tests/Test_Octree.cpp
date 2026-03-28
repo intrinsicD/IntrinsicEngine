@@ -58,8 +58,8 @@ TEST(Octree, BuildFromPointsMatchesExplicitPointAabbs)
 
         std::vector<std::size_t> explicitKnn;
         std::vector<std::size_t> pointsKnn;
-        explicitTree.QueryKnn(query, 3u, explicitKnn);
-        pointsTree.QueryKnn(query, 3u, pointsKnn);
+        explicitTree.QueryKNN(query, 3u, explicitKnn);
+        pointsTree.QueryKNN(query, 3u, pointsKnn);
         EXPECT_EQ(pointsKnn, explicitKnn);
     }
 }

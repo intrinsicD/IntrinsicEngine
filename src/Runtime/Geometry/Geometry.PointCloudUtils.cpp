@@ -102,7 +102,7 @@ namespace Geometry::PointCloud
             if (idx >= stats.PointCount) break;
 
             knnIndices.clear();
-            octree.QueryKnn(positions[idx], 2, knnIndices);
+            octree.QueryKNN(positions[idx], 2, knnIndices);
 
             float nearestDist = std::numeric_limits<float>::max();
             for (std::size_t ni : knnIndices)
@@ -267,7 +267,7 @@ namespace Geometry::PointCloud
         for (std::size_t i = 0; i < cloud.VerticesSize(); ++i)
         {
             knnIndices.clear();
-            octree.QueryKnn(positions[i], kQuery, knnIndices);
+            octree.QueryKNN(positions[i], kQuery, knnIndices);
 
             float distSum = 0.0f;
             uint32_t neighborCount = 0;

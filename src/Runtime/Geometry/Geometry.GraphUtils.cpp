@@ -295,7 +295,7 @@ namespace Geometry::Graph
         for (std::uint32_t i = 0; i < static_cast<std::uint32_t>(n); ++i)
         {
             queryNeighbors.clear();
-            octree.QueryKnn(points[static_cast<std::size_t>(i)], effectiveK + 1U, queryNeighbors);
+            octree.QueryKNN(points[static_cast<std::size_t>(i)], effectiveK + 1U, queryNeighbors);
 
             auto& output = neighborhoods[static_cast<std::size_t>(i)];
             output.reserve(effectiveK);

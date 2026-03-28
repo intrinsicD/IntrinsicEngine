@@ -174,7 +174,7 @@ Mapping guidance for current Intrinsic code while preserving that reference shap
 
 #### B4.4 Simulation stage (B)
 
-- [x] Move deterministic gameplay / ECS / physics / AI / animation work onto the fixed-step lane. *(Engine now registers caller fixed-step systems plus the core deterministic ECS bundle (`TransformUpdate`, `PropertySetDirtySync`, `PrimitiveBVHSync`) in the fixed-step frame graph; render-lane engine registration is GPU-sync-only.)*
+- [x] Move deterministic gameplay / ECS / physics / AI / animation work onto the fixed-step lane. *(Engine now registers caller fixed-step systems plus the core deterministic ECS bundle (`TransformUpdate`, `PropertySetDirtySync`, `PrimitiveBVHBuild`) in the fixed-step frame graph; render-lane engine registration is GPU-sync-only.)*
 
 #### B4.5 Extraction stage (C)
 

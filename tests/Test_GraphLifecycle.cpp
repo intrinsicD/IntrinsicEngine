@@ -9,10 +9,10 @@ import Graphics;
 import Geometry;
 
 // =============================================================================
-// GraphGeometrySync — Compile-time contract tests
+// GraphLifecycle — Compile-time contract tests
 // =============================================================================
 //
-// These tests validate the CPU-side contract of the GraphGeometrySyncSystem
+// These tests validate the CPU-side contract of the GraphLifecycleSystem
 // without requiring a GPU device. They verify:
 //   - Edge pair extraction from graph topology (including deleted-vertex compaction).
 //   - Per-edge color extraction from PropertySets.
@@ -40,7 +40,7 @@ static std::shared_ptr<Geometry::Graph::Graph> MakeLineGraph()
     return g;
 }
 
-// Replicate the edge pair extraction logic from GraphGeometrySyncSystem.
+// Replicate the edge pair extraction logic from GraphLifecycleSystem.
 // This builds a remap table from raw vertex indices to compacted indices
 // (skipping deleted vertices), then extracts edge pairs using remapped indices.
 static std::vector<ECS::EdgePair> ExtractEdgePairs(
@@ -82,7 +82,7 @@ static std::vector<ECS::EdgePair> ExtractEdgePairs(
 // Section 1: Edge Pair Extraction
 // =============================================================================
 
-TEST(GraphGeometrySync_EdgePairs, ExtractsCorrectPairsFromSimpleGraph)
+TEST(GraphLifecycle_EdgePairs, ExtractsCorrectPairsFromSimpleGraph)
 {
     auto g = MakeLineGraph();
     std::vector<uint32_t> remap;
@@ -98,7 +98,7 @@ TEST(GraphGeometrySync_EdgePairs, ExtractsCorrectPairsFromSimpleGraph)
     EXPECT_EQ(pairs[2].i1, 3u);
 }
 
-TEST(GraphGeometrySync_EdgePairs, RemapsIndicesAfterVertexDeletion)
+TEST(GraphLifecycle_EdgePairs, RemapsIndicesAfterVertexDeletion)
 {
     auto g = MakeLineGraph(); // v0 -- v1 -- v2 -- v3
     auto v1 = Geometry::VertexHandle{1};
@@ -118,7 +118,7 @@ TEST(GraphGeometrySync_EdgePairs, RemapsIndicesAfterVertexDeletion)
     EXPECT_EQ(pairs[0].i1, 2u);  // remapped v3
 }
 
-TEST(GraphGeometrySync_EdgePairs, EmptyGraphProducesNoPairs)
+TEST(GraphLifecycle_EdgePairs, EmptyGraphProducesNoPairs)
 {
     auto g = std::make_shared<Geometry::Graph::Graph>();
     std::vector<uint32_t> remap;
@@ -128,7 +128,7 @@ TEST(GraphGeometrySync_EdgePairs, EmptyGraphProducesNoPairs)
     EXPECT_TRUE(remap.empty());
 }
 
-TEST(GraphGeometrySync_EdgePairs, SingleVertexNoPairs)
+TEST(GraphLifecycle_EdgePairs, SingleVertexNoPairs)
 {
     auto g = std::make_shared<Geometry::Graph::Graph>();
     g->AddVertex(glm::vec3(0, 0, 0));
@@ -141,7 +141,7 @@ TEST(GraphGeometrySync_EdgePairs, SingleVertexNoPairs)
     EXPECT_EQ(remap[0], 0u);
 }
 
-TEST(GraphGeometrySync_EdgePairs, AllVerticesDeletedProducesNoPairs)
+TEST(GraphLifecycle_EdgePairs, AllVerticesDeletedProducesNoPairs)
 {
     auto g = std::make_shared<Geometry::Graph::Graph>();
     auto v0 = g->AddVertex(glm::vec3(0, 0, 0));
@@ -160,7 +160,7 @@ TEST(GraphGeometrySync_EdgePairs, AllVerticesDeletedProducesNoPairs)
 // Section 2: Per-Edge Color Extraction
 // =============================================================================
 
-TEST(GraphGeometrySync_EdgeColors, ExtractsEdgeColorsFromPropertySet)
+TEST(GraphLifecycle_EdgeColors, ExtractsEdgeColorsFromPropertySet)
 {
     auto g = MakeLineGraph();
     [[maybe_unused]] auto colorProp = g->GetOrAddEdgeProperty<glm::vec4>("e:color",
@@ -186,7 +186,7 @@ TEST(GraphGeometrySync_EdgeColors, ExtractsEdgeColorsFromPropertySet)
     EXPECT_EQ(data.CachedEdgeColors.size(), 3u); // 3 edges in line graph.
 }
 
-TEST(GraphGeometrySync_EdgeColors, NoEdgeColorsWhenPropertyAbsent)
+TEST(GraphLifecycle_EdgeColors, NoEdgeColorsWhenPropertyAbsent)
 {
     auto g = MakeLineGraph();
     ECS::Graph::Data data;
@@ -196,7 +196,7 @@ TEST(GraphGeometrySync_EdgeColors, NoEdgeColorsWhenPropertyAbsent)
     EXPECT_TRUE(data.CachedEdgeColors.empty());
 }
 
-TEST(GraphGeometrySync_EdgeColors, EdgeColorCountMatchesAfterDeletion)
+TEST(GraphLifecycle_EdgeColors, EdgeColorCountMatchesAfterDeletion)
 {
     auto g = MakeLineGraph();
     (void)g->GetOrAddEdgeProperty<glm::vec4>("e:color", glm::vec4(1, 0, 0, 1));
@@ -226,7 +226,7 @@ TEST(GraphGeometrySync_EdgeColors, EdgeColorCountMatchesAfterDeletion)
 // Section 3: Upload Mode Selection
 // =============================================================================
 
-TEST(GraphGeometrySync_UploadMode, DynamicGraphUsesDirect)
+TEST(GraphLifecycle_UploadMode, DynamicGraphUsesDirect)
 {
     ECS::Graph::Data data;
     data.StaticGeometry = false;
@@ -237,7 +237,7 @@ TEST(GraphGeometrySync_UploadMode, DynamicGraphUsesDirect)
     EXPECT_EQ(mode, Graphics::GeometryUploadMode::Direct);
 }
 
-TEST(GraphGeometrySync_UploadMode, StaticGraphUsesStaged)
+TEST(GraphLifecycle_UploadMode, StaticGraphUsesStaged)
 {
     ECS::Graph::Data data;
     data.StaticGeometry = true;
@@ -252,14 +252,14 @@ TEST(GraphGeometrySync_UploadMode, StaticGraphUsesStaged)
 // Section 4: GpuDirty Lifecycle
 // =============================================================================
 
-TEST(GraphGeometrySync_Lifecycle, GpuDirtyStartsTrueForInitialUpload)
+TEST(GraphLifecycle_Lifecycle, GpuDirtyStartsTrueForInitialUpload)
 {
     ECS::Graph::Data data;
     data.GraphRef = MakeLineGraph();
     EXPECT_TRUE(data.GpuDirty);
 }
 
-TEST(GraphGeometrySync_Lifecycle, GpuDirtyClearedAfterUpload)
+TEST(GraphLifecycle_Lifecycle, GpuDirtyClearedAfterUpload)
 {
     ECS::Graph::Data data;
     data.GraphRef = MakeLineGraph();
@@ -272,7 +272,7 @@ TEST(GraphGeometrySync_Lifecycle, GpuDirtyClearedAfterUpload)
     EXPECT_EQ(data.GpuVertexCount, 4u);
 }
 
-TEST(GraphGeometrySync_Lifecycle, GpuDirtyResetOnTopologyChange)
+TEST(GraphLifecycle_Lifecycle, GpuDirtyResetOnTopologyChange)
 {
     ECS::Graph::Data data;
     data.GraphRef = MakeLineGraph();
@@ -285,7 +285,7 @@ TEST(GraphGeometrySync_Lifecycle, GpuDirtyResetOnTopologyChange)
     EXPECT_TRUE(data.GpuDirty);
 }
 
-TEST(GraphGeometrySync_Lifecycle, EmptyGraphClearsAllCachedData)
+TEST(GraphLifecycle_Lifecycle, EmptyGraphClearsAllCachedData)
 {
     ECS::Graph::Data data;
     data.GraphRef = MakeLineGraph();
@@ -315,7 +315,7 @@ TEST(GraphGeometrySync_Lifecycle, EmptyGraphClearsAllCachedData)
 // Section 5: Compaction Vertex Count Consistency
 // =============================================================================
 
-TEST(GraphGeometrySync_Compaction, VertexCountMatchesLiveVertices)
+TEST(GraphLifecycle_Compaction, VertexCountMatchesLiveVertices)
 {
     auto g = std::make_shared<Geometry::Graph::Graph>();
     auto v0 = g->AddVertex(glm::vec3(0, 0, 0));
@@ -339,7 +339,7 @@ TEST(GraphGeometrySync_Compaction, VertexCountMatchesLiveVertices)
     EXPECT_EQ(compactedCount, 3u); // v0, v2, v3 live.
 }
 
-TEST(GraphGeometrySync_Compaction, RemapTableSizeMatchesVerticesSize)
+TEST(GraphLifecycle_Compaction, RemapTableSizeMatchesVerticesSize)
 {
     auto g = MakeLineGraph();
     g->DeleteVertex(Geometry::VertexHandle{2});

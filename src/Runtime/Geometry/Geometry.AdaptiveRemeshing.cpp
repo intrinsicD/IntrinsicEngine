@@ -95,7 +95,7 @@ namespace Geometry::AdaptiveRemeshing
                 if (!Enabled || Triangles.empty()) return point;
 
                 std::vector<KDTree::ElementIndex> candidates;
-                const auto knn = Tree.QueryKnn(point, std::max<std::uint32_t>(K, 1u), candidates);
+                const auto knn = Tree.QueryKNN(point, std::max<std::uint32_t>(K, 1u), candidates);
                 if (!knn.has_value() || candidates.empty()) return point;
 
                 float bestDistSq = std::numeric_limits<float>::max();

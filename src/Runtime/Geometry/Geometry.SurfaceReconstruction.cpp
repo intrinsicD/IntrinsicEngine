@@ -73,7 +73,7 @@ namespace Geometry::SurfaceReconstruction
         const ReconstructionParams& params,
         std::vector<std::size_t>& neighborBuffer)
     {
-        octree.QueryKnn(queryPoint, k + 1, neighborBuffer);
+        octree.QueryKNN(queryPoint, k + 1, neighborBuffer);
 
         if (neighborBuffer.empty())
             return std::numeric_limits<float>::max();

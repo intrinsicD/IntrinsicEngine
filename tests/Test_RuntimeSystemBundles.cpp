@@ -29,7 +29,7 @@ TEST(RuntimeSystemBundles, ExportedCoreFeatureOrderMatchesCanonicalBaseline)
     constexpr std::array<std::string_view, 3> kExpectedOrder{
         "TransformUpdate",
         "PropertySetDirtySync",
-        "PrimitiveBVHSync",
+        "PrimitiveBVHBuild",
     };
 
     const auto order = Runtime::GetCoreFrameGraphFeatureOrder();
@@ -46,9 +46,9 @@ TEST(RuntimeSystemBundles, ExportedCoreFeatureOrderMatchesCanonicalBaseline)
 TEST(RuntimeSystemBundles, ExportedGpuFeatureOrderMatchesCanonicalBaseline)
 {
     constexpr std::array<std::string_view, 5> kExpectedOrder{
-        "GraphGeometrySync",
+        "GraphLifecycle",
         "MeshRendererLifecycle",
-        "PointCloudGeometrySync",
+        "PointCloudLifecycle",
         "MeshViewLifecycle",
         "GPUSceneSync",
     };
@@ -70,10 +70,10 @@ TEST(RuntimeSystemBundles, ExportedFullVariableFeatureOrderMatchesCanonicalBasel
     constexpr std::array<std::string_view, 8> kExpectedOrder{
         "TransformUpdate",
         "PropertySetDirtySync",
-        "PrimitiveBVHSync",
-        "GraphGeometrySync",
+        "PrimitiveBVHBuild",
+        "GraphLifecycle",
         "MeshRendererLifecycle",
-        "PointCloudGeometrySync",
+        "PointCloudLifecycle",
         "MeshViewLifecycle",
         "GPUSceneSync",
     };
@@ -92,7 +92,7 @@ TEST(RuntimeSystemBundles, CoreBundle_PreservesCanonicalPassOrder)
     Core::FeatureRegistry featureRegistry;
     RegisterSystemFeature(featureRegistry, Runtime::SystemFeatureCatalog::TransformUpdate);
     RegisterSystemFeature(featureRegistry, Runtime::SystemFeatureCatalog::PropertySetDirtySync);
-    RegisterSystemFeature(featureRegistry, Runtime::SystemFeatureCatalog::PrimitiveBVHSync);
+    RegisterSystemFeature(featureRegistry, Runtime::SystemFeatureCatalog::PrimitiveBVHBuild);
 
     Core::Memory::ScopeStack scope(1024 * 64);
     Core::FrameGraph graph(scope);
@@ -111,7 +111,7 @@ TEST(RuntimeSystemBundles, CoreBundle_PreservesCanonicalPassOrder)
     ASSERT_EQ(graph.GetPassCount(), 3u);
     EXPECT_EQ(graph.GetPassName(0), "TransformUpdate");
     EXPECT_EQ(graph.GetPassName(1), "PropertySetDirtySync");
-    EXPECT_EQ(graph.GetPassName(2), "PrimitiveBVHSync");
+    EXPECT_EQ(graph.GetPassName(2), "PrimitiveBVHBuild");
 
     const auto compileResult = graph.Compile();
     ASSERT_TRUE(compileResult.has_value()) << "Compile failed";
@@ -122,9 +122,9 @@ TEST(RuntimeSystemBundles, CoreBundle_RespectsFeatureToggles)
     Core::FeatureRegistry featureRegistry;
     RegisterSystemFeature(featureRegistry, Runtime::SystemFeatureCatalog::TransformUpdate);
     RegisterSystemFeature(featureRegistry, Runtime::SystemFeatureCatalog::PropertySetDirtySync);
-    RegisterSystemFeature(featureRegistry, Runtime::SystemFeatureCatalog::PrimitiveBVHSync);
+    RegisterSystemFeature(featureRegistry, Runtime::SystemFeatureCatalog::PrimitiveBVHBuild);
     ASSERT_TRUE(featureRegistry.SetEnabled(Runtime::SystemFeatureCatalog::PropertySetDirtySync, false));
-    ASSERT_TRUE(featureRegistry.SetEnabled(Runtime::SystemFeatureCatalog::PrimitiveBVHSync, false));
+    ASSERT_TRUE(featureRegistry.SetEnabled(Runtime::SystemFeatureCatalog::PrimitiveBVHBuild, false));
 
     Core::Memory::ScopeStack scope(1024 * 64);
     Core::FrameGraph graph(scope);
@@ -149,7 +149,7 @@ TEST(RuntimeSystemBundles, VariableBundle_CoreOnlyMatchesCanonicalBaseline)
     Core::FeatureRegistry featureRegistry;
     RegisterSystemFeature(featureRegistry, Runtime::SystemFeatureCatalog::TransformUpdate);
     RegisterSystemFeature(featureRegistry, Runtime::SystemFeatureCatalog::PropertySetDirtySync);
-    RegisterSystemFeature(featureRegistry, Runtime::SystemFeatureCatalog::PrimitiveBVHSync);
+    RegisterSystemFeature(featureRegistry, Runtime::SystemFeatureCatalog::PrimitiveBVHBuild);
 
     Core::Memory::ScopeStack scope(1024 * 64);
     Core::FrameGraph graph(scope);
@@ -168,7 +168,7 @@ TEST(RuntimeSystemBundles, VariableBundle_CoreOnlyMatchesCanonicalBaseline)
     ASSERT_EQ(graph.GetPassCount(), 3u);
     EXPECT_EQ(graph.GetPassName(0), "TransformUpdate");
     EXPECT_EQ(graph.GetPassName(1), "PropertySetDirtySync");
-    EXPECT_EQ(graph.GetPassName(2), "PrimitiveBVHSync");
+    EXPECT_EQ(graph.GetPassName(2), "PrimitiveBVHBuild");
 
     const auto compileResult = graph.Compile();
     ASSERT_TRUE(compileResult.has_value()) << "Compile failed";
@@ -179,9 +179,9 @@ TEST(RuntimeSystemBundles, VariableBundle_CoreOnlyRespectsFeatureToggles)
     Core::FeatureRegistry featureRegistry;
     RegisterSystemFeature(featureRegistry, Runtime::SystemFeatureCatalog::TransformUpdate);
     RegisterSystemFeature(featureRegistry, Runtime::SystemFeatureCatalog::PropertySetDirtySync);
-    RegisterSystemFeature(featureRegistry, Runtime::SystemFeatureCatalog::PrimitiveBVHSync);
+    RegisterSystemFeature(featureRegistry, Runtime::SystemFeatureCatalog::PrimitiveBVHBuild);
     ASSERT_TRUE(featureRegistry.SetEnabled(Runtime::SystemFeatureCatalog::TransformUpdate, false));
-    ASSERT_TRUE(featureRegistry.SetEnabled(Runtime::SystemFeatureCatalog::PrimitiveBVHSync, false));
+    ASSERT_TRUE(featureRegistry.SetEnabled(Runtime::SystemFeatureCatalog::PrimitiveBVHBuild, false));
 
     Core::Memory::ScopeStack scope(1024 * 64);
     Core::FrameGraph graph(scope);

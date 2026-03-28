@@ -324,7 +324,7 @@ TEST(MeshViewLifecycle_Contract, ReuseVertexBuffersFromSharedHandle)
 //   - LinePass requires a valid EdgeView geometry handle (BDA index buffer)
 //     for all retained edge sources. MeshViewLifecycleSystem auto-attaches
 //     MeshEdgeView when ShowWireframe=true and creates the edge index buffer
-//     from collision data. GraphGeometrySyncSystem creates edge index buffers
+//     from collision data. GraphLifecycleSystem creates edge index buffers
 //     via ReuseVertexBuffersFrom. No LinePass-internal fallback buffers.
 //
 //   - PointPass prefers MeshVertexView::Geometry when available (vertex

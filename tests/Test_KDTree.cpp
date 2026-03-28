@@ -47,7 +47,7 @@ TEST(KDTree, KnnMatchesBruteForceOrderingForPointAabbs)
     constexpr std::uint32_t k = 4;
 
     std::vector<Geometry::KDTree::ElementIndex> kdIndices;
-    const auto knn = tree.QueryKnn(query, k, kdIndices);
+    const auto knn = tree.QueryKNN(query, k, kdIndices);
     ASSERT_TRUE(knn.has_value());
     EXPECT_EQ(knn->ReturnedCount, k);
 
@@ -137,11 +137,11 @@ TEST(KDTree, HandlesCoincidentElementsAndInvalidQueries)
     ASSERT_TRUE(tree.Build(boxes).has_value());
 
     std::vector<Geometry::KDTree::ElementIndex> indices;
-    const auto knn = tree.QueryKnn(glm::vec3{1.0f, 2.0f, 3.0f}, 3, indices);
+    const auto knn = tree.QueryKNN(glm::vec3{1.0f, 2.0f, 3.0f}, 3, indices);
     ASSERT_TRUE(knn.has_value());
     EXPECT_EQ(knn->ReturnedCount, 3u);
 
-    EXPECT_FALSE(tree.QueryKnn(glm::vec3{0.0f}, 0, indices).has_value());
+    EXPECT_FALSE(tree.QueryKNN(glm::vec3{0.0f}, 0, indices).has_value());
     EXPECT_FALSE(tree.QueryRadius(glm::vec3{0.0f}, -1.0f, indices).has_value());
     EXPECT_FALSE(tree.QueryRadius(glm::vec3{0.0f}, std::numeric_limits<float>::quiet_NaN(), indices).has_value());
 }

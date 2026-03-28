@@ -3,7 +3,7 @@
 // =============================================================================
 // Shared test mesh builders for geometry test suites.
 //
-// Usage: #include "TestMeshBuilders.h" AFTER `import Geometry;` in each test
+// Usage: #include "Test_MeshBuilders.h" AFTER `import Geometry;` in each test
 // file. All functions are inline to avoid ODR issues across translation units.
 // =============================================================================
 

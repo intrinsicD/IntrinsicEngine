@@ -180,7 +180,7 @@ namespace Geometry
         };
     }
 
-    std::optional<KDTreeKnnResult> KDTree::QueryKnn(const glm::vec3& query, const std::uint32_t k,
+    std::optional<KDTreeKNNResult> KDTree::QueryKNN(const glm::vec3& query, const std::uint32_t k,
         std::vector<ElementIndex>& outElementIndices) const
     {
         outElementIndices.clear();
@@ -276,7 +276,7 @@ namespace Geometry
             outElementIndices.push_back(index);
         }
 
-        return KDTreeKnnResult{
+        return KDTreeKNNResult{
             .ReturnedCount = outElementIndices.size(),
             .VisitedNodes = visitedNodes,
             .DistanceEvaluations = distanceEvaluations,

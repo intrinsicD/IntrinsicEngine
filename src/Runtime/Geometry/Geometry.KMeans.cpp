@@ -126,7 +126,7 @@ namespace Geometry::KMeans
             if (cpuScratch != nullptr && !cpuScratch->CentroidTree.Nodes().empty())
             {
                 auto& nearest = cpuScratch->QueryBuffer;
-                if (cpuScratch->CentroidTree.QueryKnn(point, 1u, nearest) && !nearest.empty())
+                if (cpuScratch->CentroidTree.QueryKNN(point, 1u, nearest) && !nearest.empty())
                 {
                     const uint32_t bestCluster = nearest.front();
                     if (bestCluster < centroids.size())

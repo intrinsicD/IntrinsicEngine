@@ -9,7 +9,7 @@ import Graphics;
 import Geometry;
 
 // =============================================================================
-// PointCloudGeometrySync — Compile-time contract tests
+// PointCloudLifecycle — Compile-time contract tests
 // =============================================================================
 //
 // These tests validate the CPU-side contract of the Cloud-backed retained-mode
@@ -23,7 +23,7 @@ import Geometry;
 
 // ---- Component GPU State Defaults ----
 
-TEST(PointCloudGeometrySync_Contract, DefaultGpuStateFields)
+TEST(PointCloudLifecycle_Contract, DefaultGpuStateFields)
 {
     ECS::PointCloud::Data comp;
 
@@ -38,7 +38,7 @@ TEST(PointCloudGeometrySync_Contract, DefaultGpuStateFields)
     EXPECT_EQ(comp.KMeansLastBackend, Geometry::KMeans::Backend::CPU);
 }
 
-TEST(PointCloudGeometrySync_Contract, InvalidSlotSentinel)
+TEST(PointCloudLifecycle_Contract, InvalidSlotSentinel)
 {
     // All components now use the shared ECS::kInvalidGpuSlot constant.
     EXPECT_EQ(ECS::kInvalidGpuSlot, ~0u);
@@ -46,13 +46,13 @@ TEST(PointCloudGeometrySync_Contract, InvalidSlotSentinel)
 
 // ---- HasGpuGeometry Query ----
 
-TEST(PointCloudGeometrySync_Contract, HasGpuGeometryFalseByDefault)
+TEST(PointCloudLifecycle_Contract, HasGpuGeometryFalseByDefault)
 {
     ECS::PointCloud::Data comp;
     EXPECT_FALSE(comp.HasGpuGeometry());
 }
 
-TEST(PointCloudGeometrySync_Contract, HasGpuGeometryTrueWhenValid)
+TEST(PointCloudLifecycle_Contract, HasGpuGeometryTrueWhenValid)
 {
     ECS::PointCloud::Data comp;
     comp.GpuGeometry = Geometry::GeometryHandle(0, 1);
@@ -61,7 +61,7 @@ TEST(PointCloudGeometrySync_Contract, HasGpuGeometryTrueWhenValid)
 
 // ---- CloudRef Queries ----
 
-TEST(PointCloudGeometrySync_Contract, NullCloudRefQueriesReturnFalse)
+TEST(PointCloudLifecycle_Contract, NullCloudRefQueriesReturnFalse)
 {
     ECS::PointCloud::Data comp;
     EXPECT_EQ(comp.PointCount(), 0u);
@@ -70,7 +70,7 @@ TEST(PointCloudGeometrySync_Contract, NullCloudRefQueriesReturnFalse)
     EXPECT_FALSE(comp.HasRadii());
 }
 
-TEST(PointCloudGeometrySync_Contract, CloudRefDelegatesQueries)
+TEST(PointCloudLifecycle_Contract, CloudRefDelegatesQueries)
 {
     auto cloud = std::make_shared<Geometry::PointCloud::Cloud>();
     cloud->AddPoint({0.f, 0.f, 0.f});
@@ -86,7 +86,7 @@ TEST(PointCloudGeometrySync_Contract, CloudRefDelegatesQueries)
     EXPECT_FALSE(comp.HasRadii());
 }
 
-TEST(PointCloudGeometrySync_Contract, CloudRefWithNormals)
+TEST(PointCloudLifecycle_Contract, CloudRefWithNormals)
 {
     auto cloud = std::make_shared<Geometry::PointCloud::Cloud>();
     cloud->EnableNormals();
@@ -98,7 +98,7 @@ TEST(PointCloudGeometrySync_Contract, CloudRefWithNormals)
     EXPECT_TRUE(comp.HasNormals());
 }
 
-TEST(PointCloudGeometrySync_Contract, CloudRefWithColors)
+TEST(PointCloudLifecycle_Contract, CloudRefWithColors)
 {
     auto cloud = std::make_shared<Geometry::PointCloud::Cloud>();
     cloud->EnableColors();
@@ -110,7 +110,7 @@ TEST(PointCloudGeometrySync_Contract, CloudRefWithColors)
     EXPECT_TRUE(comp.HasColors());
 }
 
-TEST(PointCloudGeometrySync_Contract, CloudRefWithRadii)
+TEST(PointCloudLifecycle_Contract, CloudRefWithRadii)
 {
     auto cloud = std::make_shared<Geometry::PointCloud::Cloud>();
     cloud->EnableRadii();
@@ -124,14 +124,14 @@ TEST(PointCloudGeometrySync_Contract, CloudRefWithRadii)
 
 // ---- Cloud Span Accessors for Zero-Copy Upload ----
 
-TEST(PointCloudGeometrySync_Contract, CloudSpanAccessorsForUpload)
+TEST(PointCloudLifecycle_Contract, CloudSpanAccessorsForUpload)
 {
     auto cloud = std::make_shared<Geometry::PointCloud::Cloud>();
     cloud->EnableNormals();
     cloud->AddPoint({1.f, 2.f, 3.f});
     cloud->AddPoint({4.f, 5.f, 6.f});
 
-    // PointCloudGeometrySyncSystem reads these spans directly for GPU upload.
+    // PointCloudLifecycleSystem reads these spans directly for GPU upload.
     auto positions = cloud->Positions();
     auto normals = cloud->Normals();
 
@@ -144,7 +144,7 @@ TEST(PointCloudGeometrySync_Contract, CloudSpanAccessorsForUpload)
 
 // ---- Upload Request Construction ----
 
-TEST(PointCloudGeometrySync_Contract, UploadRequestFromCloudSpans)
+TEST(PointCloudLifecycle_Contract, UploadRequestFromCloudSpans)
 {
     auto cloud = std::make_shared<Geometry::PointCloud::Cloud>();
     cloud->EnableNormals();
@@ -152,7 +152,7 @@ TEST(PointCloudGeometrySync_Contract, UploadRequestFromCloudSpans)
     cloud->AddPoint({1.f, 0.f, 0.f});
     cloud->AddPoint({0.f, 1.f, 0.f});
 
-    // Simulate what PointCloudGeometrySyncSystem does: build a
+    // Simulate what PointCloudLifecycleSystem does: build a
     // GeometryUploadRequest from Cloud span accessors.
     Graphics::GeometryUploadRequest upload{};
     upload.Positions = cloud->Positions();
@@ -167,7 +167,7 @@ TEST(PointCloudGeometrySync_Contract, UploadRequestFromCloudSpans)
     EXPECT_TRUE(upload.Indices.empty());
 }
 
-TEST(PointCloudGeometrySync_Contract, UploadRequestOmitsNormalsWhenCloudHasNone)
+TEST(PointCloudLifecycle_Contract, UploadRequestOmitsNormalsWhenCloudHasNone)
 {
     auto cloud = std::make_shared<Geometry::PointCloud::Cloud>();
     cloud->AddPoint({0.f, 0.f, 0.f});
@@ -183,7 +183,7 @@ TEST(PointCloudGeometrySync_Contract, UploadRequestOmitsNormalsWhenCloudHasNone)
 
 // ---- GpuDirty Lifecycle Transitions ----
 
-TEST(PointCloudGeometrySync_Contract, NewComponentIsDirty)
+TEST(PointCloudLifecycle_Contract, NewComponentIsDirty)
 {
     ECS::PointCloud::Data comp;
     comp.CloudRef = std::make_shared<Geometry::PointCloud::Cloud>();
@@ -193,7 +193,7 @@ TEST(PointCloudGeometrySync_Contract, NewComponentIsDirty)
     EXPECT_FALSE(comp.HasGpuGeometry());
 }
 
-TEST(PointCloudGeometrySync_Contract, DirtyFlagClearedAfterUpload)
+TEST(PointCloudLifecycle_Contract, DirtyFlagClearedAfterUpload)
 {
     ECS::PointCloud::Data comp;
     comp.CloudRef = std::make_shared<Geometry::PointCloud::Cloud>();
@@ -211,20 +211,20 @@ TEST(PointCloudGeometrySync_Contract, DirtyFlagClearedAfterUpload)
 
 // ---- Rendering Parameters ----
 
-TEST(PointCloudGeometrySync_Contract, RenderModeDefault)
+TEST(PointCloudLifecycle_Contract, RenderModeDefault)
 {
     ECS::PointCloud::Data comp;
     EXPECT_EQ(comp.RenderMode, Geometry::PointCloud::RenderMode::FlatDisc);
 }
 
-TEST(PointCloudGeometrySync_Contract, RenderModePreserved)
+TEST(PointCloudLifecycle_Contract, RenderModePreserved)
 {
     ECS::PointCloud::Data comp;
     comp.RenderMode = Geometry::PointCloud::RenderMode::EWA;
     EXPECT_EQ(comp.RenderMode, Geometry::PointCloud::RenderMode::EWA);
 }
 
-TEST(PointCloudGeometrySync_Contract, DefaultColorPreserved)
+TEST(PointCloudLifecycle_Contract, DefaultColorPreserved)
 {
     ECS::PointCloud::Data comp;
     comp.DefaultColor = {0.5f, 0.3f, 0.1f, 1.0f};
@@ -234,7 +234,7 @@ TEST(PointCloudGeometrySync_Contract, DefaultColorPreserved)
     EXPECT_FLOAT_EQ(comp.DefaultColor.b, 0.1f);
 }
 
-TEST(PointCloudGeometrySync_Contract, VisibilityToggle)
+TEST(PointCloudLifecycle_Contract, VisibilityToggle)
 {
     ECS::PointCloud::Data comp;
     EXPECT_TRUE(comp.Visible);
@@ -245,13 +245,13 @@ TEST(PointCloudGeometrySync_Contract, VisibilityToggle)
 
 // ---- Cached Attributes ----
 
-TEST(PointCloudGeometrySync_Contract, CachedColorsInitiallyEmpty)
+TEST(PointCloudLifecycle_Contract, CachedColorsInitiallyEmpty)
 {
     ECS::PointCloud::Data comp;
     EXPECT_TRUE(comp.CachedColors.empty());
 }
 
-TEST(PointCloudGeometrySync_Contract, CachedRadiiInitiallyEmpty)
+TEST(PointCloudLifecycle_Contract, CachedRadiiInitiallyEmpty)
 {
     ECS::PointCloud::Data comp;
     EXPECT_TRUE(comp.CachedRadii.empty());
@@ -259,7 +259,7 @@ TEST(PointCloudGeometrySync_Contract, CachedRadiiInitiallyEmpty)
 
 // ---- Single-Path PointCloud Contract ----
 
-TEST(PointCloudGeometrySync_Contract, PointCloudDataIsSinglePointCloudPath)
+TEST(PointCloudLifecycle_Contract, PointCloudDataIsSinglePointCloudPath)
 {
     ECS::PointCloud::Data cloudComp;
     cloudComp.CloudRef = std::make_shared<Geometry::PointCloud::Cloud>();
@@ -271,7 +271,7 @@ TEST(PointCloudGeometrySync_Contract, PointCloudDataIsSinglePointCloudPath)
 
 // ---- Cloud Data Survives After Upload (not freed) ----
 
-TEST(PointCloudGeometrySync_Contract, CloudDataSurvivesAfterUpload)
+TEST(PointCloudLifecycle_Contract, CloudDataSurvivesAfterUpload)
 {
     // PointCloud::Data keeps the Cloud alive for potential re-upload.
     auto cloud = std::make_shared<Geometry::PointCloud::Cloud>();
@@ -294,7 +294,7 @@ TEST(PointCloudGeometrySync_Contract, CloudDataSurvivesAfterUpload)
 
 // ---- Re-Upload on Data Change ----
 
-TEST(PointCloudGeometrySync_Contract, ReUploadOnDataChange)
+TEST(PointCloudLifecycle_Contract, ReUploadOnDataChange)
 {
     auto cloud = std::make_shared<Geometry::PointCloud::Cloud>();
     cloud->AddPoint({0.f, 0.f, 0.f});
@@ -318,7 +318,7 @@ TEST(PointCloudGeometrySync_Contract, ReUploadOnDataChange)
     EXPECT_EQ(comp.GpuPointCount, 1u); // Stale until sync runs.
 }
 
-TEST(PointCloudGeometrySync_Contract, PreloadedGpuNormalsContract)
+TEST(PointCloudLifecycle_Contract, PreloadedGpuNormalsContract)
 {
     ECS::PointCloud::Data comp;
     comp.HasGpuNormals = true;

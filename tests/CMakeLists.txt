@@ -174,9 +174,9 @@ intrinsic_test_object_lib(RuntimeTestObjs
         Test_GraphRenderPass.cpp
         Test_RuntimeGeometry_Reuse.cpp
         Test_BDASharedBufferContract.cpp
-        Test_PointCloudGeometrySync.cpp
+        Test_PointCloudLifecycle.cpp
         Test_MeshViewLifecycle.cpp
-        Test_GraphGeometrySync.cpp
+        Test_GraphLifecycle.cpp
         Test_MeshRendererLifecycle.cpp
         Test_PerPassComponents.cpp
         Test_PerFaceAttributes.cpp
@@ -197,7 +197,7 @@ intrinsic_test_object_lib(RuntimeTestObjs
         Test_RenderUpdateIntegration.cpp
         Test_RenderExtraction.cpp
         Test_CudaDevice.cpp
-        Test_PrimitiveBVHSync.cpp
+        Test_PrimitiveBVHBuild.cpp
         Test_RenderGraphPackets.cpp
         Test_ImporterUtils.cpp
         Test_Importers.cpp

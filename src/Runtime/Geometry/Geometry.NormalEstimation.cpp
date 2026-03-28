@@ -268,7 +268,7 @@ namespace Geometry::NormalEstimation
         {
             // Find k nearest neighbors
             std::vector<std::size_t> neighbors;
-            octree.QueryKnn(points[i], k + 1, neighbors); // +1 because the point itself is included
+            octree.QueryKNN(points[i], k + 1, neighbors); // +1 because the point itself is included
 
             // Remove self from neighbors
             auto selfIt = std::find(neighbors.begin(), neighbors.end(), i);

@@ -328,7 +328,7 @@ export namespace Geometry
             }
         }
 
-        void QueryKnn(const glm::vec3& queryPoint, std::size_t k, std::vector<size_t>& out) const;
+        void QueryKNN(const glm::vec3& queryPoint, std::size_t k, std::vector<size_t>& out) const;
 
         void QueryNearest(const glm::vec3& queryPoint, std::size_t& out) const;
 
