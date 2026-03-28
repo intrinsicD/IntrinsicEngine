@@ -75,14 +75,15 @@ TEST(RenderUpdateIntegration, RenderDriver_ExposesStagedFrameExecutionApi)
     static_assert(requires(Graphics::RenderDriver& renderSystem,
                            ECS::Scene& scene,
                            const Graphics::CameraComponent& camera,
+                           const Graphics::LightEnvironmentPacket& lighting,
                            Core::Assets::AssetManager& assetManager,
                            uint64_t currentFrame)
     {
         renderSystem.BeginFrame(currentFrame);
         { renderSystem.AcquireFrame() } -> std::same_as<bool>;
         renderSystem.ProcessCompletedGpuWork(scene, currentFrame);
-        renderSystem.UpdateGlobals(camera);
-        renderSystem.BuildGraph(assetManager, camera);
+        renderSystem.UpdateGlobals(camera, lighting);
+        renderSystem.BuildGraph(assetManager, camera, lighting);
         renderSystem.ExecuteGraph();
         renderSystem.EndFrame();
     });

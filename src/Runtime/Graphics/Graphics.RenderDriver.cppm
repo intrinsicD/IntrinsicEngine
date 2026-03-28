@@ -65,9 +65,10 @@ export namespace Graphics
         void BeginFrame(uint64_t currentFrame);
         [[nodiscard]] bool AcquireFrame();
         void ProcessCompletedGpuWork(ECS::Scene& scene, uint64_t currentFrame);
-        void UpdateGlobals(const CameraComponent& camera);
+        void UpdateGlobals(const CameraComponent& camera, const LightEnvironmentPacket& lighting);
         void BuildGraph(Core::Assets::AssetManager& assetManager,
                         const CameraComponent& camera,
+                        const LightEnvironmentPacket& lighting = {},
                         bool hasSelectionWork = false,
                         const SelectionOutlinePacket& selectionOutline = {},
                         std::span<const PickingSurfacePacket> pickingSurfacePackets = {},

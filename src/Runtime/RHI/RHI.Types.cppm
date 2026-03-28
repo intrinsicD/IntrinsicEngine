@@ -62,6 +62,11 @@ export namespace RHI
     {
         alignas(16) glm::mat4 View;
         alignas(16) glm::mat4 Proj;
+
+        // Scene lighting (directional + ambient).  xyz = data, w = intensity.
+        alignas(16) glm::vec4 LightDirAndIntensity;   // xyz = normalised direction to light, w = intensity
+        alignas(16) glm::vec4 LightColor;              // xyz = light color, w = unused
+        alignas(16) glm::vec4 AmbientColorAndIntensity; // xyz = ambient color, w = ambient intensity
     };
 
     // WARNING: This block is 128 bytes — the Vulkan guaranteed minimum.

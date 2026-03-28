@@ -187,8 +187,7 @@ Mapping guidance for current Intrinsic code while preserving that reference shap
 
 - Extraction is the sole resolver of live ECS state into render packets per frame.
 - [ ] Define immutable packet families for Intrinsic's renderer:
-  - Surface draw, line/point/debug draw, and selection/picking packets are complete.
-  - [ ] light / environment packets
+  - Surface draw, line/point/debug draw, selection/picking, and light/environment packets are complete.
   - [ ] UI / editor overlay packets
   - [ ] geometry-processing visualization packets *(HTEX patch preview now extracts immutable inputs; broader visualization packet families are still pending)*
 - Picking entity/primitive resolution and selection-presence recipe inputs now consume extraction snapshots.

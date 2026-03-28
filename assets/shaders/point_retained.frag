@@ -11,6 +11,14 @@
 #version 460
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 
+layout(set = 0, binding = 0) uniform CameraBuffer {
+    mat4 view;
+    mat4 proj;
+    vec4 lightDirAndIntensity;
+    vec4 lightColor;
+    vec4 ambientColorAndIntensity;
+} camera;
+
 layout(location = 0) in vec4 fragColor;
 layout(location = 1) in vec2 fragDiscUV;
 layout(location = 2) in vec3 fragNormal;
@@ -53,11 +61,11 @@ void main()
         // Epsilon-guarded renormalization with camera-facing fallback.
         float nLenE = length(fragNormal);
         vec3 N = (nLenE > 1e-6) ? (fragNormal / nLenE) : vec3(0.0, 0.0, 1.0);
-        vec3 lightDir = normalize(vec3(1.0, 1.0, 1.0));
+        vec3 lightDir = normalize(camera.lightDirAndIntensity.xyz);
         float NdotL = dot(N, lightDir);
-        float diffuse = max(abs(NdotL), 0.0);
+        float diffuse = max(abs(NdotL), 0.0) * camera.lightDirAndIntensity.w;
 
-        float ambient = 0.15;
+        float ambient = camera.ambientColorAndIntensity.w;
         vec3 lit = fragColor.rgb * (ambient + (1.0 - ambient) * diffuse);
 
         outColor = vec4(lit, fragColor.a * weight);
@@ -77,13 +85,13 @@ void main()
             // Epsilon-guarded renormalization with camera-facing fallback.
             float nLenS = length(fragNormal);
             vec3 N = (nLenS > 1e-6) ? (fragNormal / nLenS) : vec3(0.0, 0.0, 1.0);
-            vec3 lightDir = normalize(vec3(1.0, 1.0, 1.0));
+            vec3 lightDir = normalize(camera.lightDirAndIntensity.xyz);
 
             // Two-sided lighting: flip normal if facing away from light.
             float NdotL = dot(N, lightDir);
-            float diffuse = max(abs(NdotL), 0.0);
+            float diffuse = max(abs(NdotL), 0.0) * camera.lightDirAndIntensity.w;
 
-            float ambient = 0.15;
+            float ambient = camera.ambientColorAndIntensity.w;
             vec3 lit = fragColor.rgb * (ambient + (1.0 - ambient) * diffuse);
 
             outColor = vec4(lit, fragColor.a * alpha);

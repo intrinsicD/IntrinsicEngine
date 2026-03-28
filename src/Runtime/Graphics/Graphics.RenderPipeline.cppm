@@ -243,6 +243,25 @@ export namespace Graphics
         }
     };
 
+    // -----------------------------------------------------------------------
+    // Light / Environment Packet — immutable per-frame scene lighting state.
+    // -----------------------------------------------------------------------
+    // Extracted once per frame and consumed by all lit render passes (forward
+    // surface, deferred composition, point, line).  Values match the previous
+    // hardcoded shader constants as defaults so existing visuals are unchanged.
+    struct LightEnvironmentPacket
+    {
+        // Directional light (single scene light for now).
+        glm::vec3 LightDirection = glm::normalize(glm::vec3(1.0f, 1.0f, 1.0f));
+        float     LightIntensity = 1.0f;
+        glm::vec3 LightColor     = glm::vec3(1.0f, 1.0f, 1.0f);
+        float     _pad0          = 0.0f;
+
+        // Ambient / environment.
+        glm::vec3 AmbientColor   = glm::vec3(1.0f, 1.0f, 1.0f);
+        float     AmbientIntensity = 0.1f;
+    };
+
     struct PickingSurfacePacket
     {
         Geometry::GeometryHandle Geometry{};
@@ -393,6 +412,7 @@ export namespace Graphics
 
         glm::mat4 CameraView{1.0f};
         glm::mat4 CameraProj{1.0f};
+        LightEnvironmentPacket Lighting{};
 
         RHI::VulkanBuffer* PickReadbackBuffer = nullptr;
         bool HasSelectionWork = false;

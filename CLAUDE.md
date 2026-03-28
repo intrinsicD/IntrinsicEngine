@@ -221,6 +221,21 @@ Push constants per pass:
 - **LinePass**: `uint64_t PtrPositions` + `PtrEdges` + `PtrEdgeAttr` for per-edge colors.
 - **PointPass** (120 bytes): Model + `PtrPositions`/`PtrNormals`/`PtrAttr` + PointSize/SizeMultiplier/Viewport + Color/Flags.
 
+### Global Camera + Lighting UBO
+
+`RHI::CameraBufferObject` (set 0, binding 0) carries per-frame camera matrices **and** scene lighting state. All lit passes read light parameters from this UBO rather than from hardcoded shader constants.
+
+```cpp
+struct CameraBufferObject {
+    mat4 View, Proj;
+    vec4 LightDirAndIntensity;    // xyz = normalised direction to light, w = intensity
+    vec4 LightColor;              // xyz = light color, w = unused
+    vec4 AmbientColorAndIntensity; // xyz = ambient color, w = ambient intensity
+};
+```
+
+`Graphics::LightEnvironmentPacket` is the immutable CPU-side carrier extracted once per frame into `RenderWorld::Lighting`. `GlobalResources::Update()` copies it into the dynamic-offset UBO. The deferred composition pass (`deferred_lighting.frag`) receives the same data via push constants because it uses its own descriptor set layout (G-buffer samplers at set 0).
+
 ### Lifecycle Systems
 
 **System naming convention:**

@@ -311,9 +311,10 @@ namespace Runtime
         if (!m_RenderDriver->AcquireFrame())
             return;
 
-        m_RenderDriver->UpdateGlobals(preparedRenderWorld->View.Camera);
+        m_RenderDriver->UpdateGlobals(preparedRenderWorld->View.Camera, preparedRenderWorld->Lighting);
         m_RenderDriver->BuildGraph(m_AssetManager,
                                    preparedRenderWorld->View.Camera,
+                                   preparedRenderWorld->Lighting,
                                    preparedRenderWorld->HasSelectionWork,
                                    preparedRenderWorld->SelectionOutline,
                                    preparedRenderWorld->SurfacePicking,

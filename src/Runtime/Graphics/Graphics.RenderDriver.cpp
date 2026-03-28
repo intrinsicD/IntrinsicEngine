@@ -1055,19 +1055,20 @@ namespace Graphics
         }
     }
 
-    void RenderDriver::UpdateGlobals(const CameraComponent& camera)
+    void RenderDriver::UpdateGlobals(const CameraComponent& camera, const LightEnvironmentPacket& lighting)
     {
         const uint32_t frameIndex = m_Presentation.GetFrameIndex();
         const auto extent = m_Presentation.GetResolution();
 
         m_GlobalResources.BeginFrame(frameIndex);
-        m_GlobalResources.Update(camera, frameIndex);
+        m_GlobalResources.Update(camera, lighting, frameIndex);
 
         ApplyPendingPipelineSwap(extent.width, extent.height);
     }
 
     void RenderDriver::BuildGraph(Core::Assets::AssetManager& assetManager,
                                   const CameraComponent& camera,
+                                  const LightEnvironmentPacket& lighting,
                                   bool hasSelectionWork,
                                   const SelectionOutlinePacket& selectionOutline,
                                   std::span<const PickingSurfacePacket> pickingSurfacePackets,
@@ -1122,6 +1123,7 @@ namespace Graphics
             m_LastDebugPasses,
             camera.ViewMatrix,
             camera.ProjectionMatrix,
+            lighting,
             m_Interaction.GetReadbackBuffer(frameIndex),
         };
         ctx.HasSelectionWork = hasSelectionWork;

@@ -15,6 +15,9 @@
 layout(set = 0, binding = 0) uniform CameraBuffer {
     mat4 view;
     mat4 proj;
+    vec4 lightDirAndIntensity;
+    vec4 lightColor;
+    vec4 ambientColorAndIntensity;
 } camera;
 
 layout(location = 0) in vec4 fragColor;
@@ -63,9 +66,11 @@ void main()
     if (depth < 0.0 || depth > 1.0) discard;
     gl_FragDepth = depth;
 
-    // Simple Phong shading in view space.
-    vec3 lightDir = normalize(vec3(1.0, 1.0, 1.0));
-    float ambient = 0.15;
+    // Phong shading in view space with scene lighting.
+    vec3 lightDir = normalize(camera.lightDirAndIntensity.xyz);
+    float lightIntensity = camera.lightDirAndIntensity.w;
+    vec3 lColor = camera.lightColor.xyz * lightIntensity;
+    float ambient = camera.ambientColorAndIntensity.w;
     float diffuse = max(abs(dot(N, lightDir)), 0.0);
 
     vec3 viewDir = normalize(-surfaceViewPos);
@@ -73,7 +78,7 @@ void main()
     float NdotH = max(dot(N, halfVec), 0.0);
     float specular = pow(NdotH, 32.0) * 0.3;
 
-    vec3 lit = fragColor.rgb * (ambient + (1.0 - ambient) * diffuse) + vec3(specular);
+    vec3 lit = fragColor.rgb * (ambient + (1.0 - ambient) * diffuse) * lColor + vec3(specular);
     lit = clamp(lit, 0.0, 1.0);
 
     outColor = vec4(lit, fragColor.a);

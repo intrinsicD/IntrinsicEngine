@@ -155,16 +155,22 @@ namespace Graphics::Passes
 
         const uint32_t fi = ctx.FrameIndex % FRAMES;
 
-        // Push constants: inverse VP + clear color.
+        // Push constants: inverse VP + clear color + scene lighting.
         struct DeferredPushConstants
         {
             glm::mat4 InvViewProj;
             glm::vec4 ClearColor;
+            glm::vec4 LightDirAndIntensity;
+            glm::vec4 LightColor;
+            glm::vec4 AmbientColorAndIntensity;
         };
 
         DeferredPushConstants pc{};
         pc.InvViewProj = glm::inverse(ctx.CameraProj * ctx.CameraView);
-        pc.ClearColor = glm::vec4(0.1f, 0.3f, 0.6f, 1.0f); // Match forward clear color.
+        pc.ClearColor = glm::vec4(0.1f, 0.3f, 0.6f, 1.0f);
+        pc.LightDirAndIntensity = glm::vec4(ctx.Lighting.LightDirection, ctx.Lighting.LightIntensity);
+        pc.LightColor = glm::vec4(ctx.Lighting.LightColor, 0.0f);
+        pc.AmbientColorAndIntensity = glm::vec4(ctx.Lighting.AmbientColor, ctx.Lighting.AmbientIntensity);
 
         struct PassData
         {
@@ -277,7 +283,7 @@ namespace Graphics::Passes
         VkPushConstantRange pcr{};
         pcr.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
         pcr.offset = 0;
-        pcr.size = sizeof(glm::mat4) + sizeof(glm::vec4); // 80 bytes
+        pcr.size = sizeof(glm::mat4) + sizeof(glm::vec4) * 4; // 128 bytes (InvViewProj + ClearColor + 3x light)
         pb.AddPushConstantRange(pcr);
 
         auto built = pb.Build();
