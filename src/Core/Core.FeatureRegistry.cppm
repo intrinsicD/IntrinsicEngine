@@ -18,7 +18,7 @@ import Core.Logging;
 // PURPOSE: Provides a single, engine-wide registry where render features,
 // geometry operators, UI panels, and ECS systems register at startup.
 //
-// This removes the need to hard-wire features into Engine or RenderSystem.
+// This removes the need to hard-wire features into Engine or RenderDriver.
 // Adding a new feature = add a .cppm module + one registration call.
 //
 // Design:

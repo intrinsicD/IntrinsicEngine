@@ -116,7 +116,7 @@ export namespace Runtime
         // External asset ingest orchestration (drag-drop + re-import).
         std::unique_ptr<AssetIngestService> m_AssetIngestService;
 
-        // Render subsystem: ShaderRegistry, PipelineLibrary, GPUScene, RenderSystem,
+        // Render subsystem: ShaderRegistry, PipelineLibrary, GPUScene, RenderDriver,
         // MaterialRegistry, per-frame arena/scope/FrameGraph, GeometryPool.
         std::unique_ptr<RenderOrchestrator> m_RenderOrchestrator;
 

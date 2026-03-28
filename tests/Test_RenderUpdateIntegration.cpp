@@ -70,9 +70,9 @@ TEST(RenderUpdateIntegration, RenderOrchestrator_NotDefaultConstructible)
     SUCCEED();
 }
 
-TEST(RenderUpdateIntegration, RenderSystem_ExposesStagedFrameExecutionApi)
+TEST(RenderUpdateIntegration, RenderDriver_ExposesStagedFrameExecutionApi)
 {
-    static_assert(requires(Graphics::RenderSystem& renderSystem,
+    static_assert(requires(Graphics::RenderDriver& renderSystem,
                            ECS::Scene& scene,
                            const Graphics::CameraComponent& camera,
                            Core::Assets::AssetManager& assetManager,

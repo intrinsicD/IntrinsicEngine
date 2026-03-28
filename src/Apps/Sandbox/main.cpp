@@ -240,7 +240,7 @@ public:
         // 9. Selection
         if (cameraComponent != nullptr)
         {
-            auto& renderSys = GetRenderOrchestrator().GetRenderSystem();
+            auto& renderSys = GetRenderOrchestrator().GetRenderDriver();
 
             GetSelection().GetConfig().MouseButton = m_SelectMouseButton;
 
@@ -443,7 +443,7 @@ private:
                 {
                     auto pipeline = std::make_unique<Graphics::DefaultPipeline>();
                     pipeline->SetFeatureRegistry(&GetFeatureRegistry());
-                    GetRenderOrchestrator().GetRenderSystem().RequestPipelineSwap(std::move(pipeline));
+                    GetRenderOrchestrator().GetRenderDriver().RequestPipelineSwap(std::move(pipeline));
                 }
             }
 
@@ -486,7 +486,7 @@ private:
                     ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.2f, 1.0f),
                                        "No renderable outline PickIDs resolved for this selection.");
 
-                const auto gpuPick = GetRenderOrchestrator().GetRenderSystem().GetLastPickResult();
+                const auto gpuPick = GetRenderOrchestrator().GetRenderDriver().GetLastPickResult();
                 ImGui::Text("Last GPU Pick: Hit=%d EntityID=%u", (int)gpuPick.HasHit, gpuPick.EntityID);
 
                 const auto& picked = GetSelection().GetPicked();
@@ -608,7 +608,7 @@ private:
     void DrawViewSettingsPanel()
     {
         // --- Post-Processing ---
-        auto* postSettings = GetRenderOrchestrator().GetRenderSystem().GetPostProcessSettings();
+        auto* postSettings = GetRenderOrchestrator().GetRenderDriver().GetPostProcessSettings();
         if (postSettings)
         {
             ImGui::SeparatorText("Post Processing");
@@ -659,7 +659,7 @@ private:
                 ImGui::SliderFloat("Min EV", &postSettings->HistogramMinEV, -20.0f, 0.0f, "%.1f");
                 ImGui::SliderFloat("Max EV", &postSettings->HistogramMaxEV, 0.0f, 20.0f, "%.1f");
 
-                const auto* histo = GetRenderOrchestrator().GetRenderSystem().GetHistogramReadback();
+                const auto* histo = GetRenderOrchestrator().GetRenderDriver().GetHistogramReadback();
                 if (histo && histo->Valid)
                 {
                     uint32_t maxBin = 1;
@@ -719,7 +719,7 @@ private:
         }
 
         // --- Selection Outline ---
-        auto* outlineSettings = GetRenderOrchestrator().GetRenderSystem().GetSelectionOutlineSettings();
+        auto* outlineSettings = GetRenderOrchestrator().GetRenderDriver().GetSelectionOutlineSettings();
         if (!outlineSettings)
         {
             ImGui::TextDisabled("Selection outline settings not available.");

@@ -23,7 +23,7 @@ import RHI.TransientAllocator;
 
 namespace Graphics
 {
-    // Remove file-local transient allocator state; lifetime is managed by RenderSystem.
+    // Remove file-local transient allocator state; lifetime is managed by RenderDriver.
 
     // --- RGRegistry ---
     VkImage RGRegistry::GetImage(RGResourceHandle handle) const

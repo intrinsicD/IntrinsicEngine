@@ -25,7 +25,7 @@ import Graphics.Geometry;
 import Graphics.GPUScene;
 import Graphics.MaterialRegistry;
 import Graphics.PipelineLibrary;
-import Graphics.RenderSystem;
+import Graphics.RenderDriver;
 import Graphics.ShaderRegistry;
 import Geometry.Handle;
 import ECS;
@@ -34,7 +34,7 @@ import Runtime.RenderExtraction;
 export namespace Runtime
 {
     // Owns the render subsystem: ShaderRegistry, PipelineLibrary, GPUScene,
-    // RenderSystem, MaterialRegistry, per-frame arena/scope/FrameGraph, and
+    // RenderDriver, MaterialRegistry, per-frame arena/scope/FrameGraph, and
     // GeometryPool.  Extracted from Engine following the GraphicsBackend /
     // AssetPipeline / SceneManager pattern.
     class RenderOrchestrator
@@ -62,8 +62,8 @@ export namespace Runtime
         RenderOrchestrator& operator=(RenderOrchestrator&&) = delete;
 
         // --- Accessors ---
-        [[nodiscard]] Graphics::RenderSystem& GetRenderSystem() { return *m_RenderSystem; }
-        [[nodiscard]] const Graphics::RenderSystem& GetRenderSystem() const { return *m_RenderSystem; }
+        [[nodiscard]] Graphics::RenderDriver& GetRenderDriver() { return *m_RenderDriver; }
+        [[nodiscard]] const Graphics::RenderDriver& GetRenderDriver() const { return *m_RenderDriver; }
 
         [[nodiscard]] Graphics::GPUScene& GetGPUScene() { return *m_GpuScene; }
         [[nodiscard]] const Graphics::GPUScene& GetGPUScene() const { return *m_GpuScene; }
@@ -142,8 +142,8 @@ export namespace Runtime
         // Retained-mode GPU scene (persistent SSBOs, slot allocator).
         std::unique_ptr<Graphics::GPUScene> m_GpuScene;
 
-        // Full render system (owns RenderGraph, presentation, interaction).
-        std::unique_ptr<Graphics::RenderSystem> m_RenderSystem;
+        // Full render driver (owns RenderGraph, presentation, interaction).
+        std::unique_ptr<Graphics::RenderDriver> m_RenderDriver;
 
         // Borrowed references to GraphicsBackend infrastructure.
         std::shared_ptr<RHI::VulkanDevice> m_Device;

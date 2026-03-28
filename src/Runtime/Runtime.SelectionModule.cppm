@@ -12,7 +12,7 @@ import Core.Window;
 import Core.Input;
 import ECS;
 import Graphics.Camera;
-import Graphics.RenderSystem;
+import Graphics.RenderDriver;
 import Runtime.Selection;
 
 export namespace Runtime
@@ -20,7 +20,7 @@ export namespace Runtime
     // High-level selection controller owned by the Engine.
     // Bridges:
     //  - platform input (GLFW via Core::Input)
-    //  - GpuPickCompleted dispatcher event (from RenderSystem readback)
+    //  - GpuPickCompleted dispatcher event (from RenderDriver readback)
     //  - registry tags (SelectedTag/HoveredTag)
     class SelectionModule
     {
@@ -63,11 +63,11 @@ export namespace Runtime
 
         // Per-frame update.
         // Contract:
-        //  - Call this once per frame, before/after RenderSystem update is fine.
+        //  - Call this once per frame, before/after RenderDriver update is fine.
         //  - For GPU: schedules pick on click; results arrive via GpuPickCompleted event.
         //  - For CPU: performs a raycast immediately on click.
         void Update(ECS::Scene& scene,
-                    Graphics::RenderSystem& renderSystem,
+                    Graphics::RenderDriver& renderSystem,
                     const Graphics::CameraComponent* camera,
                     const Core::Windowing::Window& window,
                     bool uiCapturesMouse);

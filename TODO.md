@@ -173,9 +173,9 @@ Mapping guidance for current Intrinsic code while preserving that reference shap
 
 - `platform` maps to `RuntimePlatformFrameHost` + `PlatformFrameCoordinator` (main-thread ownership, pump/minimize, framebuffer extent capture).
 - Current baseline: `world` maps to `SceneManager` + authoritative ECS scene ownership, with an explicit `commit_tick()` / readonly snapshot boundary.
-- Current baseline: `renderer` maps to `RenderOrchestrator` plus `RenderSystem`, with the runtime render lane now following `begin_frame -> extract_render_world -> prepare_frame -> execute_frame -> end_frame`.
+- Current baseline: `renderer` maps to `RenderOrchestrator` plus `RenderDriver`, with the runtime render lane now following `begin_frame -> extract_render_world -> prepare_frame -> execute_frame -> end_frame`.
 - `resource_system` maps to `Runtime::ResourceMaintenanceService` (GPU sync capture, readback, deferred-destruction, transfer GC, texture/material retirement).
-- Current baseline: `RenderFrameInput`, `RenderWorld`, and `FrameContext` are first-class types rather than remaining implicit in `Engine::Run()` / `RenderSystem::OnUpdate(...)`.
+- Current baseline: `RenderFrameInput`, `RenderWorld`, and `FrameContext` are first-class types rather than remaining implicit in `Engine::Run()` / `RenderDriver::OnUpdate(...)`.
 
 #### B4.3 Platform stage (A)
 
@@ -282,8 +282,7 @@ Mapping guidance for current Intrinsic code while preserving that reference shap
 
 ### B5. Architectural Legibility — Deferred Cleanup
 
-- [ ] **Rename `Graphics.RenderSystem` to `Graphics.RenderDriver`.** Infrastructure class shares "System" suffix with ECS systems. ~40 references across Sandbox, RenderOrchestrator, SelectionModule. High blast radius — separate PR.
-- [ ] **Convert `Graphics.LifecycleUtils.hpp` to a C++23 module.** Currently a raw `.hpp` header included in system `.cpp` files but not part of any exported module interface.
+*(All B5 items completed — see git history for implementation details.)*
 
 ---
 
