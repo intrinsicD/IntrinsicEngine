@@ -285,6 +285,32 @@ namespace Core
             return Err(ErrorCode::InvalidState);
         }
 
+        // Post-compile: canonicalize Dependents to a guaranteed-unique list.
+        // During setup, AddEdgeInternal maintains dedup via either linear scan
+        // (< kLinearDedupThreshold) or sorted binary search. Canonicalizing here
+        // provides a second line of defense for the concurrent execution path
+        // in FrameGraph::Execute(), where duplicate entries in Dependents would
+        // cause indegree underflow on atomic decrement.
+        for (uint32_t i = 0; i < m_ActiveNodeCount; ++i)
+        {
+            auto& node = m_NodePool[i];
+            if (!node.DedupSortedDependents.empty())
+            {
+                // DedupSortedDependents is the sorted, unique authority — adopt it.
+                node.Dependents.assign(
+                    node.DedupSortedDependents.begin(),
+                    node.DedupSortedDependents.end());
+            }
+            else if (node.Dependents.size() > 1)
+            {
+                // Small list: sort + unique as a defensive measure.
+                std::sort(node.Dependents.begin(), node.Dependents.end());
+                node.Dependents.erase(
+                    std::unique(node.Dependents.begin(), node.Dependents.end()),
+                    node.Dependents.end());
+            }
+        }
+
         return Ok();
     }
 }
