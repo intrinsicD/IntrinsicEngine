@@ -25,20 +25,27 @@ layout(push_constant) uniform PushConsts {
     uint64_t PtrFaceAttr;
 } push;
 
-// Binding 0 = Camera (UBO), Binding 1 = Bindless Array
-// Note: We don't declare Binding 0 here if we don't use it in Frag,
-// but usually it's good practice to keep set layouts consistent.
+// Binding 0 = Camera + Lighting (UBO), Binding 1 = Bindless Array
+layout(set = 0, binding = 0) uniform CameraBuffer {
+    mat4 view;
+    mat4 proj;
+    vec4 lightDirAndIntensity;
+    vec4 lightColor;
+    vec4 ambientColorAndIntensity;
+} camera;
+
 layout(set = 1, binding = 0) uniform sampler2D globalTextures[];
 
 void main() {
-    vec3 lightDir = normalize(vec3(1.0, 1.0, 1.0));
-    vec3 lightColor = vec3(1.0, 1.0, 1.0);
-    float ambientStrength = 0.1;
-    vec3 ambient = ambientStrength * lightColor;
+    vec3 lightDir = normalize(camera.lightDirAndIntensity.xyz);
+    float lightIntensity = camera.lightDirAndIntensity.w;
+    vec3 lColor = camera.lightColor.xyz * lightIntensity;
+    float ambientStrength = camera.ambientColorAndIntensity.w;
+    vec3 ambient = ambientStrength * camera.ambientColorAndIntensity.xyz;
 
     vec3 norm = normalize(fragNormal);
     float diff = max(dot(norm, lightDir), 0.0);
-    vec3 diffuse = diff * lightColor;
+    vec3 diffuse = diff * lColor;
 
     // Per-face color: when PtrFaceAttr is valid, read per-face packed ABGR color
     // indexed by gl_PrimitiveID. The face color replaces the texture color,

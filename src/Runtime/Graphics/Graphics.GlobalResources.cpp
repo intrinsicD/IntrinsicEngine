@@ -2,6 +2,7 @@ module;
 #include <cstring>
 #include <memory>
 #include <vector>
+#include <glm/glm.hpp>
 #include "RHI.Vulkan.hpp"
 
 module Graphics.GlobalResources;
@@ -16,6 +17,7 @@ import RHI.Descriptors;
 import RHI.Device;
 import RHI.TransientAllocator;
 import RHI.Types;
+import Graphics.RenderPipeline;
 
 namespace Graphics
 {
@@ -100,21 +102,22 @@ namespace Graphics
         (void)frameIndex;
     }
 
-    void GlobalResources::Update(const CameraComponent& camera, uint32_t frameIndex)
+    void GlobalResources::Update(const CameraComponent& camera, const LightEnvironmentPacket& lighting, uint32_t frameIndex)
     {
         RHI::CameraBufferObject ubo{};
         ubo.View = camera.ViewMatrix;
         ubo.Proj = camera.ProjectionMatrix;
+        ubo.LightDirAndIntensity = glm::vec4(lighting.LightDirection, lighting.LightIntensity);
+        ubo.LightColor = glm::vec4(lighting.LightColor, 0.0f);
+        ubo.AmbientColorAndIntensity = glm::vec4(lighting.AmbientColor, lighting.AmbientIntensity);
 
         const size_t dynamicOffset = frameIndex * m_CameraAlignedSize;
 
-        // Map, Copy, Unmap (handled by VulkanBuffer internal mapping if persistent)
-        // Note: Map() returns the base pointer.
         void* ptr = m_CameraUBO->Map();
         if (ptr)
         {
             std::memcpy(static_cast<char*>(ptr) + dynamicOffset, &ubo, m_CameraDataSize);
-            m_CameraUBO->Flush(dynamicOffset, m_CameraDataSize); // If non-coherent
+            m_CameraUBO->Flush(dynamicOffset, m_CameraDataSize);
             m_CameraUBO->Unmap();
         }
     }

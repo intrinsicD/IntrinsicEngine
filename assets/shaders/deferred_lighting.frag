@@ -21,6 +21,9 @@ layout(push_constant) uniform Push
 {
     mat4  InvViewProj;    // Inverse of (Proj * View) for position reconstruction
     vec4  ClearColor;     // Background clear color (matches forward path)
+    vec4  LightDirAndIntensity;    // xyz = direction to light, w = intensity
+    vec4  LightColor;              // xyz = light color
+    vec4  AmbientColorAndIntensity; // xyz = ambient color, w = ambient intensity
 } pc;
 
 vec3 ReconstructWorldPos(vec2 uv, float depth)
@@ -51,12 +54,13 @@ void main()
     vec3 norm = (nLen > 1e-6) ? (normal / nLen) : vec3(0.0, 0.0, 1.0);
 
     // Blinn-Phong — matches forward surface.frag.
-    vec3 lightDir = normalize(vec3(1.0, 1.0, 1.0));
-    vec3 lightColor = vec3(1.0, 1.0, 1.0);
-    float ambientStrength = 0.1;
-    vec3 ambient = ambientStrength * lightColor;
+    vec3 lightDir = normalize(pc.LightDirAndIntensity.xyz);
+    float lightIntensity = pc.LightDirAndIntensity.w;
+    vec3 lColor = pc.LightColor.xyz * lightIntensity;
+    float ambientStrength = pc.AmbientColorAndIntensity.w;
+    vec3 ambient = ambientStrength * pc.AmbientColorAndIntensity.xyz;
     float diff = max(dot(norm, lightDir), 0.0);
-    vec3 diffuse = diff * lightColor;
+    vec3 diffuse = diff * lColor;
 
     vec3 result = (ambient + diffuse) * albedo.rgb;
 

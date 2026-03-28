@@ -39,25 +39,32 @@ layout(push_constant) uniform PushConsts {
     uint64_t PtrCentroids;
 } push;
 
-// Binding 0 = Camera (UBO), Binding 1 = Bindless Array
-// Note: We don't declare Binding 0 here if we don't use it in Frag,
-// but usually it's good practice to keep set layouts consistent.
+// Binding 0 = Camera + Lighting (UBO), Binding 1 = Bindless Array
+layout(set = 0, binding = 0) uniform CameraBuffer {
+    mat4 view;
+    mat4 proj;
+    vec4 lightDirAndIntensity;
+    vec4 lightColor;
+    vec4 ambientColorAndIntensity;
+} camera;
+
 layout(set = 1, binding = 0) uniform sampler2D globalTextures[];
 
 #include "surface_color_resolve.glsl"
 
 void main() {
-    vec3 lightDir = normalize(vec3(1.0, 1.0, 1.0));
-    vec3 lightColor = vec3(1.0, 1.0, 1.0);
-    float ambientStrength = 0.1;
-    vec3 ambient = ambientStrength * lightColor;
+    vec3 lightDir = normalize(camera.lightDirAndIntensity.xyz);
+    float lightIntensity = camera.lightDirAndIntensity.w;
+    vec3 lColor = camera.lightColor.xyz * lightIntensity;
+    float ambientStrength = camera.ambientColorAndIntensity.w;
+    vec3 ambient = ambientStrength * camera.ambientColorAndIntensity.xyz;
 
     // Epsilon-guarded renormalization: interpolation across a triangle can
     // produce near-zero normals when adjacent vertices have opposing directions.
     float nLen = length(fragNormal);
     vec3 norm = (nLen > 1e-6) ? (fragNormal / nLen) : vec3(0.0, 0.0, 1.0);
     float diff = max(dot(norm, lightDir), 0.0);
-    vec3 diffuse = diff * lightColor;
+    vec3 diffuse = diff * lColor;
 
     vec4 baseColor = ResolveSurfaceBaseColor();
 

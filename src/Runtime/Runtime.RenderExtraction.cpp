@@ -652,10 +652,16 @@ namespace Runtime
         std::vector<Graphics::SurfaceDrawPacket> surfaceDraws = ExtractSurfaceDrawPackets(input.World);
         std::vector<Graphics::LineDrawPacket> lineDraws = ExtractLineDrawPackets(input.World);
         std::vector<Graphics::PointDrawPacket> pointDraws = ExtractPointDrawPackets(input.World);
+        // Scene lighting defaults — matches the previously hardcoded shader
+        // constants so existing visuals are unchanged.  Future work will extract
+        // these from an ECS lighting component or view settings.
+        Graphics::LightEnvironmentPacket lighting{};
+
         return RenderWorld{
             .Alpha = SanitizeAlpha(input.Alpha),
             .View = input.View,
             .World = input.World,
+            .Lighting = lighting,
             .HasSelectionWork = ExtractSelectionWorkState(input.World),
             .SelectionOutline = ExtractSelectionOutlinePacket(input.World),
             .SurfacePicking = std::move(packets.Surface),

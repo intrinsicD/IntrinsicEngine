@@ -70,6 +70,7 @@ export namespace Runtime
         double Alpha = 0.0;
         RenderViewPacket View{};
         WorldSnapshot World{};
+        Graphics::LightEnvironmentPacket Lighting{};
         bool HasSelectionWork = false;
         Graphics::SelectionOutlinePacket SelectionOutline{};
         std::vector<Graphics::PickingSurfacePacket> SurfacePicking{};

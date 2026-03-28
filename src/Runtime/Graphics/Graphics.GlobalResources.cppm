@@ -12,6 +12,7 @@ import RHI.Descriptors;
 import RHI.Device;
 import RHI.TransientAllocator;
 import Graphics.Camera;
+import Graphics.RenderPipeline;
 import Graphics.ShaderRegistry;
 import Graphics.PipelineLibrary;
 
@@ -34,8 +35,8 @@ export namespace Graphics
                         uint32_t framesInFlight);
         ~GlobalResources();
 
-        // Called at the start of the frame to update camera data.
-        void Update(const CameraComponent& camera, uint32_t frameIndex);
+        // Called at the start of the frame to update camera + lighting data.
+        void Update(const CameraComponent& camera, const LightEnvironmentPacket& lighting, uint32_t frameIndex);
 
         // Called to reset per-frame transient allocators.
         void BeginFrame(uint32_t frameIndex);

@@ -16,6 +16,9 @@ layout(buffer_reference, scalar) readonly buffer PositionBuffer {
 layout(set = 0, binding = 0) uniform CameraBuffer {
     mat4 view;
     mat4 proj;
+    vec4 lightDirAndIntensity;
+    vec4 lightColor;
+    vec4 ambientColorAndIntensity;
 } camera;
 
 layout(push_constant) uniform PickPushConsts {
