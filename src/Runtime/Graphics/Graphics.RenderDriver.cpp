@@ -1084,6 +1084,7 @@ namespace Graphics
                                   std::span<const DebugDraw::LineSegment> debugDrawLines,
                                   std::span<const DebugDraw::LineSegment> debugDrawOverlayLines,
                                   std::span<const DebugDraw::PointMarker> debugDrawPoints,
+                                  std::span<const DebugDraw::TriangleVertex> debugDrawTriangles,
                                   const EditorOverlayPacket& editorOverlay)
     {
         const uint32_t frameIndex = m_Presentation.GetFrameIndex();
@@ -1142,6 +1143,7 @@ namespace Graphics
         ctx.DebugDrawLines = debugDrawLines;
         ctx.DebugDrawOverlayLines = debugDrawOverlayLines;
         ctx.DebugDrawPoints = debugDrawPoints;
+        ctx.DebugDrawTriangles = debugDrawTriangles;
         ctx.EditorOverlay = editorOverlay;
 
         auto stable = m_FrameScope.New<RenderPassContext>(ctx);

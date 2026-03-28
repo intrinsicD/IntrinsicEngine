@@ -442,6 +442,7 @@ export namespace Graphics
         std::span<const DebugDraw::LineSegment> DebugDrawLines{};
         std::span<const DebugDraw::LineSegment> DebugDrawOverlayLines{};
         std::span<const DebugDraw::PointMarker> DebugDrawPoints{};
+        std::span<const DebugDraw::TriangleVertex> DebugDrawTriangles{};
 
         // Editor overlay state (ImGui draw-data readiness).
         EditorOverlayPacket EditorOverlay{};

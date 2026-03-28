@@ -263,7 +263,7 @@ All shaders handling normals use epsilon-guarded renormalization (`length > 1e-6
 
 ### Transient Debug Content
 
-Only `DebugDraw` content uses per-frame transient uploads. `LinePass` uploads transient lines as flat position arrays with identity edge pairs, reusing the same BDA shader path. `PointPass` uploads transient points via per-frame host-visible BDA buffers. All retained geometry uses persistent device-local buffers.
+Only `DebugDraw` content uses per-frame transient uploads. `LinePass` uploads transient lines as flat position arrays with identity edge pairs, reusing the same BDA shader path. `PointPass` uploads transient points via per-frame host-visible BDA buffers. `SurfacePass` uploads transient debug triangles (from `DebugDraw::Triangle()`) via per-frame host-visible BDA buffers and renders them with a dedicated lightweight pipeline (`kPipeline_DebugSurface`) that supports alpha blending and disables depth writes — used for face selection highlighting and geometry-processing visualization. All retained geometry uses persistent device-local buffers.
 
 ### Editor Overlay Extraction
 

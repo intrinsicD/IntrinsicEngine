@@ -186,9 +186,8 @@ Mapping guidance for current Intrinsic code while preserving that reference shap
 #### B4.5 Extraction stage (C)
 
 - Extraction is the sole resolver of live ECS state into render packets per frame.
-- [ ] Define immutable packet families for Intrinsic's renderer:
-  - Surface draw, line/point/debug draw, selection/picking, light/environment, and UI/editor overlay packets are complete.
-  - [ ] geometry-processing visualization packets *(HTEX patch preview now extracts immutable inputs; broader visualization packet families are still pending)*
+- Immutable packet families for Intrinsic's renderer are complete:
+  - Surface draw, line/point/debug draw, selection/picking, light/environment, UI/editor overlay, and geometry-processing visualization (debug triangles) packets are all extracted through `RenderWorld`.
 - Picking entity/primitive resolution and selection-presence recipe inputs now consume extraction snapshots.
 - [ ] Resolve retained `GPUScene` handles, bindless references, and debug-view state during extraction rather than during late pass recording.
 - Extraction-only consumption is locked by `RenderExtraction` test coverage.

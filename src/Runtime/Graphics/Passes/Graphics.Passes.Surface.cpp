@@ -100,6 +100,12 @@ namespace Graphics::Passes
             if (normal.IsValid() && albedo.IsValid() && material.IsValid())
             {
                 AddGBufferRasterPass(ctx, normal, albedo, material, depth, std::move(stream));
+
+                // Debug triangles render to SceneColorHDR even in deferred mode
+                // (they're editor overlays, not scene geometry).
+                const RGResourceHandle sceneColor = ctx.Blackboard.Get(RenderResource::SceneColorHDR);
+                if (sceneColor.IsValid())
+                    AddDebugTrianglePass(ctx, sceneColor, depth);
                 return;
             }
             // Fall through to forward path if G-buffer resources are missing.
@@ -112,6 +118,10 @@ namespace Graphics::Passes
             return;
 
         AddRasterPass(ctx, sceneColor, depth, std::move(stream));
+
+        // Transient debug triangles — rendered AFTER retained geometry with alpha blending
+        // and depth-write-off so fills don't occlude scene content.
+        AddDebugTrianglePass(ctx, sceneColor, depth);
     }
 
 
@@ -1296,6 +1306,111 @@ namespace Graphics::Passes
         }
         return EnsurePerEntityBuffer<GpuCentroidEntry>(
             *m_Device, m_CentroidBuffers, geoIndex, gpu.data(), static_cast<uint32_t>(gpu.size()), "SurfacePass");
+    }
+
+    // -----------------------------------------------------------------
+    // Debug triangle pass — geometry-processing visualization
+    // -----------------------------------------------------------------
+    // Renders extracted DebugDraw triangles with a lightweight dedicated
+    // pipeline (no instance SSBOs, alpha blending, depth-write off).
+
+    void SurfacePass::AddDebugTrianglePass(RenderPassContext& ctx, RGResourceHandle sceneColor, RGResourceHandle depth)
+    {
+        const auto& debugTriangles = ctx.DebugDrawTriangles;
+        if (debugTriangles.empty() || !m_DebugSurfacePipeline || !m_Device)
+            return;
+
+        const uint32_t vertexCount = static_cast<uint32_t>(debugTriangles.size());
+        const uint32_t frameIndex = ctx.FrameIndex % FRAMES;
+
+        constexpr uint32_t kMinCap = 256u;
+        constexpr VkBufferUsageFlags kBDA = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
+                                          | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+
+        // Ensure per-frame transient BDA buffers (SoA: positions, normals, colors).
+        if (!EnsurePerFrameBuffer<glm::vec3, FRAMES>(
+                *m_Device, m_TransientPosBuffer, m_TransientPosCapacity,
+                vertexCount, kMinCap, "SurfacePass.DebugTri", kBDA))
+            return;
+        if (!EnsurePerFrameBuffer<glm::vec3, FRAMES>(
+                *m_Device, m_TransientNormBuffer, m_TransientNormCapacity,
+                vertexCount, kMinCap, "SurfacePass.DebugTri", kBDA))
+            return;
+        if (!EnsurePerFrameBuffer<uint32_t, FRAMES>(
+                *m_Device, m_TransientColorBuffer, m_TransientColorCapacity,
+                vertexCount, kMinCap, "SurfacePass.DebugTri", kBDA))
+            return;
+
+        // Deinterleave TriangleVertex AoS → SoA and upload.
+        auto* posData = static_cast<glm::vec3*>(m_TransientPosBuffer[frameIndex]->GetMappedData());
+        auto* normData = static_cast<glm::vec3*>(m_TransientNormBuffer[frameIndex]->GetMappedData());
+        auto* colorData = static_cast<uint32_t*>(m_TransientColorBuffer[frameIndex]->GetMappedData());
+
+        if (!posData || !normData || !colorData)
+        {
+            Core::Log::Error("SurfacePass: Debug triangle transient buffers are not mapped.");
+            return;
+        }
+
+        for (uint32_t i = 0; i < vertexCount; ++i)
+        {
+            posData[i] = debugTriangles[i].Position;
+            normData[i] = debugTriangles[i].Normal;
+            colorData[i] = debugTriangles[i].Color;
+        }
+
+        m_TransientPosBuffer[frameIndex]->Flush(0u, vertexCount * sizeof(glm::vec3));
+        m_TransientNormBuffer[frameIndex]->Flush(0u, vertexCount * sizeof(glm::vec3));
+        m_TransientColorBuffer[frameIndex]->Flush(0u, vertexCount * sizeof(uint32_t));
+
+        const uint64_t posAddr = m_TransientPosBuffer[frameIndex]->GetDeviceAddress();
+        const uint64_t normAddr = m_TransientNormBuffer[frameIndex]->GetDeviceAddress();
+        const uint64_t colorAddr = m_TransientColorBuffer[frameIndex]->GetDeviceAddress();
+
+        // Push constants: 3 x uint64_t BDA pointers = 24 bytes.
+        struct DebugSurfacePushConstants
+        {
+            uint64_t PtrPositions;
+            uint64_t PtrNormals;
+            uint64_t PtrColors;
+        };
+        static_assert(sizeof(DebugSurfacePushConstants) == 24);
+
+        const DebugSurfacePushConstants push{posAddr, normAddr, colorAddr};
+        const VkDescriptorSet globalSet = ctx.GlobalDescriptorSet;
+        const uint32_t dynamicOffset = static_cast<uint32_t>(ctx.GlobalCameraDynamicOffset);
+        const VkExtent2D resolution = ctx.Resolution;
+        const VkPipeline pipeline = m_DebugSurfacePipeline->GetHandle();
+        const VkPipelineLayout layout = m_DebugSurfacePipeline->GetLayout();
+
+        ctx.Graph.AddPass<PassData>("DebugTriangles",
+            [&](PassData& data, RGBuilder& builder)
+            {
+                RGAttachmentInfo colorInfo{};
+                colorInfo.LoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+                colorInfo.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+                data.Color = builder.WriteColor(sceneColor, colorInfo);
+
+                RGAttachmentInfo depthInfo{};
+                depthInfo.LoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+                depthInfo.StoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+                data.Depth = builder.WriteDepth(depth, depthInfo);
+            },
+            [globalSet, dynamicOffset, resolution, pipeline, layout, push, vertexCount]
+            (const PassData&, const RGRegistry&, VkCommandBuffer cmd)
+            {
+                vkCmdSetPrimitiveTopology(cmd, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+                SetViewportScissor(cmd, resolution);
+
+                vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+                vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                        layout, 0, 1, &globalSet, 1, &dynamicOffset);
+                vkCmdPushConstants(cmd, layout,
+                                   VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                                   0, sizeof(push), &push);
+
+                vkCmdDraw(cmd, vertexCount, 1, 0, 0);
+            });
     }
 
     // -----------------------------------------------------------------

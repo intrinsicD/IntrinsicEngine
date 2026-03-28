@@ -81,6 +81,7 @@ export namespace Graphics
                         std::span<const DebugDraw::LineSegment> debugDrawLines = {},
                         std::span<const DebugDraw::LineSegment> debugDrawOverlayLines = {},
                         std::span<const DebugDraw::PointMarker> debugDrawPoints = {},
+                        std::span<const DebugDraw::TriangleVertex> debugDrawTriangles = {},
                         const EditorOverlayPacket& editorOverlay = {});
         void ExecuteGraph();
         void EndFrame();

@@ -88,6 +88,7 @@ export namespace Runtime
         std::vector<Graphics::DebugDraw::LineSegment> DebugDrawLines{};
         std::vector<Graphics::DebugDraw::LineSegment> DebugDrawOverlayLines{};
         std::vector<Graphics::DebugDraw::PointMarker> DebugDrawPoints{};
+        std::vector<Graphics::DebugDraw::TriangleVertex> DebugDrawTriangles{};
 
         [[nodiscard]] bool IsValid() const
         {

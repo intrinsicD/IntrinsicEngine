@@ -167,6 +167,10 @@ namespace Graphics
         if (pipelineLibrary.Contains(kPipeline_SurfaceGBuffer))
             m_SurfacePass->SetGBufferPipeline(&pipelineLibrary.GetOrDie(kPipeline_SurfaceGBuffer));
 
+        // Wire debug surface pipeline for transient triangle visualization.
+        if (pipelineLibrary.Contains(kPipeline_DebugSurface))
+            m_SurfacePass->SetDebugSurfacePipeline(&pipelineLibrary.GetOrDie(kPipeline_DebugSurface));
+
         m_PathDirty = true;
     }
 

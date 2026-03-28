@@ -195,6 +195,8 @@ namespace Runtime
             ShaderRegistration{"Post.BloomDown.Frag"_id, "shaders/post_bloom_downsample.frag.spv"},
             ShaderRegistration{"Post.BloomUp.Frag"_id, "shaders/post_bloom_upsample.frag.spv"},
             ShaderRegistration{"Post.Histogram.Comp"_id, "shaders/post_histogram.comp.spv"},
+            ShaderRegistration{"DebugSurface.Vert"_id, "shaders/debug_surface.vert.spv"},
+            ShaderRegistration{"DebugSurface.Frag"_id, "shaders/debug_surface.frag.spv"},
         };
 
         for (const auto& registration : kShaderRegistrations)
@@ -281,12 +283,15 @@ namespace Runtime
         auto lines = m_DebugDraw.GetLines();
         auto overlayLines = m_DebugDraw.GetOverlayLines();
         auto points = m_DebugDraw.GetPoints();
+        auto triangles = m_DebugDraw.GetTriangles();
         if (!lines.empty())
             world.DebugDrawLines.assign(lines.begin(), lines.end());
         if (!overlayLines.empty())
             world.DebugDrawOverlayLines.assign(overlayLines.begin(), overlayLines.end());
         if (!points.empty())
             world.DebugDrawPoints.assign(points.begin(), points.end());
+        if (!triangles.empty())
+            world.DebugDrawTriangles.assign(triangles.begin(), triangles.end());
 
         return world;
     }
@@ -335,6 +340,7 @@ namespace Runtime
                                    preparedRenderWorld->DebugDrawLines,
                                    preparedRenderWorld->DebugDrawOverlayLines,
                                    preparedRenderWorld->DebugDrawPoints,
+                                   preparedRenderWorld->DebugDrawTriangles,
                                    preparedRenderWorld->EditorOverlay);
         frame.Prepared = true;
     }
