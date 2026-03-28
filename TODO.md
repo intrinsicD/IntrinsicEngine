@@ -189,7 +189,7 @@ Mapping guidance for current Intrinsic code while preserving that reference shap
 - Immutable packet families for Intrinsic's renderer are complete:
   - Surface draw, line/point/debug draw, selection/picking, light/environment, UI/editor overlay, and geometry-processing visualization (debug triangles) packets are all extracted through `RenderWorld`.
 - Picking entity/primitive resolution and selection-presence recipe inputs now consume extraction snapshots.
-- [ ] Resolve retained `GPUScene` handles, bindless references, and debug-view state during extraction rather than during late pass recording.
+- Retained GPUScene snapshot, pick-request state, and debug-view state are now resolved during extraction into `RenderWorld` (via `PickRequestSnapshot`, `DebugViewSnapshot`, `GpuSceneSnapshot`). `BuildGraph` consumes immutable extracted state instead of querying live `InteractionSystem`. Bindless descriptor infrastructure remains a persistent reference (flushed before graph execution, not per-frame state).
 - Extraction-only consumption is locked by `RenderExtraction` test coverage.
 
 #### B4.6 Render preparation stage (D)
