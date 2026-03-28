@@ -63,7 +63,7 @@ O2 remains the default migration path per `docs/architecture/adr-o2-pragmatic-me
 
 ##### Critical / Correctness
 
-- [ ] **Flaky `CoreFrameGraph.ReadyQueueNestedDispatchStressHighWorkerCount` assertion failure.** Intermittent `assert(prior > 0 && "FrameGraph dependent indegree underflow")` in `Core.FrameGraph.cpp:143` during the nested-dispatch stress test with high worker counts. Race condition in indegree bookkeeping — passes non-deterministically depending on thread scheduling.
+*(No active items — see git history for completed fixes.)*
 
 ##### Performance
 
@@ -71,7 +71,7 @@ O2 remains the default migration path per `docs/architecture/adr-o2-pragmatic-me
 
 ##### Process / Hygiene
 
-- [ ] **`tools/check_todo_active_only.sh` fails on current `TODO.md`.** The script enforces an active-only policy (no `[x]` items), but multiple completed checklist items remain throughout the file. Either clean up all `[x]` entries (move completion notes to git history) or adjust the script to permit `[x]` items in specific sections (e.g., migration-phase tracking in B4).
+*(No active items — completed `[x]` entries cleaned up, `check_todo_active_only.sh` now passes. See git history.)*
 
 ##### Compiler Warnings (pre-existing)
 
@@ -88,7 +88,7 @@ O2 remains the default migration path per `docs/architecture/adr-o2-pragmatic-me
 
 ###### Process / Hygiene
 
-- [x] **Bundled unrelated changes in single commits:** `e711573` mixes RHI module refactoring with KMeans rendering fixes. `4e474f2` bundles CUDA-default removal with frame-loop scaffolding. `563aa1c` bundles Material/PostProcess code reorganization with import narrowing. Future commits should separate mechanical refactors from behavioral changes. *(Addressed by codifying a repo-wide commit hygiene policy in `CLAUDE.md`.)*
+*(Commit hygiene concern addressed by codifying a repo-wide commit hygiene policy in `CLAUDE.md` — see git history.)*
 
 ### B4. Next-Gen Frame Pipeline Refactor (Fixed-Step + Extraction + Explicit Frame Contexts)
 
@@ -97,9 +97,9 @@ Goal: refactor the runtime from a monolithic update/render loop into a staged fr
 #### B4.0 Target properties (the contract we are designing toward)
 
 - Baseline now runs simulation on a fixed timestep while keeping rendering variable-rate.
-- [x] Treat job-system-driven parallelism as the default for simulation/extraction/render prep work. *(Picking-packet extraction now dispatches surface/line/point packet builds through `Core::Tasks::Scheduler` with a serial fallback when the scheduler is unavailable.)*
-- [x] Make GPU synchronization, frame pacing, and deferred resource retirement explicit architecture concepts. *(Maintenance lane now snapshots graphics timeline/global-frame sync state once per frame (`CaptureGpuSyncState`) before readback/material-retirement work, so GPU-completion-driven maintenance is an explicit staged concept instead of scattered ad-hoc queries.)*
-- [x] Preserve headless/testable paths by isolating platform + swapchain work from simulation/extraction/maintenance logic. *(Added `ResizeSyncCoordinator` + `IResizeSyncHost` seam so framebuffer/swapchain resize decisions are testable outside `Engine::Run()` and reusable for non-renderable platform frames.)*
+- Job-system-driven parallelism is the default for simulation/extraction/render prep work.
+- GPU synchronization, frame pacing, and deferred resource retirement are explicit architecture concepts.
+- Headless/testable paths isolated from platform + swapchain work.
 
 #### B4.1 Core principle: authoritative world state -> immutable render state
 
@@ -172,32 +172,29 @@ while (!app.should_quit())
 
 Mapping guidance for current Intrinsic code while preserving that reference shape:
 
-- [x] `platform` maps to the current window/event/minimize/resize orchestration on the main thread. *(Implemented via `RuntimePlatformFrameHost` + `PlatformFrameCoordinator`, including main-thread ownership validation, pump/minimize handling, and framebuffer extent capture before staged frame execution.)*
+- `platform` maps to `RuntimePlatformFrameHost` + `PlatformFrameCoordinator` (main-thread ownership, pump/minimize, framebuffer extent capture).
 - Current baseline: `world` maps to `SceneManager` + authoritative ECS scene ownership, with an explicit `commit_tick()` / readonly snapshot boundary.
 - Current baseline: `renderer` maps to `RenderOrchestrator` plus `RenderSystem`, with the runtime render lane now following `begin_frame -> extract_render_world -> prepare_frame -> execute_frame -> end_frame`.
-- [x] `resource_system` maps to the currently split upload-retirement / deferred-destruction responsibilities across `AssetPipeline`, render-side lifetime queues, and future explicit GPU-retirement services. *(Implemented `Runtime::ResourceMaintenanceService` as the typed runtime seam consumed by `RuntimeMaintenanceLaneHost`, consolidating GPU sync capture, readback completion, deferred-destruction collection, transfer garbage collection, and texture/material retirement under one maintenance-lane-facing service.)*
+- `resource_system` maps to `Runtime::ResourceMaintenanceService` (GPU sync capture, readback, deferred-destruction, transfer GC, texture/material retirement).
 - Current baseline: `RenderFrameInput`, `RenderWorld`, and `FrameContext` are first-class types rather than remaining implicit in `Engine::Run()` / `RenderSystem::OnUpdate(...)`.
 
 #### B4.3 Platform stage (A)
 
 #### B4.4 Simulation stage (B)
 
-- [x] Move deterministic gameplay / ECS / physics / AI / animation work onto the fixed-step lane. *(Engine now registers caller fixed-step systems plus the core deterministic ECS bundle (`TransformUpdate`, `PropertySetDirtySync`, `PrimitiveBVHBuild`) in the fixed-step frame graph; render-lane engine registration is GPU-sync-only.)*
+- Deterministic gameplay / ECS / physics / AI / animation work runs on the fixed-step lane.
 
 #### B4.5 Extraction stage (C)
 
-- [x] Ensure extraction is the only place that resolves live ECS state into render packets for the frame. *(`Runtime::RenderExtraction` now resolves committed-world surface/line/point draw packets, HTEX preview inputs, and selection/picking packets before render prep; `Graphics::RenderSystem::BuildGraph(...)` no longer takes `ECS::Scene`, so pass recording consumes extracted packet spans instead of late live-ECS queries.)*
+- Extraction is the sole resolver of live ECS state into render packets per frame.
 - [ ] Define immutable packet families for Intrinsic's renderer:
-  - [x] surface draw packets
-  - [x] line / point / debug draw packets *(line and point packets extracted via ECS; debug draw now snapshotted into `RenderWorld` vectors during `ExtractRenderWorld` and consumed as immutable spans through `RenderPassContext`)*
-  - [x] selection / picking packets
+  - Surface draw, line/point/debug draw, and selection/picking packets are complete.
   - [ ] light / environment packets
   - [ ] UI / editor overlay packets
   - [ ] geometry-processing visualization packets *(HTEX patch preview now extracts immutable inputs; broader visualization packet families are still pending)*
-- [x] Move `Graphics.Passes.Picking` entity/primitive resolution into extraction so pass recording consumes immutable pick packets instead of live ECS traversal. *(Runtime extraction now builds immutable `PickingSurfacePacket`/`PickingLinePacket`/`PickingPointPacket` bundles, and `PickingPass` records draws exclusively from `RenderPassContext` packet spans.)*
-- [x] Route selection-presence recipe inputs through extraction snapshots instead of querying live ECS during render-graph recipe construction. *(Extraction now captures immutable `RenderWorld::HasSelectionWork`, and both `RenderSystem` fallback recipe logic plus `DefaultPipeline::BuildFrameRecipe` consume that snapshot state rather than doing late `SelectedTag`/`HoveredTag` registry traversals.)*
+- Picking entity/primitive resolution and selection-presence recipe inputs now consume extraction snapshots.
 - [ ] Resolve retained `GPUScene` handles, bindless references, and debug-view state during extraction rather than during late pass recording.
-- [x] Add tests that guarantee render prep and command recording consume extraction output only. *(`RenderExtraction` coverage now locks immutable extraction-snapshot behavior for picking, surface draw, line draw, point draw, and HTEX preview packets, preventing live ECS mutations from changing recorded packet inputs.)*
+- Extraction-only consumption is locked by `RenderExtraction` test coverage.
 
 #### B4.6 Render preparation stage (D)
 
@@ -216,9 +213,7 @@ Mapping guidance for current Intrinsic code while preserving that reference shap
 
 #### B4.8 Maintenance stage (F)
 
-- [x] Retire completed uploads after GPU completion is known. *(Maintenance lane now owns transfer garbage collection after render submission.)*
-- [x] Process deferred destruction only when the relevant GPU completion value has passed. *(Maintenance lane now explicitly runs timeline-based deferred-destruction collection.)*
-- [x] Centralize GPU readback completion in the maintenance lane. *(GPU pick readback completion now runs via `MaintenanceLaneCoordinator` instead of render preparation.)*
+- Upload retirement, deferred destruction, and GPU readback completion are centralized in the maintenance lane.
 - [ ] Keep centralizing remaining maintenance concerns here:
   - [ ] garbage collection
   - [ ] profiler rollup
@@ -238,7 +233,7 @@ Mapping guidance for current Intrinsic code while preserving that reference shap
   - [ ] per-frame render graph or graph-execution cache
   - [ ] per-frame profiling/stat samples
 - [ ] Audit existing systems and migrate any frame-temporary resource keyed by swapchain image count to frame-in-flight ownership unless image affinity is truly required.
-- [x] Add explicit wait behavior before a `FrameContext` is reused once GPU-completion tracking is wired into the frame ring. *(Renderer now blocks on the graphics timeline semaphore when a recycled slot still references an in-flight submit, using the slot's last-submitted timeline value.)*
+- Explicit wait behavior before `FrameContext` reuse is wired via graphics timeline semaphore blocking.
 
 #### B4.10 Job system + multi-threaded command recording
 
