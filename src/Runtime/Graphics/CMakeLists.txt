@@ -12,7 +12,20 @@ target_sources(${target_name}
         Graphics.Model.cppm
         Graphics.RenderSystem.cppm
         Graphics.RenderGraph.cppm
-        Graphics.Components.cppm
+        Components/Graphics.Components.cppm
+        Components/Graphics.Components.Core.cppm
+        Components/Graphics.Components.DirtyTag.cppm
+        Components/Graphics.Components.MeshCollider.cppm
+        Components/Graphics.Components.PrimitiveBVH.cppm
+        Components/Graphics.Components.PointKDTree.cppm
+        Components/Graphics.Components.Mesh.cppm
+        Components/Graphics.Components.PointCloud.cppm
+        Components/Graphics.Components.Graph.cppm
+        Components/Graphics.Components.MeshEdgeView.cppm
+        Components/Graphics.Components.MeshVertexView.cppm
+        Components/Graphics.Components.Surface.cppm
+        Components/Graphics.Components.Line.cppm
+        Components/Graphics.Components.Point.cppm
         Graphics.ModelLoader.cppm
         Graphics.TextureLoader.cppm
         Graphics.AssetErrors.cppm

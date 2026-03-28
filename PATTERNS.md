@@ -172,7 +172,7 @@ registry.on_destroy<ECS::Surface::Component>().connect<&OnSurfaceDestroyed>();
 ```
 
 **Canonical examples:**
-- `Graphics.Components.cppm` — `Surface::Component`, `Line::Component`, `Point::Component`, `Graph::Data`, `PointCloud::Data`, `DirtyTag::*`.
+- `Graphics/Components/Graphics.Components.*.cppm` — `Surface::Component`, `Line::Component`, `Point::Component`, `Graph::Data`, `PointCloud::Data`, `DirtyTag::*`. Split into one file per component type with a re-export aggregator (`Graphics.Components.cppm`).
 - `ECS.Components.Transform.cppm` — `IsDirtyTag`, `WorldUpdatedTag`.
 - `ECS.Components.Selection.cppm` — `SelectableTag`, `SelectedTag`, `HoveredTag`.
 - `Runtime.SceneManager.cpp` — `on_destroy` hooks for GPU resource cleanup.
@@ -419,11 +419,11 @@ A mesh uploads positions/normals once; wireframe, vertex visualization, and kNN 
 | 2 | **`std::expected` Error Handling** | `Graphics.Importers.STL.cpp`, `Graphics.IORegistry.cppm` | All fallible operations |
 | 3 | **Geometry Operator** | `Geometry.Simplification.cppm`, `Geometry.CatmullClark.cppm`, `Geometry.ConvexHullBuilder.cppm` | New mesh/graph/cloud algorithms |
 | 4 | **Module Organization** | `Core.Assets.cppm`/`.cpp`, `RHI.Pipeline.cppm`/`.cpp` | Every new source file |
-| 5 | **ECS Components** | `Graphics.Components.cppm`, `ECS.Components.Selection.cppm` | New entity data types |
+| 5 | **ECS Components** | `Graphics/Components/Graphics.Components.*.cppm`, `ECS.Components.Selection.cppm` | New entity data types |
 | 6 | **Render Pass / IRenderFeature** | `Graphics.Passes.Surface.cppm`, `Graphics.Pipelines.cppm` | New primitive types or rendering methods |
 | 7 | **Frame Graph / DAG Scheduling** | `Core.FrameGraph.cppm`, system `RegisterSystem()` functions | New per-frame ECS systems |
 | 8 | **SafeDestroy / Deferred Destruction** | `RHI.Device.cppm`, `Core.InplaceFunction.cppm` | GPU resource cleanup |
-| 9 | **Event Communication** | `ECS.Components.Events.cppm`, `Graphics.Components.cppm` (DirtyTag) | Inter-system notifications |
+| 9 | **Event Communication** | `ECS.Components.Events.cppm`, `Graphics/Components/Graphics.Components.DirtyTag.cppm` | Inter-system notifications |
 | 10 | **Asset Loader/Exporter** | `Graphics.IORegistry.cppm`, `Graphics.Importers.*.cpp` | New file format support |
 | 11 | **Lifecycle System** | `Graphics.Systems.MeshViewLifecycle.cppm`, `Graphics.Systems.GraphLifecycle.cppm` | New geometry type → GPU pipeline |
 | 12 | **Vtable Anchor** | `Graphics.IORegistry.cpp`, `Graphics.Pipelines.cppm` | Virtual interfaces in modules |
