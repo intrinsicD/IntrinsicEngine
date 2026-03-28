@@ -21,9 +21,10 @@ import Geometry.Handle;
 
 import Core.SystemFeatureCatalog;
 
-#include "Graphics.LifecycleUtils.hpp"
+import Graphics.LifecycleUtils;
 
 using namespace Core::Hash;
+using namespace Graphics::LifecycleUtils;
 
 namespace Graphics::Systems::MeshRendererLifecycle
 {

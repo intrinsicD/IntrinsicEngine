@@ -21,15 +21,15 @@ The concrete systems reviewed were:
 - `src/Runtime/Graphics/Graphics.Systems.PointCloudLifecycle.cpp`
 - `src/Runtime/Graphics/Graphics.Systems.MeshViewLifecycle.cpp`
 - `src/Runtime/Graphics/Graphics.Systems.PropertySetDirtySync.cpp`
-- `src/Runtime/Graphics/Graphics.LifecycleUtils.hpp`
+- `src/Runtime/Graphics/Graphics.LifecycleUtils.cppm`
 - `src/Runtime/Graphics/Graphics.GraphPropertyHelpers.hpp`
 
 ## Summary
 
 The retained-geometry systems already share a useful common substrate:
 
-- GPUScene slot allocation/release lives in `Graphics.LifecycleUtils.hpp`.
-- Visibility-aware pass component population also lives in `Graphics.LifecycleUtils.hpp`.
+- GPUScene slot allocation/release lives in `Graphics.LifecycleUtils.cppm`.
+- Visibility-aware pass component population also lives in `Graphics.LifecycleUtils.cppm`.
 - Graph property extraction is already centralized in `Graphics.GraphPropertyHelpers.hpp`.
 
 However, the audit found three remaining duplication clusters:
@@ -129,7 +129,7 @@ The recommended path is an **incremental O2-style medium refactor**, not a full 
 
 - Centralize point-cloud attribute extraction in a dedicated helper header.
 - Keep graph extraction in `Graphics.GraphPropertyHelpers.hpp`.
-- Keep existing lifecycle helpers in `Graphics.LifecycleUtils.hpp`.
+- Keep existing lifecycle helpers in `Graphics.LifecycleUtils.cppm`.
 
 This change is implemented together with this audit.
 

@@ -30,11 +30,12 @@ import RHI.Transfer;
 import Geometry.PointCloud;
 import Geometry.Handle;
 import Core.SystemFeatureCatalog;
+import Graphics.LifecycleUtils;
 
 #include "Graphics.PointCloudPropertyHelpers.hpp"
-#include "Graphics.LifecycleUtils.hpp"
 
 using namespace Core::Hash;
+using namespace Graphics::LifecycleUtils;
 
 namespace Graphics::Systems::PointCloudLifecycle
 {
