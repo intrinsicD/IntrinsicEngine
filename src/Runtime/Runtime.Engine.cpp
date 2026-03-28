@@ -32,7 +32,7 @@ import Runtime.RenderOrchestrator;
 import Runtime.FrameLoop;
 import Runtime.PointCloudKMeans;
 import Runtime.SystemBundles;
-import Runtime.SystemFeatureCatalog;
+import Core.SystemFeatureCatalog;
 
 using namespace Core::Hash;
 

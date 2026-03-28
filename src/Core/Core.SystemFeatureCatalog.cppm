@@ -1,7 +1,7 @@
 module;
 #include <string_view>
 
-export module Runtime.SystemFeatureCatalog;
+export module Core.SystemFeatureCatalog;
 
 import Core.FeatureRegistry;
 

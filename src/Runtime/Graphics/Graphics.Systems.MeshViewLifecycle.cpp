@@ -26,10 +26,9 @@ import RHI.Device;
 import RHI.Transfer;
 
 import Geometry.Handle;
+import Core.SystemFeatureCatalog;
 
 #include "Graphics.LifecycleUtils.hpp"
-
-import Runtime.SystemFeatureCatalog;
 
 using namespace Core::Hash;
 

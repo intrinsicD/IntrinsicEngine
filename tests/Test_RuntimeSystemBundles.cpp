@@ -8,7 +8,7 @@
 
 import Core;
 import ECS;
-import Runtime.SystemFeatureCatalog;
+import Core.SystemFeatureCatalog;
 import Runtime.SystemBundles;
 
 namespace

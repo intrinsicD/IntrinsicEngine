@@ -31,6 +31,7 @@ target_sources(${target_name}
         Core.Commands.cppm
         Core.IOBackend.cppm
         Core.Benchmark.cppm
+        Core.SystemFeatureCatalog.cppm
         PRIVATE
         Core.Memory.cpp
         Core.Logging.cpp

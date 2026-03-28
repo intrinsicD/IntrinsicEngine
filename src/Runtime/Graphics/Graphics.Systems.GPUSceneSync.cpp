@@ -14,7 +14,7 @@ import Core.Assets;
 import Core.FrameGraph;
 import Graphics.MaterialRegistry;
 import Graphics.Material;
-import Runtime.SystemFeatureCatalog;
+import Core.SystemFeatureCatalog;
 
 using namespace Core::Hash;
 

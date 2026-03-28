@@ -12,7 +12,7 @@ import Graphics.Systems.MeshViewLifecycle;
 import Graphics.Systems.PointCloudLifecycle;
 import Graphics.Systems.PrimitiveBVHBuild;
 import Graphics.Systems.PropertySetDirtySync;
-import Runtime.SystemFeatureCatalog;
+import Core.SystemFeatureCatalog;
 
 namespace
 {

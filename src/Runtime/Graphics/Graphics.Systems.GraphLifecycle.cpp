@@ -32,10 +32,10 @@ import Geometry.Handle;
 import RHI.Device;
 import RHI.Transfer;
 
+import Core.SystemFeatureCatalog;
+
 #include "Graphics.GraphPropertyHelpers.hpp"
 #include "Graphics.LifecycleUtils.hpp"
-
-import Runtime.SystemFeatureCatalog;
 
 using namespace Core::Hash;
 

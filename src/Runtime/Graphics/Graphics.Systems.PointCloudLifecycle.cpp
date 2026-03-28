@@ -29,11 +29,10 @@ import RHI.Transfer;
 
 import Geometry.PointCloud;
 import Geometry.Handle;
+import Core.SystemFeatureCatalog;
 
 #include "Graphics.PointCloudPropertyHelpers.hpp"
 #include "Graphics.LifecycleUtils.hpp"
-
-import Runtime.SystemFeatureCatalog;
 
 using namespace Core::Hash;
 

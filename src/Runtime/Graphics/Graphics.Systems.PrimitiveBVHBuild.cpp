@@ -22,7 +22,7 @@ import Core.Hash;
 import Core.FrameGraph;
 
 import ECS;
-import Runtime.SystemFeatureCatalog;
+import Core.SystemFeatureCatalog;
 
 using namespace Core::Hash;
 

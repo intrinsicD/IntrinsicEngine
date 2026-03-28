@@ -22,7 +22,7 @@ import Geometry.PointCloud;
 import Core.Hash;
 import Core.Logging;
 import Core.FrameGraph;
-import Runtime.SystemFeatureCatalog;
+import Core.SystemFeatureCatalog;
 
 #include "Graphics.GraphPropertyHelpers.hpp"
 #include "Graphics.PointCloudPropertyHelpers.hpp"
