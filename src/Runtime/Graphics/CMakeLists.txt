@@ -34,13 +34,13 @@ target_sources(${target_name}
         Graphics.RenderPipeline.cppm
         Graphics.GPUScene.cppm
         Graphics.FeatureCatalog.cppm
-        Graphics.Systems.GPUSceneSync.cppm
-        Graphics.Systems.MeshRendererLifecycle.cppm
-        Graphics.Systems.PrimitiveBVHBuild.cppm
-        Graphics.Systems.GraphLifecycle.cppm
-        Graphics.Systems.PointCloudLifecycle.cppm
-        Graphics.Systems.MeshViewLifecycle.cppm
-        Graphics.Systems.PropertySetDirtySync.cppm
+        Systems/Graphics.Systems.GPUSceneSync.cppm
+        Systems/Graphics.Systems.MeshRendererLifecycle.cppm
+        Systems/Graphics.Systems.PrimitiveBVHBuild.cppm
+        Systems/Graphics.Systems.GraphLifecycle.cppm
+        Systems/Graphics.Systems.PointCloudLifecycle.cppm
+        Systems/Graphics.Systems.MeshViewLifecycle.cppm
+        Systems/Graphics.Systems.PropertySetDirtySync.cppm
         # New Modules
         Graphics.RenderPath.cppm
         Graphics.GpuColor.cppm
@@ -116,13 +116,13 @@ target_sources(${target_name}
         Graphics.IsolineExtractor.cpp
         Pipelines/Graphics.Pipelines.cpp
         Graphics.IORegistry.cpp
-        Graphics.Systems.GPUSceneSync.cpp
-        Graphics.Systems.MeshRendererLifecycle.cpp
-        Graphics.Systems.PrimitiveBVHBuild.cpp
-        Graphics.Systems.GraphLifecycle.cpp
-        Graphics.Systems.PointCloudLifecycle.cpp
-        Graphics.Systems.MeshViewLifecycle.cpp
-        Graphics.Systems.PropertySetDirtySync.cpp
+        Systems/Graphics.Systems.GPUSceneSync.cpp
+        Systems/Graphics.Systems.MeshRendererLifecycle.cpp
+        Systems/Graphics.Systems.PrimitiveBVHBuild.cpp
+        Systems/Graphics.Systems.GraphLifecycle.cpp
+        Systems/Graphics.Systems.PointCloudLifecycle.cpp
+        Systems/Graphics.Systems.MeshViewLifecycle.cpp
+        Systems/Graphics.Systems.PropertySetDirtySync.cpp
         Passes/Graphics.Passes.Picking.cpp
         Passes/Graphics.Passes.Surface.cpp
         Passes/Graphics.Passes.SelectionOutline.cpp
