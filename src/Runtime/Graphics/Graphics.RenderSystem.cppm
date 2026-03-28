@@ -76,7 +76,10 @@ export namespace Graphics
                         std::span<const SurfaceDrawPacket> surfaceDrawPackets = {},
                         std::span<const LineDrawPacket> lineDrawPackets = {},
                         std::span<const PointDrawPacket> pointDrawPackets = {},
-                        const HtexPatchPreviewPacket* htexPatchPreview = nullptr);
+                        const HtexPatchPreviewPacket* htexPatchPreview = nullptr,
+                        std::span<const DebugDraw::LineSegment> debugDrawLines = {},
+                        std::span<const DebugDraw::LineSegment> debugDrawOverlayLines = {},
+                        std::span<const DebugDraw::PointMarker> debugDrawPoints = {});
         void ExecuteGraph();
         void EndFrame();
 
@@ -87,8 +90,6 @@ export namespace Graphics
         // Retained-mode scene is owned by Runtime::Engine. RenderSystem consumes it during rendering.
         void SetGpuScene(GPUScene* scene) { m_GpuScene = scene; }
 
-        // Debug drawing accumulator (owned by RenderOrchestrator, set during init).
-        void SetDebugDraw(DebugDraw* dd) { m_DebugDraw = dd; }
 
         // Accessors
         [[nodiscard]] InteractionSystem& GetInteraction() { return m_Interaction; }
@@ -139,9 +140,6 @@ export namespace Graphics
 
         // Retained-mode GPU scene (persistent SSBOs + sparse updates). Non-owning.
         GPUScene* m_GpuScene = nullptr;
-
-        // Debug drawing accumulator (non-owning, owned by RenderOrchestrator).
-        DebugDraw* m_DebugDraw = nullptr;
 
         // Cached frame lists for UI and debug resolve selection.
         std::vector<RenderGraphDebugPass> m_LastDebugPasses;

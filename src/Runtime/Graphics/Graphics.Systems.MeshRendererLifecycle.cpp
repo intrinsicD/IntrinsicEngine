@@ -19,9 +19,9 @@ import ECS;
 
 import Geometry.Handle;
 
-#include "Graphics.LifecycleUtils.hpp"
+import Core.SystemFeatureCatalog;
 
-import Runtime.SystemFeatureCatalog;
+#include "Graphics.LifecycleUtils.hpp"
 
 using namespace Core::Hash;
 

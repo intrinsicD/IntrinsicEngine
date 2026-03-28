@@ -15,7 +15,6 @@ target_sources(${target_name}
         Runtime.Selection.cppm
         Runtime.SelectionModule.cppm
         Runtime.FrameLoop.cppm
-        Runtime.SystemFeatureCatalog.cppm
         Runtime.SystemBundles.cppm
         Runtime.SceneSerializer.cppm
         Runtime.PointCloudKMeans.cppm

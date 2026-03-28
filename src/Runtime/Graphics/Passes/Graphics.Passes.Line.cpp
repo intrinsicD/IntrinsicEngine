@@ -18,7 +18,6 @@ import Graphics.RenderPipeline;
 import Graphics.RenderGraph;
 import Graphics.Geometry;
 import Graphics.Components;
-import Graphics.DebugDraw;
 import Graphics.ShaderRegistry;
 import Graphics.GpuColor;
 
@@ -345,10 +344,11 @@ namespace Graphics::Passes
         // =================================================================
         // Transient DebugDraw lines (uploaded per-frame via BDA)
         // =================================================================
-        if (m_DebugDraw && m_DebugDraw->HasContent())
+        // Consumes immutable debug draw snapshots from the extraction stage
+        // instead of reading the live DebugDraw accumulator.
         {
-            const uint32_t depthLineCount = m_DebugDraw->GetLineCount();
-            const uint32_t overlayLineCount = m_DebugDraw->GetOverlayLineCount();
+            const uint32_t depthLineCount = static_cast<uint32_t>(ctx.DebugDrawLines.size());
+            const uint32_t overlayLineCount = static_cast<uint32_t>(ctx.DebugDrawOverlayLines.size());
             const uint32_t totalTransient = depthLineCount + overlayLineCount;
 
             if (totalTransient > 0)
@@ -363,9 +363,6 @@ namespace Graphics::Passes
                 {
                     // Upload all transient lines into a single position + color buffer.
                     // Layout: [depth-tested lines..., overlay lines...]
-                    auto depthLines = m_DebugDraw->GetLines();
-                    auto overlayLines = m_DebugDraw->GetOverlayLines();
-
                     auto* mappedPositions = static_cast<glm::vec3*>(m_TransientPosBuffer[frameIndex]->GetMappedData());
                     auto* mappedColors = static_cast<uint32_t*>(m_TransientColorBuffer[frameIndex]->GetMappedData());
                     if (!mappedPositions || !mappedColors)
@@ -377,7 +374,7 @@ namespace Graphics::Passes
                         uint32_t segmentIndex = 0;
 
                         // Depth-tested lines first.
-                        for (const auto& seg : depthLines)
+                        for (const auto& seg : ctx.DebugDrawLines)
                         {
                             const uint32_t vertexIndex = segmentIndex * 2u;
                             mappedPositions[vertexIndex + 0u] = seg.Start;
@@ -387,7 +384,7 @@ namespace Graphics::Passes
                         }
 
                         // Overlay lines second.
-                        for (const auto& seg : overlayLines)
+                        for (const auto& seg : ctx.DebugDrawOverlayLines)
                         {
                             const uint32_t vertexIndex = segmentIndex * 2u;
                             mappedPositions[vertexIndex + 0u] = seg.Start;

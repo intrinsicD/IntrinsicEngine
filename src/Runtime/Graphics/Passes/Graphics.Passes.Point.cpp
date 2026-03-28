@@ -19,7 +19,6 @@ import Graphics.RenderPipeline;
 import Graphics.RenderGraph;
 import Graphics.Geometry;
 import Graphics.Components;
-import Graphics.DebugDraw;
 import Graphics.ShaderRegistry;
 import Graphics.GpuColor;
 
@@ -400,9 +399,10 @@ namespace Graphics::Passes
         // =================================================================
         // Transient DebugDraw points (uploaded per-frame via BDA)
         // =================================================================
-        if (m_DebugDraw)
+        // Consumes immutable debug draw snapshots from the extraction stage
+        // instead of reading the live DebugDraw accumulator.
         {
-            auto debugPoints = m_DebugDraw->GetPoints();
+            const auto& debugPoints = ctx.DebugDrawPoints;
             const uint32_t transientCount = static_cast<uint32_t>(debugPoints.size());
 
             if (transientCount > 0)

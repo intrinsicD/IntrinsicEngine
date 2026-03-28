@@ -1076,15 +1076,13 @@ namespace Graphics
                                   std::span<const SurfaceDrawPacket> surfaceDrawPackets,
                                   std::span<const LineDrawPacket> lineDrawPackets,
                                   std::span<const PointDrawPacket> pointDrawPackets,
-                                  const HtexPatchPreviewPacket* htexPatchPreview)
+                                  const HtexPatchPreviewPacket* htexPatchPreview,
+                                  std::span<const DebugDraw::LineSegment> debugDrawLines,
+                                  std::span<const DebugDraw::LineSegment> debugDrawOverlayLines,
+                                  std::span<const DebugDraw::PointMarker> debugDrawPoints)
     {
         const uint32_t frameIndex = m_Presentation.GetFrameIndex();
         m_RenderGraph.Reset(frameIndex);
-
-        // DebugDraw is transient per-frame and is reset by Engine::Run via
-        // RenderOrchestrator::ResetFrameState() before client OnUpdate emits lines.
-        // Do NOT clear here or we erase client-submitted debug lines (bounds/octree/kdtree)
-        // right before pipeline passes consume them.
 
         const uint32_t imageIndex = m_Presentation.GetImageIndex();
         const auto extent = m_Presentation.GetResolution();
@@ -1143,6 +1141,9 @@ namespace Graphics
         ctx.LineDrawPackets = lineDrawPackets;
         ctx.PointDrawPackets = pointDrawPackets;
         ctx.HtexPatchPreview = htexPatchPreview;
+        ctx.DebugDrawLines = debugDrawLines;
+        ctx.DebugDrawOverlayLines = debugDrawOverlayLines;
+        ctx.DebugDrawPoints = debugDrawPoints;
 
         auto stable = m_FrameScope.New<RenderPassContext>(ctx);
         RenderPassContext* stableCtx = stable ? *stable : &ctx;
@@ -1248,7 +1249,6 @@ namespace Graphics
 
         if (m_ActivePipeline)
         {
-            m_ActivePipeline->SetDebugDraw(m_DebugDraw);
             m_ActivePipeline->SetupFrame(*stableCtx);
         }
     }

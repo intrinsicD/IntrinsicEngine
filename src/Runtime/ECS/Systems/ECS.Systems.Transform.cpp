@@ -8,7 +8,7 @@ import :Components.Transform;
 import :Components.Hierarchy;
 import Core.Hash;
 import Core.FrameGraph;
-import Runtime.SystemFeatureCatalog;
+import Core.SystemFeatureCatalog;
 
 using Core::Hash::operator""_id;
 

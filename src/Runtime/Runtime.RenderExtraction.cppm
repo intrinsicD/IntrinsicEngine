@@ -8,6 +8,7 @@ module;
 export module Runtime.RenderExtraction;
 
 import Graphics.Camera;
+import Graphics.DebugDraw;
 import Graphics.RenderPipeline;
 import Runtime.SceneManager;
 
@@ -78,6 +79,11 @@ export namespace Runtime
         std::vector<Graphics::LineDrawPacket> LineDraws{};
         std::vector<Graphics::PointDrawPacket> PointDraws{};
         std::optional<Graphics::HtexPatchPreviewPacket> HtexPatchPreview{};
+
+        // Debug draw snapshots — immutable copies extracted from the DebugDraw accumulator.
+        std::vector<Graphics::DebugDraw::LineSegment> DebugDrawLines{};
+        std::vector<Graphics::DebugDraw::LineSegment> DebugDrawOverlayLines{};
+        std::vector<Graphics::DebugDraw::PointMarker> DebugDrawPoints{};
 
         [[nodiscard]] bool IsValid() const
         {

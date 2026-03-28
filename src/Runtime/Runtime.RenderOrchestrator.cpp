@@ -232,9 +232,6 @@ namespace Runtime
             std::exit(1);
         }
 
-        // Wire DebugDraw accumulator to RenderSystem (consumed by LinePass).
-        m_RenderSystem->SetDebugDraw(&m_DebugDraw);
-
         // Default Render Pipeline (hot-swappable)
         auto defaultPipeline = std::make_unique<Graphics::DefaultPipeline>();
         defaultPipeline->SetFeatureRegistry(m_FeatureRegistry);
@@ -269,7 +266,21 @@ namespace Runtime
 
     RenderWorld RenderOrchestrator::ExtractRenderWorld(const RenderFrameInput& input) const
     {
-        return Runtime::ExtractRenderWorld(input);
+        RenderWorld world = Runtime::ExtractRenderWorld(input);
+
+        // Snapshot transient debug draw data into immutable vectors so render
+        // passes consume frozen state instead of the live DebugDraw accumulator.
+        auto lines = m_DebugDraw.GetLines();
+        auto overlayLines = m_DebugDraw.GetOverlayLines();
+        auto points = m_DebugDraw.GetPoints();
+        if (!lines.empty())
+            world.DebugDrawLines.assign(lines.begin(), lines.end());
+        if (!overlayLines.empty())
+            world.DebugDrawOverlayLines.assign(overlayLines.begin(), overlayLines.end());
+        if (!points.empty())
+            world.DebugDrawPoints.assign(points.begin(), points.end());
+
+        return world;
     }
 
     void RenderOrchestrator::PrepareFrame(FrameContext& frame, RenderWorld renderWorld)
@@ -311,7 +322,10 @@ namespace Runtime
                                    preparedRenderWorld->SurfaceDraws,
                                    preparedRenderWorld->LineDraws,
                                    preparedRenderWorld->PointDraws,
-                                   preparedRenderWorld->HtexPatchPreview ? &*preparedRenderWorld->HtexPatchPreview : nullptr);
+                                   preparedRenderWorld->HtexPatchPreview ? &*preparedRenderWorld->HtexPatchPreview : nullptr,
+                                   preparedRenderWorld->DebugDrawLines,
+                                   preparedRenderWorld->DebugDrawOverlayLines,
+                                   preparedRenderWorld->DebugDrawPoints);
         frame.Prepared = true;
     }
 

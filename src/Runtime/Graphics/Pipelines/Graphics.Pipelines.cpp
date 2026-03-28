@@ -13,7 +13,7 @@ import Graphics.RenderPipeline;
 import Graphics.RenderGraph;
 import Graphics.Components;
 import Graphics.Geometry;
-import Graphics.DebugDraw;
+
 import Graphics.Passes.Picking;
 import Graphics.Passes.Surface;
 import Graphics.Passes.SelectionOutline;
@@ -379,14 +379,6 @@ namespace Graphics
         }
 
         m_Path.Execute(ctx);
-    }
-
-    void DefaultPipeline::SetDebugDraw(DebugDraw* dd)
-    {
-        if (m_LinePass)
-            m_LinePass->SetDebugDraw(dd);
-        if (m_PointPass)
-            m_PointPass->SetDebugDraw(dd);
     }
 
     void DefaultPipeline::OnResize(uint32_t width, uint32_t height)
