@@ -90,6 +90,11 @@ export namespace Runtime
         std::vector<Graphics::DebugDraw::PointMarker> DebugDrawPoints{};
         std::vector<Graphics::DebugDraw::TriangleVertex> DebugDrawTriangles{};
 
+        // Interaction state resolved during extraction (not late in BuildGraph).
+        Graphics::PickRequestSnapshot PickRequest{};
+        Graphics::DebugViewSnapshot DebugView{};
+        Graphics::GpuSceneSnapshot GpuScene{};
+
         [[nodiscard]] bool IsValid() const
         {
             return World.IsValid() && View.IsValid();

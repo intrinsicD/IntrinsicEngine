@@ -1074,6 +1074,8 @@ namespace Graphics
                                   const LightEnvironmentPacket& lighting,
                                   bool hasSelectionWork,
                                   const SelectionOutlinePacket& selectionOutline,
+                                  const PickRequestSnapshot& pickRequest,
+                                  const DebugViewSnapshot& debugView,
                                   std::span<const PickingSurfacePacket> pickingSurfacePackets,
                                   std::span<const PickingLinePacket> pickingLinePackets,
                                   std::span<const PickingPointPacket> pickingPointPackets,
@@ -1099,8 +1101,8 @@ namespace Graphics
         auto stableBlackboard = m_FrameScope.New<RenderBlackboard>(blackboard);
         RenderBlackboard* activeBlackboard = stableBlackboard ? *stableBlackboard : &blackboard;
 
-        const auto& pendingPick = m_Interaction.GetPendingPick();
-        const auto& debugView = m_Interaction.GetDebugViewState();
+        // Pick/debug state is now consumed from extraction-time snapshots
+        // rather than queried live from InteractionSystem.
 
         RenderPassContext ctx{
             m_RenderGraph,
@@ -1121,9 +1123,8 @@ namespace Graphics
             m_GlobalResources.GetGlobalDescriptorSet(),
             m_GlobalResources.GetDynamicUBOOffset(frameIndex),
             m_GlobalResources.GetBindlessSystem(),
-            {pendingPick.Pending, pendingPick.X, pendingPick.Y},
-            {debugView.Enabled, debugView.ShowInViewport, debugView.DisableCulling,
-             debugView.SelectedResource, debugView.DepthNear, debugView.DepthFar},
+            pickRequest,
+            debugView,
             m_LastDebugImages,
             m_LastDebugPasses,
             camera.ViewMatrix,
@@ -1154,7 +1155,7 @@ namespace Graphics
         else
         {
             stableCtx->Recipe.Depth = true;
-            stableCtx->Recipe.EntityId = pendingPick.Pending || hasSelectionWork || debugView.Enabled;
+            stableCtx->Recipe.EntityId = pickRequest.Pending || hasSelectionWork || debugView.Enabled;
             stableCtx->Recipe.DebugVisualization = debugView.Enabled;
             stableCtx->Recipe.Selection = hasSelectionWork;
             stableCtx->Recipe.LightingPath = FrameLightingPath::Forward;
