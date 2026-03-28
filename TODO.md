@@ -63,12 +63,20 @@ O2 remains the default migration path per `docs/architecture/adr-o2-pragmatic-me
 
 ##### Critical / Correctness
 
+- [ ] **Flaky `CoreFrameGraph.ReadyQueueNestedDispatchStressHighWorkerCount` assertion failure.** Intermittent `assert(prior > 0 && "FrameGraph dependent indegree underflow")` in `Core.FrameGraph.cpp:143` during the nested-dispatch stress test with high worker counts. Race condition in indegree bookkeeping — passes non-deterministically depending on thread scheduling.
 
 ##### Performance
 
 ##### Architecture / Pattern Compliance
 
 ##### Process / Hygiene
+
+- [ ] **`tools/check_todo_active_only.sh` fails on current `TODO.md`.** The script enforces an active-only policy (no `[x]` items), but multiple completed checklist items remain throughout the file. Either clean up all `[x]` entries (move completion notes to git history) or adjust the script to permit `[x]` items in specific sections (e.g., migration-phase tracking in B4).
+
+##### Compiler Warnings (pre-existing)
+
+- [ ] **Unused variable `bf` in `Graphics.Importers.OFF.cpp:135`.** `float bf` is computed but never used — only `rf` and `gf` are stored in `Aux.zw`. The blue channel is silently dropped.
+- [ ] **Missing field `PickRequest` initializer in `Graphics.RenderSystem.cpp:1118`.** Designated-initializer aggregate construction of `RenderPassContext` omits `PickRequest`, triggering `-Wmissing-field-initializers`. Fields are assigned separately on lines 1120-1122, but the aggregate init should include them or use a separate construction pattern.
 
 ##### 2026-03-20 / 2026-03-21 commit review
 
