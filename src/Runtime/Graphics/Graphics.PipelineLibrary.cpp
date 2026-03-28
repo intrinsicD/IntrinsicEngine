@@ -291,6 +291,47 @@ namespace Graphics
         }
 
         // ---------------------------------------------------------------------
+        // Debug surface pipeline (transient debug triangles)
+        //
+        // Lightweight: no instance SSBOs, no bindless textures. Only set=0
+        // camera UBO + 24-byte push constants (3 BDA pointers). Alpha blending
+        // enabled for semi-transparent fills. No backface culling (double-sided).
+        // Depth test on, depth write off (fills don't occlude scene geometry).
+        // ---------------------------------------------------------------------
+        {
+            auto [vertPath, fragPath] = resolveVF("DebugSurface.Vert"_id, "DebugSurface.Frag"_id);
+
+            RHI::ShaderModule vert(*m_Device, vertPath, RHI::ShaderStage::Vertex);
+            RHI::ShaderModule frag(*m_Device, fragPath, RHI::ShaderStage::Fragment);
+
+            RHI::VertexInputDescription inputLayout = {};
+            RHI::PipelineBuilder builder(m_DeviceOwner);
+            builder.SetShaders(&vert, &frag);
+            builder.SetInputLayout(inputLayout);
+            builder.SetColorFormats({sceneColorFormat});
+            builder.SetDepthFormat(depthFormat);
+            builder.SetCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE);
+            builder.EnableAlphaBlending();
+            builder.EnableDepthTest(false); // depth test on, depth write off
+            builder.AddDescriptorSetLayout(m_GlobalSetLayout.GetHandle());
+
+            VkPushConstantRange pushConstant{};
+            pushConstant.offset = 0;
+            pushConstant.size = 24; // 3 x uint64_t BDA pointers
+            pushConstant.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+            builder.AddPushConstantRange(pushConstant);
+
+            auto pipelineResult = builder.Build();
+            if (!pipelineResult)
+            {
+                Core::Log::Error("Failed to build DebugSurface pipeline: {}", (int)pipelineResult.error());
+                std::exit(1);
+            }
+
+            m_Pipelines[kPipeline_DebugSurface] = std::move(*pipelineResult);
+        }
+
+        // ---------------------------------------------------------------------
         // Picking pipeline (ID buffer + BDA)
         // ---------------------------------------------------------------------
         {

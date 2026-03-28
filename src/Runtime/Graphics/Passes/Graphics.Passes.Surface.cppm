@@ -60,6 +60,7 @@ export namespace Graphics::Passes
         void SetPointPipeline(RHI::GraphicsPipeline* p) { m_PointPipeline = p; }
         void SetCullPipeline(RHI::ComputePipeline* p) { m_CullPipeline = p; }
         void SetGBufferPipeline(RHI::GraphicsPipeline* p) { m_GBufferPipeline = p; }
+        void SetDebugSurfacePipeline(RHI::GraphicsPipeline* p) { m_DebugSurfacePipeline = p; }
 
         void AddPasses(RenderPassContext& ctx) override;
 
@@ -83,8 +84,8 @@ export namespace Graphics::Passes
         static_assert(sizeof(TransientVertex) == 32, "TransientVertex must be 32 bytes for GPU SSBO alignment");
 
         // Submit a single triangle for transient (per-frame) rendering.
-        // Transient triangles are rendered with the same pipeline as retained
-        // surface geometry but from a host-visible SSBO that is rebuilt each frame.
+        // Transient triangles are rendered via a dedicated debug surface pipeline
+        // with alpha blending and depth-write-off for overlay visualization.
         void SubmitTriangle(const glm::vec3& a, const glm::vec3& b, const glm::vec3& c,
                             const glm::vec3& normal, uint32_t color);
 
@@ -149,6 +150,7 @@ export namespace Graphics::Passes
         RHI::GraphicsPipeline* m_PointPipeline = nullptr; // owned by PipelineLibrary
         RHI::ComputePipeline* m_CullPipeline = nullptr; // owned by PipelineLibrary
         RHI::GraphicsPipeline* m_GBufferPipeline = nullptr; // owned by PipelineLibrary
+        RHI::GraphicsPipeline* m_DebugSurfacePipeline = nullptr; // owned by PipelineLibrary
 
         // Stage 1: SSBO pull-model.
         // CRITICAL: must match VulkanDevice::MAX_FRAMES_IN_FLIGHT (3) exactly.
@@ -206,6 +208,14 @@ export namespace Graphics::Passes
 
         // Transient triangle vertex buffer (rebuilt each frame).
         std::vector<TransientVertex> m_TransientVertices;
+
+        // Per-frame transient BDA buffers for debug/geometry-processing visualization.
+        std::unique_ptr<RHI::VulkanBuffer> m_TransientPosBuffer[FRAMES];
+        std::unique_ptr<RHI::VulkanBuffer> m_TransientNormBuffer[FRAMES];
+        std::unique_ptr<RHI::VulkanBuffer> m_TransientColorBuffer[FRAMES];
+        uint32_t m_TransientPosCapacity = 0;
+        uint32_t m_TransientNormCapacity = 0;
+        uint32_t m_TransientColorCapacity = 0;
 
         // ---------------------------------------------------------------------
         // Unified draw-stream contract (long-term error-resistant design)
@@ -275,6 +285,9 @@ export namespace Graphics::Passes
                                   RGResourceHandle normal, RGResourceHandle albedo,
                                   RGResourceHandle material, RGResourceHandle depth,
                                   DrawStream&& stream);
+
+        // Render transient debug triangles (geometry-processing visualization).
+        void AddDebugTrianglePass(RenderPassContext& ctx, RGResourceHandle sceneColor, RGResourceHandle depth);
 
         // Legacy helpers (will be folded into BuildDrawStream/AddRasterPass).
         void AddStage1And2Passes(RenderPassContext& ctx, RGResourceHandle backbuffer, RGResourceHandle depth);

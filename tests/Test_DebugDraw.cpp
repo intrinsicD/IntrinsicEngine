@@ -472,3 +472,63 @@ TEST(DebugDraw, MaxLineSegmentsCapsEmissionAndTracksDrops)
     EXPECT_EQ(dd.GetDroppedLineCount(), 0u);
     EXPECT_EQ(dd.GetRemainingLineCapacity(), 4u);
 }
+
+// =========================================================================
+// Triangle accumulation and extraction readiness
+// =========================================================================
+
+TEST(DebugDraw, Triangle_AccumulatesVerticesCorrectly)
+{
+    DebugDraw dd;
+    const uint32_t kBlue = DebugDraw::PackColor(40, 120, 255, 160);
+    const glm::vec3 a{0.0f, 0.0f, 0.0f};
+    const glm::vec3 b{1.0f, 0.0f, 0.0f};
+    const glm::vec3 c{0.0f, 1.0f, 0.0f};
+    const glm::vec3 n{0.0f, 0.0f, 1.0f};
+
+    dd.Triangle(a, b, c, n, kBlue);
+
+    EXPECT_EQ(dd.GetTriangleCount(), 1u);
+    EXPECT_TRUE(dd.HasContent());
+
+    auto verts = dd.GetTriangles();
+    ASSERT_EQ(verts.size(), 3u);
+    EXPECT_EQ(verts[0].Position, a);
+    EXPECT_EQ(verts[1].Position, b);
+    EXPECT_EQ(verts[2].Position, c);
+    EXPECT_EQ(verts[0].Normal, n);
+    EXPECT_EQ(verts[0].Color, kBlue);
+}
+
+TEST(DebugDraw, Triangle_MultipleAccumulate)
+{
+    DebugDraw dd;
+    dd.Triangle({0,0,0}, {1,0,0}, {0,1,0}, {0,0,1}, DebugDraw::Red());
+    dd.Triangle({0,0,0}, {0,0,1}, {1,0,0}, {0,1,0}, DebugDraw::Green());
+
+    EXPECT_EQ(dd.GetTriangleCount(), 2u);
+    EXPECT_EQ(dd.GetTriangles().size(), 6u);
+}
+
+TEST(DebugDraw, Triangle_ResetClearsAll)
+{
+    DebugDraw dd;
+    dd.Triangle({0,0,0}, {1,0,0}, {0,1,0}, {0,0,1}, DebugDraw::White());
+    EXPECT_EQ(dd.GetTriangleCount(), 1u);
+
+    dd.Reset();
+    EXPECT_EQ(dd.GetTriangleCount(), 0u);
+    EXPECT_TRUE(dd.GetTriangles().empty());
+}
+
+TEST(DebugDraw, TriangleVertex_LayoutMatchesSurfacePassTransientVertex)
+{
+    // DebugDraw::TriangleVertex must be binary-compatible with SurfacePass::TransientVertex
+    // for zero-copy extraction (same size, alignment, and field offsets).
+    using TV = DebugDraw::TriangleVertex;
+    EXPECT_EQ(sizeof(TV), 32u);
+    EXPECT_EQ(alignof(TV), 16u);
+    EXPECT_EQ(offsetof(TV, Position), 0u);
+    EXPECT_EQ(offsetof(TV, Color), 12u);
+    EXPECT_EQ(offsetof(TV, Normal), 16u);
+}

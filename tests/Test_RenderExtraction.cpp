@@ -12,6 +12,7 @@ import Runtime.RenderExtraction;
 import Runtime.SceneManager;
 import Graphics.Camera;
 import Graphics.Components;
+import Graphics.DebugDraw;
 import Graphics.RenderPipeline;
 import Geometry.Graph;
 import Geometry.PointCloud;
@@ -694,4 +695,64 @@ TEST(RenderExtraction, FrameContext_PreparedRenderWorldCarriesEditorOverlay)
     const Runtime::RenderWorld* prepared = frame.GetPreparedRenderWorld();
     ASSERT_NE(prepared, nullptr);
     EXPECT_TRUE(prepared->EditorOverlay.HasDrawData);
+}
+
+// --------------------------------------------------------------------------
+// DebugDrawTriangles extraction packet
+// --------------------------------------------------------------------------
+
+TEST(RenderExtraction, RenderWorld_DebugDrawTrianglesDefaultEmpty)
+{
+    Runtime::RenderWorld world{};
+    EXPECT_TRUE(world.DebugDrawTriangles.empty());
+}
+
+TEST(RenderExtraction, RenderWorld_DebugDrawTrianglesCarriesPopulatedData)
+{
+    Runtime::RenderWorld world{};
+
+    const uint32_t kBlue = Graphics::DebugDraw::PackColor(40, 120, 255, 160);
+    const glm::vec3 a{0.0f, 0.0f, 0.0f};
+    const glm::vec3 b{1.0f, 0.0f, 0.0f};
+    const glm::vec3 c{0.0f, 1.0f, 0.0f};
+    const glm::vec3 n{0.0f, 0.0f, 1.0f};
+
+    world.DebugDrawTriangles.push_back({a, kBlue, n, 0.0f});
+    world.DebugDrawTriangles.push_back({b, kBlue, n, 0.0f});
+    world.DebugDrawTriangles.push_back({c, kBlue, n, 0.0f});
+
+    ASSERT_EQ(world.DebugDrawTriangles.size(), 3u);
+    EXPECT_EQ(world.DebugDrawTriangles[0].Position, a);
+    EXPECT_EQ(world.DebugDrawTriangles[1].Position, b);
+    EXPECT_EQ(world.DebugDrawTriangles[2].Position, c);
+    EXPECT_EQ(world.DebugDrawTriangles[0].Color, kBlue);
+    EXPECT_EQ(world.DebugDrawTriangles[0].Normal, n);
+}
+
+TEST(RenderExtraction, RenderWorld_DebugDrawTrianglesSurviveMove)
+{
+    Runtime::SceneManager sceneManager;
+    sceneManager.CommitFixedTick();
+
+    Runtime::RenderWorld world{
+        .Alpha = 0.5,
+        .View = Runtime::MakeRenderViewPacket(Graphics::CameraComponent{},
+                                              Runtime::RenderViewport{.Width = 800, .Height = 600}),
+        .World = sceneManager.CreateReadonlySnapshot(),
+    };
+
+    const uint32_t kRed = Graphics::DebugDraw::PackColor(255, 0, 0, 255);
+    world.DebugDrawTriangles.push_back({{1,2,3}, kRed, {0,0,1}, 0.0f});
+    world.DebugDrawTriangles.push_back({{4,5,6}, kRed, {0,0,1}, 0.0f});
+    world.DebugDrawTriangles.push_back({{7,8,9}, kRed, {0,0,1}, 0.0f});
+
+    Runtime::FrameContext frame{};
+    frame.PreparedRenderWorld = std::move(world);
+    frame.Prepared = true;
+
+    const Runtime::RenderWorld* prepared = frame.GetPreparedRenderWorld();
+    ASSERT_NE(prepared, nullptr);
+    ASSERT_EQ(prepared->DebugDrawTriangles.size(), 3u);
+    EXPECT_EQ(prepared->DebugDrawTriangles[0].Position, glm::vec3(1, 2, 3));
+    EXPECT_EQ(prepared->DebugDrawTriangles[2].Position, glm::vec3(7, 8, 9));
 }
