@@ -2,6 +2,8 @@ module;
 #include <chrono>
 #include <memory>
 #include <algorithm>
+#include <optional>
+#include <utility>
 #include <vector>
 
 #include "RHI.Vulkan.hpp"
@@ -67,6 +69,11 @@ namespace RHI
     void SimpleRenderer::RequestShutdown()
     {
         m_ShutdownRequested = true;
+    }
+
+    std::optional<GpuTimestampFrame> SimpleRenderer::ConsumeResolvedGpuProfile()
+    {
+        return std::exchange(m_ResolvedGpuProfile, std::nullopt);
     }
 
     void SimpleRenderer::InitSyncStructures()
@@ -313,29 +320,14 @@ namespace RHI
         VK_CHECK(m_Device->SubmitToGraphicsQueue(submitInfo, m_InFlightFences[m_CurrentFrame]));
 
         // --- Non-blocking resolve of an older frame (avoid stalls) ---
+        // Cache the result for the orchestrator to consume per-FrameContext (B4.9).
         if (m_GpuProfiler)
         {
             const uint32_t framesInFlight = m_FramesInFlight;
             const uint32_t resolveFrame = (m_CurrentFrame + 1u) % framesInFlight;
 
             if (auto resolved = m_GpuProfiler->Resolve(resolveFrame); resolved.has_value())
-            {
-                auto& telemetry = Core::Telemetry::TelemetrySystem::Get();
-                telemetry.SetGpuFrameTimeNs(resolved->GpuFrameTimeNs);
-
-                // Build per-pass GPU timing entries from resolved scopes.
-                std::vector<Core::Telemetry::PassTimingEntry> passTimings;
-                passTimings.reserve(resolved->ScopeCount);
-                for (uint32_t s = 0; s < resolved->ScopeCount; ++s)
-                {
-                    passTimings.push_back(Core::Telemetry::PassTimingEntry{
-                        resolved->ScopeNames[s],
-                        resolved->ScopeDurationsNs[s],
-                        0 // CPU time merged separately
-                    });
-                }
-                telemetry.SetPassGpuTimings(std::move(passTimings));
-            }
+                m_ResolvedGpuProfile = std::move(*resolved);
         }
 
         // 8. Present
