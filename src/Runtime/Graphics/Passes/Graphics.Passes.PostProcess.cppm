@@ -12,6 +12,11 @@ import Graphics.RenderPipeline;
 import Graphics.RenderGraph;
 import Graphics.ShaderRegistry;
 import Graphics.Passes.PostProcessSettings;
+import Graphics.Passes.PostProcess.Bloom;
+import Graphics.Passes.PostProcess.ToneMap;
+import Graphics.Passes.PostProcess.FXAA;
+import Graphics.Passes.PostProcess.SMAA;
+import Graphics.Passes.PostProcess.Histogram;
 import RHI.Buffer;
 import RHI.ComputePipeline;
 import RHI.Descriptors;
@@ -22,30 +27,15 @@ import RHI.Pipeline;
 export namespace Graphics::Passes
 {
     // -----------------------------------------------------------------
-    // PostProcessPass — Bloom + HDR tone mapping + AA (FXAA or SMAA).
+    // PostProcessPass — orchestrator for post-processing sub-passes.
+    //
+    // Delegates to BloomSubPass, ToneMapSubPass, FXAASubPass,
+    // SMAASubPass, and HistogramSubPass. Each sub-pass owns its own
+    // pipelines, descriptor sets, and PostCompile logic.
     //
     // Reads canonical `SceneColorHDR` from the blackboard.
     // Writes canonical `SceneColorLDR` for later overlays and final presentation.
-    //
-    // Bloom chain (when enabled):
-    //   Downsample: SceneColorHDR -> BloomMip0 -> ... -> BloomMipN
-    //   Upsample:   BloomMipN -> ... -> BloomMip0 (additive accumulation)
-    //
-    // When FXAA is enabled:
-    //   ToneMap: SceneColorHDR + BloomMip0 -> PostLdrTemp
-    //   FXAA:    PostLdrTemp -> SceneColorLDR
-    //
-    // When SMAA is enabled (3-pass):
-    //   ToneMap:      SceneColorHDR + BloomMip0 -> PostLdrTemp
-    //   SMAA Edge:    PostLdrTemp -> SMAAEdges (RG8 edge mask)
-    //   SMAA Blend:   SMAAEdges + AreaTex + SearchTex -> SMAAWeights
-    //   SMAA Resolve: PostLdrTemp + SMAAWeights -> SceneColorLDR
-    //
-    // When AA is disabled:
-    //   ToneMap: SceneColorHDR + BloomMip0 -> SceneColorLDR
     // -----------------------------------------------------------------
-
-
     class PostProcessPass final : public IRenderFeature
     {
     public:
@@ -53,11 +43,7 @@ export namespace Graphics::Passes
                         RHI::DescriptorAllocator& descriptorPool,
                         RHI::DescriptorLayout&) override;
 
-        void SetShaderRegistry(const ShaderRegistry& shaderRegistry)
-        {
-            m_ShaderRegistry = &shaderRegistry;
-            m_DebugState.ShaderRegistryConfigured = true;
-        }
+        void SetShaderRegistry(const ShaderRegistry& shaderRegistry);
 
         void AddPasses(RenderPassContext& ctx) override;
         void Shutdown() override;
@@ -72,7 +58,7 @@ export namespace Graphics::Passes
         [[nodiscard]] const PostProcessDebugState& GetDebugState() const { return m_DebugState; }
 
         // Access CPU-side histogram readback for UI display.
-        [[nodiscard]] const HistogramReadback& GetHistogram() const { return m_HistogramReadback; }
+        [[nodiscard]] const HistogramReadback& GetHistogram() const { return m_Histogram.GetHistogram(); }
 
     private:
         RHI::VulkanDevice*   m_Device          = nullptr;
@@ -81,81 +67,19 @@ export namespace Graphics::Passes
         PostProcessSettings m_Settings;
         PostProcessDebugState m_DebugState;
 
-        // Tone map pipeline + descriptors (2 bindings: scene color + bloom)
-        VkDescriptorSetLayout m_ToneMapSetLayout = VK_NULL_HANDLE;
-        VkSampler             m_LinearSampler    = VK_NULL_HANDLE;
-        VkDescriptorSet       m_ToneMapSets[3]   = {};
-        std::unique_ptr<RHI::GraphicsPipeline> m_ToneMapPipeline;
-
-        // FXAA pipeline + descriptors
-        VkDescriptorSetLayout m_FXAASetLayout = VK_NULL_HANDLE;
-        VkDescriptorSet       m_FXAASets[3]   = {};
-        std::unique_ptr<RHI::GraphicsPipeline> m_FXAAPipeline;
-
-        // SMAA pipelines + descriptors
-        // Edge detection: 1 sampler (LDR input)
-        VkDescriptorSetLayout m_SMAAEdgeSetLayout = VK_NULL_HANDLE;
-        VkDescriptorSet       m_SMAAEdgeSets[3]   = {};
-        std::unique_ptr<RHI::GraphicsPipeline> m_SMAAEdgePipeline;
-
-        // Blend weight: 3 samplers (edges, area tex, search tex)
-        VkDescriptorSetLayout m_SMAABlendSetLayout = VK_NULL_HANDLE;
-        VkDescriptorSet       m_SMAABlendSets[3]   = {};
-        std::unique_ptr<RHI::GraphicsPipeline> m_SMAABlendPipeline;
-
-        // Neighborhood blending: 2 samplers (LDR input, blend weights)
-        VkDescriptorSetLayout m_SMAAResolveSetLayout = VK_NULL_HANDLE;
-        VkDescriptorSet       m_SMAAResolveSets[3]   = {};
-        std::unique_ptr<RHI::GraphicsPipeline> m_SMAAResolvePipeline;
-
-        // SMAA lookup textures (persistent, generated once)
-        std::unique_ptr<RHI::VulkanImage> m_SMAAAreaTex;
-        std::unique_ptr<RHI::VulkanImage> m_SMAASearchTex;
-
-        // Cached SMAA resource handles for PostCompile.
-        RGResourceHandle m_LastSMAAEdgesHandle{};
-        RGResourceHandle m_LastSMAAWeightsHandle{};
-
-        // Bloom downsample pipeline + descriptors
-        VkDescriptorSetLayout m_BloomDownSetLayout = VK_NULL_HANDLE;
-        VkDescriptorSet       m_BloomDownSets[3][kBloomMipCount] = {};
-        std::unique_ptr<RHI::GraphicsPipeline> m_BloomDownPipeline;
-
-        // Bloom upsample pipeline + descriptors
-        VkDescriptorSetLayout m_BloomUpSetLayout = VK_NULL_HANDLE;
-        VkDescriptorSet       m_BloomUpSets[3][kBloomMipCount] = {};
-        std::unique_ptr<RHI::GraphicsPipeline> m_BloomUpPipeline;
-
-        // Safe default binding used until PostCompile patches in the frame's actual image views.
+        // Shared resources.
+        VkSampler m_LinearSampler = VK_NULL_HANDLE;
         std::unique_ptr<RHI::VulkanImage> m_DummySampled;
 
-        // Cached resource handles for PostCompile descriptor update.
+        // Sub-passes.
+        BloomSubPass     m_Bloom;
+        ToneMapSubPass   m_ToneMap;
+        FXAASubPass      m_FXAA;
+        SMAASubPass      m_SMAA;
+        HistogramSubPass m_Histogram;
+
+        // Cached handles for PostCompile coordination.
         RGResourceHandle m_LastSceneColorHandle{};
         RGResourceHandle m_LastPostLdrHandle{};
-        RGResourceHandle m_LastBloomMip0Handle{};
-        std::array<RGResourceHandle, kBloomMipCount> m_LastBloomDownHandles{};
-        std::array<RGResourceHandle, kBloomMipCount> m_LastBloomUpSrcHandles{};
-        std::array<RGResourceHandle, kBloomMipCount> m_LastBloomMipWriteHandles{};
-
-        // Histogram compute pipeline + storage
-        VkDescriptorSetLayout m_HistogramSetLayout = VK_NULL_HANDLE;
-        VkDescriptorSet       m_HistogramSets[3]   = {};
-        std::unique_ptr<RHI::ComputePipeline> m_HistogramPipeline;
-        std::unique_ptr<RHI::VulkanBuffer>    m_HistogramBuffers[3]; // per-frame SSBO
-        HistogramReadback m_HistogramReadback;
-
-        std::unique_ptr<RHI::GraphicsPipeline> BuildToneMapPipeline(VkFormat outputFormat);
-        std::unique_ptr<RHI::GraphicsPipeline> BuildFXAAPipeline(VkFormat outputFormat);
-        std::unique_ptr<RHI::GraphicsPipeline> BuildSMAAEdgePipeline(VkFormat edgeFormat);
-        std::unique_ptr<RHI::GraphicsPipeline> BuildSMAABlendPipeline(VkFormat weightFormat);
-        std::unique_ptr<RHI::GraphicsPipeline> BuildSMAAResolvePipeline(VkFormat outputFormat);
-        std::unique_ptr<RHI::GraphicsPipeline> BuildBloomDownsamplePipeline();
-        std::unique_ptr<RHI::GraphicsPipeline> BuildBloomUpsamplePipeline();
-        std::unique_ptr<RHI::ComputePipeline>  BuildHistogramPipeline();
-
-        void InitializeSMAALookupTextures();
-        void AddBloomPasses(RenderPassContext& ctx, RGResourceHandle sceneColor);
-        void AddSMAAPasses(RenderPassContext& ctx, RGResourceHandle postLdr, RGResourceHandle sceneColorLdr);
-        void AddHistogramPass(RenderPassContext& ctx, RGResourceHandle sceneColor);
     };
 }

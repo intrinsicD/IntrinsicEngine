@@ -72,6 +72,11 @@ target_sources(${target_name}
         Passes/Graphics.Passes.Point.cppm
         Passes/Graphics.Passes.DebugView.cppm
         Passes/Graphics.Passes.PostProcessSettings.cppm
+        Passes/Graphics.Passes.PostProcess.Bloom.cppm
+        Passes/Graphics.Passes.PostProcess.ToneMap.cppm
+        Passes/Graphics.Passes.PostProcess.FXAA.cppm
+        Passes/Graphics.Passes.PostProcess.SMAA.cppm
+        Passes/Graphics.Passes.PostProcess.Histogram.cppm
         Passes/Graphics.Passes.PostProcess.cppm
         Passes/Graphics.Passes.Composition.cppm
         Passes/Graphics.Passes.ImGui.cppm
@@ -131,6 +136,11 @@ target_sources(${target_name}
         Passes/Graphics.Passes.Line.cpp
         Passes/Graphics.Passes.Point.cpp
         Passes/Graphics.Passes.DebugView.cpp
+        Passes/Graphics.Passes.PostProcess.Bloom.cpp
+        Passes/Graphics.Passes.PostProcess.ToneMap.cpp
+        Passes/Graphics.Passes.PostProcess.FXAA.cpp
+        Passes/Graphics.Passes.PostProcess.SMAA.cpp
+        Passes/Graphics.Passes.PostProcess.Histogram.cpp
         Passes/Graphics.Passes.PostProcess.cpp
         Passes/Graphics.Passes.Composition.cpp
         Importers/Graphics.Importers.OBJ.cpp
