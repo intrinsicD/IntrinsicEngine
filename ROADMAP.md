@@ -43,6 +43,43 @@ This roadmap now explicitly tracks the staged runtime/frame-pipeline work captur
 
 This architecture track is intentionally cross-cutting: it enables later rendering, streaming, and interaction work without reordering the feature roadmap below.
 
+### Architecture constraints (preserve during all refactor work)
+
+These constraints must be respected even when the underlying features are not being implemented yet:
+
+- Leave room for a material-system rewrite.
+- Leave room for transparency-path separation.
+- Leave room for hybrid lighting.
+- Leave room for motion vectors/history buffers.
+- Leave room for clustered/tiled lighting.
+- Leave room for effect passes like SSAO, decals, and bloom.
+- Leave room for future GPU-driven visibility integration.
+- Keep any non-MRT compatibility mode behind an explicit build/runtime feature flag; do not reintroduce it as an implicit picker fallback.
+
+### Anti-goals for the frame pipeline refactor
+
+- No single giant task graph that mixes simulation mutation and render submission.
+- No renderer walking arbitrary live ECS state during command recording.
+- No tying per-frame transient ownership to swapchain image count.
+- No unlimited frames in flight.
+- No immediate GPU resource destruction from gameplay/editor code.
+- No hardcoded detailed pass order in the top-level engine loop.
+
+### Sequencing rules
+
+- Finish P0 before starting P1 feature work unless the task is pure documentation, instrumentation, or test scaffolding that directly de-risks P0.
+- Treat P2 as design pressure during P0, not as implementation scope creep.
+- Keep selection/debug independent of the chosen lighting path.
+- Do not allocate every buffer every frame unless required by the active `FrameRecipe`.
+- Do not force full deferred shading everywhere yet.
+
+### Definition of done (cross-cutting)
+
+- Update `README.md` for each merged refactor milestone when user-facing architecture or workflow changes.
+- Remove superseded code paths immediately (no compatibility clutter beyond staged migration windows).
+- Add at least one integration test per milestone and wire it into the existing test targets.
+- Add or update migration notes when render contracts change.
+
 ---
 
 ## Phase 1 — Foundation
