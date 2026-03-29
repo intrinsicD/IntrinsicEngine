@@ -172,12 +172,10 @@ Currently only a single forward PBR pass (metallic-roughness) exists via `Surfac
 
 ### Shadow Mapping
 
-No shadow support exists. Shadows are critical for spatial understanding.
+CSM foundation (depth prepass + directional cascade shadow pass + PCF) is promoted to near-term priority and tracked in `TODO.md` P1/A1–A2. Remaining items after CSM lands:
 
-- Cascaded shadow maps (CSM) for directional lights.
 - Point light shadow maps (cubemap or dual-paraboloid) if point lights are added.
-- PCF or variance shadow maps for soft edges.
-- Shadow pass reuses `SurfacePass` geometry, writes depth only.
+- Variance shadow maps (VSM) as an alternative to PCF.
 
 ### Benchmarking & Profiling (**MVP complete**)
 
@@ -307,7 +305,7 @@ The two-layer architecture (I/O backend + format loaders) is complete with 8 imp
 
 ## Ongoing
 
-- **Shader hot-reload:** File-watcher integration for automatic recompilation on save. Implement alongside mesh rendering modes for fast shader iteration.
+- **Shader hot-reload:** Tracked in `TODO.md` P1/A3. File-watcher integration for automatic recompilation on save.
 - **Port-based testing boundaries:** Type-erased "port" interfaces for filesystem, windowing, and time so subsystems can be tested without Vulkan. Implement opportunistically as new subsystems are added.
 
 ---
