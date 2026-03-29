@@ -85,6 +85,8 @@ export namespace Runtime
         [[nodiscard]] Graphics::GeometryPool& GetGeometryStorage() { return m_GeometryStorage; }
         [[nodiscard]] const Graphics::GeometryPool& GetGeometryStorage() const { return m_GeometryStorage; }
 
+        // CPU-side FrameGraph allocators (ECS system closures).
+        // Render-graph allocators are per-FrameContext; see FrameContext::GetRenderArena/Scope.
         [[nodiscard]] Core::Memory::LinearArena& GetFrameArena() { return m_FrameArena; }
         [[nodiscard]] Core::Memory::ScopeStack& GetFrameScope() { return m_FrameScope; }
 
@@ -125,7 +127,8 @@ export namespace Runtime
                            Graphics::GeometryUploadMode uploadMode = Graphics::GeometryUploadMode::Staged);
 
     private:
-        // Per-frame scratch memory.
+        // Per-frame scratch memory for CPU-side FrameGraph (ECS system closures).
+        // Render-graph allocators are per-FrameContext (owned by FrameContextRing).
         Core::Memory::LinearArena m_FrameArena;
         Core::Memory::ScopeStack m_FrameScope;
         Core::FrameGraph m_FrameGraph;

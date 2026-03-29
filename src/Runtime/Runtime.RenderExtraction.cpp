@@ -12,6 +12,7 @@ module;
 
 module Runtime.RenderExtraction;
 
+import Core.Memory;
 import Graphics.Components;
 import Geometry.HalfedgeMesh;
 import Geometry.MeshUtils;
@@ -573,20 +574,29 @@ namespace Runtime
         return std::clamp(requestedCount, MinFrameContexts, MaxFrameContexts);
     }
 
-    FrameContextRing::FrameContextRing(uint32_t framesInFlight)
+    FrameContextRing::FrameContextRing(uint32_t framesInFlight, size_t renderArenaSize)
         : m_FramesInFlight(SanitizeFrameContextCount(framesInFlight))
+        , m_RenderArenaSize(renderArenaSize)
     {
-        Configure(m_FramesInFlight);
+        Configure(m_FramesInFlight, m_RenderArenaSize);
     }
 
-    void FrameContextRing::Configure(uint32_t framesInFlight)
+    // Precondition: must not be called while frames are in flight.
+    // Resizing the context vector invalidates references returned by BeginFrame().
+    void FrameContextRing::Configure(uint32_t framesInFlight, size_t renderArenaSize)
     {
         m_FramesInFlight = SanitizeFrameContextCount(framesInFlight);
-        m_Contexts.assign(m_FramesInFlight, FrameContext{});
+        m_RenderArenaSize = renderArenaSize;
+        m_Contexts.resize(m_FramesInFlight);
         for (uint32_t slotIndex = 0; slotIndex < m_FramesInFlight; ++slotIndex)
         {
-            m_Contexts[slotIndex].SlotIndex = slotIndex;
-            m_Contexts[slotIndex].FramesInFlight = m_FramesInFlight;
+            auto& ctx = m_Contexts[slotIndex];
+            ctx.SlotIndex = slotIndex;
+            ctx.FramesInFlight = m_FramesInFlight;
+            if (!ctx.RenderArena)
+                ctx.RenderArena = std::make_unique<Core::Memory::LinearArena>(m_RenderArenaSize);
+            if (!ctx.RenderScope)
+                ctx.RenderScope = std::make_unique<Core::Memory::ScopeStack>(m_RenderArenaSize);
         }
     }
 

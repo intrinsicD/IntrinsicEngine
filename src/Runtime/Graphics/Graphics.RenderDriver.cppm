@@ -90,6 +90,10 @@ export namespace Graphics
 
         void OnResize();
 
+        // Rebind per-frame allocators to a FrameContext-owned backing store.
+        void RebindFrameAllocators(Core::Memory::LinearArena& arena,
+                                   Core::Memory::ScopeStack& scope);
+
         [[nodiscard]] RHI::VulkanBuffer* GetGlobalUBO() const { return m_GlobalResources.GetCameraUBO(); }
 
         // Retained-mode scene is owned by Runtime::Engine. RenderDriver consumes it during rendering.
@@ -129,10 +133,9 @@ export namespace Graphics
         RHI::VulkanSwapchain& m_Swapchain;
         RHI::SimpleRenderer& m_Renderer;
 
-        // Per-frame scratch allocators provided by Runtime::Engine.
-        // - LinearArena: POD pass data
+        // Per-frame scratch allocators (non-owning, rebound per frame via FrameContext).
         // - ScopeStack : destructor-safe closures + frame-stable context snapshots
-        Core::Memory::ScopeStack& m_FrameScope;
+        Core::Memory::ScopeStack* m_FrameScope;
 
         // Sub-Systems
         GlobalResources m_GlobalResources; // Holds UBOs, Descriptors, Allocators

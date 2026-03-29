@@ -95,7 +95,7 @@ namespace Runtime
         , m_DescriptorLayout(descriptorLayout)
         , m_AssetManager(assetManager)
         , m_FeatureRegistry(featureRegistry)
-        , m_FrameContextRing(frameContextCount)
+        , m_FrameContextRing(frameContextCount, frameArenaSize)
     {
         Core::Log::Info("RenderOrchestrator: Initializing...");
         Core::Log::Info("RenderOrchestrator: frame-context ring configured for {} slots.",
@@ -136,6 +136,8 @@ namespace Runtime
         m_GeometryStorage.Clear();
 
         // Destroy per-frame transient RHI objects while VulkanDevice is still alive.
+        // Per-FrameContext render-graph scopes are cleaned up by FrameContextRing's
+        // implicit destruction (runs after vkDeviceWaitIdle in RenderDriver dtor).
         m_FrameScope.Reset();
 
         Core::Log::Info("RenderOrchestrator: Shutdown complete.");
@@ -351,6 +353,17 @@ namespace Runtime
         m_RenderDriver->BeginFrame(currentFrame);
         if (!m_RenderDriver->AcquireFrame())
             return;
+
+        // Rebind render-graph allocators to this FrameContext's per-slot memory.
+        // RenderGraph::Reset() (called inside BuildGraph) will reset these allocators.
+        if (!frame.HasAllocators())
+        {
+            Core::Log::Error("RenderOrchestrator::PrepareFrame: FrameContext slot {} has no render allocators — "
+                             "skipping frame. FrameContextRing::Configure() must allocate per-slot arenas.",
+                             frame.SlotIndex);
+            return;
+        }
+        m_RenderDriver->RebindFrameAllocators(frame.GetRenderArena(), frame.GetRenderScope());
 
         m_RenderDriver->UpdateGlobals(preparedRenderWorld->View.Camera, preparedRenderWorld->Lighting);
         m_RenderDriver->BuildGraph(m_AssetManager,

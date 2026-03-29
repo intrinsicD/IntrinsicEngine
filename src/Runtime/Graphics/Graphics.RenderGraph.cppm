@@ -235,6 +235,11 @@ export namespace Graphics
         explicit RenderGraph(std::shared_ptr<RHI::VulkanDevice> device,
                              Core::Memory::LinearArena& arena,
                              Core::Memory::ScopeStack& scope);
+
+        // Rebind per-frame scratch allocators to a different backing store.
+        // Called at the start of each frame when allocators are per-FrameContext.
+        void RebindAllocators(Core::Memory::LinearArena& arena,
+                              Core::Memory::ScopeStack& scope);
         ~RenderGraph();
 
         // 1. Setup Phase: Add a pass to the frame
@@ -248,7 +253,7 @@ export namespace Graphics
             // NOTE: ExecuteFn is stored in ScopeStack, so it may capture non-trivial objects (std::string/shared_ptr/etc.).
 
             // 1. Allocate Pass Data (POD-only)
-            auto dataResult = m_Arena.New<Data>();
+            auto dataResult = m_Arena->New<Data>();
             if (!dataResult)
             {
                 Core::Log::Error("RenderGraph::AddPass failed to allocate PassData from LinearArena");
@@ -269,7 +274,7 @@ export namespace Graphics
                 Data* DataPtr;
             };
 
-            auto closureMem = m_Scope.New<PassClosure>(std::forward<ExecuteFn>(execute), data);
+            auto closureMem = m_Scope->New<PassClosure>(std::forward<ExecuteFn>(execute), data);
             if (!closureMem)
             {
                 Core::Log::Error("RenderGraph::AddPass failed to allocate PassClosure from ScopeStack");
@@ -482,8 +487,8 @@ export namespace Graphics
         };
 
         std::shared_ptr<RHI::VulkanDevice> m_Device;
-        Core::Memory::LinearArena& m_Arena;      // POD pass data
-        Core::Memory::ScopeStack& m_Scope;       // destructor-safe pass closures
+        Core::Memory::LinearArena* m_Arena;      // POD pass data (non-owning, rebound per frame)
+        Core::Memory::ScopeStack* m_Scope;       // destructor-safe pass closures (non-owning, rebound per frame)
 
         RHI::TransientAllocator* m_TransientAllocator = nullptr; // non-owning
 

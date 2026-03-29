@@ -306,7 +306,9 @@ namespace Graphics
           , m_Device(m_DeviceOwner.get())
           , m_Swapchain(swapchain)
           , m_Renderer(renderer)
-          , m_FrameScope(frameScope)
+          // Initial binding uses the caller's ECS-scope allocators as placeholders.
+          // PrepareFrame() rebinds to FrameContext-owned per-slot allocators before BuildGraph.
+          , m_FrameScope(&frameScope)
           // Sub-Systems (must match declaration order)
           , m_GlobalResources(m_DeviceOwner, descriptorPool, descriptorLayout, bindlessSystem, shaderRegistry,
                               pipelineLibrary, renderer.GetFramesInFlight())
@@ -1098,7 +1100,7 @@ namespace Graphics
         m_LastBuiltImageIndex = imageIndex;
         m_LastBuiltGraphExtent = extent;
         RenderBlackboard blackboard;
-        auto stableBlackboard = m_FrameScope.New<RenderBlackboard>(blackboard);
+        auto stableBlackboard = m_FrameScope->New<RenderBlackboard>(blackboard);
         RenderBlackboard* activeBlackboard = stableBlackboard ? *stableBlackboard : &blackboard;
 
         // Pick/debug state is now consumed from extraction-time snapshots
@@ -1147,7 +1149,7 @@ namespace Graphics
         ctx.DebugDrawTriangles = debugDrawTriangles;
         ctx.EditorOverlay = editorOverlay;
 
-        auto stable = m_FrameScope.New<RenderPassContext>(ctx);
+        auto stable = m_FrameScope->New<RenderPassContext>(ctx);
         RenderPassContext* stableCtx = stable ? *stable : &ctx;
 
         if (m_ActivePipeline)
@@ -1298,6 +1300,13 @@ namespace Graphics
     void RenderDriver::EndFrame()
     {
         m_Presentation.EndFrame();
+    }
+
+    void RenderDriver::RebindFrameAllocators(Core::Memory::LinearArena& arena,
+                                              Core::Memory::ScopeStack& scope)
+    {
+        m_FrameScope = &scope;
+        m_RenderGraph.RebindAllocators(arena, scope);
     }
 
     void RenderDriver::OnResize()

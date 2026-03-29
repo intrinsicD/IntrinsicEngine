@@ -1,12 +1,14 @@
 module;
 #include <cstdint>
 #include <limits>
+#include <memory>
 #include <optional>
 #include <vector>
 #include <glm/glm.hpp>
 
 export module Runtime.RenderExtraction;
 
+import Core.Memory;
 import Graphics.Camera;
 import Graphics.DebugDraw;
 import Graphics.RenderPipeline;
@@ -101,6 +103,8 @@ export namespace Runtime
         }
     };
 
+    inline constexpr size_t DefaultFrameArenaSize = 1024 * 1024;
+
     struct FrameContext
     {
         uint64_t FrameNumber = 0;
@@ -113,6 +117,35 @@ export namespace Runtime
         bool Prepared = false;
         bool Submitted = false;
         bool ReusedSubmittedSlot = false;
+
+        // Per-frame-context scratch allocators for render-graph data.
+        // Owned by the FrameContext so each in-flight frame has independent memory.
+        std::unique_ptr<Core::Memory::LinearArena> RenderArena{};
+        std::unique_ptr<Core::Memory::ScopeStack> RenderScope{};
+
+        [[nodiscard]] bool HasAllocators() const
+        {
+            return RenderArena != nullptr && RenderScope != nullptr;
+        }
+
+        [[nodiscard]] Core::Memory::LinearArena& GetRenderArena()
+        {
+            return *RenderArena;
+        }
+
+        [[nodiscard]] Core::Memory::ScopeStack& GetRenderScope()
+        {
+            return *RenderScope;
+        }
+
+        // Explicit allocator reset for callers outside the render-graph path.
+        // Note: RenderGraph::Reset() already resets these during BuildGraph, so this
+        // is only needed for non-standard frame flows (e.g. error recovery, testing).
+        void ResetRenderAllocators()
+        {
+            if (RenderScope) RenderScope->Reset();
+            if (RenderArena) RenderArena->Reset();
+        }
 
         [[nodiscard]] const RenderWorld* GetPreparedRenderWorld() const
         {
@@ -136,9 +169,10 @@ export namespace Runtime
     class FrameContextRing
     {
     public:
-        explicit FrameContextRing(uint32_t framesInFlight = DefaultFrameContexts);
+        explicit FrameContextRing(uint32_t framesInFlight = DefaultFrameContexts,
+                                  size_t renderArenaSize = DefaultFrameArenaSize);
 
-        void Configure(uint32_t framesInFlight);
+        void Configure(uint32_t framesInFlight, size_t renderArenaSize = DefaultFrameArenaSize);
 
         [[nodiscard]] uint32_t GetFramesInFlight() const
         {
@@ -149,6 +183,7 @@ export namespace Runtime
 
     private:
         uint32_t m_FramesInFlight = DefaultFrameContexts;
+        size_t m_RenderArenaSize = DefaultFrameArenaSize;
         std::vector<FrameContext> m_Contexts{};
     };
 
