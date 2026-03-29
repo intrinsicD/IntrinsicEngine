@@ -1,6 +1,7 @@
 // Graphics.RenderGraph.cpp
 module;
 #include "RHI.Vulkan.hpp"
+#include <cassert>
 #include <chrono>
 #include <string>
 #include <vector>
@@ -91,7 +92,7 @@ namespace Graphics
         }
 
         AccessNode node{resource.ID, stage, access, nullptr};
-        AppendToList(m_Graph.m_Arena,
+        AppendToList(*m_Graph.m_Arena,
                      m_Graph.m_PassPool[m_PassIndex].AccessHead,
                      m_Graph.m_PassPool[m_PassIndex].AccessTail,
                      std::move(node));
@@ -114,7 +115,7 @@ namespace Graphics
         TouchResourceLifetime(resource, true);
 
         AttachmentNode node{resource.ID, info, isDepth, nullptr};
-        AppendToList(m_Graph.m_Arena,
+        AppendToList(*m_Graph.m_Arena,
                      m_Graph.m_PassPool[m_PassIndex].AttachmentHead,
                      m_Graph.m_PassPool[m_PassIndex].AttachmentTail,
                      std::move(node));
@@ -245,9 +246,16 @@ namespace Graphics
                              Core::Memory::LinearArena& arena,
                              Core::Memory::ScopeStack& scope) :
         m_Device(device),
-        m_Arena(arena),
-        m_Scope(scope)
+        m_Arena(&arena),
+        m_Scope(&scope)
     {
+    }
+
+    void RenderGraph::RebindAllocators(Core::Memory::LinearArena& arena,
+                                       Core::Memory::ScopeStack& scope)
+    {
+        m_Arena = &arena;
+        m_Scope = &scope;
     }
 
     RenderGraph::~RenderGraph()
@@ -326,8 +334,10 @@ namespace Graphics
         m_Scheduler.Reset();
 
         // 1. Reset Allocators (Reclaim memory)
-        m_Scope.Reset();
-        m_Arena.Reset();
+        assert(m_Arena && "RenderGraph::Reset called with null arena — RebindAllocators() not called?");
+        assert(m_Scope && "RenderGraph::Reset called with null scope — RebindAllocators() not called?");
+        m_Scope->Reset();
+        m_Arena->Reset();
 
         // Reset transient GPU pages only for the frame slot being recorded.
         if (m_TransientAllocator)
@@ -378,7 +388,7 @@ namespace Graphics
         unboundImg.BindMemory(binding.Memory, binding.Offset);
 
         // 5. Move to Frame Scope
-        auto allocation = m_Scope.New<RHI::VulkanImage>(std::move(unboundImg));
+        auto allocation = m_Scope->New<RHI::VulkanImage>(std::move(unboundImg));
         if (!allocation)
         {
             Core::Log::Error("RenderGraph: Failed to allocate image wrapper in ScopeStack (OOM)");
@@ -707,7 +717,7 @@ namespace Graphics
                     barrier.subresourceRange.baseArrayLayer = 0;
                     barrier.subresourceRange.layerCount = 1;
 
-                    auto alloc = m_Arena.New<VkImageMemoryBarrier2>(barrier);
+                    auto alloc = m_Arena->New<VkImageMemoryBarrier2>(barrier);
                     if (alloc)
                     {
                         if (imgCount == 0) imgStart = *alloc;
@@ -816,7 +826,7 @@ namespace Graphics
                     barrier.dstStageMask = node->Stage;
                     barrier.dstAccessMask = effectiveAccess;
 
-                    auto alloc = m_Arena.New<VkBufferMemoryBarrier2>(barrier);
+                    auto alloc = m_Arena->New<VkBufferMemoryBarrier2>(barrier);
                     if (alloc)
                     {
                         if (bufCount == 0) bufStart = *alloc;

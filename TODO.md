@@ -133,7 +133,6 @@ Mapping guidance for current Intrinsic code while preserving that reference shap
   - [ ] command allocator pools
   - [ ] upload arenas / staging allocators
   - [ ] descriptor arenas
-  - [ ] transient buffers / scratch allocators
   - [ ] deferred deletion queues
   - [ ] per-frame render graph or graph-execution cache
   - [ ] per-frame profiling/stat samples

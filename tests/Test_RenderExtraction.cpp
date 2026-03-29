@@ -8,6 +8,7 @@
 #include <utility>
 #include <entt/entity/fwd.hpp>
 
+import Core.Memory;
 import Runtime.RenderExtraction;
 import Runtime.SceneManager;
 import Graphics.Camera;
@@ -33,6 +34,65 @@ TEST(RenderExtraction, FrameContext_DefaultStateIsUnprepared)
     EXPECT_FALSE(frame.ReusedSubmittedSlot);
     EXPECT_FALSE(frame.Viewport.IsValid());
     EXPECT_EQ(frame.GetPreparedRenderWorld(), nullptr);
+    EXPECT_FALSE(frame.HasAllocators());
+}
+
+TEST(RenderExtraction, FrameContextRing_AllocatesPerSlotRenderAllocators)
+{
+    Runtime::FrameContextRing ring(2u);
+    Runtime::FrameContext& frame0 =
+        ring.BeginFrame(0u, Runtime::RenderViewport{.Width = 800, .Height = 600});
+    EXPECT_TRUE(frame0.HasAllocators());
+
+    Runtime::FrameContext& frame1 =
+        ring.BeginFrame(1u, Runtime::RenderViewport{.Width = 800, .Height = 600});
+    EXPECT_TRUE(frame1.HasAllocators());
+
+    // Each slot has its own allocators (distinct pointers).
+    EXPECT_NE(&frame0.GetRenderArena(), &frame1.GetRenderArena());
+    EXPECT_NE(&frame0.GetRenderScope(), &frame1.GetRenderScope());
+}
+
+TEST(RenderExtraction, FrameContextRing_WrapAroundPreservesAllocatorPointers)
+{
+    Runtime::FrameContextRing ring(2u);
+    constexpr Runtime::RenderViewport vp{.Width = 800, .Height = 600};
+
+    // First pass: frames 0 and 1.
+    Runtime::FrameContext& first0 = ring.BeginFrame(0u, vp);
+    auto* arena0 = &first0.GetRenderArena();
+    auto* scope0 = &first0.GetRenderScope();
+    Runtime::FrameContext& first1 = ring.BeginFrame(1u, vp);
+    auto* arena1 = &first1.GetRenderArena();
+
+    // Second pass: wrap around to slots 0 and 1 again.
+    Runtime::FrameContext& second0 = ring.BeginFrame(2u, vp);
+    Runtime::FrameContext& second1 = ring.BeginFrame(3u, vp);
+
+    // Same slot returns the same allocator objects (stable pointers).
+    EXPECT_EQ(&second0.GetRenderArena(), arena0);
+    EXPECT_EQ(&second0.GetRenderScope(), scope0);
+    EXPECT_EQ(&second1.GetRenderArena(), arena1);
+}
+
+TEST(RenderExtraction, FrameContextRing_ArenaContentIsolation)
+{
+    Runtime::FrameContextRing ring(2u);
+    constexpr Runtime::RenderViewport vp{.Width = 640, .Height = 480};
+
+    Runtime::FrameContext& frame0 = ring.BeginFrame(0u, vp);
+    Runtime::FrameContext& frame1 = ring.BeginFrame(1u, vp);
+
+    // Allocate from slot 0's arena.
+    auto& arena0 = frame0.GetRenderArena();
+    auto r0 = arena0.Alloc(128, alignof(std::max_align_t));
+    ASSERT_TRUE(r0.has_value());
+
+    // Allocate from slot 1's arena — must not alias slot 0's allocation.
+    auto& arena1 = frame1.GetRenderArena();
+    auto r1 = arena1.Alloc(128, alignof(std::max_align_t));
+    ASSERT_TRUE(r1.has_value());
+    EXPECT_NE(*r0, *r1);
 }
 
 TEST(RenderExtraction, FrameContext_ResetPreparedStateClearsOwnedRenderWorld)
