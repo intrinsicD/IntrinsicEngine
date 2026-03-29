@@ -1072,24 +1072,7 @@ namespace Graphics
     }
 
     void RenderDriver::BuildGraph(Core::Assets::AssetManager& assetManager,
-                                  const CameraComponent& camera,
-                                  const LightEnvironmentPacket& lighting,
-                                  bool hasSelectionWork,
-                                  const SelectionOutlinePacket& selectionOutline,
-                                  const PickRequestSnapshot& pickRequest,
-                                  const DebugViewSnapshot& debugView,
-                                  std::span<const PickingSurfacePacket> pickingSurfacePackets,
-                                  std::span<const PickingLinePacket> pickingLinePackets,
-                                  std::span<const PickingPointPacket> pickingPointPackets,
-                                  std::span<const SurfaceDrawPacket> surfaceDrawPackets,
-                                  std::span<const LineDrawPacket> lineDrawPackets,
-                                  std::span<const PointDrawPacket> pointDrawPackets,
-                                  const HtexPatchPreviewPacket* htexPatchPreview,
-                                  std::span<const DebugDraw::LineSegment> debugDrawLines,
-                                  std::span<const DebugDraw::LineSegment> debugDrawOverlayLines,
-                                  std::span<const DebugDraw::PointMarker> debugDrawPoints,
-                                  std::span<const DebugDraw::TriangleVertex> debugDrawTriangles,
-                                  const EditorOverlayPacket& editorOverlay)
+                                  const BuildGraphInput& input)
     {
         const uint32_t frameIndex = m_Presentation.GetFrameIndex();
         m_RenderGraph.Reset(frameIndex);
@@ -1102,9 +1085,6 @@ namespace Graphics
         RenderBlackboard blackboard;
         auto stableBlackboard = m_FrameScope->New<RenderBlackboard>(blackboard);
         RenderBlackboard* activeBlackboard = stableBlackboard ? *stableBlackboard : &blackboard;
-
-        // Pick/debug state is now consumed from extraction-time snapshots
-        // rather than queried live from InteractionSystem.
 
         RenderPassContext ctx{
             m_RenderGraph,
@@ -1125,29 +1105,29 @@ namespace Graphics
             m_GlobalResources.GetGlobalDescriptorSet(),
             m_GlobalResources.GetDynamicUBOOffset(frameIndex),
             m_GlobalResources.GetBindlessSystem(),
-            pickRequest,
-            debugView,
+            input.PickRequest,
+            input.DebugView,
             m_LastDebugImages,
             m_LastDebugPasses,
-            camera.ViewMatrix,
-            camera.ProjectionMatrix,
-            lighting,
+            input.Camera.ViewMatrix,
+            input.Camera.ProjectionMatrix,
+            input.Lighting,
             m_Interaction.GetReadbackBuffer(frameIndex),
         };
-        ctx.HasSelectionWork = hasSelectionWork;
-        ctx.SelectionOutline = selectionOutline;
-        ctx.PickingSurfacePackets = pickingSurfacePackets;
-        ctx.PickingLinePackets = pickingLinePackets;
-        ctx.PickingPointPackets = pickingPointPackets;
-        ctx.SurfaceDrawPackets = surfaceDrawPackets;
-        ctx.LineDrawPackets = lineDrawPackets;
-        ctx.PointDrawPackets = pointDrawPackets;
-        ctx.HtexPatchPreview = htexPatchPreview;
-        ctx.DebugDrawLines = debugDrawLines;
-        ctx.DebugDrawOverlayLines = debugDrawOverlayLines;
-        ctx.DebugDrawPoints = debugDrawPoints;
-        ctx.DebugDrawTriangles = debugDrawTriangles;
-        ctx.EditorOverlay = editorOverlay;
+        ctx.HasSelectionWork = input.HasSelectionWork;
+        ctx.SelectionOutline = input.SelectionOutline;
+        ctx.PickingSurfacePackets = input.SurfacePicking;
+        ctx.PickingLinePackets = input.LinePicking;
+        ctx.PickingPointPackets = input.PointPicking;
+        ctx.SurfaceDrawPackets = input.SurfaceDraws;
+        ctx.LineDrawPackets = input.LineDraws;
+        ctx.PointDrawPackets = input.PointDraws;
+        ctx.HtexPatchPreview = input.HtexPatchPreview;
+        ctx.DebugDrawLines = input.DebugDrawLines;
+        ctx.DebugDrawOverlayLines = input.DebugDrawOverlayLines;
+        ctx.DebugDrawPoints = input.DebugDrawPoints;
+        ctx.DebugDrawTriangles = input.DebugDrawTriangles;
+        ctx.EditorOverlay = input.EditorOverlay;
 
         auto stable = m_FrameScope->New<RenderPassContext>(ctx);
         RenderPassContext* stableCtx = stable ? *stable : &ctx;
@@ -1157,9 +1137,9 @@ namespace Graphics
         else
         {
             stableCtx->Recipe.Depth = true;
-            stableCtx->Recipe.EntityId = pickRequest.Pending || hasSelectionWork || debugView.Enabled;
-            stableCtx->Recipe.DebugVisualization = debugView.Enabled;
-            stableCtx->Recipe.Selection = hasSelectionWork;
+            stableCtx->Recipe.EntityId = input.PickRequest.Pending || input.HasSelectionWork || input.DebugView.Enabled;
+            stableCtx->Recipe.DebugVisualization = input.DebugView.Enabled;
+            stableCtx->Recipe.Selection = input.HasSelectionWork;
             stableCtx->Recipe.LightingPath = FrameLightingPath::Forward;
             stableCtx->Recipe.Post = true;
             stableCtx->Recipe.SceneColorLDR = true;

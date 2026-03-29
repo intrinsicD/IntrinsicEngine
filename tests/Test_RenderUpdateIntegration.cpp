@@ -76,9 +76,7 @@ TEST(RenderUpdateIntegration, RenderDriver_ExposesStagedFrameExecutionApi)
                            ECS::Scene& scene,
                            const Graphics::CameraComponent& camera,
                            const Graphics::LightEnvironmentPacket& lighting,
-                           const Graphics::SelectionOutlinePacket& selectionOutline,
-                           const Graphics::PickRequestSnapshot& pickRequest,
-                           const Graphics::DebugViewSnapshot& debugView,
+                           const Graphics::BuildGraphInput& graphInput,
                            Core::Assets::AssetManager& assetManager,
                            uint64_t currentFrame)
     {
@@ -86,11 +84,63 @@ TEST(RenderUpdateIntegration, RenderDriver_ExposesStagedFrameExecutionApi)
         { renderSystem.AcquireFrame() } -> std::same_as<bool>;
         renderSystem.ProcessCompletedGpuWork(scene, currentFrame);
         renderSystem.UpdateGlobals(camera, lighting);
-        renderSystem.BuildGraph(assetManager, camera, lighting, false, selectionOutline, pickRequest, debugView);
+        renderSystem.BuildGraph(assetManager, graphInput);
         renderSystem.ExecuteGraph();
         renderSystem.EndFrame();
     });
     SUCCEED();
+}
+
+// ---------------------------------------------------------------------------
+// BuildGraphInput: structured render preparation data contract
+// ---------------------------------------------------------------------------
+
+TEST(RenderUpdateIntegration, BuildGraphInput_DefaultConstructionIsValid)
+{
+    Graphics::BuildGraphInput input{};
+
+    // Default-constructed input has no active work.
+    EXPECT_FALSE(input.HasSelectionWork);
+    EXPECT_FALSE(input.PickRequest.Pending);
+    EXPECT_FALSE(input.DebugView.Enabled);
+    EXPECT_EQ(input.HtexPatchPreview, nullptr);
+
+    // All draw packet spans are empty.
+    EXPECT_TRUE(input.SurfacePicking.empty());
+    EXPECT_TRUE(input.LinePicking.empty());
+    EXPECT_TRUE(input.PointPicking.empty());
+    EXPECT_TRUE(input.SurfaceDraws.empty());
+    EXPECT_TRUE(input.LineDraws.empty());
+    EXPECT_TRUE(input.PointDraws.empty());
+    EXPECT_TRUE(input.DebugDrawLines.empty());
+    EXPECT_TRUE(input.DebugDrawOverlayLines.empty());
+    EXPECT_TRUE(input.DebugDrawPoints.empty());
+    EXPECT_TRUE(input.DebugDrawTriangles.empty());
+    EXPECT_FALSE(input.EditorOverlay.HasDrawData);
+}
+
+TEST(RenderUpdateIntegration, BuildGraphInput_SpansReferenceExternalData)
+{
+    // Verify that BuildGraphInput's spans correctly reference external data
+    // (the ownership model: RenderWorld owns, BuildGraphInput views).
+    std::vector<Graphics::SurfaceDrawPacket> surfaces(3);
+    std::vector<Graphics::LineDrawPacket> lines(2);
+    std::vector<Graphics::PointDrawPacket> points(1);
+
+    Graphics::BuildGraphInput input{
+        .SurfaceDraws = surfaces,
+        .LineDraws = lines,
+        .PointDraws = points,
+    };
+
+    EXPECT_EQ(input.SurfaceDraws.size(), 3u);
+    EXPECT_EQ(input.LineDraws.size(), 2u);
+    EXPECT_EQ(input.PointDraws.size(), 1u);
+
+    // Spans point to the external vectors.
+    EXPECT_EQ(input.SurfaceDraws.data(), surfaces.data());
+    EXPECT_EQ(input.LineDraws.data(), lines.data());
+    EXPECT_EQ(input.PointDraws.data(), points.data());
 }
 
 // ---------------------------------------------------------------------------

@@ -410,25 +410,31 @@ namespace Runtime
         m_RenderDriver->RebindFrameAllocators(frame.GetRenderArena(), frame.GetRenderScope());
 
         m_RenderDriver->UpdateGlobals(preparedRenderWorld->View.Camera, preparedRenderWorld->Lighting);
-        m_RenderDriver->BuildGraph(m_AssetManager,
-                                   preparedRenderWorld->View.Camera,
-                                   preparedRenderWorld->Lighting,
-                                   preparedRenderWorld->HasSelectionWork,
-                                   preparedRenderWorld->SelectionOutline,
-                                   preparedRenderWorld->PickRequest,
-                                   preparedRenderWorld->DebugView,
-                                   preparedRenderWorld->SurfacePicking,
-                                   preparedRenderWorld->LinePicking,
-                                   preparedRenderWorld->PointPicking,
-                                   preparedRenderWorld->SurfaceDraws,
-                                   preparedRenderWorld->LineDraws,
-                                   preparedRenderWorld->PointDraws,
-                                   preparedRenderWorld->HtexPatchPreview ? &*preparedRenderWorld->HtexPatchPreview : nullptr,
-                                   preparedRenderWorld->DebugDrawLines,
-                                   preparedRenderWorld->DebugDrawOverlayLines,
-                                   preparedRenderWorld->DebugDrawPoints,
-                                   preparedRenderWorld->DebugDrawTriangles,
-                                   preparedRenderWorld->EditorOverlay);
+
+        // Construct structured render preparation input from the extracted RenderWorld.
+        // BuildGraphInput holds non-owning views into the RenderWorld, which remains
+        // alive on the FrameContext until EndFrame.
+        const Graphics::BuildGraphInput graphInput{
+            .Camera = preparedRenderWorld->View.Camera,
+            .Lighting = preparedRenderWorld->Lighting,
+            .HasSelectionWork = preparedRenderWorld->HasSelectionWork,
+            .SelectionOutline = preparedRenderWorld->SelectionOutline,
+            .PickRequest = preparedRenderWorld->PickRequest,
+            .DebugView = preparedRenderWorld->DebugView,
+            .SurfacePicking = preparedRenderWorld->SurfacePicking,
+            .LinePicking = preparedRenderWorld->LinePicking,
+            .PointPicking = preparedRenderWorld->PointPicking,
+            .SurfaceDraws = preparedRenderWorld->SurfaceDraws,
+            .LineDraws = preparedRenderWorld->LineDraws,
+            .PointDraws = preparedRenderWorld->PointDraws,
+            .HtexPatchPreview = preparedRenderWorld->HtexPatchPreview ? &*preparedRenderWorld->HtexPatchPreview : nullptr,
+            .DebugDrawLines = preparedRenderWorld->DebugDrawLines,
+            .DebugDrawOverlayLines = preparedRenderWorld->DebugDrawOverlayLines,
+            .DebugDrawPoints = preparedRenderWorld->DebugDrawPoints,
+            .DebugDrawTriangles = preparedRenderWorld->DebugDrawTriangles,
+            .EditorOverlay = preparedRenderWorld->EditorOverlay,
+        };
+        m_RenderDriver->BuildGraph(m_AssetManager, graphInput);
         frame.Prepared = true;
     }
 
