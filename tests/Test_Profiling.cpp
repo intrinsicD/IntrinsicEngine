@@ -264,3 +264,43 @@ TEST(Profiling_TimingCategory, ResetClearsState)
     EXPECT_EQ(cat.MinTimeNs, UINT64_MAX);
     EXPECT_EQ(cat.MaxTimeNs, 0u);
 }
+
+// =============================================================================
+// Present timing telemetry
+// =============================================================================
+
+TEST(TelemetryPresentTiming, PresentTimingsRecordedInFrameStats)
+{
+    auto& telemetry = TelemetrySystem::Get();
+
+    telemetry.BeginFrame();
+    telemetry.SetPresentTimings(1000, 2000, 3000);
+    telemetry.SetFramesInFlightCount(2);
+    telemetry.EndFrame();
+
+    const auto& stats = telemetry.GetFrameStats(0);
+    EXPECT_EQ(stats.FenceWaitTimeNs, 1000u);
+    EXPECT_EQ(stats.AcquireTimeNs, 2000u);
+    EXPECT_EQ(stats.PresentTimeNs, 3000u);
+    EXPECT_EQ(stats.FramesInFlightCount, 2u);
+}
+
+TEST(TelemetryPresentTiming, PresentTimingsResetEachFrame)
+{
+    auto& telemetry = TelemetrySystem::Get();
+
+    // Set non-zero timings in one frame.
+    telemetry.BeginFrame();
+    telemetry.SetPresentTimings(5000, 6000, 7000);
+    telemetry.EndFrame();
+
+    // Start a new frame without calling SetPresentTimings.
+    // BeginFrame resets the atomics, so EndFrame should snapshot zeroes.
+    telemetry.BeginFrame();
+    telemetry.EndFrame();
+
+    const auto& stats = telemetry.GetFrameStats(0);
+    EXPECT_EQ(stats.FenceWaitTimeNs, 0u);
+    EXPECT_EQ(stats.AcquireTimeNs, 0u);
+    EXPECT_EQ(stats.PresentTimeNs, 0u);
+}

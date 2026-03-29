@@ -1,4 +1,5 @@
 module;
+#include <chrono>
 #include <memory>
 #include <algorithm>
 #include <vector>
@@ -103,10 +104,15 @@ namespace RHI
             return;
         }
 
-        // 1. Wait for fence (CPU wait)
+        // 1. Wait for fence (CPU wait) — timed for telemetry
         constexpr uint64_t kFenceWaitTimeoutNs = 16'000'000ull; // ~16 ms: keep the frame loop responsive.
+        const auto fenceWaitStart = std::chrono::high_resolution_clock::now();
         const VkResult fenceWaitResult = vkWaitForFences(
             m_Device->GetLogicalDevice(), 1, &m_InFlightFences[m_CurrentFrame], VK_TRUE, kFenceWaitTimeoutNs);
+        const auto fenceWaitEnd = std::chrono::high_resolution_clock::now();
+        const uint64_t fenceWaitNs = static_cast<uint64_t>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(fenceWaitEnd - fenceWaitStart).count());
+
         if (fenceWaitResult != VK_SUCCESS)
         {
             if (fenceWaitResult == VK_TIMEOUT)
@@ -136,7 +142,8 @@ namespace RHI
         // 3. Advance global frame epoch for newly scheduled deferred deletions.
         m_Device->IncrementGlobalFrame();
 
-        // 2. Acquire Image
+        // 4. Acquire Image — timed for telemetry
+        const auto acquireStart = std::chrono::high_resolution_clock::now();
         VkResult result = vkAcquireNextImageKHR(
             m_Device->GetLogicalDevice(),
             m_Swapchain.GetHandle(),
@@ -145,6 +152,14 @@ namespace RHI
             VK_NULL_HANDLE,
             &m_ImageIndex
         );
+        const auto acquireEnd = std::chrono::high_resolution_clock::now();
+        const uint64_t acquireNs = static_cast<uint64_t>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(acquireEnd - acquireStart).count());
+
+        // Cache fence + acquire timings; present timing added in EndFrame.
+        m_LastFenceWaitNs = fenceWaitNs;
+        m_LastAcquireNs = acquireNs;
+        Core::Telemetry::TelemetrySystem::Get().SetFramesInFlightCount(m_FramesInFlight);
 
         if (result == VK_ERROR_OUT_OF_DATE_KHR)
         {
@@ -337,12 +352,16 @@ namespace RHI
         presentInfo.pSwapchains = swapchains;
         presentInfo.pImageIndices = &m_ImageIndex;
 
-        // --- NEW: Lock Queue for Present ---
-        // (Technically PresentQueue might be different, but typically it's the same in this simple setup.
-        // Even if different, locking the Graphics queue mutex here is safe enough or we should have a PresentMutex)
-        VkResult result = m_Device->Present(presentInfo);
+        const auto presentStart = std::chrono::high_resolution_clock::now();
+        VkResult presentResult = m_Device->Present(presentInfo);
+        const auto presentEnd = std::chrono::high_resolution_clock::now();
+        const uint64_t presentNs = static_cast<uint64_t>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(presentEnd - presentStart).count());
 
-        if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+        // Report all three present-path timings together.
+        Core::Telemetry::TelemetrySystem::Get().SetPresentTimings(m_LastFenceWaitNs, m_LastAcquireNs, presentNs);
+
+        if (presentResult == VK_ERROR_OUT_OF_DATE_KHR || presentResult == VK_SUBOPTIMAL_KHR) {
             m_Swapchain.Recreate();
         }
 

@@ -5,6 +5,7 @@ module;
 #include <algorithm>
 #include <limits>
 #include <memory>
+#include <string_view>
 
 #include "GLFW/glfw3.h"
 
@@ -15,8 +16,39 @@ import Core.Window;
 
 namespace RHI {
 
-    VulkanSwapchain::VulkanSwapchain(std::shared_ptr<VulkanDevice> device, Core::Windowing::Window& window)
-        : m_Device(device), m_Window(window)
+    VkPresentModeKHR SelectPresentMode(PresentPolicy policy,
+                                        const std::vector<VkPresentModeKHR>& availableModes)
+    {
+        auto has = [&](VkPresentModeKHR mode) {
+            return std::find(availableModes.begin(), availableModes.end(), mode)
+                   != availableModes.end();
+        };
+
+        switch (policy)
+        {
+            case PresentPolicy::VSync:
+                return VK_PRESENT_MODE_FIFO_KHR;  // Always available per Vulkan spec.
+
+            case PresentPolicy::LowLatency:
+                if (has(VK_PRESENT_MODE_MAILBOX_KHR)) return VK_PRESENT_MODE_MAILBOX_KHR;
+                return VK_PRESENT_MODE_FIFO_KHR;
+
+            case PresentPolicy::Uncapped:
+                if (has(VK_PRESENT_MODE_IMMEDIATE_KHR)) return VK_PRESENT_MODE_IMMEDIATE_KHR;
+                if (has(VK_PRESENT_MODE_MAILBOX_KHR))   return VK_PRESENT_MODE_MAILBOX_KHR;
+                return VK_PRESENT_MODE_FIFO_KHR;
+
+            case PresentPolicy::EditorThrottled:
+                if (has(VK_PRESENT_MODE_FIFO_RELAXED_KHR)) return VK_PRESENT_MODE_FIFO_RELAXED_KHR;
+                return VK_PRESENT_MODE_FIFO_KHR;
+        }
+
+        return VK_PRESENT_MODE_FIFO_KHR;
+    }
+
+    VulkanSwapchain::VulkanSwapchain(std::shared_ptr<VulkanDevice> device, Core::Windowing::Window& window,
+                                     PresentPolicy policy)
+        : m_Device(device), m_Window(window), m_PresentPolicy(policy)
     {
         CreateSwapchain();
         CreateImageViews();
@@ -57,11 +89,17 @@ namespace RHI {
         DestructionUtils::SafeDestroyVk(*m_Device, m_Swapchain, vkDestroySwapchainKHR);
     }
 
+    void VulkanSwapchain::SetPresentPolicy(PresentPolicy policy)
+    {
+        m_PresentPolicy = policy;
+    }
+
     void VulkanSwapchain::CreateSwapchain() {
         auto support = m_Device->QuerySwapchainSupport();
 
         VkSurfaceFormatKHR surfaceFormat = ChooseSwapSurfaceFormat(support.Formats);
-        VkPresentModeKHR presentMode = ChooseSwapPresentMode(support.PresentModes);
+        VkPresentModeKHR presentMode = SelectPresentMode(m_PresentPolicy, support.PresentModes);
+        m_ActivePresentMode = presentMode;
         VkExtent2D extent = ChooseSwapExtent(support.Capabilities);
 
         uint32_t imageCount = support.Capabilities.minImageCount + 1;
@@ -113,11 +151,11 @@ namespace RHI {
         m_ImageFormat = surfaceFormat.format;
         m_Extent = extent;
 
-        Core::Log::Info("Swapchain Created/Resized: {}x{}", extent.width, extent.height);
+        Core::Log::Info("Swapchain Created/Resized: {}x{}, PresentMode={} (policy={})",
+                        extent.width, extent.height,
+                        static_cast<int>(m_ActivePresentMode),
+                        ToString(m_PresentPolicy));
     }
-
-    // ... (CreateImageViews, ChooseSwap* functions remain the same as previous step) ...
-    // Paste them here or keep them if you are editing the file.
 
     void VulkanSwapchain::CreateImageViews() {
         m_ImageViews.resize(m_Images.size());
@@ -151,15 +189,6 @@ namespace RHI {
             }
         }
         return formats[0];
-    }
-
-    VkPresentModeKHR VulkanSwapchain::ChooseSwapPresentMode(const std::vector<VkPresentModeKHR>& presentModes) {
-        for (const auto& availablePresentMode : presentModes) {
-            if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
-                return availablePresentMode;
-            }
-        }
-        return VK_PRESENT_MODE_FIFO_KHR;
     }
 
     VkExtent2D VulkanSwapchain::ChooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities) {

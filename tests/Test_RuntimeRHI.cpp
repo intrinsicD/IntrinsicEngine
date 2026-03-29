@@ -508,3 +508,103 @@ TEST_F(PipelineBuilderTest, ComputePushConstantValidation_ExceedsLimit_ReturnsEr
     ASSERT_FALSE(result.has_value());
     EXPECT_EQ(result.error(), VK_ERROR_UNKNOWN);
 }
+
+// =============================================================================
+// PresentPolicy / SelectPresentMode
+// =============================================================================
+
+TEST(PresentPolicy, VSyncAlwaysReturnsFIFO)
+{
+    // FIFO is always available per Vulkan spec — even with an empty mode list,
+    // the function returns FIFO as the safe fallback.
+    const std::vector<VkPresentModeKHR> modes = {
+        VK_PRESENT_MODE_IMMEDIATE_KHR,
+        VK_PRESENT_MODE_MAILBOX_KHR,
+        VK_PRESENT_MODE_FIFO_KHR,
+        VK_PRESENT_MODE_FIFO_RELAXED_KHR,
+    };
+    EXPECT_EQ(RHI::SelectPresentMode(RHI::PresentPolicy::VSync, modes), VK_PRESENT_MODE_FIFO_KHR);
+}
+
+TEST(PresentPolicy, LowLatencyPrefersMailbox)
+{
+    const std::vector<VkPresentModeKHR> modes = {
+        VK_PRESENT_MODE_FIFO_KHR,
+        VK_PRESENT_MODE_MAILBOX_KHR,
+    };
+    EXPECT_EQ(RHI::SelectPresentMode(RHI::PresentPolicy::LowLatency, modes), VK_PRESENT_MODE_MAILBOX_KHR);
+}
+
+TEST(PresentPolicy, LowLatencyFallsBackToFIFO)
+{
+    const std::vector<VkPresentModeKHR> modes = {
+        VK_PRESENT_MODE_FIFO_KHR,
+        VK_PRESENT_MODE_IMMEDIATE_KHR,
+    };
+    EXPECT_EQ(RHI::SelectPresentMode(RHI::PresentPolicy::LowLatency, modes), VK_PRESENT_MODE_FIFO_KHR);
+}
+
+TEST(PresentPolicy, UncappedPrefersImmediate)
+{
+    const std::vector<VkPresentModeKHR> modes = {
+        VK_PRESENT_MODE_FIFO_KHR,
+        VK_PRESENT_MODE_MAILBOX_KHR,
+        VK_PRESENT_MODE_IMMEDIATE_KHR,
+    };
+    EXPECT_EQ(RHI::SelectPresentMode(RHI::PresentPolicy::Uncapped, modes), VK_PRESENT_MODE_IMMEDIATE_KHR);
+}
+
+TEST(PresentPolicy, UncappedFallsToMailboxThenFIFO)
+{
+    // No Immediate → prefer Mailbox.
+    {
+        const std::vector<VkPresentModeKHR> modes = {
+            VK_PRESENT_MODE_FIFO_KHR,
+            VK_PRESENT_MODE_MAILBOX_KHR,
+        };
+        EXPECT_EQ(RHI::SelectPresentMode(RHI::PresentPolicy::Uncapped, modes), VK_PRESENT_MODE_MAILBOX_KHR);
+    }
+
+    // No Immediate, no Mailbox → FIFO.
+    {
+        const std::vector<VkPresentModeKHR> modes = { VK_PRESENT_MODE_FIFO_KHR };
+        EXPECT_EQ(RHI::SelectPresentMode(RHI::PresentPolicy::Uncapped, modes), VK_PRESENT_MODE_FIFO_KHR);
+    }
+}
+
+TEST(PresentPolicy, EditorThrottledPrefersFIFORelaxed)
+{
+    const std::vector<VkPresentModeKHR> modes = {
+        VK_PRESENT_MODE_FIFO_KHR,
+        VK_PRESENT_MODE_FIFO_RELAXED_KHR,
+        VK_PRESENT_MODE_MAILBOX_KHR,
+    };
+    EXPECT_EQ(RHI::SelectPresentMode(RHI::PresentPolicy::EditorThrottled, modes),
+              VK_PRESENT_MODE_FIFO_RELAXED_KHR);
+}
+
+TEST(PresentPolicy, EditorThrottledFallsBackToFIFO)
+{
+    const std::vector<VkPresentModeKHR> modes = {
+        VK_PRESENT_MODE_FIFO_KHR,
+        VK_PRESENT_MODE_MAILBOX_KHR,
+    };
+    EXPECT_EQ(RHI::SelectPresentMode(RHI::PresentPolicy::EditorThrottled, modes), VK_PRESENT_MODE_FIFO_KHR);
+}
+
+TEST(PresentPolicy, EmptyModesAlwaysReturnsFIFO)
+{
+    const std::vector<VkPresentModeKHR> empty{};
+    EXPECT_EQ(RHI::SelectPresentMode(RHI::PresentPolicy::VSync, empty), VK_PRESENT_MODE_FIFO_KHR);
+    EXPECT_EQ(RHI::SelectPresentMode(RHI::PresentPolicy::LowLatency, empty), VK_PRESENT_MODE_FIFO_KHR);
+    EXPECT_EQ(RHI::SelectPresentMode(RHI::PresentPolicy::Uncapped, empty), VK_PRESENT_MODE_FIFO_KHR);
+    EXPECT_EQ(RHI::SelectPresentMode(RHI::PresentPolicy::EditorThrottled, empty), VK_PRESENT_MODE_FIFO_KHR);
+}
+
+TEST(PresentPolicy, ToStringCoversAllPolicies)
+{
+    EXPECT_EQ(RHI::ToString(RHI::PresentPolicy::VSync), "VSync");
+    EXPECT_EQ(RHI::ToString(RHI::PresentPolicy::LowLatency), "LowLatency");
+    EXPECT_EQ(RHI::ToString(RHI::PresentPolicy::Uncapped), "Uncapped");
+    EXPECT_EQ(RHI::ToString(RHI::PresentPolicy::EditorThrottled), "EditorThrottled");
+}
