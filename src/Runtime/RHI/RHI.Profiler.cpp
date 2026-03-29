@@ -2,7 +2,6 @@ module;
 
 #include "RHI.Vulkan.hpp"
 
-#include <array>
 #include <limits>
 #include <memory>
 #include <expected>
@@ -18,8 +17,9 @@ namespace RHI
 {
     static uint32_t AlignUp(uint32_t v, uint32_t a) { return (v + (a - 1u)) & ~(a - 1u); }
 
-    GpuProfiler::GpuProfiler(std::shared_ptr<VulkanDevice> device)
+    GpuProfiler::GpuProfiler(std::shared_ptr<VulkanDevice> device, uint32_t framesInFlight)
         : m_Device(std::move(device))
+        , m_FramesInFlight(std::max(framesInFlight, 1u))
     {
         if (!m_Device || !m_Device->IsValid())
         {
@@ -35,6 +35,8 @@ namespace RHI
 
         // If timestampPeriod == 0, timestamps are effectively unusable.
         m_Supported = (m_TimestampPeriodNs > 0.0);
+
+        m_Frames.resize(m_FramesInFlight);
 
         // Create a small initial pool. Capacity will grow as needed.
         EnsurePoolCapacity(1024);
@@ -77,7 +79,7 @@ namespace RHI
     {
         if (!m_Supported || m_QueryPool == VK_NULL_HANDLE) return;
 
-        FrameState& fs = m_Frames[frameIndex % kFramesInFlight];
+        FrameState& fs = m_Frames[frameIndex % m_FramesInFlight];
         fs.FrameNumber = m_Device->GetGlobalFrameNumber();
         fs.Scopes.clear();
 
@@ -99,7 +101,7 @@ namespace RHI
     {
         if (!m_Supported || m_QueryPool == VK_NULL_HANDLE) return;
         const uint32_t frameIndex = m_Device->GetCurrentFrameIndex();
-        FrameState& fs = m_Frames[frameIndex % kFramesInFlight];
+        FrameState& fs = m_Frames[frameIndex % m_FramesInFlight];
         if (fs.FrameStartQuery == ~0u) return;
 
         vkCmdWriteTimestamp2(cmd, VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, m_QueryPool, fs.FrameStartQuery);
@@ -109,7 +111,7 @@ namespace RHI
     {
         if (!m_Supported || m_QueryPool == VK_NULL_HANDLE) return;
         const uint32_t frameIndex = m_Device->GetCurrentFrameIndex();
-        FrameState& fs = m_Frames[frameIndex % kFramesInFlight];
+        FrameState& fs = m_Frames[frameIndex % m_FramesInFlight];
         if (fs.FrameEndQuery == ~0u) return;
 
         vkCmdWriteTimestamp2(cmd, VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT, m_QueryPool, fs.FrameEndQuery);
@@ -120,7 +122,7 @@ namespace RHI
         if (!m_Supported || m_QueryPool == VK_NULL_HANDLE) return 0;
 
         const uint32_t frameIndex = m_Device->GetCurrentFrameIndex();
-        FrameState& fs = m_Frames[frameIndex % kFramesInFlight];
+        FrameState& fs = m_Frames[frameIndex % m_FramesInFlight];
 
         const uint32_t scopeIndex = static_cast<uint32_t>(fs.Scopes.size());
 
@@ -141,7 +143,7 @@ namespace RHI
     {
         if (!m_Supported || m_QueryPool == VK_NULL_HANDLE) return;
         const uint32_t frameIndex = m_Device->GetCurrentFrameIndex();
-        FrameState& fs = m_Frames[frameIndex % kFramesInFlight];
+        FrameState& fs = m_Frames[frameIndex % m_FramesInFlight];
         if (scopeIndex >= fs.Scopes.size()) return;
 
         vkCmdWriteTimestamp2(cmd, stage, m_QueryPool, fs.Scopes[scopeIndex].BeginQuery);
@@ -151,7 +153,7 @@ namespace RHI
     {
         if (!m_Supported || m_QueryPool == VK_NULL_HANDLE) return;
         const uint32_t frameIndex = m_Device->GetCurrentFrameIndex();
-        FrameState& fs = m_Frames[frameIndex % kFramesInFlight];
+        FrameState& fs = m_Frames[frameIndex % m_FramesInFlight];
         if (scopeIndex >= fs.Scopes.size()) return;
 
         vkCmdWriteTimestamp2(cmd, stage, m_QueryPool, fs.Scopes[scopeIndex].EndQuery);
@@ -161,7 +163,7 @@ namespace RHI
     {
         if (!m_Supported || m_QueryPool == VK_NULL_HANDLE) return std::unexpected(GpuTimestampError::InvalidState);
 
-        const FrameState& fs = m_Frames[frameIndex % kFramesInFlight];
+        const FrameState& fs = m_Frames[frameIndex % m_FramesInFlight];
 
         // Read back only what we used this frame: frame timestamps + per-scope begin/end.
         const uint32_t scopeCount = static_cast<uint32_t>(fs.Scopes.size());

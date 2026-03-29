@@ -1,5 +1,6 @@
 module;
 
+#include <optional>
 #include <vector>
 #include <memory>
 
@@ -43,6 +44,10 @@ namespace RHI
 
         [[nodiscard]] GpuProfiler* GetGpuProfiler() const { return m_GpuProfiler.get(); }
 
+        // Consume the last resolved GPU profiling result (moves ownership to the caller).
+        // Returns std::nullopt if no resolved result is available yet.
+        [[nodiscard]] std::optional<GpuTimestampFrame> ConsumeResolvedGpuProfile();
+
         // GPU picking helper: schedule a copy of a single pixel (x,y) from an R32_UINT image into a host-visible buffer.
         // The caller must ensure the image is in VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL.
         void CopyPixel_R32_UINT_ToBuffer(VkImage srcImage,
@@ -75,5 +80,9 @@ namespace RHI
 
         void InitSyncStructures();
         std::unique_ptr<GpuProfiler> m_GpuProfiler;
+
+        // Cached resolved GPU profile from the oldest in-flight frame.
+        // Populated in EndFrame(), consumed by RenderOrchestrator via ConsumeResolvedGpuProfile().
+        std::optional<GpuTimestampFrame> m_ResolvedGpuProfile{};
     };
 }

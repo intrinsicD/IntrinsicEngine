@@ -133,7 +133,6 @@ Mapping guidance for current Intrinsic code while preserving that reference shap
   - [ ] upload arenas / staging allocators
   - [ ] descriptor arenas
   - [ ] per-frame render graph or graph-execution cache
-  - [ ] per-frame profiling/stat samples
 - [ ] Audit existing systems and migrate any frame-temporary resource keyed by swapchain image count to frame-in-flight ownership unless image affinity is truly required.
 
 #### B4.10 Job system + multi-threaded command recording

@@ -13,6 +13,7 @@ import Core.Memory;
 import Graphics.Camera;
 import Graphics.DebugDraw;
 import Graphics.RenderPipeline;
+import RHI.Profiler;
 import Runtime.SceneManager;
 
 export namespace Runtime
@@ -123,6 +124,13 @@ export namespace Runtime
         // Owned by the FrameContext so each in-flight frame has independent memory.
         std::unique_ptr<Core::Memory::LinearArena> RenderArena{};
         std::unique_ptr<Core::Memory::ScopeStack> RenderScope{};
+
+        // Per-frame-context resolved GPU profiling sample (B4.9).
+        // Populated during EndFrame after GPU work for this slot completes,
+        // consumed by the telemetry system on the next reuse of this slot.
+        // Keeps profiling results under frame-context ownership rather than
+        // keyed by swapchain image count.
+        std::optional<RHI::GpuTimestampFrame> ResolvedGpuProfile{};
 
         // Per-frame-context deferred deletion queue (B4.9).
         // Resources whose lifetime is tied to THIS frame slot push cleanup

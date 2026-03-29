@@ -13,6 +13,7 @@ import RHI.Bindless;
 import RHI.Buffer;
 import RHI.Descriptors;
 import RHI.Device;
+import RHI.Profiler;
 import RHI.Renderer;
 import RHI.Swapchain;
 import Graphics.Camera;
@@ -118,6 +119,10 @@ export namespace Graphics
 
         // Access histogram readback data (returns nullptr if not available)
         [[nodiscard]] const Passes::HistogramReadback* GetHistogramReadback() const;
+
+        // Consume the last resolved GPU profiling result (moves ownership to the caller).
+        // Returns std::nullopt if no resolved result is available yet.
+        [[nodiscard]] std::optional<RHI::GpuTimestampFrame> ConsumeResolvedGpuProfile();
 
         // Dump the last compiled render graph to a human-readable string.
         // Returns pass execution order, resource lifetimes, and dependency info.

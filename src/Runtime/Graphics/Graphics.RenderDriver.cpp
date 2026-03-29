@@ -1322,6 +1322,11 @@ namespace Graphics
     }
 
     // -------------------------------------------------------------------------
+    std::optional<RHI::GpuTimestampFrame> RenderDriver::ConsumeResolvedGpuProfile()
+    {
+        return m_Renderer.ConsumeResolvedGpuProfile();
+    }
+
     // DumpRenderGraphToString — human-readable render graph snapshot
     // -------------------------------------------------------------------------
 

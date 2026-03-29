@@ -49,7 +49,11 @@ export namespace RHI
     class GpuProfiler
     {
     public:
-        explicit GpuProfiler(std::shared_ptr<VulkanDevice> device);
+        // Construct with an explicit frame-in-flight count.
+        // This decouples the profiler ring from the swapchain image count,
+        // aligning it with FrameContext ownership (B4.9).
+        explicit GpuProfiler(std::shared_ptr<VulkanDevice> device,
+                             uint32_t framesInFlight = VulkanDevice::GetFramesInFlight());
         ~GpuProfiler();
 
         GpuProfiler(const GpuProfiler&) = delete;
@@ -70,11 +74,13 @@ export namespace RHI
         void WriteScopeBegin(VkCommandBuffer cmd, uint32_t scopeIndex, VkPipelineStageFlags2 stage = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT);
         void WriteScopeEnd(VkCommandBuffer cmd, uint32_t scopeIndex, VkPipelineStageFlags2 stage = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT);
 
-        // Resolve results from an older frame (typically frameIndex from N frames ago.
+        // Resolve results from an older frame (typically frameIndex from N frames ago).
         // Non-blocking by default. If results aren't ready, returns unexpected(NotReady).
         [[nodiscard]] std::expected<GpuTimestampFrame, GpuTimestampError> Resolve(uint32_t frameIndex) const;
 
         [[nodiscard]] bool IsSupported() const { return m_Supported; }
+
+        [[nodiscard]] uint32_t GetFramesInFlight() const { return m_FramesInFlight; }
 
     private:
         struct FrameState
@@ -98,8 +104,8 @@ export namespace RHI
         double m_TimestampPeriodNs = 0.0;
         bool m_Supported = false;
 
-        static constexpr uint32_t kFramesInFlight = VulkanDevice::GetFramesInFlight();
-        FrameState m_Frames[kFramesInFlight]{};
+        uint32_t m_FramesInFlight = 0;
+        std::vector<FrameState> m_Frames{};
     };
 }
 

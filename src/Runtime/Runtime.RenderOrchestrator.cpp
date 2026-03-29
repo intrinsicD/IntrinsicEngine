@@ -1,8 +1,10 @@
 module;
 #include <array>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string_view>
+#include <vector>
 #include "RHI.Vulkan.hpp"
 
 module Runtime.RenderOrchestrator;
@@ -13,10 +15,12 @@ import Core.Memory;
 import Core.FrameGraph;
 import Core.Assets;
 import Core.FeatureRegistry;
+import Core.Telemetry;
 import RHI.Bindless;
 import RHI.Descriptors;
 import RHI.Device;
 import RHI.Image;
+import RHI.Profiler;
 import RHI.Renderer;
 import RHI.Swapchain;
 import RHI.Texture;
@@ -290,6 +294,29 @@ namespace Runtime
         if (frame.ReusedSubmittedSlot || !m_Device)
             frame.FlushDeferredDeletions();
 
+        // Push the stored GPU profiling sample from this slot's previous
+        // frame to telemetry (B4.9).  The sample was cached in EndFrame()
+        // and lives on the FrameContext so profiling data follows frame-
+        // context ownership rather than going straight to a global sink.
+        if (frame.ResolvedGpuProfile)
+        {
+            auto& telemetry = Core::Telemetry::TelemetrySystem::Get();
+            telemetry.SetGpuFrameTimeNs(frame.ResolvedGpuProfile->GpuFrameTimeNs);
+
+            std::vector<Core::Telemetry::PassTimingEntry> passTimings;
+            passTimings.reserve(frame.ResolvedGpuProfile->ScopeCount);
+            for (uint32_t s = 0; s < frame.ResolvedGpuProfile->ScopeCount; ++s)
+            {
+                passTimings.push_back(Core::Telemetry::PassTimingEntry{
+                    frame.ResolvedGpuProfile->ScopeNames[s],
+                    frame.ResolvedGpuProfile->ScopeDurationsNs[s],
+                    0 // CPU time merged separately
+                });
+            }
+            telemetry.SetPassGpuTimings(std::move(passTimings));
+            frame.ResolvedGpuProfile.reset();
+        }
+
         return frame;
     }
 
@@ -428,6 +455,18 @@ namespace Runtime
     void RenderOrchestrator::EndFrame(FrameContext& frame)
     {
         frame.LastSubmittedTimelineValue = (frame.Submitted && m_Device) ? m_Device->GetGraphicsTimelineValue() : 0u;
+
+        // Consume the resolved GPU profiling sample from the renderer and
+        // store it under this FrameContext's ownership (B4.9).  The sample
+        // was resolved non-blockingly in SimpleRenderer::EndFrame() for the
+        // oldest in-flight slot.  Telemetry is fed from BeginFrame() when
+        // the slot is next reused — keeping profiling data on the frame-
+        // context ring rather than going directly to a global sink.
+        // Only consume when the frame was actually submitted to avoid
+        // misattributing stale profiling data to unsubmitted frames.
+        if (frame.Submitted && m_RenderDriver)
+            frame.ResolvedGpuProfile = m_RenderDriver->ConsumeResolvedGpuProfile();
+
         frame.ResetPreparedState();
     }
 

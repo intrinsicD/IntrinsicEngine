@@ -10,6 +10,7 @@
 
 import Core.InplaceFunction;
 import Core.Memory;
+import RHI.Profiler;
 import Runtime.RenderExtraction;
 import Runtime.SceneManager;
 import Graphics.Camera;
@@ -1080,4 +1081,85 @@ TEST(RenderExtraction, FrameContext_DeferredDeletions_MoveOnlyCapture)
     EXPECT_FALSE(deleted);
     frame.FlushDeferredDeletions();
     EXPECT_TRUE(deleted);
+}
+
+// FrameContext GPU profiling ownership (B4.9)
+// -------------------------------------------------------------------------
+
+TEST(RenderExtraction, FrameContext_ResolvedGpuProfile_DefaultIsNullopt)
+{
+    Runtime::FrameContext frame{};
+    EXPECT_FALSE(frame.ResolvedGpuProfile.has_value());
+}
+
+TEST(RenderExtraction, FrameContext_ResolvedGpuProfile_StoresAndConsumes)
+{
+    Runtime::FrameContext frame{};
+
+    RHI::GpuTimestampFrame profile{};
+    profile.FrameNumber = 42;
+    profile.GpuFrameTimeNs = 16'000'000;
+    profile.ScopeCount = 2;
+    profile.ScopeNames = {"SurfacePass", "LinePass"};
+    profile.ScopeDurationsNs = {8'000'000, 4'000'000};
+
+    frame.ResolvedGpuProfile = std::move(profile);
+    ASSERT_TRUE(frame.ResolvedGpuProfile.has_value());
+    EXPECT_EQ(frame.ResolvedGpuProfile->FrameNumber, 42u);
+    EXPECT_EQ(frame.ResolvedGpuProfile->GpuFrameTimeNs, 16'000'000u);
+    EXPECT_EQ(frame.ResolvedGpuProfile->ScopeCount, 2u);
+    EXPECT_EQ(frame.ResolvedGpuProfile->ScopeNames.size(), 2u);
+
+    // Consuming resets the optional.
+    frame.ResolvedGpuProfile.reset();
+    EXPECT_FALSE(frame.ResolvedGpuProfile.has_value());
+}
+
+TEST(RenderExtraction, FrameContext_ResolvedGpuProfile_SurvivesSlotReuseUntilConsumed)
+{
+    // Verify that a stored GPU profile on a FrameContext slot persists
+    // across ring reuse so the orchestrator can consume it in BeginFrame.
+    Runtime::FrameContextRing ring(2u);
+    const Runtime::RenderViewport vp{.Width = 800, .Height = 600};
+
+    Runtime::FrameContext& slot0 = ring.BeginFrame(0u, vp);
+    RHI::GpuTimestampFrame profile{};
+    profile.FrameNumber = 7;
+    profile.GpuFrameTimeNs = 5'000'000;
+    slot0.ResolvedGpuProfile = std::move(profile);
+
+    // Advance to the next slot.
+    ring.BeginFrame(1u, vp);
+
+    // Reuse slot 0 — the profile should still be there.
+    Runtime::FrameContext& slot0_reused = ring.BeginFrame(2u, vp);
+    ASSERT_TRUE(slot0_reused.ResolvedGpuProfile.has_value());
+    EXPECT_EQ(slot0_reused.ResolvedGpuProfile->FrameNumber, 7u);
+    EXPECT_EQ(slot0_reused.ResolvedGpuProfile->GpuFrameTimeNs, 5'000'000u);
+}
+
+TEST(RenderExtraction, FrameContextRing_InvalidateAfterResize_ClearsResolvedGpuProfile)
+{
+    Runtime::FrameContextRing ring(2u);
+    const Runtime::RenderViewport vp{.Width = 800, .Height = 600};
+
+    Runtime::FrameContext& slot0 = ring.BeginFrame(0u, vp);
+    RHI::GpuTimestampFrame profile{};
+    profile.FrameNumber = 99;
+    profile.GpuFrameTimeNs = 10'000'000;
+    slot0.ResolvedGpuProfile = std::move(profile);
+
+    Runtime::FrameContext& slot1 = ring.BeginFrame(1u, vp);
+    RHI::GpuTimestampFrame profile1{};
+    profile1.FrameNumber = 100;
+    slot1.ResolvedGpuProfile = std::move(profile1);
+
+    // Simulate resize — all stale profiling data should be cleared.
+    ring.InvalidateAfterResize();
+
+    Runtime::FrameContext& slot0_post = ring.BeginFrame(2u, vp);
+    EXPECT_FALSE(slot0_post.ResolvedGpuProfile.has_value());
+
+    Runtime::FrameContext& slot1_post = ring.BeginFrame(3u, vp);
+    EXPECT_FALSE(slot1_post.ResolvedGpuProfile.has_value());
 }

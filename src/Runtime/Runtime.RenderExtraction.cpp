@@ -612,6 +612,7 @@ namespace Runtime
             ctx.LastSubmittedTimelineValue = 0;
             ctx.Submitted = false;
             ctx.ReusedSubmittedSlot = false;
+            ctx.ResolvedGpuProfile.reset();
             ctx.ResetPreparedState();
             ctx.ResetRenderAllocators();
         }
