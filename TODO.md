@@ -132,7 +132,6 @@ Mapping guidance for current Intrinsic code while preserving that reference shap
   - [ ] command allocator pools
   - [ ] upload arenas / staging allocators
   - [ ] descriptor arenas
-  - [ ] deferred deletion queues
   - [ ] per-frame render graph or graph-execution cache
   - [ ] per-frame profiling/stat samples
 - [ ] Audit existing systems and migrate any frame-temporary resource keyed by swapchain image count to frame-in-flight ownership unless image affinity is truly required.

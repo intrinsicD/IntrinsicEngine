@@ -604,6 +604,9 @@ namespace Runtime
     {
         for (auto& ctx : m_Contexts)
         {
+            // GPU is idle — safe to flush any pending per-slot deletions.
+            ctx.FlushDeferredDeletions();
+
             ctx.LastSubmittedTimelineValue = 0;
             ctx.Submitted = false;
             ctx.ReusedSubmittedSlot = false;

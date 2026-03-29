@@ -8,6 +8,7 @@ module;
 
 export module Runtime.RenderExtraction;
 
+import Core.InplaceFunction;
 import Core.Memory;
 import Graphics.Camera;
 import Graphics.DebugDraw;
@@ -122,6 +123,53 @@ export namespace Runtime
         // Owned by the FrameContext so each in-flight frame has independent memory.
         std::unique_ptr<Core::Memory::LinearArena> RenderArena{};
         std::unique_ptr<Core::Memory::ScopeStack> RenderScope{};
+
+        // Per-frame-context deferred deletion queue (B4.9).
+        // Resources whose lifetime is tied to THIS frame slot push cleanup
+        // callbacks here.  The queue is flushed after the GPU confirms
+        // completion of this slot's work (timeline wait in BeginFrame),
+        // but BEFORE render allocators are reused for the next frame.
+        //
+        // Use this for per-frame transient resources (staging buffers,
+        // descriptor sets, scratch allocations).  For resources with
+        // cross-frame or unknown-frame lifetimes, continue using
+        // VulkanDevice::SafeDestroy / SafeDestroyAfter.
+        std::vector<Core::InplaceFunction<void()>> DeferredDeletions{};
+
+        // Enqueue a cleanup callback to run when this slot is next reused
+        // (i.e. after the GPU has finished executing this slot's commands).
+        //
+        // Threading contract: call only from the main thread.
+        // Timing: the callback will fire when FlushDeferredDeletions() is
+        // called — typically in RenderOrchestrator::BeginFrame() after the
+        // GPU timeline wait confirms this slot's prior work is complete.
+        // Unlike VulkanDevice::SafeDestroy (which delays by N frames from
+        // the call site), this delays until the specific slot wraps around
+        // (i.e. FramesInFlight frames later).
+        void DeferDeletion(Core::InplaceFunction<void()>&& fn)
+        {
+            DeferredDeletions.push_back(std::move(fn));
+        }
+
+        // Execute and clear all deferred deletion callbacks.
+        // Caller must ensure the GPU has completed this slot's work first.
+        //
+        // Re-entrancy safe: callbacks that call DeferDeletion() during flush
+        // will enqueue into the next cycle (the vector is swapped out before
+        // iteration so new pushes go to the live vector, not the batch being
+        // drained).
+        void FlushDeferredDeletions()
+        {
+            if (DeferredDeletions.empty())
+                return;
+
+            // Swap-and-drain: avoids iterator invalidation if a callback
+            // enqueues another deletion during flush.
+            std::vector<Core::InplaceFunction<void()>> batch;
+            batch.swap(DeferredDeletions);
+            for (auto& fn : batch)
+                fn();
+        }
 
         [[nodiscard]] bool HasAllocators() const
         {

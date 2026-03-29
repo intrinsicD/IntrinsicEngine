@@ -278,6 +278,18 @@ namespace Runtime
                 .Height = extent.height,
             });
         WaitForFrameContextReuseIfNeeded(m_Device, frame);
+
+        // Flush per-slot deferred deletions now that the GPU has confirmed
+        // completion of this slot's previous work.  Must happen BEFORE
+        // render allocators are reset for the new frame.
+        //
+        // Only flush when reusing a previously-submitted slot (the GPU wait
+        // has confirmed completion) or when there is no device (headless/test
+        // — nothing is in flight).  Skip on first-cycle slots that were never
+        // submitted to avoid flushing deletions before any GPU work ran.
+        if (frame.ReusedSubmittedSlot || !m_Device)
+            frame.FlushDeferredDeletions();
+
         return frame;
     }
 
