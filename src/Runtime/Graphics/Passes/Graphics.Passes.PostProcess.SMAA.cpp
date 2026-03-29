@@ -5,6 +5,7 @@ module;
 #include <string>
 #include <cstdint>
 #include <cstring>
+#include <unordered_map>
 #include <glm/glm.hpp>
 
 #include "RHI.Vulkan.hpp"

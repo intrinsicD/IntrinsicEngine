@@ -4,6 +4,7 @@ module;
 #include <span>
 #include <string>
 #include <cstdint>
+#include <unordered_map>
 #include <glm/glm.hpp>
 
 #include "RHI.Vulkan.hpp"
@@ -18,6 +19,8 @@ import Core.Hash;
 import Core.Logging;
 import Core.Filesystem;
 
+import RHI.Buffer;
+import RHI.CommandUtils;
 import RHI.Descriptors;
 import RHI.Device;
 import RHI.Pipeline;
