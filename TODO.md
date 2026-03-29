@@ -33,81 +33,17 @@ This document tracks the **active rendering-architecture backlog** for Intrinsic
 
 ---
 
-## P0 — Critical Refactor
-
-*(All P0 items completed — see git history for implementation details.)*
-
 ## 2. Next (P1) — Near-Term Follow-Up After the Refactor Lands
 
 These are not required to finish the first wave, but they should begin soon after P0 is stable.
 
-### B3. Engine Architecture Review Follow-Up (Boundary + Coupling + Migration)
-
-#### B3.1 Current Architecture Map (baseline and keep current)
-
-#### B3.2 Coupling Hotspots (reduce first)
-
-*(No active items — see git history for completed coupling reductions.)*
-
-#### B3.3 Mixed Concerns + Unstable Interfaces
-
-#### B3.4 Barriers to Testing + Evolution
-
-#### B3.5 Hidden Architectural Duplication
-
-#### B3.7 Recommended Path (default = O2) + Migration Plan
+### B3. Engine Architecture Review Follow-Up
 
 O2 remains the default migration path per `docs/architecture/adr-o2-pragmatic-medium-runtime-refactor.md` unless future benchmark/test evidence overturns it.
-
-#### B3.8 Code Review Findings
-
-##### Critical / Correctness
-
-*(No active items — see git history for completed fixes.)*
-
-##### Performance
-
-##### Architecture / Pattern Compliance
-
-##### Process / Hygiene
-
-*(No active items — completed `[x]` entries cleaned up, `check_todo_active_only.sh` now passes. See git history.)*
-
-##### Compiler Warnings (pre-existing)
-
-*(No active items — see git history for completed fixes.)*
-
-##### 2026-03-20 / 2026-03-21 commit review
-
-###### Critical / Correctness
-
-###### Architecture / Pattern Compliance
-
-###### Performance
-
-###### Process / Hygiene
-
-*(Commit hygiene concern addressed by codifying a repo-wide commit hygiene policy in `CLAUDE.md` — see git history.)*
 
 ### B4. Next-Gen Frame Pipeline Refactor (Fixed-Step + Extraction + Explicit Frame Contexts)
 
 Goal: refactor the runtime from a monolithic update/render loop into a staged frame pipeline with explicit ownership boundaries, immutable render extraction, bounded frames in flight, and explicit CPU/GPU completion tracking. The target shape is: platform -> fixed simulation -> extraction -> render preparation -> GPU submission -> maintenance.
-
-#### B4.0 Target properties (the contract we are designing toward)
-
-- Baseline now runs simulation on a fixed timestep while keeping rendering variable-rate.
-- Job-system-driven parallelism is the default for simulation/extraction/render prep work.
-- GPU synchronization, frame pacing, and deferred resource retirement are explicit architecture concepts.
-- Headless/testable paths isolated from platform + swapchain work.
-
-#### B4.1 Core principle: authoritative world state -> immutable render state
-
-- Baseline rule is now explicit: simulation and rendering must not mutate the same live state during a frame.
-- Baseline handoff is now explicit:
-  - simulation writes `WorldState N+1`
-  - extraction reads stable `WorldState N+1`
-  - extraction writes immutable `RenderWorld N+1`
-  - rendering consumes only `RenderWorld N+1`
 
 #### B4.2 Reference main loop (use this shape as the migration target)
 
@@ -172,54 +108,35 @@ while (!app.should_quit())
 Mapping guidance for current Intrinsic code while preserving that reference shape:
 
 - `platform` maps to `RuntimePlatformFrameHost` + `PlatformFrameCoordinator` (main-thread ownership, pump/minimize, framebuffer extent capture).
-- Current baseline: `world` maps to `SceneManager` + authoritative ECS scene ownership, with an explicit `commit_tick()` / readonly snapshot boundary.
-- Current baseline: `renderer` maps to `RenderOrchestrator` plus `RenderDriver`, with the runtime render lane now following `begin_frame -> extract_render_world -> prepare_frame -> execute_frame -> end_frame`.
+- `world` maps to `SceneManager` + authoritative ECS scene ownership, with an explicit `commit_tick()` / readonly snapshot boundary.
+- `renderer` maps to `RenderOrchestrator` plus `RenderDriver`, with the runtime render lane now following `begin_frame -> extract_render_world -> prepare_frame -> execute_frame -> end_frame`.
 - `resource_system` maps to `Runtime::ResourceMaintenanceService` (GPU sync capture, readback, deferred-destruction, transfer GC, texture/material retirement).
-- Current baseline: `RenderFrameInput`, `RenderWorld`, and `FrameContext` are first-class types rather than remaining implicit in `Engine::Run()` / `RenderDriver::OnUpdate(...)`.
+- `RenderFrameInput`, `RenderWorld`, and `FrameContext` are first-class types rather than remaining implicit in `Engine::Run()` / `RenderDriver::OnUpdate(...)`.
 
-#### B4.3 Platform stage (A)
-
-#### B4.4 Simulation stage (B)
-
-- Deterministic gameplay / ECS / physics / AI / animation work runs on the fixed-step lane.
-
-#### B4.5 Extraction stage (C)
-
-- Extraction is the sole resolver of live ECS state into render packets per frame.
-- Immutable packet families for Intrinsic's renderer are complete:
-  - Surface draw, line/point/debug draw, selection/picking, light/environment, UI/editor overlay, and geometry-processing visualization (debug triangles) packets are all extracted through `RenderWorld`.
-- Picking entity/primitive resolution and selection-presence recipe inputs now consume extraction snapshots.
-- Retained GPUScene snapshot, pick-request state, and debug-view state are now resolved during extraction into `RenderWorld` (via `PickRequestSnapshot`, `DebugViewSnapshot`, `GpuSceneSnapshot`). `BuildGraph` consumes immutable extracted state instead of querying live `InteractionSystem`. Bindless descriptor infrastructure remains a persistent reference (flushed before graph execution, not per-frame state).
-- Extraction-only consumption is locked by `RenderExtraction` test coverage.
-
-#### B4.6 Render preparation stage (D)
+#### B4.6 Render preparation stage
 
 - [ ] Treat render preparation as CPU work that may schedule jobs for visibility, culling, LOD selection, sort keys, draw packet compaction, upload staging, and command recording.
 - [ ] Keep the main loop aware only of broad phases; do not hardcode detailed pass order outside renderer-owned preparation code.
 - [ ] Keep the current three-pass pipeline, deferred path, post-process path, selection/debug overlays, and future hybrid paths expressed as render-graph composition rather than top-level loop branching.
 - [ ] Prepare for GPU-driven / indirect execution by making CPU preparation emit packets and scheduling metadata rather than immediate live-state callbacks.
 
-#### B4.7 GPU submission stage (E)
+#### B4.7 GPU submission stage
 
 - [ ] Make the renderer follow the explicit-API rhythm: wait frame-context availability -> acquire -> reset per-frame allocators -> record -> submit -> present.
 - [ ] Keep swapchain acquire/present and final submit on the main thread; push all other practical work to jobs.
-- Baseline now keeps `RenderGraph` compile/record/execute under renderer-owned execution code.
 - [ ] Handle resize / out-of-date / minimized states without corrupting in-flight frame contexts.
 - [ ] Evolve toward queue-domain-aware scheduling (graphics / compute / transfer) without exposing queue details directly to the top-level engine loop.
 
-#### B4.8 Maintenance stage (F)
+#### B4.8 Maintenance stage
 
-- Upload retirement, deferred destruction, and GPU readback completion are centralized in the maintenance lane.
-- [ ] Keep centralizing remaining maintenance concerns here:
+- [ ] Centralize remaining maintenance concerns:
   - [ ] garbage collection
   - [ ] profiler rollup
   - [ ] telemetry capture
   - [ ] hot-reload bookkeeping
-- Baseline now ensures maintenance can run in headless/test configurations even when no swapchain is active.
 
 #### B4.9 Explicit frame-context ring + bounded frames in flight
 
-- Baseline now tracks frame-context slot reuse over previously submitted work (`FrameContext::ReusedSubmittedSlot`) so renderer-owned wait policy can be asserted in tests before full GPU-completion wiring lands.
 - [ ] Move per-frame transient ownership under `FrameContext`:
   - [ ] command allocator pools
   - [ ] upload arenas / staging allocators
@@ -229,7 +146,6 @@ Mapping guidance for current Intrinsic code while preserving that reference shap
   - [ ] per-frame render graph or graph-execution cache
   - [ ] per-frame profiling/stat samples
 - [ ] Audit existing systems and migrate any frame-temporary resource keyed by swapchain image count to frame-in-flight ownership unless image affinity is truly required.
-- Explicit wait behavior before `FrameContext` reuse is wired via graphics timeline semaphore blocking.
 
 #### B4.10 Job system + multi-threaded command recording
 
@@ -253,33 +169,6 @@ Mapping guidance for current Intrinsic code while preserving that reference shap
 - [ ] Add frame-pacing policies for vsync, low-latency/mailbox, uncapped, editor-throttled, and background-throttled modes.
 - [ ] Add telemetry for CPU frame time, GPU frame time, present blocking time, frames in flight, and estimated input-to-present latency.
 - [ ] Acquire late when practical, keep frames in flight bounded, and avoid the CPU running many frames ahead of the GPU.
-
-#### B4.12 Migration plan + anti-goals
-
-- [ ] Phase A: lock the current frame-order, resize, upload-retirement, pick/debug, and render-graph validation baselines.
-- [ ] Phase B: split the top-level loop into platform / simulation / extraction / render prep / submission / maintenance stages without changing behavior.
-- [ ] Phase C: introduce fixed-step simulation + authoritative world commit semantics.
-- [ ] Phase D: introduce immutable render extraction types and move renderer-facing ECS walks behind them.
-- [ ] Phase E: add the `FrameContext` ring and migrate frame-temporary ownership off swapchain image count.
-- [ ] Phase F: split the renderer into `BeginFrame / Extract / Prepare / Execute / EndFrame` lifecycle entry points.
-- [ ] Phase G: parallelize extraction/render-prep work and add explicit maintenance-stage retirement.
-- [ ] Phase H: evolve toward queue-domain-aware graph scheduling, GPU-driven preparation, and richer async compute / transfer overlap.
-- [ ] Preserve safe checkpoints after every phase:
-  - [ ] render-graph validation remains green
-  - [ ] headless/runtime smoke tests remain green
-  - [ ] resize / pick / debug-view behavior remains stable
-  - [ ] telemetry budgets stay within agreed thresholds
-- [ ] Explicit anti-goals for the refactor:
-  - [ ] no single giant task graph that mixes simulation mutation and render submission
-  - [ ] no renderer walking arbitrary live ECS state during command recording
-  - [ ] no tying per-frame transient ownership to swapchain image count
-  - [ ] no unlimited frames in flight
-  - [ ] no immediate GPU resource destruction
-  - [ ] no hardcoded detailed pass order in the top-level engine loop
-
-### B5. Architectural Legibility — Deferred Cleanup
-
-*(All B5 items completed — see git history for implementation details.)*
 
 ---
 
@@ -364,37 +253,3 @@ These items should be **planned now** so the current refactor leaves room for th
 - [ ] Ensure frame-recipe-relevant settings are serializable where appropriate.
 - [ ] Plan material serialization compatibility with the future rewrite.
 - [ ] Plan debug/editor-only render state separation from scene state.
-
----
-
-## 4. Planned Constraints — Design Now, Build Later
-
-These are the explicit constraints agents must preserve during the refactor even when the underlying features are not being implemented yet.
-
-- [ ] Leave room for a material-system rewrite.
-- [ ] Leave room for transparency-path separation.
-- [ ] Leave room for hybrid lighting.
-- [ ] Leave room for motion vectors/history buffers.
-- [ ] Leave room for clustered/tiled lighting.
-- [ ] Leave room for effect passes like SSAO, decals, and bloom.
-- [ ] Leave room for future GPU-driven visibility integration.
-- [ ] Keep any non-MRT compatibility mode behind an explicit build/runtime feature flag; do not reintroduce it as an implicit picker fallback.
-
----
-
-## 5. Sequencing & Definition of Done
-
-### Sequencing Rules
-
-- Finish P0 before starting P1 feature work unless the task is pure documentation, instrumentation, or test scaffolding that directly de-risks P0.
-- Treat P2 as design pressure during P0, not as implementation scope creep.
-- Keep selection/debug independent of the chosen lighting path.
-- Do not allocate every buffer every frame unless required by the active `FrameRecipe`.
-- Do not force full deferred shading everywhere yet.
-
-### Cross-Cut Definition of Done
-
-- [ ] Update `README.md` for each merged refactor milestone when user-facing architecture or workflow changes.
-- [ ] Remove superseded code paths immediately (no compatibility clutter beyond staged migration windows).
-- [ ] Add at least one integration test per milestone and wire it into the existing test targets.
-- [ ] Add or update migration notes when render contracts change.
