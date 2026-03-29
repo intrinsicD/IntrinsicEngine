@@ -12,6 +12,7 @@ module;
 
 export module Graphics.RenderPipeline;
 
+import Graphics.Camera;
 import Graphics.RenderGraph;
 import Graphics.GPUScene;
 import Graphics.MaterialRegistry;
@@ -629,5 +630,52 @@ export namespace Graphics
             // AuthorizedWriter empty to allow multiple scene pass writers.
         };
     }
+
+    // -----------------------------------------------------------------------
+    // BuildGraphInput — structured render preparation data for BuildGraph
+    // -----------------------------------------------------------------------
+    // Consolidates all per-frame extracted render state into a single struct,
+    // replacing the 18-parameter BuildGraph signature. This serves as the
+    // structured intermediate between the extraction stage (RenderWorld in
+    // Runtime) and the graph construction stage (BuildGraph in Graphics).
+    //
+    // All spans are non-owning views into the owning RenderWorld. The
+    // BuildGraphInput must not outlive the RenderWorld it was built from.
+    struct BuildGraphInput
+    {
+        // Camera / view
+        CameraComponent Camera{};
+        LightEnvironmentPacket Lighting{};
+
+        // Selection
+        bool HasSelectionWork = false;
+        SelectionOutlinePacket SelectionOutline{};
+
+        // Interaction state (extraction-time snapshots)
+        PickRequestSnapshot PickRequest{};
+        DebugViewSnapshot DebugView{};
+
+        // Picking draw packets
+        std::span<const PickingSurfacePacket> SurfacePicking{};
+        std::span<const PickingLinePacket> LinePicking{};
+        std::span<const PickingPointPacket> PointPicking{};
+
+        // Scene draw packets
+        std::span<const SurfaceDrawPacket> SurfaceDraws{};
+        std::span<const LineDrawPacket> LineDraws{};
+        std::span<const PointDrawPacket> PointDraws{};
+
+        // Optional preview data
+        const HtexPatchPreviewPacket* HtexPatchPreview = nullptr;
+
+        // Debug draw snapshots (immutable copies from DebugDraw accumulator)
+        std::span<const DebugDraw::LineSegment> DebugDrawLines{};
+        std::span<const DebugDraw::LineSegment> DebugDrawOverlayLines{};
+        std::span<const DebugDraw::PointMarker> DebugDrawPoints{};
+        std::span<const DebugDraw::TriangleVertex> DebugDrawTriangles{};
+
+        // Editor overlay state
+        EditorOverlayPacket EditorOverlay{};
+    };
 
 }

@@ -271,7 +271,7 @@ ImGui draw-data generation (`GUI::BeginFrame()` + `GUI::DrawGUI()`) runs **befor
 
 ### Extraction-Time Interaction Snapshots
 
-Pick-request, debug-view, and GPU-scene state are resolved during `RenderOrchestrator::ExtractRenderWorld()` into immutable `RenderWorld` packets (`PickRequestSnapshot`, `DebugViewSnapshot`, `GpuSceneSnapshot` — defined in `Graphics.RenderPipeline`). `RenderDriver::BuildGraph()` consumes these extracted snapshots rather than querying live `InteractionSystem` state. This ensures all render-graph inputs are determined at extraction time and the graph build/record phase has no mutable dependencies on editor state.
+Pick-request, debug-view, and GPU-scene state are resolved during `RenderOrchestrator::ExtractRenderWorld()` into immutable `RenderWorld` packets (`PickRequestSnapshot`, `DebugViewSnapshot`, `GpuSceneSnapshot` — defined in `Graphics.RenderPipeline`). `RenderDriver::BuildGraph()` accepts a single `Graphics::BuildGraphInput` struct (non-owning spans into the `RenderWorld`) rather than 18 splayed parameters, establishing a structured data contract between the extraction stage and graph construction. `RenderOrchestrator::PrepareFrame()` constructs the `BuildGraphInput` via designated initializers from the frame-context-owned `RenderWorld`. This ensures all render-graph inputs are determined at extraction time and the graph build/record phase has no mutable dependencies on editor state.
 
 ## Build & Test Workflow
 

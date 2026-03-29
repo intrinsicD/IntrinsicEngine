@@ -68,24 +68,7 @@ export namespace Graphics
         void ProcessCompletedGpuWork(ECS::Scene& scene, uint64_t currentFrame);
         void UpdateGlobals(const CameraComponent& camera, const LightEnvironmentPacket& lighting);
         void BuildGraph(Core::Assets::AssetManager& assetManager,
-                        const CameraComponent& camera,
-                        const LightEnvironmentPacket& lighting,
-                        bool hasSelectionWork,
-                        const SelectionOutlinePacket& selectionOutline,
-                        const PickRequestSnapshot& pickRequest,
-                        const DebugViewSnapshot& debugView,
-                        std::span<const PickingSurfacePacket> pickingSurfacePackets = {},
-                        std::span<const PickingLinePacket> pickingLinePackets = {},
-                        std::span<const PickingPointPacket> pickingPointPackets = {},
-                        std::span<const SurfaceDrawPacket> surfaceDrawPackets = {},
-                        std::span<const LineDrawPacket> lineDrawPackets = {},
-                        std::span<const PointDrawPacket> pointDrawPackets = {},
-                        const HtexPatchPreviewPacket* htexPatchPreview = nullptr,
-                        std::span<const DebugDraw::LineSegment> debugDrawLines = {},
-                        std::span<const DebugDraw::LineSegment> debugDrawOverlayLines = {},
-                        std::span<const DebugDraw::PointMarker> debugDrawPoints = {},
-                        std::span<const DebugDraw::TriangleVertex> debugDrawTriangles = {},
-                        const EditorOverlayPacket& editorOverlay = {});
+                        const BuildGraphInput& input);
         void ExecuteGraph();
         void EndFrame();
 
