@@ -38,6 +38,8 @@ This document tracks the **active rendering-architecture backlog** for Intrinsic
 
 ## 2. Next (P1) — Near-Term Priorities
 
+P1 items are active development targets with concrete deliverables and test requirements.
+
 ### A. Rendering Architecture Gaps
 
 These close critical gaps in the rendering pipeline that block or de-risk later feature work.
@@ -46,11 +48,8 @@ These close critical gaps in the rendering pipeline that block or de-risk later 
 
 ```
 A1 (Depth Prepass) ──→ A2 (CSM Phase 1) ──→ A2b (CSM Phase 2: PCF)
-                   └─→ future SSAO (see ROADMAP C6)
+                   └─→ future SSAO (see P2 C6)
                    └─→ future HiZ (see P2 C4)
-
-A3 (Shader Hot-Reload) — independent, begin alongside A1 for fast shader iteration
-A4 (GPU Memory Budget) — independent
 ```
 
 #### A1. Depth Prepass
@@ -61,7 +60,9 @@ A depth-only early-Z pass is a prerequisite for shadow mapping, SSAO, and effici
 - [ ] `SurfacePass` switches to depth-equal test when prepass is active (no redundant fragment work).
 - [ ] Recipe-driven: prepass is enabled/disabled via `FrameRecipe` feature flag.
 - [ ] Pipeline created with no fragment shader module and no color attachments (depth-only rendering). Reuse `SurfacePass` vertex pipeline + BDA push constants.
+- [ ] Validate depth prepass + deferred path: `CompositionPass` reads prepass-produced `SceneDepth` for position reconstruction.
 - [ ] Add contract test: when prepass is active, `SurfacePass` must not clear depth.
+- [ ] Add integration test: depth prepass produces correct results in both forward and deferred modes.
 - [ ] Update `rendering-three-pass.md` pass contract table.
 
 #### A2. Cascaded Shadow Maps (CSM)
@@ -84,31 +85,16 @@ Split into two sub-phases to keep commits reviewable:
 - [ ] Stabilized cascade frusta (texel snapping to reduce shimmer).
 - [ ] Update `rendering-three-pass.md` pass contract table with `ShadowPass`.
 
-#### A3. Shader Hot-Reload
-
-Independent track — begin alongside A1 for fast shader iteration during rendering mode and shadow development.
-
-- [ ] File watcher (inotify/kqueue) on the shader source directory.
-- [ ] On change: recompile affected SPIR-V, recreate `VkPipeline` via `PipelineLibrary`.
-- [ ] Graceful fallback: if compilation fails, keep the previous pipeline and log the error.
-- [ ] Wire into `FeatureRegistry` as a toggle (`ShaderHotReload`).
-- [ ] Scope: graphics pipelines only (compute hot-reload can follow later).
-- [ ] Update ROADMAP "Ongoing" section to cross-reference this item.
-
-#### A4. GPU Memory Budget Tracking
-
-Independent track. The engine has no visibility into GPU memory consumption, blocking informed decisions about atlas sizes, LOD streaming budgets, and point-cloud out-of-core loading.
-
-- [ ] Query `VkPhysicalDeviceMemoryBudgetPropertiesEXT` (or VMA budget API) once per frame.
-- [ ] Expose total/used/budget per memory heap in telemetry.
-- [ ] Add an ImGui panel section showing live GPU memory usage.
-- [ ] Warning threshold configurable via `FeatureRegistry`. Initial default 80% per heap. Warning fires once per heap per transition (not per frame).
-
 ### B. Frame Pipeline Hardening (O2 ADR Continuation)
 
 Continue the staged frame-pipeline refactor from `docs/architecture/adr-o2-pragmatic-medium-runtime-refactor.md`. These items harden existing seams rather than adding new features.
 
 O2 remains the default migration path unless future benchmark/test evidence overturns it.
+
+**Architectural constraints (preserve during all B-section work):**
+- Keep the three-pass/deferred/post/overlay behavior expressed as renderer-owned render-graph composition rather than top-level loop branching.
+- Keep the main loop aware only of broad phases (platform, simulation, extraction, render, maintenance) — not pass-level detail.
+- Preserve headless/testable paths by isolating platform and swapchain specifics from simulation, extraction, and maintenance logic.
 
 **Dependency graph:**
 
@@ -230,7 +216,7 @@ Split into two sub-phases:
   - [ ] draw-packet building / sorting
   - [ ] upload staging
 - [ ] Keep the main thread as a conductor, not a worker.
-- [ ] Multi-threaded command recording of heavy passes (shadow cascades, debug/editor overlays, multi-view paths) via secondary command buffers per `ExecutionPacket` layer. Use existing `Core::Tasks::Scheduler` with `CounterEvent` barrier.
+- [ ] Multi-threaded command recording of heavy passes via secondary command buffers per `ExecutionPacket` layer. Use existing `Core::Tasks::Scheduler` with `CounterEvent` barrier. Shadow cascade rendering (A2) is the first candidate for multi-view parallel command recording.
 
 #### B5. Queue Model, Synchronization, Frame Pacing, and Resource Lifetime
 
@@ -266,11 +252,35 @@ Independent parallel track with no ordering relationship to sections A or B. CUD
 - [ ] Focused test: round-trip a buffer (Vulkan write -> CUDA read -> verify).
 - [ ] Focused test: timeline semaphore signals correctly across APIs.
 
+### E. Developer Workflow
+
+Independent tracks that improve iteration speed and observability. Not rendering architecture gaps, but practical enablers for A-section and B-section work.
+
+#### E1. Shader Hot-Reload
+
+Begin alongside A1 for fast shader iteration during rendering mode and shadow development.
+
+- [ ] File watcher (inotify/kqueue) on the shader source directory.
+- [ ] On change: recompile affected SPIR-V, recreate `VkPipeline` via `PipelineLibrary`.
+- [ ] Graceful fallback: if compilation fails, keep the previous pipeline and log the error.
+- [ ] Wire into `FeatureRegistry` as a toggle (`ShaderHotReload`).
+- [ ] Scope: graphics pipelines only (compute hot-reload can follow later).
+- [ ] Update ROADMAP "Ongoing" section to cross-reference this item.
+
+#### E2. GPU Memory Budget Tracking
+
+The engine has no visibility into GPU memory consumption.
+
+- [ ] Query `VkPhysicalDeviceMemoryBudgetPropertiesEXT` (or VMA budget API) once per frame.
+- [ ] Expose total/used/budget per memory heap in telemetry.
+- [ ] Add an ImGui panel section showing live GPU memory usage.
+- [ ] Warning threshold configurable via `FeatureRegistry`. Initial default 80% per heap. Warning fires once per heap per transition (not per frame).
+
 ---
 
 ## 3. Later (P2) — Planned Downstream Work
 
-These items should be **planned now** so the current refactor leaves room for them, but they should be implemented later.
+P2 items are design-only: plan the interfaces and constraints, do not implement. These should be **planned now** so the current refactor leaves room for them.
 
 ### C1. Material System Rewrite
 
