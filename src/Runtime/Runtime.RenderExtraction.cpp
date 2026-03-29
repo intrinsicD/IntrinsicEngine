@@ -69,6 +69,8 @@ namespace Runtime
         {
             if (const auto* world = registry.try_get<ECS::Components::Transform::WorldMatrix>(entity))
                 return world->Matrix;
+            if (const auto* transform = registry.try_get<ECS::Components::Transform::Component>(entity))
+                return ECS::Components::Transform::GetMatrix(*transform);
             return glm::mat4(1.0f);
         }
 
@@ -604,6 +606,9 @@ namespace Runtime
     {
         for (auto& ctx : m_Contexts)
         {
+            // GPU is idle — safe to flush any pending per-slot deletions.
+            ctx.FlushDeferredDeletions();
+
             ctx.LastSubmittedTimelineValue = 0;
             ctx.Submitted = false;
             ctx.ReusedSubmittedSlot = false;

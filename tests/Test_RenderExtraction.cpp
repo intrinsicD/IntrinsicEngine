@@ -8,6 +8,7 @@
 #include <utility>
 #include <entt/entity/fwd.hpp>
 
+import Core.InplaceFunction;
 import Core.Memory;
 import Runtime.RenderExtraction;
 import Runtime.SceneManager;
@@ -947,4 +948,136 @@ TEST(RenderExtraction, FrameContextRing_InvalidateAfterResize_PreservesAllocator
     EXPECT_TRUE(frame0.HasAllocators());
     EXPECT_EQ(&frame0.GetRenderArena(), arena0);
     EXPECT_EQ(&frame0.GetRenderScope(), scope0);
+}
+
+// ---------------------------------------------------------------------------
+// FrameContext deferred deletion queue (B4.9)
+// ---------------------------------------------------------------------------
+
+TEST(RenderExtraction, FrameContext_DeferDeletion_CallbackFiresOnFlush)
+{
+    Runtime::FrameContext frame{};
+    int counter = 0;
+    frame.DeferDeletion([&counter]() { ++counter; });
+    frame.DeferDeletion([&counter]() { counter += 10; });
+
+    EXPECT_EQ(counter, 0);
+    frame.FlushDeferredDeletions();
+    EXPECT_EQ(counter, 11);
+}
+
+TEST(RenderExtraction, FrameContext_FlushDeferredDeletions_ClearsQueue)
+{
+    Runtime::FrameContext frame{};
+    int counter = 0;
+    frame.DeferDeletion([&counter]() { ++counter; });
+
+    frame.FlushDeferredDeletions();
+    EXPECT_EQ(counter, 1);
+
+    // Second flush should be a no-op (queue cleared).
+    frame.FlushDeferredDeletions();
+    EXPECT_EQ(counter, 1);
+}
+
+TEST(RenderExtraction, FrameContext_FlushDeferredDeletions_EmptyQueueIsNoOp)
+{
+    Runtime::FrameContext frame{};
+    // Should not crash or assert.
+    frame.FlushDeferredDeletions();
+}
+
+TEST(RenderExtraction, FrameContext_DeferredDeletions_ExecuteInOrder)
+{
+    Runtime::FrameContext frame{};
+    std::vector<int> order;
+    frame.DeferDeletion([&order]() { order.push_back(1); });
+    frame.DeferDeletion([&order]() { order.push_back(2); });
+    frame.DeferDeletion([&order]() { order.push_back(3); });
+
+    frame.FlushDeferredDeletions();
+    ASSERT_EQ(order.size(), 3u);
+    EXPECT_EQ(order[0], 1);
+    EXPECT_EQ(order[1], 2);
+    EXPECT_EQ(order[2], 3);
+}
+
+TEST(RenderExtraction, FrameContextRing_InvalidateAfterResize_FlushesDeferredDeletions)
+{
+    Runtime::FrameContextRing ring(2u);
+    constexpr Runtime::RenderViewport vp{.Width = 640, .Height = 480};
+
+    Runtime::FrameContext& frame0 = ring.BeginFrame(0u, vp);
+    int counter = 0;
+    frame0.DeferDeletion([&counter]() { ++counter; });
+
+    Runtime::FrameContext& frame1 = ring.BeginFrame(1u, vp);
+    frame1.DeferDeletion([&counter]() { counter += 10; });
+
+    EXPECT_EQ(counter, 0);
+    ring.InvalidateAfterResize();
+    EXPECT_EQ(counter, 11);
+}
+
+TEST(RenderExtraction, FrameContext_DeferredDeletions_SurviveSlotReuse)
+{
+    // Deferred deletions enqueued on a slot persist until explicitly flushed.
+    // The ring's BeginFrame does NOT auto-flush (that's the orchestrator's job
+    // after the timeline wait). Verify the queue survives wrap-around.
+    Runtime::FrameContextRing ring(2u);
+    constexpr Runtime::RenderViewport vp{.Width = 800, .Height = 600};
+
+    Runtime::FrameContext& slot0_frame0 = ring.BeginFrame(0u, vp);
+    int counter = 0;
+    slot0_frame0.DeferDeletion([&counter]() { ++counter; });
+
+    // Advance past slot 1 back to slot 0.
+    [[maybe_unused]] auto& slot1 = ring.BeginFrame(1u, vp);
+    Runtime::FrameContext& slot0_frame2 = ring.BeginFrame(2u, vp);
+
+    // Deletion callback should still be pending (not auto-flushed by ring).
+    EXPECT_EQ(counter, 0);
+
+    // Explicit flush simulates what the orchestrator does after timeline wait.
+    slot0_frame2.FlushDeferredDeletions();
+    EXPECT_EQ(counter, 1);
+}
+
+TEST(RenderExtraction, FrameContext_DeferredDeletions_ReentrancySafe)
+{
+    // A callback that enqueues another deletion during flush must not
+    // trigger iterator invalidation (swap-and-drain pattern).
+    Runtime::FrameContext frame{};
+    int counter = 0;
+
+    frame.DeferDeletion([&frame, &counter]() {
+        ++counter;
+        // Re-entrant: enqueue a second deletion from inside the flush.
+        frame.DeferDeletion([&counter]() { counter += 100; });
+    });
+
+    frame.FlushDeferredDeletions();
+    // Only the first callback ran; the re-entrant one is deferred.
+    EXPECT_EQ(counter, 1);
+
+    // Second flush drains the re-entrant callback.
+    frame.FlushDeferredDeletions();
+    EXPECT_EQ(counter, 101);
+}
+
+TEST(RenderExtraction, FrameContext_DeferredDeletions_MoveOnlyCapture)
+{
+    // Verify that move-only captures work through InplaceFunction.
+    Runtime::FrameContext frame{};
+    bool deleted = false;
+
+    auto ptr = std::make_unique<int>(42);
+    frame.DeferDeletion([p = std::move(ptr), &deleted]() {
+        EXPECT_EQ(*p, 42);
+        deleted = true;
+    });
+
+    EXPECT_FALSE(deleted);
+    frame.FlushDeferredDeletions();
+    EXPECT_TRUE(deleted);
 }
