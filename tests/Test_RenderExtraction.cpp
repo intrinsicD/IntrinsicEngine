@@ -756,3 +756,62 @@ TEST(RenderExtraction, RenderWorld_DebugDrawTrianglesSurviveMove)
     EXPECT_EQ(prepared->DebugDrawTriangles[0].Position, glm::vec3(1, 2, 3));
     EXPECT_EQ(prepared->DebugDrawTriangles[2].Position, glm::vec3(7, 8, 9));
 }
+
+// ---------------------------------------------------------------------------
+// Extraction-time interaction snapshots
+// ---------------------------------------------------------------------------
+
+TEST(RenderExtraction, RenderWorld_PickRequestDefaultIsNotPending)
+{
+    Runtime::RenderWorld world{};
+    EXPECT_FALSE(world.PickRequest.Pending);
+    EXPECT_EQ(world.PickRequest.X, 0u);
+    EXPECT_EQ(world.PickRequest.Y, 0u);
+}
+
+TEST(RenderExtraction, RenderWorld_DebugViewDefaultIsDisabled)
+{
+    Runtime::RenderWorld world{};
+    EXPECT_FALSE(world.DebugView.Enabled);
+    EXPECT_FALSE(world.DebugView.ShowInViewport);
+    EXPECT_FALSE(world.DebugView.DisableCulling);
+    EXPECT_FLOAT_EQ(world.DebugView.DepthNear, 0.1f);
+    EXPECT_FLOAT_EQ(world.DebugView.DepthFar, 1000.0f);
+}
+
+TEST(RenderExtraction, RenderWorld_GpuSceneDefaultIsUnavailable)
+{
+    Runtime::RenderWorld world{};
+    EXPECT_FALSE(world.GpuScene.Available);
+    EXPECT_EQ(world.GpuScene.ActiveCountApprox, 0u);
+}
+
+TEST(RenderExtraction, RenderWorld_ExtractionSnapshotsCarryThroughFrameContext)
+{
+    Runtime::SceneManager sceneManager;
+    sceneManager.CommitFixedTick();
+
+    Runtime::RenderWorld world{
+        .Alpha = 0.5,
+        .View = Runtime::MakeRenderViewPacket(Graphics::CameraComponent{},
+                                              Runtime::RenderViewport{.Width = 800, .Height = 600}),
+        .World = sceneManager.CreateReadonlySnapshot(),
+    };
+    world.PickRequest = Graphics::PickRequestSnapshot{.Pending = true, .X = 42, .Y = 99};
+    world.DebugView = Graphics::DebugViewSnapshot{.Enabled = true, .ShowInViewport = true};
+    world.GpuScene = Graphics::GpuSceneSnapshot{.Available = true, .ActiveCountApprox = 128};
+
+    Runtime::FrameContext frame{};
+    frame.PreparedRenderWorld = std::move(world);
+    frame.Prepared = true;
+
+    const Runtime::RenderWorld* prepared = frame.GetPreparedRenderWorld();
+    ASSERT_NE(prepared, nullptr);
+    EXPECT_TRUE(prepared->PickRequest.Pending);
+    EXPECT_EQ(prepared->PickRequest.X, 42u);
+    EXPECT_EQ(prepared->PickRequest.Y, 99u);
+    EXPECT_TRUE(prepared->DebugView.Enabled);
+    EXPECT_TRUE(prepared->DebugView.ShowInViewport);
+    EXPECT_TRUE(prepared->GpuScene.Available);
+    EXPECT_EQ(prepared->GpuScene.ActiveCountApprox, 128u);
+}

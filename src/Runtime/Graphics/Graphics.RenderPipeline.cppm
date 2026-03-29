@@ -363,6 +363,35 @@ export namespace Graphics
     };
 
     // ---------------------------------------------------------------------
+    // Extraction-time snapshots for interaction state
+    // ---------------------------------------------------------------------
+    // Immutable snapshot of the pending pick request.
+    struct PickRequestSnapshot
+    {
+        bool Pending = false;
+        uint32_t X = 0;
+        uint32_t Y = 0;
+    };
+
+    // Immutable snapshot of the debug-view state.
+    struct DebugViewSnapshot
+    {
+        bool Enabled = false;
+        bool ShowInViewport = false;
+        bool DisableCulling = false;
+        Core::Hash::StringID SelectedResource = GetRenderResourceName(RenderResource::EntityId);
+        float DepthNear = 0.1f;
+        float DepthFar = 1000.0f;
+    };
+
+    // Immutable snapshot of retained GPUScene state at extraction time.
+    struct GpuSceneSnapshot
+    {
+        bool Available = false;
+        uint32_t ActiveCountApprox = 0;
+    };
+
+    // ---------------------------------------------------------------------
     // Frame Context
     // ---------------------------------------------------------------------
     struct RenderPassContext
@@ -402,22 +431,8 @@ export namespace Graphics
 
         RHI::BindlessDescriptorSystem& Bindless;
 
-        struct PickRequestState
-        {
-            bool Pending = false;
-            uint32_t X = 0;
-            uint32_t Y = 0;
-        } PickRequest;
-
-        struct DebugState
-        {
-            bool Enabled = false;
-            bool ShowInViewport = false;
-            bool DisableCulling = false;
-            Core::Hash::StringID SelectedResource = GetRenderResourceName(RenderResource::EntityId);
-            float DepthNear = 0.1f;
-            float DepthFar = 1000.0f;
-        } Debug;
+        PickRequestSnapshot PickRequest;
+        DebugViewSnapshot Debug;
 
         std::span<const RenderGraphDebugImage> PrevFrameDebugImages{};
         std::span<const RenderGraphDebugPass> PrevFrameDebugPasses{};
