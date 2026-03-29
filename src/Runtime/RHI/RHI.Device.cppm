@@ -107,7 +107,7 @@ namespace RHI
         void FlushAllDeletionQueues();
 
         // Drain *timeline-based* deferred deletions immediately.
-        // Contract: only call when the GPU is idle (e.g., after vkDeviceWaitIdle).
+        // Contract: only call when the GPU is idle (e.g., after WaitForGraphicsIdle).
         void FlushTimelineDeletionQueueNow();
 
         // ---------------------------------------------------------------------
@@ -135,6 +135,12 @@ namespace RHI
 
         // Existing API: keep name, but implement in terms of timeline.
         void SafeDestroy(Core::InplaceFunction<void()>&& deleteFn);
+
+        // Wait for all submitted graphics-queue work to complete using the timeline
+        // semaphore, then flush all deferred deletion queues. This is a targeted
+        // alternative to vkDeviceWaitIdle that only drains the graphics queue.
+        // Returns true if the wait succeeded (or no work was pending).
+        [[nodiscard]] bool WaitForGraphicsIdle();
 
         // Graphics timeline semaphore handle used for vkQueueSubmit signaling.
         [[nodiscard]] VkSemaphore GetGraphicsTimelineSemaphore() const { return m_GraphicsTimelineSemaphore; }

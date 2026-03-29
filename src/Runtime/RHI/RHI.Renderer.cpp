@@ -394,9 +394,15 @@ namespace RHI
 
     void SimpleRenderer::OnResize()
     {
-        vkDeviceWaitIdle(m_Device->GetLogicalDevice());
+        // Use timeline-semaphore-based drain instead of vkDeviceWaitIdle.
+        // This only waits for submitted graphics-queue work rather than stalling all queues,
+        // so concurrent transfer-queue uploads can continue uninterrupted during resize.
+        if (!m_Device->WaitForGraphicsIdle())
+        {
+            // Fallback: if timeline wait fails, drain everything to avoid UB.
+            vkDeviceWaitIdle(m_Device->GetLogicalDevice());
+        }
         m_Swapchain.Recreate();
-        // CreateDepthBuffer(); // No longer needed
     }
 
     void SimpleRenderer::Draw(uint32_t vertexCount)

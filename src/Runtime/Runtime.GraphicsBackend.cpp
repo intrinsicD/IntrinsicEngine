@@ -219,7 +219,7 @@ namespace Runtime
         if (m_Swapchain && m_Swapchain->GetPresentPolicy() != policy)
         {
             m_Swapchain->SetPresentPolicy(policy);
-            // Recreate() internally calls vkDeviceWaitIdle before rebuilding.
+            // Recreate() internally calls WaitForGraphicsIdle() before rebuilding.
             m_Swapchain->Recreate();
             Core::Log::Info("GraphicsBackend: Present policy changed to {}", RHI::ToString(policy));
         }

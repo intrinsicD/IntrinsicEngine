@@ -248,7 +248,7 @@ namespace RHI
 
     void TextureManager::Clear()
     {
-        // NOTE: This must only be called when the GPU is idle (vkDeviceWaitIdle already executed).
+        // NOTE: This must only be called when the GPU is idle (WaitForGraphicsIdle already executed).
         // Clears pending kills and immediately releases all TextureGpuData heap objects (which free Vulkan images).
 
         // Reclaim all bindless slots except 0.

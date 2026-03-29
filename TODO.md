@@ -124,7 +124,6 @@ Mapping guidance for current Intrinsic code while preserving that reference shap
 
 - [ ] Make the renderer follow the explicit-API rhythm: wait frame-context availability -> acquire -> reset per-frame allocators -> record -> submit -> present.
 - [ ] Keep swapchain acquire/present and final submit on the main thread; push all other practical work to jobs.
-- [ ] Handle resize / out-of-date / minimized states without corrupting in-flight frame contexts.
 - [ ] Evolve toward queue-domain-aware scheduling (graphics / compute / transfer) without exposing queue details directly to the top-level engine loop.
 
 #### B4.9 Explicit frame-context ring + bounded frames in flight

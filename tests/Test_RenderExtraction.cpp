@@ -875,3 +875,76 @@ TEST(RenderExtraction, RenderWorld_ExtractionSnapshotsCarryThroughFrameContext)
     EXPECT_TRUE(prepared->GpuScene.Available);
     EXPECT_EQ(prepared->GpuScene.ActiveCountApprox, 128u);
 }
+
+// ---------------------------------------------------------------------------
+// InvalidateAfterResize
+// ---------------------------------------------------------------------------
+
+TEST(RenderExtraction, FrameContextRing_InvalidateAfterResize_ClearsSubmittedStateOnAllSlots)
+{
+    Runtime::FrameContextRing ring(2u);
+    constexpr Runtime::RenderViewport vp{.Width = 800, .Height = 600};
+
+    // Simulate two submitted frames.
+    Runtime::FrameContext& frame0 = ring.BeginFrame(0u, vp);
+    frame0.Prepared = true;
+    frame0.Submitted = true;
+    frame0.LastSubmittedTimelineValue = 10u;
+
+    Runtime::FrameContext& frame1 = ring.BeginFrame(1u, vp);
+    frame1.Prepared = true;
+    frame1.Submitted = true;
+    frame1.LastSubmittedTimelineValue = 11u;
+
+    // Invalidate simulates what happens after the GPU has been drained during resize.
+    ring.InvalidateAfterResize();
+
+    EXPECT_FALSE(frame0.Submitted);
+    EXPECT_FALSE(frame0.ReusedSubmittedSlot);
+    EXPECT_EQ(frame0.LastSubmittedTimelineValue, 0u);
+    EXPECT_FALSE(frame0.Prepared);
+    EXPECT_EQ(frame0.GetPreparedRenderWorld(), nullptr);
+
+    EXPECT_FALSE(frame1.Submitted);
+    EXPECT_FALSE(frame1.ReusedSubmittedSlot);
+    EXPECT_EQ(frame1.LastSubmittedTimelineValue, 0u);
+    EXPECT_FALSE(frame1.Prepared);
+    EXPECT_EQ(frame1.GetPreparedRenderWorld(), nullptr);
+}
+
+TEST(RenderExtraction, FrameContextRing_InvalidateAfterResize_NextBeginFrameDoesNotFlagReuse)
+{
+    Runtime::FrameContextRing ring(2u);
+    constexpr Runtime::RenderViewport vp{.Width = 1024, .Height = 768};
+
+    // Simulate a submitted frame then invalidate (resize).
+    Runtime::FrameContext& frame0 = ring.BeginFrame(0u, vp);
+    frame0.Submitted = true;
+    frame0.LastSubmittedTimelineValue = 5u;
+
+    ring.InvalidateAfterResize();
+
+    // Next BeginFrame wraps to the same slot. Since InvalidateAfterResize
+    // cleared Submitted, BeginFrame should NOT flag ReusedSubmittedSlot.
+    Runtime::FrameContext& frame2 = ring.BeginFrame(2u, vp);
+    EXPECT_FALSE(frame2.ReusedSubmittedSlot);
+    EXPECT_EQ(frame2.LastSubmittedTimelineValue, 0u);
+}
+
+TEST(RenderExtraction, FrameContextRing_InvalidateAfterResize_PreservesAllocators)
+{
+    Runtime::FrameContextRing ring(2u);
+    constexpr Runtime::RenderViewport vp{.Width = 640, .Height = 480};
+
+    Runtime::FrameContext& frame0 = ring.BeginFrame(0u, vp);
+    ASSERT_TRUE(frame0.HasAllocators());
+    const auto* arena0 = &frame0.GetRenderArena();
+    const auto* scope0 = &frame0.GetRenderScope();
+
+    ring.InvalidateAfterResize();
+
+    // Allocators survive invalidation — they are reused, not destroyed.
+    EXPECT_TRUE(frame0.HasAllocators());
+    EXPECT_EQ(&frame0.GetRenderArena(), arena0);
+    EXPECT_EQ(&frame0.GetRenderScope(), scope0);
+}

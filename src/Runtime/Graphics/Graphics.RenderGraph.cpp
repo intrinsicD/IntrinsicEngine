@@ -274,7 +274,7 @@ namespace Graphics
 
     void RenderGraph::Trim()
     {
-        // Caller is expected to have synchronized with the GPU (e.g., vkDeviceWaitIdle via renderer resize path).
+        // Caller is expected to have synchronized with the GPU (e.g., WaitForGraphicsIdle via renderer resize path).
         // We keep Trim() itself lightweight and deterministic.
 
         // NOTE:
