@@ -137,6 +137,7 @@ intrinsic_test_object_lib(GeometryTestObjs
         Test_ContactManifold.cpp
         Test_Simplification.cpp
         Test_Geodesic.cpp
+        Test_VectorHeatMethod.cpp
         Test_ShortestPath.cpp
         Test_Subdivision.cpp
         Test_Smoothing.cpp
