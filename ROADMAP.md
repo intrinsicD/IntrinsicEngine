@@ -254,8 +254,7 @@ Core operators are complete (16 mesh operators + DEC + graph builders/layouts + 
 - **Shape and point cloud registration (ICP variants):** Point-to-point, point-to-plane, and robust weighted ICP pipelines.
 - **Additional state-of-the-art geometry processing methods:** Continue integrating current research-grade operators as first-class runtime tools.
 
-**Top next (dependency-ordered):** Ordered from foundational geometry robustness and correspondence to advanced deformation/reconstruction so later operators can reuse earlier data products and solvers. Heat-method geodesic distance is already implemented; vector heat geodesics (parallel transport) remains.
-- **Vector heat geodesics:** Parallel transport extension of the existing heat-method solver for direction/frame field applications.
+**Top next (dependency-ordered):** Ordered from foundational geometry robustness and correspondence to advanced deformation/reconstruction so later operators can reuse earlier data products and solvers. Heat-method geodesic distance and vector heat geodesics (parallel transport + logarithmic map) are implemented.
 - **Robust global registration (TEASER++/FGR/Super4PCS):** Outlier-tolerant coarse alignment before local ICP refinement.
 - **Non-rigid registration (CPD/embedded deformation):** Deformable alignment for temporal scans and articulated shapes.
 - **Field-aligned quad remeshing (MIQ/Instant Meshes class):** Direction-field-driven quad dominant remeshing for downstream UV/edit workflows.
