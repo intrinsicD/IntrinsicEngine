@@ -600,6 +600,18 @@ namespace Runtime
         }
     }
 
+    void FrameContextRing::InvalidateAfterResize()
+    {
+        for (auto& ctx : m_Contexts)
+        {
+            ctx.LastSubmittedTimelineValue = 0;
+            ctx.Submitted = false;
+            ctx.ReusedSubmittedSlot = false;
+            ctx.ResetPreparedState();
+            ctx.ResetRenderAllocators();
+        }
+    }
+
     FrameContext& FrameContextRing::BeginFrame(uint64_t frameNumber, RenderViewport viewport) &
     {
         const uint32_t slotIndex = static_cast<uint32_t>(frameNumber % static_cast<uint64_t>(m_FramesInFlight));

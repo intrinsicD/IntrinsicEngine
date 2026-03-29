@@ -171,6 +171,40 @@ namespace RHI
         return completed;
     }
 
+    bool VulkanDevice::WaitForGraphicsIdle()
+    {
+        if (!m_Device)
+            return false;
+
+        // If no graphics work has been submitted yet, there is nothing to wait for.
+        const uint64_t lastSignaled = m_GraphicsTimelineValue.load(std::memory_order_acquire);
+        if (lastSignaled == 0 || !m_GraphicsTimelineSemaphore)
+        {
+            FlushAllDeletionQueues();
+            return true;
+        }
+
+        // Wait for the graphics timeline to reach the last signaled value.
+        VkSemaphoreWaitInfo waitInfo{};
+        waitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
+        waitInfo.semaphoreCount = 1;
+        waitInfo.pSemaphores = &m_GraphicsTimelineSemaphore;
+        waitInfo.pValues = &lastSignaled;
+
+        constexpr uint64_t kTimeoutNs = 5'000'000'000ull; // 5 seconds — generous but not infinite
+        const VkResult result = vkWaitSemaphores(m_Device, &waitInfo, kTimeoutNs);
+        if (result != VK_SUCCESS)
+        {
+            Core::Log::Error("VulkanDevice::WaitForGraphicsIdle: vkWaitSemaphores failed (VkResult={}).",
+                             static_cast<int>(result));
+            return false;
+        }
+
+        // All submitted graphics work is now complete. Flush all deletion queues.
+        FlushAllDeletionQueues();
+        return true;
+    }
+
     // Partition-and-execute deferred deletion:
     //
     // Queries the GPU-completed timeline value via vkGetSemaphoreCounterValue,

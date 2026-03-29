@@ -181,6 +181,12 @@ export namespace Runtime
 
         [[nodiscard]] FrameContext& BeginFrame(uint64_t frameNumber, RenderViewport viewport) &;
 
+        // Reset timeline/submitted state on all frame-context slots after the GPU
+        // has been fully drained (e.g. during resize). This prevents the next
+        // BeginFrame from double-waiting on already-completed timeline values and
+        // clears stale per-frame state that referenced the old swapchain.
+        void InvalidateAfterResize();
+
     private:
         uint32_t m_FramesInFlight = DefaultFrameContexts;
         size_t m_RenderArenaSize = DefaultFrameArenaSize;

@@ -137,7 +137,7 @@ namespace Runtime
 
         // Destroy per-frame transient RHI objects while VulkanDevice is still alive.
         // Per-FrameContext render-graph scopes are cleaned up by FrameContextRing's
-        // implicit destruction (runs after vkDeviceWaitIdle in RenderDriver dtor).
+        // implicit destruction (runs after WaitForGraphicsIdle in RenderDriver dtor).
         m_FrameScope.Reset();
 
         Core::Log::Info("RenderOrchestrator: Shutdown complete.");
@@ -247,6 +247,11 @@ namespace Runtime
     {
         if (m_RenderDriver)
             m_RenderDriver->OnResize();
+
+        // After the GPU has been drained and the swapchain recreated, reset all
+        // frame-context slots so the next BeginFrame does not attempt to wait on
+        // stale timeline values from before the resize.
+        m_FrameContextRing.InvalidateAfterResize();
     }
 
     void RenderOrchestrator::ResetFrameState()

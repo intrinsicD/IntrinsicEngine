@@ -67,7 +67,13 @@ namespace RHI {
             height = m_Window.GetFramebufferHeight();
         }
 
-        vkDeviceWaitIdle(m_Device->GetLogicalDevice());
+        // Use timeline-semaphore-based drain instead of vkDeviceWaitIdle.
+        // The caller (SimpleRenderer::OnResize) may have already drained the graphics queue,
+        // in which case this completes immediately. When called from other paths (e.g.
+        // present-policy changes), this ensures graphics-queue work is complete before
+        // tearing down swapchain resources.
+        if (!m_Device->WaitForGraphicsIdle())
+            vkDeviceWaitIdle(m_Device->GetLogicalDevice());
 
         // 1. Cleanup OLD views via SafeDestroy for consistency with other RHI resources.
         DestructionUtils::SafeDestroyBatch(*m_Device, m_ImageViews, vkDestroyImageView);
