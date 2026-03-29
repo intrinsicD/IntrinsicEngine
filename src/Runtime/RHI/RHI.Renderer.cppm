@@ -69,6 +69,10 @@ namespace RHI
         bool m_IsFrameStarted = false;
         bool m_ShutdownRequested = false;
 
+        // Per-frame present-path timing (ns). Cached in BeginFrame, reported in EndFrame.
+        uint64_t m_LastFenceWaitNs = 0;
+        uint64_t m_LastAcquireNs = 0;
+
         void InitSyncStructures();
         std::unique_ptr<GpuProfiler> m_GpuProfiler;
     };

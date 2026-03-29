@@ -214,6 +214,22 @@ namespace Runtime
         m_TextureManager->SetDefaultDescriptor(m_DefaultTexture->GetView(), m_DefaultTexture->GetSampler());
     }
 
+    void GraphicsBackend::SetPresentPolicy(RHI::PresentPolicy policy)
+    {
+        if (m_Swapchain && m_Swapchain->GetPresentPolicy() != policy)
+        {
+            m_Swapchain->SetPresentPolicy(policy);
+            // Recreate() internally calls vkDeviceWaitIdle before rebuilding.
+            m_Swapchain->Recreate();
+            Core::Log::Info("GraphicsBackend: Present policy changed to {}", RHI::ToString(policy));
+        }
+    }
+
+    RHI::PresentPolicy GraphicsBackend::GetPresentPolicy() const
+    {
+        return m_Swapchain ? m_Swapchain->GetPresentPolicy() : RHI::PresentPolicy::LowLatency;
+    }
+
     void GraphicsBackend::OnResize()
     {
         m_Renderer->OnResize();

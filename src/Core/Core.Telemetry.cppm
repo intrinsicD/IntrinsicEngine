@@ -32,6 +32,10 @@ export namespace Core::Telemetry
         uint64_t FrameTimeNs = 0;
         uint64_t CpuTimeNs = 0;
         uint64_t GpuTimeNs = 0;
+        uint64_t FenceWaitTimeNs = 0;       // CPU time blocked waiting for in-flight fence
+        uint64_t AcquireTimeNs = 0;         // CPU time in vkAcquireNextImageKHR
+        uint64_t PresentTimeNs = 0;         // CPU time in vkQueuePresentKHR
+        uint32_t FramesInFlightCount = 0;   // Bounded frame-context count (constant, for display)
         uint32_t SimulationTickCount = 0;
         uint32_t SimulationClampHitCount = 0;
         uint64_t SimulationCpuTimeNs = 0;
@@ -103,6 +107,8 @@ export namespace Core::Telemetry
         void RecordSample(uint32_t nameHash, const char* name, uint64_t durationNs, uint16_t depth = 0);
         void RecordDrawCall(uint32_t triangles = 0);
         void SetGpuFrameTimeNs(uint64_t gpuTimeNs);
+        void SetPresentTimings(uint64_t fenceWaitNs, uint64_t acquireNs, uint64_t presentNs);
+        void SetFramesInFlightCount(uint32_t count);
         void SetSimulationStats(uint32_t tickCount, uint32_t clampHitCount, uint64_t simulationCpuTimeNs);
         void SetTaskSchedulerStats(const Core::Tasks::Scheduler::Stats& stats);
         void SetFrameGraphTimings(uint64_t compileTimeNs, uint64_t executeTimeNs, uint64_t criticalPathTimeNs);
@@ -141,6 +147,10 @@ export namespace Core::Telemetry
         std::atomic<uint32_t> m_CurrentFrameSampleCount{0};
         std::atomic<uint32_t> m_DrawCallCount{0};
         std::atomic<uint32_t> m_TriangleCount{0};
+        std::atomic<uint64_t> m_FenceWaitTimeNs{0};
+        std::atomic<uint64_t> m_AcquireTimeNs{0};
+        std::atomic<uint64_t> m_PresentTimeNs{0};
+        std::atomic<uint32_t> m_FramesInFlightCount{0};
         std::atomic<uint32_t> m_SimulationTickCount{0};
         std::atomic<uint32_t> m_SimulationClampHitCount{0};
         std::atomic<uint64_t> m_SimulationCpuTimeNs{0};

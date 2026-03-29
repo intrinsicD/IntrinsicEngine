@@ -157,8 +157,6 @@ Mapping guidance for current Intrinsic code while preserving that reference shap
 - [ ] Track queue domains conceptually as graphics / compute / transfer, even if the first implementation remains mostly single-queue.
 - [ ] Promote GPU completion tracking to a first-class timeline/fence abstraction shared by upload retirement, deferred deletion, and readback readiness.
 - [ ] Add timeline-based resource retirement instead of immediate GPU resource destruction from gameplay/editor code.
-- [ ] Add frame-pacing policies for vsync, low-latency/mailbox, uncapped, editor-throttled, and background-throttled modes.
-- [ ] Add telemetry for CPU frame time, GPU frame time, present blocking time, frames in flight, and estimated input-to-present latency.
 - [ ] Acquire late when practical, keep frames in flight bounded, and avoid the CPU running many frames ahead of the GPU.
 
 ---

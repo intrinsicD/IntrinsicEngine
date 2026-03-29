@@ -65,6 +65,10 @@ export namespace Runtime
         [[nodiscard]] RHI::CudaDevice* GetCudaDevice() const { return m_CudaDevice.get(); }
 #endif
 
+        // --- Present policy ---
+        void SetPresentPolicy(RHI::PresentPolicy policy);
+        [[nodiscard]] RHI::PresentPolicy GetPresentPolicy() const;
+
         // --- Per-frame maintenance ---
         void OnResize();
         void CollectGpuDeferredDestructions();

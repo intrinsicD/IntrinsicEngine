@@ -41,6 +41,9 @@ namespace Core::Telemetry
     {
         m_FrameStartTime = std::chrono::high_resolution_clock::now();
         m_CurrentFrameSampleCount.store(0, std::memory_order_relaxed);
+        m_FenceWaitTimeNs.store(0, std::memory_order_relaxed);
+        m_AcquireTimeNs.store(0, std::memory_order_relaxed);
+        m_PresentTimeNs.store(0, std::memory_order_relaxed);
         m_SimulationTickCount.store(0, std::memory_order_relaxed);
         m_SimulationClampHitCount.store(0, std::memory_order_relaxed);
         m_SimulationCpuTimeNs.store(0, std::memory_order_relaxed);
@@ -61,6 +64,10 @@ namespace Core::Telemetry
         m_FrameHistory[idx].FrameNumber = m_CurrentFrame;
         m_FrameHistory[idx].FrameTimeNs = duration;
         m_FrameHistory[idx].CpuTimeNs = duration;
+        m_FrameHistory[idx].FenceWaitTimeNs = m_FenceWaitTimeNs.load(std::memory_order_relaxed);
+        m_FrameHistory[idx].AcquireTimeNs = m_AcquireTimeNs.load(std::memory_order_relaxed);
+        m_FrameHistory[idx].PresentTimeNs = m_PresentTimeNs.load(std::memory_order_relaxed);
+        m_FrameHistory[idx].FramesInFlightCount = m_FramesInFlightCount.load(std::memory_order_relaxed);
         m_FrameHistory[idx].SimulationTickCount = m_SimulationTickCount.load(std::memory_order_relaxed);
         m_FrameHistory[idx].SimulationClampHitCount = m_SimulationClampHitCount.load(std::memory_order_relaxed);
         m_FrameHistory[idx].SimulationCpuTimeNs = m_SimulationCpuTimeNs.load(std::memory_order_relaxed);
@@ -118,6 +125,18 @@ namespace Core::Telemetry
     {
         size_t idx = (m_CurrentFrame - 1) % MAX_FRAME_HISTORY;
         m_FrameHistory[idx].GpuTimeNs = gpuTimeNs;
+    }
+
+    void TelemetrySystem::SetPresentTimings(uint64_t fenceWaitNs, uint64_t acquireNs, uint64_t presentNs)
+    {
+        m_FenceWaitTimeNs.store(fenceWaitNs, std::memory_order_relaxed);
+        m_AcquireTimeNs.store(acquireNs, std::memory_order_relaxed);
+        m_PresentTimeNs.store(presentNs, std::memory_order_relaxed);
+    }
+
+    void TelemetrySystem::SetFramesInFlightCount(uint32_t count)
+    {
+        m_FramesInFlightCount.store(count, std::memory_order_relaxed);
     }
 
     void TelemetrySystem::SetSimulationStats(uint32_t tickCount,
