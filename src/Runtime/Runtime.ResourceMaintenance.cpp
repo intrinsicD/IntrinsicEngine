@@ -1,5 +1,8 @@
 module Runtime.ResourceMaintenance;
 
+import Core.Tasks;
+import Core.Telemetry;
+
 namespace Runtime
 {
     void ResourceMaintenanceService::CaptureGpuSyncState()
@@ -33,5 +36,26 @@ namespace Runtime
     void ResourceMaintenanceService::ProcessMaterialDeletions()
     {
         m_Materials.ProcessDeletions(m_LastObservedGlobalFrameNumber);
+    }
+
+    void ResourceMaintenanceService::CaptureFrameTelemetry(const FrameTelemetrySnapshot& snapshot)
+    {
+        auto& telemetry = Core::Telemetry::TelemetrySystem::Get();
+        telemetry.SetSimulationStats(
+            snapshot.FixedStepSubsteps,
+            snapshot.AccumulatorClamped ? 1u : 0u,
+            snapshot.SimulationCpuTimeNs);
+        telemetry.SetTaskSchedulerStats(Core::Tasks::Scheduler::GetStats());
+        telemetry.SetFrameGraphTimings(
+            snapshot.FrameGraphCompileNs,
+            snapshot.FrameGraphExecuteNs,
+            snapshot.FrameGraphCriticalPathNs);
+    }
+
+    void ResourceMaintenanceService::BookkeepHotReloads()
+    {
+        // Hook for future shader/material hot-reload bookkeeping.
+        // FileWatcher infrastructure exists; shader-specific reload
+        // will be wired here when implemented (see ROADMAP.md Ongoing).
     }
 }

@@ -10,6 +10,16 @@ import Runtime.SceneManager;
 
 export namespace Runtime
 {
+    struct FrameTelemetrySnapshot
+    {
+        uint32_t FixedStepSubsteps = 0;
+        bool AccumulatorClamped = false;
+        uint64_t SimulationCpuTimeNs = 0;
+        uint64_t FrameGraphCompileNs = 0;
+        uint64_t FrameGraphExecuteNs = 0;
+        uint64_t FrameGraphCriticalPathNs = 0;
+    };
+
     class ResourceMaintenanceService
     {
     public:
@@ -27,6 +37,8 @@ export namespace Runtime
         void GarbageCollectTransfers();
         void ProcessTextureDeletions();
         void ProcessMaterialDeletions();
+        void CaptureFrameTelemetry(const FrameTelemetrySnapshot& snapshot);
+        void BookkeepHotReloads();
 
         [[nodiscard]] uint64_t LastCompletedGraphicsTimelineValue() const { return m_LastCompletedGraphicsTimelineValue; }
         [[nodiscard]] uint64_t LastObservedGlobalFrameNumber() const { return m_LastObservedGlobalFrameNumber; }

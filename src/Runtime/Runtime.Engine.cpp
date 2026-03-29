@@ -433,7 +433,7 @@ namespace Runtime
                 }
 
                 const double frameTime = platformResult.FrameStep.FrameTime;
-                const FramePhaseRunResult framePhaseResult = RunFramePhasesForMode(
+                (void)RunFramePhasesForMode(
                     frameLoopMode,
                     frameTime,
                     accumulator,
@@ -471,19 +471,11 @@ namespace Runtime
                                 .OnRender = [&](double alpha) { OnRender(alpha); },
                             },
                         .ExecuteVariableGraph = [&](Core::FrameGraph& graph) { executeGraph.Execute(graph); },
+                        .Timings = &frameGraphTimings,
                     });
 
-                Core::Telemetry::TelemetrySystem::Get().SetSimulationStats(
-                    static_cast<uint32_t>(framePhaseResult.FixedStep.ExecutedSubsteps),
-                    framePhaseResult.FixedStep.AccumulatorClamped ? 1u : 0u,
-                    framePhaseResult.FixedStep.CpuTimeNs);
-                Core::Telemetry::TelemetrySystem::Get().SetTaskSchedulerStats(Core::Tasks::Scheduler::GetStats());
-                Core::Telemetry::TelemetrySystem::Get().SetFrameGraphTimings(
-                    frameGraphTimings.CompileNsTotal,
-                    frameGraphTimings.ExecuteNsTotal,
-                    frameGraphTimings.CriticalPathNsTotal);
-
-                // End frame telemetry
+                // End frame telemetry (simulation, task, and frame-graph stats are now
+                // captured by the maintenance lane via CaptureFrameTelemetry).
                 Core::Telemetry::TelemetrySystem::Get().EndFrame();
 
                 // Benchmark mode: record frame and exit when complete.

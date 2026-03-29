@@ -127,14 +127,6 @@ Mapping guidance for current Intrinsic code while preserving that reference shap
 - [ ] Handle resize / out-of-date / minimized states without corrupting in-flight frame contexts.
 - [ ] Evolve toward queue-domain-aware scheduling (graphics / compute / transfer) without exposing queue details directly to the top-level engine loop.
 
-#### B4.8 Maintenance stage
-
-- [ ] Centralize remaining maintenance concerns:
-  - [ ] garbage collection
-  - [ ] profiler rollup
-  - [ ] telemetry capture
-  - [ ] hot-reload bookkeeping
-
 #### B4.9 Explicit frame-context ring + bounded frames in flight
 
 - [ ] Move per-frame transient ownership under `FrameContext`:

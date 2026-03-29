@@ -281,6 +281,8 @@ export namespace Runtime
         virtual void GarbageCollectTransfers() = 0;
         virtual void ProcessTextureDeletions() = 0;
         virtual void ProcessMaterialDeletions() = 0;
+        virtual void CaptureFrameTelemetry(const FrameTelemetrySnapshot& snapshot) = 0;
+        virtual void BookkeepHotReloads() = 0;
     };
 
     class RuntimeMaintenanceLaneHost final : public IMaintenanceLaneHost
@@ -299,6 +301,8 @@ export namespace Runtime
         void GarbageCollectTransfers() override;
         void ProcessTextureDeletions() override;
         void ProcessMaterialDeletions() override;
+        void CaptureFrameTelemetry(const FrameTelemetrySnapshot& snapshot) override;
+        void BookkeepHotReloads() override;
 
     private:
         ResourceMaintenanceService m_Maintenance;
@@ -308,7 +312,7 @@ export namespace Runtime
     {
         IMaintenanceLaneHost& Host;
 
-        void Run(this const MaintenanceLaneCoordinator&);
+        void Run(this const MaintenanceLaneCoordinator&, const FrameTelemetrySnapshot& telemetry);
     };
 
     struct RenderLaneCallbacks
@@ -382,6 +386,7 @@ export namespace Runtime
         ExecuteGraphFn ExecuteFixedGraph;
         RenderLaneCallbacks Render;
         ExecuteGraphFn ExecuteVariableGraph;
+        FrameGraphTimingTotals* Timings = nullptr;
     };
 
     struct FramePhaseRunResult
