@@ -235,11 +235,7 @@ These items should be **planned now** so the current refactor leaves room for th
 - [ ] Plan decal insertion points in the graph.
 - [ ] Plan debug output for effect intermediates.
 
-### C7. PostProcessPass Factoring
-
-- [ ] Factor `PostProcessPass` into sub-pass classes (bloom, SMAA, tone mapping, histogram) to reduce single-class complexity.
-
-### C8. Render Asset / Shader System Cleanup
+### C7. Render Asset / Shader System Cleanup
 
 - [ ] Plan shader registration refactor.
 - [ ] Plan shader hot-reload boundaries by pass/stage.
@@ -247,7 +243,7 @@ These items should be **planned now** so the current refactor leaves room for th
 - [ ] Plan shader feature-key derivation from material/frame recipe.
 - [ ] Plan pipeline-cache invalidation strategy.
 
-### C9. Scene Serialization Compatibility
+### C8. Scene Serialization Compatibility
 
 - [ ] Ensure render settings serialize cleanly.
 - [ ] Ensure frame-recipe-relevant settings are serializable where appropriate.
